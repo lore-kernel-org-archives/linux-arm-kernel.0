@@ -1,21 +1,52 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Thu, 2 Feb 2017 20:41:50 +0900
-Subject: [PATCH] ARM: orion5x: fix Makefile for linkstation-lschl.dtb
-In-Reply-To: <20170202113856.728043-1-arnd@arndb.de>
-References: <20170202113856.728043-1-arnd@arndb.de>
-Message-ID: <CAEQ9gE=-kSqBW1+WHOKVpFzRN6p6PZ8vGHa5c=j6bMDfnt1DBg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 2 Feb 2017 11:44:38 +0000
+Subject: [PATCH v31 04/12] arm64: mm: allow for unmapping part of kernel
+ mapping
+In-Reply-To: <20170202102131.GD13549@linaro.org>
+References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
+ <20170201124630.6016-3-takahiro.akashi@linaro.org>
+ <20170201160354.GF4756@leverpostej>
+ <20170202102131.GD13549@linaro.org>
+Message-ID: <20170202114437.GH31394@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd,
+On Thu, Feb 02, 2017 at 07:21:32PM +0900, AKASHI Takahiro wrote:
+> On Wed, Feb 01, 2017 at 04:03:54PM +0000, Mark Rutland wrote:
+> > Hi,
+> > 
+> > On Wed, Feb 01, 2017 at 09:46:23PM +0900, AKASHI Takahiro wrote:
+> > > A new function, remove_pgd_mapping(), is added.
+> > > It allows us to unmap a specific portion of kernel mapping later as far as
+> > > the mapping is made using create_pgd_mapping() and unless we try to free
+> > > a sub-set of memory range within a section mapping.
+> > 
+> > I'm not keen on adding more page table modification code. It was painful
+> > enough to ensure that those worked in all configurations.
+> > 
+> > Why can't we reuse create_pgd_mapping()? If we pass page_mappings_only,
+> > and use an invalid prot (i.e. 0), what is the problem?
+> 
+> As I did in v30?
+> (though my implementation in v30 should be improved.)
 
-On Thu, Feb 2, 2017 at 8:38 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The rename of orion5x-lschl.dts needs to be reflected in the Makefile:
+Something like that. I wasn't entirely sure why we needed to change
+those functions so much, so I'm clearly missing something there. I'll go
+have another look.
 
-Indeed.
-Sorry that I forgot to do it. And thanks for your patch!
+> > I can see that we wouldn't free/reallocate the pud or pmd entries, but
+> > the "wasted" memory should be small. If anything, I'd argue that it's
+> > preferable to keep that around so that we don't have to allocate memory
+> > when we need to map the crashkernel region.
+> > 
+> > Is there another problem I'm missing?
+> 
+> If we don't need to free unused page tables, that would make things
+> much simple. There are still some minor problems on the merge, but
+> we can sort it out.
 
-Cheers,
--- 
-Roger Shimizu, GMT +9 Tokyo
-PGP/GPG: 4096R/6C6ACD6417B3ACB1
+I'm not sure I follow what you mean by 'on merge' here. Could you
+elaborate?
+
+Thanks,
+Mark.
