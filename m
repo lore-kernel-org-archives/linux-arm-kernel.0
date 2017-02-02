@@ -1,61 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 2 Feb 2017 11:26:15 +0000
-Subject: [PATCH] virtio: Try to untangle DMA coherency
-In-Reply-To: <20170201210648-mutt-send-email-mst@kernel.org>
-References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
- <20170201195732-mutt-send-email-mst@kernel.org>
- <20170201182659.GM8177@arm.com>
- <20170201210648-mutt-send-email-mst@kernel.org>
-Message-ID: <20170202112614.GB30577@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 2 Feb 2017 11:26:20 +0000
+Subject: [PATCH v31 03/12] arm64: kdump: reserve memory for crash dump
+ kernel
+In-Reply-To: <20170202045235.GB13549@linaro.org>
+References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
+ <20170201124630.6016-2-takahiro.akashi@linaro.org>
+ <20170201152609.GE4756@leverpostej>
+ <20170202045235.GB13549@linaro.org>
+Message-ID: <20170202112619.GB31394@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 09:19:22PM +0200, Michael S. Tsirkin wrote:
-> On Wed, Feb 01, 2017 at 06:27:09PM +0000, Will Deacon wrote:
-> > On Wed, Feb 01, 2017 at 08:09:21PM +0200, Michael S. Tsirkin wrote:
-> > > I'd like to do that instead. It's fastboot doing the unreasonable thing
-> > > here and deviating from what every other legacy device without exception
-> > > did for years. If this means fastboot will need to update to virtio 1,
-> > > all the better.
+On Thu, Feb 02, 2017 at 01:52:36PM +0900, AKASHI Takahiro wrote:
+> On Wed, Feb 01, 2017 at 03:26:09PM +0000, Mark Rutland wrote:
+> > On Wed, Feb 01, 2017 at 09:46:22PM +0900, AKASHI Takahiro wrote:
+> > > +	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
+> > > +		crash_size >> 20, crash_base >> 20);
 > > 
-> > The problem still exists with virtio 1, unless we require that the
-> > "dma-coherent" property is set/unset correctly when VIRTIO_F_IOMMU_PLATFORM
-> > is advertised by the device (which is what I suggested in my reply).
+> > We only page-align the size, so the MB will be a little off, but that's
+> > probably OK. However, it would also be nicer to log the base as an
+> > address.
 > 
-> I'm not ignoring that, but I need to understand that part a bit better.
-> I'll reply to that patch in a day or two after looking at how _CCA is
-> supposed to work.
+> You might notice that the exact same message is used by all the other
+> architectures, but
 
-Thanks. I do think that whatever solution we come up with for virtio 1
-should influence what we do for legacy.
+Almost all; I see arch/sh prints the address with %08x. ;)
 
-> > We can't detect the fastmodel,
+> > Could we dump this as we do for the kernel memory layout? e.g.
+> > 
+> > 	pr_info("crashkernel reserved: 0x%016lx - 0x%016lx (%lld MB)\n",
+> > 		crash_base, crash_base + crash_size, crash_size >> 20);
 > 
-> Surely, it puts a hardware id somewhere? I think you mean
-> fastmodel isn't always affected, right?
+> We can go either way.
 
-I don't think there's a hardware ID. The thing is, the fastmodel is a
-toolkit for building all sorts of platforms: you can chop and change
-the CPUs, the peripherals, the memory, the interrupt controller, the
-interconnect etc. Pretty much everything can be customised. So, for
-any fastmodel configuration that places virtio upstream of the SMMU
-(which is common, because virtio is one of the few DMA-capable peripherals
-that the fastmodel supports), we need to do something special.
+Even if it's different from other archtiectures, I'd prefer to log as
+above, with the range in hex.
 
-> I'd like to see basically
-> 
-> if (fastmodel)
-> 	a pile of special work-arounds
-> else
-> 	not less hacky but more common virtio work-arounds
-> 
-> :)
-> 
-> And then I can apply whatever comes from @arm.com and not
-> worry about breaking actual hardware.
-
-What we could do is call iommu_group_get(&vdev->dev) for legacy
-devices if CONFIG_ARM64. If that returns non-NULL, then we know that
-the device is upstream of an SMMU, which means it must be the fastmodel.
-
-Will
+Thanks,
+Mark.
