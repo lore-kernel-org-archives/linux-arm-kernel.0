@@ -1,60 +1,100 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 2 Feb 2017 19:35:39 +0100
-Subject: [PATCH v3] arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to
- IOMMU
-In-Reply-To: <30026398-c5d3-1806-33b6-ba2b59ec2703@arm.com>
-References: <1485861178-22694-1-git-send-email-geert+renesas@glider.be>
- <30026398-c5d3-1806-33b6-ba2b59ec2703@arm.com>
-Message-ID: <CAMuHMdVDPP64zdXef095D=Ji+ZuY39mQg54e_4SKH0TgZMhKwQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 2 Feb 2017 18:36:47 +0000
+Subject: [PATCH v4] efi: arm64: Add vmlinux debug link to the Image binary
+In-Reply-To: <20170202183000.GN13839@arm.com>
+References: <1486056799-4825-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170202183000.GN13839@arm.com>
+Message-ID: <CAKv+Gu82NmBNavpVQ8z7xZ6++HPqAWNnn3dM=dKw0JaWLZocSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-On Thu, Feb 2, 2017 at 2:15 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 31/01/17 11:12, Geert Uytterhoeven wrote:
->> Add support for allocating physically contiguous DMA buffers on arm64
->> systems with an IOMMU.  This can be useful when two or more devices
->> with different memory requirements are involved in buffer sharing.
->>
->> Note that as this uses the CMA allocator, setting the
->> DMA_ATTR_FORCE_CONTIGUOUS attribute has a runtime-dependency on
->> CONFIG_DMA_CMA, just like on arm32.
-
->> @@ -625,7 +651,8 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
->>
->>       size = PAGE_ALIGN(size);
->>       /*
->> -      * @cpu_addr will be one of 3 things depending on how it was allocated:
->> +      * @cpu_addr will be one of 4 things depending on how it was allocated:
->> +      * - A remapped array of pages for contiguous allocations.
->>        * - A remapped array of pages from iommu_dma_alloc(), for all
->>        *   non-atomic allocations.
->>        * - A non-cacheable alias from the atomic pool, for atomic
->> @@ -637,6 +664,12 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
->>       if (__in_atomic_pool(cpu_addr, size)) {
->>               iommu_dma_unmap_page(dev, handle, iosize, 0, 0);
->>               __free_from_pool(cpu_addr, size);
->> +     } else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
->> +             struct page *page = phys_to_page(dma_to_phys(dev, handle));
+On 2 February 2017 at 18:30, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Ard,
 >
-> handle is the IOVA returned by the original iommu_dma_map_page() call,
-> so I can't see this working very well. I was about to naively suggest
-> virt_to_page(cpu_addr), except of course cpu_addr isn't going to be a
-> linear map address :(
+> On Thu, Feb 02, 2017 at 05:33:19PM +0000, Ard Biesheuvel wrote:
+>> When building with debugging symbols, take the absolute path to the
+>> vmlinux binary and add it to the special PE/COFF debug table entry.
+>> This allows a debug EFI build to find the vmlinux binary, which is
+>> very helpful in debugging, given that the offset where the Image is
+>> first loaded by EFI is highly unpredictable.
+>>
+>> On implementations of UEFI that choose to implement it, this
+>> information is exposed via the EFI debug support table, which is a UEFI
+>> configuration table that is accessible both by the firmware at boot time
+>> and by the OS at runtime, and lists all PE/COFF images loaded by the
+>> system.
+>>
+>> The format of the NB10 Codeview entry is based on the definition used
+>> by EDK2, which is our primary reference when it comes to the use of
+>> PE/COFF in the context of UEFI firmware.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>> v4: add a separate DEBUG_EFI debug option so that this feature is disabled
+>>     by default
+>>     dropped 1/2 which has been queued already in the EFI tree
+>>     use ASCII rather than an opaque constant for "NB10" signature
+>>
+>>  arch/arm64/Kconfig.debug   |  8 ++++
+>>  arch/arm64/kernel/Makefile |  4 ++
+>>  arch/arm64/kernel/head.S   | 47 +++++++++++++++++++-
+>>  3 files changed, 58 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+>> index d1ebd46872fd..f7f38b1aab14 100644
+>> --- a/arch/arm64/Kconfig.debug
+>> +++ b/arch/arm64/Kconfig.debug
+>> @@ -95,6 +95,14 @@ config DEBUG_ALIGN_RODATA
+>>
+>>         If in doubt, say N.
+>>
+>> +config DEBUG_EFI
+>> +     depends on EFI && DEBUG_INFO
+>> +     bool "UEFI debugging"
+>> +     help
+>> +       Enable this option to include EFI specific debugging features into
+>> +       the kernel that are only useful when using a debug build of the
+>> +       UEFI firmware
+>> +
+>
+> I don't much like embedding the absolute host build path in the kernel
+> image, but if that's what the tools expect then so be it.
+>
+>>  source "drivers/hwtracing/coresight/Kconfig"
+>>
+>>  endmenu
+>> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+>> index 7d66bbaafc0c..2600c60337ac 100644
+>> --- a/arch/arm64/kernel/Makefile
+>> +++ b/arch/arm64/kernel/Makefile
+>> @@ -55,3 +55,7 @@ obj-y                                       += $(arm64-obj-y) vdso/ probes/
+>>  obj-m                                        += $(arm64-obj-m)
+>>  head-y                                       := head.o
+>>  extra-y                                      += $(head-y) vmlinux.lds
+>> +
+>> +ifeq ($(CONFIG_DEBUG_EFI),y)
+>> +AFLAGS_head.o += -DVMLINUX_PATH="\"$(shell readlink -f $(objtree)/vmlinux)\""
+>> +endif
+>
+> Can we use the Make realpath directive instead of calling out to the shell?
+>
 
-You're right: upon closer look, this will free the wrong pages in the CMA
-allocator. Funny, that the system didn't scream...
+Yep. This works as expected:
 
-Thanks for noticing, I'll look into fixing that...
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 2600c60337ac..1606c6b2a280 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -57,5 +57,5 @@ head-y                                        := head.o
+ extra-y                                        += $(head-y) vmlinux.lds
 
-Gr{oetje,eeting}s,
+ ifeq ($(CONFIG_DEBUG_EFI),y)
+-AFLAGS_head.o += -DVMLINUX_PATH="\"$(shell readlink -f $(objtree)/vmlinux)\""
++AFLAGS_head.o += -DVMLINUX_PATH="\"$(realpath $(objtree)/vmlinux)\""
+ endif
 
-                        Geert
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> Do you want me to merge this via arm64?
+>
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yes, please
