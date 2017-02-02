@@ -1,81 +1,48 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 3 Feb 2017 00:21:19 +0200
-Subject: [PATCH 11/14] serial: 8250_dw: simplify optional reset handling
-In-Reply-To: <20170130114116.22089-11-p.zabel@pengutronix.de>
-References: <20170130114116.22089-1-p.zabel@pengutronix.de>
- <20170130114116.22089-11-p.zabel@pengutronix.de>
-Message-ID: <CAHp75Vc1OZeGUJPMVROHhhN5WRtQ+9WT45txzKfm8bCdcN6TXg@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Feb 2017 22:29:25 +0000
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <2e1cf096-ecb8-ba3d-a554-f4cc6999ed4e@gmail.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170202172245.GT27312@n2100.armlinux.org.uk>
+ <20170202175600.GU27312@n2100.armlinux.org.uk>
+ <4815b9c8-782a-ac67-d296-c4acb296d849@gmail.com>
+ <20170202185826.GV27312@n2100.armlinux.org.uk>
+ <2e1cf096-ecb8-ba3d-a554-f4cc6999ed4e@gmail.com>
+Message-ID: <20170202222925.GW27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 1:41 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> As of commit bb475230b8e5 ("reset: make optional functions really
-> optional"), the reset framework API calls use NULL pointers to describe
-> optional, non-present reset controls.
-
-Eventually!
-
-FWIW:
-Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-
->
-> This allows to return errors from devm_reset_control_get_optional and to
-> call reset_control_(de)assert unconditionally.
->
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> ---
->  drivers/tty/serial/8250/8250_dw.c | 13 +++++--------
->  1 file changed, 5 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
-> index c89fafc972b69..b8b911adff471 100644
-> --- a/drivers/tty/serial/8250/8250_dw.c
-> +++ b/drivers/tty/serial/8250/8250_dw.c
-> @@ -503,12 +503,11 @@ static int dw8250_probe(struct platform_device *pdev)
+On Thu, Feb 02, 2017 at 11:12:41AM -0800, Steve Longerbeam wrote:
+> Here is the current .queue_setup() op in imx-media-capture.c:
+> 
+> static int capture_queue_setup(struct vb2_queue *vq,
+>                                unsigned int *nbuffers,
+>                                unsigned int *nplanes,
+>                                unsigned int sizes[],
+>                                struct device *alloc_devs[])
+> {
+>         struct capture_priv *priv = vb2_get_drv_priv(vq);
+>         struct v4l2_pix_format *pix = &priv->vdev.fmt.fmt.pix;
+>         unsigned int count = *nbuffers;
+> 
+>         if (vq->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+>                 return -EINVAL;
+> 
+>         if (*nplanes) {
+>                 if (*nplanes != 1 || sizes[0] < pix->sizeimage)
+>                         return -EINVAL;
+>                 count += vq->num_buffers;
 >         }
->
->         data->rst = devm_reset_control_get_optional(dev, NULL);
-> -       if (IS_ERR(data->rst) && PTR_ERR(data->rst) == -EPROBE_DEFER) {
-> -               err = -EPROBE_DEFER;
-> +       if (IS_ERR(data->rst)) {
-> +               err = PTR_ERR(data->rst);
->                 goto err_pclk;
->         }
-> -       if (!IS_ERR(data->rst))
-> -               reset_control_deassert(data->rst);
-> +       reset_control_deassert(data->rst);
->
->         dw8250_quirks(p, data);
->
-> @@ -540,8 +539,7 @@ static int dw8250_probe(struct platform_device *pdev)
->         return 0;
->
->  err_reset:
-> -       if (!IS_ERR(data->rst))
-> -               reset_control_assert(data->rst);
-> +       reset_control_assert(data->rst);
->
->  err_pclk:
->         if (!IS_ERR(data->pclk))
-> @@ -562,8 +560,7 @@ static int dw8250_remove(struct platform_device *pdev)
->
->         serial8250_unregister_port(data->line);
->
-> -       if (!IS_ERR(data->rst))
-> -               reset_control_assert(data->rst);
-> +       reset_control_assert(data->rst);
->
->         if (!IS_ERR(data->pclk))
->                 clk_disable_unprepare(data->pclk);
-> --
-> 2.11.0
->
+> 
+>         while (pix->sizeimage * count > VID_MEM_LIMIT)
+>                 count--;
 
+That's a weird way of writing:
 
+	unsigned int max_num = VID_MEM_LIMIT / pix->sizeimage;
+	count = max(count, max_num);
 
 -- 
-With Best Regards,
-Andy Shevchenko
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
