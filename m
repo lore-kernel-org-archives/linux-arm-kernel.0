@@ -1,20 +1,31 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  2 Feb 2017 10:47:42 +0100
-Subject: [PATCH 0/2] drm: meson: Fixup driver and module name 
-Message-ID: <1486028864-19622-1-git-send-email-narmstrong@baylibre.com>
+Date: Thu,  2 Feb 2017 10:47:43 +0100
+Subject: [PATCH 1/2] drm: meson: rename module name to meson-drm
+In-Reply-To: <1486028864-19622-1-git-send-email-narmstrong@baylibre.com>
+References: <1486028864-19622-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1486028864-19622-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is a simple fixup to rename the confusion possible
-module and driver name "meson" to a more explicit "meson-drm" name.
+The module is currently names "meson.ko" which can lead to some
+confusion, this patches renames it "meson-drm.ko"
 
-Neil Armstrong (2):
-  drm: meson: rename module name to meson-drm
-  drm: meson: rename driver name to meson-drm
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/gpu/drm/meson/Makefile | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
- drivers/gpu/drm/meson/Makefile    | 6 +++---
- drivers/gpu/drm/meson/meson_drv.c | 3 +--
- 2 files changed, 4 insertions(+), 5 deletions(-)
-
+diff --git a/drivers/gpu/drm/meson/Makefile b/drivers/gpu/drm/meson/Makefile
+index 2591978..92cf845 100644
+--- a/drivers/gpu/drm/meson/Makefile
++++ b/drivers/gpu/drm/meson/Makefile
+@@ -1,4 +1,4 @@
+-meson-y := meson_drv.o meson_plane.o meson_crtc.o meson_venc_cvbs.o
+-meson-y += meson_viu.o meson_vpp.o meson_venc.o meson_vclk.o meson_canvas.o
++meson-drm-y := meson_drv.o meson_plane.o meson_crtc.o meson_venc_cvbs.o
++meson-drm-y += meson_viu.o meson_vpp.o meson_venc.o meson_vclk.o meson_canvas.o
+ 
+-obj-$(CONFIG_DRM_MESON) += meson.o
++obj-$(CONFIG_DRM_MESON) += meson-drm.o
 -- 
 1.9.1
