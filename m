@@ -1,25 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 Feb 2017 14:15:34 +0100
-Subject: [PATCH] ARM: orion5x: fix Makefile for linkstation-lschl.dtb
-In-Reply-To: <87wpd8wxn6.fsf@free-electrons.com>
-References: <20170202113856.728043-1-arnd@arndb.de>
- <87wpd8wxn6.fsf@free-electrons.com>
-Message-ID: <CAK8P3a1x0SU4Zzzx_a9HAG9UdkhuB6_3msLoEYM7ZZcjHGDQiA@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 2 Feb 2017 19:01:45 +0530
+Subject: [GIT PULL 1/4] DaVinci driver updates
+Message-ID: <20170202133148.32531-1-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 2, 2017 at 2:05 PM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
->  On jeu., f?vr. 02 2017, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> Will you applied this patch just after merging tags/mvebu-fixes-4.10-1 ?
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
-Ah, I had not realized that.
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 
-> Do you want I resubmit a PR with your patch?
+are available in the git repository at:
 
-Please add this patch on top of the first and send a new pull request
-as a reply to the
-origin pull request.
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.11/drivers
 
-    Arnd
+for you to fetch changes up to cdf0ead3747200d527f37170d3fdd41e368f88b0:
+
+  sata: ahci-da850: un-hardcode the MPY bits (2017-01-31 20:41:52 +0530)
+
+----------------------------------------------------------------
+Driver updates for SATA support on DA850.
+
+These have been acked by SATA maintainer
+Tejun Heo. Tejun preferred these be queued
+through ARM-SoC because of the dependencies
+with platform code.
+
+----------------------------------------------------------------
+Bartosz Golaszewski (6):
+      sata: ahci-da850: get the sata clock using a connection id
+      sata: ahci-da850: add device tree match table
+      sata: ahci-da850: implement a workaround for the softreset quirk
+      sata: ahci: export ahci_do_hardreset() locally
+      sata: ahci-da850: add a workaround for controller instability
+      sata: ahci-da850: un-hardcode the MPY bits
+
+ drivers/ata/ahci.h       |   3 +
+ drivers/ata/ahci_da850.c | 175 ++++++++++++++++++++++++++++++++++++++++++-----
+ drivers/ata/libahci.c    |  18 +++--
+ 3 files changed, 174 insertions(+), 22 deletions(-)
