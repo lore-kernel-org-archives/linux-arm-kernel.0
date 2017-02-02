@@ -1,151 +1,176 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  2 Feb 2017 16:51:41 +0100
-Subject: [PATCHv3 net-next 12/12] net: mvpp2: enable building on 64-bit
- platforms
-In-Reply-To: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1486050701-27899-13-git-send-email-thomas.petazzoni@free-electrons.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Thu, 2 Feb 2017 08:00:16 -0800
+Subject: [PATCH v6 3/3] thermal: zx2967: add thermal driver for ZTE's
+ zx2967 family
+In-Reply-To: <1486048086-3431-3-git-send-email-baoyou.xie@linaro.org>
+References: <1486048086-3431-1-git-send-email-baoyou.xie@linaro.org>
+ <1486048086-3431-3-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170202160014.GA2419@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvpp2 is going to be extended to support the Marvell Armada 7K/8K
-platform, which is ARM64. As a preparation to this work, this commit
-enables building the mvpp2 driver on ARM64, by:
+Helllo Baoyou,
 
- - Adjusting the Kconfig dependency
+Sorry I was not clear enough in my previous comment.
 
- - Fixing the types used in the driver so that they are 32/64-bits
-   compliant. We use dma_addr_t for DMA addresses, and unsigned long
-   for virtual addresses.
+Please find the explanation below:
 
-It is worth mentioning that after this commit, the driver is for now
-still only used on 32-bits platforms, and will only work on 32-bits
-platforms.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/net/ethernet/marvell/Kconfig |  3 +--
- drivers/net/ethernet/marvell/mvpp2.c | 31 ++++++++++++++++++-------------
- 2 files changed, 19 insertions(+), 15 deletions(-)
+On Thu, Feb 02, 2017 at 11:08:06PM +0800, Baoyou Xie wrote:
+> This patch adds thermal driver for ZTE's zx2967 family.
+> 
 
-diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
-index f4b7cf1..d2555e8b 100644
---- a/drivers/net/ethernet/marvell/Kconfig
-+++ b/drivers/net/ethernet/marvell/Kconfig
-@@ -83,9 +83,8 @@ config MVNETA_BM
- 
- config MVPP2
- 	tristate "Marvell Armada 375 network interface support"
--	depends on MACH_ARMADA_375 || COMPILE_TEST
-+	depends on ARCH_MVEBU || COMPILE_TEST
- 	depends on HAS_DMA
--	depends on !64BIT
- 	select MVMDIO
- 	---help---
- 	  This driver supports the network interface units in the
-diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 4132dc8..a785e3c 100644
---- a/drivers/net/ethernet/marvell/mvpp2.c
-+++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -3388,7 +3388,8 @@ static int mvpp2_bm_pool_create(struct platform_device *pdev,
- 	if (!bm_pool->virt_addr)
- 		return -ENOMEM;
- 
--	if (!IS_ALIGNED((u32)bm_pool->virt_addr, MVPP2_BM_POOL_PTR_ALIGN)) {
-+	if (!IS_ALIGNED((unsigned long)bm_pool->virt_addr,
-+			MVPP2_BM_POOL_PTR_ALIGN)) {
- 		dma_free_coherent(&pdev->dev, size_bytes, bm_pool->virt_addr,
- 				  bm_pool->phys_addr);
- 		dev_err(&pdev->dev, "BM pool %d is not %d bytes aligned\n",
-@@ -3433,7 +3434,7 @@ static void mvpp2_bm_bufs_free(struct device *dev, struct mvpp2 *priv,
- 
- 	for (i = 0; i < bm_pool->buf_num; i++) {
- 		dma_addr_t buf_phys_addr;
--		u32 vaddr;
-+		unsigned long vaddr;
- 
- 		/* Get buffer virtual address (indirect access) */
- 		buf_phys_addr = mvpp2_read(priv,
-@@ -3596,14 +3597,15 @@ static inline u32 mvpp2_bm_cookie_pool_set(u32 cookie, int pool)
- }
- 
- /* Get pool number from a BM cookie */
--static inline int mvpp2_bm_cookie_pool_get(u32 cookie)
-+static inline int mvpp2_bm_cookie_pool_get(unsigned long cookie)
- {
- 	return (cookie >> MVPP2_BM_COOKIE_POOL_OFFS) & 0xFF;
- }
- 
- /* Release buffer to BM */
- static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
--				     u32 buf_phys_addr, u32 buf_virt_addr)
-+				     dma_addr_t buf_phys_addr,
-+				     unsigned long buf_virt_addr)
- {
- 	mvpp2_write(port->priv, MVPP2_BM_VIRT_RLS_REG, buf_virt_addr);
- 	mvpp2_write(port->priv, MVPP2_BM_PHY_RLS_REG(pool), buf_phys_addr);
-@@ -3611,7 +3613,8 @@ static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
- 
- /* Release multicast buffer */
- static void mvpp2_bm_pool_mc_put(struct mvpp2_port *port, int pool,
--				 u32 buf_phys_addr, u32 buf_virt_addr,
-+				 dma_addr_t buf_phys_addr,
-+				 unsigned long buf_virt_addr,
- 				 int mc_id)
- {
- 	u32 val = 0;
-@@ -3626,7 +3629,8 @@ static void mvpp2_bm_pool_mc_put(struct mvpp2_port *port, int pool,
- 
- /* Refill BM pool */
- static void mvpp2_pool_refill(struct mvpp2_port *port, u32 bm,
--			      u32 phys_addr, u32 cookie)
-+			      dma_addr_t phys_addr,
-+			      unsigned long cookie)
- {
- 	int pool = mvpp2_bm_cookie_pool_get(bm);
- 
-@@ -3657,7 +3661,8 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
- 		if (!buf)
- 			break;
- 
--		mvpp2_bm_pool_put(port, bm_pool->id, (u32)phys_addr, (u32)buf);
-+		mvpp2_bm_pool_put(port, bm_pool->id, phys_addr,
-+				  (unsigned long)buf);
- 	}
- 
- 	/* Update BM driver with number of buffers added to pool */
-@@ -5032,7 +5037,7 @@ static int mvpp2_rx_refill(struct mvpp2_port *port,
- 	if (!buf)
- 		return -ENOMEM;
- 
--	mvpp2_pool_refill(port, bm, (u32)phys_addr, (u32)buf);
-+	mvpp2_pool_refill(port, bm, phys_addr, (unsigned long)buf);
- 
- 	return 0;
- }
-@@ -5074,10 +5079,10 @@ static void mvpp2_buff_hdr_rx(struct mvpp2_port *port,
- 	struct mvpp2_buff_hdr *buff_hdr;
- 	struct sk_buff *skb;
- 	u32 rx_status = rx_desc->status;
--	u32 buff_phys_addr;
--	u32 buff_virt_addr;
--	u32 buff_phys_addr_next;
--	u32 buff_virt_addr_next;
-+	dma_addr_t buff_phys_addr;
-+	unsigned long buff_virt_addr;
-+	dma_addr_t buff_phys_addr_next;
-+	unsigned long buff_virt_addr_next;
- 	int mc_id;
- 	int pool_id;
- 
-@@ -5134,7 +5139,7 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
- 		rx_status = rx_desc->status;
- 		rx_bytes = rx_desc->data_size - MVPP2_MH_SIZE;
- 		phys_addr = rx_desc->buf_phys_addr;
--		data = (void *)rx_desc->buf_cookie;
-+		data = (void *)(uintptr_t)rx_desc->buf_cookie;
- 
- 		bm = mvpp2_bm_cookie_build(rx_desc);
- 		pool = mvpp2_bm_cookie_pool_get(bm);
--- 
-2.7.4
+<cut>
+
+> +
+> +static int zx2967_thermal_probe(struct platform_device *pdev)
+> +{
+> +	struct zx2967_thermal_priv *priv;
+> +	struct resource *res;
+> +	u32 buf[2];
+> +	int ret, i;
+> +
+> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	priv->regs = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(priv->regs))
+> +		return PTR_ERR(priv->regs);
+> +
+> +	ret = of_property_read_u32_array(pdev->dev.of_node,
+> +					 "coefficients", buf, 2);
+
+What I meant in my previous comment is that of-thermal already does the
+above parsing for you. Therefore, the above line is not needed. And...
+
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to read coefficients\n");
+> +		return ret;
+> +	}
+> +	priv->slope = (s32)buf[0];
+> +	priv->offset = (s32)buf[1];
+> +
+
+You should also not need to have priv data for storing the slope and
+offset.
+
+> +	priv->clk_gate = devm_clk_get(&pdev->dev, "gate");
+> +	if (IS_ERR(priv->clk_gate)) {
+> +		ret = PTR_ERR(priv->clk_gate);
+> +		dev_err(&pdev->dev, "failed to get clock gate: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_prepare_enable(priv->clk_gate);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable converter clock: %d\n",
+> +			ret);
+> +		return ret;
+> +	}
+> +
+> +	priv->pclk = devm_clk_get(&pdev->dev, "pclk");
+> +	if (IS_ERR(priv->pclk)) {
+> +		ret = PTR_ERR(priv->pclk);
+> +		clk_disable_unprepare(priv->clk_gate);
+> +		dev_err(&pdev->dev, "failed to get apb clock: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_prepare_enable(priv->pclk);
+> +	if (ret) {
+> +		clk_disable_unprepare(priv->clk_gate);
+> +		dev_err(&pdev->dev, "failed to enable converter clock: %d\n",
+> +			ret);
+> +		return ret;
+> +	}
+> +
+> +	mutex_init(&priv->lock);
+> +	for (i = 0; i < NUM_SENSORS; i++) {
+> +		struct zx2967_thermal_sensor *sensor = &priv->sensors[i];
+> +
+> +		sensor->priv = priv;
+> +		sensor->id = i;
+> +		sensor->tzd = thermal_zone_of_sensor_register(&pdev->dev,
+> +					i, sensor, &zx2967_of_thermal_ops);
+
+After calling the above function, if it succeeds, and you have the
+coefficients property in your DTS, then
+
+> +		if (IS_ERR(sensor->tzd)) {
+> +			ret = PTR_ERR(sensor->tzd);
+> +			dev_err(&pdev->dev, "failed to register sensor %d: %d\n",
+> +				i, ret);
+> +			goto remove_ts;
+> +		}
+
+Right here, you should be able to access sensor->tzd->tzp->slope and
+sensor->tzd->tzp->offset, if you added the entry:
+		coefficients = <SLOPE OFFSET>;
+
+		in you thermal zone in DT.
+
+I hope this clarifies.
+
+Let me know if you are able to use the parsing from of-thermal, instead
+of in your driver.
+
+> +	}
+> +	priv->dev = &pdev->dev;
+> +	platform_set_drvdata(pdev, priv);
+> +
+> +	return 0;
+> +
+> +remove_ts:
+> +	clk_disable_unprepare(priv->clk_gate);
+> +	clk_disable_unprepare(priv->pclk);
+> +	for (i--; i >= 0; i--)
+> +		thermal_zone_of_sensor_unregister(&pdev->dev,
+> +						  priv->sensors[i].tzd);
+> +
+> +	return ret;
+> +}
+> +
+> +static int zx2967_thermal_exit(struct platform_device *pdev)
+> +{
+> +	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
+> +	int i;
+> +
+> +	for (i = 0; i < NUM_SENSORS; i++) {
+> +		struct zx2967_thermal_sensor *sensor = &priv->sensors[i];
+> +
+> +		thermal_zone_of_sensor_unregister(&pdev->dev, sensor->tzd);
+> +	}
+> +	clk_disable_unprepare(priv->pclk);
+> +	clk_disable_unprepare(priv->clk_gate);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id zx2967_thermal_id_table[] = {
+> +	{ .compatible = "zte,zx296718-thermal" },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, zx2967_thermal_id_table);
+> +
+> +static SIMPLE_DEV_PM_OPS(zx2967_thermal_pm_ops,
+> +			 zx2967_thermal_suspend, zx2967_thermal_resume);
+> +
+> +static struct platform_driver zx2967_thermal_driver = {
+> +	.probe = zx2967_thermal_probe,
+> +	.remove = zx2967_thermal_exit,
+> +	.driver = {
+> +		.name = "zx2967_thermal",
+> +		.of_match_table = zx2967_thermal_id_table,
+> +		.pm = &zx2967_thermal_pm_ops,
+> +	},
+> +};
+> +module_platform_driver(zx2967_thermal_driver);
+> +
+> +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
+> +MODULE_DESCRIPTION("ZTE zx2967 thermal driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 2.7.4
+> 
