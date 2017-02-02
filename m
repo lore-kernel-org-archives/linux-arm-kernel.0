@@ -1,32 +1,179 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 Feb 2017 12:38:33 +0100
-Subject: [PATCH] ARM: orion5x: fix Makefile for linkstation-lschl.dtb
-Message-ID: <20170202113856.728043-1-arnd@arndb.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  2 Feb 2017 11:38:55 +0000
+Subject: [PATCH 1/2] crypto: arm64/aes - don't use IV buffer to return final
+ keystream block
+Message-ID: <1486035536-895-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rename of orion5x-lschl.dts needs to be reflected in the Makefile:
+The arm64 bit sliced AES core code uses the IV buffer to pass the final
+keystream block back to the glue code if the input is not a multiple of
+the block size, so that the asm code does not have to deal with anything
+except 16 byte blocks. This is done under the assumption that the outgoing
+IV is meaningless anyway in this case, given that chaining is no longer
+possible under these circumstances.
 
-make[3]: *** No rule to make target 'arch/arm/boot/dts/orion5x-lschl.dtb', needed by '__build'.
+However, as it turns out, the CCM driver does expect the IV to retain
+a value that is equal to the original IV except for the counter value,
+and even interprets byte zero as a length indicator, which may result
+in memory corruption if the IV is overwritten with something else.
 
-Fixes: 6cfd3cd8d836 ("ARM: dts: orion5x-lschl: More consistent naming on linkstation series")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+So use a separate buffer to return the final keystream block.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/boot/dts/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Note that this patch includes the fix
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 10eec600cf6b..47208fc5a750 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -633,7 +633,7 @@ dtb-$(CONFIG_ARCH_ORION5X) += \
- 	orion5x-lacie-ethernet-disk-mini-v2.dtb \
- 	orion5x-linkstation-lsgl.dtb \
- 	orion5x-linkstation-lswtgl.dtb \
--	orion5x-lschl.dtb \
-+	orion5x-linkstation-lschl.dtb \
- 	orion5x-lswsgl.dtb \
- 	orion5x-maxtor-shared-storage-2.dtb \
- 	orion5x-netgear-wnr854t.dtb \
+crypto: arm64/aes-neon-bs - honour iv_out requirement in CTR mode
+
+which I sent out earlier.
+
+ arch/arm64/crypto/aes-neonbs-core.S | 37 ++++++++++++--------
+ arch/arm64/crypto/aes-neonbs-glue.c |  9 ++---
+ 2 files changed, 28 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm64/crypto/aes-neonbs-core.S b/arch/arm64/crypto/aes-neonbs-core.S
+index 8d0cdaa2768d..ca0472500433 100644
+--- a/arch/arm64/crypto/aes-neonbs-core.S
++++ b/arch/arm64/crypto/aes-neonbs-core.S
+@@ -853,13 +853,15 @@ ENDPROC(aesbs_xts_decrypt)
+ 
+ 	/*
+ 	 * aesbs_ctr_encrypt(u8 out[], u8 const in[], u8 const rk[],
+-	 *		     int rounds, int blocks, u8 iv[], bool final)
++	 *		     int rounds, int blocks, u8 iv[], u8 final[])
+ 	 */
+ ENTRY(aesbs_ctr_encrypt)
+ 	stp		x29, x30, [sp, #-16]!
+ 	mov		x29, sp
+ 
+-	add		x4, x4, x6		// do one extra block if final
++	cmp		x6, #0
++	cset		x10, ne
++	add		x4, x4, x10		// do one extra block if final
+ 
+ 	ldp		x7, x8, [x5]
+ 	ld1		{v0.16b}, [x5]
+@@ -874,19 +876,26 @@ CPU_LE(	rev		x8, x8		)
+ 	csel		x4, x4, xzr, pl
+ 	csel		x9, x9, xzr, le
+ 
++	tbnz		x9, #1, 0f
+ 	next_ctr	v1
++	tbnz		x9, #2, 0f
+ 	next_ctr	v2
++	tbnz		x9, #3, 0f
+ 	next_ctr	v3
++	tbnz		x9, #4, 0f
+ 	next_ctr	v4
++	tbnz		x9, #5, 0f
+ 	next_ctr	v5
++	tbnz		x9, #6, 0f
+ 	next_ctr	v6
++	tbnz		x9, #7, 0f
+ 	next_ctr	v7
+ 
+ 0:	mov		bskey, x2
+ 	mov		rounds, x3
+ 	bl		aesbs_encrypt8
+ 
+-	lsr		x9, x9, x6		// disregard the extra block
++	lsr		x9, x9, x10		// disregard the extra block
+ 	tbnz		x9, #0, 0f
+ 
+ 	ld1		{v8.16b}, [x1], #16
+@@ -928,36 +937,36 @@ CPU_LE(	rev		x8, x8		)
+ 	eor		v5.16b, v5.16b, v15.16b
+ 	st1		{v5.16b}, [x0], #16
+ 
+-	next_ctr	v0
++8:	next_ctr	v0
+ 	cbnz		x4, 99b
+ 
+ 0:	st1		{v0.16b}, [x5]
+-8:	ldp		x29, x30, [sp], #16
++	ldp		x29, x30, [sp], #16
+ 	ret
+ 
+ 	/*
+-	 * If we are handling the tail of the input (x6 == 1), return the
+-	 * final keystream block back to the caller via the IV buffer.
++	 * If we are handling the tail of the input (x6 != NULL), return the
++	 * final keystream block back to the caller.
+ 	 */
+ 1:	cbz		x6, 8b
+-	st1		{v1.16b}, [x5]
++	st1		{v1.16b}, [x6]
+ 	b		8b
+ 2:	cbz		x6, 8b
+-	st1		{v4.16b}, [x5]
++	st1		{v4.16b}, [x6]
+ 	b		8b
+ 3:	cbz		x6, 8b
+-	st1		{v6.16b}, [x5]
++	st1		{v6.16b}, [x6]
+ 	b		8b
+ 4:	cbz		x6, 8b
+-	st1		{v3.16b}, [x5]
++	st1		{v3.16b}, [x6]
+ 	b		8b
+ 5:	cbz		x6, 8b
+-	st1		{v7.16b}, [x5]
++	st1		{v7.16b}, [x6]
+ 	b		8b
+ 6:	cbz		x6, 8b
+-	st1		{v2.16b}, [x5]
++	st1		{v2.16b}, [x6]
+ 	b		8b
+ 7:	cbz		x6, 8b
+-	st1		{v5.16b}, [x5]
++	st1		{v5.16b}, [x6]
+ 	b		8b
+ ENDPROC(aesbs_ctr_encrypt)
+diff --git a/arch/arm64/crypto/aes-neonbs-glue.c b/arch/arm64/crypto/aes-neonbs-glue.c
+index 863e436ecf89..db2501d93550 100644
+--- a/arch/arm64/crypto/aes-neonbs-glue.c
++++ b/arch/arm64/crypto/aes-neonbs-glue.c
+@@ -34,7 +34,7 @@ asmlinkage void aesbs_cbc_decrypt(u8 out[], u8 const in[], u8 const rk[],
+ 				  int rounds, int blocks, u8 iv[]);
+ 
+ asmlinkage void aesbs_ctr_encrypt(u8 out[], u8 const in[], u8 const rk[],
+-				  int rounds, int blocks, u8 iv[], bool final);
++				  int rounds, int blocks, u8 iv[], u8 final[]);
+ 
+ asmlinkage void aesbs_xts_encrypt(u8 out[], u8 const in[], u8 const rk[],
+ 				  int rounds, int blocks, u8 iv[]);
+@@ -201,6 +201,7 @@ static int ctr_encrypt(struct skcipher_request *req)
+ 	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
+ 	struct aesbs_ctx *ctx = crypto_skcipher_ctx(tfm);
+ 	struct skcipher_walk walk;
++	u8 buf[AES_BLOCK_SIZE];
+ 	int err;
+ 
+ 	err = skcipher_walk_virt(&walk, req, true);
+@@ -208,12 +209,12 @@ static int ctr_encrypt(struct skcipher_request *req)
+ 	kernel_neon_begin();
+ 	while (walk.nbytes > 0) {
+ 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
+-		bool final = (walk.total % AES_BLOCK_SIZE) != 0;
++		u8 *final = (walk.total % AES_BLOCK_SIZE) ? buf : NULL;
+ 
+ 		if (walk.nbytes < walk.total) {
+ 			blocks = round_down(blocks,
+ 					    walk.stride / AES_BLOCK_SIZE);
+-			final = false;
++			final = NULL;
+ 		}
+ 
+ 		aesbs_ctr_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
+@@ -225,7 +226,7 @@ static int ctr_encrypt(struct skcipher_request *req)
+ 
+ 			if (dst != src)
+ 				memcpy(dst, src, walk.total % AES_BLOCK_SIZE);
+-			crypto_xor(dst, walk.iv, walk.total % AES_BLOCK_SIZE);
++			crypto_xor(dst, final, walk.total % AES_BLOCK_SIZE);
+ 
+ 			err = skcipher_walk_done(&walk, 0);
+ 			break;
 -- 
-2.9.0
+2.7.4
