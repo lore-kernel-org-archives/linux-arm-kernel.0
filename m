@@ -1,81 +1,28 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 2 Feb 2017 17:11:21 +0100
-Subject: [PATCHv2 net-next 02/11] net: mvpp2: handle too large value in
- mvpp2_rx_time_coal_set()
-In-Reply-To: <20170106125923.GA14217@n2100.armlinux.org.uk>
+Date: Thu, 2 Feb 2017 17:11:59 +0100
+Subject: [PATCHv2 net-next 09/11] net: mvpp2: simplify MVPP2_PRS_RI_*
+ definitions
+In-Reply-To: <20170106130727.GB14217@n2100.armlinux.org.uk>
 References: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943567-12483-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170106125923.GA14217@n2100.armlinux.org.uk>
-Message-ID: <20170202171121.4540faf3@free-electrons.com>
+ <1482943567-12483-10-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170106130727.GB14217@n2100.armlinux.org.uk>
+Message-ID: <20170202171159.353d80cc@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hello,
 
-On Fri, 6 Jan 2017 12:59:24 +0000, Russell King - ARM Linux wrote:
+On Fri, 6 Jan 2017 13:07:27 +0000, Russell King - ARM Linux wrote:
 
-> Beware of rounding and overflow errors.  usec and val are u32's.
+>   #define MVPP2_PRS_RI_L2_CAST_MASK              (BIT(10) | BIT(9))
+>   #define MVPP2_PRS_RI_L2_UCAST                  0
+>   #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
+>   #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
 
-[...]
+Your comment makes perfect sense, so I've adopted this second option
+you suggested. This is in my v3 I sent a few minutes ago.
 
-Thanks for all the suggestions, I've taken this into account in my v3
-that I've sent a few minutes ago? I've re-used almost exactly your
-implementation, with a few changes (see below).
-
-> static u32 usec_to_cycles(u32 usec, unsigned long clock_rate_hz)
-> {
-> 	u64 tmp = clock_rate_hz * usec;
-
-I had to cast one of the variables to u64 here otherwise the
-multiplication was done on 32 bits, and then the result was expanded to
-64 bits.
-
-> 	do_div(tmp, USEC_PER_SEC);
-> 
-> 	return tmp > 0xffffffff ? 0xffffffff : tmp;
-
-I've used U32_MAX here.
-
-> static u32 cycles_to_usec(u32 cycles, unsigned long clock_rate_hz)
-> {
-> 	u64 tmp = cycles * USEC_PER_SEC;
-> 
-> 	do_div(tmp, clock_rate_hz);
-> 
-> 	return tmp > 0xffffffff ? 0xffffffff : tmp;
-
-Same comments for this function.
-
-> and:
-> 	u32 val = usec_to_cycles(usec, port->priv->tclk);
-> 
-> 	if (val > MVPP2_MAX_ISR_RX_THRESHOLD) {
-> 		usec = cycles_to_usec(MVPP2_MAX_ISR_RX_THRESHOLD,
-> 				      port->priv->tclk);
-> 
-> 		/* re-evaluate to get actual register value for usec */
-> 		val = usec_to_cycles(usec, port->priv->tclk);
-> 	}
-> 
-> >  	mvpp2_write(port->priv, MVPP2_ISR_RX_THRESHOLD_REG(rxq->id), val);
-> >  
-> >  	rxq->time_coal = usec;  
-> 
-> This function appears to be called from two places:
-> 
-> mvpp2_rxq_init():
->         mvpp2_rx_time_coal_set(port, rxq, rxq->time_coal);
-> 
-> mvpp2_ethtool_set_coalesce():
->                 rxq->time_coal = c->rx_coalesce_usecs;
->                 mvpp2_rx_time_coal_set(port, rxq, rxq->time_coal);
-> 
-> It seems rather pointless to pass in rxq->time_coal when you're also
-> passing in rxq.
-
-Indeed, so I've added another patch in the series that does this.
-
-Thanks for the review!
+Thanks!
 
 Thomas
 -- 
