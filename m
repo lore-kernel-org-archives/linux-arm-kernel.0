@@ -1,74 +1,50 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 02 Feb 2017 07:57:19 +0100
-Subject: [PATCH] pinctrl: samsung: mark PM functions as __maybe_unused
-In-Reply-To: <20170201161636.2109091-1-arnd@arndb.de>
-References: <CGME20170201161645epcas3p235bc144eb1f03127d707371f7cf963e1@epcas3p2.samsung.com>
- <20170201161636.2109091-1-arnd@arndb.de>
-Message-ID: <8385d3c5-2da6-e39e-de8c-e10fde820e43@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 2 Feb 2017 08:09:57 +0100
+Subject: [PATCH v2] ARM: dts: i.MX25: add AIPS control registers
+In-Reply-To: <1485987378-27784-1-git-send-email-martin@kaiser.cx>
+References: <1485890402-22974-1-git-send-email-martin@kaiser.cx>
+ <1485987378-27784-1-git-send-email-martin@kaiser.cx>
+Message-ID: <20170202070957.zzmrutbgbv66cv5d@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Martin,
 
-On 2017-02-01 17:16, Arnd Bergmann wrote:
-> The rework of the suspend/resume handling uses the wrong #ifdef check, leading
-> to a build warning without CONFIG_PM_SLEEP:
->
-> drivers/pinctrl/samsung/pinctrl-samsung.c:1142:12: error: 'samsung_pinctrl_resume' defined but not used [-Werror=unused-function]
-> drivers/pinctrl/samsung/pinctrl-samsung.c:1092:12: error: 'samsung_pinctrl_suspend' defined but not used [-Werror=unused-function]
->
-> Using a __maybe_unused annotation instead of the #ifdef is a simple way to
-> avoid this problem class.
->
-> Fixes: 2b24efa8e5c5 ("pinctrl: samsung: Replace syscore ops with standard platform device pm_ops")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Thanks for the fix!
-
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
+On Wed, Feb 01, 2017 at 11:16:18PM +0100, Martin Kaiser wrote:
+> The i.MX25 contains two AHB to IP bridges (AIPS), each of which has a set of
+> control registers. Add the memory regions for the control registers to
+> the Device Tree.
+> 
+> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
 > ---
->   drivers/pinctrl/samsung/pinctrl-samsung.c | 6 ++----
->   1 file changed, 2 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> index d79eadad6c5f..d601b5303e73 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> @@ -1083,13 +1083,12 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
->   	return 0;
->   }
->   
-> -#ifdef CONFIG_PM
->   /**
->    * samsung_pinctrl_suspend - save pinctrl state for suspend
->    *
->    * Save data for all banks handled by this device.
->    */
-> -static int samsung_pinctrl_suspend(struct device *dev)
-> +static int __maybe_unused samsung_pinctrl_suspend(struct device *dev)
->   {
->   	struct samsung_pinctrl_drv_data *drvdata = dev_get_drvdata(dev);
->   	int i;
-> @@ -1139,7 +1138,7 @@ static int samsung_pinctrl_suspend(struct device *dev)
->    * We don't bother doing anything complicated to avoid glitching lines since
->    * we're called before pad retention is turned off.
->    */
-> -static int samsung_pinctrl_resume(struct device *dev)
-> +static int __maybe_unused samsung_pinctrl_resume(struct device *dev)
->   {
->   	struct samsung_pinctrl_drv_data *drvdata = dev_get_drvdata(dev);
->   	int i;
-> @@ -1183,7 +1182,6 @@ static int samsung_pinctrl_resume(struct device *dev)
->   
->   	return 0;
->   }
-> -#endif
->   
->   static const struct of_device_id samsung_pinctrl_dt_match[] = {
->   #ifdef CONFIG_PINCTRL_EXYNOS
+> v2:
+>    removed the "fsl,imx53-aipstz" property as per Sascha's request
+> 
+>  arch/arm/boot/dts/imx25.dtsi |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> index e0ba550..1914858 100644
+> --- a/arch/arm/boot/dts/imx25.dtsi
+> +++ b/arch/arm/boot/dts/imx25.dtsi
+> @@ -93,6 +93,11 @@
+>  			reg = <0x43f00000 0x100000>;
+>  			ranges;
+>  
+> +			aips1: bridge at 43f00000 {
+> +				compatible = "fsl,imx25-aips";
+> +				reg = <0x43f00000 0x60>;
+> +			};
 
-Best regards
+One thing I haven't seen the first time: The size should be the size of
+the while register space given to this device, not the position of the
+last register, so 0x4000 instead of 0x60 here.
+
+Sascha
+
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
