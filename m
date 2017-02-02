@@ -1,232 +1,104 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  2 Feb 2017 16:51:40 +0100
-Subject: [PATCHv3 net-next 11/12] net: mvpp2: switch to build_skb() in the RX
- path
+Date: Thu,  2 Feb 2017 16:51:35 +0100
+Subject: [PATCHv3 net-next 06/12] net: mvpp2: drop useless fields in
+ mvpp2_bm_pool and related code
 In-Reply-To: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1486050701-27899-12-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1486050701-27899-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adapts the mvpp2 RX path to use the build_skb() method. Not
-only build_skb() is now the recommended mechanism, but it also
-simplifies the addition of support for the PPv2.2 variant.
+This commit drops dead code from the mvpp2 driver. The 'in_use' and
+'in_use_thresh' fields of 'struct mvpp2_bm_pool' are
+incremented/decremented/initialized in various places. But they are only
+used in one place:
 
-Indeed, without build_skb(), we have to keep track for each RX
-descriptor of the physical address of the packet buffer, and the virtual
-address of the SKB. However, in PPv2.2 running on 64 bits platform,
-there is not enough space in the descriptor to store the virtual address
-of the SKB. So having to take care only of the address of the packet
-buffer, and building the SKB upon reception helps in supporting PPv2.2.
+       if (is_recycle &&
+           (atomic_read(&bm_pool->in_use) < bm_pool->in_use_thresh))
+               return 0;
 
-The implementation is fairly straightforward:
-
- - mvpp2_skb_alloc() is renamed to mvpp2_buf_alloc() and no longer
-   allocates a SKB. Instead, it allocates a buffer using the new
-   mvpp2_frag_alloc() function, with enough space for the data and SKB.
-
- - The initialization of the RX buffers in mvpp2_bm_bufs_add() as well
-   as the refill of the RX buffers in mvpp2_rx_refill() is adjusted
-   accordingly.
-
- - Finally, the mvpp2_rx() is modified to use build_skb().
+However 'is_recycle', passed as argument to mvpp2_rx_refill() is always
+false. So in fact, this code is never reached, and the 'is_recycle'
+argument is useless. So let's drop this code.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 77 +++++++++++++++++++++++++-----------
- 1 file changed, 55 insertions(+), 22 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 18 +++---------------
+ 1 file changed, 3 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index ec8f452..4132dc8 100644
+index 907619c..ed550c4 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -918,6 +918,7 @@ struct mvpp2_bm_pool {
- 	int buf_size;
- 	/* Packet size */
- 	int pkt_size;
-+	int frag_size;
+@@ -930,10 +930,6 @@ struct mvpp2_bm_pool {
  
- 	/* BPPE virtual base address */
- 	u32 *virt_addr;
-@@ -3354,6 +3355,22 @@ static void mvpp2_cls_oversize_rxq_set(struct mvpp2_port *port)
- 	mvpp2_write(port->priv, MVPP2_CLS_SWFWD_PCTRL_REG, val);
- }
+ 	/* Ports using BM pool */
+ 	u32 port_map;
+-
+-	/* Occupied buffers indicator */
+-	atomic_t in_use;
+-	int in_use_thresh;
+ };
  
-+static void *mvpp2_frag_alloc(const struct mvpp2_bm_pool *pool)
-+{
-+	if (likely(pool->frag_size <= PAGE_SIZE))
-+		return netdev_alloc_frag(pool->frag_size);
-+	else
-+		return kmalloc(pool->frag_size, GFP_ATOMIC);
-+}
-+
-+static void mvpp2_frag_free(const struct mvpp2_bm_pool *pool, void *data)
-+{
-+	if (likely(pool->frag_size <= PAGE_SIZE))
-+		skb_free_frag(data);
-+	else
-+		kfree(data);
-+}
-+
- /* Buffer Manager configuration routines */
- 
- /* Create pool */
-@@ -3428,7 +3445,8 @@ static void mvpp2_bm_bufs_free(struct device *dev, struct mvpp2 *priv,
- 
- 		if (!vaddr)
- 			break;
--		dev_kfree_skb_any((struct sk_buff *)vaddr);
-+
-+		mvpp2_frag_free(bm_pool, (void *)vaddr);
- 	}
- 
- 	/* Update BM driver with number of buffers removed from pool */
-@@ -3542,29 +3560,28 @@ static void mvpp2_rxq_short_pool_set(struct mvpp2_port *port,
- 	mvpp2_write(port->priv, MVPP2_RXQ_CONFIG_REG(prxq), val);
- }
- 
--/* Allocate skb for BM pool */
--static struct sk_buff *mvpp2_skb_alloc(struct mvpp2_port *port,
--				       struct mvpp2_bm_pool *bm_pool,
--				       dma_addr_t *buf_phys_addr,
--				       gfp_t gfp_mask)
-+static void *mvpp2_buf_alloc(struct mvpp2_port *port,
-+			     struct mvpp2_bm_pool *bm_pool,
-+			     dma_addr_t *buf_phys_addr,
-+			     gfp_t gfp_mask)
- {
--	struct sk_buff *skb;
- 	dma_addr_t phys_addr;
-+	void *data;
- 
--	skb = __dev_alloc_skb(bm_pool->pkt_size, gfp_mask);
--	if (!skb)
-+	data = mvpp2_frag_alloc(bm_pool);
-+	if (!data)
- 		return NULL;
- 
--	phys_addr = dma_map_single(port->dev->dev.parent, skb->head,
-+	phys_addr = dma_map_single(port->dev->dev.parent, data,
- 				   MVPP2_RX_BUF_SIZE(bm_pool->pkt_size),
- 				    DMA_FROM_DEVICE);
- 	if (unlikely(dma_mapping_error(port->dev->dev.parent, phys_addr))) {
--		dev_kfree_skb_any(skb);
-+		mvpp2_frag_free(bm_pool, data);
- 		return NULL;
- 	}
- 	*buf_phys_addr = phys_addr;
- 
--	return skb;
-+	return data;
- }
- 
- /* Set pool number in a BM cookie */
-@@ -3620,9 +3637,9 @@ static void mvpp2_pool_refill(struct mvpp2_port *port, u32 bm,
- static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
- 			     struct mvpp2_bm_pool *bm_pool, int buf_num)
- {
--	struct sk_buff *skb;
- 	int i, buf_size, total_size;
- 	dma_addr_t phys_addr;
-+	void *buf;
- 
- 	buf_size = MVPP2_RX_BUF_SIZE(bm_pool->pkt_size);
- 	total_size = MVPP2_RX_TOTAL_SIZE(buf_size);
-@@ -3636,11 +3653,11 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
- 	}
- 
- 	for (i = 0; i < buf_num; i++) {
--		skb = mvpp2_skb_alloc(port, bm_pool, &phys_addr, GFP_KERNEL);
--		if (!skb)
-+		buf = mvpp2_buf_alloc(port, bm_pool, &phys_addr, GFP_KERNEL);
-+		if (!buf)
- 			break;
- 
--		mvpp2_bm_pool_put(port, bm_pool->id, (u32)phys_addr, (u32)skb);
-+		mvpp2_bm_pool_put(port, bm_pool->id, (u32)phys_addr, (u32)buf);
- 	}
- 
- 	/* Update BM driver with number of buffers added to pool */
-@@ -3696,6 +3713,9 @@ mvpp2_bm_pool_use(struct mvpp2_port *port, int pool, enum mvpp2_bm_type type,
- 					   port->priv, new_pool);
- 
- 		new_pool->pkt_size = pkt_size;
-+		new_pool->frag_size =
-+			SKB_DATA_ALIGN(MVPP2_RX_BUF_SIZE(pkt_size)) +
-+			MVPP2_SKB_SHINFO_SIZE;
- 
- 		/* Allocate buffers for this pool */
- 		num = mvpp2_bm_bufs_add(port, new_pool, pkts_num);
-@@ -5004,15 +5024,15 @@ static void mvpp2_rx_csum(struct mvpp2_port *port, u32 status,
- static int mvpp2_rx_refill(struct mvpp2_port *port,
- 			   struct mvpp2_bm_pool *bm_pool, u32 bm)
- {
--	struct sk_buff *skb;
- 	dma_addr_t phys_addr;
-+	void *buf;
- 
- 	/* No recycle or too many buffers are in use, so allocate a new skb */
--	skb = mvpp2_skb_alloc(port, bm_pool, &phys_addr, GFP_ATOMIC);
--	if (!skb)
-+	buf = mvpp2_buf_alloc(port, bm_pool, &phys_addr, GFP_ATOMIC);
-+	if (!buf)
- 		return -ENOMEM;
- 
--	mvpp2_pool_refill(port, bm, (u32)phys_addr, (u32)skb);
-+	mvpp2_pool_refill(port, bm, (u32)phys_addr, (u32)buf);
+ struct mvpp2_buff_hdr {
+@@ -3399,7 +3395,6 @@ static int mvpp2_bm_pool_create(struct platform_device *pdev,
+ 	bm_pool->size = size;
+ 	bm_pool->pkt_size = 0;
+ 	bm_pool->buf_num = 0;
+-	atomic_set(&bm_pool->in_use, 0);
  
  	return 0;
  }
-@@ -5104,14 +5124,17 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
- 		struct mvpp2_rx_desc *rx_desc = mvpp2_rxq_next_desc_get(rxq);
- 		struct mvpp2_bm_pool *bm_pool;
- 		struct sk_buff *skb;
-+		unsigned int frag_size;
- 		dma_addr_t phys_addr;
- 		u32 bm, rx_status;
- 		int pool, rx_bytes, err;
-+		void *data;
+@@ -3656,7 +3651,6 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
  
- 		rx_done++;
- 		rx_status = rx_desc->status;
- 		rx_bytes = rx_desc->data_size - MVPP2_MH_SIZE;
- 		phys_addr = rx_desc->buf_phys_addr;
-+		data = (void *)rx_desc->buf_cookie;
+ 	/* Update BM driver with number of buffers added to pool */
+ 	bm_pool->buf_num += i;
+-	bm_pool->in_use_thresh = bm_pool->buf_num / 4;
  
- 		bm = mvpp2_bm_cookie_build(rx_desc);
- 		pool = mvpp2_bm_cookie_pool_get(bm);
-@@ -5132,12 +5155,22 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
- 			dev->stats.rx_errors++;
- 			mvpp2_rx_error(port, rx_desc);
- 			/* Return the buffer to the pool */
+ 	netdev_dbg(port->dev,
+ 		   "%s pool %d: pkt_size=%4d, buf_size=%4d, total_size=%4d\n",
+@@ -5014,23 +5008,18 @@ static void mvpp2_rx_csum(struct mvpp2_port *port, u32 status,
+ 
+ /* Reuse skb if possible, or allocate a new skb and add it to BM pool */
+ static int mvpp2_rx_refill(struct mvpp2_port *port,
+-			   struct mvpp2_bm_pool *bm_pool,
+-			   u32 bm, int is_recycle)
++			   struct mvpp2_bm_pool *bm_pool, u32 bm)
+ {
+ 	struct sk_buff *skb;
+ 	dma_addr_t phys_addr;
+ 
+-	if (is_recycle &&
+-	    (atomic_read(&bm_pool->in_use) < bm_pool->in_use_thresh))
+-		return 0;
+-
+ 	/* No recycle or too many buffers are in use, so allocate a new skb */
+ 	skb = mvpp2_skb_alloc(port, bm_pool, &phys_addr, GFP_ATOMIC);
+ 	if (!skb)
+ 		return -ENOMEM;
+ 
+ 	mvpp2_pool_refill(port, bm, (u32)phys_addr, (u32)skb);
+-	atomic_dec(&bm_pool->in_use);
 +
- 			mvpp2_pool_refill(port, bm, rx_desc->buf_phys_addr,
- 					  rx_desc->buf_cookie);
- 			continue;
- 		}
+ 	return 0;
+ }
  
--		skb = (struct sk_buff *)rx_desc->buf_cookie;
-+		if (bm_pool->frag_size > PAGE_SIZE)
-+			frag_size = 0;
-+		else
-+			frag_size = bm_pool->frag_size;
-+
-+		skb = build_skb(data, frag_size);
-+		if (!skb) {
-+			netdev_warn(port->dev, "skb build failed\n");
-+			goto err_drop_frame;
-+		}
+@@ -5156,7 +5145,7 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
  
- 		err = mvpp2_rx_refill(port, bm_pool, bm);
+ 		skb = (struct sk_buff *)rx_desc->buf_cookie;
+ 
+-		err = mvpp2_rx_refill(port, bm_pool, bm, 0);
++		err = mvpp2_rx_refill(port, bm_pool, bm);
  		if (err) {
-@@ -5151,7 +5184,7 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
+ 			netdev_err(port->dev, "failed to refill BM pools\n");
+ 			goto err_drop_frame;
+@@ -5167,7 +5156,6 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
+ 
  		rcvd_pkts++;
  		rcvd_bytes += rx_bytes;
+-		atomic_inc(&bm_pool->in_use);
  
--		skb_reserve(skb, MVPP2_MH_SIZE);
-+		skb_reserve(skb, MVPP2_MH_SIZE + NET_SKB_PAD);
+ 		skb_reserve(skb, MVPP2_MH_SIZE);
  		skb_put(skb, rx_bytes);
- 		skb->protocol = eth_type_trans(skb, dev);
- 		mvpp2_rx_csum(port, rx_status, skb);
 -- 
 2.7.4
