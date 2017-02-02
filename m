@@ -1,94 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 2 Feb 2017 15:47:34 +0100
-Subject: [PATCH 3/3 v4] iio: adc: add a driver for Qualcomm PM8xxx HK/XOADC
-In-Reply-To: <0c54c4d8-265c-112e-60f1-af21b73148ec@kernel.org>
-References: <20170131100938.23660-1-linus.walleij@linaro.org>
- <CACRpkdYDMH9A=ezPkANRQXcqceEqn-A+oL2TxHyNkjmSms5AOA@mail.gmail.com>
- <0c54c4d8-265c-112e-60f1-af21b73148ec@kernel.org>
-Message-ID: <CACRpkdYLwVEuOcjyGYo7U=57JY3-R2FCYnEBWFqL89iqm3yEDA@mail.gmail.com>
+From: jintack@cs.columbia.edu (Jintack Lim)
+Date: Thu, 2 Feb 2017 09:51:13 -0500
+Subject: [RFC v3 00/10] Provide the EL1 physical timer to the VM
+In-Reply-To: <20170202123104.GJ27852@cbox>
+References: <1485970990-13775-1-git-send-email-jintack@cs.columbia.edu>
+ <20170202123104.GJ27852@cbox>
+Message-ID: <CAHyh4xhsqS6CijRysFvg+NqGo0rBQU45OhAaZUuHDm4M0JufTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 8:54 PM, Jonathan Cameron <jic23@kernel.org> wrote:
-
-> Applied this one as well with a spot of fuzz but all obvious stuff in the
-> Makefile.
+On Thu, Feb 2, 2017 at 7:31 AM, Christoffer Dall <cdall@linaro.org> wrote:
+> Hi Jintack,
 >
-> However...
+> On Wed, Feb 01, 2017 at 12:43:00PM -0500, Jintack Lim wrote:
+>> The ARM architecture defines the EL1 physical timer and the virtual timer,
+>> and it is reasonable for an OS to expect to be able to access both.
+>> However, the current KVM implementation does not provide the EL1 physical
+>> timer to VMs but terminates VMs on access to the timer.
+>>
+>> This patch series enables VMs to use the EL1 physical timer through
+>> trap-and-emulate.  The KVM host emulates each EL1 physical timer register
+>> access and sets up the background timer accordingly.  When the background
+>> timer expires, the KVM host injects EL1 physical timer interrupts to the
+>> VM.  Alternatively, it's also possible to allow VMs to access the EL1
+>> physical timer without trapping.  However, this requires somehow using the
+>> EL2 physical timer for the Linux host while running the VM instead of the
+>> EL1 physical timer.  Right now I just implemented trap-and-emulate because
+>> this was straightforward to do, and I leave it to future work to determine
+>> if transferring the EL1 physical timer state to the EL2 timer provides any
+>> performance benefit.
+>>
+>> This feature will be useful for any OS that wishes to access the EL1
+>> physical timer. Nested virtualization is one of those use cases. A nested
+>> hypervisor running inside a VM would think it has full access to the
+>> hardware and naturally tries to use the EL1 physical timer as Linux would
+>> do. Other nested hypervisors may try to use the EL2 physical timer as Xen
+>> would do, but supporting the EL2 physical timer to the VM is out of scope
+>> of this patch series. This patch series will make it easy to add the EL2
+>> timer support in the future, though.
+>>
+>> Note that Linux VMs booting in EL1 will be unaffected by this patch series
+>> and will continue to use only the virtual timer and this patch series will
+>> therefore not introduce any performance degredation as a result of
+>> trap-and-emulate.
+>>
+>> v2 => v3:
+>>  - Rebase on kvmarm/queue
+>>  - Take kvm->lock to synchronize cntvoff across all vtimers
+>>  - Remove unnecessary function parameters
+>>  - Add comments
 >
-> ERROR: "qcom_vadc_decimation_from_dt" [drivers/iio/adc/qcom-spmi-vadc.ko] undefined!
-> ERROR: "qcom_vadc_scale" [drivers/iio/adc/qcom-spmi-vadc.ko] undefined!
-> make[1]: *** [scripts/Makefile.modpost:91: __modpost] Error 1
-> make: *** [Makefile:1198: modules] Error 2
+> I just gave v3 a test run on my TC2 (32-bit platform) and my guest
+> quickly locks up trying to run cyclictest or when booting the machine it
+> stalls with RCU timeouts.
+
+Ok. It's my fault not to specify that the emulated physical timer is
+supported/tested on arm64.
+On 32-bit platform, it is supposed to show the same behavior as
+before, but I haven't tested.
+Were you using the physical timer or the virtual timer for the guest?
+
 >
-> I've fixed that up and some static declaration issue.
+> Could you have a look?
+
+Sure, I'll have a look. I don't have access to my Cubietruck today,
+but I can work on that tomorrow.
+
 >
-> Please do sanity check builds as modules!  It all needs to be one one object file
-> when added to the $(magic)-m
-
-Sorry :(
-
-I guess I should really get better at that. I guess the sloppiness comes
-from never using modules for anything on any system in the first place.
-
-I did push a branch to my kernelorg git linux-integrator.git so I was
-expecting the zerodaybuild to pick it up and build it and find these things
-but apparently I doesn't. Mea culpa, need to check with Fenguang
-about this.
-
-> However, I can't see any way of keeping them module name as was (qcom-smpi-vadc.ko)
-> without renaming one of the c files out of the way. Please check I haven't messed
-> anything up.  The new naming is a bit naff, but I couldn't think of anything better
-> off the top of my head!
-
-It looks all right to me, there is a dangling space after
-+obj-$(CONFIG_QCOM_SPMI_VADC) += qcom-spmi-vadc.o
-otherwise it looks fine.
-
-> Actually this is enough of a mess I'm pulling these last two patches for now.
-> Will push them out in a special testing2 branch for you to take a look at though.
-
-By all means save it for whenever later or just tell me to resend after
-v4.11-rc1. I have all time in the world.
-
-Anyways, I cherry-picked a commit needed for a boot regression
-and added a hacky DT patch and built and booted this!
-
-The dmesg detects the device fine with nice calibration results,
-lsiio reports it and the readings from the voltage ADCs work just
-fine.
-
-> I also temporarily changed the mfd dependencies to add COMPILE_TEST.
-> Seems fine, so if you could do a patch adding that we'll get better build coverage.
-
-I added || COMPILE_TEST to MFD_PM8XXX
-
-Then I get the following with x86_64 allyesconfig:
-
-  LD      drivers/iio/adc/built-in.o
-drivers/iio/adc/qcom-pm8xxx-xoadc.o: In function `qcom_vadc_decimation_from_dt':
-(.text+0x410): multiple definition of `qcom_vadc_decimation_from_dt'
-drivers/iio/adc/qcom-spmi-vadc.o:(.text+0x410): first defined here
-drivers/iio/adc/qcom-pm8xxx-xoadc.o: In function `qcom_vadc_scale':
-(.text+0x0): multiple definition of `qcom_vadc_scale'
-drivers/iio/adc/qcom-spmi-vadc.o:(.text+0x0): first defined here
-../scripts/Makefile.build:446: recipe for target
-'drivers/iio/adc/built-in.o' failed
-make[5]: *** [drivers/iio/adc/built-in.o] Error 1
-../scripts/Makefile.build:551: recipe for target 'drivers/iio/adc' failed
-make[4]: *** [drivers/iio/adc] Error 2
-../scripts/Makefile.build:551: recipe for target 'drivers/iio' failed
-
-I looked at how you handle it in the Makefile, and it all makes sense to
-me unfortunately, it's just this thing with baking several objects into one
-module - it seems the Kbuild around that is easy to get wrong and
-simply hard :(
-
-I first naturally put all the common code into its own module and export
-the symbols, simple. It just works, but that's just sooo.... ugly. So the
-elegant solutions are hard to get right.
-
-I can't figure it out right now, will get back to it after dinner or so.
-
-Yours,
-Linus Walleij
+> Thanks,
+> -Christoffer
+>
