@@ -1,31 +1,34 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  2 Feb 2017 10:47:43 +0100
-Subject: [PATCH 1/2] drm: meson: rename module name to meson-drm
+Date: Thu,  2 Feb 2017 10:47:44 +0100
+Subject: [PATCH 2/2] drm: meson: rename driver name to meson-drm
 In-Reply-To: <1486028864-19622-1-git-send-email-narmstrong@baylibre.com>
 References: <1486028864-19622-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1486028864-19622-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1486028864-19622-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The module is currently names "meson.ko" which can lead to some
-confusion, this patches renames it "meson-drm.ko"
+The platform driver name is currently "meson" which can lead to some
+confusion, this patch renames it to "meson-drm" and removes the owner
+attribute.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/gpu/drm/meson/Makefile | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/meson/meson_drv.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/meson/Makefile b/drivers/gpu/drm/meson/Makefile
-index 2591978..92cf845 100644
---- a/drivers/gpu/drm/meson/Makefile
-+++ b/drivers/gpu/drm/meson/Makefile
-@@ -1,4 +1,4 @@
--meson-y := meson_drv.o meson_plane.o meson_crtc.o meson_venc_cvbs.o
--meson-y += meson_viu.o meson_vpp.o meson_venc.o meson_vclk.o meson_canvas.o
-+meson-drm-y := meson_drv.o meson_plane.o meson_crtc.o meson_venc_cvbs.o
-+meson-drm-y += meson_viu.o meson_vpp.o meson_venc.o meson_vclk.o meson_canvas.o
- 
--obj-$(CONFIG_DRM_MESON) += meson.o
-+obj-$(CONFIG_DRM_MESON) += meson-drm.o
+diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+index ff1f601..380bde7 100644
+--- a/drivers/gpu/drm/meson/meson_drv.c
++++ b/drivers/gpu/drm/meson/meson_drv.c
+@@ -329,8 +329,7 @@ static int meson_drv_remove(struct platform_device *pdev)
+ 	.probe      = meson_drv_probe,
+ 	.remove     = meson_drv_remove,
+ 	.driver     = {
+-		.owner  = THIS_MODULE,
+-		.name   = DRIVER_NAME,
++		.name	= "meson-drm",
+ 		.of_match_table = dt_match,
+ 	},
+ };
 -- 
 1.9.1
