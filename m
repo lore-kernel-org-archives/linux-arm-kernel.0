@@ -1,59 +1,79 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 2 Feb 2017 20:36:06 +0530
-Subject: [PATCH v2 1/2] ARM: davinci: Allocate extra interrupts
-In-Reply-To: <dedc276f-e25b-f3b8-dc4a-568f41d9f82e@lechnology.com>
-References: <1484337612-11120-1-git-send-email-david@lechnology.com>
- <1484337612-11120-2-git-send-email-david@lechnology.com>
- <95440160-8346-fef8-27d2-fb17c0da38f6@ti.com>
- <25c0bc60-bb99-9aa5-db56-6299d82db9c1@lechnology.com>
- <0bd745dc-df46-0d37-ed18-b419c1cf2e78@ti.com>
- <dedc276f-e25b-f3b8-dc4a-568f41d9f82e@lechnology.com>
-Message-ID: <139f2c33-7fb3-3a63-6dfe-caa2cca500ce@ti.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 2 Feb 2017 16:08:44 +0100
+Subject: [RFC v3 00/10] Provide the EL1 physical timer to the VM
+In-Reply-To: <CAHyh4xhsqS6CijRysFvg+NqGo0rBQU45OhAaZUuHDm4M0JufTg@mail.gmail.com>
+References: <1485970990-13775-1-git-send-email-jintack@cs.columbia.edu>
+ <20170202123104.GJ27852@cbox>
+ <CAHyh4xhsqS6CijRysFvg+NqGo0rBQU45OhAaZUuHDm4M0JufTg@mail.gmail.com>
+Message-ID: <CAMJs5B89qBe9NRULeFeVxH6f=BQ-NdEE+1i2DhYJwEmJtZe9mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 January 2017 11:47 PM, David Lechner wrote:
-> On 01/20/2017 05:50 AM, Sekhar Nori wrote:
->> On Wednesday 18 January 2017 10:27 PM, David Lechner wrote:
->>> On 01/18/2017 03:50 AM, Sekhar Nori wrote:
->>>> On Saturday 14 January 2017 01:30 AM, David Lechner wrote:
->>>>> This allocates extra interrupts for mach-davinci. These extra
->>>>> interrupts
->>>>> are need for things like IIO triggers.
->>>>
->>>> I am not really familiar with IIO triggers. Can you give some more
->>>> detail on what fails without this patch?
->>>
->>> A trigger is used to initiate the reading of an iio device. For example,
->>> there is a mechanism for a sysfs trigger. When you write 1 to the sysfs
->>> attribute, it triggers an interrupt that is handled by the iio device.
->>>
->>> Since these triggers use interrupts, you need to allocate spare
->>> interrupts in order to set up the trigger. Otherwise, setting up the
->>> trigger will fail with an error code (I forgot which one exactly)
->>> because all of the allocated irqs have already been assigned to hardware
->>> irqs and are not available.
->>>
->>> Here is where the iio subsytem actually allocates the irq:
->>> http://lxr.free-electrons.com/source/drivers/iio/industrialio-trigger.c#L525
->>>
+On Thu, Feb 2, 2017 at 3:51 PM, Jintack Lim <jintack@cs.columbia.edu> wrote:
+> On Thu, Feb 2, 2017 at 7:31 AM, Christoffer Dall <cdall@linaro.org> wrote:
+>> Hi Jintack,
 >>
->> Alright, I will take a look. Do note that this may not get included in
->> the first batch of v4.11 changes I queue. But I promise to come back to
->> it soon afterwards.
+>> On Wed, Feb 01, 2017 at 12:43:00PM -0500, Jintack Lim wrote:
+>>> The ARM architecture defines the EL1 physical timer and the virtual timer,
+>>> and it is reasonable for an OS to expect to be able to access both.
+>>> However, the current KVM implementation does not provide the EL1 physical
+>>> timer to VMs but terminates VMs on access to the timer.
+>>>
+>>> This patch series enables VMs to use the EL1 physical timer through
+>>> trap-and-emulate.  The KVM host emulates each EL1 physical timer register
+>>> access and sets up the background timer accordingly.  When the background
+>>> timer expires, the KVM host injects EL1 physical timer interrupts to the
+>>> VM.  Alternatively, it's also possible to allow VMs to access the EL1
+>>> physical timer without trapping.  However, this requires somehow using the
+>>> EL2 physical timer for the Linux host while running the VM instead of the
+>>> EL1 physical timer.  Right now I just implemented trap-and-emulate because
+>>> this was straightforward to do, and I leave it to future work to determine
+>>> if transferring the EL1 physical timer state to the EL2 timer provides any
+>>> performance benefit.
+>>>
+>>> This feature will be useful for any OS that wishes to access the EL1
+>>> physical timer. Nested virtualization is one of those use cases. A nested
+>>> hypervisor running inside a VM would think it has full access to the
+>>> hardware and naturally tries to use the EL1 physical timer as Linux would
+>>> do. Other nested hypervisors may try to use the EL2 physical timer as Xen
+>>> would do, but supporting the EL2 physical timer to the VM is out of scope
+>>> of this patch series. This patch series will make it easy to add the EL2
+>>> timer support in the future, though.
+>>>
+>>> Note that Linux VMs booting in EL1 will be unaffected by this patch series
+>>> and will continue to use only the virtual timer and this patch series will
+>>> therefore not introduce any performance degredation as a result of
+>>> trap-and-emulate.
+>>>
+>>> v2 => v3:
+>>>  - Rebase on kvmarm/queue
+>>>  - Take kvm->lock to synchronize cntvoff across all vtimers
+>>>  - Remove unnecessary function parameters
+>>>  - Add comments
 >>
-> 
-> It is not critical at this point, so it is fine to wait a bit.
+>> I just gave v3 a test run on my TC2 (32-bit platform) and my guest
+>> quickly locks up trying to run cyclictest or when booting the machine it
+>> stalls with RCU timeouts.
+>
+> Ok. It's my fault not to specify that the emulated physical timer is
+> supported/tested on arm64.
+> On 32-bit platform, it is supposed to show the same behavior as
+> before, but I haven't tested.
+> Were you using the physical timer or the virtual timer for the guest?
+>
 
-So, I think instead of increasing NR_IRQS by a small number, we should 
-instead shift to use SPARSE_IRQ. I looked at some patches from Tony 
-Lindgren converting OMAP1 to use SPARSE_IRQ. There is some work 
-involved, but it does not look to be too huge a change to me.
+I used the same guest and QEMU that I always test with so I expect it
+to only use the virtual timer.
 
-685e2d08c54b ARM: OMAP1: Change interrupt numbering for sparse IRQ
-b694331cfb2e ARM: omap1: Switch to use MULTI_IRQ
-55b447744389 ARM: OMAP1: Switch to use generic irqchip in preparation for sparse IRQ
-928f81aa619d ARM: OMAP1: Move UART defines to prepare for sparse IRQ
+I wonder if we can somehow manage to not reset the timer properly on
+the 32-bit side and end up in a form of endless interrupt loop?
 
-Thanks,
-Sekhar
+>>
+>> Could you have a look?
+>
+> Sure, I'll have a look. I don't have access to my Cubietruck today,
+> but I can work on that tomorrow.
+>
+ok, thanks.
+
+-Christoffer
