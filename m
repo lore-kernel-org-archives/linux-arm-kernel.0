@@ -1,170 +1,79 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 2 Feb 2017 15:45:46 +0000
-Subject: Build failure with v4.9-rc1 and GCC trunk -- compiler weirdness
-In-Reply-To: <72d02b19-54b6-f4b1-8b52-40d3a57b7ec7@redhat.com>
-References: <20161017183806.GG5601@arm.com> <20161019153746.GA4411@x4>
- <CA+55aFzSi4V9ZYDfxvZNfz1ogngTywW5Q9U_vQq3v83+0wgPrA@mail.gmail.com>
- <20161019155658.GB4411@x4>
- <CA+55aFx=ZX=7u07R6zJ7fSw=zSQNaYqVX7R3LQs4riiEf+uA=A@mail.gmail.com>
- <20161019162222.GT9193@arm.com>
- <c578d5ac-ab8a-974a-bdd9-597b8c545583@redhat.com>
- <CAKv+Gu9G+r7eH0mhniH1+ucrHNiGBMFQdKfMOi=OmekapoBtUg@mail.gmail.com>
- <7ee40760-f89f-9737-bcf2-41b8197e9767@redhat.com>
- <CAKv+Gu8kMZcxYF5yYJLRX4ykHgCxuw_i3P4txnCZxD3uqs6jwQ@mail.gmail.com>
- <72d02b19-54b6-f4b1-8b52-40d3a57b7ec7@redhat.com>
-Message-ID: <CAKv+Gu9_tnEVKs+zRBJW4-k8CW8ke2nJsG5n+7pfZgpJhyFajw@mail.gmail.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Thu, 02 Feb 2017 23:50:42 +0800
+Subject: [PATCH v3 08/10] dmaengine: sun6i: allow build on ARM64 platforms
+ (sun50i)
+In-Reply-To: <20170131033236.GH19244@localhost>
+References: <20170129023331.62106-1-icenowy@aosc.xyz>
+ <20170129023331.62106-9-icenowy@aosc.xyz>
+ <20170130164210.GD19244@localhost>
+ <3729521485800635@web23g.yandex.ru> <20170131033236.GH19244@localhost>
+Message-ID: <5605761486050642@web3m.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 February 2017 at 15:43, Laura Abbott <labbott@redhat.com> wrote:
-> On 02/02/2017 01:17 AM, Ard Biesheuvel wrote:
->> On 1 February 2017 at 21:50, Laura Abbott <labbott@redhat.com> wrote:
->>> On 02/01/2017 09:36 AM, Ard Biesheuvel wrote:
->>>> On 1 February 2017 at 16:58, Laura Abbott <labbott@redhat.com> wrote:
->>>>> On 10/19/2016 09:22 AM, Will Deacon wrote:
->>>>>> On Wed, Oct 19, 2016 at 09:01:33AM -0700, Linus Torvalds wrote:
->>>>>>> On Wed, Oct 19, 2016 at 8:56 AM, Markus Trippelsdorf
->>>>>>> <markus@trippelsdorf.de> wrote:
->>>>>>>> On 2016.10.19 at 08:55 -0700, Linus Torvalds wrote:
->>>>>>>>>
->>>>>>>>> Well, in the meantime we apparently have to live with it. Unless Will
->>>>>>>>> is using some unreleased gcc version that nobody else is using and we
->>>>>>>>> can just ignore it?
->>>>>>>>
->>>>>>>> Yes, he is using gcc-7 that is unreleased. (It will be released April
->>>>>>>> next year.)
->>>>>>>
->>>>>>> Ahh, self-built? So it's not part of some experimental ARM distro
->>>>>>> setup and this will be annoying lots of people?
->>>>>>
->>>>>> Our friendly compiler guys built it, but it's just a snapshot of trunk,
->>>>>> so it's all heading towards GCC 7.0. AFAIU, the problematic optimisation
->>>>>> is also a mid-end pass, so it would affect other architectures too.
->>>>>>
->>>>>>> If so, still think that we could just get rid of the ____ilog2_NaN()
->>>>>>> thing as it's not _that_ important, but it's certainly not very
->>>>>>> high-priority. Will can do it in his tree too for testing, and it can
->>>>>>> remind people to get the gcc problem fixed.
->>>>>>
->>>>>> I'm carrying the diff below, which fixes arm64 defconfig, but I'm worried
->>>>>> that we might be relying on this trick elsewhere. The arm __bad_cmpxchg
->>>>>> function, for example.
->>>>>>
->>>>>> Will
->>>>>>
->>>>>> --->8
->>>>>>
->>>>>> diff --git a/include/linux/log2.h b/include/linux/log2.h
->>>>>> index fd7ff3d91e6a..9cf5ad69065d 100644
->>>>>> --- a/include/linux/log2.h
->>>>>> +++ b/include/linux/log2.h
->>>>>> @@ -16,12 +16,6 @@
->>>>>>  #include <linux/bitops.h>
->>>>>>
->>>>>>  /*
->>>>>> - * deal with unrepresentable constant logarithms
->>>>>> - */
->>>>>> -extern __attribute__((const, noreturn))
->>>>>> -int ____ilog2_NaN(void);
->>>>>> -
->>>>>> -/*
->>>>>>   * non-constant log of base 2 calculators
->>>>>>   * - the arch may override these in asm/bitops.h if they can be implemented
->>>>>>   *   more efficiently than using fls() and fls64()
->>>>>> @@ -85,7 +79,7 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->>>>>>  #define ilog2(n)                             \
->>>>>>  (                                            \
->>>>>>       __builtin_constant_p(n) ? (             \
->>>>>> -             (n) < 1 ? ____ilog2_NaN() :     \
->>>>>> +             (n) < 1 ? 0 :                   \
->>>>>>               (n) & (1ULL << 63) ? 63 :       \
->>>>>>               (n) & (1ULL << 62) ? 62 :       \
->>>>>>               (n) & (1ULL << 61) ? 61 :       \
->>>>>> @@ -149,9 +143,7 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->>>>>>               (n) & (1ULL <<  3) ?  3 :       \
->>>>>>               (n) & (1ULL <<  2) ?  2 :       \
->>>>>>               (n) & (1ULL <<  1) ?  1 :       \
->>>>>> -             (n) & (1ULL <<  0) ?  0 :       \
->>>>>> -             ____ilog2_NaN()                 \
->>>>>> -                                ) :          \
->>>>>> +             0) :                            \
->>>>>>       (sizeof(n) <= 4) ?                      \
->>>>>>       __ilog2_u32(n) :                        \
->>>>>>       __ilog2_u64(n)                          \
->>>>>> @@ -194,7 +186,6 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->>>>>>   * @n: parameter
->>>>>>   *
->>>>>>   * The first few values calculated by this routine:
->>>>>> - *  ob2(0) = 0
->>>>>>   *  ob2(1) = 0
->>>>>>   *  ob2(2) = 1
->>>>>>   *  ob2(3) = 2
->>>>>>
->>>>>
->>>>> Reviving this thread as gcc 7 has now hit Fedora rawhide and has this
->>>>> same issue. I pulled in the above patch from Will as a temporary work
->>>>> around for building. It didn't look like there was consensus on a
->>>>> permanent solution though from the thread.
->>>>>
->>>>
->>>> I still think order_base_2() is broken, since it may invoke
->>>> roundup_pow_of_two() with an input value that is documented as
->>>> producing undefined output. I would argue that the below is the
->>>> correct fix.
->>>>
->>>> diff --git a/include/linux/log2.h b/include/linux/log2.h
->>>> index fd7ff3d91e6a..46523731bec0 100644
->>>> --- a/include/linux/log2.h
->>>> +++ b/include/linux/log2.h
->>>> @@ -203,6 +203,18 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->>>>   *  ... and so on.
->>>>   */
->>>>
->>>> -#define order_base_2(n) ilog2(roundup_pow_of_two(n))
->>>> +static inline __attribute__((__const__))
->>>> +unsigned long __order_base_2(unsigned long n)
->>>> +{
->>>> +       return n ? 1UL << fls_long(n - 1) : 1;
->>>> +}
->>>> +
->>>> +#define order_base_2(n)                                \
->>>> +(                                              \
->>>> +       __builtin_constant_p(n) ? (             \
->>>> +               ((n) < 2) ? (n) :               \
->>>> +               ilog2((n) - 1) + 1) :           \
->>>> +       ilog2(__order_base_2(n))                \
->>>> + )
->>>>
->>>>  #endif /* _LINUX_LOG2_H */
->>>>
->>>
->>> This fixes the problem although the comments should be updated
->>> as well.
+
+
+31.01.2017, 11:32, "Vinod Koul" <vinod.koul@intel.com>:
+> On Tue, Jan 31, 2017 at 02:23:55AM +0800, Icenowy Zheng wrote:
+>> ?31.01.2017, 00:41, "Vinod Koul" <vinod.koul@intel.com>:
+>> ?> On Sun, Jan 29, 2017 at 10:33:29AM +0800, Icenowy Zheng wrote:
+>> ?>> ?As 64-bit Allwinner H5 SoC has the same DMA engine with H3, the DMA
+>> ?>> ?driver should be allowed to be built for ARM64, in order to make it work on H5.
+>> ?>>
+>> ?>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ?>> ?Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> ?>> ?Acked-by: Chen-Yu Tsai <wens@csie.org>
+>> ?>> ?---
+>> ?>> ?Patch introduced between v1 and v2, to satisfy the newly added H3/H5 audio
+>> ?>> ?codec support.
+>> ?>>
+>> ?>> ??drivers/dma/Kconfig | 2 +-
+>> ?>> ??1 file changed, 1 insertion(+), 1 deletion(-)
+>> ?>>
+>> ?>> ?diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+>> ?>> ?index 0d6a96ee9fc7..d01d59812cf3 100644
+>> ?>> ?--- a/drivers/dma/Kconfig
+>> ?>> ?+++ b/drivers/dma/Kconfig
+>> ?>> ?@@ -157,7 +157,7 @@ config DMA_SUN4I
+>> ?>>
+>> ?>> ??config DMA_SUN6I
+>> ?>> ??????????tristate "Allwinner A31 SoCs DMA support"
+>> ?>> ?- depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
+>> ?>> ?+ depends on MACH_SUN6I || MACH_SUN8I || (ARM64 && ARCH_SUNXI) || COMPILE_TEST
+>> ?>
+>> ?> Do we really need ARM64 here? also looking at others I wonder why isn't
+>> ?> this MACH_SUNXI...?
 >>
->> This brings order_base_2() in line with the comments, so I am not sure
->> what you'd want to update here?
+>> ?You mean directly place "ARCH_SUNXI" here?
 >>
+>> ?SUN4I/SUN5I/SUN7I do not use DMA_SUN6I, they have different DMA
+>> ?controllers.
 >
-> ob2(1) = 1  for the __builtin_constant_p case which doesn't
-> match the comment of ob2(1) = 0. So my statement should actually
-> be is this correct?
+> No my question was different..
 >
-> Thanks,
-> Laura
+> We have MACH_SUNxx for 6I and 8I, so why do we have ARCH_SUNXI and if its an
+> arch SUNXI, X means it can take any value...
+>
+> This schema looks pretty confusing while reading
 
-You are right. But the final one I proposed is correct:
+It's a weird schema made by the vendor.
 
-#define order_base_2(n)                        \
-(                                              \
-       __builtin_constant_p(n) ? (             \
-               ((n) == 0 || (n) == 1) ? 0 :    \
-               ilog2((n) - 1) + 1) :           \
-       __order_base_2(n)                       \
-)
+> Also I had a question on usage of ARM64..
 
-and solves Joe's issue as well.
+For ARM64, we have no MACH_SUN50I, as the only ARM64-capable series in SUNXI
+is SUN50I. So I use (ARM64 && ARCH_SUNXI) here to represent "MACH_SUN50I".
 
-I will submit this as a proper patch.
+P.S. Allwinner have sun4i(A10), sun5i(A13/A10s/GR8), sun6i(A31/A31s), sun7i(A20),
+sun8i(A23/A33/H3/V3s/A83T), sun9i(A80), sun50i(A64/H5). From the sun6i
+generation, things changed a lot; however, sun7i is a derivation of sun4i. In U-Boot,
+every SoC after sun6i (except sun7i) have an option CONFIG_GEN_SUN6I.
 
-Thanks,
-Ard.
+This DMAengine driver is for the new generation DMA engine.
+
+SUN4I, SUN5I and SUN7I have no hardware that uses such a DMAengine, so here's
+MACH_SUN6I || MACH_SUN8I || (ARM64 && ARCH_SUNXI), to prevent it to be built
+in a kernel that do not support any system with such a DMAengine.
+
+>
+> --
+> ~Vinod
