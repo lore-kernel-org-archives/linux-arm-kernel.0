@@ -1,47 +1,37 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Thu, 2 Feb 2017 08:23:03 -0600
-Subject: [RFC] w1: regression, remove need for ida and use
- PLATFORM_DEVID_AUTO
-In-Reply-To: <d0b52b94-0c87-61f8-32ff-99f2a354e500@tul.cz>
-References: <d0b52b94-0c87-61f8-32ff-99f2a354e500@tul.cz>
-Message-ID: <308e185e-26eb-39ee-d82f-a0d210a41743@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  2 Feb 2017 15:29:03 +0100
+Subject: [PATCH] iommu: mtk: remove bogus 'select' statements
+Message-ID: <20170202142921.3467470-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2017 07:05 PM, Petr Cvek wrote:
-> Patch 
-> 	w1: remove need for ida and use PLATFORM_DEVID_AUTO
-> 	098f9fb0c962eb2fdba5f9d34f4cf7a938237184 
-> 
-> causes a regression in the w1_ds2760 driver. Initialization creates a name "ds2760-battery.0.auto". It seems that name of that size will cause checking code in __thermal_cooling_device_register() from thermal_core.c to fail as it checks for names shorter than 20 chars:
-> 
-> 	if (type && strlen(type) >= THERMAL_NAME_LENGTH)
-> 		return ERR_PTR(-EINVAL);
-> 
-> A second problem seems to be with magician_supplicants list as "ds2760-battery.0" does not match in a test power_supply_am_i_supplied() in ds2760_battery_update_status() from drivers/power/supply/ds2760_battery.c . This causes status flag to be forever in POWER_SUPPLY_STATUS_DISCHARGING state.
-> 
-> Functionality returned after I hotfix changed (drivers/w1/slaves/w1_ds2760.c)
-> 
-> 	pdev = platform_device_alloc("ds2760-battery", PLATFORM_DEVID_AUTO);
-> 
-> to
-> 
-> 	pdev = platform_device_alloc("ds2760-battery", 0);
-> 
-> Which solution do you advise. Shortening the name let's say just to "ds2760" (with changes to arch files, w1 files and supply files), increasing THERMAL_NAME_LENGTH to let's say 32 (I don't know if this doesn't break something other) or just reverting to the old behavior?
-> 
+The mediatek IOMMU driver enables some drivers that it does not directly
+rely on, and that causes a warning for build testing:
 
-If 20 is no longer the max thermal name then THERMAL_NAME_LENGTH should
-be changed.
+warning: (MTK_IOMMU_V1) selects COMMON_CLK_MT2701_VDECSYS which has unmet direct dependencies (COMMON_CLK && COMMON_CLK_MT2701)
+warning: (MTK_IOMMU_V1) selects COMMON_CLK_MT2701_IMGSYS which has unmet direct dependencies (COMMON_CLK && COMMON_CLK_MT2701)
+warning: (MTK_IOMMU_V1) selects COMMON_CLK_MT2701_MMSYS which has unmet direct dependencies (COMMON_CLK && COMMON_CLK_MT2701)
 
-As for the couple boards hard-coding "ds2760-battery.0", this is a
-problem that should be fix regardless of any fix we chose here as IDA is
-not guaranteed to return 0, so the battery could just as easily be
-called ds2760-battery.7. (I've had this discussion before as the N900
-user-space also make this mistake).
+This removes the select statements.
 
-Andrew
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/iommu/Kconfig | 3 ---
+ 1 file changed, 3 deletions(-)
 
-> Best regards,
-> Petr
-> 
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index bb537d06d319..8b6fd8928819 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -352,9 +352,6 @@ config MTK_IOMMU_V1
+ 	select IOMMU_API
+ 	select MEMORY
+ 	select MTK_SMI
+-	select COMMON_CLK_MT2701_MMSYS
+-	select COMMON_CLK_MT2701_IMGSYS
+-	select COMMON_CLK_MT2701_VDECSYS
+ 	help
+ 	  Support for the M4U on certain Mediatek SoCs. M4U generation 1 HW is
+ 	  Multimedia Memory Managememt Unit. This option enables remapping of
+-- 
+2.9.0
