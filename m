@@ -1,46 +1,22 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 2 Feb 2017 12:08:50 +0000
-Subject: [PATCH v31 09/12] arm64: kdump: provide /proc/vmcore file
-In-Reply-To: <20170202120320.GK31394@leverpostej>
-References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
- <20170201124630.6016-8-takahiro.akashi@linaro.org>
- <20170201192121.GB30584@leverpostej>
- <20170202062408.GC13549@linaro.org>
- <20170202120320.GK31394@leverpostej>
-Message-ID: <20170202120850.GL31394@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 2 Feb 2017 13:11:36 +0100
+Subject: [PATCH] [media] staging: bcm2835: mark all symbols as 'static'
+In-Reply-To: <CAK8P3a0TMW+GrdbLPqBDKyqXaP-LvYkGfD5bfcW4W6dXMnHy1A@mail.gmail.com>
+References: <20170202113436.690145-1-arnd@arndb.de>
+ <CAK8P3a0TMW+GrdbLPqBDKyqXaP-LvYkGfD5bfcW4W6dXMnHy1A@mail.gmail.com>
+Message-ID: <CAK8P3a3W0q8NjZdY9Wc328o6dCwkkod1k0zFqYtrkuvXwO_5dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 12:03:20PM +0000, Mark Rutland wrote:
-> On Thu, Feb 02, 2017 at 03:24:09PM +0900, AKASHI Takahiro wrote:
-> > On Wed, Feb 01, 2017 at 07:21:22PM +0000, Mark Rutland wrote:
-> > > On Wed, Feb 01, 2017 at 09:46:28PM +0900, AKASHI Takahiro wrote:
+On Thu, Feb 2, 2017 at 1:04 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thu, Feb 2, 2017 at 12:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> I got a link error in allyesconfig:
+>> Fixes: 7b3ad5abf027 ("staging: Import the BCM2835 MMAL-based V4L2 camera driver.")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
+> Please disregard this patch version, it's broken.
 
-> > > > +/*
-> > > > + * reserve_elfcorehdr() - reserves memory for elf core header
-> > > > + *
-> > > > + * This function reserves elf core header given in "elfcorehdr=" kernel
-> > > > + * command line parameter. This region contains all the information about
-> > > > + * primary kernel's core image and is used by a dump capture kernel to
-> > > > + * access the system memory on primary kernel.
-> > > > + */
+Too late, I see it's already applied, I'll send a follow-up to revert
+the first hunk.
 
-> Can you also fix the comment above reserve_elfcorehdr()? It refers to a
-> non-existent kernel command line option.
-
-... or rather, one that's handled by core code, not
-reserve_elfcorehdr().
-
-So more specifically, it would be nicer to have something like:
-
-	/*
-	 * reserve_elfcorehdr() - reserves memory for elf core header
-	 *
-	 * This function reserves the memory occupied by an elf core header
-	 * described in the device tree. This region contains all the
-	 * information about primary kernel's core image and is used by a dump
-	 * capture kernel to access the system memory on primary kernel.
-	 */
-
-Thanks,
-Mark.
+    Arnd
