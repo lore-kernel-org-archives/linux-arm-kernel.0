@@ -1,29 +1,38 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 2 Feb 2017 10:02:16 +0100
-Subject: Build failure with v4.9-rc1 and GCC trunk -- compiler weirdness
-In-Reply-To: <1485975894.2560.13.camel@perches.com>
-References: <20161017183806.GG5601@arm.com> <20161019153746.GA4411@x4>
- <CA+55aFzSi4V9ZYDfxvZNfz1ogngTywW5Q9U_vQq3v83+0wgPrA@mail.gmail.com>
- <20161019155658.GB4411@x4>
- <CA+55aFx=ZX=7u07R6zJ7fSw=zSQNaYqVX7R3LQs4riiEf+uA=A@mail.gmail.com>
- <20161019162222.GT9193@arm.com>
- <c578d5ac-ab8a-974a-bdd9-597b8c545583@redhat.com>
- <CAKv+Gu9G+r7eH0mhniH1+ucrHNiGBMFQdKfMOi=OmekapoBtUg@mail.gmail.com>
- <CAKv+Gu_kifdUOwKgGv1xqboPMjyYRhHwFXDye1HpBo9hQY+_Uw@mail.gmail.com>
- <1485975894.2560.13.camel@perches.com>
-Message-ID: <20170202090216.GV6515@twins.programming.kicks-ass.net>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Thu,  2 Feb 2017 01:05:36 -0800
+Subject: [PATCH V2] Add devicetree for the Raspberry Pi 3, for arm (32)
+Message-ID: <20170202090536.16724-1-mzoran@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 11:04:54AM -0800, Joe Perches wrote:
-> > +#define order_base_2(n)                                \
-> > +(                                              \
-> > +       __builtin_constant_p(n) ? (             \
-> > +               ((n) < 2) ? (n) :               \
-> > +               ilog2((n) - 1) + 1) :           \
-> > +       __order_base_2(n)                       \
-> > + )
-> 
-> Does this work properly when n is a signed negative value?
+Signed-off-by: Michael Zoran <mzoran@crowfest.net>
+---
+ arch/arm/boot/dts/Makefile            | 3 ++-
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 2 ++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3-b.dts
 
-Do you see it returning a complex number?
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 8bd8878efe7b..72ba524df912 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -72,7 +72,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+ 	bcm2835-rpi-b-plus.dtb \
+ 	bcm2835-rpi-a-plus.dtb \
+ 	bcm2836-rpi-2-b.dtb \
+-	bcm2835-rpi-zero.dtb
++	bcm2835-rpi-zero.dtb \
++	bcm2837-rpi-3-b.dtb
+ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4708-asus-rt-ac56u.dtb \
+ 	bcm4708-asus-rt-ac68u.dtb \
+diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+new file mode 100644
+index 000000000000..48ad20f83255
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+@@ -0,0 +1,2 @@
++#include "../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts"
++
+-- 
+2.11.0
