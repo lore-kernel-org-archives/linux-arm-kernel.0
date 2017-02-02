@@ -1,34 +1,62 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 2 Feb 2017 21:45:47 +0000
-Subject: [PATCH 6/7] efi: Handle secure boot from UEFI-2.6 [ver #7]
-In-Reply-To: <20170202213626.GQ31613@codeblueprint.co.uk>
-References: <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
- <148587564847.4026.5759345672956585977.stgit@warthog.procyon.org.uk>
- <CAKv+Gu8dnKB1sRGb3U+XB1eoA7Eyo4qSFBtPRbvGV912xPViVw@mail.gmail.com>
- <10454.1485889162@warthog.procyon.org.uk>
- <CAKv+Gu_gy6575axL6M64OSo33ZM2dnbs7cajqJRd8VtbjAXCTw@mail.gmail.com>
- <20578.1485952425@warthog.procyon.org.uk>
- <CAKv+Gu8FOcMx0UXXdd3nhE+PUPzbEn9X=kBQDfkLOZBvVu-8fg@mail.gmail.com>
- <23750.1485961217@warthog.procyon.org.uk>
- <CAKv+Gu9ACE23ZMcQN3NpZ_N-CWzg=N6qFVu3_UruH0miPe=izA@mail.gmail.com>
- <20170202213626.GQ31613@codeblueprint.co.uk>
-Message-ID: <720A4D70-602D-4EBC-9232-F74679A94067@linaro.org>
+From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
+Date: Thu,  2 Feb 2017 16:05:21 -0600
+Subject: [PATCHv2] ARM: dts: Add EMAC AXI settings for Arria10
+Message-ID: <1486073121-3364-1-git-send-email-thor.thayer@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Thor Thayer <thor.thayer@linux.intel.com>
 
+Add the device tree entries needed to support the EMAC AXI
+bus settings on the Arria10 SoCFPGA chip.
 
-> On 2 Feb 2017, at 21:36, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> 
->> On Wed, 01 Feb, at 03:02:14PM, Ard Biesheuvel wrote:
->> 
->> Let's wait for Matt to comment on the x86 bits before reissuing
->> anything, but if the subsequent patches still apply cleanly, I don't
->> think there is a need to resend or re-sign.
-> 
-> This all looks fine to me now, thanks for the re-work David.
-> 
-> Ard, do you want to apply these patches along with a fixup for the
-> multi-line comments and send a second v4.11 pull to tip?
+Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+---
+v2 Add the AXI configuration to the other DW EMACs in the chip.
+---
+ arch/arm/boot/dts/socfpga_arria10.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-Sure, I'll take care of it tomorrow
+diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
+index f520cbf..9abc7d8 100644
+--- a/arch/arm/boot/dts/socfpga_arria10.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
+@@ -400,6 +400,12 @@
+ 				};
+ 		};
+ 
++		socfpga_axi_setup: stmmac-axi-config {
++			snps,wr_osr_lmt = <0xf>;
++			snps,rd_osr_lmt = <0xf>;
++			snps,blen = <0 0 0 0 16 0 0>;
++		};
++
+ 		gmac0: ethernet at ff800000 {
+ 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.72a", "snps,dwmac";
+ 			altr,sysmgr-syscon = <&sysmgr 0x44 0>;
+@@ -416,6 +422,7 @@
+ 			clock-names = "stmmaceth";
+ 			resets = <&rst EMAC0_RESET>;
+ 			reset-names = "stmmaceth";
++			snps,axi-config = <&socfpga_axi_setup>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -435,6 +442,7 @@
+ 			clock-names = "stmmaceth";
+ 			resets = <&rst EMAC1_RESET>;
+ 			reset-names = "stmmaceth";
++			snps,axi-config = <&socfpga_axi_setup>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -452,6 +460,7 @@
+ 			rx-fifo-depth = <16384>;
+ 			clocks = <&l4_mp_clk>;
+ 			clock-names = "stmmaceth";
++			snps,axi-config = <&socfpga_axi_setup>;
+ 			status = "disabled";
+ 		};
+ 
+-- 
+2.7.4
