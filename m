@@ -1,156 +1,151 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 2 Feb 2017 15:36:13 +0000
-Subject: [PATCH v31 05/12] arm64: kdump: protect crash dump kernel memory
-In-Reply-To: <20170202143602.GA3078@fireball>
-References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
- <20170201124630.6016-4-takahiro.akashi@linaro.org>
- <20170201180008.GG4756@leverpostej>
- <20170202103129.GE13549@linaro.org>
- <20170202111637.GA31394@leverpostej>
- <20170202143602.GA3078@fireball>
-Message-ID: <20170202153612.GN31394@leverpostej>
+From: labbott@redhat.com (Laura Abbott)
+Date: Thu, 2 Feb 2017 07:43:39 -0800
+Subject: Build failure with v4.9-rc1 and GCC trunk -- compiler weirdness
+In-Reply-To: <CAKv+Gu8kMZcxYF5yYJLRX4ykHgCxuw_i3P4txnCZxD3uqs6jwQ@mail.gmail.com>
+References: <20161017183806.GG5601@arm.com> <20161019153746.GA4411@x4>
+ <CA+55aFzSi4V9ZYDfxvZNfz1ogngTywW5Q9U_vQq3v83+0wgPrA@mail.gmail.com>
+ <20161019155658.GB4411@x4>
+ <CA+55aFx=ZX=7u07R6zJ7fSw=zSQNaYqVX7R3LQs4riiEf+uA=A@mail.gmail.com>
+ <20161019162222.GT9193@arm.com>
+ <c578d5ac-ab8a-974a-bdd9-597b8c545583@redhat.com>
+ <CAKv+Gu9G+r7eH0mhniH1+ucrHNiGBMFQdKfMOi=OmekapoBtUg@mail.gmail.com>
+ <7ee40760-f89f-9737-bcf2-41b8197e9767@redhat.com>
+ <CAKv+Gu8kMZcxYF5yYJLRX4ykHgCxuw_i3P4txnCZxD3uqs6jwQ@mail.gmail.com>
+Message-ID: <72d02b19-54b6-f4b1-8b52-40d3a57b7ec7@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 11:36:04PM +0900, AKASHI Takahiro wrote:
-> On Thu, Feb 02, 2017 at 11:16:37AM +0000, Mark Rutland wrote:
-> > On Thu, Feb 02, 2017 at 07:31:30PM +0900, AKASHI Takahiro wrote:
-> > > On Wed, Feb 01, 2017 at 06:00:08PM +0000, Mark Rutland wrote:
-> > > > On Wed, Feb 01, 2017 at 09:46:24PM +0900, AKASHI Takahiro wrote:
-
-> > Imagine we have phyiscal memory:
-> > 
-> > singe RAM bank:    |---------------------------------------------------|
-> > kernel image:              |---|
-> > crashkernel:                                      |------|
-> > 
-> > ... we reserve the image and crashkernel region, but these would still
-> > remain part of the memory memblock, and we'd have a memblock layout
-> > like:
-> > 
-> > memblock.memory:   |---------------------------------------------------|
-> > memblock.reserved:         |---|                  |------|
-> > 
-> > ... in map_mem() we iterate over memblock.memory, so we only have a
-> > single entry to handle in this case. With the code above, we'd find that
-> > it overlaps the crashk_res, and we'd map the parts which don't overlap,
-> > e.g.
-> > 
-> > memblock.memory:   |---------------------------------------------------|
-> > crashkernel:                                      |------|
-> > mapped regions:    |-----------------------------|        |------------|
+On 02/02/2017 01:17 AM, Ard Biesheuvel wrote:
+> On 1 February 2017 at 21:50, Laura Abbott <labbott@redhat.com> wrote:
+>> On 02/01/2017 09:36 AM, Ard Biesheuvel wrote:
+>>> On 1 February 2017 at 16:58, Laura Abbott <labbott@redhat.com> wrote:
+>>>> On 10/19/2016 09:22 AM, Will Deacon wrote:
+>>>>> On Wed, Oct 19, 2016 at 09:01:33AM -0700, Linus Torvalds wrote:
+>>>>>> On Wed, Oct 19, 2016 at 8:56 AM, Markus Trippelsdorf
+>>>>>> <markus@trippelsdorf.de> wrote:
+>>>>>>> On 2016.10.19 at 08:55 -0700, Linus Torvalds wrote:
+>>>>>>>>
+>>>>>>>> Well, in the meantime we apparently have to live with it. Unless Will
+>>>>>>>> is using some unreleased gcc version that nobody else is using and we
+>>>>>>>> can just ignore it?
+>>>>>>>
+>>>>>>> Yes, he is using gcc-7 that is unreleased. (It will be released April
+>>>>>>> next year.)
+>>>>>>
+>>>>>> Ahh, self-built? So it's not part of some experimental ARM distro
+>>>>>> setup and this will be annoying lots of people?
+>>>>>
+>>>>> Our friendly compiler guys built it, but it's just a snapshot of trunk,
+>>>>> so it's all heading towards GCC 7.0. AFAIU, the problematic optimisation
+>>>>> is also a mid-end pass, so it would affect other architectures too.
+>>>>>
+>>>>>> If so, still think that we could just get rid of the ____ilog2_NaN()
+>>>>>> thing as it's not _that_ important, but it's certainly not very
+>>>>>> high-priority. Will can do it in his tree too for testing, and it can
+>>>>>> remind people to get the gcc problem fixed.
+>>>>>
+>>>>> I'm carrying the diff below, which fixes arm64 defconfig, but I'm worried
+>>>>> that we might be relying on this trick elsewhere. The arm __bad_cmpxchg
+>>>>> function, for example.
+>>>>>
+>>>>> Will
+>>>>>
+>>>>> --->8
+>>>>>
+>>>>> diff --git a/include/linux/log2.h b/include/linux/log2.h
+>>>>> index fd7ff3d91e6a..9cf5ad69065d 100644
+>>>>> --- a/include/linux/log2.h
+>>>>> +++ b/include/linux/log2.h
+>>>>> @@ -16,12 +16,6 @@
+>>>>>  #include <linux/bitops.h>
+>>>>>
+>>>>>  /*
+>>>>> - * deal with unrepresentable constant logarithms
+>>>>> - */
+>>>>> -extern __attribute__((const, noreturn))
+>>>>> -int ____ilog2_NaN(void);
+>>>>> -
+>>>>> -/*
+>>>>>   * non-constant log of base 2 calculators
+>>>>>   * - the arch may override these in asm/bitops.h if they can be implemented
+>>>>>   *   more efficiently than using fls() and fls64()
+>>>>> @@ -85,7 +79,7 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
+>>>>>  #define ilog2(n)                             \
+>>>>>  (                                            \
+>>>>>       __builtin_constant_p(n) ? (             \
+>>>>> -             (n) < 1 ? ____ilog2_NaN() :     \
+>>>>> +             (n) < 1 ? 0 :                   \
+>>>>>               (n) & (1ULL << 63) ? 63 :       \
+>>>>>               (n) & (1ULL << 62) ? 62 :       \
+>>>>>               (n) & (1ULL << 61) ? 61 :       \
+>>>>> @@ -149,9 +143,7 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
+>>>>>               (n) & (1ULL <<  3) ?  3 :       \
+>>>>>               (n) & (1ULL <<  2) ?  2 :       \
+>>>>>               (n) & (1ULL <<  1) ?  1 :       \
+>>>>> -             (n) & (1ULL <<  0) ?  0 :       \
+>>>>> -             ____ilog2_NaN()                 \
+>>>>> -                                ) :          \
+>>>>> +             0) :                            \
+>>>>>       (sizeof(n) <= 4) ?                      \
+>>>>>       __ilog2_u32(n) :                        \
+>>>>>       __ilog2_u64(n)                          \
+>>>>> @@ -194,7 +186,6 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
+>>>>>   * @n: parameter
+>>>>>   *
+>>>>>   * The first few values calculated by this routine:
+>>>>> - *  ob2(0) = 0
+>>>>>   *  ob2(1) = 0
+>>>>>   *  ob2(2) = 1
+>>>>>   *  ob2(3) = 2
+>>>>>
+>>>>
+>>>> Reviving this thread as gcc 7 has now hit Fedora rawhide and has this
+>>>> same issue. I pulled in the above patch from Will as a temporary work
+>>>> around for building. It didn't look like there was consensus on a
+>>>> permanent solution though from the thread.
+>>>>
+>>>
+>>> I still think order_base_2() is broken, since it may invoke
+>>> roundup_pow_of_two() with an input value that is documented as
+>>> producing undefined output. I would argue that the below is the
+>>> correct fix.
+>>>
+>>> diff --git a/include/linux/log2.h b/include/linux/log2.h
+>>> index fd7ff3d91e6a..46523731bec0 100644
+>>> --- a/include/linux/log2.h
+>>> +++ b/include/linux/log2.h
+>>> @@ -203,6 +203,18 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
+>>>   *  ... and so on.
+>>>   */
+>>>
+>>> -#define order_base_2(n) ilog2(roundup_pow_of_two(n))
+>>> +static inline __attribute__((__const__))
+>>> +unsigned long __order_base_2(unsigned long n)
+>>> +{
+>>> +       return n ? 1UL << fls_long(n - 1) : 1;
+>>> +}
+>>> +
+>>> +#define order_base_2(n)                                \
+>>> +(                                              \
+>>> +       __builtin_constant_p(n) ? (             \
+>>> +               ((n) < 2) ? (n) :               \
+>>> +               ilog2((n) - 1) + 1) :           \
+>>> +       ilog2(__order_base_2(n))                \
+>>> + )
+>>>
+>>>  #endif /* _LINUX_LOG2_H */
+>>>
+>>
+>> This fixes the problem although the comments should be updated
+>> as well.
 > 
-> I'm afraid that you might be talking about my v30.
-> The code in v31 was a bit modified, and now
+> This brings order_base_2() in line with the comments, so I am not sure
+> what you'd want to update here?
 > 
-> > ... hwoever, this means we've mapped the portion which overlaps with the
-> > kernel's linear alias (i.e. the case that we try to handle in
-> > __map_memblock()). What we actually wanted was:
-> > 
-> > memblock.memory:   |---------------------------------------------------|
-> > kernel image:              |---|
-> > crashkernel:                                      |------|
-> 
->                      |-----------(A)---------------|        |----(B)-----|
-> 
-> __map_memblock() is called against each of (A) and (B),
-> so I think we will get
-> 
-> > mapped regions:    |------|     |----------------|        |------------|
-> 
-> this mapping.
 
-Ah, I see. You are correct; this will work.
-
-Clearly I needed more coffee before considering this. :/
-
-> > To handle all cases I think we have to isolate *both* the image and
-> > crashkernel in map_mem(). That would leave use with:
-> > 
-> > memblock.memory:   |------||---||----------------||------||------------|
-> > memblock.reserved:         |---|                  |------|
-> > 
-> > ... so then we can check for overlap with either the kernel or
-> > crashkernel in __map_memblock(), and return early, e.g.
-> > 
-> > __map_memblock(...)
-> > 	if (overlaps_with_kernel(...))
-> > 		return;
-> > 	if (overlaps_with_crashekrenl(...))
-> > 		return;
-> > 	
-> > 	__create_pgd_mapping(...);
-> > }
-> > 
-> > We can pull the kernel alias mapping out of __map_memblock() and put it
-> > at the end of map_mem().
-> > 
-> > Does that make sense?
-> 
-> OK, I now understand your anticipation.
-
-Thinking about it, we can do this consistently in one place if we use nomap
-(temporarily), which would allow us to simplify the existing code. We'd have to
-introduce memblock_clear_nomap(), but that's less of an internal detail than
-memblock_isolate_range(), so that seems reasonable.
-
-I think we can handle this like:
-
-/*
- * Create a linear mapping for all memblock memory regions which are mappable.
- */
-static void __init __map_mem(pgd_t *pgd)
-{
-        struct memblock_region *reg;
-
-        /* map all the memory banks */
-        for_each_memblock(memory, reg) {
-                phys_addr_t start = reg->base;
-                phys_addr_t end = start + reg->size;
-
-                if (start >= end)
-                        break;
-                if (memblock_is_nomap(reg))
-                        continue;
-
-                __create_pgd_mapping(pgd, start, __phys_to_virt(start),
-                                     end - start, PAGE_KERNEL,
-                                     early_pgtable_alloc,
-                                     debug_pagealloc_enabled());
-        }   
-}
-
-/*
- * Create a linear mapping for mappable memory, handling regions which have
- * special mapping requirements.
- */
-static void __init map_mem(pgd_t *pgd)
-{
-        unsigned long kernel_start = __pa(_text);
-        unsigned long kernel_end = __pa(__init_begin);
-
-        memblock_mark_nomap(kernel_start, kernel_end);
-
-        // mark crashkernel nomap here
-
-        __map_mem(pgd);
-
-        /*  
-         * Map the linear alias of the [_text, __init_begin) interval as
-         * read-only/non-executable. This makes the contents of the
-         * region accessible to subsystems such as hibernate, but
-         * protects it from inadvertent modification or execution.
-         */
-        __create_pgd_mapping(pgd, kernel_start, __phys_to_virt(kernel_start),
-                             kernel_end - kernel_start, PAGE_KERNEL_RO,
-                             early_pgtable_alloc, debug_pagealloc_enabled());
-        memblock_clear_nomap(kernel_start, kernel_end);
-
-        // map crashkernel here
-        // clear nomap for crashkernel
-}
-
-Thoughts?
+ob2(1) = 1  for the __builtin_constant_p case which doesn't
+match the comment of ob2(1) = 0. So my statement should actually
+be is this correct?
 
 Thanks,
-Mark.
+Laura
