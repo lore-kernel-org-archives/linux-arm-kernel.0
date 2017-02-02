@@ -1,42 +1,78 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 2 Feb 2017 10:34:00 +0800
-Subject: [PATCH V8 09/10] trace, ras: add ARM processor error trace event
-In-Reply-To: <1485969413-23577-10-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <201702021014.xd63mfiV%fengguang.wu@intel.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Wed, 1 Feb 2017 21:37:13 -0500
+Subject: [PATCH v3 3/3] reset: zx2967: add reset controller driver for
+ ZTE's zx2967 family
+In-Reply-To: <1484623377-16208-3-git-send-email-baoyou.xie@linaro.org>
+References: <1484623377-16208-1-git-send-email-baoyou.xie@linaro.org>
+ <1484623377-16208-3-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <CAP=VYLqhAEKAdnO7skBU7V+NxbQqXs_UbOO0J1hYHmCq3aKQow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+On Mon, Jan 16, 2017 at 10:22 PM, Baoyou Xie <baoyou.xie@linaro.org> wrote:
+> This patch adds reset controller driver for ZTE's zx2967 family.
+>
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> ---
+>  drivers/reset/Kconfig        |   6 +++
+>  drivers/reset/Makefile       |   1 +
+>  drivers/reset/reset-zx2967.c | 106 +++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 113 insertions(+)
+>  create mode 100644 drivers/reset/reset-zx2967.c
+>
+> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+> index 172dc96..f4cdfe9 100644
+> --- a/drivers/reset/Kconfig
+> +++ b/drivers/reset/Kconfig
+> @@ -86,6 +86,12 @@ config RESET_UNIPHIER
+>           Say Y if you want to control reset signals provided by System Control
+>           block, Media I/O block, Peripheral Block.
+>
+> +config RESET_ZX2967
+> +       bool "ZTE ZX2967 Reset Driver"
 
-[auto build test ERROR on pm/linux-next]
-[also build test ERROR on v4.10-rc6 next-20170201]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+This new driver just tripped my linux-next testing for non-modular code
+that is using modular infrastructure.  Is there any value in having this
+driver as a tristate, or should I send a patch to strip out the needless
+references to anything modular?
 
-url:    https://github.com/0day-ci/linux/commits/Tyler-Baicar/Add-UEFI-2-6-and-ACPI-6-1-updates-for-RAS-on-ARM64/20170202-020320
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
-config: x86_64-randconfig-r0-02020102 (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+Thanks,
+Paul.
+--
 
-All errors (new ones prefixed by >>):
+> +       depends on ARCH_ZX || COMPILE_TEST
+> +       help
+> +         This enables the reset controller driver for ZTE's zx2967 family.
+> +
+>  config RESET_ZYNQ
+>         bool "ZYNQ Reset Driver" if COMPILE_TEST
+>         default ARCH_ZYNQ
+> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+> index 13b346e..2cd3f6c 100644
+> --- a/drivers/reset/Makefile
+> +++ b/drivers/reset/Makefile
+> @@ -13,4 +13,5 @@ obj-$(CONFIG_RESET_STM32) += reset-stm32.o
+>  obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
+>  obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
+>  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
+> +obj-$(CONFIG_RESET_ZX2967) += reset-zx2967.o
+>  obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
+> diff --git a/drivers/reset/reset-zx2967.c b/drivers/reset/reset-zx2967.c
+> new file mode 100644
+> index 0000000..5d82151
+> --- /dev/null
+> +++ b/drivers/reset/reset-zx2967.c
+> @@ -0,0 +1,106 @@
+> +/*
+> + * ZTE's zx2967 family reset controller driver
+> + *
+> + * Copyright (C) 2017 ZTE Ltd.
+> + *
+> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
+> + *
+> + * License terms: GNU General Public License (GPL) version 2
+> + */
+> +
+> +#include <linux/module.h>
 
-   drivers/built-in.o: In function `ghes_do_proc.isra.9':
->> ghes.c:(.text+0x92fda): undefined reference to `__tracepoint_arm_event'
-   ghes.c:(.text+0x9300a): undefined reference to `__tracepoint_arm_event'
-   ghes.c:(.text+0x93054): undefined reference to `__tracepoint_arm_event'
-   ghes.c:(.text+0x93083): undefined reference to `__tracepoint_unknown_sec_event'
-   ghes.c:(.text+0x930b8): undefined reference to `__tracepoint_unknown_sec_event'
-   ghes.c:(.text+0x93121): undefined reference to `__tracepoint_unknown_sec_event'
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 25871 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170202/00eeb16c/attachment-0001.gz>
+[...]
