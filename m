@@ -1,40 +1,79 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 2 Feb 2017 19:03:45 +0530
-Subject: [GIT PULL 1/4] DaVinci driver updates
-Message-ID: <20170202133348.32713-1-nsekhar@ti.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 2 Feb 2017 13:34:03 +0000
+Subject: [PATCH] virtio: Try to untangle DMA coherency
+In-Reply-To: <20170202112614.GB30577@arm.com>
+References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
+ <20170201195732-mutt-send-email-mst@kernel.org>
+ <20170201182659.GM8177@arm.com>
+ <20170201210648-mutt-send-email-mst@kernel.org>
+ <20170202112614.GB30577@arm.com>
+Message-ID: <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+On 02/02/17 11:26, Will Deacon wrote:
+> On Wed, Feb 01, 2017 at 09:19:22PM +0200, Michael S. Tsirkin wrote:
+>> On Wed, Feb 01, 2017 at 06:27:09PM +0000, Will Deacon wrote:
+>>> On Wed, Feb 01, 2017 at 08:09:21PM +0200, Michael S. Tsirkin wrote:
+>>>> I'd like to do that instead. It's fastboot doing the unreasonable thing
+>>>> here and deviating from what every other legacy device without exception
+>>>> did for years. If this means fastboot will need to update to virtio 1,
+>>>> all the better.
+>>>
+>>> The problem still exists with virtio 1, unless we require that the
+>>> "dma-coherent" property is set/unset correctly when VIRTIO_F_IOMMU_PLATFORM
+>>> is advertised by the device (which is what I suggested in my reply).
+>>
+>> I'm not ignoring that, but I need to understand that part a bit better.
+>> I'll reply to that patch in a day or two after looking at how _CCA is
+>> supposed to work.
+> 
+> Thanks. I do think that whatever solution we come up with for virtio 1
+> should influence what we do for legacy.
+> 
+>>> We can't detect the fastmodel,
+>>
+>> Surely, it puts a hardware id somewhere? I think you mean
+>> fastmodel isn't always affected, right?
+> 
+> I don't think there's a hardware ID. The thing is, the fastmodel is a
+> toolkit for building all sorts of platforms: you can chop and change
+> the CPUs, the peripherals, the memory, the interrupt controller, the
+> interconnect etc. Pretty much everything can be customised. So, for
+> any fastmodel configuration that places virtio upstream of the SMMU
+> (which is common, because virtio is one of the few DMA-capable peripherals
+> that the fastmodel supports), we need to do something special.
+> 
+>> I'd like to see basically
+>>
+>> if (fastmodel)
+>> 	a pile of special work-arounds
+>> else
+>> 	not less hacky but more common virtio work-arounds
+>>
+>> :)
+>>
+>> And then I can apply whatever comes from @arm.com and not
+>> worry about breaking actual hardware.
+> 
+> What we could do is call iommu_group_get(&vdev->dev) for legacy
 
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+Actually, that should be vdev->dev.parent - I'm now not sure quite what
+I managed to successfully test yesterday, but apparently it wasn't this
+patch :(
 
-are available in the git repository at:
+> devices if CONFIG_ARM64. If that returns non-NULL, then we know that
+> the device is upstream of an SMMU, which means it must be the fastmodel.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.11/drivers
+We can boot 32-bit kernels on models, so I'd be inclined to keep
+CONFIG_ARM included, but I do tend to agree that explicitly checking for
+an IOMMU is probably the cleanest approach if we reposition this as a
+more specific quirk. I'll split apart the "Fast Models are wacky" vs.
+"uh-oh device coherency" aspects and spin a v2 so that we can
+(hopefully) sort the regression out ASAP.
 
-for you to fetch changes up to cdf0ead3747200d527f37170d3fdd41e368f88b0:
+Robin.
 
-  sata: ahci-da850: un-hardcode the MPY bits (2017-01-31 20:41:52 +0530)
-
-----------------------------------------------------------------
-Driver updates for SATA support on DA850.
-
-These have been acked by SATA maintainer
-Tejun Heo. Tejun preferred these be queued
-through ARM-SoC because of the dependencies
-with platform code.
-
-----------------------------------------------------------------
-Bartosz Golaszewski (6):
-      sata: ahci-da850: get the sata clock using a connection id
-      sata: ahci-da850: add device tree match table
-      sata: ahci-da850: implement a workaround for the softreset quirk
-      sata: ahci: export ahci_do_hardreset() locally
-      sata: ahci-da850: add a workaround for controller instability
-      sata: ahci-da850: un-hardcode the MPY bits
-
- drivers/ata/ahci.h       |   3 +
- drivers/ata/ahci_da850.c | 175 ++++++++++++++++++++++++++++++++++++++++++-----
- drivers/ata/libahci.c    |  18 +++--
- 3 files changed, 174 insertions(+), 22 deletions(-)
+> 
+> Will
+> 
