@@ -1,40 +1,79 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Feb 2017 16:48:08 +0000
-Subject: [PATCHv2 net-next 01/16] dt-bindings: net: update Marvell PPv2
- binding for PPv2.2 support
-In-Reply-To: <20170202175650.1fc06c2d@free-electrons.com>
-References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943592-12556-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170103201842.hdg2uzzesog2jund@rob-hp-laptop>
- <20170202175650.1fc06c2d@free-electrons.com>
-Message-ID: <20170203164808.GD27312@n2100.armlinux.org.uk>
+From: jintack@cs.columbia.edu (Jintack Lim)
+Date: Fri, 3 Feb 2017 11:51:03 -0500
+Subject: [RFC v4 00/10] Provide the EL1 physical timer to the VM
+In-Reply-To: <11908d08-6e2d-010c-2e6f-fd677c7ad8b1@arm.com>
+References: <1486135208-13415-1-git-send-email-jintack@cs.columbia.edu>
+ <11908d08-6e2d-010c-2e6f-fd677c7ad8b1@arm.com>
+Message-ID: <CAHyh4xivs-0jA4-HDK8H9YsJqdTioGfDaW5WZMdyLQTc57aNDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 05:56:50PM +0100, Thomas Petazzoni wrote:
-> For PPv2.2, we wanted to simplify a little bit the register mappings,
-> and simply reflect the memory map of the SoC. In the SoC datasheet,
-> there are two memory areas for the networking subsystem, which are the
-> two areas reflected in:
-> 
->         reg = <0x0 0x100000>,
->               <0x100000 0x80000>;
-> 
-> The per-port registers are inside the second register area. But by
-> exposing the entire register area in the Device Tree binding, we allow
-> improvements in the driver that need additional registers to be made
-> without changing the Device Tree description of the device.
+On Fri, Feb 3, 2017 at 11:14 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 03/02/17 15:19, Jintack Lim wrote:
+>> The ARM architecture defines the EL1 physical timer and the virtual timer,
+>> and it is reasonable for an OS to expect to be able to access both.
+>> However, the current KVM implementation does not provide the EL1 physical
+>> timer to VMs but terminates VMs on access to the timer.
+>>
+>> This patch series enables VMs to use the EL1 physical timer through
+>> trap-and-emulate only on arm64. The KVM host emulates each EL1 physical
+>> timer register access and sets up the background timer accordingly.  When
+>> the background timer expires, the KVM host injects EL1 physical timer
+>> interrupts to the VM.  Alternatively, it's also possible to allow VMs to
+>> access the EL1 physical timer without trapping.  However, this requires
+>> somehow using the EL2 physical timer for the Linux host while running the
+>> VM instead of the EL1 physical timer.  Right now I just implemented
+>> trap-and-emulate because this was straightforward to do, and I leave it to
+>> future work to determine if transferring the EL1 physical timer state to
+>> the EL2 timer provides any performance benefit.
+>>
+>> This feature will be useful for any OS that wishes to access the EL1
+>> physical timer. Nested virtualization is one of those use cases. A nested
+>> hypervisor running inside a VM would think it has full access to the
+>> hardware and naturally tries to use the EL1 physical timer as Linux would
+>> do. Other nested hypervisors may try to use the EL2 physical timer as Xen
+>> would do, but supporting the EL2 physical timer to the VM is out of scope
+>> of this patch series. This patch series will make it easy to add the EL2
+>> timer support in the future, though.
+>>
+>> Note that Linux VMs booting in EL1 will be unaffected by this patch series
+>> and will continue to use only the virtual timer and this patch series will
+>> therefore not introduce any performance degredation as a result of
+>> trap-and-emulate.
+>>
+>> v3 => v4:
+>>  - Fix a bug that prevents a VM from booting on 32-bit architecture
+>>  - Clarify that the emulated physical timer is only supported on arm64
+>>    in the cover letter
+>
+> Hi Jintack,
+>
+> I've now applied this to queue, and will push it out later today.
 
-Are you sure that this makes sense?  You have the serdes block at
-0x120000-0x125fff, which sits within that range, and that needs to
-be configured for SATA and PCIe, so it's not strictly just a network
-thing.
+Thanks, Marc.
 
-I know from my experimentation that disabling the "serdes" by clearing
-the SD_EXTERNAL_CONFIG1_REG and SD_EXTERNAL_CONFIG0_REG for SATA
-channels prevents SATA working.
+>
+> Out of curiosity, is there any reason why this is arm64 only?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+It was simply because I didn't have a convenient 32bit architecture
+develop environment at hand and didn't spend time to set it up myself
+:(
+(As specified in the nesting RFC patch series cover letter, the
+nesting patches are compiled, but not tested on 32-bit architecture
+yet.)
+I guess it's time to set it up.
+
+> As far as
+> I can tell, we're only missing the cp15 handling (both for arm and in
+> the 32bit handling in arm64).
+
+I think so, too. I can't promise when, but I'll try to add those once
+I set the develop environment.
+
+>
+> Thanks,
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
+>
