@@ -1,79 +1,41 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Fri, 3 Feb 2017 09:53:51 -0600
-Subject: [RFC] w1: regression, remove need for ida and use
- PLATFORM_DEVID_AUTO
-In-Reply-To: <cfa35897-383e-674a-f049-e45c4dfeb534@tul.cz>
-References: <d0b52b94-0c87-61f8-32ff-99f2a354e500@tul.cz>
- <308e185e-26eb-39ee-d82f-a0d210a41743@ti.com>
- <cfa35897-383e-674a-f049-e45c4dfeb534@tul.cz>
-Message-ID: <2f6c0042-c096-d315-b037-242fec3cd24d@ti.com>
+From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
+Date: Fri, 3 Feb 2017 10:56:34 -0500
+Subject: [PATCH 4/6] bus: add driver for the Technologic Systems NBUS
+In-Reply-To: <CACRpkdbAYyxTOq_ZAwjSJAhCbrzTaUMSG9N7t8Wq1ifTDFBLrQ@mail.gmail.com>
+References: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
+ <20161214231237.17496-5-sebastien.bourdelin@savoirfairelinux.com>
+ <CACRpkdYHHrYY-fAPnNmV94ejFJ36rhSF0SqSVHkTNq+YCRNNZw@mail.gmail.com>
+ <7bc0871f-ac0a-e8a0-0c84-a0e61b3991a8@savoirfairelinux.com>
+ <CACRpkdbAYyxTOq_ZAwjSJAhCbrzTaUMSG9N7t8Wq1ifTDFBLrQ@mail.gmail.com>
+Message-ID: <3f3cd438-63dc-dea8-e17b-7eb3e588cc36@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/2017 07:31 PM, Petr Cvek wrote:
-> Dne 2.2.2017 v 15:23 Andrew F. Davis napsal(a):
->> On 02/01/2017 07:05 PM, Petr Cvek wrote:
->>> Patch 
->>> 	w1: remove need for ida and use PLATFORM_DEVID_AUTO
->>> 	098f9fb0c962eb2fdba5f9d34f4cf7a938237184 
->>>
->>> causes a regression in the w1_ds2760 driver. Initialization creates a name "ds2760-battery.0.auto". It seems that name of that size will cause checking code in __thermal_cooling_device_register() from thermal_core.c to fail as it checks for names shorter than 20 chars:
->>>
->>> 	if (type && strlen(type) >= THERMAL_NAME_LENGTH)
->>> 		return ERR_PTR(-EINVAL);
->>>
->>> A second problem seems to be with magician_supplicants list as "ds2760-battery.0" does not match in a test power_supply_am_i_supplied() in ds2760_battery_update_status() from drivers/power/supply/ds2760_battery.c . This causes status flag to be forever in POWER_SUPPLY_STATUS_DISCHARGING state.
->>>
->>> Functionality returned after I hotfix changed (drivers/w1/slaves/w1_ds2760.c)
->>>
->>> 	pdev = platform_device_alloc("ds2760-battery", PLATFORM_DEVID_AUTO);
->>>
->>> to
->>>
->>> 	pdev = platform_device_alloc("ds2760-battery", 0);
->>>
->>> Which solution do you advise. Shortening the name let's say just to "ds2760" (with changes to arch files, w1 files and supply files), increasing THERMAL_NAME_LENGTH to let's say 32 (I don't know if this doesn't break something other) or just reverting to the old behavior?
->>>
->>
->> If 20 is no longer the max thermal name then THERMAL_NAME_LENGTH should
->> be changed.
-> 
-> Yes it is that ".auto" addition to "ds2760-battery.0" makes 21 chars long string. With higher number (".10" onwards) it is 22 chars. Load of the module then fails at test in thermal_zone_device_register():
-> 
-> 	https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/thermal/thermal_core.c?id=refs/tags/v4.10-rc6#n1158
-> 
-> 	if (type && strlen(type) >= THERMAL_NAME_LENGTH)
-> 		return ERR_PTR(-EINVAL);
-> 
-> I searched in code further and with THERMAL_NAME_LENGTH = 30 (enough space) the module load fails at another place in __hwmon_device_register():
-> 	
-> 	https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/hwmon/hwmon.c?id=refs/tags/v4.10-rc6#n548
-> 
-> 	if (name && (!strlen(name) || strpbrk(name, "-* \t\n")))
-> 		return ERR_PTR(-EINVAL);
-> 
-> That's because there is "-" in "ds2760-battery.0.auto" (and that's why shortening to "ds2760.0" works). Is there some reason for disallowing "-" in a name? If not then I'm for removal (in other case we need to change ds2760-battery and others names). Increasing THERMAL_NAME_LENGTH to 22 should be just OK for ds2760 (but maybe not enough for others) I would increased it to 32 (nice number ;-) ).
-> 
->>
->> As for the couple boards hard-coding "ds2760-battery.0", this is a
->> problem that should be fix regardless of any fix we chose here as IDA is
->> not guaranteed to return 0, so the battery could just as easily be
->> called ds2760-battery.7. (I've had this discussion before as the N900
->> user-space also make this mistake).
->>
-> 
-> I'm not familiar with power supply subsystem, so just a naive idea. Should suffice to change drivers/power/supply/power_supply_core.c __power_supply_is_supplied_by() for only first part of the string? (like "ds2760-battery" subset of "ds2760-battery.7").
-> 
-> Do you have a link to discussion about N900?
-> 
+Hi Linus,
 
-The thread doesn't look to have happened on the lists, but the commit
-that reverted my change is: 9aafabc7fece. I argued against this revert
-as relying on sysfs names never changing should be considered ABI abuse
-and we should not hold back proper fixes for the sake of keeping a hack
-in user-space working.
-
-Andrew
-
-> Petr
+On 02/03/2017 08:51 AM, Linus Walleij wrote:
+> Your child nodes I guess will be instatiated as devices as well.
 > 
+> These devices will have the NBUS driver as .parent in their
+> struct device I guess. Else the design of this bus is tilted.
+> 
+> If the NBUS driver use dev_set_drvdata(dev, state_container_cookie)
+> the children can use dev_get_drvdata(dev->parent); to get a pointer to
+> the same cookie.
+> 
+> The subdrivers don't even need to know the members of the state
+> container as long as you're just passing a pointer to it. It's
+> enough if you forward-declare it as a "pointer to some struct":
+> 
+> struct foo;
+> 
+> {
+>    struct foo *fooptr = dev_get_drvdata(dev->parent);
+>    write(fooptr, 0x10);
+> 
+> etc
+
+Thanks a lot, this is perfect!
+
+Best Regards,
+Sebastien.
