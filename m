@@ -1,41 +1,28 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 3 Feb 2017 17:14:27 -0600
-Subject: [PATCH 2/2] DTS: dra7: Add "opp_high" opp node to support 1.5 GHz
- SoC operation
-In-Reply-To: <20170204000615.4417940f@jawa>
-References: <1486135491-14223-1-git-send-email-lukma@denx.de>
- <1486135491-14223-2-git-send-email-lukma@denx.de>
- <f17ceda2-45e0-9c67-7c8a-5a35132a2d0a@ti.com>
- <20170204000615.4417940f@jawa>
-Message-ID: <CAGo_u6qiXnmMCXs=NB=L6E1Ecguo_1MAHap9bi1G-5rVbaiN7g@mail.gmail.com>
+From: vicmos89@gmail.com (Victor Vaschenko)
+Date: Sat,  4 Feb 2017 02:18:41 +0300
+Subject: [PATCH] One coding style correction.
+Message-ID: <1486163921-29331-1-git-send-email-vicmos89@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 3, 2017 at 5:06 PM, Lukasz Majewski <lukma@denx.de> wrote:
-[...]
->> > +           opp_high at 1500000000 {
->> > +                   opp-hz = /bits/ 64 <1500000000>;
->> > +                   opp-microvolt = <1210000 950000 1250000>;
->> > +           };
->> >     };
->> >
->> >     /*
->> >
->> Please keep this out of the way till we get the AVS class0 integrated
->> in. devices wont be save at 1.5GHz without the opp powerdomain + AVS
->> Class0 implementation.
->>
->
-> Yes, correct. My AM5728 works with this opp, but AM5718 hangs when this
-> frequency is enabled.
-
-Right, and if you leave it on for too long without avs class0, you
-might need a new silicon as well :(
-
-If you'd like to help, I saw Dave's response, it will be good if you
-can help us get the dependencies out of the way to enable 1.5G
-cleanly.
--- 
+Signed-off-by: Victor Vaschenko <vicmos89@gmail.com>
 ---
-Regards,
-Nishanth Menon
+ drivers/staging/bcm2835-audio/bcm2835-ctl.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/staging/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
+index 164daa4..bfb7e9f 100644
+--- a/drivers/staging/bcm2835-audio/bcm2835-ctl.c
++++ b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
+@@ -164,8 +164,7 @@ static int snd_bcm2835_ctl_put(struct snd_kcontrol *kcontrol,
+ 		.get = snd_bcm2835_ctl_get,
+ 		.put = snd_bcm2835_ctl_put,
+ 		.count = 1,
+-		.tlv =
+-		{.p = snd_bcm2835_db_scale}
++		.tlv = {.p = snd_bcm2835_db_scale}
+ 	},
+ 	{
+ 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+--
+1.9.1
