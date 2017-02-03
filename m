@@ -1,82 +1,40 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 3 Feb 2017 16:02:27 +0100
-Subject: [PATCHv2 net-next 05/16] net: mvpp2: introduce PPv2.2 HW
- descriptors and adapt accessors
-In-Reply-To: <231514f4-2e35-8bde-4469-aada833635aa@arm.com>
-References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943592-12556-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170106142901.GC14217@n2100.armlinux.org.uk>
- <113811b6-79a4-9c66-d302-add9fb0c5b1a@arm.com>
- <20170203142446.2ee517a7@free-electrons.com>
- <231514f4-2e35-8bde-4469-aada833635aa@arm.com>
-Message-ID: <20170203160227.08b40c58@free-electrons.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 3 Feb 2017 15:11:41 +0000
+Subject: [PATCH v8 00/15] ACPI platform MSI support and its example mbigen
+In-Reply-To: <a2eb29e2-0f46-0be0-dc43-b3a086556965@codeaurora.org>
+References: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
+ <a2eb29e2-0f46-0be0-dc43-b3a086556965@codeaurora.org>
+Message-ID: <fd106be9-836d-8d91-e57c-183ca56b4a49@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, 3 Feb 2017 14:05:13 +0000, Robin Murphy wrote:
-
-> > So do you have a better suggestion? The descriptors only have enough
-> > space to store a 40-bit virtual address, which is not enough to fit the
-> > virtual addresses used by Linux for SKBs. This is why I'm instead
-> > relying on the fact that the descriptors can store the 40-bit physical
-> > address, and convert it back to a virtual address, which should be fine
-> > on ARM64 because the entire physical memory is part of the kernel linear
-> > mapping.  
+On 03/02/17 14:50, Sinan Kaya wrote:
+> On 1/18/2017 7:54 AM, Hanjun Guo wrote:
+>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>
+>> With platform msi support landed in the kernel, and the introduction
+>> of IORT for GICv3 ITS (PCI MSI) and SMMU, the framework for platform msi
+>> is ready, this patch set add few patches to enable the ACPI platform
+>> msi support.
+>>
+>> For platform device connecting to ITS on arm platform, we have IORT
+>> table with the named componant node to describe the mappings of paltform
+>> device and ITS, so we can retrieve the dev id and find its parent
+>> irqdomain (ITS) from IORT table (simlar with the ACPI ITS support).
+>>
 > 
-> OK, that has nothing to do with DMA addresses then.
-
-Well, it has to do with DMA in the sense that those buffers are
-mapped with dma_map_single(). So the address that is given to us by the
-hardware as the "physical address of the RX buffer" is the one that we
-have initially given to the hardware and was the result of 
-dma_map_single().
-
-> > Russell proposal of testing the size of a virtual address
-> > pointer instead would solve this I believe, correct?  
+> I understand that there is a consensus on IORT/SMMUv3 specific pieces
+> of this series while there is some ongoing work on the MBIgen part in
+> due to dependency on Agustin's patch vs. ACPI definitions.
 > 
-> AFAICS, even that shouldn't really be necessary - for all VA/PA
-> combinations of 32/32, 32/40 and 64/40, storing virt_to_phys() of the
-> SKB VA won't overflow 40 bits,
+> Can we merge the IORT/SMMUv3 specific pieces to 4.11 so that the base
+> implementation comes in place?
 
-I'm already lost here. Why are you talking about virt_to_phys() ? See
-above: we have the dma_addr_t returned from dma_map_single(), and we
-need to find back the corresponding virtual address, because there is
-not enough room in the HW descriptors to store a full 64-bit VA.
+Sorry, but I may be missing something. Which IORT/SMMUv3 patches are we
+talking about? Do you have a pointer to a series?
 
-> so a corresponding phys_to_virt() at the other end can't go wrong
-> either. If you really do want to special-case things based on VA
-> size, though, either CONFIG_64BIT or sizeof(void *) would indeed be
-> infinitely more useful than the unrelated DMA address width - I know
-> this driver's never going to run on SPARC64, but that's one example
-> of where the above logic would lead to precisely the truncated VA
-> it's trying to avoid.
+Thanks,
 
-What is different on SPARC64 here?
-
-The situation we have is the following:
-
- - On systems where VAs are 32-bit wide, we have enough room to store
-   the VA in the HW descriptor. So when we receive a packet, the HW
-   descriptor provides us directly with the VA of the network packet,
-   and the DMA address of the packet. We can dma_unmap_single() the
-   packet, and do its processing.
-
- - On systems where VAs are 64-bit wide, we don't have enough room to
-   store the VA in the HW descriptor. However, on 64-bit systems, the
-   entire physical memory is mapped in the kernel linear mapping, so
-   phys_to_virt() is valid on any physical address. And we use this
-   property to retrieve the full 64-bit VA using the DMA address that
-   we get from the HW descriptor.
-
-   Since what we get from the HW descriptor is a DMA address, that's
-   why we're using phys_to_virt(dma_to_phys(...)).
-
-Best regards,
-
-Thomas
+	M.
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
