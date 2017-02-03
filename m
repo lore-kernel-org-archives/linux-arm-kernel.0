@@ -1,5 +1,5 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Fri, 3 Feb 2017 09:07:07 +0530
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 03 Feb 2017 11:37:04 +0800
 Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
  deferred probing or error
 In-Reply-To: <3f4aa4c1e660c7e62256de9ca64fc822@codeaurora.org>
@@ -15,13 +15,12 @@ References: <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
  <f401e27e-d619-0eec-2401-50d8e2fc2f0f@codeaurora.org>
  <20170201185230.GA1922@red-moon>
  <3f4aa4c1e660c7e62256de9ca64fc822@codeaurora.org>
-Message-ID: <013f01d27dce$cf8f5da0$6eae18e0$@codeaurora.org>
+Message-ID: <5893FAE0.8070301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
->On 2017-02-01 13:52, Lorenzo Pieralisi wrote:
+On 02/03/2017 03:01 AM, Nate Watterson wrote:
+> On 2017-02-01 13:52, Lorenzo Pieralisi wrote:
 >>
 >> I debugged the issue and Nate's fix is correct, the fact that you
 >> can't it hit it with mainline is just a matter of timing because it has
@@ -34,18 +33,16 @@ Hi,
 >> fix is already queued, so it is all good.
 >>
 >> What about USB stalls ?
->Our fault. The USB controller was getting 48-bit IOVAs, but the
->bus it sits on only supports 44-bits so the controller's DMA
->transactions ended up targeting addresses that were never mapped.
+> Our fault. The USB controller was getting 48-bit IOVAs, but the
+> bus it sits on only supports 44-bits so the controller's DMA
+> transactions ended up targeting addresses that were never mapped.
 >
->It started working once I applied the iort/dma-mapping patches I
->sent out earlier this week that use the iort memory_address_limit
->field to check if a dma_mask is sane.
->
->Sorry for the false alarm.
+> It started working once I applied the iort/dma-mapping patches I
+> sent out earlier this week that use the iort memory_address_limit
+> field to check if a dma_mask is sane.
 
-Ok, thanks for closing on it. I will just post V8 with all acks picked up and
-Robin's fix , right away.
+OK, great, I tested this patch with platform USB device which was
+working fine on Hisilicon D03, so I didn't miss anything here.
 
-Regards,
- Sricharan
+Thanks
+Hanjun
