@@ -1,191 +1,63 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 Feb 2017 20:40:57 +0100
-Subject: [PATCH v2 4/5] iio: trigger: add support for STM32 EXTI triggers
-In-Reply-To: <1485786840-4557-5-git-send-email-fabrice.gasnier@st.com>
-References: <1485786840-4557-1-git-send-email-fabrice.gasnier@st.com>
- <1485786840-4557-5-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <CACRpkdZeiFYFdRWCEgYWDWh4Wn2gT29KAFao9mgj7sTi768kFQ@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 3 Feb 2017 11:45:56 -0800
+Subject: [PATCHv2 1/2] arch: Move CONFIG_DEBUG_RODATA and
+ CONFIG_SET_MODULE_RONX to be common
+In-Reply-To: <1486144343-24998-2-git-send-email-labbott@redhat.com>
+References: <1486144343-24998-1-git-send-email-labbott@redhat.com>
+ <1486144343-24998-2-git-send-email-labbott@redhat.com>
+Message-ID: <CAGXu5jK6_y=dWHUDBto7ykN_sSOQ6Gx+sZs_gQ1Hoh5DjP-fTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 3:33 PM, Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
-
-> EXTi[0..15] gpio signal can be routed internally as trigger source for
-> ADC or DAC conversions. Configure them as interrupts to configure
-> trigger path in HW.
+On Fri, Feb 3, 2017 at 9:52 AM, Laura Abbott <labbott@redhat.com> wrote:
+> There are multiple architectures that support CONFIG_DEBUG_RODATA and
+> CONFIG_SET_MODULE_RONX. These options also now have the ability to be
+> turned off at runtime. Move these to an architecture independent
+> location and make these options def_bool y for almost all of those
+> arches.
 >
-> Note: interrupt handler isn't required here, and corresponding interrupt
-> can be kept masked at exti controller level.
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> v2: This patch is now doing just the refactor of the existing config options.
+> ---
+>  arch/Kconfig              | 28 ++++++++++++++++++++++++++++
+>  arch/arm/Kconfig          |  3 +++
+>  arch/arm/Kconfig.debug    | 11 -----------
+>  arch/arm/mm/Kconfig       | 12 ------------
+>  arch/arm64/Kconfig        |  5 ++---
+>  arch/arm64/Kconfig.debug  | 11 -----------
+>  arch/parisc/Kconfig       |  1 +
+>  arch/parisc/Kconfig.debug | 11 -----------
+>  arch/s390/Kconfig         |  5 ++---
+>  arch/s390/Kconfig.debug   |  3 ---
+>  arch/x86/Kconfig          |  5 ++---
+>  arch/x86/Kconfig.debug    | 11 -----------
+>  12 files changed, 38 insertions(+), 68 deletions(-)
 >
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-
-But I see nothing STM32-specific about this driver?
-
-I think we should do everone a service and just create
-drivers/iio/trigger/gpio-trigger.c
-
-I wondered before why we don't have a generic GPIO IIO trigger,
-it seems like such an intuitive and useful thing to have.
-
-Let's see what Jonathan says.
-
-> +config IIO_STM32_EXTI_TRIGGER
-> +       tristate "STM32 EXTI Trigger"
-> +       depends on (ARCH_STM32 && OF) || COMPILE_TEST
-
-config IIO_GPIO_TRIGGER
-    depends on GPIOLIB
-
-> +       select STM32_EXTI
-
-Isn't the dependency actually the other way around?
-
-default STM32_EXTI makes more sense, or just put it into the
-defconfig.
-
-> +#include <linux/gpio/consumer.h>
-> +#include <linux/iio/iio.h>
-> +#include <linux/iio/trigger.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
+> diff --git a/arch/Kconfig b/arch/Kconfig
+> index 99839c2..22ee01e 100644
+> --- a/arch/Kconfig
+> +++ b/arch/Kconfig
+> @@ -781,4 +781,32 @@ config VMAP_STACK
+>           the stack to map directly to the KASAN shadow map using a formula
+>           that is incorrect if the stack is in vmalloc space.
+>
+> +config ARCH_NO_STRICT_RWX_DEFAULTS
+> +       def_bool n
 > +
-> +/* STM32 has up to 16 EXTI triggers on GPIOs */
-> +#define STM32_MAX_EXTI_TRIGGER 16
-
-Just don't put any restrictions like this so it can be widely
-reused.
-
-> +static irqreturn_t stm32_exti_trigger_handler(int irq, void *data)
-> +{
-> +       /* Exti handler shouldn't be invoked, and isn't used */
-> +       return IRQ_HANDLED;
-> +}
-
-It could be a good idea to capture the timestamp here if we were
-actually using this IRQ.
-
-> +static int stm32_exti_trigger_probe(struct platform_device *pdev)
-> +{
-> +       int irq, ret;
-> +       char name[8];
-> +       struct gpio_desc *gpio;
-> +       struct iio_trigger *trig;
-> +       unsigned int i;
+> +config ARCH_HAS_STRICT_KERNEL_RWX
+> +       def_bool n
 > +
-> +       for (i = 0; i < STM32_MAX_EXTI_TRIGGER; i++) {
+> +config DEBUG_RODATA
+> +       def_bool y if !ARCH_NO_STRICT_RWX_DEFAULTS
+> +       prompt "Make kernel text and rodata read-only" if ARCH_NO_STRICT_RWX_DEFAULTS
 
-Why not just run this until devm_gpiod_get() returns -ERRNO
-or something?
+Ah! Yes, perfect. I totally forgot about using conditional "prompt" lines. Nice!
 
-> +               snprintf(name, sizeof(name), "exti%d", i);
-> +
-> +               gpio = devm_gpiod_get_optional(&pdev->dev, name, GPIOD_IN);
+Acked-by: Kees Cook <keescook@chromium.org>
 
-Why would it be optional?
+-Kees
 
-Either it is there in the device tree or we get -EINVAL or something
-if there is no
-such index in the device tree. We can get -EPROBE_DEEER too, and then
-we should exit silently or just print that deferring is happening.
-
-> +               if (IS_ERR_OR_NULL(gpio)) {
-> +                       if (IS_ERR(gpio)) {
-> +                               dev_err(&pdev->dev, "gpio %s get error %ld\n",
-> +                                       name, PTR_ERR(gpio));
-> +                               return PTR_ERR(gpio);
-> +                       }
-> +                       dev_dbg(&pdev->dev, "No %s gpio\n", name);
-> +                       continue;
-> +               }
-
-Good
-
-> +               irq = gpiod_to_irq(gpio);
-> +               if (irq < 0) {
-> +                       dev_err(&pdev->dev, "gpio %d to irq failed\n", i);
-> +                       return irq;
-> +               }
-> +
-> +               ret = devm_request_irq(&pdev->dev, irq,
-> +                                      stm32_exti_trigger_handler,
-> +                                      0, dev_name(&pdev->dev), pdev);
-> +               if (ret) {
-> +                       dev_err(&pdev->dev, "request IRQ %d failed\n", irq);
-> +                       return ret;
-> +               }
-
-Here you need some elaborate trigger edge handling.
-
-The flags that you define as "0" here, how do we say that we
-want to handle rising or falling edges, for example?
-
-I think you might want to establish these DT properties for
-GPIO triggers:
-
-gpio-trigger-rising-edge;
-gpio-trigger-falling-edge;
-
-Then:
-
-int irq_flags = 0;
-
-if (of_property_read_bool(np, "gpio-trigger-rising-edge")
-   irq_flags |= IRQF_TRIGGER_RISING;
-else if (of_property_read_bool(np, "gpio-trigger-falling-edge")
-   irq_flags |= IRQF_TRIGGER_FALLING;
-
-To pass along to the devm_request_irq() function as flags.
-
-I find it weird that it even works without. Most GPIO interrupts
-should require you to set a trigger type. But I guess it is because
-of the other weirdness you describe below.
-
-> +               /*
-> +                * gpios are configured as interrupts, so exti trigger path is
-> +                * configured in HW, and can now be used as external trigger
-> +                * source by other IPs. But getting interrupts when trigger
-> +                * occurs is unused here, so mask irq on exti controller by
-> +                * default.
-> +                */
-> +               disable_irq(irq);
-
-Aha. That is not generic. But what about just adding:
-
-if (of_property_read_bool(np, "gpio-trigger-numb-irq")
-    disable_irq();
-
-(Plus add the binding for that something like "this makes the
-GPIO mentioned get requested, translated to an IRQ, get the
-IRQ requested, and then immediately just disabled as other
-hardware will actually hande the IRQ line".)
-
-I understand that this is kind of weird: we're making a whole generic
-GPIO trigger driver just to use it with hardware that grabs and disabled
-the irq immediately.
-
-But I think that in the long run it makes for more reusable code.
-
-> +static const struct of_device_id stm32_exti_trigger_of_match[] = {
-> +       { .compatible = "st,stm32-exti-trigger" },
-> +       {},
-
-"iio-gpio-trigger"
-
-Should fit anyone, given the above amendments.
-
-> +#if IS_ENABLED(CONFIG_IIO_STM32_EXTI_TRIGGER)
-> +bool is_stm32_exti_trigger(struct iio_trigger *trig);
-> +#else
-> +static inline bool is_stm32_exti_trigger(struct iio_trigger *trig)
-> +{
-> +       return false;
-> +}
-> +#endif
-
-This seems unnecessary to broadcast to the entire kernel.
-
-Why? (Maybe I can find explanations in later patches.
-
-Yours,
-Linus Walleij
+-- 
+Kees Cook
+Pixel Security
