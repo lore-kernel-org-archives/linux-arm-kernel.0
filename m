@@ -1,88 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  3 Feb 2017 10:23:12 +0000
-Subject: [PATCH v4 03/10] serial: st-asc: Read in all Pinctrl states
+Date: Fri,  3 Feb 2017 10:23:14 +0000
+Subject: [PATCH v4 05/10] serial: st-asc: Use generic DT binding for
+ announcing RTS/CTS lines
 In-Reply-To: <20170203102319.23489-1-lee.jones@linaro.org>
 References: <20170203102319.23489-1-lee.jones@linaro.org>
-Message-ID: <20170203102319.23489-4-lee.jones@linaro.org>
+Message-ID: <20170203102319.23489-6-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are now 2 possible separate/different Pinctrl states which can
-be provided from platform data.  One which encompasses the lines
-required for HW flow-control (CTS/RTS) and another which does not
-specify these lines, such that they can be used via GPIO mechanisms
-for manually toggling (i.e. from a request by `stty`).
+The initial binding 'st,hw-flow-control' isn't used anywhere, in neither
+in upstream nor downstream kernels.  It isn't even documented in
+dt-bindings, so we can safely assume it's safe to swap to the generic
+one.
 
 Acked-by: Peter Griffin <peter.griffin@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/tty/serial/st-asc.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ drivers/tty/serial/st-asc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-index 397df50..1058020 100644
+index e521078..bcf1d33 100644
 --- a/drivers/tty/serial/st-asc.c
 +++ b/drivers/tty/serial/st-asc.c
-@@ -18,6 +18,7 @@
- #include <linux/serial.h>
- #include <linux/console.h>
- #include <linux/sysrq.h>
-+#include <linux/pinctrl/consumer.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-@@ -37,10 +38,16 @@
- #define ASC_FIFO_SIZE 16
- #define ASC_MAX_PORTS 8
+@@ -794,7 +794,7 @@ static struct asc_port *asc_of_get_asc_port(struct platform_device *pdev)
+ 		return NULL;
  
-+/* Pinctrl states */
-+#define DEFAULT		0
-+#define NO_HW_FLOWCTRL	1
-+
- struct asc_port {
- 	struct uart_port port;
- 	struct gpio_desc *rts;
- 	struct clk *clk;
-+	struct pinctrl *pinctrl;
-+	struct pinctrl_state *states[2];
- 	unsigned int hw_flow_control:1;
- 	unsigned int force_m1:1;
- };
-@@ -694,6 +701,7 @@ static int asc_init_port(struct asc_port *ascport,
- {
- 	struct uart_port *port = &ascport->port;
- 	struct resource *res;
-+	int ret;
- 
- 	port->iotype	= UPIO_MEM;
- 	port->flags	= UPF_BOOT_AUTOCONF;
-@@ -720,6 +728,27 @@ static int asc_init_port(struct asc_port *ascport,
- 	WARN_ON(ascport->port.uartclk == 0);
- 	clk_disable_unprepare(ascport->clk);
- 
-+	ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
-+	if (IS_ERR(ascport->pinctrl)) {
-+		ret = PTR_ERR(ascport->pinctrl);
-+		dev_err(&pdev->dev, "Failed to get Pinctrl: %d\n", ret);
-+	}
-+
-+	ascport->states[DEFAULT] =
-+		pinctrl_lookup_state(ascport->pinctrl, "default");
-+	if (IS_ERR(ascport->states[DEFAULT])) {
-+		ret = PTR_ERR(ascport->states[DEFAULT]);
-+		dev_err(&pdev->dev,
-+			"Failed to look up Pinctrl state 'default': %d\n", ret);
-+		return ret;
-+	}
-+
-+	/* "no-hw-flowctrl" state is optional */
-+	ascport->states[NO_HW_FLOWCTRL] =
-+		pinctrl_lookup_state(ascport->pinctrl, "no-hw-flowctrl");
-+	if (IS_ERR(ascport->states[NO_HW_FLOWCTRL]))
-+		ascport->states[NO_HW_FLOWCTRL] = NULL;
-+
- 	return 0;
- }
- 
+ 	asc_ports[id].hw_flow_control = of_property_read_bool(np,
+-							"st,hw-flow-control");
++							"uart-has-rtscts");
+ 	asc_ports[id].force_m1 =  of_property_read_bool(np, "st,force_m1");
+ 	asc_ports[id].port.line = id;
+ 	asc_ports[id].rts = NULL;
 -- 
 2.9.3
