@@ -1,39 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 Feb 2017 14:05:28 +0100
-Subject: [PATCH 2/2] ARM: dts: Qualcomm APQ8060 DragonBoard ALS sensor
-In-Reply-To: <20170201183631.GJ10531@minitux>
-References: <20170131102114.25085-1-linus.walleij@linaro.org>
- <20170131102114.25085-2-linus.walleij@linaro.org>
- <20170201183631.GJ10531@minitux>
-Message-ID: <CACRpkdbH9WgC8EwERRNDUjnAAz7YAq-=S1Wja5Hq2w0uDeO7rg@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 3 Feb 2017 21:10:18 +0800
+Subject: [GIT PULL 2/5] i.MX cleanups for 4.11
+In-Reply-To: <20170130050724.GQ18943@localhost>
+References: <1485662803-31235-1-git-send-email-shawnguo@kernel.org>
+ <1485662803-31235-2-git-send-email-shawnguo@kernel.org>
+ <20170130050724.GQ18943@localhost>
+Message-ID: <20170203131016.GB3407@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 1, 2017 at 7:36 PM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
-> On Tue 31 Jan 02:21 PST 2017, Linus Walleij wrote:
+On Sun, Jan 29, 2017 at 09:07:24PM -0800, Olof Johansson wrote:
+> On Sun, Jan 29, 2017 at 12:06:40PM +0800, Shawn Guo wrote:
+> > The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
+> > 
+> >   Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-cleanup-4.11
+> > 
+> > for you to fetch changes up to 5fdb98dcfb0221f488dd238570933fd3dcfae031:
+> > 
+> >   ARM: mach-mx27_3ds: Remove camera support (2017-01-03 13:52:38 +0800)
+> > 
+> > ----------------------------------------------------------------
+> > i.MX cleanup for 4.11:
+> >  - Remove unused flexcan and esdhc device definitions for i.MX25.
+> >  - A series from Fabio to remove camera device initialization code from
+> >    i.MX platform support, since the corresponding media driver has been
+> >    deprecated and removed from kernel tree.
+> > 
+> > ----------------------------------------------------------------
+> > Arnd Bergmann (1):
+> >       ARM: imx: remove unused device definitions
+> > 
+> > Fabio Estevam (6):
+> >       ARM: mach-mx31_3ds: Remove camera support
+> >       ARM: mx31moboard-marxbot: Remove camera support
+> >       ARM: mx31moboard-smartbot: Remove camera support
+> >       ARM: mach-mx35_3ds: Remove camera support
+> >       ARM: mach-pcm037: Remove camera support
+> >       ARM: mach-mx27_3ds: Remove camera support
+> 
+> Merged, thanks.
+> 
+> Did camera support on this platform get completely removed, or was it
+> a migration to a newer driver?
 
->> +                                                     /* Let's use channel 5 */
->> +                                                     qcom,amux-route = <PMIC_MPP_AMUX_ROUTE_CH5>;
->
-> Unrelated to this patch, I did look at how this works on later devices.
-> It seems like we want to be able to switch the amux-route depending on
-> which ADC "channel" we're querying - e.g. on DB820c we have thermistors
-> on 3 different AMUX inputs but we don't have 3 mpps available.
->
-> Any thoughts on how to deal with this?
+The driver was completely removed [1], because no one stepped up to
+rework it as required [2].
 
-The AMUX is just one big mystery to me, it's one of those areas where I
-think a real datasheet would be extremely helpful.
+Shawn
 
-In absence of datasheet, maybe a piece of ASCII art illustrating the muxes
-in the device tree binding docs or so, written by someone who understand
-it.
-
-In absence of any written sources, maybe hearsay, rumors, palimpsest...
-hehe.
-
-I'd seriously like to know how this is engineered.
-
-Yours,
-Linus Walleij
+[1] https://patchwork.kernel.org/patch/9149367/
+[2] https://patchwork.kernel.org/patch/8491381/
