@@ -1,33 +1,44 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 3 Feb 2017 19:19:11 +0200
-Subject: [PATCH v3] initramfs: finish fput() before accessing any binary
- from initramfs
-In-Reply-To: <20170201141213.3cf81a7a3a771ac2b94e8d48@linux-foundation.org>
-References: <20170201140540.22051-1-lokeshvutla@ti.com>
- <20170201141213.3cf81a7a3a771ac2b94e8d48@linux-foundation.org>
-Message-ID: <689e7fdc-8445-2d5f-da2e-116aeb0b9c90@ti.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 03 Feb 2017 09:26:14 -0800
+Subject: [PATCH v2 4/8] arm: set CONFIG_MMC_BCM2835=y in bcm2835_defconfig
+In-Reply-To: <1486123913-31705-5-git-send-email-kraxel@redhat.com>
+References: <1486123913-31705-1-git-send-email-kraxel@redhat.com>
+ <1486123913-31705-5-git-send-email-kraxel@redhat.com>
+Message-ID: <87inorp4nd.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/17 00:12, Andrew Morton wrote:
-> On Wed, 1 Feb 2017 19:35:40 +0530 Lokesh Vutla <lokeshvutla@ti.com> wrote:
->
->> commit 4a9d4b024a31 ("switch fput to task_work_add") implements a
->> schedule_work() for completing fput(), but did not guarantee calling
->> __fput() after unpacking initramfs. Because of this, there is a
->> possibility that during boot a driver can see ETXTBSY when it tries
->> to load a binary from initramfs as fput() is still pending on that
->> binary. This patch makes sure that fput() is completed after unpacking
->> initramfs and removes the call to flush_delayed_fput() in kernel_init()
->> which happens very late after unpacking initramfs.
->
-> There's not really enough info here for others to be able to decide
-> which kernel versions need the fix.  How serious is the bug?  Given
-> that it's been there for 4 years, I assume "not very"?
+Gerd Hoffmann <kraxel@redhat.com> writes:
 
-I think the issue only surfaces with certain timing conditions, and for 
-some reason it has been masked for at least us until we noticed this 
-with 4.9-lts kernel. The same issue was not detected with earlier 
-4.4-lts kernel.
+> ---
+>  arch/arm/configs/bcm2835_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+> index 4b89f4e..3767c24 100644
+> --- a/arch/arm/configs/bcm2835_defconfig
+> +++ b/arch/arm/configs/bcm2835_defconfig
+> @@ -92,6 +92,7 @@ CONFIG_MMC=y
+>  CONFIG_MMC_SDHCI=y
+>  CONFIG_MMC_SDHCI_PLTFM=y
+>  CONFIG_MMC_SDHCI_IPROC=y
+> +CONFIG_MMC_BCM2835=y
+>  CONFIG_NEW_LEDS=y
+>  CONFIG_LEDS_CLASS=y
+>  CONFIG_LEDS_GPIO=y
 
--Tero
+If you end up resubmitting this, could you extend the commit message of
+the defconfig changes to explain why it's being done?  Something like:
+
+"We need to enable this controller so that we can switch the SD card's
+pinmux over to it by default, which will improve storage read/write
+speed."
+
+(even better if we have some sort of stats on how much better it is).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170203/20099ee6/attachment.sig>
