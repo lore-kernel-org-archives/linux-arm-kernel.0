@@ -1,369 +1,56 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 3 Feb 2017 09:36:05 -0700
-Subject: [PATCH v7 3/3] thermal: zx2967: add thermal driver for ZTE's
- zx2967 family
-In-Reply-To: <1486116655-24111-3-git-send-email-baoyou.xie@linaro.org>
-References: <1486116655-24111-1-git-send-email-baoyou.xie@linaro.org>
- <1486116655-24111-3-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170203163605.GB30336@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri,  3 Feb 2017 17:46:25 +0100
+Subject: [PATCH] ARM: defconfigs: make NF_CT_PROTO_SCTP and
+ NF_CT_PROTO_UDPLITE built-in
+Message-ID: <20170203164647.3610978-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2017 at 06:10:55PM +0800, Baoyou Xie wrote:
-> This patch adds thermal driver for ZTE's zx2967 family.
-> 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> ---
->  drivers/thermal/Kconfig          |   8 ++
->  drivers/thermal/Makefile         |   1 +
->  drivers/thermal/zx2967_thermal.c | 281 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 290 insertions(+)
->  create mode 100644 drivers/thermal/zx2967_thermal.c
-> 
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index 18f2de6..f64bd50 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -444,4 +444,12 @@ config BCM2835_THERMAL
->  	help
->  	  Support for thermal sensors on Broadcom bcm2835 SoCs.
->  
-> +config ZX2967_THERMAL
-> +	tristate "Thermal sensors on zx2967 SoC"
-> +	depends on ARCH_ZX || COMPILE_TEST
-> +	help
-> +	  Enable the zx2967 thermal sensors driver, which supports
-> +	  the primitive temperature sensor embedded in zx2967 SoCs.
-> +	  This sensor generates the real time die temperature.
-> +
->  endif
-> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> index 677c6d9..c00c05e 100644
-> --- a/drivers/thermal/Makefile
-> +++ b/drivers/thermal/Makefile
-> @@ -57,3 +57,4 @@ obj-$(CONFIG_HISI_THERMAL)     += hisi_thermal.o
->  obj-$(CONFIG_MTK_THERMAL)	+= mtk_thermal.o
->  obj-$(CONFIG_GENERIC_ADC_THERMAL)	+= thermal-generic-adc.o
->  obj-$(CONFIG_BCM2835_THERMAL)	+= bcm2835_thermal.o
-> +obj-$(CONFIG_ZX2967_THERMAL)	+= zx2967_thermal.o
-> diff --git a/drivers/thermal/zx2967_thermal.c b/drivers/thermal/zx2967_thermal.c
-> new file mode 100644
-> index 0000000..fba55b1c
-> --- /dev/null
-> +++ b/drivers/thermal/zx2967_thermal.c
-> @@ -0,0 +1,281 @@
-> +/*
-> + * ZTE's zx2967 family thermal sensor driver
-> + *
-> + * Copyright (C) 2017 ZTE Ltd.
-> + *
-> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
-> + *
-> + * License terms: GNU General Public License (GPL) version 2
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/iopoll.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/thermal.h>
-> +
-> +/* Power Mode: 0->low 1->high */
-> +#define ZX2967_THERMAL_POWER_MODE	0
-> +#define ZX2967_POWER_MODE_LOW		0
-> +#define ZX2967_POWER_MODE_HIGH		1
-> +
-> +/* DCF Control Register */
-> +#define ZX2967_THERMAL_DCF		0x4
-> +#define ZX2967_DCF_EN			BIT(1)
-> +#define ZX2967_DCF_FREEZE		BIT(0)
-> +
-> +/* Selection Register */
-> +#define ZX2967_THERMAL_SEL		0x8
-> +
-> +/* Control Register */
-> +#define ZX2967_THERMAL_CTRL		0x10
-> +
-> +#define ZX2967_THERMAL_READY		BIT(12)
-> +#define ZX2967_THERMAL_TEMP_MASK	0xfff
-> +#define ZX2967_THERMAL_ID_MASK		0x18
-> +#define ZX2967_THERMAL_ID0		0x10
-> +#define ZX2967_THERMAL_ID1		0x8
-> +
-> +#define ZX2967_GET_TEMP_TIMEOUT_US	(100 * 1024)
-> +
-> +struct zx2967_thermal_sensor {
-> +	struct zx2967_thermal_priv *priv;
-> +	struct thermal_zone_device *tzd;
-> +	int id;
-> +};
-> +
-> +/*
-> + * Now, one sensor remains in system, but in fact, we intend to support
-> + * two sensors.
-> + */
+The symbols can no longer be used as loadable modules, leading to a harmless Kconfig
+warning:
 
-The general rule of thumb is to write drivers for the current HW and add
-enhancement when new revision come out but I will let Zhang and Eduardo
-make the call. 
+arch/arm/configs/imote2_defconfig:60:warning: symbol value 'm' invalid for NF_CT_PROTO_UDPLITE
+arch/arm/configs/imote2_defconfig:59:warning: symbol value 'm' invalid for NF_CT_PROTO_SCTP
+arch/arm/configs/ezx_defconfig:68:warning: symbol value 'm' invalid for NF_CT_PROTO_UDPLITE
+arch/arm/configs/ezx_defconfig:67:warning: symbol value 'm' invalid for NF_CT_PROTO_SCTP
 
-> +#define NUM_SENSORS	1
-> +
-> +struct zx2967_thermal_priv {
-> +	struct zx2967_thermal_sensor	sensors[NUM_SENSORS];
-> +	/* Prevents reads sensor in parallel */
-> +	struct mutex			lock;
-> +	struct clk			*clk_gate;
-> +	struct clk			*pclk;
-> +	void __iomem			*regs;
-> +	struct device			*dev;
-> +};
+Let's make them built-in.
 
-Normally all new structure need to use the proper comment style [1] (as noted in my
-previous email) but this one is pretty obvious and private to this file.  Again
-I'll let Zhang and Eduardo decide what they want to do here.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/configs/ezx_defconfig    | 4 ++--
+ arch/arm/configs/imote2_defconfig | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-[1]. http://lxr.free-electrons.com/source/Documentation/CodingStyle 
-
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int zx2967_thermal_suspend(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
-> +
-> +	if (priv && priv->pclk)
-> +		clk_disable_unprepare(priv->pclk);
-> +
-> +	if (priv && priv->clk_gate)
-> +		clk_disable_unprepare(priv->clk_gate);
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_thermal_resume(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
-> +	int error;
-> +
-> +	error = clk_prepare_enable(priv->clk_gate);
-> +	if (error)
-> +		return error;
-> +
-> +	error = clk_prepare_enable(priv->pclk);
-> +	if (error) {
-> +		clk_disable_unprepare(priv->clk_gate);
-> +		return error;
-> +	}
-> +
-> +	return 0;
-> +}
-> +static SIMPLE_DEV_PM_OPS(zx2967_thermal_pm_ops,
-> +			 zx2967_thermal_suspend, zx2967_thermal_resume);
-
-The pm_runtime macros are built in such a way that the call to SIMPLE_DEV_PM_OPS
-itself doesn't have to be enclosed in the #if/#endif.  That way you don't have
-to add the #if/#endif in the platform driver definition. 
-
-> +#endif
-> +
-> +static int zx2967_thermal_get_temp(void *data, int *temp)
-> +{
-> +	void __iomem *regs;
-> +	struct zx2967_thermal_sensor *sensor = data;
-> +	struct zx2967_thermal_priv *priv = sensor->priv;
-> +	u32 val, sel_id;
-> +	int ret;
-> +
-> +	if (!sensor->tzd)
-> +		return -EAGAIN;
-> +
-> +	regs = priv->regs;
-> +	mutex_lock(&priv->lock);
-> +	writel_relaxed(ZX2967_POWER_MODE_LOW,
-> +		       regs + ZX2967_THERMAL_POWER_MODE);
-> +	writel_relaxed(ZX2967_DCF_EN, regs + ZX2967_THERMAL_DCF);
-> +
-> +	val = readl_relaxed(regs + ZX2967_THERMAL_SEL);
-> +	val &= ~ZX2967_THERMAL_ID_MASK;
-> +	sel_id = sensor->id ? ZX2967_THERMAL_ID1 : ZX2967_THERMAL_ID0;
-> +	val |= sel_id;
-> +	writel_relaxed(val, regs + ZX2967_THERMAL_SEL);
-> +
-> +	usleep_range(100, 300);
-
-You have not addressed my comment from the previous review, something that
-affects my motivation to keep reviewing your work and help you get your code
-upstream.
-
-> +	ret = readx_poll_timeout(readl, regs + ZX2967_THERMAL_CTRL,
-> +				 val, val & ZX2967_THERMAL_READY, 300,
-> +				 ZX2967_GET_TEMP_TIMEOUT_US);
-> +	if (ret) {
-> +		dev_err(priv->dev, "Thermal sensor %d data timeout\n",
-> +			sensor->id);
-> +		mutex_unlock(&priv->lock);
-
-                goto out;
-
-> +		return ret;
-> +	}
-> +
-> +	writel_relaxed(ZX2967_DCF_FREEZE | ZX2967_DCF_EN,
-> +		       regs + ZX2967_THERMAL_DCF);
-> +	val = readl_relaxed(regs + ZX2967_THERMAL_CTRL)
-> +			 & ZX2967_THERMAL_TEMP_MASK;
-> +	writel_relaxed(ZX2967_POWER_MODE_HIGH,
-> +		       regs + ZX2967_THERMAL_POWER_MODE);
-> +
-> +	/*
-> +	 * Calculate temperature
-> +	 * In dts, coefficients are multiplied by 1000.
-> +	 */
-> +	*temp = DIV_ROUND_CLOSEST(((s32)val + sensor->tzd->tzp->offset) * 1000,
-> +				  sensor->tzd->tzp->slope);
-> 
-
-out:
-
-> +	mutex_unlock(&priv->lock);
-> +
-> +	return 0;
-
-        return ret;
-
-> +}
-> +
-> +static struct thermal_zone_of_device_ops zx2967_of_thermal_ops = {
-> +	.get_temp = zx2967_thermal_get_temp,
-> +};
-> +
-> +static int zx2967_thermal_probe(struct platform_device *pdev)
-> +{
-> +	struct zx2967_thermal_priv *priv;
-> +	struct resource *res;
-> +	int ret, i;
-> +
-> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	priv->regs = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(priv->regs))
-> +		return PTR_ERR(priv->regs);
-> +
-> +	priv->clk_gate = devm_clk_get(&pdev->dev, "gate");
-> +	if (IS_ERR(priv->clk_gate)) {
-> +		ret = PTR_ERR(priv->clk_gate);
-> +		dev_err(&pdev->dev, "failed to get clock gate: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_prepare_enable(priv->clk_gate);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to enable converter clock: %d\n",
-> +			ret);
-> +		return ret;
-> +	}
-> +
-> +	priv->pclk = devm_clk_get(&pdev->dev, "pclk");
-> +	if (IS_ERR(priv->pclk)) {
-> +		ret = PTR_ERR(priv->pclk);
-> +		dev_err(&pdev->dev, "failed to get apb clock: %d\n", ret);
-> +		goto disable_clk_gate;
-> +	}
-> +
-> +	ret = clk_prepare_enable(priv->pclk);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to enable converter clock: %d\n",
-> +			ret);
-> +		goto disable_clk_gate;
-> +	}
-> +
-> +	mutex_init(&priv->lock);
-> +	for (i = 0; i < NUM_SENSORS; i++) {
-> +		struct zx2967_thermal_sensor *sensor = &priv->sensors[i];
-> +
-> +		sensor->priv = priv;
-> +		sensor->id = i;
-> +		sensor->tzd = thermal_zone_of_sensor_register(&pdev->dev,
-> +					i, sensor, &zx2967_of_thermal_ops);
-> +
-> +		if (IS_ERR(sensor->tzd)) {
-> +			ret = PTR_ERR(sensor->tzd);
-> +			dev_err(&pdev->dev, "failed to register sensor %d: %d\n",
-> +				i, ret);
-> +			goto remove_ts;
-> +		}
-> +
-> +		if (sensor->tzd->tzp->slope == 0) {
-> +			thermal_zone_of_sensor_unregister(&pdev->dev,
-> +							sensor->tzd);
-> +			dev_err(&pdev->dev,
-> +				"coefficients of sensor-%d is invalid\n", i);
-> +			ret = -EINVAL;
-> +			goto remove_ts;
-> +		}
-> +	}
-> +	priv->dev = &pdev->dev;
-> +	platform_set_drvdata(pdev, priv);
-> +
-> +	return 0;
-> +
-> +remove_ts:
-> +	for (i--; i >= 0; i--)
-> +		thermal_zone_of_sensor_unregister(&pdev->dev,
-> +						  priv->sensors[i].tzd);
-> +	clk_disable_unprepare(priv->pclk);
-> +disable_clk_gate:
-> +	clk_disable_unprepare(priv->clk_gate);
-> +
-> +	return ret;
-> +}
-> +
-> +static int zx2967_thermal_exit(struct platform_device *pdev)
-> +{
-> +	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
-> +	int i;
-> +
-> +	for (i = 0; i < NUM_SENSORS; i++) {
-> +		struct zx2967_thermal_sensor *sensor = &priv->sensors[i];
-> +
-> +		thermal_zone_of_sensor_unregister(&pdev->dev, sensor->tzd);
-> +	}
-> +	clk_disable_unprepare(priv->pclk);
-> +	clk_disable_unprepare(priv->clk_gate);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id zx2967_thermal_id_table[] = {
-> +	{ .compatible = "zte,zx296718-thermal" },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, zx2967_thermal_id_table);
-> +
-> +static struct platform_driver zx2967_thermal_driver = {
-> +	.probe = zx2967_thermal_probe,
-> +	.remove = zx2967_thermal_exit,
-> +	.driver = {
-> +		.name = "zx2967_thermal",
-> +		.of_match_table = zx2967_thermal_id_table,
-> +#ifdef CONFIG_PM_SLEEP
-> +		.pm = &zx2967_thermal_pm_ops,
-> +#endif
-> +	},
-> +};
-> +module_platform_driver(zx2967_thermal_driver);
-> +
-> +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
-> +MODULE_DESCRIPTION("ZTE zx2967 thermal driver");
-> +MODULE_LICENSE("GPL v2");
-> -- 
-> 2.7.4
-> 
+diff --git a/arch/arm/configs/ezx_defconfig b/arch/arm/configs/ezx_defconfig
+index ea316c4b890e..d3f1768840e2 100644
+--- a/arch/arm/configs/ezx_defconfig
++++ b/arch/arm/configs/ezx_defconfig
+@@ -64,8 +64,8 @@ CONFIG_NETFILTER=y
+ CONFIG_NETFILTER_NETLINK_QUEUE=m
+ CONFIG_NF_CONNTRACK=m
+ CONFIG_NF_CONNTRACK_EVENTS=y
+-CONFIG_NF_CT_PROTO_SCTP=m
+-CONFIG_NF_CT_PROTO_UDPLITE=m
++CONFIG_NF_CT_PROTO_SCTP=y
++CONFIG_NF_CT_PROTO_UDPLITE=y
+ CONFIG_NF_CONNTRACK_AMANDA=m
+ CONFIG_NF_CONNTRACK_FTP=m
+ CONFIG_NF_CONNTRACK_H323=m
+diff --git a/arch/arm/configs/imote2_defconfig b/arch/arm/configs/imote2_defconfig
+index 18e59feaa307..7f479cdb3479 100644
+--- a/arch/arm/configs/imote2_defconfig
++++ b/arch/arm/configs/imote2_defconfig
+@@ -56,8 +56,8 @@ CONFIG_NETFILTER=y
+ CONFIG_NETFILTER_NETLINK_QUEUE=m
+ CONFIG_NF_CONNTRACK=m
+ CONFIG_NF_CONNTRACK_EVENTS=y
+-CONFIG_NF_CT_PROTO_SCTP=m
+-CONFIG_NF_CT_PROTO_UDPLITE=m
++CONFIG_NF_CT_PROTO_SCTP=y
++CONFIG_NF_CT_PROTO_UDPLITE=y
+ CONFIG_NF_CONNTRACK_AMANDA=m
+ CONFIG_NF_CONNTRACK_FTP=m
+ CONFIG_NF_CONNTRACK_H323=m
+-- 
+2.9.0
