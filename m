@@ -1,46 +1,60 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 3 Feb 2017 09:00:40 +0100
-Subject: [PATCH V7 3/4] drm/bridge: Add driver for GE B850v3 LVDS/DP++
- Bridge
-In-Reply-To: <CACvgo50bOZ=jzeJc_J4_7fpiEh9-ATKo1KOhAia2679AGA=mng@mail.gmail.com>
-References: <CACvgo535iyFvdOWzQHRnU++Ye0GgyZyN3R9ALSXRP7k3EPyRGA@mail.gmail.com>
- <3e31-58931d80-1-221fa900@101383713>
- <CACvgo50bOZ=jzeJc_J4_7fpiEh9-ATKo1KOhAia2679AGA=mng@mail.gmail.com>
-Message-ID: <20170203080040.qn53xnpojxzk4qoi@phenom.ffwll.local>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Fri, 3 Feb 2017 16:16:15 +0800
+Subject: [PATCH 2/8] power: add power sequence library
+In-Reply-To: <20170201080817.GD17968@kroah.com>
+References: <1483425211-14473-1-git-send-email-peter.chen@nxp.com>
+ <1483425211-14473-3-git-send-email-peter.chen@nxp.com>
+ <CAJZ5v0iR7p-ftUzvVwW96Y55A=vYG8_UbhjuA4vw0BFFZ8a9iw@mail.gmail.com>
+ <20170201080817.GD17968@kroah.com>
+Message-ID: <20170203081614.GA24614@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 12:37:21PM +0000, Emil Velikov wrote:
->  - Daniel, gents - is drm-misc aimed at devs with limited (no?)
-> review/commit history in the area and/or the kernel in general ?
-> In this case, Peter have quite noticeable experience [in kernel
-> development] with little-to no in DRM.
-> Should one draw a line in the sand somewhere ?
+On Wed, Feb 01, 2017 at 09:08:17AM +0100, Greg Kroah-Hartman wrote:
+> On Wed, Feb 01, 2017 at 12:10:17AM +0100, Rafael J. Wysocki wrote:
+> > On Tue, Jan 3, 2017 at 7:33 AM, Peter Chen <peter.chen@nxp.com> wrote:
+> > > We have an well-known problem that the device needs to do some power
+> > > sequence before it can be recognized by related host, the typical
+> > > example like hard-wired mmc devices and usb devices.
+> > >
+> > > This power sequence is hard to be described at device tree and handled by
+> > > related host driver, so we have created a common power sequence
+> > > library to cover this requirement. The core code has supplied
+> > > some common helpers for host driver, and individual power sequence
+> > > libraries handle kinds of power sequence for devices. The pwrseq
+> > > librares always need to allocate extra instance for compatible
+> > > string match.
+> > >
+> > > pwrseq_generic is intended for general purpose of power sequence, which
+> > > handles gpios and clocks currently, and can cover other controls in
+> > > future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+> > > if only one power sequence is needed, else call of_pwrseq_on_list
+> > > /of_pwrseq_off_list instead (eg, USB hub driver).
+> > >
+> > > For new power sequence library, it can add its compatible string
+> > > to pwrseq_of_match_table, then the pwrseq core will match it with
+> > > DT's, and choose this library at runtime.
+> > >
+> > > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > > Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+> > > Tested-by Joshua Clayton <stillcompiling@gmail.com>
+> > > Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+> > > Tested-by: Matthias Kaehlcke <mka@chromium.org>
+> > 
+> > Quite honestly, I have a really hard time with trying to follow this
+> > code and the total lack of documentation makes it even harder. 
 
-We're fairly lenient with accepting new drivers already, and for drivers
-in drm-misc we require some checks and peer review to make sure new folks
-learn faster. But it's an expirement, I fully expect some fallout and then
-some learnign and fine tuning from that, and maybe we even need to crank
-requirements back up to a much higher level of experience.
+Sorry about that, Is it ok I add the design doc at:
+Documentation/power/power-sequence/design.rst?
 
-But for drivers I'm honestly not too concerned: As long as there's some
-process in place to foster learning&collaboration (which I think will be
-better with this) I really don't see much harm in merging non-perfect
-driver code.
+> > particular, the generic power sequence code is not even commented at
+> > all, 
 
->  - You patch has been on a long [bit rocky road] for a while, with
-> devs giving you [what seems like] a partial reviews.
-> Have you considered reviewing others' patches in exchange for a [more
-> complete one] of this one ? According to git log people have poked you
-> a handful of times, but seemingly you were busy.
-
-Just a clarification: When I review drivers I don't do a fairly cursor
-look, hunting for areas where some refactoring and align with drm best
-practices would be good. And I think that's perfectly fine and enough to
-get a driver landed, but we're definitely not 100% consistent on this
-within drm-misc. Probably will take some time to figure this out.
--Daniel
+The generic power sequence code just implements the APIs which are 
+called at power/pwrseq/core.c, and those API are commented at
+include/linux/power/pwrseq.h. Anyway, I will add more comments at it.
+	
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+
+Best Regards,
+Peter Chen
