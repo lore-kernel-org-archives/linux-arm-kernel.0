@@ -1,40 +1,42 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri,  3 Feb 2017 15:56:55 +0100
-Subject: [PATCH v2 5/5] KVM: arm/arm64: Advertise support for
- KVM_CAP_ARM_USER_IRQ
-In-Reply-To: <20170203145655.15007-1-cdall@linaro.org>
-References: <20170203145655.15007-1-cdall@linaro.org>
-Message-ID: <20170203145655.15007-6-cdall@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri,  3 Feb 2017 14:58:20 +0000
+Subject: [PATCHv2 0/3] drivers/perf: arm_pmu: rework IRQ management
+Message-ID: <1486133903-20665-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+For historical reasons, we lazily request and free interrupts in the
+arm_pmu driver, managing affinity at request time. Unfortunately, this
+is not well balanced w.r.t. CPU hotplug, resulting in a number of
+issues.
 
-Now when we support both the virtual timer and PMU reporting interrupts
-to userspace, we can advertise this support.
+This series addresses this by reworking the way we manage interrupts,
+splitting request/free from affinity management. This renders some code
+redundant, and said code is removed.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm/kvm/arm.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+I've given this a spin on a Juno R1 system and another system which uses PPIs.
+I've verified that the IRQ affinity is as expected after CPUs are brought
+online. I've also run basic perf queries and the perf fuzzer, both in parallel
+with random hotplug events.
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 92f38f6..71cf78e 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -226,6 +226,13 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 		else
- 			r = kvm->arch.vgic.msis_require_devid;
- 		break;
-+	case KVM_CAP_ARM_USER_IRQ:
-+		/*
-+		 * 1: EL1_VTIMER, EL1_PTIMER, and PMU.
-+		 * (bump this number if adding more devices)
-+		 */
-+		r = 1;
-+		break;
- 	default:
- 		r = kvm_arch_dev_ioctl_check_extension(kvm, ext);
- 		break;
+Since v1 [1]:
+* Free resources correctly.
+* Remove unused fields from struct arm_pmu.
+* Improve messages when parsing IRQs.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/484285.html
+
+Mark Rutland (3):
+  drivers/perf: arm_pmu: rework per-cpu allocation
+  drivers/perf: arm_pmu: manage interrupts per-cpu
+  drivers/perf: arm_pmu: split irq request from enable
+
+ drivers/perf/arm_pmu.c       | 465 ++++++++++++++++++++-----------------------
+ include/linux/perf/arm_pmu.h |   7 +-
+ 2 files changed, 223 insertions(+), 249 deletions(-)
+
 -- 
-2.9.0
+1.9.1
