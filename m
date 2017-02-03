@@ -1,127 +1,98 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 3 Feb 2017 13:33:20 +0100
-Subject: [RFC v3 00/10] Provide the EL1 physical timer to the VM
-In-Reply-To: <CAHyh4xhsqS6CijRysFvg+NqGo0rBQU45OhAaZUuHDm4M0JufTg@mail.gmail.com>
-References: <1485970990-13775-1-git-send-email-jintack@cs.columbia.edu>
- <20170202123104.GJ27852@cbox>
- <CAHyh4xhsqS6CijRysFvg+NqGo0rBQU45OhAaZUuHDm4M0JufTg@mail.gmail.com>
-Message-ID: <20170203123320.GK27852@cbox>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 3 Feb 2017 13:00:26 +0000
+Subject: [PATCH v2 1/3] perf tools: Use offset instead of dwarfnum in
+ register table.
+In-Reply-To: <20170203110607.97529-1-hekuang@huawei.com>
+References: <20170203110607.97529-1-hekuang@huawei.com>
+Message-ID: <20170203130026.GF11585@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 09:51:13AM -0500, Jintack Lim wrote:
-> On Thu, Feb 2, 2017 at 7:31 AM, Christoffer Dall <cdall@linaro.org> wrote:
-> > Hi Jintack,
-> >
-> > On Wed, Feb 01, 2017 at 12:43:00PM -0500, Jintack Lim wrote:
-> >> The ARM architecture defines the EL1 physical timer and the virtual timer,
-> >> and it is reasonable for an OS to expect to be able to access both.
-> >> However, the current KVM implementation does not provide the EL1 physical
-> >> timer to VMs but terminates VMs on access to the timer.
-> >>
-> >> This patch series enables VMs to use the EL1 physical timer through
-> >> trap-and-emulate.  The KVM host emulates each EL1 physical timer register
-> >> access and sets up the background timer accordingly.  When the background
-> >> timer expires, the KVM host injects EL1 physical timer interrupts to the
-> >> VM.  Alternatively, it's also possible to allow VMs to access the EL1
-> >> physical timer without trapping.  However, this requires somehow using the
-> >> EL2 physical timer for the Linux host while running the VM instead of the
-> >> EL1 physical timer.  Right now I just implemented trap-and-emulate because
-> >> this was straightforward to do, and I leave it to future work to determine
-> >> if transferring the EL1 physical timer state to the EL2 timer provides any
-> >> performance benefit.
-> >>
-> >> This feature will be useful for any OS that wishes to access the EL1
-> >> physical timer. Nested virtualization is one of those use cases. A nested
-> >> hypervisor running inside a VM would think it has full access to the
-> >> hardware and naturally tries to use the EL1 physical timer as Linux would
-> >> do. Other nested hypervisors may try to use the EL2 physical timer as Xen
-> >> would do, but supporting the EL2 physical timer to the VM is out of scope
-> >> of this patch series. This patch series will make it easy to add the EL2
-> >> timer support in the future, though.
-> >>
-> >> Note that Linux VMs booting in EL1 will be unaffected by this patch series
-> >> and will continue to use only the virtual timer and this patch series will
-> >> therefore not introduce any performance degredation as a result of
-> >> trap-and-emulate.
-> >>
-> >> v2 => v3:
-> >>  - Rebase on kvmarm/queue
-> >>  - Take kvm->lock to synchronize cntvoff across all vtimers
-> >>  - Remove unnecessary function parameters
-> >>  - Add comments
-> >
-> > I just gave v3 a test run on my TC2 (32-bit platform) and my guest
-> > quickly locks up trying to run cyclictest or when booting the machine it
-> > stalls with RCU timeouts.
+On Fri, Feb 03, 2017 at 11:06:05AM +0000, He Kuang wrote:
+> This patch changes the 'dwarfnum' to 'offset' in register table, so
+> the index of array becomes the dwarfnum (the index of each register
+> defined by DWARF) and the "offset" member means the byte-offset of the
+> register in (user_)pt_regs. This change makes the code consistent with
+> x86.
 > 
-> Ok. It's my fault not to specify that the emulated physical timer is
-> supported/tested on arm64.
-> On 32-bit platform, it is supposed to show the same behavior as
-> before, but I haven't tested.
-> Were you using the physical timer or the virtual timer for the guest?
-> 
-> >
-> > Could you have a look?
-> 
-> Sure, I'll have a look. I don't have access to my Cubietruck today,
-> but I can work on that tomorrow.
-> 
+> Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+> Signed-off-by: He Kuang <hekuang@huawei.com>
+> ---
+>  tools/perf/arch/arm64/util/dwarf-regs.c | 107 ++++++++++++++++----------------
+>  1 file changed, 52 insertions(+), 55 deletions(-)
 
-Don't bother, I've figured this out for you.
+Thanks for splitting this up. Comment below.
 
-You need the following fixup to your patch:
+> diff --git a/tools/perf/arch/arm64/util/dwarf-regs.c b/tools/perf/arch/arm64/util/dwarf-regs.c
+> index d49efeb..090f36b 100644
+> --- a/tools/perf/arch/arm64/util/dwarf-regs.c
+> +++ b/tools/perf/arch/arm64/util/dwarf-regs.c
+> @@ -9,72 +9,69 @@
+>   */
+>  
+>  #include <stddef.h>
+> +#include <linux/ptrace.h> /* for struct user_pt_regs */
+>  #include <dwarf-regs.h>
+>  
+> -struct pt_regs_dwarfnum {
+> +struct pt_regs_offset {
+>  	const char *name;
+> -	unsigned int dwarfnum;
+> +	int offset;
+>  };
+>  
+> -#define STR(s) #s
+> -#define REG_DWARFNUM_NAME(r, num) {.name = r, .dwarfnum = num}
+> -#define GPR_DWARFNUM_NAME(num) \
+> -	{.name = STR(%x##num), .dwarfnum = num}
+> -#define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0}
+> -
+>  /*
+>   * Reference:
+>   * http://infocenter.arm.com/help/topic/com.arm.doc.ihi0057b/IHI0057B_aadwarf64.pdf
+>   */
+> -static const struct pt_regs_dwarfnum regdwarfnum_table[] = {
+> -	GPR_DWARFNUM_NAME(0),
+> -	GPR_DWARFNUM_NAME(1),
+> -	GPR_DWARFNUM_NAME(2),
+> -	GPR_DWARFNUM_NAME(3),
+> -	GPR_DWARFNUM_NAME(4),
+> -	GPR_DWARFNUM_NAME(5),
+> -	GPR_DWARFNUM_NAME(6),
+> -	GPR_DWARFNUM_NAME(7),
+> -	GPR_DWARFNUM_NAME(8),
+> -	GPR_DWARFNUM_NAME(9),
+> -	GPR_DWARFNUM_NAME(10),
+> -	GPR_DWARFNUM_NAME(11),
+> -	GPR_DWARFNUM_NAME(12),
+> -	GPR_DWARFNUM_NAME(13),
+> -	GPR_DWARFNUM_NAME(14),
+> -	GPR_DWARFNUM_NAME(15),
+> -	GPR_DWARFNUM_NAME(16),
+> -	GPR_DWARFNUM_NAME(17),
+> -	GPR_DWARFNUM_NAME(18),
+> -	GPR_DWARFNUM_NAME(19),
+> -	GPR_DWARFNUM_NAME(20),
+> -	GPR_DWARFNUM_NAME(21),
+> -	GPR_DWARFNUM_NAME(22),
+> -	GPR_DWARFNUM_NAME(23),
+> -	GPR_DWARFNUM_NAME(24),
+> -	GPR_DWARFNUM_NAME(25),
+> -	GPR_DWARFNUM_NAME(26),
+> -	GPR_DWARFNUM_NAME(27),
+> -	GPR_DWARFNUM_NAME(28),
+> -	GPR_DWARFNUM_NAME(29),
+> -	REG_DWARFNUM_NAME("%lr", 30),
+> -	REG_DWARFNUM_NAME("%sp", 31),
+> -	REG_DWARFNUM_END,
+> -};
+> +#define REG_OFFSET_NAME(r, num) {.name = "%" #r,			\
+> +			.offset = offsetof(struct user_pt_regs, regs[num])}
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 93c811c..35d7100 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -410,14 +410,21 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- }
- 
- /* Make the updates of cntvoff for all vtimer contexts atomic */
--static void update_vtimer_cntvoff(struct kvm *kvm, u64 cntvoff)
-+static void update_vtimer_cntvoff(struct kvm_vcpu *vcpu, u64 cntvoff)
- {
- 	int i;
--	struct kvm_vcpu *vcpu;
-+	struct kvm *kvm = vcpu->kvm;
-+	struct kvm_vcpu *tmp;
- 
- 	mutex_lock(&kvm->lock);
--	kvm_for_each_vcpu(i, vcpu, kvm)
--		vcpu_vtimer(vcpu)->cntvoff = cntvoff;
-+	kvm_for_each_vcpu(i, tmp, kvm)
-+		vcpu_vtimer(tmp)->cntvoff = cntvoff;
-+
-+	/*
-+	 * When called from the vcpu create path, the CPU being created is not
-+	 * included in the loop above, so we just set it here as well.
-+	 */
-+	vcpu_vtimer(vcpu)->cntvoff = cntvoff;
- 	mutex_unlock(&kvm->lock);
- }
- 
-@@ -426,7 +433,7 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 
- 	/* Synchronize cntvoff across all vtimers of a VM. */
--	update_vtimer_cntvoff(vcpu->kvm, kvm_phys_timer_read());
-+	update_vtimer_cntvoff(vcpu, kvm_phys_timer_read());
- 	vcpu_ptimer(vcpu)->cntvoff = 0;
- 
- 	INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
-@@ -448,7 +455,7 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
- 		vtimer->cnt_ctl = value;
- 		break;
- 	case KVM_REG_ARM_TIMER_CNT:
--		update_vtimer_cntvoff(vcpu->kvm, kvm_phys_timer_read() - value);
-+		update_vtimer_cntvoff(vcpu, kvm_phys_timer_read() - value);
- 		break;
- 	case KVM_REG_ARM_TIMER_CVAL:
- 		vtimer->cnt_cval = value;
+Whilst this works in practice, this is undefined behaviour for "sp", since
+you'll go off the end of the regs array.
 
-This is an amuzing one.
+I still think you're better off sticking with the dwarfnum, then just having
+a dwarfnum2offset macro that multiplies by the size of a register.
 
-Thanks,
--Christoffer
+Will
