@@ -1,84 +1,34 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 3 Feb 2017 08:31:48 +0000
-Subject: modversions: redefine kcrctab entries as 32-bit values
-In-Reply-To: <20170203050954.4qisyy66es6yjhkg@jeyu>
-References: <1485274600-21976-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170203035441.GA2964@packer-debian-8-amd64.digitalocean.com>
- <20170203050954.4qisyy66es6yjhkg@jeyu>
-Message-ID: <CAKv+Gu_vBJPN071h_kRpLMSG3FWx_Gq6TLeZbOP8_W3XDk3V+Q@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 03 Feb 2017 09:37:03 +0100
+Subject: [PATCH 8/9] mfd: wm97xx-core: core support for wm97xx Codec
+In-Reply-To: <20161206111353.fq5445yuzsy7li4i@sirena.org.uk> (Mark Brown's
+ message of "Tue, 6 Dec 2016 11:13:53 +0000")
+References: <1477510907-23495-1-git-send-email-robert.jarzmik@free.fr>
+ <1477510907-23495-9-git-send-email-robert.jarzmik@free.fr>
+ <20161118165040.GB19884@dell.home> <87twb3r94s.fsf@belgarion.home>
+ <20161121101219.GB32509@dell> <87y406ppjl.fsf@belgarion.home>
+ <20161206111353.fq5445yuzsy7li4i@sirena.org.uk>
+Message-ID: <87y3xn1xhs.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 February 2017 at 05:09, Jessica Yu <jeyu@redhat.com> wrote:
-> +++ Jessica Yu [02/02/17 22:54 -0500]:
->>
->> +++ Ard Biesheuvel [24/01/17 16:16 +0000]:
->>>
->>> This v4 is a followup to [0] 'modversions: redefine kcrctab entries as
->>> relative CRC pointers', but since relative CRC pointers do not work in
->>> modules, and are actually only needed by powerpc with
->>> CONFIG_RELOCATABLE=y,
->>> I have made it a Kconfig selectable feature instead.
->>>
->>> Patch #1 introduces the MODULE_REL_CRCS Kconfig symbol, and adds the
->>> kbuild
->>> handling of it, i.e., modpost, genksyms and kallsyms.
->>>
->>> Patch #2 switches all architectures to 32-bit CRC entries in kcrctab,
->>> where
->>> all architectures except powerpc with CONFIG_RELOCATABLE=y use absolute
->>> ELF
->>> symbol references as before.
->>>
->>> v4: make relative CRCs kconfig selectable
->>>   use absolute CRC symbols in modules regardless of kconfig selection
->>>   split into two patches
->>
->>
->> This asymmetry threw me off a bit, especially the Kconfig naming (only
->> vmlinux crcs get the relative offsets, and only on powerpc atm, but all
->> modules keep the absolute syms, but it is called MODULE_REL_CRCS...),
->> if we keep this asymmetric crc treatment, it would be really nice to
->> note this discrepancy this somewhere, perhaps in the Kconfig, to keep
->> our heads from spinning :-)
->>
->> I'm still catching up on the previous discussion threads, but can you
->> explain a bit more why you switched away from full blown relative crcs
->> from your last patchset [1]? I had lightly tested your v3 on ppc64le
->> previously, and relative offsets with modules seemed to worked very
->> well. I'm probably missing something very obvious.
+Mark Brown <broonie@kernel.org> writes:
+>> >> As for the "sound specific part", it's because AC97 bus is mainly used in sound
+>> >> oriented drivers, but still the codec IPs provide more than just sound, as the
+>> >> Wolfson codecs for instance.
 >
+>> > I'd like to get Mark Brown's opinion on this.
 >
-> Ah, I just saw your other comment about other arches not having support
-> for the rel32 offsets :-/
->
-> The asymmetry still bothers me though. Can't we have something that just
-> switches relative crcs on and off, that applies to *both* vmlinux and
-> modules?
-> Then we can get rid of the crc_owner check in check_version() and just have
-> something like:
->
->   if (IS_ENABLED(CONFIG_RELATIVE_CRCS))
->       crcval = resolve_crc(crc);
->
-> Also we could get rid of the '&& !defined(MODULE)' checks scattered in
-> export.h. Then the arches that want relative crcs and that *do* have rel32
-> relocation support can turn relative crcs on, and powerpc can enable it,
-> right?
->
+> I'm not sure what the question is, sorry.
 
-Indeed. My reasoning was that, given that we need to support both
-absolute and relative CRCs anyway, it would make sense for modules to
-keep using absolute ones regardless of what vmlinux is using, but it
-does obfuscate the code a bit.
+Ok, I've been busy lately and didn't pay attention to this. As I can't answer to
+Mark in Lee's place, and there is a good chance that almost everybody forgot
+what this was about, I'll respin the serie.
 
-> Would that work or is there another reason this won't work with modules
-> (assuming that the arches that select this option support the relative
-> offsets)?
->
+Then Lee can ask again his question to Mark so that you guys can talk directly
+one to the other.
 
-PowerPC with CONFIG_RELOCATABLE=y is really the only arch that
-requires this atm, and it supports REL32 relocations just fine, both
-for 32-bit and 64-bit.
+Cheers.
 
-I will respin the patches with the above modification.
+--
+Robert
