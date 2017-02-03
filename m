@@ -1,80 +1,51 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 2 Feb 2017 19:31:12 -0800
-Subject: [RFC] w1: regression, remove need for ida and use
- PLATFORM_DEVID_AUTO
-In-Reply-To: <cfa35897-383e-674a-f049-e45c4dfeb534@tul.cz>
-References: <d0b52b94-0c87-61f8-32ff-99f2a354e500@tul.cz>
- <308e185e-26eb-39ee-d82f-a0d210a41743@ti.com>
- <cfa35897-383e-674a-f049-e45c4dfeb534@tul.cz>
-Message-ID: <0928fc89-490f-1d12-dc3d-51f2d433d2e0@roeck-us.net>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Fri, 3 Feb 2017 09:07:07 +0530
+Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <3f4aa4c1e660c7e62256de9ca64fc822@codeaurora.org>
+References: <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
+ <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
+ <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
+ <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
+ <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
+ <20170130143851.GJ16461@arm.com>
+ <b2e50c17de156341deab9fb8e91a8dec@codeaurora.org>
+ <1e048aff-0d77-b9f2-ebf8-2ba315b90ca7@codeaurora.org>
+ <20170130165124.GA11712@red-moon>
+ <f401e27e-d619-0eec-2401-50d8e2fc2f0f@codeaurora.org>
+ <20170201185230.GA1922@red-moon>
+ <3f4aa4c1e660c7e62256de9ca64fc822@codeaurora.org>
+Message-ID: <013f01d27dce$cf8f5da0$6eae18e0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/2017 05:31 PM, Petr Cvek wrote:
-> Dne 2.2.2017 v 15:23 Andrew F. Davis napsal(a):
->> On 02/01/2017 07:05 PM, Petr Cvek wrote:
->>> Patch
->>> 	w1: remove need for ida and use PLATFORM_DEVID_AUTO
->>> 	098f9fb0c962eb2fdba5f9d34f4cf7a938237184
->>>
->>> causes a regression in the w1_ds2760 driver. Initialization creates a name "ds2760-battery.0.auto". It seems that name of that size will cause checking code in __thermal_cooling_device_register() from thermal_core.c to fail as it checks for names shorter than 20 chars:
->>>
->>> 	if (type && strlen(type) >= THERMAL_NAME_LENGTH)
->>> 		return ERR_PTR(-EINVAL);
->>>
->>> A second problem seems to be with magician_supplicants list as "ds2760-battery.0" does not match in a test power_supply_am_i_supplied() in ds2760_battery_update_status() from drivers/power/supply/ds2760_battery.c . This causes status flag to be forever in POWER_SUPPLY_STATUS_DISCHARGING state.
->>>
->>> Functionality returned after I hotfix changed (drivers/w1/slaves/w1_ds2760.c)
->>>
->>> 	pdev = platform_device_alloc("ds2760-battery", PLATFORM_DEVID_AUTO);
->>>
->>> to
->>>
->>> 	pdev = platform_device_alloc("ds2760-battery", 0);
->>>
->>> Which solution do you advise. Shortening the name let's say just to "ds2760" (with changes to arch files, w1 files and supply files), increasing THERMAL_NAME_LENGTH to let's say 32 (I don't know if this doesn't break something other) or just reverting to the old behavior?
->>>
+Hi,
+
+>On 2017-02-01 13:52, Lorenzo Pieralisi wrote:
 >>
->> If 20 is no longer the max thermal name then THERMAL_NAME_LENGTH should
->> be changed.
->
-> Yes it is that ".auto" addition to "ds2760-battery.0" makes 21 chars long string. With higher number (".10" onwards) it is 22 chars. Load of the module then fails at test in thermal_zone_device_register():
->
-> 	https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/thermal/thermal_core.c?id=refs/tags/v4.10-rc6#n1158
->
-> 	if (type && strlen(type) >= THERMAL_NAME_LENGTH)
-> 		return ERR_PTR(-EINVAL);
->
-> I searched in code further and with THERMAL_NAME_LENGTH = 30 (enough space) the module load fails at another place in __hwmon_device_register():
-> 	
-> 	https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/hwmon/hwmon.c?id=refs/tags/v4.10-rc6#n548
->
-> 	if (name && (!strlen(name) || strpbrk(name, "-* \t\n")))
-> 		return ERR_PTR(-EINVAL);
->
-> That's because there is "-" in "ds2760-battery.0.auto" (and that's why shortening to "ds2760.0" works). Is there some reason for disallowing "-" in a name? If not then I'm for removal (in other case we need to change ds2760-battery and others names). Increasing THERMAL_NAME_LENGTH to 22 should be just OK for ds2760 (but maybe not enough for others) I would increased it to 32 (nice number ;-) ).
->
-
-'-' is not permitted in hwmon name attributes, primarily because libsensors
-interprets it as a delimiter in its configuration file.
-
-Anyway, the related change in thermal has been reverted, so that should
-no longer be an issue. Also, we'll change the hwmon code in 4.11 to no longer
-return an error but to (only) issue a warning if an invalid name is provided.
-
-Guenter
-
+>> I debugged the issue and Nate's fix is correct, the fact that you
+>> can't it hit it with mainline is just a matter of timing because it has
+>> to do with the CTX pointer value (we OR it with the existing value), so
+>> it may work or not depending on how the cdptr memory allocation
+>> pattern turns out to be (which explains why Nate and I can hit it with
+>> simple PCI device remove/add execution too).
 >>
->> As for the couple boards hard-coding "ds2760-battery.0", this is a
->> problem that should be fix regardless of any fix we chose here as IDA is
->> not guaranteed to return 0, so the battery could just as easily be
->> called ds2760-battery.7. (I've had this discussion before as the N900
->> user-space also make this mistake).
+>> So it is neither an ACPI nor an IOMMU probe deferral issue per-se,
+>> fix is already queued, so it is all good.
 >>
+>> What about USB stalls ?
+>Our fault. The USB controller was getting 48-bit IOVAs, but the
+>bus it sits on only supports 44-bits so the controller's DMA
+>transactions ended up targeting addresses that were never mapped.
 >
-> I'm not familiar with power supply subsystem, so just a naive idea. Should suffice to change drivers/power/supply/power_supply_core.c __power_supply_is_supplied_by() for only first part of the string? (like "ds2760-battery" subset of "ds2760-battery.7").
+>It started working once I applied the iort/dma-mapping patches I
+>sent out earlier this week that use the iort memory_address_limit
+>field to check if a dma_mask is sane.
 >
-> Do you have a link to discussion about N900?
->
-> Petr
->
+>Sorry for the false alarm.
+
+Ok, thanks for closing on it. I will just post V8 with all acks picked up and
+Robin's fix , right away.
+
+Regards,
+ Sricharan
