@@ -1,33 +1,37 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 3 Feb 2017 18:22:44 +0800
-Subject: [PATCH 2/2] crypto: arm/aes - don't use IV buffer to return
- final keystream block
-In-Reply-To: <1486035536-895-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1486035536-895-1-git-send-email-ard.biesheuvel@linaro.org>
- <1486035536-895-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170203102244.GI2632@gondor.apana.org.au>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri,  3 Feb 2017 10:23:09 +0000
+Subject: [PATCH v4 00/10] serial: st-asc: Allow handling of RTS lin
+Message-ID: <20170203102319.23489-1-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 11:38:56AM +0000, Ard Biesheuvel wrote:
-> The ARM bit sliced AES core code uses the IV buffer to pass the final
-> keystream block back to the glue code if the input is not a multiple of
-> the block size, so that the asm code does not have to deal with anything
-> except 16 byte blocks. This is done under the assumption that the outgoing
-> IV is meaningless anyway in this case, given that chaining is no longer
-> possible under these circumstances.
-> 
-> However, as it turns out, the CCM driver does expect the IV to retain
-> a value that is equal to the original IV except for the counter value,
-> and even interprets byte zero as a length indicator, which may result
-> in memory corruption if the IV is overwritten with something else.
-> 
-> So use a separate buffer to return the final keystream block.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+When hardware flow-control is disabled, manual toggling of the UART's
+reset line (RTS) using userland applications (e.g. stty) is not
+possible, since the ASC IP does not provide this functionality in the
+same was as some other IPs do.  Thus, we have to do this manually.
 
-Patch applied.  Thanks.
+This set ensures the correct Pinctrl groups are configured and
+obtained for both manual toggling of the RTS line and for the IP to
+take over the lines when HW flow-control is requested by the user.
+
+Lee Jones (10):
+  serial: st-asc: Ignore the parity error bit if 8-bit mode is enabled
+  serial: st-asc: Provide RTS functionality
+  serial: st-asc: Read in all Pinctrl states
+  serial: st-asc: (De)Register GPIOD and swap Pinctrl profiles
+  serial: st-asc: Use generic DT binding for announcing RTS/CTS lines
+  dt-bindings: serial: Update 'uart-has-rtscts' description
+  ARM: dts: STiH410-b2260: Identify the UART RTS line
+  ARM: dts: STiH407-pinctrl: Add Pinctrl group for HW flow-control
+  ARM: dts: STiH407-family: Use new Pinctrl groups
+  ARM: dts: STiH410-b2260: Enable HW flow-control
+
+ .../devicetree/bindings/serial/serial.txt          |   3 +-
+ arch/arm/boot/dts/stih407-family.dtsi              |   3 +-
+ arch/arm/boot/dts/stih407-pinctrl.dtsi             |  12 ++-
+ arch/arm/boot/dts/stih410-b2260.dts                |   5 +
+ drivers/tty/serial/st-asc.c                        | 101 +++++++++++++++++++--
+ 5 files changed, 110 insertions(+), 14 deletions(-)
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.9.3
