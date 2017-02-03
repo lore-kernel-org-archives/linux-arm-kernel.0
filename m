@@ -1,73 +1,89 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Fri, 3 Feb 2017 14:28:11 +0100
-Subject: [RFC] w1: regression, remove need for ida and use
- PLATFORM_DEVID_AUTO
-In-Reply-To: <0928fc89-490f-1d12-dc3d-51f2d433d2e0@roeck-us.net>
-References: <d0b52b94-0c87-61f8-32ff-99f2a354e500@tul.cz>
- <308e185e-26eb-39ee-d82f-a0d210a41743@ti.com>
- <cfa35897-383e-674a-f049-e45c4dfeb534@tul.cz>
- <0928fc89-490f-1d12-dc3d-51f2d433d2e0@roeck-us.net>
-Message-ID: <822b1827-959b-13dc-6331-f0954954c010@tul.cz>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 3 Feb 2017 14:34:37 +0100
+Subject: [RFC v3 00/10] Provide the EL1 physical timer to the VM
+In-Reply-To: <CAHyh4xhtozK58v-rsWGQ6gwu1zs2E_PURiytS=_TLdQAdNV6nA@mail.gmail.com>
+References: <1485970990-13775-1-git-send-email-jintack@cs.columbia.edu>
+ <20170202123104.GJ27852@cbox>
+ <CAHyh4xhsqS6CijRysFvg+NqGo0rBQU45OhAaZUuHDm4M0JufTg@mail.gmail.com>
+ <20170203123320.GK27852@cbox>
+ <CAHyh4xhtozK58v-rsWGQ6gwu1zs2E_PURiytS=_TLdQAdNV6nA@mail.gmail.com>
+Message-ID: <CAMJs5B8BF2TfZkQr_R2VfXjvyqL7EvGG1v8C+GsVi6WsEOEeMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 3.2.2017 v 04:31 Guenter Roeck napsal(a):
-> On 02/02/2017 05:31 PM, Petr Cvek wrote:
->> Dne 2.2.2017 v 15:23 Andrew F. Davis napsal(a):
->>> On 02/01/2017 07:05 PM, Petr Cvek wrote:
->>>> Patch
->>>>     w1: remove need for ida and use PLATFORM_DEVID_AUTO
->>>>     098f9fb0c962eb2fdba5f9d34f4cf7a938237184
->>>>
->>>> causes a regression in the w1_ds2760 driver. Initialization creates a name "ds2760-battery.0.auto". It seems that name of that size will cause checking code in __thermal_cooling_device_register() from thermal_core.c to fail as it checks for names shorter than 20 chars:
->>>>
->>>>     if (type && strlen(type) >= THERMAL_NAME_LENGTH)
->>>>         return ERR_PTR(-EINVAL);
->>>>
->>>> A second problem seems to be with magician_supplicants list as "ds2760-battery.0" does not match in a test power_supply_am_i_supplied() in ds2760_battery_update_status() from drivers/power/supply/ds2760_battery.c . This causes status flag to be forever in POWER_SUPPLY_STATUS_DISCHARGING state.
->>>>
->>>> Functionality returned after I hotfix changed (drivers/w1/slaves/w1_ds2760.c)
->>>>
->>>>     pdev = platform_device_alloc("ds2760-battery", PLATFORM_DEVID_AUTO);
->>>>
->>>> to
->>>>
->>>>     pdev = platform_device_alloc("ds2760-battery", 0);
->>>>
->>>> Which solution do you advise. Shortening the name let's say just to "ds2760" (with changes to arch files, w1 files and supply files), increasing THERMAL_NAME_LENGTH to let's say 32 (I don't know if this doesn't break something other) or just reverting to the old behavior?
->>>>
+On Fri, Feb 3, 2017 at 2:14 PM, Jintack Lim <jintack@cs.columbia.edu> wrote:
+> On Fri, Feb 3, 2017 at 7:33 AM, Christoffer Dall <cdall@linaro.org> wrote:
+>> On Thu, Feb 02, 2017 at 09:51:13AM -0500, Jintack Lim wrote:
+>>> On Thu, Feb 2, 2017 at 7:31 AM, Christoffer Dall <cdall@linaro.org> wrote:
+>>> > Hi Jintack,
+>>> >
+>>> > On Wed, Feb 01, 2017 at 12:43:00PM -0500, Jintack Lim wrote:
+>>> >> The ARM architecture defines the EL1 physical timer and the virtual timer,
+>>> >> and it is reasonable for an OS to expect to be able to access both.
+>>> >> However, the current KVM implementation does not provide the EL1 physical
+>>> >> timer to VMs but terminates VMs on access to the timer.
+>>> >>
+>>> >> This patch series enables VMs to use the EL1 physical timer through
+>>> >> trap-and-emulate.  The KVM host emulates each EL1 physical timer register
+>>> >> access and sets up the background timer accordingly.  When the background
+>>> >> timer expires, the KVM host injects EL1 physical timer interrupts to the
+>>> >> VM.  Alternatively, it's also possible to allow VMs to access the EL1
+>>> >> physical timer without trapping.  However, this requires somehow using the
+>>> >> EL2 physical timer for the Linux host while running the VM instead of the
+>>> >> EL1 physical timer.  Right now I just implemented trap-and-emulate because
+>>> >> this was straightforward to do, and I leave it to future work to determine
+>>> >> if transferring the EL1 physical timer state to the EL2 timer provides any
+>>> >> performance benefit.
+>>> >>
+>>> >> This feature will be useful for any OS that wishes to access the EL1
+>>> >> physical timer. Nested virtualization is one of those use cases. A nested
+>>> >> hypervisor running inside a VM would think it has full access to the
+>>> >> hardware and naturally tries to use the EL1 physical timer as Linux would
+>>> >> do. Other nested hypervisors may try to use the EL2 physical timer as Xen
+>>> >> would do, but supporting the EL2 physical timer to the VM is out of scope
+>>> >> of this patch series. This patch series will make it easy to add the EL2
+>>> >> timer support in the future, though.
+>>> >>
+>>> >> Note that Linux VMs booting in EL1 will be unaffected by this patch series
+>>> >> and will continue to use only the virtual timer and this patch series will
+>>> >> therefore not introduce any performance degredation as a result of
+>>> >> trap-and-emulate.
+>>> >>
+>>> >> v2 => v3:
+>>> >>  - Rebase on kvmarm/queue
+>>> >>  - Take kvm->lock to synchronize cntvoff across all vtimers
+>>> >>  - Remove unnecessary function parameters
+>>> >>  - Add comments
+>>> >
+>>> > I just gave v3 a test run on my TC2 (32-bit platform) and my guest
+>>> > quickly locks up trying to run cyclictest or when booting the machine it
+>>> > stalls with RCU timeouts.
 >>>
->>> If 20 is no longer the max thermal name then THERMAL_NAME_LENGTH should
->>> be changed.
+>>> Ok. It's my fault not to specify that the emulated physical timer is
+>>> supported/tested on arm64.
+>>> On 32-bit platform, it is supposed to show the same behavior as
+>>> before, but I haven't tested.
+>>> Were you using the physical timer or the virtual timer for the guest?
+>>>
+>>> >
+>>> > Could you have a look?
+>>>
+>>> Sure, I'll have a look. I don't have access to my Cubietruck today,
+>>> but I can work on that tomorrow.
+>>>
 >>
->> Yes it is that ".auto" addition to "ds2760-battery.0" makes 21 chars long string. With higher number (".10" onwards) it is 22 chars. Load of the module then fails at test in thermal_zone_device_register():
+>> Don't bother, I've figured this out for you.
+>
+> Thanks a lot.
+>
 >>
->>     https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/thermal/thermal_core.c?id=refs/tags/v4.10-rc6#n1158
->>
->>     if (type && strlen(type) >= THERMAL_NAME_LENGTH)
->>         return ERR_PTR(-EINVAL);
->>
->> I searched in code further and with THERMAL_NAME_LENGTH = 30 (enough space) the module load fails at another place in __hwmon_device_register():
->>     
->>     https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/hwmon/hwmon.c?id=refs/tags/v4.10-rc6#n548
->>
->>     if (name && (!strlen(name) || strpbrk(name, "-* \t\n")))
->>         return ERR_PTR(-EINVAL);
->>
->> That's because there is "-" in "ds2760-battery.0.auto" (and that's why shortening to "ds2760.0" works). Is there some reason for disallowing "-" in a name? If not then I'm for removal (in other case we need to change ds2760-battery and others names). Increasing THERMAL_NAME_LENGTH to 22 should be just OK for ds2760 (but maybe not enough for others) I would increased it to 32 (nice number ;-) ).
->>
-> 
-> '-' is not permitted in hwmon name attributes, primarily because libsensors
-> interprets it as a delimiter in its configuration file.
-> 
+>> You need the following fixup to your patch:
+>
+> Ok. I'll post v4 soon.
+> You've already do "acked-by" for this commit. Do I need to change it
+> to "signed-off-by"?
+>
 
-OK so this means we need to rename ds2760-battery so libsensors works. 
+I guess so, technically.  I don't care deeply though.
 
-Hmm is an underscore in "ds2760_battery.0.auto" OK?
-
-> Anyway, the related change in thermal has been reverted, so that should
-
-s/thermal/hwmon ? Or I'm confused :-D (there was no change in thermal, code stopped working because of change in w1 driver (".auto" addition))
-
-Best regards,
-Petr
+-Christoffer
