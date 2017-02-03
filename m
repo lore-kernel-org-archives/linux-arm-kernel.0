@@ -1,63 +1,41 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 3 Feb 2017 11:45:56 -0800
-Subject: [PATCHv2 1/2] arch: Move CONFIG_DEBUG_RODATA and
- CONFIG_SET_MODULE_RONX to be common
-In-Reply-To: <1486144343-24998-2-git-send-email-labbott@redhat.com>
-References: <1486144343-24998-1-git-send-email-labbott@redhat.com>
- <1486144343-24998-2-git-send-email-labbott@redhat.com>
-Message-ID: <CAGXu5jK6_y=dWHUDBto7ykN_sSOQ6Gx+sZs_gQ1Hoh5DjP-fTw@mail.gmail.com>
+From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
+Date: Fri,  3 Feb 2017 14:47:24 -0500
+Subject: [PATCH v2 1/6] of: documentation: add bindings documentation for
+ TS-4600
+In-Reply-To: <20170203194729.20995-1-sebastien.bourdelin@savoirfairelinux.com>
+References: <20170203194729.20995-1-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20170203194729.20995-2-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 3, 2017 at 9:52 AM, Laura Abbott <labbott@redhat.com> wrote:
-> There are multiple architectures that support CONFIG_DEBUG_RODATA and
-> CONFIG_SET_MODULE_RONX. These options also now have the ability to be
-> turned off at runtime. Move these to an architecture independent
-> location and make these options def_bool y for almost all of those
-> arches.
->
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> v2: This patch is now doing just the refactor of the existing config options.
-> ---
->  arch/Kconfig              | 28 ++++++++++++++++++++++++++++
->  arch/arm/Kconfig          |  3 +++
->  arch/arm/Kconfig.debug    | 11 -----------
->  arch/arm/mm/Kconfig       | 12 ------------
->  arch/arm64/Kconfig        |  5 ++---
->  arch/arm64/Kconfig.debug  | 11 -----------
->  arch/parisc/Kconfig       |  1 +
->  arch/parisc/Kconfig.debug | 11 -----------
->  arch/s390/Kconfig         |  5 ++---
->  arch/s390/Kconfig.debug   |  3 ---
->  arch/x86/Kconfig          |  5 ++---
->  arch/x86/Kconfig.debug    | 11 -----------
->  12 files changed, 38 insertions(+), 68 deletions(-)
->
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index 99839c2..22ee01e 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -781,4 +781,32 @@ config VMAP_STACK
->           the stack to map directly to the KASAN shadow map using a formula
->           that is incorrect if the stack is in vmalloc space.
->
-> +config ARCH_NO_STRICT_RWX_DEFAULTS
-> +       def_bool n
-> +
-> +config ARCH_HAS_STRICT_KERNEL_RWX
-> +       def_bool n
-> +
-> +config DEBUG_RODATA
-> +       def_bool y if !ARCH_NO_STRICT_RWX_DEFAULTS
-> +       prompt "Make kernel text and rodata read-only" if ARCH_NO_STRICT_RWX_DEFAULTS
+This adds the documentation for the TS-4600 by Technologic Systems.
 
-Ah! Yes, perfect. I totally forgot about using conditional "prompt" lines. Nice!
+Acked-by: Rob Herring <robh@kernel.org>
+---
+Changes v1 -> v2:
+  - rebase on master
+  - add ack by Rob Herring <robh@kernel.org>
 
-Acked-by: Kees Cook <keescook@chromium.org>
+Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+---
+ Documentation/devicetree/bindings/arm/technologic.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
--Kees
-
+diff --git a/Documentation/devicetree/bindings/arm/technologic.txt b/Documentation/devicetree/bindings/arm/technologic.txt
+index 33797acad846..e9d6d6575566 100644
+--- a/Documentation/devicetree/bindings/arm/technologic.txt
++++ b/Documentation/devicetree/bindings/arm/technologic.txt
+@@ -1,6 +1,11 @@
+ Technologic Systems Platforms Device Tree Bindings
+ --------------------------------------------------
+ 
++TS-4600 is a System-on-Module based on the Freescale i.MX28 System-on-Chip.
++It can be mounted on a carrier board providing additional peripheral connectors.
++Required root node properties:
++	- compatible = "technologic,imx28-ts4600", "fsl,imx28"
++
+ TS-4800 board
+ Required root node properties:
+ 	- compatible = "technologic,imx51-ts4800", "fsl,imx51";
 -- 
-Kees Cook
-Pixel Security
+2.11.0
