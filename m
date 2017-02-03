@@ -1,141 +1,92 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Fri, 3 Feb 2017 08:14:45 -0500
-Subject: [RFC v3 00/10] Provide the EL1 physical timer to the VM
-In-Reply-To: <20170203123320.GK27852@cbox>
-References: <1485970990-13775-1-git-send-email-jintack@cs.columbia.edu>
- <20170202123104.GJ27852@cbox>
- <CAHyh4xhsqS6CijRysFvg+NqGo0rBQU45OhAaZUuHDm4M0JufTg@mail.gmail.com>
- <20170203123320.GK27852@cbox>
-Message-ID: <CAHyh4xhtozK58v-rsWGQ6gwu1zs2E_PURiytS=_TLdQAdNV6nA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 3 Feb 2017 13:18:51 +0000
+Subject: [PATCH v4] PCI: Xilinx NWL: Modifying irq chip for legacy
+ interrupts
+In-Reply-To: <8520D5D51A55D047800579B094147198263E03C4@XAP-PVEXMBX02.xlnx.xilinx.com>
+References: <1486120110-15205-1-git-send-email-bharatku@xilinx.com>
+ <3c78506f-9bcb-0b43-4625-27229ee1f642@arm.com>
+ <8520D5D51A55D047800579B094147198263E03C4@XAP-PVEXMBX02.xlnx.xilinx.com>
+Message-ID: <69159364-f20a-c4e9-3e0b-187593d206fb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 3, 2017 at 7:33 AM, Christoffer Dall <cdall@linaro.org> wrote:
-> On Thu, Feb 02, 2017 at 09:51:13AM -0500, Jintack Lim wrote:
->> On Thu, Feb 2, 2017 at 7:31 AM, Christoffer Dall <cdall@linaro.org> wrote:
->> > Hi Jintack,
->> >
->> > On Wed, Feb 01, 2017 at 12:43:00PM -0500, Jintack Lim wrote:
->> >> The ARM architecture defines the EL1 physical timer and the virtual timer,
->> >> and it is reasonable for an OS to expect to be able to access both.
->> >> However, the current KVM implementation does not provide the EL1 physical
->> >> timer to VMs but terminates VMs on access to the timer.
->> >>
->> >> This patch series enables VMs to use the EL1 physical timer through
->> >> trap-and-emulate.  The KVM host emulates each EL1 physical timer register
->> >> access and sets up the background timer accordingly.  When the background
->> >> timer expires, the KVM host injects EL1 physical timer interrupts to the
->> >> VM.  Alternatively, it's also possible to allow VMs to access the EL1
->> >> physical timer without trapping.  However, this requires somehow using the
->> >> EL2 physical timer for the Linux host while running the VM instead of the
->> >> EL1 physical timer.  Right now I just implemented trap-and-emulate because
->> >> this was straightforward to do, and I leave it to future work to determine
->> >> if transferring the EL1 physical timer state to the EL2 timer provides any
->> >> performance benefit.
->> >>
->> >> This feature will be useful for any OS that wishes to access the EL1
->> >> physical timer. Nested virtualization is one of those use cases. A nested
->> >> hypervisor running inside a VM would think it has full access to the
->> >> hardware and naturally tries to use the EL1 physical timer as Linux would
->> >> do. Other nested hypervisors may try to use the EL2 physical timer as Xen
->> >> would do, but supporting the EL2 physical timer to the VM is out of scope
->> >> of this patch series. This patch series will make it easy to add the EL2
->> >> timer support in the future, though.
->> >>
->> >> Note that Linux VMs booting in EL1 will be unaffected by this patch series
->> >> and will continue to use only the virtual timer and this patch series will
->> >> therefore not introduce any performance degredation as a result of
->> >> trap-and-emulate.
->> >>
->> >> v2 => v3:
->> >>  - Rebase on kvmarm/queue
->> >>  - Take kvm->lock to synchronize cntvoff across all vtimers
->> >>  - Remove unnecessary function parameters
->> >>  - Add comments
->> >
->> > I just gave v3 a test run on my TC2 (32-bit platform) and my guest
->> > quickly locks up trying to run cyclictest or when booting the machine it
->> > stalls with RCU timeouts.
+On 03/02/17 12:16, Bharat Kumar Gogada wrote:
+>> On 03/02/17 11:08, Bharat Kumar Gogada wrote:
+>>> - Adding mutex lock for protecting legacy mask register
+>>> - Few wifi end points which only support legacy interrupts, performs
+>>> hardware reset functionalities after disabling interrupts by invoking
+>>> disable_irq and then re-enable using enable_irq, they enable hardware
+>>> interrupts first and then virtual irq line later.
+>>> - The legacy irq line goes low only after DEASSERT_INTx is received.As
+>>> the legacy irq line is high immediately after hardware interrupts are
+>>> enabled but virq of EP is still in disabled state and EP handler is
+>>> never executed resulting no DEASSERT_INTx.If dummy irq chip is used,
+>>> interrutps are not masked and system is hanging with CPU stall.
+>>> - Adding irq chip functions instead of dummy irq chip for legacy
+>>> interrupts.
+>>> - Legacy interrupts are level sensitive, so using handle_level_irq is
+>>> more appropriate as it is masks interrupts until End point handles
+>>> interrupts and unmasks interrutps after End point handler is executed.
+>>> - Legacy interrupts are level triggered, virtual irq line of End Point
+>>> shows as edge in /proc/interrupts.
+>>> - Setting irq flags of virtual irq line of EP to level triggered at
+>>> the time of mapping.
+>>>
+>>> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+>>> ---
+>>>  drivers/pci/host/pcie-xilinx-nwl.c |   45
+>> +++++++++++++++++++++++++++++++++++-
+>>>  1 files changed, 44 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c
+>>> b/drivers/pci/host/pcie-xilinx-nwl.c
+>>> index 43eaa4a..e4605f9 100644
+>>> --- a/drivers/pci/host/pcie-xilinx-nwl.c
+>>> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
+>>> @@ -184,6 +184,7 @@ struct nwl_pcie {
+>>>  	u8 root_busno;
+>>>  	struct nwl_msi msi;
+>>>  	struct irq_domain *legacy_irq_domain;
+>>> +	spinlock_t leg_mask_lock;
+>>>  };
+>>>
+>>>  static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off) @@
+>>> -395,11 +396,52 @@ static void nwl_pcie_msi_handler_low(struct irq_desc
+>> *desc)
+>>>  	chained_irq_exit(chip, desc);
+>>>  }
+>>>
+>>> +static void nwl_mask_leg_irq(struct irq_data *data) {
+>>> +	struct irq_desc *desc = irq_to_desc(data->irq);
+>>> +	struct nwl_pcie *pcie;
+>>> +	unsigned long flags;
+>>> +	u32 mask;
+>>> +	u32 val;
+>>> +
+>>> +	pcie = irq_desc_get_chip_data(desc);
+>>> +	mask = 1 << (data->hwirq - 1);
+>>> +	spin_lock_irqsave(&pcie->leg_mask_lock, flags);
 >>
->> Ok. It's my fault not to specify that the emulated physical timer is
->> supported/tested on arm64.
->> On 32-bit platform, it is supposed to show the same behavior as
->> before, but I haven't tested.
->> Were you using the physical timer or the virtual timer for the guest?
+>> I've asked you to use a raw spinlock for a reason. If using RT, this gets turned
+>> into a sleeping lock...
 >>
->> >
->> > Could you have a look?
->>
->> Sure, I'll have a look. I don't have access to my Cubietruck today,
->> but I can work on that tomorrow.
->>
->
-> Don't bother, I've figured this out for you.
+>  In include/linux/spinlock.h 
+> #define spin_lock_irqsave(lock, flags)                          \
+> do {                                                            \
+>         raw_spin_lock_irqsave(spinlock_check(lock), flags);     \
+> } while (0)
+> 
+> The above API invokes raw_spin_lock_irqsave know.
+> So is there any difference between raw_spin_lock_irqsave and spin_lock_irqsave ?
 
-Thanks a lot.
+When using RT, yes. RT upgrades all spinlocks to sleeping locks. We're
+trying hard not to break RT, despite most of it not being merged yet. So
+your patch will work on mainline Linux, and will break horribly on Linux/RT.
 
->
-> You need the following fixup to your patch:
+So please, turn this into a raw spinlock as requested.
 
-Ok. I'll post v4 soon.
-You've already do "acked-by" for this commit. Do I need to change it
-to "signed-off-by"?
+Thanks,
 
->
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 93c811c..35d7100 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -410,14 +410,21 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->  }
->
->  /* Make the updates of cntvoff for all vtimer contexts atomic */
-> -static void update_vtimer_cntvoff(struct kvm *kvm, u64 cntvoff)
-> +static void update_vtimer_cntvoff(struct kvm_vcpu *vcpu, u64 cntvoff)
->  {
->         int i;
-> -       struct kvm_vcpu *vcpu;
-> +       struct kvm *kvm = vcpu->kvm;
-> +       struct kvm_vcpu *tmp;
->
->         mutex_lock(&kvm->lock);
-> -       kvm_for_each_vcpu(i, vcpu, kvm)
-> -               vcpu_vtimer(vcpu)->cntvoff = cntvoff;
-> +       kvm_for_each_vcpu(i, tmp, kvm)
-> +               vcpu_vtimer(tmp)->cntvoff = cntvoff;
-> +
-> +       /*
-> +        * When called from the vcpu create path, the CPU being created is not
-> +        * included in the loop above, so we just set it here as well.
-> +        */
-> +       vcpu_vtimer(vcpu)->cntvoff = cntvoff;
->         mutex_unlock(&kvm->lock);
->  }
->
-> @@ -426,7 +433,7 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
->         struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->
->         /* Synchronize cntvoff across all vtimers of a VM. */
-> -       update_vtimer_cntvoff(vcpu->kvm, kvm_phys_timer_read());
-> +       update_vtimer_cntvoff(vcpu, kvm_phys_timer_read());
->         vcpu_ptimer(vcpu)->cntvoff = 0;
->
->         INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
-> @@ -448,7 +455,7 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
->                 vtimer->cnt_ctl = value;
->                 break;
->         case KVM_REG_ARM_TIMER_CNT:
-> -               update_vtimer_cntvoff(vcpu->kvm, kvm_phys_timer_read() - value);
-> +               update_vtimer_cntvoff(vcpu, kvm_phys_timer_read() - value);
->                 break;
->         case KVM_REG_ARM_TIMER_CVAL:
->                 vtimer->cnt_cval = value;
->
-> This is an amuzing one.
-
-nice catch!
-
->
-> Thanks,
-> -Christoffer
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
