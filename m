@@ -1,56 +1,151 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 3 Feb 2017 18:26:49 +0000
-Subject: [PATCHv2 2/2] arch: Rename CONFIG_DEBUG_RODATA and
- CONFIG_DEBUG_MODULE_RONX
-In-Reply-To: <1486144343-24998-3-git-send-email-labbott@redhat.com>
-References: <1486144343-24998-1-git-send-email-labbott@redhat.com>
- <1486144343-24998-3-git-send-email-labbott@redhat.com>
-Message-ID: <20170203182648.GB26578@leverpostej>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 3 Feb 2017 18:36:26 +0000
+Subject: [PATCH v8 00/15] ACPI platform MSI support and its example mbigen
+In-Reply-To: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
+References: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <20170203183626.GB17899@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2017 at 09:52:22AM -0800, Laura Abbott wrote:
+Hanjun, Sinan,
+
+On Wed, Jan 18, 2017 at 08:54:50PM +0800, Hanjun Guo wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
 > 
-> Both of these options are poorly named. The features they provide are
-> necessary for system security and should not be considered debug only.
-> Change the name to something that accurately describes what these
-> options do.
+> With platform msi support landed in the kernel, and the introduction
+> of IORT for GICv3 ITS (PCI MSI) and SMMU, the framework for platform msi
+> is ready, this patch set add few patches to enable the ACPI platform
+> msi support.
 > 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> For platform device connecting to ITS on arm platform, we have IORT
+> table with the named componant node to describe the mappings of paltform
+> device and ITS, so we can retrieve the dev id and find its parent
+> irqdomain (ITS) from IORT table (simlar with the ACPI ITS support).
 
-As with patch 1, this looks good to me. FWIW:
+Depending on how things go, I prepared a branch with the first 12
+patches (I basically updated some logs and added some cosmetics changes)
+for testing (Hanjun please have a look in details since I may have misread
+some logs), whether or not I will send a pull request for it we shall see
+next week.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Here:
 
-> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-> index 939815e..560a8d8 100644
-> --- a/arch/arm64/Kconfig.debug
-> +++ b/arch/arm64/Kconfig.debug
-> @@ -72,7 +72,7 @@ config DEBUG_WX
->  	  If in doubt, say "Y".
->  
->  config DEBUG_ALIGN_RODATA
-> -	depends on DEBUG_RODATA
-> +	depends on STRICT_KERNEL_RWX
->  	bool "Align linker sections up to SECTION_SIZE"
->  	help
->  	  If this option is enabled, sections that may potentially be marked as
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index 94b62c1..67f9cb9 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -93,7 +93,7 @@ static void __kprobes *patch_map(void *addr, int fixmap)
->  	bool module = !core_kernel_text(uintaddr);
->  	struct page *page;
->  
-> -	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
-> +	if (module && IS_ENABLED(CONFIG_STRICT_MODULE_RWX))
->  		page = vmalloc_to_page(addr);
->  	else if (!module)
->  		page = pfn_to_page(PHYS_PFN(__pa(addr)));
-
-Since CONFIG_STRICT_MODULE_RWX is mandatory for arm64, we should be able
-to simplify this, but that can wait for a later patch.
+git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/platform-msi
 
 Thanks,
-Mark.
+Lorenzo
+
+> v7 -> v8:
+> 	- Using _CRS instead of _PRS for Interrupt resources for mbigen
+> 
+> 	- reshuffle the patch slightly to introduce iort_node_map_platform_id()
+> 	  first and then retrieve the dev id for platform MSI, no functional
+> 	  change
+> 
+> 	- Fix the compile error with patch "irqchip: gicv3-its: platform-msi:
+> 	  scan MADT to create platform msi domain", which forgot to add 
+> 	  <include/acpi_iort.h> (added in later patches in last version).
+> 
+> 	- renew some commit message which suggested by Lorenzo
+> 
+> 	- address some othe minor issues which commented by Lorenzo
+> 
+> 	- Add review and test tag as it's no functional change except
+> 	  the last patch of mbigen
+> 
+> 	- rebase on top of 4.10-rc4 and test it on x86, ia64 and ARM64
+> 	  platforms (also with Agustin's patch [1-2/3] "[PATCH V9 0/3] irqchip: qcom:
+>           Add IRQ combiner driver" and Lorenzo's patch
+>           https://patchwork.kernel.org/patch/9507041/)
+> 
+> v6 -> v7: 
+> 	- Introduce iort_node_map_platform_id() to retrieve the
+> 	  dev id for both NC (named component) -> ITS/SMMU and
+> 	  NC -> SMMU -> ITS cases, suggested by Lorenzo;
+> 
+> 	- Reorder the patches and rewrite some commit message;
+> 
+> 	- Remove the test tags because it has major changes
+> 	  to retrieve the dev id, Sinan, Majun, Xinwei, could
+> 	  you please test them again on your platform?
+> 
+> 	- rebased on top of 4.10-rc3 and Lorenzo's patch
+>           https://patchwork.kernel.org/patch/9507041/
+> 
+> 	- Tested against Agustin's patch [1-2/3] "[PATCH V9 0/3] irqchip: qcom:
+>           Add IRQ combiner driver"
+> 
+> v5 -> v6:
+>         - Call acpi_configure_pmsi_domain() for platform devices in
+>           acpi_platform_notify() as it's cleaner (suggested by Rafael)
+>         - Remove the "u8 type" for iort_id_map() because it's unused
+>         - Rebase on top of 4.10-rc2
+>         - Collect test and review tags
+> 
+> v4 -> v5:
+>         - Add mbigen support back with tested on with Agustin's patchset,
+>           and it's a good example of how ACPI platform MSI works
+>         - rebased on top of lastest Linus tree (commit 52bce91 splice: reinstate SIGPIPE/EPIPE handling)
+> 
+> v3 -> v4:
+>         - Drop mbi-gen patches to just submit platform msi support because
+>           will rebase mbi-gen patches on top of Agustin's patchset, and discusion
+>           is going there.
+>         - Add a patch to support device topology such as NC(named componant, paltform device)
+>           ->SMMU->ITS which suggested by Lorenzo;
+>         - rebased on top of Lorenzo's v9 of ACPI IORT ARM SMMU support;
+>         - rebased on top of 4.9-rc7
+> 
+> v2 -> v3:
+>         - Drop RFC tag
+>         - Rebase against v4.9-rc2 and Lorenzo's v6 of ACPI IORT ARM SMMU support [1]
+>         - Add 3 cleanup patches (patch 1, 2, 3)
+>         - Drop arch_init call patch from last version
+>         - Introduce a callback for platform device to set msi domain
+>         - Introduce a new API to get paltform device's domain instead of
+>           reusing the PCI one in previous version
+>         - Add a patch to rework iort_node_get_id()
+> 
+> [1]: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1251993.html
+> 
+> v1 -> v2:
+>         - Fix the bug of if multi Interrupt() resoures in single _PRS,
+>           we need to calculate all the irq numbers (I missed it in previous
+>           version);
+>         - Rebased on Marc's irq/irqchip-4.9 branch and Lorenzo's v5
+>           SMMU patches (also Robin's SMMu patches)
+>         - Add patch irqchip: mbigen: promote mbigen init.
+> 
+> Hanjun Guo (13):
+>   ACPI: IORT: fix the indentation in iort_scan_node()
+>   ACPI: IORT: add missing comment for iort_dev_find_its_id()
+>   ACPI: IORT: minor cleanup for iort_match_node_callback()
+>   irqchip: gic-v3-its: keep the head file include in alphabetic order
+>   irqchip: gicv3-its: platform-msi: refactor its_pmsi_prepare()
+>   irqchip: gicv3-its: platform-msi: refactor its_pmsi_init() to prepare
+>     for ACPI
+>   irqchip: gicv3-its: platform-msi: scan MADT to create platform msi
+>     domain
+>   ACPI: IORT: rename iort_node_map_rid() to make it generic
+>   ACPI: IORT: introduce iort_node_map_platform_id() to retrieve dev id
+>   ACPI: platform-msi: retrieve dev id from IORT
+>   ACPI: platform: setup MSI domain for ACPI based platform device
+>   msi: platform: make platform_msi_create_device_domain() ACPI aware
+>   irqchip: mbigen: Add ACPI support
+> 
+> Kefeng Wang (2):
+>   irqchip: mbigen: drop module owner
+>   irqchip: mbigen: introduce mbigen_of_create_domain()
+> 
+>  drivers/acpi/arm64/iort.c                     | 158 +++++++++++++++++++++-----
+>  drivers/acpi/glue.c                           |   6 +
+>  drivers/base/platform-msi.c                   |   3 +-
+>  drivers/irqchip/irq-gic-v3-its-platform-msi.c | 106 +++++++++++++----
+>  drivers/irqchip/irq-gic-v3-its.c              |   3 +-
+>  drivers/irqchip/irq-mbigen.c                  | 109 +++++++++++++++---
+>  include/linux/acpi_iort.h                     |   8 ++
+>  7 files changed, 316 insertions(+), 77 deletions(-)
+> 
+> -- 
+> 1.7.12.4
+> 
