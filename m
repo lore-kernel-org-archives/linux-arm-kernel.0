@@ -1,59 +1,52 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Fri, 3 Feb 2017 07:20:51 -0500
-Subject: [PATCH 0/5] Implement SMMU passthrough using the default domain
-In-Reply-To: <20170202151241.GE13839@arm.com>
-References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
- <010801d27654$47b7e450$d727acf0$@codeaurora.org>
- <20170126171857.GE27598@8bytes.org>
- <CAF6AEGtfrrwVZ_W86_HqVsiqfcM=XFa+g2LECFYQJmvv7-JSqQ@mail.gmail.com>
- <20170202151241.GE13839@arm.com>
-Message-ID: <CAF6AEGvL_WDt0e6FpuCjeMddaGarF7wu8ZEHtzSwx_ygVURtyQ@mail.gmail.com>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Fri, 3 Feb 2017 12:25:24 +0000
+Subject: [PATCH V7 3/4] drm/bridge: Add driver for GE B850v3 LVDS/DP++
+ Bridge
+In-Reply-To: <20170203080040.qn53xnpojxzk4qoi@phenom.ffwll.local>
+References: <CACvgo535iyFvdOWzQHRnU++Ye0GgyZyN3R9ALSXRP7k3EPyRGA@mail.gmail.com>
+ <3e31-58931d80-1-221fa900@101383713>
+ <CACvgo50bOZ=jzeJc_J4_7fpiEh9-ATKo1KOhAia2679AGA=mng@mail.gmail.com>
+ <20170203080040.qn53xnpojxzk4qoi@phenom.ffwll.local>
+Message-ID: <CACvgo53BpgFwr3-LRhe8QpvD3ZRMr7huaRKyp5PTAY6O60J3xA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 2, 2017 at 10:12 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Thu, Feb 02, 2017 at 10:02:50AM -0500, Rob Clark wrote:
->> On Thu, Jan 26, 2017 at 12:18 PM, Joerg Roedel <joro@8bytes.org> wrote:
->> > On Tue, Jan 24, 2017 at 08:42:23PM +0530, Sricharan wrote:
->> >> Thanks for this series. We had a case with the GPU.
->> >> The GPU's iommu was setup by kernel and the GPU
->> >> also does dynamic updates for on-the-fly switching between
->> >> process pagetables.  GPU driver was not using DMA domain and
->> >> the GPU's firmware was always expecting to run out  of contextbank
->> >>  '0' (although not correct) , which was not the case after the DMA domain
->> >> was made default  as '0' was getting allocated for DMA domain and
->> >> there were concerns about reusing the DMA domain as well.
->> >> Now with this series, looks there is an way out of that that can be tried.
->> >>
->> >> So should the default domain not be per device specific selectable ?
->> >
->> > Note that iommu-drivers can request direct-mapping for any given device
->> > on its initializtion. This is used on x86 for devices that need a 1-1
->> > mapping for some reason.
->> >
->> > Also device drivers can use the iommu-api and assign their own domain to
->> > a device, which allows them to manage the dma address space on their
->> > own.
->>
->> Part of the problem is that dev->archdata.dma_ops gets wired up to
->> iommu_dma_ops.  Which isn't so bad on it's own, except that cache ops
->> are not exposed to drivers, forcing us to use dma-mapping API
->> (dma_map_sg, etc) for cache operations.
->>
->> Possibly we should just expose cache op's to drivers bypass this abuse
->> of dma-mapping.
->>
->> btw, Will, we definitely want this to *not* rely on kcmdline for the
->> gpu with it's own private iommu case..
+On 3 February 2017 at 08:00, Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Thu, Feb 02, 2017 at 12:37:21PM +0000, Emil Velikov wrote:
+>>  - Daniel, gents - is drm-misc aimed at devs with limited (no?)
+>> review/commit history in the area and/or the kernel in general ?
+>> In this case, Peter have quite noticeable experience [in kernel
+>> development] with little-to no in DRM.
+>> Should one draw a line in the sand somewhere ?
 >
-> I still need to understand the unmanaged domain case, but I don't really
-> see why that's related to this series to be honest.
+> We're fairly lenient with accepting new drivers already, and for drivers
+> in drm-misc we require some checks and peer review to make sure new folks
+> learn faster. But it's an expirement, I fully expect some fallout and then
+> some learnign and fine tuning from that, and maybe we even need to crank
+> requirements back up to a much higher level of experience.
 >
+> But for drivers I'm honestly not too concerned: As long as there's some
+> process in place to foster learning&collaboration (which I think will be
+> better with this) I really don't see much harm in merging non-perfect
+> driver code.
+>
+Thank you Daniel, this is very well said. Being lenient to begin with
+and adjusting where/if needed is the more welcoming approach, indeed.
+Doubt there'll be (m)any cases of (ab|mis)use but even if so, nobody
+can see the future.
 
-Only relation is if we were trying to solve the case of a driver that
-needs to manage it's own domain with this patchset..  but that seems a
-bit like "when all you have is a hammer, everything looks like a
-nail"..
+>>  - You patch has been on a long [bit rocky road] for a while, with
+>> devs giving you [what seems like] a partial reviews.
+>> Have you considered reviewing others' patches in exchange for a [more
+>> complete one] of this one ? According to git log people have poked you
+>> a handful of times, but seemingly you were busy.
+>
+> Just a clarification: When I review drivers I don't do a fairly cursor
+> look, hunting for areas where some refactoring and align with drm best
+> practices would be good. And I think that's perfectly fine and enough to
+> get a driver landed, but we're definitely not 100% consistent on this
+> within drm-misc. Probably will take some time to figure this out.
+Seems like I've missed "Peter, your patch..." above, silly me.
 
-BR,
--R
+Thanks for answering my [what may seem silly] questions ;-)
+Emil
