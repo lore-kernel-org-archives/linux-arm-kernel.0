@@ -1,40 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 3 Feb 2017 15:17:28 +0000
-Subject: [PATCH v4] efi: arm64: Add vmlinux debug link to the Image binary
-In-Reply-To: <CAKv+Gu9VmbjtvFVveAXiRtpBtZCWJV6pMGmnEzTc5gPrOnYvnQ@mail.gmail.com>
-References: <1486056799-4825-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170202183000.GN13839@arm.com>
- <CAKv+Gu82NmBNavpVQ8z7xZ6++HPqAWNnn3dM=dKw0JaWLZocSw@mail.gmail.com>
- <CAKv+Gu9VmbjtvFVveAXiRtpBtZCWJV6pMGmnEzTc5gPrOnYvnQ@mail.gmail.com>
-Message-ID: <20170203151728.GB23547@arm.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri,  3 Feb 2017 16:17:47 +0100
+Subject: [PATCH 09/10] iommu/exynos: Make use of iommu_device_register
+ interface
+In-Reply-To: <1486135068-23994-1-git-send-email-joro@8bytes.org>
+References: <1486135068-23994-1-git-send-email-joro@8bytes.org>
+Message-ID: <1486135068-23994-10-git-send-email-joro@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2017 at 02:50:40PM +0000, Ard Biesheuvel wrote:
-> On 2 February 2017 at 18:36, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > On 2 February 2017 at 18:30, Will Deacon <will.deacon@arm.com> wrote:
-> >> On Thu, Feb 02, 2017 at 05:33:19PM +0000, Ard Biesheuvel wrote:
-> > diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> > index 2600c60337ac..1606c6b2a280 100644
-> > --- a/arch/arm64/kernel/Makefile
-> > +++ b/arch/arm64/kernel/Makefile
-> > @@ -57,5 +57,5 @@ head-y                                        := head.o
-> >  extra-y                                        += $(head-y) vmlinux.lds
-> >
-> >  ifeq ($(CONFIG_DEBUG_EFI),y)
-> > -AFLAGS_head.o += -DVMLINUX_PATH="\"$(shell readlink -f $(objtree)/vmlinux)\""
-> > +AFLAGS_head.o += -DVMLINUX_PATH="\"$(realpath $(objtree)/vmlinux)\""
-> >  endif
-> >
-> >
-> >> Do you want me to merge this via arm64?
-> >>
-> >
-> > Yes, please
-> 
-> Should I respin this?
+From: Joerg Roedel <jroedel@suse.de>
 
-No need, I'll pick it up and make the change. I'll push out before I leave
-work this evening.
+Register Exynos IOMMUs to the IOMMU core and make them
+visible in sysfs. This patch does not add the links between
+IOMMUs and translated devices yet.
 
-Will
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Signed-off-by: Joerg Roedel <jroedel@suse.de>
+---
+ drivers/iommu/exynos-iommu.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 57ba0d3..90f0f52 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -276,6 +276,8 @@ struct sysmmu_drvdata {
+ 	struct list_head owner_node;	/* node for owner controllers list */
+ 	phys_addr_t pgtable;		/* assigned page table structure */
+ 	unsigned int version;		/* our version */
++
++	struct iommu_device iommu;	/* IOMMU core handle */
+ };
+ 
+ static struct exynos_iommu_domain *to_exynos_domain(struct iommu_domain *dom)
+@@ -556,6 +558,7 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct sysmmu_drvdata *data;
+ 	struct resource *res;
++	resource_size_t ioaddr;
+ 
+ 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
+ 	if (!data)
+@@ -565,6 +568,7 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ 	data->sfrbase = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(data->sfrbase))
+ 		return PTR_ERR(data->sfrbase);
++	ioaddr = res->start;
+ 
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq <= 0) {
+@@ -611,6 +615,18 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+ 	data->sysmmu = dev;
+ 	spin_lock_init(&data->lock);
+ 
++	ret = iommu_device_sysfs_add(&data->iommu, &pdev->dev, NULL,
++				     "sysmmu.%pa", &ioaddr);
++	if (ret)
++		return ret;
++
++	data->iommu.ops    = &exynos_iommu_ops;
++	data->iommu.fwnode = &dev->of_node->fwnode;
++
++	ret = iommu_device_register(&data->iommu);
++	if (ret)
++		return ret;
++
+ 	platform_set_drvdata(pdev, data);
+ 
+ 	__sysmmu_get_version(data);
+-- 
+1.9.1
