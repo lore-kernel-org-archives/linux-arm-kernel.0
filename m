@@ -1,115 +1,39 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Feb 2017 15:54:49 +0000
-Subject: [PATCHv2 net-next 05/16] net: mvpp2: introduce PPv2.2 HW
- descriptors and adapt accessors
-In-Reply-To: <231514f4-2e35-8bde-4469-aada833635aa@arm.com>
-References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943592-12556-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170106142901.GC14217@n2100.armlinux.org.uk>
- <113811b6-79a4-9c66-d302-add9fb0c5b1a@arm.com>
- <20170203142446.2ee517a7@free-electrons.com>
- <231514f4-2e35-8bde-4469-aada833635aa@arm.com>
-Message-ID: <20170203155449.GC27312@n2100.armlinux.org.uk>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 3 Feb 2017 10:57:44 -0500
+Subject: [PATCH v8 00/15] ACPI platform MSI support and its example mbigen
+In-Reply-To: <8687cb39-bffe-8f4a-76aa-a4d4ed61d30e@arm.com>
+References: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
+ <a2eb29e2-0f46-0be0-dc43-b3a086556965@codeaurora.org>
+ <fd106be9-836d-8d91-e57c-183ca56b4a49@arm.com>
+ <45d4de34-cfd2-06af-93c2-e721bd80ab43@codeaurora.org>
+ <8687cb39-bffe-8f4a-76aa-a4d4ed61d30e@arm.com>
+Message-ID: <6eb61900-640d-fd7f-7e7f-9deced1ec71e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2017 at 02:05:13PM +0000, Robin Murphy wrote:
-> AFAICS, even that shouldn't really be necessary - for all VA/PA
-> combinations of 32/32, 32/40 and 64/40, storing virt_to_phys() of the
-> SKB VA won't overflow 40 bits, so a corresponding phys_to_virt() at the
-> other end can't go wrong either.
+On 2/3/2017 10:49 AM, Marc Zyngier wrote:
+>> Patches 13-15 are specific for MBIGEN. 00-12 are for the base functionality.
+> Is that to support SMMUv3's own MSI generation? It would be helpful if
+> you explained why you want this code to be merged beforehand,
+> potentially without any in-tree user.
 
-Except for the detail that virt_to_phys()/phys_to_virt() is only defined
-for the direct-mapped memory, not for highmem.  That matters a lot for
-32-bit platforms.
+Sure, I'm more interested in supporting MSI on my HIDMA code rather than
+MSI on SMMUv3.
 
-Now for a bit of a whinge.  Reading through this code is rather annoying
-because of what's called a "physical" address which is actually a DMA
-address as far as the kernel is concerned - this makes it much harder
-when thinking about this issue because it causes all sorts of confusion.
-Please can the next revision of the patches start calling things by their
-right name - a dma_addr_t is a DMA address, not a physical address, even
-though _numerically_ it may be the same thing.  From the point of view
-of the kernel, you must not do phys_to_virt() on a dma_addr_t address.
-Thanks.
+HIDMA MSI patches were merged November 2016.
 
-If we're going to start dealing with _real_ physical addresses, then
-this is even more important to separate the concept of what's a physical
-address and what's a DMA address in this driver.
+https://github.com/torvalds/linux/commits/master/drivers/dma/qcom/hidma.c
 
-Taking a step backwards...
+Commits on Nov 3, 2016
+ @vinodkoul
+dmaengine: qcom_hidma: add MSI support for interrupts  ?
+Sinan Kaya committed with vinodkoul on Oct 21, 2016
 
-How do DMA addresses and this cookie get into the receive ring - from what
-I can see, the driver doesn't write these into the receive ring, it's the
-hardware that writes it, and the only route I can see that they get there
-is via writes performed in mvpp2_bm_pool_put().
+I tested the first 12 patches of this series against HIDMA and provided
+my tested-by.
 
-Now, from what I can see, the "buf_virt_addr" comes from:
-
-+static void *mvpp2_frag_alloc(const struct mvpp2_bm_pool *pool)
-+{
-+       if (likely(pool->frag_size <= PAGE_SIZE))
-+               return netdev_alloc_frag(pool->frag_size);
-+       else
-+               return kmalloc(pool->frag_size, GFP_ATOMIC);
-+}
-
-via mvpp2_buf_alloc().
-
-Both kmalloc() and netdev_alloc_frag() guarantee that the virtual
-address will be in lowmem.
-
-Given that, I would suggest changing mvpp2_bm_pool_put() as follows -
-and this is where my point above about separating the notion of "dma
-address" and "physical address" becomes very important:
-
- static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
--                                    dma_addr_t buf_phys_addr,
--                                    unsigned long buf_virt_addr)
-+                                    dma_addr_t dma, phys_addr_t phys)
- {
-
-and updating it to write "phys" as the existing buf_virt_addr.
-
-In mvpp2_bm_bufs_add():
-
-                buf = mvpp2_buf_alloc(port, bm_pool, &phys_addr, GFP_KERNEL);
-                if (!buf)
-                        break;
- 
-                mvpp2_bm_pool_put(port, bm_pool->id, phys_addr,
--                                 (unsigned long)buf);
-+                                 virt_to_phys(buf));
-
-which I think means that mvpp2_rxdesc_virt_addr_get() can just become:
-
- 	phys_addr_t cookie;
- 
-        /* PPv2.1 can only be used on 32 bits architectures, and there
-         * are 32 bits in buf_cookie which are enough to store the
-         * full virtual address, so things are easy.
-         */
-        if (port->priv->hw_version == MVPP21)
-                cookie = rx_desc->pp21.buf_cookie;
-        else
- 		cookie = rx_desc->pp22.buf_cookie_misc & FORTY_BIT_MASK;
-
- 	return phys_to_virt(cookie);
-
-I'd suggest against using DMA_BIT_MASK(40) there - because it's not a
-DMA address, even though it happens to resolve to the same number.
-
-Again, I may have missed how the addresses end up getting into
-buf_cookie_misc, so what I suggest above may not be possible.
-
-I'd also suggest that there is some test in mvpp2_bm_bufs_add() to
-verify that the physical addresses and DMA addresses do fit within
-the available number of bits - if they don't we could end up scribbling
-over memory that we shouldn't be, and it looks like we have a failure
-path there to gracefully handle that situation - gracefully compared
-to a nasty BUG_ON().
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
