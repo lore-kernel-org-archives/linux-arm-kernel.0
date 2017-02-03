@@ -1,48 +1,45 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 03 Feb 2017 11:37:04 +0800
-Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <3f4aa4c1e660c7e62256de9ca64fc822@codeaurora.org>
-References: <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
- <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
- <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
- <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
- <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
- <20170130143851.GJ16461@arm.com>
- <b2e50c17de156341deab9fb8e91a8dec@codeaurora.org>
- <1e048aff-0d77-b9f2-ebf8-2ba315b90ca7@codeaurora.org>
- <20170130165124.GA11712@red-moon>
- <f401e27e-d619-0eec-2401-50d8e2fc2f0f@codeaurora.org>
- <20170201185230.GA1922@red-moon>
- <3f4aa4c1e660c7e62256de9ca64fc822@codeaurora.org>
-Message-ID: <5893FAE0.8070301@linaro.org>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Fri,  3 Feb 2017 16:38:01 +1300
+Subject: [PATCH 0/4] Updates for Marvell Switch SoCs
+Message-ID: <20170203033805.29046-1-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2017 03:01 AM, Nate Watterson wrote:
-> On 2017-02-01 13:52, Lorenzo Pieralisi wrote:
->>
->> I debugged the issue and Nate's fix is correct, the fact that you
->> can't it hit it with mainline is just a matter of timing because it has
->> to do with the CTX pointer value (we OR it with the existing value), so
->> it may work or not depending on how the cdptr memory allocation
->> pattern turns out to be (which explains why Nate and I can hit it with
->> simple PCI device remove/add execution too).
->>
->> So it is neither an ACPI nor an IOMMU probe deferral issue per-se,
->> fix is already queued, so it is all good.
->>
->> What about USB stalls ?
-> Our fault. The USB controller was getting 48-bit IOVAs, but the
-> bus it sits on only supports 44-bits so the controller's DMA
-> transactions ended up targeting addresses that were never mapped.
->
-> It started working once I applied the iort/dma-mapping patches I
-> sent out earlier this week that use the iort memory_address_limit
-> field to check if a dma_mask is sane.
+Shortly after I posted my last series I got access to a more recent
+Marvell SDK which had some device tree support for the switch SoCs I'd
+been wanting. It was still based on an older kernel but it was a huge
+improvement over what came before.
 
-OK, great, I tested this patch with platform USB device which was
-working fine on Hisilicon D03, so I didn't miss anything here.
+Patch 1/4 is a bit of a cleanup. I did initially struggle with how to
+access individual parts of the DFX block as well as retaining a handle on
+the entire thing for the switch driver to use.
 
-Thanks
-Hanjun
+Patch 2/4 is a re-jig of the dtsi files which is needed by 4/4. This is
+required because I need to use the coreclk label on a different node. It
+also means I don't have to disable nodes for blocks that only exist on
+the Armada-XP.
+
+Patch 3/4 and 4/4 are ported from the Marvell Linux kernel. I've tested
+them on the hardware I have access to and things look pretty good.
+
+Chris Packham (4):
+  ARM: dts: armada-xp-98dx3236: combine dfx server nodes
+  ARM: dts: Use armada-370-xp as a base for armada-xp-98dx3236
+  ARM: mvebu: Add mv98dx3236-soc-id
+  clk: mvebu: Expand mv98dx3236-core-clock support
+
+ .../bindings/arm/marvell/mv98dx3236-soc-id.txt     |  14 ++
+ .../devicetree/bindings/clock/mvebu-core-clock.txt |   7 +
+ .../bindings/clock/mvebu-gated-clock.txt           |  11 ++
+ .../devicetree/bindings/net/marvell,prestera.txt   |  13 +-
+ arch/arm/boot/dts/armada-xp-98dx3236.dtsi          | 211 ++++++++++++++++-----
+ arch/arm/mach-mvebu/mvebu-soc-id.c                 |  43 ++++-
+ drivers/clk/mvebu/Makefile                         |   2 +-
+ drivers/clk/mvebu/armada-xp.c                      |  13 --
+ drivers/clk/mvebu/mv98dx3236.c                     | 144 ++++++++++++++
+ 9 files changed, 382 insertions(+), 76 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell/mv98dx3236-soc-id.txt
+ create mode 100644 drivers/clk/mvebu/mv98dx3236.c
+
+-- 
+2.11.0.24.ge6920cf
