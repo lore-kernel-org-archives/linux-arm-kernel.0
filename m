@@ -1,45 +1,79 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Fri,  3 Feb 2017 08:39:49 -0600
-Subject: [RESEND PATCH] KVM: arm/arm64: vgic: Stop injecting the MSI
- occurrence twice
-Message-ID: <1486132790-20890-1-git-send-email-shankerd@codeaurora.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 03 Feb 2017 16:41:14 +0200
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <8e577a3f-8d44-9dde-9507-36c3769228b6@gmail.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1485941457.3353.13.camel@pengutronix.de>
+ <8e577a3f-8d44-9dde-9507-36c3769228b6@gmail.com>
+Message-ID: <2201157.ylZrBapgio@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQFD framework calls the architecture dependent function
-twice if the corresponding GSI type is edge triggered. For ARM,
-the function kvm_set_msi() is getting called twice whenever the
-IRQFD receives the event signal. The rest of the code path is
-trying to inject the MSI without any validation checks. No need
-to call the function vgic_its_inject_msi() second time to avoid
-an unnecessary overhead in IRQ queue logic. It also avoids the
-possibility of VM seeing the MSI twice.
+Hello,
 
-Simple fix, return -1 if the argument 'level' value is zero.
+On Wednesday 01 Feb 2017 16:19:27 Steve Longerbeam wrote:
+> On 02/01/2017 01:30 AM, Philipp Zabel wrote:
+> > On Tue, 2017-01-31 at 17:26 -0800, Steve Longerbeam wrote:
+> > [...]
+> > 
+> >>> # Set pad formats
+> >>> media-ctl --set-v4l2 "'tc358743 1-000f':0[fmt:UYVY/1920x1080]"
+> >>> media-ctl --set-v4l2 "'imx6-mipi-csi2':1[fmt:UYVY2X8/1920x1080]"
+> >>> media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080]"
+> >>> media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/1920x1080]"
+> >>> 
+> >>> v4l2-ctl -d /dev/video4 -V
+> >>> # This still is configured to 640x480, which is inconsistent with
+> >>> # the 'ipu1_csi0':2 pad format. The pad set_fmt above should
+> >>> # have set this, too.
+> >> 
+> >> Because you've only configured the source pads,
+> >> and not the sink pads. The ipu_csi source format is
+> >> dependent on the sink format - output crop window is
+> >> limited by max input sensor frame, and since sink pad is
+> >> still at 640x480, output is reduced to that.
+> > 
+> > No, it is set (see below). What happens is that capture_g_fmt_vid_cap
+> > just returns the capture devices' priv->vdev.fmt, even if it is
+> > incompatible with the connected csi subdevice's output pad format.
+> > 
+> > priv->vdev.fmt was never changed from the default set in
+> > imx_media_capture_device_register, because capture_s/try_fmt_vid_cap
+> > were not called yet.
+> 
+> Ah, yep, this is a bug. Need to modify the capture device's
+> width/height at .set_fmt() in the subdev's device-node source
+> pad (csi and prpenc/vf).
+> 
+> >> Maybe I'm missing something, is it expected behavior that
+> >> a source format should be automatically propagated to
+> >> the sink?
+> > 
+> > media-ctl propagates the output pad format to all remote subdevices'
+> > input pads for all enabled links:
+> > 
+> > https://git.linuxtv.org/v4l-utils.git/tree/utils/media-ctl/libv4l2subdev.c
+> > #n693
+>
+> Ah cool, I wasn't aware media-ctl did this, but it makes sense and
+> makes it easier on the user.
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
----
-Forgot to CC the kvmarm list earlier, including now.
+To be precise, userspace is responsible for propagating formats *between* 
+subdevs (source to sink, over a link) and drivers for propagating formats *in* 
+subdevs (sink to source, inside the subdev).
 
- virt/kvm/arm/vgic/vgic-irqfd.c | 3 +++
- 1 file changed, 3 insertions(+)
+> >>> v4l2-ctl --list-formats -d /dev/video4
+> >>> # This lists all the RGB formats, which it shouldn't. There is
+> >>> # no CSC in this pipeline, so we should be limited to YUV formats
+> >>> # only.
+> >> 
+> >> right, need to fix that. Probably by poking the attached
+> >> source subdev (csi or prpenc/vf) for its supported formats.
+> > 
+> > You are right, in bayer/raw mode only one specific format should be
+> > listed, depending on the CSI output pad format.
 
-diff --git a/virt/kvm/arm/vgic/vgic-irqfd.c b/virt/kvm/arm/vgic/vgic-irqfd.c
-index d918dcf..f138ed2 100644
---- a/virt/kvm/arm/vgic/vgic-irqfd.c
-+++ b/virt/kvm/arm/vgic/vgic-irqfd.c
-@@ -99,6 +99,9 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
- 	if (!vgic_has_its(kvm))
- 		return -ENODEV;
- 
-+	if (!level)
-+		return -1;
-+
- 	return vgic_its_inject_msi(kvm, &msi);
- }
- 
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Regards,
+
+Laurent Pinchart
