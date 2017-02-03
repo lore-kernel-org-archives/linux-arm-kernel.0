@@ -1,38 +1,109 @@
-From: hekuang@huawei.com (He Kuang)
-Date: Fri, 3 Feb 2017 11:06:07 +0000
-Subject: [PATCH v2 3/3] perf tools: Add missing newline in debug messages
-In-Reply-To: <20170203110607.97529-1-hekuang@huawei.com>
-References: <20170203110607.97529-1-hekuang@huawei.com>
-Message-ID: <20170203110607.97529-3-hekuang@huawei.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Fri, 3 Feb 2017 16:38:30 +0530
+Subject: [PATCH v4] PCI: Xilinx NWL: Modifying irq chip for legacy interrupts
+Message-ID: <1486120110-15205-1-git-send-email-bharatku@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These two debug messages are missing the trailing newline.
+- Adding mutex lock for protecting legacy mask register
+- Few wifi end points which only support legacy interrupts,
+performs hardware reset functionalities after disabling interrupts
+by invoking disable_irq and then re-enable using enable_irq, they
+enable hardware interrupts first and then virtual irq line later.
+- The legacy irq line goes low only after DEASSERT_INTx is
+received.As the legacy irq line is high immediately after hardware
+interrupts are enabled but virq of EP is still in disabled state
+and EP handler is never executed resulting no DEASSERT_INTx.If dummy
+irq chip is used, interrutps are not masked and system is
+hanging with CPU stall.
+- Adding irq chip functions instead of dummy irq chip for legacy
+interrupts.
+- Legacy interrupts are level sensitive, so using handle_level_irq
+is more appropriate as it is masks interrupts until End point handles
+interrupts and unmasks interrutps after End point handler is executed.
+- Legacy interrupts are level triggered, virtual irq line of End
+Point shows as edge in /proc/interrupts.
+- Setting irq flags of virtual irq line of EP to level triggered
+at the time of mapping.
 
-Signed-off-by: He Kuang <hekuang@huawei.com>
+Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
 ---
- tools/perf/util/bpf-loader.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/pci/host/pcie-xilinx-nwl.c |   45 +++++++++++++++++++++++++++++++++++-
+ 1 files changed, 44 insertions(+), 1 deletions(-)
 
-diff --git a/tools/perf/util/bpf-loader.c b/tools/perf/util/bpf-loader.c
-index 36c8611..bc6bc70 100644
---- a/tools/perf/util/bpf-loader.c
-+++ b/tools/perf/util/bpf-loader.c
-@@ -670,13 +670,13 @@ int bpf__probe(struct bpf_object *obj)
+diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+index 43eaa4a..e4605f9 100644
+--- a/drivers/pci/host/pcie-xilinx-nwl.c
++++ b/drivers/pci/host/pcie-xilinx-nwl.c
+@@ -184,6 +184,7 @@ struct nwl_pcie {
+ 	u8 root_busno;
+ 	struct nwl_msi msi;
+ 	struct irq_domain *legacy_irq_domain;
++	spinlock_t leg_mask_lock;
+ };
  
- 		err = convert_perf_probe_events(pev, 1);
- 		if (err < 0) {
--			pr_debug("bpf_probe: failed to convert perf probe events");
-+			pr_debug("bpf_probe: failed to convert perf probe events\n");
- 			goto out;
- 		}
+ static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off)
+@@ -395,11 +396,52 @@ static void nwl_pcie_msi_handler_low(struct irq_desc *desc)
+ 	chained_irq_exit(chip, desc);
+ }
  
- 		err = apply_perf_probe_events(pev, 1);
- 		if (err < 0) {
--			pr_debug("bpf_probe: failed to apply perf probe events");
-+			pr_debug("bpf_probe: failed to apply perf probe events\n");
- 			goto out;
- 		}
++static void nwl_mask_leg_irq(struct irq_data *data)
++{
++	struct irq_desc *desc = irq_to_desc(data->irq);
++	struct nwl_pcie *pcie;
++	unsigned long flags;
++	u32 mask;
++	u32 val;
++
++	pcie = irq_desc_get_chip_data(desc);
++	mask = 1 << (data->hwirq - 1);
++	spin_lock_irqsave(&pcie->leg_mask_lock, flags);
++	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
++	nwl_bridge_writel(pcie, (val & (~mask)), MSGF_LEG_MASK);
++	spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
++}
++
++static void nwl_unmask_leg_irq(struct irq_data *data)
++{
++	struct irq_desc *desc = irq_to_desc(data->irq);
++	struct nwl_pcie *pcie;
++	unsigned long flags;
++	u32 mask;
++	u32 val;
++
++	pcie = irq_desc_get_chip_data(desc);
++	mask = 1 << (data->hwirq - 1);
++	spin_lock_irqsave(&pcie->leg_mask_lock, flags);
++	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
++	nwl_bridge_writel(pcie, (val | mask), MSGF_LEG_MASK);
++	spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
++}
++
++static struct irq_chip nwl_leg_irq_chip = {
++	.name = "nwl_pcie:legacy",
++	.irq_enable = nwl_unmask_leg_irq,
++	.irq_disable = nwl_mask_leg_irq,
++	.irq_mask = nwl_mask_leg_irq,
++	.irq_unmask = nwl_unmask_leg_irq,
++};
++
+ static int nwl_legacy_map(struct irq_domain *domain, unsigned int irq,
+ 			  irq_hw_number_t hwirq)
+ {
+-	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
++	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_level_irq);
+ 	irq_set_chip_data(irq, domain->host_data);
++	irq_set_status_flags(irq, IRQ_LEVEL);
  
+ 	return 0;
+ }
+@@ -538,6 +580,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
+ 		return -ENOMEM;
+ 	}
+ 
++	spin_lock_init(&pcie->leg_mask_lock);
+ 	nwl_pcie_init_msi_irq_domain(pcie);
+ 	return 0;
+ }
 -- 
-1.8.5.2
+1.7.1
