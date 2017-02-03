@@ -1,321 +1,411 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Fri, 3 Feb 2017 13:38:23 -0700
-Subject: [PATCH V8 05/10] acpi: apei: handle SEA notification type for
- ARMv8
-In-Reply-To: <5894A937.5010603@arm.com>
-References: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
- <1485969413-23577-6-git-send-email-tbaicar@codeaurora.org>
- <5894A937.5010603@arm.com>
-Message-ID: <c26dabca-71f5-f6e2-5b16-7e4a8151cabd@codeaurora.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 3 Feb 2017 21:58:23 +0100
+Subject: [PATCH net-next 4/8] net: ethernet: add the Alpine Ethernet driver
+In-Reply-To: <20170203181216.30214-5-antoine.tenart@free-electrons.com>
+References: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
+ <20170203181216.30214-5-antoine.tenart@free-electrons.com>
+Message-ID: <20170203205823.GA22572@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello James,
+> +/* MDIO */
+> +#define AL_ETH_MDIO_C45_DEV_MASK	0x1f0000
+> +#define AL_ETH_MDIO_C45_DEV_SHIFT	16
+> +#define AL_ETH_MDIO_C45_REG_MASK	0xffff
+> +
+> +static int al_mdio_read(struct mii_bus *bp, int mii_id, int reg)
+> +{
+> +	struct al_eth_adapter *adapter = bp->priv;
+> +	u16 value = 0;
+> +	int rc;
+> +	int timeout = MDIO_TIMEOUT_MSEC;
+> +
+> +	while (timeout > 0) {
+> +		if (reg & MII_ADDR_C45) {
+> +			netdev_dbg(adapter->netdev, "[c45]: dev %x reg %x val %x\n",
+> +				   ((reg & AL_ETH_MDIO_C45_DEV_MASK) >> AL_ETH_MDIO_C45_DEV_SHIFT),
+> +				   (reg & AL_ETH_MDIO_C45_REG_MASK), value);
+> +			rc = al_eth_mdio_read(&adapter->hw_adapter, adapter->phy_addr,
+> +				((reg & AL_ETH_MDIO_C45_DEV_MASK) >> AL_ETH_MDIO_C45_DEV_SHIFT),
+> +				(reg & AL_ETH_MDIO_C45_REG_MASK), &value);
+> +		} else {
+> +			rc = al_eth_mdio_read(&adapter->hw_adapter, adapter->phy_addr,
+> +					      MDIO_DEVAD_NONE, reg, &value);
+> +		}
+> +
+> +		if (rc == 0)
+> +			return value;
+> +
+> +		netdev_dbg(adapter->netdev,
+> +			   "mdio read failed. try again in 10 msec\n");
+> +
+> +		timeout -= 10;
+> +		msleep(10);
+> +	}
+
+This is rather unusual, retrying MDIO operations. Are you working
+around a hardware bug? I suspect this also opens up race conditions,
+in particular with PHY interrupts, which can be clear on read.
+
+> +
+> +static int al_eth_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
+> +{
+> +	struct al_eth_adapter *adapter = netdev_priv(netdev);
+> +	struct mii_ioctl_data *mdio = if_mii(ifr);
+> +	struct phy_device *phydev;
+> +
+> +	netdev_info(adapter->netdev, "ioctl: phy id 0x%x, reg 0x%x, val_in 0x%x\n",
+> +		    mdio->phy_id, mdio->reg_num, mdio->val_in);
+
+netdev_info() for an ioctl?
+
+> +static int al_eth_flow_ctrl_config(struct al_eth_adapter *adapter);
+> +static u8 al_eth_flow_ctrl_mutual_cap_get(struct al_eth_adapter *adapter);
+> +static void al_eth_down(struct al_eth_adapter *adapter);
+> +static int al_eth_up(struct al_eth_adapter *adapter);
+
+Forward declarations are generally not liked. Can you move the code
+around to remove them?
+
+> +
+> +static void al_eth_adjust_link(struct net_device *dev)
+> +{
+> +	struct al_eth_adapter *adapter = netdev_priv(dev);
+> +	struct al_eth_link_config *link_config = &adapter->link_config;
+> +	struct phy_device *phydev = adapter->phydev;
+> +	enum al_eth_mac_mode mac_mode_needed = AL_ETH_MAC_MODE_RGMII;
+> +	int new_state = 0;
+> +	bool force_1000_base_x = false;
+> +
+> +	if (phydev->link) {
+> +		if (phydev->duplex != link_config->active_duplex) {
+> +			new_state = 1;
+> +			link_config->active_duplex = phydev->duplex;
+> +		}
+> +
+> +		if (phydev->speed != link_config->active_speed) {
+> +			new_state = 1;
+> +			switch (phydev->speed) {
+> +			case SPEED_1000:
+> +			case SPEED_100:
+> +			case SPEED_10:
+> +				mac_mode_needed = (adapter->mac_mode == AL_ETH_MAC_MODE_RGMII) ?
+> +					AL_ETH_MAC_MODE_RGMII : AL_ETH_MAC_MODE_SGMII;
+> +				break;
+> +			case SPEED_10000:
+> +			case SPEED_2500:
+> +				mac_mode_needed = AL_ETH_MAC_MODE_10GbE_Serial;
+> +				break;
+> +			default:
+> +				if (netif_msg_link(adapter))
+> +					netdev_warn(adapter->netdev,
+> +						    "Ack!  Speed (%d) is not 10/100/1000!",
+
+Not particularly accurate, since 2.5G and 10G is supported.
+
+> +						    phydev->speed);
+> +static int al_eth_phy_init(struct al_eth_adapter *adapter)
+> +{
+> +	struct phy_device *phydev = mdiobus_get_phy(adapter->mdio_bus, adapter->phy_addr);
+> +
+> +	adapter->link_config.old_link = 0;
+> +	adapter->link_config.active_duplex = DUPLEX_UNKNOWN;
+> +	adapter->link_config.active_speed = SPEED_UNKNOWN;
+> +
+> +	/* Attach the MAC to the PHY. */
+> +	phydev = phy_connect(adapter->netdev, dev_name(&phydev->mdio.dev), al_eth_adjust_link,
+> +			     PHY_INTERFACE_MODE_RGMII);
+> +	if (IS_ERR(phydev)) {
+> +		netdev_err(adapter->netdev, "Could not attach to PHY\n");
+> +		return PTR_ERR(phydev);
+> +	}
+> +
+> +	netdev_info(adapter->netdev, "phy[%d]: device %s, driver %s\n",
+> +		    phydev->mdio.addr, dev_name(&phydev->mdio.dev),
+> +		    phydev->drv ? phydev->drv->name : "unknown");
+> +
+
+phy_attached_info()?
+
+> +	/* Mask with MAC supported features. */
+> +	phydev->supported &= (PHY_GBIT_FEATURES |
+> +				SUPPORTED_Pause |
+> +				SUPPORTED_Asym_Pause);
+> +
+> +	phydev->advertising = phydev->supported;
+> +
+> +	netdev_info(adapter->netdev, "phy[%d]:supported %x adv %x\n",
+> +		    phydev->mdio.addr, phydev->supported, phydev->advertising);
+> +
+
+More output?
+
+> +	adapter->phydev = phydev;
+> +	/* Bring the PHY up */
+> +	phy_start(adapter->phydev);
+
+This is normally done in the open() call.
+
+> +/* al_eth_mdiobus_setup - initialize mdiobus and register to kernel */
+> +static int al_eth_mdiobus_setup(struct al_eth_adapter *adapter)
+> +{
+> +	struct phy_device *phydev;
+> +	int i;
+> +	int ret = 0;
+> +
+> +	adapter->mdio_bus = mdiobus_alloc();
+> +	if (!adapter->mdio_bus)
+> +		return -ENOMEM;
+> +
+> +	adapter->mdio_bus->name     = "al mdio bus";
+> +	snprintf(adapter->mdio_bus->id, MII_BUS_ID_SIZE, "%x",
+> +		 (adapter->pdev->bus->number << 8) | adapter->pdev->devfn);
+> +	adapter->mdio_bus->priv     = adapter;
+> +	adapter->mdio_bus->parent   = &adapter->pdev->dev;
+> +	adapter->mdio_bus->read     = &al_mdio_read;
+> +	adapter->mdio_bus->write    = &al_mdio_write;
+> +	adapter->mdio_bus->phy_mask = ~BIT(adapter->phy_addr);
+
+Why do this?
 
 
-On 2/3/2017 9:00 AM, James Morse wrote:
-> On 01/02/17 17:16, Tyler Baicar wrote:
->> ARM APEI extension proposal added SEA (Synchronous External Abort)
->> notification type for ARMv8.
->> Add a new GHES error source handling function for SEA. If an error
->> source's notification type is SEA, then this function can be registered
->> into the SEA exception handler. That way GHES will parse and report
->> SEA exceptions when they occur.
-> It's worth adding details of the other things this patch changes, just to alert
-> busy reviewers, something like:
-> An SEA can interrupt code that had interrupts masked and is treated as an NMI.
-> To aid this the page of address space for mapping APEI buffers while in_nmi() is
-> always reserved, and ghes_ioremap_pfn_nmi() is changed to use the helper methods
-> to find the prot_t to map with in the same way as ghes_ioremap_pfn_irq().
-I'll add this in in the next version.
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 1117421..f92778d 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -53,6 +53,8 @@ config ARM64
->>   	select HANDLE_DOMAIN_IRQ
->>   	select HARDIRQS_SW_RESEND
->>   	select HAVE_ACPI_APEI if (ACPI && EFI)
->> +	select HAVE_ACPI_APEI_SEA if (ACPI && EFI)
->> +	select HAVE_NMI if HAVE_ACPI_APEI_SEA
-> Nit: This section of the file is largely in alphabetical order, can we try to
-> keep it that way?!
-Yes, will do!
->>   	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
->>   	select HAVE_ARCH_AUDITSYSCALL
->>   	select HAVE_ARCH_BITREVERSE
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->> index 9ae7e65..5a5a096 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -30,6 +30,7 @@
->>   #include <linux/highmem.h>
->>   #include <linux/perf_event.h>
->>   #include <linux/preempt.h>
->> +#include <linux/hardirq.h>
-> This header is already included by this file further up.
-Oops, guess I missed that :)
->>   
->>   #include <asm/bug.h>
->>   #include <asm/cpufeature.h>
->> @@ -41,6 +42,8 @@
->>   #include <asm/pgtable.h>
->>   #include <asm/tlbflush.h>
->>   
->> +#include <acpi/ghes.h>
->> +
->>   static const char *fault_name(unsigned int esr);
->>   
->>   #ifdef CONFIG_KPROBES
->> @@ -500,6 +503,14 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>   	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
->>   		 fault_name(esr), esr, addr);
->>   
->> +	/*
->> +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
->> +	 * rcu_read_lock().
->> +	 */
-> This comment should go against the use of RCU in ghes_notify_sea(), but there
-> should be something here to explain the surprise use of nmi. Something like:
-> Synchronous aborts may interrupt code which had interrupts masked. Before
-> calling out into the wider kernel tell the interested subsystems.
-Sounds good. I'll update the comments.
-> This should be wrapped in:
-> if (IS_ENABLED(HAVE_ACPI_APEI_SEA)) {
->
->> +	nmi_enter();
->> +	ghes_notify_sea();
->> +	nmi_exit();
-> }
->
-> To avoid breaking systems that don't have SEA configured.
-Yes, I'll add that check in the next version.
->> +
->>   	info.si_signo = SIGBUS;
->>   	info.si_errno = 0;
->>   	info.si_code  = 0;
->> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
->> index b0140c8..3786ff1 100644
->> --- a/drivers/acpi/apei/Kconfig
->> +++ b/drivers/acpi/apei/Kconfig
->> @@ -4,6 +4,20 @@ config HAVE_ACPI_APEI
->>   config HAVE_ACPI_APEI_NMI
->>   	bool
->>   
->> +config HAVE_ACPI_APEI_SEA
->> +	bool "APEI Synchronous External Abort logging/recovering support"
->> +	depends on ARM64
-> depends on CONFIG_ACPI_APEI_GHES
-> ?
->
-> (I think this is what the kbuild robot has managed to miss out!)
-Will do.
->> +	help
->> +	  This option should be enabled if the system supports
->> +	  firmware first handling of SEA (Synchronous External Abort).
->> +	  SEA happens with certain faults of data abort or instruction
->> +	  abort synchronous exceptions on ARMv8 systems. If a system
->> +	  supports firmware first handling of SEA, the platform analyzes
->> +	  and handles hardware error notifications with SEA, and it may then
-> Nit: notifications from SEA,
-Will do.
->> +	  form a HW error record for the OS to parse and handle. This
->> +	  option allows the OS to look for such HW error record, and
-> Nit: 'HW'->hardware. This is spelled out for the other seven uses in the file.
-Will do.
->> +	  take appropriate action.
->> +
->>   config ACPI_APEI
->>   	bool "ACPI Platform Error Interface (APEI)"
->>   	select MISC_FILESYSTEMS
->> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->> index b25e7cf..8756172 100644
->> --- a/drivers/acpi/apei/ghes.c
->> +++ b/drivers/acpi/apei/ghes.c
->> @@ -114,11 +114,7 @@
->>    * Two virtual pages are used, one for IRQ/PROCESS context, the other for
->>    * NMI context (optionally).
->>    */
->> -#ifdef CONFIG_HAVE_ACPI_APEI_NMI
->>   #define GHES_IOREMAP_PAGES           2
->> -#else
->> -#define GHES_IOREMAP_PAGES           1
->> -#endif
->>   #define GHES_IOREMAP_IRQ_PAGE(base)	(base)
->>   #define GHES_IOREMAP_NMI_PAGE(base)	((base) + PAGE_SIZE)
->>   
->> @@ -156,11 +152,14 @@ static void ghes_ioremap_exit(void)
->>   
->>   static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
->>   {
->> -	unsigned long vaddr;
->> +	unsigned long vaddr, paddr;
->> +	pgprot_t prot;
->>   
->>   	vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
->> -	ioremap_page_range(vaddr, vaddr + PAGE_SIZE,
->> -			   pfn << PAGE_SHIFT, PAGE_KERNEL);
->> +
->> +	paddr = pfn << PAGE_SHIFT;
-> Physical addresses might not always fit in 'unsigned long'. phys_addr_t exists
-> to hide this nasty detail!
->
->  From arch/x86/Kconfig:
->> config ARCH_PHYS_ADDR_T_64BIT
->> 	def_bool y
->> 	depends on X86_64 || X86_PAE
-> 32bit x86 kernels configured with PAE define phys_addr_t to be u64.
-I'll make that change.
+> +	for (i = 0; i < PHY_MAX_ADDR; i++)
+> +		adapter->mdio_bus->irq[i] = PHY_POLL;
 
-ghes_ioremap_pfn_irq() should probably be updated in a separate change 
-because it uses unsigned
-long for it's paddr...I just mimicked that code here :)
->> +	prot = arch_apei_get_mem_attribute(paddr);
->> +	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
->>   
->>   	return (void __iomem *)vaddr;
->>   }
->> @@ -767,6 +766,48 @@ static int ghes_notify_sci(struct notifier_block *this,
->>   	.notifier_call = ghes_notify_sci,
->>   };
->>   
->> +#ifdef CONFIG_HAVE_ACPI_APEI_SEA
->> +static LIST_HEAD(ghes_sea);
->> +
->> +void ghes_notify_sea(void)
->> +{
->> +	struct ghes *ghes;
->> +
-> 	/*
-> 	 * synchronize_rcu() will wait for nmi_exit(), so no need to
-> 	 * rcu_read_lock().
-> 	 */
->
->> +	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
->> +		ghes_proc(ghes);
->> +	}
->> +}
->> +
->> +static int ghes_sea_add(struct ghes *ghes)
->> +{
->> +	mutex_lock(&ghes_list_mutex);
->> +	list_add_rcu(&ghes->list, &ghes_sea);
->> +	mutex_unlock(&ghes_list_mutex);
->> +	return 0;
-> This function returns 0 or -ENOTSUPP, depending on CONFIG_HAVE_ACPI_APEI_SEA,
-> but ...
->
->
->> +}
->> +
->> +static void ghes_sea_remove(struct ghes *ghes)
->> +{
->> +	mutex_lock(&ghes_list_mutex);
->> +	list_del_rcu(&ghes->list);
->> +	mutex_unlock(&ghes_list_mutex);
->> +	synchronize_rcu();
->> +}
->> +#else /* CONFIG_HAVE_ACPI_APEI_SEA */
->> +static inline int ghes_sea_add(struct ghes *ghes)
->> +{
->> +	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not supported\n",
->> +	       ghes->generic->header.source_id);
->> +	return -ENOTSUPP;
->> +}
->> +
->> +static inline void ghes_sea_remove(struct ghes *ghes)
->> +{
->> +	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not supported\n",
->> +	       ghes->generic->header.source_id);
->> +}
->> +#endif /* CONFIG_HAVE_ACPI_APEI_SEA */
->> +
->>   #ifdef CONFIG_HAVE_ACPI_APEI_NMI
->>   /*
->>    * printk is not safe in NMI context.  So in NMI handler, we allocate
->> @@ -1012,6 +1053,14 @@ static int ghes_probe(struct platform_device *ghes_dev)
->>   	case ACPI_HEST_NOTIFY_EXTERNAL:
->>   	case ACPI_HEST_NOTIFY_SCI:
->>   		break;
->> +	case ACPI_HEST_NOTIFY_SEA:
->> +		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_SEA)) {
->> +			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
->> +				generic->header.source_id);
->> +			rc = -ENOTSUPP;
->> +			goto err;
-> ... here we jump out of ghes_probe() if NOTIFY_SEA is used but the kernel wasn't
-> built with CONFIG_HAVE_ACPI_APEI_SEA....
->
->
->> +		}
->> +		break;
->>   	case ACPI_HEST_NOTIFY_NMI:
->>   		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
->>   			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
->> @@ -1023,6 +1072,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
->>   		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
->>   			   generic->header.source_id);
->>   		goto err;
->> +	case ACPI_HEST_NOTIFY_GPIO:
->> +	case ACPI_HEST_NOTIFY_SEI:
->> +	case ACPI_HEST_NOTIFY_GSIV:
->> +		pr_warn(GHES_PFX "Generic hardware error source: %d notified via notification type %u is not supported\n",
->> +			generic->header.source_id, generic->header.source_id);
->> +		rc = -ENOTSUPP;
->> +		goto err;
->>   	default:
->>   		pr_warning(FW_WARN GHES_PFX "Unknown notification type: %u for generic hardware error source: %d\n",
->>   			   generic->notify.type, generic->header.source_id);
->> @@ -1077,6 +1133,11 @@ static int ghes_probe(struct platform_device *ghes_dev)
->>   		list_add_rcu(&ghes->list, &ghes_sci);
->>   		mutex_unlock(&ghes_list_mutex);
->>   		break;
->> +	case ACPI_HEST_NOTIFY_SEA:
->> +		rc = ghes_sea_add(ghes);
-> ... so this error handling will never be needed.
-> ghes_nmi_add() returns void.
->
-> I guess the not-configured versions of the symbols need to exist for older
-> compilers that can't work out that this can never be called.
-I can remove the extra error handling here.
->> +		if (rc)
->> +			goto err_edac_unreg;
->> +		break;
->>   	case ACPI_HEST_NOTIFY_NMI:
->>   		ghes_nmi_add(ghes);
->>   		break;
->> @@ -1119,6 +1180,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
->>   			unregister_acpi_hed_notifier(&ghes_notifier_sci);
->>   		mutex_unlock(&ghes_list_mutex);
->>   		break;
->> +	case ACPI_HEST_NOTIFY_SEA:
->> +		ghes_sea_remove(ghes);
->> +		break;
->>   	case ACPI_HEST_NOTIFY_NMI:
->>   		ghes_nmi_remove(ghes);
->>   		break;
->> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
->> index 6ae318b..adf5455 100644
->> --- a/include/acpi/ghes.h
->> +++ b/include/acpi/ghes.h
->> @@ -95,3 +95,5 @@ static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data
->>   		(void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
->>   		gdata + 1;
->>   }
->> +
->> +void ghes_notify_sea(void);
->>
-> This header file ought to have an include guard, could you add one?
->
-> I think the kbuild-robot has managed to configure SEA on, but GHES off so ghes.c
-> isn't included in the kernel. I will dig some more into this on Monday.
-Yes, I can add that.
+Not needed. The core will do this.
 
-Thanks for all the great reviewing :)
+> +
+> +	if (adapter->phy_if != AL_ETH_BOARD_PHY_IF_XMDIO) {
+> +		i = mdiobus_register(adapter->mdio_bus);
+> +		if (i) {
+> +			netdev_warn(adapter->netdev,
+> +				    "mdiobus_reg failed (0x%x)\n", i);
+> +			mdiobus_free(adapter->mdio_bus);
+> +			return i;
+> +		}
+> +
+> +		phydev = mdiobus_get_phy(adapter->mdio_bus, adapter->phy_addr);
+> +	} else {
+> +		adapter->mdio_bus->phy_mask = 0xffffffff;
+> +		i = mdiobus_register(adapter->mdio_bus);
+> +		if (i) {
+> +			netdev_warn(adapter->netdev,
+> +				    "mdiobus_reg failed (0x%x)\n", i);
+> +			mdiobus_free(adapter->mdio_bus);
+> +			return i;
+> +		}
+> +
+> +		phydev = get_phy_device(adapter->mdio_bus, adapter->phy_addr,
+> +					true);
+> +		if (!phydev) {
+> +			netdev_err(adapter->netdev, "phy device get failed\n");
+> +			goto error;
+> +		}
+> +
+> +		ret = phy_device_register(phydev);
+> +		if (ret) {
+> +			netdev_err(adapter->netdev,
+> +				   "phy device register failed\n");
+> +			goto error;
+> +		}
+> +	}
 
-Tyler
+It seems like this should be split up into two. One function to
+register the MDIO bus, and a second to handle the PHY on the mdio bus.
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+> +
+> +	if (!phydev || !phydev->drv)
+> +		goto error;
+> +
+> +	return 0;
+> +
+> +error:
+> +	netdev_warn(adapter->netdev, "No PHY devices\n");
+
+Yet more warnings....
+
+> +	mdiobus_unregister(adapter->mdio_bus);
+> +	mdiobus_free(adapter->mdio_bus);
+> +	return -ENODEV;
+> +}
+> +
+> +/* al_eth_mdiobus_teardown - mdiobus unregister */
+> +static void al_eth_mdiobus_teardown(struct al_eth_adapter *adapter)
+> +{
+> +	if (!adapter->mdio_bus)
+> +		return;
+> +
+> +	mdiobus_unregister(adapter->mdio_bus);
+> +	mdiobus_free(adapter->mdio_bus);
+> +	phy_device_free(adapter->phydev);
+
+Humm, you might want to think about the ordering here.
+
+> +}
+> +
+> +static void al_eth_tx_timeout(struct net_device *dev)
+> +{
+> +	struct al_eth_adapter *adapter = netdev_priv(dev);
+> +
+> +	if (netif_msg_tx_err(adapter))
+> +		netdev_err(dev, "transmit timed out!!!!\n");
+> +}
+> +
+> +static int al_eth_change_mtu(struct net_device *dev, int new_mtu)
+> +{
+> +	struct al_eth_adapter *adapter = netdev_priv(dev);
+> +	int max_frame = new_mtu + ETH_HLEN + ETH_FCS_LEN + VLAN_HLEN;
+> +
+> +	if ((new_mtu < AL_ETH_MIN_FRAME_LEN) || (new_mtu > AL_ETH_MAX_MTU) ||
+> +	    (max_frame > AL_ETH_MAX_FRAME_LEN)) {
+> +		netdev_err(dev, "Invalid MTU setting\n");
+> +		return -EINVAL;
+> +	}
+
+The core will do this check for you, if you tell it to.
+
+> +		switch (params.speed) {
+> +		default:
+> +			dev_warn(&adapter->pdev->dev,
+> +				 "invalid speed (%d)\n", params.speed);
+
+It is a bit unusual having the default first. And that leads me to a C
+question. Can it fall through into the next case statement if there is no break?
+
+> +static int al_eth_nway_reset(struct net_device *netdev)
+> +{
+> +	struct al_eth_adapter *adapter = netdev_priv(netdev);
+> +	struct phy_device *phydev = adapter->phydev;
+> +
+> +	if (!phydev)
+> +		return -ENODEV;
+> +
+> +	return phy_start_aneg(phydev);
+> +}
+
+phy_ethtool_nway_reset() should be used.
+
+> +static int al_eth_set_mac_addr(struct net_device *dev, void *p)
+> +{
+> +	struct al_eth_adapter *adapter = netdev_priv(dev);
+> +	struct sockaddr *addr = p;
+> +	int err = 0;
+> +
+> +	if (!is_valid_ether_addr(addr->sa_data))
+> +		return -EADDRNOTAVAIL;
+
+Seems like the core should be doing that for you. Not checked though.
+If it does not, i suggest you do add it to the core.
+
+> +static void al_eth_mdio_1g_mac_read(struct al_hw_eth_adapter *adapter,
+> +				    u32 phy_addr, u32 reg, u16 *val)
+> +{
+> +	*val = readl(&adapter->mac_regs_base->mac_1g.phy_regs_base + reg);
+> +}
+> +
+> +static void al_eth_mdio_1g_mac_write(struct al_hw_eth_adapter *adapter,
+> +				     u32 phy_addr, u32 reg, u16 val)
+> +{
+> +	writel(val, &adapter->mac_regs_base->mac_1g.phy_regs_base + reg);
+> +}
+
+Are there range checks made on reg before these functions are called?
+Just thinking about SIOCSMIIREG ioctl.
+
+> +
+> +static int al_eth_mdio_10g_mac_wait_busy(struct al_hw_eth_adapter *adapter)
+> +{
+> +	int count = 0;
+> +	u32 mdio_cfg_status;
+> +
+> +	do {
+> +		mdio_cfg_status = readl(&adapter->mac_regs_base->mac_10g.mdio_cfg_status);
+> +		if (mdio_cfg_status & BIT(0)) {
+
+Would be nice to have a #define for this 0 bit, and it seems bit 1 is an error?
+
+> +			if (count > 0)
+> +				netdev_dbg(adapter->netdev,
+> +					   "eth [%s] mdio: still busy!\n",
+> +					   adapter->name);
+> +		} else {
+> +			return 0;
+> +		}
+> +		udelay(AL_ETH_MDIO_DELAY_PERIOD);
+> +	} while (count++ < AL_ETH_MDIO_DELAY_COUNT);
+> +
+> +	return -ETIMEDOUT;
+> +}
+> +
+> +static int al_eth_mdio_10g_mac_type22(struct al_hw_eth_adapter *adapter,
+> +				      int read, u32 phy_addr, u32 reg, u16 *val)
+> +{
+> +	int rc;
+> +	const char *op = (read == 1) ? "read" : "write";
+> +	u32 mdio_cfg_status;
+> +	u16 mdio_cmd;
+> +
+> +	/* wait if the HW is busy */
+> +	rc = al_eth_mdio_10g_mac_wait_busy(adapter);
+> +	if (rc) {
+> +		netdev_err(adapter->netdev,
+> +			   " eth [%s] mdio %s failed. HW is busy\n",
+> +			   adapter->name, op);
+
+How about moving this netdev_err() inside
+al_eth_mdio_10g_mac_wait_busy() so you only need it once?
+
+> +		return rc;
+> +	}
+> +
+> +	mdio_cmd = (u16)(0x1F & reg);
+> +	mdio_cmd |= (0x1F & phy_addr) << 5;
+> +
+> +	if (read)
+> +		mdio_cmd |= BIT(15); /* READ command */
+
+Another #define please.
+
+> + * acquire mdio interface ownership
+> + * when mdio interface shared between multiple eth controllers, this function waits until the ownership granted for this controller.
+> + * this function does nothing when the mdio interface is used only by this controller.
+> + *
+> + * @param adapter
+> + * @return 0 on success, -ETIMEDOUT  on timeout.
+> + */
+> +static int al_eth_mdio_lock(struct al_hw_eth_adapter *adapter)
+> +{
+> +	int count = 0;
+> +	u32 mdio_ctrl_1;
+> +
+> +	if (!adapter->shared_mdio_if)
+> +		return 0; /* nothing to do when interface is not shared */
+> +
+> +	do {
+> +		mdio_ctrl_1 = readl(&adapter->mac_regs_base->gen.mdio_ctrl_1);
+> +		if (mdio_ctrl_1 & BIT(0)) {
+> +			if (count > 0)
+> +				netdev_dbg(adapter->netdev,
+> +					   "eth %s mdio interface still busy!\n",
+> +					   adapter->name);
+> +		} else {
+> +			return 0;
+> +		}
+> +		udelay(AL_ETH_MDIO_DELAY_PERIOD);
+> +	} while (count++ < (AL_ETH_MDIO_DELAY_COUNT * 4));
+
+This needs explaining. How can a read alone perform a lock? How is
+this race free? 
+
+> +		if (adapter->mdio_type == AL_ETH_MDIO_TYPE_CLAUSE_22)
+> +			rc = al_eth_mdio_10g_mac_type22(adapter, 1, phy_addr,
+> +							reg, val);
+> +		else
+> +			rc = al_eth_mdio_10g_mac_type45(adapter, 1, phy_addr,
+> +							device, reg, val);
+
+This seems odd. My understanding is that the device on the MDIO bus,
+the PHY, is either c22 or c45. The PHY driver will tell you this, not
+the adaptor.
+
+    Andrew
