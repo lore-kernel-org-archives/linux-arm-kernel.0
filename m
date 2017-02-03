@@ -1,71 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 3 Feb 2017 11:43:21 +0000
-Subject: [PATCH v4] PCI: Xilinx NWL: Modifying irq chip for legacy
- interrupts
-In-Reply-To: <1486120110-15205-1-git-send-email-bharatku@xilinx.com>
-References: <1486120110-15205-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <3c78506f-9bcb-0b43-4625-27229ee1f642@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 3 Feb 2017 11:51:59 +0000
+Subject: [PATCH v31 05/12] arm64: kdump: protect crash dump kernel memory
+In-Reply-To: <20170203014538.GA29585@linaro.org>
+References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
+ <20170201124630.6016-4-takahiro.akashi@linaro.org>
+ <20170201180008.GG4756@leverpostej>
+ <20170201182506.GA30584@leverpostej>
+ <20170202103905.GF13549@linaro.org>
+ <20170202115425.GJ31394@leverpostej>
+ <20170203014538.GA29585@linaro.org>
+Message-ID: <20170203115158.GD30497@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/17 11:08, Bharat Kumar Gogada wrote:
-> - Adding mutex lock for protecting legacy mask register
-> - Few wifi end points which only support legacy interrupts,
-> performs hardware reset functionalities after disabling interrupts
-> by invoking disable_irq and then re-enable using enable_irq, they
-> enable hardware interrupts first and then virtual irq line later.
-> - The legacy irq line goes low only after DEASSERT_INTx is
-> received.As the legacy irq line is high immediately after hardware
-> interrupts are enabled but virq of EP is still in disabled state
-> and EP handler is never executed resulting no DEASSERT_INTx.If dummy
-> irq chip is used, interrutps are not masked and system is
-> hanging with CPU stall.
-> - Adding irq chip functions instead of dummy irq chip for legacy
-> interrupts.
-> - Legacy interrupts are level sensitive, so using handle_level_irq
-> is more appropriate as it is masks interrupts until End point handles
-> interrupts and unmasks interrutps after End point handler is executed.
-> - Legacy interrupts are level triggered, virtual irq line of End
-> Point shows as edge in /proc/interrupts.
-> - Setting irq flags of virtual irq line of EP to level triggered
-> at the time of mapping.
-> 
-> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> ---
->  drivers/pci/host/pcie-xilinx-nwl.c |   45 +++++++++++++++++++++++++++++++++++-
->  1 files changed, 44 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-> index 43eaa4a..e4605f9 100644
-> --- a/drivers/pci/host/pcie-xilinx-nwl.c
-> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-> @@ -184,6 +184,7 @@ struct nwl_pcie {
->  	u8 root_busno;
->  	struct nwl_msi msi;
->  	struct irq_domain *legacy_irq_domain;
-> +	spinlock_t leg_mask_lock;
->  };
->  
->  static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off)
-> @@ -395,11 +396,52 @@ static void nwl_pcie_msi_handler_low(struct irq_desc *desc)
->  	chained_irq_exit(chip, desc);
->  }
->  
-> +static void nwl_mask_leg_irq(struct irq_data *data)
-> +{
-> +	struct irq_desc *desc = irq_to_desc(data->irq);
-> +	struct nwl_pcie *pcie;
-> +	unsigned long flags;
-> +	u32 mask;
-> +	u32 val;
-> +
-> +	pcie = irq_desc_get_chip_data(desc);
-> +	mask = 1 << (data->hwirq - 1);
-> +	spin_lock_irqsave(&pcie->leg_mask_lock, flags);
+Hi,
 
-I've asked you to use a raw spinlock for a reason. If using RT, this
-gets turned into a sleeping lock...
+On Fri, Feb 03, 2017 at 10:45:39AM +0900, AKASHI Takahiro wrote:
+> On Thu, Feb 02, 2017 at 11:54:25AM +0000, Mark Rutland wrote:
+> > On Thu, Feb 02, 2017 at 07:39:06PM +0900, AKASHI Takahiro wrote:
+> > > On Wed, Feb 01, 2017 at 06:25:06PM +0000, Mark Rutland wrote:
+> > > > On Wed, Feb 01, 2017 at 06:00:08PM +0000, Mark Rutland wrote:
+> > > > Another question is (how) does hyp map this region?
+> > > 
+> > > I don't get your point here.
+> > > Hyp mode does care only physical memory in intermediate address, doesn't it?
+> > 
+> > My concern was that hyp may map the region; and thus buggy code at hyp
+> > can corrupt the region (and/or hyp may conflict w.r.t. attributes).
+> 
+> Grep'ing create_hyp_mappings() under arch/arm(64)/kvm shows that
+> we have only a few small regions of memory mapped in hyp mode.
+> I also confirmed that there is no active mapping for crash dump kernel
+> memory by checking mmu tables with DS-5 debugger.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Ok, that sounds fine.
+
+I was under the mistaken impression that hyp had a copy of the whole
+linear mapping, but it seems it lazily maps that in (at page
+granularity) as required. So there should be no alias for the
+crashkernel region.
+
+> > We mght have to ensure hyp doesn't map the crashkernel region, and to
+> > case us pain, disallow freeing of any part of the region.
+> 
+> So I don't believe we need to worry such a case.
+
+I agree.
+
+Thanks,
+Mark.
