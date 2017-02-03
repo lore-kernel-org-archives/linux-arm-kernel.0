@@ -1,58 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 3 Feb 2017 09:22:59 +0000
-Subject: [PATCH v2 00/10] serial: st-asc: Allow handling of RTS line
-In-Reply-To: <20170202095541.GB30437@kroah.com>
-References: <20170127172804.23881-1-lee.jones@linaro.org>
- <20170202074236.ni3tozz3er4g3t64@dell>
- <20170202095541.GB30437@kroah.com>
-Message-ID: <20170203092259.3opu2feqnco6gv2s@dell>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 03 Feb 2017 10:47:16 +0100
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.11 (#3)
+Message-ID: <87h94bwqqj.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 02 Feb 2017, Greg KH wrote:
+Hi,
 
-> On Thu, Feb 02, 2017 at 07:42:36AM +0000, Lee Jones wrote:
-> > Hi Greg, Jiri,
-> > 
-> > > When hardware flow-control is disabled, manual toggling of the UART's
-> > > reset line (RTS) using userland applications (e.g. stty) is not
-> > > possible, since the ASC IP does not provide this functionality in the
-> > > same was as some other IPs do.  Thus, we have to do this manually.
-> > > 
-> > > This set ensures the correct Pinctrl groups are configured and
-> > > obtained for both manual toggling of the RTS line and for the IP to
-> > > take over the lines when HW flow-control is requested by the user. 
-> > > 
-> > > Lee Jones (10):
-> > >   serial: st-asc: Ignore the parity error bit if 8-bit mode is enabled
-> > >   serial: st-asc: Provide RTS functionality
-> > >   serial: st-asc: Read in all Pinctrl states
-> > >   serial: st-asc: (De)Register GPIOD and swap Pinctrl profiles
-> > >   serial: st-asc: Use generic DT binding for announcing RTS/CTS lines
-> > >   dt-bindings: serial: Update 'uart-has-rtscts' description
-> > >   ARM: dts: STiH410-b2260: Identify the UART RTS line
-> > >   ARM: dts: STiH407-pinctrl: Add Pinctrl group for HW flow-control
-> > >   ARM: dts: STiH407-family: Use new Pinctrl groups
-> > >   ARM: dts: STiH410-b2260: Enable HW flow-control
-> > > 
-> > >  .../devicetree/bindings/serial/serial.txt          |   3 +-
-> > >  arch/arm/boot/dts/stih407-family.dtsi              |   3 +-
-> > >  arch/arm/boot/dts/stih407-pinctrl.dtsi             |  12 ++-
-> > >  arch/arm/boot/dts/stih410-b2260.dts                |   5 +
-> > >  drivers/tty/serial/st-asc.c                        | 101 +++++++++++++++++++--
-> > >  5 files changed, 110 insertions(+), 14 deletions(-)
-> > 
-> > Looks like everyone is happy with the set.
-> > 
-> > Are you planning to merge it?
-> 
-> I'll take it in my next round of patches, give me a few days to sync up,
-> I normally do serial patches once a week or so.
+Here is the third pull request for dt64 for mvebu for v4.11.
+(I forgot to send this one with the other on Tuesday).
 
-Works for me.  Thanks Greg.
+Gregory
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+The following changes since commit 7292ff67b9b28feb3bef97b437f08c7e7568786f:
+
+  arm64: dts: marvell: add generic-ahci compatibles for CP110 ahci (2017-01-27 11:13:01 +0100)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.11-3
+
+for you to fetch changes up to d0979c07ff52a316aa762ac749ba6377b2c10d61:
+
+  arm64: dts: marvell: adjust name of sd-mmc-gop clock in syscon (2017-01-31 11:51:45 +0100)
+
+----------------------------------------------------------------
+mvebu dt for 4.11 (part 3)
+
+adjust name of sd-mmc-gop clock in sysco for Armada 7K/8K
+
+----------------------------------------------------------------
+Thomas Petazzoni (1):
+      arm64: dts: marvell: adjust name of sd-mmc-gop clock in syscon
+
+ arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 2 +-
+ arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
