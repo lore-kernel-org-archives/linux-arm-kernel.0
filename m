@@ -1,45 +1,42 @@
 From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Fri,  3 Feb 2017 09:29:07 -0600
-Subject: [PATCH] MAINTAINERS: socfpga: update email for Dinh Nguyen
-Message-ID: <1486135747-7358-1-git-send-email-dinguyen@kernel.org>
+Date: Fri,  3 Feb 2017 09:22:02 -0600
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.11, part 2
+Message-ID: <1486135322-7041-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My opensource.altera.com email will be going away soon.
+Hi Arnd, Kevin, and Olof:
 
-Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
----
-Hi Arnd, Kevin, Olof:
-
-I was hoping to take this patch through arm-soc.
+Please pull in these DTS updates for v4.11.
 
 Thanks,
 Dinh
----
- MAINTAINERS | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index cfff2c9..a16c497 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1771,7 +1771,7 @@ F:	drivers/soc/renesas/
- F:	include/linux/soc/renesas/
- 
- ARM/SOCFPGA ARCHITECTURE
--M:	Dinh Nguyen <dinguyen@opensource.altera.com>
-+M:	Dinh Nguyen <dinguyen@kernel.org>
- S:	Maintained
- F:	arch/arm/mach-socfpga/
- F:	arch/arm/boot/dts/socfpga*
-@@ -1781,7 +1781,7 @@ W:	http://www.rocketboards.org
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git
- 
- ARM/SOCFPGA CLOCK FRAMEWORK SUPPORT
--M:	Dinh Nguyen <dinguyen@opensource.altera.com>
-+M:	Dinh Nguyen <dinguyen@kernel.org>
- S:	Maintained
- F:	drivers/clk/socfpga/
- 
--- 
-2.7.4
+
+The following changes since commit 7f0f5460d46867a8f980683136a054cff1357780:
+
+  ARM: dts: socfpga: add missing compatible string for SDRAM controller (2017-01-06 01:42:06 -0600)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.11_part_2
+
+for you to fetch changes up to cda1ade6a25c85d0a7cc2001a96b0b20f6bfd3f0:
+
+  ARM: dts: Add EMAC AXI settings for Arria10 (2017-02-02 21:33:47 -0600)
+
+----------------------------------------------------------------
+SoCFPGA DTS updates for v4.11, part 2
+- Add AXI configuration for DWMAC ethernet controllers on Arria10
+- Use watchdog1 instead of watchdog0 on Arria10
+
+----------------------------------------------------------------
+Dinh Nguyen (1):
+      ARM: dts: watchdog0 cannot reliably trigger reset
+
+Thor Thayer (1):
+      ARM: dts: Add EMAC AXI settings for Arria10
+
+ arch/arm/boot/dts/socfpga_arria10.dtsi       | 9 +++++++++
+ arch/arm/boot/dts/socfpga_arria10_socdk.dtsi | 2 +-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
