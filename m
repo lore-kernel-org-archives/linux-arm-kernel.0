@@ -1,36 +1,59 @@
 From: lukma@denx.de (Lukasz Majewski)
-Date: Fri,  3 Feb 2017 16:24:51 +0100
-Subject: [PATCH 2/2] DTS: dra7: Add "opp_high" opp node to support 1.5 GHz SoC
- operation
-In-Reply-To: <1486135491-14223-1-git-send-email-lukma@denx.de>
-References: <1486135491-14223-1-git-send-email-lukma@denx.de>
-Message-ID: <1486135491-14223-2-git-send-email-lukma@denx.de>
+Date: Fri,  3 Feb 2017 16:24:50 +0100
+Subject: [PATCH 1/2] DTS: dra7: Replace obsolete "operating-points" property
+ with "operating-points-v2"
+Message-ID: <1486135491-14223-1-git-send-email-lukma@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "opp_high" property brings support for 1.5 GHz CPU frequency for TI's
-am57xx line of processors.
+The "operating-points" property have been replaced with
+"operating-points-v2". Only entries with the same frequencies have
+been added, so no reqression should be introduced.
 
 Signed-off-by: Lukasz Majewski <lukma@denx.de>
 ---
- arch/arm/boot/dts/dra7.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/dra7.dtsi | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index a860a56..5e678cd 100644
+index 3c228f9..a860a56 100644
 --- a/arch/arm/boot/dts/dra7.dtsi
 +++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -108,6 +108,11 @@
- 			opp-hz = /bits/ 64 <1176000000>;
- 			opp-microvolt = <1160000 885000 1160000>;
+@@ -80,11 +80,7 @@
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0>;
+ 
+-			operating-points = <
+-				/* kHz    uV */
+-				1000000	1060000
+-				1176000	1160000
+-				>;
++			operating-points-v2 = <&cpu0_opp_table>;
+ 
+ 			clocks = <&dpll_mpu_ck>;
+ 			clock-names = "cpu";
+@@ -98,6 +94,22 @@
  		};
-+
-+		opp_high at 1500000000 {
-+			opp-hz = /bits/ 64 <1500000000>;
-+			opp-microvolt = <1210000 950000 1250000>;
-+		};
  	};
  
++	cpu0_opp_table: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp_nom at 1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <1060000 850000 1150000>;
++			opp-suspend;
++		};
++
++		opp_od at 1176000000 {
++			opp-hz = /bits/ 64 <1176000000>;
++			opp-microvolt = <1160000 885000 1160000>;
++		};
++	};
++
  	/*
+ 	 * The soc node represents the soc top level view. It is used for IPs
+ 	 * that are not memory mapped in the MPU view or for the MPU itself.
 -- 
 2.1.4
