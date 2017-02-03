@@ -1,78 +1,58 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 3 Feb 2017 10:22:50 +0100
-Subject: [RFC PATCH v6 2/7] dma: Add simple dma_noop_mmap
-In-Reply-To: <1486113624-7494-2-git-send-email-alexandre.torgue@st.com>
-References: <1486113624-7494-2-git-send-email-alexandre.torgue@st.com>
-Message-ID: <f10d5579-f8e8-cb7b-ec12-0519fd496315@st.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 3 Feb 2017 09:22:59 +0000
+Subject: [PATCH v2 00/10] serial: st-asc: Allow handling of RTS line
+In-Reply-To: <20170202095541.GB30437@kroah.com>
+References: <20170127172804.23881-1-lee.jones@linaro.org>
+ <20170202074236.ni3tozz3er4g3t64@dell>
+ <20170202095541.GB30437@kroah.com>
+Message-ID: <20170203092259.3opu2feqnco6gv2s@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 02 Feb 2017, Greg KH wrote:
 
-Apologize for this bad sent.
-Please forget it.
+> On Thu, Feb 02, 2017 at 07:42:36AM +0000, Lee Jones wrote:
+> > Hi Greg, Jiri,
+> > 
+> > > When hardware flow-control is disabled, manual toggling of the UART's
+> > > reset line (RTS) using userland applications (e.g. stty) is not
+> > > possible, since the ASC IP does not provide this functionality in the
+> > > same was as some other IPs do.  Thus, we have to do this manually.
+> > > 
+> > > This set ensures the correct Pinctrl groups are configured and
+> > > obtained for both manual toggling of the RTS line and for the IP to
+> > > take over the lines when HW flow-control is requested by the user. 
+> > > 
+> > > Lee Jones (10):
+> > >   serial: st-asc: Ignore the parity error bit if 8-bit mode is enabled
+> > >   serial: st-asc: Provide RTS functionality
+> > >   serial: st-asc: Read in all Pinctrl states
+> > >   serial: st-asc: (De)Register GPIOD and swap Pinctrl profiles
+> > >   serial: st-asc: Use generic DT binding for announcing RTS/CTS lines
+> > >   dt-bindings: serial: Update 'uart-has-rtscts' description
+> > >   ARM: dts: STiH410-b2260: Identify the UART RTS line
+> > >   ARM: dts: STiH407-pinctrl: Add Pinctrl group for HW flow-control
+> > >   ARM: dts: STiH407-family: Use new Pinctrl groups
+> > >   ARM: dts: STiH410-b2260: Enable HW flow-control
+> > > 
+> > >  .../devicetree/bindings/serial/serial.txt          |   3 +-
+> > >  arch/arm/boot/dts/stih407-family.dtsi              |   3 +-
+> > >  arch/arm/boot/dts/stih407-pinctrl.dtsi             |  12 ++-
+> > >  arch/arm/boot/dts/stih410-b2260.dts                |   5 +
+> > >  drivers/tty/serial/st-asc.c                        | 101 +++++++++++++++++++--
+> > >  5 files changed, 110 insertions(+), 14 deletions(-)
+> > 
+> > Looks like everyone is happy with the set.
+> > 
+> > Are you planning to merge it?
+> 
+> I'll take it in my next round of patches, give me a few days to sync up,
+> I normally do serial patches once a week or so.
 
-regards
+Works for me.  Thanks Greg.
 
-On 02/03/2017 10:20 AM, Alexandre TORGUE wrote:
-> From: Vladimir Murzin <vladimir.murzin@arm.com>
->
-> This patch adds a simple implementation of mmap to dma_noop_ops.
->
-> Cc: Joerg Roedel <jroedel@suse.de>
-> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
-> Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> Tested-by: Andras Szemzo <sza@esh.hu>
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> ---
->  lib/dma-noop.c | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
->
-> diff --git a/lib/dma-noop.c b/lib/dma-noop.c
-> index a14eee5..70504eb 100644
-> --- a/lib/dma-noop.c
-> +++ b/lib/dma-noop.c
-> @@ -66,6 +66,26 @@ static int dma_noop_supported(struct device *dev, u64 mask)
->  	return 1;
->  }
->
-> +static int dma_noop_mmap(struct device *dev, struct vm_area_struct *vma,
-> +			 void *cpu_addr, dma_addr_t dma_addr, size_t size,
-> +			 unsigned long attrs)
-> +{
-> +	unsigned long user_count = vma_pages(vma);
-> +	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-> +	unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
-> +	unsigned long off = vma->vm_pgoff;
-> +	int ret = -ENXIO;
-> +
-> +	if (off < count && user_count <= (count - off)) {
-> +		ret = remap_pfn_range(vma, vma->vm_start,
-> +				      pfn + off,
-> +				      user_count << PAGE_SHIFT,
-> +				      vma->vm_page_prot);
-> +	}
-> +
-> +	return ret;
-> +}
-> +
->  struct dma_map_ops dma_noop_ops = {
->  	.alloc			= dma_noop_alloc,
->  	.free			= dma_noop_free,
-> @@ -73,6 +93,7 @@ struct dma_map_ops dma_noop_ops = {
->  	.map_sg			= dma_noop_map_sg,
->  	.mapping_error		= dma_noop_mapping_error,
->  	.dma_supported		= dma_noop_supported,
-> +	.mmap			= dma_noop_mmap,
->  };
->
->  EXPORT_SYMBOL(dma_noop_ops);
-> -- 2.0.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
