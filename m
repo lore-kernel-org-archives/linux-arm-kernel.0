@@ -1,44 +1,142 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  3 Feb 2017 09:54:07 +0000
-Subject: [PATCH v5 3/3] module: unify absolute krctab definitions for 32-bit
- and 64-bit
-In-Reply-To: <1486115647-27680-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1486115647-27680-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1486115647-27680-4-git-send-email-ard.biesheuvel@linaro.org>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Fri,  3 Feb 2017 18:10:53 +0800
+Subject: [PATCH v7 1/3] dt: bindings: add documentation for zx2967 family
+ thermal sensor
+Message-ID: <1486116655-24111-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The previous patch introduced a separate inline asm version of the
-krcrctab declaration template for use with 64-bit architectures, which
-cannot refer to ELF symbols using 32-bit quantities. This declaration
-should be equivalent to the C one for 32-bit architectures, but this
-needs to be checked first, so unify them in a separate patch.
+This patch adds dt-binding documentation for zx2967 family thermal sensor.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Shawn Guo <shawnguo@kernel.org>
 ---
+ .../devicetree/bindings/thermal/zx2967-thermal.txt | 116 +++++++++++++++++++++
+ 1 file changed, 116 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
 
-... which can simply be dropped if it turns out to break anything.
-
- include/linux/export.h | 7 -------
- 1 file changed, 7 deletions(-)
-
-diff --git a/include/linux/export.h b/include/linux/export.h
-index 7473fba6a60c..1a1dfdb2a5c6 100644
---- a/include/linux/export.h
-+++ b/include/linux/export.h
-@@ -49,13 +49,6 @@ extern struct module __this_module;
- 	    "	.weak	" VMLINUX_SYMBOL_STR(__crc_##sym) "	\n"	\
- 	    "	.long	" VMLINUX_SYMBOL_STR(__crc_##sym) " - .	\n"	\
- 	    "	.previous					\n");
--#elif !defined(CONFIG_64BIT)
--#define __CRC_SYMBOL(sym, sec)						\
--	extern __visible void *__crc_##sym __attribute__((weak));	\
--	static const unsigned long __kcrctab_##sym			\
--	__used								\
--	__attribute__((section("___kcrctab" sec "+" #sym), used))	\
--	= (unsigned long) &__crc_##sym;
- #else
- #define __CRC_SYMBOL(sym, sec)						\
- 	asm("	.section \"___kcrctab" sec "+" #sym "\", \"a\"	\n"	\
+diff --git a/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+new file mode 100644
+index 0000000..169a699
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+@@ -0,0 +1,116 @@
++* ZTE zx2967 family Thermal
++
++Required Properties:
++- compatible: should be one of the following.
++    * zte,zx296718-thermal
++- reg: physical base address of the controller and length of memory mapped
++    region.
++- clocks : Pairs of phandle and specifier referencing the controller's clocks.
++- clock-names: "gate" for the topcrm clock.
++	       "pclk" for the apb clock.
++- #thermal-sensor-cells: must be 0.
++
++Please note: coefficients defined in thermal-zones section need to be
++multiplied by 1000.
++
++Example for tempsensor:
++
++	tempsensor: tempsensor at 148a000 {
++		compatible = "zte,zx296718-thermal";
++		reg = <0x0148a000 0x20>;
++		clocks = <&topcrm TEMPSENSOR_GATE>, <&audiocrm AUDIO_TS_PCLK>;
++		clock-names = "gate", "pclk";
++		#thermal-sensor-cells = <0>;
++	};
++
++Example for cooling device:
++
++	cooling_dev: cooling_dev {
++		cluster0_cooling_dev: cluster0-cooling-dev {
++			#cooling-cells = <2>;
++			cpumask = <0xf>;
++			capacitance = <1500>;
++		};
++
++	cluster1_cooling_dev: cluster1-cooling-dev {
++			#cooling-cells = <2>;
++			cpumask = <0x30>;
++			capacitance = <2000>;
++		};
++	};
++
++Example for thermal zones:
++
++	thermal-zones {
++		zx296718_thermal: zx296718_thermal {
++			polling-delay-passive = <500>;
++			polling-delay = <1000>;
++			sustainable-power = <6500>;
++
++			thermal-sensors = <&tempsensor 0>;
++			/*
++			 * both slope and offset need to be multiplied by 1000.
++			 */
++			coefficients = <1951 (-922)>;
++
++			trips {
++				trip0: switch_on_temperature {
++					temperature = <90000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				trip1: desired_temperature {
++					temperature = <100000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				crit: critical_temperature {
++					temperature = <110000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++				map0 {
++					trip = <&trip0>;
++					cooling-device = <&gpu 2 5>;
++				};
++
++				map1 {
++					trip = <&trip0>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map2 {
++					trip = <&trip1>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map3 {
++					trip = <&crit>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map4 {
++					trip = <&trip0>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <9000>;
++				};
++
++				map5 {
++					trip = <&trip1>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <4096>;
++				};
++
++				map6 {
++					trip = <&crit>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <4096>;
++				};
++			};
++		};
++	};
 -- 
 2.7.4
