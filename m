@@ -1,40 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 3 Feb 2017 15:11:41 +0000
-Subject: [PATCH v8 00/15] ACPI platform MSI support and its example mbigen
-In-Reply-To: <a2eb29e2-0f46-0be0-dc43-b3a086556965@codeaurora.org>
-References: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
- <a2eb29e2-0f46-0be0-dc43-b3a086556965@codeaurora.org>
-Message-ID: <fd106be9-836d-8d91-e57c-183ca56b4a49@arm.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Fri, 3 Feb 2017 16:14:14 +0100
+Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
+In-Reply-To: <20170117191656.GS27328@arm.com>
+References: <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
+ <cbbf14fd-a1cc-2463-ba67-acd6d61e9db1@linaro.org>
+ <CAKv+Gu8-+0LUTN0+8OGWRhd22Ls5cMQqTJcjKQK_0N=Uc-0jog@mail.gmail.com>
+ <20170109115320.GI4930@rric.localdomain>
+ <20170112160535.GF13843@arm.com>
+ <20170112185825.GE5020@rric.localdomain>
+ <20170113091903.GA22538@arm.com>
+ <20170113131500.GS4930@rric.localdomain>
+ <20170117100015.GG5020@rric.localdomain>
+ <20170117191656.GS27328@arm.com>
+Message-ID: <20170203151414.GE16822@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/17 14:50, Sinan Kaya wrote:
-> On 1/18/2017 7:54 AM, Hanjun Guo wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
->>
->> With platform msi support landed in the kernel, and the introduction
->> of IORT for GICv3 ITS (PCI MSI) and SMMU, the framework for platform msi
->> is ready, this patch set add few patches to enable the ACPI platform
->> msi support.
->>
->> For platform device connecting to ITS on arm platform, we have IORT
->> table with the named componant node to describe the mappings of paltform
->> device and ITS, so we can retrieve the dev id and find its parent
->> irqdomain (ITS) from IORT table (simlar with the ACPI ITS support).
->>
-> 
-> I understand that there is a consensus on IORT/SMMUv3 specific pieces
-> of this series while there is some ongoing work on the MBIgen part in
-> due to dependency on Agustin's patch vs. ACPI definitions.
-> 
-> Can we merge the IORT/SMMUv3 specific pieces to 4.11 so that the base
-> implementation comes in place?
+On 17.01.17 19:16:56, Will Deacon wrote:
+> I can't really see the trend given that, for system time, your
+> pfn_valid_within results have a variance of ~9 and the early_pfn_valid
+> results have a variance of ~92. Given that the variance seems to come
+> about due to the reboots, I think we need more numbers to establish whether
+> the data sets end up largely overlapping or if they really are disjoint.
 
-Sorry, but I may be missing something. Which IORT/SMMUv3 patches are we
-talking about? Do you have a pointer to a series?
+Assuming the numbers of both versions are not significant, please
+apply one or the other.
 
 Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+-Robert
