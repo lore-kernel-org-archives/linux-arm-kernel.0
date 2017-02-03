@@ -1,126 +1,63 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 3 Feb 2017 13:08:40 -0800
-Subject: [PATCHv2 1/2] arch: Move CONFIG_DEBUG_RODATA and
- CONFIG_SET_MODULE_RONX to be common
-In-Reply-To: <20170203202919.GE27312@n2100.armlinux.org.uk>
-References: <1486144343-24998-1-git-send-email-labbott@redhat.com>
- <1486144343-24998-2-git-send-email-labbott@redhat.com>
- <CAGXu5jK6_y=dWHUDBto7ykN_sSOQ6Gx+sZs_gQ1Hoh5DjP-fTw@mail.gmail.com>
- <20170203202919.GE27312@n2100.armlinux.org.uk>
-Message-ID: <CAGXu5j+HOTHRrFJFMsMaAvqcTAUoEBuphzrYAr7VAjJQU9_RYA@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 03 Feb 2017 22:14:31 +0100
+Subject: [PATCH 2/8] power: add power sequence library
+In-Reply-To: <20170203081614.GA24614@b29397-desktop>
+References: <1483425211-14473-1-git-send-email-peter.chen@nxp.com>
+ <20170201080817.GD17968@kroah.com> <20170203081614.GA24614@b29397-desktop>
+Message-ID: <16336642.sihi7izbLX@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 3, 2017 at 12:29 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Fri, Feb 03, 2017 at 11:45:56AM -0800, Kees Cook wrote:
->> On Fri, Feb 3, 2017 at 9:52 AM, Laura Abbott <labbott@redhat.com> wrote:
->> > diff --git a/arch/Kconfig b/arch/Kconfig
->> > index 99839c2..22ee01e 100644
->> > --- a/arch/Kconfig
->> > +++ b/arch/Kconfig
->> > @@ -781,4 +781,32 @@ config VMAP_STACK
->> >           the stack to map directly to the KASAN shadow map using a formula
->> >           that is incorrect if the stack is in vmalloc space.
->> >
->> > +config ARCH_NO_STRICT_RWX_DEFAULTS
->> > +       def_bool n
->> > +
->> > +config ARCH_HAS_STRICT_KERNEL_RWX
->> > +       def_bool n
->> > +
->> > +config DEBUG_RODATA
->> > +       def_bool y if !ARCH_NO_STRICT_RWX_DEFAULTS
->> > +       prompt "Make kernel text and rodata read-only" if ARCH_NO_STRICT_RWX_DEFAULTS
->>
->> Ah! Yes, perfect. I totally forgot about using conditional "prompt"
->> lines. Nice!
->
-> It's no different from the more usual:
->
->         bool "Make kernel text and rodata read-only" if ARCH_NO_STRICT_RWX_DEFAULTS
->         default y if !ARCH_NO_STRICT_RWX_DEFAULTS
->         depends on ARCH_HAS_STRICT_KERNEL_RWX
->
-> But... I really don't like this - way too many negations and negatives
-> which make it difficult to figure out what's going on here.
->
-> The situation we have today is:
->
-> -config DEBUG_RODATA
-> -       bool "Make kernel text and rodata read-only"
-> -       depends on MMU && !XIP_KERNEL
-> -       default y if CPU_V7
->
-> which is "allow the user to select DEBUG_RODATA if building a MMU non-XIP
-> kernel", suggesting that the user turns it on for ARMv7 CPUs.
->
-> That changes with this and the above:
->
-> +       select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
-> +       select ARCH_HAS_STRICT_MODULE_RWX if MMU
-> +       select ARCH_NO_STRICT_RWX_DEFAULTS if !CPU_V7
->
-> This means that ARCH_HAS_STRICT_KERNEL_RWX is set for a MMU non-XIP
-> kernel, which carries the same pre-condition for DEBUG_RODATA - no
-> problem there.
->
-> However, ARCH_NO_STRICT_RWX_DEFAULTS is set for non-ARMv7 CPUs, which
-> means the "Make kernel text and rodata read-only" prompt _is_ provided
-> for those.  However, for all ARMv7 systems, we go from "suggesting that
-> the user enables the option" to "you don't have a choice, you get this
-> whether you want it or not."
->
-> I'd prefer to keep it off for my development systems, where I don't
-> care about kernel security.  If we don't wish to do that as a general
-> rule, can we make it dependent on EMBEDDED?
->
-> Given that on ARM it can add up to 4MB to the kernel image - there
-> _will_ be about 1MB before the .text section, the padding on between
-> __modver and __ex_table which for me is around 626k, the padding
-> between .notes and the init sections start with .vectors (the space
-> between __ex_table and end of .notes is only 4124, which gets padded
-> up to 1MB) and lastly the padding between the .init section and the
-> data section (for me around 593k).  This all adds up to an increase
-> in kernel image size of 3.2MB on 14.2MB - an increase of 22%.
->
-> So no, I'm really not happy with that.
+On Friday, February 03, 2017 04:16:15 PM Peter Chen wrote:
+> On Wed, Feb 01, 2017 at 09:08:17AM +0100, Greg Kroah-Hartman wrote:
+> > On Wed, Feb 01, 2017 at 12:10:17AM +0100, Rafael J. Wysocki wrote:
+> > > On Tue, Jan 3, 2017 at 7:33 AM, Peter Chen <peter.chen@nxp.com> wrote:
+> > > > We have an well-known problem that the device needs to do some power
+> > > > sequence before it can be recognized by related host, the typical
+> > > > example like hard-wired mmc devices and usb devices.
+> > > >
+> > > > This power sequence is hard to be described at device tree and handled by
+> > > > related host driver, so we have created a common power sequence
+> > > > library to cover this requirement. The core code has supplied
+> > > > some common helpers for host driver, and individual power sequence
+> > > > libraries handle kinds of power sequence for devices. The pwrseq
+> > > > librares always need to allocate extra instance for compatible
+> > > > string match.
+> > > >
+> > > > pwrseq_generic is intended for general purpose of power sequence, which
+> > > > handles gpios and clocks currently, and can cover other controls in
+> > > > future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+> > > > if only one power sequence is needed, else call of_pwrseq_on_list
+> > > > /of_pwrseq_off_list instead (eg, USB hub driver).
+> > > >
+> > > > For new power sequence library, it can add its compatible string
+> > > > to pwrseq_of_match_table, then the pwrseq core will match it with
+> > > > DT's, and choose this library at runtime.
+> > > >
+> > > > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > > > Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+> > > > Tested-by Joshua Clayton <stillcompiling@gmail.com>
+> > > > Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+> > > > Tested-by: Matthias Kaehlcke <mka@chromium.org>
+> > > 
+> > > Quite honestly, I have a really hard time with trying to follow this
+> > > code and the total lack of documentation makes it even harder. 
+> 
+> Sorry about that, Is it ok I add the design doc at:
+> Documentation/power/power-sequence/design.rst?
 
-Ah yeah, good point. We have three cases: unsupported, mandatory,
-optional, but we have the case of setting the default for the optional
-case. Maybe something like this?
+You can do that if you think it will address the request to explain the design.
 
-config STRICT_KERNEL_RWX
-  bool "Make kernel text and rodata read-only" if ARCH_OPTIONAL_KERNEL_RWX
-  depends on ARCH_HAS_STRICT_KERNEL_RWX
-  default ARCH_OPTIONAL_KERNEL_RWX_DEFAULT
+> > > particular, the generic power sequence code is not even commented at
+> > > all, 
+> 
+> The generic power sequence code just implements the APIs which are 
+> called at power/pwrseq/core.c, and those API are commented at
+> include/linux/power/pwrseq.h. Anyway, I will add more comments at it.
 
-unsupported:
-!ARCH_HAS_STRICT_KERNEL_RWX
+It actually seems to be doing more than that and I'm not sure why the code in
+core.c is necessary at all.  The "generic" thing seems to be the only user of
+it anyway and the callbacks seem to be tailored to its needs.
 
-mandatory:
-ARCH_HAS_STRICT_KERNEL_RWX
-!ARCH_OPTIONAL_KERNEL_RWX
-
-optional:
-ARCH_HAS_STRICT_KERNEL_RWX
-ARCH_OPTIONAL_KERNEL_RWX
-with default controlled by ARCH_OPTIONAL_KERNEL_RWX_DEFAULT
-
-Then arm is:
-  select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
-  select ARCH_HAS_STRICT_MODULE_RWX if MMU
-  select ARCH_OPTIONAL_KERNEL_RWX if ARCH_HAS_STRICT_KERNEL_RWX
-  select ARCH_OPTIONAL_KERNEL_RWX_DEFAULT if CPU_V7
-
-x86 and arm64 are:
-  select ARCH_HAS_STRICT_KERNEL_RWX
-  select ARCH_HAS_STRICT_MODULE_RWX
-
-?
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+Thanks,
+Rafael
