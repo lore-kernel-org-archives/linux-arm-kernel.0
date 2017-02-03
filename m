@@ -1,81 +1,59 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Fri, 3 Feb 2017 12:16:55 +0000
-Subject: [PATCH v4] PCI: Xilinx NWL: Modifying irq chip for legacy
- interrupts
-In-Reply-To: <3c78506f-9bcb-0b43-4625-27229ee1f642@arm.com>
-References: <1486120110-15205-1-git-send-email-bharatku@xilinx.com>
- <3c78506f-9bcb-0b43-4625-27229ee1f642@arm.com>
-Message-ID: <8520D5D51A55D047800579B094147198263E03C4@XAP-PVEXMBX02.xlnx.xilinx.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Fri, 3 Feb 2017 07:20:51 -0500
+Subject: [PATCH 0/5] Implement SMMU passthrough using the default domain
+In-Reply-To: <20170202151241.GE13839@arm.com>
+References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
+ <010801d27654$47b7e450$d727acf0$@codeaurora.org>
+ <20170126171857.GE27598@8bytes.org>
+ <CAF6AEGtfrrwVZ_W86_HqVsiqfcM=XFa+g2LECFYQJmvv7-JSqQ@mail.gmail.com>
+ <20170202151241.GE13839@arm.com>
+Message-ID: <CAF6AEGvL_WDt0e6FpuCjeMddaGarF7wu8ZEHtzSwx_ygVURtyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 03/02/17 11:08, Bharat Kumar Gogada wrote:
-> > - Adding mutex lock for protecting legacy mask register
-> > - Few wifi end points which only support legacy interrupts, performs
-> > hardware reset functionalities after disabling interrupts by invoking
-> > disable_irq and then re-enable using enable_irq, they enable hardware
-> > interrupts first and then virtual irq line later.
-> > - The legacy irq line goes low only after DEASSERT_INTx is received.As
-> > the legacy irq line is high immediately after hardware interrupts are
-> > enabled but virq of EP is still in disabled state and EP handler is
-> > never executed resulting no DEASSERT_INTx.If dummy irq chip is used,
-> > interrutps are not masked and system is hanging with CPU stall.
-> > - Adding irq chip functions instead of dummy irq chip for legacy
-> > interrupts.
-> > - Legacy interrupts are level sensitive, so using handle_level_irq is
-> > more appropriate as it is masks interrupts until End point handles
-> > interrupts and unmasks interrutps after End point handler is executed.
-> > - Legacy interrupts are level triggered, virtual irq line of End Point
-> > shows as edge in /proc/interrupts.
-> > - Setting irq flags of virtual irq line of EP to level triggered at
-> > the time of mapping.
-> >
-> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> > ---
-> >  drivers/pci/host/pcie-xilinx-nwl.c |   45
-> +++++++++++++++++++++++++++++++++++-
-> >  1 files changed, 44 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/drivers/pci/host/pcie-xilinx-nwl.c
-> > b/drivers/pci/host/pcie-xilinx-nwl.c
-> > index 43eaa4a..e4605f9 100644
-> > --- a/drivers/pci/host/pcie-xilinx-nwl.c
-> > +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-> > @@ -184,6 +184,7 @@ struct nwl_pcie {
-> >  	u8 root_busno;
-> >  	struct nwl_msi msi;
-> >  	struct irq_domain *legacy_irq_domain;
-> > +	spinlock_t leg_mask_lock;
-> >  };
-> >
-> >  static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off) @@
-> > -395,11 +396,52 @@ static void nwl_pcie_msi_handler_low(struct irq_desc
-> *desc)
-> >  	chained_irq_exit(chip, desc);
-> >  }
-> >
-> > +static void nwl_mask_leg_irq(struct irq_data *data) {
-> > +	struct irq_desc *desc = irq_to_desc(data->irq);
-> > +	struct nwl_pcie *pcie;
-> > +	unsigned long flags;
-> > +	u32 mask;
-> > +	u32 val;
-> > +
-> > +	pcie = irq_desc_get_chip_data(desc);
-> > +	mask = 1 << (data->hwirq - 1);
-> > +	spin_lock_irqsave(&pcie->leg_mask_lock, flags);
-> 
-> I've asked you to use a raw spinlock for a reason. If using RT, this gets turned
-> into a sleeping lock...
-> 
- In include/linux/spinlock.h 
-#define spin_lock_irqsave(lock, flags)                          \
-do {                                                            \
-        raw_spin_lock_irqsave(spinlock_check(lock), flags);     \
-} while (0)
+On Thu, Feb 2, 2017 at 10:12 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Feb 02, 2017 at 10:02:50AM -0500, Rob Clark wrote:
+>> On Thu, Jan 26, 2017 at 12:18 PM, Joerg Roedel <joro@8bytes.org> wrote:
+>> > On Tue, Jan 24, 2017 at 08:42:23PM +0530, Sricharan wrote:
+>> >> Thanks for this series. We had a case with the GPU.
+>> >> The GPU's iommu was setup by kernel and the GPU
+>> >> also does dynamic updates for on-the-fly switching between
+>> >> process pagetables.  GPU driver was not using DMA domain and
+>> >> the GPU's firmware was always expecting to run out  of contextbank
+>> >>  '0' (although not correct) , which was not the case after the DMA domain
+>> >> was made default  as '0' was getting allocated for DMA domain and
+>> >> there were concerns about reusing the DMA domain as well.
+>> >> Now with this series, looks there is an way out of that that can be tried.
+>> >>
+>> >> So should the default domain not be per device specific selectable ?
+>> >
+>> > Note that iommu-drivers can request direct-mapping for any given device
+>> > on its initializtion. This is used on x86 for devices that need a 1-1
+>> > mapping for some reason.
+>> >
+>> > Also device drivers can use the iommu-api and assign their own domain to
+>> > a device, which allows them to manage the dma address space on their
+>> > own.
+>>
+>> Part of the problem is that dev->archdata.dma_ops gets wired up to
+>> iommu_dma_ops.  Which isn't so bad on it's own, except that cache ops
+>> are not exposed to drivers, forcing us to use dma-mapping API
+>> (dma_map_sg, etc) for cache operations.
+>>
+>> Possibly we should just expose cache op's to drivers bypass this abuse
+>> of dma-mapping.
+>>
+>> btw, Will, we definitely want this to *not* rely on kcmdline for the
+>> gpu with it's own private iommu case..
+>
+> I still need to understand the unmanaged domain case, but I don't really
+> see why that's related to this series to be honest.
+>
 
-The above API invokes raw_spin_lock_irqsave know.
-So is there any difference between raw_spin_lock_irqsave and spin_lock_irqsave ?
+Only relation is if we were trying to solve the case of a driver that
+needs to manage it's own domain with this patchset..  but that seems a
+bit like "when all you have is a hammer, everything looks like a
+nail"..
 
-Thanks & Regards,
-Bharat
+BR,
+-R
