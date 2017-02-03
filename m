@@ -1,56 +1,152 @@
-From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Fri, 3 Feb 2017 22:47:54 +0100
-Subject: [PATCH 3/5] mfd: axp20x: Add support for the AXP808 PMIC
-In-Reply-To: <CAGb2v64O7wax5Pku=VVY3rgS2Ybm-=BDQQT+oB13FSGQHhtkiw@mail.gmail.com>
-References: <cover.1485456003.git.rask@formelder.dk>
- <e1d6d6acfaa95e214b6baa73a7edeaa8e6af3670.1485456006.git.rask@formelder.dk>
- <CAGb2v64O7wax5Pku=VVY3rgS2Ybm-=BDQQT+oB13FSGQHhtkiw@mail.gmail.com>
-Message-ID: <20170203214753.rbybkadomljcvtdg@localhost>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Feb 2017 22:28:22 +0000
+Subject: [PATCHv2 1/2] arch: Move CONFIG_DEBUG_RODATA and
+ CONFIG_SET_MODULE_RONX to be common
+In-Reply-To: <CAGXu5j+HOTHRrFJFMsMaAvqcTAUoEBuphzrYAr7VAjJQU9_RYA@mail.gmail.com>
+References: <1486144343-24998-1-git-send-email-labbott@redhat.com>
+ <1486144343-24998-2-git-send-email-labbott@redhat.com>
+ <CAGXu5jK6_y=dWHUDBto7ykN_sSOQ6Gx+sZs_gQ1Hoh5DjP-fTw@mail.gmail.com>
+ <20170203202919.GE27312@n2100.armlinux.org.uk>
+ <CAGXu5j+HOTHRrFJFMsMaAvqcTAUoEBuphzrYAr7VAjJQU9_RYA@mail.gmail.com>
+Message-ID: <20170203222822.GG27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 03:23:33PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Jan 27, 2017 at 5:25 AM, Rask Ingemann Lambertsen
-> <rask@formelder.dk> wrote:
-[...]
-> > diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> > index 25115fe..2d3383e 100644
-> > --- a/drivers/mfd/axp20x.c
-> > +++ b/drivers/mfd/axp20x.c
-[...]
-> > @@ -148,6 +149,13 @@ static const struct regmap_range axp806_writeable_ranges[] = {
-> >         regmap_reg_range(AXP806_REG_ADDR_EXT, AXP806_REG_ADDR_EXT),
-> >  };
+On Fri, Feb 03, 2017 at 01:08:40PM -0800, Kees Cook wrote:
+> On Fri, Feb 3, 2017 at 12:29 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > On Fri, Feb 03, 2017 at 11:45:56AM -0800, Kees Cook wrote:
+> >> On Fri, Feb 3, 2017 at 9:52 AM, Laura Abbott <labbott@redhat.com> wrote:
+> >> > diff --git a/arch/Kconfig b/arch/Kconfig
+> >> > index 99839c2..22ee01e 100644
+> >> > --- a/arch/Kconfig
+> >> > +++ b/arch/Kconfig
+> >> > @@ -781,4 +781,32 @@ config VMAP_STACK
+> >> >           the stack to map directly to the KASAN shadow map using a formula
+> >> >           that is incorrect if the stack is in vmalloc space.
+> >> >
+> >> > +config ARCH_NO_STRICT_RWX_DEFAULTS
+> >> > +       def_bool n
+> >> > +
+> >> > +config ARCH_HAS_STRICT_KERNEL_RWX
+> >> > +       def_bool n
+> >> > +
+> >> > +config DEBUG_RODATA
+> >> > +       def_bool y if !ARCH_NO_STRICT_RWX_DEFAULTS
+> >> > +       prompt "Make kernel text and rodata read-only" if ARCH_NO_STRICT_RWX_DEFAULTS
+> >>
+> >> Ah! Yes, perfect. I totally forgot about using conditional "prompt"
+> >> lines. Nice!
 > >
-> > +static const struct regmap_range axp808_writeable_ranges[] = {
-> > +       regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_DATACACHE(3)),
-> > +       regmap_reg_range(AXP806_PWR_OUT_CTRL1, AXP806_CLDO3_V_CTRL),
-> > +       regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ2_EN),
-> > +       regmap_reg_range(AXP20X_IRQ1_STATE, AXP20X_IRQ2_STATE),
-> > +};
-> > +
-> >  static const struct regmap_range axp806_volatile_ranges[] = {
-> >         regmap_reg_range(AXP20X_IRQ1_STATE, AXP20X_IRQ2_STATE),
-> >  };
-> > @@ -162,6 +170,11 @@ static const struct regmap_access_table axp806_volatile_table = {
-> >         .n_yes_ranges   = ARRAY_SIZE(axp806_volatile_ranges),
-> >  };
+> > It's no different from the more usual:
 > >
-> > +static const struct regmap_access_table axp808_writeable_table = {
-> > +       .yes_ranges     = axp808_writeable_ranges,
-> > +       .n_yes_ranges   = ARRAY_SIZE(axp808_writeable_ranges),
+> >         bool "Make kernel text and rodata read-only" if ARCH_NO_STRICT_RWX_DEFAULTS
+> >         default y if !ARCH_NO_STRICT_RWX_DEFAULTS
+> >         depends on ARCH_HAS_STRICT_KERNEL_RWX
+> >
+> > But... I really don't like this - way too many negations and negatives
+> > which make it difficult to figure out what's going on here.
+> >
+> > The situation we have today is:
+> >
+> > -config DEBUG_RODATA
+> > -       bool "Make kernel text and rodata read-only"
+> > -       depends on MMU && !XIP_KERNEL
+> > -       default y if CPU_V7
+> >
+> > which is "allow the user to select DEBUG_RODATA if building a MMU non-XIP
+> > kernel", suggesting that the user turns it on for ARMv7 CPUs.
+> >
+> > That changes with this and the above:
+> >
+> > +       select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
+> > +       select ARCH_HAS_STRICT_MODULE_RWX if MMU
+> > +       select ARCH_NO_STRICT_RWX_DEFAULTS if !CPU_V7
+> >
+> > This means that ARCH_HAS_STRICT_KERNEL_RWX is set for a MMU non-XIP
+> > kernel, which carries the same pre-condition for DEBUG_RODATA - no
+> > problem there.
+> >
+> > However, ARCH_NO_STRICT_RWX_DEFAULTS is set for non-ARMv7 CPUs, which
+> > means the "Make kernel text and rodata read-only" prompt _is_ provided
+> > for those.  However, for all ARMv7 systems, we go from "suggesting that
+> > the user enables the option" to "you don't have a choice, you get this
+> > whether you want it or not."
+> >
+> > I'd prefer to keep it off for my development systems, where I don't
+> > care about kernel security.  If we don't wish to do that as a general
+> > rule, can we make it dependent on EMBEDDED?
+> >
+> > Given that on ARM it can add up to 4MB to the kernel image - there
+> > _will_ be about 1MB before the .text section, the padding on between
+> > __modver and __ex_table which for me is around 626k, the padding
+> > between .notes and the init sections start with .vectors (the space
+> > between __ex_table and end of .notes is only 4124, which gets padded
+> > up to 1MB) and lastly the padding between the .init section and the
+> > data section (for me around 593k).  This all adds up to an increase
+> > in kernel image size of 3.2MB on 14.2MB - an increase of 22%.
+> >
+> > So no, I'm really not happy with that.
 > 
-> You could probably get away with using axp806_writeable_ranges,
-> and pass ARRAY_SIZE(axp808_writeable_ranges) - 1 for .n_yes_ranges.
+> Ah yeah, good point. We have three cases: unsupported, mandatory,
+> optional, but we have the case of setting the default for the optional
+> case. Maybe something like this?
+> 
+> config STRICT_KERNEL_RWX
+>   bool "Make kernel text and rodata read-only" if ARCH_OPTIONAL_KERNEL_RWX
+>   depends on ARCH_HAS_STRICT_KERNEL_RWX
+>   default ARCH_OPTIONAL_KERNEL_RWX_DEFAULT
+> 
+> unsupported:
+> !ARCH_HAS_STRICT_KERNEL_RWX
+> 
+> mandatory:
+> ARCH_HAS_STRICT_KERNEL_RWX
+> !ARCH_OPTIONAL_KERNEL_RWX
+> 
+> optional:
+> ARCH_HAS_STRICT_KERNEL_RWX
+> ARCH_OPTIONAL_KERNEL_RWX
+> with default controlled by ARCH_OPTIONAL_KERNEL_RWX_DEFAULT
+> 
+> Then arm is:
+>   select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
+>   select ARCH_HAS_STRICT_MODULE_RWX if MMU
+>   select ARCH_OPTIONAL_KERNEL_RWX if ARCH_HAS_STRICT_KERNEL_RWX
+>   select ARCH_OPTIONAL_KERNEL_RWX_DEFAULT if CPU_V7
+> 
+> x86 and arm64 are:
+>   select ARCH_HAS_STRICT_KERNEL_RWX
+>   select ARCH_HAS_STRICT_MODULE_RWX
 
-Assuming that register ranges not supported on the AXP808 are always
-at one end of the table, I think it will ease maintenance by avoiding
-duplicate data should entries be added or removed in the future. I'll put
-a comment above axp806_writeable_ranges to point out what's going on.
+Looks to me like it will do the job.
 
-> Or maybe the compiler figures out the 2 arrays share common data.
+In passing, I noticed that, on ARM:
 
-It doesn't as of gcc 6.2.1.
+  3 .rodata       002212b4  c0703000  c0703000  00703000  2**6
+                  CONTENTS, ALLOC, LOAD, DATA
+
+a lack of READONLY there - which suggests something in this lot isn't
+actually read-only data:
+
+        .rodata           : AT(ADDR(.rodata) - LOAD_OFFSET) {           \
+                VMLINUX_SYMBOL(__start_rodata) = .;                     \
+                *(.rodata) *(.rodata.*)                                 \
+                RO_AFTER_INIT_DATA      /* Read only after init */      \
+                KEEP(*(__vermagic))     /* Kernel version magic */      \
+                . = ALIGN(8);                                           \
+                VMLINUX_SYMBOL(__start___tracepoints_ptrs) = .;         \
+                KEEP(*(__tracepoints_ptrs)) /* Tracepoints: pointer array */ \
+                VMLINUX_SYMBOL(__stop___tracepoints_ptrs) = .;          \
+                *(__tracepoints_strings)/* Tracepoints: strings */      \
+        }                                                               \
+
+I suspect it's the RO_AFTER_INIT_DATA section - maybe this should be
+placed into its own separate output section?  I don't think it's doing
+any harm, it's just odd that the .rodata section is marked as a normal
+data section.
 
 -- 
-Rask Ingemann Lambertsen
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
