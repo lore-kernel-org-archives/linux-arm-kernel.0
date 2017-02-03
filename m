@@ -1,67 +1,91 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Fri, 3 Feb 2017 02:31:44 +0100
-Subject: [RFC] w1: regression, remove need for ida and use
- PLATFORM_DEVID_AUTO
-In-Reply-To: <308e185e-26eb-39ee-d82f-a0d210a41743@ti.com>
-References: <d0b52b94-0c87-61f8-32ff-99f2a354e500@tul.cz>
- <308e185e-26eb-39ee-d82f-a0d210a41743@ti.com>
-Message-ID: <cfa35897-383e-674a-f049-e45c4dfeb534@tul.cz>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 3 Feb 2017 10:45:39 +0900
+Subject: [PATCH v31 05/12] arm64: kdump: protect crash dump kernel memory
+In-Reply-To: <20170202115425.GJ31394@leverpostej>
+References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
+ <20170201124630.6016-4-takahiro.akashi@linaro.org>
+ <20170201180008.GG4756@leverpostej>
+ <20170201182506.GA30584@leverpostej>
+ <20170202103905.GF13549@linaro.org>
+ <20170202115425.GJ31394@leverpostej>
+Message-ID: <20170203014538.GA29585@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 2.2.2017 v 15:23 Andrew F. Davis napsal(a):
-> On 02/01/2017 07:05 PM, Petr Cvek wrote:
->> Patch 
->> 	w1: remove need for ida and use PLATFORM_DEVID_AUTO
->> 	098f9fb0c962eb2fdba5f9d34f4cf7a938237184 
->>
->> causes a regression in the w1_ds2760 driver. Initialization creates a name "ds2760-battery.0.auto". It seems that name of that size will cause checking code in __thermal_cooling_device_register() from thermal_core.c to fail as it checks for names shorter than 20 chars:
->>
->> 	if (type && strlen(type) >= THERMAL_NAME_LENGTH)
->> 		return ERR_PTR(-EINVAL);
->>
->> A second problem seems to be with magician_supplicants list as "ds2760-battery.0" does not match in a test power_supply_am_i_supplied() in ds2760_battery_update_status() from drivers/power/supply/ds2760_battery.c . This causes status flag to be forever in POWER_SUPPLY_STATUS_DISCHARGING state.
->>
->> Functionality returned after I hotfix changed (drivers/w1/slaves/w1_ds2760.c)
->>
->> 	pdev = platform_device_alloc("ds2760-battery", PLATFORM_DEVID_AUTO);
->>
->> to
->>
->> 	pdev = platform_device_alloc("ds2760-battery", 0);
->>
->> Which solution do you advise. Shortening the name let's say just to "ds2760" (with changes to arch files, w1 files and supply files), increasing THERMAL_NAME_LENGTH to let's say 32 (I don't know if this doesn't break something other) or just reverting to the old behavior?
->>
+Mark,
+
+On Thu, Feb 02, 2017 at 11:54:25AM +0000, Mark Rutland wrote:
+> On Thu, Feb 02, 2017 at 07:39:06PM +0900, AKASHI Takahiro wrote:
+> > Mark,
+> > 
+> > On Wed, Feb 01, 2017 at 06:25:06PM +0000, Mark Rutland wrote:
+> > > On Wed, Feb 01, 2017 at 06:00:08PM +0000, Mark Rutland wrote:
+> > > > On Wed, Feb 01, 2017 at 09:46:24PM +0900, AKASHI Takahiro wrote:
+> > > > > arch_kexec_protect_crashkres() and arch_kexec_unprotect_crashkres()
+> > > > > are meant to be called around kexec_load() in order to protect
+> > > > > the memory allocated for crash dump kernel once after it's loaded.
+> > > > > 
+> > > > > The protection is implemented here by unmapping the region rather than
+> > > > > making it read-only.
+> > > > > To make the things work correctly, we also have to
+> > > > > - put the region in an isolated, page-level mapping initially, and
+> > > > > - move copying kexec's control_code_page to machine_kexec_prepare()
+> > > > > 
+> > > > > Note that page-level mapping is also required to allow for shrinking
+> > > > > the size of memory, through /sys/kernel/kexec_crash_size, by any number
+> > > > > of multiple pages.
+> > > > 
+> > > > Looking at kexec_crash_size_store(), I don't see where memory returned
+> > > > to the OS is mapped. AFAICT, if the region is protected when the user
+> > > > shrinks the region, the memory will not be mapped, yet handed over to
+> > > > the kernel for general allocation.
+> > > > 
+> > > > Surely we need an arch-specific callback to handle that? e.g.
+> > > > 
+> > > > arch_crash_release_region(unsigned long base, unsigned long size)
+> > > > {
+> > > > 	/*
+> > > > 	 * Ensure the region is part of the linear map before we return
+> > > > 	 * it to the OS. We won't unmap this again, so we can use block
+> > > > 	 * mappings.
+> > > > 	 */
+> > > > 	create_pgd_mapping(&init_mm, start, __phys_to_virt(start),
+> > > > 			   size, PAGE_KERNEL, false);
+> > > > }
+> > > > 
+> > > > ... which we'd call from crash_shrink_memory() before we freed the
+> > > > reserved pages.
+> > > 
+> > > Another question is (how) does hyp map this region?
+> > 
+> > I don't get your point here.
+> > Hyp mode does care only physical memory in intermediate address, doesn't it?
 > 
-> If 20 is no longer the max thermal name then THERMAL_NAME_LENGTH should
-> be changed.
+> My concern was that hyp may map the region; and thus buggy code at hyp
+> can corrupt the region (and/or hyp may conflict w.r.t. attributes).
 
-Yes it is that ".auto" addition to "ds2760-battery.0" makes 21 chars long string. With higher number (".10" onwards) it is 22 chars. Load of the module then fails at test in thermal_zone_device_register():
+Grep'ing create_hyp_mappings() under arch/arm(64)/kvm shows that
+we have only a few small regions of memory mapped in hyp mode.
+I also confirmed that there is no active mapping for crash dump kernel
+memory by checking mmu tables with DS-5 debugger.
 
-	https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/thermal/thermal_core.c?id=refs/tags/v4.10-rc6#n1158
+> We mght have to ensure hyp doesn't map the crashkernel region, and to
+> case us pain, disallow freeing of any part of the region.
 
-	if (type && strlen(type) >= THERMAL_NAME_LENGTH)
-		return ERR_PTR(-EINVAL);
+So I don't believe we need to worry such a case.
 
-I searched in code further and with THERMAL_NAME_LENGTH = 30 (enough space) the module load fails at another place in __hwmon_device_register():
-	
-	https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/hwmon/hwmon.c?id=refs/tags/v4.10-rc6#n548
+Thanks,
+-Takahiro AKASHI
 
-	if (name && (!strlen(name) || strpbrk(name, "-* \t\n")))
-		return ERR_PTR(-EINVAL);
-
-That's because there is "-" in "ds2760-battery.0.auto" (and that's why shortening to "ds2760.0" works). Is there some reason for disallowing "-" in a name? If not then I'm for removal (in other case we need to change ds2760-battery and others names). Increasing THERMAL_NAME_LENGTH to 22 should be just OK for ds2760 (but maybe not enough for others) I would increased it to 32 (nice number ;-) ).
-
+> I'll dig into this.
 > 
-> As for the couple boards hard-coding "ds2760-battery.0", this is a
-> problem that should be fix regardless of any fix we chose here as IDA is
-> not guaranteed to return 0, so the battery could just as easily be
-> called ds2760-battery.7. (I've had this discussion before as the N900
-> user-space also make this mistake).
+> Thanks,
+> Mark.
 > 
-
-I'm not familiar with power supply subsystem, so just a naive idea. Should suffice to change drivers/power/supply/power_supply_core.c __power_supply_is_supplied_by() for only first part of the string? (like "ds2760-battery" subset of "ds2760-battery.7").
-
-Do you have a link to discussion about N900?
-
-Petr
+> > If this is not a matter now, I will post v32 tomorrow :)
+> > 
+> > -Takahiro AKASHI
+> > 
+> > 
+> > > Thanks,
+> > > Mark.
