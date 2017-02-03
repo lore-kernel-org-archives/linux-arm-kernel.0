@@ -1,73 +1,82 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 3 Feb 2017 14:05:13 +0000
-Subject: [PATCHv2 net-next 05/16] net: mvpp2: introduce PPv2.2 HW
- descriptors and adapt accessors
-In-Reply-To: <20170203142446.2ee517a7@free-electrons.com>
-References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943592-12556-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170106142901.GC14217@n2100.armlinux.org.uk>
- <113811b6-79a4-9c66-d302-add9fb0c5b1a@arm.com>
- <20170203142446.2ee517a7@free-electrons.com>
-Message-ID: <231514f4-2e35-8bde-4469-aada833635aa@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 3 Feb 2017 06:07:29 -0800
+Subject: [RFC] w1: regression, remove need for ida and use
+ PLATFORM_DEVID_AUTO
+In-Reply-To: <822b1827-959b-13dc-6331-f0954954c010@tul.cz>
+References: <d0b52b94-0c87-61f8-32ff-99f2a354e500@tul.cz>
+ <308e185e-26eb-39ee-d82f-a0d210a41743@ti.com>
+ <cfa35897-383e-674a-f049-e45c4dfeb534@tul.cz>
+ <0928fc89-490f-1d12-dc3d-51f2d433d2e0@roeck-us.net>
+ <822b1827-959b-13dc-6331-f0954954c010@tul.cz>
+Message-ID: <0a4d4a6d-5ede-b77a-0600-19a8d815a33f@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/17 13:24, Thomas Petazzoni wrote:
-> Hello,
-> 
-> On Fri, 6 Jan 2017 14:44:56 +0000, Robin Murphy wrote:
-> 
->>>> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
->>>> +		dma_addr_t dma_addr =
->>>> +			rx_desc->pp22.buf_phys_addr_key_hash & DMA_BIT_MASK(40);
->>>> +		phys_addr_t phys_addr =
->>>> +			dma_to_phys(port->dev->dev.parent, dma_addr);  
->>
->> Ugh, this looks bogus. dma_to_phys(), in the arm64 case at least, is
->> essentially a SWIOTLB internal helper function which has to be
->> implemented in architecture code because reasons. Calling it from a
->> driver is almost certainly wrong (it doesn't even exist on most
->> architectures). Besides, if this is really a genuine dma_addr_t obtained
->> from a DMA API call, you cannot infer it to be related to a CPU physical
->> address, or convertible to one at all.
-> 
-> So do you have a better suggestion? The descriptors only have enough
-> space to store a 40-bit virtual address, which is not enough to fit the
-> virtual addresses used by Linux for SKBs. This is why I'm instead
-> relying on the fact that the descriptors can store the 40-bit physical
-> address, and convert it back to a virtual address, which should be fine
-> on ARM64 because the entire physical memory is part of the kernel linear
-> mapping.
-
-OK, that has nothing to do with DMA addresses then.
-
->>>> +		return (unsigned long)phys_to_virt(phys_addr);
->>>> +#else
->>>> +		return rx_desc->pp22.buf_cookie_misc & DMA_BIT_MASK(40);
->>>> +#endif  
+On 02/03/2017 05:28 AM, Petr Cvek wrote:
+> Dne 3.2.2017 v 04:31 Guenter Roeck napsal(a):
+>> On 02/02/2017 05:31 PM, Petr Cvek wrote:
+>>> Dne 2.2.2017 v 15:23 Andrew F. Davis napsal(a):
+>>>> On 02/01/2017 07:05 PM, Petr Cvek wrote:
+>>>>> Patch
+>>>>>     w1: remove need for ida and use PLATFORM_DEVID_AUTO
+>>>>>     098f9fb0c962eb2fdba5f9d34f4cf7a938237184
+>>>>>
+>>>>> causes a regression in the w1_ds2760 driver. Initialization creates a name "ds2760-battery.0.auto". It seems that name of that size will cause checking code in __thermal_cooling_device_register() from thermal_core.c to fail as it checks for names shorter than 20 chars:
+>>>>>
+>>>>>     if (type && strlen(type) >= THERMAL_NAME_LENGTH)
+>>>>>         return ERR_PTR(-EINVAL);
+>>>>>
+>>>>> A second problem seems to be with magician_supplicants list as "ds2760-battery.0" does not match in a test power_supply_am_i_supplied() in ds2760_battery_update_status() from drivers/power/supply/ds2760_battery.c . This causes status flag to be forever in POWER_SUPPLY_STATUS_DISCHARGING state.
+>>>>>
+>>>>> Functionality returned after I hotfix changed (drivers/w1/slaves/w1_ds2760.c)
+>>>>>
+>>>>>     pdev = platform_device_alloc("ds2760-battery", PLATFORM_DEVID_AUTO);
+>>>>>
+>>>>> to
+>>>>>
+>>>>>     pdev = platform_device_alloc("ds2760-battery", 0);
+>>>>>
+>>>>> Which solution do you advise. Shortening the name let's say just to "ds2760" (with changes to arch files, w1 files and supply files), increasing THERMAL_NAME_LENGTH to let's say 32 (I don't know if this doesn't break something other) or just reverting to the old behavior?
+>>>>>
+>>>>
+>>>> If 20 is no longer the max thermal name then THERMAL_NAME_LENGTH should
+>>>> be changed.
 >>>
->>> I'm not sure that's the best way of selecting the difference.  
+>>> Yes it is that ".auto" addition to "ds2760-battery.0" makes 21 chars long string. With higher number (".10" onwards) it is 22 chars. Load of the module then fails at test in thermal_zone_device_register():
+>>>
+>>>     https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/thermal/thermal_core.c?id=refs/tags/v4.10-rc6#n1158
+>>>
+>>>     if (type && strlen(type) >= THERMAL_NAME_LENGTH)
+>>>         return ERR_PTR(-EINVAL);
+>>>
+>>> I searched in code further and with THERMAL_NAME_LENGTH = 30 (enough space) the module load fails at another place in __hwmon_device_register():
+>>>
+>>>     https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/hwmon/hwmon.c?id=refs/tags/v4.10-rc6#n548
+>>>
+>>>     if (name && (!strlen(name) || strpbrk(name, "-* \t\n")))
+>>>         return ERR_PTR(-EINVAL);
+>>>
+>>> That's because there is "-" in "ds2760-battery.0.auto" (and that's why shortening to "ds2760.0" works). Is there some reason for disallowing "-" in a name? If not then I'm for removal (in other case we need to change ds2760-battery and others names). Increasing THERMAL_NAME_LENGTH to 22 should be just OK for ds2760 (but maybe not enough for others) I would increased it to 32 (nice number ;-) ).
+>>>
 >>
->> Given that CONFIG_ARCH_DMA_ADDR_T_64BIT could be enabled on 32-bit LPAE
->> systems, indeed it definitely isn't.
-> 
-> Russell proposal of testing the size of a virtual address
-> pointer instead would solve this I believe, correct?
+>> '-' is not permitted in hwmon name attributes, primarily because libsensors
+>> interprets it as a delimiter in its configuration file.
+>>
+>
+> OK so this means we need to rename ds2760-battery so libsensors works.
+>
+> Hmm is an underscore in "ds2760_battery.0.auto" OK?
 
-AFAICS, even that shouldn't really be necessary - for all VA/PA
-combinations of 32/32, 32/40 and 64/40, storing virt_to_phys() of the
-SKB VA won't overflow 40 bits, so a corresponding phys_to_virt() at the
-other end can't go wrong either. If you really do want to special-case
-things based on VA size, though, either CONFIG_64BIT or sizeof(void *)
-would indeed be infinitely more useful than the unrelated DMA address
-width - I know this driver's never going to run on SPARC64, but that's
-one example of where the above logic would lead to precisely the
-truncated VA it's trying to avoid.
+Theoretically yes, but there was objection to that idea because replacing the '-'
+with '_' is considered by some to be an ABI change (why the addition of '.auto'
+doesn't matter escapes me, though).
 
-Robin.
+>
+>> Anyway, the related change in thermal has been reverted, so that should
+>
+> s/thermal/hwmon ? Or I'm confused :-D (there was no change in thermal, code stopped working because of change in w1 driver (".auto" addition))
+>
 
-> 
-> Thanks,
-> 
-> Thomas
-> 
+3feb479cea37 Revert "thermal: thermal_hwmon: Convert to hwmon_device_register_with_info()"
+
+Guenter
