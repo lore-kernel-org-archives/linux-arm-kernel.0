@@ -1,74 +1,36 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Fri,  3 Feb 2017 10:20:07 -0500
-Subject: [RFC v4 09/10] KVM: arm64: Add the EL1 physical timer access handler
-In-Reply-To: <1486135208-13415-1-git-send-email-jintack@cs.columbia.edu>
-References: <1486135208-13415-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1486135208-13415-10-git-send-email-jintack@cs.columbia.edu>
+From: lukma@denx.de (Lukasz Majewski)
+Date: Fri,  3 Feb 2017 16:24:51 +0100
+Subject: [PATCH 2/2] DTS: dra7: Add "opp_high" opp node to support 1.5 GHz SoC
+ operation
+In-Reply-To: <1486135491-14223-1-git-send-email-lukma@denx.de>
+References: <1486135491-14223-1-git-send-email-lukma@denx.de>
+Message-ID: <1486135491-14223-2-git-send-email-lukma@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM traps on the EL1 phys timer accesses from VMs, but it doesn't handle
-those traps. This results in terminating VMs. Instead, set a handler for
-the EL1 phys timer access, and inject an undefined exception as an
-intermediate step.
+The "opp_high" property brings support for 1.5 GHz CPU frequency for TI's
+am57xx line of processors.
 
-Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Lukasz Majewski <lukma@denx.de>
 ---
- arch/arm64/kvm/sys_regs.c | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ arch/arm/boot/dts/dra7.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index caa47ce..1cd3464 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -820,6 +820,30 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	  CRm((0b1100 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
- 	  access_pmu_evtyper, reset_unknown, (PMEVTYPER0_EL0 + n), }
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index a860a56..5e678cd 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -108,6 +108,11 @@
+ 			opp-hz = /bits/ 64 <1176000000>;
+ 			opp-microvolt = <1160000 885000 1160000>;
+ 		};
++
++		opp_high at 1500000000 {
++			opp-hz = /bits/ 64 <1500000000>;
++			opp-microvolt = <1210000 950000 1250000>;
++		};
+ 	};
  
-+static bool access_cntp_tval(struct kvm_vcpu *vcpu,
-+		struct sys_reg_params *p,
-+		const struct sys_reg_desc *r)
-+{
-+	kvm_inject_undefined(vcpu);
-+	return true;
-+}
-+
-+static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
-+		struct sys_reg_params *p,
-+		const struct sys_reg_desc *r)
-+{
-+	kvm_inject_undefined(vcpu);
-+	return true;
-+}
-+
-+static bool access_cntp_cval(struct kvm_vcpu *vcpu,
-+		struct sys_reg_params *p,
-+		const struct sys_reg_desc *r)
-+{
-+	kvm_inject_undefined(vcpu);
-+	return true;
-+}
-+
- /*
-  * Architected system registers.
-  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
-@@ -1029,6 +1053,16 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b011),
- 	  NULL, reset_unknown, TPIDRRO_EL0 },
- 
-+	/* CNTP_TVAL_EL0 */
-+	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b000),
-+	  access_cntp_tval },
-+	/* CNTP_CTL_EL0 */
-+	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b001),
-+	  access_cntp_ctl },
-+	/* CNTP_CVAL_EL0 */
-+	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b010),
-+	  access_cntp_cval },
-+
- 	/* PMEVCNTRn_EL0 */
- 	PMU_PMEVCNTR_EL0(0),
- 	PMU_PMEVCNTR_EL0(1),
+ 	/*
 -- 
-1.9.1
+2.1.4
