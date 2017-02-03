@@ -1,42 +1,56 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 3 Feb 2017 21:21:46 +0300
-Subject: [PATCH net-next 6/8] net: ethernet: annapurna: add wol helpers to
- the Alpine driver
-In-Reply-To: <20170203181216.30214-7-antoine.tenart@free-electrons.com>
-References: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
- <20170203181216.30214-7-antoine.tenart@free-electrons.com>
-Message-ID: <08b62752-8bb2-4633-c44f-74eb585e7e52@cogentembedded.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 3 Feb 2017 18:26:49 +0000
+Subject: [PATCHv2 2/2] arch: Rename CONFIG_DEBUG_RODATA and
+ CONFIG_DEBUG_MODULE_RONX
+In-Reply-To: <1486144343-24998-3-git-send-email-labbott@redhat.com>
+References: <1486144343-24998-1-git-send-email-labbott@redhat.com>
+ <1486144343-24998-3-git-send-email-labbott@redhat.com>
+Message-ID: <20170203182648.GB26578@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On Fri, Feb 03, 2017 at 09:52:22AM -0800, Laura Abbott wrote:
+> 
+> Both of these options are poorly named. The features they provide are
+> necessary for system security and should not be considered debug only.
+> Change the name to something that accurately describes what these
+> options do.
+> 
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
 
-On 02/03/2017 09:12 PM, Antoine Tenart wrote:
+As with patch 1, this looks good to me. FWIW:
 
-> Implement the get_wol() and set_wol() helpers in the Annapurna Labs
-> Alpine Ethernet driver.
-> ---
->  drivers/net/ethernet/annapurna/al_eth.c | 44 +++++++++++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
->
-> diff --git a/drivers/net/ethernet/annapurna/al_eth.c b/drivers/net/ethernet/annapurna/al_eth.c
-> index 8dd84f66b5d1..d06a75a49ce5 100644
-> --- a/drivers/net/ethernet/annapurna/al_eth.c
-> +++ b/drivers/net/ethernet/annapurna/al_eth.c
-> @@ -2519,10 +2519,54 @@ static u32 al_eth_get_rxfh_indir_size(struct net_device *netdev)
->  	return AL_ETH_RX_RSS_TABLE_SIZE;
->  }
->
-> +static void al_eth_get_wol(struct net_device *netdev,
-> +			   struct ethtool_wolinfo *wol)
-> +{
-> +	struct al_eth_adapter *adapter = netdev_priv(netdev);
-> +	struct phy_device *phydev;
-> +
-> +	wol->wolopts = adapter->wol;
-> +
-> +	if ((adapter) && (adapter->phy_exist) && (adapter->mdio_bus)) {
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-    Now that's somewhat stupid looking... does the whole driver use this "style"?
+> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+> index 939815e..560a8d8 100644
+> --- a/arch/arm64/Kconfig.debug
+> +++ b/arch/arm64/Kconfig.debug
+> @@ -72,7 +72,7 @@ config DEBUG_WX
+>  	  If in doubt, say "Y".
+>  
+>  config DEBUG_ALIGN_RODATA
+> -	depends on DEBUG_RODATA
+> +	depends on STRICT_KERNEL_RWX
+>  	bool "Align linker sections up to SECTION_SIZE"
+>  	help
+>  	  If this option is enabled, sections that may potentially be marked as
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 94b62c1..67f9cb9 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -93,7 +93,7 @@ static void __kprobes *patch_map(void *addr, int fixmap)
+>  	bool module = !core_kernel_text(uintaddr);
+>  	struct page *page;
+>  
+> -	if (module && IS_ENABLED(CONFIG_DEBUG_SET_MODULE_RONX))
+> +	if (module && IS_ENABLED(CONFIG_STRICT_MODULE_RWX))
+>  		page = vmalloc_to_page(addr);
+>  	else if (!module)
+>  		page = pfn_to_page(PHYS_PFN(__pa(addr)));
 
-MBR, Sergei
+Since CONFIG_STRICT_MODULE_RWX is mandatory for arm64, we should be able
+to simplify this, but that can wait for a later patch.
+
+Thanks,
+Mark.
