@@ -1,109 +1,52 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Fri, 3 Feb 2017 16:38:30 +0530
-Subject: [PATCH v4] PCI: Xilinx NWL: Modifying irq chip for legacy interrupts
-Message-ID: <1486120110-15205-1-git-send-email-bharatku@xilinx.com>
+From: hekuang@huawei.com (Hekuang)
+Date: Fri, 3 Feb 2017 19:08:53 +0800
+Subject: [PATCH 2/2 v2] perf tools: Enable bpf prologue for arm64
+In-Reply-To: <20170126193122.GB17504@kernel.org>
+References: <20170124190908.GG10340@kernel.org>
+ <20170125072311.22922-1-hekuang@huawei.com> <20170125133201.GC27026@arm.com>
+ <20170126104916.971478fa29083cf4ae14fac3@kernel.org>
+ <20170126165211.GK14167@arm.com> <20170126193122.GB17504@kernel.org>
+Message-ID: <589464C5.5050205@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Adding mutex lock for protecting legacy mask register
-- Few wifi end points which only support legacy interrupts,
-performs hardware reset functionalities after disabling interrupts
-by invoking disable_irq and then re-enable using enable_irq, they
-enable hardware interrupts first and then virtual irq line later.
-- The legacy irq line goes low only after DEASSERT_INTx is
-received.As the legacy irq line is high immediately after hardware
-interrupts are enabled but virq of EP is still in disabled state
-and EP handler is never executed resulting no DEASSERT_INTx.If dummy
-irq chip is used, interrutps are not masked and system is
-hanging with CPU stall.
-- Adding irq chip functions instead of dummy irq chip for legacy
-interrupts.
-- Legacy interrupts are level sensitive, so using handle_level_irq
-is more appropriate as it is masks interrupts until End point handles
-interrupts and unmasks interrutps after End point handler is executed.
-- Legacy interrupts are level triggered, virtual irq line of End
-Point shows as edge in /proc/interrupts.
-- Setting irq flags of virtual irq line of EP to level triggered
-at the time of mapping.
+hi,
 
-Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
----
- drivers/pci/host/pcie-xilinx-nwl.c |   45 +++++++++++++++++++++++++++++++++++-
- 1 files changed, 44 insertions(+), 1 deletions(-)
+? 2017/1/27 3:31, Arnaldo Carvalho de Melo ??:
+> Em Thu, Jan 26, 2017 at 04:52:12PM +0000, Will Deacon escreveu:
+>> On Thu, Jan 26, 2017 at 10:49:16AM +0900, Masami Hiramatsu wrote:
+>>> On Wed, 25 Jan 2017 13:32:01 +0000
+>>> Will Deacon <will.deacon@arm.com> wrote:
+>>>
+>>>> On Wed, Jan 25, 2017 at 07:23:11AM +0000, He Kuang wrote:
+>>>>> Since HAVE_KPROBES can be enabled in arm64, this patch introduces
+>>>>> regs_query_register_offset() to convert register name to offset for
+>>>>> arm64, so the BPF prologue feature is ready to use.
+>>>>>
+>>>>> This patch also changes the 'dwarfnum' to 'offset' in register table,
+>>>>> so the related functions are consistent with x86.
+>>>> Wouldn't it be an awful lot simpler just to leave the code as-is, and
+>>>> implement regs_query_register_offset in the same way that we implement
+>>>> get_arch_regstr but return the dwarfnum?
+>>> No, since the offset is not same as dwarfnum.
+>>>
+>>> With this style, the index of array becomes the dwarfnum (the index of
+>>> each register defined by DWARF) and the "offset" member means the
+>>> byte-offset of the register in (user_)pt_regs. Those should be different.
+>> Ok, then do it as two patches then, rather than introduce functionality
+>> along with the renaming.
+>>
+>>>> I don't really see the point of all the refactoring.
+>>> Also, from the maintenance point of view, this rewrite work makes
+>>> the code simply similar to x86 implementation, that will be easier to
+>>> maintain :)
+>> Right, apart from the two howling bugs in the version that was nearly merged
+>> initially :p. I tend to err on the "if it ain't broke, don't fix it" side
+>> of the argument but if you really want the refactoring lets keep it as a
+>> separate change.
+> So, He, can you do that? How do we proceed?
+>
+> - Arnaldo
 
-diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-index 43eaa4a..e4605f9 100644
---- a/drivers/pci/host/pcie-xilinx-nwl.c
-+++ b/drivers/pci/host/pcie-xilinx-nwl.c
-@@ -184,6 +184,7 @@ struct nwl_pcie {
- 	u8 root_busno;
- 	struct nwl_msi msi;
- 	struct irq_domain *legacy_irq_domain;
-+	spinlock_t leg_mask_lock;
- };
- 
- static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off)
-@@ -395,11 +396,52 @@ static void nwl_pcie_msi_handler_low(struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
- }
- 
-+static void nwl_mask_leg_irq(struct irq_data *data)
-+{
-+	struct irq_desc *desc = irq_to_desc(data->irq);
-+	struct nwl_pcie *pcie;
-+	unsigned long flags;
-+	u32 mask;
-+	u32 val;
-+
-+	pcie = irq_desc_get_chip_data(desc);
-+	mask = 1 << (data->hwirq - 1);
-+	spin_lock_irqsave(&pcie->leg_mask_lock, flags);
-+	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
-+	nwl_bridge_writel(pcie, (val & (~mask)), MSGF_LEG_MASK);
-+	spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
-+}
-+
-+static void nwl_unmask_leg_irq(struct irq_data *data)
-+{
-+	struct irq_desc *desc = irq_to_desc(data->irq);
-+	struct nwl_pcie *pcie;
-+	unsigned long flags;
-+	u32 mask;
-+	u32 val;
-+
-+	pcie = irq_desc_get_chip_data(desc);
-+	mask = 1 << (data->hwirq - 1);
-+	spin_lock_irqsave(&pcie->leg_mask_lock, flags);
-+	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
-+	nwl_bridge_writel(pcie, (val | mask), MSGF_LEG_MASK);
-+	spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
-+}
-+
-+static struct irq_chip nwl_leg_irq_chip = {
-+	.name = "nwl_pcie:legacy",
-+	.irq_enable = nwl_unmask_leg_irq,
-+	.irq_disable = nwl_mask_leg_irq,
-+	.irq_mask = nwl_mask_leg_irq,
-+	.irq_unmask = nwl_unmask_leg_irq,
-+};
-+
- static int nwl_legacy_map(struct irq_domain *domain, unsigned int irq,
- 			  irq_hw_number_t hwirq)
- {
--	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
-+	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_level_irq);
- 	irq_set_chip_data(irq, domain->host_data);
-+	irq_set_status_flags(irq, IRQ_LEVEL);
- 
- 	return 0;
- }
-@@ -538,6 +580,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
- 		return -ENOMEM;
- 	}
- 
-+	spin_lock_init(&pcie->leg_mask_lock);
- 	nwl_pcie_init_msi_irq_domain(pcie);
- 	return 0;
- }
--- 
-1.7.1
+I split the patch as Will suggested and resend them. Sorry for
+late response, just back from Spring festival.
