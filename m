@@ -1,59 +1,45 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Fri,  3 Feb 2017 16:24:50 +0100
-Subject: [PATCH 1/2] DTS: dra7: Replace obsolete "operating-points" property
- with "operating-points-v2"
-Message-ID: <1486135491-14223-1-git-send-email-lukma@denx.de>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Fri,  3 Feb 2017 09:29:07 -0600
+Subject: [PATCH] MAINTAINERS: socfpga: update email for Dinh Nguyen
+Message-ID: <1486135747-7358-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "operating-points" property have been replaced with
-"operating-points-v2". Only entries with the same frequencies have
-been added, so no reqression should be introduced.
+My opensource.altera.com email will be going away soon.
 
-Signed-off-by: Lukasz Majewski <lukma@denx.de>
+Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
 ---
- arch/arm/boot/dts/dra7.dtsi | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
+Hi Arnd, Kevin, Olof:
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 3c228f9..a860a56 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -80,11 +80,7 @@
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
+I was hoping to take this patch through arm-soc.
+
+Thanks,
+Dinh
+---
+ MAINTAINERS | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index cfff2c9..a16c497 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1771,7 +1771,7 @@ F:	drivers/soc/renesas/
+ F:	include/linux/soc/renesas/
  
--			operating-points = <
--				/* kHz    uV */
--				1000000	1060000
--				1176000	1160000
--				>;
-+			operating-points-v2 = <&cpu0_opp_table>;
+ ARM/SOCFPGA ARCHITECTURE
+-M:	Dinh Nguyen <dinguyen@opensource.altera.com>
++M:	Dinh Nguyen <dinguyen@kernel.org>
+ S:	Maintained
+ F:	arch/arm/mach-socfpga/
+ F:	arch/arm/boot/dts/socfpga*
+@@ -1781,7 +1781,7 @@ W:	http://www.rocketboards.org
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git
  
- 			clocks = <&dpll_mpu_ck>;
- 			clock-names = "cpu";
-@@ -98,6 +94,22 @@
- 		};
- 	};
+ ARM/SOCFPGA CLOCK FRAMEWORK SUPPORT
+-M:	Dinh Nguyen <dinguyen@opensource.altera.com>
++M:	Dinh Nguyen <dinguyen@kernel.org>
+ S:	Maintained
+ F:	drivers/clk/socfpga/
  
-+	cpu0_opp_table: opp_table0 {
-+		compatible = "operating-points-v2";
-+		opp-shared;
-+
-+		opp_nom at 1000000000 {
-+			opp-hz = /bits/ 64 <1000000000>;
-+			opp-microvolt = <1060000 850000 1150000>;
-+			opp-suspend;
-+		};
-+
-+		opp_od at 1176000000 {
-+			opp-hz = /bits/ 64 <1176000000>;
-+			opp-microvolt = <1160000 885000 1160000>;
-+		};
-+	};
-+
- 	/*
- 	 * The soc node represents the soc top level view. It is used for IPs
- 	 * that are not memory mapped in the MPU view or for the MPU itself.
 -- 
-2.1.4
+2.7.4
