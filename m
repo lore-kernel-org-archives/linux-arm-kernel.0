@@ -1,48 +1,73 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 3 Feb 2017 14:00:13 +0000
-Subject: [RFC 01/13] KVM: arm/arm64: Add vITS save/restore API
- documentation
-In-Reply-To: <1484236613-24633-2-git-send-email-eric.auger@redhat.com>
-References: <1484236613-24633-1-git-send-email-eric.auger@redhat.com>
- <1484236613-24633-2-git-send-email-eric.auger@redhat.com>
-Message-ID: <CAFEAcA98mFM=iNs2n=F9d4suV7+mjPJRjZfiYagX5y7HiPgMnw@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 3 Feb 2017 14:05:13 +0000
+Subject: [PATCHv2 net-next 05/16] net: mvpp2: introduce PPv2.2 HW
+ descriptors and adapt accessors
+In-Reply-To: <20170203142446.2ee517a7@free-electrons.com>
+References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482943592-12556-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170106142901.GC14217@n2100.armlinux.org.uk>
+ <113811b6-79a4-9c66-d302-add9fb0c5b1a@arm.com>
+ <20170203142446.2ee517a7@free-electrons.com>
+Message-ID: <231514f4-2e35-8bde-4469-aada833635aa@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 January 2017 at 15:56, Eric Auger <eric.auger@redhat.com> wrote:
-> Add description for how to access vITS registers and how to flush/restore
-> vITS tables into/from memory
->
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> ---
->  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 70 ++++++++++++++++++++++
->  1 file changed, 70 insertions(+)
->
-> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> index 6081a5b..bd74613 100644
-> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> @@ -36,3 +36,73 @@ Groups:
->      -ENXIO:  ITS not properly configured as required prior to setting
->               this attribute
->      -ENOMEM: Memory shortage when allocating ITS internal data
-> +
-> +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
-> +  Attributes:
-> +      The attr field of kvm_device_attr encodes the offset of the
-> +      ITS register, relative to the ITS control frame base address
-> +      (ITS_base).
-> +
-> +      kvm_device_attr.addr points to a __u64 value whatever the width
-> +      of the addressed register (32/64 bits).
-> +
-> +      Writes to read-only registers are ignored by the kernel except
-> +      for a single register, GITS_READR. Normally this register is RO
-> +      but it needs to be restored otherwise commands in the queue will
-> +      be re-executed after CWRITER setting.
+On 03/02/17 13:24, Thomas Petazzoni wrote:
+> Hello,
+> 
+> On Fri, 6 Jan 2017 14:44:56 +0000, Robin Murphy wrote:
+> 
+>>>> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+>>>> +		dma_addr_t dma_addr =
+>>>> +			rx_desc->pp22.buf_phys_addr_key_hash & DMA_BIT_MASK(40);
+>>>> +		phys_addr_t phys_addr =
+>>>> +			dma_to_phys(port->dev->dev.parent, dma_addr);  
+>>
+>> Ugh, this looks bogus. dma_to_phys(), in the arm64 case at least, is
+>> essentially a SWIOTLB internal helper function which has to be
+>> implemented in architecture code because reasons. Calling it from a
+>> driver is almost certainly wrong (it doesn't even exist on most
+>> architectures). Besides, if this is really a genuine dma_addr_t obtained
+>> from a DMA API call, you cannot infer it to be related to a CPU physical
+>> address, or convertible to one at all.
+> 
+> So do you have a better suggestion? The descriptors only have enough
+> space to store a 40-bit virtual address, which is not enough to fit the
+> virtual addresses used by Linux for SKBs. This is why I'm instead
+> relying on the fact that the descriptors can store the 40-bit physical
+> address, and convert it back to a virtual address, which should be fine
+> on ARM64 because the entire physical memory is part of the kernel linear
+> mapping.
 
-Dumb question -- is it possible/sensible to process the command
-queue rather than migrating a list of outstanding commands?
+OK, that has nothing to do with DMA addresses then.
 
-thanks
--- PMM
+>>>> +		return (unsigned long)phys_to_virt(phys_addr);
+>>>> +#else
+>>>> +		return rx_desc->pp22.buf_cookie_misc & DMA_BIT_MASK(40);
+>>>> +#endif  
+>>>
+>>> I'm not sure that's the best way of selecting the difference.  
+>>
+>> Given that CONFIG_ARCH_DMA_ADDR_T_64BIT could be enabled on 32-bit LPAE
+>> systems, indeed it definitely isn't.
+> 
+> Russell proposal of testing the size of a virtual address
+> pointer instead would solve this I believe, correct?
+
+AFAICS, even that shouldn't really be necessary - for all VA/PA
+combinations of 32/32, 32/40 and 64/40, storing virt_to_phys() of the
+SKB VA won't overflow 40 bits, so a corresponding phys_to_virt() at the
+other end can't go wrong either. If you really do want to special-case
+things based on VA size, though, either CONFIG_64BIT or sizeof(void *)
+would indeed be infinitely more useful than the unrelated DMA address
+width - I know this driver's never going to run on SPARC64, but that's
+one example of where the above logic would lead to precisely the
+truncated VA it's trying to avoid.
+
+Robin.
+
+> 
+> Thanks,
+> 
+> Thomas
+> 
