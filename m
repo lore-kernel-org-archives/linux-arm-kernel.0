@@ -1,92 +1,59 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 3 Feb 2017 13:18:51 +0000
-Subject: [PATCH v4] PCI: Xilinx NWL: Modifying irq chip for legacy
- interrupts
-In-Reply-To: <8520D5D51A55D047800579B094147198263E03C4@XAP-PVEXMBX02.xlnx.xilinx.com>
-References: <1486120110-15205-1-git-send-email-bharatku@xilinx.com>
- <3c78506f-9bcb-0b43-4625-27229ee1f642@arm.com>
- <8520D5D51A55D047800579B094147198263E03C4@XAP-PVEXMBX02.xlnx.xilinx.com>
-Message-ID: <69159364-f20a-c4e9-3e0b-187593d206fb@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 3 Feb 2017 14:24:46 +0100
+Subject: [PATCHv2 net-next 05/16] net: mvpp2: introduce PPv2.2 HW
+ descriptors and adapt accessors
+In-Reply-To: <113811b6-79a4-9c66-d302-add9fb0c5b1a@arm.com>
+References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482943592-12556-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170106142901.GC14217@n2100.armlinux.org.uk>
+ <113811b6-79a4-9c66-d302-add9fb0c5b1a@arm.com>
+Message-ID: <20170203142446.2ee517a7@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/17 12:16, Bharat Kumar Gogada wrote:
->> On 03/02/17 11:08, Bharat Kumar Gogada wrote:
->>> - Adding mutex lock for protecting legacy mask register
->>> - Few wifi end points which only support legacy interrupts, performs
->>> hardware reset functionalities after disabling interrupts by invoking
->>> disable_irq and then re-enable using enable_irq, they enable hardware
->>> interrupts first and then virtual irq line later.
->>> - The legacy irq line goes low only after DEASSERT_INTx is received.As
->>> the legacy irq line is high immediately after hardware interrupts are
->>> enabled but virq of EP is still in disabled state and EP handler is
->>> never executed resulting no DEASSERT_INTx.If dummy irq chip is used,
->>> interrutps are not masked and system is hanging with CPU stall.
->>> - Adding irq chip functions instead of dummy irq chip for legacy
->>> interrupts.
->>> - Legacy interrupts are level sensitive, so using handle_level_irq is
->>> more appropriate as it is masks interrupts until End point handles
->>> interrupts and unmasks interrutps after End point handler is executed.
->>> - Legacy interrupts are level triggered, virtual irq line of End Point
->>> shows as edge in /proc/interrupts.
->>> - Setting irq flags of virtual irq line of EP to level triggered at
->>> the time of mapping.
->>>
->>> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
->>> ---
->>>  drivers/pci/host/pcie-xilinx-nwl.c |   45
->> +++++++++++++++++++++++++++++++++++-
->>>  1 files changed, 44 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c
->>> b/drivers/pci/host/pcie-xilinx-nwl.c
->>> index 43eaa4a..e4605f9 100644
->>> --- a/drivers/pci/host/pcie-xilinx-nwl.c
->>> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
->>> @@ -184,6 +184,7 @@ struct nwl_pcie {
->>>  	u8 root_busno;
->>>  	struct nwl_msi msi;
->>>  	struct irq_domain *legacy_irq_domain;
->>> +	spinlock_t leg_mask_lock;
->>>  };
->>>
->>>  static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off) @@
->>> -395,11 +396,52 @@ static void nwl_pcie_msi_handler_low(struct irq_desc
->> *desc)
->>>  	chained_irq_exit(chip, desc);
->>>  }
->>>
->>> +static void nwl_mask_leg_irq(struct irq_data *data) {
->>> +	struct irq_desc *desc = irq_to_desc(data->irq);
->>> +	struct nwl_pcie *pcie;
->>> +	unsigned long flags;
->>> +	u32 mask;
->>> +	u32 val;
->>> +
->>> +	pcie = irq_desc_get_chip_data(desc);
->>> +	mask = 1 << (data->hwirq - 1);
->>> +	spin_lock_irqsave(&pcie->leg_mask_lock, flags);
->>
->> I've asked you to use a raw spinlock for a reason. If using RT, this gets turned
->> into a sleeping lock...
->>
->  In include/linux/spinlock.h 
-> #define spin_lock_irqsave(lock, flags)                          \
-> do {                                                            \
->         raw_spin_lock_irqsave(spinlock_check(lock), flags);     \
-> } while (0)
+Hello,
+
+On Fri, 6 Jan 2017 14:44:56 +0000, Robin Murphy wrote:
+
+> >> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+> >> +		dma_addr_t dma_addr =
+> >> +			rx_desc->pp22.buf_phys_addr_key_hash & DMA_BIT_MASK(40);
+> >> +		phys_addr_t phys_addr =
+> >> +			dma_to_phys(port->dev->dev.parent, dma_addr);  
 > 
-> The above API invokes raw_spin_lock_irqsave know.
-> So is there any difference between raw_spin_lock_irqsave and spin_lock_irqsave ?
+> Ugh, this looks bogus. dma_to_phys(), in the arm64 case at least, is
+> essentially a SWIOTLB internal helper function which has to be
+> implemented in architecture code because reasons. Calling it from a
+> driver is almost certainly wrong (it doesn't even exist on most
+> architectures). Besides, if this is really a genuine dma_addr_t obtained
+> from a DMA API call, you cannot infer it to be related to a CPU physical
+> address, or convertible to one at all.
 
-When using RT, yes. RT upgrades all spinlocks to sleeping locks. We're
-trying hard not to break RT, despite most of it not being merged yet. So
-your patch will work on mainline Linux, and will break horribly on Linux/RT.
+So do you have a better suggestion? The descriptors only have enough
+space to store a 40-bit virtual address, which is not enough to fit the
+virtual addresses used by Linux for SKBs. This is why I'm instead
+relying on the fact that the descriptors can store the 40-bit physical
+address, and convert it back to a virtual address, which should be fine
+on ARM64 because the entire physical memory is part of the kernel linear
+mapping.
 
-So please, turn this into a raw spinlock as requested.
+> >> +		return (unsigned long)phys_to_virt(phys_addr);
+> >> +#else
+> >> +		return rx_desc->pp22.buf_cookie_misc & DMA_BIT_MASK(40);
+> >> +#endif  
+> > 
+> > I'm not sure that's the best way of selecting the difference.  
+> 
+> Given that CONFIG_ARCH_DMA_ADDR_T_64BIT could be enabled on 32-bit LPAE
+> systems, indeed it definitely isn't.
+
+Russell proposal of testing the size of a virtual address
+pointer instead would solve this I believe, correct?
 
 Thanks,
 
-	M.
+Thomas
 -- 
-Jazz is not dead. It just smells funny...
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
