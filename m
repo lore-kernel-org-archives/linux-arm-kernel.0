@@ -1,82 +1,75 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 3 Feb 2017 06:07:29 -0800
-Subject: [RFC] w1: regression, remove need for ida and use
- PLATFORM_DEVID_AUTO
-In-Reply-To: <822b1827-959b-13dc-6331-f0954954c010@tul.cz>
-References: <d0b52b94-0c87-61f8-32ff-99f2a354e500@tul.cz>
- <308e185e-26eb-39ee-d82f-a0d210a41743@ti.com>
- <cfa35897-383e-674a-f049-e45c4dfeb534@tul.cz>
- <0928fc89-490f-1d12-dc3d-51f2d433d2e0@roeck-us.net>
- <822b1827-959b-13dc-6331-f0954954c010@tul.cz>
-Message-ID: <0a4d4a6d-5ede-b77a-0600-19a8d815a33f@roeck-us.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 3 Feb 2017 14:22:16 +0000
+Subject: [PATCH v31 04/12] arm64: mm: allow for unmapping part of kernel
+ mapping
+In-Reply-To: <20170203061317.GC29585@linaro.org>
+References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
+ <20170201124630.6016-3-takahiro.akashi@linaro.org>
+ <20170201160354.GF4756@leverpostej>
+ <20170202102131.GD13549@linaro.org>
+ <20170202114437.GH31394@leverpostej>
+ <20170202140102.GA22666@fireball>
+ <20170202143535.GM31394@leverpostej>
+ <20170202145553.GA3238@fireball>
+ <20170203061317.GC29585@linaro.org>
+Message-ID: <20170203142216.GF30497@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2017 05:28 AM, Petr Cvek wrote:
-> Dne 3.2.2017 v 04:31 Guenter Roeck napsal(a):
->> On 02/02/2017 05:31 PM, Petr Cvek wrote:
->>> Dne 2.2.2017 v 15:23 Andrew F. Davis napsal(a):
->>>> On 02/01/2017 07:05 PM, Petr Cvek wrote:
->>>>> Patch
->>>>>     w1: remove need for ida and use PLATFORM_DEVID_AUTO
->>>>>     098f9fb0c962eb2fdba5f9d34f4cf7a938237184
->>>>>
->>>>> causes a regression in the w1_ds2760 driver. Initialization creates a name "ds2760-battery.0.auto". It seems that name of that size will cause checking code in __thermal_cooling_device_register() from thermal_core.c to fail as it checks for names shorter than 20 chars:
->>>>>
->>>>>     if (type && strlen(type) >= THERMAL_NAME_LENGTH)
->>>>>         return ERR_PTR(-EINVAL);
->>>>>
->>>>> A second problem seems to be with magician_supplicants list as "ds2760-battery.0" does not match in a test power_supply_am_i_supplied() in ds2760_battery_update_status() from drivers/power/supply/ds2760_battery.c . This causes status flag to be forever in POWER_SUPPLY_STATUS_DISCHARGING state.
->>>>>
->>>>> Functionality returned after I hotfix changed (drivers/w1/slaves/w1_ds2760.c)
->>>>>
->>>>>     pdev = platform_device_alloc("ds2760-battery", PLATFORM_DEVID_AUTO);
->>>>>
->>>>> to
->>>>>
->>>>>     pdev = platform_device_alloc("ds2760-battery", 0);
->>>>>
->>>>> Which solution do you advise. Shortening the name let's say just to "ds2760" (with changes to arch files, w1 files and supply files), increasing THERMAL_NAME_LENGTH to let's say 32 (I don't know if this doesn't break something other) or just reverting to the old behavior?
->>>>>
->>>>
->>>> If 20 is no longer the max thermal name then THERMAL_NAME_LENGTH should
->>>> be changed.
->>>
->>> Yes it is that ".auto" addition to "ds2760-battery.0" makes 21 chars long string. With higher number (".10" onwards) it is 22 chars. Load of the module then fails at test in thermal_zone_device_register():
->>>
->>>     https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/thermal/thermal_core.c?id=refs/tags/v4.10-rc6#n1158
->>>
->>>     if (type && strlen(type) >= THERMAL_NAME_LENGTH)
->>>         return ERR_PTR(-EINVAL);
->>>
->>> I searched in code further and with THERMAL_NAME_LENGTH = 30 (enough space) the module load fails at another place in __hwmon_device_register():
->>>
->>>     https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/hwmon/hwmon.c?id=refs/tags/v4.10-rc6#n548
->>>
->>>     if (name && (!strlen(name) || strpbrk(name, "-* \t\n")))
->>>         return ERR_PTR(-EINVAL);
->>>
->>> That's because there is "-" in "ds2760-battery.0.auto" (and that's why shortening to "ds2760.0" works). Is there some reason for disallowing "-" in a name? If not then I'm for removal (in other case we need to change ds2760-battery and others names). Increasing THERMAL_NAME_LENGTH to 22 should be just OK for ds2760 (but maybe not enough for others) I would increased it to 32 (nice number ;-) ).
->>>
->>
->> '-' is not permitted in hwmon name attributes, primarily because libsensors
->> interprets it as a delimiter in its configuration file.
->>
->
-> OK so this means we need to rename ds2760-battery so libsensors works.
->
-> Hmm is an underscore in "ds2760_battery.0.auto" OK?
+Hi,
 
-Theoretically yes, but there was objection to that idea because replacing the '-'
-with '_' is considered by some to be an ABI change (why the addition of '.auto'
-doesn't matter escapes me, though).
+On Fri, Feb 03, 2017 at 03:13:18PM +0900, AKASHI Takahiro wrote:
+> On Thu, Feb 02, 2017 at 11:55:54PM +0900, AKASHI Takahiro wrote:
+> > On Thu, Feb 02, 2017 at 02:35:35PM +0000, Mark Rutland wrote:
 
->
->> Anyway, the related change in thermal has been reverted, so that should
->
-> s/thermal/hwmon ? Or I'm confused :-D (there was no change in thermal, code stopped working because of change in w1 driver (".auto" addition))
->
+> > > I think that if we only allow ourselves to make PTEs invalid, we don't
+> > > have to handle that case. If we use page_mappings_only, we should only
+> > > check pgattr_change_is_safe() for the pte level, and the {pmd,pud,pgd}
+> > > entries shouldn't change.
+> > > 
+> > > Is the below sufficient to allow that, or have I missed something?
+> > 
+> > I think it will be OK, but will double-check tomorrow.
+> > However, is is acceptable that create_pgd_mapping( __prot(0) ) can
+> > only handle the cases of page-mapping-only?
+> > That would be fine to kdump, but in general?
 
-3feb479cea37 Revert "thermal: thermal_hwmon: Convert to hwmon_device_register_with_info()"
+Given we're only going to use this for page mappings, I think it's fine
+(and preferable) to restrict it to page mappings for now. Until we need
+to do this for the pmd/pud/pgd levels, those won't see any testing, and
+it will be very easy for us to accidentally break this.
 
-Guenter
+> My proposed code is attached below.
+> I think that the changes are quite trivial and it works even if
+> there is a section mapping as far as we refrain from reclaiming
+> unsed p[ug]d tables.
+> 
+> (Of course, we can't merely unmap a subset of a section mapping here.)
+
+Sure. We have a similar restriction when changing permissions, so I
+think that's fine.
+
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 17243e43184e..7f96eabc99d7 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -140,7 +140,11 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+>                         __prot = prot;
+>         }
+> 
+> -		set_pte(pte, pfn_pte(pfn, __prot));
+> +		if (pgprot_val(prot) & PTE_VALID)
+> +			set_pte(pte, pfn_pte(pfn, __prot));
+> +		else
+> +			pte_clear(null, null, pte);
+
+It took me a moment to figure out how this line could compile. ;)
+
+I'm happy to take this approach in alloc_init_pte(), but as above I'd
+prefer that we only handled it there, and left the pmd/pud/pgd code
+as-is for now.
+
+We can/should add a comment to make that clear.
+
+Thanks,
+Mark.
