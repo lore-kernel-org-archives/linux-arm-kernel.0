@@ -1,48 +1,48 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 3 Feb 2017 14:53:25 +0100
-Subject: [PATCH] KVM: arm/arm64: vgic: Stop injecting the MSI occurrence
- twice
-In-Reply-To: <1486089003-413-1-git-send-email-shankerd@codeaurora.org>
-References: <1486089003-413-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <20170203135325.GL27852@cbox>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 3 Feb 2017 14:00:13 +0000
+Subject: [RFC 01/13] KVM: arm/arm64: Add vITS save/restore API
+ documentation
+In-Reply-To: <1484236613-24633-2-git-send-email-eric.auger@redhat.com>
+References: <1484236613-24633-1-git-send-email-eric.auger@redhat.com>
+ <1484236613-24633-2-git-send-email-eric.auger@redhat.com>
+Message-ID: <CAFEAcA98mFM=iNs2n=F9d4suV7+mjPJRjZfiYagX5y7HiPgMnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shanker,
-
-[please cc the kvmarm list for kvm/arm patches, thanks]
-
-On Thu, Feb 02, 2017 at 08:30:03PM -0600, Shanker Donthineni wrote:
-> The IRQFD framework calls the architecture dependent function
-> twice if the corresponding GSI type is edge triggered. For ARM,
-> the function kvm_set_msi() is getting called twice whenever the
-> IRQFD receives the event signal. The rest of the code path is
-> trying to inject the MSI without any validation checks. No need
-> to call the function vgic_its_inject_msi() second time to avoid
-> an unnecessary overhead in IRQ queue logic. It also avoids the
-> possibility of VM seeing the MSI twice.
-> 
-> Simple fix, return -1 if the argument 'level' value is zero.
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+On 12 January 2017 at 15:56, Eric Auger <eric.auger@redhat.com> wrote:
+> Add description for how to access vITS registers and how to flush/restore
+> vITS tables into/from memory
+>
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
 > ---
->  virt/kvm/arm/vgic/vgic-irqfd.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-irqfd.c b/virt/kvm/arm/vgic/vgic-irqfd.c
-> index d918dcf..f138ed2 100644
-> --- a/virt/kvm/arm/vgic/vgic-irqfd.c
-> +++ b/virt/kvm/arm/vgic/vgic-irqfd.c
-> @@ -99,6 +99,9 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
->  	if (!vgic_has_its(kvm))
->  		return -ENODEV;
->  
-> +	if (!level)
-> +		return -1;
+>  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 70 ++++++++++++++++++++++
+>  1 file changed, 70 insertions(+)
+>
+> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> index 6081a5b..bd74613 100644
+> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+> @@ -36,3 +36,73 @@ Groups:
+>      -ENXIO:  ITS not properly configured as required prior to setting
+>               this attribute
+>      -ENOMEM: Memory shortage when allocating ITS internal data
 > +
->  	return vgic_its_inject_msi(kvm, &msi);
->  }
->  
-> -- 
+> +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+> +  Attributes:
+> +      The attr field of kvm_device_attr encodes the offset of the
+> +      ITS register, relative to the ITS control frame base address
+> +      (ITS_base).
+> +
+> +      kvm_device_attr.addr points to a __u64 value whatever the width
+> +      of the addressed register (32/64 bits).
+> +
+> +      Writes to read-only registers are ignored by the kernel except
+> +      for a single register, GITS_READR. Normally this register is RO
+> +      but it needs to be restored otherwise commands in the queue will
+> +      be re-executed after CWRITER setting.
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Dumb question -- is it possible/sensible to process the command
+queue rather than migrating a list of outstanding commands?
+
+thanks
+-- PMM
