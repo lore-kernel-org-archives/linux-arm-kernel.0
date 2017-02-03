@@ -1,28 +1,96 @@
-From: vicmos89@gmail.com (Victor Vaschenko)
-Date: Sat,  4 Feb 2017 02:18:41 +0300
-Subject: [PATCH] One coding style correction.
-Message-ID: <1486163921-29331-1-git-send-email-vicmos89@gmail.com>
+From: lukma@denx.de (Lukasz Majewski)
+Date: Sat, 4 Feb 2017 00:21:50 +0100
+Subject: [PATCH 2/2] DTS: dra7: Add "opp_high" opp node to support 1.5
+ GHz SoC operation
+In-Reply-To: <e398ff96-dca7-7934-70b1-9a95c01d3b27@ti.com>
+References: <1486135491-14223-1-git-send-email-lukma@denx.de>
+ <1486135491-14223-2-git-send-email-lukma@denx.de>
+ <e398ff96-dca7-7934-70b1-9a95c01d3b27@ti.com>
+Message-ID: <20170204002150.707b231d@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Victor Vaschenko <vicmos89@gmail.com>
----
- drivers/staging/bcm2835-audio/bcm2835-ctl.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Hi Dave,
 
-diff --git a/drivers/staging/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
-index 164daa4..bfb7e9f 100644
---- a/drivers/staging/bcm2835-audio/bcm2835-ctl.c
-+++ b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
-@@ -164,8 +164,7 @@ static int snd_bcm2835_ctl_put(struct snd_kcontrol *kcontrol,
- 		.get = snd_bcm2835_ctl_get,
- 		.put = snd_bcm2835_ctl_put,
- 		.count = 1,
--		.tlv =
--		{.p = snd_bcm2835_db_scale}
-+		.tlv = {.p = snd_bcm2835_db_scale}
- 	},
- 	{
- 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+Thanks for sharing the knowledge :-)
+
+> On 02/03/2017 09:24 AM, Lukasz Majewski wrote:
+> > The "opp_high" property brings support for 1.5 GHz CPU frequency
+> > for TI's am57xx line of processors.
+> >
+> > Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> > ---
+> >  arch/arm/boot/dts/dra7.dtsi | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> >
+> 
+> This can't be blindly enabled for all am57xx SoCs, 
+
+Yes, I'm fully aware of AVS, which uses fuses and SoC silicon revision
+to assess if frequency can be enabled.
+
+Example from my playground:
+
+- AM5728 works with 1.5 GHz enabled
+
+- AM5718 hangs when I try to enable 1.5 GHz frequency
+
+
+> there is a
+> forthcoming ti-cpufreq [1] driver 
+
+I've backported and tested this code on v4.9 vanilla. It works :-)
+
+> that is needed that will decided
+> which OPPs can and cannot be enabled for the specific variant in use.
+
+I do have a question:
+
+Do you know the correct opp-supported-hw value for 1.5 GHz on AM57x8
+SoC?
+In TI's SDK Linux (v4.4): opp-supported-hw = <0xFF 0x04>; but this seems
+to be always enabled (and not taking silicon revision and efuse into
+account).
+
+For my use case it would be best to see what data should prevent my
+AM5718 from 1.5 GHz OPP. 
+
+In other words I need to be 100% sure that my silicon SoC version
+doesn't support the 1.5 GHz frequency.
+
+
+> 
+> Regards,
+> Dave
+> 
+> [1] http://www.spinics.net/lists/devicetree/msg158967.html
+> 
+> > diff --git a/arch/arm/boot/dts/dra7.dtsi
+> > b/arch/arm/boot/dts/dra7.dtsi index a860a56..5e678cd 100644
+> > --- a/arch/arm/boot/dts/dra7.dtsi
+> > +++ b/arch/arm/boot/dts/dra7.dtsi
+> > @@ -108,6 +108,11 @@
+> >  			opp-hz = /bits/ 64 <1176000000>;
+> >  			opp-microvolt = <1160000 885000 1160000>;
+> >  		};
+> > +
+> > +		opp_high at 1500000000 {
+> > +			opp-hz = /bits/ 64 <1500000000>;
+> > +			opp-microvolt = <1210000 950000 1250000>;
+> > +		};
+> >  	};
+> >
+> >  	/*
+> >
+> 
+
+
+Best regards,
+
+Lukasz Majewski
+
 --
-1.9.1
+
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
