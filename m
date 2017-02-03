@@ -1,82 +1,182 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Fri,  3 Feb 2017 10:19:58 -0500
-Subject: [RFC v4 00/10] Provide the EL1 physical timer to the VM
-Message-ID: <1486135208-13415-1-git-send-email-jintack@cs.columbia.edu>
+Date: Fri,  3 Feb 2017 10:20:01 -0500
+Subject: [RFC v4 03/10] KVM: arm/arm64: Decouple kvm timer functions from
+ virtual timer
+In-Reply-To: <1486135208-13415-1-git-send-email-jintack@cs.columbia.edu>
+References: <1486135208-13415-1-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1486135208-13415-4-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM architecture defines the EL1 physical timer and the virtual timer,
-and it is reasonable for an OS to expect to be able to access both.
-However, the current KVM implementation does not provide the EL1 physical
-timer to VMs but terminates VMs on access to the timer.
+Now that we have a separate structure for timer context, make functions
+generic so that they can work with any timer context, not just the
+virtual timer context.  This does not change the virtual timer
+functionality.
 
-This patch series enables VMs to use the EL1 physical timer through
-trap-and-emulate only on arm64. The KVM host emulates each EL1 physical
-timer register access and sets up the background timer accordingly.  When
-the background timer expires, the KVM host injects EL1 physical timer
-interrupts to the VM.  Alternatively, it's also possible to allow VMs to
-access the EL1 physical timer without trapping.  However, this requires
-somehow using the EL2 physical timer for the Linux host while running the
-VM instead of the EL1 physical timer.  Right now I just implemented
-trap-and-emulate because this was straightforward to do, and I leave it to
-future work to determine if transferring the EL1 physical timer state to
-the EL2 timer provides any performance benefit.
+Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm/kvm/arm.c           |  2 +-
+ include/kvm/arm_arch_timer.h |  2 +-
+ virt/kvm/arm/arch_timer.c    | 54 ++++++++++++++++++++------------------------
+ 3 files changed, 27 insertions(+), 31 deletions(-)
 
-This feature will be useful for any OS that wishes to access the EL1
-physical timer. Nested virtualization is one of those use cases. A nested
-hypervisor running inside a VM would think it has full access to the
-hardware and naturally tries to use the EL1 physical timer as Linux would
-do. Other nested hypervisors may try to use the EL2 physical timer as Xen
-would do, but supporting the EL2 physical timer to the VM is out of scope
-of this patch series. This patch series will make it easy to add the EL2
-timer support in the future, though.
-
-Note that Linux VMs booting in EL1 will be unaffected by this patch series
-and will continue to use only the virtual timer and this patch series will
-therefore not introduce any performance degredation as a result of
-trap-and-emulate.
-
-v3 => v4:
- - Fix a bug that prevents a VM from booting on 32-bit architecture
- - Clarify that the emulated physical timer is only supported on arm64
-   in the cover letter
-
-v2 => v3:
- - Rebase on kvmarm/queue
- - Take kvm->lock to synchronize cntvoff across all vtimers
- - Remove unnecessary function parameters
- - Add comments
-
-v1 => v2:
- - Rebase on kvm-arm-for-4.10-rc4
- - To make it simple, schedule the background timer for the EL1 physical timer
-   emulation on every entry to the VM and cancel it on exit.
- - Change timer_context structure to have cntvoff and restore enable field back
-   to arch_timer_cpu structure
-Jintack Lim (10):
-  KVM: arm/arm64: Abstract virtual timer context into separate structure
-  KVM: arm/arm64: Move cntvoff to each timer context
-  KVM: arm/arm64: Decouple kvm timer functions from virtual timer
-  KVM: arm/arm64: Add the EL1 physical timer context
-  KVM: arm/arm64: Initialize the emulated EL1 physical timer
-  KVM: arm/arm64: Update the physical timer interrupt level
-  KVM: arm/arm64: Set a background timer to the earliest timer
-    expiration
-  KVM: arm/arm64: Set up a background timer for the physical timer
-    emulation
-  KVM: arm64: Add the EL1 physical timer access handler
-  KVM: arm/arm64: Emulate the EL1 phys timer registers
-
- arch/arm/include/asm/kvm_host.h   |   3 -
- arch/arm/kvm/arm.c                |   4 +-
- arch/arm/kvm/reset.c              |   9 +-
- arch/arm64/include/asm/kvm_host.h |   3 -
- arch/arm64/kvm/reset.c            |   9 +-
- arch/arm64/kvm/sys_regs.c         |  65 +++++++++++++
- include/kvm/arm_arch_timer.h      |  39 ++++----
- virt/kvm/arm/arch_timer.c         | 200 ++++++++++++++++++++++++++------------
- virt/kvm/arm/hyp/timer-sr.c       |  13 +--
- 9 files changed, 249 insertions(+), 96 deletions(-)
-
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index f93f2171..0ecd6cf 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -300,7 +300,7 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
+ 
+ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
+ {
+-	return kvm_timer_should_fire(vcpu);
++	return kvm_timer_should_fire(vcpu_vtimer(vcpu));
+ }
+ 
+ void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index 2c8560b..f46fa3b 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -66,7 +66,7 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+ int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+ 
+-bool kvm_timer_should_fire(struct kvm_vcpu *vcpu);
++bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx);
+ void kvm_timer_schedule(struct kvm_vcpu *vcpu);
+ void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
+ 
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 5004a67..5261f98 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -98,13 +98,12 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
+ 	kvm_vcpu_kick(vcpu);
+ }
+ 
+-static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
++static u64 kvm_timer_compute_delta(struct arch_timer_context *timer_ctx)
+ {
+ 	u64 cval, now;
+-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 
+-	cval = vtimer->cnt_cval;
+-	now = kvm_phys_timer_read() - vtimer->cntvoff;
++	cval = timer_ctx->cnt_cval;
++	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
+ 
+ 	if (now < cval) {
+ 		u64 ns;
+@@ -133,7 +132,7 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+ 	 * PoV (NTP on the host may have forced it to expire
+ 	 * early). If we should have slept longer, restart it.
+ 	 */
+-	ns = kvm_timer_compute_delta(vcpu);
++	ns = kvm_timer_compute_delta(vcpu_vtimer(vcpu));
+ 	if (unlikely(ns)) {
+ 		hrtimer_forward_now(hrt, ns_to_ktime(ns));
+ 		return HRTIMER_RESTART;
+@@ -143,43 +142,39 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+ 	return HRTIMER_NORESTART;
+ }
+ 
+-static bool kvm_timer_irq_can_fire(struct kvm_vcpu *vcpu)
++static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
+ {
+-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+-
+-	return !(vtimer->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
+-		(vtimer->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
++	return !(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
++		(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
+ }
+ 
+-bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
++bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
+ {
+-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 	u64 cval, now;
+ 
+-	if (!kvm_timer_irq_can_fire(vcpu))
++	if (!kvm_timer_irq_can_fire(timer_ctx))
+ 		return false;
+ 
+-	cval = vtimer->cnt_cval;
+-	now = kvm_phys_timer_read() - vtimer->cntvoff;
++	cval = timer_ctx->cnt_cval;
++	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
+ 
+ 	return cval <= now;
+ }
+ 
+-static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
++static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
++				 struct arch_timer_context *timer_ctx)
+ {
+ 	int ret;
+-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 
+ 	BUG_ON(!vgic_initialized(vcpu->kvm));
+ 
+-	vtimer->active_cleared_last = false;
+-	vtimer->irq.level = new_level;
+-	trace_kvm_timer_update_irq(vcpu->vcpu_id, vtimer->irq.irq,
+-				   vtimer->irq.level);
++	timer_ctx->active_cleared_last = false;
++	timer_ctx->irq.level = new_level;
++	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
++				   timer_ctx->irq.level);
+ 
+-	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+-					 vtimer->irq.irq,
+-					 vtimer->irq.level);
++	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, timer_ctx->irq.irq,
++				  timer_ctx->irq.level);
+ 	WARN_ON(ret);
+ }
+ 
+@@ -201,8 +196,8 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	if (!vgic_initialized(vcpu->kvm) || !timer->enabled)
+ 		return -ENODEV;
+ 
+-	if (kvm_timer_should_fire(vcpu) != vtimer->irq.level)
+-		kvm_timer_update_irq(vcpu, !vtimer->irq.level);
++	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
++		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
+ 
+ 	return 0;
+ }
+@@ -215,6 +210,7 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 
+ 	BUG_ON(timer_is_armed(timer));
+ 
+@@ -223,18 +219,18 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+ 	 * already expired, because kvm_vcpu_block will return before putting
+ 	 * the thread to sleep.
+ 	 */
+-	if (kvm_timer_should_fire(vcpu))
++	if (kvm_timer_should_fire(vtimer))
+ 		return;
+ 
+ 	/*
+ 	 * If the timer is not capable of raising interrupts (disabled or
+ 	 * masked), then there's no more work for us to do.
+ 	 */
+-	if (!kvm_timer_irq_can_fire(vcpu))
++	if (!kvm_timer_irq_can_fire(vtimer))
+ 		return;
+ 
+ 	/*  The timer has not yet expired, schedule a background timer */
+-	timer_arm(timer, kvm_timer_compute_delta(vcpu));
++	timer_arm(timer, kvm_timer_compute_delta(vtimer));
+ }
+ 
+ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
 -- 
 1.9.1
