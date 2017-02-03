@@ -1,38 +1,69 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 3 Feb 2017 11:29:29 -0600
-Subject: [PATCH v5 4/4] cpufreq: dt: Don't use generic platdev driver for
- ti-cpufreq platforms
-In-Reply-To: <20170203172929.23940-1-d-gerlach@ti.com>
-References: <20170203172929.23940-1-d-gerlach@ti.com>
-Message-ID: <20170203172929.23940-5-d-gerlach@ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 3 Feb 2017 18:27:26 +0100
+Subject: [PATCH v3] ARM: dts: i.MX25: add AIPS control registers
+In-Reply-To: <1486126792-28186-1-git-send-email-martin@kaiser.cx>
+References: <1485890402-22974-1-git-send-email-martin@kaiser.cx>
+ <1486126792-28186-1-git-send-email-martin@kaiser.cx>
+Message-ID: <20170203172726.5kn5h6xkrl4zszmd@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some TI platforms, specifically those in the am33xx, am43xx, dra7xx, and
-am57xx families of SoCs can make use of the ti-cpufreq driver to
-selectively enable OPPs based on the exact configuration in use. The
-ti-cpufreq is given the responsibility of creating the cpufreq-dt
-platform device when the driver is in use so drop am33xx and dra7xx
-from the cpufreq-dt-platdev driver so it is not created twice.
+On Fri, Feb 03, 2017 at 01:59:52PM +0100, Martin Kaiser wrote:
+> The i.MX25 contains two AHB to IP bridges (AIPS), each of which has a set of
+> control registers. Add the memory regions for the control registers to
+> the Device Tree.
+> 
+> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- drivers/cpufreq/cpufreq-dt-platdev.c | 2 --
- 1 file changed, 2 deletions(-)
+Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-index 7fcaf26e8f81..921b4a6c3d16 100644
---- a/drivers/cpufreq/cpufreq-dt-platdev.c
-+++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-@@ -87,8 +87,6 @@ static const struct of_device_id machines[] __initconst = {
- 	{ .compatible = "socionext,uniphier-ld11", },
- 	{ .compatible = "socionext,uniphier-ld20", },
- 
--	{ .compatible = "ti,am33xx", },
--	{ .compatible = "ti,dra7", },
- 	{ .compatible = "ti,omap2", },
- 	{ .compatible = "ti,omap3", },
- 	{ .compatible = "ti,omap4", },
+Sascha
+
+> ---
+> v3:
+>    fixed the size of the memory regions, both are 16KBytes long
+> 
+> v2:
+>    removed the "fsl,imx53-aipstz" property as per Sascha's request
+> 
+>  arch/arm/boot/dts/imx25.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> index e0ba550..5ae8a14 100644
+> --- a/arch/arm/boot/dts/imx25.dtsi
+> +++ b/arch/arm/boot/dts/imx25.dtsi
+> @@ -93,6 +93,11 @@
+>  			reg = <0x43f00000 0x100000>;
+>  			ranges;
+>  
+> +			aips1: bridge at 43f00000 {
+> +				compatible = "fsl,imx25-aips";
+> +				reg = <0x43f00000 0x4000>;
+> +			};
+> +
+>  			i2c1: i2c at 43f80000 {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+> @@ -342,6 +347,11 @@
+>  			reg = <0x53f00000 0x100000>;
+>  			ranges;
+>  
+> +			aips2: bridge at 53f00000 {
+> +				compatible = "fsl,imx25-aips";
+> +				reg = <0x53f00000 0x4000>;
+> +			};
+> +
+>  			clks: ccm at 53f80000 {
+>  				compatible = "fsl,imx25-ccm";
+>  				reg = <0x53f80000 0x4000>;
+> -- 
+> 2.1.4
+> 
+> 
+
 -- 
-2.11.0
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
