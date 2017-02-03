@@ -1,50 +1,33 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri, 3 Feb 2017 10:49:41 -0800
-Subject: [PATCH v3 00/24] i.MX Media Driver
-In-Reply-To: <20170202222925.GW27312@n2100.armlinux.org.uk>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <20170202172245.GT27312@n2100.armlinux.org.uk>
- <20170202175600.GU27312@n2100.armlinux.org.uk>
- <4815b9c8-782a-ac67-d296-c4acb296d849@gmail.com>
- <20170202185826.GV27312@n2100.armlinux.org.uk>
- <2e1cf096-ecb8-ba3d-a554-f4cc6999ed4e@gmail.com>
- <20170202222925.GW27312@n2100.armlinux.org.uk>
-Message-ID: <02a3a834-efce-e87d-6e1d-ffe21015509e@gmail.com>
+From: hendrik@consetetur.de (Hendrik v. Raven)
+Date: Fri,  3 Feb 2017 19:50:09 +0100
+Subject: [PATCH] staging: bcm2835-audio: remove unused macro
+In-Reply-To: <1486142858.22276.63.camel@perches.com>
+References: <1486142858.22276.63.camel@perches.com>
+Message-ID: <20170203185009.5909-1-hendrik@consetetur.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The VC_AUDIO_MAX_MSG_LEN macro is not used anywhere and has coding style
+violations.
 
+Signed-off-by: Hendrik v. Raven <hendrik@consetetur.de>
+---
+ drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h | 3 ---
+ 1 file changed, 3 deletions(-)
 
-On 02/02/2017 02:29 PM, Russell King - ARM Linux wrote:
-> On Thu, Feb 02, 2017 at 11:12:41AM -0800, Steve Longerbeam wrote:
->> Here is the current .queue_setup() op in imx-media-capture.c:
->>
->> static int capture_queue_setup(struct vb2_queue *vq,
->>                                 unsigned int *nbuffers,
->>                                 unsigned int *nplanes,
->>                                 unsigned int sizes[],
->>                                 struct device *alloc_devs[])
->> {
->>          struct capture_priv *priv = vb2_get_drv_priv(vq);
->>          struct v4l2_pix_format *pix = &priv->vdev.fmt.fmt.pix;
->>          unsigned int count = *nbuffers;
->>
->>          if (vq->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
->>                  return -EINVAL;
->>
->>          if (*nplanes) {
->>                  if (*nplanes != 1 || sizes[0] < pix->sizeimage)
->>                          return -EINVAL;
->>                  count += vq->num_buffers;
->>          }
->>
->>          while (pix->sizeimage * count > VID_MEM_LIMIT)
->>                  count--;
-> That's a weird way of writing:
->
-> 	unsigned int max_num = VID_MEM_LIMIT / pix->sizeimage;
-> 	count = max(count, max_num);
-
-I think you mean min() there, but yes thanks, fixed.
-
-Steve
+diff --git a/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h b/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h
+index 09f07fd891bb..da96f1bc2516 100644
+--- a/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h
++++ b/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h
+@@ -21,9 +21,6 @@
+ /* FourCC code used for VCHI connection */
+ #define VC_AUDIO_SERVER_NAME  MAKE_FOURCC("AUDS")
+ 
+-/* Maximum message length */
+-#define VC_AUDIO_MAX_MSG_LEN  (sizeof( VC_AUDIO_MSG_T ))
+-
+ /*
+  *  List of screens that are currently supported
+  *  All message types supported for HOST->VC direction
+-- 
+2.11.0
