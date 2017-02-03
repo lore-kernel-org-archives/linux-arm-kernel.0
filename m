@@ -1,142 +1,70 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 3 Feb 2017 16:46:18 +0800
-Subject: [PATCH v8 0/3] Support qcom's HSIC USB and rewrite USB2 HS support
-In-Reply-To: <588A149C.6020207@ti.com>
-References: <20170125223245.2688-1-stephen.boyd@linaro.org>
- <588A149C.6020207@ti.com>
-Message-ID: <20170203084618.GA25013@b29397-desktop>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 3 Feb 2017 09:01:13 +0000
+Subject: [PATCH V12 1/3] ACPI: Generic GSI: Do not attempt to map non-GSI
+ IRQs during bus scan
+In-Reply-To: <1486077839-25547-2-git-send-email-agustinv@codeaurora.org>
+References: <1486077839-25547-1-git-send-email-agustinv@codeaurora.org>
+ <1486077839-25547-2-git-send-email-agustinv@codeaurora.org>
+Message-ID: <20170203090113.GB30745@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 08:54:12PM +0530, Kishon Vijay Abraham I wrote:
+On Thu, Feb 02, 2017 at 06:23:57PM -0500, Agustin Vega-Frias wrote:
+> ACPI extended IRQ resources may contain a Resource Source field to specify
+> an alternate interrupt controller, attempting to map them as GSIs is
+> incorrect, so just disable the platform resource.
 > 
+> Since this field is currently ignored, we make this change conditional
+> on CONFIG_ACPI_GENERIC_GSI to keep the current behavior on x86 platforms,
+> in case some existing ACPI tables are using this incorrectly.
 > 
-> On Thursday 26 January 2017 04:02 AM, Stephen Boyd wrote:
-> > This patch series continues the usb chipidea rewrite for 
-> > Qualcommm platforms. I've dropped the patches that were applied
-> > to Peter's tree for chipidea. Now the phy drivers are left,
-> > along with the patch to call phy_set_mode() at the right place.
-> > 
-> > I've left the HSIC phy driver here, because it wasn't merged in
-> > the last round. Nothing has changed in that driver, so I believe
-> > it is ready to be merged now. The chipidea patch is independent and
-> > can be merged without causing any dependency with the phy tree.
+> Acked-by: Rafael J. Wysocki <rafael@kernel.org>
+> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+> ---
+>  drivers/acpi/resource.c | 18 +++++++++++++++++-
+>  1 file changed, 17 insertions(+), 1 deletion(-)
+
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+> diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
+> index cb57962..8b11d6d 100644
+> --- a/drivers/acpi/resource.c
+> +++ b/drivers/acpi/resource.c
+> @@ -43,6 +43,19 @@ static inline bool acpi_iospace_resource_valid(struct resource *res)
+>  acpi_iospace_resource_valid(struct resource *res) { return true; }
+>  #endif
+>  
+> +#if IS_ENABLED(CONFIG_ACPI_GENERIC_GSI)
+> +static inline bool is_gsi(struct acpi_resource_extended_irq *ext_irq)
+> +{
+> +	return ext_irq->resource_source.string_length == 0 &&
+> +	       ext_irq->producer_consumer == ACPI_CONSUMER;
+> +}
+> +#else
+> +static inline bool is_gsi(struct acpi_resource_extended_irq *ext_irq)
+> +{
+> +	return true;
+> +}
+> +#endif
+> +
+>  static bool acpi_dev_resource_len_valid(u64 start, u64 end, u64 len, bool io)
+>  {
+>  	u64 reslen = end - start + 1;
+> @@ -470,9 +483,12 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
+>  			acpi_dev_irqresource_disabled(res, 0);
+>  			return false;
+>  		}
+> -		acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
+> +		if (is_gsi(ext_irq))
+> +			acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
+>  					 ext_irq->triggering, ext_irq->polarity,
+>  					 ext_irq->sharable, false);
+> +		else
+> +			acpi_dev_irqresource_disabled(res, 0);
+>  		break;
+>  	default:
+>  		res->flags = 0;
+> -- 
+> Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
 > 
-> merged the phy patches. Please send a patch updating the MAINTAINERS for the
-> phy driver.
-> 
-> Thanks
-> Kishon
-> > 
-> > Patches based on v4.10-rc1 + first 22 patches from v5. Full
-> > branch is here[1].
-> > 
-> > Changes from v7:
-> >  * Dropped set_vbus() callback (Kishon)
-> >  * Made phy_set_mode() generic and moved into ci_platform_configure() (Peter)
-> > 
-> > Changes from v6:
-> >  * Dropped first 22 applied patches
-> >  * Rewrote phy_set_mode() patch to be msm specific
-> >  * New set_vbus() callback in phy framework
-> >  * Updated HS phy driver for set_vbus() callback
-> > 
-> > Changes from v5:
-> >  * Replaced "Emulate OTGSC interrupt enable path" patch with a patch
-> >    from Peter
-> >  * Updated HS phy driver to support set_mode callback to handle pullup
-> >  * New patch to set the mode to device or host in chipidea udc pullup
-> >    function to toggle the pullup for HS mode
-> >  * New patch to drop lock around event_notify callback to avoid lockdep
-> >    issues
-> >  * Removal of extcon usage from HS phy driver
-> >  * Picked up acks from Heikki and Peter on ULPI core patch
-> > 
-> > Changes from v4:
-> >  * Picked up Acks from Rob
-> >  * Updated HS phy init sequence DT property to restrict it to offsets
-> > 
-> > Changes from v3:
-> >  * Picked up Acks from Peter
-> >  * Updated extcon consolidation patch per Peter's comments
-> >  * Folded in simplification from Heikki for ULPI DT matching
-> > 
-> > Changes from v2:
-> >  * Added SoC specific compatibles in phy bindings
-> >  * Dropped AVVIS patch for OTG statemachine
-> >  * New patch to consolidate extcon handlers
-> >  * Picked up Acks from Peter
-> >  * Rebased onto v4.8-rc1
-> >  * Reworked ULPI OF code to look at vid == 0 instead of pid == 0
-> >  * Dropped ULPI bindings for vid and pid overrides
-> > 
-> > Changes from v1:
-> >  * Reworked ULPI device probing to keep using vendor/product ids that
-> >    come from DT if needed and falls back to OF style match when product id
-> >    is 0
-> >  * PHY init later patch was rejected so that moved to a quirk flag and
-> >    the msm wrapper started managing the phy on/off
-> >  * Updated clk requirements for HSIC phy in binding doc
-> >  * Added optional clk in wrapper for "housekeeping" found on older qcom
-> >    platforms
-> >  * Bug fix to OTGSC polling function
-> >  * Changed runtime PM patch to set as active instead of get/put
-> > 
-> > TODO:
-> >  * DMA fails on arm64 so we need something like [2] to make it work.
-
-It will be fixed after [1] has merged, but I have not found them either
-at Greg's linus tree or next tree.
-
-[1] http://www.spinics.net/lists/linux-usb/msg152375.html
-
-Peter
-
-> >  * The db410c needs a driver to toggle the onboard switch to connect
-> >    the usb hub instead of micro port when the usb cable is disconnected.
-> >    I've sent a patch set for this[3], which needs some further
-> >    discussion/development. The current plan is to reintroduce the usb
-> >    mux framework.
-> >  * apq8064 platforms need a vbus regulator to really use otg and I haven't
-> >    tried out the RPM based regulators yet
-> >  * The HSIC phy on the apq8074 dragonboard is connected to a usb4604
-> >    device which requires the i2c driver to probe and send an i2c
-> >    sequence before the HSIC controller enumerates or HSIC doesn't work.
-> >    Right now I have a hack to force the controller to probe defer
-> >    once so that usb4604 probes first. This needs a more proper solution
-> >    like having the DT describe a linkage between the controller and
-> >    the usb device so we can enforce probe ordering. My current plan
-> >    is to use DT graphs/endpoints for this.
-> > 
-> > [1] https://git.linaro.org/people/stephen.boyd/linux.git/log/?h=usb-hsic-8074
-> > [2] https://patchwork.kernel.org/patch/9319527/
-> > [3] https://lkml.kernel.org/r/20160914014246.31847-1-stephen.boyd at linaro.org
-> > 
-> > Stephen Boyd (3):
-> >   usb: chipidea: Configure phy for appropriate mode
-> >   phy: Add support for Qualcomm's USB HSIC phy
-> >   phy: Add support for Qualcomm's USB HS phy
-> > 
-> >  .../devicetree/bindings/phy/qcom,usb-hs-phy.txt    |  84 ++++++
-> >  .../devicetree/bindings/phy/qcom,usb-hsic-phy.txt  |  65 +++++
-> >  drivers/phy/Kconfig                                |  15 ++
-> >  drivers/phy/Makefile                               |   2 +
-> >  drivers/phy/phy-qcom-usb-hs.c                      | 296 +++++++++++++++++++++
-> >  drivers/phy/phy-qcom-usb-hsic.c                    | 160 +++++++++++
-> >  drivers/usb/chipidea/core.c                        |  20 +-
-> >  7 files changed, 636 insertions(+), 6 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
-> >  create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
-> >  create mode 100644 drivers/phy/phy-qcom-usb-hs.c
-> >  create mode 100644 drivers/phy/phy-qcom-usb-hsic.c
-> > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-
-Best Regards,
-Peter Chen
