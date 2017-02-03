@@ -1,31 +1,40 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Fri, 3 Feb 2017 16:14:14 +0100
-Subject: [PATCH v3] arm64: mm: Fix NOMAP page initialization
-In-Reply-To: <20170117191656.GS27328@arm.com>
-References: <c74d6ec6-16ba-dccc-3b0d-a8bedcb46dc5@linaro.org>
- <cbbf14fd-a1cc-2463-ba67-acd6d61e9db1@linaro.org>
- <CAKv+Gu8-+0LUTN0+8OGWRhd22Ls5cMQqTJcjKQK_0N=Uc-0jog@mail.gmail.com>
- <20170109115320.GI4930@rric.localdomain>
- <20170112160535.GF13843@arm.com>
- <20170112185825.GE5020@rric.localdomain>
- <20170113091903.GA22538@arm.com>
- <20170113131500.GS4930@rric.localdomain>
- <20170117100015.GG5020@rric.localdomain>
- <20170117191656.GS27328@arm.com>
-Message-ID: <20170203151414.GE16822@rric.localdomain>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 3 Feb 2017 15:17:28 +0000
+Subject: [PATCH v4] efi: arm64: Add vmlinux debug link to the Image binary
+In-Reply-To: <CAKv+Gu9VmbjtvFVveAXiRtpBtZCWJV6pMGmnEzTc5gPrOnYvnQ@mail.gmail.com>
+References: <1486056799-4825-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170202183000.GN13839@arm.com>
+ <CAKv+Gu82NmBNavpVQ8z7xZ6++HPqAWNnn3dM=dKw0JaWLZocSw@mail.gmail.com>
+ <CAKv+Gu9VmbjtvFVveAXiRtpBtZCWJV6pMGmnEzTc5gPrOnYvnQ@mail.gmail.com>
+Message-ID: <20170203151728.GB23547@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.01.17 19:16:56, Will Deacon wrote:
-> I can't really see the trend given that, for system time, your
-> pfn_valid_within results have a variance of ~9 and the early_pfn_valid
-> results have a variance of ~92. Given that the variance seems to come
-> about due to the reboots, I think we need more numbers to establish whether
-> the data sets end up largely overlapping or if they really are disjoint.
+On Fri, Feb 03, 2017 at 02:50:40PM +0000, Ard Biesheuvel wrote:
+> On 2 February 2017 at 18:36, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 2 February 2017 at 18:30, Will Deacon <will.deacon@arm.com> wrote:
+> >> On Thu, Feb 02, 2017 at 05:33:19PM +0000, Ard Biesheuvel wrote:
+> > diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> > index 2600c60337ac..1606c6b2a280 100644
+> > --- a/arch/arm64/kernel/Makefile
+> > +++ b/arch/arm64/kernel/Makefile
+> > @@ -57,5 +57,5 @@ head-y                                        := head.o
+> >  extra-y                                        += $(head-y) vmlinux.lds
+> >
+> >  ifeq ($(CONFIG_DEBUG_EFI),y)
+> > -AFLAGS_head.o += -DVMLINUX_PATH="\"$(shell readlink -f $(objtree)/vmlinux)\""
+> > +AFLAGS_head.o += -DVMLINUX_PATH="\"$(realpath $(objtree)/vmlinux)\""
+> >  endif
+> >
+> >
+> >> Do you want me to merge this via arm64?
+> >>
+> >
+> > Yes, please
+> 
+> Should I respin this?
 
-Assuming the numbers of both versions are not significant, please
-apply one or the other.
+No need, I'll pick it up and make the change. I'll push out before I leave
+work this evening.
 
-Thanks,
-
--Robert
+Will
