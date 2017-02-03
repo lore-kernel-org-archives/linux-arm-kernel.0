@@ -1,88 +1,69 @@
 From: lukma@denx.de (Lukasz Majewski)
-Date: Sat, 4 Feb 2017 00:21:50 +0100
-Subject: [PATCH 2/2] DTS: dra7: Add "opp_high" opp node to support 1.5
- GHz SoC operation
-In-Reply-To: <e398ff96-dca7-7934-70b1-9a95c01d3b27@ti.com>
-References: <1486135491-14223-1-git-send-email-lukma@denx.de>
- <1486135491-14223-2-git-send-email-lukma@denx.de>
- <e398ff96-dca7-7934-70b1-9a95c01d3b27@ti.com>
-Message-ID: <20170204002150.707b231d@jawa>
+Date: Sat, 4 Feb 2017 00:23:14 +0100
+Subject: [PATCH v5 0/4] cpufreq: Introduce TI CPUFreq/OPP Driver
+In-Reply-To: <20170203172929.23940-1-d-gerlach@ti.com>
+References: <20170203172929.23940-1-d-gerlach@ti.com>
+Message-ID: <20170204002314.7ce27aee@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Dave,
 
-Thanks for sharing the knowledge :-)
-
-> On 02/03/2017 09:24 AM, Lukasz Majewski wrote:
-> > The "opp_high" property brings support for 1.5 GHz CPU frequency
-> > for TI's am57xx line of processors.
-> >
-> > Signed-off-by: Lukasz Majewski <lukma@denx.de>
-> > ---
-> >  arch/arm/boot/dts/dra7.dtsi | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> >
+> Hi,
+> This is v5 of the series to introduce the ti-cpufreq driver
+> which parses SoC data and provides opp-supported-hw data to the
+> OPP core in order to enable the proper OPPs for the silicon in use.
 > 
-> This can't be blindly enabled for all am57xx SoCs, 
-
-Yes, I'm fully aware of AVS, which uses fuses and SoC silicon revision
-to assess if frequency can be enabled.
-
-Example from my playground:
-
-- AM5728 works with 1.5 GHz enabled
-
-- AM5718 hangs when I try to enable 1.5 GHz frequency
-
-
-> there is a
-> forthcoming ti-cpufreq [1] driver 
-
-I've backported and tested this code on v4.9 vanilla. It works :-)
-
-> that is needed that will decided
-> which OPPs can and cannot be enabled for the specific variant in use.
-
-I do have a question:
-
-Do you know the correct opp-supported-hw value for 1.5 GHz on AM57x8
-SoC?
-In TI's SDK Linux (v4.4): opp-supported-hw = <0xFF 0x04>; but this seems
-to be always enabled (and not taking silicon revision and efuse into
-account).
-
-For my use case it would be best to see what data should prevent my
-AM5718 from 1.5 GHz OPP. 
-
-In other words I need to be 100% sure that my silicon SoC version
-doesn't support the 1.5 GHz frequency.
-
-
+> History:
+> v4: http://www.spinics.net/lists/linux-omap/msg134629.html
+> v3: http://www.spinics.net/lists/linux-omap/msg132733.html
+> v2: http://www.spinics.net/lists/linux-omap/msg131601.html
+> v1: http://www.spinics.net/lists/linux-omap/msg129089.html
+> 
+> Very minor changes from v4:
+> 	* In patch 2 change "opp_table0" to "opp_table" in example
+> 	* Add acks on all patches (he approved change in patch 2)
+> from Viresh
+> 
+> DT patches to enable this driver will follow after the DT binding is
+> merged. Branch for testing, with updated DT nodes, pushed here [1].
 > 
 > Regards,
 > Dave
 > 
-> [1] http://www.spinics.net/lists/devicetree/msg158967.html
+> [1]
+> https://github.com/dgerlach/linux-pm/commits/upstream/ti-cpufreq-driver-new-v5
+
+For the whole series:
+
+Tested-by: Lukasz Majewski <lukma@denx.de>
+
+(code backported to v4.9)
+Test HW: AM5718 and AM5728.
+
+
 > 
-> > diff --git a/arch/arm/boot/dts/dra7.dtsi
-> > b/arch/arm/boot/dts/dra7.dtsi index a860a56..5e678cd 100644
-> > --- a/arch/arm/boot/dts/dra7.dtsi
-> > +++ b/arch/arm/boot/dts/dra7.dtsi
-> > @@ -108,6 +108,11 @@
-> >  			opp-hz = /bits/ 64 <1176000000>;
-> >  			opp-microvolt = <1160000 885000 1160000>;
-> >  		};
-> > +
-> > +		opp_high at 1500000000 {
-> > +			opp-hz = /bits/ 64 <1500000000>;
-> > +			opp-microvolt = <1210000 950000 1250000>;
-> > +		};
-> >  	};
-> >
-> >  	/*
-> >
+> Dave Gerlach (4):
+>   PM / OPP: Expose _of_get_opp_desc_node as dev_pm_opp API
+>   Documentation: dt: add bindings for ti-cpufreq
+>   cpufreq: ti: Add cpufreq driver to determine available OPPs at
+> runtime cpufreq: dt: Don't use generic platdev driver for ti-cpufreq
+> platforms
 > 
+>  .../devicetree/bindings/cpufreq/ti-cpufreq.txt     | 128 ++++++++++
+>  drivers/base/power/opp/of.c                        |   9 +-
+>  drivers/cpufreq/Kconfig.arm                        |  11 +
+>  drivers/cpufreq/Makefile                           |   1 +
+>  drivers/cpufreq/cpufreq-dt-platdev.c               |   2 -
+>  drivers/cpufreq/ti-cpufreq.c                       | 272
+> +++++++++++++++++++++
+> include/linux/pm_opp.h                             |   6 + 7 files
+> changed, 423 insertions(+), 6 deletions(-) create mode 100644
+> Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt create mode
+> 100644 drivers/cpufreq/ti-cpufreq.c
+> 
+
+
 
 
 Best regards,
