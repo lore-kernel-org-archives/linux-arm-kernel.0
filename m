@@ -1,52 +1,127 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Fri, 3 Feb 2017 12:25:24 +0000
-Subject: [PATCH V7 3/4] drm/bridge: Add driver for GE B850v3 LVDS/DP++
- Bridge
-In-Reply-To: <20170203080040.qn53xnpojxzk4qoi@phenom.ffwll.local>
-References: <CACvgo535iyFvdOWzQHRnU++Ye0GgyZyN3R9ALSXRP7k3EPyRGA@mail.gmail.com>
- <3e31-58931d80-1-221fa900@101383713>
- <CACvgo50bOZ=jzeJc_J4_7fpiEh9-ATKo1KOhAia2679AGA=mng@mail.gmail.com>
- <20170203080040.qn53xnpojxzk4qoi@phenom.ffwll.local>
-Message-ID: <CACvgo53BpgFwr3-LRhe8QpvD3ZRMr7huaRKyp5PTAY6O60J3xA@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 3 Feb 2017 13:33:20 +0100
+Subject: [RFC v3 00/10] Provide the EL1 physical timer to the VM
+In-Reply-To: <CAHyh4xhsqS6CijRysFvg+NqGo0rBQU45OhAaZUuHDm4M0JufTg@mail.gmail.com>
+References: <1485970990-13775-1-git-send-email-jintack@cs.columbia.edu>
+ <20170202123104.GJ27852@cbox>
+ <CAHyh4xhsqS6CijRysFvg+NqGo0rBQU45OhAaZUuHDm4M0JufTg@mail.gmail.com>
+Message-ID: <20170203123320.GK27852@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 February 2017 at 08:00, Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Thu, Feb 02, 2017 at 12:37:21PM +0000, Emil Velikov wrote:
->>  - Daniel, gents - is drm-misc aimed at devs with limited (no?)
->> review/commit history in the area and/or the kernel in general ?
->> In this case, Peter have quite noticeable experience [in kernel
->> development] with little-to no in DRM.
->> Should one draw a line in the sand somewhere ?
->
-> We're fairly lenient with accepting new drivers already, and for drivers
-> in drm-misc we require some checks and peer review to make sure new folks
-> learn faster. But it's an expirement, I fully expect some fallout and then
-> some learnign and fine tuning from that, and maybe we even need to crank
-> requirements back up to a much higher level of experience.
->
-> But for drivers I'm honestly not too concerned: As long as there's some
-> process in place to foster learning&collaboration (which I think will be
-> better with this) I really don't see much harm in merging non-perfect
-> driver code.
->
-Thank you Daniel, this is very well said. Being lenient to begin with
-and adjusting where/if needed is the more welcoming approach, indeed.
-Doubt there'll be (m)any cases of (ab|mis)use but even if so, nobody
-can see the future.
+On Thu, Feb 02, 2017 at 09:51:13AM -0500, Jintack Lim wrote:
+> On Thu, Feb 2, 2017 at 7:31 AM, Christoffer Dall <cdall@linaro.org> wrote:
+> > Hi Jintack,
+> >
+> > On Wed, Feb 01, 2017 at 12:43:00PM -0500, Jintack Lim wrote:
+> >> The ARM architecture defines the EL1 physical timer and the virtual timer,
+> >> and it is reasonable for an OS to expect to be able to access both.
+> >> However, the current KVM implementation does not provide the EL1 physical
+> >> timer to VMs but terminates VMs on access to the timer.
+> >>
+> >> This patch series enables VMs to use the EL1 physical timer through
+> >> trap-and-emulate.  The KVM host emulates each EL1 physical timer register
+> >> access and sets up the background timer accordingly.  When the background
+> >> timer expires, the KVM host injects EL1 physical timer interrupts to the
+> >> VM.  Alternatively, it's also possible to allow VMs to access the EL1
+> >> physical timer without trapping.  However, this requires somehow using the
+> >> EL2 physical timer for the Linux host while running the VM instead of the
+> >> EL1 physical timer.  Right now I just implemented trap-and-emulate because
+> >> this was straightforward to do, and I leave it to future work to determine
+> >> if transferring the EL1 physical timer state to the EL2 timer provides any
+> >> performance benefit.
+> >>
+> >> This feature will be useful for any OS that wishes to access the EL1
+> >> physical timer. Nested virtualization is one of those use cases. A nested
+> >> hypervisor running inside a VM would think it has full access to the
+> >> hardware and naturally tries to use the EL1 physical timer as Linux would
+> >> do. Other nested hypervisors may try to use the EL2 physical timer as Xen
+> >> would do, but supporting the EL2 physical timer to the VM is out of scope
+> >> of this patch series. This patch series will make it easy to add the EL2
+> >> timer support in the future, though.
+> >>
+> >> Note that Linux VMs booting in EL1 will be unaffected by this patch series
+> >> and will continue to use only the virtual timer and this patch series will
+> >> therefore not introduce any performance degredation as a result of
+> >> trap-and-emulate.
+> >>
+> >> v2 => v3:
+> >>  - Rebase on kvmarm/queue
+> >>  - Take kvm->lock to synchronize cntvoff across all vtimers
+> >>  - Remove unnecessary function parameters
+> >>  - Add comments
+> >
+> > I just gave v3 a test run on my TC2 (32-bit platform) and my guest
+> > quickly locks up trying to run cyclictest or when booting the machine it
+> > stalls with RCU timeouts.
+> 
+> Ok. It's my fault not to specify that the emulated physical timer is
+> supported/tested on arm64.
+> On 32-bit platform, it is supposed to show the same behavior as
+> before, but I haven't tested.
+> Were you using the physical timer or the virtual timer for the guest?
+> 
+> >
+> > Could you have a look?
+> 
+> Sure, I'll have a look. I don't have access to my Cubietruck today,
+> but I can work on that tomorrow.
+> 
 
->>  - You patch has been on a long [bit rocky road] for a while, with
->> devs giving you [what seems like] a partial reviews.
->> Have you considered reviewing others' patches in exchange for a [more
->> complete one] of this one ? According to git log people have poked you
->> a handful of times, but seemingly you were busy.
->
-> Just a clarification: When I review drivers I don't do a fairly cursor
-> look, hunting for areas where some refactoring and align with drm best
-> practices would be good. And I think that's perfectly fine and enough to
-> get a driver landed, but we're definitely not 100% consistent on this
-> within drm-misc. Probably will take some time to figure this out.
-Seems like I've missed "Peter, your patch..." above, silly me.
+Don't bother, I've figured this out for you.
 
-Thanks for answering my [what may seem silly] questions ;-)
-Emil
+You need the following fixup to your patch:
+
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 93c811c..35d7100 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -410,14 +410,21 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ }
+ 
+ /* Make the updates of cntvoff for all vtimer contexts atomic */
+-static void update_vtimer_cntvoff(struct kvm *kvm, u64 cntvoff)
++static void update_vtimer_cntvoff(struct kvm_vcpu *vcpu, u64 cntvoff)
+ {
+ 	int i;
+-	struct kvm_vcpu *vcpu;
++	struct kvm *kvm = vcpu->kvm;
++	struct kvm_vcpu *tmp;
+ 
+ 	mutex_lock(&kvm->lock);
+-	kvm_for_each_vcpu(i, vcpu, kvm)
+-		vcpu_vtimer(vcpu)->cntvoff = cntvoff;
++	kvm_for_each_vcpu(i, tmp, kvm)
++		vcpu_vtimer(tmp)->cntvoff = cntvoff;
++
++	/*
++	 * When called from the vcpu create path, the CPU being created is not
++	 * included in the loop above, so we just set it here as well.
++	 */
++	vcpu_vtimer(vcpu)->cntvoff = cntvoff;
+ 	mutex_unlock(&kvm->lock);
+ }
+ 
+@@ -426,7 +433,7 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 
+ 	/* Synchronize cntvoff across all vtimers of a VM. */
+-	update_vtimer_cntvoff(vcpu->kvm, kvm_phys_timer_read());
++	update_vtimer_cntvoff(vcpu, kvm_phys_timer_read());
+ 	vcpu_ptimer(vcpu)->cntvoff = 0;
+ 
+ 	INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
+@@ -448,7 +455,7 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
+ 		vtimer->cnt_ctl = value;
+ 		break;
+ 	case KVM_REG_ARM_TIMER_CNT:
+-		update_vtimer_cntvoff(vcpu->kvm, kvm_phys_timer_read() - value);
++		update_vtimer_cntvoff(vcpu, kvm_phys_timer_read() - value);
+ 		break;
+ 	case KVM_REG_ARM_TIMER_CVAL:
+ 		vtimer->cnt_cval = value;
+
+This is an amuzing one.
+
+Thanks,
+-Christoffer
