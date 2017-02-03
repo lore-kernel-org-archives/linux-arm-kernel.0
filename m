@@ -1,38 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 3 Feb 2017 08:30:48 -0800
-Subject: v4.9 to v4.10 regression: oops when USB cable is plugged in.
-In-Reply-To: <20170203075907.GA21338@amd>
-References: <20170123222537.GA11543@amd> <20170123224454.GY7403@atomide.com>
- <20170124091817.GA29246@amd> <20170124100133.GA21079@pali>
- <20170124145127.GC7403@atomide.com> <20170127215512.GG20571@amd>
- <20170127234832.cte4ki4ajwme2b2j@earth>
- <20170203075907.GA21338@amd>
-Message-ID: <20170203163048.GA3721@atomide.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 3 Feb 2017 08:30:09 -0800
+Subject: [PATCH v5 0/3] modversions: redefine kcrctab entries as 32-bit
+ values
+In-Reply-To: <1486115647-27680-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1486115647-27680-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CA+55aFz8faoGYBqkHuGPy4yp+SU5brCbkOCdZNTgfdDzkN8hOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [170203 00:00]:
-> Hi!
-> 
-> > On Fri, Jan 27, 2017 at 10:55:12PM +0100, Pavel Machek wrote:
-> > > Ok, I can try. But so far even -rc1 is a lot of fun. But... I consider
-> > > phone calls core feature of a phone. I'd very much like to get that to
-> > > work. Unfortunately, that means real-time audio, and a lot of
-> > > fun. Plus, as it is touchscreen device, it needs a GUI. 
-> > 
-> > Talking about testing - kernelci's n900 is broken?
-> > 
-> > https://kernelci.org/boot/omap3-n900/
-> 
-> The N900 regressions are now more of "audio mixers no longer work"
-> than "it fails to boot" kind -- thus difficult to test automatically,
-> I'm afraid.
+On Fri, Feb 3, 2017 at 1:54 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> This v4 is a followup to [0] 'modversions: redefine kcrctab entries as
+> relative CRC pointers' [...]
 
-Talking about audio testing, next now has commit 9834ffd1ecc3
-("ASoC: omap-mcbsp: Add PM QoS support for McBSP to prevent glitches"),
-care to check if that also fixes the n900 audio glitch issues you
-reported earlier?
+ok, I have this in a local branch now, assuming it passes my
+(admittedly fairly superficial) testing I'll merge it so that we can
+put this whole sorry saga behind us.
 
-Regards,
+Thanks,
 
-Tony
+             Linus
