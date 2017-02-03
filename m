@@ -1,34 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  3 Feb 2017 10:23:19 +0000
-Subject: [PATCH v4 10/10] ARM: dts: STiH410-b2260: Enable HW flow-control
-In-Reply-To: <20170203102319.23489-1-lee.jones@linaro.org>
-References: <20170203102319.23489-1-lee.jones@linaro.org>
-Message-ID: <20170203102319.23489-11-lee.jones@linaro.org>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 3 Feb 2017 18:31:48 +0800
+Subject: [PATCH V12 0/3] irqchip: qcom: Add IRQ combiner driver
+In-Reply-To: <1486077839-25547-1-git-send-email-agustinv@codeaurora.org>
+References: <1486077839-25547-1-git-send-email-agustinv@codeaurora.org>
+Message-ID: <58945C14.2090009@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hardware flow-control capability must be specified at a platform
-level in order to inform the ASC driver that the platform is capable
-(i.e. are the lines wired up, etc).  STiH4{07,10} devices are indeed
-capable, so let's provide the property.
+On 2017/2/3 7:23, Agustin Vega-Frias wrote:
+> Add support for IRQ combiners in the Top-level Control and Status
+> Registers (TCSR) hardware block in Qualcomm Technologies chips.
+>
+> The first patch prevents the ACPI core from attempting to map IRQ resources
+> with a valid ResourceSource as GSIs.
+>
+> The second patch adds support for ResourceSource/IRQ domain mapping and
+> fixes IRQ probe deferral by allowing platform_device IRQ resources to be
+> re-initialized from the corresponding ACPI IRQ resource.
+>
+> Both changes described above are conditional on the ACPI_GENERIC_GSI config.
+>
+> The third patch takes advantage of the new capabilities to implement
+> the driver for the IRQ combiners.
+>
+> Tested on top of v4.10-rc6.
+>
+> Changes V11 -> V12:
+> * Remove probe table, add that optimization later.
+> * Fix some minor style issues.
 
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih410-b2260.dts | 1 +
- 1 file changed, 1 insertion(+)
+For patch [1-2/3], I tested on x86 and IA64 machine, didn't see
+regressions in dmesg, and tested them on Hisilicon D03 (ARM64 with
+mbigen irqchip which needs this mechanism) , it works fine.
 
-diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
-index cbcbcb4..93c14d1 100644
---- a/arch/arm/boot/dts/stih410-b2260.dts
-+++ b/arch/arm/boot/dts/stih410-b2260.dts
-@@ -66,6 +66,7 @@
- 			pinctrl-0 = <&pinctrl_serial0_hw_flowctrl>;
- 			pinctrl-1 = <&pinctrl_serial0>;
- 			rts-gpios = <&pio17 3 GPIO_ACTIVE_LOW>;
-+			uart-has-rtscts;
- 			status = "okay";
- 		};
- 
--- 
-2.9.3
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+Thanks
+Hanjun
