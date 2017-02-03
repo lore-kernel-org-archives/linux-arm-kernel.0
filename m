@@ -1,52 +1,66 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 3 Feb 2017 16:30:03 +0530
-Subject: [PATCH 3/6] async_tx: Handle DMA devices having support for fewer
- PQ coefficients
-In-Reply-To: <CAPcyv4gBFu7skx_8cvsaL0sL5=44DMcWY_EjWSCfaNd8oh=Svw@mail.gmail.com>
-References: <1486010836-25228-1-git-send-email-anup.patel@broadcom.com>
- <1486010836-25228-4-git-send-email-anup.patel@broadcom.com>
- <CAPcyv4gBFu7skx_8cvsaL0sL5=44DMcWY_EjWSCfaNd8oh=Svw@mail.gmail.com>
-Message-ID: <CAALAos_9uuOVG8zVY4KLY+AeuOCv+rTsF6uM-WLFxf6TM8GRPg@mail.gmail.com>
+From: hekuang@huawei.com (He Kuang)
+Date: Fri, 3 Feb 2017 11:06:06 +0000
+Subject: [PATCH v2 2/3] perf tools: Enable bpf prologue for arm64
+In-Reply-To: <20170203110607.97529-1-hekuang@huawei.com>
+References: <20170203110607.97529-1-hekuang@huawei.com>
+Message-ID: <20170203110607.97529-2-hekuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 2, 2017 at 11:31 AM, Dan Williams <dan.j.williams@intel.com> wrote:
->
-> On Wed, Feb 1, 2017 at 8:47 PM, Anup Patel <anup.patel@broadcom.com> wrote:
-> > The DMAENGINE framework assumes that if PQ offload is supported by a
-> > DMA device then all 256 PQ coefficients are supported. This assumption
-> > does not hold anymore because we now have BCM-SBA-RAID offload engine
-> > which supports PQ offload with limited number of PQ coefficients.
-> >
-> > This patch extends async_tx APIs to handle DMA devices with support
-> > for fewer PQ coefficients.
-> >
-> > Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> > Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> > ---
-> >  crypto/async_tx/async_pq.c          |  3 +++
-> >  crypto/async_tx/async_raid6_recov.c | 12 ++++++++++--
-> >  include/linux/dmaengine.h           | 19 +++++++++++++++++++
-> >  include/linux/raid/pq.h             |  3 +++
-> >  4 files changed, 35 insertions(+), 2 deletions(-)
->
-> So, I hate the way async_tx does these checks on each operation, and
-> it's ok for me to say that because it's my fault. Really it's md that
-> should be validating engine offload capabilities once at the beginning
-> of time. I'd rather we move in that direction than continue to pile
-> onto a bad design.
+Since HAVE_KPROBES can be enabled in arm64, this patch introduces
+regs_query_register_offset() to convert register name to offset for
+arm64, so the BPF prologue feature is ready to use.
 
-Yes, indeed. All async_tx APIs have lot of checks and for high throughput
-RAID offload engine these checks can add some overhead.
+Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+Signed-off-by: He Kuang <hekuang@huawei.com>
+---
+ tools/perf/arch/arm64/Makefile          |  1 +
+ tools/perf/arch/arm64/util/dwarf-regs.c | 20 ++++++++++++++++++++
+ 2 files changed, 21 insertions(+)
 
-I think doing checks in Linux md would be certainly better but this would
-mean lot of changes in Linux md as well as remove checks in async_tx.
-
-Also, async_tx APIs should not find DMA channel on its own instead it
-should rely on Linux md to provide DMA channel pointer as parameter.
-
-It's better to do checks cleanup in async_tx as separate patchset and
-keep this patchset simple.
-
-Regards,
-Anup
+diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
+index 18b1351..eebe1ec 100644
+--- a/tools/perf/arch/arm64/Makefile
++++ b/tools/perf/arch/arm64/Makefile
+@@ -2,3 +2,4 @@ ifndef NO_DWARF
+ PERF_HAVE_DWARF_REGS := 1
+ endif
+ PERF_HAVE_JITDUMP := 1
++PERF_HAVE_ARCH_REGS_QUERY_REGISTER_OFFSET := 1
+diff --git a/tools/perf/arch/arm64/util/dwarf-regs.c b/tools/perf/arch/arm64/util/dwarf-regs.c
+index 090f36b..6d17a31 100644
+--- a/tools/perf/arch/arm64/util/dwarf-regs.c
++++ b/tools/perf/arch/arm64/util/dwarf-regs.c
+@@ -9,6 +9,8 @@
+  */
+ 
+ #include <stddef.h>
++#include <errno.h> /* for EINVAL */
++#include <string.h> /* for strcmp */
+ #include <linux/ptrace.h> /* for struct user_pt_regs */
+ #include <dwarf-regs.h>
+ 
+@@ -75,3 +77,21 @@ const char *get_arch_regstr(unsigned int n)
+ {
+ 	return (n < ARCH_MAX_REGS) ? regoffset_table[n].name : NULL;
+ }
++
++/* Reuse code from arch/arm64/kernel/ptrace.c */
++/**
++ * regs_query_register_offset() - query register offset from its name
++ * @name:	the name of a register
++ *
++ * regs_query_register_offset() returns the offset of a register in struct
++ * user_pt_regs from its name. If the name is invalid, this returns -EINVAL;
++ */
++int regs_query_register_offset(const char *name)
++{
++	const struct pt_regs_offset *roff;
++
++	for (roff = regoffset_table; roff->name != NULL; roff++)
++		if (!strcmp(roff->name, name))
++			return roff->offset;
++	return -EINVAL;
++}
+-- 
+1.8.5.2
