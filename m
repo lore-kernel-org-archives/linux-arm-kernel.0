@@ -1,98 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 3 Feb 2017 13:00:26 +0000
-Subject: [PATCH v2 1/3] perf tools: Use offset instead of dwarfnum in
- register table.
-In-Reply-To: <20170203110607.97529-1-hekuang@huawei.com>
-References: <20170203110607.97529-1-hekuang@huawei.com>
-Message-ID: <20170203130026.GF11585@arm.com>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Fri,  3 Feb 2017 13:59:52 +0100
+Subject: [PATCH v3] ARM: dts: i.MX25: add AIPS control registers
+In-Reply-To: <1485890402-22974-1-git-send-email-martin@kaiser.cx>
+References: <1485890402-22974-1-git-send-email-martin@kaiser.cx>
+Message-ID: <1486126792-28186-1-git-send-email-martin@kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2017 at 11:06:05AM +0000, He Kuang wrote:
-> This patch changes the 'dwarfnum' to 'offset' in register table, so
-> the index of array becomes the dwarfnum (the index of each register
-> defined by DWARF) and the "offset" member means the byte-offset of the
-> register in (user_)pt_regs. This change makes the code consistent with
-> x86.
-> 
-> Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
-> Signed-off-by: He Kuang <hekuang@huawei.com>
-> ---
->  tools/perf/arch/arm64/util/dwarf-regs.c | 107 ++++++++++++++++----------------
->  1 file changed, 52 insertions(+), 55 deletions(-)
+The i.MX25 contains two AHB to IP bridges (AIPS), each of which has a set of
+control registers. Add the memory regions for the control registers to
+the Device Tree.
 
-Thanks for splitting this up. Comment below.
+Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+---
+v3:
+   fixed the size of the memory regions, both are 16KBytes long
 
-> diff --git a/tools/perf/arch/arm64/util/dwarf-regs.c b/tools/perf/arch/arm64/util/dwarf-regs.c
-> index d49efeb..090f36b 100644
-> --- a/tools/perf/arch/arm64/util/dwarf-regs.c
-> +++ b/tools/perf/arch/arm64/util/dwarf-regs.c
-> @@ -9,72 +9,69 @@
->   */
->  
->  #include <stddef.h>
-> +#include <linux/ptrace.h> /* for struct user_pt_regs */
->  #include <dwarf-regs.h>
->  
-> -struct pt_regs_dwarfnum {
-> +struct pt_regs_offset {
->  	const char *name;
-> -	unsigned int dwarfnum;
-> +	int offset;
->  };
->  
-> -#define STR(s) #s
-> -#define REG_DWARFNUM_NAME(r, num) {.name = r, .dwarfnum = num}
-> -#define GPR_DWARFNUM_NAME(num) \
-> -	{.name = STR(%x##num), .dwarfnum = num}
-> -#define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0}
-> -
->  /*
->   * Reference:
->   * http://infocenter.arm.com/help/topic/com.arm.doc.ihi0057b/IHI0057B_aadwarf64.pdf
->   */
-> -static const struct pt_regs_dwarfnum regdwarfnum_table[] = {
-> -	GPR_DWARFNUM_NAME(0),
-> -	GPR_DWARFNUM_NAME(1),
-> -	GPR_DWARFNUM_NAME(2),
-> -	GPR_DWARFNUM_NAME(3),
-> -	GPR_DWARFNUM_NAME(4),
-> -	GPR_DWARFNUM_NAME(5),
-> -	GPR_DWARFNUM_NAME(6),
-> -	GPR_DWARFNUM_NAME(7),
-> -	GPR_DWARFNUM_NAME(8),
-> -	GPR_DWARFNUM_NAME(9),
-> -	GPR_DWARFNUM_NAME(10),
-> -	GPR_DWARFNUM_NAME(11),
-> -	GPR_DWARFNUM_NAME(12),
-> -	GPR_DWARFNUM_NAME(13),
-> -	GPR_DWARFNUM_NAME(14),
-> -	GPR_DWARFNUM_NAME(15),
-> -	GPR_DWARFNUM_NAME(16),
-> -	GPR_DWARFNUM_NAME(17),
-> -	GPR_DWARFNUM_NAME(18),
-> -	GPR_DWARFNUM_NAME(19),
-> -	GPR_DWARFNUM_NAME(20),
-> -	GPR_DWARFNUM_NAME(21),
-> -	GPR_DWARFNUM_NAME(22),
-> -	GPR_DWARFNUM_NAME(23),
-> -	GPR_DWARFNUM_NAME(24),
-> -	GPR_DWARFNUM_NAME(25),
-> -	GPR_DWARFNUM_NAME(26),
-> -	GPR_DWARFNUM_NAME(27),
-> -	GPR_DWARFNUM_NAME(28),
-> -	GPR_DWARFNUM_NAME(29),
-> -	REG_DWARFNUM_NAME("%lr", 30),
-> -	REG_DWARFNUM_NAME("%sp", 31),
-> -	REG_DWARFNUM_END,
-> -};
-> +#define REG_OFFSET_NAME(r, num) {.name = "%" #r,			\
-> +			.offset = offsetof(struct user_pt_regs, regs[num])}
+v2:
+   removed the "fsl,imx53-aipstz" property as per Sascha's request
 
-Whilst this works in practice, this is undefined behaviour for "sp", since
-you'll go off the end of the regs array.
+ arch/arm/boot/dts/imx25.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-I still think you're better off sticking with the dwarfnum, then just having
-a dwarfnum2offset macro that multiplies by the size of a register.
-
-Will
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index e0ba550..5ae8a14 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -93,6 +93,11 @@
+ 			reg = <0x43f00000 0x100000>;
+ 			ranges;
+ 
++			aips1: bridge at 43f00000 {
++				compatible = "fsl,imx25-aips";
++				reg = <0x43f00000 0x4000>;
++			};
++
+ 			i2c1: i2c at 43f80000 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+@@ -342,6 +347,11 @@
+ 			reg = <0x53f00000 0x100000>;
+ 			ranges;
+ 
++			aips2: bridge at 53f00000 {
++				compatible = "fsl,imx25-aips";
++				reg = <0x53f00000 0x4000>;
++			};
++
+ 			clks: ccm at 53f80000 {
+ 				compatible = "fsl,imx25-ccm";
+ 				reg = <0x53f80000 0x4000>;
+-- 
+2.1.4
