@@ -1,29 +1,101 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 3 Feb 2017 10:10:43 +0100
-Subject: [PATCH v2 00/10] serial: st-asc: Allow handling of RTS line
-In-Reply-To: <20170201143145.31962-1-lee.jones@linaro.org>
-References: <20170201143145.31962-1-lee.jones@linaro.org>
-Message-ID: <20170203091043.GA10386@kroah.com>
+From: alexandre.torgue@st.com (Alexandre TORGUE)
+Date: Fri, 3 Feb 2017 10:20:20 +0100
+Subject: [RFC PATCH v6 3/7] drivers: dma-coherent: Account dma_pfn_offset when
+ used with device tree
+In-Reply-To: <1486113624-7494-2-git-send-email-alexandre.torgue@st.com>
+References: <1486113624-7494-2-git-send-email-alexandre.torgue@st.com>
+Message-ID: <1486113624-7494-3-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 02:31:35PM +0000, Lee Jones wrote:
-> When hardware flow-control is disabled, manual toggling of the UART's
-> reset line (RTS) using userland applications (e.g. stty) is not
-> possible, since the ASC IP does not provide this functionality in the
-> same was as some other IPs do.  Thus, we have to do this manually.
-> 
-> This set ensures the correct Pinctrl groups are configured and
-> obtained for both manual toggling of the RTS line and for the IP to
-> take over the lines when HW flow-control is requested by the user.
+From: Vladimir Murzin <vladimir.murzin@arm.com>
 
-I see 2 series that are listed as "v2", which one to take?
+dma_declare_coherent_memory() and friends are designed to account
+difference in CPU and device addresses. However, when it is used with
+reserved memory regions there is assumption that CPU and device have
+the same view on address space. This assumption gets invalid when
+reserved memory for coherent DMA allocations is referenced by device
+with non-empty "dma-range" property.
 
-I know, I'll drop both and wait for an updated set with all of the acks
-added to them...
+Simply feeding device address as rmem->base + dev->dma_pfn_offset
+would not work due to reserved memory region can be shared, so this
+patch turns device address to be expressed with help of CPU address
+and device's dma_pfn_offset.
 
-Please fix up and resend.
+For the case where device tree is not used and device sees memory
+different to CPU we explicitly set device's dma_pfn_offset to
+accomplish such difference. The latter might look controversial, but
+it seems only a few drivers set device address different to CPU's:
+- drivers/usb/host/ohci-sm501.c
+- arch/sh/drivers/pci/fixups-dreamcast.c
+so they can be screwed only if dma_pfn_offset there is set and not in
+sync with device address range - we try to catch such cases with
+WARN_ON.
 
-thanks,
+Cc: Michal Nazarewicz <mina86@mina86.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+Cc: Rich Felker <dalias@libc.org>
+Cc: Roger Quadros <rogerq@ti.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Andras Szemzo <sza@esh.hu>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ drivers/base/dma-coherent.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
-greg k-h
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index 640a7e6..c59708c 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -18,6 +18,12 @@ struct dma_coherent_mem {
+ 	spinlock_t	spinlock;
+ };
+ 
++static inline dma_addr_t dma_get_device_base(struct device *dev,
++					     struct dma_coherent_mem * mem)
++{
++	return (mem->pfn_base - dev->dma_pfn_offset) << PAGE_SHIFT;
++}
++
+ static bool dma_init_coherent_memory(
+ 	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
+ 	struct dma_coherent_mem **mem)
+@@ -83,9 +89,16 @@ static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
+ static int dma_assign_coherent_memory(struct device *dev,
+ 				      struct dma_coherent_mem *mem)
+ {
++	unsigned long dma_pfn_offset = mem->pfn_base - PFN_DOWN(mem->device_base);
++
+ 	if (dev->dma_mem)
+ 		return -EBUSY;
+ 
++	if (dev->dma_pfn_offset)
++		WARN_ON(dma_pfn_offset && (dev->dma_pfn_offset != dma_pfn_offset));
++	else
++		dev->dma_pfn_offset = dma_pfn_offset;
++
+ 	dev->dma_mem = mem;
+ 	/* FIXME: this routine just ignores DMA_MEMORY_INCLUDES_CHILDREN */
+ 
+@@ -133,7 +146,7 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
+ 		return ERR_PTR(-EINVAL);
+ 
+ 	spin_lock_irqsave(&mem->spinlock, flags);
+-	pos = (device_addr - mem->device_base) >> PAGE_SHIFT;
++	pos = PFN_DOWN(device_addr - dma_get_device_base(dev, mem));
+ 	err = bitmap_allocate_region(mem->bitmap, pos, get_order(size));
+ 	spin_unlock_irqrestore(&mem->spinlock, flags);
+ 
+@@ -186,7 +199,7 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+ 	/*
+ 	 * Memory was found in the per-device area.
+ 	 */
+-	*dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
++	*dma_handle = dma_get_device_base(dev, mem) + (pageno << PAGE_SHIFT);
+ 	*ret = mem->virt_base + (pageno << PAGE_SHIFT);
+ 	dma_memory_map = (mem->flags & DMA_MEMORY_MAP);
+ 	spin_unlock_irqrestore(&mem->spinlock, flags);
+-- 2.0.0
