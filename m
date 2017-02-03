@@ -1,77 +1,135 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Fri,  3 Feb 2017 10:20:06 -0500
-Subject: [RFC v4 08/10] KVM: arm/arm64: Set up a background timer for the
- physical timer emulation
+Date: Fri,  3 Feb 2017 10:20:05 -0500
+Subject: [RFC v4 07/10] KVM: arm/arm64: Set a background timer to the earliest
+ timer expiration
 In-Reply-To: <1486135208-13415-1-git-send-email-jintack@cs.columbia.edu>
 References: <1486135208-13415-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1486135208-13415-9-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1486135208-13415-8-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set a background timer for the EL1 physical timer emulation while VMs
-are running, so that VMs get the physical timer interrupts in a timely
-manner.
-
-Schedule the background timer on entry to the VM and cancel it on exit.
-This would not have any performance impact to the guest OSes that
-currently use the virtual timer since the physical timer is always not
-enabled.
+When scheduling a background timer, consider both of the virtual and
+physical timer and pick the earliest expiration time.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/arch_timer.c | 25 ++++++++++++++++++++++++-
- 1 file changed, 24 insertions(+), 1 deletion(-)
+ arch/arm/kvm/arm.c        |  3 ++-
+ virt/kvm/arm/arch_timer.c | 53 +++++++++++++++++++++++++++++++++++------------
+ 2 files changed, 42 insertions(+), 14 deletions(-)
 
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 0ecd6cf..21c493a 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -300,7 +300,8 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
+ 
+ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
+ {
+-	return kvm_timer_should_fire(vcpu_vtimer(vcpu));
++	return kvm_timer_should_fire(vcpu_vtimer(vcpu)) ||
++	       kvm_timer_should_fire(vcpu_ptimer(vcpu));
+ }
+ 
+ void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
 diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 0ea7452..33257b5 100644
+index 7f9a664..0ea7452 100644
 --- a/virt/kvm/arm/arch_timer.c
 +++ b/virt/kvm/arm/arch_timer.c
-@@ -229,6 +229,22 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+@@ -118,6 +118,35 @@ static u64 kvm_timer_compute_delta(struct arch_timer_context *timer_ctx)
  	return 0;
  }
  
-+/* Schedule the background timer for the emulated timer. */
-+static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
-+			      struct arch_timer_context *timer_ctx)
++static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
 +{
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+
-+	if (kvm_timer_should_fire(timer_ctx))
-+		return;
-+
-+	if (!kvm_timer_irq_can_fire(timer_ctx))
-+		return;
-+
-+	/*  The timer has not yet expired, schedule a background timer */
-+	timer_arm(timer, kvm_timer_compute_delta(timer_ctx));
++	return !(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
++		(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
 +}
 +
- /*
-  * Schedule the background timer before calling kvm_vcpu_block, so that this
-  * thread is removed from its waitqueue and made runnable when there's a timer
-@@ -286,6 +302,9 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
- 	if (kvm_timer_update_state(vcpu))
- 		return;
- 
-+	/* Set the background timer for the physical timer emulation. */
-+	kvm_timer_emulate(vcpu, vcpu_ptimer(vcpu));
++/*
++ * Returns the earliest expiration time in ns among guest timers.
++ * Note that it will return 0 if none of timers can fire.
++ */
++static u64 kvm_timer_earliest_exp(struct kvm_vcpu *vcpu)
++{
++	u64 min_virt = ULLONG_MAX, min_phys = ULLONG_MAX;
++	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
++	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
 +
- 	/*
- 	* If we enter the guest with the virtual input level to the VGIC
- 	* asserted, then we have already told the VGIC what we need to, and
-@@ -348,7 +367,11 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
++	if (kvm_timer_irq_can_fire(vtimer))
++		min_virt = kvm_timer_compute_delta(vtimer);
++
++	if (kvm_timer_irq_can_fire(ptimer))
++		min_phys = kvm_timer_compute_delta(ptimer);
++
++	/* If none of timers can fire, then return 0 */
++	if ((min_virt == ULLONG_MAX) && (min_phys == ULLONG_MAX))
++		return 0;
++
++	return min(min_virt, min_phys);
++}
++
+ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+ {
+ 	struct arch_timer_cpu *timer;
+@@ -132,7 +161,7 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+ 	 * PoV (NTP on the host may have forced it to expire
+ 	 * early). If we should have slept longer, restart it.
+ 	 */
+-	ns = kvm_timer_compute_delta(vcpu_vtimer(vcpu));
++	ns = kvm_timer_earliest_exp(vcpu);
+ 	if (unlikely(ns)) {
+ 		hrtimer_forward_now(hrt, ns_to_ktime(ns));
+ 		return HRTIMER_RESTART;
+@@ -142,12 +171,6 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+ 	return HRTIMER_NORESTART;
+ }
+ 
+-static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
+-{
+-	return !(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
+-		(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
+-}
+-
+ bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
+ {
+ 	u64 cval, now;
+@@ -215,26 +238,30 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
  {
  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
++	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
  
--	BUG_ON(timer_is_armed(timer));
-+	/*
-+	 * This is to cancel the background timer for the physical timer
-+	 * emulation if it is set.
-+	 */
-+	timer_disarm(timer);
+ 	BUG_ON(timer_is_armed(timer));
  
  	/*
- 	 * The guest could have modified the timer registers or the timer
+-	 * No need to schedule a background timer if the guest timer has
++	 * No need to schedule a background timer if any guest timer has
+ 	 * already expired, because kvm_vcpu_block will return before putting
+ 	 * the thread to sleep.
+ 	 */
+-	if (kvm_timer_should_fire(vtimer))
++	if (kvm_timer_should_fire(vtimer) || kvm_timer_should_fire(ptimer))
+ 		return;
+ 
+ 	/*
+-	 * If the timer is not capable of raising interrupts (disabled or
++	 * If both timers are not capable of raising interrupts (disabled or
+ 	 * masked), then there's no more work for us to do.
+ 	 */
+-	if (!kvm_timer_irq_can_fire(vtimer))
++	if (!kvm_timer_irq_can_fire(vtimer) && !kvm_timer_irq_can_fire(ptimer))
+ 		return;
+ 
+-	/*  The timer has not yet expired, schedule a background timer */
+-	timer_arm(timer, kvm_timer_compute_delta(vtimer));
++	/*
++	 * The guest timers have not yet expired, schedule a background timer.
++	 * Set the earliest expiration time among the guest timers.
++	 */
++	timer_arm(timer, kvm_timer_earliest_exp(vcpu));
+ }
+ 
+ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
 -- 
 1.9.1
