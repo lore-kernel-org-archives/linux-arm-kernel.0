@@ -1,160 +1,26 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 3 Feb 2017 11:29:27 -0600
-Subject: [PATCH v5 2/4] Documentation: dt: add bindings for ti-cpufreq
-In-Reply-To: <20170203172929.23940-1-d-gerlach@ti.com>
-References: <20170203172929.23940-1-d-gerlach@ti.com>
-Message-ID: <20170203172929.23940-3-d-gerlach@ti.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 03 Feb 2017 09:31:35 -0800
+Subject: [PATCH v2 3/8] mmc: bcm2835: add sdhost controller to devicetree
+In-Reply-To: <1486123913-31705-4-git-send-email-kraxel@redhat.com>
+References: <1486123913-31705-1-git-send-email-kraxel@redhat.com>
+ <1486123913-31705-4-git-send-email-kraxel@redhat.com>
+Message-ID: <87fujvp4eg.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device tree bindings document for the TI CPUFreq/OPP driver
-on AM33xx, AM43xx, DRA7xx, and AM57xx SoCs. The operating-points-v2
-binding allows us to provide an opp-supported-hw property for each OPP
-to define when it is available. This driver is responsible for reading
-and parsing registers to determine which OPPs can be selectively enabled
-based on the specific SoC in use by matching against the opp-supported-hw
-data.
+Gerd Hoffmann <kraxel@redhat.com> writes:
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- .../devicetree/bindings/cpufreq/ti-cpufreq.txt     | 128 +++++++++++++++++++++
- 1 file changed, 128 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
+> Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
 
-diff --git a/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
-new file mode 100644
-index 000000000000..d35b87a2e33f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
-@@ -0,0 +1,128 @@
-+TI CPUFreq and OPP bindings
-+================================
-+
-+Certain TI SoCs, like those in the am335x, am437x, am57xx, and dra7xx
-+families support different OPPs depending on the silicon variant in use.
-+The ti-cpufreq driver can use revision and an efuse value from the SoC to
-+provide the OPP framework with supported hardware information. This is
-+used to determine which OPPs from the operating-points-v2 table get enabled
-+when it is parsed by the OPP framework.
-+
-+Required properties:
-+--------------------
-+In 'cpus' nodes:
-+- operating-points-v2: Phandle to the operating-points-v2 table to use.
-+
-+In 'operating-points-v2' table:
-+- compatible: Should be
-+	- 'operating-points-v2-ti-cpu' for am335x, am43xx, and dra7xx/am57xx SoCs
-+- syscon: A phandle pointing to a syscon node representing the control module
-+	  register space of the SoC.
-+
-+Optional properties:
-+--------------------
-+For each opp entry in 'operating-points-v2' table:
-+- opp-supported-hw: Two bitfields indicating:
-+	1. Which revision of the SoC the OPP is supported by
-+	2. Which eFuse bits indicate this OPP is available
-+
-+	A bitwise AND is performed against these values and if any bit
-+	matches, the OPP gets enabled.
-+
-+Example:
-+--------
-+
-+/* From arch/arm/boot/dts/am33xx.dtsi */
-+cpus {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	cpu at 0 {
-+		compatible = "arm,cortex-a8";
-+		device_type = "cpu";
-+		reg = <0>;
-+
-+		operating-points-v2 = <&cpu0_opp_table>;
-+
-+		clocks = <&dpll_mpu_ck>;
-+		clock-names = "cpu";
-+
-+		clock-latency = <300000>; /* From omap-cpufreq driver */
-+	};
-+};
-+
-+/*
-+ * cpu0 has different OPPs depending on SoC revision and some on revisions
-+ * 0x2 and 0x4 have eFuse bits that indicate if they are available or not
-+ */
-+cpu0_opp_table: opp_table {
-+	compatible = "operating-points-v2-ti-cpu";
-+	syscon = <&scm_conf>;
-+
-+	/*
-+	 * The three following nodes are marked with opp-suspend
-+	 * because they can not be enabled simultaneously on a
-+	 * single SoC.
-+	 */
-+	opp50 at 300000000 {
-+		opp-hz = /bits/ 64 <300000000>;
-+		opp-microvolt = <950000 931000 969000>;
-+		opp-supported-hw = <0x06 0x0010>;
-+		opp-suspend;
-+	};
-+
-+	opp100 at 275000000 {
-+		opp-hz = /bits/ 64 <275000000>;
-+		opp-microvolt = <1100000 1078000 1122000>;
-+		opp-supported-hw = <0x01 0x00FF>;
-+		opp-suspend;
-+	};
-+
-+	opp100 at 300000000 {
-+		opp-hz = /bits/ 64 <300000000>;
-+		opp-microvolt = <1100000 1078000 1122000>;
-+		opp-supported-hw = <0x06 0x0020>;
-+		opp-suspend;
-+	};
-+
-+	opp100 at 500000000 {
-+		opp-hz = /bits/ 64 <500000000>;
-+		opp-microvolt = <1100000 1078000 1122000>;
-+		opp-supported-hw = <0x01 0xFFFF>;
-+	};
-+
-+	opp100 at 600000000 {
-+		opp-hz = /bits/ 64 <600000000>;
-+		opp-microvolt = <1100000 1078000 1122000>;
-+		opp-supported-hw = <0x06 0x0040>;
-+	};
-+
-+	opp120 at 600000000 {
-+		opp-hz = /bits/ 64 <600000000>;
-+		opp-microvolt = <1200000 1176000 1224000>;
-+		opp-supported-hw = <0x01 0xFFFF>;
-+	};
-+
-+	opp120 at 720000000 {
-+		opp-hz = /bits/ 64 <720000000>;
-+		opp-microvolt = <1200000 1176000 1224000>;
-+		opp-supported-hw = <0x06 0x0080>;
-+	};
-+
-+	oppturbo at 720000000 {
-+		opp-hz = /bits/ 64 <720000000>;
-+		opp-microvolt = <1260000 1234800 1285200>;
-+		opp-supported-hw = <0x01 0xFFFF>;
-+	};
-+
-+	oppturbo at 800000000 {
-+		opp-hz = /bits/ 64 <800000000>;
-+		opp-microvolt = <1260000 1234800 1285200>;
-+		opp-supported-hw = <0x06 0x0100>;
-+	};
-+
-+	oppnitro at 1000000000 {
-+		opp-hz = /bits/ 64 <1000000000>;
-+		opp-microvolt = <1325000 1298500 1351500>;
-+		opp-supported-hw = <0x04 0x0200>;
-+	};
-+};
--- 
-2.11.0
+Patches 3, 7, 8 are:
+
+Acked-by: Eric Anholt <eric@anholt.net>
+
+waiting on Ulf for merging the driver now.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170203/f1e9419d/attachment.sig>
