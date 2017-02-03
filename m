@@ -1,30 +1,23 @@
-From: hendrik@consetetur.de (Hendrik v. Raven)
-Date: Fri,  3 Feb 2017 17:17:27 +0100
-Subject: [PATCH] staging: bcm2835-audio: fix spacing of macro
-Message-ID: <20170203161733.5930-1-hendrik@consetetur.de>
+From: dhowells@redhat.com (David Howells)
+Date: Fri, 03 Feb 2017 16:21:58 +0000
+Subject: [PATCH 7/7] efi: Print the secure boot status in x86 setup_arch()
+ [ver #7]
+In-Reply-To: <CAKv+Gu8otPYWcKw72zP2q+34JAzZ-QRy8xGFmbStO6WseeANdw@mail.gmail.com>
+References: <CAKv+Gu8otPYWcKw72zP2q+34JAzZ-QRy8xGFmbStO6WseeANdw@mail.gmail.com>
+ <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
+ <148587565838.4026.2835771993519594392.stgit@warthog.procyon.org.uk>
+Message-ID: <13280.1486138918@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-removes the unwanted spaces inside of sizeof( ), removing a complaint of
-checkpatch.pl. Also removes the second space behind the macro name.
+Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
-Signed-off-by: Hendrik v. Raven <hendrik@consetetur.de>
----
- drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> > +       if (IS_ENABLED(CONFIG_EFI)) {
+> 
+> Shouldn't this be a runtime check?
 
-diff --git a/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h b/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h
-index 09f07fd891bb..dd2f162b1ccb 100644
---- a/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h
-+++ b/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h
-@@ -22,7 +22,7 @@
- #define VC_AUDIO_SERVER_NAME  MAKE_FOURCC("AUDS")
- 
- /* Maximum message length */
--#define VC_AUDIO_MAX_MSG_LEN  (sizeof( VC_AUDIO_MSG_T ))
-+#define VC_AUDIO_MAX_MSG_LEN (sizeof(VC_AUDIO_MSG_T))
- 
- /*
-  *  List of screens that are currently supported
--- 
-2.11.0
+Interesting question.  The original patch I was working from had a #ifdef
+here.  Possibly it doesn't need to be there at all.  We could rely entirely on
+the value of boot_params.secure_boot.
+
+David
