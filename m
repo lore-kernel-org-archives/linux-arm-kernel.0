@@ -1,104 +1,56 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 3 Feb 2017 14:50:40 +0000
-Subject: [PATCH v4] efi: arm64: Add vmlinux debug link to the Image binary
-In-Reply-To: <CAKv+Gu82NmBNavpVQ8z7xZ6++HPqAWNnn3dM=dKw0JaWLZocSw@mail.gmail.com>
-References: <1486056799-4825-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170202183000.GN13839@arm.com>
- <CAKv+Gu82NmBNavpVQ8z7xZ6++HPqAWNnn3dM=dKw0JaWLZocSw@mail.gmail.com>
-Message-ID: <CAKv+Gu9VmbjtvFVveAXiRtpBtZCWJV6pMGmnEzTc5gPrOnYvnQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 3 Feb 2017 14:51:48 +0000
+Subject: [RFC 01/13] KVM: arm/arm64: Add vITS save/restore API
+ documentation
+In-Reply-To: <CAFEAcA98mFM=iNs2n=F9d4suV7+mjPJRjZfiYagX5y7HiPgMnw@mail.gmail.com>
+References: <1484236613-24633-1-git-send-email-eric.auger@redhat.com>
+ <1484236613-24633-2-git-send-email-eric.auger@redhat.com>
+ <CAFEAcA98mFM=iNs2n=F9d4suV7+mjPJRjZfiYagX5y7HiPgMnw@mail.gmail.com>
+Message-ID: <a1517c30-bad7-c587-167b-534ef15ab658@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 February 2017 at 18:36, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 2 February 2017 at 18:30, Will Deacon <will.deacon@arm.com> wrote:
->> Hi Ard,
+On 03/02/17 14:00, Peter Maydell wrote:
+> On 12 January 2017 at 15:56, Eric Auger <eric.auger@redhat.com> wrote:
+>> Add description for how to access vITS registers and how to flush/restore
+>> vITS tables into/from memory
 >>
->> On Thu, Feb 02, 2017 at 05:33:19PM +0000, Ard Biesheuvel wrote:
->>> When building with debugging symbols, take the absolute path to the
->>> vmlinux binary and add it to the special PE/COFF debug table entry.
->>> This allows a debug EFI build to find the vmlinux binary, which is
->>> very helpful in debugging, given that the offset where the Image is
->>> first loaded by EFI is highly unpredictable.
->>>
->>> On implementations of UEFI that choose to implement it, this
->>> information is exposed via the EFI debug support table, which is a UEFI
->>> configuration table that is accessible both by the firmware at boot time
->>> and by the OS at runtime, and lists all PE/COFF images loaded by the
->>> system.
->>>
->>> The format of the NB10 Codeview entry is based on the definition used
->>> by EDK2, which is our primary reference when it comes to the use of
->>> PE/COFF in the context of UEFI firmware.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>> v4: add a separate DEBUG_EFI debug option so that this feature is disabled
->>>     by default
->>>     dropped 1/2 which has been queued already in the EFI tree
->>>     use ASCII rather than an opaque constant for "NB10" signature
->>>
->>>  arch/arm64/Kconfig.debug   |  8 ++++
->>>  arch/arm64/kernel/Makefile |  4 ++
->>>  arch/arm64/kernel/head.S   | 47 +++++++++++++++++++-
->>>  3 files changed, 58 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
->>> index d1ebd46872fd..f7f38b1aab14 100644
->>> --- a/arch/arm64/Kconfig.debug
->>> +++ b/arch/arm64/Kconfig.debug
->>> @@ -95,6 +95,14 @@ config DEBUG_ALIGN_RODATA
->>>
->>>         If in doubt, say N.
->>>
->>> +config DEBUG_EFI
->>> +     depends on EFI && DEBUG_INFO
->>> +     bool "UEFI debugging"
->>> +     help
->>> +       Enable this option to include EFI specific debugging features into
->>> +       the kernel that are only useful when using a debug build of the
->>> +       UEFI firmware
->>> +
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>> ---
+>>  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 70 ++++++++++++++++++++++
+>>  1 file changed, 70 insertions(+)
 >>
->> I don't much like embedding the absolute host build path in the kernel
->> image, but if that's what the tools expect then so be it.
->>
->>>  source "drivers/hwtracing/coresight/Kconfig"
->>>
->>>  endmenu
->>> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
->>> index 7d66bbaafc0c..2600c60337ac 100644
->>> --- a/arch/arm64/kernel/Makefile
->>> +++ b/arch/arm64/kernel/Makefile
->>> @@ -55,3 +55,7 @@ obj-y                                       += $(arm64-obj-y) vdso/ probes/
->>>  obj-m                                        += $(arm64-obj-m)
->>>  head-y                                       := head.o
->>>  extra-y                                      += $(head-y) vmlinux.lds
->>> +
->>> +ifeq ($(CONFIG_DEBUG_EFI),y)
->>> +AFLAGS_head.o += -DVMLINUX_PATH="\"$(shell readlink -f $(objtree)/vmlinux)\""
->>> +endif
->>
->> Can we use the Make realpath directive instead of calling out to the shell?
->>
->
-> Yep. This works as expected:
->
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 2600c60337ac..1606c6b2a280 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -57,5 +57,5 @@ head-y                                        := head.o
->  extra-y                                        += $(head-y) vmlinux.lds
->
->  ifeq ($(CONFIG_DEBUG_EFI),y)
-> -AFLAGS_head.o += -DVMLINUX_PATH="\"$(shell readlink -f $(objtree)/vmlinux)\""
-> +AFLAGS_head.o += -DVMLINUX_PATH="\"$(realpath $(objtree)/vmlinux)\""
->  endif
->
->
->> Do you want me to merge this via arm64?
->>
->
-> Yes, please
+>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>> index 6081a5b..bd74613 100644
+>> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+>> @@ -36,3 +36,73 @@ Groups:
+>>      -ENXIO:  ITS not properly configured as required prior to setting
+>>               this attribute
+>>      -ENOMEM: Memory shortage when allocating ITS internal data
+>> +
+>> +  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+>> +  Attributes:
+>> +      The attr field of kvm_device_attr encodes the offset of the
+>> +      ITS register, relative to the ITS control frame base address
+>> +      (ITS_base).
+>> +
+>> +      kvm_device_attr.addr points to a __u64 value whatever the width
+>> +      of the addressed register (32/64 bits).
+>> +
+>> +      Writes to read-only registers are ignored by the kernel except
+>> +      for a single register, GITS_READR. Normally this register is RO
+>> +      but it needs to be restored otherwise commands in the queue will
+>> +      be re-executed after CWRITER setting.
+> 
+> Dumb question -- is it possible/sensible to process the command
+> queue rather than migrating a list of outstanding commands?
 
-Should I respin this?
+It is not always possible, specially if the ITS implements the "stall"
+mechanism, where it waits for SW acknowledgement in case of a command error.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
