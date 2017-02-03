@@ -1,69 +1,160 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 3 Feb 2017 18:27:26 +0100
-Subject: [PATCH v3] ARM: dts: i.MX25: add AIPS control registers
-In-Reply-To: <1486126792-28186-1-git-send-email-martin@kaiser.cx>
-References: <1485890402-22974-1-git-send-email-martin@kaiser.cx>
- <1486126792-28186-1-git-send-email-martin@kaiser.cx>
-Message-ID: <20170203172726.5kn5h6xkrl4zszmd@pengutronix.de>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 3 Feb 2017 11:29:27 -0600
+Subject: [PATCH v5 2/4] Documentation: dt: add bindings for ti-cpufreq
+In-Reply-To: <20170203172929.23940-1-d-gerlach@ti.com>
+References: <20170203172929.23940-1-d-gerlach@ti.com>
+Message-ID: <20170203172929.23940-3-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2017 at 01:59:52PM +0100, Martin Kaiser wrote:
-> The i.MX25 contains two AHB to IP bridges (AIPS), each of which has a set of
-> control registers. Add the memory regions for the control registers to
-> the Device Tree.
-> 
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+Add the device tree bindings document for the TI CPUFreq/OPP driver
+on AM33xx, AM43xx, DRA7xx, and AM57xx SoCs. The operating-points-v2
+binding allows us to provide an opp-supported-hw property for each OPP
+to define when it is available. This driver is responsible for reading
+and parsing registers to determine which OPPs can be selectively enabled
+based on the specific SoC in use by matching against the opp-supported-hw
+data.
 
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ .../devicetree/bindings/cpufreq/ti-cpufreq.txt     | 128 +++++++++++++++++++++
+ 1 file changed, 128 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
 
-Sascha
-
-> ---
-> v3:
->    fixed the size of the memory regions, both are 16KBytes long
-> 
-> v2:
->    removed the "fsl,imx53-aipstz" property as per Sascha's request
-> 
->  arch/arm/boot/dts/imx25.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> index e0ba550..5ae8a14 100644
-> --- a/arch/arm/boot/dts/imx25.dtsi
-> +++ b/arch/arm/boot/dts/imx25.dtsi
-> @@ -93,6 +93,11 @@
->  			reg = <0x43f00000 0x100000>;
->  			ranges;
->  
-> +			aips1: bridge at 43f00000 {
-> +				compatible = "fsl,imx25-aips";
-> +				reg = <0x43f00000 0x4000>;
-> +			};
-> +
->  			i2c1: i2c at 43f80000 {
->  				#address-cells = <1>;
->  				#size-cells = <0>;
-> @@ -342,6 +347,11 @@
->  			reg = <0x53f00000 0x100000>;
->  			ranges;
->  
-> +			aips2: bridge at 53f00000 {
-> +				compatible = "fsl,imx25-aips";
-> +				reg = <0x53f00000 0x4000>;
-> +			};
-> +
->  			clks: ccm at 53f80000 {
->  				compatible = "fsl,imx25-ccm";
->  				reg = <0x53f80000 0x4000>;
-> -- 
-> 2.1.4
-> 
-> 
-
+diff --git a/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
+new file mode 100644
+index 000000000000..d35b87a2e33f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
+@@ -0,0 +1,128 @@
++TI CPUFreq and OPP bindings
++================================
++
++Certain TI SoCs, like those in the am335x, am437x, am57xx, and dra7xx
++families support different OPPs depending on the silicon variant in use.
++The ti-cpufreq driver can use revision and an efuse value from the SoC to
++provide the OPP framework with supported hardware information. This is
++used to determine which OPPs from the operating-points-v2 table get enabled
++when it is parsed by the OPP framework.
++
++Required properties:
++--------------------
++In 'cpus' nodes:
++- operating-points-v2: Phandle to the operating-points-v2 table to use.
++
++In 'operating-points-v2' table:
++- compatible: Should be
++	- 'operating-points-v2-ti-cpu' for am335x, am43xx, and dra7xx/am57xx SoCs
++- syscon: A phandle pointing to a syscon node representing the control module
++	  register space of the SoC.
++
++Optional properties:
++--------------------
++For each opp entry in 'operating-points-v2' table:
++- opp-supported-hw: Two bitfields indicating:
++	1. Which revision of the SoC the OPP is supported by
++	2. Which eFuse bits indicate this OPP is available
++
++	A bitwise AND is performed against these values and if any bit
++	matches, the OPP gets enabled.
++
++Example:
++--------
++
++/* From arch/arm/boot/dts/am33xx.dtsi */
++cpus {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	cpu at 0 {
++		compatible = "arm,cortex-a8";
++		device_type = "cpu";
++		reg = <0>;
++
++		operating-points-v2 = <&cpu0_opp_table>;
++
++		clocks = <&dpll_mpu_ck>;
++		clock-names = "cpu";
++
++		clock-latency = <300000>; /* From omap-cpufreq driver */
++	};
++};
++
++/*
++ * cpu0 has different OPPs depending on SoC revision and some on revisions
++ * 0x2 and 0x4 have eFuse bits that indicate if they are available or not
++ */
++cpu0_opp_table: opp_table {
++	compatible = "operating-points-v2-ti-cpu";
++	syscon = <&scm_conf>;
++
++	/*
++	 * The three following nodes are marked with opp-suspend
++	 * because they can not be enabled simultaneously on a
++	 * single SoC.
++	 */
++	opp50 at 300000000 {
++		opp-hz = /bits/ 64 <300000000>;
++		opp-microvolt = <950000 931000 969000>;
++		opp-supported-hw = <0x06 0x0010>;
++		opp-suspend;
++	};
++
++	opp100 at 275000000 {
++		opp-hz = /bits/ 64 <275000000>;
++		opp-microvolt = <1100000 1078000 1122000>;
++		opp-supported-hw = <0x01 0x00FF>;
++		opp-suspend;
++	};
++
++	opp100 at 300000000 {
++		opp-hz = /bits/ 64 <300000000>;
++		opp-microvolt = <1100000 1078000 1122000>;
++		opp-supported-hw = <0x06 0x0020>;
++		opp-suspend;
++	};
++
++	opp100 at 500000000 {
++		opp-hz = /bits/ 64 <500000000>;
++		opp-microvolt = <1100000 1078000 1122000>;
++		opp-supported-hw = <0x01 0xFFFF>;
++	};
++
++	opp100 at 600000000 {
++		opp-hz = /bits/ 64 <600000000>;
++		opp-microvolt = <1100000 1078000 1122000>;
++		opp-supported-hw = <0x06 0x0040>;
++	};
++
++	opp120 at 600000000 {
++		opp-hz = /bits/ 64 <600000000>;
++		opp-microvolt = <1200000 1176000 1224000>;
++		opp-supported-hw = <0x01 0xFFFF>;
++	};
++
++	opp120 at 720000000 {
++		opp-hz = /bits/ 64 <720000000>;
++		opp-microvolt = <1200000 1176000 1224000>;
++		opp-supported-hw = <0x06 0x0080>;
++	};
++
++	oppturbo at 720000000 {
++		opp-hz = /bits/ 64 <720000000>;
++		opp-microvolt = <1260000 1234800 1285200>;
++		opp-supported-hw = <0x01 0xFFFF>;
++	};
++
++	oppturbo at 800000000 {
++		opp-hz = /bits/ 64 <800000000>;
++		opp-microvolt = <1260000 1234800 1285200>;
++		opp-supported-hw = <0x06 0x0100>;
++	};
++
++	oppnitro at 1000000000 {
++		opp-hz = /bits/ 64 <1000000000>;
++		opp-microvolt = <1325000 1298500 1351500>;
++		opp-supported-hw = <0x04 0x0200>;
++	};
++};
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.11.0
