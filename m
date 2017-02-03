@@ -1,94 +1,321 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 3 Feb 2017 12:35:43 -0800
-Subject: [PATCH v5 1/2] dt-bindings: brcm: clocks: add binding for
- brcmstb-cpu-clk-div
-In-Reply-To: <20170203200652.GD25384@codeaurora.org>
-References: <20170119002933.7529-1-code@mmayer.net>
- <20170119002933.7529-2-code@mmayer.net>
- <20170121005202.GB8801@codeaurora.org>
- <CAGt4E5sGScHp83ufKcX3Q74vW0fo=L0FHM7tCptvqJfchHAweg@mail.gmail.com>
- <20170203200652.GD25384@codeaurora.org>
-Message-ID: <d56c827e-41cf-fcb3-42e0-792e8bf37871@gmail.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Fri, 3 Feb 2017 13:38:23 -0700
+Subject: [PATCH V8 05/10] acpi: apei: handle SEA notification type for
+ ARMv8
+In-Reply-To: <5894A937.5010603@arm.com>
+References: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
+ <1485969413-23577-6-git-send-email-tbaicar@codeaurora.org>
+ <5894A937.5010603@arm.com>
+Message-ID: <c26dabca-71f5-f6e2-5b16-7e4a8151cabd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2017 12:06 PM, Stephen Boyd wrote:
-> On 02/01, Markus Mayer wrote:
->> On 20 January 2017 at 16:52, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>>
->>> Are these properties used? Please don't put these types of
->>> details in DT.
+Hello James,
+
+
+On 2/3/2017 9:00 AM, James Morse wrote:
+> On 01/02/17 17:16, Tyler Baicar wrote:
+>> ARM APEI extension proposal added SEA (Synchronous External Abort)
+>> notification type for ARMv8.
+>> Add a new GHES error source handling function for SEA. If an error
+>> source's notification type is SEA, then this function can be registered
+>> into the SEA exception handler. That way GHES will parse and report
+>> SEA exceptions when they occur.
+> It's worth adding details of the other things this patch changes, just to alert
+> busy reviewers, something like:
+> An SEA can interrupt code that had interrupts masked and is treated as an NMI.
+> To aid this the page of address space for mapping APEI buffers while in_nmi() is
+> always reserved, and ghes_ioremap_pfn_nmi() is changed to use the helper methods
+> to find the prot_t to map with in the same way as ghes_ioremap_pfn_irq().
+I'll add this in in the next version.
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 1117421..f92778d 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -53,6 +53,8 @@ config ARM64
+>>   	select HANDLE_DOMAIN_IRQ
+>>   	select HARDIRQS_SW_RESEND
+>>   	select HAVE_ACPI_APEI if (ACPI && EFI)
+>> +	select HAVE_ACPI_APEI_SEA if (ACPI && EFI)
+>> +	select HAVE_NMI if HAVE_ACPI_APEI_SEA
+> Nit: This section of the file is largely in alphabetical order, can we try to
+> keep it that way?!
+Yes, will do!
+>>   	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
+>>   	select HAVE_ARCH_AUDITSYSCALL
+>>   	select HAVE_ARCH_BITREVERSE
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index 9ae7e65..5a5a096 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -30,6 +30,7 @@
+>>   #include <linux/highmem.h>
+>>   #include <linux/perf_event.h>
+>>   #include <linux/preempt.h>
+>> +#include <linux/hardirq.h>
+> This header is already included by this file further up.
+Oops, guess I missed that :)
+>>   
+>>   #include <asm/bug.h>
+>>   #include <asm/cpufeature.h>
+>> @@ -41,6 +42,8 @@
+>>   #include <asm/pgtable.h>
+>>   #include <asm/tlbflush.h>
+>>   
+>> +#include <acpi/ghes.h>
+>> +
+>>   static const char *fault_name(unsigned int esr);
+>>   
+>>   #ifdef CONFIG_KPROBES
+>> @@ -500,6 +503,14 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>>   	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+>>   		 fault_name(esr), esr, addr);
+>>   
+>> +	/*
+>> +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
+>> +	 * rcu_read_lock().
+>> +	 */
+> This comment should go against the use of RCU in ghes_notify_sea(), but there
+> should be something here to explain the surprise use of nmi. Something like:
+> Synchronous aborts may interrupt code which had interrupts masked. Before
+> calling out into the wider kernel tell the interested subsystems.
+Sounds good. I'll update the comments.
+> This should be wrapped in:
+> if (IS_ENABLED(HAVE_ACPI_APEI_SEA)) {
+>
+>> +	nmi_enter();
+>> +	ghes_notify_sea();
+>> +	nmi_exit();
+> }
+>
+> To avoid breaking systems that don't have SEA configured.
+Yes, I'll add that check in the next version.
+>> +
+>>   	info.si_signo = SIGBUS;
+>>   	info.si_errno = 0;
+>>   	info.si_code  = 0;
+>> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+>> index b0140c8..3786ff1 100644
+>> --- a/drivers/acpi/apei/Kconfig
+>> +++ b/drivers/acpi/apei/Kconfig
+>> @@ -4,6 +4,20 @@ config HAVE_ACPI_APEI
+>>   config HAVE_ACPI_APEI_NMI
+>>   	bool
+>>   
+>> +config HAVE_ACPI_APEI_SEA
+>> +	bool "APEI Synchronous External Abort logging/recovering support"
+>> +	depends on ARM64
+> depends on CONFIG_ACPI_APEI_GHES
+> ?
+>
+> (I think this is what the kbuild robot has managed to miss out!)
+Will do.
+>> +	help
+>> +	  This option should be enabled if the system supports
+>> +	  firmware first handling of SEA (Synchronous External Abort).
+>> +	  SEA happens with certain faults of data abort or instruction
+>> +	  abort synchronous exceptions on ARMv8 systems. If a system
+>> +	  supports firmware first handling of SEA, the platform analyzes
+>> +	  and handles hardware error notifications with SEA, and it may then
+> Nit: notifications from SEA,
+Will do.
+>> +	  form a HW error record for the OS to parse and handle. This
+>> +	  option allows the OS to look for such HW error record, and
+> Nit: 'HW'->hardware. This is spelled out for the other seven uses in the file.
+Will do.
+>> +	  take appropriate action.
+>> +
+>>   config ACPI_APEI
+>>   	bool "ACPI Platform Error Interface (APEI)"
+>>   	select MISC_FILESYSTEMS
+>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+>> index b25e7cf..8756172 100644
+>> --- a/drivers/acpi/apei/ghes.c
+>> +++ b/drivers/acpi/apei/ghes.c
+>> @@ -114,11 +114,7 @@
+>>    * Two virtual pages are used, one for IRQ/PROCESS context, the other for
+>>    * NMI context (optionally).
+>>    */
+>> -#ifdef CONFIG_HAVE_ACPI_APEI_NMI
+>>   #define GHES_IOREMAP_PAGES           2
+>> -#else
+>> -#define GHES_IOREMAP_PAGES           1
+>> -#endif
+>>   #define GHES_IOREMAP_IRQ_PAGE(base)	(base)
+>>   #define GHES_IOREMAP_NMI_PAGE(base)	((base) + PAGE_SIZE)
+>>   
+>> @@ -156,11 +152,14 @@ static void ghes_ioremap_exit(void)
+>>   
+>>   static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
+>>   {
+>> -	unsigned long vaddr;
+>> +	unsigned long vaddr, paddr;
+>> +	pgprot_t prot;
+>>   
+>>   	vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
+>> -	ioremap_page_range(vaddr, vaddr + PAGE_SIZE,
+>> -			   pfn << PAGE_SHIFT, PAGE_KERNEL);
+>> +
+>> +	paddr = pfn << PAGE_SHIFT;
+> Physical addresses might not always fit in 'unsigned long'. phys_addr_t exists
+> to hide this nasty detail!
+>
+>  From arch/x86/Kconfig:
+>> config ARCH_PHYS_ADDR_T_64BIT
+>> 	def_bool y
+>> 	depends on X86_64 || X86_PAE
+> 32bit x86 kernels configured with PAE define phys_addr_t to be u64.
+I'll make that change.
+
+ghes_ioremap_pfn_irq() should probably be updated in a separate change 
+because it uses unsigned
+long for it's paddr...I just mimicked that code here :)
+>> +	prot = arch_apei_get_mem_attribute(paddr);
+>> +	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
+>>   
+>>   	return (void __iomem *)vaddr;
+>>   }
+>> @@ -767,6 +766,48 @@ static int ghes_notify_sci(struct notifier_block *this,
+>>   	.notifier_call = ghes_notify_sci,
+>>   };
+>>   
+>> +#ifdef CONFIG_HAVE_ACPI_APEI_SEA
+>> +static LIST_HEAD(ghes_sea);
+>> +
+>> +void ghes_notify_sea(void)
+>> +{
+>> +	struct ghes *ghes;
+>> +
+> 	/*
+> 	 * synchronize_rcu() will wait for nmi_exit(), so no need to
+> 	 * rcu_read_lock().
+> 	 */
+>
+>> +	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
+>> +		ghes_proc(ghes);
+>> +	}
+>> +}
+>> +
+>> +static int ghes_sea_add(struct ghes *ghes)
+>> +{
+>> +	mutex_lock(&ghes_list_mutex);
+>> +	list_add_rcu(&ghes->list, &ghes_sea);
+>> +	mutex_unlock(&ghes_list_mutex);
+>> +	return 0;
+> This function returns 0 or -ENOTSUPP, depending on CONFIG_HAVE_ACPI_APEI_SEA,
+> but ...
+>
+>
+>> +}
+>> +
+>> +static void ghes_sea_remove(struct ghes *ghes)
+>> +{
+>> +	mutex_lock(&ghes_list_mutex);
+>> +	list_del_rcu(&ghes->list);
+>> +	mutex_unlock(&ghes_list_mutex);
+>> +	synchronize_rcu();
+>> +}
+>> +#else /* CONFIG_HAVE_ACPI_APEI_SEA */
+>> +static inline int ghes_sea_add(struct ghes *ghes)
+>> +{
+>> +	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not supported\n",
+>> +	       ghes->generic->header.source_id);
+>> +	return -ENOTSUPP;
+>> +}
+>> +
+>> +static inline void ghes_sea_remove(struct ghes *ghes)
+>> +{
+>> +	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not supported\n",
+>> +	       ghes->generic->header.source_id);
+>> +}
+>> +#endif /* CONFIG_HAVE_ACPI_APEI_SEA */
+>> +
+>>   #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+>>   /*
+>>    * printk is not safe in NMI context.  So in NMI handler, we allocate
+>> @@ -1012,6 +1053,14 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>>   	case ACPI_HEST_NOTIFY_EXTERNAL:
+>>   	case ACPI_HEST_NOTIFY_SCI:
+>>   		break;
+>> +	case ACPI_HEST_NOTIFY_SEA:
+>> +		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_SEA)) {
+>> +			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
+>> +				generic->header.source_id);
+>> +			rc = -ENOTSUPP;
+>> +			goto err;
+> ... here we jump out of ghes_probe() if NOTIFY_SEA is used but the kernel wasn't
+> built with CONFIG_HAVE_ACPI_APEI_SEA....
+>
+>
+>> +		}
+>> +		break;
+>>   	case ACPI_HEST_NOTIFY_NMI:
+>>   		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
+>>   			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
+>> @@ -1023,6 +1072,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>>   		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
+>>   			   generic->header.source_id);
+>>   		goto err;
+>> +	case ACPI_HEST_NOTIFY_GPIO:
+>> +	case ACPI_HEST_NOTIFY_SEI:
+>> +	case ACPI_HEST_NOTIFY_GSIV:
+>> +		pr_warn(GHES_PFX "Generic hardware error source: %d notified via notification type %u is not supported\n",
+>> +			generic->header.source_id, generic->header.source_id);
+>> +		rc = -ENOTSUPP;
+>> +		goto err;
+>>   	default:
+>>   		pr_warning(FW_WARN GHES_PFX "Unknown notification type: %u for generic hardware error source: %d\n",
+>>   			   generic->notify.type, generic->header.source_id);
+>> @@ -1077,6 +1133,11 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>>   		list_add_rcu(&ghes->list, &ghes_sci);
+>>   		mutex_unlock(&ghes_list_mutex);
+>>   		break;
+>> +	case ACPI_HEST_NOTIFY_SEA:
+>> +		rc = ghes_sea_add(ghes);
+> ... so this error handling will never be needed.
+> ghes_nmi_add() returns void.
+>
+> I guess the not-configured versions of the symbols need to exist for older
+> compilers that can't work out that this can never be called.
+I can remove the extra error handling here.
+>> +		if (rc)
+>> +			goto err_edac_unreg;
+>> +		break;
+>>   	case ACPI_HEST_NOTIFY_NMI:
+>>   		ghes_nmi_add(ghes);
+>>   		break;
+>> @@ -1119,6 +1180,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
+>>   			unregister_acpi_hed_notifier(&ghes_notifier_sci);
+>>   		mutex_unlock(&ghes_list_mutex);
+>>   		break;
+>> +	case ACPI_HEST_NOTIFY_SEA:
+>> +		ghes_sea_remove(ghes);
+>> +		break;
+>>   	case ACPI_HEST_NOTIFY_NMI:
+>>   		ghes_nmi_remove(ghes);
+>>   		break;
+>> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+>> index 6ae318b..adf5455 100644
+>> --- a/include/acpi/ghes.h
+>> +++ b/include/acpi/ghes.h
+>> @@ -95,3 +95,5 @@ static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data
+>>   		(void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
+>>   		gdata + 1;
+>>   }
+>> +
+>> +void ghes_notify_sea(void);
 >>
->> Yeah, unfortunately they are. Luckily, I think the issue can be
->> resolved quite easily, because the user of those properties isn't
->> involved in this series.
->>
->> They are currently being used by a clock driver
->> ("drivers/clk/clk-brcmstb.c") that hasn't been upstreamed yet. I
->> performed some code archeology. While I wasn't 100% successful in
->> tracking down the origins of this interface, it looks like it was
->> designed this way a while back (4+ years or so), probably before
->> device tree best practices were developed or, at least, before they
->> were widely known.
->>
->> So, what I can do is to remove the properties from the official
->> binding. (I'll send an update to that effect shortly.) Once the
->> binding is accepted upstream, we can work on fixing up the design of
->> clk-brcmstb.c, so it doesn't rely on these properties anymore (and
->> derives them from the compatible string instead), and then proceed to
->> upstream that, as well.
-> 
-> Ok. Sounds like some cleanup needs to be done on the way
-> upstream.
-> 
->>> This register really looks like some offset in something larger.
->>> Is there some clock controller? What's the hw block at
->>> 0xf03e2000? Maybe I already asked this.
->>
->> It looks this way, but in this case, looks are deceiving. The address
->> and the length are really correct the way they are.
->>
->> This memory area holds a range of only loosely related configuration
->> registers. It's called the Bus Interface Unit Register Set and deals
->> with configuring the CPU in general. At address 0xf03e257c, there
->> happens to be the clock divider register we need, and it's really just
->> one register, i.e. 4 bytes.
-> 
-> We've seen this style of hardware design before. I'd prefer we
-> make the "Bus Interface Unit Register Set" into one device node
-> and have a driver probe for it that registers this clock. If
-> other things need to be controlled in there then the driver will
-> do more than just register one clock, possibly hooking into
-> multiple frameworks. The compatible string can indicate which SoC
-> it is if the divider register offset changes or if the register
-> layout is a total free for all.
+> This header file ought to have an include guard, could you add one?
+>
+> I think the kbuild-robot has managed to configure SEA on, but GHES off so ghes.c
+> isn't included in the kernel. I will dig some more into this on Monday.
+Yes, I can add that.
 
-We already have another piece of drive code that manipulates registers
-in the Bus Interface Unit located in drivers/soc/bcm/brcmstb/biuctrl.c
-and which has little to nothing to do with the CPU's clock ratio. And
-actually another one being submitted that deals with the CPU's
-read-ahead cache. I would very much prefer we keep all of them separate
-and dealing with just the register offset they need to do, but that does
-not mean the Device Tree binding has to look that way though.
+Thanks for all the great reviewing :)
 
-The binding for the BIUCTRL register made it here:
+Tyler
 
-Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
-
-so we should re-use that, and have a small piece of clock provided that
-just uses the relevant register range within that larger register space
-and provide the CLOCK_RATIO. Does that work?
-
-> 
-> Either way, having reg properties end in non-zero values is
-> suspect on ARM systems because a device is usually aligned to at
-> least a 1k boundary for proper CPU addressing and mapping of the
-> device. We can't possibly make a smaller mapping than a page
-> anyway, so the registers around this one register will need to be
-> mapped with the same attributes, hence the desire to make one
-> device for the hardware block.
-
-Yes that's absolutely valid, but this is not really a problem, since
-ioremap() is smart enough to re-use existing mappings (or AFAIR).
 -- 
-Florian
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
