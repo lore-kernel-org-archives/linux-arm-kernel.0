@@ -1,82 +1,73 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 3 Feb 2017 16:54:05 +0000
-Subject: [RFC v4 00/10] Provide the EL1 physical timer to the VM
-In-Reply-To: <CAHyh4xivs-0jA4-HDK8H9YsJqdTioGfDaW5WZMdyLQTc57aNDQ@mail.gmail.com>
-References: <1486135208-13415-1-git-send-email-jintack@cs.columbia.edu>
- <11908d08-6e2d-010c-2e6f-fd677c7ad8b1@arm.com>
- <CAHyh4xivs-0jA4-HDK8H9YsJqdTioGfDaW5WZMdyLQTc57aNDQ@mail.gmail.com>
-Message-ID: <198db6cc-4731-9f69-5a1c-c4646ec2c641@arm.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 3 Feb 2017 10:54:54 -0600
+Subject: [PATCH 1/2] DTS: dra7: Replace obsolete "operating-points"
+ property with "operating-points-v2"
+In-Reply-To: <1486135491-14223-1-git-send-email-lukma@denx.de>
+References: <1486135491-14223-1-git-send-email-lukma@denx.de>
+Message-ID: <9f5ef6ed-add0-098f-a380-c859a6839c0a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/17 16:51, Jintack Lim wrote:
-> On Fri, Feb 3, 2017 at 11:14 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 03/02/17 15:19, Jintack Lim wrote:
->>> The ARM architecture defines the EL1 physical timer and the virtual timer,
->>> and it is reasonable for an OS to expect to be able to access both.
->>> However, the current KVM implementation does not provide the EL1 physical
->>> timer to VMs but terminates VMs on access to the timer.
->>>
->>> This patch series enables VMs to use the EL1 physical timer through
->>> trap-and-emulate only on arm64. The KVM host emulates each EL1 physical
->>> timer register access and sets up the background timer accordingly.  When
->>> the background timer expires, the KVM host injects EL1 physical timer
->>> interrupts to the VM.  Alternatively, it's also possible to allow VMs to
->>> access the EL1 physical timer without trapping.  However, this requires
->>> somehow using the EL2 physical timer for the Linux host while running the
->>> VM instead of the EL1 physical timer.  Right now I just implemented
->>> trap-and-emulate because this was straightforward to do, and I leave it to
->>> future work to determine if transferring the EL1 physical timer state to
->>> the EL2 timer provides any performance benefit.
->>>
->>> This feature will be useful for any OS that wishes to access the EL1
->>> physical timer. Nested virtualization is one of those use cases. A nested
->>> hypervisor running inside a VM would think it has full access to the
->>> hardware and naturally tries to use the EL1 physical timer as Linux would
->>> do. Other nested hypervisors may try to use the EL2 physical timer as Xen
->>> would do, but supporting the EL2 physical timer to the VM is out of scope
->>> of this patch series. This patch series will make it easy to add the EL2
->>> timer support in the future, though.
->>>
->>> Note that Linux VMs booting in EL1 will be unaffected by this patch series
->>> and will continue to use only the virtual timer and this patch series will
->>> therefore not introduce any performance degredation as a result of
->>> trap-and-emulate.
->>>
->>> v3 => v4:
->>>  - Fix a bug that prevents a VM from booting on 32-bit architecture
->>>  - Clarify that the emulated physical timer is only supported on arm64
->>>    in the cover letter
->>
->> Hi Jintack,
->>
->> I've now applied this to queue, and will push it out later today.
-> 
-> Thanks, Marc.
-> 
->>
->> Out of curiosity, is there any reason why this is arm64 only?
-> 
-> It was simply because I didn't have a convenient 32bit architecture
-> develop environment at hand and didn't spend time to set it up myself
-> :(
-> (As specified in the nesting RFC patch series cover letter, the
-> nesting patches are compiled, but not tested on 32-bit architecture
-> yet.)
-> I guess it's time to set it up.
-> 
->> As far as
->> I can tell, we're only missing the cp15 handling (both for arm and in
->> the 32bit handling in arm64).
-> 
-> I think so, too. I can't promise when, but I'll try to add those once
-> I set the develop environment.
+Hi,
+On 02/03/2017 09:24 AM, Lukasz Majewski wrote:
+> The "operating-points" property have been replaced with
+> "operating-points-v2". Only entries with the same frequencies have
+> been added, so no reqression should be introduced.
+>
+> Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> ---
+>  arch/arm/boot/dts/dra7.dtsi | 22 +++++++++++++++++-----
+>  1 file changed, 17 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 3c228f9..a860a56 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -80,11 +80,7 @@
+>  			compatible = "arm,cortex-a15";
+>  			reg = <0>;
+>
+> -			operating-points = <
+> -				/* kHz    uV */
+> -				1000000	1060000
+> -				1176000	1160000
+> -				>;
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>
+>  			clocks = <&dpll_mpu_ck>;
+>  			clock-names = "cpu";
+> @@ -98,6 +94,22 @@
+>  		};
+>  	};
+>
+> +	cpu0_opp_table: opp_table0 {
+> +		compatible = "operating-points-v2";
+> +		opp-shared;
+> +
+> +		opp_nom at 1000000000 {
+> +			opp-hz = /bits/ 64 <1000000000>;
+> +			opp-microvolt = <1060000 850000 1150000>;
+> +			opp-suspend;
+> +		};
+> +
+> +		opp_od at 1176000000 {
+> +			opp-hz = /bits/ 64 <1176000000>;
+> +			opp-microvolt = <1160000 885000 1160000>;
+> +		};
+> +	};
+> +
 
-That's fine, we can add these later (and maybe I'll just do it, since it
-is pretty trivial).
+This is being done here already [1] as these OPPs have specific requirements 
+depending on the SoC in use. I have sent proper operating-points-v2 tables here 
+[2] already, they won't be ready to merge until after the driver at [1] is merged.
 
-Thanks,
+Regards,
+Dave
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+[1] http://www.spinics.net/lists/devicetree/msg158967.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-May/430209.html
+
+>  	/*
+>  	 * The soc node represents the soc top level view. It is used for IPs
+>  	 * that are not memory mapped in the MPU view or for the MPU itself.
+>
