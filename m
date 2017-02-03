@@ -1,294 +1,303 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri,  3 Feb 2017 19:12:15 +0100
-Subject: [PATCH net-next 7/8] net: ethernet: annapurna: add eee helpers to the
- Alpine driver
-In-Reply-To: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
-References: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
-Message-ID: <20170203181216.30214-8-antoine.tenart@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 3 Feb 2017 18:16:07 +0000
+Subject: [PATCHv2 1/2] arch: Move CONFIG_DEBUG_RODATA and
+ CONFIG_SET_MODULE_RONX to be common
+In-Reply-To: <1486144343-24998-2-git-send-email-labbott@redhat.com>
+References: <1486144343-24998-1-git-send-email-labbott@redhat.com>
+ <1486144343-24998-2-git-send-email-labbott@redhat.com>
+Message-ID: <20170203181607.GA26578@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the get_eee() and set_eee() helpers to support the Energy-Efficient
-(EEE) feature in the Annapurna Labs Alpine driver.
----
- drivers/net/ethernet/annapurna/al_eth.c            | 44 +++++++++++
- drivers/net/ethernet/annapurna/al_hw_eth.h         | 28 +++++++
- drivers/net/ethernet/annapurna/al_hw_eth_ec_regs.h | 11 +++
- .../net/ethernet/annapurna/al_hw_eth_mac_regs.h    | 11 +++
- drivers/net/ethernet/annapurna/al_hw_eth_main.c    | 92 ++++++++++++++++++++++
- 5 files changed, 186 insertions(+)
+On Fri, Feb 03, 2017 at 09:52:21AM -0800, Laura Abbott wrote:
+> There are multiple architectures that support CONFIG_DEBUG_RODATA and
+> CONFIG_SET_MODULE_RONX. These options also now have the ability to be
+> turned off at runtime. Move these to an architecture independent
+> location and make these options def_bool y for almost all of those
+> arches.
+> 
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
 
-diff --git a/drivers/net/ethernet/annapurna/al_eth.c b/drivers/net/ethernet/annapurna/al_eth.c
-index d06a75a49ce5..674dafdb638a 100644
---- a/drivers/net/ethernet/annapurna/al_eth.c
-+++ b/drivers/net/ethernet/annapurna/al_eth.c
-@@ -2519,6 +2519,47 @@ static u32 al_eth_get_rxfh_indir_size(struct net_device *netdev)
- 	return AL_ETH_RX_RSS_TABLE_SIZE;
- }
- 
-+static int al_eth_get_eee(struct net_device *netdev,
-+			  struct ethtool_eee *edata)
-+{
-+	struct al_eth_adapter *adapter = netdev_priv(netdev);
-+	struct al_eth_eee_params params;
-+
-+	if (!adapter->phy_exist)
-+		return -EOPNOTSUPP;
-+
-+	al_eth_eee_get(&adapter->hw_adapter, &params);
-+
-+	edata->eee_enabled = params.enable;
-+	edata->tx_lpi_timer = params.tx_eee_timer;
-+
-+	return phy_ethtool_get_eee(adapter->phydev, edata);
-+}
-+
-+static int al_eth_set_eee(struct net_device *netdev,
-+			  struct ethtool_eee *edata)
-+{
-+	struct al_eth_adapter *adapter = netdev_priv(netdev);
-+	struct al_eth_eee_params params;
-+
-+	struct phy_device *phydev;
-+
-+	if (!adapter->phy_exist)
-+		return -EOPNOTSUPP;
-+
-+	phydev = mdiobus_get_phy(adapter->mdio_bus, adapter->phy_addr);
-+
-+	phy_init_eee(phydev, 1);
-+
-+	params.enable = edata->eee_enabled;
-+	params.tx_eee_timer = edata->tx_lpi_timer;
-+	params.min_interval = 10;
-+
-+	al_eth_eee_config(&adapter->hw_adapter, &params);
-+
-+	return phy_ethtool_set_eee(phydev, edata);
-+}
-+
- static void al_eth_get_wol(struct net_device *netdev,
- 			   struct ethtool_wolinfo *wol)
- {
-@@ -2576,6 +2617,9 @@ static const struct ethtool_ops al_eth_ethtool_ops = {
- 	.set_pauseparam		= al_eth_set_pauseparam,
- 	.get_rxnfc		= al_eth_get_rxnfc,
- 	.get_rxfh_indir_size    = al_eth_get_rxfh_indir_size,
-+
-+	.get_eee		= al_eth_get_eee,
-+	.set_eee		= al_eth_set_eee,
- };
- 
- static void al_eth_tx_csum(struct al_eth_ring *tx_ring,
-diff --git a/drivers/net/ethernet/annapurna/al_hw_eth.h b/drivers/net/ethernet/annapurna/al_hw_eth.h
-index a44f3f200838..2ef11de6b1db 100644
---- a/drivers/net/ethernet/annapurna/al_hw_eth.h
-+++ b/drivers/net/ethernet/annapurna/al_hw_eth.h
-@@ -884,6 +884,34 @@ int al_eth_filter_config(struct al_hw_eth_adapter *adapter, struct al_eth_filter
- 
- int al_eth_flow_control_config(struct al_hw_eth_adapter *adapter, struct al_eth_flow_control_params *params);
- 
-+struct al_eth_eee_params {
-+	u8 enable;
-+	u32 tx_eee_timer; /* time in cycles the interface delays prior to entering eee state */
-+	u32 min_interval; /* minimum interval in cycles between two eee states */
-+	u32 stop_cnt; /* time in cycles to stop Tx mac i/f after getting out of eee state */
-+	bool fast_wake; /* fast_wake is only applicable to 40/50G, otherwise the mode is deep_sleep */
-+};
-+
-+/*
-+ * configure EEE mode
-+ * @param adapter pointer to the private structure.
-+ * @param params pointer to the eee input parameters.
-+ *
-+ * @return return 0 on success. otherwise on failure.
-+ */
-+int al_eth_eee_config(struct al_hw_eth_adapter *adapter,
-+		      struct al_eth_eee_params *params);
-+
-+/*
-+ * get EEE configuration
-+ * @param adapter pointer to the private structure.
-+ * @param params pointer to the eee output parameters.
-+ *
-+ * @return return 0 on success. otherwise on failure.
-+ */
-+int al_eth_eee_get(struct al_hw_eth_adapter *adapter,
-+		   struct al_eth_eee_params *params);
-+
- /* enum for methods when updating systime using triggers */
- enum al_eth_pth_update_method {
- 	AL_ETH_PTH_UPDATE_METHOD_SET = 0, /* Set the time in int/ext update time */
-diff --git a/drivers/net/ethernet/annapurna/al_hw_eth_ec_regs.h b/drivers/net/ethernet/annapurna/al_hw_eth_ec_regs.h
-index c239ac1e8b6c..c9353012101e 100644
---- a/drivers/net/ethernet/annapurna/al_hw_eth_ec_regs.h
-+++ b/drivers/net/ethernet/annapurna/al_hw_eth_ec_regs.h
-@@ -1085,4 +1085,15 @@ struct al_ec_regs {
- /* Threshold high */
- #define EC_EFC_RX_FIFO_HYST_TH_HIGH_SHIFT 16
- 
-+/* Use Ethernet controller Tx FIFO empty status for EEE control */
-+#define EC_EEE_CFG_E_USE_EC_TX_FIFO      BIT(2)
-+/* Use Ethernet controller Rx FIFO empty status for EEE control */
-+#define EC_EEE_CFG_E_USE_EC_RX_FIFO      BIT(3)
-+/* Enable Low power signalling. */
-+#define EC_EEE_CFG_E_ENABLE              BIT(4)
-+/* Mask output to MAC.  */
-+#define EC_EEE_CFG_E_MASK_MAC_EEE        BIT(8)
-+/* Mask output to stop MAC interface. */
-+#define EC_EEE_CFG_E_MASK_EC_TMI_STOP    BIT(9)
-+
- #endif /* __AL_HW_EC_REG_H */
-diff --git a/drivers/net/ethernet/annapurna/al_hw_eth_mac_regs.h b/drivers/net/ethernet/annapurna/al_hw_eth_mac_regs.h
-index b2b956b7e28f..4201f3c4b01f 100644
---- a/drivers/net/ethernet/annapurna/al_hw_eth_mac_regs.h
-+++ b/drivers/net/ethernet/annapurna/al_hw_eth_mac_regs.h
-@@ -692,6 +692,10 @@ struct al_eth_mac_regs {
- /* LED default value */
- #define ETH_MAC_GEN_LED_CFG_DEF          BIT(4)
- 
-+/* EEE timer value  */
-+#define ETH_MAC_KR_PCS_CFG_EEE_TIMER_VAL_MASK 0x0000FF00
-+#define ETH_MAC_KR_PCS_CFG_EEE_TIMER_VAL_SHIFT 8
-+
- #define ETH_MAC_SGMII_REG_ADDR_CTRL_REG	0x0
- #define ETH_MAC_SGMII_REG_ADDR_IF_MODE_REG 0x14
- 
-@@ -703,6 +707,10 @@ struct al_eth_mac_regs {
- #define ETH_MAC_SGMII_REG_DATA_IF_MODE_SGMII_SPEED_1000		0x2
- #define ETH_MAC_SGMII_REG_DATA_IF_MODE_SGMII_DUPLEX		BIT(4)
- 
-+/* Low power timer configuration */
-+#define ETH_MAC_GEN_V3_PCS_40G_LL_EEE_CFG_TIMER_VAL_MASK 0x000000FF
-+#define ETH_MAC_GEN_V3_PCS_40G_LL_EEE_CFG_TIMER_VAL_SHIFT 0
-+
- /* command config */
- #define ETH_MAC_GEN_V3_MAC_40G_COMMAND_CONFIG_ADDR	0x00000008
- #define ETH_MAC_GEN_V3_MAC_40G_COMMAND_CONFIG_TX_ENA	BIT(0)
-@@ -724,4 +732,7 @@ struct al_eth_mac_regs {
- /* spare */
- #define ETH_MAC_GEN_V3_SPARE_CHICKEN_DISABLE_TIMESTAMP_STRETCH BIT(0)
- 
-+/* 40g EEE control and capability */
-+#define ETH_MAC_GEN_V3_PCS_40G_EEE_CONTROL_ADDR         0x00000028
-+
- #endif /* __AL_HW_ETH_MAC_REGS_H__ */
-diff --git a/drivers/net/ethernet/annapurna/al_hw_eth_main.c b/drivers/net/ethernet/annapurna/al_hw_eth_main.c
-index dac0c1e2a941..99ed601332da 100644
---- a/drivers/net/ethernet/annapurna/al_hw_eth_main.c
-+++ b/drivers/net/ethernet/annapurna/al_hw_eth_main.c
-@@ -20,6 +20,12 @@
- #define AL_ADDR_LOW(x)	((u32)((dma_addr_t)(x)))
- #define AL_ADDR_HIGH(x)	((u32)((((dma_addr_t)(x)) >> 16) >> 16))
- 
-+/* Number of xfi_txclk cycles that accumulate into 100ns */
-+#define ETH_MAC_KR_10_PCS_CFG_EEE_TIMER_VAL 52
-+#define ETH_MAC_KR_25_PCS_CFG_EEE_TIMER_VAL 80
-+#define ETH_MAC_XLG_40_PCS_CFG_EEE_TIMER_VAL 63
-+#define ETH_MAC_XLG_50_PCS_CFG_EEE_TIMER_VAL 85
-+
- #define AL_ETH_TX_PKT_UDMA_FLAGS	(AL_ETH_TX_FLAGS_NO_SNOOP | \
- 					 AL_ETH_TX_FLAGS_INT)
- 
-@@ -2639,6 +2645,89 @@ int al_eth_flow_control_config(struct al_hw_eth_adapter *adapter,
- 	return 0;
- }
- 
-+int al_eth_eee_get(struct al_hw_eth_adapter *adapter,
-+		   struct al_eth_eee_params *params)
-+{
-+	u32 reg;
-+
-+	netdev_dbg(adapter->netdev, "[%s]: getting eee.\n", adapter->name);
-+
-+	reg = readl(&adapter->ec_regs_base->eee.cfg_e);
-+	params->enable = (reg & EC_EEE_CFG_E_ENABLE) ? true : false;
-+
-+	params->tx_eee_timer = readl(&adapter->ec_regs_base->eee.pre_cnt);
-+	params->min_interval = readl(&adapter->ec_regs_base->eee.post_cnt);
-+	params->stop_cnt = readl(&adapter->ec_regs_base->eee.stop_cnt);
-+
-+	return 0;
-+}
-+
-+int al_eth_eee_config(struct al_hw_eth_adapter *adapter,
-+		      struct al_eth_eee_params *params)
-+{
-+	u32 reg;
-+
-+	netdev_dbg(adapter->netdev, "[%s]: config eee.\n", adapter->name);
-+
-+	if (params->enable == 0) {
-+		netdev_dbg(adapter->netdev, "[%s]: disable eee.\n",
-+			   adapter->name);
-+		writel(0, &adapter->ec_regs_base->eee.cfg_e);
-+		return 0;
-+	}
-+	if (AL_ETH_IS_10G_MAC(adapter->mac_mode) || AL_ETH_IS_25G_MAC(adapter->mac_mode)) {
-+		reg = readl(&adapter->mac_regs_base->kr.pcs_cfg);
-+		reg &= ~ETH_MAC_KR_PCS_CFG_EEE_TIMER_VAL_MASK;
-+		reg |= (AL_ETH_IS_10G_MAC(adapter->mac_mode) ?
-+			ETH_MAC_KR_10_PCS_CFG_EEE_TIMER_VAL :
-+			ETH_MAC_KR_25_PCS_CFG_EEE_TIMER_VAL) <<
-+			ETH_MAC_KR_PCS_CFG_EEE_TIMER_VAL_SHIFT,
-+		writel(reg, &adapter->mac_regs_base->kr.pcs_cfg);
-+	}
-+	if ((adapter->mac_mode == AL_ETH_MAC_MODE_XLG_LL_40G) ||
-+	    (adapter->mac_mode == AL_ETH_MAC_MODE_XLG_LL_50G)) {
-+		reg = readl(&adapter->mac_regs_base->gen_v3.pcs_40g_ll_eee_cfg);
-+		reg &= ~ETH_MAC_GEN_V3_PCS_40G_LL_EEE_CFG_TIMER_VAL_MASK;
-+		reg |= ((adapter->mac_mode == AL_ETH_MAC_MODE_XLG_LL_40G) ?
-+			ETH_MAC_XLG_40_PCS_CFG_EEE_TIMER_VAL :
-+			ETH_MAC_XLG_50_PCS_CFG_EEE_TIMER_VAL) <<
-+			ETH_MAC_GEN_V3_PCS_40G_LL_EEE_CFG_TIMER_VAL_SHIFT;
-+		writel(reg, &adapter->mac_regs_base->gen_v3.pcs_40g_ll_eee_cfg);
-+
-+		/* set Deep sleep mode as the LPI function (instead of Fast wake mode) */
-+		al_eth_40g_pcs_reg_write(adapter, ETH_MAC_GEN_V3_PCS_40G_EEE_CONTROL_ADDR,
-+					 params->fast_wake ? 1 : 0);
-+	}
-+
-+	writel(params->tx_eee_timer, &adapter->ec_regs_base->eee.pre_cnt);
-+	writel(params->min_interval, &adapter->ec_regs_base->eee.post_cnt);
-+	writel(params->stop_cnt, &adapter->ec_regs_base->eee.stop_cnt);
-+
-+	reg = EC_EEE_CFG_E_MASK_EC_TMI_STOP | EC_EEE_CFG_E_MASK_MAC_EEE |
-+	      EC_EEE_CFG_E_ENABLE | EC_EEE_CFG_E_USE_EC_TX_FIFO |
-+	      EC_EEE_CFG_E_USE_EC_RX_FIFO;
-+
-+	/*
-+	 * Addressing RMN: 3732
-+	 *
-+	 * RMN description:
-+	 * When the HW get into eee mode, it can't transmit any pause packet
-+	 * (when flow control policy is enabled).
-+	 * In such case, the HW has no way to handle extreme pushback from
-+	 * the Rx_path fifos.
-+	 *
-+	 * Software flow:
-+	 * Configure RX_FIFO empty as eee mode term.
-+	 * That way, nothing will prevent pause packet transmittion in
-+	 * case of extreme pushback from the Rx_path fifos.
-+	 *
-+	 */
-+
-+	writel(reg, &adapter->ec_regs_base->eee.cfg_e);
-+
-+	return 0;
-+}
-+
- /* get statistics */
- int al_eth_mac_stats_get(struct al_hw_eth_adapter *adapter, struct al_eth_mac_stats *stats)
- {
-@@ -2860,6 +2949,9 @@ int al_eth_mac_stats_get(struct al_hw_eth_adapter *adapter, struct al_eth_mac_st
- 		stats->etherStatsPkts1519toX = _40g_mac_reg_read32(&reg_rx_stats->etherStatsPkts1519toMax);
- 	}
- 
-+	stats->eee_in = readl(&adapter->mac_regs_base->stat.eee_in);
-+	stats->eee_out = readl(&adapter->mac_regs_base->stat.eee_out);
-+
- /*	stats->etherStatsPkts = 1; */
- 	return 0;
- }
--- 
-2.11.0
+>From my POV this looks good. FWIW:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> ---
+> v2: This patch is now doing just the refactor of the existing config options.
+> ---
+>  arch/Kconfig              | 28 ++++++++++++++++++++++++++++
+>  arch/arm/Kconfig          |  3 +++
+>  arch/arm/Kconfig.debug    | 11 -----------
+>  arch/arm/mm/Kconfig       | 12 ------------
+>  arch/arm64/Kconfig        |  5 ++---
+>  arch/arm64/Kconfig.debug  | 11 -----------
+>  arch/parisc/Kconfig       |  1 +
+>  arch/parisc/Kconfig.debug | 11 -----------
+>  arch/s390/Kconfig         |  5 ++---
+>  arch/s390/Kconfig.debug   |  3 ---
+>  arch/x86/Kconfig          |  5 ++---
+>  arch/x86/Kconfig.debug    | 11 -----------
+>  12 files changed, 38 insertions(+), 68 deletions(-)
+> 
+> diff --git a/arch/Kconfig b/arch/Kconfig
+> index 99839c2..22ee01e 100644
+> --- a/arch/Kconfig
+> +++ b/arch/Kconfig
+> @@ -781,4 +781,32 @@ config VMAP_STACK
+>  	  the stack to map directly to the KASAN shadow map using a formula
+>  	  that is incorrect if the stack is in vmalloc space.
+>  
+> +config ARCH_NO_STRICT_RWX_DEFAULTS
+> +	def_bool n
+> +
+> +config ARCH_HAS_STRICT_KERNEL_RWX
+> +	def_bool n
+> +
+> +config DEBUG_RODATA
+> +	def_bool y if !ARCH_NO_STRICT_RWX_DEFAULTS
+> +	prompt "Make kernel text and rodata read-only" if ARCH_NO_STRICT_RWX_DEFAULTS
+> +	depends on ARCH_HAS_STRICT_KERNEL_RWX
+> +	help
+> +	  If this is set, kernel text and rodata memory will be made read-only,
+> +	  and non-text memory will be made non-executable. This provides
+> +	  protection against certain security exploits (e.g. executing the heap
+> +	  or modifying text)
+> +
+> +config ARCH_HAS_STRICT_MODULE_RWX
+> +	def_bool n
+> +
+> +config DEBUG_SET_MODULE_RONX
+> +	def_bool y if !ARCH_NO_STRICT_RWX_DEFAULTS
+> +	prompt "Set loadable kenrel module data as NX and text as RO" if ARCH_NO_STRICT_RWX_DEFAULTS
+> +	depends on ARCH_HAS_STRICT_MODULE_RWX && MODULES
+> +	help
+> +	  If this is set, module text and rodata memory will be made read-only,
+> +	  and non-text memory will be made non-executable. This provides
+> +	  protection against certain security exploits (e.g. writing to text)
+> +
+>  source "kernel/gcov/Kconfig"
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 186c4c2..aa73ca8 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -4,10 +4,13 @@ config ARM
+>  	select ARCH_CLOCKSOURCE_DATA
+>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
+>  	select ARCH_HAS_ELF_RANDOMIZE
+> +	select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
+> +	select ARCH_HAS_STRICT_MODULE_RWX if MMU
+>  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+>  	select ARCH_HAVE_CUSTOM_GPIO_H
+>  	select ARCH_HAS_GCOV_PROFILE_ALL
+>  	select ARCH_MIGHT_HAVE_PC_PARPORT
+> +	select ARCH_NO_STRICT_RWX_DEFAULTS if !CPU_V7
+>  	select ARCH_SUPPORTS_ATOMIC_RMW
+>  	select ARCH_USE_BUILTIN_BSWAP
+>  	select ARCH_USE_CMPXCHG_LOCKREF
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index d83f7c3..426d271 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -1738,17 +1738,6 @@ config PID_IN_CONTEXTIDR
+>  	  additional instructions during context switch. Say Y here only if you
+>  	  are planning to use hardware trace tools with this kernel.
+>  
+> -config DEBUG_SET_MODULE_RONX
+> -	bool "Set loadable kernel module data as NX and text as RO"
+> -	depends on MODULES && MMU
+> -	---help---
+> -	  This option helps catch unintended modifications to loadable
+> -	  kernel module's text and read-only data. It also prevents execution
+> -	  of module data. Such protection may interfere with run-time code
+> -	  patching and dynamic kernel tracing - and they might also protect
+> -	  against certain classes of kernel exploits.
+> -	  If in doubt, say "N".
+> -
+>  source "drivers/hwtracing/coresight/Kconfig"
+>  
+>  endmenu
+> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+> index f68e8ec..419a035 100644
+> --- a/arch/arm/mm/Kconfig
+> +++ b/arch/arm/mm/Kconfig
+> @@ -1051,18 +1051,6 @@ config ARCH_SUPPORTS_BIG_ENDIAN
+>  	  This option specifies the architecture can support big endian
+>  	  operation.
+>  
+> -config DEBUG_RODATA
+> -	bool "Make kernel text and rodata read-only"
+> -	depends on MMU && !XIP_KERNEL
+> -	default y if CPU_V7
+> -	help
+> -	  If this is set, kernel text and rodata memory will be made
+> -	  read-only, and non-text kernel memory will be made non-executable.
+> -	  The tradeoff is that each region is padded to section-size (1MiB)
+> -	  boundaries (because their permissions are different and splitting
+> -	  the 1M pages into 4K ones causes TLB performance problems), which
+> -	  can waste memory.
+> -
+>  config DEBUG_ALIGN_RODATA
+>  	bool "Make rodata strictly non-executable"
+>  	depends on DEBUG_RODATA
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 1117421..e1efbcc 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -13,6 +13,8 @@ config ARM64
+>  	select ARCH_HAS_GIGANTIC_PAGE
+>  	select ARCH_HAS_KCOV
+>  	select ARCH_HAS_SG_CHAIN
+> +	select ARCH_HAS_STRICT_KERNEL_RWX
+> +	select ARCH_HAS_STRICT_MODULE_RWX
+>  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+>  	select ARCH_USE_CMPXCHG_LOCKREF
+>  	select ARCH_SUPPORTS_ATOMIC_RMW
+> @@ -123,9 +125,6 @@ config ARCH_PHYS_ADDR_T_64BIT
+>  config MMU
+>  	def_bool y
+>  
+> -config DEBUG_RODATA
+> -	def_bool y
+> -
+>  config ARM64_PAGE_SHIFT
+>  	int
+>  	default 16 if ARM64_64K_PAGES
+> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+> index d1ebd46..939815e 100644
+> --- a/arch/arm64/Kconfig.debug
+> +++ b/arch/arm64/Kconfig.debug
+> @@ -71,17 +71,6 @@ config DEBUG_WX
+>  
+>  	  If in doubt, say "Y".
+>  
+> -config DEBUG_SET_MODULE_RONX
+> -	bool "Set loadable kernel module data as NX and text as RO"
+> -	depends on MODULES
+> -	default y
+> -	help
+> -	  Is this is set, kernel module text and rodata will be made read-only.
+> -	  This is to help catch accidental or malicious attempts to change the
+> -	  kernel's executable code.
+> -
+> -	  If in doubt, say Y.
+> -
+>  config DEBUG_ALIGN_RODATA
+>  	depends on DEBUG_RODATA
+>  	bool "Align linker sections up to SECTION_SIZE"
+> diff --git a/arch/parisc/Kconfig b/arch/parisc/Kconfig
+> index 3a71f38..ad294b3 100644
+> --- a/arch/parisc/Kconfig
+> +++ b/arch/parisc/Kconfig
+> @@ -8,6 +8,7 @@ config PARISC
+>  	select HAVE_SYSCALL_TRACEPOINTS
+>  	select ARCH_WANT_FRAME_POINTERS
+>  	select ARCH_HAS_ELF_RANDOMIZE
+> +	select ARCH_HAS_STRICT_KERNEL_RWX
+>  	select RTC_CLASS
+>  	select RTC_DRV_GENERIC
+>  	select INIT_ALL_POSSIBLE
+> diff --git a/arch/parisc/Kconfig.debug b/arch/parisc/Kconfig.debug
+> index 68b7cbd..0d856b9 100644
+> --- a/arch/parisc/Kconfig.debug
+> +++ b/arch/parisc/Kconfig.debug
+> @@ -5,15 +5,4 @@ source "lib/Kconfig.debug"
+>  config TRACE_IRQFLAGS_SUPPORT
+>  	def_bool y
+>  
+> -config DEBUG_RODATA
+> -       bool "Write protect kernel read-only data structures"
+> -       depends on DEBUG_KERNEL
+> -       default y
+> -       help
+> -         Mark the kernel read-only data as write-protected in the pagetables,
+> -         in order to catch accidental (and incorrect) writes to such const
+> -         data. This option may have a slight performance impact because a
+> -         portion of the kernel code won't be covered by a TLB anymore.
+> -         If in doubt, say "N".
+> -
+>  endmenu
+> diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
+> index c6722112..53bb0e3 100644
+> --- a/arch/s390/Kconfig
+> +++ b/arch/s390/Kconfig
+> @@ -62,9 +62,6 @@ config PCI_QUIRKS
+>  config ARCH_SUPPORTS_UPROBES
+>  	def_bool y
+>  
+> -config DEBUG_RODATA
+> -	def_bool y
+> -
+>  config S390
+>  	def_bool y
+>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
+> @@ -73,6 +70,8 @@ config S390
+>  	select ARCH_HAS_GIGANTIC_PAGE
+>  	select ARCH_HAS_KCOV
+>  	select ARCH_HAS_SG_CHAIN
+> +	select ARCH_HAS_STRICT_KERNEL_RWX
+> +	select ARCH_HAS_STRICT_MODULE_RWX
+>  	select ARCH_HAS_UBSAN_SANITIZE_ALL
+>  	select ARCH_HAVE_NMI_SAFE_CMPXCHG
+>  	select ARCH_INLINE_READ_LOCK
+> diff --git a/arch/s390/Kconfig.debug b/arch/s390/Kconfig.debug
+> index 26c5d5be..57f8ea9 100644
+> --- a/arch/s390/Kconfig.debug
+> +++ b/arch/s390/Kconfig.debug
+> @@ -17,7 +17,4 @@ config S390_PTDUMP
+>  	  kernel.
+>  	  If in doubt, say "N"
+>  
+> -config DEBUG_SET_MODULE_RONX
+> -	def_bool y
+> -	depends on MODULES
+>  endmenu
+> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> index e487493..13e1bf4 100644
+> --- a/arch/x86/Kconfig
+> +++ b/arch/x86/Kconfig
+> @@ -54,6 +54,8 @@ config X86
+>  	select ARCH_HAS_MMIO_FLUSH
+>  	select ARCH_HAS_PMEM_API		if X86_64
+>  	select ARCH_HAS_SG_CHAIN
+> +	select ARCH_HAS_STRICT_KERNEL_RWX
+> +	select ARCH_HAS_STRICT_MODULE_RWX
+>  	select ARCH_HAS_UBSAN_SANITIZE_ALL
+>  	select ARCH_HAVE_NMI_SAFE_CMPXCHG
+>  	select ARCH_MIGHT_HAVE_ACPI_PDC		if ACPI
+> @@ -309,9 +311,6 @@ config ARCH_SUPPORTS_UPROBES
+>  config FIX_EARLYCON_MEM
+>  	def_bool y
+>  
+> -config DEBUG_RODATA
+> -	def_bool y
+> -
+>  config PGTABLE_LEVELS
+>  	int
+>  	default 4 if X86_64
+> diff --git a/arch/x86/Kconfig.debug b/arch/x86/Kconfig.debug
+> index 67eec55..69cdd0b 100644
+> --- a/arch/x86/Kconfig.debug
+> +++ b/arch/x86/Kconfig.debug
+> @@ -109,17 +109,6 @@ config DEBUG_WX
+>  
+>  	  If in doubt, say "Y".
+>  
+> -config DEBUG_SET_MODULE_RONX
+> -	bool "Set loadable kernel module data as NX and text as RO"
+> -	depends on MODULES
+> -	---help---
+> -	  This option helps catch unintended modifications to loadable
+> -	  kernel module's text and read-only data. It also prevents execution
+> -	  of module data. Such protection may interfere with run-time code
+> -	  patching and dynamic kernel tracing - and they might also protect
+> -	  against certain classes of kernel exploits.
+> -	  If in doubt, say "N".
+> -
+>  config DEBUG_NX_TEST
+>  	tristate "Testcase for the NX non-executable stack feature"
+>  	depends on DEBUG_KERNEL && m
+> -- 
+> 2.7.4
+> 
