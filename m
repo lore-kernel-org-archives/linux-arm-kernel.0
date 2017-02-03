@@ -1,102 +1,201 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Fri,  3 Feb 2017 19:12:08 +0100
-Subject: [PATCH net-next 0/8] ARM: Alpine: Ethernet support
-Message-ID: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
+Date: Fri,  3 Feb 2017 19:12:09 +0100
+Subject: [PATCH net-next 1/8] alpine: add I/O fabric interrupt controller
+ (iofic) helpers
+In-Reply-To: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
+References: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
+Message-ID: <20170203181216.30214-2-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+All units connected to the I/O fabric share a common interrupt
+controller interface, with the same architecture. This means there are
+multiple interrupt controllers exposed, one per unit connected to the
+I/O fabric, with the exact same interface.
 
-This series intend to add Ethernet support for the Annapurna Labs Alpine
-v1 (ARM) and v2 (ARM64). The series first adds helpers for the I/O
-fabric interrupt controller that is found in many controllers on the
-Alpine, then helpers for the so called "Universal DMA" (UDMA) are also
-added and finally adds the Alpine Ethernet driver (split in a few
-patches, per functionality).
+One particularity of the Alpine platform is that units conencted to the
+I/O fabric and their controllers (iofic, udma) are exposed as PCIe
+endpoints and their registers are mapped through BARs.
 
-Many units in the Alpine platform (as the Ethernet controller) are
-connected to what is called an I/O fabric bus. All these units share a
-common implementation of an interrupt controller (the IOFIC) and some
-share a DMA controller implementation (the UDMA). These controller are
-duplicated in each unit (and there can be more than one per unit) and
-use the same common definitions and functions. This is why SoC-specific
-helpers and headers are provided here, to abstract some code. As these
-controllers are not fully independent ones (they just happen to expose
-the same registers in the units register spaces), proper interrupt nor
-DMA drivers were not implemented.
+This patch adds helpers for drivers supporting one unit connected to the
+Alpine I/O fabric, to configure and use the per-unit exposed iofic.
 
-This Ethernet controller is connected over PCIe, uses MSIX interrupts,
-handle multiple UDMA controllers (4 rx queues + 4 tx queues per UDMA),
-and offloading helpers (TSO, checksum offloads...).
-
-This was tested on an Alpine v2 (ARM64) platform, and applies on top
-of net-next (8fe809a99263).
-
-Thanks,
-
-Antoine Tenart (8):
-  alpine: add I/O fabric interrupt controller (iofic) helpers
-  soc: alpine: add udma helpers
-  pci: add Annapurna Labs PCI id
-  net: ethernet: add the Alpine Ethernet driver
-  net: ethernet: annapurna: add statistics helper
-  net: ethernet: annapurna: add wol helpers to the Alpine driver
-  net: ethernet: annapurna: add eee helpers to the Alpine driver
-  net: ethernet: annapurna: add the coalesce helpers to the Alpine
-    driver
-
- drivers/net/ethernet/Kconfig                       |    1 +
- drivers/net/ethernet/Makefile                      |    1 +
- drivers/net/ethernet/annapurna/Kconfig             |   29 +
- drivers/net/ethernet/annapurna/Makefile            |    6 +
- drivers/net/ethernet/annapurna/al_eth.c            | 3267 +++++++++++++++++++
- drivers/net/ethernet/annapurna/al_eth.h            |  282 ++
- drivers/net/ethernet/annapurna/al_hw_eth.h         | 1301 ++++++++
- drivers/net/ethernet/annapurna/al_hw_eth_ec_regs.h | 1099 +++++++
- .../net/ethernet/annapurna/al_hw_eth_mac_regs.h    |  738 +++++
- drivers/net/ethernet/annapurna/al_hw_eth_main.c    | 3367 ++++++++++++++++++++
- .../ethernet/annapurna/al_hw_unit_adapter_regs.h   |   24 +
- drivers/soc/Kconfig                                |    1 +
- drivers/soc/Makefile                               |    1 +
- drivers/soc/alpine/Kconfig                         |   11 +
- drivers/soc/alpine/Makefile                        |    1 +
- drivers/soc/alpine/udma/Makefile                   |    1 +
- drivers/soc/alpine/udma/al_udma_config.c           |  140 +
- drivers/soc/alpine/udma/al_udma_iofic.c            |  110 +
- drivers/soc/alpine/udma/al_udma_main.c             |  245 ++
- drivers/soc/alpine/udma/al_udma_queue.c            |  232 ++
- include/linux/pci_ids.h                            |    2 +
- include/linux/soc/alpine/al_hw_udma.h              |  499 +++
- include/linux/soc/alpine/al_hw_udma_config.h       |   75 +
- include/linux/soc/alpine/al_hw_udma_iofic.h        |  199 ++
- include/linux/soc/alpine/al_hw_udma_regs.h         |  134 +
- include/linux/soc/alpine/al_hw_udma_regs_m2s.h     |  413 +++
- include/linux/soc/alpine/al_hw_udma_regs_s2m.h     |  294 ++
- include/linux/soc/alpine/iofic.h                   |  165 +
- 28 files changed, 12638 insertions(+)
- create mode 100644 drivers/net/ethernet/annapurna/Kconfig
- create mode 100644 drivers/net/ethernet/annapurna/Makefile
- create mode 100644 drivers/net/ethernet/annapurna/al_eth.c
- create mode 100644 drivers/net/ethernet/annapurna/al_eth.h
- create mode 100644 drivers/net/ethernet/annapurna/al_hw_eth.h
- create mode 100644 drivers/net/ethernet/annapurna/al_hw_eth_ec_regs.h
- create mode 100644 drivers/net/ethernet/annapurna/al_hw_eth_mac_regs.h
- create mode 100644 drivers/net/ethernet/annapurna/al_hw_eth_main.c
- create mode 100644 drivers/net/ethernet/annapurna/al_hw_unit_adapter_regs.h
- create mode 100644 drivers/soc/alpine/Kconfig
- create mode 100644 drivers/soc/alpine/Makefile
- create mode 100644 drivers/soc/alpine/udma/Makefile
- create mode 100644 drivers/soc/alpine/udma/al_udma_config.c
- create mode 100644 drivers/soc/alpine/udma/al_udma_iofic.c
- create mode 100644 drivers/soc/alpine/udma/al_udma_main.c
- create mode 100644 drivers/soc/alpine/udma/al_udma_queue.c
- create mode 100644 include/linux/soc/alpine/al_hw_udma.h
- create mode 100644 include/linux/soc/alpine/al_hw_udma_config.h
- create mode 100644 include/linux/soc/alpine/al_hw_udma_iofic.h
- create mode 100644 include/linux/soc/alpine/al_hw_udma_regs.h
- create mode 100644 include/linux/soc/alpine/al_hw_udma_regs_m2s.h
- create mode 100644 include/linux/soc/alpine/al_hw_udma_regs_s2m.h
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ include/linux/soc/alpine/iofic.h | 165 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 165 insertions(+)
  create mode 100644 include/linux/soc/alpine/iofic.h
 
+diff --git a/include/linux/soc/alpine/iofic.h b/include/linux/soc/alpine/iofic.h
+new file mode 100644
+index 000000000000..d65b99e865ff
+--- /dev/null
++++ b/include/linux/soc/alpine/iofic.h
+@@ -0,0 +1,165 @@
++/*
++ * Annapurna Labs IOFIC helpers
++ *
++ * Copyright (C) 2017, Amazon.com, Inc. or its affiliates. All Rights Reserved.
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef __AL_IOFIC_H__
++#define __AL_IOFIC_H__
++
++#include <linux/io.h>
++#include <linux/slab.h>
++
++#define CTRL_GROUP(group)		((group) * 0x40)
++#define GROUP_INT_MODE(group, vector)	(0x400 + (group) * 0x20 + (vector) * 0x8)
++
++#define INT_CAUSE_GROUP		0x0
++#define INT_MASK_GROUP		0x10
++#define INT_MASK_CLEAR_GROUP	0x18
++#define INT_CONTROL_GROUP	0x28
++#define INT_ABORT_MASK_GROUP	0x30
++
++#define INT_CONTROL_GRP_CLEAR_ON_READ	BIT(0)
++#define INT_CONTROL_GRP_AUTO_MASK	BIT(1)
++#define INT_CONTROL_GRP_AUTO_CLEAR	BIT(2)
++#define INT_CONTROL_GRP_SET_ON_POSEDGE	BIT(3)
++#define INT_CONTROL_GRP_MASK_MSI_X	BIT(5)
++/* MSI-X AWID value, same ID for all cause bits */
++#define INT_CONTROL_GRP_MOD_RES_MASK	0xf000000
++#define INT_CONTROL_GRP_MOD_RES_SHIFT	0x18
++
++#define INT_MOD_INTV_MASK		0x000000ff
++#define INT_MOD_INTV_SHIFT		0x0
++
++
++/*
++ * Configure the interrupt controller registers, actual interrupts are still
++ * masked at this stage.
++ *
++ * @param regs_base regs pointer to interrupt controller registers
++ * @param group the interrupt group.
++ * @param flags flags of Interrupt Control Register
++ */
++
++static inline void al_iofic_config(void __iomem *base, int group, u32 flags)
++{
++	writel(flags, base + CTRL_GROUP(group) + INT_CONTROL_GROUP);
++}
++
++/*
++ * Configure the moderation timer resolution for a given group.
++ *
++ * Applies for both msix and legacy mode.
++ *
++ * @param regs_base pointer to unit registers
++ * @param group the interrupt group
++ * @param resolution resolution of the timer interval, the resolution determines
++ * the rate of decrementing the interval timer, setting value N means that the
++ * interval timer will be decremented each (N+1) * (0.68) micro seconds.
++ */
++static inline void al_iofic_moder_res_config(void __iomem *base, int group,
++					     u8 resolution)
++{
++	u32 reg = readl(base + CTRL_GROUP(group) + INT_CONTROL_GROUP);
++
++	reg &= ~INT_CONTROL_GRP_MOD_RES_MASK;
++	reg |= resolution << INT_CONTROL_GRP_MOD_RES_SHIFT;
++
++	writel(reg, base + CTRL_GROUP(group) + INT_CONTROL_GROUP);
++}
++
++/*
++ * Configure the moderation timer interval for a given msix vector.
++ *
++ * @param regs_base pointer to unit registers
++ * @param group the interrupt group
++ * @param vector vector index
++ * @param interval interval between interrupts, 0 disable
++ */
++static inline void al_iofic_msix_moder_interval_config(void __iomem *base,
++						       int group, u8 vector,
++						       u8 interval)
++{
++	u32 reg = readl(base + GROUP_INT_MODE(group, vector));
++
++	reg &= ~INT_MOD_INTV_MASK;
++	reg |= interval << INT_MOD_INTV_SHIFT;
++
++	writel(reg, base + GROUP_INT_MODE(group, vector));
++}
++
++/*
++ * Unmask specific interrupts for a given group.
++ *
++ * This functions guarantees atomic operations, it is performance optimized as
++ * it will not require read-modify-write. The unmask done using the interrupt
++ * mask clear register, so it's safe to call it while the mask is changed by
++ * the HW (auto mask) or another core.
++ *
++ * @param regs_base pointer to unit registers
++ * @param group the interrupt group
++ * @param mask bitwise of interrupts to unmask, set bits will be unmasked.
++ */
++static inline void al_iofic_unmask(void __iomem *base, int group, u32 mask)
++{
++	/*
++	 * use the mask clear register, no need to read the mask register
++	 * itself. write 0 to unmask, 1 has no effect
++	 */
++	writel(~mask, base + CTRL_GROUP(group) + INT_MASK_CLEAR_GROUP);
++}
++
++/*
++ * Mask specific interrupts for a given group.
++ *
++ * This functions modifies interrupt mask register, the callee must make sure
++ * the mask is not changed by another cpu.
++ *
++ * @param regs_base pointer to unit registers
++ * @param group the interrupt group
++ * @param mask bitwise of interrupts to mask, set bits will be masked.
++ */
++static inline void al_iofic_mask(void __iomem *base, int group, u32 mask)
++{
++	u32 reg = readl(base + CTRL_GROUP(group) + INT_MASK_GROUP);
++	reg |= mask;
++	writel(reg, base + CTRL_GROUP(group) + INT_MASK_GROUP);
++}
++
++/*
++ * Read interrupt cause register for a given group.
++ *
++ * This will clear the set bits if the clear on read mode is enabled.
++ *
++ * @param regs_base pointer to unit registers
++ * @param group the interrupt group
++ */
++static inline u32 al_iofic_read_cause(void __iomem *base, int group)
++{
++	return readl(base + CTRL_GROUP(group) + INT_CAUSE_GROUP);
++}
++
++/*
++ * Unmask specific interrupts from aborting the udma a given group.
++ *
++ * @param regs_base pointer to unit registers
++ * @param group the interrupt group
++ * @param mask bitwise of interrupts to mask
++ */
++static inline void al_iofic_abort_mask(void __iomem *base, int group, u32 mask)
++{
++	writel(mask, base + CTRL_GROUP(group) + INT_ABORT_MASK_GROUP);
++}
++
++/* return the offset of the unmask register for a given group */
++static inline u32 __iomem *al_iofic_unmask_offset_get(void __iomem *base,
++						      int group)
++{
++	return base + CTRL_GROUP(group) + INT_MASK_CLEAR_GROUP;
++}
++
++#endif
 -- 
 2.11.0
