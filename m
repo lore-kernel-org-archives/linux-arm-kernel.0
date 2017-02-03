@@ -1,41 +1,115 @@
-From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
-Date: Fri, 3 Feb 2017 10:56:34 -0500
-Subject: [PATCH 4/6] bus: add driver for the Technologic Systems NBUS
-In-Reply-To: <CACRpkdbAYyxTOq_ZAwjSJAhCbrzTaUMSG9N7t8Wq1ifTDFBLrQ@mail.gmail.com>
-References: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
- <20161214231237.17496-5-sebastien.bourdelin@savoirfairelinux.com>
- <CACRpkdYHHrYY-fAPnNmV94ejFJ36rhSF0SqSVHkTNq+YCRNNZw@mail.gmail.com>
- <7bc0871f-ac0a-e8a0-0c84-a0e61b3991a8@savoirfairelinux.com>
- <CACRpkdbAYyxTOq_ZAwjSJAhCbrzTaUMSG9N7t8Wq1ifTDFBLrQ@mail.gmail.com>
-Message-ID: <3f3cd438-63dc-dea8-e17b-7eb3e588cc36@savoirfairelinux.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Feb 2017 15:54:49 +0000
+Subject: [PATCHv2 net-next 05/16] net: mvpp2: introduce PPv2.2 HW
+ descriptors and adapt accessors
+In-Reply-To: <231514f4-2e35-8bde-4469-aada833635aa@arm.com>
+References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482943592-12556-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170106142901.GC14217@n2100.armlinux.org.uk>
+ <113811b6-79a4-9c66-d302-add9fb0c5b1a@arm.com>
+ <20170203142446.2ee517a7@free-electrons.com>
+ <231514f4-2e35-8bde-4469-aada833635aa@arm.com>
+Message-ID: <20170203155449.GC27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Feb 03, 2017 at 02:05:13PM +0000, Robin Murphy wrote:
+> AFAICS, even that shouldn't really be necessary - for all VA/PA
+> combinations of 32/32, 32/40 and 64/40, storing virt_to_phys() of the
+> SKB VA won't overflow 40 bits, so a corresponding phys_to_virt() at the
+> other end can't go wrong either.
 
-On 02/03/2017 08:51 AM, Linus Walleij wrote:
-> Your child nodes I guess will be instatiated as devices as well.
-> 
-> These devices will have the NBUS driver as .parent in their
-> struct device I guess. Else the design of this bus is tilted.
-> 
-> If the NBUS driver use dev_set_drvdata(dev, state_container_cookie)
-> the children can use dev_get_drvdata(dev->parent); to get a pointer to
-> the same cookie.
-> 
-> The subdrivers don't even need to know the members of the state
-> container as long as you're just passing a pointer to it. It's
-> enough if you forward-declare it as a "pointer to some struct":
-> 
-> struct foo;
-> 
-> {
->    struct foo *fooptr = dev_get_drvdata(dev->parent);
->    write(fooptr, 0x10);
-> 
-> etc
+Except for the detail that virt_to_phys()/phys_to_virt() is only defined
+for the direct-mapped memory, not for highmem.  That matters a lot for
+32-bit platforms.
 
-Thanks a lot, this is perfect!
+Now for a bit of a whinge.  Reading through this code is rather annoying
+because of what's called a "physical" address which is actually a DMA
+address as far as the kernel is concerned - this makes it much harder
+when thinking about this issue because it causes all sorts of confusion.
+Please can the next revision of the patches start calling things by their
+right name - a dma_addr_t is a DMA address, not a physical address, even
+though _numerically_ it may be the same thing.  From the point of view
+of the kernel, you must not do phys_to_virt() on a dma_addr_t address.
+Thanks.
 
-Best Regards,
-Sebastien.
+If we're going to start dealing with _real_ physical addresses, then
+this is even more important to separate the concept of what's a physical
+address and what's a DMA address in this driver.
+
+Taking a step backwards...
+
+How do DMA addresses and this cookie get into the receive ring - from what
+I can see, the driver doesn't write these into the receive ring, it's the
+hardware that writes it, and the only route I can see that they get there
+is via writes performed in mvpp2_bm_pool_put().
+
+Now, from what I can see, the "buf_virt_addr" comes from:
+
++static void *mvpp2_frag_alloc(const struct mvpp2_bm_pool *pool)
++{
++       if (likely(pool->frag_size <= PAGE_SIZE))
++               return netdev_alloc_frag(pool->frag_size);
++       else
++               return kmalloc(pool->frag_size, GFP_ATOMIC);
++}
+
+via mvpp2_buf_alloc().
+
+Both kmalloc() and netdev_alloc_frag() guarantee that the virtual
+address will be in lowmem.
+
+Given that, I would suggest changing mvpp2_bm_pool_put() as follows -
+and this is where my point above about separating the notion of "dma
+address" and "physical address" becomes very important:
+
+ static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
+-                                    dma_addr_t buf_phys_addr,
+-                                    unsigned long buf_virt_addr)
++                                    dma_addr_t dma, phys_addr_t phys)
+ {
+
+and updating it to write "phys" as the existing buf_virt_addr.
+
+In mvpp2_bm_bufs_add():
+
+                buf = mvpp2_buf_alloc(port, bm_pool, &phys_addr, GFP_KERNEL);
+                if (!buf)
+                        break;
+ 
+                mvpp2_bm_pool_put(port, bm_pool->id, phys_addr,
+-                                 (unsigned long)buf);
++                                 virt_to_phys(buf));
+
+which I think means that mvpp2_rxdesc_virt_addr_get() can just become:
+
+ 	phys_addr_t cookie;
+ 
+        /* PPv2.1 can only be used on 32 bits architectures, and there
+         * are 32 bits in buf_cookie which are enough to store the
+         * full virtual address, so things are easy.
+         */
+        if (port->priv->hw_version == MVPP21)
+                cookie = rx_desc->pp21.buf_cookie;
+        else
+ 		cookie = rx_desc->pp22.buf_cookie_misc & FORTY_BIT_MASK;
+
+ 	return phys_to_virt(cookie);
+
+I'd suggest against using DMA_BIT_MASK(40) there - because it's not a
+DMA address, even though it happens to resolve to the same number.
+
+Again, I may have missed how the addresses end up getting into
+buf_cookie_misc, so what I suggest above may not be possible.
+
+I'd also suggest that there is some test in mvpp2_bm_bufs_add() to
+verify that the physical addresses and DMA addresses do fit within
+the available number of bits - if they don't we could end up scribbling
+over memory that we shouldn't be, and it looks like we have a failure
+path there to gracefully handle that situation - gracefully compared
+to a nasty BUG_ON().
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
