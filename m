@@ -1,94 +1,82 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 3 Feb 2017 23:00:29 +0800
-Subject: [xlnx:master 2262/2699]
- drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_osk_low_level_mem.c:36:26:
- error: implicit declaration of function 'ioremap_nocache'
-Message-ID: <201702032314.rBHXkUMl%fengguang.wu@intel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 3 Feb 2017 16:02:27 +0100
+Subject: [PATCHv2 net-next 05/16] net: mvpp2: introduce PPv2.2 HW
+ descriptors and adapt accessors
+In-Reply-To: <231514f4-2e35-8bde-4469-aada833635aa@arm.com>
+References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482943592-12556-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170106142901.GC14217@n2100.armlinux.org.uk>
+ <113811b6-79a4-9c66-d302-add9fb0c5b1a@arm.com>
+ <20170203142446.2ee517a7@free-electrons.com>
+ <231514f4-2e35-8bde-4469-aada833635aa@arm.com>
+Message-ID: <20170203160227.08b40c58@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Hello,
 
-First bad commit (maybe != root cause):
+On Fri, 3 Feb 2017 14:05:13 +0000, Robin Murphy wrote:
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   629041605b93343ad2e8971ceaac3edcef0b043b
-commit: 2ab6f2613b2c23f3d79821331f709d17219c6ec1 [2262/2699] Merge tag 'v4.2' into master
-config: um-allyesconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout 2ab6f2613b2c23f3d79821331f709d17219c6ec1
-        # save the attached .config to linux build tree
-        make ARCH=um 
+> > So do you have a better suggestion? The descriptors only have enough
+> > space to store a 40-bit virtual address, which is not enough to fit the
+> > virtual addresses used by Linux for SKBs. This is why I'm instead
+> > relying on the fact that the descriptors can store the 40-bit physical
+> > address, and convert it back to a virtual address, which should be fine
+> > on ARM64 because the entire physical memory is part of the kernel linear
+> > mapping.  
+> 
+> OK, that has nothing to do with DMA addresses then.
 
-All error/warnings (new ones prefixed by >>):
+Well, it has to do with DMA in the sense that those buffers are
+mapped with dma_map_single(). So the address that is given to us by the
+hardware as the "physical address of the RX buffer" is the one that we
+have initially given to the hardware and was the result of 
+dma_map_single().
 
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_osk_low_level_mem.c: In function '_mali_osk_mem_mapioregion':
->> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_osk_low_level_mem.c:36:26: error: implicit declaration of function 'ioremap_nocache' [-Werror=implicit-function-declaration]
-     return (mali_io_address)ioremap_nocache(phys, size);
-                             ^~~~~~~~~~~~~~~
->> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_osk_low_level_mem.c:36:9: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-     return (mali_io_address)ioremap_nocache(phys, size);
-            ^
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_osk_low_level_mem.c: In function '_mali_osk_mem_unmapioregion':
->> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_osk_low_level_mem.c:41:2: error: implicit declaration of function 'iounmap' [-Werror=implicit-function-declaration]
-     iounmap((void *)virt);
-     ^~~~~~~
-   cc1: some warnings being treated as errors
---
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c: In function 'mali_read_phys':
->> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c:330:21: error: implicit declaration of function 'ioremap_nocache' [-Werror=implicit-function-declaration]
-     void *mem_mapped = ioremap_nocache(phys_addr_page, map_size);
-                        ^~~~~~~~~~~~~~~
->> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c:330:21: warning: initialization makes pointer from integer without a cast [-Wint-conversion]
->> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c:333:3: error: implicit declaration of function 'iounmap' [-Werror=implicit-function-declaration]
-      iounmap(mem_mapped);
-      ^~~~~~~
-   At top level:
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c:324:12: warning: 'mali_read_phys' defined but not used [-Wunused-function]
-    static u32 mali_read_phys(u32 phys_addr)
-               ^~~~~~~~~~~~~~
-   In file included from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c:25:0:
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c: In function 'mali_platform_device_init':
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_kernel_common.h:156:45: warning: 'num_pp_cores' may be used uninitialized in this function [-Wmaybe-uninitialized]
-    #define MALI_DEBUG_ASSERT(condition) do  {if( !(condition)) {MALI_PRINT_ERROR(("ASSERT failed: " #condition )); _mali_osk_break();} } while(0)
-                                                ^
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c:238:6: note: 'num_pp_cores' was declared here
-     int num_pp_cores;
-         ^~~~~~~~~~~~
-   cc1: some warnings being treated as errors
+> > Russell proposal of testing the size of a virtual address
+> > pointer instead would solve this I believe, correct?  
+> 
+> AFAICS, even that shouldn't really be necessary - for all VA/PA
+> combinations of 32/32, 32/40 and 64/40, storing virt_to_phys() of the
+> SKB VA won't overflow 40 bits,
 
-vim +/ioremap_nocache +36 drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_osk_low_level_mem.c
+I'm already lost here. Why are you talking about virt_to_phys() ? See
+above: we have the dma_addr_t returned from dma_map_single(), and we
+need to find back the corresponding virtual address, because there is
+not enough room in the HW descriptors to store a full 64-bit VA.
 
-8e905b3b Michal Simek 2015-06-10  30  {
-8e905b3b Michal Simek 2015-06-10  31  	wmb();
-8e905b3b Michal Simek 2015-06-10  32  }
-8e905b3b Michal Simek 2015-06-10  33  
-8e905b3b Michal Simek 2015-06-10  34  mali_io_address _mali_osk_mem_mapioregion(uintptr_t phys, u32 size, const char *description)
-8e905b3b Michal Simek 2015-06-10  35  {
-8e905b3b Michal Simek 2015-06-10 @36  	return (mali_io_address)ioremap_nocache(phys, size);
-8e905b3b Michal Simek 2015-06-10  37  }
-8e905b3b Michal Simek 2015-06-10  38  
-8e905b3b Michal Simek 2015-06-10  39  void _mali_osk_mem_unmapioregion(uintptr_t phys, u32 size, mali_io_address virt)
-8e905b3b Michal Simek 2015-06-10  40  {
-8e905b3b Michal Simek 2015-06-10 @41  	iounmap((void *)virt);
-8e905b3b Michal Simek 2015-06-10  42  }
-8e905b3b Michal Simek 2015-06-10  43  
-8e905b3b Michal Simek 2015-06-10  44  _mali_osk_errcode_t inline _mali_osk_mem_reqregion(uintptr_t phys, u32 size, const char *description)
+> so a corresponding phys_to_virt() at the other end can't go wrong
+> either. If you really do want to special-case things based on VA
+> size, though, either CONFIG_64BIT or sizeof(void *) would indeed be
+> infinitely more useful than the unrelated DMA address width - I know
+> this driver's never going to run on SPARC64, but that's one example
+> of where the above logic would lead to precisely the truncated VA
+> it's trying to avoid.
 
-:::::: The code at line 36 was first introduced by commit
-:::::: 8e905b3b33fa6f3f2f97591500b53d8a8245df29 staging: mali: Add r5p1-01rel0 and r5p2-00rel0 drivers
+What is different on SPARC64 here?
 
-:::::: TO: Michal Simek <michal.simek@xilinx.com>
-:::::: CC: Michal Simek <michal.simek@xilinx.com>
+The situation we have is the following:
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 16422 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170203/da41b26f/attachment-0001.gz>
+ - On systems where VAs are 32-bit wide, we have enough room to store
+   the VA in the HW descriptor. So when we receive a packet, the HW
+   descriptor provides us directly with the VA of the network packet,
+   and the DMA address of the packet. We can dma_unmap_single() the
+   packet, and do its processing.
+
+ - On systems where VAs are 64-bit wide, we don't have enough room to
+   store the VA in the HW descriptor. However, on 64-bit systems, the
+   entire physical memory is mapped in the kernel linear mapping, so
+   phys_to_virt() is valid on any physical address. And we use this
+   property to retrieve the full 64-bit VA using the DMA address that
+   we get from the HW descriptor.
+
+   Since what we get from the HW descriptor is a DMA address, that's
+   why we're using phys_to_virt(dma_to_phys(...)).
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
