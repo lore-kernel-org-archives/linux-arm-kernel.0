@@ -1,61 +1,78 @@
-From: alexandre.torgue@st.com (Alexandre TORGUE)
-Date: Fri, 3 Feb 2017 10:20:19 +0100
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 3 Feb 2017 10:22:50 +0100
 Subject: [RFC PATCH v6 2/7] dma: Add simple dma_noop_mmap
-Message-ID: <1486113624-7494-2-git-send-email-alexandre.torgue@st.com>
+In-Reply-To: <1486113624-7494-2-git-send-email-alexandre.torgue@st.com>
+References: <1486113624-7494-2-git-send-email-alexandre.torgue@st.com>
+Message-ID: <f10d5579-f8e8-cb7b-ec12-0519fd496315@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Murzin <vladimir.murzin@arm.com>
+Hi,
 
-This patch adds a simple implementation of mmap to dma_noop_ops.
+Apologize for this bad sent.
+Please forget it.
 
-Cc: Joerg Roedel <jroedel@suse.de>
-Cc: Christian Borntraeger <borntraeger@de.ibm.com>
-Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Tested-by: Andras Szemzo <sza@esh.hu>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- lib/dma-noop.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+regards
 
-diff --git a/lib/dma-noop.c b/lib/dma-noop.c
-index a14eee5..70504eb 100644
---- a/lib/dma-noop.c
-+++ b/lib/dma-noop.c
-@@ -66,6 +66,26 @@ static int dma_noop_supported(struct device *dev, u64 mask)
- 	return 1;
- }
- 
-+static int dma_noop_mmap(struct device *dev, struct vm_area_struct *vma,
-+			 void *cpu_addr, dma_addr_t dma_addr, size_t size,
-+			 unsigned long attrs)
-+{
-+	unsigned long user_count = vma_pages(vma);
-+	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-+	unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
-+	unsigned long off = vma->vm_pgoff;
-+	int ret = -ENXIO;
-+
-+	if (off < count && user_count <= (count - off)) {
-+		ret = remap_pfn_range(vma, vma->vm_start,
-+				      pfn + off,
-+				      user_count << PAGE_SHIFT,
-+				      vma->vm_page_prot);
-+	}
-+
-+	return ret;
-+}
-+
- struct dma_map_ops dma_noop_ops = {
- 	.alloc			= dma_noop_alloc,
- 	.free			= dma_noop_free,
-@@ -73,6 +93,7 @@ struct dma_map_ops dma_noop_ops = {
- 	.map_sg			= dma_noop_map_sg,
- 	.mapping_error		= dma_noop_mapping_error,
- 	.dma_supported		= dma_noop_supported,
-+	.mmap			= dma_noop_mmap,
- };
- 
- EXPORT_SYMBOL(dma_noop_ops);
--- 2.0.0
+On 02/03/2017 10:20 AM, Alexandre TORGUE wrote:
+> From: Vladimir Murzin <vladimir.murzin@arm.com>
+>
+> This patch adds a simple implementation of mmap to dma_noop_ops.
+>
+> Cc: Joerg Roedel <jroedel@suse.de>
+> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+> Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> Tested-by: Andras Szemzo <sza@esh.hu>
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> ---
+>  lib/dma-noop.c | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>
+> diff --git a/lib/dma-noop.c b/lib/dma-noop.c
+> index a14eee5..70504eb 100644
+> --- a/lib/dma-noop.c
+> +++ b/lib/dma-noop.c
+> @@ -66,6 +66,26 @@ static int dma_noop_supported(struct device *dev, u64 mask)
+>  	return 1;
+>  }
+>
+> +static int dma_noop_mmap(struct device *dev, struct vm_area_struct *vma,
+> +			 void *cpu_addr, dma_addr_t dma_addr, size_t size,
+> +			 unsigned long attrs)
+> +{
+> +	unsigned long user_count = vma_pages(vma);
+> +	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> +	unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
+> +	unsigned long off = vma->vm_pgoff;
+> +	int ret = -ENXIO;
+> +
+> +	if (off < count && user_count <= (count - off)) {
+> +		ret = remap_pfn_range(vma, vma->vm_start,
+> +				      pfn + off,
+> +				      user_count << PAGE_SHIFT,
+> +				      vma->vm_page_prot);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+>  struct dma_map_ops dma_noop_ops = {
+>  	.alloc			= dma_noop_alloc,
+>  	.free			= dma_noop_free,
+> @@ -73,6 +93,7 @@ struct dma_map_ops dma_noop_ops = {
+>  	.map_sg			= dma_noop_map_sg,
+>  	.mapping_error		= dma_noop_mapping_error,
+>  	.dma_supported		= dma_noop_supported,
+> +	.mmap			= dma_noop_mmap,
+>  };
+>
+>  EXPORT_SYMBOL(dma_noop_ops);
+> -- 2.0.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
