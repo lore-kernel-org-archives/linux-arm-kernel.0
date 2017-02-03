@@ -1,43 +1,54 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 3 Feb 2017 15:20:52 +0000
-Subject: [PATCH v4] efi: arm64: Add vmlinux debug link to the Image binary
-In-Reply-To: <20170203151728.GB23547@arm.com>
-References: <1486056799-4825-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170202183000.GN13839@arm.com>
- <CAKv+Gu82NmBNavpVQ8z7xZ6++HPqAWNnn3dM=dKw0JaWLZocSw@mail.gmail.com>
- <CAKv+Gu9VmbjtvFVveAXiRtpBtZCWJV6pMGmnEzTc5gPrOnYvnQ@mail.gmail.com>
- <20170203151728.GB23547@arm.com>
-Message-ID: <CAKv+Gu__3zh42t1+H4ivU+jy2vcwnEOTWEA93kmvWfkok++ojw@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 3 Feb 2017 10:35:08 -0500
+Subject: [PATCH v8 00/15] ACPI platform MSI support and its example mbigen
+In-Reply-To: <fd106be9-836d-8d91-e57c-183ca56b4a49@arm.com>
+References: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
+ <a2eb29e2-0f46-0be0-dc43-b3a086556965@codeaurora.org>
+ <fd106be9-836d-8d91-e57c-183ca56b4a49@arm.com>
+Message-ID: <45d4de34-cfd2-06af-93c2-e721bd80ab43@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 February 2017 at 15:17, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Feb 03, 2017 at 02:50:40PM +0000, Ard Biesheuvel wrote:
->> On 2 February 2017 at 18:36, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > On 2 February 2017 at 18:30, Will Deacon <will.deacon@arm.com> wrote:
->> >> On Thu, Feb 02, 2017 at 05:33:19PM +0000, Ard Biesheuvel wrote:
->> > diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
->> > index 2600c60337ac..1606c6b2a280 100644
->> > --- a/arch/arm64/kernel/Makefile
->> > +++ b/arch/arm64/kernel/Makefile
->> > @@ -57,5 +57,5 @@ head-y                                        := head.o
->> >  extra-y                                        += $(head-y) vmlinux.lds
->> >
->> >  ifeq ($(CONFIG_DEBUG_EFI),y)
->> > -AFLAGS_head.o += -DVMLINUX_PATH="\"$(shell readlink -f $(objtree)/vmlinux)\""
->> > +AFLAGS_head.o += -DVMLINUX_PATH="\"$(realpath $(objtree)/vmlinux)\""
->> >  endif
->> >
->> >
->> >> Do you want me to merge this via arm64?
->> >>
->> >
->> > Yes, please
+On 2/3/2017 10:11 AM, Marc Zyngier wrote:
+> On 03/02/17 14:50, Sinan Kaya wrote:
+>> On 1/18/2017 7:54 AM, Hanjun Guo wrote:
+>>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>>
+>>> With platform msi support landed in the kernel, and the introduction
+>>> of IORT for GICv3 ITS (PCI MSI) and SMMU, the framework for platform msi
+>>> is ready, this patch set add few patches to enable the ACPI platform
+>>> msi support.
+>>>
+>>> For platform device connecting to ITS on arm platform, we have IORT
+>>> table with the named componant node to describe the mappings of paltform
+>>> device and ITS, so we can retrieve the dev id and find its parent
+>>> irqdomain (ITS) from IORT table (simlar with the ACPI ITS support).
+>>>
 >>
->> Should I respin this?
->
-> No need, I'll pick it up and make the change. I'll push out before I leave
-> work this evening.
->
+>> I understand that there is a consensus on IORT/SMMUv3 specific pieces
+>> of this series while there is some ongoing work on the MBIgen part in
+>> due to dependency on Agustin's patch vs. ACPI definitions.
+>>
+>> Can we merge the IORT/SMMUv3 specific pieces to 4.11 so that the base
+>> implementation comes in place?
+> 
+> Sorry, but I may be missing something. Which IORT/SMMUv3 patches are we
+> talking about? Do you have a pointer to a series?
+> 
 
-Cheers
+I was talking about patches V8 00-12 of this particular one. 
+
+[PATCH v8 00/15] ACPI platform MSI support and its example mbigen
+
+Patches 13-15 are specific for MBIGEN. 00-12 are for the base functionality.
+
+> Thanks,
+> 
+> 	M.
+> 
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
