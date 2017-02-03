@@ -1,211 +1,41 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 3 Feb 2017 11:37:37 +0100
-Subject: [PATCH 3/5] Documentation: dt: iio: document stm32 exti trigger
-In-Reply-To: <CAL_JsqKgGuh5==Xfd6LKZe70G1NiuesW0_xE98CZQZ3=BCPvLg@mail.gmail.com>
-References: <1485784663-19505-1-git-send-email-fabrice.gasnier@st.com>
- <1485784663-19505-4-git-send-email-fabrice.gasnier@st.com>
- <20170201163500.ivxnxejurhzzoctl@rob-hp-laptop>
- <e814a2c6-f0de-cb56-eb3a-e22daed8990b@st.com>
- <CAL_JsqKgGuh5==Xfd6LKZe70G1NiuesW0_xE98CZQZ3=BCPvLg@mail.gmail.com>
-Message-ID: <9ef03374-9108-aec4-d2d8-58af17d62fef@st.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 3 Feb 2017 10:44:38 +0000
+Subject: [PATCH v2 3/3] arm64: kvm: add support for the extended 64bit
+ ccsidr
+In-Reply-To: <85bd7758-e0a3-f274-ba7a-db080e66d97c@arm.com>
+References: <1485793527-18028-1-git-send-email-sudeep.holla@arm.com>
+ <1485793527-18028-3-git-send-email-sudeep.holla@arm.com>
+ <85bd7758-e0a3-f274-ba7a-db080e66d97c@arm.com>
+Message-ID: <d9b2a308-c207-5f92-d855-33339bd28990@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/2017 04:45 PM, Rob Herring wrote:
-> +Linus W
+Hi Marc,
+
+On 01/02/17 16:02, Marc Zyngier wrote:
+[...]
+
+> 
+> I'm a bit worried about this patch. If we snapshot a VM on a 32bit
+> CCSIDR system, and restore it on a 64bit CSSIDR system (or the reverse),
+> what happens? My hunch is that we cannot restore the VM properly.
 >
-> On Thu, Feb 2, 2017 at 3:19 AM, Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
->> On 02/01/2017 05:35 PM, Rob Herring wrote:
->>>
->>> On Mon, Jan 30, 2017 at 02:57:41PM +0100, Fabrice Gasnier wrote:
->>>>
->>>> Add dt documentation for st,stm32-exti-trigger.
->>>> EXTi gpio signal can be routed internally as trigger source for various
->>>
->>>
->>> s/gpio/GPIO/
->>>
->>>> IPs (e.g. for ADC or DAC conversions).
->>>
->>>
->>> Please use "dt-bindings: iio:" for the subject prefix.
->>
->>
->> Hi Rob,
->>
->> I'll fix this in V2.
->>
->>>
->>>>
->>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->>>> ---
->>>>  .../bindings/iio/trigger/st,stm32-exti-trigger.txt      | 17
->>>> +++++++++++++++++
->>>>  1 file changed, 17 insertions(+)
->>>>  create mode 100644
->>>> Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
->>>>
->>>> diff --git
->>>> a/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
->>>> b/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
->>>> new file mode 100644
->>>> index 0000000..ebf2645
->>>> --- /dev/null
->>>> +++
->>>> b/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
->>>> @@ -0,0 +1,17 @@
->>>> +STMicroelectronics STM32 EXTI trigger bindings
->>>> +
->>>> +EXTi gpio signal can be routed internally as trigger source for various
->>>
->>>
->>> s/gpio/GPIO/
->>>
->>>> +IPs (e.g. for ADC or DAC conversions).
->>>> +
->>>> +Contents of a stm32 exti trigger root node:
->>>
->>>
->>> Drop "root"
->>
->> I'll fix these in V2.
->>
->>>
->>>> +-------------------------------------------
->>>> +Required properties:
->>>> +- compatible: Should be "st,stm32-exti-trigger"
->>>
->>>
->>> This whole binding looks a bit suspicious. Is this actually a h/w block?
->>> What makes it stm32 specific? Seems like the gpio properties should just
->>> be part of the ADC or DAC that they trigger.
->>
->>
->> Please let me explain in more details.
->> I think best is I add following documentation in binding. Something like:
->>
->> GPIO + EXTI controller side | ADC side (input trigger MUX, same for DAC)
->>                             |
->>        IIO trigger         --->         IIO device
->>                             |                  __________
->>                             |          inX  --|          \
->>                             |          ...  --|  SAR ADC  |-->
->>         __                  |         __      |__________/
->> PA11 --|  \                 | TIMx --|  \   trigger   ^
->> PB11 --|   |                  ...  --|   }----------->'
->> ...  --|   }---- EXTI11 ---------->--|__/
->>      --|   |                |
->> PJ11 --|__/                 |
->>
->> In fact, this driver configures GPIO and EXTI controllers (left side of
->> above scheme), and it registers corresponding trigger in IIO. Then it can be
->> used by other IPs registered as IIO devices.
->>
->> I think this should be outside of ADC or DAC IIO device drivers, to live in
->> separate IIO trigger driver. It will avoid duplicating code (e.g. PATCH 4)
->> into several IIO device drivers.
->>
->> Is it ok to declare this as separate IIO trigger driver?
->
-> Drivers and DT nodes are not necessarily 1 to 1.
-Hi Rob,
 
-Sorry, I don't get it. Can you clarify ?
+I agree. I had a look at QEMU as you suggested offline. Looks like QEMU
+emulate these registers with predefined values for each core type. Also
+it looks like it's not using the existing DEMUX_ID_CCSIDR
 
->
-> What controls the GPIO line that is used for the trigger?
+> Now, I'm questioning the need for having those altogether, as we do a
+> lot of work to prevent the guest from actually using that geometry (and
+> on a big-little system, this hardly works).
+> 
 
-This can be anything connected to GPIO line, such as (on board)
-push-button, external synchronization signal ...
+If we can conclude there are no users for DEMUX_ID_CCSIDR, we can remove
+it all together instead of introducing new one for 64bit.
 
->
->> Maybe Jonathan could also advise on this ?
->>
->> As I see it, this is stm32 specific, as any GPIO bank, (e.g. PA11,
->> PB11...) can be selected to generate (EXTI11) hardware trigger signal.
->
-> This seems more like a pinmux'ing issue than a GPIO. This isn't really
-> a GPIO if it is routed to a h/w control.
+Are there any other users of these interface provided by KVM after from
+kvmtool and qemu ?
 
-Sorry, muxing part (e.g. PA11, PB11...) isn't shown in above scheme.
-GPIO is muxed via gpio/pinctrl driver.
-
->
-> A -gpios property for a trigger would make sense if you had a driver
-> handling GPIO interrupts to generate IIO triggers. This seems to be
-> just mux control.
-
-This is almost it, there are two stages.
-- trigger starts conversion on device (e.g. ADC...) by hardware (no need 
-for interrupt on 1st stage, data isn't ready anyway).
-- 2nd stage, end of conversion polls the trigger.
-
-Just to summarize, rephrase, in case push button is used to trigger 
-conversions:
-- 1st declare GPIO (to which push button is connected)
-- GPIO is muxed into external interrupt (e.g. EXTI) by using pinctrl
-and exti driver. This may be compared to a 'gpio_keys' up to this point.
-- EXTI line is able to either generate an interrupt (not used here)
-and/or start conversion as trigger line (that is used here).
-- end of conversion does the actual trigger poll.
-
->
->>>> +- extiN-gpio: optional gpio line that may be used as external trigger
->>>> source
->>>
->>>
->>> -gpios is the preferred form.
->>
->>
->> I apologize, I didn't make it clear in the first place. Please let me
->> rephrase. Is bellow description more suitable ?
->
-> What I mean is the property name is wrong. It should be "extiN-gpios".
-Oh... got it, thanks.
-I'll update this.
-
-Best Regards,
-Fabrice
->
->>
->> - extiN-gpio: One or several named GPIO lines that may be used as
->>   external trigger source by STM32 ADC, DAC. N may be 0..15.
->>   For example, on stm32f4, exti11-gpio can trig ADC, exti9-gpio can
->>   trig DAC.
->>
->>>
->>>> +  (e.g. N may be 0..15. For example, exti11-gpio can trig ADC on
->>>> stm32f4).
->>>> +
->>>> +Example:
->>>> +       triggers {
->>>> +               compatible = "st,stm32-exti-trigger";
->>>> +               exti11-gpio=<&gpioa 11 0>;
->>>
->>>
->>> spaces around the "=".
->>
->> I'll fix it in V2, and also add example for more that one EXTI trigger:
->>
->>         triggers {
->>                 compatible = "st,stm32-exti-trigger";
->>                 exti9-gpio = <&gpioa 9 0>;
->>                 exti11-gpio = <&gpioa 11 0>;
->>                 ...
->>         };
->>
->> Above binding can typically be used in board dt, in case on-board gpio is
->> connected/used as trigger source for IIO device (STM32 ADC/DAC).
->>
->> Please let me know if this clarifies, so I'll do necessary changes in V2.
->>
->> Many thanks for your review.
->> Best Regards,
->> Fabrice
->>
->>>
->>>> +       };
->>>> --
->>>> 1.9.1
->>>>
->>
+-- 
+Regards,
+Sudeep
