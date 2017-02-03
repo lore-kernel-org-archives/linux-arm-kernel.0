@@ -1,40 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 3 Feb 2017 10:17:51 +0000
-Subject: [PATCH v2 00/10] serial: st-asc: Allow handling of RTS line
-In-Reply-To: <20170203091043.GA10386@kroah.com>
-References: <20170201143145.31962-1-lee.jones@linaro.org>
- <20170203091043.GA10386@kroah.com>
-Message-ID: <20170203101751.bkuq4hic3utmypyl@dell>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 3 Feb 2017 18:20:59 +0800
+Subject: [PATCH v3 00/12] crypto: atmel-authenc: add support to
+ authenc(hmac(shaX),Y(aes)) modes
+In-Reply-To: <cover.1485443478.git.cyrille.pitchen@atmel.com>
+References: <cover.1485443478.git.cyrille.pitchen@atmel.com>
+Message-ID: <20170203102059.GC2632@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 03 Feb 2017, Greg KH wrote:
-
-> On Wed, Feb 01, 2017 at 02:31:35PM +0000, Lee Jones wrote:
-> > When hardware flow-control is disabled, manual toggling of the UART's
-> > reset line (RTS) using userland applications (e.g. stty) is not
-> > possible, since the ASC IP does not provide this functionality in the
-> > same was as some other IPs do.  Thus, we have to do this manually.
-> > 
-> > This set ensures the correct Pinctrl groups are configured and
-> > obtained for both manual toggling of the RTS line and for the IP to
-> > take over the lines when HW flow-control is requested by the user.
+On Thu, Jan 26, 2017 at 05:07:45PM +0100, Cyrille Pitchen wrote:
+> Hi all,
 > 
-> I see 2 series that are listed as "v2", which one to take?
+> this series of patches has been based and tested on next-20170125 with
+> CRYPTO_MANAGER_DISABLED_TESTS not set.
+> 
+> The series adds support to the hmac(shaX) algorithms first, then combines
+> both the Atmel SHA and AES hardware accelerators to implement
+> authenc(hmac(shaX),Y(aes)) algorithms as used by IPSEC/SSL connections.
+> 
+> It has also been tested with strongswan + xl2tpd to create an IPSEC+L2TP
+> (transport mode) VPN and strongswan only (tunnel mode) for an IPSEC VPN.
+> 
+> Then iperf was used to measure the bandwidth improvement in tunnel mode:
+> 
+> drivers                                    AES SHA SPLIP iperf half-duplex
+>                                                          Mbit/s
+> authenc(hmac(sha1-generic),cbc(aes))        SW   SW  N/A 27.7
+> authenc(hmac(sha1-generic),atmel-cbc-aes)   HW   SW  N/A 30.2 (mainline)
+> authenc(atmel-hmac-sha1,atmel-cbc-aes)      HW   HW   no 29.1
+> atmel-authenc-hmac-sha1-cbc-aes             HW   HW  yes 38.8
+> 
+> SPLIP: Secure Protocol Layers Improved Performances (AES+SHA combined).
+> 
+> Some patches of this series are purely transitional: I've split the
+> modifications into many patches to ease the review.
 
-The one which was sent most recently. ;)
-
-> I know, I'll drop both and wait for an updated set with all of the acks
-> added to them...
-
-Easy way out. ;)
-
-> Please fix up and resend.
-
-Okay, give me 5.
-
+All applied.  Thanks.
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
