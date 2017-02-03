@@ -1,33 +1,71 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri, 3 Feb 2017 09:56:18 -0800
-Subject: [PATCH v3 00/24] i.MX Media Driver
-In-Reply-To: <2201157.ylZrBapgio@avalon>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1485941457.3353.13.camel@pengutronix.de>
- <8e577a3f-8d44-9dde-9507-36c3769228b6@gmail.com> <2201157.ylZrBapgio@avalon>
-Message-ID: <e2ddd5a9-e3a3-5f1d-72a8-3b82bee316ea@gmail.com>
+From: rob.rice@broadcom.com (Rob Rice)
+Date: Fri,  3 Feb 2017 12:55:31 -0500
+Subject: [PATCH v4 0/3] Add Broadcom SPU Crypto Driver
+Message-ID: <1486144534-44887-1-git-send-email-rob.rice@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Changes in v4:
+- Added Rob Herring's Acked-by to patch 1/3 for bindings doc
+- In response to Herbert's comment, in ahash_export() and 
+  ahash_import(), only copy the hash state, not state params
+  related to cipher or aead algos. 
+- Noticed that hmac_offset in iproc_reqctx_s and spu_hash_params
+  wasn't really used. So removed.
 
+Changes in v3:
+- rebase to 4.10-rc3 in cryptodev-2.6 tree
+- in bindings doc, list all valid compatibility strings
+- rename DT nodes "crypto" rather than "spu-crypto"
+- include a separate DT node for each SPU hardware block. Previously,
+ there was a single SPU node listing a register range for each
+ hw block.
+- select hash algos in Kconfig. Driver HMAC implementation uses hash
+ sw algos for inner and outer hashes.
+- Fix crash for AES CCM decrypt when AAD and data are both empty
 
-On 02/03/2017 06:41 AM, Laurent Pinchart wrote:
-> Hello,
->
-> On Wednesday 01 Feb 2017 16:19:27 Steve Longerbeam wrote:
->> On 02/01/2017 01:30 AM, Philipp Zabel wrote:
->>
->>> media-ctl propagates the output pad format to all remote subdevices'
->>> input pads for all enabled links:
->>>
->>> https://git.linuxtv.org/v4l-utils.git/tree/utils/media-ctl/libv4l2subdev.c
->>> #n693
->> Ah cool, I wasn't aware media-ctl did this, but it makes sense and
->> makes it easier on the user.
-> To be precise, userspace is responsible for propagating formats *between*
-> subdevs (source to sink, over a link) and drivers for propagating formats *in*
-> subdevs (sink to source, inside the subdev).
+Change in v2:
+- select CRYPTO_DES in Kconfig
 
-Hi Laurent, yes thanks for that clarification.
+The Broadcom SPU crypto driver provides access to SPU hardware
+for symmetric crypto offload. The driver supports ablkcipher,
+ahash, and aead operations. The driver supports several
+Broadcom SoCs with different revisions of the SPU hardware.
+The driver supports SPU-M and SPU2 hardware revisions, and
+a couple versions of each hw revision, each version with minor
+differences.
 
-Steve
+Rob Rice (3):
+  crypto: brcm: DT documentation for Broadcom SPU hardware
+  crypto: brcm: Add Broadcom SPU driver
+  arm64: dts: ns2: Add Broadcom SPU driver DT entry.
+
+ .../devicetree/bindings/crypto/brcm,spu-crypto.txt |   22 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |   24 +
+ drivers/crypto/Kconfig                             |   15 +
+ drivers/crypto/Makefile                            |    2 +
+ drivers/crypto/bcm/Makefile                        |   15 +
+ drivers/crypto/bcm/cipher.c                        | 4964 ++++++++++++++++++++
+ drivers/crypto/bcm/cipher.h                        |  483 ++
+ drivers/crypto/bcm/spu.c                           | 1251 +++++
+ drivers/crypto/bcm/spu.h                           |  287 ++
+ drivers/crypto/bcm/spu2.c                          | 1401 ++++++
+ drivers/crypto/bcm/spu2.h                          |  228 +
+ drivers/crypto/bcm/spum.h                          |  174 +
+ drivers/crypto/bcm/util.c                          |  581 +++
+ drivers/crypto/bcm/util.h                          |  116 +
+ 14 files changed, 9563 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
+ create mode 100644 drivers/crypto/bcm/Makefile
+ create mode 100644 drivers/crypto/bcm/cipher.c
+ create mode 100644 drivers/crypto/bcm/cipher.h
+ create mode 100644 drivers/crypto/bcm/spu.c
+ create mode 100644 drivers/crypto/bcm/spu.h
+ create mode 100644 drivers/crypto/bcm/spu2.c
+ create mode 100644 drivers/crypto/bcm/spu2.h
+ create mode 100644 drivers/crypto/bcm/spum.h
+ create mode 100644 drivers/crypto/bcm/util.c
+ create mode 100644 drivers/crypto/bcm/util.h
+
+-- 
+2.1.0
