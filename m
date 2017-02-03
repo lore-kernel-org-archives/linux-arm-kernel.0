@@ -1,60 +1,48 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 3 Feb 2017 16:16:15 +0800
-Subject: [PATCH 2/8] power: add power sequence library
-In-Reply-To: <20170201080817.GD17968@kroah.com>
-References: <1483425211-14473-1-git-send-email-peter.chen@nxp.com>
- <1483425211-14473-3-git-send-email-peter.chen@nxp.com>
- <CAJZ5v0iR7p-ftUzvVwW96Y55A=vYG8_UbhjuA4vw0BFFZ8a9iw@mail.gmail.com>
- <20170201080817.GD17968@kroah.com>
-Message-ID: <20170203081614.GA24614@b29397-desktop>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 3 Feb 2017 09:25:48 +0100
+Subject: [PATCH] KVM: arm/arm64: vgic: Stop injecting the MSI occurrence
+ twice
+In-Reply-To: <1486089003-413-1-git-send-email-shankerd@codeaurora.org>
+References: <1486089003-413-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <9e5ed0dc-d32a-1ad5-f1ea-e46d51ec808a@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 09:08:17AM +0100, Greg Kroah-Hartman wrote:
-> On Wed, Feb 01, 2017 at 12:10:17AM +0100, Rafael J. Wysocki wrote:
-> > On Tue, Jan 3, 2017 at 7:33 AM, Peter Chen <peter.chen@nxp.com> wrote:
-> > > We have an well-known problem that the device needs to do some power
-> > > sequence before it can be recognized by related host, the typical
-> > > example like hard-wired mmc devices and usb devices.
-> > >
-> > > This power sequence is hard to be described at device tree and handled by
-> > > related host driver, so we have created a common power sequence
-> > > library to cover this requirement. The core code has supplied
-> > > some common helpers for host driver, and individual power sequence
-> > > libraries handle kinds of power sequence for devices. The pwrseq
-> > > librares always need to allocate extra instance for compatible
-> > > string match.
-> > >
-> > > pwrseq_generic is intended for general purpose of power sequence, which
-> > > handles gpios and clocks currently, and can cover other controls in
-> > > future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> > > if only one power sequence is needed, else call of_pwrseq_on_list
-> > > /of_pwrseq_off_list instead (eg, USB hub driver).
-> > >
-> > > For new power sequence library, it can add its compatible string
-> > > to pwrseq_of_match_table, then the pwrseq core will match it with
-> > > DT's, and choose this library at runtime.
-> > >
-> > > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> > > Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
-> > > Tested-by Joshua Clayton <stillcompiling@gmail.com>
-> > > Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-> > > Tested-by: Matthias Kaehlcke <mka@chromium.org>
-> > 
-> > Quite honestly, I have a really hard time with trying to follow this
-> > code and the total lack of documentation makes it even harder. 
+Hi Shanker,
+On 03/02/2017 03:30, Shanker Donthineni wrote:
+> The IRQFD framework calls the architecture dependent function
+> twice if the corresponding GSI type is edge triggered. For ARM,
+> the function kvm_set_msi() is getting called twice whenever the
+> IRQFD receives the event signal. The rest of the code path is
+> trying to inject the MSI without any validation checks. No need
+> to call the function vgic_its_inject_msi() second time to avoid
+> an unnecessary overhead in IRQ queue logic. It also avoids the
+> possibility of VM seeing the MSI twice.
+> 
+> Simple fix, return -1 if the argument 'level' value is zero.
+> 
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-Sorry about that, Is it ok I add the design doc at:
-Documentation/power/power-sequence/design.rst?
+Thanks for catching that bug!
 
-> > particular, the generic power sequence code is not even commented at
-> > all, 
-
-The generic power sequence code just implements the APIs which are 
-called at power/pwrseq/core.c, and those API are commented at
-include/linux/power/pwrseq.h. Anyway, I will add more comments at it.
-	
--- 
-
-Best Regards,
-Peter Chen
+Eric
+> ---
+>  virt/kvm/arm/vgic/vgic-irqfd.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-irqfd.c b/virt/kvm/arm/vgic/vgic-irqfd.c
+> index d918dcf..f138ed2 100644
+> --- a/virt/kvm/arm/vgic/vgic-irqfd.c
+> +++ b/virt/kvm/arm/vgic/vgic-irqfd.c
+> @@ -99,6 +99,9 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
+>  	if (!vgic_has_its(kvm))
+>  		return -ENODEV;
+>  
+> +	if (!level)
+> +		return -1;
+> +
+>  	return vgic_its_inject_msi(kvm, &msi);
+>  }
+>  
+> 
