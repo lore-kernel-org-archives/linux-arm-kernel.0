@@ -1,40 +1,58 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Thu,  2 Feb 2017 20:30:03 -0600
-Subject: [PATCH] KVM: arm/arm64: vgic: Stop injecting the MSI occurrence twice
-Message-ID: <1486089003-413-1-git-send-email-shankerd@codeaurora.org>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Fri,  3 Feb 2017 11:22:18 +0800
+Subject: [PATCH v8 1/3] dt: bindings: add documentation for zx2967 family
+ watchdog controller
+Message-ID: <1486092140-1017-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQFD framework calls the architecture dependent function
-twice if the corresponding GSI type is edge triggered. For ARM,
-the function kvm_set_msi() is getting called twice whenever the
-IRQFD receives the event signal. The rest of the code path is
-trying to inject the MSI without any validation checks. No need
-to call the function vgic_its_inject_msi() second time to avoid
-an unnecessary overhead in IRQ queue logic. It also avoids the
-possibility of VM seeing the MSI twice.
+This patch adds dt-binding documentation for zx2967 family
+watchdog controller.
 
-Simple fix, return -1 if the argument 'level' value is zero.
-
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- virt/kvm/arm/vgic/vgic-irqfd.c | 3 +++
- 1 file changed, 3 insertions(+)
+ .../bindings/watchdog/zte,zx2967-wdt.txt           | 32 ++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt
 
-diff --git a/virt/kvm/arm/vgic/vgic-irqfd.c b/virt/kvm/arm/vgic/vgic-irqfd.c
-index d918dcf..f138ed2 100644
---- a/virt/kvm/arm/vgic/vgic-irqfd.c
-+++ b/virt/kvm/arm/vgic/vgic-irqfd.c
-@@ -99,6 +99,9 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
- 	if (!vgic_has_its(kvm))
- 		return -ENODEV;
- 
-+	if (!level)
-+		return -1;
+diff --git a/Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt b/Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt
+new file mode 100644
+index 0000000..06ce677
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt
+@@ -0,0 +1,32 @@
++ZTE zx2967 Watchdog timer
 +
- 	return vgic_its_inject_msi(kvm, &msi);
- }
- 
++Required properties:
++
++- compatible : should be one of the following.
++       * zte,zx296718-wdt
++- reg : Specifies base physical address and size of the registers.
++- clocks : Pairs of phandle and specifier referencing the controller's clocks.
++- resets : Reference to the reset controller controlling the watchdog
++           controller.
++
++Optional properties:
++
++- timeout-sec : Contains the watchdog timeout in seconds.
++- zte,wdt-reset-sysctrl : Directs how to reset system by the watchdog.
++	if we don't want to restart system when watchdog been triggered,
++	it's not required, vice versa.
++	It should include following fields.
++	  * phandle of aon-sysctrl.
++	  * offset of register that be written, should be 0xb0.
++	  * configure value that be written to aon-sysctrl.
++	  * bit mask, corresponding bits will be affected.
++
++Example:
++
++wdt: watchdog at 1465000 {
++	compatible = "zte,zx296718-wdt";
++	reg = <0x1465000 0x1000>;
++	clocks = <&topcrm WDT_WCLK>;
++	resets = <&toprst 35>;
++	zte,wdt-reset-sysctrl = <&aon_sysctrl 0xb0 1 0x115>;
++};
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.7.4
