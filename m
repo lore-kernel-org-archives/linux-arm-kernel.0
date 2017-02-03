@@ -1,126 +1,89 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Fri, 3 Feb 2017 13:24:38 -0700
-Subject: [PATCH V8 04/10] arm64: exception: handle Synchronous External
- Abort
-In-Reply-To: <5894A8E5.6000803@arm.com>
-References: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
- <1485969413-23577-5-git-send-email-tbaicar@codeaurora.org>
- <5894A8E5.6000803@arm.com>
-Message-ID: <12162620-6b88-50af-ec05-8173a0ce59f0@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Feb 2017 20:29:19 +0000
+Subject: [PATCHv2 1/2] arch: Move CONFIG_DEBUG_RODATA and
+ CONFIG_SET_MODULE_RONX to be common
+In-Reply-To: <CAGXu5jK6_y=dWHUDBto7ykN_sSOQ6Gx+sZs_gQ1Hoh5DjP-fTw@mail.gmail.com>
+References: <1486144343-24998-1-git-send-email-labbott@redhat.com>
+ <1486144343-24998-2-git-send-email-labbott@redhat.com>
+ <CAGXu5jK6_y=dWHUDBto7ykN_sSOQ6Gx+sZs_gQ1Hoh5DjP-fTw@mail.gmail.com>
+Message-ID: <20170203202919.GE27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello James,
+On Fri, Feb 03, 2017 at 11:45:56AM -0800, Kees Cook wrote:
+> On Fri, Feb 3, 2017 at 9:52 AM, Laura Abbott <labbott@redhat.com> wrote:
+> > diff --git a/arch/Kconfig b/arch/Kconfig
+> > index 99839c2..22ee01e 100644
+> > --- a/arch/Kconfig
+> > +++ b/arch/Kconfig
+> > @@ -781,4 +781,32 @@ config VMAP_STACK
+> >           the stack to map directly to the KASAN shadow map using a formula
+> >           that is incorrect if the stack is in vmalloc space.
+> >
+> > +config ARCH_NO_STRICT_RWX_DEFAULTS
+> > +       def_bool n
+> > +
+> > +config ARCH_HAS_STRICT_KERNEL_RWX
+> > +       def_bool n
+> > +
+> > +config DEBUG_RODATA
+> > +       def_bool y if !ARCH_NO_STRICT_RWX_DEFAULTS
+> > +       prompt "Make kernel text and rodata read-only" if ARCH_NO_STRICT_RWX_DEFAULTS
+> 
+> Ah! Yes, perfect. I totally forgot about using conditional "prompt"
+> lines. Nice!
 
+It's no different from the more usual:
 
-On 2/3/2017 8:59 AM, James Morse wrote:
-> On 01/02/17 17:16, Tyler Baicar wrote:
->> SEA exceptions are often caused by an uncorrected hardware
->> error, and are handled when data abort and instruction abort
->> exception classes have specific values for their Fault Status
->> Code.
->> When SEA occurs, before killing the process, report the error
->> in the kernel logs.
->> Update fault_info[] with specific SEA faults so that the
->> new SEA handler is used.
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->> index 156169c..9ae7e65 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -487,6 +487,31 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>   	return 1;
->>   }
->>   
->> +#define SEA_FnV_MASK	0x00000400
-> There are a glut of ESR_ELx_ macros in arch/arm64/include/asm/esr.h, could this
-> be fitted in there in a similar format?
->
->
-> --- a/arch/arm64/include/asm/esr.h
-> +++ b/arch/arm64/include/asm/esr.h
-> @@ -83,6 +83,7 @@
->   #define ESR_ELx_WNR            (UL(1) << 6)
->
->   /* Shared ISS field definitions for Data/Instruction aborts */
-> +#define ESR_ELx_FnV            (UL(1) << 10)
->   #define ESR_ELx_EA             (UL(1) << 9)
->   #define ESR_ELx_S1PTW          (UL(1) << 7)
-I'll make this change in the next version.
->> +
->> +/*
->> + * This abort handler deals with Synchronous External Abort.
->> + * It calls notifiers, and then returns "fault".
->> + */
->> +static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->> +{
->> +	struct siginfo info;
->> +
->> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
->> +		 fault_name(esr), esr, addr);
->> +
->> +	info.si_signo = SIGBUS;
->> +	info.si_errno = 0;
->> +	info.si_code  = 0;
->> +	if (esr & SEA_FnV_MASK)
->> +		info.si_addr = 0;
->> +	else
->> +		info.si_addr  = (void __user *)addr;
->> +	arm64_notify_die("", regs, &info, esr);
->> +
->> +	return 0;
->> +}
->> +
->>   static const struct fault_info {
->>   	int	(*fn)(unsigned long addr, unsigned int esr, struct pt_regs *regs);
->>   	int	sig;
->> @@ -509,22 +534,22 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>   	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
->>   	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
->>   	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
->> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
->> +	{ do_sea,		SIGBUS,  0,		"synchronous external abort"	},
-> This will print:
->> Synchronous External Abort: synchronous external abort
-> It looks odd, but I can't think of anything better to put there.
->
->
->>   	{ do_bad,		SIGBUS,  0,		"unknown 17"			},
->>   	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
->>   	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
->> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 0 (translation table walk)"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 1 (translation table walk)"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 2 (translation table walk)"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 3 (translation table walk)"	},
->> +	{ do_sea,		SIGBUS,  0,		"synchronous parity or ECC error" },
->>   	{ do_bad,		SIGBUS,  0,		"unknown 25"			},
->>   	{ do_bad,		SIGBUS,  0,		"unknown 26"			},
->>   	{ do_bad,		SIGBUS,  0,		"unknown 27"			},
->> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
->> +	{ do_sea,		SIGBUS,  0,		"level 0 synchronous parity error (translation table walk)"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 1 synchronous parity error (translation table walk)"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 2 synchronous parity error (translation table walk)"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 3 synchronous parity error (translation table walk)"	},
->>   	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
->>   	{ do_alignment_fault,	SIGBUS,  BUS_ADRALN,	"alignment fault"		},
->>   	{ do_bad,		SIGBUS,  0,		"unknown 34"			},
->>
->
-> With the ESR_ELx_FnV change above,
-> Reviewed-by: James Morse <james.morse@arm.com>
->
-Great, thanks!
+	bool "Make kernel text and rodata read-only" if ARCH_NO_STRICT_RWX_DEFAULTS
+	default y if !ARCH_NO_STRICT_RWX_DEFAULTS
+	depends on ARCH_HAS_STRICT_KERNEL_RWX
 
-Tyler
+But... I really don't like this - way too many negations and negatives
+which make it difficult to figure out what's going on here.
+
+The situation we have today is:
+
+-config DEBUG_RODATA
+-       bool "Make kernel text and rodata read-only"
+-       depends on MMU && !XIP_KERNEL
+-       default y if CPU_V7
+
+which is "allow the user to select DEBUG_RODATA if building a MMU non-XIP
+kernel", suggesting that the user turns it on for ARMv7 CPUs.
+
+That changes with this and the above:
+
++       select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
++       select ARCH_HAS_STRICT_MODULE_RWX if MMU
++       select ARCH_NO_STRICT_RWX_DEFAULTS if !CPU_V7
+
+This means that ARCH_HAS_STRICT_KERNEL_RWX is set for a MMU non-XIP
+kernel, which carries the same pre-condition for DEBUG_RODATA - no
+problem there.
+
+However, ARCH_NO_STRICT_RWX_DEFAULTS is set for non-ARMv7 CPUs, which
+means the "Make kernel text and rodata read-only" prompt _is_ provided
+for those.  However, for all ARMv7 systems, we go from "suggesting that
+the user enables the option" to "you don't have a choice, you get this
+whether you want it or not."
+
+I'd prefer to keep it off for my development systems, where I don't
+care about kernel security.  If we don't wish to do that as a general
+rule, can we make it dependent on EMBEDDED?
+
+Given that on ARM it can add up to 4MB to the kernel image - there
+_will_ be about 1MB before the .text section, the padding on between
+__modver and __ex_table which for me is around 626k, the padding
+between .notes and the init sections start with .vectors (the space
+between __ex_table and end of .notes is only 4124, which gets padded
+up to 1MB) and lastly the padding between the .init section and the
+data section (for me around 593k).  This all adds up to an increase
+in kernel image size of 3.2MB on 14.2MB - an increase of 22%.
+
+So no, I'm really not happy with that.
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
