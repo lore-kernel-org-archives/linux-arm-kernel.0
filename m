@@ -1,221 +1,191 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 3 Feb 2017 11:34:10 -0800
-Subject: [PATCH net-next 5/8] net: ethernet: annapurna: add statistics
- helper
-In-Reply-To: <20170203181216.30214-6-antoine.tenart@free-electrons.com>
-References: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
- <20170203181216.30214-6-antoine.tenart@free-electrons.com>
-Message-ID: <ee80d905-8d48-9e46-17ef-bc4242052172@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 3 Feb 2017 20:40:57 +0100
+Subject: [PATCH v2 4/5] iio: trigger: add support for STM32 EXTI triggers
+In-Reply-To: <1485786840-4557-5-git-send-email-fabrice.gasnier@st.com>
+References: <1485786840-4557-1-git-send-email-fabrice.gasnier@st.com>
+ <1485786840-4557-5-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <CACRpkdZeiFYFdRWCEgYWDWh4Wn2gT29KAFao9mgj7sTi768kFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2017 10:12 AM, Antoine Tenart wrote:
-> Add the ndo_get_stats64() helper in the Annapurna Labs Alpine Ethernet
-> driver.
-> ---
->  drivers/net/ethernet/annapurna/al_eth.c         |  36 ++++
->  drivers/net/ethernet/annapurna/al_hw_eth.h      |   9 +
->  drivers/net/ethernet/annapurna/al_hw_eth_main.c | 225 ++++++++++++++++++++++++
->  3 files changed, 270 insertions(+)
-> 
-> diff --git a/drivers/net/ethernet/annapurna/al_eth.c b/drivers/net/ethernet/annapurna/al_eth.c
-> index 779a885de014..8dd84f66b5d1 100644
-> --- a/drivers/net/ethernet/annapurna/al_eth.c
-> +++ b/drivers/net/ethernet/annapurna/al_eth.c
-> @@ -2388,6 +2388,41 @@ static void al_eth_set_msglevel(struct net_device *netdev, u32 value)
->  	adapter->msg_enable = value;
->  }
->  
-> +static void al_eth_get_stats64(struct net_device *netdev,
-> +			       struct rtnl_link_stats64 *stats)
+On Mon, Jan 30, 2017 at 3:33 PM, Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+
+> EXTi[0..15] gpio signal can be routed internally as trigger source for
+> ADC or DAC conversions. Configure them as interrupts to configure
+> trigger path in HW.
+>
+> Note: interrupt handler isn't required here, and corresponding interrupt
+> can be kept masked at exti controller level.
+>
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+
+But I see nothing STM32-specific about this driver?
+
+I think we should do everone a service and just create
+drivers/iio/trigger/gpio-trigger.c
+
+I wondered before why we don't have a generic GPIO IIO trigger,
+it seems like such an intuitive and useful thing to have.
+
+Let's see what Jonathan says.
+
+> +config IIO_STM32_EXTI_TRIGGER
+> +       tristate "STM32 EXTI Trigger"
+> +       depends on (ARCH_STM32 && OF) || COMPILE_TEST
+
+config IIO_GPIO_TRIGGER
+    depends on GPIOLIB
+
+> +       select STM32_EXTI
+
+Isn't the dependency actually the other way around?
+
+default STM32_EXTI makes more sense, or just put it into the
+defconfig.
+
+> +#include <linux/gpio/consumer.h>
+> +#include <linux/iio/iio.h>
+> +#include <linux/iio/trigger.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +
+> +/* STM32 has up to 16 EXTI triggers on GPIOs */
+> +#define STM32_MAX_EXTI_TRIGGER 16
+
+Just don't put any restrictions like this so it can be widely
+reused.
+
+> +static irqreturn_t stm32_exti_trigger_handler(int irq, void *data)
 > +{
-> +	struct al_eth_adapter *adapter = netdev_priv(netdev);
-> +	struct al_eth_mac_stats *mac_stats = &adapter->mac_stats;
-> +
-> +	if (!adapter->up)
-> +		return NULL;
-> +
-> +	al_eth_mac_stats_get(&adapter->hw_adapter, mac_stats);
-
-Are not you missing a reader synchronization here? Something like what
-drivers/net/ethernet/realtek/8139too.c does for instance, especially if
-this driver runs on ARM where you won't get "atomic" 64-bit reads (you
-could, but it's more complicated).
-
-
-> +
-> +	stats->rx_packets = mac_stats->aFramesReceivedOK; /* including pause frames */
-> +	stats->tx_packets = mac_stats->aFramesTransmittedOK; /* including pause frames */
-> +	stats->rx_bytes = mac_stats->aOctetsReceivedOK;
-> +	stats->tx_bytes = mac_stats->aOctetsTransmittedOK;
-> +	stats->rx_dropped = 0;
-> +	stats->multicast = mac_stats->ifInMulticastPkts;
-> +	stats->collisions = 0;
-
-Are these free running counters, or read on clear, or?
-
-> +
-> +	stats->rx_length_errors = (mac_stats->etherStatsUndersizePkts + /* good but short */
-> +				   mac_stats->etherStatsFragments + /* short and bad*/
-> +				   mac_stats->etherStatsJabbers + /* with crc errors */
-> +				   mac_stats->etherStatsOversizePkts);
-> +	stats->rx_crc_errors = mac_stats->aFrameCheckSequenceErrors;
-> +	stats->rx_frame_errors = mac_stats->aAlignmentErrors;
-> +	stats->rx_fifo_errors = mac_stats->etherStatsDropEvents;
-> +	stats->rx_missed_errors = 0;
-> +	stats->tx_window_errors = 0;
-> +
-> +	stats->rx_errors = mac_stats->ifInErrors;
-> +	stats->tx_errors = mac_stats->ifOutErrors;
-> +
-> +	return stats;
+> +       /* Exti handler shouldn't be invoked, and isn't used */
+> +       return IRQ_HANDLED;
 > +}
-> +
->  static void al_eth_get_drvinfo(struct net_device *dev,
->  			       struct ethtool_drvinfo *info)
->  {
-> @@ -2763,6 +2798,7 @@ static const struct net_device_ops al_eth_netdev_ops = {
->  	.ndo_stop		= al_eth_close,
->  	.ndo_start_xmit		= al_eth_start_xmit,
->  	.ndo_select_queue	= al_eth_select_queue,
-> +	.ndo_get_stats64	= al_eth_get_stats64,
->  	.ndo_do_ioctl		= al_eth_ioctl,
->  	.ndo_tx_timeout		= al_eth_tx_timeout,
->  	.ndo_change_mtu		= al_eth_change_mtu,
-> diff --git a/drivers/net/ethernet/annapurna/al_hw_eth.h b/drivers/net/ethernet/annapurna/al_hw_eth.h
-> index b2fc58793b3a..a44f3f200838 100644
-> --- a/drivers/net/ethernet/annapurna/al_hw_eth.h
-> +++ b/drivers/net/ethernet/annapurna/al_hw_eth.h
-> @@ -982,6 +982,15 @@ struct al_eth_mac_stats {
->  };
->  
->  /*
-> + * get mac statistics
-> + * @param adapter pointer to the private structure.
-> + * @param stats pointer to structure that will be filled with statistics.
-> + *
-> + * @return return 0 on success. otherwise on failure.
-> + */
-> +int al_eth_mac_stats_get(struct al_hw_eth_adapter *adapter, struct al_eth_mac_stats *stats);
-> +
-> +/*
->   * perform Function Level Reset RMN
->   *
->   * Addressing RMN: 714
-> diff --git a/drivers/net/ethernet/annapurna/al_hw_eth_main.c b/drivers/net/ethernet/annapurna/al_hw_eth_main.c
-> index abb9ffd09fbf..dac0c1e2a941 100644
-> --- a/drivers/net/ethernet/annapurna/al_hw_eth_main.c
-> +++ b/drivers/net/ethernet/annapurna/al_hw_eth_main.c
-> @@ -2639,6 +2639,231 @@ int al_eth_flow_control_config(struct al_hw_eth_adapter *adapter,
->  	return 0;
->  }
->  
-> +/* get statistics */
-> +int al_eth_mac_stats_get(struct al_hw_eth_adapter *adapter, struct al_eth_mac_stats *stats)
+
+It could be a good idea to capture the timestamp here if we were
+actually using this IRQ.
+
+> +static int stm32_exti_trigger_probe(struct platform_device *pdev)
 > +{
-> +	WARN_ON(!stats);
+> +       int irq, ret;
+> +       char name[8];
+> +       struct gpio_desc *gpio;
+> +       struct iio_trigger *trig;
+> +       unsigned int i;
 > +
-> +	memset(stats, 0, sizeof(struct al_eth_mac_stats));
+> +       for (i = 0; i < STM32_MAX_EXTI_TRIGGER; i++) {
+
+Why not just run this until devm_gpiod_get() returns -ERRNO
+or something?
+
+> +               snprintf(name, sizeof(name), "exti%d", i);
 > +
-> +	if (AL_ETH_IS_1G_MAC(adapter->mac_mode)) {
-> +		struct al_eth_mac_1g_stats __iomem *reg_stats =
-> +			&adapter->mac_regs_base->mac_1g.stats;
+> +               gpio = devm_gpiod_get_optional(&pdev->dev, name, GPIOD_IN);
+
+Why would it be optional?
+
+Either it is there in the device tree or we get -EINVAL or something
+if there is no
+such index in the device tree. We can get -EPROBE_DEEER too, and then
+we should exit silently or just print that deferring is happening.
+
+> +               if (IS_ERR_OR_NULL(gpio)) {
+> +                       if (IS_ERR(gpio)) {
+> +                               dev_err(&pdev->dev, "gpio %s get error %ld\n",
+> +                                       name, PTR_ERR(gpio));
+> +                               return PTR_ERR(gpio);
+> +                       }
+> +                       dev_dbg(&pdev->dev, "No %s gpio\n", name);
+> +                       continue;
+> +               }
+
+Good
+
+> +               irq = gpiod_to_irq(gpio);
+> +               if (irq < 0) {
+> +                       dev_err(&pdev->dev, "gpio %d to irq failed\n", i);
+> +                       return irq;
+> +               }
 > +
-> +		stats->ifInUcastPkts = readl(&reg_stats->ifInUcastPkts);
-> +		stats->ifInMulticastPkts = readl(&reg_stats->ifInMulticastPkts);
-> +		stats->ifInBroadcastPkts = readl(&reg_stats->ifInBroadcastPkts);
-> +		stats->etherStatsPkts = readl(&reg_stats->etherStatsPkts);
-> +		stats->ifOutUcastPkts = readl(&reg_stats->ifOutUcastPkts);
-> +		stats->ifOutMulticastPkts = readl(&reg_stats->ifOutMulticastPkts);
-> +		stats->ifOutBroadcastPkts = readl(&reg_stats->ifOutBroadcastPkts);
-> +		stats->ifInErrors = readl(&reg_stats->ifInErrors);
-> +		stats->ifOutErrors = readl(&reg_stats->ifOutErrors);
-> +		stats->aFramesReceivedOK = readl(&reg_stats->aFramesReceivedOK);
-> +		stats->aFramesTransmittedOK = readl(&reg_stats->aFramesTransmittedOK);
-> +		stats->aOctetsReceivedOK = readl(&reg_stats->aOctetsReceivedOK);
-> +		stats->aOctetsTransmittedOK = readl(&reg_stats->aOctetsTransmittedOK);
-> +		stats->etherStatsUndersizePkts = readl(&reg_stats->etherStatsUndersizePkts);
-> +		stats->etherStatsFragments = readl(&reg_stats->etherStatsFragments);
-> +		stats->etherStatsJabbers = readl(&reg_stats->etherStatsJabbers);
-> +		stats->etherStatsOversizePkts = readl(&reg_stats->etherStatsOversizePkts);
-> +		stats->aFrameCheckSequenceErrors =
-> +			readl(&reg_stats->aFrameCheckSequenceErrors);
-> +		stats->aAlignmentErrors = readl(&reg_stats->aAlignmentErrors);
-> +		stats->etherStatsDropEvents = readl(&reg_stats->etherStatsDropEvents);
-> +		stats->aPAUSEMACCtrlFramesTransmitted =
-> +			readl(&reg_stats->aPAUSEMACCtrlFramesTransmitted);
-> +		stats->aPAUSEMACCtrlFramesReceived =
-> +			readl(&reg_stats->aPAUSEMACCtrlFramesReceived);
-> +		stats->aFrameTooLongErrors = 0; /* N/A */
-> +		stats->aInRangeLengthErrors = 0; /* N/A */
-> +		stats->VLANTransmittedOK = 0; /* N/A */
-> +		stats->VLANReceivedOK = 0; /* N/A */
-> +		stats->etherStatsOctets = readl(&reg_stats->etherStatsOctets);
-> +		stats->etherStatsPkts64Octets = readl(&reg_stats->etherStatsPkts64Octets);
-> +		stats->etherStatsPkts65to127Octets =
-> +			readl(&reg_stats->etherStatsPkts65to127Octets);
-> +		stats->etherStatsPkts128to255Octets =
-> +			readl(&reg_stats->etherStatsPkts128to255Octets);
-> +		stats->etherStatsPkts256to511Octets =
-> +			readl(&reg_stats->etherStatsPkts256to511Octets);
-> +		stats->etherStatsPkts512to1023Octets =
-> +			readl(&reg_stats->etherStatsPkts512to1023Octets);
-> +		stats->etherStatsPkts1024to1518Octets =
-> +			readl(&reg_stats->etherStatsPkts1024to1518Octets);
-> +		stats->etherStatsPkts1519toX = readl(&reg_stats->etherStatsPkts1519toX);
-> +	} else if (AL_ETH_IS_10G_MAC(adapter->mac_mode) || AL_ETH_IS_25G_MAC(adapter->mac_mode)) {
-> +		if (adapter->rev_id < AL_ETH_REV_ID_3) {
-> +			struct al_eth_mac_10g_stats_v2 __iomem *reg_stats =
-> +				&adapter->mac_regs_base->mac_10g.stats.v2;
-> +			u64 octets;
-> +
+> +               ret = devm_request_irq(&pdev->dev, irq,
+> +                                      stm32_exti_trigger_handler,
+> +                                      0, dev_name(&pdev->dev), pdev);
+> +               if (ret) {
+> +                       dev_err(&pdev->dev, "request IRQ %d failed\n", irq);
+> +                       return ret;
+> +               }
 
-Using a structure to describe HW register is really ugly here, can't you
-either come up with separate functions per generation of the hardware,
-or even indirection tables with register offsets? Most statistics read
-seem to be identical between generations of the HW, but their location
-might differ.
+Here you need some elaborate trigger edge handling.
 
-> +			stats->ifInUcastPkts = readl(&reg_stats->ifInUcastPkts);
-> +			stats->ifInMulticastPkts = readl(&reg_stats->ifInMulticastPkts);
-> +			stats->ifInBroadcastPkts = readl(&reg_stats->ifInBroadcastPkts);
-> +			stats->etherStatsPkts = readl(&reg_stats->etherStatsPkts);
-> +			stats->ifOutUcastPkts = readl(&reg_stats->ifOutUcastPkts);
-> +			stats->ifOutMulticastPkts = readl(&reg_stats->ifOutMulticastPkts);
-> +			stats->ifOutBroadcastPkts = readl(&reg_stats->ifOutBroadcastPkts);
-> +			stats->ifInErrors = readl(&reg_stats->ifInErrors);
-> +			stats->ifOutErrors = readl(&reg_stats->ifOutErrors);
-> +			stats->aFramesReceivedOK = readl(&reg_stats->aFramesReceivedOK);
-> +			stats->aFramesTransmittedOK = readl(&reg_stats->aFramesTransmittedOK);
-> +
-> +			/* aOctetsReceivedOK = ifInOctets - 18 * aFramesReceivedOK - 4 * VLANReceivedOK */
-> +			octets = readl(&reg_stats->ifInOctetsL);
-> +			octets |= (u64)(readl(&reg_stats->ifInOctetsH)) << 32;
-> +			octets -= 18 * stats->aFramesReceivedOK;
-> +			octets -= 4 * readl(&reg_stats->VLANReceivedOK);
-> +			stats->aOctetsReceivedOK = octets;
-> +
-> +			/* aOctetsTransmittedOK = ifOutOctets - 18 * aFramesTransmittedOK - 4 * VLANTransmittedOK */
+The flags that you define as "0" here, how do we say that we
+want to handle rising or falling edges, for example?
 
-What's that 18 for? Ethernet header + VLAN header? If so, express it
-with appropriate constants
+I think you might want to establish these DT properties for
+GPIO triggers:
 
-> +			octets = readl(&reg_stats->ifOutOctetsL);
-> +			octets |= (u64)(readl(&reg_stats->ifOutOctetsH)) << 32;
+gpio-trigger-rising-edge;
+gpio-trigger-falling-edge;
 
-upper_32_bits()
+Then:
 
-> +			octets -= 18 * stats->aFramesTransmittedOK;
+int irq_flags = 0;
 
-What's that 18 for? Ethernet header + VLAN header? If so, express it
-with appropriate constants
+if (of_property_read_bool(np, "gpio-trigger-rising-edge")
+   irq_flags |= IRQF_TRIGGER_RISING;
+else if (of_property_read_bool(np, "gpio-trigger-falling-edge")
+   irq_flags |= IRQF_TRIGGER_FALLING;
 
-> +			octets -= 4 * readl(&reg_stats->VLANTransmittedOK);
+To pass along to the devm_request_irq() function as flags.
 
-4 = ETH_VLAN_HLEN
+I find it weird that it even works without. Most GPIO interrupts
+should require you to set a trigger type. But I guess it is because
+of the other weirdness you describe below.
 
-> +			stats->aOctetsTransmittedOK = octets;
-> +
+> +               /*
+> +                * gpios are configured as interrupts, so exti trigger path is
+> +                * configured in HW, and can now be used as external trigger
+> +                * source by other IPs. But getting interrupts when trigger
+> +                * occurs is unused here, so mask irq on exti controller by
+> +                * default.
+> +                */
+> +               disable_irq(irq);
 
--- 
-Florian
+Aha. That is not generic. But what about just adding:
+
+if (of_property_read_bool(np, "gpio-trigger-numb-irq")
+    disable_irq();
+
+(Plus add the binding for that something like "this makes the
+GPIO mentioned get requested, translated to an IRQ, get the
+IRQ requested, and then immediately just disabled as other
+hardware will actually hande the IRQ line".)
+
+I understand that this is kind of weird: we're making a whole generic
+GPIO trigger driver just to use it with hardware that grabs and disabled
+the irq immediately.
+
+But I think that in the long run it makes for more reusable code.
+
+> +static const struct of_device_id stm32_exti_trigger_of_match[] = {
+> +       { .compatible = "st,stm32-exti-trigger" },
+> +       {},
+
+"iio-gpio-trigger"
+
+Should fit anyone, given the above amendments.
+
+> +#if IS_ENABLED(CONFIG_IIO_STM32_EXTI_TRIGGER)
+> +bool is_stm32_exti_trigger(struct iio_trigger *trig);
+> +#else
+> +static inline bool is_stm32_exti_trigger(struct iio_trigger *trig)
+> +{
+> +       return false;
+> +}
+> +#endif
+
+This seems unnecessary to broadcast to the entire kernel.
+
+Why? (Maybe I can find explanations in later patches.
+
+Yours,
+Linus Walleij
