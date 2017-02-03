@@ -1,323 +1,94 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  3 Feb 2017 14:58:23 +0000
-Subject: [PATCHv2 3/3] drivers/perf: arm_pmu: split irq request from enable
-In-Reply-To: <1486133903-20665-1-git-send-email-mark.rutland@arm.com>
-References: <1486133903-20665-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1486133903-20665-4-git-send-email-mark.rutland@arm.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 3 Feb 2017 23:00:29 +0800
+Subject: [xlnx:master 2262/2699]
+ drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_osk_low_level_mem.c:36:26:
+ error: implicit declaration of function 'ioremap_nocache'
+Message-ID: <201702032314.rBHXkUMl%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For historical reasons, we lazily request and free interrupts in the
-arm pmu driver. This requires us to refcount use of the pmu (by way of
-counting the active events) in order to request/free interrupts at the
-correct times, which complicates the driver somewhat.
+Hi Michal,
 
-The existing logic is flawed, as it only considers currently online CPUs
-when requesting, freeing, or managing the affinity of interrupts.
-Intervening hotplug events can result in erroneous IRQ affinity, online
-CPUs for which interrupts have not been requested, or offline CPUs whose
-interrupts are still requested.
+First bad commit (maybe != root cause):
 
-To fix this, this patch splits the requesting of interrupts from any
-per-cpu management (i.e. per-cpu enable/disable, and configuration of
-cpu affinity). We now request all interrupts up-front at probe time (and
-never free them, since we never unregister PMUs).
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   629041605b93343ad2e8971ceaac3edcef0b043b
+commit: 2ab6f2613b2c23f3d79821331f709d17219c6ec1 [2262/2699] Merge tag 'v4.2' into master
+config: um-allyesconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout 2ab6f2613b2c23f3d79821331f709d17219c6ec1
+        # save the attached .config to linux build tree
+        make ARCH=um 
 
-The management of affinity, and per-cpu enable/disable now happens in
-our cpu hotplug callback, ensuring it occurs consistently. This means
-that we must now invoke the CPU hotplug callback at boot time in order
-to configure IRQs, and since the callback also resets the PMU hardware,
-we can remove the duplicate reset in the probe path.
+All error/warnings (new ones prefixed by >>):
 
-This rework renders our event refcounting unnecessary, so this is
-removed.
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_osk_low_level_mem.c: In function '_mali_osk_mem_mapioregion':
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_osk_low_level_mem.c:36:26: error: implicit declaration of function 'ioremap_nocache' [-Werror=implicit-function-declaration]
+     return (mali_io_address)ioremap_nocache(phys, size);
+                             ^~~~~~~~~~~~~~~
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_osk_low_level_mem.c:36:9: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     return (mali_io_address)ioremap_nocache(phys, size);
+            ^
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_osk_low_level_mem.c: In function '_mali_osk_mem_unmapioregion':
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_osk_low_level_mem.c:41:2: error: implicit declaration of function 'iounmap' [-Werror=implicit-function-declaration]
+     iounmap((void *)virt);
+     ^~~~~~~
+   cc1: some warnings being treated as errors
+--
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c: In function 'mali_read_phys':
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c:330:21: error: implicit declaration of function 'ioremap_nocache' [-Werror=implicit-function-declaration]
+     void *mem_mapped = ioremap_nocache(phys_addr_page, map_size);
+                        ^~~~~~~~~~~~~~~
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c:330:21: warning: initialization makes pointer from integer without a cast [-Wint-conversion]
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c:333:3: error: implicit declaration of function 'iounmap' [-Werror=implicit-function-declaration]
+      iounmap(mem_mapped);
+      ^~~~~~~
+   At top level:
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c:324:12: warning: 'mali_read_phys' defined but not used [-Wunused-function]
+    static u32 mali_read_phys(u32 phys_addr)
+               ^~~~~~~~~~~~~~
+   In file included from drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c:25:0:
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c: In function 'mali_platform_device_init':
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/common/mali_kernel_common.h:156:45: warning: 'num_pp_cores' may be used uninitialized in this function [-Wmaybe-uninitialized]
+    #define MALI_DEBUG_ASSERT(condition) do  {if( !(condition)) {MALI_PRINT_ERROR(("ASSERT failed: " #condition )); _mali_osk_break();} } while(0)
+                                                ^
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/platform/arm/arm.c:238:6: note: 'num_pp_cores' was declared here
+     int num_pp_cores;
+         ^~~~~~~~~~~~
+   cc1: some warnings being treated as errors
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+vim +/ioremap_nocache +36 drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_osk_low_level_mem.c
+
+8e905b3b Michal Simek 2015-06-10  30  {
+8e905b3b Michal Simek 2015-06-10  31  	wmb();
+8e905b3b Michal Simek 2015-06-10  32  }
+8e905b3b Michal Simek 2015-06-10  33  
+8e905b3b Michal Simek 2015-06-10  34  mali_io_address _mali_osk_mem_mapioregion(uintptr_t phys, u32 size, const char *description)
+8e905b3b Michal Simek 2015-06-10  35  {
+8e905b3b Michal Simek 2015-06-10 @36  	return (mali_io_address)ioremap_nocache(phys, size);
+8e905b3b Michal Simek 2015-06-10  37  }
+8e905b3b Michal Simek 2015-06-10  38  
+8e905b3b Michal Simek 2015-06-10  39  void _mali_osk_mem_unmapioregion(uintptr_t phys, u32 size, mali_io_address virt)
+8e905b3b Michal Simek 2015-06-10  40  {
+8e905b3b Michal Simek 2015-06-10 @41  	iounmap((void *)virt);
+8e905b3b Michal Simek 2015-06-10  42  }
+8e905b3b Michal Simek 2015-06-10  43  
+8e905b3b Michal Simek 2015-06-10  44  _mali_osk_errcode_t inline _mali_osk_mem_reqregion(uintptr_t phys, u32 size, const char *description)
+
+:::::: The code at line 36 was first introduced by commit
+:::::: 8e905b3b33fa6f3f2f97591500b53d8a8245df29 staging: mali: Add r5p1-01rel0 and r5p2-00rel0 drivers
+
+:::::: TO: Michal Simek <michal.simek@xilinx.com>
+:::::: CC: Michal Simek <michal.simek@xilinx.com>
+
 ---
- drivers/perf/arm_pmu.c       | 153 ++++++++++++++-----------------------------
- include/linux/perf/arm_pmu.h |   4 --
- 2 files changed, 50 insertions(+), 107 deletions(-)
-
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index bc54f2f..0cc4b61 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -351,37 +351,6 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
- 	return ret;
- }
- 
--static void
--armpmu_release_hardware(struct arm_pmu *armpmu)
--{
--	armpmu->free_irq(armpmu);
--}
--
--static int
--armpmu_reserve_hardware(struct arm_pmu *armpmu)
--{
--	int err = armpmu->request_irq(armpmu, armpmu_dispatch_irq);
--	if (err) {
--		armpmu_release_hardware(armpmu);
--		return err;
--	}
--
--	return 0;
--}
--
--static void
--hw_perf_event_destroy(struct perf_event *event)
--{
--	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
--	atomic_t *active_events	 = &armpmu->active_events;
--	struct mutex *pmu_reserve_mutex = &armpmu->reserve_mutex;
--
--	if (atomic_dec_and_mutex_lock(active_events, pmu_reserve_mutex)) {
--		armpmu_release_hardware(armpmu);
--		mutex_unlock(pmu_reserve_mutex);
--	}
--}
--
- static int
- event_requires_mode_exclusion(struct perf_event_attr *attr)
- {
-@@ -454,8 +423,6 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
- static int armpmu_event_init(struct perf_event *event)
- {
- 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
--	int err = 0;
--	atomic_t *active_events = &armpmu->active_events;
- 
- 	/*
- 	 * Reject CPU-affine events for CPUs that are of a different class to
-@@ -475,26 +442,7 @@ static int armpmu_event_init(struct perf_event *event)
- 	if (armpmu->map_event(event) == -ENOENT)
- 		return -ENOENT;
- 
--	event->destroy = hw_perf_event_destroy;
--
--	if (!atomic_inc_not_zero(active_events)) {
--		mutex_lock(&armpmu->reserve_mutex);
--		if (atomic_read(active_events) == 0)
--			err = armpmu_reserve_hardware(armpmu);
--
--		if (!err)
--			atomic_inc(active_events);
--		mutex_unlock(&armpmu->reserve_mutex);
--	}
--
--	if (err)
--		return err;
--
--	err = __hw_perf_event_init(event);
--	if (err)
--		hw_perf_event_destroy(event);
--
--	return err;
-+	return __hw_perf_event_init(event);
- }
- 
- static void armpmu_enable(struct pmu *pmu)
-@@ -554,9 +502,6 @@ static ssize_t armpmu_cpumask_show(struct device *dev,
- 
- static void armpmu_init(struct arm_pmu *armpmu)
- {
--	atomic_set(&armpmu->active_events, 0);
--	mutex_init(&armpmu->reserve_mutex);
--
- 	armpmu->pmu = (struct pmu) {
- 		.pmu_enable	= armpmu_enable,
- 		.pmu_disable	= armpmu_disable,
-@@ -600,21 +545,7 @@ int perf_num_counters(void)
- }
- EXPORT_SYMBOL_GPL(perf_num_counters);
- 
--static void cpu_pmu_enable_percpu_irq(void *data)
--{
--	int irq = *(int *)data;
--
--	enable_percpu_irq(irq, IRQ_TYPE_NONE);
--}
--
--static void cpu_pmu_disable_percpu_irq(void *data)
--{
--	int irq = *(int *)data;
--
--	disable_percpu_irq(irq);
--}
--
--static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
-+static void cpu_pmu_free_irqs(struct arm_pmu *cpu_pmu)
- {
- 	int cpu;
- 	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
-@@ -625,10 +556,7 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
- 			continue;
- 
- 		if (irq_is_percpu(irq)) {
--			on_each_cpu_mask(&cpu_pmu->supported_cpus,
--					 cpu_pmu_disable_percpu_irq, &irq, 1);
- 			free_percpu_irq(irq, &hw_events->percpu_pmu);
--
- 			break;
- 		}
- 
-@@ -639,7 +567,7 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
- 	}
- }
- 
--static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
-+static int cpu_pmu_request_irqs(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- {
- 	int cpu, err;
- 	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
-@@ -655,25 +583,9 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- 			if (err) {
- 				pr_err("unable to request IRQ%d for ARM PMU counters\n",
- 					irq);
--				return err;
- 			}
- 
--			on_each_cpu_mask(&cpu_pmu->supported_cpus,
--					 cpu_pmu_enable_percpu_irq, &irq, 1);
--
--			break;
--		}
--
--		/*
--		 * If we have a single PMU interrupt that we can't shift,
--		 * assume that we're running on a uniprocessor machine and
--		 * continue. Otherwise, continue without this interrupt.
--		 */
--		if (irq_set_affinity(irq, cpumask_of(cpu)) &&
--		    num_possible_cpus() > 1) {
--			pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
--				irq, cpu);
--			continue;
-+			return err;
- 		}
- 
- 		err = request_irq(irq, handler,
-@@ -691,6 +603,12 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- 	return 0;
- }
- 
-+int armpmu_get_cpu_irq(struct arm_pmu *pmu, int cpu)
-+{
-+	struct pmu_hw_events __percpu *hw_events = pmu->hw_events;
-+	return per_cpu(hw_events->irq, cpu);
-+}
-+
- /*
-  * PMU hardware loses all context when a CPU goes offline.
-  * When a CPU is hotplugged back in, since some hardware registers are
-@@ -700,11 +618,42 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- static int arm_perf_starting_cpu(unsigned int cpu, struct hlist_node *node)
- {
- 	struct arm_pmu *pmu = hlist_entry_safe(node, struct arm_pmu, node);
-+	int irq;
- 
- 	if (!cpumask_test_cpu(cpu, &pmu->supported_cpus))
- 		return 0;
- 	if (pmu->reset)
- 		pmu->reset(pmu);
-+
-+	irq = armpmu_get_cpu_irq(pmu, cpu);
-+	if (irq) {
-+		if (irq_is_percpu(irq)) {
-+			enable_percpu_irq(irq, IRQ_TYPE_NONE);
-+			return 0;
-+		}
-+
-+		if (irq_force_affinity(irq, cpumask_of(cpu)) &&
-+		    num_possible_cpus() > 1) {
-+			pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
-+				irq, cpu);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int arm_perf_teardown_cpu(unsigned int cpu, struct hlist_node *node)
-+{
-+	struct arm_pmu *pmu = hlist_entry_safe(node, struct arm_pmu, node);
-+	int irq;
-+
-+	if (!cpumask_test_cpu(cpu, &pmu->supported_cpus))
-+		return 0;
-+
-+	irq = armpmu_get_cpu_irq(pmu, cpu);
-+	if (irq && irq_is_percpu(irq))
-+		disable_percpu_irq(irq);
-+
- 	return 0;
- }
- 
-@@ -810,8 +759,12 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	int err;
- 
--	err = cpuhp_state_add_instance_nocalls(CPUHP_AP_PERF_ARM_STARTING,
--					       &cpu_pmu->node);
-+	err = cpu_pmu_request_irqs(cpu_pmu, armpmu_dispatch_irq);
-+	if (err)
-+		goto out;
-+
-+	err = cpuhp_state_add_instance(CPUHP_AP_PERF_ARM_STARTING,
-+				       &cpu_pmu->node);
- 	if (err)
- 		goto out;
- 
-@@ -819,14 +772,6 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 	if (err)
- 		goto out_unregister;
- 
--	cpu_pmu->request_irq	= cpu_pmu_request_irq;
--	cpu_pmu->free_irq	= cpu_pmu_free_irq;
--
--	/* Ensure the PMU has sane values out of reset. */
--	if (cpu_pmu->reset)
--		on_each_cpu_mask(&cpu_pmu->supported_cpus, cpu_pmu->reset,
--			 cpu_pmu, 1);
--
- 	/* If no interrupts available, set the corresponding capability flag */
- 	if (!platform_get_irq(cpu_pmu->plat_device, 0))
- 		cpu_pmu->pmu.capabilities |= PERF_PMU_CAP_NO_INTERRUPT;
-@@ -845,6 +790,7 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpuhp_state_remove_instance_nocalls(CPUHP_AP_PERF_ARM_STARTING,
- 					    &cpu_pmu->node);
- out:
-+	cpu_pmu_free_irqs(cpu_pmu);
- 	return err;
- }
- 
-@@ -1115,7 +1061,8 @@ static int arm_pmu_hp_init(void)
- 
- 	ret = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_STARTING,
- 				      "perf/arm/pmu:starting",
--				      arm_perf_starting_cpu, NULL);
-+				      arm_perf_starting_cpu,
-+				      arm_perf_teardown_cpu);
- 	if (ret)
- 		pr_err("CPU hotplug notifier for ARM PMU could not be registered: %d\n",
- 		       ret);
-diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index 05a3eb4..44f43fc 100644
---- a/include/linux/perf/arm_pmu.h
-+++ b/include/linux/perf/arm_pmu.h
-@@ -105,12 +105,8 @@ struct arm_pmu {
- 	void		(*start)(struct arm_pmu *);
- 	void		(*stop)(struct arm_pmu *);
- 	void		(*reset)(void *);
--	int		(*request_irq)(struct arm_pmu *, irq_handler_t handler);
--	void		(*free_irq)(struct arm_pmu *);
- 	int		(*map_event)(struct perf_event *event);
- 	int		num_events;
--	atomic_t	active_events;
--	struct mutex	reserve_mutex;
- 	u64		max_period;
- 	bool		secure_access; /* 32-bit ARM only */
- #define ARMV8_PMUV3_MAX_COMMON_EVENTS 0x40
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 16422 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170203/da41b26f/attachment-0001.gz>
