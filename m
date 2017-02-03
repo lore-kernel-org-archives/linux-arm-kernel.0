@@ -1,75 +1,125 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri,  3 Feb 2017 21:18:53 +0530
-Subject: [PATCH V8 11/11] ACPI/IORT: Remove linker section for IORT entries
- probing
-In-Reply-To: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
-References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1486136933-20328-12-git-send-email-sricharan@codeaurora.org>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 03 Feb 2017 15:59:33 +0000
+Subject: [PATCH V8 04/10] arm64: exception: handle Synchronous External
+ Abort
+In-Reply-To: <1485969413-23577-5-git-send-email-tbaicar@codeaurora.org>
+References: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
+ <1485969413-23577-5-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <5894A8E5.6000803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Hi Tyler,
 
-The IORT linker section introduced by commit 34ceea275f62
-("ACPI/IORT: Introduce linker section for IORT entries probing")
-was needed to make sure SMMU drivers are registered (and therefore
-probed) in the kernel before devices using the SMMU have a chance
-to probe in turn.
+On 01/02/17 17:16, Tyler Baicar wrote:
+> SEA exceptions are often caused by an uncorrected hardware
+> error, and are handled when data abort and instruction abort
+> exception classes have specific values for their Fault Status
+> Code.
+> When SEA occurs, before killing the process, report the error
+> in the kernel logs.
+> Update fault_info[] with specific SEA faults so that the
+> new SEA handler is used.
 
-Through the introduction of deferred IOMMU configuration the linker
-section based IORT probing infrastructure is not needed any longer, in
-that device/SMMU probe dependencies are managed through the probe
-deferral mechanism, making the IORT linker section infrastructure
-unused, so that it can be removed.
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 156169c..9ae7e65 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -487,6 +487,31 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>  	return 1;
+>  }
+>  
+> +#define SEA_FnV_MASK	0x00000400
 
-Remove the unused IORT linker section probing infrastructure
-from the kernel to complete the ACPI IORT IOMMU configure probe
-deferral mechanism implementation.
+There are a glut of ESR_ELx_ macros in arch/arm64/include/asm/esr.h, could this
+be fitted in there in a similar format?
 
-Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Sricharan R <sricharan@codeaurora.org>
----
- drivers/acpi/arm64/iort.c         | 2 --
- include/asm-generic/vmlinux.lds.h | 1 -
- include/linux/acpi_iort.h         | 3 ---
- 3 files changed, 6 deletions(-)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index d01bae8..ac45623 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -992,6 +992,4 @@ void __init acpi_iort_init(void)
- 	}
- 
- 	iort_init_platform_devices();
--
--	acpi_probe_device_table(iort);
- }
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 4e09b28..93ea70a 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -567,7 +567,6 @@
- 	IRQCHIP_OF_MATCH_TABLE()					\
- 	ACPI_PROBE_TABLE(irqchip)					\
- 	ACPI_PROBE_TABLE(clksrc)					\
--	ACPI_PROBE_TABLE(iort)						\
- 	EARLYCON_TABLE()
- 
- #define INIT_TEXT							\
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index 77e0809..f167e1d04 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -52,7 +52,4 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
- { return NULL; }
- #endif
- 
--#define IORT_ACPI_DECLARE(name, table_id, fn)		\
--	ACPI_DECLARE_PROBE_ENTRY(iort, name, table_id, 0, NULL, 0, fn)
--
- #endif /* __ACPI_IORT_H__ */
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -83,6 +83,7 @@
+ #define ESR_ELx_WNR            (UL(1) << 6)
+
+ /* Shared ISS field definitions for Data/Instruction aborts */
++#define ESR_ELx_FnV            (UL(1) << 10)
+ #define ESR_ELx_EA             (UL(1) << 9)
+ #define ESR_ELx_S1PTW          (UL(1) << 7)
+
+
+> +
+> +/*
+> + * This abort handler deals with Synchronous External Abort.
+> + * It calls notifiers, and then returns "fault".
+> + */
+> +static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+> +{
+> +	struct siginfo info;
+> +
+> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+> +		 fault_name(esr), esr, addr);
+> +
+> +	info.si_signo = SIGBUS;
+> +	info.si_errno = 0;
+> +	info.si_code  = 0;
+> +	if (esr & SEA_FnV_MASK)
+> +		info.si_addr = 0;
+> +	else
+> +		info.si_addr  = (void __user *)addr;
+> +	arm64_notify_die("", regs, &info, esr);
+> +
+> +	return 0;
+> +}
+> +
+>  static const struct fault_info {
+>  	int	(*fn)(unsigned long addr, unsigned int esr, struct pt_regs *regs);
+>  	int	sig;
+> @@ -509,22 +534,22 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
+>  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
+>  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
+> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
+> +	{ do_sea,		SIGBUS,  0,		"synchronous external abort"	},
+
+This will print:
+> Synchronous External Abort: synchronous external abort
+
+It looks odd, but I can't think of anything better to put there.
+
+
+>  	{ do_bad,		SIGBUS,  0,		"unknown 17"			},
+>  	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
+>  	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
+> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
+> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
+> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
+> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
+> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
+> +	{ do_sea,		SIGBUS,  0,		"level 0 (translation table walk)"	},
+> +	{ do_sea,		SIGBUS,  0,		"level 1 (translation table walk)"	},
+> +	{ do_sea,		SIGBUS,  0,		"level 2 (translation table walk)"	},
+> +	{ do_sea,		SIGBUS,  0,		"level 3 (translation table walk)"	},
+> +	{ do_sea,		SIGBUS,  0,		"synchronous parity or ECC error" },
+>  	{ do_bad,		SIGBUS,  0,		"unknown 25"			},
+>  	{ do_bad,		SIGBUS,  0,		"unknown 26"			},
+>  	{ do_bad,		SIGBUS,  0,		"unknown 27"			},
+> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
+> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
+> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
+> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error (translation table walk)" },
+> +	{ do_sea,		SIGBUS,  0,		"level 0 synchronous parity error (translation table walk)"	},
+> +	{ do_sea,		SIGBUS,  0,		"level 1 synchronous parity error (translation table walk)"	},
+> +	{ do_sea,		SIGBUS,  0,		"level 2 synchronous parity error (translation table walk)"	},
+> +	{ do_sea,		SIGBUS,  0,		"level 3 synchronous parity error (translation table walk)"	},
+>  	{ do_bad,		SIGBUS,  0,		"unknown 32"			},
+>  	{ do_alignment_fault,	SIGBUS,  BUS_ADRALN,	"alignment fault"		},
+>  	{ do_bad,		SIGBUS,  0,		"unknown 34"			},
+> 
+
+
+With the ESR_ELx_FnV change above,
+Reviewed-by: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+James
