@@ -1,39 +1,46 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 3 Feb 2017 08:59:07 +0100
-Subject: v4.9 to v4.10 regression: oops when USB cable is plugged in.
-In-Reply-To: <20170127234832.cte4ki4ajwme2b2j@earth>
-References: <20170123222537.GA11543@amd> <20170123224454.GY7403@atomide.com>
- <20170124091817.GA29246@amd> <20170124100133.GA21079@pali>
- <20170124145127.GC7403@atomide.com> <20170127215512.GG20571@amd>
- <20170127234832.cte4ki4ajwme2b2j@earth>
-Message-ID: <20170203075907.GA21338@amd>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Fri, 3 Feb 2017 09:00:40 +0100
+Subject: [PATCH V7 3/4] drm/bridge: Add driver for GE B850v3 LVDS/DP++
+ Bridge
+In-Reply-To: <CACvgo50bOZ=jzeJc_J4_7fpiEh9-ATKo1KOhAia2679AGA=mng@mail.gmail.com>
+References: <CACvgo535iyFvdOWzQHRnU++Ye0GgyZyN3R9ALSXRP7k3EPyRGA@mail.gmail.com>
+ <3e31-58931d80-1-221fa900@101383713>
+ <CACvgo50bOZ=jzeJc_J4_7fpiEh9-ATKo1KOhAia2679AGA=mng@mail.gmail.com>
+Message-ID: <20170203080040.qn53xnpojxzk4qoi@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Thu, Feb 02, 2017 at 12:37:21PM +0000, Emil Velikov wrote:
+>  - Daniel, gents - is drm-misc aimed at devs with limited (no?)
+> review/commit history in the area and/or the kernel in general ?
+> In this case, Peter have quite noticeable experience [in kernel
+> development] with little-to no in DRM.
+> Should one draw a line in the sand somewhere ?
 
-> On Fri, Jan 27, 2017 at 10:55:12PM +0100, Pavel Machek wrote:
-> > Ok, I can try. But so far even -rc1 is a lot of fun. But... I consider
-> > phone calls core feature of a phone. I'd very much like to get that to
-> > work. Unfortunately, that means real-time audio, and a lot of
-> > fun. Plus, as it is touchscreen device, it needs a GUI. 
-> 
-> Talking about testing - kernelci's n900 is broken?
-> 
-> https://kernelci.org/boot/omap3-n900/
+We're fairly lenient with accepting new drivers already, and for drivers
+in drm-misc we require some checks and peer review to make sure new folks
+learn faster. But it's an expirement, I fully expect some fallout and then
+some learnign and fine tuning from that, and maybe we even need to crank
+requirements back up to a much higher level of experience.
 
-The N900 regressions are now more of "audio mixers no longer work"
-than "it fails to boot" kind -- thus difficult to test automatically,
-I'm afraid.
-									Pavel
+But for drivers I'm honestly not too concerned: As long as there's some
+process in place to foster learning&collaboration (which I think will be
+better with this) I really don't see much harm in merging non-perfect
+driver code.
 
+>  - You patch has been on a long [bit rocky road] for a while, with
+> devs giving you [what seems like] a partial reviews.
+> Have you considered reviewing others' patches in exchange for a [more
+> complete one] of this one ? According to git log people have poked you
+> a handful of times, but seemingly you were busy.
+
+Just a clarification: When I review drivers I don't do a fairly cursor
+look, hunting for areas where some refactoring and align with drm best
+practices would be good. And I think that's perfectly fine and enough to
+get a driver landed, but we're definitely not 100% consistent on this
+within drm-misc. Probably will take some time to figure this out.
+-Daniel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170203/a4e28c79/attachment.sig>
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
