@@ -1,131 +1,60 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Sat, 4 Feb 2017 06:30:30 +0100
-Subject: [PATCH 2/2] DTS: dra7: Add "opp_high" opp node to support 1.5
- GHz SoC operation
-In-Reply-To: <79e08896-895e-4996-8402-832328b4f7d8@ti.com>
-References: <1486135491-14223-1-git-send-email-lukma@denx.de>
- <1486135491-14223-2-git-send-email-lukma@denx.de>
- <e398ff96-dca7-7934-70b1-9a95c01d3b27@ti.com>
- <20170204002150.707b231d@jawa>
- <79e08896-895e-4996-8402-832328b4f7d8@ti.com>
-Message-ID: <20170204063030.3ba736f9@jawa>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Sat, 4 Feb 2017 15:02:15 +0800
+Subject: [PATCH v8 00/15] ACPI platform MSI support and its example mbigen
+In-Reply-To: <20170203183626.GB17899@red-moon>
+References: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
+ <20170203183626.GB17899@red-moon>
+Message-ID: <58957C77.7070206@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nishanth,
+Hi Lorenzo,
 
-> On 02/03/2017 05:21 PM, Lukasz Majewski wrote:
-> > Hi Dave,
-> >
-> > Thanks for sharing the knowledge :-)
-> >
-> >> On 02/03/2017 09:24 AM, Lukasz Majewski wrote:
-> >>> The "opp_high" property brings support for 1.5 GHz CPU frequency
-> >>> for TI's am57xx line of processors.
-> >>>
-> >>> Signed-off-by: Lukasz Majewski <lukma@denx.de>
-> >>> ---
-> >>>  arch/arm/boot/dts/dra7.dtsi | 5 +++++
-> >>>  1 file changed, 5 insertions(+)
-> >>>
-> >>
-> >> This can't be blindly enabled for all am57xx SoCs,
-> >
-> > Yes, I'm fully aware of AVS, which uses fuses and SoC silicon
-> > revision to assess if frequency can be enabled.
-> >
-> > Example from my playground:
-> >
-> > - AM5728 works with 1.5 GHz enabled
-> >
-> > - AM5718 hangs when I try to enable 1.5 GHz frequency
-> >
-> >
-> >> there is a
-> >> forthcoming ti-cpufreq [1] driver
-> >
-> > I've backported and tested this code on v4.9 vanilla. It works :-)
-> >
-> >> that is needed that will decided
-> >> which OPPs can and cannot be enabled for the specific variant in
-> >> use.
-> >
-> > I do have a question:
-> >
-> > Do you know the correct opp-supported-hw value for 1.5 GHz on AM57x8
-> > SoC?
-> > In TI's SDK Linux (v4.4): opp-supported-hw = <0xFF 0x04>; but this
-> > seems to be always enabled (and not taking silicon revision and
-> > efuse into account).
-> 
-> There is a TISDK 4.9 being built up as well (we typically do let the 
-> driver soak for a test cycle prior to posting it upstream) but if it 
-> is of interest.. it should match the version Dave posted upstream..
-> 
-> http://git.ti.com/ti-linux-kernel/ti-linux-kernel/blobs/ti-lsk-linux-4.9.y/arch/arm/boot/dts/dra7.dtsi#line100
+On 2017/2/4 2:36, Lorenzo Pieralisi wrote:
+> Hanjun, Sinan,
+>
+> On Wed, Jan 18, 2017 at 08:54:50PM +0800, Hanjun Guo wrote:
+>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>
+>> With platform msi support landed in the kernel, and the introduction
+>> of IORT for GICv3 ITS (PCI MSI) and SMMU, the framework for platform msi
+>> is ready, this patch set add few patches to enable the ACPI platform
+>> msi support.
+>>
+>> For platform device connecting to ITS on arm platform, we have IORT
+>> table with the named componant node to describe the mappings of paltform
+>> device and ITS, so we can retrieve the dev id and find its parent
+>> irqdomain (ITS) from IORT table (simlar with the ACPI ITS support).
+> Depending on how things go, I prepared a branch with the first 12
+> patches (I basically updated some logs and added some cosmetics changes)
+> for testing (Hanjun please have a look in details since I may have misread
+> some logs), whether or not I will send a pull request for it we shall see
+> next week.
+>
+> Here:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/platform-msi
 
-This opp_table0 DTS node definition is different than the one sent to ML
-by Dave (e.g. opp-microvolt has different definition).
+Thanks a lot for putting them together, I fetched your git tree and
+took a detail look, there is one issue in patch "msi: platform: make
+platform_msi_create_device_domain() ACPI aware" which has two
+"Cc: Greg KH <gregkh@linuxfoundation.org>" in the commit log
+(it's in the original patch from me, my bad), others are pretty good
+to me (to make sure it works I retested those patches and patches
+in your branch work as before).
 
-> 
-> > For my use case it would be best to see what data should prevent my
-> > AM5718 from 1.5 GHz OPP.
-> >
-> > In other words I need to be 100% sure that my silicon SoC version
-> > doesn't support the 1.5 GHz frequency.
-> >
-> 
-> look at dra7_efuse_xlate which does a speed grade decode of the
-> speeds permitted.. a value of 15 or 23 should permit 1.5GHz. those
-> are common for DRA7/AM57 SoCs.
+BTW, patches in Lorenzo's branch have no conflicts with Agustin's
+patch set + my mbigen one, so after a pull request to Rafael, could
+them (Agustin's patch set + my mbigen one) go via one tree such as
+Marc's one for 4.11?  I know it's a little bit late but those patches
+are quite self-contained, which Agustin's changes are conditional
+on the ACPI_GENERIC_GSI config which is only available with
+ARM64 ACPI and others (interrupt combiner and mbigen) are specific
+to QC and Hisilicon platforms.
 
-Ok, I've checked this and both SoCs have value 23, so they should
-support 1.5 GHz operation. Hence, the AM5718 should not hang.
+Marc, Lorenzo, could you give some comments that how can we
+proceed those patches (Agustin's patch set + my mbigen one)?
+It's really critical for us, thank you very much.
 
-> 
-> If the efuses seem set for 1.5GHz, the chip should be capable of 
-> 1.5GHz, i'd start suspecting regulators, slew rates and the like.
-
-Then I do need to examine them.
-
-> 
-> http://www.ti.com/lit/pdf/spruhz7
-> rev d: page 371 -> 23 (0x17) = X speed designator Refer to device DM 
-> for supported speed grades for a given device, and the definition for 
-> supported speed grades.
-> So, if you go to 
-> http://www.ti.com/product/AM5718/datasheet/specifications#SWPS043-7245x 
-> -> you will see the "X" designator in AM5718xxX which does support 23 
-> and 1.5GHz.
-
-Yes, correct.
-
-> 
-> 
-> Now, if you did get one of the pre-production samples,
-
-Is there any prod_id (or any other register value), which indicates the
-production sample?
-
-> it is possible 
-> to have efuses slightly messed up on very initial samples - at least 
-> internally, we have had them replaced and none of those samples
-> should have exited TI.. but mistakes might happen.. if the efuse
-> value does not meet the speed grade in documentation, then, please
-> contact TI FAE your company works with and let them know for what to
-> do alternatively, you can also file it on e2e.ti.com for further
-> support.
-> 
-
-Thanks for support.
-
-
-Best regards,
-
-Lukasz Majewski
-
---
-
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+Best Regards
+Hanjun
