@@ -1,167 +1,254 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Sat, 4 Feb 2017 18:06:37 +0800
-Subject: [Update][PATCH v8 15/15] irqchip: mbigen: Add ACPI support
-Message-ID: <1486202797-61269-1-git-send-email-guohanjun@huawei.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 4 Feb 2017 11:14:48 +0100
+Subject: [PATCH v2 4/6] bus: add driver for the Technologic Systems NBUS
+In-Reply-To: <20170203194729.20995-5-sebastien.bourdelin@savoirfairelinux.com>
+References: <20170203194729.20995-1-sebastien.bourdelin@savoirfairelinux.com>
+ <20170203194729.20995-5-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <CACRpkdYfGmVBYgAc4KZGN6634WM_EyzNj_SBbALEs4WYipXRQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+On Fri, Feb 3, 2017 at 8:47 PM, Sebastien Bourdelin
+<sebastien.bourdelin@savoirfairelinux.com> wrote:
 
-With the preparation of platform msi support and interrupt producer
-in DSDT, we can add mbigen ACPI support now.
+> This driver implements a GPIOs bit-banged bus, called the NBUS by
+> Technologic Systems. It is used to communicate with the peripherals in
+> the FPGA on the TS-4600 SoM.
+>
+> ---
+> Changes v1 -> v2:
+>   - rebase on master
+>   - the driver now populate its child nodes
+>   - remove the 'default y' option from the Kconfig
+>   - rework the driver to not use singleton anymore (suggested by Linus
+>   Walleij)
+>   - replace the use of the legacy GPIO API with gpiod (suggested by
+>   Linus Walleij)
+>   - use the ts vendor prefix for gpios (suggested by Rob Herring)
+>
+> Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
 
-We are using Interrupt resource type in _CRS methd to indicate number
-of irq pins instead of num_pins in DT to avoid _DSD usage in this case.
+This is starting to look nice!
 
-For mbigen,
-    Device(MBI0) {
-          Name(_HID, "HISI0152")
-          Name(_UID, Zero)
-          Name(_CRS, ResourceTemplate() {
-                  Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
-		  Interrupt(ResourceProducer,...) {12,14,....}
-          })
-    }
+More comments:
 
-For devices,
-   Device(COM0) {
-          Name(_HID, "ACPIIDxx")
-          Name(_UID, Zero)
-          Name(_CRS, ResourceTemplate() {
-                 Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
-		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12}
-          })
-    }
+First, you sprinked "inline" like cinnamon over everything, skip that. The
+compiler will inline selectively as it seems fit if you turn on optimization.
 
-With the help of platform msi and interrupt producer, then devices
-will get the virq from mbigen's irqdomain.
+> +static DEFINE_MUTEX(ts_nbus_lock);
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Ma Jun <majun258@huawei.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
----
+Move this into struct ts_nbus, initialize the mutex in probe()
+and just mutex_lock(&ts_nbus->lock); etc.
 
-There are some trailing white spaces in previous
-version, send a updated one.
+> + * the txrx gpio is used by the FPGA to know if the following transactions
+> + * should be handled to read or write a value.
+> + */
+> +static inline void ts_nbus_set_mode(struct ts_nbus *ts_nbus, int mode)
 
- drivers/irqchip/irq-mbigen.c | 70 ++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 67 insertions(+), 3 deletions(-)
+Why inline? Let the compiler decide about that.
 
-diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-index 3756408..e6bb503 100644
---- a/drivers/irqchip/irq-mbigen.c
-+++ b/drivers/irqchip/irq-mbigen.c
-@@ -16,6 +16,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/interrupt.h>
- #include <linux/irqchip.h>
- #include <linux/module.h>
-@@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
- 				    unsigned long *hwirq,
- 				    unsigned int *type)
- {
--	if (is_of_node(fwspec->fwnode)) {
-+	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
- 		if (fwspec->param_count != 2)
- 			return -EINVAL;
- 
-@@ -271,6 +272,54 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
- 	return 0;
- }
- 
-+#ifdef CONFIG_ACPI
-+static acpi_status mbigen_acpi_process_resource(struct acpi_resource *ares,
-+					     void *context)
-+{
-+	struct acpi_resource_extended_irq *ext_irq;
-+	u32 *num_irqs = context;
-+
-+	switch (ares->type) {
-+	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
-+		ext_irq = &ares->data.extended_irq;
-+		*num_irqs += ext_irq->interrupt_count;
-+		break;
-+	default:
-+		break;
-+	}
-+
-+	return AE_OK;
-+}
-+
-+static int mbigen_acpi_create_domain(struct platform_device *pdev,
-+				     struct mbigen_device *mgn_chip)
-+{
-+	struct irq_domain *domain;
-+	u32 num_msis = 0;
-+	acpi_status status;
-+
-+	status = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), METHOD_NAME__CRS,
-+				     mbigen_acpi_process_resource, &num_msis);
-+	if (ACPI_FAILURE(status) || num_msis == 0)
-+		return -EINVAL;
-+
-+	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
-+						   mbigen_write_msg,
-+						   &mbigen_domain_ops,
-+						   mgn_chip);
-+	if (!domain)
-+		return -ENOMEM;
-+
-+	return 0;
-+}
-+#else
-+static inline int mbigen_acpi_create_domain(struct platform_device *pdev,
-+					    struct mbigen_device *mgn_chip)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
- static int mbigen_device_probe(struct platform_device *pdev)
- {
- 	struct mbigen_device *mgn_chip;
-@@ -289,9 +338,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
- 	if (IS_ERR(mgn_chip->base))
- 		return PTR_ERR(mgn_chip->base);
- 
--	err = mbigen_of_create_domain(pdev, mgn_chip);
--	if (err)
-+	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
-+		err = mbigen_of_create_domain(pdev, mgn_chip);
-+	else if (ACPI_COMPANION(&pdev->dev))
-+		err = mbigen_acpi_create_domain(pdev, mgn_chip);
-+	else
-+		err = -EINVAL;
-+
-+	if (err) {
-+		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain", mgn_chip->base);
- 		return err;
-+	}
- 
- 	platform_set_drvdata(pdev, mgn_chip);
- 	return 0;
-@@ -303,10 +360,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
- };
- MODULE_DEVICE_TABLE(of, mbigen_of_match);
- 
-+static const struct acpi_device_id mbigen_acpi_match[] = {
-+	{ "HISI0152", 0 },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
-+
- static struct platform_driver mbigen_platform_driver = {
- 	.driver = {
- 		.name		= "Hisilicon MBIGEN-V2",
- 		.of_match_table	= mbigen_of_match,
-+		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
- 	},
- 	.probe			= mbigen_device_probe,
- };
--- 
-1.7.12.4
+> +{
+> +       if (mode == TS_NBUS_READ_MODE)
+
+This mode parameter is too complicated. Isn't it just a bool?
+(not superimportant)
+
+> +               gpiod_set_value_cansleep(ts_nbus->txrx, 0);
+> +       else
+> +               gpiod_set_value_cansleep(ts_nbus->txrx, 1);
+> +}
+
+You're certainly just using it as a bool.
+
+> +static inline void ts_nbus_set_direction(struct ts_nbus *ts_nbus, int direction)
+> +{
+> +       int i;
+> +
+> +       for (i = 0; i < ts_nbus->data->ndescs; i++) {
+> +               if (direction == TS_NBUS_DIRECTION_IN)
+> +                       gpiod_direction_input(ts_nbus->data->desc[i]);
+> +               else
+> +                       gpiod_direction_output(ts_nbus->data->desc[i], 1);
+
+Add a comment here explaining why you driver the line high by default
+when setting it to output mode. It certainly makes sense but how
+does the electronics work and why?
+
+> +static inline void ts_nbus_reset_bus(struct ts_nbus *ts_nbus)
+> +{
+> +       int i;
+> +       int values[ts_nbus->data->ndescs];
+> +
+> +       for (i = 0; i < ts_nbus->data->ndescs; i++)
+> +               values[i] = 0;
+> +
+> +       gpiod_set_array_value_cansleep(ts_nbus->data->ndescs,
+> +                       ts_nbus->data->desc, values);
+> +       gpiod_set_value_cansleep(ts_nbus->csn, 0);
+> +       gpiod_set_value_cansleep(ts_nbus->strobe, 0);
+> +       gpiod_set_value_cansleep(ts_nbus->ale, 0);
+
+Add a comment about the process taken when this bus is reset. We
+see what is happening, but why?
+
+> +/*
+> + * let the FPGA knows it can process.
+> + */
+> +static inline void ts_nbus_start_transaction(struct ts_nbus *ts_nbus)
+
+Why inline?
+
+> +{
+> +       gpiod_set_value_cansleep(ts_nbus->strobe, 1);
+> +}
+
+For example this is a well commented function. We see what is happening
+and stobe has an evident name. Nice work!
+
+> +/*
+> + * return the byte value read from the data gpios.
+> + */
+> +static inline u8 ts_nbus_read_byte(struct ts_nbus *ts_nbus)
+
+Why inline?
+
+Then this cannot fail can it?
+
+I think this accessor should be changed to return an error code.
+
+static int ts_nbus_read_byte(struct ts_nbus *ts_nbus, u8 *val);
+
+Then if the return value from the function is != 0 it failed. Simple
+to check, just pass a pointer to the value you are getting in
+val.
+
+I KNOW I KNOW, not you have to put in error handling everywhere,
+what a DRAG! But we usually follow that pattern because...
+
+> +{
+> +       struct gpio_descs *gpios = ts_nbus->data;
+> +       int i;
+> +       u8 value = 0;
+> +
+> +       for (i = 0; i < gpios->ndescs; i++)
+
+Using gpios->ndescs is a bit overparametrized right? Isn't it
+simply 8 bits? Just putting 8 there is fine IMO. All 8 descs
+must be available for the thing to work anyway right?
+
+> +               if (gpiod_get_value_cansleep(gpios->desc[i]))
+
+This can fail and you should return an error if < 0...
+
+You are ignoring that right now. That is why the function should
+be returning an error code that is usually 0.
+
+> +                       value |= 1 << i;
+
+Use:
+#include <linux/bitops.h>
+
+value |= BIT(i);
+
+> +/*
+> + * set the data gpios accordingly to the byte value.
+> + */
+> +static inline void ts_nbus_write_byte(struct ts_nbus *ts_nbus, u8 byte)
+> +{
+> +       struct gpio_descs *gpios = ts_nbus->data;
+> +       int i;
+> +       int values[gpios->ndescs];
+> +
+> +       for (i = 0; i < gpios->ndescs; i++)
+> +               if (byte & (1 << i))
+> +                       values[i] = 1;
+> +               else
+> +                       values[i] = 0;
+> +
+> +       gpiod_set_array_value_cansleep(gpios->ndescs, gpios->desc, values);
+
+This can also fail and you should check the return code and print an error
+message if it does.
+
+> +/*
+> + * reading the bus consists of resetting the bus, then notifying the FPGA to
+> + * send the data in the data gpios and return the read value.
+> + */
+> +static inline u8 ts_nbus_read_bus(struct ts_nbus *ts_nbus)
+
+All this inline...
+
+> +/*
+> + * writing to the bus consists of resetting the bus, then define the type of
+> + * command (address/value), write the data and notify the FPGA to retrieve the
+> + * value in the data gpios.
+> + */
+> +static inline void ts_nbus_write_bus(struct ts_nbus *ts_nbus, int cmd, u8 value)
+> +{
+> +       ts_nbus_reset_bus(ts_nbus);
+> +
+> +       if (cmd == TS_NBUS_WRITE_ADR)
+> +               gpiod_set_value_cansleep(ts_nbus->ale, 1);
+> +
+> +       ts_nbus_write_byte(ts_nbus, value);
+> +       ts_nbus_start_transaction(ts_nbus);
+
+Error codes?
+
+> +       /* reading value MSB first */
+> +       do {
+> +               val = 0;
+> +               for (i = 1; i >= 0; i--)
+> +                       val |= (ts_nbus_read_bus(ts_nbus) << (i * 8));
+
+Hard to deal with errors in this loop!
+
+> +               gpiod_set_value_cansleep(ts_nbus->csn, 1);
+
+Here too.
+
+> +++ b/include/linux/ts-nbus.h
+> @@ -0,0 +1,26 @@
+> +/*
+> + * Copyright (c) 2016 - Savoir-faire Linux
+> + * Author: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#ifndef _TS_NBUS_H
+> +#define _TS_NBUS_H
+> +
+> +struct ts_nbus {
+> +       struct pwm_device *pwm;
+> +       struct gpio_descs *data;
+> +       struct gpio_desc *csn;
+> +       struct gpio_desc *txrx;
+> +       struct gpio_desc *strobe;
+> +       struct gpio_desc *ale;
+> +       struct gpio_desc *rdy;
+> +};
+
+Is any consumer really looking into this struct? If not, why
+do you expose it?
+
+Move it to the ts-nbus.c file.
+
+The only thing you need in this header is:
+
+struct ts_nbus;
+
+Just that one line. The rest of the code, like the declarations
+below and all call sites, are just dealing with "pointers to something",
+they don't need to know what it is. You'll be amazed to see how it compiles.
+struct gpio_desc works exactly like that.
+
+> +extern u16 ts_nbus_read(struct ts_nbus *, u8 adr);
+> +extern int ts_nbus_write(struct ts_nbus *, u8 adr, u16 value);
+
+I suspect the first function should be augmented to return an error code.
+
+Yours,
+Linus Walleij
