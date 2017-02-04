@@ -1,191 +1,111 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 4 Feb 2017 12:36:03 -0800
-Subject: [PATCH] ARM: dts: Add keypad support for droid 4
-In-Reply-To: <20170127042844.GU7403@atomide.com>
-References: <20170127041525.29648-1-tony@atomide.com>
- <20170127042844.GU7403@atomide.com>
-Message-ID: <20170204203603.GB3900@atomide.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat,  4 Feb 2017 12:57:07 -0800
+Subject: [PATCH net-next v5 0/4] net: dsa: Support for pdata in dsa2
+Message-ID: <20170204205715.14708-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [170126 20:30]:
-> * Tony Lindgren <tony@atomide.com> [170126 20:16]:
-> > Let's configure the keypad in a way where it's usable out of the
-> > box for Linux console use. To do this, let's follow the standard
-> > PC keyboard layout for ctrl, shift and alt keys:
-> > 
-> > Ctrl = what is labeled as shift
-> > Alt = what is labeled as SYM
-> > Shift = what is lableled as caps lock
-> > Meta = what is labled as OK
-> > 
-> > Who knows where they got the caps lock idea.. Probably from
-> > some focus group popularity vote or something.
-> > 
-> > Note that some other keys don't match the labels either as they
-> > don't follow the PC keyboard style. For example we have "shift + ,"
-> > produce "<", and "shift + ." produce ">" instead of ";" and ":".
-> > 
-> > Pretty much Esc is the only key missing. I've used "Meta + 1"
-> > produce Esc, and that seems to work OK. But that can be mapped
-> > using the standard userspace tools.
-> 
-> Oh looks like KEY_VOLUMEUP is on omap4-keypad, then POWER and
-> VOLUMEDOWN must be on the CPCAP.
-> 
-> Updated patch below with KEY_VOLUMEUP added.
+Hi all,
 
-And it seems the KEY_OK could be any of the missing keys, so let's
-deal with that one with the userspace key mappings. Updated patch
-below with more reasoning for the mapping.
+This is not exactly new, and was sent before, although back then, I did not
+have an user of the pre-declared MDIO board information, but now we do. Note
+that I have additional changes queued up to have b53 register platform data for
+MIPS bcm47xx and bcm63xx.
 
-Regards,
+Yes I know that we should have the Orion platforms eventually be converted to
+Device Tree, but until that happens, I don't want any remaining users of the
+old "dsa" platform device (hence the previous DTS submissions for ARM/mvebu)
+and, there will be platforms out there that most likely won't never see DT
+coming their way (BCM47xx is almost 100% sure, BCM63xx maybe not in a distant
+future).
 
-Tony
+We would probably want the whole series to be merged via David Miller's tree
+to simplify things.
 
-8< --------------------
->From tony Mon Sep 17 00:00:00 2001
-From: Tony Lindgren <tony@atomide.com>
-Date: Mon, 30 Jan 2017 07:10:31 -0800
-Subject: [PATCH] ARM: dts: Add keypad support for droid 4
+Thanks!
 
-Let's configure the keypad in a way where it's usable out of the
-box for Linux console use. We want to have the keyboard usable with
-Linux console for example when stuck into an initramfs during boot,
-or when installing a distro.
+Changes in v5:
 
-As we need to need to have keys mapped in the user space anyways
-for some of the keys to match the labels, this non-standard mapping
-or usability should be OK.
+- dropped changes to drivers/base/ because after more than a month, we cannot
+  get any answer from Greg KH
 
-Some keys don't match the labels either as they don't follow the PC
-keyboard style. For example we have "shift + ," produce "<", and
-"shift + ." produce ">" instead of ";" and ":".
+Changes in v4:
 
-So let's follow the standard PC keyboard layout for ctrl, shift and
-alt keys:
+- Changed device_find_class() to device_find_in_class_name()
+- Added kerneldoc above device_find_in_class_name() to explain what it does
+  and the calling convention regarding device reference counts
+- Changed dev_to_net_device to device_to_net_device() added comments
+  about what it does and the caller conventions regarding reference counts
 
-Ctrl = what is labeled as shift
-Alt = what is labeled as SYM
-Shift = what is lableled as caps lock
+Changes in v3:
 
-This way we have Ctrl key for console use. Who knows where they got
-the caps lock idea.. Probably from some focus group popularity vote
-or something.
+- Tested EPROBE_DEFER from a mockup MDIO/DSA switch driver and everything
+  is fine, once the driver finally probes we have access to platform data
+  as expected
 
-For the OK key, let's keep it as the useless KEY_OK unless we can
-come up with some standard mapping for it we can stick with.
+- added comment above dsa_port_is_valid() that port->name is mandatory
+  for platform data cases
 
-We have at least Esc, Delete, Meta, and Page Down keys missing, but
-none of them seem to be better than others. PC keyboard often has
-Page Down in that location. Esc would be probably the most usable
-one when installing a Linux distro but is the opposite of OK.
+- added an extra check in dsa_parse_member() for a NULL pdata pointer
 
-Note that the LCD keys are just touchscreen hot spots, so I'm not
-sure if the driver or hardware allows setting them up as keys for
-the console.
+- fixed a bunch of checkpatch errors and warnings
 
-Anyways, the rest can be mapped in the user space.
+Changes in v2:
 
-Cc: Marcel Partap <mpartap@gmx.net>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Michael Scott <michael.scott@linaro.org>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/omap4-droid4-xt894.dts | 75 ++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
+- Rebased against latest net-next/master
 
-diff --git a/arch/arm/boot/dts/omap4-droid4-xt894.dts b/arch/arm/boot/dts/omap4-droid4-xt894.dts
---- a/arch/arm/boot/dts/omap4-droid4-xt894.dts
-+++ b/arch/arm/boot/dts/omap4-droid4-xt894.dts
-@@ -5,6 +5,7 @@
-  */
- /dts-v1/;
- 
-+#include <dt-bindings/input/input.h>
- #include "omap443x.dtsi"
- 
- / {
-@@ -60,6 +61,80 @@
- 	status = "disabled";
- };
- 
-+&keypad {
-+	keypad,num-rows = <8>;
-+	keypad,num-columns = <8>;
-+	linux,keymap = <
-+
-+	/* Row 1 */
-+	MATRIX_KEY(0, 2, KEY_1)
-+	MATRIX_KEY(0, 6, KEY_2)
-+	MATRIX_KEY(2, 3, KEY_3)
-+	MATRIX_KEY(0, 7, KEY_4)
-+	MATRIX_KEY(0, 4, KEY_5)
-+	MATRIX_KEY(5, 5, KEY_6)
-+	MATRIX_KEY(0, 1, KEY_7)
-+	MATRIX_KEY(0, 5, KEY_8)
-+	MATRIX_KEY(0, 0, KEY_9)
-+	MATRIX_KEY(1, 6, KEY_0)
-+
-+	/* Row 2 */
-+	MATRIX_KEY(3, 4, KEY_APOSTROPHE)
-+	MATRIX_KEY(7, 6, KEY_Q)
-+	MATRIX_KEY(7, 7, KEY_W)
-+	MATRIX_KEY(7, 2, KEY_E)
-+	MATRIX_KEY(1, 0, KEY_R)
-+	MATRIX_KEY(4, 4, KEY_T)
-+	MATRIX_KEY(1, 2, KEY_Y)
-+	MATRIX_KEY(6, 7, KEY_U)
-+	MATRIX_KEY(2, 2, KEY_I)
-+	MATRIX_KEY(5, 6, KEY_O)
-+	MATRIX_KEY(3, 7, KEY_P)
-+	MATRIX_KEY(6, 5, KEY_BACKSPACE)
-+
-+	/* Row 3 */
-+	MATRIX_KEY(5, 4, KEY_TAB)
-+	MATRIX_KEY(5, 7, KEY_A)
-+	MATRIX_KEY(2, 7, KEY_S)
-+	MATRIX_KEY(7, 0, KEY_D)
-+	MATRIX_KEY(2, 6, KEY_F)
-+	MATRIX_KEY(6, 2, KEY_G)
-+	MATRIX_KEY(6, 6, KEY_H)
-+	MATRIX_KEY(1, 4, KEY_J)
-+	MATRIX_KEY(3, 1, KEY_K)
-+	MATRIX_KEY(2, 1, KEY_L)
-+	MATRIX_KEY(4, 6, KEY_ENTER)
-+
-+	/* Row 4 */
-+	MATRIX_KEY(3, 6, KEY_LEFTSHIFT)		/* KEY_CAPSLOCK */
-+	MATRIX_KEY(6, 1, KEY_Z)
-+	MATRIX_KEY(7, 4, KEY_X)
-+	MATRIX_KEY(5, 1, KEY_C)
-+	MATRIX_KEY(1, 7, KEY_V)
-+	MATRIX_KEY(2, 4, KEY_B)
-+	MATRIX_KEY(4, 1, KEY_N)
-+	MATRIX_KEY(1, 1, KEY_M)
-+	MATRIX_KEY(3, 5, KEY_COMMA)
-+	MATRIX_KEY(5, 2, KEY_DOT)
-+	MATRIX_KEY(6, 3, KEY_UP)
-+	MATRIX_KEY(7, 3, KEY_OK)
-+
-+	/* Row 5 */
-+	MATRIX_KEY(2, 5, KEY_LEFTCTRL)		/* KEY_LEFTSHIFT */
-+	MATRIX_KEY(4, 5, KEY_LEFTALT)		/* SYM */
-+	MATRIX_KEY(6, 0, KEY_MINUS)
-+	MATRIX_KEY(4, 7, KEY_EQUAL)
-+	MATRIX_KEY(1, 5, KEY_SPACE)
-+	MATRIX_KEY(3, 2, KEY_SLASH)
-+	MATRIX_KEY(4, 3, KEY_LEFT)
-+	MATRIX_KEY(5, 3, KEY_DOWN)
-+	MATRIX_KEY(3, 3, KEY_RIGHT)
-+
-+	/* Side buttons, KEY_VOLUMEDOWN and KEY_PWER are on CPCAP? */
-+	MATRIX_KEY(5, 0, KEY_VOLUMEUP)
-+	>;
-+};
-+
- &mmc1 {
- 	vmmc-supply = <&vmmc>;
- 	bus-width = <4>;
+- Moved dev_find_class() to device_find_class() into drivers/base/core.c
+
+- Moved dev_to_net_device into net/core/dev.c
+
+- Utilize dsa_chip_data directly instead of dsa_platform_data
+
+- Augmented dsa_chip_data to be multi-CPU port ready
+
+Changes from last submission (few months back):
+
+- rebased against latest net-next
+
+- do not introduce dsa2_platform_data which was overkill and was meant to
+  allow us to do exaclty the same things with platform data and Device Tree
+  we use the existing dsa_platform_data instead
+
+- properly register MDIO devices when the MDIO bus is registered and associate
+  platform_data with them
+
+- add a change to the Orion platform code to demonstrate how this can be used
+
+Thank you
+
+Florian Fainelli (4):
+  net: dsa: Rename and export dev_to_net_device()
+  net: dsa: Add support for platform data
+  net: phy: Allow pre-declaration of MDIO devices
+  ARM: orion: Register DSA switch as a MDIO device
+
+ arch/arm/mach-orion5x/common.c               |   2 +-
+ arch/arm/mach-orion5x/common.h               |   4 +-
+ arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c |   7 +-
+ arch/arm/mach-orion5x/rd88f5181l-ge-setup.c  |   7 +-
+ arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c |   7 +-
+ arch/arm/mach-orion5x/wnr854t-setup.c        |   2 +-
+ arch/arm/mach-orion5x/wrt350n-v2-setup.c     |   7 +-
+ arch/arm/plat-orion/common.c                 |  25 +++++--
+ arch/arm/plat-orion/include/plat/common.h    |   4 +-
+ drivers/net/phy/Makefile                     |   3 +-
+ drivers/net/phy/mdio-boardinfo.c             |  86 ++++++++++++++++++++++
+ drivers/net/phy/mdio-boardinfo.h             |  19 +++++
+ drivers/net/phy/mdio_bus.c                   |   4 ++
+ drivers/net/phy/mdio_device.c                |  11 +++
+ include/linux/mdio.h                         |   3 +
+ include/linux/mod_devicetable.h              |   1 +
+ include/linux/phy.h                          |  19 +++++
+ include/net/dsa.h                            |   7 ++
+ net/dsa/dsa.c                                |   5 +-
+ net/dsa/dsa2.c                               | 102 ++++++++++++++++++++++-----
+ 20 files changed, 268 insertions(+), 57 deletions(-)
+ create mode 100644 drivers/net/phy/mdio-boardinfo.c
+ create mode 100644 drivers/net/phy/mdio-boardinfo.h
+
 -- 
-2.11.0
+2.9.3
