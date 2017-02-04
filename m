@@ -1,143 +1,30 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sat, 4 Feb 2017 14:59:38 +0100
-Subject: [PATCHv2 net-next 05/16] net: mvpp2: introduce PPv2.2 HW
- descriptors and adapt accessors
-In-Reply-To: <20170203155449.GC27312@n2100.armlinux.org.uk>
-References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943592-12556-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170106142901.GC14217@n2100.armlinux.org.uk>
- <113811b6-79a4-9c66-d302-add9fb0c5b1a@arm.com>
- <20170203142446.2ee517a7@free-electrons.com>
- <231514f4-2e35-8bde-4469-aada833635aa@arm.com>
- <20170203155449.GC27312@n2100.armlinux.org.uk>
-Message-ID: <20170204145938.6e6380d9@free-electrons.com>
+From: vicmos89@gmail.com (Victor Vaschenko)
+Date: Sat,  4 Feb 2017 17:30:02 +0300
+Subject: [PATCH] One coding style correction.
+Message-ID: <1486218602-4846-1-git-send-email-vicmos89@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Just one coding style error correction.
 
-On Fri, 3 Feb 2017 15:54:49 +0000, Russell King - ARM Linux wrote:
+Signed-off-by: Victor Vaschenko <vicmos89@gmail.com>
+---
+ drivers/staging/bcm2835-audio/bcm2835-ctl.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-> Now for a bit of a whinge.  Reading through this code is rather annoying
-> because of what's called a "physical" address which is actually a DMA
-> address as far as the kernel is concerned - this makes it much harder
-> when thinking about this issue because it causes all sorts of confusion.
-> Please can the next revision of the patches start calling things by their
-> right name - a dma_addr_t is a DMA address, not a physical address, even
-> though _numerically_ it may be the same thing.  From the point of view
-> of the kernel, you must not do phys_to_virt() on a dma_addr_t address.
-> Thanks.
-
-I do know that phys_addr_t is different from dma_addr_t. The case where
-you have an IOMMU makes this very obvious. The fact that the driver
-isn't completely correct in that respect indeed needs to be fixed.
-
-> Taking a step backwards...
-> 
-> How do DMA addresses and this cookie get into the receive ring - from what
-> I can see, the driver doesn't write these into the receive ring, it's the
-> hardware that writes it, and the only route I can see that they get there
-> is via writes performed in mvpp2_bm_pool_put().
-
-Correct. Here is a quick summary of my understand of the HW operation.
-The HW has a "buffer manager", i.e it can internally manage a list of
-buffers. At initialization time, we provide to the HW a list of buffers
-by pushing the DMA address and virtual address of each buffer into a
-register. Thanks to that the HW then knows about all the buffers we
-have given. Then, upon RX of a packet, the HW picks one of those
-buffers, and then fills a RX descriptor with the DMA address of the
-packet, and the VA in the "cookie" field. The "cookie" field can I
-believe be used for whatever we want, it's just "free" space in the
-descriptor.
-
-> Now, from what I can see, the "buf_virt_addr" comes from:
-> 
-> +static void *mvpp2_frag_alloc(const struct mvpp2_bm_pool *pool)
-> +{
-> +       if (likely(pool->frag_size <= PAGE_SIZE))
-> +               return netdev_alloc_frag(pool->frag_size);
-> +       else
-> +               return kmalloc(pool->frag_size, GFP_ATOMIC);
-> +}
-> 
-> via mvpp2_buf_alloc().
-> 
-> Both kmalloc() and netdev_alloc_frag() guarantee that the virtual
-> address will be in lowmem.
-
-*That* is the thing I didn't realize until now. If the buffers are
-always in lowmem, then it's much easier because we can indeed use
-virt_to_phys()/phys_to_virt() on them. But it's indeed obvious they are
-in lowmem, since we get a void* pointer for them.
-
-> Given that, I would suggest changing mvpp2_bm_pool_put() as follows -
-> and this is where my point above about separating the notion of "dma
-> address" and "physical address" becomes very important:
-> 
->  static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
-> -                                    dma_addr_t buf_phys_addr,
-> -                                    unsigned long buf_virt_addr)
-> +                                    dma_addr_t dma, phys_addr_t phys)
->  {
-> 
-> and updating it to write "phys" as the existing buf_virt_addr.
-> 
-> In mvpp2_bm_bufs_add():
-> 
->                 buf = mvpp2_buf_alloc(port, bm_pool, &phys_addr, GFP_KERNEL);
->                 if (!buf)
->                         break;
->  
->                 mvpp2_bm_pool_put(port, bm_pool->id, phys_addr,
-> -                                 (unsigned long)buf);
-> +                                 virt_to_phys(buf));
-> 
-> which I think means that mvpp2_rxdesc_virt_addr_get() can just become:
-> 
->  	phys_addr_t cookie;
->  
->         /* PPv2.1 can only be used on 32 bits architectures, and there
->          * are 32 bits in buf_cookie which are enough to store the
->          * full virtual address, so things are easy.
->          */
->         if (port->priv->hw_version == MVPP21)
->                 cookie = rx_desc->pp21.buf_cookie;
->         else
->  		cookie = rx_desc->pp22.buf_cookie_misc & FORTY_BIT_MASK;
-> 
->  	return phys_to_virt(cookie);
-
-This makes complete sense. We use the cookie to store the phys_addr_t
-rather than the virtual address. I might be missing something, but it
-seems like a very good solution. Thanks for the suggestion, I'll try
-this!
-
-> I'd suggest against using DMA_BIT_MASK(40) there - because it's not a
-> DMA address, even though it happens to resolve to the same number.
-
-Sure, will update this as well.
-
-> Again, I may have missed how the addresses end up getting into
-> buf_cookie_misc, so what I suggest above may not be possible.
-
-No, I think you got it right. At least it matches my own understanding
-of the HW.
-
-> I'd also suggest that there is some test in mvpp2_bm_bufs_add() to
-> verify that the physical addresses and DMA addresses do fit within
-> the available number of bits - if they don't we could end up scribbling
-> over memory that we shouldn't be, and it looks like we have a failure
-> path there to gracefully handle that situation - gracefully compared
-> to a nasty BUG_ON().
-
-For the DMA addresses, I have some additional changes on top of my v2
-to use dma_set_mask() to ensure that DMA addresses fit in 40 bits. But
-that's only for DMA addresses indeed.
-
-Thanks again for your suggestion!
-
-Thomas
+diff --git a/drivers/staging/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
+index 164daa4..bfb7e9f 100644
+--- a/drivers/staging/bcm2835-audio/bcm2835-ctl.c
++++ b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
+@@ -164,8 +164,7 @@ static int snd_bcm2835_ctl_put(struct snd_kcontrol *kcontrol,
+ 		.get = snd_bcm2835_ctl_get,
+ 		.put = snd_bcm2835_ctl_put,
+ 		.count = 1,
+-		.tlv =
+-		{.p = snd_bcm2835_db_scale}
++		.tlv = {.p = snd_bcm2835_db_scale}
+ 	},
+ 	{
+ 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
