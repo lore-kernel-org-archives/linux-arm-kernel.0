@@ -1,60 +1,100 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Sat, 4 Feb 2017 15:02:15 +0800
-Subject: [PATCH v8 00/15] ACPI platform MSI support and its example mbigen
-In-Reply-To: <20170203183626.GB17899@red-moon>
-References: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
- <20170203183626.GB17899@red-moon>
-Message-ID: <58957C77.7070206@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 4 Feb 2017 15:15:47 +0800
+Subject: [PATCH v3 3/3] i2c: zx2967: add i2c controller driver for ZTE's
+ zx2967 family
+In-Reply-To: <1485435631-32642-3-git-send-email-baoyou.xie@linaro.org>
+References: <1485435631-32642-1-git-send-email-baoyou.xie@linaro.org>
+ <1485435631-32642-3-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170204071545.GC3407@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Only a couple of comments below.  Otherwise, the patch looks fine to me.
 
-On 2017/2/4 2:36, Lorenzo Pieralisi wrote:
-> Hanjun, Sinan,
->
-> On Wed, Jan 18, 2017 at 08:54:50PM +0800, Hanjun Guo wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
->>
->> With platform msi support landed in the kernel, and the introduction
->> of IORT for GICv3 ITS (PCI MSI) and SMMU, the framework for platform msi
->> is ready, this patch set add few patches to enable the ACPI platform
->> msi support.
->>
->> For platform device connecting to ITS on arm platform, we have IORT
->> table with the named componant node to describe the mappings of paltform
->> device and ITS, so we can retrieve the dev id and find its parent
->> irqdomain (ITS) from IORT table (simlar with the ACPI ITS support).
-> Depending on how things go, I prepared a branch with the first 12
-> patches (I basically updated some logs and added some cosmetics changes)
-> for testing (Hanjun please have a look in details since I may have misread
-> some logs), whether or not I will send a pull request for it we shall see
-> next week.
->
-> Here:
->
-> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/platform-msi
+On Thu, Jan 26, 2017 at 09:00:31PM +0800, Baoyou Xie wrote:
 
-Thanks a lot for putting them together, I fetched your git tree and
-took a detail look, there is one issue in patch "msi: platform: make
-platform_msi_create_device_domain() ACPI aware" which has two
-"Cc: Greg KH <gregkh@linuxfoundation.org>" in the commit log
-(it's in the original patch from me, my bad), others are pretty good
-to me (to make sure it works I retested those patches and patches
-in your branch work as before).
+<snip>
 
-BTW, patches in Lorenzo's branch have no conflicts with Agustin's
-patch set + my mbigen one, so after a pull request to Rafael, could
-them (Agustin's patch set + my mbigen one) go via one tree such as
-Marc's one for 4.11?  I know it's a little bit late but those patches
-are quite self-contained, which Agustin's changes are conditional
-on the ACPI_GENERIC_GSI config which is only available with
-ARM64 ACPI and others (interrupt combiner and mbigen) are specific
-to QC and Hisilicon platforms.
+> +static int zx2967_i2c_flush_fifos(struct zx2967_i2c_info *zx_i2c)
+> +{
+> +	u32 val;
+> +	u32 offset;
+> +
+> +	if (zx_i2c->msg_rd) {
+> +		offset = REG_RDCONF;
+> +		val = I2C_RFIFO_RESET;
+> +	} else {
+> +		offset = REG_WRCONF;
+> +		val = I2C_WFIFO_RESET;
+> +	}
+> +
+> +	val |= zx2967_i2c_readl(zx_i2c, offset);
+> +	zx2967_i2c_writel(zx_i2c, val, offset);
+> +
+> +	return 0;
 
-Marc, Lorenzo, could you give some comments that how can we
-proceed those patches (Agustin's patch set + my mbigen one)?
-It's really critical for us, thank you very much.
+Since the function will never return other values than 0, should we
+simply define the return type as void?
 
-Best Regards
-Hanjun
+> +}
+
+<snip>
+
+> +static int zx2967_i2c_probe(struct platform_device *pdev)
+> +{
+> +	struct zx2967_i2c_info *zx_i2c;
+> +	void __iomem *reg_base;
+> +	struct resource *res;
+> +	struct clk *clk;
+> +	int ret;
+> +
+> +	zx_i2c = devm_kzalloc(&pdev->dev, sizeof(*zx_i2c), GFP_KERNEL);
+> +	if (!zx_i2c)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	reg_base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(reg_base))
+> +		return PTR_ERR(reg_base);
+> +
+> +	clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(clk)) {
+> +		dev_err(&pdev->dev, "missing controller clock");
+> +		return PTR_ERR(clk);
+> +	}
+> +
+> +	ret = clk_prepare_enable(clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable i2c_clk\n");
+> +		return ret;
+> +	}
+> +
+> +	ret = platform_get_irq(pdev, 0);
+> +	if (ret < 0)
+> +		return ret;
+> +	zx_i2c->irq = ret;
+> +
+> +	ret = device_property_read_u32(&pdev->dev, "clock-frequency",
+> +				       &zx_i2c->clk_freq);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "missing clock-frequency");
+> +		return ret;
+> +	}
+> +
+> +	zx_i2c->reg_base = reg_base;
+> +	zx_i2c->clk = clk;
+> +	zx_i2c->dev = &pdev->dev;
+> +
+> +	zx_i2c->pin_ctrl = devm_pinctrl_get_select_default(&pdev->dev);
+> +	if (IS_ERR(zx_i2c->pin_ctrl)) {
+> +		if (PTR_ERR(zx_i2c->pin_ctrl) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +		dev_info(&pdev->dev, "no pinctrl handle\n");
+> +	}
+
+You do not need this boilerplate code for request "default" pin state,
+since device core will automatically issue the call.  See section "Pin
+control requests from drivers" in Documentation/pinctrl.txt for more
+info.
+
+Shawn
