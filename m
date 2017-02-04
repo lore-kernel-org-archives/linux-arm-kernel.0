@@ -1,330 +1,143 @@
-From: john.garry@huawei.com (John Garry)
-Date: Sat, 4 Feb 2017 13:20:46 +0000
-Subject: [PATCH V5 5/5] LPC: Add the ACPI LPC support
-In-Reply-To: <1485241525-201782-6-git-send-email-yuanzhichang@hisilicon.com>
-References: <1485241525-201782-1-git-send-email-yuanzhichang@hisilicon.com>
- <1485241525-201782-6-git-send-email-yuanzhichang@hisilicon.com>
-Message-ID: <781b05af-1bf2-2be5-f614-5aeff0bc3df3@huawei.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 4 Feb 2017 14:59:38 +0100
+Subject: [PATCHv2 net-next 05/16] net: mvpp2: introduce PPv2.2 HW
+ descriptors and adapt accessors
+In-Reply-To: <20170203155449.GC27312@n2100.armlinux.org.uk>
+References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482943592-12556-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170106142901.GC14217@n2100.armlinux.org.uk>
+ <113811b6-79a4-9c66-d302-add9fb0c5b1a@arm.com>
+ <20170203142446.2ee517a7@free-electrons.com>
+ <231514f4-2e35-8bde-4469-aada833635aa@arm.com>
+ <20170203155449.GC27312@n2100.armlinux.org.uk>
+Message-ID: <20170204145938.6e6380d9@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ linux-acpi
+Hello,
 
-Adding linux-acpi list, which should have been originally included.
+On Fri, 3 Feb 2017 15:54:49 +0000, Russell King - ARM Linux wrote:
 
-The patchset threads have had much discussion, here is a pointer: 
-http://www.spinics.net/lists/devicetree/msg160611.html
+> Now for a bit of a whinge.  Reading through this code is rather annoying
+> because of what's called a "physical" address which is actually a DMA
+> address as far as the kernel is concerned - this makes it much harder
+> when thinking about this issue because it causes all sorts of confusion.
+> Please can the next revision of the patches start calling things by their
+> right name - a dma_addr_t is a DMA address, not a physical address, even
+> though _numerically_ it may be the same thing.  From the point of view
+> of the kernel, you must not do phys_to_virt() on a dma_addr_t address.
+> Thanks.
 
-John
+I do know that phys_addr_t is different from dma_addr_t. The case where
+you have an IOMMU makes this very obvious. The fact that the driver
+isn't completely correct in that respect indeed needs to be fixed.
 
-On 24/01/2017 07:05, zhichang.yuan wrote:
-> The patch update the _CRS of LPC children with the system logical I/O resource
-> after the translation from LPC-local I/O. Then the ACPI platform device
-> enumeration for LPC can apply the right I/O resource to request the system I/O
-> space.
->
-> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
-> ---
->  drivers/bus/hisi_lpc.c |  26 ++++++
->  include/linux/extio.h  |   4 +
->  lib/extio.c            | 228 +++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 258 insertions(+)
->
-> diff --git a/drivers/bus/hisi_lpc.c b/drivers/bus/hisi_lpc.c
-> index a96e384..8d52666 100644
-> --- a/drivers/bus/hisi_lpc.c
-> +++ b/drivers/bus/hisi_lpc.c
-> @@ -583,6 +583,32 @@ static int hisilpc_bus_platform_notify(struct notifier_block *nb,
->  	/* register the linux virtual IO range node to list. */
->  	register_extio(io_node);
->
-> +	/*
-> +	 * For ACPI children, translate the bus-local I/O range to logical
-> +	 * I/O range and set it as the current resource before the children
-> +	 * are enumerated.
-> +	 */
-> +	if (has_acpi_companion(dev)) {
-> +		struct acpi_device *root, *child;
-> +
-> +		root = to_acpi_device_node(dev->fwnode);
-> +		/* For hisilpc, only care about the sons of host. */
-> +		list_for_each_entry(child, &root->children, node) {
-> +			ret = acpi_set_extio_resource(child, root);
-> +			if (ret) {
-> +				dev_err(dev, "set resource failed..\n");
-> +				break;
-> +			}
-> +		}
-> +
-> +		if (ret) {
-> +			list_del(&io_node->list);
-> +			kfree(io_node);
-> +			dev_err(dev, "notify handling failed..\n");
-> +			return NOTIFY_DONE;
-> +		}
-> +	}
-> +
->  	return NOTIFY_OK;
->  }
->
-> diff --git a/include/linux/extio.h b/include/linux/extio.h
-> index 2ca7eab..c07607e 100644
-> --- a/include/linux/extio.h
-> +++ b/include/linux/extio.h
-> @@ -20,6 +20,7 @@
->
->  #ifdef __KERNEL__
->
-> +#include <linux/acpi.h>
->  #include <linux/fwnode.h>
->
->  struct extio_ops {
-> @@ -81,5 +82,8 @@ static inline struct extio_node *extio_find_node(struct fwnode_handle *node)
->  #endif
->  extern void register_extio(struct extio_node *node);
->
-> +extern int acpi_set_extio_resource(struct acpi_device *adev,
-> +		struct acpi_device *host);
-> +
->  #endif /* __KERNEL__ */
->  #endif /* __LINUX_EXTIO_H */
-> diff --git a/lib/extio.c b/lib/extio.c
-> index 46228de..47f5913 100644
-> --- a/lib/extio.c
-> +++ b/lib/extio.c
-> @@ -75,6 +75,234 @@ unsigned long extio_translate(struct fwnode_handle *node,
->  	return port_id;
->  }
->
-> +static inline bool acpi_extio_supported_resource(struct acpi_resource *res)
+> Taking a step backwards...
+> 
+> How do DMA addresses and this cookie get into the receive ring - from what
+> I can see, the driver doesn't write these into the receive ring, it's the
+> hardware that writes it, and the only route I can see that they get there
+> is via writes performed in mvpp2_bm_pool_put().
+
+Correct. Here is a quick summary of my understand of the HW operation.
+The HW has a "buffer manager", i.e it can internally manage a list of
+buffers. At initialization time, we provide to the HW a list of buffers
+by pushing the DMA address and virtual address of each buffer into a
+register. Thanks to that the HW then knows about all the buffers we
+have given. Then, upon RX of a packet, the HW picks one of those
+buffers, and then fills a RX descriptor with the DMA address of the
+packet, and the VA in the "cookie" field. The "cookie" field can I
+believe be used for whatever we want, it's just "free" space in the
+descriptor.
+
+> Now, from what I can see, the "buf_virt_addr" comes from:
+> 
+> +static void *mvpp2_frag_alloc(const struct mvpp2_bm_pool *pool)
 > +{
-> +	switch (res->type) {
-> +	case ACPI_RESOURCE_TYPE_ADDRESS16:
-> +	case ACPI_RESOURCE_TYPE_ADDRESS32:
-> +	case ACPI_RESOURCE_TYPE_ADDRESS64:
-> +		return true;
-> +	}
-> +	return false;
+> +       if (likely(pool->frag_size <= PAGE_SIZE))
+> +               return netdev_alloc_frag(pool->frag_size);
+> +       else
+> +               return kmalloc(pool->frag_size, GFP_ATOMIC);
 > +}
-> +
-> +static acpi_status acpi_count_extiores(struct acpi_resource *res,
-> +					   void *data)
-> +{
-> +	int *res_cnt = data;
-> +
-> +	if (acpi_extio_supported_resource(res) &&
-> +		!acpi_dev_filter_resource_type(res, IORESOURCE_IO))
-> +		(*res_cnt)++;
-> +
-> +	return AE_OK;
-> +}
-> +
-> +static acpi_status acpi_read_one_extiores(struct acpi_resource *res,
-> +		void *data)
-> +{
-> +	struct acpi_resource **resource = data;
-> +
-> +	if (acpi_extio_supported_resource(res) &&
-> +		!acpi_dev_filter_resource_type(res, IORESOURCE_IO)) {
-> +		memcpy((*resource), res, sizeof(struct acpi_resource));
-> +		(*resource)->length = sizeof(struct acpi_resource);
-> +		(*resource)->type = res->type;
-> +		(*resource)++;
-> +	}
-> +
-> +	return AE_OK;
-> +}
-> +
-> +static acpi_status
-> +acpi_build_extiores_template(struct acpi_device *adev,
-> +			struct acpi_buffer *buffer)
-> +{
-> +	acpi_handle handle = adev->handle;
-> +	struct acpi_resource *resource;
-> +	acpi_status status;
-> +	int res_cnt = 0;
-> +
-> +	status = acpi_walk_resources(handle, METHOD_NAME__PRS,
-> +				     acpi_count_extiores, &res_cnt);
-> +	if (ACPI_FAILURE(status) || !res_cnt) {
-> +		dev_err(&adev->dev, "can't evaluate _CRS: %d\n", status);
-> +		return -EINVAL;
-> +	}
-> +
-> +	buffer->length = sizeof(struct acpi_resource) * (res_cnt + 1) + 1;
-> +	buffer->pointer = kzalloc(buffer->length - 1, GFP_KERNEL);
-> +	if (!buffer->pointer)
-> +		return -ENOMEM;
-> +
-> +	resource = (struct acpi_resource *)buffer->pointer;
-> +	status = acpi_walk_resources(handle, METHOD_NAME__PRS,
-> +				     acpi_read_one_extiores, &resource);
-> +	if (ACPI_FAILURE(status)) {
-> +		kfree(buffer->pointer);
-> +		dev_err(&adev->dev, "can't evaluate _PRS: %d\n", status);
-> +		return -EINVAL;
-> +	}
-> +
-> +	resource->type = ACPI_RESOURCE_TYPE_END_TAG;
-> +	resource->length = sizeof(struct acpi_resource);
-> +
-> +	return 0;
-> +}
-> +
-> +static int acpi_translate_extiores(struct acpi_device *adev,
-> +		struct acpi_device *host, struct acpi_buffer *buffer)
-> +{
-> +	int res_cnt = (buffer->length - 1) / sizeof(struct acpi_resource) - 1;
-> +	struct acpi_resource *resource = buffer->pointer;
-> +	struct acpi_resource_address64 addr;
-> +	unsigned long sys_port;
-> +	struct device *dev = &adev->dev;
-> +
-> +	/* only one I/O resource now */
-> +	if (res_cnt != 1) {
-> +		dev_err(dev, "encode %d resources whose type is(%d)!\n",
-> +			res_cnt, resource->type);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (ACPI_FAILURE(acpi_resource_to_address64(resource, &addr))) {
-> +		dev_err(dev, "convert acpi resource(%d) as addr64 FAIL!\n",
-> +			resource->type);
-> +		return -EFAULT;
-> +	}
-> +
-> +	/* For indirect-IO, addr length must be fixed. (>0, 0, 0) */
-> +	if (!addr.address.address_length || addr.min_address_fixed ||
-> +		addr.max_address_fixed) {
-> +		dev_warn(dev, "variable I/O resource is invalid!\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	sys_port = extio_translate(&host->fwnode, addr.address.minimum);
-> +	if (sys_port == -1) {
-> +		dev_err(dev, "translate bus-addr(0x%llx) fail!\n",
-> +			addr.address.minimum);
-> +		return -EFAULT;
-> +	}
-> +
-> +	switch (resource->type) {
-> +	case ACPI_RESOURCE_TYPE_ADDRESS16:
-> +	{
-> +		struct acpi_resource_address16 *out_res;
-> +
-> +		out_res = &resource->data.address16;
-> +		out_res->address.minimum = sys_port;
-> +		out_res->address.maximum = sys_port +
-> +			addr.address.address_length - 1;
-> +
-> +		dev_info(dev, "_SRS 16IO: [0x%x - 0x%x]\n",
-> +			out_res->address.minimum,
-> +			out_res->address.maximum);
-> +
-> +		break;
-> +	}
-> +
-> +	case ACPI_RESOURCE_TYPE_ADDRESS32:
-> +	{
-> +		struct acpi_resource_address32 *out_res;
-> +
-> +		out_res = &resource->data.address32;
-> +		out_res->address.minimum = sys_port;
-> +		out_res->address.maximum = sys_port +
-> +			addr.address.address_length - 1;
-> +
-> +		dev_info(dev, "_SRS 32IO: [0x%x - 0x%x]\n",
-> +			out_res->address.minimum,
-> +			out_res->address.maximum);
-> +
-> +		break;
-> +	}
-> +
-> +	case ACPI_RESOURCE_TYPE_ADDRESS64:
-> +	{
-> +		struct acpi_resource_address64 *out_res;
-> +
-> +		out_res = &resource->data.address64;
-> +		out_res->address.minimum = sys_port;
-> +		out_res->address.maximum = sys_port +
-> +			addr.address.address_length - 1;
-> +
-> +		dev_info(dev, "_SRS 64IO: [0x%llx - 0x%llx]\n",
-> +			out_res->address.minimum,
-> +			out_res->address.maximum);
-> +
-> +		break;
-> +	}
-> +
-> +	default:
-> +		return -EINVAL;
-> +
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * update/set the current I/O resource of the designated device node.
-> + * after this calling, the enumeration can be started as the I/O resource
-> + * had been translated to logicial I/O from bus-local I/O.
-> + *
-> + * @adev: the device node to be updated the I/O resource;
-> + * @host: the device node where 'adev' is attached, which can be not
-> + *	the parent of 'adev';
-> + *
-> + * return 0 when successful, negative is for failure.
-> + */
-> +int acpi_set_extio_resource(struct acpi_device *adev,
-> +		struct acpi_device *host)
-> +{
-> +	struct device *dev = &adev->dev;
-> +	struct acpi_buffer buffer;
-> +	acpi_status status;
-> +	int ret;
-> +
-> +	if (!host)
-> +		return -EINVAL;
-> +
-> +	/* check the device state */
-> +	if (!adev->status.present) {
-> +		dev_info(dev, "ACPI: device is not present!\n");
-> +		return 0;
-> +	}
-> +	/* whether the child had been enumerated? */
-> +	if (acpi_device_enumerated(adev)) {
-> +		dev_info(dev, "ACPI: had been enumerated!\n");
-> +		return 0;
-> +	}
-> +
-> +	/* read the _PRS and convert as acpi_buffer */
-> +	status = acpi_build_extiores_template(adev, &buffer);
-> +	if (ACPI_FAILURE(status)) {
-> +		dev_warn(dev, "Failure evaluating %s\n",
-> +				METHOD_NAME__PRS);
-> +		return -ENODEV;
-> +	}
-> +
-> +	/* translate the I/O resources */
-> +	ret = acpi_translate_extiores(adev, host, &buffer);
-> +	if (ret) {
-> +		kfree(buffer.pointer);
-> +		dev_err(dev, "Translate I/O range FAIL!\n");
-> +		return ret;
-> +	}
-> +
-> +	/* set current resource... */
-> +	status = acpi_set_current_resources(adev->handle, &buffer);
-> +	kfree(buffer.pointer);
-> +	if (ACPI_FAILURE(status)) {
-> +		dev_err(dev, "Error evaluating _SRS (0x%x)\n", status);
-> +		ret = -EIO;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
->  #ifdef PCI_IOBASE
->
->  #define BUILD_EXTIO(bw, type)						\
->
+> 
+> via mvpp2_buf_alloc().
+> 
+> Both kmalloc() and netdev_alloc_frag() guarantee that the virtual
+> address will be in lowmem.
+
+*That* is the thing I didn't realize until now. If the buffers are
+always in lowmem, then it's much easier because we can indeed use
+virt_to_phys()/phys_to_virt() on them. But it's indeed obvious they are
+in lowmem, since we get a void* pointer for them.
+
+> Given that, I would suggest changing mvpp2_bm_pool_put() as follows -
+> and this is where my point above about separating the notion of "dma
+> address" and "physical address" becomes very important:
+> 
+>  static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
+> -                                    dma_addr_t buf_phys_addr,
+> -                                    unsigned long buf_virt_addr)
+> +                                    dma_addr_t dma, phys_addr_t phys)
+>  {
+> 
+> and updating it to write "phys" as the existing buf_virt_addr.
+> 
+> In mvpp2_bm_bufs_add():
+> 
+>                 buf = mvpp2_buf_alloc(port, bm_pool, &phys_addr, GFP_KERNEL);
+>                 if (!buf)
+>                         break;
+>  
+>                 mvpp2_bm_pool_put(port, bm_pool->id, phys_addr,
+> -                                 (unsigned long)buf);
+> +                                 virt_to_phys(buf));
+> 
+> which I think means that mvpp2_rxdesc_virt_addr_get() can just become:
+> 
+>  	phys_addr_t cookie;
+>  
+>         /* PPv2.1 can only be used on 32 bits architectures, and there
+>          * are 32 bits in buf_cookie which are enough to store the
+>          * full virtual address, so things are easy.
+>          */
+>         if (port->priv->hw_version == MVPP21)
+>                 cookie = rx_desc->pp21.buf_cookie;
+>         else
+>  		cookie = rx_desc->pp22.buf_cookie_misc & FORTY_BIT_MASK;
+> 
+>  	return phys_to_virt(cookie);
+
+This makes complete sense. We use the cookie to store the phys_addr_t
+rather than the virtual address. I might be missing something, but it
+seems like a very good solution. Thanks for the suggestion, I'll try
+this!
+
+> I'd suggest against using DMA_BIT_MASK(40) there - because it's not a
+> DMA address, even though it happens to resolve to the same number.
+
+Sure, will update this as well.
+
+> Again, I may have missed how the addresses end up getting into
+> buf_cookie_misc, so what I suggest above may not be possible.
+
+No, I think you got it right. At least it matches my own understanding
+of the HW.
+
+> I'd also suggest that there is some test in mvpp2_bm_bufs_add() to
+> verify that the physical addresses and DMA addresses do fit within
+> the available number of bits - if they don't we could end up scribbling
+> over memory that we shouldn't be, and it looks like we have a failure
+> path there to gracefully handle that situation - gracefully compared
+> to a nasty BUG_ON().
+
+For the DMA addresses, I have some additional changes on top of my v2
+to use dma_set_mask() to ensure that DMA addresses fit in 40 bits. But
+that's only for DMA addresses indeed.
+
+Thanks again for your suggestion!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
