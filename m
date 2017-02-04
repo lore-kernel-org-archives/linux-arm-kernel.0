@@ -1,104 +1,131 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 3 Feb 2017 20:13:21 -0800
-Subject: [RFC] w1: regression, remove need for ida and use
- PLATFORM_DEVID_AUTO
-In-Reply-To: <8f24eb01-d9f3-4c7a-7b51-36a7b9b8d023@tul.cz>
-References: <d0b52b94-0c87-61f8-32ff-99f2a354e500@tul.cz>
- <308e185e-26eb-39ee-d82f-a0d210a41743@ti.com>
- <cfa35897-383e-674a-f049-e45c4dfeb534@tul.cz>
- <0928fc89-490f-1d12-dc3d-51f2d433d2e0@roeck-us.net>
- <822b1827-959b-13dc-6331-f0954954c010@tul.cz>
- <0a4d4a6d-5ede-b77a-0600-19a8d815a33f@roeck-us.net>
- <8f24eb01-d9f3-4c7a-7b51-36a7b9b8d023@tul.cz>
-Message-ID: <0a085ba7-0d05-ef7e-9918-2079cab04c10@roeck-us.net>
+From: lukma@denx.de (Lukasz Majewski)
+Date: Sat, 4 Feb 2017 06:30:30 +0100
+Subject: [PATCH 2/2] DTS: dra7: Add "opp_high" opp node to support 1.5
+ GHz SoC operation
+In-Reply-To: <79e08896-895e-4996-8402-832328b4f7d8@ti.com>
+References: <1486135491-14223-1-git-send-email-lukma@denx.de>
+ <1486135491-14223-2-git-send-email-lukma@denx.de>
+ <e398ff96-dca7-7934-70b1-9a95c01d3b27@ti.com>
+ <20170204002150.707b231d@jawa>
+ <79e08896-895e-4996-8402-832328b4f7d8@ti.com>
+Message-ID: <20170204063030.3ba736f9@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2017 03:30 PM, Petr Cvek wrote:
-> Dne 3.2.2017 v 15:07 Guenter Roeck napsal(a):
->> On 02/03/2017 05:28 AM, Petr Cvek wrote:
->>> Dne 3.2.2017 v 04:31 Guenter Roeck napsal(a):
->>>> On 02/02/2017 05:31 PM, Petr Cvek wrote:
->>>>> Dne 2.2.2017 v 15:23 Andrew F. Davis napsal(a):
->>>>>> On 02/01/2017 07:05 PM, Petr Cvek wrote:
->>>>>>> Patch
->>>>>>>     w1: remove need for ida and use PLATFORM_DEVID_AUTO
->>>>>>>     098f9fb0c962eb2fdba5f9d34f4cf7a938237184
->>>>>>>
->>>>>>> causes a regression in the w1_ds2760 driver. Initialization creates a name "ds2760-battery.0.auto". It seems that name of that size will cause checking code in __thermal_cooling_device_register() from thermal_core.c to fail as it checks for names shorter than 20 chars:
->>>>>>>
->>>>>>>     if (type && strlen(type) >= THERMAL_NAME_LENGTH)
->>>>>>>         return ERR_PTR(-EINVAL);
->>>>>>>
->>>>>>> A second problem seems to be with magician_supplicants list as "ds2760-battery.0" does not match in a test power_supply_am_i_supplied() in ds2760_battery_update_status() from drivers/power/supply/ds2760_battery.c . This causes status flag to be forever in POWER_SUPPLY_STATUS_DISCHARGING state.
->>>>>>>
->>>>>>> Functionality returned after I hotfix changed (drivers/w1/slaves/w1_ds2760.c)
->>>>>>>
->>>>>>>     pdev = platform_device_alloc("ds2760-battery", PLATFORM_DEVID_AUTO);
->>>>>>>
->>>>>>> to
->>>>>>>
->>>>>>>     pdev = platform_device_alloc("ds2760-battery", 0);
->>>>>>>
->>>>>>> Which solution do you advise. Shortening the name let's say just to "ds2760" (with changes to arch files, w1 files and supply files), increasing THERMAL_NAME_LENGTH to let's say 32 (I don't know if this doesn't break something other) or just reverting to the old behavior?
->>>>>>>
->>>>>>
->>>>>> If 20 is no longer the max thermal name then THERMAL_NAME_LENGTH should
->>>>>> be changed.
->>>>>
->>>>> Yes it is that ".auto" addition to "ds2760-battery.0" makes 21 chars long string. With higher number (".10" onwards) it is 22 chars. Load of the module then fails at test in thermal_zone_device_register():
->>>>>
->>>>>     https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/thermal/thermal_core.c?id=refs/tags/v4.10-rc6#n1158
->>>>>
->>>>>     if (type && strlen(type) >= THERMAL_NAME_LENGTH)
->>>>>         return ERR_PTR(-EINVAL);
->>>>>
->>>>> I searched in code further and with THERMAL_NAME_LENGTH = 30 (enough space) the module load fails at another place in __hwmon_device_register():
->>>>>
->>>>>     https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/hwmon/hwmon.c?id=refs/tags/v4.10-rc6#n548
->>>>>
->>>>>     if (name && (!strlen(name) || strpbrk(name, "-* \t\n")))
->>>>>         return ERR_PTR(-EINVAL);
->>>>>
->>>>> That's because there is "-" in "ds2760-battery.0.auto" (and that's why shortening to "ds2760.0" works). Is there some reason for disallowing "-" in a name? If not then I'm for removal (in other case we need to change ds2760-battery and others names). Increasing THERMAL_NAME_LENGTH to 22 should be just OK for ds2760 (but maybe not enough for others) I would increased it to 32 (nice number ;-) ).
->>>>>
->>>>
->>>> '-' is not permitted in hwmon name attributes, primarily because libsensors
->>>> interprets it as a delimiter in its configuration file.
->>>>
->>>
->>> OK so this means we need to rename ds2760-battery so libsensors works.
->>>
->>> Hmm is an underscore in "ds2760_battery.0.auto" OK?
->>
->> Theoretically yes, but there was objection to that idea because replacing the '-'
->> with '_' is considered by some to be an ABI change (why the addition of '.auto'
->> doesn't matter escapes me, though).
->>
->
-> I read that discussion and both ways are not optimal. Many drivers has "-" in its
-> name and even "*" is a valid filename. And changing to underscore is ugly too.
-> Too bad libsensors parses "-" that way.
->
+Hi Nishanth,
 
-FWIW, libsensors also parses '*' as wildcard.
+> On 02/03/2017 05:21 PM, Lukasz Majewski wrote:
+> > Hi Dave,
+> >
+> > Thanks for sharing the knowledge :-)
+> >
+> >> On 02/03/2017 09:24 AM, Lukasz Majewski wrote:
+> >>> The "opp_high" property brings support for 1.5 GHz CPU frequency
+> >>> for TI's am57xx line of processors.
+> >>>
+> >>> Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> >>> ---
+> >>>  arch/arm/boot/dts/dra7.dtsi | 5 +++++
+> >>>  1 file changed, 5 insertions(+)
+> >>>
+> >>
+> >> This can't be blindly enabled for all am57xx SoCs,
+> >
+> > Yes, I'm fully aware of AVS, which uses fuses and SoC silicon
+> > revision to assess if frequency can be enabled.
+> >
+> > Example from my playground:
+> >
+> > - AM5728 works with 1.5 GHz enabled
+> >
+> > - AM5718 hangs when I try to enable 1.5 GHz frequency
+> >
+> >
+> >> there is a
+> >> forthcoming ti-cpufreq [1] driver
+> >
+> > I've backported and tested this code on v4.9 vanilla. It works :-)
+> >
+> >> that is needed that will decided
+> >> which OPPs can and cannot be enabled for the specific variant in
+> >> use.
+> >
+> > I do have a question:
+> >
+> > Do you know the correct opp-supported-hw value for 1.5 GHz on AM57x8
+> > SoC?
+> > In TI's SDK Linux (v4.4): opp-supported-hw = <0xFF 0x04>; but this
+> > seems to be always enabled (and not taking silicon revision and
+> > efuse into account).
+> 
+> There is a TISDK 4.9 being built up as well (we typically do let the 
+> driver soak for a test cycle prior to posting it upstream) but if it 
+> is of interest.. it should match the version Dave posted upstream..
+> 
+> http://git.ti.com/ti-linux-kernel/ti-linux-kernel/blobs/ti-lsk-linux-4.9.y/arch/arm/boot/dts/dra7.dtsi#line100
 
-There was a suggestion to change libsensors to be more name-forgiving.
-I suspect that may not be as easy as it sounds, but as always everyone
-should feel free to submit patches.
+This opp_table0 DTS node definition is different than the one sent to ML
+by Dave (e.g. opp-microvolt has different definition).
 
->>>
->>>> Anyway, the related change in thermal has been reverted, so that should
->>>
->>> s/thermal/hwmon ? Or I'm confused :-D (there was no change in thermal, code stopped working because of change in w1 driver (".auto" addition))
->>>
->>
->> 3feb479cea37 Revert "thermal: thermal_hwmon: Convert to hwmon_device_register_with_info()"
->
-> But after applying revert on my kernel copy there still will be a problem
-> in arch init with missing ".auto" match and driver load still fails on a shorter string array.
->
+> 
+> > For my use case it would be best to see what data should prevent my
+> > AM5718 from 1.5 GHz OPP.
+> >
+> > In other words I need to be 100% sure that my silicon SoC version
+> > doesn't support the 1.5 GHz frequency.
+> >
+> 
+> look at dra7_efuse_xlate which does a speed grade decode of the
+> speeds permitted.. a value of 15 or 23 should permit 1.5GHz. those
+> are common for DRA7/AM57 SoCs.
 
-Can't help you there, sorry.
+Ok, I've checked this and both SoCs have value 23, so they should
+support 1.5 GHz operation. Hence, the AM5718 should not hang.
 
-Guenter
+> 
+> If the efuses seem set for 1.5GHz, the chip should be capable of 
+> 1.5GHz, i'd start suspecting regulators, slew rates and the like.
+
+Then I do need to examine them.
+
+> 
+> http://www.ti.com/lit/pdf/spruhz7
+> rev d: page 371 -> 23 (0x17) = X speed designator Refer to device DM 
+> for supported speed grades for a given device, and the definition for 
+> supported speed grades.
+> So, if you go to 
+> http://www.ti.com/product/AM5718/datasheet/specifications#SWPS043-7245x 
+> -> you will see the "X" designator in AM5718xxX which does support 23 
+> and 1.5GHz.
+
+Yes, correct.
+
+> 
+> 
+> Now, if you did get one of the pre-production samples,
+
+Is there any prod_id (or any other register value), which indicates the
+production sample?
+
+> it is possible 
+> to have efuses slightly messed up on very initial samples - at least 
+> internally, we have had them replaced and none of those samples
+> should have exited TI.. but mistakes might happen.. if the efuse
+> value does not meet the speed grade in documentation, then, please
+> contact TI FAE your company works with and let them know for what to
+> do alternatively, you can also file it on e2e.ti.com for further
+> support.
+> 
+
+Thanks for support.
+
+
+Best regards,
+
+Lukasz Majewski
+
+--
+
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
