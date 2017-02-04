@@ -1,49 +1,104 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Sat, 4 Feb 2017 11:59:27 +0800
-Subject: [PATCH v8 00/15] ACPI platform MSI support and its example mbigen
-In-Reply-To: <a2eb29e2-0f46-0be0-dc43-b3a086556965@codeaurora.org>
-References: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
- <a2eb29e2-0f46-0be0-dc43-b3a086556965@codeaurora.org>
-Message-ID: <5895519F.2060608@huawei.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 3 Feb 2017 20:13:21 -0800
+Subject: [RFC] w1: regression, remove need for ida and use
+ PLATFORM_DEVID_AUTO
+In-Reply-To: <8f24eb01-d9f3-4c7a-7b51-36a7b9b8d023@tul.cz>
+References: <d0b52b94-0c87-61f8-32ff-99f2a354e500@tul.cz>
+ <308e185e-26eb-39ee-d82f-a0d210a41743@ti.com>
+ <cfa35897-383e-674a-f049-e45c4dfeb534@tul.cz>
+ <0928fc89-490f-1d12-dc3d-51f2d433d2e0@roeck-us.net>
+ <822b1827-959b-13dc-6331-f0954954c010@tul.cz>
+ <0a4d4a6d-5ede-b77a-0600-19a8d815a33f@roeck-us.net>
+ <8f24eb01-d9f3-4c7a-7b51-36a7b9b8d023@tul.cz>
+Message-ID: <0a085ba7-0d05-ef7e-9918-2079cab04c10@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/2/3 22:50, Sinan Kaya wrote:
-> On 1/18/2017 7:54 AM, Hanjun Guo wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
+On 02/03/2017 03:30 PM, Petr Cvek wrote:
+> Dne 3.2.2017 v 15:07 Guenter Roeck napsal(a):
+>> On 02/03/2017 05:28 AM, Petr Cvek wrote:
+>>> Dne 3.2.2017 v 04:31 Guenter Roeck napsal(a):
+>>>> On 02/02/2017 05:31 PM, Petr Cvek wrote:
+>>>>> Dne 2.2.2017 v 15:23 Andrew F. Davis napsal(a):
+>>>>>> On 02/01/2017 07:05 PM, Petr Cvek wrote:
+>>>>>>> Patch
+>>>>>>>     w1: remove need for ida and use PLATFORM_DEVID_AUTO
+>>>>>>>     098f9fb0c962eb2fdba5f9d34f4cf7a938237184
+>>>>>>>
+>>>>>>> causes a regression in the w1_ds2760 driver. Initialization creates a name "ds2760-battery.0.auto". It seems that name of that size will cause checking code in __thermal_cooling_device_register() from thermal_core.c to fail as it checks for names shorter than 20 chars:
+>>>>>>>
+>>>>>>>     if (type && strlen(type) >= THERMAL_NAME_LENGTH)
+>>>>>>>         return ERR_PTR(-EINVAL);
+>>>>>>>
+>>>>>>> A second problem seems to be with magician_supplicants list as "ds2760-battery.0" does not match in a test power_supply_am_i_supplied() in ds2760_battery_update_status() from drivers/power/supply/ds2760_battery.c . This causes status flag to be forever in POWER_SUPPLY_STATUS_DISCHARGING state.
+>>>>>>>
+>>>>>>> Functionality returned after I hotfix changed (drivers/w1/slaves/w1_ds2760.c)
+>>>>>>>
+>>>>>>>     pdev = platform_device_alloc("ds2760-battery", PLATFORM_DEVID_AUTO);
+>>>>>>>
+>>>>>>> to
+>>>>>>>
+>>>>>>>     pdev = platform_device_alloc("ds2760-battery", 0);
+>>>>>>>
+>>>>>>> Which solution do you advise. Shortening the name let's say just to "ds2760" (with changes to arch files, w1 files and supply files), increasing THERMAL_NAME_LENGTH to let's say 32 (I don't know if this doesn't break something other) or just reverting to the old behavior?
+>>>>>>>
+>>>>>>
+>>>>>> If 20 is no longer the max thermal name then THERMAL_NAME_LENGTH should
+>>>>>> be changed.
+>>>>>
+>>>>> Yes it is that ".auto" addition to "ds2760-battery.0" makes 21 chars long string. With higher number (".10" onwards) it is 22 chars. Load of the module then fails at test in thermal_zone_device_register():
+>>>>>
+>>>>>     https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/thermal/thermal_core.c?id=refs/tags/v4.10-rc6#n1158
+>>>>>
+>>>>>     if (type && strlen(type) >= THERMAL_NAME_LENGTH)
+>>>>>         return ERR_PTR(-EINVAL);
+>>>>>
+>>>>> I searched in code further and with THERMAL_NAME_LENGTH = 30 (enough space) the module load fails at another place in __hwmon_device_register():
+>>>>>
+>>>>>     https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/hwmon/hwmon.c?id=refs/tags/v4.10-rc6#n548
+>>>>>
+>>>>>     if (name && (!strlen(name) || strpbrk(name, "-* \t\n")))
+>>>>>         return ERR_PTR(-EINVAL);
+>>>>>
+>>>>> That's because there is "-" in "ds2760-battery.0.auto" (and that's why shortening to "ds2760.0" works). Is there some reason for disallowing "-" in a name? If not then I'm for removal (in other case we need to change ds2760-battery and others names). Increasing THERMAL_NAME_LENGTH to 22 should be just OK for ds2760 (but maybe not enough for others) I would increased it to 32 (nice number ;-) ).
+>>>>>
+>>>>
+>>>> '-' is not permitted in hwmon name attributes, primarily because libsensors
+>>>> interprets it as a delimiter in its configuration file.
+>>>>
+>>>
+>>> OK so this means we need to rename ds2760-battery so libsensors works.
+>>>
+>>> Hmm is an underscore in "ds2760_battery.0.auto" OK?
 >>
->> With platform msi support landed in the kernel, and the introduction
->> of IORT for GICv3 ITS (PCI MSI) and SMMU, the framework for platform msi
->> is ready, this patch set add few patches to enable the ACPI platform
->> msi support.
+>> Theoretically yes, but there was objection to that idea because replacing the '-'
+>> with '_' is considered by some to be an ABI change (why the addition of '.auto'
+>> doesn't matter escapes me, though).
 >>
->> For platform device connecting to ITS on arm platform, we have IORT
->> table with the named componant node to describe the mappings of paltform
->> device and ITS, so we can retrieve the dev id and find its parent
->> irqdomain (ITS) from IORT table (simlar with the ACPI ITS support).
+>
+> I read that discussion and both ways are not optimal. Many drivers has "-" in its
+> name and even "*" is a valid filename. And changing to underscore is ugly too.
+> Too bad libsensors parses "-" that way.
+>
+
+FWIW, libsensors also parses '*' as wildcard.
+
+There was a suggestion to change libsensors to be more name-forgiving.
+I suspect that may not be as easy as it sounds, but as always everyone
+should feel free to submit patches.
+
+>>>
+>>>> Anyway, the related change in thermal has been reverted, so that should
+>>>
+>>> s/thermal/hwmon ? Or I'm confused :-D (there was no change in thermal, code stopped working because of change in w1 driver (".auto" addition))
+>>>
 >>
-> I understand that there is a consensus on IORT/SMMUv3 specific pieces
-> of this series while there is some ongoing work on the MBIgen part in
-> due to dependency on Agustin's patch vs. ACPI definitions.
+>> 3feb479cea37 Revert "thermal: thermal_hwmon: Convert to hwmon_device_register_with_info()"
+>
+> But after applying revert on my kernel copy there still will be a problem
+> in arch init with missing ".auto" match and driver load still fails on a shorter string array.
+>
 
-I think both Agustin's patch set and my mbigen one are in good shape
-now if I didn't miss something, Rafael and Lorenzo already acked Agustin's
-patch [1-2/3], I provided my review and test tags on them.
+Can't help you there, sorry.
 
-And Lorenzo said about the mbigen patches:
-"I think this patch (and the FW that goes with it) is wrong, but the rest
-of the series, in particular the IORT bits, are ok with me."
-and I fixed the wrong patch and updated the _PRS to _CRS as Lorenzo
-suggested in v8.
-
-So, can I kindly ask that those patches (Agustin's patch set and my mbigen one)
-be merged to 4.11 please? It's really important for Hisilicon (Hip06/Hip07) SoCs
-which native NIC [1], SAS [2], USB and even the console on Hip07-D05 drivers
-depend on those patches, and those platform are completely dead without
-them if PCI is not enabled...
-
-Thanks
-Hanjun
-
-[1]: https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/net/ethernet/hisilicon/hns/
-[2]: https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/scsi/hisi_sas/
+Guenter
