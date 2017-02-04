@@ -1,104 +1,72 @@
 From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Sat, 4 Feb 2017 22:03:55 +0100
-Subject: [PATCH 1/2] clk: scpi: RfC - Allow to ignore invalid SCPI DVFS clock
- rates
+Date: Sat, 4 Feb 2017 22:04:48 +0100
+Subject: [PATCH 2/2] cpufreq: scpi: RfC - Allow to ignore invalid SCPI DVFS
+ clock rates
 In-Reply-To: <3b60654a-88b6-6262-396e-a058ade1c586@gmail.com>
 References: <3b60654a-88b6-6262-396e-a058ade1c586@gmail.com>
-Message-ID: <d7b8f9db-7512-646c-bb96-ef74e7266661@gmail.com>
+Message-ID: <9a4d7b23-3d5b-b8be-142e-76ded75a5ea4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce an optional property "clock-max-frequency" for SCPI DVFS
-clocks. All frequencies for the respective clock exceeding this
-threshold will be ignored.
+Get the highest allowed SCPI DVFS clock rate and ignore all OPP's
+exceeding this clock rate threshold.
+Based on DT settings the highest allowed clock rate may be lower
+than the firmware-offered highest clock rate.
 
 This is useful on systems where the firmware offers too optimistic
 clock rates causing instabilities and crashes.
 
 Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
 ---
- Documentation/devicetree/bindings/arm/arm,scpi.txt |  7 +++++++
- drivers/clk/clk-scpi.c                             | 15 ++++++++++++++-
- 2 files changed, 21 insertions(+), 1 deletion(-)
+ drivers/cpufreq/scpi-cpufreq.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-index 40183197..7582dd2e 100644
---- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
-+++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-@@ -56,6 +56,13 @@ Other required properties for all clocks(all from common clock binding):
- 	node. It can be non linear and hence provide the mapping of identifiers
- 	into the clock-output-names array.
+diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
+index ea7a4e1b..b5148f3b 100644
+--- a/drivers/cpufreq/scpi-cpufreq.c
++++ b/drivers/cpufreq/scpi-cpufreq.c
+@@ -25,6 +25,8 @@
+ #include <linux/pm_opp.h>
+ #include <linux/scpi_protocol.h>
+ #include <linux/types.h>
++#include <linux/of.h>
++#include <linux/clk.h>
  
-+For DVFS SCPI clocks a further optional property is supported to deal with
-+SCPI DVFS clocks where some firmware-provided clocks rates are too optimistic
-+and cause stability issues.
+ #include "arm_big_little.h"
+ 
+@@ -54,6 +56,20 @@ static int scpi_init_opp_table(const struct cpumask *cpumask)
+ 	struct scpi_opp *opp;
+ 	struct device *cpu_dev = get_cpu_device(cpumask_first(cpumask));
+ 	struct scpi_dvfs_info *info = scpi_get_dvfs_info(cpu_dev);
++	u32 max_freq = UINT_MAX;
 +
-+- clock-max-frequency : Ignore all firmware-provided frequencies above this
-+			threshold. Value 0 means no threshold.
++	if (cpu_dev->of_node) {
++		struct clk *clk = of_clk_get(cpu_dev->of_node, 0);
 +
- SRAM and Shared Memory for SCPI
- -------------------------------
- 
-diff --git a/drivers/clk/clk-scpi.c b/drivers/clk/clk-scpi.c
-index 96d37175..fc99bb6e 100644
---- a/drivers/clk/clk-scpi.c
-+++ b/drivers/clk/clk-scpi.c
-@@ -27,6 +27,7 @@
- 
- struct scpi_clk {
- 	u32 id;
-+	u32 max_freq;
- 	struct clk_hw hw;
- 	struct scpi_dvfs_info *info;
- 	struct scpi_ops *scpi_ops;
-@@ -36,6 +37,11 @@ struct scpi_clk {
- 
- static struct platform_device *cpufreq_dev;
- 
-+static inline bool invalid_freq(struct scpi_clk *clk, u32 freq)
-+{
-+	return clk->max_freq && freq > clk->max_freq;
-+}
++		if (!IS_ERR(clk)) {
++			/* find highest supported rate */
++			long tmp = clk_round_rate(clk, UINT_MAX);
 +
- static unsigned long scpi_clk_recalc_rate(struct clk_hw *hw,
- 					  unsigned long parent_rate)
- {
-@@ -79,6 +85,8 @@ static int __scpi_dvfs_round_rate(struct scpi_clk *clk, unsigned long rate)
++			if (tmp > 0)
++				max_freq = tmp;
++			clk_put(clk);
++		}
++	}
  
- 	for (idx = 0; idx < clk->info->count; idx++, opp++) {
- 		ftmp = opp->freq;
-+		if (invalid_freq(clk, ftmp))
+ 	if (IS_ERR(info))
+ 		return PTR_ERR(info);
+@@ -62,6 +78,12 @@ static int scpi_init_opp_table(const struct cpumask *cpumask)
+ 		return -EIO;
+ 
+ 	for (opp = info->opps, idx = 0; idx < info->count; idx++, opp++) {
++		/* quirk: skip too optimistic firmware-provided rates */
++		if (opp->freq > max_freq) {
++			pr_notice("skip frequency %u\n", opp->freq);
 +			continue;
- 		if (ftmp >= (u32)rate) {
- 			if (ftmp <= fmax)
- 				fmax = ftmp;
-@@ -118,7 +126,7 @@ static int __scpi_find_dvfs_index(struct scpi_clk *clk, unsigned long rate)
- 	const struct scpi_opp *opp = clk->info->opps;
- 
- 	for (idx = 0; idx < max_opp; idx++, opp++)
--		if (opp->freq == rate)
-+		if (opp->freq == rate && !invalid_freq(clk, opp->freq))
- 			return idx;
- 	return -EINVAL;
- }
-@@ -165,6 +173,7 @@ scpi_clk_ops_init(struct device *dev, const struct of_device_id *match,
- 		sclk->info = sclk->scpi_ops->dvfs_get_info(sclk->id);
- 		if (IS_ERR(sclk->info))
- 			return PTR_ERR(sclk->info);
-+		max = sclk->max_freq;
- 	} else if (init.ops == &scpi_clk_ops) {
- 		if (sclk->scpi_ops->clk_get_range(sclk->id, &min, &max) || !max)
- 			return -EINVAL;
-@@ -244,6 +253,10 @@ static int scpi_clk_add(struct device *dev, struct device_node *np,
- 
- 		sclk->id = val;
- 
-+		if (match->data == &scpi_dvfs_ops)
-+			of_property_read_u32_index(np, "clock-max-frequency",
-+						   idx, &sclk->max_freq);
++		}
 +
- 		err = scpi_clk_ops_init(dev, match, sclk, name);
- 		if (err)
- 			dev_err(dev, "failed to register clock '%s'\n", name);
+ 		ret = dev_pm_opp_add(cpu_dev, opp->freq, opp->m_volt * 1000);
+ 		if (ret) {
+ 			dev_warn(cpu_dev, "failed to add opp %uHz %umV\n",
 -- 
 2.11.0
