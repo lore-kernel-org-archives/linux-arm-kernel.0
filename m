@@ -1,235 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat,  4 Feb 2017 12:17:22 -0800
-Subject: [PATCH] ARM: dts: Configure regulators for droid 4
-Message-ID: <20170204201722.1544-1-tony@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 4 Feb 2017 21:33:19 +0100
+Subject: [PATCH 3/3 v4] iio: adc: add a driver for Qualcomm PM8xxx HK/XOADC
+In-Reply-To: <1D4293AF-7894-470C-BF50-3C1A9C0EB247@jic23.retrosnub.co.uk>
+References: <20170131100938.23660-1-linus.walleij@linaro.org>
+ <CACRpkdYDMH9A=ezPkANRQXcqceEqn-A+oL2TxHyNkjmSms5AOA@mail.gmail.com>
+ <0c54c4d8-265c-112e-60f1-af21b73148ec@kernel.org>
+ <CACRpkdYLwVEuOcjyGYo7U=57JY3-R2FCYnEBWFqL89iqm3yEDA@mail.gmail.com>
+ <1D4293AF-7894-470C-BF50-3C1A9C0EB247@jic23.retrosnub.co.uk>
+Message-ID: <CACRpkdb_0QhbqdUoQw4+8SMuDA1e-CZDi1h0eoP+c-D4iru1Ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With drivers/mfd/motorola-cpcap.c and drivers/regulator/cpcap-regulator.c
-we can now configure proper regulators for droid 4.
+On Thu, Feb 2, 2017 at 5:25 PM, Jonathan Cameron
+<jic23@jic23.retrosnub.co.uk> wrote:
+> On 2 February 2017 14:47:34 GMT+00:00, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-Let's add regulator voltages and switch over MMC, eMMC and WLAN to use
-the CPCAP regulators.
+>>Then I get the following with x86_64 allyesconfig:
+(...)
+> Drat shows I never build other than modules :)
+> Will probably have to be a helper module.
 
-Cc: devicetree at vger.kernel.org
-Cc: Marcel Partap <mpartap@gmx.net>
-Cc: Michael Scott <michael.scott@linaro.org>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/motorola-cpcap-mapphone.dtsi | 151 +++++++++++++++++++++++++
- arch/arm/boot/dts/omap4-droid4-xt894.dts       |  25 +---
- 2 files changed, 155 insertions(+), 21 deletions(-)
- create mode 100644 arch/arm/boot/dts/motorola-cpcap-mapphone.dtsi
+Hahah yeah I guess we resort to that if I can't figure this out,
+what a mess. I'm trying my best to figure something out that
+works with both allyesconfig and allmodconfig and when I find
+it I will use the pattern everywhere for the rest of my life.
 
-diff --git a/arch/arm/boot/dts/motorola-cpcap-mapphone.dtsi b/arch/arm/boot/dts/motorola-cpcap-mapphone.dtsi
-new file mode 100644
---- /dev/null
-+++ b/arch/arm/boot/dts/motorola-cpcap-mapphone.dtsi
-@@ -0,0 +1,151 @@
-+/*
-+ * Common CPCAP configuration used on Motorola phones
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+&mcspi1 {
-+	cpcap: pmic at 0 {
-+		compatible = "motorola,cpcap", "st,6556002";
-+		reg = <0>;	/* cs0 */
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <7 IRQ_TYPE_EDGE_RISING>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		spi-max-frequency = <3000000>;
-+		spi-cs-high;
-+
-+		cpcap_regulator: regulator {
-+			compatible = "motorola,mapphone-cpcap-regulator";
-+
-+			cpcap_regulators: regulators {
-+			};
-+		};
-+	};
-+};
-+
-+&cpcap_regulators {
-+	sw5: SW5 {
-+		regulator-min-microvolt = <5050000>;
-+		regulator-max-microvolt = <5050000>;
-+		regulator-enable-ramp-delay = <50000>;
-+		regulator-boot-on;
-+	};
-+
-+	vcam: VCAM {
-+		regulator-min-microvolt = <2900000>;
-+		regulator-max-microvolt = <2900000>;
-+		regulator-enable-ramp-delay = <1000>;
-+	};
-+
-+	/* Used by DSS */
-+	vcsi: VCSI {
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-enable-ramp-delay = <1000>;
-+		regulator-boot-on;
-+	};
-+
-+	vdac: VDAC {
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-enable-ramp-delay = <1000>;
-+	};
-+
-+	vdig: VDIG {
-+		regulator-min-microvolt = <1875000>;
-+		regulator-max-microvolt = <1875000>;
-+		regulator-enable-ramp-delay = <1000>;
-+	};
-+
-+	vfuse: VFUSE {
-+		regulator-min-microvolt = <1500000>;
-+		regulator-max-microvolt = <3150000>;
-+		regulator-enable-ramp-delay = <1000>;
-+	};
-+
-+	vhvio: VHVIO {
-+		regulator-min-microvolt = <2775000>;
-+		regulator-max-microvolt = <2775000>;
-+		regulator-enable-ramp-delay = <1000>;
-+		regulator-always-on;
-+	};
-+
-+	/* Used by eMMC at mmc2 */
-+	vsdio: VSDIO {
-+		regulator-min-microvolt = <2900000>;
-+		regulator-max-microvolt = <2900000>;
-+		regulator-enable-ramp-delay = <1000>;
-+	};
-+
-+	vpll: VPLL {
-+		regulator-min-microvolt = <1200000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-enable-ramp-delay = <100>;
-+	};
-+
-+	vrf1: VRF1 {
-+		regulator-min-microvolt = <2775000>;
-+		regulator-max-microvolt = <2775000>;
-+		regulator-enable-ramp-delay = <1000>;
-+	};
-+
-+	vrf2: VRF2 {
-+		regulator-min-microvolt = <2775000>;
-+		regulator-max-microvolt = <2775000>;
-+		regulator-enable-ramp-delay = <1000>;
-+	};
-+
-+	vrfref: VRFREF {
-+		regulator-min-microvolt = <2500000>;
-+		regulator-max-microvolt = <2775000>;
-+		regulator-enable-ramp-delay = <100>;
-+	};
-+
-+	vwlan1: VWLAN1 {
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1900000>;
-+		regulator-enable-ramp-delay = <1000>;
-+	};
-+
-+	vwlan2: VWLAN2 {
-+		regulator-min-microvolt = <3000000>;
-+		regulator-max-microvolt = <3000000>;
-+		regulator-enable-ramp-delay = <1000>;
-+	};
-+
-+	vsim: VSIM {
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <2900000>;
-+		regulator-enable-ramp-delay = <1000>;
-+	};
-+
-+	/* Used by micro-SDIO at mmc1 */
-+	vsimcard: VSIMCARD {
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <2900000>;
-+		regulator-enable-ramp-delay = <1000>;
-+	};
-+
-+	vvib: VVIB {
-+		regulator-min-microvolt = <1300000>;
-+		regulator-max-microvolt = <3000000>;
-+		regulator-enable-ramp-delay = <500>;
-+	};
-+
-+	vusb: VUSB {
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-enable-ramp-delay = <1000>;
-+	};
-+
-+	vaudio: VAUDIO {
-+		regulator-min-microvolt = <2775000>;
-+		regulator-max-microvolt = <2775000>;
-+		regulator-enable-ramp-delay = <1000>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/omap4-droid4-xt894.dts b/arch/arm/boot/dts/omap4-droid4-xt894.dts
---- a/arch/arm/boot/dts/omap4-droid4-xt894.dts
-+++ b/arch/arm/boot/dts/omap4-droid4-xt894.dts
-@@ -7,6 +7,7 @@
- 
- #include <dt-bindings/input/input.h>
- #include "omap443x.dtsi"
-+#include "motorola-cpcap-mapphone.dtsi"
- 
- / {
- 	model = "Motorola Droid 4 XT894";
-@@ -26,25 +27,7 @@
- 		reg = <0x80000000 0x3fd00000>;	/* 1021 MB */
- 	};
- 
--	/* CPCAP really supports 1650000 to 3400000 range */
--	vmmc: regulator-mmc {
--		compatible = "regulator-fixed";
--		regulator-name = "vmmc";
--		regulator-min-microvolt = <3000000>;
--		regulator-max-microvolt = <3000000>;
--		regulator-always-on;
--	};
--
--	/* CPCAP really supports 3000000 to 3100000 range */
--	vemmc: regulator-emmc {
--		compatible = "regulator-fixed";
--		regulator-name = "vemmc";
--		regulator-min-microvolt = <3000000>;
--		regulator-max-microvolt = <3000000>;
--		regulator-always-on;
--	};
--
--	/* CPCAP really supports 1650000 to 1950000 range */
-+	/* This is probably coming straight from the battery.. */
- 	wl12xx_vmmc: regulator-wl12xx {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vwl1271";
-@@ -136,13 +119,13 @@
- };
- 
- &mmc1 {
--	vmmc-supply = <&vmmc>;
-+	vmmc-supply = <&vsimcard>;
- 	bus-width = <4>;
- 	cd-gpios = <&gpio4 10 GPIO_ACTIVE_LOW>;	/* gpio106 */
- };
- 
- &mmc2 {
--	vmmc-supply = <&vemmc>;
-+	vmmc-supply = <&vsdio>;
- 	bus-width = <8>;
- 	non-removable;
- };
--- 
-2.11.0
+Yours,
+Linus Walleij
