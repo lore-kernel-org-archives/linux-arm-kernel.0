@@ -1,70 +1,167 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 4 Feb 2017 10:36:23 +0100 (CET)
-Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
-In-Reply-To: <20170202042930.GA6377@localhost.localdomain>
-References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
- <20170120041400.GA24617@localhost.localdomain>
- <060918B6-A773-46A5-8D10-C9F6BBA6D3F1@martin.sperl.org>
- <20170124093127.GB3651@localhost.localdomain>
- <0452720A-5914-469B-9EF7-0581CF1B5478@martin.sperl.org>
- <20170202042930.GA6377@localhost.localdomain>
-Message-ID: <48317588.166823.1486200983836@email.1und1.de>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Sat, 4 Feb 2017 18:06:37 +0800
+Subject: [Update][PATCH v8 15/15] irqchip: mbigen: Add ACPI support
+Message-ID: <1486202797-61269-1-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
-> Eduardo Valentin <edubezval@gmail.com> hat am 2. Februar 2017 um 05:29 geschrieben:
-> 
-> 
-> Hello Martin,
-> 
-> ...
-> 
-> 
-> #include <dt-bindings/thermal/thermal.h>
-> 
-> ocp {
-> 	...
-> 	/*
-> 	 * A simple IC with several bandgap temperature sensors.
-> 	 */
-> 	bandgap0: bandgap at 0x0000ED00 {
-> 		...
-> 		#thermal-sensor-cells = <1>;
-> 	};
-> };
-> 
-> thermal-zones {
-> 	cpu_thermal: cpu-thermal {
-> 		polling-delay-passive = <250>; /* milliseconds */
-> 		polling-delay = <1000>; /* milliseconds */
-> 
-> 				/* sensor       ID */
-> 		thermal-sensors = <&bandgap0     0>;
-> 
-> 		trips {
-> 			/* each zone within the SoC may have its own trips */
-> 			cpu_alert: cpu-alert {
-> 				temperature = <100000>; /* millicelsius */
-> 				hysteresis = <2000>; /* millicelsius */
-> 				type = "passive";
-> 			};
-> 			cpu_crit: cpu-crit {
-> 				temperature = <125000>; /* millicelsius */
-> 				hysteresis = <2000>; /* millicelsius */
-> 				type = "critical";
-> 			};
-> 		};
-> 
-> 		cooling-maps {
-> 			/* each zone within the SoC may have its own cooling */
-> 			...
-> 		};
-> 	};
-> 
+With the preparation of platform msi support and interrupt producer
+in DSDT, we can add mbigen ACPI support now.
 
-if i get it right the device tree binding requires also a cooling map. But how should we model this without a fan or a DVFS driver? Is there something like a placeholder? Do you have an example?
+We are using Interrupt resource type in _CRS methd to indicate number
+of irq pins instead of num_pins in DT to avoid _DSD usage in this case.
 
-Regards
-Stefan
+For mbigen,
+    Device(MBI0) {
+          Name(_HID, "HISI0152")
+          Name(_UID, Zero)
+          Name(_CRS, ResourceTemplate() {
+                  Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+		  Interrupt(ResourceProducer,...) {12,14,....}
+          })
+    }
+
+For devices,
+   Device(COM0) {
+          Name(_HID, "ACPIIDxx")
+          Name(_UID, Zero)
+          Name(_CRS, ResourceTemplate() {
+                 Memory32Fixed(ReadWrite, 0xb0030000, 0x10000)
+		 Interrupt(ResourceConsumer,..., "\_SB.MBI0") {12}
+          })
+    }
+
+With the help of platform msi and interrupt producer, then devices
+will get the virq from mbigen's irqdomain.
+
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Ma Jun <majun258@huawei.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+---
+
+There are some trailing white spaces in previous
+version, send a updated one.
+
+ drivers/irqchip/irq-mbigen.c | 70 ++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 67 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
+index 3756408..e6bb503 100644
+--- a/drivers/irqchip/irq-mbigen.c
++++ b/drivers/irqchip/irq-mbigen.c
+@@ -16,6 +16,7 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/acpi.h>
+ #include <linux/interrupt.h>
+ #include <linux/irqchip.h>
+ #include <linux/module.h>
+@@ -180,7 +181,7 @@ static int mbigen_domain_translate(struct irq_domain *d,
+ 				    unsigned long *hwirq,
+ 				    unsigned int *type)
+ {
+-	if (is_of_node(fwspec->fwnode)) {
++	if (is_of_node(fwspec->fwnode) || is_acpi_device_node(fwspec->fwnode)) {
+ 		if (fwspec->param_count != 2)
+ 			return -EINVAL;
+ 
+@@ -271,6 +272,54 @@ static int mbigen_of_create_domain(struct platform_device *pdev,
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_ACPI
++static acpi_status mbigen_acpi_process_resource(struct acpi_resource *ares,
++					     void *context)
++{
++	struct acpi_resource_extended_irq *ext_irq;
++	u32 *num_irqs = context;
++
++	switch (ares->type) {
++	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
++		ext_irq = &ares->data.extended_irq;
++		*num_irqs += ext_irq->interrupt_count;
++		break;
++	default:
++		break;
++	}
++
++	return AE_OK;
++}
++
++static int mbigen_acpi_create_domain(struct platform_device *pdev,
++				     struct mbigen_device *mgn_chip)
++{
++	struct irq_domain *domain;
++	u32 num_msis = 0;
++	acpi_status status;
++
++	status = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), METHOD_NAME__CRS,
++				     mbigen_acpi_process_resource, &num_msis);
++	if (ACPI_FAILURE(status) || num_msis == 0)
++		return -EINVAL;
++
++	domain = platform_msi_create_device_domain(&pdev->dev, num_msis,
++						   mbigen_write_msg,
++						   &mbigen_domain_ops,
++						   mgn_chip);
++	if (!domain)
++		return -ENOMEM;
++
++	return 0;
++}
++#else
++static inline int mbigen_acpi_create_domain(struct platform_device *pdev,
++					    struct mbigen_device *mgn_chip)
++{
++	return -ENODEV;
++}
++#endif
++
+ static int mbigen_device_probe(struct platform_device *pdev)
+ {
+ 	struct mbigen_device *mgn_chip;
+@@ -289,9 +338,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
+ 	if (IS_ERR(mgn_chip->base))
+ 		return PTR_ERR(mgn_chip->base);
+ 
+-	err = mbigen_of_create_domain(pdev, mgn_chip);
+-	if (err)
++	if (IS_ENABLED(CONFIG_OF) && pdev->dev.of_node)
++		err = mbigen_of_create_domain(pdev, mgn_chip);
++	else if (ACPI_COMPANION(&pdev->dev))
++		err = mbigen_acpi_create_domain(pdev, mgn_chip);
++	else
++		err = -EINVAL;
++
++	if (err) {
++		dev_err(&pdev->dev, "Failed to create mbi-gen@%p irqdomain", mgn_chip->base);
+ 		return err;
++	}
+ 
+ 	platform_set_drvdata(pdev, mgn_chip);
+ 	return 0;
+@@ -303,10 +360,17 @@ static int mbigen_device_probe(struct platform_device *pdev)
+ };
+ MODULE_DEVICE_TABLE(of, mbigen_of_match);
+ 
++static const struct acpi_device_id mbigen_acpi_match[] = {
++	{ "HISI0152", 0 },
++	{}
++};
++MODULE_DEVICE_TABLE(acpi, mbigen_acpi_match);
++
+ static struct platform_driver mbigen_platform_driver = {
+ 	.driver = {
+ 		.name		= "Hisilicon MBIGEN-V2",
+ 		.of_match_table	= mbigen_of_match,
++		.acpi_match_table = ACPI_PTR(mbigen_acpi_match),
+ 	},
+ 	.probe			= mbigen_device_probe,
+ };
+-- 
+1.7.12.4
