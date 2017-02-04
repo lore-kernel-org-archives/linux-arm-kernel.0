@@ -1,7 +1,7 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat,  4 Feb 2017 12:57:07 -0800
+Date: Sat,  4 Feb 2017 13:02:41 -0800
 Subject: [PATCH net-next v5 0/4] net: dsa: Support for pdata in dsa2
-Message-ID: <20170204205715.14708-1-f.fainelli@gmail.com>
+Message-ID: <20170204210245.14812-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,6 +28,8 @@ Changes in v5:
 
 - dropped changes to drivers/base/ because after more than a month, we cannot
   get any answer from Greg KH
+
+- rebased against latest net-next/master
 
 Changes in v4:
 
