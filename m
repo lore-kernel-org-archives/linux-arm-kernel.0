@@ -1,28 +1,44 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Sat, 4 Feb 2017 22:03:34 +0100
-Subject: [PATCH 0/2] scpi: RfC - Allow to ignore invalid SCPI DVFS clock rates
-Message-ID: <a4c725a9-2f79-a48b-b732-61e1fe31aba8@gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Sat,  4 Feb 2017 22:39:31 +0100
+Subject: [PATCH] serial: imx: Only enable UART DMA on i.MX6Q and i.MX53
+Message-ID: <20170204213931.3566-1-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Odroid C2 (Amlogic S905GXBB) the firmware defines SCPI DVFS cpu
-clock rates which make the system crash or at least unstable.
-Therefore cpufreq can't be used on this system as of today.
-Other systems might face similar issues with too optimistic SCPI SVFS
-clock rates.
+From: Kai Ruhnau <kai.ruhnau@target-sg.com>
 
-This RfC patch series addresses this by allowing to define a max
-frequency per clock via DT. All frequencies for the respective clock
-exceeding this threshold will be ignored.
+In 1c06bde6 with the introduction of DMA support for the i.MX53 platform,
+DMA was enabled for all platforms instead. On an i.MX6SX (which is a
+IMX21_UART), this breaks gpsd talking to an UART module with
 
-Heiner Kallweit (2):
-  clk: scpi: RfC - Allow to ignore invalid SCPI DVFS clock rates
-  cpufreq: scpi: RfC - Allow to ignore invalid SCPI DVFS clock rates
+ imx-uart 21f4000.serial: DMA transaction error.
 
- Documentation/devicetree/bindings/arm/arm,scpi.txt |  7 +++++++
- drivers/clk/clk-scpi.c                             | 15 ++++++++++++++-
- drivers/cpufreq/scpi-cpufreq.c                     | 22 ++++++++++++++++++++++
- 3 files changed, 43 insertions(+), 1 deletion(-)
+This patch makes sure, UART DMA is only activated for i.MX53 and i.MX6Q.
 
+Signed-off-by: Kai Ruhnau <kai.ruhnau@target-sg.com>
+Reviewed-by: Marek Vasut <marex@denx.de>
+Fixes: 1c06bde643d0 ("Allowing UART DMA to be configured on i.MX53")
+Cc: <stable@vger.kernel.org> # 4.9+
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+Cc: Shawn Guo <shawnguo@kernel.org>
+---
+ drivers/tty/serial/imx.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index a70356d..8e2b5f2 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -1269,7 +1269,8 @@ static int imx_startup(struct uart_port *port)
+ 	writel(temp & ~UCR4_DREN, sport->port.membase + UCR4);
+ 
+ 	/* Can we enable the DMA support? */
+-	if (!uart_console(port) && !sport->dma_is_inited)
++	if ((is_imx6q_uart(sport)  || is_imx53_uart(sport)) &&
++	    !uart_console(port) && !sport->dma_is_inited)
+ 		imx_uart_dma_init(sport);
+ 
+ 	spin_lock_irqsave(&sport->port.lock, flags);
 -- 
-2.11.0
+2.10.2
