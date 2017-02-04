@@ -1,251 +1,165 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 4 Feb 2017 11:39:36 +0000
-Subject: [PATCH v2 4/5] iio: trigger: add support for STM32 EXTI triggers
-In-Reply-To: <CACRpkdZeiFYFdRWCEgYWDWh4Wn2gT29KAFao9mgj7sTi768kFQ@mail.gmail.com>
-References: <1485786840-4557-1-git-send-email-fabrice.gasnier@st.com>
- <1485786840-4557-5-git-send-email-fabrice.gasnier@st.com>
- <CACRpkdZeiFYFdRWCEgYWDWh4Wn2gT29KAFao9mgj7sTi768kFQ@mail.gmail.com>
-Message-ID: <1236cee4-41bf-b3b9-51e4-7e585234b0c7@kernel.org>
+Date: Sat, 4 Feb 2017 12:09:33 +0000
+Subject: [PATCH 3/7] IIO: add bindings for STM32 DFSDM ADC driver
+In-Reply-To: <d9747aa9-e3c2-f280-7dca-8862e8e74e6e@st.com>
+References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
+ <1485189145-29576-4-git-send-email-arnaud.pouliquen@st.com>
+ <fa6b541d-2818-afa7-82fa-eb19806e9f4d@kernel.org>
+ <36426523-c59f-4010-b341-acb60ebdcbb5@kernel.org>
+ <d9747aa9-e3c2-f280-7dca-8862e8e74e6e@st.com>
+Message-ID: <701672ca-9888-7d86-d41a-d457b1739b9a@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/17 19:40, Linus Walleij wrote:
-> On Mon, Jan 30, 2017 at 3:33 PM, Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+On 31/01/17 14:10, Arnaud Pouliquen wrote:
+> Hi Jonathan,
 > 
->> EXTi[0..15] gpio signal can be routed internally as trigger source for
->> ADC or DAC conversions. Configure them as interrupts to configure
->> trigger path in HW.
+> On 01/29/2017 01:42 PM, Jonathan Cameron wrote:
+>> On 29/01/17 11:58, Jonathan Cameron wrote:
+>>> On 23/01/17 16:32, Arnaud Pouliquen wrote:
+>>>> This patch adds documentation of device tree bindings for the
+>>>> STM32 DFSDM ADC.
+>>>>
+>>>> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+>>> Trivial bits inline.
+>>>> ---
+>>>>  .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        | 60 ++++++++++++++++++++++
+>>>>  1 file changed, 60 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt  b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 
+>>>> new file mode 100644
+>>>> index 0000000..c156bcb
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 	
+>>>> @@ -0,0 +1,60 @@
+>>>> +STMicroelectronics STM32 DFSDM ADC device driver
+>>>> +
+>>>> +STM32 DFSDM ADC is a sigma delta analog-to-digital converter.
+>>>> +It has to be declared in device-tree as a subnode of the DFSDM mfd node.
+>>>> +
+>>>> +It has several multiplexed input channels. Conversions can be performed
+>>>> +in single, scan or discontinuous mode. Conversions can be launched in software
+>>>> +or using hardware triggers.
+>>>> +Each instance of the driver uses one filter instance handle by the DFSDM mfd
+>>>> +driver.
+>>>> +
+>>>> +DFSDM also offers extra features:
+>>>> +-The analog watchdog feature allows the application to detect if the
+>>>> + input voltage goes beyond the user-defined, higher or lower thresholds.
+>>>> +-The short circuit detection allows allows the application to detect if the
+>>>> + input is in CC.
+>>>> +-The clock absence detection allows application to detect if SPI input is clocked.
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible:	Must be "st,stm32-dfsdm-adc".
+>>>> +- reg:		Specifies the DFSDM filter instance.
+>>>> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
+>>>> +- st,adc-channels:	List of single-ended channels muxed for this ADC.
+>>>> +- st,adc-channel-names:	List of single-ended channels Name.
+>>>> +
+>>>> +Optional properties:
+>>>> +- st,adc-channel-types:	Single-ended channel input type. Default value is 0.
+>>>> +			- 0: SPI with data on rising edge (default)
+>>>> +			- 1: SPI with data on falling edge
+>>> This is an element that can be described without magic numbers so I'd
+>>> prefer that you do so.
+>>>
+>>> Also spell check edage -> edge.
+>>>
+>>>> +			- 2: manchester codec, rising edage = logic 0
+>>>> +			- 3: manchester codec, rising edage = logic 1
+>>>> +- st,adc-channel-clk-src: Conversion clock source. default value is 1.
+>>>> +			  - 0: External SPI clocl (CLKIN x)
+>>>> +			  - 1: internal SPI clock (CLKOUT) (default)
+>>>> +			  - 2: internal SPI clock divided by 2 (falling edge).
+>>>> +			  - 2: internal SPI clock divided by 2 (rising edge).
+>>> 3?
+>>>> +- st,adc-alt-channel: 	  must be defined if Two ADCs are connected on same SPI
+>>>> +			  input.
+>>>> +			  If not set channel n is connected to SPI input n.
+>>>> +			  If set channel n is connected to SPI input n + 1.
+>>> ? Two data inputs with shared clock?
+>>>> +
+>>>> +Example:
+>>>> +	dfsdm: dfsdm at 4400D000 {
+>> I'd like to actually see the ADCs on the end of these explicitly
+>> described as well.  It's entirely possible we'll have something
+>> that isn't simply a dumb sigma delta modulator that will need
+>> it's own driver.
 >>
->> Note: interrupt handler isn't required here, and corresponding interrupt
->> can be kept masked at exti controller level.
+>> In some senses what we actually have here is a data bus so we
+>> should be able to describe things on it in that fashion
+>> rather than just describing the data that is in coming.
+>> Our boundary of knowledge isn't at the edge of this device!
 >>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> A quick example google fed me would be the gain control on a
+>> maxim ds8102.
+>>
+>> Tricky bit here will be defining this nice and generally when we
+>> currently only have the one piece of hardware to do it with ;)
+>>
+>> That's what makes kernel development fun!
+>>
 > 
-> But I see nothing STM32-specific about this driver?
+> What you describe here seems similar to audio codecs device defined in
+> ASoC. An Audio codec is an external chip that is connected to SoC
+> through an audio bus.
+> ASoC allows to bind this codec with the SOC DAI (digital Audio Interface).
+Yes, that was exactly what I was thinking of.  Was a while back but
+I once mainlined a codec so had this at the back of my mind.
 > 
-> I think we should do everone a service and just create
-> drivers/iio/trigger/gpio-trigger.c
+> FYI we should have this kind of feature to support on STM32 uin second step:
+> DSFDM input can also process stm32 ADC output through an hardware pipe
+> (stm32-adc IIO driver that has been recently integrated in kernel).
+> Internally, to pipe the ADC with DFSDM, we use an extension of inkern
+> interface that is very similar with the one mentioned by Lars:
 > 
-> I wondered before why we don't have a generic GPIO IIO trigger,
-> it seems like such an intuitive and useful thing to have.
-We do, it just got renamed at some point a while back to be
-iio-trig-interrupt after it became clear that it didn't need
-to be a gpio either - just an interrupt.  Can't remember which
-part provided a non gpio interrupt pin and hence drove that
-change.  Was quite a while back!
-d4fd73bf25c3aafc891ef4443fc744d427ec1df0 specifically in 2013
+> https://github.com/analogdevicesinc/linux/blob/xcomm_zynq/drivers
+> /iio/buffer/hw_consumer.c
+> 
+> Don't know if this is what Lars has in mind... but a solution could be
+> to define a new type of IIO that would be something like
+> "postprocessing" or "filter". This new iio device type could be piped to
+> a frontend IIO device to export a new one (through hw_consumer.c interface).
+> In this case for simple device like PDM audio microphone that does not
+> required control a kind of dummy frontend device could be defined...
+That could work.  We already have stacked IIO devices - only difference
+here is that we can't actually see the data flowing between the levels
+of stack (or pipeline).
 
-Handling of the gpio stuff should be handled in the interrupt
-description itself.
-
-However, it's a bit different - in that in the below it
-would be the equivalent of triggering on the unused exti
-interrupt rather than on the end of conversion.
-
-In this case, because of the hardware linkage we can effectively
-skip the first interrupt.
-
-Arguably to make this a general purpose trigger we should enable
-that interrupt if anything other than the STM devices that can
-use it in hardware are hooked on to it.
-
-So this is an interrupt trigger without the interrupt ever
-being visible to software.
-
-It might be easy enough to add that support to the generic version
-except that linking said trigger requires some register changes
-in the STM side. + there is a kicker in the various last bit
-of this patch - we need a way to find out if it's the interrupt
-we think it is (i.e. an exti interrupt)
+J
 > 
-> Let's see what Jonathan says.
-
-
+> Regards
+> Arnaud
 > 
->> +config IIO_STM32_EXTI_TRIGGER
->> +       tristate "STM32 EXTI Trigger"
->> +       depends on (ARCH_STM32 && OF) || COMPILE_TEST
-> 
-> config IIO_GPIO_TRIGGER
->     depends on GPIOLIB
-> 
->> +       select STM32_EXTI
-> 
-> Isn't the dependency actually the other way around?
-> 
-> default STM32_EXTI makes more sense, or just put it into the
-> defconfig.
-> 
->> +#include <linux/gpio/consumer.h>
->> +#include <linux/iio/iio.h>
->> +#include <linux/iio/trigger.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/module.h>
->> +#include <linux/platform_device.h>
->> +
->> +/* STM32 has up to 16 EXTI triggers on GPIOs */
->> +#define STM32_MAX_EXTI_TRIGGER 16
-> 
-> Just don't put any restrictions like this so it can be widely
-> reused.
-> 
->> +static irqreturn_t stm32_exti_trigger_handler(int irq, void *data)
->> +{
->> +       /* Exti handler shouldn't be invoked, and isn't used */
->> +       return IRQ_HANDLED;
->> +}
-> 
-> It could be a good idea to capture the timestamp here if we were
-> actually using this IRQ.
-> 
->> +static int stm32_exti_trigger_probe(struct platform_device *pdev)
->> +{
->> +       int irq, ret;
->> +       char name[8];
->> +       struct gpio_desc *gpio;
->> +       struct iio_trigger *trig;
->> +       unsigned int i;
->> +
->> +       for (i = 0; i < STM32_MAX_EXTI_TRIGGER; i++) {
-> 
-> Why not just run this until devm_gpiod_get() returns -ERRNO
-> or something?
-> 
->> +               snprintf(name, sizeof(name), "exti%d", i);
->> +
->> +               gpio = devm_gpiod_get_optional(&pdev->dev, name, GPIOD_IN);
-> 
-> Why would it be optional?
-> 
-> Either it is there in the device tree or we get -EINVAL or something
-> if there is no
-> such index in the device tree. We can get -EPROBE_DEEER too, and then
-> we should exit silently or just print that deferring is happening.
-> 
->> +               if (IS_ERR_OR_NULL(gpio)) {
->> +                       if (IS_ERR(gpio)) {
->> +                               dev_err(&pdev->dev, "gpio %s get error %ld\n",
->> +                                       name, PTR_ERR(gpio));
->> +                               return PTR_ERR(gpio);
->> +                       }
->> +                       dev_dbg(&pdev->dev, "No %s gpio\n", name);
->> +                       continue;
->> +               }
-> 
-> Good
-> 
->> +               irq = gpiod_to_irq(gpio);
->> +               if (irq < 0) {
->> +                       dev_err(&pdev->dev, "gpio %d to irq failed\n", i);
->> +                       return irq;
->> +               }
->> +
->> +               ret = devm_request_irq(&pdev->dev, irq,
->> +                                      stm32_exti_trigger_handler,
->> +                                      0, dev_name(&pdev->dev), pdev);
-Hmm. So this is a trick to set the interrupt mapping up inside the device.
-The whole thing doesn't really exist.
-
-Rather feels like there ought to be some generic interface for
-'I want to pretend I want a particular interrupt but not actually get one'.
-
-But that would only work in this weird case where there is also a real interrupt
-associated with it - just one we elect not to use.
->> +               if (ret) {
->> +                       dev_err(&pdev->dev, "request IRQ %d failed\n", irq);
->> +                       return ret;
->> +               }
-> 
-> Here you need some elaborate trigger edge handling.
-> 
-> The flags that you define as "0" here, how do we say that we
-> want to handle rising or falling edges, for example?
-> 
-> I think you might want to establish these DT properties for
-> GPIO triggers:
-> 
-> gpio-trigger-rising-edge;
-> gpio-trigger-falling-edge;
-> 
-> Then:
-> 
-> int irq_flags = 0;
-> 
-> if (of_property_read_bool(np, "gpio-trigger-rising-edge")
->    irq_flags |= IRQF_TRIGGER_RISING;
-> else if (of_property_read_bool(np, "gpio-trigger-falling-edge")
->    irq_flags |= IRQF_TRIGGER_FALLING;
-Should this not all be part of the interrupt specification rather
-than down here in the specific driver?
-> 
-> To pass along to the devm_request_irq() function as flags.
-> 
-> I find it weird that it even works without. Most GPIO interrupts
-> should require you to set a trigger type. But I guess it is because
-> of the other weirdness you describe below.
-> 
->> +               /*
->> +                * gpios are configured as interrupts, so exti trigger path is
->> +                * configured in HW, and can now be used as external trigger
->> +                * source by other IPs. But getting interrupts when trigger
->> +                * occurs is unused here, so mask irq on exti controller by
->> +                * default.
->> +                */
->> +               disable_irq(irq);
-> 
-> Aha. That is not generic. But what about just adding:
-> 
-> if (of_property_read_bool(np, "gpio-trigger-numb-irq")
->     disable_irq();
-> 
-> (Plus add the binding for that something like "this makes the
-> GPIO mentioned get requested, translated to an IRQ, get the
-> IRQ requested, and then immediately just disabled as other
-> hardware will actually hande the IRQ line".)
-> 
-> I understand that this is kind of weird: we're making a whole generic
-> GPIO trigger driver just to use it with hardware that grabs and disabled
-> the irq immediately.
-> 
-> But I think that in the long run it makes for more reusable code.
-I'd go a step further.  Whether it is numbed or not will depend on what
-is downstream.  We should be providing this interrupt like normal if
-we have other devices triggering off it.  In that case it becomes a standard
-interrupt trigger.
-
-Polling off the back of the dataready interrupt is fine if there is nothing
-earlier available. Here there is so we should really be triggering other
-devices off this earlier interrupt.
-> 
->> +static const struct of_device_id stm32_exti_trigger_of_match[] = {
->> +       { .compatible = "st,stm32-exti-trigger" },
->> +       {},
-> 
-> "iio-gpio-trigger"
-> 
-> Should fit anyone, given the above amendments.
-> 
->> +#if IS_ENABLED(CONFIG_IIO_STM32_EXTI_TRIGGER)
->> +bool is_stm32_exti_trigger(struct iio_trigger *trig);
->> +#else
->> +static inline bool is_stm32_exti_trigger(struct iio_trigger *trig)
->> +{
->> +       return false;
->> +}
->> +#endif
-> 
-> This seems unnecessary to broadcast to the entire kernel.
-This one section is the only really non generic element that
-isn't supported by the existing interrupt trigger.
-Mind you that doesn't have device tree bindings yet :(
-
-I wonder if we can add some sort of flag in there to identify hardware
-blocks for tricks like this. Or at a push provide the interrupt
-to both bits of kit so they can compare and see if they are looking
-at the same one?
-> 
-> Why? (Maybe I can find explanations in later patches.
-> 
-> Yours,
-> Linus Walleij
+>>>> +		iio_dfsdm0: iio-dfsdm at 0 {
+>>>> +			compatible = "st,stm32-dfsdm-adc";
+>>>> +			#io-channel-cells = <1>;
+>>>> +			reg = <0>;
+>>>> +			st,adc-channels = <1>;
+>>>> +			st,adc-channel-names = "in0";
+>>>> +		};
+>>>> +		iio_dfsdm1: iio-dfsdm at 1 {
+>>>> +			compatible = "st,stm32-dfsdm-adc";
+>>>> +			#io-channel-cells = <1>;
+>>>> +			reg = <1>;
+>>>> +			st,adc-channels = <1>;
+>>>> +			st,adc-channel-names = "in1";
+>>>> +			st,adc-channel-types = <1>;
+>>>> +			st,adc-alt-channel = <1>;
+>>>> +		};
+>>>> +	};
+>>>>
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
