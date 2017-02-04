@@ -1,79 +1,142 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Sat, 4 Feb 2017 09:56:18 +0800
-Subject: [PATCH 2/8] power: add power sequence library
-In-Reply-To: <16336642.sihi7izbLX@aspire.rjw.lan>
-References: <1483425211-14473-1-git-send-email-peter.chen@nxp.com>
- <20170201080817.GD17968@kroah.com>
- <20170203081614.GA24614@b29397-desktop>
- <16336642.sihi7izbLX@aspire.rjw.lan>
-Message-ID: <20170204015618.GB25013@b29397-desktop>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Sat,  4 Feb 2017 11:39:55 +0800
+Subject: [PATCH v8 1/3] dt: bindings: add documentation for zx2967 family
+ thermal sensor
+Message-ID: <1486179597-30953-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2017 at 10:14:31PM +0100, Rafael J. Wysocki wrote:
-> On Friday, February 03, 2017 04:16:15 PM Peter Chen wrote:
-> > On Wed, Feb 01, 2017 at 09:08:17AM +0100, Greg Kroah-Hartman wrote:
-> > > On Wed, Feb 01, 2017 at 12:10:17AM +0100, Rafael J. Wysocki wrote:
-> > > > On Tue, Jan 3, 2017 at 7:33 AM, Peter Chen <peter.chen@nxp.com> wrote:
-> > > > > We have an well-known problem that the device needs to do some power
-> > > > > sequence before it can be recognized by related host, the typical
-> > > > > example like hard-wired mmc devices and usb devices.
-> > > > >
-> > > > > This power sequence is hard to be described at device tree and handled by
-> > > > > related host driver, so we have created a common power sequence
-> > > > > library to cover this requirement. The core code has supplied
-> > > > > some common helpers for host driver, and individual power sequence
-> > > > > libraries handle kinds of power sequence for devices. The pwrseq
-> > > > > librares always need to allocate extra instance for compatible
-> > > > > string match.
-> > > > >
-> > > > > pwrseq_generic is intended for general purpose of power sequence, which
-> > > > > handles gpios and clocks currently, and can cover other controls in
-> > > > > future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> > > > > if only one power sequence is needed, else call of_pwrseq_on_list
-> > > > > /of_pwrseq_off_list instead (eg, USB hub driver).
-> > > > >
-> > > > > For new power sequence library, it can add its compatible string
-> > > > > to pwrseq_of_match_table, then the pwrseq core will match it with
-> > > > > DT's, and choose this library at runtime.
-> > > > >
-> > > > > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> > > > > Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
-> > > > > Tested-by Joshua Clayton <stillcompiling@gmail.com>
-> > > > > Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-> > > > > Tested-by: Matthias Kaehlcke <mka@chromium.org>
-> > > > 
-> > > > Quite honestly, I have a really hard time with trying to follow this
-> > > > code and the total lack of documentation makes it even harder. 
-> > 
-> > Sorry about that, Is it ok I add the design doc at:
-> > Documentation/power/power-sequence/design.rst?
-> 
-> You can do that if you think it will address the request to explain the design.
-> 
-> > > > particular, the generic power sequence code is not even commented at
-> > > > all, 
-> > 
-> > The generic power sequence code just implements the APIs which are 
-> > called at power/pwrseq/core.c, and those API are commented at
-> > include/linux/power/pwrseq.h. Anyway, I will add more comments at it.
-> 
-> It actually seems to be doing more than that and I'm not sure why the code in
-> core.c is necessary at all.  The "generic" thing seems to be the only user of
-> it anyway and the callbacks seem to be tailored to its needs.
-> 
+This patch adds dt-binding documentation for zx2967 family thermal sensor.
 
-Currently, the "generic" pwrseq is the only use case. But some devices may have
-custom power sequence [1], and MMC devices (mmc card/wifi) have two
-power sequences (drivers/mmc/core/pwrseq_emmc.c, drivers/mmc/core/pwrseq_simple.c)
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Shawn Guo <shawnguo@kernel.org>
+---
+ .../devicetree/bindings/thermal/zx2967-thermal.txt | 116 +++++++++++++++++++++
+ 1 file changed, 116 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
 
-I have an example use case at v7 named pwrseq_compatible_sample.c for
-those custom use case [2].
-
-[1] https://www.spinics.net/lists/devicetree/msg139756.html
-[2] https://lkml.org/lkml/2016/9/19/972
-
+diff --git a/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+new file mode 100644
+index 0000000..0810644
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+@@ -0,0 +1,116 @@
++* ZTE zx2967 family Thermal
++
++Required Properties:
++- compatible: should be one of the following.
++    * zte,zx296718-thermal
++- reg: physical base address of the controller and length of memory mapped
++    region.
++- clocks : Pairs of phandle and specifier referencing the controller's clocks.
++- clock-names: "topcrm" for the topcrm clock.
++	       "apb" for the apb clock.
++- #thermal-sensor-cells: must be 0.
++
++Please note: coefficients defined in thermal-zones section need to be
++multiplied by 1000.
++
++Example for tempsensor:
++
++	tempsensor: tempsensor at 148a000 {
++		compatible = "zte,zx296718-thermal";
++		reg = <0x0148a000 0x20>;
++		clocks = <&topcrm TEMPSENSOR_GATE>, <&audiocrm AUDIO_TS_PCLK>;
++		clock-names = "topcrm", "apb";
++		#thermal-sensor-cells = <0>;
++	};
++
++Example for cooling device:
++
++	cooling_dev: cooling_dev {
++		cluster0_cooling_dev: cluster0-cooling-dev {
++			#cooling-cells = <2>;
++			cpumask = <0xf>;
++			capacitance = <1500>;
++		};
++
++	cluster1_cooling_dev: cluster1-cooling-dev {
++			#cooling-cells = <2>;
++			cpumask = <0x30>;
++			capacitance = <2000>;
++		};
++	};
++
++Example for thermal zones:
++
++	thermal-zones {
++		zx296718_thermal: zx296718_thermal {
++			polling-delay-passive = <500>;
++			polling-delay = <1000>;
++			sustainable-power = <6500>;
++
++			thermal-sensors = <&tempsensor 0>;
++			/*
++			 * slope need to be multiplied by 1000.
++			 */
++			coefficients = <1951 (-922)>;
++
++			trips {
++				trip0: switch_on_temperature {
++					temperature = <90000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				trip1: desired_temperature {
++					temperature = <100000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				crit: critical_temperature {
++					temperature = <110000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++				map0 {
++					trip = <&trip0>;
++					cooling-device = <&gpu 2 5>;
++				};
++
++				map1 {
++					trip = <&trip0>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map2 {
++					trip = <&trip1>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map3 {
++					trip = <&crit>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map4 {
++					trip = <&trip0>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <9000>;
++				};
++
++				map5 {
++					trip = <&trip1>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <4096>;
++				};
++
++				map6 {
++					trip = <&crit>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <4096>;
++				};
++			};
++		};
++	};
 -- 
-
-Best Regards,
-Peter Chen
+2.7.4
