@@ -1,125 +1,70 @@
-From: hekuang@huawei.com (Hekuang)
-Date: Sat, 4 Feb 2017 17:03:20 +0800
-Subject: [PATCH v2 1/3] perf tools: Use offset instead of dwarfnum in
- register table.
-In-Reply-To: <20170203130026.GF11585@arm.com>
-References: <20170203110607.97529-1-hekuang@huawei.com>
- <20170203130026.GF11585@arm.com>
-Message-ID: <589598D8.8050304@huawei.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 4 Feb 2017 10:36:23 +0100 (CET)
+Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
+In-Reply-To: <20170202042930.GA6377@localhost.localdomain>
+References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
+ <20170120041400.GA24617@localhost.localdomain>
+ <060918B6-A773-46A5-8D10-C9F6BBA6D3F1@martin.sperl.org>
+ <20170124093127.GB3651@localhost.localdomain>
+ <0452720A-5914-469B-9EF7-0581CF1B5478@martin.sperl.org>
+ <20170202042930.GA6377@localhost.localdomain>
+Message-ID: <48317588.166823.1486200983836@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi
+Hi Eduardo,
 
-? 2017/2/3 21:00, Will Deacon ??:
-> On Fri, Feb 03, 2017 at 11:06:05AM +0000, He Kuang wrote:
->> This patch changes the 'dwarfnum' to 'offset' in register table, so
->> the index of array becomes the dwarfnum (the index of each register
->> defined by DWARF) and the "offset" member means the byte-offset of the
->> register in (user_)pt_regs. This change makes the code consistent with
->> x86.
->>
->> Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
->> Signed-off-by: He Kuang <hekuang@huawei.com>
->> ---
->>   tools/perf/arch/arm64/util/dwarf-regs.c | 107 ++++++++++++++++----------------
->>   1 file changed, 52 insertions(+), 55 deletions(-)
-> Thanks for splitting this up. Comment below.
->
->> diff --git a/tools/perf/arch/arm64/util/dwarf-regs.c b/tools/perf/arch/arm64/util/dwarf-regs.c
->> index d49efeb..090f36b 100644
->> --- a/tools/perf/arch/arm64/util/dwarf-regs.c
->> +++ b/tools/perf/arch/arm64/util/dwarf-regs.c
->> @@ -9,72 +9,69 @@
->>    */
->>   
->>   #include <stddef.h>
->> +#include <linux/ptrace.h> /* for struct user_pt_regs */
->>   #include <dwarf-regs.h>
->>   
->> -struct pt_regs_dwarfnum {
->> +struct pt_regs_offset {
->>   	const char *name;
->> -	unsigned int dwarfnum;
->> +	int offset;
->>   };
->>   
->> -#define STR(s) #s
->> -#define REG_DWARFNUM_NAME(r, num) {.name = r, .dwarfnum = num}
->> -#define GPR_DWARFNUM_NAME(num) \
->> -	{.name = STR(%x##num), .dwarfnum = num}
->> -#define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0}
->> -
->>   /*
->>    * Reference:
->>    * http://infocenter.arm.com/help/topic/com.arm.doc.ihi0057b/IHI0057B_aadwarf64.pdf
->>    */
->> -static const struct pt_regs_dwarfnum regdwarfnum_table[] = {
->> -	GPR_DWARFNUM_NAME(0),
->> -	GPR_DWARFNUM_NAME(1),
->> -	GPR_DWARFNUM_NAME(2),
->> -	GPR_DWARFNUM_NAME(3),
->> -	GPR_DWARFNUM_NAME(4),
->> -	GPR_DWARFNUM_NAME(5),
->> -	GPR_DWARFNUM_NAME(6),
->> -	GPR_DWARFNUM_NAME(7),
->> -	GPR_DWARFNUM_NAME(8),
->> -	GPR_DWARFNUM_NAME(9),
->> -	GPR_DWARFNUM_NAME(10),
->> -	GPR_DWARFNUM_NAME(11),
->> -	GPR_DWARFNUM_NAME(12),
->> -	GPR_DWARFNUM_NAME(13),
->> -	GPR_DWARFNUM_NAME(14),
->> -	GPR_DWARFNUM_NAME(15),
->> -	GPR_DWARFNUM_NAME(16),
->> -	GPR_DWARFNUM_NAME(17),
->> -	GPR_DWARFNUM_NAME(18),
->> -	GPR_DWARFNUM_NAME(19),
->> -	GPR_DWARFNUM_NAME(20),
->> -	GPR_DWARFNUM_NAME(21),
->> -	GPR_DWARFNUM_NAME(22),
->> -	GPR_DWARFNUM_NAME(23),
->> -	GPR_DWARFNUM_NAME(24),
->> -	GPR_DWARFNUM_NAME(25),
->> -	GPR_DWARFNUM_NAME(26),
->> -	GPR_DWARFNUM_NAME(27),
->> -	GPR_DWARFNUM_NAME(28),
->> -	GPR_DWARFNUM_NAME(29),
->> -	REG_DWARFNUM_NAME("%lr", 30),
->> -	REG_DWARFNUM_NAME("%sp", 31),
->> -	REG_DWARFNUM_END,
->> -};
->> +#define REG_OFFSET_NAME(r, num) {.name = "%" #r,			\
->> +			.offset = offsetof(struct user_pt_regs, regs[num])}
-> Whilst this works in practice, this is undefined behaviour for "sp", since
-> you'll go off the end of the regs array.
+> Eduardo Valentin <edubezval@gmail.com> hat am 2. Februar 2017 um 05:29 geschrieben:
+> 
+> 
+> Hello Martin,
+> 
+> ...
+> 
+> 
+> #include <dt-bindings/thermal/thermal.h>
+> 
+> ocp {
+> 	...
+> 	/*
+> 	 * A simple IC with several bandgap temperature sensors.
+> 	 */
+> 	bandgap0: bandgap at 0x0000ED00 {
+> 		...
+> 		#thermal-sensor-cells = <1>;
+> 	};
+> };
+> 
+> thermal-zones {
+> 	cpu_thermal: cpu-thermal {
+> 		polling-delay-passive = <250>; /* milliseconds */
+> 		polling-delay = <1000>; /* milliseconds */
+> 
+> 				/* sensor       ID */
+> 		thermal-sensors = <&bandgap0     0>;
+> 
+> 		trips {
+> 			/* each zone within the SoC may have its own trips */
+> 			cpu_alert: cpu-alert {
+> 				temperature = <100000>; /* millicelsius */
+> 				hysteresis = <2000>; /* millicelsius */
+> 				type = "passive";
+> 			};
+> 			cpu_crit: cpu-crit {
+> 				temperature = <125000>; /* millicelsius */
+> 				hysteresis = <2000>; /* millicelsius */
+> 				type = "critical";
+> 			};
+> 		};
+> 
+> 		cooling-maps {
+> 			/* each zone within the SoC may have its own cooling */
+> 			...
+> 		};
+> 	};
+> 
 
-It's not undefined behaviour here,
-struct user_pt_regs {
-         __u64           regs[31];
-         __u64           sp;
-         __u64           pc;
-         __u64           pstate;
-};
-user_pt_regs->regs[31] is user_pt_regs->sp and the offset value is correct.
->
-> I still think you're better off sticking with the dwarfnum, then just having
-> a dwarfnum2offset macro that multiplies by the size of a register.
->
-> Will
-I think add a ptregs_offset field is more suitable and makes the code 
-indepent
-to struct user_pt_regs layout, for example if the structure changed to this:
+if i get it right the device tree binding requires also a cooling map. But how should we model this without a fan or a DVFS driver? Is there something like a placeholder? Do you have an example?
 
-struct user_pt_regs {
-         __u64           sp;
-         __u64           pc;
-         __u64           pstate;
-         __u64           regs[31];
-};
-
-The multiply result will be incorrect.
-Patch updated and the change is similar to commit "4679bccaa308"
-  (perf tools powerpc: Add support for generating bpf prologue)
-
-Please review, thanks.
+Regards
+Stefan
