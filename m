@@ -1,61 +1,68 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Sun,  5 Feb 2017 20:20:46 +0100
-Subject: [PATCH 3.10 059/319] arm64: Define AT_VECTOR_SIZE_ARCH for ARCH_DLINFO
-In-Reply-To: <1486322486-8024-1-git-send-email-w@1wt.eu>
-References: <1486322486-8024-1-git-send-email-w@1wt.eu>
-Message-ID: <1486322486-8024-30-git-send-email-w@1wt.eu>
+From: flatmax@flatmax.org (Matt Flax)
+Date: Mon, 6 Feb 2017 07:37:03 +1100
+Subject: [alsa-devel] [PATCH] ASoC: bcm2835: Increase channels_max to 8
+In-Reply-To: <20170205163451.4x3svwbqdqlfc7t4@sirena.org.uk>
+References: <1485992264-9058-1-git-send-email-flatmax@flatmax.org>
+ <20170204154944.timxhmmibc4kngly@sirena.org.uk>
+ <a7f5de09-b07b-638d-466f-525e68ebf0f9@flatmax.org>
+ <20170205163451.4x3svwbqdqlfc7t4@sirena.org.uk>
+Message-ID: <aa6b9cbd-e033-eee6-d7f8-8ba8c8e611ab@flatmax.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Hogan <james.hogan@imgtec.com>
+On 06/02/17 03:34, Mark Brown wrote:
+> On Sun, Feb 05, 2017 at 12:26:31PM +1100, Matt Flax wrote:
+>> On 05/02/17 02:49, Mark Brown wrote:
+>>> On Thu, Feb 02, 2017 at 10:37:44AM +1100, Matt Flax wrote:
+>>> I can't understand how this works.  We're programming the hardware in an
+>>> identical fashion for both channel counts, that means that what we're
+>> I am not surprised it is confusing, to my knowledge this is the first time
+>> that someone has demonstrated this type of I2S signalling.
+> More than stereo I2S?  That is actually a thing, while most people use
+> DSP modes for higher channel counts it's fairly common to have the
+> support especially in CODECs that also support DSP mode since the
+> hardware implementation is fairly straightforward if you abstracted in
+> the bus interface.
+>
+>> In this case BCM2835 is a clock slave and not concerned with generating the
+>> I2S clocks, only receiving - think of all clocks and synchrony being
+>> generated/managed in hardware on the sound card.
+>> In short the BCM2835 silicon is only concerned with shifting bits into two
+>> hardware registers which (after DMA) are interpreted by ALSA according to
+>> the specified channel count.
+> Sure, that's what all audio controllers do.  But there's a few problems.
+> One is that nothing in your code that prevents this running in master
+> mode.  Another is that if this *is* for I2S mode then when doing
+> multichannel I2S you usually still respect the left/right indication in
+> LRCLK so you will end up with the data in the in memory format:
+>
+>    L1 R1 L2 R2 L3 R3 L4 R4
+>
+> but multi channel I2S would usually be rendered with all the left
+> channels and all the right channels grouped together so you get:
+>
+>    L1 L2 L3 L4 R1 R2 R3 R4
+>
+> It'll also require exact clocking with no spare bits in order to sync
+> the right channels with the LRCLK switch but that's not so unusual.
+> Looking at the driver it may be possible for the hardware to do DSP
+> modes at which point this gets much easier but right now it only has I2S
+> support, I've got a feeling that the other end of the link may actually
+> be running in a DSP mode.
+You've got it !
 
-commit 3146bc64d12377a74dbda12b96ea32da3774ae07 upstream.
+This can also work with the BCM2835 in master mode, no reason at this 
+point to limit it to slave mode only.
 
-AT_VECTOR_SIZE_ARCH should be defined with the maximum number of
-NEW_AUX_ENT entries that ARCH_DLINFO can contain, but it wasn't defined
-for arm64 at all even though ARCH_DLINFO will contain one NEW_AUX_ENT
-for the VDSO address.
+I haven't looked into why, but I am getting the correct channel mapping 
+under the hood. To me that is a concern of the higher up levels of the 
+ALSA driver - it was a pleasant surprise when it worked nicely, because 
+to me it indicated a robustly coded system.
 
-This shouldn't be a problem as AT_VECTOR_SIZE_BASE includes space for
-AT_BASE_PLATFORM which arm64 doesn't use, but lets define it now and add
-the comment above ARCH_DLINFO as found in several other architectures to
-remind future modifiers of ARCH_DLINFO to keep AT_VECTOR_SIZE_ARCH up to
-date.
+My next patch is to allow DSP modes in this I2S driver. I wanted to make 
+sure that this got through first however.
 
-Fixes: f668cd1673aa ("arm64: ELF definitions")
-Signed-off-by: James Hogan <james.hogan@imgtec.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Willy Tarreau <w@1wt.eu>
----
- arch/arm64/include/asm/elf.h         | 1 +
- arch/arm64/include/uapi/asm/auxvec.h | 2 ++
- 2 files changed, 3 insertions(+)
+The majority of these other concerns you mention are controlled at the 
+machine driver level.
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index fe32c0e..e647e6d 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -126,6 +126,7 @@ extern unsigned long randomize_et_dyn(unsigned long base);
- 
- #define SET_PERSONALITY(ex)		clear_thread_flag(TIF_32BIT);
- 
-+/* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
- #define ARCH_DLINFO							\
- do {									\
- 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
-diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
-index 22d6d88..4cf0c17 100644
---- a/arch/arm64/include/uapi/asm/auxvec.h
-+++ b/arch/arm64/include/uapi/asm/auxvec.h
-@@ -19,4 +19,6 @@
- /* vDSO location */
- #define AT_SYSINFO_EHDR	33
- 
-+#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
-+
- #endif
--- 
-2.8.0.rc2.1.gbe9624a
+Matt
