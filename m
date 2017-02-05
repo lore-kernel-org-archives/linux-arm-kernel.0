@@ -1,100 +1,75 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 05 Feb 2017 17:36:59 +0200
-Subject: [PATCH v3 12/24] add mux and video interface bridge entity
- functions
-In-Reply-To: <1483755102-24785-13-git-send-email-steve_longerbeam@mentor.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sun, 5 Feb 2017 15:37:55 +0000
+Subject: [PATCH v3 06/24] ARM: dts: imx6-sabrelite: add OV5642 and OV5640
+ camera sensors
+In-Reply-To: <23975350.L90NWivx6X@avalon>
 References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-13-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <6948005.DnfziI9GIJ@avalon>
+ <1483755102-24785-7-git-send-email-steve_longerbeam@mentor.com>
+ <20170130225133.GF27898@n2100.armlinux.org.uk>
+ <23975350.L90NWivx6X@avalon>
+Message-ID: <20170205153754.GJ27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
-
-Thank you for the patch
-
-On Friday 06 Jan 2017 18:11:30 Steve Longerbeam wrote:
-> From: Philipp Zabel <p.zabel@pengutronix.de>
+On Sun, Feb 05, 2017 at 05:24:30PM +0200, Laurent Pinchart wrote:
+> Hi Russell,
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> ---
->  Documentation/media/uapi/mediactl/media-types.rst | 22 ++++++++++++++++++++
->  include/uapi/linux/media.h                        |  6 ++++++
->  2 files changed, 28 insertions(+)
+> On Monday 30 Jan 2017 22:51:33 Russell King - ARM Linux wrote:
+> > > +			ov5640_to_mipi_csi: endpoint at 1 {
+> > > +				reg = <1>;
+> > > +				remote-endpoint = 
+> <&mipi_csi_from_mipi_sensor>;
+> > > +				data-lanes = <0 1>;
+> > > +				clock-lanes = <2>;
+> > 
+> > How do you envision a four-lane sensor being described?
+> > 
+> > 	data-lanes = <0 1 3 4>;
+> > 	clock-lanes = <2>;
+> > 
+> > ?
+> > 
+> > The binding document for video-interfaces.txt says:
+> > 
+> > - clock-lanes: an array of physical clock lane indexes. Position of an entry
+> > determines the logical lane number, while the value of an entry indicates
+> > physical lane, e.g. for a MIPI CSI-2 bus we could have "clock-lanes =
+> > <0>;", which places the clock lane on hardware lane 0. This property is
+> > valid for serial busses only (e.g. MIPI CSI-2). Note that for the MIPI
+> > CSI-2 bus this array contains only one entry.
+> > 
+> > So I think you need to have a good reason to make the clock lane non-zero.
 > 
-> diff --git a/Documentation/media/uapi/mediactl/media-types.rst
-> b/Documentation/media/uapi/mediactl/media-types.rst index 3e03dc2..023be29
-> 100644
-> --- a/Documentation/media/uapi/mediactl/media-types.rst
-> +++ b/Documentation/media/uapi/mediactl/media-types.rst
-> @@ -298,6 +298,28 @@ Types and flags used to represent the media graph
-> elements received on its sink pad and outputs the statistics data on
->  	  its source pad.
-> 
-> +    -  ..  row 29
-> +
-> +       ..  _MEDIA-ENT-F-MUX:
-> +
-> +       -  ``MEDIA_ENT_F_MUX``
-> +
-> +       - Video multiplexer. An entity capable of multiplexing must have at
-> +         least two sink pads and one source pad, and must pass the video
-> +         frame(s) received from the active sink pad to the source pad.
-> Video
-> +         frame(s) from the inactive sink pads are discarded.
+> The purpose of the data-lanes and clock-lanes properties is to describe lane 
+> assignment for hardware that supports lane routing. As far as I know the 
+> OV5640 doesn't support lane routing and has dedicated pins for the clock and 
+> data lanes. The data-lanes and clock-lanes properties should probably not be 
+> specified at all.
 
-Apart from the comment made by Hans regarding the macro name, this looks good 
-to me.
+You need at least data-lanes so you know how many data lanes are wired
+between the camera and the mipi csi2 receiver.  Just because a camera
+has (eg) four lanes does not mean you need to wire all four, and in
+some cases less than four will be wired.
 
-> +    -  ..  row 30
-> +
-> +       ..  _MEDIA-ENT-F-VID-IF-BRIDGE:
-> +
-> +       -  ``MEDIA_ENT_F_VID_IF_BRIDGE``
-> +
-> +       - Video interface bridge. A video interface bridge entity must have
-> at
-> +         least one sink pad and one source pad. It receives video frame(s)
-> on
-> +         its sink pad in one bus format (HDMI, eDP, MIPI CSI-2, ...) and
-> +         converts them and outputs them on its source pad in another bus
-> format
-> +         (eDP, MIPI CSI-2, parallel, ...).
+If data-lanes does not describe that, then all existing users of the
+binding are abusing it:
 
+$ grep data_lanes drivers/media/i2c -r
+drivers/media/i2c/s5k5baf.c:                state->nlanes = ep.bus.mipi_csi2.num_data_lanes;
+drivers/media/i2c/s5c73m3/s5c73m3-core.c:   if (ep.bus.mipi_csi2.num_data_lanes != S5C73M3_MIPI_DATA_LANES)
+drivers/media/i2c/tc358743.c:           endpoint->bus.mipi_csi2.num_data_lanes == 0 ||
+drivers/media/i2c/smiapp/smiapp-core.c:     hwcfg->lanes = bus_cfg->bus.mipi_csi2.num_data_lanes;
 
-The first sentence mentions *at least* one sink pad and one source pad, and 
-the second one refers to "its sink pad" and "its source pad". This is a bit 
-confusing. An easy option would be to require a single sink and a single 
-source pad, but that would exclude bridges that combine a multiplexer.
+So all those drivers are using it for the _number_ of CSI2 lanes, and
+are not touching the mapping in any way (not even checking that it is
+an identity mapping.)  You could specify any mapping to these drivers,
+as long as num_data_lanes came out right.
 
-I also wonder whether "bridge" is the appropriate word here. Transceiver might 
-be a better choice, to insist on the fact that one of the two pads corresponds 
-to a physical interface that has special electrical properties (such as HDMI, 
-eDP, or CSI-2 that all require PHYs).
-
->  ..  tabularcolumns:: |p{5.5cm}|p{12.0cm}|
-> 
-> diff --git a/include/uapi/linux/media.h b/include/uapi/linux/media.h
-> index 4890787..08a8bfa 100644
-> --- a/include/uapi/linux/media.h
-> +++ b/include/uapi/linux/media.h
-> @@ -105,6 +105,12 @@ struct media_device_info {
->  #define MEDIA_ENT_F_PROC_VIDEO_STATISTICS	(MEDIA_ENT_F_BASE + 0x4006)
-> 
->  /*
-> + * Switch and bridge entitites
-> + */
-> +#define MEDIA_ENT_F_MUX				(MEDIA_ENT_F_BASE + 
-0x5001)
-> +#define MEDIA_ENT_F_VID_IF_BRIDGE		(MEDIA_ENT_F_BASE + 0x5002)
-> +
-> +/*
->   * Connectors
->   */
->  /* It is a responsibility of the entity drivers to add connectors and links
-> */
+And... there's no point having a property in a binding if no one is
+using it... and even more silly not to have a property that everyone
+needs...
 
 -- 
-Regards,
-
-Laurent Pinchart
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
