@@ -1,91 +1,108 @@
-From: clemens.gruber@pqgruber.com (Clemens Gruber)
-Date: Sun, 5 Feb 2017 18:51:32 +0100
-Subject: [PATCH] serial: imx: Only enable UART DMA on i.MX6Q and i.MX53
-In-Reply-To: <CAOMZO5D8_vE+t=V6wHMKt590jZqJJRzeJ+_MLgqbLp=6gwsmyQ@mail.gmail.com>
-References: <20170204213931.3566-1-marex@denx.de>
- <DB6PR0402MB2743C709F162BDE52429DF49E3410@DB6PR0402MB2743.eurprd04.prod.outlook.com>
- <CAOMZO5D8_vE+t=V6wHMKt590jZqJJRzeJ+_MLgqbLp=6gwsmyQ@mail.gmail.com>
-Message-ID: <20170205175132.GA2182@archie.localdomain>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Sun, 5 Feb 2017 20:23:14 +0100
+Subject: [PATCH 5/5] ARM: dts: sun9i: Initial support for the Sunchip
+ CX-A99 board
+In-Reply-To: <CAGb2v65EAJBsNCDNSg=uNm3-h8xAKoiuS_rUdaWS8Be84WMvsQ@mail.gmail.com>
+References: <cover.1485456003.git.rask@formelder.dk>
+ <82617383a0739458d5c9c95dccaf479675fce593.1485456007.git.rask@formelder.dk>
+ <CAGb2v65EAJBsNCDNSg=uNm3-h8xAKoiuS_rUdaWS8Be84WMvsQ@mail.gmail.com>
+Message-ID: <20170205192313.iik7fdcygltpjfwt@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 05, 2017 at 02:36:10PM -0200, Fabio Estevam wrote:
-> On Sun, Feb 5, 2017 at 12:56 PM, Fabio Estevam <fabio.estevam@nxp.com> wrote:
-> > [Sorry, for the top-posting]
-> >
-> >
-> > imx6sx uart should be of a IMX6Q_UART instead.
-> >
-> >
-> > Does this patch fix the issue?
+On Thu, Feb 02, 2017 at 03:36:41PM +0800, Chen-Yu Tsai wrote:
+> Hi,
 > 
-> It seems this dts change will not fix the problem.
+> On Fri, Jan 27, 2017 at 5:27 AM, Rask Ingemann Lambertsen
+> <rask@formelder.dk> wrote:
+[...]
+> > diff --git a/arch/arm/boot/dts/sun9i-a80-cx-a99.dts b/arch/arm/boot/dts/sun9i-a80-cx-a99.dts
+> > new file mode 100644
+> > index 0000000..8925093
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/sun9i-a80-cx-a99.dts
+[...]
+> > +       leds {
+> > +               compatible = "gpio-leds";
+> > +
+> > +               blue {
+> > +                       gpios = <&pio 6 10 GPIO_ACTIVE_HIGH>;   /* PG10 */
+> > +                       label = "cx-a99:blue:status";
+> > +                       default-state = "on";
 > 
-> > From: Kai Ruhnau <kai.ruhnau@target-sg.com>
-> >
-> > In 1c06bde6 with the introduction of DMA support for the i.MX53 platform,
-> > DMA was enabled for all platforms instead. On an i.MX6SX (which is a
-> > IMX21_UART), this breaks gpsd talking to an UART module with
-> >
-> >  imx-uart 21f4000.serial: DMA transaction error.
-> >
-> > This patch makes sure, UART DMA is only activated for i.MX53 and i.MX6Q.
-> >
-> > Signed-off-by: Kai Ruhnau <kai.ruhnau@target-sg.com>
-> > Reviewed-by: Marek Vasut <marex@denx.de>
-> > Fixes: 1c06bde643d0 ("Allowing UART DMA to be configured on i.MX53")
-> > Cc: <stable@vger.kernel.org> # 4.9+
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: Martyn Welch <martyn.welch@collabora.co.uk>
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > ---
-> >  drivers/tty/serial/imx.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> > index a70356d..8e2b5f2 100644
-> > --- a/drivers/tty/serial/imx.c
-> > +++ b/drivers/tty/serial/imx.c
-> > @@ -1269,7 +1269,8 @@ static int imx_startup(struct uart_port *port)
-> >          writel(temp & ~UCR4_DREN, sport->port.membase + UCR4);
-> >
-> >          /* Can we enable the DMA support? */
-> > -       if (!uart_console(port) && !sport->dma_is_inited)
-> > +       if ((is_imx6q_uart(sport)  || is_imx53_uart(sport)) &&
-> > +           !uart_console(port) && !sport->dma_is_inited)
-> >                  imx_uart_dma_init(sport);
+> Please add a note justifying default-state = "on".
+
+I think I'll remove it instead. The device ships with a U-Boot and Android
+installation where blue means "on" and red means "stand-by" (which is simply
+implemented by blanking the screen, it seems), but I doubt many people want
+to run the rather old Android version available for this device. Instead,
+I was going to point to the quick setup guide, but it has no mention of the
+LEDs at all, so I guess the user won't expect the blue LED to turn on.
+
+> > +       /* USB 3.0 OTG connector. For now, only Vbus is supported. */
+> > +       reg_usb0_vbus: regulator-usb0-vbus {
+> > +               compatible = "regulator-fixed";
+> > +               regulator-name = "usb0-vbus";
+> > +               regulator-min-microvolt = <5000000>;
+> > +               regulator-max-microvolt = <5000000>;
+> > +               gpio = <&pio 7 15 GPIO_ACTIVE_HIGH>;    /* PH15 */
+> > +               enable-active-high;
+> > +               regulator-always-on;
 > 
-> Looks like imx serial DMA is broken in 4.9.
+> It's bad to leave VBUS for OTG connectors on. You never know
+> what is plugged in.
 
-There are probably two separate problems:
+The comment is misleading as the connector is not an OTG one but just a
+standard-A receptacle wired to the SoC's OTG port. I'll change the comment.
 
-A)
-I also observed the DMA transaction error message when I used the ROM
-SDMA scripts. Seems to affect single- and multi-core systems and is
-fixed by: github.com/Freescale/linux-fslc/commit/a2ec8df37f5d (?)
-This is also not RS-485 specific, but affects RS-232 too.
-
-B)
-The RS-485 DMA problem I reported, which only affects multi-core
-systems.
-RS-232 DMA is not affected.
-
+> > +/* SD card slot. */
+> > +&mmc0 {
+> > +       bus-width = <4>;
+> > +       cd-gpios = <&pio 7 17 GPIO_ACTIVE_LOW>; /* PH17 */
+> > +       broken-cd;                              /* Interrupts don't work. */
 > 
-> There is also this report from Clemens: https://lkml.org/lkml/2017/1/4/579
+> This should be handled by the driver.
+
+The MMC core, without broken-cd, requests the GPIO driver to enable
+interrupt delivery on the pin and will fall back to polling the GPIO pin
+if the GPIO driver refuses to enable interrupt delivery. What I see is
+that the GPIO driver accepts to deliver interrupts, but only the first
+interrupt is triggered (as evident from /proc/interrupts showing only 1).
+The vendor sys_config.fex also sets the GPIO pin to polled operation, so
+maybe there is a hardware bug.
+
+The sunxi-mmc driver doesn't really support operation with broken-cd only
+because it spams the console and dmesg with useless error messages, see
+https://www.mail-archive.com/linux-sunxi at googlegroups.com/msg19963.html
+for an example.
+
+The comment should probably read something like "GPIO pin delivers no
+interrupts, poll it".
+
+> > +                       /* 1.8 V (enabled). */
+> > +                       reg_bldo1: bldo1 {
+> > +                               regulator-boot-on;
+> > +                               regulator-always-on;    /* Hang if disabled */
 > 
-> Could anyone run a git bisect?
+> If you specify always-on, you don't need to add boot-on.
 
-I reverted tty/serial/imx.c to the first implementation of RS-485,
-namely to commit 17b8f2a3fdca ("serial: imx: add support for half duplex
-rs485"). Also had to add "fsl," in front of uart-has-rts-cts in the DT.
-But it does not work either (same behavior). Looks like RS-485 DMA never
-worked on SMP systems..?
+Ack.
 
-It's still a mistery to me what is causing the xmit->tail index to walk
-over the xmit->head index, leading to the rest of the whole
-UART_XMIT_SIZE buffer to be sent out. But it must be connected to the
-transmit-complete interrupt, because if I disable it, this does not
-happen.
+> > +                       /* 3.3 V (enabled). */
+> > +                       reg_dcdce: dcdce {
+> > +                               regulator-boot-on;
+> > +                               regulator-always-on;
+> > +                               regulator-min-microvolt = <3300000>;
+> > +                               regulator-max-microvolt = <3300000>;
+> > +                               regulator-name = "vcc-pb-pc-pd-pe-pf-ph-mmc-spdif";
+> 
+> This is probably vcc-io or something shorter.
 
-Thanks,
-Clemens
+I'm verbose with the names of the regulators for documentation purposes
+because unlike some of the boards aimed at developers, documentation is on
+this device is scarse. I see that with -mmc now added after my latest round
+of probing with a multimeter, the line went above 80 characters. Will it be
+OK with vcc-pb,c,d,e,f,h-mmc-spdif?
+
+-- 
+Rask Ingemann Lambertsen
