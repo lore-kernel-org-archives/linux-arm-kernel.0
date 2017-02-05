@@ -1,82 +1,64 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sun, 05 Feb 2017 17:17:43 +0200
+Date: Sun, 05 Feb 2017 17:24:30 +0200
 Subject: [PATCH v3 06/24] ARM: dts: imx6-sabrelite: add OV5642 and OV5640
  camera sensors
-In-Reply-To: <1484571323.8415.98.camel@pengutronix.de>
+In-Reply-To: <20170130225133.GF27898@n2100.armlinux.org.uk>
 References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1bb64209-7c58-fe10-3db9-c5b8103eda90@gmail.com>
- <1484571323.8415.98.camel@pengutronix.de>
-Message-ID: <3727718.gJmzFHnJnC@avalon>
+ <1483755102-24785-7-git-send-email-steve_longerbeam@mentor.com>
+ <20170130225133.GF27898@n2100.armlinux.org.uk>
+Message-ID: <23975350.L90NWivx6X@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 Jan 2017 13:55:23 Philipp Zabel wrote:
-> On Fri, 2017-01-13 at 15:04 -0800, Steve Longerbeam wrote:
-> > On 01/13/2017 04:03 AM, Philipp Zabel wrote:
-> > > Am Freitag, den 06.01.2017, 18:11 -0800 schrieb Steve Longerbeam:
-> > >> Enables the OV5642 parallel-bus sensor, and the OV5640 MIPI CSI-2
-> > >> sensor.
-> > >> Both hang off the same i2c2 bus, so they require different (and non-
-> > >> default) i2c slave addresses.
-> > >> 
-> > >> The OV5642 connects to the parallel-bus mux input port on
-> > >> ipu1_csi0_mux.
-> > >> 
-> > >> The OV5640 connects to the input port on the MIPI CSI-2 receiver on
-> > >> mipi_csi. It is set to transmit over MIPI virtual channel 1.
-> > >> 
-> > >> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> > >> ---
-> > >> 
-> > >>   arch/arm/boot/dts/imx6dl-sabrelite.dts   |   5 ++
-> > >>   arch/arm/boot/dts/imx6q-sabrelite.dts    |   6 ++
-> > >>   arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 118 ++++++++++++++++++++++
-> > >>   3 files changed, 129 insertions(+)
-> > >> 
-> > >> diff --git a/arch/arm/boot/dts/imx6dl-sabrelite.dts
-> > >> b/arch/arm/boot/dts/imx6dl-sabrelite.dts index 0f06ca5..fec2524 100644
-> > >> --- a/arch/arm/boot/dts/imx6dl-sabrelite.dts
-> > >> +++ b/arch/arm/boot/dts/imx6dl-sabrelite.dts
-> 
-> [...]
-> 
-> > >> @@ -299,6 +326,52 @@
-> > >> 
-> > >>   	pinctrl-names = "default";
-> > >>   	pinctrl-0 = <&pinctrl_i2c2>;
-> > >>   	status = "okay";
-> > >> 
-> > >> +
-> > >> +	ov5640: camera at 40 {
-> > >> +		compatible = "ovti,ov5640";
-> > >> +		pinctrl-names = "default";
-> > >> +		pinctrl-0 = <&pinctrl_ov5640>;
-> > >> +		clocks = <&mipi_xclk>;
-> > >> +		clock-names = "xclk";
-> > >> +		reg = <0x40>;
-> > >> +		xclk = <22000000>;
-> > > 
-> > > This is superfluous, you can use clk_get_rate on mipi_xclk.
-> > 
-> > This property is actually there to tell the driver what to set the
-> > rate to, with clk_set_rate(). So you are saying it would be better
-> > to set the rate in the device tree and the driver should only
-> > retrieve the rate?
-> 
-> Yes. Given that this is a reference clock input that is constant on a
-> given board and never changes during runtime, I think this is the
-> correct way. The clock will be fixed rate on most boards, I assume.
+Hi Russell,
 
-I think it's a bit worse than that. The ov5640 and ov5642 drivers should 
-retrieve the clock rate and compute register values accordingly (PLL 
-configuration parameters for instance, but most probably other values as 
-well). Unfortunately, as usual with Omnivision, the lack of public and even 
-non-public information results in drivers hardcoding large lists of 
-register/value pairs that have been computed for a specific clock frequency. 
-The drivers will thus not operate correctly if the clock is running at a 
-different rate. Until that can be fixed, the best option is probably to assign 
-the rate in the device tree as Philipp proposed, and to use clk_get_rate() in 
-the driver to reject any rate other than 22MHz.
+On Monday 30 Jan 2017 22:51:33 Russell King - ARM Linux wrote:
+> On Fri, Jan 06, 2017 at 06:11:24PM -0800, Steve Longerbeam wrote:
+> > +	ov5640: camera at 40 {
+> > +		compatible = "ovti,ov5640";
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&pinctrl_ov5640>;
+> > +		clocks = <&mipi_xclk>;
+> > +		clock-names = "xclk";
+> > +		reg = <0x40>;
+> > +		xclk = <22000000>;
+> > +		reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>; /* NANDF_D5 */
+> > +		pwdn-gpios = <&gpio6 9 GPIO_ACTIVE_HIGH>; /* NANDF_WP_B */
+> > +
+> > +		port {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +
+> > +			ov5640_to_mipi_csi: endpoint at 1 {
+> > +				reg = <1>;
+> > +				remote-endpoint = 
+<&mipi_csi_from_mipi_sensor>;
+> > +				data-lanes = <0 1>;
+> > +				clock-lanes = <2>;
+> 
+> How do you envision a four-lane sensor being described?
+> 
+> 	data-lanes = <0 1 3 4>;
+> 	clock-lanes = <2>;
+> 
+> ?
+> 
+> The binding document for video-interfaces.txt says:
+> 
+> - clock-lanes: an array of physical clock lane indexes. Position of an entry
+> determines the logical lane number, while the value of an entry indicates
+> physical lane, e.g. for a MIPI CSI-2 bus we could have "clock-lanes =
+> <0>;", which places the clock lane on hardware lane 0. This property is
+> valid for serial busses only (e.g. MIPI CSI-2). Note that for the MIPI
+> CSI-2 bus this array contains only one entry.
+> 
+> So I think you need to have a good reason to make the clock lane non-zero.
+
+The purpose of the data-lanes and clock-lanes properties is to describe lane 
+assignment for hardware that supports lane routing. As far as I know the 
+OV5640 doesn't support lane routing and has dedicated pins for the clock and 
+data lanes. The data-lanes and clock-lanes properties should probably not be 
+specified at all.
 
 -- 
 Regards,
