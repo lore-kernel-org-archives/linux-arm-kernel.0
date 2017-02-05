@@ -1,37 +1,231 @@
 From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Sun, 5 Feb 2017 00:57:03 +0000
-Subject: [PATCH v2 2/5] MAINTAINERS: Add Cavium ThunderX2 entry
+Date: Sun, 5 Feb 2017 00:57:04 +0000
+Subject: [PATCH v2 3/5] arm64: dts: add device trees for ARCH_THUNDER2
 In-Reply-To: <1486256226-43889-1-git-send-email-jnair@caviumnetworks.com>
 References: <1486256226-43889-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <1486256226-43889-3-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <1486256226-43889-4-git-send-email-jnair@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add maintainer information for Cavium ThunderX2 ARM64 processor
-family.
+Add device tree files for Cavium's ThunderX2 CN99XX arm64 server
+processors. The file cavium/thunder-99xx.dtsi has been added for
+the CPU and on-chip devices, and cavium/thunder-99xx.dts has been
+added for the evaluation board using the chip.
+
+Update the Makefile to build the thunder-99xx.dtb when the
+ARCH_THUNDER2 option is selected.
 
 Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
 ---
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/cavium/Makefile          |   1 +
+ arch/arm64/boot/dts/cavium/thunder-99xx.dts  |  34 +++++++
+ arch/arm64/boot/dts/cavium/thunder-99xx.dtsi | 147 +++++++++++++++++++++++++++
+ 3 files changed, 182 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/cavium/thunder-99xx.dts
+ create mode 100644 arch/arm64/boot/dts/cavium/thunder-99xx.dtsi
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 187b961..4f788ad 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2972,6 +2972,13 @@ S:	Maintained
- F:	drivers/iio/light/cm*
- F:	Documentation/devicetree/bindings/i2c/trivial-admin-guide/devices.rst
+diff --git a/arch/arm64/boot/dts/cavium/Makefile b/arch/arm64/boot/dts/cavium/Makefile
+index e34f89d..557c8be 100644
+--- a/arch/arm64/boot/dts/cavium/Makefile
++++ b/arch/arm64/boot/dts/cavium/Makefile
+@@ -1,4 +1,5 @@
+ dtb-$(CONFIG_ARCH_THUNDER) += thunder-88xx.dtb
++dtb-$(CONFIG_ARCH_THUNDER2) += thunder-99xx.dtb
  
-+CAVIUM THUNDERX2 ARM64 SOC
-+M:	Jayachandran C <jnair@caviumnetworks.com>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm64/boot/dts/cavium/thunder-99xx*
-+F:	Documentation/devicetree/bindings/arm/cavium-thunder2.txt
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/cavium/thunder-99xx.dts b/arch/arm64/boot/dts/cavium/thunder-99xx.dts
+new file mode 100644
+index 0000000..ed6715a
+--- /dev/null
++++ b/arch/arm64/boot/dts/cavium/thunder-99xx.dts
+@@ -0,0 +1,34 @@
++/*
++ * dts file for Cavium ThunderX2 CN99XX based Evaluation Boards
++ *
++ * Copyright (c) 2017 Cavium Inc.
++ * Copyright (c) 2013-2016 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
 +
- CAVIUM I2C DRIVER
- M:	Jan Glauber <jglauber@cavium.com>
- M:	David Daney <david.daney@cavium.com>
++/dts-v1/;
++
++#include "thunder-99xx.dtsi"
++
++/ {
++	model = "Cavium ThunderX2 CN99XX";
++	compatible = "cavium,thunder-99xx";
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x80000000 0x0 0x80000000>,  /* 2G @ 2G  */
++		      <0x00000008 0x80000000 0x0 0x80000000>;  /* 2G @ 34G */
++	};
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
+diff --git a/arch/arm64/boot/dts/cavium/thunder-99xx.dtsi b/arch/arm64/boot/dts/cavium/thunder-99xx.dtsi
+new file mode 100644
+index 0000000..1c07732
+--- /dev/null
++++ b/arch/arm64/boot/dts/cavium/thunder-99xx.dtsi
+@@ -0,0 +1,147 @@
++/*
++ * dtsi file for Cavium ThunderX2 CN99XX processor
++ *
++ * Copyright (c) 2017 Cavium Inc.
++ * Copyright (c) 2013-2016 Broadcom
++ * Author: Zi Shen Lim <zlim@broadcom.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	model = "Cavium ThunderX2 CN99xx";
++	compatible = "cavium,thunder-99xx";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	/* just 4 cpus now, 128 needed in full config */
++	cpus {
++		#address-cells = <0x2>;
++		#size-cells = <0x0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "cavium,thunder2", "arm,armv8";
++			reg = <0x0 0x0>;
++			enable-method = "psci";
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "cavium,thunder2", "arm,armv8";
++			reg = <0x0 0x1>;
++			enable-method = "psci";
++		};
++
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "cavium,thunder2", "arm,armv8";
++			reg = <0x0 0x2>;
++			enable-method = "psci";
++		};
++
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "cavium,thunder2", "arm,armv8";
++			reg = <0x0 0x3>;
++			enable-method = "psci";
++		};
++	};
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	gic: interrupt-controller at 400080000 {
++		compatible = "arm,gic-v3";
++		#interrupt-cells = <3>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		interrupt-controller;
++		#redistributor-regions = <1>;
++		reg = <0x04 0x00080000 0x0 0x20000>,	/* GICD */
++		      <0x04 0x01000000 0x0 0x1000000>;	/* GICR */
++		interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
++
++		gicits: gic-its at 40010000 {
++			compatible = "arm,gic-v3-its";
++			msi-controller;
++			reg = <0x04 0x00100000 0x0 0x20000>;	/* GIC ITS */
++		};
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_PPI 14 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_PPI 10 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	pmu {
++		compatible = "arm,armv8-pmuv3";
++		interrupts = <GIC_PPI 7 IRQ_TYPE_LEVEL_HIGH>; /* PMU overflow */
++	};
++
++	clk125mhz: uart_clk125mhz {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <125000000>;
++		clock-output-names = "clk125mhz";
++	};
++
++	pci {
++		compatible = "pci-host-ecam-generic";
++		device_type = "pci";
++		#interrupt-cells = <1>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++
++		/* ECAM at 0x3000_0000 - 0x4000_0000 */
++		reg = <0x0 0x30000000  0x0 0x10000000>;
++		reg-names = "PCI ECAM";
++
++		/*
++		 * PCI ranges:
++		 *   IO		no supported
++		 *   MEM        0x4000_0000 - 0x6000_0000
++		 *   MEM64 pref 0x40_0000_0000 - 0x60_0000_0000
++		 */
++		ranges =
++		  <0x02000000    0 0x40000000    0 0x40000000    0 0x20000000
++		   0x43000000 0x40 0x00000000 0x40 0x00000000 0x20 0x00000000>;
++		interrupt-map-mask = <0 0 0 7>;
++		interrupt-map =
++		      /* addr  pin  ic   icaddr  icintr */
++			<0 0 0  1  &gic   0 0    GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH
++			 0 0 0  2  &gic   0 0    GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH
++			 0 0 0  3  &gic   0 0    GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH
++			 0 0 0  4  &gic   0 0    GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
++		msi-parent = <&gicits>;
++		dma-coherent;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		uart0: serial at 402020000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x04 0x02020000 0x0 0x1000>;
++			interrupt-parent = <&gic>;
++			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clk125mhz>;
++			clock-names = "apb_pclk";
++		};
++	};
++};
 -- 
 2.7.4
