@@ -1,35 +1,34 @@
 From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Sun,  5 Feb 2017 16:25:38 +0000
-Subject: [PATCH -next] usb: mtu3: remove redundant dev_err call in
- get_ssusb_rscs()
-Message-ID: <20170205162538.25781-1-weiyj.lk@gmail.com>
+Date: Sun,  5 Feb 2017 16:32:55 +0000
+Subject: [PATCH -next v2] ARM: hisi: fix error return code in hip04_smp_init()
+In-Reply-To: <20170122164128.29381-1-weiyj.lk@gmail.com>
+References: <20170122164128.29381-1-weiyj.lk@gmail.com>
+Message-ID: <20170205163255.28589-1-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wei Yongjun <weiyongjun1@huawei.com>
 
-There is a error message within devm_ioremap_resource
-already, so remove the dev_err call to avoid redundant
-error message.
+Fix to return error code -ENODEV from the of_find_compatible_node()
+error handling case instead of 0, as done elsewhere in this function.
 
 Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 ---
- drivers/usb/mtu3/mtu3_plat.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+v1 -> v2: fix file module
+---
+ arch/arm/mach-hisi/platmcpm.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
-index 19a345d..4559baa 100644
---- a/drivers/usb/mtu3/mtu3_plat.c
-+++ b/drivers/usb/mtu3/mtu3_plat.c
-@@ -252,10 +252,8 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ippc");
- 	ssusb->ippc_base = devm_ioremap_resource(dev, res);
--	if (IS_ERR(ssusb->ippc_base)) {
--		dev_err(dev, "failed to map memory for ippc\n");
-+	if (IS_ERR(ssusb->ippc_base))
- 		return PTR_ERR(ssusb->ippc_base);
--	}
- 
- 	ssusb->dr_mode = usb_get_dr_mode(dev);
- 	if (ssusb->dr_mode == USB_DR_MODE_UNKNOWN) {
+diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
+index a6c1176..f0fff21 100644
+--- a/arch/arm/mach-hisi/platmcpm.c
++++ b/arch/arm/mach-hisi/platmcpm.c
+@@ -279,6 +279,8 @@ static int __init hip04_smp_init(void)
+ 					 &hip04_boot_method[0], 4);
+ 	if (ret)
+ 		goto err;
++
++	ret = -ENODEV;
+ 	np_sctl = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
+ 	if (!np_sctl)
+ 		goto err;
