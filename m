@@ -1,86 +1,48 @@
-From: guochun.mao@mediatek.com (Guochun Mao)
-Date: Sun, 5 Feb 2017 12:00:49 +0800
-Subject: [PATCH v2 2/2] arm: dts: mt2701: add nor flash node
-In-Reply-To: <1485315515-29942-3-git-send-email-guochun.mao@mediatek.com>
-References: <1485315515-29942-1-git-send-email-guochun.mao@mediatek.com>
- <1485315515-29942-3-git-send-email-guochun.mao@mediatek.com>
-Message-ID: <1486267249.10417.9.camel@mhfsdcap03>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 4 Feb 2017 20:29:27 -0800
+Subject: [PATCH v9 2/3] MAINTAINERS: add zx2967 watchdog controller driver
+ to ARM ZTE architecture
+In-Reply-To: <20170205034504.GD3407@dragon>
+References: <1486172055-13162-1-git-send-email-baoyou.xie@linaro.org>
+ <1486172055-13162-2-git-send-email-baoyou.xie@linaro.org>
+ <4cba1be6-ee85-7371-ea02-1bf8e7eb628e@roeck-us.net>
+ <CA+DQWkyOZPQORy-rVSqGY8Ht9xWttYt6Csp6pvShGG4OVA_2YQ@mail.gmail.com>
+ <20170205034504.GD3407@dragon>
+Message-ID: <e8573429-8082-abc2-be23-4605172cedf1@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-01-25 at 11:38 +0800, Guochun Mao wrote:
-> Add Mediatek nor flash node.
-> 
-> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt2701-evb.dts |   25 +++++++++++++++++++++++++
->  arch/arm/boot/dts/mt2701.dtsi    |   12 ++++++++++++
->  2 files changed, 37 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-> index 082ca88..85e5ae8 100644
-> --- a/arch/arm/boot/dts/mt2701-evb.dts
-> +++ b/arch/arm/boot/dts/mt2701-evb.dts
-> @@ -24,6 +24,31 @@
->  	};
->  };
->  
-> +&nor_flash {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&nor_pins_default>;
-> +	status = "okay";
-> +	flash at 0 {
-> +		compatible = "jedec,spi-nor";
-> +		reg = <0>;
-> +	};
-> +};
-> +
-> +&pio {
-> +	nor_pins_default: nor {
-> +		pins1 {
-> +			pinmux = <MT2701_PIN_240_EXT_XCS__FUNC_EXT_XCS>,
-> +				 <MT2701_PIN_241_EXT_SCK__FUNC_EXT_SCK>,
-> +				 <MT2701_PIN_239_EXT_SDIO0__FUNC_EXT_SDIO0>,
-> +				 <MT2701_PIN_238_EXT_SDIO1__FUNC_EXT_SDIO1>,
-> +				 <MT2701_PIN_237_EXT_SDIO2__FUNC_EXT_SDIO2>,
-> +				 <MT2701_PIN_236_EXT_SDIO3__FUNC_EXT_SDIO3>;
-> +			drive-strength = <MTK_DRIVE_4mA>;
-> +			bias-pull-up;
-> +		};
-> +	};
-> +};
-> +
->  &uart0 {
->  	status = "okay";
->  };
-> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> index bdf8954..1eefce4 100644
-> --- a/arch/arm/boot/dts/mt2701.dtsi
-> +++ b/arch/arm/boot/dts/mt2701.dtsi
-> @@ -227,6 +227,18 @@
->  		status = "disabled";
->  	};
->  
-> +	nor_flash: spi at 11014000 {
-> +		compatible = "mediatek,mt2701-nor",
-> +			     "mediatek,mt8173-nor";
-> +		reg = <0 0x11014000 0 0xe0>;
-> +		clocks = <&pericfg CLK_PERI_FLASH>,
-> +			 <&topckgen CLK_TOP_FLASH_SEL>;
-> +		clock-names = "spi", "sf";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		status = "disabled";
-> +	};
-> +
->  	mmsys: syscon at 14000000 {
->  		compatible = "mediatek,mt2701-mmsys", "syscon";
->  		reg = <0 0x14000000 0 0x1000>;
+On 02/04/2017 07:45 PM, Shawn Guo wrote:
+> Hi Baoyou,
+>
+> On Sun, Feb 05, 2017 at 10:36:38AM +0800, Baoyou Xie wrote:
+>> On 5 February 2017 at 08:05, Guenter Roeck <linux@roeck-us.net> wrote:
+>>
+>>> On 02/03/2017 05:34 PM, Baoyou Xie wrote:
+>>>
+>>>> Add the zx2967 watchdog controller driver as maintained by ARM ZTE
+>>>> architecture maintainers, as they're parts of the core IP.
+>>>>
+>>>> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+>>>>
+>>>
+>>> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+>>>
+>>> I assume you'll submit this patch through the arm tree ?
+>>>
+>> Could you please submit all three patches through your tree? Thanks a lot
+>> :)
+>
+> Patch #2 is the only one that Guenter is concerned about, as there are
+> other subsystem related updates on the file.  I think Guenter's
+> suggestion is good, i.e. we have patch #1 and #3 go upstream through
+> watchdog tree, and later we update MAINTAINERS as needed via arm-soc
+> tree.
+>
 
-Hi,
-mtk-quadspi.txt had been updated as suggested.
-Is there suggestion about this patch?
-Thanks.
+Yes. One of the problems is that the patch doesn't apply to my tree
+(which is based on v4.10-rc3), and it doesn't have a common anchestor,
+meaning it is most likely not based on mainline. I would prefer to avoid
+conflicts with the arm tree if possible.
 
-BR,
-Guochun
+Guenter
