@@ -1,114 +1,86 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Sun,  5 Feb 2017 11:54:14 +0800
-Subject: [PATCH v5 6/6] drm/rockchip/dsi: add dw-mipi power domain support
-In-Reply-To: <1486266854-9887-1-git-send-email-zyw@rock-chips.com>
-References: <1486266854-9887-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1486266854-9887-7-git-send-email-zyw@rock-chips.com>
+From: guochun.mao@mediatek.com (Guochun Mao)
+Date: Sun, 5 Feb 2017 12:00:49 +0800
+Subject: [PATCH v2 2/2] arm: dts: mt2701: add nor flash node
+In-Reply-To: <1485315515-29942-3-git-send-email-guochun.mao@mediatek.com>
+References: <1485315515-29942-1-git-send-email-guochun.mao@mediatek.com>
+ <1485315515-29942-3-git-send-email-guochun.mao@mediatek.com>
+Message-ID: <1486267249.10417.9.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reference the power domain incase dw-mipi power down when
-in use.
+On Wed, 2017-01-25 at 11:38 +0800, Guochun Mao wrote:
+> Add Mediatek nor flash node.
+> 
+> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+> ---
+>  arch/arm/boot/dts/mt2701-evb.dts |   25 +++++++++++++++++++++++++
+>  arch/arm/boot/dts/mt2701.dtsi    |   12 ++++++++++++
+>  2 files changed, 37 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
+> index 082ca88..85e5ae8 100644
+> --- a/arch/arm/boot/dts/mt2701-evb.dts
+> +++ b/arch/arm/boot/dts/mt2701-evb.dts
+> @@ -24,6 +24,31 @@
+>  	};
+>  };
+>  
+> +&nor_flash {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&nor_pins_default>;
+> +	status = "okay";
+> +	flash at 0 {
+> +		compatible = "jedec,spi-nor";
+> +		reg = <0>;
+> +	};
+> +};
+> +
+> +&pio {
+> +	nor_pins_default: nor {
+> +		pins1 {
+> +			pinmux = <MT2701_PIN_240_EXT_XCS__FUNC_EXT_XCS>,
+> +				 <MT2701_PIN_241_EXT_SCK__FUNC_EXT_SCK>,
+> +				 <MT2701_PIN_239_EXT_SDIO0__FUNC_EXT_SDIO0>,
+> +				 <MT2701_PIN_238_EXT_SDIO1__FUNC_EXT_SDIO1>,
+> +				 <MT2701_PIN_237_EXT_SDIO2__FUNC_EXT_SDIO2>,
+> +				 <MT2701_PIN_236_EXT_SDIO3__FUNC_EXT_SDIO3>;
+> +			drive-strength = <MTK_DRIVE_4mA>;
+> +			bias-pull-up;
+> +		};
+> +	};
+> +};
+> +
+>  &uart0 {
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> index bdf8954..1eefce4 100644
+> --- a/arch/arm/boot/dts/mt2701.dtsi
+> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> @@ -227,6 +227,18 @@
+>  		status = "disabled";
+>  	};
+>  
+> +	nor_flash: spi at 11014000 {
+> +		compatible = "mediatek,mt2701-nor",
+> +			     "mediatek,mt8173-nor";
+> +		reg = <0 0x11014000 0 0xe0>;
+> +		clocks = <&pericfg CLK_PERI_FLASH>,
+> +			 <&topckgen CLK_TOP_FLASH_SEL>;
+> +		clock-names = "spi", "sf";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		status = "disabled";
+> +	};
+> +
+>  	mmsys: syscon at 14000000 {
+>  		compatible = "mediatek,mt2701-mmsys", "syscon";
+>  		reg = <0 0x14000000 0 0x1000>;
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
----
+Hi,
+mtk-quadspi.txt had been updated as suggested.
+Is there suggestion about this patch?
+Thanks.
 
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
-
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
-
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 35f22bc..d263352 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -12,6 +12,7 @@
- #include <linux/math64.h>
- #include <linux/module.h>
- #include <linux/of_device.h>
-+#include <linux/pm_runtime.h>
- #include <linux/regmap.h>
- #include <linux/reset.h>
- #include <linux/mfd/syscon.h>
-@@ -293,6 +294,7 @@ struct dw_mipi_dsi {
- 	struct clk *pclk;
- 	struct clk *phy_cfg_clk;
- 
-+	int dpms_mode;
- 	unsigned int lane_mbps; /* per lane */
- 	u32 channel;
- 	u32 lanes;
-@@ -969,6 +971,9 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
- {
- 	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
- 
-+	if (dsi->dpms_mode != DRM_MODE_DPMS_ON)
-+		return;
-+
- 	if (clk_prepare_enable(dsi->pclk)) {
- 		dev_err(dsi->dev, "%s: Failed to enable pclk\n", __func__);
- 		return;
-@@ -980,7 +985,9 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
- 	drm_panel_unprepare(dsi->panel);
- 
- 	dw_mipi_dsi_disable(dsi);
-+	pm_runtime_put(dsi->dev);
- 	clk_disable_unprepare(dsi->pclk);
-+	dsi->dpms_mode = DRM_MODE_DPMS_OFF;
- }
- 
- static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
-@@ -990,11 +997,15 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
- 	int mux = drm_of_encoder_active_endpoint_id(dsi->dev->of_node, encoder);
- 	u32 val;
- 
-+	if (dsi->dpms_mode == DRM_MODE_DPMS_ON)
-+		return;
-+
- 	if (clk_prepare_enable(dsi->pclk)) {
- 		dev_err(dsi->dev, "%s: Failed to enable pclk\n", __func__);
- 		return;
- 	}
- 
-+	pm_runtime_get_sync(dsi->dev);
- 	dw_mipi_dsi_init(dsi);
- 	dw_mipi_dsi_dpi_config(dsi);
- 	dw_mipi_dsi_packet_handler_config(dsi);
-@@ -1030,6 +1041,7 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
- 
- 	regmap_write(dsi->grf_regmap, pdata->grf_switch_reg, val);
- 	dev_dbg(dsi->dev, "vop %s output to dsi0\n", (mux) ? "LIT" : "BIG");
-+	dsi->dpms_mode = DRM_MODE_DPMS_ON;
- }
- 
- static int
-@@ -1198,6 +1210,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 
- 	dsi->dev = dev;
- 	dsi->pdata = pdata;
-+	dsi->dpms_mode = DRM_MODE_DPMS_OFF;
- 
- 	ret = rockchip_mipi_parse_dt(dsi);
- 	if (ret)
-@@ -1278,6 +1291,8 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 
- 	dev_set_drvdata(dev, dsi);
- 
-+	pm_runtime_enable(dev);
-+
- 	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
- 	dsi->dsi_host.dev = dev;
- 	ret = mipi_dsi_host_register(&dsi->dsi_host);
-@@ -1300,6 +1315,7 @@ static void dw_mipi_dsi_unbind(struct device *dev, struct device *master,
- 	struct dw_mipi_dsi *dsi = dev_get_drvdata(dev);
- 
- 	mipi_dsi_host_unregister(&dsi->dsi_host);
-+	pm_runtime_disable(dev);
- 	clk_disable_unprepare(dsi->pllref_clk);
- }
- 
--- 
-2.6.3
+BR,
+Guochun
