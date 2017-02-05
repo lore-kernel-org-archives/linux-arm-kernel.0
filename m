@@ -1,136 +1,40 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Sun, 5 Feb 2017 11:42:42 +0800
-Subject: [PATCH v3 3/5] drm/rockchip/dsi: remove mode_valid function
-In-Reply-To: <20170201181218.GA8595@art_vandelay>
-References: <1484907051-7159-1-git-send-email-zyw@rock-chips.com>
- <1484907051-7159-4-git-send-email-zyw@rock-chips.com>
- <20170123174841.GB25789@trickycodes.roam.corp.google.com>
- <5886BB8F.6040707@rock-chips.com> <20170201181218.GA8595@art_vandelay>
-Message-ID: <58969F32.9010003@rock-chips.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 5 Feb 2017 11:45:06 +0800
+Subject: [PATCH v9 2/3] MAINTAINERS: add zx2967 watchdog controller
+ driver to ARM ZTE architecture
+In-Reply-To: <CA+DQWkyOZPQORy-rVSqGY8Ht9xWttYt6Csp6pvShGG4OVA_2YQ@mail.gmail.com>
+References: <1486172055-13162-1-git-send-email-baoyou.xie@linaro.org>
+ <1486172055-13162-2-git-send-email-baoyou.xie@linaro.org>
+ <4cba1be6-ee85-7371-ea02-1bf8e7eb628e@roeck-us.net>
+ <CA+DQWkyOZPQORy-rVSqGY8Ht9xWttYt6Csp6pvShGG4OVA_2YQ@mail.gmail.com>
+Message-ID: <20170205034504.GD3407@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Baoyou,
 
+On Sun, Feb 05, 2017 at 10:36:38AM +0800, Baoyou Xie wrote:
+> On 5 February 2017 at 08:05, Guenter Roeck <linux@roeck-us.net> wrote:
+> 
+> > On 02/03/2017 05:34 PM, Baoyou Xie wrote:
+> >
+> >> Add the zx2967 watchdog controller driver as maintained by ARM ZTE
+> >> architecture maintainers, as they're parts of the core IP.
+> >>
+> >> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> >>
+> >
+> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> >
+> > I assume you'll submit this patch through the arm tree ?
+> >
+> Could you please submit all three patches through your tree? Thanks a lot
+> :)
 
-On 02/02/2017 02:12 AM, Sean Paul wrote:
-> On Tue, Jan 24, 2017 at 10:27:27AM +0800, Chris Zhong wrote:
->> Hi Sean
->>
->> On 01/24/2017 01:48 AM, Sean Paul wrote:
->>> On Fri, Jan 20, 2017 at 06:10:49PM +0800, Chris Zhong wrote:
->>>> The MIPI DSI do not need check the validity of resolution, the max
->>>> resolution should depend VOP. Hence, remove rk3288_mipi_dsi_mode_valid
->>>> here.
->>> Does vop actually enforce this, though? I see that mode_config.max_width is
->>> 4096, but there is no bounds checking in mode_fixup().
->>>
->>> The connector is currently rejecting everything greater than 2047. So I think
->>> you're going to regress behavior here.
->>>
->>> Sean
->> The mipi controller has not this width limit, it depend the VOP,
->> such as RK3399, VOP_LIT only support 2560,
->> but VOP_BIG support 4K. So this driver should check the width here.
-> I don't see anything in the vop driver that rejects large modes for little vop.
-> So, while I agree the check shouldn't be here, you should move it to where it
-> should be instead of removing it entirely.
->
-> Sean
+Patch #2 is the only one that Guenter is concerned about, as there are
+other subsystem related updates on the file.  I think Guenter's
+suggestion is good, i.e. we have patch #1 and #3 go upstream through
+watchdog tree, and later we update MAINTAINERS as needed via arm-soc
+tree.
 
-drm_mode_validate_size will check the dev->mode_config.max_width and
-dev->mode_config.max_height, these 2 value come from 
-rockchip_drm_mode_config_init,
-currently, they are both 4096. So you are right, drm driver does not 
-distinguish
-between vop lit and big.
-
-I think Mark Yao already have a local solution, and he will post it soon.
-
->
->>>
->>>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
->>>> ---
->>>>
->>>> Changes in v3: None
->>>>
->>>>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 39 ----------------------------------
->>>>   1 file changed, 39 deletions(-)
->>>>
->>>> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
->>>> index a93ce97..6f0e252 100644
->>>> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
->>>> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
->>>> @@ -278,8 +278,6 @@ struct dw_mipi_dsi_plat_data {
->>>>   	u32 grf_dsi0_mode;
->>>>   	u32 grf_dsi0_mode_reg;
->>>>   	unsigned int max_data_lanes;
->>>> -	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
->>>> -					   struct drm_display_mode *mode);
->>>>   };
->>>>   struct dw_mipi_dsi {
->>>> @@ -1081,23 +1079,8 @@ static int dw_mipi_dsi_connector_get_modes(struct drm_connector *connector)
->>>>   	return drm_panel_get_modes(dsi->panel);
->>>>   }
->>>> -static enum drm_mode_status dw_mipi_dsi_mode_valid(
->>>> -					struct drm_connector *connector,
->>>> -					struct drm_display_mode *mode)
->>>> -{
->>>> -	struct dw_mipi_dsi *dsi = con_to_dsi(connector);
->>>> -
->>>> -	enum drm_mode_status mode_status = MODE_OK;
->>>> -
->>>> -	if (dsi->pdata->mode_valid)
->>>> -		mode_status = dsi->pdata->mode_valid(connector, mode);
->>>> -
->>>> -	return mode_status;
->>>> -}
->>>> -
->>>>   static struct drm_connector_helper_funcs dw_mipi_dsi_connector_helper_funcs = {
->>>>   	.get_modes = dw_mipi_dsi_connector_get_modes,
->>>> -	.mode_valid = dw_mipi_dsi_mode_valid,
->>>>   };
->>>>   static void dw_mipi_dsi_drm_connector_destroy(struct drm_connector *connector)
->>>> @@ -1168,33 +1151,11 @@ static int rockchip_mipi_parse_dt(struct dw_mipi_dsi *dsi)
->>>>   	return 0;
->>>>   }
->>>> -static enum drm_mode_status rk3288_mipi_dsi_mode_valid(
->>>> -					struct drm_connector *connector,
->>>> -					struct drm_display_mode *mode)
->>>> -{
->>>> -	/*
->>>> -	 * The VID_PKT_SIZE field in the DSI_VID_PKT_CFG
->>>> -	 * register is 11-bit.
->>>> -	 */
->>>> -	if (mode->hdisplay > 0x7ff)
->>>> -		return MODE_BAD_HVALUE;
->>>> -
->>>> -	/*
->>>> -	 * The V_ACTIVE_LINES field in the DSI_VTIMING_CFG
->>>> -	 * register is 11-bit.
->>>> -	 */
->>>> -	if (mode->vdisplay > 0x7ff)
->>>> -		return MODE_BAD_VVALUE;
->>>> -
->>>> -	return MODE_OK;
->>>> -}
->>>> -
->>>>   static struct dw_mipi_dsi_plat_data rk3288_mipi_dsi_drv_data = {
->>>>   	.dsi0_en_bit = RK3288_DSI0_SEL_VOP_LIT,
->>>>   	.dsi1_en_bit = RK3288_DSI1_SEL_VOP_LIT,
->>>>   	.grf_switch_reg = RK3288_GRF_SOC_CON6,
->>>>   	.max_data_lanes = 4,
->>>> -	.mode_valid = rk3288_mipi_dsi_mode_valid,
->>>>   };
->>>>   static struct dw_mipi_dsi_plat_data rk3399_mipi_dsi_drv_data = {
->>>> -- 
->>>> 2.6.3
->>>>
->>>> _______________________________________________
->>>> dri-devel mailing list
->>>> dri-devel at lists.freedesktop.org
->>>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->>
->> _______________________________________________
->> dri-devel mailing list
->> dri-devel at lists.freedesktop.org
->> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+Shawn
