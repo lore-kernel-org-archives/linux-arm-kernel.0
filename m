@@ -1,60 +1,61 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 5 Feb 2017 14:36:10 -0200
-Subject: [PATCH] serial: imx: Only enable UART DMA on i.MX6Q and i.MX53
-In-Reply-To: <DB6PR0402MB2743C709F162BDE52429DF49E3410@DB6PR0402MB2743.eurprd04.prod.outlook.com>
-References: <20170204213931.3566-1-marex@denx.de>
- <DB6PR0402MB2743C709F162BDE52429DF49E3410@DB6PR0402MB2743.eurprd04.prod.outlook.com>
-Message-ID: <CAOMZO5D8_vE+t=V6wHMKt590jZqJJRzeJ+_MLgqbLp=6gwsmyQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 5 Feb 2017 17:34:51 +0100
+Subject: [alsa-devel] [PATCH] ASoC: bcm2835: Increase channels_max to 8
+In-Reply-To: <a7f5de09-b07b-638d-466f-525e68ebf0f9@flatmax.org>
+References: <1485992264-9058-1-git-send-email-flatmax@flatmax.org>
+ <20170204154944.timxhmmibc4kngly@sirena.org.uk>
+ <a7f5de09-b07b-638d-466f-525e68ebf0f9@flatmax.org>
+Message-ID: <20170205163451.4x3svwbqdqlfc7t4@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 5, 2017 at 12:56 PM, Fabio Estevam <fabio.estevam@nxp.com> wrote:
-> [Sorry, for the top-posting]
->
->
-> imx6sx uart should be of a IMX6Q_UART instead.
->
->
-> Does this patch fix the issue?
+On Sun, Feb 05, 2017 at 12:26:31PM +1100, Matt Flax wrote:
+> On 05/02/17 02:49, Mark Brown wrote:
+> > On Thu, Feb 02, 2017 at 10:37:44AM +1100, Matt Flax wrote:
 
-It seems this dts change will not fix the problem.
+> > I can't understand how this works.  We're programming the hardware in an
+> > identical fashion for both channel counts, that means that what we're
 
-> From: Kai Ruhnau <kai.ruhnau@target-sg.com>
->
-> In 1c06bde6 with the introduction of DMA support for the i.MX53 platform,
-> DMA was enabled for all platforms instead. On an i.MX6SX (which is a
-> IMX21_UART), this breaks gpsd talking to an UART module with
->
->  imx-uart 21f4000.serial: DMA transaction error.
->
-> This patch makes sure, UART DMA is only activated for i.MX53 and i.MX6Q.
->
-> Signed-off-by: Kai Ruhnau <kai.ruhnau@target-sg.com>
-> Reviewed-by: Marek Vasut <marex@denx.de>
-> Fixes: 1c06bde643d0 ("Allowing UART DMA to be configured on i.MX53")
-> Cc: <stable@vger.kernel.org> # 4.9+
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> ---
->  drivers/tty/serial/imx.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index a70356d..8e2b5f2 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -1269,7 +1269,8 @@ static int imx_startup(struct uart_port *port)
->          writel(temp & ~UCR4_DREN, sport->port.membase + UCR4);
->
->          /* Can we enable the DMA support? */
-> -       if (!uart_console(port) && !sport->dma_is_inited)
-> +       if ((is_imx6q_uart(sport)  || is_imx53_uart(sport)) &&
-> +           !uart_console(port) && !sport->dma_is_inited)
->                  imx_uart_dma_init(sport);
+> I am not surprised it is confusing, to my knowledge this is the first time
+> that someone has demonstrated this type of I2S signalling.
 
-Looks like imx serial DMA is broken in 4.9.
+More than stereo I2S?  That is actually a thing, while most people use
+DSP modes for higher channel counts it's fairly common to have the
+support especially in CODECs that also support DSP mode since the
+hardware implementation is fairly straightforward if you abstracted in
+the bus interface.
 
-There is also this report from Clemens: https://lkml.org/lkml/2017/1/4/579
+> In this case BCM2835 is a clock slave and not concerned with generating the
+> I2S clocks, only receiving - think of all clocks and synchrony being
+> generated/managed in hardware on the sound card.
 
-Could anyone run a git bisect?
+> In short the BCM2835 silicon is only concerned with shifting bits into two
+> hardware registers which (after DMA) are interpreted by ALSA according to
+> the specified channel count.
+
+Sure, that's what all audio controllers do.  But there's a few problems.
+One is that nothing in your code that prevents this running in master
+mode.  Another is that if this *is* for I2S mode then when doing
+multichannel I2S you usually still respect the left/right indication in
+LRCLK so you will end up with the data in the in memory format:
+
+  L1 R1 L2 R2 L3 R3 L4 R4
+
+but multi channel I2S would usually be rendered with all the left
+channels and all the right channels grouped together so you get:
+
+  L1 L2 L3 L4 R1 R2 R3 R4
+
+It'll also require exact clocking with no spare bits in order to sync
+the right channels with the LRCLK switch but that's not so unusual.
+Looking at the driver it may be possible for the hardware to do DSP
+modes at which point this gets much easier but right now it only has I2S
+support, I've got a feeling that the other end of the link may actually
+be running in a DSP mode.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170205/5fc6f15d/attachment.sig>
