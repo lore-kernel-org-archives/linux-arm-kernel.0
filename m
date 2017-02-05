@@ -1,108 +1,61 @@
-From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Sun, 5 Feb 2017 20:23:14 +0100
-Subject: [PATCH 5/5] ARM: dts: sun9i: Initial support for the Sunchip
- CX-A99 board
-In-Reply-To: <CAGb2v65EAJBsNCDNSg=uNm3-h8xAKoiuS_rUdaWS8Be84WMvsQ@mail.gmail.com>
-References: <cover.1485456003.git.rask@formelder.dk>
- <82617383a0739458d5c9c95dccaf479675fce593.1485456007.git.rask@formelder.dk>
- <CAGb2v65EAJBsNCDNSg=uNm3-h8xAKoiuS_rUdaWS8Be84WMvsQ@mail.gmail.com>
-Message-ID: <20170205192313.iik7fdcygltpjfwt@localhost>
+From: w@1wt.eu (Willy Tarreau)
+Date: Sun,  5 Feb 2017 20:20:46 +0100
+Subject: [PATCH 3.10 059/319] arm64: Define AT_VECTOR_SIZE_ARCH for ARCH_DLINFO
+In-Reply-To: <1486322486-8024-1-git-send-email-w@1wt.eu>
+References: <1486322486-8024-1-git-send-email-w@1wt.eu>
+Message-ID: <1486322486-8024-30-git-send-email-w@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 03:36:41PM +0800, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> On Fri, Jan 27, 2017 at 5:27 AM, Rask Ingemann Lambertsen
-> <rask@formelder.dk> wrote:
-[...]
-> > diff --git a/arch/arm/boot/dts/sun9i-a80-cx-a99.dts b/arch/arm/boot/dts/sun9i-a80-cx-a99.dts
-> > new file mode 100644
-> > index 0000000..8925093
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/sun9i-a80-cx-a99.dts
-[...]
-> > +       leds {
-> > +               compatible = "gpio-leds";
-> > +
-> > +               blue {
-> > +                       gpios = <&pio 6 10 GPIO_ACTIVE_HIGH>;   /* PG10 */
-> > +                       label = "cx-a99:blue:status";
-> > +                       default-state = "on";
-> 
-> Please add a note justifying default-state = "on".
+From: James Hogan <james.hogan@imgtec.com>
 
-I think I'll remove it instead. The device ships with a U-Boot and Android
-installation where blue means "on" and red means "stand-by" (which is simply
-implemented by blanking the screen, it seems), but I doubt many people want
-to run the rather old Android version available for this device. Instead,
-I was going to point to the quick setup guide, but it has no mention of the
-LEDs at all, so I guess the user won't expect the blue LED to turn on.
+commit 3146bc64d12377a74dbda12b96ea32da3774ae07 upstream.
 
-> > +       /* USB 3.0 OTG connector. For now, only Vbus is supported. */
-> > +       reg_usb0_vbus: regulator-usb0-vbus {
-> > +               compatible = "regulator-fixed";
-> > +               regulator-name = "usb0-vbus";
-> > +               regulator-min-microvolt = <5000000>;
-> > +               regulator-max-microvolt = <5000000>;
-> > +               gpio = <&pio 7 15 GPIO_ACTIVE_HIGH>;    /* PH15 */
-> > +               enable-active-high;
-> > +               regulator-always-on;
-> 
-> It's bad to leave VBUS for OTG connectors on. You never know
-> what is plugged in.
+AT_VECTOR_SIZE_ARCH should be defined with the maximum number of
+NEW_AUX_ENT entries that ARCH_DLINFO can contain, but it wasn't defined
+for arm64 at all even though ARCH_DLINFO will contain one NEW_AUX_ENT
+for the VDSO address.
 
-The comment is misleading as the connector is not an OTG one but just a
-standard-A receptacle wired to the SoC's OTG port. I'll change the comment.
+This shouldn't be a problem as AT_VECTOR_SIZE_BASE includes space for
+AT_BASE_PLATFORM which arm64 doesn't use, but lets define it now and add
+the comment above ARCH_DLINFO as found in several other architectures to
+remind future modifiers of ARCH_DLINFO to keep AT_VECTOR_SIZE_ARCH up to
+date.
 
-> > +/* SD card slot. */
-> > +&mmc0 {
-> > +       bus-width = <4>;
-> > +       cd-gpios = <&pio 7 17 GPIO_ACTIVE_LOW>; /* PH17 */
-> > +       broken-cd;                              /* Interrupts don't work. */
-> 
-> This should be handled by the driver.
+Fixes: f668cd1673aa ("arm64: ELF definitions")
+Signed-off-by: James Hogan <james.hogan@imgtec.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Willy Tarreau <w@1wt.eu>
+---
+ arch/arm64/include/asm/elf.h         | 1 +
+ arch/arm64/include/uapi/asm/auxvec.h | 2 ++
+ 2 files changed, 3 insertions(+)
 
-The MMC core, without broken-cd, requests the GPIO driver to enable
-interrupt delivery on the pin and will fall back to polling the GPIO pin
-if the GPIO driver refuses to enable interrupt delivery. What I see is
-that the GPIO driver accepts to deliver interrupts, but only the first
-interrupt is triggered (as evident from /proc/interrupts showing only 1).
-The vendor sys_config.fex also sets the GPIO pin to polled operation, so
-maybe there is a hardware bug.
-
-The sunxi-mmc driver doesn't really support operation with broken-cd only
-because it spams the console and dmesg with useless error messages, see
-https://www.mail-archive.com/linux-sunxi at googlegroups.com/msg19963.html
-for an example.
-
-The comment should probably read something like "GPIO pin delivers no
-interrupts, poll it".
-
-> > +                       /* 1.8 V (enabled). */
-> > +                       reg_bldo1: bldo1 {
-> > +                               regulator-boot-on;
-> > +                               regulator-always-on;    /* Hang if disabled */
-> 
-> If you specify always-on, you don't need to add boot-on.
-
-Ack.
-
-> > +                       /* 3.3 V (enabled). */
-> > +                       reg_dcdce: dcdce {
-> > +                               regulator-boot-on;
-> > +                               regulator-always-on;
-> > +                               regulator-min-microvolt = <3300000>;
-> > +                               regulator-max-microvolt = <3300000>;
-> > +                               regulator-name = "vcc-pb-pc-pd-pe-pf-ph-mmc-spdif";
-> 
-> This is probably vcc-io or something shorter.
-
-I'm verbose with the names of the regulators for documentation purposes
-because unlike some of the boards aimed at developers, documentation is on
-this device is scarse. I see that with -mmc now added after my latest round
-of probing with a multimeter, the line went above 80 characters. Will it be
-OK with vcc-pb,c,d,e,f,h-mmc-spdif?
-
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index fe32c0e..e647e6d 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -126,6 +126,7 @@ extern unsigned long randomize_et_dyn(unsigned long base);
+ 
+ #define SET_PERSONALITY(ex)		clear_thread_flag(TIF_32BIT);
+ 
++/* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
+ #define ARCH_DLINFO							\
+ do {									\
+ 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
+diff --git a/arch/arm64/include/uapi/asm/auxvec.h b/arch/arm64/include/uapi/asm/auxvec.h
+index 22d6d88..4cf0c17 100644
+--- a/arch/arm64/include/uapi/asm/auxvec.h
++++ b/arch/arm64/include/uapi/asm/auxvec.h
+@@ -19,4 +19,6 @@
+ /* vDSO location */
+ #define AT_SYSINFO_EHDR	33
+ 
++#define AT_VECTOR_SIZE_ARCH 1 /* entries in ARCH_DLINFO */
++
+ #endif
 -- 
-Rask Ingemann Lambertsen
+2.8.0.rc2.1.gbe9624a
