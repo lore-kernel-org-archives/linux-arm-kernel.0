@@ -1,28 +1,45 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sun, 5 Feb 2017 01:29:43 +0100
-Subject: [PATCH] somedriver: remove the initialization of static pointers.
-In-Reply-To: <1486237182-4563-1-git-send-email-abdallah.meziti.pro@gmail.com>
-References: <1486237182-4563-1-git-send-email-abdallah.meziti.pro@gmail.com>
-Message-ID: <20170205002943.GA21184@kroah.com>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Sun, 5 Feb 2017 00:57:01 +0000
+Subject: [PATCH v2 0/5] Add Cavium ARCH_THUNDER2 platform
+Message-ID: <1486256226-43889-1-git-send-email-jnair@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 04, 2017 at 08:39:21PM +0100, AbdAllah-MEZITI wrote:
-> In C a static pointer will be initialized to NULL (e.g: draft C99 standard $6.7.8):
-> "If an object that has static storage duration is not initialized
-> explicitly, then:
->  __ if it has pointer type, it is initialized to a null pointer;"
-> 
-> Signed-off-by: AbdAllah-MEZITI <abdallah.meziti.pro@gmail.com>
+Here's the updated patchset, please let me know if thereare any
+comments.  If a pull request is needed(with a public git tree), I
+can set one up on github.
 
-Your subject is very odd :(
+This patchset adds support for the new ThunderX2 CN99XX processor
+family.
 
-And is that the correct spelling of your name that you use for legal
-documents?  If not, please fix up when you resend this.
+Changes are to add: the config option, the required device tree files,
+the device tree bindings documentation and the defconfig entry.
 
-Also, fix the line-wrapping of your changelog, and the C99 standard is
-not a "draft" anymore, it was released in 1999 :)
+Changes from v1 -> v2:
+* split Kconfig.platforms changes and device tree changes
+* Added MAINTAINERS entry
 
-thanks,
+JC.
 
-greg k-h
+Jayachandran C (5):
+  arm64: add THUNDER2 processor family
+  MAINTAINERS: Add Cavium ThunderX2 entry
+  arm64: dts: add device trees for ARCH_THUNDER2
+  dt-bindings: arm64 ARCH_THUNDER2 platform documentation
+  arm64: add ARCH_THUNDER2 to defconfig
+
+ .../devicetree/bindings/arm/cavium-thunder2.txt    |   5 +
+ Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+ MAINTAINERS                                        |   7 +
+ arch/arm64/Kconfig.platforms                       |   7 +
+ arch/arm64/boot/dts/cavium/Makefile                |   1 +
+ arch/arm64/boot/dts/cavium/thunder-99xx.dts        |  34 +++++
+ arch/arm64/boot/dts/cavium/thunder-99xx.dtsi       | 147 +++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |   1 +
+ 8 files changed, 203 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder2.txt
+ create mode 100644 arch/arm64/boot/dts/cavium/thunder-99xx.dts
+ create mode 100644 arch/arm64/boot/dts/cavium/thunder-99xx.dtsi
+
+-- 
+2.7.4
