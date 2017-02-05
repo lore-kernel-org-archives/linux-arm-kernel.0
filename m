@@ -1,40 +1,67 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 5 Feb 2017 11:45:06 +0800
-Subject: [PATCH v9 2/3] MAINTAINERS: add zx2967 watchdog controller
- driver to ARM ZTE architecture
-In-Reply-To: <CA+DQWkyOZPQORy-rVSqGY8Ht9xWttYt6Csp6pvShGG4OVA_2YQ@mail.gmail.com>
-References: <1486172055-13162-1-git-send-email-baoyou.xie@linaro.org>
- <1486172055-13162-2-git-send-email-baoyou.xie@linaro.org>
- <4cba1be6-ee85-7371-ea02-1bf8e7eb628e@roeck-us.net>
- <CA+DQWkyOZPQORy-rVSqGY8Ht9xWttYt6Csp6pvShGG4OVA_2YQ@mail.gmail.com>
-Message-ID: <20170205034504.GD3407@dragon>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Sun,  5 Feb 2017 11:54:08 +0800
+Subject: [PATCH v5 0/6] Rockchip dw-mipi-dsi driver
+Message-ID: <1486266854-9887-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baoyou,
+Hi all
 
-On Sun, Feb 05, 2017 at 10:36:38AM +0800, Baoyou Xie wrote:
-> On 5 February 2017 at 08:05, Guenter Roeck <linux@roeck-us.net> wrote:
-> 
-> > On 02/03/2017 05:34 PM, Baoyou Xie wrote:
-> >
-> >> Add the zx2967 watchdog controller driver as maintained by ARM ZTE
-> >> architecture maintainers, as they're parts of the core IP.
-> >>
-> >> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> >>
-> >
-> > Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-> >
-> > I assume you'll submit this patch through the arm tree ?
-> >
-> Could you please submit all three patches through your tree? Thanks a lot
-> :)
+This patch serial is for RK3399 MIPI DSI. The MIPI DSI controller of
+RK3399 is almost the same as RK3288, except a little bit of difference
+in phy clock controlling and port id selection register. These patches
+add RK3399 support and the power domain support.
 
-Patch #2 is the only one that Guenter is concerned about, as there are
-other subsystem related updates on the file.  I think Guenter's
-suggestion is good, i.e. we have patch #1 and #3 go upstream through
-watchdog tree, and later we update MAINTAINERS as needed via arm-soc
-tree.
+And these patches base on John Keeping's series[0], it fixes many bugs,
+they have been tested on rk3288 evb board.
 
-Shawn
+[0]:
+[01/26] https://patchwork.kernel.org/patch/9340213
+[02/26] https://patchwork.kernel.org/patch/9340145
+[03/26] https://patchwork.kernel.org/patch/9340235
+[04/26] https://patchwork.kernel.org/patch/9340123
+[05/26] https://patchwork.kernel.org/patch/9340161
+[06/26] https://patchwork.kernel.org/patch/9340203
+[07/26] https://patchwork.kernel.org/patch/9340229
+[08/26] https://patchwork.kernel.org/patch/9340131
+[09/26] https://patchwork.kernel.org/patch/9340191
+[10/26] https://patchwork.kernel.org/patch/9340175
+[11/26] https://patchwork.kernel.org/patch/9340237
+[12/26] https://patchwork.kernel.org/patch/9340207
+[13/26] https://patchwork.kernel.org/patch/9340233
+[14/26] https://patchwork.kernel.org/patch/9340205
+[15/26] https://patchwork.kernel.org/patch/9340189
+[16/26] https://patchwork.kernel.org/patch/9340143
+[17/26] https://patchwork.kernel.org/patch/9340117
+[18/26] https://patchwork.kernel.org/patch/9340193
+[19/26] https://patchwork.kernel.org/patch/9340151
+[20/26] https://patchwork.kernel.org/patch/9340183
+[23/26] https://patchwork.kernel.org/patch/9340173
+[24/26] https://patchwork.kernel.org/patch/9340251
+[25/26] https://patchwork.kernel.org/patch/9340127
+[26/26] https://patchwork.kernel.org/patch/9340139
+
+
+Changes in v5:
+- check the error of phy_cfg_clk in dw_mipi_dsi_bind
+
+Changes in v4:
+- remove the unrelated change
+
+Changes in v3:
+- base on John Keeping's patch series
+
+Chris Zhong (6):
+  dt-bindings: add rk3399 support for dw-mipi-rockchip
+  drm/rockchip/dsi: dw-mipi: support RK3399 mipi dsi
+  drm/rockchip/dsi: dw-mipi: correct the coding style
+  drm/rockchip/dsi: remove mode_valid function
+  dt-bindings: add power domain node for dw-mipi-rockchip
+  drm/rockchip/dsi: add dw-mipi power domain support
+
+ .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   7 +-
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 163 ++++++++++++---------
+ 2 files changed, 103 insertions(+), 67 deletions(-)
+
+-- 
+2.6.3
