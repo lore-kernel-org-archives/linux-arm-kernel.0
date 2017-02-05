@@ -1,56 +1,104 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Sun,  5 Feb 2017 15:54:59 +0800
-Subject: [PATCH v17 4/7] drm/rockchip: cdn-dp: do not use
- drm_helper_hpd_irq_event
+Date: Sun,  5 Feb 2017 15:55:02 +0800
+Subject: [PATCH v17 7/7] drm/rockchip: cdn-dp: don't configure hardware in
+ mode_set
 In-Reply-To: <1486281302-28200-1-git-send-email-zyw@rock-chips.com>
 References: <1486281302-28200-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1486281302-28200-5-git-send-email-zyw@rock-chips.com>
+Message-ID: <1486281302-28200-8-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cdn_dp_pd_event_work is using drm_helper_hpd_irq_event to update the
-connector status, this function is used to update all connectors of
-drm_device. Therefore, the detect of other connector will be call, when
-cdn_dp_pd_event_work is triggered, every time. It is not necessary, and
-it may cause system crash. replace drm_helper_hpd_irq_event with
-drm_kms_helper_hotplug_event, only update cdn-dp status.
+With atomic modesetting the hardware will be powered off when the
+mode_set function is called.  We should configure the hardware in the
+enable function.
 
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Tested-by: Guenter Roeck <groeck@chromium.org>
-Reviewed-by: Guenter Roeck <groeck@chromium.org>
 ---
 
 Changes in v17: None
 
- drivers/gpu/drm/rockchip/cdn-dp-core.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/rockchip/cdn-dp-core.c | 49 +++++++++++++++++-----------------
+ 1 file changed, 24 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-index a70eedc..62e02a4 100644
+index a630b0d..9ab67a6 100644
 --- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
 +++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-@@ -935,6 +935,9 @@ static void cdn_dp_pd_event_work(struct work_struct *work)
+@@ -568,9 +568,7 @@ static void cdn_dp_encoder_mode_set(struct drm_encoder *encoder,
  {
- 	struct cdn_dp_device *dp = container_of(work, struct cdn_dp_device,
- 						event_work);
-+	struct drm_connector *connector = &dp->connector;
-+	enum drm_connector_status old_status;
-+
- 	int ret;
- 	u8 sink_count;
+ 	struct cdn_dp_device *dp = encoder_to_dp(encoder);
+ 	struct drm_display_info *display_info = &dp->connector.display_info;
+-	struct rockchip_crtc_state *state;
+ 	struct video_info *video = &dp->video_info;
+-	int ret, val;
  
-@@ -997,7 +1000,11 @@ static void cdn_dp_pd_event_work(struct work_struct *work)
+ 	switch (display_info->bpc) {
+ 	case 10:
+@@ -585,31 +583,9 @@ static void cdn_dp_encoder_mode_set(struct drm_encoder *encoder,
+ 	}
  
- out:
- 	mutex_unlock(&dp->lock);
--	drm_helper_hpd_irq_event(dp->drm_dev);
-+
-+	old_status = connector->status;
-+	connector->status = connector->funcs->detect(connector, false);
-+	if (old_status != connector->status)
-+		drm_kms_helper_hotplug_event(dp->drm_dev);
+ 	video->color_fmt = PXL_RGB;
+-
+ 	video->v_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NVSYNC);
+ 	video->h_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NHSYNC);
+ 
+-	ret = drm_of_encoder_active_endpoint_id(dp->dev->of_node, encoder);
+-	if (ret < 0) {
+-		DRM_DEV_ERROR(dp->dev, "Could not get vop id, %d", ret);
+-		return;
+-	}
+-
+-	DRM_DEV_DEBUG_KMS(dp->dev, "vop %s output to cdn-dp\n",
+-			  (ret) ? "LIT" : "BIG");
+-	state = to_rockchip_crtc_state(encoder->crtc->state);
+-	if (ret) {
+-		val = DP_SEL_VOP_LIT | (DP_SEL_VOP_LIT << 16);
+-		state->output_mode = ROCKCHIP_OUT_MODE_P888;
+-	} else {
+-		val = DP_SEL_VOP_LIT << 16;
+-		state->output_mode = ROCKCHIP_OUT_MODE_AAAA;
+-	}
+-
+-	ret = cdn_dp_grf_write(dp, GRF_SOC_CON9, val);
+-	if (ret)
+-		return;
+-
+ 	memcpy(&dp->mode, adjusted, sizeof(*mode));
  }
  
- static int cdn_dp_pd_event(struct notifier_block *nb,
+@@ -635,9 +611,32 @@ static bool cdn_dp_check_link_status(struct cdn_dp_device *dp)
+ static void cdn_dp_encoder_enable(struct drm_encoder *encoder)
+ {
+ 	struct cdn_dp_device *dp = encoder_to_dp(encoder);
+-	int ret;
++	int ret, val;
++	struct rockchip_crtc_state *state;
++
++	ret = drm_of_encoder_active_endpoint_id(dp->dev->of_node, encoder);
++	if (ret < 0) {
++		DRM_DEV_ERROR(dp->dev, "Could not get vop id, %d", ret);
++		return;
++	}
++
++	DRM_DEV_DEBUG_KMS(dp->dev, "vop %s output to cdn-dp\n",
++			  (ret) ? "LIT" : "BIG");
++	state = to_rockchip_crtc_state(encoder->crtc->state);
++	if (ret) {
++		val = DP_SEL_VOP_LIT | (DP_SEL_VOP_LIT << 16);
++		state->output_mode = ROCKCHIP_OUT_MODE_P888;
++	} else {
++		val = DP_SEL_VOP_LIT << 16;
++		state->output_mode = ROCKCHIP_OUT_MODE_AAAA;
++	}
++
++	ret = cdn_dp_grf_write(dp, GRF_SOC_CON9, val);
++	if (ret)
++		return;
+ 
+ 	mutex_lock(&dp->lock);
++
+ 	ret = cdn_dp_enable(dp);
+ 	if (ret) {
+ 		DRM_DEV_ERROR(dp->dev, "Failed to enable encoder %d\n",
 -- 
 2.6.3
