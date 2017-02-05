@@ -1,75 +1,130 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 5 Feb 2017 15:37:55 +0000
-Subject: [PATCH v3 06/24] ARM: dts: imx6-sabrelite: add OV5642 and OV5640
- camera sensors
-In-Reply-To: <23975350.L90NWivx6X@avalon>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 05 Feb 2017 17:48:46 +0200
+Subject: [PATCH v3 13/24] platform: add video-multiplexer subdevice driver
+In-Reply-To: <651d7b40-e87d-05ce-ae4d-256b0c1b28f7@gmail.com>
 References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-7-git-send-email-steve_longerbeam@mentor.com>
- <20170130225133.GF27898@n2100.armlinux.org.uk>
- <23975350.L90NWivx6X@avalon>
-Message-ID: <20170205153754.GJ27312@n2100.armlinux.org.uk>
+ <1485259368.3600.126.camel@pengutronix.de>
+ <651d7b40-e87d-05ce-ae4d-256b0c1b28f7@gmail.com>
+Message-ID: <2258037.UCXsIYbtGD@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 05, 2017 at 05:24:30PM +0200, Laurent Pinchart wrote:
-> Hi Russell,
+Hi Steve,
+
+On Tuesday 24 Jan 2017 18:07:55 Steve Longerbeam wrote:
+> On 01/24/2017 04:02 AM, Philipp Zabel wrote:
+> > On Fri, 2017-01-20 at 15:03 +0100, Hans Verkuil wrote:
+> >>> +
+> >>> +int vidsw_g_mbus_config(struct v4l2_subdev *sd, struct v4l2_mbus_config
+> >>> *cfg)
+> >>> +{
+> >>> +	struct vidsw *vidsw = v4l2_subdev_to_vidsw(sd);
+> >>> +	struct media_pad *pad;
+> >>> +	int ret;
+> >>> +
+> >>> +	if (vidsw->active == -1) {
+> >>> +		dev_err(sd->dev, "no configuration for inactive mux\n");
+> >>> +		return -EINVAL;
+> >>> +	}
+> >>> +
+> >>> +	/*
+> >>> +	 * Retrieve media bus configuration from the entity connected to the
+> >>> +	 * active input
+> >>> +	 */
+> >>> +	pad = media_entity_remote_pad(&vidsw->pads[vidsw->active]);
+> >>> +	if (pad) {
+> >>> +		sd = media_entity_to_v4l2_subdev(pad->entity);
+> >>> +		ret = v4l2_subdev_call(sd, video, g_mbus_config, cfg);
+> >>> +		if (ret == -ENOIOCTLCMD)
+> >>> +			pad = NULL;
+> >>> +		else if (ret < 0) {
+> >>> +			dev_err(sd->dev, "failed to get source 
+configuration\n");
+> >>> +			return ret;
+> >>> +		}
+> >>> +	}
+> >>> +	if (!pad) {
+> >>> +		/* Mirror the input side on the output side */
+> >>> +		cfg->type = vidsw->endpoint[vidsw->active].bus_type;
+> >>> +		if (cfg->type == V4L2_MBUS_PARALLEL ||
+> >>> +		    cfg->type == V4L2_MBUS_BT656)
+> >>> +			cfg->flags = vidsw->endpoint[vidsw-
+>active].bus.parallel.flags;
+> >>> +	}
+> >>> +
+> >>> +	return 0;
+> >>> +}
+> >> 
+> >> I am not certain this op is needed at all. In the current kernel this op
+> >> is only used by soc_camera, pxa_camera and omap3isp (somewhat dubious).
+> >> Normally this information should come from the device tree and there
+> >> should be no need for this op.
+> >> 
+> >> My (tentative) long-term plan was to get rid of this op.
+> >> 
+> >> If you don't need it, then I recommend it is removed.
 > 
-> On Monday 30 Jan 2017 22:51:33 Russell King - ARM Linux wrote:
-> > > +			ov5640_to_mipi_csi: endpoint at 1 {
-> > > +				reg = <1>;
-> > > +				remote-endpoint = 
-> <&mipi_csi_from_mipi_sensor>;
-> > > +				data-lanes = <0 1>;
-> > > +				clock-lanes = <2>;
+> Hi Hans, the imx-media driver was only calling g_mbus_config to the camera
+> sensor, and it was doing that to determine the sensor's bus type. This info
+> was already available from parsing a v4l2_of_endpoint from the sensor node.
+> So it was simple to remove the g_mbus_config calls, and instead rely on the
+> parsed sensor v4l2_of_endpoint.
+
+That's not a good point. The imx-media driver must not parse the sensor DT 
+node as it is not aware of what bindings the sensor is compatible with. 
+Information must instead be queried from the sensor subdev at runtime, through 
+the g_mbus_config() operation.
+
+Of course, if you can get the information from the imx-media DT node, that's 
+certainly an option. It's only information provided by the sensor driver that 
+you have no choice but query using a subdev operation.
+
+> > We currently use this to make the CSI capture interface understand
+> > whether its source from the MIPI CSI-2 or from the parallel bus. That is
+> > probably something that should be fixed, but I'm not quite sure how.
 > > 
-> > How do you envision a four-lane sensor being described?
+> > The Synopsys DesignWare MIPI CSI-2 reciever turns the incoming MIPI
+> > CSI-2 signal into a 32-bit parallel pixel bus plus some signals for the
+> > MIPI specific metadata (virtual channel, data type).
 > > 
-> > 	data-lanes = <0 1 3 4>;
-> > 	clock-lanes = <2>;
+> > Then the CSI2IPU gasket turns this input bus into four separate parallel
+> > 16-bit pixel buses plus an 8-bit "mct_di" bus for each of them, that
+> > carries the MIPI metadata. The incoming data is split into the four
+> > outputs according to the MIPI virtual channel.
 > > 
-> > ?
+> > Two of these 16-bit + 8-bit parallel buses are routed through a
+> > multiplexer before finally arriving at the CSI on the other side.
 > > 
-> > The binding document for video-interfaces.txt says:
-> > 
-> > - clock-lanes: an array of physical clock lane indexes. Position of an entry
-> > determines the logical lane number, while the value of an entry indicates
-> > physical lane, e.g. for a MIPI CSI-2 bus we could have "clock-lanes =
-> > <0>;", which places the clock lane on hardware lane 0. This property is
-> > valid for serial busses only (e.g. MIPI CSI-2). Note that for the MIPI
-> > CSI-2 bus this array contains only one entry.
-> > 
-> > So I think you need to have a good reason to make the clock lane non-zero.
+> > We need to configure the CSI to either use or ignore the data from the
+> > 8-bit mct_di bus depending on whether the source of the mux is
+> > configured to the MIPI CSI-2 receiver / CSI2IPU gasket, or to a parallel
+> > input.
 > 
-> The purpose of the data-lanes and clock-lanes properties is to describe lane 
-> assignment for hardware that supports lane routing. As far as I know the 
-> OV5640 doesn't support lane routing and has dedicated pins for the clock and 
-> data lanes. The data-lanes and clock-lanes properties should probably not be 
-> specified at all.
-
-You need at least data-lanes so you know how many data lanes are wired
-between the camera and the mipi csi2 receiver.  Just because a camera
-has (eg) four lanes does not mean you need to wire all four, and in
-some cases less than four will be wired.
-
-If data-lanes does not describe that, then all existing users of the
-binding are abusing it:
-
-$ grep data_lanes drivers/media/i2c -r
-drivers/media/i2c/s5k5baf.c:                state->nlanes = ep.bus.mipi_csi2.num_data_lanes;
-drivers/media/i2c/s5c73m3/s5c73m3-core.c:   if (ep.bus.mipi_csi2.num_data_lanes != S5C73M3_MIPI_DATA_LANES)
-drivers/media/i2c/tc358743.c:           endpoint->bus.mipi_csi2.num_data_lanes == 0 ||
-drivers/media/i2c/smiapp/smiapp-core.c:     hwcfg->lanes = bus_cfg->bus.mipi_csi2.num_data_lanes;
-
-So all those drivers are using it for the _number_ of CSI2 lanes, and
-are not touching the mapping in any way (not even checking that it is
-an identity mapping.)  You could specify any mapping to these drivers,
-as long as num_data_lanes came out right.
-
-And... there's no point having a property in a binding if no one is
-using it... and even more silly not to have a property that everyone
-needs...
+> Philipp, from my experience, the CSI_MIPI_DI register (configured
+> by ipu_csi_set_mipi_datatype()) can only be given a virtual channel 0,
+> otherwise no data is received from the MIPI CSI-2 sensor, regardless
+> of the virtual channel the sensor is transmitting over.
+> 
+> So it seems the info on the 8-bit mct_di buses generated by the CSI2IPU
+> gasket are ignored by the CSI's, at least the virtual channel number is
+> ignored.
+> 
+> For example, if the sensor is transmitting on vc 1, the gasket routes
+> the sensor data to the parallel bus to CSI1. But if CSI_MIPI_DI on CSI1
+> is written with vc 1, no data is received.
+> 
+> Steve
+> 
+> > Currently we let g_mbus_config pretend that even the internal 32-bit +
+> > metadata and 16-bit + 8-bit metadata parallel buses are of type
+> > V4L2_MBUS_CSI so that the CSI can ask the mux, which propagates to the
+> > CSI-2 receiver, if connected.
+> > 
+> > Without g_mbus_config we'd need to get that information from somewhere
+> > else. One possibility would be to extend MEDIA_BUS formats to describe
+> > these "parallelized MIPI data" buses separately.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+
+Laurent Pinchart
