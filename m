@@ -1,50 +1,55 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  5 Feb 2017 19:49:36 +0100
-Subject: [PATCH 0/9] ARM: sun5i: Cleanup and reorganisation of the DTSI
-Message-ID: <cover.8519ab0b2252458a322bea5955d191e63f67100b.1486320544.git-series.maxime.ripard@free-electrons.com>
+Date: Sun,  5 Feb 2017 19:49:38 +0100
+Subject: [PATCH 2/9] ARM: sun5i: a10s: switch simple framebuffer indices
+In-Reply-To: <cover.8519ab0b2252458a322bea5955d191e63f67100b.1486320544.git-series.maxime.ripard@free-electrons.com>
+References: <cover.8519ab0b2252458a322bea5955d191e63f67100b.1486320544.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <5f1f3913705fecab150e11be06b4e560fe2865e2.1486320544.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Of the three simple framebuffer setups we have in the A10s, two of them can
+be shared with the other SoCs from the sun5i family (LCD panel and
+composite output).
 
-Most of the sun5i DTSI have grown organically, some nodes being added to
-SoC DTSI because they were not properly tested, some because old datasheet
-were wrong, and some times because we were not even sure whether it could
-be shared at all, or how to share it.
+However, the only one we cannot share is the HDMI, which is the first
+listed in the A10s DTSI. In order to make it more logical and so that we
+can share the framebuffer nodes in the common DTSI, reorder those nodes.
 
-Now that we have much more details, we can use that opportunity to
-refactor all our DTSI so that we reduce greatly the duplication, especially
-with the GR8 DTSI.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Let me know what you think,
-Maxime
-
-Maxime Ripard (9):
-  ARM: sun5i: A10s: Switch the EMAC pins indices
-  ARM: sun5i: a10s: switch simple framebuffer indices
-  ARM: sunxi: Rename pwm0_pins to match our usual pattern
-  ARM: sun5i: Add UART2 pin group
-  ARM: sun5i: Rename UART3 flow control pins
-  ARM: sun5i: a13: Merge common controllers into the common DTSI
-  ARM: sun5i: a10s: Merge common controllers into the common DTSI
-  ARM: sun5i: r8: Merge common controllers into the common DTSI
-  ARM: sun5i: gr8: Use common sun5i DTSI
-
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts       |   4 +-
- arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts               |   2 +-
- arch/arm/boot/dts/sun5i-a10s.dtsi                      |  76 +-
- arch/arm/boot/dts/sun5i-a13-empire-electronix-d709.dts |   2 +-
- arch/arm/boot/dts/sun5i-a13.dtsi                       | 139 +--
- arch/arm/boot/dts/sun5i-gr8-chip-pro.dts               |   2 +-
- arch/arm/boot/dts/sun5i-gr8-evb.dts                    |   2 +-
- arch/arm/boot/dts/sun5i-gr8.dtsi                       | 617 +----------
- arch/arm/boot/dts/sun5i-r8-chip.dts                    |   2 +-
- arch/arm/boot/dts/sun5i-r8.dtsi                        |  40 +-
- arch/arm/boot/dts/sun5i.dtsi                           | 292 ++++-
- arch/arm/boot/dts/sun8i-a23-a33.dtsi                   |   2 +-
- arch/arm/boot/dts/sunxi-reference-design-tablet.dtsi   |   2 +-
- 13 files changed, 327 insertions(+), 855 deletions(-)
-
-base-commit: 2a6e628efb37432a83bb42b00e3c403b1d8873dd
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index df2ba63d4ff9..0c08b6173d9c 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -61,7 +61,7 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
+-		framebuffer at 0 {
++		framebuffer at 2 {
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0-hdmi";
+@@ -71,7 +71,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		framebuffer at 1 {
++		framebuffer at 0 {
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0";
+@@ -80,7 +80,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		framebuffer at 2 {
++		framebuffer at 1 {
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0-tve0";
 -- 
 git-series 0.8.11
