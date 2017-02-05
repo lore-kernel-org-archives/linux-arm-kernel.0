@@ -1,68 +1,51 @@
-From: flatmax@flatmax.org (Matt Flax)
-Date: Mon, 6 Feb 2017 07:37:03 +1100
-Subject: [alsa-devel] [PATCH] ASoC: bcm2835: Increase channels_max to 8
-In-Reply-To: <20170205163451.4x3svwbqdqlfc7t4@sirena.org.uk>
-References: <1485992264-9058-1-git-send-email-flatmax@flatmax.org>
- <20170204154944.timxhmmibc4kngly@sirena.org.uk>
- <a7f5de09-b07b-638d-466f-525e68ebf0f9@flatmax.org>
- <20170205163451.4x3svwbqdqlfc7t4@sirena.org.uk>
-Message-ID: <aa6b9cbd-e033-eee6-d7f8-8ba8c8e611ab@flatmax.org>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Sun, 5 Feb 2017 22:33:13 +0100
+Subject: [v5,3/7] rtc: ac100: Add RTC driver for X-Powers AC100
+In-Reply-To: <1467988422-17934-4-git-send-email-wens@csie.org>
+References: <1467988422-17934-4-git-send-email-wens@csie.org>
+Message-ID: <20170205213312.pcoxq2di54ur7ncv@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/17 03:34, Mark Brown wrote:
-> On Sun, Feb 05, 2017 at 12:26:31PM +1100, Matt Flax wrote:
->> On 05/02/17 02:49, Mark Brown wrote:
->>> On Thu, Feb 02, 2017 at 10:37:44AM +1100, Matt Flax wrote:
->>> I can't understand how this works.  We're programming the hardware in an
->>> identical fashion for both channel counts, that means that what we're
->> I am not surprised it is confusing, to my knowledge this is the first time
->> that someone has demonstrated this type of I2S signalling.
-> More than stereo I2S?  That is actually a thing, while most people use
-> DSP modes for higher channel counts it's fairly common to have the
-> support especially in CODECs that also support DSP mode since the
-> hardware implementation is fairly straightforward if you abstracted in
-> the bus interface.
->
->> In this case BCM2835 is a clock slave and not concerned with generating the
->> I2S clocks, only receiving - think of all clocks and synchrony being
->> generated/managed in hardware on the sound card.
->> In short the BCM2835 silicon is only concerned with shifting bits into two
->> hardware registers which (after DMA) are interpreted by ALSA according to
->> the specified channel count.
-> Sure, that's what all audio controllers do.  But there's a few problems.
-> One is that nothing in your code that prevents this running in master
-> mode.  Another is that if this *is* for I2S mode then when doing
-> multichannel I2S you usually still respect the left/right indication in
-> LRCLK so you will end up with the data in the in memory format:
->
->    L1 R1 L2 R2 L3 R3 L4 R4
->
-> but multi channel I2S would usually be rendered with all the left
-> channels and all the right channels grouped together so you get:
->
->    L1 L2 L3 L4 R1 R2 R3 R4
->
-> It'll also require exact clocking with no spare bits in order to sync
-> the right channels with the LRCLK switch but that's not so unusual.
-> Looking at the driver it may be possible for the hardware to do DSP
-> modes at which point this gets much easier but right now it only has I2S
-> support, I've got a feeling that the other end of the link may actually
-> be running in a DSP mode.
-You've got it !
+On Fri, Jul 08, 2016 at 10:33:38PM +0800, Chen-Yu Tsai wrote:
+> X-Powers AC100 is a codec / RTC combo chip. This driver supports
+> the RTC sub-device.
 
-This can also work with the BCM2835 in master mode, no reason at this 
-point to limit it to slave mode only.
+Don't we also want to build this driver by default, at least for
+sunxi_defconfig, but possibly for multi_v7_defconfig as well?
 
-I haven't looked into why, but I am getting the correct channel mapping 
-under the hood. To me that is a concern of the higher up levels of the 
-ALSA driver - it was a pleasant surprise when it worked nicely, because 
-to me it indicated a robustly coded system.
+-------------------- >8 --------------------
+Subject: [PATCH] ARM: sunxi_defconfig: Enable AC100 RTC driver
 
-My next patch is to allow DSP modes in this I2S driver. I wanted to make 
-sure that this got through first however.
+Enable the AC100 RTC driver so boards with it can keep track of time.
 
-The majority of these other concerns you mention are controlled at the 
-machine driver level.
+Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
+---
+ arch/arm/configs/sunxi_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Matt
+diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
+index da92c25..5cd5dd70 100644
+--- a/arch/arm/configs/sunxi_defconfig
++++ b/arch/arm/configs/sunxi_defconfig
+@@ -87,6 +87,7 @@ CONFIG_THERMAL_OF=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_SUNXI_WATCHDOG=y
++CONFIG_MFD_AC100=y
+ CONFIG_MFD_AXP20X=y
+ CONFIG_MFD_AXP20X_I2C=y
+ CONFIG_MFD_AXP20X_RSB=y
+@@ -129,6 +130,7 @@ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+ CONFIG_RTC_CLASS=y
+ # CONFIG_RTC_INTF_SYSFS is not set
+ # CONFIG_RTC_INTF_PROC is not set
++CONFIG_RTC_DRV_AC100=y
+ CONFIG_RTC_DRV_SUN6I=y
+ CONFIG_RTC_DRV_SUNXI=y
+ CONFIG_DMADEVICES=y
+-- 
+2.10.2
+
+-- 
+Rask Ingemann Lambertsen
