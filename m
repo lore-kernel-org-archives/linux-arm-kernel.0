@@ -1,37 +1,41 @@
-From: shorne@gmail.com (Stafford Horne)
-Date: Sun,  5 Feb 2017 16:07:33 +0900
-Subject: [PATCH 2/2] staging: vchip_shim: Remove unneeded stddef.h include
-In-Reply-To: <cover.1486276931.git.shorne@gmail.com>
-References: <cover.1486276931.git.shorne@gmail.com>
-Message-ID: <4d0f17e3fc7b9435b0f8fa9fd562b6774596252d.1486276931.git.shorne@gmail.com>
+From: abdallah.meziti.pro@gmail.com (AbdAllah MEZITI)
+Date: Sun, 5 Feb 2017 08:12:26 +0100
+Subject: [PATCH] somedriver: remove the initialization of static pointers.
+In-Reply-To: <20170205002943.GA21184@kroah.com>
+References: <1486237182-4563-1-git-send-email-abdallah.meziti.pro@gmail.com>
+ <20170205002943.GA21184@kroah.com>
+Message-ID: <20170205081226.3c3c681e@GL552JX>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building on openrisc musl toolchain this causes the allyesconfig build
-to fail.
+On Sun, 5 Feb 2017 01:29:43 +0100
+Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
 
-  drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c:42:20:
-  fatal error: stddef.h: No such file or directory
+> On Sat, Feb 04, 2017 at 08:39:21PM +0100, AbdAllah-MEZITI wrote:
+> > In C a static pointer will be initialized to NULL (e.g: draft C99
+> > standard $6.7.8): "If an object that has static storage duration is
+> > not initialized explicitly, then:
+> >  __ if it has pointer type, it is initialized to a null pointer;"
+> > 
+> > Signed-off-by: AbdAllah-MEZITI <abdallah.meziti.pro@gmail.com>  
+> 
+> Your subject is very odd :(
+> 
+> And is that the correct spelling of your name that you use for legal
+> documents?  If not, please fix up when you resend this.
+> 
+> Also, fix the line-wrapping of your changelog, and the C99 standard is
+> not a "draft" anymore, it was released in 1999 :)
+> 
+> thanks,
+> 
+> greg k-h
 
-Removing this causes no issues with the build.
 
-Signed-off-by: Stafford Horne <shorne@gmail.com>
----
- drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c | 2 --
- 1 file changed, 2 deletions(-)
+Do not worry, this is just an answer to the Task 10 of the Eudyptula Challenge.
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-index d977139..70c530c 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-@@ -39,8 +39,6 @@
- 
- #include "vchiq_util.h"
- 
--#include <stddef.h>
--
- #define vchiq_status_to_vchi(status) ((int32_t)status)
- 
- typedef struct {
--- 
-2.9.3
+yes, this is the correct spelling of my name that i use for legal documents.
+
+OK.
+
+AbdAllah MEZITI.
