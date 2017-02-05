@@ -1,104 +1,69 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Sun,  5 Feb 2017 15:55:02 +0800
-Subject: [PATCH v17 7/7] drm/rockchip: cdn-dp: don't configure hardware in
- mode_set
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Sun, 5 Feb 2017 16:42:23 +0800
+Subject: [PATCH v17 0/7] drm/rockchip: Add CDN DP driver
 In-Reply-To: <1486281302-28200-1-git-send-email-zyw@rock-chips.com>
 References: <1486281302-28200-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1486281302-28200-8-git-send-email-zyw@rock-chips.com>
+Message-ID: <5896E56F.6020500@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With atomic modesetting the hardware will be powered off when the
-mode_set function is called.  We should configure the hardware in the
-enable function.
+Hi Chris
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
----
+Applied to my drm-next and already sent pull request to Dave.
 
-Changes in v17: None
+Thanks.
 
- drivers/gpu/drm/rockchip/cdn-dp-core.c | 49 +++++++++++++++++-----------------
- 1 file changed, 24 insertions(+), 25 deletions(-)
+On 2017?02?05? 15:54, Chris Zhong wrote:
+> This series adds support for the CDN DP controller to the rockchip drm
+> driver. This version fixes some coding style error in v16, it post by
+> Sean Paul, you can find it here:
+> 	https://patchwork.kernel.org/patch/9442135/
+>
+> And I sorted out a few patches to fix the following problems:
+> - suspend/resume crash cause by drm_helper_hpd_irq_event
+> - crash during shutdown when cdn-dp failed to bind
+> - check sink count failed after reconnection
+> - suspend/reusme crash in mode_set function
+>
+> I also added these 2 patches to this series, although nothing changed:
+> https://patchwork.kernel.org/patch/9442141/
+> https://patchwork.kernel.org/patch/9442151/
+>
+>
+> Changes in v17:
+> - Correct the clock check condition
+> - Correct the coding style
+> - change LANE_REF_CYC to 0x8000
+>
+> Chris Zhong (4):
+>    drm/rockchip: cdn-dp: add cdn DP support for rk3399
+>    drm/rockchip: cdn-dp: do not use drm_helper_hpd_irq_event
+>    drm/rockchip: cdn-dp: retry to check sink count
+>    drm/rockchip: cdn-dp: don't configure hardware in mode_set
+>
+> Guenter Roeck (2):
+>    drm/rockchip: cdn-dp: Load firmware if no monitor connected
+>    drm/rockchip: cdn-dp: Do not run worker while suspended
+>
+> Jeffy Chen (1):
+>    drm/rockchip: cdn-dp: Move mutex_init to probe
+>
+>   drivers/gpu/drm/rockchip/Kconfig            |   10 +
+>   drivers/gpu/drm/rockchip/Makefile           |    2 +
+>   drivers/gpu/drm/rockchip/cdn-dp-core.c      | 1260 +++++++++++++++++++++++++++
+>   drivers/gpu/drm/rockchip/cdn-dp-core.h      |  112 +++
+>   drivers/gpu/drm/rockchip/cdn-dp-reg.c       |  979 +++++++++++++++++++++
+>   drivers/gpu/drm/rockchip/cdn-dp-reg.h       |  483 ++++++++++
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   13 +-
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.h |    9 +
+>   drivers/gpu/drm/rockchip/rockchip_vop_reg.c |    2 +
+>   9 files changed, 2867 insertions(+), 3 deletions(-)
+>   create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.c
+>   create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.h
+>   create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.c
+>   create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.h
+>
 
-diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-index a630b0d..9ab67a6 100644
---- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
-+++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
-@@ -568,9 +568,7 @@ static void cdn_dp_encoder_mode_set(struct drm_encoder *encoder,
- {
- 	struct cdn_dp_device *dp = encoder_to_dp(encoder);
- 	struct drm_display_info *display_info = &dp->connector.display_info;
--	struct rockchip_crtc_state *state;
- 	struct video_info *video = &dp->video_info;
--	int ret, val;
- 
- 	switch (display_info->bpc) {
- 	case 10:
-@@ -585,31 +583,9 @@ static void cdn_dp_encoder_mode_set(struct drm_encoder *encoder,
- 	}
- 
- 	video->color_fmt = PXL_RGB;
--
- 	video->v_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NVSYNC);
- 	video->h_sync_polarity = !!(mode->flags & DRM_MODE_FLAG_NHSYNC);
- 
--	ret = drm_of_encoder_active_endpoint_id(dp->dev->of_node, encoder);
--	if (ret < 0) {
--		DRM_DEV_ERROR(dp->dev, "Could not get vop id, %d", ret);
--		return;
--	}
--
--	DRM_DEV_DEBUG_KMS(dp->dev, "vop %s output to cdn-dp\n",
--			  (ret) ? "LIT" : "BIG");
--	state = to_rockchip_crtc_state(encoder->crtc->state);
--	if (ret) {
--		val = DP_SEL_VOP_LIT | (DP_SEL_VOP_LIT << 16);
--		state->output_mode = ROCKCHIP_OUT_MODE_P888;
--	} else {
--		val = DP_SEL_VOP_LIT << 16;
--		state->output_mode = ROCKCHIP_OUT_MODE_AAAA;
--	}
--
--	ret = cdn_dp_grf_write(dp, GRF_SOC_CON9, val);
--	if (ret)
--		return;
--
- 	memcpy(&dp->mode, adjusted, sizeof(*mode));
- }
- 
-@@ -635,9 +611,32 @@ static bool cdn_dp_check_link_status(struct cdn_dp_device *dp)
- static void cdn_dp_encoder_enable(struct drm_encoder *encoder)
- {
- 	struct cdn_dp_device *dp = encoder_to_dp(encoder);
--	int ret;
-+	int ret, val;
-+	struct rockchip_crtc_state *state;
-+
-+	ret = drm_of_encoder_active_endpoint_id(dp->dev->of_node, encoder);
-+	if (ret < 0) {
-+		DRM_DEV_ERROR(dp->dev, "Could not get vop id, %d", ret);
-+		return;
-+	}
-+
-+	DRM_DEV_DEBUG_KMS(dp->dev, "vop %s output to cdn-dp\n",
-+			  (ret) ? "LIT" : "BIG");
-+	state = to_rockchip_crtc_state(encoder->crtc->state);
-+	if (ret) {
-+		val = DP_SEL_VOP_LIT | (DP_SEL_VOP_LIT << 16);
-+		state->output_mode = ROCKCHIP_OUT_MODE_P888;
-+	} else {
-+		val = DP_SEL_VOP_LIT << 16;
-+		state->output_mode = ROCKCHIP_OUT_MODE_AAAA;
-+	}
-+
-+	ret = cdn_dp_grf_write(dp, GRF_SOC_CON9, val);
-+	if (ret)
-+		return;
- 
- 	mutex_lock(&dp->lock);
-+
- 	ret = cdn_dp_enable(dp);
- 	if (ret) {
- 		DRM_DEV_ERROR(dp->dev, "Failed to enable encoder %d\n",
+
 -- 
-2.6.3
+?ark Yao
