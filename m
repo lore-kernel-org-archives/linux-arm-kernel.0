@@ -1,39 +1,37 @@
 From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Sun, 5 Feb 2017 00:57:02 +0000
-Subject: [PATCH v2 1/5] arm64: add THUNDER2 processor family
+Date: Sun, 5 Feb 2017 00:57:03 +0000
+Subject: [PATCH v2 2/5] MAINTAINERS: Add Cavium ThunderX2 entry
 In-Reply-To: <1486256226-43889-1-git-send-email-jnair@caviumnetworks.com>
 References: <1486256226-43889-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <1486256226-43889-2-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <1486256226-43889-3-git-send-email-jnair@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for ThunderX2 CN99XX arm64 server processors.
-
-Introduce a new arm64 platform config option ARCH_THUNDER2 for these
-processors.
+Add maintainer information for Cavium ThunderX2 ARM64 processor
+family.
 
 Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
 ---
- arch/arm64/Kconfig.platforms | 7 +++++++
+ MAINTAINERS | 7 +++++++
  1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 715ef12..129cc5a 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -190,6 +190,13 @@ config ARCH_THUNDER
- 	help
- 	  This enables support for Cavium's Thunder Family of SoCs.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 187b961..4f788ad 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2972,6 +2972,13 @@ S:	Maintained
+ F:	drivers/iio/light/cm*
+ F:	Documentation/devicetree/bindings/i2c/trivial-admin-guide/devices.rst
  
-+config ARCH_THUNDER2
-+	bool "Cavium ThunderX2 Server Processors"
-+	select GPIOLIB
-+	help
-+	  This enables support for Cavium's ThunderX2 CN99XX family of
-+	  server processors.
++CAVIUM THUNDERX2 ARM64 SOC
++M:	Jayachandran C <jnair@caviumnetworks.com>
++L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++S:	Maintained
++F:	arch/arm64/boot/dts/cavium/thunder-99xx*
++F:	Documentation/devicetree/bindings/arm/cavium-thunder2.txt
 +
- config ARCH_UNIPHIER
- 	bool "Socionext UniPhier SoC Family"
- 	select ARCH_HAS_RESET_CONTROLLER
+ CAVIUM I2C DRIVER
+ M:	Jan Glauber <jglauber@cavium.com>
+ M:	David Daney <david.daney@cavium.com>
 -- 
 2.7.4
