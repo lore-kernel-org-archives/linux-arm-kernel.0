@@ -1,238 +1,241 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Sun, 5 Feb 2017 11:36:57 +0530
-Subject: [PATCH 5/6] dmaengine: Add Broadcom SBA RAID driver
-In-Reply-To: <1486010836-25228-6-git-send-email-anup.patel@broadcom.com>
-References: <1486010836-25228-1-git-send-email-anup.patel@broadcom.com>
- <1486010836-25228-6-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20170205060657.GV19244@localhost>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Sun, 5 Feb 2017 12:21:11 +0530
+Subject: [PATCH V8 08/11] drivers: acpi: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <3d32202c-4127-e808-414b-6067178f150d@arm.com>
+References: <1486136933-20328-1-git-send-email-sricharan@codeaurora.org>
+ <1486136933-20328-9-git-send-email-sricharan@codeaurora.org>
+ <017301d27e38$cc361350$64a239f0$@codeaurora.org>
+ <3d32202c-4127-e808-414b-6067178f150d@arm.com>
+Message-ID: <000c01d27f7c$43593e00$ca0bba00$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 10:17:15AM +0530, Anup Patel wrote:
-> +config BCM_SBA_RAID
-> +        tristate "Broadcom SBA RAID engine support"
-> +        depends on (ARM64 && MAILBOX && RAID6_PQ) || COMPILE_TEST
-> +        select DMA_ENGINE
-> +        select DMA_ENGINE_RAID
-> +	select ASYNC_TX_ENABLE_CHANNEL_SWITCH
-> +	default ARCH_BCM_IPROC
+Hi Robin,
 
-whats with the funny alignement?
+>>
+>>> -----Original Message-----
+>>> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Sricharan R
+>>> Sent: Friday, February 03, 2017 9:19 PM
+>>> To: robin.murphy at arm.com; will.deacon at arm.com; joro at 8bytes.org; lorenzo.pieralisi at arm.com; iommu at lists.linux-
+>foundation.org;
+>>> linux-arm-kernel at lists.infradead.org; linux-arm-msm at vger.kernel.org; m.szyprowski at samsung.com; bhelgaas at google.com;
+>linux-
+>>> pci at vger.kernel.org; linux-acpi at vger.kernel.org; tn at semihalf.com; hanjun.guo at linaro.org; okaya at codeaurora.org
+>>> Cc: sricharan at codeaurora.org
+>>> Subject: [PATCH V8 08/11] drivers: acpi: Handle IOMMU lookup failure with deferred probing or error
+>>>
+>>> This is an equivalent to the DT's handling of the iommu master's probe
+>>> with deferred probing when the corrsponding iommu is not probed yet.
+>>> The lack of a registered IOMMU can be caused by the lack of a driver for
+>>> the IOMMU, the IOMMU device probe not having been performed yet, having
+>>> been deferred, or having failed.
+>>>
+>>> The first case occurs when the firmware describes the bus master and
+>>> IOMMU topology correctly but no device driver exists for the IOMMU yet
+>>> or the device driver has not been compiled in. Return NULL, the caller
+>>> will configure the device without an IOMMU.
+>>>
+>>> The second and third cases are handled by deferring the probe of the bus
+>>> master device which will eventually get reprobed after the IOMMU.
+>>>
+>>> The last case is currently handled by deferring the probe of the bus
+>>> master device as well. A mechanism to either configure the bus master
+>>> device without an IOMMU or to fail the bus master device probe depending
+>>> on whether the IOMMU is optional or mandatory would be a good
+>>> enhancement.
+>>>
+>>> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>>> ---
+>>> drivers/acpi/arm64/iort.c  | 25 ++++++++++++++++++++++++-
+>>> drivers/acpi/scan.c        |  7 +++++--
+>>> drivers/base/dma-mapping.c |  2 +-
+>>> include/acpi/acpi_bus.h    |  2 +-
+>>> include/linux/acpi.h       |  7 +++++--
+>>> 5 files changed, 36 insertions(+), 7 deletions(-)
+>>>
+>>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+>>> index bf0ed09..d01bae8 100644
+>>> --- a/drivers/acpi/arm64/iort.c
+>>> +++ b/drivers/acpi/arm64/iort.c
+>>> @@ -550,8 +550,17 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+>>> 			return NULL;
+>>>
+>>> 		ops = iommu_get_instance(iort_fwnode);
+>>> +		/*
+>>> +		 * If the ops look-up fails, this means that either
+>>> +		 * the SMMU drivers have not been probed yet or that
+>>> +		 * the SMMU drivers are not built in the kernel;
+>>> +		 * Depending on whether the SMMU drivers are built-in
+>>> +		 * in the kernel or not, defer the IOMMU configuration
+>>> +		 * or just abort it.
+>>> +		 */
+>>> 		if (!ops)
+>>> -			return NULL;
+>>> +			return iort_iommu_driver_enabled(node->type) ?
+>>> +			       ERR_PTR(-EPROBE_DEFER) : NULL;
+>>>
+>>> 		ret = arm_smmu_iort_xlate(dev, streamid, iort_fwnode, ops);
+>>> 	}
+>>> @@ -625,12 +634,26 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
+>>>
+>>> 		while (parent) {
+>>> 			ops = iort_iommu_xlate(dev, parent, streamid);
+>>> +			if (IS_ERR_OR_NULL(ops))
+>>> +				return ops;
+>>>
+>>> 			parent = iort_node_get_id(node, &streamid,
+>>> 						  IORT_IOMMU_TYPE, i++);
+>>> 		}
+>>> 	}
+>>>
+>>> +	/*
+>>> +	 * If we have reason to believe the IOMMU driver missed the initial
+>>> +	 * add_device callback for dev, replay it to get things in order.
+>>> +	 */
+>>> +	if (!IS_ERR_OR_NULL(ops) && ops->add_device &&
+>>> +	    dev->bus && !dev->iommu_group) {
+>>> +		int err = ops->add_device(dev);
+>>> +
+>>> +		if (err)
+>>> +			ops = ERR_PTR(err);
+>>> +	}
+>>> +
+>>
+>> On the last post we discussed that the above replay hunk can be made
+>> common. In trying to do that, i ended up with a patch like below. But not
+>> sure if that should be a part of this series though. I tested with OF devices
+>> and would have to be tested with ACPI devices once. Nothing changes
+>> functionally because of this ideally. Should be split in two patches though.
+>>
+>> Regards,
+>>  Sricharan
+>>
+>> From aafbf2c97375a086327504f2367eaf9197c719b1 Mon Sep 17 00:00:00 2001
+>> From: Sricharan R <sricharan@codeaurora.org>
+>> Date: Fri, 3 Feb 2017 15:24:47 +0530
+>> Subject: [PATCH] drivers: iommu: Add iommu_add_device api
+>>
+>> The code to call IOMMU driver's add_device is same
+>> for both OF and ACPI cases. So add an api which can
+>> be shared across both the places.
+>>
+>> Also, now with probe-deferral the iommu master devices gets
+>> added to the respective iommus during probe time instead
+>> of device creation time. The xlate callbacks of iommu
+>> drivers are also called only at probe time. As a result
+>> the add_iommu_group which gets called when the iommu is
+>> registered to add all devices created before the iommu
+>> becomes dummy. Similar the BUS_NOTIFY_ADD_DEVICE notification
+>> also is not needed. So just cleanup those code.
+>>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>  drivers/acpi/arm64/iort.c | 12 +-------
+>>  drivers/iommu/iommu.c     | 70 ++++++++++++-----------------------------------
+>>  drivers/iommu/of_iommu.c  | 11 +-------
+>>  include/linux/iommu.h     |  8 ++++++
+>>  4 files changed, 27 insertions(+), 74 deletions(-)
+>>
+>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+>> index ac45623..ab2a554 100644
+>> --- a/drivers/acpi/arm64/iort.c
+>> +++ b/drivers/acpi/arm64/iort.c
+>> @@ -642,17 +642,7 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
+>>                 }
+>>         }
+>>
+>> -       /*
+>> -        * If we have reason to believe the IOMMU driver missed the initial
+>> -        * add_device callback for dev, replay it to get things in order.
+>> -        */
+>> -       if (!IS_ERR_OR_NULL(ops) && ops->add_device &&
+>> -           dev->bus && !dev->iommu_group) {
+>> -               int err = ops->add_device(dev);
+>> -
+>> -               if (err)
+>> -                       ops = ERR_PTR(err);
+>> -       }
+>> +       ops = iommu_add_device(dev, ops);
+>>
+>>         return ops;
+>>  }
+>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+>> index b752c3d..750552d 100644
+>> --- a/drivers/iommu/iommu.c
+>> +++ b/drivers/iommu/iommu.c
+>> @@ -1015,41 +1015,6 @@ struct iommu_domain *iommu_group_default_domain(struct iommu_group *group)
+>>         return group->default_domain;
+>>  }
+>>
+>> -static int add_iommu_group(struct device *dev, void *data)
+>> -{
+>> -       struct iommu_callback_data *cb = data;
+>> -       const struct iommu_ops *ops = cb->ops;
+>> -       int ret;
+>> -
+>> -       if (!ops->add_device)
+>> -               return 0;
+>> -
+>> -       WARN_ON(dev->iommu_group);
+>> -
+>> -       ret = ops->add_device(dev);
+>> -
+>> -       /*
+>> -        * We ignore -ENODEV errors for now, as they just mean that the
+>> -        * device is not translated by an IOMMU. We still care about
+>> -        * other errors and fail to initialize when they happen.
+>> -        */
+>> -       if (ret == -ENODEV)
+>> -               ret = 0;
+>> -
+>> -       return ret;
+>> -}
+>> -
+>> -static int remove_iommu_group(struct device *dev, void *data)
+>> -{
+>> -       struct iommu_callback_data *cb = data;
+>> -       const struct iommu_ops *ops = cb->ops;
+>> -
+>> -       if (ops->remove_device && dev->iommu_group)
+>> -               ops->remove_device(dev);
+>> -
+>> -       return 0;
+>> -}
+>> -
+>>  static int iommu_bus_notifier(struct notifier_block *nb,
+>>                               unsigned long action, void *data)
+>>  {
+>> @@ -1059,13 +1024,10 @@ static int iommu_bus_notifier(struct notifier_block *nb,
+>>         unsigned long group_action = 0;
+>>
+>>         /*
+>> -        * ADD/DEL call into iommu driver ops if provided, which may
+>> +        * DEL call into iommu driver ops if provided, which may
+>>          * result in ADD/DEL notifiers to group->notifier
+>>          */
+>> -       if (action == BUS_NOTIFY_ADD_DEVICE) {
+>> -               if (ops->add_device)
+>> -                       return ops->add_device(dev);
+>
+>I'm pretty sure this completely breaks x86 and anyone else...
+>
 
-> +/* SBA command related defines */
-> +#define SBA_TYPE_SHIFT					48
-> +#define SBA_TYPE_MASK					0x3
-> +#define SBA_TYPE_A					0x0
-> +#define SBA_TYPE_B					0x2
-> +#define SBA_TYPE_C					0x3
-> +#define SBA_USER_DEF_SHIFT				32
-> +#define SBA_USER_DEF_MASK				0xffff
-> +#define SBA_R_MDATA_SHIFT				24
-> +#define SBA_R_MDATA_MASK				0xff
-> +#define SBA_C_MDATA_MS_SHIFT				18
-> +#define SBA_C_MDATA_MS_MASK				0x3
-> +#define SBA_INT_SHIFT					17
-> +#define SBA_INT_MASK					0x1
-> +#define SBA_RESP_SHIFT					16
-> +#define SBA_RESP_MASK					0x1
-> +#define SBA_C_MDATA_SHIFT				8
-> +#define SBA_C_MDATA_MASK				0xff
-> +#define SBA_CMD_SHIFT					0
-> +#define SBA_CMD_MASK					0xf
-> +#define SBA_CMD_ZERO_ALL_BUFFERS			0x8
-> +#define SBA_CMD_LOAD_BUFFER				0x9
-> +#define SBA_CMD_XOR					0xa
-> +#define SBA_CMD_GALOIS_XOR				0xb
-> +#define SBA_CMD_ZERO_BUFFER				0x4
-> +#define SBA_CMD_WRITE_BUFFER				0xc
+ha, i just missed thinking about non-arm, for this super cleanup :)
 
-Try using BIT and GENMAST for hardware descriptions
+>Anyway, I'd be inclined to leave this alone for now - it's essentially
+>just a workaround to mesh the per-instance probing behaviour with the
+>per-bus ops model, so it's bound to be a bit ugly. Moving the IOMMU core
+>code over to a per-instance model will inevitably subsume the underlying
+>problem, and I think a bit of duplication is probably the lesser of two
+>evils in the meantime. On which note, I need to have a good look at
+>Joerg's shiny new series :)
+>
 
-> +
-> +/* SBA C_MDATA helper macros */
-> +#define SBA_C_MDATA_LOAD_VAL(__bnum0)		((__bnum0) & 0x3)
-> +#define SBA_C_MDATA_WRITE_VAL(__bnum0)		((__bnum0) & 0x3)
-> +#define SBA_C_MDATA_XOR_VAL(__bnum1, __bnum0)			\
-> +			({	u32 __v = ((__bnum0) & 0x3);	\
-> +				__v |= ((__bnum1) & 0x3) << 2;	\
-> +				__v;				\
-> +			})
-> +#define SBA_C_MDATA_PQ_VAL(__dnum, __bnum1, __bnum0)		\
-> +			({	u32 __v = ((__bnum0) & 0x3);	\
-> +				__v |= ((__bnum1) & 0x3) << 2;	\
-> +				__v |= ((__dnum) & 0x1f) << 5;	\
-> +				__v;				\
-> +			})
+Agree, better way for this cleanup is with the per-instance model and let
+the series go otherwise.
 
-ah why are we usig complex macros, why can't these be simple functions..
-
-> +#define SBA_C_MDATA_LS(__c_mdata_val)	((__c_mdata_val) & 0xff)
-> +#define SBA_C_MDATA_MS(__c_mdata_val)	(((__c_mdata_val) >> 8) & 0x3)
-> +
-> +/* Driver helper macros */
-> +#define to_sba_request(tx)		\
-> +	container_of(tx, struct sba_request, tx)
-> +#define to_sba_device(dchan)		\
-> +	container_of(dchan, struct sba_device, dma_chan)
-> +
-> +enum sba_request_state {
-> +	SBA_REQUEST_STATE_FREE = 1,
-> +	SBA_REQUEST_STATE_ALLOCED = 2,
-> +	SBA_REQUEST_STATE_PENDING = 3,
-> +	SBA_REQUEST_STATE_ACTIVE = 4,
-> +	SBA_REQUEST_STATE_COMPLETED = 5,
-> +	SBA_REQUEST_STATE_ABORTED = 6,
-
-whats up with a very funny indentation setting, we use 8 chars.
-
-Please re-read the Documentation/process/coding-style.rst
-
-> +static int sba_alloc_chan_resources(struct dma_chan *dchan)
-> +{
-> +	/*
-> +	 * We only have one channel so we have pre-alloced
-> +	 * channel resources. Over here we just return number
-> +	 * of free request.
-> +	 */
-> +	return sba_free_request_count(to_sba_device(dchan));
-> +}
-
-essentially you are not doing much, so you can skip it. Its an optional
-call.
-
-> +static void sba_free_chan_resources(struct dma_chan *dchan)
-> +{
-> +	/*
-> +	 * Channel resources are pre-alloced so we just free-up
-> +	 * whatever we can so that we can re-use pre-alloced
-> +	 * channel resources next time.
-> +	 */
-> +	sba_cleanup_inflight_requests(to_sba_device(dchan));
-
-well this one checks for pending requests as well, which shouldn't be there
-when freeing a channel, something seems not quite right here..
-
-> +static int sba_send_mbox_request(struct sba_device *sba,
-> +				 struct sba_request *req)
-> +{
-> +	int mchans_idx, ret = 0;
-> +
-> +	/* Select mailbox channel in round-robin fashion */
-> +	mchans_idx = atomic_inc_return(&sba->mchans_current);
-> +	mchans_idx = mchans_idx % sba->mchans_count;
-> +
-> +	/* Send batch message for the request */
-> +	req->bmsg.batch.msgs_queued = 0;
-> +	ret = mbox_send_message(sba->mchans[mchans_idx], &req->bmsg);
-> +	if (ret < 0) {
-> +		dev_info(sba->dev, "channel %d message %d (total %d)",
-> +			 mchans_idx, req->bmsg.batch.msgs_queued,
-> +			 req->bmsg.batch.msgs_count);
-
-dev_err?
-
-> +		dev_err(sba->dev, "send message failed with error %d", ret);
-> +		return ret;
-> +	}
-> +	ret = req->bmsg.error;
-> +	if (ret < 0) {
-> +		dev_info(sba->dev,
-> +			 "mbox channel %d message %d (total %d)",
-> +			 mchans_idx, req->bmsg.batch.msgs_queued,
-> +			 req->bmsg.batch.msgs_count);
-
-same here
-
-> +static dma_cookie_t sba_tx_submit(struct dma_async_tx_descriptor *tx)
-> +{
-> +	unsigned long flags;
-> +	dma_cookie_t cookie;
-> +	struct sba_request *req;
-> +	struct sba_device *sba;
-> +
-> +	if (unlikely(!tx))
-> +		return -EINVAL;
-> +
-> +	sba = to_sba_device(tx->chan);
-> +	req = to_sba_request(tx);
-> +
-> +	/* Assign cookie and mark request pending */
-> +	spin_lock_irqsave(&sba->reqs_lock, flags);
-> +	cookie = dma_cookie_assign(tx);
-> +	_sba_pending_request(sba, req);
-> +	spin_unlock_irqrestore(&sba->reqs_lock, flags);
-> +
-> +	/* Try to submit pending request */
-> +	sba_issue_pending(&sba->dma_chan);
-
-Nope, thats wrong, caller needs to call .issue_pending for that
-
-> +static enum dma_status sba_tx_status(struct dma_chan *dchan,
-> +				     dma_cookie_t cookie,
-> +				     struct dma_tx_state *txstate)
-> +{
-> +	int mchan_idx;
-> +	enum dma_status ret;
-> +	struct sba_device *sba = to_sba_device(dchan);
-> +
-> +	ret = dma_cookie_status(dchan, cookie, txstate);
-> +	if (ret == DMA_COMPLETE)
-> +		return ret;
-> +
-> +	for (mchan_idx = 0; mchan_idx < sba->mchans_count; mchan_idx++)
-> +		mbox_client_peek_data(sba->mchans[mchan_idx]);
-
-what is this achieving?
-
-> +static struct dma_async_tx_descriptor *
-> +sba_prep_dma_memcpy(struct dma_chan *dchan, dma_addr_t dst, dma_addr_t src,
-> +		    size_t len, unsigned long flags)
-> +{
-> +	size_t msg_len;
-> +	dma_addr_t msg_offset = 0;
-> +	unsigned int msgs_count = 0, cmds_count, cmds_idx = 0;
-> +	struct sba_device *sba = to_sba_device(dchan);
-> +	struct sba_request *req = NULL;
-> +
-> +	/* Sanity checks */
-> +	if (unlikely(len > sba->req_size))
-> +		return NULL;
-
-why is that an error, you can create multiple txn of max length
-
-> +static int sba_async_register(struct sba_device *sba)
-> +{
-> +	int ret;
-> +	struct dma_device *dma_dev = &sba->dma_dev;
-> +
-> +	/* Initialize DMA channel cookie */
-> +	sba->dma_chan.device = dma_dev;
-> +	dma_cookie_init(&sba->dma_chan);
-> +
-> +	/* Initialize DMA device capability mask */
-> +	dma_cap_zero(dma_dev->cap_mask);
-> +	dma_cap_set(DMA_MEMCPY, dma_dev->cap_mask);
-> +	dma_cap_set(DMA_XOR, dma_dev->cap_mask);
-> +	dma_cap_set(DMA_PQ, dma_dev->cap_mask);
-> +
-> +	/*
-> +	 * Set mailbox channel device as the base device of
-> +	 * our dma_device because the actual memory accesses
-> +	 * will be done by mailbox controller
-> +	 */
-> +	dma_dev->dev = sba->mbox_dev;
-> +
-> +	/* Set base prep routines */
-> +	dma_dev->device_alloc_chan_resources = sba_alloc_chan_resources;
-> +	dma_dev->device_free_chan_resources = sba_free_chan_resources;
-> +	dma_dev->device_issue_pending = sba_issue_pending;
-> +	dma_dev->device_tx_status = sba_tx_status;
-
-Please add terminate callback support, also add the capabilities, we need to
-advertise that and use in clients
-
-Also you can simplify bunch of code by using virt-chan support for managing
-channels and descriptors
-
--- 
-~Vinod
+Regards,
+ Sricharan
