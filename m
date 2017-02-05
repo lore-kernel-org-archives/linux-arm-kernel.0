@@ -1,41 +1,19 @@
-From: abdallah.meziti.pro@gmail.com (AbdAllah MEZITI)
-Date: Sun, 5 Feb 2017 08:12:26 +0100
-Subject: [PATCH] somedriver: remove the initialization of static pointers.
-In-Reply-To: <20170205002943.GA21184@kroah.com>
-References: <1486237182-4563-1-git-send-email-abdallah.meziti.pro@gmail.com>
- <20170205002943.GA21184@kroah.com>
-Message-ID: <20170205081226.3c3c681e@GL552JX>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sun, 5 Feb 2017 12:49:44 +0530
+Subject: [PATCH v3 08/10] dmaengine: sun6i: allow build on ARM64
+ platforms (sun50i)
+In-Reply-To: <20170129023331.62106-9-icenowy@aosc.xyz>
+References: <20170129023331.62106-1-icenowy@aosc.xyz>
+ <20170129023331.62106-9-icenowy@aosc.xyz>
+Message-ID: <20170205071944.GW19244@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 5 Feb 2017 01:29:43 +0100
-Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
+On Sun, Jan 29, 2017 at 10:33:29AM +0800, Icenowy Zheng wrote:
+> As 64-bit Allwinner H5 SoC has the same DMA engine with H3, the DMA
+> driver should be allowed to be built for ARM64, in order to make it work on H5.
 
-> On Sat, Feb 04, 2017 at 08:39:21PM +0100, AbdAllah-MEZITI wrote:
-> > In C a static pointer will be initialized to NULL (e.g: draft C99
-> > standard $6.7.8): "If an object that has static storage duration is
-> > not initialized explicitly, then:
-> >  __ if it has pointer type, it is initialized to a null pointer;"
-> > 
-> > Signed-off-by: AbdAllah-MEZITI <abdallah.meziti.pro@gmail.com>  
-> 
-> Your subject is very odd :(
-> 
-> And is that the correct spelling of your name that you use for legal
-> documents?  If not, please fix up when you resend this.
-> 
-> Also, fix the line-wrapping of your changelog, and the C99 standard is
-> not a "draft" anymore, it was released in 1999 :)
-> 
-> thanks,
-> 
-> greg k-h
+Applied, thanks
 
-
-Do not worry, this is just an answer to the Task 10 of the Eudyptula Challenge.
-
-yes, this is the correct spelling of my name that i use for legal documents.
-
-OK.
-
-AbdAllah MEZITI.
+-- 
+~Vinod
