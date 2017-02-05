@@ -1,136 +1,165 @@
-From: mark.yao@rock-chips.com (Mark Yao)
-Date: Sun,  5 Feb 2017 15:36:36 +0800
-Subject: [PATCH 1/2] drm/rockchip: support mode_valid for crtc
-Message-ID: <1486280197-1585-1-git-send-email-mark.yao@rock-chips.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Sun, 5 Feb 2017 15:42:22 +0800
+Subject: [PATCH v3 3/5] drm/rockchip/dsi: remove mode_valid function
+In-Reply-To: <58969F32.9010003@rock-chips.com>
+References: <1484907051-7159-1-git-send-email-zyw@rock-chips.com>
+ <1484907051-7159-4-git-send-email-zyw@rock-chips.com>
+ <20170123174841.GB25789@trickycodes.roam.corp.google.com>
+ <5886BB8F.6040707@rock-chips.com> <20170201181218.GA8595@art_vandelay>
+ <58969F32.9010003@rock-chips.com>
+Message-ID: <5896D75E.5020501@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drm crtc already has mode_fixup callback to can do mode check, but
-We actually want to valid display mode on connector getmode time,
-mode_fixup can't do it.
+On 2017?02?05? 11:42, Chris Zhong wrote:
+>
+>
+> On 02/02/2017 02:12 AM, Sean Paul wrote:
+>> On Tue, Jan 24, 2017 at 10:27:27AM +0800, Chris Zhong wrote:
+>>> Hi Sean
+>>>
+>>> On 01/24/2017 01:48 AM, Sean Paul wrote:
+>>>> On Fri, Jan 20, 2017 at 06:10:49PM +0800, Chris Zhong wrote:
+>>>>> The MIPI DSI do not need check the validity of resolution, the max
+>>>>> resolution should depend VOP. Hence, remove 
+>>>>> rk3288_mipi_dsi_mode_valid
+>>>>> here.
+>>>> Does vop actually enforce this, though? I see that 
+>>>> mode_config.max_width is
+>>>> 4096, but there is no bounds checking in mode_fixup().
+>>>>
+>>>> The connector is currently rejecting everything greater than 2047. 
+>>>> So I think
+>>>> you're going to regress behavior here.
+>>>>
+>>>> Sean
+>>> The mipi controller has not this width limit, it depend the VOP,
+>>> such as RK3399, VOP_LIT only support 2560,
+>>> but VOP_BIG support 4K. So this driver should check the width here.
+>> I don't see anything in the vop driver that rejects large modes for 
+>> little vop.
+>> So, while I agree the check shouldn't be here, you should move it to 
+>> where it
+>> should be instead of removing it entirely.
+>>
+>> Sean
+>
+> drm_mode_validate_size will check the dev->mode_config.max_width and
+> dev->mode_config.max_height, these 2 value come from 
+> rockchip_drm_mode_config_init,
+> currently, they are both 4096. So you are right, drm driver does not 
+> distinguish
+> between vop lit and big.
+>
+> I think Mark Yao already have a local solution, and he will post it soon.
+Hi
 
-So add a private mode_valid callback to rockchip crtc, connectors can
-check mode with this mode_valid callback.
+See follow patches, support mode valid with vop callback.
 
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h |  2 ++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 15 +++++++++++++++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h |  7 +++++++
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 13 +++++++++++++
- 4 files changed, 37 insertions(+)
+[0] https://patchwork.kernel.org/patch/9555943/
+[1] https://patchwork.kernel.org/patch/9555945/
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-index fb6226c..d10b15c 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-@@ -39,6 +39,8 @@
- struct rockchip_crtc_funcs {
- 	int (*enable_vblank)(struct drm_crtc *crtc);
- 	void (*disable_vblank)(struct drm_crtc *crtc);
-+	enum drm_mode_status (*mode_valid)(struct drm_crtc *crtc,
-+					   const struct drm_display_mode *mode);
- };
- 
- struct rockchip_crtc_state {
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index fb5f001..256fe73 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -853,9 +853,24 @@ static void vop_crtc_disable_vblank(struct drm_crtc *crtc)
- 	spin_unlock_irqrestore(&vop->irq_lock, flags);
- }
- 
-+static enum drm_mode_status
-+vop_crtc_mode_valid(struct drm_crtc *crtc, const struct drm_display_mode *mode)
-+{
-+	struct vop *vop = to_vop(crtc);
-+	const struct vop_data *vop_data = vop->data;
-+
-+	if (mode->hdisplay > vop_data->max_output.width)
-+		return MODE_BAD_HVALUE;
-+	if (mode->vdisplay > vop_data->max_output.height)
-+		return MODE_BAD_VVALUE;
-+
-+	return MODE_OK;
-+}
-+
- static const struct rockchip_crtc_funcs private_crtc_funcs = {
- 	.enable_vblank = vop_crtc_enable_vblank,
- 	.disable_vblank = vop_crtc_disable_vblank,
-+	.mode_valid = vop_crtc_mode_valid,
- };
- 
- static bool vop_crtc_mode_fixup(struct drm_crtc *crtc,
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-index 1dbc526..9e9dba1 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
-@@ -133,6 +133,11 @@ struct vop_win_data {
- 	enum drm_plane_type type;
- };
- 
-+struct vop_rect {
-+	int width;
-+	int height;
-+};
-+
- struct vop_data {
- 	const struct vop_reg_data *init_table;
- 	unsigned int table_size;
-@@ -140,6 +145,8 @@ struct vop_data {
- 	const struct vop_intr *intr;
- 	const struct vop_win_data *win;
- 	unsigned int win_size;
-+	struct vop_rect max_input;
-+	struct vop_rect max_output;
- };
- 
- /* interrupt define */
-diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-index 35c51f3..0c72361 100644
---- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-@@ -132,6 +132,8 @@
- };
- 
- static const struct vop_data rk3036_vop = {
-+	.max_input = { 1920, 1080},
-+	.max_output = { 1920, 1080},
- 	.init_table = rk3036_vop_init_reg_table,
- 	.table_size = ARRAY_SIZE(rk3036_vop_init_reg_table),
- 	.ctrl = &rk3036_ctrl_data,
-@@ -273,6 +275,13 @@
- };
- 
- static const struct vop_data rk3288_vop = {
-+	.max_input = { 4096, 8192},
-+	/*
-+	 * TODO: rk3288 have two vop, big one support 3840x2160,
-+	 * little one only support 2560x1600.
-+	 * Now force use 3840x2160.
-+	 */
-+	.max_output = { 3840, 2160},
- 	.init_table = rk3288_init_reg_table,
- 	.table_size = ARRAY_SIZE(rk3288_init_reg_table),
- 	.intr = &rk3288_vop_intr,
-@@ -339,6 +348,8 @@
- };
- 
- static const struct vop_data rk3399_vop_big = {
-+	.max_input = { 4096, 8192},
-+	.max_output = { 4096, 2160},
- 	.init_table = rk3399_init_reg_table,
- 	.table_size = ARRAY_SIZE(rk3399_init_reg_table),
- 	.intr = &rk3399_vop_intr,
-@@ -358,6 +369,8 @@
- };
- 
- static const struct vop_data rk3399_vop_lit = {
-+	.max_input = { 4096, 8192},
-+	.max_output = { 2560, 1600},
- 	.init_table = rk3399_init_reg_table,
- 	.table_size = ARRAY_SIZE(rk3399_init_reg_table),
- 	.intr = &rk3399_vop_intr,
+>
+>>
+>>>>
+>>>>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>>>>> ---
+>>>>>
+>>>>> Changes in v3: None
+>>>>>
+>>>>>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 39 
+>>>>> ----------------------------------
+>>>>>   1 file changed, 39 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c 
+>>>>> b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>>>>> index a93ce97..6f0e252 100644
+>>>>> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>>>>> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>>>>> @@ -278,8 +278,6 @@ struct dw_mipi_dsi_plat_data {
+>>>>>       u32 grf_dsi0_mode;
+>>>>>       u32 grf_dsi0_mode_reg;
+>>>>>       unsigned int max_data_lanes;
+>>>>> -    enum drm_mode_status (*mode_valid)(struct drm_connector 
+>>>>> *connector,
+>>>>> -                       struct drm_display_mode *mode);
+>>>>>   };
+>>>>>   struct dw_mipi_dsi {
+>>>>> @@ -1081,23 +1079,8 @@ static int 
+>>>>> dw_mipi_dsi_connector_get_modes(struct drm_connector *connector)
+>>>>>       return drm_panel_get_modes(dsi->panel);
+>>>>>   }
+>>>>> -static enum drm_mode_status dw_mipi_dsi_mode_valid(
+>>>>> -                    struct drm_connector *connector,
+>>>>> -                    struct drm_display_mode *mode)
+>>>>> -{
+>>>>> -    struct dw_mipi_dsi *dsi = con_to_dsi(connector);
+>>>>> -
+>>>>> -    enum drm_mode_status mode_status = MODE_OK;
+>>>>> -
+>>>>> -    if (dsi->pdata->mode_valid)
+>>>>> -        mode_status = dsi->pdata->mode_valid(connector, mode);
+>>>>> -
+>>>>> -    return mode_status;
+>>>>> -}
+>>>>> -
+>>>>>   static struct drm_connector_helper_funcs 
+>>>>> dw_mipi_dsi_connector_helper_funcs = {
+>>>>>       .get_modes = dw_mipi_dsi_connector_get_modes,
+>>>>> -    .mode_valid = dw_mipi_dsi_mode_valid,
+>>>>>   };
+>>>>>   static void dw_mipi_dsi_drm_connector_destroy(struct 
+>>>>> drm_connector *connector)
+>>>>> @@ -1168,33 +1151,11 @@ static int rockchip_mipi_parse_dt(struct 
+>>>>> dw_mipi_dsi *dsi)
+>>>>>       return 0;
+>>>>>   }
+>>>>> -static enum drm_mode_status rk3288_mipi_dsi_mode_valid(
+>>>>> -                    struct drm_connector *connector,
+>>>>> -                    struct drm_display_mode *mode)
+>>>>> -{
+>>>>> -    /*
+>>>>> -     * The VID_PKT_SIZE field in the DSI_VID_PKT_CFG
+>>>>> -     * register is 11-bit.
+>>>>> -     */
+>>>>> -    if (mode->hdisplay > 0x7ff)
+>>>>> -        return MODE_BAD_HVALUE;
+>>>>> -
+>>>>> -    /*
+>>>>> -     * The V_ACTIVE_LINES field in the DSI_VTIMING_CFG
+>>>>> -     * register is 11-bit.
+>>>>> -     */
+>>>>> -    if (mode->vdisplay > 0x7ff)
+>>>>> -        return MODE_BAD_VVALUE;
+>>>>> -
+>>>>> -    return MODE_OK;
+>>>>> -}
+>>>>> -
+>>>>>   static struct dw_mipi_dsi_plat_data rk3288_mipi_dsi_drv_data = {
+>>>>>       .dsi0_en_bit = RK3288_DSI0_SEL_VOP_LIT,
+>>>>>       .dsi1_en_bit = RK3288_DSI1_SEL_VOP_LIT,
+>>>>>       .grf_switch_reg = RK3288_GRF_SOC_CON6,
+>>>>>       .max_data_lanes = 4,
+>>>>> -    .mode_valid = rk3288_mipi_dsi_mode_valid,
+>>>>>   };
+>>>>>   static struct dw_mipi_dsi_plat_data rk3399_mipi_dsi_drv_data = {
+>>>>> -- 
+>>>>> 2.6.3
+>>>>>
+>>>>> _______________________________________________
+>>>>> dri-devel mailing list
+>>>>> dri-devel at lists.freedesktop.org
+>>>>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>>>
+>>> _______________________________________________
+>>> dri-devel mailing list
+>>> dri-devel at lists.freedesktop.org
+>>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>
+>
+>
+>
+
+
 -- 
-1.9.1
+?ark Yao
