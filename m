@@ -1,165 +1,58 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Sun, 5 Feb 2017 15:42:22 +0800
-Subject: [PATCH v3 3/5] drm/rockchip/dsi: remove mode_valid function
-In-Reply-To: <58969F32.9010003@rock-chips.com>
-References: <1484907051-7159-1-git-send-email-zyw@rock-chips.com>
- <1484907051-7159-4-git-send-email-zyw@rock-chips.com>
- <20170123174841.GB25789@trickycodes.roam.corp.google.com>
- <5886BB8F.6040707@rock-chips.com> <20170201181218.GA8595@art_vandelay>
- <58969F32.9010003@rock-chips.com>
-Message-ID: <5896D75E.5020501@rock-chips.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Sun,  5 Feb 2017 15:54:55 +0800
+Subject: [PATCH v17 0/7] drm/rockchip: Add CDN DP driver
+Message-ID: <1486281302-28200-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?02?05? 11:42, Chris Zhong wrote:
->
->
-> On 02/02/2017 02:12 AM, Sean Paul wrote:
->> On Tue, Jan 24, 2017 at 10:27:27AM +0800, Chris Zhong wrote:
->>> Hi Sean
->>>
->>> On 01/24/2017 01:48 AM, Sean Paul wrote:
->>>> On Fri, Jan 20, 2017 at 06:10:49PM +0800, Chris Zhong wrote:
->>>>> The MIPI DSI do not need check the validity of resolution, the max
->>>>> resolution should depend VOP. Hence, remove 
->>>>> rk3288_mipi_dsi_mode_valid
->>>>> here.
->>>> Does vop actually enforce this, though? I see that 
->>>> mode_config.max_width is
->>>> 4096, but there is no bounds checking in mode_fixup().
->>>>
->>>> The connector is currently rejecting everything greater than 2047. 
->>>> So I think
->>>> you're going to regress behavior here.
->>>>
->>>> Sean
->>> The mipi controller has not this width limit, it depend the VOP,
->>> such as RK3399, VOP_LIT only support 2560,
->>> but VOP_BIG support 4K. So this driver should check the width here.
->> I don't see anything in the vop driver that rejects large modes for 
->> little vop.
->> So, while I agree the check shouldn't be here, you should move it to 
->> where it
->> should be instead of removing it entirely.
->>
->> Sean
->
-> drm_mode_validate_size will check the dev->mode_config.max_width and
-> dev->mode_config.max_height, these 2 value come from 
-> rockchip_drm_mode_config_init,
-> currently, they are both 4096. So you are right, drm driver does not 
-> distinguish
-> between vop lit and big.
->
-> I think Mark Yao already have a local solution, and he will post it soon.
-Hi
+This series adds support for the CDN DP controller to the rockchip drm
+driver. This version fixes some coding style error in v16, it post by
+Sean Paul, you can find it here:
+	https://patchwork.kernel.org/patch/9442135/
 
-See follow patches, support mode valid with vop callback.
+And I sorted out a few patches to fix the following problems:
+- suspend/resume crash cause by drm_helper_hpd_irq_event
+- crash during shutdown when cdn-dp failed to bind
+- check sink count failed after reconnection
+- suspend/reusme crash in mode_set function
 
-[0] https://patchwork.kernel.org/patch/9555943/
-[1] https://patchwork.kernel.org/patch/9555945/
+I also added these 2 patches to this series, although nothing changed:
+https://patchwork.kernel.org/patch/9442141/
+https://patchwork.kernel.org/patch/9442151/
 
->
->>
->>>>
->>>>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
->>>>> ---
->>>>>
->>>>> Changes in v3: None
->>>>>
->>>>>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 39 
->>>>> ----------------------------------
->>>>>   1 file changed, 39 deletions(-)
->>>>>
->>>>> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c 
->>>>> b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
->>>>> index a93ce97..6f0e252 100644
->>>>> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
->>>>> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
->>>>> @@ -278,8 +278,6 @@ struct dw_mipi_dsi_plat_data {
->>>>>       u32 grf_dsi0_mode;
->>>>>       u32 grf_dsi0_mode_reg;
->>>>>       unsigned int max_data_lanes;
->>>>> -    enum drm_mode_status (*mode_valid)(struct drm_connector 
->>>>> *connector,
->>>>> -                       struct drm_display_mode *mode);
->>>>>   };
->>>>>   struct dw_mipi_dsi {
->>>>> @@ -1081,23 +1079,8 @@ static int 
->>>>> dw_mipi_dsi_connector_get_modes(struct drm_connector *connector)
->>>>>       return drm_panel_get_modes(dsi->panel);
->>>>>   }
->>>>> -static enum drm_mode_status dw_mipi_dsi_mode_valid(
->>>>> -                    struct drm_connector *connector,
->>>>> -                    struct drm_display_mode *mode)
->>>>> -{
->>>>> -    struct dw_mipi_dsi *dsi = con_to_dsi(connector);
->>>>> -
->>>>> -    enum drm_mode_status mode_status = MODE_OK;
->>>>> -
->>>>> -    if (dsi->pdata->mode_valid)
->>>>> -        mode_status = dsi->pdata->mode_valid(connector, mode);
->>>>> -
->>>>> -    return mode_status;
->>>>> -}
->>>>> -
->>>>>   static struct drm_connector_helper_funcs 
->>>>> dw_mipi_dsi_connector_helper_funcs = {
->>>>>       .get_modes = dw_mipi_dsi_connector_get_modes,
->>>>> -    .mode_valid = dw_mipi_dsi_mode_valid,
->>>>>   };
->>>>>   static void dw_mipi_dsi_drm_connector_destroy(struct 
->>>>> drm_connector *connector)
->>>>> @@ -1168,33 +1151,11 @@ static int rockchip_mipi_parse_dt(struct 
->>>>> dw_mipi_dsi *dsi)
->>>>>       return 0;
->>>>>   }
->>>>> -static enum drm_mode_status rk3288_mipi_dsi_mode_valid(
->>>>> -                    struct drm_connector *connector,
->>>>> -                    struct drm_display_mode *mode)
->>>>> -{
->>>>> -    /*
->>>>> -     * The VID_PKT_SIZE field in the DSI_VID_PKT_CFG
->>>>> -     * register is 11-bit.
->>>>> -     */
->>>>> -    if (mode->hdisplay > 0x7ff)
->>>>> -        return MODE_BAD_HVALUE;
->>>>> -
->>>>> -    /*
->>>>> -     * The V_ACTIVE_LINES field in the DSI_VTIMING_CFG
->>>>> -     * register is 11-bit.
->>>>> -     */
->>>>> -    if (mode->vdisplay > 0x7ff)
->>>>> -        return MODE_BAD_VVALUE;
->>>>> -
->>>>> -    return MODE_OK;
->>>>> -}
->>>>> -
->>>>>   static struct dw_mipi_dsi_plat_data rk3288_mipi_dsi_drv_data = {
->>>>>       .dsi0_en_bit = RK3288_DSI0_SEL_VOP_LIT,
->>>>>       .dsi1_en_bit = RK3288_DSI1_SEL_VOP_LIT,
->>>>>       .grf_switch_reg = RK3288_GRF_SOC_CON6,
->>>>>       .max_data_lanes = 4,
->>>>> -    .mode_valid = rk3288_mipi_dsi_mode_valid,
->>>>>   };
->>>>>   static struct dw_mipi_dsi_plat_data rk3399_mipi_dsi_drv_data = {
->>>>> -- 
->>>>> 2.6.3
->>>>>
->>>>> _______________________________________________
->>>>> dri-devel mailing list
->>>>> dri-devel at lists.freedesktop.org
->>>>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->>>
->>> _______________________________________________
->>> dri-devel mailing list
->>> dri-devel at lists.freedesktop.org
->>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->
->
->
->
 
+Changes in v17:
+- Correct the clock check condition
+- Correct the coding style
+- change LANE_REF_CYC to 0x8000
+
+Chris Zhong (4):
+  drm/rockchip: cdn-dp: add cdn DP support for rk3399
+  drm/rockchip: cdn-dp: do not use drm_helper_hpd_irq_event
+  drm/rockchip: cdn-dp: retry to check sink count
+  drm/rockchip: cdn-dp: don't configure hardware in mode_set
+
+Guenter Roeck (2):
+  drm/rockchip: cdn-dp: Load firmware if no monitor connected
+  drm/rockchip: cdn-dp: Do not run worker while suspended
+
+Jeffy Chen (1):
+  drm/rockchip: cdn-dp: Move mutex_init to probe
+
+ drivers/gpu/drm/rockchip/Kconfig            |   10 +
+ drivers/gpu/drm/rockchip/Makefile           |    2 +
+ drivers/gpu/drm/rockchip/cdn-dp-core.c      | 1260 +++++++++++++++++++++++++++
+ drivers/gpu/drm/rockchip/cdn-dp-core.h      |  112 +++
+ drivers/gpu/drm/rockchip/cdn-dp-reg.c       |  979 +++++++++++++++++++++
+ drivers/gpu/drm/rockchip/cdn-dp-reg.h       |  483 ++++++++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   13 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h |    9 +
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c |    2 +
+ 9 files changed, 2867 insertions(+), 3 deletions(-)
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.c
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.h
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.c
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.h
 
 -- 
-?ark Yao
+2.6.3
