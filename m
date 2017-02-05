@@ -1,76 +1,60 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Sun, 5 Feb 2017 10:53:02 +0100 (CET)
-Subject: [PATCH 14/22] ARM: dts: add a devicetree for Raidsonic NAS
- IB-4220-B
-In-Reply-To: <20170122122254.10764-1-linus.walleij@linaro.org>
-References: <20170122122254.10764-1-linus.walleij@linaro.org>
-Message-ID: <alpine.LNX.2.00.1702051051090.26313@T420s>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 5 Feb 2017 09:56:18 +0000
+Subject: [PATCH v2 1/5] Documentation: dt: iio: document stm32 adc trigger
+ polarity
+In-Reply-To: <1485786840-4557-2-git-send-email-fabrice.gasnier@st.com>
+References: <1485786840-4557-1-git-send-email-fabrice.gasnier@st.com>
+ <1485786840-4557-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1b326a3d-522f-b76e-0bc3-656b5fd2a8ae@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 30/01/17 14:33, Fabrice Gasnier wrote:
+> STM32 ADC trigger polarity can be set to either rising, falling
+> or both edges. Allow to configure it from dt.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+This falls into the same question of whether this is really an interrupt
+(be it one that linux can't see) or not.
 
-please add right baudrate and partition scheme for NAS 4220
+It certainly similar enough I'd like to see us use as much of the
+interrupt bindings as possible rather than reinventing the wheel.
 
-Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+cc'd Thomas Gleixner.
 
----
- arch/arm/boot/dts/gemini-nas4220b.dts | 36 +++++++++++++++++++++++++++++++++--
- 1 file changed, 34 insertions(+), 2 deletions(-)
+Thomas, what we have here effectively an interrupt that we have the option
+to directly route to the hardware block to initialize an ADC sample
+(rather than bouncing through the kernel).  It can also be directly
+exposed as a real interrupt and the chances are we are going to end
+up with a mixture of the two depending on who is interesting in the
+'interrupt'.
 
-diff --git a/arch/arm/boot/dts/gemini-nas4220b.dts b/arch/arm/boot/dts/gemini-nas4220b.dts
-index 0b30cdeb2354..7668ba52158e 100644
---- a/arch/arm/boot/dts/gemini-nas4220b.dts
-+++ b/arch/arm/boot/dts/gemini-nas4220b.dts
-@@ -19,7 +19,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "console=ttyS0,115200n8";
-+		bootargs = "console=ttyS0,19200n8";
- 		stdout-path = &uart0;
- 	};
- 
-@@ -64,7 +64,39 @@
- 			status = "okay";
- 			/* 16MB of flash */
- 			reg = <0x30000000 0x01000000>;
--			/* TODO: add flash partitions here */
-+
-+			partition at 0 {
-+				label = "RedBoot";
-+				reg = <0x00000000 0x00020000>;
-+				read-only;
-+			};
-+			partition at 20000 {
-+				label = "Kernel";
-+				reg = <0x00020000 0x00300000>;
-+			};
-+			partition at 320000 {
-+				label = "Ramdisk";
-+				reg = <0x00320000 0x00600000>;
-+			};
-+			partition at 920000 {
-+				label = "Application";
-+				reg = <0x00920000 0x00600000>;
-+			};
-+			partition at f20000 {
-+				label = "VCTL";
-+				reg = <0x00f20000 0x00020000>;
-+				read-only;
-+			};
-+			partition at f40000 {
-+				label = "CurConf";
-+				reg = <0x00f40000 0x000a0000>;
-+				read-only;
-+			};
-+			partition at fe0000 {
-+				label = "FIS directory";
-+				reg = <0x00fe0000 0x00020000>;
-+				read-only;
-+			};
- 		};
- 	};
- };
--- 
-2.11.0
+Any thoughts?
+
+Jonathan
+> ---
+>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> index 5dfc88e..6c6d968 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> @@ -57,6 +57,8 @@ Optional properties:
+>  - dmas: Phandle to dma channel for this ADC instance.
+>    See ../../dma/dma.txt for details.
+>  - dma-names: Must be "rx" when dmas property is being used.
+> +- st,trigger-polarity: Must be 0 (default), 1 or 2 to set default trigger
+> +  polarity to respectively "rising-edge", "falling-edge" or "both-edges".
+>  
+>  Example:
+>  	adc: adc at 40012000 {
+> @@ -84,6 +86,7 @@ Example:
+>  			st,adc-channels = <8>;
+>  			dmas = <&dma2 0 0 0x400 0x0>;
+>  			dma-names = "rx";
+> +			st,trigger-polarity = <1>;
+>  		};
+>  		...
+>  		other adc child nodes follow...
+> 
