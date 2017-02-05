@@ -1,92 +1,73 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  5 Feb 2017 19:49:39 +0100
-Subject: [PATCH 3/9] ARM: sunxi: Rename pwm0_pins to match our usual pattern
+Date: Sun,  5 Feb 2017 19:49:37 +0100
+Subject: [PATCH 1/9] ARM: sun5i: A10s: Switch the EMAC pins indices
 In-Reply-To: <cover.8519ab0b2252458a322bea5955d191e63f67100b.1486320544.git-series.maxime.ripard@free-electrons.com>
 References: <cover.8519ab0b2252458a322bea5955d191e63f67100b.1486320544.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <d78adf8ff6ceedadeda235b3abda73f8bc87d377.1486320544.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <8f51ef7e000e57e1fa861188d421ad1bfd9af86a.1486320544.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pwm0_pins group name is suggesting that this is the only option usable
-for the PWM0 on the SoCs it's declared on. However, this is not the case
-and defining a second pwm0 group would be quite weird given the name of the
-first group.
+One of the pins group for the EMAC can be used by all the SoCs of the sun5i
+family, and as such can be moved to the common DTSI.
 
-Rename it so that it matches our usual pattern.
+Unfortunately, this group is the second one we declare in our DT for now.
+Make it the first one so that it's more logical and consistent with the
+rest of our DTs before moving it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-a13-empire-electronix-d709.dts |  2 +-
- arch/arm/boot/dts/sun5i.dtsi                           | 10 +++++-----
- arch/arm/boot/dts/sun8i-a23-a33.dtsi                   |  2 +-
- arch/arm/boot/dts/sunxi-reference-design-tablet.dtsi   |  2 +-
- 4 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 2 +-
+ arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts         | 2 +-
+ arch/arm/boot/dts/sun5i-a10s.dtsi                | 4 ++--
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-empire-electronix-d709.dts b/arch/arm/boot/dts/sun5i-a13-empire-electronix-d709.dts
-index 42435454acef..1bc87523b37c 100644
---- a/arch/arm/boot/dts/sun5i-a13-empire-electronix-d709.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-empire-electronix-d709.dts
-@@ -157,7 +157,7 @@
+diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+index d8245c6314a7..9fbeb584abf5 100644
+--- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+@@ -83,7 +83,7 @@
  
- &pwm {
+ &emac {
  	pinctrl-names = "default";
--	pinctrl-0 = <&pwm0_pins>;
-+	pinctrl-0 = <&pwm0_pins_a>;
+-	pinctrl-0 = <&emac_pins_a>;
++	pinctrl-0 = <&emac_pins_b>;
+ 	phy = <&phy1>;
  	status = "okay";
  };
+diff --git a/arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts b/arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts
+index 2b8adda0deda..99c84e870d91 100644
+--- a/arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts
++++ b/arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts
+@@ -95,7 +95,7 @@
  
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index a9574a6cd95c..fce3ec693531 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -321,6 +321,11 @@
- 				bias-pull-up;
- 			};
- 
-+			pwm0_pins_a: pwm0 at 0 {
-+				pins = "PB2";
-+				function = "pwm0";
-+			};
-+
- 			spi2_pins_a: spi2 at 0 {
- 				pins = "PE1", "PE2", "PE3";
- 				function = "spi2";
-@@ -340,11 +345,6 @@
- 				pins = "PG11", "PG12";
- 				function = "uart3";
- 			};
--
--			pwm0_pins: pwm0 {
--				pins = "PB2";
--				function = "pwm";
--			};
- 		};
- 
- 		timer at 01c20c00 {
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 35008b78d899..b558d318a72e 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -316,7 +316,7 @@
- 				bias-pull-up;
- 			};
- 
--			pwm0_pins: pwm0 {
-+			pwm0_pins_a: pwm0 {
- 				pins = "PH0";
- 				function = "pwm0";
- 			};
-diff --git a/arch/arm/boot/dts/sunxi-reference-design-tablet.dtsi b/arch/arm/boot/dts/sunxi-reference-design-tablet.dtsi
-index b8241462fcea..5cd891942fe3 100644
---- a/arch/arm/boot/dts/sunxi-reference-design-tablet.dtsi
-+++ b/arch/arm/boot/dts/sunxi-reference-design-tablet.dtsi
-@@ -78,6 +78,6 @@
- 
- &pwm {
+ &emac {
  	pinctrl-names = "default";
--	pinctrl-0 = <&pwm0_pins>;
-+	pinctrl-0 = <&pwm0_pins_a>;
+-	pinctrl-0 = <&emac_pins_b>;
++	pinctrl-0 = <&emac_pins_a>;
+ 	phy = <&phy1>;
  	status = "okay";
  };
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index 24b0f5f556f8..df2ba63d4ff9 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -156,7 +156,7 @@
+ 		function = "uart2";
+ 	};
+ 
+-	emac_pins_a: emac0 at 0 {
++	emac_pins_b: emac0 at 1 {
+ 		pins = "PA0", "PA1", "PA2",
+ 				"PA3", "PA4", "PA5", "PA6",
+ 				"PA7", "PA8", "PA9", "PA10",
+@@ -165,7 +165,7 @@
+ 		function = "emac";
+ 	};
+ 
+-	emac_pins_b: emac0 at 1 {
++	emac_pins_a: emac0 at 0 {
+ 		pins = "PD6", "PD7", "PD10",
+ 				"PD11", "PD12", "PD13", "PD14",
+ 				"PD15", "PD18", "PD19", "PD20",
 -- 
 git-series 0.8.11
