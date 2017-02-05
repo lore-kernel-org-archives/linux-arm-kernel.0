@@ -1,45 +1,39 @@
 From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Sun, 5 Feb 2017 00:57:01 +0000
-Subject: [PATCH v2 0/5] Add Cavium ARCH_THUNDER2 platform
-Message-ID: <1486256226-43889-1-git-send-email-jnair@caviumnetworks.com>
+Date: Sun, 5 Feb 2017 00:57:02 +0000
+Subject: [PATCH v2 1/5] arm64: add THUNDER2 processor family
+In-Reply-To: <1486256226-43889-1-git-send-email-jnair@caviumnetworks.com>
+References: <1486256226-43889-1-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <1486256226-43889-2-git-send-email-jnair@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's the updated patchset, please let me know if thereare any
-comments.  If a pull request is needed(with a public git tree), I
-can set one up on github.
+Add support for ThunderX2 CN99XX arm64 server processors.
 
-This patchset adds support for the new ThunderX2 CN99XX processor
-family.
+Introduce a new arm64 platform config option ARCH_THUNDER2 for these
+processors.
 
-Changes are to add: the config option, the required device tree files,
-the device tree bindings documentation and the defconfig entry.
+Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+---
+ arch/arm64/Kconfig.platforms | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Changes from v1 -> v2:
-* split Kconfig.platforms changes and device tree changes
-* Added MAINTAINERS entry
-
-JC.
-
-Jayachandran C (5):
-  arm64: add THUNDER2 processor family
-  MAINTAINERS: Add Cavium ThunderX2 entry
-  arm64: dts: add device trees for ARCH_THUNDER2
-  dt-bindings: arm64 ARCH_THUNDER2 platform documentation
-  arm64: add ARCH_THUNDER2 to defconfig
-
- .../devicetree/bindings/arm/cavium-thunder2.txt    |   5 +
- Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
- MAINTAINERS                                        |   7 +
- arch/arm64/Kconfig.platforms                       |   7 +
- arch/arm64/boot/dts/cavium/Makefile                |   1 +
- arch/arm64/boot/dts/cavium/thunder-99xx.dts        |  34 +++++
- arch/arm64/boot/dts/cavium/thunder-99xx.dtsi       | 147 +++++++++++++++++++++
- arch/arm64/configs/defconfig                       |   1 +
- 8 files changed, 203 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder2.txt
- create mode 100644 arch/arm64/boot/dts/cavium/thunder-99xx.dts
- create mode 100644 arch/arm64/boot/dts/cavium/thunder-99xx.dtsi
-
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 715ef12..129cc5a 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -190,6 +190,13 @@ config ARCH_THUNDER
+ 	help
+ 	  This enables support for Cavium's Thunder Family of SoCs.
+ 
++config ARCH_THUNDER2
++	bool "Cavium ThunderX2 Server Processors"
++	select GPIOLIB
++	help
++	  This enables support for Cavium's ThunderX2 CN99XX family of
++	  server processors.
++
+ config ARCH_UNIPHIER
+ 	bool "Socionext UniPhier SoC Family"
+ 	select ARCH_HAS_RESET_CONTROLLER
 -- 
 2.7.4
