@@ -1,96 +1,114 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Sun,  5 Feb 2017 11:54:12 +0800
-Subject: [PATCH v5 4/6] drm/rockchip/dsi: remove mode_valid function
+Date: Sun,  5 Feb 2017 11:54:14 +0800
+Subject: [PATCH v5 6/6] drm/rockchip/dsi: add dw-mipi power domain support
 In-Reply-To: <1486266854-9887-1-git-send-email-zyw@rock-chips.com>
 References: <1486266854-9887-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1486266854-9887-5-git-send-email-zyw@rock-chips.com>
+Message-ID: <1486266854-9887-7-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MIPI DSI do not need check the validity of resolution, the max
-resolution should depend VOP. Hence, remove rk3288_mipi_dsi_mode_valid
-here.
+Reference the power domain incase dw-mipi power down when
+in use.
 
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
 ---
 
 Changes in v5: None
 Changes in v4: None
 Changes in v3: None
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 39 ----------------------------------
- 1 file changed, 39 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 89a8941..35f22bc 100644
+index 35f22bc..d263352 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -278,8 +278,6 @@ struct dw_mipi_dsi_plat_data {
- 	u32 grf_dsi0_mode;
- 	u32 grf_dsi0_mode_reg;
- 	unsigned int max_data_lanes;
--	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
--					   struct drm_display_mode *mode);
- };
+@@ -12,6 +12,7 @@
+ #include <linux/math64.h>
+ #include <linux/module.h>
+ #include <linux/of_device.h>
++#include <linux/pm_runtime.h>
+ #include <linux/regmap.h>
+ #include <linux/reset.h>
+ #include <linux/mfd/syscon.h>
+@@ -293,6 +294,7 @@ struct dw_mipi_dsi {
+ 	struct clk *pclk;
+ 	struct clk *phy_cfg_clk;
  
- struct dw_mipi_dsi {
-@@ -1081,23 +1079,8 @@ static int dw_mipi_dsi_connector_get_modes(struct drm_connector *connector)
- 	return drm_panel_get_modes(dsi->panel);
++	int dpms_mode;
+ 	unsigned int lane_mbps; /* per lane */
+ 	u32 channel;
+ 	u32 lanes;
+@@ -969,6 +971,9 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
+ {
+ 	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
+ 
++	if (dsi->dpms_mode != DRM_MODE_DPMS_ON)
++		return;
++
+ 	if (clk_prepare_enable(dsi->pclk)) {
+ 		dev_err(dsi->dev, "%s: Failed to enable pclk\n", __func__);
+ 		return;
+@@ -980,7 +985,9 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
+ 	drm_panel_unprepare(dsi->panel);
+ 
+ 	dw_mipi_dsi_disable(dsi);
++	pm_runtime_put(dsi->dev);
+ 	clk_disable_unprepare(dsi->pclk);
++	dsi->dpms_mode = DRM_MODE_DPMS_OFF;
  }
  
--static enum drm_mode_status dw_mipi_dsi_mode_valid(
--					struct drm_connector *connector,
--					struct drm_display_mode *mode)
--{
--	struct dw_mipi_dsi *dsi = con_to_dsi(connector);
--
--	enum drm_mode_status mode_status = MODE_OK;
--
--	if (dsi->pdata->mode_valid)
--		mode_status = dsi->pdata->mode_valid(connector, mode);
--
--	return mode_status;
--}
--
- static struct drm_connector_helper_funcs dw_mipi_dsi_connector_helper_funcs = {
- 	.get_modes = dw_mipi_dsi_connector_get_modes,
--	.mode_valid = dw_mipi_dsi_mode_valid,
- };
+ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+@@ -990,11 +997,15 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+ 	int mux = drm_of_encoder_active_endpoint_id(dsi->dev->of_node, encoder);
+ 	u32 val;
  
- static void dw_mipi_dsi_drm_connector_destroy(struct drm_connector *connector)
-@@ -1168,33 +1151,11 @@ static int rockchip_mipi_parse_dt(struct dw_mipi_dsi *dsi)
- 	return 0;
++	if (dsi->dpms_mode == DRM_MODE_DPMS_ON)
++		return;
++
+ 	if (clk_prepare_enable(dsi->pclk)) {
+ 		dev_err(dsi->dev, "%s: Failed to enable pclk\n", __func__);
+ 		return;
+ 	}
+ 
++	pm_runtime_get_sync(dsi->dev);
+ 	dw_mipi_dsi_init(dsi);
+ 	dw_mipi_dsi_dpi_config(dsi);
+ 	dw_mipi_dsi_packet_handler_config(dsi);
+@@ -1030,6 +1041,7 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+ 
+ 	regmap_write(dsi->grf_regmap, pdata->grf_switch_reg, val);
+ 	dev_dbg(dsi->dev, "vop %s output to dsi0\n", (mux) ? "LIT" : "BIG");
++	dsi->dpms_mode = DRM_MODE_DPMS_ON;
  }
  
--static enum drm_mode_status rk3288_mipi_dsi_mode_valid(
--					struct drm_connector *connector,
--					struct drm_display_mode *mode)
--{
--	/*
--	 * The VID_PKT_SIZE field in the DSI_VID_PKT_CFG
--	 * register is 11-bit.
--	 */
--	if (mode->hdisplay > 0x7ff)
--		return MODE_BAD_HVALUE;
--
--	/*
--	 * The V_ACTIVE_LINES field in the DSI_VTIMING_CFG
--	 * register is 11-bit.
--	 */
--	if (mode->vdisplay > 0x7ff)
--		return MODE_BAD_VVALUE;
--
--	return MODE_OK;
--}
--
- static struct dw_mipi_dsi_plat_data rk3288_mipi_dsi_drv_data = {
- 	.dsi0_en_bit = RK3288_DSI0_SEL_VOP_LIT,
- 	.dsi1_en_bit = RK3288_DSI1_SEL_VOP_LIT,
- 	.grf_switch_reg = RK3288_GRF_SOC_CON6,
- 	.max_data_lanes = 4,
--	.mode_valid = rk3288_mipi_dsi_mode_valid,
- };
+ static int
+@@ -1198,6 +1210,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
  
- static struct dw_mipi_dsi_plat_data rk3399_mipi_dsi_drv_data = {
+ 	dsi->dev = dev;
+ 	dsi->pdata = pdata;
++	dsi->dpms_mode = DRM_MODE_DPMS_OFF;
+ 
+ 	ret = rockchip_mipi_parse_dt(dsi);
+ 	if (ret)
+@@ -1278,6 +1291,8 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+ 
+ 	dev_set_drvdata(dev, dsi);
+ 
++	pm_runtime_enable(dev);
++
+ 	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
+ 	dsi->dsi_host.dev = dev;
+ 	ret = mipi_dsi_host_register(&dsi->dsi_host);
+@@ -1300,6 +1315,7 @@ static void dw_mipi_dsi_unbind(struct device *dev, struct device *master,
+ 	struct dw_mipi_dsi *dsi = dev_get_drvdata(dev);
+ 
+ 	mipi_dsi_host_unregister(&dsi->dsi_host);
++	pm_runtime_disable(dev);
+ 	clk_disable_unprepare(dsi->pllref_clk);
+ }
+ 
 -- 
 2.6.3
