@@ -1,38 +1,98 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Sun, 5 Feb 2017 11:03:14 +0100 (CET)
-Subject: [PATCH 4/4] ARM: dts: add PCI to the Gemini DTSI
-In-Reply-To: <20170128204839.18330-4-linus.walleij@linaro.org>
-References: <20170128204839.18330-1-linus.walleij@linaro.org>
- <20170128204839.18330-4-linus.walleij@linaro.org>
-Message-ID: <alpine.LNX.2.00.1702051101110.26313@T420s>
+From: florian.kauer@koalo.de (Florian Kauer)
+Date: Sun, 5 Feb 2017 11:20:04 +0100
+Subject: [alsa-devel] [PATCH] ASoC: bcm2835: Increase channels_max to 8
+In-Reply-To: <a7f5de09-b07b-638d-466f-525e68ebf0f9@flatmax.org>
+References: <1485992264-9058-1-git-send-email-flatmax@flatmax.org>
+ <20170204154944.timxhmmibc4kngly@sirena.org.uk>
+ <a7f5de09-b07b-638d-466f-525e68ebf0f9@flatmax.org>
+Message-ID: <6d2a00ef-edb0-1c70-8303-26a92bf05ef5@koalo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus
+Hi Matt,
+great to hear from your work!
+However, I have to disappoint you, it is not the first time someone has 
+done this. Actually, I have done the same thing in 2014 and mentioned it 
+at my talk at the Linux Audio Conference. However, I have not upstreamed 
+it because I thought it is too special ;-)
+http://lac.linuxaudio.org/2014/video.php?id=4 at 16:28
 
-We need to the remove hwirq 26-28 from DT.
-First one will print this warning while boot.
+The problem is that it highly depends on the codec you connect if the 
+timing matches. Actually the official I2S bus specification does only 
+support two channels. Everything else is some special thing anyway.
 
-irq: type mismatch, failed to map hwirq-26 for /soc/interrupt-controller at 48000000!
+The question is: Should the driver be open to accept "special things" 
+even if the hardware does not "officially" support it?
+Upside: It enables more applications.
+Downside: If you select an arbitrary 8 channel codec and this driver you 
+do not get any error message, but it might or might not work.
 
- arch/arm/boot/dts/gemini.dtsi | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+I would tend to accepting the patch because everyone who writes a board 
+driver should check the compatibility anyway and otherwise we would 
+block a working application.
 
-diff --git a/arch/arm/boot/dts/gemini.dtsi b/arch/arm/boot/dts/gemini.dtsi
-index 11441e577058..0e2c021cd8c5 100644
---- a/arch/arm/boot/dts/gemini.dtsi
-+++ b/arch/arm/boot/dts/gemini.dtsi
-@@ -114,10 +114,7 @@
- 		pci at 50000000 {
- 			compatible = "cortina,gemini-pci";
- 			reg = <0x50000000 0x100>;
--			interrupts = <8 IRQ_TYPE_LEVEL_HIGH>, /* PCI A */
--				   	<26 IRQ_TYPE_LEVEL_HIGH>, /* PCI B */
--					<27 IRQ_TYPE_LEVEL_HIGH>, /* PCI C */
--					<28 IRQ_TYPE_LEVEL_HIGH>; /* PCI D */
-+			interrupts = <8 IRQ_TYPE_LEVEL_HIGH>; /* chained irq PCI A-D */
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			#interrupt-cells = <1>;
--- 
-2.11.0
+Greetings,
+Florian
+
+On 05.02.2017 02:26, Matt Flax wrote:
+>
+>
+> On 05/02/17 02:49, Mark Brown wrote:
+>> On Thu, Feb 02, 2017 at 10:37:44AM +1100, Matt Flax wrote:
+>>
+>>>       switch (params_channels(params)) {
+>>>       case 2:
+>>> +    case 8:
+>>>           format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
+>>>           format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
+>>>           format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
+>> I can't understand how this works.  We're programming the hardware in an
+>> identical fashion for both channel counts, that means that what we're
+>> sending will be indistinguishable from a garbled stereo stream.  How
+>> does this produce working clocks or manage to sync up reliably with
+>> external clocks?
+>>
+> I am not surprised it is confusing, to my knowledge this is the first
+> time that someone has demonstrated this type of I2S signalling.
+>
+> I will attempt to explain why nothing is garbled by talking about what
+> the BCM2835 silicon does.
+>
+> In this case BCM2835 is a clock slave and not concerned with generating
+> the I2S clocks, only receiving - think of all clocks and synchrony being
+> generated/managed in hardware on the sound card.
+>
+> In short the BCM2835 silicon is only concerned with shifting bits into
+> two hardware registers which (after DMA) are interpreted by ALSA
+> according to the specified channel count.
+>
+> Let me be a little more explicit. Regarding the BCM2835 I2S silicon :
+> The BCM2835 I2S silicon is concerned with shifting data from I2S bit
+> streams into hardware registers. The BCM2835 is only concerned with the
+> word format for the hardware registers. The BCM2835 silicon doesn't care
+> about channel count. This is why we use format=* in this part of the
+> bcm2835-i2s.c driver. Specifically we are concerned with the protocol's
+> word format (e.g. BCM2835_I2S_CH1(format)) and the location of the word
+> onset in the bit stream (e.g. BCM2835_I2S_CHPOS(ch1pos)).
+>
+> This is (to my knowledge) the first time someone has tried this concept
+> and proven that it is successful and robust. My gut feeling is that it
+> will work will most/all silicon. In my opinion it is a little
+> evolution/revolution in I2S signalling.
+>
+> Personally, I think it would be better if the code read as follows :
+>
+>    // if the channel count is even
+>    if ( fmod((float)params_channels(params)) != 1 ) {
+>           format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
+>           format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
+>           format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
+>   } else
+>         return -EINVAL;
+>
+> I would even prefer to get rid of the channel count guard as strictly
+> speaking the format of the I2S bit stream has nothing to do with the
+> channel count !
+>
+> thanks
+> Matt
