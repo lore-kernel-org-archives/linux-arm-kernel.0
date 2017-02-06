@@ -1,39 +1,45 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 6 Feb 2017 10:29:34 +0100
-Subject: [PATCH] ARM64: dts: meson-gxbb: set reset for ethernet
-In-Reply-To: <ec31eddc-d286-d0bc-0bdb-ae9d5014d82e@gmail.com>
-References: <ec31eddc-d286-d0bc-0bdb-ae9d5014d82e@gmail.com>
-Message-ID: <259f7102-591b-f251-5844-a864fa39e137@baylibre.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 6 Feb 2017 09:33:08 +0000
+Subject: [PATCH] irqchip/gicv3: Fix GICR_WAKE & GICD_IGROUPR accesses from
+ non-secure
+In-Reply-To: <1486347465-28316-1-git-send-email-shankerd@codeaurora.org>
+References: <1486347465-28316-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <fd1d435d-28e8-117b-4794-886b11a7454c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/29/2017 03:07 PM, Heiner Kallweit wrote:
-> Add reset control for ethernet.
-> 
-> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> index 39a774ad..753fddf6 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> @@ -113,6 +113,8 @@
->  		 <&clkc CLKID_FCLK_DIV2>,
->  		 <&clkc CLKID_MPLL2>;
->  	clock-names = "stmmaceth", "clkin0", "clkin1";
-> +	resets = <&reset RESET_ETHERNET>;
-> +	reset-names = "stmmaceth";
->  };
->  
->  &aobus {
-> 
+Hi Shanker,
 
-Hi,
+On 06/02/17 02:17, Shanker Donthineni wrote:
+> On systems where it supports two security states, both the register
+> GICR_WAKE and GICD_IGROUPR accesses are RAZ/WI from non-secure.
+> The function gic_enable_redist() to wake/sleep redistributor is not
+> harmful at all, but it is confusing looking at the code. The current
+> code checks the single security state based on bit GICD_CTLR.DS which
+> is absolutely incorrect. The disable security bit GICD_CTLR.DS is RAZ
+> to non-secure.
 
-Actually this is a no-op since the Amlogic reset controller only supports "pulse" resets and the
-STMMAC driver only supports "level" resets. If you want to use this reset, you must add the
-corresponding support code in the meson8b glue code to call device_reset().
+I'm afraid we don't have the same definition of GICD_CTLR.DS. In my copy
+of the architecture spec, it says:
 
-Neil
+"When this field is set to 1, all accesses to GICD_CTLR access the
+single Security state view, and all bits are accessible".
+                                ^^^^^^^^^^^^^^^^^^^^^^^
+
+This would tend to support my interpretation that once DS has been set
+from the secure side, it becomes visible to all type of accesses.
+
+> The GICD_TYPE.SecurityExtn indicates whether the GIC
+> implementation supports two security states or only one security
+> state.
+
+Yes, and that's orthogonal to having set DS or not.
+
+So clearly, we have a difference of interpretation. What part of the
+spec is supporting yours?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
