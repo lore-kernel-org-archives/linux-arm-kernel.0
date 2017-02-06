@@ -1,154 +1,59 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 6 Feb 2017 09:54:16 +0100
-Subject: [PATCH v3 2/3] nvmem: sunxi-sid: add support for H3's SID
- controller
-In-Reply-To: <20170202131338.20234-2-icenowy@aosc.xyz>
-References: <20170202131338.20234-1-icenowy@aosc.xyz>
- <20170202131338.20234-2-icenowy@aosc.xyz>
-Message-ID: <20170206085416.4qtd3wfhtinp42xv@lukather>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Mon, 06 Feb 2017 14:07:02 +0530
+Subject: [PATCH 02/11] [media] s5p-mfc: Adding initial support for MFC
+ v10.10
+In-Reply-To: <20170121202852.pxxfxpqwjxewjoj5@rob-hp-laptop>
+References: <1484733729-25371-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170118100723epcas5p132e0ebfad38261bed95cffc47334f9dc@epcas5p1.samsung.com>
+ <1484733729-25371-3-git-send-email-smitha.t@samsung.com>
+ <20170121202852.pxxfxpqwjxewjoj5@rob-hp-laptop>
+Message-ID: <1486370223.16927.76.camel@smitha-fedora>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 09:13:37PM +0800, Icenowy Zheng wrote:
-> The H3 SoC have a bigger SID controller, which has its direct read
-> address at 0x200 position in the SID block, not 0x0.
+On Sat, 2017-01-21 at 14:28 -0600, Rob Herring wrote:
+> On Wed, Jan 18, 2017 at 03:32:00PM +0530, Smitha T Murthy wrote:
+> > Adding the support for MFC v10.10, with new register file and
+> > necessary hw control, decoder, encoder and structural changes.
+> > 
+> > CC: Rob Herring <robh+dt@kernel.org>
+> > CC: devicetree at vger.kernel.org 
+> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> > ---
+> >  .../devicetree/bindings/media/s5p-mfc.txt          |    1 +
+> >  drivers/media/platform/s5p-mfc/regs-mfc-v10.h      |   36 ++++++++++++++++
+> >  drivers/media/platform/s5p-mfc/s5p_mfc.c           |   30 +++++++++++++
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |    4 +-
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |    4 ++
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |   44 +++++++++++---------
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       |   21 +++++----
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    |    9 +++-
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |    2 +
+> >  9 files changed, 118 insertions(+), 33 deletions(-)
+> >  create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+> > 
+> > diff --git a/Documentation/devicetree/bindings/media/s5p-mfc.txt b/Documentation/devicetree/bindings/media/s5p-mfc.txt
+> > index 2c90128..b70c613 100644
+> > --- a/Documentation/devicetree/bindings/media/s5p-mfc.txt
+> > +++ b/Documentation/devicetree/bindings/media/s5p-mfc.txt
+> > @@ -13,6 +13,7 @@ Required properties:
+> >  	(c) "samsung,mfc-v7" for MFC v7 present in Exynos5420 SoC
+> >  	(d) "samsung,mfc-v8" for MFC v8 present in Exynos5800 SoC
+> >  	(e) "samsung,exynos5433-mfc" for MFC v8 present in Exynos5433 SoC
+> > +	(f) "samsung,mfc-v10" for MFC v10 present in a variant of Exynos7 SoC
 > 
-> Also, H3 SID controller has some silicon bug that makes the direct read
-> value wrong at cold boot, add code to workaround the bug. (This bug has
-> already been fixed on A64 and later SoCs)
+> You are up to v10 in how many SoCs? Please stop with versions and use 
+> SoC numbers. It's one thing to use versions when you have many SoCs per 
+> version, but that doesn't seem to be happening here.
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
-> This patch is the part of [PATCH v2 1/1] that adds support for H3 SID
-> controller.
+> Rob
+MFCv10.10 is used in Exynos7880. There are other variants of MFCv10 used
+in Exynos8890 and Exynos7870. I will mention in the next version of
+patches the SoC name Exynos7880 using MFCv10 on which I have tested.
+ 
+Thank you for the review.
+
+Regards,
+Smitha
 > 
->  .../bindings/nvmem/allwinner,sunxi-sid.txt         | 12 +++-
->  drivers/nvmem/sunxi_sid.c                          | 72 +++++++++++++++++++++-
->  2 files changed, 82 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-> index d543ed3f5363..9ab9e75a6351 100644
-> --- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-> +++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-> @@ -1,7 +1,11 @@
->  Allwinner sunxi-sid
->  
->  Required properties:
-> -- compatible: "allwinner,sun4i-a10-sid" or "allwinner,sun7i-a20-sid"
-> +- compatible: Should be one of the following (depending on your SoC):
-> +  "allwinner,sun4i-a10-sid"
-> +  "allwinner,sun7i-a20-sid"
-> +  "allwinner,sun8i-h3-sid"
-> +
->  - reg: Should contain registers location and length
->  
->  = Data cells =
-> @@ -19,3 +23,9 @@ Example for sun7i:
->  		compatible = "allwinner,sun7i-a20-sid";
->  		reg = <0x01c23800 0x200>
->  	};
-> +
-> +Example for sun8i-h3:
-> +	sid at 01c14000 {
-> +		compatible = "allwinner,sun8i-h3-sid";
-> +		reg = <0x01c14000 0x400>;
-> +	};
-> diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
-> index 69524b67007f..476a161ff23a 100644
-> --- a/drivers/nvmem/sunxi_sid.c
-> +++ b/drivers/nvmem/sunxi_sid.c
-> @@ -25,6 +25,16 @@
->  #include <linux/slab.h>
->  #include <linux/random.h>
->  
-> +/* Registers and special values for doing register-based SID readout on H3 */
-> +#define SUN8I_SID_PRCTL		0x40
-> +#define SUN8I_SID_RDKEY		0x60
-> +
-> +#define SUN8I_SID_OP_LOCK	0xAC
-> +#define SUN8I_SID_OFFSET_MASK	0x1FF
-> +#define SUN8I_SID_OFFSET_SHIFT	16
-> +#define SUN8I_SID_LOCK_SHIFT	8
-> +#define SUN8I_SID_READ		BIT(1)
-> +
->  static struct nvmem_config econfig = {
->  	.name = "sunxi-sid",
->  	.read_only = true,
-> @@ -34,11 +44,14 @@ static struct nvmem_config econfig = {
->  };
->  
->  struct sunxi_sid_cfg {
-> +	u32	value_offset;
->  	u32	size;
-> +	bool	need_register_readout;
->  };
->  
->  struct sunxi_sid {
->  	void __iomem		*base;
-> +	u32			value_offset;
->  };
->  
->  /* We read the entire key, due to a 32 bit read alignment requirement. Since we
-> @@ -51,7 +64,8 @@ static u8 sunxi_sid_read_byte(const struct sunxi_sid *sid,
->  {
->  	u32 sid_key;
->  
-> -	sid_key = ioread32be(sid->base + round_down(offset, 4));
-> +	sid_key = ioread32be(sid->base + sid->value_offset +
-> +			     round_down(offset, 4));
-
-This would probably be more logical to have this in sunxi_sid_read.
-
->  	sid_key >>= (offset % 4) * 8;
->  
->  	return sid_key; /* Only return the last byte */
-> @@ -69,6 +83,33 @@ static int sunxi_sid_read(void *context, unsigned int offset,
->  	return 0;
->  }
->  
-> +static int sun8i_sid_register_readout(const struct sunxi_sid *sid,
-> +				      const unsigned int word,
-> +				      u32 *out)
-> +{
-> +	u32 reg_val;
-> +	unsigned long expire = jiffies + msecs_to_jiffies(250);
-> +
-> +	/* Set word, lock access, and set read command */
-> +	reg_val = (word & SUN8I_SID_OFFSET_MASK)
-> +		  << SUN8I_SID_OFFSET_SHIFT;
-> +	reg_val |= SUN8I_SID_OP_LOCK << SUN8I_SID_LOCK_SHIFT;
-
-You're not using those mask and shifts anywhere else, why not just
-define the value / macro you need directly?
-
-> +	reg_val |= SUN8I_SID_READ;
-> +	writel(reg_val, sid->base + SUN8I_SID_PRCTL);
-> +
-> +	do {
-> +		reg_val = readl(sid->base + SUN8I_SID_PRCTL);
-> +	} while (time_before(jiffies, expire) && (reg_val & SUN8I_SID_READ));
-
-readl_poll_timeout?
-
-> +	if (reg_val & SUN8I_SID_READ)
-> +		return -EIO;
-> +
-> +	if (out)
-> +		*out = readl(sid->base + SUN8I_SID_RDKEY);
-
-Why do you need that out parameter?
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170206/2758c6cf/attachment.sig>
