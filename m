@@ -1,71 +1,127 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon, 6 Feb 2017 06:59:40 -0600
-Subject: [PATCH] irqchip/gicv3: Fix GICR_WAKE & GICD_IGROUPR accesses from
- non-secure
-In-Reply-To: <fd1d435d-28e8-117b-4794-886b11a7454c@arm.com>
-References: <1486347465-28316-1-git-send-email-shankerd@codeaurora.org>
- <fd1d435d-28e8-117b-4794-886b11a7454c@arm.com>
-Message-ID: <31731b77-e985-5b86-705a-f1ae61522070@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 6 Feb 2017 13:02:29 +0000
+Subject: [PATCH v2 1/3] perf tools: Use offset instead of dwarfnum in
+ register table.
+In-Reply-To: <589598D8.8050304@huawei.com>
+References: <20170203110607.97529-1-hekuang@huawei.com>
+ <20170203130026.GF11585@arm.com> <589598D8.8050304@huawei.com>
+Message-ID: <20170206130229.GI19939@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Sat, Feb 04, 2017 at 05:03:20PM +0800, Hekuang wrote:
+> hi
+> 
+> ? 2017/2/3 21:00, Will Deacon ??:
+> >On Fri, Feb 03, 2017 at 11:06:05AM +0000, He Kuang wrote:
+> >>This patch changes the 'dwarfnum' to 'offset' in register table, so
+> >>the index of array becomes the dwarfnum (the index of each register
+> >>defined by DWARF) and the "offset" member means the byte-offset of the
+> >>register in (user_)pt_regs. This change makes the code consistent with
+> >>x86.
+> >>
+> >>Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+> >>Signed-off-by: He Kuang <hekuang@huawei.com>
+> >>---
+> >>  tools/perf/arch/arm64/util/dwarf-regs.c | 107 ++++++++++++++++----------------
+> >>  1 file changed, 52 insertions(+), 55 deletions(-)
+> >Thanks for splitting this up. Comment below.
+> >
+> >>diff --git a/tools/perf/arch/arm64/util/dwarf-regs.c b/tools/perf/arch/arm64/util/dwarf-regs.c
+> >>index d49efeb..090f36b 100644
+> >>--- a/tools/perf/arch/arm64/util/dwarf-regs.c
+> >>+++ b/tools/perf/arch/arm64/util/dwarf-regs.c
+> >>@@ -9,72 +9,69 @@
+> >>   */
+> >>  #include <stddef.h>
+> >>+#include <linux/ptrace.h> /* for struct user_pt_regs */
+> >>  #include <dwarf-regs.h>
+> >>-struct pt_regs_dwarfnum {
+> >>+struct pt_regs_offset {
+> >>  	const char *name;
+> >>-	unsigned int dwarfnum;
+> >>+	int offset;
+> >>  };
+> >>-#define STR(s) #s
+> >>-#define REG_DWARFNUM_NAME(r, num) {.name = r, .dwarfnum = num}
+> >>-#define GPR_DWARFNUM_NAME(num) \
+> >>-	{.name = STR(%x##num), .dwarfnum = num}
+> >>-#define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0}
+> >>-
+> >>  /*
+> >>   * Reference:
+> >>   * http://infocenter.arm.com/help/topic/com.arm.doc.ihi0057b/IHI0057B_aadwarf64.pdf
+> >>   */
+> >>-static const struct pt_regs_dwarfnum regdwarfnum_table[] = {
+> >>-	GPR_DWARFNUM_NAME(0),
+> >>-	GPR_DWARFNUM_NAME(1),
+> >>-	GPR_DWARFNUM_NAME(2),
+> >>-	GPR_DWARFNUM_NAME(3),
+> >>-	GPR_DWARFNUM_NAME(4),
+> >>-	GPR_DWARFNUM_NAME(5),
+> >>-	GPR_DWARFNUM_NAME(6),
+> >>-	GPR_DWARFNUM_NAME(7),
+> >>-	GPR_DWARFNUM_NAME(8),
+> >>-	GPR_DWARFNUM_NAME(9),
+> >>-	GPR_DWARFNUM_NAME(10),
+> >>-	GPR_DWARFNUM_NAME(11),
+> >>-	GPR_DWARFNUM_NAME(12),
+> >>-	GPR_DWARFNUM_NAME(13),
+> >>-	GPR_DWARFNUM_NAME(14),
+> >>-	GPR_DWARFNUM_NAME(15),
+> >>-	GPR_DWARFNUM_NAME(16),
+> >>-	GPR_DWARFNUM_NAME(17),
+> >>-	GPR_DWARFNUM_NAME(18),
+> >>-	GPR_DWARFNUM_NAME(19),
+> >>-	GPR_DWARFNUM_NAME(20),
+> >>-	GPR_DWARFNUM_NAME(21),
+> >>-	GPR_DWARFNUM_NAME(22),
+> >>-	GPR_DWARFNUM_NAME(23),
+> >>-	GPR_DWARFNUM_NAME(24),
+> >>-	GPR_DWARFNUM_NAME(25),
+> >>-	GPR_DWARFNUM_NAME(26),
+> >>-	GPR_DWARFNUM_NAME(27),
+> >>-	GPR_DWARFNUM_NAME(28),
+> >>-	GPR_DWARFNUM_NAME(29),
+> >>-	REG_DWARFNUM_NAME("%lr", 30),
+> >>-	REG_DWARFNUM_NAME("%sp", 31),
+> >>-	REG_DWARFNUM_END,
+> >>-};
+> >>+#define REG_OFFSET_NAME(r, num) {.name = "%" #r,			\
+> >>+			.offset = offsetof(struct user_pt_regs, regs[num])}
+> >Whilst this works in practice, this is undefined behaviour for "sp", since
+> >you'll go off the end of the regs array.
+> 
+> It's not undefined behaviour here,
+> struct user_pt_regs {
+>         __u64           regs[31];
+>         __u64           sp;
+>         __u64           pc;
+>         __u64           pstate;
+> };
+> user_pt_regs->regs[31] is user_pt_regs->sp and the offset value is correct.
 
+I think it's undefined from the C standard perspective.
 
-On 02/06/2017 03:33 AM, Marc Zyngier wrote:
-> Hi Shanker,
->
-> On 06/02/17 02:17, Shanker Donthineni wrote:
->> On systems where it supports two security states, both the register
->> GICR_WAKE and GICD_IGROUPR accesses are RAZ/WI from non-secure.
->> The function gic_enable_redist() to wake/sleep redistributor is not
->> harmful at all, but it is confusing looking at the code. The current
->> code checks the single security state based on bit GICD_CTLR.DS which
->> is absolutely incorrect. The disable security bit GICD_CTLR.DS is RAZ
->> to non-secure.
-> I'm afraid we don't have the same definition of GICD_CTLR.DS. In my copy
-> of the architecture spec, it says:
->
-> "When this field is set to 1, all accesses to GICD_CTLR access the
-> single Security state view, and all bits are accessible".
->                                  ^^^^^^^^^^^^^^^^^^^^^^^
-Yes, but GICD_CTLR.DS is reversed bit not defined when accessing from 
-non-secure.
-Please look at GICD_CTLR definition 'When access is Non-secure, in a 
-system that supports two Security states'
+> >
+> >I still think you're better off sticking with the dwarfnum, then just having
+> >a dwarfnum2offset macro that multiplies by the size of a register.
+> >
+> >Will
+> I think add a ptregs_offset field is more suitable and makes the code
+> indepent
+> to struct user_pt_regs layout, for example if the structure changed to this:
+> 
+> struct user_pt_regs {
+>         __u64           sp;
+>         __u64           pc;
+>         __u64           pstate;
+>         __u64           regs[31];
+> };
 
-> This would tend to support my interpretation that once DS has been set
-> from the secure side, it becomes visible to all type of accesses.
->
->> The GICD_TYPE.SecurityExtn indicates whether the GIC
->> implementation supports two security states or only one security
->> state.
-> Yes, and that's orthogonal to having set DS or not.
->
-> So clearly, we have a difference of interpretation. What part of the
-> spec is supporting yours?
-I've verified three releases of GIC specs, all of them have the same 
-definition of GICD_CTLR.
+We won't reorder a uapi structure because that would binary compatibility.
 
-  1) First release of GICv3 and GICv4 issue A
-  2) First release of GICv3 and GICv4 issue B
-  3) First release of GICv3 and GICv4 issue C
+Just send a patch using the dwarfnum as the index for the offset calculation,
+like I've been saying since you posted the first version.
 
-Section '8.9.4 GICD_CTLR, Distributor Control Register' has the three 
-definitions.
-    1) When access is Secure, in a system that supports two Security states
-        DS bit: When this field is set to 1, all accesses to GICD_CTLR 
-access the single Security state view, and all
-bits are accessible.
-
-    2) When access is Non-secure, in a system that supports two Security 
-states
-         DS bit: Reserved.
-    3) When in a system that supports only a single Security state
-         DS bit: Disable Security. This field is RAO/WI.
-
-
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Will
