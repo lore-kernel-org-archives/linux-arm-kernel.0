@@ -1,61 +1,107 @@
-From: abhijitnaik27@gmail.com (Abhijit Naik)
-Date: Mon,  6 Feb 2017 13:26:51 +0530
-Subject: [PATCH 2/2] staging: bcm2835-audio: Removed space after '('
-In-Reply-To: <20170206075651.4829-1-abhijitnaik27@gmail.com>
-References: <20170206075651.4829-1-abhijitnaik27@gmail.com>
-Message-ID: <20170206075651.4829-2-abhijitnaik27@gmail.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Mon, 6 Feb 2017 09:18:20 +0100
+Subject: [RFC PATCH v6 0/7] ARM: Fix dma_alloc_coherent() and friends for
+ NOMMU
+In-Reply-To: <c3a09063-65e8-e560-742f-a0c350268cec@arm.com>
+References: <1485448965-32855-1-git-send-email-vladimir.murzin@arm.com>
+ <c3a09063-65e8-e560-742f-a0c350268cec@arm.com>
+Message-ID: <CA+M3ks58ZULnnC1v_R7SxjAPbyHTovxQq10Rvj=2kb0nSP3Nuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bcm2835-vchiq.c and vc_vchi_audioserv_defs.h:
-fixing ERROR: space prohibited after that open parenthesis '('
+2017-01-31 12:30 GMT+01:00 Vladimir Murzin <vladimir.murzin@arm.com>:
+> Gentle ping...
+>
+> On 26/01/17 16:42, Vladimir Murzin wrote:
+>> Hi,
+>>
+>> It seem that addition of cache support for M-class CPUs uncovered
+>> latent bug in DMA usage. NOMMU memory model has been treated as being
+>> always consistent; however, for R/M CPU classes memory can be covered
+>> by MPU which in turn might configure RAM as Normal i.e. bufferable and
+>> cacheable. It breaks dma_alloc_coherent() and friends, since data can
+>> stuck in caches now or be buffered.
+>>
+>> This patch set is trying to address the issue by providing region of
+>> memory suitable for consistent DMA operations. It is supposed that
+>> such region is marked by MPU as non-cacheable. Robin suggested to
+>> advertise such memory as reserved shared-dma-pool, rather then using
+>> homebrew command line option, and extend dma-coherent to provide
+>> default DMA area in the similar way as it is done for CMA (PATCH
+>> 4/7). It allows us to offload all bookkeeping on generic coherent DMA
+>> framework, and it seems that it might be reused by other architectures
+>> like c6x and blackfin.
+>>
+>> While reviewing/testing previous vesrions of the patch set it turned
+>> out that dma-coherent does not take into account "dma-ranges" device
+>> tree property, so it is addressed in PATCH 3/7.
+>>
+>> For ARM, dedicated DMA region is required for cases other than:
+>>  - MMU/MPU is off
+>>  - cpu is v7m w/o cache support
+>>  - device is coherent
+>>
+>> In case one of the above conditions is true dma operations are forced
+>> to be coherent and wired with dma_noop_ops.
+>>
+>> To make life easier NOMMU dma operations are kept in separate
+>> compilation unit.
+>>
+>> Since the issue was reported in the same time as Benjamin sent his
+>> patch [1] to allow mmap for NOMMU, his case is also addressed in this
+>> series (PATCH 1/7 and PATCH 2/7).
+>>
+>> Thanks!
+>>
+>> [1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
+>>
+>> Cc: Joerg Roedel <jroedel@suse.de>
+>> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+>> Cc: Michal Nazarewicz <mina86@mina86.com>
+>> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Cc: Alan Stern <stern@rowland.harvard.edu>
+>> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+>> Cc: Rich Felker <dalias@libc.org>
+>> Cc: Roger Quadros <rogerq@ti.com>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>
+>> Vladimir Murzin (7):
+>>   dma: Take into account dma_pfn_offset
+>>   dma: Add simple dma_noop_mmap
+>>   drivers: dma-coherent: Account dma_pfn_offset when used with device
+>>     tree
+>>   drivers: dma-coherent: Introduce default DMA pool
+>>   ARM: NOMMU: Introduce dma operations for noMMU
+>>   ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
+>>   ARM: dma-mapping: Remove traces of NOMMU code
+>>
+>>  .../bindings/reserved-memory/reserved-memory.txt   |   3 +
+>>  arch/arm/include/asm/dma-mapping.h                 |   3 +-
+>>  arch/arm/mm/Kconfig                                |   2 +-
+>>  arch/arm/mm/Makefile                               |   5 +-
+>>  arch/arm/mm/dma-mapping-nommu.c                    | 253 +++++++++++++++++++++
+>>  arch/arm/mm/dma-mapping.c                          |  26 +--
+>>  drivers/base/dma-coherent.c                        |  76 ++++++-
+>>  lib/dma-noop.c                                     |  29 ++-
+>>  8 files changed, 356 insertions(+), 41 deletions(-)
+>>  create mode 100644 arch/arm/mm/dma-mapping-nommu.c
+>>
+>
 
-Signed-off-by: Abhijit Naik <abhijitnaik27@gmail.com>
----
- drivers/staging/bcm2835-audio/bcm2835-vchiq.c          | 16 ++++++++--------
- drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h |  2 +-
- 2 files changed, 9 insertions(+), 9 deletions(-)
+I have tested this version on CortexM4 dma_alloc_coherent() and
+mmaping are working.
+Thanks,
 
-diff --git a/drivers/staging/bcm2835-audio/bcm2835-vchiq.c b/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
-index 99dc8c4e0185..043c79593691 100644
---- a/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
-+++ b/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
-@@ -44,15 +44,15 @@
+Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Acked-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
 
- /* Logging macros (for remapping to other logging mechanisms, i.e., printf) */
- #ifdef AUDIO_DEBUG_ENABLE
--#define LOG_ERR( fmt, arg...)   pr_err( "%s:%d " fmt, __func__, __LINE__, ##arg)
--#define LOG_WARN( fmt, arg...)  pr_info( "%s:%d " fmt, __func__, __LINE__, ##arg)
--#define LOG_INFO( fmt, arg...)  pr_info( "%s:%d " fmt, __func__, __LINE__, ##arg)
--#define LOG_DBG( fmt, arg...)   pr_info( "%s:%d " fmt, __func__, __LINE__, ##arg)
-+#define LOG_ERR(fmt, arg...)   pr_err("%s:%d " fmt, __func__, __LINE__, ##arg)
-+#define LOG_WARN(fmt, arg...)  pr_info("%s:%d " fmt, __func__, __LINE__, ##arg)
-+#define LOG_INFO(fmt, arg...)  pr_info("%s:%d " fmt, __func__, __LINE__, ##arg)
-+#define LOG_DBG(fmt, arg...)   pr_info("%s:%d " fmt, __func__, __LINE__, ##arg)
- #else
--#define LOG_ERR( fmt, arg...)   pr_err( "%s:%d " fmt, __func__, __LINE__, ##arg)
--#define LOG_WARN( fmt, arg...)
--#define LOG_INFO( fmt, arg...)
--#define LOG_DBG( fmt, arg...)
-+#define LOG_ERR(fmt, arg...)   pr_err("%s:%d " fmt, __func__, __LINE__, ##arg)
-+#define LOG_WARN(fmt, arg...)
-+#define LOG_INFO(fmt, arg...)
-+#define LOG_DBG(fmt, arg...)
- #endif
+-- 
+Benjamin Gaignard
 
- struct bcm2835_audio_instance {
-diff --git a/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h b/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h
-index f88c5632918b..928dd6009510 100644
---- a/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h
-+++ b/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h
-@@ -22,7 +22,7 @@
- #define VC_AUDIO_SERVER_NAME  MAKE_FOURCC("AUDS")
+Graphic Study Group
 
- /* Maximum message length */
--#define VC_AUDIO_MAX_MSG_LEN  (sizeof( VC_AUDIO_MSG_T))
-+#define VC_AUDIO_MAX_MSG_LEN  (sizeof(VC_AUDIO_MSG_T))
+Linaro.org ? Open source software for ARM SoCs
 
- /*
-  *  List of screens that are currently supported
---
-2.11.0
+Follow Linaro: Facebook | Twitter | Blog
