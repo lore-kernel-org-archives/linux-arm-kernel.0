@@ -1,23 +1,21 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 6 Feb 2017 09:43:14 +0100
-Subject: [PATCH 3/8] Documentation: dt-bindings: Add STM32 pinctrl driver
- DT bindings
-In-Reply-To: <1485868465-30446-4-git-send-email-alexandre.torgue@st.com>
-References: <1485868465-30446-1-git-send-email-alexandre.torgue@st.com>
- <1485868465-30446-4-git-send-email-alexandre.torgue@st.com>
-Message-ID: <CACRpkdbbrWtJx4Dj1N6b5vifxaw4RLftohK1fVLE2vcpNu5bBA@mail.gmail.com>
+Date: Mon, 6 Feb 2017 09:45:47 +0100
+Subject: [PATCH 3/8] Documentation: dt: Add bindings for STM32 pinctrl
+In-Reply-To: <1485533721-9019-4-git-send-email-alexandre.torgue@st.com>
+References: <1485533721-9019-1-git-send-email-alexandre.torgue@st.com>
+ <1485533721-9019-4-git-send-email-alexandre.torgue@st.com>
+Message-ID: <CACRpkdY7G2=1fPAG4BSGe9ivsGWi8qZ8euHa3r-66Wc_TMWTBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 2:14 PM, Alexandre TORGUE
+On Fri, Jan 27, 2017 at 5:15 PM, Alexandre TORGUE
 <alexandre.torgue@st.com> wrote:
 
-> Add compatible sting for stm32h743 MCU.
+> Adds "ngpios" and "gpio-ranges" bindings definition.
 >
 > Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-Patch applied, incorporating the changes suggested by Rob,
-amending subject and dropping (a,b,c).
+Patch applied with Rob's ACK, amending subject as well.
 
 Yours,
 Linus Walleij
