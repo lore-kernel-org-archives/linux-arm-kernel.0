@@ -1,51 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 6 Feb 2017 09:46:53 +0100
-Subject: [PATCH 6/8] Documentation: dt: Add new compatible to STM32
- pinctrl driver bindings
-In-Reply-To: <abee01c1-da4f-97b4-258a-3ab937f620eb@st.com>
-References: <1485533721-9019-1-git-send-email-alexandre.torgue@st.com>
- <1485533721-9019-7-git-send-email-alexandre.torgue@st.com>
- <20170201150609.cbhwon76m6igmhyh@rob-hp-laptop>
- <abee01c1-da4f-97b4-258a-3ab937f620eb@st.com>
-Message-ID: <CACRpkdb=U+UMRqR2GKGwDzk9X_nLv0tf2dZ8LhDGceAD83LKag@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 6 Feb 2017 09:48:28 +0100
+Subject: [PATCH v3 1/3] nvmem: sunxi-sid: read NVMEM size from device
+ compatible
+In-Reply-To: <20170202131338.20234-1-icenowy@aosc.xyz>
+References: <20170202131338.20234-1-icenowy@aosc.xyz>
+Message-ID: <20170206084828.s33k4fg6n7mcivb2@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 1, 2017 at 4:58 PM, Alexandre Torgue
-<alexandre.torgue@st.com> wrote:
-> On 02/01/2017 04:06 PM, Rob Herring wrote:
->>
->> On Fri, Jan 27, 2017 at 05:15:19PM +0100, Alexandre TORGUE wrote:
->>>
->>> Add new compatible for stm32f469 MCU.
->>>
->>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
->>>
->>> diff --git
->>> a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
->>> b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
->>> index 25d9809..4f0487d 100644
->>> --- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
->>> +++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
->>> @@ -9,7 +9,8 @@ Pin controller node:
->>>  Required properies:
->>>   - compatible: value should be one of the following:
->>>     (a) "st,stm32f429-pinctrl"
->>> -   (b) "st,stm32f746-pinctrl"
->>> +   (b) "st,stm32f469-pinctrl"
->>> +   (c) "st,stm32f746-pinctrl"
->>
->>
->> Drop the a,b,c. Otherwise, you'll be changing a bunch of lines every
->> time.
->
->
-> I completely agree.
->
-> Linus, Do i need to send a v2 for this patch ?
+On Thu, Feb 02, 2017 at 09:13:36PM +0800, Icenowy Zheng wrote:
+> Sometimes the SID device have more memory address space than the real
+> NVMEM size (for the registers used to read/write the SID).
+> 
+> Fetch the NVMEM size from device compatible, rather than the memory
+> address space's length, in order to prepare for adding some
+> registers-based read support.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-Nopes, applied the amended v1 patch already with these
-changes, check the result.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Yours,
-Linus Walleij
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170206/c3412e37/attachment.sig>
