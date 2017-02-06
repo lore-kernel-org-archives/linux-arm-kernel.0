@@ -1,493 +1,964 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 7 Feb 2017 02:32:41 +0800
-Subject: [hisi:topic-lpc-4.10-libio 136/148] lib/libio.c:80:13: error:
- dereferencing pointer to incomplete type 'struct acpi_resource'
-Message-ID: <201702070238.HMQTlBwF%fengguang.wu@intel.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 6 Feb 2017 18:35:01 +0000
+Subject: [PATCH v9 3/3] iio: adc: add support for Allwinner SoCs ADC
+In-Reply-To: <ca104163-e9ef-0e8f-0c0e-2339ce7da6d3@free-electrons.com>
+References: <20161213143332.24988-1-quentin.schulz@free-electrons.com>
+ <20161213143332.24988-4-quentin.schulz@free-electrons.com>
+ <8132b799-6c6e-fc74-ebac-6959ac4c97a7@kernel.org>
+ <f8285a90-656f-0da4-ee81-47b79ce4cd2c@kernel.org>
+ <9e1d1e4d-84e6-ba9d-f1da-4d2bb81c2d40@free-electrons.com>
+ <6C7E1B31-9758-4BB2-A47E-648CA53AAC72@jic23.retrosnub.co.uk>
+ <ca104163-e9ef-0e8f-0c0e-2339ce7da6d3@free-electrons.com>
+Message-ID: <ddc0090a-2778-8643-2cc1-5f1590aeb72b@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+On 06/02/17 07:37, Quentin Schulz wrote:
+> Hi Jonathan,
+> 
+> On 14/01/2017 20:28, Jonathan Cameron wrote:
+>>
+>>
+>> On 14 January 2017 19:19:58 GMT+00:00, Quentin Schulz <quentin.schulz@free-electrons.com> wrote:
+>>> Hi Jonathan,
+>>>
+>>> On 08/01/2017 12:17, Jonathan Cameron wrote:
+>>>> On 30/12/16 14:40, Jonathan Cameron wrote:
+>>>>> On 13/12/16 14:33, Quentin Schulz wrote:
+>>>>>> The Allwinner SoCs all have an ADC that can also act as a
+>>> touchscreen
+>>>>>> controller and a thermal sensor. This patch adds the ADC driver
+>>> which is
+>>>>>> based on the MFD for the same SoCs ADC.
+>>>>>>
+>>>>>> This also registers the thermal adc channel in the iio map array so
+>>>>>> iio_hwmon could use it without modifying the Device Tree. This
+>>> registers
+>>>>>> the driver in the thermal framework.
+>>>>>>
+>>>>>> The thermal sensor requires the IP to be in touchscreen mode to
+>>> return
+>>>>>> correct values. Therefore, if the user is continuously reading the
+>>> ADC
+>>>>>> channel(s), the thermal framework in which the thermal sensor is
+>>>>>> registered will switch the IP in touchscreen mode to get a
+>>> temperature
+>>>>>> value and requires a delay of 100ms (because of the mode
+>>> switching),
+>>>>>> then the ADC will switch back to ADC mode and requires also a delay
+>>> of
+>>>>>> 100ms. If the ADC readings are critical to user and the SoC
+>>> temperature
+>>>>>> is not, this driver is capable of not registering the thermal
+>>> sensor in
+>>>>>> the thermal framework and thus, "quicken" the ADC readings.
+>>>>>>
+>>>>>> This driver probes on three different platform_device_id to take
+>>> into
+>>>>>> account slight differences (registers bit and temperature
+>>> computation)
+>>>>>> between Allwinner SoCs ADCs.
+>>>>>>
+>>>>>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>>>>>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>>>>> Acked-by: Jonathan Cameron <jic23@kernel.org>
+>>>>>> Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+>>>>> One comment inline but not a blocker.
+>>>>>
+>>>>> I would ideally like an ack from the thermal side.  The relevant
+>>> code
+>>>>> is small, but best to be sure and keep them in the loop as well.
+>>>>>
+>>>>> It does feel a little convoluted to have both this directly
+>>> providing
+>>>>> a thermal zone and being able to create one indirectly through hwmon
+>>> as
+>>>>> well but this solution works for me I think...
+>>>>>
+>>>>> Cc'd Zang and Eduardo.
+>>>> Nothing seems to have come through on that front.
+>>>>
+>>>> I need to get a pull request out to Greg and rebase my tree before I
+>>> have
+>>>> the precursor patch in place. Give me a bump if you haven't heard
+>>> anything by
+>>>> the time next week.
+>>>>
+>>>
+>>> Kindly "giving you a bump" you as requested since I haven't heard from
+>>> you for a week.
+>> Greg hasn't pulled yet, so may be a few more days.
+>>
+>> J
+> 
+> I haven't received any news from you on the merging of this patch series
+> for a month, so kindly pinging.
+Gah!  Sorry, I completely lost this one in my patch queue. Thanks for the
+reminder.
 
-First bad commit (maybe != root cause):
+Applied to the togreg branch of iio.git and pushed out as testing for the
+autobuilders to play with it.
 
-tree:   https://github.com/hisilicon/linux-hisi topic-lpc-4.10-libio
-head:   06443d85dc35b64a704f7be84cc538281a1598f4
-commit: 1138304d3967f65dac8be95ce39f9abffc5f1f65 [136/148] libio: create from extio
-config: x86_64-acpi-redef (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout 1138304d3967f65dac8be95ce39f9abffc5f1f65
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+I'm afraid due to my tardiness it's missed the coming merge window, but
+I'll make sure it goes in my first pull request for the next cycle.
 
-Note: the hisi/topic-lpc-4.10-libio HEAD 06443d85dc35b64a704f7be84cc538281a1598f4 builds fine.
-      It only hurts bisectibility.
-
-All error/warnings (new ones prefixed by >>):
-
-   lib/libio.c:24:28: warning: 'struct extio_node' declared inside parameter list will not be visible outside of this definition or declaration
-    void register_extio(struct extio_node *node)
-                               ^~~~~~~~~~
-   lib/libio.c: In function 'register_extio':
-   lib/libio.c:27:21: error: dereferencing pointer to incomplete type 'struct extio_node'
-     list_add_tail(&node->list, &extio_dev_list);
-                        ^~
-   In file included from include/asm-generic/bug.h:13:0,
-                    from arch/x86/include/asm/bug.h:35,
-                    from include/linux/bug.h:4,
-                    from include/linux/io.h:23,
-                    from lib/libio.c:18:
-   lib/libio.c: In function 'find_extio_token':
-   include/linux/list.h:463:43: error: dereferencing pointer to incomplete type 'struct extio_node'
-     for (pos = list_first_entry(head, typeof(*pos), member); \
-                                               
-   include/linux/kernel.h:850:18: note: in definition of macro 'container_of'
-     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-                     ^~~~
-   include/linux/list.h:376:2: note: in expansion of macro 'list_entry'
-     list_entry((ptr)->next, type, member)
-     ^~~~~~~~~~
-   include/linux/list.h:463:13: note: in expansion of macro 'list_first_entry'
-     for (pos = list_first_entry(head, typeof(*pos), member); \
-                ^~~~~~~~~~~~~~~~
->> lib/libio.c:36:2: note: in expansion of macro 'list_for_each_entry'
-     list_for_each_entry(extio_entry, &extio_dev_list, list) {
-     ^~~~~~~~~~~~~~~~~~~
-   include/linux/kernel.h:850:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-                                                   ^
-   include/linux/list.h:365:2: note: in expansion of macro 'container_of'
-     container_of(ptr, type, member)
-     ^~~~~~~~~~~~
-   include/linux/list.h:376:2: note: in expansion of macro 'list_entry'
-     list_entry((ptr)->next, type, member)
-     ^~~~~~~~~~
-   include/linux/list.h:463:13: note: in expansion of macro 'list_first_entry'
-     for (pos = list_first_entry(head, typeof(*pos), member); \
-                ^~~~~~~~~~~~~~~~
->> lib/libio.c:36:2: note: in expansion of macro 'list_for_each_entry'
-     list_for_each_entry(extio_entry, &extio_dev_list, list) {
-     ^~~~~~~~~~~~~~~~~~~
-   lib/libio.c: At top level:
-   lib/libio.c:45:43: warning: 'struct fwnode_handle' declared inside parameter list will not be visible outside of this definition or declaration
-    struct extio_node *extio_find_node(struct fwnode_handle *node)
-                                              ^~~~~~~~~~~~~
-   In file included from include/asm-generic/bug.h:13:0,
-                    from arch/x86/include/asm/bug.h:35,
-                    from include/linux/bug.h:4,
-                    from include/linux/io.h:23,
-                    from lib/libio.c:18:
-   lib/libio.c: In function 'extio_find_node':
-   include/linux/kernel.h:850:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-                                                   ^
-   include/linux/list.h:365:2: note: in expansion of macro 'container_of'
-     container_of(ptr, type, member)
-     ^~~~~~~~~~~~
-   include/linux/list.h:376:2: note: in expansion of macro 'list_entry'
-     list_entry((ptr)->next, type, member)
-     ^~~~~~~~~~
-   include/linux/list.h:463:13: note: in expansion of macro 'list_first_entry'
-     for (pos = list_first_entry(head, typeof(*pos), member); \
-                ^~~~~~~~~~~~~~~~
-   lib/libio.c:50:2: note: in expansion of macro 'list_for_each_entry'
-     list_for_each_entry(entry, &extio_dev_list, list) {
-     ^~~~~~~~~~~~~~~~~~~
-   lib/libio.c: At top level:
-   lib/libio.c:59:38: warning: 'struct fwnode_handle' declared inside parameter list will not be visible outside of this definition or declaration
-    unsigned long extio_translate(struct fwnode_handle *node,
-                                         ^~~~~~~~~~~~~
-   In file included from include/asm-generic/bug.h:13:0,
-                    from arch/x86/include/asm/bug.h:35,
-                    from include/linux/bug.h:4,
-                    from include/linux/io.h:23,
-                    from lib/libio.c:18:
-   lib/libio.c: In function 'extio_translate':
-   include/linux/kernel.h:850:48: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-     const typeof( ((type *)0)->member ) *__mptr = (ptr); \
-                                                   ^
-   include/linux/list.h:365:2: note: in expansion of macro 'container_of'
-     container_of(ptr, type, member)
-     ^~~~~~~~~~~~
-   include/linux/list.h:376:2: note: in expansion of macro 'list_entry'
-     list_entry((ptr)->next, type, member)
-     ^~~~~~~~~~
-   include/linux/list.h:463:13: note: in expansion of macro 'list_first_entry'
-     for (pos = list_first_entry(head, typeof(*pos), member); \
-                ^~~~~~~~~~~~~~~~
-   lib/libio.c:66:2: note: in expansion of macro 'list_for_each_entry'
-     list_for_each_entry(entry, &extio_dev_list, list) {
-     ^~~~~~~~~~~~~~~~~~~
-   lib/libio.c: At top level:
->> lib/libio.c:78:57: warning: 'struct acpi_resource' declared inside parameter list will not be visible outside of this definition or declaration
-    static inline bool acpi_extio_supported_resource(struct acpi_resource *res)
-                                                            ^~~~~~~~~~~~~
-   lib/libio.c: In function 'acpi_extio_supported_resource':
->> lib/libio.c:80:13: error: dereferencing pointer to incomplete type 'struct acpi_resource'
-     switch (res->type) {
-                ^~
->> lib/libio.c:81:7: error: 'ACPI_RESOURCE_TYPE_ADDRESS16' undeclared (first use in this function)
-     case ACPI_RESOURCE_TYPE_ADDRESS16:
-          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   lib/libio.c:81:7: note: each undeclared identifier is reported only once for each function it appears in
->> lib/libio.c:82:7: error: 'ACPI_RESOURCE_TYPE_ADDRESS32' undeclared (first use in this function)
-     case ACPI_RESOURCE_TYPE_ADDRESS32:
-          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
->> lib/libio.c:83:7: error: 'ACPI_RESOURCE_TYPE_ADDRESS64' undeclared (first use in this function)
-     case ACPI_RESOURCE_TYPE_ADDRESS64:
-          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   lib/libio.c: At top level:
->> lib/libio.c:89:8: error: unknown type name 'acpi_status'
-    static acpi_status acpi_count_extiores(struct acpi_resource *res,
-           ^~~~~~~~~~~
-   lib/libio.c:89:47: warning: 'struct acpi_resource' declared inside parameter list will not be visible outside of this definition or declaration
-    static acpi_status acpi_count_extiores(struct acpi_resource *res,
-                                                  ^~~~~~~~~~~~~
-   lib/libio.c: In function 'acpi_count_extiores':
-   lib/libio.c:94:36: error: passing argument 1 of 'acpi_extio_supported_resource' from incompatible pointer type [-Werror=incompatible-pointer-types]
-     if (acpi_extio_supported_resource(res) &&
-                                       ^~~
-   lib/libio.c:78:20: note: expected 'struct acpi_resource *' but argument is of type 'struct acpi_resource *'
-    static inline bool acpi_extio_supported_resource(struct acpi_resource *res)
-                       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
->> lib/libio.c:95:4: error: implicit declaration of function 'acpi_dev_filter_resource_type' [-Werror=implicit-function-declaration]
-      !acpi_dev_filter_resource_type(res, IORESOURCE_IO))
-       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   lib/libio.c:95:39: error: 'IORESOURCE_IO' undeclared (first use in this function)
-      !acpi_dev_filter_resource_type(res, IORESOURCE_IO))
-                                          ^~~~~~~~~~~~~
->> lib/libio.c:98:9: error: 'AE_OK' undeclared (first use in this function)
-     return AE_OK;
-            ^~~~~
-   lib/libio.c: At top level:
-   lib/libio.c:101:8: error: unknown type name 'acpi_status'
-    static acpi_status acpi_read_one_extiores(struct acpi_resource *res,
-           ^~~~~~~~~~~
-   lib/libio.c:101:50: warning: 'struct acpi_resource' declared inside parameter list will not be visible outside of this definition or declaration
-    static acpi_status acpi_read_one_extiores(struct acpi_resource *res,
-                                                     ^~~~~~~~~~~~~
-   lib/libio.c: In function 'acpi_read_one_extiores':
-   lib/libio.c:106:36: error: passing argument 1 of 'acpi_extio_supported_resource' from incompatible pointer type [-Werror=incompatible-pointer-types]
-     if (acpi_extio_supported_resource(res) &&
-                                       ^~~
-   lib/libio.c:78:20: note: expected 'struct acpi_resource *' but argument is of type 'struct acpi_resource *'
-    static inline bool acpi_extio_supported_resource(struct acpi_resource *res)
-                       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   lib/libio.c:107:39: error: 'IORESOURCE_IO' undeclared (first use in this function)
-      !acpi_dev_filter_resource_type(res, IORESOURCE_IO)) {
-                                          ^~~~~~~~~~~~~
->> lib/libio.c:108:35: error: invalid application of 'sizeof' to incomplete type 'struct acpi_resource'
-      memcpy((*resource), res, sizeof(struct acpi_resource));
-                                      ^~~~~~
-   lib/libio.c:109:14: error: dereferencing pointer to incomplete type 'struct acpi_resource'
-      (*resource)->length = sizeof(struct acpi_resource);
-                 ^~
-   lib/libio.c:109:32: error: invalid application of 'sizeof' to incomplete type 'struct acpi_resource'
-      (*resource)->length = sizeof(struct acpi_resource);
-                                   ^~~~~~
->> lib/libio.c:111:14: error: increment of pointer to an incomplete type 'struct acpi_resource'
-      (*resource)++;
-                 ^~
-   lib/libio.c:114:9: error: 'AE_OK' undeclared (first use in this function)
-     return AE_OK;
-            ^~~~~
-   lib/libio.c: At top level:
-   lib/libio.c:117:8: error: unknown type name 'acpi_status'
-    static acpi_status
-           ^~~~~~~~~~~
->> lib/libio.c:119:11: warning: 'struct acpi_buffer' declared inside parameter list will not be visible outside of this definition or declaration
-       struct acpi_buffer *buffer)
-              ^~~~~~~~~~~
->> lib/libio.c:118:37: warning: 'struct acpi_device' declared inside parameter list will not be visible outside of this definition or declaration
-    acpi_build_extiores_template(struct acpi_device *adev,
-                                        ^~~~~~~~~~~
-   lib/libio.c: In function 'acpi_build_extiores_template':
->> lib/libio.c:121:2: error: unknown type name 'acpi_handle'
-     acpi_handle handle = adev->handle;
-     ^~~~~~~~~~~
->> lib/libio.c:121:27: error: dereferencing pointer to incomplete type 'struct acpi_device'
-     acpi_handle handle = adev->handle;
-                              ^~
-   lib/libio.c:123:2: error: unknown type name 'acpi_status'
-     acpi_status status;
-     ^~~~~~~~~~~
->> lib/libio.c:126:11: error: implicit declaration of function 'acpi_walk_resources' [-Werror=implicit-function-declaration]
-     status = acpi_walk_resources(handle, METHOD_NAME__PRS,
-              ^~~~~~~~~~~~~~~~~~~
->> lib/libio.c:126:39: error: 'METHOD_NAME__PRS' undeclared (first use in this function)
-     status = acpi_walk_resources(handle, METHOD_NAME__PRS,
-                                          ^~~~~~~~~~~~~~~~
->> lib/libio.c:128:6: error: implicit declaration of function 'ACPI_FAILURE' [-Werror=implicit-function-declaration]
-     if (ACPI_FAILURE(status) || !res_cnt) {
-         ^~~~~~~~~~~~
->> lib/libio.c:129:3: error: implicit declaration of function 'dev_err' [-Werror=implicit-function-declaration]
-      dev_err(&adev->dev, "can't evaluate _CRS: %d\n", status);
-      ^~~~~~~
-
-vim +80 lib/libio.c
-
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   30  
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   31  static struct extio_node *find_extio_token(unsigned long addr)
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   32  {
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   33  	struct extio_node *extio_entry;
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   34  
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   35  	read_lock(&extio_list_lock);
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23  @36  	list_for_each_entry(extio_entry, &extio_dev_list, list) {
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   37  		if ((addr < extio_entry->io_start + extio_entry->range_size) &&
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   38  			(addr >= extio_entry->io_start))
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   39  			break;
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   40  	}
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   41  	read_unlock(&extio_list_lock);
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   42  	return (&extio_entry->list == &extio_dev_list) ? NULL : extio_entry;
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   43  }
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   44  
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   45  struct extio_node *extio_find_node(struct fwnode_handle *node)
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   46  {
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   47  	struct extio_node *entry;
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   48  
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   49  	read_lock(&extio_list_lock);
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   50  	list_for_each_entry(entry, &extio_dev_list, list) {
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   51  		if (entry->fwnode == node)
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   52  			break;
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   53  	}
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   54  	read_unlock(&extio_list_lock);
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   55  
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   56  	return (&entry->list == &extio_dev_list) ? NULL : entry;
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23  @57  }
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   58  
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   59  unsigned long extio_translate(struct fwnode_handle *node,
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   60  		unsigned long bus_addr)
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   61  {
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   62  	struct extio_node *entry;
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   63  	unsigned long port_id = -1;
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   64  
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   65  	read_lock(&extio_list_lock);
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23  @66  	list_for_each_entry(entry, &extio_dev_list, list) {
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   67  		if (entry->fwnode == node &&
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   68  			bus_addr >= entry->bus_start &&
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   69  			bus_addr - entry->bus_start < entry->range_size)
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   70  			port_id = entry->io_start + bus_addr -
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   71  					entry->bus_start;
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   72  	}
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   73  	read_unlock(&extio_list_lock);
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   74  
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   75  	return port_id;
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   76  }
-14c67d09 lib/extio.c zhichang.yuan 2017-01-23   77  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  @78  static inline bool acpi_extio_supported_resource(struct acpi_resource *res)
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24   79  {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  @80  	switch (res->type) {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  @81  	case ACPI_RESOURCE_TYPE_ADDRESS16:
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  @82  	case ACPI_RESOURCE_TYPE_ADDRESS32:
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  @83  	case ACPI_RESOURCE_TYPE_ADDRESS64:
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24   84  		return true;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24   85  	}
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24   86  	return false;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24   87  }
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24   88  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  @89  static acpi_status acpi_count_extiores(struct acpi_resource *res,
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24   90  					   void *data)
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24   91  {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24   92  	int *res_cnt = data;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24   93  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  @94  	if (acpi_extio_supported_resource(res) &&
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  @95  		!acpi_dev_filter_resource_type(res, IORESOURCE_IO))
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24   96  		(*res_cnt)++;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24   97  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  @98  	return AE_OK;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24   99  }
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  100  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  101  static acpi_status acpi_read_one_extiores(struct acpi_resource *res,
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  102  		void *data)
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  103  {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  104  	struct acpi_resource **resource = data;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  105  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @106  	if (acpi_extio_supported_resource(res) &&
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  107  		!acpi_dev_filter_resource_type(res, IORESOURCE_IO)) {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @108  		memcpy((*resource), res, sizeof(struct acpi_resource));
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  109  		(*resource)->length = sizeof(struct acpi_resource);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  110  		(*resource)->type = res->type;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @111  		(*resource)++;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  112  	}
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  113  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @114  	return AE_OK;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  115  }
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  116  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @117  static acpi_status
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @118  acpi_build_extiores_template(struct acpi_device *adev,
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @119  			struct acpi_buffer *buffer)
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  120  {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @121  	acpi_handle handle = adev->handle;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  122  	struct acpi_resource *resource;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @123  	acpi_status status;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  124  	int res_cnt = 0;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  125  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @126  	status = acpi_walk_resources(handle, METHOD_NAME__PRS,
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  127  				     acpi_count_extiores, &res_cnt);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @128  	if (ACPI_FAILURE(status) || !res_cnt) {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @129  		dev_err(&adev->dev, "can't evaluate _CRS: %d\n", status);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  130  		return -EINVAL;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  131  	}
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  132  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @133  	buffer->length = sizeof(struct acpi_resource) * (res_cnt + 1) + 1;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @134  	buffer->pointer = kzalloc(buffer->length - 1, GFP_KERNEL);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  135  	if (!buffer->pointer)
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  136  		return -ENOMEM;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  137  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  138  	resource = (struct acpi_resource *)buffer->pointer;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  139  	status = acpi_walk_resources(handle, METHOD_NAME__PRS,
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  140  				     acpi_read_one_extiores, &resource);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  141  	if (ACPI_FAILURE(status)) {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @142  		kfree(buffer->pointer);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  143  		dev_err(&adev->dev, "can't evaluate _PRS: %d\n", status);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  144  		return -EINVAL;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  145  	}
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  146  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @147  	resource->type = ACPI_RESOURCE_TYPE_END_TAG;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  148  	resource->length = sizeof(struct acpi_resource);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  149  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  150  	return 0;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  151  }
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  152  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @153  static int acpi_translate_extiores(struct acpi_device *adev,
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  154  		struct acpi_device *host, struct acpi_buffer *buffer)
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  155  {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @156  	int res_cnt = (buffer->length - 1) / sizeof(struct acpi_resource) - 1;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  157  	struct acpi_resource *resource = buffer->pointer;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @158  	struct acpi_resource_address64 addr;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  159  	unsigned long sys_port;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @160  	struct device *dev = &adev->dev;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  161  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  162  	/* only one I/O resource now */
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  163  	if (res_cnt != 1) {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  164  		dev_err(dev, "encode %d resources whose type is(%d)!\n",
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  165  			res_cnt, resource->type);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  166  		return -EINVAL;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  167  	}
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  168  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @169  	if (ACPI_FAILURE(acpi_resource_to_address64(resource, &addr))) {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  170  		dev_err(dev, "convert acpi resource(%d) as addr64 FAIL!\n",
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  171  			resource->type);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  172  		return -EFAULT;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  173  	}
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  174  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  175  	/* For indirect-IO, addr length must be fixed. (>0, 0, 0) */
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  176  	if (!addr.address.address_length || addr.min_address_fixed ||
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  177  		addr.max_address_fixed) {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @178  		dev_warn(dev, "variable I/O resource is invalid!\n");
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  179  		return -EINVAL;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  180  	}
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  181  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  182  	sys_port = extio_translate(&host->fwnode, addr.address.minimum);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  183  	if (sys_port == -1) {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  184  		dev_err(dev, "translate bus-addr(0x%llx) fail!\n",
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  185  			addr.address.minimum);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  186  		return -EFAULT;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  187  	}
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  188  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  189  	switch (resource->type) {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  190  	case ACPI_RESOURCE_TYPE_ADDRESS16:
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  191  	{
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  192  		struct acpi_resource_address16 *out_res;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  193  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  194  		out_res = &resource->data.address16;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @195  		out_res->address.minimum = sys_port;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  196  		out_res->address.maximum = sys_port +
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  197  			addr.address.address_length - 1;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  198  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @199  		dev_info(dev, "_SRS 16IO: [0x%x - 0x%x]\n",
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  200  			out_res->address.minimum,
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  201  			out_res->address.maximum);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  202  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  203  		break;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  204  	}
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  205  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @206  	case ACPI_RESOURCE_TYPE_ADDRESS32:
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  207  	{
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  208  		struct acpi_resource_address32 *out_res;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  209  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  210  		out_res = &resource->data.address32;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @211  		out_res->address.minimum = sys_port;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  212  		out_res->address.maximum = sys_port +
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  213  			addr.address.address_length - 1;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  214  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  215  		dev_info(dev, "_SRS 32IO: [0x%x - 0x%x]\n",
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  216  			out_res->address.minimum,
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  217  			out_res->address.maximum);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  218  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  219  		break;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  220  	}
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  221  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  222  	case ACPI_RESOURCE_TYPE_ADDRESS64:
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  223  	{
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  224  		struct acpi_resource_address64 *out_res;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  225  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  226  		out_res = &resource->data.address64;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @227  		out_res->address.minimum = sys_port;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  228  		out_res->address.maximum = sys_port +
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  229  			addr.address.address_length - 1;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  230  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  231  		dev_info(dev, "_SRS 64IO: [0x%llx - 0x%llx]\n",
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  232  			out_res->address.minimum,
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  233  			out_res->address.maximum);
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  234  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  235  		break;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  236  	}
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  237  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  238  	default:
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  239  		return -EINVAL;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  240  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  241  	}
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  242  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  243  	return 0;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  244  }
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  245  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  246  /*
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  247   * update/set the current I/O resource of the designated device node.
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  248   * after this calling, the enumeration can be started as the I/O resource
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  249   * had been translated to logicial I/O from bus-local I/O.
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  250   *
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  251   * @adev: the device node to be updated the I/O resource;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  252   * @host: the device node where 'adev' is attached, which can be not
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  253   *	the parent of 'adev';
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  254   *
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  255   * return 0 when successful, negative is for failure.
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  256   */
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @257  int acpi_set_extio_resource(struct acpi_device *adev,
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  258  		struct acpi_device *host)
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  259  {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @260  	struct device *dev = &adev->dev;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @261  	struct acpi_buffer buffer;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  262  	acpi_status status;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  263  	int ret;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  264  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  265  	if (!host)
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  266  		return -EINVAL;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  267  
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  268  	/* check the device state */
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  269  	if (!adev->status.present) {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  270  		dev_info(dev, "ACPI: device is not present!\n");
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  271  		return 0;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  272  	}
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  273  	/* whether the child had been enumerated? */
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24 @274  	if (acpi_device_enumerated(adev)) {
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  275  		dev_info(dev, "ACPI: had been enumerated!\n");
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  276  		return 0;
-0ccaa690 lib/extio.c zhichang.yuan 2017-01-24  277  	}
-
-:::::: The code at line 80 was first introduced by commit
-:::::: 0ccaa690913e8dc13f3bbdfff3c059dc3c2ae936 LPC: Add the ACPI LPC support
-
-:::::: TO: zhichang.yuan <yuanzhichang@hisilicon.com>
-:::::: CC: zhichang.yuan <yuanzhichang@hisilicon.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 28928 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/879f8ab8/attachment-0001.gz>
+Jonathan
+> 
+> Thanks,
+> Quentin
+> 
+>>>
+>>> Thanks,
+>>> Quentin
+>>>
+>>>> Thanks,
+>>>>
+>>>> Jonathan
+>>>>>
+>>>>> Jonathan
+>>>>>> ---
+>>>>>>
+>>>>>> v9:
+>>>>>>  - clarify comment on why we have to use the parent node as node
+>>> for
+>>>>>>  registering in thermal framework, (backward compatibility)
+>>>>>>  - clarify comment on why we can disable CONFIG_THERMAL_OF,
+>>>>>>  - clarify Kconfig help to say that CONFIG_THERMAL_OF can be
+>>> disabled
+>>>>>>  but should not in most cases,
+>>>>>>  - make return value of devm_thermal_zone_of_sensor_register a
+>>> local
+>>>>>>  variable of the condition block,
+>>>>>>  - correct scale from _PLUS_MICRO to _PLUS_NANO for ADC raw
+>>> readings
+>>>>>>  scale,
+>>>>>>
+>>>>>> v8:
+>>>>>>  - remove Kconfig depends on !TOUCHSCREEN_SUN4I (moved to
+>>>>>> MFD_SUN4I_GPADC),
+>>>>>>  - fix return values of regmap_irq_get_virq and
+>>> platform_get_irq_byname
+>>>>>> stored in an unsigned int and then check if negative,
+>>>>>>  - fix uninitialized ret value when an error occurs while
+>>> registering
+>>>>>> the thermal sensor in the framework,
+>>>>>>
+>>>>>> v7:
+>>>>>>  - add Kconfig depends on !TOUCHSCREEN_SUN4I,
+>>>>>>  - remove Kconfig selects THERMAL_OF,
+>>>>>>  - do not register thermal sensor if CONFIG_THERMAL_OF is disabled,
+>>>>>>  - disable irq in irq_handler rather than in read_raw,
+>>>>>>  - add delay when switching the IP's mode or channel (delay
+>>> empirically found),
+>>>>>>  - quicken thermal sensor interrupt period,
+>>>>>>  - add masks for channel bits,
+>>>>>>  - fix deadlock in sun4i_gpadc_read if regmap_read/write fails,
+>>>>>>  - move some logic from sun4i_gpadc_read to sun4i_prepare_for_irq,
+>>>>>>  - mark last busy for runtime_pm only on success in
+>>> sun4i_gpadc_read,
+>>>>>>  - remove cached values,
+>>>>>>  - increase wait_for_completion_timeout timeout to 1s to be sure to
+>>> not miss the
+>>>>>>  thermal interrupt,
+>>>>>>  - add voltage scale,
+>>>>>>  - use devm_iio_device_register,
+>>>>>>
+>>>>>> v6:
+>>>>>>  - remove "-mfd" from filenames and variables inside MFD driver,
+>>>>>>  - use DEFINE_RES_IRQ_NAMED instead of setting resources manually,
+>>>>>>  - cosmetic changes,
+>>>>>>  - use IDs and switch over ID to get cells specific to an
+>>> architecture, instead
+>>>>>>  of using cells direclty, in of_device_id.data,
+>>>>>>  - compute size of mfd_cells array instead of hardcoded one,
+>>>>>>
+>>>>>> v5:
+>>>>>>  - correct mail address,
+>>>>>>
+>>>>>> v4:
+>>>>>>  - rename files and variables from sunxi* to sun4i*,
+>>>>>>  - rename defines from SUNXI_* to SUN4I_* or SUN6I_*,
+>>>>>>  - remove TP in defines name,
+>>>>>>  - rename SUNXI_IRQ_* to SUN4I_GPADC_IRQ_* for consistency,
+>>>>>>  - use devm functions for regmap_add_irq_chip and mfd_add_devices,
+>>>>>>  - remove remove functions (now empty thanks to devm functions),
+>>>>>>
+>>>>>> v3:
+>>>>>>  - use defines in regmap_irq instead of hard coded BITs,
+>>>>>>  - use of_device_id data field to chose which MFD cells to add
+>>> considering
+>>>>>>    the compatible responsible of the MFD probe,
+>>>>>>  - remove useless initializations,
+>>>>>>  - disable all interrupts before adding them to regmap_irqchip,
+>>>>>>  - add goto error label in probe,
+>>>>>>  - correct wrapping in header license,
+>>>>>>  - move defines from IIO driver to header,
+>>>>>>  - use GENMASK to limit the size of the variable passed to a macro,
+>>>>>>  - prefix register BIT defines with the name of the register,
+>>>>>>  - reorder defines,
+>>>>>>
+>>>>>> v2:
+>>>>>>  - add license headers,
+>>>>>>  - reorder alphabetically includes,
+>>>>>>  - add SUNXI_GPADC_ prefixes for defines,
+>>>>>>
+>>>>>>  drivers/iio/adc/Kconfig           |  17 ++
+>>>>>>  drivers/iio/adc/Makefile          |   1 +
+>>>>>>  drivers/iio/adc/sun4i-gpadc-iio.c | 613
+>>> ++++++++++++++++++++++++++++++++++++++
+>>>>>>  include/linux/mfd/sun4i-gpadc.h   |   2 +
+>>>>>>  4 files changed, 633 insertions(+)
+>>>>>>  create mode 100644 drivers/iio/adc/sun4i-gpadc-iio.c
+>>>>>>
+>>>>>> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+>>>>>> index 99c0514..6a6d369 100644
+>>>>>> --- a/drivers/iio/adc/Kconfig
+>>>>>> +++ b/drivers/iio/adc/Kconfig
+>>>>>> @@ -434,6 +434,23 @@ config STX104
+>>>>>>  	  The base port addresses for the devices may be configured via
+>>> the base
+>>>>>>  	  array module parameter.
+>>>>>>  
+>>>>>> +config SUN4I_GPADC
+>>>>>> +	tristate "Support for the Allwinner SoCs GPADC"
+>>>>>> +	depends on IIO
+>>>>>> +	depends on MFD_SUN4I_GPADC
+>>>>>> +	help
+>>>>>> +	  Say yes here to build support for Allwinner (A10, A13 and A31)
+>>> SoCs
+>>>>>> +	  GPADC. This ADC provides 4 channels which can be used as an ADC
+>>> or as
+>>>>>> +	  a touchscreen input and one channel for thermal sensor.
+>>>>>> +
+>>>>>> +	  The thermal sensor slows down ADC readings and can be disabled
+>>> by
+>>>>>> +	  disabling CONFIG_THERMAL_OF. However, the thermal sensor should
+>>> be
+>>>>>> +	  enabled by default since the SoC temperature is usually more
+>>> critical
+>>>>>> +	  than ADC readings.
+>>>>>> +
+>>>>>> +	  To compile this driver as a module, choose M here: the module
+>>> will be
+>>>>>> +	  called sun4i-gpadc-iio.
+>>>>>> +
+>>>>>>  config TI_ADC081C
+>>>>>>  	tristate "Texas Instruments ADC081C/ADC101C/ADC121C family"
+>>>>>>  	depends on I2C
+>>>>>> diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
+>>>>>> index 7a40c04..18ce8d6 100644
+>>>>>> --- a/drivers/iio/adc/Makefile
+>>>>>> +++ b/drivers/iio/adc/Makefile
+>>>>>> @@ -41,6 +41,7 @@ obj-$(CONFIG_QCOM_SPMI_IADC) += qcom-spmi-iadc.o
+>>>>>>  obj-$(CONFIG_QCOM_SPMI_VADC) += qcom-spmi-vadc.o
+>>>>>>  obj-$(CONFIG_ROCKCHIP_SARADC) += rockchip_saradc.o
+>>>>>>  obj-$(CONFIG_STX104) += stx104.o
+>>>>>> +obj-$(CONFIG_SUN4I_GPADC) += sun4i-gpadc-iio.o
+>>>>>>  obj-$(CONFIG_TI_ADC081C) += ti-adc081c.o
+>>>>>>  obj-$(CONFIG_TI_ADC0832) += ti-adc0832.o
+>>>>>>  obj-$(CONFIG_TI_ADC12138) += ti-adc12138.o
+>>>>>> diff --git a/drivers/iio/adc/sun4i-gpadc-iio.c
+>>> b/drivers/iio/adc/sun4i-gpadc-iio.c
+>>>>>> new file mode 100644
+>>>>>> index 0000000..a8e134f
+>>>>>> --- /dev/null
+>>>>>> +++ b/drivers/iio/adc/sun4i-gpadc-iio.c
+>>>>>> @@ -0,0 +1,613 @@
+>>>>>> +/* ADC driver for sunxi platforms' (A10, A13 and A31) GPADC
+>>>>>> + *
+>>>>>> + * Copyright (c) 2016 Quentin Schulz
+>>> <quentin.schulz@free-electrons.com>
+>>>>>> + *
+>>>>>> + * This program is free software; you can redistribute it and/or
+>>> modify it under
+>>>>>> + * the terms of the GNU General Public License version 2 as
+>>> published by the
+>>>>>> + * Free Software Foundation.
+>>>>>> + *
+>>>>>> + * The Allwinner SoCs all have an ADC that can also act as a
+>>> touchscreen
+>>>>>> + * controller and a thermal sensor.
+>>>>>> + * The thermal sensor works only when the ADC acts as a
+>>> touchscreen controller
+>>>>>> + * and is configured to throw an interrupt every fixed periods of
+>>> time (let say
+>>>>>> + * every X seconds).
+>>>>>> + * One would be tempted to disable the IP on the hardware side
+>>> rather than
+>>>>>> + * disabling interrupts to save some power but that resets the
+>>> internal clock of
+>>>>>> + * the IP, resulting in having to wait X seconds every time we
+>>> want to read the
+>>>>>> + * value of the thermal sensor.
+>>>>>> + * This is also the reason of using autosuspend in pm_runtime. If
+>>> there was no
+>>>>>> + * autosuspend, the thermal sensor would need X seconds after
+>>> every
+>>>>>> + * pm_runtime_get_sync to get a value from the ADC. The
+>>> autosuspend allows the
+>>>>>> + * thermal sensor to be requested again in a certain time span
+>>> before it gets
+>>>>>> + * shutdown for not being used.
+>>>>>> + */
+>>>>>> +
+>>>>>> +#include <linux/completion.h>
+>>>>>> +#include <linux/interrupt.h>
+>>>>>> +#include <linux/io.h>
+>>>>>> +#include <linux/module.h>
+>>>>>> +#include <linux/of.h>
+>>>>>> +#include <linux/of_device.h>
+>>>>>> +#include <linux/platform_device.h>
+>>>>>> +#include <linux/pm_runtime.h>
+>>>>>> +#include <linux/regmap.h>
+>>>>>> +#include <linux/thermal.h>
+>>>>>> +#include <linux/delay.h>
+>>>>>> +
+>>>>>> +#include <linux/iio/iio.h>
+>>>>>> +#include <linux/iio/driver.h>
+>>>>>> +#include <linux/iio/machine.h>
+>>>>>> +#include <linux/mfd/sun4i-gpadc.h>
+>>>>>> +
+>>>>>> +static unsigned int sun4i_gpadc_chan_select(unsigned int chan)
+>>>>>> +{
+>>>>>> +	return SUN4I_GPADC_CTRL1_ADC_CHAN_SELECT(chan);
+>>>>>> +}
+>>>>>> +
+>>>>>> +static unsigned int sun6i_gpadc_chan_select(unsigned int chan)
+>>>>>> +{
+>>>>>> +	return SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(chan);
+>>>>>> +}
+>>>>>> +
+>>>>>> +struct gpadc_data {
+>>>>>> +	int		temp_offset;
+>>>>>> +	int		temp_scale;
+>>>>>> +	unsigned int	tp_mode_en;
+>>>>>> +	unsigned int	tp_adc_select;
+>>>>>> +	unsigned int	(*adc_chan_select)(unsigned int chan);
+>>>>>> +	unsigned int	adc_chan_mask;
+>>>>>> +};
+>>>>>> +
+>>>>>> +static const struct gpadc_data sun4i_gpadc_data = {
+>>>>>> +	.temp_offset = -1932,
+>>>>>> +	.temp_scale = 133,
+>>>>>> +	.tp_mode_en = SUN4I_GPADC_CTRL1_TP_MODE_EN,
+>>>>>> +	.tp_adc_select = SUN4I_GPADC_CTRL1_TP_ADC_SELECT,
+>>>>>> +	.adc_chan_select = &sun4i_gpadc_chan_select,
+>>>>>> +	.adc_chan_mask = SUN4I_GPADC_CTRL1_ADC_CHAN_MASK,
+>>>>>> +};
+>>>>>> +
+>>>>>> +static const struct gpadc_data sun5i_gpadc_data = {
+>>>>>> +	.temp_offset = -1447,
+>>>>>> +	.temp_scale = 100,
+>>>>>> +	.tp_mode_en = SUN4I_GPADC_CTRL1_TP_MODE_EN,
+>>>>>> +	.tp_adc_select = SUN4I_GPADC_CTRL1_TP_ADC_SELECT,
+>>>>>> +	.adc_chan_select = &sun4i_gpadc_chan_select,
+>>>>>> +	.adc_chan_mask = SUN4I_GPADC_CTRL1_ADC_CHAN_MASK,
+>>>>>> +};
+>>>>>> +
+>>>>>> +static const struct gpadc_data sun6i_gpadc_data = {
+>>>>>> +	.temp_offset = -1623,
+>>>>>> +	.temp_scale = 167,
+>>>>>> +	.tp_mode_en = SUN6I_GPADC_CTRL1_TP_MODE_EN,
+>>>>>> +	.tp_adc_select = SUN6I_GPADC_CTRL1_TP_ADC_SELECT,
+>>>>>> +	.adc_chan_select = &sun6i_gpadc_chan_select,
+>>>>>> +	.adc_chan_mask = SUN6I_GPADC_CTRL1_ADC_CHAN_MASK,
+>>>>>> +};
+>>>>>> +
+>>>>>> +struct sun4i_gpadc_iio {
+>>>>>> +	struct iio_dev			*indio_dev;
+>>>>>> +	struct completion		completion;
+>>>>>> +	int				temp_data;
+>>>>>> +	u32				adc_data;
+>>>>>> +	struct regmap			*regmap;
+>>>>>> +	unsigned int			fifo_data_irq;
+>>>>>> +	atomic_t			ignore_fifo_data_irq;
+>>>>>> +	unsigned int			temp_data_irq;
+>>>>>> +	atomic_t			ignore_temp_data_irq;
+>>>>>> +	const struct gpadc_data		*data;
+>>>>>> +	/* prevents concurrent reads of temperature and ADC */
+>>>>>> +	struct mutex			mutex;
+>>>>>> +};
+>>>>>> +
+>>>>>> +#define SUN4I_GPADC_ADC_CHANNEL(_channel, _name) {		\
+>>>>>> +	.type = IIO_VOLTAGE,					\
+>>>>>> +	.indexed = 1,						\
+>>>>>> +	.channel = _channel,					\
+>>>>>> +	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),		\
+>>>>>> +	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),	\
+>>>>>> +	.datasheet_name = _name,				\
+>>>>>> +}
+>>>>>> +
+>>>>>> +static struct iio_map sun4i_gpadc_hwmon_maps[] = {
+>>>>>> +	{
+>>>>>> +		.adc_channel_label = "temp_adc",
+>>>>>> +		.consumer_dev_name = "iio_hwmon.0",
+>>>>> It's theoretically possible we have another one of these which will
+>>> make
+>>>>> life interesting.  Oh well, no easy way around that at the mo...
+>>>>>> +	},
+>>>>>> +	{ /* sentinel */ },
+>>>>>> +};
+>>>>>> +
+>>>>>> +static const struct iio_chan_spec sun4i_gpadc_channels[] = {
+>>>>>> +	SUN4I_GPADC_ADC_CHANNEL(0, "adc_chan0"),
+>>>>>> +	SUN4I_GPADC_ADC_CHANNEL(1, "adc_chan1"),
+>>>>>> +	SUN4I_GPADC_ADC_CHANNEL(2, "adc_chan2"),
+>>>>>> +	SUN4I_GPADC_ADC_CHANNEL(3, "adc_chan3"),
+>>>>>> +	{
+>>>>>> +		.type = IIO_TEMP,
+>>>>>> +		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
+>>>>>> +				      BIT(IIO_CHAN_INFO_SCALE) |
+>>>>>> +				      BIT(IIO_CHAN_INFO_OFFSET),
+>>>>>> +		.datasheet_name = "temp_adc",
+>>>>>> +	},
+>>>>>> +};
+>>>>>> +
+>>>>>> +static const struct iio_chan_spec sun4i_gpadc_channels_no_temp[] =
+>>> {
+>>>>>> +	SUN4I_GPADC_ADC_CHANNEL(0, "adc_chan0"),
+>>>>>> +	SUN4I_GPADC_ADC_CHANNEL(1, "adc_chan1"),
+>>>>>> +	SUN4I_GPADC_ADC_CHANNEL(2, "adc_chan2"),
+>>>>>> +	SUN4I_GPADC_ADC_CHANNEL(3, "adc_chan3"),
+>>>>>> +};
+>>>>>> +
+>>>>>> +static int sun4i_prepare_for_irq(struct iio_dev *indio_dev, int
+>>> channel,
+>>>>>> +				 unsigned int irq)
+>>>>>> +{
+>>>>>> +	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+>>>>>> +	int ret;
+>>>>>> +	u32 reg;
+>>>>>> +
+>>>>>> +	pm_runtime_get_sync(indio_dev->dev.parent);
+>>>>>> +
+>>>>>> +	reinit_completion(&info->completion);
+>>>>>> +
+>>>>>> +	ret = regmap_write(info->regmap, SUN4I_GPADC_INT_FIFOC,
+>>>>>> +			   SUN4I_GPADC_INT_FIFOC_TP_FIFO_TRIG_LEVEL(1) |
+>>>>>> +			   SUN4I_GPADC_INT_FIFOC_TP_FIFO_FLUSH);
+>>>>>> +	if (ret)
+>>>>>> +		return ret;
+>>>>>> +
+>>>>>> +	ret = regmap_read(info->regmap, SUN4I_GPADC_CTRL1, &reg);
+>>>>>> +	if (ret)
+>>>>>> +		return ret;
+>>>>>> +
+>>>>>> +	if (irq == info->fifo_data_irq) {
+>>>>>> +		ret = regmap_write(info->regmap, SUN4I_GPADC_CTRL1,
+>>>>>> +				   info->data->tp_mode_en |
+>>>>>> +				   info->data->tp_adc_select |
+>>>>>> +				   info->data->adc_chan_select(channel));
+>>>>>> +		/*
+>>>>>> +		 * When the IP changes channel, it needs a bit of time to get
+>>>>>> +		 * correct values.
+>>>>>> +		 */
+>>>>>> +		if ((reg & info->data->adc_chan_mask) !=
+>>>>>> +			 info->data->adc_chan_select(channel))
+>>>>>> +			mdelay(10);
+>>>>>> +
+>>>>>> +	} else {
+>>>>>> +		/*
+>>>>>> +		 * The temperature sensor returns valid data only when the ADC
+>>>>>> +		 * operates in touchscreen mode.
+>>>>>> +		 */
+>>>>>> +		ret = regmap_write(info->regmap, SUN4I_GPADC_CTRL1,
+>>>>>> +				   info->data->tp_mode_en);
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	if (ret)
+>>>>>> +		return ret;
+>>>>>> +
+>>>>>> +	/*
+>>>>>> +	 * When the IP changes mode between ADC or touchscreen, it
+>>>>>> +	 * needs a bit of time to get correct values.
+>>>>>> +	 */
+>>>>>> +	if ((reg & info->data->tp_adc_select) !=
+>>> info->data->tp_adc_select)
+>>>>>> +		mdelay(100);
+>>>>>> +
+>>>>>> +	return 0;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static int sun4i_gpadc_read(struct iio_dev *indio_dev, int
+>>> channel, int *val,
+>>>>>> +			    unsigned int irq)
+>>>>>> +{
+>>>>>> +	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+>>>>>> +	int ret;
+>>>>>> +
+>>>>>> +	mutex_lock(&info->mutex);
+>>>>>> +
+>>>>>> +	ret = sun4i_prepare_for_irq(indio_dev, channel, irq);
+>>>>>> +	if (ret)
+>>>>>> +		goto err;
+>>>>>> +
+>>>>>> +	enable_irq(irq);
+>>>>>> +
+>>>>>> +	/*
+>>>>>> +	 * The temperature sensor throws an interruption periodically
+>>> (currently
+>>>>>> +	 * set at periods of ~0.6s in sun4i_gpadc_runtime_resume). A 1s
+>>> delay
+>>>>>> +	 * makes sure an interruption occurs in normal conditions. If it
+>>> doesn't
+>>>>>> +	 * occur, then there is a timeout.
+>>>>>> +	 */
+>>>>>> +	if (!wait_for_completion_timeout(&info->completion,
+>>>>>> +					 msecs_to_jiffies(1000))) {
+>>>>>> +		ret = -ETIMEDOUT;
+>>>>>> +		goto err;
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	if (irq == info->fifo_data_irq)
+>>>>>> +		*val = info->adc_data;
+>>>>>> +	else
+>>>>>> +		*val = info->temp_data;
+>>>>>> +
+>>>>>> +	ret = 0;
+>>>>>> +	pm_runtime_mark_last_busy(indio_dev->dev.parent);
+>>>>>> +
+>>>>>> +err:
+>>>>>> +	pm_runtime_put_autosuspend(indio_dev->dev.parent);
+>>>>>> +	mutex_unlock(&info->mutex);
+>>>>>> +
+>>>>>> +	return ret;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static int sun4i_gpadc_adc_read(struct iio_dev *indio_dev, int
+>>> channel,
+>>>>>> +				int *val)
+>>>>>> +{
+>>>>>> +	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+>>>>>> +
+>>>>>> +	return sun4i_gpadc_read(indio_dev, channel, val,
+>>> info->fifo_data_irq);
+>>>>>> +}
+>>>>>> +
+>>>>>> +static int sun4i_gpadc_temp_read(struct iio_dev *indio_dev, int
+>>> *val)
+>>>>>> +{
+>>>>>> +	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+>>>>>> +
+>>>>>> +	return sun4i_gpadc_read(indio_dev, 0, val, info->temp_data_irq);
+>>>>>> +}
+>>>>>> +
+>>>>>> +static int sun4i_gpadc_temp_offset(struct iio_dev *indio_dev, int
+>>> *val)
+>>>>>> +{
+>>>>>> +	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+>>>>>> +
+>>>>>> +	*val = info->data->temp_offset;
+>>>>>> +
+>>>>>> +	return 0;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static int sun4i_gpadc_temp_scale(struct iio_dev *indio_dev, int
+>>> *val)
+>>>>>> +{
+>>>>>> +	struct sun4i_gpadc_iio *info = iio_priv(indio_dev);
+>>>>>> +
+>>>>>> +	*val = info->data->temp_scale;
+>>>>>> +
+>>>>>> +	return 0;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static int sun4i_gpadc_read_raw(struct iio_dev *indio_dev,
+>>>>>> +				struct iio_chan_spec const *chan, int *val,
+>>>>>> +				int *val2, long mask)
+>>>>>> +{
+>>>>>> +	int ret;
+>>>>>> +
+>>>>>> +	switch (mask) {
+>>>>>> +	case IIO_CHAN_INFO_OFFSET:
+>>>>>> +		ret = sun4i_gpadc_temp_offset(indio_dev, val);
+>>>>>> +		if (ret)
+>>>>>> +			return ret;
+>>>>>> +
+>>>>>> +		return IIO_VAL_INT;
+>>>>>> +	case IIO_CHAN_INFO_RAW:
+>>>>>> +		if (chan->type == IIO_VOLTAGE)
+>>>>>> +			ret = sun4i_gpadc_adc_read(indio_dev, chan->channel,
+>>>>>> +						   val);
+>>>>>> +		else
+>>>>>> +			ret = sun4i_gpadc_temp_read(indio_dev, val);
+>>>>>> +
+>>>>>> +		if (ret)
+>>>>>> +			return ret;
+>>>>>> +
+>>>>>> +		return IIO_VAL_INT;
+>>>>>> +	case IIO_CHAN_INFO_SCALE:
+>>>>>> +		if (chan->type == IIO_VOLTAGE) {
+>>>>>> +			/* 3000mV / 4096 * raw */
+>>>>>> +			*val = 0;
+>>>>>> +			*val2 = 732421875;
+>>>>>> +			return IIO_VAL_INT_PLUS_NANO;
+>>>>>> +		}
+>>>>>> +
+>>>>>> +		ret = sun4i_gpadc_temp_scale(indio_dev, val);
+>>>>>> +		if (ret)
+>>>>>> +			return ret;
+>>>>>> +
+>>>>>> +		return IIO_VAL_INT;
+>>>>>> +	default:
+>>>>>> +		return -EINVAL;
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	return -EINVAL;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static const struct iio_info sun4i_gpadc_iio_info = {
+>>>>>> +	.read_raw = sun4i_gpadc_read_raw,
+>>>>>> +	.driver_module = THIS_MODULE,
+>>>>>> +};
+>>>>>> +
+>>>>>> +static irqreturn_t sun4i_gpadc_temp_data_irq_handler(int irq, void
+>>> *dev_id)
+>>>>>> +{
+>>>>>> +	struct sun4i_gpadc_iio *info = dev_id;
+>>>>>> +
+>>>>>> +	if (atomic_read(&info->ignore_temp_data_irq))
+>>>>>> +		goto out;
+>>>>>> +
+>>>>>> +	if (!regmap_read(info->regmap, SUN4I_GPADC_TEMP_DATA,
+>>> &info->temp_data))
+>>>>>> +		complete(&info->completion);
+>>>>>> +
+>>>>>> +out:
+>>>>>> +	disable_irq_nosync(info->temp_data_irq);
+>>>>>> +	return IRQ_HANDLED;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static irqreturn_t sun4i_gpadc_fifo_data_irq_handler(int irq, void
+>>> *dev_id)
+>>>>>> +{
+>>>>>> +	struct sun4i_gpadc_iio *info = dev_id;
+>>>>>> +
+>>>>>> +	if (atomic_read(&info->ignore_fifo_data_irq))
+>>>>>> +		goto out;
+>>>>>> +
+>>>>>> +	if (!regmap_read(info->regmap, SUN4I_GPADC_DATA,
+>>> &info->adc_data))
+>>>>>> +		complete(&info->completion);
+>>>>>> +
+>>>>>> +out:
+>>>>>> +	disable_irq_nosync(info->fifo_data_irq);
+>>>>>> +	return IRQ_HANDLED;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static int sun4i_gpadc_runtime_suspend(struct device *dev)
+>>>>>> +{
+>>>>>> +	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+>>>>>> +
+>>>>>> +	/* Disable the ADC on IP */
+>>>>>> +	regmap_write(info->regmap, SUN4I_GPADC_CTRL1, 0);
+>>>>>> +	/* Disable temperature sensor on IP */
+>>>>>> +	regmap_write(info->regmap, SUN4I_GPADC_TPR, 0);
+>>>>>> +
+>>>>>> +	return 0;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static int sun4i_gpadc_runtime_resume(struct device *dev)
+>>>>>> +{
+>>>>>> +	struct sun4i_gpadc_iio *info = iio_priv(dev_get_drvdata(dev));
+>>>>>> +
+>>>>>> +	/* clkin = 6MHz */
+>>>>>> +	regmap_write(info->regmap, SUN4I_GPADC_CTRL0,
+>>>>>> +		     SUN4I_GPADC_CTRL0_ADC_CLK_DIVIDER(2) |
+>>>>>> +		     SUN4I_GPADC_CTRL0_FS_DIV(7) |
+>>>>>> +		     SUN4I_GPADC_CTRL0_T_ACQ(63));
+>>>>>> +	regmap_write(info->regmap, SUN4I_GPADC_CTRL1,
+>>> info->data->tp_mode_en);
+>>>>>> +	regmap_write(info->regmap, SUN4I_GPADC_CTRL3,
+>>>>>> +		     SUN4I_GPADC_CTRL3_FILTER_EN |
+>>>>>> +		     SUN4I_GPADC_CTRL3_FILTER_TYPE(1));
+>>>>>> +	/* period = SUN4I_GPADC_TPR_TEMP_PERIOD * 256 * 16 / clkin; ~0.6s
+>>> */
+>>>>>> +	regmap_write(info->regmap, SUN4I_GPADC_TPR,
+>>>>>> +		     SUN4I_GPADC_TPR_TEMP_ENABLE |
+>>>>>> +		     SUN4I_GPADC_TPR_TEMP_PERIOD(800));
+>>>>>> +
+>>>>>> +	return 0;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static int sun4i_gpadc_get_temp(void *data, int *temp)
+>>>>>> +{
+>>>>>> +	struct sun4i_gpadc_iio *info = (struct sun4i_gpadc_iio *)data;
+>>>>>> +	int val, scale, offset;
+>>>>>> +
+>>>>>> +	if (sun4i_gpadc_temp_read(info->indio_dev, &val))
+>>>>>> +		return -ETIMEDOUT;
+>>>>>> +
+>>>>>> +	sun4i_gpadc_temp_scale(info->indio_dev, &scale);
+>>>>>> +	sun4i_gpadc_temp_offset(info->indio_dev, &offset);
+>>>>>> +
+>>>>>> +	*temp = (val + offset) * scale;
+>>>>>> +
+>>>>>> +	return 0;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static const struct thermal_zone_of_device_ops sun4i_ts_tz_ops = {
+>>>>>> +	.get_temp = &sun4i_gpadc_get_temp,
+>>>>>> +};
+>>>>>> +
+>>>>>> +static const struct dev_pm_ops sun4i_gpadc_pm_ops = {
+>>>>>> +	.runtime_suspend = &sun4i_gpadc_runtime_suspend,
+>>>>>> +	.runtime_resume = &sun4i_gpadc_runtime_resume,
+>>>>>> +};
+>>>>>> +
+>>>>>> +static int sun4i_irq_init(struct platform_device *pdev, const char
+>>> *name,
+>>>>>> +			  irq_handler_t handler, const char *devname,
+>>>>>> +			  unsigned int *irq, atomic_t *atomic)
+>>>>>> +{
+>>>>>> +	int ret;
+>>>>>> +	struct sun4i_gpadc_dev *mfd_dev =
+>>> dev_get_drvdata(pdev->dev.parent);
+>>>>>> +	struct sun4i_gpadc_iio *info =
+>>> iio_priv(dev_get_drvdata(&pdev->dev));
+>>>>>> +
+>>>>>> +	/*
+>>>>>> +	 * Once the interrupt is activated, the IP continuously performs
+>>>>>> +	 * conversions thus throws interrupts. The interrupt is activated
+>>> right
+>>>>>> +	 * after being requested but we want to control when these
+>>> interrupts
+>>>>>> +	 * occur thus we disable it right after being requested. However,
+>>> an
+>>>>>> +	 * interrupt might occur between these two instructions and we
+>>> have to
+>>>>>> +	 * make sure that does not happen, by using atomic flags. We set
+>>> the
+>>>>>> +	 * flag before requesting the interrupt and unset it right after
+>>>>>> +	 * disabling the interrupt. When an interrupt occurs between
+>>> these two
+>>>>>> +	 * instructions, reading the atomic flag will tell us to ignore
+>>> the
+>>>>>> +	 * interrupt.
+>>>>>> +	 */
+>>>>>> +	atomic_set(atomic, 1);
+>>>>>> +
+>>>>>> +	ret = platform_get_irq_byname(pdev, name);
+>>>>>> +	if (ret < 0) {
+>>>>>> +		dev_err(&pdev->dev, "no %s interrupt registered\n", name);
+>>>>>> +		return ret;
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	ret = regmap_irq_get_virq(mfd_dev->regmap_irqc, ret);
+>>>>>> +	if (ret < 0) {
+>>>>>> +		dev_err(&pdev->dev, "failed to get virq for irq %s\n", name);
+>>>>>> +		return ret;
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	*irq = ret;
+>>>>>> +	ret = devm_request_any_context_irq(&pdev->dev, *irq, handler, 0,
+>>>>>> +					   devname, info);
+>>>>>> +	if (ret < 0) {
+>>>>>> +		dev_err(&pdev->dev, "could not request %s interrupt: %d\n",
+>>>>>> +			name, ret);
+>>>>>> +		return ret;
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	disable_irq(*irq);
+>>>>>> +	atomic_set(atomic, 0);
+>>>>>> +
+>>>>>> +	return 0;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static int sun4i_gpadc_probe(struct platform_device *pdev)
+>>>>>> +{
+>>>>>> +	struct sun4i_gpadc_iio *info;
+>>>>>> +	struct iio_dev *indio_dev;
+>>>>>> +	int ret;
+>>>>>> +	struct sun4i_gpadc_dev *sun4i_gpadc_dev;
+>>>>>> +
+>>>>>> +	sun4i_gpadc_dev = dev_get_drvdata(pdev->dev.parent);
+>>>>>> +
+>>>>>> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
+>>>>>> +	if (!indio_dev)
+>>>>>> +		return -ENOMEM;
+>>>>>> +
+>>>>>> +	info = iio_priv(indio_dev);
+>>>>>> +	platform_set_drvdata(pdev, indio_dev);
+>>>>>> +
+>>>>>> +	mutex_init(&info->mutex);
+>>>>>> +	info->regmap = sun4i_gpadc_dev->regmap;
+>>>>>> +	info->indio_dev = indio_dev;
+>>>>>> +	init_completion(&info->completion);
+>>>>>> +	indio_dev->name = dev_name(&pdev->dev);
+>>>>>> +	indio_dev->dev.parent = &pdev->dev;
+>>>>>> +	indio_dev->dev.of_node = pdev->dev.of_node;
+>>>>>> +	indio_dev->info = &sun4i_gpadc_iio_info;
+>>>>>> +	indio_dev->modes = INDIO_DIRECT_MODE;
+>>>>>> +	indio_dev->num_channels = ARRAY_SIZE(sun4i_gpadc_channels);
+>>>>>> +	indio_dev->channels = sun4i_gpadc_channels;
+>>>>>> +
+>>>>>> +	info->data = (struct gpadc_data
+>>> *)platform_get_device_id(pdev)->driver_data;
+>>>>>> +
+>>>>>> +	/*
+>>>>>> +	 * Since the controller needs to be in touchscreen mode for its
+>>> thermal
+>>>>>> +	 * sensor to operate properly, and that switching between the two
+>>> modes
+>>>>>> +	 * needs a delay, always registering in the thermal framework
+>>> will
+>>>>>> +	 * significantly slow down the conversion rate of the ADCs.
+>>>>>> +	 *
+>>>>>> +	 * Therefore, instead of depending on THERMAL_OF in Kconfig, we
+>>> only
+>>>>>> +	 * register the sensor if that option is enabled, eventually
+>>> leaving
+>>>>>> +	 * that choice to the user.
+>>>>>> +	 */
+>>>>>> +
+>>>>>> +	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
+>>>>>> +		/*
+>>>>>> +		 * This driver is a child of an MFD which has a node in the DT
+>>>>>> +		 * but not its children, because of DT backward compatibility
+>>>>>> +		 * for A10, A13 and A31 SoCs. Therefore, the resulting devices
+>>>>>> +		 * of this driver do not have an of_node variable.
+>>>>>> +		 * However, its parent (the MFD driver) has an of_node variable
+>>>>>> +		 * and since devm_thermal_zone_of_sensor_register uses its first
+>>>>>> +		 * argument to match the phandle defined in the node of the
+>>>>>> +		 * thermal driver with the of_node of the device passed as first
+>>>>>> +		 * argument and the third argument to call ops from
+>>>>>> +		 * thermal_zone_of_device_ops, the solution is to use the parent
+>>>>>> +		 * device as first argument to match the phandle with its
+>>>>>> +		 * of_node, and the device from this driver as third argument to
+>>>>>> +		 * return the temperature.
+>>>>>> +		 */
+>>>>>> +		struct thermal_zone_device *tzd;
+>>>>>> +		tzd = devm_thermal_zone_of_sensor_register(pdev->dev.parent, 0,
+>>>>>> +							   info,
+>>>>>> +							   &sun4i_ts_tz_ops);
+>>>>>> +		if (IS_ERR(tzd)) {
+>>>>>> +			dev_err(&pdev->dev,
+>>>>>> +				"could not register thermal sensor: %ld\n",
+>>>>>> +				PTR_ERR(tzd));
+>>>>>> +			ret = PTR_ERR(tzd);
+>>>>>> +			goto err;
+>>>>>> +		}
+>>>>>> +	} else {
+>>>>>> +		indio_dev->num_channels =
+>>>>>> +			ARRAY_SIZE(sun4i_gpadc_channels_no_temp);
+>>>>>> +		indio_dev->channels = sun4i_gpadc_channels_no_temp;
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	pm_runtime_set_autosuspend_delay(&pdev->dev,
+>>>>>> +					 SUN4I_GPADC_AUTOSUSPEND_DELAY);
+>>>>>> +	pm_runtime_use_autosuspend(&pdev->dev);
+>>>>>> +	pm_runtime_set_suspended(&pdev->dev);
+>>>>>> +	pm_runtime_enable(&pdev->dev);
+>>>>>> +
+>>>>>> +	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
+>>>>>> +		ret = sun4i_irq_init(pdev, "TEMP_DATA_PENDING",
+>>>>>> +				     sun4i_gpadc_temp_data_irq_handler,
+>>>>>> +				     "temp_data", &info->temp_data_irq,
+>>>>>> +				     &info->ignore_temp_data_irq);
+>>>>>> +		if (ret < 0)
+>>>>>> +			goto err;
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	ret = sun4i_irq_init(pdev, "FIFO_DATA_PENDING",
+>>>>>> +			     sun4i_gpadc_fifo_data_irq_handler, "fifo_data",
+>>>>>> +			     &info->fifo_data_irq, &info->ignore_fifo_data_irq);
+>>>>>> +	if (ret < 0)
+>>>>>> +		goto err;
+>>>>>> +
+>>>>>> +	if (IS_ENABLED(CONFIG_THERMAL_OF)) {
+>>>>>> +		ret = iio_map_array_register(indio_dev, sun4i_gpadc_hwmon_maps);
+>>>>>> +		if (ret < 0) {
+>>>>>> +			dev_err(&pdev->dev,
+>>>>>> +				"failed to register iio map array\n");
+>>>>>> +			goto err;
+>>>>>> +		}
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	ret = devm_iio_device_register(&pdev->dev, indio_dev);
+>>>>>> +	if (ret < 0) {
+>>>>>> +		dev_err(&pdev->dev, "could not register the device\n");
+>>>>>> +		goto err_map;
+>>>>>> +	}
+>>>>>> +
+>>>>>> +	return 0;
+>>>>>> +
+>>>>>> +err_map:
+>>>>>> +	if (IS_ENABLED(CONFIG_THERMAL_OF))
+>>>>>> +		iio_map_array_unregister(indio_dev);
+>>>>>> +
+>>>>>> +err:
+>>>>>> +	pm_runtime_put(&pdev->dev);
+>>>>>> +	pm_runtime_disable(&pdev->dev);
+>>>>>> +
+>>>>>> +	return ret;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static int sun4i_gpadc_remove(struct platform_device *pdev)
+>>>>>> +{
+>>>>>> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+>>>>>> +
+>>>>>> +	pm_runtime_put(&pdev->dev);
+>>>>>> +	pm_runtime_disable(&pdev->dev);
+>>>>>> +	if (IS_ENABLED(CONFIG_THERMAL_OF))
+>>>>>> +		iio_map_array_unregister(indio_dev);
+>>>>>> +
+>>>>>> +	return 0;
+>>>>>> +}
+>>>>>> +
+>>>>>> +static const struct platform_device_id sun4i_gpadc_id[] = {
+>>>>>> +	{ "sun4i-a10-gpadc-iio", (kernel_ulong_t)&sun4i_gpadc_data },
+>>>>>> +	{ "sun5i-a13-gpadc-iio", (kernel_ulong_t)&sun5i_gpadc_data },
+>>>>>> +	{ "sun6i-a31-gpadc-iio", (kernel_ulong_t)&sun6i_gpadc_data },
+>>>>>> +	{ /* sentinel */ },
+>>>>>> +};
+>>>>>> +
+>>>>>> +static struct platform_driver sun4i_gpadc_driver = {
+>>>>>> +	.driver = {
+>>>>>> +		.name = "sun4i-gpadc-iio",
+>>>>>> +		.pm = &sun4i_gpadc_pm_ops,
+>>>>>> +	},
+>>>>>> +	.id_table = sun4i_gpadc_id,
+>>>>>> +	.probe = sun4i_gpadc_probe,
+>>>>>> +	.remove = sun4i_gpadc_remove,
+>>>>>> +};
+>>>>>> +
+>>>>>> +module_platform_driver(sun4i_gpadc_driver);
+>>>>>> +
+>>>>>> +MODULE_DESCRIPTION("ADC driver for sunxi platforms");
+>>>>>> +MODULE_AUTHOR("Quentin Schulz
+>>> <quentin.schulz@free-electrons.com>");
+>>>>>> +MODULE_LICENSE("GPL v2");
+>>>>>> diff --git a/include/linux/mfd/sun4i-gpadc.h
+>>> b/include/linux/mfd/sun4i-gpadc.h
+>>>>>> index d7a29f2..509e736 100644
+>>>>>> --- a/include/linux/mfd/sun4i-gpadc.h
+>>>>>> +++ b/include/linux/mfd/sun4i-gpadc.h
+>>>>>> @@ -28,6 +28,7 @@
+>>>>>>  #define SUN4I_GPADC_CTRL1_TP_MODE_EN			BIT(4)
+>>>>>>  #define SUN4I_GPADC_CTRL1_TP_ADC_SELECT			BIT(3)
+>>>>>>  #define SUN4I_GPADC_CTRL1_ADC_CHAN_SELECT(x)		(GENMASK(2, 0) &
+>>> (x))
+>>>>>> +#define SUN4I_GPADC_CTRL1_ADC_CHAN_MASK			GENMASK(2, 0)
+>>>>>>  
+>>>>>>  /* TP_CTRL1 bits for sun6i SOCs */
+>>>>>>  #define SUN6I_GPADC_CTRL1_TOUCH_PAN_CALI_EN		BIT(7)
+>>>>>> @@ -35,6 +36,7 @@
+>>>>>>  #define SUN6I_GPADC_CTRL1_TP_MODE_EN			BIT(5)
+>>>>>>  #define SUN6I_GPADC_CTRL1_TP_ADC_SELECT			BIT(4)
+>>>>>>  #define SUN6I_GPADC_CTRL1_ADC_CHAN_SELECT(x)		(GENMASK(3, 0) &
+>>> BIT(x))
+>>>>>> +#define SUN6I_GPADC_CTRL1_ADC_CHAN_MASK			GENMASK(3, 0)
+>>>>>>  
+>>>>>>  #define SUN4I_GPADC_CTRL2				0x08
+>>>>>>  
+>>>>>>
+>>>>>
+>>>>> --
+>>>>> To unsubscribe from this list: send the line "unsubscribe linux-iio"
+>>> in
+>>>>> the body of a message to majordomo at vger.kernel.org
+>>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>>>
+>>>>
+>>
+> 
