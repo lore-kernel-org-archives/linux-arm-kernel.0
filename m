@@ -1,167 +1,60 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 6 Feb 2017 17:13:41 +0800
-Subject: [PATCH v12 9/9] usb: core: add power sequence handling for USB devices
-In-Reply-To: <1486372421-29073-1-git-send-email-peter.chen@nxp.com>
-References: <1486372421-29073-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1486372421-29073-10-git-send-email-peter.chen@nxp.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Mon, 6 Feb 2017 17:28:56 +0800
+Subject: [PATCH v2 1/6] usb: mtu3: get resources that cause deferred probe
+ earlier
+Message-ID: <1486373341-4399-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some hard-wired USB devices need to do power sequence to let the
-device work normally, the typical power sequence like: enable USB
-PHY clock, toggle reset pin, etc. But current Linux USB driver
-lacks of such code to do it, it may cause some hard-wired USB devices
-works abnormal or can't be recognized by controller at all.
+Some resources such as regulator, clock usually cause deferred
+probe, get them earlier to avoid more ineffective processing.
 
-In this patch, it calls power sequence library APIs to finish
-the power sequence events. It will do power on sequence at hub's
-probe for all devices under this hub (includes root hub).
-At hub_disconnect, it will do power off sequence which is at powered
-on list.
-
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
-Tested-by Joshua Clayton <stillcompiling@gmail.com>
-Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
-Reviewed-by: Vaibhav Hiremath <hvaibhav.linux@gmail.com>
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/Kconfig    |  1 +
- drivers/usb/core/hub.c | 49 +++++++++++++++++++++++++++++++++++++++++++++----
- drivers/usb/core/hub.h |  1 +
- 3 files changed, 47 insertions(+), 4 deletions(-)
+ drivers/usb/mtu3/mtu3_plat.c |   24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/usb/Kconfig b/drivers/usb/Kconfig
-index fbe493d..706f261 100644
---- a/drivers/usb/Kconfig
-+++ b/drivers/usb/Kconfig
-@@ -40,6 +40,7 @@ config USB
- 	tristate "Support for Host-side USB"
- 	depends on USB_ARCH_HAS_HCD
- 	select USB_COMMON
-+	select POWER_SEQUENCE
- 	select NLS  # for UTF-8 strings
- 	---help---
- 	  Universal Serial Bus (USB) is a specification for a serial bus
-diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-index a56c75e..5b40c48 100644
---- a/drivers/usb/core/hub.c
-+++ b/drivers/usb/core/hub.c
-@@ -28,6 +28,7 @@
- #include <linux/mutex.h>
- #include <linux/random.h>
- #include <linux/pm_qos.h>
-+#include <linux/power/pwrseq.h>
+diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
+index 7833678..6344859 100644
+--- a/drivers/usb/mtu3/mtu3_plat.c
++++ b/drivers/usb/mtu3/mtu3_plat.c
+@@ -204,6 +204,18 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+ 	int i;
+ 	int ret;
  
- #include <linux/uaccess.h>
- #include <asm/byteorder.h>
-@@ -1616,6 +1617,7 @@ static void hub_disconnect(struct usb_interface *intf)
- 	hub->error = 0;
- 	hub_quiesce(hub, HUB_DISCONNECT);
- 
-+	of_pwrseq_off_list(&hub->pwrseq_on_list);
- 	mutex_lock(&usb_port_peer_mutex);
- 
- 	/* Avoid races with recursively_mark_NOTATTACHED() */
-@@ -1643,12 +1645,42 @@ static void hub_disconnect(struct usb_interface *intf)
- 	kref_put(&hub->kref, hub_release);
- }
- 
-+#ifdef CONFIG_OF
-+static int hub_of_pwrseq_on(struct usb_hub *hub)
-+{
-+	struct device *parent;
-+	struct usb_device *hdev = hub->hdev;
-+	struct device_node *np;
-+	int ret;
-+
-+	if (hdev->parent)
-+		parent = &hdev->dev;
-+	else
-+		parent = bus_to_hcd(hdev->bus)->self.sysdev;
-+
-+	for_each_child_of_node(parent->of_node, np) {
-+		ret = of_pwrseq_on_list(np, &hub->pwrseq_on_list);
-+		/* Maybe no power sequence library is chosen */
-+		if (ret && ret != -ENOENT)
-+			return ret;
++	ssusb->vusb33 = devm_regulator_get(&pdev->dev, "vusb33");
++	if (IS_ERR(ssusb->vusb33)) {
++		dev_err(dev, "failed to get vusb33\n");
++		return PTR_ERR(ssusb->vusb33);
 +	}
 +
-+	return 0;
-+}
-+#else
-+static int hub_of_pwrseq_on(struct usb_hub *hub)
-+{
-+	return 0;
-+}
-+#endif
-+
- static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
- {
- 	struct usb_host_interface *desc;
- 	struct usb_endpoint_descriptor *endpoint;
- 	struct usb_device *hdev;
- 	struct usb_hub *hub;
-+	int ret = -ENODEV;
- 
- 	desc = intf->cur_altsetting;
- 	hdev = interface_to_usbdev(intf);
-@@ -1753,6 +1785,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
- 	INIT_DELAYED_WORK(&hub->leds, led_work);
- 	INIT_DELAYED_WORK(&hub->init_work, NULL);
- 	INIT_WORK(&hub->events, hub_event);
-+	INIT_LIST_HEAD(&hub->pwrseq_on_list);
- 	usb_get_intf(intf);
- 	usb_get_dev(hdev);
- 
-@@ -1766,11 +1799,14 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
- 	if (id->driver_info & HUB_QUIRK_CHECK_PORT_AUTOSUSPEND)
- 		hub->quirk_check_port_auto_suspend = 1;
- 
--	if (hub_configure(hub, endpoint) >= 0)
--		return 0;
-+	if (hub_configure(hub, endpoint) >= 0) {
-+		ret = hub_of_pwrseq_on(hub);
-+		if (!ret)
-+			return 0;
++	ssusb->sys_clk = devm_clk_get(dev, "sys_ck");
++	if (IS_ERR(ssusb->sys_clk)) {
++		dev_err(dev, "failed to get sys clock\n");
++		return PTR_ERR(ssusb->sys_clk);
 +	}
- 
- 	hub_disconnect(intf);
--	return -ENODEV;
-+	return ret;
- }
- 
- static int
-@@ -3584,14 +3620,19 @@ static int hub_suspend(struct usb_interface *intf, pm_message_t msg)
- 
- 	/* stop hub_wq and related activity */
- 	hub_quiesce(hub, HUB_SUSPEND);
--	return 0;
-+	return pwrseq_suspend_list(&hub->pwrseq_on_list);
- }
- 
- static int hub_resume(struct usb_interface *intf)
- {
- 	struct usb_hub *hub = usb_get_intfdata(intf);
-+	int ret;
- 
- 	dev_dbg(&intf->dev, "%s\n", __func__);
-+	ret = pwrseq_resume_list(&hub->pwrseq_on_list);
-+	if (ret)
-+		return ret;
 +
- 	hub_activate(hub, HUB_RESUME);
- 	return 0;
- }
-diff --git a/drivers/usb/core/hub.h b/drivers/usb/core/hub.h
-index 34c1a7e..cd86f91 100644
---- a/drivers/usb/core/hub.h
-+++ b/drivers/usb/core/hub.h
-@@ -78,6 +78,7 @@ struct usb_hub {
- 	struct delayed_work	init_work;
- 	struct work_struct      events;
- 	struct usb_port		**ports;
-+	struct list_head	pwrseq_on_list; /* powered pwrseq node list */
- };
+ 	ssusb->num_phys = of_count_phandle_with_args(node,
+ 			"phys", "#phy-cells");
+ 	if (ssusb->num_phys > 0) {
+@@ -230,18 +242,6 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+ 		return PTR_ERR(ssusb->ippc_base);
+ 	}
  
- /**
+-	ssusb->vusb33 = devm_regulator_get(&pdev->dev, "vusb33");
+-	if (IS_ERR(ssusb->vusb33)) {
+-		dev_err(dev, "failed to get vusb33\n");
+-		return PTR_ERR(ssusb->vusb33);
+-	}
+-
+-	ssusb->sys_clk = devm_clk_get(dev, "sys_ck");
+-	if (IS_ERR(ssusb->sys_clk)) {
+-		dev_err(dev, "failed to get sys clock\n");
+-		return PTR_ERR(ssusb->sys_clk);
+-	}
+-
+ 	ssusb->dr_mode = usb_get_dr_mode(dev);
+ 	if (ssusb->dr_mode == USB_DR_MODE_UNKNOWN) {
+ 		dev_err(dev, "dr_mode is error\n");
 -- 
-2.7.4
+1.7.9.5
