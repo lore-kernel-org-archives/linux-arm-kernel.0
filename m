@@ -1,32 +1,103 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 6 Feb 2017 09:05:26 -0200
-Subject: [PATCH v2] ARM: dts: imx: Pass 'chosen' and 'memory' nodes
-In-Reply-To: <13787b59-6bfc-d020-9853-ae37074009dc@i2se.com>
-References: <6d3e9733-bebc-4347-95db-2a1c9018948d@i2se.com>
- <13787b59-6bfc-d020-9853-ae37074009dc@i2se.com>
-Message-ID: <CAOMZO5BZ2=pvtscV4J52Tj8Gc3A-O5B4azzzQAr48mKJ_L8-tQ@mail.gmail.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 6 Feb 2017 12:10:34 +0100
+Subject: [PATCH] tty/serial: atmel: ensure state is restored after
+ suspending
+In-Reply-To: <20170203225316.10466-1-alexandre.belloni@free-electrons.com>
+References: <20170203225316.10466-1-alexandre.belloni@free-electrons.com>
+Message-ID: <55a39641-87d4-4f61-11fa-54c8904ac40d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Hi Alexandre,
 
-On Mon, Feb 6, 2017 at 8:49 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+On 03/02/2017 23:53, Alexandre Belloni wrote:
+> When going to suspend, the UART registers may be lost because the power to
+> VDDcore is cut. This is not an issue in the normal case but when
+> no_console_suspend is used, we need to restore the registers in order to
+> get a functional console.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/tty/serial/atmel_serial.c | 44 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 168b10cad47b..22e0a73c0cb7 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -175,6 +175,17 @@ struct atmel_uart_port {
+>  	unsigned int		pending_status;
+>  	spinlock_t		lock_suspended;
+>  
+> +	struct {
+> +		u32		cr;
+> +		u32		mr;
+> +		u32		imr;
+> +		u32		brgr;
+> +		u32		rtor;
+> +		u32		ttgr;
+> +		u32		fmr;
+> +		u32		fimr;
+> +	} cache;
+> +
+As struct cache is only used in suspend()/resume() we could add:
+#ifdef CONFIG_PM / #endif
+to remove it from atmel_uart_port when PM is not selected.
+Even if I'm not a big fan of ifdefs, the suspend code is already
+compiled out with #ifdef CONFIG_PM, so, at least, it would be consistent.
 
->> Btw are Arnd and Olof informed about this urgent patch?
->
-> @Shawn
->
-> Okay, 4.10-rc7 is out but this fix isn't applied :-(
->
-> Is there a chance for 4.10 or do we have to wait for 4.10.1?
->
-> Maybe the subject of the patch is to harmless.
+>  	int (*prepare_rx)(struct uart_port *port);
+>  	int (*prepare_tx)(struct uart_port *port);
+>  	void (*schedule_rx)(struct uart_port *port);
+> @@ -2649,6 +2660,20 @@ static int atmel_serial_suspend(struct platform_device *pdev,
+>  			cpu_relax();
+>  	}
+>  
+> +	if (atmel_is_console_port(port) && !console_suspend_enabled) {
+> +		/* Cache register values as we won't get a full shutdown/startup
+> +		 * cycle
+> +		 */
+> +		atmel_port->cache.mr = atmel_uart_readl(port, ATMEL_US_MR);
+> +		atmel_port->cache.imr = atmel_uart_readl(port, ATMEL_US_IMR);
+> +		atmel_port->cache.brgr = atmel_uart_readl(port, ATMEL_US_BRGR);
+> +		atmel_port->cache.rtor = atmel_uart_readl(port,
+> +							  atmel_port->rtor);
+> +		atmel_port->cache.ttgr = atmel_uart_readl(port, ATMEL_US_TTGR);
+> +		atmel_port->cache.fmr = atmel_uart_readl(port, ATMEL_US_FMR);
+> +		atmel_port->cache.fimr = atmel_uart_readl(port, ATMEL_US_FIMR);
+> +	}
+> +
+>  	/* we can not wake up if we're running on slow clock */
+>  	atmel_port->may_wakeup = device_may_wakeup(&pdev->dev);
+>  	if (atmel_serial_clk_will_stop()) {
+> @@ -2671,6 +2696,25 @@ static int atmel_serial_resume(struct platform_device *pdev)
+>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>  	unsigned long flags;
+>  
+> +	if (atmel_is_console_port(port) && !console_suspend_enabled) {
+> +		atmel_uart_writel(port, ATMEL_US_MR, atmel_port->cache.mr);
+> +		atmel_uart_writel(port, ATMEL_US_IER, atmel_port->cache.imr);
+> +		atmel_uart_writel(port, ATMEL_US_BRGR, atmel_port->cache.brgr);
+> +		atmel_uart_writel(port, atmel_port->rtor,
+> +				  atmel_port->cache.rtor);
+> +		atmel_uart_writel(port, ATMEL_US_TTGR, atmel_port->cache.ttgr);
+> +
+> +		if (atmel_port->fifo_size) {
+> +			atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_FIFOEN |
+> +					  ATMEL_US_RXFCLR | ATMEL_US_TXFLCLR);
+> +			atmel_uart_writel(port, ATMEL_US_FMR,
+> +					  atmel_port->cache.fmr);
+> +			atmel_uart_writel(port, ATMEL_US_FIER,
+> +					  atmel_port->cache.fimr);
+> +		}
+> +		atmel_start_rx(port);
+> +	}
+> +
+>  	spin_lock_irqsave(&atmel_port->lock_suspended, flags);
+>  	if (atmel_port->pending) {
+>  		atmel_handle_receive(port, atmel_port->pending);
+> 
 
-The patch is in the arm-soc 'fixes' branch:
-https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=fixes&id=a971c5545c3d45a1e33fda6e57913bb75aaa20c9
+Thanks !
 
-Olof/Arnd,
-
-Will this branch be sent to Linus so that it lands at 4.10 final?
-
-Thanks
+Richard.
