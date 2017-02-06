@@ -1,39 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 6 Feb 2017 11:07:33 +0100
-Subject: [PATCH 0/2] pinctrl: sunxi: Merge A31s pinctrl driver with A31
-In-Reply-To: <20170202081332.okjxo4ogm2kp3abh@lukather>
-References: <20170201162547.24232-1-wens@csie.org>
- <20170202081332.okjxo4ogm2kp3abh@lukather>
-Message-ID: <CACRpkdZUOszrqbPq4Ak+pUeYQB2qBnSrE2qWMkoNzvw+E74maw@mail.gmail.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Mon, 6 Feb 2017 11:07:41 +0100
+Subject: [PATCH] mfd: stm32-timers: fix driver removal
+In-Reply-To: <1485967306-30589-1-git-send-email-fabrice.gasnier@st.com>
+References: <1485967306-30589-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <CA+M3ks6n3eBrYxqQNOwxHog6ke-7=JJ+z5tN_LOJ4dz9oZq+Bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 2, 2017 at 9:13 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Thu, Feb 02, 2017 at 12:25:45AM +0800, Chen-Yu Tsai wrote:
->> Hi everyone,
->>
->> This series merges support for the A31s' pin controller into the A31
->> driver, using the new sunxi variants support code. The A31s is a trimmed
->> down version of the A31, with some hardware blocks removed, and some
->> pin functions or pins removed. Thus it is easy to support the A31s
->> using the A31 driver by marking the extra pins/functions as A31 only.
->>
->> Patch 1 does exactly this.
->>
->> Patch 2 removes the original A31s driver, which is now redundant.
->>
->> I opted not to rename sun6i-a31 to sun6i in various places.
+2017-02-01 17:41 GMT+01:00 Fabrice Gasnier <fabrice.gasnier@st.com>:
+> Add missing of_platform_depopulate() upon driver removal.
 >
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
+>  drivers/mfd/stm32-timers.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
+> index 41bd901..192cbb6 100644
+> --- a/drivers/mfd/stm32-timers.c
+> +++ b/drivers/mfd/stm32-timers.c
+> @@ -61,6 +61,13 @@ static int stm32_timers_probe(struct platform_device *pdev)
+>         return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+>  }
+>
+> +static int stm32_timers_remove(struct platform_device *pdev)
+> +{
+> +       of_platform_depopulate(&pdev->dev);
+> +
+> +       return 0;
+> +}
+> +
+>  static const struct of_device_id stm32_timers_of_match[] = {
+>         { .compatible = "st,stm32-timers", },
+>         { /* end node */ },
+> @@ -69,6 +76,7 @@ static int stm32_timers_probe(struct platform_device *pdev)
+>
+>  static struct platform_driver stm32_timers_driver = {
+>         .probe = stm32_timers_probe,
+> +       .remove = stm32_timers_remove,
+>         .driver = {
+>                 .name = "stm32-timers",
+>                 .of_match_table = stm32_timers_of_match,
+> --
+> 1.9.1
+>
 
-Could you guys make a patch either adding these drivers as
-commonly maintained by you two in MAINTAINERS?
-
-It is commonly maintained right?
-
-Or if you prefer, just list the pinctrl dir under the Allwinner
-SoC support entry?
-
-Yours,
-Linus Walleij
+Acked-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
