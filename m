@@ -1,53 +1,44 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 6 Feb 2017 16:43:59 +0000
-Subject: [alsa-devel] [PATCH] ASoC: bcm2835: Increase channels_max to 8
-In-Reply-To: <aa6b9cbd-e033-eee6-d7f8-8ba8c8e611ab@flatmax.org>
-References: <1485992264-9058-1-git-send-email-flatmax@flatmax.org>
- <20170204154944.timxhmmibc4kngly@sirena.org.uk>
- <a7f5de09-b07b-638d-466f-525e68ebf0f9@flatmax.org>
- <20170205163451.4x3svwbqdqlfc7t4@sirena.org.uk>
- <aa6b9cbd-e033-eee6-d7f8-8ba8c8e611ab@flatmax.org>
-Message-ID: <20170206164359.vnyxa5iumtslxisy@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon,  6 Feb 2017 16:47:38 +0000
+Subject: [GIT PULL] arch timer updates for v4.11
+Message-ID: <1486399662-17601-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2017 at 07:37:03AM +1100, Matt Flax wrote:
-> On 06/02/17 03:34, Mark Brown wrote:
+Hi Daniel,
 
-> > Looking at the driver it may be possible for the hardware to do DSP
-> > modes at which point this gets much easier but right now it only has I2S
-> > support, I've got a feeling that the other end of the link may actually
-> > be running in a DSP mode.
+These are the arch timer updates for v4.11. I wasn't sure if you wanted
+to pull these or pick them, so I'm sending the full series with all
+relevant tags folded in.
 
-> You've got it !
+I'll send the arm64 documentation and the dts updates separately via
+arm64 and arm-soc respectively.
 
-If you're actually using the device in DSP mode you need to be showing
-that in the driver, not claiming that it's I2S.
+Thanks,
+Mark.
 
-> I haven't looked into why, but I am getting the correct channel mapping
-> under the hood. To me that is a concern of the higher up levels of the ALSA
-> driver - it was a pleasant surprise when it worked nicely, because to me it
-> indicated a robustly coded system.
+The following changes since commit 49def1853334396f948dcb4cedb9347abb318df5:
 
-If the external device is running in DSP mode it'll work fine.
+  Linux 4.10-rc4 (2017-01-15 16:21:59 -0800)
 
-> My next patch is to allow DSP modes in this I2S driver. I wanted to make
-> sure that this got through first however.
+are available in the git repository at:
 
-This is the wrong way round.
+  git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arch-timer/updates
 
-> The majority of these other concerns you mention are controlled at the
-> machine driver level.
+for you to fetch changes up to 96aace83d26887143287428d0361d67cbde38d12:
 
-The driver should be checking for errors, it shouldn't be silently
-accepting incorrect configurations - we shouldn't be forcing all the
-machine drivers to replicate code for this, or requiring modifications
-to machine drivers because a new feature has been added to one of the
-drivers it uses.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170206/c57d4efb/attachment.sig>
+  arm64: arch_timer: work around Hisilicon erratum 161010101 (2017-02-06 16:27:08 +0000)
+
+----------------------------------------------------------------
+Ding Tianhong (4):
+      arm64: arch_timer: add dt binding for hisilicon-161010101 erratum
+      arm64: arm_arch_timer: remove fsl-a008585 parameter
+      arm64: arch_timer: introduce generic errata handling infrastructure
+      arm64: arch_timer: work around Hisilicon erratum 161010101
+
+ Documentation/admin-guide/kernel-parameters.txt    |   9 --
+ .../devicetree/bindings/arm/arch_timer.txt         |   6 +
+ arch/arm64/include/asm/arch_timer.h                |  38 ++----
+ drivers/clocksource/Kconfig                        |  14 ++
+ drivers/clocksource/arm_arch_timer.c               | 151 +++++++++++++++------
+ 5 files changed, 143 insertions(+), 75 deletions(-)
