@@ -1,77 +1,88 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Mon, 6 Feb 2017 14:58:59 +0000
-Subject: [PATCH] ARM: shmobile: r7s72100: Enable L2 cache
-In-Reply-To: <CAMuHMdU6kJDxGtjUT1S2JkQTLvzrgtF3mkqa5Xo08oF6d3tUbw@mail.gmail.com>
-References: <20170202212000.10768-1-chris.brandt@renesas.com>
- <CAMuHMdU6kJDxGtjUT1S2JkQTLvzrgtF3mkqa5Xo08oF6d3tUbw@mail.gmail.com>
-Message-ID: <SG2PR06MB11657125A12CC1BDE6AD17748A400@SG2PR06MB1165.apcprd06.prod.outlook.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Mon, 6 Feb 2017 15:58:52 +0100
+Subject: Fractional divider on the Atmel USART controller
+In-Reply-To: <20170206134256.tp5rgx6axd532gp3@rfolt0960.corp.atmel.com>
+References: <CAGkQfmNshOGWT8Vs_J-49qq2UHoCMJ8cYb9jbjaDqM2YNy05rg@mail.gmail.com>
+ <20170206134256.tp5rgx6axd532gp3@rfolt0960.corp.atmel.com>
+Message-ID: <b32aeadb-57a3-f327-e387-e4bb720f9297@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+Hi Ludovic,
 
-On Monday, February 06, 2017, Geert Uytterhoeven wrote:
-> CC linux-arm-kernel
+On 06/02/2017 14:42, Ludovic Desroches wrote:
+> Hello Romain,
 > 
-> On Thu, Feb 2, 2017 at 10:20 PM, Chris Brandt <chris.brandt@renesas.com>
-> wrote:
-> > This enables the 128KB L2 cache in the RZ/A1 (R7S72100).
-> >
-> > The 'Write full line of zeros mode' of this Cortex-A9 cannot be used
-> > because the sideband signals between the CA9 and PL310 are not connected.
-> > Since there is no option to disable this feature in the cache-l2x0
-> > driver, our only option is to specify a secure write function which
-> > will then cause the cache-l2x0 driver to not enable this feature.
+> On Mon, Feb 06, 2017 at 12:56:42PM +0100, Romain Izard wrote:
+>> Hello,
+>>
+>> On Atmel SAMA5D2, when trying to configure a serial port for 3 Mbauds
+>> operation, I do not always get the requested baud rate. If the hardware
+>> flow control is disabled by software, the line works correctly. But if I
+>> set the crtscts option, the line does not work, and after checking the
+>> line I can observe that the signal is sent at 2.6 Mbauds.
+>>
+>> This is due to the code used to manage fractional baud rate divisor: the
+>> existing code prevents the fractional bits from being used if the line
+>> is not configured in normal mode. This case occurs when the hardware
+>> flow control or the RS485 mode is set.
+>>
+>> If I apply the following patch to drivers/tty/serial/atmel_serial.c,
+>> I get the required baudrate.
+>>
+>> 8<----------------------------------------------------------------
+>>
+>> @@ -2204,14 +2204,13
+>>       * baudrate = selected clock / (8 * (2 - OVER) * (CD + FP / 8))
+>>       * Currently, OVER is always set to 0 so we get
+>>       * baudrate = selected clock / (16 * (CD + FP / 8))
+>>       * then
+>>       * 8 CD + FP = selected clock / (2 * baudrate)
+>>       */
+>> -    if (atmel_port->has_frac_baudrate &&
+>> -        (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
+>> +    if (atmel_port->has_frac_baudrate) {
+>>          div = DIV_ROUND_CLOSEST(port->uartclk, baud * 2);
+>>          cd = div >> 3;
+>>          fp = div & ATMEL_US_FP_MASK;
+>>      } else {
+>>          cd = uart_get_divisor(port, baud);
+>>      }
+>>
+>> 8<----------------------------------------------------------------
+>>
+>> Unfortunately, I know that this will work on SAMA5D2, but this driver is
+>> used for many other Atmel chips. I do not know if the existing code is
+>> meant to respect a known limitation on other devices that use the same
+>> controller, or if it is just a bug.
 > 
-> What about adding a DT property (e.g. "arm,pl310-broken-sideband", cfr.
-> "arm,pl330-broken-no-flushp"), and handling this in arch/arm/mm/cache-
-> l2x0.c instead?
+> It depends on the device used. In the SAMA5D4 datasheet, it is
+> mentionned: "This feature is only available when using USART normal mode".
 
-Well, first I have to say that 'broken-sideband' is not actually "accurate"
-in this case.
+It seems you have an old datasheet version, because in table 60.2 (page 1784) of SAMA5D4 datasheet (rev D), there's :
 
->From the RZ/A1H Hardware Manual:
+Section 43.6.1.2 ?Fractional Baud Rate in Asynchronous Mode?: added warning ?When the value of field FP
+is greater than 0...?; removed sentence ?This feature is only available when using USART normal mode.?
 
-4.  Secondary Cache
-4.1 Features
-
-  * Sideband signal from CA9: No
+So I guess this should also work on SAMA5D4 ? 
 
 
-So the chip designers knew the sideband signals were not connected.
-If you have a look at the next chapter "5. LSI Internal Bus", you'll notice
-that the CA9 is on the North bus (fig 5.2) but the PL310 is on the south
-bus (fig 5.3) in between the AXI and the SDRAM/QSPI controller. So in this
-in SoC, maybe the PL310 looks more like a L3 than an L2 cache???
-
-So, I would say "arm,pl310-no-sideband" is a better name.
-
-
-I agree that faking out a secure write function just so the fill-zeros
-sideband feature is not enabled is a bit of a hack, but I'm not sure if
-modifying the cache-l2x0.c was an option.
-
-
-If you think so, I can try the "arm,pl310-no-sideband" path first,
-and if that doesn't get in I can fall back to what I'm doing now.
-
-Thoughts???
-
-
-
-> > +static void r7s72100_l2c_write_sec(unsigned long val, unsigned int
-> > +reg) {
-> > +       static void __iomem *base;
-> > +
-> > +       if (!base)
-> > +               base = ioremap_nocache(0x3ffff000, SZ_4K);
+> In the SAMA5D2 datasheet, this constraint is no longer mentionned you
+> confirm that is works, that is great.
 > 
-> FWIW, plain ioremap() is fine.
+>>
+>> Ludovic, Nicolas,  what is your opinion on that matter? Should I just
+>> propose this as a patch, or is it necessary to add a limitation for
+>> supported devices only ?
+> 
+> Yes, only SAMA5D2 supports fractionnal baudrate in other modes than the
+> normal one. A new compatible string may be added, I am not sure you have
+> enough information in atmel_get_ip_name...
 
-Of course they both go to the same thing for ARM, but I thought the "_nocache"
-version should be used for sanity purposes (as ie, "yes, I know what I'm
-doing").
+I checked the version numbers on some atmel platforms I have:
 
+AT91SAM9G35 / SAMA5D3: 0x502
+AT91SAM9G20: 0x10330
+SAMA5D2: 0x814
 
-Thanks,
-Chris
+Ludovic, could you please check the version number of the SAMA5D4 USART (if you have one lying around) ?
