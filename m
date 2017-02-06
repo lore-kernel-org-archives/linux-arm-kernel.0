@@ -1,121 +1,112 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  6 Feb 2017 16:47:42 +0000
-Subject: [PATCH 4/4] arm64: arch_timer: work around Hisilicon erratum 161010101
-In-Reply-To: <1486399662-17601-1-git-send-email-mark.rutland@arm.com>
-References: <1486399662-17601-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1486399662-17601-5-git-send-email-mark.rutland@arm.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon,  6 Feb 2017 10:26:52 -0600
+Subject: [PATCH v2] irqchip/gicv3: Fix GICR_WAKE & GICD_IGROUPR accesses from
+ non-secure
+Message-ID: <1486398412-11357-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ding Tianhong <dingtianhong@huawei.com>
+On systems where GIC support two security states, both the register
+GICR_WAKE and GICD_IGROUPR accesses are RAZ/WI from non-secure.
+The function gic_enable_redist() to wake/sleep redistributor is not
+harmful at all, but it is confusing looking at the code. The current
+code checks the single security state based on bit GICD_CTLR.DS which
+is absolutely incorrect. The disable security bit GICD_CTLR.DS is RAZ
+to non-secure. The GICD_TYPE.SecurityExtn indicates whether the GIC
+implementation supports two security states or only one security
+state.
 
-Erratum Hisilicon-161010101 says that the ARM generic timer counter "has
-the potential to contain an erroneous value when the timer value
-changes". Accesses to TVAL (both read and write) are also affected due
-to the implicit counter read. Accesses to CVAL are not affected.
+Let's introduce a new helper function gic_has_security_extn() to
+know GIC security state. Use this function to bypass the code that
+is touching the registers GICR_WAKE and GICD_IGROUPR.
 
-The workaround is to reread the system count registers until the value
-of the second read is larger than the first one by less than 32, the
-system counter can be guaranteed not to return wrong value twice by
-back-to-back read and the error value is always larger than the correct
-one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
-
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-[Mark: split patch, fix Kconfig, reword commit message]
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 ---
- drivers/clocksource/Kconfig          | 10 ++++++++
- drivers/clocksource/arm_arch_timer.c | 49 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 59 insertions(+)
+Changes since v1:
+    Edit comments.
+    Do explicit writes to IGRPMODR if GIC security is disabled.
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index e132bb3..17ee71c 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -339,6 +339,16 @@ config FSL_ERRATUM_A008585
- 	  value").  The workaround will only be active if the
- 	  fsl,erratum-a008585 property is found in the timer node.
- 
-+config HISILICON_ERRATUM_161010101
-+	bool "Workaround for Hisilicon Erratum 161010101"
-+	default y
-+	select ARM_ARCH_TIMER_OOL_WORKAROUND
-+	depends on ARM_ARCH_TIMER && ARM64
-+	help
-+	  This option enables a workaround for Hisilicon Erratum
-+	  161010101. The workaround will be active if the hisilicon,erratum-161010101
-+	  property is found in the timer node.
-+
- config ARM_GLOBAL_TIMER
- 	bool "Support for the ARM global timer" if COMPILE_TEST
- 	select CLKSRC_OF if OF
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 2af0739..7b06aef 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -130,6 +130,47 @@ static u64 notrace fsl_a008585_read_cntvct_el0(void)
+ drivers/irqchip/irq-gic-v3.c       | 40 +++++++++++++++++++++++++++++++-------
+ include/linux/irqchip/arm-gic-v3.h |  1 +
+ 2 files changed, 34 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index c132f29..31b54ab 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -130,12 +130,28 @@ static u64 __maybe_unused gic_read_iar(void)
  }
  #endif
  
-+#ifdef CONFIG_HISILICON_ERRATUM_161010101
-+/*
-+ * Verify whether the value of the second read is larger than the first by
-+ * less than 32 is the only way to confirm the value is correct, so clear the
-+ * lower 5 bits to check whether the difference is greater than 32 or not.
-+ * Theoretically the erratum should not occur more than twice in succession
-+ * when reading the system counter, but it is possible that some interrupts
-+ * may lead to more than twice read errors, triggering the warning, so setting
-+ * the number of retries far beyond the number of iterations the loop has been
-+ * observed to take.
++/**
++ * Check whether the GIC implementation supports two security
++ * states or only one security state.
++ * return true if it has two security states else return false.
 + */
-+#define __hisi_161010101_read_reg(reg) ({				\
-+	u64 _old, _new;						\
-+	int _retries = 50;					\
-+								\
-+	do {							\
-+		_old = read_sysreg(reg);			\
-+		_new = read_sysreg(reg);			\
-+		_retries--;					\
-+	} while (unlikely((_new - _old) >> 5) && _retries);	\
-+								\
-+	WARN_ON_ONCE(!_retries);				\
-+	_new;							\
-+})
-+
-+static u32 notrace hisi_161010101_read_cntp_tval_el0(void)
++static bool gic_has_security_extn(void)
 +{
-+	return __hisi_161010101_read_reg(cntp_tval_el0);
++	u32 typer = readl_relaxed(gic_data.dist_base + GICD_TYPER);
++
++	return !!(typer & GICD_TYPER_SECURITY_EXTN);
 +}
 +
-+static u32 notrace hisi_161010101_read_cntv_tval_el0(void)
-+{
-+	return __hisi_161010101_read_reg(cntv_tval_el0);
-+}
-+
-+static u64 notrace hisi_161010101_read_cntvct_el0(void)
-+{
-+	return __hisi_161010101_read_reg(cntvct_el0);
-+}
-+#endif
-+
- #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
- const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround = NULL;
- EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
-@@ -146,6 +187,14 @@ static u64 notrace fsl_a008585_read_cntvct_el0(void)
- 		.read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
- 	},
- #endif
-+#ifdef CONFIG_HISILICON_ERRATUM_161010101
-+	{
-+		.id = "hisilicon,erratum-161010101",
-+		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
-+		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
-+		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
-+	},
-+#endif
- };
- #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+ static void gic_enable_redist(bool enable)
+ {
+ 	void __iomem *rbase;
+ 	u32 count = 1000000;	/* 1s! */
+ 	u32 val;
  
++	/* With only one security state, GICR_WAKE is RAZ/WI to non-secure */
++	if (gic_has_security_extn())
++		return;
++
+ 	rbase = gic_data_rdist_rd_base();
+ 
+ 	val = readl_relaxed(rbase + GICR_WAKER);
+@@ -399,14 +415,24 @@ static void __init gic_dist_init(void)
+ 
+ 	/*
+ 	 * Configure SPIs as non-secure Group-1. This will only matter
+-	 * if the GIC only has a single security state. This will not
+-	 * do the right thing if the kernel is running in secure mode,
+-	 * but that's not the intended use case anyway.
++	 * if the GIC only has a single security state. This will do
++	 * the right thing if the kernel is running in secure mode and
++	 * with assumption all the SPIs are allocated to Linux, but
++	 * that's not the intended use case anyway.
++	 *
++	 * IGRPMODR  IGROUPR  Definition         ShortName
++	 *    0         0     Secure Group0      G0S
++	 *    0         1     Non-secure Group1  G1NS
++	 *    1         0     Secure Group1      G1S
++	 *    1         1     Reserved           treated as G1NS
+ 	 */
+-	for (i = 32; i < gic_data.irq_nr; i += 32)
+-		writel_relaxed(~0, base + GICD_IGROUPR + i / 8);
+-
+-	gic_dist_config(base, gic_data.irq_nr, gic_dist_wait_for_rwp);
++	if (!gic_has_security_extn()) {
++		for (i = 32; i < gic_data.irq_nr; i += 32) {
++			writel_relaxed(0, base + GICD_IGRPMODR + i / 8);
++			writel_relaxed(~0, base + GICD_IGROUPR + i / 8);
++		}
++		gic_dist_config(base, gic_data.irq_nr, gic_dist_wait_for_rwp);
++	}
+ 
+ 	/* Enable distributor with ARE, Group1 */
+ 	writel_relaxed(GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1,
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index e808f8a..aab00e5 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -70,6 +70,7 @@
+ 
+ #define GICD_TYPER_LPIS			(1U << 17)
+ #define GICD_TYPER_MBIS			(1U << 16)
++#define GICD_TYPER_SECURITY_EXTN	(1U << 10)
+ 
+ #define GICD_TYPER_ID_BITS(typer)	((((typer) >> 19) & 0x1f) + 1)
+ #define GICD_TYPER_IRQS(typer)		((((typer) & 0x1f) + 1) * 32)
 -- 
-1.9.1
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
