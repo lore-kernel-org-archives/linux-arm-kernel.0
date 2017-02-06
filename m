@@ -1,104 +1,177 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 6 Feb 2017 09:07:10 +0000
-Subject: [RFC PATCH v6 0/7] ARM: Fix dma_alloc_coherent() and friends for
- NOMMU
-In-Reply-To: <c3a09063-65e8-e560-742f-a0c350268cec@arm.com>
-References: <1485448965-32855-1-git-send-email-vladimir.murzin@arm.com>
- <c3a09063-65e8-e560-742f-a0c350268cec@arm.com>
-Message-ID: <daf5ecd3-29aa-9626-5193-3080a9f5fd98@arm.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Mon, 6 Feb 2017 17:13:32 +0800
+Subject: [PATCH v12 0/9] power: add power sequence library
+Message-ID: <1486372421-29073-1-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
 
-Can somebody help to get this series reviewed/merged?
+This is a follow-up for my last power sequence framework patch set [1].
+According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
+power sequence instances will be added at postcore_initcall, the match
+criteria is compatible string first, if the compatible string is not
+matched between dts and library, it will try to use generic power sequence.
+	 
+The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+if only one power sequence instance is needed, for more power sequences
+are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
 
-Thanks!
-Vladimir
+In future, if there are special power sequence requirements, the special
+power sequence library can be created.
 
-On 31/01/17 11:30, Vladimir Murzin wrote:
-> Gentle ping...
-> 
-> On 26/01/17 16:42, Vladimir Murzin wrote:
->> Hi,
->>
->> It seem that addition of cache support for M-class CPUs uncovered
->> latent bug in DMA usage. NOMMU memory model has been treated as being
->> always consistent; however, for R/M CPU classes memory can be covered
->> by MPU which in turn might configure RAM as Normal i.e. bufferable and
->> cacheable. It breaks dma_alloc_coherent() and friends, since data can
->> stuck in caches now or be buffered.
->>
->> This patch set is trying to address the issue by providing region of
->> memory suitable for consistent DMA operations. It is supposed that
->> such region is marked by MPU as non-cacheable. Robin suggested to
->> advertise such memory as reserved shared-dma-pool, rather then using
->> homebrew command line option, and extend dma-coherent to provide
->> default DMA area in the similar way as it is done for CMA (PATCH
->> 4/7). It allows us to offload all bookkeeping on generic coherent DMA
->> framework, and it seems that it might be reused by other architectures
->> like c6x and blackfin.
->>
->> While reviewing/testing previous vesrions of the patch set it turned
->> out that dma-coherent does not take into account "dma-ranges" device
->> tree property, so it is addressed in PATCH 3/7.
->>
->> For ARM, dedicated DMA region is required for cases other than:
->>  - MMU/MPU is off
->>  - cpu is v7m w/o cache support
->>  - device is coherent
->>
->> In case one of the above conditions is true dma operations are forced
->> to be coherent and wired with dma_noop_ops.
->>
->> To make life easier NOMMU dma operations are kept in separate
->> compilation unit.
->>
->> Since the issue was reported in the same time as Benjamin sent his
->> patch [1] to allow mmap for NOMMU, his case is also addressed in this
->> series (PATCH 1/7 and PATCH 2/7).
->>
->> Thanks!
->>
->> [1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
->>
->> Cc: Joerg Roedel <jroedel@suse.de>
->> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
->> Cc: Michal Nazarewicz <mina86@mina86.com>
->> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
->> Cc: Alan Stern <stern@rowland.harvard.edu>
->> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
->> Cc: Rich Felker <dalias@libc.org>
->> Cc: Roger Quadros <rogerq@ti.com>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->>
->> Vladimir Murzin (7):
->>   dma: Take into account dma_pfn_offset
->>   dma: Add simple dma_noop_mmap
->>   drivers: dma-coherent: Account dma_pfn_offset when used with device
->>     tree
->>   drivers: dma-coherent: Introduce default DMA pool
->>   ARM: NOMMU: Introduce dma operations for noMMU
->>   ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
->>   ARM: dma-mapping: Remove traces of NOMMU code
->>
->>  .../bindings/reserved-memory/reserved-memory.txt   |   3 +
->>  arch/arm/include/asm/dma-mapping.h                 |   3 +-
->>  arch/arm/mm/Kconfig                                |   2 +-
->>  arch/arm/mm/Makefile                               |   5 +-
->>  arch/arm/mm/dma-mapping-nommu.c                    | 253 +++++++++++++++++++++
->>  arch/arm/mm/dma-mapping.c                          |  26 +--
->>  drivers/base/dma-coherent.c                        |  76 ++++++-
->>  lib/dma-noop.c                                     |  29 ++-
->>  8 files changed, 356 insertions(+), 41 deletions(-)
->>  create mode 100644 arch/arm/mm/dma-mapping-nommu.c
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+two hot-plug devices to simulate this use case, the related binding
+change is updated at patch [1/6], The udoo board changes were tested
+using my last power sequence patch set.[3]
+
+Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+need to power on itself before it can be found by ULPI bus.
+
+Changes for v12:
+- Add design doc and more comments at generic power sequence source file [Patch 2/9]
+- Introduce four Arnd Bergmann patches and one my ehci related patches, these patches
+  are used to get property DT/firmware information at USB code, and these information
+  are needed for power sequence operation at USB. With these five patches, my chipidea
+  hack patch in previous patch set can be removed. [Patch 3-7/9]
+- Add -ENOENT judgement to avoid USB error if no power sequence library is chosen [9/9]
+
+Rafael, if the first two power sequence patches are ok for you, would you consider
+accept these first, the other USB patches can go through USB tree at v4.12-rc1?
+
+Changes for v11:
+- Fix warning: (USB) selects POWER_SEQUENCE which has unmet direct dependencies (OF)
+- Delete redundant copyright statement.
+- Change pr_warn to pr_debug at wrseq_find_available_instance
+- Refine kerneldoc
+- %s/ENONET/ENOENT 
+- Allocate pwrseq list node before than carry out power sequence on 
+- Add mutex_lock/mutex_lock for pwrseq node browse at pwrseq_find_available_instance
+- Add pwrseq_suspend/resume for API both single instance and list 
+- Add .pwrseq_suspend/resume for pwrseq_generic.c
+- Add pwrseq_suspend_list and pwrseq_resume_list for USB hub suspend
+  and resume routine
+
+Changes for v10:
+- Improve the kernel-doc for power sequence core, including exported APIs and
+  main structure. [Patch 2/8]
+- Change Kconfig, and let the user choose power sequence. [Patch 2/8]
+- Delete EXPORT_SYMBOL and change related APIs as local, these APIs do not
+  be intended to export currently. [Patch 2/8]
+- Selete POWER_SEQUENCE at USB core's Kconfig. [Patch 4/8]
+
+Changes for v9:
+- Add Vaibhav Hiremath's reviewed-by [Patch 4/8]
+- Rebase to v4.9-rc1
+
+Changes for v8:
+- Allocate one extra pwrseq instance if pwrseq_get has succeed, it can avoid
+  preallocate instances problem which the number of instance is decided at
+  compile time, thanks for Heiko Stuebner's suggestion [Patch 2/8]
+- Delete pwrseq_compatible_sample.c which is the demo purpose to show compatible
+  match method. [Patch 2/8]
+- Add Maciej S. Szmigiero's tested-by. [Patch 7/8]
+
+Changes for v7:
+- Create kinds of power sequence instance at postcore_initcall, and match
+  the instance with node using compatible string, the beneit of this is
+  the host driver doesn't need to consider which pwrseq instance needs
+  to be used, and pwrseq core will match it, however, it eats some memories
+  if less power sequence instances are used. [Patch 2/8]
+- Add pwrseq_compatible_sample.c to test match pwrseq using device_id. [Patch 2/8]
+- Fix the comments Vaibhav Hiremath adds for error path for clock and do not
+  use device_node for parameters at pwrseq_on. [Patch 2/8]
+- Simplify the caller to use power sequence, follows Alan's commnets [Patch 4/8]
+- Tested three pwrseq instances together using both specific compatible string and
+  generic libraries.
+
+Changes for v6:
+- Add Matthias Kaehlcke's Reviewed-by and Tested-by. (patch [2/6])
+- Change chipidea core of_node assignment for coming user. (patch [5/6])
+- Applies Joshua Clayton's three dts changes for two boards,
+  the USB device's reg has only #address-cells, but without #size-cells.
+
+Changes for v5:
+- Delete pwrseq_register/pwrseq_unregister, which is useless currently
+- Fix the linker error when the pwrseq user is compiled as module
+
+Changes for v4:
+- Create the patch on next-20160722 
+- Fix the of_node is not NULL after chipidea driver is unbinded [Patch 5/6]
+- Using more friendly wait method for reset gpio [Patch 2/6]
+- Support multiple input clocks [Patch 2/6]
+- Add Rob Herring's ack for DT changes
+- Add Joshua Clayton's Tested-by
+
+Changes for v3:
+- Delete "power-sequence" property at binding-doc, and change related code
+  at both library and user code.
+- Change binding-doc example node name with Rob's comments
+- of_get_named_gpio_flags only gets the gpio, but without setting gpio flags,
+  add additional code request gpio with proper gpio flags
+- Add Philipp Zabel's Ack and MAINTAINER's entry
+
+Changes for v2:
+- Delete "pwrseq" prefix and clock-names for properties at dt binding
+- Should use structure not but its pointer for kzalloc
+- Since chipidea core has no of_node, let core's of_node equals glue
+  layer's at core's probe
+
+[1] http://www.spinics.net/lists/linux-usb/msg142755.html
+[2] http://www.spinics.net/lists/linux-usb/msg143106.html
+[3] http://www.spinics.net/lists/linux-usb/msg142815.html
+[4] http://www.spinics.net/lists/linux-usb/msg152375.html
+
+Arnd Bergmann (4):
+  usb: separate out sysdev pointer from usb_bus
+  usb: chipidea: use bus->sysdev for DMA configuration
+  usb: ehci: fsl: use bus->sysdev for DMA configuration
+  usb: xhci: use bus->sysdev for DMA configuration
+
+Peter Chen (5):
+  binding-doc: power: pwrseq-generic: add binding doc for generic power
+    sequence library
+  power: add power sequence library
+  usb: ehci: use bus->sysdev for DMA configuration
+  binding-doc: usb: usb-device: add optional properties for power
+    sequence
+  usb: core: add power sequence handling for USB devices
+
+ .../bindings/power/pwrseq/pwrseq-generic.txt       |  48 +++
+ .../devicetree/bindings/usb/usb-device.txt         |  10 +-
+ Documentation/power/power-sequence/design.rst      |  38 +++
+ MAINTAINERS                                        |   9 +
+ drivers/power/Kconfig                              |   1 +
+ drivers/power/Makefile                             |   1 +
+ drivers/power/pwrseq/Kconfig                       |  20 ++
+ drivers/power/pwrseq/Makefile                      |   2 +
+ drivers/power/pwrseq/core.c                        | 335 +++++++++++++++++++++
+ drivers/power/pwrseq/pwrseq_generic.c              | 234 ++++++++++++++
+ drivers/usb/Kconfig                                |   1 +
+ drivers/usb/chipidea/core.c                        |   3 -
+ drivers/usb/chipidea/host.c                        |   3 +-
+ drivers/usb/chipidea/udc.c                         |  10 +-
+ drivers/usb/core/buffer.c                          |  12 +-
+ drivers/usb/core/hcd.c                             |  48 +--
+ drivers/usb/core/hub.c                             |  49 ++-
+ drivers/usb/core/hub.h                             |   1 +
+ drivers/usb/core/usb.c                             |  18 +-
+ drivers/usb/host/ehci-fsl.c                        |   4 +-
+ drivers/usb/host/ehci-mem.c                        |  38 +--
+ drivers/usb/host/xhci-mem.c                        |  12 +-
+ drivers/usb/host/xhci-plat.c                       |  33 +-
+ drivers/usb/host/xhci.c                            |  15 +-
+ include/linux/power/pwrseq.h                       |  81 +++++
+ include/linux/usb.h                                |   1 +
+ include/linux/usb/hcd.h                            |   3 +
+ 27 files changed, 945 insertions(+), 85 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+ create mode 100644 Documentation/power/power-sequence/design.rst
+ create mode 100644 drivers/power/pwrseq/Kconfig
+ create mode 100644 drivers/power/pwrseq/Makefile
+ create mode 100644 drivers/power/pwrseq/core.c
+ create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
+ create mode 100644 include/linux/power/pwrseq.h
+
+-- 
+2.7.4
