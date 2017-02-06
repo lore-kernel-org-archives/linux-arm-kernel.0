@@ -1,22 +1,21 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 6 Feb 2017 13:17:00 +0100
-Subject: [PATCH] iommu: mtk: remove bogus 'select' statements
-In-Reply-To: <20170202142921.3467470-1-arnd@arndb.de>
-References: <20170202142921.3467470-1-arnd@arndb.de>
-Message-ID: <20170206121700.GC25981@8bytes.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 06 Feb 2017 13:22:00 +0100
+Subject: IRQ masking hierarchy with GIC as the root
+Message-ID: <1486383720.2275.22.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 03:29:03PM +0100, Arnd Bergmann wrote:
-> The mediatek IOMMU driver enables some drivers that it does not directly
-> rely on, and that causes a warning for build testing:
-> 
-> warning: (MTK_IOMMU_V1) selects COMMON_CLK_MT2701_VDECSYS which has unmet direct dependencies (COMMON_CLK && COMMON_CLK_MT2701)
-> warning: (MTK_IOMMU_V1) selects COMMON_CLK_MT2701_IMGSYS which has unmet direct dependencies (COMMON_CLK && COMMON_CLK_MT2701)
-> warning: (MTK_IOMMU_V1) selects COMMON_CLK_MT2701_MMSYS which has unmet direct dependencies (COMMON_CLK && COMMON_CLK_MT2701)
-> 
-> This removes the select statements.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hi Marc and others,
 
-Applied, thanks.
+in the conversion of the old GIC arch_extension to proper stacked IRQ
+domain chips you added calls to irq_chip_mask_parent() to both the Tegra
+LIC (drivers/irqchip/irq-tegra.c) and the i.MX GPC
+(arch/arm/mach-imx/gpc.c).
+
+Both IRQ controllers should be able to mask the IRQ on their own,
+meaning the IRQ will not reach the GIC if it is masked at this hierarchy
+level. Is it safe to remove the the call to mask the IRQ at the GIC
+level, or is there something more to it that I don't (yet) see?
+
+Thanks,
+Lucas
