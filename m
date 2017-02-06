@@ -1,54 +1,56 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Mon, 6 Feb 2017 11:35:49 +0000
-Subject: [PATCH net-next 6/8] net: ethernet: annapurna: add wol helpers
- to the Alpine driver
-In-Reply-To: <08b62752-8bb2-4633-c44f-74eb585e7e52@cogentembedded.com>
-References: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
- <20170203181216.30214-7-antoine.tenart@free-electrons.com>
- <08b62752-8bb2-4633-c44f-74eb585e7e52@cogentembedded.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DB027C6C3@AcuExch.aculab.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Mon, 6 Feb 2017 12:56:42 +0100
+Subject: Fractional divider on the Atmel USART controller
+Message-ID: <CAGkQfmNshOGWT8Vs_J-49qq2UHoCMJ8cYb9jbjaDqM2YNy05rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: netdev-owner@vger.kernel.org [mailto:netdev-owner at vger.kernel.org] On Behalf Of Sergei Shtylyov
-> Sent: 03 February 2017 18:22
-> On 02/03/2017 09:12 PM, Antoine Tenart wrote:
-> 
-> > Implement the get_wol() and set_wol() helpers in the Annapurna Labs
-> > Alpine Ethernet driver.
-> > ---
-> >  drivers/net/ethernet/annapurna/al_eth.c | 44 +++++++++++++++++++++++++++++++++
-> >  1 file changed, 44 insertions(+)
-> >
-> > diff --git a/drivers/net/ethernet/annapurna/al_eth.c b/drivers/net/ethernet/annapurna/al_eth.c
-> > index 8dd84f66b5d1..d06a75a49ce5 100644
-> > --- a/drivers/net/ethernet/annapurna/al_eth.c
-> > +++ b/drivers/net/ethernet/annapurna/al_eth.c
-> > @@ -2519,10 +2519,54 @@ static u32 al_eth_get_rxfh_indir_size(struct net_device *netdev)
-> >  	return AL_ETH_RX_RSS_TABLE_SIZE;
-> >  }
-> >
-> > +static void al_eth_get_wol(struct net_device *netdev,
-> > +			   struct ethtool_wolinfo *wol)
-> > +{
-> > +	struct al_eth_adapter *adapter = netdev_priv(netdev);
-> > +	struct phy_device *phydev;
-> > +
-> > +	wol->wolopts = adapter->wol;
-> > +
-> > +	if ((adapter) && (adapter->phy_exist) && (adapter->mdio_bus)) {
-> 
->     Now that's somewhat stupid looking... does the whole driver use this "style"?
+Hello,
 
-Not only that, in one of the two functions it is followed by:
+On Atmel SAMA5D2, when trying to configure a serial port for 3 Mbauds
+operation, I do not always get the requested baud rate. If the hardware
+flow control is disabled by software, the line works correctly. But if I
+set the crtscts option, the line does not work, and after checking the
+line I can observe that the signal is sent at 2.6 Mbauds.
 
-+	device_set_wakeup_enable(&adapter->pdev->dev, adapter->wol);
+This is due to the code used to manage fractional baud rate divisor: the
+existing code prevents the fractional bits from being used if the line
+is not configured in normal mode. This case occurs when the hardware
+flow control or the RS485 mode is set.
 
-Which assumes that 'adapter' is not NULL.
-Some verifiers will detect that as a possible NULL pointer dereference.
+If I apply the following patch to drivers/tty/serial/atmel_serial.c,
+I get the required baudrate.
 
-Pointers should only be checked for NULL if there are valid reasons
-why they can be NULL in that code path.
-Getting there with a NULL pointer dues to some race condition isn't one of them.
+8<----------------------------------------------------------------
 
-	David
+@@ -2204,14 +2204,13
+      * baudrate = selected clock / (8 * (2 - OVER) * (CD + FP / 8))
+      * Currently, OVER is always set to 0 so we get
+      * baudrate = selected clock / (16 * (CD + FP / 8))
+      * then
+      * 8 CD + FP = selected clock / (2 * baudrate)
+      */
+-    if (atmel_port->has_frac_baudrate &&
+-        (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
++    if (atmel_port->has_frac_baudrate) {
+         div = DIV_ROUND_CLOSEST(port->uartclk, baud * 2);
+         cd = div >> 3;
+         fp = div & ATMEL_US_FP_MASK;
+     } else {
+         cd = uart_get_divisor(port, baud);
+     }
+
+8<----------------------------------------------------------------
+
+Unfortunately, I know that this will work on SAMA5D2, but this driver is
+used for many other Atmel chips. I do not know if the existing code is
+meant to respect a known limitation on other devices that use the same
+controller, or if it is just a bug.
+
+Ludovic, Nicolas,  what is your opinion on that matter? Should I just
+propose this as a patch, or is it necessary to add a limitation for
+supported devices only ?
+
+Best regards,
+-- 
+Romain Izard
