@@ -1,34 +1,32 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Mon, 6 Feb 2017 12:43:17 +0000
-Subject: [PATCHv2 net-next 05/16] net: mvpp2: introduce PPv2.2 HW
- descriptors and adapt accessors
-In-Reply-To: <20170204145938.6e6380d9@free-electrons.com>
-References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943592-12556-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170106142901.GC14217@n2100.armlinux.org.uk>
- <113811b6-79a4-9c66-d302-add9fb0c5b1a@arm.com>
- <20170203142446.2ee517a7@free-electrons.com>
- <231514f4-2e35-8bde-4469-aada833635aa@arm.com>
- <20170203155449.GC27312@n2100.armlinux.org.uk>
- <20170204145938.6e6380d9@free-electrons.com>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DB027C728@AcuExch.aculab.com>
+From: vicmos89@gmail.com (Victor Vaschenko)
+Date: Mon,  6 Feb 2017 15:48:01 +0300
+Subject: [PATCH] Staging: bcm2835-audio: Fixed that open brace should be on
+ previous line error in bcm2835-ctl.c
+Message-ID: <1486385281-7387-1-git-send-email-vicmos89@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni
-> Sent: 04 February 2017 14:00
-...
-> This makes complete sense. We use the cookie to store the phys_addr_t
-> rather than the virtual address. I might be missing something, but it
-> seems like a very good solution. Thanks for the suggestion, I'll try
-> this!
+Fixed ERROR: that open brace { should be on the previous line. 
+One coding style correction for better readable code.
 
-Why not just store an array index for the buffer info?
-That would save you having to regenerate kernel virtual
-addresses from limited info.
+Signed-off-by: Victor Vaschenko <vicmos89@gmail.com>
+---
+ drivers/staging/bcm2835-audio/bcm2835-ctl.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Or realise that the low bits (page offset) of the dma address
-and kernel virtual address (and kernel physical for that matter)
-will always match. 50 bits might be enough for a kernel virtual address.
-
-	David
+diff --git a/drivers/staging/bcm2835-audio/bcm2835-ctl.c b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
+index 164daa4..bfb7e9f 100644
+--- a/drivers/staging/bcm2835-audio/bcm2835-ctl.c
++++ b/drivers/staging/bcm2835-audio/bcm2835-ctl.c
+@@ -164,8 +164,7 @@ static int snd_bcm2835_ctl_put(struct snd_kcontrol *kcontrol,
+ 		.get = snd_bcm2835_ctl_get,
+ 		.put = snd_bcm2835_ctl_put,
+ 		.count = 1,
+-		.tlv =
+-		{.p = snd_bcm2835_db_scale}
++		.tlv = {.p = snd_bcm2835_db_scale}
+ 	},
+ 	{
+ 		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+-- 
+1.9.1
