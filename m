@@ -1,68 +1,115 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Mon, 6 Feb 2017 15:26:37 -0700
-Subject: [PATCH] arm64: kconfig: allow support for memory failure handling
-In-Reply-To: <8737fvqlxs.fsf@e105922-lin.cambridge.arm.com>
-References: <1485985115-27274-1-git-send-email-tbaicar@codeaurora.org>
- <8737fvqlxs.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <ec1f1a61-8569-58b8-a78f-972f43a5e8ca@codeaurora.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 07 Feb 2017 00:33:33 +0200
+Subject: [PATCH v3 13/24] platform: add video-multiplexer subdevice driver
+In-Reply-To: <f6bfb9ec-1ea3-8477-4933-cf655acd3e0f@xs4all.nl>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <2258037.UCXsIYbtGD@avalon> <f6bfb9ec-1ea3-8477-4933-cf655acd3e0f@xs4all.nl>
+Message-ID: <2038922.a1tReKKdaL@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Punit,
+Hi Hans,
 
+(CC'ing Sakari)
 
-On 2/3/2017 9:27 AM, Punit Agrawal wrote:
-> Tyler Baicar <tbaicar@codeaurora.org> writes:
->
->> From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
->>
->> If ACPI_APEI and MEMORY_FAILURE is configured, select
->> ACPI_APEI_MEMORY_FAILURE. This enables memory failure recovery
->> when such memory failure is reported through ACPI APEI. APEI
->> (ACPI Platform Error Interfaces) provides a means for the
->> platform to convey error information to the kernel.
->>
->> Declare ARCH_SUPPORTS_MEMORY_FAILURE, as arm64 does support
->> memory failure recovery attempt.
->>
->> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
->> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
->> ---
->>   arch/arm64/Kconfig | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index f92778d..4cd12a0 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -15,6 +15,8 @@ config ARM64
->>   	select ARCH_HAS_SG_CHAIN
->>   	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
->>   	select ARCH_USE_CMPXCHG_LOCKREF
->> +	select ACPI_APEI_MEMORY_FAILURE if ACPI_APEI && MEMORY_FAILURE
->> +	select ARCH_SUPPORTS_MEMORY_FAILURE
-> Although enabling support for memory failure handling makes sense in the
-> architecture config, it feels out of place to select
-> ACPI_APEI_MEMORY_FAILURE here.
->
-> Maybe key it off of CONFIG_APEI?
-Yes, I can move it there.
+On Monday 06 Feb 2017 10:50:22 Hans Verkuil wrote:
+> On 02/05/2017 04:48 PM, Laurent Pinchart wrote:
+> > On Tuesday 24 Jan 2017 18:07:55 Steve Longerbeam wrote:
+> >> On 01/24/2017 04:02 AM, Philipp Zabel wrote:
+> >>> On Fri, 2017-01-20 at 15:03 +0100, Hans Verkuil wrote:
+> >>>>> +
+> >>>>> +int vidsw_g_mbus_config(struct v4l2_subdev *sd, struct
+> >>>>> v4l2_mbus_config
+> >>>>> *cfg)
+> >>>>> +{
+> >>>>> +	struct vidsw *vidsw = v4l2_subdev_to_vidsw(sd);
+> >>>>> +	struct media_pad *pad;
+> >>>>> +	int ret;
+> >>>>> +
+> >>>>> +	if (vidsw->active == -1) {
+> >>>>> +		dev_err(sd->dev, "no configuration for inactive 
+mux\n");
+> >>>>> +		return -EINVAL;
+> >>>>> +	}
+> >>>>> +
+> >>>>> +	/*
+> >>>>> +	 * Retrieve media bus configuration from the entity connected 
+to the
+> >>>>> +	 * active input
+> >>>>> +	 */
+> >>>>> +	pad = media_entity_remote_pad(&vidsw->pads[vidsw->active]);
+> >>>>> +	if (pad) {
+> >>>>> +		sd = media_entity_to_v4l2_subdev(pad->entity);
+> >>>>> +		ret = v4l2_subdev_call(sd, video, g_mbus_config, cfg);
+> >>>>> +		if (ret == -ENOIOCTLCMD)
+> >>>>> +			pad = NULL;
+> >>>>> +		else if (ret < 0) {
+> >>>>> +			dev_err(sd->dev, "failed to get source
+> >>>>> configuration\n");
+> >>>>> +			return ret;
+> >>>>> +		}
+> >>>>> +	}
+> >>>>> +	if (!pad) {
+> >>>>> +		/* Mirror the input side on the output side */
+> >>>>> +		cfg->type = vidsw->endpoint[vidsw->active].bus_type;
+> >>>>> +		if (cfg->type == V4L2_MBUS_PARALLEL ||
+> >>>>> +		    cfg->type == V4L2_MBUS_BT656)
+> >>>>> +			cfg->flags = vidsw->endpoint[vidsw-
+> >>>>> active].bus.parallel.flags;
+> >>>>> +	}
+> >>>>> +
+> >>>>> +	return 0;
+> >>>>> +}
+> >>>> 
+> >>>> I am not certain this op is needed at all. In the current kernel this
+> >>>> op is only used by soc_camera, pxa_camera and omap3isp (somewhat
+> >>>> dubious). Normally this information should come from the device tree
+> >>>> and there should be no need for this op.
+> >>>> 
+> >>>> My (tentative) long-term plan was to get rid of this op.
+> >>>> 
+> >>>> If you don't need it, then I recommend it is removed.
+> >> 
+> >> Hi Hans, the imx-media driver was only calling g_mbus_config to the
+> >> camera sensor, and it was doing that to determine the sensor's bus type.
+> >> This info was already available from parsing a v4l2_of_endpoint from the
+> >> sensor node. So it was simple to remove the g_mbus_config calls, and
+> >> instead rely on the parsed sensor v4l2_of_endpoint.
+> > 
+> > That's not a good point.
 
-config ACPI_APEI
-         bool "ACPI Platform Error Interface (APEI)"
-         select MISC_FILESYSTEMS
-         select PSTORE
-         select UEFI_CPER
-+        select ACPI_APEI_MEMORY_FAILURE if MEMORY_FAILURE
-         depends on HAVE_ACPI_APEI
+(mea culpa, s/point/idea/)
 
-The ARCH_SUPPORTS_MEMORY_FAILURE should remain in arch/arm64/Kconfig 
-though, correct?
+> > The imx-media driver must not parse the sensor DT node as it is not aware
+> > of what bindings the sensor is compatible with. Information must instead
+> > be queried from the sensor subdev at runtime, through the g_mbus_config()
+> > operation.
+> > 
+> > Of course, if you can get the information from the imx-media DT node,
+> > that's certainly an option. It's only information provided by the sensor
+> > driver that you have no choice but query using a subdev operation.
+> 
+> Shouldn't this come from the imx-media DT node? BTW, why is omap3isp using
+> this?
 
-Thanks,
-Tyler
+It all depends on what type of information needs to be retrieved, and whether 
+it can change at runtime or is fixed. Adding properties to the imx-media DT 
+node is certainly fine as long as those properties describe the i.MX side.
+
+In the omap3isp case, we use the operation to query whether parallel data 
+contains embedded sync (BT.656) or uses separate h/v sync signals.
+
+> The reason I am suspicious about this op is that it came from soc-camera and
+> predates the DT. The contents of v4l2_mbus_config seems very much like a HW
+> description to me, i.e. something that belongs in the DT.
+
+Part of it is possibly outdated, but for buses that support multiple modes of 
+operation (such as the parallel bus case described above) we need to make that 
+information discoverable at runtime. Maybe this should be considered as 
+related to Sakari's efforts to support VC/DT for CSI-2, and supported through 
+the API he is working on.
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Regards,
+
+Laurent Pinchart
