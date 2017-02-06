@@ -1,27 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 6 Feb 2017 11:04:52 +0100
-Subject: [PATCH] pinctrl: samsung: mark PM functions as __maybe_unused
-In-Reply-To: <20170201161636.2109091-1-arnd@arndb.de>
-References: <20170201161636.2109091-1-arnd@arndb.de>
-Message-ID: <CACRpkdYBL_4caeSkD4aXqGCJ0XF=S_pQ24J8pBPCacDyzdow0g@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 6 Feb 2017 10:06:08 +0000
+Subject: [PATCH RESEND 1/3] arm64: add THUNDER2 processor family
+In-Reply-To: <1486233461-2679-2-git-send-email-jnair@caviumnetworks.com>
+References: <1486233461-2679-1-git-send-email-jnair@caviumnetworks.com>
+ <1486233461-2679-2-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <20170206100608.GA8540@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 1, 2017 at 5:16 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Sat, Feb 04, 2017 at 06:37:39PM +0000, Jayachandran C wrote:
+> Add support for ThunderX2 CN99XX arm64 server processors.
+> 
+> Introduce a new arm64 platform config option ARCH_THUNDER2 for these
+> processors. Add device tree files boot/dts/cavium/thunder-99xx.dtsi for
+> on-chip devices and boot/dts/cavium/thunder-99xx.dts for the evaluation
+> board.
+> 
+> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+> ---
+>  arch/arm64/Kconfig.platforms                 |   7 ++
+>  arch/arm64/boot/dts/cavium/Makefile          |   1 +
+>  arch/arm64/boot/dts/cavium/thunder-99xx.dts  |  34 +++++++
+>  arch/arm64/boot/dts/cavium/thunder-99xx.dtsi | 147 +++++++++++++++++++++++++++
 
-> The rework of the suspend/resume handling uses the wrong #ifdef check, leading
-> to a build warning without CONFIG_PM_SLEEP:
->
-> drivers/pinctrl/samsung/pinctrl-samsung.c:1142:12: error: 'samsung_pinctrl_resume' defined but not used [-Werror=unused-function]
-> drivers/pinctrl/samsung/pinctrl-samsung.c:1092:12: error: 'samsung_pinctrl_suspend' defined but not used [-Werror=unused-function]
->
-> Using a __maybe_unused annotation instead of the #ifdef is a simple way to
-> avoid this problem class.
->
-> Fixes: 2b24efa8e5c5 ("pinctrl: samsung: Replace syscore ops with standard platform device pm_ops")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+This is basically identical to vulcan.dtsi. Do we really need both in the
+tree?
 
-Patch applied with Marek's ACK.
-
-Yours,
-Linus Walleij
+Will
