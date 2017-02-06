@@ -1,59 +1,100 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Mon, 6 Feb 2017 17:29:01 +0800
-Subject: [PATCH v2 6/6] dt-bindings: mt8173-mtu3: add reference clock
-In-Reply-To: <1486373341-4399-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1486373341-4399-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1486373341-4399-6-git-send-email-chunfeng.yun@mediatek.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 6 Feb 2017 10:31:42 +0100
+Subject: [PATCH] tty/serial: atmel: ensure state is restored after
+ suspending
+In-Reply-To: <20170203225316.10466-1-alexandre.belloni@free-electrons.com>
+References: <20170203225316.10466-1-alexandre.belloni@free-electrons.com>
+Message-ID: <8d788b97-5dfa-1beb-e561-2a558a62e56b@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the reference clock comes from 26M oscillator directly
-on mt8173, and it is a fixed-clock in DTS which always turned
-on, we ignore it before. But on some platforms, it comes
-from PLL, and need be controlled, so here add it, no matter
-it is a fixed-clock or not.
+Le 03/02/2017 ? 23:53, Alexandre Belloni a ?crit :
+> When going to suspend, the UART registers may be lost because the power to
+> VDDcore is cut. This is not an issue in the normal case but when
+> no_console_suspend is used, we need to restore the registers in order to
+> get a functional console.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- .../devicetree/bindings/usb/mt8173-mtu3.txt        |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Reviewed-by: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-diff --git a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt b/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
-index e049d19..8c976cd 100644
---- a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
-+++ b/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
-@@ -10,7 +10,7 @@ Required properties:
-  - vusb33-supply : regulator of USB avdd3.3v
-  - clocks : a list of phandle + clock-specifier pairs, one for each
- 	entry in clock-names
-- - clock-names : must contain "sys_ck" for clock of controller;
-+ - clock-names : must contain "sys_ck" and "ref_ck" for clock of controller;
- 	"wakeup_deb_p0" and "wakeup_deb_p1" are optional, they are
- 	depends on "mediatek,enable-wakeup"
-  - phys : a list of phandle + phy specifier pairs
-@@ -56,10 +56,10 @@ ssusb: usb at 11271000 {
- 	phys = <&phy_port0 PHY_TYPE_USB3>,
- 	       <&phy_port1 PHY_TYPE_USB2>;
- 	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
--	clocks = <&topckgen CLK_TOP_USB30_SEL>,
-+	clocks = <&topckgen CLK_TOP_USB30_SEL>, <&clk26m>,
- 		 <&pericfg CLK_PERI_USB0>,
- 		 <&pericfg CLK_PERI_USB1>;
--	clock-names = "sys_ck",
-+	clock-names = "sys_ck", "ref_ck",
- 		      "wakeup_deb_p0",
- 		      "wakeup_deb_p1";
- 	vusb33-supply = <&mt6397_vusb_reg>;
-@@ -79,8 +79,8 @@ ssusb: usb at 11271000 {
- 		reg-names = "mac";
- 		interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
- 		power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
--		clocks = <&topckgen CLK_TOP_USB30_SEL>;
--		clock-names = "sys_ck";
-+		clocks = <&topckgen CLK_TOP_USB30_SEL>, <&clk26m>;
-+		clock-names = "sys_ck", "ref_ck";
- 		vusb33-supply = <&mt6397_vusb_reg>;
- 		status = "disabled";
- 	};
+Thanks,
+
+> ---
+>  drivers/tty/serial/atmel_serial.c | 44 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 168b10cad47b..22e0a73c0cb7 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -175,6 +175,17 @@ struct atmel_uart_port {
+>  	unsigned int		pending_status;
+>  	spinlock_t		lock_suspended;
+>  
+> +	struct {
+> +		u32		cr;
+> +		u32		mr;
+> +		u32		imr;
+> +		u32		brgr;
+> +		u32		rtor;
+> +		u32		ttgr;
+> +		u32		fmr;
+> +		u32		fimr;
+> +	} cache;
+> +
+>  	int (*prepare_rx)(struct uart_port *port);
+>  	int (*prepare_tx)(struct uart_port *port);
+>  	void (*schedule_rx)(struct uart_port *port);
+> @@ -2649,6 +2660,20 @@ static int atmel_serial_suspend(struct platform_device *pdev,
+>  			cpu_relax();
+>  	}
+>  
+> +	if (atmel_is_console_port(port) && !console_suspend_enabled) {
+> +		/* Cache register values as we won't get a full shutdown/startup
+> +		 * cycle
+> +		 */
+> +		atmel_port->cache.mr = atmel_uart_readl(port, ATMEL_US_MR);
+> +		atmel_port->cache.imr = atmel_uart_readl(port, ATMEL_US_IMR);
+> +		atmel_port->cache.brgr = atmel_uart_readl(port, ATMEL_US_BRGR);
+> +		atmel_port->cache.rtor = atmel_uart_readl(port,
+> +							  atmel_port->rtor);
+> +		atmel_port->cache.ttgr = atmel_uart_readl(port, ATMEL_US_TTGR);
+> +		atmel_port->cache.fmr = atmel_uart_readl(port, ATMEL_US_FMR);
+> +		atmel_port->cache.fimr = atmel_uart_readl(port, ATMEL_US_FIMR);
+> +	}
+> +
+>  	/* we can not wake up if we're running on slow clock */
+>  	atmel_port->may_wakeup = device_may_wakeup(&pdev->dev);
+>  	if (atmel_serial_clk_will_stop()) {
+> @@ -2671,6 +2696,25 @@ static int atmel_serial_resume(struct platform_device *pdev)
+>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>  	unsigned long flags;
+>  
+> +	if (atmel_is_console_port(port) && !console_suspend_enabled) {
+> +		atmel_uart_writel(port, ATMEL_US_MR, atmel_port->cache.mr);
+> +		atmel_uart_writel(port, ATMEL_US_IER, atmel_port->cache.imr);
+> +		atmel_uart_writel(port, ATMEL_US_BRGR, atmel_port->cache.brgr);
+> +		atmel_uart_writel(port, atmel_port->rtor,
+> +				  atmel_port->cache.rtor);
+> +		atmel_uart_writel(port, ATMEL_US_TTGR, atmel_port->cache.ttgr);
+> +
+> +		if (atmel_port->fifo_size) {
+> +			atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_FIFOEN |
+> +					  ATMEL_US_RXFCLR | ATMEL_US_TXFLCLR);
+> +			atmel_uart_writel(port, ATMEL_US_FMR,
+> +					  atmel_port->cache.fmr);
+> +			atmel_uart_writel(port, ATMEL_US_FIER,
+> +					  atmel_port->cache.fimr);
+> +		}
+> +		atmel_start_rx(port);
+> +	}
+> +
+>  	spin_lock_irqsave(&atmel_port->lock_suspended, flags);
+>  	if (atmel_port->pending) {
+>  		atmel_handle_receive(port, atmel_port->pending);
+> 
+
+
 -- 
-1.7.9.5
+Nicolas Ferre
