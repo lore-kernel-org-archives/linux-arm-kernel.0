@@ -1,58 +1,70 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 7 Feb 2017 12:51:28 +0800
-Subject: [PATCH 08/10] iommu/mediatek: Make use of iommu_device_register
- interface
-In-Reply-To: <1486397429-29327-9-git-send-email-joro@8bytes.org>
-Message-ID: <201702071256.v8ex5COX%fengguang.wu@intel.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 6 Feb 2017 13:08:37 -0800
+Subject: [RFC][PATCH 1/2] remoteproc: Reduce asynchronous
+ request_firmware to auto-boot only
+In-Reply-To: <1485299581-30476-1-git-send-email-spjoshi@codeaurora.org>
+References: <1485299581-30476-1-git-send-email-spjoshi@codeaurora.org>
+Message-ID: <20170206210837.GH31134@builder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Tue 24 Jan 15:13 PST 2017, Sarangdhar Joshi wrote:
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.10-rc7]
-[cannot apply to iommu/next next-20170206]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> The rproc_add_virtio_devices() requests firmware asynchronously and
+> triggers boot if the auto_boot flag is set. However, this
+> asynchronous call seems to be redundant for non auto-boot scenario
+> since the rproc_boot() would call request_firmware() anyways. Move
+> the auto_boot check to rproc_add() so that a redundant call to
+> _request_firmware can be avoided for non auto-boot case.
+> 
+> Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
 
-url:    https://github.com/0day-ci/linux/commits/Joerg-Roedel/Let-IOMMU-core-know-about-individual-IOMMUs/20170207-003931
-config: arm-allyesconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Looks good, applied both patches.
 
-Note: the linux-review/Joerg-Roedel/Let-IOMMU-core-know-about-individual-IOMMUs/20170207-003931 HEAD 0b8fd0f8bbcfb693621ee90abffb0774c143549d builds fine.
-      It only hurts bisectibility.
+Regards,
+Bjorn
 
-All errors (new ones prefixed by >>):
-
-   drivers/iommu/mtk_iommu.c: In function 'mtk_iommu_probe':
->> drivers/iommu/mtk_iommu.c:587:13: error: 'struct iommu_device' has no member named 'fwnode'
-     data->iommu.fwnode = &pdev->dev.of_node->fwnode;
-                ^
-
-vim +587 drivers/iommu/mtk_iommu.c
-
-   581		ret = iommu_device_sysfs_add(&data->iommu, dev, NULL,
-   582					     "mtk-iommu.%pa", &ioaddr);
-   583		if (ret)
-   584			return ret;
-   585	
-   586		data->iommu.ops    = &mtk_iommu_ops;
- > 587		data->iommu.fwnode = &pdev->dev.of_node->fwnode;
-   588	
-   589		ret = iommu_device_register(&data->iommu);
-   590		if (ret)
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 59744 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/9072f208/attachment-0001.gz>
+> ---
+> 
+> I'm requesting RFC on this patch since I'm not aware of any scenario
+> where we might need asynchronous firmware loading for non auto-boot case.
+> 
+>  drivers/remoteproc/remoteproc_core.c | 14 ++++++++------
+>  1 file changed, 8 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+> index f58e634..16242b0 100644
+> --- a/drivers/remoteproc/remoteproc_core.c
+> +++ b/drivers/remoteproc/remoteproc_core.c
+> @@ -970,9 +970,7 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
+>  {
+>  	struct rproc *rproc = context;
+>  
+> -	/* if rproc is marked always-on, request it to boot */
+> -	if (rproc->auto_boot)
+> -		rproc_boot(rproc);
+> +	rproc_boot(rproc);
+>  
+>  	release_firmware(fw);
+>  }
+> @@ -1286,9 +1284,13 @@ int rproc_add(struct rproc *rproc)
+>  
+>  	/* create debugfs entries */
+>  	rproc_create_debug_dir(rproc);
+> -	ret = rproc_add_virtio_devices(rproc);
+> -	if (ret < 0)
+> -		return ret;
+> +
+> +	/* if rproc is marked always-on, request it to boot */
+> +	if (rproc->auto_boot) {
+> +		ret = rproc_add_virtio_devices(rproc);
+> +		if (ret < 0)
+> +			return ret;
+> +	}
+>  
+>  	/* expose to rproc_get_by_phandle users */
+>  	mutex_lock(&rproc_list_mutex);
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
