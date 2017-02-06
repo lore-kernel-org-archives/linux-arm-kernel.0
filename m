@@ -1,42 +1,45 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Mon, 6 Feb 2017 16:14:31 +0100
-Subject: Fractional divider on the Atmel USART controller
-In-Reply-To: <20170206134256.tp5rgx6axd532gp3@rfolt0960.corp.atmel.com>
-References: <CAGkQfmNshOGWT8Vs_J-49qq2UHoCMJ8cYb9jbjaDqM2YNy05rg@mail.gmail.com>
- <20170206134256.tp5rgx6axd532gp3@rfolt0960.corp.atmel.com>
-Message-ID: <CAGkQfmPHmc+7fnD78KbyMLgmdSsCddGC07vSWFm-RVWanh6Ttg@mail.gmail.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Mon,  6 Feb 2017 07:17:13 -0800
+Subject: [PATCH v3 0/3] i.MX7 PCI support
+Message-ID: <20170206151716.10381-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-02-06 14:42 GMT+01:00 Ludovic Desroches <ludovic.desroches@microchip.com>:
-> Hello Romain,
->
-> On Mon, Feb 06, 2017 at 12:56:42PM +0100, Romain Izard wrote:
->>
->> Unfortunately, I know that this will work on SAMA5D2, but this driver is
->> used for many other Atmel chips. I do not know if the existing code is
->> meant to respect a known limitation on other devices that use the same
->> controller, or if it is just a bug.
->
-> It depends on the device used. In the SAMA5D4 datasheet, it is
-> mentionned: "This feature is only available when using USART normal mode".
->
-> In the SAMA5D2 datasheet, this constraint is no longer mentionned you
-> confirm that is works, that is great.
->
 
-For verification, I checked the SAMA5D2 datasheet, and (in rev. D) the
-warning is still present in ?41.7.1.2. Unfortunately, I did not test the
-CTS/RTS mode directly, and I would not go as far as claiming that it
-works without any reservation.
+Hello, everyone:
 
-In my original use case, the hardware handshaking was activated
-automatically when loading the HCILL line discipline to access the
-Bluetooth part of a TI WL1831 chip. Fixing the baud rate issue was
-enough to restore the Bluetooth stack to the working state I had when I
-used the linux4sam 5.3 branch, but I am not sure of how the handshaking
-is really used in practice.
+This is a third iteration of the code that adds PCI-subsystem bits
+necessary for enabling PCI support on i.MX7.
 
-Best regards,
+Changes since v2 (can be found at [version2]):
+
+	- Collected Reviewed-by for patch #2 from Lucas
+	- Reset logic implementation moved out into a reset controller
+          driver (see [reset1])
+	- Removed unused leftover code
+
+Changes since v1 (can be found at [version1]):
+
+	- All GPC related code moved into a separate driver (see [gpc1])
+	- Removed GPIO probe deferral logging
+	- Fixed section mismatch warning
+	- Minor reformatting of fsl,imx6q-pcie.txt(as per Rob
+          Herring's request)
+
+[version2] https://lkml.org/lkml/2017/2/1/510
+[version1] https://lkml.org/lkml/2017/1/19/488
+[gpc1] https://lkml.org/lkml/2017/2/6/551
+[reset1] https://lkml.org/lkml/2017/2/6/554
+
+Andrey Smirnov (3):
+  PCI: imx6: Fix a typo in error message
+  PCI: imx6: Allow probe deferal by reset GPIO
+  PCI: imx6: Add code to support i.MX7D
+
+ .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
+ drivers/pci/host/pci-imx6.c                        | 131 ++++++++++++++++-----
+ include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
+ 3 files changed, 111 insertions(+), 30 deletions(-)
+
 -- 
-Romain Izard
+2.9.3
