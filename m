@@ -1,582 +1,104 @@
-From: eddie.cai.linux@gmail.com (Eddie Cai)
-Date: Mon,  6 Feb 2017 10:14:47 +0800
-Subject: [PATCH V2 2/2] ARM: dts: rockchip: add dts for RK3288-Tinker board
-In-Reply-To: <1486347287-31051-1-git-send-email-eddie.cai@rock-chips.com>
-References: <1486347287-31051-1-git-send-email-eddie.cai@rock-chips.com>
-Message-ID: <1486347287-31051-3-git-send-email-eddie.cai@rock-chips.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sun,  5 Feb 2017 20:17:45 -0600
+Subject: [PATCH] irqchip/gicv3: Fix GICR_WAKE & GICD_IGROUPR accesses from
+ non-secure
+Message-ID: <1486347465-28316-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add basic support for RK3288-Tinker board. We can boot in to rootfs
-with this patch.
+On systems where it supports two security states, both the register
+GICR_WAKE and GICD_IGROUPR accesses are RAZ/WI from non-secure.
+The function gic_enable_redist() to wake/sleep redistributor is not
+harmful at all, but it is confusing looking at the code. The current
+code checks the single security state based on bit GICD_CTLR.DS which
+is absolutely incorrect. The disable security bit GICD_CTLR.DS is RAZ
+to non-secure. The GICD_TYPE.SecurityExtn indicates whether the GIC
+implementation supports two security states or only one security
+state.
 
-Signed-off-by: Eddie Cai <eddie.cai@rock-chips.com>
+Let's introduce a new helper function gic_has_security_extn() to
+know GIC security state. Use this function to bypass the code that
+is touching the registers GICR_WAKE and GICD_IGROUPR.
+
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 ---
- arch/arm/boot/dts/Makefile          |   1 +
- arch/arm/boot/dts/rk3288-tinker.dts | 543 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 544 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3288-tinker.dts
+ drivers/irqchip/irq-gic-v3.c       | 36 +++++++++++++++++++++++++++---------
+ include/linux/irqchip/arm-gic-v3.h |  1 +
+ 2 files changed, 28 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 7327250..4fc05b7 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -679,6 +679,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rk3288-popmetal.dtb \
- 	rk3288-r89.dtb \
- 	rk3288-rock2-square.dtb \
-+	rk3288-tinker.dtb \
- 	rk3288-veyron-brain.dtb \
- 	rk3288-veyron-jaq.dtb \
- 	rk3288-veyron-jerry.dtb \
-diff --git a/arch/arm/boot/dts/rk3288-tinker.dts b/arch/arm/boot/dts/rk3288-tinker.dts
-new file mode 100644
-index 0000000..c48563e
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3288-tinker.dts
-@@ -0,0 +1,543 @@
-+/*
-+ * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index c132f29..a66002c 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -130,12 +130,28 @@ static u64 __maybe_unused gic_read_iar(void)
+ }
+ #endif
+ 
++/**
++ * Check whether the GIC implementation supports two security
++ * states or only one security state.
++ * return true if it has two security states else return false.
 + */
-+
-+/dts-v1/;
-+
-+#include "rk3288.dtsi"
-+
-+/ {
-+	model = "Rockchip RK3288 Tinker Board";
-+	compatible = "asus,rk3288-tinker", "rockchip,rk3288";
-+
-+	memory {
-+		reg = <0x0 0x80000000>;
-+		device_type = "memory";
-+	};
-+
-+	ext_gmac: external-gmac-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+		clock-output-names = "ext_gmac";
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		autorepeat;
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwrbtn>;
-+
-+		button at 0 {
-+			gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
-+			linux,code = <116>;
-+			label = "GPIO Key Power";
-+			linux,input-type = <1>;
-+			gpio-key,wakeup = <1>;
-+			debounce-interval = <100>;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		pwr-led {
-+			gpios = <&gpio2 2 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		act-led {
-+			gpios=<&gpio2 3 GPIO_ACTIVE_LOW>;
-+			linux,default-trigger="mmc0";
-+		};
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,name = "rockchip,tinker-codec";
-+		simple-audio-card,mclk-fs = <512>;
-+		simple-audio-card,cpu {
-+			sound-dai = <&i2s>;
-+		};
-+		simple-audio-card,codec {
-+			sound-dai = <&hdmi>;
-+		};
-+	};
-+
-+	vcc_sys: vsys-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_sys";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
-+	vcc_sd: sdmmc-regulator {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio7 11 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sdmmc_pwr>;
-+		regulator-name = "vcc_sd";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+};
-+
-+&cpu0 {
-+	cpu0-supply = <&vdd_cpu>;
-+};
-+
-+&gmac {
-+	phy-supply = <&vcc33_lan>;
-+	phy-mode = "rgmii";
-+	clock_in_out = "input";
-+	snps,reset-gpio = <&gpio4 7 0>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 1000000>;
-+	assigned-clocks = <&cru SCLK_MAC>;
-+	assigned-clock-parents = <&ext_gmac>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	tx_delay = <0x30>;
-+	rx_delay = <0x10>;
-+	status = "ok";
-+};
-+
-+&hdmi {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	#sound-dai-cells = <0>;
-+	ddc-i2c-bus = <&i2c5>;
-+	status = "okay";
-+	/* Don't use vopl for HDMI */
-+	ports {
-+		hdmi_in: port {
-+			/delete-node/ endpoint at 1;
-+		};
-+	};
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	rk808: pmic at 1b {
-+		compatible = "rockchip,rk808";
-+		reg = <0x1b>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int &global_pwroff &dvs_1 &dvs_2>;
-+		dvs-gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>,
-+				<&gpio0 12 GPIO_ACTIVE_HIGH>;
-+
-+		rockchip,system-power-controller;
-+		wakeup-source;
-+		#clock-cells = <1>;
-+		clock-output-names = "xin32k", "rk808-clkout2";
-+
-+		vcc1-supply = <&vcc_sys>;
-+		vcc2-supply = <&vcc_sys>;
-+		vcc3-supply = <&vcc_sys>;
-+		vcc4-supply = <&vcc_sys>;
-+		vcc6-supply = <&vcc_sys>;
-+		vcc7-supply = <&vcc_sys>;
-+		vcc8-supply = <&vcc_io>;
-+		vcc9-supply = <&vcc_io>;
-+		vcc10-supply = <&vcc_io>;
-+		vcc11-supply = <&vcc_sys>;
-+		vcc12-supply = <&vcc_io>;
-+		vddio-supply = <&vcc_io>;
-+
-+		regulators {
-+			vdd_cpu: DCDC_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <750000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-name = "vdd_arm";
-+				regulator-ramp-delay = <6000>;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vdd_gpu: DCDC_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <1250000>;
-+				regulator-name = "vdd_gpu";
-+				regulator-ramp-delay = <6000>;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
-+			};
-+
-+			vcc_ddr: DCDC_REG3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc_ddr";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc_io: DCDC_REG4 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc_io";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
-+			};
-+
-+			vcc18_ldo1: LDO_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc18_ldo1";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc33_mipi: LDO_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc33_mipi";
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vdd_10: LDO_REG3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-name = "vdd_10";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
-+			};
-+
-+			vcc18_codec: LDO_REG4 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc18_codec";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vccio_sd: LDO_REG5 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vccio_sd";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
-+			};
-+
-+			vdd10_lcd: LDO_REG6 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-name = "vdd10_lcd";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
-+			};
-+
-+			vcc_18: LDO_REG7 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc_18";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc18_lcd: LDO_REG8 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc18_lcd";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc33_sd: SWITCH_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc33_sd";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc33_lan: SWITCH_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc33_lan";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&i2c5 {
-+	status = "okay";
-+};
-+
-+&i2s {
-+	#sound-dai-cells = <0>;
-+	status = "okay";
-+};
-+
-+&io_domains {
-+	status = "okay";
-+
-+	sdcard-supply = <&vccio_sd>;
-+};
-+
-+&pinctrl {
-+	pcfg_pull_none_drv_8ma: pcfg-pull-none-drv-8ma {
-+		drive-strength = <8>;
-+	};
-+
-+	pcfg_pull_up_drv_8ma: pcfg-pull-up-drv-8ma {
-+		bias-pull-up;
-+		drive-strength = <8>;
-+	};
-+
-+	backlight {
-+		bl_en: bl-en {
-+			rockchip,pins = <7 2 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	buttons {
-+		pwrbtn: pwrbtn {
-+			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+
-+	eth_phy {
-+		eth_phy_pwr: eth-phy-pwr {
-+			rockchip,pins = <0 6 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	pmic {
-+		pmic_int: pmic-int {
-+			rockchip,pins = <RK_GPIO0 4 RK_FUNC_GPIO \
-+					&pcfg_pull_up>;
-+		};
-+
-+		dvs_1: dvs-1 {
-+			rockchip,pins = <RK_GPIO0 11 RK_FUNC_GPIO \
-+					&pcfg_pull_down>;
-+		};
-+
-+		dvs_2: dvs-2 {
-+			rockchip,pins = <RK_GPIO0 12 RK_FUNC_GPIO \
-+					&pcfg_pull_down>;
-+		};
-+	};
-+
-+	sdmmc {
-+		sdmmc_bus4: sdmmc-bus4 {
-+			rockchip,pins = <6 16 RK_FUNC_1 &pcfg_pull_up_drv_8ma>,
-+					<6 17 RK_FUNC_1 &pcfg_pull_up_drv_8ma>,
-+					<6 18 RK_FUNC_1 &pcfg_pull_up_drv_8ma>,
-+					<6 19 RK_FUNC_1 &pcfg_pull_up_drv_8ma>;
-+		};
-+
-+		sdmmc_clk: sdmmc-clk {
-+			rockchip,pins = <6 20 RK_FUNC_1 \
-+					&pcfg_pull_none_drv_8ma>;
-+		};
-+
-+		sdmmc_cmd: sdmmc-cmd {
-+			rockchip,pins = <6 21 RK_FUNC_1 &pcfg_pull_up_drv_8ma>;
-+		};
-+
-+		sdmmc_pwr: sdmmc-pwr {
-+			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	usb {
-+		host_vbus_drv: host-vbus-drv {
-+			rockchip,pins = <0 14 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		pwr_3g: pwr-3g {
-+			rockchip,pins = <7 8 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+};
-+
-+&pwm0 {
-+	status = "okay";
-+};
-+
-+&saradc {
-+	vref-supply = <&vcc18_ldo1>;
-+	status ="okay";
-+};
-+
-+&sdmmc {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	card-detect-delay = <200>;
-+	disable-wp;			/* wp not hooked up */
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
-+	status = "okay";
-+	vmmc-supply = <&vcc33_sd>;
-+	vqmmc-supply = <&vccio_sd>;
-+};
-+
-+&tsadc {
-+	rockchip,hw-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
-+	rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
-+
-+&usb_host0_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host1 {
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	status= "okay";
-+};
-+
-+&vopb {
-+	status = "okay";
-+};
-+
-+&vopb_mmu {
-+	status = "okay";
-+};
-+
-+&vopl {
-+	status = "okay";
-+	/* Don't use vopl for HDMI */
-+	vopl_out: port {
-+		/delete-node/ endpoint at 0;
-+	};
-+};
-+
-+&vopl_mmu {
-+	status = "okay";
-+};
-+
-+&wdt {
-+	status = "okay";
-+};
-+
++static bool gic_has_security_extn(void)
++{
++	u32 typer = readl_relaxed(gic_data.dist_base + GICD_TYPER);
++
++	return !!(typer & GICD_TYPER_SECURITY_EXTN);
++}
++
+ static void gic_enable_redist(bool enable)
+ {
+ 	void __iomem *rbase;
+ 	u32 count = 1000000;	/* 1s! */
+ 	u32 val;
+ 
++	/* With only one security state, GICR_WAKE is RAZ/WI to non-secure */
++	if (gic_has_security_extn())
++		return;
++
+ 	rbase = gic_data_rdist_rd_base();
+ 
+ 	val = readl_relaxed(rbase + GICR_WAKER);
+@@ -397,16 +413,18 @@ static void __init gic_dist_init(void)
+ 	writel_relaxed(0, base + GICD_CTLR);
+ 	gic_dist_wait_for_rwp();
+ 
+-	/*
+-	 * Configure SPIs as non-secure Group-1. This will only matter
+-	 * if the GIC only has a single security state. This will not
+-	 * do the right thing if the kernel is running in secure mode,
+-	 * but that's not the intended use case anyway.
+-	 */
+-	for (i = 32; i < gic_data.irq_nr; i += 32)
+-		writel_relaxed(~0, base + GICD_IGROUPR + i / 8);
++	if (!gic_has_security_extn()) {
++		/*
++		 * Configure SPIs as non-secure Group-1. This will only matter
++		 * if the GIC only has a single security state. This will not
++		 * do the right thing if the kernel is running in secure mode,
++		 * but that's not the intended use case anyway.
++		 */
++		for (i = 32; i < gic_data.irq_nr; i += 32)
++			writel_relaxed(~0, base + GICD_IGROUPR + i / 8);
+ 
+-	gic_dist_config(base, gic_data.irq_nr, gic_dist_wait_for_rwp);
++		gic_dist_config(base, gic_data.irq_nr, gic_dist_wait_for_rwp);
++	}
+ 
+ 	/* Enable distributor with ARE, Group1 */
+ 	writel_relaxed(GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1,
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index e808f8a..aab00e5 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -70,6 +70,7 @@
+ 
+ #define GICD_TYPER_LPIS			(1U << 17)
+ #define GICD_TYPER_MBIS			(1U << 16)
++#define GICD_TYPER_SECURITY_EXTN	(1U << 10)
+ 
+ #define GICD_TYPER_ID_BITS(typer)	((((typer) >> 19) & 0x1f) + 1)
+ #define GICD_TYPER_IRQS(typer)		((((typer) & 0x1f) + 1) * 32)
 -- 
-2.7.4
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
