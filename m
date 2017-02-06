@@ -1,164 +1,97 @@
-From: cristian.birsan@microchip.com (cristian.birsan at microchip.com)
-Date: Mon, 6 Feb 2017 22:02:50 +0200
-Subject: [PATCH linux-next] fixup! usb: gadget: udc: atmel: Update endpoint
- allocation scheme
-Message-ID: <1486411370-24023-1-git-send-email-cristian.birsan@microchip.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 7 Feb 2017 04:07:07 +0800
+Subject: [hisi:topic-lpc-4.10-libio 138/148]
+ drivers/tty/serial/8250/8250_port.c:420: undefined reference to `libio_outb'
+Message-ID: <201702070457.wkXw3Exc%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cristian Birsan <cristian.birsan@microchip.com>
+tree:   https://github.com/hisilicon/linux-hisi topic-lpc-4.10-libio
+head:   06443d85dc35b64a704f7be84cc538281a1598f4
+commit: c3fb8a18b9d66d740ac05a181c83d12f67f39f24 [138/148] asm-generic: use libio accessors as default
+config: nios2-10m50_defconfig (attached as .config)
+compiler: nios2-linux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout c3fb8a18b9d66d740ac05a181c83d12f67f39f24
+        # save the attached .config to linux build tree
+        make.cross ARCH=nios2 
 
-Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+All errors (new ones prefixed by >>):
+
+   drivers/built-in.o: In function `io_serial_out':
+>> drivers/tty/serial/8250/8250_port.c:420: undefined reference to `libio_outb'
+   drivers/tty/serial/8250/8250_port.c:420:(.text+0x1bbb0): relocation truncated to fit: R_NIOS2_CALL26 against `libio_outb'
+   drivers/built-in.o: In function `hub6_serial_out':
+   drivers/tty/serial/8250/8250_port.c:359: undefined reference to `libio_outb'
+   drivers/tty/serial/8250/8250_port.c:359:(.text+0x1bbf4): relocation truncated to fit: R_NIOS2_CALL26 against `libio_outb'
+   drivers/tty/serial/8250/8250_port.c:360: undefined reference to `libio_outb'
+   drivers/tty/serial/8250/8250_port.c:360:(.text+0x1bc04): relocation truncated to fit: R_NIOS2_CALL26 against `libio_outb'
+   drivers/built-in.o: In function `io_serial_in':
+>> drivers/tty/serial/8250/8250_port.c:414: undefined reference to `libio_inb'
+   drivers/tty/serial/8250/8250_port.c:414:(.text+0x1bc34): relocation truncated to fit: R_NIOS2_CALL26 against `libio_inb'
+   drivers/built-in.o: In function `hub6_serial_in':
+   drivers/tty/serial/8250/8250_port.c:352: undefined reference to `libio_outb'
+   drivers/tty/serial/8250/8250_port.c:352:(.text+0x1bc74): relocation truncated to fit: R_NIOS2_CALL26 against `libio_outb'
+   drivers/tty/serial/8250/8250_port.c:353: undefined reference to `libio_inb'
+   drivers/tty/serial/8250/8250_port.c:353:(.text+0x1bc80): relocation truncated to fit: R_NIOS2_CALL26 against `libio_inb'
+   drivers/built-in.o: In function `serial8250_do_shutdown':
+   drivers/tty/serial/8250/8250_port.c:2381: undefined reference to `libio_inb'
+   drivers/tty/serial/8250/8250_port.c:2381:(.text+0x1c22c): relocation truncated to fit: R_NIOS2_CALL26 against `libio_inb'
+   drivers/built-in.o: In function `outb_p':
+>> include/asm-generic/io.h:414: undefined reference to `libio_outb'
+   include/asm-generic/io.h:414:(.text+0x1d744): relocation truncated to fit: R_NIOS2_CALL26 against `libio_outb'
+   drivers/built-in.o: In function `inb_p':
+>> include/asm-generic/io.h:390: undefined reference to `libio_inb'
+   include/asm-generic/io.h:390:(.text+0x1d74c): relocation truncated to fit: R_NIOS2_CALL26 against `libio_inb'
+   drivers/built-in.o: In function `outb_p':
+>> include/asm-generic/io.h:414: undefined reference to `libio_outb'
+   include/asm-generic/io.h:414:(.text+0x1e348): relocation truncated to fit: R_NIOS2_CALL26 against `libio_outb'
+   drivers/built-in.o: In function `inb_p':
+>> include/asm-generic/io.h:390: undefined reference to `libio_inb'
+   include/asm-generic/io.h:390:(.text+0x1e360): additional relocation overflows omitted from the output
+   drivers/built-in.o: In function `outb_p':
+>> include/asm-generic/io.h:414: undefined reference to `libio_outb'
+   drivers/built-in.o: In function `inb_p':
+>> include/asm-generic/io.h:390: undefined reference to `libio_inb'
+   drivers/built-in.o: In function `serial8250_early_in':
+>> drivers/tty/serial/8250/8250_early.c:54: undefined reference to `libio_inb'
+   drivers/built-in.o: In function `serial8250_early_out':
+>> drivers/tty/serial/8250/8250_early.c:78: undefined reference to `libio_outb'
+
+vim +420 drivers/tty/serial/8250/8250_port.c
+
+b6830f6d Peter Hurley 2015-06-27  408  	return ioread32be(p->membase + offset);
+b6830f6d Peter Hurley 2015-06-27  409  }
+b6830f6d Peter Hurley 2015-06-27  410  
+b6830f6d Peter Hurley 2015-06-27  411  static unsigned int io_serial_in(struct uart_port *p, int offset)
+b6830f6d Peter Hurley 2015-06-27  412  {
+b6830f6d Peter Hurley 2015-06-27  413  	offset = offset << p->regshift;
+b6830f6d Peter Hurley 2015-06-27 @414  	return inb(p->iobase + offset);
+b6830f6d Peter Hurley 2015-06-27  415  }
+b6830f6d Peter Hurley 2015-06-27  416  
+b6830f6d Peter Hurley 2015-06-27  417  static void io_serial_out(struct uart_port *p, int offset, int value)
+b6830f6d Peter Hurley 2015-06-27  418  {
+b6830f6d Peter Hurley 2015-06-27  419  	offset = offset << p->regshift;
+b6830f6d Peter Hurley 2015-06-27 @420  	outb(value, p->iobase + offset);
+b6830f6d Peter Hurley 2015-06-27  421  }
+b6830f6d Peter Hurley 2015-06-27  422  
+b6830f6d Peter Hurley 2015-06-27  423  static int serial8250_default_handle_irq(struct uart_port *port);
+
+:::::: The code at line 420 was first introduced by commit
+:::::: b6830f6df8914faae9561bb245860c21af9b9e9b serial: 8250: Split base port operations from universal driver
+
+:::::: TO: Peter Hurley <peter@hurleysoftware.com>
+:::::: CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
 ---
-Fixes since previous patch:
-	- Fix coding style
-	- Validate parameters againsta device tree values
-	- Update error message display
-	- Update Kconfig comments
-
- drivers/usb/gadget/udc/Kconfig          |  5 ++--
- drivers/usb/gadget/udc/atmel_usba_udc.c | 48 ++++++++++++++++++++++-----------
- 2 files changed, 36 insertions(+), 17 deletions(-)
-
-diff --git a/drivers/usb/gadget/udc/Kconfig b/drivers/usb/gadget/udc/Kconfig
-index 4b69f28..6a991b7 100644
---- a/drivers/usb/gadget/udc/Kconfig
-+++ b/drivers/usb/gadget/udc/Kconfig
-@@ -62,8 +62,9 @@ config USB_ATMEL_USBA
- 
- 	  The fifo_mode parameter is used to select endpoint allocation mode.
- 	  fifo_mode = 0 is used to let the driver autoconfigure the endpoints.
--	  In this case 2 banks are allocated for isochronous endpoints and
--	  only one bank is allocated for the rest of the endpoints.
-+	  In this case 2 banks are allocated so that they could be use as
-+	  isochronous endpoints and only one bank is allocated for the rest
-+	  of the endpoints.
- 
- 	  fifo_mode = 1 is a generic maximum fifo size (1024 bytes) configuration
- 	  allowing the usage of ep1 - ep6
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 11bbce2..37f71e5 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -321,7 +321,6 @@ static inline void usba_cleanup_debugfs(struct usba_udc *udc)
- 
- static ushort fifo_mode;
- 
--/* "modprobe ... fifo_mode=1" etc */
- module_param(fifo_mode, ushort, 0x0);
- MODULE_PARM_DESC(fifo_mode, "Endpoint configuration mode");
- 
-@@ -369,9 +368,10 @@ static struct usba_fifo_cfg mode_4_cfg[] = {
- { .hw_ep_num = 7, .fifo_size = 8,	.nr_banks = 2, },
- { .hw_ep_num = 8, .fifo_size = 8,	.nr_banks = 2, },
- };
-+
- /* Add additional configurations here */
- 
--int usba_config_fifo_table(struct usba_udc *udc)
-+static int usba_config_fifo_table(struct usba_udc *udc)
- {
- 	int n;
- 
-@@ -1076,11 +1076,9 @@ static int atmel_usba_start(struct usb_gadget *gadget,
- 		struct usb_gadget_driver *driver);
- static int atmel_usba_stop(struct usb_gadget *gadget);
- 
--static struct usb_ep *atmel_usba_match_ep(
--		struct usb_gadget		*gadget,
--		struct usb_endpoint_descriptor	*desc,
--		struct usb_ss_ep_comp_descriptor *ep_comp
--)
-+static struct usb_ep *atmel_usba_match_ep(struct usb_gadget *gadget,
-+				struct usb_endpoint_descriptor	*desc,
-+				struct usb_ss_ep_comp_descriptor *ep_comp)
- {
- 	struct usb_ep	*_ep;
- 	struct usba_ep *ep;
-@@ -1100,7 +1098,6 @@ static struct usb_ep *atmel_usba_match_ep(
- 		ep = to_usba_ep(_ep);
- 
- 		switch (usb_endpoint_type(desc)) {
--
- 		case USB_ENDPOINT_XFER_CONTROL:
- 			break;
- 
-@@ -1141,7 +1138,7 @@ static struct usb_ep *atmel_usba_match_ep(
- 		ep->udc->configured_ep++;
- 	}
- 
--return _ep;
-+	return _ep;
- }
- 
- static const struct usb_gadget_ops usba_udc_ops = {
-@@ -1855,7 +1852,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 		 * but it's clearly harmless...
- 		 */
- 		if (!(usba_ep_readl(ep0, CFG) & USBA_EPT_MAPPED))
--			dev_dbg(&udc->pdev->dev,
-+			dev_warn(&udc->pdev->dev,
- 				 "ODD: EP0 configuration is invalid!\n");
- 
- 		/* Preallocate other endpoints */
-@@ -1864,8 +1861,8 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 			ep = &udc->usba_ep[i];
- 			usba_ep_writel(ep, CFG, ep->ept_cfg);
- 			if (!(usba_ep_readl(ep, CFG) & USBA_EPT_MAPPED))
--				dev_dbg(&udc->pdev->dev,
--				 "ODD: EP%d configuration is invalid!\n", i);
-+				dev_warn(&udc->pdev->dev,
-+					 "ODD: EP%d configuration is invalid!\n", i);
- 		}
- 	}
- 
-@@ -2089,8 +2086,9 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
- 		while ((pp = of_get_next_child(np, pp)))
- 			udc->num_ep++;
- 		udc->configured_ep = 1;
--	} else
-+	} else {
- 		udc->num_ep = usba_config_fifo_table(udc);
-+	}
- 
- 	eps = devm_kzalloc(&pdev->dev, sizeof(struct usba_ep) * udc->num_ep,
- 			   GFP_KERNEL);
-@@ -2118,14 +2116,34 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
- 			dev_err(&pdev->dev, "of_probe: fifo-size error(%d)\n", ret);
- 			goto err;
- 		}
--		ep->fifo_size = fifo_mode ? udc->fifo_cfg[i].fifo_size : val;
-+		if (fifo_mode) {
-+			if (val < udc->fifo_cfg[i].fifo_size) {
-+				dev_warn(&pdev->dev,
-+					 "of_probe: using fifo-size from DT instead of table\n");
-+				ep->fifo_size = val;
-+			} else {
-+				ep->fifo_size = udc->fifo_cfg[i].fifo_size;
-+			}
-+		} else {
-+			ep->fifo_size = val;
-+		}
- 
- 		ret = of_property_read_u32(pp, "atmel,nb-banks", &val);
- 		if (ret) {
- 			dev_err(&pdev->dev, "of_probe: nb-banks error(%d)\n", ret);
- 			goto err;
- 		}
--		ep->nr_banks = fifo_mode ? udc->fifo_cfg[i].nr_banks : val;
-+		if (fifo_mode) {
-+			if (val < udc->fifo_cfg[i].nr_banks) {
-+				dev_warn(&pdev->dev,
-+					 "of_probe: using nb-banks from DT instead of table\n");
-+				ep->nr_banks = val;
-+			} else {
-+				ep->nr_banks = udc->fifo_cfg[i].nr_banks;
-+			}
-+		} else {
-+			ep->nr_banks = val;
-+		}
- 
- 		ep->can_dma = of_property_read_bool(pp, "atmel,can-dma");
- 		ep->can_isoc = of_property_read_bool(pp, "atmel,can-isoc");
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 9380 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/f333a73d/attachment.gz>
