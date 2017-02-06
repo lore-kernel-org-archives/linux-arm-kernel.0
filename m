@@ -1,53 +1,51 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 6 Feb 2017 10:33:38 -0700
-Subject: [PATCH] somedriver: remove the initialization of static pointers.
-In-Reply-To: <20170205081226.3c3c681e@GL552JX>
-References: <1486237182-4563-1-git-send-email-abdallah.meziti.pro@gmail.com>
- <20170205002943.GA21184@kroah.com>
- <20170205081226.3c3c681e@GL552JX>
-Message-ID: <20170206173338.GD11391@linaro.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 7 Feb 2017 01:39:37 +0800
+Subject: [xlnx:master 2695/2699] drivers/fpga/zynqmp-fpga.c:60:2: error:
+ implicit declaration of function '__flush_cache_user_range'
+Message-ID: <201702070133.fsMcqvuN%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 05, 2017 at 08:12:26AM +0100, AbdAllah MEZITI wrote:
-> On Sun, 5 Feb 2017 01:29:43 +0100
-> Greg Kroah-Hartman <gregkh@linuxfoundation.org> wrote:
-> 
-> > On Sat, Feb 04, 2017 at 08:39:21PM +0100, AbdAllah-MEZITI wrote:
-> > > In C a static pointer will be initialized to NULL (e.g: draft C99
-> > > standard $6.7.8): "If an object that has static storage duration is
-> > > not initialized explicitly, then:
-> > >  __ if it has pointer type, it is initialized to a null pointer;"
-> > > 
-> > > Signed-off-by: AbdAllah-MEZITI <abdallah.meziti.pro@gmail.com>  
-> > 
-> > Your subject is very odd :(
-> > 
-> > And is that the correct spelling of your name that you use for legal
-> > documents?  If not, please fix up when you resend this.
-> > 
-> > Also, fix the line-wrapping of your changelog, and the C99 standard is
-> > not a "draft" anymore, it was released in 1999 :)
-> > 
-> > thanks,
-> > 
-> > greg k-h
-> 
-> 
-> Do not worry, this is just an answer to the Task 10 of the Eudyptula Challenge.
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   629041605b93343ad2e8971ceaac3edcef0b043b
+commit: 280ca3f99087c428f2627bdeada12224596e0784 [2695/2699] fpga manager: Adding FPGA Manager support for Xilinx zynqmp
+config: ia64-allmodconfig (attached as .config)
+compiler: ia64-linux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 280ca3f99087c428f2627bdeada12224596e0784
+        # save the attached .config to linux build tree
+        make.cross ARCH=ia64 
 
-AbdAllah, 
+All errors (new ones prefixed by >>):
 
-Patches submitted as part of the Eudyptula Challenge are fixing real problems
-and most of the time accepted for queueing.  As such the work you sumbit for it
-is serious and should be as perfect as possible.
+   drivers/fpga/zynqmp-fpga.c: In function 'zynqmp_fpga_ops_write':
+>> drivers/fpga/zynqmp-fpga.c:60:2: error: implicit declaration of function '__flush_cache_user_range' [-Werror=implicit-function-declaration]
+     __flush_cache_user_range(kbuf, kbuf + size);
+     ^~~~~~~~~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
 
-Happy times with the Challenge,
-Mathieu
+vim +/__flush_cache_user_range +60 drivers/fpga/zynqmp-fpga.c
 
-> 
-> yes, this is the correct spelling of my name that i use for legal documents.
-> 
-> OK.
-> 
-> AbdAllah MEZITI.
+    54	
+    55		kbuf = dma_alloc_coherent(priv->dev, size, &dma_addr, GFP_KERNEL);
+    56		if (!kbuf)
+    57			return -ENOMEM;
+    58	
+    59		memcpy(kbuf, buf, size);
+  > 60		__flush_cache_user_range(kbuf, kbuf + size);
+    61	
+    62		/**
+    63		 * Translate size from bytes to number of 32bit words that
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 43592 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/6a8fbe12/attachment-0001.gz>
