@@ -1,86 +1,89 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon, 6 Feb 2017 11:18:18 -0800
-Subject: [PATCH v3 3/3] PCI: imx6: Add code to support i.MX7D
-In-Reply-To: <1486395217.2275.38.camel@pengutronix.de>
-References: <20170206151716.10381-1-andrew.smirnov@gmail.com>
- <20170206151716.10381-4-andrew.smirnov@gmail.com>
- <1486395217.2275.38.camel@pengutronix.de>
-Message-ID: <CAHQ1cqHD=h-aQbiOsPeS5BQdD_CHPBgA3VsBUPGtF7hWdObmxw@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 6 Feb 2017 20:24:11 +0100
+Subject: [PATCH] serial: imx: Only enable UART DMA on i.MX6Q and i.MX53
+In-Reply-To: <20170205175132.GA2182@archie.localdomain>
+References: <20170204213931.3566-1-marex@denx.de>
+ <DB6PR0402MB2743C709F162BDE52429DF49E3410@DB6PR0402MB2743.eurprd04.prod.outlook.com>
+ <CAOMZO5D8_vE+t=V6wHMKt590jZqJJRzeJ+_MLgqbLp=6gwsmyQ@mail.gmail.com>
+ <20170205175132.GA2182@archie.localdomain>
+Message-ID: <8c31d0ca-2893-b50c-5a8d-09ab5a6575fa@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 6, 2017 at 7:33 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Am Montag, den 06.02.2017, 07:17 -0800 schrieb Andrey Smirnov:
->> Add various bits of code needed to support i.MX7D variant of the IP.
+On 02/05/2017 06:51 PM, Clemens Gruber wrote:
+> On Sun, Feb 05, 2017 at 02:36:10PM -0200, Fabio Estevam wrote:
+>> On Sun, Feb 5, 2017 at 12:56 PM, Fabio Estevam <fabio.estevam@nxp.com> wrote:
+>>> [Sorry, for the top-posting]
+>>>
+>>>
+>>> imx6sx uart should be of a IMX6Q_UART instead.
+>>>
+>>>
+>>> Does this patch fix the issue?
 >>
->> Cc: yurovsky at gmail.com
->> Cc: Lucas Stach <l.stach@pengutronix.de>
->> Cc: Bjorn Helgaas <bhelgaas@google.com>
->> Cc: Fabio Estevam <fabio.estevam@nxp.com>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Lee Jones <lee.jones@linaro.org>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: devicetree at vger.kernel.org
->> Cc: linux-kernel at vger.kernel.org
->> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
->
-> Two small comments inline, otherwise looks real good now.
->
->> ---
->>  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
->>  drivers/pci/host/pci-imx6.c                        | 121 ++++++++++++++++-----
->>  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
->>  3 files changed, 105 insertions(+), 26 deletions(-)
+>> It seems this dts change will not fix the problem.
 >>
->> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
->> index 83aeb1f..9f57759 100644
->> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
->> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
->> @@ -4,7 +4,11 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
->>  and thus inherits all the common properties defined in designware-pcie.txt.
+>>> From: Kai Ruhnau <kai.ruhnau@target-sg.com>
+>>>
+>>> In 1c06bde6 with the introduction of DMA support for the i.MX53 platform,
+>>> DMA was enabled for all platforms instead. On an i.MX6SX (which is a
+>>> IMX21_UART), this breaks gpsd talking to an UART module with
+>>>
+>>>  imx-uart 21f4000.serial: DMA transaction error.
+>>>
+>>> This patch makes sure, UART DMA is only activated for i.MX53 and i.MX6Q.
+>>>
+>>> Signed-off-by: Kai Ruhnau <kai.ruhnau@target-sg.com>
+>>> Reviewed-by: Marek Vasut <marex@denx.de>
+>>> Fixes: 1c06bde643d0 ("Allowing UART DMA to be configured on i.MX53")
+>>> Cc: <stable@vger.kernel.org> # 4.9+
+>>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+>>> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+>>> Cc: Shawn Guo <shawnguo@kernel.org>
+>>> ---
+>>>  drivers/tty/serial/imx.c | 3 ++-
+>>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+>>> index a70356d..8e2b5f2 100644
+>>> --- a/drivers/tty/serial/imx.c
+>>> +++ b/drivers/tty/serial/imx.c
+>>> @@ -1269,7 +1269,8 @@ static int imx_startup(struct uart_port *port)
+>>>          writel(temp & ~UCR4_DREN, sport->port.membase + UCR4);
+>>>
+>>>          /* Can we enable the DMA support? */
+>>> -       if (!uart_console(port) && !sport->dma_is_inited)
+>>> +       if ((is_imx6q_uart(sport)  || is_imx53_uart(sport)) &&
+>>> +           !uart_console(port) && !sport->dma_is_inited)
+>>>                  imx_uart_dma_init(sport);
 >>
->>  Required properties:
->> -- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie", "fsl,imx6qp-pcie"
->> +- compatible:
->> +     - "fsl,imx6q-pcie"
->> +     - "fsl,imx6sx-pcie",
->> +     - "fsl,imx6qp-pcie"
->> +     - "fsl,imx7d-pcie"
->>  - reg: base address and length of the PCIe controller
->>  - interrupts: A list of interrupt outputs of the controller. Must contain an
->>    entry for each entry in the interrupt-names property.
->
-> This misses an "Additional required properties for imx7d-pcie" section
-> listing the required reset handles.
+>> Looks like imx serial DMA is broken in 4.9.
+> 
+> There are probably two separate problems:
+> 
+> A)
+> I also observed the DMA transaction error message when I used the ROM
+> SDMA scripts. Seems to affect single- and multi-core systems and is
+> fixed by: github.com/Freescale/linux-fslc/commit/a2ec8df37f5d (?)
+> This is also not RS-485 specific, but affects RS-232 too.
 
-Darn! Forgot to update this part. Will fix in v4.
+OK, thanks for the hint, but this is unrelated, since DMA should not be
+enabled on MX6SX in 4.9 (but it is , due to the error in 1c06bde643d0 )
+and newer.
 
->
->> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
->> index 3ef8093..34a21c9 100644
->> --- a/drivers/pci/host/pci-imx6.c
->> +++ b/drivers/pci/host/pci-imx6.c
->
-> [...]
->
->>  static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
->>  {
->>       struct pcie_port *pp = &imx6_pcie->pp;
->> @@ -381,6 +416,11 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
->>       }
->>
->>       switch (imx6_pcie->variant) {
->> +     case IMX7D:
->> +             reset_control_assert(imx6_pcie->apps_reset);
->
-> Can this reset assertion be moved into imx6_pcie_assert_core_reset()?
-> This may change the programming order slightly from the downstream
-> driver, but I guess that won't hurt if this is the equivalent of the
-> LTSSM enable signal.
+If you want to enable/fix DMA on MX6SX , that should be a separate patch
+which is a feature addition IMO.
 
-I don't see why it wouldn't be possible to move it. I'll give it a try
-on a real HW and update v4 accordingly.
+> B)
+> The RS-485 DMA problem I reported, which only affects multi-core
+> systems.
+> RS-232 DMA is not affected.
 
-Thanks,
-Andrey Smirnov
+This has nothing to do with RS485/232 , the problem this patch fixes is
+that the DMA is errornously enabled on MX6SX and it should not be .
+
+[...]
+
+-- 
+Best regards,
+Marek Vasut
