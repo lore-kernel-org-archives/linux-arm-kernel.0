@@ -1,127 +1,91 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 6 Feb 2017 10:27:46 +0100
-Subject: [PATCH 0/2] scpi: RfC - Allow to ignore invalid SCPI DVFS clock
- rates
-In-Reply-To: <a4c725a9-2f79-a48b-b732-61e1fe31aba8@gmail.com>
-References: <a4c725a9-2f79-a48b-b732-61e1fe31aba8@gmail.com>
-Message-ID: <bd6d2a14-a3e5-ddfb-ab7d-3b0835bcab62@baylibre.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 6 Feb 2017 10:50:22 +0100
+Subject: [PATCH v3 13/24] platform: add video-multiplexer subdevice driver
+In-Reply-To: <2258037.UCXsIYbtGD@avalon>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1485259368.3600.126.camel@pengutronix.de>
+ <651d7b40-e87d-05ce-ae4d-256b0c1b28f7@gmail.com> <2258037.UCXsIYbtGD@avalon>
+Message-ID: <f6bfb9ec-1ea3-8477-4933-cf655acd3e0f@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/2017 10:03 PM, Heiner Kallweit wrote:
-> On the Odroid C2 (Amlogic S905GXBB) the firmware defines SCPI DVFS cpu
-> clock rates which make the system crash or at least unstable.
-> Therefore cpufreq can't be used on this system as of today.
-> Other systems might face similar issues with too optimistic SCPI SVFS
-> clock rates.
+On 02/05/2017 04:48 PM, Laurent Pinchart wrote:
+> Hi Steve,
 > 
-> This RfC patch series addresses this by allowing to define a max
-> frequency per clock via DT. All frequencies for the respective clock
-> exceeding this threshold will be ignored.
+> On Tuesday 24 Jan 2017 18:07:55 Steve Longerbeam wrote:
+>> On 01/24/2017 04:02 AM, Philipp Zabel wrote:
+>>> On Fri, 2017-01-20 at 15:03 +0100, Hans Verkuil wrote:
+>>>>> +
+>>>>> +int vidsw_g_mbus_config(struct v4l2_subdev *sd, struct v4l2_mbus_config
+>>>>> *cfg)
+>>>>> +{
+>>>>> +	struct vidsw *vidsw = v4l2_subdev_to_vidsw(sd);
+>>>>> +	struct media_pad *pad;
+>>>>> +	int ret;
+>>>>> +
+>>>>> +	if (vidsw->active == -1) {
+>>>>> +		dev_err(sd->dev, "no configuration for inactive mux\n");
+>>>>> +		return -EINVAL;
+>>>>> +	}
+>>>>> +
+>>>>> +	/*
+>>>>> +	 * Retrieve media bus configuration from the entity connected to the
+>>>>> +	 * active input
+>>>>> +	 */
+>>>>> +	pad = media_entity_remote_pad(&vidsw->pads[vidsw->active]);
+>>>>> +	if (pad) {
+>>>>> +		sd = media_entity_to_v4l2_subdev(pad->entity);
+>>>>> +		ret = v4l2_subdev_call(sd, video, g_mbus_config, cfg);
+>>>>> +		if (ret == -ENOIOCTLCMD)
+>>>>> +			pad = NULL;
+>>>>> +		else if (ret < 0) {
+>>>>> +			dev_err(sd->dev, "failed to get source 
+> configuration\n");
+>>>>> +			return ret;
+>>>>> +		}
+>>>>> +	}
+>>>>> +	if (!pad) {
+>>>>> +		/* Mirror the input side on the output side */
+>>>>> +		cfg->type = vidsw->endpoint[vidsw->active].bus_type;
+>>>>> +		if (cfg->type == V4L2_MBUS_PARALLEL ||
+>>>>> +		    cfg->type == V4L2_MBUS_BT656)
+>>>>> +			cfg->flags = vidsw->endpoint[vidsw-
+>> active].bus.parallel.flags;
+>>>>> +	}
+>>>>> +
+>>>>> +	return 0;
+>>>>> +}
+>>>>
+>>>> I am not certain this op is needed at all. In the current kernel this op
+>>>> is only used by soc_camera, pxa_camera and omap3isp (somewhat dubious).
+>>>> Normally this information should come from the device tree and there
+>>>> should be no need for this op.
+>>>>
+>>>> My (tentative) long-term plan was to get rid of this op.
+>>>>
+>>>> If you don't need it, then I recommend it is removed.
+>>
+>> Hi Hans, the imx-media driver was only calling g_mbus_config to the camera
+>> sensor, and it was doing that to determine the sensor's bus type. This info
+>> was already available from parsing a v4l2_of_endpoint from the sensor node.
+>> So it was simple to remove the g_mbus_config calls, and instead rely on the
+>> parsed sensor v4l2_of_endpoint.
 > 
-> Heiner Kallweit (2):
->   clk: scpi: RfC - Allow to ignore invalid SCPI DVFS clock rates
->   cpufreq: scpi: RfC - Allow to ignore invalid SCPI DVFS clock rates
+> That's not a good point. The imx-media driver must not parse the sensor DT 
+> node as it is not aware of what bindings the sensor is compatible with. 
+> Information must instead be queried from the sensor subdev at runtime, through 
+> the g_mbus_config() operation.
 > 
->  Documentation/devicetree/bindings/arm/arm,scpi.txt |  7 +++++++
->  drivers/clk/clk-scpi.c                             | 15 ++++++++++++++-
->  drivers/cpufreq/scpi-cpufreq.c                     | 22 ++++++++++++++++++++++
->  3 files changed, 43 insertions(+), 1 deletion(-)
-> 
+> Of course, if you can get the information from the imx-media DT node, that's 
+> certainly an option. It's only information provided by the sensor driver that 
+> you have no choice but query using a subdev operation.
 
-Hi Heiner,
+Shouldn't this come from the imx-media DT node? BTW, why is omap3isp using this?
 
-Thanks for this pathset, I have an alternative patchset for this feature.
+The reason I am suspicious about this op is that it came from soc-camera and
+predates the DT. The contents of v4l2_mbus_config seems very much like a HW
+description to me, i.e. something that belongs in the DT.
 
-My patchset adds a maximum frequency in the cpu node, this permits cleanly specifying
-a max frequency per cluster and leave the SCPI code intact since it's only a protocol
-implementation.
+Regards,
 
-Please find below a simpler implementation only touching the scpi-cpufreq code.
-
-Anyway, Sudeep, could you give us your point of view about such changes ?
-
-Neil
-
-----><--
-diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-index a1bcfee..b813933 100644
---- a/Documentation/devicetree/bindings/arm/cpus.txt
-+++ b/Documentation/devicetree/bindings/arm/cpus.txt
-@@ -276,6 +276,14 @@ nodes to be present and contain the properties described below.
-
- 			    where voltage is in uV, frequency is in MHz.
-
-+	- arm,scpi-dvfs-max-freq
-+		Usage: optional
-+		Value type: <u32>
-+		Definition:
-+			Specifies the maximum DVFS frequency in Hz unit this
-+			CPU can support when the OPP tables are obtained via
-+			the SCP interface.
-+
- Example 1 (dual-cluster big.LITTLE system 32-bit):
-
- 	cpus {
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-index 238fbea..881f20c 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
-@@ -137,6 +137,22 @@
- 	};
- };
-
-+&cpu0 {
-+	arm,scpi-dvfs-max-freq = <1536000000>;
-+};
-+
-+&cpu1 {
-+	arm,scpi-dvfs-max-freq = <1536000000>;
-+};
-+
-+&cpu2 {
-+	arm,scpi-dvfs-max-freq = <1536000000>;
-+};
-+
-+&cpu3 {
-+	arm,scpi-dvfs-max-freq = <1536000000>;
-+};
-+
- &uart_AO {
- 	status = "okay";
- 	pinctrl-0 = <&uart_ao_a_pins>;
-diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
-index ea7a4e1..80a6f27b 100644
---- a/drivers/cpufreq/scpi-cpufreq.c
-+++ b/drivers/cpufreq/scpi-cpufreq.c
-@@ -25,6 +25,7 @@
- #include <linux/pm_opp.h>
- #include <linux/scpi_protocol.h>
- #include <linux/types.h>
-+#include <linux/of.h>
-
- #include "arm_big_little.h"
-
-@@ -54,6 +55,11 @@ static int scpi_init_opp_table(const struct cpumask *cpumask)
- 	struct scpi_opp *opp;
- 	struct device *cpu_dev = get_cpu_device(cpumask_first(cpumask));
- 	struct scpi_dvfs_info *info = scpi_get_dvfs_info(cpu_dev);
-+	u32 max_freq = 0;
-+
-+	/* Eventually get a platform frequency limitation */
-+	of_property_read_u32(cpu_dev->of_node, "arm,scpi-dvfs-max-freq",
-+			     &max_freq);
-
- 	if (IS_ERR(info))
- 		return PTR_ERR(info);
-@@ -62,6 +68,10 @@ static int scpi_init_opp_table(const struct cpumask *cpumask)
- 		return -EIO;
-
- 	for (opp = info->opps, idx = 0; idx < info->count; idx++, opp++) {
-+		/* Drop unsupported frequencies */
-+		if (max_freq && opp->freq > max_freq)
-+			continue;
-+
- 		ret = dev_pm_opp_add(cpu_dev, opp->freq, opp->m_volt * 1000);
- 		if (ret) {
- 			dev_warn(cpu_dev, "failed to add opp %uHz %umV\n",
+	Hans
