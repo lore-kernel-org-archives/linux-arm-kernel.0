@@ -1,77 +1,35 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Mon, 6 Feb 2017 14:42:56 +0100
-Subject: Fractional divider on the Atmel USART controller
-In-Reply-To: <CAGkQfmNshOGWT8Vs_J-49qq2UHoCMJ8cYb9jbjaDqM2YNy05rg@mail.gmail.com>
-References: <CAGkQfmNshOGWT8Vs_J-49qq2UHoCMJ8cYb9jbjaDqM2YNy05rg@mail.gmail.com>
-Message-ID: <20170206134256.tp5rgx6axd532gp3@rfolt0960.corp.atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 6 Feb 2017 14:44:13 +0100
+Subject: [PATCH RESEND 1/3] arm64: add THUNDER2 processor family
+In-Reply-To: <20170206100608.GA8540@arm.com>
+References: <1486233461-2679-1-git-send-email-jnair@caviumnetworks.com>
+ <1486233461-2679-2-git-send-email-jnair@caviumnetworks.com>
+ <20170206100608.GA8540@arm.com>
+Message-ID: <CAK8P3a1_dQZd3RRyavMKqBFcHsXTQ2oAUO5vaLhyTiH99XhqrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Romain,
+On Mon, Feb 6, 2017 at 11:06 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Sat, Feb 04, 2017 at 06:37:39PM +0000, Jayachandran C wrote:
+>> Add support for ThunderX2 CN99XX arm64 server processors.
+>>
+>> Introduce a new arm64 platform config option ARCH_THUNDER2 for these
+>> processors. Add device tree files boot/dts/cavium/thunder-99xx.dtsi for
+>> on-chip devices and boot/dts/cavium/thunder-99xx.dts for the evaluation
+>> board.
+>>
+>> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+>> ---
+>>  arch/arm64/Kconfig.platforms                 |   7 ++
+>>  arch/arm64/boot/dts/cavium/Makefile          |   1 +
+>>  arch/arm64/boot/dts/cavium/thunder-99xx.dts  |  34 +++++++
+>>  arch/arm64/boot/dts/cavium/thunder-99xx.dtsi | 147 +++++++++++++++++++++++++++
+>
+> This is basically identical to vulcan.dtsi. Do we really need both in the
+> tree?
 
-On Mon, Feb 06, 2017 at 12:56:42PM +0100, Romain Izard wrote:
-> Hello,
-> 
-> On Atmel SAMA5D2, when trying to configure a serial port for 3 Mbauds
-> operation, I do not always get the requested baud rate. If the hardware
-> flow control is disabled by software, the line works correctly. But if I
-> set the crtscts option, the line does not work, and after checking the
-> line I can observe that the signal is sent at 2.6 Mbauds.
-> 
-> This is due to the code used to manage fractional baud rate divisor: the
-> existing code prevents the fractional bits from being used if the line
-> is not configured in normal mode. This case occurs when the hardware
-> flow control or the RS485 mode is set.
-> 
-> If I apply the following patch to drivers/tty/serial/atmel_serial.c,
-> I get the required baudrate.
-> 
-> 8<----------------------------------------------------------------
-> 
-> @@ -2204,14 +2204,13
->       * baudrate = selected clock / (8 * (2 - OVER) * (CD + FP / 8))
->       * Currently, OVER is always set to 0 so we get
->       * baudrate = selected clock / (16 * (CD + FP / 8))
->       * then
->       * 8 CD + FP = selected clock / (2 * baudrate)
->       */
-> -    if (atmel_port->has_frac_baudrate &&
-> -        (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
-> +    if (atmel_port->has_frac_baudrate) {
->          div = DIV_ROUND_CLOSEST(port->uartclk, baud * 2);
->          cd = div >> 3;
->          fp = div & ATMEL_US_FP_MASK;
->      } else {
->          cd = uart_get_divisor(port, baud);
->      }
-> 
-> 8<----------------------------------------------------------------
-> 
-> Unfortunately, I know that this will work on SAMA5D2, but this driver is
-> used for many other Atmel chips. I do not know if the existing code is
-> meant to respect a known limitation on other devices that use the same
-> controller, or if it is just a bug.
+Hmm, an alternative would be to add the new .dtsi file and start out with an
+#include of the existing file, with overrides for anything that needs changing.
+Similarly, the Kconfig symbol could just 'select ARCH_VULCAN' for now.
 
-It depends on the device used. In the SAMA5D4 datasheet, it is
-mentionned: "This feature is only available when using USART normal mode".
-
-In the SAMA5D2 datasheet, this constraint is no longer mentionned you
-confirm that is works, that is great.
-
-> 
-> Ludovic, Nicolas,  what is your opinion on that matter? Should I just
-> propose this as a patch, or is it necessary to add a limitation for
-> supported devices only ?
-
-Yes, only SAMA5D2 supports fractionnal baudrate in other modes than the
-normal one. A new compatible string may be added, I am not sure you have
-enough information in atmel_get_ip_name...
-
-Regards
-
-Ludovic
-
-> 
-> Best regards,
-> -- 
-> Romain Izard
+     Arnd
