@@ -1,302 +1,42 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon,  6 Feb 2017 07:08:36 -0800
-Subject: [PATCH] reset: Add i.MX7 SRC reset driver
-Message-ID: <20170206150836.10001-1-andrew.smirnov@gmail.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Mon, 6 Feb 2017 16:14:31 +0100
+Subject: Fractional divider on the Atmel USART controller
+In-Reply-To: <20170206134256.tp5rgx6axd532gp3@rfolt0960.corp.atmel.com>
+References: <CAGkQfmNshOGWT8Vs_J-49qq2UHoCMJ8cYb9jbjaDqM2YNy05rg@mail.gmail.com>
+ <20170206134256.tp5rgx6axd532gp3@rfolt0960.corp.atmel.com>
+Message-ID: <CAGkQfmPHmc+7fnD78KbyMLgmdSsCddGC07vSWFm-RVWanh6Ttg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver exposes various reset faculties, impelented by System Reset
-Controller IP block, as a reset driver. Currently only PCIE related
-reset lines are implemented.
+2017-02-06 14:42 GMT+01:00 Ludovic Desroches <ludovic.desroches@microchip.com>:
+> Hello Romain,
+>
+> On Mon, Feb 06, 2017 at 12:56:42PM +0100, Romain Izard wrote:
+>>
+>> Unfortunately, I know that this will work on SAMA5D2, but this driver is
+>> used for many other Atmel chips. I do not know if the existing code is
+>> meant to respect a known limitation on other devices that use the same
+>> controller, or if it is just a bug.
+>
+> It depends on the device used. In the SAMA5D4 datasheet, it is
+> mentionned: "This feature is only available when using USART normal mode".
+>
+> In the SAMA5D2 datasheet, this constraint is no longer mentionned you
+> confirm that is works, that is great.
+>
 
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- .../devicetree/bindings/reset/fsl,imx7-src.txt     |  47 +++++++
- drivers/reset/Kconfig                              |   8 ++
- drivers/reset/Makefile                             |   1 +
- drivers/reset/reset-imx7.c                         | 149 +++++++++++++++++++++
- include/dt-bindings/reset/imx7-reset.h             |  28 ++++
- 5 files changed, 233 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
- create mode 100644 drivers/reset/reset-imx7.c
- create mode 100644 include/dt-bindings/reset/imx7-reset.h
+For verification, I checked the SAMA5D2 datasheet, and (in rev. D) the
+warning is still present in ?41.7.1.2. Unfortunately, I did not test the
+CTS/RTS mode directly, and I would not go as far as claiming that it
+works without any reservation.
 
-diff --git a/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
-new file mode 100644
-index 0000000..19a77f9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
-@@ -0,0 +1,47 @@
-+Freescale i.MX7 System Reset Controller
-+======================================
-+
-+Please also refer to reset.txt in this directory for common reset
-+controller binding usage.
-+
-+Required properties:
-+- compatible: Should be "fsl,imx7-src", "syscon"
-+- reg: should be register base and length as documented in the
-+  datasheet
-+- interrupts: Should contain SRC interrupt
-+- #reset-cells: 1, see below
-+
-+example:
-+
-+src: src at 30390000 {
-+     compatible = "fsl,imx7d-src", "syscon";
-+     reg = <0x30390000 0x10000>;
-+     interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-+     #reset-cells = <1>;
-+};
-+
-+
-+Specifying reset lines connected to IP modules
-+==============================================
-+
-+The system reset controller can be used to reset various set of
-+peripherals. Device nodes that need access to reset lines should
-+specify them as a reset phandle in their corresponding node as
-+specified in reset.txt.
-+
-+Example:
-+
-+	pcie: pcie at 0x33800000 {
-+
-+		...
-+
-+		resets = <&src IMX7_RESET_PCIEPHY>,
-+			 <&src IMX7_RESET_PCIE_CTRL_APPS>;
-+		reset-names = "pciephy", "apps";
-+
-+		...
-+        };
-+
-+
-+For list of all valid reset indicies see
-+<dt-bindings/reset/imx7-reset.h>
-diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index 172dc96..664a88b 100644
---- a/drivers/reset/Kconfig
-+++ b/drivers/reset/Kconfig
-@@ -92,6 +92,14 @@ config RESET_ZYNQ
- 	help
- 	  This enables the reset controller driver for Xilinx Zynq SoCs.
- 
-+config RESET_IMX7
-+	bool "i.MX7 Reset Driver"
-+	depends on SOC_IMX7D || COMPILE_TEST
-+	select MFD_SYSCON
-+	default SOC_IMX7D
-+	help
-+	  This enables the reset controller driver for i.MX7 SoCs.
-+
- source "drivers/reset/sti/Kconfig"
- source "drivers/reset/hisilicon/Kconfig"
- source "drivers/reset/tegra/Kconfig"
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index 13b346e..417c9d0 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -14,3 +14,4 @@ obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
- obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
- obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
- obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
-+obj-$(CONFIG_RESET_IMX7) += reset-imx7.o
-diff --git a/drivers/reset/reset-imx7.c b/drivers/reset/reset-imx7.c
-new file mode 100644
-index 0000000..6d90e57
---- /dev/null
-+++ b/drivers/reset/reset-imx7.c
-@@ -0,0 +1,149 @@
-+/*
-+ * Copyright (c) 2017, Impinj, Inc.
-+ *
-+ * i.MX7 System Reset Controller (SRC) driver
-+ *
-+ * Author: Andrey Smirnov <andrew.smirnov@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; version 2 of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/init.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+#include <linux/regmap.h>
-+#include <linux/types.h>
-+#include <dt-bindings/reset/imx7-reset.h>
-+
-+struct imx7_src {
-+	struct reset_controller_dev rcdev;
-+	struct device *dev;
-+	struct regmap *regmap;
-+};
-+
-+enum imx7_src_registers {
-+	SRC_PCIEPHY_RCR = 0x002c,
-+	SRC_PCIEPHY_RCR_PCIEPHY_G_RST     = BIT(1),
-+	SRC_PCIEPHY_RCR_PCIEPHY_BTN       = BIT(2),
-+	SRC_PCIEPHY_RCR_PCIE_CTRL_APPS_EN = BIT(6),
-+};
-+
-+static struct imx7_src *to_imx7_src(struct reset_controller_dev *rcdev)
-+{
-+	return container_of(rcdev, struct imx7_src, rcdev);
-+}
-+
-+static int imx7_reset_assert(struct reset_controller_dev *rcdev,
-+			     unsigned long id)
-+{
-+	struct imx7_src *imx7src = to_imx7_src(rcdev);
-+
-+	switch (id) {
-+	case IMX7_RESET_PCIE_CTRL_APPS:
-+		regmap_update_bits(imx7src->regmap,
-+				   SRC_PCIEPHY_RCR,
-+				   SRC_PCIEPHY_RCR_PCIE_CTRL_APPS_EN, 0);
-+		return 0;
-+
-+	case IMX7_RESET_PCIEPHY:
-+		regmap_update_bits(imx7src->regmap,
-+				   SRC_PCIEPHY_RCR,
-+				   SRC_PCIEPHY_RCR_PCIEPHY_G_RST,
-+				   SRC_PCIEPHY_RCR_PCIEPHY_G_RST);
-+		regmap_update_bits(imx7src->regmap,
-+				   SRC_PCIEPHY_RCR,
-+				   SRC_PCIEPHY_RCR_PCIEPHY_BTN,
-+				   SRC_PCIEPHY_RCR_PCIEPHY_BTN);
-+		return 0;
-+	default:
-+		dev_err(imx7src->dev, "Unknown reset ID %lu\n", id);
-+		break;
-+	}
-+
-+	return -EINVAL;
-+}
-+
-+static int imx7_reset_deassert(struct reset_controller_dev *rcdev,
-+			       unsigned long id)
-+{
-+	struct imx7_src *imx7src = to_imx7_src(rcdev);
-+
-+	switch (id) {
-+	case IMX7_RESET_PCIE_CTRL_APPS:
-+		regmap_update_bits(imx7src->regmap,
-+				   SRC_PCIEPHY_RCR,
-+				   SRC_PCIEPHY_RCR_PCIE_CTRL_APPS_EN,
-+				   SRC_PCIEPHY_RCR_PCIE_CTRL_APPS_EN);
-+		return 0;
-+
-+	case IMX7_RESET_PCIEPHY:
-+		/* wait for more than 10us to release phy g_rst and btnrst */
-+		udelay(10);
-+		regmap_update_bits(imx7src->regmap,
-+				   SRC_PCIEPHY_RCR,
-+				   SRC_PCIEPHY_RCR_PCIEPHY_G_RST, 0);
-+		regmap_update_bits(imx7src->regmap,
-+				   SRC_PCIEPHY_RCR,
-+				   SRC_PCIEPHY_RCR_PCIEPHY_BTN, 0);
-+		return 0;
-+	default:
-+		dev_err(imx7src->dev, "Unknown reset ID %lu\n", id);
-+		break;
-+	};
-+
-+	return -EINVAL;
-+}
-+
-+static const struct reset_control_ops imx7_reset_ops = {
-+	.assert		= imx7_reset_assert,
-+	.deassert	= imx7_reset_deassert,
-+};
-+
-+static int imx7_reset_probe(struct platform_device *pdev)
-+{
-+	struct imx7_src *imx7src;
-+	struct device *dev = &pdev->dev;
-+
-+	imx7src = devm_kzalloc(dev, sizeof(*imx7src), GFP_KERNEL);
-+	if (!imx7src)
-+		return -ENOMEM;
-+
-+	imx7src->dev = dev;
-+	imx7src->regmap = syscon_node_to_regmap(dev->of_node);
-+	if (IS_ERR(imx7src->regmap)) {
-+		dev_err(dev, "Unable to get imx7-src regmap");
-+		return PTR_ERR(imx7src->regmap);
-+	}
-+
-+	imx7src->rcdev.owner     = THIS_MODULE;
-+	imx7src->rcdev.nr_resets = IMX7_RESET_NUM;
-+	imx7src->rcdev.ops       = &imx7_reset_ops;
-+	imx7src->rcdev.of_node   = dev->of_node;
-+
-+	return devm_reset_controller_register(dev, &imx7src->rcdev);
-+}
-+
-+static const struct of_device_id imx7_reset_dt_ids[] = {
-+	{ .compatible = "fsl,imx7d-src", },
-+	{ /* sentinel */ },
-+};
-+
-+static struct platform_driver imx7_reset_driver = {
-+	.probe	= imx7_reset_probe,
-+	.driver = {
-+		.name		= KBUILD_MODNAME,
-+		.of_match_table	= imx7_reset_dt_ids,
-+	},
-+};
-+builtin_platform_driver(imx7_reset_driver);
-diff --git a/include/dt-bindings/reset/imx7-reset.h b/include/dt-bindings/reset/imx7-reset.h
-new file mode 100644
-index 0000000..e20f2db
---- /dev/null
-+++ b/include/dt-bindings/reset/imx7-reset.h
-@@ -0,0 +1,28 @@
-+/*
-+ * Copyright (C) 2017 Impinj, Inc.
-+ *
-+ * Author: Andrey Smirnov <andrew.smirnov@gmail.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef DT_BINDING_RESET_IMX7_H
-+#define DT_BINDING_RESET_IMX7_H
-+
-+#define IMX7_RESET_PCIE_CTRL_APPS	0
-+#define IMX7_RESET_PCIEPHY		1
-+
-+#define IMX7_RESET_NUM			2
-+
-+#endif
-+
+In my original use case, the hardware handshaking was activated
+automatically when loading the HCILL line discipline to access the
+Bluetooth part of a TI WL1831 chip. Fixing the baud rate issue was
+enough to restore the Bluetooth stack to the working state I had when I
+used the linux4sam 5.3 branch, but I am not sure of how the handshaking
+is really used in practice.
+
+Best regards,
 -- 
-2.9.3
+Romain Izard
