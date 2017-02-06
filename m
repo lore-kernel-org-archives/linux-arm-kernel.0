@@ -1,312 +1,186 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 6 Feb 2017 17:01:58 +0100
-Subject: [PATCH v2 4/5] iio: trigger: add support for STM32 EXTI triggers
-In-Reply-To: <1236cee4-41bf-b3b9-51e4-7e585234b0c7@kernel.org>
-References: <1485786840-4557-1-git-send-email-fabrice.gasnier@st.com>
- <1485786840-4557-5-git-send-email-fabrice.gasnier@st.com>
- <CACRpkdZeiFYFdRWCEgYWDWh4Wn2gT29KAFao9mgj7sTi768kFQ@mail.gmail.com>
- <1236cee4-41bf-b3b9-51e4-7e585234b0c7@kernel.org>
-Message-ID: <b035b596-6b48-2671-93af-24b52b1ffab8@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 6 Feb 2017 17:05:57 +0100
+Subject: [PATCH 1/4] PCI: add DT bindings for Cortina Gemini PCI Host
+ Bridge
+In-Reply-To: <CACRpkdYpBYaeTo2SJ55=cwKcZ5Y7A1k-wy1N3UuR6u3L3RdNoA@mail.gmail.com>
+References: <20170128204839.18330-1-linus.walleij@linaro.org>
+ <17693846.Edk12xXofc@wuerfel>
+ <CACRpkdYpBYaeTo2SJ55=cwKcZ5Y7A1k-wy1N3UuR6u3L3RdNoA@mail.gmail.com>
+Message-ID: <CAK8P3a0qouN9F-kxsaJe31TK_gUh=_JAZVOuvKj1ghbpNtit=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/04/2017 12:39 PM, Jonathan Cameron wrote:
-> On 03/02/17 19:40, Linus Walleij wrote:
->> On Mon, Jan 30, 2017 at 3:33 PM, Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
->>
->>> EXTi[0..15] gpio signal can be routed internally as trigger source for
->>> ADC or DAC conversions. Configure them as interrupts to configure
->>> trigger path in HW.
+On Sun, Feb 5, 2017 at 3:56 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Feb 1, 2017 at 12:19 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Saturday, January 28, 2017 9:48:36 PM CET Linus Walleij wrote:
+>>> +       interrupt-map-mask = <0xff00 0 0 7>;
+>>> +       interrupt-map = <0x4800 0 0 1 &pci_intc 0>, /* Slot 9 */
+>>> +                       <0x4900 0 0 2 &pci_intc 1>,
+>>> +                       <0x4a00 0 0 3 &pci_intc 2>,
+>>> +                       <0x4b00 0 0 4 &pci_intc 3>,
+>>> +                       <0x5000 0 0 1 &pci_intc 0>, /* Slot 10 */
+>>> +                       <0x5100 0 0 2 &pci_intc 1>,
+>>> +                       <0x5200 0 0 3 &pci_intc 2>,
+>>> +                       <0x5300 0 0 4 &pci_intc 3>,
+>>> +                       <0x5800 0 0 1 &pci_intc 0>, /* Slot 11 */
+>>> +                       <0x5900 0 0 2 &pci_intc 1>,
+>>> +                       <0x5a00 0 0 3 &pci_intc 2>,
+>>> +                       <0x5b00 0 0 4 &pci_intc 3>,
+>>> +                       <0x6000 0 0 1 &pci_intc 0>, /* Slot 12 */
+>>> +                       <0x6100 0 0 2 &pci_intc 1>,
+>>> +                       <0x6200 0 0 3 &pci_intc 2>,
+>>> +                       <0x6300 0 0 4 &pci_intc 3>;
 >>>
->>> Note: interrupt handler isn't required here, and corresponding interrupt
->>> can be kept masked at exti controller level.
->>>
->>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 >>
->> But I see nothing STM32-specific about this driver?
->>
->> I think we should do everone a service and just create
->> drivers/iio/trigger/gpio-trigger.c
->>
->> I wondered before why we don't have a generic GPIO IIO trigger,
->> it seems like such an intuitive and useful thing to have.
-> We do, it just got renamed at some point a while back to be
-> iio-trig-interrupt after it became clear that it didn't need
-> to be a gpio either - just an interrupt.  Can't remember which
-> part provided a non gpio interrupt pin and hence drove that
-> change.  Was quite a while back!
-> d4fd73bf25c3aafc891ef4443fc744d427ec1df0 specifically in 2013
+
+>> For this particular board, the interrupt lines appear to have been badly
+>> configured so all slots use the same interrupt 0 for IntA. IIRC This also
+>> means you can probably use <0 0 0 7> as the mask and just specify each of
+>> the four interrupts once. A properly wired board would swizzle the
+>> interrupts so that each slot has a different IRQ for its IntA line.
 >
-> Handling of the gpio stuff should be handled in the interrupt
-> description itself.
+> They are swizzled, I just have very bad hardware docs. (Only
+> code.) It turns out when I'm browsing through old board support
+> code that there is a comment followed by a piece of code like this:
 >
-> However, it's a bit different - in that in the below it
-> would be the equivalent of triggering on the unused exti
-> interrupt rather than on the end of conversion.
+> /*
+>  *      No swizzle on SL2312
+>  */
+> static u8 __init sl2312_pci_swizzle(struct pci_dev *dev, u8 *pinp)
+> {
+>         return PCI_SLOT(dev->devfn);
+> }
 >
-> In this case, because of the hardware linkage we can effectively
-> skip the first interrupt.
+> /*
+>  * map the specified device/slot/pin to an IRQ.  This works out such
+>  * that slot 9 pin 1 is INT0, pin 2 is INT1, and slot 10 pin 1 is INT1.
+>  */
+> static int __init sl2312_pci_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
+> {
+>         int intnr = ((slot  + (pin - 1)) & 3) + 4;  /* the IRQ number
+> of PCI bridge */
 >
-> Arguably to make this a general purpose trigger we should enable
-> that interrupt if anything other than the STM devices that can
-> use it in hardware are hooked on to it.
+>         printk("%s : slot = %d  pin = %d \n",__func__,slot,pin);
+>     switch (slot)
+>     {
+>         case 12:
+>                 if (pin==1)
+>                 {
+>                         intnr = 3;
+>                     }
+>                     else
+>                     {
+>                         intnr = 0;
+>                     }
+> #ifdef CONFIG_DUAL_PCI
+>                     return IRQ_PCI_INTD;
+> #endif
+>             break;
+>         case 11:
+>                     intnr = (2 + (pin - 1)) & 3;
+> #ifdef CONFIG_DUAL_PCI
+>                     return IRQ_PCI_INTC;
+> #endif
+>             break;
+>         case 10:
+>                     intnr = (1 + (pin - 1)) & 3;
+> #ifdef CONFIG_DUAL_PCI
+>                     return IRQ_PCI_INTB;
+> #endif
+>             break;
+>         case  9:
+>                     intnr = (pin - 1) & 3;
+>             break;
+>     }
+> //      if (slot == 10)
+> //              intnr = (1 + (pin - 1)) & 3;
+> //      else if (slot == 9)
+> //              intnr = (pin - 1) & 3;
+>         return (IRQ_PCI_INTA + intnr);
+> }
 >
-> So this is an interrupt trigger without the interrupt ever
-> being visible to software.
+> If I understand correctly they say that the IRQs are not swizzled
+> on the PCI bridge side but on the IRQ handler side.
+
+That depends on whether CONFIG_DUAL_PCI is set or not:
+
+It seems that slot 12 is hardwired to have hwirq 3 on IntA and
+hwirq 0 on all others by default, but have hwirq on IntA through
+IntD on boards that use CONFIG_DUAL_PCI.
+
+Slot 10/11 use the default swizzling without CONFIG_DUAL_PCI but
+uses hwirq 1 or 2 for all four pins with CONFIG_DUAL_PCI.
+
+Slot 9 seems to always use the default swizzling, so it has all
+four IRQ pins connected to the four hwirqs of the SoC.
+
+This is still an awful wiring, but not unthinkable, as board
+designers may have had a specific usage for the four interrupts
+in mind, to spread the devices that are actually present across
+the available hwirqs.
+
+> So if I put it in the device tree like so:
 >
-> It might be easy enough to add that support to the generic version
-> except that linking said trigger requires some register changes
-> in the STM side. + there is a kicker in the various last bit
-> of this patch - we need a way to find out if it's the interrupt
-> we think it is (i.e. an exti interrupt)
+> +                         interrupt-map =
+> +                               <0x4800 0 0 1 &pci_intc 0>, /* Slot 9 */
+> +                               <0x4800 0 0 2 &pci_intc 1>,
+> +                               <0x4800 0 0 3 &pci_intc 2>,
+> +                               <0x4800 0 0 4 &pci_intc 3>,
+> +                               <0x5000 0 0 1 &pci_intc 1>, /* Slot 10 */
+> +                               <0x5000 0 0 2 &pci_intc 2>,
+> +                               <0x5000 0 0 3 &pci_intc 3>,
+> +                               <0x5000 0 0 4 &pci_intc 0>,
+> +                               <0x5800 0 0 1 &pci_intc 2>, /* Slot 11 */
+> +                               <0x5800 0 0 2 &pci_intc 3>,
+> +                               <0x5800 0 0 3 &pci_intc 0>,
+> +                               <0x5800 0 0 4 &pci_intc 1>,
 
-Hi Jonathan, Linus, all,
+For boards that require CONFIG_DUAL_PCI, this would be
 
-First, many thanks for reviewing.
+                               <0x5000 0 0 1 &pci_intc 1>, /* Slot 10 */
+                               <0x5000 0 0 2 &pci_intc 1>,
+                               <0x5000 0 0 3 &pci_intc 1>,
+                               <0x5000 0 0 4 &pci_intc 1>,
+                               <0x5800 0 0 1 &pci_intc 2>, /* Slot 11 */
+                               <0x5800 0 0 2 &pci_intc 2>,
+                               <0x5800 0 0 3 &pci_intc 2>,
+                               <0x5800 0 0 4 &pci_intc 2>,
 
-In this patch-set, I choose to implement this hardware trigger line
-into separate driver... Thinking out loud:
-If I try to summarize, as you perfectly describe here before, I see two 
-items to address:
-- this is pure HW line, that can either generate interrupts, and/or 
-start conversions in HW. This may be hard to combine both, an interrupt 
-handler to call iio_trigger_poll() from there, for generic devices, but 
-not for stm devices (not sure if this can benefit to others?).
-- there is need to do some register changes on stm device side (ADC) as 
-well, when choosing a particular trigger (EXTI line for instance) e.g. 
-in validate_trigger().
+It probably works either way if you put just one device in there,
+as almost everything uses just IntA, but you'd notice the difference
+if there is ever a PCI bridge behind that slot.
 
-I'm starting to wonder if this can be separate driver. Maybe this
-should be part of device driver (e.g. ADC), at least for the time being.
+> +                               <0x6000 0 0 1 &pci_intc 3>, /* Slot 12 */
+> +                               <0x6000 0 0 2 &pci_intc 0>,
+> +                               <0x6000 0 0 3 &pci_intc 1>,
+> +                               <0x6000 0 0 4 &pci_intc 2>;
 
->>
->> Let's see what Jonathan says.
+The last two have to be
+
+                               <0x6000 0 0 3 &pci_intc 0>, /* [sic] */
+                               <0x6000 0 0 4 &pci_intc 0>; /* [sic] */
+
+> So the IRQs on the right side are swizzled instead
+> of the pins being swizzled.
 >
+> ...but that looks a bit insane.
 >
->>
->>> +config IIO_STM32_EXTI_TRIGGER
->>> +       tristate "STM32 EXTI Trigger"
->>> +       depends on (ARCH_STM32 && OF) || COMPILE_TEST
->>
->> config IIO_GPIO_TRIGGER
->>     depends on GPIOLIB
->>
->>> +       select STM32_EXTI
->>
->> Isn't the dependency actually the other way around?
->>
->> default STM32_EXTI makes more sense, or just put it into the
->> defconfig.
->>
->>> +#include <linux/gpio/consumer.h>
->>> +#include <linux/iio/iio.h>
->>> +#include <linux/iio/trigger.h>
->>> +#include <linux/interrupt.h>
->>> +#include <linux/module.h>
->>> +#include <linux/platform_device.h>
->>> +
->>> +/* STM32 has up to 16 EXTI triggers on GPIOs */
->>> +#define STM32_MAX_EXTI_TRIGGER 16
->>
->> Just don't put any restrictions like this so it can be widely
->> reused.
->>
->>> +static irqreturn_t stm32_exti_trigger_handler(int irq, void *data)
->>> +{
->>> +       /* Exti handler shouldn't be invoked, and isn't used */
->>> +       return IRQ_HANDLED;
->>> +}
->>
->> It could be a good idea to capture the timestamp here if we were
->> actually using this IRQ.
->>
->>> +static int stm32_exti_trigger_probe(struct platform_device *pdev)
->>> +{
->>> +       int irq, ret;
->>> +       char name[8];
->>> +       struct gpio_desc *gpio;
->>> +       struct iio_trigger *trig;
->>> +       unsigned int i;
->>> +
->>> +       for (i = 0; i < STM32_MAX_EXTI_TRIGGER; i++) {
->>
->> Why not just run this until devm_gpiod_get() returns -ERRNO
->> or something?
->>
->>> +               snprintf(name, sizeof(name), "exti%d", i);
->>> +
->>> +               gpio = devm_gpiod_get_optional(&pdev->dev, name, GPIOD_IN);
->>
->> Why would it be optional?
->>
->> Either it is there in the device tree or we get -EINVAL or something
->> if there is no
->> such index in the device tree. We can get -EPROBE_DEEER too, and then
->> we should exit silently or just print that deferring is happening.
->>
->>> +               if (IS_ERR_OR_NULL(gpio)) {
->>> +                       if (IS_ERR(gpio)) {
->>> +                               dev_err(&pdev->dev, "gpio %s get error %ld\n",
->>> +                                       name, PTR_ERR(gpio));
->>> +                               return PTR_ERR(gpio);
->>> +                       }
->>> +                       dev_dbg(&pdev->dev, "No %s gpio\n", name);
->>> +                       continue;
->>> +               }
->>
->> Good
->>
->>> +               irq = gpiod_to_irq(gpio);
->>> +               if (irq < 0) {
->>> +                       dev_err(&pdev->dev, "gpio %d to irq failed\n", i);
->>> +                       return irq;
->>> +               }
->>> +
->>> +               ret = devm_request_irq(&pdev->dev, irq,
->>> +                                      stm32_exti_trigger_handler,
->>> +                                      0, dev_name(&pdev->dev), pdev);
-> Hmm. So this is a trick to set the interrupt mapping up inside the device.
-> The whole thing doesn't really exist.
->
-> Rather feels like there ought to be some generic interface for
-> 'I want to pretend I want a particular interrupt but not actually get one'.
->
-> But that would only work in this weird case where there is also a real interrupt
-> associated with it - just one we elect not to use.
->>> +               if (ret) {
->>> +                       dev_err(&pdev->dev, "request IRQ %d failed\n", irq);
->>> +                       return ret;
->>> +               }
->>
->> Here you need some elaborate trigger edge handling.
->>
->> The flags that you define as "0" here, how do we say that we
->> want to handle rising or falling edges, for example?
->>
->> I think you might want to establish these DT properties for
->> GPIO triggers:
->>
->> gpio-trigger-rising-edge;
->> gpio-trigger-falling-edge;
->>
->> Then:
->>
->> int irq_flags = 0;
->>
->> if (of_property_read_bool(np, "gpio-trigger-rising-edge")
->>    irq_flags |= IRQF_TRIGGER_RISING;
->> else if (of_property_read_bool(np, "gpio-trigger-falling-edge")
->>    irq_flags |= IRQF_TRIGGER_FALLING;
-> Should this not all be part of the interrupt specification rather
-> than down here in the specific driver?
->>
->> To pass along to the devm_request_irq() function as flags.
->>
->> I find it weird that it even works without. Most GPIO interrupts
->> should require you to set a trigger type. But I guess it is because
->> of the other weirdness you describe below.
->>
->>> +               /*
->>> +                * gpios are configured as interrupts, so exti trigger path is
->>> +                * configured in HW, and can now be used as external trigger
->>> +                * source by other IPs. But getting interrupts when trigger
->>> +                * occurs is unused here, so mask irq on exti controller by
->>> +                * default.
->>> +                */
->>> +               disable_irq(irq);
->>
->> Aha. That is not generic. But what about just adding:
->>
->> if (of_property_read_bool(np, "gpio-trigger-numb-irq")
->>     disable_irq();
->>
->> (Plus add the binding for that something like "this makes the
->> GPIO mentioned get requested, translated to an IRQ, get the
->> IRQ requested, and then immediately just disabled as other
->> hardware will actually hande the IRQ line".)
->>
->> I understand that this is kind of weird: we're making a whole generic
->> GPIO trigger driver just to use it with hardware that grabs and disabled
->> the irq immediately.
->>
->> But I think that in the long run it makes for more reusable code.
-> I'd go a step further.  Whether it is numbed or not will depend on what
-> is downstream.  We should be providing this interrupt like normal if
-> we have other devices triggering off it.  In that case it becomes a standard
-> interrupt trigger.
+> Isn't that exactly the same thing just exposed in some
+> inverse way?
 
-Hmm, in case stm device is using this trigger, iio_trigger_poll() will
-be called. If I understand your point here, this interrupt should be 
-enabled, when stm device isn't using this trigger (for generic devices).
-May validate_device()/set_trigger_state() be used to enable or disable 
-this interrupt ? Then, what criteria may be used for that purpose ?
+I don't understand your question. The mapping that you list
+is the default swizzling, right? I think if you have a board with
+sane wiring, you could write that as
 
->
-> Polling off the back of the dataready interrupt is fine if there is nothing
-> earlier available. Here there is so we should really be triggering other
-> devices off this earlier interrupt.
+                      interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+                      interrupt-map =
+                              <0x0 0x0 0x0 0x1 &pci_intc 0>, /* int A */
+                              <0x0 0x0 0x0 0x2 &pci_intc 1>, /* int B */
+                              <0x0 0x0 0x0 0x3 &pci_intc 2>, /* int C */
+                              <0x0 0x0 0x0 0x4 &pci_intc 3>; /* int D */
 
-I fear it can add complexity, because it will depend on user choice to
-select this trigger for an stm32 adc, or another device, or both ?
-Not sure how to distinguish both from within this trigger driver.
-In the end, best maybe to implement this closer in stm32 adc/dac
-driver, and limit trigger usage with .validate_device().
+meaning that the IRQs are wired correctly to the root bus, and
+all slots are connected one would normally do with the standard
+swizzling.
 
->>
->>> +static const struct of_device_id stm32_exti_trigger_of_match[] = {
->>> +       { .compatible = "st,stm32-exti-trigger" },
->>> +       {},
->>
->> "iio-gpio-trigger"
->>
->> Should fit anyone, given the above amendments.
->>
->>> +#if IS_ENABLED(CONFIG_IIO_STM32_EXTI_TRIGGER)
->>> +bool is_stm32_exti_trigger(struct iio_trigger *trig);
->>> +#else
->>> +static inline bool is_stm32_exti_trigger(struct iio_trigger *trig)
->>> +{
->>> +       return false;
->>> +}
->>> +#endif
->>
->> This seems unnecessary to broadcast to the entire kernel.
-> This one section is the only really non generic element that
-> isn't supported by the existing interrupt trigger.
-> Mind you that doesn't have device tree bindings yet :(
-
-Yes, then I suppose simple approach is to rework this, and put it
-inside stm32 adc core driver ?
-Then, register trigger from there, and read from dt child node.
-Is something like the following suitable ?
-adc at 0xhhhh {
-	compatible = "st,stm32f4-adc-core"
-	...
-	adc1 {
-		...
-	}
-
-	trigger {
-		gpios = <...>;
-		st,trigger-value = <11>; /* e.g. EXTI nb */
-		st,trigger-polarity = <1>;
-	}
-}
-
-Please let me know your opinion.
-
-Best regards,
-Fabrice
-
->
-> I wonder if we can add some sort of flag in there to identify hardware
-> blocks for tricks like this. Or at a push provide the interrupt
-> to both bits of kit so they can compare and see if they are looking
-> at the same one?
->>
->> Why? (Maybe I can find explanations in later patches.
->>
->> Yours,
->> Linus Walleij
->>
->
+    Arnd
