@@ -1,47 +1,31 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 6 Feb 2017 13:38:56 +0000
-Subject: [GIT PULL] ACPI IORT fixes for v4.10-rc8
-Message-ID: <20170206133856.GA14139@red-moon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 6 Feb 2017 13:40:39 +0000
+Subject: IRQ masking hierarchy with GIC as the root
+In-Reply-To: <1486383720.2275.22.camel@pengutronix.de>
+References: <1486383720.2275.22.camel@pengutronix.de>
+Message-ID: <158e22d4-9864-a788-d4fd-576b3531ae22@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will, Catalin,
+On 06/02/17 12:22, Lucas Stach wrote:
+> Hi Marc and others,
+> 
+> in the conversion of the old GIC arch_extension to proper stacked IRQ
+> domain chips you added calls to irq_chip_mask_parent() to both the Tegra
+> LIC (drivers/irqchip/irq-tegra.c) and the i.MX GPC
+> (arch/arm/mach-imx/gpc.c).
+> 
+> Both IRQ controllers should be able to mask the IRQ on their own,
+> meaning the IRQ will not reach the GIC if it is masked at this hierarchy
+> level. Is it safe to remove the the call to mask the IRQ at the GIC
+> level, or is there something more to it that I don't (yet) see?
 
-please consider pulling a couple of minor ACPI IORT fixes that were
-missed in the last few -rc* cycles but should be considered for
-merging as soon as possible, hopefully before v4.10 is released.
+It should be safe, as long as you can guarantee that the LIC (resp. the
+GPC) is always active between the device and the GIC (it never goes in
+some bypass mode). If that condition holds, you can then cut it short.
 
 Thanks,
-Lorenzo
 
-The following changes since commit d5adbfcd5f7bcc6fa58a41c5c5ada0e5c826ce2c:
-
-  Linux 4.10-rc7 (2017-02-05 15:10:58 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git tags/iort-fixes-for-v4.10
-
-for you to fetch changes up to 2a42d9d5dd259b0bdef34a00da426ac5fb0261e1:
-
-  ACPI/IORT: Fix the error return code in iort_add_smmu_platform_device() (2017-02-06 12:50:53 +0000)
-
-----------------------------------------------------------------
-IORT fixes as a fall-out from IORT SMMU changes:
-
-* Fix return value when IORT code allocating platform
-  devices fails, that is causing a successful return
-  on failure
-* Fix the indexing in iort_node_get_id() so that the correct
-  mapping entry is used to return the correct IORT parent
-  node resulting from the mapping
-
-----------------------------------------------------------------
-Dan Carpenter (1):
-      ACPI/IORT: Fix the error return code in iort_add_smmu_platform_device()
-
-Lorenzo Pieralisi (1):
-      ACPI/IORT: Fix iort_node_get_id() mapping entries indexing
-
- drivers/acpi/arm64/iort.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+	M.
+-- 
+Jazz is not dead. It just smells funny...
