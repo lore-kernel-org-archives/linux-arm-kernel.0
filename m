@@ -1,36 +1,37 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 6 Feb 2017 11:49:53 +0100
-Subject: [PATCH v2] ARM: dts: imx: Pass 'chosen' and 'memory' nodes
-In-Reply-To: <6d3e9733-bebc-4347-95db-2a1c9018948d@i2se.com>
-References: <6d3e9733-bebc-4347-95db-2a1c9018948d@i2se.com>
-Message-ID: <13787b59-6bfc-d020-9853-ae37074009dc@i2se.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 6 Feb 2017 11:52:20 +0100
+Subject: [PATCH] clk: sunxi-ng: select SUNXI_CCU_MULT for sun5i
+In-Reply-To: <20170202143417.3514875-1-arnd@arndb.de>
+References: <20170202143417.3514875-1-arnd@arndb.de>
+Message-ID: <20170206105220.zplxoeckwbfypwxx@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 01.02.2017 um 14:30 schrieb Stefan Wahren:
-> Hi,
->
->> On Mon, Jan 30, 2017 at 4:54 PM, Russell King - ARM Linux
->> <linux@xxxxxxxxxxxxxxx> wrote:
->>
->>> /We need this regression fixed before 4.10 comes out so systems don't/
->>> /break when 4.10 comes out./
->> It will be fixed in the next rc with the following commit:
->>
-> https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/fixes&id=a971c5545c3d45a1e33fda6e57913bb75aaa20c9
-> <https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/fixes&id=a971c5545c3d45a1e33fda6e57913bb75aaa20c9>
->
->
-> i want to report that the combination i.MX28 + imx-bootlets (requires
-> CONFIG_ARM_APPENDED_DTB since bootlets can't handle DTBs) was also
-> affected before and fixed by this patch.
->
-> Btw are Arnd and Olof informed about this urgent patch?
+On Thu, Feb 02, 2017 at 03:33:57PM +0100, Arnd Bergmann wrote:
+> We get a link error when CCU_MULT is not set with the
+> newly added driver:
+> 
+> drivers/clk/sunxi-ng/ccu-sun5i.o:(.data.__compound_literal.17+0x4): undefined reference to `ccu_mult_ops'
+> drivers/clk/sunxi-ng/ccu-sun5i.o:(.data.__compound_literal.5+0x4): undefined reference to `ccu_mult_ops'
+> 
+> Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-@Shawn
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Okay, 4.10-rc7 is out but this fix isn't applied :-(
+Mike, Stephen, can you apply it directly?
 
-Is there a chance for 4.10 or do we have to wait for 4.10.1?
+Thanks,
+Maxime
 
-Maybe the subject of the patch is to harmless.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170206/26e9fa96/attachment.sig>
