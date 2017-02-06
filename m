@@ -1,61 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 6 Feb 2017 15:04:43 +0100
-Subject: [PATCH net-next v5 3/4] net: phy: Allow pre-declaration of MDIO
- devices
-In-Reply-To: <20170204210245.14812-4-f.fainelli@gmail.com>
-References: <20170204210245.14812-1-f.fainelli@gmail.com>
- <20170204210245.14812-4-f.fainelli@gmail.com>
-Message-ID: <20170206140443.GH32506@lunn.ch>
+From: panand@redhat.com (Pratyush Anand)
+Date: Mon,  6 Feb 2017 19:46:22 +0530
+Subject: [PATCH] arm64: do not trace atomic operations
+Message-ID: <f3159358fc4feb62f25bbaca9b3f949bc4341f0b.1486390538.git.panand@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +/**
-> + * mdio_register_board_info - register MDIO devices for a given board
-> + * @info: array of devices descriptors
-> + * @n: number of descriptors provided
-> + * Context: can sleep
-> + *
-> + * The board info passed can be marked with __initdata but be pointers
-> + * such as platform_data etc. are copied as-is
-> + */
-> +int mdiobus_register_board_info(const struct mdio_board_info *info,
-> +				unsigned int n)
-> +{
-> +	struct mdio_board_entry *be;
-> +	unsigned int i;
-> +
-> +	be = kcalloc(n, sizeof(*be), GFP_KERNEL);
-> +	if (!be)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < n; i++, be++, info++) {
-> +		memcpy(&be->board_info, info, sizeof(*info));
-> +		mutex_lock(&mdio_board_lock);
-> +		list_add_tail(&be->list, &mdio_board_list);
-> +		mutex_unlock(&mdio_board_lock);
-> +	}
-> +
-> +	return 0;
+Atomic operation function symbols are exported,when
+CONFIG_ARM64_LSE_ATOMICS is defined. Prefix them with notrace, so that
+an user can not trace these functions. Tracing these functions causes
+kernel crash.
 
-Hi Florian
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+---
+ arch/arm64/include/asm/lse.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I've recently been playing with a hot-pluggable SPI bus controller. It
-is a USB device, hence can come and go. On the SPI bus i have an
-SRAM. On order to instantiate the MTD device, i need SPI board info. I
-cannot add the board info until after the SPI bus master appears,
-since i need to know its ID to fill in the board info. At the moment,
-i have udev script which when the SPI bus master appears loads a
-little kernel module which registers the board info.
-
-Such a scheme will not work here. You need to iterate the list of MDIO
-devices at the end of mdiobus_register_board_info() to see if the just
-registered board info applies to any existing MDIO bus.
-
-I don't think we yet have any hardware which would do this. But there
-have been patches to one of the USB-Ethernet dongles to allow it run
-without a PHY. My guess is, to allow an SFP module. But it is not too
-big a step for somebody to make a USB attached Ethernet switch.
-
-Maybe consider adding this functionality? Also an unregister call?
-
-      Andrew
+diff --git a/arch/arm64/include/asm/lse.h b/arch/arm64/include/asm/lse.h
+index fc756e22c84c..606b20910a5c 100644
+--- a/arch/arm64/include/asm/lse.h
++++ b/arch/arm64/include/asm/lse.h
+@@ -19,7 +19,7 @@
+ __asm__(".arch_extension	lse");
+ 
+ /* Move the ll/sc atomics out-of-line */
+-#define __LL_SC_INLINE
++#define __LL_SC_INLINE		notrace
+ #define __LL_SC_PREFIX(x)	__ll_sc_##x
+ #define __LL_SC_EXPORT(x)	EXPORT_SYMBOL(__LL_SC_PREFIX(x))
+ 
+-- 
+2.9.3
