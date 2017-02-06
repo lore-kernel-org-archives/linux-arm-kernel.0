@@ -1,59 +1,54 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 6 Feb 2017 12:21:44 +0100
-Subject: [PATCH 6/8] Documentation: dt: Add new compatible to STM32
- pinctrl driver bindings
-In-Reply-To: <CACRpkdb=U+UMRqR2GKGwDzk9X_nLv0tf2dZ8LhDGceAD83LKag@mail.gmail.com>
-References: <1485533721-9019-1-git-send-email-alexandre.torgue@st.com>
- <1485533721-9019-7-git-send-email-alexandre.torgue@st.com>
- <20170201150609.cbhwon76m6igmhyh@rob-hp-laptop>
- <abee01c1-da4f-97b4-258a-3ab937f620eb@st.com>
- <CACRpkdb=U+UMRqR2GKGwDzk9X_nLv0tf2dZ8LhDGceAD83LKag@mail.gmail.com>
-Message-ID: <c1c5ca2b-3fc1-6077-87b3-4c815b7469d0@st.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Mon, 6 Feb 2017 11:35:49 +0000
+Subject: [PATCH net-next 6/8] net: ethernet: annapurna: add wol helpers
+ to the Alpine driver
+In-Reply-To: <08b62752-8bb2-4633-c44f-74eb585e7e52@cogentembedded.com>
+References: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
+ <20170203181216.30214-7-antoine.tenart@free-electrons.com>
+ <08b62752-8bb2-4633-c44f-74eb585e7e52@cogentembedded.com>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6DB027C6C3@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: netdev-owner@vger.kernel.org [mailto:netdev-owner at vger.kernel.org] On Behalf Of Sergei Shtylyov
+> Sent: 03 February 2017 18:22
+> On 02/03/2017 09:12 PM, Antoine Tenart wrote:
+> 
+> > Implement the get_wol() and set_wol() helpers in the Annapurna Labs
+> > Alpine Ethernet driver.
+> > ---
+> >  drivers/net/ethernet/annapurna/al_eth.c | 44 +++++++++++++++++++++++++++++++++
+> >  1 file changed, 44 insertions(+)
+> >
+> > diff --git a/drivers/net/ethernet/annapurna/al_eth.c b/drivers/net/ethernet/annapurna/al_eth.c
+> > index 8dd84f66b5d1..d06a75a49ce5 100644
+> > --- a/drivers/net/ethernet/annapurna/al_eth.c
+> > +++ b/drivers/net/ethernet/annapurna/al_eth.c
+> > @@ -2519,10 +2519,54 @@ static u32 al_eth_get_rxfh_indir_size(struct net_device *netdev)
+> >  	return AL_ETH_RX_RSS_TABLE_SIZE;
+> >  }
+> >
+> > +static void al_eth_get_wol(struct net_device *netdev,
+> > +			   struct ethtool_wolinfo *wol)
+> > +{
+> > +	struct al_eth_adapter *adapter = netdev_priv(netdev);
+> > +	struct phy_device *phydev;
+> > +
+> > +	wol->wolopts = adapter->wol;
+> > +
+> > +	if ((adapter) && (adapter->phy_exist) && (adapter->mdio_bus)) {
+> 
+>     Now that's somewhat stupid looking... does the whole driver use this "style"?
 
+Not only that, in one of the two functions it is followed by:
 
-On 02/06/2017 09:46 AM, Linus Walleij wrote:
-> On Wed, Feb 1, 2017 at 4:58 PM, Alexandre Torgue
-> <alexandre.torgue@st.com> wrote:
->> On 02/01/2017 04:06 PM, Rob Herring wrote:
->>>
->>> On Fri, Jan 27, 2017 at 05:15:19PM +0100, Alexandre TORGUE wrote:
->>>>
->>>> Add new compatible for stm32f469 MCU.
->>>>
->>>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
->>>>
->>>> diff --git
->>>> a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
->>>> b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
->>>> index 25d9809..4f0487d 100644
->>>> --- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
->>>> +++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
->>>> @@ -9,7 +9,8 @@ Pin controller node:
->>>>  Required properies:
->>>>   - compatible: value should be one of the following:
->>>>     (a) "st,stm32f429-pinctrl"
->>>> -   (b) "st,stm32f746-pinctrl"
->>>> +   (b) "st,stm32f469-pinctrl"
->>>> +   (c) "st,stm32f746-pinctrl"
->>>
->>>
->>> Drop the a,b,c. Otherwise, you'll be changing a bunch of lines every
->>> time.
->>
->>
->> I completely agree.
->>
->> Linus, Do i need to send a v2 for this patch ?
->
-> Nopes, applied the amended v1 patch already with these
-> changes, check the result.
++	device_set_wakeup_enable(&adapter->pdev->dev, adapter->wol);
 
-Thanks Linus!
+Which assumes that 'adapter' is not NULL.
+Some verifiers will detect that as a possible NULL pointer dereference.
 
->
-> Yours,
-> Linus Walleij
->
+Pointers should only be checked for NULL if there are valid reasons
+why they can be NULL in that code path.
+Getting there with a NULL pointer dues to some race condition isn't one of them.
+
+	David
