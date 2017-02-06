@@ -1,50 +1,70 @@
-From: nleeder@codeaurora.org (Leeder, Neil)
-Date: Mon, 6 Feb 2017 14:11:36 -0500
-Subject: [PATCH v9] perf: add qcom l2 cache perf events driver
-In-Reply-To: <20170206154814.GA4190@leverpostej>
-References: <1486161081-28409-1-git-send-email-nleeder@codeaurora.org>
- <20170206154814.GA4190@leverpostej>
-Message-ID: <8d61d7fb-71d0-190e-26e3-a72e98cfb10d@codeaurora.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 6 Feb 2017 11:17:32 -0800
+Subject: [PATCH net-next v5 3/4] net: phy: Allow pre-declaration of MDIO
+ devices
+In-Reply-To: <20170206140443.GH32506@lunn.ch>
+References: <20170204210245.14812-1-f.fainelli@gmail.com>
+ <20170204210245.14812-4-f.fainelli@gmail.com>
+ <20170206140443.GH32506@lunn.ch>
+Message-ID: <ce6ee5a6-12c9-94ae-630e-549fc67a00d9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-Thanks for those comments - I'll add the fixes.
+On 02/06/2017 06:04 AM, Andrew Lunn wrote:
+>> +/**
+>> + * mdio_register_board_info - register MDIO devices for a given board
+>> + * @info: array of devices descriptors
+>> + * @n: number of descriptors provided
+>> + * Context: can sleep
+>> + *
+>> + * The board info passed can be marked with __initdata but be pointers
+>> + * such as platform_data etc. are copied as-is
+>> + */
+>> +int mdiobus_register_board_info(const struct mdio_board_info *info,
+>> +				unsigned int n)
+>> +{
+>> +	struct mdio_board_entry *be;
+>> +	unsigned int i;
+>> +
+>> +	be = kcalloc(n, sizeof(*be), GFP_KERNEL);
+>> +	if (!be)
+>> +		return -ENOMEM;
+>> +
+>> +	for (i = 0; i < n; i++, be++, info++) {
+>> +		memcpy(&be->board_info, info, sizeof(*info));
+>> +		mutex_lock(&mdio_board_lock);
+>> +		list_add_tail(&be->list, &mdio_board_list);
+>> +		mutex_unlock(&mdio_board_lock);
+>> +	}
+>> +
+>> +	return 0;
+> 
+> Hi Florian
+> 
+> I've recently been playing with a hot-pluggable SPI bus controller. It
+> is a USB device, hence can come and go. On the SPI bus i have an
+> SRAM. On order to instantiate the MTD device, i need SPI board info. I
+> cannot add the board info until after the SPI bus master appears,
+> since i need to know its ID to fill in the board info. At the moment,
+> i have udev script which when the SPI bus master appears loads a
+> little kernel module which registers the board info.
+> 
+> Such a scheme will not work here. You need to iterate the list of MDIO
+> devices at the end of mdiobus_register_board_info() to see if the just
+> registered board info applies to any existing MDIO bus.
 
-On 2/6/2017 10:48 AM, Mark Rutland wrote:
-> I'm still concerned by this use of the filter_match callback, because it
-> depends on the set of other active events, and can change as other
-> events are scheduled in and out.
->
-> When we schedule in two conflicting events A and B in order, B will fail
-> its filter match. When we scheduled out A and B in order, B will succeed
-> its filter match.
->
-> The perf core does not expect this inconsistency, and this appears to
-> break the timing update logic in event_sched_out(), when unconditionally
-> called from ctx_sched_out() as part of perf_rotate_context().
->
-> I would feel much happier if we dropped l2_cache_filter_match(), at
-> least for the timebeing, and handled this as we do for other cases of
-> intra-pmu resource contention.
->
-> We can then consider the filter_match addition on its own at a later
-> point.
+I was thinking when mdio_device_register() is called, see if there is a
+matching board info for it, and if so, assign its platform_data
+accordingly. In the case where mdiobus_register_with_board
 
-So could this be detected in get_event_idx, the same way we handle 
-counter resource contention? That would eliminate filter_match, and it's 
-the same way its done in armv7 
-(arch/arm/kernel/perf_event_v7.c:krait_pmu_get_event_idx()).
+> 
+> I don't think we yet have any hardware which would do this. But there
+> have been patches to one of the USB-Ethernet dongles to allow it run
+> without a PHY. My guess is, to allow an SFP module. But it is not too
+> big a step for somebody to make a USB attached Ethernet switch.
+> 
+> Maybe consider adding this functionality? Also an unregister call?
 
-It's less obvious to the user, but seeing 2 events being rotated so they 
-each have ~50% coverage should provide a hint that the user did 
-something wrong, so I think that would work.
-
-Thanks,
-
-Neil
+Sure, makes sense.
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm 
-Technologies Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Florian
