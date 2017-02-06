@@ -1,186 +1,161 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Mon, 06 Feb 2017 14:12:00 +0530
-Subject: [PATCH 08/11] [media] s5p-mfc: Add VP9 decoder support
-In-Reply-To: <0b2fc4bf-347e-f4d3-1004-d5816fb32cfa@samsung.com>
-References: <1484733729-25371-1-git-send-email-smitha.t@samsung.com>
- <CGME20170118100756epcas1p2c8a93b383a4c85648b5e9efac8cea9c7@epcas1p2.samsung.com>
- <1484733729-25371-9-git-send-email-smitha.t@samsung.com>
- <0b2fc4bf-347e-f4d3-1004-d5816fb32cfa@samsung.com>
-Message-ID: <1486370520.16927.85.camel@smitha-fedora>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Mon, 06 Feb 2017 16:56:55 +0800
+Subject: [PATCH v3 2/3] nvmem: sunxi-sid: add support for H3's SID
+ controller
+In-Reply-To: <20170206085416.4qtd3wfhtinp42xv@lukather>
+References: <20170202131338.20234-1-icenowy@aosc.xyz>
+ <20170202131338.20234-2-icenowy@aosc.xyz>
+ <20170206085416.4qtd3wfhtinp42xv@lukather>
+Message-ID: <5119511486371415@web15m.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-02-02 at 09:39 +0100, Andrzej Hajda wrote: 
-> On 18.01.2017 11:02, Smitha T Murthy wrote:
-> > Add support for codec definition and corresponding buffer
-> > requirements for VP9 decoder.
-> >
-> > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> > ---
-> >  drivers/media/platform/s5p-mfc/regs-mfc-v10.h   |    6 +++++
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c |    3 ++
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_common.h |    1 +
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    |    8 ++++++
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr.h    |    2 +
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |   28 +++++++++++++++++++++++
-> >  6 files changed, 48 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-> > index a57009a..81a0a96 100644
-> > --- a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-> > +++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-> > @@ -18,6 +18,8 @@
-> >  /* MFCv10 register definitions*/
-> >  #define S5P_FIMV_MFC_CLOCK_OFF_V10			0x7120
-> >  #define S5P_FIMV_MFC_STATE_V10				0x7124
-> > +#define S5P_FIMV_D_STATIC_BUFFER_ADDR_V10		0xF570
-> > +#define S5P_FIMV_D_STATIC_BUFFER_SIZE_V10		0xF574
-> >  
-> >  /* MFCv10 Context buffer sizes */
-> >  #define MFC_CTX_BUF_SIZE_V10		(30 * SZ_1K)	/* 30KB */
-> > @@ -34,6 +36,10 @@
-> >  
-> >  /* MFCv10 codec defines*/
-> >  #define S5P_FIMV_CODEC_HEVC_DEC		17
-> > +#define S5P_FIMV_CODEC_VP9_DEC		18
-> > +
-> > +/* Decoder buffer size for MFC v10 */
-> > +#define DEC_VP9_STATIC_BUFFER_SIZE	20480
-> >  
-> >  /* Encoder buffer size for MFC v10.0 */
-> >  #define ENC_V100_H264_ME_SIZE(x, y)	\
-> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
-> > index 76eca67..102b47e 100644
-> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
-> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c
-> > @@ -104,6 +104,9 @@ static int s5p_mfc_open_inst_cmd_v6(struct s5p_mfc_ctx *ctx)
-> >  	case S5P_MFC_CODEC_HEVC_DEC:
-> >  		codec_type = S5P_FIMV_CODEC_HEVC_DEC;
-> >  		break;
-> > +	case S5P_MFC_CODEC_VP9_DEC:
-> > +		codec_type = S5P_FIMV_CODEC_VP9_DEC;
-> > +		break;
-> >  	case S5P_MFC_CODEC_H264_ENC:
-> >  		codec_type = S5P_FIMV_CODEC_H264_ENC_V6;
-> >  		break;
-> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> > index 5c46060..e720ce6 100644
-> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> > @@ -80,6 +80,7 @@ static inline dma_addr_t s5p_mfc_mem_cookie(void *a, void *b)
-> >  #define S5P_MFC_CODEC_VC1RCV_DEC	6
-> >  #define S5P_MFC_CODEC_VP8_DEC		7
-> >  #define S5P_MFC_CODEC_HEVC_DEC		17
-> > +#define S5P_MFC_CODEC_VP9_DEC		18
-> >  
-> >  #define S5P_MFC_CODEC_H264_ENC		20
-> >  #define S5P_MFC_CODEC_H264_MVC_ENC	21
-> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> > index 9f459b3..93626ed 100644
-> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> > @@ -164,6 +164,14 @@
-> >  		.num_planes	= 1,
-> >  		.versions	= MFC_V10_BIT,
-> >  	},
-> > +	{
-> > +		.name		= "VP9 Encoded Stream",
-> > +		.fourcc		= V4L2_PIX_FMT_VP9,
-> > +		.codec_mode	= S5P_FIMV_CODEC_VP9_DEC,
-> > +		.type		= MFC_FMT_DEC,
-> > +		.num_planes	= 1,
-> > +		.versions	= MFC_V10_BIT,
-> > +	},
-> >  };
-> >  
-> >  #define NUM_FORMATS ARRAY_SIZE(formats)
-> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
-> > index 6478f70..565decf 100644
-> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
-> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
-> > @@ -170,6 +170,8 @@ struct s5p_mfc_regs {
-> >  	void __iomem *d_used_dpb_flag_upper;/* v7 and v8 */
-> >  	void __iomem *d_used_dpb_flag_lower;/* v7 and v8 */
-> >  	void __iomem *d_min_scratch_buffer_size; /* v10 */
-> > +	void __iomem *d_static_buffer_addr; /* v10 */
-> > +	void __iomem *d_static_buffer_size; /* v10 */
-> >  
-> >  	/* encoder registers */
-> >  	void __iomem *e_frame_width;
-> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> > index b6cb280..da4202f 100644
-> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> > @@ -227,6 +227,13 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
-> >  			ctx->scratch_buf_size +
-> >  			(ctx->mv_count * ctx->mv_size);
-> >  		break;
-> > +	case S5P_MFC_CODEC_VP9_DEC:
-> > +		mfc_debug(2, "Use min scratch buffer size\n");
-> > +		ctx->scratch_buf_size = ALIGN(ctx->scratch_buf_size, 256);
-> 
-> Again ALIGN and magic number.
-> 
-> Beside this:
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
-Yes if we are using the scratch buffer given by the firmware we need not
-align. I will correct this in next version.
 
-Thank you for the review.
-Regards,
-Smitha 
-> 
-> 
-> > +		ctx->bank1.size =
-> > +			ctx->scratch_buf_size +
-> > +			DEC_VP9_STATIC_BUFFER_SIZE;
-> > +		break;
-> >  	case S5P_MFC_CODEC_H264_ENC:
-> >  		if (IS_MFCV10(dev)) {
-> >  			mfc_debug(2, "Use min scratch buffer size\n");
-> > @@ -338,6 +345,7 @@ static int s5p_mfc_alloc_instance_buffer_v6(struct s5p_mfc_ctx *ctx)
-> >  	case S5P_MFC_CODEC_VC1_DEC:
-> >  	case S5P_MFC_CODEC_MPEG2_DEC:
-> >  	case S5P_MFC_CODEC_VP8_DEC:
-> > +	case S5P_MFC_CODEC_VP9_DEC:
-> >  		ctx->ctx.size = buf_size->other_dec_ctx;
-> >  		break;
-> >  	case S5P_MFC_CODEC_H264_ENC:
-> > @@ -579,6 +587,14 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
-> >  		}
-> >  	}
-> >  
-> > +	if (ctx->codec_mode == S5P_FIMV_CODEC_VP9_DEC) {
-> > +		writel(buf_addr1, mfc_regs->d_static_buffer_addr);
-> > +		writel(DEC_VP9_STATIC_BUFFER_SIZE,
-> > +				mfc_regs->d_static_buffer_size);
-> > +		buf_addr1 += DEC_VP9_STATIC_BUFFER_SIZE;
-> > +		buf_size1 -= DEC_VP9_STATIC_BUFFER_SIZE;
-> > +	}
-> > +
-> >  	mfc_debug(2, "Buf1: %zu, buf_size1: %d (frames %d)\n",
-> >  			buf_addr1, buf_size1, ctx->total_dpb_count);
-> >  	if (buf_size1 < 0) {
-> > @@ -2286,6 +2302,18 @@ static unsigned int s5p_mfc_get_crop_info_v_v6(struct s5p_mfc_ctx *ctx)
-> >  	R(e_h264_options, S5P_FIMV_E_H264_OPTIONS_V8);
-> >  	R(e_min_scratch_buffer_size, S5P_FIMV_E_MIN_SCRATCH_BUFFER_SIZE_V8);
-> >  
-> > +	if (!IS_MFCV10(dev))
-> > +		goto done;
-> > +
-> > +	/* Initialize registers used in MFC v10 only.
-> > +	 * Also, over-write the registers which have
-> > +	 * a different offset for MFC v10.
-> > +	 */
-> > +
-> > +	/* decoder registers */
-> > +	R(d_static_buffer_addr, S5P_FIMV_D_STATIC_BUFFER_ADDR_V10);
-> > +	R(d_static_buffer_size, S5P_FIMV_D_STATIC_BUFFER_SIZE_V10);
-> > +
-> >  done:
-> >  	return &mfc_regs;
-> >  #undef S5P_MFC_REG_ADDR
-> 
-> 
-> 
+06.02.2017, 16:54, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> On Thu, Feb 02, 2017 at 09:13:37PM +0800, Icenowy Zheng wrote:
+>> ?The H3 SoC have a bigger SID controller, which has its direct read
+>> ?address at 0x200 position in the SID block, not 0x0.
+>>
+>> ?Also, H3 SID controller has some silicon bug that makes the direct read
+>> ?value wrong at cold boot, add code to workaround the bug. (This bug has
+>> ?already been fixed on A64 and later SoCs)
+>>
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ?---
+>> ?This patch is the part of [PATCH v2 1/1] that adds support for H3 SID
+>> ?controller.
+>>
+>> ??.../bindings/nvmem/allwinner,sunxi-sid.txt | 12 +++-
+>> ??drivers/nvmem/sunxi_sid.c | 72 +++++++++++++++++++++-
+>> ??2 files changed, 82 insertions(+), 2 deletions(-)
+>>
+>> ?diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+>> ?index d543ed3f5363..9ab9e75a6351 100644
+>> ?--- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+>> ?+++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+>> ?@@ -1,7 +1,11 @@
+>> ??Allwinner sunxi-sid
+>>
+>> ??Required properties:
+>> ?-- compatible: "allwinner,sun4i-a10-sid" or "allwinner,sun7i-a20-sid"
+>> ?+- compatible: Should be one of the following (depending on your SoC):
+>> ?+ "allwinner,sun4i-a10-sid"
+>> ?+ "allwinner,sun7i-a20-sid"
+>> ?+ "allwinner,sun8i-h3-sid"
+>> ?+
+>> ??- reg: Should contain registers location and length
+>>
+>> ??= Data cells =
+>> ?@@ -19,3 +23,9 @@ Example for sun7i:
+>> ??????????????????compatible = "allwinner,sun7i-a20-sid";
+>> ??????????????????reg = <0x01c23800 0x200>
+>> ??????????};
+>> ?+
+>> ?+Example for sun8i-h3:
+>> ?+ sid at 01c14000 {
+>> ?+ compatible = "allwinner,sun8i-h3-sid";
+>> ?+ reg = <0x01c14000 0x400>;
+>> ?+ };
+>> ?diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
+>> ?index 69524b67007f..476a161ff23a 100644
+>> ?--- a/drivers/nvmem/sunxi_sid.c
+>> ?+++ b/drivers/nvmem/sunxi_sid.c
+>> ?@@ -25,6 +25,16 @@
+>> ??#include <linux/slab.h>
+>> ??#include <linux/random.h>
+>>
+>> ?+/* Registers and special values for doing register-based SID readout on H3 */
+>> ?+#define SUN8I_SID_PRCTL 0x40
+>> ?+#define SUN8I_SID_RDKEY 0x60
+>> ?+
+>> ?+#define SUN8I_SID_OP_LOCK 0xAC
+>> ?+#define SUN8I_SID_OFFSET_MASK 0x1FF
+>> ?+#define SUN8I_SID_OFFSET_SHIFT 16
+>> ?+#define SUN8I_SID_LOCK_SHIFT 8
+>> ?+#define SUN8I_SID_READ BIT(1)
+>> ?+
+>> ??static struct nvmem_config econfig = {
+>> ??????????.name = "sunxi-sid",
+>> ??????????.read_only = true,
+>> ?@@ -34,11 +44,14 @@ static struct nvmem_config econfig = {
+>> ??};
+>>
+>> ??struct sunxi_sid_cfg {
+>> ?+ u32 value_offset;
+>> ??????????u32 size;
+>> ?+ bool need_register_readout;
+>> ??};
+>>
+>> ??struct sunxi_sid {
+>> ??????????void __iomem *base;
+>> ?+ u32 value_offset;
+>> ??};
+>>
+>> ??/* We read the entire key, due to a 32 bit read alignment requirement. Since we
+>> ?@@ -51,7 +64,8 @@ static u8 sunxi_sid_read_byte(const struct sunxi_sid *sid,
+>> ??{
+>> ??????????u32 sid_key;
+>>
+>> ?- sid_key = ioread32be(sid->base + round_down(offset, 4));
+>> ?+ sid_key = ioread32be(sid->base + sid->value_offset +
+>> ?+ round_down(offset, 4));
+>
+> This would probably be more logical to have this in sunxi_sid_read.
+
+But it's here which really access the memory...
+
+>
+>> ??????????sid_key >>= (offset % 4) * 8;
+>>
+>> ??????????return sid_key; /* Only return the last byte */
+>> ?@@ -69,6 +83,33 @@ static int sunxi_sid_read(void *context, unsigned int offset,
+>> ??????????return 0;
+>> ??}
+>>
+>> ?+static int sun8i_sid_register_readout(const struct sunxi_sid *sid,
+>> ?+ const unsigned int word,
+>> ?+ u32 *out)
+>> ?+{
+>> ?+ u32 reg_val;
+>> ?+ unsigned long expire = jiffies + msecs_to_jiffies(250);
+>> ?+
+>> ?+ /* Set word, lock access, and set read command */
+>> ?+ reg_val = (word & SUN8I_SID_OFFSET_MASK)
+>> ?+ << SUN8I_SID_OFFSET_SHIFT;
+>> ?+ reg_val |= SUN8I_SID_OP_LOCK << SUN8I_SID_LOCK_SHIFT;
+>
+> You're not using those mask and shifts anywhere else, why not just
+> define the value / macro you need directly?
+>
+>> ?+ reg_val |= SUN8I_SID_READ;
+>> ?+ writel(reg_val, sid->base + SUN8I_SID_PRCTL);
+>> ?+
+>> ?+ do {
+>> ?+ reg_val = readl(sid->base + SUN8I_SID_PRCTL);
+>> ?+ } while (time_before(jiffies, expire) && (reg_val & SUN8I_SID_READ));
+>
+> readl_poll_timeout?
+
+Thanks. I'll check it.
+
+>
+>> ?+ if (reg_val & SUN8I_SID_READ)
+>> ?+ return -EIO;
+>> ?+
+>> ?+ if (out)
+>> ?+ *out = readl(sid->base + SUN8I_SID_RDKEY);
+>
+> Why do you need that out parameter?
+
+The read operation by registers can really return a value --
+in fact, the fix to the pre-read value is a side effect.
+
+>
+> Thanks,
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
