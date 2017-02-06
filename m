@@ -1,109 +1,76 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Mon, 6 Feb 2017 12:33:16 +0530
-Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy interrupts
-Message-ID: <1486364596-19699-1-git-send-email-bharatku@xilinx.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Mon, 6 Feb 2017 15:03:41 +0800
+Subject: [PATCH 2/6] usb: mtu3: add reference clock
+In-Reply-To: <60a7c32a-b7d9-5856-2a61-3670e266bea3@gmail.com>
+References: <1484719707-12107-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1484719707-12107-2-git-send-email-chunfeng.yun@mediatek.com>
+ <7fc9de99-4bef-ddf2-c5fe-985f8d2348d2@gmail.com>
+ <1484878825.10292.58.camel@mhfsdcap03>
+ <60a7c32a-b7d9-5856-2a61-3670e266bea3@gmail.com>
+Message-ID: <1486364621.3750.4.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Adding spinlock for protecting legacy mask register
-- Few wifi end points which only support legacy interrupts,
-performs hardware reset functionalities after disabling interrupts
-by invoking disable_irq and then re-enable using enable_irq, they
-enable hardware interrupts first and then virtual irq line later.
-- The legacy irq line goes low only after DEASSERT_INTx is
-received.As the legacy irq line is high immediately after hardware
-interrupts are enabled but virq of EP is still in disabled state
-and EP handler is never executed resulting no DEASSERT_INTx.If dummy
-irq chip is used, interrutps are not masked and system is
-hanging with CPU stall.
-- Adding irq chip functions instead of dummy irq chip for legacy
-interrupts.
-- Legacy interrupts are level sensitive, so using handle_level_irq
-is more appropriate as it is masks interrupts until End point handles
-interrupts and unmasks interrutps after End point handler is executed.
-- Legacy interrupts are level triggered, virtual irq line of End
-Point shows as edge in /proc/interrupts.
-- Setting irq flags of virtual irq line of EP to level triggered
-at the time of mapping.
+On Wed, 2017-01-25 at 00:23 +0100, Matthias Brugger wrote:
+> 
+> On 01/20/2017 03:20 AM, Chunfeng Yun wrote:
+> > On Thu, 2017-01-19 at 13:22 +0100, Matthias Brugger wrote:
+> >>
+> >> On 18/01/17 07:08, Chunfeng Yun wrote:
+> >>> usually, the reference clock comes from 26M oscillator directly,
+> >>> but some SoCs are not, add it for compatibility.
+> >>>
+> >>> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> >>> ---
+> >>>  drivers/usb/mtu3/mtu3.h      |    1 +
+> >>>  drivers/usb/mtu3/mtu3_plat.c |   21 +++++++++++++++++++--
+> >>>  2 files changed, 20 insertions(+), 2 deletions(-)
+> > [...]
+> >>> @@ -154,6 +162,7 @@ static int ssusb_rscs_init(struct ssusb_mtk *ssusb)
+> >>>  static void ssusb_rscs_exit(struct ssusb_mtk *ssusb)
+> >>>  {
+> >>>  	clk_disable_unprepare(ssusb->sys_clk);
+> >>> +	clk_disable_unprepare(ssusb->ref_clk);
+> >>>  	regulator_disable(ssusb->vusb33);
+> >>>  	ssusb_phy_power_off(ssusb);
+> >>>  	ssusb_phy_exit(ssusb);
+> >>> @@ -216,6 +225,12 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+> >>>  		return PTR_ERR(ssusb->sys_clk);
+> >>>  	}
+> >>>
+> >>> +	ssusb->ref_clk = devm_clk_get(dev, "ref_ck");
+> >>> +	if (IS_ERR(ssusb->ref_clk)) {
+> >>> +		dev_err(dev, "failed to get ref clock\n");
+> >>> +		return PTR_ERR(ssusb->ref_clk);
+> >>> +	}
+> >>> +
+> >>
+> >> That would break older dts bindings, right?
+> > Yes, So I send a new patch for the related dts. Maybe it's not a
+> > problem, only one dts file need be updated currently.
+> >
+> >> ref_ck must be optional for the code.
+> > I tend to make it be optional for the dts, but not for the code.
+> > There are some "fixed-clock" which can be treated as dummy ones, and if
+> > a clock is really optional, we can use one fixed-clock in dts, and keep
+> > the code simple.
+> > In fact, the reference clock is essential for usb controller.
+> 
+> Well the thing is that there are devices in the field with an older dtb 
+> which would break on a newer kernel. That's why we need to make it work 
+> with the old dtb in the code as well.
+> 
+Happy Chinese New Year!
 
-Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
----
- drivers/pci/host/pcie-xilinx-nwl.c | 45 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 44 insertions(+), 1 deletion(-)
+Ok, I will make it optional.
 
-diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-index 43eaa4a..36f4fb4 100644
---- a/drivers/pci/host/pcie-xilinx-nwl.c
-+++ b/drivers/pci/host/pcie-xilinx-nwl.c
-@@ -184,6 +184,7 @@ struct nwl_pcie {
- 	u8 root_busno;
- 	struct nwl_msi msi;
- 	struct irq_domain *legacy_irq_domain;
-+	raw_spinlock_t leg_mask_lock;
- };
- 
- static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off)
-@@ -395,11 +396,52 @@ static void nwl_pcie_msi_handler_low(struct irq_desc *desc)
- 	chained_irq_exit(chip, desc);
- }
- 
-+static void nwl_mask_leg_irq(struct irq_data *data)
-+{
-+	struct irq_desc *desc = irq_to_desc(data->irq);
-+	struct nwl_pcie *pcie;
-+	unsigned long flags;
-+	u32 mask;
-+	u32 val;
-+
-+	pcie = irq_desc_get_chip_data(desc);
-+	mask = 1 << (data->hwirq - 1);
-+	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
-+	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
-+	nwl_bridge_writel(pcie, (val & (~mask)), MSGF_LEG_MASK);
-+	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
-+}
-+
-+static void nwl_unmask_leg_irq(struct irq_data *data)
-+{
-+	struct irq_desc *desc = irq_to_desc(data->irq);
-+	struct nwl_pcie *pcie;
-+	unsigned long flags;
-+	u32 mask;
-+	u32 val;
-+
-+	pcie = irq_desc_get_chip_data(desc);
-+	mask = 1 << (data->hwirq - 1);
-+	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
-+	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
-+	nwl_bridge_writel(pcie, (val | mask), MSGF_LEG_MASK);
-+	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
-+}
-+
-+static struct irq_chip nwl_leg_irq_chip = {
-+	.name = "nwl_pcie:legacy",
-+	.irq_enable = nwl_unmask_leg_irq,
-+	.irq_disable = nwl_mask_leg_irq,
-+	.irq_mask = nwl_mask_leg_irq,
-+	.irq_unmask = nwl_unmask_leg_irq,
-+};
-+
- static int nwl_legacy_map(struct irq_domain *domain, unsigned int irq,
- 			  irq_hw_number_t hwirq)
- {
--	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
-+	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_level_irq);
- 	irq_set_chip_data(irq, domain->host_data);
-+	irq_set_status_flags(irq, IRQ_LEVEL);
- 
- 	return 0;
- }
-@@ -538,6 +580,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
- 		return -ENOMEM;
- 	}
- 
-+	raw_spin_lock_init(&pcie->leg_mask_lock);
- 	nwl_pcie_init_msi_irq_domain(pcie);
- 	return 0;
- }
--- 
-2.1.1
+Thanks and sorry for later reply.
+
+> Regards,
+> Matthias
+> 
+> >>
+> >> Regards,
+> >> Matthias
+> >
+> >
