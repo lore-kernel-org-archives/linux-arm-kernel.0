@@ -1,71 +1,109 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  5 Feb 2017 19:49:40 +0100
-Subject: [PATCH 4/9] ARM: sun5i: Add UART2 pin group
-In-Reply-To: <cover.8519ab0b2252458a322bea5955d191e63f67100b.1486320544.git-series.maxime.ripard@free-electrons.com>
-References: <cover.8519ab0b2252458a322bea5955d191e63f67100b.1486320544.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <1da35c92609058bff5e2b4d56d8940c2919f594d.1486320544.git-series.maxime.ripard@free-electrons.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Mon, 6 Feb 2017 12:33:16 +0530
+Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy interrupts
+Message-ID: <1486364596-19699-1-git-send-email-bharatku@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's one UART2 pin group that can be used across all sun5i SoCs.
-However, the A10s already has one pin group for that controller.
+- Adding spinlock for protecting legacy mask register
+- Few wifi end points which only support legacy interrupts,
+performs hardware reset functionalities after disabling interrupts
+by invoking disable_irq and then re-enable using enable_irq, they
+enable hardware interrupts first and then virtual irq line later.
+- The legacy irq line goes low only after DEASSERT_INTx is
+received.As the legacy irq line is high immediately after hardware
+interrupts are enabled but virq of EP is still in disabled state
+and EP handler is never executed resulting no DEASSERT_INTx.If dummy
+irq chip is used, interrutps are not masked and system is
+hanging with CPU stall.
+- Adding irq chip functions instead of dummy irq chip for legacy
+interrupts.
+- Legacy interrupts are level sensitive, so using handle_level_irq
+is more appropriate as it is masks interrupts until End point handles
+interrupts and unmasks interrutps after End point handler is executed.
+- Legacy interrupts are level triggered, virtual irq line of End
+Point shows as edge in /proc/interrupts.
+- Setting irq flags of virtual irq line of EP to level triggered
+at the time of mapping.
 
-Change the index of the one in the A10s DTSI, and add the common one to
-sun5i.dtsi
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
 ---
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |  2 +-
- arch/arm/boot/dts/sun5i-a10s.dtsi                |  2 +-
- arch/arm/boot/dts/sun5i.dtsi                     | 10 ++++++++++
- 3 files changed, 12 insertions(+), 2 deletions(-)
+ drivers/pci/host/pcie-xilinx-nwl.c | 45 +++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 44 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-index 9fbeb584abf5..baee64d61f6d 100644
---- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-@@ -257,7 +257,7 @@
- 
- &uart2 {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&uart2_pins_a>;
-+	pinctrl-0 = <&uart2_pins_b>;
- 	status = "okay";
+diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+index 43eaa4a..36f4fb4 100644
+--- a/drivers/pci/host/pcie-xilinx-nwl.c
++++ b/drivers/pci/host/pcie-xilinx-nwl.c
+@@ -184,6 +184,7 @@ struct nwl_pcie {
+ 	u8 root_busno;
+ 	struct nwl_msi msi;
+ 	struct irq_domain *legacy_irq_domain;
++	raw_spinlock_t leg_mask_lock;
  };
  
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 0c08b6173d9c..5122d1179e59 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -151,7 +151,7 @@
- 		function = "uart0";
- 	};
+ static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off)
+@@ -395,11 +396,52 @@ static void nwl_pcie_msi_handler_low(struct irq_desc *desc)
+ 	chained_irq_exit(chip, desc);
+ }
  
--	uart2_pins_a: uart2 at 0 {
-+	uart2_pins_b: uart2 at 1 {
- 		pins = "PC18", "PC19";
- 		function = "uart2";
- 	};
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index fce3ec693531..cd951e2cdbe7 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -336,6 +336,16 @@
- 				function = "spi2";
- 			};
++static void nwl_mask_leg_irq(struct irq_data *data)
++{
++	struct irq_desc *desc = irq_to_desc(data->irq);
++	struct nwl_pcie *pcie;
++	unsigned long flags;
++	u32 mask;
++	u32 val;
++
++	pcie = irq_desc_get_chip_data(desc);
++	mask = 1 << (data->hwirq - 1);
++	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
++	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
++	nwl_bridge_writel(pcie, (val & (~mask)), MSGF_LEG_MASK);
++	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
++}
++
++static void nwl_unmask_leg_irq(struct irq_data *data)
++{
++	struct irq_desc *desc = irq_to_desc(data->irq);
++	struct nwl_pcie *pcie;
++	unsigned long flags;
++	u32 mask;
++	u32 val;
++
++	pcie = irq_desc_get_chip_data(desc);
++	mask = 1 << (data->hwirq - 1);
++	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
++	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
++	nwl_bridge_writel(pcie, (val | mask), MSGF_LEG_MASK);
++	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
++}
++
++static struct irq_chip nwl_leg_irq_chip = {
++	.name = "nwl_pcie:legacy",
++	.irq_enable = nwl_unmask_leg_irq,
++	.irq_disable = nwl_mask_leg_irq,
++	.irq_mask = nwl_mask_leg_irq,
++	.irq_unmask = nwl_unmask_leg_irq,
++};
++
+ static int nwl_legacy_map(struct irq_domain *domain, unsigned int irq,
+ 			  irq_hw_number_t hwirq)
+ {
+-	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
++	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_level_irq);
+ 	irq_set_chip_data(irq, domain->host_data);
++	irq_set_status_flags(irq, IRQ_LEVEL);
  
-+			uart2_pins_a: uart2 at 0 {
-+				pins = "PD2", "PD3";
-+				function = "uart2";
-+			};
-+
-+			uart2_cts_rts_pins_a: uart2-cts-rts at 0 {
-+				pins = "PD4", "PD5";
-+				function = "uart2";
-+			};
-+
- 			uart3_pins_a: uart3 at 0 {
- 				pins = "PG9", "PG10";
- 				function = "uart3";
+ 	return 0;
+ }
+@@ -538,6 +580,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
+ 		return -ENOMEM;
+ 	}
+ 
++	raw_spin_lock_init(&pcie->leg_mask_lock);
+ 	nwl_pcie_init_msi_irq_domain(pcie);
+ 	return 0;
+ }
 -- 
-git-series 0.8.11
+2.1.1
