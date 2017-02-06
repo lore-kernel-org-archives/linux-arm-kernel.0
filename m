@@ -1,49 +1,60 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 6 Feb 2017 17:13:40 +0800
-Subject: [PATCH v12 8/9] binding-doc: usb: usb-device: add optional properties
- for power sequence
-In-Reply-To: <1486372421-29073-1-git-send-email-peter.chen@nxp.com>
-References: <1486372421-29073-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1486372421-29073-9-git-send-email-peter.chen@nxp.com>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Mon, 6 Feb 2017 10:55:03 +0100 (CET)
+Subject: [PATCH 4/4] ARM: dts: add PCI to the Gemini DTSI
+In-Reply-To: <CACRpkdbrys49Yv5fJ_te2H1mEUqquc1jn2dP-uvkdLixFbtYFA@mail.gmail.com>
+References: <20170128204839.18330-1-linus.walleij@linaro.org>
+ <20170128204839.18330-4-linus.walleij@linaro.org>
+ <alpine.LNX.2.00.1702051101110.26313@T420s>
+ <CACRpkdbrys49Yv5fJ_te2H1mEUqquc1jn2dP-uvkdLixFbtYFA@mail.gmail.com>
+Message-ID: <alpine.LNX.2.00.1702061038590.7077@T420s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add optional properties for power sequence.
+Hi Linus,
 
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/usb/usb-device.txt | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+On Sun, 5 Feb 2017, Linus Walleij wrote:
 
-diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
-index 1c35e7b..3661dd2 100644
---- a/Documentation/devicetree/bindings/usb/usb-device.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-device.txt
-@@ -13,6 +13,10 @@ Required properties:
- - reg: the port number which this device is connecting to, the range
-   is 1-31.
- 
-+Optional properties:
-+power sequence properties, see
-+Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt for detail
-+
- Example:
- 
- &usb1 {
-@@ -21,8 +25,12 @@ Example:
- 	#address-cells = <1>;
- 	#size-cells = <0>;
- 
--	hub: genesys at 1 {
-+	genesys: hub at 1 {
- 		compatible = "usb5e3,608";
- 		reg = <1>;
-+
-+		clocks = <&clks IMX6SX_CLK_CKO>;
-+		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
-+		reset-duration-us = <10>;
- 	};
- }
--- 
-2.7.4
+> On Sun, Feb 5, 2017 at 11:03 AM, Hans Ulli Kroll
+> <ulli.kroll@googlemail.com> wrote:
+> 
+> > We need to the remove hwirq 26-28 from DT.
+> > First one will print this warning while boot.
+> >
+> > irq: type mismatch, failed to map hwirq-26 for /soc/interrupt-controller at 48000000!
+> (...)
+> > -                       interrupts = <8 IRQ_TYPE_LEVEL_HIGH>, /* PCI A */
+> > -                                       <26 IRQ_TYPE_LEVEL_HIGH>, /* PCI B */
+> > -                                       <27 IRQ_TYPE_LEVEL_HIGH>, /* PCI C */
+> > -                                       <28 IRQ_TYPE_LEVEL_HIGH>; /* PCI D */
+> > +                       interrupts = <8 IRQ_TYPE_LEVEL_HIGH>; /* chained irq PCI A-D */
+> 
+> Sure I can remove them ... just found them in the irqs.h file and thought it
+> made sense to add them. I'll just cut them.
+> 
+> Since there is actually an internal IRQ controller in the host controller
+> cascading the four PCI child IRQs that we model as an irqchip, I don't
+> really see why they have these "PCI B-D" IRQs... anyone has a guess?
+
+I think they used some other IP vendor.
+
+from my IB 4220 sources.
+
+#define IRQ_PCI_INTA				       PCI_IRQ_OFFSET + 0
+#ifndef CONFIG_DUAL_PCI
+#define IRQ_PCI_INTB				       PCI_IRQ_OFFSET + 1
+#define IRQ_PCI_INTC				       PCI_IRQ_OFFSET + 2
+#define IRQ_PCI_INTD				       PCI_IRQ_OFFSET + 3
+#else
+#define IRQ_PCI_INTB				       27
+#define IRQ_PCI_INTC				       28
+#define IRQ_PCI_INTD				       29
+#endif
+
+CONFIG_DUAL_PCI is never used
+IRQ_PCIB - IRQ_PCID or IRQ_PCI_INTB - IRQ_PCI_INTD are also never used.
+
+You can download my original NAS 4220 here
+http://ulli-kroll.de/gemini/kernel.tgz
+
+Greetings
+Hans Ulli Kroll
