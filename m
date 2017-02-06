@@ -1,139 +1,40 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Tue,  7 Feb 2017 02:50:08 +0800
-Subject: [PATCH v21 06/13] clocksource: arm_arch_timer: move
- arch_timer_needs_of_probing into DT init call
-In-Reply-To: <20170206185015.12296-1-fu.wei@linaro.org>
-References: <20170206185015.12296-1-fu.wei@linaro.org>
-Message-ID: <20170206185015.12296-7-fu.wei@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 6 Feb 2017 17:38:25 -0200
+Subject: [PATCH] serial: imx: Only enable UART DMA on i.MX6Q and i.MX53
+In-Reply-To: <e7f91dac-03a0-d6d1-5b12-cafcc45314f1@denx.de>
+References: <20170204213931.3566-1-marex@denx.de>
+ <DB6PR0402MB2743C709F162BDE52429DF49E3410@DB6PR0402MB2743.eurprd04.prod.outlook.com>
+ <CAOMZO5D8_vE+t=V6wHMKt590jZqJJRzeJ+_MLgqbLp=6gwsmyQ@mail.gmail.com>
+ <e7f91dac-03a0-d6d1-5b12-cafcc45314f1@denx.de>
+Message-ID: <CAOMZO5AkbtWn65p6mj=7AxCh3-v18XPuRqR07NHCSiQY82QG=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+Hi Marek,
 
-Because arch_timer_needs_of_probing is only for booting with device-tree,
-but arch_timer_common_init is a generic init call which shouldn't include
-the FW-specific code. It's better to put arch_timer_needs_of_probing into
-DT init function.
+On Mon, Feb 6, 2017 at 5:05 PM, Marek Vasut <marex@denx.de> wrote:
 
-But for per-cpu timer, the arch_timer_common_init is called from
-arch_timer_init. For reaching the goal above, this patch disassemble
-arch_timer_init and use arch_timer_register and arch_timer_common_init
-directly, just like arch_timer_mem init code is doing.
-By this way, all the DT relevant code are only called from DT init call.
+> Well yes, DMA is broken in 4.9 , that's why it's CC stable 4.9+ :)
 
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/clocksource/arm_arch_timer.c | 46 ++++++++++++++++--------------------
- 1 file changed, 21 insertions(+), 25 deletions(-)
+This patch is based on the fact that the UART on the imx6sx is not of
+a imx6q UART type, which is not correct.
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 97ed103..f2b9ec4 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -887,9 +887,6 @@ static bool __init arch_timer_needs_of_probing(void)
- 
- static int __init arch_timer_common_init(void)
- {
--	if (acpi_disabled && arch_timer_needs_of_probing())
--		return 0;
--
- 	arch_timer_banner(arch_timers_present);
- 	arch_counter_register(arch_timers_present);
- 	return arch_timer_arch_init();
-@@ -927,26 +924,9 @@ static enum arch_timer_ppi_nr __init arch_timer_select_ppi(void)
- 	return ARCH_TIMER_PHYS_SECURE_PPI;
- }
- 
--static int __init arch_timer_init(void)
--{
--	int ret;
--
--	ret = arch_timer_register();
--	if (ret)
--		return ret;
--
--	ret = arch_timer_common_init();
--	if (ret)
--		return ret;
--
--	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[ARCH_TIMER_VIRT_PPI];
--
--	return 0;
--}
--
- static int __init arch_timer_of_init(struct device_node *np)
- {
--	int i;
-+	int i, ret;
- 
- 	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
- 		pr_warn("multiple nodes in dt, skipping\n");
-@@ -957,6 +937,8 @@ static int __init arch_timer_of_init(struct device_node *np)
- 	for (i = ARCH_TIMER_PHYS_SECURE_PPI; i < ARCH_TIMER_MAX_TIMER_PPI; i++)
- 		arch_timer_ppi[i] = irq_of_parse_and_map(np, i);
- 
-+	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[ARCH_TIMER_VIRT_PPI];
-+
- 	/*
- 	 * Try to determine the frequency from the device tree,
- 	 * if fail, get the frequency from the sysreg CNTFRQ.
-@@ -1001,7 +983,14 @@ static int __init arch_timer_of_init(struct device_node *np)
- 	arch_counter_suspend_stop = of_property_read_bool(np,
- 							 "arm,no-tick-in-suspend");
- 
--	return arch_timer_init();
-+	ret = arch_timer_register();
-+	if (ret)
-+		return ret;
-+
-+	if (arch_timer_needs_of_probing())
-+		return 0;
-+
-+	return arch_timer_common_init();
- }
- CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer", arch_timer_of_init);
- CLOCKSOURCE_OF_DECLARE(armv8_arch_timer, "arm,armv8-timer", arch_timer_of_init);
-@@ -1093,7 +1082,8 @@ static int __init arch_timer_mem_init(struct device_node *np)
- 	if (ret)
- 		goto out;
- 
--	return arch_timer_common_init();
-+	if (!arch_timer_needs_of_probing())
-+		ret = arch_timer_common_init();
- out:
- 	iounmap(cntctlbase);
- 	of_node_put(best_frame);
-@@ -1122,6 +1112,7 @@ static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
- /* Initialize per-processor generic timer */
- static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- {
-+	int ret;
- 	struct acpi_table_gtdt *gtdt;
- 
- 	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
-@@ -1149,6 +1140,8 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 		map_generic_timer_interrupt(gtdt->non_secure_el2_interrupt,
- 		gtdt->non_secure_el2_flags);
- 
-+	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[ARCH_TIMER_VIRT_PPI];
-+
- 	/* Get the frequency from the sysreg CNTFRQ */
- 	arch_timer_sysreg_freq = arch_timer_get_sysreg_freq();
- 	if (!arch_timer_sysreg_freq) {
-@@ -1165,8 +1158,11 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 	/* Always-on capability */
- 	arch_timer_c3stop = !(gtdt->non_secure_el1_flags & ACPI_GTDT_ALWAYS_ON);
- 
--	arch_timer_init();
--	return 0;
-+	ret = arch_timer_register();
-+	if (ret)
-+		return ret;
-+
-+	return arch_timer_common_init();
- }
- CLOCKSOURCE_ACPI_DECLARE(arch_timer, ACPI_SIG_GTDT, arch_timer_acpi_init);
- #endif
--- 
-2.9.3
+Current imx6sx.dtsi misses to add a "fsl,imx6q-uart" compatible
+string, just like all other imx6 SoC dtsi.
+
+When we fix the compatible uart problem on imx6sx.dtsi, then DMA will
+be enabled and things will break again.
+
+That's why we need a better fix for this issue:
+
+1) Let's see if Clemens' suggestion of using the latest SDMA firmware
+can make DMA robust on  your usecase.
+
+2) If the system fails even with the latest SDMA, then the board dts
+can disable dma by passing empty dma nodes.
+
+Not all mx6 system seem to suffer from such SDMA problem. On a
+imx6sx-udoo-neo we could use UART with DMA to connect to the Bluetooth
+chip.
+
+Thanks
