@@ -1,432 +1,152 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 6 Feb 2017 17:07:31 +0000
-Subject: [PATCH 3/7] arm64: efi: move EFI header and related data to a
- separate .S file
-In-Reply-To: <20170206170334.GD4190@leverpostej>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 6 Feb 2017 17:13:12 +0000
+Subject: [PATCH 6/7] arm64: efi: replace open coded constants with
+ symbolic ones
+In-Reply-To: <1486398275-3966-7-git-send-email-ard.biesheuvel@linaro.org>
 References: <1486398275-3966-1-git-send-email-ard.biesheuvel@linaro.org>
- <1486398275-3966-4-git-send-email-ard.biesheuvel@linaro.org>
- <20170206170334.GD4190@leverpostej>
-Message-ID: <CAKv+Gu8H-Jxo-H5EZ9g6LwcW6iEHZq53bBWYAOye9EFQqUyPvw@mail.gmail.com>
+ <1486398275-3966-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170206171312.GG4190@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 February 2017 at 17:03, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Feb 06, 2017 at 04:24:31PM +0000, Ard Biesheuvel wrote:
->> In preparation of yet another round of modifications to the PE/COFF
->> header, macroize it and move the definition into a separate source
->> file.
->
-> I'm really not keen on portioning out bits of the arm64 header like
-> this.
->
-> The __jmp macro obscures the first few byes of the header, and we lose
-> the obvious relationship between the overlapping portions of the arm64
-> and PE/COFF headrs.
->
-> I think those portions which have a fixed offset from _head (which is at
-> least the overlapping PE/COFF and arm64 header bits) should stay in
-> head.S.
->
-> Can we factor out only the portions with a dynamic offset from the start
-> of the image? i.e. only pe_header and beyond?
->
+On Mon, Feb 06, 2017 at 04:24:34PM +0000, Ard Biesheuvel wrote:
+> Replace open coded constants with symbolic ones throughout the
+> Image and the EFI headers. Note that in two cases, this removes
+> a value that the PE/COFF spec does not allow:
+> - NumberOfSymbols in the PE header should be 0
+> - PE/COFF executable sections (as opposed to sections in object files)
+>   should not use the section alignment flags
 
-I have no problem at all with that. It is primarily the PE header, and
-not the Image header that clutters up head.S, which is what I am
-trying to address with this patch.
+I take it that EDK2 doesn't care about either of these, but perhaps we
+should fix those in a preparatory patch, at the start of the series, to
+separate fixes from rework.
 
+That also makes it easier to binary-diff an Image after this patch, to
+ensure that the mnemonicisation is correct. ;)
 
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/efi-header.S | 182 ++++++++++++++++++++
->>  arch/arm64/kernel/head.S       | 171 +-----------------
->>  2 files changed, 186 insertions(+), 167 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/efi-header.S b/arch/arm64/kernel/efi-header.S
->> new file mode 100644
->> index 000000000000..8c8cd0a8192b
->> --- /dev/null
->> +++ b/arch/arm64/kernel/efi-header.S
->> @@ -0,0 +1,182 @@
->> +/*
->> + * Copyright (C) 2013 - 2017 Linaro, Ltd.
->> + * Copyright (C) 2013, 2014 Red Hat, Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +
->> +     .macro  __jmp, target
->> +#ifdef CONFIG_EFI
->> +     /*
->> +      * This add instruction has no meaningful effect except that
->> +      * its opcode forms the magic "MZ" signature required by UEFI.
->> +      */
->> +     add     x13, x18, #0x16
->> +     b       \target
->> +#else
->> +     b       \target                         // branch to kernel start, magic
->> +     .long   0                               // reserved
->> +#endif
->> +     .endm
->> +
->> +     .macro  __EFI_HEADER
->> +#ifdef CONFIG_EFI
->> +     .long   pe_header - _head               // Offset to the PE header.
->> +#else
->> +     .word   0                               // reserved
->> +#endif
->> +
->> +#ifdef CONFIG_EFI
->> +     .align 3
->> +pe_header:
->> +     .ascii  "PE"
->> +     .short  0
->> +coff_header:
->> +     .short  0xaa64                                  // AArch64
->> +     .short  2                                       // nr_sections
->> +     .long   0                                       // TimeDateStamp
->> +     .long   0                                       // PointerToSymbolTable
->> +     .long   1                                       // NumberOfSymbols
->> +     .short  section_table - optional_header         // SizeOfOptionalHeader
->> +     .short  0x206                                   // Characteristics.
->> +                                                     // IMAGE_FILE_DEBUG_STRIPPED |
->> +                                                     // IMAGE_FILE_EXECUTABLE_IMAGE |
->> +                                                     // IMAGE_FILE_LINE_NUMS_STRIPPED
->> +optional_header:
->> +     .short  0x20b                                   // PE32+ format
->> +     .byte   0x02                                    // MajorLinkerVersion
->> +     .byte   0x14                                    // MinorLinkerVersion
->> +     .long   _end - efi_header_end                   // SizeOfCode
->> +     .long   0                                       // SizeOfInitializedData
->> +     .long   0                                       // SizeOfUninitializedData
->> +     .long   __efistub_entry - _head                 // AddressOfEntryPoint
->> +     .long   efi_header_end - _head                  // BaseOfCode
->> +
->> +extra_header_fields:
->> +     .quad   0                                       // ImageBase
->> +     .long   0x1000                                  // SectionAlignment
->> +     .long   PECOFF_FILE_ALIGNMENT                   // FileAlignment
->> +     .short  0                                       // MajorOperatingSystemVersion
->> +     .short  0                                       // MinorOperatingSystemVersion
->> +     .short  0                                       // MajorImageVersion
->> +     .short  0                                       // MinorImageVersion
->> +     .short  0                                       // MajorSubsystemVersion
->> +     .short  0                                       // MinorSubsystemVersion
->> +     .long   0                                       // Win32VersionValue
->> +
->> +     .long   _end - _head                            // SizeOfImage
->> +
->> +     // Everything before the kernel image is considered part of the header
->> +     .long   efi_header_end - _head                  // SizeOfHeaders
->> +     .long   0                                       // CheckSum
->> +     .short  0xa                                     // Subsystem (EFI application)
->> +     .short  0                                       // DllCharacteristics
->> +     .quad   0                                       // SizeOfStackReserve
->> +     .quad   0                                       // SizeOfStackCommit
->> +     .quad   0                                       // SizeOfHeapReserve
->> +     .quad   0                                       // SizeOfHeapCommit
->> +     .long   0                                       // LoaderFlags
->> +     .long   (section_table - .) / 8                 // NumberOfRvaAndSizes
->> +
->> +     .quad   0                                       // ExportTable
->> +     .quad   0                                       // ImportTable
->> +     .quad   0                                       // ResourceTable
->> +     .quad   0                                       // ExceptionTable
->> +     .quad   0                                       // CertificationTable
->> +     .quad   0                                       // BaseRelocationTable
->> +
->> +#ifdef CONFIG_DEBUG_EFI
->> +     .long   efi_debug_table - _head                 // DebugTable
->> +     .long   efi_debug_table_size
->> +#endif
->> +
->> +     // Section table
->> +section_table:
->> +
->> +     /*
->> +      * The EFI application loader requires a relocation section
->> +      * because EFI applications must be relocatable.  This is a
->> +      * dummy section as far as we are concerned.
->> +      */
->> +     .ascii  ".reloc"
->> +     .byte   0
->> +     .byte   0                                       // end of 0 padding of section name
->> +     .long   0
->> +     .long   0
->> +     .long   0                                       // SizeOfRawData
->> +     .long   0                                       // PointerToRawData
->> +     .long   0                                       // PointerToRelocations
->> +     .long   0                                       // PointerToLineNumbers
->> +     .short  0                                       // NumberOfRelocations
->> +     .short  0                                       // NumberOfLineNumbers
->> +     .long   0x42100040                              // Characteristics (section flags)
->> +
->> +
->> +     .ascii  ".text"
->> +     .byte   0
->> +     .byte   0
->> +     .byte   0                                       // end of 0 padding of section name
->> +     .long   _end - efi_header_end                   // VirtualSize
->> +     .long   efi_header_end - _head                  // VirtualAddress
->> +     .long   _edata - efi_header_end                 // SizeOfRawData
->> +     .long   efi_header_end - _head                  // PointerToRawData
->> +
->> +     .long   0                                       // PointerToRelocations
->> +     .long   0                                       // PointerToLineNumbers
->> +     .short  0                                       // NumberOfRelocations
->> +     .short  0                                       // NumberOfLineNumbers
->> +     .long   0xe0500020                              // Characteristics
->> +
->> +#ifdef CONFIG_DEBUG_EFI
->> +     /*
->> +      * The debug table is referenced via its Relative Virtual Address (RVA),
->> +      * which is only defined for those parts of the image that are covered
->> +      * by a section declaration. Since this header is not covered by any
->> +      * section, the debug table must be emitted elsewhere. So stick it in
->> +      * the .init.rodata section instead.
->> +      *
->> +      * Note that the EFI debug entry itself may legally have a zero RVA,
->> +      * which means we can simply put it right after the section headers.
->> +      */
->> +     __INITRODATA
->> +
->> +     .align  2
->> +efi_debug_table:
->> +     // EFI_IMAGE_DEBUG_DIRECTORY_ENTRY
->> +     .long   0                                       // Characteristics
->> +     .long   0                                       // TimeDateStamp
->> +     .short  0                                       // MajorVersion
->> +     .short  0                                       // MinorVersion
->> +     .long   2                                       // Type == EFI_IMAGE_DEBUG_TYPE_CODEVIEW
->> +     .long   efi_debug_entry_size                    // SizeOfData
->> +     .long   0                                       // RVA
->> +     .long   efi_debug_entry - _head                 // FileOffset
->> +
->> +     .set    efi_debug_table_size, . - efi_debug_table
->> +     .previous
->> +
->> +efi_debug_entry:
->> +     // EFI_IMAGE_DEBUG_CODEVIEW_NB10_ENTRY
->> +     .ascii  "NB10"                                  // Signature
->> +     .long   0                                       // Unknown
->> +     .long   0                                       // Unknown2
->> +     .long   0                                       // Unknown3
->> +
->> +     .asciz  VMLINUX_PATH
->> +
->> +     .set    efi_debug_entry_size, . - efi_debug_entry
->> +#endif
->> +
->> +     /*
->> +      * EFI will load .text onwards at the 4k section alignment
->> +      * described in the PE/COFF header. To ensure that instruction
->> +      * sequences using an adrp and a :lo12: immediate will function
->> +      * correctly at this alignment, we must ensure that .text is
->> +      * placed at a 4k boundary in the Image to begin with.
->> +      */
->> +     .align 12
->> +efi_header_end:
->> +#endif
->> +     .endm
->> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->> index c6cc82ec190b..aca9b184035a 100644
->> --- a/arch/arm64/kernel/head.S
->> +++ b/arch/arm64/kernel/head.S
->> @@ -42,6 +42,8 @@
->>  #include <asm/thread_info.h>
->>  #include <asm/virt.h>
->>
->> +#include "efi-header.S"
->> +
->>  #define __PHYS_OFFSET        (KERNEL_START - TEXT_OFFSET)
->>
->>  #if (TEXT_OFFSET & 0xfff) != 0
->> @@ -72,17 +74,7 @@ _head:
->>       /*
->>        * DO NOT MODIFY. Image header expected by Linux boot-loaders.
->>        */
->> -#ifdef CONFIG_EFI
->> -     /*
->> -      * This add instruction has no meaningful effect except that
->> -      * its opcode forms the magic "MZ" signature required by UEFI.
->> -      */
->> -     add     x13, x18, #0x16
->> -     b       stext
->> -#else
->> -     b       stext                           // branch to kernel start, magic
->> -     .long   0                               // reserved
->> -#endif
->> +     __jmp   stext                           // Executable code
->>       le64sym _kernel_offset_le               // Image load offset from start of RAM, little-endian
->>       le64sym _kernel_size_le                 // Effective size of kernel image, little-endian
->>       le64sym _kernel_flags_le                // Informative flags, little-endian
->> @@ -93,163 +85,8 @@ _head:
->>       .byte   0x52
->>       .byte   0x4d
->>       .byte   0x64
->> -#ifdef CONFIG_EFI
->> -     .long   pe_header - _head               // Offset to the PE header.
->> -#else
->> -     .word   0                               // reserved
->> -#endif
->> -
->> -#ifdef CONFIG_EFI
->> -     .align 3
->> -pe_header:
->> -     .ascii  "PE"
->> -     .short  0
->> -coff_header:
->> -     .short  0xaa64                          // AArch64
->> -     .short  2                               // nr_sections
->> -     .long   0                               // TimeDateStamp
->> -     .long   0                               // PointerToSymbolTable
->> -     .long   1                               // NumberOfSymbols
->> -     .short  section_table - optional_header // SizeOfOptionalHeader
->> -     .short  0x206                           // Characteristics.
->> -                                             // IMAGE_FILE_DEBUG_STRIPPED |
->> -                                             // IMAGE_FILE_EXECUTABLE_IMAGE |
->> -                                             // IMAGE_FILE_LINE_NUMS_STRIPPED
->> -optional_header:
->> -     .short  0x20b                           // PE32+ format
->> -     .byte   0x02                            // MajorLinkerVersion
->> -     .byte   0x14                            // MinorLinkerVersion
->> -     .long   _end - efi_header_end           // SizeOfCode
->> -     .long   0                               // SizeOfInitializedData
->> -     .long   0                               // SizeOfUninitializedData
->> -     .long   __efistub_entry - _head         // AddressOfEntryPoint
->> -     .long   efi_header_end - _head          // BaseOfCode
->> -
->> -extra_header_fields:
->> -     .quad   0                               // ImageBase
->> -     .long   0x1000                          // SectionAlignment
->> -     .long   PECOFF_FILE_ALIGNMENT           // FileAlignment
->> -     .short  0                               // MajorOperatingSystemVersion
->> -     .short  0                               // MinorOperatingSystemVersion
->> -     .short  0                               // MajorImageVersion
->> -     .short  0                               // MinorImageVersion
->> -     .short  0                               // MajorSubsystemVersion
->> -     .short  0                               // MinorSubsystemVersion
->> -     .long   0                               // Win32VersionValue
->> -
->> -     .long   _end - _head                    // SizeOfImage
->> -
->> -     // Everything before the kernel image is considered part of the header
->> -     .long   efi_header_end - _head          // SizeOfHeaders
->> -     .long   0                               // CheckSum
->> -     .short  0xa                             // Subsystem (EFI application)
->> -     .short  0                               // DllCharacteristics
->> -     .quad   0                               // SizeOfStackReserve
->> -     .quad   0                               // SizeOfStackCommit
->> -     .quad   0                               // SizeOfHeapReserve
->> -     .quad   0                               // SizeOfHeapCommit
->> -     .long   0                               // LoaderFlags
->> -     .long   (section_table - .) / 8         // NumberOfRvaAndSizes
->> -
->> -     .quad   0                               // ExportTable
->> -     .quad   0                               // ImportTable
->> -     .quad   0                               // ResourceTable
->> -     .quad   0                               // ExceptionTable
->> -     .quad   0                               // CertificationTable
->> -     .quad   0                               // BaseRelocationTable
->> -
->> -#ifdef CONFIG_DEBUG_EFI
->> -     .long   efi_debug_table - _head         // DebugTable
->> -     .long   efi_debug_table_size
->> -#endif
->> -
->> -     // Section table
->> -section_table:
->>
->> -     /*
->> -      * The EFI application loader requires a relocation section
->> -      * because EFI applications must be relocatable.  This is a
->> -      * dummy section as far as we are concerned.
->> -      */
->> -     .ascii  ".reloc"
->> -     .byte   0
->> -     .byte   0                       // end of 0 padding of section name
->> -     .long   0
->> -     .long   0
->> -     .long   0                       // SizeOfRawData
->> -     .long   0                       // PointerToRawData
->> -     .long   0                       // PointerToRelocations
->> -     .long   0                       // PointerToLineNumbers
->> -     .short  0                       // NumberOfRelocations
->> -     .short  0                       // NumberOfLineNumbers
->> -     .long   0x42100040              // Characteristics (section flags)
->> -
->> -
->> -     .ascii  ".text"
->> -     .byte   0
->> -     .byte   0
->> -     .byte   0                       // end of 0 padding of section name
->> -     .long   _end - efi_header_end   // VirtualSize
->> -     .long   efi_header_end - _head  // VirtualAddress
->> -     .long   _edata - efi_header_end // SizeOfRawData
->> -     .long   efi_header_end - _head  // PointerToRawData
->> -
->> -     .long   0               // PointerToRelocations (0 for executables)
->> -     .long   0               // PointerToLineNumbers (0 for executables)
->> -     .short  0               // NumberOfRelocations  (0 for executables)
->> -     .short  0               // NumberOfLineNumbers  (0 for executables)
->> -     .long   0xe0500020      // Characteristics (section flags)
->> -
->> -#ifdef CONFIG_DEBUG_EFI
->> -     /*
->> -      * The debug table is referenced via its Relative Virtual Address (RVA),
->> -      * which is only defined for those parts of the image that are covered
->> -      * by a section declaration. Since this header is not covered by any
->> -      * section, the debug table must be emitted elsewhere. So stick it in
->> -      * the .init.rodata section instead.
->> -      *
->> -      * Note that the EFI debug entry itself may legally have a zero RVA,
->> -      * which means we can simply put it right after the section headers.
->> -      */
->> -     __INITRODATA
->> -
->> -     .align  2
->> -efi_debug_table:
->> -     // EFI_IMAGE_DEBUG_DIRECTORY_ENTRY
->> -     .long   0                       // Characteristics
->> -     .long   0                       // TimeDateStamp
->> -     .short  0                       // MajorVersion
->> -     .short  0                       // MinorVersion
->> -     .long   2                       // Type == EFI_IMAGE_DEBUG_TYPE_CODEVIEW
->> -     .long   efi_debug_entry_size    // SizeOfData
->> -     .long   0                       // RVA
->> -     .long   efi_debug_entry - _head // FileOffset
->> -
->> -     .set    efi_debug_table_size, . - efi_debug_table
->> -     .previous
->> -
->> -efi_debug_entry:
->> -     // EFI_IMAGE_DEBUG_CODEVIEW_NB10_ENTRY
->> -     .ascii  "NB10"                  // Signature
->> -     .long   0                       // Unknown
->> -     .long   0                       // Unknown2
->> -     .long   0                       // Unknown3
->> -
->> -     .asciz  VMLINUX_PATH
->> -
->> -     .set    efi_debug_entry_size, . - efi_debug_entry
->> -#endif
->> -
->> -     /*
->> -      * EFI will load .text onwards at the 4k section alignment
->> -      * described in the PE/COFF header. To ensure that instruction
->> -      * sequences using an adrp and a :lo12: immediate will function
->> -      * correctly at this alignment, we must ensure that .text is
->> -      * placed at a 4k boundary in the Image to begin with.
->> -      */
->> -     .align 12
->> -efi_header_end:
->> -#endif
->> +     __EFI_HEADER
->>
->>       __INIT
->>
->> --
->> 2.7.4
->>
+Otherwise, this generally looks fine.
+
+Thanks,
+Mark.
+
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/efi-header.S | 37 ++++++++++----------
+>  arch/arm64/kernel/head.S       |  5 +--
+>  2 files changed, 20 insertions(+), 22 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi-header.S b/arch/arm64/kernel/efi-header.S
+> index 35b11654ecc5..c87c23336c86 100644
+> --- a/arch/arm64/kernel/efi-header.S
+> +++ b/arch/arm64/kernel/efi-header.S
+> @@ -7,6 +7,8 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> +#include <linux/pe.h>
+> +
+>  	.macro	__jmp, target
+>  #ifdef CONFIG_EFI
+>  	/*
+> @@ -33,21 +35,20 @@
+>  	.long	pe_header - _head		// Offset to the PE header.
+>  
+>  pe_header:
+> -	.ascii	"PE"
+> -	.short 	0
+> +	.long	PE_MAGIC
+>  coff_header:
+> -	.short	0xaa64					// AArch64
+> -	.short	1					// nr_sections
+> +	.short	IMAGE_FILE_MACHINE_ARM64		// Machine
+> +	.short	1					// NumberOfSections
+>  	.long	0 					// TimeDateStamp
+>  	.long	0					// PointerToSymbolTable
+> -	.long	1					// NumberOfSymbols
+> +	.long	0					// NumberOfSymbols
+>  	.short	section_table - optional_header		// SizeOfOptionalHeader
+> -	.short	0x206					// Characteristics.
+> -							// IMAGE_FILE_DEBUG_STRIPPED |
+> -							// IMAGE_FILE_EXECUTABLE_IMAGE |
+> -							// IMAGE_FILE_LINE_NUMS_STRIPPED
+> +	.short	IMAGE_FILE_DEBUG_STRIPPED | \
+> +		IMAGE_FILE_EXECUTABLE_IMAGE | \
+> +		IMAGE_FILE_LINE_NUMS_STRIPPED		// Characteristics
+> +
+>  optional_header:
+> -	.short	0x20b					// PE32+ format
+> +	.short	PE_OPT_MAGIC_PE32PLUS			// PE32+ format
+>  	.byte	0x02					// MajorLinkerVersion
+>  	.byte	0x14					// MinorLinkerVersion
+>  	.long	_end - efi_header_end			// SizeOfCode
+> @@ -58,7 +59,7 @@ optional_header:
+>  
+>  extra_header_fields:
+>  	.quad	0					// ImageBase
+> -	.long	0x1000					// SectionAlignment
+> +	.long	SZ_4K					// SectionAlignment
+>  	.long	PECOFF_FILE_ALIGNMENT			// FileAlignment
+>  	.short	0					// MajorOperatingSystemVersion
+>  	.short	0					// MinorOperatingSystemVersion
+> @@ -73,7 +74,7 @@ extra_header_fields:
+>  	// Everything before the kernel image is considered part of the header
+>  	.long	efi_header_end - _head			// SizeOfHeaders
+>  	.long	0					// CheckSum
+> -	.short	0xa					// Subsystem (EFI application)
+> +	.short	IMAGE_SUBSYSTEM_EFI_APPLICATION		// Subsystem
+>  	.short	0					// DllCharacteristics
+>  	.quad	0					// SizeOfStackReserve
+>  	.quad	0					// SizeOfStackCommit
+> @@ -96,10 +97,7 @@ extra_header_fields:
+>  
+>  	// Section table
+>  section_table:
+> -	.ascii	".text"
+> -	.byte	0
+> -	.byte	0
+> -	.byte	0        				// end of 0 padding of section name
+> +	.ascii	".text\0\0\0"
+>  	.long	_end - efi_header_end			// VirtualSize
+>  	.long	efi_header_end - _head			// VirtualAddress
+>  	.long	_edata - efi_header_end			// SizeOfRawData
+> @@ -109,7 +107,10 @@ section_table:
+>  	.long	0					// PointerToLineNumbers
+>  	.short	0					// NumberOfRelocations
+>  	.short	0					// NumberOfLineNumbers
+> -	.long	0xe0500020				// Characteristics
+> +	.long	IMAGE_SCN_CNT_CODE | \
+> +		IMAGE_SCN_MEM_EXECUTE | \
+> +		IMAGE_SCN_MEM_READ | \
+> +		IMAGE_SCN_MEM_WRITE			// Characteristics
+>  
+>  #ifdef CONFIG_DEBUG_EFI
+>  	/*
+> @@ -131,7 +132,7 @@ efi_debug_table:
+>  	.long	0					// TimeDateStamp
+>  	.short	0					// MajorVersion
+>  	.short	0					// MinorVersion
+> -	.long	2					// Type == EFI_IMAGE_DEBUG_TYPE_CODEVIEW
+> +	.long	IMAGE_DEBUG_TYPE_CODEVIEW		// Type
+>  	.long	efi_debug_entry_size			// SizeOfData
+>  	.long	0					// RVA
+>  	.long	efi_debug_entry - _head			// FileOffset
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index aca9b184035a..055735ba3600 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -81,10 +81,7 @@ _head:
+>  	.quad	0				// reserved
+>  	.quad	0				// reserved
+>  	.quad	0				// reserved
+> -	.byte	0x41				// Magic number, "ARM\x64"
+> -	.byte	0x52
+> -	.byte	0x4d
+> -	.byte	0x64
+> +	.ascii	"ARM\x64"			// Magic number
+>  
+>  	__EFI_HEADER
+>  
+> -- 
+> 2.7.4
+> 
