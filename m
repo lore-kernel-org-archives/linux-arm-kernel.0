@@ -1,72 +1,89 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Mon,  6 Feb 2017 15:22:24 +0000
-Subject: [PATCH -next] ASoC: sun4i-spdif: drop unnessary
- snd_soc_unregister_component()
-Message-ID: <20170206152224.7566-1-weiyj.lk@gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 6 Feb 2017 09:24:55 -0600
+Subject: [PATCH 2/2] DTS: dra7: Add "opp_high" opp node to support 1.5
+ GHz SoC operation
+In-Reply-To: <20170206152450.3739af18@jawa>
+References: <1486135491-14223-1-git-send-email-lukma@denx.de>	<1486135491-14223-2-git-send-email-lukma@denx.de>	<e398ff96-dca7-7934-70b1-9a95c01d3b27@ti.com>
+ <20170206152450.3739af18@jawa>
+Message-ID: <58989547.9030002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <weiyongjun1@huawei.com>
+Hi,
+On 02/06/2017 08:24 AM, Lukasz Majewski wrote:
+> Hi Dave,
+> 
+>> On 02/03/2017 09:24 AM, Lukasz Majewski wrote:
+>>> The "opp_high" property brings support for 1.5 GHz CPU frequency
+>>> for TI's am57xx line of processors.
+>>>
+>>> Signed-off-by: Lukasz Majewski <lukma@denx.de>
+>>> ---
+>>>  arch/arm/boot/dts/dra7.dtsi | 5 +++++
+>>>  1 file changed, 5 insertions(+)
+>>>
+>>
+>> This can't be blindly enabled for all am57xx SoCs, there is a
+>> forthcoming ti-cpufreq [1] driver that is needed that will decided
+>> which OPPs can and cannot be enabled for the specific variant in use.
+> 
+> Do you know if there is ongoing work on using Avs0 voltage (encoded in
+> efuse) to control the per SoC PMIC voltage value when switching to
+> opp_high (1.5 GHz)?
 
-It's not necessary to unregister a component registered
-with devm_snd_soc_register_component(). Also removed
-pointness clk_disable_unprepare() from error path and
-snd_soc_unregister_platform() from the remove.
+Yes, Viresh Kumar introduced multi-regulator support in the OPP core recently
+[1] which I wrote a test driver for here [2] which hooks into the OPP framework
+to do both ABB regulator scaling and also programs the AVS0 voltages. The
+current implementation I have cleaned up will depend on the ti-cpufreq driver so
+once that is merged I will send the AVS0 and ABB support driver upstream as
+well. If you are curious you can look at current internal implementation here [3].
 
-Fixes: f8260afa444b ("ASoC: sunxi: Add support for the SPDIF block")
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
----
- sound/soc/sunxi/sun4i-spdif.c | 13 +++----------
- 1 file changed, 3 insertions(+), 10 deletions(-)
+Regards,
+Dave
 
-diff --git a/sound/soc/sunxi/sun4i-spdif.c b/sound/soc/sunxi/sun4i-spdif.c
-index c03cd07..eaefd07 100644
---- a/sound/soc/sunxi/sun4i-spdif.c
-+++ b/sound/soc/sunxi/sun4i-spdif.c
-@@ -510,8 +510,7 @@ static int sun4i_spdif_probe(struct platform_device *pdev)
- 	host->spdif_clk = devm_clk_get(&pdev->dev, "spdif");
- 	if (IS_ERR(host->spdif_clk)) {
- 		dev_err(&pdev->dev, "failed to get a spdif clock.\n");
--		ret = PTR_ERR(host->spdif_clk);
--		goto err_disable_apb_clk;
-+		return PTR_ERR(host->spdif_clk);
- 	}
- 
- 	host->dma_params_tx.addr = res->start + quirks->reg_dac_txdata;
-@@ -525,7 +524,7 @@ static int sun4i_spdif_probe(struct platform_device *pdev)
- 		if (IS_ERR(host->rst) && PTR_ERR(host->rst) == -EPROBE_DEFER) {
- 			ret = -EPROBE_DEFER;
- 			dev_err(&pdev->dev, "Failed to get reset: %d\n", ret);
--			goto err_disable_apb_clk;
-+			return ret;
- 		}
- 		if (!IS_ERR(host->rst))
- 			reset_control_deassert(host->rst);
-@@ -534,7 +533,7 @@ static int sun4i_spdif_probe(struct platform_device *pdev)
- 	ret = devm_snd_soc_register_component(&pdev->dev,
- 				&sun4i_spdif_component, &sun4i_spdif_dai, 1);
- 	if (ret)
--		goto err_disable_apb_clk;
-+		return ret;
- 
- 	pm_runtime_enable(&pdev->dev);
- 	if (!pm_runtime_enabled(&pdev->dev)) {
-@@ -552,9 +551,6 @@ static int sun4i_spdif_probe(struct platform_device *pdev)
- 		sun4i_spdif_runtime_suspend(&pdev->dev);
- err_unregister:
- 	pm_runtime_disable(&pdev->dev);
--	snd_soc_unregister_component(&pdev->dev);
--err_disable_apb_clk:
--	clk_disable_unprepare(host->apb_clk);
- 	return ret;
- }
- 
-@@ -564,9 +560,6 @@ static int sun4i_spdif_remove(struct platform_device *pdev)
- 	if (!pm_runtime_status_suspended(&pdev->dev))
- 		sun4i_spdif_runtime_suspend(&pdev->dev);
- 
--	snd_soc_unregister_platform(&pdev->dev);
--	snd_soc_unregister_component(&pdev->dev);
--
- 	return 0;
- }
+[1] http://www.spinics.net/lists/devicetree/msg153212.html
+[2] https://www.spinics.net/lists/kernel/msg2384336.html
+[3]
+http://git.ti.com/ti-linux-kernel/ti-linux-kernel/blobs/ti-lsk-linux-4.9.y/drivers/base/power/opp/ti-opp-supply.c
+
+
+> 
+> 
+>>
+>> Regards,
+>> Dave
+>>
+>> [1] http://www.spinics.net/lists/devicetree/msg158967.html
+>>
+>>> diff --git a/arch/arm/boot/dts/dra7.dtsi
+>>> b/arch/arm/boot/dts/dra7.dtsi index a860a56..5e678cd 100644
+>>> --- a/arch/arm/boot/dts/dra7.dtsi
+>>> +++ b/arch/arm/boot/dts/dra7.dtsi
+>>> @@ -108,6 +108,11 @@
+>>>  			opp-hz = /bits/ 64 <1176000000>;
+>>>  			opp-microvolt = <1160000 885000 1160000>;
+>>>  		};
+>>> +
+>>> +		opp_high at 1500000000 {
+>>> +			opp-hz = /bits/ 64 <1500000000>;
+>>> +			opp-microvolt = <1210000 950000 1250000>;
+>>> +		};
+>>>  	};
+>>>
+>>>  	/*
+>>>
+>>
+> 
+> 
+> 
+> 
+> Best regards,
+> 
+> Lukasz Majewski
+> 
+> --
+> 
+> DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+> HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+> Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+> 
