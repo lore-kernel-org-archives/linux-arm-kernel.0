@@ -1,39 +1,104 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 6 Feb 2017 10:05:42 +0100
-Subject: [PATCH v2 2/2] mtd: nand: Update dependency of IFC for LS1021A
-In-Reply-To: <DB6PR0401MB2584DBE5D6496F44B7169B49F4600@DB6PR0401MB2584.eurprd04.prod.outlook.com>
-References: <1483411266-45875-1-git-send-email-b18965@freescale.com>
- <1483411266-45875-2-git-send-email-b18965@freescale.com>
- <4e04eb5e-fb53-f71e-ee49-0872a6c11e97@gmail.com>
- <DB6PR0401MB2584606EC932BF1FAED788E1F4610@DB6PR0401MB2584.eurprd04.prod.outlook.com>
- <ffb2c20d-3aeb-6f5a-1880-3bed0c964821@gmail.com>
- <DB6PR0401MB2584DBE5D6496F44B7169B49F4600@DB6PR0401MB2584.eurprd04.prod.outlook.com>
-Message-ID: <20170206100542.65f19dc5@bbrezillon>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 6 Feb 2017 09:07:10 +0000
+Subject: [RFC PATCH v6 0/7] ARM: Fix dma_alloc_coherent() and friends for
+ NOMMU
+In-Reply-To: <c3a09063-65e8-e560-742f-a0c350268cec@arm.com>
+References: <1485448965-32855-1-git-send-email-vladimir.murzin@arm.com>
+ <c3a09063-65e8-e560-742f-a0c350268cec@arm.com>
+Message-ID: <daf5ecd3-29aa-9626-5193-3080a9f5fd98@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alison,
+Hi,
 
-On Thu, 5 Jan 2017 02:02:30 +0000
-Alison Wang <alison.wang@nxp.com> wrote:
+Can somebody help to get this series reviewed/merged?
 
-> > On 01/04/2017 02:46 AM, Alison Wang wrote:  
-> > >> On 01/03/2017 03:41 AM, Alison Wang wrote:  
-> > >>> As NAND support for Freescale/NXP IFC controller is available on
-> > >>> LS1021A, the dependency for LS1021A is added.  
-> > >>
-> > >> Does LS stand for LayerScape ? Yes it does. So why does
-> > >> ARCH_LAYERSCAPE not cover LS1021 ?  
-> > > [Alison Wang] LS1021A is an earlier product and is not compatible  
-> > with later Layerscape architecture. So ARCH_LAYERSCAPE can't cover
-> > LS1021A.
-> > 
-> > Ah ok, I see. That information would be useful in the commit message ;-)
-> >   
-> [Alison Wang] Ok. :)
+Thanks!
+Vladimir
 
-Would you mind sending a v3 with the updated commit message?
-
-Thanks,
-
-Boris
+On 31/01/17 11:30, Vladimir Murzin wrote:
+> Gentle ping...
+> 
+> On 26/01/17 16:42, Vladimir Murzin wrote:
+>> Hi,
+>>
+>> It seem that addition of cache support for M-class CPUs uncovered
+>> latent bug in DMA usage. NOMMU memory model has been treated as being
+>> always consistent; however, for R/M CPU classes memory can be covered
+>> by MPU which in turn might configure RAM as Normal i.e. bufferable and
+>> cacheable. It breaks dma_alloc_coherent() and friends, since data can
+>> stuck in caches now or be buffered.
+>>
+>> This patch set is trying to address the issue by providing region of
+>> memory suitable for consistent DMA operations. It is supposed that
+>> such region is marked by MPU as non-cacheable. Robin suggested to
+>> advertise such memory as reserved shared-dma-pool, rather then using
+>> homebrew command line option, and extend dma-coherent to provide
+>> default DMA area in the similar way as it is done for CMA (PATCH
+>> 4/7). It allows us to offload all bookkeeping on generic coherent DMA
+>> framework, and it seems that it might be reused by other architectures
+>> like c6x and blackfin.
+>>
+>> While reviewing/testing previous vesrions of the patch set it turned
+>> out that dma-coherent does not take into account "dma-ranges" device
+>> tree property, so it is addressed in PATCH 3/7.
+>>
+>> For ARM, dedicated DMA region is required for cases other than:
+>>  - MMU/MPU is off
+>>  - cpu is v7m w/o cache support
+>>  - device is coherent
+>>
+>> In case one of the above conditions is true dma operations are forced
+>> to be coherent and wired with dma_noop_ops.
+>>
+>> To make life easier NOMMU dma operations are kept in separate
+>> compilation unit.
+>>
+>> Since the issue was reported in the same time as Benjamin sent his
+>> patch [1] to allow mmap for NOMMU, his case is also addressed in this
+>> series (PATCH 1/7 and PATCH 2/7).
+>>
+>> Thanks!
+>>
+>> [1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
+>>
+>> Cc: Joerg Roedel <jroedel@suse.de>
+>> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+>> Cc: Michal Nazarewicz <mina86@mina86.com>
+>> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Cc: Alan Stern <stern@rowland.harvard.edu>
+>> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+>> Cc: Rich Felker <dalias@libc.org>
+>> Cc: Roger Quadros <rogerq@ti.com>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>
+>> Vladimir Murzin (7):
+>>   dma: Take into account dma_pfn_offset
+>>   dma: Add simple dma_noop_mmap
+>>   drivers: dma-coherent: Account dma_pfn_offset when used with device
+>>     tree
+>>   drivers: dma-coherent: Introduce default DMA pool
+>>   ARM: NOMMU: Introduce dma operations for noMMU
+>>   ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
+>>   ARM: dma-mapping: Remove traces of NOMMU code
+>>
+>>  .../bindings/reserved-memory/reserved-memory.txt   |   3 +
+>>  arch/arm/include/asm/dma-mapping.h                 |   3 +-
+>>  arch/arm/mm/Kconfig                                |   2 +-
+>>  arch/arm/mm/Makefile                               |   5 +-
+>>  arch/arm/mm/dma-mapping-nommu.c                    | 253 +++++++++++++++++++++
+>>  arch/arm/mm/dma-mapping.c                          |  26 +--
+>>  drivers/base/dma-coherent.c                        |  76 ++++++-
+>>  lib/dma-noop.c                                     |  29 ++-
+>>  8 files changed, 356 insertions(+), 41 deletions(-)
+>>  create mode 100644 arch/arm/mm/dma-mapping-nommu.c
+>>
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
