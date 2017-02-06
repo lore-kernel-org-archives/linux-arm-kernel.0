@@ -1,69 +1,59 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 6 Feb 2017 10:13:58 -0700
-Subject: [PATCH v9 3/3] watchdog: zx2967: add watchdog controller driver
- for ZTE's zx2967 family
-In-Reply-To: <1486172055-13162-3-git-send-email-baoyou.xie@linaro.org>
-References: <1486172055-13162-1-git-send-email-baoyou.xie@linaro.org>
- <1486172055-13162-3-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170206171358.GB11391@linaro.org>
+Date: Mon, 6 Feb 2017 10:23:53 -0700
+Subject: [PATCH v8 3/3] thermal: zx2967: add thermal driver for ZTE's
+ zx2967 family
+In-Reply-To: <1486179597-30953-3-git-send-email-baoyou.xie@linaro.org>
+References: <1486179597-30953-1-git-send-email-baoyou.xie@linaro.org>
+ <1486179597-30953-3-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170206172353.GC11391@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 04, 2017 at 09:34:15AM +0800, Baoyou Xie wrote:
-> This patch adds watchdog controller driver for ZTE's zx2967 family.
->
-
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
- 
+On Sat, Feb 04, 2017 at 11:39:57AM +0800, Baoyou Xie wrote:
+> This patch adds thermal driver for ZTE's zx2967 family.
+> 
 > Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 > ---
->  drivers/watchdog/Kconfig      |  10 ++
->  drivers/watchdog/Makefile     |   1 +
->  drivers/watchdog/zx2967_wdt.c | 291 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 302 insertions(+)
->  create mode 100644 drivers/watchdog/zx2967_wdt.c
+>  drivers/thermal/Kconfig          |   8 ++
+>  drivers/thermal/Makefile         |   1 +
+>  drivers/thermal/zx2967_thermal.c | 255 +++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 264 insertions(+)
+>  create mode 100644 drivers/thermal/zx2967_thermal.c
 > 
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index acb00b5..05093a2 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -714,6 +714,16 @@ config ASPEED_WATCHDOG
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called aspeed_wdt.
+> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+> index 18f2de6..f64bd50 100644
+> --- a/drivers/thermal/Kconfig
+> +++ b/drivers/thermal/Kconfig
+> @@ -444,4 +444,12 @@ config BCM2835_THERMAL
+>  	help
+>  	  Support for thermal sensors on Broadcom bcm2835 SoCs.
 >  
-> +config ZX2967_WATCHDOG
-> +	tristate "ZTE zx2967 SoCs watchdog support"
-> +	depends on ARCH_ZX
-> +	select WATCHDOG_CORE
+> +config ZX2967_THERMAL
+> +	tristate "Thermal sensors on zx2967 SoC"
+> +	depends on ARCH_ZX || COMPILE_TEST
 > +	help
-> +	  Say Y here to include support for the watchdog timer
-> +	  in ZTE zx2967 SoCs.
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called zx2967_wdt.
+> +	  Enable the zx2967 thermal sensors driver, which supports
+> +	  the primitive temperature sensor embedded in zx2967 SoCs.
+> +	  This sensor generates the real time die temperature.
 > +
->  # AVR32 Architecture
->  
->  config AT32AP700X_WDT
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index 0c3d35e..bf2d296 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -82,6 +82,7 @@ obj-$(CONFIG_BCM7038_WDT) += bcm7038_wdt.o
->  obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
->  obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
->  obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
-> +obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
->  
->  # AVR32 Architecture
->  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-> diff --git a/drivers/watchdog/zx2967_wdt.c b/drivers/watchdog/zx2967_wdt.c
+>  endif
+> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
+> index 677c6d9..c00c05e 100644
+> --- a/drivers/thermal/Makefile
+> +++ b/drivers/thermal/Makefile
+> @@ -57,3 +57,4 @@ obj-$(CONFIG_HISI_THERMAL)     += hisi_thermal.o
+>  obj-$(CONFIG_MTK_THERMAL)	+= mtk_thermal.o
+>  obj-$(CONFIG_GENERIC_ADC_THERMAL)	+= thermal-generic-adc.o
+>  obj-$(CONFIG_BCM2835_THERMAL)	+= bcm2835_thermal.o
+> +obj-$(CONFIG_ZX2967_THERMAL)	+= zx2967_thermal.o
+> diff --git a/drivers/thermal/zx2967_thermal.c b/drivers/thermal/zx2967_thermal.c
 > new file mode 100644
-> index 0000000..e290d5a
+> index 0000000..d177238
 > --- /dev/null
-> +++ b/drivers/watchdog/zx2967_wdt.c
-> @@ -0,0 +1,291 @@
+> +++ b/drivers/thermal/zx2967_thermal.c
+> @@ -0,0 +1,255 @@
 > +/*
-> + * watchdog driver for ZTE's zx2967 family
+> + * ZTE's zx2967 family thermal sensor driver
 > + *
 > + * Copyright (C) 2017 ZTE Ltd.
 > + *
@@ -73,285 +63,255 @@ Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 > + */
 > +
 > +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +#include <linux/mfd/syscon.h>
+> +#include <linux/device.h>
+> +#include <linux/err.h>
+> +#include <linux/iopoll.h>
 > +#include <linux/module.h>
-> +#include <linux/of_address.h>
 > +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/reset.h>
-> +#include <linux/watchdog.h>
+> +#include <linux/thermal.h>
 > +
-> +#define ZX2967_WDT_CFG_REG			0x4
-> +#define ZX2967_WDT_LOAD_REG			0x8
-> +#define ZX2967_WDT_REFRESH_REG			0x18
-> +#define ZX2967_WDT_START_REG			0x1c
+> +/* Power Mode: 0->low 1->high */
+> +#define ZX2967_THERMAL_POWER_MODE	0
+> +#define ZX2967_POWER_MODE_LOW		0
+> +#define ZX2967_POWER_MODE_HIGH		1
 > +
-> +#define ZX2967_WDT_REFRESH_MASK			GENMASK(5, 0)
+> +/* DCF Control Register */
+> +#define ZX2967_THERMAL_DCF		0x4
+> +#define ZX2967_DCF_EN			BIT(1)
+> +#define ZX2967_DCF_FREEZE		BIT(0)
 > +
-> +#define ZX2967_WDT_CFG_DIV(n)			((((n) & 0xff) - 1) << 8)
-> +#define ZX2967_WDT_START_EN			0x1
+> +/* Selection Register */
+> +#define ZX2967_THERMAL_SEL		0x8
 > +
-> +/*
-> + * Hardware magic number.
-> + * When watchdog reg is written, the lowest 16 bits are valid, but
-> + * the highest 16 bits should be always this number.
-> + */
-> +#define ZX2967_WDT_WRITEKEY			(0x1234 << 16)
-> +#define ZX2967_WDT_VAL_MASK			GENMASK(15, 0)
+> +/* Control Register */
+> +#define ZX2967_THERMAL_CTRL		0x10
 > +
-> +#define ZX2967_WDT_DIV_DEFAULT			16
-> +#define ZX2967_WDT_DEFAULT_TIMEOUT		32
-> +#define ZX2967_WDT_MIN_TIMEOUT			1
-> +#define ZX2967_WDT_MAX_TIMEOUT			524
-> +#define ZX2967_WDT_MAX_COUNT			0xffff
+> +#define ZX2967_THERMAL_READY		BIT(12)
+> +#define ZX2967_THERMAL_TEMP_MASK	GENMASK(11, 0)
+> +#define ZX2967_THERMAL_ID_MASK		0x18
+> +#define ZX2967_THERMAL_ID		0x10
 > +
-> +#define ZX2967_WDT_CLK_FREQ			0x8000
+> +#define ZX2967_GET_TEMP_TIMEOUT_US	(100 * 1024)
 > +
-> +#define ZX2967_WDT_FLAG_REBOOT_MON		BIT(0)
-> +
-> +struct zx2967_wdt {
-> +	struct watchdog_device	wdt_device;
-> +	void __iomem		*reg_base;
-> +	struct clk		*clock;
+> +/* zx2967 Thermal Sensor Private Structure */
+> +struct zx2967_thermal_priv {
+> +	/* struct thermal_zone_device where the sensor is registered */
+> +	struct thermal_zone_device	*tzd;
+> +	/* prevents reads sensor in parallel */
+> +	struct mutex			lock;
+> +	/* topcrm clk structure */
+> +	struct clk			*clk_topcrm;
+> +	/* apb clk structure */
+> +	struct clk			*clk_apb;
+> +	/* pointer to base address of the thermal sensor */
+> +	void __iomem			*regs;
+> +	struct device			*dev;
 > +};
+
+Apologies for not being clearer before.  The proper way to document a structure
+can be found here [1].
+
+[1]. http://lxr.free-electrons.com/source/drivers/thermal/of-thermal.c#L39
+
 > +
-> +static inline u32 zx2967_wdt_readl(struct zx2967_wdt *wdt, u16 reg)
+> +static int zx2967_thermal_get_temp(void *data, int *temp)
 > +{
-> +	return readl_relaxed(wdt->reg_base + reg);
-> +}
-> +
-> +static inline void zx2967_wdt_writel(struct zx2967_wdt *wdt, u16 reg, u32 val)
-> +{
-> +	writel_relaxed(val | ZX2967_WDT_WRITEKEY, wdt->reg_base + reg);
-> +}
-> +
-> +static void zx2967_wdt_refresh(struct zx2967_wdt *wdt)
-> +{
+> +	void __iomem *regs;
+> +	struct zx2967_thermal_priv *priv = data;
 > +	u32 val;
+> +	int ret;
 > +
-> +	val = zx2967_wdt_readl(wdt, ZX2967_WDT_REFRESH_REG);
+> +	if (!priv->tzd)
+> +		return -EAGAIN;
+> +
+> +	regs = priv->regs;
+> +	mutex_lock(&priv->lock);
+> +	writel_relaxed(ZX2967_POWER_MODE_LOW,
+> +		       regs + ZX2967_THERMAL_POWER_MODE);
+> +	writel_relaxed(ZX2967_DCF_EN, regs + ZX2967_THERMAL_DCF);
+> +
+> +	val = readl_relaxed(regs + ZX2967_THERMAL_SEL);
+> +	val &= ~ZX2967_THERMAL_ID_MASK;
+> +	val |= ZX2967_THERMAL_ID;
+> +	writel_relaxed(val, regs + ZX2967_THERMAL_SEL);
+> +
 > +	/*
-> +	 * Bit 4-5, 1 and 2: refresh config info
-> +	 * Bit 2-3, 1 and 2: refresh counter
-> +	 * Bit 0-1, 1 and 2: refresh int-value
-> +	 * we shift each group value between 1 and 2 to refresh all data.
+> +	 * Must wait for a while, surely it's a bit odd.
+> +	 * otherwise temperature value we got has a few deviation, even if
+> +	 * the THERMAL_READY bit is set.
 > +	 */
-> +	val ^= ZX2967_WDT_REFRESH_MASK;
-> +	zx2967_wdt_writel(wdt, ZX2967_WDT_REFRESH_REG,
-> +			  val & ZX2967_WDT_VAL_MASK);
-> +}
-> +
-> +static int
-> +zx2967_wdt_set_timeout(struct watchdog_device *wdd, unsigned int timeout)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +	unsigned int divisor = ZX2967_WDT_DIV_DEFAULT;
-> +	u32 count;
-> +
-> +	count = timeout * ZX2967_WDT_CLK_FREQ;
-> +	if (count > divisor * ZX2967_WDT_MAX_COUNT)
-> +		divisor = DIV_ROUND_UP(count, ZX2967_WDT_MAX_COUNT);
-> +	count = DIV_ROUND_UP(count, divisor);
-> +	zx2967_wdt_writel(wdt, ZX2967_WDT_CFG_REG,
-> +			ZX2967_WDT_CFG_DIV(divisor) & ZX2967_WDT_VAL_MASK);
-> +	zx2967_wdt_writel(wdt, ZX2967_WDT_LOAD_REG,
-> +			count & ZX2967_WDT_VAL_MASK);
-> +	zx2967_wdt_refresh(wdt);
-> +	wdd->timeout =  (count * divisor) / ZX2967_WDT_CLK_FREQ;
-> +
-> +	return 0;
-> +}
-> +
-> +static void __zx2967_wdt_start(struct zx2967_wdt *wdt)
-> +{
-> +	u32 val;
-> +
-> +	val = zx2967_wdt_readl(wdt, ZX2967_WDT_START_REG);
-> +	val |= ZX2967_WDT_START_EN;
-> +	zx2967_wdt_writel(wdt, ZX2967_WDT_START_REG,
-> +			val & ZX2967_WDT_VAL_MASK);
-> +}
-> +
-> +static void __zx2967_wdt_stop(struct zx2967_wdt *wdt)
-> +{
-> +	u32 val;
-> +
-> +	val = zx2967_wdt_readl(wdt, ZX2967_WDT_START_REG);
-> +	val &= ~ZX2967_WDT_START_EN;
-> +	zx2967_wdt_writel(wdt, ZX2967_WDT_START_REG,
-> +			val & ZX2967_WDT_VAL_MASK);
-> +}
-> +
-> +static int zx2967_wdt_start(struct watchdog_device *wdd)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	zx2967_wdt_set_timeout(wdd, wdd->timeout);
-> +	__zx2967_wdt_start(wdt);
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_wdt_stop(struct watchdog_device *wdd)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	__zx2967_wdt_stop(wdt);
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_wdt_keepalive(struct watchdog_device *wdd)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	zx2967_wdt_refresh(wdt);
-> +
-> +	return 0;
-> +}
-> +
-> +#define ZX2967_WDT_OPTIONS \
-> +	(WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE)
-> +static const struct watchdog_info zx2967_wdt_ident = {
-> +	.options          =     ZX2967_WDT_OPTIONS,
-> +	.identity         =	"zx2967 watchdog",
-> +};
-> +
-> +static struct watchdog_ops zx2967_wdt_ops = {
-> +	.owner = THIS_MODULE,
-> +	.start = zx2967_wdt_start,
-> +	.stop = zx2967_wdt_stop,
-> +	.ping = zx2967_wdt_keepalive,
-> +	.set_timeout = zx2967_wdt_set_timeout,
-> +};
-> +
-> +static void zx2967_wdt_reset_sysctrl(struct device *dev)
-> +{
-> +	int ret;
-> +	void __iomem *regmap;
-> +	unsigned int offset, mask, config;
-> +	struct of_phandle_args out_args;
-> +
-> +	ret = of_parse_phandle_with_fixed_args(dev->of_node,
-> +			"zte,wdt-reset-sysctrl", 3, 0, &out_args);
-> +	if (ret)
-> +		return;
-> +
-> +	offset = out_args.args[0];
-> +	config = out_args.args[1];
-> +	mask = out_args.args[2];
-> +
-> +	regmap = syscon_node_to_regmap(out_args.np);
-> +	if (IS_ERR(regmap)) {
-> +		of_node_put(out_args.np);
-> +		return;
+> +	usleep_range(100, 300);
+> +	ret = readx_poll_timeout(readl, regs + ZX2967_THERMAL_CTRL,
+> +				 val, val & ZX2967_THERMAL_READY, 300,
+> +				 ZX2967_GET_TEMP_TIMEOUT_US);
+> +	if (ret) {
+> +		dev_err(priv->dev, "Thermal sensor data timeout\n");
+> +		goto unlock;
 > +	}
 > +
-> +	regmap_update_bits(regmap, offset, mask, config);
-> +	of_node_put(out_args.np);
-> +}
+> +	writel_relaxed(ZX2967_DCF_FREEZE | ZX2967_DCF_EN,
+> +		       regs + ZX2967_THERMAL_DCF);
+> +	val = readl_relaxed(regs + ZX2967_THERMAL_CTRL)
+> +			 & ZX2967_THERMAL_TEMP_MASK;
+> +	writel_relaxed(ZX2967_POWER_MODE_HIGH,
+> +		       regs + ZX2967_THERMAL_POWER_MODE);
 > +
-> +static int zx2967_wdt_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct zx2967_wdt *wdt;
-> +	struct resource *base;
-> +	int ret;
-> +	struct reset_control *rstc;
+> +	/*
+> +	 * Calculate temperature
+> +	 * In dts, slope is multiplied by 1000.
+> +	 */
+> +	*temp = DIV_ROUND_CLOSEST(((s32)val + priv->tzd->tzp->offset) * 1000,
+> +				  priv->tzd->tzp->slope);
 > +
-> +	wdt = devm_kzalloc(dev, sizeof(*wdt), GFP_KERNEL);
-> +	if (!wdt)
-> +		return -ENOMEM;
-> +
-> +	platform_set_drvdata(pdev, wdt);
-> +
-> +	wdt->wdt_device.info = &zx2967_wdt_ident;
-> +	wdt->wdt_device.ops = &zx2967_wdt_ops;
-> +	wdt->wdt_device.timeout = ZX2967_WDT_DEFAULT_TIMEOUT;
-> +	wdt->wdt_device.max_timeout = ZX2967_WDT_MAX_TIMEOUT;
-> +	wdt->wdt_device.min_timeout = ZX2967_WDT_MIN_TIMEOUT;
-> +	wdt->wdt_device.parent = &pdev->dev;
-> +
-> +	base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	wdt->reg_base = devm_ioremap_resource(dev, base);
-> +	if (IS_ERR(wdt->reg_base)) {
-> +		dev_err(dev, "ioremap failed\n");
-> +		return PTR_ERR(wdt->reg_base);
-> +	}
-> +
-> +	zx2967_wdt_reset_sysctrl(dev);
-> +
-> +	wdt->clock = devm_clk_get(dev, NULL);
-> +	if (IS_ERR(wdt->clock)) {
-> +		dev_err(dev, "failed to find watchdog clock source\n");
-> +		return PTR_ERR(wdt->clock);
-> +	}
-> +
-> +	ret = clk_prepare_enable(wdt->clock);
-> +	if (ret < 0) {
-> +		dev_err(dev, "failed to enable clock\n");
-> +		return ret;
-> +	}
-> +	clk_set_rate(wdt->clock, ZX2967_WDT_CLK_FREQ);
-> +
-> +	rstc = devm_reset_control_get(dev, NULL);
-> +	if (IS_ERR(rstc)) {
-> +		dev_err(dev, "failed to get rstc");
-> +		ret = PTR_ERR(rstc);
-> +		goto err;
-> +	}
-> +
-> +	reset_control_assert(rstc);
-> +	reset_control_deassert(rstc);
-> +
-> +	watchdog_set_drvdata(&wdt->wdt_device, wdt);
-> +	watchdog_init_timeout(&wdt->wdt_device,
-> +			ZX2967_WDT_DEFAULT_TIMEOUT, dev);
-> +	watchdog_set_nowayout(&wdt->wdt_device, WATCHDOG_NOWAYOUT);
-> +
-> +	ret = watchdog_register_device(&wdt->wdt_device);
-> +	if (ret)
-> +		goto err;
-> +
-> +	dev_info(dev, "watchdog enabled (timeout=%d sec, nowayout=%d)",
-> +		 wdt->wdt_device.timeout, WATCHDOG_NOWAYOUT);
-> +
-> +	return 0;
-> +
-> +err:
-> +	clk_disable_unprepare(wdt->clock);
+> +unlock:
+> +	mutex_unlock(&priv->lock);
 > +	return ret;
 > +}
 > +
-> +static int zx2967_wdt_remove(struct platform_device *pdev)
-> +{
-> +	struct zx2967_wdt *wdt = platform_get_drvdata(pdev);
+> +static struct thermal_zone_of_device_ops zx2967_of_thermal_ops = {
+> +	.get_temp = zx2967_thermal_get_temp,
+> +};
 > +
-> +	watchdog_unregister_device(&wdt->wdt_device);
-> +	clk_disable_unprepare(wdt->clock);
+> +static int zx2967_thermal_probe(struct platform_device *pdev)
+> +{
+> +	struct zx2967_thermal_priv *priv;
+> +	struct resource *res;
+> +	int ret;
+> +
+> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	priv->regs = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(priv->regs))
+> +		return PTR_ERR(priv->regs);
+> +
+> +	priv->clk_topcrm = devm_clk_get(&pdev->dev, "topcrm");
+> +	if (IS_ERR(priv->clk_topcrm)) {
+> +		ret = PTR_ERR(priv->clk_topcrm);
+> +		dev_err(&pdev->dev, "failed to get topcrm clock: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_prepare_enable(priv->clk_topcrm);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable topcrm clock: %d\n",
+> +			ret);
+> +		return ret;
+> +	}
+> +
+> +	priv->clk_apb = devm_clk_get(&pdev->dev, "apb");
+> +	if (IS_ERR(priv->clk_apb)) {
+> +		ret = PTR_ERR(priv->clk_apb);
+> +		dev_err(&pdev->dev, "failed to get apb clock: %d\n", ret);
+> +		goto disable_clk_topcrm;
+> +	}
+> +
+> +	ret = clk_prepare_enable(priv->clk_apb);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable apb clock: %d\n",
+> +			ret);
+> +		goto disable_clk_topcrm;
+> +	}
+> +
+> +	mutex_init(&priv->lock);
+> +	priv->tzd = thermal_zone_of_sensor_register(&pdev->dev,
+> +					0, priv, &zx2967_of_thermal_ops);
+> +
+> +	if (IS_ERR(priv->tzd)) {
+> +		ret = PTR_ERR(priv->tzd);
+> +		dev_err(&pdev->dev, "failed to register sensor: %d\n", ret);
+> +		goto disable_clk_all;
+> +	}
+> +
+> +	if (priv->tzd->tzp->slope == 0) {
+> +		thermal_zone_of_sensor_unregister(&pdev->dev, priv->tzd);
+> +		dev_err(&pdev->dev, "coefficients of sensor is invalid\n");
+> +		ret = -EINVAL;
+> +		goto disable_clk_all;
+> +	}
+> +
+> +	priv->dev = &pdev->dev;
+> +	platform_set_drvdata(pdev, priv);
+> +
+> +	return 0;
+> +
+> +disable_clk_all:
+> +	clk_disable_unprepare(priv->clk_apb);
+> +disable_clk_topcrm:
+> +	clk_disable_unprepare(priv->clk_topcrm);
+> +	return ret;
+> +}
+> +
+> +static int zx2967_thermal_exit(struct platform_device *pdev)
+> +{
+> +	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
+> +
+> +	thermal_zone_of_sensor_unregister(&pdev->dev, priv->tzd);
+> +	clk_disable_unprepare(priv->clk_topcrm);
+> +	clk_disable_unprepare(priv->clk_apb);
 > +
 > +	return 0;
 > +}
 > +
-> +static const struct of_device_id zx2967_wdt_match[] = {
-> +	{ .compatible = "zte,zx296718-wdt", },
+> +static const struct of_device_id zx2967_thermal_id_table[] = {
+> +	{ .compatible = "zte,zx296718-thermal" },
 > +	{}
 > +};
-> +MODULE_DEVICE_TABLE(of, zx2967_wdt_match);
+> +MODULE_DEVICE_TABLE(of, zx2967_thermal_id_table);
 > +
-> +static struct platform_driver zx2967_wdt_driver = {
-> +	.probe		= zx2967_wdt_probe,
-> +	.remove		= zx2967_wdt_remove,
-> +	.driver		= {
-> +		.name	= "zx2967-wdt",
-> +		.of_match_table	= of_match_ptr(zx2967_wdt_match),
+> +#ifdef CONFIG_PM_SLEEP
+> +static int zx2967_thermal_suspend(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
+> +
+> +	if (priv && priv->clk_topcrm)
+> +		clk_disable_unprepare(priv->clk_topcrm);
+> +
+> +	if (priv && priv->clk_apb)
+> +		clk_disable_unprepare(priv->clk_apb);
+> +
+> +	return 0;
+> +}
+> +
+> +static int zx2967_thermal_resume(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
+> +	int error;
+> +
+> +	error = clk_prepare_enable(priv->clk_topcrm);
+> +	if (error)
+> +		return error;
+> +
+> +	error = clk_prepare_enable(priv->clk_apb);
+> +	if (error) {
+> +		clk_disable_unprepare(priv->clk_topcrm);
+> +		return error;
+> +	}
+> +
+> +	return 0;
+> +}
+> +#endif
+> +
+> +static SIMPLE_DEV_PM_OPS(zx2967_thermal_pm_ops,
+> +			 zx2967_thermal_suspend, zx2967_thermal_resume);
+> +
+> +static struct platform_driver zx2967_thermal_driver = {
+> +	.probe = zx2967_thermal_probe,
+> +	.remove = zx2967_thermal_exit,
+> +	.driver = {
+> +		.name = "zx2967_thermal",
+> +		.of_match_table = zx2967_thermal_id_table,
+> +		.pm = &zx2967_thermal_pm_ops,
 > +	},
 > +};
-> +module_platform_driver(zx2967_wdt_driver);
+> +module_platform_driver(zx2967_thermal_driver);
 > +
 > +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
-> +MODULE_DESCRIPTION("ZTE zx2967 Watchdog Device Driver");
+> +MODULE_DESCRIPTION("ZTE zx2967 thermal driver");
 > +MODULE_LICENSE("GPL v2");
 > -- 
 > 2.7.4
