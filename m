@@ -1,19 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 06 Feb 2017 17:36:01 +0100
-Subject: [GIT PULL] ARM: mvebu: fixes for v4.10 (#1)
-In-Reply-To: <87shnwwknh.fsf@free-electrons.com>
-References: <87y3xrz5ir.fsf@free-electrons.com>
- <87shnwwknh.fsf@free-electrons.com>
-Message-ID: <4021283.AnkRVP7sTo@wuerfel>
+Date: Mon, 6 Feb 2017 17:38:45 +0100
+Subject: [PATCH] ARM: defconfigs: make NF_CT_PROTO_SCTP and
+ NF_CT_PROTO_UDPLITE built-in
+In-Reply-To: <20170203164647.3610978-1-arnd@arndb.de>
+References: <20170203164647.3610978-1-arnd@arndb.de>
+Message-ID: <CAK8P3a0ms69LLevt5oamJ5h6S3o-Rm_RtR=YCdayU3v+7BCdzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 2, 2017 6:46:26 PM CET Gregory CLEMENT wrote:
-> mvebu fixes for 4.10 (part 1)
-> 
-> More consistent naming for some orion5x based boards helping the
-> switch to device tree for debian users.
+On Fri, Feb 3, 2017 at 5:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The symbols can no longer be used as loadable modules, leading to a harmless Kconfig
+> warning:
+>
+> arch/arm/configs/imote2_defconfig:60:warning: symbol value 'm' invalid for NF_CT_PROTO_UDPLITE
+> arch/arm/configs/imote2_defconfig:59:warning: symbol value 'm' invalid for NF_CT_PROTO_SCTP
+> arch/arm/configs/ezx_defconfig:68:warning: symbol value 'm' invalid for NF_CT_PROTO_UDPLITE
+> arch/arm/configs/ezx_defconfig:67:warning: symbol value 'm' invalid for NF_CT_PROTO_SCTP
+>
+> Let's make them built-in.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Pulled into fixes, thanks!
+Added to the fixes branch now, as I see the warnings in kernelci for ARM.
 
-	Arnd
+    Arnd
