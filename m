@@ -1,112 +1,98 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon,  6 Feb 2017 10:26:52 -0600
-Subject: [PATCH v2] irqchip/gicv3: Fix GICR_WAKE & GICD_IGROUPR accesses from
- non-secure
-Message-ID: <1486398412-11357-1-git-send-email-shankerd@codeaurora.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 6 Feb 2017 22:24:00 +0530
+Subject: [PATCH 5/6] dmaengine: Add Broadcom SBA RAID driver
+In-Reply-To: <CAALAos9FxwKuF+qtqViybZ8APZNYt-PWLnTfJs64xtoyYB5NZQ@mail.gmail.com>
+References: <1486010836-25228-1-git-send-email-anup.patel@broadcom.com>
+ <1486010836-25228-6-git-send-email-anup.patel@broadcom.com>
+ <20170205060657.GV19244@localhost>
+ <CAALAos9FxwKuF+qtqViybZ8APZNYt-PWLnTfJs64xtoyYB5NZQ@mail.gmail.com>
+Message-ID: <20170206165400.GD19244@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On systems where GIC support two security states, both the register
-GICR_WAKE and GICD_IGROUPR accesses are RAZ/WI from non-secure.
-The function gic_enable_redist() to wake/sleep redistributor is not
-harmful at all, but it is confusing looking at the code. The current
-code checks the single security state based on bit GICD_CTLR.DS which
-is absolutely incorrect. The disable security bit GICD_CTLR.DS is RAZ
-to non-secure. The GICD_TYPE.SecurityExtn indicates whether the GIC
-implementation supports two security states or only one security
-state.
+On Mon, Feb 06, 2017 at 05:31:15PM +0530, Anup Patel wrote:
 
-Let's introduce a new helper function gic_has_security_extn() to
-know GIC security state. Use this function to bypass the code that
-is touching the registers GICR_WAKE and GICD_IGROUPR.
+> >> +
+> >> +/* SBA C_MDATA helper macros */
+> >> +#define SBA_C_MDATA_LOAD_VAL(__bnum0)                ((__bnum0) & 0x3)
+> >> +#define SBA_C_MDATA_WRITE_VAL(__bnum0)               ((__bnum0) & 0x3)
+> >> +#define SBA_C_MDATA_XOR_VAL(__bnum1, __bnum0)                        \
+> >> +                     ({      u32 __v = ((__bnum0) & 0x3);    \
+> >> +                             __v |= ((__bnum1) & 0x3) << 2;  \
+> >> +                             __v;                            \
+> >> +                     })
+> >> +#define SBA_C_MDATA_PQ_VAL(__dnum, __bnum1, __bnum0)         \
+> >> +                     ({      u32 __v = ((__bnum0) & 0x3);    \
+> >> +                             __v |= ((__bnum1) & 0x3) << 2;  \
+> >> +                             __v |= ((__dnum) & 0x1f) << 5;  \
+> >> +                             __v;                            \
+> >> +                     })
+> >
+> > ah why are we usig complex macros, why can't these be simple functions..
+> 
+> "static inline functions" seemed too complicated here because most of
+> these macros are two lines of c-code.
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
-Changes since v1:
-    Edit comments.
-    Do explicit writes to IGRPMODR if GIC security is disabled.
+and thats where I have an issue with this. Macros for simple things is fine
+but not for couple of line of logic!
 
- drivers/irqchip/irq-gic-v3.c       | 40 +++++++++++++++++++++++++++++++-------
- include/linux/irqchip/arm-gic-v3.h |  1 +
- 2 files changed, 34 insertions(+), 7 deletions(-)
+> 
+> Do you still insist on using "static inline functions"?
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index c132f29..31b54ab 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -130,12 +130,28 @@ static u64 __maybe_unused gic_read_iar(void)
- }
- #endif
- 
-+/**
-+ * Check whether the GIC implementation supports two security
-+ * states or only one security state.
-+ * return true if it has two security states else return false.
-+ */
-+static bool gic_has_security_extn(void)
-+{
-+	u32 typer = readl_relaxed(gic_data.dist_base + GICD_TYPER);
-+
-+	return !!(typer & GICD_TYPER_SECURITY_EXTN);
-+}
-+
- static void gic_enable_redist(bool enable)
- {
- 	void __iomem *rbase;
- 	u32 count = 1000000;	/* 1s! */
- 	u32 val;
- 
-+	/* With only one security state, GICR_WAKE is RAZ/WI to non-secure */
-+	if (gic_has_security_extn())
-+		return;
-+
- 	rbase = gic_data_rdist_rd_base();
- 
- 	val = readl_relaxed(rbase + GICR_WAKER);
-@@ -399,14 +415,24 @@ static void __init gic_dist_init(void)
- 
- 	/*
- 	 * Configure SPIs as non-secure Group-1. This will only matter
--	 * if the GIC only has a single security state. This will not
--	 * do the right thing if the kernel is running in secure mode,
--	 * but that's not the intended use case anyway.
-+	 * if the GIC only has a single security state. This will do
-+	 * the right thing if the kernel is running in secure mode and
-+	 * with assumption all the SPIs are allocated to Linux, but
-+	 * that's not the intended use case anyway.
-+	 *
-+	 * IGRPMODR  IGROUPR  Definition         ShortName
-+	 *    0         0     Secure Group0      G0S
-+	 *    0         1     Non-secure Group1  G1NS
-+	 *    1         0     Secure Group1      G1S
-+	 *    1         1     Reserved           treated as G1NS
- 	 */
--	for (i = 32; i < gic_data.irq_nr; i += 32)
--		writel_relaxed(~0, base + GICD_IGROUPR + i / 8);
--
--	gic_dist_config(base, gic_data.irq_nr, gic_dist_wait_for_rwp);
-+	if (!gic_has_security_extn()) {
-+		for (i = 32; i < gic_data.irq_nr; i += 32) {
-+			writel_relaxed(0, base + GICD_IGRPMODR + i / 8);
-+			writel_relaxed(~0, base + GICD_IGROUPR + i / 8);
-+		}
-+		gic_dist_config(base, gic_data.irq_nr, gic_dist_wait_for_rwp);
-+	}
- 
- 	/* Enable distributor with ARE, Group1 */
- 	writel_relaxed(GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1,
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index e808f8a..aab00e5 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -70,6 +70,7 @@
- 
- #define GICD_TYPER_LPIS			(1U << 17)
- #define GICD_TYPER_MBIS			(1U << 16)
-+#define GICD_TYPER_SECURITY_EXTN	(1U << 10)
- 
- #define GICD_TYPER_ID_BITS(typer)	((((typer) >> 19) & 0x1f) + 1)
- #define GICD_TYPER_IRQS(typer)		((((typer) & 0x1f) + 1) * 32)
+Yes
+
+> 
+> >
+> >> +#define SBA_C_MDATA_LS(__c_mdata_val)        ((__c_mdata_val) & 0xff)
+> >> +#define SBA_C_MDATA_MS(__c_mdata_val)        (((__c_mdata_val) >> 8) & 0x3)
+> >> +
+> >> +/* Driver helper macros */
+> >> +#define to_sba_request(tx)           \
+> >> +     container_of(tx, struct sba_request, tx)
+> >> +#define to_sba_device(dchan)         \
+> >> +     container_of(dchan, struct sba_device, dma_chan)
+> >> +
+> >> +enum sba_request_state {
+> >> +     SBA_REQUEST_STATE_FREE = 1,
+> >> +     SBA_REQUEST_STATE_ALLOCED = 2,
+> >> +     SBA_REQUEST_STATE_PENDING = 3,
+> >> +     SBA_REQUEST_STATE_ACTIVE = 4,
+> >> +     SBA_REQUEST_STATE_COMPLETED = 5,
+> >> +     SBA_REQUEST_STATE_ABORTED = 6,
+> >
+> > whats up with a very funny indentation setting, we use 8 chars.
+> >
+> > Please re-read the Documentation/process/coding-style.rst
+> 
+> I have double checked this enum. The indentation is fine
+> and as-per coding style. Am I missing anything else?
+
+Somehow the initial indent doesnt seem to be 8 chars to me.
+
+> >> +static enum dma_status sba_tx_status(struct dma_chan *dchan,
+> >> +                                  dma_cookie_t cookie,
+> >> +                                  struct dma_tx_state *txstate)
+> >> +{
+> >> +     int mchan_idx;
+> >> +     enum dma_status ret;
+> >> +     struct sba_device *sba = to_sba_device(dchan);
+> >> +
+> >> +     ret = dma_cookie_status(dchan, cookie, txstate);
+> >> +     if (ret == DMA_COMPLETE)
+> >> +             return ret;
+> >> +
+> >> +     for (mchan_idx = 0; mchan_idx < sba->mchans_count; mchan_idx++)
+> >> +             mbox_client_peek_data(sba->mchans[mchan_idx]);
+> >
+> > what is this achieving?
+> 
+> The mbox_client_peek_data() is a hint to mailbox controller driver
+> to check for available messages.
+> 
+> This gives good performance improvement when some DMA client
+> code is polling using tx_status() callback.
+
+Then why do it before and then check status.
+
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+~Vinod
