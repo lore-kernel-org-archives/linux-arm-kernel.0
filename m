@@ -1,223 +1,167 @@
 From: peter.chen@nxp.com (Peter Chen)
-Date: Mon, 6 Feb 2017 17:13:38 +0800
-Subject: [PATCH v12 6/9] usb: xhci: use bus->sysdev for DMA configuration
+Date: Mon, 6 Feb 2017 17:13:41 +0800
+Subject: [PATCH v12 9/9] usb: core: add power sequence handling for USB devices
 In-Reply-To: <1486372421-29073-1-git-send-email-peter.chen@nxp.com>
 References: <1486372421-29073-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1486372421-29073-7-git-send-email-peter.chen@nxp.com>
+Message-ID: <1486372421-29073-10-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+Some hard-wired USB devices need to do power sequence to let the
+device work normally, the typical power sequence like: enable USB
+PHY clock, toggle reset pin, etc. But current Linux USB driver
+lacks of such code to do it, it may cause some hard-wired USB devices
+works abnormal or can't be recognized by controller at all.
 
-For xhci-hcd platform device, all the DMA parameters are not
-configured properly, notably dma ops for dwc3 devices. So, set
-the dma for xhci from sysdev. sysdev is pointing to device that
-is known to the system firmware or hardware.
+In this patch, it calls power sequence library APIs to finish
+the power sequence events. It will do power on sequence at hub's
+probe for all devices under this hub (includes root hub).
+At hub_disconnect, it will do power off sequence which is at powered
+on list.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
-Tested-by: Baolin Wang <baolin.wang@linaro.org>
-Tested-by: Vivek Gautam <vivek.gautam@codeaurora.org>
-Tested-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
-Signed-off-by: Mathias Nyman <mathias.nyman@linux.intel.com>
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
+Tested-by Joshua Clayton <stillcompiling@gmail.com>
+Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+Reviewed-by: Vaibhav Hiremath <hvaibhav.linux@gmail.com>
 ---
- drivers/usb/host/xhci-mem.c  | 12 ++++++------
- drivers/usb/host/xhci-plat.c | 33 ++++++++++++++++++++++++++-------
- drivers/usb/host/xhci.c      | 15 +++++++++++----
- 3 files changed, 43 insertions(+), 17 deletions(-)
+ drivers/usb/Kconfig    |  1 +
+ drivers/usb/core/hub.c | 49 +++++++++++++++++++++++++++++++++++++++++++++----
+ drivers/usb/core/hub.h |  1 +
+ 3 files changed, 47 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/host/xhci-mem.c b/drivers/usb/host/xhci-mem.c
-index ba1853f4..032a702 100644
---- a/drivers/usb/host/xhci-mem.c
-+++ b/drivers/usb/host/xhci-mem.c
-@@ -586,7 +586,7 @@ static void xhci_free_stream_ctx(struct xhci_hcd *xhci,
- 		unsigned int num_stream_ctxs,
- 		struct xhci_stream_ctx *stream_ctx, dma_addr_t dma)
- {
--	struct device *dev = xhci_to_hcd(xhci)->self.controller;
-+	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
- 	size_t size = sizeof(struct xhci_stream_ctx) * num_stream_ctxs;
+diff --git a/drivers/usb/Kconfig b/drivers/usb/Kconfig
+index fbe493d..706f261 100644
+--- a/drivers/usb/Kconfig
++++ b/drivers/usb/Kconfig
+@@ -40,6 +40,7 @@ config USB
+ 	tristate "Support for Host-side USB"
+ 	depends on USB_ARCH_HAS_HCD
+ 	select USB_COMMON
++	select POWER_SEQUENCE
+ 	select NLS  # for UTF-8 strings
+ 	---help---
+ 	  Universal Serial Bus (USB) is a specification for a serial bus
+diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+index a56c75e..5b40c48 100644
+--- a/drivers/usb/core/hub.c
++++ b/drivers/usb/core/hub.c
+@@ -28,6 +28,7 @@
+ #include <linux/mutex.h>
+ #include <linux/random.h>
+ #include <linux/pm_qos.h>
++#include <linux/power/pwrseq.h>
  
- 	if (size > MEDIUM_STREAM_ARRAY_SIZE)
-@@ -614,7 +614,7 @@ static struct xhci_stream_ctx *xhci_alloc_stream_ctx(struct xhci_hcd *xhci,
- 		unsigned int num_stream_ctxs, dma_addr_t *dma,
- 		gfp_t mem_flags)
- {
--	struct device *dev = xhci_to_hcd(xhci)->self.controller;
-+	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
- 	size_t size = sizeof(struct xhci_stream_ctx) * num_stream_ctxs;
+ #include <linux/uaccess.h>
+ #include <asm/byteorder.h>
+@@ -1616,6 +1617,7 @@ static void hub_disconnect(struct usb_interface *intf)
+ 	hub->error = 0;
+ 	hub_quiesce(hub, HUB_DISCONNECT);
  
- 	if (size > MEDIUM_STREAM_ARRAY_SIZE)
-@@ -1686,7 +1686,7 @@ void xhci_slot_copy(struct xhci_hcd *xhci,
- static int scratchpad_alloc(struct xhci_hcd *xhci, gfp_t flags)
- {
- 	int i;
--	struct device *dev = xhci_to_hcd(xhci)->self.controller;
-+	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
- 	int num_sp = HCS_MAX_SCRATCHPAD(xhci->hcs_params2);
++	of_pwrseq_off_list(&hub->pwrseq_on_list);
+ 	mutex_lock(&usb_port_peer_mutex);
  
- 	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
-@@ -1758,7 +1758,7 @@ static void scratchpad_free(struct xhci_hcd *xhci)
- {
- 	int num_sp;
- 	int i;
--	struct device *dev = xhci_to_hcd(xhci)->self.controller;
-+	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
- 
- 	if (!xhci->scratchpad)
- 		return;
-@@ -1831,7 +1831,7 @@ void xhci_free_command(struct xhci_hcd *xhci,
- 
- void xhci_mem_cleanup(struct xhci_hcd *xhci)
- {
--	struct device	*dev = xhci_to_hcd(xhci)->self.controller;
-+	struct device	*dev = xhci_to_hcd(xhci)->self.sysdev;
- 	int size;
- 	int i, j, num_ports;
- 
-@@ -2373,7 +2373,7 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
- int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
- {
- 	dma_addr_t	dma;
--	struct device	*dev = xhci_to_hcd(xhci)->self.controller;
-+	struct device	*dev = xhci_to_hcd(xhci)->self.sysdev;
- 	unsigned int	val, val2;
- 	u64		val_64;
- 	struct xhci_segment	*seg;
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 6d33b42..7a9c860 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -14,6 +14,7 @@
- #include <linux/clk.h>
- #include <linux/dma-mapping.h>
- #include <linux/module.h>
-+#include <linux/pci.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/usb/phy.h>
-@@ -148,6 +149,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id *match;
- 	const struct hc_driver	*driver;
-+	struct device		*sysdev;
- 	struct xhci_hcd		*xhci;
- 	struct resource         *res;
- 	struct usb_hcd		*hcd;
-@@ -164,22 +166,39 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	if (irq < 0)
- 		return -ENODEV;
- 
-+	/*
-+	 * sysdev must point to a device that is known to the system firmware
-+	 * or PCI hardware. We handle these three cases here:
-+	 * 1. xhci_plat comes from firmware
-+	 * 2. xhci_plat is child of a device from firmware (dwc3-plat)
-+	 * 3. xhci_plat is grandchild of a pci device (dwc3-pci)
-+	 */
-+	sysdev = &pdev->dev;
-+	if (sysdev->parent && !sysdev->of_node && sysdev->parent->of_node)
-+		sysdev = sysdev->parent;
-+#ifdef CONFIG_PCI
-+	else if (sysdev->parent && sysdev->parent->parent &&
-+		 sysdev->parent->parent->bus == &pci_bus_type)
-+		sysdev = sysdev->parent->parent;
-+#endif
-+
- 	/* Try to set 64-bit DMA first */
--	if (!pdev->dev.dma_mask)
-+	if (WARN_ON(!sysdev->dma_mask))
- 		/* Platform did not initialize dma_mask */
--		ret = dma_coerce_mask_and_coherent(&pdev->dev,
-+		ret = dma_coerce_mask_and_coherent(sysdev,
- 						   DMA_BIT_MASK(64));
- 	else
--		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
-+		ret = dma_set_mask_and_coherent(sysdev, DMA_BIT_MASK(64));
- 
- 	/* If seting 64-bit DMA mask fails, fall back to 32-bit DMA mask */
- 	if (ret) {
--		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-+		ret = dma_set_mask_and_coherent(sysdev, DMA_BIT_MASK(32));
- 		if (ret)
- 			return ret;
- 	}
- 
--	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
-+	hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
-+			       dev_name(&pdev->dev), NULL);
- 	if (!hcd)
- 		return -ENOMEM;
- 
-@@ -229,13 +248,13 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 		goto disable_clk;
- 	}
- 
--	if (device_property_read_bool(&pdev->dev, "usb3-lpm-capable"))
-+	if (device_property_read_bool(sysdev, "usb3-lpm-capable"))
- 		xhci->quirks |= XHCI_LPM_SUPPORT;
- 
- 	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
- 		xhci->quirks |= XHCI_BROKEN_PORT_PED;
- 
--	hcd->usb_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
-+	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
- 	if (IS_ERR(hcd->usb_phy)) {
- 		ret = PTR_ERR(hcd->usb_phy);
- 		if (ret == -EPROBE_DEFER)
-diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
-index 6d6c460..ab0839c 100644
---- a/drivers/usb/host/xhci.c
-+++ b/drivers/usb/host/xhci.c
-@@ -237,6 +237,9 @@ static int xhci_free_msi(struct xhci_hcd *xhci)
- static int xhci_setup_msi(struct xhci_hcd *xhci)
- {
- 	int ret;
-+	/*
-+	 * TODO:Check with MSI Soc for sysdev
-+	 */
- 	struct pci_dev  *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
- 
- 	ret = pci_enable_msi(pdev);
-@@ -263,7 +266,7 @@ static int xhci_setup_msi(struct xhci_hcd *xhci)
-  */
- static void xhci_free_irq(struct xhci_hcd *xhci)
- {
--	struct pci_dev *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
-+	struct pci_dev *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
- 	int ret;
- 
- 	/* return if using legacy interrupt */
-@@ -748,7 +751,7 @@ void xhci_shutdown(struct usb_hcd *hcd)
- 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
- 
- 	if (xhci->quirks & XHCI_SPURIOUS_REBOOT)
--		usb_disable_xhci_ports(to_pci_dev(hcd->self.controller));
-+		usb_disable_xhci_ports(to_pci_dev(hcd->self.sysdev));
- 
- 	spin_lock_irq(&xhci->lock);
- 	xhci_halt(xhci);
-@@ -765,7 +768,7 @@ void xhci_shutdown(struct usb_hcd *hcd)
- 
- 	/* Yet another workaround for spurious wakeups at shutdown with HSW */
- 	if (xhci->quirks & XHCI_SPURIOUS_WAKEUP)
--		pci_set_power_state(to_pci_dev(hcd->self.controller), PCI_D3hot);
-+		pci_set_power_state(to_pci_dev(hcd->self.sysdev), PCI_D3hot);
+ 	/* Avoid races with recursively_mark_NOTATTACHED() */
+@@ -1643,12 +1645,42 @@ static void hub_disconnect(struct usb_interface *intf)
+ 	kref_put(&hub->kref, hub_release);
  }
  
- #ifdef CONFIG_PM
-@@ -4801,7 +4804,11 @@ int xhci_get_frame(struct usb_hcd *hcd)
- int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
++#ifdef CONFIG_OF
++static int hub_of_pwrseq_on(struct usb_hub *hub)
++{
++	struct device *parent;
++	struct usb_device *hdev = hub->hdev;
++	struct device_node *np;
++	int ret;
++
++	if (hdev->parent)
++		parent = &hdev->dev;
++	else
++		parent = bus_to_hcd(hdev->bus)->self.sysdev;
++
++	for_each_child_of_node(parent->of_node, np) {
++		ret = of_pwrseq_on_list(np, &hub->pwrseq_on_list);
++		/* Maybe no power sequence library is chosen */
++		if (ret && ret != -ENOENT)
++			return ret;
++	}
++
++	return 0;
++}
++#else
++static int hub_of_pwrseq_on(struct usb_hub *hub)
++{
++	return 0;
++}
++#endif
++
+ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
  {
- 	struct xhci_hcd		*xhci;
--	struct device		*dev = hcd->self.controller;
-+	/*
-+	 * TODO: Check with DWC3 clients for sysdev according to
-+	 * quirks
-+	 */
-+	struct device		*dev = hcd->self.sysdev;
- 	int			retval;
+ 	struct usb_host_interface *desc;
+ 	struct usb_endpoint_descriptor *endpoint;
+ 	struct usb_device *hdev;
+ 	struct usb_hub *hub;
++	int ret = -ENODEV;
  
- 	/* Accept arbitrarily long scatter-gather lists */
+ 	desc = intf->cur_altsetting;
+ 	hdev = interface_to_usbdev(intf);
+@@ -1753,6 +1785,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
+ 	INIT_DELAYED_WORK(&hub->leds, led_work);
+ 	INIT_DELAYED_WORK(&hub->init_work, NULL);
+ 	INIT_WORK(&hub->events, hub_event);
++	INIT_LIST_HEAD(&hub->pwrseq_on_list);
+ 	usb_get_intf(intf);
+ 	usb_get_dev(hdev);
+ 
+@@ -1766,11 +1799,14 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
+ 	if (id->driver_info & HUB_QUIRK_CHECK_PORT_AUTOSUSPEND)
+ 		hub->quirk_check_port_auto_suspend = 1;
+ 
+-	if (hub_configure(hub, endpoint) >= 0)
+-		return 0;
++	if (hub_configure(hub, endpoint) >= 0) {
++		ret = hub_of_pwrseq_on(hub);
++		if (!ret)
++			return 0;
++	}
+ 
+ 	hub_disconnect(intf);
+-	return -ENODEV;
++	return ret;
+ }
+ 
+ static int
+@@ -3584,14 +3620,19 @@ static int hub_suspend(struct usb_interface *intf, pm_message_t msg)
+ 
+ 	/* stop hub_wq and related activity */
+ 	hub_quiesce(hub, HUB_SUSPEND);
+-	return 0;
++	return pwrseq_suspend_list(&hub->pwrseq_on_list);
+ }
+ 
+ static int hub_resume(struct usb_interface *intf)
+ {
+ 	struct usb_hub *hub = usb_get_intfdata(intf);
++	int ret;
+ 
+ 	dev_dbg(&intf->dev, "%s\n", __func__);
++	ret = pwrseq_resume_list(&hub->pwrseq_on_list);
++	if (ret)
++		return ret;
++
+ 	hub_activate(hub, HUB_RESUME);
+ 	return 0;
+ }
+diff --git a/drivers/usb/core/hub.h b/drivers/usb/core/hub.h
+index 34c1a7e..cd86f91 100644
+--- a/drivers/usb/core/hub.h
++++ b/drivers/usb/core/hub.h
+@@ -78,6 +78,7 @@ struct usb_hub {
+ 	struct delayed_work	init_work;
+ 	struct work_struct      events;
+ 	struct usb_port		**ports;
++	struct list_head	pwrseq_on_list; /* powered pwrseq node list */
+ };
+ 
+ /**
 -- 
 2.7.4
