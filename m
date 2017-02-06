@@ -1,106 +1,59 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 6 Feb 2017 11:21:51 +0000
-Subject: [RFC PATCH v6 0/7] ARM: Fix dma_alloc_coherent() and friends for
- NOMMU
-In-Reply-To: <b3d37c4b-a37c-0bd8-127a-8816b0889f23@st.com>
-References: <1485448965-32855-1-git-send-email-vladimir.murzin@arm.com>
- <b3d37c4b-a37c-0bd8-127a-8816b0889f23@st.com>
-Message-ID: <16d436ad-3308-fd9d-7ed2-46363a1eb86e@arm.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 6 Feb 2017 12:21:44 +0100
+Subject: [PATCH 6/8] Documentation: dt: Add new compatible to STM32
+ pinctrl driver bindings
+In-Reply-To: <CACRpkdb=U+UMRqR2GKGwDzk9X_nLv0tf2dZ8LhDGceAD83LKag@mail.gmail.com>
+References: <1485533721-9019-1-git-send-email-alexandre.torgue@st.com>
+ <1485533721-9019-7-git-send-email-alexandre.torgue@st.com>
+ <20170201150609.cbhwon76m6igmhyh@rob-hp-laptop>
+ <abee01c1-da4f-97b4-258a-3ab937f620eb@st.com>
+ <CACRpkdb=U+UMRqR2GKGwDzk9X_nLv0tf2dZ8LhDGceAD83LKag@mail.gmail.com>
+Message-ID: <c1c5ca2b-3fc1-6077-87b3-4c815b7469d0@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/17 11:19, Alexandre Torgue wrote:
-> Hi Vladimir,
-> 
-> On 01/26/2017 05:42 PM, Vladimir Murzin wrote:
->> Hi,
->>
->> It seem that addition of cache support for M-class CPUs uncovered
->> latent bug in DMA usage. NOMMU memory model has been treated as being
->> always consistent; however, for R/M CPU classes memory can be covered
->> by MPU which in turn might configure RAM as Normal i.e. bufferable and
->> cacheable. It breaks dma_alloc_coherent() and friends, since data can
->> stuck in caches now or be buffered.
->>
->> This patch set is trying to address the issue by providing region of
->> memory suitable for consistent DMA operations. It is supposed that
->> such region is marked by MPU as non-cacheable. Robin suggested to
->> advertise such memory as reserved shared-dma-pool, rather then using
->> homebrew command line option, and extend dma-coherent to provide
->> default DMA area in the similar way as it is done for CMA (PATCH
->> 4/7). It allows us to offload all bookkeeping on generic coherent DMA
->> framework, and it seems that it might be reused by other architectures
->> like c6x and blackfin.
->>
->> While reviewing/testing previous vesrions of the patch set it turned
->> out that dma-coherent does not take into account "dma-ranges" device
->> tree property, so it is addressed in PATCH 3/7.
->>
->> For ARM, dedicated DMA region is required for cases other than:
->>  - MMU/MPU is off
->>  - cpu is v7m w/o cache support
->>  - device is coherent
->>
->> In case one of the above conditions is true dma operations are forced
->> to be coherent and wired with dma_noop_ops.
->>
->> To make life easier NOMMU dma operations are kept in separate
->> compilation unit.
->>
->> Since the issue was reported in the same time as Benjamin sent his
->> patch [1] to allow mmap for NOMMU, his case is also addressed in this
->> series (PATCH 1/7 and PATCH 2/7).
-> 
-> I just test this series on STM32F746 based on cortexM7. I see no more issues to use DMA (coherent) when caches are enabled. Thanks!
-> 
-> Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-Thanks for giving it a try!
 
-Cheers
-Vladimir
+On 02/06/2017 09:46 AM, Linus Walleij wrote:
+> On Wed, Feb 1, 2017 at 4:58 PM, Alexandre Torgue
+> <alexandre.torgue@st.com> wrote:
+>> On 02/01/2017 04:06 PM, Rob Herring wrote:
+>>>
+>>> On Fri, Jan 27, 2017 at 05:15:19PM +0100, Alexandre TORGUE wrote:
+>>>>
+>>>> Add new compatible for stm32f469 MCU.
+>>>>
+>>>> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>>>>
+>>>> diff --git
+>>>> a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>>>> b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>>>> index 25d9809..4f0487d 100644
+>>>> --- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>>>> +++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+>>>> @@ -9,7 +9,8 @@ Pin controller node:
+>>>>  Required properies:
+>>>>   - compatible: value should be one of the following:
+>>>>     (a) "st,stm32f429-pinctrl"
+>>>> -   (b) "st,stm32f746-pinctrl"
+>>>> +   (b) "st,stm32f469-pinctrl"
+>>>> +   (c) "st,stm32f746-pinctrl"
+>>>
+>>>
+>>> Drop the a,b,c. Otherwise, you'll be changing a bunch of lines every
+>>> time.
+>>
+>>
+>> I completely agree.
+>>
+>> Linus, Do i need to send a v2 for this patch ?
+>
+> Nopes, applied the amended v1 patch already with these
+> changes, check the result.
 
-> 
-> Regards
-> Alex
-> 
-> 
->>
->> Thanks!
->>
->> [1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
->>
->> Cc: Joerg Roedel <jroedel@suse.de>
->> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
->> Cc: Michal Nazarewicz <mina86@mina86.com>
->> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
->> Cc: Alan Stern <stern@rowland.harvard.edu>
->> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
->> Cc: Rich Felker <dalias@libc.org>
->> Cc: Roger Quadros <rogerq@ti.com>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->>
->> Vladimir Murzin (7):
->>   dma: Take into account dma_pfn_offset
->>   dma: Add simple dma_noop_mmap
->>   drivers: dma-coherent: Account dma_pfn_offset when used with device
->>     tree
->>   drivers: dma-coherent: Introduce default DMA pool
->>   ARM: NOMMU: Introduce dma operations for noMMU
->>   ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
->>   ARM: dma-mapping: Remove traces of NOMMU code
->>
->>  .../bindings/reserved-memory/reserved-memory.txt   |   3 +
->>  arch/arm/include/asm/dma-mapping.h                 |   3 +-
->>  arch/arm/mm/Kconfig                                |   2 +-
->>  arch/arm/mm/Makefile                               |   5 +-
->>  arch/arm/mm/dma-mapping-nommu.c                    | 253 +++++++++++++++++++++
->>  arch/arm/mm/dma-mapping.c                          |  26 +--
->>  drivers/base/dma-coherent.c                        |  76 ++++++-
->>  lib/dma-noop.c                                     |  29 ++-
->>  8 files changed, 356 insertions(+), 41 deletions(-)
->>  create mode 100644 arch/arm/mm/dma-mapping-nommu.c
->>
-> 
+Thanks Linus!
+
+>
+> Yours,
+> Linus Walleij
+>
