@@ -1,100 +1,39 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 6 Feb 2017 10:31:42 +0100
-Subject: [PATCH] tty/serial: atmel: ensure state is restored after
- suspending
-In-Reply-To: <20170203225316.10466-1-alexandre.belloni@free-electrons.com>
-References: <20170203225316.10466-1-alexandre.belloni@free-electrons.com>
-Message-ID: <8d788b97-5dfa-1beb-e561-2a558a62e56b@atmel.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 6 Feb 2017 10:29:34 +0100
+Subject: [PATCH] ARM64: dts: meson-gxbb: set reset for ethernet
+In-Reply-To: <ec31eddc-d286-d0bc-0bdb-ae9d5014d82e@gmail.com>
+References: <ec31eddc-d286-d0bc-0bdb-ae9d5014d82e@gmail.com>
+Message-ID: <259f7102-591b-f251-5844-a864fa39e137@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/02/2017 ? 23:53, Alexandre Belloni a ?crit :
-> When going to suspend, the UART registers may be lost because the power to
-> VDDcore is cut. This is not an issue in the normal case but when
-> no_console_suspend is used, we need to restore the registers in order to
-> get a functional console.
+On 01/29/2017 03:07 PM, Heiner Kallweit wrote:
+> Add reset control for ethernet.
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
-Reviewed-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-
-Thanks,
-
+> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
 > ---
->  drivers/tty/serial/atmel_serial.c | 44 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 168b10cad47b..22e0a73c0cb7 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -175,6 +175,17 @@ struct atmel_uart_port {
->  	unsigned int		pending_status;
->  	spinlock_t		lock_suspended;
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> index 39a774ad..753fddf6 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+> @@ -113,6 +113,8 @@
+>  		 <&clkc CLKID_FCLK_DIV2>,
+>  		 <&clkc CLKID_MPLL2>;
+>  	clock-names = "stmmaceth", "clkin0", "clkin1";
+> +	resets = <&reset RESET_ETHERNET>;
+> +	reset-names = "stmmaceth";
+>  };
 >  
-> +	struct {
-> +		u32		cr;
-> +		u32		mr;
-> +		u32		imr;
-> +		u32		brgr;
-> +		u32		rtor;
-> +		u32		ttgr;
-> +		u32		fmr;
-> +		u32		fimr;
-> +	} cache;
-> +
->  	int (*prepare_rx)(struct uart_port *port);
->  	int (*prepare_tx)(struct uart_port *port);
->  	void (*schedule_rx)(struct uart_port *port);
-> @@ -2649,6 +2660,20 @@ static int atmel_serial_suspend(struct platform_device *pdev,
->  			cpu_relax();
->  	}
->  
-> +	if (atmel_is_console_port(port) && !console_suspend_enabled) {
-> +		/* Cache register values as we won't get a full shutdown/startup
-> +		 * cycle
-> +		 */
-> +		atmel_port->cache.mr = atmel_uart_readl(port, ATMEL_US_MR);
-> +		atmel_port->cache.imr = atmel_uart_readl(port, ATMEL_US_IMR);
-> +		atmel_port->cache.brgr = atmel_uart_readl(port, ATMEL_US_BRGR);
-> +		atmel_port->cache.rtor = atmel_uart_readl(port,
-> +							  atmel_port->rtor);
-> +		atmel_port->cache.ttgr = atmel_uart_readl(port, ATMEL_US_TTGR);
-> +		atmel_port->cache.fmr = atmel_uart_readl(port, ATMEL_US_FMR);
-> +		atmel_port->cache.fimr = atmel_uart_readl(port, ATMEL_US_FIMR);
-> +	}
-> +
->  	/* we can not wake up if we're running on slow clock */
->  	atmel_port->may_wakeup = device_may_wakeup(&pdev->dev);
->  	if (atmel_serial_clk_will_stop()) {
-> @@ -2671,6 +2696,25 @@ static int atmel_serial_resume(struct platform_device *pdev)
->  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->  	unsigned long flags;
->  
-> +	if (atmel_is_console_port(port) && !console_suspend_enabled) {
-> +		atmel_uart_writel(port, ATMEL_US_MR, atmel_port->cache.mr);
-> +		atmel_uart_writel(port, ATMEL_US_IER, atmel_port->cache.imr);
-> +		atmel_uart_writel(port, ATMEL_US_BRGR, atmel_port->cache.brgr);
-> +		atmel_uart_writel(port, atmel_port->rtor,
-> +				  atmel_port->cache.rtor);
-> +		atmel_uart_writel(port, ATMEL_US_TTGR, atmel_port->cache.ttgr);
-> +
-> +		if (atmel_port->fifo_size) {
-> +			atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_FIFOEN |
-> +					  ATMEL_US_RXFCLR | ATMEL_US_TXFLCLR);
-> +			atmel_uart_writel(port, ATMEL_US_FMR,
-> +					  atmel_port->cache.fmr);
-> +			atmel_uart_writel(port, ATMEL_US_FIER,
-> +					  atmel_port->cache.fimr);
-> +		}
-> +		atmel_start_rx(port);
-> +	}
-> +
->  	spin_lock_irqsave(&atmel_port->lock_suspended, flags);
->  	if (atmel_port->pending) {
->  		atmel_handle_receive(port, atmel_port->pending);
+>  &aobus {
 > 
 
+Hi,
 
--- 
-Nicolas Ferre
+Actually this is a no-op since the Amlogic reset controller only supports "pulse" resets and the
+STMMAC driver only supports "level" resets. If you want to use this reset, you must add the
+corresponding support code in the meson8b glue code to call device_reset().
+
+Neil
