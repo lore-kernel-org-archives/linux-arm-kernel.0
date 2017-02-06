@@ -1,38 +1,22 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Mon, 6 Feb 2017 15:06:59 +0800
-Subject: [PATCH 6/6] dt-bindings: mt8173-mtu3: add reference clock
-In-Reply-To: <CAL_JsqJg7=ykNkAbMeLqFT6HK-pK+FQAK7ZS_UMMy8ftrGM-KA@mail.gmail.com>
-References: <1484719707-12107-1-git-send-email-chunfeng.yun@mediatek.com>
- <1484719707-12107-6-git-send-email-chunfeng.yun@mediatek.com>
- <20170121201155.cqcihopdc3kjyfi6@rob-hp-laptop>
- <1485049780.10292.78.camel@mhfsdcap03>
- <CAL_JsqJg7=ykNkAbMeLqFT6HK-pK+FQAK7ZS_UMMy8ftrGM-KA@mail.gmail.com>
-Message-ID: <1486364819.3750.7.camel@mhfsdcap03>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 6 Feb 2017 15:10:45 +0800
+Subject: [PATCH 1/9] ARM: sun5i: A10s: Switch the EMAC pins indices
+In-Reply-To: <8f51ef7e000e57e1fa861188d421ad1bfd9af86a.1486320544.git-series.maxime.ripard@free-electrons.com>
+References: <cover.8519ab0b2252458a322bea5955d191e63f67100b.1486320544.git-series.maxime.ripard@free-electrons.com>
+ <8f51ef7e000e57e1fa861188d421ad1bfd9af86a.1486320544.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v670Y8LTOJDPf1jzZJWuV5=3ci+u3ri8BV3AeMYVaq+15Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-01-23 at 08:02 -0600, Rob Herring wrote:
-> On Sat, Jan 21, 2017 at 7:49 PM, Chunfeng Yun <chunfeng.yun@mediatek.com> wrote:
-> > Hi,
-> >
-> > On Sat, 2017-01-21 at 14:11 -0600, Rob Herring wrote:
-> >> On Wed, Jan 18, 2017 at 02:08:27PM +0800, Chunfeng Yun wrote:
-> >> > add a reference clock for compatibility
-> >>
-> >> Why? This block suddenly has 2 clocks instead of 1?
-> > In fact, there is a reference clock which comes from 26M oscillator
-> > directly. I ignore it because it is a fixed-clock in DTS, and always
-> > turned on for mt8173. But later, I find that I made a mistake before
-> > when I bring up it on a new platform whose reference clock comes from
-> > PLL, and need control it. So here add it, no matter it is a fixed-clock
-> > or not.
-> 
-> Add this explanation to the changelog.
-> 
-Happy Chinese New Year!
+On Mon, Feb 6, 2017 at 2:49 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> One of the pins group for the EMAC can be used by all the SoCs of the sun5i
+> family, and as such can be moved to the common DTSI.
+>
+> Unfortunately, this group is the second one we declare in our DT for now.
+> Make it the first one so that it's more logical and consistent with the
+> rest of our DTs before moving it.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Ok, I'll add it.
-
-Thanks and sorry for later reply.
-
-> Rob
+Acked-by: Chen-Yu Tsai <wens@csie.org>
