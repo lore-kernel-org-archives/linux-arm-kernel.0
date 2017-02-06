@@ -1,67 +1,248 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 7 Feb 2017 03:32:53 +0800
-Subject: [hisi:topic-lpc-4.10-libio 48/148]
- drivers/scsi/hisi_sas/hisi_sas_main.c:459:4: warning: this 'if' clause does
- not guard...
-Message-ID: <201702070349.w8gmauhW%fengguang.wu@intel.com>
+From: fu.wei@linaro.org (fu.wei at linaro.org)
+Date: Tue,  7 Feb 2017 02:50:10 +0800
+Subject: [PATCH v21 08/13] clocksource: arm_arch_timer: refactor MMIO timer
+ probing.
+In-Reply-To: <20170206185015.12296-1-fu.wei@linaro.org>
+References: <20170206185015.12296-1-fu.wei@linaro.org>
+Message-ID: <20170206185015.12296-9-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/hisilicon/linux-hisi topic-lpc-4.10-libio
-head:   06443d85dc35b64a704f7be84cc538281a1598f4
-commit: c6f387dfed7cb1d816463818dead210c16bdfeea [48/148] {noup} hisi_sas: initialize dev when dev found
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout c6f387dfed7cb1d816463818dead210c16bdfeea
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+From: Fu Wei <fu.wei@linaro.org>
 
-All warnings (new ones prefixed by >>):
+Currently the code to probe MMIO architected timers mixes DT parsing with
+actual poking of hardware. This makes the code harder than necessary to
+understand, and makes it difficult to add support for probing via ACPI.
 
-   drivers/scsi/hisi_sas/hisi_sas_main.c: In function 'hisi_sas_init_disk':
->> drivers/scsi/hisi_sas/hisi_sas_main.c:459:4: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
-       if (!rc)
-       ^~
-   drivers/scsi/hisi_sas/hisi_sas_main.c:461:5: note: ...this statement, but the latter is misleadingly indented as if it is guarded by the 'if'
-        retry--;
-        ^~~~~
+This patch factors all the DT-specific logic out of arch_timer_mem_init(),
+into a new function arch_timer_mem_of_init().
+The former pokes the hardware and determines the suitablility of frames
+based on a datastructure populated by the latter.
 
-vim +/if +459 drivers/scsi/hisi_sas/hisi_sas_main.c
+This cleanly separates the two and will make it possible to add probing
+using the ACPI GTDT in subsequent patches.
 
-   443		int retry = HISI_SAS_SRST_ATA_DISK_CNT;
-   444	
-   445		switch (device->dev_type) {
-   446		case SAS_END_DEVICE:
-   447			int_to_scsilun(0, &lun);
-   448	
-   449			tmf_task.tmf = TMF_CLEAR_TASK_SET;
-   450			rc = hisi_sas_debug_issue_ssp_tmf(device, lun.scsi_lun,
-   451				&tmf_task);
-   452			break;
-   453		case SAS_SATA_DEV:
-   454		case SAS_SATA_PM:
-   455		case SAS_SATA_PM_PORT:
-   456		case SAS_SATA_PENDING:
-   457			while (retry > 0) {
-   458				rc = hisi_sas_softreset_ata_disk(device);
- > 459				if (!rc)
-   460					break;
-   461					retry--;
-   462				}
-   463			break;
-   464		case SAS_EDGE_EXPANDER_DEVICE:
-   465		case SAS_FANOUT_EXPANDER_DEVICE:
-   466		default:
-   467			break;
-
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 57924 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/3f293d0c/attachment-0001.gz>
+ drivers/clocksource/arm_arch_timer.c | 156 +++++++++++++++++++++++++----------
+ 1 file changed, 111 insertions(+), 45 deletions(-)
+
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index f2b9ec4..73e875d 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -995,17 +995,20 @@ static int __init arch_timer_of_init(struct device_node *np)
+ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer, "arm,armv7-timer", arch_timer_of_init);
+ CLOCKSOURCE_OF_DECLARE(armv8_arch_timer, "arm,armv8-timer", arch_timer_of_init);
+ 
+-static int __init arch_timer_mem_init(struct device_node *np)
++static int __init arch_timer_mem_init(struct arch_timer_mem *timer_mem)
+ {
+-	struct device_node *frame, *best_frame = NULL;
+ 	void __iomem *cntctlbase, *base;
+-	unsigned int irq, ret = -EINVAL;
++	struct arch_timer_mem_frame *best_frame = NULL;
++	unsigned int irq;
+ 	u32 cnttidr;
++	int i, ret;
+ 
+-	arch_timers_present |= ARCH_TIMER_TYPE_MEM;
+-	cntctlbase = of_iomap(np, 0);
++	if (!timer_mem->num_frames)
++		return -ENODEV;
++
++	cntctlbase = ioremap(timer_mem->cntctlbase, timer_mem->size);
+ 	if (!cntctlbase) {
+-		pr_err("Can't find CNTCTLBase\n");
++		pr_err("Can't map CNTCTLBase.\n");
+ 		return -ENXIO;
+ 	}
+ 
+@@ -1015,26 +1018,18 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 	 * Try to find a virtual capable frame. Otherwise fall back to a
+ 	 * physical capable frame.
+ 	 */
+-	for_each_available_child_of_node(np, frame) {
+-		int n;
+-		u32 cntacr;
+-
+-		if (of_property_read_u32(frame, "frame-number", &n)) {
+-			pr_err("Missing frame-number\n");
+-			of_node_put(frame);
+-			goto out;
+-		}
++	for (i = 0; i < timer_mem->num_frames; i++) {
++		u32 cntacr = CNTACR_RFRQ | CNTACR_RWPT | CNTACR_RPCT |
++			     CNTACR_RWVT | CNTACR_RVOFF | CNTACR_RVCT;
++		int n = timer_mem->frame[i].frame_nr;
+ 
+ 		/* Try enabling everything, and see what sticks */
+-		cntacr = CNTACR_RFRQ | CNTACR_RWPT | CNTACR_RPCT |
+-			 CNTACR_RWVT | CNTACR_RVOFF | CNTACR_RVCT;
+ 		writel_relaxed(cntacr, cntctlbase + CNTACR(n));
+ 		cntacr = readl_relaxed(cntctlbase + CNTACR(n));
+ 
+ 		if ((cnttidr & CNTTIDR_VIRT(n)) &&
+ 		    !(~cntacr & (CNTACR_RWVT | CNTACR_RVCT))) {
+-			of_node_put(best_frame);
+-			best_frame = frame;
++			best_frame = &timer_mem->frame[i];
+ 			arch_timer_mem_use_virtual = true;
+ 			break;
+ 		}
+@@ -1042,55 +1037,126 @@ static int __init arch_timer_mem_init(struct device_node *np)
+ 		if (~cntacr & (CNTACR_RWPT | CNTACR_RPCT))
+ 			continue;
+ 
+-		of_node_put(best_frame);
+-		best_frame = of_node_get(frame);
++		best_frame = &timer_mem->frame[i];
+ 	}
++	iounmap(cntctlbase);
+ 
+-	ret= -ENXIO;
+-	base = arch_counter_base = of_io_request_and_map(best_frame, 0,
+-							 "arch_mem_timer");
+-	if (IS_ERR(base)) {
+-		pr_err("Can't map frame's registers\n");
+-		goto out;
++	if (!best_frame) {
++		pr_err("Can't find frame for register\n");
++		return -EINVAL;
+ 	}
+ 
+ 	if (arch_timer_mem_use_virtual)
+-		irq = irq_of_parse_and_map(best_frame, ARCH_TIMER_VIRT_SPI);
++		irq = best_frame->virt_irq;
+ 	else
+-		irq = irq_of_parse_and_map(best_frame, ARCH_TIMER_PHYS_SPI);
++		irq = best_frame->phys_irq;
+ 
+-	ret = -EINVAL;
+ 	if (!irq) {
+ 		pr_err("Frame missing %s irq.\n",
+ 		       arch_timer_mem_use_virtual ? "virt" : "phys");
+-		goto out;
++		return -EINVAL;
+ 	}
+ 
+-	/*
+-	 * Try to determine the frequency from the device tree,
+-	 * if fail, get the frequency from the CNTFRQ reg of MMIO timer.
+-	 */
+-	if (of_property_read_u32(np, "clock-frequency", &arch_timer_mmio_freq))
++	if (!request_mem_region(best_frame->cntbase, best_frame->size,
++				"arch_mem_timer"))
++		return -EBUSY;
++
++	base = ioremap(best_frame->cntbase, best_frame->size);
++	if (!base) {
++		pr_err("Can't map frame's registers\n");
++		return -ENXIO;
++	}
++
++	if (!arch_timer_mmio_freq)
+ 		arch_timer_mmio_freq = arch_timer_get_mmio_freq(base);
+-	if (!arch_timer_mmio_freq) {
+-		pr_err(FW_BUG "frequency not available for MMIO timer.\n");
+-		ret = -EINVAL;
+-		goto out;
++	if (!arch_timer_mmio_freq ||
++	    (arch_timer_sysreg_freq &&
++	     arch_timer_mmio_freq != arch_timer_sysreg_freq)) {
++		pr_err(FW_BUG "invalid frequency for MMIO timer.\n");
++		arch_timer_mmio_freq = 0;
++		iounmap(base);
++		return -EINVAL;
+ 	}
+ 
+ 	ret = arch_timer_mem_register(base, irq);
+-	if (ret)
++	if (ret) {
++		iounmap(base);
++		return ret;
++	}
++
++	arch_counter_base = base;
++	arch_timers_present |= ARCH_TIMER_TYPE_MEM;
++
++	return 0;
++}
++
++static int __init arch_timer_mem_of_init(struct device_node *np)
++{
++	struct arch_timer_mem *timer_mem;
++	struct device_node *frame_node;
++	struct resource res;
++	int i, ret = -EINVAL;
++
++	timer_mem = kzalloc(sizeof(*timer_mem), GFP_KERNEL);
++	if (!timer_mem)
++		return -ENOMEM;
++
++	if (of_address_to_resource(np, 0, &res))
+ 		goto out;
++	timer_mem->cntctlbase = res.start;
++	timer_mem->size = resource_size(&res);
++
++	i = 0;
++	for_each_available_child_of_node(np, frame_node) {
++		int n;
++		struct arch_timer_mem_frame *frame;
++
++		if (i >= ARCH_TIMER_MEM_MAX_FRAMES) {
++			pr_err(FW_BUG "too many frames, only %u are permitted.\n",
++			       ARCH_TIMER_MEM_MAX_FRAMES);
++			goto out;
++		}
+ 
+-	if (!arch_timer_needs_of_probing())
++		frame = &timer_mem->frame[i];
++
++		if (of_property_read_u32(frame_node, "frame-number", &n)) {
++			pr_err(FW_BUG "Missing frame-number\n");
++			of_node_put(frame_node);
++			goto out;
++		}
++		frame->frame_nr = n;
++
++		if (of_address_to_resource(frame_node, 0, &res)) {
++			of_node_put(frame_node);
++			goto out;
++		}
++		frame->cntbase = res.start;
++		frame->size = resource_size(&res);
++
++		frame->virt_irq = irq_of_parse_and_map(frame_node,
++						       ARCH_TIMER_VIRT_SPI);
++		frame->phys_irq = irq_of_parse_and_map(frame_node,
++						       ARCH_TIMER_PHYS_SPI);
++
++		i++;
++	}
++	timer_mem->num_frames = i;
++
++	/*
++	 * Try to get the frequency from the device tree,
++	 * if fail, we will try the CNTFRQ register in arch_timer_mem_init.
++	 */
++	of_property_read_u32(np, "clock-frequency", &arch_timer_mmio_freq);
++
++	ret = arch_timer_mem_init(timer_mem);
++	if (!ret && !arch_timer_needs_of_probing())
+ 		ret = arch_timer_common_init();
+ out:
+-	iounmap(cntctlbase);
+-	of_node_put(best_frame);
++	kfree(timer_mem);
+ 	return ret;
+ }
+ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
+-		       arch_timer_mem_init);
++		       arch_timer_mem_of_init);
+ 
+ #ifdef CONFIG_ACPI
+ static int __init map_generic_timer_interrupt(u32 interrupt, u32 flags)
+-- 
+2.9.3
