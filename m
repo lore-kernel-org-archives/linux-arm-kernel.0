@@ -1,89 +1,82 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 6 Feb 2017 20:24:11 +0100
-Subject: [PATCH] serial: imx: Only enable UART DMA on i.MX6Q and i.MX53
-In-Reply-To: <20170205175132.GA2182@archie.localdomain>
-References: <20170204213931.3566-1-marex@denx.de>
- <DB6PR0402MB2743C709F162BDE52429DF49E3410@DB6PR0402MB2743.eurprd04.prod.outlook.com>
- <CAOMZO5D8_vE+t=V6wHMKt590jZqJJRzeJ+_MLgqbLp=6gwsmyQ@mail.gmail.com>
- <20170205175132.GA2182@archie.localdomain>
-Message-ID: <8c31d0ca-2893-b50c-5a8d-09ab5a6575fa@denx.de>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 7 Feb 2017 03:23:29 +0800
+Subject: [hisi:topic-lpc-4.10-libio 134/148]
+ arch/blackfin/kernel/module.c:7:40: error: 'mod' undeclared
+Message-ID: <201702070325.7CZrNAwn%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2017 06:51 PM, Clemens Gruber wrote:
-> On Sun, Feb 05, 2017 at 02:36:10PM -0200, Fabio Estevam wrote:
->> On Sun, Feb 5, 2017 at 12:56 PM, Fabio Estevam <fabio.estevam@nxp.com> wrote:
->>> [Sorry, for the top-posting]
->>>
->>>
->>> imx6sx uart should be of a IMX6Q_UART instead.
->>>
->>>
->>> Does this patch fix the issue?
->>
->> It seems this dts change will not fix the problem.
->>
->>> From: Kai Ruhnau <kai.ruhnau@target-sg.com>
->>>
->>> In 1c06bde6 with the introduction of DMA support for the i.MX53 platform,
->>> DMA was enabled for all platforms instead. On an i.MX6SX (which is a
->>> IMX21_UART), this breaks gpsd talking to an UART module with
->>>
->>>  imx-uart 21f4000.serial: DMA transaction error.
->>>
->>> This patch makes sure, UART DMA is only activated for i.MX53 and i.MX6Q.
->>>
->>> Signed-off-by: Kai Ruhnau <kai.ruhnau@target-sg.com>
->>> Reviewed-by: Marek Vasut <marex@denx.de>
->>> Fixes: 1c06bde643d0 ("Allowing UART DMA to be configured on i.MX53")
->>> Cc: <stable@vger.kernel.org> # 4.9+
->>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
->>> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
->>> Cc: Shawn Guo <shawnguo@kernel.org>
->>> ---
->>>  drivers/tty/serial/imx.c | 3 ++-
->>>  1 file changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
->>> index a70356d..8e2b5f2 100644
->>> --- a/drivers/tty/serial/imx.c
->>> +++ b/drivers/tty/serial/imx.c
->>> @@ -1269,7 +1269,8 @@ static int imx_startup(struct uart_port *port)
->>>          writel(temp & ~UCR4_DREN, sport->port.membase + UCR4);
->>>
->>>          /* Can we enable the DMA support? */
->>> -       if (!uart_console(port) && !sport->dma_is_inited)
->>> +       if ((is_imx6q_uart(sport)  || is_imx53_uart(sport)) &&
->>> +           !uart_console(port) && !sport->dma_is_inited)
->>>                  imx_uart_dma_init(sport);
->>
->> Looks like imx serial DMA is broken in 4.9.
-> 
-> There are probably two separate problems:
-> 
-> A)
-> I also observed the DMA transaction error message when I used the ROM
-> SDMA scripts. Seems to affect single- and multi-core systems and is
-> fixed by: github.com/Freescale/linux-fslc/commit/a2ec8df37f5d (?)
-> This is also not RS-485 specific, but affects RS-232 too.
+tree:   https://github.com/hisilicon/linux-hisi topic-lpc-4.10-libio
+head:   06443d85dc35b64a704f7be84cc538281a1598f4
+commit: 0ccaa690913e8dc13f3bbdfff3c059dc3c2ae936 [134/148] LPC: Add the ACPI LPC support
+config: blackfin-TCM-BF537_defconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 0ccaa690913e8dc13f3bbdfff3c059dc3c2ae936
+        # save the attached .config to linux build tree
+        make.cross ARCH=blackfin 
 
-OK, thanks for the hint, but this is unrelated, since DMA should not be
-enabled on MX6SX in 4.9 (but it is , due to the error in 1c06bde643d0 )
-and newer.
+All error/warnings (new ones prefixed by >>):
 
-If you want to enable/fix DMA on MX6SX , that should be a separate patch
-which is a feature addition IMO.
+   include/linux/ratelimit.h: In function 'ratelimit_state_exit':
+>> arch/blackfin/kernel/module.c:7:40: error: 'mod' undeclared (first use in this function)
+    #define pr_fmt(fmt) "module %s: " fmt, mod->name
+                                           ^
+   include/linux/printk.h:294:22: note: in expansion of macro 'pr_fmt'
+     printk(KERN_WARNING pr_fmt(fmt), ##__VA_ARGS__)
+                         ^~~~~~
+   include/linux/printk.h:295:17: note: in expansion of macro 'pr_warning'
+    #define pr_warn pr_warning
+                    ^~~~~~~~~~
+>> include/linux/ratelimit.h:61:3: note: in expansion of macro 'pr_warn'
+      pr_warn("%s: %d output lines suppressed due to ratelimiting\n",
+      ^~~~~~~
+   arch/blackfin/kernel/module.c:7:40: note: each undeclared identifier is reported only once for each function it appears in
+    #define pr_fmt(fmt) "module %s: " fmt, mod->name
+                                           ^
+   include/linux/printk.h:294:22: note: in expansion of macro 'pr_fmt'
+     printk(KERN_WARNING pr_fmt(fmt), ##__VA_ARGS__)
+                         ^~~~~~
+   include/linux/printk.h:295:17: note: in expansion of macro 'pr_warning'
+    #define pr_warn pr_warning
+                    ^~~~~~~~~~
+>> include/linux/ratelimit.h:61:3: note: in expansion of macro 'pr_warn'
+      pr_warn("%s: %d output lines suppressed due to ratelimiting\n",
+      ^~~~~~~
 
-> B)
-> The RS-485 DMA problem I reported, which only affects multi-core
-> systems.
-> RS-232 DMA is not affected.
+vim +/mod +7 arch/blackfin/kernel/module.c
 
-This has nothing to do with RS485/232 , the problem this patch fixes is
-that the DMA is errornously enabled on MX6SX and it should not be .
+1394f032 Bryan Wu    2007-05-06   1  /*
+96f1050d Robin Getz  2009-09-24   2   * Copyright 2004-2009 Analog Devices Inc.
+1394f032 Bryan Wu    2007-05-06   3   *
+96f1050d Robin Getz  2009-09-24   4   * Licensed under the GPL-2 or later
+1394f032 Bryan Wu    2007-05-06   5   */
+1394f032 Bryan Wu    2007-05-06   6  
+b75a9e6b Joe Perches 2010-10-20  @7  #define pr_fmt(fmt) "module %s: " fmt, mod->name
+1394f032 Bryan Wu    2007-05-06   8  
+1394f032 Bryan Wu    2007-05-06   9  #include <linux/moduleloader.h>
+1394f032 Bryan Wu    2007-05-06  10  #include <linux/elf.h>
+1394f032 Bryan Wu    2007-05-06  11  #include <linux/vmalloc.h>
+1394f032 Bryan Wu    2007-05-06  12  #include <linux/fs.h>
+1394f032 Bryan Wu    2007-05-06  13  #include <linux/string.h>
+1394f032 Bryan Wu    2007-05-06  14  #include <linux/kernel.h>
+1394f032 Bryan Wu    2007-05-06  15  #include <asm/dma.h>
 
-[...]
+:::::: The code at line 7 was first introduced by commit
+:::::: b75a9e6bfba5c7343391ac1bacd44d6652dde8da Blackfin: use more standard pr_fmt in the module loader
 
--- 
-Best regards,
-Marek Vasut
+:::::: TO: Joe Perches <joe@perches.com>
+:::::: CC: Mike Frysinger <vapier@gentoo.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 10658 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/2a29c6eb/attachment-0001.gz>
