@@ -1,77 +1,127 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 6 Feb 2017 10:32:41 +0100
-Subject: [PATCH] mmc: meson-gx: add support for HS400 mode
-In-Reply-To: <m2fuk4uyco.fsf@baylibre.com>
-References: <f7f325ec-6099-7f51-5bb4-24ac24073ee7@gmail.com>
- <m2fuk4uyco.fsf@baylibre.com>
-Message-ID: <0939c5e6-98bb-7a7c-4b4c-645f7b8b141b@baylibre.com>
+Date: Mon, 6 Feb 2017 10:27:46 +0100
+Subject: [PATCH 0/2] scpi: RfC - Allow to ignore invalid SCPI DVFS clock
+ rates
+In-Reply-To: <a4c725a9-2f79-a48b-b732-61e1fe31aba8@gmail.com>
+References: <a4c725a9-2f79-a48b-b732-61e1fe31aba8@gmail.com>
+Message-ID: <bd6d2a14-a3e5-ddfb-ab7d-3b0835bcab62@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2017 07:55 PM, Kevin Hilman wrote:
-> Heiner Kallweit <hkallweit1@gmail.com> writes:
+On 02/04/2017 10:03 PM, Heiner Kallweit wrote:
+> On the Odroid C2 (Amlogic S905GXBB) the firmware defines SCPI DVFS cpu
+> clock rates which make the system crash or at least unstable.
+> Therefore cpufreq can't be used on this system as of today.
+> Other systems might face similar issues with too optimistic SCPI SVFS
+> clock rates.
 > 
->> Add support for HS400 mode.
->>
->> Successfully tested on a Odroid C2 (S905 GXBB).
->>
->> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+> This RfC patch series addresses this by allowing to define a max
+> frequency per clock via DT. All frequencies for the respective clock
+> exceeding this threshold will be ignored.
 > 
-> Excellent!  Thanks for the patch.
+> Heiner Kallweit (2):
+>   clk: scpi: RfC - Allow to ignore invalid SCPI DVFS clock rates
+>   cpufreq: scpi: RfC - Allow to ignore invalid SCPI DVFS clock rates
 > 
-> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-> Tested-by: Kevin Hilman <khilman@baylibre.com>
+>  Documentation/devicetree/bindings/arm/arm,scpi.txt |  7 +++++++
+>  drivers/clk/clk-scpi.c                             | 15 ++++++++++++++-
+>  drivers/cpufreq/scpi-cpufreq.c                     | 22 ++++++++++++++++++++++
+>  3 files changed, 43 insertions(+), 1 deletion(-)
 > 
-> Some folks on IRC had reported that eMMC wasn't working on some boards
-> (like Amlogic P200) and with this patch, it's working again for me on P200.
-> 
-> @Andreas: does this patch fix your R-box Pro?
-> 
-> Kevin
 
 Hi Heiner,
 
-Actually activating HS400 and DDR modes should need DT attributes to actually enable them
-in the MMC core code, and it seems the hardware needs some timings adjustment to use these
-modes. If you consider they are enabled by U-boot, good but it won't always be the case !
+Thanks for this pathset, I have an alternative patchset for this feature.
 
-Ulf, what is exactly needed to support these modes ?
-In other drivers and Amlogic own driver, they have support for the some calibration
-commands handling.
+My patchset adds a maximum frequency in the cpu node, this permits cleanly specifying
+a max frequency per cluster and leave the SCPI code intact since it's only a protocol
+implementation.
+
+Please find below a simpler implementation only touching the scpi-cpufreq code.
+
+Anyway, Sudeep, could you give us your point of view about such changes ?
 
 Neil
 
-> 
->> ---
->>  drivers/mmc/host/meson-gx-mmc.c | 11 +++++++++++
->>  1 file changed, 11 insertions(+)
->>
->> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
->> index 030425be..be45d57d 100644
->> --- a/drivers/mmc/host/meson-gx-mmc.c
->> +++ b/drivers/mmc/host/meson-gx-mmc.c
->> @@ -83,6 +83,7 @@
->>  #define   CFG_RC_CC_MASK 0xf
->>  #define   CFG_STOP_CLOCK BIT(22)
->>  #define   CFG_CLK_ALWAYS_ON BIT(18)
->> +#define   CFG_CHK_DS BIT(20)
->>  #define   CFG_AUTO_CLK BIT(23)
->>  
->>  #define SD_EMMC_STATUS 0x48
->> @@ -412,6 +413,16 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->>  	val &= ~(CFG_RC_CC_MASK << CFG_RC_CC_SHIFT);
->>  	val |= ilog2(SD_EMMC_CFG_CMD_GAP) << CFG_RC_CC_SHIFT;
->>  
->> +	val &= ~CFG_DDR;
->> +	if (ios->timing == MMC_TIMING_UHS_DDR50 ||
->> +	    ios->timing == MMC_TIMING_MMC_DDR52 ||
->> +	    ios->timing == MMC_TIMING_MMC_HS400)
->> +		val |= CFG_DDR;
->> +
->> +	val &= ~CFG_CHK_DS;
->> +	if (ios->timing == MMC_TIMING_MMC_HS400)
->> +		val |= CFG_CHK_DS;
->> +
->>  	writel(val, host->regs + SD_EMMC_CFG);
->>  
->>  	if (val != orig)
+----><--
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index a1bcfee..b813933 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -276,6 +276,14 @@ nodes to be present and contain the properties described below.
+
+ 			    where voltage is in uV, frequency is in MHz.
+
++	- arm,scpi-dvfs-max-freq
++		Usage: optional
++		Value type: <u32>
++		Definition:
++			Specifies the maximum DVFS frequency in Hz unit this
++			CPU can support when the OPP tables are obtained via
++			the SCP interface.
++
+ Example 1 (dual-cluster big.LITTLE system 32-bit):
+
+ 	cpus {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+index 238fbea..881f20c 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+@@ -137,6 +137,22 @@
+ 	};
+ };
+
++&cpu0 {
++	arm,scpi-dvfs-max-freq = <1536000000>;
++};
++
++&cpu1 {
++	arm,scpi-dvfs-max-freq = <1536000000>;
++};
++
++&cpu2 {
++	arm,scpi-dvfs-max-freq = <1536000000>;
++};
++
++&cpu3 {
++	arm,scpi-dvfs-max-freq = <1536000000>;
++};
++
+ &uart_AO {
+ 	status = "okay";
+ 	pinctrl-0 = <&uart_ao_a_pins>;
+diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
+index ea7a4e1..80a6f27b 100644
+--- a/drivers/cpufreq/scpi-cpufreq.c
++++ b/drivers/cpufreq/scpi-cpufreq.c
+@@ -25,6 +25,7 @@
+ #include <linux/pm_opp.h>
+ #include <linux/scpi_protocol.h>
+ #include <linux/types.h>
++#include <linux/of.h>
+
+ #include "arm_big_little.h"
+
+@@ -54,6 +55,11 @@ static int scpi_init_opp_table(const struct cpumask *cpumask)
+ 	struct scpi_opp *opp;
+ 	struct device *cpu_dev = get_cpu_device(cpumask_first(cpumask));
+ 	struct scpi_dvfs_info *info = scpi_get_dvfs_info(cpu_dev);
++	u32 max_freq = 0;
++
++	/* Eventually get a platform frequency limitation */
++	of_property_read_u32(cpu_dev->of_node, "arm,scpi-dvfs-max-freq",
++			     &max_freq);
+
+ 	if (IS_ERR(info))
+ 		return PTR_ERR(info);
+@@ -62,6 +68,10 @@ static int scpi_init_opp_table(const struct cpumask *cpumask)
+ 		return -EIO;
+
+ 	for (opp = info->opps, idx = 0; idx < info->count; idx++, opp++) {
++		/* Drop unsupported frequencies */
++		if (max_freq && opp->freq > max_freq)
++			continue;
++
+ 		ret = dev_pm_opp_add(cpu_dev, opp->freq, opp->m_volt * 1000);
+ 		if (ret) {
+ 			dev_warn(cpu_dev, "failed to add opp %uHz %umV\n",
