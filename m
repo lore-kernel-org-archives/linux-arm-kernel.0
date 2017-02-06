@@ -1,28 +1,25 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 6 Feb 2017 14:02:59 +0100
-Subject: [PATCH] Signed-off-by: Ran Algawi <ran.algawi@gmail.com>
-In-Reply-To: <20170206125623.GA2390@LestatChateau>
-References: <20170206125623.GA2390@LestatChateau>
-Message-ID: <20170206130259.GA5504@kroah.com>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Mon, 6 Feb 2017 14:36:11 +0100
+Subject: [PATCH 2/2] arm64: mm: enable CONFIG_HOLES_IN_ZONE for NUMA
+In-Reply-To: <1481706707-6211-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1481706707-6211-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1481706707-6211-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170206133611.GL16822@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2017 at 02:56:23PM +0200, Ran Algawi wrote:
-> linux-arm-kernel at lists.infradead.org, linux-kernel at vger.kernel.org
-> Bcc: 
-> Subject: [PATCH] Signed-off-by: Ran Algawi <ran.algawi@gmail.com>
-> Reply-To: 
-> Signed-off-by: Ran Algawi <ran.algawi@gmail.com>
-> Description: fixed errors and warnings in file at:
-> /drivers/staging/bcm2835-audio/bcm
-> mostly, i have changed syntax, like using null isntead of ! or
-> intialiazing stastics wil NULL.
+On 14.12.16 09:11:47, Ard Biesheuvel wrote:
+> The NUMA code may get confused by the presence of NOMAP regions within
+> zones, resulting in spurious BUG() checks where the node id deviates
+> from the containing zone's node id.
 > 
-> fixed erros in drivers/staging/bcm2835-audio/bcm2835.c
-> ---
->  drivers/staging/bcm2835-audio/bcm2835.c | 22 +++++++++++-----------
->  1 file changed, 11 insertions(+), 11 deletions(-)
+> Since the kernel has no business reasoning about node ids of pages it
+> does not own in the first place, enable CONFIG_HOLES_IN_ZONE to ensure
+> that such pages are disregarded.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Something went really wrong there, don't you agree?
+I would rather see a solution other than making pfn_valid checks more
+fine grained, but this patch also fixes the issue. So:
 
-:(
+Acked-by: Robert Richter <rrichter@cavium.com>
