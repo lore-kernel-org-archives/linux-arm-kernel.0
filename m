@@ -1,22 +1,37 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Mon, 6 Feb 2017 16:30:31 +0100
-Subject: Fractional divider on the Atmel USART controller
-In-Reply-To: <CAGkQfmPHmc+7fnD78KbyMLgmdSsCddGC07vSWFm-RVWanh6Ttg@mail.gmail.com>
-References: <CAGkQfmNshOGWT8Vs_J-49qq2UHoCMJ8cYb9jbjaDqM2YNy05rg@mail.gmail.com>
- <20170206134256.tp5rgx6axd532gp3@rfolt0960.corp.atmel.com>
- <CAGkQfmPHmc+7fnD78KbyMLgmdSsCddGC07vSWFm-RVWanh6Ttg@mail.gmail.com>
-Message-ID: <CAGkQfmNhA9oZwGDf3gFbrLK3hHxK+y8JQA-sNh67AcHJSty0Rw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 6 Feb 2017 16:32:55 +0100
+Subject: [PATCH -next] ASoC: sun4i-spdif: drop unnessary
+ snd_soc_unregister_component()
+In-Reply-To: <20170206152224.7566-1-weiyj.lk@gmail.com>
+References: <20170206152224.7566-1-weiyj.lk@gmail.com>
+Message-ID: <20170206153255.emowvun4nlssiyvs@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-02-06 16:14 GMT+01:00 Romain Izard <romain.izard.pro@gmail.com>:
->
-> For verification, I checked the SAMA5D2 datasheet, and (in rev. D) the
-> warning is still present in ?41.7.1.2.
+On Mon, Feb 06, 2017 at 03:22:24PM +0000, Wei Yongjun wrote:
+> From: Wei Yongjun <weiyongjun1@huawei.com>
+> 
+> It's not necessary to unregister a component registered
+> with devm_snd_soc_register_component(). Also removed
+> pointness clk_disable_unprepare() from error path and
+> snd_soc_unregister_platform() from the remove.
+> 
+> Fixes: f8260afa444b ("ASoC: sunxi: Add support for the SPDIF block")
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 
-It looks like I got confused with between the versions. In fact, the warning
-disappeared between versions C & D, and the last version (E) does not
-have it.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Thanks,
+Maxime
 
 -- 
-Romain Izard
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170206/0a945d6b/attachment-0001.sig>
