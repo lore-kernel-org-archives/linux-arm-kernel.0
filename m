@@ -1,103 +1,364 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 6 Feb 2017 12:10:34 +0100
-Subject: [PATCH] tty/serial: atmel: ensure state is restored after
- suspending
-In-Reply-To: <20170203225316.10466-1-alexandre.belloni@free-electrons.com>
-References: <20170203225316.10466-1-alexandre.belloni@free-electrons.com>
-Message-ID: <55a39641-87d4-4f61-11fa-54c8904ac40d@gmail.com>
+From: ar@linux.vnet.ibm.com (Andrea Reale)
+Date: Mon, 6 Feb 2017 11:17:32 +0000
+Subject: [RFC PATCH] Memory hotplug support for arm64 platform
+In-Reply-To: <6568a65d-79c0-6fe4-e4d0-f1d3fe205321@broadcom.com>
+References: <1481717765-31186-1-git-send-email-m.bielski@virtualopensystems.com>
+ <75156ea7-6e74-27e8-bf29-762f79151d23@broadcom.com>
+ <7977063a-20bb-cc85-449f-51bb7d20761e@virtualopensystems.com>
+ <6568a65d-79c0-6fe4-e4d0-f1d3fe205321@broadcom.com>
+Message-ID: <20170206111732.GA5589@samekh>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+Hi Scott,
+Hi all,
 
-On 03/02/2017 23:53, Alexandre Belloni wrote:
-> When going to suspend, the UART registers may be lost because the power to
-> VDDcore is cut. This is not an issue in the normal case but when
-> no_console_suspend is used, we need to restore the registers in order to
-> get a functional console.
+in reply to the issues that Scott reported last month, myself and Maciej
+investigated further by running quite a number of experiments on the
+physical and virtual environments we have avaialable.
+
+We collected all the results and relevant logs in a Web page at
+https://hotplug-tests.eu-gb.mybluemix.net/ so that anyone interested can
+go there and check all the details.
+
+The tl;dr version is that, in all configuration, we could not reproduce
+what Scott has described as "memory corruption". The only issue we
+encountered happens when the system is booted with a small amount of
+initial memory (e.g., mem=64M) and one tries to hot-add several sections
+of memory in ZONE_MOVABLE; in that case, the process is likely to fail
+when vmemmap tries to allocate chunks of 2^9 consecutive pages to make
+space for the `struct page`s describing the new memory; in fact, it
+seems likely that, in low memory situations, the system cannot find enough
+consecutive pages in ZONE_DMA or ZONE_NORMAL. This condition is not
+dependand on memory hot-plug; in fact, we counter-tested this by writing
+a simple module that just tries to allocate a few chunks of 2^9 pages,
+and we experienced that it fails when the system is booted with low
+memory (sources and logs in the Web page linked above).
+
+@Scott: were your referring to this issue, by any chance, in your
+previous emails? If not, we would really appreciate if you could help us
+reproduce the condition you are experiencing and/or give us a more detail 
+of what are the symptoms of the corruption you are referring to.
+
+We are still running additional tests on other boards and we will update
+the Web page while we get them. If anyone happens to try these patches
+on their system, we warmly invite to send feedback with either 
+negative or positive outcomes.
+
+Thanks and best regards,
+Andrea
+
+On Wed, Dec 21, 2016 at 05:20:06PM -0800, Scott Branden wrote:
+> Hi Maciej,
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  drivers/tty/serial/atmel_serial.c | 44 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
+> On 16-12-21 01:44 AM, Maciej Bielski wrote:
+> >Hi Scott,
+> >
+> >Thanks for testing it and providing us the feedback. For replicating the problem you have reported,
+> >could you provide more info on your system configuration, please?
+> >Among others, few questions that we have in mind are:
+> >* What is the RAM size at boot? Is it multiple of 1GB (or precisely `1<<MIN_MEMORY_BLOCK_SIZE`) ?
+> RAM size at boot is 64MB, not a multiple of 1GB.  I will try next
+> week on a system with multi-GB at boot to see if it makes a
+> difference. SECTION_SIZE_BITS in sparsemem.h has been modified to 28
+> to allow for 256MB hotplug regions to be added.
 > 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index 168b10cad47b..22e0a73c0cb7 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -175,6 +175,17 @@ struct atmel_uart_port {
->  	unsigned int		pending_status;
->  	spinlock_t		lock_suspended;
->  
-> +	struct {
-> +		u32		cr;
-> +		u32		mr;
-> +		u32		imr;
-> +		u32		brgr;
-> +		u32		rtor;
-> +		u32		ttgr;
-> +		u32		fmr;
-> +		u32		fimr;
-> +	} cache;
-> +
-As struct cache is only used in suspend()/resume() we could add:
-#ifdef CONFIG_PM / #endif
-to remove it from atmel_uart_port when PM is not selected.
-Even if I'm not a big fan of ifdefs, the suspend code is already
-compiled out with #ifdef CONFIG_PM, so, at least, it would be consistent.
-
->  	int (*prepare_rx)(struct uart_port *port);
->  	int (*prepare_tx)(struct uart_port *port);
->  	void (*schedule_rx)(struct uart_port *port);
-> @@ -2649,6 +2660,20 @@ static int atmel_serial_suspend(struct platform_device *pdev,
->  			cpu_relax();
->  	}
->  
-> +	if (atmel_is_console_port(port) && !console_suspend_enabled) {
-> +		/* Cache register values as we won't get a full shutdown/startup
-> +		 * cycle
-> +		 */
-> +		atmel_port->cache.mr = atmel_uart_readl(port, ATMEL_US_MR);
-> +		atmel_port->cache.imr = atmel_uart_readl(port, ATMEL_US_IMR);
-> +		atmel_port->cache.brgr = atmel_uart_readl(port, ATMEL_US_BRGR);
-> +		atmel_port->cache.rtor = atmel_uart_readl(port,
-> +							  atmel_port->rtor);
-> +		atmel_port->cache.ttgr = atmel_uart_readl(port, ATMEL_US_TTGR);
-> +		atmel_port->cache.fmr = atmel_uart_readl(port, ATMEL_US_FMR);
-> +		atmel_port->cache.fimr = atmel_uart_readl(port, ATMEL_US_FIMR);
-> +	}
-> +
->  	/* we can not wake up if we're running on slow clock */
->  	atmel_port->may_wakeup = device_may_wakeup(&pdev->dev);
->  	if (atmel_serial_clk_will_stop()) {
-> @@ -2671,6 +2696,25 @@ static int atmel_serial_resume(struct platform_device *pdev)
->  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
->  	unsigned long flags;
->  
-> +	if (atmel_is_console_port(port) && !console_suspend_enabled) {
-> +		atmel_uart_writel(port, ATMEL_US_MR, atmel_port->cache.mr);
-> +		atmel_uart_writel(port, ATMEL_US_IER, atmel_port->cache.imr);
-> +		atmel_uart_writel(port, ATMEL_US_BRGR, atmel_port->cache.brgr);
-> +		atmel_uart_writel(port, atmel_port->rtor,
-> +				  atmel_port->cache.rtor);
-> +		atmel_uart_writel(port, ATMEL_US_TTGR, atmel_port->cache.ttgr);
-> +
-> +		if (atmel_port->fifo_size) {
-> +			atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_FIFOEN |
-> +					  ATMEL_US_RXFCLR | ATMEL_US_TXFLCLR);
-> +			atmel_uart_writel(port, ATMEL_US_FMR,
-> +					  atmel_port->cache.fmr);
-> +			atmel_uart_writel(port, ATMEL_US_FIER,
-> +					  atmel_port->cache.fimr);
-> +		}
-> +		atmel_start_rx(port);
-> +	}
-> +
->  	spin_lock_irqsave(&atmel_port->lock_suspended, flags);
->  	if (atmel_port->pending) {
->  		atmel_handle_receive(port, atmel_port->pending);
+> >* Do you run the kernel with `mem=YYY` option?
+> no, memory is defined in dts file with a few reserved regions:
+> /memreserve/ 0x75000000 0x00800000;
+> /memreserve/ 0x77f00000 0x00100000;
+> &memory {
+> 	reg = <0x00000000 0x74000000 0x0 0x04000000>; /* 64MB */
+> };
 > 
-
-Thanks !
-
-Richard.
+> >* Do you follow steps (1) and (2) for performing the hotplug?
+> no, only step 1 is done, auto-online is enabled.  I'll try turning
+> that off and see if it makes a difference.
+> 
+> >* Do you have any other configuration flags enabled except for CONFIG_MEMORY_HOTPLUG?
+> >* Any other non-defaults?
+> Yes, a lot of config options have been disabled to reduce kernel
+> size. The memory auto-online is also enabled.  I'll try with the
+> default defconfig to see if it makes a difference.
+> >
+> >Up to now the patch was passing our simple tests but if we miss something we will be very thankful
+> >if you could help us to sort it out. If you have found something after your deeper analysis, please
+> >keep us informed.
+> I think the path forward is to get a normal multi-GB system going
+> and then reduce the memory on boot and then hotplug it in after to
+> see if that works.  Or, if you can reduce your memory down and give
+> it a try that might uncover a problem as well.
+> >
+> >
+> >On 20/12/2016 20:12, Scott Branden wrote:
+> >>Hi Maciej,
+> >>
+> >>I have applied that patch ontop of the patches I previously sent out
+> >>and tested.
+> >>
+> >>It does recognized the memory in /proc/iomem but I get memory corruption of the original system
+> >>RAM soon after.  It appears the page allocation gets corrupted.  I will try to dig into it further
+> >>but if somebody else could try it out in their system to see what results they get it would help.
+> >>
+> >>Regards,
+> >> Scott
+> >>
+> >>On 16-12-14 04:16 AM, Maciej Bielski wrote:
+> >>>This patch relates to the work previously announced in [1]. This builds on the
+> >>>work by Scott Branden [2] and, henceforth, it needs to be applied on top of
+> >>>Scott's patches [2]. Comments are very welcome.
+> >>>
+> >>>Changes from the original patchset and known issues:
+> >>>
+> >>>- Compared to Scott's original patchset, this work adds the mapping of
+> >>>  the new hotplugged pages into the kernel page tables. This is done by
+> >>>  copying the old swapper_pg_dir over a new page, adding the new mappings,
+> >>>  and then switching to the newly built pg_dir (see `hotplug_paging` in
+> >>>  arch/arm64/mmu.c). There might be better ways to to this: suggestions
+> >>>  are more than welcome.
+> >>>
+> >>>- The stub function for `arch_remove_memory` has been removed for now; we
+> >>>  are working in parallel on memory hot remove, and we plan to contribute
+> >>>  it as a separate patch.
+> >>>
+> >>>- Corresponding Kconfig flags have been added;
+> >>>
+> >>>- Note that this patch does not work when NUMA is enabled; in fact,
+> >>>  the function `memory_add_physaddr_to_nid` does not have an
+> >>>  implementation when the NUMA flag is on: this function is supposed to
+> >>>  return the nid the hotplugged memory should be associated with. However
+> >>>  it is not really clear to us  yet what the semantics of this function
+> >>>  in the context of a NUMA system should be. A quick and dirty fix would
+> >>>  be to always attach to the first available NUMA node.
+> >>>
+> >>>- In arch/arm64/mm/init.c `arch_add_memory`, we are doing a hack with the
+> >>>  nomap memory block flags to satisfy preconditions and postconditions of
+> >>>  `__add_pages` and postconditions of `arch_add_memory`. Compared to
+> >>>  memory hotplug implementation for other architectures, the "issue"
+> >>>  seems to be in the implemenation of `pfn_valid`. Suggestions on how
+> >>>  to cleanly avoid this hack are welcome.
+> >>>
+> >>>This patchset can be tested by starting the kernel with the `mem=X` flag, where
+> >>>X is less than the total available physical memory and has to be multiple of
+> >>>MIN_MEMORY_BLOCK_SIZE. We also tested it on a customised version of QEMU
+> >>>capable to emulate physical hotplug on arm64 platform.
+> >>>
+> >>>To enable the feature the CONFIG_MEMORY_HOTPLUG compilation flag
+> >>>needs to be set to true. Then, after memory is physically hotplugged,
+> >>>the standard two steps to make it available (as also documented in
+> >>>Documentation/memory-hotplug.txt) are:
+> >>>
+> >>>(1) Notify memory hot-add
+> >>>     echo '0xYY000000' > /sys/devices/system/memory/probe
+> >>>
+> >>>where 0xYY000000 is the first physical address of the new memory section.
+> >>>
+> >>>(2) Online new memory block(s)
+> >>>    echo online > /sys/devices/system/memory/memoryXXX/state
+> >>>
+> >>>where XXX corresponds to the ids of newly added blocks.
+> >>>
+> >>>Onlining can optionally be automatic at hot-add notification by enabling
+> >>>the global flag:
+> >>>    echo online > /sys/devices/system/memory/auto_online_blocks
+> >>>or by setting the corresponding config flag in the kernel build.
+> >>>
+> >>>Again, any comment is highly appreciated.
+> >>>
+> >>>[1] https://lkml.org/lkml/2016/11/17/49
+> >>>[2] https://lkml.org/lkml/2016/12/1/811
+> >>>
+> >>>Signed-off-by: Maciej Bielski <m.bielski@virtualopensystems.com>
+> >>>Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
+> >>>---
+> >>> arch/arm64/Kconfig           |  4 +--
+> >>> arch/arm64/include/asm/mmu.h |  3 +++
+> >>> arch/arm64/mm/init.c         | 58 +++++++++++++++++++++++++++++++-------------
+> >>> arch/arm64/mm/mmu.c          | 24 ++++++++++++++++++
+> >>> include/linux/memblock.h     |  1 +
+> >>> mm/memblock.c                | 10 ++++++++
+> >>> 6 files changed, 80 insertions(+), 20 deletions(-)
+> >>>
+> >>>diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> >>>index 2482fdd..bd8ddf2 100644
+> >>>--- a/arch/arm64/Kconfig
+> >>>+++ b/arch/arm64/Kconfig
+> >>>@@ -577,9 +577,7 @@ config HOTPLUG_CPU
+> >>>       can be controlled through /sys/devices/system/cpu.
+> >>>
+> >>> config ARCH_ENABLE_MEMORY_HOTPLUG
+> >>>-    def_bool y
+> >>>-
+> >>>-config ARCH_ENABLE_MEMORY_HOTREMOVE
+> >>>+    depends on !NUMA
+> >>>     def_bool y
+> >>>
+> >>> # Common NUMA Features
+> >>>diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+> >>>index 8d9fce0..2499745 100644
+> >>>--- a/arch/arm64/include/asm/mmu.h
+> >>>+++ b/arch/arm64/include/asm/mmu.h
+> >>>@@ -36,5 +36,8 @@ extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+> >>>                    unsigned long virt, phys_addr_t size,
+> >>>                    pgprot_t prot, bool allow_block_mappings);
+> >>> extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
+> >>>+#ifdef CONFIG_MEMORY_HOTPLUG
+> >>>+extern void hotplug_paging(phys_addr_t start, phys_addr_t size);
+> >>>+#endif
+> >>>
+> >>> #endif
+> >>>diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> >>>index 687d087..a7c740e 100644
+> >>>--- a/arch/arm64/mm/init.c
+> >>>+++ b/arch/arm64/mm/init.c
+> >>>@@ -544,37 +544,61 @@ int arch_add_memory(int nid, u64 start, u64 size, bool for_device)
+> >>>     struct zone *zone;
+> >>>     unsigned long start_pfn = start >> PAGE_SHIFT;
+> >>>     unsigned long nr_pages = size >> PAGE_SHIFT;
+> >>>+    unsigned long end_pfn = start_pfn + nr_pages;
+> >>>+    unsigned long max_sparsemem_pfn = 1UL << (MAX_PHYSMEM_BITS-PAGE_SHIFT);
+> >>>+    unsigned long pfn;
+> >>>     int ret;
+> >>>
+> >>>+    if (end_pfn > max_sparsemem_pfn) {
+> >>>+        pr_err("end_pfn too big");
+> >>>+        return -1;
+> >>>+    }
+> >>>+    hotplug_paging(start, size);
+> >>>+
+> >>>+    /*
+> >>>+     * Mark all the page range as unsuable.
+> >>>+     * This is needed because  __add_section (within __add_pages)
+> >>>+     * wants pfn_valid to be false, and in arm64 pfn falid is implemented
+> >>>+     * by just checking at the nomap flag for existing blocks
+> >>>+     */
+> >>>+    memblock_mark_nomap(start, size);
+> >>>+
+> >>>     pgdat = NODE_DATA(nid);
+> >>>
+> >>>     zone = pgdat->node_zones +
+> >>>         zone_for_memory(nid, start, size, ZONE_NORMAL, for_device);
+> >>>     ret = __add_pages(nid, zone, start_pfn, nr_pages);
+> >>>
+> >>>-    if (ret)
+> >>>-        pr_warn("%s: Problem encountered in __add_pages() ret=%d\n",
+> >>>-            __func__, ret);
+> >>>+    /*
+> >>>+     * Make the pages usable after they have been added.
+> >>>+     * This will make pfn_valid return true
+> >>>+     */
+> >>>+    memblock_clear_nomap(start, size);
+> >>>
+> >>>-    return ret;
+> >>>-}
+> >>>+    /*
+> >>>+     * This is a hack to avoid having to mix arch specific code into arch
+> >>>+     * independent code. SetPageReserved is supposed to be called by __add_zone
+> >>>+     * (within __add_section, within __add_pages). However, when it is called
+> >>>+     * there, it assumes that pfn_valid returns true.  For the way pfn_valid is
+> >>>+     * implemented in arm64 (a check on the nomap flag), the only way to make
+> >>>+     * this evaluate true inside __add_zone is to clear the nomap flags of
+> >>>+     * blocks in architecture independent code.
+> >>>+     *
+> >>>+     * To avoid this, we set the Reserved flag here after we cleared the nomap
+> >>>+     * flag in the line above.
+> >>>+     */
+> >>>+    for (pfn = start_pfn; pfn < start_pfn + nr_pages; pfn++) {
+> >>>+        if (!pfn_valid(pfn))
+> >>>+            continue;
+> >>>
+> >>>-#ifdef CONFIG_MEMORY_HOTREMOVE
+> >>>-int arch_remove_memory(u64 start, u64 size)
+> >>>-{
+> >>>-    unsigned long start_pfn = start >> PAGE_SHIFT;
+> >>>-    unsigned long nr_pages = size >> PAGE_SHIFT;
+> >>>-    struct zone *zone;
+> >>>-    int ret;
+> >>>+        SetPageReserved(pfn_to_page(pfn));
+> >>>+    }
+> >>>
+> >>>-    zone = page_zone(pfn_to_page(start_pfn));
+> >>>-    ret = __remove_pages(zone, start_pfn, nr_pages);
+> >>>     if (ret)
+> >>>-        pr_warn("%s: Problem encountered in __remove_pages() ret=%d\n",
+> >>>+        pr_warn("%s: Problem encountered in __add_pages() ret=%d\n",
+> >>>             __func__, ret);
+> >>>
+> >>>     return ret;
+> >>> }
+> >>> #endif
+> >>>-#endif
+> >>>
+> >>>diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> >>>index 05615a3..9efa7d1 100644
+> >>>--- a/arch/arm64/mm/mmu.c
+> >>>+++ b/arch/arm64/mm/mmu.c
+> >>>@@ -493,6 +493,30 @@ void __init paging_init(void)
+> >>>               SWAPPER_DIR_SIZE - PAGE_SIZE);
+> >>> }
+> >>>
+> >>>+#ifdef CONFIG_MEMORY_HOTPLUG
+> >>>+/*
+> >>>+ * hotplug_paging() is used by memory hotplug to build new page tables
+> >>>+ * for hot added memory.
+> >>>+ */
+> >>>+void hotplug_paging(phys_addr_t start, phys_addr_t size)
+> >>>+{
+> >>>+    phys_addr_t pgd_phys = pgd_pgtable_alloc();
+> >>>+    pgd_t *pgd = pgd_set_fixmap(pgd_phys);
+> >>>+
+> >>>+    memcpy(pgd, swapper_pg_dir, PAGE_SIZE);
+> >>>+
+> >>>+    __create_pgd_mapping(pgd, start, __phys_to_virt(start), size,
+> >>>+            PAGE_KERNEL, pgd_pgtable_alloc, false);
+> >>>+
+> >>>+    cpu_replace_ttbr1(__va(pgd_phys));
+> >>>+    memcpy(swapper_pg_dir, pgd, PAGE_SIZE);
+> >>>+    cpu_replace_ttbr1(swapper_pg_dir);
+> >>>+
+> >>>+    pgd_clear_fixmap();
+> >>>+    memblock_free(pgd_phys, PAGE_SIZE);
+> >>>+}
+> >>>+#endif
+> >>>+
+> >>> /*
+> >>>  * Check whether a kernel address is valid (derived from arch/x86/).
+> >>>  */
+> >>>diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+> >>>index 5b759c9..5f78257 100644
+> >>>--- a/include/linux/memblock.h
+> >>>+++ b/include/linux/memblock.h
+> >>>@@ -92,6 +92,7 @@ int memblock_mark_hotplug(phys_addr_t base, phys_addr_t size);
+> >>> int memblock_clear_hotplug(phys_addr_t base, phys_addr_t size);
+> >>> int memblock_mark_mirror(phys_addr_t base, phys_addr_t size);
+> >>> int memblock_mark_nomap(phys_addr_t base, phys_addr_t size);
+> >>>+int memblock_clear_nomap(phys_addr_t base, phys_addr_t size);
+> >>> ulong choose_memblock_flags(void);
+> >>>
+> >>> /* Low level functions */
+> >>>diff --git a/mm/memblock.c b/mm/memblock.c
+> >>>index 7608bc3..05e7676 100644
+> >>>--- a/mm/memblock.c
+> >>>+++ b/mm/memblock.c
+> >>>@@ -814,6 +814,16 @@ int __init_memblock memblock_mark_nomap(phys_addr_t base, phys_addr_t size)
+> >>> }
+> >>>
+> >>> /**
+> >>>+ * memblock_clear_nomap - Clear a flag of MEMBLOCK_NOMAP memory region
+> >>>+ * @base: the base phys addr of the region
+> >>>+ * @size: the size of the region
+> >>>+ */
+> >>>+int __init_memblock memblock_clear_nomap(phys_addr_t base, phys_addr_t size)
+> >>>+{
+> >>>+    return memblock_setclr_flag(base, size, 0, MEMBLOCK_NOMAP);
+> >>>+}
+> >>>+
+> >>>+/**
+> >>>  * __next_reserved_mem_region - next function for for_each_reserved_region()
+> >>>  * @idx: pointer to u64 loop variable
+> >>>  * @out_start: ptr to phys_addr_t for start address of the region, can be %NULL
+> >>>
+> >
+> >BR,
+> >
+> 
