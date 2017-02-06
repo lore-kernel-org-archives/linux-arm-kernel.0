@@ -1,78 +1,102 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 06 Feb 2017 16:33:37 +0100
-Subject: [PATCH v3 3/3] PCI: imx6: Add code to support i.MX7D
-In-Reply-To: <20170206151716.10381-4-andrew.smirnov@gmail.com>
-References: <20170206151716.10381-1-andrew.smirnov@gmail.com>
- <20170206151716.10381-4-andrew.smirnov@gmail.com>
-Message-ID: <1486395217.2275.38.camel@pengutronix.de>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Mon, 6 Feb 2017 16:37:23 +0100
+Subject: Fractional divider on the Atmel USART controller
+In-Reply-To: <b32aeadb-57a3-f327-e387-e4bb720f9297@gmail.com>
+References: <CAGkQfmNshOGWT8Vs_J-49qq2UHoCMJ8cYb9jbjaDqM2YNy05rg@mail.gmail.com>
+ <20170206134256.tp5rgx6axd532gp3@rfolt0960.corp.atmel.com>
+ <b32aeadb-57a3-f327-e387-e4bb720f9297@gmail.com>
+Message-ID: <20170206153723.om7yen4laybhkm6d@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 06.02.2017, 07:17 -0800 schrieb Andrey Smirnov:
-> Add various bits of code needed to support i.MX7D variant of the IP.
+On Mon, Feb 06, 2017 at 03:58:52PM +0100, Richard Genoud wrote:
+> Hi Ludovic,
 > 
-> Cc: yurovsky at gmail.com
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-
-Two small comments inline, otherwise looks real good now.
-
-> ---
->  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
->  drivers/pci/host/pci-imx6.c                        | 121 ++++++++++++++++-----
->  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
->  3 files changed, 105 insertions(+), 26 deletions(-)
+> On 06/02/2017 14:42, Ludovic Desroches wrote:
+> > Hello Romain,
+> > 
+> > On Mon, Feb 06, 2017 at 12:56:42PM +0100, Romain Izard wrote:
+> >> Hello,
+> >>
+> >> On Atmel SAMA5D2, when trying to configure a serial port for 3 Mbauds
+> >> operation, I do not always get the requested baud rate. If the hardware
+> >> flow control is disabled by software, the line works correctly. But if I
+> >> set the crtscts option, the line does not work, and after checking the
+> >> line I can observe that the signal is sent at 2.6 Mbauds.
+> >>
+> >> This is due to the code used to manage fractional baud rate divisor: the
+> >> existing code prevents the fractional bits from being used if the line
+> >> is not configured in normal mode. This case occurs when the hardware
+> >> flow control or the RS485 mode is set.
+> >>
+> >> If I apply the following patch to drivers/tty/serial/atmel_serial.c,
+> >> I get the required baudrate.
+> >>
+> >> 8<----------------------------------------------------------------
+> >>
+> >> @@ -2204,14 +2204,13
+> >>       * baudrate = selected clock / (8 * (2 - OVER) * (CD + FP / 8))
+> >>       * Currently, OVER is always set to 0 so we get
+> >>       * baudrate = selected clock / (16 * (CD + FP / 8))
+> >>       * then
+> >>       * 8 CD + FP = selected clock / (2 * baudrate)
+> >>       */
+> >> -    if (atmel_port->has_frac_baudrate &&
+> >> -        (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
+> >> +    if (atmel_port->has_frac_baudrate) {
+> >>          div = DIV_ROUND_CLOSEST(port->uartclk, baud * 2);
+> >>          cd = div >> 3;
+> >>          fp = div & ATMEL_US_FP_MASK;
+> >>      } else {
+> >>          cd = uart_get_divisor(port, baud);
+> >>      }
+> >>
+> >> 8<----------------------------------------------------------------
+> >>
+> >> Unfortunately, I know that this will work on SAMA5D2, but this driver is
+> >> used for many other Atmel chips. I do not know if the existing code is
+> >> meant to respect a known limitation on other devices that use the same
+> >> controller, or if it is just a bug.
+> > 
+> > It depends on the device used. In the SAMA5D4 datasheet, it is
+> > mentionned: "This feature is only available when using USART normal mode".
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> index 83aeb1f..9f57759 100644
-> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> @@ -4,7 +4,11 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
->  and thus inherits all the common properties defined in designware-pcie.txt.
->  
->  Required properties:
-> -- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie", "fsl,imx6qp-pcie"
-> +- compatible:
-> +	- "fsl,imx6q-pcie"
-> +	- "fsl,imx6sx-pcie",
-> +	- "fsl,imx6qp-pcie"
-> +	- "fsl,imx7d-pcie"
->  - reg: base address and length of the PCIe controller
->  - interrupts: A list of interrupt outputs of the controller. Must contain an
->    entry for each entry in the interrupt-names property.
+> It seems you have an old datasheet version, because in table 60.2 (page 1784) of SAMA5D4 datasheet (rev D), there's :
+> 
 
-This misses an "Additional required properties for imx7d-pcie" section
-listing the required reset handles.
+Right, it seems there was an update of all sama5 datasheet to remove
+this constraint. I don't know if it concerns also old devices, I'll try
+to get more information.
 
-> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> index 3ef8093..34a21c9 100644
-> --- a/drivers/pci/host/pci-imx6.c
-> +++ b/drivers/pci/host/pci-imx6.c
+> Section 43.6.1.2 ?Fractional Baud Rate in Asynchronous Mode?: added warning ?When the value of field FP
+> is greater than 0...?; removed sentence ?This feature is only available when using USART normal mode.?
+> 
+> So I guess this should also work on SAMA5D4 ? 
+> 
+> 
+> > In the SAMA5D2 datasheet, this constraint is no longer mentionned you
+> > confirm that is works, that is great.
+> > 
+> >>
+> >> Ludovic, Nicolas,  what is your opinion on that matter? Should I just
+> >> propose this as a patch, or is it necessary to add a limitation for
+> >> supported devices only ?
+> > 
+> > Yes, only SAMA5D2 supports fractionnal baudrate in other modes than the
+> > normal one. A new compatible string may be added, I am not sure you have
+> > enough information in atmel_get_ip_name...
+> 
+> I checked the version numbers on some atmel platforms I have:
+> 
+> AT91SAM9G35 / SAMA5D3: 0x502
+> AT91SAM9G20: 0x10330
+> SAMA5D2: 0x814
+> 
+> Ludovic, could you please check the version number of the SAMA5D4 USART (if you have one lying around) ?
+> 
 
-[...]
+SAMA5D4: 0x701
 
->  static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
->  {
->  	struct pcie_port *pp = &imx6_pcie->pp;
-> @@ -381,6 +416,11 @@ static void imx6_pcie_deassert_core_reset(struct imx6_pcie *imx6_pcie)
->  	}
->  
->  	switch (imx6_pcie->variant) {
-> +	case IMX7D:
-> +		reset_control_assert(imx6_pcie->apps_reset);
+Regards
 
-Can this reset assertion be moved into imx6_pcie_assert_core_reset()?
-This may change the programming order slightly from the downstream
-driver, but I guess that won't hurt if this is the equivalent of the
-LTSSM enable signal.
-
-Regards,
-Lucas
+Ludovic
