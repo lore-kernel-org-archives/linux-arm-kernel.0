@@ -1,31 +1,131 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon, 6 Feb 2017 23:25:23 +0000
-Subject: [PATCH 4/4] clk: mvebu: Expand mv98dx3236-core-clock support
-References: <20170203034012.29399-1-chris.packham@alliedtelesis.co.nz>
- <20170203034012.29399-5-chris.packham@alliedtelesis.co.nz>
- <20170206231400.GM25384@codeaurora.org>
-Message-ID: <9974653ab84040c3b12fad075790c123@svr-chch-ex1.atlnz.lc>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Mon, 6 Feb 2017 15:10:46 -0800
+Subject: [PATCH v3 13/24] platform: add video-multiplexer subdevice driver
+In-Reply-To: <2038922.a1tReKKdaL@avalon>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <2258037.UCXsIYbtGD@avalon> <f6bfb9ec-1ea3-8477-4933-cf655acd3e0f@xs4all.nl>
+ <2038922.a1tReKKdaL@avalon>
+Message-ID: <bd64a86e-d90c-f4aa-6f22-1c832e0b563f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/17 12:14, Stephen Boyd wrote:
-> On 02/03, Chris Packham wrote:
->> The initial implementation in commit e120c17a70e5 ("clk: mvebu: support
->> for 98DX3236 SoC") hardcoded a fixed value for the main PLL frequency.
->> Port code from the Marvell supplied Linux kernel to support different
->> PLL frequencies and provide clock gating support.
->>
->> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->> ---
->>  .../devicetree/bindings/clock/mvebu-core-clock.txt |   7 +
->>  .../bindings/clock/mvebu-gated-clock.txt           |  11 ++
->>  arch/arm/boot/dts/armada-xp-98dx3236.dtsi          |  14 +-
->>  drivers/clk/mvebu/Makefile                         |   2 +-
->>  drivers/clk/mvebu/armada-xp.c                      |  13 --
->>  drivers/clk/mvebu/mv98dx3236.c                     | 144 +++++++++++++++++++++
->
-> This mixes dts and clk driver changes. Any chance it can be split
-> up and just have the clk part go through clk tree? Otherwise, I
-> can ack this if you want to take it all through arm-soc?
 
-I'm happy to split it if it will make life easier.
+
+On 02/06/2017 02:33 PM, Laurent Pinchart wrote:
+> Hi Hans,
+>
+> (CC'ing Sakari)
+>
+> On Monday 06 Feb 2017 10:50:22 Hans Verkuil wrote:
+>> On 02/05/2017 04:48 PM, Laurent Pinchart wrote:
+>>> On Tuesday 24 Jan 2017 18:07:55 Steve Longerbeam wrote:
+>>>> On 01/24/2017 04:02 AM, Philipp Zabel wrote:
+>>>>> On Fri, 2017-01-20 at 15:03 +0100, Hans Verkuil wrote:
+>>>>>>> +
+>>>>>>> +int vidsw_g_mbus_config(struct v4l2_subdev *sd, struct
+>>>>>>> v4l2_mbus_config
+>>>>>>> *cfg)
+>>>>>>> +{
+>>>>>>> +	struct vidsw *vidsw = v4l2_subdev_to_vidsw(sd);
+>>>>>>> +	struct media_pad *pad;
+>>>>>>> +	int ret;
+>>>>>>> +
+>>>>>>> +	if (vidsw->active == -1) {
+>>>>>>> +		dev_err(sd->dev, "no configuration for inactive
+> mux\n");
+>>>>>>> +		return -EINVAL;
+>>>>>>> +	}
+>>>>>>> +
+>>>>>>> +	/*
+>>>>>>> +	 * Retrieve media bus configuration from the entity connected
+> to the
+>>>>>>> +	 * active input
+>>>>>>> +	 */
+>>>>>>> +	pad = media_entity_remote_pad(&vidsw->pads[vidsw->active]);
+>>>>>>> +	if (pad) {
+>>>>>>> +		sd = media_entity_to_v4l2_subdev(pad->entity);
+>>>>>>> +		ret = v4l2_subdev_call(sd, video, g_mbus_config, cfg);
+>>>>>>> +		if (ret == -ENOIOCTLCMD)
+>>>>>>> +			pad = NULL;
+>>>>>>> +		else if (ret < 0) {
+>>>>>>> +			dev_err(sd->dev, "failed to get source
+>>>>>>> configuration\n");
+>>>>>>> +			return ret;
+>>>>>>> +		}
+>>>>>>> +	}
+>>>>>>> +	if (!pad) {
+>>>>>>> +		/* Mirror the input side on the output side */
+>>>>>>> +		cfg->type = vidsw->endpoint[vidsw->active].bus_type;
+>>>>>>> +		if (cfg->type == V4L2_MBUS_PARALLEL ||
+>>>>>>> +		    cfg->type == V4L2_MBUS_BT656)
+>>>>>>> +			cfg->flags = vidsw->endpoint[vidsw-
+>>>>>>> active].bus.parallel.flags;
+>>>>>>> +	}
+>>>>>>> +
+>>>>>>> +	return 0;
+>>>>>>> +}
+>>>>>> I am not certain this op is needed at all. In the current kernel this
+>>>>>> op is only used by soc_camera, pxa_camera and omap3isp (somewhat
+>>>>>> dubious). Normally this information should come from the device tree
+>>>>>> and there should be no need for this op.
+>>>>>>
+>>>>>> My (tentative) long-term plan was to get rid of this op.
+>>>>>>
+>>>>>> If you don't need it, then I recommend it is removed.
+>>>> Hi Hans, the imx-media driver was only calling g_mbus_config to the
+>>>> camera sensor, and it was doing that to determine the sensor's bus type.
+>>>> This info was already available from parsing a v4l2_of_endpoint from the
+>>>> sensor node. So it was simple to remove the g_mbus_config calls, and
+>>>> instead rely on the parsed sensor v4l2_of_endpoint.
+>>> That's not a good point.
+> (mea culpa, s/point/idea/)
+>
+>>> The imx-media driver must not parse the sensor DT node as it is not aware
+>>> of what bindings the sensor is compatible with.
+
+Hi Laurent,
+
+I don't really understand this argument. The sensor node has been found
+by parsing the OF graph, so it is known to be a camera sensor node at
+that point.
+
+
+>>>   Information must instead
+>>> be queried from the sensor subdev at runtime, through the g_mbus_config()
+>>> operation.
+>>>
+>>> Of course, if you can get the information from the imx-media DT node,
+>>> that's certainly an option. It's only information provided by the sensor
+>>> driver that you have no choice but query using a subdev operation.
+>> Shouldn't this come from the imx-media DT node? BTW, why is omap3isp using
+>> this?
+> It all depends on what type of information needs to be retrieved, and whether
+> it can change at runtime or is fixed. Adding properties to the imx-media DT
+> node is certainly fine as long as those properties describe the i.MX side.
+
+In this case the info needed is the media bus type. That info is most easily
+available by calling v4l2_of_parse_endpoint() on the sensor's endpoint node.
+
+The media bus type is not something that can be added to the
+imx-media node since it contains no endpoint nodes.
+
+
+> In the omap3isp case, we use the operation to query whether parallel data
+> contains embedded sync (BT.656) or uses separate h/v sync signals.
+>
+>> The reason I am suspicious about this op is that it came from soc-camera and
+>> predates the DT. The contents of v4l2_mbus_config seems very much like a HW
+>> description to me, i.e. something that belongs in the DT.
+> Part of it is possibly outdated, but for buses that support multiple modes of
+> operation (such as the parallel bus case described above) we need to make that
+> information discoverable at runtime. Maybe this should be considered as
+> related to Sakari's efforts to support VC/DT for CSI-2, and supported through
+> the API he is working on.
+
+That sounds interesting, can you point me to some info on this effort?
+I've been thinking the DT should contain virtual channel info for CSI-2
+buses.
+
+Steve
+
+>
