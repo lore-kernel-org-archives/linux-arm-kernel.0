@@ -1,29 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 6 Feb 2017 10:06:08 +0000
-Subject: [PATCH RESEND 1/3] arm64: add THUNDER2 processor family
-In-Reply-To: <1486233461-2679-2-git-send-email-jnair@caviumnetworks.com>
-References: <1486233461-2679-1-git-send-email-jnair@caviumnetworks.com>
- <1486233461-2679-2-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <20170206100608.GA8540@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 6 Feb 2017 11:07:33 +0100
+Subject: [PATCH 0/2] pinctrl: sunxi: Merge A31s pinctrl driver with A31
+In-Reply-To: <20170202081332.okjxo4ogm2kp3abh@lukather>
+References: <20170201162547.24232-1-wens@csie.org>
+ <20170202081332.okjxo4ogm2kp3abh@lukather>
+Message-ID: <CACRpkdZUOszrqbPq4Ak+pUeYQB2qBnSrE2qWMkoNzvw+E74maw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 04, 2017 at 06:37:39PM +0000, Jayachandran C wrote:
-> Add support for ThunderX2 CN99XX arm64 server processors.
-> 
-> Introduce a new arm64 platform config option ARCH_THUNDER2 for these
-> processors. Add device tree files boot/dts/cavium/thunder-99xx.dtsi for
-> on-chip devices and boot/dts/cavium/thunder-99xx.dts for the evaluation
-> board.
-> 
-> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
-> ---
->  arch/arm64/Kconfig.platforms                 |   7 ++
->  arch/arm64/boot/dts/cavium/Makefile          |   1 +
->  arch/arm64/boot/dts/cavium/thunder-99xx.dts  |  34 +++++++
->  arch/arm64/boot/dts/cavium/thunder-99xx.dtsi | 147 +++++++++++++++++++++++++++
+On Thu, Feb 2, 2017 at 9:13 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Thu, Feb 02, 2017 at 12:25:45AM +0800, Chen-Yu Tsai wrote:
+>> Hi everyone,
+>>
+>> This series merges support for the A31s' pin controller into the A31
+>> driver, using the new sunxi variants support code. The A31s is a trimmed
+>> down version of the A31, with some hardware blocks removed, and some
+>> pin functions or pins removed. Thus it is easy to support the A31s
+>> using the A31 driver by marking the extra pins/functions as A31 only.
+>>
+>> Patch 1 does exactly this.
+>>
+>> Patch 2 removes the original A31s driver, which is now redundant.
+>>
+>> I opted not to rename sun6i-a31 to sun6i in various places.
+>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-This is basically identical to vulcan.dtsi. Do we really need both in the
-tree?
+Could you guys make a patch either adding these drivers as
+commonly maintained by you two in MAINTAINERS?
 
-Will
+It is commonly maintained right?
+
+Or if you prefer, just list the pinctrl dir under the Allwinner
+SoC support entry?
+
+Yours,
+Linus Walleij
