@@ -1,84 +1,58 @@
 From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 7 Feb 2017 02:35:40 +0800
-Subject: [hisi:topic-lpc-4.10-libio 1/2]
- arch/x86/boot/compressed/../ctype.h:4:19: error: redefinition of 'isdigit'
-Message-ID: <201702070235.q8XEizOd%fengguang.wu@intel.com>
+Date: Tue, 7 Feb 2017 02:48:45 +0800
+Subject: [hisi:topic-lpc-4.10-libio 139/148] drivers/of/address.c:330:3:
+ error: implicit declaration of function 'address_to_pio'
+Message-ID: <201702070243.4D7HItWA%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 tree:   https://github.com/hisilicon/linux-hisi topic-lpc-4.10-libio
 head:   06443d85dc35b64a704f7be84cc538281a1598f4
-commit: 4963ab639c628204056ef81b89c8cf2d628a2dae [1/2] libio: eliminate some compile errors
-config: x86_64-acpi-redef (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+commit: b7bc5eec71294f8df5db8a1e0be4c4eb09c007cd [139/148] libio: relocate pci io functions
+config: x86_64-randconfig-i0-201706 (attached as .config)
+compiler: gcc-4.9 (Debian 4.9.4-2) 4.9.4
 reproduce:
-        git checkout 4963ab639c628204056ef81b89c8cf2d628a2dae
+        git checkout b7bc5eec71294f8df5db8a1e0be4c4eb09c007cd
         # save the attached .config to linux build tree
         make ARCH=x86_64 
 
-All error/warnings (new ones prefixed by >>):
+Note: the hisi/topic-lpc-4.10-libio HEAD 06443d85dc35b64a704f7be84cc538281a1598f4 builds fine.
+      It only hurts bisectibility.
 
-   In file included from arch/x86/boot/compressed/misc.h:24:0,
-                    from arch/x86/boot/compressed/cmdline.c:1:
->> arch/x86/boot/compressed/../ctype.h:4:19: error: redefinition of 'isdigit'
-    static inline int isdigit(int ch)
-                      ^~~~~~~
-   In file included from include/acpi/platform/aclinux.h:82:0,
-                    from include/acpi/platform/acenv.h:185,
-                    from include/acpi/acpi.h:56,
-                    from include/linux/acpi.h:33,
-                    from include/linux/libio.h:23,
-                    from include/linux/io.h:27,
-                    from arch/x86/boot/compressed/misc.h:17,
-                    from arch/x86/boot/compressed/cmdline.c:1:
-   include/linux/ctype.h:25:19: note: previous definition of 'isdigit' was here
-    static inline int isdigit(int c)
-                      ^~~~~~~
->> arch/x86/boot/compressed/../ctype.h:9:32: error: expected ')' before 'ch'
-    static inline int isxdigit(int ch)
-                                   ^
-   include/linux/ctype.h:20:50: note: in definition of macro '__ismask'
-    #define __ismask(x) (_ctype[(int)(unsigned char)(x)])
-                                                     ^
->> arch/x86/boot/compressed/../ctype.h:9:19: note: in expansion of macro 'isxdigit'
-    static inline int isxdigit(int ch)
-                      ^~~~~~~~
->> include/linux/ctype.h:20:52: error: expected expression before ']' token
-    #define __ismask(x) (_ctype[(int)(unsigned char)(x)])
-                                                       ^
->> include/linux/ctype.h:36:23: note: in expansion of macro '__ismask'
-    #define isxdigit(c) ((__ismask(c)&(_D|_X)) != 0)
-                          ^~~~~~~~
->> arch/x86/boot/compressed/../ctype.h:9:19: note: in expansion of macro 'isxdigit'
-    static inline int isxdigit(int ch)
-                      ^~~~~~~~
->> include/linux/ctype.h:36:44: error: expected ')' before '!=' token
-    #define isxdigit(c) ((__ismask(c)&(_D|_X)) != 0)
-                                               ^
->> arch/x86/boot/compressed/../ctype.h:9:19: note: in expansion of macro 'isxdigit'
-    static inline int isxdigit(int ch)
-                      ^~~~~~~~
+All errors (new ones prefixed by >>):
 
-vim +/isdigit +4 arch/x86/boot/compressed/../ctype.h
+   drivers/of/address.c: In function 'of_pci_range_to_resource':
+   drivers/of/address.c:327:3: error: implicit declaration of function 'register_io_range' [-Werror=implicit-function-declaration]
+      err = register_io_range(&np->fwnode, range->cpu_addr, range->size);
+      ^
+>> drivers/of/address.c:330:3: error: implicit declaration of function 'address_to_pio' [-Werror=implicit-function-declaration]
+      port = address_to_pio(range->cpu_addr);
+      ^
+   drivers/of/address.c: In function '__of_translate_address':
+>> drivers/of/address.c:610:3: error: implicit declaration of function 'find_io_range_from_fwnode' [-Werror=implicit-function-declaration]
+      if (find_io_range_from_fwnode(&dev->fwnode)) {
+      ^
+   drivers/of/address.c: In function 'of_translate_ioport':
+>> drivers/of/address.c:726:3: error: implicit declaration of function 'io_translate' [-Werror=implicit-function-declaration]
+      port = io_translate(&host->fwnode, taddr);
+      ^
+   cc1: some warnings being treated as errors
 
-60b217a0 arch/x86/boot/ctype.h   Alexander Kuleshov 2015-01-03   1  #ifndef BOOT_CTYPE_H
-60b217a0 arch/x86/boot/ctype.h   Alexander Kuleshov 2015-01-03   2  #define BOOT_CTYPE_H
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02   3  
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02  @4  static inline int isdigit(int ch)
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02   5  {
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02   6  	return (ch >= '0') && (ch <= '9');
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02   7  }
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02   8  
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02  @9  static inline int isxdigit(int ch)
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02  10  {
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02  11  	if (isdigit(ch))
-f4ed2877 arch/x86/boot/isdigit.h Yinghai Lu         2010-08-02  12  		return true;
+vim +/address_to_pio +330 drivers/of/address.c
 
-:::::: The code at line 4 was first introduced by commit
-:::::: f4ed2877b16e8146427306aea8819adac5c88374 x86, setup: reorganize the early console setup
-
-:::::: TO: Yinghai Lu <yinghai@kernel.org>
-:::::: CC: H. Peter Anvin <hpa@linux.intel.com>
+   321		res->flags = range->flags;
+   322		res->parent = res->child = res->sibling = NULL;
+   323		res->name = np->full_name;
+   324	
+   325		if (res->flags & IORESOURCE_IO) {
+   326			unsigned long port;
+ > 327			err = register_io_range(&np->fwnode, range->cpu_addr, range->size);
+   328			if (err)
+   329				goto invalid_range;
+ > 330			port = address_to_pio(range->cpu_addr);
+   331			if (port == (unsigned long)-1) {
+   332				err = -EINVAL;
+   333				goto invalid_range;
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -87,6 +61,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 28928 bytes
+Size: 26858 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/f5538fa1/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/9f82d2a9/attachment-0001.gz>
