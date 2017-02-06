@@ -1,157 +1,134 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Tue,  7 Feb 2017 02:50:15 +0800
-Subject: [PATCH v21 13/13] acpi/arm64: Add SBSA Generic Watchdog support in
- GTDT driver
-In-Reply-To: <20170206185015.12296-1-fu.wei@linaro.org>
-References: <20170206185015.12296-1-fu.wei@linaro.org>
-Message-ID: <20170206185015.12296-14-fu.wei@linaro.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 6 Feb 2017 10:47:45 -0800
+Subject: [PATCHv2 1/2] arch: Move CONFIG_DEBUG_RODATA and
+ CONFIG_SET_MODULE_RONX to be common
+In-Reply-To: <CAGXu5j+HOTHRrFJFMsMaAvqcTAUoEBuphzrYAr7VAjJQU9_RYA@mail.gmail.com>
+References: <1486144343-24998-1-git-send-email-labbott@redhat.com>
+ <1486144343-24998-2-git-send-email-labbott@redhat.com>
+ <CAGXu5jK6_y=dWHUDBto7ykN_sSOQ6Gx+sZs_gQ1Hoh5DjP-fTw@mail.gmail.com>
+ <20170203202919.GE27312@n2100.armlinux.org.uk>
+ <CAGXu5j+HOTHRrFJFMsMaAvqcTAUoEBuphzrYAr7VAjJQU9_RYA@mail.gmail.com>
+Message-ID: <f88765d3-4c45-542e-892b-33a6c3c3c4d2@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+On 02/03/2017 01:08 PM, Kees Cook wrote:
+> On Fri, Feb 3, 2017 at 12:29 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+>> On Fri, Feb 03, 2017 at 11:45:56AM -0800, Kees Cook wrote:
+>>> On Fri, Feb 3, 2017 at 9:52 AM, Laura Abbott <labbott@redhat.com> wrote:
+>>>> diff --git a/arch/Kconfig b/arch/Kconfig
+>>>> index 99839c2..22ee01e 100644
+>>>> --- a/arch/Kconfig
+>>>> +++ b/arch/Kconfig
+>>>> @@ -781,4 +781,32 @@ config VMAP_STACK
+>>>>           the stack to map directly to the KASAN shadow map using a formula
+>>>>           that is incorrect if the stack is in vmalloc space.
+>>>>
+>>>> +config ARCH_NO_STRICT_RWX_DEFAULTS
+>>>> +       def_bool n
+>>>> +
+>>>> +config ARCH_HAS_STRICT_KERNEL_RWX
+>>>> +       def_bool n
+>>>> +
+>>>> +config DEBUG_RODATA
+>>>> +       def_bool y if !ARCH_NO_STRICT_RWX_DEFAULTS
+>>>> +       prompt "Make kernel text and rodata read-only" if ARCH_NO_STRICT_RWX_DEFAULTS
+>>>
+>>> Ah! Yes, perfect. I totally forgot about using conditional "prompt"
+>>> lines. Nice!
+>>
+>> It's no different from the more usual:
+>>
+>>         bool "Make kernel text and rodata read-only" if ARCH_NO_STRICT_RWX_DEFAULTS
+>>         default y if !ARCH_NO_STRICT_RWX_DEFAULTS
+>>         depends on ARCH_HAS_STRICT_KERNEL_RWX
+>>
+>> But... I really don't like this - way too many negations and negatives
+>> which make it difficult to figure out what's going on here.
+>>
+>> The situation we have today is:
+>>
+>> -config DEBUG_RODATA
+>> -       bool "Make kernel text and rodata read-only"
+>> -       depends on MMU && !XIP_KERNEL
+>> -       default y if CPU_V7
+>>
+>> which is "allow the user to select DEBUG_RODATA if building a MMU non-XIP
+>> kernel", suggesting that the user turns it on for ARMv7 CPUs.
+>>
+>> That changes with this and the above:
+>>
+>> +       select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
+>> +       select ARCH_HAS_STRICT_MODULE_RWX if MMU
+>> +       select ARCH_NO_STRICT_RWX_DEFAULTS if !CPU_V7
+>>
+>> This means that ARCH_HAS_STRICT_KERNEL_RWX is set for a MMU non-XIP
+>> kernel, which carries the same pre-condition for DEBUG_RODATA - no
+>> problem there.
+>>
+>> However, ARCH_NO_STRICT_RWX_DEFAULTS is set for non-ARMv7 CPUs, which
+>> means the "Make kernel text and rodata read-only" prompt _is_ provided
+>> for those.  However, for all ARMv7 systems, we go from "suggesting that
+>> the user enables the option" to "you don't have a choice, you get this
+>> whether you want it or not."
+>>
+>> I'd prefer to keep it off for my development systems, where I don't
+>> care about kernel security.  If we don't wish to do that as a general
+>> rule, can we make it dependent on EMBEDDED?
+>>
+>> Given that on ARM it can add up to 4MB to the kernel image - there
+>> _will_ be about 1MB before the .text section, the padding on between
+>> __modver and __ex_table which for me is around 626k, the padding
+>> between .notes and the init sections start with .vectors (the space
+>> between __ex_table and end of .notes is only 4124, which gets padded
+>> up to 1MB) and lastly the padding between the .init section and the
+>> data section (for me around 593k).  This all adds up to an increase
+>> in kernel image size of 3.2MB on 14.2MB - an increase of 22%.
+>>
+>> So no, I'm really not happy with that.
+> 
+> Ah yeah, good point. We have three cases: unsupported, mandatory,
+> optional, but we have the case of setting the default for the optional
+> case. Maybe something like this?
+> 
+> config STRICT_KERNEL_RWX
+>   bool "Make kernel text and rodata read-only" if ARCH_OPTIONAL_KERNEL_RWX
+>   depends on ARCH_HAS_STRICT_KERNEL_RWX
+>   default ARCH_OPTIONAL_KERNEL_RWX_DEFAULT
+> 
+> unsupported:
+> !ARCH_HAS_STRICT_KERNEL_RWX
+> 
+> mandatory:
+> ARCH_HAS_STRICT_KERNEL_RWX
+> !ARCH_OPTIONAL_KERNEL_RWX
+> 
+> optional:
+> ARCH_HAS_STRICT_KERNEL_RWX
+> ARCH_OPTIONAL_KERNEL_RWX
+> with default controlled by ARCH_OPTIONAL_KERNEL_RWX_DEFAULT
+> 
+> Then arm is:
+>   select ARCH_HAS_STRICT_KERNEL_RWX if MMU && !XIP_KERNEL
+>   select ARCH_HAS_STRICT_MODULE_RWX if MMU
+>   select ARCH_OPTIONAL_KERNEL_RWX if ARCH_HAS_STRICT_KERNEL_RWX
+>   select ARCH_OPTIONAL_KERNEL_RWX_DEFAULT if CPU_V7
+> 
+> x86 and arm64 are:
+>   select ARCH_HAS_STRICT_KERNEL_RWX
+>   select ARCH_HAS_STRICT_MODULE_RWX
+> 
+> ?
+> 
+> -Kees
+> 
 
-This driver adds support for parsing SBSA Generic Watchdog timer
-in GTDT, parse all info in SBSA Generic Watchdog Structure in GTDT,
-and creating a platform device with that information.
+Yes, that looks good. I wanted it to be mandatory to avoid the
+mindset of "optional means we don't need it" but I see there
+are some cases where it's better to turn it off. I'll see if
+I can emphasize this properly in the help text ("Say Y here
+unless you love security exploits running in production")
 
-This allows the operating system to obtain device data from the
-resource of platform device. The platform device named "sbsa-gwdt"
-can be used by the ARM SBSA Generic Watchdog driver.
-
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
----
- drivers/acpi/arm64/gtdt.c | 93 +++++++++++++++++++++++++++++++++++++++++++++++
- drivers/watchdog/Kconfig  |  1 +
- 2 files changed, 94 insertions(+)
-
-diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
-index 29b9acc..3a2eb57 100644
---- a/drivers/acpi/arm64/gtdt.c
-+++ b/drivers/acpi/arm64/gtdt.c
-@@ -14,6 +14,7 @@
- #include <linux/acpi.h>
- #include <linux/init.h>
- #include <linux/kernel.h>
-+#include <linux/platform_device.h>
- 
- #include <clocksource/arm_arch_timer.h>
- 
-@@ -59,6 +60,13 @@ static inline bool is_timer_block(void *platform_timer)
- 	return gh->type == ACPI_GTDT_TYPE_TIMER_BLOCK;
- }
- 
-+static inline bool is_watchdog(void *platform_timer)
-+{
-+	struct acpi_gtdt_header *gh = platform_timer;
-+
-+	return gh->type == ACPI_GTDT_TYPE_WATCHDOG;
-+}
-+
- static int __init map_gt_gsi(u32 interrupt, u32 flags)
- {
- 	int trigger, polarity;
-@@ -283,3 +291,88 @@ int __init acpi_arch_timer_mem_init(struct arch_timer_mem *data,
- 
- 	return 0;
- }
-+
-+/*
-+ * Initialize a SBSA generic Watchdog platform device info from GTDT
-+ */
-+static int __init gtdt_import_sbsa_gwdt(struct acpi_gtdt_watchdog *wd,
-+					int index)
-+{
-+	struct platform_device *pdev;
-+	int irq = map_gt_gsi(wd->timer_interrupt, wd->timer_flags);
-+	int no_irq = 1;
-+
-+	/*
-+	 * According to SBSA specification the size of refresh and control
-+	 * frames of SBSA Generic Watchdog is SZ_4K(Offset 0x000 ? 0xFFF).
-+	 */
-+	struct resource res[] = {
-+		DEFINE_RES_MEM(wd->control_frame_address, SZ_4K),
-+		DEFINE_RES_MEM(wd->refresh_frame_address, SZ_4K),
-+		DEFINE_RES_IRQ(irq),
-+	};
-+
-+	pr_debug("found a Watchdog (0x%llx/0x%llx gsi:%u flags:0x%x).\n",
-+		 wd->refresh_frame_address, wd->control_frame_address,
-+		 wd->timer_interrupt, wd->timer_flags);
-+
-+	if (!(wd->refresh_frame_address && wd->control_frame_address)) {
-+		pr_err(FW_BUG "failed to get the Watchdog base address.\n");
-+		return -EINVAL;
-+	}
-+
-+	if (!wd->timer_interrupt)
-+		pr_warn(FW_BUG "failed to get the Watchdog interrupt.\n");
-+	else if (irq <= 0)
-+		pr_warn("failed to map the Watchdog interrupt.\n");
-+	else
-+		no_irq = 0;
-+
-+	/*
-+	 * Add a platform device named "sbsa-gwdt" to match the platform driver.
-+	 * "sbsa-gwdt": SBSA(Server Base System Architecture) Generic Watchdog
-+	 * The platform driver (like drivers/watchdog/sbsa_gwdt.c)can get device
-+	 * info below by matching this name.
-+	 */
-+	pdev = platform_device_register_simple("sbsa-gwdt", index, res,
-+					       ARRAY_SIZE(res) - no_irq);
-+	if (IS_ERR(pdev)) {
-+		acpi_unregister_gsi(wd->timer_interrupt);
-+		return PTR_ERR(pdev);
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init gtdt_sbsa_gwdt_init(void)
-+{
-+	int ret, i = 0;
-+	void *platform_timer;
-+	struct acpi_table_header *table;
-+
-+	if (acpi_disabled)
-+		return 0;
-+
-+	if (ACPI_FAILURE(acpi_get_table(ACPI_SIG_GTDT, 0, &table)))
-+		return -EINVAL;
-+
-+	ret = acpi_gtdt_init(table, NULL);
-+	if (ret)
-+		return ret;
-+
-+	for_each_platform_timer(platform_timer) {
-+		if (is_watchdog(platform_timer)) {
-+			ret = gtdt_import_sbsa_gwdt(platform_timer, i);
-+			if (ret)
-+				break;
-+			i++;
-+		}
-+	}
-+
-+	if (i)
-+		pr_info("found %d SBSA generic Watchdog(s).\n", i);
-+
-+	return ret;
-+}
-+
-+device_initcall(gtdt_sbsa_gwdt_init);
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index acb00b5..c899df1 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -219,6 +219,7 @@ config ARM_SBSA_WATCHDOG
- 	tristate "ARM SBSA Generic Watchdog"
- 	depends on ARM64
- 	depends on ARM_ARCH_TIMER
-+	depends on ACPI_GTDT || !ACPI
- 	select WATCHDOG_CORE
- 	help
- 	  ARM SBSA Generic Watchdog has two stage timeouts:
--- 
-2.9.3
+Thanks,
+Laura
