@@ -1,178 +1,91 @@
 From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Tue,  7 Feb 2017 02:50:06 +0800
-Subject: [PATCH v21 04/13] clocksource: arm_arch_timer: split arch_timer_rate
- for different types of timer
+Date: Tue,  7 Feb 2017 02:50:07 +0800
+Subject: [PATCH v21 05/13] clocksource: arm_arch_timer: refactor
+ arch_timer_needs_probing
 In-Reply-To: <20170206185015.12296-1-fu.wei@linaro.org>
 References: <20170206185015.12296-1-fu.wei@linaro.org>
-Message-ID: <20170206185015.12296-5-fu.wei@linaro.org>
+Message-ID: <20170206185015.12296-6-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fu Wei <fu.wei@linaro.org>
 
-Currently, arch_timer_rate is used to store the frequency got from per-cpu
-arch-timer or the memory-mapped (MMIO) timers. But those values come from
-different registers which should all be initialized by firmware.
+When system init with device-tree, we don't know which node will be
+initialized first. And the code in arch_timer_common_init should wait
+until per-cpu timer and MMIO timer are both initialized. So we need
+arch_timer_needs_probing to detect the init status of system.
 
-This patch remove arch_timer_rate, and use arch_timer_sysreg_freq and
-arch_timer_mmio_freq instead.
+But currently the code is dispersed in arch_timer_needs_probing and
+arch_timer_common_init. And the function name doesn't specify that
+it's only for device-tree. This is somewhat confusing.
+
+This patch move all related code from arch_timer_common_init to
+arch_timer_needs_probing, refactor it, and rename it to
+arch_timer_needs_of_probing. And make sure that it will be called
+only if acpi is disabled.
 
 Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- drivers/clocksource/arm_arch_timer.c | 42 ++++++++++++++++++++----------------
- 1 file changed, 24 insertions(+), 18 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 34 +++++++++++++++++++---------------
+ 1 file changed, 19 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 63fb441..97a4e90 100644
+index 97a4e90..97ed103 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -65,7 +65,8 @@ struct arch_timer {
+@@ -858,15 +858,28 @@ static const struct of_device_id arch_timer_mem_of_match[] __initconst = {
+ 	{},
+ };
  
- #define to_arch_timer(e) container_of(e, struct arch_timer, evt)
- 
--static u32 arch_timer_rate;
-+static u32 arch_timer_sysreg_freq;
-+static u32 arch_timer_mmio_freq;
- static int arch_timer_ppi[ARCH_TIMER_MAX_TIMER_PPI];
- 
- static struct clock_event_device __percpu *arch_timer_evt;
-@@ -417,6 +418,7 @@ static void erratum_workaround_set_sne(struct clock_event_device *clk)
- static void __arch_timer_setup(unsigned type,
- 			       struct clock_event_device *clk)
+-static bool __init
+-arch_timer_needs_probing(int type, const struct of_device_id *matches)
++static bool __init arch_timer_needs_of_probing(void)
  {
-+	u32 freq;
- 	clk->features = CLOCK_EVT_FEAT_ONESHOT;
+ 	struct device_node *dn;
+ 	bool needs_probing = false;
++	unsigned int mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
  
- 	if (type == ARCH_TIMER_TYPE_CP15) {
-@@ -444,6 +446,7 @@ static void __arch_timer_setup(unsigned type,
- 		}
- 
- 		erratum_workaround_set_sne(clk);
-+		freq = arch_timer_sysreg_freq;
- 	} else {
- 		clk->features |= CLOCK_EVT_FEAT_DYNIRQ;
- 		clk->name = "arch_mem_timer";
-@@ -460,11 +463,12 @@ static void __arch_timer_setup(unsigned type,
- 			clk->set_next_event =
- 				arch_timer_set_next_event_phys_mem;
- 		}
-+		freq = arch_timer_mmio_freq;
- 	}
- 
- 	clk->set_state_shutdown(clk);
- 
--	clockevents_config_and_register(clk, arch_timer_rate, 0xf, 0x7fffffff);
-+	clockevents_config_and_register(clk, freq, 0xf, 0x7fffffff);
- }
- 
- static void arch_timer_evtstrm_enable(int divider)
-@@ -487,7 +491,7 @@ static void arch_timer_configure_evtstream(void)
- 	int evt_stream_div, pos;
- 
- 	/* Find the closest power of two to the divisor */
--	evt_stream_div = arch_timer_rate / ARCH_TIMER_EVT_STREAM_FREQ;
-+	evt_stream_div = arch_timer_sysreg_freq / ARCH_TIMER_EVT_STREAM_FREQ;
- 	pos = fls(evt_stream_div);
- 	if (pos > 1 && !(evt_stream_div & (1 << (pos - 2))))
- 		pos--;
-@@ -578,8 +582,8 @@ static void arch_timer_banner(unsigned type)
- 		type == (ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM) ?
- 			" and " : "",
- 		type & ARCH_TIMER_TYPE_MEM ? "mmio" : "",
--		(unsigned long)arch_timer_rate / 1000000,
--		(unsigned long)(arch_timer_rate / 10000) % 100,
-+		(unsigned long)arch_timer_sysreg_freq / 1000000,
-+		(unsigned long)(arch_timer_sysreg_freq / 10000) % 100,
- 		type & ARCH_TIMER_TYPE_CP15 ?
- 			(arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI) ? "virt" : "phys" :
- 			"",
-@@ -591,7 +595,7 @@ static void arch_timer_banner(unsigned type)
- 
- u32 arch_timer_get_rate(void)
- {
--	return arch_timer_rate;
-+	return arch_timer_sysreg_freq;
- }
- 
- static u64 arch_counter_get_cntvct_mem(void)
-@@ -648,6 +652,7 @@ struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
- static void __init arch_counter_register(unsigned type)
- {
- 	u64 start_count;
-+	u32 freq;
- 
- 	/* Register the CP15 based counter if we have one */
- 	if (type & ARCH_TIMER_TYPE_CP15) {
-@@ -657,6 +662,8 @@ static void __init arch_counter_register(unsigned type)
- 		else
- 			arch_timer_read_counter = arch_counter_get_cntpct;
- 
-+		freq = arch_timer_sysreg_freq;
+-	dn = of_find_matching_node(NULL, matches);
+-	if (dn && of_device_is_available(dn) && !(arch_timers_present & type))
++	/* We have two timers, and both device-tree nodes are probed. */
++	if ((arch_timers_present & mask) == mask)
++		return false;
 +
- 		clocksource_counter.archdata.vdso_direct = true;
++	/*
++	 * Only one type of timer is probed,
++	 * check if we have another type of timer node in device-tree.
++	 */
++	if (arch_timers_present & ARCH_TIMER_TYPE_CP15)
++		dn = of_find_matching_node(NULL, arch_timer_mem_of_match);
++	else
++		dn = of_find_matching_node(NULL, arch_timer_of_match);
++
++	if (dn && of_device_is_available(dn))
+ 		needs_probing = true;
++
+ 	of_node_put(dn);
  
- #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
-@@ -669,19 +676,20 @@ static void __init arch_counter_register(unsigned type)
- #endif
- 	} else {
- 		arch_timer_read_counter = arch_counter_get_cntvct_mem;
-+		freq = arch_timer_mmio_freq;
- 	}
+ 	return needs_probing;
+@@ -874,17 +887,8 @@ arch_timer_needs_probing(int type, const struct of_device_id *matches)
  
- 	if (!arch_counter_suspend_stop)
- 		clocksource_counter.flags |= CLOCK_SOURCE_SUSPEND_NONSTOP;
- 	start_count = arch_timer_read_counter();
--	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
-+	clocksource_register_hz(&clocksource_counter, freq);
- 	cyclecounter.mult = clocksource_counter.mult;
- 	cyclecounter.shift = clocksource_counter.shift;
- 	timecounter_init(&arch_timer_kvm_info.timecounter,
- 			 &cyclecounter, start_count);
+ static int __init arch_timer_common_init(void)
+ {
+-	unsigned mask = ARCH_TIMER_TYPE_CP15 | ARCH_TIMER_TYPE_MEM;
+-
+-	/* Wait until both nodes are probed if we have two timers */
+-	if ((arch_timers_present & mask) != mask) {
+-		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_MEM,
+-					     arch_timer_mem_of_match))
+-			return 0;
+-		if (arch_timer_needs_probing(ARCH_TIMER_TYPE_CP15,
+-					     arch_timer_of_match))
+-			return 0;
+-	}
++	if (acpi_disabled && arch_timer_needs_of_probing())
++		return 0;
  
- 	/* 56 bits minimum, so we assume worst case rollover */
--	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
-+	sched_clock_register(arch_timer_read_counter, 56, freq);
- }
- 
- static void arch_timer_stop(struct clock_event_device *clk)
-@@ -949,10 +957,9 @@ static int __init arch_timer_of_init(struct device_node *np)
- 	 * Try to determine the frequency from the device tree,
- 	 * if fail, get the frequency from the sysreg CNTFRQ.
- 	 */
--	if (!arch_timer_rate &&
--	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
--		arch_timer_rate = arch_timer_get_sysreg_freq();
--	if (!arch_timer_rate) {
-+	if (of_property_read_u32(np, "clock-frequency", &arch_timer_sysreg_freq))
-+		arch_timer_sysreg_freq = arch_timer_get_sysreg_freq();
-+	if (!arch_timer_sysreg_freq) {
- 		pr_err(FW_BUG "frequency not available.\n");
- 		return -EINVAL;
- 	}
-@@ -1070,10 +1077,9 @@ static int __init arch_timer_mem_init(struct device_node *np)
- 	 * Try to determine the frequency from the device tree,
- 	 * if fail, get the frequency from the CNTFRQ reg of MMIO timer.
- 	 */
--	if (!arch_timer_rate &&
--	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate))
--		arch_timer_rate = arch_timer_get_mmio_freq(base);
--	if (!arch_timer_rate) {
-+	if (of_property_read_u32(np, "clock-frequency", &arch_timer_mmio_freq))
-+		arch_timer_mmio_freq = arch_timer_get_mmio_freq(base);
-+	if (!arch_timer_mmio_freq) {
- 		pr_err(FW_BUG "frequency not available for MMIO timer.\n");
- 		ret = -EINVAL;
- 		goto out;
-@@ -1140,8 +1146,8 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 		gtdt->non_secure_el2_flags);
- 
- 	/* Get the frequency from the sysreg CNTFRQ */
--	arch_timer_rate = arch_timer_get_sysreg_freq();
--	if (!arch_timer_rate) {
-+	arch_timer_sysreg_freq = arch_timer_get_sysreg_freq();
-+	if (!arch_timer_sysreg_freq) {
- 		pr_err(FW_BUG "frequency not available.\n");
- 		return -EINVAL;
- 	}
+ 	arch_timer_banner(arch_timers_present);
+ 	arch_counter_register(arch_timers_present);
 -- 
 2.9.3
