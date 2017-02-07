@@ -1,45 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 7 Feb 2017 11:21:15 -0800
-Subject: [PATCH] ARM: ux500: cut some platform data
-In-Reply-To: <2080077.OMxztrf17j@wuerfel>
-References: <20170131210832.3377-1-linus.walleij@linaro.org>
- <2080077.OMxztrf17j@wuerfel>
-Message-ID: <CAOesGMidfUAomiTzStaby6TUDE0rhbQcC1P8v3UHaMVnG9FrXA@mail.gmail.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue,  7 Feb 2017 13:22:08 -0600
+Subject: [PATCH 2/3] ARM: davinci_all_defconfig: Enable TI ADS7950
+In-Reply-To: <1486495329-2789-1-git-send-email-david@lechnology.com>
+References: <1486495329-2789-1-git-send-email-david@lechnology.com>
+Message-ID: <1486495329-2789-3-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 7, 2017 at 7:01 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday, January 31, 2017 10:08:32 PM CET Linus Walleij wrote:
->> This platform data is revoked: the drivers are getting the DMA
->> configuration from the device tree, it has been done like that
->> since the DMA support was merged and this data has not been used
->> since. The remaining auxdata is also unused.
->>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->> ARM SoC folks: please apply this directly to the ux500/dev branch,
->> or if you want some separate cleanup branch. I originally
->> intended to send it along with other changes but those will land
->> in v4.12 or something instead.
->> ---
->>  arch/arm/mach-ux500/board-mop500-audio.c | 77 -----------------------------
->>  arch/arm/mach-ux500/board-mop500.h       | 17 -------
->>  arch/arm/mach-ux500/cpu-db8500.c         | 16 ------
->>  arch/arm/mach-ux500/ste-dma40-db8500.h   | 85 --------------------------------
->>  4 files changed, 195 deletions(-)
->>  delete mode 100644 arch/arm/mach-ux500/board-mop500-audio.c
->>  delete mode 100644 arch/arm/mach-ux500/board-mop500.h
->>  delete mode 100644 arch/arm/mach-ux500/ste-dma40-db8500.h
->
-> Applied to next/soc, thanks!
+This enables the TI ADS7950 IIO driver. This is used on LEGO MINDSTORMS
+EV3. The other IIO configs removed in this patch are selected by
+CONFIG_TI_ADS7950, so they are not actually being desabled.
 
-Linus,
+Signed-off-by: David Lechner <david@lechnology.com>
+---
+ arch/arm/configs/davinci_all_defconfig | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Looks like you missed to update the Makefile:
-http://arm-soc.lixom.net/buildlogs/arm-soc/v4.10-rc5-794-gf8777f3/buildall.arm.allmodconfig.log.failed
-
-I'll fix up in our tree, no need to send a patch.
-
-
--Olof
+diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
+index c8663ea..0a95fc4 100644
+--- a/arch/arm/configs/davinci_all_defconfig
++++ b/arch/arm/configs/davinci_all_defconfig
+@@ -204,12 +204,10 @@ CONFIG_MEMORY=y
+ CONFIG_TI_AEMIF=m
+ CONFIG_DA8XX_DDRCTL=y
+ CONFIG_IIO=m
+-CONFIG_IIO_BUFFER=y
+ CONFIG_IIO_BUFFER_CB=m
+-CONFIG_IIO_KFIFO_BUF=m
+-CONFIG_IIO_TRIGGER=y
+ CONFIG_IIO_SW_DEVICE=m
+ CONFIG_IIO_SW_TRIGGER=m
++CONFIG_TI_ADS7950=m
+ CONFIG_IIO_HRTIMER_TRIGGER=m
+ CONFIG_IIO_SYSFS_TRIGGER=m
+ CONFIG_PWM=y
+-- 
+2.7.4
