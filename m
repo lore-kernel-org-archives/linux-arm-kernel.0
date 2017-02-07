@@ -1,33 +1,39 @@
 From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Tue,  7 Feb 2017 11:02:49 +0800
-Subject: [PATCH v2 1/3] clk: zte: add i2s clocks for zx296718
-Message-ID: <1486436571-8682-1-git-send-email-baoyou.xie@linaro.org>
+Date: Tue,  7 Feb 2017 11:02:50 +0800
+Subject: [PATCH v2 2/3] dt: ASoC: zx-i2s: Document for the ZTE zx296718 I2S
+ controller
+In-Reply-To: <1486436571-8682-1-git-send-email-baoyou.xie@linaro.org>
+References: <1486436571-8682-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <1486436571-8682-2-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i2s related clock support is missing from the existing zx296718
-clock driver. This patch adds it, so that the upstream ZX I2S driver
-can work out.
+This patch documents the devicetree for the ZTE's zx296718
+I2S audio controller.
 
 Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 ---
- drivers/clk/zte/clk-zx296718.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ Documentation/devicetree/bindings/sound/zte,zx-i2s.txt | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/zte/clk-zx296718.c b/drivers/clk/zte/clk-zx296718.c
-index ad5d1df..f106d40 100644
---- a/drivers/clk/zte/clk-zx296718.c
-+++ b/drivers/clk/zte/clk-zx296718.c
-@@ -941,6 +941,10 @@ static struct zx_clk_gate audio_gate_clk[] = {
- 	GATE(AUDIO_SPDIF1_WCLK, "spdif1_wclk", "spdif1_wclk_div", AUDIO_SPDIF1_CLK, 9, CLK_SET_RATE_PARENT, 0),
- 	GATE(AUDIO_TDM_WCLK, "tdm_wclk", "tdm_wclk_div", AUDIO_TDM_CLK, 17, CLK_SET_RATE_PARENT, 0),
- 	GATE(AUDIO_TS_PCLK, "tempsensor_pclk", "clk49m5", AUDIO_TS_CLK, 1, 0, 0),
-+	GATE(AUDIO_I2S0_PCLK, "i2s0_pclk", "clk49m5", AUDIO_I2S0_CLK, 8, 0, 0),
-+	GATE(AUDIO_I2S1_PCLK, "i2s1_pclk", "clk49m5", AUDIO_I2S1_CLK, 8, 0, 0),
-+	GATE(AUDIO_I2S2_PCLK, "i2s2_pclk", "clk49m5", AUDIO_I2S2_CLK, 8, 0, 0),
-+	GATE(AUDIO_I2S3_PCLK, "i2s3_pclk", "clk49m5", AUDIO_I2S3_CLK, 8, 0, 0),
- };
+diff --git a/Documentation/devicetree/bindings/sound/zte,zx-i2s.txt b/Documentation/devicetree/bindings/sound/zte,zx-i2s.txt
+index 7e5aa6f..c405561 100644
+--- a/Documentation/devicetree/bindings/sound/zte,zx-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/zte,zx-i2s.txt
+@@ -1,10 +1,12 @@
+ ZTE ZX296702 I2S controller
  
- static struct clk_hw_onecell_data audio_hw_onecell_data = {
+ Required properties:
+- - compatible : Must be "zte,zx296702-i2s"
++ - compatible : Should include one of the following strings:
++	"zte,zx296702-i2s","zte,zx296718-i2s".
+  - reg : Must contain I2S core's registers location and length
+  - clocks : Pairs of phandle and specifier referencing the controller's clocks.
+- - clock-names: "tx" for the clock to the I2S interface.
++ - clock-names: "tx" for the wclk, "pclk" for the pclk to the I2S interface.
++	must contain pclk for zx296718 SoC.
+  - dmas: Pairs of phandle and specifier for the DMA channel that is used by
+    the core. The core expects two dma channels for transmit.
+  - dma-names : Must be "tx" and "rx"
 -- 
 2.7.4
