@@ -1,87 +1,91 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Tue, 7 Feb 2017 09:43:46 -0600
-Subject: [PATCH v3 03/10] staging: fsl-mc: add device release callback
+Date: Tue, 7 Feb 2017 09:43:44 -0600
+Subject: [PATCH v3 01/10] staging: fsl-mc: drop root dprc counting
 In-Reply-To: <20170207154353.20691-1-laurentiu.tudor@nxp.com>
 References: <20170207154353.20691-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170207154353.20691-4-laurentiu.tudor@nxp.com>
+Message-ID: <20170207154353.20691-2-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-When hot unplugging a mc-bus device the kernel displays
-this pertinent message, followed by a stack dump:
-    "Device 'foo.N' does not have a release() function,
-     it is broken and must be fixed."
-Add the required callback to fix and drop the now
-uneeded explicit freeing.
+It was used just to sanity check some obscure
+cases that are unlikely to ever happen.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
 v3:
- - dropped useless explicit freeing
+ - no changes
 
- drivers/staging/fsl-mc/bus/fsl-mc-bus.c | 29 +++++++++++++++++------------
- 1 file changed, 17 insertions(+), 12 deletions(-)
+ drivers/staging/fsl-mc/bus/fsl-mc-bus.c | 26 +-------------------------
+ 1 file changed, 1 insertion(+), 25 deletions(-)
 
 diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-index 7c6a43b..5963e98 100644
+index 5ac373c..cc20dc4 100644
 --- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
 +++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-@@ -419,6 +419,22 @@ bool fsl_mc_is_root_dprc(struct device *dev)
- 	return dev == root_dprc_dev;
- }
+@@ -77,9 +77,6 @@ static int fsl_mc_bus_match(struct device *dev, struct device_driver *drv)
+ 	struct fsl_mc_driver *mc_drv = to_fsl_mc_driver(drv);
+ 	bool found = false;
  
-+static void fsl_mc_device_release(struct device *dev)
-+{
-+	struct fsl_mc_device *mc_dev = to_fsl_mc_device(dev);
-+	struct fsl_mc_bus *mc_bus = NULL;
-+
-+	kfree(mc_dev->regions);
-+
-+	if (strcmp(mc_dev->obj_desc.type, "dprc") == 0)
-+		mc_bus = to_fsl_mc_bus(mc_dev);
-+
-+	if (mc_bus)
-+		devm_kfree(mc_dev->dev.parent, mc_bus);
-+	else
-+		kmem_cache_free(mc_dev_cache, mc_dev);
-+}
-+
- /**
-  * Add a newly discovered fsl-mc device to be visible in Linux
-  */
-@@ -460,6 +476,7 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
- 	device_initialize(&mc_dev->dev);
- 	mc_dev->dev.parent = parent_dev;
- 	mc_dev->dev.bus = &fsl_mc_bus_type;
-+	mc_dev->dev.release = fsl_mc_device_release;
- 	dev_set_name(&mc_dev->dev, "%s.%d", obj_desc->type, obj_desc->id);
+-	if (WARN_ON(!fsl_mc_bus_exists()))
+-		goto out;
+-
+ 	if (!mc_drv->match_id_table)
+ 		goto out;
  
- 	if (strcmp(obj_desc->type, "dprc") == 0) {
-@@ -561,23 +578,11 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
-  */
- void fsl_mc_device_remove(struct fsl_mc_device *mc_dev)
+@@ -149,8 +146,6 @@ struct bus_type fsl_mc_bus_type = {
+ };
+ EXPORT_SYMBOL_GPL(fsl_mc_bus_type);
+ 
+-static atomic_t root_dprc_count = ATOMIC_INIT(0);
+-
+ static int fsl_mc_driver_probe(struct device *dev)
  {
--	struct fsl_mc_bus *mc_bus = NULL;
+ 	struct fsl_mc_driver *mc_drv;
+@@ -246,15 +241,6 @@ void fsl_mc_driver_unregister(struct fsl_mc_driver *mc_driver)
+ EXPORT_SYMBOL_GPL(fsl_mc_driver_unregister);
+ 
+ /**
+- * fsl_mc_bus_exists - check if a root dprc exists
+- */
+-bool fsl_mc_bus_exists(void)
+-{
+-	return atomic_read(&root_dprc_count) > 0;
+-}
+-EXPORT_SYMBOL_GPL(fsl_mc_bus_exists);
 -
--	kfree(mc_dev->regions);
+-/**
+  * fsl_mc_get_root_dprc - function to traverse to the root dprc
+  */
+ void fsl_mc_get_root_dprc(struct device *dev,
+@@ -506,8 +492,6 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
+ 			}
+ 
+ 			mc_io2 = mc_io;
 -
- 	/*
- 	 * The device-specific remove callback will get invoked by device_del()
- 	 */
+-			atomic_inc(&root_dprc_count);
+ 		}
+ 
+ 		error = get_dprc_icid(mc_io2, obj_desc->id, &mc_dev->icid);
+@@ -588,17 +572,9 @@ void fsl_mc_device_remove(struct fsl_mc_device *mc_dev)
  	device_del(&mc_dev->dev);
  	put_device(&mc_dev->dev);
--
--	if (strcmp(mc_dev->obj_desc.type, "dprc") == 0)
--		mc_bus = to_fsl_mc_bus(mc_dev);
--
--	if (mc_bus)
--		devm_kfree(mc_dev->dev.parent, mc_bus);
--	else
--		kmem_cache_free(mc_dev_cache, mc_dev);
- }
- EXPORT_SYMBOL_GPL(fsl_mc_device_remove);
  
+-	if (strcmp(mc_dev->obj_desc.type, "dprc") == 0) {
++	if (strcmp(mc_dev->obj_desc.type, "dprc") == 0)
+ 		mc_bus = to_fsl_mc_bus(mc_dev);
+ 
+-		if (fsl_mc_is_root_dprc(&mc_dev->dev)) {
+-			if (atomic_read(&root_dprc_count) > 0)
+-				atomic_dec(&root_dprc_count);
+-			else
+-				WARN_ON(1);
+-		}
+-	}
+-
+ 	if (mc_bus)
+ 		devm_kfree(mc_dev->dev.parent, mc_bus);
+ 	else
 -- 
 1.8.3.1
