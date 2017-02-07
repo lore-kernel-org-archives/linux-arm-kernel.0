@@ -1,57 +1,88 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed,  8 Feb 2017 02:30:33 +0800
-Subject: [PATCH v4 0/9] Allwinner H5 and Orange Pi PC2 support
-Message-ID: <20170207183042.62699-1-icenowy@aosc.xyz>
+From: pjones@redhat.com (Peter Jones)
+Date: Tue, 7 Feb 2017 13:30:57 -0500
+Subject: [PATCH 5/7] arm64: efi: remove pointless dummy .reloc section
+In-Reply-To: <1486398275-3966-6-git-send-email-ard.biesheuvel@linaro.org>
+References: <1486398275-3966-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1486398275-3966-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170207183056.42gqqg2jp32jexmy@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H5 is a 64-bit SoC with a design like the 32-bit
-H3.
+On Mon, Feb 06, 2017 at 04:24:33PM +0000, Ard Biesheuvel wrote:
+> The kernel's EFI PE/COFF header contains a dummy .reloc section, and
+> an explanatory comment that claims that this is required for the EFI
+> application loader to accept the Image as a relocatable image (i.e.,
+> one that can be loaded at any offset and fixed up in place)
+> 
+> This was inherited from the x86 implementation, which has elaborate host
+> tooling to mangle the PE/COFF header post-link time, and which populates
+> the .reloc section with a single dummy base relocation. On ARM, no such
+> tooling exists, and the .reloc section remains empty, and is never even
+> exposed via the BaseRelocationTable directory entry, which is where the
+> PE/COFF loader looks for it.
+> 
+> The PE/COFF spec is unclear about relocatable images that do not require
+> any fixups, but the EDK2 implementation, which is the de facto reference
+> for PE/COFF in the UEFI space, clearly does not care, and explicitly
+> mentions (in a comment) that relocatable images with no base relocations
+> are perfectly fine, as long as they don't have the RELOCS_STRIPPED
+> attribute set (which is not the case for our PE/COFF image)
+> 
+> So simply remove the .reloc section altogether.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-This patchset adds support for it, along with the first available
-board -- Orange Pi PC2.
+Looks completely reasonable to me.
 
-Some drivers are also enabled to be built on ARM64 ARCH_SUNXI
-platform, in order to make the internal audio codec work.
+Acked-by: Peter Jones <pjones@redhat.com>
 
-Andre Przywara (3):
-  arm: dts: sun8i: split Allwinner H3 .dtsi
-  arm64: dts: allwinner: add Allwinner H5 .dtsi
-  arm64: dts: sunxi: add support for the Orange Pi PC 2 board
-
-Icenowy Zheng (6):
-  arm64: allwinner: Kconfig: add essential pinctrl driver for H5
-  clk: sunxi-ng: rename sun8i-h3 driver to sunxi-h3-h5
-  clk: sunxi-ng: add support for Allwinner H5 SoC
-  ARM: dts: sun8i: convert H3 dtsi to use new sunxi-h3-h5 binding header
-  dt-bindings: remove transitional headers for Allwinner H3 CCU
-  ASoC: sunxi: allow the analog codec driver to be built on ARM64
-
- .../devicetree/bindings/clock/sunxi-ccu.txt        |   1 +
- arch/arm/boot/dts/sun8i-h3.dtsi                    | 789 ++++-----------------
- .../boot/dts/{sun8i-h3.dtsi => sunxi-h3-h5.dtsi}   |  91 +--
- arch/arm64/Kconfig.platforms                       |   5 +-
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 164 +++++
- arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi       | 139 ++++
- arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi     |   1 +
- drivers/clk/sunxi-ng/Kconfig                       |   6 +-
- drivers/clk/sunxi-ng/Makefile                      |   2 +-
- .../sunxi-ng/{ccu-sun8i-h3.c => ccu-sunxi-h3-h5.c} | 236 +++++-
- .../sunxi-ng/{ccu-sun8i-h3.h => ccu-sunxi-h3-h5.h} |  15 +-
- .../clock/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h}    |  11 +-
- .../reset/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h}    |  11 +-
- sound/soc/sunxi/Kconfig                            |   2 +-
- 15 files changed, 709 insertions(+), 765 deletions(-)
- rewrite arch/arm/boot/dts/sun8i-h3.dtsi (81%)
- copy arch/arm/boot/dts/{sun8i-h3.dtsi => sunxi-h3-h5.dtsi} (88%)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
- create mode 120000 arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
- rename drivers/clk/sunxi-ng/{ccu-sun8i-h3.c => ccu-sunxi-h3-h5.c} (76%)
- rename drivers/clk/sunxi-ng/{ccu-sun8i-h3.h => ccu-sunxi-h3-h5.h} (82%)
- rename include/dt-bindings/clock/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h} (95%)
- rename include/dt-bindings/reset/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h} (94%)
+> ---
+>  arch/arm64/kernel/efi-header.S | 22 +-------------------
+>  1 file changed, 1 insertion(+), 21 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/efi-header.S b/arch/arm64/kernel/efi-header.S
+> index 74a25c09a1b8..35b11654ecc5 100644
+> --- a/arch/arm64/kernel/efi-header.S
+> +++ b/arch/arm64/kernel/efi-header.S
+> @@ -37,7 +37,7 @@ pe_header:
+>  	.short 	0
+>  coff_header:
+>  	.short	0xaa64					// AArch64
+> -	.short	2					// nr_sections
+> +	.short	1					// nr_sections
+>  	.long	0 					// TimeDateStamp
+>  	.long	0					// PointerToSymbolTable
+>  	.long	1					// NumberOfSymbols
+> @@ -96,26 +96,6 @@ extra_header_fields:
+>  
+>  	// Section table
+>  section_table:
+> -
+> -	/*
+> -	 * The EFI application loader requires a relocation section
+> -	 * because EFI applications must be relocatable.  This is a
+> -	 * dummy section as far as we are concerned.
+> -	 */
+> -	.ascii	".reloc"
+> -	.byte	0
+> -	.byte	0					// end of 0 padding of section name
+> -	.long	0
+> -	.long	0
+> -	.long	0					// SizeOfRawData
+> -	.long	0					// PointerToRawData
+> -	.long	0					// PointerToRelocations
+> -	.long	0					// PointerToLineNumbers
+> -	.short	0					// NumberOfRelocations
+> -	.short	0					// NumberOfLineNumbers
+> -	.long	0x42100040				// Characteristics (section flags)
+> -
+> -
+>  	.ascii	".text"
+>  	.byte	0
+>  	.byte	0
+> -- 
+> 2.7.4
+> 
 
 -- 
-2.11.0
+  Peter
