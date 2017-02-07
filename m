@@ -1,38 +1,27 @@
 From: david@lechnology.com (David Lechner)
-Date: Tue,  7 Feb 2017 13:22:08 -0600
-Subject: [PATCH 2/3] ARM: davinci_all_defconfig: Enable TI ADS7950
-In-Reply-To: <1486495329-2789-1-git-send-email-david@lechnology.com>
-References: <1486495329-2789-1-git-send-email-david@lechnology.com>
-Message-ID: <1486495329-2789-3-git-send-email-david@lechnology.com>
+Date: Tue,  7 Feb 2017 13:22:06 -0600
+Subject: [PATCH 0/3] A/C and Sound device tree nodes for LEGO MINDSTORMS EV3
+Message-ID: <1486495329-2789-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the TI ADS7950 IIO driver. This is used on LEGO MINDSTORMS
-EV3. The other IIO configs removed in this patch are selected by
-CONFIG_TI_ADS7950, so they are not actually being desabled.
+This series adds device tree nodes for an analog/digital convert and for sound
+on LEGO MINDSTORMS EV3. The device tree bindings for these nodes have been acked
+and the drivers used by these nodes have been in linux-next for a couple weeks
+now and as far as I know, will be included in mainline v4.11.
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
- arch/arm/configs/davinci_all_defconfig | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+This series has been tested on LEGO MINDSTORMS EV3 using next-20170207 merged
+with linux-davinci/master.
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index c8663ea..0a95fc4 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -204,12 +204,10 @@ CONFIG_MEMORY=y
- CONFIG_TI_AEMIF=m
- CONFIG_DA8XX_DDRCTL=y
- CONFIG_IIO=m
--CONFIG_IIO_BUFFER=y
- CONFIG_IIO_BUFFER_CB=m
--CONFIG_IIO_KFIFO_BUF=m
--CONFIG_IIO_TRIGGER=y
- CONFIG_IIO_SW_DEVICE=m
- CONFIG_IIO_SW_TRIGGER=m
-+CONFIG_TI_ADS7950=m
- CONFIG_IIO_HRTIMER_TRIGGER=m
- CONFIG_IIO_SYSFS_TRIGGER=m
- CONFIG_PWM=y
+
+David Lechner (3):
+  ARM: da850-lego-ev3: Add device tree node for A/DC
+  ARM: davinci_all_defconfig: Enable TI ADS7950
+  ARM: da850-lego-ev3: Add device tree node for sound
+
+ arch/arm/boot/dts/da850-lego-ev3.dts   | 52 ++++++++++++++++++++++++++++++++++
+ arch/arm/configs/davinci_all_defconfig |  4 +--
+ 2 files changed, 53 insertions(+), 3 deletions(-)
+
 -- 
 2.7.4
