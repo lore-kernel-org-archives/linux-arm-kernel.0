@@ -1,145 +1,52 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 7 Feb 2017 22:50:05 +0200
-Subject: [PATCH v3 13/24] platform: add video-multiplexer subdevice driver
-In-Reply-To: <20170207133648.GA27065@ti.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <2038922.a1tReKKdaL@avalon>
- <bd64a86e-d90c-f4aa-6f22-1c832e0b563f@gmail.com>
- <3823958.XNLmIv7GEv@avalon> <20170207133648.GA27065@ti.com>
-Message-ID: <20170207205005.GE13854@valkosipuli.retiisi.org.uk>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 7 Feb 2017 12:59:12 -0800
+Subject: [GIT PULL 1/2] Broadcom dts changes for 4.11 (part 2)
+In-Reply-To: <1912177.f24aWX6xy5@wuerfel>
+References: <20170202020607.31682-1-f.fainelli@gmail.com>
+ <1912177.f24aWX6xy5@wuerfel>
+Message-ID: <077dc1a1-7069-dd84-5f23-1f88420b05e5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
-
-On Tue, Feb 07, 2017 at 07:36:48AM -0600, Benoit Parrot wrote:
-> Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote on Tue [2017-Feb-07 12:26:32 +0200]:
-> > Hi Steve,
-> > 
-> > On Monday 06 Feb 2017 15:10:46 Steve Longerbeam wrote:
-> > > On 02/06/2017 02:33 PM, Laurent Pinchart wrote:
-> > > > On Monday 06 Feb 2017 10:50:22 Hans Verkuil wrote:
-> > > >> On 02/05/2017 04:48 PM, Laurent Pinchart wrote:
-> > > >>> On Tuesday 24 Jan 2017 18:07:55 Steve Longerbeam wrote:
-> > > >>>> On 01/24/2017 04:02 AM, Philipp Zabel wrote:
-> > > >>>>> On Fri, 2017-01-20 at 15:03 +0100, Hans Verkuil wrote:
-> > > >>>>>>> +
-> > > >>>>>>> +int vidsw_g_mbus_config(struct v4l2_subdev *sd, struct
-> > > >>>>>>> v4l2_mbus_config *cfg)
-> > 
-> > [snip]
-> > 
-> > > >>>>>> I am not certain this op is needed at all. In the current kernel this
-> > > >>>>>> op is only used by soc_camera, pxa_camera and omap3isp (somewhat
-> > > >>>>>> dubious). Normally this information should come from the device tree
-> > > >>>>>> and there should be no need for this op.
-> > > >>>>>> 
-> > > >>>>>> My (tentative) long-term plan was to get rid of this op.
-> > > >>>>>> 
-> > > >>>>>> If you don't need it, then I recommend it is removed.
-> > > >>>> 
-> > > >>>> Hi Hans, the imx-media driver was only calling g_mbus_config to the
-> > > >>>> camera sensor, and it was doing that to determine the sensor's bus
-> > > >>>> type. This info was already available from parsing a v4l2_of_endpoint
-> > > >>>> from the sensor node. So it was simple to remove the g_mbus_config
-> > > >>>> calls, and instead rely on the parsed sensor v4l2_of_endpoint.
-> > > >>> 
-> > > >>> That's not a good point.
-> > > > 
-> > > > (mea culpa, s/point/idea/)
-> > > > 
-> > > >>> The imx-media driver must not parse the sensor DT node as it is not
-> > > >>> aware of what bindings the sensor is compatible with.
-> > > 
-> > > Hi Laurent,
-> > > 
-> > > I don't really understand this argument. The sensor node has been found
-> > > by parsing the OF graph, so it is known to be a camera sensor node at
-> > > that point.
-> > 
-> > All you know in the i.MX6 driver is that the remote node is a video source. 
-> > You can rely on the fact that it implements the OF graph bindings to locate 
-> > other ports in that DT node, but that's more or less it.
-> > 
-> > DT properties are defined by DT bindings and thus qualified by a compatible 
-> > string. Unless you match on sensor compat strings in the i.MX6 driver (which 
-> > you shouldn't do, to keep the driver generic) you can't know for certain how 
-> > to parse the sensor node DT properties. For all you know, the video source 
-> > could be a bridge such as an HDMI to CSI-2 converter for instance, so you 
-> > can't even rely on the fact that it's a sensor.
-> > 
-> > > >>> Information must instead be queried from the sensor subdev at runtime,
-> > > >>> through the g_mbus_config() operation.
-> > > >>> 
-> > > >>> Of course, if you can get the information from the imx-media DT node,
-> > > >>> that's certainly an option. It's only information provided by the sensor
-> > > >>> driver that you have no choice but query using a subdev operation.
-> > > >> 
-> > > >> Shouldn't this come from the imx-media DT node? BTW, why is omap3isp
-> > > >> using this?
-> > > > 
-> > > > It all depends on what type of information needs to be retrieved, and
-> > > > whether it can change at runtime or is fixed. Adding properties to the
-> > > > imx-media DT node is certainly fine as long as those properties describe
-> > > > the i.MX side.
-> > >
-> > > In this case the info needed is the media bus type. That info is most easily
-> > > available by calling v4l2_of_parse_endpoint() on the sensor's endpoint
-> > > node.
-> > 
-> > I haven't had time to check the code in details yet, so I can't really comment 
-> > on what you need and how it should be implemented exactly.
-> > 
-> > > The media bus type is not something that can be added to the
-> > > imx-media node since it contains no endpoint nodes.
-> > 
-> > Agreed. You have endpoints in the CSI nodes though.
-> > 
-> > > > In the omap3isp case, we use the operation to query whether parallel data
-> > > > contains embedded sync (BT.656) or uses separate h/v sync signals.
-> > > > 
-> > > >> The reason I am suspicious about this op is that it came from soc-camera
-> > > >> and predates the DT. The contents of v4l2_mbus_config seems very much
-> > > >> like a HW description to me, i.e. something that belongs in the DT.
-> > > > 
-> > > > Part of it is possibly outdated, but for buses that support multiple modes
-> > > > of operation (such as the parallel bus case described above) we need to
-> > > > make that information discoverable at runtime. Maybe this should be
-> > > > considered as related to Sakari's efforts to support VC/DT for CSI-2, and
-> > > > supported through the API he is working on.
-> > > 
-> > > That sounds interesting, can you point me to some info on this effort?
-> > 
-> > Sure.
-> > 
-> > http://git.retiisi.org.uk/?p=~sailus/linux.git;a=shortlog;h=refs/heads/vc
-> > 
-> > > I've been thinking the DT should contain virtual channel info for CSI-2
-> > > buses.
-> > 
-> > I don't think it should. CSI-2 virtual channels and data types should be 
-> > handled as a software concept, and thus supported through driver code without 
-> > involving DT.
+On 02/07/2017 06:49 AM, Arnd Bergmann wrote:
+> On Wednesday, February 1, 2017 6:06:07 PM CET Florian Fainelli wrote:
+>> Please note that because of the "clk" topic branch merged by Eric, we end-up with
+>> pulling in v4.10-rc2 which is responsible for the funny diff here.
 > 
-> Laurent,
+> It's generally better to avoid those back-merges entirely, that is not
+> the only problem with them. Our DT branch is already based on -rc3,
+> so it's not a back-merged for me, and I think that's ok when I send
+> it upstream.
 > 
-> So when you have a CSI2 port aggregator for instance where traffic from up
-> to 4 CSI2 sources where each source is now assigned its own VC by the
-> aggregator and interleaved into a single CSI2 Receiver. I was hoping that
-> in this case the VC would be DT discoverable as a specicic source identifier.
-> So the CSI-RX side could associate a specific source and create its own
-> video device. I am guessing that no such thing exist today?
+> However, I see that you do pull in these changes:
+> 
+> Eric Anholt (5):
+>       clk: bcm2835: Don't rate change PLLs on behalf of DSI PLL dividers.
+>       clk: bcm2835: Register the DSI0/DSI1 pixel clocks.
+>       clk: bcm2835: Add leaf clock measurement support, disabled by default
+> 
+> I'd rather not have those in next/dt at all, and at the very least
+> we require an explanation in the changelog about why you are sending
+> them to arm-soc. I assume that they are present in the clk-next
+> tree and won't get rebased, but that's not clear from your pull
+> request.
 
-This should be configurable in software: the sensors connected to the
-aggregator may also output multiple streams. The number of streams may also
-depend on the user specified configuration over the MC / V4L2 sub-device
-interfaces. Thus, this needs to be configurable in software.
+OK, the explanation is provided in the merge commit, but I suppose I
+should have added this again to the pull request changelog.
 
-We do need additional patches on top of the current mediatree.git master
-branch though, some of which are not yet written...
+> 
+> Are you doing an incompatible DT binding change that requires changing
+> the dts files and the driver together? If so, that also needs to be
+> in the changelog (or avoided if at all possible).
 
+Eric, do you mind commenting on that part?
+
+> 
+> If you send the other changes again today, I'll pull them right away,
+> and then we can talk about what we do for the clk-bcm2835 changes.
+
+OK, let me try to sync up with Eric on this and see if we can come up
+with something better. A pull request based on v4.10-rc3 would be
+acceptable, right?
 -- 
-Kind regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Florian
