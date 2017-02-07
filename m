@@ -1,225 +1,148 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue,  7 Feb 2017 17:09:02 +0900
-Subject: [PATCH v32 10/13] arm64: kdump: provide /proc/vmcore file
+Date: Tue,  7 Feb 2017 17:08:56 +0900
+Subject: [PATCH v32 04/13] arm64: kdump: reserve memory for crash dump kernel
 In-Reply-To: <20170207080601.5816-1-takahiro.akashi@linaro.org>
 References: <20170207080601.5816-1-takahiro.akashi@linaro.org>
-Message-ID: <20170207080904.5974-8-takahiro.akashi@linaro.org>
+Message-ID: <20170207080904.5974-2-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arch-specific functions are added to allow for implementing a crash dump
-file interface, /proc/vmcore, which can be viewed as a ELF file.
+"crashkernel=" kernel parameter specifies the size (and optionally
+the start address) of the system ram to be used by crash dump kernel.
+reserve_crashkernel() will allocate and reserve that memory at boot time
+of primary kernel.
 
-A user space tool, like kexec-tools, is responsible for allocating
-a separate region for the core's ELF header within crash kdump kernel
-memory and filling it in when executing kexec_load().
-
-Then, its location will be advertised to crash dump kernel via a new
-device-tree property, "linux,elfcorehdr", and crash dump kernel preserves
-the region for later use with reserve_elfcorehdr() at boot time.
-
-On crash dump kernel, /proc/vmcore will access the primary kernel's memory
-with copy_oldmem_page(), which feeds the data page-by-page by ioremap'ing
-it since it does not reside in linear mapping on crash dump kernel.
-
-Meanwhile, elfcorehdr_read() is simple as the region is always mapped.
+The memory range will be exposed to userspace as a resource named
+"Crash kernel" in /proc/iomem.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Mark Salter <msalter@redhat.com>
+Signed-off-by: Pratyush Anand <panand@redhat.com>
 Reviewed-by: James Morse <james.morse@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/Kconfig             | 11 +++++++
- arch/arm64/kernel/Makefile     |  1 +
- arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/init.c           | 53 +++++++++++++++++++++++++++++++
- 4 files changed, 136 insertions(+)
- create mode 100644 arch/arm64/kernel/crash_dump.c
+ arch/arm64/kernel/setup.c |  7 ++++-
+ arch/arm64/mm/init.c      | 66 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 72 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 111742126897..2bd6a1a062b9 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -693,6 +693,17 @@ config KEXEC
- 	  but it is independent of the system firmware.   And like a reboot
- 	  you can start any kernel with it, not just Linux.
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index b051367e2149..515e9c6696df 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -31,7 +31,6 @@
+ #include <linux/screen_info.h>
+ #include <linux/init.h>
+ #include <linux/kexec.h>
+-#include <linux/crash_dump.h>
+ #include <linux/root_dev.h>
+ #include <linux/cpu.h>
+ #include <linux/interrupt.h>
+@@ -224,6 +223,12 @@ static void __init request_standard_resources(void)
+ 		if (kernel_data.start >= res->start &&
+ 		    kernel_data.end <= res->end)
+ 			request_resource(res, &kernel_data);
++#ifdef CONFIG_KEXEC_CORE
++		/* Userspace will find "Crash kernel" region in /proc/iomem. */
++		if (crashk_res.end && crashk_res.start >= res->start &&
++		    crashk_res.end <= res->end)
++			request_resource(res, &crashk_res);
++#endif
+ 	}
+ }
  
-+config CRASH_DUMP
-+	bool "Build kdump crash kernel"
-+	help
-+	  Generate crash dump after being started by kexec. This should
-+	  be normally only set in special crash dump kernels which are
-+	  loaded in the main kernel with kexec-tools into a specially
-+	  reserved region and then later executed after a crash by
-+	  kdump/kexec.
-+
-+	  For more details see Documentation/kdump/kdump.txt
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 7d66bbaafc0c..6a7384eee08d 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -50,6 +50,7 @@ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
- arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
- arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
- 					   cpu-reset.o
-+arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
- 
- obj-y					+= $(arm64-obj-y) vdso/ probes/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
-new file mode 100644
-index 000000000000..f46d57c31443
---- /dev/null
-+++ b/arch/arm64/kernel/crash_dump.c
-@@ -0,0 +1,71 @@
-+/*
-+ * Routines for doing kexec-based kdump
-+ *
-+ * Copyright (C) 2017 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/crash_dump.h>
-+#include <linux/errno.h>
-+#include <linux/io.h>
-+#include <linux/memblock.h>
-+#include <linux/uaccess.h>
-+#include <asm/memory.h>
-+
-+/**
-+ * copy_oldmem_page() - copy one page from old kernel memory
-+ * @pfn: page frame number to be copied
-+ * @buf: buffer where the copied page is placed
-+ * @csize: number of bytes to copy
-+ * @offset: offset in bytes into the page
-+ * @userbuf: if set, @buf is in a user address space
-+ *
-+ * This function copies one page from old kernel memory into buffer pointed by
-+ * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
-+ * copied or negative error in case of failure.
-+ */
-+ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-+			 size_t csize, unsigned long offset,
-+			 int userbuf)
-+{
-+	void *vaddr;
-+
-+	if (!csize)
-+		return 0;
-+
-+	vaddr = memremap(__pfn_to_phys(pfn), PAGE_SIZE, MEMREMAP_WB);
-+	if (!vaddr)
-+		return -ENOMEM;
-+
-+	if (userbuf) {
-+		if (copy_to_user((char __user *)buf, vaddr + offset, csize)) {
-+			memunmap(vaddr);
-+			return -EFAULT;
-+		}
-+	} else {
-+		memcpy(buf, vaddr + offset, csize);
-+	}
-+
-+	memunmap(vaddr);
-+
-+	return csize;
-+}
-+
-+/**
-+ * elfcorehdr_read - read from ELF core header
-+ * @buf: buffer where the data is placed
-+ * @csize: number of bytes to read
-+ * @ppos: address in the memory
-+ *
-+ * This function reads @count bytes from elf core header which exists
-+ * on crash dump kernel's memory.
-+ */
-+ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
-+{
-+	memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
-+	return count;
-+}
 diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 083e8fc9b771..a95f8edebf51 100644
+index 3c41fd0bbce6..083e8fc9b771 100644
 --- a/arch/arm64/mm/init.c
 +++ b/arch/arm64/mm/init.c
-@@ -38,6 +38,7 @@
+@@ -30,12 +30,14 @@
+ #include <linux/gfp.h>
+ #include <linux/memblock.h>
+ #include <linux/sort.h>
++#include <linux/of.h>
+ #include <linux/of_fdt.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/dma-contiguous.h>
+ #include <linux/efi.h>
  #include <linux/swiotlb.h>
  #include <linux/vmalloc.h>
- #include <linux/kexec.h>
-+#include <linux/crash_dump.h>
++#include <linux/kexec.h>
  
  #include <asm/boot.h>
  #include <asm/fixmap.h>
-@@ -139,6 +140,56 @@ static void __init reserve_crashkernel(void)
- }
- #endif /* CONFIG_KEXEC_CORE */
+@@ -76,6 +78,67 @@ static int __init early_initrd(char *p)
+ early_param("initrd", early_initrd);
+ #endif
  
-+#ifdef CONFIG_CRASH_DUMP
-+static int __init early_init_dt_scan_elfcorehdr(unsigned long node,
-+		const char *uname, int depth, void *data)
-+{
-+	const __be32 *reg;
-+	int len;
-+
-+	if (depth != 1 || strcmp(uname, "chosen") != 0)
-+		return 0;
-+
-+	reg = of_get_flat_dt_prop(node, "linux,elfcorehdr", &len);
-+	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
-+		return 1;
-+
-+	elfcorehdr_addr = dt_mem_next_cell(dt_root_addr_cells, &reg);
-+	elfcorehdr_size = dt_mem_next_cell(dt_root_size_cells, &reg);
-+
-+	return 1;
-+}
-+
++#ifdef CONFIG_KEXEC_CORE
 +/*
-+ * reserve_elfcorehdr() - reserves memory for elf core header
++ * reserve_crashkernel() - reserves memory for crash kernel
 + *
-+ * This function reserves the memory occupied by an elf core header
-+ * described in the device tree. This region contains all the
-+ * information about primary kernel's core image and is used by a dump
-+ * capture kernel to access the system memory on primary kernel.
++ * This function reserves memory area given in "crashkernel=" kernel command
++ * line parameter. The memory reserved is used by dump capture kernel when
++ * primary kernel is crashing.
 + */
-+static void __init reserve_elfcorehdr(void)
++static void __init reserve_crashkernel(void)
 +{
-+	of_scan_flat_dt(early_init_dt_scan_elfcorehdr, NULL);
++	unsigned long long crash_base, crash_size;
++	int ret;
 +
-+	if (!elfcorehdr_size)
++	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
++				&crash_size, &crash_base);
++	/* no crashkernel= or invalid value specified */
++	if (ret || !crash_size)
 +		return;
 +
-+	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
-+		pr_warn("elfcorehdr is overlapped\n");
-+		return;
++	crash_size = PAGE_ALIGN(crash_size);
++
++	if (crash_base == 0) {
++		/* Current arm64 boot protocol requires 2MB alignment */
++		crash_base = memblock_find_in_range(0, ARCH_LOW_ADDRESS_LIMIT,
++				crash_size, SZ_2M);
++		if (crash_base == 0) {
++			pr_warn("cannot allocate crashkernel (size:0x%llx)\n",
++				crash_size);
++			return;
++		}
++	} else {
++		/* User specifies base address explicitly. */
++		if (!memblock_is_region_memory(crash_base, crash_size)) {
++			pr_warn("cannot reserve crashkernel: region is not memory\n");
++			return;
++		}
++
++		if (memblock_is_region_reserved(crash_base, crash_size)) {
++			pr_warn("cannot reserve crashkernel: region overlaps reserved memory\n");
++			return;
++		}
++
++		if (!IS_ALIGNED(crash_base, SZ_2M)) {
++			pr_warn("cannot reserve crashkernel: base address is not 2MB aligned\n");
++			return;
++		}
 +	}
++	memblock_reserve(crash_base, crash_size);
 +
-+	memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
++	pr_info("crashkernel reserved: 0x%016llx - 0x%016llx (%lld MB)\n",
++		crash_base, crash_base + crash_size, crash_size >> 20);
 +
-+	pr_info("Reserving %lldKB of memory@0x%llx for elfcorehdr\n",
-+		elfcorehdr_size >> 10, elfcorehdr_addr);
++	crashk_res.start = crash_base;
++	crashk_res.end = crash_base + crash_size - 1;
 +}
 +#else
-+static void __init reserve_elfcorehdr(void)
++static void __init reserve_crashkernel(void)
 +{
 +}
-+#endif /* CONFIG_CRASH_DUMP */
++#endif /* CONFIG_KEXEC_CORE */
++
  /*
   * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
   * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -397,6 +448,8 @@ void __init arm64_memblock_init(void)
- 
- 	reserve_crashkernel();
- 
-+	reserve_elfcorehdr();
+@@ -331,6 +394,9 @@ void __init arm64_memblock_init(void)
+ 		arm64_dma_phys_limit = max_zone_dma_phys();
+ 	else
+ 		arm64_dma_phys_limit = PHYS_MASK + 1;
++
++	reserve_crashkernel();
 +
  	dma_contiguous_reserve(arm64_dma_phys_limit);
  
