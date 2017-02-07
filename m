@@ -1,100 +1,74 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 7 Feb 2017 09:24:03 +0100
-Subject: [PATCH v2 2/8] mmc: bcm2835: Add new driver for the sdhost
- controller.
-In-Reply-To: <1486454575.24589.29.camel@redhat.com>
-References: <1486123913-31705-1-git-send-email-kraxel@redhat.com>
- <1486123913-31705-3-git-send-email-kraxel@redhat.com>
- <1708749883.208474.1486413240581@email.1und1.de>
- <1486454575.24589.29.camel@redhat.com>
-Message-ID: <f495e10a-bb9b-ab23-e3af-47a000b28783@i2se.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue,  7 Feb 2017 17:10:10 +0900
+Subject: [PATCH v32 13/13] Documentation: dt: chosen properties for arm64 kdump
+In-Reply-To: <20170207080601.5816-1-takahiro.akashi@linaro.org>
+References: <20170207080601.5816-1-takahiro.akashi@linaro.org>
+Message-ID: <20170207081010.6079-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gerd,
+From: James Morse <james.morse@arm.com>
 
-Am 07.02.2017 um 09:02 schrieb Gerd Hoffmann:
-> On Mo, 2017-02-06 at 21:34 +0100, Stefan Wahren wrote:
->> Hi Gerd,
->>
->> first of all here my wishlist for the next round of this driver:
->> * compile test the series with ARM and ARM64
-> It is tested on both arm and arm64 (rpi2 + rpi3).
+Add documentation for DT properties:
+	linux,usable-memory-range
+	linux,elfcorehdr
+used by arm64 kdump. Those are, respectively, a usable memory range
+allocated to crash dump kernel and the elfcorehdr's location within it.
 
-i got implicite declaration for request_threaded_irq() and free_irq().
-After including linux/interrupt.h the issue is fixed (patch #1 of my
-series).
+Signed-off-by: James Morse <james.morse@arm.com>
+[takahiro.akashi at linaro.org: update the text due to recent changes ]
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Cc: devicetree at vger.kernel.org
+Cc: Rob Herring <robh+dt@kernel.org>
+---
+ Documentation/devicetree/bindings/chosen.txt | 37 ++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
->
->> * add me in CC for all patches of the series
-> Oops.  /me should be more careful when reading names.  I thought I had
-> you on Cc:  Double-checked.  Turned out that was Stephen Warren ...
-
-No problem
-
->
->> * run checkpatch.pl before submission
-> Hmm?  Are there any issues?  /me has a pre-commit hook running
-> checkpatch to avoid anything slipping though.
-
-Just a single issue about a unnecessary return at the end of
-bcm2835_data_irq() (patch #4 of my series). Maybe this was a new rule.
-
->
->> * apply the patch series to your cgit repo
-> Branch pushed now: bcm2837-sdhost-squashed-v2
-
-Thanks
-
->
->>> The sdhci controller supports both sdcard and sdio.  The sdhost
->>> controller supports the sdcard only, but has better performance.  Also
->> Sorry, for the confusion. I was wrong. According to the registers the SDHOST should also support SDIO. It's a feature we could implement later.
-> Ok.
->
->>> note that the rpi3 has sdio wifi, so driving the sdcard with the sdhost
->>> controller allows to use the sdhci controller for wifi support.
->>>
->>> The configuration is done by devicetree via pin muxing.  Both SD
->>> controller are available on the same pins (2 pin groups = pin 22 to 27 +
->>> pin 48 to 53).  So it's possible to use both SD controllers at the same
->>> time with different pin groups.
->>>
->>> The code was originally written by Phil Elwell in the downstream
->>> Rasbperry Pi tree, and I did a major cleanup on it (+319, -707 lines
->>> out of the original 2055) for inclusion.
->> I think it would be helpful to known the downstream commit, because this commit [1]
->> doesn't seem to be included.
->>
->> [1] - https://github.com/raspberrypi/linux/commit/ea4b1c5c2ddbb6caba43ab9b0103542a4ca7e1f0
-
-Sorry wrong link, this must be the right one
-
-https://github.com/raspberrypi/linux/commit/1131510a589ae7262b8861af8d2f4a000710d59c
-
->>
->> I've found and fixed a lot of issues in this version and i think it would be better if i send you the patches for squashing them all together. Here is the preview for my patch series:
->>
->> Stefan Wahren (15):
->>   mmc: bcm2835: Add missing include for threaded irq
->>   mmc: bcm2835: Remove CMD_DALLY_US
->>   mmc: bcm2835: Fix pio_timeout handling
->>   mmc: bcm2835: Remove unnecessary return in bcm2835_data_irq
->>   mmc: bcm2835: Handle error cases during probe
->>   mmc: bcm2835: Print clk_max as decimal
->>   mmc: bcm2835: Downrate message in case of PIO fallback
->>   mmc: bcm2835: Don't unveil the data pointer
->>   mmc: bcm2835: remove unused host members
->>   mmc: bcm2835: Avoid unnecessary linebreaks
->>   mmc: bcm2835: Add leading zero to register dumps
->>   mmc: bcm2835: Align struct members with tabs
->>   mmc: bcm2835: Rearrange bcm2835_finish_request()
->>   mmc: bcm2835: Rearrange bcm2835_dma_complete_work()
->>   mmc: bcm2835: Rename Kconfig switch
->>
->> I'll send it after my tests. In the following review i will mention only the issues which aren't fixed in my patch series.
-> I'll pick up the patches and look at the remaining issues, new version
-> later this week (i hope).
->
-> thanks,
->   Gerd
+diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+index 6ae9d82d4c37..8dc82431acc1 100644
+--- a/Documentation/devicetree/bindings/chosen.txt
++++ b/Documentation/devicetree/bindings/chosen.txt
+@@ -52,3 +52,40 @@ This property is set (currently only on PowerPC, and only needed on
+ book3e) by some versions of kexec-tools to tell the new kernel that it
+ is being booted by kexec, as the booting environment may differ (e.g.
+ a different secondary CPU release mechanism)
++
++linux,usable-memory-range
++-------------------------
++
++This property (arm64 only) holds a base address and size, describing a
++limited region in which memory may be considered available for use by
++the kernel. Memory outside of this range is not available for use.
++
++This property describes a limitation: memory within this range is only
++valid when also described through another mechanism that the kernel
++would otherwise use to determine available memory (e.g. memory nodes
++or the EFI memory map). Valid memory may be sparse within the range.
++e.g.
++
++/ {
++	chosen {
++		linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
++	};
++};
++
++The main usage is for crash dump kernel to identify its own usable
++memory and exclude, at its boot time, any other memory areas that are
++part of the panicked kernel's memory.
++
++linux,elfcorehdr
++----------------
++
++This property (currently used only on arm64) holds the memory range,
++the address and the size, of the elf core header which mainly describes
++the panicked kernel's memory layout as PT_LOAD segments of elf format.
++e.g.
++
++/ {
++	chosen {
++		linux,elfcorehdr = <0x9 0xfffff000 0x0 0x800>;
++	};
++};
+-- 
+2.11.1
