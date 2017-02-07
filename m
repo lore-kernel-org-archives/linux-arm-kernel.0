@@ -1,86 +1,23 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Tue, 7 Feb 2017 22:43:09 +0900
-Subject: [PATCH v4 1/2] perf tools arm64: Add support for generating bpf
- prologue
-In-Reply-To: <20170207073412.26983-1-hekuang@huawei.com>
-References: <20170207073412.26983-1-hekuang@huawei.com>
-Message-ID: <20170207224309.9260a3c718911393eda7a4bf@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 7 Feb 2017 15:07:34 +0100
+Subject: [PULL v2] ARM: DTS: Fix broken GICv2 register maps
+In-Reply-To: <86zii77eib.fsf@arm.com>
+References: <1485766389-30811-1-git-send-email-marc.zyngier@arm.com>
+ <20170131050648.GB16560@localhost> <86zii77eib.fsf@arm.com>
+Message-ID: <CAK8P3a24sZHmEUFrqXO1khSTtGgsqO73f37RXaiqMjj_f=Nypg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Feb 2017 07:34:11 +0000
-He Kuang <hekuang@huawei.com> wrote:
+On Tue, Jan 31, 2017 at 10:41 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Tue, Jan 31 2017 at 05:06:48 AM, Olof Johansson <olof@lixom.net> wrote:
+>
+>> Care to respin? Or I can just pick over the patches, as long as you
+>> don't need them as a stable base somewhere else.
+>
+> If that works for you, please cherry pick the patches. I don't need them
+> to be based on anything in particular.
+>
 
-> Since HAVE_KPROBES can be enabled in arm64, this patch introduces
-> regs_query_register_offset() to convert register name to offset for
-> arm64, so the BPF prologue feature is ready to use.
-> 
+Applied both to next/dt now, thanks for the cleanup!
 
-Ok, looks good to me.
-
-Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
-
-Thanks!
-
-> Signed-off-by: He Kuang <hekuang@huawei.com>
-> ---
->  tools/perf/arch/arm64/Makefile          |  1 +
->  tools/perf/arch/arm64/util/dwarf-regs.c | 15 ++++++++++++++-
->  2 files changed, 15 insertions(+), 1 deletion(-)
-> 
-> diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
-> index 18b1351..eebe1ec 100644
-> --- a/tools/perf/arch/arm64/Makefile
-> +++ b/tools/perf/arch/arm64/Makefile
-> @@ -2,3 +2,4 @@ ifndef NO_DWARF
->  PERF_HAVE_DWARF_REGS := 1
->  endif
->  PERF_HAVE_JITDUMP := 1
-> +PERF_HAVE_ARCH_REGS_QUERY_REGISTER_OFFSET := 1
-> diff --git a/tools/perf/arch/arm64/util/dwarf-regs.c b/tools/perf/arch/arm64/util/dwarf-regs.c
-> index d49efeb..068b618 100644
-> --- a/tools/perf/arch/arm64/util/dwarf-regs.c
-> +++ b/tools/perf/arch/arm64/util/dwarf-regs.c
-> @@ -10,17 +10,20 @@
->  
->  #include <stddef.h>
->  #include <dwarf-regs.h>
-> +#include <linux/ptrace.h> /* for struct user_pt_regs */
-> +#include "util.h"
->  
->  struct pt_regs_dwarfnum {
->  	const char *name;
->  	unsigned int dwarfnum;
->  };
->  
-> -#define STR(s) #s
->  #define REG_DWARFNUM_NAME(r, num) {.name = r, .dwarfnum = num}
->  #define GPR_DWARFNUM_NAME(num) \
->  	{.name = STR(%x##num), .dwarfnum = num}
->  #define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0}
-> +#define DWARFNUM2OFFSET(index) \
-> +	(index * sizeof((struct user_pt_regs *)0)->regs[0])
->  
->  /*
->   * Reference:
-> @@ -78,3 +81,13 @@ const char *get_arch_regstr(unsigned int n)
->  			return roff->name;
->  	return NULL;
->  }
-> +
-> +int regs_query_register_offset(const char *name)
-> +{
-> +	const struct pt_regs_dwarfnum *roff;
-> +
-> +	for (roff = regdwarfnum_table; roff->name != NULL; roff++)
-> +		if (!strcmp(roff->name, name))
-> +			return DWARFNUM2OFFSET(roff->dwarfnum);
-> +	return -EINVAL;
-> +}
-> -- 
-> 1.8.5.2
-> 
-
-
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
+     Arnd
