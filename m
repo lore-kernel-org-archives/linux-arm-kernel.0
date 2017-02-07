@@ -1,90 +1,47 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 07 Feb 2017 13:36:15 +0100
-Subject: [PATCH 09/10] iommu/exynos: Make use of iommu_device_register
- interface
-In-Reply-To: <1486397429-29327-10-git-send-email-joro@8bytes.org>
-References: <1486397429-29327-1-git-send-email-joro@8bytes.org>
- <CGME20170206161330epcas3p185c7719afc89ab2ad87e55e9f62ccfa1@epcas3p1.samsung.com>
- <1486397429-29327-10-git-send-email-joro@8bytes.org>
-Message-ID: <3e4709a7-2231-7c76-18bd-6e2d6b802b8e@samsung.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 7 Feb 2017 13:37:07 +0100
+Subject: [PATCH v2 7/7] drm/rockchip: Call drm_gem_object_release() to
+ destroy GEM base
+In-Reply-To: <1486456773-19233-1-git-send-email-mark.yao@rock-chips.com>
+References: <1486456542-18675-1-git-send-email-mark.yao@rock-chips.com>
+ <1486456773-19233-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <20170207123707.GC18315@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Tue, Feb 07, 2017 at 04:39:33PM +0800, Mark Yao wrote:
+> From: Tomasz Figa <tfiga@chromium.org>
+> 
+> When converting the driver to use shmem-backed GEMs for IOMMU-enabled
+> systems, we forgot to add calls to drm_gem_object_release(), which gave
+> us a quite nice memory leak. This patch adds the missing calls.
+> 
+> Fixes: f11d5f0 ("FROMLIST: drm/rockchip: Do not use DMA mapping API if
+> attached to IOMMU domain")
+> 
+> TEST=while true; do backlight_dbus_tool --set --percent=0 && sleep 8 &&
+>  backlight_dbus_tool --set --percent=100 && sleep 3 ; done
 
-On 2017-02-06 17:10, Joerg Roedel wrote:
-> From: Joerg Roedel <jroedel@suse.de>
->
-> Register Exynos IOMMUs to the IOMMU core and make them
-> visible in sysfs. This patch does not add the links between
-> IOMMUs and translated devices yet.
->
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Signed-off-by: Joerg Roedel <jroedel@suse.de>
-> ---
->   drivers/iommu/exynos-iommu.c | 16 ++++++++++++++++
->   1 file changed, 16 insertions(+)
->
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 57ba0d3..90f0f52 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -276,6 +276,8 @@ struct sysmmu_drvdata {
->   	struct list_head owner_node;	/* node for owner controllers list */
->   	phys_addr_t pgtable;		/* assigned page table structure */
->   	unsigned int version;		/* our version */
-> +
-> +	struct iommu_device iommu;	/* IOMMU core handle */
->   };
->   
->   static struct exynos_iommu_domain *to_exynos_domain(struct iommu_domain *dom)
-> @@ -556,6 +558,7 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
->   	struct device *dev = &pdev->dev;
->   	struct sysmmu_drvdata *data;
->   	struct resource *res;
-> +	resource_size_t ioaddr;
->   
->   	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
->   	if (!data)
-> @@ -565,6 +568,7 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
->   	data->sfrbase = devm_ioremap_resource(dev, res);
->   	if (IS_ERR(data->sfrbase))
->   		return PTR_ERR(data->sfrbase);
-> +	ioaddr = res->start;
->   
->   	irq = platform_get_irq(pdev, 0);
->   	if (irq <= 0) {
-> @@ -611,6 +615,18 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
->   	data->sysmmu = dev;
->   	spin_lock_init(&data->lock);
->   
-> +	ret = iommu_device_sysfs_add(&data->iommu, &pdev->dev, NULL,
-> +				     "sysmmu.%pa", &ioaddr);
+Ugh... please clean up your commit messages before posting to the
+mailing list. FROMLIST: patches clearly aren't what will be merged
+upstream and the SHA1 isn't going to match, so nobody but you will
+find this anywhere.
 
-Can we stick to the common name across the /sysfs and use 
-dev_name(data->sysmmu)
-or even dev_name(dev) here?
+> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> Reviewed-on: https://chromium-review.googlesource.com/385456
 
-ret = iommu_device_sysfs_add(&data->iommu, &pdev->dev, NULL, 
-dev_name(dev));
+This is also present in some of the patches you posted, but it's not
+typical for these to be included in upstream patches because usually
+by the time patches from some gerrit make it to upstream, upstream
+can have diverged significantly enough for the review to no longer
+apply.
 
-> +	if (ret)
-> +		return ret;
-> +
-> +	data->iommu.ops    = &exynos_iommu_ops;
-> +	data->iommu.fwnode = &dev->of_node->fwnode;
-> +
-> +	ret = iommu_device_register(&data->iommu);
-> +	if (ret)
-> +		return ret;
-> +
->   	platform_set_drvdata(pdev, data);
->   
->   	__sysmmu_get_version(data);
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/de71c776/attachment.sig>
