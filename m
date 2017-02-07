@@ -1,84 +1,75 @@
-From: alexander@alemayhu.com (Alexander Alemayhu)
-Date: Tue,  7 Feb 2017 12:53:08 +0100
-Subject: [PATCH] staging: vc04_services: remove unused functions
-Message-ID: <20170207115308.5208-1-alexander@alemayhu.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 07 Feb 2017 12:03:06 +0000
+Subject: [PATCH] arm64: kconfig: allow support for memory failure handling
+In-Reply-To: <ec1f1a61-8569-58b8-a78f-972f43a5e8ca@codeaurora.org> (Tyler
+ Baicar's message of "Mon, 6 Feb 2017 15:26:37 -0700")
+References: <1485985115-27274-1-git-send-email-tbaicar@codeaurora.org>
+ <8737fvqlxs.fsf@e105922-lin.cambridge.arm.com>
+ <ec1f1a61-8569-58b8-a78f-972f43a5e8ca@codeaurora.org>
+Message-ID: <87k292yzr9.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looking at the history these calls were introduced in 71bad7f08641
-(staging: add bcm2708 vchiq driver, 2013-07-02) and they were not
-being used at all.
+"Baicar, Tyler" <tbaicar@codeaurora.org> writes:
 
-Discovered using sparse and fixes the following output:
+> Hello Punit,
+>
+>
+> On 2/3/2017 9:27 AM, Punit Agrawal wrote:
+>> Tyler Baicar <tbaicar@codeaurora.org> writes:
+>>
+>>> From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
+>>>
+>>> If ACPI_APEI and MEMORY_FAILURE is configured, select
+>>> ACPI_APEI_MEMORY_FAILURE. This enables memory failure recovery
+>>> when such memory failure is reported through ACPI APEI. APEI
+>>> (ACPI Platform Error Interfaces) provides a means for the
+>>> platform to convey error information to the kernel.
+>>>
+>>> Declare ARCH_SUPPORTS_MEMORY_FAILURE, as arm64 does support
+>>> memory failure recovery attempt.
+>>>
+>>> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+>>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>>> ---
+>>>   arch/arm64/Kconfig | 2 ++
+>>>   1 file changed, 2 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>> index f92778d..4cd12a0 100644
+>>> --- a/arch/arm64/Kconfig
+>>> +++ b/arch/arm64/Kconfig
+>>> @@ -15,6 +15,8 @@ config ARM64
+>>>   	select ARCH_HAS_SG_CHAIN
+>>>   	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+>>>   	select ARCH_USE_CMPXCHG_LOCKREF
+>>> +	select ACPI_APEI_MEMORY_FAILURE if ACPI_APEI && MEMORY_FAILURE
+>>> +	select ARCH_SUPPORTS_MEMORY_FAILURE
+>> Although enabling support for memory failure handling makes sense in the
+>> architecture config, it feels out of place to select
+>> ACPI_APEI_MEMORY_FAILURE here.
+>>
+>> Maybe key it off of CONFIG_APEI?
+> Yes, I can move it there.
+>
+> config ACPI_APEI
+>         bool "ACPI Platform Error Interface (APEI)"
+>         select MISC_FILESYSTEMS
+>         select PSTORE
+>         select UEFI_CPER
+> +        select ACPI_APEI_MEMORY_FAILURE if MEMORY_FAILURE
+>         depends on HAVE_ACPI_APEI
+>
 
-drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c:816:1: warning: symbol 'vchi_readbuf_uint32' was not declared. Should it be static?
-drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c:827:1: warning: symbol 'vchi_writebuf_uint32' was not declared. Should it be static?
-drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c:841:1: warning: symbol 'vchi_readbuf_uint16' was not declared. Should it be static?
-drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c:852:1: warning: symbol 'vchi_writebuf_uint16' was not declared. Should it be static?
+That's what I was suggesting - we'll see what the ACPI maintainers think
+of the change.
 
-Signed-off-by: Alexander Alemayhu <alexander@alemayhu.com>
----
- .../vc04_services/interface/vchiq_arm/vchiq_shim.c | 48 ----------------------
- 1 file changed, 48 deletions(-)
+> The ARCH_SUPPORTS_MEMORY_FAILURE should remain in arch/arm64/Kconfig
+> though, correct?
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-index 48984abc3854..cd0c332210ca 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
-@@ -808,54 +808,6 @@ int32_t vchi_get_peer_version(const VCHI_SERVICE_HANDLE_T handle, short *peer_ve
- }
- EXPORT_SYMBOL(vchi_get_peer_version);
- 
--/* ----------------------------------------------------------------------
-- * read a uint32_t from buffer.
-- * network format is defined to be little endian
-- * -------------------------------------------------------------------- */
--uint32_t
--vchi_readbuf_uint32(const void *_ptr)
--{
--	const unsigned char *ptr = _ptr;
--	return ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24);
--}
--
--/* ----------------------------------------------------------------------
-- * write a uint32_t to buffer.
-- * network format is defined to be little endian
-- * -------------------------------------------------------------------- */
--void
--vchi_writebuf_uint32(void *_ptr, uint32_t value)
--{
--	unsigned char *ptr = _ptr;
--	ptr[0] = (unsigned char)((value >> 0)  & 0xFF);
--	ptr[1] = (unsigned char)((value >> 8)  & 0xFF);
--	ptr[2] = (unsigned char)((value >> 16) & 0xFF);
--	ptr[3] = (unsigned char)((value >> 24) & 0xFF);
--}
--
--/* ----------------------------------------------------------------------
-- * read a uint16_t from buffer.
-- * network format is defined to be little endian
-- * -------------------------------------------------------------------- */
--uint16_t
--vchi_readbuf_uint16(const void *_ptr)
--{
--	const unsigned char *ptr = _ptr;
--	return ptr[0] | (ptr[1] << 8);
--}
--
--/* ----------------------------------------------------------------------
-- * write a uint16_t into the buffer.
-- * network format is defined to be little endian
-- * -------------------------------------------------------------------- */
--void
--vchi_writebuf_uint16(void *_ptr, uint16_t value)
--{
--	unsigned char *ptr = _ptr;
--	ptr[0] = (value >> 0)  & 0xFF;
--	ptr[1] = (value >> 8)  & 0xFF;
--}
--
- /***********************************************************
-  * Name: vchi_service_use
-  *
--- 
-2.11.1
+Yes, that's right - as that's a feature the architecture is advertising
+support for, it should stay in the arm64 Kconfig,
+
+>
+> Thanks,
+> Tyler
