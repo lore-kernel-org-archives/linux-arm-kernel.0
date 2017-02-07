@@ -1,73 +1,69 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 7 Feb 2017 08:21:03 +0100
-Subject: [PATCH] drm/atmel-hlcdc: Simplify the HLCDC layer logic
-In-Reply-To: <1486405627-25714-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1486405627-25714-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20170207072103.fmitjl4t6jigybak@phenom.ffwll.local>
+From: hekuang@huawei.com (He Kuang)
+Date: Tue, 7 Feb 2017 07:34:11 +0000
+Subject: [PATCH v4 1/2] perf tools arm64: Add support for generating bpf
+ prologue
+Message-ID: <20170207073412.26983-1-hekuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2017 at 07:27:07PM +0100, Boris Brezillon wrote:
-> An HLCDC layers in Atmel's nomenclature is either a DRM plane or a 'Post
-> Processing Layer' which can be used to output the results of the HLCDC
-> composition in a memory buffer.
-> 
-> atmel_hlcdc_layer.c was designed to be generic enough to be re-usable in
-> both cases, but we're not exposing the post-processing layer yet, and
-> even if we were, I'm not sure the code would provide the necessary tools
-> to manipulate this kind of layer.
-> 
-> Moreover, the code in atmel_hlcdc_{plane,layer}.c was designed before the
-> atomic modesetting API, and was trying solve the
-> check-setting/commit-if-ok/rollback-otherwise problem, which is now
-> entirely solved by the existing core infrastructure.
-> 
-> And finally, the code in atmel_hlcdc_layer.c in over-complicated compared
-> to what we really need. This rework is a good excuse to simplify it. Note
-> that this rework solves an existing resource leak (leading to a -EBUSY
-> error) which I failed to clearly identify.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
-> Hi Daniel,
-> 
-> You might not remember, but this is something you asked me to do a while
-> ago, and it's finally there.
-> This patch reworks the Atmel HLCDC plane logic to get rid of all the
-> complexity in atmel_hlcdc_layer.c and this includes getting rid of
-> drm_flip_work, which you were trying to kill IIRC.
+Since HAVE_KPROBES can be enabled in arm64, this patch introduces
+regs_query_register_offset() to convert register name to offset for
+arm64, so the BPF prologue feature is ready to use.
 
-[snip]
+Signed-off-by: He Kuang <hekuang@huawei.com>
+---
+ tools/perf/arch/arm64/Makefile          |  1 +
+ tools/perf/arch/arm64/util/dwarf-regs.c | 15 ++++++++++++++-
+ 2 files changed, 15 insertions(+), 1 deletion(-)
 
-> @@ -76,6 +77,27 @@ drm_plane_state_to_atmel_hlcdc_plane_state(struct drm_plane_state *s)
->  	return container_of(s, struct atmel_hlcdc_plane_state, base);
->  }
->  
-> +/**
-> + * Atmel HLCDC Plane.
-> + *
-> + * @base: base DRM plane structure
-> + * @desc: HLCDC layer desc structure
-> + * @properties: pointer to the property definitions structure
-> + * @regmap: HLCDC regmap
-> + */
-> +struct atmel_hlcdc_plane {
-> +	struct drm_plane base;
-> +	const struct atmel_hlcdc_layer_desc *desc;
-
-So I'm not 100%, but it looks like you have a 1:1 relationship between
-atmel_hlcdc_plane and atmel_hlcdc_layer. I't go one step further even and
-merge these two structures together (or embed one into the other). Only
-reason against that would be if eventually you need to dynamically assign
-layers to planes (e.g. 2 layers for nv12 or something like that), which
-would mean you need to keep the pointer (and for dynamic assignement, move
-it into the plane_state).
-
-I didn't check the details of your patch really, but in general removing
-abstractions when we don't need them is a good idea.
-
-Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
+index 18b1351..eebe1ec 100644
+--- a/tools/perf/arch/arm64/Makefile
++++ b/tools/perf/arch/arm64/Makefile
+@@ -2,3 +2,4 @@ ifndef NO_DWARF
+ PERF_HAVE_DWARF_REGS := 1
+ endif
+ PERF_HAVE_JITDUMP := 1
++PERF_HAVE_ARCH_REGS_QUERY_REGISTER_OFFSET := 1
+diff --git a/tools/perf/arch/arm64/util/dwarf-regs.c b/tools/perf/arch/arm64/util/dwarf-regs.c
+index d49efeb..068b618 100644
+--- a/tools/perf/arch/arm64/util/dwarf-regs.c
++++ b/tools/perf/arch/arm64/util/dwarf-regs.c
+@@ -10,17 +10,20 @@
+ 
+ #include <stddef.h>
+ #include <dwarf-regs.h>
++#include <linux/ptrace.h> /* for struct user_pt_regs */
++#include "util.h"
+ 
+ struct pt_regs_dwarfnum {
+ 	const char *name;
+ 	unsigned int dwarfnum;
+ };
+ 
+-#define STR(s) #s
+ #define REG_DWARFNUM_NAME(r, num) {.name = r, .dwarfnum = num}
+ #define GPR_DWARFNUM_NAME(num) \
+ 	{.name = STR(%x##num), .dwarfnum = num}
+ #define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0}
++#define DWARFNUM2OFFSET(index) \
++	(index * sizeof((struct user_pt_regs *)0)->regs[0])
+ 
+ /*
+  * Reference:
+@@ -78,3 +81,13 @@ const char *get_arch_regstr(unsigned int n)
+ 			return roff->name;
+ 	return NULL;
+ }
++
++int regs_query_register_offset(const char *name)
++{
++	const struct pt_regs_dwarfnum *roff;
++
++	for (roff = regdwarfnum_table; roff->name != NULL; roff++)
++		if (!strcmp(roff->name, name))
++			return DWARFNUM2OFFSET(roff->dwarfnum);
++	return -EINVAL;
++}
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+1.8.5.2
