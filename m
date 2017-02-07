@@ -1,48 +1,53 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 7 Feb 2017 22:12:08 +0530
-Subject: [PATCH v2 2/5] async_tx: Handle DMA devices having support for
- fewer PQ coefficients
-In-Reply-To: <CAALAos_yhXufdt79KWY0eugjF5oyJ8+NcPh2E-dEXnSQu2WhhA@mail.gmail.com>
-References: <1486455406-11202-1-git-send-email-anup.patel@broadcom.com>
- <1486455406-11202-3-git-send-email-anup.patel@broadcom.com>
- <CAPcyv4gbV1yf52JrejW+Dn3wOPn7Er+8HWdu2qsW0+Qm+cRr9g@mail.gmail.com>
- <CAALAos_yhXufdt79KWY0eugjF5oyJ8+NcPh2E-dEXnSQu2WhhA@mail.gmail.com>
-Message-ID: <20170207164207.GI19244@localhost>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Tue,  7 Feb 2017 17:41:13 +0100
+Subject: [PATCH 00/10] ARM: davinci: add vpif display support
+Message-ID: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2017 at 02:32:15PM +0530, Anup Patel wrote:
-> On Tue, Feb 7, 2017 at 1:57 PM, Dan Williams <dan.j.williams@intel.com> wrote:
-> > On Tue, Feb 7, 2017 at 12:16 AM, Anup Patel <anup.patel@broadcom.com> wrote:
-> >> The DMAENGINE framework assumes that if PQ offload is supported by a
-> >> DMA device then all 256 PQ coefficients are supported. This assumption
-> >> does not hold anymore because we now have BCM-SBA-RAID offload engine
-> >> which supports PQ offload with limited number of PQ coefficients.
-> >>
-> >> This patch extends async_tx APIs to handle DMA devices with support
-> >> for fewer PQ coefficients.
-> >>
-> >> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> >> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> >
-> > I don't like this approach. Define an interface for md to query the
-> > offload engine once at the beginning of time. We should not be adding
-> > any new extensions to async_tx.
-> 
-> Even if we do capability checks in Linux MD, we still need a way
-> for DMAENGINE drivers to advertise number of PQ coefficients
-> handled by the HW.
+The following series adds support for v4l2 display on da850-evm with
+a UI board in device tree boot mode.
 
-If the question is only for advertising caps, then why not do as done
-for dma_get_slave_caps(). you can add dma_get_pq_caps() so that clients (md)
-in this case would know the HW capability.
+Patches 1/10 - 5/10 deal with the device tree: we fix whitespace
+errors in dts files and bindings, extend the example and the dts for
+da850-evm with the output port and address the pinmuxing.
 
-> I agree capability checks should be done once in Linux MD but I don't
-> see why this has to be part of BCM-SBA-RAID driver patches. We need
-> separate patchsets to address limitations of async_tx framework.
-> 
-> Regards,
-> Anup
+Patch 6/10 enables the relevant modules in the defconfig file.
+
+Patches 7/10 and 8/10 fix two already existing bugs encountered
+during development.
+
+Patch 9/10 make it possible to use a different i2c adapter in the
+vpif display driver.
+
+The last patch adds the pdata quirks necessary to enable v4l2 display.
+
+Tested with a modified version of yavta[1] as gstreamer support for
+v4l2 seems to be broken and results in picture artifacts.
+
+[1] https://github.com/brgl/yavta davinci/vpif-display
+
+Bartosz Golaszewski (10):
+  media: dt-bindings: vpif: fix whitespace errors
+  ARM: dts: da850-evm: fix whitespace errors
+  media: dt-bindings: vpif: extend the example with an output port
+  ARM: dts: da850-evm: add the output port to the vpif node
+  ARM: dts: da850: add vpif video display pins
+  ARM: davinci_all_defconfig: enable VPIF display modules
+  ARM: davinci: fix a whitespace error
+  ARM: davinci: fix the DT boot on da850-evm
+  media: vpif: use a configurable i2c_adapter_id for vpif display
+  ARM: davinci: add pdata-quirks for da850-evm vpif display
+
+ .../devicetree/bindings/media/ti,da850-vpif.txt    | 45 ++++++++---
+ arch/arm/boot/dts/da850-evm.dts                    | 26 +++---
+ arch/arm/boot/dts/da850.dtsi                       | 25 +++++-
+ arch/arm/configs/davinci_all_defconfig             |  2 +
+ arch/arm/mach-davinci/board-da850-evm.c            |  1 +
+ arch/arm/mach-davinci/pdata-quirks.c               | 92 ++++++++++++++++++++--
+ drivers/media/platform/davinci/vpif_display.c      |  2 +-
+ include/media/davinci/vpif_types.h                 |  1 +
+ 8 files changed, 164 insertions(+), 30 deletions(-)
 
 -- 
-~Vinod
+2.9.3
