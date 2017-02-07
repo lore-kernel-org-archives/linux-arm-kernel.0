@@ -1,658 +1,106 @@
-From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Tue, 7 Feb 2017 08:15:26 -0600
-Subject: [PATCH 06/10] staging: fsl-mc: dpmcp: drop unused APIs
-In-Reply-To: <20170207141530.12979-1-laurentiu.tudor@nxp.com>
-References: <20170207141530.12979-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170207141530.12979-7-laurentiu.tudor@nxp.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 7 Feb 2017 15:22:25 +0100
+Subject: i.MX7 clock support broken
+Message-ID: <20170207142225.zitac2r7g3kvowjw@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+Hi All,
 
-These APIs are not used yet, so drop the dead code.
-The patch is mostly mechanical, with a couple exceptions:
- - getters/setters were not removed even if only one of
-   them is being used
- - versioning API was also left in place
-Also in this patch, add missing prototype for
-version query function.
+I recently adopted the i.MX7 clock tree from Linux to barebox and wondered
+why ethernet doesn't work. I found out that the clock tree in Linux is quite
+different from what the reference manual describes and also quite different
+from the hardware I have on my desk. There are several clocks that only exist
+in the driver, but not in the actual hardware and also several clocks which
+are in hardware, but not in the driver.
 
-Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
----
- drivers/staging/fsl-mc/bus/dpmcp-cmd.h |  95 --------
- drivers/staging/fsl-mc/bus/dpmcp.c     | 382 ---------------------------------
- drivers/staging/fsl-mc/bus/dpmcp.h     | 100 +--------
- 3 files changed, 4 insertions(+), 573 deletions(-)
+These clocks exist in the driver only, but not in the hardware:
 
-diff --git a/drivers/staging/fsl-mc/bus/dpmcp-cmd.h b/drivers/staging/fsl-mc/bus/dpmcp-cmd.h
-index 7cb5149..384a13d 100644
---- a/drivers/staging/fsl-mc/bus/dpmcp-cmd.h
-+++ b/drivers/staging/fsl-mc/bus/dpmcp-cmd.h
-@@ -45,107 +45,12 @@
- /* Command IDs */
- #define DPMCP_CMDID_CLOSE		DPMCP_CMD(0x800)
- #define DPMCP_CMDID_OPEN		DPMCP_CMD(0x80b)
--#define DPMCP_CMDID_CREATE		DPMCP_CMD(0x90b)
--#define DPMCP_CMDID_DESTROY		DPMCP_CMD(0x98b)
- #define DPMCP_CMDID_GET_API_VERSION	DPMCP_CMD(0xa0b)
- 
--#define DPMCP_CMDID_GET_ATTR		DPMCP_CMD(0x004)
- #define DPMCP_CMDID_RESET		DPMCP_CMD(0x005)
- 
--#define DPMCP_CMDID_SET_IRQ		DPMCP_CMD(0x010)
--#define DPMCP_CMDID_GET_IRQ		DPMCP_CMD(0x011)
--#define DPMCP_CMDID_SET_IRQ_ENABLE	DPMCP_CMD(0x012)
--#define DPMCP_CMDID_GET_IRQ_ENABLE	DPMCP_CMD(0x013)
--#define DPMCP_CMDID_SET_IRQ_MASK	DPMCP_CMD(0x014)
--#define DPMCP_CMDID_GET_IRQ_MASK	DPMCP_CMD(0x015)
--#define DPMCP_CMDID_GET_IRQ_STATUS	DPMCP_CMD(0x016)
--
- struct dpmcp_cmd_open {
- 	__le32 dpmcp_id;
- };
- 
--struct dpmcp_cmd_create {
--	__le32 portal_id;
--};
--
--struct dpmcp_cmd_destroy {
--	__le32 object_id;
--};
--
--struct dpmcp_cmd_set_irq {
--	/* cmd word 0 */
--	u8 irq_index;
--	u8 pad[3];
--	__le32 irq_val;
--	/* cmd word 1 */
--	__le64 irq_addr;
--	/* cmd word 2 */
--	__le32 irq_num;
--};
--
--struct dpmcp_cmd_get_irq {
--	__le32 pad;
--	u8 irq_index;
--};
--
--struct dpmcp_rsp_get_irq {
--	/* cmd word 0 */
--	__le32 irq_val;
--	__le32 pad;
--	/* cmd word 1 */
--	__le64 irq_paddr;
--	/* cmd word 2 */
--	__le32 irq_num;
--	__le32 type;
--};
--
--#define DPMCP_ENABLE		0x1
--
--struct dpmcp_cmd_set_irq_enable {
--	u8 enable;
--	u8 pad[3];
--	u8 irq_index;
--};
--
--struct dpmcp_cmd_get_irq_enable {
--	__le32 pad;
--	u8 irq_index;
--};
--
--struct dpmcp_rsp_get_irq_enable {
--	u8 enabled;
--};
--
--struct dpmcp_cmd_set_irq_mask {
--	__le32 mask;
--	u8 irq_index;
--};
--
--struct dpmcp_cmd_get_irq_mask {
--	__le32 pad;
--	u8 irq_index;
--};
--
--struct dpmcp_rsp_get_irq_mask {
--	__le32 mask;
--};
--
--struct dpmcp_cmd_get_irq_status {
--	__le32 status;
--	u8 irq_index;
--};
--
--struct dpmcp_rsp_get_irq_status {
--	__le32 status;
--};
--
--struct dpmcp_rsp_get_attributes {
--	/* response word 0 */
--	__le32 pad;
--	__le32 id;
--	/* response word 1 */
--	__le16 version_major;
--	__le16 version_minor;
--};
--
- #endif /* _FSL_DPMCP_CMD_H */
-diff --git a/drivers/staging/fsl-mc/bus/dpmcp.c b/drivers/staging/fsl-mc/bus/dpmcp.c
-index e4d1651..ad4c8b4 100644
---- a/drivers/staging/fsl-mc/bus/dpmcp.c
-+++ b/drivers/staging/fsl-mc/bus/dpmcp.c
-@@ -104,82 +104,6 @@ int dpmcp_close(struct fsl_mc_io *mc_io,
- }
- 
- /**
-- * dpmcp_create() - Create the DPMCP object.
-- * @mc_io:	Pointer to MC portal's I/O object
-- * @dprc_token:	Parent container token; '0' for default container
-- * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @cfg:	Configuration structure
-- * @obj_id:	Returned object id; use in subsequent API calls
-- *
-- * Create the DPMCP object, allocate required resources and
-- * perform required initialization.
-- *
-- * The object can be created either by declaring it in the
-- * DPL file, or by calling this function.
--
-- * This function accepts an authentication token of a parent
-- * container that this object should be assigned to and returns
-- * an object id. This object_id will be used in all subsequent calls to
-- * this specific object.
-- *
-- * Return:	'0' on Success; Error code otherwise.
-- */
--int dpmcp_create(struct fsl_mc_io *mc_io,
--		 u16 dprc_token,
--		 u32 cmd_flags,
--		 const struct dpmcp_cfg *cfg,
--		 u32 *obj_id)
--{
--	struct mc_command cmd = { 0 };
--	struct dpmcp_cmd_create *cmd_params;
--
--	int err;
--
--	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_CREATE,
--					  cmd_flags, dprc_token);
--	cmd_params = (struct dpmcp_cmd_create *)cmd.params;
--	cmd_params->portal_id = cpu_to_le32(cfg->portal_id);
--
--	/* send command to mc*/
--	err = mc_send_command(mc_io, &cmd);
--	if (err)
--		return err;
--
--	/* retrieve response parameters */
--	*obj_id = mc_cmd_read_object_id(&cmd);
--
--	return 0;
--}
--
--/**
-- * dpmcp_destroy() - Destroy the DPMCP object and release all its resources.
-- * @mc_io:	Pointer to MC portal's I/O object
-- * @dprc_token:	Parent container token; '0' for default container
-- * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @obj_id:	ID of DPMCP object
-- *
-- * Return:	'0' on Success; error code otherwise.
-- */
--int dpmcp_destroy(struct fsl_mc_io *mc_io,
--		  u16 dprc_token,
--		  u32 cmd_flags,
--		  u32 obj_id)
--{
--	struct mc_command cmd = { 0 };
--	struct dpmcp_cmd_destroy *cmd_params;
--
--	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_DESTROY,
--					  cmd_flags, dprc_token);
--	cmd_params = (struct dpmcp_cmd_destroy *)cmd.params;
--	cmd_params->object_id = cpu_to_le32(obj_id);
--
--	/* send command to mc*/
--	return mc_send_command(mc_io, &cmd);
--}
--
--/**
-  * dpmcp_reset() - Reset the DPMCP, returns the object to initial state.
-  * @mc_io:	Pointer to MC portal's I/O object
-  * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-@@ -202,312 +126,6 @@ int dpmcp_reset(struct fsl_mc_io *mc_io,
- }
- 
- /**
-- * dpmcp_set_irq() - Set IRQ information for the DPMCP to trigger an interrupt.
-- * @mc_io:	Pointer to MC portal's I/O object
-- * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPMCP object
-- * @irq_index:	Identifies the interrupt index to configure
-- * @irq_cfg:	IRQ configuration
-- *
-- * Return:	'0' on Success; Error code otherwise.
-- */
--int dpmcp_set_irq(struct fsl_mc_io *mc_io,
--		  u32 cmd_flags,
--		  u16 token,
--		  u8 irq_index,
--		  struct dpmcp_irq_cfg	*irq_cfg)
--{
--	struct mc_command cmd = { 0 };
--	struct dpmcp_cmd_set_irq *cmd_params;
--
--	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_SET_IRQ,
--					  cmd_flags, token);
--	cmd_params = (struct dpmcp_cmd_set_irq *)cmd.params;
--	cmd_params->irq_index = irq_index;
--	cmd_params->irq_val = cpu_to_le32(irq_cfg->val);
--	cmd_params->irq_addr = cpu_to_le64(irq_cfg->paddr);
--	cmd_params->irq_num = cpu_to_le32(irq_cfg->irq_num);
--
--	/* send command to mc*/
--	return mc_send_command(mc_io, &cmd);
--}
--
--/**
-- * dpmcp_get_irq() - Get IRQ information from the DPMCP.
-- * @mc_io:	Pointer to MC portal's I/O object
-- * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPMCP object
-- * @irq_index:	The interrupt index to configure
-- * @type:	Interrupt type: 0 represents message interrupt
-- *		type (both irq_addr and irq_val are valid)
-- * @irq_cfg:	IRQ attributes
-- *
-- * Return:	'0' on Success; Error code otherwise.
-- */
--int dpmcp_get_irq(struct fsl_mc_io *mc_io,
--		  u32 cmd_flags,
--		  u16 token,
--		  u8 irq_index,
--		  int *type,
--		  struct dpmcp_irq_cfg	*irq_cfg)
--{
--	struct mc_command cmd = { 0 };
--	struct dpmcp_cmd_get_irq *cmd_params;
--	struct dpmcp_rsp_get_irq *rsp_params;
--	int err;
--
--	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_GET_IRQ,
--					  cmd_flags, token);
--	cmd_params = (struct dpmcp_cmd_get_irq *)cmd.params;
--	cmd_params->irq_index = irq_index;
--
--	/* send command to mc*/
--	err = mc_send_command(mc_io, &cmd);
--	if (err)
--		return err;
--
--	/* retrieve response parameters */
--	rsp_params = (struct dpmcp_rsp_get_irq *)cmd.params;
--	irq_cfg->val = le32_to_cpu(rsp_params->irq_val);
--	irq_cfg->paddr = le64_to_cpu(rsp_params->irq_paddr);
--	irq_cfg->irq_num = le32_to_cpu(rsp_params->irq_num);
--	*type = le32_to_cpu(rsp_params->type);
--	return 0;
--}
--
--/**
-- * dpmcp_set_irq_enable() - Set overall interrupt state.
-- * @mc_io:	Pointer to MC portal's I/O object
-- * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPMCP object
-- * @irq_index:	The interrupt index to configure
-- * @en:	Interrupt state - enable = 1, disable = 0
-- *
-- * Allows GPP software to control when interrupts are generated.
-- * Each interrupt can have up to 32 causes.  The enable/disable control's the
-- * overall interrupt state. if the interrupt is disabled no causes will cause
-- * an interrupt.
-- *
-- * Return:	'0' on Success; Error code otherwise.
-- */
--int dpmcp_set_irq_enable(struct fsl_mc_io *mc_io,
--			 u32 cmd_flags,
--			 u16 token,
--			 u8 irq_index,
--			 u8 en)
--{
--	struct mc_command cmd = { 0 };
--	struct dpmcp_cmd_set_irq_enable *cmd_params;
--
--	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_SET_IRQ_ENABLE,
--					  cmd_flags, token);
--	cmd_params = (struct dpmcp_cmd_set_irq_enable *)cmd.params;
--	cmd_params->enable = en & DPMCP_ENABLE;
--	cmd_params->irq_index = irq_index;
--
--	/* send command to mc*/
--	return mc_send_command(mc_io, &cmd);
--}
--
--/**
-- * dpmcp_get_irq_enable() - Get overall interrupt state
-- * @mc_io:	Pointer to MC portal's I/O object
-- * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPMCP object
-- * @irq_index:	The interrupt index to configure
-- * @en:		Returned interrupt state - enable = 1, disable = 0
-- *
-- * Return:	'0' on Success; Error code otherwise.
-- */
--int dpmcp_get_irq_enable(struct fsl_mc_io *mc_io,
--			 u32 cmd_flags,
--			 u16 token,
--			 u8 irq_index,
--			 u8 *en)
--{
--	struct mc_command cmd = { 0 };
--	struct dpmcp_cmd_get_irq_enable *cmd_params;
--	struct dpmcp_rsp_get_irq_enable *rsp_params;
--	int err;
--
--	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_GET_IRQ_ENABLE,
--					  cmd_flags, token);
--	cmd_params = (struct dpmcp_cmd_get_irq_enable *)cmd.params;
--	cmd_params->irq_index = irq_index;
--
--	/* send command to mc*/
--	err = mc_send_command(mc_io, &cmd);
--	if (err)
--		return err;
--
--	/* retrieve response parameters */
--	rsp_params = (struct dpmcp_rsp_get_irq_enable *)cmd.params;
--	*en = rsp_params->enabled & DPMCP_ENABLE;
--	return 0;
--}
--
--/**
-- * dpmcp_set_irq_mask() - Set interrupt mask.
-- * @mc_io:	Pointer to MC portal's I/O object
-- * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPMCP object
-- * @irq_index:	The interrupt index to configure
-- * @mask:	Event mask to trigger interrupt;
-- *			each bit:
-- *				0 = ignore event
-- *				1 = consider event for asserting IRQ
-- *
-- * Every interrupt can have up to 32 causes and the interrupt model supports
-- * masking/unmasking each cause independently
-- *
-- * Return:	'0' on Success; Error code otherwise.
-- */
--int dpmcp_set_irq_mask(struct fsl_mc_io *mc_io,
--		       u32 cmd_flags,
--		       u16 token,
--		       u8 irq_index,
--		       u32 mask)
--{
--	struct mc_command cmd = { 0 };
--	struct dpmcp_cmd_set_irq_mask *cmd_params;
--
--	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_SET_IRQ_MASK,
--					  cmd_flags, token);
--	cmd_params = (struct dpmcp_cmd_set_irq_mask *)cmd.params;
--	cmd_params->mask = cpu_to_le32(mask);
--	cmd_params->irq_index = irq_index;
--
--	/* send command to mc*/
--	return mc_send_command(mc_io, &cmd);
--}
--
--/**
-- * dpmcp_get_irq_mask() - Get interrupt mask.
-- * @mc_io:	Pointer to MC portal's I/O object
-- * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPMCP object
-- * @irq_index:	The interrupt index to configure
-- * @mask:	Returned event mask to trigger interrupt
-- *
-- * Every interrupt can have up to 32 causes and the interrupt model supports
-- * masking/unmasking each cause independently
-- *
-- * Return:	'0' on Success; Error code otherwise.
-- */
--int dpmcp_get_irq_mask(struct fsl_mc_io *mc_io,
--		       u32 cmd_flags,
--		       u16 token,
--		       u8 irq_index,
--		       u32 *mask)
--{
--	struct mc_command cmd = { 0 };
--	struct dpmcp_cmd_get_irq_mask *cmd_params;
--	struct dpmcp_rsp_get_irq_mask *rsp_params;
--
--	int err;
--
--	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_GET_IRQ_MASK,
--					  cmd_flags, token);
--	cmd_params = (struct dpmcp_cmd_get_irq_mask *)cmd.params;
--	cmd_params->irq_index = irq_index;
--
--	/* send command to mc*/
--	err = mc_send_command(mc_io, &cmd);
--	if (err)
--		return err;
--
--	/* retrieve response parameters */
--	rsp_params = (struct dpmcp_rsp_get_irq_mask *)cmd.params;
--	*mask = le32_to_cpu(rsp_params->mask);
--
--	return 0;
--}
--
--/**
-- * dpmcp_get_irq_status() - Get the current status of any pending interrupts.
-- *
-- * @mc_io:	Pointer to MC portal's I/O object
-- * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPMCP object
-- * @irq_index:	The interrupt index to configure
-- * @status:	Returned interrupts status - one bit per cause:
-- *			0 = no interrupt pending
-- *			1 = interrupt pending
-- *
-- * Return:	'0' on Success; Error code otherwise.
-- */
--int dpmcp_get_irq_status(struct fsl_mc_io *mc_io,
--			 u32 cmd_flags,
--			 u16 token,
--			 u8 irq_index,
--			 u32 *status)
--{
--	struct mc_command cmd = { 0 };
--	struct dpmcp_cmd_get_irq_status *cmd_params;
--	struct dpmcp_rsp_get_irq_status *rsp_params;
--	int err;
--
--	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_GET_IRQ_STATUS,
--					  cmd_flags, token);
--	cmd_params = (struct dpmcp_cmd_get_irq_status *)cmd.params;
--	cmd_params->status = cpu_to_le32(*status);
--	cmd_params->irq_index = irq_index;
--
--	/* send command to mc*/
--	err = mc_send_command(mc_io, &cmd);
--	if (err)
--		return err;
--
--	/* retrieve response parameters */
--	rsp_params = (struct dpmcp_rsp_get_irq_status *)cmd.params;
--	*status = le32_to_cpu(rsp_params->status);
--
--	return 0;
--}
--
--/**
-- * dpmcp_get_attributes - Retrieve DPMCP attributes.
-- *
-- * @mc_io:	Pointer to MC portal's I/O object
-- * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPMCP object
-- * @attr:	Returned object's attributes
-- *
-- * Return:	'0' on Success; Error code otherwise.
-- */
--int dpmcp_get_attributes(struct fsl_mc_io *mc_io,
--			 u32 cmd_flags,
--			 u16 token,
--			 struct dpmcp_attr *attr)
--{
--	struct mc_command cmd = { 0 };
--	struct dpmcp_rsp_get_attributes *rsp_params;
--	int err;
--
--	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_GET_ATTR,
--					  cmd_flags, token);
--
--	/* send command to mc*/
--	err = mc_send_command(mc_io, &cmd);
--	if (err)
--		return err;
--
--	/* retrieve response parameters */
--	rsp_params = (struct dpmcp_rsp_get_attributes *)cmd.params;
--	attr->id = le32_to_cpu(rsp_params->id);
--
--	return 0;
--}
--
--/**
-  * dpmcp_get_api_version - Get Data Path Management Command Portal API version
-  * @mc_io:	Pointer to Mc portal's I/O object
-  * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-diff --git a/drivers/staging/fsl-mc/bus/dpmcp.h b/drivers/staging/fsl-mc/bus/dpmcp.h
-index 98a100d..f616031 100644
---- a/drivers/staging/fsl-mc/bus/dpmcp.h
-+++ b/drivers/staging/fsl-mc/bus/dpmcp.h
-@@ -44,109 +44,17 @@ int dpmcp_open(struct fsl_mc_io *mc_io,
- 	       int dpmcp_id,
- 	       u16 *token);
- 
--/* Get portal ID from pool */
--#define DPMCP_GET_PORTAL_ID_FROM_POOL (-1)
--
- int dpmcp_close(struct fsl_mc_io *mc_io,
- 		u32 cmd_flags,
- 		u16 token);
- 
--/**
-- * struct dpmcp_cfg - Structure representing DPMCP configuration
-- * @portal_id:	Portal ID; 'DPMCP_GET_PORTAL_ID_FROM_POOL' to get the portal ID
-- *		from pool
-- */
--struct dpmcp_cfg {
--	int portal_id;
--};
--
--int dpmcp_create(struct fsl_mc_io *mc_io,
--		 u16 dprc_token,
--		 u32 cmd_flags,
--		 const struct dpmcp_cfg *cfg,
--		 u32 *obj_id);
--
--int dpmcp_destroy(struct fsl_mc_io *mc_io,
--		  u16 dprc_token,
--		  u32 cmd_flags,
--		  u32 obj_id);
-+int dpmcp_get_api_version(struct fsl_mc_io *mc_io,
-+			  u32 cmd_flags,
-+			  u16 *major_ver,
-+			  u16 *minor_ver);
- 
- int dpmcp_reset(struct fsl_mc_io *mc_io,
- 		u32 cmd_flags,
- 		u16 token);
- 
--/* IRQ */
--/* IRQ Index */
--#define DPMCP_IRQ_INDEX                             0
--/* irq event - Indicates that the link state changed */
--#define DPMCP_IRQ_EVENT_CMD_DONE                    0x00000001
--
--/**
-- * struct dpmcp_irq_cfg - IRQ configuration
-- * @paddr:	Address that must be written to signal a message-based interrupt
-- * @val:	Value to write into irq_addr address
-- * @irq_num: A user defined number associated with this IRQ
-- */
--struct dpmcp_irq_cfg {
--	     u64 paddr;
--	     u32 val;
--	     int irq_num;
--};
--
--int dpmcp_set_irq(struct fsl_mc_io *mc_io,
--		  u32 cmd_flags,
--		  u16 token,
--		  u8 irq_index,
--		  struct dpmcp_irq_cfg *irq_cfg);
--
--int dpmcp_get_irq(struct fsl_mc_io *mc_io,
--		  u32 cmd_flags,
--		  u16 token,
--		  u8 irq_index,
--		  int *type,
--		  struct dpmcp_irq_cfg *irq_cfg);
--
--int dpmcp_set_irq_enable(struct fsl_mc_io *mc_io,
--			 u32 cmd_flags,
--			 u16 token,
--			 u8 irq_index,
--			 u8 en);
--
--int dpmcp_get_irq_enable(struct fsl_mc_io *mc_io,
--			 u32 cmd_flags,
--			 u16 token,
--			 u8 irq_index,
--			 u8 *en);
--
--int dpmcp_set_irq_mask(struct fsl_mc_io *mc_io,
--		       u32 cmd_flags,
--		       u16 token,
--		       u8 irq_index,
--		       u32 mask);
--
--int dpmcp_get_irq_mask(struct fsl_mc_io *mc_io,
--		       u32 cmd_flags,
--		       u16 token,
--		       u8 irq_index,
--		       u32 *mask);
--
--int dpmcp_get_irq_status(struct fsl_mc_io *mc_io,
--			 u32 cmd_flags,
--			 u16 token,
--			 u8 irq_index,
--			 u32 *status);
--
--/**
-- * struct dpmcp_attr - Structure representing DPMCP attributes
-- * @id:		DPMCP object ID
-- */
--struct dpmcp_attr {
--	int id;
--};
--
--int dpmcp_get_attributes(struct fsl_mc_io *mc_io,
--			 u32 cmd_flags,
--			 u16 token,
--			 struct dpmcp_attr *attr);
--
- #endif /* __FSL_DPMCP_H */
+clks[IMX7D_ARM_A7_ROOT_CLK] = imx_clk_gate4("arm_a7_root_clk", "arm_a7_div", base + 0x4000, 0);
+clks[IMX7D_ARM_M4_ROOT_CLK] = imx_clk_gate4("arm_m4_root_clk", "arm_m4_div", base + 0x4010, 0);
+clks[IMX7D_ARM_M0_ROOT_CLK] = imx_clk_gate4("arm_m0_root_clk", "arm_m0_div", base + 0x4020, 0);
+clks[IMX7D_USB_HSIC_ROOT_CLK] = imx_clk_gate4("usb_hsic_root_clk", "usb_hsic_post_div", base + 0x4420, 0);
+clks[IMX7D_PCIE_PHY_ROOT_CLK] = imx_clk_gate4("pcie_phy_root_clk", "pcie_phy_post_div", base + 0x4600, 0);
+clks[IMX7D_SPDIF_ROOT_CLK] = imx_clk_gate4("spdif_root_clk", "spdif_post_div", base + 0x44d0, 0);
+clks[IMX7D_ENET1_REF_ROOT_CLK] = imx_clk_gate4("enet1_ref_root_clk", "enet1_ref_post_div", base + 0x44e0, 0);
+clks[IMX7D_ENET1_TIME_ROOT_CLK] = imx_clk_gate4("enet1_time_root_clk", "enet1_time_post_div", base + 0x44f0, 0);
+clks[IMX7D_ENET2_REF_ROOT_CLK] = imx_clk_gate4("enet2_ref_root_clk", "enet2_ref_post_div", base + 0x4500, 0);
+clks[IMX7D_ENET2_TIME_ROOT_CLK] = imx_clk_gate4("enet2_time_root_clk", "enet2_time_post_div", base + 0x4510, 0);
+clks[IMX7D_ENET_PHY_REF_ROOT_CLK] = imx_clk_gate4("enet_phy_ref_root_clk", "enet_phy_ref_post_div", base + 0x4520, 0);
+clks[IMX7D_AUDIO_MCLK_ROOT_CLK] = imx_clk_gate4("audio_mclk_root_clk", "audio_mclk_post_div", base + 0x4790, 0);
+clks[IMX7D_WRCLK_ROOT_CLK] = imx_clk_gate4("wrclk_root_clk", "wrclk_post_div", base + 0x47a0, 0);
+clks[IMX7D_ADC_ROOT_CLK] = imx_clk_gate4("adc_root_clk", "ipg_root_clk", base + 0x4200, 0);
+
+And these clocks are described in the reference manual, but not handled
+in the driver:
+
+CCM_CCGR7 sim_m 0x4070
+CCM_CCGR8 sim_s 0x4080
+CCM_CCGR9 sim_wakeup 0x4090
+CCM_CCGR10 ipmux1 0x40A0
+CCM_CCGR11 ipmux2 0x40B0
+CCM_CCGR12 ipmux3 0x40C0
+CCM_CCGR16 rom 0x4100
+CCM_CCGR33 anatop 0x4210
+CCM_CCGR34 sctr 0x4220
+CCM_CCGR35 ocotp 0x4230
+CCM_CCGR36 caam 0x4240
+CCM_CCGR37 snvs 0x4250
+CCM_CCGR38 rdc 0x4260
+CCM_CCGR39 mu 0x4270
+CCM_CCGR40 hs 0x4280
+CCM_CCGR41 dvfs 0x4290
+CCM_CCGR42 qos 0x42A0
+CCM_CCGR43 qos_dispmix 0x42B0
+CCM_CCGR44 qos_megamix 0x42C0
+CCM_CCGR45 csu 0x42D0
+CCM_CCGR46 dbgmon 0x42E0
+CCM_CCGR47 debug 0x42F0
+CCM_CCGR49 sec_debug 0x4310
+CCM_CCGR64 sema1 0x4400
+CCM_CCGR65 sema2 0x4410
+CCM_CCGR68 perfmon1 0x4440
+CCM_CCGR69 perfmon2 0x4450
+CCM_CCGR76 pxp 0x44C0
+CCM_CCGR104 usb_ctrl 0x4680
+CCM_CCGR105 usb_hsic 0x4690
+CCM_CCGR106 usb_phy1 0x46A0
+CCM_CCGR107 usb_phy2 0x46B0
+CCM_CCGR112 enet1 0x4700
+CCM_CCGR113 enet2 0x4710
+CCM_CCGR160 gpio1 0x4A00
+CCM_CCGR161 gpio2 0x4A10
+CCM_CCGR162 gpio3 0x4A20
+CCM_CCGR163 gpio4 0x4A30
+CCM_CCGR164 gpio5 0x4A40
+CCM_CCGR165 gpio6 0x4A50
+CCM_CCGR166 gpio7 0x4A60
+CCM_CCGR168 iomux 0x4A80
+CCM_CCGR169 iomux_lpsr 0x4A90
+CCM_CCGR170 kpp 0x4AA0
+
+It seems most stuff works in the Kernel when the clocks are left
+enabled in the bootloader, but for example the real ethernet clocks
+are never handled in the kernel.
+
+Also I stumbled upon the gate at offset 0x4130. The same gate is
+registered as 5 different gates in the kernel without being handled
+as a shared gate:
+
+clks[IMX7D_NAND_USDHC_BUS_ROOT_CLK] = imx_clk_gate4("nand_usdhc_root_clk", "nand_usdhc_post_div", base + 0x4130, 0);
+clks[IMX7D_DRAM_ROOT_CLK] = imx_clk_gate4("dram_root_clk", "dram_post_div", base + 0x4130, 0);
+clks[IMX7D_DRAM_PHYM_ROOT_CLK] = imx_clk_gate4("dram_phym_root_clk", "dram_phym_cg", base + 0x4130, 0);
+clks[IMX7D_DRAM_PHYM_ALT_ROOT_CLK] = imx_clk_gate4("dram_phym_alt_root_clk", "dram_phym_alt_post_div", base + 0x4130, 0);
+clks[IMX7D_DRAM_ALT_ROOT_CLK] = imx_clk_gate4("dram_alt_root_clk", "dram_alt_post_div", base + 0x4130, 0);
+
+I don't have a patch for this, just hope that somebody @NXP has a better
+clue what's going on and maybe there already is a fix somewhere floating
+around.
+
+Sascha
+
 -- 
-1.8.3.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
