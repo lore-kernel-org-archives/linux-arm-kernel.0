@@ -1,141 +1,38 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue,  7 Feb 2017 17:41:23 +0100
-Subject: [PATCH 10/10] ARM: davinci: add pdata-quirks for da850-evm vpif
- display
-In-Reply-To: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1486485683-11427-11-git-send-email-bgolaszewski@baylibre.com>
+From: roy.pledge@nxp.com (Roy Pledge)
+Date: Tue, 7 Feb 2017 16:44:26 +0000
+Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
+ flush_dcache_range()
+References: <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
+ <HE1PR0401MB263638F320470CA216990BCC86720@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+ <5414359.8GMja3pNrI@wuerfel>
+ <VI1PR0401MB24303C4A5C0042005E17F1A391770@VI1PR0401MB2430.eurprd04.prod.outlook.com>
+ <CAK8P3a1Gd4bd7GjEp_a9WXc_mTPk0XmP7DH8aPWhbn2K3MMuDQ@mail.gmail.com>
+ <1485570872.9266.22.camel@buserror.net>
+ <d5ca6bcd-1d1a-2a61-1f5c-9086a67f629a@arm.com>
+ <HE1PR0401MB2636FF4D977DDA6888616A26864B0@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+ <3cc42823-0fc9-ed3e-1738-bf6e314dd569@arm.com>
+ <HE1PR0401MB2636B14B4F1637A5A7D5432386400@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+ <20170206223721.GN27312@n2100.armlinux.org.uk>
+Message-ID: <HE1PR0401MB26362EA8D498B77755DE63A286430@HE1PR0401MB2636.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similarly to vpif capture: we need to register the vpif display driver
-and the corresponding adv7343 encoder in pdata-quirks as the DT
-support is not complete.
+On 2/6/2017 5:37 PM, Russell King - ARM Linux wrote:
+> On Mon, Feb 06, 2017 at 10:26:26PM +0000, Roy Pledge wrote:
+>> Why don't I simplify this and use dma_sync_single_for_device() to flush
+>> the cache?
+> ... which can only be used on direct-mapped memory.
+>
+Then I don't see another (or understand) any other option. There is no
+way I can add a large area of physical memory carved out by
+of_reserve_mem to a DMA allocator since both ioremap and memremap throw
+an error if I try to do so. I appreciate the suggestions from people to
+resolve this but so far there isn't a workable solution to the problem.
+As far as I can tell other users of dma_declare_coherent_memory() are
+using it for device backed memory, not DDR.  It sounds like a solution
+on the surface but when you dig into the details it just doesn't work. 
+Please let me know if I'm missing something, I really want to close this
+issue so we can get upstream support for this device on ARM.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/pdata-quirks.c | 86 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 85 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
-index 09f62ac..0a55546 100644
---- a/arch/arm/mach-davinci/pdata-quirks.c
-+++ b/arch/arm/mach-davinci/pdata-quirks.c
-@@ -9,13 +9,17 @@
-  */
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
-+#include <linux/gpio.h>
- 
- #include <media/i2c/tvp514x.h>
-+#include <media/i2c/adv7343.h>
- 
- #include <mach/common.h>
- #include <mach/da8xx.h>
- #include <mach/mux.h>
- 
-+#define DA850_EVM_UI_EXP_SEL_VPIF_DISP 5
-+
- struct pdata_init {
- 	const char *compatible;
- 	void (*fn)(void);
-@@ -107,7 +111,78 @@ static struct vpif_capture_config da850_vpif_capture_config = {
- 	},
- 	.card_name = "DA850/OMAP-L138 Video Capture",
- };
-+#endif /* IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) */
-+
-+#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
-+static void vpif_evm_display_setup(void)
-+{
-+	int gpio = DAVINCI_N_GPIO + DA850_EVM_UI_EXP_SEL_VPIF_DISP, ret;
-+
-+	ret = gpio_request(gpio, "sel_c");
-+	if (ret) {
-+		pr_warn("Cannot open UI expander pin %d\n", gpio);
-+		return;
-+	}
-+
-+	gpio_direction_output(gpio, 0);
-+}
-+
-+static struct adv7343_platform_data adv7343_pdata = {
-+	.mode_config = {
-+		.dac = { 1, 1, 1 },
-+	},
-+	.sd_config = {
-+		.sd_dac_out = { 1 },
-+	},
-+};
-+
-+static struct vpif_subdev_info da850_vpif_subdev[] = {
-+	{
-+		.name = "adv7343",
-+		.board_info = {
-+			I2C_BOARD_INFO("adv7343", 0x2a),
-+			.platform_data = &adv7343_pdata,
-+		},
-+	},
-+};
- 
-+static const struct vpif_output da850_ch0_outputs[] = {
-+	{
-+		.output = {
-+			.index = 0,
-+			.name = "Composite",
-+			.type = V4L2_OUTPUT_TYPE_ANALOG,
-+			.capabilities = V4L2_OUT_CAP_STD,
-+			.std = V4L2_STD_ALL,
-+		},
-+		.subdev_name = "adv7343",
-+		.output_route = ADV7343_COMPOSITE_ID,
-+	},
-+	{
-+		.output = {
-+			.index = 1,
-+			.name = "S-Video",
-+			.type = V4L2_OUTPUT_TYPE_ANALOG,
-+			.capabilities = V4L2_OUT_CAP_STD,
-+			.std = V4L2_STD_ALL,
-+		},
-+		.subdev_name = "adv7343",
-+		.output_route = ADV7343_SVIDEO_ID,
-+	},
-+};
-+
-+static struct vpif_display_config da850_vpif_display_config = {
-+	.subdevinfo   = da850_vpif_subdev,
-+	.subdev_count = ARRAY_SIZE(da850_vpif_subdev),
-+	.chan_config[0] = {
-+		.outputs = da850_ch0_outputs,
-+		.output_count = ARRAY_SIZE(da850_ch0_outputs),
-+	},
-+	.card_name    = "DA850/OMAP-L138 Video Display",
-+};
-+#endif /* defined(CONFIG_DA850_UI_SD_VIDEO_PORT) */
-+
-+#if IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) || defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
- static void __init da850_vpif_legacy_init(void)
- {
- 	int ret;
-@@ -120,8 +195,17 @@ static void __init da850_vpif_legacy_init(void)
- 	if (ret)
- 		pr_warn("%s: VPIF capture setup failed: %d\n",
- 			__func__, ret);
-+
-+	/* LCDK doesn't support VPIF display */
-+	if (of_machine_is_compatible("ti,da850-evm")) {
-+		vpif_evm_display_setup();
-+		ret = da850_register_vpif_display(&da850_vpif_display_config);
-+		if (ret)
-+			pr_warn("%s: VPIF display setup failed: %d\n",
-+				__func__, ret);
-+	}
- }
--#endif
-+#endif /* IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) || defined(CONFIG_DA850_UI_SD_VIDEO_PORT) */
- 
- static void pdata_quirks_check(struct pdata_init *quirks)
- {
--- 
-2.9.3
+Roy
