@@ -1,143 +1,45 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue,  7 Feb 2017 16:38:36 +0100
-Subject: [PATCH v4] arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU
-Message-ID: <1486481916-1892-1-git-send-email-geert+renesas@glider.be>
+From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
+Date: Tue, 7 Feb 2017 09:43:43 -0600
+Subject: [PATCH v3 00/10] staging: fsl-mc: fixes and cleanups
+Message-ID: <20170207154353.20691-1-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for allocating physically contiguous DMA buffers on arm64
-systems with an IOMMU.  This can be useful when two or more devices
-with different memory requirements are involved in buffer sharing.
+From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Note that as this uses the CMA allocator, setting the
-DMA_ATTR_FORCE_CONTIGUOUS attribute has a runtime-dependency on
-CONFIG_DMA_CMA, just like on arm32.
+First 4 patches fix several driver model related
+issues and drop an useless atomic global.
+The rest of the patches are cleanups mostly
+consisting in removing dead code.
 
-For arm64 systems using swiotlb, no changes are needed to support the
-allocation of physically contiguous DMA buffers:
-  - swiotlb always uses physically contiguous buffers (up to
-    IO_TLB_SEGSIZE = 128 pages),
-  - arm64's __dma_alloc_coherent() already calls
-    dma_alloc_from_contiguous() when CMA is available.
+Only patch 3, 4, 5 and 10 changed. See individual patch notes for
+details.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
-v4:
-  - Replace dma_to_phys()/phys_to_page() by vmalloc_to_page(), to pass
-    the correct page pointer to dma_release_from_contiguous().
-    Note that the latter doesn't scream when passed a wrong pointer, but
-    just returns false.  While this makes life easier for callers who
-    may want to call another deallocator, it makes it harder catching
-    bugs.
+Laurentiu Tudor (10):
+  staging: fsl-mc: drop root dprc counting
+  staging: fsl-mc: fix device ref counting
+  staging: fsl-mc: add device release callback
+  staging: fsl-mc: don't use devres api for refcounted objects
+  staging: fsl-mc: remove slab cache for mc devices
+  staging: fsl-mc: dpmcp: drop unused APIs
+  staging: fsl-mc: dpmng: drop unused prototype
+  staging: fsl-mc: dpbp: drop unused APIs
+  staging: fsl-mc: dpbp: add a few missing EXPORT_SYMBOL()s
+  staging: fsl-mc: dprc: drop unused APIs
 
-v3:
-  - Add Acked-by,
-  - Update comment to "one of _4_ things",
-  - Call dma_alloc_from_contiguous() and iommu_dma_map_page() directly,
-    as suggested by Robin Murphy,
+ drivers/staging/fsl-mc/bus/dpbp-cmd.h    | 116 ------
+ drivers/staging/fsl-mc/bus/dpbp.c        | 452 +--------------------
+ drivers/staging/fsl-mc/bus/dpmcp-cmd.h   |  95 -----
+ drivers/staging/fsl-mc/bus/dpmcp.c       | 382 ------------------
+ drivers/staging/fsl-mc/bus/dpmcp.h       | 100 +----
+ drivers/staging/fsl-mc/bus/dprc-cmd.h    |  18 -
+ drivers/staging/fsl-mc/bus/dprc-driver.c |   1 +
+ drivers/staging/fsl-mc/bus/dprc.c        | 666 -------------------------------
+ drivers/staging/fsl-mc/bus/fsl-mc-bus.c  |  75 +---
+ drivers/staging/fsl-mc/include/dpbp.h    | 129 ------
+ drivers/staging/fsl-mc/include/dpmng.h   |   4 -
+ drivers/staging/fsl-mc/include/dprc.h    | 243 -----------
+ 12 files changed, 30 insertions(+), 2251 deletions(-)
 
-v2:
-  - New, handle dispatching in the arch (arm64) code, as requested by
-    Robin Murphy.
----
- arch/arm64/mm/dma-mapping.c | 63 ++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 48 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 351f7595cb3ebdb9..fb76e82c90edd514 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -584,20 +584,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
- 	 */
- 	gfp |= __GFP_ZERO;
- 
--	if (gfpflags_allow_blocking(gfp)) {
--		struct page **pages;
--		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
--
--		pages = iommu_dma_alloc(dev, iosize, gfp, attrs, ioprot,
--					handle, flush_page);
--		if (!pages)
--			return NULL;
--
--		addr = dma_common_pages_remap(pages, size, VM_USERMAP, prot,
--					      __builtin_return_address(0));
--		if (!addr)
--			iommu_dma_free(dev, pages, iosize, handle);
--	} else {
-+	if (!gfpflags_allow_blocking(gfp)) {
- 		struct page *page;
- 		/*
- 		 * In atomic context we can't remap anything, so we'll only
-@@ -621,6 +608,45 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
- 				__free_from_pool(addr, size);
- 			addr = NULL;
- 		}
-+	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-+		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
-+		struct page *page;
-+
-+		page = dma_alloc_from_contiguous(dev, size >> PAGE_SHIFT,
-+						 get_order(size));
-+		if (!page)
-+			return NULL;
-+
-+		*handle = iommu_dma_map_page(dev, page, 0, iosize, ioprot);
-+		if (iommu_dma_mapping_error(dev, *handle)) {
-+			dma_release_from_contiguous(dev, page,
-+						    size >> PAGE_SHIFT);
-+			return NULL;
-+		}
-+		if (!coherent)
-+			__dma_flush_area(page_to_virt(page), iosize);
-+
-+		addr = dma_common_contiguous_remap(page, size, VM_USERMAP,
-+						   prot,
-+						   __builtin_return_address(0));
-+		if (!addr) {
-+			iommu_dma_unmap_page(dev, *handle, iosize, 0, attrs);
-+			dma_release_from_contiguous(dev, page,
-+						    size >> PAGE_SHIFT);
-+		}
-+	} else {
-+		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
-+		struct page **pages;
-+
-+		pages = iommu_dma_alloc(dev, iosize, gfp, attrs, ioprot,
-+					handle, flush_page);
-+		if (!pages)
-+			return NULL;
-+
-+		addr = dma_common_pages_remap(pages, size, VM_USERMAP, prot,
-+					      __builtin_return_address(0));
-+		if (!addr)
-+			iommu_dma_free(dev, pages, iosize, handle);
- 	}
- 	return addr;
- }
-@@ -632,7 +658,8 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
- 
- 	size = PAGE_ALIGN(size);
- 	/*
--	 * @cpu_addr will be one of 3 things depending on how it was allocated:
-+	 * @cpu_addr will be one of 4 things depending on how it was allocated:
-+	 * - A remapped array of pages for contiguous allocations.
- 	 * - A remapped array of pages from iommu_dma_alloc(), for all
- 	 *   non-atomic allocations.
- 	 * - A non-cacheable alias from the atomic pool, for atomic
-@@ -644,6 +671,12 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
- 	if (__in_atomic_pool(cpu_addr, size)) {
- 		iommu_dma_unmap_page(dev, handle, iosize, 0, 0);
- 		__free_from_pool(cpu_addr, size);
-+	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-+		struct page *page = vmalloc_to_page(cpu_addr);
-+
-+		iommu_dma_unmap_page(dev, handle, iosize, 0, attrs);
-+		dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT);
-+		dma_common_free_remap(cpu_addr, size, VM_USERMAP);
- 	} else if (is_vmalloc_addr(cpu_addr)){
- 		struct vm_struct *area = find_vm_area(cpu_addr);
- 
 -- 
-1.9.1
+1.8.3.1
