@@ -1,123 +1,66 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue, 7 Feb 2017 11:32:23 +0530
-Subject: [PATCH 5/6] dmaengine: Add Broadcom SBA RAID driver
-In-Reply-To: <20170206165400.GD19244@localhost>
-References: <1486010836-25228-1-git-send-email-anup.patel@broadcom.com>
- <1486010836-25228-6-git-send-email-anup.patel@broadcom.com>
- <20170205060657.GV19244@localhost>
- <CAALAos9FxwKuF+qtqViybZ8APZNYt-PWLnTfJs64xtoyYB5NZQ@mail.gmail.com>
- <20170206165400.GD19244@localhost>
-Message-ID: <CAALAos8W13Xcxw+VpkvJWNNEiO6_6Hri0EheASHqOzCKagDYzA@mail.gmail.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Tue, 7 Feb 2017 14:03:54 +0800
+Subject: [PATCH v2 6/6] dt-bindings: mt8173-mtu3: add reference clock
+In-Reply-To: <1486373341-4399-6-git-send-email-chunfeng.yun@mediatek.com>
+References: <1486373341-4399-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1486373341-4399-6-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1486447434.3750.20.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 6, 2017 at 10:24 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Mon, Feb 06, 2017 at 05:31:15PM +0530, Anup Patel wrote:
->
->> >> +
->> >> +/* SBA C_MDATA helper macros */
->> >> +#define SBA_C_MDATA_LOAD_VAL(__bnum0)                ((__bnum0) & 0x3)
->> >> +#define SBA_C_MDATA_WRITE_VAL(__bnum0)               ((__bnum0) & 0x3)
->> >> +#define SBA_C_MDATA_XOR_VAL(__bnum1, __bnum0)                        \
->> >> +                     ({      u32 __v = ((__bnum0) & 0x3);    \
->> >> +                             __v |= ((__bnum1) & 0x3) << 2;  \
->> >> +                             __v;                            \
->> >> +                     })
->> >> +#define SBA_C_MDATA_PQ_VAL(__dnum, __bnum1, __bnum0)         \
->> >> +                     ({      u32 __v = ((__bnum0) & 0x3);    \
->> >> +                             __v |= ((__bnum1) & 0x3) << 2;  \
->> >> +                             __v |= ((__dnum) & 0x1f) << 5;  \
->> >> +                             __v;                            \
->> >> +                     })
->> >
->> > ah why are we usig complex macros, why can't these be simple functions..
->>
->> "static inline functions" seemed too complicated here because most of
->> these macros are two lines of c-code.
->
-> and thats where I have an issue with this. Macros for simple things is fine
-> but not for couple of line of logic!
->
->>
->> Do you still insist on using "static inline functions"?
->
-> Yes
+Please ignore this series of patches, due to the first version have been
+merged into usb-next branch except DTS's one[PACH 4/6].
+This will cause mtu3 probe failure, so I will send new patches based on
+usb-next branch.
 
-Sure, will use "static inline functions" instead these macros.
+sorry
 
->
->>
->> >
->> >> +#define SBA_C_MDATA_LS(__c_mdata_val)        ((__c_mdata_val) & 0xff)
->> >> +#define SBA_C_MDATA_MS(__c_mdata_val)        (((__c_mdata_val) >> 8) & 0x3)
->> >> +
->> >> +/* Driver helper macros */
->> >> +#define to_sba_request(tx)           \
->> >> +     container_of(tx, struct sba_request, tx)
->> >> +#define to_sba_device(dchan)         \
->> >> +     container_of(dchan, struct sba_device, dma_chan)
->> >> +
->> >> +enum sba_request_state {
->> >> +     SBA_REQUEST_STATE_FREE = 1,
->> >> +     SBA_REQUEST_STATE_ALLOCED = 2,
->> >> +     SBA_REQUEST_STATE_PENDING = 3,
->> >> +     SBA_REQUEST_STATE_ACTIVE = 4,
->> >> +     SBA_REQUEST_STATE_COMPLETED = 5,
->> >> +     SBA_REQUEST_STATE_ABORTED = 6,
->> >
->> > whats up with a very funny indentation setting, we use 8 chars.
->> >
->> > Please re-read the Documentation/process/coding-style.rst
->>
->> I have double checked this enum. The indentation is fine
->> and as-per coding style. Am I missing anything else?
->
-> Somehow the initial indent doesnt seem to be 8 chars to me.
->
->> >> +static enum dma_status sba_tx_status(struct dma_chan *dchan,
->> >> +                                  dma_cookie_t cookie,
->> >> +                                  struct dma_tx_state *txstate)
->> >> +{
->> >> +     int mchan_idx;
->> >> +     enum dma_status ret;
->> >> +     struct sba_device *sba = to_sba_device(dchan);
->> >> +
->> >> +     ret = dma_cookie_status(dchan, cookie, txstate);
->> >> +     if (ret == DMA_COMPLETE)
->> >> +             return ret;
->> >> +
->> >> +     for (mchan_idx = 0; mchan_idx < sba->mchans_count; mchan_idx++)
->> >> +             mbox_client_peek_data(sba->mchans[mchan_idx]);
->> >
->> > what is this achieving?
->>
->> The mbox_client_peek_data() is a hint to mailbox controller driver
->> to check for available messages.
->>
->> This gives good performance improvement when some DMA client
->> code is polling using tx_status() callback.
->
-> Then why do it before and then check status.
-
-If there was a work completed when mbox_client_peek_data()
-is called then sba_receive_message() will be called immediately
-by mailbox controller driver.
-
-We are doing dma_cookie_complete() in sba_receive_message()
-so if mbox_client_peek_data() is called before dma_cookie_status()
-then dma_cookie_status() will see correct state of cookie.
-
-Also, I explored virt-dma APIs for BCM-SBA-RAID driver. The virt-dma
-implements tasklet based bottom-half for each virt-dma-channel. This
-bottom-half is not required for BCM-FS4-RAID driver because its a
-mailbox client driver and the mailbox controller driver already implements
-bottom-half for each mailbox channel.
-
-If we still go ahead and use virt-dma in BCM-FS4-RAID driver then we
-will have two bottom-halfs in-action one in mailbox controller driver and
-another in BCM-FS4-RAID driver which in-turn will add bottom-half
-scheduling overhead thereby reducing performance of BCM-FS4-RAID
-driver.
-
-Regards,
-Anup
+On Mon, 2017-02-06 at 17:29 +0800, Chunfeng Yun wrote:
+> Due to the reference clock comes from 26M oscillator directly
+> on mt8173, and it is a fixed-clock in DTS which always turned
+> on, we ignore it before. But on some platforms, it comes
+> from PLL, and need be controlled, so here add it, no matter
+> it is a fixed-clock or not.
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  .../devicetree/bindings/usb/mt8173-mtu3.txt        |   10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt b/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
+> index e049d19..8c976cd 100644
+> --- a/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
+> +++ b/Documentation/devicetree/bindings/usb/mt8173-mtu3.txt
+> @@ -10,7 +10,7 @@ Required properties:
+>   - vusb33-supply : regulator of USB avdd3.3v
+>   - clocks : a list of phandle + clock-specifier pairs, one for each
+>  	entry in clock-names
+> - - clock-names : must contain "sys_ck" for clock of controller;
+> + - clock-names : must contain "sys_ck" and "ref_ck" for clock of controller;
+>  	"wakeup_deb_p0" and "wakeup_deb_p1" are optional, they are
+>  	depends on "mediatek,enable-wakeup"
+>   - phys : a list of phandle + phy specifier pairs
+> @@ -56,10 +56,10 @@ ssusb: usb at 11271000 {
+>  	phys = <&phy_port0 PHY_TYPE_USB3>,
+>  	       <&phy_port1 PHY_TYPE_USB2>;
+>  	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
+> -	clocks = <&topckgen CLK_TOP_USB30_SEL>,
+> +	clocks = <&topckgen CLK_TOP_USB30_SEL>, <&clk26m>,
+>  		 <&pericfg CLK_PERI_USB0>,
+>  		 <&pericfg CLK_PERI_USB1>;
+> -	clock-names = "sys_ck",
+> +	clock-names = "sys_ck", "ref_ck",
+>  		      "wakeup_deb_p0",
+>  		      "wakeup_deb_p1";
+>  	vusb33-supply = <&mt6397_vusb_reg>;
+> @@ -79,8 +79,8 @@ ssusb: usb at 11271000 {
+>  		reg-names = "mac";
+>  		interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
+>  		power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
+> -		clocks = <&topckgen CLK_TOP_USB30_SEL>;
+> -		clock-names = "sys_ck";
+> +		clocks = <&topckgen CLK_TOP_USB30_SEL>, <&clk26m>;
+> +		clock-names = "sys_ck", "ref_ck";
+>  		vusb33-supply = <&mt6397_vusb_reg>;
+>  		status = "disabled";
+>  	};
