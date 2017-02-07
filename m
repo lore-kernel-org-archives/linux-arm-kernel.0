@@ -1,49 +1,38 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue,  7 Feb 2017 07:50:24 -0800
-Subject: [PATCH v4 0/3] i.MX7 PCI support
-Message-ID: <20170207155027.7734-1-andrew.smirnov@gmail.com>
+Date: Tue,  7 Feb 2017 07:50:25 -0800
+Subject: [PATCH v4 1/3] PCI: imx6: Fix a typo in error message
+In-Reply-To: <20170207155027.7734-1-andrew.smirnov@gmail.com>
+References: <20170207155027.7734-1-andrew.smirnov@gmail.com>
+Message-ID: <20170207155027.7734-2-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, everyone:
+Cc: yurovsky at gmail.com
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
 
-This is a fourth iteration of the code that adds PCI-subsystem bits
-necessary for enabling PCI support on i.MX7.
+Acked-by: Lucas Stach <l.stach@pengutronix.de>
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ drivers/pci/host/pci-imx6.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Changes since v3 (can be found at [version3]):
-	- Move all of the reset_control_assert's into imx6_pcie_assert_core_reset
-	- Documented required reset and power domain DT bindings
-
-Changes since v2 (can be found at [version2]):
-
-	- Collected Reviewed-by for patch #2 from Lucas
-	- Reset logic implementation moved out into a reset controller
-          driver (see [reset1])
-	- Removed unused leftover code
-
-Changes since v1 (can be found at [version1]):
-
-	- All GPC related code moved into a separate driver (see [gpc1])
-	- Removed GPIO probe deferral logging
-	- Fixed section mismatch warning
-	- Minor reformatting of fsl,imx6q-pcie.txt(as per Rob
-          Herring's request)
-
-[version3] https://lkml.org/lkml/2017/2/6/565
-[version2] https://lkml.org/lkml/2017/2/1/510
-[version1] https://lkml.org/lkml/2017/1/19/488
-[gpc1] https://lkml.org/lkml/2017/2/6/551
-[reset1] https://lkml.org/lkml/2017/2/6/554
-
-Andrey Smirnov (3):
-  PCI: imx6: Fix a typo in error message
-  PCI: imx6: Allow probe deferal by reset GPIO
-  PCI: imx6: Add code to support i.MX7D
-
- .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 +-
- drivers/pci/host/pci-imx6.c                        | 131 ++++++++++++++++-----
- include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
- 3 files changed, 118 insertions(+), 30 deletions(-)
-
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index c8cefb0..50a1291 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -678,8 +678,7 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 		imx6_pcie->pcie_inbound_axi = devm_clk_get(dev,
+ 							   "pcie_inbound_axi");
+ 		if (IS_ERR(imx6_pcie->pcie_inbound_axi)) {
+-			dev_err(dev,
+-				"pcie_incbound_axi clock missing or invalid\n");
++			dev_err(dev, "pcie_inbound_axi clock missing or invalid\n");
+ 			return PTR_ERR(imx6_pcie->pcie_inbound_axi);
+ 		}
+ 	}
 -- 
 2.9.3
