@@ -1,146 +1,60 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 08 Feb 2017 01:04:18 +0200
-Subject: [PATCH v3 13/24] platform: add video-multiplexer subdevice driver
-In-Reply-To: <20170207133648.GA27065@ti.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <3823958.XNLmIv7GEv@avalon> <20170207133648.GA27065@ti.com>
-Message-ID: <1629314.nX3p8IZEp0@avalon>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 7 Feb 2017 15:09:16 -0800
+Subject: [PATCH v2] somedriver: remove the initialization of static
+ pointers.
+In-Reply-To: <1486504570-5811-1-git-send-email-abdallah.meziti.pro@gmail.com>
+References: <1486504570-5811-1-git-send-email-abdallah.meziti.pro@gmail.com>
+Message-ID: <b66303e8-7a25-6bc9-ba73-62dc8250c277@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On 02/07/2017 01:55 PM, AbdAllah-MEZITI wrote:
+> In C a static pointer will be initialized to NULL.
+> The ?6.7.8 of the ISO/IEC 9899:1999 (E) document says that:
+> If an object that has static storage duration is not initialized
+> explicitly, then:
+>  __ if it has pointer type, it is initialized to a null pointer.
 
-On Tuesday 07 Feb 2017 07:36:48 Benoit Parrot wrote:
-> Laurent Pinchart wrote on Tue [2017-Feb-07 12:26:32 +0200]:
-> > On Monday 06 Feb 2017 15:10:46 Steve Longerbeam wrote:
-> >> On 02/06/2017 02:33 PM, Laurent Pinchart wrote:
-> >>> On Monday 06 Feb 2017 10:50:22 Hans Verkuil wrote:
-> >>>> On 02/05/2017 04:48 PM, Laurent Pinchart wrote:
-> >>>>> On Tuesday 24 Jan 2017 18:07:55 Steve Longerbeam wrote:
-> >>>>>> On 01/24/2017 04:02 AM, Philipp Zabel wrote:
-> >>>>>>> On Fri, 2017-01-20 at 15:03 +0100, Hans Verkuil wrote:
-> >>>>>>>>> +
-> >>>>>>>>> +int vidsw_g_mbus_config(struct v4l2_subdev *sd, struct
-> >>>>>>>>> v4l2_mbus_config *cfg)
-> > 
-> > [snip]
-> > 
-> >>>>>>>> I am not certain this op is needed at all. In the current kernel
-> >>>>>>>> this op is only used by soc_camera, pxa_camera and omap3isp
-> >>>>>>>> (somewhat dubious). Normally this information should come from the
-> >>>>>>>> device tree and there should be no need for this op.
-> >>>>>>>> 
-> >>>>>>>> My (tentative) long-term plan was to get rid of this op.
-> >>>>>>>> 
-> >>>>>>>> If you don't need it, then I recommend it is removed.
-> >>>>>> 
-> >>>>>> Hi Hans, the imx-media driver was only calling g_mbus_config to the
-> >>>>>> camera sensor, and it was doing that to determine the sensor's bus
-> >>>>>> type. This info was already available from parsing a
-> >>>>>> v4l2_of_endpoint from the sensor node. So it was simple to remove the
-> >>>>>> g_mbus_config calls, and instead rely on the parsed sensor
-> >>>>>> v4l2_of_endpoint.
-> >>>>> 
-> >>>>> That's not a good point.
-> >>> 
-> >>> (mea culpa, s/point/idea/)
-> >>> 
-> >>>>> The imx-media driver must not parse the sensor DT node as it is not
-> >>>>> aware of what bindings the sensor is compatible with.
-> >> 
-> >> Hi Laurent,
-> >> 
-> >> I don't really understand this argument. The sensor node has been found
-> >> by parsing the OF graph, so it is known to be a camera sensor node at
-> >> that point.
-> > 
-> > All you know in the i.MX6 driver is that the remote node is a video
-> > source. You can rely on the fact that it implements the OF graph bindings
-> > to locate other ports in that DT node, but that's more or less it.
-> > 
-> > DT properties are defined by DT bindings and thus qualified by a
-> > compatible string. Unless you match on sensor compat strings in the i.MX6
-> > driver (which you shouldn't do, to keep the driver generic) you can't know
-> > for certain how to parse the sensor node DT properties. For all you know,
-> > the video source could be a bridge such as an HDMI to CSI-2 converter for
-> > instance, so you can't even rely on the fact that it's a sensor.
-> > 
-> >>>>> Information must instead be queried from the sensor subdev at
-> >>>>> runtime, through the g_mbus_config() operation.
-> >>>>> 
-> >>>>> Of course, if you can get the information from the imx-media DT
-> >>>>> node, that's certainly an option. It's only information provided by
-> >>>>> the sensor driver that you have no choice but query using a subdev
-> >>>>> operation.
-> >>>> 
-> >>>> Shouldn't this come from the imx-media DT node? BTW, why is omap3isp
-> >>>> using this?
-> >>> 
-> >>> It all depends on what type of information needs to be retrieved, and
-> >>> whether it can change at runtime or is fixed. Adding properties to the
-> >>> imx-media DT node is certainly fine as long as those properties
-> >>> describe the i.MX side.
-> >> 
-> >> In this case the info needed is the media bus type. That info is most
-> >> easily available by calling v4l2_of_parse_endpoint() on the sensor's
-> >> endpoint node.
-> > 
-> > I haven't had time to check the code in details yet, so I can't really
-> > comment on what you need and how it should be implemented exactly.
-> > 
-> >> The media bus type is not something that can be added to the
-> >> imx-media node since it contains no endpoint nodes.
-> > 
-> > Agreed. You have endpoints in the CSI nodes though.
-> > 
-> >>> In the omap3isp case, we use the operation to query whether parallel
-> >>> data contains embedded sync (BT.656) or uses separate h/v sync signals.
-> >>> 
-> >>>> The reason I am suspicious about this op is that it came from
-> >>>> soc-camera and predates the DT. The contents of v4l2_mbus_config seems
-> >>>> very much like a HW description to me, i.e. something that belongs in
-> >>>> the DT.
-> >>> 
-> >>> Part of it is possibly outdated, but for buses that support multiple
-> >>> modes of operation (such as the parallel bus case described above) we
-> >>> need to make that information discoverable at runtime. Maybe this should
-> >>> be considered as related to Sakari's efforts to support VC/DT for CSI-2,
-> >>> and supported through the API he is working on.
-> >> 
-> >> That sounds interesting, can you point me to some info on this effort?
-> > 
-> > Sure.
-> > 
-> > http://git.retiisi.org.uk/?p=~sailus/linux.git;a=shortlog;h=refs/heads/vc
-> > 
-> >> I've been thinking the DT should contain virtual channel info for CSI-2
-> >> buses.
-> > 
-> > I don't think it should. CSI-2 virtual channels and data types should be
-> > handled as a software concept, and thus supported through driver code
-> > without involving DT.
+The commit subject should be based on previous submissions, if you do a
+git log --oneline drivers/staging/bcm2835-audio/bcm2835.c you will see
+that the most frequent subject used was:
+
+Staging: bcm2835-audio:
+
+So you should utilize the same subject prefix, and make your prefix be
+something like:
+
+Staging: bcm2835-audio: Remove the initialization of static pointers
+
 > 
-> Laurent,
+> Signed-off-by: AbdAllah-MEZITI <abdallah.meziti.pro@gmail.com>
 > 
-> So when you have a CSI2 port aggregator for instance where traffic from up
-> to 4 CSI2 sources where each source is now assigned its own VC by the
-> aggregator and interleaved into a single CSI2 Receiver. I was hoping that
-> in this case the VC would be DT discoverable as a specicic source
-> identifier. So the CSI-RX side could associate a specific source and create
-> its own video device.
+> v2: -fix the line-wrapping of the changelog.
+>     -fix the ref. documentation: C99 standards release,
+> 	and not the draft.
+>     -this patch is the Task 10 Eudyptula Challenge
+> 	that only fix one code style problem.
+> ---
+>  drivers/staging/bcm2835-audio/bcm2835.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/staging/bcm2835-audio/bcm2835.c b/drivers/staging/bcm2835-audio/bcm2835.c
+> index a84d74d..265fe55 100644
+> --- a/drivers/staging/bcm2835-audio/bcm2835.c
+> +++ b/drivers/staging/bcm2835-audio/bcm2835.c
+> @@ -28,8 +28,8 @@
+>   * to debug if we run into issues
+>   */
+>  
+> -static struct snd_card *g_card = NULL;
+> -static struct bcm2835_chip *g_chip = NULL;
+> +static struct snd_card *g_card;
+> +static struct bcm2835_chip *g_chip;
+>  
+>  static int snd_bcm2835_free(struct bcm2835_chip *chip)
+>  {
+> 
 
-In this specific example, I believe the aggregator should be modelled with 4 
-input ports and one output port in DT, and with 4 sink pads and one source pad 
-in MC. Information about the VCs multiplexed over the aggregator's source link 
-should not be part of the device tree, but should be discoverable at runtime 
-through V4L2 subdev operations. This would include information about how the 4 
-input streams are routed to VCs inside the aggregator.
-
-> I am guessing that no such thing exist today?
-
-There's very little (to not say nothing) in terms of VC support in V4L2 today.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Florian
