@@ -1,49 +1,123 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 6 Feb 2017 21:35:38 -0800
-Subject: [PATCH 1/2] arm: dts: qcom: msm8974: Add RPMCC DT node
-In-Reply-To: <20170203183614.28135-1-georgi.djakov@linaro.org>
-References: <20170203183614.28135-1-georgi.djakov@linaro.org>
-Message-ID: <20170207053538.GE27837@minitux>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Tue, 7 Feb 2017 11:32:23 +0530
+Subject: [PATCH 5/6] dmaengine: Add Broadcom SBA RAID driver
+In-Reply-To: <20170206165400.GD19244@localhost>
+References: <1486010836-25228-1-git-send-email-anup.patel@broadcom.com>
+ <1486010836-25228-6-git-send-email-anup.patel@broadcom.com>
+ <20170205060657.GV19244@localhost>
+ <CAALAos9FxwKuF+qtqViybZ8APZNYt-PWLnTfJs64xtoyYB5NZQ@mail.gmail.com>
+ <20170206165400.GD19244@localhost>
+Message-ID: <CAALAos8W13Xcxw+VpkvJWNNEiO6_6Hri0EheASHqOzCKagDYzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 03 Feb 10:36 PST 2017, Georgi Djakov wrote:
+On Mon, Feb 6, 2017 at 10:24 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Mon, Feb 06, 2017 at 05:31:15PM +0530, Anup Patel wrote:
+>
+>> >> +
+>> >> +/* SBA C_MDATA helper macros */
+>> >> +#define SBA_C_MDATA_LOAD_VAL(__bnum0)                ((__bnum0) & 0x3)
+>> >> +#define SBA_C_MDATA_WRITE_VAL(__bnum0)               ((__bnum0) & 0x3)
+>> >> +#define SBA_C_MDATA_XOR_VAL(__bnum1, __bnum0)                        \
+>> >> +                     ({      u32 __v = ((__bnum0) & 0x3);    \
+>> >> +                             __v |= ((__bnum1) & 0x3) << 2;  \
+>> >> +                             __v;                            \
+>> >> +                     })
+>> >> +#define SBA_C_MDATA_PQ_VAL(__dnum, __bnum1, __bnum0)         \
+>> >> +                     ({      u32 __v = ((__bnum0) & 0x3);    \
+>> >> +                             __v |= ((__bnum1) & 0x3) << 2;  \
+>> >> +                             __v |= ((__dnum) & 0x1f) << 5;  \
+>> >> +                             __v;                            \
+>> >> +                     })
+>> >
+>> > ah why are we usig complex macros, why can't these be simple functions..
+>>
+>> "static inline functions" seemed too complicated here because most of
+>> these macros are two lines of c-code.
+>
+> and thats where I have an issue with this. Macros for simple things is fine
+> but not for couple of line of logic!
+>
+>>
+>> Do you still insist on using "static inline functions"?
+>
+> Yes
 
-> Add the RPM Clock Controller DT node for msm8974-based platforms, so that
-> drivers can use the clocks provided by the RPM processor.
-> 
-> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+Sure, will use "static inline functions" instead these macros.
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+>
+>>
+>> >
+>> >> +#define SBA_C_MDATA_LS(__c_mdata_val)        ((__c_mdata_val) & 0xff)
+>> >> +#define SBA_C_MDATA_MS(__c_mdata_val)        (((__c_mdata_val) >> 8) & 0x3)
+>> >> +
+>> >> +/* Driver helper macros */
+>> >> +#define to_sba_request(tx)           \
+>> >> +     container_of(tx, struct sba_request, tx)
+>> >> +#define to_sba_device(dchan)         \
+>> >> +     container_of(dchan, struct sba_device, dma_chan)
+>> >> +
+>> >> +enum sba_request_state {
+>> >> +     SBA_REQUEST_STATE_FREE = 1,
+>> >> +     SBA_REQUEST_STATE_ALLOCED = 2,
+>> >> +     SBA_REQUEST_STATE_PENDING = 3,
+>> >> +     SBA_REQUEST_STATE_ACTIVE = 4,
+>> >> +     SBA_REQUEST_STATE_COMPLETED = 5,
+>> >> +     SBA_REQUEST_STATE_ABORTED = 6,
+>> >
+>> > whats up with a very funny indentation setting, we use 8 chars.
+>> >
+>> > Please re-read the Documentation/process/coding-style.rst
+>>
+>> I have double checked this enum. The indentation is fine
+>> and as-per coding style. Am I missing anything else?
+>
+> Somehow the initial indent doesnt seem to be 8 chars to me.
+>
+>> >> +static enum dma_status sba_tx_status(struct dma_chan *dchan,
+>> >> +                                  dma_cookie_t cookie,
+>> >> +                                  struct dma_tx_state *txstate)
+>> >> +{
+>> >> +     int mchan_idx;
+>> >> +     enum dma_status ret;
+>> >> +     struct sba_device *sba = to_sba_device(dchan);
+>> >> +
+>> >> +     ret = dma_cookie_status(dchan, cookie, txstate);
+>> >> +     if (ret == DMA_COMPLETE)
+>> >> +             return ret;
+>> >> +
+>> >> +     for (mchan_idx = 0; mchan_idx < sba->mchans_count; mchan_idx++)
+>> >> +             mbox_client_peek_data(sba->mchans[mchan_idx]);
+>> >
+>> > what is this achieving?
+>>
+>> The mbox_client_peek_data() is a hint to mailbox controller driver
+>> to check for available messages.
+>>
+>> This gives good performance improvement when some DMA client
+>> code is polling using tx_status() callback.
+>
+> Then why do it before and then check status.
+
+If there was a work completed when mbox_client_peek_data()
+is called then sba_receive_message() will be called immediately
+by mailbox controller driver.
+
+We are doing dma_cookie_complete() in sba_receive_message()
+so if mbox_client_peek_data() is called before dma_cookie_status()
+then dma_cookie_status() will see correct state of cookie.
+
+Also, I explored virt-dma APIs for BCM-SBA-RAID driver. The virt-dma
+implements tasklet based bottom-half for each virt-dma-channel. This
+bottom-half is not required for BCM-FS4-RAID driver because its a
+mailbox client driver and the mailbox controller driver already implements
+bottom-half for each mailbox channel.
+
+If we still go ahead and use virt-dma in BCM-FS4-RAID driver then we
+will have two bottom-halfs in-action one in mailbox controller driver and
+another in BCM-FS4-RAID driver which in-turn will add bottom-half
+scheduling overhead thereby reducing performance of BCM-FS4-RAID
+driver.
 
 Regards,
-Bjorn
-
-> ---
->  arch/arm/boot/dts/qcom-msm8974.dtsi | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> index d3e1a61b8671..4b4c61e2ee35 100644
-> --- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-> +++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-> @@ -2,6 +2,7 @@
->  
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/clock/qcom,gcc-msm8974.h>
-> +#include <dt-bindings/clock/qcom,rpmcc.h>
->  #include <dt-bindings/gpio/gpio.h>
->  #include <dt-bindings/reset/qcom,gcc-msm8974.h>
->  #include "skeleton.dtsi"
-> @@ -760,6 +761,11 @@
->  				compatible = "qcom,rpm-msm8974";
->  				qcom,smd-channels = "rpm_requests";
->  
-> +				rpmcc: clock-controller {
-> +					compatible = "qcom,rpmcc-msm8974", "qcom,rpmcc";
-> +					#clock-cells = <1>;
-> +				};
-> +
->  				pm8841-regulators {
->  					compatible = "qcom,rpm-pm8841-regulators";
->  
+Anup
