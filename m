@@ -1,54 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 7 Feb 2017 22:21:16 +0100
-Subject: [PATCH] ARM: ux500: cut some platform data
-In-Reply-To: <CAOesGMidfUAomiTzStaby6TUDE0rhbQcC1P8v3UHaMVnG9FrXA@mail.gmail.com>
-References: <20170131210832.3377-1-linus.walleij@linaro.org>
- <2080077.OMxztrf17j@wuerfel>
- <CAOesGMidfUAomiTzStaby6TUDE0rhbQcC1P8v3UHaMVnG9FrXA@mail.gmail.com>
-Message-ID: <CACRpkdZMKP0XAZTXKcQGCOHRS+8Qmd4O=YWojhvTcZSibAWcAw@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 7 Feb 2017 13:25:53 -0800
+Subject: [RFC][PATCH] treewide: Move set_memory_* functions away from
+ cacheflush.h
+In-Reply-To: <1486501816-27600-1-git-send-email-labbott@redhat.com>
+References: <1486501816-27600-1-git-send-email-labbott@redhat.com>
+Message-ID: <CAGXu5j+BGgs747D2cCW_is2z8QPA2crduE4SDDmu8tmxQ4Zh8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 7, 2017 at 8:21 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Tue, Feb 7, 2017 at 7:01 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Tuesday, January 31, 2017 10:08:32 PM CET Linus Walleij wrote:
->>> This platform data is revoked: the drivers are getting the DMA
->>> configuration from the device tree, it has been done like that
->>> since the DMA support was merged and this data has not been used
->>> since. The remaining auxdata is also unused.
->>>
->>> Acked-by: Arnd Bergmann <arnd@arndb.de>
->>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->>> ---
->>> ARM SoC folks: please apply this directly to the ux500/dev branch,
->>> or if you want some separate cleanup branch. I originally
->>> intended to send it along with other changes but those will land
->>> in v4.12 or something instead.
->>> ---
->>>  arch/arm/mach-ux500/board-mop500-audio.c | 77 -----------------------------
->>>  arch/arm/mach-ux500/board-mop500.h       | 17 -------
->>>  arch/arm/mach-ux500/cpu-db8500.c         | 16 ------
->>>  arch/arm/mach-ux500/ste-dma40-db8500.h   | 85 --------------------------------
->>>  4 files changed, 195 deletions(-)
->>>  delete mode 100644 arch/arm/mach-ux500/board-mop500-audio.c
->>>  delete mode 100644 arch/arm/mach-ux500/board-mop500.h
->>>  delete mode 100644 arch/arm/mach-ux500/ste-dma40-db8500.h
->>
->> Applied to next/soc, thanks!
+On Tue, Feb 7, 2017 at 1:10 PM, Laura Abbott <labbott@redhat.com> wrote:
+> The set_memory_* APIs came out of a desire to have a better way to
+> change memory attributes. Many of these attributes were linked to cache
+> functionality so the prototypes were put in cacheflush.h. These days,
+> the APIs have grown and have a much wider use than just cache APIs. To
+> support this growth, split off set_memory_* and friends into a separate
+> header file to avoid growing cacheflush.h for APIs that have nothing to
+> do with caches.
 >
-> Linus,
->
-> Looks like you missed to update the Makefile:
-> http://arm-soc.lixom.net/buildlogs/arm-soc/v4.10-rc5-794-gf8777f3/buildall.arm.allmodconfig.log.failed
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> This came out of a comment Russell made while reviewing RODATA test cases
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/480855.html
+> While the final result of that series was the rodata code was refactored into
+> its own header file, the set_memory_* APIs are still out of place.
 
-Ah, it's one of those missed by a dirty work tree.
+Yeah, this is a nice clean up to start on.
 
-I pushed it to kernelorg but apparently the autobuild isn't on
-in this tree...
+> This is a simple attempt at moving all the API stubs to their own file.
+> Another idea I had was throwing set_memory_{x,nx,ro,rw} in an asm-generic
+> file since those are commonly used for module setting across all arches.
 
-> I'll fix up in our tree, no need to send a patch.
+It seems like asm-generic would be cleaner, yes? Only a few archs have
+anything "special" happening in the resulting header files.
 
-Thanks a lot!
+-Kees
 
-Yours,
-Linus Walleij
+-- 
+Kees Cook
+Pixel Security
