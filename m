@@ -1,242 +1,146 @@
-From: abelvesa@linux.com (Abel Vesa)
-Date: Tue,  7 Feb 2017 22:57:55 +0000
-Subject: [PATCHv3] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-Message-ID: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 08 Feb 2017 01:04:18 +0200
+Subject: [PATCH v3 13/24] platform: add video-multiplexer subdevice driver
+In-Reply-To: <20170207133648.GA27065@ti.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <3823958.XNLmIv7GEv@avalon> <20170207133648.GA27065@ti.com>
+Message-ID: <1629314.nX3p8IZEp0@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DYNAMIC_FTRACE_WITH_REGS configuration makes it possible for a ftrace
-operation to specify if registers need to saved/restored by the ftrace handler.
-This is needed by kgraft and possibly other ftrace-based tools, and the ARM
-architecture is currently lacking this feature. It would also be the first step
-to support the "Kprobes-on-ftrace" optimization on ARM.
+Hi Benoit,
 
-This patch introduces a new ftrace handler that stores the registers on the
-stack before calling the next stage. The registers are restored from the stack
-before going back to the instrumented function.
+On Tuesday 07 Feb 2017 07:36:48 Benoit Parrot wrote:
+> Laurent Pinchart wrote on Tue [2017-Feb-07 12:26:32 +0200]:
+> > On Monday 06 Feb 2017 15:10:46 Steve Longerbeam wrote:
+> >> On 02/06/2017 02:33 PM, Laurent Pinchart wrote:
+> >>> On Monday 06 Feb 2017 10:50:22 Hans Verkuil wrote:
+> >>>> On 02/05/2017 04:48 PM, Laurent Pinchart wrote:
+> >>>>> On Tuesday 24 Jan 2017 18:07:55 Steve Longerbeam wrote:
+> >>>>>> On 01/24/2017 04:02 AM, Philipp Zabel wrote:
+> >>>>>>> On Fri, 2017-01-20 at 15:03 +0100, Hans Verkuil wrote:
+> >>>>>>>>> +
+> >>>>>>>>> +int vidsw_g_mbus_config(struct v4l2_subdev *sd, struct
+> >>>>>>>>> v4l2_mbus_config *cfg)
+> > 
+> > [snip]
+> > 
+> >>>>>>>> I am not certain this op is needed at all. In the current kernel
+> >>>>>>>> this op is only used by soc_camera, pxa_camera and omap3isp
+> >>>>>>>> (somewhat dubious). Normally this information should come from the
+> >>>>>>>> device tree and there should be no need for this op.
+> >>>>>>>> 
+> >>>>>>>> My (tentative) long-term plan was to get rid of this op.
+> >>>>>>>> 
+> >>>>>>>> If you don't need it, then I recommend it is removed.
+> >>>>>> 
+> >>>>>> Hi Hans, the imx-media driver was only calling g_mbus_config to the
+> >>>>>> camera sensor, and it was doing that to determine the sensor's bus
+> >>>>>> type. This info was already available from parsing a
+> >>>>>> v4l2_of_endpoint from the sensor node. So it was simple to remove the
+> >>>>>> g_mbus_config calls, and instead rely on the parsed sensor
+> >>>>>> v4l2_of_endpoint.
+> >>>>> 
+> >>>>> That's not a good point.
+> >>> 
+> >>> (mea culpa, s/point/idea/)
+> >>> 
+> >>>>> The imx-media driver must not parse the sensor DT node as it is not
+> >>>>> aware of what bindings the sensor is compatible with.
+> >> 
+> >> Hi Laurent,
+> >> 
+> >> I don't really understand this argument. The sensor node has been found
+> >> by parsing the OF graph, so it is known to be a camera sensor node at
+> >> that point.
+> > 
+> > All you know in the i.MX6 driver is that the remote node is a video
+> > source. You can rely on the fact that it implements the OF graph bindings
+> > to locate other ports in that DT node, but that's more or less it.
+> > 
+> > DT properties are defined by DT bindings and thus qualified by a
+> > compatible string. Unless you match on sensor compat strings in the i.MX6
+> > driver (which you shouldn't do, to keep the driver generic) you can't know
+> > for certain how to parse the sensor node DT properties. For all you know,
+> > the video source could be a bridge such as an HDMI to CSI-2 converter for
+> > instance, so you can't even rely on the fact that it's a sensor.
+> > 
+> >>>>> Information must instead be queried from the sensor subdev at
+> >>>>> runtime, through the g_mbus_config() operation.
+> >>>>> 
+> >>>>> Of course, if you can get the information from the imx-media DT
+> >>>>> node, that's certainly an option. It's only information provided by
+> >>>>> the sensor driver that you have no choice but query using a subdev
+> >>>>> operation.
+> >>>> 
+> >>>> Shouldn't this come from the imx-media DT node? BTW, why is omap3isp
+> >>>> using this?
+> >>> 
+> >>> It all depends on what type of information needs to be retrieved, and
+> >>> whether it can change at runtime or is fixed. Adding properties to the
+> >>> imx-media DT node is certainly fine as long as those properties
+> >>> describe the i.MX side.
+> >> 
+> >> In this case the info needed is the media bus type. That info is most
+> >> easily available by calling v4l2_of_parse_endpoint() on the sensor's
+> >> endpoint node.
+> > 
+> > I haven't had time to check the code in details yet, so I can't really
+> > comment on what you need and how it should be implemented exactly.
+> > 
+> >> The media bus type is not something that can be added to the
+> >> imx-media node since it contains no endpoint nodes.
+> > 
+> > Agreed. You have endpoints in the CSI nodes though.
+> > 
+> >>> In the omap3isp case, we use the operation to query whether parallel
+> >>> data contains embedded sync (BT.656) or uses separate h/v sync signals.
+> >>> 
+> >>>> The reason I am suspicious about this op is that it came from
+> >>>> soc-camera and predates the DT. The contents of v4l2_mbus_config seems
+> >>>> very much like a HW description to me, i.e. something that belongs in
+> >>>> the DT.
+> >>> 
+> >>> Part of it is possibly outdated, but for buses that support multiple
+> >>> modes of operation (such as the parallel bus case described above) we
+> >>> need to make that information discoverable at runtime. Maybe this should
+> >>> be considered as related to Sakari's efforts to support VC/DT for CSI-2,
+> >>> and supported through the API he is working on.
+> >> 
+> >> That sounds interesting, can you point me to some info on this effort?
+> > 
+> > Sure.
+> > 
+> > http://git.retiisi.org.uk/?p=~sailus/linux.git;a=shortlog;h=refs/heads/vc
+> > 
+> >> I've been thinking the DT should contain virtual channel info for CSI-2
+> >> buses.
+> > 
+> > I don't think it should. CSI-2 virtual channels and data types should be
+> > handled as a software concept, and thus supported through driver code
+> > without involving DT.
+> 
+> Laurent,
+> 
+> So when you have a CSI2 port aggregator for instance where traffic from up
+> to 4 CSI2 sources where each source is now assigned its own VC by the
+> aggregator and interleaved into a single CSI2 Receiver. I was hoping that
+> in this case the VC would be DT discoverable as a specicic source
+> identifier. So the CSI-RX side could associate a specific source and create
+> its own video device.
 
-A side-effect of this patch is to activate the support for ftrace_modify_call()
-as it defines ARCH_SUPPORTS_FTRACE_OPS for the ARM architecture.
+In this specific example, I believe the aggregator should be modelled with 4 
+input ports and one output port in DT, and with 4 sink pads and one source pad 
+in MC. Information about the VCs multiplexed over the aggregator's source link 
+should not be part of the device tree, but should be discoverable at runtime 
+through V4L2 subdev operations. This would include information about how the 4 
+input streams are routed to VCs inside the aggregator.
 
-Signed-off-by: Abel Vesa <abelvesa@linux.com>
----
- arch/arm/Kconfig               |  1 +
- arch/arm/include/asm/ftrace.h  |  4 +++
- arch/arm/kernel/entry-ftrace.S | 79 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/ftrace.c       | 37 ++++++++++++++++++++
- 4 files changed, 121 insertions(+)
+> I am guessing that no such thing exist today?
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 186c4c2..df401f4 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -50,6 +50,7 @@ config ARM
- 	select HAVE_DMA_API_DEBUG
- 	select HAVE_DMA_CONTIGUOUS if MMU
- 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
-+	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE && OLD_MCOUNT
- 	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
- 	select HAVE_EXIT_THREAD
- 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
-diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-index 22b7311..f379881 100644
---- a/arch/arm/include/asm/ftrace.h
-+++ b/arch/arm/include/asm/ftrace.h
-@@ -1,6 +1,10 @@
- #ifndef _ASM_ARM_FTRACE
- #define _ASM_ARM_FTRACE
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+#define ARCH_SUPPORTS_FTRACE_OPS 1
-+#endif
-+
- #ifdef CONFIG_FUNCTION_TRACER
- #define MCOUNT_ADDR		((unsigned long)(__gnu_mcount_nc))
- #define MCOUNT_INSN_SIZE	4 /* sizeof mcount call */
-diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
-index c73c403..b1fee6c 100644
---- a/arch/arm/kernel/entry-ftrace.S
-+++ b/arch/arm/kernel/entry-ftrace.S
-@@ -92,12 +92,74 @@
- 2:	mcount_exit
- .endm
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+
-+.macro __ftrace_regs_caller
-+
-+	add 	ip, sp, #4	@ move in IP the value of SP as it was
-+				@ before the push {lr} of the mcount mechanism
-+	stmdb	sp!, {ip,lr,pc}
-+	stmdb	sp!, {r0-r11,lr}
-+
-+	@ stack content at this point:
-+	@ 0  4          44    48   52       56   60   64
-+	@ R0 | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |
-+
-+	mov r3, sp				@ struct pt_regs*
-+	ldr r2, =function_trace_op
-+	ldr r2, [r2]				@ pointer to the current
-+						@ function tracing op
-+	ldr	r1, [sp, #64]			@ lr of instrumented func
-+	mcount_adjust_addr	r0, lr		@ instrumented function
-+
-+	.globl ftrace_regs_call
-+ftrace_regs_call:
-+	bl	ftrace_stub
-+
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	.globl ftrace_graph_regs_call
-+ftrace_graph_regs_call:
-+	mov	r0, r0
-+#endif
-+	@ pop saved regs
-+	ldr	lr, [sp, #64]			@ get the previous LR value from stack
-+	ldmia   sp, {r0-r11, ip, sp, pc}	@ pop the saved registers INCLUDING
-+						@ the stack pointer
-+.endm
-+
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+.macro __ftrace_graph_regs_caller
-+
-+	sub	r0, fp, #4		@ lr of instrumented routine (parent)
-+
-+	@ called from __ftrace_regs_caller
-+	ldr     r1, [sp, #56]		@ instrumented routine (func)
-+	mcount_adjust_addr	r1, r1
-+
-+	sub	r2, r0, #4		@ frame pointer
-+	bl	prepare_ftrace_return
-+
-+	@ pop regs saved in ftrace_regs_caller
-+	ldr	lr, [sp, #64]			@ restore lr from the stack
-+	ldmia   sp, {r0-r11, ip, sp, pc}	@ restore r0 through pc
-+
-+.endm
-+#endif
-+#endif
-+
- .macro __ftrace_caller suffix
- 	mcount_enter
- 
- 	mcount_get_lr	r1			@ lr of instrumented func
- 	mcount_adjust_addr	r0, lr		@ instrumented function
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+	ldr r2, =function_trace_op
-+	ldr r2, [r2]				@ pointer to the current
-+						@ function tracing op
-+	mov r3, #0				@ regs is NULL
-+#endif
-+
- 	.globl ftrace_call\suffix
- ftrace_call\suffix:
- 	bl	ftrace_stub
-@@ -212,6 +274,15 @@ UNWIND(.fnstart)
- 	__ftrace_caller
- UNWIND(.fnend)
- ENDPROC(ftrace_caller)
-+
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+ENTRY(ftrace_regs_caller)
-+UNWIND(.fnstart)
-+	__ftrace_regs_caller
-+UNWIND(.fnend)
-+ENDPROC(ftrace_regs_caller)
-+#endif
-+
- #endif
- 
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
-@@ -220,6 +291,14 @@ UNWIND(.fnstart)
- 	__ftrace_graph_caller
- UNWIND(.fnend)
- ENDPROC(ftrace_graph_caller)
-+
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+ENTRY(ftrace_graph_regs_caller)
-+UNWIND(.fnstart)
-+	__ftrace_graph_regs_caller
-+UNWIND(.fnend)
-+ENDPROC(ftrace_graph_regs_caller)
-+#endif
- #endif
- 
- .purgem mcount_enter
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index 3f17594..cb0358c 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -139,6 +139,15 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
- 
- 	ret = ftrace_modify_code(pc, 0, new, false);
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+	if (!ret) {
-+		pc = (unsigned long)&ftrace_regs_call;
-+		new = ftrace_call_replace(pc, (unsigned long)func);
-+
-+		ret = ftrace_modify_code(pc, 0, new, false);
-+	}
-+#endif
-+
- #ifdef CONFIG_OLD_MCOUNT
- 	if (!ret) {
- 		pc = (unsigned long)&ftrace_call_old;
-@@ -157,11 +166,29 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- 	unsigned long ip = rec->ip;
- 
- 	old = ftrace_nop_replace(rec);
-+
-+	new = ftrace_call_replace(ip, adjust_address(rec, addr));
-+
-+	return ftrace_modify_code(rec->ip, old, new, true);
-+}
-+
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+
-+int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
-+				unsigned long addr)
-+{
-+	unsigned long new, old;
-+	unsigned long ip = rec->ip;
-+
-+	old = ftrace_call_replace(ip, adjust_address(rec, old_addr));
-+
- 	new = ftrace_call_replace(ip, adjust_address(rec, addr));
- 
- 	return ftrace_modify_code(rec->ip, old, new, true);
- }
- 
-+#endif
-+
- int ftrace_make_nop(struct module *mod,
- 		    struct dyn_ftrace *rec, unsigned long addr)
- {
-@@ -229,6 +256,8 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
- extern unsigned long ftrace_graph_call;
- extern unsigned long ftrace_graph_call_old;
- extern void ftrace_graph_caller_old(void);
-+extern unsigned long ftrace_graph_regs_call;
-+extern void ftrace_graph_regs_caller(void);
- 
- static int __ftrace_modify_caller(unsigned long *callsite,
- 				  void (*func) (void), bool enable)
-@@ -251,6 +280,14 @@ static int ftrace_modify_graph_caller(bool enable)
- 				     ftrace_graph_caller,
- 				     enable);
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+	if (!ret)
-+		ret = __ftrace_modify_caller(&ftrace_graph_regs_call,
-+				     ftrace_graph_regs_caller,
-+				     enable);
-+#endif
-+
-+
- #ifdef CONFIG_OLD_MCOUNT
- 	if (!ret)
- 		ret = __ftrace_modify_caller(&ftrace_graph_call_old,
+There's very little (to not say nothing) in terms of VC support in V4L2 today.
+
 -- 
-2.7.4
+Regards,
+
+Laurent Pinchart
