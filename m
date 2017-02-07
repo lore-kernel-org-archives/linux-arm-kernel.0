@@ -1,22 +1,43 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 7 Feb 2017 12:21:43 +0100
-Subject: [PATCH 0/5] arm64: dts: r8a779[56]: EtherAVB Gigabit timing
- enhancements
-In-Reply-To: <1485938524-9322-1-git-send-email-horms+renesas@verge.net.au>
-References: <1485938524-9322-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20170207112143.GA28188@verge.net.au>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Tue, 7 Feb 2017 12:42:11 +0100
+Subject: [PATCHv3 1/2] arch: Move CONFIG_DEBUG_RODATA and
+ CONFIG_SET_MODULE_RONX to be common
+In-Reply-To: <1486427518-14819-2-git-send-email-labbott@redhat.com>
+References: <1486427518-14819-1-git-send-email-labbott@redhat.com>
+ <1486427518-14819-2-git-send-email-labbott@redhat.com>
+Message-ID: <20170207114211.GB4973@osiris>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 09:41:59AM +0100, Simon Horman wrote:
-> Hi,
+On Mon, Feb 06, 2017 at 04:31:57PM -0800, Laura Abbott wrote:
 > 
-> this series tweaks PHY settings to address communications failures reported
-> for 1Gbit communication using EtherAVB. Gigabit is supported for R-Car H3
-> ES1.1+ and M3-W as of commit 0e98f9d5f0b4 ("ravb: Support 1Gbps on R-Car H3
-> ES1.1+ and R-Car M3-W") which is present in net-next and should be included
-> in v4.11.
+> There are multiple architectures that support CONFIG_DEBUG_RODATA and
+> CONFIG_SET_MODULE_RONX. These options also now have the ability to be
+> turned off at runtime. Move these to an architecture independent
+> location and make these options def_bool y for almost all of those
+> arches.
 > 
-> This series is based on renesas-devel-20170130-v4.10-rc6
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> v3: Make these configs selectable for arm. Include some documentation about
+> how the setup of the optional Kconfigs work as well. Stop spelling 'kenrel'
+> in prompt text.
+> ---
+>  Documentation/security/self-protection.txt |  6 ++++++
+>  arch/Kconfig                               | 34 ++++++++++++++++++++++++++++++
+>  arch/arm/Kconfig                           |  4 ++++
+>  arch/arm/Kconfig.debug                     | 11 ----------
+>  arch/arm/mm/Kconfig                        | 12 -----------
+>  arch/arm64/Kconfig                         |  5 ++---
+>  arch/arm64/Kconfig.debug                   | 11 ----------
+>  arch/parisc/Kconfig                        |  1 +
+>  arch/parisc/Kconfig.debug                  | 11 ----------
+>  arch/s390/Kconfig                          |  5 ++---
+>  arch/s390/Kconfig.debug                    |  3 ---
+>  arch/x86/Kconfig                           |  5 ++---
+>  arch/x86/Kconfig.debug                     | 11 ----------
+>  13 files changed, 51 insertions(+), 68 deletions(-)
 
-I have queued up this series for v4.12.
+For the s390 bits:
+
+Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
