@@ -1,21 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Feb 2017 16:11:07 +0100
-Subject: [GIT PULL] Allwinner DT changes for 4.11, part 2
-In-Reply-To: <20170206125041.iswtdtw2v6vfbus4@lukather>
-References: <20170206125041.iswtdtw2v6vfbus4@lukather>
-Message-ID: <CAK8P3a1dgYgGuobse3oYEB3qshpeVOuLU=vjXaTe1huqpFa7mQ@mail.gmail.com>
+Date: Tue, 07 Feb 2017 16:17:11 +0100
+Subject: [GIT PULL] ARM: mvebu: soc for v4.11 (#2)
+In-Reply-To: <87wpdbz58c.fsf@free-electrons.com>
+References: <87wpdbz58c.fsf@free-electrons.com>
+Message-ID: <3577259.LdH4DD5QlE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 6, 2017 at 1:50 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Arnd, Olof,
->
-> Here is a new pull request for our DT patches that comes on top of the
-> previous one.
->
-> I expect it to be our last pull request for the 4.11 merge window.
+On Tuesday, January 31, 2017 3:14:27 PM CET Gregory CLEMENT wrote:
+> 
+> I hope it is not too late, the support for this new SoC needed to have
+> several iteration and the last one was mainly cosmetic. The code was
+> in linux-next since last week by the way. SO I don't expect any
+> regression with it.
+> 
+> 
 
-Pulled along with the first one, thanks!
+Pulled into next/soc, thanks!
 
-     Arnd
+	Arnd
