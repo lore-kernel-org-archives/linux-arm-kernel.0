@@ -1,75 +1,27 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 07 Feb 2017 12:03:06 +0000
-Subject: [PATCH] arm64: kconfig: allow support for memory failure handling
-In-Reply-To: <ec1f1a61-8569-58b8-a78f-972f43a5e8ca@codeaurora.org> (Tyler
- Baicar's message of "Mon, 6 Feb 2017 15:26:37 -0700")
-References: <1485985115-27274-1-git-send-email-tbaicar@codeaurora.org>
- <8737fvqlxs.fsf@e105922-lin.cambridge.arm.com>
- <ec1f1a61-8569-58b8-a78f-972f43a5e8ca@codeaurora.org>
-Message-ID: <87k292yzr9.fsf@e105922-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 7 Feb 2017 12:02:12 +0000
+Subject: [PATCH v2 2/3] dt: ASoC: zx-i2s: Document for the ZTE zx296718
+ I2S controller
+In-Reply-To: <1486436571-8682-2-git-send-email-baoyou.xie@linaro.org>
+References: <1486436571-8682-1-git-send-email-baoyou.xie@linaro.org>
+ <1486436571-8682-2-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170207120212.uggkwhdeep5o2uxb@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Baicar, Tyler" <tbaicar@codeaurora.org> writes:
+On Tue, Feb 07, 2017 at 11:02:50AM +0800, Baoyou Xie wrote:
+> This patch documents the devicetree for the ZTE's zx296718
+> I2S audio controller.
 
-> Hello Punit,
->
->
-> On 2/3/2017 9:27 AM, Punit Agrawal wrote:
->> Tyler Baicar <tbaicar@codeaurora.org> writes:
->>
->>> From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
->>>
->>> If ACPI_APEI and MEMORY_FAILURE is configured, select
->>> ACPI_APEI_MEMORY_FAILURE. This enables memory failure recovery
->>> when such memory failure is reported through ACPI APEI. APEI
->>> (ACPI Platform Error Interfaces) provides a means for the
->>> platform to convey error information to the kernel.
->>>
->>> Declare ARCH_SUPPORTS_MEMORY_FAILURE, as arm64 does support
->>> memory failure recovery attempt.
->>>
->>> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
->>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
->>> ---
->>>   arch/arm64/Kconfig | 2 ++
->>>   1 file changed, 2 insertions(+)
->>>
->>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>> index f92778d..4cd12a0 100644
->>> --- a/arch/arm64/Kconfig
->>> +++ b/arch/arm64/Kconfig
->>> @@ -15,6 +15,8 @@ config ARM64
->>>   	select ARCH_HAS_SG_CHAIN
->>>   	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
->>>   	select ARCH_USE_CMPXCHG_LOCKREF
->>> +	select ACPI_APEI_MEMORY_FAILURE if ACPI_APEI && MEMORY_FAILURE
->>> +	select ARCH_SUPPORTS_MEMORY_FAILURE
->> Although enabling support for memory failure handling makes sense in the
->> architecture config, it feels out of place to select
->> ACPI_APEI_MEMORY_FAILURE here.
->>
->> Maybe key it off of CONFIG_APEI?
-> Yes, I can move it there.
->
-> config ACPI_APEI
->         bool "ACPI Platform Error Interface (APEI)"
->         select MISC_FILESYSTEMS
->         select PSTORE
->         select UEFI_CPER
-> +        select ACPI_APEI_MEMORY_FAILURE if MEMORY_FAILURE
->         depends on HAVE_ACPI_APEI
->
-
-That's what I was suggesting - we'll see what the ACPI maintainers think
-of the change.
-
-> The ARCH_SUPPORTS_MEMORY_FAILURE should remain in arch/arm64/Kconfig
-> though, correct?
-
-Yes, that's right - as that's a feature the architecture is advertising
-support for, it should stay in the arm64 Kconfig,
-
->
-> Thanks,
-> Tyler
+Please submit patches using subject lines reflecting the style for the
+subsystem.  This makes it easier for people to identify relevant
+patches.  Look at what existing commits in the area you're changing are
+doing and make sure your subject lines visually resemble what they're
+doing.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/1a161597/attachment.sig>
