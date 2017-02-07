@@ -1,88 +1,85 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Tue, 7 Feb 2017 08:15:21 -0600
-Subject: [PATCH 01/10] staging: fsl-mc: drop root dprc counting
+Date: Tue, 7 Feb 2017 08:15:25 -0600
+Subject: [PATCH 05/10] staging: fsl-mc: remove slab cache for mc devices
 In-Reply-To: <20170207141530.12979-1-laurentiu.tudor@nxp.com>
 References: <20170207141530.12979-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170207141530.12979-2-laurentiu.tudor@nxp.com>
+Message-ID: <20170207141530.12979-6-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-It was used just to sanity check some obscure
-cases that are unlikely to ever happen.
+Let's drop the slab cache for objects
+until we actually have proof that it improves
+performance. This makes the code cleaner.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/fsl-mc-bus.c | 26 +-------------------------
- 1 file changed, 1 insertion(+), 25 deletions(-)
+ drivers/staging/fsl-mc/bus/fsl-mc-bus.c | 17 +++--------------
+ 1 file changed, 3 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-index 5ac373c..cc20dc4 100644
+index f310687..e607e98 100644
 --- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
 +++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-@@ -77,9 +77,6 @@ static int fsl_mc_bus_match(struct device *dev, struct device_driver *drv)
- 	struct fsl_mc_driver *mc_drv = to_fsl_mc_driver(drv);
- 	bool found = false;
+@@ -27,8 +27,6 @@
+ #include "fsl-mc-private.h"
+ #include "dprc-cmd.h"
  
--	if (WARN_ON(!fsl_mc_bus_exists()))
--		goto out;
+-static struct kmem_cache *mc_dev_cache;
 -
- 	if (!mc_drv->match_id_table)
- 		goto out;
- 
-@@ -149,8 +146,6 @@ struct bus_type fsl_mc_bus_type = {
- };
- EXPORT_SYMBOL_GPL(fsl_mc_bus_type);
- 
--static atomic_t root_dprc_count = ATOMIC_INIT(0);
--
- static int fsl_mc_driver_probe(struct device *dev)
- {
- 	struct fsl_mc_driver *mc_drv;
-@@ -246,15 +241,6 @@ void fsl_mc_driver_unregister(struct fsl_mc_driver *mc_driver)
- EXPORT_SYMBOL_GPL(fsl_mc_driver_unregister);
+ /**
+  * Default DMA mask for devices on a fsl-mc bus
+  */
+@@ -432,7 +430,7 @@ static void fsl_mc_device_release(struct device *dev)
+ 	if (mc_bus)
+ 		kfree(mc_bus);
+ 	else
+-		kmem_cache_free(mc_dev_cache, mc_dev);
++		kfree(mc_dev);
+ }
  
  /**
-- * fsl_mc_bus_exists - check if a root dprc exists
-- */
--bool fsl_mc_bus_exists(void)
--{
--	return atomic_read(&root_dprc_count) > 0;
--}
--EXPORT_SYMBOL_GPL(fsl_mc_bus_exists);
--
--/**
-  * fsl_mc_get_root_dprc - function to traverse to the root dprc
-  */
- void fsl_mc_get_root_dprc(struct device *dev,
-@@ -506,8 +492,6 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
- 			}
+@@ -466,7 +464,7 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
+ 		/*
+ 		 * Allocate a regular fsl_mc_device object:
+ 		 */
+-		mc_dev = kmem_cache_zalloc(mc_dev_cache, GFP_KERNEL);
++		mc_dev = kzalloc(sizeof(*mc_dev), GFP_KERNEL);
+ 		if (!mc_dev)
+ 			return -ENOMEM;
+ 	}
+@@ -564,7 +562,7 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
+ 	if (mc_bus)
+ 		kfree(mc_bus);
+ 	else
+-		kmem_cache_free(mc_dev_cache, mc_dev);
++		kfree(mc_dev);
  
- 			mc_io2 = mc_io;
--
--			atomic_inc(&root_dprc_count);
- 		}
+ 	return error;
+ }
+@@ -823,14 +821,6 @@ static int __init fsl_mc_bus_driver_init(void)
+ {
+ 	int error;
  
- 		error = get_dprc_icid(mc_io2, obj_desc->id, &mc_dev->icid);
-@@ -588,17 +572,9 @@ void fsl_mc_device_remove(struct fsl_mc_device *mc_dev)
- 	device_del(&mc_dev->dev);
- 	put_device(&mc_dev->dev);
- 
--	if (strcmp(mc_dev->obj_desc.type, "dprc") == 0) {
-+	if (strcmp(mc_dev->obj_desc.type, "dprc") == 0)
- 		mc_bus = to_fsl_mc_bus(mc_dev);
- 
--		if (fsl_mc_is_root_dprc(&mc_dev->dev)) {
--			if (atomic_read(&root_dprc_count) > 0)
--				atomic_dec(&root_dprc_count);
--			else
--				WARN_ON(1);
--		}
+-	mc_dev_cache = kmem_cache_create("fsl_mc_device",
+-					 sizeof(struct fsl_mc_device), 0, 0,
+-					 NULL);
+-	if (!mc_dev_cache) {
+-		pr_err("Could not create fsl_mc_device cache\n");
+-		return -ENOMEM;
 -	}
 -
- 	if (mc_bus)
- 		devm_kfree(mc_dev->dev.parent, mc_bus);
- 	else
+ 	error = bus_register(&fsl_mc_bus_type);
+ 	if (error < 0) {
+ 		pr_err("bus type registration failed: %d\n", error);
+@@ -870,7 +860,6 @@ static int __init fsl_mc_bus_driver_init(void)
+ 	bus_unregister(&fsl_mc_bus_type);
+ 
+ error_cleanup_cache:
+-	kmem_cache_destroy(mc_dev_cache);
+ 	return error;
+ }
+ postcore_initcall(fsl_mc_bus_driver_init);
 -- 
 1.8.3.1
