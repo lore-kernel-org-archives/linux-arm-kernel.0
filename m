@@ -1,21 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 07 Feb 2017 16:17:11 +0100
-Subject: [GIT PULL] ARM: mvebu: soc for v4.11 (#2)
-In-Reply-To: <87wpdbz58c.fsf@free-electrons.com>
-References: <87wpdbz58c.fsf@free-electrons.com>
-Message-ID: <3577259.LdH4DD5QlE@wuerfel>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Tue,  7 Feb 2017 15:16:20 +0000
+Subject: [PATCH -next] [media] mtk-vcodec: remove redundant return value check
+ of platform_get_resource()
+Message-ID: <20170207151620.12711-1-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 31, 2017 3:14:27 PM CET Gregory CLEMENT wrote:
-> 
-> I hope it is not too late, the support for this new SoC needed to have
-> several iteration and the last one was mainly cosmetic. The code was
-> in linux-next since last week by the way. SO I don't expect any
-> regression with it.
-> 
-> 
+From: Wei Yongjun <weiyongjun1@huawei.com>
 
-Pulled into next/soc, thanks!
+Remove unneeded error handling on the result of a call
+to platform_get_resource() when the value is passed to
+devm_ioremap_resource().
 
-	Arnd
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c
+index aa81f3c..83f859e 100644
+--- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c
++++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc_drv.c
+@@ -269,11 +269,6 @@ static int mtk_vcodec_probe(struct platform_device *pdev)
+ 
+ 	for (i = VENC_SYS, j = 0; i < NUM_MAX_VCODEC_REG_BASE; i++, j++) {
+ 		res = platform_get_resource(pdev, IORESOURCE_MEM, j);
+-		if (res == NULL) {
+-			dev_err(&pdev->dev, "get memory resource failed.");
+-			ret = -ENXIO;
+-			goto err_res;
+-		}
+ 		dev->reg_base[i] = devm_ioremap_resource(&pdev->dev, res);
+ 		if (IS_ERR((__force void *)dev->reg_base[i])) {
+ 			ret = PTR_ERR((__force void *)dev->reg_base[i]);
