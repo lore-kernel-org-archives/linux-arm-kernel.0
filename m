@@ -1,42 +1,62 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue,  7 Feb 2017 17:41:14 +0100
-Subject: [PATCH 01/10] media: dt-bindings: vpif: fix whitespace errors
+Date: Tue,  7 Feb 2017 17:41:18 +0100
+Subject: [PATCH 05/10] ARM: dts: da850: add vpif video display pins
 In-Reply-To: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1486485683-11427-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1486485683-11427-6-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add a new pinctrl sub-node for vpif display pins. Move VP_CLKIN3 and
+VP_CLKIN2 to the display node where they actually belong (vide section
+35.2.2 of the da850 datasheet).
+
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- Documentation/devicetree/bindings/media/ti,da850-vpif.txt | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/da850-evm.dts |  2 +-
+ arch/arm/boot/dts/da850.dtsi    | 17 +++++++++++++++--
+ 2 files changed, 16 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
-index 6d25d7f..9c7510b 100644
---- a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
-+++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
-@@ -30,15 +30,15 @@ I2C-connected TVP5147 decoder:
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 3d6dd66..6db16ba 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -295,7 +295,7 @@
  
- 		port {
- 			vpif_ch0: endpoint at 0 {
--				  reg = <0>;
--				  bus-width = <8>;
--				  remote-endpoint = <&composite>;
-+				reg = <0>;
-+				bus-width = <8>;
-+				remote-endpoint = <&composite>;
- 			};
+ &vpif {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&vpif_capture_pins>;
++	pinctrl-0 = <&vpif_capture_pins>, <&vpif_display_pins>;
+ 	status = "okay";
  
- 			vpif_ch1: endpoint at 1 {
--				  reg = <1>;
--				  bus-width = <8>;
--				  data-shift = <8>;
-+				reg = <1>;
-+				bus-width = <8>;
-+				data-shift = <8>;
+ 	/* VPIF capture port */
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 768a58c..d317bc5 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -218,8 +218,21 @@
+ 					0x3c 0x11111111 0xffffffff
+ 					/* VP_DIN[8..9] */
+ 					0x40 0x00000011 0x000000ff
+-					/* VP_CLKIN3, VP_CLKIN2 */
+-					0x4c 0x00010100 0x000f0f00
++				>;
++			};
++			vpif_display_pins: vpif_display_pins {
++				pinctrl-single,bits = <
++					/* VP_DOUT[2..7] */
++					0x40 0x11111100 0xffffff00
++					/* VP_DOUT[10..15,0..1] */
++					0x44 0x11111111 0xffffffff
++					/*  VP_DOUT[8..9] */
++					0x48 0x00000011 0x000000ff
++					/*
++					 * VP_CLKOUT3, VP_CLKIN3,
++					 * VP_CLKOUT2, VP_CLKIN2
++					 */
++					0x4c 0x00111100 0x00ffff00
+ 				>;
  			};
  		};
- 	};
 -- 
 2.9.3
