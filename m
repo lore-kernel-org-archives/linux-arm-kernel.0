@@ -1,9 +1,9 @@
 From: naveen.n.rao@linux.vnet.ibm.com (Naveen N. Rao)
-Date: Wed,  8 Feb 2017 01:24:15 +0530
-Subject: [PATCH 2/3] arm: kprobes: remove kprobe_exceptions_notify
+Date: Wed,  8 Feb 2017 01:24:16 +0530
+Subject: [PATCH 3/3] powerpc: kprobes: remove kprobe_exceptions_notify()
 In-Reply-To: <b0894e503195b13a5ed6319e897e673f376a748d.1486496890.git.naveen.n.rao@linux.vnet.ibm.com>
 References: <b0894e503195b13a5ed6319e897e673f376a748d.1486496890.git.naveen.n.rao@linux.vnet.ibm.com>
-Message-ID: <46a640f65b86650d3a7d64a577dd441838de1c20.1486496890.git.naveen.n.rao@linux.vnet.ibm.com>
+Message-ID: <4d802c747c86386fbf744021007b1cc74c8cdc59.1486496890.git.naveen.n.rao@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,47 +11,28 @@ List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Naveen N. Rao <naveen.n.rao@linux.vnet.ibm.com>
 ---
- arch/arm/probes/kprobes/core.c     | 10 ----------
- arch/arm64/kernel/probes/kprobes.c |  6 ------
- 2 files changed, 16 deletions(-)
+ arch/powerpc/kernel/kprobes.c | 9 ---------
+ 1 file changed, 9 deletions(-)
 
-diff --git a/arch/arm/probes/kprobes/core.c b/arch/arm/probes/kprobes/core.c
-index a4ec240ee7ba..f89db1e278cf 100644
---- a/arch/arm/probes/kprobes/core.c
-+++ b/arch/arm/probes/kprobes/core.c
-@@ -391,16 +391,6 @@ int __kprobes kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr)
+diff --git a/arch/powerpc/kernel/kprobes.c b/arch/powerpc/kernel/kprobes.c
+index 45e4f82b230d..fce05a38851c 100644
+--- a/arch/powerpc/kernel/kprobes.c
++++ b/arch/powerpc/kernel/kprobes.c
+@@ -475,15 +475,6 @@ int __kprobes kprobe_fault_handler(struct pt_regs *regs, int trapnr)
  	return 0;
  }
  
--int __kprobes kprobe_exceptions_notify(struct notifier_block *self,
--				       unsigned long val, void *data)
--{
--	/*
--	 * notify_die() is currently never called on ARM,
--	 * so this callback is currently empty.
--	 */
--	return NOTIFY_DONE;
--}
--
- /*
-  * When a retprobed function returns, trampoline_handler() is called,
-  * calling the kretprobe's handler. We construct a struct pt_regs to
-diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-index f0593c92279b..769becae3e90 100644
---- a/arch/arm64/kernel/probes/kprobes.c
-+++ b/arch/arm64/kernel/probes/kprobes.c
-@@ -371,12 +371,6 @@ int __kprobes kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr)
- 	return 0;
- }
- 
+-/*
+- * Wrapper routine to for handling exceptions.
+- */
 -int __kprobes kprobe_exceptions_notify(struct notifier_block *self,
 -				       unsigned long val, void *data)
 -{
 -	return NOTIFY_DONE;
 -}
 -
- static void __kprobes kprobe_handler(struct pt_regs *regs)
+ unsigned long arch_deref_entry_point(void *entry)
  {
- 	struct kprobe *p, *cur_kprobe;
+ 	return ppc_global_function_entry(entry);
 -- 
 2.11.0
