@@ -1,341 +1,149 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Tue, 7 Feb 2017 16:03:02 +0800
-Subject: [PATCH 1/4] drm/rockchip: Do not use DMA mapping API if attached
- to IOMMU domain
-In-Reply-To: <CAAFQd5AJRg3LXWuiv_bB+q+JXcgq5phOzjR=zcadc7tb4ewboA@mail.gmail.com>
-References: <1486447776-30543-1-git-send-email-mark.yao@rock-chips.com>
- <1486447776-30543-2-git-send-email-mark.yao@rock-chips.com>
- <CAAFQd5AJRg3LXWuiv_bB+q+JXcgq5phOzjR=zcadc7tb4ewboA@mail.gmail.com>
-Message-ID: <58997F36.50007@rock-chips.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue,  7 Feb 2017 17:06:01 +0900
+Subject: [PATCH v32 00/13] arm64: add kdump support
+Message-ID: <20170207080601.5816-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?02?07? 14:53, Tomasz Figa wrote:
-> Hi Mark,
->
-> Thanks for reviving this series and sorry for not taking care of it
-> myself. Please see some comments inline.
+This patch series adds kdump support on arm64.
 
-Hi Tomasz
+To load a crash-dump kernel to the systems, a series of patches to
+kexec-tools[1] are also needed. Please use the latest one, v5 [2].
+For your convinience, you can pick them up from:
+   https://git.linaro.org/people/takahiro.akashi/linux-aarch64.git arm64/kdump
+   https://git.linaro.org/people/takahiro.akashi/kexec-tools.git arm64/kdump
 
-Thanks for review,
+To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+  - crash utility (v7.1.8 or later, i.e. master for now) [3]
 
-I will add the patches you mentioned  into v2 version.
+I tested this patchset on fast model and hikey.
+(under various configurations, in particular 4KB-page/39,48-bits, 64KB-page/42
+-bits with hibernate)
 
->
-> On Tue, Feb 7, 2017 at 3:09 PM, Mark Yao <mark.yao@rock-chips.com> wrote:
->> From: Tomasz Figa <tfiga@chromium.org>
->>
->> The API is not suitable for subsystems consisting of multiple devices
->> and requires severe hacks to use it. To mitigate this, this patch
->> implements allocation and address space management locally by using
->> helpers provided by DRM framework, like other DRM drivers do, e.g.
->> Tegra.
->>
->> This patch should not introduce any functional changes until the driver
->> is made to attach subdevices into an IOMMU domain with the generic IOMMU
->> API, which will happen in following patch. Based heavily on GEM
->> implementation of Tegra DRM driver.
->>
->> Signed-off-by: Tomasz Figa <tfiga@chromium.org>
->> Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
->> Acked-by: Mark Yao <mark.yao@rock-chips.com>
-> I believe you need your Signed-off-by here.
->
->> ---
->>   drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   4 +-
->>   drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 217 ++++++++++++++++++++++++++--
->>   drivers/gpu/drm/rockchip/rockchip_drm_gem.h |   8 +
->>   3 files changed, 219 insertions(+), 10 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
->> index fb6226c..7c123d9 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
->> @@ -30,6 +30,7 @@
->>
->>   struct drm_device;
->>   struct drm_connector;
->> +struct iommu_domain;
->>
->>   /*
->>    * Rockchip drm private crtc funcs.
->> @@ -60,7 +61,8 @@ struct rockchip_drm_private {
->>          struct drm_gem_object *fbdev_bo;
->>          const struct rockchip_crtc_funcs *crtc_funcs[ROCKCHIP_MAX_CRTC];
->>          struct drm_atomic_state *state;
->> -
->> +       struct iommu_domain *domain;
->> +       struct drm_mm mm;
->>          struct list_head psr_list;
->>          spinlock_t psr_list_lock;
->>   };
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
->> index b70f942..5209392 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
->> @@ -16,11 +16,135 @@
->>   #include <drm/drmP.h>
->>   #include <drm/drm_gem.h>
->>   #include <drm/drm_vma_manager.h>
->> +#include <linux/iommu.h>
->>
->>   #include "rockchip_drm_drv.h"
->>   #include "rockchip_drm_gem.h"
->>
->> -static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
->> +static int rockchip_gem_iommu_map(struct rockchip_gem_object *rk_obj)
->> +{
->> +       struct drm_device *drm = rk_obj->base.dev;
->> +       struct rockchip_drm_private *private = drm->dev_private;
->> +       int prot = IOMMU_READ | IOMMU_WRITE;
->> +       ssize_t ret;
->> +
->> +       ret = drm_mm_insert_node_generic(&private->mm, &rk_obj->mm,
->> +                                        rk_obj->base.size, PAGE_SIZE,
->> +                                        0, 0);
->> +       if (ret < 0) {
->> +               DRM_ERROR("out of I/O virtual memory: %zd\n", ret);
->> +               return ret;
->> +       }
->> +
->> +       rk_obj->dma_addr = rk_obj->mm.start;
->> +
->> +       ret = iommu_map_sg(private->domain, rk_obj->dma_addr, rk_obj->sgt->sgl,
->> +                          rk_obj->sgt->nents, prot);
->> +       if (ret < 0) {
->> +               DRM_ERROR("failed to map buffer: %zd\n", ret);
->> +               goto err_remove_node;
->> +       }
->> +
->> +       rk_obj->size = ret;
->> +
->> +       return 0;
->> +
->> +err_remove_node:
->> +       drm_mm_remove_node(&rk_obj->mm);
->> +
->> +       return ret;
->> +}
->> +
->> +static int rockchip_gem_iommu_unmap(struct rockchip_gem_object *rk_obj)
->> +{
->> +       struct drm_device *drm = rk_obj->base.dev;
->> +       struct rockchip_drm_private *private = drm->dev_private;
->> +
->> +       iommu_unmap(private->domain, rk_obj->dma_addr, rk_obj->size);
->> +       drm_mm_remove_node(&rk_obj->mm);
->> +
->> +       return 0;
->> +}
->> +
->> +static int rockchip_gem_get_pages(struct rockchip_gem_object *rk_obj)
->> +{
->> +       struct drm_device *drm = rk_obj->base.dev;
->> +       int ret, i;
->> +       struct scatterlist *s;
->> +
->> +       rk_obj->pages = drm_gem_get_pages(&rk_obj->base);
->> +       if (IS_ERR(rk_obj->pages))
->> +               return PTR_ERR(rk_obj->pages);
->> +
->> +       rk_obj->num_pages = rk_obj->base.size >> PAGE_SHIFT;
->> +
->> +       rk_obj->sgt = drm_prime_pages_to_sg(rk_obj->pages, rk_obj->num_pages);
->> +       if (IS_ERR(rk_obj->sgt)) {
->> +               ret = PTR_ERR(rk_obj->sgt);
->> +               goto err_put_pages;
->> +       }
->> +
->> +       /*
->> +        * Fake up the SG table so that dma_sync_sg_for_device() can be used
->> +        * to flush the pages associated with it.
->> +        *
->> +        * TODO: Replace this by drm_clflush_sg() once it can be implemented
->> +        * without relying on symbols that are not exported.
->> +        */
->> +       for_each_sg(rk_obj->sgt->sgl, s, rk_obj->sgt->nents, i)
->> +               sg_dma_address(s) = sg_phys(s);
->> +
->> +       dma_sync_sg_for_device(drm->dev, rk_obj->sgt->sgl, rk_obj->sgt->nents,
->> +                              DMA_TO_DEVICE);
->> +
->> +       return 0;
->> +
->> +err_put_pages:
->> +       drm_gem_put_pages(&rk_obj->base, rk_obj->pages, false, false);
->> +       return ret;
->> +}
->> +
->> +static void rockchip_gem_put_pages(struct rockchip_gem_object *rk_obj)
->> +{
->> +       sg_free_table(rk_obj->sgt);
->> +       kfree(rk_obj->sgt);
->> +       drm_gem_put_pages(&rk_obj->base, rk_obj->pages, false, false);
-> We need to call drm_gem_put_pages with two last arguments true, not
-> false, because we don't have any way of tracking the accesses, so we
-> need to assume the page was both accessed and dirty. See
-> https://chromium-review.googlesource.com/382934.
->
->> +}
->> +
->> +static int rockchip_gem_alloc_iommu(struct rockchip_gem_object *rk_obj,
->> +                                   bool alloc_kmap)
->> +{
->> +       int ret;
->> +
->> +       ret = rockchip_gem_get_pages(rk_obj);
->> +       if (ret < 0)
->> +               return ret;
->> +
->> +       ret = rockchip_gem_iommu_map(rk_obj);
->> +       if (ret < 0)
->> +               goto err_free;
->> +
->> +       if (alloc_kmap) {
->> +               rk_obj->kvaddr = vmap(rk_obj->pages, rk_obj->num_pages, VM_MAP,
->> +                                     pgprot_writecombine(PAGE_KERNEL));
->> +               if (!rk_obj->kvaddr) {
->> +                       DRM_ERROR("failed to vmap() buffer\n");
->> +                       ret = -ENOMEM;
->> +                       goto err_unmap;
->> +               }
->> +       }
->> +
->> +       return 0;
->> +
->> +err_unmap:
->> +       rockchip_gem_iommu_unmap(rk_obj);
->> +err_free:
->> +       rockchip_gem_put_pages(rk_obj);
->> +
->> +       return ret;
->> +}
->> +
->> +static int rockchip_gem_alloc_dma(struct rockchip_gem_object *rk_obj,
->>                                    bool alloc_kmap)
->>   {
->>          struct drm_gem_object *obj = &rk_obj->base;
->> @@ -42,7 +166,27 @@ static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
->>          return 0;
->>   }
->>
->> -static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
->> +static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
->> +                                 bool alloc_kmap)
->> +{
->> +       struct drm_gem_object *obj = &rk_obj->base;
->> +       struct drm_device *drm = obj->dev;
->> +       struct rockchip_drm_private *private = drm->dev_private;
->> +
->> +       if (private->domain)
->> +               return rockchip_gem_alloc_iommu(rk_obj, alloc_kmap);
->> +       else
->> +               return rockchip_gem_alloc_dma(rk_obj, alloc_kmap);
->> +}
->> +
->> +static void rockchip_gem_free_iommu(struct rockchip_gem_object *rk_obj)
->> +{
->> +       vunmap(rk_obj->kvaddr);
->> +       rockchip_gem_iommu_unmap(rk_obj);
->> +       rockchip_gem_put_pages(rk_obj);
->> +}
->> +
->> +static void rockchip_gem_free_dma(struct rockchip_gem_object *rk_obj)
->>   {
->>          struct drm_gem_object *obj = &rk_obj->base;
->>          struct drm_device *drm = obj->dev;
->> @@ -51,23 +195,64 @@ static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
->>                         rk_obj->dma_attrs);
->>   }
->>
->> -static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
->> -                                       struct vm_area_struct *vma)
->> +static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
->> +{
->> +       if (rk_obj->pages)
->> +               rockchip_gem_free_iommu(rk_obj);
->> +       else
->> +               rockchip_gem_free_dma(rk_obj);
->> +}
->>
->> +static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
->> +                                             struct vm_area_struct *vma)
->>   {
->> +       struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
->> +       unsigned int i, count = obj->size >> PAGE_SHIFT;
->> +       unsigned long user_count = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
->> +       unsigned long uaddr = vma->vm_start;
->>          int ret;
->> +
->> +       if (user_count == 0 || user_count > count)
->> +               return -ENXIO;
->> +
->> +       for (i = 0; i < user_count; i++) {
-> Even though DRM mmap doesn't support page offset, we need to respect
-> it here for PRIME/DMA-buf mmap. See
-> https://chromium-review.googlesource.com/386477.
->
->> +               ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
->> +               if (ret)
->> +                       return ret;
->> +               uaddr += PAGE_SIZE;
->> +       }
->> +
->> +       return 0;
->> +}
->> +
->> +static int rockchip_drm_gem_object_mmap_dma(struct drm_gem_object *obj,
->> +                                           struct vm_area_struct *vma)
->> +{
->>          struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
->>          struct drm_device *drm = obj->dev;
->>
->> +       return dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
->> +                             obj->size, rk_obj->dma_attrs);
->> +}
->> +
->> +static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
->> +                                       struct vm_area_struct *vma)
->> +{
->> +       int ret;
->> +       struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
->> +
->>          /*
->> -        * dma_alloc_attrs() allocated a struct page table for rk_obj, so clear
->> +        * We allocated a struct page table for rk_obj, so clear
->>           * VM_PFNMAP flag that was set by drm_gem_mmap_obj()/drm_gem_mmap().
->>           */
->>          vma->vm_flags &= ~VM_PFNMAP;
->>          vma->vm_pgoff = 0;
->>
->> -       ret = dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
->> -                            obj->size, rk_obj->dma_attrs);
->> +       if (rk_obj->pages)
->> +               ret = rockchip_drm_gem_object_mmap_iommu(obj, vma);
->> +       else
->> +               ret = rockchip_drm_gem_object_mmap_dma(obj, vma);
->> +
->>          if (ret)
->>                  drm_gem_vm_close(vma);
->>
->> @@ -117,7 +302,7 @@ struct rockchip_gem_object *
->>
->>          obj = &rk_obj->base;
->>
->> -       drm_gem_private_object_init(drm, obj, size);
->> +       drm_gem_object_init(drm, obj, size);
-> In error path of this function and in all functions that destroy the
-> GEM we need to call drm_gem_object_release(), as it's the counterpart
-> to drm_gem_object_init(). See
-> https://chromium-review.googlesource.com/385456.
->
-> Best regards,
-> Tomasz
->
->
->
+The previous versions were also:
+Tested-by: Pratyush Anand <panand@redhat.com> (v29, mustang and seattle)
+Tested-by: James Morse <james.morse@arm.com> (v27, Juno)
 
+Changes for v32 (Feb 7, 2017)
+  o isolate crash dump kernel memory as well as kernel text/data by using
+    MEMBLOCK_MAP attribute to and then specifically map them in map_mem()
+    (patch #1,6)
+  o delete remove_pgd_mapping() and instead modify create_pgd_mapping() to
+    allowing for unmapping a kernel mapping (patch #5)
+  o correct a commit message as well as a comment in the source (patch#10)
+  o other trivial changes after Mark's comments (patch#3,4)
+
+Changes for v31 (Feb 1, 2017)
+  o add/use remove_pgd_mapping() instead of modifying (__)create_pgd_mapping()
+    to protect crash dump kernel memory (patch #4,5)
+  o fix an issue at the isolation of crash dump kernel memory in
+    map_mem()/__map_memblock(), adding map_crashkernel() (patch#5)
+  o preserve the contents of crash dump kernel memory around hibernation
+    (patch#6)
+
+Changes for v30 (Jan 24, 2017)
+  o rebased to Linux-v4.10-rc5
+  o remove "linux,crashkernel-base/size" from exported device tree
+  o protect memory region for crash-dump kernel (adding patch#4,5)
+  o remove "in_crash_kexec" variable
+  o and other trivial changes
+
+Changes for v29 (Dec 28, 2016)
+  o rebased to Linux-v4.10-rc1
+  o change asm constraints in crash_setup_regs() per Catalin
+
+Changes for v28 (Nov 22, 2016)
+  o rebased to Linux-v4.9-rc6
+  o revamp patch #1 and merge memblock_cap_memory_range() with
+    memblock_mem_limit_remove_map()
+
+Changes for v27 (Nov 1, 2016)
+  o rebased to Linux-v4.9-rc3
+  o revert v26 change, i.e. revive "linux,usable-memory-range" property
+    (patch #2/#3, updating patch #9)
+  o minor fixes per review comments (patch #3/#4/#6/#8)
+  o re-order patches and improve commit messages for readability
+
+Changes for v26 (Sep 7, 2016):
+  o Use /reserved-memory instead of "linux,usable-memory-range" property
+    (dropping v25's patch#2 and #3, updating ex-patch#9.)
+
+Changes for v25 (Aug 29, 2016):
+  o Rebase to Linux-4.8-rc4
+  o Use memremap() instead of ioremap_cache() [patch#5]
+
+Changes for v24 (Aug 9, 2016):
+  o Rebase to Linux-4.8-rc1
+  o Update descriptions about newly added DT proerties
+
+Changes for v23 (July 26, 2016):
+
+  o Move memblock_reserve() to a single place in reserve_crashkernel()
+  o Use  cpu_park_loop() in ipi_cpu_crash_stop()
+  o Always enforce ARCH_LOW_ADDRESS_LIMIT to the memory range of crash kernel
+  o Re-implement fdt_enforce_memory_region() to remove non-reserve regions
+    (for ACPI) from usable memory at crash kernel
+
+Changes for v22 (July 12, 2016):
+
+  o Export "crashkernel-base" and "crashkernel-size" via device-tree,
+    and add some descriptions about them in chosen.txt
+  o Rename "usable-memory" to "usable-memory-range" to avoid inconsistency
+    with powerpc's "usable-memory"
+  o Make cosmetic changes regarding "ifdef" usage
+  o Correct some wordings in kdump.txt
+
+Changes for v21 (July 6, 2016):
+
+  o Remove kexec patches.
+  o Rebase to arm64's for-next/core (Linux-4.7-rc4 based).
+  o Clarify the description about kvm in kdump.txt.
+
+See the link [4] for older changes.
+
+
+[1] https://git.kernel.org/pub/scm/utils/kernel/kexec/kexec-tools.git
+[2] http://lists.infradead.org/pipermail/kexec/2017-January/018002.html
+[3] https://github.com/crash-utility/crash.git
+[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/438780.html
+
+AKASHI Takahiro (12):
+  memblock: add memblock_clear_nomap()
+  memblock: add memblock_cap_memory_range()
+  arm64: limit memory regions based on DT property, usable-memory-range
+  arm64: kdump: reserve memory for crash dump kernel
+  arm64: mm: allow for unmapping part of kernel mapping
+  arm64: kdump: protect crash dump kernel memory
+  arm64: hibernate: preserve kdump image around hibernation
+  arm64: kdump: implement machine_crash_shutdown()
+  arm64: kdump: add VMCOREINFO's for user-space tools
+  arm64: kdump: provide /proc/vmcore file
+  arm64: kdump: enable kdump in defconfig
+  Documentation: kdump: describe arm64 port
+
+James Morse (1):
+  Documentation: dt: chosen properties for arm64 kdump
+
+ Documentation/devicetree/bindings/chosen.txt |  37 +++++++
+ Documentation/kdump/kdump.txt                |  16 ++-
+ arch/arm64/Kconfig                           |  11 ++
+ arch/arm64/configs/defconfig                 |   1 +
+ arch/arm64/include/asm/hardirq.h             |   2 +-
+ arch/arm64/include/asm/kexec.h               |  42 +++++++-
+ arch/arm64/include/asm/pgtable-prot.h        |   1 +
+ arch/arm64/include/asm/smp.h                 |   2 +
+ arch/arm64/kernel/Makefile                   |   1 +
+ arch/arm64/kernel/crash_dump.c               |  71 ++++++++++++
+ arch/arm64/kernel/hibernate.c                |  13 +++
+ arch/arm64/kernel/machine_kexec.c            | 133 ++++++++++++++++++-----
+ arch/arm64/kernel/setup.c                    |   7 +-
+ arch/arm64/kernel/smp.c                      |  63 +++++++++++
+ arch/arm64/mm/init.c                         | 154 +++++++++++++++++++++++++++
+ arch/arm64/mm/mmu.c                          | 107 ++++++++++---------
+ include/linux/memblock.h                     |   2 +
+ mm/memblock.c                                |  56 +++++++---
+ 18 files changed, 626 insertions(+), 93 deletions(-)
+ create mode 100644 arch/arm64/kernel/crash_dump.c
 
 -- 
-?ark Yao
+2.11.1
