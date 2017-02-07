@@ -1,26 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 07 Feb 2017 15:35:32 +0100
-Subject: [GIT PULL] Ux500 devicetree changes for v4.11
-In-Reply-To: <CACRpkdbOrFAgOn_vr8vLc9pGHqzkm+Os9MrhxJjs0xxzMHO+Og@mail.gmail.com>
-References: <CACRpkdbOrFAgOn_vr8vLc9pGHqzkm+Os9MrhxJjs0xxzMHO+Og@mail.gmail.com>
-Message-ID: <6730134.qNxu1LDYPg@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 7 Feb 2017 15:44:59 +0100
+Subject: [GIT PULL] ARM: mvebu: dt for v4.11 (#3)
+In-Reply-To: <3013051.dlCd81dF2f@wuerfel>
+References: <87vasvz575.fsf@free-electrons.com>
+ <3013051.dlCd81dF2f@wuerfel>
+Message-ID: <20170207144459.GH17018@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 1, 2017 10:29:30 AM CET Linus Walleij wrote:
-> 
-> sorry for the late pull request, but these really should be going to
-> 4.11. As late or whatever is fine.
-> 
-> I found a number of bugs in the platform that had been accumulating
-> and it would be nice to iron out most of them in v4.11.
-> 
-> Please pull this to the ARM SoC tree in some apropriate branch.
-> 
-> 
+> Pulled into next/dt, nice to see this getting added! Just for my information,
+> do we also support the actual switch driver in Linux, or just the parts that
+> are common with Armada?
 
-No worries, the changes looks simple enough.
+Hi Arnd
 
-Pulled into next/dt, thanks!
+This just supports the SoC part of the switch. As Gregory pointed out,
+this switch is a completely different beast to the Marvell SOHO
+switches DSA supports.
 
-	Arnd
+	 Andrew
