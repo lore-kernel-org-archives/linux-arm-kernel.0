@@ -1,62 +1,40 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue,  7 Feb 2017 17:41:18 +0100
-Subject: [PATCH 05/10] ARM: dts: da850: add vpif video display pins
+Date: Tue,  7 Feb 2017 17:41:15 +0100
+Subject: [PATCH 02/10] ARM: dts: da850-evm: fix whitespace errors
 In-Reply-To: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1486485683-11427-6-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1486485683-11427-3-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new pinctrl sub-node for vpif display pins. Move VP_CLKIN3 and
-VP_CLKIN2 to the display node where they actually belong (vide section
-35.2.2 of the da850 datasheet).
-
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/boot/dts/da850-evm.dts |  2 +-
- arch/arm/boot/dts/da850.dtsi    | 17 +++++++++++++++--
- 2 files changed, 16 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/da850-evm.dts | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 3d6dd66..6db16ba 100644
+index c970b6e..94938a3 100644
 --- a/arch/arm/boot/dts/da850-evm.dts
 +++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -295,7 +295,7 @@
- 
- &vpif {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&vpif_capture_pins>;
-+	pinctrl-0 = <&vpif_capture_pins>, <&vpif_display_pins>;
- 	status = "okay";
- 
+@@ -301,14 +301,14 @@
  	/* VPIF capture port */
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 768a58c..d317bc5 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -218,8 +218,21 @@
- 					0x3c 0x11111111 0xffffffff
- 					/* VP_DIN[8..9] */
- 					0x40 0x00000011 0x000000ff
--					/* VP_CLKIN3, VP_CLKIN2 */
--					0x4c 0x00010100 0x000f0f00
-+				>;
-+			};
-+			vpif_display_pins: vpif_display_pins {
-+				pinctrl-single,bits = <
-+					/* VP_DOUT[2..7] */
-+					0x40 0x11111100 0xffffff00
-+					/* VP_DOUT[10..15,0..1] */
-+					0x44 0x11111111 0xffffffff
-+					/*  VP_DOUT[8..9] */
-+					0x48 0x00000011 0x000000ff
-+					/*
-+					 * VP_CLKOUT3, VP_CLKIN3,
-+					 * VP_CLKOUT2, VP_CLKIN2
-+					 */
-+					0x4c 0x00111100 0x00ffff00
- 				>;
- 			};
+ 	port {
+ 		vpif_ch0: endpoint at 0 {
+-			  reg = <0>;
+-			  bus-width = <8>;
++			reg = <0>;
++			bus-width = <8>;
  		};
+ 
+ 		vpif_ch1: endpoint at 1 {
+-			  reg = <1>;
+-			  bus-width = <8>;
+-			  data-shift = <8>;
++			reg = <1>;
++			bus-width = <8>;
++			data-shift = <8>;
+ 		};
+ 	};
+ };
 -- 
 2.9.3
