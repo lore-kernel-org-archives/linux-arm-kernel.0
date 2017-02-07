@@ -1,42 +1,103 @@
-From: guy.shapiro@mobi-wize.com (Guy Shapiro)
-Date: Tue,  7 Feb 2017 14:54:12 +0200
-Subject: [PATCH 0/2] imx: Fix power-up on RTC alarm
-Message-ID: <1486472054-4367-1-git-send-email-guy.shapiro@mobi-wize.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue,  7 Feb 2017 13:58:38 +0100
+Subject: [PATCH 4.9 04/66] efi/fdt: Avoid FDT manipulation after
+ ExitBootServices()
+In-Reply-To: <20170207124528.281881183@linuxfoundation.org>
+References: <20170207124528.281881183@linuxfoundation.org>
+Message-ID: <20170207124528.503692416@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the syscon-poweroff driver cleans the alarm enable bit during power
-off. This behaviour makes it impossible to wake up the device using the RTC.
+4.9-stable review patch.  If anyone has any objections, please let me know.
 
-The first patch adds a mask option to the syscon-poweroff driver. It uses the
-method suggested by Sebastian Reichel [0] to maintain compatibility with the
-old binding.
+------------------
 
-The second patch update the device trees for the snvs component users.
-Although I believe this should work on all the modified devices, I had only
-imx6ul to test with.
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Making the wake-up alarm work may require applying another patch [1], already
-accepted to the rtc-snvs driver. 
+commit c8f325a59cfc718d13a50fbc746ed9b415c25e92 upstream.
 
-Thanks,
-Guy.
+Some AArch64 UEFI implementations disable the MMU in ExitBootServices(),
+after which unaligned accesses to RAM are no longer supported.
 
-[0] http://www.spinics.net/lists/devicetree/msg161527.html
-[1] https://patchwork.ozlabs.org/patch/721155/
+Commit:
 
-Guy Shapiro (2):
-  power: reset: syscon-poweroff: add a mask property
-  ARM: dts: imx: update snvs-poweroff mask
+  abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the kernel")
 
- .../bindings/power/reset/syscon-poweroff.txt          | 11 +++++++++--
- arch/arm/boot/dts/imx6qdl.dtsi                        |  1 +
- arch/arm/boot/dts/imx6sl.dtsi                         |  1 +
- arch/arm/boot/dts/imx6sx.dtsi                         |  1 +
- arch/arm/boot/dts/imx6ul.dtsi                         |  1 +
- arch/arm/boot/dts/imx7s.dtsi                          |  1 +
- drivers/power/reset/syscon-poweroff.c                 | 19 ++++++++++++++++---
- 7 files changed, 30 insertions(+), 5 deletions(-)
+fixed an issue in the memory map handling of the stub FDT code, but
+inadvertently created an issue with such firmware, by moving some
+of the FDT manipulation to after the invocation of ExitBootServices().
 
--- 
-2.1.4
+Given that the stub's libfdt implementation uses the ordinary, accelerated
+string functions, which rely on hardware handling of unaligned accesses,
+manipulating the FDT with the MMU off may result in alignment faults.
+
+So fix the situation by moving the update_fdt_memmap() call into the
+callback function invoked by efi_exit_boot_services() right before it
+calls the ExitBootServices() UEFI service (which is arguably a better
+place for it anyway)
+
+Note that disabling the MMU in ExitBootServices() is not compliant with
+the UEFI spec, and carries great risk due to the fact that switching from
+cached to uncached memory accesses halfway through compiler generated code
+(i.e., involving a stack) can never be done in a way that is architecturally
+safe.
+
+Fixes: abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the kernel")
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Tested-by: Riku Voipio <riku.voipio@linaro.org>
+Cc: mark.rutland at arm.com
+Cc: linux-efi at vger.kernel.org
+Cc: matt at codeblueprint.co.uk
+Cc: leif.lindholm at linaro.org
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/1485971102-23330-2-git-send-email-ard.biesheuvel at linaro.org
+Signed-off-by: Ingo Molnar <mingo@kernel.org>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+ drivers/firmware/efi/libstub/fdt.c |   14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
+
+--- a/drivers/firmware/efi/libstub/fdt.c
++++ b/drivers/firmware/efi/libstub/fdt.c
+@@ -187,6 +187,7 @@ static efi_status_t update_fdt_memmap(vo
+ struct exit_boot_struct {
+ 	efi_memory_desc_t *runtime_map;
+ 	int *runtime_entry_count;
++	void *new_fdt_addr;
+ };
+ 
+ static efi_status_t exit_boot_func(efi_system_table_t *sys_table_arg,
+@@ -202,7 +203,7 @@ static efi_status_t exit_boot_func(efi_s
+ 	efi_get_virtmap(*map->map, *map->map_size, *map->desc_size,
+ 			p->runtime_map, p->runtime_entry_count);
+ 
+-	return EFI_SUCCESS;
++	return update_fdt_memmap(p->new_fdt_addr, map);
+ }
+ 
+ /*
+@@ -300,22 +301,13 @@ efi_status_t allocate_new_fdt_and_exit_b
+ 
+ 	priv.runtime_map = runtime_map;
+ 	priv.runtime_entry_count = &runtime_entry_count;
++	priv.new_fdt_addr = (void *)*new_fdt_addr;
+ 	status = efi_exit_boot_services(sys_table, handle, &map, &priv,
+ 					exit_boot_func);
+ 
+ 	if (status == EFI_SUCCESS) {
+ 		efi_set_virtual_address_map_t *svam;
+ 
+-		status = update_fdt_memmap((void *)*new_fdt_addr, &map);
+-		if (status != EFI_SUCCESS) {
+-			/*
+-			 * The kernel won't get far without the memory map, but
+-			 * may still be able to print something meaningful so
+-			 * return success here.
+-			 */
+-			return EFI_SUCCESS;
+-		}
+-
+ 		/* Install the new virtual address map */
+ 		svam = sys_table->runtime->set_virtual_address_map;
+ 		status = svam(runtime_entry_count * desc_size, desc_size,
