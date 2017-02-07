@@ -1,121 +1,136 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 7 Feb 2017 09:20:03 +0000
-Subject: [PATCH v2 1/3] perf tools: Use offset instead of dwarfnum in
- register table.
-In-Reply-To: <20170207095451.10ac50a90de0fdac529a2522@kernel.org>
-References: <20170203110607.97529-1-hekuang@huawei.com>
- <20170203130026.GF11585@arm.com> <589598D8.8050304@huawei.com>
- <20170206130229.GI19939@arm.com>
- <20170207095451.10ac50a90de0fdac529a2522@kernel.org>
-Message-ID: <20170207092002.GA1883@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 7 Feb 2017 10:25:03 +0100
+Subject: [PATCH v3 2/3] nvmem: sunxi-sid: add support for H3's SID
+ controller
+In-Reply-To: <5119511486371415@web15m.yandex.ru>
+References: <20170202131338.20234-1-icenowy@aosc.xyz>
+ <20170202131338.20234-2-icenowy@aosc.xyz>
+ <20170206085416.4qtd3wfhtinp42xv@lukather>
+ <5119511486371415@web15m.yandex.ru>
+Message-ID: <20170207092503.3nh2g6orkgjgdi7q@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2017 at 09:54:51AM +0900, Masami Hiramatsu wrote:
-> On Mon, 6 Feb 2017 13:02:29 +0000
-> Will Deacon <will.deacon@arm.com> wrote:
+On Mon, Feb 06, 2017 at 04:56:55PM +0800, Icenowy Zheng wrote:
+> 06.02.2017, 16:54, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > On Thu, Feb 02, 2017 at 09:13:37PM +0800, Icenowy Zheng wrote:
+> >> ?The H3 SoC have a bigger SID controller, which has its direct read
+> >> ?address at 0x200 position in the SID block, not 0x0.
+> >>
+> >> ?Also, H3 SID controller has some silicon bug that makes the direct read
+> >> ?value wrong at cold boot, add code to workaround the bug. (This bug has
+> >> ?already been fixed on A64 and later SoCs)
+> >>
+> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >> ?---
+> >> ?This patch is the part of [PATCH v2 1/1] that adds support for H3 SID
+> >> ?controller.
+> >>
+> >> ??.../bindings/nvmem/allwinner,sunxi-sid.txt | 12 +++-
+> >> ??drivers/nvmem/sunxi_sid.c | 72 +++++++++++++++++++++-
+> >> ??2 files changed, 82 insertions(+), 2 deletions(-)
+> >>
+> >> ?diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+> >> ?index d543ed3f5363..9ab9e75a6351 100644
+> >> ?--- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+> >> ?+++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+> >> ?@@ -1,7 +1,11 @@
+> >> ??Allwinner sunxi-sid
+> >>
+> >> ??Required properties:
+> >> ?-- compatible: "allwinner,sun4i-a10-sid" or "allwinner,sun7i-a20-sid"
+> >> ?+- compatible: Should be one of the following (depending on your SoC):
+> >> ?+ "allwinner,sun4i-a10-sid"
+> >> ?+ "allwinner,sun7i-a20-sid"
+> >> ?+ "allwinner,sun8i-h3-sid"
+> >> ?+
+> >> ??- reg: Should contain registers location and length
+> >>
+> >> ??= Data cells =
+> >> ?@@ -19,3 +23,9 @@ Example for sun7i:
+> >> ??????????????????compatible = "allwinner,sun7i-a20-sid";
+> >> ??????????????????reg = <0x01c23800 0x200>
+> >> ??????????};
+> >> ?+
+> >> ?+Example for sun8i-h3:
+> >> ?+ sid at 01c14000 {
+> >> ?+ compatible = "allwinner,sun8i-h3-sid";
+> >> ?+ reg = <0x01c14000 0x400>;
+> >> ?+ };
+> >> ?diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
+> >> ?index 69524b67007f..476a161ff23a 100644
+> >> ?--- a/drivers/nvmem/sunxi_sid.c
+> >> ?+++ b/drivers/nvmem/sunxi_sid.c
+> >> ?@@ -25,6 +25,16 @@
+> >> ??#include <linux/slab.h>
+> >> ??#include <linux/random.h>
+> >>
+> >> ?+/* Registers and special values for doing register-based SID readout on H3 */
+> >> ?+#define SUN8I_SID_PRCTL 0x40
+> >> ?+#define SUN8I_SID_RDKEY 0x60
+> >> ?+
+> >> ?+#define SUN8I_SID_OP_LOCK 0xAC
+> >> ?+#define SUN8I_SID_OFFSET_MASK 0x1FF
+> >> ?+#define SUN8I_SID_OFFSET_SHIFT 16
+> >> ?+#define SUN8I_SID_LOCK_SHIFT 8
+> >> ?+#define SUN8I_SID_READ BIT(1)
+> >> ?+
+> >> ??static struct nvmem_config econfig = {
+> >> ??????????.name = "sunxi-sid",
+> >> ??????????.read_only = true,
+> >> ?@@ -34,11 +44,14 @@ static struct nvmem_config econfig = {
+> >> ??};
+> >>
+> >> ??struct sunxi_sid_cfg {
+> >> ?+ u32 value_offset;
+> >> ??????????u32 size;
+> >> ?+ bool need_register_readout;
+> >> ??};
+> >>
+> >> ??struct sunxi_sid {
+> >> ??????????void __iomem *base;
+> >> ?+ u32 value_offset;
+> >> ??};
+> >>
+> >> ??/* We read the entire key, due to a 32 bit read alignment requirement. Since we
+> >> ?@@ -51,7 +64,8 @@ static u8 sunxi_sid_read_byte(const struct sunxi_sid *sid,
+> >> ??{
+> >> ??????????u32 sid_key;
+> >>
+> >> ?- sid_key = ioread32be(sid->base + round_down(offset, 4));
+> >> ?+ sid_key = ioread32be(sid->base + sid->value_offset +
+> >> ?+ round_down(offset, 4));
+> >
+> > This would probably be more logical to have this in sunxi_sid_read.
 > 
-> > On Sat, Feb 04, 2017 at 05:03:20PM +0800, Hekuang wrote:
-> > > hi
-> > > 
-> > > ? 2017/2/3 21:00, Will Deacon ??:
-> > > >On Fri, Feb 03, 2017 at 11:06:05AM +0000, He Kuang wrote:
-> > > >>This patch changes the 'dwarfnum' to 'offset' in register table, so
-> > > >>the index of array becomes the dwarfnum (the index of each register
-> > > >>defined by DWARF) and the "offset" member means the byte-offset of the
-> > > >>register in (user_)pt_regs. This change makes the code consistent with
-> > > >>x86.
-> > > >>
-> > > >>Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
-> > > >>Signed-off-by: He Kuang <hekuang@huawei.com>
-> > > >>---
-> > > >>  tools/perf/arch/arm64/util/dwarf-regs.c | 107 ++++++++++++++++----------------
-> > > >>  1 file changed, 52 insertions(+), 55 deletions(-)
-> > > >Thanks for splitting this up. Comment below.
-> > > >
-> > > >>diff --git a/tools/perf/arch/arm64/util/dwarf-regs.c b/tools/perf/arch/arm64/util/dwarf-regs.c
-> > > >>index d49efeb..090f36b 100644
-> > > >>--- a/tools/perf/arch/arm64/util/dwarf-regs.c
-> > > >>+++ b/tools/perf/arch/arm64/util/dwarf-regs.c
-> > > >>@@ -9,72 +9,69 @@
-> > > >>   */
-> > > >>  #include <stddef.h>
-> > > >>+#include <linux/ptrace.h> /* for struct user_pt_regs */
-> > > >>  #include <dwarf-regs.h>
-> > > >>-struct pt_regs_dwarfnum {
-> > > >>+struct pt_regs_offset {
-> > > >>  	const char *name;
-> > > >>-	unsigned int dwarfnum;
-> > > >>+	int offset;
-> > > >>  };
-> > > >>-#define STR(s) #s
-> > > >>-#define REG_DWARFNUM_NAME(r, num) {.name = r, .dwarfnum = num}
-> > > >>-#define GPR_DWARFNUM_NAME(num) \
-> > > >>-	{.name = STR(%x##num), .dwarfnum = num}
-> > > >>-#define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0}
-> > > >>-
-> > > >>  /*
-> > > >>   * Reference:
-> > > >>   * http://infocenter.arm.com/help/topic/com.arm.doc.ihi0057b/IHI0057B_aadwarf64.pdf
-> > > >>   */
-> > > >>-static const struct pt_regs_dwarfnum regdwarfnum_table[] = {
-> > > >>-	GPR_DWARFNUM_NAME(0),
-> > > >>-	GPR_DWARFNUM_NAME(1),
-> > > >>-	GPR_DWARFNUM_NAME(2),
-> > > >>-	GPR_DWARFNUM_NAME(3),
-> > > >>-	GPR_DWARFNUM_NAME(4),
-> > > >>-	GPR_DWARFNUM_NAME(5),
-> > > >>-	GPR_DWARFNUM_NAME(6),
-> > > >>-	GPR_DWARFNUM_NAME(7),
-> > > >>-	GPR_DWARFNUM_NAME(8),
-> > > >>-	GPR_DWARFNUM_NAME(9),
-> > > >>-	GPR_DWARFNUM_NAME(10),
-> > > >>-	GPR_DWARFNUM_NAME(11),
-> > > >>-	GPR_DWARFNUM_NAME(12),
-> > > >>-	GPR_DWARFNUM_NAME(13),
-> > > >>-	GPR_DWARFNUM_NAME(14),
-> > > >>-	GPR_DWARFNUM_NAME(15),
-> > > >>-	GPR_DWARFNUM_NAME(16),
-> > > >>-	GPR_DWARFNUM_NAME(17),
-> > > >>-	GPR_DWARFNUM_NAME(18),
-> > > >>-	GPR_DWARFNUM_NAME(19),
-> > > >>-	GPR_DWARFNUM_NAME(20),
-> > > >>-	GPR_DWARFNUM_NAME(21),
-> > > >>-	GPR_DWARFNUM_NAME(22),
-> > > >>-	GPR_DWARFNUM_NAME(23),
-> > > >>-	GPR_DWARFNUM_NAME(24),
-> > > >>-	GPR_DWARFNUM_NAME(25),
-> > > >>-	GPR_DWARFNUM_NAME(26),
-> > > >>-	GPR_DWARFNUM_NAME(27),
-> > > >>-	GPR_DWARFNUM_NAME(28),
-> > > >>-	GPR_DWARFNUM_NAME(29),
-> > > >>-	REG_DWARFNUM_NAME("%lr", 30),
-> > > >>-	REG_DWARFNUM_NAME("%sp", 31),
-> > > >>-	REG_DWARFNUM_END,
-> > > >>-};
-> > > >>+#define REG_OFFSET_NAME(r, num) {.name = "%" #r,			\
-> > > >>+			.offset = offsetof(struct user_pt_regs, regs[num])}
-> > > >Whilst this works in practice, this is undefined behaviour for "sp", since
-> > > >you'll go off the end of the regs array.
-> > > 
-> > > It's not undefined behaviour here,
-> > > struct user_pt_regs {
-> > >         __u64           regs[31];
-> > >         __u64           sp;
-> > >         __u64           pc;
-> > >         __u64           pstate;
-> > > };
-> > > user_pt_regs->regs[31] is user_pt_regs->sp and the offset value is correct.
-> > 
-> > I think it's undefined from the C standard perspective.
-> 
-> Actually, this '%sp' is used for kprobes/uprobes dynamic events, which only 
-> depend on how regs_query_register_offset()@arch/arm64/kernel/ptrace.c is implemented.
-> And also, since perf-probe uses debuginfo, it can find out the base register.
-> 
-> So we don't need to care the C standard in this file :)
+> But it's here which really access the memory...
 
-Up to the perf tool maintainers really, but I expect it will irritate
-anybody running UBSAN and it's really not difficult to fix.
+This function is made to read a single register. What you want is to
+offset all reads, and all the reads are made in sunxi_sid_read.
 
-Will
+> >> ?+ if (reg_val & SUN8I_SID_READ)
+> >> ?+ return -EIO;
+> >> ?+
+> >> ?+ if (out)
+> >> ?+ *out = readl(sid->base + SUN8I_SID_RDKEY);
+> >
+> > Why do you need that out parameter?
+> 
+> The read operation by registers can really return a value --
+> in fact, the fix to the pre-read value is a side effect.
+
+Yet, you're not using it at all, so this is dead code.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/99252249/attachment.sig>
