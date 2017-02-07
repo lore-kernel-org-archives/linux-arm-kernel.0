@@ -1,103 +1,140 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Tue, 7 Feb 2017 14:30:31 +0100
-Subject: [PATCH v2 3/3] gpiolib: Add GPIO initialization
-In-Reply-To: <20170207110950.zy5pzo2hq6hrvmr5@pengutronix.de>
-References: <1440920686-6892-1-git-send-email-mpa@pengutronix.de>
- <1440920686-6892-4-git-send-email-mpa@pengutronix.de>
- <20170207110950.zy5pzo2hq6hrvmr5@pengutronix.de>
-Message-ID: <20170207143031.4700300a@ipc1.ka-ro>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 07 Feb 2017 21:36:35 +0800
+Subject: [PATCH v3 2/3] nvmem: sunxi-sid: add support for H3's SID
+ controller
+In-Reply-To: <20170207092503.3nh2g6orkgjgdi7q@lukather>
+References: <20170202131338.20234-1-icenowy@aosc.xyz>
+ <20170202131338.20234-2-icenowy@aosc.xyz>
+ <20170206085416.4qtd3wfhtinp42xv@lukather>
+ <5119511486371415@web15m.yandex.ru> <20170207092503.3nh2g6orkgjgdi7q@lukather>
+Message-ID: <4664661486474595@web28j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tue, 7 Feb 2017 12:09:50 +0100 Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> (Markus left Pengutronix, so I dropped his non-working address from the
-> recipients and pick up his discussion.)
-> 
-> as far as I see, this topic isn't closed yet. I want something similar,
-> maybe even a bit more than this patch achieves:
-> 
-> Some gpios should get a fixed direction. If such a gpio is configured as
-> output, a value should be specified. This is already working today with
-> gpio-hogs.
-> 
-> Now additionally I want to initialize some gpios but allow them to be
-> grabbed later. IMHO there are the following new cases:
-> 
-> It should be possible to:
-> 
->  a) change the value of a gpio initially configured as output
->  b) change the direction of a gpio initially configured as output
->  c) change the direction of a gpio initially configured as input
-> 
-> IMHO the dts should describe which case should be applied to a given
-> gpio.
-> 
-> Is it a valid assumption that a gpio that can change direction is also
-> allowed to change value when configured as output? I assume this in the
-> following discussion, some details need to change if this shouldn't be
-> implied. (I think we need a d) then, not sure how this should look
-> though.)
-> 
-> I'd suggest the following description for these cases:
-> 
->  a)
->  	/*
-> 	 * initially configured as low output. Consumer can do
-> 	 * gpio_set_value(..., 1); but not gpio_direction_input(...);
-> 	 */
->  	nodename {
-> 		gpio-hog;
-> 		gpios = <...>;
-> 		output-low-init;
-> 	};
-> 
->  b)
->  	/*
-> 	 * initially configured as low output. Consumer can do
-> 	 * gpio_set_value(..., 1); and gpio_direction_input(...);
-> 	 */
->  	nodename {
-> 		gpio-hog;
-> 		gpios = <...>;
-> 		output-init-low;
-> 	};
-> 
->  c)
->  	/*
-> 	 * initially configured as input. Consumer can do
-> 	 * gpio_direction_output(..., ...) and then set the value
-> 	 * freely.
-> 	 */
-> 	 nodename {
-> 	 	gpio-hog;
-> 		gpios = <...>;
-> 		input-init;
-> 	};
-> 
-> I don't like that "output-low-init" and "output-init-low" are so
-> similar, so if someone suggests a better naming scheme, that would be
-> great.
-> 
-The position of the 'output' or 'input' within the word could
-imply whether the direction can be changed lateron or not. E.g.:
-output-init-low => an output whose state is initially low, but can be
-                   reconfigured to high lateron.
 
-init-low-output => a gpio that is initially configured as output low,  
-                   but can subsequently be reconfigured as input or to
-                   a different state
+07.02.2017, 17:25, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> On Mon, Feb 06, 2017 at 04:56:55PM +0800, Icenowy Zheng wrote:
+>> ?06.02.2017, 16:54, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> ?> On Thu, Feb 02, 2017 at 09:13:37PM +0800, Icenowy Zheng wrote:
+>> ?>> ?The H3 SoC have a bigger SID controller, which has its direct read
+>> ?>> ?address at 0x200 position in the SID block, not 0x0.
+>> ?>>
+>> ?>> ?Also, H3 SID controller has some silicon bug that makes the direct read
+>> ?>> ?value wrong at cold boot, add code to workaround the bug. (This bug has
+>> ?>> ?already been fixed on A64 and later SoCs)
+>> ?>>
+>> ?>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ?>> ?---
+>> ?>> ?This patch is the part of [PATCH v2 1/1] that adds support for H3 SID
+>> ?>> ?controller.
+>> ?>>
+>> ?>> ??.../bindings/nvmem/allwinner,sunxi-sid.txt | 12 +++-
+>> ?>> ??drivers/nvmem/sunxi_sid.c | 72 +++++++++++++++++++++-
+>> ?>> ??2 files changed, 82 insertions(+), 2 deletions(-)
+>> ?>>
+>> ?>> ?diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+>> ?>> ?index d543ed3f5363..9ab9e75a6351 100644
+>> ?>> ?--- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+>> ?>> ?+++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+>> ?>> ?@@ -1,7 +1,11 @@
+>> ?>> ??Allwinner sunxi-sid
+>> ?>>
+>> ?>> ??Required properties:
+>> ?>> ?-- compatible: "allwinner,sun4i-a10-sid" or "allwinner,sun7i-a20-sid"
+>> ?>> ?+- compatible: Should be one of the following (depending on your SoC):
+>> ?>> ?+ "allwinner,sun4i-a10-sid"
+>> ?>> ?+ "allwinner,sun7i-a20-sid"
+>> ?>> ?+ "allwinner,sun8i-h3-sid"
+>> ?>> ?+
+>> ?>> ??- reg: Should contain registers location and length
+>> ?>>
+>> ?>> ??= Data cells =
+>> ?>> ?@@ -19,3 +23,9 @@ Example for sun7i:
+>> ?>> ??????????????????compatible = "allwinner,sun7i-a20-sid";
+>> ?>> ??????????????????reg = <0x01c23800 0x200>
+>> ?>> ??????????};
+>> ?>> ?+
+>> ?>> ?+Example for sun8i-h3:
+>> ?>> ?+ sid at 01c14000 {
+>> ?>> ?+ compatible = "allwinner,sun8i-h3-sid";
+>> ?>> ?+ reg = <0x01c14000 0x400>;
+>> ?>> ?+ };
+>> ?>> ?diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
+>> ?>> ?index 69524b67007f..476a161ff23a 100644
+>> ?>> ?--- a/drivers/nvmem/sunxi_sid.c
+>> ?>> ?+++ b/drivers/nvmem/sunxi_sid.c
+>> ?>> ?@@ -25,6 +25,16 @@
+>> ?>> ??#include <linux/slab.h>
+>> ?>> ??#include <linux/random.h>
+>> ?>>
+>> ?>> ?+/* Registers and special values for doing register-based SID readout on H3 */
+>> ?>> ?+#define SUN8I_SID_PRCTL 0x40
+>> ?>> ?+#define SUN8I_SID_RDKEY 0x60
+>> ?>> ?+
+>> ?>> ?+#define SUN8I_SID_OP_LOCK 0xAC
+>> ?>> ?+#define SUN8I_SID_OFFSET_MASK 0x1FF
+>> ?>> ?+#define SUN8I_SID_OFFSET_SHIFT 16
+>> ?>> ?+#define SUN8I_SID_LOCK_SHIFT 8
+>> ?>> ?+#define SUN8I_SID_READ BIT(1)
+>> ?>> ?+
+>> ?>> ??static struct nvmem_config econfig = {
+>> ?>> ??????????.name = "sunxi-sid",
+>> ?>> ??????????.read_only = true,
+>> ?>> ?@@ -34,11 +44,14 @@ static struct nvmem_config econfig = {
+>> ?>> ??};
+>> ?>>
+>> ?>> ??struct sunxi_sid_cfg {
+>> ?>> ?+ u32 value_offset;
+>> ?>> ??????????u32 size;
+>> ?>> ?+ bool need_register_readout;
+>> ?>> ??};
+>> ?>>
+>> ?>> ??struct sunxi_sid {
+>> ?>> ??????????void __iomem *base;
+>> ?>> ?+ u32 value_offset;
+>> ?>> ??};
+>> ?>>
+>> ?>> ??/* We read the entire key, due to a 32 bit read alignment requirement. Since we
+>> ?>> ?@@ -51,7 +64,8 @@ static u8 sunxi_sid_read_byte(const struct sunxi_sid *sid,
+>> ?>> ??{
+>> ?>> ??????????u32 sid_key;
+>> ?>>
+>> ?>> ?- sid_key = ioread32be(sid->base + round_down(offset, 4));
+>> ?>> ?+ sid_key = ioread32be(sid->base + sid->value_offset +
+>> ?>> ?+ round_down(offset, 4));
+>> ?>
+>> ?> This would probably be more logical to have this in sunxi_sid_read.
+>>
+>> ?But it's here which really access the memory...
+>
+> This function is made to read a single register. What you want is to
+> offset all reads, and all the reads are made in sunxi_sid_read.
 
-init-input      => your case c)
-input           => a GPIO input that cannot be reconfigured
+I think the semantic of this function is to read out one byte from SID,
+not read out a single register from SID; the parameter passed into it is
+also a const struct *sunxi_sid, so I think make the offset here is right.
 
-IOW: if the pin direction is mentioned in front of the 'init', it
-cannot be changed lateron, if it is mentioned after the 'init' it can
-be changed. If nothing follows 'init', the 'init' can be omitted.
-This would also allow an 'output-low' as a GPIO that is permanently
-grounded...
+>
+>> ?>> ?+ if (reg_val & SUN8I_SID_READ)
+>> ?>> ?+ return -EIO;
+>> ?>> ?+
+>> ?>> ?+ if (out)
+>> ?>> ?+ *out = readl(sid->base + SUN8I_SID_RDKEY);
+>> ?>
+>> ?> Why do you need that out parameter?
+>>
+>> ?The read operation by registers can really return a value --
+>> ?in fact, the fix to the pre-read value is a side effect.
+>
+> Yet, you're not using it at all, so this is dead code.
 
-Lothar Wa?mann
+Removed it.
+
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
