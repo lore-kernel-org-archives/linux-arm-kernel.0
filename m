@@ -1,40 +1,122 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 7 Feb 2017 13:25:53 -0800
-Subject: [RFC][PATCH] treewide: Move set_memory_* functions away from
- cacheflush.h
-In-Reply-To: <1486501816-27600-1-git-send-email-labbott@redhat.com>
-References: <1486501816-27600-1-git-send-email-labbott@redhat.com>
-Message-ID: <CAGXu5j+BGgs747D2cCW_is2z8QPA2crduE4SDDmu8tmxQ4Zh8A@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue,  7 Feb 2017 22:48:12 +0100
+Subject: [PATCH 12/22 v3] ARM: dts: add top-level DT bindings for Cortina
+ Gemini
+Message-ID: <20170207214812.27365-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 7, 2017 at 1:10 PM, Laura Abbott <labbott@redhat.com> wrote:
-> The set_memory_* APIs came out of a desire to have a better way to
-> change memory attributes. Many of these attributes were linked to cache
-> functionality so the prototypes were put in cacheflush.h. These days,
-> the APIs have grown and have a much wider use than just cache APIs. To
-> support this growth, split off set_memory_* and friends into a separate
-> header file to avoid growing cacheflush.h for APIs that have nothing to
-> do with caches.
->
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> This came out of a comment Russell made while reviewing RODATA test cases
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/480855.html
-> While the final result of that series was the rodata code was refactored into
-> its own header file, the set_memory_* APIs are still out of place.
+This adds the top level SoC bindings for Cortina systems Gemini
+platforms.
 
-Yeah, this is a nice clean up to start on.
+Cc: Janos Laube <janos.dev@gmail.com>
+Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v2->v3:
+- Fix soc bus node and references.
+- Fix spelling of interrupt-controller
+ChangeLog v1->v2:
+- Rename required property "intcon" to "interrupt-controller"
+- Elaborate a bit on the SoC origins
+- Put the example DTS SoC nodes in a soc {} node
+---
+ Documentation/devicetree/bindings/arm/gemini.txt | 84 ++++++++++++++++++++++++
+ 1 file changed, 84 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/gemini.txt
 
-> This is a simple attempt at moving all the API stubs to their own file.
-> Another idea I had was throwing set_memory_{x,nx,ro,rw} in an asm-generic
-> file since those are commonly used for module setting across all arches.
-
-It seems like asm-generic would be cleaner, yes? Only a few archs have
-anything "special" happening in the resulting header files.
-
--Kees
-
+diff --git a/Documentation/devicetree/bindings/arm/gemini.txt b/Documentation/devicetree/bindings/arm/gemini.txt
+new file mode 100644
+index 000000000000..c3e8430202ef
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/gemini.txt
+@@ -0,0 +1,84 @@
++Cortina systems Gemini platforms
++
++The Gemini SoC is the project name for an ARMv4 FA525-based SoC originally
++produced by Storlink Semiconductor around 2005. The company was renamed
++later renamed Storm Semiconductor. The chip product name is Storlink SL3516.
++It was derived from earlier products from Storm named SL3316 (Centroid) and
++SL3512.
++
++Storm Semiconductor was acquired by Cortina Systems in 2008 and the SoC was
++produced and used for NAS and similar usecases. In 2014 Cortina Systems was
++in turn acquired by Inphi, who seem to have discontinued this product family.
++
++Required properties (in root node):
++	compatible = "cortina,gemini";
++
++Required nodes:
++
++- soc: the SoC should be represented by a simple bus encompassing all the
++  onchip devices, this is referred to as the soc bus node.
++
++- syscon: the soc bus node must have a system controller node pointing to the
++  global control registers, with the compatible string
++  "cortina,gemini-syscon", "syscon";
++
++- timer: the soc bus node must have a timer node pointing to the SoC timer
++  block, with the compatible string "cortina,gemini-timer"
++  See: clocksource/cortina,gemini-timer.txt
++
++- interrupt-controller: the sob bus node must have an interrupt controller
++  node pointing to the SoC interrupt controller block, with the compatible
++  string "cortina,gemini-interrupt-controller"
++  See interrupt-controller/cortina,gemini-interrupt-controller.txt
++
++Example:
++
++/ {
++	model = "Foo Gemini Machine";
++	compatible = "cortina,gemini";
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x8000000>;
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		compatible = "simple-bus";
++		interrupt-parent = <&intcon>;
++
++		syscon: syscon at 40000000 {
++			compatible = "cortina,gemini-syscon", "syscon";
++			reg = <0x40000000 0x1000>;
++		};
++
++		uart0: serial at 42000000 {
++			compatible = "ns16550a";
++			reg = <0x42000000 0x100>;
++			clock-frequency = <48000000>;
++			interrupts = <18 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++		};
++
++		timer at 43000000 {
++			compatible = "cortina,gemini-timer";
++			reg = <0x43000000 0x1000>;
++			interrupt-parent = <&intcon>;
++			interrupts = <14 IRQ_TYPE_EDGE_RISING>, /* Timer 1 */
++				     <15 IRQ_TYPE_EDGE_RISING>, /* Timer 2 */
++				     <16 IRQ_TYPE_EDGE_RISING>; /* Timer 3 */
++			syscon = <&syscon>;
++		};
++
++		intcon: interrupt-controller at 48000000 {
++			compatible = "cortina,gemini-interrupt-controller";
++			reg = <0x48000000 0x1000>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++	};
++};
 -- 
-Kees Cook
-Pixel Security
+2.9.3
