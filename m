@@ -1,67 +1,121 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 7 Feb 2017 11:16:02 +0100
-Subject: [PATCH] KVM: arm64: Increase number of memslots to 512
-In-Reply-To: <1484153537-20984-1-git-send-email-linucherian@gmail.com>
-References: <1484153537-20984-1-git-send-email-linucherian@gmail.com>
-Message-ID: <fd707698-ba58-f3cb-f0c5-6a4507585bd7@redhat.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 07 Feb 2017 12:26:32 +0200
+Subject: [PATCH v3 13/24] platform: add video-multiplexer subdevice driver
+In-Reply-To: <bd64a86e-d90c-f4aa-6f22-1c832e0b563f@gmail.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <2038922.a1tReKKdaL@avalon> <bd64a86e-d90c-f4aa-6f22-1c832e0b563f@gmail.com>
+Message-ID: <3823958.XNLmIv7GEv@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linu,
+Hi Steve,
 
-On 11/01/2017 17:52, linucherian at gmail.com wrote:
-> From: Linu Cherian <linu.cherian@cavium.com>
-> 
-> Having only 32 memslots is a real constraint for the maximum number of
-> PCI devices that can be assigned to a single guest. Assuming each PCI
-> device/virtual function having two memory BAR regions, we could assign
-> only 15 devices/virtual functions to a guest.
-> 
-> So increase KVM_MEM_SLOTS_NUM to 512 as done in other archs like x86 and
-> powerpc. For this, KVM_USER_MEM_SLOTS has been changed to 508.
-> 
-> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+On Monday 06 Feb 2017 15:10:46 Steve Longerbeam wrote:
+> On 02/06/2017 02:33 PM, Laurent Pinchart wrote:
+> > On Monday 06 Feb 2017 10:50:22 Hans Verkuil wrote:
+> >> On 02/05/2017 04:48 PM, Laurent Pinchart wrote:
+> >>> On Tuesday 24 Jan 2017 18:07:55 Steve Longerbeam wrote:
+> >>>> On 01/24/2017 04:02 AM, Philipp Zabel wrote:
+> >>>>> On Fri, 2017-01-20 at 15:03 +0100, Hans Verkuil wrote:
+> >>>>>>> +
+> >>>>>>> +int vidsw_g_mbus_config(struct v4l2_subdev *sd, struct
+> >>>>>>> v4l2_mbus_config *cfg)
 
-> ---
->  arch/arm/kvm/arm.c                | 3 +++
->  arch/arm64/include/asm/kvm_host.h | 2 +-
->  2 files changed, 4 insertions(+), 1 deletion(-)
+[snip]
+
+> >>>>>> I am not certain this op is needed at all. In the current kernel this
+> >>>>>> op is only used by soc_camera, pxa_camera and omap3isp (somewhat
+> >>>>>> dubious). Normally this information should come from the device tree
+> >>>>>> and there should be no need for this op.
+> >>>>>> 
+> >>>>>> My (tentative) long-term plan was to get rid of this op.
+> >>>>>> 
+> >>>>>> If you don't need it, then I recommend it is removed.
+> >>>> 
+> >>>> Hi Hans, the imx-media driver was only calling g_mbus_config to the
+> >>>> camera sensor, and it was doing that to determine the sensor's bus
+> >>>> type. This info was already available from parsing a v4l2_of_endpoint
+> >>>> from the sensor node. So it was simple to remove the g_mbus_config
+> >>>> calls, and instead rely on the parsed sensor v4l2_of_endpoint.
+> >>> 
+> >>> That's not a good point.
+> > 
+> > (mea culpa, s/point/idea/)
+> > 
+> >>> The imx-media driver must not parse the sensor DT node as it is not
+> >>> aware of what bindings the sensor is compatible with.
 > 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 8f92efa..a19389b 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -221,6 +221,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->  	case KVM_CAP_MAX_VCPUS:
->  		r = KVM_MAX_VCPUS;
->  		break;
-> +	case KVM_CAP_NR_MEMSLOTS:
-> +		r = KVM_USER_MEM_SLOTS;
-> +		break;
-This change is not documented in the commit message and I think it
-should since we now allow KVM/ARM to report the number of available user
-mem slots. I would personally suggest to put it in a sepate patch as it
-was done on s390 for instance
-(http://marc.info/?l=linux-s390&m=136422861316920&w=2)
-
-Thanks
-
-Eric
-
->  	case KVM_CAP_MSI_DEVID:
->  		if (!kvm)
->  			r = -EINVAL;
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index e505038..88f017d 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -30,7 +30,7 @@
->  
->  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
->  
-> -#define KVM_USER_MEM_SLOTS 32
-> +#define KVM_USER_MEM_SLOTS 508
->  #define KVM_PRIVATE_MEM_SLOTS 4
->  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
->  #define KVM_HALT_POLL_NS_DEFAULT 500000
+> Hi Laurent,
 > 
+> I don't really understand this argument. The sensor node has been found
+> by parsing the OF graph, so it is known to be a camera sensor node at
+> that point.
+
+All you know in the i.MX6 driver is that the remote node is a video source. 
+You can rely on the fact that it implements the OF graph bindings to locate 
+other ports in that DT node, but that's more or less it.
+
+DT properties are defined by DT bindings and thus qualified by a compatible 
+string. Unless you match on sensor compat strings in the i.MX6 driver (which 
+you shouldn't do, to keep the driver generic) you can't know for certain how 
+to parse the sensor node DT properties. For all you know, the video source 
+could be a bridge such as an HDMI to CSI-2 converter for instance, so you 
+can't even rely on the fact that it's a sensor.
+
+> >>> Information must instead be queried from the sensor subdev at runtime,
+> >>> through the g_mbus_config() operation.
+> >>> 
+> >>> Of course, if you can get the information from the imx-media DT node,
+> >>> that's certainly an option. It's only information provided by the sensor
+> >>> driver that you have no choice but query using a subdev operation.
+> >> 
+> >> Shouldn't this come from the imx-media DT node? BTW, why is omap3isp
+> >> using this?
+> > 
+> > It all depends on what type of information needs to be retrieved, and
+> > whether it can change at runtime or is fixed. Adding properties to the
+> > imx-media DT node is certainly fine as long as those properties describe
+> > the i.MX side.
+>
+> In this case the info needed is the media bus type. That info is most easily
+> available by calling v4l2_of_parse_endpoint() on the sensor's endpoint
+> node.
+
+I haven't had time to check the code in details yet, so I can't really comment 
+on what you need and how it should be implemented exactly.
+
+> The media bus type is not something that can be added to the
+> imx-media node since it contains no endpoint nodes.
+
+Agreed. You have endpoints in the CSI nodes though.
+
+> > In the omap3isp case, we use the operation to query whether parallel data
+> > contains embedded sync (BT.656) or uses separate h/v sync signals.
+> > 
+> >> The reason I am suspicious about this op is that it came from soc-camera
+> >> and predates the DT. The contents of v4l2_mbus_config seems very much
+> >> like a HW description to me, i.e. something that belongs in the DT.
+> > 
+> > Part of it is possibly outdated, but for buses that support multiple modes
+> > of operation (such as the parallel bus case described above) we need to
+> > make that information discoverable at runtime. Maybe this should be
+> > considered as related to Sakari's efforts to support VC/DT for CSI-2, and
+> > supported through the API he is working on.
+> 
+> That sounds interesting, can you point me to some info on this effort?
+
+Sure.
+
+http://git.retiisi.org.uk/?p=~sailus/linux.git;a=shortlog;h=refs/heads/vc
+
+> I've been thinking the DT should contain virtual channel info for CSI-2
+> buses.
+
+I don't think it should. CSI-2 virtual channels and data types should be 
+handled as a software concept, and thus supported through driver code without 
+involving DT.
+
+-- 
+Regards,
+
+Laurent Pinchart
