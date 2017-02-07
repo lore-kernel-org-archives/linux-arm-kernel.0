@@ -1,47 +1,48 @@
-From: luc.vanoostenryck@gmail.com (Van Oostenryck Luc)
-Date: Tue, 7 Feb 2017 21:33:15 +0100
-Subject: [RFC/PATCH] arm64: Rename macro arguments to silence sparse
-In-Reply-To: <5f7a5bf1-1285-d9c3-b892-c8f9f8ee6d63@codeaurora.org>
-References: <20170207010143.22371-1-sboyd@codeaurora.org>
- <d5bb9d5a-5b02-ffab-d404-bbda532b6c76@codeaurora.org>
- <20170207015047.4ffc3xzrqsuuzo54@macpro.local>
- <5f7a5bf1-1285-d9c3-b892-c8f9f8ee6d63@codeaurora.org>
-Message-ID: <CAExDi1T5+odE6j2mFpUheN+3RQwabvgKmqKHHgWReE3L6oQAVA@mail.gmail.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Tue, 7 Feb 2017 21:43:11 +0100
+Subject: [PATCH] ARM64: dts: meson-gxbb: set reset for ethernet
+In-Reply-To: <259f7102-591b-f251-5844-a864fa39e137@baylibre.com>
+References: <ec31eddc-d286-d0bc-0bdb-ae9d5014d82e@gmail.com>
+ <259f7102-591b-f251-5844-a864fa39e137@baylibre.com>
+Message-ID: <f2759982-28c6-db7b-2e0a-48f3ed90adf5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 7, 2017 at 9:11 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 02/06/2017 05:50 PM, Luc Van Oostenryck wrote:
->> On Mon, Feb 06, 2017 at 05:08:17PM -0800, Stephen Boyd wrote:
->>> On 02/06/2017 05:01 PM, Stephen Boyd wrote:
->>>> When I compile files with sparse, I get these sorts of warnings:
->>>>
->>>> arch/arm64/include/asm/lse.h:14:28: warning: Unknown escape 'l'
->>>> arch/arm64/include/asm/lse.h:14:37: warning: Unknown escape 'l'
->>>> arch/arm64/include/asm/alternative.h:172:28: warning: Unknown escape 'o'
->>>>
->>>> This is because sparse is trying to tokenize these files and sees
->>>> a line like this:
->>>>
->>>>  alternative_insn "\llsc", "\lse", ARM64_HAS_LSE_ATOMICS
->>>>
->>>> It gets past alternative_insn part and then sees the start of a
->>>> string with the double quote character. So sparse starts to parse
->>>> the string (eat_string() in the sparse code) but the string has
->>>> an escape character '\' in it. Sparse sees the escape character,
->>>> so it checks to see if it's an escape sequence, but '\l' isn't.
->>>> This causes sparse to spit out this warning of an unknown escape
->>>> sequence 'l'.
->>>>
->>>> In reality, sparse isn't going to use these macros anyway because
->>>> this whole thing is inside an __ASSEMBLER__ ifdef.
->> Yes, annoying. Conversion of escaped characters is supposed to be
->> done just after preprocessing. It's definitively a bug.
->
-> Ok. Thanks for the fixes to sparse. My hack patch can be safely ignored.
+Am 06.02.2017 um 10:29 schrieb Neil Armstrong:
+> On 01/29/2017 03:07 PM, Heiner Kallweit wrote:
+>> Add reset control for ethernet.
+>>
+>> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+>> ---
+>>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+>> index 39a774ad..753fddf6 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+>> @@ -113,6 +113,8 @@
+>>  		 <&clkc CLKID_FCLK_DIV2>,
+>>  		 <&clkc CLKID_MPLL2>;
+>>  	clock-names = "stmmaceth", "clkin0", "clkin1";
+>> +	resets = <&reset RESET_ETHERNET>;
+>> +	reset-names = "stmmaceth";
+>>  };
+>>  
+>>  &aobus {
+>>
+> 
+> Hi,
+> 
+> Actually this is a no-op since the Amlogic reset controller only supports "pulse" resets and the
+> STMMAC driver only supports "level" resets. If you want to use this reset, you must add the
+> corresponding support code in the meson8b glue code to call device_reset().
+> 
+Thanks for the hint! I did some further tests to check the "nature" of the reset register bits.
+Setting a reset bit and immediately reading it back always returns 0.
+And the chip spec doesn't mention whether writing a reset bit triggers a reset pulse or
+whether it asserts the reset line.
+Therefore I'm a little clueless whether it's possible to have "level" resets.
 
-Well, I don't know.
-Maybe it's still useful for everyone using the official version of sparse
-or an older one.
-
-Luc Van Oostenryck
+> Neil
+> 
