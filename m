@@ -1,49 +1,41 @@
 From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Tue, 7 Feb 2017 21:19:54 +0000
-Subject: [PATCH v3 0/5] Add Cavium ARCH_THUNDER2 platform
-Message-ID: <1486502399-2950-1-git-send-email-jnair@caviumnetworks.com>
+Date: Tue, 7 Feb 2017 21:19:55 +0000
+Subject: [PATCH v3 1/5] arm64: add THUNDER2 processor family
+In-Reply-To: <1486502399-2950-1-git-send-email-jnair@caviumnetworks.com>
+References: <1486502399-2950-1-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <1486502399-2950-2-git-send-email-jnair@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's another revision of the patchset, updated based on the last
-discussion.
+Add support for ThunderX2 CN99XX arm64 server processors. Introduce a
+new arm64 platform config option ARCH_THUNDER2 for these processors.
 
-This patchset adds support for the new ThunderX2 CN99XX processor
-family.
+ARCH_THUNDER2 has the same on-chip devices as ARCH_VULCAN, so select
+ARCH_VULCAN for now, until the driver dependencies are updated.
 
-Changes are to add: the config option, the required device tree files,
-the device tree bindings documentation and the defconfig entry.
+Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+---
+ arch/arm64/Kconfig.platforms | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Changes from v2 -> v3:
-* drop thunder-99xx.dtsi which was a copy of vulcan.dtsi, include file
-  instead
-* Don't add cavium,thunder2 processor compat ID, not needed until vulcan.dtsi
-  moves to dts/cavium/
-* select ARCH_VULCAN when ARCH_THUNDER2 is selected (for now)
-* dropped Ack from Rob H due to change in specific patch
-
-Changes from v1 -> v2:
-* split Kconfig.platforms changes and device tree changes
-* Added MAINTAINERS entry
-
-JC.
-
-Jayachandran C (5):
-  arm64: add THUNDER2 processor family
-  MAINTAINERS: Add Cavium ThunderX2 entry
-  arm64: dts: add device tree for ARCH_THUNDER2
-  dt-bindings: arm64 ARCH_THUNDER2 platform documentation
-  arm64: add ARCH_THUNDER2 to defconfig
-
- .../devicetree/bindings/arm/cavium-thunder2.txt    |  5 ++++
- MAINTAINERS                                        |  7 +++++
- arch/arm64/Kconfig.platforms                       |  8 +++++
- arch/arm64/boot/dts/cavium/Makefile                |  1 +
- arch/arm64/boot/dts/cavium/thunder-99xx.dts        | 34 ++++++++++++++++++++++
- arch/arm64/configs/defconfig                       |  1 +
- 6 files changed, 56 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder2.txt
- create mode 100644 arch/arm64/boot/dts/cavium/thunder-99xx.dts
-
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 715ef12..1ee377d 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -190,6 +190,14 @@ config ARCH_THUNDER
+ 	help
+ 	  This enables support for Cavium's Thunder Family of SoCs.
+ 
++config ARCH_THUNDER2
++	bool "Cavium ThunderX2 Server Processors"
++	select ARCH_VULCAN
++	select GPIOLIB
++	help
++	  This enables support for Cavium's ThunderX2 CN99XX family of
++	  server processors.
++
+ config ARCH_UNIPHIER
+ 	bool "Socionext UniPhier SoC Family"
+ 	select ARCH_HAS_RESET_CONTROLLER
 -- 
 2.7.4
