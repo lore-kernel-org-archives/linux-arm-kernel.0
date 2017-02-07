@@ -1,71 +1,103 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 7 Feb 2017 13:14:25 +0000
-Subject: Tegra baseline test results for v4.10-rc7
-Message-ID: <70f10494-b980-9c4d-4fb8-b72997b0105a@nvidia.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Tue, 7 Feb 2017 14:30:31 +0100
+Subject: [PATCH v2 3/3] gpiolib: Add GPIO initialization
+In-Reply-To: <20170207110950.zy5pzo2hq6hrvmr5@pengutronix.de>
+References: <1440920686-6892-1-git-send-email-mpa@pengutronix.de>
+ <1440920686-6892-4-git-send-email-mpa@pengutronix.de>
+ <20170207110950.zy5pzo2hq6hrvmr5@pengutronix.de>
+Message-ID: <20170207143031.4700300a@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.10-rc7.
-Logs and other details at:
+Hi,
 
-    https://nvtb.github.io//linux/test_v4.10-rc7/20170205153102/
+On Tue, 7 Feb 2017 12:09:50 +0100 Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> (Markus left Pengutronix, so I dropped his non-working address from the
+> recipients and pick up his discussion.)
+> 
+> as far as I see, this topic isn't closed yet. I want something similar,
+> maybe even a bit more than this patch achieves:
+> 
+> Some gpios should get a fixed direction. If such a gpio is configured as
+> output, a value should be specified. This is already working today with
+> gpio-hogs.
+> 
+> Now additionally I want to initialize some gpios but allow them to be
+> grabbed later. IMHO there are the following new cases:
+> 
+> It should be possible to:
+> 
+>  a) change the value of a gpio initially configured as output
+>  b) change the direction of a gpio initially configured as output
+>  c) change the direction of a gpio initially configured as input
+> 
+> IMHO the dts should describe which case should be applied to a given
+> gpio.
+> 
+> Is it a valid assumption that a gpio that can change direction is also
+> allowed to change value when configured as output? I assume this in the
+> following discussion, some details need to change if this shouldn't be
+> implied. (I think we need a d) then, not sure how this should look
+> though.)
+> 
+> I'd suggest the following description for these cases:
+> 
+>  a)
+>  	/*
+> 	 * initially configured as low output. Consumer can do
+> 	 * gpio_set_value(..., 1); but not gpio_direction_input(...);
+> 	 */
+>  	nodename {
+> 		gpio-hog;
+> 		gpios = <...>;
+> 		output-low-init;
+> 	};
+> 
+>  b)
+>  	/*
+> 	 * initially configured as low output. Consumer can do
+> 	 * gpio_set_value(..., 1); and gpio_direction_input(...);
+> 	 */
+>  	nodename {
+> 		gpio-hog;
+> 		gpios = <...>;
+> 		output-init-low;
+> 	};
+> 
+>  c)
+>  	/*
+> 	 * initially configured as input. Consumer can do
+> 	 * gpio_direction_output(..., ...) and then set the value
+> 	 * freely.
+> 	 */
+> 	 nodename {
+> 	 	gpio-hog;
+> 		gpios = <...>;
+> 		input-init;
+> 	};
+> 
+> I don't like that "output-low-init" and "output-init-low" are so
+> similar, so if someone suggests a better naming scheme, that would be
+> great.
+> 
+The position of the 'output' or 'input' within the word could
+imply whether the direction can be changed lateron or not. E.g.:
+output-init-low => an output whose state is initially low, but can be
+                   reconfigured to high lateron.
 
+init-low-output => a gpio that is initially configured as output low,  
+                   but can subsequently be reconfigured as input or to
+                   a different state
 
-Test summary
-------------
+init-input      => your case c)
+input           => a GPIO input that cannot be reconfigured
 
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+IOW: if the pin direction is mentioned in front of the 'init', it
+cannot be changed lateron, if it is mentioned after the 'init' it can
+be changed. If nothing follows 'init', the 'init' can be omitted.
+This would also allow an 'output-low' as a GPIO that is permanently
+grounded...
 
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.10-rc6 (566cf877a1fcb6d6dc0126b076aad062054c2637)):
-   text     data      bss    total  kernel
-  +3868      -16        0    +3852  defconfig
-   +556     -128        0     +428  multi_v7_defconfig
-   +636     -128        0     +508  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.10-rc6 (566cf877a1fcb6d6dc0126b076aad062054c2637))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
---
-nvpublic
+Lothar Wa?mann
