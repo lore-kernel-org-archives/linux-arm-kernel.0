@@ -1,31 +1,54 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Tue, 7 Feb 2017 21:19:59 +0000
-Subject: [PATCH v3 5/5] arm64: add ARCH_THUNDER2 to defconfig
-In-Reply-To: <1486502399-2950-1-git-send-email-jnair@caviumnetworks.com>
-References: <1486502399-2950-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <1486502399-2950-6-git-send-email-jnair@caviumnetworks.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 7 Feb 2017 22:21:16 +0100
+Subject: [PATCH] ARM: ux500: cut some platform data
+In-Reply-To: <CAOesGMidfUAomiTzStaby6TUDE0rhbQcC1P8v3UHaMVnG9FrXA@mail.gmail.com>
+References: <20170131210832.3377-1-linus.walleij@linaro.org>
+ <2080077.OMxztrf17j@wuerfel>
+ <CAOesGMidfUAomiTzStaby6TUDE0rhbQcC1P8v3UHaMVnG9FrXA@mail.gmail.com>
+Message-ID: <CACRpkdZMKP0XAZTXKcQGCOHRS+8Qmd4O=YWojhvTcZSibAWcAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow the default kernel build to boot on Cavium ThunderX2
-CN99XX processors.
+On Tue, Feb 7, 2017 at 8:21 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Tue, Feb 7, 2017 at 7:01 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Tuesday, January 31, 2017 10:08:32 PM CET Linus Walleij wrote:
+>>> This platform data is revoked: the drivers are getting the DMA
+>>> configuration from the device tree, it has been done like that
+>>> since the DMA support was merged and this data has not been used
+>>> since. The remaining auxdata is also unused.
+>>>
+>>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>> ---
+>>> ARM SoC folks: please apply this directly to the ux500/dev branch,
+>>> or if you want some separate cleanup branch. I originally
+>>> intended to send it along with other changes but those will land
+>>> in v4.12 or something instead.
+>>> ---
+>>>  arch/arm/mach-ux500/board-mop500-audio.c | 77 -----------------------------
+>>>  arch/arm/mach-ux500/board-mop500.h       | 17 -------
+>>>  arch/arm/mach-ux500/cpu-db8500.c         | 16 ------
+>>>  arch/arm/mach-ux500/ste-dma40-db8500.h   | 85 --------------------------------
+>>>  4 files changed, 195 deletions(-)
+>>>  delete mode 100644 arch/arm/mach-ux500/board-mop500-audio.c
+>>>  delete mode 100644 arch/arm/mach-ux500/board-mop500.h
+>>>  delete mode 100644 arch/arm/mach-ux500/ste-dma40-db8500.h
+>>
+>> Applied to next/soc, thanks!
+>
+> Linus,
+>
+> Looks like you missed to update the Makefile:
+> http://arm-soc.lixom.net/buildlogs/arm-soc/v4.10-rc5-794-gf8777f3/buildall.arm.allmodconfig.log.failed
 
-Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Ah, it's one of those missed by a dirty work tree.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 33b744d..7a9c262 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -53,6 +53,7 @@ CONFIG_ARCH_STRATIX10=y
- CONFIG_ARCH_TEGRA=y
- CONFIG_ARCH_SPRD=y
- CONFIG_ARCH_THUNDER=y
-+CONFIG_ARCH_THUNDER2=y
- CONFIG_ARCH_UNIPHIER=y
- CONFIG_ARCH_VEXPRESS=y
- CONFIG_ARCH_VULCAN=y
--- 
-2.7.4
+I pushed it to kernelorg but apparently the autobuild isn't on
+in this tree...
+
+> I'll fix up in our tree, no need to send a patch.
+
+Thanks a lot!
+
+Yours,
+Linus Walleij
