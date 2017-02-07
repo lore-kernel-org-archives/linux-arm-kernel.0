@@ -1,85 +1,53 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Tue, 7 Feb 2017 08:15:25 -0600
-Subject: [PATCH 05/10] staging: fsl-mc: remove slab cache for mc devices
+Date: Tue, 7 Feb 2017 08:15:27 -0600
+Subject: [PATCH 07/10] staging: fsl-mc: dpmng: drop unused prototype
 In-Reply-To: <20170207141530.12979-1-laurentiu.tudor@nxp.com>
 References: <20170207141530.12979-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170207141530.12979-6-laurentiu.tudor@nxp.com>
+Message-ID: <20170207141530.12979-8-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Let's drop the slab cache for objects
-until we actually have proof that it improves
-performance. This makes the code cleaner.
+The implementation was removed in commit:
+
+decd3d0cf (staging: fsl-mc: uprev binary interface to match MC v10.x)
+
+but the prototype was left behind.
+
+Also fix a message that was wrongly mentioning it.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/fsl-mc-bus.c | 17 +++--------------
- 1 file changed, 3 insertions(+), 14 deletions(-)
+ drivers/staging/fsl-mc/bus/fsl-mc-bus.c | 2 +-
+ drivers/staging/fsl-mc/include/dpmng.h  | 4 ----
+ 2 files changed, 1 insertion(+), 5 deletions(-)
 
 diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-index f310687..e607e98 100644
+index e607e98..47acb0a 100644
 --- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
 +++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-@@ -27,8 +27,6 @@
- #include "fsl-mc-private.h"
- #include "dprc-cmd.h"
- 
--static struct kmem_cache *mc_dev_cache;
--
- /**
-  * Default DMA mask for devices on a fsl-mc bus
-  */
-@@ -432,7 +430,7 @@ static void fsl_mc_device_release(struct device *dev)
- 	if (mc_bus)
- 		kfree(mc_bus);
- 	else
--		kmem_cache_free(mc_dev_cache, mc_dev);
-+		kfree(mc_dev);
- }
- 
- /**
-@@ -466,7 +464,7 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
- 		/*
- 		 * Allocate a regular fsl_mc_device object:
- 		 */
--		mc_dev = kmem_cache_zalloc(mc_dev_cache, GFP_KERNEL);
-+		mc_dev = kzalloc(sizeof(*mc_dev), GFP_KERNEL);
- 		if (!mc_dev)
- 			return -ENOMEM;
- 	}
-@@ -564,7 +562,7 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
- 	if (mc_bus)
- 		kfree(mc_bus);
- 	else
--		kmem_cache_free(mc_dev_cache, mc_dev);
-+		kfree(mc_dev);
- 
- 	return error;
- }
-@@ -823,14 +821,6 @@ static int __init fsl_mc_bus_driver_init(void)
- {
- 	int error;
- 
--	mc_dev_cache = kmem_cache_create("fsl_mc_device",
--					 sizeof(struct fsl_mc_device), 0, 0,
--					 NULL);
--	if (!mc_dev_cache) {
--		pr_err("Could not create fsl_mc_device cache\n");
--		return -ENOMEM;
--	}
--
- 	error = bus_register(&fsl_mc_bus_type);
+@@ -752,7 +752,7 @@ static int fsl_mc_bus_probe(struct platform_device *pdev)
+ 	error = dprc_get_container_id(mc_io, 0, &container_id);
  	if (error < 0) {
- 		pr_err("bus type registration failed: %d\n", error);
-@@ -870,7 +860,6 @@ static int __init fsl_mc_bus_driver_init(void)
- 	bus_unregister(&fsl_mc_bus_type);
+ 		dev_err(&pdev->dev,
+-			"dpmng_get_container_id() failed: %d\n", error);
++			"dprc_get_container_id() failed: %d\n", error);
+ 		goto error_cleanup_mc_io;
+ 	}
  
- error_cleanup_cache:
--	kmem_cache_destroy(mc_dev_cache);
- 	return error;
- }
- postcore_initcall(fsl_mc_bus_driver_init);
+diff --git a/drivers/staging/fsl-mc/include/dpmng.h b/drivers/staging/fsl-mc/include/dpmng.h
+index 7d8e255..170c07d 100644
+--- a/drivers/staging/fsl-mc/include/dpmng.h
++++ b/drivers/staging/fsl-mc/include/dpmng.h
+@@ -64,8 +64,4 @@ int mc_get_version(struct fsl_mc_io *mc_io,
+ 		   u32 cmd_flags,
+ 		   struct mc_version *mc_ver_info);
+ 
+-int dpmng_get_container_id(struct fsl_mc_io *mc_io,
+-			   u32 cmd_flags,
+-			   int *container_id);
+-
+ #endif /* __FSL_DPMNG_H */
 -- 
 1.8.3.1
