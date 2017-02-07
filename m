@@ -1,74 +1,49 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue,  7 Feb 2017 17:41:17 +0100
-Subject: [PATCH 04/10] ARM: dts: da850-evm: add the output port to the vpif
- node
-In-Reply-To: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1486485683-11427-5-git-send-email-bgolaszewski@baylibre.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 7 Feb 2017 10:51:03 -0600
+Subject: [PATCH v5 0/4] cpufreq: Introduce TI CPUFreq/OPP Driver
+Message-ID: <20170207165107.29394-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the vpif node with an output port with a single channel.
+Hi,
+This is v5 of the series to introduce the ti-cpufreq driver
+which parses SoC data and provides opp-supported-hw data to the
+OPP core in order to enable the proper OPPs for the silicon in use.
 
-NOTE: this is still just hardware description - the actual driver
-is registered using pdata-quirks.
+History:
+v4: http://www.spinics.net/lists/linux-omap/msg134629.html
+v3: http://www.spinics.net/lists/linux-omap/msg132733.html
+v2: http://www.spinics.net/lists/linux-omap/msg131601.html
+v1: http://www.spinics.net/lists/linux-omap/msg129089.html
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/boot/dts/da850-evm.dts | 14 +++++++++++---
- arch/arm/boot/dts/da850.dtsi    |  8 +++++++-
- 2 files changed, 18 insertions(+), 4 deletions(-)
+Very minor changes from v4:
+	* In patch 2 change "opp_table0" to "opp_table" in example
+	* Add acks on all patches (he approved change in patch 2) from Viresh
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 94938a3..3d6dd66 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -299,16 +299,24 @@
- 	status = "okay";
- 
- 	/* VPIF capture port */
--	port {
--		vpif_ch0: endpoint at 0 {
-+	port at 0 {
-+		vpif_input_ch0: endpoint at 0 {
- 			reg = <0>;
- 			bus-width = <8>;
- 		};
- 
--		vpif_ch1: endpoint at 1 {
-+		vpif_input_ch1: endpoint at 1 {
- 			reg = <1>;
- 			bus-width = <8>;
- 			data-shift = <8>;
- 		};
- 	};
-+
-+	/* VPIF display port */
-+	port at 1 {
-+		vpif_output_ch0: endpoint at 0 {
-+			reg = <0>;
-+			bus-width = <8>;
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 69ec5e7..768a58c 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -494,7 +494,13 @@
- 			status = "disabled";
- 
- 			/* VPIF capture port */
--			port {
-+			port at 0 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+
-+			/* VPIF display port */
-+			port at 1 {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 			};
+DT patches to enable this driver will follow after the DT binding is merged.
+Branch for testing, with updated DT nodes, pushed here [1].
+
+Regards,
+Dave
+
+[1] https://github.com/dgerlach/linux-pm/commits/upstream/ti-cpufreq-driver-new-v5
+
+Dave Gerlach (4):
+  PM / OPP: Expose _of_get_opp_desc_node as dev_pm_opp API
+  Documentation: dt: add bindings for ti-cpufreq
+  cpufreq: ti: Add cpufreq driver to determine available OPPs at runtime
+  cpufreq: dt: Don't use generic platdev driver for ti-cpufreq platforms
+
+ .../devicetree/bindings/cpufreq/ti-cpufreq.txt     | 128 ++++++++++
+ drivers/base/power/opp/of.c                        |   9 +-
+ drivers/cpufreq/Kconfig.arm                        |  11 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/cpufreq-dt-platdev.c               |   2 -
+ drivers/cpufreq/ti-cpufreq.c                       | 272 +++++++++++++++++++++
+ include/linux/pm_opp.h                             |   6 +
+ 7 files changed, 423 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
+ create mode 100644 drivers/cpufreq/ti-cpufreq.c
+
 -- 
-2.9.3
+2.11.0
