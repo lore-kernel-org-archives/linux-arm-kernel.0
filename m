@@ -1,37 +1,42 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 7 Feb 2017 13:38:59 +0100
-Subject: [PATCH v2 0/7] drm/rockchip: switch to drm_mm for support arm64
- iommu
-In-Reply-To: <1486456542-18675-1-git-send-email-mark.yao@rock-chips.com>
-References: <1486456542-18675-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <20170207123859.GD18315@ulmo.ba.sec>
+From: guy.shapiro@mobi-wize.com (Guy Shapiro)
+Date: Tue,  7 Feb 2017 14:54:12 +0200
+Subject: [PATCH 0/2] imx: Fix power-up on RTC alarm
+Message-ID: <1486472054-4367-1-git-send-email-guy.shapiro@mobi-wize.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2017 at 04:35:35PM +0800, Mark Yao wrote:
-> Some iommu patches on the series[0] "iommu/rockchip: Fix bugs and
-> enable on ARM64" already landed, So drm/rockchip related patches [1] and [2]
-> ready to landed, this series just rebase them to lastest drm-next.
-> 
-> And fix some bugs for drm/rockchip drm_mm
-> 
-> [0]: http://www.spinics.net/lists/arm-kernel/msg513781.html
-> [1]: https://patchwork.kernel.org/patch/9196367
-> [2]: https://patchwork.kernel.org/patch/9196369
-> 
-> Changes in v2:
-> Advices by Tomasz:
->   add some fixes patches from chromeos project.
+Currently, the syscon-poweroff driver cleans the alarm enable bit during power
+off. This behaviour makes it impossible to wake up the device using the RTC.
 
-I think those fixes should've been squashed into the patches that they
-fix. It's very unusual to merge patches upstream that are know to have
-been fixed already.
+The first patch adds a mask option to the syscon-poweroff driver. It uses the
+method suggested by Sebastian Reichel [0] to maintain compatibility with the
+old binding.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/20157287/attachment.sig>
+The second patch update the device trees for the snvs component users.
+Although I believe this should work on all the modified devices, I had only
+imx6ul to test with.
+
+Making the wake-up alarm work may require applying another patch [1], already
+accepted to the rtc-snvs driver. 
+
+Thanks,
+Guy.
+
+[0] http://www.spinics.net/lists/devicetree/msg161527.html
+[1] https://patchwork.ozlabs.org/patch/721155/
+
+Guy Shapiro (2):
+  power: reset: syscon-poweroff: add a mask property
+  ARM: dts: imx: update snvs-poweroff mask
+
+ .../bindings/power/reset/syscon-poweroff.txt          | 11 +++++++++--
+ arch/arm/boot/dts/imx6qdl.dtsi                        |  1 +
+ arch/arm/boot/dts/imx6sl.dtsi                         |  1 +
+ arch/arm/boot/dts/imx6sx.dtsi                         |  1 +
+ arch/arm/boot/dts/imx6ul.dtsi                         |  1 +
+ arch/arm/boot/dts/imx7s.dtsi                          |  1 +
+ drivers/power/reset/syscon-poweroff.c                 | 19 ++++++++++++++++---
+ 7 files changed, 30 insertions(+), 5 deletions(-)
+
+-- 
+2.1.4
