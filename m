@@ -1,82 +1,84 @@
-From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Tue, 7 Feb 2017 15:40:44 +0800
-Subject: [PATCH] [media] mtk-vcodec: fix build errors without DEBUG
-Message-ID: <1486453244-26094-1-git-send-email-minghsiu.tsai@mediatek.com>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Tue, 07 Feb 2017 09:02:55 +0100
+Subject: [PATCH v2 2/8] mmc: bcm2835: Add new driver for the sdhost
+ controller.
+In-Reply-To: <1708749883.208474.1486413240581@email.1und1.de>
+References: <1486123913-31705-1-git-send-email-kraxel@redhat.com>
+ <1486123913-31705-3-git-send-email-kraxel@redhat.com>
+ <1708749883.208474.1486413240581@email.1und1.de>
+Message-ID: <1486454575.24589.29.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix build errors after removing DEBUG definition.
+On Mo, 2017-02-06 at 21:34 +0100, Stefan Wahren wrote:
+> Hi Gerd,
+> 
+> first of all here my wishlist for the next round of this driver:
+> * compile test the series with ARM and ARM64
 
-Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
----
- drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c | 9 ++++-----
- drivers/media/platform/mtk-vcodec/vdec_vpu_if.c    | 5 ++---
- drivers/media/platform/mtk-vcodec/venc_vpu_if.c    | 4 +---
- 3 files changed, 7 insertions(+), 11 deletions(-)
+It is tested on both arm and arm64 (rpi2 + rpi3).
 
-diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-index 0746592..6219c7d 100644
---- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-+++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-@@ -1126,15 +1126,14 @@ static void vb2ops_vdec_buf_queue(struct vb2_buffer *vb)
- 		 * if there is no SPS header or picture info
- 		 * in bs
- 		 */
--		int log_level = ret ? 0 : 1;
- 
- 		src_buf = v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
- 		v4l2_m2m_buf_done(to_vb2_v4l2_buffer(src_buf),
- 					VB2_BUF_STATE_DONE);
--		mtk_v4l2_debug(log_level,
--				"[%d] vdec_if_decode() src_buf=%d, size=%zu, fail=%d, res_chg=%d",
--				ctx->id, src_buf->index,
--				src_mem.size, ret, res_chg);
-+		mtk_v4l2_debug(ret ? 0 : 1,
-+			       "[%d] vdec_if_decode() src_buf=%d, size=%zu, fail=%d, res_chg=%d",
-+			       ctx->id, src_buf->index,
-+			       src_mem.size, ret, res_chg);
- 		return;
- 	}
- 
-diff --git a/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c b/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
-index 5a24c51..1abd14e 100644
---- a/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
-+++ b/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
-@@ -70,9 +70,8 @@ void vpu_dec_ipi_handler(void *data, unsigned int len, void *priv)
- static int vcodec_vpu_send_msg(struct vdec_vpu_inst *vpu, void *msg, int len)
- {
- 	int err;
--	uint32_t msg_id = *(uint32_t *)msg;
- 
--	mtk_vcodec_debug(vpu, "id=%X", msg_id);
-+	mtk_vcodec_debug(vpu, "id=%X", *(uint32_t *)msg);
- 
- 	vpu->failure = 0;
- 	vpu->signaled = 0;
-@@ -80,7 +79,7 @@ static int vcodec_vpu_send_msg(struct vdec_vpu_inst *vpu, void *msg, int len)
- 	err = vpu_ipi_send(vpu->dev, vpu->id, msg, len);
- 	if (err) {
- 		mtk_vcodec_err(vpu, "send fail vpu_id=%d msg_id=%X status=%d",
--			       vpu->id, msg_id, err);
-+			       vpu->id, *(uint32_t *)msg, err);
- 		return err;
- 	}
- 
-diff --git a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
-index a01c759..0d882ac 100644
---- a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
-+++ b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
-@@ -79,10 +79,8 @@ static int vpu_enc_send_msg(struct venc_vpu_inst *vpu, void *msg,
- 
- 	status = vpu_ipi_send(vpu->dev, vpu->id, msg, len);
- 	if (status) {
--		uint32_t msg_id = *(uint32_t *)msg;
--
- 		mtk_vcodec_err(vpu, "vpu_ipi_send msg_id %x len %d fail %d",
--			       msg_id, len, status);
-+			       *(uint32_t *)msg, len, status);
- 		return -EINVAL;
- 	}
- 	if (vpu->failure)
--- 
-1.9.1
+> * add me in CC for all patches of the series
+
+Oops.  /me should be more careful when reading names.  I thought I had
+you on Cc:  Double-checked.  Turned out that was Stephen Warren ...
+
+> * run checkpatch.pl before submission
+
+Hmm?  Are there any issues?  /me has a pre-commit hook running
+checkpatch to avoid anything slipping though.
+
+> * apply the patch series to your cgit repo
+
+Branch pushed now: bcm2837-sdhost-squashed-v2
+
+> > The sdhci controller supports both sdcard and sdio.  The sdhost
+> > controller supports the sdcard only, but has better performance.  Also
+> 
+> Sorry, for the confusion. I was wrong. According to the registers the SDHOST should also support SDIO. It's a feature we could implement later.
+
+Ok.
+
+> > note that the rpi3 has sdio wifi, so driving the sdcard with the sdhost
+> > controller allows to use the sdhci controller for wifi support.
+> > 
+> > The configuration is done by devicetree via pin muxing.  Both SD
+> > controller are available on the same pins (2 pin groups = pin 22 to 27 +
+> > pin 48 to 53).  So it's possible to use both SD controllers at the same
+> > time with different pin groups.
+> > 
+> > The code was originally written by Phil Elwell in the downstream
+> > Rasbperry Pi tree, and I did a major cleanup on it (+319, -707 lines
+> > out of the original 2055) for inclusion.
+> 
+> I think it would be helpful to known the downstream commit, because this commit [1]
+> doesn't seem to be included.
+> 
+> [1] - https://github.com/raspberrypi/linux/commit/ea4b1c5c2ddbb6caba43ab9b0103542a4ca7e1f0
+> 
+> I've found and fixed a lot of issues in this version and i think it would be better if i send you the patches for squashing them all together. Here is the preview for my patch series:
+> 
+> Stefan Wahren (15):
+>   mmc: bcm2835: Add missing include for threaded irq
+>   mmc: bcm2835: Remove CMD_DALLY_US
+>   mmc: bcm2835: Fix pio_timeout handling
+>   mmc: bcm2835: Remove unnecessary return in bcm2835_data_irq
+>   mmc: bcm2835: Handle error cases during probe
+>   mmc: bcm2835: Print clk_max as decimal
+>   mmc: bcm2835: Downrate message in case of PIO fallback
+>   mmc: bcm2835: Don't unveil the data pointer
+>   mmc: bcm2835: remove unused host members
+>   mmc: bcm2835: Avoid unnecessary linebreaks
+>   mmc: bcm2835: Add leading zero to register dumps
+>   mmc: bcm2835: Align struct members with tabs
+>   mmc: bcm2835: Rearrange bcm2835_finish_request()
+>   mmc: bcm2835: Rearrange bcm2835_dma_complete_work()
+>   mmc: bcm2835: Rename Kconfig switch
+> 
+> I'll send it after my tests. In the following review i will mention only the issues which aren't fixed in my patch series.
+
+I'll pick up the patches and look at the remaining issues, new version
+later this week (i hope).
+
+thanks,
+  Gerd
