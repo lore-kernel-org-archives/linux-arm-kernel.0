@@ -1,116 +1,65 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Tue,  7 Feb 2017 11:02:51 +0800
-Subject: [PATCH v2 3/3] ASoC: zx-i2s: support zx296718 SoC for ZTE's i2s
- controller driver
-In-Reply-To: <1486436571-8682-1-git-send-email-baoyou.xie@linaro.org>
-References: <1486436571-8682-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <1486436571-8682-3-git-send-email-baoyou.xie@linaro.org>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Tue, 7 Feb 2017 03:07:37 +0000
+Subject: [PATCH 4/4] clk: mvebu: Expand mv98dx3236-core-clock support
+References: <20170203034012.29399-1-chris.packham@alliedtelesis.co.nz>
+ <20170203034012.29399-5-chris.packham@alliedtelesis.co.nz>
+ <20170206231400.GM25384@codeaurora.org>
+ <9974653ab84040c3b12fad075790c123@svr-chch-ex1.atlnz.lc>
+ <20170207010308.GN25384@codeaurora.org>
+ <ebe243d06f3542318e5365c560e6cf79@svr-chch-ex1.atlnz.lc>
+ <5a974d9d7260432087619486bf5d79ed@svr-chch-ex1.atlnz.lc>
+Message-ID: <6149d4126a214ac8b0b0184bd818bea6@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds zx296718 SoC support for ZTE's i2s controller driver.
+On 07/02/17 14:25, Chris Packham wrote:
+> On 07/02/17 14:13, Chris Packham wrote:
+>> On 07/02/17 14:03, Stephen Boyd wrote:
+>>> On 02/06, Chris Packham wrote:
+>>>> On 07/02/17 12:14, Stephen Boyd wrote:
+>>>>> On 02/03, Chris Packham wrote:
+>>>>>> The initial implementation in commit e120c17a70e5 ("clk: mvebu: support
+>>>>>> for 98DX3236 SoC") hardcoded a fixed value for the main PLL frequency.
+>>>>>> Port code from the Marvell supplied Linux kernel to support different
+>>>>>> PLL frequencies and provide clock gating support.
+>>>>>>
+>>>>>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>>>>>> ---
+>>>>>>  .../devicetree/bindings/clock/mvebu-core-clock.txt |   7 +
+>>>>>>  .../bindings/clock/mvebu-gated-clock.txt           |  11 ++
+>>>>>>  arch/arm/boot/dts/armada-xp-98dx3236.dtsi          |  14 +-
+>>>>>>  drivers/clk/mvebu/Makefile                         |   2 +-
+>>>>>>  drivers/clk/mvebu/armada-xp.c                      |  13 --
+>>>>>>  drivers/clk/mvebu/mv98dx3236.c                     | 144 +++++++++++++++++++++
+>>>>>
+>>>>> This mixes dts and clk driver changes. Any chance it can be split
+>>>>> up and just have the clk part go through clk tree? Otherwise, I
+>>>>> can ack this if you want to take it all through arm-soc?
+>>>>
+>>>> I'm happy to split it if it will make life easier.
+>>>>
+>>>
+>>> Well do things keep booting if the clk driver parts merge without
+>>> the associated dts changes? It's nice to maintain backwards
+>>> compatibility even for a short time to make the merge path
+>>> easier.
+>>>
+>>
+>> Unfortunately not. I could put the clk changes first (then I'd just have
+>> checkpatch.pl complaining about new compatible strings). But if the clk
+>> patches don't land before the dts changes the boards won't boot. However
+>> that affects 1 person that we know of (me).
+>>
+>
+> Actually I wonder if I can try a bit harder to keep a system booting.
+> The following might work
+> 1) add the compatible strings to the existing armada clock drivers.
+> 2) update the dts to use the new compatible strings.
+> 3) add the new driver and remove the compatible strings from the armada
+> drivers.
+>
+> #1 would still upset checkpatch.pl because the documentation would only
+> arrive in #2.
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- sound/soc/zte/zx-i2s.c | 45 +++++++++++++++++++++++++++++++++++----------
- 1 file changed, 35 insertions(+), 10 deletions(-)
-
-diff --git a/sound/soc/zte/zx-i2s.c b/sound/soc/zte/zx-i2s.c
-index ed7a56d..2afac69 100644
---- a/sound/soc/zte/zx-i2s.c
-+++ b/sound/soc/zte/zx-i2s.c
-@@ -95,12 +95,13 @@
- struct zx_i2s_info {
- 	struct snd_dmaengine_dai_dma_data	dma_playback;
- 	struct snd_dmaengine_dai_dma_data	dma_capture;
--	struct clk				*dai_clk;
-+	struct clk				*dai_wclk, *dai_pclk;
- 	void __iomem				*reg_base;
- 	int					master;
- 	resource_size_t				mapbase;
- };
- 
-+
- static void zx_i2s_tx_en(void __iomem *base, bool on)
- {
- 	unsigned long val;
-@@ -274,9 +275,14 @@ static int zx_i2s_hw_params(struct snd_pcm_substream *substream,
- 	val |= ZX_I2S_TIMING_CHN(ch_num);
- 	writel_relaxed(val, i2s->reg_base + ZX_I2S_TIMING_CTRL);
- 
--	if (i2s->master)
--		ret = clk_set_rate(i2s->dai_clk,
--				   params_rate(params) * ch_num * CLK_RAT);
-+	if (i2s->master) {
-+		unsigned long rate = params_rate(params) * ch_num * CLK_RAT;
-+
-+		ret = clk_set_rate(i2s->dai_wclk, rate);
-+		if (!ret && i2s->dai_pclk)
-+			ret = clk_set_rate(i2s->dai_pclk, rate);
-+	}
-+
- 	return ret;
- }
- 
-@@ -328,8 +334,19 @@ static int zx_i2s_startup(struct snd_pcm_substream *substream,
- 			  struct snd_soc_dai *dai)
- {
- 	struct zx_i2s_info *zx_i2s = dev_get_drvdata(dai->dev);
-+	int ret;
-+
-+	ret = clk_prepare_enable(zx_i2s->dai_wclk);
-+	if (ret)
-+		return ret;
- 
--	return clk_prepare_enable(zx_i2s->dai_clk);
-+	ret = clk_prepare_enable(zx_i2s->dai_pclk);
-+	if (ret) {
-+		clk_disable_unprepare(zx_i2s->dai_wclk);
-+		return ret;
-+	}
-+
-+	return ret;
- }
- 
- static void zx_i2s_shutdown(struct snd_pcm_substream *substream,
-@@ -337,7 +354,8 @@ static void zx_i2s_shutdown(struct snd_pcm_substream *substream,
- {
- 	struct zx_i2s_info *zx_i2s = dev_get_drvdata(dai->dev);
- 
--	clk_disable_unprepare(zx_i2s->dai_clk);
-+	clk_disable_unprepare(zx_i2s->dai_wclk);
-+	clk_disable_unprepare(zx_i2s->dai_pclk);
- }
- 
- static struct snd_soc_dai_ops zx_i2s_dai_ops = {
-@@ -381,10 +399,16 @@ static int zx_i2s_probe(struct platform_device *pdev)
- 	if (!zx_i2s)
- 		return -ENOMEM;
- 
--	zx_i2s->dai_clk = devm_clk_get(&pdev->dev, "tx");
--	if (IS_ERR(zx_i2s->dai_clk)) {
--		dev_err(&pdev->dev, "Fail to get clk\n");
--		return PTR_ERR(zx_i2s->dai_clk);
-+	zx_i2s->dai_wclk = devm_clk_get(&pdev->dev, "tx");
-+	if (IS_ERR(zx_i2s->dai_wclk)) {
-+		dev_err(&pdev->dev, "Fail to get wclk\n");
-+		return PTR_ERR(zx_i2s->dai_wclk);
-+	}
-+
-+	zx_i2s->dai_pclk = devm_clk_get(&pdev->dev, "pclk");
-+	if (IS_ERR(zx_i2s->dai_pclk)) {
-+		dev_info(&pdev->dev, "have no pclk\n");
-+		zx_i2s->dai_pclk = NULL;
- 	}
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -414,6 +438,7 @@ static int zx_i2s_probe(struct platform_device *pdev)
- 
- static const struct of_device_id zx_i2s_dt_ids[] = {
- 	{ .compatible = "zte,zx296702-i2s", },
-+	{ .compatible = "zte,zx296718-i2s", },
- 	{}
- };
- MODULE_DEVICE_TABLE(of, zx_i2s_dt_ids);
--- 
-2.7.4
+Actually upon testing #1 is unnecessary. I lose some of the gated clocks 
+but nothing that prevents booting.
