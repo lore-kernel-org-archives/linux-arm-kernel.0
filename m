@@ -1,52 +1,34 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Tue, 07 Feb 2017 13:05:06 -0800
-Subject: [GIT PULL 1/2] Broadcom dts changes for 4.11 (part 2)
-In-Reply-To: <1912177.f24aWX6xy5@wuerfel>
-References: <20170202020607.31682-1-f.fainelli@gmail.com>
- <1912177.f24aWX6xy5@wuerfel>
-Message-ID: <87shnpyanx.fsf@eliezer.anholt.net>
+Date: Tue,  7 Feb 2017 13:07:03 -0800
+Subject: [PATCH 3/3] ARM: dts: bcm283x: Add HDMI audio related properties
+In-Reply-To: <20170207210703.7082-1-eric@anholt.net>
+References: <20170207210703.7082-1-eric@anholt.net>
+Message-ID: <20170207210703.7082-3-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-> On Wednesday, February 1, 2017 6:06:07 PM CET Florian Fainelli wrote:
->> Please note that because of the "clk" topic branch merged by Eric, we end-up with
->> pulling in v4.10-rc2 which is responsible for the funny diff here.
->
-> It's generally better to avoid those back-merges entirely, that is not
-> the only problem with them. Our DT branch is already based on -rc3,
-> so it's not a back-merged for me, and I think that's ok when I send
-> it upstream.
->
-> However, I see that you do pull in these changes:
->
-> Eric Anholt (5):
->       clk: bcm2835: Don't rate change PLLs on behalf of DSI PLL dividers.
->       clk: bcm2835: Register the DSI0/DSI1 pixel clocks.
->       clk: bcm2835: Add leaf clock measurement support, disabled by default
->
-> I'd rather not have those in next/dt at all, and at the very least
-> we require an explanation in the changelog about why you are sending
-> them to arm-soc. I assume that they are present in the clk-next
-> tree and won't get rebased, but that's not clear from your pull
-> request.
->
-> Are you doing an incompatible DT binding change that requires changing
-> the dts files and the driver together? If so, that also needs to be
-> in the changelog (or avoided if at all possible).
+Add the dmas and dma-names properties to support HDMI audio.
 
-The clock maintainers merged my patches that created a new index in the
-DT binding, and produced a clk-bcm2835 branch for us to merge so that we
-could get the new index #defines.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ arch/arm/boot/dts/bcm283x.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-I guess I wasn't clear in my PR (https://lkml.org/lkml/2017/1/31/736)
-that the reason for the merge was just that we needed the #define.  I'll
-try to be better about that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/39d59b56/attachment.sig>
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index 9a44da190897..48a055d3f25e 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -491,6 +491,8 @@
+ 			clocks = <&clocks BCM2835_PLLH_PIX>,
+ 				 <&clocks BCM2835_CLOCK_HSM>;
+ 			clock-names = "pixel", "hdmi";
++			dmas = <&dma 17>;
++			dma-names = "audio-rx";
+ 			status = "disabled";
+ 		};
+ 
+-- 
+2.11.0
