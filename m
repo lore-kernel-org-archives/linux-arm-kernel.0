@@ -1,122 +1,58 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Tue, 7 Feb 2017 05:27:30 +0100
-Subject: [PATCH 2/2] DTS: dra7: Add "opp_high" opp node to support 1.5
- GHz SoC operation
-In-Reply-To: <58989547.9030002@ti.com>
-References: <1486135491-14223-1-git-send-email-lukma@denx.de>
- <1486135491-14223-2-git-send-email-lukma@denx.de>
- <e398ff96-dca7-7934-70b1-9a95c01d3b27@ti.com>
- <20170206152450.3739af18@jawa> <58989547.9030002@ti.com>
-Message-ID: <20170207052730.2192615e@jawa>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 7 Feb 2017 12:51:28 +0800
+Subject: [PATCH 08/10] iommu/mediatek: Make use of iommu_device_register
+ interface
+In-Reply-To: <1486397429-29327-9-git-send-email-joro@8bytes.org>
+Message-ID: <201702071256.v8ex5COX%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+Hi Joerg,
 
-> Hi,
-> On 02/06/2017 08:24 AM, Lukasz Majewski wrote:
-> > Hi Dave,
-> > 
-> >> On 02/03/2017 09:24 AM, Lukasz Majewski wrote:
-> >>> The "opp_high" property brings support for 1.5 GHz CPU frequency
-> >>> for TI's am57xx line of processors.
-> >>>
-> >>> Signed-off-by: Lukasz Majewski <lukma@denx.de>
-> >>> ---
-> >>>  arch/arm/boot/dts/dra7.dtsi | 5 +++++
-> >>>  1 file changed, 5 insertions(+)
-> >>>
-> >>
-> >> This can't be blindly enabled for all am57xx SoCs, there is a
-> >> forthcoming ti-cpufreq [1] driver that is needed that will decided
-> >> which OPPs can and cannot be enabled for the specific variant in
-> >> use.
-> > 
-> > Do you know if there is ongoing work on using Avs0 voltage (encoded
-> > in efuse) to control the per SoC PMIC voltage value when switching
-> > to opp_high (1.5 GHz)?
-> 
-> Yes, Viresh Kumar introduced multi-regulator support in the OPP core
-> recently [1] which I wrote a test driver for here [2] which hooks
-> into the OPP framework to do both ABB regulator scaling and also
-> programs the AVS0 voltages.
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.10-rc7]
+[cannot apply to iommu/next next-20170206]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Thanks for sharing this info.
+url:    https://github.com/0day-ci/linux/commits/Joerg-Roedel/Let-IOMMU-core-know-about-individual-IOMMUs/20170207-003931
+config: arm-allyesconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-> The current implementation I have cleaned
-> up will depend on the ti-cpufreq driver so once that is merged I will
-> send the AVS0 and ABB support driver upstream as well. 
+Note: the linux-review/Joerg-Roedel/Let-IOMMU-core-know-about-individual-IOMMUs/20170207-003931 HEAD 0b8fd0f8bbcfb693621ee90abffb0774c143549d builds fine.
+      It only hurts bisectibility.
 
-The ti-cpufreq.c seems to be solid and working, so I hope that it will
-be merged sooner than latter.
+All errors (new ones prefixed by >>):
 
-> If you are
-> curious you can look at current internal implementation here [3].
+   drivers/iommu/mtk_iommu.c: In function 'mtk_iommu_probe':
+>> drivers/iommu/mtk_iommu.c:587:13: error: 'struct iommu_device' has no member named 'fwnode'
+     data->iommu.fwnode = &pdev->dev.of_node->fwnode;
+                ^
 
-I will try it.
+vim +587 drivers/iommu/mtk_iommu.c
 
-> 
-> Regards,
-> Dave
-> 
-> [1] http://www.spinics.net/lists/devicetree/msg153212.html
-> [2] https://www.spinics.net/lists/kernel/msg2384336.html
-> [3]
-> http://git.ti.com/ti-linux-kernel/ti-linux-kernel/blobs/ti-lsk-linux-4.9.y/drivers/base/power/opp/ti-opp-supply.c
-> 
-> 
-> > 
-> > 
-> >>
-> >> Regards,
-> >> Dave
-> >>
-> >> [1] http://www.spinics.net/lists/devicetree/msg158967.html
-> >>
-> >>> diff --git a/arch/arm/boot/dts/dra7.dtsi
-> >>> b/arch/arm/boot/dts/dra7.dtsi index a860a56..5e678cd 100644
-> >>> --- a/arch/arm/boot/dts/dra7.dtsi
-> >>> +++ b/arch/arm/boot/dts/dra7.dtsi
-> >>> @@ -108,6 +108,11 @@
-> >>>  			opp-hz = /bits/ 64 <1176000000>;
-> >>>  			opp-microvolt = <1160000 885000 1160000>;
-> >>>  		};
-> >>> +
-> >>> +		opp_high at 1500000000 {
-> >>> +			opp-hz = /bits/ 64 <1500000000>;
-> >>> +			opp-microvolt = <1210000 950000 1250000>;
-> >>> +		};
-> >>>  	};
-> >>>
-> >>>  	/*
-> >>>
-> >>
-> > 
-> > 
-> > 
-> > 
-> > Best regards,
-> > 
-> > Lukasz Majewski
-> > 
-> > --
-> > 
-> > DENX Software Engineering GmbH,      Managing Director: Wolfgang
-> > Denk HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell,
-> > Germany Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email:
-> > wd at denx.de
-> > 
-> 
+   581		ret = iommu_device_sysfs_add(&data->iommu, dev, NULL,
+   582					     "mtk-iommu.%pa", &ioaddr);
+   583		if (ret)
+   584			return ret;
+   585	
+   586		data->iommu.ops    = &mtk_iommu_ops;
+ > 587		data->iommu.fwnode = &pdev->dev.of_node->fwnode;
+   588	
+   589		ret = iommu_device_register(&data->iommu);
+   590		if (ret)
 
-
-
-
-Best regards,
-
-Lukasz Majewski
-
---
-
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 59744 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/9072f208/attachment-0001.gz>
