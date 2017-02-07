@@ -1,43 +1,84 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Tue, 7 Feb 2017 12:42:11 +0100
-Subject: [PATCHv3 1/2] arch: Move CONFIG_DEBUG_RODATA and
- CONFIG_SET_MODULE_RONX to be common
-In-Reply-To: <1486427518-14819-2-git-send-email-labbott@redhat.com>
-References: <1486427518-14819-1-git-send-email-labbott@redhat.com>
- <1486427518-14819-2-git-send-email-labbott@redhat.com>
-Message-ID: <20170207114211.GB4973@osiris>
+From: alexander@alemayhu.com (Alexander Alemayhu)
+Date: Tue,  7 Feb 2017 12:53:08 +0100
+Subject: [PATCH] staging: vc04_services: remove unused functions
+Message-ID: <20170207115308.5208-1-alexander@alemayhu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2017 at 04:31:57PM -0800, Laura Abbott wrote:
-> 
-> There are multiple architectures that support CONFIG_DEBUG_RODATA and
-> CONFIG_SET_MODULE_RONX. These options also now have the ability to be
-> turned off at runtime. Move these to an architecture independent
-> location and make these options def_bool y for almost all of those
-> arches.
-> 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> v3: Make these configs selectable for arm. Include some documentation about
-> how the setup of the optional Kconfigs work as well. Stop spelling 'kenrel'
-> in prompt text.
-> ---
->  Documentation/security/self-protection.txt |  6 ++++++
->  arch/Kconfig                               | 34 ++++++++++++++++++++++++++++++
->  arch/arm/Kconfig                           |  4 ++++
->  arch/arm/Kconfig.debug                     | 11 ----------
->  arch/arm/mm/Kconfig                        | 12 -----------
->  arch/arm64/Kconfig                         |  5 ++---
->  arch/arm64/Kconfig.debug                   | 11 ----------
->  arch/parisc/Kconfig                        |  1 +
->  arch/parisc/Kconfig.debug                  | 11 ----------
->  arch/s390/Kconfig                          |  5 ++---
->  arch/s390/Kconfig.debug                    |  3 ---
->  arch/x86/Kconfig                           |  5 ++---
->  arch/x86/Kconfig.debug                     | 11 ----------
->  13 files changed, 51 insertions(+), 68 deletions(-)
+Looking at the history these calls were introduced in 71bad7f08641
+(staging: add bcm2708 vchiq driver, 2013-07-02) and they were not
+being used at all.
 
-For the s390 bits:
+Discovered using sparse and fixes the following output:
 
-Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
+drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c:816:1: warning: symbol 'vchi_readbuf_uint32' was not declared. Should it be static?
+drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c:827:1: warning: symbol 'vchi_writebuf_uint32' was not declared. Should it be static?
+drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c:841:1: warning: symbol 'vchi_readbuf_uint16' was not declared. Should it be static?
+drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c:852:1: warning: symbol 'vchi_writebuf_uint16' was not declared. Should it be static?
+
+Signed-off-by: Alexander Alemayhu <alexander@alemayhu.com>
+---
+ .../vc04_services/interface/vchiq_arm/vchiq_shim.c | 48 ----------------------
+ 1 file changed, 48 deletions(-)
+
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
+index 48984abc3854..cd0c332210ca 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_shim.c
+@@ -808,54 +808,6 @@ int32_t vchi_get_peer_version(const VCHI_SERVICE_HANDLE_T handle, short *peer_ve
+ }
+ EXPORT_SYMBOL(vchi_get_peer_version);
+ 
+-/* ----------------------------------------------------------------------
+- * read a uint32_t from buffer.
+- * network format is defined to be little endian
+- * -------------------------------------------------------------------- */
+-uint32_t
+-vchi_readbuf_uint32(const void *_ptr)
+-{
+-	const unsigned char *ptr = _ptr;
+-	return ptr[0] | (ptr[1] << 8) | (ptr[2] << 16) | (ptr[3] << 24);
+-}
+-
+-/* ----------------------------------------------------------------------
+- * write a uint32_t to buffer.
+- * network format is defined to be little endian
+- * -------------------------------------------------------------------- */
+-void
+-vchi_writebuf_uint32(void *_ptr, uint32_t value)
+-{
+-	unsigned char *ptr = _ptr;
+-	ptr[0] = (unsigned char)((value >> 0)  & 0xFF);
+-	ptr[1] = (unsigned char)((value >> 8)  & 0xFF);
+-	ptr[2] = (unsigned char)((value >> 16) & 0xFF);
+-	ptr[3] = (unsigned char)((value >> 24) & 0xFF);
+-}
+-
+-/* ----------------------------------------------------------------------
+- * read a uint16_t from buffer.
+- * network format is defined to be little endian
+- * -------------------------------------------------------------------- */
+-uint16_t
+-vchi_readbuf_uint16(const void *_ptr)
+-{
+-	const unsigned char *ptr = _ptr;
+-	return ptr[0] | (ptr[1] << 8);
+-}
+-
+-/* ----------------------------------------------------------------------
+- * write a uint16_t into the buffer.
+- * network format is defined to be little endian
+- * -------------------------------------------------------------------- */
+-void
+-vchi_writebuf_uint16(void *_ptr, uint16_t value)
+-{
+-	unsigned char *ptr = _ptr;
+-	ptr[0] = (value >> 0)  & 0xFF;
+-	ptr[1] = (value >> 8)  & 0xFF;
+-}
+-
+ /***********************************************************
+  * Name: vchi_service_use
+  *
+-- 
+2.11.1
