@@ -1,39 +1,62 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue, 7 Feb 2017 14:32:15 +0530
-Subject: [PATCH v2 2/5] async_tx: Handle DMA devices having support for
- fewer PQ coefficients
-In-Reply-To: <CAPcyv4gbV1yf52JrejW+Dn3wOPn7Er+8HWdu2qsW0+Qm+cRr9g@mail.gmail.com>
-References: <1486455406-11202-1-git-send-email-anup.patel@broadcom.com>
- <1486455406-11202-3-git-send-email-anup.patel@broadcom.com>
- <CAPcyv4gbV1yf52JrejW+Dn3wOPn7Er+8HWdu2qsW0+Qm+cRr9g@mail.gmail.com>
-Message-ID: <CAALAos_yhXufdt79KWY0eugjF5oyJ8+NcPh2E-dEXnSQu2WhhA@mail.gmail.com>
+From: christophe.leroy@c-s.fr (Christophe Leroy)
+Date: Tue,  7 Feb 2017 10:05:09 +0100 (CET)
+Subject: [PATCH 1/2] net: ethernet: ucc_geth: fix MEM_PART_MURAM mode
+In-Reply-To: <cover.1486456900.git.christophe.leroy@c-s.fr>
+References: <cover.1486456900.git.christophe.leroy@c-s.fr>
+Message-ID: <d25ee7a13b60dcd005c59169feacb18fb69a06c1.1486456900.git.christophe.leroy@c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 7, 2017 at 1:57 PM, Dan Williams <dan.j.williams@intel.com> wrote:
-> On Tue, Feb 7, 2017 at 12:16 AM, Anup Patel <anup.patel@broadcom.com> wrote:
->> The DMAENGINE framework assumes that if PQ offload is supported by a
->> DMA device then all 256 PQ coefficients are supported. This assumption
->> does not hold anymore because we now have BCM-SBA-RAID offload engine
->> which supports PQ offload with limited number of PQ coefficients.
->>
->> This patch extends async_tx APIs to handle DMA devices with support
->> for fewer PQ coefficients.
->>
->> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->
-> I don't like this approach. Define an interface for md to query the
-> offload engine once at the beginning of time. We should not be adding
-> any new extensions to async_tx.
+Since commit 5093bb965a163 ("powerpc/QE: switch to the cpm_muram
+implementation"), muram area is not part of immrbar mapping anymore
+so immrbar_virt_to_phys() is not usable anymore.
 
-Even if we do capability checks in Linux MD, we still need a way
-for DMAENGINE drivers to advertise number of PQ coefficients
-handled by the HW.
+Fixes: 5093bb965a163 ("powerpc/QE: switch to the cpm_muram implementation)
+Signed-off-by: Christophe Leroy <christophe.leroy@c-s.fr>
+---
+ drivers/net/ethernet/freescale/ucc_geth.c | 8 +++-----
+ include/soc/fsl/qe/qe.h                   | 1 +
+ 2 files changed, 4 insertions(+), 5 deletions(-)
 
-I agree capability checks should be done once in Linux MD but I don't
-see why this has to be part of BCM-SBA-RAID driver patches. We need
-separate patchsets to address limitations of async_tx framework.
-
-Regards,
-Anup
+diff --git a/drivers/net/ethernet/freescale/ucc_geth.c b/drivers/net/ethernet/freescale/ucc_geth.c
+index 3f7ae9f..f77ba9f 100644
+--- a/drivers/net/ethernet/freescale/ucc_geth.c
++++ b/drivers/net/ethernet/freescale/ucc_geth.c
+@@ -2594,11 +2594,10 @@ static int ucc_geth_startup(struct ucc_geth_private *ugeth)
+ 		} else if (ugeth->ug_info->uf_info.bd_mem_part ==
+ 			   MEM_PART_MURAM) {
+ 			out_be32(&ugeth->p_send_q_mem_reg->sqqd[i].bd_ring_base,
+-				 (u32) immrbar_virt_to_phys(ugeth->
+-							    p_tx_bd_ring[i]));
++				 (u32)qe_muram_dma(ugeth->p_tx_bd_ring[i]));
+ 			out_be32(&ugeth->p_send_q_mem_reg->sqqd[i].
+ 				 last_bd_completed_address,
+-				 (u32) immrbar_virt_to_phys(endOfRing));
++				 (u32)qe_muram_dma(endOfRing));
+ 		}
+ 	}
+ 
+@@ -2844,8 +2843,7 @@ static int ucc_geth_startup(struct ucc_geth_private *ugeth)
+ 		} else if (ugeth->ug_info->uf_info.bd_mem_part ==
+ 			   MEM_PART_MURAM) {
+ 			out_be32(&ugeth->p_rx_bd_qs_tbl[i].externalbdbaseptr,
+-				 (u32) immrbar_virt_to_phys(ugeth->
+-							    p_rx_bd_ring[i]));
++				 (u32)qe_muram_dma(ugeth->p_rx_bd_ring[i]));
+ 		}
+ 		/* rest of fields handled by QE */
+ 	}
+diff --git a/include/soc/fsl/qe/qe.h b/include/soc/fsl/qe/qe.h
+index 70339d7..0cd4c1147 100644
+--- a/include/soc/fsl/qe/qe.h
++++ b/include/soc/fsl/qe/qe.h
+@@ -243,6 +243,7 @@ static inline int qe_alive_during_sleep(void)
+ #define qe_muram_free cpm_muram_free
+ #define qe_muram_addr cpm_muram_addr
+ #define qe_muram_offset cpm_muram_offset
++#define qe_muram_dma cpm_muram_dma
+ 
+ #define qe_setbits32(_addr, _v) iowrite32be(ioread32be(_addr) |  (_v), (_addr))
+ #define qe_clrbits32(_addr, _v) iowrite32be(ioread32be(_addr) & ~(_v), (_addr))
+-- 
+2.10.1
