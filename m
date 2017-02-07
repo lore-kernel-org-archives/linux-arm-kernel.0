@@ -1,43 +1,77 @@
-From: abdallah.meziti.pro@gmail.com (AbdAllah-MEZITI)
-Date: Wed,  8 Feb 2017 00:45:47 +0100
-Subject: [PATCH v3] staging: bcm2835-audio: Remove the initialization of
- static pointers.
-Message-ID: <1486511160-2992-1-git-send-email-abdallah.meziti.pro@gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 07 Feb 2017 15:52:43 -0800
+Subject: [GIT PULL 1/2] Broadcom dts changes for 4.11 (part 2)
+In-Reply-To: <CAK8P3a2FtHbtvnzdf6UN2JxA4Uj34AW_bhD1TuBQJJbU5TdoVA@mail.gmail.com>
+References: <20170202020607.31682-1-f.fainelli@gmail.com>
+ <1912177.f24aWX6xy5@wuerfel> <077dc1a1-7069-dd84-5f23-1f88420b05e5@gmail.com>
+ <CAK8P3a2FtHbtvnzdf6UN2JxA4Uj34AW_bhD1TuBQJJbU5TdoVA@mail.gmail.com>
+Message-ID: <87wpd1h838.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In C a static pointer will be initialized to NULL.
-The ?6.7.8 of the ISO/IEC 9899:1999 (E) document says that:
-If an object that has static storage duration is not initialized
-explicitly, then:
- __ if it has pointer type, it is initialized to a null pointer.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Signed-off-by: AbdAllah-MEZITI <abdallah.meziti.pro@gmail.com>
+> On Tue, Feb 7, 2017 at 9:59 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> On 02/07/2017 06:49 AM, Arnd Bergmann wrote:
+>>> On Wednesday, February 1, 2017 6:06:07 PM CET Florian Fainelli wrote:
+>>>> Please note that because of the "clk" topic branch merged by Eric, we end-up with
+>>>> pulling in v4.10-rc2 which is responsible for the funny diff here.
+>>>
+>>> It's generally better to avoid those back-merges entirely, that is not
+>>> the only problem with them. Our DT branch is already based on -rc3,
+>>> so it's not a back-merged for me, and I think that's ok when I send
+>>> it upstream.
+>>>
+>>> However, I see that you do pull in these changes:
+>>>
+>>> Eric Anholt (5):
+>>>       clk: bcm2835: Don't rate change PLLs on behalf of DSI PLL dividers.
+>>>       clk: bcm2835: Register the DSI0/DSI1 pixel clocks.
+>>>       clk: bcm2835: Add leaf clock measurement support, disabled by default
+>>>
+>>> I'd rather not have those in next/dt at all, and at the very least
+>>> we require an explanation in the changelog about why you are sending
+>>> them to arm-soc. I assume that they are present in the clk-next
+>>> tree and won't get rebased, but that's not clear from your pull
+>>> request.
+>>
+>> OK, the explanation is provided in the merge commit, but I suppose I
+>> should have added this again to the pull request changelog.
+>
+> Yes, more generally speaking, the pull request changelog (i.e. the tag
+> description) should give me enough information to decide whether to
+> merge it or not.
+>
+>>> If you send the other changes again today, I'll pull them right away,
+>>> and then we can talk about what we do for the clk-bcm2835 changes.
+>>
+>> OK, let me try to sync up with Eric on this and see if we can come up
+>> with something better. A pull request based on v4.10-rc3 would be
+>> acceptable, right?
+>
+> Yes, basing on -rc3 is fine. I think you pulled Eric's branch into yours
+> last, so if you just send the pull request without that merge, and without
+> rebasing, then we can take all other changes.
+>
+> For the bcm2835, try coming up with a branch that doesn't need the
+> dependency and send that separately. There are three common ways
+> to do that:
+>
+> - rebase the patches on top of the commit that introduced the header file
+>   change, provided that one sits directly on top of an -rc without any
+>   driver patches below it (or in the same patch)
+> - change the dts files to refer to the clk by numeric value instead of the
+>   macro name, then follow up with a patch to use the name for a later
+>   release
+> - defer the whole branch for the next kernel release.
 
-v2: -fix the line-wrapping of the changelog.
-    -fix the ref. documentation: C99 standards release,
-	and not the draft.
-    -this patch is the Task 10 Eudyptula Challenge
-	that only fix one code style problem.
-v3: -fix the subject prefix: must be based on the previous submissions.
----
- drivers/staging/bcm2835-audio/bcm2835.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/staging/bcm2835-audio/bcm2835.c b/drivers/staging/bcm2835-audio/bcm2835.c
-index a84d74d..265fe55 100644
---- a/drivers/staging/bcm2835-audio/bcm2835.c
-+++ b/drivers/staging/bcm2835-audio/bcm2835.c
-@@ -28,8 +28,8 @@
-  * to debug if we run into issues
-  */
- 
--static struct snd_card *g_card = NULL;
--static struct bcm2835_chip *g_chip = NULL;
-+static struct snd_card *g_card;
-+static struct bcm2835_chip *g_chip;
- 
- static int snd_bcm2835_free(struct bcm2835_chip *chip)
- {
--- 
-2.7.4
+OK, if we can't merge the topic branch, I'll just punt on this for the
+next release.  From previous topic branch merges, I thought the rule was
+"it's OK as long as you have the subsystem maintainer's ack."
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/83f1f943/attachment.sig>
