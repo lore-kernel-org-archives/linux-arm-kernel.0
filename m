@@ -1,19 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 07 Feb 2017 17:23:39 +0100
-Subject: [GIT PULL 2/4] soc: samsung: pmu for v4.11, third round
-In-Reply-To: <20170202183008.23500-3-krzk@kernel.org>
-References: <20170202183008.23500-1-krzk@kernel.org>
- <20170202183008.23500-3-krzk@kernel.org>
-Message-ID: <2663174.01hSumXrum@wuerfel>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 7 Feb 2017 22:12:08 +0530
+Subject: [PATCH v2 2/5] async_tx: Handle DMA devices having support for
+ fewer PQ coefficients
+In-Reply-To: <CAALAos_yhXufdt79KWY0eugjF5oyJ8+NcPh2E-dEXnSQu2WhhA@mail.gmail.com>
+References: <1486455406-11202-1-git-send-email-anup.patel@broadcom.com>
+ <1486455406-11202-3-git-send-email-anup.patel@broadcom.com>
+ <CAPcyv4gbV1yf52JrejW+Dn3wOPn7Er+8HWdu2qsW0+Qm+cRr9g@mail.gmail.com>
+ <CAALAos_yhXufdt79KWY0eugjF5oyJ8+NcPh2E-dEXnSQu2WhhA@mail.gmail.com>
+Message-ID: <20170207164207.GI19244@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 2, 2017 8:30:06 PM CET Krzysztof Kozlowski wrote:
-> 3rd round of improvements for Exynos PMU driver for v4.11:
-> 1. Add defines in header for future patches changing the pad
->    retention control.
+On Tue, Feb 07, 2017 at 02:32:15PM +0530, Anup Patel wrote:
+> On Tue, Feb 7, 2017 at 1:57 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+> > On Tue, Feb 7, 2017 at 12:16 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+> >> The DMAENGINE framework assumes that if PQ offload is supported by a
+> >> DMA device then all 256 PQ coefficients are supported. This assumption
+> >> does not hold anymore because we now have BCM-SBA-RAID offload engine
+> >> which supports PQ offload with limited number of PQ coefficients.
+> >>
+> >> This patch extends async_tx APIs to handle DMA devices with support
+> >> for fewer PQ coefficients.
+> >>
+> >> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> >> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> >
+> > I don't like this approach. Define an interface for md to query the
+> > offload engine once at the beginning of time. We should not be adding
+> > any new extensions to async_tx.
 > 
+> Even if we do capability checks in Linux MD, we still need a way
+> for DMAENGINE drivers to advertise number of PQ coefficients
+> handled by the HW.
 
-Pulled into next/drivers, thanks!
+If the question is only for advertising caps, then why not do as done
+for dma_get_slave_caps(). you can add dma_get_pq_caps() so that clients (md)
+in this case would know the HW capability.
 
-	Arnd
+> I agree capability checks should be done once in Linux MD but I don't
+> see why this has to be part of BCM-SBA-RAID driver patches. We need
+> separate patchsets to address limitations of async_tx framework.
+> 
+> Regards,
+> Anup
+
+-- 
+~Vinod
