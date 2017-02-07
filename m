@@ -1,219 +1,130 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed,  8 Feb 2017 02:30:42 +0800
-Subject: [PATCH v4 9/9] arm64: dts: sunxi: add support for the Orange Pi PC 2
- board
-In-Reply-To: <20170207183042.62699-1-icenowy@aosc.xyz>
-References: <20170207183042.62699-1-icenowy@aosc.xyz>
-Message-ID: <20170207183042.62699-10-icenowy@aosc.xyz>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 7 Feb 2017 12:40:29 -0600
+Subject: [PATCH 12/22 v2] ARM: dts: add top-level DT bindings for Cortina
+ Gemini
+In-Reply-To: <20170201194632.18455-1-linus.walleij@linaro.org>
+References: <20170201194632.18455-1-linus.walleij@linaro.org>
+Message-ID: <20170207184029.tbblqmkp6vcuvo3x@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+On Wed, Feb 01, 2017 at 08:46:32PM +0100, Linus Walleij wrote:
+> This adds the top level SoC bindings for Cortina systems Gemini
+> platforms.
+> 
+> Cc: Janos Laube <janos.dev@gmail.com>
+> Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Rename required property "intcon" to "interrupt-controller"
+> - Elaborate a bit on the SoC origins
+> - Put the example DTS SoC nodes in a soc {} node
+> ---
+>  Documentation/devicetree/bindings/arm/gemini.txt | 81 ++++++++++++++++++++++++
+>  1 file changed, 81 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/gemini.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/gemini.txt b/Documentation/devicetree/bindings/arm/gemini.txt
+> new file mode 100644
+> index 000000000000..eb788302d3e9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/gemini.txt
+> @@ -0,0 +1,81 @@
+> +Cortina systems Gemini platforms
+> +
+> +The Gemini SoC is the project name for an ARMv4 FA525-based SoC originally
+> +produced by Storlink Semiconductor around 2005. The company was renamed
+> +later renamed Storm Semiconductor. The chip product name is Storlink SL3516.
+> +It was derived from earlier products from Storm named SL3316 (Centroid) and
+> +SL3512.
+> +
+> +Storm Semiconductor was acquired by Cortina Systems in 2008 and the SoC was
+> +produced and used for NAS and similar usecases. In 2014 Cortina Systems was
+> +in turn acquired by Inphi, who seem to have discontinued this product family.
+> +
+> +Required properties (in root node):
+> +	compatible = "cortina,gemini";
+> +
+> +Required nodes:
+> +
+> +- syscon: the root node must have a system controller node pointing to the
 
-The Orange Pi PC 2 is a typical single board computer using the
-Allwinner H5 SoC. Apart from the usual suspects it features three
-separately driven USB ports and a Gigabit Ethernet port.
-Also it has a SPI NOR flash soldered, from which the board can boot
-from. This enables the SBC to behave like a "real computer" with
-built-in firmware.
+the soc bus node...
 
-Add the board specific .dts file, which includes the H5 .dtsi and
-enables the peripherals that we support so far.
+> +  global control registers, with the compatible string
+> +  "cortina,gemini-syscon", "syscon";
+> +
+> +- timer: the root node must have a timer node pointing to the SoC timer
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-[Icenowy: dropped all GPIO pinctrl nodes, change red LED gpio]
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-Changes in v2:
-- Dropped all GPIO pinctrl nodes.
-- Changed red LED gpio to the correct one.
-- Added audio codec configuration copied from Orange Pi PC.
+ditto
 
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 164 +++++++++++++++++++++
- 2 files changed, 165 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index bc6f342be59f..244e8b7565f9 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -1,5 +1,6 @@
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-new file mode 100644
-index 000000000000..79784cba806c
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-@@ -0,0 +1,164 @@
-+/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun50i-h5.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Xunlong Orange Pi PC 2";
-+	compatible = "xunlong,orangepi-pc2", "allwinner,sun50i-h5";
-+
-+	reg_vcc3v3: vcc3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		pwr_led {
-+			label = "orangepi:green:pwr";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+
-+		status_led {
-+			label = "orangepi:red:status";
-+			gpios = <&pio 0 20 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	r_gpio_keys {
-+		compatible = "gpio-keys";
-+
-+		sw4 {
-+			label = "sw4";
-+			linux,code = <BTN_0>;
-+			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&codec {
-+	allwinner,audio-routing =
-+		"Line Out", "LINEOUT",
-+		"MIC1", "Mic",
-+		"Mic",  "MBIAS";
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&ehci2 {
-+	status = "okay";
-+};
-+
-+&ehci3 {
-+	status = "okay";
-+};
-+
-+&ir {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&ohci2 {
-+	status = "okay";
-+};
-+
-+&ohci3 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins>;
-+	status = "disabled";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins>;
-+	status = "disabled";
-+};
-+
-+&usbphy {
-+	/* USB VBUS is always on */
-+	status = "okay";
-+};
--- 
-2.11.0
+> +  block, with the compatible string "cortina,gemini-timer"
+> +  See: clocksource/cortina,gemini-timer.txt
+> +
+> +- interrup-controller: the root node must have an interrupt controller
+> +  node pointing to the SoC interrupt controller block, with the compatible
+> +  string "cortina,gemini-interrupt-controller"
+> +  See interrupt-controller/cortina,gemini-interrupt-controller.txt
+> +
+> +Example:
+> +
+> +/ {
+> +	model = "Foo Gemini Machine";
+> +	compatible = "cortina,gemini";
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x8000000>;
+> +	};
+> +
+> +	soc {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +		compatible = "simple-bus";
+> +		interrupt-parent = <&intcon>;
+> +
+> +		syscon: syscon at 40000000 {
+> +			compatible = "cortina,gemini-syscon", "syscon";
+> +			reg = <0x40000000 0x1000>;
+> +		};
+> +
+> +		uart0: serial at 42000000 {
+> +			compatible = "ns16550a";
+> +			reg = <0x42000000 0x100>;
+> +			clock-frequency = <48000000>;
+> +			interrupts = <18 IRQ_TYPE_LEVEL_HIGH>;
+> +			reg-shift = <2>;
+> +		};
+> +
+> +		timer at 43000000 {
+> +			compatible = "cortina,gemini-timer";
+> +			reg = <0x43000000 0x1000>;
+> +			interrupt-parent = <&intcon>;
+> +			interrupts = <14 IRQ_TYPE_EDGE_RISING>, /* Timer 1 */
+> +				     <15 IRQ_TYPE_EDGE_RISING>, /* Timer 2 */
+> +				     <16 IRQ_TYPE_EDGE_RISING>; /* Timer 3 */
+> +			syscon = <&syscon>;
+> +		};
+> +
+> +		intcon: interrupt-controller at 48000000 {
+> +			compatible = "cortina,gemini-interrupt-controller";
+> +			reg = <0x48000000 0x1000>;
+> +			interrupt-controller;
+> +			#interrupt-cells = <2>;
+> +		};
+> +	};
+> +};
+> -- 
+> 2.9.3
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
