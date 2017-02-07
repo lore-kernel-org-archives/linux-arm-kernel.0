@@ -1,46 +1,67 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Tue, 7 Feb 2017 18:09:04 +0800
-Subject: [PATCH v4 3/3] i2c: zx2967: add i2c controller driver for ZTE's
- zx2967 family
-In-Reply-To: <1486351569-4814-3-git-send-email-baoyou.xie@linaro.org>
-References: <1486351569-4814-1-git-send-email-baoyou.xie@linaro.org>
- <1486351569-4814-3-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <16935e86-cdd7-ad21-d72a-4183a0d01934@linaro.org>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 7 Feb 2017 11:16:02 +0100
+Subject: [PATCH] KVM: arm64: Increase number of memslots to 512
+In-Reply-To: <1484153537-20984-1-git-send-email-linucherian@gmail.com>
+References: <1484153537-20984-1-git-send-email-linucherian@gmail.com>
+Message-ID: <fd707698-ba58-f3cb-f0c5-6a4507585bd7@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?02?06? 11:26, Baoyou Xie wrote:
-> +}
-> +
-> +static irqreturn_t zx2967_i2c_isr(int irq, void *dev_id)
-> +{
-> +	u32 status;
-> +	struct zx2967_i2c_info *zx_i2c = (struct zx2967_i2c_info *)dev_id;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&zx_i2c->lock, flags);
-> +
-> +	status = zx2967_i2c_readl(zx_i2c, REG_STAT) & I2C_INT_MASK;
-> +	zx2967_i2c_isr_clr(zx_i2c);
-> +
-> +	if (status & I2C_ERROR_MASK) {
-> +		spin_unlock_irqrestore(&zx_i2c->lock, flags);
-> +		return IRQ_HANDLED;
-> +	}
-> +
-> +	if (status & I2C_TRANS_DONE)
-> +		complete(&zx_i2c->complete);
-> +
-> +	spin_unlock_irqrestore(&zx_i2c->lock, flags);
+Hi Linu,
 
-The spin lock appears only once here, in ISR. I am not sure what you 
-want to protect.
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
+On 11/01/2017 17:52, linucherian at gmail.com wrote:
+> From: Linu Cherian <linu.cherian@cavium.com>
+> 
+> Having only 32 memslots is a real constraint for the maximum number of
+> PCI devices that can be assigned to a single guest. Assuming each PCI
+> device/virtual function having two memory BAR regions, we could assign
+> only 15 devices/virtual functions to a guest.
+> 
+> So increase KVM_MEM_SLOTS_NUM to 512 as done in other archs like x86 and
+> powerpc. For this, KVM_USER_MEM_SLOTS has been changed to 508.
+> 
+> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
 
+> ---
+>  arch/arm/kvm/arm.c                | 3 +++
+>  arch/arm64/include/asm/kvm_host.h | 2 +-
+>  2 files changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 8f92efa..a19389b 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -221,6 +221,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+>  	case KVM_CAP_MAX_VCPUS:
+>  		r = KVM_MAX_VCPUS;
+>  		break;
+> +	case KVM_CAP_NR_MEMSLOTS:
+> +		r = KVM_USER_MEM_SLOTS;
+> +		break;
+This change is not documented in the commit message and I think it
+should since we now allow KVM/ARM to report the number of available user
+mem slots. I would personally suggest to put it in a sepate patch as it
+was done on s390 for instance
+(http://marc.info/?l=linux-s390&m=136422861316920&w=2)
 
-I am fine with all other parts.
+Thanks
 
-Jun
+Eric
+
+>  	case KVM_CAP_MSI_DEVID:
+>  		if (!kvm)
+>  			r = -EINVAL;
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index e505038..88f017d 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -30,7 +30,7 @@
+>  
+>  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
+>  
+> -#define KVM_USER_MEM_SLOTS 32
+> +#define KVM_USER_MEM_SLOTS 508
+>  #define KVM_PRIVATE_MEM_SLOTS 4
+>  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+>  #define KVM_HALT_POLL_NS_DEFAULT 500000
+> 
