@@ -1,67 +1,71 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 7 Feb 2017 21:11:56 +0800
-Subject: [xlnx:master 238/266]
- drivers/gpu/drm/xilinx/xilinx_drm_crtc.c:503:33: warning: comparison of
- constant '-517' with boolean expression is always false
-Message-ID: <201702072149.pIMzQZlj%fengguang.wu@intel.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 7 Feb 2017 13:14:25 +0000
+Subject: Tegra baseline test results for v4.10-rc7
+Message-ID: <70f10494-b980-9c4d-4fb8-b72997b0105a@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   7135a7a4b25b88a1582b27fd29593d94bb3d2974
-commit: 2f092f96db5c42ac7b1e2ea50af05eeca40da3ad [238/266] drm: xilinx: crtc: pixel clock is optional
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout 2f092f96db5c42ac7b1e2ea50af05eeca40da3ad
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Here are some basic Tegra test results for Linux v4.10-rc7.
+Logs and other details at:
 
-All warnings (new ones prefixed by >>):
+    https://nvtb.github.io//linux/test_v4.10-rc7/20170205153102/
 
-   drivers/gpu/drm/xilinx/xilinx_drm_crtc.c: In function 'xilinx_drm_crtc_create':
->> drivers/gpu/drm/xilinx/xilinx_drm_crtc.c:503:33: warning: comparison of constant '-517' with boolean expression is always false [-Wbool-compare]
-      if (IS_ERR(crtc->pixel_clock) == -EPROBE_DEFER) {
-                                    ^~
->> drivers/gpu/drm/xilinx/xilinx_drm_crtc.c:503:7: warning: ignoring return value of 'IS_ERR', declared with attribute warn_unused_result [-Wunused-result]
-      if (IS_ERR(crtc->pixel_clock) == -EPROBE_DEFER) {
-          ^~~~~~~~~~~~~~~~~~~~~~~~~
 
-vim +503 drivers/gpu/drm/xilinx/xilinx_drm_crtc.c
+Test summary
+------------
 
-   487		}
-   488	
-   489		/* create a primary plane. there's only one crtc now */
-   490		primary_plane = xilinx_drm_plane_create_primary(crtc->plane_manager,
-   491								possible_crtcs);
-   492		if (IS_ERR(primary_plane)) {
-   493			DRM_ERROR("failed to create a primary plane for crtc\n");
-   494			ret = PTR_ERR(primary_plane);
-   495			goto err_plane;
-   496		}
-   497	
-   498		/* create extra planes */
-   499		xilinx_drm_plane_create_planes(crtc->plane_manager, possible_crtcs);
-   500	
-   501		crtc->pixel_clock = devm_clk_get(drm->dev, NULL);
-   502		if (IS_ERR(crtc->pixel_clock)) {
- > 503			if (IS_ERR(crtc->pixel_clock) == -EPROBE_DEFER) {
-   504				goto err_plane;
-   505			} else {
-   506				DRM_DEBUG_KMS("failed to get pixel clock\n");
-   507				crtc->pixel_clock = NULL;
-   508			}
-   509	
-   510		}
-   511	
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 57127 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/2b961002/attachment-0001.gz>
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.10-rc6 (566cf877a1fcb6d6dc0126b076aad062054c2637)):
+   text     data      bss    total  kernel
+  +3868      -16        0    +3852  defconfig
+   +556     -128        0     +428  multi_v7_defconfig
+   +636     -128        0     +508  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.10-rc6 (566cf877a1fcb6d6dc0126b076aad062054c2637))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
