@@ -1,43 +1,76 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 7 Feb 2017 16:09:49 +0800
-Subject: [PATCH v2 1/3] clk: zte: add i2s clocks for zx296718
-In-Reply-To: <1486436571-8682-1-git-send-email-baoyou.xie@linaro.org>
-References: <1486436571-8682-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170207080947.GG3407@dragon>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Tue, 07 Feb 2017 17:13:25 +0900
+Subject: [PATCH] arm64: dts: Enable ir-spi in the tm2 and tm2e boards
+References: <CGME20170207081338epcas5p23530ff8663c58f8868a0f9dfa2e19f7a@epcas5p2.samsung.com>
+Message-ID: <20170207081325.9769-1-andi.shyti@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2017 at 11:02:49AM +0800, Baoyou Xie wrote:
-> The i2s related clock support is missing from the existing zx296718
-> clock driver. This patch adds it, so that the upstream ZX I2S driver
-> can work out.
-> 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> ---
->  drivers/clk/zte/clk-zx296718.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/clk/zte/clk-zx296718.c b/drivers/clk/zte/clk-zx296718.c
-> index ad5d1df..f106d40 100644
-> --- a/drivers/clk/zte/clk-zx296718.c
-> +++ b/drivers/clk/zte/clk-zx296718.c
-> @@ -941,6 +941,10 @@ static struct zx_clk_gate audio_gate_clk[] = {
->  	GATE(AUDIO_SPDIF1_WCLK, "spdif1_wclk", "spdif1_wclk_div", AUDIO_SPDIF1_CLK, 9, CLK_SET_RATE_PARENT, 0),
->  	GATE(AUDIO_TDM_WCLK, "tdm_wclk", "tdm_wclk_div", AUDIO_TDM_CLK, 17, CLK_SET_RATE_PARENT, 0),
->  	GATE(AUDIO_TS_PCLK, "tempsensor_pclk", "clk49m5", AUDIO_TS_CLK, 1, 0, 0),
-> +	GATE(AUDIO_I2S0_PCLK, "i2s0_pclk", "clk49m5", AUDIO_I2S0_CLK, 8, 0, 0),
-> +	GATE(AUDIO_I2S1_PCLK, "i2s1_pclk", "clk49m5", AUDIO_I2S1_CLK, 8, 0, 0),
-> +	GATE(AUDIO_I2S2_PCLK, "i2s2_pclk", "clk49m5", AUDIO_I2S2_CLK, 8, 0, 0),
-> +	GATE(AUDIO_I2S3_PCLK, "i2s3_pclk", "clk49m5", AUDIO_I2S3_CLK, 8, 0, 0),
+Add the device tree node for the ir-spi driver which enable the
+ir led for remote controlling.
 
-I would suggest we put these clocks together with AUDIO_I2S_WCLK, so
-that we can find I2S clocks in one place.
+This patch sets first the GPR3[3] gpio line as a regulator-fixed
+for enabling an external regulator which powers the IR LED.
 
-Shawn
+Removes also the default assignment of the GPG3[5] and GPG3[7]
+related to the SPI3 line.
 
->  };
->  
->  static struct clk_hw_onecell_data audio_hw_onecell_data = {
-> -- 
-> 2.7.4
-> 
+Signed-off-by: Andi Shyti <andi.shyti@samsung.com>
+---
+ .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 27 ++++++++++++++++++++--
+ 1 file changed, 25 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+index 098ad557fee3..c61df2318d8b 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
+@@ -106,6 +106,13 @@
+ 		};
+ 	};
+ 
++	irda_regulator: irda-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpr3 3 0>;
++		regulator-name = "irda_regulator";
++	};
++
+ 	sound {
+ 		compatible = "samsung,tm2-audio";
+ 		audio-codec = <&wm5110>;
+@@ -1073,8 +1080,6 @@
+ 
+ 		PIN(INPUT, gpg3-0, DOWN, FAST_SR1);
+ 		PIN(INPUT, gpg3-1, DOWN, FAST_SR1);
+-		PIN(INPUT, gpg3-5, DOWN, FAST_SR1);
+-		PIN(INPUT, gpg3-7, DOWN, FAST_SR1);
+ 	};
+ };
+ 
+@@ -1152,6 +1157,24 @@
+ 	};
+ };
+ 
++&spi_3 {
++	status = "okay";
++	no-cs-readback;
++
++	irled at 0 {
++		compatible = "ir-spi-led";
++		reg = <0x0>;
++		spi-max-frequency = <5000000>;
++		power-supply = <&irda_regulator>;
++		duty-cycle = <60>;
++		led-active-low;
++
++		controller-data {
++			samsung,spi-feedback-delay = <0>;
++		};
++	};
++};
++
+ &timer {
+ 	clock-frequency = <24000000>;
+ };
+-- 
+2.11.0
