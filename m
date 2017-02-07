@@ -1,50 +1,49 @@
-From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Tue, 7 Feb 2017 09:43:45 -0600
-Subject: [PATCH v3 02/10] staging: fsl-mc: fix device ref counting
-In-Reply-To: <20170207154353.20691-1-laurentiu.tudor@nxp.com>
-References: <20170207154353.20691-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170207154353.20691-3-laurentiu.tudor@nxp.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Tue,  7 Feb 2017 07:50:24 -0800
+Subject: [PATCH v4 0/3] i.MX7 PCI support
+Message-ID: <20170207155027.7734-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+Hello, everyone:
 
-Drop unneeded get_device() call at device creation
-and, as per documentation, drop reference count
-after using device_find_child() return.
+This is a fourth iteration of the code that adds PCI-subsystem bits
+necessary for enabling PCI support on i.MX7.
 
-Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
----
-v3:
- - no changes
+Changes since v3 (can be found at [version3]):
+	- Move all of the reset_control_assert's into imx6_pcie_assert_core_reset
+	- Documented required reset and power domain DT bindings
 
- drivers/staging/fsl-mc/bus/dprc-driver.c | 1 +
- drivers/staging/fsl-mc/bus/fsl-mc-bus.c  | 1 -
- 2 files changed, 1 insertion(+), 1 deletion(-)
+Changes since v2 (can be found at [version2]):
 
-diff --git a/drivers/staging/fsl-mc/bus/dprc-driver.c b/drivers/staging/fsl-mc/bus/dprc-driver.c
-index 4e416d8..e4b0341 100644
---- a/drivers/staging/fsl-mc/bus/dprc-driver.c
-+++ b/drivers/staging/fsl-mc/bus/dprc-driver.c
-@@ -188,6 +188,7 @@ static void dprc_add_new_devices(struct fsl_mc_device *mc_bus_dev,
- 		child_dev = fsl_mc_device_lookup(obj_desc, mc_bus_dev);
- 		if (child_dev) {
- 			check_plugged_state_change(child_dev, obj_desc);
-+			put_device(&child_dev->dev);
- 			continue;
- 		}
- 
-diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-index cc20dc4..7c6a43b 100644
---- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-+++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-@@ -537,7 +537,6 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
- 		goto error_cleanup_dev;
- 	}
- 
--	(void)get_device(&mc_dev->dev);
- 	dev_dbg(parent_dev, "added %s\n", dev_name(&mc_dev->dev));
- 
- 	*new_mc_dev = mc_dev;
+	- Collected Reviewed-by for patch #2 from Lucas
+	- Reset logic implementation moved out into a reset controller
+          driver (see [reset1])
+	- Removed unused leftover code
+
+Changes since v1 (can be found at [version1]):
+
+	- All GPC related code moved into a separate driver (see [gpc1])
+	- Removed GPIO probe deferral logging
+	- Fixed section mismatch warning
+	- Minor reformatting of fsl,imx6q-pcie.txt(as per Rob
+          Herring's request)
+
+[version3] https://lkml.org/lkml/2017/2/6/565
+[version2] https://lkml.org/lkml/2017/2/1/510
+[version1] https://lkml.org/lkml/2017/1/19/488
+[gpc1] https://lkml.org/lkml/2017/2/6/551
+[reset1] https://lkml.org/lkml/2017/2/6/554
+
+Andrey Smirnov (3):
+  PCI: imx6: Fix a typo in error message
+  PCI: imx6: Allow probe deferal by reset GPIO
+  PCI: imx6: Add code to support i.MX7D
+
+ .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 +-
+ drivers/pci/host/pci-imx6.c                        | 131 ++++++++++++++++-----
+ include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
+ 3 files changed, 118 insertions(+), 30 deletions(-)
+
 -- 
-1.8.3.1
+2.9.3
