@@ -1,61 +1,74 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue,  7 Feb 2017 17:41:22 +0100
-Subject: [PATCH 09/10] media: vpif: use a configurable i2c_adapter_id for vpif
- display
+Date: Tue,  7 Feb 2017 17:41:17 +0100
+Subject: [PATCH 04/10] ARM: dts: da850-evm: add the output port to the vpif
+ node
 In-Reply-To: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1486485683-11427-10-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1486485683-11427-5-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vpif display driver uses a static i2c adapter ID of 1 but on the
-da850-evm board in DT boot mode the i2c adapter ID is actually 0.
+Extend the vpif node with an output port with a single channel.
 
-Make the adapter ID configurable like it already is for vpif capture.
+NOTE: this is still just hardware description - the actual driver
+is registered using pdata-quirks.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/board-da850-evm.c       | 1 +
- drivers/media/platform/davinci/vpif_display.c | 2 +-
- include/media/davinci/vpif_types.h            | 1 +
- 3 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/da850-evm.dts | 14 +++++++++++---
+ arch/arm/boot/dts/da850.dtsi    |  8 +++++++-
+ 2 files changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index e5d4ded..fe0bfa7 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -1290,6 +1290,7 @@ static struct vpif_display_config da850_vpif_display_config = {
- 		.output_count = ARRAY_SIZE(da850_ch0_outputs),
- 	},
- 	.card_name    = "DA850/OMAP-L138 Video Display",
-+	.i2c_adapter_id = 1,
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 94938a3..3d6dd66 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -299,16 +299,24 @@
+ 	status = "okay";
+ 
+ 	/* VPIF capture port */
+-	port {
+-		vpif_ch0: endpoint at 0 {
++	port at 0 {
++		vpif_input_ch0: endpoint at 0 {
+ 			reg = <0>;
+ 			bus-width = <8>;
+ 		};
+ 
+-		vpif_ch1: endpoint at 1 {
++		vpif_input_ch1: endpoint at 1 {
+ 			reg = <1>;
+ 			bus-width = <8>;
+ 			data-shift = <8>;
+ 		};
+ 	};
++
++	/* VPIF display port */
++	port at 1 {
++		vpif_output_ch0: endpoint at 0 {
++			reg = <0>;
++			bus-width = <8>;
++		};
++	};
  };
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 69ec5e7..768a58c 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -494,7 +494,13 @@
+ 			status = "disabled";
  
- static __init void da850_vpif_init(void)
-diff --git a/drivers/media/platform/davinci/vpif_display.c b/drivers/media/platform/davinci/vpif_display.c
-index 50c3073..7e5cf99 100644
---- a/drivers/media/platform/davinci/vpif_display.c
-+++ b/drivers/media/platform/davinci/vpif_display.c
-@@ -1287,7 +1287,7 @@ static __init int vpif_probe(struct platform_device *pdev)
- 	}
- 
- 	if (!vpif_obj.config->asd_sizes) {
--		i2c_adap = i2c_get_adapter(1);
-+		i2c_adap = i2c_get_adapter(vpif_obj.config->i2c_adapter_id);
- 		for (i = 0; i < subdev_count; i++) {
- 			vpif_obj.sd[i] =
- 				v4l2_i2c_new_subdev_board(&vpif_obj.v4l2_dev,
-diff --git a/include/media/davinci/vpif_types.h b/include/media/davinci/vpif_types.h
-index 4282a7d..0c72b46 100644
---- a/include/media/davinci/vpif_types.h
-+++ b/include/media/davinci/vpif_types.h
-@@ -57,6 +57,7 @@ struct vpif_display_config {
- 	int (*set_clock)(int, int);
- 	struct vpif_subdev_info *subdevinfo;
- 	int subdev_count;
-+	int i2c_adapter_id;
- 	struct vpif_display_chan_config chan_config[VPIF_DISPLAY_MAX_CHANNELS];
- 	const char *card_name;
- 	struct v4l2_async_subdev **asd;	/* Flat array, arranged in groups */
+ 			/* VPIF capture port */
+-			port {
++			port at 0 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++
++			/* VPIF display port */
++			port at 1 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 			};
 -- 
 2.9.3
