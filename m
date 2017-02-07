@@ -1,131 +1,97 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Tue, 7 Feb 2017 21:17:28 +0900
-Subject: [PATCH v2 1/3] perf tools: Use offset instead of dwarfnum in
- register table.
-In-Reply-To: <20170207092002.GA1883@arm.com>
-References: <20170203110607.97529-1-hekuang@huawei.com>
- <20170203130026.GF11585@arm.com> <589598D8.8050304@huawei.com>
- <20170206130229.GI19939@arm.com>
- <20170207095451.10ac50a90de0fdac529a2522@kernel.org>
- <20170207092002.GA1883@arm.com>
-Message-ID: <20170207211728.db765a00b022347de5200004@kernel.org>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 7 Feb 2017 20:17:15 +0800
+Subject: [PATCH] [media] mtk-vcodec: fix build errors without DEBUG
+In-Reply-To: <1486453244-26094-1-git-send-email-minghsiu.tsai@mediatek.com>
+References: <1486453244-26094-1-git-send-email-minghsiu.tsai@mediatek.com>
+Message-ID: <CAGS+omAU7UohsUkXwwHyhNh_dSX=R9tLKYvSV5767m81sTf_RA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Feb 2017 09:20:03 +0000
-Will Deacon <will.deacon@arm.com> wrote:
+On Tue, Feb 7, 2017 at 3:40 PM, Minghsiu Tsai
+<minghsiu.tsai@mediatek.com> wrote:
+> Fix build errors after removing DEBUG definition.
 
-> On Tue, Feb 07, 2017 at 09:54:51AM +0900, Masami Hiramatsu wrote:
-> > On Mon, 6 Feb 2017 13:02:29 +0000
-> > Will Deacon <will.deacon@arm.com> wrote:
-> > 
-> > > On Sat, Feb 04, 2017 at 05:03:20PM +0800, Hekuang wrote:
-> > > > hi
-> > > > 
-> > > > ? 2017/2/3 21:00, Will Deacon ??:
-> > > > >On Fri, Feb 03, 2017 at 11:06:05AM +0000, He Kuang wrote:
-> > > > >>This patch changes the 'dwarfnum' to 'offset' in register table, so
-> > > > >>the index of array becomes the dwarfnum (the index of each register
-> > > > >>defined by DWARF) and the "offset" member means the byte-offset of the
-> > > > >>register in (user_)pt_regs. This change makes the code consistent with
-> > > > >>x86.
-> > > > >>
-> > > > >>Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
-> > > > >>Signed-off-by: He Kuang <hekuang@huawei.com>
-> > > > >>---
-> > > > >>  tools/perf/arch/arm64/util/dwarf-regs.c | 107 ++++++++++++++++----------------
-> > > > >>  1 file changed, 52 insertions(+), 55 deletions(-)
-> > > > >Thanks for splitting this up. Comment below.
-> > > > >
-> > > > >>diff --git a/tools/perf/arch/arm64/util/dwarf-regs.c b/tools/perf/arch/arm64/util/dwarf-regs.c
-> > > > >>index d49efeb..090f36b 100644
-> > > > >>--- a/tools/perf/arch/arm64/util/dwarf-regs.c
-> > > > >>+++ b/tools/perf/arch/arm64/util/dwarf-regs.c
-> > > > >>@@ -9,72 +9,69 @@
-> > > > >>   */
-> > > > >>  #include <stddef.h>
-> > > > >>+#include <linux/ptrace.h> /* for struct user_pt_regs */
-> > > > >>  #include <dwarf-regs.h>
-> > > > >>-struct pt_regs_dwarfnum {
-> > > > >>+struct pt_regs_offset {
-> > > > >>  	const char *name;
-> > > > >>-	unsigned int dwarfnum;
-> > > > >>+	int offset;
-> > > > >>  };
-> > > > >>-#define STR(s) #s
-> > > > >>-#define REG_DWARFNUM_NAME(r, num) {.name = r, .dwarfnum = num}
-> > > > >>-#define GPR_DWARFNUM_NAME(num) \
-> > > > >>-	{.name = STR(%x##num), .dwarfnum = num}
-> > > > >>-#define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0}
-> > > > >>-
-> > > > >>  /*
-> > > > >>   * Reference:
-> > > > >>   * http://infocenter.arm.com/help/topic/com.arm.doc.ihi0057b/IHI0057B_aadwarf64.pdf
-> > > > >>   */
-> > > > >>-static const struct pt_regs_dwarfnum regdwarfnum_table[] = {
-> > > > >>-	GPR_DWARFNUM_NAME(0),
-> > > > >>-	GPR_DWARFNUM_NAME(1),
-> > > > >>-	GPR_DWARFNUM_NAME(2),
-> > > > >>-	GPR_DWARFNUM_NAME(3),
-> > > > >>-	GPR_DWARFNUM_NAME(4),
-> > > > >>-	GPR_DWARFNUM_NAME(5),
-> > > > >>-	GPR_DWARFNUM_NAME(6),
-> > > > >>-	GPR_DWARFNUM_NAME(7),
-> > > > >>-	GPR_DWARFNUM_NAME(8),
-> > > > >>-	GPR_DWARFNUM_NAME(9),
-> > > > >>-	GPR_DWARFNUM_NAME(10),
-> > > > >>-	GPR_DWARFNUM_NAME(11),
-> > > > >>-	GPR_DWARFNUM_NAME(12),
-> > > > >>-	GPR_DWARFNUM_NAME(13),
-> > > > >>-	GPR_DWARFNUM_NAME(14),
-> > > > >>-	GPR_DWARFNUM_NAME(15),
-> > > > >>-	GPR_DWARFNUM_NAME(16),
-> > > > >>-	GPR_DWARFNUM_NAME(17),
-> > > > >>-	GPR_DWARFNUM_NAME(18),
-> > > > >>-	GPR_DWARFNUM_NAME(19),
-> > > > >>-	GPR_DWARFNUM_NAME(20),
-> > > > >>-	GPR_DWARFNUM_NAME(21),
-> > > > >>-	GPR_DWARFNUM_NAME(22),
-> > > > >>-	GPR_DWARFNUM_NAME(23),
-> > > > >>-	GPR_DWARFNUM_NAME(24),
-> > > > >>-	GPR_DWARFNUM_NAME(25),
-> > > > >>-	GPR_DWARFNUM_NAME(26),
-> > > > >>-	GPR_DWARFNUM_NAME(27),
-> > > > >>-	GPR_DWARFNUM_NAME(28),
-> > > > >>-	GPR_DWARFNUM_NAME(29),
-> > > > >>-	REG_DWARFNUM_NAME("%lr", 30),
-> > > > >>-	REG_DWARFNUM_NAME("%sp", 31),
-> > > > >>-	REG_DWARFNUM_END,
-> > > > >>-};
-> > > > >>+#define REG_OFFSET_NAME(r, num) {.name = "%" #r,			\
-> > > > >>+			.offset = offsetof(struct user_pt_regs, regs[num])}
-> > > > >Whilst this works in practice, this is undefined behaviour for "sp", since
-> > > > >you'll go off the end of the regs array.
-> > > > 
-> > > > It's not undefined behaviour here,
-> > > > struct user_pt_regs {
-> > > >         __u64           regs[31];
-> > > >         __u64           sp;
-> > > >         __u64           pc;
-> > > >         __u64           pstate;
-> > > > };
-> > > > user_pt_regs->regs[31] is user_pt_regs->sp and the offset value is correct.
-> > > 
-> > > I think it's undefined from the C standard perspective.
-> > 
-> > Actually, this '%sp' is used for kprobes/uprobes dynamic events, which only 
-> > depend on how regs_query_register_offset()@arch/arm64/kernel/ptrace.c is implemented.
-> > And also, since perf-probe uses debuginfo, it can find out the base register.
-> > 
-> > So we don't need to care the C standard in this file :)
-> 
-> Up to the perf tool maintainers really, but I expect it will irritate
-> anybody running UBSAN and it's really not difficult to fix.
+It would be useful to specify which build errors were fixed by this
+patch, and a brief description of why - namely because when DEBUG is
+not defined, mtk_v4l2_debug() is an empty macros, and therefore the
+arguments are unused.
 
-Hmm, sorry, I'm not sure, what the point UBSAN user be irriteted?
-And what is that related to this story?
+With an updated commit message, this patch is:
 
-Thank you,
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
+>
+> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+> ---
+>  drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c | 9 ++++-----
+>  drivers/media/platform/mtk-vcodec/vdec_vpu_if.c    | 5 ++---
+>  drivers/media/platform/mtk-vcodec/venc_vpu_if.c    | 4 +---
+>  3 files changed, 7 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+> index 0746592..6219c7d 100644
+> --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+> +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+> @@ -1126,15 +1126,14 @@ static void vb2ops_vdec_buf_queue(struct vb2_buffer *vb)
+>                  * if there is no SPS header or picture info
+>                  * in bs
+>                  */
+> -               int log_level = ret ? 0 : 1;
+>
+>                 src_buf = v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
+>                 v4l2_m2m_buf_done(to_vb2_v4l2_buffer(src_buf),
+>                                         VB2_BUF_STATE_DONE);
+> -               mtk_v4l2_debug(log_level,
+> -                               "[%d] vdec_if_decode() src_buf=%d, size=%zu, fail=%d, res_chg=%d",
+> -                               ctx->id, src_buf->index,
+> -                               src_mem.size, ret, res_chg);
+> +               mtk_v4l2_debug(ret ? 0 : 1,
+> +                              "[%d] vdec_if_decode() src_buf=%d, size=%zu, fail=%d, res_chg=%d",
+> +                              ctx->id, src_buf->index,
+> +                              src_mem.size, ret, res_chg);
+>                 return;
+>         }
+>
+> diff --git a/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c b/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
+> index 5a24c51..1abd14e 100644
+> --- a/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
+> +++ b/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
+> @@ -70,9 +70,8 @@ void vpu_dec_ipi_handler(void *data, unsigned int len, void *priv)
+>  static int vcodec_vpu_send_msg(struct vdec_vpu_inst *vpu, void *msg, int len)
+>  {
+>         int err;
+> -       uint32_t msg_id = *(uint32_t *)msg;
+>
+> -       mtk_vcodec_debug(vpu, "id=%X", msg_id);
+> +       mtk_vcodec_debug(vpu, "id=%X", *(uint32_t *)msg);
+>
+>         vpu->failure = 0;
+>         vpu->signaled = 0;
+> @@ -80,7 +79,7 @@ static int vcodec_vpu_send_msg(struct vdec_vpu_inst *vpu, void *msg, int len)
+>         err = vpu_ipi_send(vpu->dev, vpu->id, msg, len);
+>         if (err) {
+>                 mtk_vcodec_err(vpu, "send fail vpu_id=%d msg_id=%X status=%d",
+> -                              vpu->id, msg_id, err);
+> +                              vpu->id, *(uint32_t *)msg, err);
+>                 return err;
+>         }
+>
+> diff --git a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
+> index a01c759..0d882ac 100644
+> --- a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
+> +++ b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
+> @@ -79,10 +79,8 @@ static int vpu_enc_send_msg(struct venc_vpu_inst *vpu, void *msg,
+>
+>         status = vpu_ipi_send(vpu->dev, vpu->id, msg, len);
+>         if (status) {
+> -               uint32_t msg_id = *(uint32_t *)msg;
+> -
+>                 mtk_vcodec_err(vpu, "vpu_ipi_send msg_id %x len %d fail %d",
+> -                              msg_id, len, status);
+> +                              *(uint32_t *)msg, len, status);
+>                 return -EINVAL;
+>         }
+>         if (vpu->failure)
+> --
+> 1.9.1
+>
