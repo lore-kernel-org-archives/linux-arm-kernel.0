@@ -1,68 +1,68 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Tue, 7 Feb 2017 09:43:51 -0600
-Subject: [PATCH v3 08/10] staging: fsl-mc: dpbp: drop unused APIs
+Date: Tue, 7 Feb 2017 09:43:49 -0600
+Subject: [PATCH v3 06/10] staging: fsl-mc: dpmcp: drop unused APIs
 In-Reply-To: <20170207154353.20691-1-laurentiu.tudor@nxp.com>
 References: <20170207154353.20691-1-laurentiu.tudor@nxp.com>
-Message-ID: <20170207154353.20691-9-laurentiu.tudor@nxp.com>
+Message-ID: <20170207154353.20691-7-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Leave only APIs that will be used in upcomming drivers.
+These APIs are not used yet, so drop the dead code.
 The patch is mostly mechanical, with a couple exceptions:
  - getters/setters were not removed even if only one of
    them is being used
  - versioning API was also left in place
-They will be added back on an as-needed basis.
+Also in this patch, add missing prototype for
+version query function.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
 v3:
  - no changes
 
- drivers/staging/fsl-mc/bus/dpbp-cmd.h | 116 ---------
- drivers/staging/fsl-mc/bus/dpbp.c     | 449 ----------------------------------
- drivers/staging/fsl-mc/include/dpbp.h | 129 ----------
- 3 files changed, 694 deletions(-)
+ drivers/staging/fsl-mc/bus/dpmcp-cmd.h |  95 --------
+ drivers/staging/fsl-mc/bus/dpmcp.c     | 382 ---------------------------------
+ drivers/staging/fsl-mc/bus/dpmcp.h     | 100 +--------
+ 3 files changed, 4 insertions(+), 573 deletions(-)
 
-diff --git a/drivers/staging/fsl-mc/bus/dpbp-cmd.h b/drivers/staging/fsl-mc/bus/dpbp-cmd.h
-index 7d86539..8aa6545 100644
---- a/drivers/staging/fsl-mc/bus/dpbp-cmd.h
-+++ b/drivers/staging/fsl-mc/bus/dpbp-cmd.h
-@@ -45,8 +45,6 @@
+diff --git a/drivers/staging/fsl-mc/bus/dpmcp-cmd.h b/drivers/staging/fsl-mc/bus/dpmcp-cmd.h
+index 7cb5149..384a13d 100644
+--- a/drivers/staging/fsl-mc/bus/dpmcp-cmd.h
++++ b/drivers/staging/fsl-mc/bus/dpmcp-cmd.h
+@@ -45,107 +45,12 @@
  /* Command IDs */
- #define DPBP_CMDID_CLOSE		DPBP_CMD(0x800)
- #define DPBP_CMDID_OPEN			DPBP_CMD(0x804)
--#define DPBP_CMDID_CREATE		DPBP_CMD(0x904)
--#define DPBP_CMDID_DESTROY		DPBP_CMD(0x984)
- #define DPBP_CMDID_GET_API_VERSION	DPBP_CMD(0xa04)
+ #define DPMCP_CMDID_CLOSE		DPMCP_CMD(0x800)
+ #define DPMCP_CMDID_OPEN		DPMCP_CMD(0x80b)
+-#define DPMCP_CMDID_CREATE		DPMCP_CMD(0x90b)
+-#define DPMCP_CMDID_DESTROY		DPMCP_CMD(0x98b)
+ #define DPMCP_CMDID_GET_API_VERSION	DPMCP_CMD(0xa0b)
  
- #define DPBP_CMDID_ENABLE		DPBP_CMD(0x002)
-@@ -55,18 +53,6 @@
- #define DPBP_CMDID_RESET		DPBP_CMD(0x005)
- #define DPBP_CMDID_IS_ENABLED		DPBP_CMD(0x006)
+-#define DPMCP_CMDID_GET_ATTR		DPMCP_CMD(0x004)
+ #define DPMCP_CMDID_RESET		DPMCP_CMD(0x005)
  
--#define DPBP_CMDID_SET_IRQ		DPBP_CMD(0x010)
--#define DPBP_CMDID_GET_IRQ		DPBP_CMD(0x011)
--#define DPBP_CMDID_SET_IRQ_ENABLE	DPBP_CMD(0x012)
--#define DPBP_CMDID_GET_IRQ_ENABLE	DPBP_CMD(0x013)
--#define DPBP_CMDID_SET_IRQ_MASK		DPBP_CMD(0x014)
--#define DPBP_CMDID_GET_IRQ_MASK		DPBP_CMD(0x015)
--#define DPBP_CMDID_GET_IRQ_STATUS	DPBP_CMD(0x016)
--#define DPBP_CMDID_CLEAR_IRQ_STATUS	DPBP_CMD(0x017)
+-#define DPMCP_CMDID_SET_IRQ		DPMCP_CMD(0x010)
+-#define DPMCP_CMDID_GET_IRQ		DPMCP_CMD(0x011)
+-#define DPMCP_CMDID_SET_IRQ_ENABLE	DPMCP_CMD(0x012)
+-#define DPMCP_CMDID_GET_IRQ_ENABLE	DPMCP_CMD(0x013)
+-#define DPMCP_CMDID_SET_IRQ_MASK	DPMCP_CMD(0x014)
+-#define DPMCP_CMDID_GET_IRQ_MASK	DPMCP_CMD(0x015)
+-#define DPMCP_CMDID_GET_IRQ_STATUS	DPMCP_CMD(0x016)
 -
--#define DPBP_CMDID_SET_NOTIFICATIONS	DPBP_CMD(0x01b0)
--#define DPBP_CMDID_GET_NOTIFICATIONS	DPBP_CMD(0x01b1)
--
- struct dpbp_cmd_open {
- 	__le32 dpbp_id;
- };
-@@ -81,76 +67,6 @@ struct dpbp_rsp_is_enabled {
- 	u8 enabled;
+ struct dpmcp_cmd_open {
+ 	__le32 dpmcp_id;
  };
  
--struct dpbp_cmd_set_irq {
+-struct dpmcp_cmd_create {
+-	__le32 portal_id;
+-};
+-
+-struct dpmcp_cmd_destroy {
+-	__le32 object_id;
+-};
+-
+-struct dpmcp_cmd_set_irq {
 -	/* cmd word 0 */
 -	u8 irq_index;
 -	u8 pad[3];
@@ -73,123 +73,93 @@ index 7d86539..8aa6545 100644
 -	__le32 irq_num;
 -};
 -
--struct dpbp_cmd_get_irq {
+-struct dpmcp_cmd_get_irq {
 -	__le32 pad;
 -	u8 irq_index;
 -};
 -
--struct dpbp_rsp_get_irq {
--	/* response word 0 */
+-struct dpmcp_rsp_get_irq {
+-	/* cmd word 0 */
 -	__le32 irq_val;
 -	__le32 pad;
--	/* response word 1 */
--	__le64 irq_addr;
--	/* response word 2 */
+-	/* cmd word 1 */
+-	__le64 irq_paddr;
+-	/* cmd word 2 */
 -	__le32 irq_num;
 -	__le32 type;
 -};
 -
--struct dpbp_cmd_set_irq_enable {
+-#define DPMCP_ENABLE		0x1
+-
+-struct dpmcp_cmd_set_irq_enable {
 -	u8 enable;
 -	u8 pad[3];
 -	u8 irq_index;
 -};
 -
--struct dpbp_cmd_get_irq_enable {
+-struct dpmcp_cmd_get_irq_enable {
 -	__le32 pad;
 -	u8 irq_index;
 -};
 -
--struct dpbp_rsp_get_irq_enable {
+-struct dpmcp_rsp_get_irq_enable {
 -	u8 enabled;
 -};
 -
--struct dpbp_cmd_set_irq_mask {
+-struct dpmcp_cmd_set_irq_mask {
 -	__le32 mask;
 -	u8 irq_index;
 -};
 -
--struct dpbp_cmd_get_irq_mask {
+-struct dpmcp_cmd_get_irq_mask {
 -	__le32 pad;
 -	u8 irq_index;
 -};
 -
--struct dpbp_rsp_get_irq_mask {
+-struct dpmcp_rsp_get_irq_mask {
 -	__le32 mask;
 -};
 -
--struct dpbp_cmd_get_irq_status {
+-struct dpmcp_cmd_get_irq_status {
 -	__le32 status;
 -	u8 irq_index;
 -};
 -
--struct dpbp_rsp_get_irq_status {
+-struct dpmcp_rsp_get_irq_status {
 -	__le32 status;
 -};
 -
--struct dpbp_cmd_clear_irq_status {
--	__le32 status;
--	u8 irq_index;
--};
--
- struct dpbp_rsp_get_attributes {
- 	/* response word 0 */
- 	__le16 pad;
-@@ -161,36 +77,4 @@ struct dpbp_rsp_get_attributes {
- 	__le16 version_minor;
- };
- 
--struct dpbp_cmd_set_notifications {
--	/* cmd word 0 */
--	__le32 depletion_entry;
--	__le32 depletion_exit;
--	/* cmd word 1 */
--	__le32 surplus_entry;
--	__le32 surplus_exit;
--	/* cmd word 2 */
--	__le16 options;
--	__le16 pad[3];
--	/* cmd word 3 */
--	__le64 message_ctx;
--	/* cmd word 4 */
--	__le64 message_iova;
--};
--
--struct dpbp_rsp_get_notifications {
+-struct dpmcp_rsp_get_attributes {
 -	/* response word 0 */
--	__le32 depletion_entry;
--	__le32 depletion_exit;
+-	__le32 pad;
+-	__le32 id;
 -	/* response word 1 */
--	__le32 surplus_entry;
--	__le32 surplus_exit;
--	/* response word 2 */
--	__le16 options;
--	__le16 pad[3];
--	/* response word 3 */
--	__le64 message_ctx;
--	/* response word 4 */
--	__le64 message_iova;
+-	__le16 version_major;
+-	__le16 version_minor;
 -};
 -
- #endif /* _FSL_DPBP_CMD_H */
-diff --git a/drivers/staging/fsl-mc/bus/dpbp.c b/drivers/staging/fsl-mc/bus/dpbp.c
-index cf4782f..1fa7257 100644
---- a/drivers/staging/fsl-mc/bus/dpbp.c
-+++ b/drivers/staging/fsl-mc/bus/dpbp.c
-@@ -106,77 +106,6 @@ int dpbp_close(struct fsl_mc_io *mc_io,
- EXPORT_SYMBOL(dpbp_close);
+ #endif /* _FSL_DPMCP_CMD_H */
+diff --git a/drivers/staging/fsl-mc/bus/dpmcp.c b/drivers/staging/fsl-mc/bus/dpmcp.c
+index e4d1651..ad4c8b4 100644
+--- a/drivers/staging/fsl-mc/bus/dpmcp.c
++++ b/drivers/staging/fsl-mc/bus/dpmcp.c
+@@ -104,82 +104,6 @@ int dpmcp_close(struct fsl_mc_io *mc_io,
+ }
  
  /**
-- * dpbp_create() - Create the DPBP object.
+- * dpmcp_create() - Create the DPMCP object.
 - * @mc_io:	Pointer to MC portal's I/O object
 - * @dprc_token:	Parent container token; '0' for default container
 - * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
 - * @cfg:	Configuration structure
 - * @obj_id:	Returned object id; use in subsequent API calls
 - *
-- * Create the DPBP object, allocate required resources and
+- * Create the DPMCP object, allocate required resources and
 - * perform required initialization.
 - *
+- * The object can be created either by declaring it in the
+- * DPL file, or by calling this function.
+-
 - * This function accepts an authentication token of a parent
 - * container that this object should be assigned to and returns
 - * an object id. This object_id will be used in all subsequent calls to
@@ -197,20 +167,22 @@ index cf4782f..1fa7257 100644
 - *
 - * Return:	'0' on Success; Error code otherwise.
 - */
--int dpbp_create(struct fsl_mc_io *mc_io,
--		u16 dprc_token,
--		u32 cmd_flags,
--		const struct dpbp_cfg *cfg,
--		u32 *obj_id)
+-int dpmcp_create(struct fsl_mc_io *mc_io,
+-		 u16 dprc_token,
+-		 u32 cmd_flags,
+-		 const struct dpmcp_cfg *cfg,
+-		 u32 *obj_id)
 -{
 -	struct mc_command cmd = { 0 };
+-	struct dpmcp_cmd_create *cmd_params;
+-
 -	int err;
 -
--	(void)(cfg); /* unused */
--
 -	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPBP_CMDID_CREATE,
+-	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_CREATE,
 -					  cmd_flags, dprc_token);
+-	cmd_params = (struct dpmcp_cmd_create *)cmd.params;
+-	cmd_params->portal_id = cpu_to_le32(cfg->portal_id);
 -
 -	/* send command to mc*/
 -	err = mc_send_command(mc_io, &cmd);
@@ -224,26 +196,26 @@ index cf4782f..1fa7257 100644
 -}
 -
 -/**
-- * dpbp_destroy() - Destroy the DPBP object and release all its resources.
+- * dpmcp_destroy() - Destroy the DPMCP object and release all its resources.
 - * @mc_io:	Pointer to MC portal's I/O object
 - * @dprc_token:	Parent container token; '0' for default container
 - * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @obj_id:	ID of DPBP object
+- * @obj_id:	ID of DPMCP object
 - *
 - * Return:	'0' on Success; error code otherwise.
 - */
--int dpbp_destroy(struct fsl_mc_io *mc_io,
--		 u16 dprc_token,
--		 u32 cmd_flags,
--		 u32 obj_id)
+-int dpmcp_destroy(struct fsl_mc_io *mc_io,
+-		  u16 dprc_token,
+-		  u32 cmd_flags,
+-		  u32 obj_id)
 -{
--	struct dpbp_cmd_destroy *cmd_params;
 -	struct mc_command cmd = { 0 };
+-	struct dpmcp_cmd_destroy *cmd_params;
 -
 -	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPBP_CMDID_DESTROY,
+-	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_DESTROY,
 -					  cmd_flags, dprc_token);
--	cmd_params = (struct dpbp_cmd_destroy *)cmd.params;
+-	cmd_params = (struct dpmcp_cmd_destroy *)cmd.params;
 -	cmd_params->object_id = cpu_to_le32(obj_id);
 -
 -	/* send command to mc*/
@@ -251,38 +223,38 @@ index cf4782f..1fa7257 100644
 -}
 -
 -/**
-  * dpbp_enable() - Enable the DPBP.
+  * dpmcp_reset() - Reset the DPMCP, returns the object to initial state.
   * @mc_io:	Pointer to MC portal's I/O object
   * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-@@ -278,310 +207,6 @@ int dpbp_reset(struct fsl_mc_io *mc_io,
+@@ -202,312 +126,6 @@ int dpmcp_reset(struct fsl_mc_io *mc_io,
  }
  
  /**
-- * dpbp_set_irq() - Set IRQ information for the DPBP to trigger an interrupt.
+- * dpmcp_set_irq() - Set IRQ information for the DPMCP to trigger an interrupt.
 - * @mc_io:	Pointer to MC portal's I/O object
 - * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPBP object
+- * @token:	Token of DPMCP object
 - * @irq_index:	Identifies the interrupt index to configure
 - * @irq_cfg:	IRQ configuration
 - *
 - * Return:	'0' on Success; Error code otherwise.
 - */
--int dpbp_set_irq(struct fsl_mc_io *mc_io,
--		 u32 cmd_flags,
--		 u16 token,
--		 u8 irq_index,
--		 struct dpbp_irq_cfg *irq_cfg)
+-int dpmcp_set_irq(struct fsl_mc_io *mc_io,
+-		  u32 cmd_flags,
+-		  u16 token,
+-		  u8 irq_index,
+-		  struct dpmcp_irq_cfg	*irq_cfg)
 -{
 -	struct mc_command cmd = { 0 };
--	struct dpbp_cmd_set_irq *cmd_params;
+-	struct dpmcp_cmd_set_irq *cmd_params;
 -
 -	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPBP_CMDID_SET_IRQ,
+-	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_SET_IRQ,
 -					  cmd_flags, token);
--	cmd_params = (struct dpbp_cmd_set_irq *)cmd.params;
+-	cmd_params = (struct dpmcp_cmd_set_irq *)cmd.params;
 -	cmd_params->irq_index = irq_index;
 -	cmd_params->irq_val = cpu_to_le32(irq_cfg->val);
--	cmd_params->irq_addr = cpu_to_le64(irq_cfg->addr);
+-	cmd_params->irq_addr = cpu_to_le64(irq_cfg->paddr);
 -	cmd_params->irq_num = cpu_to_le32(irq_cfg->irq_num);
 -
 -	/* send command to mc*/
@@ -290,10 +262,10 @@ index cf4782f..1fa7257 100644
 -}
 -
 -/**
-- * dpbp_get_irq() - Get IRQ information from the DPBP.
+- * dpmcp_get_irq() - Get IRQ information from the DPMCP.
 - * @mc_io:	Pointer to MC portal's I/O object
 - * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPBP object
+- * @token:	Token of DPMCP object
 - * @irq_index:	The interrupt index to configure
 - * @type:	Interrupt type: 0 represents message interrupt
 - *		type (both irq_addr and irq_val are valid)
@@ -301,22 +273,22 @@ index cf4782f..1fa7257 100644
 - *
 - * Return:	'0' on Success; Error code otherwise.
 - */
--int dpbp_get_irq(struct fsl_mc_io *mc_io,
--		 u32 cmd_flags,
--		 u16 token,
--		 u8 irq_index,
--		 int *type,
--		 struct dpbp_irq_cfg *irq_cfg)
+-int dpmcp_get_irq(struct fsl_mc_io *mc_io,
+-		  u32 cmd_flags,
+-		  u16 token,
+-		  u8 irq_index,
+-		  int *type,
+-		  struct dpmcp_irq_cfg	*irq_cfg)
 -{
 -	struct mc_command cmd = { 0 };
--	struct dpbp_cmd_get_irq *cmd_params;
--	struct dpbp_rsp_get_irq *rsp_params;
+-	struct dpmcp_cmd_get_irq *cmd_params;
+-	struct dpmcp_rsp_get_irq *rsp_params;
 -	int err;
 -
 -	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPBP_CMDID_GET_IRQ,
+-	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_GET_IRQ,
 -					  cmd_flags, token);
--	cmd_params = (struct dpbp_cmd_get_irq *)cmd.params;
+-	cmd_params = (struct dpmcp_cmd_get_irq *)cmd.params;
 -	cmd_params->irq_index = irq_index;
 -
 -	/* send command to mc*/
@@ -325,20 +297,19 @@ index cf4782f..1fa7257 100644
 -		return err;
 -
 -	/* retrieve response parameters */
--	rsp_params = (struct dpbp_rsp_get_irq *)cmd.params;
+-	rsp_params = (struct dpmcp_rsp_get_irq *)cmd.params;
 -	irq_cfg->val = le32_to_cpu(rsp_params->irq_val);
--	irq_cfg->addr = le64_to_cpu(rsp_params->irq_addr);
+-	irq_cfg->paddr = le64_to_cpu(rsp_params->irq_paddr);
 -	irq_cfg->irq_num = le32_to_cpu(rsp_params->irq_num);
 -	*type = le32_to_cpu(rsp_params->type);
--
 -	return 0;
 -}
 -
 -/**
-- * dpbp_set_irq_enable() - Set overall interrupt state.
+- * dpmcp_set_irq_enable() - Set overall interrupt state.
 - * @mc_io:	Pointer to MC portal's I/O object
 - * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPBP object
+- * @token:	Token of DPMCP object
 - * @irq_index:	The interrupt index to configure
 - * @en:	Interrupt state - enable = 1, disable = 0
 - *
@@ -349,20 +320,20 @@ index cf4782f..1fa7257 100644
 - *
 - * Return:	'0' on Success; Error code otherwise.
 - */
--int dpbp_set_irq_enable(struct fsl_mc_io *mc_io,
--			u32 cmd_flags,
--			u16 token,
--			u8 irq_index,
--			u8 en)
+-int dpmcp_set_irq_enable(struct fsl_mc_io *mc_io,
+-			 u32 cmd_flags,
+-			 u16 token,
+-			 u8 irq_index,
+-			 u8 en)
 -{
 -	struct mc_command cmd = { 0 };
--	struct dpbp_cmd_set_irq_enable *cmd_params;
+-	struct dpmcp_cmd_set_irq_enable *cmd_params;
 -
 -	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPBP_CMDID_SET_IRQ_ENABLE,
+-	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_SET_IRQ_ENABLE,
 -					  cmd_flags, token);
--	cmd_params = (struct dpbp_cmd_set_irq_enable *)cmd.params;
--	cmd_params->enable = en & DPBP_ENABLE;
+-	cmd_params = (struct dpmcp_cmd_set_irq_enable *)cmd.params;
+-	cmd_params->enable = en & DPMCP_ENABLE;
 -	cmd_params->irq_index = irq_index;
 -
 -	/* send command to mc*/
@@ -370,30 +341,30 @@ index cf4782f..1fa7257 100644
 -}
 -
 -/**
-- * dpbp_get_irq_enable() - Get overall interrupt state
+- * dpmcp_get_irq_enable() - Get overall interrupt state
 - * @mc_io:	Pointer to MC portal's I/O object
 - * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPBP object
+- * @token:	Token of DPMCP object
 - * @irq_index:	The interrupt index to configure
 - * @en:		Returned interrupt state - enable = 1, disable = 0
 - *
 - * Return:	'0' on Success; Error code otherwise.
 - */
--int dpbp_get_irq_enable(struct fsl_mc_io *mc_io,
--			u32 cmd_flags,
--			u16 token,
--			u8 irq_index,
--			u8 *en)
+-int dpmcp_get_irq_enable(struct fsl_mc_io *mc_io,
+-			 u32 cmd_flags,
+-			 u16 token,
+-			 u8 irq_index,
+-			 u8 *en)
 -{
 -	struct mc_command cmd = { 0 };
--	struct dpbp_cmd_get_irq_enable *cmd_params;
--	struct dpbp_rsp_get_irq_enable *rsp_params;
+-	struct dpmcp_cmd_get_irq_enable *cmd_params;
+-	struct dpmcp_rsp_get_irq_enable *rsp_params;
 -	int err;
 -
 -	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPBP_CMDID_GET_IRQ_ENABLE,
+-	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_GET_IRQ_ENABLE,
 -					  cmd_flags, token);
--	cmd_params = (struct dpbp_cmd_get_irq_enable *)cmd.params;
+-	cmd_params = (struct dpmcp_cmd_get_irq_enable *)cmd.params;
 -	cmd_params->irq_index = irq_index;
 -
 -	/* send command to mc*/
@@ -402,16 +373,16 @@ index cf4782f..1fa7257 100644
 -		return err;
 -
 -	/* retrieve response parameters */
--	rsp_params = (struct dpbp_rsp_get_irq_enable *)cmd.params;
--	*en = rsp_params->enabled & DPBP_ENABLE;
+-	rsp_params = (struct dpmcp_rsp_get_irq_enable *)cmd.params;
+-	*en = rsp_params->enabled & DPMCP_ENABLE;
 -	return 0;
 -}
 -
 -/**
-- * dpbp_set_irq_mask() - Set interrupt mask.
+- * dpmcp_set_irq_mask() - Set interrupt mask.
 - * @mc_io:	Pointer to MC portal's I/O object
 - * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPBP object
+- * @token:	Token of DPMCP object
 - * @irq_index:	The interrupt index to configure
 - * @mask:	Event mask to trigger interrupt;
 - *			each bit:
@@ -423,19 +394,19 @@ index cf4782f..1fa7257 100644
 - *
 - * Return:	'0' on Success; Error code otherwise.
 - */
--int dpbp_set_irq_mask(struct fsl_mc_io *mc_io,
--		      u32 cmd_flags,
--		      u16 token,
--		      u8 irq_index,
--		      u32 mask)
+-int dpmcp_set_irq_mask(struct fsl_mc_io *mc_io,
+-		       u32 cmd_flags,
+-		       u16 token,
+-		       u8 irq_index,
+-		       u32 mask)
 -{
 -	struct mc_command cmd = { 0 };
--	struct dpbp_cmd_set_irq_mask *cmd_params;
+-	struct dpmcp_cmd_set_irq_mask *cmd_params;
 -
 -	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPBP_CMDID_SET_IRQ_MASK,
+-	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_SET_IRQ_MASK,
 -					  cmd_flags, token);
--	cmd_params = (struct dpbp_cmd_set_irq_mask *)cmd.params;
+-	cmd_params = (struct dpmcp_cmd_set_irq_mask *)cmd.params;
 -	cmd_params->mask = cpu_to_le32(mask);
 -	cmd_params->irq_index = irq_index;
 -
@@ -444,10 +415,10 @@ index cf4782f..1fa7257 100644
 -}
 -
 -/**
-- * dpbp_get_irq_mask() - Get interrupt mask.
+- * dpmcp_get_irq_mask() - Get interrupt mask.
 - * @mc_io:	Pointer to MC portal's I/O object
 - * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPBP object
+- * @token:	Token of DPMCP object
 - * @irq_index:	The interrupt index to configure
 - * @mask:	Returned event mask to trigger interrupt
 - *
@@ -456,21 +427,22 @@ index cf4782f..1fa7257 100644
 - *
 - * Return:	'0' on Success; Error code otherwise.
 - */
--int dpbp_get_irq_mask(struct fsl_mc_io *mc_io,
--		      u32 cmd_flags,
--		      u16 token,
--		      u8 irq_index,
--		      u32 *mask)
+-int dpmcp_get_irq_mask(struct fsl_mc_io *mc_io,
+-		       u32 cmd_flags,
+-		       u16 token,
+-		       u8 irq_index,
+-		       u32 *mask)
 -{
 -	struct mc_command cmd = { 0 };
--	struct dpbp_cmd_get_irq_mask *cmd_params;
--	struct dpbp_rsp_get_irq_mask *rsp_params;
+-	struct dpmcp_cmd_get_irq_mask *cmd_params;
+-	struct dpmcp_rsp_get_irq_mask *rsp_params;
+-
 -	int err;
 -
 -	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPBP_CMDID_GET_IRQ_MASK,
+-	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_GET_IRQ_MASK,
 -					  cmd_flags, token);
--	cmd_params = (struct dpbp_cmd_get_irq_mask *)cmd.params;
+-	cmd_params = (struct dpmcp_cmd_get_irq_mask *)cmd.params;
 -	cmd_params->irq_index = irq_index;
 -
 -	/* send command to mc*/
@@ -479,18 +451,18 @@ index cf4782f..1fa7257 100644
 -		return err;
 -
 -	/* retrieve response parameters */
--	rsp_params = (struct dpbp_rsp_get_irq_mask *)cmd.params;
+-	rsp_params = (struct dpmcp_rsp_get_irq_mask *)cmd.params;
 -	*mask = le32_to_cpu(rsp_params->mask);
 -
 -	return 0;
 -}
 -
 -/**
-- * dpbp_get_irq_status() - Get the current status of any pending interrupts.
+- * dpmcp_get_irq_status() - Get the current status of any pending interrupts.
 - *
 - * @mc_io:	Pointer to MC portal's I/O object
 - * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPBP object
+- * @token:	Token of DPMCP object
 - * @irq_index:	The interrupt index to configure
 - * @status:	Returned interrupts status - one bit per cause:
 - *			0 = no interrupt pending
@@ -498,21 +470,21 @@ index cf4782f..1fa7257 100644
 - *
 - * Return:	'0' on Success; Error code otherwise.
 - */
--int dpbp_get_irq_status(struct fsl_mc_io *mc_io,
--			u32 cmd_flags,
--			u16 token,
--			u8 irq_index,
--			u32 *status)
+-int dpmcp_get_irq_status(struct fsl_mc_io *mc_io,
+-			 u32 cmd_flags,
+-			 u16 token,
+-			 u8 irq_index,
+-			 u32 *status)
 -{
 -	struct mc_command cmd = { 0 };
--	struct dpbp_cmd_get_irq_status *cmd_params;
--	struct dpbp_rsp_get_irq_status *rsp_params;
+-	struct dpmcp_cmd_get_irq_status *cmd_params;
+-	struct dpmcp_rsp_get_irq_status *rsp_params;
 -	int err;
 -
 -	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPBP_CMDID_GET_IRQ_STATUS,
+-	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_GET_IRQ_STATUS,
 -					  cmd_flags, token);
--	cmd_params = (struct dpbp_cmd_get_irq_status *)cmd.params;
+-	cmd_params = (struct dpmcp_cmd_get_irq_status *)cmd.params;
 -	cmd_params->status = cpu_to_le32(*status);
 -	cmd_params->irq_index = irq_index;
 -
@@ -522,107 +494,34 @@ index cf4782f..1fa7257 100644
 -		return err;
 -
 -	/* retrieve response parameters */
--	rsp_params = (struct dpbp_rsp_get_irq_status *)cmd.params;
+-	rsp_params = (struct dpmcp_rsp_get_irq_status *)cmd.params;
 -	*status = le32_to_cpu(rsp_params->status);
 -
 -	return 0;
 -}
 -
 -/**
-- * dpbp_clear_irq_status() - Clear a pending interrupt's status
+- * dpmcp_get_attributes - Retrieve DPMCP attributes.
 - *
 - * @mc_io:	Pointer to MC portal's I/O object
 - * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPBP object
-- * @irq_index:	The interrupt index to configure
-- * @status:	Bits to clear (W1C) - one bit per cause:
-- *					0 = don't change
-- *					1 = clear status bit
+- * @token:	Token of DPMCP object
+- * @attr:	Returned object's attributes
 - *
 - * Return:	'0' on Success; Error code otherwise.
 - */
--int dpbp_clear_irq_status(struct fsl_mc_io *mc_io,
--			  u32 cmd_flags,
--			  u16 token,
--			  u8 irq_index,
--			  u32 status)
+-int dpmcp_get_attributes(struct fsl_mc_io *mc_io,
+-			 u32 cmd_flags,
+-			 u16 token,
+-			 struct dpmcp_attr *attr)
 -{
 -	struct mc_command cmd = { 0 };
--	struct dpbp_cmd_clear_irq_status *cmd_params;
--
--	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPBP_CMDID_CLEAR_IRQ_STATUS,
--					  cmd_flags, token);
--	cmd_params = (struct dpbp_cmd_clear_irq_status *)cmd.params;
--	cmd_params->status = cpu_to_le32(status);
--	cmd_params->irq_index = irq_index;
--
--	/* send command to mc*/
--	return mc_send_command(mc_io, &cmd);
--}
--
--/**
-  * dpbp_get_attributes - Retrieve DPBP attributes.
-  *
-  * @mc_io:	Pointer to MC portal's I/O object
-@@ -619,80 +244,6 @@ int dpbp_get_attributes(struct fsl_mc_io *mc_io,
- EXPORT_SYMBOL(dpbp_get_attributes);
- 
- /**
-- * dpbp_set_notifications() - Set notifications towards software
-- * @mc_io:	Pointer to MC portal's I/O object
-- * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPBP object
-- * @cfg:	notifications configuration
-- *
-- * Return:	'0' on Success; Error code otherwise.
-- */
--int dpbp_set_notifications(struct fsl_mc_io *mc_io,
--			   u32 cmd_flags,
--			   u16 token,
--			   struct dpbp_notification_cfg	*cfg)
--{
--	struct mc_command cmd = { 0 };
--	struct dpbp_cmd_set_notifications *cmd_params;
--
--	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPBP_CMDID_SET_NOTIFICATIONS,
--					  cmd_flags, token);
--	cmd_params = (struct dpbp_cmd_set_notifications *)cmd.params;
--	cmd_params->depletion_entry = cpu_to_le32(cfg->depletion_entry);
--	cmd_params->depletion_exit = cpu_to_le32(cfg->depletion_exit);
--	cmd_params->surplus_entry = cpu_to_le32(cfg->surplus_entry);
--	cmd_params->surplus_exit = cpu_to_le32(cfg->surplus_exit);
--	cmd_params->options = cpu_to_le16(cfg->options);
--	cmd_params->message_ctx = cpu_to_le64(cfg->message_ctx);
--	cmd_params->message_iova = cpu_to_le64(cfg->message_iova);
--
--	/* send command to mc*/
--	return mc_send_command(mc_io, &cmd);
--}
--
--/**
-- * dpbp_get_notifications() - Get the notifications configuration
-- * @mc_io:	Pointer to MC portal's I/O object
-- * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPBP object
-- * @cfg:	notifications configuration
-- *
-- * Return:	'0' on Success; Error code otherwise.
-- */
--int dpbp_get_notifications(struct fsl_mc_io *mc_io,
--			   u32 cmd_flags,
--			   u16 token,
--			   struct dpbp_notification_cfg	*cfg)
--{
--	struct mc_command cmd = { 0 };
--	struct dpbp_rsp_get_notifications *rsp_params;
+-	struct dpmcp_rsp_get_attributes *rsp_params;
 -	int err;
 -
 -	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPBP_CMDID_GET_NOTIFICATIONS,
--					  cmd_flags,
--					  token);
+-	cmd.header = mc_encode_cmd_header(DPMCP_CMDID_GET_ATTR,
+-					  cmd_flags, token);
 -
 -	/* send command to mc*/
 -	err = mc_send_command(mc_io, &cmd);
@@ -630,178 +529,133 @@ index cf4782f..1fa7257 100644
 -		return err;
 -
 -	/* retrieve response parameters */
--	rsp_params = (struct dpbp_rsp_get_notifications *)cmd.params;
--	cfg->depletion_entry = le32_to_cpu(rsp_params->depletion_entry);
--	cfg->depletion_exit = le32_to_cpu(rsp_params->depletion_exit);
--	cfg->surplus_entry = le32_to_cpu(rsp_params->surplus_entry);
--	cfg->surplus_exit = le32_to_cpu(rsp_params->surplus_exit);
--	cfg->options = le16_to_cpu(rsp_params->options);
--	cfg->message_ctx = le64_to_cpu(rsp_params->message_ctx);
--	cfg->message_iova = le64_to_cpu(rsp_params->message_iova);
+-	rsp_params = (struct dpmcp_rsp_get_attributes *)cmd.params;
+-	attr->id = le32_to_cpu(rsp_params->id);
 -
 -	return 0;
 -}
 -
 -/**
-  * dpbp_get_api_version - Get Data Path Buffer Pool API version
+  * dpmcp_get_api_version - Get Data Path Management Command Portal API version
   * @mc_io:	Pointer to Mc portal's I/O object
   * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-diff --git a/drivers/staging/fsl-mc/include/dpbp.h b/drivers/staging/fsl-mc/include/dpbp.h
-index bf34b1e..e9e04cc 100644
---- a/drivers/staging/fsl-mc/include/dpbp.h
-+++ b/drivers/staging/fsl-mc/include/dpbp.h
-@@ -49,25 +49,6 @@ int dpbp_close(struct fsl_mc_io *mc_io,
- 	       u32 cmd_flags,
- 	       u16 token);
+diff --git a/drivers/staging/fsl-mc/bus/dpmcp.h b/drivers/staging/fsl-mc/bus/dpmcp.h
+index 98a100d..f616031 100644
+--- a/drivers/staging/fsl-mc/bus/dpmcp.h
++++ b/drivers/staging/fsl-mc/bus/dpmcp.h
+@@ -44,109 +44,17 @@ int dpmcp_open(struct fsl_mc_io *mc_io,
+ 	       int dpmcp_id,
+ 	       u16 *token);
  
--/**
-- * struct dpbp_cfg - Structure representing DPBP configuration
-- * @options:	place holder
-- */
--struct dpbp_cfg {
--	u32 options;
--};
+-/* Get portal ID from pool */
+-#define DPMCP_GET_PORTAL_ID_FROM_POOL (-1)
 -
--int dpbp_create(struct fsl_mc_io *mc_io,
--		u16 dprc_token,
--		u32 cmd_flags,
--		const struct dpbp_cfg *cfg,
--		u32 *obj_id);
--
--int dpbp_destroy(struct fsl_mc_io *mc_io,
--		 u16 dprc_token,
--		 u32 cmd_flags,
--		 u32 obj_id);
--
- int dpbp_enable(struct fsl_mc_io *mc_io,
+ int dpmcp_close(struct fsl_mc_io *mc_io,
  		u32 cmd_flags,
  		u16 token);
-@@ -86,67 +67,6 @@ int dpbp_reset(struct fsl_mc_io *mc_io,
- 	       u16 token);
  
- /**
-- * struct dpbp_irq_cfg - IRQ configuration
-- * @addr:	Address that must be written to signal a message-based interrupt
+-/**
+- * struct dpmcp_cfg - Structure representing DPMCP configuration
+- * @portal_id:	Portal ID; 'DPMCP_GET_PORTAL_ID_FROM_POOL' to get the portal ID
+- *		from pool
+- */
+-struct dpmcp_cfg {
+-	int portal_id;
+-};
+-
+-int dpmcp_create(struct fsl_mc_io *mc_io,
+-		 u16 dprc_token,
+-		 u32 cmd_flags,
+-		 const struct dpmcp_cfg *cfg,
+-		 u32 *obj_id);
+-
+-int dpmcp_destroy(struct fsl_mc_io *mc_io,
+-		  u16 dprc_token,
+-		  u32 cmd_flags,
+-		  u32 obj_id);
++int dpmcp_get_api_version(struct fsl_mc_io *mc_io,
++			  u32 cmd_flags,
++			  u16 *major_ver,
++			  u16 *minor_ver);
+ 
+ int dpmcp_reset(struct fsl_mc_io *mc_io,
+ 		u32 cmd_flags,
+ 		u16 token);
+ 
+-/* IRQ */
+-/* IRQ Index */
+-#define DPMCP_IRQ_INDEX                             0
+-/* irq event - Indicates that the link state changed */
+-#define DPMCP_IRQ_EVENT_CMD_DONE                    0x00000001
+-
+-/**
+- * struct dpmcp_irq_cfg - IRQ configuration
+- * @paddr:	Address that must be written to signal a message-based interrupt
 - * @val:	Value to write into irq_addr address
 - * @irq_num: A user defined number associated with this IRQ
 - */
--struct dpbp_irq_cfg {
--	     u64 addr;
+-struct dpmcp_irq_cfg {
+-	     u64 paddr;
 -	     u32 val;
 -	     int irq_num;
 -};
 -
--int dpbp_set_irq(struct fsl_mc_io *mc_io,
--		 u32 cmd_flags,
--		 u16 token,
--		 u8 irq_index,
--		 struct dpbp_irq_cfg *irq_cfg);
+-int dpmcp_set_irq(struct fsl_mc_io *mc_io,
+-		  u32 cmd_flags,
+-		  u16 token,
+-		  u8 irq_index,
+-		  struct dpmcp_irq_cfg *irq_cfg);
 -
--int dpbp_get_irq(struct fsl_mc_io *mc_io,
--		 u32 cmd_flags,
--		 u16 token,
--		 u8 irq_index,
--		 int *type,
--		 struct dpbp_irq_cfg *irq_cfg);
+-int dpmcp_get_irq(struct fsl_mc_io *mc_io,
+-		  u32 cmd_flags,
+-		  u16 token,
+-		  u8 irq_index,
+-		  int *type,
+-		  struct dpmcp_irq_cfg *irq_cfg);
 -
--int dpbp_set_irq_enable(struct fsl_mc_io *mc_io,
--			u32 cmd_flags,
--			u16 token,
--			u8 irq_index,
--			u8 en);
+-int dpmcp_set_irq_enable(struct fsl_mc_io *mc_io,
+-			 u32 cmd_flags,
+-			 u16 token,
+-			 u8 irq_index,
+-			 u8 en);
 -
--int dpbp_get_irq_enable(struct fsl_mc_io *mc_io,
--			u32 cmd_flags,
--			u16 token,
--			u8 irq_index,
--			u8 *en);
+-int dpmcp_get_irq_enable(struct fsl_mc_io *mc_io,
+-			 u32 cmd_flags,
+-			 u16 token,
+-			 u8 irq_index,
+-			 u8 *en);
 -
--int dpbp_set_irq_mask(struct fsl_mc_io	*mc_io,
--		      u32 cmd_flags,
--		      u16 token,
--		      u8 irq_index,
--		      u32 mask);
+-int dpmcp_set_irq_mask(struct fsl_mc_io *mc_io,
+-		       u32 cmd_flags,
+-		       u16 token,
+-		       u8 irq_index,
+-		       u32 mask);
 -
--int dpbp_get_irq_mask(struct fsl_mc_io	*mc_io,
--		      u32 cmd_flags,
--		      u16 token,
--		      u8 irq_index,
--		      u32 *mask);
+-int dpmcp_get_irq_mask(struct fsl_mc_io *mc_io,
+-		       u32 cmd_flags,
+-		       u16 token,
+-		       u8 irq_index,
+-		       u32 *mask);
 -
--int dpbp_get_irq_status(struct fsl_mc_io *mc_io,
--			u32 cmd_flags,
--			u16 token,
--			u8 irq_index,
--			u32 *status);
--
--int dpbp_clear_irq_status(struct fsl_mc_io *mc_io,
--			  u32 cmd_flags,
--			  u16 token,
--			  u8 irq_index,
--			  u32 status);
+-int dpmcp_get_irq_status(struct fsl_mc_io *mc_io,
+-			 u32 cmd_flags,
+-			 u16 token,
+-			 u8 irq_index,
+-			 u32 *status);
 -
 -/**
-  * struct dpbp_attr - Structure representing DPBP attributes
-  * @id:		DPBP object ID
-  * @bpid:	Hardware buffer pool ID; should be used as an argument in
-@@ -162,58 +82,9 @@ int dpbp_get_attributes(struct fsl_mc_io *mc_io,
- 			u16 token,
- 			struct dpbp_attr *attr);
- 
--/**
-- *  DPBP notifications options
+- * struct dpmcp_attr - Structure representing DPMCP attributes
+- * @id:		DPMCP object ID
 - */
--
--/**
-- * BPSCN write will attempt to allocate into a cache (coherent write)
-- */
--#define DPBP_NOTIF_OPT_COHERENT_WRITE	0x00000001
--
--/**
-- * struct dpbp_notification_cfg - Structure representing DPBP notifications
-- *	towards software
-- * @depletion_entry: below this threshold the pool is "depleted";
-- *	set it to '0' to disable it
-- * @depletion_exit: greater than or equal to this threshold the pool exit its
-- *	"depleted" state
-- * @surplus_entry: above this threshold the pool is in "surplus" state;
-- *	set it to '0' to disable it
-- * @surplus_exit: less than or equal to this threshold the pool exit its
-- *	"surplus" state
-- * @message_iova: MUST be given if either 'depletion_entry' or 'surplus_entry'
-- *	is not '0' (enable); I/O virtual address (must be in DMA-able memory),
-- *	must be 16B aligned.
-- * @message_ctx: The context that will be part of the BPSCN message and will
-- *	be written to 'message_iova'
-- * @options: Mask of available options; use 'DPBP_NOTIF_OPT_<X>' values
-- */
--struct dpbp_notification_cfg {
--	u32 depletion_entry;
--	u32 depletion_exit;
--	u32 surplus_entry;
--	u32 surplus_exit;
--	u64 message_iova;
--	u64 message_ctx;
--	u16 options;
+-struct dpmcp_attr {
+-	int id;
 -};
 -
--int dpbp_set_notifications(struct fsl_mc_io *mc_io,
--			   u32 cmd_flags,
--			   u16 token,
--			   struct dpbp_notification_cfg *cfg);
+-int dpmcp_get_attributes(struct fsl_mc_io *mc_io,
+-			 u32 cmd_flags,
+-			 u16 token,
+-			 struct dpmcp_attr *attr);
 -
--int dpbp_get_notifications(struct fsl_mc_io *mc_io,
--			   u32 cmd_flags,
--			   u16 token,
--			   struct dpbp_notification_cfg *cfg);
--
- int dpbp_get_api_version(struct fsl_mc_io *mc_io,
- 			 u32 cmd_flags,
- 			 u16 *major_ver,
- 			 u16 *minor_ver);
- 
--/** @} */
--
- #endif /* __FSL_DPBP_H */
+ #endif /* __FSL_DPMCP_H */
 -- 
 1.8.3.1
