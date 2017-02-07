@@ -1,140 +1,137 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 07 Feb 2017 21:36:35 +0800
-Subject: [PATCH v3 2/3] nvmem: sunxi-sid: add support for H3's SID
- controller
-In-Reply-To: <20170207092503.3nh2g6orkgjgdi7q@lukather>
-References: <20170202131338.20234-1-icenowy@aosc.xyz>
- <20170202131338.20234-2-icenowy@aosc.xyz>
- <20170206085416.4qtd3wfhtinp42xv@lukather>
- <5119511486371415@web15m.yandex.ru> <20170207092503.3nh2g6orkgjgdi7q@lukather>
-Message-ID: <4664661486474595@web28j.yandex.ru>
+From: bparrot@ti.com (Benoit Parrot)
+Date: Tue, 7 Feb 2017 07:36:48 -0600
+Subject: [PATCH v3 13/24] platform: add video-multiplexer subdevice driver
+In-Reply-To: <3823958.XNLmIv7GEv@avalon>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <2038922.a1tReKKdaL@avalon>
+ <bd64a86e-d90c-f4aa-6f22-1c832e0b563f@gmail.com>
+ <3823958.XNLmIv7GEv@avalon>
+Message-ID: <20170207133648.GA27065@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote on Tue [2017-Feb-07 12:26:32 +0200]:
+> Hi Steve,
+> 
+> On Monday 06 Feb 2017 15:10:46 Steve Longerbeam wrote:
+> > On 02/06/2017 02:33 PM, Laurent Pinchart wrote:
+> > > On Monday 06 Feb 2017 10:50:22 Hans Verkuil wrote:
+> > >> On 02/05/2017 04:48 PM, Laurent Pinchart wrote:
+> > >>> On Tuesday 24 Jan 2017 18:07:55 Steve Longerbeam wrote:
+> > >>>> On 01/24/2017 04:02 AM, Philipp Zabel wrote:
+> > >>>>> On Fri, 2017-01-20 at 15:03 +0100, Hans Verkuil wrote:
+> > >>>>>>> +
+> > >>>>>>> +int vidsw_g_mbus_config(struct v4l2_subdev *sd, struct
+> > >>>>>>> v4l2_mbus_config *cfg)
+> 
+> [snip]
+> 
+> > >>>>>> I am not certain this op is needed at all. In the current kernel this
+> > >>>>>> op is only used by soc_camera, pxa_camera and omap3isp (somewhat
+> > >>>>>> dubious). Normally this information should come from the device tree
+> > >>>>>> and there should be no need for this op.
+> > >>>>>> 
+> > >>>>>> My (tentative) long-term plan was to get rid of this op.
+> > >>>>>> 
+> > >>>>>> If you don't need it, then I recommend it is removed.
+> > >>>> 
+> > >>>> Hi Hans, the imx-media driver was only calling g_mbus_config to the
+> > >>>> camera sensor, and it was doing that to determine the sensor's bus
+> > >>>> type. This info was already available from parsing a v4l2_of_endpoint
+> > >>>> from the sensor node. So it was simple to remove the g_mbus_config
+> > >>>> calls, and instead rely on the parsed sensor v4l2_of_endpoint.
+> > >>> 
+> > >>> That's not a good point.
+> > > 
+> > > (mea culpa, s/point/idea/)
+> > > 
+> > >>> The imx-media driver must not parse the sensor DT node as it is not
+> > >>> aware of what bindings the sensor is compatible with.
+> > 
+> > Hi Laurent,
+> > 
+> > I don't really understand this argument. The sensor node has been found
+> > by parsing the OF graph, so it is known to be a camera sensor node at
+> > that point.
+> 
+> All you know in the i.MX6 driver is that the remote node is a video source. 
+> You can rely on the fact that it implements the OF graph bindings to locate 
+> other ports in that DT node, but that's more or less it.
+> 
+> DT properties are defined by DT bindings and thus qualified by a compatible 
+> string. Unless you match on sensor compat strings in the i.MX6 driver (which 
+> you shouldn't do, to keep the driver generic) you can't know for certain how 
+> to parse the sensor node DT properties. For all you know, the video source 
+> could be a bridge such as an HDMI to CSI-2 converter for instance, so you 
+> can't even rely on the fact that it's a sensor.
+> 
+> > >>> Information must instead be queried from the sensor subdev at runtime,
+> > >>> through the g_mbus_config() operation.
+> > >>> 
+> > >>> Of course, if you can get the information from the imx-media DT node,
+> > >>> that's certainly an option. It's only information provided by the sensor
+> > >>> driver that you have no choice but query using a subdev operation.
+> > >> 
+> > >> Shouldn't this come from the imx-media DT node? BTW, why is omap3isp
+> > >> using this?
+> > > 
+> > > It all depends on what type of information needs to be retrieved, and
+> > > whether it can change at runtime or is fixed. Adding properties to the
+> > > imx-media DT node is certainly fine as long as those properties describe
+> > > the i.MX side.
+> >
+> > In this case the info needed is the media bus type. That info is most easily
+> > available by calling v4l2_of_parse_endpoint() on the sensor's endpoint
+> > node.
+> 
+> I haven't had time to check the code in details yet, so I can't really comment 
+> on what you need and how it should be implemented exactly.
+> 
+> > The media bus type is not something that can be added to the
+> > imx-media node since it contains no endpoint nodes.
+> 
+> Agreed. You have endpoints in the CSI nodes though.
+> 
+> > > In the omap3isp case, we use the operation to query whether parallel data
+> > > contains embedded sync (BT.656) or uses separate h/v sync signals.
+> > > 
+> > >> The reason I am suspicious about this op is that it came from soc-camera
+> > >> and predates the DT. The contents of v4l2_mbus_config seems very much
+> > >> like a HW description to me, i.e. something that belongs in the DT.
+> > > 
+> > > Part of it is possibly outdated, but for buses that support multiple modes
+> > > of operation (such as the parallel bus case described above) we need to
+> > > make that information discoverable at runtime. Maybe this should be
+> > > considered as related to Sakari's efforts to support VC/DT for CSI-2, and
+> > > supported through the API he is working on.
+> > 
+> > That sounds interesting, can you point me to some info on this effort?
+> 
+> Sure.
+> 
+> http://git.retiisi.org.uk/?p=~sailus/linux.git;a=shortlog;h=refs/heads/vc
+> 
+> > I've been thinking the DT should contain virtual channel info for CSI-2
+> > buses.
+> 
+> I don't think it should. CSI-2 virtual channels and data types should be 
+> handled as a software concept, and thus supported through driver code without 
+> involving DT.
 
+Laurent,
 
-07.02.2017, 17:25, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> On Mon, Feb 06, 2017 at 04:56:55PM +0800, Icenowy Zheng wrote:
->> ?06.02.2017, 16:54, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
->> ?> On Thu, Feb 02, 2017 at 09:13:37PM +0800, Icenowy Zheng wrote:
->> ?>> ?The H3 SoC have a bigger SID controller, which has its direct read
->> ?>> ?address at 0x200 position in the SID block, not 0x0.
->> ?>>
->> ?>> ?Also, H3 SID controller has some silicon bug that makes the direct read
->> ?>> ?value wrong at cold boot, add code to workaround the bug. (This bug has
->> ?>> ?already been fixed on A64 and later SoCs)
->> ?>>
->> ?>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?>> ?---
->> ?>> ?This patch is the part of [PATCH v2 1/1] that adds support for H3 SID
->> ?>> ?controller.
->> ?>>
->> ?>> ??.../bindings/nvmem/allwinner,sunxi-sid.txt | 12 +++-
->> ?>> ??drivers/nvmem/sunxi_sid.c | 72 +++++++++++++++++++++-
->> ?>> ??2 files changed, 82 insertions(+), 2 deletions(-)
->> ?>>
->> ?>> ?diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
->> ?>> ?index d543ed3f5363..9ab9e75a6351 100644
->> ?>> ?--- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
->> ?>> ?+++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
->> ?>> ?@@ -1,7 +1,11 @@
->> ?>> ??Allwinner sunxi-sid
->> ?>>
->> ?>> ??Required properties:
->> ?>> ?-- compatible: "allwinner,sun4i-a10-sid" or "allwinner,sun7i-a20-sid"
->> ?>> ?+- compatible: Should be one of the following (depending on your SoC):
->> ?>> ?+ "allwinner,sun4i-a10-sid"
->> ?>> ?+ "allwinner,sun7i-a20-sid"
->> ?>> ?+ "allwinner,sun8i-h3-sid"
->> ?>> ?+
->> ?>> ??- reg: Should contain registers location and length
->> ?>>
->> ?>> ??= Data cells =
->> ?>> ?@@ -19,3 +23,9 @@ Example for sun7i:
->> ?>> ??????????????????compatible = "allwinner,sun7i-a20-sid";
->> ?>> ??????????????????reg = <0x01c23800 0x200>
->> ?>> ??????????};
->> ?>> ?+
->> ?>> ?+Example for sun8i-h3:
->> ?>> ?+ sid at 01c14000 {
->> ?>> ?+ compatible = "allwinner,sun8i-h3-sid";
->> ?>> ?+ reg = <0x01c14000 0x400>;
->> ?>> ?+ };
->> ?>> ?diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
->> ?>> ?index 69524b67007f..476a161ff23a 100644
->> ?>> ?--- a/drivers/nvmem/sunxi_sid.c
->> ?>> ?+++ b/drivers/nvmem/sunxi_sid.c
->> ?>> ?@@ -25,6 +25,16 @@
->> ?>> ??#include <linux/slab.h>
->> ?>> ??#include <linux/random.h>
->> ?>>
->> ?>> ?+/* Registers and special values for doing register-based SID readout on H3 */
->> ?>> ?+#define SUN8I_SID_PRCTL 0x40
->> ?>> ?+#define SUN8I_SID_RDKEY 0x60
->> ?>> ?+
->> ?>> ?+#define SUN8I_SID_OP_LOCK 0xAC
->> ?>> ?+#define SUN8I_SID_OFFSET_MASK 0x1FF
->> ?>> ?+#define SUN8I_SID_OFFSET_SHIFT 16
->> ?>> ?+#define SUN8I_SID_LOCK_SHIFT 8
->> ?>> ?+#define SUN8I_SID_READ BIT(1)
->> ?>> ?+
->> ?>> ??static struct nvmem_config econfig = {
->> ?>> ??????????.name = "sunxi-sid",
->> ?>> ??????????.read_only = true,
->> ?>> ?@@ -34,11 +44,14 @@ static struct nvmem_config econfig = {
->> ?>> ??};
->> ?>>
->> ?>> ??struct sunxi_sid_cfg {
->> ?>> ?+ u32 value_offset;
->> ?>> ??????????u32 size;
->> ?>> ?+ bool need_register_readout;
->> ?>> ??};
->> ?>>
->> ?>> ??struct sunxi_sid {
->> ?>> ??????????void __iomem *base;
->> ?>> ?+ u32 value_offset;
->> ?>> ??};
->> ?>>
->> ?>> ??/* We read the entire key, due to a 32 bit read alignment requirement. Since we
->> ?>> ?@@ -51,7 +64,8 @@ static u8 sunxi_sid_read_byte(const struct sunxi_sid *sid,
->> ?>> ??{
->> ?>> ??????????u32 sid_key;
->> ?>>
->> ?>> ?- sid_key = ioread32be(sid->base + round_down(offset, 4));
->> ?>> ?+ sid_key = ioread32be(sid->base + sid->value_offset +
->> ?>> ?+ round_down(offset, 4));
->> ?>
->> ?> This would probably be more logical to have this in sunxi_sid_read.
->>
->> ?But it's here which really access the memory...
->
-> This function is made to read a single register. What you want is to
-> offset all reads, and all the reads are made in sunxi_sid_read.
+So when you have a CSI2 port aggregator for instance where traffic from up
+to 4 CSI2 sources where each source is now assigned its own VC by the
+aggregator and interleaved into a single CSI2 Receiver. I was hoping that
+in this case the VC would be DT discoverable as a specicic source identifier.
+So the CSI-RX side could associate a specific source and create its own
+video device. I am guessing that no such thing exist today?
 
-I think the semantic of this function is to read out one byte from SID,
-not read out a single register from SID; the parameter passed into it is
-also a const struct *sunxi_sid, so I think make the offset here is right.
+Benoit
 
->
->> ?>> ?+ if (reg_val & SUN8I_SID_READ)
->> ?>> ?+ return -EIO;
->> ?>> ?+
->> ?>> ?+ if (out)
->> ?>> ?+ *out = readl(sid->base + SUN8I_SID_RDKEY);
->> ?>
->> ?> Why do you need that out parameter?
->>
->> ?The read operation by registers can really return a value --
->> ?in fact, the fix to the pre-read value is a side effect.
->
-> Yet, you're not using it at all, so this is dead code.
-
-Removed it.
-
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
