@@ -1,82 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Feb 2017 19:55:59 +0000
-Subject: [PATCH] efi/libstub/arm*: Set default address and size cells
- values for an empty dtb
-In-Reply-To: <252539a6-72f6-1afa-6ed5-3cf6a1aa24c2@codeaurora.org>
-References: <1486490390-25251-1-git-send-email-jhugo@codeaurora.org>
- <CAKv+Gu963uZB4MaMDuwTGd5-AqEN53Er8tExVLMZNVx3krJrZw@mail.gmail.com>
- <1f47fcdd-c5d8-4082-70a3-ca9b1746d7ca@codeaurora.org>
- <20170207190113.GG26173@leverpostej>
- <c49cc64e-4ca1-8d82-5faf-74c0355c35ef@codeaurora.org>
- <20170207191320.GI26173@leverpostej>
- <252539a6-72f6-1afa-6ed5-3cf6a1aa24c2@codeaurora.org>
-Message-ID: <20170207195558.GK26173@leverpostej>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 7 Feb 2017 12:11:59 -0800
+Subject: [RFC/PATCH] arm64: Rename macro arguments to silence sparse
+In-Reply-To: <20170207015047.4ffc3xzrqsuuzo54@macpro.local>
+References: <20170207010143.22371-1-sboyd@codeaurora.org>
+ <d5bb9d5a-5b02-ffab-d404-bbda532b6c76@codeaurora.org>
+ <20170207015047.4ffc3xzrqsuuzo54@macpro.local>
+Message-ID: <5f7a5bf1-1285-d9c3-b892-c8f9f8ee6d63@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2017 at 12:29:38PM -0700, Jeffrey Hugo wrote:
-> On 2/7/2017 12:13 PM, Mark Rutland wrote:
-> >On Tue, Feb 07, 2017 at 12:07:56PM -0700, Jeffrey Hugo wrote:
-> >>On 2/7/2017 12:01 PM, Mark Rutland wrote:
-> >>>I take it this is specific to the kdump properties?
-> >>>
-> >>>I can't immediately see what would matter for the !kdump case.
-> >>>properties inserted under /chosen are not truncated?
-> >>
-> >>The kexec/kdump properties are added under /chosen, therefore yes,
-> >>properties added under /chosen are truncated, per our observations.
-> >
-> >Sorry for the dodgy (and confusing) reply above.
-> >
-> >What I was trying to ask was does this *only* affect kdump properties?
-> >I note that kdump is not yet upstream for arm64.
-> >
-> >Or are there regular kexec properties that this affects?
-> >
-> >Or !kdump && !kexec properties?
-> >
-> >Can you please enumerate the set of properties for which this matters?
-> 
-> "linux,elfcorehdr" and "linux,usable-memory-range"
-> 
-> We are not aware of !kdump && !kexec properties where this is an issue.
+On 02/06/2017 05:50 PM, Luc Van Oostenryck wrote:
+> On Mon, Feb 06, 2017 at 05:08:17PM -0800, Stephen Boyd wrote:
+>> On 02/06/2017 05:01 PM, Stephen Boyd wrote:
+>>> When I compile files with sparse, I get these sorts of warnings:
+>>>
+>>> arch/arm64/include/asm/lse.h:14:28: warning: Unknown escape 'l'
+>>> arch/arm64/include/asm/lse.h:14:37: warning: Unknown escape 'l'
+>>> arch/arm64/include/asm/alternative.h:172:28: warning: Unknown escape 'o'
+>>>
+>>> This is because sparse is trying to tokenize these files and sees
+>>> a line like this:
+>>>
+>>>  alternative_insn "\llsc", "\lse", ARM64_HAS_LSE_ATOMICS
+>>>
+>>> It gets past alternative_insn part and then sees the start of a
+>>> string with the double quote character. So sparse starts to parse
+>>> the string (eat_string() in the sparse code) but the string has
+>>> an escape character '\' in it. Sparse sees the escape character,
+>>> so it checks to see if it's an escape sequence, but '\l' isn't.
+>>> This causes sparse to spit out this warning of an unknown escape
+>>> sequence 'l'.
+>>>
+>>> In reality, sparse isn't going to use these macros anyway because
+>>> this whole thing is inside an __ASSEMBLER__ ifdef.
+> Yes, annoying. Conversion of escaped characters is supposed to be
+> done just after preprocessing. It's definitively a bug.
 
-Ok, I understand the problem now. Thanks for clarifying the !kdump
-situation.
+Ok. Thanks for the fixes to sparse. My hack patch can be safely ignored.
 
-As per my reply to Timur, given this only affects kdump, this is all
-happening in code that is not upstream, and therefore this is not
-*currently* an issue.
-
-In future, please report this kind of issue in reply to relevant
-postings (e.g. [1]). At the very least, refer to these, with relevant
-people Cc'd (e.g. Takahiro-san in this case).
-
-I think there are three things which should happen:
-
-(a) The userspace kexec-tools kdump code should take /#address-cells and
-    /#size-cells into account when inserting the linux,elfcorehdr and
-    linux,usable-memory-range properties. There can be DTs for 64 bit
-    platforms where these are not 2.
-    
-    Takahiro-san, from looking at your kexec-tools repo, this is not
-    currently the case. Could you address that?
-
-(b) The kdump documentation should updated to explicitly state that
-    these properties are #address-cells + #size-cells tuples, since this
-    is clearly going to be confusing either way. I'll try to come up
-    with wording for that, and I'll reply on the current [1] kdump
-    thread.
-
-(c) Regardless, when creating the empty DT the EFI stub should insert
-    /#address-cells = <2> and /#size-cells = <2>. That better aligns
-    with the usual requirements for an otherwise empty DTB, and avoids a
-    tonne of fragility when the DTB is passed on or altered by other
-    agents.
-
-So, please respin this patch, stating explicitly what this matters for.
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/486234.html 
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
