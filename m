@@ -1,39 +1,87 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Tue,  7 Feb 2017 15:56:45 +0000
-Subject: [PATCH -next] cpufreq: brcmstb-avs-cpufreq: remove unnecessary
- platform_set_drvdata()
-Message-ID: <20170207155645.5455-1-weiyj.lk@gmail.com>
+From: guy.shapiro@mobi-wize.com (Guy Shapiro)
+Date: Tue,  7 Feb 2017 17:56:06 +0200
+Subject: [PATCH 2/2] ARM: dts: imx: update snvs-poweroff mask
+In-Reply-To: <1486482966-4497-1-git-send-email-guy.shapiro@mobi-wize.com>
+References: <1486472054-4367-1-git-send-email-guy.shapiro@mobi-wize.com>
+ <1486482966-4497-1-git-send-email-guy.shapiro@mobi-wize.com>
+Message-ID: <1486482966-4497-2-git-send-email-guy.shapiro@mobi-wize.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <weiyongjun1@huawei.com>
+Make the syscon-poweroff driver change only the shutdown bits on the
+SNVS_LP control register.
 
-The driver core clears the driver data to NULL after device_release
-or on probe failure. Thus, it is not needed to manually clear the
-device driver data to NULL.
+This change fixes an issue with the RTC wakeup alarm, that was
+previously disabled during power off.
 
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
 ---
- drivers/cpufreq/brcmstb-avs-cpufreq.c | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi | 1 +
+ arch/arm/boot/dts/imx6sl.dtsi  | 1 +
+ arch/arm/boot/dts/imx6sx.dtsi  | 1 +
+ arch/arm/boot/dts/imx6ul.dtsi  | 1 +
+ arch/arm/boot/dts/imx7s.dtsi   | 1 +
+ 5 files changed, 5 insertions(+)
 
-diff --git a/drivers/cpufreq/brcmstb-avs-cpufreq.c b/drivers/cpufreq/brcmstb-avs-cpufreq.c
-index c943606..7281a2c 100644
---- a/drivers/cpufreq/brcmstb-avs-cpufreq.c
-+++ b/drivers/cpufreq/brcmstb-avs-cpufreq.c
-@@ -878,7 +878,6 @@ static int brcm_avs_prepare_init(struct platform_device *pdev)
- 	iounmap(priv->avs_intr_base);
- unmap_base:
- 	iounmap(priv->base);
--	platform_set_drvdata(pdev, NULL);
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 89b834f..06984b1 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -757,6 +757,7 @@
+ 					compatible = "syscon-poweroff";
+ 					regmap = <&snvs>;
+ 					offset = <0x38>;
++					value = <0x60>;
+ 					mask = <0x60>;
+ 					status = "disabled";
+ 				};
+diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+index 19cbd87..58717d3 100644
+--- a/arch/arm/boot/dts/imx6sl.dtsi
++++ b/arch/arm/boot/dts/imx6sl.dtsi
+@@ -644,6 +644,7 @@
+ 					compatible = "syscon-poweroff";
+ 					regmap = <&snvs>;
+ 					offset = <0x38>;
++					value = <0x60>;
+ 					mask = <0x60>;
+ 					status = "disabled";
+ 				};
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 10f3330..be142ed5 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -698,6 +698,7 @@
+ 					compatible = "syscon-poweroff";
+ 					regmap = <&snvs>;
+ 					offset = <0x38>;
++					value = <0x60>;
+ 					mask = <0x60>;
+ 					status = "disabled";
+ 				};
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 39845a7..505d24e 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -606,6 +606,7 @@
+ 					compatible = "syscon-poweroff";
+ 					regmap = <&snvs>;
+ 					offset = <0x38>;
++					value = <0x60>;
+ 					mask = <0x60>;
+ 					status = "disabled";
+ 				};
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 8ff2cbdd..aadb1134 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -529,6 +529,7 @@
+ 					compatible = "syscon-poweroff";
+ 					regmap = <&snvs>;
+ 					offset = <0x38>;
++					value = <0x60>;
+ 					mask = <0x60>;
+ 				};
  
- 	return ret;
- }
-@@ -1042,7 +1041,6 @@ static int brcm_avs_cpufreq_remove(struct platform_device *pdev)
- 	priv = platform_get_drvdata(pdev);
- 	iounmap(priv->base);
- 	iounmap(priv->avs_intr_base);
--	platform_set_drvdata(pdev, NULL);
- 
- 	return 0;
- }
+-- 
+2.1.4
