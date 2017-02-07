@@ -1,103 +1,31 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue,  7 Feb 2017 13:58:38 +0100
-Subject: [PATCH 4.9 04/66] efi/fdt: Avoid FDT manipulation after
- ExitBootServices()
-In-Reply-To: <20170207124528.281881183@linuxfoundation.org>
-References: <20170207124528.281881183@linuxfoundation.org>
-Message-ID: <20170207124528.503692416@linuxfoundation.org>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Tue, 7 Feb 2017 22:05:39 +0900
+Subject: [PATCH v2 7/7] drm/rockchip: Call drm_gem_object_release() to
+ destroy GEM base
+In-Reply-To: <20170207123707.GC18315@ulmo.ba.sec>
+References: <1486456542-18675-1-git-send-email-mark.yao@rock-chips.com>
+ <1486456773-19233-1-git-send-email-mark.yao@rock-chips.com>
+ <20170207123707.GC18315@ulmo.ba.sec>
+Message-ID: <CAAFQd5DX9fTzKr8OA8eFs6QN2Mb2cSTSJCwgy3_Wd=ioxJ1oOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.9-stable review patch.  If anyone has any objections, please let me know.
+Hi Mark,
 
-------------------
+On Tue, Feb 7, 2017 at 9:37 PM, Thierry Reding <thierry.reding@gmail.com> wrote:
+> On Tue, Feb 07, 2017 at 04:39:33PM +0800, Mark Yao wrote:
+>> From: Tomasz Figa <tfiga@chromium.org>
+>>
+>> When converting the driver to use shmem-backed GEMs for IOMMU-enabled
+>> systems, we forgot to add calls to drm_gem_object_release(), which gave
+>> us a quite nice memory leak. This patch adds the missing calls.
+>>
+>> Fixes: f11d5f0 ("FROMLIST: drm/rockchip: Do not use DMA mapping API if
+>> attached to IOMMU domain")
 
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Since the patch being fixed is also a part of this series, the fix
+could be just squashed directly (with sign-off lists merged). Same for
+patch 6/7.
 
-commit c8f325a59cfc718d13a50fbc746ed9b415c25e92 upstream.
-
-Some AArch64 UEFI implementations disable the MMU in ExitBootServices(),
-after which unaligned accesses to RAM are no longer supported.
-
-Commit:
-
-  abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the kernel")
-
-fixed an issue in the memory map handling of the stub FDT code, but
-inadvertently created an issue with such firmware, by moving some
-of the FDT manipulation to after the invocation of ExitBootServices().
-
-Given that the stub's libfdt implementation uses the ordinary, accelerated
-string functions, which rely on hardware handling of unaligned accesses,
-manipulating the FDT with the MMU off may result in alignment faults.
-
-So fix the situation by moving the update_fdt_memmap() call into the
-callback function invoked by efi_exit_boot_services() right before it
-calls the ExitBootServices() UEFI service (which is arguably a better
-place for it anyway)
-
-Note that disabling the MMU in ExitBootServices() is not compliant with
-the UEFI spec, and carries great risk due to the fact that switching from
-cached to uncached memory accesses halfway through compiler generated code
-(i.e., involving a stack) can never be done in a way that is architecturally
-safe.
-
-Fixes: abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the kernel")
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Tested-by: Riku Voipio <riku.voipio@linaro.org>
-Cc: mark.rutland at arm.com
-Cc: linux-efi at vger.kernel.org
-Cc: matt at codeblueprint.co.uk
-Cc: leif.lindholm at linaro.org
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1485971102-23330-2-git-send-email-ard.biesheuvel at linaro.org
-Signed-off-by: Ingo Molnar <mingo@kernel.org>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- drivers/firmware/efi/libstub/fdt.c |   14 +++-----------
- 1 file changed, 3 insertions(+), 11 deletions(-)
-
---- a/drivers/firmware/efi/libstub/fdt.c
-+++ b/drivers/firmware/efi/libstub/fdt.c
-@@ -187,6 +187,7 @@ static efi_status_t update_fdt_memmap(vo
- struct exit_boot_struct {
- 	efi_memory_desc_t *runtime_map;
- 	int *runtime_entry_count;
-+	void *new_fdt_addr;
- };
- 
- static efi_status_t exit_boot_func(efi_system_table_t *sys_table_arg,
-@@ -202,7 +203,7 @@ static efi_status_t exit_boot_func(efi_s
- 	efi_get_virtmap(*map->map, *map->map_size, *map->desc_size,
- 			p->runtime_map, p->runtime_entry_count);
- 
--	return EFI_SUCCESS;
-+	return update_fdt_memmap(p->new_fdt_addr, map);
- }
- 
- /*
-@@ -300,22 +301,13 @@ efi_status_t allocate_new_fdt_and_exit_b
- 
- 	priv.runtime_map = runtime_map;
- 	priv.runtime_entry_count = &runtime_entry_count;
-+	priv.new_fdt_addr = (void *)*new_fdt_addr;
- 	status = efi_exit_boot_services(sys_table, handle, &map, &priv,
- 					exit_boot_func);
- 
- 	if (status == EFI_SUCCESS) {
- 		efi_set_virtual_address_map_t *svam;
- 
--		status = update_fdt_memmap((void *)*new_fdt_addr, &map);
--		if (status != EFI_SUCCESS) {
--			/*
--			 * The kernel won't get far without the memory map, but
--			 * may still be able to print something meaningful so
--			 * return success here.
--			 */
--			return EFI_SUCCESS;
--		}
--
- 		/* Install the new virtual address map */
- 		svam = sys_table->runtime->set_virtual_address_map;
- 		status = svam(runtime_entry_count * desc_size, desc_size,
+Best regards,
+Tomasz
