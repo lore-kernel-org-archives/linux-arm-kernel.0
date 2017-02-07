@@ -1,92 +1,57 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 7 Feb 2017 10:27:52 -0800
-Subject: [PATCH] arm64: uaccess: consistently check object sizes
-In-Reply-To: <1486470835-25956-1-git-send-email-mark.rutland@arm.com>
-References: <1486470835-25956-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAGXu5jJ2UR4FVikrFgmkNEL81LYr+Htw0OokZFmfJEKq5BuQOQ@mail.gmail.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Wed,  8 Feb 2017 02:30:33 +0800
+Subject: [PATCH v4 0/9] Allwinner H5 and Orange Pi PC2 support
+Message-ID: <20170207183042.62699-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 7, 2017 at 4:33 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> Currently in arm64's copy_{to,from}_user, we only check the
-> source/destination object size if access_ok() tells us the user access
-> is permissible.
->
-> However, in copy_from_user() we'll subsequently zero any remainder on
-> the destination object. If we failed the access_ok() check, that applies
-> to the whole object size, which we didn't check.
->
-> To ensure that we catch that case, this patch hoists check_object_size()
-> to the start of copy_from_user(), matching __copy_from_user() and
-> __copy_to_user(). To make all of our uaccess copy primitives consistent,
-> the same is done to copy_to_user().
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Kees Cook <keescook@chromium.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/uaccess.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> Kees, Was there any rationale for not handling the !access_ok() case?
+Allwinner H5 is a 64-bit SoC with a design like the 32-bit
+H3.
 
-So, when I pulled the similar code for other architectures out of PaX,
-I retained this pattern. When I reworked x86 and added arm64, it
-seemed sensible to optimize the check to follow access_ok(), since if
-that failed, why do the checking work... but yes, in copy_from_user(),
-we'll wipe the destination without having done the check. Ewww.
-Excellent catch.
+This patchset adds support for it, along with the first available
+board -- Orange Pi PC2.
 
-> I note that other architectures follow the same pattern, and may need a similar
-> fixup.
+Some drivers are also enabled to be built on ARM64 ARCH_SUNXI
+platform, in order to make the internal audio codec work.
 
-I would agree. It will need some fiddling, though. If you look at ARM,
-it's implicitly after the access_ok() check because
-check_object_size() is only run in __copy_*_user().
+Andre Przywara (3):
+  arm: dts: sun8i: split Allwinner H3 .dtsi
+  arm64: dts: allwinner: add Allwinner H5 .dtsi
+  arm64: dts: sunxi: add support for the Orange Pi PC 2 board
 
-(I still think the whole memset(to, 0, n) thing is a bit dangerous...
-it's kind of a "write 0 anywhere" primitive if an attacker can control
-the kernel address at all...)
+Icenowy Zheng (6):
+  arm64: allwinner: Kconfig: add essential pinctrl driver for H5
+  clk: sunxi-ng: rename sun8i-h3 driver to sunxi-h3-h5
+  clk: sunxi-ng: add support for Allwinner H5 SoC
+  ARM: dts: sun8i: convert H3 dtsi to use new sunxi-h3-h5 binding header
+  dt-bindings: remove transitional headers for Allwinner H3 CCU
+  ASoC: sunxi: allow the analog codec driver to be built on ARM64
 
--Kees
-
->
-> Thanks,
-> Mark.
->
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index 46da3ea..5308d69 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -379,9 +379,9 @@ static inline unsigned long __must_check copy_from_user(void *to, const void __u
->  {
->         unsigned long res = n;
->         kasan_check_write(to, n);
-> +       check_object_size(to, n, false);
->
->         if (access_ok(VERIFY_READ, from, n)) {
-> -               check_object_size(to, n, false);
->                 res = __arch_copy_from_user(to, from, n);
->         }
->         if (unlikely(res))
-> @@ -392,9 +392,9 @@ static inline unsigned long __must_check copy_from_user(void *to, const void __u
->  static inline unsigned long __must_check copy_to_user(void __user *to, const void *from, unsigned long n)
->  {
->         kasan_check_read(from, n);
-> +       check_object_size(from, n, true);
->
->         if (access_ok(VERIFY_WRITE, to, n)) {
-> -               check_object_size(from, n, true);
->                 n = __arch_copy_to_user(to, from, n);
->         }
->         return n;
-> --
-> 1.9.1
->
-
-
+ .../devicetree/bindings/clock/sunxi-ccu.txt        |   1 +
+ arch/arm/boot/dts/sun8i-h3.dtsi                    | 789 ++++-----------------
+ .../boot/dts/{sun8i-h3.dtsi => sunxi-h3-h5.dtsi}   |  91 +--
+ arch/arm64/Kconfig.platforms                       |   5 +-
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 164 +++++
+ arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi       | 139 ++++
+ arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi     |   1 +
+ drivers/clk/sunxi-ng/Kconfig                       |   6 +-
+ drivers/clk/sunxi-ng/Makefile                      |   2 +-
+ .../sunxi-ng/{ccu-sun8i-h3.c => ccu-sunxi-h3-h5.c} | 236 +++++-
+ .../sunxi-ng/{ccu-sun8i-h3.h => ccu-sunxi-h3-h5.h} |  15 +-
+ .../clock/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h}    |  11 +-
+ .../reset/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h}    |  11 +-
+ sound/soc/sunxi/Kconfig                            |   2 +-
+ 15 files changed, 709 insertions(+), 765 deletions(-)
+ rewrite arch/arm/boot/dts/sun8i-h3.dtsi (81%)
+ copy arch/arm/boot/dts/{sun8i-h3.dtsi => sunxi-h3-h5.dtsi} (88%)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+ create mode 120000 arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
+ rename drivers/clk/sunxi-ng/{ccu-sun8i-h3.c => ccu-sunxi-h3-h5.c} (76%)
+ rename drivers/clk/sunxi-ng/{ccu-sun8i-h3.h => ccu-sunxi-h3-h5.h} (82%)
+ rename include/dt-bindings/clock/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h} (95%)
+ rename include/dt-bindings/reset/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h} (94%)
 
 -- 
-Kees Cook
-Pixel Security
+2.11.0
