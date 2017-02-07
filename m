@@ -1,38 +1,37 @@
 From: lis8215@gmail.com (lis8215 at gmail.com)
-Date: Tue,  7 Feb 2017 20:50:42 +0300
-Subject: [PATCH v2 0/4] Add the Allwinner A31/A31s PWM driver
-Message-ID: <1486489846-662-1-git-send-email-lis8215@gmail.com>
+Date: Tue,  7 Feb 2017 20:50:46 +0300
+Subject: [PATCH v2 4/4] ARM: dts: sun6i: Add the PWM block to the A31/A31s.
+In-Reply-To: <1486489846-662-1-git-send-email-lis8215@gmail.com>
+References: <1486489846-662-1-git-send-email-lis8215@gmail.com>
+Message-ID: <1486489846-662-5-git-send-email-lis8215@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Siarhei Volkau <lis8215@gmail.com>
 
-First of all im sorry for accidentally sent old patch,
-please ignore them.
+Signed-off-by: Siarhei Volkau <lis8215@gmail.com>
+---
+ arch/arm/boot/dts/sun6i-a31.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-This is the second version of the sun6i PWM patchset.
- - added missing documentation changes
- - dts changes in separate patch
-
-Thanks to Julian Calaby for tips.
-
---------------------------
-This series of patches introduces support for Allwinner A31 PWM, which
-is significantly differ from PWM founded in other Allwinner SoCs.
-Patches 1/4 and 2/4 refactors existing code for easier A31 PWM integration.
-Patch 3/4 adds support for A31 PWM on top of existing Allwinner PWM driver.
-Patch 4/4 adds the PWM block to A31/A31s device tree.
-
-Siarhei Volkau (4):
-  ARM: pwm: sun4i: unification of register operations for support sun6i.
-  ARM: pwm: sun4i: selectable prescaler table for support sun6i.
-  ARM: pwm: sun6i: add support the Allwinner A31 PWM.
-  ARM: dts: sun6i: Add the PWM block to the A31/A31s.
-
- .../devicetree/bindings/pwm/pwm-sun4i.txt          |   3 +-
- arch/arm/boot/dts/sun6i-a31.dtsi                   |   8 +
- drivers/pwm/pwm-sun4i.c                            | 193 ++++++++++++++++++---
- 3 files changed, 176 insertions(+), 28 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index ee1eb6d..fcba129 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -627,6 +627,14 @@
+ 			status = "disabled";
+ 		};
+ 
++		pwm: pwm at 01c21400 {
++			compatible = "allwinner,sun6i-a31-pwm";
++			reg = <0x01c21400 0x400>;
++			clocks = <&osc24M>;
++			#pwm-cells = <3>;
++			status = "disabled";
++		};
++
+ 		lradc: lradc at 01c22800 {
+ 			compatible = "allwinner,sun4i-a10-lradc-keys";
+ 			reg = <0x01c22800 0x100>;
 -- 
 2.4.11
