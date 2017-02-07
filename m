@@ -1,83 +1,43 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Tue, 7 Feb 2017 02:50:48 +0100
-Subject: [RFC/PATCH] arm64: Rename macro arguments to silence sparse
-In-Reply-To: <d5bb9d5a-5b02-ffab-d404-bbda532b6c76@codeaurora.org>
-References: <20170207010143.22371-1-sboyd@codeaurora.org>
- <d5bb9d5a-5b02-ffab-d404-bbda532b6c76@codeaurora.org>
-Message-ID: <20170207015047.4ffc3xzrqsuuzo54@macpro.local>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Mon, 6 Feb 2017 17:52:48 -0800
+Subject: [PATCH v3 20/24] media: imx: Add Camera Interface subdev driver
+In-Reply-To: <20170202223528.GX27312@n2100.armlinux.org.uk>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-21-git-send-email-steve_longerbeam@mentor.com>
+ <20170202223528.GX27312@n2100.armlinux.org.uk>
+Message-ID: <b836f8c6-f166-261e-a989-414a5b56af70@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2017 at 05:08:17PM -0800, Stephen Boyd wrote:
-> On 02/06/2017 05:01 PM, Stephen Boyd wrote:
-> > When I compile files with sparse, I get these sorts of warnings:
-> >
-> > arch/arm64/include/asm/lse.h:14:28: warning: Unknown escape 'l'
-> > arch/arm64/include/asm/lse.h:14:37: warning: Unknown escape 'l'
-> > arch/arm64/include/asm/alternative.h:172:28: warning: Unknown escape 'o'
-> >
-> > This is because sparse is trying to tokenize these files and sees
-> > a line like this:
-> >
-> >  alternative_insn "\llsc", "\lse", ARM64_HAS_LSE_ATOMICS
-> >
-> > It gets past alternative_insn part and then sees the start of a
-> > string with the double quote character. So sparse starts to parse
-> > the string (eat_string() in the sparse code) but the string has
-> > an escape character '\' in it. Sparse sees the escape character,
-> > so it checks to see if it's an escape sequence, but '\l' isn't.
-> > This causes sparse to spit out this warning of an unknown escape
-> > sequence 'l'.
-> >
-> > In reality, sparse isn't going to use these macros anyway because
-> > this whole thing is inside an __ASSEMBLER__ ifdef.
 
-Yes, annoying. Conversion of escaped characters is supposed to be
-done just after preprocessing. It's definitively a bug.
+On 02/02/2017 02:35 PM, Russell King - ARM Linux wrote:
+> <snip>
+> However, "*vfd" contains a struct device, and you _correctly_ set the
+> release function for "*vfd" to video_device_release via camif_videodev.
+>
+> However, if you try to rmmod imx-media, then you end up with a kernel
+> warning that you're freeing memory containing a held lock, and later
+> chaos ensues because kmalloc has been corrupted.
+>
+> The root cause of this is embedding the device structure within the
+> video_device into the driver's private data.  *Any* structure what so
+> ever that contains a kref is reference counted, and that includes
+> struct device, and therefore also includes struct video_device.  What
+> that means is that its lifetime is _not_ under _your_ control, and
+> you may not free it except through its release function (which is
+> video_device_release().)  However, that also tries to kfree (with an
+> offset of 4) your private data, which results in the warning and the
+> corrupted kmalloc free lists.
+>
+> The solution is simple, make "vfd" a pointer in your private data
+> structure and kmalloc() it separately, letting video_device_release()
+> kfree() that data when it needs to.
 
-Luc
+Thanks Russell for tracking this down. I remember doing this
+when I was reviewing the code for opportunities to "optimize" :-/,
+and carelessly caused this bug by not reviewing how video_device
+is freed.
 
+Fixed.
 
->From 786877f6fa5a3b49c92ef08b28c19e58b75ba8e8 Mon Sep 17 00:00:00 2001
-From: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
-Date: Tue, 7 Feb 2017 02:37:00 +0100
-Subject: [PATCH] add testcase for wrong early escape conversion
-
-Reported-by: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
----
- validation/preprocessor/early-escape.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 validation/preprocessor/early-escape.c
-
-diff --git a/validation/preprocessor/early-escape.c b/validation/preprocessor/early-escape.c
-new file mode 100644
-index 000000000..c7beba5d8
---- /dev/null
-+++ b/validation/preprocessor/early-escape.c
-@@ -0,0 +1,23 @@
-+#if 0
-+"\l"
-+#endif
-+
-+/*
-+ * check-description:
-+ *	Following the C standard, escape conversion must be
-+ *	done in phase 5, just after preprocessing and just
-+ *	before string concatenation. So we're not supposed
-+ *	to receive a diagnostic for an unknown escape char
-+ *	for a token which is excluded by the preprocessor.
-+ * check-name: early-escape
-+ * check-command: sparse -E $file
-+ * check-known-to-fail
-+ *
-+ * check-output-start
-+
-+
-+ * check-output-end
-+ *
-+ * check-error-start
-+ * check-error-end
-+ */
--- 
-2.11.0
+Steve
