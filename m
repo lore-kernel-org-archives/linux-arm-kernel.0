@@ -1,52 +1,79 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 6 Feb 2017 17:04:26 -0800
-Subject: [PATCH v5 1/2] dt-bindings: brcm: clocks: add binding for
- brcmstb-cpu-clk-div
-In-Reply-To: <a1a11072-908b-352e-a49f-49240d430df9@broadcom.com>
-References: <20170119002933.7529-1-code@mmayer.net>
- <20170119002933.7529-2-code@mmayer.net>
- <20170121005202.GB8801@codeaurora.org>
- <CAGt4E5sGScHp83ufKcX3Q74vW0fo=L0FHM7tCptvqJfchHAweg@mail.gmail.com>
- <20170203200652.GD25384@codeaurora.org>
- <d56c827e-41cf-fcb3-42e0-792e8bf37871@gmail.com>
- <20170206225914.GJ25384@codeaurora.org>
- <a1a11072-908b-352e-a49f-49240d430df9@broadcom.com>
-Message-ID: <20170207010426.GO25384@codeaurora.org>
+Date: Mon, 6 Feb 2017 17:08:17 -0800
+Subject: [RFC/PATCH] arm64: Rename macro arguments to silence sparse
+In-Reply-To: <20170207010143.22371-1-sboyd@codeaurora.org>
+References: <20170207010143.22371-1-sboyd@codeaurora.org>
+Message-ID: <d5bb9d5a-5b02-ffab-d404-bbda532b6c76@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06, Florian Fainelli wrote:
-> On 02/06/2017 02:59 PM, Stephen Boyd wrote:
-> > On 02/03, Florian Fainelli wrote:
-> >>
-> >> We already have another piece of drive code that manipulates registers
-> >> in the Bus Interface Unit located in drivers/soc/bcm/brcmstb/biuctrl.c
-> >> and which has little to nothing to do with the CPU's clock ratio. And
-> >> actually another one being submitted that deals with the CPU's
-> >> read-ahead cache. I would very much prefer we keep all of them separate
-> >> and dealing with just the register offset they need to do, but that does
-> >> not mean the Device Tree binding has to look that way though.
-> >>
-> >> The binding for the BIUCTRL register made it here:
-> >>
-> >> Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
-> >>
-> >> so we should re-use that, and have a small piece of clock provided that
-> >> just uses the relevant register range within that larger register space
-> >> and provide the CLOCK_RATIO. Does that work?
-> >>
-> > 
-> > Ok. That's fine. The existing binding will be updated to include
-> > this new subnode then for the clock component?
-> 
-> Humm, I suppose we could do that yes, my original thought was to just
-> have this CPU clock provider remap the entire BIUCTRL register range
-> (of_iomap() etc.) and manipulate just the relevant register range of
-> interest (CPU_CLOCK_CONFIG_REG), but if you want a sub-node to appear,
-> we could probably do that as well.
+On 02/06/2017 05:01 PM, Stephen Boyd wrote:
+> When I compile files with sparse, I get these sorts of warnings:
+>
+> arch/arm64/include/asm/lse.h:14:28: warning: Unknown escape 'l'
+> arch/arm64/include/asm/lse.h:14:37: warning: Unknown escape 'l'
+> arch/arm64/include/asm/alternative.h:172:28: warning: Unknown escape 'o'
+>
+> This is because sparse is trying to tokenize these files and sees
+> a line like this:
+>
+>  alternative_insn "\llsc", "\lse", ARM64_HAS_LSE_ATOMICS
+>
+> It gets past alternative_insn part and then sees the start of a
+> string with the double quote character. So sparse starts to parse
+> the string (eat_string() in the sparse code) but the string has
+> an escape character '\' in it. Sparse sees the escape character,
+> so it checks to see if it's an escape sequence, but '\l' isn't.
+> This causes sparse to spit out this warning of an unknown escape
+> sequence 'l'.
+>
+> In reality, sparse isn't going to use these macros anyway because
+> this whole thing is inside an __ASSEMBLER__ ifdef. One hacky
+> solution is to make sparse think it actually is an escape
+> sequence by starting the macro arguments with the 'n' character.
+> Then sparse will see a \n inside a string, which keeps it silent
+> and the assembler doesn't seem to mind either.
+>
+> Cc: <sparse@vger.kernel.org>
 
-One node is fine as well. I thought the plan was many subnodes
-based on the binding document you mentioned earlier.
+Sorry, supposed to be <linux-sparse@vger.kernel.org>
+
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm64/include/asm/alternative.h | 4 ++--
+>  arch/arm64/include/asm/lse.h         | 4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+> index 6e1cb8c5af4d..dd393db554c8 100644
+> --- a/arch/arm64/include/asm/alternative.h
+> +++ b/arch/arm64/include/asm/alternative.h
+> @@ -168,8 +168,8 @@ alternative_endif
+>  #define _ALTERNATIVE_CFG(insn1, insn2, cap, cfg, ...)	\
+>  	alternative_insn insn1, insn2, cap, IS_ENABLED(cfg)
+>  
+> -.macro user_alt, label, oldinstr, newinstr, cond
+> -9999:	alternative_insn "\oldinstr", "\newinstr", \cond
+> +.macro user_alt, label, noldinstr, newinstr, cond
+> +9999:	alternative_insn "\noldinstr", "\newinstr", \cond
+>  	_ASM_EXTABLE 9999b, \label
+>  .endm
+>  
+> diff --git a/arch/arm64/include/asm/lse.h b/arch/arm64/include/asm/lse.h
+> index fc756e22c84c..36206d75943d 100644
+> --- a/arch/arm64/include/asm/lse.h
+> +++ b/arch/arm64/include/asm/lse.h
+> @@ -10,8 +10,8 @@
+>  
+>  .arch_extension	lse
+>  
+> -.macro alt_lse, llsc, lse
+> -	alternative_insn "\llsc", "\lse", ARM64_HAS_LSE_ATOMICS
+> +.macro alt_lse, nllsc, nlse
+> +	alternative_insn "\nllsc", "\nlse", ARM64_HAS_LSE_ATOMICS
+>  .endm
+>  
+>  #else	/* __ASSEMBLER__ */
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
