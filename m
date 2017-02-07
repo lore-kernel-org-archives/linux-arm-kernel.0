@@ -1,22 +1,47 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 7 Feb 2017 15:11:45 +0800
-Subject: [PATCH v4 3/3] i2c: zx2967: add i2c controller driver for ZTE's
- zx2967 family
-In-Reply-To: <CA+DQWkw70=cJUW4xbj91gMTpnfk4bOSgv9u9bv8427GjEVQoYA@mail.gmail.com>
-References: <1486351569-4814-1-git-send-email-baoyou.xie@linaro.org>
- <1486351569-4814-3-git-send-email-baoyou.xie@linaro.org>
- <CA+DQWkw70=cJUW4xbj91gMTpnfk4bOSgv9u9bv8427GjEVQoYA@mail.gmail.com>
-Message-ID: <20170207071143.GF3407@dragon>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 7 Feb 2017 08:16:46 +0100
+Subject: [PATCHv3 1/2] arch: Move CONFIG_DEBUG_RODATA and
+ CONFIG_SET_MODULE_RONX to be common
+In-Reply-To: <1486427518-14819-2-git-send-email-labbott@redhat.com>
+References: <1486427518-14819-1-git-send-email-labbott@redhat.com>
+ <1486427518-14819-2-git-send-email-labbott@redhat.com>
+Message-ID: <20170207071646.GA18584@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2017 at 11:28:20AM +0800, Baoyou Xie wrote:
-> + Shawn
-> 
-> On 6 February 2017 at 11:26, Baoyou Xie <baoyou.xie@linaro.org> wrote:
-> 
-> > This patch adds i2c controller driver for ZTE's zx2967 family.
-> >
-> > Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 
-Reviewed-by: Shawn Guo <shawnguo@kernel.org>
+* Laura Abbott <labbott@redhat.com> wrote:
+
+> 
+> There are multiple architectures that support CONFIG_DEBUG_RODATA and
+> CONFIG_SET_MODULE_RONX. These options also now have the ability to be
+> turned off at runtime. Move these to an architecture independent
+> location and make these options def_bool y for almost all of those
+> arches.
+> 
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> v3: Make these configs selectable for arm. Include some documentation about
+> how the setup of the optional Kconfigs work as well. Stop spelling 'kenrel'
+> in prompt text.
+> ---
+>  Documentation/security/self-protection.txt |  6 ++++++
+>  arch/Kconfig                               | 34 ++++++++++++++++++++++++++++++
+>  arch/arm/Kconfig                           |  4 ++++
+>  arch/arm/Kconfig.debug                     | 11 ----------
+>  arch/arm/mm/Kconfig                        | 12 -----------
+>  arch/arm64/Kconfig                         |  5 ++---
+>  arch/arm64/Kconfig.debug                   | 11 ----------
+>  arch/parisc/Kconfig                        |  1 +
+>  arch/parisc/Kconfig.debug                  | 11 ----------
+>  arch/s390/Kconfig                          |  5 ++---
+>  arch/s390/Kconfig.debug                    |  3 ---
+>  arch/x86/Kconfig                           |  5 ++---
+>  arch/x86/Kconfig.debug                     | 11 ----------
+>  13 files changed, 51 insertions(+), 68 deletions(-)
+
+Acked-by: Ingo Molnar <mingo@kernel.org>
+
+Thanks,
+
+	Ingo
