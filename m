@@ -1,92 +1,29 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Tue, 07 Feb 2017 14:03:28 -0500
-Subject: [PATCH 1/3] dt: pwm: lpc32xx: add description of clocks and
- #pwm-cells properties
-In-Reply-To: <1483456920.7643.1.camel@localhost>
-References: <20161205014237.1689-1-vz@mleia.com>
- <20161205014237.1689-2-vz@mleia.com>
- <20161209214137.2hdugl5rmnwjrus4@rob-hp-laptop>
- <015305d5-c22f-52da-9605-f2c19e3108b1@mleia.com>
- <5a865e27-e673-2f45-6c71-ca1e7d92a346@mleia.com>
- <1483456920.7643.1.camel@localhost>
-Message-ID: <1486494208.32098.3.camel@localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 7 Feb 2017 19:06:02 +0000
+Subject: [PATCH] efi/libstub/arm*: Set default address and size cells
+ values for an empty dtb
+In-Reply-To: <20170207190113.GG26173@leverpostej>
+References: <1486490390-25251-1-git-send-email-jhugo@codeaurora.org>
+ <CAKv+Gu963uZB4MaMDuwTGd5-AqEN53Er8tExVLMZNVx3krJrZw@mail.gmail.com>
+ <1f47fcdd-c5d8-4082-70a3-ca9b1746d7ca@codeaurora.org>
+ <20170207190113.GG26173@leverpostej>
+Message-ID: <20170207190602.GH26173@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Tue, Feb 07, 2017 at 07:01:14PM +0000, Mark Rutland wrote:
+> On Tue, Feb 07, 2017 at 11:54:55AM -0700, Jeffrey Hugo wrote:
 
-On Tue, 2017-01-03 at 10:22 -0500, Sylvain Lemieux wrote:
-> Hi Rob,
+> > Kexec attempts to insert these values in the fdt.  The fdt only
+> > accepts 32-bit values, so it truncates what is put in.  Then later
+> > kexec/kdump read the values from the fdt, and get garbage.
 > 
-> On Wed, 2016-12-21 at 05:30 +0200, Vladimir Zapolskiy wrote:
-> > On 12/10/2016 01:51 AM, Vladimir Zapolskiy wrote:
-> > > Hi Rob,
-> > > 
-> > > On 12/09/2016 11:41 PM, Rob Herring wrote:
-> > >> On Mon, Dec 05, 2016 at 03:42:37AM +0200, Vladimir Zapolskiy wrote:
-> > >>> NXP LPC32xx SoCs have two simple independent PWM controllers with a single
-> > >>> output each, in this case there is no need to specify PWM channel argument
-> > >>> on client side, one cell for setting PWM output frequency is sufficient.
-> > >>>
-> > >>> Another added to the description property 'clocks' has a standard meaning
-> > >>> of a controller supply clock, in the LPC32xx User's Manual the clock is
-> > >>> denoted as PWM1_CLK or PWM2_CLK clock.
-> > >>>
-> > >>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> > >>> ---
-> > >>>  Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt | 7 +++++++
-> > >>>  1 file changed, 7 insertions(+)
-> > >>>
-> > >>> diff --git a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-> > >>> index 74b5bc5..523d796 100644
-> > >>> --- a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-> > >>> +++ b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-> > >>> @@ -3,15 +3,22 @@ LPC32XX PWM controller
-> > >>>  Required properties:
-> > >>>  - compatible: should be "nxp,lpc3220-pwm"
-> > >>>  - reg: physical base address and length of the controller's registers
-> > >>> +- clocks: clock phandle and clock specifier pair
-> > >>> +- #pwm-cells: should be 1, the cell is used to specify the period in
-> > >>> +  nanoseconds.
-> > >>
-> > >> This use of the cell is a bit odd as the period is s/w config and this 
-> > >> would typically be a channel selection or such.
-> > > 
-> > > this is a classic PWM channel configuration property for PWM consumers
-> > > described in DT, for instance PWM frequency for display panel backlight
-> > > on boot.
-> > > 
-> > > I think >90% of PWM controllers with device tree bindings have this
-> > > argument in #pwm-cells, from bindings/pwm/pwm.txt :
-> > > 
-> > >     pwm-specifier typically encodes the chip-relative PWM number and
-> > >     the PWM period in nanoseconds.
-> > > 
-> > > You also may skim through phandle arguments of 'pwms' property,
-> > > commonly the second argument is the requested frequency.
-> > > 
-> > > In this particular case I just drop PWM channel number, because
-> > > the LPC32xx PWM controller has a single output channel.
-> > > 
-> > >> What if I want user specified/changed periods?
-> > >>
-> > > 
-> > > The preset period still can be changed over sysfs in runtime.
-> > 
-> > Rob, have I managed to answer your questions?
-> > 
-> > If you accept my clarification, could you please ack the change?
-> > 
-> > --
-> > With best wishes,
-> > Vladimir
-> > 
-> ping
+> I take it this is specific to the kdump properties? 
 > 
-> Sylvain
-> 
-Can you provide feedback; I think your questions were answered
-by Vladimir.
+> I can't immediately see what would matter for the !kdump case.
+> properties inserted under /chosen are not truncated?
 
-Regards,
-Sylvain
+Whoops; please ignore the last line. I'd meant to delete that (and it
+obviously makes no sense).
+
+Mark.
