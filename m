@@ -1,44 +1,217 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Tue,  7 Feb 2017 16:35:35 +0800
-Subject: [PATCH v2 0/7] drm/rockchip: switch to drm_mm for support arm64 iommu
-Message-ID: <1486456542-18675-1-git-send-email-mark.yao@rock-chips.com>
+Date: Tue,  7 Feb 2017 16:35:37 +0800
+Subject: [PATCH v2 2/7] drm/rockchip: Use common IOMMU API to attach devices
+In-Reply-To: <1486456542-18675-1-git-send-email-mark.yao@rock-chips.com>
+References: <1486456542-18675-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1486456542-18675-3-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some iommu patches on the series[0] "iommu/rockchip: Fix bugs and
-enable on ARM64" already landed, So drm/rockchip related patches [1] and [2]
-ready to landed, this series just rebase them to lastest drm-next.
+From: Shunqian Zheng <zhengsq@rock-chips.com>
 
-And fix some bugs for drm/rockchip drm_mm
+Rockchip DRM used the arm special API, arm_iommu_*(), to attach
+iommu for ARM32 SoCs. This patch convert to common iommu API
+so it would support ARM64 like RK3399.
 
-[0]: http://www.spinics.net/lists/arm-kernel/msg513781.html
-[1]: https://patchwork.kernel.org/patch/9196367
-[2]: https://patchwork.kernel.org/patch/9196369
+Since previous patch added support for direct IOMMU address space
+management, there is no need to use DMA API anymore and this patch wires
+things to use the new method.
 
-Changes in v2:
-Advices by Tomasz:
-  add some fixes patches from chromeos project.
+Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
+Acked-by: Mark Yao <mark.yao@rock-chips.com>
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 100 +++++++++++++++-------------
+ 1 file changed, 53 insertions(+), 47 deletions(-)
 
-Mark Yao (2):
-  drm/rockchip: gem: add mutex lock for drm mm
-  drm/rockchip: gem: fixup iommu_map_sg error path
-
-Shunqian Zheng (1):
-  drm/rockchip: Use common IOMMU API to attach devices
-
-Tomasz Figa (3):
-  drm/rockchip: Do not use DMA mapping API if attached to IOMMU domain
-  drm/rockchip: Fix the call to drm_gem_put_pages()
-  drm/rockchip: Call drm_gem_object_release() to destroy GEM base
-
-?rjan Eide (1):
-  drm/rockchip: Respect page offset in IOMMU mmap
-
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 101 ++++++------
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   6 +-
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 244 ++++++++++++++++++++++++++--
- drivers/gpu/drm/rockchip/rockchip_drm_gem.h |   8 +
- 4 files changed, 298 insertions(+), 61 deletions(-)
-
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index c30d649..7a610e9 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -14,19 +14,19 @@
+  * GNU General Public License for more details.
+  */
+ 
+-#include <asm/dma-iommu.h>
+-
+ #include <drm/drmP.h>
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_fb_helper.h>
+ #include <drm/drm_gem_cma_helper.h>
+ #include <drm/drm_of.h>
+ #include <linux/dma-mapping.h>
++#include <linux/dma-iommu.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/module.h>
+ #include <linux/of_graph.h>
+ #include <linux/component.h>
+ #include <linux/console.h>
++#include <linux/iommu.h>
+ 
+ #include "rockchip_drm_drv.h"
+ #include "rockchip_drm_fb.h"
+@@ -50,28 +50,31 @@
+ int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
+ 				   struct device *dev)
+ {
+-	struct dma_iommu_mapping *mapping = drm_dev->dev->archdata.mapping;
++	struct rockchip_drm_private *private = drm_dev->dev_private;
+ 	int ret;
+ 
+ 	if (!is_support_iommu)
+ 		return 0;
+ 
+-	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
+-	if (ret)
++	ret = iommu_attach_device(private->domain, dev);
++	if (ret) {
++		dev_err(dev, "Failed to attach iommu device\n");
+ 		return ret;
++	}
+ 
+-	dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
+-
+-	return arm_iommu_attach_device(dev, mapping);
++	return 0;
+ }
+ 
+ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
+ 				    struct device *dev)
+ {
++	struct rockchip_drm_private *private = drm_dev->dev_private;
++	struct iommu_domain *domain = private->domain;
++
+ 	if (!is_support_iommu)
+ 		return;
+ 
+-	arm_iommu_detach_device(dev);
++	iommu_detach_device(domain, dev);
+ }
+ 
+ int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
+@@ -123,11 +126,45 @@ static void rockchip_drm_crtc_disable_vblank(struct drm_device *dev,
+ 		priv->crtc_funcs[pipe]->disable_vblank(crtc);
+ }
+ 
++static int rockchip_drm_init_iommu(struct drm_device *drm_dev)
++{
++	struct rockchip_drm_private *private = drm_dev->dev_private;
++	struct iommu_domain_geometry *geometry;
++	u64 start, end;
++
++	if (!is_support_iommu)
++		return 0;
++
++	private->domain = iommu_domain_alloc(&platform_bus_type);
++	if (!private->domain)
++		return -ENOMEM;
++
++	geometry = &private->domain->geometry;
++	start = geometry->aperture_start;
++	end = geometry->aperture_end;
++
++	DRM_DEBUG("IOMMU context initialized (aperture: %#llx-%#llx)\n",
++		  start, end);
++	drm_mm_init(&private->mm, start, end - start + 1);
++
++	return 0;
++}
++
++static void rockchip_iommu_cleanup(struct drm_device *drm_dev)
++{
++	struct rockchip_drm_private *private = drm_dev->dev_private;
++
++	if (!is_support_iommu)
++		return;
++
++	drm_mm_takedown(&private->mm);
++	iommu_domain_free(private->domain);
++}
++
+ static int rockchip_drm_bind(struct device *dev)
+ {
+ 	struct drm_device *drm_dev;
+ 	struct rockchip_drm_private *private;
+-	struct dma_iommu_mapping *mapping = NULL;
+ 	int ret;
+ 
+ 	drm_dev = drm_dev_alloc(&rockchip_drm_driver, dev);
+@@ -151,38 +188,14 @@ static int rockchip_drm_bind(struct device *dev)
+ 
+ 	rockchip_drm_mode_config_init(drm_dev);
+ 
+-	dev->dma_parms = devm_kzalloc(dev, sizeof(*dev->dma_parms),
+-				      GFP_KERNEL);
+-	if (!dev->dma_parms) {
+-		ret = -ENOMEM;
++	ret = rockchip_drm_init_iommu(drm_dev);
++	if (ret)
+ 		goto err_config_cleanup;
+-	}
+-
+-	if (is_support_iommu) {
+-		/* TODO(djkurtz): fetch the mapping start/size from somewhere */
+-		mapping = arm_iommu_create_mapping(&platform_bus_type,
+-						   0x00000000,
+-						   SZ_2G);
+-		if (IS_ERR(mapping)) {
+-			ret = PTR_ERR(mapping);
+-			goto err_config_cleanup;
+-		}
+-
+-		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
+-		if (ret)
+-			goto err_release_mapping;
+-
+-		dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
+-
+-		ret = arm_iommu_attach_device(dev, mapping);
+-		if (ret)
+-			goto err_release_mapping;
+-	}
+ 
+ 	/* Try to bind all sub drivers. */
+ 	ret = component_bind_all(dev, drm_dev);
+ 	if (ret)
+-		goto err_detach_device;
++		goto err_iommu_cleanup;
+ 
+ 	/* init kms poll for handling hpd */
+ 	drm_kms_helper_poll_init(drm_dev);
+@@ -207,8 +220,6 @@ static int rockchip_drm_bind(struct device *dev)
+ 	if (ret)
+ 		goto err_fbdev_fini;
+ 
+-	if (is_support_iommu)
+-		arm_iommu_release_mapping(mapping);
+ 	return 0;
+ err_fbdev_fini:
+ 	rockchip_drm_fbdev_fini(drm_dev);
+@@ -217,12 +228,8 @@ static int rockchip_drm_bind(struct device *dev)
+ err_kms_helper_poll_fini:
+ 	drm_kms_helper_poll_fini(drm_dev);
+ 	component_unbind_all(dev, drm_dev);
+-err_detach_device:
+-	if (is_support_iommu)
+-		arm_iommu_detach_device(dev);
+-err_release_mapping:
+-	if (is_support_iommu)
+-		arm_iommu_release_mapping(mapping);
++err_iommu_cleanup:
++	rockchip_iommu_cleanup(drm_dev);
+ err_config_cleanup:
+ 	drm_mode_config_cleanup(drm_dev);
+ 	drm_dev->dev_private = NULL;
+@@ -239,8 +246,7 @@ static void rockchip_drm_unbind(struct device *dev)
+ 	drm_vblank_cleanup(drm_dev);
+ 	drm_kms_helper_poll_fini(drm_dev);
+ 	component_unbind_all(dev, drm_dev);
+-	if (is_support_iommu)
+-		arm_iommu_detach_device(dev);
++	rockchip_iommu_cleanup(drm_dev);
+ 	drm_mode_config_cleanup(drm_dev);
+ 	drm_dev->dev_private = NULL;
+ 	drm_dev_unregister(drm_dev);
 -- 
 1.9.1
