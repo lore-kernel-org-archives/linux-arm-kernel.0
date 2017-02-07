@@ -1,97 +1,49 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 7 Feb 2017 20:17:15 +0800
-Subject: [PATCH] [media] mtk-vcodec: fix build errors without DEBUG
-In-Reply-To: <1486453244-26094-1-git-send-email-minghsiu.tsai@mediatek.com>
-References: <1486453244-26094-1-git-send-email-minghsiu.tsai@mediatek.com>
-Message-ID: <CAGS+omAU7UohsUkXwwHyhNh_dSX=R9tLKYvSV5767m81sTf_RA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 7 Feb 2017 13:19:09 +0100
+Subject: [PATCH v2 3/7] drm/rockchip: gem: add mutex lock for drm mm
+In-Reply-To: <1486456542-18675-4-git-send-email-mark.yao@rock-chips.com>
+References: <1486456542-18675-1-git-send-email-mark.yao@rock-chips.com>
+ <1486456542-18675-4-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <20170207121909.GA18315@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 7, 2017 at 3:40 PM, Minghsiu Tsai
-<minghsiu.tsai@mediatek.com> wrote:
-> Fix build errors after removing DEBUG definition.
+On Tue, Feb 07, 2017 at 04:35:38PM +0800, Mark Yao wrote:
+> drm_mm_insert_node_generic and drm_mm_remove_node may access same
+> resource with list ops, it's not threads safe, so protect this context
+> with mutex lock.
+> 
+> Fix bug:
+> [49451.856244] ==================================================================
+> [49451.856350] BUG: KASAN: wild-memory-access on address dead000000000108
+> [49451.856379] Write of size 8 by task Binder:218_4/683
+> [49451.856417] CPU: 2 PID: 683 Comm: Binder:218_4 Not tainted 4.4.36 #62
+> [49451.856443] Hardware name: Rockchip RK3399 Excavator Board edp (Android) (DT)
+> [49451.856469] Call trace:
+> [49451.856519] [<ffffff900808a9d0>] dump_backtrace+0x0/0x230
+> [49451.856556] [<ffffff900808ac14>] show_stack+0x14/0x1c
+> [49451.856592] [<ffffff90084a4de0>] dump_stack+0xa0/0xc8
+> [49451.856633] [<ffffff900821b700>] kasan_report+0x110/0x4dc
+> [49451.856670] [<ffffff900821aa84>] __asan_store8+0x24/0x7c
+> [49451.856715] [<ffffff90086158c4>] drm_mm_insert_node_generic+0x2dc/0x464
+> [49451.856760] [<ffffff90086406a8>] rockchip_gem_iommu_map+0x60/0x158
+> [49451.856794] [<ffffff9008640bb4>] rockchip_gem_create_object+0x278/0x488
+> [49451.856827] [<ffffff9008641020>] rockchip_gem_create_with_handle+0x24/0x10c
+> [49451.856862] [<ffffff9008641364>] rockchip_gem_create_ioctl+0x3c/0x50
+> [49451.856896] [<ffffff900860aee4>] drm_ioctl+0x354/0x52c
+> [49451.856939] [<ffffff900823d948>] do_vfs_ioctl+0x670/0x78c
+> [49451.856976] [<ffffff900823dac4>] SyS_ioctl+0x60/0x88
+> [49451.857009] [<ffffff9008082ef0>] el0_svc_naked+0x24/0x28
+> 
+> Change-Id: I2ea377aa9ca24f70c59e2d86f2a6ad5ccb9c0891
 
-It would be useful to specify which build errors were fixed by this
-patch, and a brief description of why - namely because when DEBUG is
-not defined, mtk_v4l2_debug() is an empty macros, and therefore the
-arguments are unused.
+This is meaningless in an upstream tree. Please remove.
 
-With an updated commit message, this patch is:
-
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-
->
-> Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-> ---
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c | 9 ++++-----
->  drivers/media/platform/mtk-vcodec/vdec_vpu_if.c    | 5 ++---
->  drivers/media/platform/mtk-vcodec/venc_vpu_if.c    | 4 +---
->  3 files changed, 7 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> index 0746592..6219c7d 100644
-> --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> @@ -1126,15 +1126,14 @@ static void vb2ops_vdec_buf_queue(struct vb2_buffer *vb)
->                  * if there is no SPS header or picture info
->                  * in bs
->                  */
-> -               int log_level = ret ? 0 : 1;
->
->                 src_buf = v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
->                 v4l2_m2m_buf_done(to_vb2_v4l2_buffer(src_buf),
->                                         VB2_BUF_STATE_DONE);
-> -               mtk_v4l2_debug(log_level,
-> -                               "[%d] vdec_if_decode() src_buf=%d, size=%zu, fail=%d, res_chg=%d",
-> -                               ctx->id, src_buf->index,
-> -                               src_mem.size, ret, res_chg);
-> +               mtk_v4l2_debug(ret ? 0 : 1,
-> +                              "[%d] vdec_if_decode() src_buf=%d, size=%zu, fail=%d, res_chg=%d",
-> +                              ctx->id, src_buf->index,
-> +                              src_mem.size, ret, res_chg);
->                 return;
->         }
->
-> diff --git a/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c b/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
-> index 5a24c51..1abd14e 100644
-> --- a/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
-> +++ b/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
-> @@ -70,9 +70,8 @@ void vpu_dec_ipi_handler(void *data, unsigned int len, void *priv)
->  static int vcodec_vpu_send_msg(struct vdec_vpu_inst *vpu, void *msg, int len)
->  {
->         int err;
-> -       uint32_t msg_id = *(uint32_t *)msg;
->
-> -       mtk_vcodec_debug(vpu, "id=%X", msg_id);
-> +       mtk_vcodec_debug(vpu, "id=%X", *(uint32_t *)msg);
->
->         vpu->failure = 0;
->         vpu->signaled = 0;
-> @@ -80,7 +79,7 @@ static int vcodec_vpu_send_msg(struct vdec_vpu_inst *vpu, void *msg, int len)
->         err = vpu_ipi_send(vpu->dev, vpu->id, msg, len);
->         if (err) {
->                 mtk_vcodec_err(vpu, "send fail vpu_id=%d msg_id=%X status=%d",
-> -                              vpu->id, msg_id, err);
-> +                              vpu->id, *(uint32_t *)msg, err);
->                 return err;
->         }
->
-> diff --git a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
-> index a01c759..0d882ac 100644
-> --- a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
-> +++ b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
-> @@ -79,10 +79,8 @@ static int vpu_enc_send_msg(struct venc_vpu_inst *vpu, void *msg,
->
->         status = vpu_ipi_send(vpu->dev, vpu->id, msg, len);
->         if (status) {
-> -               uint32_t msg_id = *(uint32_t *)msg;
-> -
->                 mtk_vcodec_err(vpu, "vpu_ipi_send msg_id %x len %d fail %d",
-> -                              msg_id, len, status);
-> +                              *(uint32_t *)msg, len, status);
->                 return -EINVAL;
->         }
->         if (vpu->failure)
-> --
-> 1.9.1
->
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/41ac3c5b/attachment.sig>
