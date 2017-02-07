@@ -1,119 +1,142 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Tue, 7 Feb 2017 09:54:51 +0900
-Subject: [PATCH v2 1/3] perf tools: Use offset instead of dwarfnum in
- register table.
-In-Reply-To: <20170206130229.GI19939@arm.com>
-References: <20170203110607.97529-1-hekuang@huawei.com>
- <20170203130026.GF11585@arm.com> <589598D8.8050304@huawei.com>
- <20170206130229.GI19939@arm.com>
-Message-ID: <20170207095451.10ac50a90de0fdac529a2522@kernel.org>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Tue,  7 Feb 2017 08:56:39 +0800
+Subject: [PATCH v9 1/3] dt: bindings: add documentation for zx2967 family
+ thermal sensor
+Message-ID: <1486429001-31940-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Feb 2017 13:02:29 +0000
-Will Deacon <will.deacon@arm.com> wrote:
+This patch adds dt-binding documentation for zx2967 family thermal sensor.
 
-> On Sat, Feb 04, 2017 at 05:03:20PM +0800, Hekuang wrote:
-> > hi
-> > 
-> > ? 2017/2/3 21:00, Will Deacon ??:
-> > >On Fri, Feb 03, 2017 at 11:06:05AM +0000, He Kuang wrote:
-> > >>This patch changes the 'dwarfnum' to 'offset' in register table, so
-> > >>the index of array becomes the dwarfnum (the index of each register
-> > >>defined by DWARF) and the "offset" member means the byte-offset of the
-> > >>register in (user_)pt_regs. This change makes the code consistent with
-> > >>x86.
-> > >>
-> > >>Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
-> > >>Signed-off-by: He Kuang <hekuang@huawei.com>
-> > >>---
-> > >>  tools/perf/arch/arm64/util/dwarf-regs.c | 107 ++++++++++++++++----------------
-> > >>  1 file changed, 52 insertions(+), 55 deletions(-)
-> > >Thanks for splitting this up. Comment below.
-> > >
-> > >>diff --git a/tools/perf/arch/arm64/util/dwarf-regs.c b/tools/perf/arch/arm64/util/dwarf-regs.c
-> > >>index d49efeb..090f36b 100644
-> > >>--- a/tools/perf/arch/arm64/util/dwarf-regs.c
-> > >>+++ b/tools/perf/arch/arm64/util/dwarf-regs.c
-> > >>@@ -9,72 +9,69 @@
-> > >>   */
-> > >>  #include <stddef.h>
-> > >>+#include <linux/ptrace.h> /* for struct user_pt_regs */
-> > >>  #include <dwarf-regs.h>
-> > >>-struct pt_regs_dwarfnum {
-> > >>+struct pt_regs_offset {
-> > >>  	const char *name;
-> > >>-	unsigned int dwarfnum;
-> > >>+	int offset;
-> > >>  };
-> > >>-#define STR(s) #s
-> > >>-#define REG_DWARFNUM_NAME(r, num) {.name = r, .dwarfnum = num}
-> > >>-#define GPR_DWARFNUM_NAME(num) \
-> > >>-	{.name = STR(%x##num), .dwarfnum = num}
-> > >>-#define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0}
-> > >>-
-> > >>  /*
-> > >>   * Reference:
-> > >>   * http://infocenter.arm.com/help/topic/com.arm.doc.ihi0057b/IHI0057B_aadwarf64.pdf
-> > >>   */
-> > >>-static const struct pt_regs_dwarfnum regdwarfnum_table[] = {
-> > >>-	GPR_DWARFNUM_NAME(0),
-> > >>-	GPR_DWARFNUM_NAME(1),
-> > >>-	GPR_DWARFNUM_NAME(2),
-> > >>-	GPR_DWARFNUM_NAME(3),
-> > >>-	GPR_DWARFNUM_NAME(4),
-> > >>-	GPR_DWARFNUM_NAME(5),
-> > >>-	GPR_DWARFNUM_NAME(6),
-> > >>-	GPR_DWARFNUM_NAME(7),
-> > >>-	GPR_DWARFNUM_NAME(8),
-> > >>-	GPR_DWARFNUM_NAME(9),
-> > >>-	GPR_DWARFNUM_NAME(10),
-> > >>-	GPR_DWARFNUM_NAME(11),
-> > >>-	GPR_DWARFNUM_NAME(12),
-> > >>-	GPR_DWARFNUM_NAME(13),
-> > >>-	GPR_DWARFNUM_NAME(14),
-> > >>-	GPR_DWARFNUM_NAME(15),
-> > >>-	GPR_DWARFNUM_NAME(16),
-> > >>-	GPR_DWARFNUM_NAME(17),
-> > >>-	GPR_DWARFNUM_NAME(18),
-> > >>-	GPR_DWARFNUM_NAME(19),
-> > >>-	GPR_DWARFNUM_NAME(20),
-> > >>-	GPR_DWARFNUM_NAME(21),
-> > >>-	GPR_DWARFNUM_NAME(22),
-> > >>-	GPR_DWARFNUM_NAME(23),
-> > >>-	GPR_DWARFNUM_NAME(24),
-> > >>-	GPR_DWARFNUM_NAME(25),
-> > >>-	GPR_DWARFNUM_NAME(26),
-> > >>-	GPR_DWARFNUM_NAME(27),
-> > >>-	GPR_DWARFNUM_NAME(28),
-> > >>-	GPR_DWARFNUM_NAME(29),
-> > >>-	REG_DWARFNUM_NAME("%lr", 30),
-> > >>-	REG_DWARFNUM_NAME("%sp", 31),
-> > >>-	REG_DWARFNUM_END,
-> > >>-};
-> > >>+#define REG_OFFSET_NAME(r, num) {.name = "%" #r,			\
-> > >>+			.offset = offsetof(struct user_pt_regs, regs[num])}
-> > >Whilst this works in practice, this is undefined behaviour for "sp", since
-> > >you'll go off the end of the regs array.
-> > 
-> > It's not undefined behaviour here,
-> > struct user_pt_regs {
-> >         __u64           regs[31];
-> >         __u64           sp;
-> >         __u64           pc;
-> >         __u64           pstate;
-> > };
-> > user_pt_regs->regs[31] is user_pt_regs->sp and the offset value is correct.
-> 
-> I think it's undefined from the C standard perspective.
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Shawn Guo <shawnguo@kernel.org>
+---
+ .../devicetree/bindings/thermal/zx2967-thermal.txt | 116 +++++++++++++++++++++
+ 1 file changed, 116 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
 
-Actually, this '%sp' is used for kprobes/uprobes dynamic events, which only 
-depend on how regs_query_register_offset()@arch/arm64/kernel/ptrace.c is implemented.
-And also, since perf-probe uses debuginfo, it can find out the base register.
-
-So we don't need to care the C standard in this file :)
-
-Thank you,
-
+diff --git a/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+new file mode 100644
+index 0000000..0810644
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+@@ -0,0 +1,116 @@
++* ZTE zx2967 family Thermal
++
++Required Properties:
++- compatible: should be one of the following.
++    * zte,zx296718-thermal
++- reg: physical base address of the controller and length of memory mapped
++    region.
++- clocks : Pairs of phandle and specifier referencing the controller's clocks.
++- clock-names: "topcrm" for the topcrm clock.
++	       "apb" for the apb clock.
++- #thermal-sensor-cells: must be 0.
++
++Please note: slope coefficient defined in thermal-zones section need to be
++multiplied by 1000.
++
++Example for tempsensor:
++
++	tempsensor: tempsensor at 148a000 {
++		compatible = "zte,zx296718-thermal";
++		reg = <0x0148a000 0x20>;
++		clocks = <&topcrm TEMPSENSOR_GATE>, <&audiocrm AUDIO_TS_PCLK>;
++		clock-names = "topcrm", "apb";
++		#thermal-sensor-cells = <0>;
++	};
++
++Example for cooling device:
++
++	cooling_dev: cooling_dev {
++		cluster0_cooling_dev: cluster0-cooling-dev {
++			#cooling-cells = <2>;
++			cpumask = <0xf>;
++			capacitance = <1500>;
++		};
++
++	cluster1_cooling_dev: cluster1-cooling-dev {
++			#cooling-cells = <2>;
++			cpumask = <0x30>;
++			capacitance = <2000>;
++		};
++	};
++
++Example for thermal zones:
++
++	thermal-zones {
++		zx296718_thermal: zx296718_thermal {
++			polling-delay-passive = <500>;
++			polling-delay = <1000>;
++			sustainable-power = <6500>;
++
++			thermal-sensors = <&tempsensor 0>;
++			/*
++			 * slope need to be multiplied by 1000.
++			 */
++			coefficients = <1951 (-922)>;
++
++			trips {
++				trip0: switch_on_temperature {
++					temperature = <90000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				trip1: desired_temperature {
++					temperature = <100000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				crit: critical_temperature {
++					temperature = <110000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++				map0 {
++					trip = <&trip0>;
++					cooling-device = <&gpu 2 5>;
++				};
++
++				map1 {
++					trip = <&trip0>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map2 {
++					trip = <&trip1>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map3 {
++					trip = <&crit>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map4 {
++					trip = <&trip0>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <9000>;
++				};
++
++				map5 {
++					trip = <&trip1>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <4096>;
++				};
++
++				map6 {
++					trip = <&crit>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <4096>;
++				};
++			};
++		};
++	};
 -- 
-Masami Hiramatsu <mhiramat@kernel.org>
+2.7.4
