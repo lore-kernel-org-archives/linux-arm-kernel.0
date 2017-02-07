@@ -1,97 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 7 Feb 2017 17:22:03 -0600
-Subject: [PATCH 1/3] dt: pwm: lpc32xx: add description of clocks and
- #pwm-cells properties
-In-Reply-To: <1486494208.32098.3.camel@localhost>
-References: <20161205014237.1689-1-vz@mleia.com>
- <20161205014237.1689-2-vz@mleia.com>
- <20161209214137.2hdugl5rmnwjrus4@rob-hp-laptop>
- <015305d5-c22f-52da-9605-f2c19e3108b1@mleia.com>
- <5a865e27-e673-2f45-6c71-ca1e7d92a346@mleia.com>
- <1483456920.7643.1.camel@localhost>
- <1486494208.32098.3.camel@localhost>
-Message-ID: <CAL_JsqJ_g1jGuzE5m9=2iNSPDt2nDFYTXZJOpqPzrtw8kH-qQw@mail.gmail.com>
+From: abdallah.meziti.pro@gmail.com (AbdAllah-MEZITI)
+Date: Wed,  8 Feb 2017 00:45:47 +0100
+Subject: [PATCH v3] staging: bcm2835-audio: Remove the initialization of
+ static pointers.
+Message-ID: <1486511160-2992-1-git-send-email-abdallah.meziti.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 7, 2017 at 1:03 PM, Sylvain Lemieux <slemieux.tyco@gmail.com> wrote:
-> Hi Rob,
->
-> On Tue, 2017-01-03 at 10:22 -0500, Sylvain Lemieux wrote:
->> Hi Rob,
->>
->> On Wed, 2016-12-21 at 05:30 +0200, Vladimir Zapolskiy wrote:
->> > On 12/10/2016 01:51 AM, Vladimir Zapolskiy wrote:
->> > > Hi Rob,
->> > >
->> > > On 12/09/2016 11:41 PM, Rob Herring wrote:
->> > >> On Mon, Dec 05, 2016 at 03:42:37AM +0200, Vladimir Zapolskiy wrote:
->> > >>> NXP LPC32xx SoCs have two simple independent PWM controllers with a single
->> > >>> output each, in this case there is no need to specify PWM channel argument
->> > >>> on client side, one cell for setting PWM output frequency is sufficient.
->> > >>>
->> > >>> Another added to the description property 'clocks' has a standard meaning
->> > >>> of a controller supply clock, in the LPC32xx User's Manual the clock is
->> > >>> denoted as PWM1_CLK or PWM2_CLK clock.
->> > >>>
->> > >>> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
->> > >>> ---
->> > >>>  Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt | 7 +++++++
->> > >>>  1 file changed, 7 insertions(+)
->> > >>>
->> > >>> diff --git a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
->> > >>> index 74b5bc5..523d796 100644
->> > >>> --- a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
->> > >>> +++ b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
->> > >>> @@ -3,15 +3,22 @@ LPC32XX PWM controller
->> > >>>  Required properties:
->> > >>>  - compatible: should be "nxp,lpc3220-pwm"
->> > >>>  - reg: physical base address and length of the controller's registers
->> > >>> +- clocks: clock phandle and clock specifier pair
->> > >>> +- #pwm-cells: should be 1, the cell is used to specify the period in
->> > >>> +  nanoseconds.
->> > >>
->> > >> This use of the cell is a bit odd as the period is s/w config and this
->> > >> would typically be a channel selection or such.
->> > >
->> > > this is a classic PWM channel configuration property for PWM consumers
->> > > described in DT, for instance PWM frequency for display panel backlight
->> > > on boot.
->> > >
->> > > I think >90% of PWM controllers with device tree bindings have this
->> > > argument in #pwm-cells, from bindings/pwm/pwm.txt :
->> > >
->> > >     pwm-specifier typically encodes the chip-relative PWM number and
->> > >     the PWM period in nanoseconds.
->> > >
->> > > You also may skim through phandle arguments of 'pwms' property,
->> > > commonly the second argument is the requested frequency.
->> > >
->> > > In this particular case I just drop PWM channel number, because
->> > > the LPC32xx PWM controller has a single output channel.
->> > >
->> > >> What if I want user specified/changed periods?
->> > >>
->> > >
->> > > The preset period still can be changed over sysfs in runtime.
->> >
->> > Rob, have I managed to answer your questions?
->> >
->> > If you accept my clarification, could you please ack the change?
->> >
->> > --
->> > With best wishes,
->> > Vladimir
->> >
->> ping
->>
->> Sylvain
->>
-> Can you provide feedback; I think your questions were answered
-> by Vladimir.
+In C a static pointer will be initialized to NULL.
+The ?6.7.8 of the ISO/IEC 9899:1999 (E) document says that:
+If an object that has static storage duration is not initialized
+explicitly, then:
+ __ if it has pointer type, it is initialized to a null pointer.
 
-Yes. Sorry for the delay. It's best to resend if you want to be sure I see it.
+Signed-off-by: AbdAllah-MEZITI <abdallah.meziti.pro@gmail.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
+v2: -fix the line-wrapping of the changelog.
+    -fix the ref. documentation: C99 standards release,
+	and not the draft.
+    -this patch is the Task 10 Eudyptula Challenge
+	that only fix one code style problem.
+v3: -fix the subject prefix: must be based on the previous submissions.
+---
+ drivers/staging/bcm2835-audio/bcm2835.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Rob
+diff --git a/drivers/staging/bcm2835-audio/bcm2835.c b/drivers/staging/bcm2835-audio/bcm2835.c
+index a84d74d..265fe55 100644
+--- a/drivers/staging/bcm2835-audio/bcm2835.c
++++ b/drivers/staging/bcm2835-audio/bcm2835.c
+@@ -28,8 +28,8 @@
+  * to debug if we run into issues
+  */
+ 
+-static struct snd_card *g_card = NULL;
+-static struct bcm2835_chip *g_chip = NULL;
++static struct snd_card *g_card;
++static struct bcm2835_chip *g_chip;
+ 
+ static int snd_bcm2835_free(struct bcm2835_chip *chip)
+ {
+-- 
+2.7.4
