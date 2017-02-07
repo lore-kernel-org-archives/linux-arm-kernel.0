@@ -1,151 +1,47 @@
-From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
-Date: Tue, 7 Feb 2017 21:31:43 +0100
-Subject: [PATCH] ARM: dts: imx6q-cm-fx6: add analog audio support
-Message-ID: <b6776a0aa8484faf816a238705ed6d22@rwthex-s1-b.rwth-ad.de>
+From: luc.vanoostenryck@gmail.com (Van Oostenryck Luc)
+Date: Tue, 7 Feb 2017 21:33:15 +0100
+Subject: [RFC/PATCH] arm64: Rename macro arguments to silence sparse
+In-Reply-To: <5f7a5bf1-1285-d9c3-b892-c8f9f8ee6d63@codeaurora.org>
+References: <20170207010143.22371-1-sboyd@codeaurora.org>
+ <d5bb9d5a-5b02-ffab-d404-bbda532b6c76@codeaurora.org>
+ <20170207015047.4ffc3xzrqsuuzo54@macpro.local>
+ <5f7a5bf1-1285-d9c3-b892-c8f9f8ee6d63@codeaurora.org>
+Message-ID: <CAExDi1T5+odE6j2mFpUheN+3RQwabvgKmqKHHgWReE3L6oQAVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Valentin Raevsky <valentin@compulab.co.il>
+On Tue, Feb 7, 2017 at 9:11 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 02/06/2017 05:50 PM, Luc Van Oostenryck wrote:
+>> On Mon, Feb 06, 2017 at 05:08:17PM -0800, Stephen Boyd wrote:
+>>> On 02/06/2017 05:01 PM, Stephen Boyd wrote:
+>>>> When I compile files with sparse, I get these sorts of warnings:
+>>>>
+>>>> arch/arm64/include/asm/lse.h:14:28: warning: Unknown escape 'l'
+>>>> arch/arm64/include/asm/lse.h:14:37: warning: Unknown escape 'l'
+>>>> arch/arm64/include/asm/alternative.h:172:28: warning: Unknown escape 'o'
+>>>>
+>>>> This is because sparse is trying to tokenize these files and sees
+>>>> a line like this:
+>>>>
+>>>>  alternative_insn "\llsc", "\lse", ARM64_HAS_LSE_ATOMICS
+>>>>
+>>>> It gets past alternative_insn part and then sees the start of a
+>>>> string with the double quote character. So sparse starts to parse
+>>>> the string (eat_string() in the sparse code) but the string has
+>>>> an escape character '\' in it. Sparse sees the escape character,
+>>>> so it checks to see if it's an escape sequence, but '\l' isn't.
+>>>> This causes sparse to spit out this warning of an unknown escape
+>>>> sequence 'l'.
+>>>>
+>>>> In reality, sparse isn't going to use these macros anyway because
+>>>> this whole thing is inside an __ASSEMBLER__ ifdef.
+>> Yes, annoying. Conversion of escaped characters is supposed to be
+>> done just after preprocessing. It's definitively a bug.
+>
+> Ok. Thanks for the fixes to sparse. My hack patch can be safely ignored.
 
-The cm-fx6 module has an onboard Wolfson wm8731 codec which is muxed
-to the ssi2 controller. Unlike most (all?) supported i.MX6 board/codec
-combinations the wm8731 is operated in slave mode and the clock setup
-is static.
+Well, I don't know.
+Maybe it's still useful for everyone using the official version of sparse
+or an older one.
 
-Add support for it.
-
-Signed-off-by: Valentin Raevsky <valentin@compulab.co.il>
-[christopher.spinrath at rwth-aachen.de: enhanced commit message, ported
-  to upstream and some cleanup]
-Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
----
- arch/arm/boot/dts/imx6q-cm-fx6.dts | 83 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 83 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-index d8a5789..8a85862 100644
---- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
-+++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-@@ -43,6 +43,7 @@
- 
- /dts-v1/;
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/sound/fsl-imx-audmux.h>
- #include "imx6q.dtsi"
- 
- / {
-@@ -90,6 +91,34 @@
- 		enable-active-high;
- 	};
- 
-+	sound-analog {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "On-board analog audio";
-+		simple-audio-card,widgets =
-+			"Headphone", "Headphone Jack",
-+			"Line", "Line Out",
-+			"Microphone", "Mic Jack",
-+			"Line", "Line In";
-+		simple-audio-card,routing =
-+			"Headphone Jack", "RHPOUT",
-+			"Headphone Jack", "LHPOUT",
-+			"MICIN", "Mic Bias",
-+			"Mic Bias", "Mic Jack";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&sound_master>;
-+		simple-audio-card,frame-master = <&sound_master>;
-+		simple-audio-card,bitclock-inversion;
-+
-+		sound_master: simple-audio-card,cpu {
-+			sound-dai = <&ssi2>;
-+			system-clock-frequency = <2822400>;
-+		};
-+
-+		simple-audio-card,codec {
-+			sound-dai = <&wm8731>;
-+		};
-+        };
-+
- 	sound-spdif {
- 		compatible = "fsl,imx-audio-spdif";
- 		model = "imx-spdif";
-@@ -99,6 +128,36 @@
- 	};
- };
- 
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>;
-+	status = "okay";
-+
-+	ssi2 {
-+		fsl,audmux-port = <1>;
-+		fsl,port-config = <
-+			(IMX_AUDMUX_V2_PTCR_RCLKDIR |
-+			IMX_AUDMUX_V2_PTCR_RCSEL(3 | 0x8) |
-+			IMX_AUDMUX_V2_PTCR_TCLKDIR |
-+			IMX_AUDMUX_V2_PTCR_TCSEL(3))
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(3)
-+		>;
-+	};
-+
-+	pins5 {
-+		fsl,audmux-port = <3>;
-+		fsl,port-config = <
-+			(IMX_AUDMUX_V2_PTCR_TFSDIR |
-+			IMX_AUDMUX_V2_PTCR_TFSEL(1) |
-+			IMX_AUDMUX_V2_PTCR_RCLKDIR |
-+			IMX_AUDMUX_V2_PTCR_RCSEL(1 | 0x8) |
-+			IMX_AUDMUX_V2_PTCR_TCLKDIR |
-+			IMX_AUDMUX_V2_PTCR_TCSEL(1))
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(1)
-+		>;
-+	};
-+};
-+
- &cpu0 {
- 	/*
- 	 * Although the imx6q fuse indicates that 1.2GHz operation is possible,
-@@ -160,9 +219,25 @@
- 		reg = <0x50>;
- 		pagesize = <16>;
- 	};
-+
-+	wm8731: codec at 1a {
-+		#sound-dai-cells = <0>;
-+		compatible = "wlf,wm8731";
-+		reg = <0x1a>;
-+	};
- };
- 
- &iomuxc {
-+	pinctrl_audmux: audmuxgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD2_CMD__AUD4_RXC   0x17059
-+			MX6QDL_PAD_SD2_DAT0__AUD4_RXD  0x17059
-+			MX6QDL_PAD_SD2_DAT3__AUD4_TXC  0x17059
-+			MX6QDL_PAD_SD2_DAT2__AUD4_TXD  0x17059
-+			MX6QDL_PAD_SD2_DAT1__AUD4_TXFS 0x17059
-+		>;
-+	};
-+
- 	pinctrl_ecspi1: ecspi1grp {
- 		fsl,pins = <
- 			MX6QDL_PAD_EIM_D16__ECSPI1_SCLK	0x100b1
-@@ -279,6 +354,14 @@
- 	status = "okay";
- };
- 
-+&ssi2 {
-+	assigned-clocks = <&clks IMX6QDL_CLK_SSI2_SEL>,
-+			<&clks IMX6QDL_CLK_PLL4_AUDIO_DIV>;
-+	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL4_AUDIO_DIV>;
-+	assigned-clock-rates = <0>, <786432000>;
-+	status = "okay";
-+};
-+
- &uart4 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart4>;
--- 
-2.10.2
+Luc Van Oostenryck
