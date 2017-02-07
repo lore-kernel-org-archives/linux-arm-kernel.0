@@ -1,142 +1,142 @@
 From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Tue, 7 Feb 2017 22:46:17 +0200
+Date: Tue, 7 Feb 2017 22:50:05 +0200
 Subject: [PATCH v3 13/24] platform: add video-multiplexer subdevice driver
-In-Reply-To: <1483755102-24785-14-git-send-email-steve_longerbeam@mentor.com>
+In-Reply-To: <20170207133648.GA27065@ti.com>
 References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-14-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170207204617.GD13854@valkosipuli.retiisi.org.uk>
+ <2038922.a1tReKKdaL@avalon>
+ <bd64a86e-d90c-f4aa-6f22-1c832e0b563f@gmail.com>
+ <3823958.XNLmIv7GEv@avalon> <20170207133648.GA27065@ti.com>
+Message-ID: <20170207205005.GE13854@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+Hi Benoit,
 
-On Fri, Jan 06, 2017 at 06:11:31PM -0800, Steve Longerbeam wrote:
-> From: Philipp Zabel <p.zabel@pengutronix.de>
+On Tue, Feb 07, 2017 at 07:36:48AM -0600, Benoit Parrot wrote:
+> Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote on Tue [2017-Feb-07 12:26:32 +0200]:
+> > Hi Steve,
+> > 
+> > On Monday 06 Feb 2017 15:10:46 Steve Longerbeam wrote:
+> > > On 02/06/2017 02:33 PM, Laurent Pinchart wrote:
+> > > > On Monday 06 Feb 2017 10:50:22 Hans Verkuil wrote:
+> > > >> On 02/05/2017 04:48 PM, Laurent Pinchart wrote:
+> > > >>> On Tuesday 24 Jan 2017 18:07:55 Steve Longerbeam wrote:
+> > > >>>> On 01/24/2017 04:02 AM, Philipp Zabel wrote:
+> > > >>>>> On Fri, 2017-01-20 at 15:03 +0100, Hans Verkuil wrote:
+> > > >>>>>>> +
+> > > >>>>>>> +int vidsw_g_mbus_config(struct v4l2_subdev *sd, struct
+> > > >>>>>>> v4l2_mbus_config *cfg)
+> > 
+> > [snip]
+> > 
+> > > >>>>>> I am not certain this op is needed at all. In the current kernel this
+> > > >>>>>> op is only used by soc_camera, pxa_camera and omap3isp (somewhat
+> > > >>>>>> dubious). Normally this information should come from the device tree
+> > > >>>>>> and there should be no need for this op.
+> > > >>>>>> 
+> > > >>>>>> My (tentative) long-term plan was to get rid of this op.
+> > > >>>>>> 
+> > > >>>>>> If you don't need it, then I recommend it is removed.
+> > > >>>> 
+> > > >>>> Hi Hans, the imx-media driver was only calling g_mbus_config to the
+> > > >>>> camera sensor, and it was doing that to determine the sensor's bus
+> > > >>>> type. This info was already available from parsing a v4l2_of_endpoint
+> > > >>>> from the sensor node. So it was simple to remove the g_mbus_config
+> > > >>>> calls, and instead rely on the parsed sensor v4l2_of_endpoint.
+> > > >>> 
+> > > >>> That's not a good point.
+> > > > 
+> > > > (mea culpa, s/point/idea/)
+> > > > 
+> > > >>> The imx-media driver must not parse the sensor DT node as it is not
+> > > >>> aware of what bindings the sensor is compatible with.
+> > > 
+> > > Hi Laurent,
+> > > 
+> > > I don't really understand this argument. The sensor node has been found
+> > > by parsing the OF graph, so it is known to be a camera sensor node at
+> > > that point.
+> > 
+> > All you know in the i.MX6 driver is that the remote node is a video source. 
+> > You can rely on the fact that it implements the OF graph bindings to locate 
+> > other ports in that DT node, but that's more or less it.
+> > 
+> > DT properties are defined by DT bindings and thus qualified by a compatible 
+> > string. Unless you match on sensor compat strings in the i.MX6 driver (which 
+> > you shouldn't do, to keep the driver generic) you can't know for certain how 
+> > to parse the sensor node DT properties. For all you know, the video source 
+> > could be a bridge such as an HDMI to CSI-2 converter for instance, so you 
+> > can't even rely on the fact that it's a sensor.
+> > 
+> > > >>> Information must instead be queried from the sensor subdev at runtime,
+> > > >>> through the g_mbus_config() operation.
+> > > >>> 
+> > > >>> Of course, if you can get the information from the imx-media DT node,
+> > > >>> that's certainly an option. It's only information provided by the sensor
+> > > >>> driver that you have no choice but query using a subdev operation.
+> > > >> 
+> > > >> Shouldn't this come from the imx-media DT node? BTW, why is omap3isp
+> > > >> using this?
+> > > > 
+> > > > It all depends on what type of information needs to be retrieved, and
+> > > > whether it can change at runtime or is fixed. Adding properties to the
+> > > > imx-media DT node is certainly fine as long as those properties describe
+> > > > the i.MX side.
+> > >
+> > > In this case the info needed is the media bus type. That info is most easily
+> > > available by calling v4l2_of_parse_endpoint() on the sensor's endpoint
+> > > node.
+> > 
+> > I haven't had time to check the code in details yet, so I can't really comment 
+> > on what you need and how it should be implemented exactly.
+> > 
+> > > The media bus type is not something that can be added to the
+> > > imx-media node since it contains no endpoint nodes.
+> > 
+> > Agreed. You have endpoints in the CSI nodes though.
+> > 
+> > > > In the omap3isp case, we use the operation to query whether parallel data
+> > > > contains embedded sync (BT.656) or uses separate h/v sync signals.
+> > > > 
+> > > >> The reason I am suspicious about this op is that it came from soc-camera
+> > > >> and predates the DT. The contents of v4l2_mbus_config seems very much
+> > > >> like a HW description to me, i.e. something that belongs in the DT.
+> > > > 
+> > > > Part of it is possibly outdated, but for buses that support multiple modes
+> > > > of operation (such as the parallel bus case described above) we need to
+> > > > make that information discoverable at runtime. Maybe this should be
+> > > > considered as related to Sakari's efforts to support VC/DT for CSI-2, and
+> > > > supported through the API he is working on.
+> > > 
+> > > That sounds interesting, can you point me to some info on this effort?
+> > 
+> > Sure.
+> > 
+> > http://git.retiisi.org.uk/?p=~sailus/linux.git;a=shortlog;h=refs/heads/vc
+> > 
+> > > I've been thinking the DT should contain virtual channel info for CSI-2
+> > > buses.
+> > 
+> > I don't think it should. CSI-2 virtual channels and data types should be 
+> > handled as a software concept, and thus supported through driver code without 
+> > involving DT.
 > 
-> This driver can handle SoC internal and external video bus multiplexers,
-> controlled either by register bit fields or by a GPIO. The subdevice
-> passes through frame interval and mbus configuration of the active input
-> to the output side.
+> Laurent,
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> 
-> --
-> 
-> - fixed a cut&paste error in vidsw_remove(): v4l2_async_register_subdev()
->   should be unregister.
-> 
-> - added media_entity_cleanup() and v4l2_device_unregister_subdev()
->   to vidsw_remove().
-> 
-> - there was a line left over from a previous iteration that negated
->   the new way of determining the pad count just before it which
->   has been removed (num_pads = of_get_child_count(np)).
-> 
-> - Philipp Zabel has developed a set of patches that allow adding
->   to the subdev async notifier waiting list using a chaining method
->   from the async registered callbacks (v4l2_of_subdev_registered()
->   and the prep patches for that). For now, I've removed the use of
->   v4l2_of_subdev_registered() for the vidmux driver's registered
->   callback. This doesn't affect the functionality of this driver,
->   but allows for it to be merged now, before adding the chaining
->   support.
-> 
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> ---
->  .../bindings/media/video-multiplexer.txt           |  59 +++
->  drivers/media/platform/Kconfig                     |   8 +
->  drivers/media/platform/Makefile                    |   2 +
->  drivers/media/platform/video-multiplexer.c         | 472 +++++++++++++++++++++
->  4 files changed, 541 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/video-multiplexer.txt
->  create mode 100644 drivers/media/platform/video-multiplexer.c
-> 
-> diff --git a/Documentation/devicetree/bindings/media/video-multiplexer.txt b/Documentation/devicetree/bindings/media/video-multiplexer.txt
-> new file mode 100644
-> index 0000000..9d133d9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/video-multiplexer.txt
-> @@ -0,0 +1,59 @@
-> +Video Multiplexer
-> +=================
-> +
-> +Video multiplexers allow to select between multiple input ports. Video received
-> +on the active input port is passed through to the output port. Muxes described
-> +by this binding may be controlled by a syscon register bitfield or by a GPIO.
-> +
-> +Required properties:
-> +- compatible : should be "video-multiplexer"
-> +- reg: should be register base of the register containing the control bitfield
-> +- bit-mask: bitmask of the control bitfield in the control register
-> +- bit-shift: bit offset of the control bitfield in the control register
-> +- gpios: alternatively to reg, bit-mask, and bit-shift, a single GPIO phandle
-> +  may be given to switch between two inputs
-> +- #address-cells: should be <1>
-> +- #size-cells: should be <0>
-> +- port@*: at least three port nodes containing endpoints connecting to the
-> +  source and sink devices according to of_graph bindings. The last port is
-> +  the output port, all others are inputs.
-> +
-> +Example:
-> +
-> +syscon {
-> +	compatible = "syscon", "simple-mfd";
-> +
-> +	mux {
+> So when you have a CSI2 port aggregator for instance where traffic from up
+> to 4 CSI2 sources where each source is now assigned its own VC by the
+> aggregator and interleaved into a single CSI2 Receiver. I was hoping that
+> in this case the VC would be DT discoverable as a specicic source identifier.
+> So the CSI-RX side could associate a specific source and create its own
+> video device. I am guessing that no such thing exist today?
 
-Could you use standardised properties for this, i.e. ones defined in
-Documentation/devicetree/bindings/media/video-interfaces.txt ?
+This should be configurable in software: the sensors connected to the
+aggregator may also output multiple streams. The number of streams may also
+depend on the user specified configuration over the MC / V4L2 sub-device
+interfaces. Thus, this needs to be configurable in software.
 
-This is very similar to another patch "[PATCH] devicetree: Add video bus
-switch" posted by Pavel Machek recently. The problem with that is also
-similar than with this one: how to pass the CSI-2 bus configuration to the
-receiver.
-
-There's some discussion here:
-
-<URL:http://www.spinics.net/lists/linux-media/msg109493.html>
-
-As Laurent already suggested, I think we should have a common solution for
-the problem that, besides conveying the bus parameters to the receiver, also
-encompasses CSI-2 virtual channels and data types.
-
-That would mean finishing the series of patches in the branch I believe
-Laurent already quoted here.
-
-> +		compatible = "video-multiplexer";
-> +		/* Single bit (1 << 19) in syscon register 0x04: */
-> +		reg = <0x04>;
-> +		bit-mask = <1>;
-> +		bit-shift = <19>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		port at 0 {
-> +			reg = <0>;
-> +
-> +			mux_in0: endpoint {
-> +				remote-endpoint = <&video_source0_out>;
-> +			};
-> +		};
-> +
-> +		port at 1 {
-> +			reg = <1>;
-> +
-> +			mux_in1: endpoint {
-> +				remote-endpoint = <&video_source1_out>;
-> +			};
-> +		};
-> +
-> +		port at 2 {
-> +			reg = <2>;
-> +
-> +			mux_out: endpoint {
-> +				remote-endpoint = <&capture_interface_in>;
-> +			};
-> +		};
-> +	};
-> +};
+We do need additional patches on top of the current mediatree.git master
+branch though, some of which are not yet written...
 
 -- 
 Kind regards,
