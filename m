@@ -1,88 +1,43 @@
-From: pjones@redhat.com (Peter Jones)
-Date: Tue, 7 Feb 2017 13:30:57 -0500
-Subject: [PATCH 5/7] arm64: efi: remove pointless dummy .reloc section
-In-Reply-To: <1486398275-3966-6-git-send-email-ard.biesheuvel@linaro.org>
-References: <1486398275-3966-1-git-send-email-ard.biesheuvel@linaro.org>
- <1486398275-3966-6-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170207183056.42gqqg2jp32jexmy@redhat.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Wed,  8 Feb 2017 02:30:34 +0800
+Subject: [PATCH v4 1/9] arm64: allwinner: Kconfig: add essential pinctrl
+ driver for H5
+In-Reply-To: <20170207183042.62699-1-icenowy@aosc.xyz>
+References: <20170207183042.62699-1-icenowy@aosc.xyz>
+Message-ID: <20170207183042.62699-2-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2017 at 04:24:33PM +0000, Ard Biesheuvel wrote:
-> The kernel's EFI PE/COFF header contains a dummy .reloc section, and
-> an explanatory comment that claims that this is required for the EFI
-> application loader to accept the Image as a relocatable image (i.e.,
-> one that can be loaded at any offset and fixed up in place)
-> 
-> This was inherited from the x86 implementation, which has elaborate host
-> tooling to mangle the PE/COFF header post-link time, and which populates
-> the .reloc section with a single dummy base relocation. On ARM, no such
-> tooling exists, and the .reloc section remains empty, and is never even
-> exposed via the BaseRelocationTable directory entry, which is where the
-> PE/COFF loader looks for it.
-> 
-> The PE/COFF spec is unclear about relocatable images that do not require
-> any fixups, but the EDK2 implementation, which is the de facto reference
-> for PE/COFF in the UEFI space, clearly does not care, and explicitly
-> mentions (in a comment) that relocatable images with no base relocations
-> are perfectly fine, as long as they don't have the RELOCS_STRIPPED
-> attribute set (which is not the case for our PE/COFF image)
-> 
-> So simply remove the .reloc section altogether.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+H5 SoC has two pin controllers, one (in user manual called "CPUx") needs
+a slightly advanced driver, and the other (called "CPUs") is just equal
+to the on in H3, and the H3 driver can be just reused.
 
-Looks completely reasonable to me.
+Select the two necessary pinctrl drivers when building kernel for
+Allwinner SoCs.
 
-Acked-by: Peter Jones <pjones@redhat.com>
+Also add H5 in the option's description.
 
-> ---
->  arch/arm64/kernel/efi-header.S | 22 +-------------------
->  1 file changed, 1 insertion(+), 21 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/efi-header.S b/arch/arm64/kernel/efi-header.S
-> index 74a25c09a1b8..35b11654ecc5 100644
-> --- a/arch/arm64/kernel/efi-header.S
-> +++ b/arch/arm64/kernel/efi-header.S
-> @@ -37,7 +37,7 @@ pe_header:
->  	.short 	0
->  coff_header:
->  	.short	0xaa64					// AArch64
-> -	.short	2					// nr_sections
-> +	.short	1					// nr_sections
->  	.long	0 					// TimeDateStamp
->  	.long	0					// PointerToSymbolTable
->  	.long	1					// NumberOfSymbols
-> @@ -96,26 +96,6 @@ extra_header_fields:
->  
->  	// Section table
->  section_table:
-> -
-> -	/*
-> -	 * The EFI application loader requires a relocation section
-> -	 * because EFI applications must be relocatable.  This is a
-> -	 * dummy section as far as we are concerned.
-> -	 */
-> -	.ascii	".reloc"
-> -	.byte	0
-> -	.byte	0					// end of 0 padding of section name
-> -	.long	0
-> -	.long	0
-> -	.long	0					// SizeOfRawData
-> -	.long	0					// PointerToRawData
-> -	.long	0					// PointerToRelocations
-> -	.long	0					// PointerToLineNumbers
-> -	.short	0					// NumberOfRelocations
-> -	.short	0					// NumberOfLineNumbers
-> -	.long	0x42100040				// Characteristics (section flags)
-> -
-> -
->  	.ascii	".text"
->  	.byte	0
->  	.byte	0
-> -- 
-> 2.7.4
-> 
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ arch/arm64/Kconfig.platforms | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 715ef1256838..e11523d204b5 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -5,8 +5,11 @@ config ARCH_SUNXI
+ 	select GENERIC_IRQ_CHIP
+ 	select PINCTRL
+ 	select PINCTRL_SUN50I_A64
++	select PINCTRL_SUN50I_H5
++	select PINCTRL_SUN8I_H3_R
+ 	help
+-	  This enables support for Allwinner sunxi based SoCs like the A64.
++	  This enables support for Allwinner sunxi based SoCs like the A64
++	  and H5.
+ 
+ config ARCH_ALPINE
+ 	bool "Annapurna Labs Alpine platform"
 -- 
-  Peter
+2.11.0
