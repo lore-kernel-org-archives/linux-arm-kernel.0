@@ -1,59 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Feb 2017 16:04:37 +0100
-Subject: [PATCH 0/2] pinctrl: sunxi: Merge A31s pinctrl driver with A31
-In-Reply-To: <CACRpkdZUOszrqbPq4Ak+pUeYQB2qBnSrE2qWMkoNzvw+E74maw@mail.gmail.com>
-References: <20170201162547.24232-1-wens@csie.org>
- <20170202081332.okjxo4ogm2kp3abh@lukather>
- <CACRpkdZUOszrqbPq4Ak+pUeYQB2qBnSrE2qWMkoNzvw+E74maw@mail.gmail.com>
-Message-ID: <20170207150437.ob77nbtanmsijoeh@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 07 Feb 2017 16:05:08 +0100
+Subject: [PATCH RESEND] ARM: ep93xx: Disable TS-72xx watchdog before
+ uncompressing
+In-Reply-To: <SN1PR0101MB1565DDD368EF9D0F9F9ACD9DD04C0@SN1PR0101MB1565.prod.exchangelabs.com>
+References: <20170202201226.29631-1-f.fainelli@gmail.com>
+ <SN1PR0101MB1565DDD368EF9D0F9F9ACD9DD04C0@SN1PR0101MB1565.prod.exchangelabs.com>
+Message-ID: <2082981.zMc11d8l12@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Mon, Feb 06, 2017 at 11:07:33AM +0100, Linus Walleij wrote:
-> On Thu, Feb 2, 2017 at 9:13 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Thu, Feb 02, 2017 at 12:25:45AM +0800, Chen-Yu Tsai wrote:
-> >> Hi everyone,
-> >>
-> >> This series merges support for the A31s' pin controller into the A31
-> >> driver, using the new sunxi variants support code. The A31s is a trimmed
-> >> down version of the A31, with some hardware blocks removed, and some
-> >> pin functions or pins removed. Thus it is easy to support the A31s
-> >> using the A31 driver by marking the extra pins/functions as A31 only.
-> >>
-> >> Patch 1 does exactly this.
-> >>
-> >> Patch 2 removes the original A31s driver, which is now redundant.
-> >>
-> >> I opted not to rename sun6i-a31 to sun6i in various places.
+On Thursday, February 2, 2017 8:43:52 PM CET Hartley Sweeten wrote:
+> On Thursday, February 02, 2017 1:12 PM, Florian Fainelli wrote:
+> > The TS-72xx/73xx boards have a CPLD watchdog which is configured to
+> > reset the board after 8 seconds, if the kernel is large enough that this
+> > takes about this time to decompress the kernel, we will encounter a
+> > spurious reboot.
 > >
-> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Do not pull ts72xx.h, but instead locally define what we need to disable
+> > the watchdog.
+> >
+> > Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> > ---
+> > Arnd, this is a recent, so you can queue this up, thanks!
 > 
-> Could you guys make a patch either adding these drivers as
-> commonly maintained by you two in MAINTAINERS?
+> Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 > 
-> It is commonly maintained right?
+> or Tested-by/Acked-by as appropriate...
 > 
-> Or if you prefer, just list the pinctrl dir under the Allwinner
-> SoC support entry?
 
-I'm not sure what you mean. We already have a wildcard matching sun*i
-in our maintainer entry, so the pinctrl driver is definitely covered.
+Too bad, this really gets in the way of a future multiplatform
+ep93xx configuration as that doesn't easily allow us to have
+board specific hacks in the decompressor.
 
-Or do you want us to add an explicit one?
+Applied to next/soc with Hartley's reviewed-by tag.
 
-Maxime
+It's not clear from your description if this is needed for stable
+backports. If it is, please write to stable at vger.kernel.org
+once it is merged upstream.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170207/8144d9be/attachment.sig>
+	Arnd
