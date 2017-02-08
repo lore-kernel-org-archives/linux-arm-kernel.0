@@ -1,41 +1,82 @@
 From: rafal@milecki.pl (=?UTF-8?Q?Rafa=C5=82_Mi=C5=82ecki?=)
-Date: Thu, 09 Feb 2017 00:39:08 +0100
-Subject: [PATCH for-4.11 1/2] Revert "phy: Add USB3 PHY support for
- Broadcom NSP SoC"
-In-Reply-To: <82b47a03-c41b-378b-2d7c-f263eff514a9@gmail.com>
-References: <20170208233023.31922-1-zajec5@gmail.com>
- <82b47a03-c41b-378b-2d7c-f263eff514a9@gmail.com>
-Message-ID: <1b66f9ab3a9efd1bd0817a114e5b9ec9@milecki.pl>
+Date: Thu, 09 Feb 2017 00:40:52 +0100
+Subject: [PATCH] MAINTAINERS: Add Jon Mason to BCM5301X maintainers
+In-Reply-To: <ffaf7ac4-cf2f-efb8-27b3-b8efbe290b34@gmail.com>
+References: <1486596146-26766-1-git-send-email-jon.mason@broadcom.com>
+ <d7b40d59-4121-97ef-9829-405df8042bd7@milecki.pl>
+ <CAC3K-4obNm0LLzsirCqZF9xY-Bwv---m5MeSQuv5Q65=gsngnQ@mail.gmail.com>
+ <109ba5ff20b86cca145fd4e0767e9292@milecki.pl>
+ <CAC3K-4rXAi_1aYg37of60acAh8PsuCaDUtrh0CvkkVdwKP0Fgg@mail.gmail.com>
+ <ffaf7ac4-cf2f-efb8-27b3-b8efbe290b34@gmail.com>
+Message-ID: <a1ae582536f0b11ba0699be0709178bb@milecki.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-02-09 00:32, Florian Fainelli wrote:
-> On 02/08/2017 03:30 PM, Rafa? Mi?ecki wrote:
->> From: Rafa? Mi?ecki <rafal@milecki.pl>
+On 2017-02-09 00:37, Florian Fainelli wrote:
+> On 02/08/2017 03:37 PM, Jon Mason wrote:
+>> On Wed, Feb 8, 2017 at 6:35 PM, Rafa? Mi?ecki <rafal@milecki.pl> 
+>> wrote:
+>>> On 2017-02-09 00:34, Jon Mason wrote:
+>>>> 
+>>>> On Wed, Feb 8, 2017 at 6:29 PM, Rafa? Mi?ecki <rafal@milecki.pl> 
+>>>> wrote:
+>>>>> 
+>>>>> On 02/09/2017 12:22 AM, Jon Mason wrote:
+>>>>>> 
+>>>>>> 
+>>>>>> Adding myself as a maintainer for Broadcom Northstar SoCs.  Also, 
+>>>>>> adding
+>>>>>> a regex entry to discover the SVK DTs already present.
+>>>>>> 
+>>>>>> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+>>>>> 
+>>>>> 
+>>>>> 
+>>>>> Acked-by: Rafa? Mi?ecki <rafal@milecki.pl>
+>>>>> 
+>>>>> 
+>>>>>>  MAINTAINERS | 2 ++
+>>>>>>  1 file changed, 2 insertions(+)
+>>>>>> 
+>>>>>> diff --git a/MAINTAINERS b/MAINTAINERS
+>>>>>> index 2abda6c..03c1760 100644
+>>>>>> --- a/MAINTAINERS
+>>>>>> +++ b/MAINTAINERS
+>>>>>> @@ -2641,12 +2641,14 @@ F:      
+>>>>>> arch/mips/include/asm/mach-bcm47xx/*
+>>>>>>  BROADCOM BCM5301X ARM ARCHITECTURE
+>>>>>>  M:     Hauke Mehrtens <hauke@hauke-m.de>
+>>>>>>  M:     Rafa? Mi?ecki <zajec5@gmail.com>
+>>>>>> +M:     Jon Mason <jonmason@broadcom.com>
+>>>>>>  M:     bcm-kernel-feedback-list at broadcom.com
+>>>>>>  L:     linux-arm-kernel at lists.infradead.org
+>>>>>>  S:     Maintained
+>>>>>>  F:     arch/arm/mach-bcm/bcm_5301x.c
+>>>>>>  F:     arch/arm/boot/dts/bcm5301x*.dtsi
+>>>>>>  F:     arch/arm/boot/dts/bcm470*
+>>>>>> +N:     bcm953012
+>>>> 
+>>>> 
+>>>> There are 2 now, and a 3rd one coming soon.
+>>>> ./arch/arm/boot/dts/bcm953012k.dts
+>>>> ./arch/arm/boot/dts/bcm953012er.dts
+>>>> 
+>>>> It might be overkill, but I thought it was the way everyone was 
+>>>> going
+>>>> (and seems to be more elegant).  I'll defer if the simpler version 
+>>>> is
+>>>> desired
+>>> 
+>>> 
+>>> Maybe
+>>> F: arch/arm/boot/dts/bcm953012*
+>>> would be sufficient and more efficient?
 >> 
->> This reverts commit d7bc1a7d41bf ("phy: Add USB3 PHY support for
->> Broadcom NSP SoC") as we already have driver for this PHY (shared by 
->> NS
->> and NSP). It was added in commit e5666281d9ea ("phy: bcm-ns-usb3: new
->> driver for USB 3.0 PHY on Northstar").
+>> Works for me.
 >> 
->> Instead of adding separated driver & duplicating code we should work 
->> on
->> improving existing (old) one. Thanks to work done by Broadcom we know
->> there is MDIO bus we weren't aware of & we know register names which
->> makes initialization more clear. This is very valuable info and we
->> should work on using it in existing driver afterwards.
+>> Florian, you want a v2 or did you want to massage the patch by hand?
 > 
-> Should not we first extend the old driver to support NSP and then 
-> revert
-> d7bc1a7d41bf ("phy: Add USB3 PHY support for Broadcom NSP SoC")?
+> I am very lazy, so I need a v2, thanks!
 
-Sounds like a weird / dirty development method to me: adding duplicated 
-code
-first then working on cleaning it. Unless you mean drivers/staging/.
-
-We also should never drop support for supported DT bindings, so I really 
-think
-it's the cleanest to revert it now.
-
-I think Jon was also OK with this solution.
+I am lazy too: keep my Acked-by :P
+I'm sure your V2 will be OK :)
