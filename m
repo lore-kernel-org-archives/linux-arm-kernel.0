@@ -1,103 +1,73 @@
-From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
-Date: Wed, 8 Feb 2017 09:38:27 +0800
-Subject: [PATCH] [media] mtk-vcodec: fix build errors without DEBUG
-In-Reply-To: <CAGS+omAU7UohsUkXwwHyhNh_dSX=R9tLKYvSV5767m81sTf_RA@mail.gmail.com>
-References: <1486453244-26094-1-git-send-email-minghsiu.tsai@mediatek.com>
- <CAGS+omAU7UohsUkXwwHyhNh_dSX=R9tLKYvSV5767m81sTf_RA@mail.gmail.com>
-Message-ID: <1486517907.18649.1.camel@mtksdaap41>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Tue, 07 Feb 2017 17:43:11 -0800
+Subject: [PATCH] staging: vc04_services: remove unused functions
+In-Reply-To: <20170207221954.GE11154@mwanda>
+References: <20170207115308.5208-1-alexander@alemayhu.com>
+ <20170207120943.GC11154@mwanda> <87lgthpuv5.fsf@eliezer.anholt.net>
+ <20170207221954.GE11154@mwanda>
+Message-ID: <1486518191.2883.2.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-02-07 at 20:17 +0800, Daniel Kurtz wrote:
-> On Tue, Feb 7, 2017 at 3:40 PM, Minghsiu Tsai
-> <minghsiu.tsai@mediatek.com> wrote:
-> > Fix build errors after removing DEBUG definition.
+On Wed, 2017-02-08 at 01:19 +0300, Dan Carpenter wrote:
+> On Tue, Feb 07, 2017 at 01:13:34PM -0800, Eric Anholt wrote:
+> > Dan Carpenter <dan.carpenter@oracle.com> writes:
+> > 
+> > > There is a bunch of vc04_services that we're still looking to
+> > > merge in
+> > > the near future.??Please hold off deleting these until we are
+> > > further
+> > > along on that.
+> > 
+> > Checking the downstream tree, these are actually dead.
 > 
-> It would be useful to specify which build errors were fixed by this
-> patch, and a brief description of why - namely because when DEBUG is
-> not defined, mtk_v4l2_debug() is an empty macros, and therefore the
-> arguments are unused.
+> Ahh...??Thanks.??In that case, of course, fine let's remove them.
 > 
-> With an updated commit message, this patch is:
-> 
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> regards,
+> dan carpenter
 > 
 
-Hi Daniel,
-Thanks for your review and comment. I will update it soon.
+I made a table awhile ago as to which entry points are being used by
+what.  Most of the entry points are indeed only being used by those
+other drivers which exist mostly to support a debugging tool called
+vcdbg(which I didn't find that useful).
 
-> >
-> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
-> > ---
-> >  drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c | 9 ++++-----
-> >  drivers/media/platform/mtk-vcodec/vdec_vpu_if.c    | 5 ++---
-> >  drivers/media/platform/mtk-vcodec/venc_vpu_if.c    | 4 +---
-> >  3 files changed, 7 insertions(+), 11 deletions(-)
-> >
-> > diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> > index 0746592..6219c7d 100644
-> > --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> > +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-> > @@ -1126,15 +1126,14 @@ static void vb2ops_vdec_buf_queue(struct vb2_buffer *vb)
-> >                  * if there is no SPS header or picture info
-> >                  * in bs
-> >                  */
-> > -               int log_level = ret ? 0 : 1;
-> >
-> >                 src_buf = v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
-> >                 v4l2_m2m_buf_done(to_vb2_v4l2_buffer(src_buf),
-> >                                         VB2_BUF_STATE_DONE);
-> > -               mtk_v4l2_debug(log_level,
-> > -                               "[%d] vdec_if_decode() src_buf=%d, size=%zu, fail=%d, res_chg=%d",
-> > -                               ctx->id, src_buf->index,
-> > -                               src_mem.size, ret, res_chg);
-> > +               mtk_v4l2_debug(ret ? 0 : 1,
-> > +                              "[%d] vdec_if_decode() src_buf=%d, size=%zu, fail=%d, res_chg=%d",
-> > +                              ctx->id, src_buf->index,
-> > +                              src_mem.size, ret, res_chg);
-> >                 return;
-> >         }
-> >
-> > diff --git a/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c b/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
-> > index 5a24c51..1abd14e 100644
-> > --- a/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
-> > +++ b/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
-> > @@ -70,9 +70,8 @@ void vpu_dec_ipi_handler(void *data, unsigned int len, void *priv)
-> >  static int vcodec_vpu_send_msg(struct vdec_vpu_inst *vpu, void *msg, int len)
-> >  {
-> >         int err;
-> > -       uint32_t msg_id = *(uint32_t *)msg;
-> >
-> > -       mtk_vcodec_debug(vpu, "id=%X", msg_id);
-> > +       mtk_vcodec_debug(vpu, "id=%X", *(uint32_t *)msg);
-> >
-> >         vpu->failure = 0;
-> >         vpu->signaled = 0;
-> > @@ -80,7 +79,7 @@ static int vcodec_vpu_send_msg(struct vdec_vpu_inst *vpu, void *msg, int len)
-> >         err = vpu_ipi_send(vpu->dev, vpu->id, msg, len);
-> >         if (err) {
-> >                 mtk_vcodec_err(vpu, "send fail vpu_id=%d msg_id=%X status=%d",
-> > -                              vpu->id, msg_id, err);
-> > +                              vpu->id, *(uint32_t *)msg, err);
-> >                 return err;
-> >         }
-> >
-> > diff --git a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
-> > index a01c759..0d882ac 100644
-> > --- a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
-> > +++ b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
-> > @@ -79,10 +79,8 @@ static int vpu_enc_send_msg(struct venc_vpu_inst *vpu, void *msg,
-> >
-> >         status = vpu_ipi_send(vpu->dev, vpu->id, msg, len);
-> >         if (status) {
-> > -               uint32_t msg_id = *(uint32_t *)msg;
-> > -
-> >                 mtk_vcodec_err(vpu, "vpu_ipi_send msg_id %x len %d fail %d",
-> > -                              msg_id, len, status);
-> > +                              *(uint32_t *)msg, len, status);
-> >                 return -EINVAL;
-> >         }
-> >         if (vpu->failure)
-> > --
-> > 1.9.1
-> >
+The other drivers are small drivers, but I'm not sure bringing them
+here makes much sense either especially since they are mostly to
+support that debugging tool.  Which complicates things because probably
+half the driver could be otherwise deleted instantly.
+
+I attached a list of driver exports and which drivers are using them.
+
+
+
+-------------- next part --------------
+interface/vchiq_arm/vchiq_connected.c:EXPORT_SYMBOL(vchiq_add_connected_callback)   -- 	Github(vc_cma/vc_cma.c & vc_sm/vmcs_sm.c)
+interface/vchiq_arm/vchiq_kern_lib.c:EXPORT_SYMBOL(vchiq_initialise)		    --  Github(vc_cma/vc_cma.c)
+interface/vchiq_arm/vchiq_kern_lib.c:EXPORT_SYMBOL(vchiq_shutdown)		    --  Github(vc_cma/vc_cma.c)
+interface/vchiq_arm/vchiq_kern_lib.c:EXPORT_SYMBOL(vchiq_connect)		    --  Github(vc_cma/vc_cma.c)
+interface/vchiq_arm/vchiq_kern_lib.c:EXPORT_SYMBOL(vchiq_add_service)		    --  Internal Only
+interface/vchiq_arm/vchiq_kern_lib.c:EXPORT_SYMBOL(vchiq_open_service)		    --  Github(vc_cma/vc_cma.c)
+interface/vchiq_arm/vchiq_kern_lib.c:EXPORT_SYMBOL(vchiq_queue_bulk_transmit)	    --  Internal Only
+interface/vchiq_arm/vchiq_kern_lib.c:EXPORT_SYMBOL(vchiq_queue_bulk_receive)	    --  Internal Only
+interface/vchiq_arm/vchiq_kern_lib.c:EXPORT_SYMBOL(vchiq_bulk_transmit)		    --  Internal Only
+interface/vchiq_arm/vchiq_kern_lib.c:EXPORT_SYMBOL(vchiq_bulk_receive)		    --  Internal Only
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_msg_peek)			    --  Github(vc_sm/vc_vchi_sm.c)
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_msg_remove)			    --  Github(vc_sm/vc_vchi_sm.c)
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_msg_queue)			    --  bcm2835/mmal-vchiq.c, bcm2835-audio/bcm2835-vchiq.c, Github(vc_sm/vc_vchi_sm.c)
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_bulk_queue_receive)		    --  bcm2835/mmal-vchiq.c
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_bulk_queue_transmit)	    --  bcm2835-audio/bcm2835-vchiq.c
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_msg_dequeue)		    --  bcm2835-audio/bcm2835-vchiq.c
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_held_msg_release) 		    --  bcm2835/mmal-vchiq.c
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_msg_hold)			    --  bcm2835/mmal-vchiq.c
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_initialise)			    --  bcm2835/mmal-vchiq.c, bcm2835-audio/bcm2835-vchiq.c, Github(vc_sm/vmcs_sm.c)
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_connect)			    --  bcm2835/mmal-vchiq.c, Github(vc_sm/vmcs_sm.c)
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_disconnect) 		    --  Internal Only
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_service_open)		    --  bcm2835/mmal-vchiq.c, Github(vc_sm/vc_vchi_sm.c)
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_service_create)		    --  Internal Only
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_service_close)		    --  Github(vc_sm/vc_vchi_sm.c)
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_service_destroy)                --  Internal Only
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_service_set_option)		    --  Internal Only
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_get_peer_version)		    --  bcm2835-audio/bcm2835-vchiq.c
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_service_use)		    --  bcm2835/mmal-vchiq.c, bcm2835-audio/bcm2835-vchiq.c, Github(vc_sm/vc_vchi_sm.c)
+interface/vchiq_arm/vchiq_shim.c:EXPORT_SYMBOL(vchi_service_release)		    --  bcm2835/mmal-vchiq.c, bcm2835-audio/bcm2835-vchiq.c
