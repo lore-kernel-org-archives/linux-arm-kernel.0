@@ -1,78 +1,32 @@
-From: jhugo@codeaurora.org (Jeffrey Hugo)
-Date: Wed, 8 Feb 2017 10:22:36 -0700
-Subject: [PATCH v3 06/10] arm64: efi: add EFI stub
-In-Reply-To: <20170208170305.GI15459@leverpostej>
-References: <1396637113-22790-1-git-send-email-leif.lindholm@linaro.org>
- <1396637113-22790-7-git-send-email-leif.lindholm@linaro.org>
- <CAOZdJXWU1dmFfCc88RMp3SvouU7roDiJsA=3aHzwijwhMH7naA@mail.gmail.com>
- <E4BDBC23-A96A-4D84-B7EE-B7967D4E4DDD@linaro.org>
- <73a460e5-98f5-86c2-142f-a9a084ee0203@codeaurora.org>
- <20170208170305.GI15459@leverpostej>
-Message-ID: <423ec003-225e-8a5f-c071-0fcbbec2679e@codeaurora.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 8 Feb 2017 17:22:50 +0000
+Subject: next-20170208 build: 1 failures 16 warnings (next-20170208)
+In-Reply-To: <E1cbPtA-00012m-9J@optimist>
+References: <E1cbPtA-00012m-9J@optimist>
+Message-ID: <20170208172250.rnqxq7g77ekuo2pv@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/8/2017 10:03 AM, Mark Rutland wrote:
-> On Wed, Feb 08, 2017 at 10:35:02AM -0600, Timur Tabi wrote:
->> On 02/08/2017 10:29 AM, Ard Biesheuvel wrote:
->>>>>>> +       status = handle_cmdline_files(sys_table, image, cmdline_ptr,
->>>>>>> +                                     "initrd=", dram_base + SZ_512M,
->>>>>>> +                                     (unsigned long *)&initrd_addr,
->>>>>>> +                                     (unsigned long *)&initrd_size);
->>>>>
->>>>> So I know this patch is almost three years old, but why is there a
->>>>> 512M limit on the initrd size?
->>>>>
->>> How do you reckon this constitutes a limit?
->>
->> handle_cmdline_files() calls efi_high_alloc() with that limit.  I'm
->> still trying to understand all the details myself, but apparently
->> our firmware and initrd need to fit within the first 512MB because
->> of dram_base + SZ_512M. When we change "dram_base + SZ_512M" to
->> "~0", everything works.
->
-> Just to check, how big is that initrd?
+On Wed, Feb 08, 2017 at 10:54:16AM +0000, Build bot for Mark Brown wrote:
 
-120MB right now.  Probably could be optimized, but I don't think that's 
-really the issue here.
+Today's -next fails to build an arm64 allmodconfig due to:
 
-The big problem is we don't have much memory free as the platform 
-requires that all of firmware exists in the first 512MB.  On systems 
-with a lot of devices (ie 16+ STAT drives), UEFI ends up doing a lot of 
-allocations, which pushes the platform over the edge due to the limited 
-memory and fragmentation of what is available.
+>       arm64-allmodconfig
+> ../arch/arm64/kernel/armv8_deprecated.c:359:31: error: expected '=',
+> ',', ';',
++'asm' or '__attribute__' before 'aarch32_check_condition'
+> ../arch/arm64/kernel/armv8_deprecated.c:386:10: error: implicit
+> declaration of
++function 'aarch32_check_condition'
+[-Werror=implicit-function-declaration]
 
->
-> I guess it's possible that there simply isn't sufficient contiguous free
-> memory in that range, even if the initrd isn't that large. Can you share
-> the EFI memory map dump from booting with efi=debug?
->
-> We originally needed to restrict this to ensure that the kernel could
-> map the initrd (and I think the 512M restriction specifically was
-> inherited from the DTB mapping restriction). Since then, we have relaxed
-> things in the kernel, and today Documentation/arm64/booting.txt says:
->
-> 	If an initrd/initramfs is passed to the kernel at boot, it must
-> 	reside entirely within a 1 GB aligned physical memory window of
-> 	up to 32 GB in size that fully covers the kernel Image as well.
->
-> ... so I think the EFI stub should be able to take advantage of that
-> relaxation.
->
-> Ard?
->
-> Thanks,
-> Mark.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-
-
--- 
-Jeffrey Hugo
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+triggered by 1930faf201e83f6 (kprobes: move kprobe declarations to
+asm-generic/kprobes.h) according to a bisect, though I didn't
+immediately see how.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170208/2fd25d1f/attachment-0001.sig>
