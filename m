@@ -1,44 +1,27 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 8 Feb 2017 15:50:14 -0600
-Subject: [PATCH v2 6/6] watchdog: ts4600: add driver for TS-4600 watchdog
-In-Reply-To: <20170203194729.20995-7-sebastien.bourdelin@savoirfairelinux.com>
-References: <20170203194729.20995-1-sebastien.bourdelin@savoirfairelinux.com>
- <20170203194729.20995-7-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <20170208215014.d2tblyu7olhph5qx@rob-hp-laptop>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 8 Feb 2017 15:55:08 -0600
+Subject: [PATCH 0/2] PCI: iproc: MPS fix and quirks
+In-Reply-To: <1485553449-9345-1-git-send-email-jon.mason@broadcom.com>
+References: <1485553449-9345-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <20170208215508.GA4800@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2017 at 02:47:29PM -0500, Sebastien Bourdelin wrote:
-> This watchdog is instantiated in a FPGA and can only be access using a
-> GPIOs bit-banged bus, called the NBUS by Technologic Systems.
-> The watchdog is made of only one register, called the feed register.
-> Writing to this register will re-arm the watchdog for a given time (and
-> enable it if it was disable). It can be disabled by writing a special
-> value into it.
+On Fri, Jan 27, 2017 at 04:44:07PM -0500, Jon Mason wrote:
+> A patch that corrects an issue where the MPS could not be set, and
+> another that fixes some quirks in the PAXC
 > 
-> ---
-> Changes v1 -> v2:
->   - rebase on master
->   - retrieve the ts_nbus instantiated by the parent node (suggested by
->   Linus Walleij)
->   - rename the wdt by watchdog in the device tree and in the
->   documentation (suggested by Rob Herring)
->   - add a dependency to the TS_NBUS driver in the Kconfig (suggested by
->   Guenter Roeck)
->   - simplify the set_timeout function (suggested by Guenter Roeck)
->   - use the max_hw_heartbeat_ms callback instead of the max_timeout
->   callback (suggested by Guenter Roeck)
+> Jon Mason (2):
+>   PCI: iproc: allow the MPS to be set
+>   PCI: Add quirk entry for NS2 PAXC PCI
 > 
-> Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
-> ---
->  .../devicetree/bindings/watchdog/ts4600-wdt.txt    |  16 ++
->  arch/arm/boot/dts/imx28-ts4600-common.dtsi         |   5 +
+>  drivers/pci/host/pcie-iproc.c |  5 ++++-
+>  drivers/pci/quirks.c          | 21 +++++++++++++++++++++
+>  2 files changed, 25 insertions(+), 1 deletion(-)
 
-Acked-by: Rob Herring <robh@kernel.org>
+Applied with Ray's ack to pci/host-iproc for v4.11, thanks!
 
->  drivers/watchdog/Kconfig                           |  11 ++
->  drivers/watchdog/Makefile                          |   1 +
->  drivers/watchdog/ts4600_wdt.c                      | 217 +++++++++++++++++++++
->  5 files changed, 250 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/watchdog/ts4600-wdt.txt
->  create mode 100644 drivers/watchdog/ts4600_wdt.c
+It looks to me like several other drivers need a similar MPS fix.
+I'll CC you on the patches.
+
+Bjorn
