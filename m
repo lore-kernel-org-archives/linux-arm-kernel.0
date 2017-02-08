@@ -1,86 +1,79 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed, 08 Feb 2017 19:08:46 +0800
-Subject: [PATCH 5/8] arm64: dts: allwinner: add R_PIO node
-In-Reply-To: <20170208101458.du6ybqsw52ypzhzw@lukather>
-References: <20170208100009.29362-1-icenowy@aosc.xyz>
- <20170208100009.29362-5-icenowy@aosc.xyz>
- <20170208101458.du6ybqsw52ypzhzw@lukather>
-Message-ID: <39431486552126@web41j.yandex.ru>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 8 Feb 2017 19:19:25 +0800
+Subject: [PATCH 2/2 v2] cpufreq: qoriq: Don't look at clock
+ implementation details
+In-Reply-To: <1486532585-36463-2-git-send-email-yuantian.tang@nxp.com>
+Message-ID: <201702081937.6pnj3VE2%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tang,
 
+[auto build test WARNING on pm/linux-next]
+[also build test WARNING on v4.10-rc7 next-20170208]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-08.02.2017, 18:15, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> On Wed, Feb 08, 2017 at 06:00:06PM +0800, Icenowy Zheng wrote:
->> ?Allwinner A64 SoC has a R_PIO node like the one in H3.
->>
->> ?Add the node as well as needed clocks and resets.
->>
->> ?As there's no document for apb0_gates, I only added the R_PIO bit here.
->>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?---
->> ??arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 40 +++++++++++++++++++++++++++
->> ??1 file changed, 40 insertions(+)
->>
->> ?diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> ?index 1c64ea2d23f9..4b0baa79554c 100644
->> ?--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> ?+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
->> ?@@ -98,6 +98,15 @@
->> ??????????????????clock-output-names = "osc32k";
->> ??????????};
->>
->> ?+ apb0: apb0_clk {
->> ?+ compatible = "fixed-factor-clock";
->> ?+ #clock-cells = <0>;
->> ?+ clock-div = <1>;
->> ?+ clock-mult = <1>;
->> ?+ clocks = <&osc24M>;
->> ?+ clock-output-names = "apb0";
->> ?+ };
->> ?+
->> ??????????psci {
->> ??????????????????compatible = "arm,psci-0.2";
->> ??????????????????method = "smc";
->> ?@@ -392,5 +401,36 @@
->> ??????????????????????????interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
->> ???????????????????????????????????????<GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
->> ??????????????????};
->> ?+
->> ?+ apb0_gates: clk at 1f01428 {
->> ?+ compatible = "allwinner,sun50i-a64-apb0-gates-clk",
->> ?+ "allwinner,sun4i-a10-gates-clk";
->> ?+ reg = <0x01f01428 0x4>;
->> ?+ #clock-cells = <1>;
->> ?+ clocks = <&apb0>;
->> ?+ clock-indices = <0>;
->> ?+ clock-output-names = "apb0_pio";
->> ?+ };
->> ?+
->> ?+ apb0_rst: reset at 1f014b0 {
->> ?+ reg = <0x01f014b0 0x4>;
->> ?+ compatible = "allwinner,sun6i-a31-clock-reset";
->> ?+ #reset-cells = <1>;
->> ?+ };
->
-> Please make a sunxi-ng driver for those clocks.
+url:    https://github.com/0day-ci/linux/commits/yuantian-tang-nxp-com/cpufreq-qoriq-added-arm64-socs-support/20170208-163748
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+config: arm-multi_v7_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-We have no enough materials to make such a CCU driver.
+Note: it may well be a FALSE warning. FWIW you are at least aware of it now.
+http://gcc.gnu.org/wiki/Better_Uninitialized_Warnings
 
-Clocks in CPUs are usually undocumented, and difficult to
-be collected -- even the clk-sun50iw1.c in BSP do not have
-all clocks in CPUs.
+All warnings (new ones prefixed by >>):
 
-We should only make it sunxi-ng until it's fully discovered
-(all functions in CPUs are functional).
+   drivers/cpufreq/qoriq-cpufreq.c: In function 'qoriq_cpufreq_cpu_init':
+>> drivers/cpufreq/qoriq-cpufreq.c:230:2: warning: 'pnode' may be used uninitialized in this function [-Wmaybe-uninitialized]
+     of_node_put(pnode);
+     ^~~~~~~~~~~~~~~~~~
 
->
-> Thanks,
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+vim +/pnode +230 drivers/cpufreq/qoriq-cpufreq.c
+
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  214  		pr_err("invalid frequency table: %d\n", ret);
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  215  		goto err_nomem1;
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  216  	}
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  217  
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  218  	data->table = table;
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  219  
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  220  	/* update ->cpus if we have cluster, no harm if not */
+a4f20742 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2015-03-13  221  	set_affected_cpus(policy);
+a4f20742 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2015-03-13  222  	policy->driver_data = data;
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  223  
+906fe033 drivers/cpufreq/ppc-corenet-cpufreq.c Ed Swarthout  2014-06-05  224  	/* Minimum transition latency is 12 platform clocks */
+906fe033 drivers/cpufreq/ppc-corenet-cpufreq.c Ed Swarthout  2014-06-05  225  	u64temp = 12ULL * NSEC_PER_SEC;
+a4f20742 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2015-03-13  226  	do_div(u64temp, get_bus_freq());
+906fe033 drivers/cpufreq/ppc-corenet-cpufreq.c Ed Swarthout  2014-06-05  227  	policy->cpuinfo.transition_latency = u64temp + 1;
+6712d293 drivers/cpufreq/ppc-corenet-cpufreq.c Tim Gardner   2014-04-28  228  
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  229  	of_node_put(np);
+8a95c144 drivers/cpufreq/qoriq-cpufreq.c       Tang Yuantian 2015-06-04 @230  	of_node_put(pnode);
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  231  
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  232  	return 0;
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  233  
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  234  err_nomem1:
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  235  	kfree(table);
+8a95c144 drivers/cpufreq/qoriq-cpufreq.c       Tang Yuantian 2015-06-04  236  err_pclk:
+8a95c144 drivers/cpufreq/qoriq-cpufreq.c       Tang Yuantian 2015-06-04  237  	kfree(data->pclk);
+defa4c73 drivers/cpufreq/ppc-corenet-cpufreq.c Tang Yuantian 2013-06-05  238  err_nomem2:
+
+:::::: The code at line 230 was first introduced by commit
+:::::: 8a95c1441c799bb0f0d31cdb11523d91923d51a7 cpufreq: qoriq: optimize the CPU frequency switching time
+
+:::::: TO: Tang Yuantian <Yuantian.Tang@freescale.com>
+:::::: CC: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 39884 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170208/d515f106/attachment-0001.gz>
