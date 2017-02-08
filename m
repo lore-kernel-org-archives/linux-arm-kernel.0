@@ -1,41 +1,35 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 08 Feb 2017 14:08:49 +0000
-Subject: [PATCH 2/2 v3] irqchip: add a driver for Cortina Gemini
-In-Reply-To: <20170130192849.15876-1-linus.walleij@linaro.org> (Linus
- Walleij's message of "Mon, 30 Jan 2017 20:28:49 +0100")
-References: <20170130192849.15876-1-linus.walleij@linaro.org>
-Message-ID: <877f5093m6.fsf@on-the-bus.cambridge.arm.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 8 Feb 2017 08:09:12 -0600
+Subject: [PATCH 1/2] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
+In-Reply-To: <20170208133306.GE15459@leverpostej>
+References: <20170208005736.18724-1-cov@codeaurora.org>
+ <7151be59-000c-d50b-f8f5-5fef0c053d91@arm.com>
+ <f9504cde-a87a-ba99-2f72-fc3029ef5fe5@codeaurora.org>
+ <20170208133306.GE15459@leverpostej>
+Message-ID: <e16986de-31fa-8d34-05be-aa8a585500d4@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30 2017 at  7:28:49 pm GMT, Linus Walleij <linus.walleij@linaro.org> wrote:
-> As a part of transitioning the Gemini platform to device tree we
-> create this clean, device-tree-only irqchip driver.
+Mark Rutland wrote:
+
+>> No, only Kryo and Falkor V1 based SOCs have this problem.  Falkor V2
+>> will have this fixed.  We intend to revert these fixes after Falkor
+>> V1 SOCs are no longer supported.
 >
-> Cc: Janos Laube <janos.dev@gmail.com>
-> Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
-> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v2->v3:
-> - Facing the need to support a falling edge in the power controller
->   I went ahead and tested and implemented support for falling edge.
-> - Rename register defines with GEMINI_ prefix to avoid namespace
->   clashes with other stuff IRQ.
-> ChangeLog v1->v2:
-> - Do not call irq_create_mapping() on all hwirqs at probe: this
->   will happen automatically when looking up the IRQs from the
->   device tree and is not needed.
->
-> irqchip maintainers: please just apply this when you feel pleased
-> with it. These portions are functionally orthogonal to the series,
-> it is just in a series for context.
+> Supported by whom?
 
-Both patches queued.
+Qualcomm.
 
-Thanks,
+> Generally, once something's upstreamed we expect it to remain supported.
 
-	M.
+The V1 SOCs are technically pre-production, but still in wide use and it will be 
+a while before they are all replaced by V2 SOCs.  It's only because of the 
+"ugliness" of the erratum and its work-around that we want to git rid of it when 
+we can.
+
+Cov is better equipped to answer your other questions.
+
 -- 
-Jazz is not dead, it just smell funny.
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
