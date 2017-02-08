@@ -1,50 +1,57 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 08 Feb 2017 17:13:36 +0100
-Subject: [PATCH -next] reset: uniphier: fix non static symbol warnings
-In-Reply-To: <CAK7LNATyFHr0uXSADcVy7fnE+bs+go9fJ4KHrptH3MynubrRuA@mail.gmail.com>
-References: <20170208155620.25055-1-weiyj.lk@gmail.com>
- <CAK7LNATyFHr0uXSADcVy7fnE+bs+go9fJ4KHrptH3MynubrRuA@mail.gmail.com>
-Message-ID: <1486570416.2309.39.camel@pengutronix.de>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 8 Feb 2017 08:24:59 -0800
+Subject: [PATCH v2 2/5] async_tx: Handle DMA devices having support for
+ fewer PQ coefficients
+In-Reply-To: <CAALAos9ovab4x=waRgM7G2adRC7syHMkY0Rhf-UPB_+h4w3yNQ@mail.gmail.com>
+References: <1486455406-11202-1-git-send-email-anup.patel@broadcom.com>
+ <1486455406-11202-3-git-send-email-anup.patel@broadcom.com>
+ <CAPcyv4gbV1yf52JrejW+Dn3wOPn7Er+8HWdu2qsW0+Qm+cRr9g@mail.gmail.com>
+ <CAALAos_yhXufdt79KWY0eugjF5oyJ8+NcPh2E-dEXnSQu2WhhA@mail.gmail.com>
+ <CAPcyv4hK_1f8bryq6smPQy7vTnP+QEzmT9wnAEE1xpxq7EAnjQ@mail.gmail.com>
+ <CAALAos9ovab4x=waRgM7G2adRC7syHMkY0Rhf-UPB_+h4w3yNQ@mail.gmail.com>
+Message-ID: <CAPcyv4iFJXxvJFrUs2jtwP9GX5NcJ8LiEDHeZ5b1fwjCAToe5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-02-09 at 01:04 +0900, Masahiro Yamada wrote:
-> 2017-02-09 0:56 GMT+09:00 Wei Yongjun <weiyj.lk@gmail.com>:
-> > From: Wei Yongjun <weiyongjun1@huawei.com>
-> >
-> > Fixes the following sparse warnings:
-> >
-> > drivers/reset/reset-uniphier.c:68:34: warning:
-> >  symbol 'uniphier_sld3_sys_reset_data' was not declared. Should it be static?
-> > drivers/reset/reset-uniphier.c:73:34: warning:
-> >  symbol 'uniphier_pro4_sys_reset_data' was not declared. Should it be static?
-> > drivers/reset/reset-uniphier.c:81:34: warning:
-> >  symbol 'uniphier_pro5_sys_reset_data' was not declared. Should it be static?
-> > drivers/reset/reset-uniphier.c:89:34: warning:
-> >  symbol 'uniphier_pxs2_sys_reset_data' was not declared. Should it be static?
-> > drivers/reset/reset-uniphier.c:103:34: warning:
-> >  symbol 'uniphier_ld11_sys_reset_data' was not declared. Should it be static?
-> > drivers/reset/reset-uniphier.c:108:34: warning:
-> >  symbol 'uniphier_ld20_sys_reset_data' was not declared. Should it be static?
-> > drivers/reset/reset-uniphier.c:137:34: warning:
-> >  symbol 'uniphier_sld3_mio_reset_data' was not declared. Should it be static?
-> > drivers/reset/reset-uniphier.c:157:34: warning:
-> >  symbol 'uniphier_pro5_sd_reset_data' was not declared. Should it be static?
-> > drivers/reset/reset-uniphier.c:174:34: warning:
-> >  symbol 'uniphier_ld4_peri_reset_data' was not declared. Should it be static?
-> > drivers/reset/reset-uniphier.c:187:34: warning:
-> >  symbol 'uniphier_pro4_peri_reset_data' was not declared. Should it be static?
-> >
-> > Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-> 
-> 
-> 
-> Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> 
-> 
-> Thanks!
+On Wed, Feb 8, 2017 at 12:57 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+> On Tue, Feb 7, 2017 at 11:46 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+>> On Tue, Feb 7, 2017 at 1:02 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+>>> On Tue, Feb 7, 2017 at 1:57 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+>>>> On Tue, Feb 7, 2017 at 12:16 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+>>>>> The DMAENGINE framework assumes that if PQ offload is supported by a
+>>>>> DMA device then all 256 PQ coefficients are supported. This assumption
+>>>>> does not hold anymore because we now have BCM-SBA-RAID offload engine
+>>>>> which supports PQ offload with limited number of PQ coefficients.
+>>>>>
+>>>>> This patch extends async_tx APIs to handle DMA devices with support
+>>>>> for fewer PQ coefficients.
+>>>>>
+>>>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>>>
+>>>> I don't like this approach. Define an interface for md to query the
+>>>> offload engine once at the beginning of time. We should not be adding
+>>>> any new extensions to async_tx.
+>>>
+>>> Even if we do capability checks in Linux MD, we still need a way
+>>> for DMAENGINE drivers to advertise number of PQ coefficients
+>>> handled by the HW.
+>>>
+>>> I agree capability checks should be done once in Linux MD but I don't
+>>> see why this has to be part of BCM-SBA-RAID driver patches. We need
+>>> separate patchsets to address limitations of async_tx framework.
+>>
+>> Right, separate enabling before we pile on new hardware support to a
+>> known broken framework.
+>
+> Linux Async Tx not broken framework. The issue is:
+> 1. Its not complete enough
+> 2. Its not optimized for very high through-put offload engines
 
-Applied, thanks.
-
-regards
-Philipp
+I'm not understanding your point. I'm nak'ing this change to add yet
+more per-transaction capability checking to async_tx. I don't like the
+DMA_HAS_FEWER_PQ_COEF flag, especially since it is equal to
+DMA_HAS_PQ_CONTINUE. I'm not asking for all of async_tx's problems to
+be fixed before this new hardware support, I'm simply saying we should
+start the process of moving offload-engine capability checking to the
+raid code.
