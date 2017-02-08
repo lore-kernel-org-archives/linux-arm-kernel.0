@@ -1,119 +1,26 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 8 Feb 2017 10:40:53 +0000
-Subject: [PATCH] efi/libstub/arm*: Set default address and size cells
- values for an empty dtb
-In-Reply-To: <20170208074301.GB18445@linaro.org>
-References: <1486490390-25251-1-git-send-email-jhugo@codeaurora.org>
- <CAKv+Gu963uZB4MaMDuwTGd5-AqEN53Er8tExVLMZNVx3krJrZw@mail.gmail.com>
- <1f47fcdd-c5d8-4082-70a3-ca9b1746d7ca@codeaurora.org>
- <20170207190113.GG26173@leverpostej>
- <c49cc64e-4ca1-8d82-5faf-74c0355c35ef@codeaurora.org>
- <20170207191320.GI26173@leverpostej>
- <252539a6-72f6-1afa-6ed5-3cf6a1aa24c2@codeaurora.org>
- <20170207195558.GK26173@leverpostej>
- <20170208074301.GB18445@linaro.org>
-Message-ID: <CAKv+Gu8OXn20JvtFkE_bS=cbWV3XZ5b7a+XaG7tvea+4BqrHfw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 08 Feb 2017 11:42:21 +0100
+Subject: [PATCH] staging: vc04_services: remove unused functions
+In-Reply-To: <20170207120943.GC11154@mwanda>
+References: <20170207115308.5208-1-alexander@alemayhu.com>
+ <20170207120943.GC11154@mwanda>
+Message-ID: <78243491.gCbftNnyIb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 February 2017 at 07:43, AKASHI, Takahiro
-<takahiro.akashi@linaro.org> wrote:
-> Hi Mark,
->
-> Thank you for this heads-up.
->
-> On Tue, Feb 07, 2017 at 07:55:59PM +0000, Mark Rutland wrote:
->> On Tue, Feb 07, 2017 at 12:29:38PM -0700, Jeffrey Hugo wrote:
->> > On 2/7/2017 12:13 PM, Mark Rutland wrote:
->> > >On Tue, Feb 07, 2017 at 12:07:56PM -0700, Jeffrey Hugo wrote:
->> > >>On 2/7/2017 12:01 PM, Mark Rutland wrote:
->> > >>>I take it this is specific to the kdump properties?
->> > >>>
->> > >>>I can't immediately see what would matter for the !kdump case.
->> > >>>properties inserted under /chosen are not truncated?
->> > >>
->> > >>The kexec/kdump properties are added under /chosen, therefore yes,
->> > >>properties added under /chosen are truncated, per our observations.
->> > >
->> > >Sorry for the dodgy (and confusing) reply above.
->> > >
->> > >What I was trying to ask was does this *only* affect kdump properties?
->> > >I note that kdump is not yet upstream for arm64.
->> > >
->> > >Or are there regular kexec properties that this affects?
->> > >
->> > >Or !kdump && !kexec properties?
->> > >
->> > >Can you please enumerate the set of properties for which this matters?
->> >
->> > "linux,elfcorehdr" and "linux,usable-memory-range"
->> >
->> > We are not aware of !kdump && !kexec properties where this is an issue.
->>
->> Ok, I understand the problem now. Thanks for clarifying the !kdump
->> situation.
->>
->> As per my reply to Timur, given this only affects kdump, this is all
->> happening in code that is not upstream, and therefore this is not
->> *currently* an issue.
->>
->> In future, please report this kind of issue in reply to relevant
->> postings (e.g. [1]). At the very least, refer to these, with relevant
->> people Cc'd (e.g. Takahiro-san in this case).
->>
->> I think there are three things which should happen:
->>
->> (a) The userspace kexec-tools kdump code should take /#address-cells and
->>     /#size-cells into account when inserting the linux,elfcorehdr and
->>     linux,usable-memory-range properties. There can be DTs for 64 bit
->>     platforms where these are not 2.
->>
->>     Takahiro-san, from looking at your kexec-tools repo, this is not
->>     currently the case. Could you address that?
->
-> Yup, I will, but if this is the case,
-> we might need to think about another case where /#address-cells and /#size-cells
-> are <1> but the range of crash dump kernel can be still 64-bit wide since
-> the system memory information comes from ACPI table (not DT).
->
-> Therefore, the properties in this case should look like:
-> / {
->     #address-cells = <1>;
->     #size-cells = <1>;
->     chosen {
->          ...
->          linux,usable-memory-range {
->              #address-cells = <2>;
->              #size-cells = <2>; may be omitted if possible
->              reg = < ... >;
->          }
->          linux,elfcorehdr {
->              #address-cells = <2>;
->              #size-cells = <2>; may be omitted if possible
->              reg = < ... >;
->          }
->          ...
->     }
-> }
->
-> Is this what you meant?
-> (Obviously, I will have to modify the kernel patches as well.)
->
+On Tuesday, February 7, 2017 3:09:44 PM CET Dan Carpenter wrote:
+> There is a bunch of vc04_services that we're still looking to merge in
+> the near future.  Please hold off deleting these until we are further
+> along on that.
+> 
 
-I think the cell sizes of reg properties are defined in terms of the
-#address/size-cells attributes of the parent node. This makes sense
-when you think of it, because the regs of all nodes under the same
-parent should have the same size, given that they all live in their
-parent's address space. Of course, /chosen is special since it does
-not describe a bus.
+More generally speaking, I'd like to see all the 
+-Wmissing-declarations/-Wmissing-prototypes warnings addressed
+in the kernel and turn on that warning by default.
 
-So that means the tooling /could/ inject #address-cells/size-cells
-properties either at the root, or in /chosen, but not in the kdump
-properties themselves. However, that is not the point.
+If there are parts of vc04_services that are intentionally
+left in place but currently unused, adding a declaration in the
+header file with a comment should be sufficient to prevent it
+from getting deleted or seeing bogus warnings.
 
-The point is that the tooling should take *existing* cell counts into
-account: if there are no address-cells/size-cells properties under
-/chosen or under the root node, the tooling should use 32-bit
-quantities for address and size. If there are such properties, it
-should emit reg tuples of the same size as the cells properties
-describe.
+	Arnd
