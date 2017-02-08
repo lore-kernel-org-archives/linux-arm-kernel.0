@@ -1,52 +1,39 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 08 Feb 2017 16:08:46 -0600
-Subject: [PATCH v1 0/3] PCI: Configure PCIe MPS settings
-Message-ID: <20170208215558.8352.90635.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Date: Wed, 08 Feb 2017 16:08:55 -0600
+Subject: [PATCH v1 1/3] PCI: xilinx: Configure PCIe MPS settings
+In-Reply-To: <20170208215558.8352.90635.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170208215558.8352.90635.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170208220854.8352.28570.stgit@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI core doesn't configure the PCIe MPS settings by itself.  Each host
-bridge driver has to call pcie_bus_configure_settings() to make this
-happen.
+Make sure PCIe MPS settings are valid when we enumerate a new hierarchy.
 
-Jon fixed this for pcie-iproc.c.  I propose these similar patches for other
-drivers.   
-
-HV guys, I included you because create_root_hv_pci_bus() is one place that
-calls pci_scan_child_bus() but does not call pcie_bus_configure_settings().
-I know you probably don't strictly *need* to configure MPS settings in a
-paravirtual front-end, but the PCI core does other device configuration in
-this path:
-
-  pci_scan_child_bus
-    pci_scan_slot
-      pci_scan_single_device
-        pci_device_add
-	  pci_configure_device
-	  pci_init_capabilities
-
-and I would like to eventually migrate the MPS configuration into that same
-path.  Since we do this other configuration for HV devices already, I think
-pcie_bus_configure_settings() should also work (even if it ends up not
-doing anything to real devices).
-
-It would make that eventual migration easier if all the
-pci_scan_child_bus() callers had the same pattern of calling
-pcie_bus_configure_settings().
-
-So would it make sense to make a similar patch for HV?  It looks easy to
-add it to create_root_hv_pci_bus(), but I don't know exactly what to do
-about pci_devices_present_work().
-
+Based-on-patch-by: Jon Mason <jon.mason@broadcom.com>
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
+ drivers/pci/host/pcie-xilinx.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Bjorn Helgaas (3):
-      PCI: xilinx: Configure PCIe MPS settings
-      PCI: versatile: Configure PCIe MPS settings
-      PCI: xgene: Configure PCIe MPS settings
-
-
- drivers/pci/host/pci-versatile.c |    4 +++-
- drivers/pci/host/pci-xgene.c     |    4 +++-
- drivers/pci/host/pcie-xilinx.c   |    4 +++-
- 3 files changed, 9 insertions(+), 3 deletions(-)
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index c8616fadccf1..7f030f5d750b 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -632,7 +632,7 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct xilinx_pcie_port *port;
+-	struct pci_bus *bus;
++	struct pci_bus *bus, *child;
+ 	int err;
+ 	resource_size_t iobase = 0;
+ 	LIST_HEAD(res);
+@@ -686,6 +686,8 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
+ #ifndef CONFIG_MICROBLAZE
+ 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+ #endif
++	list_for_each_entry(child, &bus->children, node)
++		pcie_bus_configure_settings(child);
+ 	pci_bus_add_devices(bus);
+ 	return 0;
+ 
