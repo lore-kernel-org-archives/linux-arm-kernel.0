@@ -1,51 +1,58 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  8 Feb 2017 11:55:43 +0000
-Subject: [PATCH v2 10/14] arm: efi: remove forbidden values from the PE/COFF
- header
-In-Reply-To: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1486554947-3964-11-git-send-email-ard.biesheuvel@linaro.org>
+Date: Wed,  8 Feb 2017 11:55:33 +0000
+Subject: [PATCH v2 00/14] arm64+ARM: efi: PE/COFF cleanup/hardening
+Message-ID: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bring the PE/COFF header in line with the PE/COFF spec, by setting
-NumberOfSymbols to 0, and removing the section alignment flags.
+This cleans up the PE/COFF EFI header, by taking some of Mark's patches
+and use them to replace open coded constants with symbolic ones, and
+remove incorrect values or unused sections.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/boot/compressed/efi-header.S | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Finally, it updates the section layout so that the kernel Image can be
+mapped in a way that does not require setting RWX permissions anywhere.
+Note that this is currently not a huge win, given that most current UEFI
+implementations map all of RAM RWX by default, but this is finally gaining
+some attention, and work is underway to make the PE/COFF loader in EDK2
+adhere to the section permissions, which would also allow the RAM mapping
+to default to non-executable. Work in progress nonetheless...
 
-diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
-index 1d26a9d0a9e8..50eff3bbc57c 100644
---- a/arch/arm/boot/compressed/efi-header.S
-+++ b/arch/arm/boot/compressed/efi-header.S
-@@ -43,7 +43,7 @@ coff_header:
- 		.short	2			@ nr_sections
- 		.long	0 			@ TimeDateStamp
- 		.long	0			@ PointerToSymbolTable
--		.long	1			@ NumberOfSymbols
-+		.long	0			@ NumberOfSymbols
- 		.short	section_table - optional_header
- 						@ SizeOfOptionalHeader
- 		.short	0x306			@ Characteristics.
-@@ -109,7 +109,7 @@ section_table:
- 		.long	0			@ PointerToLineNumbers
- 		.short	0			@ NumberOfRelocations
- 		.short	0			@ NumberOfLineNumbers
--		.long	0x42100040		@ Characteristics
-+		.long	0x42000040		@ Characteristics
- 
- 		.ascii	".text\0\0\0"
- 		.long	_end - __efi_start	@ VirtualSize
-@@ -120,7 +120,7 @@ section_table:
- 		.long	0			@ PointerToLineNumbers
- 		.short	0			@ NumberOfRelocations
- 		.short	0			@ NumberOfLineNumbers
--		.long	0xe0500020		@ Characteristics
-+		.long	0xe0000020		@ Characteristics
- 
- 		.align	9
- __efi_start:
+Changes since v1:
+- added missing secondary SOB on Mark's patches
+- leave Image header as before, only move the PE header to a separate file
+- put PE header fixes in a separate patch
+- add acks from Mark and Peter (#6)
+- give ARM the same treatment as arm64 (#10 - #13)
+- add NB10 PE debuglink entry to ARM PE/COFF header as well (#9, #14)
+
+Ard Biesheuvel (12):
+  arm64: efi: move EFI header and related data to a separate .S file
+  arm64: efi: clean up Image header after PE header has been split off
+  arm64: efi: remove forbidden values from the PE/COFF header
+  arm64: efi: remove pointless dummy .reloc section
+  arm64: efi: replace open coded constants with symbolic ones
+  arm64: efi: split Image code and data into separate PE/COFF sections
+  arm: compressed: put zImage header and EFI header in dedicated section
+  arm: efi: remove forbidden values from the PE/COFF header
+  arm: efi: remove pointless dummy .reloc section
+  arm: efi: replace open coded constants with symbolic ones
+  arm: efi: split zImage code and data into separate PE/COFF sections
+  arm: efi: add PE/COFF debug table to EFI header
+
+Mark Rutland (2):
+  include: pe.h: allow for use in assembly
+  include: pe.h: add some missing definitions
+
+ arch/arm/boot/compressed/Makefile      |   4 +
+ arch/arm/boot/compressed/efi-header.S  | 253 ++++++++++++--------
+ arch/arm/boot/compressed/head.S        |  14 +-
+ arch/arm/boot/compressed/vmlinux.lds.S |  32 ++-
+ arch/arm64/kernel/efi-header.S         | 155 ++++++++++++
+ arch/arm64/kernel/head.S               | 167 +------------
+ arch/arm64/kernel/vmlinux.lds.S        |   5 +
+ include/linux/pe.h                     | 177 +++++++-------
+ 8 files changed, 449 insertions(+), 358 deletions(-)
+ create mode 100644 arch/arm64/kernel/efi-header.S
+
 -- 
 2.7.4
