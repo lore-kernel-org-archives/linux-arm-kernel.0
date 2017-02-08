@@ -1,59 +1,50 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed,  8 Feb 2017 14:40:24 -0800
-Subject: [PATCH] ARM: dts: Add devicetree for the Raspberry Pi 3,
- for arm32 (v3)
-Message-ID: <20170208224024.30415-1-eric@anholt.net>
+Date: Wed, 08 Feb 2017 14:40:56 -0800
+Subject: [RESENT PATCH] ARM: bcm2835: Add devicetree for the Raspberry Pi
+ 3, for arm (32)
+In-Reply-To: <1485951653.1076.54.camel@redhat.com>
+References: <1484845444-4617-1-git-send-email-kraxel@redhat.com>
+ <87fukcgsqp.fsf@eliezer.anholt.net> <878tpqki0k.fsf@eliezer.anholt.net>
+ <1485944672.1076.50.camel@redhat.com> <1485951653.1076.54.camel@redhat.com>
+Message-ID: <87y3xgs3uv.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Raspbian and Fedora have decided to support the Pi3 in 32-bit mode for
-now, so it's useful to be able to test that mode on an upstream
-kernel.  It's also been useful for me to use the same board for 32-bit
-and 64-bit development.
+Gerd Hoffmann <kraxel@redhat.com> writes:
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
+>> > I think just having links from
+>> > arch/arm64/boot/dts/broadcom/bcm2837*.dts* to arch/arm/boot/dts/ would
+>> > be the solution, then this Makefile could just reference
+>> > bcm2837-rpi-3-b.dtb.
+>> 
+>> I suspect it is not that easy, last time I tried it didn't work.
+>> Will try again though.
+>
+> Yep, dtbs_install fails:
+>
+> [ ... ]
+>   INSTALL arch/arm/boot/dts/bcm2835-rpi-b-plus.dtb
+>   INSTALL arch/arm/boot/dts/bcm2835-rpi-a-plus.dtb
+>   INSTALL arch/arm/boot/dts/bcm2836-rpi-2-b.dtb
+>   INSTALL 
+> cp: missing destination file operand after '/boot/dtbs/4.10.0-rc5+'
+> Try 'cp --help' for more information.
+> /root/linux/scripts/Makefile.dtbinst:41: recipe for target
+> 'bcm2837-rpi-3-b.dts' failed
+> make[3]: *** [bcm2837-rpi-3-b.dts] Error 1
+> arch/arm/Makefile:348: recipe for target 'dtbs_install' failed
+> make[2]: *** [dtbs_install] Error 2
+> Makefile:150: recipe for target 'sub-make' failed
+> make[1]: *** [sub-make] Error 2
+> Makefile:24: recipe for target '__sub-make' failed
+> make: *** [__sub-make] Error 2
 
-v1: Gerd's patch that put the ../../../arm64/... link in the Makefile
-v2: Michael's patch that #included from ../../../arm64/... in a new
-    bcm2837-rpi-3-b.dts.
-v3: Mine, using symlinks to make sure that we don't break the split DT
-    tree.
-
- arch/arm/boot/dts/Makefile            | 1 +
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 1 +
- arch/arm/boot/dts/bcm2837.dtsi        | 1 +
- 3 files changed, 3 insertions(+)
- create mode 120000 arch/arm/boot/dts/bcm2837-rpi-3-b.dts
- create mode 120000 arch/arm/boot/dts/bcm2837.dtsi
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 6576e3f000c9..416fdcedf5a1 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -70,6 +70,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
- 	bcm2835-rpi-b-plus.dtb \
- 	bcm2835-rpi-a-plus.dtb \
- 	bcm2836-rpi-2-b.dtb \
-+	bcm2837-rpi-3-b.dtb \
- 	bcm2835-rpi-zero.dtb
- dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4708-asus-rt-ac56u.dtb \
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-new file mode 120000
-index 000000000000..ceebc0e163fb
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-@@ -0,0 +1 @@
-+../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-\ No newline at end of file
-diff --git a/arch/arm/boot/dts/bcm2837.dtsi b/arch/arm/boot/dts/bcm2837.dtsi
-new file mode 120000
-index 000000000000..53f1cd2bba47
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm2837.dtsi
-@@ -0,0 +1 @@
-+../../../arm64/boot/dts/broadcom/bcm2837.dtsi
-\ No newline at end of file
--- 
-2.11.0
+Huh, I didn't see this when I tried it.  I just sent out that version of
+the patch.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170208/d251880b/attachment.sig>
