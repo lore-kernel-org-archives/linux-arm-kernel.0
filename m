@@ -1,32 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 8 Feb 2017 15:06:55 +0000
-Subject: [BUGFIX PATCH tip/master 2/3] kprobes/arm64: Fix a possible
- deadlock case in kretprobe
-In-Reply-To: <148648038381.30949.1443281264586280005.stgit@devbox>
-References: <148648024215.30949.11929183640906306731.stgit@devbox>
- <148648038381.30949.1443281264586280005.stgit@devbox>
-Message-ID: <20170208150654.GJ3986@arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 8 Feb 2017 23:28:33 +0800
+Subject: i.MX7 pinctrl driver writing to non existent registers
+In-Reply-To: <20170208090817.omm2dydhqukdzgqy@pengutronix.de>
+References: <20170208090817.omm2dydhqukdzgqy@pengutronix.de>
+Message-ID: <9D4713C3-26F1-4041-A227-51A8A2EEB3C1@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding linux-arm-kernel]
 
-On Wed, Feb 08, 2017 at 12:13:14AM +0900, Masami Hiramatsu wrote:
-> Similar to x86 kretprobe deadlock issue, arm64 also implements
-> kretprobe-booster (trampoline code directly call handler.)
-> So it has same deadlock issue if there are 2 kretprobes on
-> normal function and the function called from FIQ (or anywhere
-> which can be invoked when local_irq_disabled).
+> On Feb 8, 2017, at 5:08 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> 
+> Hi All,
+> 
+> The i.MX7 has two pinmux controllers, the LPSR and the regular one. We
+> instantiate a driver for each one. Now the driver assumes that the pins
+> are completely configured with one iomux controller, but for the LPSR
+> pins this is not true: The MUX_CTL and PAD_CTL registers are indeed
+> in the LPSR controller, but the SELECT_INPUT registers for the same
+> pin are found in the regular controller.
+> 
+> The result is that with this pin for example:
+> 
+> #define MX7D_PAD_GPIO1_IO06__UART5_DCE_RX                         0x0018 0x0048 0x0714 0x3 0x4
+> 
+> The LPSR controller writes to LPSR_BASE + 0x714 where it should really
+> be IOMUX_BASE + 0x714.
+> 
+> I have no idea how to fix this. We could split the LPSR pins into two
+> pins, one for each controller. Another possibility would be to create
+> some kind of shortcut from one controller to control the other one. Also
+> not nice. Also we could simply do nothing, as long as the bootloader
+> configures everything correctly we won't even notice ;)
+Always expect a bootloader is wrong and do it properly in the kernel
+as if you have 2 bootloader they may do different configuration and as the end
+found the problem in the kernel on one board and not the other.
 
-We don't support FIQ on arm64, so I'm not worried about that particular
-case. What are the other cases? I can think of debug exceptions, but those
-shouldn't be generally kprobe-able, and taking data aborts in things like
-get_user/put_user. Are those affected by this bug?
-
-Either way, could you please expand the commit message like you have
-for x86? It makes it much easier to understand the change when looking
-back at the log in future.
-
-Thanks,
-
-Will
+Best Regards,
+J.
