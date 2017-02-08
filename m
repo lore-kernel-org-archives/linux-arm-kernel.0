@@ -1,49 +1,120 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 8 Feb 2017 08:34:01 +0100
-Subject: [PATCH 1/2] drm/rockchip: support mode_valid for crtc
-In-Reply-To: <589A6A38.8050805@rock-chips.com>
-References: <1486280197-1585-1-git-send-email-mark.yao@rock-chips.com>
- <20170207161405.GG15150@art_vandelay> <589A6A38.8050805@rock-chips.com>
-Message-ID: <CAKMK7uE5gzDjBTg=XoaxB7mY89SR8yhaC9rCXHE4mCaXuqDBHA@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI, Takahiro)
+Date: Wed, 8 Feb 2017 16:43:04 +0900
+Subject: [PATCH] efi/libstub/arm*: Set default address and size cells
+ values for an empty dtb
+In-Reply-To: <20170207195558.GK26173@leverpostej>
+References: <1486490390-25251-1-git-send-email-jhugo@codeaurora.org>
+ <CAKv+Gu963uZB4MaMDuwTGd5-AqEN53Er8tExVLMZNVx3krJrZw@mail.gmail.com>
+ <1f47fcdd-c5d8-4082-70a3-ca9b1746d7ca@codeaurora.org>
+ <20170207190113.GG26173@leverpostej>
+ <c49cc64e-4ca1-8d82-5faf-74c0355c35ef@codeaurora.org>
+ <20170207191320.GI26173@leverpostej>
+ <252539a6-72f6-1afa-6ed5-3cf6a1aa24c2@codeaurora.org>
+ <20170207195558.GK26173@leverpostej>
+Message-ID: <20170208074301.GB18445@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 8, 2017 at 1:45 AM, Mark yao <mark.yao@rock-chips.com> wrote:
-> On 2017?02?08? 00:14, Sean Paul wrote:
->>
->> On Sun, Feb 05, 2017 at 03:36:36PM +0800, Mark Yao wrote:
->>>
->>> drm crtc already has mode_fixup callback to can do mode check, but
->>> We actually want to valid display mode on connector getmode time,
->>> mode_fixup can't do it.
->>>
->>> So add a private mode_valid callback to rockchip crtc, connectors can
->>> check mode with this mode_valid callback.
->>>
->> There are some nasty layer violations happening in this set. You should
->> use
->> mode_fixup if the crtc has limitations on the mode being set.
->>
->> Sean
->
-> Mode_fixup can also check crtc limitations, but it's secondly time to check
-> display mode.
->
-> mode_fixup only works on drm_setcrtc or atomic_commit check, when userspace
-> get a series of display modes,
-> They don't know which display mode is bad before drm_setcrtc or
-> atomic_commit check, they need try,
-> but drm_setcrtc or atomic_commit check not only for display mode check,
-> means that userspace didn't have a sure
-> method to verify display mode.
->
-> So I try to add the mode_valid callback to connector getmodes time, verify
-> display mode before send mode list to userspace.
-> then userspace would get a good display mode list.
+Hi Mark,
 
-You need both, the kerneldoc of these hooks explains in detail why.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+Thank you for this heads-up.
+
+On Tue, Feb 07, 2017 at 07:55:59PM +0000, Mark Rutland wrote:
+> On Tue, Feb 07, 2017 at 12:29:38PM -0700, Jeffrey Hugo wrote:
+> > On 2/7/2017 12:13 PM, Mark Rutland wrote:
+> > >On Tue, Feb 07, 2017 at 12:07:56PM -0700, Jeffrey Hugo wrote:
+> > >>On 2/7/2017 12:01 PM, Mark Rutland wrote:
+> > >>>I take it this is specific to the kdump properties?
+> > >>>
+> > >>>I can't immediately see what would matter for the !kdump case.
+> > >>>properties inserted under /chosen are not truncated?
+> > >>
+> > >>The kexec/kdump properties are added under /chosen, therefore yes,
+> > >>properties added under /chosen are truncated, per our observations.
+> > >
+> > >Sorry for the dodgy (and confusing) reply above.
+> > >
+> > >What I was trying to ask was does this *only* affect kdump properties?
+> > >I note that kdump is not yet upstream for arm64.
+> > >
+> > >Or are there regular kexec properties that this affects?
+> > >
+> > >Or !kdump && !kexec properties?
+> > >
+> > >Can you please enumerate the set of properties for which this matters?
+> > 
+> > "linux,elfcorehdr" and "linux,usable-memory-range"
+> > 
+> > We are not aware of !kdump && !kexec properties where this is an issue.
+> 
+> Ok, I understand the problem now. Thanks for clarifying the !kdump
+> situation.
+> 
+> As per my reply to Timur, given this only affects kdump, this is all
+> happening in code that is not upstream, and therefore this is not
+> *currently* an issue.
+> 
+> In future, please report this kind of issue in reply to relevant
+> postings (e.g. [1]). At the very least, refer to these, with relevant
+> people Cc'd (e.g. Takahiro-san in this case).
+> 
+> I think there are three things which should happen:
+> 
+> (a) The userspace kexec-tools kdump code should take /#address-cells and
+>     /#size-cells into account when inserting the linux,elfcorehdr and
+>     linux,usable-memory-range properties. There can be DTs for 64 bit
+>     platforms where these are not 2.
+>     
+>     Takahiro-san, from looking at your kexec-tools repo, this is not
+>     currently the case. Could you address that?
+
+Yup, I will, but if this is the case,
+we might need to think about another case where /#address-cells and /#size-cells
+are <1> but the range of crash dump kernel can be still 64-bit wide since
+the system memory information comes from ACPI table (not DT).
+
+Therefore, the properties in this case should look like:
+/ {
+    #address-cells = <1>;
+    #size-cells = <1>;
+    chosen {
+         ...
+         linux,usable-memory-range {
+             #address-cells = <2>;
+             #size-cells = <2>; may be omitted if possible
+             reg = < ... >;
+         }
+         linux,elfcorehdr {
+             #address-cells = <2>;
+             #size-cells = <2>; may be omitted if possible
+             reg = < ... >;
+         }
+         ...
+    }
+}
+
+Is this what you meant?
+(Obviously, I will have to modify the kernel patches as well.)
+
+Thanks,
+-Takahiro AKASHI
+
+
+> (b) The kdump documentation should updated to explicitly state that
+>     these properties are #address-cells + #size-cells tuples, since this
+>     is clearly going to be confusing either way. I'll try to come up
+>     with wording for that, and I'll reply on the current [1] kdump
+>     thread.
+> 
+> (c) Regardless, when creating the empty DT the EFI stub should insert
+>     /#address-cells = <2> and /#size-cells = <2>. That better aligns
+>     with the usual requirements for an otherwise empty DTB, and avoids a
+>     tonne of fragility when the DTB is passed on or altered by other
+>     agents.
+> 
+> So, please respin this patch, stating explicitly what this matters for.
+> 
+> Thanks,
+> Mark.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/486234.html 
