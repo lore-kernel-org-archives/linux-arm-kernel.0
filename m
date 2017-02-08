@@ -1,20 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 8 Feb 2017 17:01:07 -0600
-Subject: [PATCH V2 1/2] dt-bindings: add Asus Tinker board
-In-Reply-To: <1486347287-31051-2-git-send-email-eddie.cai@rock-chips.com>
-References: <1486347287-31051-1-git-send-email-eddie.cai@rock-chips.com>
- <1486347287-31051-2-git-send-email-eddie.cai@rock-chips.com>
-Message-ID: <20170208230107.e6cz2isoglw7iem2@rob-hp-laptop>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 8 Feb 2017 17:04:57 -0600
+Subject: [PATCH 1/2] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
+In-Reply-To: <6afb0a98-0973-33ec-0b76-fc6378e64309@codeaurora.org>
+References: <20170208005736.18724-1-cov@codeaurora.org>
+ <bd4a0127-0f32-a8be-c8ee-34c1cccc6d5d@codeaurora.org>
+ <6afb0a98-0973-33ec-0b76-fc6378e64309@codeaurora.org>
+Message-ID: <5e18324f-d09d-d652-df23-d4a3f8f053fd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2017 at 10:14:46AM +0800, Eddie Cai wrote:
-> Tinker board is a credit card size develop board designed by Asus.
-> Powered by RK3288.
-> 
-> Signed-off-by: Eddie Cai <eddie.cai@rock-chips.com>
-> ---
->  Documentation/devicetree/bindings/arm/rockchip.txt | 3 +++
->  1 file changed, 3 insertions(+)
+On 02/08/2017 04:22 PM, Christopher Covington wrote:
+>>> >> -    while (pl011_read(uap, REG_FR) & uap->vendor->fr_busy)
+>>> >> +    while ((pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr)
+>>> >> +                        & uap->vendor->fr_busy)
+>> >
+>> > I really think the XOR logic needs to be documented wherever it's
+>> > used. It's just too confusing.
+> References such as the following for basic bit operations like
+> setting, clearing, and toggling are easy enough to come by.
+>
+> http://stackoverflow.com/questions/47981/how-do-you-set-clear-and-toggle-a-single-bit-in-c-c
 
-Acked-by: Rob Herring <robh@kernel.org>
+I know what XOR does.  I was thinking a more high-level comment would be 
+appropriate.  With E44, we want to ignore the BUSY bit and use TXFE instead. 
+So was hoping to a comment that says that:
+
+/* Normally, we poll until BUSY=0, but E44 says we should poll until TXFE=1 
+instead. So with E44, we set fr_busy to TXFE, but we have to invert it. */
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
