@@ -1,52 +1,36 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 08 Feb 2017 11:45:39 -0800
-Subject: [PATCH 1/2] clk: scpi: RfC - Allow to ignore invalid SCPI DVFS
- clock rates
-In-Reply-To: <209248b8-2a1c-e00f-d8a8-b82759772b5d@arm.com> (Sudeep Holla's
- message of "Wed, 8 Feb 2017 11:23:47 +0000")
-References: <3b60654a-88b6-6262-396e-a058ade1c586@gmail.com>
- <d7b8f9db-7512-646c-bb96-ef74e7266661@gmail.com>
- <209248b8-2a1c-e00f-d8a8-b82759772b5d@arm.com>
-Message-ID: <m28tpgihzw.fsf@baylibre.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Wed, 8 Feb 2017 20:00:15 +0000
+Subject: [PATCH 4/4] clk: mvebu: Expand mv98dx3236-core-clock support
+References: <20170203034012.29399-1-chris.packham@alliedtelesis.co.nz>
+ <5a974d9d7260432087619486bf5d79ed@svr-chch-ex1.atlnz.lc>
+ <6149d4126a214ac8b0b0184bd818bea6@svr-chch-ex1.atlnz.lc>
+ <9294933.cXSW0amFbE@wuerfel>
+Message-ID: <aabc6853d7934507a4507b0ad4354b72@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sudeep Holla <sudeep.holla@arm.com> writes:
-
-> On 04/02/17 21:03, Heiner Kallweit wrote:
->> Introduce an optional property "clock-max-frequency" for SCPI DVFS
->> clocks. All frequencies for the respective clock exceeding this
->> threshold will be ignored.
->> 
->> This is useful on systems where the firmware offers too optimistic
->> clock rates causing instabilities and crashes.
->> 
+On 08/02/17 23:53, Arnd Bergmann wrote:
+> On Tuesday, February 7, 2017 3:07:37 AM CET Chris Packham wrote:
+>>>
+>>> Actually I wonder if I can try a bit harder to keep a system booting.
+>>> The following might work
+>>> 1) add the compatible strings to the existing armada clock drivers.
+>>> 2) update the dts to use the new compatible strings.
+>>> 3) add the new driver and remove the compatible strings from the armada
+>>> drivers.
+>>>
+>>> #1 would still upset checkpatch.pl because the documentation would only
+>>> arrive in #2.
+>>
+>> Actually upon testing #1 is unnecessary. I lose some of the gated clocks
+>> but nothing that prevents booting.
 >
-> It clearly means the firmware/hardware(IOW platform) was not tested
-> correctly before firmware advertised the OPPs. It needs to fixed in the
-> firmware. The approach should be advertise the known minimal set working
-> rather than the set for which hardware was designed.
+> Just to be sure: this means we can merge 2) and 3) independently and
+> having just one of them will not cause regressions over what we have
+> today?
 >
-> That's the whole reason while these are kept in firmware so the OS need
-> not worry about such details.
->
-> So NACK, go fix the firmware 
 
-Sorry, but "go fix the firmware" is not an option for most users of
-these boards.
+Correct. And that's what I sent out as v2.
 
-Even if the source were provided for the firwmare (it's not), it usually
-needs signing by the vendor, and we know how likely that will be
-provided by the vendors.
-
-Firmware will will always be buggy and/or broken and we will be stuck
-with it.  IMO, not allowing the kernel to work around broken
-firmwaretakes a very idealistic view of firmware, and is not based on
-historical reality with ARM SoC vendors.
-
-> or disable it completely and be happy with the boot frequency.
-
-That's an awful solution also, when we know that most of the frequencies
-work just fine.
-
-Kevin
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/486467.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/486471.html
