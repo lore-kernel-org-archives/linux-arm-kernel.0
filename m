@@ -1,27 +1,70 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 8 Feb 2017 15:55:08 -0600
-Subject: [PATCH 0/2] PCI: iproc: MPS fix and quirks
-In-Reply-To: <1485553449-9345-1-git-send-email-jon.mason@broadcom.com>
-References: <1485553449-9345-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <20170208215508.GA4800@bhelgaas-glaptop.roam.corp.google.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 8 Feb 2017 16:57:35 -0500
+Subject: [PATCH 1/2] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
+In-Reply-To: <f9504cde-a87a-ba99-2f72-fc3029ef5fe5@codeaurora.org>
+References: <20170208005736.18724-1-cov@codeaurora.org>
+ <7151be59-000c-d50b-f8f5-5fef0c053d91@arm.com>
+ <f9504cde-a87a-ba99-2f72-fc3029ef5fe5@codeaurora.org>
+Message-ID: <bd59cc0d-fcd6-aa7e-409f-1e363599b1a1@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 04:44:07PM -0500, Jon Mason wrote:
-> A patch that corrects an issue where the MPS could not be set, and
-> another that fixes some quirks in the PAXC
+Hi,
+
+On 02/08/2017 08:27 AM, Timur Tabi wrote:
+> Robin Murphy wrote:
+>> Is there a reason anyone would ever want to turn this off? AFAICS you
+>> save a few dozen bytes in return for a kernel image which you know won't
+>> work properly on some hardware. That doesn't seem particularly
+>> worthwhile, and it's not like the PL011 driver isn't already ripe with
+>> unconditional vendor-specific data.
+
+I'll make it unconditional in the next version.
+
+>>> > +static bool qdf2400_e44(void) {
+>>> > +    u32 cpu_var_model = read_cpuid_id() & ~MIDR_REVISION_MASK;
+>>> > +
+>>> > +    return (cpu_var_model == MIDR_QCOM_KRYO_V1 ||
+>>> > +        cpu_var_model == MIDR_QCOM_FALKOR_V1);
 > 
-> Jon Mason (2):
->   PCI: iproc: allow the MPS to be set
->   PCI: Add quirk entry for NS2 PAXC PCI
-> 
->  drivers/pci/host/pcie-iproc.c |  5 ++++-
->  drivers/pci/quirks.c          | 21 +++++++++++++++++++++
->  2 files changed, 25 insertions(+), 1 deletion(-)
+>> Are we to take it that every SoC now and always with any Kryo or Falkor
+>> core which also has an SBSA UART will require this workaround?
 
-Applied with Ray's ack to pci/host-iproc for v4.11, thanks!
+I should have matched full 32 bit MIDR values, but I masked off the revision
+number after careful investigation of current and future known MIDR values
+and system pairings because MIDR_FOO isn't actually a 32 bit MIDR value as
+the name would suggest but has variant and revision zeroed. The CPU in the
+QDF2432 has a non-zero revision number and I didn't want to try to add an
+unprecedented revision number to cputype.h after Will told me I wasn't
+allowed to play with CPU toys for SoC games.
 
-It looks to me like several other drivers need a similar MPS fix.
-I'll CC you on the patches.
+I'm going to stop using MIDR, but as an aside, there are two very different
+CPUs, which may require different CPU errata workarounds, that (by accident)
+only differ by the variant field. Robert Richter's recent MIDR_CPU_VAR_REV
+is a welcome clarification.
 
-Bjorn
+> No, only Kryo and Falkor V1 based SOCs have this problem. Falkor V2
+> will have this fixed.
+
+A year ago, we were operating under the incorrect-in-hindsight assumption
+that the QDF2400 v1 SoC with Falkor v1 CPU would have this fixed.
+
+As for alternative means of identifying the errant hardware, I think that I
+or a colleague will experiment with the approach used for ACPI PCI quirks:
+checking the OEM ID, OEM Table ID, and OEM Revision. In this case, those
+header fields would come from the Serial Port Console Redirection (SPCR)
+table, rather than the PCI-specific MCFG table.
+
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=5b69b85ba1ddd36be01f5c57830b37a3c8256009
+
+Regarding ongoing support, I don't see any disagreement that the code must
+be supported and maintained for the life of the hardware, however many years
+that ends up being.
+
+Thanks,
+Cov
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
+Aurora Forum, a Linux Foundation Collaborative Project.
