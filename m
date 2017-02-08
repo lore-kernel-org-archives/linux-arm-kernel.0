@@ -1,114 +1,64 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 8 Feb 2017 22:25:41 +0800
-Subject: [PATCH v3 3/3] ASoC: zx-i2s: introduce pclk for zx2967 family
-In-Reply-To: <1486522955-14528-3-git-send-email-baoyou.xie@linaro.org>
-References: <1486522955-14528-1-git-send-email-baoyou.xie@linaro.org>
- <1486522955-14528-3-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170208142539.GN3407@dragon>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 8 Feb 2017 14:30:46 +0000
+Subject: [PATCH V2 1/3] iommu/arm-smmu: Add pm_runtime/sleep ops
+In-Reply-To: <20170208135252.GF15459@leverpostej>
+References: <1486055420-19671-1-git-send-email-sricharan@codeaurora.org>
+ <1486055420-19671-2-git-send-email-sricharan@codeaurora.org>
+ <20170202174218.GO31394@leverpostej>
+ <017701d281f9$927c5fb0$b7751f10$@codeaurora.org>
+ <20170208114002.GD15459@leverpostej>
+ <018401d28207$34db60a0$9e9221e0$@codeaurora.org>
+ <b55359d8-2665-aef0-3215-53a0e8f21bcd@arm.com>
+ <000301d28211$a5233a90$ef69afb0$@codeaurora.org>
+ <20170208135252.GF15459@leverpostej>
+Message-ID: <db9bc01c-635d-1a57-8a6c-9be19a0cda16@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 11:02:35AM +0800, Baoyou Xie wrote:
-> The pclk is necessary for zx2967 I2S controller. the driver
-> currently doesn't handle it. This is something we need to fix.
+On 08/02/17 13:52, Mark Rutland wrote:
+> On Wed, Feb 08, 2017 at 07:15:37PM +0530, Sricharan wrote:
+>>> Clocks are not architectural, so it only makes sense to associate them
+>>> with an implementation-specific compatible string. There's also no
+>>
+>> ok, it for this the QCOM specific implementation binding is tried(going to).
+>>
+>>> guarantee that different microarchitectures have equivalent internal
+>>> clock domains - I'm not sure if "the SMMU's underlying bus access" is
+>>> meant to refer to accesses *by* the SMMU, i.e. page table walks,
+>>> accesses *through* the SMMU by upstream masters, or both
+>>
+>> In the above QCOM case, it is actually both. Its the same path for both the
+>> page table walker and upstream masters.
+
+Right, that's what I feared. As far as I can make out the current ARM
+implementations, transactions passing through will require at least
+TBUn_BCLK for the appropriate TBU, but would also need the page table
+walker clocked with CCLK to resolve TLB misses. But then the programming
+interface is also in the CCLK domain (not counting the incoming APB or
+AXI clock for the actual slave port itself). Thus this 'generic' clock
+binding already isn't compatible with MMU-40x/500.
+
+>>> differences are rather significant. I'd also note that an MMU-500
+>>> configuration may have up to *33* clocks.
+>>>
+>>> Either way, the QCOM implementation deserves its own compatible if only
+>>> for the sake of the imp-def gaps in the architecture (e.g. FSR.SS
+>>> behaviour WRT to IRQs as touched upon in the other thread).
+>>>
+>>
+>> Ok, slightly unclear, so you mean then *clocks* are not good enough reason
+>> to have a new compatible ?
 > 
-> In turn, the driver supports zx296718's I2S controller.
+> I beleive Robin's point was even if the clocks didn't matter, there are
+> other reasons we should have the QCOM-specific compatible string.
 > 
-> By the way, this patch also change the clock name from tx to wclk
-> to make it clear.
+> So we should have one regardless.
+
+Exactly.
+
+Robin.
+
 > 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> ---
->  sound/soc/zte/zx-i2s.c | 37 ++++++++++++++++++++++++++++---------
->  1 file changed, 28 insertions(+), 9 deletions(-)
-> 
-> diff --git a/sound/soc/zte/zx-i2s.c b/sound/soc/zte/zx-i2s.c
-> index ed7a56d..2d486ea 100644
-> --- a/sound/soc/zte/zx-i2s.c
-> +++ b/sound/soc/zte/zx-i2s.c
-> @@ -95,7 +95,7 @@
->  struct zx_i2s_info {
->  	struct snd_dmaengine_dai_dma_data	dma_playback;
->  	struct snd_dmaengine_dai_dma_data	dma_capture;
-> -	struct clk				*dai_clk;
-> +	struct clk				*dai_wclk, *dai_pclk;
-
-It's better to have them on two lines, I would say.
-
->  	void __iomem				*reg_base;
->  	int					master;
->  	resource_size_t				mapbase;
-> @@ -275,8 +275,9 @@ static int zx_i2s_hw_params(struct snd_pcm_substream *substream,
->  	writel_relaxed(val, i2s->reg_base + ZX_I2S_TIMING_CTRL);
->  
->  	if (i2s->master)
-> -		ret = clk_set_rate(i2s->dai_clk,
-> -				   params_rate(params) * ch_num * CLK_RAT);
-> +		ret = clk_set_rate(i2s->dai_wclk,
-> +				params_rate(params) * ch_num * CLK_RAT);
-> +
->  	return ret;
->  }
->  
-> @@ -328,8 +329,19 @@ static int zx_i2s_startup(struct snd_pcm_substream *substream,
->  			  struct snd_soc_dai *dai)
->  {
->  	struct zx_i2s_info *zx_i2s = dev_get_drvdata(dai->dev);
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(zx_i2s->dai_wclk);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = clk_prepare_enable(zx_i2s->dai_pclk);
-> +	if (ret) {
-> +		clk_disable_unprepare(zx_i2s->dai_wclk);
-> +		return ret;
-> +	}
->  
-> -	return clk_prepare_enable(zx_i2s->dai_clk);
-> +	return ret;
->  }
->  
->  static void zx_i2s_shutdown(struct snd_pcm_substream *substream,
-> @@ -337,7 +349,8 @@ static void zx_i2s_shutdown(struct snd_pcm_substream *substream,
->  {
->  	struct zx_i2s_info *zx_i2s = dev_get_drvdata(dai->dev);
->  
-> -	clk_disable_unprepare(zx_i2s->dai_clk);
-> +	clk_disable_unprepare(zx_i2s->dai_wclk);
-> +	clk_disable_unprepare(zx_i2s->dai_pclk);
->  }
->  
->  static struct snd_soc_dai_ops zx_i2s_dai_ops = {
-> @@ -381,10 +394,16 @@ static int zx_i2s_probe(struct platform_device *pdev)
->  	if (!zx_i2s)
->  		return -ENOMEM;
->  
-> -	zx_i2s->dai_clk = devm_clk_get(&pdev->dev, "tx");
-> -	if (IS_ERR(zx_i2s->dai_clk)) {
-> -		dev_err(&pdev->dev, "Fail to get clk\n");
-> -		return PTR_ERR(zx_i2s->dai_clk);
-> +	zx_i2s->dai_wclk = devm_clk_get(&pdev->dev, "wclk");
-> +	if (IS_ERR(zx_i2s->dai_wclk)) {
-> +		dev_err(&pdev->dev, "Fail to get wclk\n");
-> +		return PTR_ERR(zx_i2s->dai_wclk);
-> +	}
-> +
-> +	zx_i2s->dai_pclk = devm_clk_get(&pdev->dev, "pclk");
-> +	if (IS_ERR(zx_i2s->dai_pclk)) {
-> +		dev_info(&pdev->dev, "have no pclk\n");
-> +		zx_i2s->dai_pclk = NULL;
-
-The 'pclk' is actually required instead of optional.  Since we haven't
-got any in-tree DTB with I2S device yet, there is no DT compatibility to
-maintain.  So it should be good to make 'pclk' required right now.
-
-Shawn
-
->  	}
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -- 
-> 2.7.4
+> Thanks,
+> Mark.
 > 
