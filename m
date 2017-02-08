@@ -1,110 +1,96 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Wed,  8 Feb 2017 12:43:13 +0100
-Subject: [RFC v2 00/19] vITS save/restore
-Message-ID: <1486554212-2774-1-git-send-email-eric.auger@redhat.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 8 Feb 2017 11:46:15 +0000
+Subject: [PATCH v3 0/7] Pad retentions support for Exynos5433
+In-Reply-To: <1485779908-32147-1-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170130123837eucas1p13c607f81a1775a805740dccc87fe8b87@eucas1p1.samsung.com>
+ <1485779908-32147-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170208114615.c4wszjmnuackgzvx@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series specifies and implements an API aimed at saving and restoring
-the state of the in-kernel emulated ITS device.
+On Mon, 30 Jan 2017, Marek Szyprowski wrote:
 
-The ITS is programmed through registers and tables. Those latter
-are allocated by the guest. Their base address is programmed in
-registers or table entries before the ITS is enabled.
+> Hello,
+> 
+> This patchset is a first step to add support for all power domains on
+> Exynos5433 SoCs. This patchset contains patches for Exynos pin control
+> driver and Exynos LPASS MFD driver, which are needed to make the
+> platform ready for adding power domains support.
+> 
+> Patches in this patchset depends on each other. They are order in such a
+> way to make the changes bisectable.
+> 
+> Patch #2 has compile dependency on #1.
+> Patch #3 has runtime dependency on commit fa59aa70907b2 ("soc: samsung:
+> 	pmu: Add dummy support for Exynos5433 SoC",
+> 	for-v4.11/drivers-soc-exynos-pmu-the-joy-never-ends branch).
+> Patch #4 has runtime dependency on #3.
+> Patch #5 has runtime dependency on commit 7547162ac3514 ("arm64: dts:
+> 	exynos: Add clocks to Exynos5433 LPASS module, next/dt64 branch).
+> 
+> This patchset also directly depends on the "Move pad retention control to
+> Exynos pin controller driver" patchset:
+> https://www.spinics.net/lists/arm-kernel/msg556074.html
+> 
+> Patches have been generated on top of linux-next from 30th January 2017
+> with the above mentioned patchset applied.
+> 
+> This is a part of a larger task, which goal is to add support for power
+> domains on Exynos5433 SoCs / TM2 boards. First version of the all patches
+> needed to get it working have been pushed to the following git repo:
+> https://git.linaro.org/people/marek.szyprowski/linux-srpol.git v4.10-next-tm2-pd
+> 
+> Best regards
+> Marek Szyprowski
+> Samsung R&D Institute Poland
 
-The ITS is free to use some of them to flush its internal caches. This
-is likely to be used when entering low power state.
+Looks like I reviewed v2.
 
-Therefore, for save/restore use case, it looks natural to use this
-guest RAM allocated space to save the table related data. However,
-currently, The ITS in-kernel emulated device does not use all of those
-tables and for those it uses, it does not always sync them with its
-cached data. Additional sync must happen for:
-- the collection table
-- the device table
-- the per-device translation tables
-- the LPI pending tables.
+If the patches haven't changed that much, please apply my Acks to this
+set instead.  Anything that has changed, please leave them off and
+repost.
 
-The LPI configation table and the command queues do not need extra
-syncs.
-
-An alternative to flushing the tables into guest RAM could have been
-to flush them into a separate user-space buffer. However the drawback
-of this alternative is that the virtualizer would allocate dedicated
-buffers to store the data that should normally be laid out in guest
-RAM. It would also be obliged to re-compute their size from
-register/table content.
-
-So saving the tables in guest RAM better fit the ITS programming
-model and optimizes the memory usage. The drawback of this solution
-is it brings additional challenges at user-space level to make sure
-the guest RAM is frozen after table sync.
-
-The series applies on top of Vijaya's series:
-- [PATCH v11 0/8] arm/arm64: vgic: Implement API for vGICv3 live
-  migration
-  https://www.spinics.net/lists/arm-kernel/msg558046.html
-
-Best Regards
-
-Eric
-
-Git: complete series available at
-https://github.com/eauger/linux/tree/kvmarm-queue-vgic-mig-v11-its-rfcv2
-
-applied on kvmarm queue.
-
-* Testing:
-- on Cavium ThunderX using a virtio-net-pci guest (x3 vNIC),
-  virsh save/restore commands and virt-manager live migration.
-  Tested with 1 and 2 stage device table.
-
-History:
-
-v1 -> v2:
-- rebased on Vijaya's v11
-- all entries now are 8 byte large
-- devid/eventid indexing for device table and ITT
-- support 2 stage device table
-- common infra to read indexed tables
-- add cpu <-> le64 conversions
-- itte renamed into ite
-- do not care anymore about pending table 1st KB
-  (not needed at the moment for coarse mapping)
-
-RFC v1
-- creation
-
-
-Eric Auger (19):
-  KVM: arm/arm64: Add vITS save/restore API documentation
-  KVM: arm/arm64: rename itte into ite
-  arm/arm64: vgic: turn vgic_find_mmio_region into public
-  KVM: arm64: ITS: KVM_DEV_ARM_VGIC_GRP_ITS_REGS group
-  KVM: arm64: ITS: Implement vgic_its_has_attr_regs and attr_regs_access
-  KVM: arm64: ITS: Implement vgic_mmio_uaccess_write_its_creadr
-  KVM: arm64: ITS: Report the ITE size in GITS_TYPER
-  KVM: arm64: ITS: Interpret MAPD Size field and check related errors
-  KVM: arm64: ITS: Interpret MAPD ITT_addr field
-  KVM: arm64: ITS: Check the device id matches TYPER DEVBITS range
-  KVM: arm64: ITS: KVM_DEV_ARM_VGIC_GRP_ITS_TABLES group
-  KVM: arm64: ITS: vgic_its_alloc_ite/device
-  KVM: arm64: ITS: Sort the device and ITE lists
-  KVM: arm64: ITS: Add infrastructure for table lookup
-  KVM: arm64: ITS: Collection table save/restore
-  KVM: arm64: ITS: vgic_its_check_id returns the entry's GPA
-  KVM: arm64: ITS: ITT flush and restore
-  KVM: arm64: ITS: Device table save/restore
-  KVM: arm64: ITS: Pending table save/restore
-
- Documentation/virtual/kvm/devices/arm-vgic-its.txt |   78 ++
- arch/arm/include/uapi/asm/kvm.h                    |    2 +
- arch/arm64/include/uapi/asm/kvm.h                  |    2 +
- include/linux/irqchip/arm-gic-v3.h                 |    3 +
- virt/kvm/arm/vgic/vgic-its.c                       | 1031 ++++++++++++++++++--
- virt/kvm/arm/vgic/vgic-mmio.c                      |    3 +-
- virt/kvm/arm/vgic/vgic-mmio.h                      |   14 +-
- 7 files changed, 1022 insertions(+), 111 deletions(-)
+> Changelog:
+> v3:
+> - moved adding new PMU register defines to separate patch (requested by
+>   Krzysztof Kozlowski)
+> - rebased onto Linux next-20170130 (removed "soc: samsung: pmu: Add dummy
+>   support for Exynos5433 SoC" and "arm64: dts: exynos: Add clocks to
+>   Exynos5433 LPASS module" patches, which are already merged)
+> 
+> v2:
+> - fixed issues pointed by Krzysztof Kozlowski:
+>   1. added more checks to Exynos PMU driver for NULL drvdata
+>   2. reused EXYNOS_WAKEUP_FROM_LOWPWR in retention data for Exynos5433
+>   3. converted lpass driver to devm_clk_get
+>   4. added missing ->remove callback to lpass driver
+> 
+> v1: https://lkml.org/lkml/2017/1/25/214
+> - initial version
+> 
+> 
+> Patch summary:
+> 
+> Marek Szyprowski (7):
+>   soc: smasung: pmu: Add register defines for pad retention control
+>   pinctrl: samsung: Ensure that pad retention is disabled on driver init
+>   pinctrl: samsung: Add support for pad retention control for Exynos5433
+>     SoCs
+>   mfd: exynos-lpass: Remove pad retention control
+>   mfd: exynos-lpass: Add support for clocks
+>   mfd: exynos-lpass: Add missing remove() function
+>   mfd: exynos-lpass: Add runtime PM support
+> 
+>  .../bindings/mfd/samsung,exynos5433-lpass.txt      |  8 ++-
+>  drivers/mfd/exynos-lpass.c                         | 48 ++++++++++-------
+>  drivers/pinctrl/samsung/pinctrl-exynos.c           | 63 ++++++++++++++++++++++
+>  include/linux/mfd/syscon/exynos5-pmu.h             |  3 --
+>  include/linux/soc/samsung/exynos-regs-pmu.h        | 16 ++++++
+>  5 files changed, 115 insertions(+), 23 deletions(-)
+> 
 
 -- 
-2.5.5
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
