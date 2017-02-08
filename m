@@ -1,296 +1,86 @@
-From: yuantian.tang@nxp.com (yuantian.tang at nxp.com)
-Date: Wed, 8 Feb 2017 13:43:05 +0800
-Subject: [PATCH 2/2 v2] cpufreq: qoriq: Don't look at clock implementation
- details
-In-Reply-To: <1486532585-36463-1-git-send-email-yuantian.tang@nxp.com>
-References: <1486532585-36463-1-git-send-email-yuantian.tang@nxp.com>
-Message-ID: <1486532585-36463-2-git-send-email-yuantian.tang@nxp.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Wed, 8 Feb 2017 12:07:23 +0530
+Subject: [PATCH v2 2/5] async_tx: Handle DMA devices having support for
+ fewer PQ coefficients
+In-Reply-To: <20170207164207.GI19244@localhost>
+References: <1486455406-11202-1-git-send-email-anup.patel@broadcom.com>
+ <1486455406-11202-3-git-send-email-anup.patel@broadcom.com>
+ <CAPcyv4gbV1yf52JrejW+Dn3wOPn7Er+8HWdu2qsW0+Qm+cRr9g@mail.gmail.com>
+ <CAALAos_yhXufdt79KWY0eugjF5oyJ8+NcPh2E-dEXnSQu2WhhA@mail.gmail.com>
+ <20170207164207.GI19244@localhost>
+Message-ID: <CAALAos__1XVv-=CitWfWLsXUt7nYC5bN6qaVUBWY7fiLA1UtGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tang Yuantian <Yuantian.Tang@nxp.com>
+On Tue, Feb 7, 2017 at 10:12 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Tue, Feb 07, 2017 at 02:32:15PM +0530, Anup Patel wrote:
+>> On Tue, Feb 7, 2017 at 1:57 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+>> > On Tue, Feb 7, 2017 at 12:16 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+>> >> The DMAENGINE framework assumes that if PQ offload is supported by a
+>> >> DMA device then all 256 PQ coefficients are supported. This assumption
+>> >> does not hold anymore because we now have BCM-SBA-RAID offload engine
+>> >> which supports PQ offload with limited number of PQ coefficients.
+>> >>
+>> >> This patch extends async_tx APIs to handle DMA devices with support
+>> >> for fewer PQ coefficients.
+>> >>
+>> >> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>> >> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>> >
+>> > I don't like this approach. Define an interface for md to query the
+>> > offload engine once at the beginning of time. We should not be adding
+>> > any new extensions to async_tx.
+>>
+>> Even if we do capability checks in Linux MD, we still need a way
+>> for DMAENGINE drivers to advertise number of PQ coefficients
+>> handled by the HW.
+>
+> If the question is only for advertising caps, then why not do as done
+> for dma_get_slave_caps(). you can add dma_get_pq_caps() so that clients (md)
+> in this case would know the HW capability.
 
-Get the CPU clock's potential parent clocks from the clock interface
-itself, rather than manually parsing the clocks property to find a
-phandle, looking at the clock-names property of that, and assuming that
-those are valid parent clocks for the cpu clock.
+We have large number of possible capabilities for
+DMA slave such as src_addr_widths, dst_addr_widths,
+directions, max_burst, residue_granularity, and
+descriptor_resue.
 
-This is necessary now that the clocks are generated based on the clock
-driver's knowledge of the chip rather than a fragile device-tree
-description of the mux options.
+The possible capabilities of PQ offload are:
+1. Number of PQ sources handled by PQ offload
+(Represented by "max_pq" member of "struct dma_device")
+2. Number of PQ coefficients handled by PQ offload
 
-We can now rely on the clock driver to ensure that the mux only exposes
-options that are valid.  The cpufreq driver was currently being overly
-conservative in some cases -- for example, the "min_cpufreq =
-get_bus_freq()" restriction only applies to chips with erratum
-A-004510, and whether the freq_mask used on p5020 is needed depends on
-the actual frequencies of the PLLs (FWIW, p5040 has a similar
-limitation but its .freq_mask was zero) -- and the frequency mask
-mechanism made assumptions about particular parent clock indices that
-are no longer valid.
+The above two PQ capabilities are good enough for
+current PQ HW and future PQ HW so we just need a
+way to specify number of PQ coefficients.
 
-Signed-off-by: Scott Wood <scottwood@nxp.com>
-Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
----
-v2:
-  - added more soc compatible strings
+Till now all of the PQ HW always supported all 256
+PQ coefficients so we never felt the need of capability
+to specify PQ coefficients. The BCM-SBA-RAID is the
+only HW (as far as I know) which does not support all
+256 PQ coefficients.
 
- drivers/cpufreq/qoriq-cpufreq.c | 145 +++++++++++++---------------------------
- 1 file changed, 48 insertions(+), 97 deletions(-)
+Currently, DMAENGINE drivers use dma_set_maxpq() to
+specify number of PQ sources handled by PQ HW and
+Linux Async Tx uses dma_maxpq() to get number of
+PQ sources.
 
-diff --git a/drivers/cpufreq/qoriq-cpufreq.c b/drivers/cpufreq/qoriq-cpufreq.c
-index 53d8c3f..eee83c1 100644
---- a/drivers/cpufreq/qoriq-cpufreq.c
-+++ b/drivers/cpufreq/qoriq-cpufreq.c
-@@ -11,6 +11,7 @@
- #define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
- 
- #include <linux/clk.h>
-+#include <linux/clk-provider.h>
- #include <linux/cpufreq.h>
- #include <linux/cpu_cooling.h>
- #include <linux/errno.h>
-@@ -37,53 +38,20 @@ struct cpu_data {
- 	struct thermal_cooling_device *cdev;
- };
- 
-+/*
-+ * Don't use cpufreq on this SoC -- used when the SoC would have otherwise
-+ * matched a more generic compatible.
-+ */
-+#define SOC_BLACKLIST		1
-+
- /**
-  * struct soc_data - SoC specific data
-- * @freq_mask: mask the disallowed frequencies
-- * @flag: unique flags
-+ * @flags: SOC_xxx
-  */
- struct soc_data {
--	u32 freq_mask[4];
--	u32 flag;
--};
--
--#define FREQ_MASK	1
--/* see hardware specification for the allowed frqeuencies */
--static const struct soc_data sdata[] = {
--	{ /* used by p2041 and p3041 */
--		.freq_mask = {0x8, 0x8, 0x2, 0x2},
--		.flag = FREQ_MASK,
--	},
--	{ /* used by p5020 */
--		.freq_mask = {0x8, 0x2},
--		.flag = FREQ_MASK,
--	},
--	{ /* used by p4080, p5040 */
--		.freq_mask = {0},
--		.flag = 0,
--	},
-+	u32 flags;
- };
- 
--/*
-- * the minimum allowed core frequency, in Hz
-- * for chassis v1.0, >= platform frequency
-- * for chassis v2.0, >= platform frequency / 2
-- */
--static u32 min_cpufreq;
--static const u32 *fmask;
--
--#if defined(CONFIG_ARM)
--static int get_cpu_physical_id(int cpu)
--{
--	return topology_core_id(cpu);
--}
--#else
--static int get_cpu_physical_id(int cpu)
--{
--	return get_hard_smp_processor_id(cpu);
--}
--#endif
--
- static u32 get_bus_freq(void)
- {
- 	struct device_node *soc;
-@@ -101,9 +69,10 @@ static u32 get_bus_freq(void)
- 	return sysfreq;
- }
- 
--static struct device_node *cpu_to_clk_node(int cpu)
-+static struct clk *cpu_to_clk(int cpu)
- {
--	struct device_node *np, *clk_np;
-+	struct device_node *np;
-+	struct clk *clk;
- 
- 	if (!cpu_present(cpu))
- 		return NULL;
-@@ -112,37 +81,28 @@ static struct device_node *cpu_to_clk_node(int cpu)
- 	if (!np)
- 		return NULL;
- 
--	clk_np = of_parse_phandle(np, "clocks", 0);
--	if (!clk_np)
--		return NULL;
--
-+	clk = of_clk_get(np, 0);
- 	of_node_put(np);
--
--	return clk_np;
-+	return clk;
- }
- 
- /* traverse cpu nodes to get cpu mask of sharing clock wire */
- static void set_affected_cpus(struct cpufreq_policy *policy)
- {
--	struct device_node *np, *clk_np;
- 	struct cpumask *dstp = policy->cpus;
-+	struct clk *clk;
- 	int i;
- 
--	np = cpu_to_clk_node(policy->cpu);
--	if (!np)
--		return;
--
- 	for_each_present_cpu(i) {
--		clk_np = cpu_to_clk_node(i);
--		if (!clk_np)
-+		clk = cpu_to_clk(i);
-+		if (IS_ERR(clk)) {
-+			pr_err("%s: no clock for cpu %d\n", __func__, i);
- 			continue;
-+		}
- 
--		if (clk_np == np)
-+		if (clk_is_match(policy->clk, clk))
- 			cpumask_set_cpu(i, dstp);
--
--		of_node_put(clk_np);
- 	}
--	of_node_put(np);
- }
- 
- /* reduce the duplicated frequencies in frequency table */
-@@ -200,8 +160,9 @@ static int qoriq_cpufreq_cpu_init(struct cpufreq_policy *policy)
- {
- 	struct device_node *np, *pnode;
- 	int i, count, ret;
--	u32 freq, mask;
-+	u32 freq;
- 	struct clk *clk;
-+	const struct clk_hw *hwclk;
- 	struct cpufreq_frequency_table *table;
- 	struct cpu_data *data;
- 	unsigned int cpu = policy->cpu;
-@@ -221,17 +182,13 @@ static int qoriq_cpufreq_cpu_init(struct cpufreq_policy *policy)
- 		goto err_nomem2;
- 	}
- 
--	pnode = of_parse_phandle(np, "clocks", 0);
--	if (!pnode) {
--		pr_err("%s: could not get clock information\n", __func__);
--		goto err_nomem2;
--	}
-+	hwclk = __clk_get_hw(policy->clk);
-+	count = clk_hw_get_num_parents(hwclk);
- 
--	count = of_property_count_strings(pnode, "clock-names");
- 	data->pclk = kcalloc(count, sizeof(struct clk *), GFP_KERNEL);
- 	if (!data->pclk) {
- 		pr_err("%s: no memory\n", __func__);
--		goto err_node;
-+		goto err_nomem2;
- 	}
- 
- 	table = kcalloc(count + 1, sizeof(*table), GFP_KERNEL);
-@@ -240,23 +197,11 @@ static int qoriq_cpufreq_cpu_init(struct cpufreq_policy *policy)
- 		goto err_pclk;
- 	}
- 
--	if (fmask)
--		mask = fmask[get_cpu_physical_id(cpu)];
--	else
--		mask = 0x0;
--
- 	for (i = 0; i < count; i++) {
--		clk = of_clk_get(pnode, i);
-+		clk = clk_hw_get_parent_by_index(hwclk, i)->clk;
- 		data->pclk[i] = clk;
- 		freq = clk_get_rate(clk);
--		/*
--		 * the clock is valid if its frequency is not masked
--		 * and large than minimum allowed frequency.
--		 */
--		if (freq < min_cpufreq || (mask & (1 << i)))
--			table[i].frequency = CPUFREQ_ENTRY_INVALID;
--		else
--			table[i].frequency = freq / 1000;
-+		table[i].frequency = freq / 1000;
- 		table[i].driver_data = i;
- 	}
- 	freq_table_redup(table, count);
-@@ -290,10 +235,7 @@ static int qoriq_cpufreq_cpu_init(struct cpufreq_policy *policy)
- 	kfree(table);
- err_pclk:
- 	kfree(data->pclk);
--err_node:
--	of_node_put(pnode);
- err_nomem2:
--	policy->driver_data = NULL;
- 	kfree(data);
- err_np:
- 	of_node_put(np);
-@@ -357,12 +299,25 @@ static struct cpufreq_driver qoriq_cpufreq_driver = {
- 	.attr		= cpufreq_generic_attr,
- };
- 
-+static const struct soc_data blacklist = {
-+	.flags = SOC_BLACKLIST,
-+};
-+
- static const struct of_device_id node_matches[] __initconst = {
--	{ .compatible = "fsl,p2041-clockgen", .data = &sdata[0], },
--	{ .compatible = "fsl,p3041-clockgen", .data = &sdata[0], },
--	{ .compatible = "fsl,p5020-clockgen", .data = &sdata[1], },
--	{ .compatible = "fsl,p4080-clockgen", .data = &sdata[2], },
--	{ .compatible = "fsl,p5040-clockgen", .data = &sdata[2], },
-+	/* e6500 cannot use cpufreq due to erratum A-008083 */
-+	{ .compatible = "fsl,b4420-clockgen", &blacklist },
-+	{ .compatible = "fsl,b4860-clockgen", &blacklist },
-+	{ .compatible = "fsl,t2080-clockgen", &blacklist },
-+	{ .compatible = "fsl,t4240-clockgen", &blacklist },
-+
-+	{ .compatible = "fsl,ls1012a-clockgen", },
-+	{ .compatible = "fsl,ls1021a-clockgen", },
-+	{ .compatible = "fsl,ls1043a-clockgen", },
-+	{ .compatible = "fsl,ls1046a-clockgen", },
-+	{ .compatible = "fsl,ls1088a-clockgen", },
-+	{ .compatible = "fsl,ls2080a-clockgen", },
-+	{ .compatible = "fsl,p4080-clockgen", },
-+	{ .compatible = "fsl,qoriq-clockgen-1.0", },
- 	{ .compatible = "fsl,qoriq-clockgen-2.0", },
- 	{}
- };
-@@ -380,16 +335,12 @@ static int __init qoriq_cpufreq_init(void)
- 
- 	match = of_match_node(node_matches, np);
- 	data = match->data;
--	if (data) {
--		if (data->flag)
--			fmask = data->freq_mask;
--		min_cpufreq = get_bus_freq();
--	} else {
--		min_cpufreq = get_bus_freq() / 2;
--	}
- 
- 	of_node_put(np);
- 
-+	if (data && data->flags & SOC_BLACKLIST)
-+		return -ENODEV;
-+
- 	ret = cpufreq_register_driver(&qoriq_cpufreq_driver);
- 	if (!ret)
- 		pr_info("Freescale QorIQ CPU frequency scaling driver\n");
--- 
-2.1.0.27.g96db324
+On similar lines, we added dma_set_maxpqcoef() to
+specify number of PQ coefficients and Linux Async Tx
+uses dma_maxpqcoef() to get number of PQ coefficients.
+If DMAENGINE driver does not specify PQ coefficients
+then dma_maxpqcoef() will return 256 assuming all
+PQ coefficients are supported. This approach is
+backward compatible to existing DMAENGINE APIs
+and will not break existing DMAENGINE drivers.
+
+If we add dma_get_pq_caps() similar to the
+dma_get_slave_caps() for PQ capabilities then we
+will have to use this new method for both of the above
+PQ capabilities and we have to change all DMAENGINE
+drivers to use new method of specifying PQ capabilities.
+I think this is too intrusive and bit overkill because its
+very very unlikely to see anymore additions to
+PQ capabilities.
+
+Regards,
+Anup
