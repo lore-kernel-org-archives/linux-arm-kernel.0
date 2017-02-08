@@ -1,35 +1,36 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Feb 2017 23:42:35 +0000
-Subject: [PATCH v3 21/24] media: imx: Add MIPI CSI-2 Receiver subdev driver
-In-Reply-To: <ca0a2eb3-21b6-d312-c8e0-61da48c4c700@gmail.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-22-git-send-email-steve_longerbeam@mentor.com>
- <1486036237.2289.37.camel@pengutronix.de>
- <ca0a2eb3-21b6-d312-c8e0-61da48c4c700@gmail.com>
-Message-ID: <20170208234235.GA27312@n2100.armlinux.org.uk>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Wed,  8 Feb 2017 18:43:23 -0500
+Subject: [PATCH v2] MAINTAINERS: Add Jon Mason to BCM5301X maintainers
+Message-ID: <1486597403-9607-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 03:23:53PM -0800, Steve Longerbeam wrote:
-> >Actually, this exact function already exists as dw_mipi_dsi_phy_write in
-> >drivers/gpu/drm/rockchip/dw-mipi-dsi.c, and it looks like the D-PHY
-> >register 0x44 might contain a field called HSFREQRANGE_SEL.
-> 
-> Thanks for pointing out drivers/gpu/drm/rockchip/dw-mipi-dsi.c.
-> It's clear from that driver that there probably needs to be a fuller
-> treatment of the D-PHY programming here, but I don't know where
-> to find the MIPI CSI-2 D-PHY documentation for the i.MX6. The code
-> in imxcsi2_reset() was also pulled from FSL, and that's all I really have
-> to go on for the D-PHY programming. I assume the D-PHY is also a
-> Synopsys core, like the host controller, but the i.MX6 manual doesn't
-> cover it.
+Adding myself as a maintainer for Broadcom Northstar SoCs.  Also, adding
+a regex entry to discover the SVK DTs already present.
 
-Why exactly?  What problems are you seeing that would necessitate a
-more detailed programming of the D-PHY?  From my testing, I can wind
-a 2-lane MIPI bus on iMX6D from 912Mbps per lane down to (eg) 308Mbps
-per lane with your existing code without any issues.
+Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+---
+ MAINTAINERS | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 2abda6c..70f4b62 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2641,12 +2641,14 @@ F:	arch/mips/include/asm/mach-bcm47xx/*
+ BROADCOM BCM5301X ARM ARCHITECTURE
+ M:	Hauke Mehrtens <hauke@hauke-m.de>
+ M:	Rafa? Mi?ecki <zajec5@gmail.com>
++M:	Jon Mason <jonmason@broadcom.com>
+ M:	bcm-kernel-feedback-list at broadcom.com
+ L:	linux-arm-kernel at lists.infradead.org
+ S:	Maintained
+ F:	arch/arm/mach-bcm/bcm_5301x.c
+ F:	arch/arm/boot/dts/bcm5301x*.dtsi
+ F:	arch/arm/boot/dts/bcm470*
++F:	arch/arm/boot/dts/bcm953012*
+ 
+ BROADCOM BCM53573 ARM ARCHITECTURE
+ M:	Rafa? Mi?ecki <rafal@milecki.pl>
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
