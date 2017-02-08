@@ -1,35 +1,43 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Wed,  8 Feb 2017 15:37:12 -0500
-Subject: [PATCH 2/2] ARM: dts: BCM5301X: Fix memory start address
-In-Reply-To: <1486586232-6695-1-git-send-email-jon.mason@broadcom.com>
-References: <1486586232-6695-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1486586232-6695-3-git-send-email-jon.mason@broadcom.com>
+From: flatmax@flatmax.org (Matt Flax)
+Date: Thu, 9 Feb 2017 07:41:49 +1100
+Subject: [alsa-devel] [PATCH] ASoC: bcm2835: Add 8 channel (multitrack)
+ capability
+In-Reply-To: <20170208182835.6hpwcxiae2lh56d5@sirena.org.uk>
+References: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
+ <20170208182835.6hpwcxiae2lh56d5@sirena.org.uk>
+Message-ID: <21a531f2-4efb-fd92-b709-90f97ec73a92@flatmax.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Memory starts at 0x80000000, not 0.  0 "works" due to mirrior of the
-first 128M of RAM to that address.  Anything greater than 128M will
-quickly find nothing there.  Correcting the starting address has
-everything working again.
 
-Signed-off-by: Jon Mason <jon.mason@broadcom.com>
-Fixes: 7eb05f6d ("ARM: dts: bcm5301x: Add BCM SVK DT files")
----
- arch/arm/boot/dts/bcm953012k.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 09/02/17 05:28, Mark Brown wrote:
+> On Tue, Feb 07, 2017 at 10:09:36AM +1100, Matt Flax wrote:
+>
+>>   	case SND_SOC_DAIFMT_CBS_CFM:
+>>   		clk_set_rate(dev->clk, sampling_rate * bclk_ratio);
+>> +	case SND_SOC_DAIFMT_CBM_CFS:
+> Is this fall through deliberate?
+>
+>> +	/* Default data delay to 1 bit.
+>> +	   In I2S mode, we must have 2 channels */
+>>   	switch (dev->fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
+>>   	case SND_SOC_DAIFMT_I2S:
+>> +		if (params_channels(params) != 2)
+>> +			return -EINVAL;
+>> +	case SND_SOC_DAIFMT_DSP_A:
+>> +	case SND_SOC_DAIFMT_DSP_B:
+>>   		data_delay = 1;
+>>   		break;
+>>   	default:
+> Same here.  This is also buggy in that it treats DSP A and DSP B
+> identically, they are different so the configuration must be incorrect
+> for one of them.  I suspect this is configuring for DSP A.
+I can remove DSP_B. In actual fact this isn't the real problem.
+> You should also really have a setup() function that imposes a channel
+> constraint when in I2S mode, wm8988 is one example here.
+>
+I had a look at wm8988.c and couldn't see this channel constraint 
+linking to I2S. Can you point me to it ?
 
-diff --git a/arch/arm/boot/dts/bcm953012k.dts b/arch/arm/boot/dts/bcm953012k.dts
-index da5aa8f..ae31a58 100644
---- a/arch/arm/boot/dts/bcm953012k.dts
-+++ b/arch/arm/boot/dts/bcm953012k.dts
-@@ -48,7 +48,7 @@
- 	};
- 
- 	memory {
--		reg = <0x00000000 0x10000000>;
-+		reg = <0x80000000 0x10000000>;
- 	};
- };
- 
--- 
-2.7.4
+thanks
+Matt
