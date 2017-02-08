@@ -1,26 +1,53 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 8 Feb 2017 17:59:47 +0100
-Subject: [GIT PULL] arch timer updates for v4.11
-In-Reply-To: <1486399662-17601-1-git-send-email-mark.rutland@arm.com>
-References: <1486399662-17601-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170208165947.GA12695@mai>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 8 Feb 2017 17:03:05 +0000
+Subject: [PATCH v3 06/10] arm64: efi: add EFI stub
+In-Reply-To: <73a460e5-98f5-86c2-142f-a9a084ee0203@codeaurora.org>
+References: <1396637113-22790-1-git-send-email-leif.lindholm@linaro.org>
+ <1396637113-22790-7-git-send-email-leif.lindholm@linaro.org>
+ <CAOZdJXWU1dmFfCc88RMp3SvouU7roDiJsA=3aHzwijwhMH7naA@mail.gmail.com>
+ <E4BDBC23-A96A-4D84-B7EE-B7967D4E4DDD@linaro.org>
+ <73a460e5-98f5-86c2-142f-a9a084ee0203@codeaurora.org>
+Message-ID: <20170208170305.GI15459@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2017 at 04:47:38PM +0000, Mark Rutland wrote:
-> Hi Daniel,
+On Wed, Feb 08, 2017 at 10:35:02AM -0600, Timur Tabi wrote:
+> On 02/08/2017 10:29 AM, Ard Biesheuvel wrote:
+> >>>>> +       status = handle_cmdline_files(sys_table, image, cmdline_ptr,
+> >>>>> +                                     "initrd=", dram_base + SZ_512M,
+> >>>>> +                                     (unsigned long *)&initrd_addr,
+> >>>>> +                                     (unsigned long *)&initrd_size);
+> >>>
+> >>> So I know this patch is almost three years old, but why is there a
+> >>> 512M limit on the initrd size?
+> >>>
+> >How do you reckon this constitutes a limit?
 > 
-> These are the arch timer updates for v4.11. I wasn't sure if you wanted
-> to pull these or pick them, so I'm sending the full series with all
-> relevant tags folded in.
-> 
-> I'll send the arm64 documentation and the dts updates separately via
-> arm64 and arm-soc respectively.
+> handle_cmdline_files() calls efi_high_alloc() with that limit.  I'm
+> still trying to understand all the details myself, but apparently
+> our firmware and initrd need to fit within the first 512MB because
+> of dram_base + SZ_512M. When we change "dram_base + SZ_512M" to
+> "~0", everything works.
 
-Hi Mark,
+Just to check, how big is that initrd?
 
-I will take the patches through my tree.
+I guess it's possible that there simply isn't sufficient contiguous free
+memory in that range, even if the initrd isn't that large. Can you share
+the EFI memory map dump from booting with efi=debug?
 
-Thanks.
+We originally needed to restrict this to ensure that the kernel could
+map the initrd (and I think the 512M restriction specifically was
+inherited from the DTB mapping restriction). Since then, we have relaxed
+things in the kernel, and today Documentation/arm64/booting.txt says:
 
-  -- Daniel 
+	If an initrd/initramfs is passed to the kernel at boot, it must
+	reside entirely within a 1 GB aligned physical memory window of
+	up to 32 GB in size that fully covers the kernel Image as well.
+
+... so I think the EFI stub should be able to take advantage of that
+relaxation.
+
+Ard?
+
+Thanks,
+Mark.
