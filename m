@@ -1,67 +1,80 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 8 Feb 2017 19:46:55 +0100
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Feb 2017 18:52:26 +0000
 Subject: [PATCH] ARM: xip: disable PATCH_PHYS_VIRT for ARCH_MULTIPLATFORM
  when XIP
-In-Reply-To: <20170208183937.GX27312@n2100.armlinux.org.uk>
+In-Reply-To: <SG2PR06MB116573368B09D2E36C5C70F98A420@SG2PR06MB1165.apcprd06.prod.outlook.com>
 References: <20170208172209.31673-1-chris.brandt@renesas.com>
  <20170208174437.GW27312@n2100.armlinux.org.uk>
- <CAMuHMdVWT4KNqWNbTa1YBAt83+XOtn0qRFMAui8FDnHz-iYj0g@mail.gmail.com>
- <20170208183937.GX27312@n2100.armlinux.org.uk>
-Message-ID: <CAMuHMdX=EZdPk+b3Vs21bSPq-wP10W=1WOag5FgBjVfvRzrDhQ@mail.gmail.com>
+ <SG2PR06MB116573368B09D2E36C5C70F98A420@SG2PR06MB1165.apcprd06.prod.outlook.com>
+Message-ID: <20170208185226.GY27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, Feb 08, 2017 at 06:00:26PM +0000, Chris Brandt wrote:
+> On Wednesday, February 08, 2017, Russell King wrote:
+> > On Wed, Feb 08, 2017 at 12:22:09PM -0500, Chris Brandt wrote:
+> > > Since ARCH_MULTIPLATFORM explicitly selects ARM_PATCH_PHYS_VIRT, even
+> > > though ARCH_MULTIPLATFORM has 'depends on !XIP_KERNEL',
+> > > ARM_PATCH_PHYS_VIRT is still forcibly selected. The result is that
+> > > PHYS_OFFSET depends on !ARM_PATCH_PHYS_VIRT. This means you cannot
+> > > enter a physical RAM address for an XIP kernel and you cannot build.
+> > >
+> > > Given that it is already clear in the Kconfig that ARM_PATCH_PHYS_VIRT
+> > > and XIP_KERNEL do not go well together (read the help for
+> > > ARM_PATCH_PHYS_VIRT), adding this condition to ARCH_MULTIPLATFORM is
+> > > logical and will fix this build issue.
+> > 
+> > And, ergo, multiplatform kernels and XIP_KERNEL don't go together either.
+> > Think about it...
+> > 
+> > This is why I regard those who want multiplatform to work with options
+> > such as XIP_KERNEL and NOMMU to be insane.
+> 
+> It's not so much that I want multiplatform and XIP together (because
+> absolutely they do not), it's that the SOC I care about is shoved under
+> the multiplatform umbrella.
 
-On Wed, Feb 8, 2017 at 7:39 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Wed, Feb 08, 2017 at 06:53:14PM +0100, Geert Uytterhoeven wrote:
->> The problem is that "multiplatform" may mean one of two things:
->>   1. Build a single kernel that can run on multiple platforms.
->>      This is tricky when enabling XIP and/or NOMMU, as the physical parameters
->>      must be compatible with all platforms. But building a kernel with the
->>      right parameters is the responsibility of the user.
->>      I.e. don't shoot yourself in the foot.
->>   2. Your platform uses the arch/arm multiplatform framework.
->>
->> As everything is being migrated to 2, not allowing XIP and/or NOMMU on
->> "multiplatform" is IMHO an insane limitation.
->
-> There _isn't_ a framework.  What there is are a collection of Kconfig
-> options that multiplatform provides you that can also be selected by
-> any other configuration route.
->
-> (2) really doesn't apply.
->
-> The real issue is that board stuff ends up with a "depends on MULTI_xxx"
-> which needs to be bypassed.  That's pretty easy to do - I've done it as
-> a proof of concept a few years ago when this exact same thing came up
-> for !MMU, and since then I've been NAKing and refusing to apply patches
-> that try to re-use multiplat for !MMU.
+Right, and that's what I hear all the time, but it's not really an
+argument that stacks up.
 
-So you mean this:
+We have the big "ARM system type" choice, one of the options there is
+to build for multi-platform.  Historically, it's been to select the
+SoC family - where "SoC family" means a group of SoCs that could be
+built together into one image without all the fun and games of V:P
+patching, auto-zreladdr, etc - _exactly_ the conditions that !MMU
+and XIP_KERNEL depended upon[*].
 
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -31,7 +31,7 @@ config ARCH_RMOBILE
+To allow a SOC to be built without multiplatform, you add another
+option to that choice statement (exactly as we used to have before
+multiplatform).  For the sake of argument, let's say we're talking
+about iMX ARMv7 SoCs.  So, let's call it ARM_SOC_IMX_V7.
 
- menuconfig ARCH_RENESAS
-        bool "Renesas ARM SoCs"
--       depends on ARCH_MULTI_V7 && MMU
-+       depends on MMU
-        select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
-        select ARCH_SHMOBILE
-        select ARCH_SHMOBILE_MULTI
+You add to that all the select statements that multiplatform gives
+you that you need for that platform, omitting those that don't make
+sense (like virt/phys patching), making it depend on XIP_KERNEL and/or
+!MMU.
 
-?
+Then you change the mach-*/Kconfig entry like this:
 
-Gr{oetje,eeting}s,
+menuconfig ARCH_MXC
+-       bool "Freescale i.MX family"
+-       depends on ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7 || ARM_SINGLE_ARMV7M
++       bool "Freescale i.MX family" if !ARM_SOC_IMX_V7
++       depends on ARCH_MULTI_V4_V5 || ARCH_MULTI_V6_V7 || ARM_SINGLE_ARMV7M ||\
++		ARM_SOC_IMX_V7
++	default ARM_SOC_IMX_V7
 
-                        Geert
+and also modify the if ARCH_MULTI_V7 to also allow that section if
+ARM_SOC_IMX_V7 is enabled.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+* - that's the problem - multiplatform went head-long into the "we
+don't like the existing solution, we need to move everyone away, and
+let's hope no one wants XIP_KERNEL or !MMU now".  So we went from a
+relatively good solution that didn't support building diverse platforms
+together to one that rather sucks for XIP_KERNEL and !MMU.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
