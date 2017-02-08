@@ -1,37 +1,35 @@
-From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Thu,  9 Feb 2017 00:30:05 +0100 (CET)
-Subject: [PATCH v2 1/5] dts: mfd: axp20x: Add AXP806 to list of current AXP20x
- family members
-In-Reply-To: <cover.1486592470.git.rask@formelder.dk>
-References: <cover.1486592470.git.rask@formelder.dk>
-Message-ID: <fd2101870941430d82798cdde64644d5e3d49f70.1486592471.git.rask@formelder.dk>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Feb 2017 23:42:35 +0000
+Subject: [PATCH v3 21/24] media: imx: Add MIPI CSI-2 Receiver subdev driver
+In-Reply-To: <ca0a2eb3-21b6-d312-c8e0-61da48c4c700@gmail.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-22-git-send-email-steve_longerbeam@mentor.com>
+ <1486036237.2289.37.camel@pengutronix.de>
+ <ca0a2eb3-21b6-d312-c8e0-61da48c4c700@gmail.com>
+Message-ID: <20170208234235.GA27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An entry for the AXP806 was forgotten, so add one.
+On Wed, Feb 08, 2017 at 03:23:53PM -0800, Steve Longerbeam wrote:
+> >Actually, this exact function already exists as dw_mipi_dsi_phy_write in
+> >drivers/gpu/drm/rockchip/dw-mipi-dsi.c, and it looks like the D-PHY
+> >register 0x44 might contain a field called HSFREQRANGE_SEL.
+> 
+> Thanks for pointing out drivers/gpu/drm/rockchip/dw-mipi-dsi.c.
+> It's clear from that driver that there probably needs to be a fuller
+> treatment of the D-PHY programming here, but I don't know where
+> to find the MIPI CSI-2 D-PHY documentation for the i.MX6. The code
+> in imxcsi2_reset() was also pulled from FSL, and that's all I really have
+> to go on for the D-PHY programming. I assume the D-PHY is also a
+> Synopsys core, like the host controller, but the i.MX6 manual doesn't
+> cover it.
 
-Fixes: 204ae2963e10 ("mfd: axp20x: Add bindings for AXP806 PMIC")
-Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Rob Herring <robh@kernel.org>
----
+Why exactly?  What problems are you seeing that would necessitate a
+more detailed programming of the D-PHY?  From my testing, I can wind
+a 2-lane MIPI bus on iMX6D from 912Mbps per lane down to (eg) 308Mbps
+per lane with your existing code without any issues.
 
-No changes in v2.
-
- Documentation/devicetree/bindings/mfd/axp20x.txt | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-index 8f3ad9a..86ae540 100644
---- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-+++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -6,6 +6,7 @@ axp202 (X-Powers)
- axp209 (X-Powers)
- axp221 (X-Powers)
- axp223 (X-Powers)
-+axp806 (X-Powers)
- axp809 (X-Powers)
- 
- Required properties:
 -- 
-2.10.2
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
