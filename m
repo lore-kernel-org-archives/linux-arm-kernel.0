@@ -1,36 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 8 Feb 2017 10:08:17 +0100
-Subject: i.MX7 pinctrl driver writing to non existent registers
-Message-ID: <20170208090817.omm2dydhqukdzgqy@pengutronix.de>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Wed,  8 Feb 2017 17:11:05 +0800
+Subject: [PATCH v5 1/3] dt: bindings: add documentation for zx2967 family i2c
+ controller
+Message-ID: <1486545067-4688-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+This patch adds dt-binding documentation for zx2967 family
+i2c controller.
 
-The i.MX7 has two pinmux controllers, the LPSR and the regular one. We
-instantiate a driver for each one. Now the driver assumes that the pins
-are completely configured with one iomux controller, but for the LPSR
-pins this is not true: The MUX_CTL and PAD_CTL registers are indeed
-in the LPSR controller, but the SELECT_INPUT registers for the same
-pin are found in the regular controller.
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/i2c/i2c-zx2967.txt         | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-zx2967.txt
 
-The result is that with this pin for example:
-
-#define MX7D_PAD_GPIO1_IO06__UART5_DCE_RX                         0x0018 0x0048 0x0714 0x3 0x4
-
-The LPSR controller writes to LPSR_BASE + 0x714 where it should really
-be IOMUX_BASE + 0x714.
-
-I have no idea how to fix this. We could split the LPSR pins into two
-pins, one for each controller. Another possibility would be to create
-some kind of shortcut from one controller to control the other one. Also
-not nice. Also we could simply do nothing, as long as the bootloader
-configures everything correctly we won't even notice ;)
-
-Sascha
-
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-zx2967.txt b/Documentation/devicetree/bindings/i2c/i2c-zx2967.txt
+new file mode 100644
+index 0000000..a528374
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-zx2967.txt
+@@ -0,0 +1,24 @@
++ZTE zx2967 I2C controller
++
++Required properties:
++ - compatible: must be "zte,zx296718-i2c"
++ - reg: physical address and length of the device registers
++ - interrupts: a single interrupt specifier
++ - clocks: clock for the device
++ - #address-cells: should be <1>
++ - #size-cells: should be <0>
++ - clock-frequency: the desired I2C bus clock frequency.
++
++Examples:
++
++	i2c at 112000 {
++		compatible = "zte,zx296718-i2c";
++		reg = <0x00112000 0x1000>;
++		interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&osc24m>;
++		#address-cells = <1>
++		#size-cells = <0>;
++		clock-frequency = <1600000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c_global_pin>;
++	};
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.7.4
