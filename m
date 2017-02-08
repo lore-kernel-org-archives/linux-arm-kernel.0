@@ -1,58 +1,103 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 8 Feb 2017 12:34:15 +1100
-Subject: linux-next: manual merge of the kspp tree with the arm-soc tree
-Message-ID: <20170208123415.35b5425d@canb.auug.org.au>
+From: minghsiu.tsai@mediatek.com (Minghsiu Tsai)
+Date: Wed, 8 Feb 2017 09:38:27 +0800
+Subject: [PATCH] [media] mtk-vcodec: fix build errors without DEBUG
+In-Reply-To: <CAGS+omAU7UohsUkXwwHyhNh_dSX=R9tLKYvSV5767m81sTf_RA@mail.gmail.com>
+References: <1486453244-26094-1-git-send-email-minghsiu.tsai@mediatek.com>
+ <CAGS+omAU7UohsUkXwwHyhNh_dSX=R9tLKYvSV5767m81sTf_RA@mail.gmail.com>
+Message-ID: <1486517907.18649.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kees,
+On Tue, 2017-02-07 at 20:17 +0800, Daniel Kurtz wrote:
+> On Tue, Feb 7, 2017 at 3:40 PM, Minghsiu Tsai
+> <minghsiu.tsai@mediatek.com> wrote:
+> > Fix build errors after removing DEBUG definition.
+> 
+> It would be useful to specify which build errors were fixed by this
+> patch, and a brief description of why - namely because when DEBUG is
+> not defined, mtk_v4l2_debug() is an empty macros, and therefore the
+> arguments are unused.
+> 
+> With an updated commit message, this patch is:
+> 
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> 
 
-Today's linux-next merge of the kspp tree got a conflict in:
+Hi Daniel,
+Thanks for your review and comment. I will update it soon.
 
-  arch/arm/configs/aspeed_g5_defconfig
-
-between commit:
-
-  0e81eb77f5f8 ("ARM: configs: Update Aspeed with new drivers")
-
-from the arm-soc tree and commit:
-
-  0f5bf6d0afe4 ("arch: Rename CONFIG_DEBUG_RODATA and CONFIG_DEBUG_MODULE_RONX")
-
-from the kspp tree.
-
-I fixed it up (see below) and can carry the fix as necessary. This
-is now fixed as far as linux-next is concerned, but any non trivial
-conflicts should be mentioned to your upstream maintainer when your tree
-is submitted for merging.  You may also want to consider cooperating
-with the maintainer of the conflicting tree to minimise any particularly
-complex conflicts.
-
--- 
-Cheers,
-Stephen Rothwell
-
-diff --cc arch/arm/configs/aspeed_g5_defconfig
-index ae4295ec5c3e,05a16d53d03c..000000000000
---- a/arch/arm/configs/aspeed_g5_defconfig
-+++ b/arch/arm/configs/aspeed_g5_defconfig
-@@@ -26,8 -26,6 +26,7 @@@ CONFIG_ARCH_MULTI_V6=
-  # CONFIG_ARCH_MULTI_V7 is not set
-  CONFIG_ARCH_ASPEED=y
-  CONFIG_MACH_ASPEED_G5=y
-- CONFIG_DEBUG_RODATA=y
- +CONFIG_VMSPLIT_2G=y
-  CONFIG_AEABI=y
-  CONFIG_UACCESS_WITH_MEMCPY=y
-  CONFIG_SECCOMP=y
-@@@ -116,8 -80,8 +115,9 @@@ CONFIG_DEBUG_LL_UART_8250=
-  CONFIG_DEBUG_UART_PHYS=0x1e784000
-  CONFIG_DEBUG_UART_VIRT=0xe8784000
-  CONFIG_EARLY_PRINTK=y
-- CONFIG_DEBUG_SET_MODULE_RONX=y
-+ CONFIG_STRICT_MODULE_RWX=y
-+ CONFIG_STRICT_KERNEL_RWX=y
- +CONFIG_CRYPTO_ECHAINIV=y
-  # CONFIG_XZ_DEC_X86 is not set
-  # CONFIG_XZ_DEC_POWERPC is not set
-  # CONFIG_XZ_DEC_IA64 is not set
+> >
+> > Signed-off-by: Minghsiu Tsai <minghsiu.tsai@mediatek.com>
+> > ---
+> >  drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c | 9 ++++-----
+> >  drivers/media/platform/mtk-vcodec/vdec_vpu_if.c    | 5 ++---
+> >  drivers/media/platform/mtk-vcodec/venc_vpu_if.c    | 4 +---
+> >  3 files changed, 7 insertions(+), 11 deletions(-)
+> >
+> > diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+> > index 0746592..6219c7d 100644
+> > --- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+> > +++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+> > @@ -1126,15 +1126,14 @@ static void vb2ops_vdec_buf_queue(struct vb2_buffer *vb)
+> >                  * if there is no SPS header or picture info
+> >                  * in bs
+> >                  */
+> > -               int log_level = ret ? 0 : 1;
+> >
+> >                 src_buf = v4l2_m2m_src_buf_remove(ctx->m2m_ctx);
+> >                 v4l2_m2m_buf_done(to_vb2_v4l2_buffer(src_buf),
+> >                                         VB2_BUF_STATE_DONE);
+> > -               mtk_v4l2_debug(log_level,
+> > -                               "[%d] vdec_if_decode() src_buf=%d, size=%zu, fail=%d, res_chg=%d",
+> > -                               ctx->id, src_buf->index,
+> > -                               src_mem.size, ret, res_chg);
+> > +               mtk_v4l2_debug(ret ? 0 : 1,
+> > +                              "[%d] vdec_if_decode() src_buf=%d, size=%zu, fail=%d, res_chg=%d",
+> > +                              ctx->id, src_buf->index,
+> > +                              src_mem.size, ret, res_chg);
+> >                 return;
+> >         }
+> >
+> > diff --git a/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c b/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
+> > index 5a24c51..1abd14e 100644
+> > --- a/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
+> > +++ b/drivers/media/platform/mtk-vcodec/vdec_vpu_if.c
+> > @@ -70,9 +70,8 @@ void vpu_dec_ipi_handler(void *data, unsigned int len, void *priv)
+> >  static int vcodec_vpu_send_msg(struct vdec_vpu_inst *vpu, void *msg, int len)
+> >  {
+> >         int err;
+> > -       uint32_t msg_id = *(uint32_t *)msg;
+> >
+> > -       mtk_vcodec_debug(vpu, "id=%X", msg_id);
+> > +       mtk_vcodec_debug(vpu, "id=%X", *(uint32_t *)msg);
+> >
+> >         vpu->failure = 0;
+> >         vpu->signaled = 0;
+> > @@ -80,7 +79,7 @@ static int vcodec_vpu_send_msg(struct vdec_vpu_inst *vpu, void *msg, int len)
+> >         err = vpu_ipi_send(vpu->dev, vpu->id, msg, len);
+> >         if (err) {
+> >                 mtk_vcodec_err(vpu, "send fail vpu_id=%d msg_id=%X status=%d",
+> > -                              vpu->id, msg_id, err);
+> > +                              vpu->id, *(uint32_t *)msg, err);
+> >                 return err;
+> >         }
+> >
+> > diff --git a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
+> > index a01c759..0d882ac 100644
+> > --- a/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
+> > +++ b/drivers/media/platform/mtk-vcodec/venc_vpu_if.c
+> > @@ -79,10 +79,8 @@ static int vpu_enc_send_msg(struct venc_vpu_inst *vpu, void *msg,
+> >
+> >         status = vpu_ipi_send(vpu->dev, vpu->id, msg, len);
+> >         if (status) {
+> > -               uint32_t msg_id = *(uint32_t *)msg;
+> > -
+> >                 mtk_vcodec_err(vpu, "vpu_ipi_send msg_id %x len %d fail %d",
+> > -                              msg_id, len, status);
+> > +                              *(uint32_t *)msg, len, status);
+> >                 return -EINVAL;
+> >         }
+> >         if (vpu->failure)
+> > --
+> > 1.9.1
+> >
