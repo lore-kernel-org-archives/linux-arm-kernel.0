@@ -1,61 +1,114 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 08 Feb 2017 15:09:33 +0100
-Subject: [PATCH 09/10] iommu/exynos: Make use of iommu_device_register
- interface
-In-Reply-To: <20170208135742.GE7339@8bytes.org>
-References: <1486397429-29327-1-git-send-email-joro@8bytes.org>
- <CGME20170206161330epcas3p185c7719afc89ab2ad87e55e9f62ccfa1@epcas3p1.samsung.com>
- <1486397429-29327-10-git-send-email-joro@8bytes.org>
- <3e4709a7-2231-7c76-18bd-6e2d6b802b8e@samsung.com>
- <20170208135742.GE7339@8bytes.org>
-Message-ID: <5fef7241-bb87-54ed-2516-d3207334274d@samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 8 Feb 2017 22:25:41 +0800
+Subject: [PATCH v3 3/3] ASoC: zx-i2s: introduce pclk for zx2967 family
+In-Reply-To: <1486522955-14528-3-git-send-email-baoyou.xie@linaro.org>
+References: <1486522955-14528-1-git-send-email-baoyou.xie@linaro.org>
+ <1486522955-14528-3-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170208142539.GN3407@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Wed, Feb 08, 2017 at 11:02:35AM +0800, Baoyou Xie wrote:
+> The pclk is necessary for zx2967 I2S controller. the driver
+> currently doesn't handle it. This is something we need to fix.
+> 
+> In turn, the driver supports zx296718's I2S controller.
+> 
+> By the way, this patch also change the clock name from tx to wclk
+> to make it clear.
+> 
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> ---
+>  sound/soc/zte/zx-i2s.c | 37 ++++++++++++++++++++++++++++---------
+>  1 file changed, 28 insertions(+), 9 deletions(-)
+> 
+> diff --git a/sound/soc/zte/zx-i2s.c b/sound/soc/zte/zx-i2s.c
+> index ed7a56d..2d486ea 100644
+> --- a/sound/soc/zte/zx-i2s.c
+> +++ b/sound/soc/zte/zx-i2s.c
+> @@ -95,7 +95,7 @@
+>  struct zx_i2s_info {
+>  	struct snd_dmaengine_dai_dma_data	dma_playback;
+>  	struct snd_dmaengine_dai_dma_data	dma_capture;
+> -	struct clk				*dai_clk;
+> +	struct clk				*dai_wclk, *dai_pclk;
 
-On 2017-02-08 14:57, Joerg Roedel wrote:
-> On Tue, Feb 07, 2017 at 01:36:15PM +0100, Marek Szyprowski wrote:
->>> +	ret = iommu_device_sysfs_add(&data->iommu, &pdev->dev, NULL,
->>> +				     "sysmmu.%pa", &ioaddr);
->> Can we stick to the common name across the /sysfs and use
->> dev_name(data->sysmmu)
->> or even dev_name(dev) here?
->>
->> ret = iommu_device_sysfs_add(&data->iommu, &pdev->dev, NULL,
->> dev_name(dev));
-> That means that we have multiple 'struct device' with the same name,
-> no? I think will lead to confusion when using dev_printk, as its not
-> clear anymore which device is refered to in the message.
+It's better to have them on two lines, I would say.
 
-Each sysmmu device has unique name, like every other platform device
-instantiated from device tree. Here is an example from the OdroidXU3
-(Exynos5422 based):
+>  	void __iomem				*reg_base;
+>  	int					master;
+>  	resource_size_t				mapbase;
+> @@ -275,8 +275,9 @@ static int zx_i2s_hw_params(struct snd_pcm_substream *substream,
+>  	writel_relaxed(val, i2s->reg_base + ZX_I2S_TIMING_CTRL);
+>  
+>  	if (i2s->master)
+> -		ret = clk_set_rate(i2s->dai_clk,
+> -				   params_rate(params) * ch_num * CLK_RAT);
+> +		ret = clk_set_rate(i2s->dai_wclk,
+> +				params_rate(params) * ch_num * CLK_RAT);
+> +
+>  	return ret;
+>  }
+>  
+> @@ -328,8 +329,19 @@ static int zx_i2s_startup(struct snd_pcm_substream *substream,
+>  			  struct snd_soc_dai *dai)
+>  {
+>  	struct zx_i2s_info *zx_i2s = dev_get_drvdata(dai->dev);
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(zx_i2s->dai_wclk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = clk_prepare_enable(zx_i2s->dai_pclk);
+> +	if (ret) {
+> +		clk_disable_unprepare(zx_i2s->dai_wclk);
+> +		return ret;
+> +	}
+>  
+> -	return clk_prepare_enable(zx_i2s->dai_clk);
+> +	return ret;
+>  }
+>  
+>  static void zx_i2s_shutdown(struct snd_pcm_substream *substream,
+> @@ -337,7 +349,8 @@ static void zx_i2s_shutdown(struct snd_pcm_substream *substream,
+>  {
+>  	struct zx_i2s_info *zx_i2s = dev_get_drvdata(dai->dev);
+>  
+> -	clk_disable_unprepare(zx_i2s->dai_clk);
+> +	clk_disable_unprepare(zx_i2s->dai_wclk);
+> +	clk_disable_unprepare(zx_i2s->dai_pclk);
+>  }
+>  
+>  static struct snd_soc_dai_ops zx_i2s_dai_ops = {
+> @@ -381,10 +394,16 @@ static int zx_i2s_probe(struct platform_device *pdev)
+>  	if (!zx_i2s)
+>  		return -ENOMEM;
+>  
+> -	zx_i2s->dai_clk = devm_clk_get(&pdev->dev, "tx");
+> -	if (IS_ERR(zx_i2s->dai_clk)) {
+> -		dev_err(&pdev->dev, "Fail to get clk\n");
+> -		return PTR_ERR(zx_i2s->dai_clk);
+> +	zx_i2s->dai_wclk = devm_clk_get(&pdev->dev, "wclk");
+> +	if (IS_ERR(zx_i2s->dai_wclk)) {
+> +		dev_err(&pdev->dev, "Fail to get wclk\n");
+> +		return PTR_ERR(zx_i2s->dai_wclk);
+> +	}
+> +
+> +	zx_i2s->dai_pclk = devm_clk_get(&pdev->dev, "pclk");
+> +	if (IS_ERR(zx_i2s->dai_pclk)) {
+> +		dev_info(&pdev->dev, "have no pclk\n");
+> +		zx_i2s->dai_pclk = NULL;
 
-# ls -1 /sys/bus/platform/devices/ | grep sysmmu
-10a60000.sysmmu
-10a70000.sysmmu
-11200000.sysmmu
-11210000.sysmmu
-11d40000.sysmmu
-11f10000.sysmmu
-11f20000.sysmmu
-12880000.sysmmu
-12890000.sysmmu
-128a0000.sysmmu
-128c0000.sysmmu
-128d0000.sysmmu
-128e0000.sysmmu
-13e80000.sysmmu
-13e90000.sysmmu
-14640000.sysmmu
-14650000.sysmmu
-14680000.sysmmu
+The 'pclk' is actually required instead of optional.  Since we haven't
+got any in-tree DTB with I2S device yet, there is no DT compatibility to
+maintain.  So it should be good to make 'pclk' required right now.
 
-IMHO there is no need for open coding new unique names if device name,
-which already contains the base address, can be used instead.
+Shawn
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+>  	}
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -- 
+> 2.7.4
+> 
