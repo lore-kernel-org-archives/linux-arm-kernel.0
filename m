@@ -1,170 +1,70 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Wed, 8 Feb 2017 08:45:44 +0800
-Subject: [PATCH 1/2] drm/rockchip: support mode_valid for crtc
-In-Reply-To: <20170207161405.GG15150@art_vandelay>
-References: <1486280197-1585-1-git-send-email-mark.yao@rock-chips.com>
- <20170207161405.GG15150@art_vandelay>
-Message-ID: <589A6A38.8050805@rock-chips.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue,  7 Feb 2017 19:57:36 -0500
+Subject: [PATCH 2/2] tty: pl011: Work around QDF2400 E44 for earlycon
+In-Reply-To: <20170208005736.18724-1-cov@codeaurora.org>
+References: <20170208005736.18724-1-cov@codeaurora.org>
+Message-ID: <20170208005736.18724-2-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?02?08? 00:14, Sean Paul wrote:
-> On Sun, Feb 05, 2017 at 03:36:36PM +0800, Mark Yao wrote:
->> drm crtc already has mode_fixup callback to can do mode check, but
->> We actually want to valid display mode on connector getmode time,
->> mode_fixup can't do it.
->>
->> So add a private mode_valid callback to rockchip crtc, connectors can
->> check mode with this mode_valid callback.
->>
-> There are some nasty layer violations happening in this set. You should use
-> mode_fixup if the crtc has limitations on the mode being set.
->
-> Sean
-Mode_fixup can also check crtc limitations, but it's secondly time to 
-check display mode.
+The previous change worked around QDF2432v1 and QDF2400v1 SoC erratum 44
+for the full-fledged console, when UART AMBA Port (UAP) data is available.
+Additionally provide a workaround the earlycon case, again checking TXFE ==
+0 instead of BUSY == 1. As earlycon is operating before UAP data is
+available, the implementation is different than in the preceding patch.
 
-mode_fixup only works on drm_setcrtc or atomic_commit check, when 
-userspace get a series of display modes,
-They don't know which display mode is bad before drm_setcrtc or 
-atomic_commit check, they need try,
-but drm_setcrtc or atomic_commit check not only for display mode check, 
-means that userspace didn't have a sure
-method to verify display mode.
+Signed-off-by: Christopher Covington <cov@codeaurora.org>
+---
+ drivers/tty/serial/amba-pl011.c | 28 +++++++++++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
 
-So I try to add the mode_valid callback to connector getmodes time, 
-verify display mode before send mode list to userspace.
-then userspace would get a good display mode list.
-
->> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->> ---
->>   drivers/gpu/drm/rockchip/rockchip_drm_drv.h |  2 ++
->>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 15 +++++++++++++++
->>   drivers/gpu/drm/rockchip/rockchip_drm_vop.h |  7 +++++++
->>   drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 13 +++++++++++++
->>   4 files changed, 37 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
->> index fb6226c..d10b15c 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
->> @@ -39,6 +39,8 @@
->>   struct rockchip_crtc_funcs {
->>   	int (*enable_vblank)(struct drm_crtc *crtc);
->>   	void (*disable_vblank)(struct drm_crtc *crtc);
->> +	enum drm_mode_status (*mode_valid)(struct drm_crtc *crtc,
->> +					   const struct drm_display_mode *mode);
->>   };
->>   
->>   struct rockchip_crtc_state {
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> index fb5f001..256fe73 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> @@ -853,9 +853,24 @@ static void vop_crtc_disable_vblank(struct drm_crtc *crtc)
->>   	spin_unlock_irqrestore(&vop->irq_lock, flags);
->>   }
->>   
->> +static enum drm_mode_status
->> +vop_crtc_mode_valid(struct drm_crtc *crtc, const struct drm_display_mode *mode)
->> +{
->> +	struct vop *vop = to_vop(crtc);
->> +	const struct vop_data *vop_data = vop->data;
->> +
->> +	if (mode->hdisplay > vop_data->max_output.width)
->> +		return MODE_BAD_HVALUE;
->> +	if (mode->vdisplay > vop_data->max_output.height)
->> +		return MODE_BAD_VVALUE;
->> +
->> +	return MODE_OK;
->> +}
->> +
->>   static const struct rockchip_crtc_funcs private_crtc_funcs = {
->>   	.enable_vblank = vop_crtc_enable_vblank,
->>   	.disable_vblank = vop_crtc_disable_vblank,
->> +	.mode_valid = vop_crtc_mode_valid,
->>   };
->>   
->>   static bool vop_crtc_mode_fixup(struct drm_crtc *crtc,
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
->> index 1dbc526..9e9dba1 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.h
->> @@ -133,6 +133,11 @@ struct vop_win_data {
->>   	enum drm_plane_type type;
->>   };
->>   
->> +struct vop_rect {
->> +	int width;
->> +	int height;
->> +};
->> +
->>   struct vop_data {
->>   	const struct vop_reg_data *init_table;
->>   	unsigned int table_size;
->> @@ -140,6 +145,8 @@ struct vop_data {
->>   	const struct vop_intr *intr;
->>   	const struct vop_win_data *win;
->>   	unsigned int win_size;
->> +	struct vop_rect max_input;
->> +	struct vop_rect max_output;
->>   };
->>   
->>   /* interrupt define */
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
->> index 35c51f3..0c72361 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
->> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
->> @@ -132,6 +132,8 @@
->>   };
->>   
->>   static const struct vop_data rk3036_vop = {
->> +	.max_input = { 1920, 1080},
->> +	.max_output = { 1920, 1080},
->>   	.init_table = rk3036_vop_init_reg_table,
->>   	.table_size = ARRAY_SIZE(rk3036_vop_init_reg_table),
->>   	.ctrl = &rk3036_ctrl_data,
->> @@ -273,6 +275,13 @@
->>   };
->>   
->>   static const struct vop_data rk3288_vop = {
->> +	.max_input = { 4096, 8192},
->> +	/*
->> +	 * TODO: rk3288 have two vop, big one support 3840x2160,
->> +	 * little one only support 2560x1600.
->> +	 * Now force use 3840x2160.
->> +	 */
->> +	.max_output = { 3840, 2160},
->>   	.init_table = rk3288_init_reg_table,
->>   	.table_size = ARRAY_SIZE(rk3288_init_reg_table),
->>   	.intr = &rk3288_vop_intr,
->> @@ -339,6 +348,8 @@
->>   };
->>   
->>   static const struct vop_data rk3399_vop_big = {
->> +	.max_input = { 4096, 8192},
->> +	.max_output = { 4096, 2160},
->>   	.init_table = rk3399_init_reg_table,
->>   	.table_size = ARRAY_SIZE(rk3399_init_reg_table),
->>   	.intr = &rk3399_vop_intr,
->> @@ -358,6 +369,8 @@
->>   };
->>   
->>   static const struct vop_data rk3399_vop_lit = {
->> +	.max_input = { 4096, 8192},
->> +	.max_output = { 2560, 1600},
->>   	.init_table = rk3399_init_reg_table,
->>   	.table_size = ARRAY_SIZE(rk3399_init_reg_table),
->>   	.intr = &rk3399_vop_intr,
->> -- 
->> 1.9.1
->>
->>
->> _______________________________________________
->> dri-devel mailing list
->> dri-devel at lists.freedesktop.org
->> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
-
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 41e51901d6ef..f25e7c994f8e 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -2411,6 +2411,29 @@ static bool qdf2400_e44(void) {
+ 	    cpu_var_model == MIDR_QCOM_FALKOR_V1);
+ }
+ 
++#ifdef CONFIG_QCOM_QDF2400_ERRATUM_44
++static void qdf2400_e44_putc(struct uart_port *port, int c)
++{
++	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
++		cpu_relax();
++	if (port->iotype == UPIO_MEM32)
++		writel(c, port->membase + UART01x_DR);
++	else
++		writeb(c, port->membase + UART01x_DR);
++	while (!(readl(port->membase + UART01x_FR) & UART011_FR_TXFE))
++		cpu_relax();
++}
++
++static void qdf2400_e44_early_write(struct console *con, const char *s, unsigned n)
++{
++	struct earlycon_device *dev = con->data;
++
++	uart_console_write(&dev->port, s, n, qdf2400_e44_putc);
++}
++#else
++#define qdf2400_e44_early_write pl011_early_write
++#endif
++
+ static void pl011_putc(struct uart_port *port, int c)
+ {
+ 	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+@@ -2436,7 +2459,10 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
+ 	if (!device->port.membase)
+ 		return -ENODEV;
+ 
+-	device->con->write = pl011_early_write;
++	if (qdf2400_e44())
++		device->con->write = qdf2400_e44_early_write;
++	else
++		device->con->write = pl011_early_write;
+ 	return 0;
+ }
+ OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
 -- 
-?ark Yao
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
+Forum, a Linux Foundation Collaborative Project.
