@@ -1,39 +1,78 @@
-From: chris.brandt@renesas.com (Chris Brandt)
-Date: Wed,  8 Feb 2017 12:22:09 -0500
-Subject: [PATCH] ARM: xip: disable PATCH_PHYS_VIRT for ARCH_MULTIPLATFORM when
- XIP
-Message-ID: <20170208172209.31673-1-chris.brandt@renesas.com>
+From: jhugo@codeaurora.org (Jeffrey Hugo)
+Date: Wed, 8 Feb 2017 10:22:36 -0700
+Subject: [PATCH v3 06/10] arm64: efi: add EFI stub
+In-Reply-To: <20170208170305.GI15459@leverpostej>
+References: <1396637113-22790-1-git-send-email-leif.lindholm@linaro.org>
+ <1396637113-22790-7-git-send-email-leif.lindholm@linaro.org>
+ <CAOZdJXWU1dmFfCc88RMp3SvouU7roDiJsA=3aHzwijwhMH7naA@mail.gmail.com>
+ <E4BDBC23-A96A-4D84-B7EE-B7967D4E4DDD@linaro.org>
+ <73a460e5-98f5-86c2-142f-a9a084ee0203@codeaurora.org>
+ <20170208170305.GI15459@leverpostej>
+Message-ID: <423ec003-225e-8a5f-c071-0fcbbec2679e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since ARCH_MULTIPLATFORM explicitly selects ARM_PATCH_PHYS_VIRT, even
-though ARCH_MULTIPLATFORM has 'depends on !XIP_KERNEL', ARM_PATCH_PHYS_VIRT
-is still forcibly selected. The result is that PHYS_OFFSET depends on
-!ARM_PATCH_PHYS_VIRT. This means you cannot enter a physical RAM address
-for an XIP kernel and you cannot build.
+On 2/8/2017 10:03 AM, Mark Rutland wrote:
+> On Wed, Feb 08, 2017 at 10:35:02AM -0600, Timur Tabi wrote:
+>> On 02/08/2017 10:29 AM, Ard Biesheuvel wrote:
+>>>>>>> +       status = handle_cmdline_files(sys_table, image, cmdline_ptr,
+>>>>>>> +                                     "initrd=", dram_base + SZ_512M,
+>>>>>>> +                                     (unsigned long *)&initrd_addr,
+>>>>>>> +                                     (unsigned long *)&initrd_size);
+>>>>>
+>>>>> So I know this patch is almost three years old, but why is there a
+>>>>> 512M limit on the initrd size?
+>>>>>
+>>> How do you reckon this constitutes a limit?
+>>
+>> handle_cmdline_files() calls efi_high_alloc() with that limit.  I'm
+>> still trying to understand all the details myself, but apparently
+>> our firmware and initrd need to fit within the first 512MB because
+>> of dram_base + SZ_512M. When we change "dram_base + SZ_512M" to
+>> "~0", everything works.
+>
+> Just to check, how big is that initrd?
 
-Given that it is already clear in the Kconfig that ARM_PATCH_PHYS_VIRT and
-XIP_KERNEL do not go well together (read the help for ARM_PATCH_PHYS_VIRT),
-adding this condition to ARCH_MULTIPLATFORM is logical and will fix this
-build issue.
+120MB right now.  Probably could be optimized, but I don't think that's 
+really the issue here.
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
----
- arch/arm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The big problem is we don't have much memory free as the platform 
+requires that all of firmware exists in the first 512MB.  On systems 
+with a lot of devices (ie 16+ STAT drives), UEFI ends up doing a lot of 
+allocations, which pushes the platform over the edge due to the limited 
+memory and fragmentation of what is available.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index bf8d86d..c97bd2c 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -330,7 +330,7 @@ config ARCH_MULTIPLATFORM
- 	bool "Allow multiple platforms to be selected"
- 	depends on MMU
- 	select ARM_HAS_SG_CHAIN
--	select ARM_PATCH_PHYS_VIRT
-+	select ARM_PATCH_PHYS_VIRT if !XIP_KERNEL
- 	select AUTO_ZRELADDR
- 	select CLKSRC_OF
- 	select COMMON_CLK
+>
+> I guess it's possible that there simply isn't sufficient contiguous free
+> memory in that range, even if the initrd isn't that large. Can you share
+> the EFI memory map dump from booting with efi=debug?
+>
+> We originally needed to restrict this to ensure that the kernel could
+> map the initrd (and I think the 512M restriction specifically was
+> inherited from the DTB mapping restriction). Since then, we have relaxed
+> things in the kernel, and today Documentation/arm64/booting.txt says:
+>
+> 	If an initrd/initramfs is passed to the kernel at boot, it must
+> 	reside entirely within a 1 GB aligned physical memory window of
+> 	up to 32 GB in size that fully covers the kernel Image as well.
+>
+> ... so I think the EFI stub should be able to take advantage of that
+> relaxation.
+>
+> Ard?
+>
+> Thanks,
+> Mark.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+
+
 -- 
-2.10.1
+Jeffrey Hugo
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
