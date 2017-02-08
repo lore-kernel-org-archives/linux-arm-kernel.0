@@ -1,58 +1,39 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Wed, 8 Feb 2017 05:32:35 +0000
-Subject: [PATCH v3 4/5] dt-bindings: arm64 ARCH_THUNDER2 platform
- documentation
-In-Reply-To: <CAL_Jsq+i2evzVnQKf3qYMYJVZ=ecdSQObGy8CMn7aMoxBi_PTg@mail.gmail.com>
-References: <1486502399-2950-1-git-send-email-jnair@caviumnetworks.com>
- <1486502399-2950-5-git-send-email-jnair@caviumnetworks.com>
- <CAL_Jsq+i2evzVnQKf3qYMYJVZ=ecdSQObGy8CMn7aMoxBi_PTg@mail.gmail.com>
-Message-ID: <20170208053234.GA3102@localhost>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 8 Feb 2017 11:09:23 +0530
+Subject: [PATCH v32 00/13] arm64: add kdump support
+In-Reply-To: <20170207080601.5816-1-takahiro.akashi@linaro.org>
+References: <20170207080601.5816-1-takahiro.akashi@linaro.org>
+Message-ID: <d3759cc9-01d8-814c-e76e-e035eac6bb8b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2017 at 04:35:24PM -0600, Rob Herring wrote:
-> On Tue, Feb 7, 2017 at 3:19 PM, Jayachandran C <jnair@caviumnetworks.com> wrote:
-> > Add documentation for Cavium ThunderX2 CN99XX ARM64 processor family.
-> > The the SoC will use the ID "cavium,thunder-99xx".
-> >
-> > Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
-> > ---
-> >
-> > All marketing material refers to the chip as CN99XX (like CN88XX before)
-> > that is why I have used the wildcard-like 99xx here.
-> >
-> >  Documentation/devicetree/bindings/arm/cavium-thunder2.txt | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder2.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder2.txt b/Documentation/devicetree/bindings/arm/cavium-thunder2.txt
-> > new file mode 100644
-> > index 0000000..82276a2
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/cavium-thunder2.txt
-> > @@ -0,0 +1,5 @@
-> > +Cavium Thunder2 Family device tree bindings
-> > +-------------------------------------------
-> > +
-> > +Boards with Cavium ThunderX2 CN99XX shall have the root property:
-> > +  compatible = "cavium,thunder-99xx";
-> 
-> Is it ThunderX2 or Thunder2? What happened to "CN" in the compatible
-> string. There's a lot of inconsistencies here.
 
-I have followed the exiting Thunder naming as well as general DT
-conventions, Basically:
 
-Platform - ARCH_THUNDER2  (for ThunderX2 CN99XX, ARCH_THUNDER is
-           for ThunderX CN8?XX)
-Core - cavium,thunder2 (ThunderX2 cpu core, "cavium,thunder" is ThunderX core)
-Board/SoC - cavium,thunder-99xx (for ThunderX2, "cavium,thunder-88xx"
-          is existing ThunderX board)
+On Tuesday 07 February 2017 01:36 PM, AKASHI Takahiro wrote:
+> This patch series adds kdump support on arm64.
+>
+> To load a crash-dump kernel to the systems, a series of patches to
+> kexec-tools[1] are also needed. Please use the latest one, v5 [2].
+> For your convinience, you can pick them up from:
+>    https://git.linaro.org/people/takahiro.akashi/linux-aarch64.git arm64/kdump
+>    https://git.linaro.org/people/takahiro.akashi/kexec-tools.git arm64/kdump
+>
+> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+>   - crash utility (v7.1.8 or later, i.e. master for now) [3]
+>
+> I tested this patchset on fast model and hikey.
+> (under various configurations, in particular 4KB-page/39,48-bits, 64KB-page/42
+> -bits with hibernate)
+>
+> The previous versions were also:
+> Tested-by: Pratyush Anand <panand@redhat.com> (v29, mustang and seattle)
 
-Thunder2 because it is based on the next generation Thunder core, and
-processor family is ThunderX2 CN99XX.
+..and you have my Tested-by for this series as well. They work fine with 
+both the above platform.
 
-I had thought thru other possibilities as well, this seems the best I
-could come up with.
+Although we are very close, still it could be great if these patches can 
+make into v4.11.
 
-JC.
+Thanks a lot Akashi for the quick v32.
+
+~Pratyush
