@@ -1,91 +1,43 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Tue, 7 Feb 2017 22:31:15 -0600
-Subject: [PATCH 2/2] tty: pl011: Work around QDF2400 E44 for earlycon
-In-Reply-To: <35007ccc-678d-0e2a-109b-4b5321c4fbff@codeaurora.org>
-References: <20170208005736.18724-1-cov@codeaurora.org>
- <20170208005736.18724-2-cov@codeaurora.org>
- <35007ccc-678d-0e2a-109b-4b5321c4fbff@codeaurora.org>
-Message-ID: <0262b9d0-1fd1-ff56-a7c5-b9ab9dcea9a8@codeaurora.org>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Tue, 7 Feb 2017 20:31:09 -0800
+Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
+In-Reply-To: <E0A4388D-788A-40B4-9193-36FD75284654@martin.sperl.org>
+References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
+ <20170120041400.GA24617@localhost.localdomain>
+ <060918B6-A773-46A5-8D10-C9F6BBA6D3F1@martin.sperl.org>
+ <20170124093127.GB3651@localhost.localdomain>
+ <0452720A-5914-469B-9EF7-0581CF1B5478@martin.sperl.org>
+ <20170202042930.GA6377@localhost.localdomain>
+ <E0A4388D-788A-40B4-9193-36FD75284654@martin.sperl.org>
+Message-ID: <20170208043107.GA7097@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cov,
+On Sat, Feb 04, 2017 at 09:35:47AM +0100, kernel at martin.sperl.org wrote:
+> 
 
-The same PL011 driver will be used in virtutal machine, make sure your 
-changes have no side effects in VM.
+> So how does this change/impact the driver code itself?
+> 
+> Defining a thermal zone in the dts is just an additional feature
+> that only impacts the device tree.
+> The DT as is works fine and at least allows to read the current temperature.
 
+Well, your driver is still half finished. It is a DT only driver, which
+does not follow the DT spec on thermal. The impact on your code is that
+it wont need to carry your hardware data in the source code.
 
+Also, having the data described in DT allows you porting your driver
+without patching it, in  case you need, or any other system engineer,
+to have different thermal data, trips values, number or trips, offset
+and slope per sensor, on different boards, or even on different chip
+version.
 
-On 02/07/2017 10:07 PM, Timur Tabi wrote:
-> Christopher Covington wrote:
->> The previous change worked around QDF2432v1 and QDF2400v1 SoC erratum 44
->> for the full-fledged console, when UART AMBA Port (UAP) data is 
->> available.
->> Additionally provide a workaround the earlycon case, again checking 
->> TXFE ==
->> 0 instead of BUSY == 1. As earlycon is operating before UAP data is
->> available, the implementation is different than in the preceding patch.
->>
->> Signed-off-by: Christopher Covington <cov@codeaurora.org>
->> ---
->>   drivers/tty/serial/amba-pl011.c | 28 +++++++++++++++++++++++++++-
->>   1 file changed, 27 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/tty/serial/amba-pl011.c 
->> b/drivers/tty/serial/amba-pl011.c
->> index 41e51901d6ef..f25e7c994f8e 100644
->> --- a/drivers/tty/serial/amba-pl011.c
->> +++ b/drivers/tty/serial/amba-pl011.c
->> @@ -2411,6 +2411,29 @@ static bool qdf2400_e44(void) {
->>           cpu_var_model == MIDR_QCOM_FALKOR_V1);
->>   }
->>   +#ifdef CONFIG_QCOM_QDF2400_ERRATUM_44
->> +static void qdf2400_e44_putc(struct uart_port *port, int c)
->> +{
->> +    while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
->> +        cpu_relax();
->> +    if (port->iotype == UPIO_MEM32)
->> +        writel(c, port->membase + UART01x_DR);
->> +    else
->> +        writeb(c, port->membase + UART01x_DR);
-> I believe 32-bit writes are safe on QDF2400v1, so I think you 
-> technically don't need the UPIO_MEM32 check.  Just always call writel.
->> +    while (!(readl(port->membase + UART01x_FR) & UART011_FR_TXFE))
->> +        cpu_relax();
->> +}
->> +
->> +static void qdf2400_e44_early_write(struct console *con, const char 
->> *s, unsigned n)
->> +{
->> +    struct earlycon_device *dev = con->data;
->> +
->> +    uart_console_write(&dev->port, s, n, qdf2400_e44_putc);
->> +}
->> +#else
->> +#define qdf2400_e44_early_write pl011_early_write
->> +#endif
-> Same with patch 1/2.  If you change qdf2400_e44(), you don't need the 
-> #else block.
->> +
->>   static void pl011_putc(struct uart_port *port, int c)
->>   {
->>       while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
->> @@ -2436,7 +2459,10 @@ static int __init 
->> pl011_early_console_setup(struct earlycon_device *device,
->>       if (!device->port.membase)
->>           return -ENODEV;
->>   -    device->con->write = pl011_early_write;
->> +    if (qdf2400_e44())
->> +        device->con->write = qdf2400_e44_early_write;
->> +    else
->> +        device->con->write = pl011_early_write;
->>       return 0;
->>   }
->>   OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
->
->
+Not to say that having the data described in DT also allows system
+engineers to deploy different thermal zones, based on your
+driver/sensor, to extrapolate different hotspots.
 
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> Martin
+> 
+BR,
+
+Eduardo Valentin
