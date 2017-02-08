@@ -1,42 +1,44 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Wed, 8 Feb 2017 09:31:00 -0600
-Subject: [PATCH 1/9] irqchip/gic-v3-its: Fix command buffer allocation
-In-Reply-To: <20170208144328.GS5020@rric.localdomain>
-References: <20170201173833.12630-1-rrichter@cavium.com>
- <20170201173833.12630-2-rrichter@cavium.com>
- <87tw847njl.fsf@on-the-bus.cambridge.arm.com>
- <20170208144328.GS5020@rric.localdomain>
-Message-ID: <278df776-4d6d-3b89-7a94-effaafcebeb0@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 08 Feb 2017 15:35:27 +0000
+Subject: [PATCH 1/2] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
+In-Reply-To: <e16986de-31fa-8d34-05be-aa8a585500d4@codeaurora.org> (Timur
+ Tabi's message of "Wed, 8 Feb 2017 08:09:12 -0600")
+References: <20170208005736.18724-1-cov@codeaurora.org>
+ <7151be59-000c-d50b-f8f5-5fef0c053d91@arm.com>
+ <f9504cde-a87a-ba99-2f72-fc3029ef5fe5@codeaurora.org>
+ <20170208133306.GE15459@leverpostej>
+ <e16986de-31fa-8d34-05be-aa8a585500d4@codeaurora.org>
+Message-ID: <87lgtg7l1c.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-In teardown path, code is still calling 'kfree(its->cmd_base)' to free 
-memory, this should be changed to 'free_pages(get_order(ITS_CMD_QUEUE_SZ).
-
-
-On 02/08/2017 08:43 AM, Robert Richter wrote:
-> On 08.02.17 14:41:18, Marc Zyngier wrote:
->> On Wed, Feb 01 2017 at  5:38:25 pm GMT, Robert Richter
-> <rrichter@cavium.com> wrote:
->>> The its command buffer must be page aligned, but kzalloc() is not
->>> guaranteed to be (though it is mostly when allocating 64k). Use
->>> __get_free_pages() as this is used for other buffers as well.
->>>
->>> Signed-off-by: Robert Richter <rrichter@cavium.com>
->> I'm still going through this series, but as this is an obvious fix, I've
->> cherry-picked it for 4.11.
-> That was actually my intention, thus I placed it first.
+On Wed, Feb 08 2017 at  2:09:12 pm GMT, Timur Tabi <timur@codeaurora.org> wrote:
+> Mark Rutland wrote:
 >
-> -Robert
+>>> No, only Kryo and Falkor V1 based SOCs have this problem.  Falkor V2
+>>> will have this fixed.  We intend to revert these fixes after Falkor
+>>> V1 SOCs are no longer supported.
+>>
+>> Supported by whom?
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Qualcomm.
+>
+>> Generally, once something's upstreamed we expect it to remain supported.
+>
+> The V1 SOCs are technically pre-production, but still in wide use and
+> it will be a while before they are all replaced by V2 SOCs.  It's only
+> because of the "ugliness" of the erratum and its work-around that we
+> want to git rid of it when we can.
 
+Interesting. How will you guarantee that nobody will ever want to run a
+mainline kernel on this box after a certain date? Self-destruct timer?
+;-)
+
+As someone who runs mainline on HW that exceeded its "sell-by" date by a
+few decades, I'm genuinely interested.
+
+Thanks,
+
+	M.
 -- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Jazz is not dead, it just smell funny.
