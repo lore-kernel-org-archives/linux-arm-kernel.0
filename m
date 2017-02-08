@@ -1,51 +1,95 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Thu, 9 Feb 2017 06:45:32 +0900
-Subject: [BUGFIX PATCH tip/master 2/3] kprobes/arm64: Fix a possible
- deadlock case in kretprobe
-In-Reply-To: <20170208150654.GJ3986@arm.com>
-References: <148648024215.30949.11929183640906306731.stgit@devbox>
- <148648038381.30949.1443281264586280005.stgit@devbox>
- <20170208150654.GJ3986@arm.com>
-Message-ID: <20170209064532.6788c08a63e04876b3ae0b7a@kernel.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 8 Feb 2017 15:48:57 -0600
+Subject: [PATCH v2 3/6] dt-bindings: bus: Add documentation for the
+ Technologic Systems NBUS
+In-Reply-To: <20170203194729.20995-4-sebastien.bourdelin@savoirfairelinux.com>
+References: <20170203194729.20995-1-sebastien.bourdelin@savoirfairelinux.com>
+ <20170203194729.20995-4-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20170208214857.snplcpp55daa47so@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 Feb 2017 15:06:55 +0000
-Will Deacon <will.deacon@arm.com> wrote:
-
-> [adding linux-arm-kernel]
+On Fri, Feb 03, 2017 at 02:47:26PM -0500, Sebastien Bourdelin wrote:
+> Add binding documentation for the Technologic Systems NBUS that is used
+> to interface with peripherals in the FPGA of the TS-4600 SoM.
 > 
-> On Wed, Feb 08, 2017 at 12:13:14AM +0900, Masami Hiramatsu wrote:
-> > Similar to x86 kretprobe deadlock issue, arm64 also implements
-> > kretprobe-booster (trampoline code directly call handler.)
-> > So it has same deadlock issue if there are 2 kretprobes on
-> > normal function and the function called from FIQ (or anywhere
-> > which can be invoked when local_irq_disabled).
+> ---
+> Changes v1 -> v2:
+>   - rebase on master
+>   - remove the simple-bus compatibility as the root node will now
+>   populate child nodes (suggested by Rob Herring)
+>   - use the ts vendor prefix for gpios (suggested by Rob Herring)
 > 
-> We don't support FIQ on arm64, so I'm not worried about that particular
-> case. What are the other cases? I can think of debug exceptions, but those
-> shouldn't be generally kprobe-able, and taking data aborts in things like
-> get_user/put_user. Are those affected by this bug?
-
-Hmm, in that case, this may not needed at this point. Would you have
-any plan to support FIQ like as NMI in x86?
-If something can interrupt while the critical region between 
-spin_lock_irqsave() and spin_unlock_irqrestore(), and it can be
-kprobe'd, it is safer to apply this patch.
-
-> Either way, could you please expand the commit message like you have
-> for x86? It makes it much easier to understand the change when looking
-> back at the log in future.
-
-Ah, sorry. I will update the comment.
-
-Thank you,
-
+> Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+> ---
+>  Documentation/devicetree/bindings/bus/ts-nbus.txt | 50 +++++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/bus/ts-nbus.txt
 > 
-> Thanks,
+> diff --git a/Documentation/devicetree/bindings/bus/ts-nbus.txt b/Documentation/devicetree/bindings/bus/ts-nbus.txt
+> new file mode 100644
+> index 000000000000..c8a1f2cbe6a0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/bus/ts-nbus.txt
+> @@ -0,0 +1,50 @@
+> +Technologic Systems NBUS
+> +
+> +The NBUS is a bus used to interface with peripherals in the Technologic
+> +Systems FPGA on the TS-4600 SoM.
+> +
+> +Required properties :
+> + - compatible     : "technologic,ts-nbus"
+> + - #address-cells : must be 1
+> + - #size-cells    : must be 0
+> + - pws            : The PWM binded to the FPGA
+
+Should be pwms?
+
+s/binded/bound/
+
+> + - data-gpios	  : The GPIO pin connected to the data line on the FPGA
+
+lines? How many? Always 8 like the example?
+
+> + - csn-gpios	  : The GPIO pin connected to the csn line on the FPGA
+> + - txrx-gpios	  : The GPIO pin connected to the txrx line on the FPGA
+> + - strobe-gpios	  : The GPIO pin connected to the stobe line on the FPGA
+> + - ale-gpios	  : The GPIO pin connected to the ale line on the FPGA
+> + - rdy-gpios	  : The GPIO pin connected to the rdy line on the FPGA
+> +
+> +Child nodes:
+> +
+> +The NBUS node can contain zero or more child nodes representing peripherals
+> +on the bus.
+> +
+> +Example:
+> +
+> +	nbus {
+> +		compatible = "technologic,ts-nbus";
+> +		pinctrl-0 = <&nbus_pins>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pwms = <&pwm 2 83>;
+> +		ts-data-gpios   = <&gpio0 0 GPIO_ACTIVE_HIGH
+> +				   &gpio0 1 GPIO_ACTIVE_HIGH
+> +				   &gpio0 2 GPIO_ACTIVE_HIGH
+> +				   &gpio0 3 GPIO_ACTIVE_HIGH
+> +				   &gpio0 4 GPIO_ACTIVE_HIGH
+> +				   &gpio0 5 GPIO_ACTIVE_HIGH
+> +				   &gpio0 6 GPIO_ACTIVE_HIGH
+> +				   &gpio0 7 GPIO_ACTIVE_HIGH>;
+> +		ts-csn-gpios    = <&gpio0 16 GPIO_ACTIVE_HIGH>;
+> +		ts-txrx-gpios   = <&gpio0 24 GPIO_ACTIVE_HIGH>;
+> +		ts-strobe-gpios = <&gpio0 25 GPIO_ACTIVE_HIGH>;
+> +		ts-ale-gpios    = <&gpio0 26 GPIO_ACTIVE_HIGH>;
+> +		ts-rdy-gpios    = <&gpio0 21 GPIO_ACTIVE_HIGH>;
+> +
+> +		watchdog at 2a {
+> +			compatible = "...";
+> +
+> +			/* ... */
+> +		};
+> +	};
+> -- 
+> 2.11.0
 > 
-> Will
-
-
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
