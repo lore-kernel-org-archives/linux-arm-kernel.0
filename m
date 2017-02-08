@@ -1,26 +1,28 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 09 Feb 2017 00:36:28 +0100
-Subject: [PATCH v2 0/7] drm/rockchip: switch to drm_mm for support arm64
- iommu
-In-Reply-To: <1486456542-18675-1-git-send-email-mark.yao@rock-chips.com>
-References: <1486456542-18675-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <4892535.e058iD2sG7@diego>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 8 Feb 2017 15:32:20 -0800
+Subject: [PATCH for-4.11 1/2] Revert "phy: Add USB3 PHY support for
+ Broadcom NSP SoC"
+In-Reply-To: <20170208233023.31922-1-zajec5@gmail.com>
+References: <20170208233023.31922-1-zajec5@gmail.com>
+Message-ID: <82b47a03-c41b-378b-2d7c-f263eff514a9@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 7. Februar 2017, 16:35:35 CET schrieb Mark Yao:
-> Some iommu patches on the series[0] "iommu/rockchip: Fix bugs and
-> enable on ARM64" already landed, So drm/rockchip related patches [1] and [2]
-> ready to landed, this series just rebase them to lastest drm-next.
+On 02/08/2017 03:30 PM, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
 > 
-> And fix some bugs for drm/rockchip drm_mm
+> This reverts commit d7bc1a7d41bf ("phy: Add USB3 PHY support for
+> Broadcom NSP SoC") as we already have driver for this PHY (shared by NS
+> and NSP). It was added in commit e5666281d9ea ("phy: bcm-ns-usb3: new
+> driver for USB 3.0 PHY on Northstar").
 > 
-> [0]: http://www.spinics.net/lists/arm-kernel/msg513781.html
-> [1]: https://patchwork.kernel.org/patch/9196367
-> [2]: https://patchwork.kernel.org/patch/9196369
+> Instead of adding separated driver & duplicating code we should work on
+> improving existing (old) one. Thanks to work done by Broadcom we know
+> there is MDIO bus we weren't aware of & we know register names which
+> makes initialization more clear. This is very valuable info and we
+> should work on using it in existing driver afterwards.
 
-I've managed to get some output on my rk3399-gru with this series ;-)
-and rk3288 also kept on working, so
-
-On rk3288 and rk3399
-Tested-by: Heiko Stuebner <heiko@sntech.de>
+Should not we first extend the old driver to support NSP and then revert
+d7bc1a7d41bf ("phy: Add USB3 PHY support for Broadcom NSP SoC")?
+-- 
+Florian
