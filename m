@@ -1,31 +1,124 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Feb 2017 11:52:59 +0100
-Subject: [PATCH 4/4] clk: mvebu: Expand mv98dx3236-core-clock support
-In-Reply-To: <6149d4126a214ac8b0b0184bd818bea6@svr-chch-ex1.atlnz.lc>
-References: <20170203034012.29399-1-chris.packham@alliedtelesis.co.nz>
- <5a974d9d7260432087619486bf5d79ed@svr-chch-ex1.atlnz.lc>
- <6149d4126a214ac8b0b0184bd818bea6@svr-chch-ex1.atlnz.lc>
-Message-ID: <9294933.cXSW0amFbE@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 8 Feb 2017 10:56:18 +0000
+Subject: [PATCH v2 5/8] mfd: exynos-lpass: Remove pad retention control
+In-Reply-To: <1485419634-28331-6-git-send-email-m.szyprowski@samsung.com>
+References: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170126083403eucas1p2328ed884334b453ffb1faac3c745cec3@eucas1p2.samsung.com>
+ <1485419634-28331-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170208105618.thwgfpcyovw5xt6j@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, February 7, 2017 3:07:37 AM CET Chris Packham wrote:
-> >
-> > Actually I wonder if I can try a bit harder to keep a system booting.
-> > The following might work
-> > 1) add the compatible strings to the existing armada clock drivers.
-> > 2) update the dts to use the new compatible strings.
-> > 3) add the new driver and remove the compatible strings from the armada
-> > drivers.
-> >
-> > #1 would still upset checkpatch.pl because the documentation would only
-> > arrive in #2.
+On Thu, 26 Jan 2017, Marek Szyprowski wrote:
+
+> Pad retention should be controlled from pin control driver, so remove it
+> from Exynos LPASS driver. After this change, no more access to PMU regmap
+> is needed, so remove also the code for handling PMU regmap.
 > 
-> Actually upon testing #1 is unnecessary. I lose some of the gated clocks 
-> but nothing that prevents booting.
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  .../bindings/mfd/samsung,exynos5433-lpass.txt           |  2 --
+>  drivers/mfd/exynos-lpass.c                              | 17 -----------------
+>  include/linux/mfd/syscon/exynos5-pmu.h                  |  3 ---
+>  3 files changed, 22 deletions(-)
 
-Just to be sure: this means we can merge 2) and 3) independently and
-having just one of them will not cause regressions over what we have
-today?
+Love the diff! :)
 
-	Arnd
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+  
+> diff --git a/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt b/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt
+> index c110e118b79f..a8deaee82c44 100644
+> --- a/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt
+> +++ b/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt
+> @@ -5,7 +5,6 @@ Required properties:
+>   - compatible		: "samsung,exynos5433-lpass"
+>   - reg			: should contain the LPASS top SFR region location
+>  			  and size
+> - - samsung,pmu-syscon	: the phandle to the Power Management Unit node
+>   - #address-cells	: should be 1
+>   - #size-cells		: should be 1
+>   - ranges		: must be present
+> @@ -25,7 +24,6 @@ Example:
+>  audio-subsystem {
+>  	compatible = "samsung,exynos5433-lpass";
+>  	reg = <0x11400000 0x100>, <0x11500000 0x08>;
+> -	samsung,pmu-syscon = <&pmu_system_controller>;
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+>  	ranges;
+> diff --git a/drivers/mfd/exynos-lpass.c b/drivers/mfd/exynos-lpass.c
+> index 2e064fb8826f..17915daa2e80 100644
+> --- a/drivers/mfd/exynos-lpass.c
+> +++ b/drivers/mfd/exynos-lpass.c
+> @@ -18,7 +18,6 @@
+>  #include <linux/io.h>
+>  #include <linux/module.h>
+>  #include <linux/mfd/syscon.h>
+> -#include <linux/mfd/syscon/exynos5-pmu.h>
+>  #include <linux/of.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/platform_device.h>
+> @@ -51,8 +50,6 @@
+>  #define  LPASS_INTR_SFR			BIT(0)
+>  
+>  struct exynos_lpass {
+> -	/* pointer to the Power Management Unit regmap */
+> -	struct regmap *pmu;
+>  	/* pointer to the LPASS TOP regmap */
+>  	struct regmap *top;
+>  };
+> @@ -81,10 +78,6 @@ static void exynos_lpass_enable(struct exynos_lpass *lpass)
+>  	regmap_write(lpass->top, SFR_LPASS_INTR_CPU_MASK,
+>  		     LPASS_INTR_SFR | LPASS_INTR_DMA | LPASS_INTR_I2S);
+>  
+> -	/* Activate related PADs from retention state */
+> -	regmap_write(lpass->pmu, EXYNOS5433_PAD_RETENTION_AUD_OPTION,
+> -		     EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR);
+> -
+>  	exynos_lpass_core_sw_reset(lpass, LPASS_I2S_SW_RESET);
+>  	exynos_lpass_core_sw_reset(lpass, LPASS_DMA_SW_RESET);
+>  	exynos_lpass_core_sw_reset(lpass, LPASS_MEM_SW_RESET);
+> @@ -95,9 +88,6 @@ static void exynos_lpass_disable(struct exynos_lpass *lpass)
+>  	/* Mask any unmasked IP interrupt sources */
+>  	regmap_write(lpass->top, SFR_LPASS_INTR_CPU_MASK, 0);
+>  	regmap_write(lpass->top, SFR_LPASS_INTR_CA5_MASK, 0);
+> -
+> -	/* Deactivate related PADs from retention state */
+> -	regmap_write(lpass->pmu, EXYNOS5433_PAD_RETENTION_AUD_OPTION, 0);
+>  }
+>  
+>  static const struct regmap_config exynos_lpass_reg_conf = {
+> @@ -131,13 +121,6 @@ static int exynos_lpass_probe(struct platform_device *pdev)
+>  		return PTR_ERR(lpass->top);
+>  	}
+>  
+> -	lpass->pmu = syscon_regmap_lookup_by_phandle(dev->of_node,
+> -						"samsung,pmu-syscon");
+> -	if (IS_ERR(lpass->pmu)) {
+> -		dev_err(dev, "Failed to lookup PMU regmap\n");
+> -		return PTR_ERR(lpass->pmu);
+> -	}
+> -
+>  	platform_set_drvdata(pdev, lpass);
+>  	exynos_lpass_enable(lpass);
+>  
+> diff --git a/include/linux/mfd/syscon/exynos5-pmu.h b/include/linux/mfd/syscon/exynos5-pmu.h
+> index c28ff21ca4d2..0622ae86f9db 100644
+> --- a/include/linux/mfd/syscon/exynos5-pmu.h
+> +++ b/include/linux/mfd/syscon/exynos5-pmu.h
+> @@ -46,7 +46,4 @@
+>  #define EXYNOS5_MIPI_PHY_S_RESETN		BIT(1)
+>  #define EXYNOS5_MIPI_PHY_M_RESETN		BIT(2)
+>  
+> -#define EXYNOS5433_PAD_RETENTION_AUD_OPTION		(0x3028)
+> -#define EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR	BIT(28)
+> -
+>  #endif /* _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_ */
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
