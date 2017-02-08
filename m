@@ -1,58 +1,49 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 8 Feb 2017 08:31:16 +0100
-Subject: [RFC][PATCH] treewide: Move set_memory_* functions away from
- cacheflush.h
-In-Reply-To: <1486501816-27600-1-git-send-email-labbott@redhat.com>
-References: <1486501816-27600-1-git-send-email-labbott@redhat.com>
-Message-ID: <20170208073116.GA5738@gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 8 Feb 2017 08:34:01 +0100
+Subject: [PATCH 1/2] drm/rockchip: support mode_valid for crtc
+In-Reply-To: <589A6A38.8050805@rock-chips.com>
+References: <1486280197-1585-1-git-send-email-mark.yao@rock-chips.com>
+ <20170207161405.GG15150@art_vandelay> <589A6A38.8050805@rock-chips.com>
+Message-ID: <CAKMK7uE5gzDjBTg=XoaxB7mY89SR8yhaC9rCXHE4mCaXuqDBHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 8, 2017 at 1:45 AM, Mark yao <mark.yao@rock-chips.com> wrote:
+> On 2017?02?08? 00:14, Sean Paul wrote:
+>>
+>> On Sun, Feb 05, 2017 at 03:36:36PM +0800, Mark Yao wrote:
+>>>
+>>> drm crtc already has mode_fixup callback to can do mode check, but
+>>> We actually want to valid display mode on connector getmode time,
+>>> mode_fixup can't do it.
+>>>
+>>> So add a private mode_valid callback to rockchip crtc, connectors can
+>>> check mode with this mode_valid callback.
+>>>
+>> There are some nasty layer violations happening in this set. You should
+>> use
+>> mode_fixup if the crtc has limitations on the mode being set.
+>>
+>> Sean
+>
+> Mode_fixup can also check crtc limitations, but it's secondly time to check
+> display mode.
+>
+> mode_fixup only works on drm_setcrtc or atomic_commit check, when userspace
+> get a series of display modes,
+> They don't know which display mode is bad before drm_setcrtc or
+> atomic_commit check, they need try,
+> but drm_setcrtc or atomic_commit check not only for display mode check,
+> means that userspace didn't have a sure
+> method to verify display mode.
+>
+> So I try to add the mode_valid callback to connector getmodes time, verify
+> display mode before send mode list to userspace.
+> then userspace would get a good display mode list.
 
-* Laura Abbott <labbott@redhat.com> wrote:
-
-> The set_memory_* APIs came out of a desire to have a better way to
-> change memory attributes. Many of these attributes were linked to cache
-> functionality so the prototypes were put in cacheflush.h. These days,
-> the APIs have grown and have a much wider use than just cache APIs. To
-> support this growth, split off set_memory_* and friends into a separate
-> header file to avoid growing cacheflush.h for APIs that have nothing to
-> do with caches.
-> 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> This came out of a comment Russell made while reviewing RODATA test cases
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/480855.html
-> While the final result of that series was the rodata code was refactored into
-> its own header file, the set_memory_* APIs are still out of place.
-> 
-> This is a simple attempt at moving all the API stubs to their own file.
-> Another idea I had was throwing set_memory_{x,nx,ro,rw} in an asm-generic
-> file since those are commonly used for module setting across all arches.
-> 
-> This is an RFC to see if this is actually beneficial. The diffstat is not
-> negative unfortunately due to header guards in newer files.
-> I have patches to convert call sites over to set_memory.h instead of
-> cacheflush.h if there is sufficient interest.
-> ---
->  arch/arm/include/asm/cacheflush.h   |  21 +-------
->  arch/arm/include/asm/set_memory.h   |  32 ++++++++++++
->  arch/arm64/include/asm/cacheflush.h |   6 +--
->  arch/arm64/include/asm/set_memory.h |  26 ++++++++++
->  arch/s390/include/asm/cacheflush.h  |   6 +--
->  arch/s390/include/asm/set_memory.h  |   9 ++++
->  arch/x86/include/asm/cacheflush.h   |  96 +---------------------------------
->  arch/x86/include/asm/set_memory.h   | 100 ++++++++++++++++++++++++++++++++++++
->  8 files changed, 171 insertions(+), 125 deletions(-)
->  create mode 100644 arch/arm/include/asm/set_memory.h
->  create mode 100644 arch/arm64/include/asm/set_memory.h
->  create mode 100644 arch/s390/include/asm/set_memory.h
->  create mode 100644 arch/x86/include/asm/set_memory.h
-
-LGTM:
-
-Acked-by: Ingo Molnar <mingo@kernel.org>
-
-Thanks,
-
-	Ingo
+You need both, the kerneldoc of these hooks explains in detail why.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
