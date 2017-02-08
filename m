@@ -1,27 +1,31 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 8 Feb 2017 13:12:30 +0800
-Subject: [PATCH v9 2/3] MAINTAINERS: add zx2967 thermal drivers to ARM
- ZTE architecture
-In-Reply-To: <20170208044537.GA20633@localhost.localdomain>
-References: <1486429001-31940-1-git-send-email-baoyou.xie@linaro.org>
- <1486429001-31940-2-git-send-email-baoyou.xie@linaro.org>
- <20170208044537.GA20633@localhost.localdomain>
-Message-ID: <20170208051228.GL3407@dragon>
+From: dawei.chien@mediatek.com (Dawei Chien)
+Date: Wed, 8 Feb 2017 13:31:02 +0800
+Subject: [PATCH] thermal: mt8173: minor mtk_thermal.c cleanups
+Message-ID: <1486531862-31945-1-git-send-email-dawei.chien@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
+Thermal driver should read TEMP_MSR3 if thermal bank with 4 sensors.
+However, Currently thermal driver don't need read TEMP_MSR3 since
+thermal controller only use 3 sensors for each thermal bank.
 
-On Tue, Feb 07, 2017 at 08:45:39PM -0800, Eduardo Valentin wrote:
-> 
-> On Tue, Feb 07, 2017 at 08:56:40AM +0800, Baoyou Xie wrote:
-> > Add the zx2967 thermal drivers as maintained by ARM ZTE
-> > architecture maintainers, as they're parts of the core IP.
-> 
-> What kernel version is this based off? I could not apply this one
-> cleanly.
+Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+---
+ drivers/thermal/mtk_thermal.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I think you can skip this one.  We will update MAINTAINERS separately
-through arm-soc tree, after the patch lands on mainline.
-
-Shawn
+diff --git a/drivers/thermal/mtk_thermal.c b/drivers/thermal/mtk_thermal.c
+index 34169c3..c124151 100644
+--- a/drivers/thermal/mtk_thermal.c
++++ b/drivers/thermal/mtk_thermal.c
+@@ -191,7 +191,7 @@ struct mtk_thermal {
+ };
+ 
+ const int mt8173_msr[MT8173_NUM_SENSORS_PER_ZONE] = {
+-	TEMP_MSR0, TEMP_MSR1, TEMP_MSR2, TEMP_MSR2
++	TEMP_MSR0, TEMP_MSR1, TEMP_MSR2, TEMP_MSR3
+ };
+ 
+ const int mt8173_adcpnp[MT8173_NUM_SENSORS_PER_ZONE] = {
+-- 
+1.9.1
