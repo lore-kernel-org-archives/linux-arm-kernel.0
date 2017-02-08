@@ -1,96 +1,174 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  8 Feb 2017 11:55:47 +0000
-Subject: [PATCH v2 14/14] arm: efi: add PE/COFF debug table to EFI header
-In-Reply-To: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1486554947-3964-15-git-send-email-ard.biesheuvel@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 8 Feb 2017 11:58:56 +0000
+Subject: [PATCH 1/4] phy: exynos4: Remove duplicated defines of PHY
+ register defines
+In-Reply-To: <20170127200510.4444-2-krzk@kernel.org>
+References: <20170127200510.4444-1-krzk@kernel.org>
+ <20170127200510.4444-2-krzk@kernel.org>
+Message-ID: <20170208115856.f6se6btiylv6usip@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the PE/COFF header to emit the absolute path to the
-decompressor vmlinux ELF file into a so-called NB10 Codeview entry.
-This is hugely helpful when debugging the firmware->stub handover.
+On Fri, 27 Jan 2017, Krzysztof Kozlowski wrote:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/boot/compressed/Makefile     |  4 ++
- arch/arm/boot/compressed/efi-header.S | 45 ++++++++++++++++++++
- 2 files changed, 49 insertions(+)
+> Phy drivers access PMU region through regmap provided by exynos-pmu
+> driver.   However there is no need to duplicate defines for PMU
+> registers.  Instead just use whatever is defined in exynos-regs-pmu.h.
+> 
+> Additionally MIPI PHY registers for Exynos5433 start from the same
+> address as Exynos4 and Exynos5250 so re-use existing defines.
+> 
+> This reduces number of defines and allows removal of one header file.
+> 
+> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  drivers/phy/phy-exynos-mipi-video.c         | 12 ++++++------
+>  include/linux/mfd/syscon/exynos4-pmu.h      | 21 ---------------------
+>  include/linux/mfd/syscon/exynos5-pmu.h      |  3 ---
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index d50430c40045..6b978bdbac3e 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -196,3 +196,7 @@ AFLAGS_hyp-stub.o := -Wa,-march=armv7-a
- 
- $(obj)/hyp-stub.S: $(srctree)/arch/$(SRCARCH)/kernel/hyp-stub.S
- 	$(call cmd,shipped)
-+
-+ifeq ($(CONFIG_EFI)$(CONFIG_DEBUG_INFO),yy)
-+AFLAGS_head.o += -DVMLINUX_PATH="\"$(realpath $(obj)/vmlinux)\""
-+endif
-diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
-index 3cf09f7efced..dff3c72c7c5a 100644
---- a/arch/arm/boot/compressed/efi-header.S
-+++ b/arch/arm/boot/compressed/efi-header.S
-@@ -95,6 +95,11 @@ extra_header_fields:
- 	.quad	0					@ CertificationTable
- 	.quad	0					@ BaseRelocationTable
- 
-+#ifdef CONFIG_DEBUG_INFO
-+	.long	efi_debug_table - start			@ DebugTable
-+	.long	efi_debug_table_size
-+#endif
-+
- section_table:
- 	.ascii	".text\0\0\0"
- 	.long	__pecoff_data_start - __efi_start	@ VirtualSize
-@@ -124,6 +129,46 @@ section_table:
- 
- 	.set	section_count, (. - section_table) / 40
- 
-+#ifdef CONFIG_DEBUG_INFO
-+	/*
-+	 * The debug table is referenced via its Relative Virtual Address (RVA),
-+	 * which is only defined for those parts of the image that are covered
-+	 * by a section declaration. Since this header is not covered by any
-+	 * section, the debug table must be emitted elsewhere. So stick it in
-+	 * the .init.rodata section instead.
-+	 *
-+	 * Note that the EFI debug entry itself may legally have a zero RVA,
-+	 * which means we can simply put it right after the section headers.
-+	 */
-+	.section	".rodata", #alloc
-+
-+	.align	2
-+efi_debug_table:
-+	// EFI_IMAGE_DEBUG_DIRECTORY_ENTRY
-+	.long	0					@ Characteristics
-+	.long	0					@ TimeDateStamp
-+	.short	0					@ MajorVersion
-+	.short	0					@ MinorVersion
-+	.long	IMAGE_DEBUG_TYPE_CODEVIEW		@ Type
-+	.long	efi_debug_entry_size			@ SizeOfData
-+	.long	0					@ RVA
-+	.long	efi_debug_entry - start			@ FileOffset
-+
-+	.set	efi_debug_table_size, . - efi_debug_table
-+	.previous
-+
-+efi_debug_entry:
-+	// EFI_IMAGE_DEBUG_CODEVIEW_NB10_ENTRY
-+	.ascii	"NB10"					@ Signature
-+	.long	0					@ Unknown
-+	.long	0					@ Unknown2
-+	.long	0					@ Unknown3
-+
-+	.asciz	VMLINUX_PATH
-+
-+	.set	efi_debug_entry_size, . - efi_debug_entry
-+#endif
-+
- 	.align	12
- __efi_start:
- #endif
+Love that diff!
+
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+>  include/linux/soc/samsung/exynos-regs-pmu.h |  9 ++++++++-
+>  4 files changed, 14 insertions(+), 31 deletions(-)
+>  delete mode 100644 include/linux/mfd/syscon/exynos4-pmu.h
+> 
+> diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
+> index 6bee04cc4d53..d7fe1f8c3ac8 100644
+> --- a/drivers/phy/phy-exynos-mipi-video.c
+> +++ b/drivers/phy/phy-exynos-mipi-video.c
+> @@ -12,7 +12,6 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  #include <linux/kernel.h>
+> -#include <linux/mfd/syscon/exynos4-pmu.h>
+>  #include <linux/mfd/syscon/exynos5-pmu.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> @@ -21,6 +20,7 @@
+>  #include <linux/phy/phy.h>
+>  #include <linux/regmap.h>
+>  #include <linux/spinlock.h>
+> +#include <linux/soc/samsung/exynos-regs-pmu.h>
+>  #include <linux/mfd/syscon.h>
+>  
+>  enum exynos_mipi_phy_id {
+> @@ -173,7 +173,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
+>  			/* EXYNOS_MIPI_PHY_ID_CSIS0 */
+>  			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM0,
+>  			.enable_val = EXYNOS5_PHY_ENABLE,
+> -			.enable_reg = EXYNOS5433_MIPI_PHY0_CONTROL,
+> +			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(0),
+>  			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
+>  			.resetn_val = BIT(0),
+>  			.resetn_reg = EXYNOS5433_SYSREG_CAM0_MIPI_DPHY_CON,
+> @@ -182,7 +182,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
+>  			/* EXYNOS_MIPI_PHY_ID_DSIM0 */
+>  			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS0,
+>  			.enable_val = EXYNOS5_PHY_ENABLE,
+> -			.enable_reg = EXYNOS5433_MIPI_PHY0_CONTROL,
+> +			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(0),
+>  			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
+>  			.resetn_val = BIT(0),
+>  			.resetn_reg = EXYNOS5433_SYSREG_DISP_MIPI_PHY,
+> @@ -191,7 +191,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
+>  			/* EXYNOS_MIPI_PHY_ID_CSIS1 */
+>  			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
+>  			.enable_val = EXYNOS5_PHY_ENABLE,
+> -			.enable_reg = EXYNOS5433_MIPI_PHY1_CONTROL,
+> +			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(1),
+>  			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
+>  			.resetn_val = BIT(1),
+>  			.resetn_reg = EXYNOS5433_SYSREG_CAM0_MIPI_DPHY_CON,
+> @@ -200,7 +200,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
+>  			/* EXYNOS_MIPI_PHY_ID_DSIM1 */
+>  			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
+>  			.enable_val = EXYNOS5_PHY_ENABLE,
+> -			.enable_reg = EXYNOS5433_MIPI_PHY1_CONTROL,
+> +			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(1),
+>  			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
+>  			.resetn_val = BIT(1),
+>  			.resetn_reg = EXYNOS5433_SYSREG_DISP_MIPI_PHY,
+> @@ -209,7 +209,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
+>  			/* EXYNOS_MIPI_PHY_ID_CSIS2 */
+>  			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
+>  			.enable_val = EXYNOS5_PHY_ENABLE,
+> -			.enable_reg = EXYNOS5433_MIPI_PHY2_CONTROL,
+> +			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(2),
+>  			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
+>  			.resetn_val = BIT(0),
+>  			.resetn_reg = EXYNOS5433_SYSREG_CAM1_MIPI_DPHY_CON,
+> diff --git a/include/linux/mfd/syscon/exynos4-pmu.h b/include/linux/mfd/syscon/exynos4-pmu.h
+> deleted file mode 100644
+> index 278b1b1549e9..000000000000
+> --- a/include/linux/mfd/syscon/exynos4-pmu.h
+> +++ /dev/null
+> @@ -1,21 +0,0 @@
+> -/*
+> - * Copyright (C) 2015 Samsung Electronics Co., Ltd.
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+> -
+> -#ifndef _LINUX_MFD_SYSCON_PMU_EXYNOS4_H_
+> -#define _LINUX_MFD_SYSCON_PMU_EXYNOS4_H_
+> -
+> -/* Exynos4 PMU register definitions */
+> -
+> -/* MIPI_PHYn_CONTROL register offset: n = 0..1 */
+> -#define EXYNOS4_MIPI_PHY_CONTROL(n)	(0x710 + (n) * 4)
+> -#define EXYNOS4_MIPI_PHY_ENABLE		(1 << 0)
+> -#define EXYNOS4_MIPI_PHY_SRESETN	(1 << 1)
+> -#define EXYNOS4_MIPI_PHY_MRESETN	(1 << 2)
+> -#define EXYNOS4_MIPI_PHY_RESET_MASK	(3 << 1)
+> -
+> -#endif /* _LINUX_MFD_SYSCON_PMU_EXYNOS4_H_ */
+> diff --git a/include/linux/mfd/syscon/exynos5-pmu.h b/include/linux/mfd/syscon/exynos5-pmu.h
+> index 0622ae86f9db..02af8dece914 100644
+> --- a/include/linux/mfd/syscon/exynos5-pmu.h
+> +++ b/include/linux/mfd/syscon/exynos5-pmu.h
+> @@ -38,9 +38,6 @@
+>  
+>  /* Exynos5433 specific register definitions */
+>  #define EXYNOS5433_USBHOST30_PHY_CONTROL	(0x728)
+> -#define EXYNOS5433_MIPI_PHY0_CONTROL		(0x710)
+> -#define EXYNOS5433_MIPI_PHY1_CONTROL		(0x714)
+> -#define EXYNOS5433_MIPI_PHY2_CONTROL		(0x718)
+>  
+>  #define EXYNOS5_PHY_ENABLE			BIT(0)
+>  #define EXYNOS5_MIPI_PHY_S_RESETN		BIT(1)
+> diff --git a/include/linux/soc/samsung/exynos-regs-pmu.h b/include/linux/soc/samsung/exynos-regs-pmu.h
+> index 6a6529c96442..637ead0efd36 100644
+> --- a/include/linux/soc/samsung/exynos-regs-pmu.h
+> +++ b/include/linux/soc/samsung/exynos-regs-pmu.h
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Copyright (c) 2010-2012 Samsung Electronics Co., Ltd.
+> + * Copyright (c) 2010-2015 Samsung Electronics Co., Ltd.
+>   *		http://www.samsung.com
+>   *
+>   * EXYNOS - Power management unit definition
+> @@ -50,6 +50,13 @@
+>  #define S5P_WAKEUP_MASK				0x0608
+>  #define S5P_WAKEUP_MASK2				0x0614
+>  
+> +/* MIPI_PHYn_CONTROL, valid for Exynos3250, Exynos4, Exynos5250 and Exynos5433 */
+> +#define EXYNOS4_MIPI_PHY_CONTROL(n)		(0x0710 + (n) * 4)
+> +#define EXYNOS4_MIPI_PHY_ENABLE			(1 << 0)
+> +#define EXYNOS4_MIPI_PHY_SRESETN		(1 << 1)
+> +#define EXYNOS4_MIPI_PHY_MRESETN		(1 << 2)
+> +#define EXYNOS4_MIPI_PHY_RESET_MASK		(3 << 1)
+> +
+>  #define S5P_INFORM0				0x0800
+>  #define S5P_INFORM1				0x0804
+>  #define S5P_INFORM5				0x0814
+
 -- 
-2.7.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
