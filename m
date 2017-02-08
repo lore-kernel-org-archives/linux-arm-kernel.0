@@ -1,29 +1,74 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Feb 2017 14:25:50 +0100
-Subject: [PATCH] security/keys: add CONFIG_KEYS_COMPAT to Kconfig
-In-Reply-To: <CAOe_czuM1hdECu=ByWzs-fBmDS2Xo1f+TFshdO+MkcePU11ZKg@mail.gmail.com>
-References: <201701262036.mMS7eB5U%fengguang.wu@intel.com>
- <1485437243-9349-1-git-send-email-bilal.amarni@gmail.com>
- <CAOe_czuM1hdECu=ByWzs-fBmDS2Xo1f+TFshdO+MkcePU11ZKg@mail.gmail.com>
-Message-ID: <CAK8P3a3tHb=ogt=Ym1+V0c6pfGMjCd2m1vm6X87gQaY2vALRvA@mail.gmail.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Wed, 8 Feb 2017 14:26:06 +0100
+Subject: [PATCH 10/10] ARM: davinci: add pdata-quirks for da850-evm vpif
+ display
+In-Reply-To: <m2k291kglb.fsf@baylibre.com>
+References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
+ <1486485683-11427-11-git-send-email-bgolaszewski@baylibre.com>
+ <m2k291kglb.fsf@baylibre.com>
+Message-ID: <CAMpxmJUEH4-bP-x06fvYSy-6ViVMr3++txBQmtm5bEENR1yqnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 8, 2017 at 2:01 PM, Bilal Amarni <bilal.amarni@gmail.com> wrote:
-> Hi Arnd,
+2017-02-07 19:20 GMT+01:00 Kevin Hilman <khilman@baylibre.com>:
+> Bartosz Golaszewski <bgolaszewski@baylibre.com> writes:
 >
-> I've made the patch more generic as requested. As the patch affects
-> now other architectures, is it still able to go through arm mailing
-> list?
+>> Similarly to vpif capture: we need to register the vpif display driver
+>> and the corresponding adv7343 encoder in pdata-quirks as the DT
+>> support is not complete.
+>
+> To add a bit more detail to the changelog:  DT support is not complete
+> since there isn't currently a way to define the output_routing in the
+> V4L2 drivers (c.f. s_routing) via DT.
+>
 
-It would be good to get an Ack from the other architecture maintainers, you
-need to add them to Cc in the submission. The best person to merge the
-combined patch would be  the keyring maintainer, so send the patch 'To'
-him (from MAINTAINERS file):
+I'll add this in v2.
 
-KEYS/KEYRINGS:
-M:      David Howells <dhowells@redhat.com>
-L:      keyrings at vger.kernel.org
-S:      Maintained
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>
+> minor nit below, otherwise
+>
+> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+>
+>> ---
+>>  arch/arm/mach-davinci/pdata-quirks.c | 86 +++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 85 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
+>> index 09f62ac..0a55546 100644
+>> --- a/arch/arm/mach-davinci/pdata-quirks.c
+>> +++ b/arch/arm/mach-davinci/pdata-quirks.c
+>> @@ -9,13 +9,17 @@
+>>   */
+>>  #include <linux/kernel.h>
+>>  #include <linux/of_platform.h>
+>> +#include <linux/gpio.h>
+>>
+>>  #include <media/i2c/tvp514x.h>
+>> +#include <media/i2c/adv7343.h>
+>>
+>>  #include <mach/common.h>
+>>  #include <mach/da8xx.h>
+>>  #include <mach/mux.h>
+>>
+>> +#define DA850_EVM_UI_EXP_SEL_VPIF_DISP 5
+>> +
+>>  struct pdata_init {
+>>       const char *compatible;
+>>       void (*fn)(void);
+>> @@ -107,7 +111,78 @@ static struct vpif_capture_config da850_vpif_capture_config = {
+>>       },
+>>       .card_name = "DA850/OMAP-L138 Video Capture",
+>>  };
+>> +#endif /* IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) */
+>> +
+>> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
+>
+> Why not IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) also here?
 
-   Arnd
+Just a reflex ;)
+
+I'll fix this too.
+
+Thanks,
+Bartosz
