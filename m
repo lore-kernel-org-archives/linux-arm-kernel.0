@@ -1,9 +1,9 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  8 Feb 2017 11:55:39 +0000
-Subject: [PATCH v2 06/14] arm64: efi: remove pointless dummy .reloc section
+Date: Wed,  8 Feb 2017 11:55:44 +0000
+Subject: [PATCH v2 11/14] arm: efi: remove pointless dummy .reloc section
 In-Reply-To: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1486554947-3964-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1486554947-3964-12-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -28,52 +28,46 @@ attribute set (which is not the case for our PE/COFF image)
 
 So simply remove the .reloc section altogether.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Peter Jones <pjones@redhat.com>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/efi-header.S | 22 +-------------------
- 1 file changed, 1 insertion(+), 21 deletions(-)
+ arch/arm/boot/compressed/efi-header.S | 18 +-----------------
+ 1 file changed, 1 insertion(+), 17 deletions(-)
 
-diff --git a/arch/arm64/kernel/efi-header.S b/arch/arm64/kernel/efi-header.S
-index 515624bbfcd0..8786d58af2df 100644
---- a/arch/arm64/kernel/efi-header.S
-+++ b/arch/arm64/kernel/efi-header.S
-@@ -12,7 +12,7 @@
- 	.short 	0
- coff_header:
- 	.short	0xaa64					// AArch64
--	.short	2					// nr_sections
-+	.short	1					// nr_sections
- 	.long	0 					// TimeDateStamp
- 	.long	0					// PointerToSymbolTable
- 	.long	0					// NumberOfSymbols
-@@ -71,26 +71,6 @@ extra_header_fields:
+diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+index 50eff3bbc57c..5873fc2b5f9a 100644
+--- a/arch/arm/boot/compressed/efi-header.S
++++ b/arch/arm/boot/compressed/efi-header.S
+@@ -40,7 +40,7 @@ pe_header:
  
- 	// Section table
+ coff_header:
+ 		.short	0x01c2			@ ARM or Thumb
+-		.short	2			@ nr_sections
++		.short	1			@ nr_sections
+ 		.long	0 			@ TimeDateStamp
+ 		.long	0			@ PointerToSymbolTable
+ 		.long	0			@ NumberOfSymbols
+@@ -95,22 +95,6 @@ extra_header_fields:
+ 		.quad	0			@ BaseRelocationTable
+ 
  section_table:
+-		@
+-		@ The EFI application loader requires a relocation section
+-		@ because EFI applications must be relocatable. This is a
+-		@ dummy section as far as we are concerned.
+-		@
+-		.ascii	".reloc\0\0"
+-		.long	0			@ VirtualSize
+-		.long	0			@ VirtualAddress
+-		.long	0			@ SizeOfRawData
+-		.long	0			@ PointerToRawData
+-		.long	0			@ PointerToRelocations
+-		.long	0			@ PointerToLineNumbers
+-		.short	0			@ NumberOfRelocations
+-		.short	0			@ NumberOfLineNumbers
+-		.long	0x42000040		@ Characteristics
 -
--	/*
--	 * The EFI application loader requires a relocation section
--	 * because EFI applications must be relocatable.  This is a
--	 * dummy section as far as we are concerned.
--	 */
--	.ascii	".reloc"
--	.byte	0
--	.byte	0					// end of 0 padding of section name
--	.long	0
--	.long	0
--	.long	0					// SizeOfRawData
--	.long	0					// PointerToRawData
--	.long	0					// PointerToRelocations
--	.long	0					// PointerToLineNumbers
--	.short	0					// NumberOfRelocations
--	.short	0					// NumberOfLineNumbers
--	.long	0x42000040				// Characteristics (section flags)
--
--
- 	.ascii	".text"
- 	.byte	0
- 	.byte	0
+ 		.ascii	".text\0\0\0"
+ 		.long	_end - __efi_start	@ VirtualSize
+ 		.long	__efi_start		@ VirtualAddress
 -- 
 2.7.4
