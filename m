@@ -1,46 +1,96 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Wed, 8 Feb 2017 17:27:31 +0530
-Subject: [PATCH v12 6/9] usb: xhci: use bus->sysdev for DMA configuration
-In-Reply-To: <1486372421-29073-7-git-send-email-peter.chen@nxp.com>
-References: <1486372421-29073-1-git-send-email-peter.chen@nxp.com>
- <1486372421-29073-7-git-send-email-peter.chen@nxp.com>
-Message-ID: <CAFp+6iEtFetHY6FEAYD2Ymjr+BKyVKjaum_F8v4e8wapnFcK8w@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  8 Feb 2017 11:55:47 +0000
+Subject: [PATCH v2 14/14] arm: efi: add PE/COFF debug table to EFI header
+In-Reply-To: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1486554947-3964-15-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This updates the PE/COFF header to emit the absolute path to the
+decompressor vmlinux ELF file into a so-called NB10 Codeview entry.
+This is hugely helpful when debugging the firmware->stub handover.
 
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/boot/compressed/Makefile     |  4 ++
+ arch/arm/boot/compressed/efi-header.S | 45 ++++++++++++++++++++
+ 2 files changed, 49 insertions(+)
 
-On Mon, Feb 6, 2017 at 2:43 PM, Peter Chen <peter.chen@nxp.com> wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
->
-> For xhci-hcd platform device, all the DMA parameters are not
-> configured properly, notably dma ops for dwc3 devices. So, set
-> the dma for xhci from sysdev. sysdev is pointing to device that
-> is known to the system firmware or hardware.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
-> Tested-by: Baolin Wang <baolin.wang@linaro.org>
-> Tested-by: Vivek Gautam <vivek.gautam@codeaurora.org>
-> Tested-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
-> Signed-off-by: Mathias Nyman <mathias.nyman@linux.intel.com>
-> ---
-
-This patch doesn't work for me anymore on db820c target [1].
-While the same kernel with reverts of patches [2] [3] and an older
-patch [4] by Grygorii Strashko works [5].
-
-[1] https://github.com/vivekgautam1/linux/tree/linux-v4.10-rc7-usb-db820c-nonworking
-[2] 8c9f2de459c7 usb: dwc3: Do not set dma coherent mask
-[3] d64ff406e51e usb: dwc3: use bus->sysdev for DMA configuration
-[4] https://lkml.org/lkml/2016/4/25/813
-[5] https://github.com/vivekgautam1/linux/tree/linux-v4.10-rc7-usb-db820c
-
-
-regards
-Vivek
-
+diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
+index d50430c40045..6b978bdbac3e 100644
+--- a/arch/arm/boot/compressed/Makefile
++++ b/arch/arm/boot/compressed/Makefile
+@@ -196,3 +196,7 @@ AFLAGS_hyp-stub.o := -Wa,-march=armv7-a
+ 
+ $(obj)/hyp-stub.S: $(srctree)/arch/$(SRCARCH)/kernel/hyp-stub.S
+ 	$(call cmd,shipped)
++
++ifeq ($(CONFIG_EFI)$(CONFIG_DEBUG_INFO),yy)
++AFLAGS_head.o += -DVMLINUX_PATH="\"$(realpath $(obj)/vmlinux)\""
++endif
+diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+index 3cf09f7efced..dff3c72c7c5a 100644
+--- a/arch/arm/boot/compressed/efi-header.S
++++ b/arch/arm/boot/compressed/efi-header.S
+@@ -95,6 +95,11 @@ extra_header_fields:
+ 	.quad	0					@ CertificationTable
+ 	.quad	0					@ BaseRelocationTable
+ 
++#ifdef CONFIG_DEBUG_INFO
++	.long	efi_debug_table - start			@ DebugTable
++	.long	efi_debug_table_size
++#endif
++
+ section_table:
+ 	.ascii	".text\0\0\0"
+ 	.long	__pecoff_data_start - __efi_start	@ VirtualSize
+@@ -124,6 +129,46 @@ section_table:
+ 
+ 	.set	section_count, (. - section_table) / 40
+ 
++#ifdef CONFIG_DEBUG_INFO
++	/*
++	 * The debug table is referenced via its Relative Virtual Address (RVA),
++	 * which is only defined for those parts of the image that are covered
++	 * by a section declaration. Since this header is not covered by any
++	 * section, the debug table must be emitted elsewhere. So stick it in
++	 * the .init.rodata section instead.
++	 *
++	 * Note that the EFI debug entry itself may legally have a zero RVA,
++	 * which means we can simply put it right after the section headers.
++	 */
++	.section	".rodata", #alloc
++
++	.align	2
++efi_debug_table:
++	// EFI_IMAGE_DEBUG_DIRECTORY_ENTRY
++	.long	0					@ Characteristics
++	.long	0					@ TimeDateStamp
++	.short	0					@ MajorVersion
++	.short	0					@ MinorVersion
++	.long	IMAGE_DEBUG_TYPE_CODEVIEW		@ Type
++	.long	efi_debug_entry_size			@ SizeOfData
++	.long	0					@ RVA
++	.long	efi_debug_entry - start			@ FileOffset
++
++	.set	efi_debug_table_size, . - efi_debug_table
++	.previous
++
++efi_debug_entry:
++	// EFI_IMAGE_DEBUG_CODEVIEW_NB10_ENTRY
++	.ascii	"NB10"					@ Signature
++	.long	0					@ Unknown
++	.long	0					@ Unknown2
++	.long	0					@ Unknown3
++
++	.asciz	VMLINUX_PATH
++
++	.set	efi_debug_entry_size, . - efi_debug_entry
++#endif
++
+ 	.align	12
+ __efi_start:
+ #endif
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.4
