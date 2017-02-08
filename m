@@ -1,32 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 8 Feb 2017 17:22:50 +0000
+From: mcgrof@kernel.org (Luis R. Rodriguez)
+Date: Wed, 8 Feb 2017 09:25:40 -0800
 Subject: next-20170208 build: 1 failures 16 warnings (next-20170208)
-In-Reply-To: <E1cbPtA-00012m-9J@optimist>
+In-Reply-To: <20170208172250.rnqxq7g77ekuo2pv@sirena.org.uk>
 References: <E1cbPtA-00012m-9J@optimist>
-Message-ID: <20170208172250.rnqxq7g77ekuo2pv@sirena.org.uk>
+ <20170208172250.rnqxq7g77ekuo2pv@sirena.org.uk>
+Message-ID: <CAB=NE6X1WMByuARS4mZ1g9+W=LuVBnMDnh_5zyN0CLADaVh=Jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 10:54:16AM +0000, Build bot for Mark Brown wrote:
+On Wed, Feb 8, 2017 at 9:22 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Wed, Feb 08, 2017 at 10:54:16AM +0000, Build bot for Mark Brown wrote:
+>
+> Today's -next fails to build an arm64 allmodconfig due to:
+>
+>>       arm64-allmodconfig
+>> ../arch/arm64/kernel/armv8_deprecated.c:359:31: error: expected '=',
+>> ',', ';',
+> +'asm' or '__attribute__' before 'aarch32_check_condition'
+>> ../arch/arm64/kernel/armv8_deprecated.c:386:10: error: implicit
+>> declaration of
+> +function 'aarch32_check_condition'
+> [-Werror=implicit-function-declaration]
+>
+> triggered by 1930faf201e83f6 (kprobes: move kprobe declarations to
+> asm-generic/kprobes.h) according to a bisect, though I didn't
+> immediately see how.
 
-Today's -next fails to build an arm64 allmodconfig due to:
+This fixes that, will send patch.
 
->       arm64-allmodconfig
-> ../arch/arm64/kernel/armv8_deprecated.c:359:31: error: expected '=',
-> ',', ';',
-+'asm' or '__attribute__' before 'aarch32_check_condition'
-> ../arch/arm64/kernel/armv8_deprecated.c:386:10: error: implicit
-> declaration of
-+function 'aarch32_check_condition'
-[-Werror=implicit-function-declaration]
-
-triggered by 1930faf201e83f6 (kprobes: move kprobe declarations to
-asm-generic/kprobes.h) according to a bisect, though I didn't
-immediately see how.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170208/2fd25d1f/attachment-0001.sig>
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -19,6 +19,7 @@
+ #include <asm/sysreg.h>
+ #include <asm/system_misc.h>
+ #include <asm/traps.h>
++#include <asm/kprobes.h>
+ #include <linux/uaccess.h>
+ #include <asm/cpufeature.h>
