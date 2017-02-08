@@ -1,37 +1,68 @@
-From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Wed,  8 Feb 2017 23:07:15 +0100 (CET)
-Subject: [PATCH 1/4] ARM: sunxi_defconfig: Enable AC100 RTC driver
-Message-ID: <937914a68e4e7d6db2d12540cc6253b200978e2d.1486590875.git.rask@formelder.dk>
+From: aospan@netup.ru (Abylay Ospan)
+Date: Wed, 8 Feb 2017 17:07:27 -0500
+Subject: [PATCH] PCI: iproc: fix resource allocation for BCMA PCIe
+In-Reply-To: <20170208204831.GA2206@bhelgaas-glaptop.roam.corp.google.com>
+References: <1484265521-13497-1-git-send-email-aospan@netup.ru>
+ <20170128204407.GA20550@bhelgaas-glaptop.roam.corp.google.com>
+ <CAK3bHNV-O+k1rHSj-KTKOBNNDXpWxp7rXw8bi7ve7-T9qqs8dw@mail.gmail.com>
+ <20170208204831.GA2206@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CAK3bHNVz1O7pWL8xV+gf4M-MMKBsq6Bwkt654FOAEOZn=AUH-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the AC100 RTC driver so boards with it can keep track of time.
+Hi Bjorn,
 
-Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/configs/sunxi_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+I have checked first listed driver
+(drivers/pci/host/pcie-designware.c). Seems like into
+'devm_request_pci_bus_resources' we supply same stack allocated 'res'
+(actual insert of this pointer to 'iomem_resource' was done inside
+'__request_resource'). This 'res' is not changed inside
+'of_pci_get_host_bridge_resources'.
+I don't have this platforms on hand and cannot test it on real
+hadrware (to 100% verify). But investigating this code I see that the
+problem exist.
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index da92c25..5cd5dd70 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -87,6 +87,7 @@ CONFIG_THERMAL_OF=y
- CONFIG_CPU_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_SUNXI_WATCHDOG=y
-+CONFIG_MFD_AC100=y
- CONFIG_MFD_AXP20X=y
- CONFIG_MFD_AXP20X_I2C=y
- CONFIG_MFD_AXP20X_RSB=y
-@@ -129,6 +130,7 @@ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_RTC_CLASS=y
- # CONFIG_RTC_INTF_SYSFS is not set
- # CONFIG_RTC_INTF_PROC is not set
-+CONFIG_RTC_DRV_AC100=y
- CONFIG_RTC_DRV_SUN6I=y
- CONFIG_RTC_DRV_SUNXI=y
- CONFIG_DMADEVICES=y
+Here is a summary of flow for 'res' to show the problem:
+
+pcie-designware.c:
+  LIST_HEAD(res);
+  ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res,
+&pp->io_base); <--- 'res' not changing here
+  ret = devm_request_pci_bus_resources(&pdev->dev, &res);
+
+  drivers/pci/bus.c:
+    err = devm_request_resource(dev, parent, res);
+
+    kernel/resource.c:
+      conflict = request_resource_conflict(root, new);
+        conflict = __request_resource(root, new);
+          *p = new;  <--- here we introduce stack allocated res into
+global 'iomem_resource'
+
+
+Please check and correct me if i'm wrong ?
+
+>
+>   dw_pcie_host_init
+>     LIST_HEAD(res)                            # on stack
+>     of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base)
+>       res = kzalloc()                         # different "res" from above!
+>       pci_add_resource_offset(resources, res, ...)
+>     devm_request_pci_bus_resources(&pdev->dev, &res)
+>     pci_scan_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops, pp, &res)
+>     error:
+>       pci_free_resource_list(&res)
+
+> This looks good to me, but I don't think it's necessary to keep the
+> list_head in the struct iproc_pcie.  It should be safe to use
+> "LIST_HEAD(res)" on the stack like the other drivers do.  Can you
+> verify that and get an ack from Ray, Scott, or Jon?
+
+if my investigation above is true then we need to keep 'res' all the
+time we working with the driver (or find another way to fix this
+issue).
+
 -- 
-2.10.2
+Abylay Ospan,
+NetUP Inc.
+http://www.netup.tv
