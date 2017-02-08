@@ -1,270 +1,80 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 09 Feb 2017 00:07:29 +0100
-Subject: [PATCH V2 2/2] ARM: dts: rockchip: add dts for RK3288-Tinker board
-In-Reply-To: <1486347287-31051-3-git-send-email-eddie.cai@rock-chips.com>
-References: <1486347287-31051-1-git-send-email-eddie.cai@rock-chips.com>
- <1486347287-31051-3-git-send-email-eddie.cai@rock-chips.com>
-Message-ID: <10145131.LBiDzV4T0q@phil>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu,  9 Feb 2017 00:14:38 +0100
+Subject: [PATCH 04/10] clocksource/drivers/tcb_clksrc: Use 32 bit tcb as
+ sched_clock
+In-Reply-To: <1486595685-10232-1-git-send-email-daniel.lezcano@linaro.org>
+References: <20170208231208.GB12695@mai>
+ <1486595685-10232-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1486595685-10232-4-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eddie
+From: David Engraf <david.engraf@sysgo.com>
 
-Am Montag, 6. Februar 2017, 10:14:47 CET schrieb Eddie Cai:
-> This patch add basic support for RK3288-Tinker board. We can boot in to
-> rootfs with this patch.
-> 
-> Signed-off-by: Eddie Cai <eddie.cai@rock-chips.com>
-> ---
+On newer boards the TC can be read as single 32 bit value without locking.
+Thus the clock can be used as reference for sched_clock which is much more
+accurate than the jiffies implementation.
 
-[...]
+Tested on a Atmel SAMA5D2 board.
 
-> +&hdmi {
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	#sound-dai-cells = <0>;
+Signed-off-by: David Engraf <david.engraf@sysgo.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/tcb_clksrc.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-why are these needed. More importantly if they are needed, they should be in 
-rk3288.dtsi instead and not here.
-
-
-> +	ddc-i2c-bus = <&i2c5>;
-> +	status = "okay";
-> +	/* Don't use vopl for HDMI */
-> +	ports {
-> +		hdmi_in: port {
-> +			/delete-node/ endpoint at 1;
-> +		};
-> +	};
-
-See comment in previous iteration, about the link to vopl being there in 
-hardware and not wanting to use it for hdmi being a driver issue.
-No working around driver issues in the devicetree, so leave the vop <-> hdmi 
-links intact please :-)
-
-> +};
-> +
-> +&i2c0 {
-> +	status = "okay";
-> +	clock-frequency = <400000>;
-> +
-> +	rk808: pmic at 1b {
-> +		compatible = "rockchip,rk808";
-> +		reg = <0x1b>;
-> +		interrupt-parent = <&gpio0>;
-> +		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pmic_int &global_pwroff &dvs_1 &dvs_2>;
-> +		dvs-gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>,
-> +				<&gpio0 12 GPIO_ACTIVE_HIGH>;
-> +
-> +		rockchip,system-power-controller;
-> +		wakeup-source;
-> +		#clock-cells = <1>;
-> +		clock-output-names = "xin32k", "rk808-clkout2";
-> +
-> +		vcc1-supply = <&vcc_sys>;
-> +		vcc2-supply = <&vcc_sys>;
-> +		vcc3-supply = <&vcc_sys>;
-> +		vcc4-supply = <&vcc_sys>;
-> +		vcc6-supply = <&vcc_sys>;
-> +		vcc7-supply = <&vcc_sys>;
-> +		vcc8-supply = <&vcc_io>;
-> +		vcc9-supply = <&vcc_io>;
-> +		vcc10-supply = <&vcc_io>;
-> +		vcc11-supply = <&vcc_sys>;
-> +		vcc12-supply = <&vcc_io>;
-> +		vddio-supply = <&vcc_io>;
-> +
-> +		regulators {
-> +			vdd_cpu: DCDC_REG1 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <750000>;
-> +				regulator-max-microvolt = <1350000>;
-> +				regulator-name = "vdd_arm";
-> +				regulator-ramp-delay = <6000>;
-> +				regulator-state-mem {
-> +					regulator-off-in-suspend;
-> +				};
-> +			};
-> +
-> +			vdd_gpu: DCDC_REG2 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <850000>;
-> +				regulator-max-microvolt = <1250000>;
-> +				regulator-name = "vdd_gpu";
-> +				regulator-ramp-delay = <6000>;
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +					regulator-suspend-microvolt = <1000000>;
-> +				};
-> +			};
-> +
-> +			vcc_ddr: DCDC_REG3 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-name = "vcc_ddr";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +				};
-> +			};
-> +
-> +			vcc_io: DCDC_REG4 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vcc_io";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +					regulator-suspend-microvolt = <3300000>;
-> +				};
-> +			};
-> +
-> +			vcc18_ldo1: LDO_REG1 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-name = "vcc18_ldo1";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +					regulator-suspend-microvolt = <1800000>;
-> +				};
-> +			};
-> +
-> +			vcc33_mipi: LDO_REG2 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <3300000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vcc33_mipi";
-> +				regulator-state-mem {
-> +					regulator-off-in-suspend;
-> +				};
-> +			};
-> +
-> +			vdd_10: LDO_REG3 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <1000000>;
-> +				regulator-name = "vdd_10";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +					regulator-suspend-microvolt = <1000000>;
-> +				};
-> +			};
-> +
-> +			vcc18_codec: LDO_REG4 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-name = "vcc18_codec";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +					regulator-suspend-microvolt = <1800000>;
-> +				};
-> +			};
-> +
-> +			vccio_sd: LDO_REG5 {
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-name = "vccio_sd";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +					regulator-suspend-microvolt = <3300000>;
-> +				};
-> +			};
-> +
-> +			vdd10_lcd: LDO_REG6 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <1000000>;
-> +				regulator-max-microvolt = <1000000>;
-> +				regulator-name = "vdd10_lcd";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +					regulator-suspend-microvolt = <1000000>;
-> +				};
-> +			};
-> +
-> +			vcc_18: LDO_REG7 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-name = "vcc_18";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +					regulator-suspend-microvolt = <1800000>;
-> +				};
-> +			};
-> +
-> +			vcc18_lcd: LDO_REG8 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-min-microvolt = <1800000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-name = "vcc18_lcd";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +					regulator-suspend-microvolt = <1800000>;
-> +				};
-> +			};
-> +
-> +			vcc33_sd: SWITCH_REG1 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-name = "vcc33_sd";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +				};
-> +			};
-> +
-> +			vcc33_lan: SWITCH_REG2 {
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +				regulator-name = "vcc33_lan";
-> +				regulator-state-mem {
-> +					regulator-on-in-suspend;
-> +				};
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&i2c2 {
-> +	status = "okay";
-> +};
-> +
-> +&i2c5 {
-> +	status = "okay";
-> +};
-> +
-> +&i2s {
-> +	#sound-dai-cells = <0>;
-> +	status = "okay";
-> +};
-> +&vopb {
-> +	status = "okay";
-> +};
-> +
-> +&vopb_mmu {
-> +	status = "okay";
-> +};
-> +
-> +&vopl {
-> +	status = "okay";
-> +	/* Don't use vopl for HDMI */
-> +	vopl_out: port {
-> +		/delete-node/ endpoint at 0;
-> +	};
-
-same here
-
-> +};
-> +
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index d4ca996..745844e 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -10,6 +10,7 @@
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
+ #include <linux/atmel_tc.h>
++#include <linux/sched_clock.h>
+ 
+ 
+ /*
+@@ -56,11 +57,16 @@ static u64 tc_get_cycles(struct clocksource *cs)
+ 	return (upper << 16) | lower;
+ }
+ 
+-static u64 tc_get_cycles32(struct clocksource *cs)
++static u32 tc_get_cv32(void)
+ {
+ 	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
+ }
+ 
++static u64 tc_get_cycles32(struct clocksource *cs)
++{
++	return tc_get_cv32();
++}
++
+ static struct clocksource clksrc = {
+ 	.name           = "tcb_clksrc",
+ 	.rating         = 200,
+@@ -69,6 +75,11 @@ static struct clocksource clksrc = {
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
++static u64 notrace tc_read_sched_clock(void)
++{
++	return tc_get_cv32();
++}
++
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS
+ 
+ struct tc_clkevt_device {
+@@ -339,6 +350,9 @@ static int __init tcb_clksrc_init(void)
+ 		clksrc.read = tc_get_cycles32;
+ 		/* setup ony channel 0 */
+ 		tcb_setup_single_chan(tc, best_divisor_idx);
++
++		/* register sched_clock on chips with single 32 bit counter */
++		sched_clock_register(tc_read_sched_clock, 32, divided_rate);
+ 	} else {
+ 		/* tclib will give us three clocks no matter what the
+ 		 * underlying platform supports.
+-- 
+2.7.4
