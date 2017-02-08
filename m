@@ -1,127 +1,82 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 8 Feb 2017 09:42:42 -0700
-Subject: [PATCH] PM / Domains: Fix compatible for domain idle state
-In-Reply-To: <1486571692-33212-2-git-send-email-lina.iyer@linaro.org>
+Date: Wed,  8 Feb 2017 08:34:52 -0800
+Subject: [PATCH 2/2] PM / Domains: Support in context powering off parent
+ domain
+In-Reply-To: <1486571692-33212-1-git-send-email-lina.iyer@linaro.org>
 References: <1486571692-33212-1-git-send-email-lina.iyer@linaro.org>
- <1486571692-33212-2-git-send-email-lina.iyer@linaro.org>
-Message-ID: <20170208164242.GC2564@linaro.org>
+Message-ID: <1486571692-33212-4-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08 2017 at 09:35 -0700, Lina Iyer wrote:
->Re-using idle state definition provided by arm,idle-state for domain
->idle states creates a lot of confusion and limits further evolution of
->the domain idle definition. To keep things clear and simple, define a
->idle states for domain using a new compatible "domain-idle-state".
->
->Fix existing PM domains code to look for the newly defined compatible.
->
->Cc: <devicetree@vger.kernel.org>
->Cc: Rob Herring <robh@kernel.org>
->Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Powering off a domain schedules a work to opportunistically power off
+the parent domains. Domains that are IRQ safe may have parents that are
+also IRQ safe. It would be beneficial to power off such IRQ safe parents
+in the same context as well.
 
-Sorry, this has already been applied. Got tagged along with the email.
-Kindly ignore.
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+---
+ drivers/base/power/domain.c | 21 ++++++++++++++++-----
+ 1 file changed, 16 insertions(+), 5 deletions(-)
 
-Thanks,
-Lina
-
->---
-> .../bindings/power/domain-idle-state.txt           | 33 ++++++++++++++++++++++
-> .../devicetree/bindings/power/power_domain.txt     |  8 +++---
-> drivers/base/power/domain.c                        |  2 +-
-> 3 files changed, 38 insertions(+), 5 deletions(-)
-> create mode 100644 Documentation/devicetree/bindings/power/domain-idle-state.txt
->
->diff --git a/Documentation/devicetree/bindings/power/domain-idle-state.txt b/Documentation/devicetree/bindings/power/domain-idle-state.txt
->new file mode 100644
->index 0000000..eefc7ed
->--- /dev/null
->+++ b/Documentation/devicetree/bindings/power/domain-idle-state.txt
->@@ -0,0 +1,33 @@
->+PM Domain Idle State Node:
->+
->+A domain idle state node represents the state parameters that will be used to
->+select the state when there are no active components in the domain.
->+
->+The state node has the following parameters -
->+
->+- compatible:
->+	Usage: Required
->+	Value type: <string>
->+	Definition: Must be "domain-idle-state".
->+
->+- entry-latency-us
->+	Usage: Required
->+	Value type: <prop-encoded-array>
->+	Definition: u32 value representing worst case latency in
->+		    microseconds required to enter the idle state.
->+		    The exit-latency-us duration may be guaranteed
->+		    only after entry-latency-us has passed.
->+
->+- exit-latency-us
->+	Usage: Required
->+	Value type: <prop-encoded-array>
->+	Definition: u32 value representing worst case latency
->+		    in microseconds required to exit the idle state.
->+
->+- min-residency-us
->+	Usage: Required
->+	Value type: <prop-encoded-array>
->+	Definition: u32 value representing minimum residency duration
->+		    in microseconds after which the idle state will yield
->+		    power benefits after overcoming the overhead in entering
->+i		    the idle state.
->diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
->index e165036..723e1ad 100644
->--- a/Documentation/devicetree/bindings/power/power_domain.txt
->+++ b/Documentation/devicetree/bindings/power/power_domain.txt
->@@ -31,7 +31,7 @@ Optional properties:
->
-> - domain-idle-states : A phandle of an idle-state that shall be soaked into a
->                 generic domain power state. The idle state definitions are
->-                compatible with arm,idle-state specified in [1].
->+                compatible with domain-idle-state specified in [1].
->   The domain-idle-state property reflects the idle state of this PM domain and
->   not the idle states of the devices or sub-domains in the PM domain. Devices
->   and sub-domains have their own idle-states independent of the parent
->@@ -85,7 +85,7 @@ Example 3:
-> 	};
->
-> 	DOMAIN_RET: state at 0 {
->-		compatible = "arm,idle-state";
->+		compatible = "domain-idle-state";
-> 		reg = <0x0>;
-> 		entry-latency-us = <1000>;
-> 		exit-latency-us = <2000>;
->@@ -93,7 +93,7 @@ Example 3:
-> 	};
->
-> 	DOMAIN_PWR_DN: state at 1 {
->-		compatible = "arm,idle-state";
->+		compatible = "domain-idle-state";
-> 		reg = <0x1>;
-> 		entry-latency-us = <5000>;
-> 		exit-latency-us = <8000>;
->@@ -118,4 +118,4 @@ The node above defines a typical PM domain consumer device, which is located
-> inside a PM domain with index 0 of a power controller represented by a node
-> with the label "power".
->
->-[1]. Documentation/devicetree/bindings/arm/idle-states.txt
->+[1]. Documentation/devicetree/bindings/power/domain-idle-state.txt
->diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->index 661737c..f0bc672 100644
->--- a/drivers/base/power/domain.c
->+++ b/drivers/base/power/domain.c
->@@ -2048,7 +2048,7 @@ int genpd_dev_pm_attach(struct device *dev)
-> EXPORT_SYMBOL_GPL(genpd_dev_pm_attach);
->
-> static const struct of_device_id idle_state_match[] = {
->-	{ .compatible = "arm,idle-state", },
->+	{ .compatible = "domain-idle-state", },
-> 	{ }
-> };
->
->-- 
->2.7.4
->
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 3825bb9..51e2254 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -375,7 +375,8 @@ static int genpd_dev_pm_qos_notifier(struct notifier_block *nb,
+  * If all of the @genpd's devices have been suspended and all of its subdomains
+  * have been powered down, remove power from @genpd.
+  */
+-static int genpd_power_off(struct generic_pm_domain *genpd, bool is_async)
++static int genpd_power_off(struct generic_pm_domain *genpd, bool is_async,
++					unsigned int depth)
+ {
+ 	struct pm_domain_data *pdd;
+ 	struct gpd_link *link;
+@@ -442,7 +443,17 @@ static int genpd_power_off(struct generic_pm_domain *genpd, bool is_async)
+ 
+ 	list_for_each_entry(link, &genpd->slave_links, slave_node) {
+ 		genpd_sd_counter_dec(link->master);
+-		genpd_queue_power_off_work(link->master);
++		/*
++		 * Power off the parent in the same context if the parent
++		 * domain is also IRQ safe.
++		 */
++		if (genpd_is_irq_safe(genpd) &&
++				genpd_is_irq_safe(link->master)) {
++			genpd_lock_nested(link->master, depth + 1);
++			genpd_power_off(link->master, false, depth + 1);
++			genpd_unlock(link->master);
++		} else
++			genpd_queue_power_off_work(link->master);
+ 	}
+ 
+ 	return 0;
+@@ -459,7 +470,7 @@ static void genpd_power_off_work_fn(struct work_struct *work)
+ 	genpd = container_of(work, struct generic_pm_domain, power_off_work);
+ 
+ 	genpd_lock(genpd);
+-	genpd_power_off(genpd, true);
++	genpd_power_off(genpd, true, 0);
+ 	genpd_unlock(genpd);
+ }
+ 
+@@ -578,7 +589,7 @@ static int genpd_runtime_suspend(struct device *dev)
+ 		return 0;
+ 
+ 	genpd_lock(genpd);
+-	genpd_power_off(genpd, false);
++	genpd_power_off(genpd, false, 0);
+ 	genpd_unlock(genpd);
+ 
+ 	return 0;
+@@ -658,7 +669,7 @@ static int genpd_runtime_resume(struct device *dev)
+ 	if (!pm_runtime_is_irq_safe(dev) ||
+ 		(pm_runtime_is_irq_safe(dev) && genpd_is_irq_safe(genpd))) {
+ 		genpd_lock(genpd);
+-		genpd_power_off(genpd, 0);
++		genpd_power_off(genpd, 0, 0);
+ 		genpd_unlock(genpd);
+ 	}
+ 
+-- 
+2.7.4
