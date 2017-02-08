@@ -1,39 +1,42 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 8 Feb 2017 23:28:33 +0800
-Subject: i.MX7 pinctrl driver writing to non existent registers
-In-Reply-To: <20170208090817.omm2dydhqukdzgqy@pengutronix.de>
-References: <20170208090817.omm2dydhqukdzgqy@pengutronix.de>
-Message-ID: <9D4713C3-26F1-4041-A227-51A8A2EEB3C1@jcrosoft.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Wed, 8 Feb 2017 09:31:00 -0600
+Subject: [PATCH 1/9] irqchip/gic-v3-its: Fix command buffer allocation
+In-Reply-To: <20170208144328.GS5020@rric.localdomain>
+References: <20170201173833.12630-1-rrichter@cavium.com>
+ <20170201173833.12630-2-rrichter@cavium.com>
+ <87tw847njl.fsf@on-the-bus.cambridge.arm.com>
+ <20170208144328.GS5020@rric.localdomain>
+Message-ID: <278df776-4d6d-3b89-7a94-effaafcebeb0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
 
-> On Feb 8, 2017, at 5:08 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> 
-> Hi All,
-> 
-> The i.MX7 has two pinmux controllers, the LPSR and the regular one. We
-> instantiate a driver for each one. Now the driver assumes that the pins
-> are completely configured with one iomux controller, but for the LPSR
-> pins this is not true: The MUX_CTL and PAD_CTL registers are indeed
-> in the LPSR controller, but the SELECT_INPUT registers for the same
-> pin are found in the regular controller.
-> 
-> The result is that with this pin for example:
-> 
-> #define MX7D_PAD_GPIO1_IO06__UART5_DCE_RX                         0x0018 0x0048 0x0714 0x3 0x4
-> 
-> The LPSR controller writes to LPSR_BASE + 0x714 where it should really
-> be IOMUX_BASE + 0x714.
-> 
-> I have no idea how to fix this. We could split the LPSR pins into two
-> pins, one for each controller. Another possibility would be to create
-> some kind of shortcut from one controller to control the other one. Also
-> not nice. Also we could simply do nothing, as long as the bootloader
-> configures everything correctly we won't even notice ;)
-Always expect a bootloader is wrong and do it properly in the kernel
-as if you have 2 bootloader they may do different configuration and as the end
-found the problem in the kernel on one board and not the other.
+In teardown path, code is still calling 'kfree(its->cmd_base)' to free 
+memory, this should be changed to 'free_pages(get_order(ITS_CMD_QUEUE_SZ).
 
-Best Regards,
-J.
+
+On 02/08/2017 08:43 AM, Robert Richter wrote:
+> On 08.02.17 14:41:18, Marc Zyngier wrote:
+>> On Wed, Feb 01 2017 at  5:38:25 pm GMT, Robert Richter
+> <rrichter@cavium.com> wrote:
+>>> The its command buffer must be page aligned, but kzalloc() is not
+>>> guaranteed to be (though it is mostly when allocating 64k). Use
+>>> __get_free_pages() as this is used for other buffers as well.
+>>>
+>>> Signed-off-by: Robert Richter <rrichter@cavium.com>
+>> I'm still going through this series, but as this is an obvious fix, I've
+>> cherry-picked it for 4.11.
+> That was actually my intention, thus I placed it first.
+>
+> -Robert
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
