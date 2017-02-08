@@ -1,66 +1,69 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 8 Feb 2017 18:35:30 +0000
-Subject: [QUESTION] Early Write Acknowledge for PCIe configuration space
-In-Reply-To: <20170106114231.GC15333@arm.com>
-References: <df407f39-ee05-d74d-6e5e-c5e502372032@huawei.com>
- <6092525.UgRCY3dpzP@wuerfel> <20170106114231.GC15333@arm.com>
-Message-ID: <20170208183530.GA27720@red-moon>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 08 Feb 2017 18:34:03 +0000
+Subject: Applied "ASoC: sunxi: allow the analog codec driver to be built on
+ ARM64" to the asoc tree
+In-Reply-To: <20170126154859.55855-9-icenowy@aosc.xyz>
+Message-ID: <E1cbX47-0000ia-Ks@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 11:42:32AM +0000, Will Deacon wrote:
-> On Fri, Jan 06, 2017 at 12:24:25PM +0100, Arnd Bergmann wrote:
-> > On Friday, January 6, 2017 11:15:22 AM CET John Garry wrote:
-> > > [apologies if this has been queried before]
-> > > 
-> > > Hi ARM guys,
-> > > 
-> > > I have a question about the device memory attributes we assign for PCIe 
-> > > config space for arm64. Currently we use ioremap to map in the config 
-> > > space; this uses nGnRE, which means we enable Early Write Acknowledge.
-> > > 
-> > > The ARMv8 ARM states that "ARM recommend that No Early Write Acknowledge 
-> > > Hint is used for PCIe configuration writes".
-> > > 
-> > > I understand a problem with using E is in that configuration write is a 
-> > > non-post operation, which means the RP requires to get the completion 
-> > > ack from the EP The problem here is if CPU writes data to ECAM by E, 
-> > > complete will go back to CPU directly, and maybe at this point the write 
-> > > has not reached the EP.
-> > > 
-> > > I believe that this may cause ordering issues in PCI read/write. In 
-> > > practice we use non-relaxed readl/writel to access config space, which 
-> > > include the synchronization barriers, which, *as I understand*, even if 
-> > > for full system domain, may be negated by the E attribute for PCIe.
-> > 
-> > I don't think the barriers in readl/writel are enough here, in particular
-> > the write barrier is *before* the access to synchronize DMAs
-> > on RAM with MMIO accesses, which is a bit different from what you
-> > have here.
-> > 
-> > > So a question: why is the recommendation in the ARMv8 ARM ignored?
-> > 
-> > Probably nobody thought about this properly in the Linux drivers. The
-> > ARMv8 ARM sounds correct here.
-> 
-> The ARMv8 ARM also says that the E attribute is a hint, so there's no
-> guarantee that it's actually honoured by the implementation. However,
-> now that it explicitly mentions PCI config space, the intention is clearly
-> that nE *is* honoured for systems using PCIe, so I agree that we should make
-> this change. I don't want to use the nE type for all ioremap invocations,
-> though.
+The patch
 
-I suspect this is a potential issue on ARM 32-bit systems too(?). Fixing
-IO space should be reasonably simple, we just have to change the
-pgprot_device() in pci_remap_iospace() to pgprot_noncached() (they are
-the same attributes on ARM 32-bit already if I am not mistaken).
+   ASoC: sunxi: allow the analog codec driver to be built on ARM64
 
-What do we want to do for config space ? Implement ioremap_uc() for
-ARM/ARM64 (and add a devm_ioremap_uc() call to use it in basically all
-drivers/pci/host implementations to map config space - or we just patch
-the ioremap calls in drivers/pci/ecam.c and we assume the other hosts
-controllers have purportedly called devm_ioremap() because on those
-platforms it just works ok till further notice ?)
+has been applied to the asoc tree at
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
 Thanks,
-Lorenzo
+Mark
+
+>From e5028a259733ec2324893cb481023ed6cf7e9723 Mon Sep 17 00:00:00 2001
+From: Icenowy Zheng <icenowy@aosc.xyz>
+Date: Wed, 8 Feb 2017 02:30:40 +0800
+Subject: [PATCH] ASoC: sunxi: allow the analog codec driver to be built on
+ ARM64
+
+As the 64-bit Allwinner H5 SoC has the same analog codec part (also the
+same digital part) as H3, enable the driver to be built on ARM64
+Allwinner platform, so that it can be used on H5.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/sunxi/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
+index 13a8267f17c7..22408bc2d6ec 100644
+--- a/sound/soc/sunxi/Kconfig
++++ b/sound/soc/sunxi/Kconfig
+@@ -22,7 +22,7 @@ config SND_SUN8I_CODEC
+ 
+ config SND_SUN8I_CODEC_ANALOG
+ 	tristate "Allwinner sun8i Codec Analog Controls Support"
+-	depends on MACH_SUN8I || COMPILE_TEST
++	depends on MACH_SUN8I || (ARM64 && ARCH_SUNXI) || COMPILE_TEST
+ 	select REGMAP
+ 	help
+ 	  Say Y or M if you want to add support for the analog controls for
+-- 
+2.11.0
