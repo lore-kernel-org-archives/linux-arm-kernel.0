@@ -1,80 +1,65 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 8 Feb 2017 11:35:31 +0000
-Subject: [PATCH] efi/libstub/arm*: Set default address and size cells
- values for an empty dtb
-In-Reply-To: <20170208074301.GB18445@linaro.org>
-References: <1486490390-25251-1-git-send-email-jhugo@codeaurora.org>
- <CAKv+Gu963uZB4MaMDuwTGd5-AqEN53Er8tExVLMZNVx3krJrZw@mail.gmail.com>
- <1f47fcdd-c5d8-4082-70a3-ca9b1746d7ca@codeaurora.org>
- <20170207190113.GG26173@leverpostej>
- <c49cc64e-4ca1-8d82-5faf-74c0355c35ef@codeaurora.org>
- <20170207191320.GI26173@leverpostej>
- <252539a6-72f6-1afa-6ed5-3cf6a1aa24c2@codeaurora.org>
- <20170207195558.GK26173@leverpostej>
- <20170208074301.GB18445@linaro.org>
-Message-ID: <20170208113530.GC15459@leverpostej>
+Date: Wed, 8 Feb 2017 11:40:02 +0000
+Subject: [PATCH V2 1/3] iommu/arm-smmu: Add pm_runtime/sleep ops
+In-Reply-To: <017701d281f9$927c5fb0$b7751f10$@codeaurora.org>
+References: <1486055420-19671-1-git-send-email-sricharan@codeaurora.org>
+ <1486055420-19671-2-git-send-email-sricharan@codeaurora.org>
+ <20170202174218.GO31394@leverpostej>
+ <017701d281f9$927c5fb0$b7751f10$@codeaurora.org>
+Message-ID: <20170208114002.GD15459@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 04:43:04PM +0900, AKASHI, Takahiro wrote:
-> On Tue, Feb 07, 2017 at 07:55:59PM +0000, Mark Rutland wrote:
-
-> > (a) The userspace kexec-tools kdump code should take /#address-cells and
-> >     /#size-cells into account when inserting the linux,elfcorehdr and
-> >     linux,usable-memory-range properties. There can be DTs for 64 bit
-> >     platforms where these are not 2.
-> >     
-> >     Takahiro-san, from looking at your kexec-tools repo, this is not
-> >     currently the case. Could you address that?
+On Wed, Feb 08, 2017 at 04:23:17PM +0530, Sricharan wrote:
+> >On Thu, Feb 02, 2017 at 10:40:18PM +0530, Sricharan R wrote:
+> >> +- clock-names:    Should be a pair of "smmu_iface_clk" and "smmu_bus_clk"
+> >> +                  required for smmu's register group access and interface
+> >> +                  clk for the smmu's underlying bus access.
+> >> +
+> >> +- clocks:         Phandles for respective clocks described by clock-names.
+> >
+> >Which SMMU implementations are those clock-names valid for?
+> >
+> >The SMMU architecture specifications do not architect the clocks, which
+> >are implemementation-specific.
+> >
+> >AFAICT, this doesn't match MMU-400 or MMU-500.
 > 
-> Yup, I will, but if this is the case,
-> we might need to think about another case where /#address-cells and /#size-cells
-> are <1> but the range of crash dump kernel can be still 64-bit wide since
-> the system memory information comes from ACPI table (not DT).
+> Ok, should be more specific. Infact QCOM has MMU-500 and also
+> a smmu v2 implementation which is fully compatible with
+> "arm,smmu-v2", with the clocks being controlled by the soc's
+> clock controller. i was trying to define these clock bindings
+> so that its works across socs.
 
-That should only happen on an ACPI system for which the vendor has also
-provided a DT in the FW, and also chose to use /#address-cells = <1>
-and/or /#size-cells = <1>. We could log a warning and give up in this
-case.
+I don't think we can do that, if we don't know precisely what those
+clocks are used for.
 
-In the Purely DT case it shouldn't be a problem, since that would imply
-all memory is within 32 bits.
+i.e. we'd need a compatible string for the QCOM SMMUv2 variant, which
+would imply the set of clocks.
 
-... the other option Ard suggested was that we make these properties
-always take 64-bit address and size values, and don't use #address-cells
-or #size-cells at all when parsing them. I wasn't keen on this since the
-properties would be reg-like, but potentially different in size. Maybe
-that is the better option, though. :/
+> So there are one or more interface clocks which are required for the
+> smmu's interface or the configuration access and one or more clocks
+> required for smmu's downstream bus access. That was the reason i was
+> trying to iterate over the list of clocks down below.  But agree that
+> the bindings should define each of the clocks required separately.
 
-> Therefore, the properties in this case should look like:
-> / {
->     #address-cells = <1>;
->     #size-cells = <1>;
->     chosen {
->          ...
->          linux,usable-memory-range {
->              #address-cells = <2>;
->              #size-cells = <2>; may be omitted if possible
->              reg = < ... >;
->          }
->          linux,elfcorehdr {
->              #address-cells = <2>;
->              #size-cells = <2>; may be omitted if possible
->              reg = < ... >;
->          }
->          ...
->     }
-> }
-> 
-> Is this what you meant?
-> (Obviously, I will have to modify the kernel patches as well.)
+As above, I don't think the code should do this. It should only touch
+the clocks it knows about.
 
-No; I was assuming we'd only change the userspace code, not the binding
-or the kernel parsing.
+> So one way here is, define a separate compatible for QCOM's SMMU
+> implementation and define all the clock bindings as a part of it
+> and handle it in the same way in the driver.
 
-If nothing else, the root /#address-cells and /#size-cells would have to
-be widened to handle the translation, so the above alone is not
-sufficient.
+That would be my preference.
+
+> But just thinking if it would scale well for any other soc that is
+> compatible with arm,smmu-v2 driver and wants to handle clocks in the
+> future ?
+
+I don't think we can have our cake and eat it here. Either we handle the
+clock management for each variant, or we don't do it at all. We have no
+idea what requirements a future variant might have w.r.t. the management
+of clocks we don't know about yet.
 
 Thanks,
 Mark.
