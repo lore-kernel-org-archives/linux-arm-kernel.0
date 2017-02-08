@@ -1,30 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 08 Feb 2017 16:00:19 +0000
-Subject: [PATCH 1/9] irqchip/gic-v3-its: Fix command buffer allocation
-In-Reply-To: <20170208153658.GT5020@rric.localdomain> (Robert Richter's
- message of "Wed, 8 Feb 2017 16:36:58 +0100")
-References: <20170201173833.12630-1-rrichter@cavium.com>
- <20170201173833.12630-2-rrichter@cavium.com>
- <87tw847njl.fsf@on-the-bus.cambridge.arm.com>
- <20170208144328.GS5020@rric.localdomain>
- <278df776-4d6d-3b89-7a94-effaafcebeb0@codeaurora.org>
- <20170208153658.GT5020@rric.localdomain>
-Message-ID: <8760kk7jvw.fsf@on-the-bus.cambridge.arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 9 Feb 2017 01:04:45 +0900
+Subject: [PATCH -next] reset: uniphier: fix non static symbol warnings
+In-Reply-To: <20170208155620.25055-1-weiyj.lk@gmail.com>
+References: <20170208155620.25055-1-weiyj.lk@gmail.com>
+Message-ID: <CAK7LNATyFHr0uXSADcVy7fnE+bs+go9fJ4KHrptH3MynubrRuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08 2017 at  3:36:58 pm GMT, Robert Richter <robert.richter@cavium.com> wrote:
-> On 08.02.17 09:31:00, Shanker Donthineni wrote:
->> In teardown path, code is still calling 'kfree(its->cmd_base)' to free
->> memory, this should be changed to 'free_pages(get_order(ITS_CMD_QUEUE_SZ).
+2017-02-09 0:56 GMT+09:00 Wei Yongjun <weiyj.lk@gmail.com>:
+> From: Wei Yongjun <weiyongjun1@huawei.com>
 >
-> Hmm, right. This is later removed in the series, but should be part of
-> this patch. Should I respin this one?
+> Fixes the following sparse warnings:
+>
+> drivers/reset/reset-uniphier.c:68:34: warning:
+>  symbol 'uniphier_sld3_sys_reset_data' was not declared. Should it be static?
+> drivers/reset/reset-uniphier.c:73:34: warning:
+>  symbol 'uniphier_pro4_sys_reset_data' was not declared. Should it be static?
+> drivers/reset/reset-uniphier.c:81:34: warning:
+>  symbol 'uniphier_pro5_sys_reset_data' was not declared. Should it be static?
+> drivers/reset/reset-uniphier.c:89:34: warning:
+>  symbol 'uniphier_pxs2_sys_reset_data' was not declared. Should it be static?
+> drivers/reset/reset-uniphier.c:103:34: warning:
+>  symbol 'uniphier_ld11_sys_reset_data' was not declared. Should it be static?
+> drivers/reset/reset-uniphier.c:108:34: warning:
+>  symbol 'uniphier_ld20_sys_reset_data' was not declared. Should it be static?
+> drivers/reset/reset-uniphier.c:137:34: warning:
+>  symbol 'uniphier_sld3_mio_reset_data' was not declared. Should it be static?
+> drivers/reset/reset-uniphier.c:157:34: warning:
+>  symbol 'uniphier_pro5_sd_reset_data' was not declared. Should it be static?
+> drivers/reset/reset-uniphier.c:174:34: warning:
+>  symbol 'uniphier_ld4_peri_reset_data' was not declared. Should it be static?
+> drivers/reset/reset-uniphier.c:187:34: warning:
+>  symbol 'uniphier_pro4_peri_reset_data' was not declared. Should it be static?
+>
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 
-Nope, I've hacked it.
 
-Thanks,
 
-	M.
+Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+
+
+Thanks!
+
+
+
 -- 
-Jazz is not dead, it just smell funny.
+Best Regards
+Masahiro Yamada
