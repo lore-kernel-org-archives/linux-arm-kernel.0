@@ -1,62 +1,240 @@
-From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Thu,  9 Feb 2017 00:31:05 +0100 (CET)
-Subject: [PATCH v2 2/5] dts: mfd: axp20x: Add binding for the AXP808
-In-Reply-To: <cover.1486592470.git.rask@formelder.dk>
-References: <cover.1486592470.git.rask@formelder.dk>
-Message-ID: <6c4741c2cf30693bd204ac71d76bae2734eeead1.1486592471.git.rask@formelder.dk>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Thu,  9 Feb 2017 00:30:22 +0100
+Subject: [PATCH for-4.11 1/2] Revert "phy: Add USB3 PHY support for Broadcom
+ NSP SoC"
+Message-ID: <20170208233023.31922-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP808 does not support address space extension, but is otherwise
-identical to the AXP806, including the chip ID, so add a compatible
-string for it to the binding.
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+This reverts commit d7bc1a7d41bf ("phy: Add USB3 PHY support for
+Broadcom NSP SoC") as we already have driver for this PHY (shared by NS
+and NSP). It was added in commit e5666281d9ea ("phy: bcm-ns-usb3: new
+driver for USB 3.0 PHY on Northstar").
+
+Instead of adding separated driver & duplicating code we should work on
+improving existing (old) one. Thanks to work done by Broadcom we know
+there is MDIO bus we weren't aware of & we know register names which
+makes initialization more clear. This is very valuable info and we
+should work on using it in existing driver afterwards.
+
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 ---
+ drivers/phy/Kconfig            |   8 --
+ drivers/phy/Makefile           |   1 -
+ drivers/phy/phy-bcm-nsp-usb3.c | 177 -----------------------------------------
+ 3 files changed, 186 deletions(-)
+ delete mode 100644 drivers/phy/phy-bcm-nsp-usb3.c
 
-No changes in v2.
-
- Documentation/devicetree/bindings/mfd/axp20x.txt | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-index 86ae540..8195b06 100644
---- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-+++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -7,12 +7,13 @@ axp209 (X-Powers)
- axp221 (X-Powers)
- axp223 (X-Powers)
- axp806 (X-Powers)
-+axp808 (X-Powers)
- axp809 (X-Powers)
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index bb5cf6f49b06..c49a914d6409 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -502,12 +502,4 @@ config PHY_MESON8B_USB2
+ 	  and GXBB SoCs.
+ 	  If unsure, say N.
  
- Required properties:
- - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
- 	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp806",
--	      "x-powers,axp809"
-+	      "x-powers,axp808", "x-powers,axp809"
- - reg: The I2C slave address or RSB hardware address for the AXP chip
- - interrupt-parent: The parent interrupt controller
- - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
-@@ -87,7 +88,7 @@ LDO_IO1		: LDO		: ips-supply		: GPIO 1
- RTC_LDO		: LDO		: ips-supply		: always on
- DRIVEVBUS	: Enable output	: drivevbus-supply	: external regulator
- 
--AXP806 regulators, type, and corresponding input supply names:
-+AXP806/AXP808 regulators, type, and corresponding input supply names:
- 
- Regulator	  Type		  Supply Name		  Notes
- ---------	  ----		  -----------		  -----
-@@ -108,7 +109,7 @@ CLDO2		: LDO		: cldoin-supply		: shared supply
- CLDO3		: LDO		: cldoin-supply		: shared supply
- SW		: On/Off Switch : swin-supply
- 
--Additionally, the AXP806 DC-DC regulators support poly-phase arrangements
-+Additionally, the AXP806/AXP808 DC-DC regulators support poly-phase arrangements
- for higher output current. The possible groupings are: A+B, A+B+C, D+E.
- 
- AXP809 regulators, type, and corresponding input supply names:
+-config PHY_NSP_USB3
+-	tristate "Broadcom NorthStar plus USB3 PHY driver"
+-	depends on OF && (ARCH_BCM_NSP || COMPILE_TEST)
+-	select GENERIC_PHY
+-	default ARCH_BCM_NSP
+-	help
+-	  Enable this to support the Broadcom Northstar plus USB3 PHY.
+-	  If unsure, say N.
+ endmenu
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index 9f008004f75d..0e4259473d28 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -61,4 +61,3 @@ obj-$(CONFIG_PHY_CYGNUS_PCIE)		+= phy-bcm-cygnus-pcie.o
+ obj-$(CONFIG_ARCH_TEGRA) += tegra/
+ obj-$(CONFIG_PHY_NS2_PCIE)		+= phy-bcm-ns2-pcie.o
+ obj-$(CONFIG_PHY_MESON8B_USB2)		+= phy-meson8b-usb2.o
+-obj-$(CONFIG_PHY_NSP_USB3)		+= phy-bcm-nsp-usb3.o
+diff --git a/drivers/phy/phy-bcm-nsp-usb3.c b/drivers/phy/phy-bcm-nsp-usb3.c
+deleted file mode 100644
+index 49024eaa5545..000000000000
+--- a/drivers/phy/phy-bcm-nsp-usb3.c
++++ /dev/null
+@@ -1,177 +0,0 @@
+-/*
+- * Copyright (C) 2016 Broadcom
+- *
+- * This program is free software; you can redistribute it and/or
+- * modify it under the terms of the GNU General Public License as
+- * published by the Free Software Foundation version 2.
+- *
+- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+- * kind, whether express or implied; without even the implied warranty
+- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#include <linux/delay.h>
+-#include <linux/io.h>
+-#include <linux/kernel.h>
+-#include <linux/mfd/syscon.h>
+-#include <linux/mdio.h>
+-#include <linux/module.h>
+-#include <linux/of.h>
+-#include <linux/of_address.h>
+-#include <linux/phy/phy.h>
+-#include <linux/regmap.h>
+-
+-#define NSP_USB3_RST_CTRL_OFFSET	0x3f8
+-
+-/* mdio reg access */
+-#define NSP_USB3_PHY_BASE_ADDR_REG	0x1f
+-
+-#define NSP_USB3_PHY_PLL30_BLOCK	0x8000
+-#define NSP_USB3_PLL_CONTROL		0x01
+-#define NSP_USB3_PLLA_CONTROL0		0x0a
+-#define NSP_USB3_PLLA_CONTROL1		0x0b
+-
+-#define NSP_USB3_PHY_TX_PMD_BLOCK	0x8040
+-#define NSP_USB3_TX_PMD_CONTROL1	0x01
+-
+-#define NSP_USB3_PHY_PIPE_BLOCK		0x8060
+-#define NSP_USB3_LFPS_CMP		0x02
+-#define NSP_USB3_LFPS_DEGLITCH		0x03
+-
+-struct nsp_usb3_phy {
+-	struct regmap *usb3_ctrl;
+-	struct phy *phy;
+-	struct mdio_device *mdiodev;
+-};
+-
+-static int nsp_usb3_phy_init(struct phy *phy)
+-{
+-	struct nsp_usb3_phy *iphy = phy_get_drvdata(phy);
+-	struct mii_bus *bus = iphy->mdiodev->bus;
+-	int addr = iphy->mdiodev->addr;
+-	u32 data;
+-	int rc;
+-
+-	rc = regmap_read(iphy->usb3_ctrl, 0, &data);
+-	if (rc)
+-		return rc;
+-	data |= 1;
+-	rc = regmap_write(iphy->usb3_ctrl, 0, data);
+-	if (rc)
+-		return rc;
+-
+-	rc = regmap_write(iphy->usb3_ctrl, NSP_USB3_RST_CTRL_OFFSET, 1);
+-	if (rc)
+-		return rc;
+-
+-	rc = mdiobus_write(bus, addr, NSP_USB3_PHY_BASE_ADDR_REG,
+-			   NSP_USB3_PHY_PLL30_BLOCK);
+-	if (rc)
+-		return rc;
+-
+-	rc = mdiobus_write(bus, addr, NSP_USB3_PLL_CONTROL, 0x1000);
+-	if (rc)
+-		return rc;
+-
+-	rc = mdiobus_write(bus, addr, NSP_USB3_PLLA_CONTROL0, 0x6400);
+-	if (rc)
+-		return rc;
+-
+-	rc = mdiobus_write(bus, addr, NSP_USB3_PLLA_CONTROL1, 0xc000);
+-	if (rc)
+-		return rc;
+-
+-	rc = mdiobus_write(bus, addr, NSP_USB3_PLLA_CONTROL1, 0x8000);
+-	if (rc)
+-		return rc;
+-
+-	rc = regmap_write(iphy->usb3_ctrl, NSP_USB3_RST_CTRL_OFFSET, 0);
+-	if (rc)
+-		return rc;
+-
+-	rc = mdiobus_write(bus, addr, NSP_USB3_PLL_CONTROL, 0x9000);
+-	if (rc)
+-		return rc;
+-
+-	rc = mdiobus_write(bus, addr, NSP_USB3_PHY_BASE_ADDR_REG,
+-			   NSP_USB3_PHY_PIPE_BLOCK);
+-	if (rc)
+-		return rc;
+-
+-	rc = mdiobus_write(bus, addr, NSP_USB3_LFPS_CMP, 0xf30d);
+-	if (rc)
+-		return rc;
+-
+-	rc = mdiobus_write(bus, addr, NSP_USB3_LFPS_DEGLITCH, 0x6302);
+-	if (rc)
+-		return rc;
+-
+-	rc = mdiobus_write(bus, addr, NSP_USB3_PHY_BASE_ADDR_REG,
+-			   NSP_USB3_PHY_TX_PMD_BLOCK);
+-	if (rc)
+-		return rc;
+-
+-	rc = mdiobus_write(bus, addr, NSP_USB3_TX_PMD_CONTROL1, 0x1003);
+-
+-	return rc;
+-}
+-
+-static struct phy_ops nsp_usb3_phy_ops = {
+-	.init	= nsp_usb3_phy_init,
+-	.owner	= THIS_MODULE,
+-};
+-
+-static int nsp_usb3_phy_probe(struct mdio_device *mdiodev)
+-{
+-	struct device *dev = &mdiodev->dev;
+-	struct phy_provider *provider;
+-	struct nsp_usb3_phy *iphy;
+-
+-	iphy = devm_kzalloc(dev, sizeof(*iphy), GFP_KERNEL);
+-	if (!iphy)
+-		return -ENOMEM;
+-	iphy->mdiodev = mdiodev;
+-
+-	iphy->usb3_ctrl = syscon_regmap_lookup_by_phandle(dev->of_node,
+-						 "usb3-ctrl-syscon");
+-	if (IS_ERR(iphy->usb3_ctrl))
+-		return PTR_ERR(iphy->usb3_ctrl);
+-
+-	iphy->phy = devm_phy_create(dev, dev->of_node, &nsp_usb3_phy_ops);
+-	if (IS_ERR(iphy->phy)) {
+-		dev_err(dev, "failed to create PHY\n");
+-		return PTR_ERR(iphy->phy);
+-	}
+-
+-	phy_set_drvdata(iphy->phy, iphy);
+-
+-	provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+-	if (IS_ERR(provider)) {
+-		dev_err(dev, "could not register PHY provider\n");
+-		return PTR_ERR(provider);
+-	}
+-
+-	return 0;
+-}
+-
+-static const struct of_device_id nsp_usb3_phy_of_match[] = {
+-	{.compatible = "brcm,nsp-usb3-phy",},
+-	{ /* sentinel */ }
+-};
+-
+-static struct mdio_driver nsp_usb3_phy_driver = {
+-	.mdiodrv = {
+-		.driver = {
+-			.name = "nsp-usb3-phy",
+-			.of_match_table = nsp_usb3_phy_of_match,
+-		},
+-	},
+-	.probe = nsp_usb3_phy_probe,
+-};
+-
+-mdio_module_driver(nsp_usb3_phy_driver);
+-
+-MODULE_DESCRIPTION("Broadcom NSP USB3 PHY driver");
+-MODULE_LICENSE("GPL v2");
+-MODULE_AUTHOR("Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com");
 -- 
-2.10.2
+2.11.0
