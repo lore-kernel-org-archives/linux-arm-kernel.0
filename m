@@ -1,38 +1,37 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 8 Feb 2017 10:19:15 +0800
-Subject: [PATCH v2 2/4] Documentation: devicetree: Add LED subnode binding for
- MT6323 PMIC
+Date: Wed, 8 Feb 2017 10:19:17 +0800
+Subject: [PATCH v2 4/4] mfd: mt6397: Add MT6323 LED support into MT6397 driver
 In-Reply-To: <1486520357-13096-1-git-send-email-sean.wang@mediatek.com>
 References: <1486520357-13096-1-git-send-email-sean.wang@mediatek.com>
-Message-ID: <1486520357-13096-3-git-send-email-sean.wang@mediatek.com>
+Message-ID: <1486520357-13096-5-git-send-email-sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-This patch adds documentation for devicetree bindings
-for LED support as the subnode of MT6323 PMIC
+Add compatible string as "mt6323-led" that will make
+the OF core spawn child devices for the LED subnode
+of that MT6323 MFD device.
 
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/mfd/mt6397.txt | 4 ++++
+ drivers/mfd/mt6397-core.c | 4 ++++
  1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
-index 949c85f..c568d52 100644
---- a/Documentation/devicetree/bindings/mfd/mt6397.txt
-+++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
-@@ -34,6 +34,10 @@ Optional subnodes:
- - clk
- 	Required properties:
- 		- compatible: "mediatek,mt6397-clk"
-+- led
-+	Required properties:
-+		- compatible: "mediatek,mt6323-led"
-+	see Documentation/devicetree/bindings/leds/leds-mt6323.txt
+diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+index e14d8b0..8e601c8 100644
+--- a/drivers/mfd/mt6397-core.c
++++ b/drivers/mfd/mt6397-core.c
+@@ -48,6 +48,10 @@
+ 		.name = "mt6323-regulator",
+ 		.of_compatible = "mediatek,mt6323-regulator"
+ 	},
++	{
++		.name = "mt6323-led",
++		.of_compatible = "mediatek,mt6323-led"
++	},
+ };
  
- Example:
- 	pwrap: pwrap at 1000f000 {
+ static const struct mfd_cell mt6397_devs[] = {
 -- 
 1.9.1
