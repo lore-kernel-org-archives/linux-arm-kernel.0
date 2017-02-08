@@ -1,58 +1,209 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 08 Feb 2017 13:35:48 +0100
-Subject: [PATCH v3 0/7] Pad retentions support for Exynos5433
-In-Reply-To: <20170208114615.c4wszjmnuackgzvx@dell>
-References: <CGME20170130123837eucas1p13c607f81a1775a805740dccc87fe8b87@eucas1p1.samsung.com>
- <1485779908-32147-1-git-send-email-m.szyprowski@samsung.com>
- <20170208114615.c4wszjmnuackgzvx@dell>
-Message-ID: <b29e922c-4435-c9e8-2ab4-e4441eac3a09@samsung.com>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Wed,  8 Feb 2017 18:09:00 +0530
+Subject: [PATCH net] net: thunderx: Fix PHY autoneg for SGMII QLM mode
+Message-ID: <1486557540-818-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+From: Thanneeru Srinivasulu <tsrinivasulu@cavium.com>
 
-On 2017-02-08 12:46, Lee Jones wrote:
-> On Mon, 30 Jan 2017, Marek Szyprowski wrote:
->> This patchset is a first step to add support for all power domains on
->> Exynos5433 SoCs. This patchset contains patches for Exynos pin control
->> driver and Exynos LPASS MFD driver, which are needed to make the
->> platform ready for adding power domains support.
->>
->> Patches in this patchset depends on each other. They are order in such a
->> way to make the changes bisectable.
->>
->> Patch #2 has compile dependency on #1.
->> Patch #3 has runtime dependency on commit fa59aa70907b2 ("soc: samsung:
->> 	pmu: Add dummy support for Exynos5433 SoC",
->> 	for-v4.11/drivers-soc-exynos-pmu-the-joy-never-ends branch).
->> Patch #4 has runtime dependency on #3.
->> Patch #5 has runtime dependency on commit 7547162ac3514 ("arm64: dts:
->> 	exynos: Add clocks to Exynos5433 LPASS module, next/dt64 branch).
->>
->> This patchset also directly depends on the "Move pad retention control to
->> Exynos pin controller driver" patchset:
->> https://www.spinics.net/lists/arm-kernel/msg556074.html
->>
->> Patches have been generated on top of linux-next from 30th January 2017
->> with the above mentioned patchset applied.
->>
->> This is a part of a larger task, which goal is to add support for power
->> domains on Exynos5433 SoCs / TM2 boards. First version of the all patches
->> needed to get it working have been pushed to the following git repo:
->> https://git.linaro.org/people/marek.szyprowski/linux-srpol.git v4.10-next-tm2-pd
->>
->> Best regards
->> Marek Szyprowski
->> Samsung R&D Institute Poland
-> Looks like I reviewed v2.
->
-> If the patches haven't changed that much, please apply my Acks to this
-> set instead.  Anything that has changed, please leave them off and
-> repost.
+This patch fixes the case where there is no phydev attached
+to a LMAC in DT due to non-existance of a PHY driver or due
+to usage of non-stanadard PHY which doesn't support autoneg.
+Changes dependeds on firmware to send correct info w.r.t
+PHY and autoneg capability.
 
-MFD related patches were not changed between v2 and v3.
+This patch also covers a case where a 10G/40G interface is used
+as a 1G with convertors with Cortina PHY in between.
 
-Best regards
+Signed-off-by: Thanneeru Srinivasulu <tsrinivasulu@cavium.com>
+Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 108 +++++++++++++++++++---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h |   5 +
+ 2 files changed, 101 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index 2f85b64..1e46952 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -31,6 +31,7 @@ struct lmac {
+ 	u8                      lmac_type;
+ 	u8                      lane_to_sds;
+ 	bool                    use_training;
++	bool                    autoneg;
+ 	bool			link_up;
+ 	int			lmacid; /* ID within BGX */
+ 	int			lmacid_bd; /* ID on board */
+@@ -461,7 +462,17 @@ static int bgx_lmac_sgmii_init(struct bgx *bgx, struct lmac *lmac)
+ 	/* power down, reset autoneg, autoneg enable */
+ 	cfg = bgx_reg_read(bgx, lmacid, BGX_GMP_PCS_MRX_CTL);
+ 	cfg &= ~PCS_MRX_CTL_PWR_DN;
+-	cfg |= (PCS_MRX_CTL_RST_AN | PCS_MRX_CTL_AN_EN);
++	cfg |= PCS_MRX_CTL_RST_AN;
++	if (lmac->phydev) {
++		cfg |= PCS_MRX_CTL_AN_EN;
++	} else {
++		/* In scenarios where PHY driver is not present or it's a
++		 * non-standard PHY, FW sets AN_EN to inform Linux driver
++		 * to do auto-neg and link polling or not.
++		 */
++		if (cfg & PCS_MRX_CTL_AN_EN)
++			lmac->autoneg = true;
++	}
+ 	bgx_reg_write(bgx, lmacid, BGX_GMP_PCS_MRX_CTL, cfg);
+ 
+ 	if (lmac->lmac_type == BGX_MODE_QSGMII) {
+@@ -472,7 +483,7 @@ static int bgx_lmac_sgmii_init(struct bgx *bgx, struct lmac *lmac)
+ 		return 0;
+ 	}
+ 
+-	if (lmac->lmac_type == BGX_MODE_SGMII) {
++	if ((lmac->lmac_type == BGX_MODE_SGMII) && lmac->phydev) {
+ 		if (bgx_poll_reg(bgx, lmacid, BGX_GMP_PCS_MRX_STATUS,
+ 				 PCS_MRX_STATUS_AN_CPT, false)) {
+ 			dev_err(&bgx->pdev->dev, "BGX AN_CPT not completed\n");
+@@ -678,12 +689,71 @@ static int bgx_xaui_check_link(struct lmac *lmac)
+ 	return -1;
+ }
+ 
++static void bgx_poll_for_sgmii_link(struct lmac *lmac)
++{
++	u64 pcs_link, an_result;
++	u8 speed;
++
++	pcs_link = bgx_reg_read(lmac->bgx, lmac->lmacid,
++				BGX_GMP_PCS_MRX_STATUS);
++
++	/*Link state bit is sticky, read it again*/
++	if (!(pcs_link & PCS_MRX_STATUS_LINK))
++		pcs_link = bgx_reg_read(lmac->bgx, lmac->lmacid,
++					BGX_GMP_PCS_MRX_STATUS);
++
++	if (bgx_poll_reg(lmac->bgx, lmac->lmacid, BGX_GMP_PCS_MRX_STATUS,
++			 PCS_MRX_STATUS_AN_CPT, false)) {
++		lmac->link_up = false;
++		lmac->last_speed = SPEED_UNKNOWN;
++		lmac->last_duplex = DUPLEX_UNKNOWN;
++		goto next_poll;
++	}
++
++	lmac->link_up = ((pcs_link & PCS_MRX_STATUS_LINK) != 0) ? true : false;
++	an_result = bgx_reg_read(lmac->bgx, lmac->lmacid,
++				 BGX_GMP_PCS_ANX_AN_RESULTS);
++
++	speed = (an_result >> 3) & 0x3;
++	lmac->last_duplex = (an_result >> 1) & 0x1;
++	switch (speed) {
++	case 0:
++		lmac->last_speed = 10;
++		break;
++	case 1:
++		lmac->last_speed = 100;
++		break;
++	case 2:
++		lmac->last_speed = 1000;
++		break;
++	default:
++		lmac->link_up = false;
++		lmac->last_speed = SPEED_UNKNOWN;
++		lmac->last_duplex = DUPLEX_UNKNOWN;
++		break;
++	}
++
++next_poll:
++
++	if (lmac->last_link != lmac->link_up) {
++		if (lmac->link_up)
++			bgx_sgmii_change_link_state(lmac);
++		lmac->last_link = lmac->link_up;
++	}
++
++	queue_delayed_work(lmac->check_link, &lmac->dwork, HZ * 3);
++}
++
+ static void bgx_poll_for_link(struct work_struct *work)
+ {
+ 	struct lmac *lmac;
+ 	u64 spu_link, smu_link;
+ 
+ 	lmac = container_of(work, struct lmac, dwork.work);
++	if (lmac->is_sgmii) {
++		bgx_poll_for_sgmii_link(lmac);
++		return;
++	}
+ 
+ 	/* Receive link is latching low. Force it high and verify it */
+ 	bgx_reg_modify(lmac->bgx, lmac->lmacid,
+@@ -775,9 +845,21 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
+ 	    (lmac->lmac_type != BGX_MODE_XLAUI) &&
+ 	    (lmac->lmac_type != BGX_MODE_40G_KR) &&
+ 	    (lmac->lmac_type != BGX_MODE_10G_KR)) {
+-		if (!lmac->phydev)
+-			return -ENODEV;
+-
++		if (!lmac->phydev) {
++			if (lmac->autoneg) {
++				bgx_reg_write(bgx, lmacid,
++					      BGX_GMP_PCS_LINKX_TIMER,
++					      PCS_LINKX_TIMER_COUNT);
++				goto poll;
++			} else {
++				/* Default to below link speed and duplex */
++				lmac->link_up = true;
++				lmac->last_speed = 1000;
++				lmac->last_duplex = 1;
++				bgx_sgmii_change_link_state(lmac);
++				return 0;
++			}
++		}
+ 		lmac->phydev->dev_flags = 0;
+ 
+ 		if (phy_connect_direct(&lmac->netdev, lmac->phydev,
+@@ -786,15 +868,17 @@ static int bgx_lmac_enable(struct bgx *bgx, u8 lmacid)
+ 			return -ENODEV;
+ 
+ 		phy_start_aneg(lmac->phydev);
+-	} else {
+-		lmac->check_link = alloc_workqueue("check_link", WQ_UNBOUND |
+-						   WQ_MEM_RECLAIM, 1);
+-		if (!lmac->check_link)
+-			return -ENOMEM;
+-		INIT_DELAYED_WORK(&lmac->dwork, bgx_poll_for_link);
+-		queue_delayed_work(lmac->check_link, &lmac->dwork, 0);
++		return 0;
+ 	}
+ 
++poll:
++	lmac->check_link = alloc_workqueue("check_link", WQ_UNBOUND |
++					   WQ_MEM_RECLAIM, 1);
++	if (!lmac->check_link)
++		return -ENOMEM;
++	INIT_DELAYED_WORK(&lmac->dwork, bgx_poll_for_link);
++	queue_delayed_work(lmac->check_link, &lmac->dwork, 0);
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+index c18ebfe..a60f189 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.h
+@@ -153,10 +153,15 @@
+ #define	 PCS_MRX_CTL_LOOPBACK1			BIT_ULL(14)
+ #define	 PCS_MRX_CTL_RESET			BIT_ULL(15)
+ #define BGX_GMP_PCS_MRX_STATUS		0x30008
++#define	 PCS_MRX_STATUS_LINK			BIT_ULL(2)
+ #define	 PCS_MRX_STATUS_AN_CPT			BIT_ULL(5)
++#define BGX_GMP_PCS_ANX_ADV		0x30010
+ #define BGX_GMP_PCS_ANX_AN_RESULTS	0x30020
++#define BGX_GMP_PCS_LINKX_TIMER		0x30040
++#define PCS_LINKX_TIMER_COUNT			0x1E84
+ #define BGX_GMP_PCS_SGM_AN_ADV		0x30068
+ #define BGX_GMP_PCS_MISCX_CTL		0x30078
++#define  PCS_MISC_CTL_MODE			BIT_ULL(8)
+ #define  PCS_MISC_CTL_DISP_EN			BIT_ULL(13)
+ #define  PCS_MISC_CTL_GMX_ENO			BIT_ULL(11)
+ #define  PCS_MISC_CTL_SAMP_PT_MASK	0x7Full
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+2.7.4
