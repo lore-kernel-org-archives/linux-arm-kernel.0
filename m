@@ -1,53 +1,62 @@
 From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Thu,  9 Feb 2017 00:29:05 +0100 (CET)
-Subject: [PATCH v2 0/5] arm: sun9i: Support AXP808 PMIC and Sunchip CX-A99
- board
-Message-ID: <cover.1486592470.git.rask@formelder.dk>
+Date: Thu,  9 Feb 2017 00:31:05 +0100 (CET)
+Subject: [PATCH v2 2/5] dts: mfd: axp20x: Add binding for the AXP808
+In-Reply-To: <cover.1486592470.git.rask@formelder.dk>
+References: <cover.1486592470.git.rask@formelder.dk>
+Message-ID: <6c4741c2cf30693bd204ac71d76bae2734eeead1.1486592471.git.rask@formelder.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series add support for the Sunchip CX-A99 board, which is used in
-a few media players, making it the third device with an Allwinner A80 SoC
-to be supported. The board uses the X-Powers AXP808 PMIC which this patch
-series also adds support for.
+The AXP808 does not support address space extension, but is otherwise
+identical to the AXP806, including the chip ID, so add a compatible
+string for it to the binding.
 
-Patch 1 adds a documentation line which was forgotten when device tree
-bindings for the axp20x family were updated for the AXP806 PMIC. A line
-immediately below the missing line will be inserted by patch 2, so I'm
-including patch 1 in this series to avoid conflicts between patches.
+Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-Patch 2 adds the AXP808 to the axp20x device tree bindings.
+No changes in v2.
 
-Patch 3 adds support for the AXP808 to the axp20x MFD driver.
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-Patch 4 adds support for the AXP808 to the axp20x regulator driver.
-
-Patch 5 add the device tree for the Sunchip CX-A99 board. This patch is v6 of
-the only remaining patch from v4 of the patch series posted back in August.
-Support for the AXP808 has made major improvements possible, notably Wifi.
-
-Before trying out this patch series, make sure your tree contains patch
-"regulator: axp20x: AXP806: Fix dcdcb being set instead of dcdce" [1]
-to avoid damage to the DRAM chips through over-voltage.
-
-[1] https://patchwork.kernel.org/patch/9530319/
-
-Rask Ingemann Lambertsen (5):
-  dts: mfd: axp20x: Add AXP806 to list of current AXP20x family members
-  dts: mfd: axp20x: Add binding for the AXP808
-  mfd: axp20x: Add support for the AXP808 PMIC
-  regulator: axp20x: Add support for the AXP808 PMIC
-  ARM: dts: sun9i: Initial support for the Sunchip CX-A99 board
-
- Documentation/devicetree/bindings/mfd/axp20x.txt |   8 +-
- arch/arm/boot/dts/Makefile                       |   3 +-
- arch/arm/boot/dts/sun9i-a80-cx-a99.dts           | 409 +++++++++++++++++++++++
- drivers/mfd/axp20x-rsb.c                         |   1 +
- drivers/mfd/axp20x.c                             |  26 ++
- drivers/regulator/axp20x-regulator.c             |   7 +-
- include/linux/mfd/axp20x.h                       |   1 +
- 7 files changed, 449 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun9i-a80-cx-a99.dts
-
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index 86ae540..8195b06 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -7,12 +7,13 @@ axp209 (X-Powers)
+ axp221 (X-Powers)
+ axp223 (X-Powers)
+ axp806 (X-Powers)
++axp808 (X-Powers)
+ axp809 (X-Powers)
+ 
+ Required properties:
+ - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
+ 	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp806",
+-	      "x-powers,axp809"
++	      "x-powers,axp808", "x-powers,axp809"
+ - reg: The I2C slave address or RSB hardware address for the AXP chip
+ - interrupt-parent: The parent interrupt controller
+ - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+@@ -87,7 +88,7 @@ LDO_IO1		: LDO		: ips-supply		: GPIO 1
+ RTC_LDO		: LDO		: ips-supply		: always on
+ DRIVEVBUS	: Enable output	: drivevbus-supply	: external regulator
+ 
+-AXP806 regulators, type, and corresponding input supply names:
++AXP806/AXP808 regulators, type, and corresponding input supply names:
+ 
+ Regulator	  Type		  Supply Name		  Notes
+ ---------	  ----		  -----------		  -----
+@@ -108,7 +109,7 @@ CLDO2		: LDO		: cldoin-supply		: shared supply
+ CLDO3		: LDO		: cldoin-supply		: shared supply
+ SW		: On/Off Switch : swin-supply
+ 
+-Additionally, the AXP806 DC-DC regulators support poly-phase arrangements
++Additionally, the AXP806/AXP808 DC-DC regulators support poly-phase arrangements
+ for higher output current. The possible groupings are: A+B, A+B+C, D+E.
+ 
+ AXP809 regulators, type, and corresponding input supply names:
 -- 
 2.10.2
