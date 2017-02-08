@@ -1,53 +1,113 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 8 Feb 2017 17:03:05 +0000
-Subject: [PATCH v3 06/10] arm64: efi: add EFI stub
-In-Reply-To: <73a460e5-98f5-86c2-142f-a9a084ee0203@codeaurora.org>
-References: <1396637113-22790-1-git-send-email-leif.lindholm@linaro.org>
- <1396637113-22790-7-git-send-email-leif.lindholm@linaro.org>
- <CAOZdJXWU1dmFfCc88RMp3SvouU7roDiJsA=3aHzwijwhMH7naA@mail.gmail.com>
- <E4BDBC23-A96A-4D84-B7EE-B7967D4E4DDD@linaro.org>
- <73a460e5-98f5-86c2-142f-a9a084ee0203@codeaurora.org>
-Message-ID: <20170208170305.GI15459@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 08 Feb 2017 18:07:42 +0100
+Subject: [GIT PULL] ARM: SoC fixes
+Message-ID: <2374919.NrmJFMXx0l@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 10:35:02AM -0600, Timur Tabi wrote:
-> On 02/08/2017 10:29 AM, Ard Biesheuvel wrote:
-> >>>>> +       status = handle_cmdline_files(sys_table, image, cmdline_ptr,
-> >>>>> +                                     "initrd=", dram_base + SZ_512M,
-> >>>>> +                                     (unsigned long *)&initrd_addr,
-> >>>>> +                                     (unsigned long *)&initrd_size);
-> >>>
-> >>> So I know this patch is almost three years old, but why is there a
-> >>> 512M limit on the initrd size?
-> >>>
-> >How do you reckon this constitutes a limit?
-> 
-> handle_cmdline_files() calls efi_high_alloc() with that limit.  I'm
-> still trying to understand all the details myself, but apparently
-> our firmware and initrd need to fit within the first 512MB because
-> of dram_base + SZ_512M. When we change "dram_base + SZ_512M" to
-> "~0", everything works.
+The following changes since commit 7a308bb3016f57e5be11a677d15b821536419d36:
 
-Just to check, how big is that initrd?
+  Linux 4.10-rc5 (2017-01-22 12:54:15 -0800)
 
-I guess it's possible that there simply isn't sufficient contiguous free
-memory in that range, even if the initrd isn't that large. Can you share
-the EFI memory map dump from booting with efi=debug?
+are available in the git repository at:
 
-We originally needed to restrict this to ensure that the kernel could
-map the initrd (and I think the 512M restriction specifically was
-inherited from the DTB mapping restriction). Since then, we have relaxed
-things in the kernel, and today Documentation/arm64/booting.txt says:
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
-	If an initrd/initramfs is passed to the kernel at boot, it must
-	reside entirely within a 1 GB aligned physical memory window of
-	up to 32 GB in size that fully covers the kernel Image as well.
+for you to fetch changes up to 5aff1d245e8cc1ab5c4517d916edaed9e3f7f973:
 
-... so I think the EFI stub should be able to take advantage of that
-relaxation.
+  ARM: defconfigs: make NF_CT_PROTO_SCTP and NF_CT_PROTO_UDPLITE built-in (2017-02-06 17:37:42 +0100)
 
-Ard?
+----------------------------------------------------------------
+ARM: SoC fixes for v4.10
 
-Thanks,
-Mark.
+- A relatively large patch restores booting on i.MX platforms that
+  failed to boot after a cleanup was merged for v4.10.
+
+- A quirk for USB needs to be enabled on the STi platform
+
+- On the Meson platform, we saw memory corruption with part of
+  the memory used by the secure monitor, so we have to stay out
+  of that area.
+
+- The same platform also has a problem with ethernet under load,
+  which is fixed by disabling EEE negotiation.
+
+- imx6dl has an incorrect pin configuration, which prevents SPI
+  from working.
+
+- Two maintainers have lost their access to their email addresses, so
+  we should update the MAINTAINERS file before the release
+
+- Renaming one of the orion5x linkstation models to help simplify
+  the debian install.
+
+- A couple of fixes for build warnings that were introduced during
+  v4.10-rc.
+
+----------------------------------------------------------------
+Arnd Bergmann (5):
+      ARM: imx: hide unused variable in #ifdef
+      Merge tag 'imx-fixes-4.10-3' of git://git.kernel.org/.../shawnguo/linux into HEAD
+      ARM: orion5x: fix Makefile for linkstation-lschl.dtb
+      Merge tag 'mvebu-fixes-4.10-1' of git://git.infradead.org/linux-mvebu into fixes
+      ARM: defconfigs: make NF_CT_PROTO_SCTP and NF_CT_PROTO_UDPLITE built-in
+
+Dinh Nguyen (1):
+      MAINTAINERS: socfpga: update email for Dinh Nguyen
+
+Fabio Estevam (1):
+      ARM: dts: imx: Pass 'chosen' and 'memory' nodes
+
+Jerome Brunet (1):
+      ARM64: dts: meson-gxbb-odroidc2: fix GbE tx link breakage
+
+Ludovic Desroches (1):
+      MAINTAINERS: change email address from atmel to microchip
+
+Neil Armstrong (1):
+      ARM64: dts: meson-gx: Add firmware reserved memory zones
+
+Nicolas Ferre (1):
+      MAINTAINERS: at91: change email address
+
+Olof Johansson (2):
+      Merge tag 'sti-dt-for-v4.10-rc' of git://git.kernel.org/.../pchotard/sti into fixes
+      Merge tag 'at91-ab-4.10-soc' of git://git.kernel.org/.../abelloni/linux into fixes
+
+Patrice Chotard (1):
+      ARM: dts: STiH407-family: set snps,dis_u3_susphy_quirk
+
+Roger Shimizu (2):
+      ARM: dts: orion5x-lschl: Fix model name
+      ARM: dts: orion5x-lschl: More consistent naming on linkstation series
+
+S?bastien Szymanski (1):
+      ARM: dts: imx6dl: fix GPIO4 range
+
+ MAINTAINERS                                        | 36 +++++++++++-----------
+ arch/arm/boot/dts/Makefile                         |  2 +-
+ arch/arm/boot/dts/imx1.dtsi                        |  8 +++++
+ arch/arm/boot/dts/imx23.dtsi                       |  8 +++++
+ arch/arm/boot/dts/imx25.dtsi                       |  8 +++++
+ arch/arm/boot/dts/imx27.dtsi                       |  8 +++++
+ arch/arm/boot/dts/imx28.dtsi                       |  8 +++++
+ arch/arm/boot/dts/imx31.dtsi                       |  8 +++++
+ arch/arm/boot/dts/imx35.dtsi                       |  8 +++++
+ arch/arm/boot/dts/imx50.dtsi                       |  8 +++++
+ arch/arm/boot/dts/imx51.dtsi                       |  8 +++++
+ arch/arm/boot/dts/imx53.dtsi                       |  8 +++++
+ arch/arm/boot/dts/imx6dl.dtsi                      |  2 +-
+ arch/arm/boot/dts/imx6qdl.dtsi                     |  8 +++++
+ arch/arm/boot/dts/imx6sl.dtsi                      |  8 +++++
+ arch/arm/boot/dts/imx6sx.dtsi                      |  8 +++++
+ arch/arm/boot/dts/imx6ul.dtsi                      |  8 +++++
+ arch/arm/boot/dts/imx7s.dtsi                       |  8 +++++
+ ...n5x-lschl.dts => orion5x-linkstation-lschl.dts} |  4 +--
+ arch/arm/boot/dts/stih407-family.dtsi              |  1 +
+ arch/arm/configs/ezx_defconfig                     |  4 +--
+ arch/arm/configs/imote2_defconfig                  |  4 +--
+ arch/arm/mach-imx/mmdc.c                           |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi          | 18 +++++++++++
+ .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 12 ++++++++
+ 25 files changed, 178 insertions(+), 27 deletions(-)
+ rename arch/arm/boot/dts/{orion5x-lschl.dts => orion5x-linkstation-lschl.dts} (98%)
