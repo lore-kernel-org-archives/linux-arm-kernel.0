@@ -1,58 +1,50 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 8 Feb 2017 09:45:37 +0100
-Subject: [PATCH] ARM64: dts: meson-gxbb: set reset for ethernet
-In-Reply-To: <f2759982-28c6-db7b-2e0a-48f3ed90adf5@gmail.com>
-References: <ec31eddc-d286-d0bc-0bdb-ae9d5014d82e@gmail.com>
- <259f7102-591b-f251-5844-a864fa39e137@baylibre.com>
- <f2759982-28c6-db7b-2e0a-48f3ed90adf5@gmail.com>
-Message-ID: <49d828c6-a3a7-4695-8aca-e9bb34a9a805@baylibre.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Wed, 8 Feb 2017 14:27:23 +0530
+Subject: [PATCH v2 2/5] async_tx: Handle DMA devices having support for
+ fewer PQ coefficients
+In-Reply-To: <CAPcyv4hK_1f8bryq6smPQy7vTnP+QEzmT9wnAEE1xpxq7EAnjQ@mail.gmail.com>
+References: <1486455406-11202-1-git-send-email-anup.patel@broadcom.com>
+ <1486455406-11202-3-git-send-email-anup.patel@broadcom.com>
+ <CAPcyv4gbV1yf52JrejW+Dn3wOPn7Er+8HWdu2qsW0+Qm+cRr9g@mail.gmail.com>
+ <CAALAos_yhXufdt79KWY0eugjF5oyJ8+NcPh2E-dEXnSQu2WhhA@mail.gmail.com>
+ <CAPcyv4hK_1f8bryq6smPQy7vTnP+QEzmT9wnAEE1xpxq7EAnjQ@mail.gmail.com>
+Message-ID: <CAALAos9ovab4x=waRgM7G2adRC7syHMkY0Rhf-UPB_+h4w3yNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2017 09:43 PM, Heiner Kallweit wrote:
-> Am 06.02.2017 um 10:29 schrieb Neil Armstrong:
->> On 01/29/2017 03:07 PM, Heiner Kallweit wrote:
->>> Add reset control for ethernet.
+On Tue, Feb 7, 2017 at 11:46 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Tue, Feb 7, 2017 at 1:02 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+>> On Tue, Feb 7, 2017 at 1:57 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+>>> On Tue, Feb 7, 2017 at 12:16 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+>>>> The DMAENGINE framework assumes that if PQ offload is supported by a
+>>>> DMA device then all 256 PQ coefficients are supported. This assumption
+>>>> does not hold anymore because we now have BCM-SBA-RAID offload engine
+>>>> which supports PQ offload with limited number of PQ coefficients.
+>>>>
+>>>> This patch extends async_tx APIs to handle DMA devices with support
+>>>> for fewer PQ coefficients.
+>>>>
+>>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
 >>>
->>> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
->>> ---
->>>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 2 ++
->>>  1 file changed, 2 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
->>> index 39a774ad..753fddf6 100644
->>> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
->>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
->>> @@ -113,6 +113,8 @@
->>>  		 <&clkc CLKID_FCLK_DIV2>,
->>>  		 <&clkc CLKID_MPLL2>;
->>>  	clock-names = "stmmaceth", "clkin0", "clkin1";
->>> +	resets = <&reset RESET_ETHERNET>;
->>> +	reset-names = "stmmaceth";
->>>  };
->>>  
->>>  &aobus {
->>>
+>>> I don't like this approach. Define an interface for md to query the
+>>> offload engine once at the beginning of time. We should not be adding
+>>> any new extensions to async_tx.
 >>
->> Hi,
+>> Even if we do capability checks in Linux MD, we still need a way
+>> for DMAENGINE drivers to advertise number of PQ coefficients
+>> handled by the HW.
 >>
->> Actually this is a no-op since the Amlogic reset controller only supports "pulse" resets and the
->> STMMAC driver only supports "level" resets. If you want to use this reset, you must add the
->> corresponding support code in the meson8b glue code to call device_reset().
->>
-> Thanks for the hint! I did some further tests to check the "nature" of the reset register bits.
-> Setting a reset bit and immediately reading it back always returns 0.
-> And the chip spec doesn't mention whether writing a reset bit triggers a reset pulse or
-> whether it asserts the reset line.
-> Therefore I'm a little clueless whether it's possible to have "level" resets.
+>> I agree capability checks should be done once in Linux MD but I don't
+>> see why this has to be part of BCM-SBA-RAID driver patches. We need
+>> separate patchsets to address limitations of async_tx framework.
+>
+> Right, separate enabling before we pile on new hardware support to a
+> known broken framework.
 
-It seems that there is some "level" register in the next addresses used by the VPU reset in u-boot,
-but I did not get the same behaviour as the pulse reset registers.
-It seems the resets are not mapped the same way.
+Linux Async Tx not broken framework. The issue is:
+1. Its not complete enough
+2. Its not optimized for very high through-put offload engines
 
-Neil
-
-> 
->> Neil
->>
-> 
+Regards,
+Anup
