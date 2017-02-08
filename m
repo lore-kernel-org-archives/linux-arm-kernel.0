@@ -1,34 +1,270 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 8 Feb 2017 17:04:57 -0600
-Subject: [PATCH 1/2] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
-In-Reply-To: <6afb0a98-0973-33ec-0b76-fc6378e64309@codeaurora.org>
-References: <20170208005736.18724-1-cov@codeaurora.org>
- <bd4a0127-0f32-a8be-c8ee-34c1cccc6d5d@codeaurora.org>
- <6afb0a98-0973-33ec-0b76-fc6378e64309@codeaurora.org>
-Message-ID: <5e18324f-d09d-d652-df23-d4a3f8f053fd@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 09 Feb 2017 00:07:29 +0100
+Subject: [PATCH V2 2/2] ARM: dts: rockchip: add dts for RK3288-Tinker board
+In-Reply-To: <1486347287-31051-3-git-send-email-eddie.cai@rock-chips.com>
+References: <1486347287-31051-1-git-send-email-eddie.cai@rock-chips.com>
+ <1486347287-31051-3-git-send-email-eddie.cai@rock-chips.com>
+Message-ID: <10145131.LBiDzV4T0q@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08/2017 04:22 PM, Christopher Covington wrote:
->>> >> -    while (pl011_read(uap, REG_FR) & uap->vendor->fr_busy)
->>> >> +    while ((pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr)
->>> >> +                        & uap->vendor->fr_busy)
->> >
->> > I really think the XOR logic needs to be documented wherever it's
->> > used. It's just too confusing.
-> References such as the following for basic bit operations like
-> setting, clearing, and toggling are easy enough to come by.
->
-> http://stackoverflow.com/questions/47981/how-do-you-set-clear-and-toggle-a-single-bit-in-c-c
+Hi Eddie
 
-I know what XOR does.  I was thinking a more high-level comment would be 
-appropriate.  With E44, we want to ignore the BUSY bit and use TXFE instead. 
-So was hoping to a comment that says that:
+Am Montag, 6. Februar 2017, 10:14:47 CET schrieb Eddie Cai:
+> This patch add basic support for RK3288-Tinker board. We can boot in to
+> rootfs with this patch.
+> 
+> Signed-off-by: Eddie Cai <eddie.cai@rock-chips.com>
+> ---
 
-/* Normally, we poll until BUSY=0, but E44 says we should poll until TXFE=1 
-instead. So with E44, we set fr_busy to TXFE, but we have to invert it. */
+[...]
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+> +&hdmi {
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	#sound-dai-cells = <0>;
+
+why are these needed. More importantly if they are needed, they should be in 
+rk3288.dtsi instead and not here.
+
+
+> +	ddc-i2c-bus = <&i2c5>;
+> +	status = "okay";
+> +	/* Don't use vopl for HDMI */
+> +	ports {
+> +		hdmi_in: port {
+> +			/delete-node/ endpoint at 1;
+> +		};
+> +	};
+
+See comment in previous iteration, about the link to vopl being there in 
+hardware and not wanting to use it for hdmi being a driver issue.
+No working around driver issues in the devicetree, so leave the vop <-> hdmi 
+links intact please :-)
+
+> +};
+> +
+> +&i2c0 {
+> +	status = "okay";
+> +	clock-frequency = <400000>;
+> +
+> +	rk808: pmic at 1b {
+> +		compatible = "rockchip,rk808";
+> +		reg = <0x1b>;
+> +		interrupt-parent = <&gpio0>;
+> +		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pmic_int &global_pwroff &dvs_1 &dvs_2>;
+> +		dvs-gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>,
+> +				<&gpio0 12 GPIO_ACTIVE_HIGH>;
+> +
+> +		rockchip,system-power-controller;
+> +		wakeup-source;
+> +		#clock-cells = <1>;
+> +		clock-output-names = "xin32k", "rk808-clkout2";
+> +
+> +		vcc1-supply = <&vcc_sys>;
+> +		vcc2-supply = <&vcc_sys>;
+> +		vcc3-supply = <&vcc_sys>;
+> +		vcc4-supply = <&vcc_sys>;
+> +		vcc6-supply = <&vcc_sys>;
+> +		vcc7-supply = <&vcc_sys>;
+> +		vcc8-supply = <&vcc_io>;
+> +		vcc9-supply = <&vcc_io>;
+> +		vcc10-supply = <&vcc_io>;
+> +		vcc11-supply = <&vcc_sys>;
+> +		vcc12-supply = <&vcc_io>;
+> +		vddio-supply = <&vcc_io>;
+> +
+> +		regulators {
+> +			vdd_cpu: DCDC_REG1 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <750000>;
+> +				regulator-max-microvolt = <1350000>;
+> +				regulator-name = "vdd_arm";
+> +				regulator-ramp-delay = <6000>;
+> +				regulator-state-mem {
+> +					regulator-off-in-suspend;
+> +				};
+> +			};
+> +
+> +			vdd_gpu: DCDC_REG2 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <850000>;
+> +				regulator-max-microvolt = <1250000>;
+> +				regulator-name = "vdd_gpu";
+> +				regulator-ramp-delay = <6000>;
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1000000>;
+> +				};
+> +			};
+> +
+> +			vcc_ddr: DCDC_REG3 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-name = "vcc_ddr";
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +				};
+> +			};
+> +
+> +			vcc_io: DCDC_REG4 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-name = "vcc_io";
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <3300000>;
+> +				};
+> +			};
+> +
+> +			vcc18_ldo1: LDO_REG1 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-name = "vcc18_ldo1";
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1800000>;
+> +				};
+> +			};
+> +
+> +			vcc33_mipi: LDO_REG2 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-name = "vcc33_mipi";
+> +				regulator-state-mem {
+> +					regulator-off-in-suspend;
+> +				};
+> +			};
+> +
+> +			vdd_10: LDO_REG3 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <1000000>;
+> +				regulator-max-microvolt = <1000000>;
+> +				regulator-name = "vdd_10";
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1000000>;
+> +				};
+> +			};
+> +
+> +			vcc18_codec: LDO_REG4 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-name = "vcc18_codec";
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1800000>;
+> +				};
+> +			};
+> +
+> +			vccio_sd: LDO_REG5 {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-name = "vccio_sd";
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <3300000>;
+> +				};
+> +			};
+> +
+> +			vdd10_lcd: LDO_REG6 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <1000000>;
+> +				regulator-max-microvolt = <1000000>;
+> +				regulator-name = "vdd10_lcd";
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1000000>;
+> +				};
+> +			};
+> +
+> +			vcc_18: LDO_REG7 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-name = "vcc_18";
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1800000>;
+> +				};
+> +			};
+> +
+> +			vcc18_lcd: LDO_REG8 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-name = "vcc18_lcd";
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +					regulator-suspend-microvolt = <1800000>;
+> +				};
+> +			};
+> +
+> +			vcc33_sd: SWITCH_REG1 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-name = "vcc33_sd";
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +				};
+> +			};
+> +
+> +			vcc33_lan: SWITCH_REG2 {
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +				regulator-name = "vcc33_lan";
+> +				regulator-state-mem {
+> +					regulator-on-in-suspend;
+> +				};
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&i2c2 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c5 {
+> +	status = "okay";
+> +};
+> +
+> +&i2s {
+> +	#sound-dai-cells = <0>;
+> +	status = "okay";
+> +};
+> +&vopb {
+> +	status = "okay";
+> +};
+> +
+> +&vopb_mmu {
+> +	status = "okay";
+> +};
+> +
+> +&vopl {
+> +	status = "okay";
+> +	/* Don't use vopl for HDMI */
+> +	vopl_out: port {
+> +		/delete-node/ endpoint at 0;
+> +	};
+
+same here
+
+> +};
+> +
