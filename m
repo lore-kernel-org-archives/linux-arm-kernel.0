@@ -1,174 +1,100 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 8 Feb 2017 11:58:56 +0000
-Subject: [PATCH 1/4] phy: exynos4: Remove duplicated defines of PHY
- register defines
-In-Reply-To: <20170127200510.4444-2-krzk@kernel.org>
-References: <20170127200510.4444-1-krzk@kernel.org>
- <20170127200510.4444-2-krzk@kernel.org>
-Message-ID: <20170208115856.f6se6btiylv6usip@dell>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  8 Feb 2017 11:55:42 +0000
+Subject: [PATCH v2 09/14] arm: compressed: put zImage header and EFI header in
+ dedicated section
+In-Reply-To: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1486554947-3964-10-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Jan 2017, Krzysztof Kozlowski wrote:
+To align the PE/COFF and the ELF headers of the decompressor binary, put
+the zImage header and the EFI header in a separate .head.text section,
+and emit it at the start of the Image. This change is necessary for UEFI
+based debug tooling to be able to use the vmlinux ELF binary, since it
+gets confused if the PE/COFF .text section and the ELF .text section live
+at different offsets.
 
-> Phy drivers access PMU region through regmap provided by exynos-pmu
-> driver.   However there is no need to duplicate defines for PMU
-> registers.  Instead just use whatever is defined in exynos-regs-pmu.h.
-> 
-> Additionally MIPI PHY registers for Exynos5433 start from the same
-> address as Exynos4 and Exynos5250 so re-use existing defines.
-> 
-> This reduces number of defines and allows removal of one header file.
-> 
-> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  drivers/phy/phy-exynos-mipi-video.c         | 12 ++++++------
->  include/linux/mfd/syscon/exynos4-pmu.h      | 21 ---------------------
->  include/linux/mfd/syscon/exynos5-pmu.h      |  3 ---
+This requires a tweak of the initial jump, because (b)adr does not reach
+across a section boundary. Other than that, and a few bytes of padding at
+the beginning of .start, this change does not affect the binary image.
 
-Love that diff!
+Cc: Dave Martin <dave.martin@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/boot/compressed/efi-header.S  |  2 --
+ arch/arm/boot/compressed/head.S        | 14 +++++++++-----
+ arch/arm/boot/compressed/vmlinux.lds.S |  5 ++++-
+ 3 files changed, 13 insertions(+), 8 deletions(-)
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
->  include/linux/soc/samsung/exynos-regs-pmu.h |  9 ++++++++-
->  4 files changed, 14 insertions(+), 31 deletions(-)
->  delete mode 100644 include/linux/mfd/syscon/exynos4-pmu.h
-> 
-> diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
-> index 6bee04cc4d53..d7fe1f8c3ac8 100644
-> --- a/drivers/phy/phy-exynos-mipi-video.c
-> +++ b/drivers/phy/phy-exynos-mipi-video.c
-> @@ -12,7 +12,6 @@
->  #include <linux/err.h>
->  #include <linux/io.h>
->  #include <linux/kernel.h>
-> -#include <linux/mfd/syscon/exynos4-pmu.h>
->  #include <linux/mfd/syscon/exynos5-pmu.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> @@ -21,6 +20,7 @@
->  #include <linux/phy/phy.h>
->  #include <linux/regmap.h>
->  #include <linux/spinlock.h>
-> +#include <linux/soc/samsung/exynos-regs-pmu.h>
->  #include <linux/mfd/syscon.h>
->  
->  enum exynos_mipi_phy_id {
-> @@ -173,7 +173,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
->  			/* EXYNOS_MIPI_PHY_ID_CSIS0 */
->  			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM0,
->  			.enable_val = EXYNOS5_PHY_ENABLE,
-> -			.enable_reg = EXYNOS5433_MIPI_PHY0_CONTROL,
-> +			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(0),
->  			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
->  			.resetn_val = BIT(0),
->  			.resetn_reg = EXYNOS5433_SYSREG_CAM0_MIPI_DPHY_CON,
-> @@ -182,7 +182,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
->  			/* EXYNOS_MIPI_PHY_ID_DSIM0 */
->  			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS0,
->  			.enable_val = EXYNOS5_PHY_ENABLE,
-> -			.enable_reg = EXYNOS5433_MIPI_PHY0_CONTROL,
-> +			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(0),
->  			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
->  			.resetn_val = BIT(0),
->  			.resetn_reg = EXYNOS5433_SYSREG_DISP_MIPI_PHY,
-> @@ -191,7 +191,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
->  			/* EXYNOS_MIPI_PHY_ID_CSIS1 */
->  			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
->  			.enable_val = EXYNOS5_PHY_ENABLE,
-> -			.enable_reg = EXYNOS5433_MIPI_PHY1_CONTROL,
-> +			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(1),
->  			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
->  			.resetn_val = BIT(1),
->  			.resetn_reg = EXYNOS5433_SYSREG_CAM0_MIPI_DPHY_CON,
-> @@ -200,7 +200,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
->  			/* EXYNOS_MIPI_PHY_ID_DSIM1 */
->  			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
->  			.enable_val = EXYNOS5_PHY_ENABLE,
-> -			.enable_reg = EXYNOS5433_MIPI_PHY1_CONTROL,
-> +			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(1),
->  			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
->  			.resetn_val = BIT(1),
->  			.resetn_reg = EXYNOS5433_SYSREG_DISP_MIPI_PHY,
-> @@ -209,7 +209,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
->  			/* EXYNOS_MIPI_PHY_ID_CSIS2 */
->  			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
->  			.enable_val = EXYNOS5_PHY_ENABLE,
-> -			.enable_reg = EXYNOS5433_MIPI_PHY2_CONTROL,
-> +			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(2),
->  			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
->  			.resetn_val = BIT(0),
->  			.resetn_reg = EXYNOS5433_SYSREG_CAM1_MIPI_DPHY_CON,
-> diff --git a/include/linux/mfd/syscon/exynos4-pmu.h b/include/linux/mfd/syscon/exynos4-pmu.h
-> deleted file mode 100644
-> index 278b1b1549e9..000000000000
-> --- a/include/linux/mfd/syscon/exynos4-pmu.h
-> +++ /dev/null
-> @@ -1,21 +0,0 @@
-> -/*
-> - * Copyright (C) 2015 Samsung Electronics Co., Ltd.
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - */
-> -
-> -#ifndef _LINUX_MFD_SYSCON_PMU_EXYNOS4_H_
-> -#define _LINUX_MFD_SYSCON_PMU_EXYNOS4_H_
-> -
-> -/* Exynos4 PMU register definitions */
-> -
-> -/* MIPI_PHYn_CONTROL register offset: n = 0..1 */
-> -#define EXYNOS4_MIPI_PHY_CONTROL(n)	(0x710 + (n) * 4)
-> -#define EXYNOS4_MIPI_PHY_ENABLE		(1 << 0)
-> -#define EXYNOS4_MIPI_PHY_SRESETN	(1 << 1)
-> -#define EXYNOS4_MIPI_PHY_MRESETN	(1 << 2)
-> -#define EXYNOS4_MIPI_PHY_RESET_MASK	(3 << 1)
-> -
-> -#endif /* _LINUX_MFD_SYSCON_PMU_EXYNOS4_H_ */
-> diff --git a/include/linux/mfd/syscon/exynos5-pmu.h b/include/linux/mfd/syscon/exynos5-pmu.h
-> index 0622ae86f9db..02af8dece914 100644
-> --- a/include/linux/mfd/syscon/exynos5-pmu.h
-> +++ b/include/linux/mfd/syscon/exynos5-pmu.h
-> @@ -38,9 +38,6 @@
->  
->  /* Exynos5433 specific register definitions */
->  #define EXYNOS5433_USBHOST30_PHY_CONTROL	(0x728)
-> -#define EXYNOS5433_MIPI_PHY0_CONTROL		(0x710)
-> -#define EXYNOS5433_MIPI_PHY1_CONTROL		(0x714)
-> -#define EXYNOS5433_MIPI_PHY2_CONTROL		(0x718)
->  
->  #define EXYNOS5_PHY_ENABLE			BIT(0)
->  #define EXYNOS5_MIPI_PHY_S_RESETN		BIT(1)
-> diff --git a/include/linux/soc/samsung/exynos-regs-pmu.h b/include/linux/soc/samsung/exynos-regs-pmu.h
-> index 6a6529c96442..637ead0efd36 100644
-> --- a/include/linux/soc/samsung/exynos-regs-pmu.h
-> +++ b/include/linux/soc/samsung/exynos-regs-pmu.h
-> @@ -1,5 +1,5 @@
->  /*
-> - * Copyright (c) 2010-2012 Samsung Electronics Co., Ltd.
-> + * Copyright (c) 2010-2015 Samsung Electronics Co., Ltd.
->   *		http://www.samsung.com
->   *
->   * EXYNOS - Power management unit definition
-> @@ -50,6 +50,13 @@
->  #define S5P_WAKEUP_MASK				0x0608
->  #define S5P_WAKEUP_MASK2				0x0614
->  
-> +/* MIPI_PHYn_CONTROL, valid for Exynos3250, Exynos4, Exynos5250 and Exynos5433 */
-> +#define EXYNOS4_MIPI_PHY_CONTROL(n)		(0x0710 + (n) * 4)
-> +#define EXYNOS4_MIPI_PHY_ENABLE			(1 << 0)
-> +#define EXYNOS4_MIPI_PHY_SRESETN		(1 << 1)
-> +#define EXYNOS4_MIPI_PHY_MRESETN		(1 << 2)
-> +#define EXYNOS4_MIPI_PHY_RESET_MASK		(3 << 1)
-> +
->  #define S5P_INFORM0				0x0800
->  #define S5P_INFORM1				0x0804
->  #define S5P_INFORM5				0x0814
-
+diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
+index 9d5dc4fda3c1..1d26a9d0a9e8 100644
+--- a/arch/arm/boot/compressed/efi-header.S
++++ b/arch/arm/boot/compressed/efi-header.S
+@@ -23,8 +23,6 @@
+ 
+ 		.macro	__EFI_HEADER
+ #ifdef CONFIG_EFI_STUB
+-		b	__efi_start
+-
+ 		.set	start_offset, __efi_start - start
+ 		.org	start + 0x3c
+ 		@
+diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+index fc6d541549a2..42ba2f557791 100644
+--- a/arch/arm/boot/compressed/head.S
++++ b/arch/arm/boot/compressed/head.S
+@@ -114,7 +114,7 @@
+ #endif
+ 		.endm
+ 
+-		.section ".start", #alloc, #execinstr
++		.section ".head.text", #alloc, #execinstr
+ /*
+  * sort out different calling conventions
+  */
+@@ -132,17 +132,21 @@ start:
+ 		.endr
+    ARM(		mov	r0, r0		)
+    ARM(		b	1f		)
+- THUMB(		badr	r12, 1f		)
+- THUMB(		bx	r12		)
++AR_CLASS(THUMB(	sub	pc, pc, #3	))	@ A/R: switch to Thumb2 mode
++ M_CLASS(	nop.w			)	@ M: already in Thumb2 mode
++   THUMB(	.thumb			)
++   THUMB(	b.w	1f		)
+ 
+ 		.word	_magic_sig	@ Magic numbers to help the loader
+ 		.word	_magic_start	@ absolute load/run zImage address
+ 		.word	_magic_end	@ zImage end address
+ 		.word	0x04030201	@ endianness flag
+ 
+- THUMB(		.thumb			)
+-1:		__EFI_HEADER
++		__EFI_HEADER
+ 
++		.section ".start", #alloc, #execinstr
++		.align
++1:
+  ARM_BE8(	setend	be		)	@ go BE8 if compiled for BE8
+  AR_CLASS(	mrs	r9, cpsr	)
+ #ifdef CONFIG_ARM_VIRT_EXT
+diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+index 81c493156ce8..5d50daea466a 100644
+--- a/arch/arm/boot/compressed/vmlinux.lds.S
++++ b/arch/arm/boot/compressed/vmlinux.lds.S
+@@ -34,8 +34,11 @@ SECTIONS
+   . = TEXT_START;
+   _text = .;
+ 
+-  .text : {
++  .head.text : {
+     _start = .;
++    *(.head.text)
++  }
++  .text : {
+     *(.start)
+     *(.text)
+     *(.text.*)
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.7.4
