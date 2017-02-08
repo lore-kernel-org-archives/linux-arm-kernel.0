@@ -1,52 +1,89 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 8 Feb 2017 12:19:23 +0000
-Subject: [PATCH] mfd: stm32-timers: fix driver removal
-In-Reply-To: <1485967306-30589-1-git-send-email-fabrice.gasnier@st.com>
-References: <1485967306-30589-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170208121923.p6mpt55n554zcead@dell>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Wed, 8 Feb 2017 18:00:53 +0530
+Subject: [PATCH V2 1/3] iommu/arm-smmu: Add pm_runtime/sleep ops
+In-Reply-To: <20170208114002.GD15459@leverpostej>
+References: <1486055420-19671-1-git-send-email-sricharan@codeaurora.org>
+ <1486055420-19671-2-git-send-email-sricharan@codeaurora.org>
+ <20170202174218.GO31394@leverpostej>
+ <017701d281f9$927c5fb0$b7751f10$@codeaurora.org>
+ <20170208114002.GD15459@leverpostej>
+Message-ID: <018401d28207$34db60a0$9e9221e0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 01 Feb 2017, Fabrice Gasnier wrote:
+Hi Mark,
 
-> Add missing of_platform_depopulate() upon driver removal.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->  drivers/mfd/stm32-timers.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
+>On Wed, Feb 08, 2017 at 04:23:17PM +0530, Sricharan wrote:
+>> >On Thu, Feb 02, 2017 at 10:40:18PM +0530, Sricharan R wrote:
+>> >> +- clock-names:    Should be a pair of "smmu_iface_clk" and "smmu_bus_clk"
+>> >> +                  required for smmu's register group access and interface
+>> >> +                  clk for the smmu's underlying bus access.
+>> >> +
+>> >> +- clocks:         Phandles for respective clocks described by clock-names.
+>> >
+>> >Which SMMU implementations are those clock-names valid for?
+>> >
+>> >The SMMU architecture specifications do not architect the clocks, which
+>> >are implemementation-specific.
+>> >
+>> >AFAICT, this doesn't match MMU-400 or MMU-500.
+>>
+>> Ok, should be more specific. Infact QCOM has MMU-500 and also
+>> a smmu v2 implementation which is fully compatible with
+>> "arm,smmu-v2", with the clocks being controlled by the soc's
+>> clock controller. i was trying to define these clock bindings
+>> so that its works across socs.
+>
+>I don't think we can do that, if we don't know precisely what those
+>clocks are used for.
+>
+>i.e. we'd need a compatible string for the QCOM SMMUv2 variant, which
+>would imply the set of clocks.
+>
 
-Applied, thanks.
+Ok, this was what i was trying to do for V3 and will actually put it
+this way.
 
-> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
-> index 41bd901..192cbb6 100644
-> --- a/drivers/mfd/stm32-timers.c
-> +++ b/drivers/mfd/stm32-timers.c
-> @@ -61,6 +61,13 @@ static int stm32_timers_probe(struct platform_device *pdev)
->  	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
->  }
->  
-> +static int stm32_timers_remove(struct platform_device *pdev)
-> +{
-> +	of_platform_depopulate(&pdev->dev);
-> +
-> +	return 0;
-> +}
-> +
->  static const struct of_device_id stm32_timers_of_match[] = {
->  	{ .compatible = "st,stm32-timers", },
->  	{ /* end node */ },
-> @@ -69,6 +76,7 @@ static int stm32_timers_probe(struct platform_device *pdev)
->  
->  static struct platform_driver stm32_timers_driver = {
->  	.probe = stm32_timers_probe,
-> +	.remove = stm32_timers_remove,
->  	.driver	= {
->  		.name = "stm32-timers",
->  		.of_match_table = stm32_timers_of_match,
+>> So there are one or more interface clocks which are required for the
+>> smmu's interface or the configuration access and one or more clocks
+>> required for smmu's downstream bus access. That was the reason i was
+>> trying to iterate over the list of clocks down below.  But agree that
+>> the bindings should define each of the clocks required separately.
+>
+>As above, I don't think the code should do this. It should only touch
+>the clocks it knows about.
+>
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+ok, after defining QCOM specific SMMU bindings, this would be become 
+handling clocks specific to QCOM implementation as per its clock
+bindings, which as i understand is what you suggest.
+
+>> So one way here is, define a separate compatible for QCOM's SMMU
+>> implementation and define all the clock bindings as a part of it
+>> and handle it in the same way in the driver.
+>
+>That would be my preference.
+>
+
+ok.
+
+>> But just thinking if it would scale well for any other soc that is
+>> compatible with arm,smmu-v2 driver and wants to handle clocks in the
+>> future ?
+>
+>I don't think we can have our cake and eat it here. Either we handle the
+>clock management for each variant, or we don't do it at all. We have no
+>idea what requirements a future variant might have w.r.t. the management
+>of clocks we don't know about yet.
+>
+
+Right, at this point, this is first soc which adds the clocks in to the driver.
+Feels if the clocks are initialized and enabled/disabled as a part of some
+implementation specific callbacks, that would help always because that is
+the part which is going to different for each implementation and patches 2,3
+would remain common. Finally, as you have suggested will introduce new
+SMMU binding in the case of QCOM and will try to handle clocks specifically for that
+implementation and see how it looks.
+
+Regards,
+ Sricharan
