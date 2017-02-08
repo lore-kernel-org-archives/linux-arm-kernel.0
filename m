@@ -1,75 +1,124 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu,  9 Feb 2017 00:14:42 +0100
-Subject: [PATCH 08/10] clocksource/drivers/arm_arch_timer: Remove fsl-a008585
- parameter
+Date: Thu,  9 Feb 2017 00:14:44 +0100
+Subject: [PATCH 10/10] clocksource/drivers/arm_arch_timer: Work around
+ Hisilicon erratum 161010101
 In-Reply-To: <1486595685-10232-1-git-send-email-daniel.lezcano@linaro.org>
 References: <20170208231208.GB12695@mai>
  <1486595685-10232-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1486595685-10232-8-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1486595685-10232-10-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ding Tianhong <dingtianhong@huawei.com>
 
-Having a command line option to flip the errata handling for a
-particular erratum is a little bit unusual, and it's vastly superior to
-pass this in the DT. By common consensus, it's best to kill off the
-command line parameter.
+Erratum Hisilicon-161010101 says that the ARM generic timer counter "has
+the potential to contain an erroneous value when the timer value
+changes". Accesses to TVAL (both read and write) are also affected due
+to the implicit counter read. Accesses to CVAL are not affected.
+
+The workaround is to reread the system count registers until the value
+of the second read is larger than the first one by less than 32, the
+system counter can be guaranteed not to return wrong value twice by
+back-to-back read and the error value is always larger than the correct
+one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
 
 Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-[Mark: split patch, reword commit message]
+[Mark: split patch, fix Kconfig, reword commit message]
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- Documentation/admin-guide/kernel-parameters.txt |  9 ---------
- drivers/clocksource/arm_arch_timer.c            | 14 --------------
- 2 files changed, 23 deletions(-)
+ drivers/clocksource/Kconfig          | 10 ++++++++
+ drivers/clocksource/arm_arch_timer.c | 49 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 59 insertions(+)
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index be7c0d9..d8fc55a 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -549,15 +549,6 @@
- 			loops can be debugged more effectively on production
- 			systems.
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 1945af2..3356ab8 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -356,6 +356,16 @@ config FSL_ERRATUM_A008585
+ 	  value").  The workaround will only be active if the
+ 	  fsl,erratum-a008585 property is found in the timer node.
  
--	clocksource.arm_arch_timer.fsl-a008585=
--			[ARM64]
--			Format: <bool>
--			Enable/disable the workaround of Freescale/NXP
--			erratum A-008585.  This can be useful for KVM
--			guests, if the guest device tree doesn't show the
--			erratum.  If unspecified, the workaround is
--			enabled based on the device tree.
--
- 	clearcpuid=BITNUM [X86]
- 			Disable CPUID feature X for the kernel. See
- 			arch/x86/include/asm/cpufeatures.h for the valid bit
++config HISILICON_ERRATUM_161010101
++	bool "Workaround for Hisilicon Erratum 161010101"
++	default y
++	select ARM_ARCH_TIMER_OOL_WORKAROUND
++	depends on ARM_ARCH_TIMER && ARM64
++	help
++	  This option enables a workaround for Hisilicon Erratum
++	  161010101. The workaround will be active if the hisilicon,erratum-161010101
++	  property is found in the timer node.
++
+ config ARM_GLOBAL_TIMER
+ 	bool "Support for the ARM global timer" if COMPILE_TEST
+ 	select CLKSRC_OF if OF
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 4c8c3fb..6a9d031 100644
+index 2af0739..7b06aef 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -101,20 +101,6 @@ EXPORT_SYMBOL_GPL(arch_timer_read_ool_enabled);
+@@ -130,6 +130,47 @@ static u64 notrace fsl_a008585_read_cntvct_el0(void)
+ }
+ #endif
  
- static int fsl_a008585_enable = -1;
++#ifdef CONFIG_HISILICON_ERRATUM_161010101
++/*
++ * Verify whether the value of the second read is larger than the first by
++ * less than 32 is the only way to confirm the value is correct, so clear the
++ * lower 5 bits to check whether the difference is greater than 32 or not.
++ * Theoretically the erratum should not occur more than twice in succession
++ * when reading the system counter, but it is possible that some interrupts
++ * may lead to more than twice read errors, triggering the warning, so setting
++ * the number of retries far beyond the number of iterations the loop has been
++ * observed to take.
++ */
++#define __hisi_161010101_read_reg(reg) ({				\
++	u64 _old, _new;						\
++	int _retries = 50;					\
++								\
++	do {							\
++		_old = read_sysreg(reg);			\
++		_new = read_sysreg(reg);			\
++		_retries--;					\
++	} while (unlikely((_new - _old) >> 5) && _retries);	\
++								\
++	WARN_ON_ONCE(!_retries);				\
++	_new;							\
++})
++
++static u32 notrace hisi_161010101_read_cntp_tval_el0(void)
++{
++	return __hisi_161010101_read_reg(cntp_tval_el0);
++}
++
++static u32 notrace hisi_161010101_read_cntv_tval_el0(void)
++{
++	return __hisi_161010101_read_reg(cntv_tval_el0);
++}
++
++static u64 notrace hisi_161010101_read_cntvct_el0(void)
++{
++	return __hisi_161010101_read_reg(cntvct_el0);
++}
++#endif
++
+ #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+ const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround = NULL;
+ EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
+@@ -146,6 +187,14 @@ static const struct arch_timer_erratum_workaround ool_workarounds[] = {
+ 		.read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
+ 	},
+ #endif
++#ifdef CONFIG_HISILICON_ERRATUM_161010101
++	{
++		.id = "hisilicon,erratum-161010101",
++		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
++		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
++		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
++	},
++#endif
+ };
+ #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
  
--static int __init early_fsl_a008585_cfg(char *buf)
--{
--	int ret;
--	bool val;
--
--	ret = strtobool(buf, &val);
--	if (ret)
--		return ret;
--
--	fsl_a008585_enable = val;
--	return 0;
--}
--early_param("clocksource.arm_arch_timer.fsl-a008585", early_fsl_a008585_cfg);
--
- u32 __fsl_a008585_read_cntp_tval_el0(void)
- {
- 	return __fsl_a008585_read_reg(cntp_tval_el0);
 -- 
 2.7.4
