@@ -1,86 +1,94 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 8 Feb 2017 12:07:23 +0530
-Subject: [PATCH v2 2/5] async_tx: Handle DMA devices having support for
- fewer PQ coefficients
-In-Reply-To: <20170207164207.GI19244@localhost>
-References: <1486455406-11202-1-git-send-email-anup.patel@broadcom.com>
- <1486455406-11202-3-git-send-email-anup.patel@broadcom.com>
- <CAPcyv4gbV1yf52JrejW+Dn3wOPn7Er+8HWdu2qsW0+Qm+cRr9g@mail.gmail.com>
- <CAALAos_yhXufdt79KWY0eugjF5oyJ8+NcPh2E-dEXnSQu2WhhA@mail.gmail.com>
- <20170207164207.GI19244@localhost>
-Message-ID: <CAALAos__1XVv-=CitWfWLsXUt7nYC5bN6qaVUBWY7fiLA1UtGg@mail.gmail.com>
+From: michael.heimpold@i2se.com (Michael Heimpold)
+Date: Wed, 8 Feb 2017 07:43:56 +0100
+Subject: [PATCH v3 5/9] Documentation: DT: add entries for I2SE boards
+In-Reply-To: <20170201171838.vihswvpdro54aqiq@rob-hp-laptop>
+References: <1485845475-3129-1-git-send-email-michael.heimpold@i2se.com>
+ <1485845475-3129-6-git-send-email-michael.heimpold@i2se.com>
+ <20170201171838.vihswvpdro54aqiq@rob-hp-laptop>
+Message-ID: <769dba11-e290-50e0-d894-9f4ea08eb652@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 7, 2017 at 10:12 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Tue, Feb 07, 2017 at 02:32:15PM +0530, Anup Patel wrote:
->> On Tue, Feb 7, 2017 at 1:57 PM, Dan Williams <dan.j.williams@intel.com> wrote:
->> > On Tue, Feb 7, 2017 at 12:16 AM, Anup Patel <anup.patel@broadcom.com> wrote:
->> >> The DMAENGINE framework assumes that if PQ offload is supported by a
->> >> DMA device then all 256 PQ coefficients are supported. This assumption
->> >> does not hold anymore because we now have BCM-SBA-RAID offload engine
->> >> which supports PQ offload with limited number of PQ coefficients.
->> >>
->> >> This patch extends async_tx APIs to handle DMA devices with support
->> >> for fewer PQ coefficients.
->> >>
->> >> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->> >> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->> >
->> > I don't like this approach. Define an interface for md to query the
->> > offload engine once at the beginning of time. We should not be adding
->> > any new extensions to async_tx.
+Hi Rob,
+
+thanks for your review. Some questions below:
+
+
+Am 01.02.2017 um 18:18 schrieb Rob Herring:
+> On Tue, Jan 31, 2017 at 07:51:11AM +0100, Michael Heimpold wrote:
+>> From: Michael Heimpold <mhei@heimpold.de>
+> "dt-bindings: arm:" is preferred subject prefix.
+Will change it in next round.
+>> This patch adds the missing devicetree binding documentation for I2SE's
+>> Duckbill and Duckbill 2 series boards.
 >>
->> Even if we do capability checks in Linux MD, we still need a way
->> for DMAENGINE drivers to advertise number of PQ coefficients
->> handled by the HW.
->
-> If the question is only for advertising caps, then why not do as done
-> for dma_get_slave_caps(). you can add dma_get_pq_caps() so that clients (md)
-> in this case would know the HW capability.
+>> Signed-off-by: Michael Heimpold <mhei@heimpold.de>
+>> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+>> ---
+>>   Documentation/devicetree/bindings/arm/i2se.txt | 22 ++++++++++++++++++++++
+>>   1 file changed, 22 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/arm/i2se.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/i2se.txt b/Documentation/devicetree/bindings/arm/i2se.txt
+>> new file mode 100644
+>> index 0000000..9954d86
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/i2se.txt
+>> @@ -0,0 +1,22 @@
+>> +I2SE Device Tree Bindings
+>> +-------------------------
+>> +
+>> +Duckbill Board
+>> +Required root node properties:
+>> +    - compatible = "i2se,duckbill", "fsl,imx28";
+>> +
+>> +Duckbill 2 Board
+>> +Required root node properties:
+>> +    - compatible = "i2se,duckbill", "fsl,imx28";
+>> +
+>> +Duckbill 2 485 Board
+>> +Required root node properties:
+>> +    - compatible = "i2se,duckbill", "fsl,imx28";
+>> +
+>> +Duckbill 2 EnOcean Board
+>> +Required root node properties:
+>> +    - compatible = "i2se,duckbill", "fsl,imx28";
+>> +
+>> +Duckbill 2 SPI Board
+>> +Required root node properties:
+>> +    - compatible = "i2se,duckbill", "fsl,imx28";
+> It's kind of pointless to have "i2se,duckbill" if you use the same one
+> for all these boards.
+At the moment, this is only used to fix-up the MAC address' OUI part
+in mxs_machine_init. So my proposal would be to use
+compatible = "i2se,duckbill-2", "fsl,imx28";
+for the Duckbill 2 board and something like
+compatible = "i2se,duckbill-2-485", "i2se,duckbill-2", "fsl,imx28";
+for the rest. This way we need to add only one additional check in mxs_machine_init check.
 
-We have large number of possible capabilities for
-DMA slave such as src_addr_widths, dst_addr_widths,
-directions, max_burst, residue_granularity, and
-descriptor_resue.
+Would this be a way to go?
 
-The possible capabilities of PQ offload are:
-1. Number of PQ sources handled by PQ offload
-(Represented by "max_pq" member of "struct dma_device")
-2. Number of PQ coefficients handled by PQ offload
+Best regards,
+Michael
 
-The above two PQ capabilities are good enough for
-current PQ HW and future PQ HW so we just need a
-way to specify number of PQ coefficients.
+> Rob
 
-Till now all of the PQ HW always supported all 256
-PQ coefficients so we never felt the need of capability
-to specify PQ coefficients. The BCM-SBA-RAID is the
-only HW (as far as I know) which does not support all
-256 PQ coefficients.
+Mit freundlichen Gr??en / Kind regards
+Michael Heimpold
+-- 
+Software Engineer
 
-Currently, DMAENGINE drivers use dma_set_maxpq() to
-specify number of PQ sources handled by PQ HW and
-Linux Async Tx uses dma_maxpq() to get number of
-PQ sources.
+I2SE GmbH                           Tel: +49 (0) 341 355667-00
+Friedrich-Ebert-Str. 61             Fax: +49 (0) 341 355667-02
+04109 Leipzig
+Germany
+Web: http://www.i2se.com/           Mail: info at i2se.com
+VAT No.: DE 811528334
+Amtsgericht Leipzig HRB 23784
+Gesch?ftsf?hrer/CEO: Carsten Ziermann
 
-On similar lines, we added dma_set_maxpqcoef() to
-specify number of PQ coefficients and Linux Async Tx
-uses dma_maxpqcoef() to get number of PQ coefficients.
-If DMAENGINE driver does not specify PQ coefficients
-then dma_maxpqcoef() will return 256 assuming all
-PQ coefficients are supported. This approach is
-backward compatible to existing DMAENGINE APIs
-and will not break existing DMAENGINE drivers.
+*** Diese E-Mail ist allein f?r den bezeichneten Adressaten bestimmt. Sie kann rechtlich vertrauliche Informationen enthalten. Wenn Sie diese E-Mail irrt?mlich erhalten haben, informieren Sie bitte unverz?glich den Absender per E-Mail und l?schen Sie diese E-Mail von Ihrem Computer, ohne Kopien anzufertigen.
+Vielen Dank. ***
 
-If we add dma_get_pq_caps() similar to the
-dma_get_slave_caps() for PQ capabilities then we
-will have to use this new method for both of the above
-PQ capabilities and we have to change all DMAENGINE
-drivers to use new method of specifying PQ capabilities.
-I think this is too intrusive and bit overkill because its
-very very unlikely to see anymore additions to
-PQ capabilities.
-
-Regards,
-Anup
+*** This email is for the exclusive use of the addressee. It may contain legally privileged information. If you have received this message in error, please notify the sender by email immediately and delete the message from your computer without making any copies.
+Thank you. ***
