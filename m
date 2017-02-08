@@ -1,39 +1,53 @@
-From: rafal@milecki.pl (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 9 Feb 2017 00:29:05 +0100
-Subject: [PATCH] MAINTAINERS: Add Jon Mason to BCM5301X maintainers
-In-Reply-To: <1486596146-26766-1-git-send-email-jon.mason@broadcom.com>
-References: <1486596146-26766-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <d7b40d59-4121-97ef-9829-405df8042bd7@milecki.pl>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Thu,  9 Feb 2017 00:29:05 +0100 (CET)
+Subject: [PATCH v2 0/5] arm: sun9i: Support AXP808 PMIC and Sunchip CX-A99
+ board
+Message-ID: <cover.1486592470.git.rask@formelder.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2017 12:22 AM, Jon Mason wrote:
-> Adding myself as a maintainer for Broadcom Northstar SoCs.  Also, adding
-> a regex entry to discover the SVK DTs already present.
->
-> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+This patch series add support for the Sunchip CX-A99 board, which is used in
+a few media players, making it the third device with an Allwinner A80 SoC
+to be supported. The board uses the X-Powers AXP808 PMIC which this patch
+series also adds support for.
 
-Acked-by: Rafa? Mi?ecki <rafal@milecki.pl>
+Patch 1 adds a documentation line which was forgotten when device tree
+bindings for the axp20x family were updated for the AXP806 PMIC. A line
+immediately below the missing line will be inserted by patch 2, so I'm
+including patch 1 in this series to avoid conflicts between patches.
 
+Patch 2 adds the AXP808 to the axp20x device tree bindings.
 
->  MAINTAINERS | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 2abda6c..03c1760 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -2641,12 +2641,14 @@ F:	arch/mips/include/asm/mach-bcm47xx/*
->  BROADCOM BCM5301X ARM ARCHITECTURE
->  M:	Hauke Mehrtens <hauke@hauke-m.de>
->  M:	Rafa? Mi?ecki <zajec5@gmail.com>
-> +M:	Jon Mason <jonmason@broadcom.com>
->  M:	bcm-kernel-feedback-list at broadcom.com
->  L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  F:	arch/arm/mach-bcm/bcm_5301x.c
->  F:	arch/arm/boot/dts/bcm5301x*.dtsi
->  F:	arch/arm/boot/dts/bcm470*
-> +N:	bcm953012
+Patch 3 adds support for the AXP808 to the axp20x MFD driver.
 
-Is it worth using N: (regex pattern)? Just asking.
+Patch 4 adds support for the AXP808 to the axp20x regulator driver.
+
+Patch 5 add the device tree for the Sunchip CX-A99 board. This patch is v6 of
+the only remaining patch from v4 of the patch series posted back in August.
+Support for the AXP808 has made major improvements possible, notably Wifi.
+
+Before trying out this patch series, make sure your tree contains patch
+"regulator: axp20x: AXP806: Fix dcdcb being set instead of dcdce" [1]
+to avoid damage to the DRAM chips through over-voltage.
+
+[1] https://patchwork.kernel.org/patch/9530319/
+
+Rask Ingemann Lambertsen (5):
+  dts: mfd: axp20x: Add AXP806 to list of current AXP20x family members
+  dts: mfd: axp20x: Add binding for the AXP808
+  mfd: axp20x: Add support for the AXP808 PMIC
+  regulator: axp20x: Add support for the AXP808 PMIC
+  ARM: dts: sun9i: Initial support for the Sunchip CX-A99 board
+
+ Documentation/devicetree/bindings/mfd/axp20x.txt |   8 +-
+ arch/arm/boot/dts/Makefile                       |   3 +-
+ arch/arm/boot/dts/sun9i-a80-cx-a99.dts           | 409 +++++++++++++++++++++++
+ drivers/mfd/axp20x-rsb.c                         |   1 +
+ drivers/mfd/axp20x.c                             |  26 ++
+ drivers/regulator/axp20x-regulator.c             |   7 +-
+ include/linux/mfd/axp20x.h                       |   1 +
+ 7 files changed, 449 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun9i-a80-cx-a99.dts
+
+-- 
+2.10.2
