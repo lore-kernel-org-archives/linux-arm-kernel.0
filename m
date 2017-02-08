@@ -1,33 +1,31 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed,  8 Feb 2017 18:00:03 +0800
-Subject: [PATCH 2/8] dt: bindings: add binding for Allwinner A64 R_PIO pinctrl
+Date: Wed,  8 Feb 2017 18:00:05 +0800
+Subject: [PATCH 4/8] arm64: allwinner: select A64 R_PIO driver
 In-Reply-To: <20170208100009.29362-1-icenowy@aosc.xyz>
 References: <20170208100009.29362-1-icenowy@aosc.xyz>
-Message-ID: <20170208100009.29362-2-icenowy@aosc.xyz>
+Message-ID: <20170208100009.29362-4-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 SoC has also a dedicated pin controller for Port L GPIOs,
-which is called "Port Controller (CPUs-PORT)" in SoC User Manual.
-
-Add a binding for this pin controller, like the ones in A23/33 and H3.
+As the pinctrl drivers of ARM64 Allwinner SoCs do not have a way to
+be explicitly enabled, it should be select by the platform option.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt | 1 +
+ arch/arm64/Kconfig.platforms | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-index 8177bb4d5f53..b53224473672 100644
---- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-@@ -23,6 +23,7 @@ Required properties:
-   "allwinner,sun8i-h3-pinctrl"
-   "allwinner,sun8i-h3-r-pinctrl"
-   "allwinner,sun50i-a64-pinctrl"
-+  "allwinner,sun50i-a64-r-pinctrl"
-   "allwinner,sun50i-h5-pinctrl"
-   "nextthing,gr8-pinctrl"
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 715ef1256838..d539ac54a36a 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -5,6 +5,7 @@ config ARCH_SUNXI
+ 	select GENERIC_IRQ_CHIP
+ 	select PINCTRL
+ 	select PINCTRL_SUN50I_A64
++	select PINCTRL_SUN50I_A64_R
+ 	help
+ 	  This enables support for Allwinner sunxi based SoCs like the A64.
  
 -- 
 2.11.0
