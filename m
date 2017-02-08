@@ -1,57 +1,37 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 8 Feb 2017 08:24:59 -0800
-Subject: [PATCH v2 2/5] async_tx: Handle DMA devices having support for
- fewer PQ coefficients
-In-Reply-To: <CAALAos9ovab4x=waRgM7G2adRC7syHMkY0Rhf-UPB_+h4w3yNQ@mail.gmail.com>
-References: <1486455406-11202-1-git-send-email-anup.patel@broadcom.com>
- <1486455406-11202-3-git-send-email-anup.patel@broadcom.com>
- <CAPcyv4gbV1yf52JrejW+Dn3wOPn7Er+8HWdu2qsW0+Qm+cRr9g@mail.gmail.com>
- <CAALAos_yhXufdt79KWY0eugjF5oyJ8+NcPh2E-dEXnSQu2WhhA@mail.gmail.com>
- <CAPcyv4hK_1f8bryq6smPQy7vTnP+QEzmT9wnAEE1xpxq7EAnjQ@mail.gmail.com>
- <CAALAos9ovab4x=waRgM7G2adRC7syHMkY0Rhf-UPB_+h4w3yNQ@mail.gmail.com>
-Message-ID: <CAPcyv4iFJXxvJFrUs2jtwP9GX5NcJ8LiEDHeZ5b1fwjCAToe5w@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 8 Feb 2017 10:28:11 -0600
+Subject: [PATCH v3 06/10] arm64: efi: add EFI stub
+In-Reply-To: <1396637113-22790-7-git-send-email-leif.lindholm@linaro.org>
+References: <1396637113-22790-1-git-send-email-leif.lindholm@linaro.org>
+ <1396637113-22790-7-git-send-email-leif.lindholm@linaro.org>
+Message-ID: <CAOZdJXWU1dmFfCc88RMp3SvouU7roDiJsA=3aHzwijwhMH7naA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 8, 2017 at 12:57 AM, Anup Patel <anup.patel@broadcom.com> wrote:
-> On Tue, Feb 7, 2017 at 11:46 PM, Dan Williams <dan.j.williams@intel.com> wrote:
->> On Tue, Feb 7, 2017 at 1:02 AM, Anup Patel <anup.patel@broadcom.com> wrote:
->>> On Tue, Feb 7, 2017 at 1:57 PM, Dan Williams <dan.j.williams@intel.com> wrote:
->>>> On Tue, Feb 7, 2017 at 12:16 AM, Anup Patel <anup.patel@broadcom.com> wrote:
->>>>> The DMAENGINE framework assumes that if PQ offload is supported by a
->>>>> DMA device then all 256 PQ coefficients are supported. This assumption
->>>>> does not hold anymore because we now have BCM-SBA-RAID offload engine
->>>>> which supports PQ offload with limited number of PQ coefficients.
->>>>>
->>>>> This patch extends async_tx APIs to handle DMA devices with support
->>>>> for fewer PQ coefficients.
->>>>>
->>>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->>>>
->>>> I don't like this approach. Define an interface for md to query the
->>>> offload engine once at the beginning of time. We should not be adding
->>>> any new extensions to async_tx.
->>>
->>> Even if we do capability checks in Linux MD, we still need a way
->>> for DMAENGINE drivers to advertise number of PQ coefficients
->>> handled by the HW.
->>>
->>> I agree capability checks should be done once in Linux MD but I don't
->>> see why this has to be part of BCM-SBA-RAID driver patches. We need
->>> separate patchsets to address limitations of async_tx framework.
->>
->> Right, separate enabling before we pile on new hardware support to a
->> known broken framework.
+On Fri, Apr 4, 2014 at 1:45 PM, Leif Lindholm <leif.lindholm@linaro.org> wrote:
 >
-> Linux Async Tx not broken framework. The issue is:
-> 1. Its not complete enough
-> 2. Its not optimized for very high through-put offload engines
+> +/*
+> + * EFI entry point for the arm/arm64 EFI stubs.  This is the entrypoint
+> + * that is described in the PE/COFF header.  Most of the code is the same
+> + * for both archictectures, with the arch-specific code provided in the
+> + * handle_kernel_image() function.
+> + */
+> +unsigned long __init efi_entry(void *handle, efi_system_table_t *sys_table,
+> +                              unsigned long *image_addr)
+> +{
 
-I'm not understanding your point. I'm nak'ing this change to add yet
-more per-transaction capability checking to async_tx. I don't like the
-DMA_HAS_FEWER_PQ_COEF flag, especially since it is equal to
-DMA_HAS_PQ_CONTINUE. I'm not asking for all of async_tx's problems to
-be fixed before this new hardware support, I'm simply saying we should
-start the process of moving offload-engine capability checking to the
-raid code.
+...
+
+> +
+> +       status = handle_cmdline_files(sys_table, image, cmdline_ptr,
+> +                                     "initrd=", dram_base + SZ_512M,
+> +                                     (unsigned long *)&initrd_addr,
+> +                                     (unsigned long *)&initrd_size);
+
+So I know this patch is almost three years old, but why is there a
+512M limit on the initrd size?
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
