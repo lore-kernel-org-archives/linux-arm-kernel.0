@@ -1,23 +1,35 @@
 From: linucherian@gmail.com (linucherian at gmail.com)
-Date: Wed,  8 Feb 2017 12:45:39 +0530
-Subject: [PATCH V2 0/2] KVM: arm64: Increase number of user memslots
-Message-ID: <1486538141-30627-1-git-send-email-linucherian@gmail.com>
+Date: Wed,  8 Feb 2017 12:45:40 +0530
+Subject: [PATCH V2 1/2] KVM: arm/arm64: Enable KVM_CAP_NR_MEMSLOTS on arm/arm64
+In-Reply-To: <1486538141-30627-1-git-send-email-linucherian@gmail.com>
+References: <1486538141-30627-1-git-send-email-linucherian@gmail.com>
+Message-ID: <1486538141-30627-2-git-send-email-linucherian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linu Cherian <linu.cherian@cavium.com>
 
-v1 -> v2:
-- Enabling KVM_CAP_NR_MEMSLOTS for arm/arm64 moved to separate patch.
-- Updated commit message so that what is reported to userspace is explicit. 
+Return KVM_USER_MEM_SLOTS for userspace capability query on
+NR_MEMSLOTS.
 
-Linu Cherian (2):
-  KVM: arm/arm64: Enable KVM_CAP_NR_MEMSLOTS on arm/arm64
-  KVM: arm64: Increase number of user memslots to 508
+Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
+---
+ arch/arm/kvm/arm.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
- arch/arm/kvm/arm.c                | 3 +++
- arch/arm64/include/asm/kvm_host.h | 2 +-
- 2 files changed, 4 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 9d74464..b64b47f 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -221,6 +221,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
+ 	case KVM_CAP_MAX_VCPUS:
+ 		r = KVM_MAX_VCPUS;
+ 		break;
++	case KVM_CAP_NR_MEMSLOTS:
++		r = KVM_USER_MEM_SLOTS;
++		break;
+ 	case KVM_CAP_MSI_DEVID:
+ 		if (!kvm)
+ 			r = -EINVAL;
 -- 
 1.9.1
