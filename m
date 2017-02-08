@@ -1,39 +1,40 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 08 Feb 2017 16:09:10 -0600
-Subject: [PATCH v1 3/3] PCI: xgene: Configure PCIe MPS settings
-In-Reply-To: <20170208215558.8352.90635.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170208215558.8352.90635.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170208220910.8352.8243.stgit@bhelgaas-glaptop.roam.corp.google.com>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Wed,  8 Feb 2017 23:08:45 +0100 (CET)
+Subject: [PATCH 3/4] ARM: multi_v7_defconfig: Enable AC100 RTC driver
+In-Reply-To: <937914a68e4e7d6db2d12540cc6253b200978e2d.1486590875.git.rask@formelder.dk>
+References: <937914a68e4e7d6db2d12540cc6253b200978e2d.1486590875.git.rask@formelder.dk>
+Message-ID: <67ca5dceabc614510f4ce22d781fb0f69445ce6a.1486590875.git.rask@formelder.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure PCIe MPS settings are valid when we enumerate a new hierarchy.
+Enable the AC100 RTC driver so boards with it can keep track of time.
 
-Based-on-patch-by: Jon Mason <jon.mason@broadcom.com>
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
 ---
- drivers/pci/host/pci-xgene.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+This patch will have no effect if patch 2/4 is not applied.
 
-diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-index 7c3b54b9eb17..8091a8778ae7 100644
---- a/drivers/pci/host/pci-xgene.c
-+++ b/drivers/pci/host/pci-xgene.c
-@@ -638,7 +638,7 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
- 	struct device_node *dn = dev->of_node;
- 	struct xgene_pcie_port *port;
- 	resource_size_t iobase = 0;
--	struct pci_bus *bus;
-+	struct pci_bus *bus, *child;
- 	int ret;
- 	LIST_HEAD(res);
- 
-@@ -681,6 +681,8 @@ static int xgene_pcie_probe_bridge(struct platform_device *pdev)
- 
- 	pci_scan_child_bus(bus);
- 	pci_assign_unassigned_bus_resources(bus);
-+	list_for_each_entry(child, &bus->children, node)
-+		pcie_bus_configure_settings(child);
- 	pci_bus_add_devices(bus);
- 	return 0;
- 
+ arch/arm/configs/multi_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index ec3a110..5868186 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -480,6 +480,7 @@ CONFIG_MFD_AS3722=y
+ CONFIG_MFD_ATMEL_FLEXCOM=y
+ CONFIG_MFD_ATMEL_HLCDC=m
+ CONFIG_MFD_BCM590XX=y
++CONFIG_MFD_AC100=y
+ CONFIG_MFD_AXP20X=y
+ CONFIG_MFD_AXP20X_I2C=m
+ CONFIG_MFD_AXP20X_RSB=m
+@@ -749,6 +750,7 @@ CONFIG_EDAC_MM_EDAC=y
+ CONFIG_EDAC_HIGHBANK_MC=y
+ CONFIG_EDAC_HIGHBANK_L2=y
+ CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_AC100=y
+ CONFIG_RTC_DRV_AS3722=y
+ CONFIG_RTC_DRV_DS1307=y
+ CONFIG_RTC_DRV_HYM8563=m
+-- 
+2.10.2
