@@ -1,82 +1,88 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed,  8 Feb 2017 08:34:52 -0800
-Subject: [PATCH 2/2] PM / Domains: Support in context powering off parent
- domain
+Date: Wed,  8 Feb 2017 08:34:51 -0800
+Subject: [PATCH 1/2] PM / Domains: Ignore domain-idle-states that are not
+ compatible
 In-Reply-To: <1486571692-33212-1-git-send-email-lina.iyer@linaro.org>
 References: <1486571692-33212-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1486571692-33212-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1486571692-33212-3-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Powering off a domain schedules a work to opportunistically power off
-the parent domains. Domains that are IRQ safe may have parents that are
-also IRQ safe. It would be beneficial to power off such IRQ safe parents
-in the same context as well.
+domain-idle-states property may have phandles to idle state bindings
+that may not be compatible with idle state definition defined in [1].
+Such phandles would just be ignored and not throw and error when read by
+the domain core.
 
+Cc: <devicetree@vger.kernel.org>
+Cc: Rob Herring <robh@kernel.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- drivers/base/power/domain.c | 21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
+ Documentation/devicetree/bindings/power/power_domain.txt |  4 +++-
+ drivers/base/power/domain.c                              | 16 +++++++++-------
+ 2 files changed, 12 insertions(+), 8 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+index 723e1ad..940707d 100644
+--- a/Documentation/devicetree/bindings/power/power_domain.txt
++++ b/Documentation/devicetree/bindings/power/power_domain.txt
+@@ -31,7 +31,9 @@ Optional properties:
+ 
+ - domain-idle-states : A phandle of an idle-state that shall be soaked into a
+                 generic domain power state. The idle state definitions are
+-                compatible with domain-idle-state specified in [1].
++                compatible with domain-idle-state specified in [1]. phandles
++                that are not compatible with domain-idle-state will be
++                ignored.
+   The domain-idle-state property reflects the idle state of this PM domain and
+   not the idle states of the devices or sub-domains in the PM domain. Devices
+   and sub-domains have their own idle-states independent of the parent
 diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 3825bb9..51e2254 100644
+index 6b23d82..3825bb9 100644
 --- a/drivers/base/power/domain.c
 +++ b/drivers/base/power/domain.c
-@@ -375,7 +375,8 @@ static int genpd_dev_pm_qos_notifier(struct notifier_block *nb,
-  * If all of the @genpd's devices have been suspended and all of its subdomains
-  * have been powered down, remove power from @genpd.
-  */
--static int genpd_power_off(struct generic_pm_domain *genpd, bool is_async)
-+static int genpd_power_off(struct generic_pm_domain *genpd, bool is_async,
-+					unsigned int depth)
- {
- 	struct pm_domain_data *pdd;
- 	struct gpd_link *link;
-@@ -442,7 +443,17 @@ static int genpd_power_off(struct generic_pm_domain *genpd, bool is_async)
+@@ -2065,11 +2065,6 @@ static int genpd_parse_state(struct genpd_power_state *genpd_state,
+ 	int err;
+ 	u32 residency;
+ 	u32 entry_latency, exit_latency;
+-	const struct of_device_id *match_id;
+-
+-	match_id = of_match_node(idle_state_match, state_node);
+-	if (!match_id)
+-		return -EINVAL;
  
- 	list_for_each_entry(link, &genpd->slave_links, slave_node) {
- 		genpd_sd_counter_dec(link->master);
--		genpd_queue_power_off_work(link->master);
-+		/*
-+		 * Power off the parent in the same context if the parent
-+		 * domain is also IRQ safe.
-+		 */
-+		if (genpd_is_irq_safe(genpd) &&
-+				genpd_is_irq_safe(link->master)) {
-+			genpd_lock_nested(link->master, depth + 1);
-+			genpd_power_off(link->master, false, depth + 1);
-+			genpd_unlock(link->master);
-+		} else
-+			genpd_queue_power_off_work(link->master);
+ 	err = of_property_read_u32(state_node, "entry-latency-us",
+ 						&entry_latency);
+@@ -2118,6 +2113,7 @@ int of_genpd_parse_idle_states(struct device_node *dn,
+ 	int err, ret;
+ 	int count;
+ 	struct of_phandle_iterator it;
++	const struct of_device_id *match_id;
+ 
+ 	count = of_count_phandle_with_args(dn, "domain-idle-states", NULL);
+ 	if (count <= 0)
+@@ -2130,6 +2126,9 @@ int of_genpd_parse_idle_states(struct device_node *dn,
+ 	/* Loop over the phandles until all the requested entry is found */
+ 	of_for_each_phandle(&it, err, dn, "domain-idle-states", NULL, 0) {
+ 		np = it.node;
++		match_id = of_match_node(idle_state_match, np);
++		if (!match_id)
++			continue;
+ 		ret = genpd_parse_state(&st[i++], np);
+ 		if (ret) {
+ 			pr_err
+@@ -2141,8 +2140,11 @@ int of_genpd_parse_idle_states(struct device_node *dn,
+ 		}
  	}
  
- 	return 0;
-@@ -459,7 +470,7 @@ static void genpd_power_off_work_fn(struct work_struct *work)
- 	genpd = container_of(work, struct generic_pm_domain, power_off_work);
+-	*n = count;
+-	*states = st;
++	*n = i;
++	if (!i)
++		kfree(st);
++	else
++		*states = st;
  
- 	genpd_lock(genpd);
--	genpd_power_off(genpd, true);
-+	genpd_power_off(genpd, true, 0);
- 	genpd_unlock(genpd);
+ 	return 0;
  }
- 
-@@ -578,7 +589,7 @@ static int genpd_runtime_suspend(struct device *dev)
- 		return 0;
- 
- 	genpd_lock(genpd);
--	genpd_power_off(genpd, false);
-+	genpd_power_off(genpd, false, 0);
- 	genpd_unlock(genpd);
- 
- 	return 0;
-@@ -658,7 +669,7 @@ static int genpd_runtime_resume(struct device *dev)
- 	if (!pm_runtime_is_irq_safe(dev) ||
- 		(pm_runtime_is_irq_safe(dev) && genpd_is_irq_safe(genpd))) {
- 		genpd_lock(genpd);
--		genpd_power_off(genpd, 0);
-+		genpd_power_off(genpd, 0, 0);
- 		genpd_unlock(genpd);
- 	}
- 
 -- 
 2.7.4
