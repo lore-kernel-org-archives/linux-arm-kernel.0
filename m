@@ -1,101 +1,113 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Wed,  8 Feb 2017 11:02:35 +0800
-Subject: [PATCH v3 3/3] ASoC: zx-i2s: introduce pclk for zx2967 family
-In-Reply-To: <1486522955-14528-1-git-send-email-baoyou.xie@linaro.org>
-References: <1486522955-14528-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <1486522955-14528-3-git-send-email-baoyou.xie@linaro.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 8 Feb 2017 11:06:14 +0800
+Subject: i.MX7 clock support broken
+In-Reply-To: <20170207142225.zitac2r7g3kvowjw@pengutronix.de>
+References: <20170207142225.zitac2r7g3kvowjw@pengutronix.de>
+Message-ID: <20170208030613.GK3407@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pclk is necessary for zx2967 I2S controller. the driver
-currently doesn't handle it. This is something we need to fix.
++Frank, who is the author and submitter of i.MX7 clock driver.
 
-In turn, the driver supports zx296718's I2S controller.
+Shawn
 
-By the way, this patch also change the clock name from tx to wclk
-to make it clear.
-
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- sound/soc/zte/zx-i2s.c | 37 ++++++++++++++++++++++++++++---------
- 1 file changed, 28 insertions(+), 9 deletions(-)
-
-diff --git a/sound/soc/zte/zx-i2s.c b/sound/soc/zte/zx-i2s.c
-index ed7a56d..2d486ea 100644
---- a/sound/soc/zte/zx-i2s.c
-+++ b/sound/soc/zte/zx-i2s.c
-@@ -95,7 +95,7 @@
- struct zx_i2s_info {
- 	struct snd_dmaengine_dai_dma_data	dma_playback;
- 	struct snd_dmaengine_dai_dma_data	dma_capture;
--	struct clk				*dai_clk;
-+	struct clk				*dai_wclk, *dai_pclk;
- 	void __iomem				*reg_base;
- 	int					master;
- 	resource_size_t				mapbase;
-@@ -275,8 +275,9 @@ static int zx_i2s_hw_params(struct snd_pcm_substream *substream,
- 	writel_relaxed(val, i2s->reg_base + ZX_I2S_TIMING_CTRL);
- 
- 	if (i2s->master)
--		ret = clk_set_rate(i2s->dai_clk,
--				   params_rate(params) * ch_num * CLK_RAT);
-+		ret = clk_set_rate(i2s->dai_wclk,
-+				params_rate(params) * ch_num * CLK_RAT);
-+
- 	return ret;
- }
- 
-@@ -328,8 +329,19 @@ static int zx_i2s_startup(struct snd_pcm_substream *substream,
- 			  struct snd_soc_dai *dai)
- {
- 	struct zx_i2s_info *zx_i2s = dev_get_drvdata(dai->dev);
-+	int ret;
-+
-+	ret = clk_prepare_enable(zx_i2s->dai_wclk);
-+	if (ret)
-+		return ret;
-+
-+	ret = clk_prepare_enable(zx_i2s->dai_pclk);
-+	if (ret) {
-+		clk_disable_unprepare(zx_i2s->dai_wclk);
-+		return ret;
-+	}
- 
--	return clk_prepare_enable(zx_i2s->dai_clk);
-+	return ret;
- }
- 
- static void zx_i2s_shutdown(struct snd_pcm_substream *substream,
-@@ -337,7 +349,8 @@ static void zx_i2s_shutdown(struct snd_pcm_substream *substream,
- {
- 	struct zx_i2s_info *zx_i2s = dev_get_drvdata(dai->dev);
- 
--	clk_disable_unprepare(zx_i2s->dai_clk);
-+	clk_disable_unprepare(zx_i2s->dai_wclk);
-+	clk_disable_unprepare(zx_i2s->dai_pclk);
- }
- 
- static struct snd_soc_dai_ops zx_i2s_dai_ops = {
-@@ -381,10 +394,16 @@ static int zx_i2s_probe(struct platform_device *pdev)
- 	if (!zx_i2s)
- 		return -ENOMEM;
- 
--	zx_i2s->dai_clk = devm_clk_get(&pdev->dev, "tx");
--	if (IS_ERR(zx_i2s->dai_clk)) {
--		dev_err(&pdev->dev, "Fail to get clk\n");
--		return PTR_ERR(zx_i2s->dai_clk);
-+	zx_i2s->dai_wclk = devm_clk_get(&pdev->dev, "wclk");
-+	if (IS_ERR(zx_i2s->dai_wclk)) {
-+		dev_err(&pdev->dev, "Fail to get wclk\n");
-+		return PTR_ERR(zx_i2s->dai_wclk);
-+	}
-+
-+	zx_i2s->dai_pclk = devm_clk_get(&pdev->dev, "pclk");
-+	if (IS_ERR(zx_i2s->dai_pclk)) {
-+		dev_info(&pdev->dev, "have no pclk\n");
-+		zx_i2s->dai_pclk = NULL;
- 	}
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--- 
-2.7.4
+On Tue, Feb 07, 2017 at 03:22:25PM +0100, Sascha Hauer wrote:
+> Hi All,
+> 
+> I recently adopted the i.MX7 clock tree from Linux to barebox and wondered
+> why ethernet doesn't work. I found out that the clock tree in Linux is quite
+> different from what the reference manual describes and also quite different
+> from the hardware I have on my desk. There are several clocks that only exist
+> in the driver, but not in the actual hardware and also several clocks which
+> are in hardware, but not in the driver.
+> 
+> These clocks exist in the driver only, but not in the hardware:
+> 
+> clks[IMX7D_ARM_A7_ROOT_CLK] = imx_clk_gate4("arm_a7_root_clk", "arm_a7_div", base + 0x4000, 0);
+> clks[IMX7D_ARM_M4_ROOT_CLK] = imx_clk_gate4("arm_m4_root_clk", "arm_m4_div", base + 0x4010, 0);
+> clks[IMX7D_ARM_M0_ROOT_CLK] = imx_clk_gate4("arm_m0_root_clk", "arm_m0_div", base + 0x4020, 0);
+> clks[IMX7D_USB_HSIC_ROOT_CLK] = imx_clk_gate4("usb_hsic_root_clk", "usb_hsic_post_div", base + 0x4420, 0);
+> clks[IMX7D_PCIE_PHY_ROOT_CLK] = imx_clk_gate4("pcie_phy_root_clk", "pcie_phy_post_div", base + 0x4600, 0);
+> clks[IMX7D_SPDIF_ROOT_CLK] = imx_clk_gate4("spdif_root_clk", "spdif_post_div", base + 0x44d0, 0);
+> clks[IMX7D_ENET1_REF_ROOT_CLK] = imx_clk_gate4("enet1_ref_root_clk", "enet1_ref_post_div", base + 0x44e0, 0);
+> clks[IMX7D_ENET1_TIME_ROOT_CLK] = imx_clk_gate4("enet1_time_root_clk", "enet1_time_post_div", base + 0x44f0, 0);
+> clks[IMX7D_ENET2_REF_ROOT_CLK] = imx_clk_gate4("enet2_ref_root_clk", "enet2_ref_post_div", base + 0x4500, 0);
+> clks[IMX7D_ENET2_TIME_ROOT_CLK] = imx_clk_gate4("enet2_time_root_clk", "enet2_time_post_div", base + 0x4510, 0);
+> clks[IMX7D_ENET_PHY_REF_ROOT_CLK] = imx_clk_gate4("enet_phy_ref_root_clk", "enet_phy_ref_post_div", base + 0x4520, 0);
+> clks[IMX7D_AUDIO_MCLK_ROOT_CLK] = imx_clk_gate4("audio_mclk_root_clk", "audio_mclk_post_div", base + 0x4790, 0);
+> clks[IMX7D_WRCLK_ROOT_CLK] = imx_clk_gate4("wrclk_root_clk", "wrclk_post_div", base + 0x47a0, 0);
+> clks[IMX7D_ADC_ROOT_CLK] = imx_clk_gate4("adc_root_clk", "ipg_root_clk", base + 0x4200, 0);
+> 
+> And these clocks are described in the reference manual, but not handled
+> in the driver:
+> 
+> CCM_CCGR7 sim_m 0x4070
+> CCM_CCGR8 sim_s 0x4080
+> CCM_CCGR9 sim_wakeup 0x4090
+> CCM_CCGR10 ipmux1 0x40A0
+> CCM_CCGR11 ipmux2 0x40B0
+> CCM_CCGR12 ipmux3 0x40C0
+> CCM_CCGR16 rom 0x4100
+> CCM_CCGR33 anatop 0x4210
+> CCM_CCGR34 sctr 0x4220
+> CCM_CCGR35 ocotp 0x4230
+> CCM_CCGR36 caam 0x4240
+> CCM_CCGR37 snvs 0x4250
+> CCM_CCGR38 rdc 0x4260
+> CCM_CCGR39 mu 0x4270
+> CCM_CCGR40 hs 0x4280
+> CCM_CCGR41 dvfs 0x4290
+> CCM_CCGR42 qos 0x42A0
+> CCM_CCGR43 qos_dispmix 0x42B0
+> CCM_CCGR44 qos_megamix 0x42C0
+> CCM_CCGR45 csu 0x42D0
+> CCM_CCGR46 dbgmon 0x42E0
+> CCM_CCGR47 debug 0x42F0
+> CCM_CCGR49 sec_debug 0x4310
+> CCM_CCGR64 sema1 0x4400
+> CCM_CCGR65 sema2 0x4410
+> CCM_CCGR68 perfmon1 0x4440
+> CCM_CCGR69 perfmon2 0x4450
+> CCM_CCGR76 pxp 0x44C0
+> CCM_CCGR104 usb_ctrl 0x4680
+> CCM_CCGR105 usb_hsic 0x4690
+> CCM_CCGR106 usb_phy1 0x46A0
+> CCM_CCGR107 usb_phy2 0x46B0
+> CCM_CCGR112 enet1 0x4700
+> CCM_CCGR113 enet2 0x4710
+> CCM_CCGR160 gpio1 0x4A00
+> CCM_CCGR161 gpio2 0x4A10
+> CCM_CCGR162 gpio3 0x4A20
+> CCM_CCGR163 gpio4 0x4A30
+> CCM_CCGR164 gpio5 0x4A40
+> CCM_CCGR165 gpio6 0x4A50
+> CCM_CCGR166 gpio7 0x4A60
+> CCM_CCGR168 iomux 0x4A80
+> CCM_CCGR169 iomux_lpsr 0x4A90
+> CCM_CCGR170 kpp 0x4AA0
+> 
+> It seems most stuff works in the Kernel when the clocks are left
+> enabled in the bootloader, but for example the real ethernet clocks
+> are never handled in the kernel.
+> 
+> Also I stumbled upon the gate at offset 0x4130. The same gate is
+> registered as 5 different gates in the kernel without being handled
+> as a shared gate:
+> 
+> clks[IMX7D_NAND_USDHC_BUS_ROOT_CLK] = imx_clk_gate4("nand_usdhc_root_clk", "nand_usdhc_post_div", base + 0x4130, 0);
+> clks[IMX7D_DRAM_ROOT_CLK] = imx_clk_gate4("dram_root_clk", "dram_post_div", base + 0x4130, 0);
+> clks[IMX7D_DRAM_PHYM_ROOT_CLK] = imx_clk_gate4("dram_phym_root_clk", "dram_phym_cg", base + 0x4130, 0);
+> clks[IMX7D_DRAM_PHYM_ALT_ROOT_CLK] = imx_clk_gate4("dram_phym_alt_root_clk", "dram_phym_alt_post_div", base + 0x4130, 0);
+> clks[IMX7D_DRAM_ALT_ROOT_CLK] = imx_clk_gate4("dram_alt_root_clk", "dram_alt_post_div", base + 0x4130, 0);
+> 
+> I don't have a patch for this, just hope that somebody @NXP has a better
+> clue what's going on and maybe there already is a fix somewhere floating
+> around.
+> 
+> Sascha
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
