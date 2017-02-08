@@ -1,39 +1,35 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 8 Feb 2017 11:09:23 +0530
-Subject: [PATCH v32 00/13] arm64: add kdump support
-In-Reply-To: <20170207080601.5816-1-takahiro.akashi@linaro.org>
-References: <20170207080601.5816-1-takahiro.akashi@linaro.org>
-Message-ID: <d3759cc9-01d8-814c-e76e-e035eac6bb8b@redhat.com>
+From: yuantian.tang@nxp.com (yuantian.tang at nxp.com)
+Date: Wed, 8 Feb 2017 13:43:04 +0800
+Subject: [PATCH 1/2 v2] cpufreq: qoriq: added arm64 socs support
+Message-ID: <1486532585-36463-1-git-send-email-yuantian.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Tang Yuantian <Yuantian.Tang@nxp.com>
 
+Add arm64 config to Kconfig to enable cpu frequency feature on
+nxp arm64 socs.
 
-On Tuesday 07 February 2017 01:36 PM, AKASHI Takahiro wrote:
-> This patch series adds kdump support on arm64.
->
-> To load a crash-dump kernel to the systems, a series of patches to
-> kexec-tools[1] are also needed. Please use the latest one, v5 [2].
-> For your convinience, you can pick them up from:
->    https://git.linaro.org/people/takahiro.akashi/linux-aarch64.git arm64/kdump
->    https://git.linaro.org/people/takahiro.akashi/kexec-tools.git arm64/kdump
->
-> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
->   - crash utility (v7.1.8 or later, i.e. master for now) [3]
->
-> I tested this patchset on fast model and hikey.
-> (under various configurations, in particular 4KB-page/39,48-bits, 64KB-page/42
-> -bits with hibernate)
->
-> The previous versions were also:
-> Tested-by: Pratyush Anand <panand@redhat.com> (v29, mustang and seattle)
+Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
+---
+v2:
+  - no change
 
-..and you have my Tested-by for this series as well. They work fine with 
-both the above platform.
+ drivers/cpufreq/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Although we are very close, still it could be great if these patches can 
-make into v4.11.
-
-Thanks a lot Akashi for the quick v32.
-
-~Pratyush
+diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+index 15adef4..3964383 100644
+--- a/drivers/cpufreq/Kconfig
++++ b/drivers/cpufreq/Kconfig
+@@ -324,7 +324,7 @@ endif
+ 
+ config QORIQ_CPUFREQ
+ 	tristate "CPU frequency scaling driver for Freescale QorIQ SoCs"
+-	depends on OF && COMMON_CLK && (PPC_E500MC || ARM)
++	depends on OF && COMMON_CLK && (PPC_E500MC || ARM || ARM64)
+ 	depends on !CPU_THERMAL || THERMAL
+ 	select CLK_QORIQ
+ 	help
+-- 
+2.1.0.27.g96db324
