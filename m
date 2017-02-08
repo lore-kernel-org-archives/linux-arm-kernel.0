@@ -1,49 +1,35 @@
 From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Wed,  8 Feb 2017 23:09:31 +0100 (CET)
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Switch AXP20x driver from module
- to built-in
+Date: Wed,  8 Feb 2017 23:08:00 +0100 (CET)
+Subject: [PATCH 2/4] ARM: multi_v7_defconfig: Switch sunxi RSB driver from
+ module to built-in
 In-Reply-To: <937914a68e4e7d6db2d12540cc6253b200978e2d.1486590875.git.rask@formelder.dk>
 References: <937914a68e4e7d6db2d12540cc6253b200978e2d.1486590875.git.rask@formelder.dk>
-Message-ID: <49ad3e66452bd78da7b9e581129f76633c56e609.1486590875.git.rask@formelder.dk>
+Message-ID: <870393c080135a968b9c0d9e78e3009fb32593f3.1486590875.git.rask@formelder.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP20X regulator support is currently built as a module, which means
-it's not available until the root fs has been mounted, but the boot loader
-might not have enabled the required regulators, so build their drivers
-into the kernel.
+The sunxi RSB bus is used for peripherals like voltage regulators and
+real-time clocks which should be available early in the boot process.
+As a module, the driver will not be available until the root fs has been
+mounted, so build the driver into the kernel.
 
 Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
 ---
-This patch will have no effect if patch 2/4 is not applied. It will also
-not apply cleanly without patch 3/4.
-
- arch/arm/configs/multi_v7_defconfig | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/configs/multi_v7_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 5868186..cc071a0 100644
+index 028d2b7..ec3a110 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -482,8 +482,8 @@ CONFIG_MFD_ATMEL_HLCDC=m
- CONFIG_MFD_BCM590XX=y
- CONFIG_MFD_AC100=y
- CONFIG_MFD_AXP20X=y
--CONFIG_MFD_AXP20X_I2C=m
--CONFIG_MFD_AXP20X_RSB=m
-+CONFIG_MFD_AXP20X_I2C=y
-+CONFIG_MFD_AXP20X_RSB=y
- CONFIG_MFD_CROS_EC=m
- CONFIG_MFD_CROS_EC_I2C=m
- CONFIG_MFD_CROS_EC_SPI=m
-@@ -512,7 +512,7 @@ CONFIG_REGULATOR_ACT8865=y
- CONFIG_REGULATOR_ANATOP=y
- CONFIG_REGULATOR_AS3711=y
- CONFIG_REGULATOR_AS3722=y
--CONFIG_REGULATOR_AXP20X=m
-+CONFIG_REGULATOR_AXP20X=y
- CONFIG_REGULATOR_BCM590XX=y
- CONFIG_REGULATOR_DA9210=y
- CONFIG_REGULATOR_FAN53555=y
+@@ -193,7 +193,7 @@ CONFIG_DMA_CMA=y
+ CONFIG_CMA_SIZE_MBYTES=64
+ CONFIG_OMAP_OCP2SCP=y
+ CONFIG_SIMPLE_PM_BUS=y
+-CONFIG_SUNXI_RSB=m
++CONFIG_SUNXI_RSB=y
+ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_BLOCK=y
 -- 
 2.10.2
