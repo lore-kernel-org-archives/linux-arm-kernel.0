@@ -1,68 +1,52 @@
-From: aospan@netup.ru (Abylay Ospan)
-Date: Wed, 8 Feb 2017 17:07:27 -0500
-Subject: [PATCH] PCI: iproc: fix resource allocation for BCMA PCIe
-In-Reply-To: <20170208204831.GA2206@bhelgaas-glaptop.roam.corp.google.com>
-References: <1484265521-13497-1-git-send-email-aospan@netup.ru>
- <20170128204407.GA20550@bhelgaas-glaptop.roam.corp.google.com>
- <CAK3bHNV-O+k1rHSj-KTKOBNNDXpWxp7rXw8bi7ve7-T9qqs8dw@mail.gmail.com>
- <20170208204831.GA2206@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAK3bHNVz1O7pWL8xV+gf4M-MMKBsq6Bwkt654FOAEOZn=AUH-w@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 08 Feb 2017 16:08:46 -0600
+Subject: [PATCH v1 0/3] PCI: Configure PCIe MPS settings
+Message-ID: <20170208215558.8352.90635.stgit@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+The PCI core doesn't configure the PCIe MPS settings by itself.  Each host
+bridge driver has to call pcie_bus_configure_settings() to make this
+happen.
 
-I have checked first listed driver
-(drivers/pci/host/pcie-designware.c). Seems like into
-'devm_request_pci_bus_resources' we supply same stack allocated 'res'
-(actual insert of this pointer to 'iomem_resource' was done inside
-'__request_resource'). This 'res' is not changed inside
-'of_pci_get_host_bridge_resources'.
-I don't have this platforms on hand and cannot test it on real
-hadrware (to 100% verify). But investigating this code I see that the
-problem exist.
+Jon fixed this for pcie-iproc.c.  I propose these similar patches for other
+drivers.   
 
-Here is a summary of flow for 'res' to show the problem:
+HV guys, I included you because create_root_hv_pci_bus() is one place that
+calls pci_scan_child_bus() but does not call pcie_bus_configure_settings().
+I know you probably don't strictly *need* to configure MPS settings in a
+paravirtual front-end, but the PCI core does other device configuration in
+this path:
 
-pcie-designware.c:
-  LIST_HEAD(res);
-  ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res,
-&pp->io_base); <--- 'res' not changing here
-  ret = devm_request_pci_bus_resources(&pdev->dev, &res);
+  pci_scan_child_bus
+    pci_scan_slot
+      pci_scan_single_device
+        pci_device_add
+	  pci_configure_device
+	  pci_init_capabilities
 
-  drivers/pci/bus.c:
-    err = devm_request_resource(dev, parent, res);
+and I would like to eventually migrate the MPS configuration into that same
+path.  Since we do this other configuration for HV devices already, I think
+pcie_bus_configure_settings() should also work (even if it ends up not
+doing anything to real devices).
 
-    kernel/resource.c:
-      conflict = request_resource_conflict(root, new);
-        conflict = __request_resource(root, new);
-          *p = new;  <--- here we introduce stack allocated res into
-global 'iomem_resource'
+It would make that eventual migration easier if all the
+pci_scan_child_bus() callers had the same pattern of calling
+pcie_bus_configure_settings().
+
+So would it make sense to make a similar patch for HV?  It looks easy to
+add it to create_root_hv_pci_bus(), but I don't know exactly what to do
+about pci_devices_present_work().
+
+---
+
+Bjorn Helgaas (3):
+      PCI: xilinx: Configure PCIe MPS settings
+      PCI: versatile: Configure PCIe MPS settings
+      PCI: xgene: Configure PCIe MPS settings
 
 
-Please check and correct me if i'm wrong ?
-
->
->   dw_pcie_host_init
->     LIST_HEAD(res)                            # on stack
->     of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base)
->       res = kzalloc()                         # different "res" from above!
->       pci_add_resource_offset(resources, res, ...)
->     devm_request_pci_bus_resources(&pdev->dev, &res)
->     pci_scan_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops, pp, &res)
->     error:
->       pci_free_resource_list(&res)
-
-> This looks good to me, but I don't think it's necessary to keep the
-> list_head in the struct iproc_pcie.  It should be safe to use
-> "LIST_HEAD(res)" on the stack like the other drivers do.  Can you
-> verify that and get an ack from Ray, Scott, or Jon?
-
-if my investigation above is true then we need to keep 'res' all the
-time we working with the driver (or find another way to fix this
-issue).
-
--- 
-Abylay Ospan,
-NetUP Inc.
-http://www.netup.tv
+ drivers/pci/host/pci-versatile.c |    4 +++-
+ drivers/pci/host/pci-xgene.c     |    4 +++-
+ drivers/pci/host/pcie-xilinx.c   |    4 +++-
+ 3 files changed, 9 insertions(+), 3 deletions(-)
