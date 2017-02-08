@@ -1,120 +1,71 @@
-From: takahiro.akashi@linaro.org (AKASHI, Takahiro)
-Date: Wed, 8 Feb 2017 16:43:04 +0900
-Subject: [PATCH] efi/libstub/arm*: Set default address and size cells
- values for an empty dtb
-In-Reply-To: <20170207195558.GK26173@leverpostej>
-References: <1486490390-25251-1-git-send-email-jhugo@codeaurora.org>
- <CAKv+Gu963uZB4MaMDuwTGd5-AqEN53Er8tExVLMZNVx3krJrZw@mail.gmail.com>
- <1f47fcdd-c5d8-4082-70a3-ca9b1746d7ca@codeaurora.org>
- <20170207190113.GG26173@leverpostej>
- <c49cc64e-4ca1-8d82-5faf-74c0355c35ef@codeaurora.org>
- <20170207191320.GI26173@leverpostej>
- <252539a6-72f6-1afa-6ed5-3cf6a1aa24c2@codeaurora.org>
- <20170207195558.GK26173@leverpostej>
-Message-ID: <20170208074301.GB18445@linaro.org>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Wed, 8 Feb 2017 09:19:48 +0100
+Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
+In-Reply-To: <20170208043107.GA7097@localhost.localdomain>
+References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
+ <20170120041400.GA24617@localhost.localdomain>
+ <060918B6-A773-46A5-8D10-C9F6BBA6D3F1@martin.sperl.org>
+ <20170124093127.GB3651@localhost.localdomain>
+ <0452720A-5914-469B-9EF7-0581CF1B5478@martin.sperl.org>
+ <20170202042930.GA6377@localhost.localdomain>
+ <E0A4388D-788A-40B4-9193-36FD75284654@martin.sperl.org>
+ <20170208043107.GA7097@localhost.localdomain>
+Message-ID: <909C8619-2800-4BCA-A7C1-BCE7797D52C3@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
 
-Thank you for this heads-up.
+> On 08.02.2017, at 05:31, Eduardo Valentin <edubezval@gmail.com> wrote:
+> 
+> On Sat, Feb 04, 2017 at 09:35:47AM +0100, kernel at martin.sperl.org wrote:
+>> 
+> 
+>> So how does this change/impact the driver code itself?
+>> 
+>> Defining a thermal zone in the dts is just an additional feature
+>> that only impacts the device tree.
+>> The DT as is works fine and at least allows to read the current temperature.
+> 
+> Well, your driver is still half finished. It is a DT only driver, which
+> does not follow the DT spec on thermal. The impact on your code is that
+> it wont need to carry your hardware data in the source code.
+> 
+> Also, having the data described in DT allows you porting your driver
+> without patching it, in  case you need, or any other system engineer,
+> to have different thermal data, trips values, number or trips, offset
+> and slope per sensor, on different boards, or even on different chip
+> version.
+> 
+> Not to say that having the data described in DT also allows system
+> engineers to deploy different thermal zones, based on your
+> driver/sensor, to extrapolate different hotspots.
+> 
 
-On Tue, Feb 07, 2017 at 07:55:59PM +0000, Mark Rutland wrote:
-> On Tue, Feb 07, 2017 at 12:29:38PM -0700, Jeffrey Hugo wrote:
-> > On 2/7/2017 12:13 PM, Mark Rutland wrote:
-> > >On Tue, Feb 07, 2017 at 12:07:56PM -0700, Jeffrey Hugo wrote:
-> > >>On 2/7/2017 12:01 PM, Mark Rutland wrote:
-> > >>>I take it this is specific to the kdump properties?
-> > >>>
-> > >>>I can't immediately see what would matter for the !kdump case.
-> > >>>properties inserted under /chosen are not truncated?
-> > >>
-> > >>The kexec/kdump properties are added under /chosen, therefore yes,
-> > >>properties added under /chosen are truncated, per our observations.
-> > >
-> > >Sorry for the dodgy (and confusing) reply above.
-> > >
-> > >What I was trying to ask was does this *only* affect kdump properties?
-> > >I note that kdump is not yet upstream for arm64.
-> > >
-> > >Or are there regular kexec properties that this affects?
-> > >
-> > >Or !kdump && !kexec properties?
-> > >
-> > >Can you please enumerate the set of properties for which this matters?
-> > 
-> > "linux,elfcorehdr" and "linux,usable-memory-range"
-> > 
-> > We are not aware of !kdump && !kexec properties where this is an issue.
-> 
-> Ok, I understand the problem now. Thanks for clarifying the !kdump
-> situation.
-> 
-> As per my reply to Timur, given this only affects kdump, this is all
-> happening in code that is not upstream, and therefore this is not
-> *currently* an issue.
-> 
-> In future, please report this kind of issue in reply to relevant
-> postings (e.g. [1]). At the very least, refer to these, with relevant
-> people Cc'd (e.g. Takahiro-san in this case).
-> 
-> I think there are three things which should happen:
-> 
-> (a) The userspace kexec-tools kdump code should take /#address-cells and
->     /#size-cells into account when inserting the linux,elfcorehdr and
->     linux,usable-memory-range properties. There can be DTs for 64 bit
->     platforms where these are not 2.
->     
->     Takahiro-san, from looking at your kexec-tools repo, this is not
->     currently the case. Could you address that?
+That is all true and as far as I understand you can do all of that
+using the current driver - see the patch-sets by Stefan Wahren that
+incorporates this into the dts.
 
-Yup, I will, but if this is the case,
-we might need to think about another case where /#address-cells and /#size-cells
-are <1> but the range of crash dump kernel can be still 64-bit wide since
-the system memory information comes from ACPI table (not DT).
+My point is still: there are dtb?s that come with 4.10-rcX
+that do not have all of those defined 
 
-Therefore, the properties in this case should look like:
-/ {
-    #address-cells = <1>;
-    #size-cells = <1>;
-    chosen {
-         ...
-         linux,usable-memory-range {
-             #address-cells = <2>;
-             #size-cells = <2>; may be omitted if possible
-             reg = < ... >;
-         }
-         linux,elfcorehdr {
-             #address-cells = <2>;
-             #size-cells = <2>; may be omitted if possible
-             reg = < ... >;
-         }
-         ...
-    }
-}
+But as the mantra for DT is: "it is an API?, we have to be backwards
+compatible from the driver perspective.
+So we need those values in the driver to ensure the older version
+of dtb?s are working correctly. That is why it is still included.
 
-Is this what you meant?
-(Obviously, I will have to modify the kernel patches as well.)
+Also the settings of the trip are for the HW trip point for the case
+that a future version of the firmware does not set up the thermal
+HW block.
+
+Do you really want to break this Mantra of backwards compatibility
+by having those compatiblity ?defines? stripped out with all the
+possible negative side-effects if things are not set up correctly?
 
 Thanks,
--Takahiro AKASHI
+	Martin
 
-
-> (b) The kdump documentation should updated to explicitly state that
->     these properties are #address-cells + #size-cells tuples, since this
->     is clearly going to be confusing either way. I'll try to come up
->     with wording for that, and I'll reply on the current [1] kdump
->     thread.
-> 
-> (c) Regardless, when creating the empty DT the EFI stub should insert
->     /#address-cells = <2> and /#size-cells = <2>. That better aligns
->     with the usual requirements for an otherwise empty DTB, and avoids a
->     tonne of fragility when the DTB is passed on or altered by other
->     agents.
-> 
-> So, please respin this patch, stating explicitly what this matters for.
-> 
-> Thanks,
-> Mark.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/486234.html 
+P.s: I find it strange that V3 of the driver was sent out in May 2016
+(way before the DTS changes got merged) and you only started to 
+give feedback in November only in V8 (that primarily incorporated
+minor changes and a rebase to 4.9) by which time the changes to the
+dts have already been merged.
