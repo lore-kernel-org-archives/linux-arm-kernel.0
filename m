@@ -1,106 +1,59 @@
-From: aospan@netup.ru (Abylay Ospan)
-Date: Wed, 8 Feb 2017 17:39:32 -0500
-Subject: [PATCH] PCI: iproc: fix resource allocation for BCMA PCIe
-In-Reply-To: <20170208222736.GA9094@bhelgaas-glaptop.roam.corp.google.com>
-References: <1484265521-13497-1-git-send-email-aospan@netup.ru>
- <20170128204407.GA20550@bhelgaas-glaptop.roam.corp.google.com>
- <CAK3bHNV-O+k1rHSj-KTKOBNNDXpWxp7rXw8bi7ve7-T9qqs8dw@mail.gmail.com>
- <20170208204831.GA2206@bhelgaas-glaptop.roam.corp.google.com>
- <CAK3bHNVz1O7pWL8xV+gf4M-MMKBsq6Bwkt654FOAEOZn=AUH-w@mail.gmail.com>
- <20170208222736.GA9094@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CAK3bHNX3=5gH0W2X6ghe3s3AZwctwakvzUkthuD3bACGV9x4Og@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed,  8 Feb 2017 14:40:24 -0800
+Subject: [PATCH] ARM: dts: Add devicetree for the Raspberry Pi 3,
+ for arm32 (v3)
+Message-ID: <20170208224024.30415-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes, you right. Now it's clear.
+Raspbian and Fedora have decided to support the Pi3 in 32-bit mode for
+now, so it's useful to be able to test that mode on an upstream
+kernel.  It's also been useful for me to use the same board for 32-bit
+and 64-bit development.
 
-Thanks !
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
 
-2017-02-08 17:27 GMT-05:00 Bjorn Helgaas <helgaas@kernel.org>:
-> On Wed, Feb 08, 2017 at 05:07:27PM -0500, Abylay Ospan wrote:
->> Hi Bjorn,
->>
->> I have checked first listed driver
->> (drivers/pci/host/pcie-designware.c). Seems like into
->> 'devm_request_pci_bus_resources' we supply same stack allocated 'res'
->> (actual insert of this pointer to 'iomem_resource' was done inside
->> '__request_resource'). This 'res' is not changed inside
->> 'of_pci_get_host_bridge_resources'.
->> I don't have this platforms on hand and cannot test it on real
->> hadrware (to 100% verify). But investigating this code I see that the
->> problem exist.
->>
->> Here is a summary of flow for 'res' to show the problem:
->>
->> pcie-designware.c:
->>   LIST_HEAD(res);
->>   ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res,
->> &pp->io_base); <--- 'res' not changing here
->>   ret = devm_request_pci_bus_resources(&pdev->dev, &res);
->>
->>   drivers/pci/bus.c:
->>     err = devm_request_resource(dev, parent, res);
->>
->>     kernel/resource.c:
->>       conflict = request_resource_conflict(root, new);
->>         conflict = __request_resource(root, new);
->>           *p = new;  <--- here we introduce stack allocated res into
->> global 'iomem_resource'
->>
->>
->> Please check and correct me if i'm wrong ?
->
-> The "res" in dw_pcie_host_init() is a list_head (not a struct
-> resource) and is on the stack.
->
-> When we call of_pci_get_host_bridge_resources(), we pass a pointer
-> ("&res") to the empty list.  It kzallocs a struct resource for the bus
-> range and more for any bridge windows, and adds them to the list.
->
-> When we call devm_request_pci_bus_resources(), we pass a pointer
-> ("&res") to the list, which is no longer empty.  It iterates through
-> the list and calls devm_request_resource() for each resource.  Inside
-> devm_request_pci_bus_resources(), "res" is the pointer to the resource
-> (not the list_head), and this resource is the one we kzalloc'd above.
->
-> When devm_request_resource() calls request_resource_conflict(), it
-> passes that pointer to the kzalloc'd resource (the pointer is called
-> "new" in devm_request_resource()).)
->
-> So when __request_resource() assigns "*p = new", it is copying a
-> pointer to a kzalloc'd struct resource.
->
-> This is certainly a twisty maze of similar names for different things,
-> but I think it is OK if the list_head is on the stack as long as the
-> struct resources are kzalloc'd.
->
->> >   dw_pcie_host_init
->> >     LIST_HEAD(res)                            # on stack
->> >     of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base)
->> >       res = kzalloc()                         # different "res" from above!
->> >       pci_add_resource_offset(resources, res, ...)
->> >     devm_request_pci_bus_resources(&pdev->dev, &res)
->> >     pci_scan_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops, pp, &res)
->> >     error:
->> >       pci_free_resource_list(&res)
->>
->> > This looks good to me, but I don't think it's necessary to keep the
->> > list_head in the struct iproc_pcie.  It should be safe to use
->> > "LIST_HEAD(res)" on the stack like the other drivers do.  Can you
->> > verify that and get an ack from Ray, Scott, or Jon?
->>
->> if my investigation above is true then we need to keep 'res' all the
->> time we working with the driver (or find another way to fix this
->> issue).
->>
->> --
->> Abylay Ospan,
->> NetUP Inc.
->> http://www.netup.tv
+v1: Gerd's patch that put the ../../../arm64/... link in the Makefile
+v2: Michael's patch that #included from ../../../arm64/... in a new
+    bcm2837-rpi-3-b.dts.
+v3: Mine, using symlinks to make sure that we don't break the split DT
+    tree.
 
+ arch/arm/boot/dts/Makefile            | 1 +
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 1 +
+ arch/arm/boot/dts/bcm2837.dtsi        | 1 +
+ 3 files changed, 3 insertions(+)
+ create mode 120000 arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+ create mode 120000 arch/arm/boot/dts/bcm2837.dtsi
 
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 6576e3f000c9..416fdcedf5a1 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -70,6 +70,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+ 	bcm2835-rpi-b-plus.dtb \
+ 	bcm2835-rpi-a-plus.dtb \
+ 	bcm2836-rpi-2-b.dtb \
++	bcm2837-rpi-3-b.dtb \
+ 	bcm2835-rpi-zero.dtb
+ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4708-asus-rt-ac56u.dtb \
+diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+new file mode 120000
+index 000000000000..ceebc0e163fb
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+@@ -0,0 +1 @@
++../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+\ No newline at end of file
+diff --git a/arch/arm/boot/dts/bcm2837.dtsi b/arch/arm/boot/dts/bcm2837.dtsi
+new file mode 120000
+index 000000000000..53f1cd2bba47
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm2837.dtsi
+@@ -0,0 +1 @@
++../../../arm64/boot/dts/broadcom/bcm2837.dtsi
+\ No newline at end of file
 -- 
-Abylay Ospan,
-NetUP Inc.
-http://www.netup.tv
+2.11.0
