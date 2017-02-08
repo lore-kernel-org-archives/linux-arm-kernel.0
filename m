@@ -1,89 +1,79 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 08 Feb 2017 11:12:14 +0100
-Subject: [PATCH] ARM: dts: imx53-qsb: Provide the TVE DAC regulators
-In-Reply-To: <1483470751-8073-1-git-send-email-festevam@gmail.com>
-References: <1483470751-8073-1-git-send-email-festevam@gmail.com>
-Message-ID: <1486548734.2309.27.camel@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 8 Feb 2017 11:14:58 +0100
+Subject: [PATCH 5/8] arm64: dts: allwinner: add R_PIO node
+In-Reply-To: <20170208100009.29362-5-icenowy@aosc.xyz>
+References: <20170208100009.29362-1-icenowy@aosc.xyz>
+ <20170208100009.29362-5-icenowy@aosc.xyz>
+Message-ID: <20170208101458.du6ybqsw52ypzhzw@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-01-03 at 17:12 -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Wed, Feb 08, 2017 at 06:00:06PM +0800, Icenowy Zheng wrote:
+> Allwinner A64 SoC has a R_PIO node like the one in H3.
 > 
-> On imx53-qsb the TVE DAC regulator comes from:
+> Add the node as well as needed clocks and resets.
 > 
-> - LDO7 on the board with the Dialog DA9052 PMIC
-> - VDAC on the board with the MC34708 PMIC
+> As there's no document for apb0_gates, I only added the R_PIO bit here.
 > 
-> Pass them in the 'dac-supply' node.
-> 
-> While at it, remove the 'regulator-always-on/regulator-boot-on'
-> properties as the TVE driver will properly handle it.
-> 
-> Tested on a imx53-qsb board with a Dialog DA9052 PMIC.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 > ---
->  arch/arm/boot/dts/imx53-qsb.dts  | 5 ++++-
->  arch/arm/boot/dts/imx53-qsrb.dts | 6 ++++--
->  2 files changed, 8 insertions(+), 3 deletions(-)
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 40 +++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-> index 3799396..f4c158c 100644
-> --- a/arch/arm/boot/dts/imx53-qsb.dts
-> +++ b/arch/arm/boot/dts/imx53-qsb.dts
-> @@ -90,7 +90,6 @@
->  			ldo7_reg: ldo7 {
->  				regulator-min-microvolt = <1200000>;
->  				regulator-max-microvolt = <3600000>;
-
-As Lucas pointed out, we could limit the board constraints to the
-necessary voltage here.
-Since this regulator is used as the TVDAC analog power supply, this
-range should at least be limited to the analog power supply range of the
-TVDAC, listed in Table 74-9. of the i.MX53 reference manual (2.5-2.75V).
-
-But since the nominal voltage is 2.75V, which was used to determine the
-analog gain that is supposed to result in the necessary 0.7V
-peak-to-peak amplitude on the VGA output, I'd say we should just fix the
-voltage to 2750000 here.
-
-> -				regulator-always-on;
->  			};
->  
->  			ldo8_reg: ldo8 {
-> @@ -113,3 +112,7 @@
->  		};
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index 1c64ea2d23f9..4b0baa79554c 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -98,6 +98,15 @@
+>  		clock-output-names = "osc32k";
 >  	};
->  };
-> +
-> +&tve {
-> +	dac-supply = <&ldo7_reg>;
-> +};
-> diff --git a/arch/arm/boot/dts/imx53-qsrb.dts b/arch/arm/boot/dts/imx53-qsrb.dts
-> index 96d7eed..479ca4c 100644
-> --- a/arch/arm/boot/dts/imx53-qsrb.dts
-> +++ b/arch/arm/boot/dts/imx53-qsrb.dts
-> @@ -130,8 +130,6 @@
->  				regulator-name = "VDAC";
->  				regulator-min-microvolt = <2500000>;
->  				regulator-max-microvolt = <2775000>;
-
-Same as above.
-
-> -				regulator-boot-on;
-> -				regulator-always-on;
->  			};
 >  
->  			vgen1_reg: vgen1 {
-> @@ -152,3 +150,7 @@
->  		};
->  	};
->  };
+> +	apb0: apb0_clk {
+> +		compatible = "fixed-factor-clock";
+> +		#clock-cells = <0>;
+> +		clock-div = <1>;
+> +		clock-mult = <1>;
+> +		clocks = <&osc24M>;
+> +		clock-output-names = "apb0";
+> +	};
 > +
-> +&tve {
-> +	dac-supply = <&vdac_reg>;
-> +};
+>  	psci {
+>  		compatible = "arm,psci-0.2";
+>  		method = "smc";
+> @@ -392,5 +401,36 @@
+>  			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+>  				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+>  		};
+> +
+> +		apb0_gates: clk at 1f01428 {
+> +			compatible = "allwinner,sun50i-a64-apb0-gates-clk",
+> +				     "allwinner,sun4i-a10-gates-clk";
+> +			reg = <0x01f01428 0x4>;
+> +			#clock-cells = <1>;
+> +			clocks = <&apb0>;
+> +			clock-indices = <0>;
+> +			clock-output-names = "apb0_pio";
+> +		};
+> +
+> +		apb0_rst: reset at 1f014b0 {
+> +			reg = <0x01f014b0 0x4>;
+> +			compatible = "allwinner,sun6i-a31-clock-reset";
+> +			#reset-cells = <1>;
+> +		};
 
-regards
-Philipp
+Please make a sunxi-ng driver for those clocks.
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170208/e36b0c47/attachment-0001.sig>
