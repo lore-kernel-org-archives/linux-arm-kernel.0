@@ -1,58 +1,133 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  8 Feb 2017 11:55:33 +0000
-Subject: [PATCH v2 00/14] arm64+ARM: efi: PE/COFF cleanup/hardening
-Message-ID: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 8 Feb 2017 11:59:40 +0000
+Subject: [PATCH 2/4] phy: exynos5: Remove duplicated defines of PHY
+ register defines
+In-Reply-To: <20170127200510.4444-3-krzk@kernel.org>
+References: <20170127200510.4444-1-krzk@kernel.org>
+ <20170127200510.4444-3-krzk@kernel.org>
+Message-ID: <20170208115940.anjjpg7ygspca7tf@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This cleans up the PE/COFF EFI header, by taking some of Mark's patches
-and use them to replace open coded constants with symbolic ones, and
-remove incorrect values or unused sections.
+On Fri, 27 Jan 2017, Krzysztof Kozlowski wrote:
 
-Finally, it updates the section layout so that the kernel Image can be
-mapped in a way that does not require setting RWX permissions anywhere.
-Note that this is currently not a huge win, given that most current UEFI
-implementations map all of RAM RWX by default, but this is finally gaining
-some attention, and work is underway to make the PE/COFF loader in EDK2
-adhere to the section permissions, which would also allow the RAM mapping
-to default to non-executable. Work in progress nonetheless...
+> Phy drivers access PMU region through regmap provided by exynos-pmu
+> driver.   However there is no need to duplicate defines for PMU
+> registers.  Instead just use whatever is defined in exynos-regs-pmu.h.
+> 
+> This reduces number of defines and allows removal of one header.
+> 
+> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  drivers/phy/phy-exynos-dp-video.c           |  1 +
+>  drivers/phy/phy-exynos5-usbdrd.c            |  1 +
+>  include/linux/mfd/syscon/exynos5-pmu.h      | 22 ----------------------
 
-Changes since v1:
-- added missing secondary SOB on Mark's patches
-- leave Image header as before, only move the PE header to a separate file
-- put PE header fixes in a separate patch
-- add acks from Mark and Peter (#6)
-- give ARM the same treatment as arm64 (#10 - #13)
-- add NB10 PE debuglink entry to ARM PE/COFF header as well (#9, #14)
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Ard Biesheuvel (12):
-  arm64: efi: move EFI header and related data to a separate .S file
-  arm64: efi: clean up Image header after PE header has been split off
-  arm64: efi: remove forbidden values from the PE/COFF header
-  arm64: efi: remove pointless dummy .reloc section
-  arm64: efi: replace open coded constants with symbolic ones
-  arm64: efi: split Image code and data into separate PE/COFF sections
-  arm: compressed: put zImage header and EFI header in dedicated section
-  arm: efi: remove forbidden values from the PE/COFF header
-  arm: efi: remove pointless dummy .reloc section
-  arm: efi: replace open coded constants with symbolic ones
-  arm: efi: split zImage code and data into separate PE/COFF sections
-  arm: efi: add PE/COFF debug table to EFI header
-
-Mark Rutland (2):
-  include: pe.h: allow for use in assembly
-  include: pe.h: add some missing definitions
-
- arch/arm/boot/compressed/Makefile      |   4 +
- arch/arm/boot/compressed/efi-header.S  | 253 ++++++++++++--------
- arch/arm/boot/compressed/head.S        |  14 +-
- arch/arm/boot/compressed/vmlinux.lds.S |  32 ++-
- arch/arm64/kernel/efi-header.S         | 155 ++++++++++++
- arch/arm64/kernel/head.S               | 167 +------------
- arch/arm64/kernel/vmlinux.lds.S        |   5 +
- include/linux/pe.h                     | 177 +++++++-------
- 8 files changed, 449 insertions(+), 358 deletions(-)
- create mode 100644 arch/arm64/kernel/efi-header.S
+>  include/linux/soc/samsung/exynos-regs-pmu.h |  8 ++++++++
+>  4 files changed, 10 insertions(+), 22 deletions(-)
+> 
+> diff --git a/drivers/phy/phy-exynos-dp-video.c b/drivers/phy/phy-exynos-dp-video.c
+> index 34b06154e5d9..d72193188980 100644
+> --- a/drivers/phy/phy-exynos-dp-video.c
+> +++ b/drivers/phy/phy-exynos-dp-video.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/phy/phy.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/regmap.h>
+> +#include <linux/soc/samsung/exynos-regs-pmu.h>
+>  
+>  struct exynos_dp_video_phy_drvdata {
+>  	u32 phy_ctrl_offset;
+> diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
+> index 07ed608905ac..7c896d0cda18 100644
+> --- a/drivers/phy/phy-exynos5-usbdrd.c
+> +++ b/drivers/phy/phy-exynos5-usbdrd.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/mfd/syscon/exynos5-pmu.h>
+>  #include <linux/regmap.h>
+>  #include <linux/regulator/consumer.h>
+> +#include <linux/soc/samsung/exynos-regs-pmu.h>
+>  
+>  /* Exynos USB PHY registers */
+>  #define EXYNOS5_FSEL_9MHZ6		0x0
+> diff --git a/include/linux/mfd/syscon/exynos5-pmu.h b/include/linux/mfd/syscon/exynos5-pmu.h
+> index 02af8dece914..6108857ffcca 100644
+> --- a/include/linux/mfd/syscon/exynos5-pmu.h
+> +++ b/include/linux/mfd/syscon/exynos5-pmu.h
+> @@ -13,34 +13,12 @@
+>  #define _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_
+>  
+>  /* Exynos5 PMU register definitions */
+> -#define EXYNOS5_HDMI_PHY_CONTROL		(0x700)
+> -#define EXYNOS5_USBDRD_PHY_CONTROL		(0x704)
+>  
+>  /* Exynos5250 specific register definitions */
+> -#define EXYNOS5_USBHOST_PHY_CONTROL		(0x708)
+> -#define EXYNOS5_EFNAND_PHY_CONTROL		(0x70c)
+> -#define EXYNOS5_MIPI_PHY0_CONTROL		(0x710)
+> -#define EXYNOS5_MIPI_PHY1_CONTROL		(0x714)
+> -#define EXYNOS5_ADC_PHY_CONTROL			(0x718)
+> -#define EXYNOS5_MTCADC_PHY_CONTROL		(0x71c)
+> -#define EXYNOS5_DPTX_PHY_CONTROL		(0x720)
+> -#define EXYNOS5_SATA_PHY_CONTROL		(0x724)
+>  
+>  /* Exynos5420 specific register definitions */
+> -#define EXYNOS5420_USBDRD1_PHY_CONTROL		(0x708)
+> -#define EXYNOS5420_USBHOST_PHY_CONTROL		(0x70c)
+> -#define EXYNOS5420_MIPI_PHY0_CONTROL		(0x714)
+> -#define EXYNOS5420_MIPI_PHY1_CONTROL		(0x718)
+> -#define EXYNOS5420_MIPI_PHY2_CONTROL		(0x71c)
+> -#define EXYNOS5420_ADC_PHY_CONTROL		(0x720)
+> -#define EXYNOS5420_MTCADC_PHY_CONTROL		(0x724)
+> -#define EXYNOS5420_DPTX_PHY_CONTROL		(0x728)
+> -
+> -/* Exynos5433 specific register definitions */
+> -#define EXYNOS5433_USBHOST30_PHY_CONTROL	(0x728)
+>  
+>  #define EXYNOS5_PHY_ENABLE			BIT(0)
+>  #define EXYNOS5_MIPI_PHY_S_RESETN		BIT(1)
+>  #define EXYNOS5_MIPI_PHY_M_RESETN		BIT(2)
+> -
+>  #endif /* _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_ */
+> diff --git a/include/linux/soc/samsung/exynos-regs-pmu.h b/include/linux/soc/samsung/exynos-regs-pmu.h
+> index 637ead0efd36..d861e757bef8 100644
+> --- a/include/linux/soc/samsung/exynos-regs-pmu.h
+> +++ b/include/linux/soc/samsung/exynos-regs-pmu.h
+> @@ -349,6 +349,8 @@
+>  
+>  #define EXYNOS5_AUTO_WDTRESET_DISABLE				0x0408
+>  #define EXYNOS5_MASK_WDTRESET_REQUEST				0x040C
+> +#define EXYNOS5_USBDRD_PHY_CONTROL				0x0704
+> +#define EXYNOS5_DPTX_PHY_CONTROL				0x0720
+>  
+>  #define EXYNOS5_USE_RETENTION			BIT(4)
+>  #define EXYNOS5_SYS_WDTRESET					(1 << 20)
+> @@ -502,6 +504,11 @@
+>  #define EXYNOS5420_KFC_CORE_RESET(_nr)				\
+>  	((EXYNOS5420_KFC_CORE_RESET0 | EXYNOS5420_KFC_ETM_RESET0) << (_nr))
+>  
+> +#define EXYNOS5420_USBDRD1_PHY_CONTROL				0x0708
+> +#define EXYNOS5420_MIPI_PHY0_CONTROL				0x0714
+> +#define EXYNOS5420_MIPI_PHY1_CONTROL				0x0718
+> +#define EXYNOS5420_MIPI_PHY2_CONTROL				0x071C
+> +#define EXYNOS5420_DPTX_PHY_CONTROL				0x0728
+>  #define EXYNOS5420_ARM_CORE2_SYS_PWR_REG			0x1020
+>  #define EXYNOS5420_DIS_IRQ_ARM_CORE2_LOCAL_SYS_PWR_REG		0x1024
+>  #define EXYNOS5420_DIS_IRQ_ARM_CORE2_CENTRAL_SYS_PWR_REG	0x1028
+> @@ -639,6 +646,7 @@
+>  					 | EXYNOS5420_KFC_USE_STANDBY_WFI3)
+>  
+>  /* For EXYNOS5433 */
+> +#define EXYNOS5433_USBHOST30_PHY_CONTROL			(0x0728)
+>  #define EXYNOS5433_PAD_RETENTION_AUD_OPTION			(0x3028)
+>  #define EXYNOS5433_PAD_RETENTION_MMC2_OPTION			(0x30C8)
+>  #define EXYNOS5433_PAD_RETENTION_TOP_OPTION			(0x3108)
 
 -- 
-2.7.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
