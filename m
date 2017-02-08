@@ -1,79 +1,86 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 8 Feb 2017 10:58:35 +0000
-Subject: [PATCH v2 8/8] mfd: exynos-lpass: Add runtime PM support
-In-Reply-To: <1485419634-28331-9-git-send-email-m.szyprowski@samsung.com>
-References: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170126083406eucas1p20148fa4f3ca70d333400c806dd490aef@eucas1p2.samsung.com>
- <1485419634-28331-9-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170208105835.sin35b3ayzgxlpgf@dell>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Wed, 08 Feb 2017 19:08:46 +0800
+Subject: [PATCH 5/8] arm64: dts: allwinner: add R_PIO node
+In-Reply-To: <20170208101458.du6ybqsw52ypzhzw@lukather>
+References: <20170208100009.29362-1-icenowy@aosc.xyz>
+ <20170208100009.29362-5-icenowy@aosc.xyz>
+ <20170208101458.du6ybqsw52ypzhzw@lukather>
+Message-ID: <39431486552126@web41j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 26 Jan 2017, Marek Szyprowski wrote:
 
-> Convert exisitng lpass-suspend/resume callbacks into runtime PM callbacks.
-> This way Exynos LPASS driver will be ready for use with power domains
-> enabled. LPASS will be runtime resumed/suspended as a result of its child
-> devices runtime PM transitions.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  drivers/mfd/exynos-lpass.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
 
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-  
-> diff --git a/drivers/mfd/exynos-lpass.c b/drivers/mfd/exynos-lpass.c
-> index 9dbbedad916f..6d735e22acda 100644
-> --- a/drivers/mfd/exynos-lpass.c
-> +++ b/drivers/mfd/exynos-lpass.c
-> @@ -22,6 +22,7 @@
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
->  #include <linux/platform_device.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/regmap.h>
->  #include <linux/types.h>
->  
-> @@ -132,6 +133,8 @@ static int exynos_lpass_probe(struct platform_device *pdev)
->  	}
->  
->  	platform_set_drvdata(pdev, lpass);
-> +	pm_runtime_set_active(dev);
-> +	pm_runtime_enable(dev);
->  	exynos_lpass_enable(lpass);
->  
->  	return of_platform_populate(dev->of_node, NULL, NULL, dev);
-> @@ -141,7 +144,9 @@ static int exynos_lpass_remove(struct platform_device *pdev)
->  {
->  	struct exynos_lpass *lpass = platform_get_drvdata(pdev);
->  
-> -	exynos_lpass_disable(lpass);
-> +	pm_runtime_disable(&pdev->dev);
-> +	if (!pm_runtime_status_suspended(&pdev->dev))
-> +		exynos_lpass_disable(lpass);
->  	regmap_exit(lpass->top);
->  
->  	return 0;
-> @@ -165,8 +170,11 @@ static int __maybe_unused exynos_lpass_resume(struct device *dev)
->  	return 0;
->  }
->  
-> -static SIMPLE_DEV_PM_OPS(lpass_pm_ops, exynos_lpass_suspend,
-> -					exynos_lpass_resume);
-> +static const struct dev_pm_ops lpass_pm_ops = {
-> +	SET_RUNTIME_PM_OPS(exynos_lpass_suspend, exynos_lpass_resume, NULL)
-> +	SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-> +				     pm_runtime_force_resume)
-> +};
->  
->  static const struct of_device_id exynos_lpass_of_match[] = {
->  	{ .compatible = "samsung,exynos5433-lpass" },
+08.02.2017, 18:15, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> On Wed, Feb 08, 2017 at 06:00:06PM +0800, Icenowy Zheng wrote:
+>> ?Allwinner A64 SoC has a R_PIO node like the one in H3.
+>>
+>> ?Add the node as well as needed clocks and resets.
+>>
+>> ?As there's no document for apb0_gates, I only added the R_PIO bit here.
+>>
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ?---
+>> ??arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 40 +++++++++++++++++++++++++++
+>> ??1 file changed, 40 insertions(+)
+>>
+>> ?diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> ?index 1c64ea2d23f9..4b0baa79554c 100644
+>> ?--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> ?+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+>> ?@@ -98,6 +98,15 @@
+>> ??????????????????clock-output-names = "osc32k";
+>> ??????????};
+>>
+>> ?+ apb0: apb0_clk {
+>> ?+ compatible = "fixed-factor-clock";
+>> ?+ #clock-cells = <0>;
+>> ?+ clock-div = <1>;
+>> ?+ clock-mult = <1>;
+>> ?+ clocks = <&osc24M>;
+>> ?+ clock-output-names = "apb0";
+>> ?+ };
+>> ?+
+>> ??????????psci {
+>> ??????????????????compatible = "arm,psci-0.2";
+>> ??????????????????method = "smc";
+>> ?@@ -392,5 +401,36 @@
+>> ??????????????????????????interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+>> ???????????????????????????????????????<GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+>> ??????????????????};
+>> ?+
+>> ?+ apb0_gates: clk at 1f01428 {
+>> ?+ compatible = "allwinner,sun50i-a64-apb0-gates-clk",
+>> ?+ "allwinner,sun4i-a10-gates-clk";
+>> ?+ reg = <0x01f01428 0x4>;
+>> ?+ #clock-cells = <1>;
+>> ?+ clocks = <&apb0>;
+>> ?+ clock-indices = <0>;
+>> ?+ clock-output-names = "apb0_pio";
+>> ?+ };
+>> ?+
+>> ?+ apb0_rst: reset at 1f014b0 {
+>> ?+ reg = <0x01f014b0 0x4>;
+>> ?+ compatible = "allwinner,sun6i-a31-clock-reset";
+>> ?+ #reset-cells = <1>;
+>> ?+ };
+>
+> Please make a sunxi-ng driver for those clocks.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+We have no enough materials to make such a CCU driver.
+
+Clocks in CPUs are usually undocumented, and difficult to
+be collected -- even the clk-sun50iw1.c in BSP do not have
+all clocks in CPUs.
+
+We should only make it sunxi-ng until it's fully discovered
+(all functions in CPUs are functional).
+
+>
+> Thanks,
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
