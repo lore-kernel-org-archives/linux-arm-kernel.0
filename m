@@ -1,89 +1,93 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 8 Feb 2017 17:22:38 -0500
-Subject: [PATCH 1/2] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
-In-Reply-To: <bd4a0127-0f32-a8be-c8ee-34c1cccc6d5d@codeaurora.org>
-References: <20170208005736.18724-1-cov@codeaurora.org>
- <bd4a0127-0f32-a8be-c8ee-34c1cccc6d5d@codeaurora.org>
-Message-ID: <6afb0a98-0973-33ec-0b76-fc6378e64309@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 8 Feb 2017 16:27:36 -0600
+Subject: [PATCH] PCI: iproc: fix resource allocation for BCMA PCIe
+In-Reply-To: <CAK3bHNVz1O7pWL8xV+gf4M-MMKBsq6Bwkt654FOAEOZn=AUH-w@mail.gmail.com>
+References: <1484265521-13497-1-git-send-email-aospan@netup.ru>
+ <20170128204407.GA20550@bhelgaas-glaptop.roam.corp.google.com>
+ <CAK3bHNV-O+k1rHSj-KTKOBNNDXpWxp7rXw8bi7ve7-T9qqs8dw@mail.gmail.com>
+ <20170208204831.GA2206@bhelgaas-glaptop.roam.corp.google.com>
+ <CAK3bHNVz1O7pWL8xV+gf4M-MMKBsq6Bwkt654FOAEOZn=AUH-w@mail.gmail.com>
+Message-ID: <20170208222736.GA9094@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/07/2017 11:05 PM, Timur Tabi wrote:
-> Christopher Covington wrote:
->> The Qualcomm Datacenter Technologies QDF2400 family of SoCs contains a
->> custom (non-PrimeCell) implementation of the SBSA UART. Occasionally the
->> BUSY bit in the Flag Register gets stuck as 1, erratum 44 for both 2432v1
->> and 2400v1 SoCs. Checking that the Transmit FIFO Empty (TXFE) bit is 0,
->> instead of checking that the BUSY bit is 1, works around the issue. To
->> facilitate this substitution when UART AMBA Port (UAP) data is available,
->> introduce vendor-specific inversion of Feature Register bits. To keep the
->> change small, this patch only works around the full console case, where UAP
->> data is available, and does not handle the erratum for earlycon, as the UAP
->> data is not available then.
-
->> +#ifdef CONFIG_QCOM_QDF2400_ERRATUM_44
->> +static struct vendor_data vendor_qdt_qdf2400_e44 = {
->> +    .reg_offset        = pl011_std_offsets,
->> +    .fr_busy        = UART011_FR_TXFE,
->> +    .fr_dsr            = UART01x_FR_DSR,
->> +    .fr_cts            = UART01x_FR_CTS,
->> +    .fr_ri            = UART011_FR_RI,
->> +    .inv_fr            = UART011_FR_TXFE,
->> +    .access_32b        = true,
->> +    .oversampling        = false,
->> +    .dma_threshold        = false,
->> +    .cts_event_workaround    = false,
->> +    .always_enabled        = true,
->> +    .fixed_options        = true,
->> +};
->> +#else
->> +#define vendor_qdt_qdf2400_e44 vendor_sbsa
->> +#endif
+On Wed, Feb 08, 2017 at 05:07:27PM -0500, Abylay Ospan wrote:
+> Hi Bjorn,
 > 
-> Instead of the #else, just put the #ifdef inside qdf2400_e44(). That
-> way, the function always returns False if
-> CONFIG_QCOM_QDF2400_ERRATUM_44 is not defined.
-
-I'll consolidate the #ifdefery around qdf2400_e44().
-
-> Also, don't you need to add a definition of .inv_fr in vendor_sbsa
-> and the other vendor_xxx structures?
-
-The current struct definitions appear to (ab)use implicit
-zero-initialization, so I did too.
-
->> +
->>  static u16 pl011_st_offsets[REG_ARRAY_SIZE] = {
->>      [REG_DR] = UART01x_DR,
->>      [REG_ST_DMAWM] = ST_UART011_DMAWM,
->> @@ -1518,7 +1538,7 @@ static unsigned int pl011_tx_empty(struct uart_port *port)
->>  {
->>      struct uart_amba_port *uap =
->>          container_of(port, struct uart_amba_port, port);
->> -    unsigned int status = pl011_read(uap, REG_FR);
->> +    unsigned int status = pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr;
->>      return status & (uap->vendor->fr_busy | UART01x_FR_TXFF) ?
->>                              0 : TIOCSER_TEMT;
->>  }
->> @@ -2218,7 +2238,8 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
->>       *    Finally, wait for transmitter to become empty
->>       *    and restore the TCR
->>       */
->> -    while (pl011_read(uap, REG_FR) & uap->vendor->fr_busy)
->> +    while ((pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr)
->> +                        & uap->vendor->fr_busy)
+> I have checked first listed driver
+> (drivers/pci/host/pcie-designware.c). Seems like into
+> 'devm_request_pci_bus_resources' we supply same stack allocated 'res'
+> (actual insert of this pointer to 'iomem_resource' was done inside
+> '__request_resource'). This 'res' is not changed inside
+> 'of_pci_get_host_bridge_resources'.
+> I don't have this platforms on hand and cannot test it on real
+> hadrware (to 100% verify). But investigating this code I see that the
+> problem exist.
 > 
-> I really think the XOR logic needs to be documented wherever it's
-> used. It's just too confusing.
+> Here is a summary of flow for 'res' to show the problem:
+> 
+> pcie-designware.c:
+>   LIST_HEAD(res);
+>   ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res,
+> &pp->io_base); <--- 'res' not changing here
+>   ret = devm_request_pci_bus_resources(&pdev->dev, &res);
+> 
+>   drivers/pci/bus.c:
+>     err = devm_request_resource(dev, parent, res);
+> 
+>     kernel/resource.c:
+>       conflict = request_resource_conflict(root, new);
+>         conflict = __request_resource(root, new);
+>           *p = new;  <--- here we introduce stack allocated res into
+> global 'iomem_resource'
+> 
+> 
+> Please check and correct me if i'm wrong ?
 
-References such as the following for basic bit operations like
-setting, clearing, and toggling are easy enough to come by.
+The "res" in dw_pcie_host_init() is a list_head (not a struct
+resource) and is on the stack.
 
-http://stackoverflow.com/questions/47981/how-do-you-set-clear-and-toggle-a-single-bit-in-c-c
+When we call of_pci_get_host_bridge_resources(), we pass a pointer
+("&res") to the empty list.  It kzallocs a struct resource for the bus
+range and more for any bridge windows, and adds them to the list.
 
-Cov
+When we call devm_request_pci_bus_resources(), we pass a pointer
+("&res") to the list, which is no longer empty.  It iterates through
+the list and calls devm_request_resource() for each resource.  Inside
+devm_request_pci_bus_resources(), "res" is the pointer to the resource
+(not the list_head), and this resource is the one we kzalloc'd above.
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+When devm_request_resource() calls request_resource_conflict(), it
+passes that pointer to the kzalloc'd resource (the pointer is called
+"new" in devm_request_resource()).)
+
+So when __request_resource() assigns "*p = new", it is copying a
+pointer to a kzalloc'd struct resource.
+
+This is certainly a twisty maze of similar names for different things,
+but I think it is OK if the list_head is on the stack as long as the
+struct resources are kzalloc'd.
+
+> >   dw_pcie_host_init
+> >     LIST_HEAD(res)                            # on stack
+> >     of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base)
+> >       res = kzalloc()                         # different "res" from above!
+> >       pci_add_resource_offset(resources, res, ...)
+> >     devm_request_pci_bus_resources(&pdev->dev, &res)
+> >     pci_scan_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops, pp, &res)
+> >     error:
+> >       pci_free_resource_list(&res)
+> 
+> > This looks good to me, but I don't think it's necessary to keep the
+> > list_head in the struct iproc_pcie.  It should be safe to use
+> > "LIST_HEAD(res)" on the stack like the other drivers do.  Can you
+> > verify that and get an ack from Ray, Scott, or Jon?
+> 
+> if my investigation above is true then we need to keep 'res' all the
+> time we working with the driver (or find another way to fix this
+> issue).
+> 
+> -- 
+> Abylay Ospan,
+> NetUP Inc.
+> http://www.netup.tv
