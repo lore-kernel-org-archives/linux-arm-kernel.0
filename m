@@ -1,24 +1,31 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 09 Feb 2017 17:06:16 -0500 (EST)
-Subject: [PATCH] [net-next] ARM: orion: remove unused
- wnr854t_switch_plat_data
-In-Reply-To: <20170208212431.2924390-1-arnd@arndb.de>
-References: <20170208212431.2924390-1-arnd@arndb.de>
-Message-ID: <20170209.170616.2056403989254038271.davem@davemloft.net>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Thu,  9 Feb 2017 15:10:51 -0700
+Subject: [PATCH] media: fix s5p_mfc_set_dec_frame_buffer_v6() to print buf
+ size in hex
+Message-ID: <20170209221051.26234-1-shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed,  8 Feb 2017 22:24:19 +0100
+Fix s5p_mfc_set_dec_frame_buffer_v6() to print buffer size in hex to be
+consistent with the rest of the messages in the routine.
 
-> The other instances of this structure got removed along with the MDIO
-> device change, but this one was left behind and needs to be removed
-> as well:
-> 
-> arch/arm/mach-orion5x/wnr854t-setup.c:109:44: error: 'wnr854t_switch_plat_data' defined but not used [-Werror=unused-variable]
->  static struct dsa_platform_data __initdata wnr854t_switch_plat_data = {
-> 
-> Fixes: 575e93f7b5e6 ("ARM: orion: Register DSA switch as a MDIO device")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+---
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Applied.
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+index d6f207e..fc45980 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+@@ -497,7 +497,7 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
+ 		}
+ 	}
+ 
+-	mfc_debug(2, "Buf1: %zu, buf_size1: %d (frames %d)\n",
++	mfc_debug(2, "Buf1: %zx, buf_size1: %d (frames %d)\n",
+ 			buf_addr1, buf_size1, ctx->total_dpb_count);
+ 	if (buf_size1 < 0) {
+ 		mfc_debug(2, "Not enough memory has been allocated.\n");
+-- 
+2.7.4
