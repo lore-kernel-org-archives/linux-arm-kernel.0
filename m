@@ -1,33 +1,44 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 9 Feb 2017 18:22:11 +0100
-Subject: [PATCH] [net-next] ARM: orion: fix PHYLIB dependency
-In-Reply-To: <20170209150834.1158193-1-arnd@arndb.de>
-References: <20170209150834.1158193-1-arnd@arndb.de>
-Message-ID: <20170209172211.GF29882@lunn.ch>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 9 Feb 2017 09:31:33 -0800
+Subject: [PATCH v2 1/3] ARM: dts: Add support for phyCORE-AM335x PCM-953
+ carrier board
+In-Reply-To: <ff34a257-7272-9b9e-c0bb-a88bac8b3d05@arm.com>
+References: <1485252576-36955-1-git-send-email-t.remmet@phytec.de>
+ <ff34a257-7272-9b9e-c0bb-a88bac8b3d05@arm.com>
+Message-ID: <20170209173132.GD21809@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2017 at 04:08:11PM +0100, Arnd Bergmann wrote:
-> The newly introduced mdiobus_register_board_info() function is only available
-> as part of PHYLIB, so we get a link error when we call that from a board while
-> phylib is disabled:
+* Sudeep Holla <sudeep.holla@arm.com> [170209 08:57]:
+> On 24/01/17 10:09, Teresa Remmet wrote:
+> > +	user_buttons: user_buttons {
+> > +		compatible = "gpio-keys";
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&user_buttons_pins>;
+> > +
+> > +		button at 0 {
+> > +			label = "home";
+> > +			linux,code = <KEY_HOME>;
+> > +			gpios = <&gpio3 7 GPIO_ACTIVE_HIGH>;
+> > +			gpio-key,wakeup;
+> > +		};
+> > +
+> > +		button at 1 {
+> > +			label = "menu";
+> > +			linux,code = <KEY_MENU>;
+> > +			gpios = <&gpio3 8 GPIO_ACTIVE_HIGH>;
+> > +			gpio-key,wakeup;
 > 
-> arch/arm/plat-orion/common.o: In function `orion_ge00_switch_init':
-> common.c:(.init.text+0x6a4): undefined reference to `mdiobus_register_board_info'
+> Could you please replace this with wakeup-source as specified in
+> Documentation/devicetree/bindings/power/wakeup-source.txt
 > 
-> This adds a workaround that is made up of three parts:
-> 
-> - in plat-orion, the function for declaring the switch is hidden without
->   PHYLIB.
-> - in mach-orion5x, the caller conditionally stubs out the call to
->   the removed function, so we can still build other orion5x boards
->   without PHYLIB
-> - For the boards that actually declare the switch, we select PHYLIB
->   explicitly from Kconfig if NETDEVICES is set. Without NETDEVICES,
->   we cannot enable PHYLIB, but we also wouldn't need it.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> I know this patch is merged, just fix it on top of linux-next ?
+> I think TI/OMAP downstream tree has some remnants of the legacy
+> boolean and it keeps slipping through every merge window :)
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Oops sorry these keep coming. Teresa, can you please send a
+follow-up fix against current Linux next?
 
-    Andrew
+Regards,
+
+Tony
