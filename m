@@ -1,64 +1,112 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Thu, 9 Feb 2017 12:52:50 -0800
-Subject: [PATCH] ARM: multi_v7_defconfig: enable pstore configs
-In-Reply-To: <20170209195646.GA39738@beast>
-References: <20170209195646.GA39738@beast>
-Message-ID: <20170209205250.GA118863@google.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Thu, 9 Feb 2017 22:57:03 +0200
+Subject: [PATCH] virtio: Try to untangle DMA coherency
+In-Reply-To: <d6ded13e-aa48-023b-3a71-1c40aa5fced0@suse.de>
+References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
+ <20170201195732-mutt-send-email-mst@kernel.org>
+ <20170201182659.GM8177@arm.com>
+ <20170201210648-mutt-send-email-mst@kernel.org>
+ <d6ded13e-aa48-023b-3a71-1c40aa5fced0@suse.de>
+Message-ID: <20170209225635-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's useful to get testing on these features on various boards (e.g., on
-KernelCI), and (when they're working) the ramoops feature is extremely
-helpful for debugging live systems.
-
-Signed-off-by: Brian Norris <briannorris@chromium.org>
----
-+ ARM folks
-- Linus
-
->From Kees's recent pull request:
-
-On Thu, Feb 09, 2017 at 11:56:46AM -0800, Kees Cook wrote:
-> Hi,
+On Wed, Feb 08, 2017 at 01:58:10PM +0100, Alexander Graf wrote:
+> On 02/01/2017 08:19 PM, Michael S. Tsirkin wrote:
+> > On Wed, Feb 01, 2017 at 06:27:09PM +0000, Will Deacon wrote:
+> > > On Wed, Feb 01, 2017 at 08:09:21PM +0200, Michael S. Tsirkin wrote:
+> > > > On Wed, Feb 01, 2017 at 12:25:57PM +0000, Robin Murphy wrote:
+> > > > > diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
+> > > > > index 7e38ed79c3fc..961af25b385c 100644
+> > > > > --- a/drivers/virtio/virtio_ring.c
+> > > > > +++ b/drivers/virtio/virtio_ring.c
+> > > > > @@ -20,6 +20,7 @@
+> > > > >  #include <linux/virtio_ring.h>
+> > > > >  #include <linux/virtio_config.h>
+> > > > >  #include <linux/device.h>
+> > > > > +#include <linux/property.h>
+> > > > >  #include <linux/slab.h>
+> > > > >  #include <linux/module.h>
+> > > > >  #include <linux/hrtimer.h>
+> > > > > @@ -160,10 +161,14 @@ static bool vring_use_dma_api(struct virtio_device *vdev)
+> > > > >  		return true;
+> > > > > 
+> > > > >  	/*
+> > > > > -	 * On ARM-based machines, the DMA ops will do the right thing,
+> > > > > -	 * so always use them with legacy devices.
+> > > > > +	 * On ARM-based machines, the coherent DMA ops will do the right
+> > > > > +	 * thing, so always use them with legacy devices. However, using
+> > > > > +	 * non-coherent DMA when the host *is* actually coherent, but has
+> > > > > +	 * forgotten to tell us, is going to break badly; since this situation
+> > > > > +	 * already exists in the wild, maintain the old behaviour there.
+> > > > >  	 */
+> > > > > -	if (IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64))
+> > > > > +	if ((IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64)) &&
+> > > > > +	    device_get_dma_attr(&vdev->dev) == DEV_DMA_COHERENT)
+> > > > >  		return !virtio_has_feature(vdev, VIRTIO_F_VERSION_1);
+> > > > > 
+> > > > >  	return false;
+> > > > 
+> > > > This is exactly what I feared.
+> > > 
+> > > Yes, sorry about this. It works fine for virtio-pci (where "dma-coherent"
+> > > is used) and it also works on the fastmodel if you disable cache-modelling
+> > > (which is needed to make the thing run at a usable pace) so we didn't spot
+> > > this in testing.
+> > > 
+> > > > Could we identify fastboot and do the special dance just for it?
+> > > 
+> > > [assuming you mean fastmodel instead of fastboot]
+> > > 
+> > > > I'd like to do that instead. It's fastboot doing the unreasonable thing
+> > > > here and deviating from what every other legacy device without exception
+> > > > did for years. If this means fastboot will need to update to virtio 1,
+> > > > all the better.
+> > > 
+> > > The problem still exists with virtio 1, unless we require that the
+> > > "dma-coherent" property is set/unset correctly when VIRTIO_F_IOMMU_PLATFORM
+> > > is advertised by the device (which is what I suggested in my reply).
+> > 
+> > I'm not ignoring that, but I need to understand that part a bit better.
+> > I'll reply to that patch in a day or two after looking at how _CCA is
+> > supposed to work.
+> > 
+> > > We can't detect the fastmodel,
+> > 
+> > Surely, it puts a hardware id somewhere? I think you mean
+> > fastmodel isn't always affected, right?
+> > 
+> > > but we could implicitly treat virtio-mmio
+> > > devices as cache-coherent regardless of the "dma-coherent" flag. I already
+> > > prototyped this, but I suspect the devicetree people will push back (and
+> > > there's a similar patch needed for ACPI).
+> > > 
+> > > See below. Do you prefer this approach?
+> > > 
+> > > Will
+> > > 
+> > > --->8
+> > 
+> > I'd like to see basically
+> > 
+> > if (fastmodel)
+> > 	a pile of special work-arounds
+> > else
+> > 	not less hacky but more common virtio work-arounds
+> > 
+> > :)
+> > 
+> > And then I can apply whatever comes from @arm.com and not
+> > worry about breaking actual hardware.
 > 
-> This pstore regression was just noticed. If I'm too late, this can land
-> in v4.11 and -stable, but if the fix window is still open for v4.10, I'd
-> love to see this fix pulled for v4.10.
+> I'm actually seeing the exact same breakage in QEMU right now, so it's not
+> fast model related at all. In QEMU we also don't properly set the
+> dma-coherent flag, so we run into cache coherency problems.
 > 
-> Thanks!
 > 
-> -Kees
-[...]
-> ----------------------------------------------------------------
-> Fix pstore regression (boot Oops) when ftrace disabled, from Brian Norris.
-> 
-> ----------------------------------------------------------------
+> Alex
 
-I expect we aren't getting regular testing coverage (e.g., from
-KernelCI, which has a few ARM-based Chromebooks in the lab [1], which
-would have trivially caught the bug) because pstore is not enabled on
-the multiplatform config that gets used there. Seems like a good idea,
-so we can catch regressions like this automatically?
+But with latest revert QEMU should now work, right?
 
-[1] https://kernelci.org/boot/rk3288-veyron-jerry/
-
- arch/arm/configs/multi_v7_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 028d2b70e3b5..74bdb89faff6 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -906,6 +906,10 @@ CONFIG_TMPFS=y
- CONFIG_SQUASHFS=y
- CONFIG_SQUASHFS_LZO=y
- CONFIG_SQUASHFS_XZ=y
-+CONFIG_PSTORE=y
-+CONFIG_PSTORE_CONSOLE=y
-+CONFIG_PSTORE_PMSG=y
-+CONFIG_PSTORE_RAM=y
- CONFIG_NFS_FS=y
- CONFIG_NFS_V3_ACL=y
- CONFIG_NFS_V4=y
 -- 
-2.11.0.483
+MST
