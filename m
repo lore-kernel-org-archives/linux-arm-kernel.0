@@ -1,119 +1,118 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu,  9 Feb 2017 12:32:58 +0100
-Subject: [PATCH 09/11] iommu/mediatek: Make use of iommu_device_register
- interface
-In-Reply-To: <1486639981-32368-1-git-send-email-joro@8bytes.org>
-References: <1486639981-32368-1-git-send-email-joro@8bytes.org>
-Message-ID: <1486639981-32368-10-git-send-email-joro@8bytes.org>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 9 Feb 2017 11:42:18 +0000
+Subject: [QUESTION] Early Write Acknowledge for PCIe configuration space
+In-Reply-To: <20170208183530.GA27720@red-moon>
+References: <df407f39-ee05-d74d-6e5e-c5e502372032@huawei.com>
+ <6092525.UgRCY3dpzP@wuerfel> <20170106114231.GC15333@arm.com>
+ <20170208183530.GA27720@red-moon>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1FA25E1C@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joerg Roedel <jroedel@suse.de>
+Hi Lorenzo
 
-Register individual Mediatek IOMMUs to the iommu core and
-add sysfs entries.
+Many thanks to look into this
 
-Cc: Matthias Brugger <matthias.bgg@gmail.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-mediatek at lists.infradead.org
-Signed-off-by: Joerg Roedel <jroedel@suse.de>
----
- drivers/iommu/mtk_iommu.c | 26 ++++++++++++++++++++++++++
- drivers/iommu/mtk_iommu.h |  2 ++
- 2 files changed, 28 insertions(+)
+> -----Original Message-----
+> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
+> Sent: 08 February 2017 18:36
+> To: Will Deacon
+> Cc: Arnd Bergmann; linux-arm-kernel at lists.infradead.org; John Garry;
+> catalin.marinas at arm.com; Gabriele Paoloni; Linuxarm; xuwei (O);
+> Wangzhou (B); Shameerali Kolothum Thodi; Guohanjun (Hanjun Guo)
+> Subject: Re: [QUESTION] Early Write Acknowledge for PCIe configuration
+> space
+> 
+> On Fri, Jan 06, 2017 at 11:42:32AM +0000, Will Deacon wrote:
+> > On Fri, Jan 06, 2017 at 12:24:25PM +0100, Arnd Bergmann wrote:
+> > > On Friday, January 6, 2017 11:15:22 AM CET John Garry wrote:
+> > > > [apologies if this has been queried before]
+> > > >
+> > > > Hi ARM guys,
+> > > >
+> > > > I have a question about the device memory attributes we assign
+> for PCIe
+> > > > config space for arm64. Currently we use ioremap to map in the
+> config
+> > > > space; this uses nGnRE, which means we enable Early Write
+> Acknowledge.
+> > > >
+> > > > The ARMv8 ARM states that "ARM recommend that No Early Write
+> Acknowledge
+> > > > Hint is used for PCIe configuration writes".
+> > > >
+> > > > I understand a problem with using E is in that configuration
+> write is a
+> > > > non-post operation, which means the RP requires to get the
+> completion
+> > > > ack from the EP The problem here is if CPU writes data to ECAM by
+> E,
+> > > > complete will go back to CPU directly, and maybe at this point
+> the write
+> > > > has not reached the EP.
+> > > >
+> > > > I believe that this may cause ordering issues in PCI read/write.
+> In
+> > > > practice we use non-relaxed readl/writel to access config space,
+> which
+> > > > include the synchronization barriers, which, *as I understand*,
+> even if
+> > > > for full system domain, may be negated by the E attribute for
+> PCIe.
+> > >
+> > > I don't think the barriers in readl/writel are enough here, in
+> particular
+> > > the write barrier is *before* the access to synchronize DMAs
+> > > on RAM with MMIO accesses, which is a bit different from what you
+> > > have here.
+> > >
+> > > > So a question: why is the recommendation in the ARMv8 ARM
+> ignored?
+> > >
+> > > Probably nobody thought about this properly in the Linux drivers.
+> The
+> > > ARMv8 ARM sounds correct here.
+> >
+> > The ARMv8 ARM also says that the E attribute is a hint, so there's no
+> > guarantee that it's actually honoured by the implementation. However,
+> > now that it explicitly mentions PCI config space, the intention is
+> clearly
+> > that nE *is* honoured for systems using PCIe, so I agree that we
+> should make
+> > this change. I don't want to use the nE type for all ioremap
+> invocations,
+> > though.
+> 
+> I suspect this is a potential issue on ARM 32-bit systems too(?).
+> Fixing
+> IO space should be reasonably simple, we just have to change the
+> pgprot_device() in pci_remap_iospace() to pgprot_noncached() (they are
+> the same attributes on ARM 32-bit already if I am not mistaken).
 
-diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index 1479c76..d484fa6 100644
---- a/drivers/iommu/mtk_iommu.c
-+++ b/drivers/iommu/mtk_iommu.c
-@@ -360,11 +360,15 @@ static phys_addr_t mtk_iommu_iova_to_phys(struct iommu_domain *domain,
- 
- static int mtk_iommu_add_device(struct device *dev)
- {
-+	struct mtk_iommu_data *data;
- 	struct iommu_group *group;
- 
- 	if (!dev->iommu_fwspec || dev->iommu_fwspec->ops != &mtk_iommu_ops)
- 		return -ENODEV; /* Not a iommu client device */
- 
-+	data = dev->iommu_fwspec->iommu_priv;
-+	iommu_device_link(&data->iommu, dev);
-+
- 	group = iommu_group_get_for_dev(dev);
- 	if (IS_ERR(group))
- 		return PTR_ERR(group);
-@@ -375,9 +379,14 @@ static int mtk_iommu_add_device(struct device *dev)
- 
- static void mtk_iommu_remove_device(struct device *dev)
- {
-+	struct mtk_iommu_data *data;
-+
- 	if (!dev->iommu_fwspec || dev->iommu_fwspec->ops != &mtk_iommu_ops)
- 		return;
- 
-+	data = dev->iommu_fwspec->iommu_priv;
-+	iommu_device_unlink(&data->iommu, dev);
-+
- 	iommu_group_remove_device(dev);
- 	iommu_fwspec_free(dev);
- }
-@@ -497,6 +506,7 @@ static int mtk_iommu_probe(struct platform_device *pdev)
- 	struct mtk_iommu_data   *data;
- 	struct device           *dev = &pdev->dev;
- 	struct resource         *res;
-+	resource_size_t		ioaddr;
- 	struct component_match  *match = NULL;
- 	void                    *protect;
- 	int                     i, larb_nr, ret;
-@@ -519,6 +529,7 @@ static int mtk_iommu_probe(struct platform_device *pdev)
- 	data->base = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(data->base))
- 		return PTR_ERR(data->base);
-+	ioaddr = res->start;
- 
- 	data->irq = platform_get_irq(pdev, 0);
- 	if (data->irq < 0)
-@@ -567,6 +578,18 @@ static int mtk_iommu_probe(struct platform_device *pdev)
- 	if (ret)
- 		return ret;
- 
-+	ret = iommu_device_sysfs_add(&data->iommu, dev, NULL,
-+				     "mtk-iommu.%pa", &ioaddr);
-+	if (ret)
-+		return ret;
-+
-+	iommu_device_set_ops(&data->iommu, &mtk_iommu_ops);
-+	iommu_device_set_fwnode(&data->iommu, &pdev->dev.of_node->fwnode);
-+
-+	ret = iommu_device_register(&data->iommu);
-+	if (ret)
-+		return ret;
-+
- 	if (!iommu_present(&platform_bus_type))
- 		bus_set_iommu(&platform_bus_type, &mtk_iommu_ops);
- 
-@@ -577,6 +600,9 @@ static int mtk_iommu_remove(struct platform_device *pdev)
- {
- 	struct mtk_iommu_data *data = platform_get_drvdata(pdev);
- 
-+	iommu_device_sysfs_remove(&data->iommu);
-+	iommu_device_unregister(&data->iommu);
-+
- 	if (iommu_present(&platform_bus_type))
- 		bus_set_iommu(&platform_bus_type, NULL);
- 
-diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
-index 50177f7..2a28ead 100644
---- a/drivers/iommu/mtk_iommu.h
-+++ b/drivers/iommu/mtk_iommu.h
-@@ -47,6 +47,8 @@ struct mtk_iommu_data {
- 	struct iommu_group		*m4u_group;
- 	struct mtk_smi_iommu		smi_imu;      /* SMI larb iommu info */
- 	bool                            enable_4GB;
-+
-+	struct iommu_device		iommu;
- };
- 
- static inline int compare_of(struct device *dev, void *data)
--- 
-1.9.1
+Agreed on this. Actually I noticed that pci_remap_iospace() is __weak
+but no other definitions are present...
+
+> 
+> What do we want to do for config space ? Implement ioremap_uc() for
+> ARM/ARM64 (and add a devm_ioremap_uc() call to use it in basically all
+> drivers/pci/host implementations to map config space - or we just patch
+> the ioremap calls in drivers/pci/ecam.c and we assume the other hosts
+> controllers have purportedly called devm_ioremap() because on those
+> platforms it just works ok till further notice ?)
+
+Well if my understanding is correct we are 100% positive that this issue
+affects controllers mounted on ARM and ARM64, right?
+If this is correct I would look at drivers/pci/host/Kconfig and see which
+controllers depend on ARM or ARM64; for these controllers I would replace
+devm_ioremap() with devm_ioremap_uc().
+Obviously I would also replace the calls in drivers/pci/ecam.c...
+
+What do you think?
+
+Ciao
+Gab
+
+
+> 
+> Thanks,
+> Lorenzo
