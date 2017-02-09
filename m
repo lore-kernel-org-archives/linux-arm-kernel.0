@@ -1,77 +1,112 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  9 Feb 2017 14:59:22 +0000
-Subject: [PATCH 24/25] KVM: arm64: Add the EL1 physical timer access handler
-In-Reply-To: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
-References: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1486652363-7696-25-git-send-email-marc.zyngier@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  9 Feb 2017 16:08:11 +0100
+Subject: [PATCH] [net-next] ARM: orion: fix PHYLIB dependency
+Message-ID: <20170209150834.1158193-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jintack Lim <jintack@cs.columbia.edu>
+The newly introduced mdiobus_register_board_info() function is only available
+as part of PHYLIB, so we get a link error when we call that from a board while
+phylib is disabled:
 
-KVM traps on the EL1 phys timer accesses from VMs, but it doesn't handle
-those traps. This results in terminating VMs. Instead, set a handler for
-the EL1 phys timer access, and inject an undefined exception as an
-intermediate step.
+arch/arm/plat-orion/common.o: In function `orion_ge00_switch_init':
+common.c:(.init.text+0x6a4): undefined reference to `mdiobus_register_board_info'
 
-Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+This adds a workaround that is made up of three parts:
+
+- in plat-orion, the function for declaring the switch is hidden without
+  PHYLIB.
+- in mach-orion5x, the caller conditionally stubs out the call to
+  the removed function, so we can still build other orion5x boards
+  without PHYLIB
+- For the boards that actually declare the switch, we select PHYLIB
+  explicitly from Kconfig if NETDEVICES is set. Without NETDEVICES,
+  we cannot enable PHYLIB, but we also wouldn't need it.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm64/kvm/sys_regs.c | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ arch/arm/mach-orion5x/Kconfig  | 5 +++++
+ arch/arm/mach-orion5x/common.c | 4 ++--
+ arch/arm/plat-orion/common.c   | 2 ++
+ 3 files changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index caa47ce..1cd3464 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -820,6 +820,30 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	  CRm((0b1100 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
- 	  access_pmu_evtyper, reset_unknown, (PMEVTYPER0_EL0 + n), }
+diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
+index 468b8cb7fd5f..b98a0057ef66 100644
+--- a/arch/arm/mach-orion5x/Kconfig
++++ b/arch/arm/mach-orion5x/Kconfig
+@@ -107,6 +107,7 @@ config MACH_TS409
  
-+static bool access_cntp_tval(struct kvm_vcpu *vcpu,
-+		struct sys_reg_params *p,
-+		const struct sys_reg_desc *r)
-+{
-+	kvm_inject_undefined(vcpu);
-+	return true;
-+}
-+
-+static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
-+		struct sys_reg_params *p,
-+		const struct sys_reg_desc *r)
-+{
-+	kvm_inject_undefined(vcpu);
-+	return true;
-+}
-+
-+static bool access_cntp_cval(struct kvm_vcpu *vcpu,
-+		struct sys_reg_params *p,
-+		const struct sys_reg_desc *r)
-+{
-+	kvm_inject_undefined(vcpu);
-+	return true;
-+}
-+
- /*
-  * Architected system registers.
-  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
-@@ -1029,6 +1053,16 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b011),
- 	  NULL, reset_unknown, TPIDRRO_EL0 },
+ config MACH_WRT350N_V2
+ 	bool "Linksys WRT350N v2"
++	select PHYLIB if NETDEVICES
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Linksys WRT350N v2 platform.
+@@ -146,24 +147,28 @@ config MACH_MSS2_DT
  
-+	/* CNTP_TVAL_EL0 */
-+	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b000),
-+	  access_cntp_tval },
-+	/* CNTP_CTL_EL0 */
-+	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b001),
-+	  access_cntp_ctl },
-+	/* CNTP_CVAL_EL0 */
-+	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b010),
-+	  access_cntp_cval },
-+
- 	/* PMEVCNTRn_EL0 */
- 	PMU_PMEVCNTR_EL0(0),
- 	PMU_PMEVCNTR_EL0(1),
+ config MACH_WNR854T
+ 	bool "Netgear WNR854T"
++	select PHYLIB if NETDEVICES
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Netgear WNR854T platform.
+ 
+ config MACH_RD88F5181L_GE
+ 	bool "Marvell Orion-VoIP GE Reference Design"
++	select PHYLIB if NETDEVICES
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell Orion-VoIP GE (88F5181L) RD.
+ 
+ config MACH_RD88F5181L_FXO
+ 	bool "Marvell Orion-VoIP FXO Reference Design"
++	select PHYLIB if NETDEVICES
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell Orion-VoIP FXO (88F5181L) RD.
+ 
+ config MACH_RD88F6183AP_GE
+ 	bool "Marvell Orion-1-90 AP GE Reference Design"
++	select PHYLIB if NETDEVICES
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell Orion-1-90 (88F6183) AP GE RD.
+diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+index 83a7ec4c16d0..e712c5adaf87 100644
+--- a/arch/arm/mach-orion5x/common.c
++++ b/arch/arm/mach-orion5x/common.c
+@@ -107,10 +107,10 @@ void __init orion5x_eth_init(struct mv643xx_eth_platform_data *eth_data)
+  ****************************************************************************/
+ void __init orion5x_eth_switch_init(struct dsa_chip_data *d)
+ {
+-	orion_ge00_switch_init(d);
++	if (IS_BUILTIN(CONFIG_PHYLIB))
++		orion_ge00_switch_init(d);
+ }
+ 
+-
+ /*****************************************************************************
+  * I2C
+  ****************************************************************************/
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index 9255b6d67ba5..ab5af56f9b9d 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -471,6 +471,7 @@ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
+ /*****************************************************************************
+  * Ethernet switch
+  ****************************************************************************/
++#if IS_BUILTIN(CONFIG_PHYLIB)
+ static __initconst const char *orion_ge00_mvmdio_bus_name = "orion-mii";
+ static __initdata struct mdio_board_info
+ 		  orion_ge00_switch_board_info;
+@@ -493,6 +494,7 @@ void __init orion_ge00_switch_init(struct dsa_chip_data *d)
+ 
+ 	mdiobus_register_board_info(&orion_ge00_switch_board_info, 1);
+ }
++#endif
+ 
+ /*****************************************************************************
+  * I2C
 -- 
-2.1.4
+2.9.0
