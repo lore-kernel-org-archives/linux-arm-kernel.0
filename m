@@ -1,112 +1,186 @@
 From: juri.lelli@arm.com (Juri Lelli)
-Date: Thu,  9 Feb 2017 09:25:24 +0000
-Subject: [PATCH v2 8/9] arm,arm64,drivers: move externs in a new header file
+Date: Thu,  9 Feb 2017 09:25:25 +0000
+Subject: [PATCH v2 9/9] arm, arm64,
+ drivers: add a prefix to drivers arch_topology interfaces
 In-Reply-To: <20170209092525.6654-1-juri.lelli@arm.com>
 References: <20170209092525.6654-1-juri.lelli@arm.com>
-Message-ID: <20170209092525.6654-9-juri.lelli@arm.com>
+Message-ID: <20170209092525.6654-10-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a new header file (include/linux/arch_topology.h) and put there
-declarations of interfaces used by arm, arm64 and drivers code.
+Now that some functions that deal with arch topology information live
+under drivers, there is a clash of naming that might create confusion.
+
+Tidy things up by creating a drivers namespace for interfaces used by
+arch code; achieve this by prepending a 'atd_' (arch topology driver)
+prefix to driver interfaces.
 
 Signed-off-by: Juri Lelli <juri.lelli@arm.com>
 ---
- arch/arm/kernel/topology.c    |  7 +------
- arch/arm64/kernel/topology.c  |  4 +---
- drivers/base/arch_topology.c  |  1 +
- include/linux/arch_topology.h | 17 +++++++++++++++++
- 4 files changed, 20 insertions(+), 9 deletions(-)
- create mode 100644 include/linux/arch_topology.h
+ arch/arm/kernel/topology.c    |  8 ++++----
+ arch/arm64/kernel/topology.c  |  4 ++--
+ drivers/base/arch_topology.c  | 20 ++++++++++----------
+ include/linux/arch_topology.h |  8 ++++----
+ 4 files changed, 20 insertions(+), 20 deletions(-)
 
 diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 5d4679a5418b..1855632105a4 100644
+index 1855632105a4..a33e0891fee2 100644
 --- a/arch/arm/kernel/topology.c
 +++ b/arch/arm/kernel/topology.c
-@@ -11,6 +11,7 @@
-  * for more details.
-  */
+@@ -110,7 +110,7 @@ static void __init parse_dt_topology(void)
+ 			continue;
+ 		}
  
-+#include <linux/arch_topology.h>
- #include <linux/cpu.h>
- #include <linux/cpufreq.h>
- #include <linux/cpumask.h>
-@@ -44,10 +45,6 @@
-  * updated during this sequence.
-  */
+-		if (parse_cpu_capacity(cn, cpu)) {
++		if (atd_parse_cpu_capacity(cn, cpu)) {
+ 			of_node_put(cn);
+ 			continue;
+ 		}
+@@ -159,7 +159,7 @@ static void __init parse_dt_topology(void)
+ 				>> (SCHED_CAPACITY_SHIFT-1)) + 1;
  
--extern unsigned long
--arch_scale_cpu_capacity(struct sched_domain *sd, int cpu);
--extern void set_capacity_scale(unsigned int cpu, unsigned long capacity);
--
- #ifdef CONFIG_OF
- struct cpu_efficiency {
- 	const char *compatible;
-@@ -75,8 +72,6 @@ static unsigned long *__cpu_capacity;
- 
- static unsigned long middle_capacity = 1;
- static bool cap_from_dt = true;
--extern void normalize_cpu_capacity(void);
--extern int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu);
+ 	if (cap_from_dt)
+-		normalize_cpu_capacity();
++		atd_normalize_cpu_capacity();
+ }
  
  /*
-  * Iterate all CPUs' descriptor in DT and compute the efficiency
+@@ -172,10 +172,10 @@ static void update_cpu_capacity(unsigned int cpu)
+ 	if (!cpu_capacity(cpu) || cap_from_dt)
+ 		return;
+ 
+-	set_capacity_scale(cpu, cpu_capacity(cpu) / middle_capacity);
++	atd_set_capacity_scale(cpu, cpu_capacity(cpu) / middle_capacity);
+ 
+ 	pr_info("CPU%u: update cpu_capacity %lu\n",
+-		cpu, arch_scale_cpu_capacity(NULL, cpu));
++		cpu, atd_scale_cpu_capacity(NULL, cpu));
+ }
+ 
+ #else
 diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index deb5ebc1bdfe..6d2af4d9479f 100644
+index 6d2af4d9479f..1f6b34b6b359 100644
 --- a/arch/arm64/kernel/topology.c
 +++ b/arch/arm64/kernel/topology.c
-@@ -11,6 +11,7 @@
-  * for more details.
-  */
+@@ -38,7 +38,7 @@ static int __init get_cpu_for_node(struct device_node *node)
  
-+#include <linux/arch_topology.h>
- #include <linux/cpu.h>
- #include <linux/cpumask.h>
- #include <linux/init.h>
-@@ -26,9 +27,6 @@
- #include <asm/cputype.h>
- #include <asm/topology.h>
+ 	for_each_possible_cpu(cpu) {
+ 		if (of_get_cpu_node(cpu, NULL) == cpu_node) {
+-			parse_cpu_capacity(cpu_node, cpu);
++			atd_parse_cpu_capacity(cpu_node, cpu);
+ 			of_node_put(cpu_node);
+ 			return cpu;
+ 		}
+@@ -190,7 +190,7 @@ static int __init parse_dt_topology(void)
+ 	if (ret != 0)
+ 		goto out_map;
  
--extern void normalize_cpu_capacity(void);
--extern int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu);
--
- static int __init get_cpu_for_node(struct device_node *node)
- {
- 	struct device_node *cpu_node;
+-	normalize_cpu_capacity();
++	atd_normalize_cpu_capacity();
+ 
+ 	/*
+ 	 * Check that all cores are in the topology; the SMP code will
 diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
-index c75fa5ab732b..409a8bb613f2 100644
+index 409a8bb613f2..5c20280bb746 100644
 --- a/drivers/base/arch_topology.c
 +++ b/drivers/base/arch_topology.c
-@@ -10,6 +10,7 @@
-  */
+@@ -22,12 +22,12 @@
+ static DEFINE_MUTEX(cpu_scale_mutex);
+ static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
  
- #include <linux/acpi.h>
-+#include <linux/arch_topology.h>
- #include <linux/cpu.h>
- #include <linux/cpufreq.h>
- #include <linux/device.h>
+-unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
++unsigned long atd_scale_cpu_capacity(struct sched_domain *sd, int cpu)
+ {
+ 	return per_cpu(cpu_scale, cpu);
+ }
+ 
+-void set_capacity_scale(unsigned int cpu, unsigned long capacity)
++void atd_set_capacity_scale(unsigned int cpu, unsigned long capacity)
+ {
+ 	per_cpu(cpu_scale, cpu) = capacity;
+ }
+@@ -39,7 +39,7 @@ static ssize_t cpu_capacity_show(struct device *dev,
+ 	struct cpu *cpu = container_of(dev, struct cpu, dev);
+ 
+ 	return sprintf(buf, "%lu\n",
+-			arch_scale_cpu_capacity(NULL, cpu->dev.id));
++			atd_scale_cpu_capacity(NULL, cpu->dev.id));
+ }
+ 
+ static ssize_t cpu_capacity_store(struct device *dev,
+@@ -61,7 +61,7 @@ static ssize_t cpu_capacity_store(struct device *dev,
+ 
+ 		mutex_lock(&cpu_scale_mutex);
+ 		for_each_cpu(i, &cpu_topology[this_cpu].core_sibling)
+-			set_capacity_scale(i, new_capacity);
++			atd_set_capacity_scale(i, new_capacity);
+ 		mutex_unlock(&cpu_scale_mutex);
+ 	}
+ 
+@@ -93,7 +93,7 @@ u32 capacity_scale;
+ u32 *raw_capacity;
+ static bool cap_parsing_failed;
+ 
+-void normalize_cpu_capacity(void)
++void atd_normalize_cpu_capacity(void)
+ {
+ 	u64 capacity;
+ 	int cpu;
+@@ -108,14 +108,14 @@ void normalize_cpu_capacity(void)
+ 			 cpu, raw_capacity[cpu]);
+ 		capacity = (raw_capacity[cpu] << SCHED_CAPACITY_SHIFT)
+ 			/ capacity_scale;
+-		set_capacity_scale(cpu, capacity);
++		atd_set_capacity_scale(cpu, capacity);
+ 		pr_debug("cpu_capacity: CPU%d cpu_capacity=%lu\n",
+-			cpu, arch_scale_cpu_capacity(NULL, cpu));
++			cpu, atd_scale_cpu_capacity(NULL, cpu));
+ 	}
+ 	mutex_unlock(&cpu_scale_mutex);
+ }
+ 
+-int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
++int __init atd_parse_cpu_capacity(struct device_node *cpu_node, int cpu)
+ {
+ 	int ret = 1;
+ 	u32 cpu_capacity;
+@@ -180,12 +180,12 @@ init_cpu_capacity_callback(struct notifier_block *nb,
+ 			       cpus_to_visit,
+ 			       policy->related_cpus);
+ 		for_each_cpu(cpu, policy->related_cpus) {
+-			raw_capacity[cpu] = arch_scale_cpu_capacity(NULL, cpu) *
++			raw_capacity[cpu] = atd_scale_cpu_capacity(NULL, cpu) *
+ 					    policy->cpuinfo.max_freq / 1000UL;
+ 			capacity_scale = max(raw_capacity[cpu], capacity_scale);
+ 		}
+ 		if (cpumask_empty(cpus_to_visit)) {
+-			normalize_cpu_capacity();
++			atd_normalize_cpu_capacity();
+ 			kfree(raw_capacity);
+ 			pr_debug("cpu_capacity: parsing done\n");
+ 			cap_parsing_done = true;
 diff --git a/include/linux/arch_topology.h b/include/linux/arch_topology.h
-new file mode 100644
-index 000000000000..4edae9fe8cdd
---- /dev/null
+index 4edae9fe8cdd..e25458d7ee9a 100644
+--- a/include/linux/arch_topology.h
 +++ b/include/linux/arch_topology.h
-@@ -0,0 +1,17 @@
-+/*
-+ * include/linux/arch_topology.h - arch specific cpu topology information
-+ */
-+#ifndef _LINUX_ARCH_TOPOLOGY_H_
-+#define _LINUX_ARCH_TOPOLOGY_H_
-+
-+void normalize_cpu_capacity(void);
-+
-+struct device_node;
-+int parse_cpu_capacity(struct device_node *cpu_node, int cpu);
-+
-+struct sched_domain;
-+unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu);
-+
-+void set_capacity_scale(unsigned int cpu, unsigned long capacity);
-+
-+#endif /* _LINUX_ARCH_TOPOLOGY_H_ */
+@@ -4,14 +4,14 @@
+ #ifndef _LINUX_ARCH_TOPOLOGY_H_
+ #define _LINUX_ARCH_TOPOLOGY_H_
+ 
+-void normalize_cpu_capacity(void);
++void atd_normalize_cpu_capacity(void);
+ 
+ struct device_node;
+-int parse_cpu_capacity(struct device_node *cpu_node, int cpu);
++int atd_parse_cpu_capacity(struct device_node *cpu_node, int cpu);
+ 
+ struct sched_domain;
+-unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu);
++unsigned long atd_scale_cpu_capacity(struct sched_domain *sd, int cpu);
+ 
+-void set_capacity_scale(unsigned int cpu, unsigned long capacity);
++void atd_set_capacity_scale(unsigned int cpu, unsigned long capacity);
+ 
+ #endif /* _LINUX_ARCH_TOPOLOGY_H_ */
 -- 
 2.10.0
