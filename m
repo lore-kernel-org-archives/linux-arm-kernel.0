@@ -1,44 +1,44 @@
 From: michael.heimpold@i2se.com (Michael Heimpold)
-Date: Thu,  9 Feb 2017 08:42:47 +0100
-Subject: [PATCH v4 7/9] ARM: dts: add support for I2SE Duckbill 2 485
+Date: Thu,  9 Feb 2017 08:42:49 +0100
+Subject: [PATCH v4 9/9] ARM: dts: add support for I2SE Duckbill 2 SPI
 In-Reply-To: <1486626169-20022-1-git-send-email-michael.heimpold@i2se.com>
 References: <1486626169-20022-1-git-send-email-michael.heimpold@i2se.com>
-Message-ID: <1486626169-20022-8-git-send-email-michael.heimpold@i2se.com>
+Message-ID: <1486626169-20022-10-git-send-email-michael.heimpold@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Michael Heimpold <mhei@heimpold.de>
 
-This machine is based on I2SE's Duckbill 2 board and features a
-RS-485 daugther board. This device is intended to be used for
-e.g. home automation purposes.
+This machine is based on I2SE's Duckbill 2 board and is sold as part
+of I2SE's PLC Bundle for IoT. This is a development kit for Homeplug
+Green PHY based powerline products based on Qualcomms QCA7000 chip.
 
 Signed-off-by: Michael Heimpold <mhei@heimpold.de>
 Cc: Stefan Wahren <stefan.wahren@i2se.com>
 ---
  arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/imx28-duckbill-2-485.dts | 189 +++++++++++++++++++++++++++++
- 2 files changed, 190 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx28-duckbill-2-485.dts
+ arch/arm/boot/dts/imx28-duckbill-2-spi.dts | 199 +++++++++++++++++++++++++++++
+ 2 files changed, 200 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx28-duckbill-2-spi.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index fa4664b..5f758b9 100644
+index d854dcd..2f9f30c 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -475,6 +475,7 @@ dtb-$(CONFIG_ARCH_MXS) += \
- 	imx28-cfa10056.dtb \
- 	imx28-cfa10057.dtb \
- 	imx28-cfa10058.dtb \
-+	imx28-duckbill-2-485.dtb \
+@@ -478,6 +478,7 @@ dtb-$(CONFIG_ARCH_MXS) += \
+ 	imx28-duckbill-2-485.dtb \
  	imx28-duckbill-2.dtb \
+ 	imx28-duckbill-2-enocean.dtb \
++	imx28-duckbill-2-spi.dtb \
  	imx28-duckbill.dtb \
  	imx28-eukrea-mbmx283lc.dtb \
-diff --git a/arch/arm/boot/dts/imx28-duckbill-2-485.dts b/arch/arm/boot/dts/imx28-duckbill-2-485.dts
+ 	imx28-eukrea-mbmx287lc.dtb \
+diff --git a/arch/arm/boot/dts/imx28-duckbill-2-spi.dts b/arch/arm/boot/dts/imx28-duckbill-2-spi.dts
 new file mode 100644
-index 0000000..bd3fd47
+index 0000000..927732e
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx28-duckbill-2-485.dts
-@@ -0,0 +1,189 @@
++++ b/arch/arm/boot/dts/imx28-duckbill-2-spi.dts
+@@ -0,0 +1,199 @@
 +/*
 + * Copyright (C) 2015-2017 I2SE GmbH <info@i2se.com>
 + * Copyright (C) 2016 Michael Heimpold <mhei@heimpold.de>
@@ -57,8 +57,12 @@ index 0000000..bd3fd47
 +#include "imx28.dtsi"
 +
 +/ {
-+	model = "I2SE Duckbill 2 485";
-+	compatible = "i2se,duckbill-2-485", "i2se,duckbill-2", "fsl,imx28";
++	model = "I2SE Duckbill 2 SPI";
++	compatible = "i2se,duckbill-2-spi", "i2se,duckbill-2", "fsl,imx28";
++
++	aliases {
++		ethernet1 = &qca7000;
++	};
 +
 +	memory {
 +		reg = <0x40000000 0x08000000>;
@@ -78,13 +82,22 @@ index 0000000..bd3fd47
 +			};
 +
 +			ssp2: ssp at 80014000 {
-+				compatible = "fsl,imx28-mmc";
++				compatible = "fsl,imx28-spi";
 +				pinctrl-names = "default";
-+				pinctrl-0 = <&mmc2_4bit_pins_b
-+					&mmc2_cd_cfg &mmc2_sck_cfg_b>;
-+				bus-width = <4>;
-+				vmmc-supply = <&reg_3p3v>;
++				pinctrl-0 = <&spi2_pins_a>;
 +				status = "okay";
++
++				qca7000: ethernet at 0 {
++					reg = <0>;
++					compatible = "qca,qca7000";
++					pinctrl-names = "default";
++					pinctrl-0 = <&qca7000_pins>;
++					interrupt-parent = <&gpio3>;
++					interrupts = <3 IRQ_TYPE_EDGE_RISING>;
++					spi-cpha;
++					spi-cpol;
++					spi-max-frequency = <8000000>;
++				};
 +			};
 +
 +			pinctrl at 80018000 {
@@ -121,13 +134,26 @@ index 0000000..bd3fd47
 +					fsl,pull-up = <MXS_PULL_DISABLE>;
 +				};
 +
-+				led_pins: leds at 0 {
++				led_pins: led at 0 {
 +					reg = <0>;
 +					fsl,pinmux-ids = <
 +						MX28_PAD_SAIF0_MCLK__GPIO_3_20
 +						MX28_PAD_SAIF0_LRCLK__GPIO_3_21
-+						MX28_PAD_I2C0_SCL__GPIO_3_24
-+						MX28_PAD_I2C0_SDA__GPIO_3_25
++					>;
++					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_DISABLE>;
++				};
++
++				qca7000_pins: qca7000 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX28_PAD_AUART0_RTS__GPIO_3_3    /* Interrupt */
++						MX28_PAD_LCD_D13__GPIO_1_13      /* QCA7K reset */
++						MX28_PAD_LCD_D14__GPIO_1_14      /* GPIO 0 */
++						MX28_PAD_LCD_D15__GPIO_1_15      /* GPIO 1 */
++						MX28_PAD_LCD_D18__GPIO_1_18      /* GPIO 2 */
++						MX28_PAD_LCD_D21__GPIO_1_21      /* GPIO 3 */
 +					>;
 +					fsl,drive-strength = <MXS_DRIVE_4mA>;
 +					fsl,voltage = <MXS_VOLTAGE_HIGH>;
@@ -138,12 +164,6 @@ index 0000000..bd3fd47
 +
 +		apbx at 80040000 {
 +			lradc at 80050000 {
-+				status = "okay";
-+			};
-+
-+			auart0: serial at 8006a000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&auart0_2pins_a>;
 +				status = "okay";
 +			};
 +
@@ -215,16 +235,6 @@ index 0000000..bd3fd47
 +			label = "duckbill:green:status";
 +			gpios = <&gpio3 20 GPIO_ACTIVE_HIGH>;
 +			linux,default-trigger = "heartbeat";
-+		};
-+
-+		rs485-red {
-+			label = "duckbill:red:rs485";
-+			gpios = <&gpio3 24 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		rs485-green {
-+			label = "duckbill:green:rs485";
-+			gpios = <&gpio3 25 GPIO_ACTIVE_LOW>;
 +		};
 +	};
 +};
