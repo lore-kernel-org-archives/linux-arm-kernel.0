@@ -1,36 +1,26 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 9 Feb 2017 11:55:46 +0100
-Subject: [PATCH 0/2] ARM: shmobile: Remove ARCH_SHMOBILE_MULTI
-In-Reply-To: <1486635529-6636-1-git-send-email-geert+renesas@glider.be>
-References: <1486635529-6636-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170209105546.GI16056@verge.net.au>
+From: harninder.rai@nxp.com (Harninder Rai)
+Date: Thu, 9 Feb 2017 16:33:49 +0530
+Subject: [PATCH 1/3] dt-bindings: clockgen: Add compatible string for LS1088A
+Message-ID: <1486638229-7917-1-git-send-email-harninder.rai@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2017 at 11:18:47AM +0100, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus,
-> 
-> This patch series completes the migration from ARCH_SHMOBILE_MULTI to
-> ARCH_RENESAS, which was started by commit 9b5ba0df4ea4 ("ARM: shmobile:
-> Introduce ARCH_RENESAS").
-> 
-> Thanks for applying!
+Signed-off-by: Harninder Rai <harninder.rai@nxp.com>
+---
+ Documentation/devicetree/bindings/clock/qoriq-clock.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks, nice to see this coming to an end.
-
-I have queued up patch 1/2 in the dt-for-v4.12 branch.
-
-I am of a mind to defer patch 2/2 because it looks like it should
-go in the soc-for-v4.12 branch and I'd rather not add a dependency
-on the dt-for-v4.12 branch for a cleanup.
-
-In a perfect world we could have one branch to rule them all;
-we do not live in that world.
-
-> Geert Uytterhoeven (2):
->   ARM: dts: renesas: Switch from ARCH_SHMOBILE_MULTI to ARCH_RENESAS
->   ARM: shmobile: Remove ARCH_SHMOBILE_MULTI
-> 
->  arch/arm/boot/dts/Makefile     | 38 +++++++++++++++++++-------------------
->  arch/arm/mach-shmobile/Kconfig |  4 ----
->  2 files changed, 19 insertions(+), 23 deletions(-)
+diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+index aa3526f..6ed469c 100644
+--- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
++++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+@@ -35,6 +35,7 @@ Required properties:
+ 	* "fsl,ls1021a-clockgen"
+ 	* "fsl,ls1043a-clockgen"
+ 	* "fsl,ls1046a-clockgen"
++	* "fsl,ls1088a-clockgen"
+ 	* "fsl,ls2080a-clockgen"
+ 	Chassis-version clock strings include:
+ 	* "fsl,qoriq-clockgen-1.0": for chassis 1.0 clocks
+-- 
+2.7.4
