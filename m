@@ -1,103 +1,48 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  9 Feb 2017 14:59:10 +0000
-Subject: [PATCH 12/25] arm/arm64: KVM: Stop propagating cacheability status of
- a faulted page
+Date: Thu,  9 Feb 2017 14:59:13 +0000
+Subject: [PATCH 15/25] KVM: arm/arm64: vgic: Stop injecting the MSI occurrence
+ twice
 In-Reply-To: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
 References: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1486652363-7696-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1486652363-7696-16-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we unconditionally flush newly mapped pages to the PoC,
-there is no need to care about the "uncached" status of individual
-pages - they must all be visible all the way down.
+From: Shanker Donthineni <shankerd@codeaurora.org>
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+The IRQFD framework calls the architecture dependent function
+twice if the corresponding GSI type is edge triggered. For ARM,
+the function kvm_set_msi() is getting called twice whenever the
+IRQFD receives the event signal. The rest of the code path is
+trying to inject the MSI without any validation checks. No need
+to call the function vgic_its_inject_msi() second time to avoid
+an unnecessary overhead in IRQ queue logic. It also avoids the
+possibility of VM seeing the MSI twice.
+
+Simple fix, return -1 if the argument 'level' value is zero.
+
+Cc: stable at vger.kernel.org
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  3 +--
- arch/arm/kvm/mmu.c               | 11 ++++-------
- arch/arm64/include/asm/kvm_mmu.h |  3 +--
- 3 files changed, 6 insertions(+), 11 deletions(-)
+ virt/kvm/arm/vgic/vgic-irqfd.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index a58bbaa..95f38dc 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -129,8 +129,7 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
+diff --git a/virt/kvm/arm/vgic/vgic-irqfd.c b/virt/kvm/arm/vgic/vgic-irqfd.c
+index d918dcf..f138ed2 100644
+--- a/virt/kvm/arm/vgic/vgic-irqfd.c
++++ b/virt/kvm/arm/vgic/vgic-irqfd.c
+@@ -99,6 +99,9 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
+ 	if (!vgic_has_its(kvm))
+ 		return -ENODEV;
  
- static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
- 					       kvm_pfn_t pfn,
--					       unsigned long size,
--					       bool ipa_uncached)
-+					       unsigned long size)
- {
- 	/*
- 	 * If we are going to insert an instruction page and the icache is
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index a5265ed..5cc35080 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1232,9 +1232,9 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
++	if (!level)
++		return -1;
++
+ 	return vgic_its_inject_msi(kvm, &msi);
  }
- 
- static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
--				      unsigned long size, bool uncached)
-+				      unsigned long size)
- {
--	__coherent_cache_guest_page(vcpu, pfn, size, uncached);
-+	__coherent_cache_guest_page(vcpu, pfn, size);
- }
- 
- static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
-@@ -1250,7 +1250,6 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	struct vm_area_struct *vma;
- 	kvm_pfn_t pfn;
- 	pgprot_t mem_type = PAGE_S2;
--	bool fault_ipa_uncached;
- 	bool logging_active = memslot_is_logging(memslot);
- 	unsigned long flags = 0;
- 
-@@ -1337,8 +1336,6 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	if (!hugetlb && !force_pte)
- 		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
- 
--	fault_ipa_uncached = memslot->flags & KVM_MEMSLOT_INCOHERENT;
--
- 	if (hugetlb) {
- 		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
- 		new_pmd = pmd_mkhuge(new_pmd);
-@@ -1346,7 +1343,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
- 			kvm_set_pfn_dirty(pfn);
- 		}
--		coherent_cache_guest_page(vcpu, pfn, PMD_SIZE, fault_ipa_uncached);
-+		coherent_cache_guest_page(vcpu, pfn, PMD_SIZE);
- 		ret = stage2_set_pmd_huge(kvm, memcache, fault_ipa, &new_pmd);
- 	} else {
- 		pte_t new_pte = pfn_pte(pfn, mem_type);
-@@ -1356,7 +1353,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 			kvm_set_pfn_dirty(pfn);
- 			mark_page_dirty(kvm, gfn);
- 		}
--		coherent_cache_guest_page(vcpu, pfn, PAGE_SIZE, fault_ipa_uncached);
-+		coherent_cache_guest_page(vcpu, pfn, PAGE_SIZE);
- 		ret = stage2_set_pte(kvm, memcache, fault_ipa, &new_pte, flags);
- 	}
- 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 6d22017..aa1e6db 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -236,8 +236,7 @@ static inline bool vcpu_has_cache_enabled(struct kvm_vcpu *vcpu)
- 
- static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
- 					       kvm_pfn_t pfn,
--					       unsigned long size,
--					       bool ipa_uncached)
-+					       unsigned long size)
- {
- 	void *va = page_address(pfn_to_page(pfn));
  
 -- 
 2.1.4
