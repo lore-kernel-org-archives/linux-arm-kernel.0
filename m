@@ -1,133 +1,111 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 9 Feb 2017 08:51:51 +0000
-Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy
- interrupts
-In-Reply-To: <1486364596-19699-1-git-send-email-bharatku@xilinx.com>
-References: <1486364596-19699-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <4b04e834-08b6-a728-8fe5-13106d50b3b2@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 9 Feb 2017 10:02:55 +0100
+Subject: [PATCH 2/2] PM / Domains: Support in context powering off parent
+ domain
+In-Reply-To: <1486571692-33212-4-git-send-email-lina.iyer@linaro.org>
+References: <1486571692-33212-1-git-send-email-lina.iyer@linaro.org>
+ <1486571692-33212-4-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFpYJ+M4girUxS5TP7+fzvDZOxUbN1oE0BJtgsuycKf3pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/17 07:03, Bharat Kumar Gogada wrote:
-> - Adding spinlock for protecting legacy mask register
-> - Few wifi end points which only support legacy interrupts,
-> performs hardware reset functionalities after disabling interrupts
-> by invoking disable_irq and then re-enable using enable_irq, they
-> enable hardware interrupts first and then virtual irq line later.
-> - The legacy irq line goes low only after DEASSERT_INTx is
-> received.As the legacy irq line is high immediately after hardware
-> interrupts are enabled but virq of EP is still in disabled state
-> and EP handler is never executed resulting no DEASSERT_INTx.If dummy
-> irq chip is used, interrutps are not masked and system is
-> hanging with CPU stall.
-> - Adding irq chip functions instead of dummy irq chip for legacy
-> interrupts.
-> - Legacy interrupts are level sensitive, so using handle_level_irq
-> is more appropriate as it is masks interrupts until End point handles
-> interrupts and unmasks interrutps after End point handler is executed.
-> - Legacy interrupts are level triggered, virtual irq line of End
-> Point shows as edge in /proc/interrupts.
-> - Setting irq flags of virtual irq line of EP to level triggered
-> at the time of mapping.
-
-I'm now OK with the code (modulo the small nit below), but the commit
-message is a complete mess. How about something like:
-
-The current handling of legacy interrupts in the Xilinx NWL driver is
-completely dysfunctional: Interrupts are handled as edge instead of
-level, and there is no way to mask an interrupt, leading to drivers
-misbehaving.
-
-Let's address this by making it a full blown irqchip, implement
-mask/unmask methods, and use handle_level_irq as the flow handler.
-
-> 
-> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+On 8 February 2017 at 17:34, Lina Iyer <lina.iyer@linaro.org> wrote:
+> Powering off a domain schedules a work to opportunistically power off
+> the parent domains. Domains that are IRQ safe may have parents that are
+> also IRQ safe. It would be beneficial to power off such IRQ safe parents
+> in the same context as well.
+>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 > ---
->  drivers/pci/host/pcie-xilinx-nwl.c | 45 +++++++++++++++++++++++++++++++++++++-
->  1 file changed, 44 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-> index 43eaa4a..36f4fb4 100644
-> --- a/drivers/pci/host/pcie-xilinx-nwl.c
-> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-> @@ -184,6 +184,7 @@ struct nwl_pcie {
->  	u8 root_busno;
->  	struct nwl_msi msi;
->  	struct irq_domain *legacy_irq_domain;
-> +	raw_spinlock_t leg_mask_lock;
->  };
->  
->  static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off)
-> @@ -395,11 +396,52 @@ static void nwl_pcie_msi_handler_low(struct irq_desc *desc)
->  	chained_irq_exit(chip, desc);
->  }
->  
-> +static void nwl_mask_leg_irq(struct irq_data *data)
-> +{
-> +	struct irq_desc *desc = irq_to_desc(data->irq);
-> +	struct nwl_pcie *pcie;
-> +	unsigned long flags;
-> +	u32 mask;
-> +	u32 val;
-> +
-> +	pcie = irq_desc_get_chip_data(desc);
-> +	mask = 1 << (data->hwirq - 1);
-> +	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
-> +	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
-> +	nwl_bridge_writel(pcie, (val & (~mask)), MSGF_LEG_MASK);
-> +	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
-> +}
-> +
-> +static void nwl_unmask_leg_irq(struct irq_data *data)
-> +{
-> +	struct irq_desc *desc = irq_to_desc(data->irq);
-> +	struct nwl_pcie *pcie;
-> +	unsigned long flags;
-> +	u32 mask;
-> +	u32 val;
-> +
-> +	pcie = irq_desc_get_chip_data(desc);
-> +	mask = 1 << (data->hwirq - 1);
-> +	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
-> +	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
-> +	nwl_bridge_writel(pcie, (val | mask), MSGF_LEG_MASK);
-> +	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
-> +}
-> +
-> +static struct irq_chip nwl_leg_irq_chip = {
-> +	.name = "nwl_pcie:legacy",
-> +	.irq_enable = nwl_unmask_leg_irq,
-> +	.irq_disable = nwl_mask_leg_irq,
-
-You don't need these two if they are implemented in terms of mask/unmask.
-
-> +	.irq_mask = nwl_mask_leg_irq,
-> +	.irq_unmask = nwl_unmask_leg_irq,
-> +};
-> +
->  static int nwl_legacy_map(struct irq_domain *domain, unsigned int irq,
->  			  irq_hw_number_t hwirq)
+>  drivers/base/power/domain.c | 21 ++++++++++++++++-----
+>  1 file changed, 16 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 3825bb9..51e2254 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -375,7 +375,8 @@ static int genpd_dev_pm_qos_notifier(struct notifier_block *nb,
+>   * If all of the @genpd's devices have been suspended and all of its subdomains
+>   * have been powered down, remove power from @genpd.
+>   */
+> -static int genpd_power_off(struct generic_pm_domain *genpd, bool is_async)
+> +static int genpd_power_off(struct generic_pm_domain *genpd, bool is_async,
+> +                                       unsigned int depth)
 >  {
-> -	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
-> +	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_level_irq);
->  	irq_set_chip_data(irq, domain->host_data);
-> +	irq_set_status_flags(irq, IRQ_LEVEL);
->  
->  	return 0;
->  }
-> @@ -538,6 +580,7 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
->  		return -ENOMEM;
->  	}
->  
-> +	raw_spin_lock_init(&pcie->leg_mask_lock);
->  	nwl_pcie_init_msi_irq_domain(pcie);
->  	return 0;
->  }
-> 
+>         struct pm_domain_data *pdd;
+>         struct gpd_link *link;
+> @@ -442,7 +443,17 @@ static int genpd_power_off(struct generic_pm_domain *genpd, bool is_async)
+>
+>         list_for_each_entry(link, &genpd->slave_links, slave_node) {
+>                 genpd_sd_counter_dec(link->master);
+> -               genpd_queue_power_off_work(link->master);
+> +               /*
+> +                * Power off the parent in the same context if the parent
+> +                * domain is also IRQ safe.
+> +                */
+> +               if (genpd_is_irq_safe(genpd) &&
+> +                               genpd_is_irq_safe(link->master)) {
+> +                       genpd_lock_nested(link->master, depth + 1);
+> +                       genpd_power_off(link->master, false, depth + 1);
 
-Thanks,
+This doesn't work. You must not call genpd_power_off() using "false" here.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+That's because "true" in the recursive call, for the master domain
+tells genpd_power_off() that is has been called from genpd's
+->runtime_suspend() callback. That means genpd_power_off() thinks it's
+okay to allow *one* device in the domain to not be runtime suspended
+when allowing a power off to be done. This assumption is not correct
+for the master domain.
+
+> +                       genpd_unlock(link->master);
+> +               } else
+> +                       genpd_queue_power_off_work(link->master);
+>         }
+>
+>         return 0;
+> @@ -459,7 +470,7 @@ static void genpd_power_off_work_fn(struct work_struct *work)
+>         genpd = container_of(work, struct generic_pm_domain, power_off_work);
+>
+>         genpd_lock(genpd);
+> -       genpd_power_off(genpd, true);
+> +       genpd_power_off(genpd, true, 0);
+>         genpd_unlock(genpd);
+>  }
+>
+> @@ -578,7 +589,7 @@ static int genpd_runtime_suspend(struct device *dev)
+>                 return 0;
+>
+>         genpd_lock(genpd);
+> -       genpd_power_off(genpd, false);
+> +       genpd_power_off(genpd, false, 0);
+>         genpd_unlock(genpd);
+>
+>         return 0;
+> @@ -658,7 +669,7 @@ static int genpd_runtime_resume(struct device *dev)
+>         if (!pm_runtime_is_irq_safe(dev) ||
+>                 (pm_runtime_is_irq_safe(dev) && genpd_is_irq_safe(genpd))) {
+>                 genpd_lock(genpd);
+> -               genpd_power_off(genpd, 0);
+> +               genpd_power_off(genpd, 0, 0);
+>                 genpd_unlock(genpd);
+>         }
+>
+> --
+> 2.7.4
+>
+
+Some more thoughts..
+
+Actually, I have been thinking of changing genpd to avoid queuing
+power off works, no matter if the PM domain are IRQ safe or not. There
+are several reasons, but primarily it helps to avoid wasting power.
+
+Currently I don't see any reasons to why such change shouldn't be
+feasible. As a matter of fact, changing this became possible while we
+removed the intermediate states in genpd in commit ba2bbfbf6307 ("PM /
+Domains: Remove intermediate states from the power off sequence").
+
+Allow me to help out and cook a patch for this, it's already in the pipe. :-)
+
+Kind regards
+Uffe
