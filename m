@@ -1,42 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 9 Feb 2017 12:14:59 +0000
-Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy
- interrupts
-In-Reply-To: <8520D5D51A55D047800579B094147198263E68AA@XAP-PVEXMBX02.xlnx.xilinx.com>
-References: <1486364596-19699-1-git-send-email-bharatku@xilinx.com>
- <4b04e834-08b6-a728-8fe5-13106d50b3b2@arm.com>
- <8520D5D51A55D047800579B094147198263E68AA@XAP-PVEXMBX02.xlnx.xilinx.com>
-Message-ID: <131228fb-d3f8-3836-3713-e948ed30d398@arm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 9 Feb 2017 13:17:23 +0100
+Subject: [PATCH v3] staging: bcm2835-audio: Remove the initialization of
+ static pointers.
+In-Reply-To: <1486511160-2992-1-git-send-email-abdallah.meziti.pro@gmail.com>
+References: <1486511160-2992-1-git-send-email-abdallah.meziti.pro@gmail.com>
+Message-ID: <20170209121723.GA32270@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/17 12:01, Bharat Kumar Gogada wrote:
->> On 06/02/17 07:03, Bharat Kumar Gogada wrote:
->>> +static struct irq_chip nwl_leg_irq_chip = {
->>> +	.name = "nwl_pcie:legacy",
->>> +	.irq_enable = nwl_unmask_leg_irq,
->>> +	.irq_disable = nwl_mask_leg_irq,
->>
->> You don't need these two if they are implemented in terms of mask/unmask.
+On Wed, Feb 08, 2017 at 12:45:47AM +0100, AbdAllah-MEZITI wrote:
+> In C a static pointer will be initialized to NULL.
+> The ?6.7.8 of the ISO/IEC 9899:1999 (E) document says that:
+> If an object that has static storage duration is not initialized
+> explicitly, then:
+>  __ if it has pointer type, it is initialized to a null pointer.
 > 
-> These are being invoked by some drivers other than interrupt flow.
-> Ex: drivers/net/wireless/ath/ath9k/main.c
-> static int ath_reset_internal(struct ath_softc *sc, struct ath9k_channel *hchan) 
-> {
->          ....
->          disable_irq(sc->irq);
->          tasklet_disable(&sc->intr_tq);
->         ...
->         ...
->         enable_irq(sc->irq);
->         spin_unlock_bh(&sc->sc_pcu_lock);
-> }
-> For us masking/unmasking is the way to enable/disable interrupts.
+> Signed-off-by: AbdAllah-MEZITI <abdallah.meziti.pro@gmail.com>
+> 
+> v2: -fix the line-wrapping of the changelog.
+>     -fix the ref. documentation: C99 standards release,
+> 	and not the draft.
+>     -this patch is the Task 10 Eudyptula Challenge
+> 	that only fix one code style problem.
+> v3: -fix the subject prefix: must be based on the previous submissions.
+> ---
+>  drivers/staging/bcm2835-audio/bcm2835.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-And if you looked at the way disable_irq is implemented, you would have
-found out that it falls back to masking if there is no disable method,
-preserving the semantic you expect.
+This patch does not apply to my tree at all, sorry.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+greg k-h
