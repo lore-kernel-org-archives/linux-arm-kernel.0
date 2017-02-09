@@ -1,86 +1,74 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 10 Feb 2017 00:42:08 +0800
-Subject: [stericsson:mmc-no-NULL 30/34] drivers/mmc/core/mmc_test.c:856:15:
- error: too many arguments to function 'mmc_start_areq'
-Message-ID: <201702100059.4feyW6tA%fengguang.wu@intel.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Thu, 9 Feb 2017 08:44:02 -0800
+Subject: [PATCH v2 2/5] async_tx: Handle DMA devices having support for
+ fewer PQ coefficients
+In-Reply-To: <CAALAos-ua6hVpUqjnJSQ=ysSOKrN67toiT3J808uHC4A_ZV3mg@mail.gmail.com>
+References: <1486455406-11202-1-git-send-email-anup.patel@broadcom.com>
+ <1486455406-11202-3-git-send-email-anup.patel@broadcom.com>
+ <CAPcyv4gbV1yf52JrejW+Dn3wOPn7Er+8HWdu2qsW0+Qm+cRr9g@mail.gmail.com>
+ <CAALAos_yhXufdt79KWY0eugjF5oyJ8+NcPh2E-dEXnSQu2WhhA@mail.gmail.com>
+ <CAPcyv4hK_1f8bryq6smPQy7vTnP+QEzmT9wnAEE1xpxq7EAnjQ@mail.gmail.com>
+ <CAALAos9ovab4x=waRgM7G2adRC7syHMkY0Rhf-UPB_+h4w3yNQ@mail.gmail.com>
+ <CAPcyv4iFJXxvJFrUs2jtwP9GX5NcJ8LiEDHeZ5b1fwjCAToe5w@mail.gmail.com>
+ <CAALAos-ua6hVpUqjnJSQ=ysSOKrN67toiT3J808uHC4A_ZV3mg@mail.gmail.com>
+Message-ID: <CAPcyv4gDq+our1+sAPShBru-qvebo+Zvk0crgSUNXucHGQwZ1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git mmc-no-NULL
-head:   1bec9a625b256f78d00c38b58caad7ccdae8aaf5
-commit: b46e8edc13f163392fd8f5ae2b27ef2f349fe457 [30/34] mmc: queue: stop flushing the pipeline with NULL
-config: x86_64-randconfig-x014-201706 (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout b46e8edc13f163392fd8f5ae2b27ef2f349fe457
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+On Thu, Feb 9, 2017 at 1:29 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+> On Wed, Feb 8, 2017 at 9:54 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+>> On Wed, Feb 8, 2017 at 12:57 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+>>> On Tue, Feb 7, 2017 at 11:46 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+>>>> On Tue, Feb 7, 2017 at 1:02 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+>>>>> On Tue, Feb 7, 2017 at 1:57 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+>>>>>> On Tue, Feb 7, 2017 at 12:16 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+>>>>>>> The DMAENGINE framework assumes that if PQ offload is supported by a
+>>>>>>> DMA device then all 256 PQ coefficients are supported. This assumption
+>>>>>>> does not hold anymore because we now have BCM-SBA-RAID offload engine
+>>>>>>> which supports PQ offload with limited number of PQ coefficients.
+>>>>>>>
+>>>>>>> This patch extends async_tx APIs to handle DMA devices with support
+>>>>>>> for fewer PQ coefficients.
+>>>>>>>
+>>>>>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>>>>>>> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+>>>>>>
+>>>>>> I don't like this approach. Define an interface for md to query the
+>>>>>> offload engine once at the beginning of time. We should not be adding
+>>>>>> any new extensions to async_tx.
+>>>>>
+>>>>> Even if we do capability checks in Linux MD, we still need a way
+>>>>> for DMAENGINE drivers to advertise number of PQ coefficients
+>>>>> handled by the HW.
+>>>>>
+>>>>> I agree capability checks should be done once in Linux MD but I don't
+>>>>> see why this has to be part of BCM-SBA-RAID driver patches. We need
+>>>>> separate patchsets to address limitations of async_tx framework.
+>>>>
+>>>> Right, separate enabling before we pile on new hardware support to a
+>>>> known broken framework.
+>>>
+>>> Linux Async Tx not broken framework. The issue is:
+>>> 1. Its not complete enough
+>>> 2. Its not optimized for very high through-put offload engines
+>>
+>> I'm not understanding your point. I'm nak'ing this change to add yet
+>> more per-transaction capability checking to async_tx. I don't like the
+>> DMA_HAS_FEWER_PQ_COEF flag, especially since it is equal to
+>> DMA_HAS_PQ_CONTINUE. I'm not asking for all of async_tx's problems to
+>> be fixed before this new hardware support, I'm simply saying we should
+>> start the process of moving offload-engine capability checking to the
+>> raid code.
+>
+> The DMA_HAS_FEWER_PQ_COEF is not equal to
+> DMA_HAS_PQ_CONTINUE.
 
-All error/warnings (new ones prefixed by >>):
+#define DMA_HAS_PQ_CONTINUE (1 << 15
+#define DMA_HAS_FEWER_PQ_COEF (1 << 15)
 
-   drivers/mmc/core/mmc_test.c: In function 'mmc_test_nonblock_transfer':
->> drivers/mmc/core/mmc_test.c:856:15: error: too many arguments to function 'mmc_start_areq'
-      done_areq = mmc_start_areq(test->card->host, cur_areq, &status);
-                  ^~~~~~~~~~~~~~
-   In file included from drivers/mmc/core/mmc_test.c:10:0:
-   include/linux/mmc/core.h:163:5: note: declared here
-    int mmc_start_areq(struct mmc_host *host,
-        ^~~~~~~~~~~~~~
->> drivers/mmc/core/mmc_test.c:856:13: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-      done_areq = mmc_start_areq(test->card->host, cur_areq, &status);
-                ^
-   drivers/mmc/core/mmc_test.c:875:14: error: too many arguments to function 'mmc_start_areq'
-     done_areq = mmc_start_areq(test->card->host, NULL, &status);
-                 ^~~~~~~~~~~~~~
-   In file included from drivers/mmc/core/mmc_test.c:10:0:
-   include/linux/mmc/core.h:163:5: note: declared here
-    int mmc_start_areq(struct mmc_host *host,
-        ^~~~~~~~~~~~~~
-   drivers/mmc/core/mmc_test.c:875:12: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     done_areq = mmc_start_areq(test->card->host, NULL, &status);
-               ^
-   drivers/mmc/core/mmc_test.c: In function 'mmc_test_ongoing_transfer':
-   drivers/mmc/core/mmc_test.c:2405:3: error: too many arguments to function 'mmc_start_areq'
-      mmc_start_areq(host, &test_areq.areq, &blkstat);
-      ^~~~~~~~~~~~~~
-   In file included from drivers/mmc/core/mmc_test.c:10:0:
-   include/linux/mmc/core.h:163:5: note: declared here
-    int mmc_start_areq(struct mmc_host *host,
-        ^~~~~~~~~~~~~~
-   drivers/mmc/core/mmc_test.c:2443:3: error: too many arguments to function 'mmc_start_areq'
-      mmc_start_areq(host, NULL, &blkstat);
-      ^~~~~~~~~~~~~~
-   In file included from drivers/mmc/core/mmc_test.c:10:0:
-   include/linux/mmc/core.h:163:5: note: declared here
-    int mmc_start_areq(struct mmc_host *host,
-        ^~~~~~~~~~~~~~
+> I will try to drop this patch and take care of unsupported PQ
+> coefficients in BCM-SBA-RAID driver itself even if this means
+> doing some computations in BCM-SBA-RAID driver itself.
 
-vim +/mmc_start_areq +856 drivers/mmc/core/mmc_test.c
-
-9f9c4180 drivers/mmc/card/mmc_test.c Per Forlin    2011-07-01  850  	other_areq->mrq = &mrq2;
-9f9c4180 drivers/mmc/card/mmc_test.c Per Forlin    2011-07-01  851  	other_areq->err_check = mmc_test_check_result_async;
-9f9c4180 drivers/mmc/card/mmc_test.c Per Forlin    2011-07-01  852  
-9f9c4180 drivers/mmc/card/mmc_test.c Per Forlin    2011-07-01  853  	for (i = 0; i < count; i++) {
-9f9c4180 drivers/mmc/card/mmc_test.c Per Forlin    2011-07-01  854  		mmc_test_prepare_mrq(test, cur_areq->mrq, sg, sg_len, dev_addr,
-9f9c4180 drivers/mmc/card/mmc_test.c Per Forlin    2011-07-01  855  				     blocks, blksz, write);
-03259cfb drivers/mmc/core/mmc_test.c Linus Walleij 2017-01-24 @856  		done_areq = mmc_start_areq(test->card->host, cur_areq, &status);
-9f9c4180 drivers/mmc/card/mmc_test.c Per Forlin    2011-07-01  857  
-8e8b3f51 drivers/mmc/card/mmc_test.c Linus Walleij 2016-11-04  858  		if (status != MMC_BLK_SUCCESS || (!done_areq && i > 0)) {
-8e8b3f51 drivers/mmc/card/mmc_test.c Linus Walleij 2016-11-04  859  			ret = RESULT_FAIL;
-
-:::::: The code at line 856 was first introduced by commit
-:::::: 03259cfbc000b12e92ab10a8d6815d887cb2d8ae mmc: core: rename mmc_start_req() to *areq()
-
-:::::: TO: Linus Walleij <linus.walleij@linaro.org>
-:::::: CC: Linus Walleij <linus.walleij@linaro.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 21694 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170210/2c37302b/attachment-0001.gz>
+That should be nak'd as well, please do capability detection in a
+routine that is common to all raid engines.
