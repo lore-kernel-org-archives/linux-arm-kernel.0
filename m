@@ -1,92 +1,41 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Thu, 9 Feb 2017 17:38:25 +0530
-Subject: [PATCH v12 6/9] usb: xhci: use bus->sysdev for DMA configuration
-In-Reply-To: <85873d69-5664-0603-8cbd-a250d29ac335@ti.com>
-References: <1486372421-29073-1-git-send-email-peter.chen@nxp.com>
- <1486372421-29073-7-git-send-email-peter.chen@nxp.com>
- <20170208204300.GC8068@usblab-sd-06.qualcomm.com>
- <85873d69-5664-0603-8cbd-a250d29ac335@ti.com>
-Message-ID: <CAFp+6iFrE8oz2By9KR1n51OZZxZ05gStu03bMgD4zVbLXZ5ppQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 9 Feb 2017 12:06:25 +0000
+Subject: [PATCH v3 2/3] ASoC: zx-i2s: introduce pclk for zx2967 family
+In-Reply-To: <20170209014807.GO3407@dragon>
+References: <1486522955-14528-1-git-send-email-baoyou.xie@linaro.org>
+ <1486522955-14528-2-git-send-email-baoyou.xie@linaro.org>
+ <20170209005207.y6wcrzk43ngfslhl@rob-hp-laptop>
+ <20170209014807.GO3407@dragon>
+Message-ID: <20170209120625.lhqcistgyjpy3plq@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 9, 2017 at 5:23 PM, Roger Quadros <rogerq@ti.com> wrote:
->
->
-> On 08/02/17 22:43, Jack Pham wrote:
->> Hi Peter, Sriram, Arnd,
->>
->> On Mon, Feb 06, 2017 at 05:13:38PM +0800, Peter Chen wrote:
->>> From: Arnd Bergmann <arnd@arndb.de>
->>>
->>> For xhci-hcd platform device, all the DMA parameters are not
->>> configured properly, notably dma ops for dwc3 devices. So, set
->>> the dma for xhci from sysdev. sysdev is pointing to device that
->>> is known to the system firmware or hardware.
->>>
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
->>> Tested-by: Baolin Wang <baolin.wang@linaro.org>
->>> Tested-by: Vivek Gautam <vivek.gautam@codeaurora.org>
->>> Tested-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
->>> Signed-off-by: Mathias Nyman <mathias.nyman@linux.intel.com>
->>> ---
->>> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
->>> index 6d33b42..7a9c860 100644
->>> --- a/drivers/usb/host/xhci-plat.c
->>> +++ b/drivers/usb/host/xhci-plat.c
->>
->>> -    hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
->>> +    hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
->>> +                           dev_name(&pdev->dev), NULL);
->>
->> As mentioned already in [1], usb_create_shared_hcd() is called to create
->> the second bus, however it also needs to be converted.
->>
->> Not exactly as Roger's suggestion but this worked for me:
->>
->> -       xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
->> +       xhci->shared_hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
->>                         dev_name(&pdev->dev), hcd);
->
-> But we're creating a shared_hcd and there is an API for that so why not use it
-> instead of calling __usb_create_hcd()?
+On Thu, Feb 09, 2017 at 09:48:09AM +0800, Shawn Guo wrote:
+> On Wed, Feb 08, 2017 at 06:52:07PM -0600, Rob Herring wrote:
 
-Do we not want to pass on the DMA configuration from sysdev to
-shared_hcd as well?
+> > Personally, I'd prefer "dt-bindings: sound: blah...", but not enough to 
+> > argue with Mark about it. If that is not the prefix, then it should at 
+> > least have "binding" in the subject.
 
->
->>         if (!xhci->shared_hcd) {
->>                 ret = -ENOMEM;
->>
->> Without this, SuperSpeed devices fail to enumerate:
->>
->>  usb 2-1: new SuperSpeed USB device number 2 using xhci-hcd
->>  usb 2-1: device descriptor read/8, error -11
->>  usb 2-1: new SuperSpeed USB device number 2 using xhci-hcd
->>  usb 2-1: device descriptor read/8, error -11
->>  usb 2-1: new SuperSpeed USB device number 3 using xhci-hcd
->>  usb 2-1: device descriptor read/8, error -11
->>  usb 2-1: new SuperSpeed USB device number 3 using xhci-hcd
->>  usb 2-1: device descriptor read/8, error -11
->>  <and continues...>
->>
->> Thanks,
->> Jack
->>
->> [1] https://lkml.org/lkml/2016/12/9/240
->>
->
-> --
-> cheers,
-> -roger
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +1
 
+> The prefix of sound bindings is quite unique from other subsystems.
+> Looking at the prefix of Documentation/devicetree/bindings/sound/
+> commits, I'm always confused whether it's a pure binding commit
+> or just submitted as part of the driver patch.  I feel that we
+> kinda lose the point of having a prefix.
 
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+That's really not what's happening reliably - other subsystems also seem
+to have a bunch of things prefixed for the subsystem and the DT specific
+prefixes are all over the shop, people seem to be making them up at
+random.  If DT binding review were something that reliably and
+consistently happened and didn't affect the subsystem I'd perhaps buy it
+but for run of the mill stuff it seems like getting things reviewed in
+the subsystem is more important.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170209/5975fa67/attachment.sig>
