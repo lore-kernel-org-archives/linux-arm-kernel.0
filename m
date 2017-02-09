@@ -1,96 +1,97 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Thu, 9 Feb 2017 19:05:16 +0530
-Subject: [PATCH V2 1/3] iommu/arm-smmu: Add pm_runtime/sleep ops
-In-Reply-To: <db9bc01c-635d-1a57-8a6c-9be19a0cda16@arm.com>
-References: <1486055420-19671-1-git-send-email-sricharan@codeaurora.org>
- <1486055420-19671-2-git-send-email-sricharan@codeaurora.org>
- <20170202174218.GO31394@leverpostej>
- <017701d281f9$927c5fb0$b7751f10$@codeaurora.org>
- <20170208114002.GD15459@leverpostej>
- <018401d28207$34db60a0$9e9221e0$@codeaurora.org>
- <b55359d8-2665-aef0-3215-53a0e8f21bcd@arm.com>
- <000301d28211$a5233a90$ef69afb0$@codeaurora.org>
- <20170208135252.GF15459@leverpostej>
- <db9bc01c-635d-1a57-8a6c-9be19a0cda16@arm.com>
-Message-ID: <004f01d282d9$5dd0e110$1972a330$@codeaurora.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 9 Feb 2017 14:31:20 +0100
+Subject: [PATCH 1/2] clk: scpi: RfC - Allow to ignore invalid SCPI DVFS
+ clock rates
+In-Reply-To: <f7e65721-bf09-54ed-a5d3-c918b0ca4505@poczta.onet.pl>
+References: <3b60654a-88b6-6262-396e-a058ade1c586@gmail.com>
+ <d7b8f9db-7512-646c-bb96-ef74e7266661@gmail.com>
+ <209248b8-2a1c-e00f-d8a8-b82759772b5d@arm.com> <m28tpgihzw.fsf@baylibre.com>
+ <efe61325-eacd-2d4d-3ac0-71d54ef9d2bb@arm.com>
+ <f0c0ed0a-82d5-4814-3420-bae9aa65193b@poczta.onet.pl>
+ <6c360b3c-629c-03ea-3332-545da38ba283@arm.com>
+ <f7e65721-bf09-54ed-a5d3-c918b0ca4505@poczta.onet.pl>
+Message-ID: <e72f02ea-04f0-50c8-21c8-34667f7aeb92@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
->-----Original Message-----
->From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Robin Murphy
->Sent: Wednesday, February 08, 2017 8:01 PM
->To: Mark Rutland <mark.rutland@arm.com>; Sricharan <sricharan@codeaurora.org>
->Cc: devicetree at vger.kernel.org; mathieu.poirier at linaro.org; linux-arm-msm at vger.kernel.org; joro at 8bytes.org;
->will.deacon at arm.com; iommu at lists.linux-foundation.org; robh+dt at kernel.org; sboyd at codeaurora.org; linux-arm-
->kernel at lists.infradead.org; m.szyprowski at samsung.com
->Subject: Re: [PATCH V2 1/3] iommu/arm-smmu: Add pm_runtime/sleep ops
->
->On 08/02/17 13:52, Mark Rutland wrote:
->> On Wed, Feb 08, 2017 at 07:15:37PM +0530, Sricharan wrote:
->>>> Clocks are not architectural, so it only makes sense to associate them
->>>> with an implementation-specific compatible string. There's also no
+On 02/09/2017 01:51 PM, Micha? Zegan wrote:
+> 
+> 
+> W dniu 09.02.2017 o 13:25, Sudeep Holla pisze:
+>>
+>>
+>> On 09/02/17 12:19, Micha? Zegan wrote:
 >>>
->>> ok, it for this the QCOM specific implementation binding is tried(going to).
 >>>
->>>> guarantee that different microarchitectures have equivalent internal
->>>> clock domains - I'm not sure if "the SMMU's underlying bus access" is
->>>> meant to refer to accesses *by* the SMMU, i.e. page table walks,
->>>> accesses *through* the SMMU by upstream masters, or both
->>>
->>> In the above QCOM case, it is actually both. Its the same path for both the
->>> page table walker and upstream masters.
->
->Right, that's what I feared. As far as I can make out the current ARM
->implementations, transactions passing through will require at least
->TBUn_BCLK for the appropriate TBU, but would also need the page table
->walker clocked with CCLK to resolve TLB misses. But then the programming
->interface is also in the CCLK domain (not counting the incoming APB or
->AXI clock for the actual slave port itself). Thus this 'generic' clock
->binding already isn't compatible with MMU-40x/500.
->
-
-Right, this implementation's clock bindings are not going to compatible with
-MMU-500. There is also another soc which integrates MMU-500.  So
-will have to add the clock bindings for MMU-500 as well separately.
-Also in MMU-500 i saw that there is a possibility where the clock-domain
-can be shared between the TCU logic, programming interface and PTW read
-channel.  Does this mean that the TCU-clock has to be 'ON' for both register
-access and PTW, similar to above ?. So for MMU-500 clock bindings there
-can be a CFG_CLK (optional and not required in shared case), TBUn_CLK and
-TCU_CLK
-
-Regards,
- Sricharan
-
->>>> differences are rather significant. I'd also note that an MMU-500
->>>> configuration may have up to *33* clocks.
+>>> W dniu 09.02.2017 o 11:52, Sudeep Holla pisze:
 >>>>
->>>> Either way, the QCOM implementation deserves its own compatible if only
->>>> for the sake of the imp-def gaps in the architecture (e.g. FSR.SS
->>>> behaviour WRT to IRQs as touched upon in the other thread).
 >>>>
->>>
->>> Ok, slightly unclear, so you mean then *clocks* are not good enough reason
->>> to have a new compatible ?
+>>>> On 08/02/17 19:45, Kevin Hilman wrote:
+>>>>> Sudeep Holla <sudeep.holla@arm.com> writes:
+>>>>>
+>>>>>> On 04/02/17 21:03, Heiner Kallweit wrote:
+>>>>>>> Introduce an optional property "clock-max-frequency" for SCPI DVFS
+>>>>>>> clocks. All frequencies for the respective clock exceeding this
+>>>>>>> threshold will be ignored.
+>>>>>>>
+>>>>>>> This is useful on systems where the firmware offers too optimistic
+>>>>>>> clock rates causing instabilities and crashes.
+>>>>>>>
+>>>>>>
+>>>>>> It clearly means the firmware/hardware(IOW platform) was not tested
+>>>>>> correctly before firmware advertised the OPPs. It needs to fixed in the
+>>>>>> firmware. The approach should be advertise the known minimal set working
+>>>>>> rather than the set for which hardware was designed.
+>>>>>>
+>>>>>> That's the whole reason while these are kept in firmware so the OS need
+>>>>>> not worry about such details.
+>>>>>>
+>>>>>> So NACK, go fix the firmware 
+>>>>>
+>>>>> Sorry, but "go fix the firmware" is not an option for most users of
+>>>>> these boards.
+>>>>>
+>>>>
+>>>> I knew this was coming :). I just wanted to shout at vendors who are not
+>>>> validating their firmware. Sometimes I feel it's better have platform
+>>>> driver and drive everything from Linux and don't use buggy firmware at
+>>>> all instead of adding tons of workaround. It defeats the whole purpose
+>>>> of having the firmware.
+>>>>
+>>> Well, at least in the case of odroid c2 from hardkernel, I believe those
+>>> unstable frequencies are supported intentionally. The wiki of the board
+>>> lists them explicitly, and says when they are stable.
+>>> So if that was intentional, then a frequency capping set by default
+>>> would be needed, it can be lifted by a specific user if he wants. Unless
+>>> hk should disable that "feature" instead.
 >>
->> I beleive Robin's point was even if the clocks didn't matter, there are
->> other reasons we should have the QCOM-specific compatible string.
+>> If those frequency are known to cause any stability issues, they should
+>> be considered as *not supported*. If it's just thermal constraints then
+>> yes the user/developer should be allowed to use them as they can take
+>> care of thermal management so that the platform remains stable for usage.
 >>
->> So we should have one regardless.
->
->Exactly.
->
->Robin.
->
->>
->> Thanks,
->> Mark.
->>
->
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> The unstability does not occur when you do not use all cores at once, so hmm
+
+Hi Sudeep,
+
+On Hardkernel ODroid C2 based on Amlogic S905, due to a bad hardware design the platform
+crashes when using >1536MHz frequencies while activating all cores.
+
+But Hardkernel kept the frequencies to be able to use them when having a single core enabled
+using their off-tree highly modified linux kernel.
+
+So we need to handle these kind of cases where the vendor leaves them for strong reasons
+but mainlinux linux is not (yet) a strong reason to change the firmware.
+
+I'm sure we can find a smart solution to handle these use cases without adding too much
+ugly code.
+
+Neil
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170209/d3339f8f/attachment-0001.sig>
