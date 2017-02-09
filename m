@@ -1,34 +1,58 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 10 Feb 2017 02:29:08 +0800
-Subject: [stericsson:mmc-no-NULL 33/34] ERROR: "mmc_blk_rw_done_success"
- [drivers/mmc/core/mmc_core.ko] undefined!
-Message-ID: <201702100205.lV06nr1C%fengguang.wu@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 9 Feb 2017 18:31:18 +0000
+Subject: [PATCH] virtio: Try to untangle DMA coherency
+In-Reply-To: <20170209201341-mutt-send-email-mst@kernel.org>
+References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
+ <20170201195732-mutt-send-email-mst@kernel.org>
+ <20170201182659.GM8177@arm.com>
+ <20170201210648-mutt-send-email-mst@kernel.org>
+ <20170202112614.GB30577@arm.com>
+ <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
+ <20170202182224-mutt-send-email-mst@kernel.org>
+ <20170202164049.GI13839@arm.com>
+ <20170209201341-mutt-send-email-mst@kernel.org>
+Message-ID: <20170209183118.GI19397@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git mmc-no-NULL
-head:   1bec9a625b256f78d00c38b58caad7ccdae8aaf5
-commit: a2058ff91a2df34d5e26cca917b8fee35f051151 [33/34] mmc: queue: issue requests in massive parallel
-config: x86_64-rhel-7.2 (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout a2058ff91a2df34d5e26cca917b8fee35f051151
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+On Thu, Feb 09, 2017 at 08:17:16PM +0200, Michael S. Tsirkin wrote:
+> On Thu, Feb 02, 2017 at 04:40:49PM +0000, Will Deacon wrote:
+> > On Thu, Feb 02, 2017 at 06:30:28PM +0200, Michael S. Tsirkin wrote:
+> > > I am inclined to say, for 4.10 let's revert
+> > > c7070619f3408d9a0dffbed9149e6f00479cf43b since what it fixes is not a
+> > > regression in 4.10.
+> > 
+> > No complaints there, as long as we can keep working to fix this for 4.11
+> > and onwards. You'll also need to cc stable on the revert.
+> > 
+> > > So I think we can defer the fix to 4.11.
+> > > I think we still want f7f6634d23830ff74335734fbdb28ea109c1f349
+> > > for hosts with virtio 1 support.
+> > > 
+> > > All this will hopefully push hosts to just implement virtio 1.
+> > > For mmio the changes are very small: several new registers,
+> > > that's all. You want this for proper 64 bit dma mask anyway.
+> > 
+> > As I've said, virtio 1 will have exactly the same issue unless we start
+> > requiring firmware to advertise dma-coherent/_CCA for virtio-mmio
+> > devices correctly.
+> > 
+> 
+> OK I read up on _CCA in ACPI spec. It says:
+> The _CCA object returns whether or not a bus-master device supports
+> hardware managed cache coherency. Expected values are 0 to indicate it
+> is not supported, and 1 to indicate that it is supported.
+> 
+> So if host is cache coherent, and guest thinks it isn't, we incur
+> unnecessary overhead by wasting coherent memory.
+> I get that but you said it actually breaks - why does it?
 
-All errors (new ones prefixed by >>):
+It breaks because QEMU doesn't set _CCA for virtio-mmio devices, and that
+only becomes a problem when we use the DMA API, because that results in the
+guest taking out a non-cacheable mapping. On ARM (and other archs such as
+Power), having a mismatch between a cacheable and a non-cacheable mapping
+can result in a loss of coherency between the two (for example, if the
+non-cacheable gues accesses bypass the cache, but the cacheable host
+accesses allocate in the cache).
 
-   ERROR: "mmc_queue_req_put" [drivers/mmc/core/mmc_core.ko] undefined!
->> ERROR: "mmc_blk_rw_done_success" [drivers/mmc/core/mmc_core.ko] undefined!
->> ERROR: "mmc_blk_rw_done_error" [drivers/mmc/core/mmc_core.ko] undefined!
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 38277 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170210/3a8565a6/attachment-0001.gz>
+Will
