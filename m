@@ -1,56 +1,75 @@
 From: thibault.saunier@osg.samsung.com (Thibault Saunier)
-Date: Thu,  9 Feb 2017 16:43:11 -0300
-Subject: [PATCH 1/4] [media] exynos-gsc: Use 576p instead 720p as a threshold
- for colorspaces
+Date: Thu,  9 Feb 2017 16:43:14 -0300
+Subject: [PATCH 4/4] [media] s5p-mfc: Always check and set
+ 'v4l2_pix_format:field' field
 In-Reply-To: <20170209194314.5908-1-thibault.saunier@osg.samsung.com>
 References: <20170209194314.5908-1-thibault.saunier@osg.samsung.com>
-Message-ID: <20170209194314.5908-2-thibault.saunier@osg.samsung.com>
+Message-ID: <20170209194314.5908-5-thibault.saunier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Javier Martinez Canillas <javier@osg.samsung.com>
+It is required by the standard that the field order is set by the
+driver.
 
-The media documentation says that the V4L2_COLORSPACE_SMPTE170M colorspace
-should be used for SDTV and V4L2_COLORSPACE_REC709 for HDTV. But drivers
-don't agree on the display resolution that should be used as a threshold.
-
-Some drivers set V4L2_COLORSPACE_REC709 for 720p and higher while others
-set V4L2_COLORSPACE_REC709 for anything higher than 576p. Newers drivers
-use the latter and that also matches what user-space multimedia programs
-do (i.e: GStreamer), so change the driver logic to be aligned with this.
-
-Also, check for the resolution in G_FMT instead unconditionally setting
-the V4L2_COLORSPACE_REC709 colorspace.
-
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
 ---
- drivers/media/platform/exynos-gsc/gsc-core.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
-index cbb03768f5d7..2beb43401987 100644
---- a/drivers/media/platform/exynos-gsc/gsc-core.c
-+++ b/drivers/media/platform/exynos-gsc/gsc-core.c
-@@ -445,7 +445,7 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+index 960d6c7052bd..dfb21b4aee10 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -345,7 +345,6 @@ static int vidioc_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 		   rectangle. */
+ 		pix_mp->width = ctx->buf_width;
+ 		pix_mp->height = ctx->buf_height;
+-		pix_mp->field = V4L2_FIELD_NONE;
+ 		pix_mp->num_planes = 2;
+ 		/* Set pixelformat to the format in which MFC
+ 		   outputs the decoded frame */
+@@ -369,7 +368,6 @@ static int vidioc_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 		   so width and height have no meaning */
+ 		pix_mp->width = 0;
+ 		pix_mp->height = 0;
+-		pix_mp->field = V4L2_FIELD_NONE;
+ 		pix_mp->plane_fmt[0].bytesperline = ctx->dec_src_buf_size;
+ 		pix_mp->plane_fmt[0].sizeimage = ctx->dec_src_buf_size;
+ 		pix_mp->pixelformat = ctx->src_fmt->fourcc;
+@@ -379,6 +377,14 @@ static int vidioc_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 		mfc_debug(2, "%s-- with error\n", __func__);
+ 		return -EINVAL;
+ 	}
++
++	if (pix_mp->field == V4L2_FIELD_ANY) {
++		pix_mp->field = V4L2_FIELD_NONE;
++	} else if (pix_mp->field != V4L2_FIELD_NONE) {
++		mfc_err("Not supported field order(%d)\n", pix_mp->field);
++		return -EINVAL;
++	}
++
+ 	mfc_debug_leave();
+ 	return 0;
+ }
+@@ -389,6 +395,19 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 	struct s5p_mfc_dev *dev = video_drvdata(file);
+ 	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
+ 	struct s5p_mfc_fmt *fmt;
++	enum v4l2_field field;
++
++	field = f->fmt.pix.field;
++	if (field == V4L2_FIELD_ANY) {
++		field = V4L2_FIELD_NONE;
++	} else if (V4L2_FIELD_NONE != field) {
++		mfc_debug("Not supported field order(%d)\n", pix_mp->field);
++		return -EINVAL;
++	}
++
++	/* V4L2 specification suggests the driver corrects the format struct
++	 * if any of the dimensions is unsupported */
++	f->fmt.pix.field = field;
  
- 	pix_mp->num_planes = fmt->num_planes;
- 
--	if (pix_mp->width >= 1280) /* HD */
-+	if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
- 		pix_mp->colorspace = V4L2_COLORSPACE_REC709;
- 	else /* SD */
- 		pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
-@@ -492,7 +492,10 @@ int gsc_g_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
- 	pix_mp->height		= frame->f_height;
- 	pix_mp->field		= V4L2_FIELD_NONE;
- 	pix_mp->pixelformat	= frame->fmt->pixelformat;
--	pix_mp->colorspace	= V4L2_COLORSPACE_REC709;
-+	if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
-+		pix_mp->colorspace = V4L2_COLORSPACE_REC709;
-+	else /* SD */
-+		pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
- 	pix_mp->num_planes	= frame->fmt->num_planes;
- 
- 	for (i = 0; i < pix_mp->num_planes; ++i) {
+ 	mfc_debug(2, "Type is %d\n", f->type);
+ 	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
 -- 
 2.11.1
