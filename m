@@ -1,81 +1,87 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 9 Feb 2017 17:51:21 +0100
-Subject: [PATCH next 2/2] crypto: atmel-sha: fix error management in
- atmel_sha_start()
-In-Reply-To: <cover.1486655562.git.cyrille.pitchen@atmel.com>
-References: <cover.1486655562.git.cyrille.pitchen@atmel.com>
-Message-ID: <3852cb16370171988f6669b3bac98b06477bacb6.1486655562.git.cyrille.pitchen@atmel.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 9 Feb 2017 16:55:41 +0000
+Subject: [PATCH v2 1/3] ARM: dts: Add support for phyCORE-AM335x PCM-953
+ carrier board
+In-Reply-To: <1485252576-36955-1-git-send-email-t.remmet@phytec.de>
+References: <1485252576-36955-1-git-send-email-t.remmet@phytec.de>
+Message-ID: <ff34a257-7272-9b9e-c0bb-a88bac8b3d05@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch clarifies and fixes how errors should be handled by
-atmel_sha_start().
 
-For update operations, the previous code wrongly assumed that
-(err != -EINPROGRESS) implies (err == 0). It's wrong because that doesn't
-take the error cases (err < 0) into account.
 
-This patch also adds many comments to detail all the possible returned
-values and what should be done in each case.
+On 24/01/17 10:09, Teresa Remmet wrote:
+> The phyCORE-AM335x development kit is a combination of the
+> phyCORE-AM335x SoM and a PCM-953 carrier board. The features
+> of the PCM-953 are:
+> * ETH phy on carrier board: 1x RGMII
+> * 1x CAN
+> * Up to 4x UART
+> * USB0 (otg)
+> * USB1 (host)
+> * SD slot
+> * User gpio-keys
+> * User LEDs
+> 
+> Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
+> Reviewed-by: Wadim Egorov <w.egorov@phytec.de>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
+> Changes in v2:
+> - moved gpio-keys, gpio-leds and regulators nodes to root node
+> - moved muxing of gpio-keys and gpio-leds
+> - removed not needed compatible "simple-bus"
+> - fixed unit address of ethernet phy node
+> - removed redundant status properties
+> - added Acked-by: Rob Herring <robh@kernel.org>
+> 
+>  .../devicetree/bindings/arm/omap/omap.txt          |   3 +
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/am335x-pcm-953.dtsi              | 288 +++++++++++++++++++++
+>  arch/arm/boot/dts/am335x-phycore-rdk.dts           |  27 ++
+>  4 files changed, 319 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/am335x-pcm-953.dtsi
+>  create mode 100644 arch/arm/boot/dts/am335x-phycore-rdk.dts
+> 
 
-Especially, when an error occurs, since atmel_sha_complete() has already
-been called, hence releasing the hardware, atmel_sha_start() must not call
-atmel_sha_finish_req() later otherwise atmel_sha_complete() would be
-called a second time.
+[...]
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
- drivers/crypto/atmel-sha.c | 27 ++++++++++++++++++++++-----
- 1 file changed, 22 insertions(+), 5 deletions(-)
+> diff --git a/arch/arm/boot/dts/am335x-pcm-953.dtsi b/arch/arm/boot/dts/am335x-pcm-953.dtsi
+> new file mode 100644
+> index 0000000..02981ea
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am335x-pcm-953.dtsi
 
-diff --git a/drivers/crypto/atmel-sha.c b/drivers/crypto/atmel-sha.c
-index d6c3d9529d36..0d207dac9aa2 100644
---- a/drivers/crypto/atmel-sha.c
-+++ b/drivers/crypto/atmel-sha.c
-@@ -1106,22 +1106,39 @@ static int atmel_sha_start(struct atmel_sha_dev *dd)
- 						ctx->op, req->nbytes);
- 
- 	err = atmel_sha_hw_init(dd);
--
- 	if (err)
--		goto err1;
-+		return atmel_sha_complete(dd, err);
-+
-+	/*
-+	 * atmel_sha_update_req() and atmel_sha_final_req() can return either:
-+	 *  -EINPROGRESS: the hardware is busy and the SHA driver will resume
-+	 *                its job later in the done_task.
-+	 *                This is the main path.
-+	 *
-+	 * 0: the SHA driver can continue its job then release the hardware
-+	 *    later, if needed, with atmel_sha_finish_req().
-+	 *    This is the alternate path.
-+	 *
-+	 * < 0: an error has occurred so atmel_sha_complete(dd, err) has already
-+	 *      been called, hence the hardware has been released.
-+	 *      The SHA driver must stop its job without calling
-+	 *      atmel_sha_finish_req(), otherwise atmel_sha_complete() would be
-+	 *      called a second time.
-+	 *
-+	 * Please note that currently, atmel_sha_final_req() never returns 0.
-+	 */
- 
- 	dd->resume = atmel_sha_done;
- 	if (ctx->op == SHA_OP_UPDATE) {
- 		err = atmel_sha_update_req(dd);
--		if (err != -EINPROGRESS && (ctx->flags & SHA_FLAGS_FINUP))
-+		if (!err && (ctx->flags & SHA_FLAGS_FINUP))
- 			/* no final() after finup() */
- 			err = atmel_sha_final_req(dd);
- 	} else if (ctx->op == SHA_OP_FINAL) {
- 		err = atmel_sha_final_req(dd);
- 	}
- 
--err1:
--	if (err != -EINPROGRESS)
-+	if (!err)
- 		/* done_task will not finish it, so do it here */
- 		atmel_sha_finish_req(req, err);
- 
+[...]
+
+};
+> +	};
+> +
+> +	user_buttons: user_buttons {
+> +		compatible = "gpio-keys";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&user_buttons_pins>;
+> +
+> +		button at 0 {
+> +			label = "home";
+> +			linux,code = <KEY_HOME>;
+> +			gpios = <&gpio3 7 GPIO_ACTIVE_HIGH>;
+> +			gpio-key,wakeup;
+> +		};
+> +
+> +		button at 1 {
+> +			label = "menu";
+> +			linux,code = <KEY_MENU>;
+> +			gpios = <&gpio3 8 GPIO_ACTIVE_HIGH>;
+> +			gpio-key,wakeup;
+
+Could you please replace this with wakeup-source as specified in
+Documentation/devicetree/bindings/power/wakeup-source.txt
+
+I know this patch is merged, just fix it on top of linux-next ?
+I think TI/OMAP downstream tree has some remnants of the legacy
+boolean and it keeps slipping through every merge window :)
+
 -- 
-2.7.4
+Regards,
+Sudeep
