@@ -1,35 +1,50 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 9 Feb 2017 10:14:35 -0800
-Subject: [PATCH] [net-next] ARM: orion: fix PHYLIB dependency
-In-Reply-To: <20170209172024.GE29882@lunn.ch>
-References: <20170209150834.1158193-1-arnd@arndb.de>
- <20170209155751.GB29882@lunn.ch> <1967873.WpTcGj2Cy4@wuerfel>
- <20170209172024.GE29882@lunn.ch>
-Message-ID: <d00cef40-ab92-a84f-2e4e-1f7867b5ee76@gmail.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Thu, 9 Feb 2017 20:17:16 +0200
+Subject: [PATCH] virtio: Try to untangle DMA coherency
+In-Reply-To: <20170202164049.GI13839@arm.com>
+References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
+ <20170201195732-mutt-send-email-mst@kernel.org>
+ <20170201182659.GM8177@arm.com>
+ <20170201210648-mutt-send-email-mst@kernel.org>
+ <20170202112614.GB30577@arm.com>
+ <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
+ <20170202182224-mutt-send-email-mst@kernel.org>
+ <20170202164049.GI13839@arm.com>
+Message-ID: <20170209201341-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2017 09:20 AM, Andrew Lunn wrote:
->> Adding a 'select' statement to something as broad as NETDEVICES sounds
->> really bad, it has a significant risk of introducing dependency loops
->> and may be confusing if you want to build a multiplatform config without
->> networking support (note that NETDEVICES in turn depends on NET, which
->> can also be disabled).
+On Thu, Feb 02, 2017 at 04:40:49PM +0000, Will Deacon wrote:
+> On Thu, Feb 02, 2017 at 06:30:28PM +0200, Michael S. Tsirkin wrote:
+> > I am inclined to say, for 4.10 let's revert
+> > c7070619f3408d9a0dffbed9149e6f00479cf43b since what it fixes is not a
+> > regression in 4.10.
 > 
-> O.K, so overall it is not simple. So lets drop my idea.
->  
->> One possibility would be to have a special Kconfig symbol that controls
->> mdiobus_register_board_info() being present and have that symbol
->> force PHYLIB to never be "=m". Then we can either have no networking
->> support and no phylib, turning mdiobus_register_board_info() into a
->> stub, or we have the function built-in and reachable from the board
->> code.
+> No complaints there, as long as we can keep working to fix this for 4.11
+> and onwards. You'll also need to cc stable on the revert.
 > 
-> FYI: Florian is working on splitting MDIO out of PHYLIB. There will be
-> two separate symbols, so it will be possible to have MDIO without
-> PHYLIB. When this happens, i expect mdiobus_register_board_info() will
-> be in the MDIO part, not PHYLIB.
+> > So I think we can defer the fix to 4.11.
+> > I think we still want f7f6634d23830ff74335734fbdb28ea109c1f349
+> > for hosts with virtio 1 support.
+> > 
+> > All this will hopefully push hosts to just implement virtio 1.
+> > For mmio the changes are very small: several new registers,
+> > that's all. You want this for proper 64 bit dma mask anyway.
+> 
+> As I've said, virtio 1 will have exactly the same issue unless we start
+> requiring firmware to advertise dma-coherent/_CCA for virtio-mmio
+> devices correctly.
+> 
+> Will
 
-Yes that would be the plan.
+OK I read up on _CCA in ACPI spec. It says:
+The _CCA object returns whether or not a bus-master device supports
+hardware managed cache coherency. Expected values are 0 to indicate it
+is not supported, and 1 to indicate that it is supported.
+
+So if host is cache coherent, and guest thinks it isn't, we incur
+unnecessary overhead by wasting coherent memory.
+I get that but you said it actually breaks - why does it?
+
 -- 
-Florian
+MST
