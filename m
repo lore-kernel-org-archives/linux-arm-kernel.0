@@ -1,58 +1,71 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 9 Feb 2017 11:24:43 +0000
-Subject: Aarch64 kernel with 32bit userspace question
-In-Reply-To: <0747bd41-7a87-6dd6-11bf-58729ad2c3d8@denx.de>
-References: <0057242a-2e16-3b59-1f81-9f4ccf64216d@denx.de>
- <CAKv+Gu-U484qCRJ+VS4kX3eRLzdJN=_1Z57atR8VgZidQfv7Dg@mail.gmail.com>
- <0747bd41-7a87-6dd6-11bf-58729ad2c3d8@denx.de>
-Message-ID: <CAKv+Gu_8cg2n=pjkwDFDm+oJ1EiYGKsfje2mOW0FJtHXEghLjg@mail.gmail.com>
+From: miles.chen@mediatek.com (Miles Chen)
+Date: Thu, 9 Feb 2017 19:28:19 +0800
+Subject: [PATCH] arm64: use is_vmalloc_addr
+In-Reply-To: <201702091600.7Yg9Yj0D%fengguang.wu@intel.com>
+References: <201702091600.7Yg9Yj0D%fengguang.wu@intel.com>
+Message-ID: <1486639699.14885.4.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 February 2017 at 11:14, Marek Vasut <marex@denx.de> wrote:
-> On 02/09/2017 11:51 AM, Ard Biesheuvel wrote:
->> On 9 February 2017 at 10:14, Marek Vasut <marex@denx.de> wrote:
->>> Hi,
->>>
->>> I'm trying multilib userland on aarch64, but I'm running into a problem.
->>> I have a simple test code:
->>>
->>> -->8--
->>> #include <signal.h>
->>>
->>> int main(void) {
->>>     return 0;
->>> }
->>> --8<--
->>>
->>> If I compile that with aarch64 gcc , it compiles just fine.
->>>
->>> If I compile the same thing with 32bit armv7ahf multilib gcc, the
->>> build fails on "unknown type name '__uint128_t'". This comes from
->>> arch/arm64/include/uapi/asm/sigcontext.h , which has __uint128_t in
->>> struct fpsimd_context {} . The signal.h includes that (through a few
->>> glibc headers) and that's what triggers the failure. __uint128_t is
->>> defined on aarch64 , but it is not on armv7a (32bit).
->>>
->>
->> This is a toolchain or glibc bug: the arm64 version of that header
->> should never be pulled in when using a AArch32 toolchain, regardless
->> of whether you run it on arm64, ARM (or x86, for that matter)
->
-> Aha. So which version of the header should be pulled in ? The one from
-> arch/arm/include/uapi/asm/sigcontext.h (that doesn't make much sense to
-> me) ?
->
+On Thu, 2017-02-09 at 16:37 +0800, kbuild test robot wrote:
+> Hi Miles,
+> 
+> [auto build test WARNING on arm64/for-next/core]
+> [also build test WARNING on v4.10-rc7 next-20170208]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Miles-Chen/arm64-use-is_vmalloc_addr/20170209-103100
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+> config: arm64-defconfig (attached as .config)
+> compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm64 
+> 
+> All warnings (new ones prefixed by >>):
+> 
+>    arch/arm64/mm/ioremap.c: In function '__iounmap':
+> >> arch/arm64/mm/ioremap.c:91:22: warning: passing argument 1 of 'is_vmalloc_addr' makes pointer from integer without a cast [-Wint-conversion]
+>      if (is_vmalloc_addr(addr))
+>                          ^~~~
+>    In file included from arch/arm64/mm/ioremap.c:24:0:
+>    include/linux/mm.h:472:20: note: expected 'const void *' but argument is of type 'long unsigned int'
+>     static inline bool is_vmalloc_addr(const void *x)
+>                        ^~~~~~~~~~~~~~~
+> 
 
-signal.h includes bits/sigcontext.h, of which several versions exists
-on my system:
+Sorry for that. I'll send patch v2 without the build warning.
 
-/usr/aarch64-linux-gnu/include/bits/sigcontext.h
-/usr/arm-linux-gnueabi/include/bits/sigcontext.h
-/usr/arm-linux-gnueabihf/include/bits/sigcontext.h
-/usr/include/x86_64-linux-gnu/bits/sigcontext.h
-
-each of which includes asm/sigcontext.h under the same root path.
-
-It is up to the compiler to set the builtin include paths correctly:
-arm-linux-gnueabi-gcc should never use the aarch64 or x86 one.
+> vim +/is_vmalloc_addr +91 arch/arm64/mm/ioremap.c
+> 
+>     75	
+>     76	void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot)
+>     77	{
+>     78		return __ioremap_caller(phys_addr, size, prot,
+>     79					__builtin_return_address(0));
+>     80	}
+>     81	EXPORT_SYMBOL(__ioremap);
+>     82	
+>     83	void __iounmap(volatile void __iomem *io_addr)
+>     84	{
+>     85		unsigned long addr = (unsigned long)io_addr & PAGE_MASK;
+>     86	
+>     87		/*
+>     88		 * We could get an address outside vmalloc range in case
+>     89		 * of ioremap_cache() reusing a RAM mapping.
+>     90		 */
+>   > 91		if (is_vmalloc_addr(addr))
+>     92			vunmap((void *)addr);
+>     93	}
+>     94	EXPORT_SYMBOL(__iounmap);
+>     95	
+>     96	void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
+>     97	{
+>     98		/* For normal memory we already have a cacheable mapping. */
+>     99		if (pfn_valid(__phys_to_pfn(phys_addr)))
+> 
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
