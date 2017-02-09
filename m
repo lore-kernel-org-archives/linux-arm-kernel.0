@@ -1,97 +1,40 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 9 Feb 2017 14:31:20 +0100
-Subject: [PATCH 1/2] clk: scpi: RfC - Allow to ignore invalid SCPI DVFS
- clock rates
-In-Reply-To: <f7e65721-bf09-54ed-a5d3-c918b0ca4505@poczta.onet.pl>
-References: <3b60654a-88b6-6262-396e-a058ade1c586@gmail.com>
- <d7b8f9db-7512-646c-bb96-ef74e7266661@gmail.com>
- <209248b8-2a1c-e00f-d8a8-b82759772b5d@arm.com> <m28tpgihzw.fsf@baylibre.com>
- <efe61325-eacd-2d4d-3ac0-71d54ef9d2bb@arm.com>
- <f0c0ed0a-82d5-4814-3420-bae9aa65193b@poczta.onet.pl>
- <6c360b3c-629c-03ea-3332-545da38ba283@arm.com>
- <f7e65721-bf09-54ed-a5d3-c918b0ca4505@poczta.onet.pl>
-Message-ID: <e72f02ea-04f0-50c8-21c8-34667f7aeb92@baylibre.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 9 Feb 2017 14:40:21 +0100
+Subject: [PATCH 0/2] ARM: shmobile: Remove ARCH_SHMOBILE_MULTI
+In-Reply-To: <SG2PR06MB1165BBFDAA507BB95DF0A2808A450@SG2PR06MB1165.apcprd06.prod.outlook.com>
+References: <1486635529-6636-1-git-send-email-geert+renesas@glider.be>
+ <20170209105546.GI16056@verge.net.au>
+ <SG2PR06MB1165BBFDAA507BB95DF0A2808A450@SG2PR06MB1165.apcprd06.prod.outlook.com>
+Message-ID: <20170209134020.GA20339@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2017 01:51 PM, Micha? Zegan wrote:
+On Thu, Feb 09, 2017 at 01:12:24PM +0000, Chris Brandt wrote:
+> Hi Simon and Geert,
+> 
+> On Thursday, February 09, 2017, Simon Horman wrote:
+> > On Thu, Feb 09, 2017 at 11:18:47AM +0100, Geert Uytterhoeven wrote:
+> > > 	Hi Simon, Magnus,
+> > >
+> > > This patch series completes the migration from ARCH_SHMOBILE_MULTI to
+> > > ARCH_RENESAS, which was started by commit 9b5ba0df4ea4 ("ARM: shmobile:
+> > > Introduce ARCH_RENESAS").
+> > >
+> > > Thanks for applying!
+> > 
+> > Thanks, nice to see this coming to an end.
+> > 
+> > I have queued up patch 1/2 in the dt-for-v4.12 branch.
+> > 
+> > I am of a mind to defer patch 2/2 because it looks like it should go in
+> > the soc-for-v4.12 branch and I'd rather not add a dependency on the dt-
+> > for-v4.12 branch for a cleanup.
+> > 
+> > In a perfect world we could have one branch to rule them all; we do not
+> > live in that world.
 > 
 > 
-> W dniu 09.02.2017 o 13:25, Sudeep Holla pisze:
->>
->>
->> On 09/02/17 12:19, Micha? Zegan wrote:
->>>
->>>
->>> W dniu 09.02.2017 o 11:52, Sudeep Holla pisze:
->>>>
->>>>
->>>> On 08/02/17 19:45, Kevin Hilman wrote:
->>>>> Sudeep Holla <sudeep.holla@arm.com> writes:
->>>>>
->>>>>> On 04/02/17 21:03, Heiner Kallweit wrote:
->>>>>>> Introduce an optional property "clock-max-frequency" for SCPI DVFS
->>>>>>> clocks. All frequencies for the respective clock exceeding this
->>>>>>> threshold will be ignored.
->>>>>>>
->>>>>>> This is useful on systems where the firmware offers too optimistic
->>>>>>> clock rates causing instabilities and crashes.
->>>>>>>
->>>>>>
->>>>>> It clearly means the firmware/hardware(IOW platform) was not tested
->>>>>> correctly before firmware advertised the OPPs. It needs to fixed in the
->>>>>> firmware. The approach should be advertise the known minimal set working
->>>>>> rather than the set for which hardware was designed.
->>>>>>
->>>>>> That's the whole reason while these are kept in firmware so the OS need
->>>>>> not worry about such details.
->>>>>>
->>>>>> So NACK, go fix the firmware 
->>>>>
->>>>> Sorry, but "go fix the firmware" is not an option for most users of
->>>>> these boards.
->>>>>
->>>>
->>>> I knew this was coming :). I just wanted to shout at vendors who are not
->>>> validating their firmware. Sometimes I feel it's better have platform
->>>> driver and drive everything from Linux and don't use buggy firmware at
->>>> all instead of adding tons of workaround. It defeats the whole purpose
->>>> of having the firmware.
->>>>
->>> Well, at least in the case of odroid c2 from hardkernel, I believe those
->>> unstable frequencies are supported intentionally. The wiki of the board
->>> lists them explicitly, and says when they are stable.
->>> So if that was intentional, then a frequency capping set by default
->>> would be needed, it can be lifted by a specific user if he wants. Unless
->>> hk should disable that "feature" instead.
->>
->> If those frequency are known to cause any stability issues, they should
->> be considered as *not supported*. If it's just thermal constraints then
->> yes the user/developer should be allowed to use them as they can take
->> care of thermal management so that the platform remains stable for usage.
->>
-> The unstability does not occur when you do not use all cores at once, so hmm
+> Out of curiosity, when will arch/arm/mach-shmobile and arch/arm/configs/shmobile_defconfig be renamed (if ever)??
 
-Hi Sudeep,
-
-On Hardkernel ODroid C2 based on Amlogic S905, due to a bad hardware design the platform
-crashes when using >1536MHz frequencies while activating all cores.
-
-But Hardkernel kept the frequencies to be able to use them when having a single core enabled
-using their off-tree highly modified linux kernel.
-
-So we need to handle these kind of cases where the vendor leaves them for strong reasons
-but mainlinux linux is not (yet) a strong reason to change the firmware.
-
-I'm sure we can find a smart solution to handle these use cases without adding too much
-ugly code.
-
-Neil
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170209/d3339f8f/attachment-0001.sig>
+There are no plans at this time.
+I am happy to discuss a rename if there is a need for it.
