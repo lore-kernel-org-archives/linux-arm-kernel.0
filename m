@@ -1,45 +1,63 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 09 Feb 2017 10:43:11 +0100
-Subject: [PATCH v3 21/24] media: imx: Add MIPI CSI-2 Receiver subdev driver
-In-Reply-To: <ca0a2eb3-21b6-d312-c8e0-61da48c4c700@gmail.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-22-git-send-email-steve_longerbeam@mentor.com>
- <1486036237.2289.37.camel@pengutronix.de>
- <ca0a2eb3-21b6-d312-c8e0-61da48c4c700@gmail.com>
-Message-ID: <1486633391.2284.9.camel@pengutronix.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Feb 2017 09:55:34 +0000
+Subject: [PATCHv3 net-next 00/12] net: mvpp2: misc improvements and
+ preparation patches
+In-Reply-To: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20170209095534.GB27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-02-08 at 15:23 -0800, Steve Longerbeam wrote:
-[...]
-> >> +
-> >> +static int imxcsi2_get_fmt(struct v4l2_subdev *sd,
-> >> +			   struct v4l2_subdev_pad_config *cfg,
-> >> +			   struct v4l2_subdev_format *sdformat)
-> >> +{
-> >> +	struct imxcsi2_dev *csi2 = sd_to_dev(sd);
-> >> +
-> >> +	sdformat->format = csi2->format_mbus;
-> > The output formats are different from the input formats, see the media
-> > bus format discussion in the other thread. The input pad is the MIPI
-> > CSI-2 bus, but the four output pads are connected to the muxes / CSIs
-> > via a 16-bit parallel bus.
-> >
-> > So if the input format is UYVY8_1X16, for example, the output should be
-> > set to UYVY8_2X8.
+On Thu, Feb 02, 2017 at 04:51:29PM +0100, Thomas Petazzoni wrote:
+> David,
 > 
-> Since the output buses from the CSI2IPU gasket are 16-bit
-> parallel buses, shouldn't an input format UYVY8_1X16 also be
-> the same at the output?
+> This series contains a number of misc improvements and preparation
+> patches for an upcoming series that adds support for the new PPv2.2
+> network controller to the mvpp2 driver.
+> 
+> Sorry for the long delay since v2, I was on
+> vacation/conference/training in January, and therefore wasn't able to
+> resend a new version earlier. Upcoming versions should arrive much
+> faster, if there are further comments on this series.
+> 
+> The most significant improvements are:
+> 
+>  - Switching to using build_skb(), which is necessary for the upcoming
+>    PPv2.2 support, but anyway a good improvement to the current mvpp2
+>    driver (supporting PPv2.1).
+> 
+>  - Making the driver build on 64-bit platforms.
+> 
+> Changes since v2:
+> 
+>  - Fix remaining 64-bit build warning, reported by David Miller.
+> 
+>  - Adjust how bit mask related definitions are done in "net: mvpp2:
+>    simplify MVPP2_PRS_RI_* definitions" according to Russell King
+>    suggestions.
+> 
+>  - Add a patch "net: mvpp2: remove useless arguments in
+>    mvpp2_rx_{pkts,time}_coal_set", suggested by Russell King.
+> 
+>  - Rework mvpp2_rx_time_coal_set() implementation to avoid overflows
+>    and rounding errors. I've used the implementation suggested by
+>    Russell King.
+> 
+> Changes since v1:
+> 
+>  - This series is split as a separate series from the larger patch set
+>    adding support for PPv2.2 in the mvpp2 driver, as requested by
+>    David Miller.
+> 
+>  - Rebased on top of v4.10-rc1.
 
-I looked at the reference manual again, and I think I have read this
-incorrectly, probably confused by the coloring in Figure 19-10 "YUV422-8
-data reception" in the CSI2IPU chapter. It looks like indeed the 16-bit
-bus carries UYVY8_1X16, whereas the internal 32-bit bus between MIPI
-CSI-2 decoder and the CSI2IPU carries two samples (complete UYVY) per
-pixel clock.
-So UYVY is straight forward. It's the YUV420, RGB, and RAW formats that
-would be interesting to describe correctly.
+For the whole series:
 
-regards
-Philipp
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+
+Thanks.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
