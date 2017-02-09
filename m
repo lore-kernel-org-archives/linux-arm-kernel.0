@@ -1,36 +1,78 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu,  9 Feb 2017 11:18:47 +0100
-Subject: [PATCH 0/2] ARM: shmobile: Remove ARCH_SHMOBILE_MULTI
-Message-ID: <1486635529-6636-1-git-send-email-geert+renesas@glider.be>
+Date: Thu,  9 Feb 2017 11:18:48 +0100
+Subject: [PATCH 1/2] ARM: dts: renesas: Switch from ARCH_SHMOBILE_MULTI to
+ ARCH_RENESAS
+In-Reply-To: <1486635529-6636-1-git-send-email-geert+renesas@glider.be>
+References: <1486635529-6636-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1486635529-6636-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+Commit 9b5ba0df4ea4 ("ARM: shmobile: Introduce ARCH_RENESAS") started
+the migration from ARCH_SHMOBILE_MULTI to ARCH_RENESAS.
+Update the Makefile to build DTBs for Renesas platforms to use the new
+symbol, and move the Renesas section to preserve sort order.
 
-This patch series completes the migration from ARCH_SHMOBILE_MULTI to
-ARCH_RENESAS, which was started by commit 9b5ba0df4ea4 ("ARM: shmobile:
-Introduce ARCH_RENESAS").
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/boot/dts/Makefile | 38 +++++++++++++++++++-------------------
+ 1 file changed, 19 insertions(+), 19 deletions(-)
 
-Thanks for applying!
-
-Geert Uytterhoeven (2):
-  ARM: dts: renesas: Switch from ARCH_SHMOBILE_MULTI to ARCH_RENESAS
-  ARM: shmobile: Remove ARCH_SHMOBILE_MULTI
-
- arch/arm/boot/dts/Makefile     | 38 +++++++++++++++++++-------------------
- arch/arm/mach-shmobile/Kconfig |  4 ----
- 2 files changed, 19 insertions(+), 23 deletions(-)
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d1b241e3cedb4d8d..625660fcc8720de4 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -672,6 +672,25 @@ dtb-$(CONFIG_ARCH_REALVIEW) += \
+ 	arm-realview-eb-a9mp-bbrevd.dtb \
+ 	arm-realview-pba8.dtb \
+ 	arm-realview-pbx-a9.dtb
++dtb-$(CONFIG_ARCH_RENESAS) += \
++	emev2-kzm9d.dtb \
++	r7s72100-genmai.dtb \
++	r7s72100-rskrza1.dtb \
++	r8a73a4-ape6evm.dtb \
++	r8a7740-armadillo800eva.dtb \
++	r8a7743-sk-rzg1m.dtb \
++	r8a7745-sk-rzg1e.dtb \
++	r8a7778-bockw.dtb \
++	r8a7779-marzen.dtb \
++	r8a7790-lager.dtb \
++	r8a7791-koelsch.dtb \
++	r8a7791-porter.dtb \
++	r8a7792-blanche.dtb \
++	r8a7792-wheat.dtb \
++	r8a7793-gose.dtb \
++	r8a7794-alt.dtb \
++	r8a7794-silk.dtb \
++	sh73a0-kzm9g.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+ 	rk1108-evb.dtb \
+ 	rk3036-evb.dtb \
+@@ -712,25 +731,6 @@ dtb-$(CONFIG_ARCH_S5PV210) += \
+ 	s5pv210-smdkc110.dtb \
+ 	s5pv210-smdkv210.dtb \
+ 	s5pv210-torbreck.dtb
+-dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+-	emev2-kzm9d.dtb \
+-	r7s72100-genmai.dtb \
+-	r7s72100-rskrza1.dtb \
+-	r8a73a4-ape6evm.dtb \
+-	r8a7740-armadillo800eva.dtb \
+-	r8a7743-sk-rzg1m.dtb \
+-	r8a7745-sk-rzg1e.dtb \
+-	r8a7778-bockw.dtb \
+-	r8a7779-marzen.dtb \
+-	r8a7790-lager.dtb \
+-	r8a7791-koelsch.dtb \
+-	r8a7791-porter.dtb \
+-	r8a7792-blanche.dtb \
+-	r8a7792-wheat.dtb \
+-	r8a7793-gose.dtb \
+-	r8a7794-alt.dtb \
+-	r8a7794-silk.dtb \
+-	sh73a0-kzm9g.dtb
+ dtb-$(CONFIG_ARCH_SOCFPGA) += \
+ 	socfpga_arria5_socdk.dtb \
+ 	socfpga_arria10_socdk_nand.dtb \
 -- 
 1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
