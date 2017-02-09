@@ -1,216 +1,699 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  9 Feb 2017 14:59:15 +0000
-Subject: [PATCH 17/25] KVM: arm/arm64: Move cntvoff to each timer context
+Date: Thu,  9 Feb 2017 14:59:06 +0000
+Subject: [PATCH 08/25] KVM: arm/arm64: vgic: Implement VGICv3 CPU interface
+ access
 In-Reply-To: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
 References: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1486652363-7696-18-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1486652363-7696-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jintack Lim <jintack@cs.columbia.edu>
+From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
 
-Make cntvoff per each timer context. This is helpful to abstract kvm
-timer functions to work with timer context without considering timer
-types (e.g. physical timer or virtual timer).
+VGICv3 CPU interface registers are accessed using
+KVM_DEV_ARM_VGIC_CPU_SYSREGS ioctl. These registers are accessed
+as 64-bit. The cpu MPIDR value is passed along with register id.
+It is used to identify the cpu for registers access.
 
-This also would pave the way for ever doing adjustments of the cntvoff
-on a per-CPU basis if that should ever make sense.
+The VM that supports SEIs expect it on destination machine to handle
+guest aborts and hence checked for ICC_CTLR_EL1.SEIS compatibility.
+Similarly, VM that supports Affinity Level 3 that is required for AArch64
+mode, is required to be supported on destination machine. Hence checked
+for ICC_CTLR_EL1.A3V compatibility.
 
-Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+The arch/arm64/kvm/vgic-sys-reg-v3.c handles read and write of VGIC
+CPU registers for AArch64.
+
+For AArch32 mode, arch/arm/kvm/vgic-v3-coproc.c file is created but
+APIs are not implemented.
+
+Updated arch/arm/include/uapi/asm/kvm.h with new definitions
+required to compile for AArch32.
+
+The version of VGIC v3 specification is defined here
+Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   |  3 ---
- arch/arm/kvm/arm.c                |  1 -
- arch/arm64/include/asm/kvm_host.h |  3 ---
- include/kvm/arm_arch_timer.h      |  9 +++------
- virt/kvm/arm/arch_timer.c         | 38 ++++++++++++++++++++++++++++----------
- virt/kvm/arm/hyp/timer-sr.c       |  3 +--
- 6 files changed, 32 insertions(+), 25 deletions(-)
+ arch/arm/include/uapi/asm/kvm.h     |   3 +
+ arch/arm/kvm/Makefile               |   4 +-
+ arch/arm/kvm/vgic-v3-coproc.c       |  35 ++++
+ arch/arm64/include/uapi/asm/kvm.h   |   3 +
+ arch/arm64/kvm/Makefile             |   3 +-
+ arch/arm64/kvm/vgic-sys-reg-v3.c    | 346 ++++++++++++++++++++++++++++++++++++
+ include/kvm/arm_vgic.h              |   8 +
+ virt/kvm/arm/vgic/vgic-kvm-device.c |  27 +++
+ virt/kvm/arm/vgic/vgic-mmio-v3.c    |   6 +
+ virt/kvm/arm/vgic/vgic-v3.c         |   8 +
+ virt/kvm/arm/vgic/vgic.h            |  25 +++
+ 11 files changed, 465 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/kvm/vgic-v3-coproc.c
+ create mode 100644 arch/arm64/kvm/vgic-sys-reg-v3.c
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index d5423ab..cc495d79 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -60,9 +60,6 @@ struct kvm_arch {
- 	/* The last vcpu id that ran on each physical CPU */
- 	int __percpu *last_vcpu_ran;
- 
--	/* Timer */
--	struct arch_timer_kvm	timer;
--
- 	/*
- 	 * Anything that is not used directly from assembly code goes
- 	 * here.
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 9d74464..f93f2171 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -135,7 +135,6 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
- 		goto out_free_stage2_pgd;
- 
- 	kvm_vgic_early_init(kvm);
--	kvm_timer_init(kvm);
- 
- 	/* Mark the initial VMID generation invalid */
- 	kvm->arch.vmid_gen = 0;
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index e505038..4a758cb 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -70,9 +70,6 @@ struct kvm_arch {
- 
- 	/* Interrupt controller */
- 	struct vgic_dist	vgic;
--
--	/* Timer */
--	struct arch_timer_kvm	timer;
- };
- 
- #define KVM_NR_MEM_OBJS     40
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index daad3c1..2c8560b 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -23,11 +23,6 @@
- #include <linux/hrtimer.h>
- #include <linux/workqueue.h>
- 
--struct arch_timer_kvm {
--	/* Virtual offset */
--	u64			cntvoff;
--};
--
- struct arch_timer_context {
- 	/* Registers: control register, timer value */
- 	u32				cnt_ctl;
-@@ -38,6 +33,9 @@ struct arch_timer_context {
- 
- 	/* Active IRQ state caching */
- 	bool				active_cleared_last;
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index 0ae6035..7a3e537 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -186,9 +186,12 @@ struct kvm_arch_memory_slot {
+ 			(0xffffffffULL << KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT)
+ #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
+ #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
++#define   KVM_DEV_ARM_VGIC_SYSREG_INSTR_MASK (0xffff)
+ #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
+ #define KVM_DEV_ARM_VGIC_GRP_CTRL       4
+ #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
++#define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
 +
-+	/* Virtual offset */
-+	u64			cntvoff;
- };
+ #define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
  
- struct arch_timer_cpu {
-@@ -58,7 +56,6 @@ struct arch_timer_cpu {
+ /* KVM_IRQ_LINE irq field index values */
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index 12b6281..7b3670c 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -7,7 +7,7 @@ ifeq ($(plus_virt),+virt)
+ 	plus_virt_def := -DREQUIRES_VIRT=1
+ endif
  
- int kvm_timer_hyp_init(void);
- int kvm_timer_enable(struct kvm_vcpu *vcpu);
--void kvm_timer_init(struct kvm *kvm);
- int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 			 const struct kvm_irq_level *irq);
- void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index d3556b3..5004a67 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -101,9 +101,10 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
- static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
- {
- 	u64 cval, now;
-+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+-ccflags-y += -Iarch/arm/kvm
++ccflags-y += -Iarch/arm/kvm -Ivirt/kvm/arm/vgic
+ CFLAGS_arm.o := -I. $(plus_virt_def)
+ CFLAGS_mmu.o := -I.
  
--	cval = vcpu_vtimer(vcpu)->cnt_cval;
--	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
-+	cval = vtimer->cnt_cval;
-+	now = kvm_phys_timer_read() - vtimer->cntvoff;
+@@ -20,7 +20,7 @@ kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/eventfd.o $(KVM)/vf
+ obj-$(CONFIG_KVM_ARM_HOST) += hyp/
+ obj-y += kvm-arm.o init.o interrupts.o
+ obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+-obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
++obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o vgic-v3-coproc.o
+ obj-y += $(KVM)/arm/aarch32.o
  
- 	if (now < cval) {
- 		u64 ns;
-@@ -159,7 +160,7 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
- 		return false;
- 
- 	cval = vtimer->cnt_cval;
--	now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
-+	now = kvm_phys_timer_read() - vtimer->cntvoff;
- 
- 	return cval <= now;
- }
-@@ -354,10 +355,32 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 	return 0;
- }
- 
-+/* Make the updates of cntvoff for all vtimer contexts atomic */
-+static void update_vtimer_cntvoff(struct kvm_vcpu *vcpu, u64 cntvoff)
+ obj-y += $(KVM)/arm/vgic/vgic.o
+diff --git a/arch/arm/kvm/vgic-v3-coproc.c b/arch/arm/kvm/vgic-v3-coproc.c
+new file mode 100644
+index 0000000..f41abf7
+--- /dev/null
++++ b/arch/arm/kvm/vgic-v3-coproc.c
+@@ -0,0 +1,35 @@
++/*
++ * VGIC system registers handling functions for AArch32 mode
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++#include <asm/kvm_emulate.h>
++#include "vgic.h"
++
++int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
++				 u64 *reg)
 +{
-+	int i;
-+	struct kvm *kvm = vcpu->kvm;
-+	struct kvm_vcpu *tmp;
-+
-+	mutex_lock(&kvm->lock);
-+	kvm_for_each_vcpu(i, tmp, kvm)
-+		vcpu_vtimer(tmp)->cntvoff = cntvoff;
-+
 +	/*
-+	 * When called from the vcpu create path, the CPU being created is not
-+	 * included in the loop above, so we just set it here as well.
++	 * TODO: Implement for AArch32
 +	 */
-+	vcpu_vtimer(vcpu)->cntvoff = cntvoff;
-+	mutex_unlock(&kvm->lock);
++	return -ENXIO;
 +}
 +
- void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 
-+	/* Synchronize cntvoff across all vtimers of a VM. */
-+	update_vtimer_cntvoff(vcpu, kvm_phys_timer_read());
++int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write, u64 id,
++				u64 *reg)
++{
++	/*
++	 * TODO: Implement for AArch32
++	 */
++	return -ENXIO;
++}
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 56dc08d..be379d7 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -206,9 +206,12 @@ struct kvm_arch_memory_slot {
+ 			(0xffffffffULL << KVM_DEV_ARM_VGIC_V3_MPIDR_SHIFT)
+ #define   KVM_DEV_ARM_VGIC_OFFSET_SHIFT	0
+ #define   KVM_DEV_ARM_VGIC_OFFSET_MASK	(0xffffffffULL << KVM_DEV_ARM_VGIC_OFFSET_SHIFT)
++#define   KVM_DEV_ARM_VGIC_SYSREG_INSTR_MASK (0xffff)
+ #define KVM_DEV_ARM_VGIC_GRP_NR_IRQS	3
+ #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
+ #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
++#define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
 +
- 	INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
- 	hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
- 	timer->timer.function = kvm_timer_expire;
-@@ -377,7 +400,7 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
- 		vtimer->cnt_ctl = value;
+ #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
+ 
+ /* Device Control API on vcpu fd */
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index e025bec..afd51be 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for Kernel-based Virtual Machine module
+ #
+ 
+-ccflags-y += -Iarch/arm64/kvm
++ccflags-y += -Iarch/arm64/kvm -Ivirt/kvm/arm/vgic
+ CFLAGS_arm.o := -I.
+ CFLAGS_mmu.o := -I.
+ 
+@@ -19,6 +19,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
++kvm-$(CONFIG_KVM_ARM_HOST) += vgic-sys-reg-v3.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/aarch32.o
+ 
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic.o
+diff --git a/arch/arm64/kvm/vgic-sys-reg-v3.c b/arch/arm64/kvm/vgic-sys-reg-v3.c
+new file mode 100644
+index 0000000..79f37e3
+--- /dev/null
++++ b/arch/arm64/kvm/vgic-sys-reg-v3.c
+@@ -0,0 +1,346 @@
++/*
++ * VGIC system registers handling functions for AArch64 mode
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/irqchip/arm-gic-v3.h>
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++#include <asm/kvm_emulate.h>
++#include "vgic.h"
++#include "sys_regs.h"
++
++static bool access_gic_ctlr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			    const struct sys_reg_desc *r)
++{
++	u32 host_pri_bits, host_id_bits, host_seis, host_a3v, seis, a3v;
++	struct vgic_cpu *vgic_v3_cpu = &vcpu->arch.vgic_cpu;
++	struct vgic_vmcr vmcr;
++	u64 val;
++
++	vgic_get_vmcr(vcpu, &vmcr);
++	if (p->is_write) {
++		val = p->regval;
++
++		/*
++		 * Disallow restoring VM state if not supported by this
++		 * hardware.
++		 */
++		host_pri_bits = ((val & ICC_CTLR_EL1_PRI_BITS_MASK) >>
++				 ICC_CTLR_EL1_PRI_BITS_SHIFT) + 1;
++		if (host_pri_bits > vgic_v3_cpu->num_pri_bits)
++			return false;
++
++		vgic_v3_cpu->num_pri_bits = host_pri_bits;
++
++		host_id_bits = (val & ICC_CTLR_EL1_ID_BITS_MASK) >>
++				ICC_CTLR_EL1_ID_BITS_SHIFT;
++		if (host_id_bits > vgic_v3_cpu->num_id_bits)
++			return false;
++
++		vgic_v3_cpu->num_id_bits = host_id_bits;
++
++		host_seis = ((kvm_vgic_global_state.ich_vtr_el2 &
++			     ICH_VTR_SEIS_MASK) >> ICH_VTR_SEIS_SHIFT);
++		seis = (val & ICC_CTLR_EL1_SEIS_MASK) >>
++			ICC_CTLR_EL1_SEIS_SHIFT;
++		if (host_seis != seis)
++			return false;
++
++		host_a3v = ((kvm_vgic_global_state.ich_vtr_el2 &
++			    ICH_VTR_A3V_MASK) >> ICH_VTR_A3V_SHIFT);
++		a3v = (val & ICC_CTLR_EL1_A3V_MASK) >> ICC_CTLR_EL1_A3V_SHIFT;
++		if (host_a3v != a3v)
++			return false;
++
++		/*
++		 * Here set VMCR.CTLR in ICC_CTLR_EL1 layout.
++		 * The vgic_set_vmcr() will convert to ICH_VMCR layout.
++		 */
++		vmcr.ctlr = val & ICC_CTLR_EL1_CBPR_MASK;
++		vmcr.ctlr |= val & ICC_CTLR_EL1_EOImode_MASK;
++		vgic_set_vmcr(vcpu, &vmcr);
++	} else {
++		val = 0;
++		val |= (vgic_v3_cpu->num_pri_bits - 1) <<
++			ICC_CTLR_EL1_PRI_BITS_SHIFT;
++		val |= vgic_v3_cpu->num_id_bits << ICC_CTLR_EL1_ID_BITS_SHIFT;
++		val |= ((kvm_vgic_global_state.ich_vtr_el2 &
++			ICH_VTR_SEIS_MASK) >> ICH_VTR_SEIS_SHIFT) <<
++			ICC_CTLR_EL1_SEIS_SHIFT;
++		val |= ((kvm_vgic_global_state.ich_vtr_el2 &
++			ICH_VTR_A3V_MASK) >> ICH_VTR_A3V_SHIFT) <<
++			ICC_CTLR_EL1_A3V_SHIFT;
++		/*
++		 * The VMCR.CTLR value is in ICC_CTLR_EL1 layout.
++		 * Extract it directly using ICC_CTLR_EL1 reg definitions.
++		 */
++		val |= vmcr.ctlr & ICC_CTLR_EL1_CBPR_MASK;
++		val |= vmcr.ctlr & ICC_CTLR_EL1_EOImode_MASK;
++
++		p->regval = val;
++	}
++
++	return true;
++}
++
++static bool access_gic_pmr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			   const struct sys_reg_desc *r)
++{
++	struct vgic_vmcr vmcr;
++
++	vgic_get_vmcr(vcpu, &vmcr);
++	if (p->is_write) {
++		vmcr.pmr = (p->regval & ICC_PMR_EL1_MASK) >> ICC_PMR_EL1_SHIFT;
++		vgic_set_vmcr(vcpu, &vmcr);
++	} else {
++		p->regval = (vmcr.pmr << ICC_PMR_EL1_SHIFT) & ICC_PMR_EL1_MASK;
++	}
++
++	return true;
++}
++
++static bool access_gic_bpr0(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			    const struct sys_reg_desc *r)
++{
++	struct vgic_vmcr vmcr;
++
++	vgic_get_vmcr(vcpu, &vmcr);
++	if (p->is_write) {
++		vmcr.bpr = (p->regval & ICC_BPR0_EL1_MASK) >>
++			    ICC_BPR0_EL1_SHIFT;
++		vgic_set_vmcr(vcpu, &vmcr);
++	} else {
++		p->regval = (vmcr.bpr << ICC_BPR0_EL1_SHIFT) &
++			     ICC_BPR0_EL1_MASK;
++	}
++
++	return true;
++}
++
++static bool access_gic_bpr1(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			    const struct sys_reg_desc *r)
++{
++	struct vgic_vmcr vmcr;
++
++	if (!p->is_write)
++		p->regval = 0;
++
++	vgic_get_vmcr(vcpu, &vmcr);
++	if (!((vmcr.ctlr & ICH_VMCR_CBPR_MASK) >> ICH_VMCR_CBPR_SHIFT)) {
++		if (p->is_write) {
++			vmcr.abpr = (p->regval & ICC_BPR1_EL1_MASK) >>
++				     ICC_BPR1_EL1_SHIFT;
++			vgic_set_vmcr(vcpu, &vmcr);
++		} else {
++			p->regval = (vmcr.abpr << ICC_BPR1_EL1_SHIFT) &
++				     ICC_BPR1_EL1_MASK;
++		}
++	} else {
++		if (!p->is_write)
++			p->regval = min((vmcr.bpr + 1), 7U);
++	}
++
++	return true;
++}
++
++static bool access_gic_grpen0(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			      const struct sys_reg_desc *r)
++{
++	struct vgic_vmcr vmcr;
++
++	vgic_get_vmcr(vcpu, &vmcr);
++	if (p->is_write) {
++		vmcr.grpen0 = (p->regval & ICC_IGRPEN0_EL1_MASK) >>
++			       ICC_IGRPEN0_EL1_SHIFT;
++		vgic_set_vmcr(vcpu, &vmcr);
++	} else {
++		p->regval = (vmcr.grpen0 << ICC_IGRPEN0_EL1_SHIFT) &
++			     ICC_IGRPEN0_EL1_MASK;
++	}
++
++	return true;
++}
++
++static bool access_gic_grpen1(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			      const struct sys_reg_desc *r)
++{
++	struct vgic_vmcr vmcr;
++
++	vgic_get_vmcr(vcpu, &vmcr);
++	if (p->is_write) {
++		vmcr.grpen1 = (p->regval & ICC_IGRPEN1_EL1_MASK) >>
++			       ICC_IGRPEN1_EL1_SHIFT;
++		vgic_set_vmcr(vcpu, &vmcr);
++	} else {
++		p->regval = (vmcr.grpen1 << ICC_IGRPEN1_EL1_SHIFT) &
++			     ICC_IGRPEN1_EL1_MASK;
++	}
++
++	return true;
++}
++
++static void vgic_v3_access_apr_reg(struct kvm_vcpu *vcpu,
++				   struct sys_reg_params *p, u8 apr, u8 idx)
++{
++	struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
++	uint32_t *ap_reg;
++
++	if (apr)
++		ap_reg = &vgicv3->vgic_ap1r[idx];
++	else
++		ap_reg = &vgicv3->vgic_ap0r[idx];
++
++	if (p->is_write)
++		*ap_reg = p->regval;
++	else
++		p->regval = *ap_reg;
++}
++
++static bool access_gic_aprn(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			    const struct sys_reg_desc *r, u8 apr)
++{
++	struct vgic_cpu *vgic_v3_cpu = &vcpu->arch.vgic_cpu;
++	u8 idx = r->Op2 & 3;
++
++	/*
++	 * num_pri_bits are initialized with HW supported values.
++	 * We can rely safely on num_pri_bits even if VM has not
++	 * restored ICC_CTLR_EL1 before restoring APnR registers.
++	 */
++	switch (vgic_v3_cpu->num_pri_bits) {
++	case 7:
++		vgic_v3_access_apr_reg(vcpu, p, apr, idx);
++		break;
++	case 6:
++		if (idx > 1)
++			goto err;
++		vgic_v3_access_apr_reg(vcpu, p, apr, idx);
++		break;
++	default:
++		if (idx > 0)
++			goto err;
++		vgic_v3_access_apr_reg(vcpu, p, apr, idx);
++	}
++
++	return true;
++err:
++	if (!p->is_write)
++		p->regval = 0;
++
++	return false;
++}
++
++static bool access_gic_ap0r(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			    const struct sys_reg_desc *r)
++
++{
++	return access_gic_aprn(vcpu, p, r, 0);
++}
++
++static bool access_gic_ap1r(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			    const struct sys_reg_desc *r)
++{
++	return access_gic_aprn(vcpu, p, r, 1);
++}
++
++static bool access_gic_sre(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
++			   const struct sys_reg_desc *r)
++{
++	struct vgic_v3_cpu_if *vgicv3 = &vcpu->arch.vgic_cpu.vgic_v3;
++
++	/* Validate SRE bit */
++	if (p->is_write) {
++		if (!(p->regval & ICC_SRE_EL1_SRE))
++			return false;
++	} else {
++		p->regval = vgicv3->vgic_sre;
++	}
++
++	return true;
++}
++static const struct sys_reg_desc gic_v3_icc_reg_descs[] = {
++	/* ICC_PMR_EL1 */
++	{ Op0(3), Op1(0), CRn(4), CRm(6), Op2(0), access_gic_pmr },
++	/* ICC_BPR0_EL1 */
++	{ Op0(3), Op1(0), CRn(12), CRm(8), Op2(3), access_gic_bpr0 },
++	/* ICC_AP0R0_EL1 */
++	{ Op0(3), Op1(0), CRn(12), CRm(8), Op2(4), access_gic_ap0r },
++	/* ICC_AP0R1_EL1 */
++	{ Op0(3), Op1(0), CRn(12), CRm(8), Op2(5), access_gic_ap0r },
++	/* ICC_AP0R2_EL1 */
++	{ Op0(3), Op1(0), CRn(12), CRm(8), Op2(6), access_gic_ap0r },
++	/* ICC_AP0R3_EL1 */
++	{ Op0(3), Op1(0), CRn(12), CRm(8), Op2(7), access_gic_ap0r },
++	/* ICC_AP1R0_EL1 */
++	{ Op0(3), Op1(0), CRn(12), CRm(9), Op2(0), access_gic_ap1r },
++	/* ICC_AP1R1_EL1 */
++	{ Op0(3), Op1(0), CRn(12), CRm(9), Op2(1), access_gic_ap1r },
++	/* ICC_AP1R2_EL1 */
++	{ Op0(3), Op1(0), CRn(12), CRm(9), Op2(2), access_gic_ap1r },
++	/* ICC_AP1R3_EL1 */
++	{ Op0(3), Op1(0), CRn(12), CRm(9), Op2(3), access_gic_ap1r },
++	/* ICC_BPR1_EL1 */
++	{ Op0(3), Op1(0), CRn(12), CRm(12), Op2(3), access_gic_bpr1 },
++	/* ICC_CTLR_EL1 */
++	{ Op0(3), Op1(0), CRn(12), CRm(12), Op2(4), access_gic_ctlr },
++	/* ICC_SRE_EL1 */
++	{ Op0(3), Op1(0), CRn(12), CRm(12), Op2(5), access_gic_sre },
++	/* ICC_IGRPEN0_EL1 */
++	{ Op0(3), Op1(0), CRn(12), CRm(12), Op2(6), access_gic_grpen0 },
++	/* ICC_GRPEN1_EL1 */
++	{ Op0(3), Op1(0), CRn(12), CRm(12), Op2(7), access_gic_grpen1 },
++};
++
++int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
++				u64 *reg)
++{
++	struct sys_reg_params params;
++	u64 sysreg = (id & KVM_DEV_ARM_VGIC_SYSREG_MASK) | KVM_REG_SIZE_U64;
++
++	params.regval = *reg;
++	params.is_write = is_write;
++	params.is_aarch32 = false;
++	params.is_32bit = false;
++
++	if (find_reg_by_id(sysreg, &params, gic_v3_icc_reg_descs,
++			      ARRAY_SIZE(gic_v3_icc_reg_descs)))
++		return 0;
++
++	return -ENXIO;
++}
++
++int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write, u64 id,
++				u64 *reg)
++{
++	struct sys_reg_params params;
++	const struct sys_reg_desc *r;
++	u64 sysreg = (id & KVM_DEV_ARM_VGIC_SYSREG_MASK) | KVM_REG_SIZE_U64;
++
++	if (is_write)
++		params.regval = *reg;
++	params.is_write = is_write;
++	params.is_aarch32 = false;
++	params.is_32bit = false;
++
++	r = find_reg_by_id(sysreg, &params, gic_v3_icc_reg_descs,
++			   ARRAY_SIZE(gic_v3_icc_reg_descs));
++	if (!r)
++		return -ENXIO;
++
++	if (!r->access(vcpu, &params, r))
++		return -EINVAL;
++
++	if (!is_write)
++		*reg = params.regval;
++
++	return 0;
++}
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 0af1477..b72dd2a 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -71,6 +71,8 @@ struct vgic_global {
+ 
+ 	/* GIC system register CPU interface */
+ 	struct static_key_false gicv3_cpuif;
++
++	u32			ich_vtr_el2;
+ };
+ 
+ extern struct vgic_global kvm_vgic_global_state;
+@@ -275,6 +277,12 @@ struct vgic_cpu {
+ 	u64 pendbaser;
+ 
+ 	bool lpis_enabled;
++
++	/* Cache guest priority bits */
++	u32 num_pri_bits;
++
++	/* Cache guest interrupt ID bits */
++	u32 num_id_bits;
+ };
+ 
+ extern struct static_key_false vgic_v2_cpuif_trap;
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index 227337f..b30372b 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -504,6 +504,14 @@ static int vgic_v3_attr_regs_access(struct kvm_device *dev,
+ 		if (!is_write)
+ 			*reg = tmp32;
  		break;
- 	case KVM_REG_ARM_TIMER_CNT:
--		vcpu->kvm->arch.timer.cntvoff = kvm_phys_timer_read() - value;
-+		update_vtimer_cntvoff(vcpu, kvm_phys_timer_read() - value);
++	case KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS: {
++		u64 regid;
++
++		regid = (attr->attr & KVM_DEV_ARM_VGIC_SYSREG_INSTR_MASK);
++		ret = vgic_v3_cpu_sysregs_uaccess(vcpu, is_write,
++						  regid, reg);
++		break;
++	}
+ 	default:
+ 		ret = -EINVAL;
  		break;
- 	case KVM_REG_ARM_TIMER_CVAL:
- 		vtimer->cnt_cval = value;
-@@ -398,7 +421,7 @@ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
- 	case KVM_REG_ARM_TIMER_CTL:
- 		return vtimer->cnt_ctl;
- 	case KVM_REG_ARM_TIMER_CNT:
--		return kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
-+		return kvm_phys_timer_read() - vtimer->cntvoff;
- 	case KVM_REG_ARM_TIMER_CVAL:
- 		return vtimer->cnt_cval;
+@@ -537,6 +545,15 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
+ 		reg = tmp32;
+ 		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
  	}
-@@ -510,11 +533,6 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 	return 0;
++	case KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS: {
++		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
++		u64 reg;
++
++		if (get_user(reg, uaddr))
++			return -EFAULT;
++
++		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
++	}
+ 	}
+ 	return -ENXIO;
  }
- 
--void kvm_timer_init(struct kvm *kvm)
--{
--	kvm->arch.timer.cntvoff = kvm_phys_timer_read();
--}
--
- /*
-  * On VHE system, we only need to configure trap on physical timer and counter
-  * accesses in EL0 and EL1 once, not for every world switch.
-diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
-index 0cf0895..4734915 100644
---- a/virt/kvm/arm/hyp/timer-sr.c
-+++ b/virt/kvm/arm/hyp/timer-sr.c
-@@ -53,7 +53,6 @@ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
- 
- void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
- {
--	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
- 	u64 val;
-@@ -71,7 +70,7 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
+@@ -563,6 +580,15 @@ static int vgic_v3_get_attr(struct kvm_device *dev,
+ 		tmp32 = reg;
+ 		return put_user(tmp32, uaddr);
+ 	}
++	case KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS: {
++		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
++		u64 reg;
++
++		ret = vgic_v3_attr_regs_access(dev, attr, &reg, false);
++		if (ret)
++			return ret;
++		return put_user(reg, uaddr);
++	}
  	}
  
- 	if (timer->enabled) {
--		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
-+		write_sysreg(vtimer->cntvoff, cntvoff_el2);
- 		write_sysreg_el0(vtimer->cnt_cval, cntv_cval);
- 		isb();
- 		write_sysreg_el0(vtimer->cnt_ctl, cntv_ctl);
+ 	return -ENXIO;
+@@ -581,6 +607,7 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+ 		break;
+ 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+ 	case KVM_DEV_ARM_VGIC_GRP_REDIST_REGS:
++	case KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS:
+ 		return vgic_v3_has_attr_regs(dev, attr);
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+ 		return 0;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 2031138..549ae45 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -645,6 +645,12 @@ int vgic_v3_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 		iodev.base_addr = 0;
+ 		break;
+ 	}
++	case KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS: {
++		u64 reg, id;
++
++		id = (attr->attr & KVM_DEV_ARM_VGIC_SYSREG_INSTR_MASK);
++		return vgic_v3_has_cpu_sysregs_attr(vcpu, 0, id, &reg);
++	}
+ 	default:
+ 		return -ENXIO;
+ 	}
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 42ff9c9..edc6ee2 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -238,6 +238,13 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
+ 		vgic_v3->vgic_sre = 0;
+ 	}
+ 
++	vcpu->arch.vgic_cpu.num_id_bits = (kvm_vgic_global_state.ich_vtr_el2 &
++					   ICH_VTR_ID_BITS_MASK) >>
++					   ICH_VTR_ID_BITS_SHIFT;
++	vcpu->arch.vgic_cpu.num_pri_bits = ((kvm_vgic_global_state.ich_vtr_el2 &
++					    ICH_VTR_PRI_BITS_MASK) >>
++					    ICH_VTR_PRI_BITS_SHIFT) + 1;
++
+ 	/* Get the show on the road... */
+ 	vgic_v3->vgic_hcr = ICH_HCR_EN;
+ }
+@@ -336,6 +343,7 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+ 	 */
+ 	kvm_vgic_global_state.nr_lr = (ich_vtr_el2 & 0xf) + 1;
+ 	kvm_vgic_global_state.can_emulate_gicv2 = false;
++	kvm_vgic_global_state.ich_vtr_el2 = ich_vtr_el2;
+ 
+ 	if (!info->vcpu.start) {
+ 		kvm_info("GICv3: no GICV resource entry\n");
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index ecfe1a6..a5a45f6 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -52,6 +52,27 @@
+ 			    VGIC_AFFINITY_LEVEL(val, 2) | \
+ 			    VGIC_AFFINITY_LEVEL(val, 3))
+ 
++/*
++ * As per Documentation/virtual/kvm/devices/arm-vgic-v3.txt,
++ * below macros are defined for CPUREG encoding.
++ */
++#define KVM_REG_ARM_VGIC_SYSREG_OP0_MASK   0x000000000000c000
++#define KVM_REG_ARM_VGIC_SYSREG_OP0_SHIFT  14
++#define KVM_REG_ARM_VGIC_SYSREG_OP1_MASK   0x0000000000003800
++#define KVM_REG_ARM_VGIC_SYSREG_OP1_SHIFT  11
++#define KVM_REG_ARM_VGIC_SYSREG_CRN_MASK   0x0000000000000780
++#define KVM_REG_ARM_VGIC_SYSREG_CRN_SHIFT  7
++#define KVM_REG_ARM_VGIC_SYSREG_CRM_MASK   0x0000000000000078
++#define KVM_REG_ARM_VGIC_SYSREG_CRM_SHIFT  3
++#define KVM_REG_ARM_VGIC_SYSREG_OP2_MASK   0x0000000000000007
++#define KVM_REG_ARM_VGIC_SYSREG_OP2_SHIFT  0
++
++#define KVM_DEV_ARM_VGIC_SYSREG_MASK (KVM_REG_ARM_VGIC_SYSREG_OP0_MASK | \
++				      KVM_REG_ARM_VGIC_SYSREG_OP1_MASK | \
++				      KVM_REG_ARM_VGIC_SYSREG_CRN_MASK | \
++				      KVM_REG_ARM_VGIC_SYSREG_CRM_MASK | \
++				      KVM_REG_ARM_VGIC_SYSREG_OP2_MASK)
++
+ static inline bool irq_is_pending(struct vgic_irq *irq)
+ {
+ 	if (irq->config == VGIC_CONFIG_EDGE)
+@@ -139,6 +160,10 @@ int vgic_v3_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+ 			 int offset, u32 *val);
+ int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+ 			 int offset, u32 *val);
++int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write,
++			 u64 id, u64 *val);
++int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
++				u64 *reg);
+ int kvm_register_vgic_device(unsigned long type);
+ void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
 -- 
 2.1.4
