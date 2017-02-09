@@ -1,111 +1,83 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 9 Feb 2017 21:58:47 +0530
-Subject: [PATCH v7 2/4] dmaengine: Forward slave device pointer to
- of_xlate callback
-In-Reply-To: <ded8b3e8-2ef8-218b-fb6d-783825588fd8@samsung.com>
-References: <1485340088-25481-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170125102824eucas1p1cf027184286131ff628eb7113c3f9e60@eucas1p1.samsung.com>
- <1485340088-25481-3-git-send-email-m.szyprowski@samsung.com>
- <26397455-1237-2a66-acf8-215aacc7c9ce@metafoo.de>
- <49c9c23d-ff0a-268a-5edd-931e04eb98b5@samsung.com>
- <20170209041123.GK19244@localhost>
- <ded8b3e8-2ef8-218b-fb6d-783825588fd8@samsung.com>
-Message-ID: <20170209162847.GL19244@localhost>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Feb 2017 16:29:56 +0000
+Subject: [PATCHv3] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
+References: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
+Message-ID: <20170209162956.GH27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2017 at 10:22:38AM +0100, Marek Szyprowski wrote:
-> Hi Vinod,
-> 
-> On 2017-02-09 05:11, Vinod Koul wrote:
-> >On Thu, Jan 26, 2017 at 03:43:05PM +0100, Marek Szyprowski wrote:
-> >>On 2017-01-25 14:12, Lars-Peter Clausen wrote:
-> >>>On 01/25/2017 11:28 AM, Marek Szyprowski wrote:
-> >>>>Add pointer to slave device to of_dma_xlate to let DMA engine driver
-> >>>>to know which slave device is using given DMA channel. This will be
-> >>>>later used to implement non-irq-safe runtime PM for DMA engine driver.
-> >>>of_dma_xlate() is used to translate from a OF phandle and a specifier to a
-> >>>DMA channel. On one hand this does not necessarily mean that the channel is
-> >>>actually going to be used by the slave that called the xlate function.
-> >>>Modifying the driver state when a lookup of the channel is done is a
-> >>>layering violation. And this approach is also missing a way to disassociate
-> >>>a slave from a DMA channel, e.g. when it is no longer used.
-> >>>
-> >>>On the other hand there are other mechanisms to translate between some kind
-> >>>of firmware handle to a DMA channel which are completely ignored here.
-> >>>
-> >>>So this approach does not work. This is something that needs to be done at
-> >>>the dmaengine level, not a the firmware resource translation level. And it
-> >>>needs a matching method that is called when the channel is disassociated
-> >>>from a device, when the device no longer uses the DMA channel.
-> >>
-> >>Frankly I agree that of_dma_xlate() should only return the requested channel
-> >>to the dmaengine core and do not do any modification in the the
-> >>driver state.
-> >True..
-> >
-> >>However the current dma engine design and implementation breaks this rule.
-> >>Please check the drivers - how do they implement of_xlate callback. They
-> >>usually call dma_get_any_slave_channel, dma_get_slave_channel or
-> >>__dma_request_channel there, which in turn calls dma_chan_get, which then
-> >>calls back to device_alloc_chan_resources callback. Some of the drivers also
-> >>do a hardware configuration or other resource allocation in of_xlate.
-> >>This is a bit messy design and leave no place in the core to set
-> >>slave device
-> >>before device_alloc_chan_resources callback, where one would expect to have
-> >>it already set.
-> >We shouldn't be doing much at this stage. We operate on a channel, so the
-> >channel is returned to the client. We need to do these HW configurations
-> >when the channel has to be prepred for a txn.
-> 
-> IMHO, any HW configurations should be done in alloc_chan_resources
-> callback and
-> it would be best if a pointer of slave device will come as a
-> parameter to it.
+On Tue, Feb 07, 2017 at 10:57:55PM +0000, Abel Vesa wrote:
+> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+> +
+> +.macro __ftrace_regs_caller
+> +
+> +	add 	ip, sp, #4	@ move in IP the value of SP as it was
+> +				@ before the push {lr} of the mcount mechanism
+> +	stmdb	sp!, {ip,lr,pc}
+> +	stmdb	sp!, {r0-r11,lr}
+> +
+> +	@ stack content at this point:
+> +	@ 0  4          44    48   52       56   60   64
+> +	@ R0 | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |
 
-HW configuration is dependent upon the parameters passed, which are not part
-of alloc_chan_resources(). Consider it as kind of open() to get a handle for
-dmaengine
+How important is this to be close to "struct pt_regs" ?  Do we care about
+r12 being "wrong" ?  The other issue is that pt_regs is actually 72
+bytes in size, not 68 bytes.  So, does that mean we end up inappropriately
+leaking some of the kernel stack to userspace through ftrace?
 
-> 
-> >>The best place to add new calls to the dmaengine drivers to set slave device
-> >>would be just before device_alloc_chan_resources(), what in turn means that
-> >>the current dmaengine core should do in dma_chan_get(). This would
-> >>require to
-> >>forward the slave device pointer via even more layers including the of_xlate
-> >>callback too. IMHO this is not worth the effort.
-> >>
-> >>DMA engine core and API definitely needs some cleanup. During such cleanup
-> >>the slave device pointer might be moved out of xlate into separate callback
-> >>when the core gets ready for such operation.
-> >Yes agreed on that, plus the runtime handling needs to be built in, right
-> >now the APIs dont work well with it, we disucssed these during the KS and
-> >this goes without saying, patches are welcome :)
-> 
-> Okay, so what is the conclusion? Do you want me to do the whole
-> rework of dma
-> engine core to get this runtime pm patchset for pl330 merged??? Is there any
-> roadmap for this rework prepared, so I can at least take a look at
-> the amount
-> of work needed to be done?
-> 
-> I'm rather new to dma engine framework and I only wanted to fix pl330 driver
-> not to block turning off the power domain on Exynos5422/5433 SoCs.
-> 
-> I can also check again if there is any other way to find the slave device in
-> alloc_chan_resources, like for example scanning the device tree for
-> phandles,
-> to avoid changing dmaengine core as this turned out to be too problematic
-> before one will do the proper dma engine core rework.
+It's possible to save all the registers like this if we need to provide
+a complete picture of the register set at function entry:
 
-There are few things we need to do for making APIs cleaner.
+	str	ip, [sp, #-16]!
+	add	ip, sp, #20
+	stmia	sp, {ip, lr, pc}
+	stmdb	sp!, {r0 - r11}
 
-We have a mini discussion during KS/Plumbers, Here are the notes
-http://www.spinics.net/lists/dmaengine/msg11570.html
+However, is that even correct - don't we want pt_regs' LR and PC to be
+related to the function call itself?  The "previous LR" as you describe
+it is where the called function (the one that is being traced) will
+return to.  The current LR at this point is the address within the
+traced function.  So actually I think this is more strictly correct, if
+I'm understanding the intention here correctly:
 
-I don't want to block your series for this, I will take a look at v8, first
-thing in morning..
+	str	ip, [sp, #S_IP - PT_REGS_SIZE]!	@ save current IP
+	ldr	ip, [sp, #PT_REGS_SIZE - S_IP]	@ get LR at traced function entry
+	str	lr, [sp, #S_PC - S_IP]		@ save current LR as PC
+	str	ip, [sp, #S_LR - S_IP]		@ save traced function return
+	add	ip, sp, #PT_REGS_SIZE - S_IP + 4
+	str	ip, [sp, #S_SP - SP_IP]		@ save stack pointer at function entry
+	stmdb	sp!, {r0 - r11}
+	@ clear CPSR and old_r0 words
+	mov	r3, #0
+	str	r3, [sp, #S_PSR]
+	str	r3, [sp, #S_OLD_R0]
 
-Thanks
+However, that has the side effect of misaligning the stack (the stack
+needs to be aligned to 8 bytes).  So, if we decide we don't care about
+the saved LR value (except as a mechanism to preserve it across the
+call into the ftrace code):
+
+	str	ip, [sp, #S_IP - PT_REGS_SIZE + 4]!
+	str	lr, [sp, #S_PC - S_IP]
+	ldr	lr, [sp, #PT_REGS_SIZE - 4 - S_IP]
+	add	ip, sp, #PT_REGS_SIZE - S_IP
+	stmib	sp, {ip, lr}
+	stmdb	sp!, {r0 - r11}
+	@ clear CPSR and old_r0 words
+	mov	r3, #0
+	str	r3, [sp, #S_PSR]
+	str	r3, [sp, #S_OLD_R0]
+
+and the return would be:
+
+	ldmia	sp, {r0 - pc}
+
+That all said - maybe someone from the ftrace community can comment on
+how much of pt_regs is actually necessary here?
+
 -- 
-~Vinod
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
