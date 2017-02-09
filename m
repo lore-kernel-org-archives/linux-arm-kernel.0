@@ -1,40 +1,138 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  9 Feb 2017 14:59:17 +0000
-Subject: [PATCH 19/25] KVM: arm/arm64: Add the EL1 physical timer context
+Date: Thu,  9 Feb 2017 14:59:20 +0000
+Subject: [PATCH 22/25] KVM: arm/arm64: Set a background timer to the earliest
+ timer expiration
 In-Reply-To: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
 References: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1486652363-7696-20-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1486652363-7696-23-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jintack Lim <jintack@cs.columbia.edu>
 
-Add the EL1 physical timer context.
+When scheduling a background timer, consider both of the virtual and
+physical timer and pick the earliest expiration time.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/kvm/arm_arch_timer.h | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/kvm/arm.c        |  3 ++-
+ virt/kvm/arm/arch_timer.c | 53 +++++++++++++++++++++++++++++++++++------------
+ 2 files changed, 42 insertions(+), 14 deletions(-)
 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index f46fa3b..6445a3d 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -40,6 +40,7 @@ struct arch_timer_context {
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 0ecd6cf..21c493a 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -300,7 +300,8 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
  
- struct arch_timer_cpu {
- 	struct arch_timer_context	vtimer;
-+	struct arch_timer_context	ptimer;
+ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
+ {
+-	return kvm_timer_should_fire(vcpu_vtimer(vcpu));
++	return kvm_timer_should_fire(vcpu_vtimer(vcpu)) ||
++	       kvm_timer_should_fire(vcpu_ptimer(vcpu));
+ }
  
- 	/* Background timer used when the guest is not running */
- 	struct hrtimer			timer;
-@@ -75,4 +76,5 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
- void kvm_timer_init_vhe(void);
+ void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 7f9a664..0ea7452 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -118,6 +118,35 @@ static u64 kvm_timer_compute_delta(struct arch_timer_context *timer_ctx)
+ 	return 0;
+ }
  
- #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
-+#define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.ptimer)
- #endif
++static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
++{
++	return !(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
++		(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
++}
++
++/*
++ * Returns the earliest expiration time in ns among guest timers.
++ * Note that it will return 0 if none of timers can fire.
++ */
++static u64 kvm_timer_earliest_exp(struct kvm_vcpu *vcpu)
++{
++	u64 min_virt = ULLONG_MAX, min_phys = ULLONG_MAX;
++	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
++	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
++
++	if (kvm_timer_irq_can_fire(vtimer))
++		min_virt = kvm_timer_compute_delta(vtimer);
++
++	if (kvm_timer_irq_can_fire(ptimer))
++		min_phys = kvm_timer_compute_delta(ptimer);
++
++	/* If none of timers can fire, then return 0 */
++	if ((min_virt == ULLONG_MAX) && (min_phys == ULLONG_MAX))
++		return 0;
++
++	return min(min_virt, min_phys);
++}
++
+ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+ {
+ 	struct arch_timer_cpu *timer;
+@@ -132,7 +161,7 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+ 	 * PoV (NTP on the host may have forced it to expire
+ 	 * early). If we should have slept longer, restart it.
+ 	 */
+-	ns = kvm_timer_compute_delta(vcpu_vtimer(vcpu));
++	ns = kvm_timer_earliest_exp(vcpu);
+ 	if (unlikely(ns)) {
+ 		hrtimer_forward_now(hrt, ns_to_ktime(ns));
+ 		return HRTIMER_RESTART;
+@@ -142,12 +171,6 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+ 	return HRTIMER_NORESTART;
+ }
+ 
+-static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
+-{
+-	return !(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
+-		(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
+-}
+-
+ bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
+ {
+ 	u64 cval, now;
+@@ -215,26 +238,30 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
++	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 
+ 	BUG_ON(timer_is_armed(timer));
+ 
+ 	/*
+-	 * No need to schedule a background timer if the guest timer has
++	 * No need to schedule a background timer if any guest timer has
+ 	 * already expired, because kvm_vcpu_block will return before putting
+ 	 * the thread to sleep.
+ 	 */
+-	if (kvm_timer_should_fire(vtimer))
++	if (kvm_timer_should_fire(vtimer) || kvm_timer_should_fire(ptimer))
+ 		return;
+ 
+ 	/*
+-	 * If the timer is not capable of raising interrupts (disabled or
++	 * If both timers are not capable of raising interrupts (disabled or
+ 	 * masked), then there's no more work for us to do.
+ 	 */
+-	if (!kvm_timer_irq_can_fire(vtimer))
++	if (!kvm_timer_irq_can_fire(vtimer) && !kvm_timer_irq_can_fire(ptimer))
+ 		return;
+ 
+-	/*  The timer has not yet expired, schedule a background timer */
+-	timer_arm(timer, kvm_timer_compute_delta(vtimer));
++	/*
++	 * The guest timers have not yet expired, schedule a background timer.
++	 * Set the earliest expiration time among the guest timers.
++	 */
++	timer_arm(timer, kvm_timer_earliest_exp(vcpu));
+ }
+ 
+ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
 -- 
 2.1.4
