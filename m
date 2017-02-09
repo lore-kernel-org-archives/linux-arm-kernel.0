@@ -1,127 +1,96 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Thu, 9 Feb 2017 14:33:22 +0100
-Subject: Fractional divider on the Atmel USART controller
-In-Reply-To: <20170206153723.om7yen4laybhkm6d@rfolt0960.corp.atmel.com>
-References: <CAGkQfmNshOGWT8Vs_J-49qq2UHoCMJ8cYb9jbjaDqM2YNy05rg@mail.gmail.com>
- <20170206134256.tp5rgx6axd532gp3@rfolt0960.corp.atmel.com>
- <b32aeadb-57a3-f327-e387-e4bb720f9297@gmail.com>
- <20170206153723.om7yen4laybhkm6d@rfolt0960.corp.atmel.com>
-Message-ID: <20170209133322.d7bomu5dw7xvzwgg@rfolt0960.corp.atmel.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Thu, 9 Feb 2017 19:05:16 +0530
+Subject: [PATCH V2 1/3] iommu/arm-smmu: Add pm_runtime/sleep ops
+In-Reply-To: <db9bc01c-635d-1a57-8a6c-9be19a0cda16@arm.com>
+References: <1486055420-19671-1-git-send-email-sricharan@codeaurora.org>
+ <1486055420-19671-2-git-send-email-sricharan@codeaurora.org>
+ <20170202174218.GO31394@leverpostej>
+ <017701d281f9$927c5fb0$b7751f10$@codeaurora.org>
+ <20170208114002.GD15459@leverpostej>
+ <018401d28207$34db60a0$9e9221e0$@codeaurora.org>
+ <b55359d8-2665-aef0-3215-53a0e8f21bcd@arm.com>
+ <000301d28211$a5233a90$ef69afb0$@codeaurora.org>
+ <20170208135252.GF15459@leverpostej>
+ <db9bc01c-635d-1a57-8a6c-9be19a0cda16@arm.com>
+Message-ID: <004f01d282d9$5dd0e110$1972a330$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2017 at 04:37:23PM +0100, Ludovic Desroches wrote:
-> On Mon, Feb 06, 2017 at 03:58:52PM +0100, Richard Genoud wrote:
-> > Hi Ludovic,
-> > 
-> > On 06/02/2017 14:42, Ludovic Desroches wrote:
-> > > Hello Romain,
-> > > 
-> > > On Mon, Feb 06, 2017 at 12:56:42PM +0100, Romain Izard wrote:
-> > >> Hello,
-> > >>
-> > >> On Atmel SAMA5D2, when trying to configure a serial port for 3 Mbauds
-> > >> operation, I do not always get the requested baud rate. If the hardware
-> > >> flow control is disabled by software, the line works correctly. But if I
-> > >> set the crtscts option, the line does not work, and after checking the
-> > >> line I can observe that the signal is sent at 2.6 Mbauds.
-> > >>
-> > >> This is due to the code used to manage fractional baud rate divisor: the
-> > >> existing code prevents the fractional bits from being used if the line
-> > >> is not configured in normal mode. This case occurs when the hardware
-> > >> flow control or the RS485 mode is set.
-> > >>
-> > >> If I apply the following patch to drivers/tty/serial/atmel_serial.c,
-> > >> I get the required baudrate.
-> > >>
-> > >> 8<----------------------------------------------------------------
-> > >>
-> > >> @@ -2204,14 +2204,13
-> > >>       * baudrate = selected clock / (8 * (2 - OVER) * (CD + FP / 8))
-> > >>       * Currently, OVER is always set to 0 so we get
-> > >>       * baudrate = selected clock / (16 * (CD + FP / 8))
-> > >>       * then
-> > >>       * 8 CD + FP = selected clock / (2 * baudrate)
-> > >>       */
-> > >> -    if (atmel_port->has_frac_baudrate &&
-> > >> -        (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
-> > >> +    if (atmel_port->has_frac_baudrate) {
-> > >>          div = DIV_ROUND_CLOSEST(port->uartclk, baud * 2);
-> > >>          cd = div >> 3;
-> > >>          fp = div & ATMEL_US_FP_MASK;
-> > >>      } else {
-> > >>          cd = uart_get_divisor(port, baud);
-> > >>      }
-> > >>
-> > >> 8<----------------------------------------------------------------
-> > >>
-> > >> Unfortunately, I know that this will work on SAMA5D2, but this driver is
-> > >> used for many other Atmel chips. I do not know if the existing code is
-> > >> meant to respect a known limitation on other devices that use the same
-> > >> controller, or if it is just a bug.
-> > > 
-> > > It depends on the device used. In the SAMA5D4 datasheet, it is
-> > > mentionned: "This feature is only available when using USART normal mode".
-> > 
-> > It seems you have an old datasheet version, because in table 60.2 (page 1784) of SAMA5D4 datasheet (rev D), there's :
-> > 
-> 
-> Right, it seems there was an update of all sama5 datasheet to remove
-> this constraint. I don't know if it concerns also old devices, I'll try
-> to get more information.
-> 
+Hi Robin,
 
-The restriction to normal mode is no longer needed for all products.
-Datasheet of old SoCs have not been updated.
+>-----Original Message-----
+>From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Robin Murphy
+>Sent: Wednesday, February 08, 2017 8:01 PM
+>To: Mark Rutland <mark.rutland@arm.com>; Sricharan <sricharan@codeaurora.org>
+>Cc: devicetree at vger.kernel.org; mathieu.poirier at linaro.org; linux-arm-msm at vger.kernel.org; joro at 8bytes.org;
+>will.deacon at arm.com; iommu at lists.linux-foundation.org; robh+dt at kernel.org; sboyd at codeaurora.org; linux-arm-
+>kernel at lists.infradead.org; m.szyprowski at samsung.com
+>Subject: Re: [PATCH V2 1/3] iommu/arm-smmu: Add pm_runtime/sleep ops
+>
+>On 08/02/17 13:52, Mark Rutland wrote:
+>> On Wed, Feb 08, 2017 at 07:15:37PM +0530, Sricharan wrote:
+>>>> Clocks are not architectural, so it only makes sense to associate them
+>>>> with an implementation-specific compatible string. There's also no
+>>>
+>>> ok, it for this the QCOM specific implementation binding is tried(going to).
+>>>
+>>>> guarantee that different microarchitectures have equivalent internal
+>>>> clock domains - I'm not sure if "the SMMU's underlying bus access" is
+>>>> meant to refer to accesses *by* the SMMU, i.e. page table walks,
+>>>> accesses *through* the SMMU by upstream masters, or both
+>>>
+>>> In the above QCOM case, it is actually both. Its the same path for both the
+>>> page table walker and upstream masters.
+>
+>Right, that's what I feared. As far as I can make out the current ARM
+>implementations, transactions passing through will require at least
+>TBUn_BCLK for the appropriate TBU, but would also need the page table
+>walker clocked with CCLK to resolve TLB misses. But then the programming
+>interface is also in the CCLK domain (not counting the incoming APB or
+>AXI clock for the actual slave port itself). Thus this 'generic' clock
+>binding already isn't compatible with MMU-40x/500.
+>
 
-Limiting the fractional baudrate was too restrictive. It works with
-other modes but there is a warning (section 44.10.24 in SAMA5D2
-datasheet):
-"Warning: When the value of field FP is greater than 0, the SCK
-(oversampling clock) generates non-constant duty cycles.
-The SCK high duration is increased by ?selected clock? period from time
-to time. The duty cycle depends on the value of
-the CD field."
+Right, this implementation's clock bindings are not going to compatible with
+MMU-500. There is also another soc which integrates MMU-500.  So
+will have to add the clock bindings for MMU-500 as well separately.
+Also in MMU-500 i saw that there is a possibility where the clock-domain
+can be shared between the TCU logic, programming interface and PTW read
+channel.  Does this mean that the TCU-clock has to be 'ON' for both register
+access and PTW, similar to above ?. So for MMU-500 clock bindings there
+can be a CFG_CLK (optional and not required in shared case), TBUn_CLK and
+TCU_CLK
 
-In some situations, it may cause problems especially with ISO7816 mode.
+Regards,
+ Sricharan
 
-> > Section 43.6.1.2 ?Fractional Baud Rate in Asynchronous Mode?: added warning ?When the value of field FP
-> > is greater than 0...?; removed sentence ?This feature is only available when using USART normal mode.?
-> > 
-> > So I guess this should also work on SAMA5D4 ? 
-> > 
-> > 
-> > > In the SAMA5D2 datasheet, this constraint is no longer mentionned you
-> > > confirm that is works, that is great.
-> > > 
-> > >>
-> > >> Ludovic, Nicolas,  what is your opinion on that matter? Should I just
-> > >> propose this as a patch, or is it necessary to add a limitation for
-> > >> supported devices only ?
-> > > 
-
-I think you can propose this as a patch. Adding the datasheet warning as
-comment and commit message could be helpful.
-
-Regards
-
-Ludovic
-
-> > > Yes, only SAMA5D2 supports fractionnal baudrate in other modes than the
-> > > normal one. A new compatible string may be added, I am not sure you have
-> > > enough information in atmel_get_ip_name...
-> > 
-> > I checked the version numbers on some atmel platforms I have:
-> > 
-> > AT91SAM9G35 / SAMA5D3: 0x502
-> > AT91SAM9G20: 0x10330
-> > SAMA5D2: 0x814
-> > 
-> > Ludovic, could you please check the version number of the SAMA5D4 USART (if you have one lying around) ?
-> > 
-> 
-> SAMA5D4: 0x701
-> 
-> Regards
-> 
-> Ludovic
+>>>> differences are rather significant. I'd also note that an MMU-500
+>>>> configuration may have up to *33* clocks.
+>>>>
+>>>> Either way, the QCOM implementation deserves its own compatible if only
+>>>> for the sake of the imp-def gaps in the architecture (e.g. FSR.SS
+>>>> behaviour WRT to IRQs as touched upon in the other thread).
+>>>>
+>>>
+>>> Ok, slightly unclear, so you mean then *clocks* are not good enough reason
+>>> to have a new compatible ?
+>>
+>> I beleive Robin's point was even if the clocks didn't matter, there are
+>> other reasons we should have the QCOM-specific compatible string.
+>>
+>> So we should have one regardless.
+>
+>Exactly.
+>
+>Robin.
+>
+>>
+>> Thanks,
+>> Mark.
+>>
+>
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
