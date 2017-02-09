@@ -1,74 +1,124 @@
-From: olekstysh@gmail.com (Oleksandr Tyshchenko)
-Date: Thu,  9 Feb 2017 15:56:40 +0200
-Subject: [RFC PATCH v1] iommu/io-pgtable-arm: Check for leaf entry right after
- finding it
-Message-ID: <1486648600-27457-1-git-send-email-olekstysh@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 09 Feb 2017 15:22:49 +0100
+Subject: [PATCH v8 1/3] dmaengine: Add new device_{set,
+ release}_slave callbacks
+In-Reply-To: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
+References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170209142307eucas1p180323d005f524760913b8d04ac966423@eucas1p1.samsung.com>
+Message-ID: <1486650171-20598-2-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oleksandr Tyshchenko <oleksandr_tyshchenko@epam.com>
+Add two new callbacks to DMA engine device. They will used to provide
+access to slave device (the device which requested given DMA channel)
+for DMA engine driver. Access to slave device might be useful for example
+for implementing advanced runtime power management.
 
-Do a check for already installed leaf entry at the current level before
-performing any actions when trying to map.
+DMA slave channels are exclusive, so only one slave device can be set
+for a given DMA slave channel.
 
-This check is already present in arm_lpae_init_pte(), i.e. before
-installing new leaf entry at the current level if conditions to do so
-are met (size == block_size).
+device_set_slave() will be called after the device_alloc_chan_resources()
+and device_release_slave() before the device_free_chan_resources().
 
-But, this might be insufficient in case when we have already
-installed block mapping at this level and it is not time to
-install new leaf entry (size != block_size).
-In that case we continue walking the page table down with wrong pointer
-to the next level.
-
-So, move check from arm_lpae_init_pte() to __arm_lpae_map() in order to
-avoid all cases.
-
-Signed-off-by: Oleksandr Tyshchenko <oleksandr_tyshchenko@epam.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
-I hope that following actions can help to catch it:
-1. Call iommu_map for a block mapping (e.g. 2M) at some address
-   (e.g. iova 0x80000000 pa 0x80000000).
-2. Call iommu_map for a page mapping (4k) at some address from
-   the previous mapped region (e.g. iova 0x80008000 pa 0x90000000).
+ drivers/dma/dmaengine.c   | 27 ++++++++++++++++++++++++---
+ include/linux/dmaengine.h | 10 ++++++++++
+ 2 files changed, 34 insertions(+), 3 deletions(-)
 
-I understand that after iommu_map should be iommu_unmap, but
-different scenarios may occur).
----
----
- drivers/iommu/io-pgtable-arm.c | 13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
-index f5c90e1..ebdb82f 100644
---- a/drivers/iommu/io-pgtable-arm.c
-+++ b/drivers/iommu/io-pgtable-arm.c
-@@ -272,11 +272,7 @@ static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
- 	arm_lpae_iopte pte = prot;
- 	struct io_pgtable_cfg *cfg = &data->iop.cfg;
+diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+index 24e0221fd66d..5b7089d8be4d 100644
+--- a/drivers/dma/dmaengine.c
++++ b/drivers/dma/dmaengine.c
+@@ -705,6 +705,7 @@ struct dma_chan *dma_request_chan(struct device *dev, const char *name)
+ {
+ 	struct dma_device *d, *_d;
+ 	struct dma_chan *chan = NULL;
++	int ret;
  
--	if (iopte_leaf(*ptep, lvl)) {
--		/* We require an unmap first */
--		WARN_ON(!selftest_running);
--		return -EEXIST;
--	} else if (iopte_type(*ptep, lvl) == ARM_LPAE_PTE_TYPE_TABLE) {
-+	if (iopte_type(*ptep, lvl) == ARM_LPAE_PTE_TYPE_TABLE) {
- 		/*
- 		 * We need to unmap and free the old table before
- 		 * overwriting it with a block entry.
-@@ -315,6 +311,13 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, unsigned long iova,
- 	/* Find our entry at the current level */
- 	ptep += ARM_LPAE_LVL_IDX(iova, lvl, data);
+ 	/* If device-tree is present get slave info from here */
+ 	if (dev->of_node)
+@@ -715,8 +716,9 @@ struct dma_chan *dma_request_chan(struct device *dev, const char *name)
+ 		chan = acpi_dma_request_slave_chan_by_name(dev, name);
  
-+	/* Check for already installed leaf entry */
-+	if (iopte_leaf(*ptep, lvl)) {
-+		/* We require an unmap first */
-+		WARN_ON(!selftest_running);
-+		return -EEXIST;
+ 	if (chan) {
+-		/* Valid channel found or requester need to be deferred */
+-		if (!IS_ERR(chan) || PTR_ERR(chan) == -EPROBE_DEFER)
++		if (!IS_ERR(chan))
++			goto found;
++		if (PTR_ERR(chan) == -EPROBE_DEFER)
+ 			return chan;
+ 	}
+ 
+@@ -738,7 +740,21 @@ struct dma_chan *dma_request_chan(struct device *dev, const char *name)
+ 	}
+ 	mutex_unlock(&dma_list_mutex);
+ 
+-	return chan ? chan : ERR_PTR(-EPROBE_DEFER);
++	if (!chan)
++		return ERR_PTR(-EPROBE_DEFER);
++	if (IS_ERR(chan))
++		return chan;
++found:
++	if (chan->device->device_set_slave) {
++		chan->slave = dev;
++		ret = chan->device->device_set_slave(chan, dev);
++		if (ret) {
++			chan->slave = NULL;
++			dma_release_channel(chan);
++			chan = ERR_PTR(ret);
++		}
 +	}
++	return chan;
+ }
+ EXPORT_SYMBOL_GPL(dma_request_chan);
+ 
+@@ -786,6 +802,11 @@ void dma_release_channel(struct dma_chan *chan)
+ 	mutex_lock(&dma_list_mutex);
+ 	WARN_ONCE(chan->client_count != 1,
+ 		  "chan reference count %d != 1\n", chan->client_count);
++	if (chan->slave) {
++		if (chan->device->device_release_slave)
++			chan->device->device_release_slave(chan);
++		chan->slave = NULL;
++	}
+ 	dma_chan_put(chan);
+ 	/* drop PRIVATE cap enabled by __dma_request_channel() */
+ 	if (--chan->device->privatecnt == 0)
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index 533680860865..d22299e37e69 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -277,6 +277,9 @@ struct dma_chan {
+ 	struct dma_router *router;
+ 	void *route_data;
+ 
++	/* Only for SLAVE channels */
++	struct device *slave;
 +
- 	/* If we can install a leaf entry at this level, then do so */
- 	if (size == block_size && (size & cfg->pgsize_bitmap))
- 		return arm_lpae_init_pte(data, iova, paddr, prot, lvl, ptep);
+ 	void *private;
+ };
+ 
+@@ -686,6 +689,10 @@ struct dma_filter {
+  * @device_alloc_chan_resources: allocate resources and return the
+  *	number of allocated descriptors
+  * @device_free_chan_resources: release DMA channel's resources
++ * @device_set_slave: provide access to the slave device, which requested
++ *	given DMA channel, called after @device_alloc_chan_resources
++ * @device_release_slave: finishes access to the slave device, called
++ *	before @device_free_chan_resources
+  * @device_prep_dma_memcpy: prepares a memcpy operation
+  * @device_prep_dma_xor: prepares a xor operation
+  * @device_prep_dma_xor_val: prepares a xor validation operation
+@@ -746,6 +753,9 @@ struct dma_device {
+ 	int (*device_alloc_chan_resources)(struct dma_chan *chan);
+ 	void (*device_free_chan_resources)(struct dma_chan *chan);
+ 
++	int (*device_set_slave)(struct dma_chan *chan, struct device *slave);
++	void (*device_release_slave)(struct dma_chan *chan);
++
+ 	struct dma_async_tx_descriptor *(*device_prep_dma_memcpy)(
+ 		struct dma_chan *chan, dma_addr_t dst, dma_addr_t src,
+ 		size_t len, unsigned long flags);
 -- 
-2.7.4
+1.9.1
