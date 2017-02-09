@@ -1,161 +1,79 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  9 Feb 2017 14:59:18 +0000
-Subject: [PATCH 20/25] KVM: arm/arm64: Initialize the emulated EL1 physical
- timer
+Date: Thu,  9 Feb 2017 14:59:09 +0000
+Subject: [PATCH 11/25] arm/arm64: KVM: Enforce unconditional flush to PoC when
+ mapping to stage-2
 In-Reply-To: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
 References: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1486652363-7696-21-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1486652363-7696-12-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jintack Lim <jintack@cs.columbia.edu>
+When we fault in a page, we flush it to the PoC (Point of Coherency)
+if the faulting vcpu has its own caches off, so that it can observe
+the page we just brought it.
 
-Initialize the emulated EL1 physical timer with the default irq number.
+But if the vcpu has its caches on, we skip that step. Bad things
+happen when *another* vcpu tries to access that page with its own
+caches disabled. At that point, there is no garantee that the
+data has made it to the PoC, and we access stale data.
 
-Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+The obvious fix is to always flush to PoC when a page is faulted
+in, no matter what the state of the vcpu is.
+
+Cc: stable at vger.kernel.org
+Fixes: 2d58b733c876 ("arm64: KVM: force cache clean on page fault when caches are off")
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/reset.c         | 9 ++++++++-
- arch/arm64/kvm/reset.c       | 9 ++++++++-
- include/kvm/arm_arch_timer.h | 3 ++-
- virt/kvm/arm/arch_timer.c    | 9 +++++++--
- 4 files changed, 25 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h   | 9 +--------
+ arch/arm64/include/asm/kvm_mmu.h | 3 +--
+ 2 files changed, 2 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
-index 4b5e802..1da8b2d 100644
---- a/arch/arm/kvm/reset.c
-+++ b/arch/arm/kvm/reset.c
-@@ -37,6 +37,11 @@ static struct kvm_regs cortexa_regs_reset = {
- 	.usr_regs.ARM_cpsr = SVC_MODE | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
- };
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 74a44727..a58bbaa 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -150,18 +150,12 @@ static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+ 	 * and iterate over the range.
+ 	 */
  
-+static const struct kvm_irq_level cortexa_ptimer_irq = {
-+	{ .irq = 30 },
-+	.level = 1,
-+};
-+
- static const struct kvm_irq_level cortexa_vtimer_irq = {
- 	{ .irq = 27 },
- 	.level = 1,
-@@ -58,6 +63,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- {
- 	struct kvm_regs *reset_regs;
- 	const struct kvm_irq_level *cpu_vtimer_irq;
-+	const struct kvm_irq_level *cpu_ptimer_irq;
+-	bool need_flush = !vcpu_has_cache_enabled(vcpu) || ipa_uncached;
+-
+ 	VM_BUG_ON(size & ~PAGE_MASK);
  
- 	switch (vcpu->arch.target) {
- 	case KVM_ARM_TARGET_CORTEX_A7:
-@@ -65,6 +71,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 		reset_regs = &cortexa_regs_reset;
- 		vcpu->arch.midr = read_cpuid_id();
- 		cpu_vtimer_irq = &cortexa_vtimer_irq;
-+		cpu_ptimer_irq = &cortexa_ptimer_irq;
- 		break;
- 	default:
- 		return -ENODEV;
-@@ -77,5 +84,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 	kvm_reset_coprocs(vcpu);
+-	if (!need_flush && !icache_is_pipt())
+-		goto vipt_cache;
+-
+ 	while (size) {
+ 		void *va = kmap_atomic_pfn(pfn);
  
- 	/* Reset arch_timer context */
--	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
-+	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq, cpu_ptimer_irq);
- }
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index e95d4f6..d9e9697 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -46,6 +46,11 @@ static const struct kvm_regs default_regs_reset32 = {
- 			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
- };
+-		if (need_flush)
+-			kvm_flush_dcache_to_poc(va, PAGE_SIZE);
++		kvm_flush_dcache_to_poc(va, PAGE_SIZE);
  
-+static const struct kvm_irq_level default_ptimer_irq = {
-+	.irq	= 30,
-+	.level	= 1,
-+};
-+
- static const struct kvm_irq_level default_vtimer_irq = {
- 	.irq	= 27,
- 	.level	= 1,
-@@ -104,6 +109,7 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- {
- 	const struct kvm_irq_level *cpu_vtimer_irq;
-+	const struct kvm_irq_level *cpu_ptimer_irq;
- 	const struct kvm_regs *cpu_reset;
- 
- 	switch (vcpu->arch.target) {
-@@ -117,6 +123,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 		}
- 
- 		cpu_vtimer_irq = &default_vtimer_irq;
-+		cpu_ptimer_irq = &default_ptimer_irq;
- 		break;
+ 		if (icache_is_pipt())
+ 			__cpuc_coherent_user_range((unsigned long)va,
+@@ -173,7 +167,6 @@ static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+ 		kunmap_atomic(va);
  	}
  
-@@ -130,5 +137,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 	kvm_pmu_vcpu_reset(vcpu);
- 
- 	/* Reset timer */
--	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
-+	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq, cpu_ptimer_irq);
- }
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 6445a3d..f1d2fba0 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -58,7 +58,8 @@ struct arch_timer_cpu {
- int kvm_timer_hyp_init(void);
- int kvm_timer_enable(struct kvm_vcpu *vcpu);
- int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
--			 const struct kvm_irq_level *irq);
-+			 const struct kvm_irq_level *virt_irq,
-+			 const struct kvm_irq_level *phys_irq);
- void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
- void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
- void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 5261f98..dbd0af1 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -327,9 +327,11 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
- }
- 
- int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
--			 const struct kvm_irq_level *irq)
-+			 const struct kvm_irq_level *virt_irq,
-+			 const struct kvm_irq_level *phys_irq)
+-vipt_cache:
+ 	if (!icache_is_pipt() && !icache_is_vivt_asid_tagged()) {
+ 		/* any kind of VIPT cache */
+ 		__flush_icache_all();
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 6f72fe8..6d22017 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -241,8 +241,7 @@ static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
  {
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 	void *va = page_address(pfn_to_page(pfn));
  
- 	/*
- 	 * The vcpu timer irq number cannot be determined in
-@@ -337,7 +339,8 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 	 * kvm_vcpu_set_target(). To handle this, we determine
- 	 * vcpu timer irq number when the vcpu is reset.
- 	 */
--	vtimer->irq.irq = irq->irq;
-+	vtimer->irq.irq = virt_irq->irq;
-+	ptimer->irq.irq = phys_irq->irq;
+-	if (!vcpu_has_cache_enabled(vcpu) || ipa_uncached)
+-		kvm_flush_dcache_to_poc(va, size);
++	kvm_flush_dcache_to_poc(va, size);
  
- 	/*
- 	 * The bits in CNTV_CTL are architecturally reset to UNKNOWN for ARMv8
-@@ -346,6 +349,7 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 	 * the ARMv7 architecture.
- 	 */
- 	vtimer->cnt_ctl = 0;
-+	ptimer->cnt_ctl = 0;
- 	kvm_timer_update_state(vcpu);
- 
- 	return 0;
-@@ -376,6 +380,7 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
- 
- 	/* Synchronize cntvoff across all vtimers of a VM. */
- 	update_vtimer_cntvoff(vcpu, kvm_phys_timer_read());
-+	vcpu_ptimer(vcpu)->cntvoff = 0;
- 
- 	INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
- 	hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+ 	if (!icache_is_aliasing()) {		/* PIPT */
+ 		flush_icache_range((unsigned long)va,
 -- 
 2.1.4
