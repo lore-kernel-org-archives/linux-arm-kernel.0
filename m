@@ -1,52 +1,214 @@
-From: abelvesa@gmail.com (Abel Vesa)
-Date: Thu, 9 Feb 2017 19:01:10 +0000
-Subject: [PATCHv3] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-In-Reply-To: <20170209131452.472aa882@gandalf.local.home>
-References: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
- <20170209162956.GH27312@n2100.armlinux.org.uk>
- <20170209121322.5229e6cf@gandalf.local.home>
- <20170209180644.GJ27312@n2100.armlinux.org.uk>
- <20170209131414.098c848c@gandalf.local.home>
- <20170209131452.472aa882@gandalf.local.home>
-Message-ID: <20170209190110.GC3439@nuc>
+From: jhugo@codeaurora.org (Jeffrey Hugo)
+Date: Thu, 9 Feb 2017 12:04:45 -0700
+Subject: [PATCH] efi: arm-stub: Correct FDT and initrd allocation rules
+ for arm64
+In-Reply-To: <CAKv+Gu-EPdcLFBmHoVB4UROrUSkYorgn5a9SX1wpAD_30=1tGw@mail.gmail.com>
+References: <1486635389-26974-1-git-send-email-ard.biesheuvel@linaro.org>
+ <dcd9e959-eb73-6703-2d23-06065e4ccaf6@codeaurora.org>
+ <CAKv+Gu8Lr2KmEgJU4_GA8qm5_OZfYZECH0-=OBTDJ=1-5fAsnw@mail.gmail.com>
+ <5595ed30-3c97-8d7b-154a-9af474a4e22c@codeaurora.org>
+ <CAKv+Gu9fwzgbfGosVcGGqJHLhW=79LWhg4vS4MWEtTdBEHbNUw@mail.gmail.com>
+ <75121ecb-5ee6-202d-8cfa-a90d323d1bc5@codeaurora.org>
+ <CAKv+Gu8iA3eed6nHXvwez8=fjEvL1M+KzepUyM7cnNeqZSUBhw@mail.gmail.com>
+ <CAKv+Gu-EPdcLFBmHoVB4UROrUSkYorgn5a9SX1wpAD_30=1tGw@mail.gmail.com>
+Message-ID: <4460d4cd-5f31-2fa4-359a-a81a6a1c4197@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2017 at 01:14:52PM -0500, Steven Rostedt wrote:
-> 
-> [ sending again with Masami Cc'd ]
-> 
-> On Thu, 9 Feb 2017 13:14:14 -0500
-> Steven Rostedt <rostedt@goodmis.org> wrote:
-> 
-> > On Thu, 9 Feb 2017 18:06:44 +0000
-> > Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
-> > 
-> > > On Thu, Feb 09, 2017 at 12:13:22PM -0500, Steven Rostedt wrote:  
-> > > > Then came along live kernel patching, which I believe this series is
-> > > > trying to support. What is needed by pt_regs is a way to "hijack" the
-> > > > function being called to instead call the patched function. That is,
-> > > > ftrace is not being used for tracing, but in reality, being used to
-> > > > modify the running kernel. It is being used to change what function
-> > > > gets called. ftrace is just a hook for that mechanism.    
-> > > 
-> > > So, would I be correct to assume that the only parts of pt_regs that
-> > > would be touched are those which contain arguments to the function,
-> > > and the register which would contain the return value?
-> > >   
-> > 
-> > For live kernel patching, perhaps.
-> > 
-> > But for kprobes, I think they can touch anything. Matters what the
-> > creater of the kprobe wanted to do.
-> > 
-Thing is, by saving all of them is the easiest way to ensure that the
-whole context is the same when the replacing function gets called, as
-I said before.
+On 2/9/2017 11:26 AM, Ard Biesheuvel wrote:
+> On 9 February 2017 at 18:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> On 9 February 2017 at 18:01, Jeffrey Hugo <jhugo@codeaurora.org> wrote:
+>>> On 2/9/2017 10:45 AM, Ard Biesheuvel wrote:
+>>>>
+>>>> On 9 February 2017 at 17:41, Jeffrey Hugo <jhugo@codeaurora.org> wrote:
+>>>>>
+>>>>> On 2/9/2017 10:16 AM, Ard Biesheuvel wrote:
+>>>>>>
+>>>>>>
+>>>>>> On 9 February 2017 at 17:06, Jeffrey Hugo <jhugo@codeaurora.org> wrote:
+>>>>>>>
+>>>>>>>
+>>>>>>> On 2/9/2017 3:16 AM, Ard Biesheuvel wrote:
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>> On arm64, we have made some changes over the past year to the way the
+>>>>>>>> kernel itself is allocated and to how it deals with the initrd and
+>>>>>>>> FDT.
+>>>>>>>> This patch brings the allocation logic in the EFI stub in line with
+>>>>>>>> that,
+>>>>>>>> which is necessary because the introduction of KASLR has created the
+>>>>>>>> possibility for the initrd to be allocated in a place where the kernel
+>>>>>>>> may not be able to map it. (This is currently a theoretical scenario,
+>>>>>>>> since it only affects systems where the size of RAM exceeds the size
+>>>>>>>> of
+>>>>>>>> the linear mapping.)
+>>>>>>>>
+>>>>>>>> So adhere to the arm64 boot protocol, and make sure that the initrd is
+>>>>>>>> fully inside a 1GB aligned 32 GB window that covers the kernel as
+>>>>>>>> well.
+>>>>>>>>
+>>>>>>>> The FDT may be anywhere in memory on arm64 now that we map it via the
+>>>>>>>> fixmap, so we can lift the address restriction there completely.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>>>>>> ---
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> I'll give this a test on our platform that was running into the current
+>>>>>>> limitation - probably this weekend.
+>>>>>>>
+>>>>>>> I reviewed the code and its ok, but I do have one question.  Do we need
+>>>>>>> to
+>>>>>>> handle the case where initrd ends up below the kernel?
+>>>>>>>
+>>>>>>> Lets assume KALSR puts the kernel somewhere up high in DDR, after the
+>>>>>>> 32GB
+>>>>>>> mark in DDR.  Now lets assume the unlikely scenario that the initrd
+>>>>>>> won't
+>>>>>>> fit anywhere after 32GB, but will fit before 32GB.  Per my
+>>>>>>> understanding
+>>>>>>> of
+>>>>>>> efi_high_alloc, it will put the initrd before the 32GB mark, which will
+>>>>>>> be
+>>>>>>> outside of the window where the kernel is.
+>>>>>>>
+>>>>>>
+>>>>>> The 32 GB does not have to be 32 GB aligned, only 1 GB aligned. So as
+>>>>>> long as the follow expression holds, we should be fine
+>>>>>>
+>>>>>>
+>>>>>> align(max(kernel_end, initrd_end), 1g) - align_down (min
+>>>>>> (kernel_start, initrd_start), 1g) <= 32g
+>>>>>
+>>>>>
+>>>>>
+>>>>> Yes, and I argue there is a possibility (we'll call it extremely remote)
+>>>>> where that may not hold.  My question is, do we care about that
+>>>>> possibility,
+>>>>> and if so, do we do anything about it?
+>>>>>
+>>>>
+>>>> We allocate top down, so we start at align_down(base_of_image, 1g) +
+>>>> 32g, and go down until we hit a region that first our initrd. We will
+>>>> disregard the region that the kernel occupies, but below that, we will
+>>>> just proceed until we find a slot. This effectively means we have a 63
+>>>> GB window, with the kernel in the middle, where we can load the initrd
+>>>> and adhere to the boot protocol. I don't see how we could end up in
+>>>> the situation where we load the kernel somewhere, and both the 31 GB
+>>>> before *and* after are completely occupied.
+>>>>
+>>>
+>>> No we don't.  We do not allocate top down.  Please look at efi_high_alloc.
+>>>
+>>> Efi_high_alloc iterates though the memory map, low to high.
+>
+> BTW the memory map isn't necessarily sorted per the UEFI spec, so it
+> iterates in what is essentially random order, not low to high.
 
-We can't be sure that while __ftrace_ops_list_func is executing, any of
-the regs will have the value they had when the function-to-be-replaced
-was called. That's the reason I say we need to save them all.
-> > -- Steve
-> 
+True, I'm used to EDK2, which from what I've seen, keeps it ordered. 
+However that's somewhat immaterial to my point that its possible for 
+initrd to be far enough from kernel to break booting.txt
+
+>
+>>> It looks to see
+>>> if a slot can hold the allocation, and the slot does not exceed the
+>>> specified max.  If so, efi_high_alloc retains a reference to the slot. Then
+>>> efi_high_alloc continues iterating though the map, until the end.
+>>> efi_high_alloc only stores a reference to the most recently valid slot,
+>>> which would be the highest slot in the map.
+>>>
+>>
+>> It is documented as
+>>
+>> /*
+>>  * Allocate at the highest possible address that is not above 'max'.
+>>  */
+>>
+>> and what you describe is pretty much that, no?
+>>
+>>> My system can have 256GB (or more) of RAM.  It is possible, however remote,
+>>> that the initrd and kernel can be more than 64GB away from each other.
+>>>
+>>> Lets assume KASLR puts the kernel at 250GB.  Lets assume, for whatever
+>>> reason, we can't fit the initrd above 150GB (there was just enough room to
+>>> jam kernel there somwhow, but firmware is consuming the rest, maybe it put
+>>> rootfs there via NFIT).
+>>
+>> So before even booting the kernel, you already have 100 GB of memory
+>> occupied?
+
+That is possible, yes.  Likely?  Probably not.  Would our system fail if 
+initrd and kernel are father than the prescribed restriction?  No, since 
+the system can address all of RAM, we'd probably be fine.
+
+>> As I replied before, you are correct that in this case, you
+>> will not be able to put the initrd within 32 GB of the kernel. But do
+>> note that this 32 GB figure is derived from the linear region size of
+>> a 16k pages kernel with 2 levels of translation, which is a niche
+>> configuration by itself. On a system that has 256 GB of RAM, it is
+>> highly unlikely that you will be using a kernel that can only map 32
+>> GB of it.
+>>
+>> The reason for choosing the 32 GB figure is that it relieves the boot
+>> loader from having to go and figure out what kind of kernel is going
+>> to be executed. Page size can be read from the Image header but the VA
+>> size cannot. So 32 GB was a reasonable number imo.
+
+Ok, so the restriction is completely arbitrary and has no real purpose. 
+Ie nothing in the kernel will break, so long as you assume the system is 
+not configured with more RAM than can be addressed, which doesn't feel 
+reasonable to do.
+
+I realize I'm being nitpicky, from my perspective, any issues related to 
+efistub are particularly difficult to debug, so if this scenario we've 
+been going around about ever popped up, it wouldn't even give you a 
+print that happened when you back trace the output trying to figure out 
+why the boot failed.
+
+However, it really looks like even if the scenario occurred, there is 
+zero realistic expectation anything would break, and its just a 
+violation of some document that makes assumptions and should be treated 
+more as guidance to try to follow, rather than hard rules.
+
+I guess I'm satisfied, and don't see any need to continue the 
+discussion.  Thanks for entertaining me.
+
+>>
+>>> efi_high_alloc will put the initrd at some point
+>>> just below 150GB, because it iterates low to high,
+>>
+>> No, because everything above that is occupied. If efi_high_alloc()
+>> does not do what it says on the tin, we should fix that.
+
+I will agree, efi_high_alloc() does what it says on the tin (my 
+interpretation of what you were saying what not what you intended, sorry 
+about that), but relying on that is not sufficient to implicitly assume 
+that we are holding to the restrictions in booting.txt in all scenarios.
+
+>>
+>>> and 150GB will be below
+>>> the max of 250GB where the kernel is.  This will result in the initrd and
+>>> kernel being ~100GB away in this example, which violates the requirements
+>>> stated in Booting.txt
+>>>
+>>> I see the situation is possible, but I admit it is remote.  If you want to
+>>> ignore it, fine.  I would be happy with that so long as the assumption is
+>>> documented so that if it is ever somehow violated in the real world, we know
+>>> what broke.
+>>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+
+
+-- 
+Jeffrey Hugo
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
