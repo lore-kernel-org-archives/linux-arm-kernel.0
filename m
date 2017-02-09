@@ -1,47 +1,46 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 8 Feb 2017 18:43:02 -0600
-Subject: [PATCH v1 2/3] dt: Document for the ZTE zx296718 I2S controller
-In-Reply-To: <1486389020-29432-2-git-send-email-baoyou.xie@linaro.org>
-References: <1486389020-29432-1-git-send-email-baoyou.xie@linaro.org>
- <1486389020-29432-2-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170209004302.njyxhwq5d2kbai7n@rob-hp-laptop>
+From: iwamatsu@nigauri.org (Nobuhiro Iwamatsu)
+Date: Thu,  9 Feb 2017 09:43:49 +0900
+Subject: [PATCH] ARM: dts: socfpga: sodia: enable qspi
+Message-ID: <20170209004349.9772-1-iwamatsu@nigauri.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2017 at 09:50:19PM +0800, Baoyou Xie wrote:
-> This patch documents the devicetree for the ZTE's zx296718
-> I2S audio controller.
-> 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> ---
->  Documentation/devicetree/bindings/sound/zte,zx-i2s.txt | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/sound/zte,zx-i2s.txt b/Documentation/devicetree/bindings/sound/zte,zx-i2s.txt
-> index 7e5aa6f..c405561 100644
-> --- a/Documentation/devicetree/bindings/sound/zte,zx-i2s.txt
-> +++ b/Documentation/devicetree/bindings/sound/zte,zx-i2s.txt
-> @@ -1,10 +1,12 @@
->  ZTE ZX296702 I2S controller
->  
->  Required properties:
-> - - compatible : Must be "zte,zx296702-i2s"
-> + - compatible : Should include one of the following strings:
-> +	"zte,zx296702-i2s","zte,zx296718-i2s".
+Enable the qspi controller on sodia board and add the flash chip
+(n25q512a).
 
-One per line please.
+Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
+---
+ arch/arm/boot/dts/socfpga_cyclone5_sodia.dts | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
->   - reg : Must contain I2S core's registers location and length
->   - clocks : Pairs of phandle and specifier referencing the controller's clocks.
-> - - clock-names: "tx" for the clock to the I2S interface.
-> + - clock-names: "tx" for the wclk, "pclk" for the pclk to the I2S interface.
-> +	must contain pclk for zx296718 SoC.
-
-I'd reword as "pclk is only present for zte,zx296718-i2s"
-
->   - dmas: Pairs of phandle and specifier for the DMA channel that is used by
->     the core. The core expects two dma channels for transmit.
->   - dma-names : Must be "tx" and "rx"
-> -- 
-> 2.7.4
-> 
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
+index 5b7e3c27e6e9..d69ad29d1e53 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
+@@ -121,3 +121,24 @@
+ &usb1 {
+ 	status = "okay";
+ };
++
++&qspi {
++        status = "okay";
++
++        flash0: n25q512a at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "n25q512a";
++		reg = <0>;
++		spi-max-frequency = <100000000>;
++
++		m25p,fast-read;
++		cdns,page-size = <256>;
++		cdns,block-size = <16>;
++		cdns,read-delay = <4>;
++		cdns,tshsl-ns = <50>;
++		cdns,tsd2d-ns = <50>;
++		cdns,tchsh-ns = <4>;
++		cdns,tslch-ns = <4>;
++	};
++};
+-- 
+2.11.0
