@@ -1,160 +1,39 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 9 Feb 2017 09:35:49 -0600
-Subject: [PATCH v6 2/4] Documentation: dt: add bindings for ti-cpufreq
-In-Reply-To: <20170203172929.23940-3-d-gerlach@ti.com>
-References: <20170203172929.23940-3-d-gerlach@ti.com>
-Message-ID: <20170209153549.8354-1-d-gerlach@ti.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Feb 2017 15:35:26 +0000
+Subject: [PATCH v3 1/3] of: Support parsing phandle argument lists
+ through a nexus node
+In-Reply-To: <CAL_JsqKbkynNmCrXbi=VJ5wqYtRrYbC+00qSm_uyZFBLFOUz0w@mail.gmail.com>
+References: <20170123204851.12808-1-stephen.boyd@linaro.org>
+ <20170123204851.12808-2-stephen.boyd@linaro.org>
+ <5886F5ED.3030509@gmail.com>
+ <CAL_JsqKS3Q2mg0aSubB3TV6LPQjCx+hqBu4TqbsqyfBvWrwctg@mail.gmail.com>
+ <CAL_JsqKbkynNmCrXbi=VJ5wqYtRrYbC+00qSm_uyZFBLFOUz0w@mail.gmail.com>
+Message-ID: <20170209153526.GF27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device tree bindings document for the TI CPUFreq/OPP driver
-on AM33xx, AM43xx, DRA7xx, and AM57xx SoCs. The operating-points-v2
-binding allows us to provide an opp-supported-hw property for each OPP
-to define when it is available. This driver is responsible for reading
-and parsing registers to determine which OPPs can be selectively enabled
-based on the specific SoC in use by matching against the opp-supported-hw
-data.
+On Thu, Feb 09, 2017 at 09:17:58AM -0600, Rob Herring wrote:
+> Frank, any more comments on this? If not, I plan to apply this series.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- .../devicetree/bindings/cpufreq/ti-cpufreq.txt     | 128 +++++++++++++++++++++
- 1 file changed, 128 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
+Well, I find that a little annoying, because DT has the requirement
+that new bindings are properly documented in Documentation, and it
+appears that this comes with no documentation what so ever, despite
+introducing new properties (like the -map-mask-passthru thing).
 
-diff --git a/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
-new file mode 100644
-index 000000000000..ba0e15ad5bd9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
-@@ -0,0 +1,128 @@
-+TI CPUFreq and OPP bindings
-+================================
-+
-+Certain TI SoCs, like those in the am335x, am437x, am57xx, and dra7xx
-+families support different OPPs depending on the silicon variant in use.
-+The ti-cpufreq driver can use revision and an efuse value from the SoC to
-+provide the OPP framework with supported hardware information. This is
-+used to determine which OPPs from the operating-points-v2 table get enabled
-+when it is parsed by the OPP framework.
-+
-+Required properties:
-+--------------------
-+In 'cpus' nodes:
-+- operating-points-v2: Phandle to the operating-points-v2 table to use.
-+
-+In 'operating-points-v2' table:
-+- compatible: Should be
-+	- 'operating-points-v2-ti-cpu' for am335x, am43xx, and dra7xx/am57xx SoCs
-+- syscon: A phandle pointing to a syscon node representing the control module
-+	  register space of the SoC.
-+
-+Optional properties:
-+--------------------
-+For each opp entry in 'operating-points-v2' table:
-+- opp-supported-hw: Two bitfields indicating:
-+	1. Which revision of the SoC the OPP is supported by
-+	2. Which eFuse bits indicate this OPP is available
-+
-+	A bitwise AND is performed against these values and if any bit
-+	matches, the OPP gets enabled.
-+
-+Example:
-+--------
-+
-+/* From arch/arm/boot/dts/am33xx.dtsi */
-+cpus {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	cpu at 0 {
-+		compatible = "arm,cortex-a8";
-+		device_type = "cpu";
-+		reg = <0>;
-+
-+		operating-points-v2 = <&cpu0_opp_table>;
-+
-+		clocks = <&dpll_mpu_ck>;
-+		clock-names = "cpu";
-+
-+		clock-latency = <300000>; /* From omap-cpufreq driver */
-+	};
-+};
-+
-+/*
-+ * cpu0 has different OPPs depending on SoC revision and some on revisions
-+ * 0x2 and 0x4 have eFuse bits that indicate if they are available or not
-+ */
-+cpu0_opp_table: opp-table {
-+	compatible = "operating-points-v2-ti-cpu";
-+	syscon = <&scm_conf>;
-+
-+	/*
-+	 * The three following nodes are marked with opp-suspend
-+	 * because they can not be enabled simultaneously on a
-+	 * single SoC.
-+	 */
-+	opp50 at 300000000 {
-+		opp-hz = /bits/ 64 <300000000>;
-+		opp-microvolt = <950000 931000 969000>;
-+		opp-supported-hw = <0x06 0x0010>;
-+		opp-suspend;
-+	};
-+
-+	opp100 at 275000000 {
-+		opp-hz = /bits/ 64 <275000000>;
-+		opp-microvolt = <1100000 1078000 1122000>;
-+		opp-supported-hw = <0x01 0x00FF>;
-+		opp-suspend;
-+	};
-+
-+	opp100 at 300000000 {
-+		opp-hz = /bits/ 64 <300000000>;
-+		opp-microvolt = <1100000 1078000 1122000>;
-+		opp-supported-hw = <0x06 0x0020>;
-+		opp-suspend;
-+	};
-+
-+	opp100 at 500000000 {
-+		opp-hz = /bits/ 64 <500000000>;
-+		opp-microvolt = <1100000 1078000 1122000>;
-+		opp-supported-hw = <0x01 0xFFFF>;
-+	};
-+
-+	opp100 at 600000000 {
-+		opp-hz = /bits/ 64 <600000000>;
-+		opp-microvolt = <1100000 1078000 1122000>;
-+		opp-supported-hw = <0x06 0x0040>;
-+	};
-+
-+	opp120 at 600000000 {
-+		opp-hz = /bits/ 64 <600000000>;
-+		opp-microvolt = <1200000 1176000 1224000>;
-+		opp-supported-hw = <0x01 0xFFFF>;
-+	};
-+
-+	opp120 at 720000000 {
-+		opp-hz = /bits/ 64 <720000000>;
-+		opp-microvolt = <1200000 1176000 1224000>;
-+		opp-supported-hw = <0x06 0x0080>;
-+	};
-+
-+	oppturbo at 720000000 {
-+		opp-hz = /bits/ 64 <720000000>;
-+		opp-microvolt = <1260000 1234800 1285200>;
-+		opp-supported-hw = <0x01 0xFFFF>;
-+	};
-+
-+	oppturbo at 800000000 {
-+		opp-hz = /bits/ 64 <800000000>;
-+		opp-microvolt = <1260000 1234800 1285200>;
-+		opp-supported-hw = <0x06 0x0100>;
-+	};
-+
-+	oppnitro at 1000000000 {
-+		opp-hz = /bits/ 64 <1000000000>;
-+		opp-microvolt = <1325000 1298500 1351500>;
-+		opp-supported-hw = <0x04 0x0200>;
-+	};
-+};
+So I'm NAKing it until there's some documentation of how this
+mechanism is supposed to work.
+
+Merely providing an example in a commit log is (IMHO) insufficient.
+An example doesn't explain how it was created, or how to create an
+implementation.
+
+Remember, we expect people to do exactly that, so we need to give
+them this information so that they can make use of it.
+
+I did try to work out from the code how the -map-mask thing worked,
+but eventually gave up.
+
 -- 
-2.11.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
