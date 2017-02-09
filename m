@@ -1,93 +1,68 @@
-From: abelvesa@gmail.com (Abel Vesa)
-Date: Thu, 9 Feb 2017 18:30:48 +0000
-Subject: [PATCHv3] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-In-Reply-To: <20170209162956.GH27312@n2100.armlinux.org.uk>
-References: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
- <20170209162956.GH27312@n2100.armlinux.org.uk>
-Message-ID: <20170209183048.GB3439@nuc>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Thu, 9 Feb 2017 20:49:41 +0200
+Subject: [PATCH] virtio: Try to untangle DMA coherency
+In-Reply-To: <20170209183118.GI19397@arm.com>
+References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
+ <20170201195732-mutt-send-email-mst@kernel.org>
+ <20170201182659.GM8177@arm.com>
+ <20170201210648-mutt-send-email-mst@kernel.org>
+ <20170202112614.GB30577@arm.com>
+ <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
+ <20170202182224-mutt-send-email-mst@kernel.org>
+ <20170202164049.GI13839@arm.com>
+ <20170209201341-mutt-send-email-mst@kernel.org>
+ <20170209183118.GI19397@arm.com>
+Message-ID: <20170209203752-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2017 at 04:29:56PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Feb 07, 2017 at 10:57:55PM +0000, Abel Vesa wrote:
-> > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> > +
-> > +.macro __ftrace_regs_caller
-> > +
-> > +	add 	ip, sp, #4	@ move in IP the value of SP as it was
-> > +				@ before the push {lr} of the mcount mechanism
-> > +	stmdb	sp!, {ip,lr,pc}
-> > +	stmdb	sp!, {r0-r11,lr}
-> > +
-> > +	@ stack content at this point:
-> > +	@ 0  4          44    48   52       56   60   64
-> > +	@ R0 | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |
+On Thu, Feb 09, 2017 at 06:31:18PM +0000, Will Deacon wrote:
+> On Thu, Feb 09, 2017 at 08:17:16PM +0200, Michael S. Tsirkin wrote:
+> > On Thu, Feb 02, 2017 at 04:40:49PM +0000, Will Deacon wrote:
+> > > On Thu, Feb 02, 2017 at 06:30:28PM +0200, Michael S. Tsirkin wrote:
+> > > > I am inclined to say, for 4.10 let's revert
+> > > > c7070619f3408d9a0dffbed9149e6f00479cf43b since what it fixes is not a
+> > > > regression in 4.10.
+> > > 
+> > > No complaints there, as long as we can keep working to fix this for 4.11
+> > > and onwards. You'll also need to cc stable on the revert.
+> > > 
+> > > > So I think we can defer the fix to 4.11.
+> > > > I think we still want f7f6634d23830ff74335734fbdb28ea109c1f349
+> > > > for hosts with virtio 1 support.
+> > > > 
+> > > > All this will hopefully push hosts to just implement virtio 1.
+> > > > For mmio the changes are very small: several new registers,
+> > > > that's all. You want this for proper 64 bit dma mask anyway.
+> > > 
+> > > As I've said, virtio 1 will have exactly the same issue unless we start
+> > > requiring firmware to advertise dma-coherent/_CCA for virtio-mmio
+> > > devices correctly.
+> > > 
+> > 
+> > OK I read up on _CCA in ACPI spec. It says:
+> > The _CCA object returns whether or not a bus-master device supports
+> > hardware managed cache coherency. Expected values are 0 to indicate it
+> > is not supported, and 1 to indicate that it is supported.
+> > 
+> > So if host is cache coherent, and guest thinks it isn't, we incur
+> > unnecessary overhead by wasting coherent memory.
+> > I get that but you said it actually breaks - why does it?
 > 
-> How important is this to be close to "struct pt_regs" ?  Do we care about
-> r12 being "wrong" ?  The other issue is that pt_regs is actually 72
-> bytes in size, not 68 bytes.  So, does that mean we end up inappropriately
-> leaking some of the kernel stack to userspace through ftrace?
-You are right. pt_regs is 72 (due to old_r0, AFAIU). The risk is actually to
-corrupt the stack if any ftrace_call implementation is writing to pt_regs->uregs[i],
-where i >= 16 (at this point). A solution would be to decrement the SP with 4
-at the beginning of ftrace_regs_caller, this way ensuring that every ftrace_call
-implementation gets to play with the whole size of pt_regs. Will take this into
-consideration in the next iteration.
+> It breaks because QEMU doesn't set _CCA for virtio-mmio devices, and that
+> only becomes a problem when we use the DMA API, because that results in the
+> guest taking out a non-cacheable mapping. On ARM (and other archs such as
+> Power), having a mismatch between a cacheable and a non-cacheable mapping
+> can result in a loss of coherency between the two (for example, if the
+> non-cacheable gues accesses bypass the cache, but the cacheable host
+> accesses allocate in the cache).
 > 
-> It's possible to save all the registers like this if we need to provide
-> a complete picture of the register set at function entry:
-> 
-> 	str	ip, [sp, #-16]!
-> 	add	ip, sp, #20
-> 	stmia	sp, {ip, lr, pc}
-> 	stmdb	sp!, {r0 - r11}
-> 
-> However, is that even correct - don't we want pt_regs' LR and PC to be
-> related to the function call itself?  The "previous LR" as you describe
-> it is where the called function (the one that is being traced) will
-> return to.  The current LR at this point is the address within the
-> traced function.  So actually I think this is more strictly correct, if
-> I'm understanding the intention here correctly:
-> 
-> 	str	ip, [sp, #S_IP - PT_REGS_SIZE]!	@ save current IP
-> 	ldr	ip, [sp, #PT_REGS_SIZE - S_IP]	@ get LR at traced function entry
-> 	str	lr, [sp, #S_PC - S_IP]		@ save current LR as PC
-> 	str	ip, [sp, #S_LR - S_IP]		@ save traced function return
-> 	add	ip, sp, #PT_REGS_SIZE - S_IP + 4
-> 	str	ip, [sp, #S_SP - SP_IP]		@ save stack pointer at function entry
-> 	stmdb	sp!, {r0 - r11}
-> 	@ clear CPSR and old_r0 words
-> 	mov	r3, #0
-> 	str	r3, [sp, #S_PSR]
-> 	str	r3, [sp, #S_OLD_R0]
-> 
-> However, that has the side effect of misaligning the stack (the stack
-> needs to be aligned to 8 bytes).  So, if we decide we don't care about
-> the saved LR value (except as a mechanism to preserve it across the
-> call into the ftrace code):
-> 
-The solution proposed upwards will take care of the stack alignment as well.
-Again, LR needed by ftrace_graph_caller/ftrace_regs_graph_caller.
-> 	str	ip, [sp, #S_IP - PT_REGS_SIZE + 4]!
-> 	str	lr, [sp, #S_PC - S_IP]
-> 	ldr	lr, [sp, #PT_REGS_SIZE - 4 - S_IP]
-> 	add	ip, sp, #PT_REGS_SIZE - S_IP
-> 	stmib	sp, {ip, lr}
-> 	stmdb	sp!, {r0 - r11}
-> 	@ clear CPSR and old_r0 words
-> 	mov	r3, #0
-> 	str	r3, [sp, #S_PSR]
-> 	str	r3, [sp, #S_OLD_R0]
-> 
-> and the return would be:
-> 
-> 	ldmia	sp, {r0 - pc}
-> 
-> That all said - maybe someone from the ftrace community can comment on
-> how much of pt_regs is actually necessary here?
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+> Will
+
+I see. And I guess using a cacheable mapping is significantly faster.
+I would say we want to typically use cacheable for virtio then,
+whether we bypass the IOMMU or not. I guess this is why we always set
+_CCA/DT correctly, right?
+
+-- 
+MST
