@@ -1,135 +1,73 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Thu, 9 Feb 2017 10:52:15 -0800
-Subject: [PATCH v3 1/3] of: Support parsing phandle argument lists through
- a nexus node
-In-Reply-To: <CAL_JsqKbkynNmCrXbi=VJ5wqYtRrYbC+00qSm_uyZFBLFOUz0w@mail.gmail.com>
-References: <20170123204851.12808-1-stephen.boyd@linaro.org>
- <20170123204851.12808-2-stephen.boyd@linaro.org> <5886F5ED.3030509@gmail.com>
- <CAL_JsqKS3Q2mg0aSubB3TV6LPQjCx+hqBu4TqbsqyfBvWrwctg@mail.gmail.com>
- <CAL_JsqKbkynNmCrXbi=VJ5wqYtRrYbC+00qSm_uyZFBLFOUz0w@mail.gmail.com>
-Message-ID: <589CBA5F.9000101@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 9 Feb 2017 18:54:32 +0000
+Subject: [PATCH] virtio: Try to untangle DMA coherency
+In-Reply-To: <20170209203752-mutt-send-email-mst@kernel.org>
+References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
+ <20170201195732-mutt-send-email-mst@kernel.org>
+ <20170201182659.GM8177@arm.com>
+ <20170201210648-mutt-send-email-mst@kernel.org>
+ <20170202112614.GB30577@arm.com>
+ <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
+ <20170202182224-mutt-send-email-mst@kernel.org>
+ <20170202164049.GI13839@arm.com>
+ <20170209201341-mutt-send-email-mst@kernel.org>
+ <20170209183118.GI19397@arm.com>
+ <20170209203752-mutt-send-email-mst@kernel.org>
+Message-ID: <CAKv+Gu_j1FaByygYkQwYrQpCztnWwot6gUGW3suGjUhdaVopeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/17 07:17, Rob Herring wrote:
-> On Tue, Jan 24, 2017 at 12:05 PM, Rob Herring <robh+dt@kernel.org> wrote:
->> On Tue, Jan 24, 2017 at 12:36 AM, Frank Rowand <frowand.list@gmail.com> wrote:
->>> Hi Stephen,
->>>
->>> Sorry I did not get to v1 and v2 in a timely manner.
->>>
->>>
->>> On 01/23/17 12:48, Stephen Boyd wrote:
->>>> Platforms like 96boards have a standardized connector/expansion
->>>> slot that exposes signals like GPIOs to expansion boards in an
->>>> SoC agnostic way. We'd like the DT overlays for the expansion
->>>> boards to be written once without knowledge of the SoC on the
->>>> other side of the connector. This avoids the unscalable
->>>> combinatorial explosion of a different DT overlay for each
->>>> expansion board and SoC pair.
->>>>
->>>> We need a way to describe the GPIOs routed through the connector
->>>> in an SoC agnostic way. Let's introduce nexus property parsing
->>>> into the OF core to do this. This is largely based on the
->>>> interrupt nexus support we already have. This allows us to remap
->>>> a phandle list in a consumer node (e.g. reset-gpios) through a
->>>> connector in a generic way (e.g. via gpio-map). Do this in a
->>>> generic routine so that we can remap any sort of variable length
->>>> phandle list.
->>>>
->>>> Taking GPIOs as an example, the connector would be a GPIO nexus,
->>>> supporting the remapping of a GPIO specifier space to multiple
->>>> GPIO providers on the SoC. DT would look as shown below, where
->>>> 'soc_gpio1' and 'soc_gpio2' are inside the SoC, 'connector' is an
->>>> expansion port where boards can be plugged in, and
->>>> 'expansion_device' is a device on the expansion board.
->>>>
->>>>       soc {
->>>>               soc_gpio1: gpio-controller1 {
->>>>                       #gpio-cells = <2>;
->>>>               };
->>>>
->>>>               soc_gpio2: gpio-controller2 {
->>>>                       #gpio-cells = <2>;
->>>>               };
->>>>       };
->>>>
->>>>       connector: connector {
->>>>               #gpio-cells = <2>;
->>>>               gpio-map = <0 0 &soc_gpio1 1 0>,
->>>>                          <1 0 &soc_gpio2 4 0>,
->>>>                          <2 0 &soc_gpio1 3 0>,
->>>>                          <3 0 &soc_gpio2 2 0>;
->>>>               gpio-map-mask = <0xf 0x0>;
->>>>               gpio-map-pass-thru = <0x0 0x1>
->>>>       };
->>>>
->>>>       expansion_device {
->>>>               reset-gpios = <&connector 2 GPIO_ACTIVE_LOW>;
->>>>       };
->>>
->>> The how to architect connectors and plugs threads fell asleep before
->>> coming to a resolution.  We need to revive that discussion.
->>>
->>> One of the concepts of the plug and connector architecture is that
->>> a main board may contain multiple connectors of the same type (or
->>> different types, but the same type is sufficient for this discussion).
->>>
->>> The node describing the card that plugs into one of the connectors
->>> does not know the phandle of the connector it is going to be
->>> connected to.  Some other mechanism is provided to allow a card
->>> to be plugged into any of the available connectors.  If there are
->>> two identical cards plugged into two connectors, then both cards
->>> have the same exact device tree node.  But some mechanism will
->>> exist to resolve (or "link") the two card nodes to the different
->>> connector nodes.
->>>
->>> As a result of this, in the above example the reset-gpios property
->>> in the node 'expansion_device' can not contain '&connector'.  The
->>> concept of &connector belongs to the entire expansion_device node,
->>> not to individual properties within the node.
+On 9 February 2017 at 18:49, Michael S. Tsirkin <mst@redhat.com> wrote:
+> On Thu, Feb 09, 2017 at 06:31:18PM +0000, Will Deacon wrote:
+>> On Thu, Feb 09, 2017 at 08:17:16PM +0200, Michael S. Tsirkin wrote:
+>> > On Thu, Feb 02, 2017 at 04:40:49PM +0000, Will Deacon wrote:
+>> > > On Thu, Feb 02, 2017 at 06:30:28PM +0200, Michael S. Tsirkin wrote:
+>> > > > I am inclined to say, for 4.10 let's revert
+>> > > > c7070619f3408d9a0dffbed9149e6f00479cf43b since what it fixes is not a
+>> > > > regression in 4.10.
+>> > >
+>> > > No complaints there, as long as we can keep working to fix this for 4.11
+>> > > and onwards. You'll also need to cc stable on the revert.
+>> > >
+>> > > > So I think we can defer the fix to 4.11.
+>> > > > I think we still want f7f6634d23830ff74335734fbdb28ea109c1f349
+>> > > > for hosts with virtio 1 support.
+>> > > >
+>> > > > All this will hopefully push hosts to just implement virtio 1.
+>> > > > For mmio the changes are very small: several new registers,
+>> > > > that's all. You want this for proper 64 bit dma mask anyway.
+>> > >
+>> > > As I've said, virtio 1 will have exactly the same issue unless we start
+>> > > requiring firmware to advertise dma-coherent/_CCA for virtio-mmio
+>> > > devices correctly.
+>> > >
+>> >
+>> > OK I read up on _CCA in ACPI spec. It says:
+>> > The _CCA object returns whether or not a bus-master device supports
+>> > hardware managed cache coherency. Expected values are 0 to indicate it
+>> > is not supported, and 1 to indicate that it is supported.
+>> >
+>> > So if host is cache coherent, and guest thinks it isn't, we incur
+>> > unnecessary overhead by wasting coherent memory.
+>> > I get that but you said it actually breaks - why does it?
 >>
->> I think this is easily solved with a connector having 2 halves and
->> that we need to search parents for *-map properties. Inheriting from
->> parents is a common pattern in DT though perhaps not walking the
->> parents of a phandle. So we'd have something like this:
+>> It breaks because QEMU doesn't set _CCA for virtio-mmio devices, and that
+>> only becomes a problem when we use the DMA API, because that results in the
+>> guest taking out a non-cacheable mapping. On ARM (and other archs such as
+>> Power), having a mismatch between a cacheable and a non-cacheable mapping
+>> can result in a loss of coherency between the two (for example, if the
+>> non-cacheable gues accesses bypass the cache, but the cacheable host
+>> accesses allocate in the cache).
 >>
->> base-connector-1 {
->>   gpio-map = ...
->>   connector {
->>     child {
->>       some-gpios = <&connector 1>;
->>     };
->>   };
->> };
->>
->> base-connector-2 {
->>   gpio-map = ...
->>   connector {
->>     child {
->>       some-gpios = <&connector 1>;
->>     };
->>   };
->> };
->>
->> Now, how we resolve that /connector from an overlay targets
->> /base-connector-1 and /base-connector-2 is an orthogonal issue and one
->> that's going to be connector specific (at least for probe-able
->> connectors).
-> 
-> Frank, any more comments on this? If not, I plan to apply this series.
-> 
-> Rob
+>> Will
+>
+> I see. And I guess using a cacheable mapping is significantly faster.
+> I would say we want to typically use cacheable for virtio then,
+> whether we bypass the IOMMU or not. I guess this is why we always set
+> _CCA/DT correctly, right?
+>
 
-Yes, how we resolve which connector a plug goes into is orthogonal.
-
-My objection is that the original example has a property in the
-plug node (that is, on the expansion board), directly referencing
-the connector node, instead of referencing a resource inside the
-connector node.
-
-In the original example, it would make more sense for the first
-item in the reset-gpios property to be &gpio-map or "gpio-map"
-instead of &connector.
-
--Frank
+The point is that you don't get to choose: if the hardware is DMA
+coherent, the CPU should use cacheable mappings, or you may lose data.
+If the hardware is non-coherent, the CPU should use non-cacheable
+mappings for the same reason.
