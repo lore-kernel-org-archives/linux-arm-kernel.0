@@ -1,83 +1,85 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 09 Feb 2017 10:48:42 +0000
-Subject: [PATCH V8 06/10] acpi: apei: panic OS with fatal error status
- block
-In-Reply-To: <1485969413-23577-7-git-send-email-tbaicar@codeaurora.org>
-References: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
- <1485969413-23577-7-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <589C490A.9080109@arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 9 Feb 2017 13:54:58 +0200
+Subject: [PATCH v12 6/9] usb: xhci: use bus->sysdev for DMA configuration
+In-Reply-To: <85873d69-5664-0603-8cbd-a250d29ac335@ti.com>
+References: <1486372421-29073-1-git-send-email-peter.chen@nxp.com>
+ <1486372421-29073-7-git-send-email-peter.chen@nxp.com>
+ <20170208204300.GC8068@usblab-sd-06.qualcomm.com>
+ <85873d69-5664-0603-8cbd-a250d29ac335@ti.com>
+Message-ID: <6f131f15-d2f0-c8ac-c6af-accd23afab62@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan, Tyler,
 
-On 01/02/17 17:16, Tyler Baicar wrote:
-> From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
+
+On 09/02/17 13:53, Roger Quadros wrote:
 > 
-> Even if an error status block's severity is fatal, the kernel does not
-> honor the severity level and panic.
 > 
-> With the firmware first model, the platform could inform the OS about a
-> fatal hardware error through the non-NMI GHES notification type. The OS
-> should panic when a hardware error record is received with this
-> severity.
+> On 08/02/17 22:43, Jack Pham wrote:
+>> Hi Peter, Sriram, Arnd,
+>>
+>> On Mon, Feb 06, 2017 at 05:13:38PM +0800, Peter Chen wrote:
+>>> From: Arnd Bergmann <arnd@arndb.de>
+>>>
+>>> For xhci-hcd platform device, all the DMA parameters are not
+>>> configured properly, notably dma ops for dwc3 devices. So, set
+>>> the dma for xhci from sysdev. sysdev is pointing to device that
+>>> is known to the system firmware or hardware.
+>>>
+>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+>>> Tested-by: Baolin Wang <baolin.wang@linaro.org>
+>>> Tested-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+>>> Tested-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+>>> Signed-off-by: Mathias Nyman <mathias.nyman@linux.intel.com>
+>>> ---
+>>> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+>>> index 6d33b42..7a9c860 100644
+>>> --- a/drivers/usb/host/xhci-plat.c
+>>> +++ b/drivers/usb/host/xhci-plat.c
+>>
+>>> -	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
+>>> +	hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
+>>> +			       dev_name(&pdev->dev), NULL);
+>>
+>> As mentioned already in [1], usb_create_shared_hcd() is called to create
+>> the second bus, however it also needs to be converted.
+>>
+>> Not exactly as Roger's suggestion but this worked for me:
+>>
+>> -       xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
+>> +       xhci->shared_hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
+>>                         dev_name(&pdev->dev), hcd);
 > 
-> Call panic() after CPER data in error status block is printed if
-> severity is fatal, before each error section is handled.
+> But we're creating a shared_hcd and there is an API for that so why not use it
+> instead of calling __usb_create_hcd()?
+> 
 
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index 8756172..86c1f15 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -687,6 +689,13 @@ static int ghes_ack_error(struct acpi_hest_generic_v2 *generic_v2)
->  	return rc;
->  }
->  
-> +static void __ghes_call_panic(void)
-> +{
-> +	if (panic_timeout == 0)
-> +		panic_timeout = ghes_panic_timeout;
-> +	panic("Fatal hardware error!");
-> +}
-> +
+Just realized after I pressed send that there is no sysdev parameter
+for create_shared_hcd().
 
-__ghes_panic() also has:
->	__ghes_print_estatus(KERN_EMERG, ghes->generic, ghes->estatus);
+>>         if (!xhci->shared_hcd) {
+>>                 ret = -ENOMEM;
+>>
+>> Without this, SuperSpeed devices fail to enumerate:
+>>
+>>  usb 2-1: new SuperSpeed USB device number 2 using xhci-hcd
+>>  usb 2-1: device descriptor read/8, error -11
+>>  usb 2-1: new SuperSpeed USB device number 2 using xhci-hcd
+>>  usb 2-1: device descriptor read/8, error -11
+>>  usb 2-1: new SuperSpeed USB device number 3 using xhci-hcd
+>>  usb 2-1: device descriptor read/8, error -11
+>>  usb 2-1: new SuperSpeed USB device number 3 using xhci-hcd
+>>  usb 2-1: device descriptor read/8, error -11
+>>  <and continues...>
+>>
+>> Thanks,
+>> Jack
+>>
+>> [1] https://lkml.org/lkml/2016/12/9/240
+>>
+> 
 
-Which prints this estatus regardless of rate limiting and cache-ing.
-
-[ ... ]
-
-> @@ -698,6 +707,10 @@ static int ghes_proc(struct ghes *ghes)
->  		if (ghes_print_estatus(NULL, ghes->generic, ghes->estatus))
-
-ghes_print_estatus() uses some custom rate limiting '2 messages every 5
-seconds', GHES_SEV_PANIC shares the same limit as GHES_SEV_RECOVERABLE.
-
-I think its possible to get 2 recoverable messages, then a panic in a 5 second
-window. The rate limit will kick in to stop the panic estatus block being
-printed, but we still go on to call panic() without the real reason being printed...
-
-(the caching thing only seems to consider identical messages, given we would
-never see two panic messages, I don't think that will cause any problems.)
-
->  			ghes_estatus_cache_add(ghes->generic, ghes->estatus);
->  	}
-> +	if (ghes_severity(ghes->estatus->error_severity) >= GHES_SEV_PANIC) {
-> +		__ghes_call_panic();
-> +	}
-> +
-
-I think this ghes_severity() then panic() should go above the:
->	if (!ghes_estatus_cached(ghes->estatus)) {
-and we should call __ghes_print_estatus() here too, to make sure the message
-definitely got out!
-
-
-With that,
-Reviewed-by: James Morse <james.morse@arm.com>
-
-
-Thanks,
-
-James
+-- 
+cheers,
+-roger
