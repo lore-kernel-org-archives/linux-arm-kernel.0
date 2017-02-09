@@ -1,36 +1,56 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  9 Feb 2017 17:39:16 +0100
-Subject: [PATCH 2/8] dt-bindings: gpu: mali: Add optional memory-region
+Date: Thu,  9 Feb 2017 17:39:22 +0100
+Subject: [PATCH 8/8] ARM: sun8i: a33: Add the Mali OPPs
 In-Reply-To: <cover.7101c7323e6f22e281ad70b93488cf44caca4ca0.1486655917.git-series.maxime.ripard@free-electrons.com>
 References: <cover.7101c7323e6f22e281ad70b93488cf44caca4ca0.1486655917.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <49fd36f667c5ae46b0724c8204eabc51014aab92.1486655917.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <2e4a4f3f2f584f65f3c2d5e78f589015c651198d.1486655917.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reserved memory bindings allow us to specify which memory areas our
-buffers can be allocated from.
+The Mali GPU in the A33 has various operating frequencies used in the
+Allwinner BSP.
 
-Let's use it.
+Add them to our DT.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 4 ++++
- 1 file changed, 4 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/sun8i-a33.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-index 476f5ea6c627..88df4a276607 100644
---- a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-+++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-@@ -35,6 +35,10 @@ Optional properties:
-   - interrupt-names and interrupts:
-     * pmu: Power Management Unit interrupt, if implemented in hardware
+diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
+index 043b1b017276..e1b0abfee42f 100644
+--- a/arch/arm/boot/dts/sun8i-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+@@ -101,6 +101,22 @@
+ 		status = "disabled";
+ 	};
  
-+  - memory-region:
-+    Memory region to allocate from, as defined in
-+    Documentation/devicetree/bindi/reserved-memory/reserved-memory.txt
++	mali_opp_table: opp_table1 {
++		compatible = "operating-points-v2";
 +
- Vendor-specific bindings
- ------------------------
++		opp at 144000000 {
++			opp-hz = /bits/ 64 <144000000>;
++		};
++
++		opp at 240000000 {
++			opp-hz = /bits/ 64 <240000000>;
++		};
++
++		opp at 384000000 {
++			opp-hz = /bits/ 64 <384000000>;
++		};
++	};
++
+ 	memory {
+ 		reg = <0x40000000 0x80000000>;
+ 	};
+@@ -282,6 +298,7 @@
  
+ &mali {
+ 	memory-region = <&display_pool>;
++	operating-points-v2 = <&mali_opp_table>;
+ };
+ 
+ &pio {
 -- 
 git-series 0.8.11
