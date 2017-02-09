@@ -1,145 +1,77 @@
-From: jhugo@codeaurora.org (Jeffrey Hugo)
-Date: Thu, 9 Feb 2017 10:06:01 -0700
-Subject: [PATCH] efi: arm-stub: Correct FDT and initrd allocation rules
- for arm64
-In-Reply-To: <1486635389-26974-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1486635389-26974-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <dcd9e959-eb73-6703-2d23-06065e4ccaf6@codeaurora.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 10 Feb 2017 01:11:15 +0800
+Subject: [stericsson:mmc-no-NULL 32/34] drivers/mmc/core/queue.h:13:4: note:
+ in expansion of macro 'req_op'
+Message-ID: <201702100108.pjGLvqhX%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/9/2017 3:16 AM, Ard Biesheuvel wrote:
-> On arm64, we have made some changes over the past year to the way the
-> kernel itself is allocated and to how it deals with the initrd and FDT.
-> This patch brings the allocation logic in the EFI stub in line with that,
-> which is necessary because the introduction of KASLR has created the
-> possibility for the initrd to be allocated in a place where the kernel
-> may not be able to map it. (This is currently a theoretical scenario,
-> since it only affects systems where the size of RAM exceeds the size of
-> the linear mapping.)
->
-> So adhere to the arm64 boot protocol, and make sure that the initrd is
-> fully inside a 1GB aligned 32 GB window that covers the kernel as well.
->
-> The FDT may be anywhere in memory on arm64 now that we map it via the
-> fixmap, so we can lift the address restriction there completely.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git mmc-no-NULL
+head:   1bec9a625b256f78d00c38b58caad7ccdae8aaf5
+commit: 8b8bcac0e2f2356064488868b08c7d4fe8ef1f44 [32/34] mmc: queue: get/put struct mmc_queue_req
+config: x86_64-randconfig-x014-201706 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout 8b8bcac0e2f2356064488868b08c7d4fe8ef1f44
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-I'll give this a test on our platform that was running into the current 
-limitation - probably this weekend.
+All error/warnings (new ones prefixed by >>):
 
-I reviewed the code and its ok, but I do have one question.  Do we need 
-to handle the case where initrd ends up below the kernel?
+   In file included from drivers/mmc/core/core.c:42:0:
+   drivers/mmc/core/queue.h:10:46: warning: 'struct request' declared inside parameter list will not be visible outside of this definition or declaration
+    static inline bool mmc_req_is_special(struct request *req)
+                                                 ^~~~~~~
+   In file included from include/linux/writeback.h:12:0,
+                    from include/linux/memcontrol.h:30,
+                    from include/linux/swap.h:8,
+                    from include/linux/suspend.h:4,
+                    from drivers/mmc/core/core.c:27:
+   drivers/mmc/core/queue.h: In function 'mmc_req_is_special':
+>> include/linux/blk_types.h:209:8: error: dereferencing pointer to incomplete type 'struct request'
+     ((req)->cmd_flags & REQ_OP_MASK)
+           ^
+>> drivers/mmc/core/queue.h:13:4: note: in expansion of macro 'req_op'
+      (req_op(req) == REQ_OP_FLUSH ||
+       ^~~~~~
 
-Lets assume KALSR puts the kernel somewhere up high in DDR, after the 
-32GB mark in DDR.  Now lets assume the unlikely scenario that the initrd 
-won't fit anywhere after 32GB, but will fit before 32GB.  Per my 
-understanding of efi_high_alloc, it will put the initrd before the 32GB 
-mark, which will be outside of the window where the kernel is.
+vim +/req_op +13 drivers/mmc/core/queue.h
 
-Seems like there are 3 options -
-1. We consider the scenario unlikely to the point that we don't care, 
-and don't do anything
-2. We check to see if initrd is allocated to be within the window, and 
-if not print an error message
-3. Change efi_high_alloc to take a min addess as well as a max, so that 
-it will fail if the initrd can't fit in the window (which will result in 
-an error message printed)
+^1da177e4 drivers/mmc/mmc_queue.h  Linus Torvalds 2005-04-16   1  #ifndef MMC_QUEUE_H
+^1da177e4 drivers/mmc/mmc_queue.h  Linus Torvalds 2005-04-16   2  #define MMC_QUEUE_H
+^1da177e4 drivers/mmc/mmc_queue.h  Linus Torvalds 2005-04-16   3  
+adc91efbc drivers/mmc/core/queue.h Ulf Hansson    2017-01-13   4  #include <linux/types.h>
+8b8bcac0e drivers/mmc/core/queue.h Linus Walleij  2017-02-09   5  #include <linux/spinlock.h>
+adc91efbc drivers/mmc/core/queue.h Ulf Hansson    2017-01-13   6  #include <linux/blkdev.h>
+adc91efbc drivers/mmc/core/queue.h Ulf Hansson    2017-01-13   7  #include <linux/mmc/core.h>
+adc91efbc drivers/mmc/core/queue.h Ulf Hansson    2017-01-13   8  #include <linux/mmc/host.h>
+adc91efbc drivers/mmc/core/queue.h Ulf Hansson    2017-01-13   9  
+c2df40dfb drivers/mmc/card/queue.h Mike Christie  2016-06-05  10  static inline bool mmc_req_is_special(struct request *req)
+c2df40dfb drivers/mmc/card/queue.h Mike Christie  2016-06-05  11  {
+3a5e02ced drivers/mmc/card/queue.h Mike Christie  2016-06-05  12  	return req &&
+7afafc8a4 drivers/mmc/card/queue.h Adrian Hunter  2016-08-16 @13  		(req_op(req) == REQ_OP_FLUSH ||
+7afafc8a4 drivers/mmc/card/queue.h Adrian Hunter  2016-08-16  14  		 req_op(req) == REQ_OP_DISCARD ||
+7afafc8a4 drivers/mmc/card/queue.h Adrian Hunter  2016-08-16  15  		 req_op(req) == REQ_OP_SECURE_ERASE);
+c2df40dfb drivers/mmc/card/queue.h Mike Christie  2016-06-05  16  }
+ef3a69c7a drivers/mmc/card/queue.h Seungwon Jeon  2013-03-14  17  
+^1da177e4 drivers/mmc/mmc_queue.h  Linus Torvalds 2005-04-16  18  struct task_struct;
+7db3028e0 drivers/mmc/card/queue.h Linus Walleij  2016-11-18  19  struct mmc_blk_data;
+^1da177e4 drivers/mmc/mmc_queue.h  Linus Torvalds 2005-04-16  20  
+97868a2bd drivers/mmc/card/queue.h Per Forlin     2011-07-09  21  struct mmc_blk_request {
 
-Thoughts?
+:::::: The code at line 13 was first introduced by commit
+:::::: 7afafc8a44bf0ab841b17d450b02aedb3a138985 block: Fix secure erase
 
->  arch/arm/include/asm/efi.h              | 14 +++++++++++++-
->  arch/arm64/include/asm/efi.h            | 19 ++++++++++++++++++-
->  drivers/firmware/efi/libstub/arm-stub.c |  7 ++++---
->  3 files changed, 35 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
-> index 0b06f5341b45..62620451f60b 100644
-> --- a/arch/arm/include/asm/efi.h
-> +++ b/arch/arm/include/asm/efi.h
-> @@ -84,6 +84,18 @@ static inline void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
->   */
->  #define ZIMAGE_OFFSET_LIMIT	SZ_128M
->  #define MIN_ZIMAGE_OFFSET	MAX_UNCOMP_KERNEL_SIZE
-> -#define MAX_FDT_OFFSET		ZIMAGE_OFFSET_LIMIT
-> +
-> +/* on ARM, the FDT should be located in the first 128 MB of RAM */
-> +static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
-> +{
-> +		return dram_base + ZIMAGE_OFFSET_LIMIT;
-> +}
-> +
-> +/* on ARM, the initrd should be loaded in a lowmem region */
-> +static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
-> +						    unsigned long image_addr)
-> +{
-> +	return dram_base + SZ_512M;
-> +}
->
->  #endif /* _ASM_ARM_EFI_H */
-> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-> index 0b6b1633017f..6a6c8a0d1424 100644
-> --- a/arch/arm64/include/asm/efi.h
-> +++ b/arch/arm64/include/asm/efi.h
-> @@ -46,7 +46,24 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
->   * 2MiB so we know it won't cross a 2MiB boundary.
->   */
->  #define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
-> -#define MAX_FDT_OFFSET	SZ_512M
-> +
-> +/* on arm64, the FDT may be located anywhere in system RAM */
-> +static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
-> +{
-> +	return ULONG_MAX;
-> +}
-> +
-> +/*
-> + * On arm64, the initrd must be completely inside a 1 GB aligned 32 GB window
-> + * that covers Image as well. Since we allocate from the top down, set a max
-> + * address that is virtually guaranteed to produce a suitable allocation even
-> + * when the physical address of Image is randomized.
-> + */
-> +static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
-> +						    unsigned long image_addr)
-> +{
-> +	return ALIGN(image_addr, SZ_1G) + 31UL * SZ_1G;
-> +}
->
->  #define efi_call_early(f, ...)		sys_table_arg->boottime->f(__VA_ARGS__)
->  #define __efi_call_early(f, ...)	f(__VA_ARGS__)
-> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-> index b4f7d78f9e8b..557281fe375f 100644
-> --- a/drivers/firmware/efi/libstub/arm-stub.c
-> +++ b/drivers/firmware/efi/libstub/arm-stub.c
-> @@ -333,8 +333,9 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
->  	if (!fdt_addr)
->  		pr_efi(sys_table, "Generating empty DTB\n");
->
-> -	status = handle_cmdline_files(sys_table, image, cmdline_ptr,
-> -				      "initrd=", dram_base + SZ_512M,
-> +	status = handle_cmdline_files(sys_table, image, cmdline_ptr, "initrd=",
-> +				      efi_get_max_initrd_addr(dram_base,
-> +							      *image_addr),
->  				      (unsigned long *)&initrd_addr,
->  				      (unsigned long *)&initrd_size);
->  	if (status != EFI_SUCCESS)
-> @@ -344,7 +345,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
->
->  	new_fdt_addr = fdt_addr;
->  	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
-> -				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
-> +				&new_fdt_addr, efi_get_max_fdt_addr(dram_base),
->  				initrd_addr, initrd_size, cmdline_ptr,
->  				fdt_addr, fdt_size);
->
->
+:::::: TO: Adrian Hunter <adrian.hunter@intel.com>
+:::::: CC: Jens Axboe <axboe@fb.com>
 
-
--- 
-Jeffrey Hugo
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 21694 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170210/ba56dc00/attachment-0001.gz>
