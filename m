@@ -1,45 +1,97 @@
 From: juri.lelli@arm.com (Juri Lelli)
-Date: Thu,  9 Feb 2017 09:25:21 +0000
-Subject: [PATCH v2 5/9] arm64: remove wrong CONFIG_PROC_SYSCTL ifdef
+Date: Thu,  9 Feb 2017 09:25:23 +0000
+Subject: [PATCH v2 7/9] arm,arm64,drivers: reduce scope of cap_parsing_failed
 In-Reply-To: <20170209092525.6654-1-juri.lelli@arm.com>
 References: <20170209092525.6654-1-juri.lelli@arm.com>
-Message-ID: <20170209092525.6654-6-juri.lelli@arm.com>
+Message-ID: <20170209092525.6654-8-juri.lelli@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sysfs cpu_capacity entry for each CPU has nothing to do with
-PROC_FS, nor it's in /proc/sys path.
+Reduce the scope of cap_parsing_failed (making it static in
+drivers/base/arch_topology.c) by slightly changing {arm,arm64} DT
+parsing code.
 
-Remove such ifdef.
+For arm checking for !cap_parsing_failed before calling normalize_
+cpu_capacity() is superfluous, as returning an error from parse_
+cpu_capacity() (above) means cap_from _dt is set to false.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Reported-and-suggested-by: Sudeep Holla <sudeep.holla@arm.com>
-Fixes: be8f185d8af4 ('arm64: add sysfs cpu_capacity attribute')
+For arm64 we can simply check if raw_capacity points to something,
+which is not if capacity parsing has failed.
+
+Suggested-by: Morten Rasmussen <morten.rasmussen@arm.com>
 Signed-off-by: Juri Lelli <juri.lelli@arm.com>
 ---
- arch/arm64/kernel/topology.c | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/kernel/topology.c   | 3 +--
+ arch/arm64/kernel/topology.c | 5 +----
+ drivers/base/arch_topology.c | 4 ++--
+ 3 files changed, 4 insertions(+), 8 deletions(-)
 
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 51e9ed6439f1..5d4679a5418b 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -75,7 +75,6 @@ static unsigned long *__cpu_capacity;
+ 
+ static unsigned long middle_capacity = 1;
+ static bool cap_from_dt = true;
+-extern bool cap_parsing_failed;
+ extern void normalize_cpu_capacity(void);
+ extern int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu);
+ 
+@@ -164,7 +163,7 @@ static void __init parse_dt_topology(void)
+ 		middle_capacity = ((max_capacity / 3)
+ 				>> (SCHED_CAPACITY_SHIFT-1)) + 1;
+ 
+-	if (cap_from_dt && !cap_parsing_failed)
++	if (cap_from_dt)
+ 		normalize_cpu_capacity();
+ }
+ 
 diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 655e65f38f31..565dd69888cc 100644
+index f629f7524d65..deb5ebc1bdfe 100644
 --- a/arch/arm64/kernel/topology.c
 +++ b/arch/arm64/kernel/topology.c
-@@ -41,7 +41,6 @@ static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
- 	per_cpu(cpu_scale, cpu) = capacity;
- }
+@@ -26,7 +26,6 @@
+ #include <asm/cputype.h>
+ #include <asm/topology.h>
  
--#ifdef CONFIG_PROC_SYSCTL
- static ssize_t cpu_capacity_show(struct device *dev,
- 				 struct device_attribute *attr,
- 				 char *buf)
-@@ -98,7 +97,6 @@ static int register_cpu_capacity_sysctl(void)
- 	return 0;
- }
- subsys_initcall(register_cpu_capacity_sysctl);
--#endif
+-extern bool cap_parsing_failed;
+ extern void normalize_cpu_capacity(void);
+ extern int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu);
  
- static u32 capacity_scale;
- static u32 *raw_capacity;
+@@ -186,10 +185,8 @@ static int __init parse_dt_topology(void)
+ 	 * cluster with restricted subnodes.
+ 	 */
+ 	map = of_get_child_by_name(cn, "cpu-map");
+-	if (!map) {
+-		cap_parsing_failed = true;
++	if (!map)
+ 		goto out;
+-	}
+ 
+ 	ret = parse_cluster(map, 0);
+ 	if (ret != 0)
+diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
+index c1dd430adad2..c75fa5ab732b 100644
+--- a/drivers/base/arch_topology.c
++++ b/drivers/base/arch_topology.c
+@@ -90,7 +90,7 @@ subsys_initcall(register_cpu_capacity_sysctl);
+ 
+ u32 capacity_scale;
+ u32 *raw_capacity;
+-bool cap_parsing_failed;
++static bool cap_parsing_failed;
+ 
+ void normalize_cpu_capacity(void)
+ {
+@@ -205,7 +205,7 @@ static int __init register_cpufreq_notifier(void)
+ 	 * until we have the necessary code to parse the cpu capacity, so
+ 	 * skip registering cpufreq notifier.
+ 	 */
+-	if (!acpi_disabled || cap_parsing_failed)
++	if (!acpi_disabled || !raw_capacity)
+ 		return -EINVAL;
+ 
+ 	if (!alloc_cpumask_var(&cpus_to_visit, GFP_KERNEL)) {
 -- 
 2.10.0
