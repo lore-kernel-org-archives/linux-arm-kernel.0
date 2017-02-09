@@ -1,162 +1,68 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 9 Feb 2017 18:26:14 +0000
-Subject: [PATCH] efi: arm-stub: Correct FDT and initrd allocation rules
- for arm64
-In-Reply-To: <CAKv+Gu8iA3eed6nHXvwez8=fjEvL1M+KzepUyM7cnNeqZSUBhw@mail.gmail.com>
-References: <1486635389-26974-1-git-send-email-ard.biesheuvel@linaro.org>
- <dcd9e959-eb73-6703-2d23-06065e4ccaf6@codeaurora.org>
- <CAKv+Gu8Lr2KmEgJU4_GA8qm5_OZfYZECH0-=OBTDJ=1-5fAsnw@mail.gmail.com>
- <5595ed30-3c97-8d7b-154a-9af474a4e22c@codeaurora.org>
- <CAKv+Gu9fwzgbfGosVcGGqJHLhW=79LWhg4vS4MWEtTdBEHbNUw@mail.gmail.com>
- <75121ecb-5ee6-202d-8cfa-a90d323d1bc5@codeaurora.org>
- <CAKv+Gu8iA3eed6nHXvwez8=fjEvL1M+KzepUyM7cnNeqZSUBhw@mail.gmail.com>
-Message-ID: <CAKv+Gu-EPdcLFBmHoVB4UROrUSkYorgn5a9SX1wpAD_30=1tGw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 9 Feb 2017 18:26:26 +0000
+Subject: [PATCH 04/10] arm64: head.S: Enable EL1 (host) access to SPE
+ when entered at EL2
+In-Reply-To: <1485540470-11469-5-git-send-email-will.deacon@arm.com>
+References: <1485540470-11469-1-git-send-email-will.deacon@arm.com>
+ <1485540470-11469-5-git-send-email-will.deacon@arm.com>
+Message-ID: <20170209182626.GA26879@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 February 2017 at 18:18, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 9 February 2017 at 18:01, Jeffrey Hugo <jhugo@codeaurora.org> wrote:
->> On 2/9/2017 10:45 AM, Ard Biesheuvel wrote:
->>>
->>> On 9 February 2017 at 17:41, Jeffrey Hugo <jhugo@codeaurora.org> wrote:
->>>>
->>>> On 2/9/2017 10:16 AM, Ard Biesheuvel wrote:
->>>>>
->>>>>
->>>>> On 9 February 2017 at 17:06, Jeffrey Hugo <jhugo@codeaurora.org> wrote:
->>>>>>
->>>>>>
->>>>>> On 2/9/2017 3:16 AM, Ard Biesheuvel wrote:
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> On arm64, we have made some changes over the past year to the way the
->>>>>>> kernel itself is allocated and to how it deals with the initrd and
->>>>>>> FDT.
->>>>>>> This patch brings the allocation logic in the EFI stub in line with
->>>>>>> that,
->>>>>>> which is necessary because the introduction of KASLR has created the
->>>>>>> possibility for the initrd to be allocated in a place where the kernel
->>>>>>> may not be able to map it. (This is currently a theoretical scenario,
->>>>>>> since it only affects systems where the size of RAM exceeds the size
->>>>>>> of
->>>>>>> the linear mapping.)
->>>>>>>
->>>>>>> So adhere to the arm64 boot protocol, and make sure that the initrd is
->>>>>>> fully inside a 1GB aligned 32 GB window that covers the kernel as
->>>>>>> well.
->>>>>>>
->>>>>>> The FDT may be anywhere in memory on arm64 now that we map it via the
->>>>>>> fixmap, so we can lift the address restriction there completely.
->>>>>>>
->>>>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>>>>> ---
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> I'll give this a test on our platform that was running into the current
->>>>>> limitation - probably this weekend.
->>>>>>
->>>>>> I reviewed the code and its ok, but I do have one question.  Do we need
->>>>>> to
->>>>>> handle the case where initrd ends up below the kernel?
->>>>>>
->>>>>> Lets assume KALSR puts the kernel somewhere up high in DDR, after the
->>>>>> 32GB
->>>>>> mark in DDR.  Now lets assume the unlikely scenario that the initrd
->>>>>> won't
->>>>>> fit anywhere after 32GB, but will fit before 32GB.  Per my
->>>>>> understanding
->>>>>> of
->>>>>> efi_high_alloc, it will put the initrd before the 32GB mark, which will
->>>>>> be
->>>>>> outside of the window where the kernel is.
->>>>>>
->>>>>
->>>>> The 32 GB does not have to be 32 GB aligned, only 1 GB aligned. So as
->>>>> long as the follow expression holds, we should be fine
->>>>>
->>>>>
->>>>> align(max(kernel_end, initrd_end), 1g) - align_down (min
->>>>> (kernel_start, initrd_start), 1g) <= 32g
->>>>
->>>>
->>>>
->>>> Yes, and I argue there is a possibility (we'll call it extremely remote)
->>>> where that may not hold.  My question is, do we care about that
->>>> possibility,
->>>> and if so, do we do anything about it?
->>>>
->>>
->>> We allocate top down, so we start at align_down(base_of_image, 1g) +
->>> 32g, and go down until we hit a region that first our initrd. We will
->>> disregard the region that the kernel occupies, but below that, we will
->>> just proceed until we find a slot. This effectively means we have a 63
->>> GB window, with the kernel in the middle, where we can load the initrd
->>> and adhere to the boot protocol. I don't see how we could end up in
->>> the situation where we load the kernel somewhere, and both the 31 GB
->>> before *and* after are completely occupied.
->>>
->>
->> No we don't.  We do not allocate top down.  Please look at efi_high_alloc.
->>
->> Efi_high_alloc iterates though the memory map, low to high.
+On Fri, Jan 27, 2017 at 06:07:43PM +0000, Will Deacon wrote:
+> The SPE architecture requires each exception level to enable access
+> to the SPE controls for the exception level below it, since additional
+> context-switch logic may be required to handle the buffer safely.
+> 
+> This patch allows EL1 (host) access to the SPE controls when entered at
+> EL2.
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-BTW the memory map isn't necessarily sorted per the UEFI spec, so it
-iterates in what is essentially random order, not low to high.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
->> It looks to see
->> if a slot can hold the allocation, and the slot does not exceed the
->> specified max.  If so, efi_high_alloc retains a reference to the slot. Then
->> efi_high_alloc continues iterating though the map, until the end.
->> efi_high_alloc only stores a reference to the most recently valid slot,
->> which would be the highest slot in the map.
->>
->
-> It is documented as
->
-> /*
->  * Allocate at the highest possible address that is not above 'max'.
->  */
->
-> and what you describe is pretty much that, no?
->
->> My system can have 256GB (or more) of RAM.  It is possible, however remote,
->> that the initrd and kernel can be more than 64GB away from each other.
->>
->> Lets assume KASLR puts the kernel at 250GB.  Lets assume, for whatever
->> reason, we can't fit the initrd above 150GB (there was just enough room to
->> jam kernel there somwhow, but firmware is consuming the rest, maybe it put
->> rootfs there via NFIT).
->
-> So before even booting the kernel, you already have 100 GB of memory
-> occupied? As I replied before, you are correct that in this case, you
-> will not be able to put the initrd within 32 GB of the kernel. But do
-> note that this 32 GB figure is derived from the linear region size of
-> a 16k pages kernel with 2 levels of translation, which is a niche
-> configuration by itself. On a system that has 256 GB of RAM, it is
-> highly unlikely that you will be using a kernel that can only map 32
-> GB of it.
->
-> The reason for choosing the 32 GB figure is that it relieves the boot
-> loader from having to go and figure out what kind of kernel is going
-> to be executed. Page size can be read from the Image header but the VA
-> size cannot. So 32 GB was a reasonable number imo.
->
->> efi_high_alloc will put the initrd at some point
->> just below 150GB, because it iterates low to high,
->
-> No, because everything above that is occupied. If efi_high_alloc()
-> does not do what it says on the tin, we should fix that.
->
->> and 150GB will be below
->> the max of 250GB where the kernel is.  This will result in the initrd and
->> kernel being ~100GB away in this example, which violates the requirements
->> stated in Booting.txt
->>
->> I see the situation is possible, but I admit it is remote.  If you want to
->> ignore it, fine.  I would be happy with that so long as the assumption is
->> documented so that if it is ever somehow violated in the real world, we know
->> what broke.
->>
+Mark.
+
+> ---
+>  arch/arm64/kernel/head.S | 19 +++++++++++++++----
+>  1 file changed, 15 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+> index 4b1abac3485a..7f625d2e8e45 100644
+> --- a/arch/arm64/kernel/head.S
+> +++ b/arch/arm64/kernel/head.S
+> @@ -592,15 +592,26 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+>  #endif
+>  
+>  	/* EL2 debug */
+> -	mrs	x0, id_aa64dfr0_el1		// Check ID_AA64DFR0_EL1 PMUVer
+> -	sbfx	x0, x0, #8, #4
+> +	mrs	x1, id_aa64dfr0_el1		// Check ID_AA64DFR0_EL1 PMUVer
+> +	sbfx	x0, x1, #8, #4
+>  	cmp	x0, #1
+>  	b.lt	4f				// Skip if no PMU present
+>  	mrs	x0, pmcr_el0			// Disable debug access traps
+>  	ubfx	x0, x0, #11, #5			// to EL2 and allow access to
+>  4:
+> -	csel	x0, xzr, x0, lt			// all PMU counters from EL1
+> -	msr	mdcr_el2, x0			// (if they exist)
+> +	csel	x3, xzr, x0, lt			// all PMU counters from EL1
+> +
+> +	/* Statistical profiling */
+> +	ubfx	x0, x1, #32, #4			// Check ID_AA64DFR0_EL1 PMSVer
+> +	cbz	x0, 6f				// Skip if SPE not present
+> +	cbnz	x2, 5f				// VHE?
+> +	mov	x1, #(MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT)
+> +	orr	x3, x3, x1			// If we don't have VHE, then
+> +	b	6f				// use EL1&0 translation.
+> +5:						// For VHE, use EL2 translation
+> +	orr	x3, x3, #MDCR_EL2_TPMS		// and disable access from EL1
+> +6:
+> +	msr	mdcr_el2, x3			// Configure debug traps
+>  
+>  	/* Stage-2 translation */
+>  	msr	vttbr_el2, xzr
+> -- 
+> 2.1.4
+> 
