@@ -1,63 +1,50 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Feb 2017 09:55:34 +0000
-Subject: [PATCHv3 net-next 00/12] net: mvpp2: misc improvements and
- preparation patches
-In-Reply-To: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170209095534.GB27312@n2100.armlinux.org.uk>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 9 Feb 2017 10:55:43 +0100
+Subject: [PATCH v7 2/4] dmaengine: Forward slave device pointer to
+ of_xlate callback
+In-Reply-To: <ded8b3e8-2ef8-218b-fb6d-783825588fd8@samsung.com>
+References: <1485340088-25481-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170125102824eucas1p1cf027184286131ff628eb7113c3f9e60@eucas1p1.samsung.com>
+ <1485340088-25481-3-git-send-email-m.szyprowski@samsung.com>
+ <26397455-1237-2a66-acf8-215aacc7c9ce@metafoo.de>
+ <49c9c23d-ff0a-268a-5edd-931e04eb98b5@samsung.com>
+ <20170209041123.GK19244@localhost>
+ <ded8b3e8-2ef8-218b-fb6d-783825588fd8@samsung.com>
+Message-ID: <CAPDyKFqYe0YJRzjaOo1N-fgZyJ8JqNnka66kSSg0nWiXOYj=BQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 04:51:29PM +0100, Thomas Petazzoni wrote:
-> David,
-> 
-> This series contains a number of misc improvements and preparation
-> patches for an upcoming series that adds support for the new PPv2.2
-> network controller to the mvpp2 driver.
-> 
-> Sorry for the long delay since v2, I was on
-> vacation/conference/training in January, and therefore wasn't able to
-> resend a new version earlier. Upcoming versions should arrive much
-> faster, if there are further comments on this series.
-> 
-> The most significant improvements are:
-> 
->  - Switching to using build_skb(), which is necessary for the upcoming
->    PPv2.2 support, but anyway a good improvement to the current mvpp2
->    driver (supporting PPv2.1).
-> 
->  - Making the driver build on 64-bit platforms.
-> 
-> Changes since v2:
-> 
->  - Fix remaining 64-bit build warning, reported by David Miller.
-> 
->  - Adjust how bit mask related definitions are done in "net: mvpp2:
->    simplify MVPP2_PRS_RI_* definitions" according to Russell King
->    suggestions.
-> 
->  - Add a patch "net: mvpp2: remove useless arguments in
->    mvpp2_rx_{pkts,time}_coal_set", suggested by Russell King.
-> 
->  - Rework mvpp2_rx_time_coal_set() implementation to avoid overflows
->    and rounding errors. I've used the implementation suggested by
->    Russell King.
-> 
-> Changes since v1:
-> 
->  - This series is split as a separate series from the larger patch set
->    adding support for PPv2.2 in the mvpp2 driver, as requested by
->    David Miller.
-> 
->  - Rebased on top of v4.10-rc1.
+>>
+>> Yes agreed on that, plus the runtime handling needs to be built in, right
+>> now the APIs dont work well with it, we disucssed these during the KS and
+>> this goes without saying, patches are welcome :)
+>
+>
+> Okay, so what is the conclusion? Do you want me to do the whole rework of
+> dma
+> engine core to get this runtime pm patchset for pl330 merged??? Is there any
+> roadmap for this rework prepared, so I can at least take a look at the
+> amount
+> of work needed to be done?
+>
+> I'm rather new to dma engine framework and I only wanted to fix pl330 driver
+> not to block turning off the power domain on Exynos5422/5433 SoCs.
 
-For the whole series:
+As you probably know, this is a common problem for many dma devices,
+slave devices and platforms.
 
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+If possible, it would be great if we could avoid a solution that
+doesn't force changes to lots of "dma consumer" drivers.
 
-Thanks.
+>
+> I can also check again if there is any other way to find the slave device in
+> alloc_chan_resources, like for example scanning the device tree for
+> phandles,
+> to avoid changing dmaengine core as this turned out to be too problematic
+> before one will do the proper dma engine core rework.
+>
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Again, thanks for working on this!
+
+Kind regards
+Uffe
