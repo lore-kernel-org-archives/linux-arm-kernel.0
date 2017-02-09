@@ -1,86 +1,203 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Thu, 09 Feb 2017 12:18:45 +0000
-Subject: [PATCH 3/4] ARM: kuser: simplify kuser_cmpxchg* preprocessor
- conditionals
+Date: Thu, 09 Feb 2017 12:18:40 +0000
+Subject: [PATCH 2/4] ARM: kuser: split out kuser code
 In-Reply-To: <20170209121756.GC27312@n2100.armlinux.org.uk>
 References: <20170209121756.GC27312@n2100.armlinux.org.uk>
-Message-ID: <E1cbngT-000269-4q@rmk-PC.armlinux.org.uk>
+Message-ID: <E1cbngO-000262-21@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Simplify the kuser_cmpxchg* preprocessor conditionals by arranging the
-ARMv6+ code first.  This gives us one level of preprocessor conditional
-nesting, rather than two levels.
-
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/kernel/kuser.S | 42 ++++++++++++++++++------------------------
- 1 file changed, 18 insertions(+), 24 deletions(-)
+ arch/arm/kernel/Makefile     |   2 +
+ arch/arm/kernel/entry-armv.S | 198 -------------------------------------------
+ arch/arm/kernel/kuser.S      | 197 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 199 insertions(+), 198 deletions(-)
+ create mode 100644 arch/arm/kernel/kuser.S
 
-diff --git a/arch/arm/kernel/kuser.S b/arch/arm/kernel/kuser.S
-index 5d2a2784ed09..d7081a4761fe 100644
---- a/arch/arm/kernel/kuser.S
-+++ b/arch/arm/kernel/kuser.S
-@@ -2,6 +2,10 @@
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index f7751cb71fb1..a7c21ce534e3 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -30,6 +30,8 @@ else
+ obj-y		+= entry-armv.o
+ endif
  
- #include <asm/assembler.h>
- 
-+#if defined(CONFIG_SMP) && !defined(CONFIG_CPU_32v6K)
-+#error "incoherent kernel configuration"
-+#endif
++obj-$(CONFIG_KUSER_HELPERS)	+= kuser.o
 +
- 	__INIT
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+ obj-$(CONFIG_ISA_DMA_API)	+= dma.o
+ obj-$(CONFIG_FIQ)		+= fiq.o
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 9f157e7c51e7..3acc6e6b948c 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -819,204 +819,6 @@ ENTRY(__switch_to)
+  UNWIND(.fnend		)
+ ENDPROC(__switch_to)
  
- /*
-@@ -63,9 +67,7 @@ __kuser_cmpxchg64:				@ 0xffff0f60
- 	ldmfd	sp!, {r4, r5, r6, r7}
- 	usr_ret	lr
- 
+-	__INIT
+-
+-/*
+- * User helpers.
+- *
+- * Each segment is 32-byte aligned and will be moved to the top of the high
+- * vector page.  New segments (if ever needed) must be added in front of
+- * existing ones.  This mechanism should be used only for things that are
+- * really small and justified, and not be abused freely.
+- *
+- * See Documentation/arm/kernel_user_helpers.txt for formal definitions.
+- */
+- THUMB(	.arm	)
+-
+-	.macro	usr_ret, reg
+-#ifdef CONFIG_ARM_THUMB
+-	bx	\reg
+-#else
+-	ret	\reg
+-#endif
+-	.endm
+-
+-	.macro	kuser_pad, sym, size
+-	.if	(. - \sym) & 3
+-	.rept	4 - (. - \sym) & 3
+-	.byte	0
+-	.endr
+-	.endif
+-	.rept	(\size - (. - \sym)) / 4
+-	.word	0xe7fddef1
+-	.endr
+-	.endm
+-
+-#ifdef CONFIG_KUSER_HELPERS
+-	.align	5
+-	.globl	__kuser_helper_start
+-__kuser_helper_start:
+-
+-/*
+- * Due to the length of some sequences, __kuser_cmpxchg64 spans 2 regular
+- * kuser "slots", therefore 0xffff0f80 is not used as a valid entry point.
+- */
+-
+-__kuser_cmpxchg64:				@ 0xffff0f60
+-
+-#if defined(CONFIG_CPU_32v6K)
+-
+-	stmfd	sp!, {r4, r5, r6, r7}
+-	ldrd	r4, r5, [r0]			@ load old val
+-	ldrd	r6, r7, [r1]			@ load new val
+-	smp_dmb	arm
+-1:	ldrexd	r0, r1, [r2]			@ load current val
+-	eors	r3, r0, r4			@ compare with oldval (1)
+-	eoreqs	r3, r1, r5			@ compare with oldval (2)
+-	strexdeq r3, r6, r7, [r2]		@ store newval if eq
+-	teqeq	r3, #1				@ success?
+-	beq	1b				@ if no then retry
+-	smp_dmb	arm
+-	rsbs	r0, r3, #0			@ set returned val and C flag
+-	ldmfd	sp!, {r4, r5, r6, r7}
+-	usr_ret	lr
+-
 -#elif !defined(CONFIG_SMP)
 -
 -#ifdef CONFIG_MMU
-+#elif defined(CONFIG_MMU)
- 
- 	/*
- 	 * The only thing that can break atomicity in this cmpxchg64
-@@ -109,10 +111,6 @@ __kuser_cmpxchg64:				@ 0xffff0f60
- 	usr_ret	lr
- #endif
- 
+-
+-	/*
+-	 * The only thing that can break atomicity in this cmpxchg64
+-	 * implementation is either an IRQ or a data abort exception
+-	 * causing another process/thread to be scheduled in the middle of
+-	 * the critical sequence.  The same strategy as for cmpxchg is used.
+-	 */
+-	stmfd	sp!, {r4, r5, r6, lr}
+-	ldmia	r0, {r4, r5}			@ load old val
+-	ldmia	r1, {r6, lr}			@ load new val
+-1:	ldmia	r2, {r0, r1}			@ load current val
+-	eors	r3, r0, r4			@ compare with oldval (1)
+-	eoreqs	r3, r1, r5			@ compare with oldval (2)
+-2:	stmeqia	r2, {r6, lr}			@ store newval if eq
+-	rsbs	r0, r3, #0			@ set return val and C flag
+-	ldmfd	sp!, {r4, r5, r6, pc}
+-
+-	.text
+-kuser_cmpxchg64_fixup:
+-	@ Called from kuser_cmpxchg_fixup.
+-	@ r4 = address of interrupted insn (must be preserved).
+-	@ sp = saved regs. r7 and r8 are clobbered.
+-	@ 1b = first critical insn, 2b = last critical insn.
+-	@ If r4 >= 1b and r4 <= 2b then saved pc_usr is set to 1b.
+-	mov	r7, #0xffff0fff
+-	sub	r7, r7, #(0xffff0fff - (0xffff0f60 + (1b - __kuser_cmpxchg64)))
+-	subs	r8, r4, r7
+-	rsbcss	r8, r8, #(2b - 1b)
+-	strcs	r7, [sp, #S_PC]
+-#if __LINUX_ARM_ARCH__ < 6
+-	bcc	kuser_cmpxchg32_fixup
+-#endif
+-	ret	lr
+-	.previous
+-
+-#else
+-#warning "NPTL on non MMU needs fixing"
+-	mov	r0, #-1
+-	adds	r0, r0, #0
+-	usr_ret	lr
+-#endif
+-
 -#else
 -#error "incoherent kernel configuration"
 -#endif
 -
- 	kuser_pad __kuser_cmpxchg64, 64
- 
- __kuser_memory_barrier:				@ 0xffff0fa0
-@@ -123,9 +121,20 @@ __kuser_memory_barrier:				@ 0xffff0fa0
- 
- __kuser_cmpxchg:				@ 0xffff0fc0
- 
+-	kuser_pad __kuser_cmpxchg64, 64
+-
+-__kuser_memory_barrier:				@ 0xffff0fa0
+-	smp_dmb	arm
+-	usr_ret	lr
+-
+-	kuser_pad __kuser_memory_barrier, 32
+-
+-__kuser_cmpxchg:				@ 0xffff0fc0
+-
 -#if __LINUX_ARM_ARCH__ < 6
-+#if __LINUX_ARM_ARCH__ >= 6
- 
+-
 -#ifdef CONFIG_MMU
-+	smp_dmb	arm
-+1:	ldrex	r3, [r2]
-+	subs	r3, r3, r0
-+	strexeq	r3, r1, [r2]
-+	teqeq	r3, #1
-+	beq	1b
-+	rsbs	r0, r3, #0
-+	/* beware -- each __kuser slot must be 8 instructions max */
-+	ALT_SMP(b	__kuser_memory_barrier)
-+	ALT_UP(usr_ret	lr)
-+
-+#elif defined(CONFIG_MMU)
- 
- 	/*
- 	 * The only thing that can break atomicity in this cmpxchg
-@@ -164,21 +173,6 @@ __kuser_cmpxchg:				@ 0xffff0fc0
- 	usr_ret	lr
- #endif
- 
+-
+-	/*
+-	 * The only thing that can break atomicity in this cmpxchg
+-	 * implementation is either an IRQ or a data abort exception
+-	 * causing another process/thread to be scheduled in the middle
+-	 * of the critical sequence.  To prevent this, code is added to
+-	 * the IRQ and data abort exception handlers to set the pc back
+-	 * to the beginning of the critical section if it is found to be
+-	 * within that critical section (see kuser_cmpxchg_fixup).
+-	 */
+-1:	ldr	r3, [r2]			@ load current val
+-	subs	r3, r3, r0			@ compare with oldval
+-2:	streq	r1, [r2]			@ store newval if eq
+-	rsbs	r0, r3, #0			@ set return val and C flag
+-	usr_ret	lr
+-
+-	.text
+-kuser_cmpxchg32_fixup:
+-	@ Called from kuser_cmpxchg_check macro.
+-	@ r4 = address of interrupted insn (must be preserved).
+-	@ sp = saved regs. r7 and r8 are clobbered.
+-	@ 1b = first critical insn, 2b = last critical insn.
+-	@ If r4 >= 1b and r4 <= 2b then saved pc_usr is set to 1b.
+-	mov	r7, #0xffff0fff
+-	sub	r7, r7, #(0xffff0fff - (0xffff0fc0 + (1b - __kuser_cmpxchg)))
+-	subs	r8, r4, r7
+-	rsbcss	r8, r8, #(2b - 1b)
+-	strcs	r7, [sp, #S_PC]
+-	ret	lr
+-	.previous
+-
+-#else
+-#warning "NPTL on non MMU needs fixing"
+-	mov	r0, #-1
+-	adds	r0, r0, #0
+-	usr_ret	lr
+-#endif
+-
 -#else
 -
 -	smp_dmb	arm
@@ -96,8 +213,232 @@ index 5d2a2784ed09..d7081a4761fe 100644
 -
 -#endif
 -
- 	kuser_pad __kuser_cmpxchg, 32
- 
- __kuser_get_tls:				@ 0xffff0fe0
+-	kuser_pad __kuser_cmpxchg, 32
+-
+-__kuser_get_tls:				@ 0xffff0fe0
+-	ldr	r0, [pc, #(16 - 8)]	@ read TLS, set in kuser_get_tls_init
+-	usr_ret	lr
+-	mrc	p15, 0, r0, c13, c0, 3	@ 0xffff0fe8 hardware TLS code
+-	kuser_pad __kuser_get_tls, 16
+-	.rep	3
+-	.word	0			@ 0xffff0ff0 software TLS value, then
+-	.endr				@ pad up to __kuser_helper_version
+-
+-__kuser_helper_version:				@ 0xffff0ffc
+-	.word	((__kuser_helper_end - __kuser_helper_start) >> 5)
+-
+-	.globl	__kuser_helper_end
+-__kuser_helper_end:
+-
+-#endif
+-
+- THUMB(	.thumb	)
+-
+ /*
+  * Vector stubs.
+  *
+diff --git a/arch/arm/kernel/kuser.S b/arch/arm/kernel/kuser.S
+new file mode 100644
+index 000000000000..5d2a2784ed09
+--- /dev/null
++++ b/arch/arm/kernel/kuser.S
+@@ -0,0 +1,197 @@
++#include <linux/init.h>
++
++#include <asm/assembler.h>
++
++	__INIT
++
++/*
++ * User helpers.
++ *
++ * Each segment is 32-byte aligned and will be moved to the top of the high
++ * vector page.  New segments (if ever needed) must be added in front of
++ * existing ones.  This mechanism should be used only for things that are
++ * really small and justified, and not be abused freely.
++ *
++ * See Documentation/arm/kernel_user_helpers.txt for formal definitions.
++ */
++ THUMB(	.arm	)
++
++	.macro	usr_ret, reg
++#ifdef CONFIG_ARM_THUMB
++	bx	\reg
++#else
++	ret	\reg
++#endif
++	.endm
++
++	.macro	kuser_pad, sym, size
++	.if	(. - \sym) & 3
++	.rept	4 - (. - \sym) & 3
++	.byte	0
++	.endr
++	.endif
++	.rept	(\size - (. - \sym)) / 4
++	.word	0xe7fddef1
++	.endr
++	.endm
++
++	.align	5
++	.globl	__kuser_helper_start
++__kuser_helper_start:
++
++/*
++ * Due to the length of some sequences, __kuser_cmpxchg64 spans 2 regular
++ * kuser "slots", therefore 0xffff0f80 is not used as a valid entry point.
++ */
++
++__kuser_cmpxchg64:				@ 0xffff0f60
++
++#if defined(CONFIG_CPU_32v6K)
++
++	stmfd	sp!, {r4, r5, r6, r7}
++	ldrd	r4, r5, [r0]			@ load old val
++	ldrd	r6, r7, [r1]			@ load new val
++	smp_dmb	arm
++1:	ldrexd	r0, r1, [r2]			@ load current val
++	eors	r3, r0, r4			@ compare with oldval (1)
++	eoreqs	r3, r1, r5			@ compare with oldval (2)
++	strexdeq r3, r6, r7, [r2]		@ store newval if eq
++	teqeq	r3, #1				@ success?
++	beq	1b				@ if no then retry
++	smp_dmb	arm
++	rsbs	r0, r3, #0			@ set returned val and C flag
++	ldmfd	sp!, {r4, r5, r6, r7}
++	usr_ret	lr
++
++#elif !defined(CONFIG_SMP)
++
++#ifdef CONFIG_MMU
++
++	/*
++	 * The only thing that can break atomicity in this cmpxchg64
++	 * implementation is either an IRQ or a data abort exception
++	 * causing another process/thread to be scheduled in the middle of
++	 * the critical sequence.  The same strategy as for cmpxchg is used.
++	 */
++	stmfd	sp!, {r4, r5, r6, lr}
++	ldmia	r0, {r4, r5}			@ load old val
++	ldmia	r1, {r6, lr}			@ load new val
++1:	ldmia	r2, {r0, r1}			@ load current val
++	eors	r3, r0, r4			@ compare with oldval (1)
++	eoreqs	r3, r1, r5			@ compare with oldval (2)
++2:	stmeqia	r2, {r6, lr}			@ store newval if eq
++	rsbs	r0, r3, #0			@ set return val and C flag
++	ldmfd	sp!, {r4, r5, r6, pc}
++
++	.text
++	.globl kuser_cmpxchg64_fixup
++kuser_cmpxchg64_fixup:
++	@ Called from kuser_cmpxchg_check macro.
++	@ r4 = address of interrupted insn (must be preserved).
++	@ sp = saved regs. r7 and r8 are clobbered.
++	@ 1b = first critical insn, 2b = last critical insn.
++	@ If r4 >= 1b and r4 <= 2b then saved pc_usr is set to 1b.
++	mov	r7, #0xffff0fff
++	sub	r7, r7, #(0xffff0fff - (0xffff0f60 + (1b - __kuser_cmpxchg64)))
++	subs	r8, r4, r7
++	rsbcss	r8, r8, #(2b - 1b)
++	strcs	r7, [sp, #S_PC]
++#if __LINUX_ARM_ARCH__ < 6
++	bcc	kuser_cmpxchg32_fixup
++#endif
++	ret	lr
++	.previous
++
++#else
++#warning "NPTL on non MMU needs fixing"
++	mov	r0, #-1
++	adds	r0, r0, #0
++	usr_ret	lr
++#endif
++
++#else
++#error "incoherent kernel configuration"
++#endif
++
++	kuser_pad __kuser_cmpxchg64, 64
++
++__kuser_memory_barrier:				@ 0xffff0fa0
++	smp_dmb	arm
++	usr_ret	lr
++
++	kuser_pad __kuser_memory_barrier, 32
++
++__kuser_cmpxchg:				@ 0xffff0fc0
++
++#if __LINUX_ARM_ARCH__ < 6
++
++#ifdef CONFIG_MMU
++
++	/*
++	 * The only thing that can break atomicity in this cmpxchg
++	 * implementation is either an IRQ or a data abort exception
++	 * causing another process/thread to be scheduled in the middle
++	 * of the critical sequence.  To prevent this, code is added to
++	 * the IRQ and data abort exception handlers to set the pc back
++	 * to the beginning of the critical section if it is found to be
++	 * within that critical section (see kuser_cmpxchg_check).
++	 */
++1:	ldr	r3, [r2]			@ load current val
++	subs	r3, r3, r0			@ compare with oldval
++2:	streq	r1, [r2]			@ store newval if eq
++	rsbs	r0, r3, #0			@ set return val and C flag
++	usr_ret	lr
++
++	.text
++kuser_cmpxchg32_fixup:
++	@ Called from kuser_cmpxchg64_fixup above via kuser_cmpxchg_check macro.
++	@ r4 = address of interrupted insn (must be preserved).
++	@ sp = saved regs. r7 and r8 are clobbered.
++	@ 1b = first critical insn, 2b = last critical insn.
++	@ If r4 >= 1b and r4 <= 2b then saved pc_usr is set to 1b.
++	mov	r7, #0xffff0fff
++	sub	r7, r7, #(0xffff0fff - (0xffff0fc0 + (1b - __kuser_cmpxchg)))
++	subs	r8, r4, r7
++	rsbcss	r8, r8, #(2b - 1b)
++	strcs	r7, [sp, #S_PC]
++	ret	lr
++	.previous
++
++#else
++#warning "NPTL on non MMU needs fixing"
++	mov	r0, #-1
++	adds	r0, r0, #0
++	usr_ret	lr
++#endif
++
++#else
++
++	smp_dmb	arm
++1:	ldrex	r3, [r2]
++	subs	r3, r3, r0
++	strexeq	r3, r1, [r2]
++	teqeq	r3, #1
++	beq	1b
++	rsbs	r0, r3, #0
++	/* beware -- each __kuser slot must be 8 instructions max */
++	ALT_SMP(b	__kuser_memory_barrier)
++	ALT_UP(usr_ret	lr)
++
++#endif
++
++	kuser_pad __kuser_cmpxchg, 32
++
++__kuser_get_tls:				@ 0xffff0fe0
++	ldr	r0, [pc, #(16 - 8)]	@ read TLS, set in kuser_get_tls_init
++	usr_ret	lr
++	mrc	p15, 0, r0, c13, c0, 3	@ 0xffff0fe8 hardware TLS code
++	kuser_pad __kuser_get_tls, 16
++	.rep	3
++	.word	0			@ 0xffff0ff0 software TLS value, then
++	.endr				@ pad up to __kuser_helper_version
++
++__kuser_helper_version:				@ 0xffff0ffc
++	.word	((__kuser_helper_end - __kuser_helper_start) >> 5)
++
++	.globl	__kuser_helper_end
++__kuser_helper_end:
 -- 
 2.7.4
