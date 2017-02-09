@@ -1,85 +1,130 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 9 Feb 2017 13:54:58 +0200
-Subject: [PATCH v12 6/9] usb: xhci: use bus->sysdev for DMA configuration
-In-Reply-To: <85873d69-5664-0603-8cbd-a250d29ac335@ti.com>
-References: <1486372421-29073-1-git-send-email-peter.chen@nxp.com>
- <1486372421-29073-7-git-send-email-peter.chen@nxp.com>
- <20170208204300.GC8068@usblab-sd-06.qualcomm.com>
- <85873d69-5664-0603-8cbd-a250d29ac335@ti.com>
-Message-ID: <6f131f15-d2f0-c8ac-c6af-accd23afab62@ti.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Thu, 9 Feb 2017 12:01:06 +0000
+Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy
+ interrupts
+In-Reply-To: <4b04e834-08b6-a728-8fe5-13106d50b3b2@arm.com>
+References: <1486364596-19699-1-git-send-email-bharatku@xilinx.com>
+ <4b04e834-08b6-a728-8fe5-13106d50b3b2@arm.com>
+Message-ID: <8520D5D51A55D047800579B094147198263E68AA@XAP-PVEXMBX02.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 09/02/17 13:53, Roger Quadros wrote:
+> On 06/02/17 07:03, Bharat Kumar Gogada wrote:
+> > - Adding spinlock for protecting legacy mask register
+> > - Few wifi end points which only support legacy interrupts,
+> > performs hardware reset functionalities after disabling interrupts
+> > by invoking disable_irq and then re-enable using enable_irq, they
+> > enable hardware interrupts first and then virtual irq line later.
+> > - The legacy irq line goes low only after DEASSERT_INTx is
+> > received.As the legacy irq line is high immediately after hardware
+> > interrupts are enabled but virq of EP is still in disabled state
+> > and EP handler is never executed resulting no DEASSERT_INTx.If dummy
+> > irq chip is used, interrutps are not masked and system is
+> > hanging with CPU stall.
+> > - Adding irq chip functions instead of dummy irq chip for legacy
+> > interrupts.
+> > - Legacy interrupts are level sensitive, so using handle_level_irq
+> > is more appropriate as it is masks interrupts until End point handles
+> > interrupts and unmasks interrutps after End point handler is executed.
+> > - Legacy interrupts are level triggered, virtual irq line of End
+> > Point shows as edge in /proc/interrupts.
+> > - Setting irq flags of virtual irq line of EP to level triggered
+> > at the time of mapping.
 > 
+> I'm now OK with the code (modulo the small nit below), but the commit
+> message is a complete mess. How about something like:
 > 
-> On 08/02/17 22:43, Jack Pham wrote:
->> Hi Peter, Sriram, Arnd,
->>
->> On Mon, Feb 06, 2017 at 05:13:38PM +0800, Peter Chen wrote:
->>> From: Arnd Bergmann <arnd@arndb.de>
->>>
->>> For xhci-hcd platform device, all the DMA parameters are not
->>> configured properly, notably dma ops for dwc3 devices. So, set
->>> the dma for xhci from sysdev. sysdev is pointing to device that
->>> is known to the system firmware or hardware.
->>>
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
->>> Tested-by: Baolin Wang <baolin.wang@linaro.org>
->>> Tested-by: Vivek Gautam <vivek.gautam@codeaurora.org>
->>> Tested-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
->>> Signed-off-by: Mathias Nyman <mathias.nyman@linux.intel.com>
->>> ---
->>> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
->>> index 6d33b42..7a9c860 100644
->>> --- a/drivers/usb/host/xhci-plat.c
->>> +++ b/drivers/usb/host/xhci-plat.c
->>
->>> -	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
->>> +	hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
->>> +			       dev_name(&pdev->dev), NULL);
->>
->> As mentioned already in [1], usb_create_shared_hcd() is called to create
->> the second bus, however it also needs to be converted.
->>
->> Not exactly as Roger's suggestion but this worked for me:
->>
->> -       xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
->> +       xhci->shared_hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
->>                         dev_name(&pdev->dev), hcd);
+> The current handling of legacy interrupts in the Xilinx NWL driver is
+> completely dysfunctional: Interrupts are handled as edge instead of
+> level, and there is no way to mask an interrupt, leading to drivers
+> misbehaving.
 > 
-> But we're creating a shared_hcd and there is an API for that so why not use it
-> instead of calling __usb_create_hcd()?
+> Let's address this by making it a full blown irqchip, implement
+> mask/unmask methods, and use handle_level_irq as the flow handler.
+Yes, will change the commit message.
 > 
+> >
+> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> > ---
+> >  drivers/pci/host/pcie-xilinx-nwl.c | 45
+> +++++++++++++++++++++++++++++++++++++-
+> >  1 file changed, 44 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-
+> nwl.c
+> > index 43eaa4a..36f4fb4 100644
+> > --- a/drivers/pci/host/pcie-xilinx-nwl.c
+> > +++ b/drivers/pci/host/pcie-xilinx-nwl.c
+> > @@ -184,6 +184,7 @@ struct nwl_pcie {
+> >  	u8 root_busno;
+> >  	struct nwl_msi msi;
+> >  	struct irq_domain *legacy_irq_domain;
+> > +	raw_spinlock_t leg_mask_lock;
+> >  };
+> >
+> >  static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off)
+> > @@ -395,11 +396,52 @@ static void nwl_pcie_msi_handler_low(struct
+> irq_desc *desc)
+> >  	chained_irq_exit(chip, desc);
+> >  }
+> >
+> > +static void nwl_mask_leg_irq(struct irq_data *data)
+> > +{
+> > +	struct irq_desc *desc = irq_to_desc(data->irq);
+> > +	struct nwl_pcie *pcie;
+> > +	unsigned long flags;
+> > +	u32 mask;
+> > +	u32 val;
+> > +
+> > +	pcie = irq_desc_get_chip_data(desc);
+> > +	mask = 1 << (data->hwirq - 1);
+> > +	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
+> > +	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
+> > +	nwl_bridge_writel(pcie, (val & (~mask)), MSGF_LEG_MASK);
+> > +	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
+> > +}
+> > +
+> > +static void nwl_unmask_leg_irq(struct irq_data *data)
+> > +{
+> > +	struct irq_desc *desc = irq_to_desc(data->irq);
+> > +	struct nwl_pcie *pcie;
+> > +	unsigned long flags;
+> > +	u32 mask;
+> > +	u32 val;
+> > +
+> > +	pcie = irq_desc_get_chip_data(desc);
+> > +	mask = 1 << (data->hwirq - 1);
+> > +	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
+> > +	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
+> > +	nwl_bridge_writel(pcie, (val | mask), MSGF_LEG_MASK);
+> > +	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
+> > +}
+> > +
+> > +static struct irq_chip nwl_leg_irq_chip = {
+> > +	.name = "nwl_pcie:legacy",
+> > +	.irq_enable = nwl_unmask_leg_irq,
+> > +	.irq_disable = nwl_mask_leg_irq,
+> 
+> You don't need these two if they are implemented in terms of mask/unmask.
 
-Just realized after I pressed send that there is no sysdev parameter
-for create_shared_hcd().
+These are being invoked by some drivers other than interrupt flow.
+Ex: drivers/net/wireless/ath/ath9k/main.c
+static int ath_reset_internal(struct ath_softc *sc, struct ath9k_channel *hchan) 
+{
+         ....
+         disable_irq(sc->irq);
+         tasklet_disable(&sc->intr_tq);
+        ...
+        ...
+        enable_irq(sc->irq);
+        spin_unlock_bh(&sc->sc_pcu_lock);
+}
+For us masking/unmasking is the way to enable/disable interrupts.
 
->>         if (!xhci->shared_hcd) {
->>                 ret = -ENOMEM;
->>
->> Without this, SuperSpeed devices fail to enumerate:
->>
->>  usb 2-1: new SuperSpeed USB device number 2 using xhci-hcd
->>  usb 2-1: device descriptor read/8, error -11
->>  usb 2-1: new SuperSpeed USB device number 2 using xhci-hcd
->>  usb 2-1: device descriptor read/8, error -11
->>  usb 2-1: new SuperSpeed USB device number 3 using xhci-hcd
->>  usb 2-1: device descriptor read/8, error -11
->>  usb 2-1: new SuperSpeed USB device number 3 using xhci-hcd
->>  usb 2-1: device descriptor read/8, error -11
->>  <and continues...>
->>
->> Thanks,
->> Jack
->>
->> [1] https://lkml.org/lkml/2016/12/9/240
->>
 > 
-
--- 
-cheers,
--roger
+> > +	.irq_mask = nwl_mask_leg_irq,
+> > +	.irq_unmask = nwl_unmask_leg_irq,
+> > +};
+> > +
+Thanks & Regards,
+Bharat
