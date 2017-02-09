@@ -1,53 +1,26 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 9 Feb 2017 17:44:25 +0100
-Subject: [PATCH 08/10] ARM: davinci: fix the DT boot on da850-evm
-In-Reply-To: <4574d1c3-c169-b158-dba6-f1965a1056b0@ti.com>
-References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
- <1486485683-11427-9-git-send-email-bgolaszewski@baylibre.com>
- <m2fujpkgkg.fsf@baylibre.com> <4574d1c3-c169-b158-dba6-f1965a1056b0@ti.com>
-Message-ID: <CAMpxmJVKRgPOEfeAwJLQ_ge92ajjb+N9TdyZtKfhdLELNVkUFQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 9 Feb 2017 16:46:45 +0000
+Subject: [PATCH v4 2/3] ASoC: zx-i2s: Add the info of pclk to the binding
+ document for zx2967 family
+In-Reply-To: <1486609978-18482-2-git-send-email-baoyou.xie@linaro.org>
+References: <1486609978-18482-1-git-send-email-baoyou.xie@linaro.org>
+ <1486609978-18482-2-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170209164645.ztvockrd6jxpybwt@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-02-09 16:23 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
-> On Tuesday 07 February 2017 11:51 PM, Kevin Hilman wrote:
->> Bartosz Golaszewski <bgolaszewski@baylibre.com> writes:
->>
->>> When we enable vpif capture on the da850-evm we hit a BUG_ON() because
->>> the i2c adapter can't be found. The board file boot uses i2c adapter 1
->>> but in the DT mode it's actually adapter 0. Drop the problematic lines.
->>>
->>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>> ---
->>>  arch/arm/mach-davinci/pdata-quirks.c | 4 ----
->>>  1 file changed, 4 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
->>> index 94948c1..09f62ac 100644
->>> --- a/arch/arm/mach-davinci/pdata-quirks.c
->>> +++ b/arch/arm/mach-davinci/pdata-quirks.c
->>> @@ -116,10 +116,6 @@ static void __init da850_vpif_legacy_init(void)
->>>      if (of_machine_is_compatible("ti,da850-lcdk"))
->>>              da850_vpif_capture_config.subdev_count = 1;
->>>
->>> -    /* EVM (UI card) uses i2c adapter 1 (not default: zero) */
->>> -    if (of_machine_is_compatible("ti,da850-evm"))
->>> -            da850_vpif_capture_config.i2c_adapter_id = 1;
->>> -
->>
->> oops, my bad.
->>
->> Acked-by: Kevin Hilman <khilman@baylibre.com>
->
-> The offending code is not in my master branch. Since its almost certain
-> that VPIF platform support is going to wait for v4.12, can you or Kevin
-> please update Kevin's original patches with these fixes rolled in?
->
-> Thanks,
-> Sekhar
->
+On Thu, Feb 09, 2017 at 11:12:57AM +0800, Baoyou Xie wrote:
 
-Sure, I based my series on Kevin's integration branch for 4.10.
+> - - compatible : Must be "zte,zx296702-i2s"
+> + - compatible : Must be one of:
+> +	"zte,zx296718-i2s", "zte,zx296702-i2s"
+> +	"zte,zx296702-i2s"
 
-Thanks,
-Bartosz
+You've added the new compatible twice here?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170209/0d1ed6f1/attachment.sig>
