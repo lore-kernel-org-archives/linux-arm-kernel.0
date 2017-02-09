@@ -1,405 +1,359 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  9 Feb 2017 14:59:00 +0000
-Subject: [PATCH 02/25] KVM: arm/arm64: vgic: Add debugfs vgic-state file
+Date: Thu,  9 Feb 2017 14:58:59 +0000
+Subject: [PATCH 01/25] KVM: arm/arm64: Remove struct vgic_irq pending field
 In-Reply-To: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
 References: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1486652363-7696-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1486652363-7696-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Add a file to debugfs to read the in-kernel state of the vgic.  We don't
-do any locking of the entire VGIC state while traversing all the IRQs,
-so if the VM is running the user/developer may not see a quiesced state,
-but should take care to pause the VM using facilities in user space for
-that purpose.
+One of the goals behind the VGIC redesign was to get rid of cached or
+intermediate state in the data structures, but we decided to allow
+ourselves to precompute the pending value of an IRQ based on the line
+level and pending latch state.  However, this has now become difficult
+to base proper GICv3 save/restore on, because there is a potential to
+modify the pending state without knowing if an interrupt is edge or
+level configured.
 
-We also don't support LPIs yet, but they can be added easily if needed.
+See the following post and related message for more background:
+https://lists.cs.columbia.edu/pipermail/kvmarm/2017-January/023195.html
 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Tested-by: Eric Auger <eric.auger@redhat.com>
+This commit gets rid of the precomputed pending field in favor of a
+function that calculates the value when needed, irq_is_pending().
+
+The soft_pending field is renamed to pending_latch to represent that
+this latch is the equivalent hardware latch which gets manipulated by
+the input signal for edge-triggered interrupts and when writing to the
+SPENDR/CPENDR registers.
+
+After this commit save/restore code should be able to simply restore the
+pending_latch state, line_level state, and config state in any order and
+get the desired result.
+
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Tested-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/Makefile          |   1 +
- arch/arm64/kvm/Makefile        |   1 +
- include/kvm/arm_vgic.h         |   5 +
- virt/kvm/arm/vgic/vgic-debug.c | 283 +++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-init.c  |   4 +
- virt/kvm/arm/vgic/vgic.h       |   3 +
- 6 files changed, 297 insertions(+)
- create mode 100644 virt/kvm/arm/vgic/vgic-debug.c
+ include/kvm/arm_vgic.h           |  5 +++--
+ virt/kvm/arm/vgic/vgic-its.c     |  6 +++---
+ virt/kvm/arm/vgic/vgic-mmio-v2.c |  6 +++---
+ virt/kvm/arm/vgic/vgic-mmio-v3.c |  2 +-
+ virt/kvm/arm/vgic/vgic-mmio.c    | 19 +++++--------------
+ virt/kvm/arm/vgic/vgic-v2.c      | 12 +++++-------
+ virt/kvm/arm/vgic/vgic-v3.c      | 12 +++++-------
+ virt/kvm/arm/vgic/vgic.c         | 16 +++++++---------
+ virt/kvm/arm/vgic/vgic.h         |  8 ++++++++
+ 9 files changed, 40 insertions(+), 46 deletions(-)
 
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index d571243..12b6281 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -33,5 +33,6 @@ obj-y += $(KVM)/arm/vgic/vgic-mmio-v2.o
- obj-y += $(KVM)/arm/vgic/vgic-mmio-v3.o
- obj-y += $(KVM)/arm/vgic/vgic-kvm-device.o
- obj-y += $(KVM)/arm/vgic/vgic-its.o
-+obj-y += $(KVM)/arm/vgic/vgic-debug.o
- obj-y += $(KVM)/irqchip.o
- obj-y += $(KVM)/arm/arch_timer.o
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index d50a82a..e025bec 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -31,6 +31,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v2.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-kvm-device.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-its.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-debug.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
- kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index da2ce08..0af1477 100644
+index 002f092..da2ce08 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -166,6 +166,8 @@ struct vgic_its {
- 	struct list_head	collection_list;
- };
+@@ -101,9 +101,10 @@ struct vgic_irq {
+ 					 */
  
-+struct vgic_state_iter;
-+
- struct vgic_dist {
- 	bool			in_kernel;
- 	bool			ready;
-@@ -213,6 +215,9 @@ struct vgic_dist {
- 	spinlock_t		lpi_list_lock;
- 	struct list_head	lpi_list_head;
- 	int			lpi_list_count;
-+
-+	/* used by vgic-debug */
-+	struct vgic_state_iter *iter;
- };
+ 	u32 intid;			/* Guest visible INTID */
+-	bool pending;
+ 	bool line_level;		/* Level only */
+-	bool soft_pending;		/* Level only */
++	bool pending_latch;		/* The pending latch state used to calculate
++					 * the pending state for both level
++					 * and edge triggered IRQs. */
+ 	bool active;			/* not used for LPIs */
+ 	bool enabled;
+ 	bool hw;			/* Tied to HW IRQ */
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 8c2b3cd..571b64a 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -350,7 +350,7 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
  
- struct vgic_v2_cpu_if {
-diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
-new file mode 100644
-index 0000000..7072ab7
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic-debug.c
-@@ -0,0 +1,283 @@
-+/*
-+ * Copyright (C) 2016 Linaro
-+ * Author: Christoffer Dall <christoffer.dall@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/cpu.h>
-+#include <linux/debugfs.h>
-+#include <linux/interrupt.h>
-+#include <linux/kvm_host.h>
-+#include <linux/seq_file.h>
-+#include <kvm/arm_vgic.h>
-+#include <asm/kvm_mmu.h>
-+#include "vgic.h"
-+
-+/*
-+ * Structure to control looping through the entire vgic state.  We start at
-+ * zero for each field and move upwards.  So, if dist_id is 0 we print the
-+ * distributor info.  When dist_id is 1, we have already printed it and move
-+ * on.
-+ *
-+ * When vcpu_id < nr_cpus we print the vcpu info until vcpu_id == nr_cpus and
-+ * so on.
-+ */
-+struct vgic_state_iter {
-+	int nr_cpus;
-+	int nr_spis;
-+	int dist_id;
-+	int vcpu_id;
-+	int intid;
-+};
-+
-+static void iter_next(struct vgic_state_iter *iter)
-+{
-+	if (iter->dist_id == 0) {
-+		iter->dist_id++;
-+		return;
-+	}
-+
-+	iter->intid++;
-+	if (iter->intid == VGIC_NR_PRIVATE_IRQS &&
-+	    ++iter->vcpu_id < iter->nr_cpus)
-+		iter->intid = 0;
-+}
-+
-+static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
-+		      loff_t pos)
-+{
-+	int nr_cpus = atomic_read(&kvm->online_vcpus);
-+
-+	memset(iter, 0, sizeof(*iter));
-+
-+	iter->nr_cpus = nr_cpus;
-+	iter->nr_spis = kvm->arch.vgic.nr_spis;
-+
-+	/* Fast forward to the right position if needed */
-+	while (pos--)
-+		iter_next(iter);
-+}
-+
-+static bool end_of_vgic(struct vgic_state_iter *iter)
-+{
-+	return iter->dist_id > 0 &&
-+		iter->vcpu_id == iter->nr_cpus &&
-+		(iter->intid - VGIC_NR_PRIVATE_IRQS) == iter->nr_spis;
-+}
-+
-+static void *vgic_debug_start(struct seq_file *s, loff_t *pos)
-+{
-+	struct kvm *kvm = (struct kvm *)s->private;
-+	struct vgic_state_iter *iter;
-+
-+	mutex_lock(&kvm->lock);
-+	iter = kvm->arch.vgic.iter;
-+	if (iter) {
-+		iter = ERR_PTR(-EBUSY);
-+		goto out;
-+	}
-+
-+	iter = kmalloc(sizeof(*iter), GFP_KERNEL);
-+	if (!iter) {
-+		iter = ERR_PTR(-ENOMEM);
-+		goto out;
-+	}
-+
-+	iter_init(kvm, iter, *pos);
-+	kvm->arch.vgic.iter = iter;
-+
-+	if (end_of_vgic(iter))
-+		iter = NULL;
-+out:
-+	mutex_unlock(&kvm->lock);
-+	return iter;
-+}
-+
-+static void *vgic_debug_next(struct seq_file *s, void *v, loff_t *pos)
-+{
-+	struct kvm *kvm = (struct kvm *)s->private;
-+	struct vgic_state_iter *iter = kvm->arch.vgic.iter;
-+
-+	++*pos;
-+	iter_next(iter);
-+	if (end_of_vgic(iter))
-+		iter = NULL;
-+	return iter;
-+}
-+
-+static void vgic_debug_stop(struct seq_file *s, void *v)
-+{
-+	struct kvm *kvm = (struct kvm *)s->private;
-+	struct vgic_state_iter *iter;
-+
-+	/*
-+	 * If the seq file wasn't properly opened, there's nothing to clearn
-+	 * up.
-+	 */
-+	if (IS_ERR(v))
-+		return;
-+
-+	mutex_lock(&kvm->lock);
-+	iter = kvm->arch.vgic.iter;
-+	kfree(iter);
-+	kvm->arch.vgic.iter = NULL;
-+	mutex_unlock(&kvm->lock);
-+}
-+
-+static void print_dist_state(struct seq_file *s, struct vgic_dist *dist)
-+{
-+	seq_printf(s, "Distributor\n");
-+	seq_printf(s, "===========\n");
-+	seq_printf(s, "vgic_model:\t%s\n",
-+		   (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) ?
-+		   "GICv3" : "GICv2");
-+	seq_printf(s, "nr_spis:\t%d\n", dist->nr_spis);
-+	seq_printf(s, "enabled:\t%d\n", dist->enabled);
-+	seq_printf(s, "\n");
-+
-+	seq_printf(s, "P=pending_latch, L=line_level, A=active\n");
-+	seq_printf(s, "E=enabled, H=hw, C=config (level=1, edge=0)\n");
-+}
-+
-+static void print_header(struct seq_file *s, struct vgic_irq *irq,
-+			 struct kvm_vcpu *vcpu)
-+{
-+	int id = 0;
-+	char *hdr = "SPI ";
-+
-+	if (vcpu) {
-+		hdr = "VCPU";
-+		id = vcpu->vcpu_id;
-+	}
-+
-+	seq_printf(s, "\n");
-+	seq_printf(s, "%s%2d TYP   ID TGT_ID PLAEHC     HWID   TARGET SRC PRI VCPU_ID\n", hdr, id);
-+	seq_printf(s, "---------------------------------------------------------------\n");
-+}
-+
-+static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
-+			    struct kvm_vcpu *vcpu)
-+{
-+	char *type;
-+	if (irq->intid < VGIC_NR_SGIS)
-+		type = "SGI";
-+	else if (irq->intid < VGIC_NR_PRIVATE_IRQS)
-+		type = "PPI";
-+	else
-+		type = "SPI";
-+
-+	if (irq->intid ==0 || irq->intid == VGIC_NR_PRIVATE_IRQS)
-+		print_header(s, irq, vcpu);
-+
-+	seq_printf(s, "       %s %4d "
-+		      "    %2d "
-+		      "%d%d%d%d%d%d "
-+		      "%8d "
-+		      "%8x "
-+		      " %2x "
-+		      "%3d "
-+		      "     %2d "
-+		      "\n",
-+			type, irq->intid,
-+			(irq->target_vcpu) ? irq->target_vcpu->vcpu_id : -1,
-+			irq->pending_latch,
-+			irq->line_level,
-+			irq->active,
-+			irq->enabled,
-+			irq->hw,
-+			irq->config == VGIC_CONFIG_LEVEL,
-+			irq->hwintid,
-+			irq->mpidr,
-+			irq->source,
-+			irq->priority,
-+			(irq->vcpu) ? irq->vcpu->vcpu_id : -1);
-+
-+}
-+
-+static int vgic_debug_show(struct seq_file *s, void *v)
-+{
-+	struct kvm *kvm = (struct kvm *)s->private;
-+	struct vgic_state_iter *iter = (struct vgic_state_iter *)v;
-+	struct vgic_irq *irq;
-+	struct kvm_vcpu *vcpu = NULL;
-+
-+	if (iter->dist_id == 0) {
-+		print_dist_state(s, &kvm->arch.vgic);
-+		return 0;
-+	}
-+
-+	if (!kvm->arch.vgic.initialized)
-+		return 0;
-+
-+	if (iter->vcpu_id < iter->nr_cpus) {
-+		vcpu = kvm_get_vcpu(kvm, iter->vcpu_id);
-+		irq = &vcpu->arch.vgic_cpu.private_irqs[iter->intid];
-+	} else {
-+		irq = &kvm->arch.vgic.spis[iter->intid - VGIC_NR_PRIVATE_IRQS];
-+	}
-+
-+	spin_lock(&irq->irq_lock);
-+	print_irq_state(s, irq, vcpu);
-+	spin_unlock(&irq->irq_lock);
-+
-+	return 0;
-+}
-+
-+static struct seq_operations vgic_debug_seq_ops = {
-+	.start = vgic_debug_start,
-+	.next  = vgic_debug_next,
-+	.stop  = vgic_debug_stop,
-+	.show  = vgic_debug_show
-+};
-+
-+static int debug_open(struct inode *inode, struct file *file)
-+{
-+	int ret;
-+	ret = seq_open(file, &vgic_debug_seq_ops);
-+	if (!ret) {
-+		struct seq_file *seq;
-+		/* seq_open will have modified file->private_data */
-+		seq = file->private_data;
-+		seq->private = inode->i_private;
-+	}
-+
-+	return ret;
-+};
-+
-+static struct file_operations vgic_debug_fops = {
-+	.owner   = THIS_MODULE,
-+	.open    = debug_open,
-+	.read    = seq_read,
-+	.llseek  = seq_lseek,
-+	.release = seq_release
-+};
-+
-+int vgic_debug_init(struct kvm *kvm)
-+{
-+	if (!kvm->debugfs_dentry)
-+		return -ENOENT;
-+
-+	if (!debugfs_create_file("vgic-state", 0444,
-+				 kvm->debugfs_dentry,
-+				 kvm,
-+				 &vgic_debug_fops))
-+		return -ENOMEM;
-+
-+	return 0;
-+}
-+
-+int vgic_debug_destroy(struct kvm *kvm)
-+{
-+	return 0;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index c737ea0..276139a 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -259,6 +259,8 @@ int vgic_init(struct kvm *kvm)
- 	if (ret)
+ 		irq = vgic_get_irq(vcpu->kvm, NULL, intids[i]);
+ 		spin_lock(&irq->irq_lock);
+-		irq->pending = pendmask & (1U << bit_nr);
++		irq->pending_latch = pendmask & (1U << bit_nr);
+ 		vgic_queue_irq_unlock(vcpu->kvm, irq);
+ 		vgic_put_irq(vcpu->kvm, irq);
+ 	}
+@@ -465,7 +465,7 @@ static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
+ 		return -EBUSY;
+ 
+ 	spin_lock(&itte->irq->irq_lock);
+-	itte->irq->pending = true;
++	itte->irq->pending_latch = true;
+ 	vgic_queue_irq_unlock(kvm, itte->irq);
+ 
+ 	return 0;
+@@ -913,7 +913,7 @@ static int vgic_its_cmd_handle_clear(struct kvm *kvm, struct vgic_its *its,
+ 	if (!itte)
+ 		return E_ITS_CLEAR_UNMAPPED_INTERRUPT;
+ 
+-	itte->irq->pending = false;
++	itte->irq->pending_latch = false;
+ 
+ 	return 0;
+ }
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index 78e34bc..07e67f1 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -98,7 +98,7 @@ static void vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
+ 		irq = vgic_get_irq(source_vcpu->kvm, vcpu, intid);
+ 
+ 		spin_lock(&irq->irq_lock);
+-		irq->pending = true;
++		irq->pending_latch = true;
+ 		irq->source |= 1U << source_vcpu->vcpu_id;
+ 
+ 		vgic_queue_irq_unlock(source_vcpu->kvm, irq);
+@@ -182,7 +182,7 @@ static void vgic_mmio_write_sgipendc(struct kvm_vcpu *vcpu,
+ 
+ 		irq->source &= ~((val >> (i * 8)) & 0xff);
+ 		if (!irq->source)
+-			irq->pending = false;
++			irq->pending_latch = false;
+ 
+ 		spin_unlock(&irq->irq_lock);
+ 		vgic_put_irq(vcpu->kvm, irq);
+@@ -204,7 +204,7 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
+ 		irq->source |= (val >> (i * 8)) & 0xff;
+ 
+ 		if (irq->source) {
+-			irq->pending = true;
++			irq->pending_latch = true;
+ 			vgic_queue_irq_unlock(vcpu->kvm, irq);
+ 		} else {
+ 			spin_unlock(&irq->irq_lock);
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 50f42f0..2aca52a 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -646,7 +646,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+ 		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
+ 
+ 		spin_lock(&irq->irq_lock);
+-		irq->pending = true;
++		irq->pending_latch = true;
+ 
+ 		vgic_queue_irq_unlock(vcpu->kvm, irq);
+ 		vgic_put_irq(vcpu->kvm, irq);
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index ebe1b9f..2670d39 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -111,7 +111,7 @@ unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
+ 	for (i = 0; i < len * 8; i++) {
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 
+-		if (irq->pending)
++		if (irq_is_pending(irq))
+ 			value |= (1U << i);
+ 
+ 		vgic_put_irq(vcpu->kvm, irq);
+@@ -131,9 +131,7 @@ void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 
+ 		spin_lock(&irq->irq_lock);
+-		irq->pending = true;
+-		if (irq->config == VGIC_CONFIG_LEVEL)
+-			irq->soft_pending = true;
++		irq->pending_latch = true;
+ 
+ 		vgic_queue_irq_unlock(vcpu->kvm, irq);
+ 		vgic_put_irq(vcpu->kvm, irq);
+@@ -152,12 +150,7 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
+ 
+ 		spin_lock(&irq->irq_lock);
+ 
+-		if (irq->config == VGIC_CONFIG_LEVEL) {
+-			irq->soft_pending = false;
+-			irq->pending = irq->line_level;
+-		} else {
+-			irq->pending = false;
+-		}
++		irq->pending_latch = false;
+ 
+ 		spin_unlock(&irq->irq_lock);
+ 		vgic_put_irq(vcpu->kvm, irq);
+@@ -359,12 +352,10 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+ 		irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ 		spin_lock(&irq->irq_lock);
+ 
+-		if (test_bit(i * 2 + 1, &val)) {
++		if (test_bit(i * 2 + 1, &val))
+ 			irq->config = VGIC_CONFIG_EDGE;
+-		} else {
++		else
+ 			irq->config = VGIC_CONFIG_LEVEL;
+-			irq->pending = irq->line_level | irq->soft_pending;
+-		}
+ 
+ 		spin_unlock(&irq->irq_lock);
+ 		vgic_put_irq(vcpu->kvm, irq);
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 834137e..b834ecd 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -104,7 +104,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+ 		/* Edge is the only case where we preserve the pending bit */
+ 		if (irq->config == VGIC_CONFIG_EDGE &&
+ 		    (val & GICH_LR_PENDING_BIT)) {
+-			irq->pending = true;
++			irq->pending_latch = true;
+ 
+ 			if (vgic_irq_is_sgi(intid)) {
+ 				u32 cpuid = val & GICH_LR_PHYSID_CPUID;
+@@ -120,9 +120,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+ 		 */
+ 		if (irq->config == VGIC_CONFIG_LEVEL) {
+ 			if (!(val & GICH_LR_PENDING_BIT))
+-				irq->soft_pending = false;
+-
+-			irq->pending = irq->line_level || irq->soft_pending;
++				irq->pending_latch = false;
+ 		}
+ 
+ 		spin_unlock(&irq->irq_lock);
+@@ -145,11 +143,11 @@ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+ {
+ 	u32 val = irq->intid;
+ 
+-	if (irq->pending) {
++	if (irq_is_pending(irq)) {
+ 		val |= GICH_LR_PENDING_BIT;
+ 
+ 		if (irq->config == VGIC_CONFIG_EDGE)
+-			irq->pending = false;
++			irq->pending_latch = false;
+ 
+ 		if (vgic_irq_is_sgi(irq->intid)) {
+ 			u32 src = ffs(irq->source);
+@@ -158,7 +156,7 @@ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+ 			val |= (src - 1) << GICH_LR_PHYSID_CPUID_SHIFT;
+ 			irq->source &= ~(1 << (src - 1));
+ 			if (irq->source)
+-				irq->pending = true;
++				irq->pending_latch = true;
+ 		}
+ 	}
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index e6b03fd..679ba93 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -94,7 +94,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+ 		/* Edge is the only case where we preserve the pending bit */
+ 		if (irq->config == VGIC_CONFIG_EDGE &&
+ 		    (val & ICH_LR_PENDING_BIT)) {
+-			irq->pending = true;
++			irq->pending_latch = true;
+ 
+ 			if (vgic_irq_is_sgi(intid) &&
+ 			    model == KVM_DEV_TYPE_ARM_VGIC_V2) {
+@@ -111,9 +111,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+ 		 */
+ 		if (irq->config == VGIC_CONFIG_LEVEL) {
+ 			if (!(val & ICH_LR_PENDING_BIT))
+-				irq->soft_pending = false;
+-
+-			irq->pending = irq->line_level || irq->soft_pending;
++				irq->pending_latch = false;
+ 		}
+ 
+ 		spin_unlock(&irq->irq_lock);
+@@ -127,11 +125,11 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+ 	u32 model = vcpu->kvm->arch.vgic.vgic_model;
+ 	u64 val = irq->intid;
+ 
+-	if (irq->pending) {
++	if (irq_is_pending(irq)) {
+ 		val |= ICH_LR_PENDING_BIT;
+ 
+ 		if (irq->config == VGIC_CONFIG_EDGE)
+-			irq->pending = false;
++			irq->pending_latch = false;
+ 
+ 		if (vgic_irq_is_sgi(irq->intid) &&
+ 		    model == KVM_DEV_TYPE_ARM_VGIC_V2) {
+@@ -141,7 +139,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+ 			val |= (src - 1) << GICH_LR_PHYSID_CPUID_SHIFT;
+ 			irq->source &= ~(1 << (src - 1));
+ 			if (irq->source)
+-				irq->pending = true;
++				irq->pending_latch = true;
+ 		}
+ 	}
+ 
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 6440b56..dea12df 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -160,7 +160,7 @@ static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
+ 	 * If the distributor is disabled, pending interrupts shouldn't be
+ 	 * forwarded.
+ 	 */
+-	if (irq->enabled && irq->pending) {
++	if (irq->enabled && irq_is_pending(irq)) {
+ 		if (unlikely(irq->target_vcpu &&
+ 			     !irq->target_vcpu->kvm->arch.vgic.enabled))
+ 			return NULL;
+@@ -204,8 +204,8 @@ static int vgic_irq_cmp(void *priv, struct list_head *a, struct list_head *b)
  		goto out;
+ 	}
  
-+	vgic_debug_init(kvm);
-+
- 	dist->initialized = true;
- out:
- 	return ret;
-@@ -288,6 +290,8 @@ static void __kvm_vgic_destroy(struct kvm *kvm)
- 	struct kvm_vcpu *vcpu;
- 	int i;
+-	penda = irqa->enabled && irqa->pending;
+-	pendb = irqb->enabled && irqb->pending;
++	penda = irqa->enabled && irq_is_pending(irqa);
++	pendb = irqb->enabled && irq_is_pending(irqb);
  
-+	vgic_debug_destroy(kvm);
-+
- 	kvm_vgic_dist_destroy(kvm);
+ 	if (!penda || !pendb) {
+ 		ret = (int)pendb - (int)penda;
+@@ -371,12 +371,10 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+ 		return 0;
+ 	}
  
- 	kvm_for_each_vcpu(i, vcpu, kvm)
+-	if (irq->config == VGIC_CONFIG_LEVEL) {
++	if (irq->config == VGIC_CONFIG_LEVEL)
+ 		irq->line_level = level;
+-		irq->pending = level || irq->soft_pending;
+-	} else {
+-		irq->pending = true;
+-	}
++	else
++		irq->pending_latch = true;
+ 
+ 	vgic_queue_irq_unlock(kvm, irq);
+ 	vgic_put_irq(kvm, irq);
+@@ -689,7 +687,7 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
+ 
+ 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+ 		spin_lock(&irq->irq_lock);
+-		pending = irq->pending && irq->enabled;
++		pending = irq_is_pending(irq) && irq->enabled;
+ 		spin_unlock(&irq->irq_lock);
+ 
+ 		if (pending)
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index b2cf34b..48da1f6 100644
+index 859f65c..b2cf34b 100644
 --- a/virt/kvm/arm/vgic/vgic.h
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -102,4 +102,7 @@ int kvm_register_vgic_device(unsigned long type);
- int vgic_lazy_init(struct kvm *kvm);
- int vgic_init(struct kvm *kvm);
+@@ -30,6 +30,14 @@
  
-+int vgic_debug_init(struct kvm *kvm);
-+int vgic_debug_destroy(struct kvm *kvm);
+ #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+ 
++static inline bool irq_is_pending(struct vgic_irq *irq)
++{
++	if (irq->config == VGIC_CONFIG_EDGE)
++		return irq->pending_latch;
++	else
++		return irq->pending_latch || irq->line_level;
++}
 +
- #endif
+ struct vgic_vmcr {
+ 	u32	ctlr;
+ 	u32	abpr;
 -- 
 2.1.4
