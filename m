@@ -1,54 +1,25 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 9 Feb 2017 16:03:14 +0000
-Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy
- interrupts
-In-Reply-To: <8520D5D51A55D047800579B094147198263E6AF3@XAP-PVEXMBX02.xlnx.xilinx.com>
-References: <1486364596-19699-1-git-send-email-bharatku@xilinx.com>
- <4b04e834-08b6-a728-8fe5-13106d50b3b2@arm.com>
- <8520D5D51A55D047800579B094147198263E68AA@XAP-PVEXMBX02.xlnx.xilinx.com>
- <131228fb-d3f8-3836-3713-e948ed30d398@arm.com>
- <8520D5D51A55D047800579B094147198263E6AF3@XAP-PVEXMBX02.xlnx.xilinx.com>
-Message-ID: <2196f028-b834-9d32-cc3a-e3eb5ed6c3b1@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 9 Feb 2017 17:08:13 +0100
+Subject: [PATCH] i2c: busses: constify i2c_algorithm structures
+In-Reply-To: <1485540377-13686-1-git-send-email-bhumirks@gmail.com>
+References: <1485540377-13686-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <20170209160813.b77an7ywhx4gnxjc@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/02/17 15:16, Bharat Kumar Gogada wrote:
->>
->> On 09/02/17 12:01, Bharat Kumar Gogada wrote:
->>>> On 06/02/17 07:03, Bharat Kumar Gogada wrote:
->>>>> +static struct irq_chip nwl_leg_irq_chip = {
->>>>> +	.name = "nwl_pcie:legacy",
->>>>> +	.irq_enable = nwl_unmask_leg_irq,
->>>>> +	.irq_disable = nwl_mask_leg_irq,
->>>>
->>>> You don't need these two if they are implemented in terms of mask/unmask.
->>>
->>> These are being invoked by some drivers other than interrupt flow.
->>> Ex: drivers/net/wireless/ath/ath9k/main.c
->>> static int ath_reset_internal(struct ath_softc *sc, struct
->>> ath9k_channel *hchan) {
->>>          ....
->>>          disable_irq(sc->irq);
->>>          tasklet_disable(&sc->intr_tq);
->>>         ...
->>>         ...
->>>         enable_irq(sc->irq);
->>>         spin_unlock_bh(&sc->sc_pcu_lock); } For us masking/unmasking
->>> is the way to enable/disable interrupts.
->>
->> And if you looked at the way disable_irq is implemented, you would have found
->> out that it falls back to masking if there is no disable method, preserving the
->> semantic you expect.
->>
-> Yes I did see, but this fall back requires extra "IRQ_DISABLE_UNLAZY" flag to be set to each virq. 
+On Fri, Jan 27, 2017 at 11:36:17PM +0530, Bhumika Goyal wrote:
+> Declare i2c_algorithm structures as const as they are only stored in the
+> algo field of an i2c_adapter structure. This field is of type const, so
+> i2c_algorithm structures having this property can be made const too.
+> 
+> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 
-No it doesn't. If you do a disable_irq(), the interrupt is flagged as
-disabled, but nothing gets done. If an interrupt actually fires, then
-the interrupts gets masked, and the handler is not called.
+Applied to for-next with a shortened commit message, thanks!
 
-So just drop these two methods, because if this doesn't work, you have
-bigger issues.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170209/c5308865/attachment.sig>
