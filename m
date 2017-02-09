@@ -1,43 +1,111 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 9 Feb 2017 11:14:19 +0100
-Subject: Aarch64 kernel with 32bit userspace question
-Message-ID: <0057242a-2e16-3b59-1f81-9f4ccf64216d@denx.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  9 Feb 2017 10:16:29 +0000
+Subject: [PATCH] efi: arm-stub: Correct FDT and initrd allocation rules for
+ arm64
+Message-ID: <1486635389-26974-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On arm64, we have made some changes over the past year to the way the
+kernel itself is allocated and to how it deals with the initrd and FDT.
+This patch brings the allocation logic in the EFI stub in line with that,
+which is necessary because the introduction of KASLR has created the
+possibility for the initrd to be allocated in a place where the kernel
+may not be able to map it. (This is currently a theoretical scenario,
+since it only affects systems where the size of RAM exceeds the size of
+the linear mapping.)
 
-I'm trying multilib userland on aarch64, but I'm running into a problem.
-I have a simple test code:
+So adhere to the arm64 boot protocol, and make sure that the initrd is
+fully inside a 1GB aligned 32 GB window that covers the kernel as well.
 
--->8--
-#include <signal.h>
+The FDT may be anywhere in memory on arm64 now that we map it via the
+fixmap, so we can lift the address restriction there completely.
 
-int main(void) {
-    return 0;
-}
---8<--
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/include/asm/efi.h              | 14 +++++++++++++-
+ arch/arm64/include/asm/efi.h            | 19 ++++++++++++++++++-
+ drivers/firmware/efi/libstub/arm-stub.c |  7 ++++---
+ 3 files changed, 35 insertions(+), 5 deletions(-)
 
-If I compile that with aarch64 gcc , it compiles just fine.
-
-If I compile the same thing with 32bit armv7ahf multilib gcc, the
-build fails on "unknown type name '__uint128_t'". This comes from
-arch/arm64/include/uapi/asm/sigcontext.h , which has __uint128_t in
-struct fpsimd_context {} . The signal.h includes that (through a few
-glibc headers) and that's what triggers the failure. __uint128_t is
-defined on aarch64 , but it is not on armv7a (32bit).
-
-Grepping through the kernel sources , __uint128_t is used in some three
-places on aarch64 (and in bluetooth/ecc.c , where it's defined as a
-struct of two u64 internally in that file, so irrelevant). I wonder
-whether the usage of __uint128_t is really correct in sigcontext.h and
-whether it shouldn't be replaced by some u64 array or such ?
-
-Or is there any other way to use aarch64 kernel (and kernel headers)
-with 32bit userspace ?
-
-Thanks!
-
+diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
+index 0b06f5341b45..62620451f60b 100644
+--- a/arch/arm/include/asm/efi.h
++++ b/arch/arm/include/asm/efi.h
+@@ -84,6 +84,18 @@ static inline void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
+  */
+ #define ZIMAGE_OFFSET_LIMIT	SZ_128M
+ #define MIN_ZIMAGE_OFFSET	MAX_UNCOMP_KERNEL_SIZE
+-#define MAX_FDT_OFFSET		ZIMAGE_OFFSET_LIMIT
++
++/* on ARM, the FDT should be located in the first 128 MB of RAM */
++static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
++{
++		return dram_base + ZIMAGE_OFFSET_LIMIT;
++}
++
++/* on ARM, the initrd should be loaded in a lowmem region */
++static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
++						    unsigned long image_addr)
++{
++	return dram_base + SZ_512M;
++}
+ 
+ #endif /* _ASM_ARM_EFI_H */
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index 0b6b1633017f..6a6c8a0d1424 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -46,7 +46,24 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
+  * 2MiB so we know it won't cross a 2MiB boundary.
+  */
+ #define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
+-#define MAX_FDT_OFFSET	SZ_512M
++
++/* on arm64, the FDT may be located anywhere in system RAM */
++static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
++{
++	return ULONG_MAX;
++}
++
++/*
++ * On arm64, the initrd must be completely inside a 1 GB aligned 32 GB window
++ * that covers Image as well. Since we allocate from the top down, set a max
++ * address that is virtually guaranteed to produce a suitable allocation even
++ * when the physical address of Image is randomized.
++ */
++static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
++						    unsigned long image_addr)
++{
++	return ALIGN(image_addr, SZ_1G) + 31UL * SZ_1G;
++}
+ 
+ #define efi_call_early(f, ...)		sys_table_arg->boottime->f(__VA_ARGS__)
+ #define __efi_call_early(f, ...)	f(__VA_ARGS__)
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index b4f7d78f9e8b..557281fe375f 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -333,8 +333,9 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 	if (!fdt_addr)
+ 		pr_efi(sys_table, "Generating empty DTB\n");
+ 
+-	status = handle_cmdline_files(sys_table, image, cmdline_ptr,
+-				      "initrd=", dram_base + SZ_512M,
++	status = handle_cmdline_files(sys_table, image, cmdline_ptr, "initrd=",
++				      efi_get_max_initrd_addr(dram_base,
++							      *image_addr),
+ 				      (unsigned long *)&initrd_addr,
+ 				      (unsigned long *)&initrd_size);
+ 	if (status != EFI_SUCCESS)
+@@ -344,7 +345,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+ 
+ 	new_fdt_addr = fdt_addr;
+ 	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
+-				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
++				&new_fdt_addr, efi_get_max_fdt_addr(dram_base),
+ 				initrd_addr, initrd_size, cmdline_ptr,
+ 				fdt_addr, fdt_size);
+ 
 -- 
-Best regards,
-Marek Vasut
+2.7.4
