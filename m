@@ -1,25 +1,42 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 9 Feb 2017 13:13:20 +0100
-Subject: [PATCH 1/2] staging: bcm2835-audio: Removed spaces before ')'
-In-Reply-To: <20170206075651.4829-1-abhijitnaik27@gmail.com>
-References: <20170206075651.4829-1-abhijitnaik27@gmail.com>
-Message-ID: <20170209121320.GA16588@kroah.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 9 Feb 2017 12:14:59 +0000
+Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy
+ interrupts
+In-Reply-To: <8520D5D51A55D047800579B094147198263E68AA@XAP-PVEXMBX02.xlnx.xilinx.com>
+References: <1486364596-19699-1-git-send-email-bharatku@xilinx.com>
+ <4b04e834-08b6-a728-8fe5-13106d50b3b2@arm.com>
+ <8520D5D51A55D047800579B094147198263E68AA@XAP-PVEXMBX02.xlnx.xilinx.com>
+Message-ID: <131228fb-d3f8-3836-3713-e948ed30d398@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 06, 2017 at 01:26:50PM +0530, Abhijit Naik wrote:
-> bcm2835-vchiq.c and vc_vchi_audioserv_defs.h:
-> fixing ERROR: space prohibited before that close parenthesis
+On 09/02/17 12:01, Bharat Kumar Gogada wrote:
+>> On 06/02/17 07:03, Bharat Kumar Gogada wrote:
+>>> +static struct irq_chip nwl_leg_irq_chip = {
+>>> +	.name = "nwl_pcie:legacy",
+>>> +	.irq_enable = nwl_unmask_leg_irq,
+>>> +	.irq_disable = nwl_mask_leg_irq,
+>>
+>> You don't need these two if they are implemented in terms of mask/unmask.
 > 
-> Signed-off-by: Abhijit Naik <abhijitnaik27@gmail.com>
-> ---
->  drivers/staging/bcm2835-audio/bcm2835-vchiq.c          | 16 ++++++++--------
->  drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h |  2 +-
->  2 files changed, 9 insertions(+), 9 deletions(-)
+> These are being invoked by some drivers other than interrupt flow.
+> Ex: drivers/net/wireless/ath/ath9k/main.c
+> static int ath_reset_internal(struct ath_softc *sc, struct ath9k_channel *hchan) 
+> {
+>          ....
+>          disable_irq(sc->irq);
+>          tasklet_disable(&sc->intr_tq);
+>         ...
+>         ...
+>         enable_irq(sc->irq);
+>         spin_unlock_bh(&sc->sc_pcu_lock);
+> }
+> For us masking/unmasking is the way to enable/disable interrupts.
 
-These two patches do not apply to my tree at all, it looks like someone
-else already did this :(
+And if you looked at the way disable_irq is implemented, you would have
+found out that it falls back to masking if there is no disable method,
+preserving the semantic you expect.
 
-sorry,
-
-greg k-h
+	M.
+-- 
+Jazz is not dead. It just smells funny...
