@@ -1,39 +1,52 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Feb 2017 15:31:01 +0000
-Subject: [PATCH v3 1/3] of: Support parsing phandle argument lists
- through a nexus node
-In-Reply-To: <20170123204851.12808-2-stephen.boyd@linaro.org>
-References: <20170123204851.12808-1-stephen.boyd@linaro.org>
- <20170123204851.12808-2-stephen.boyd@linaro.org>
-Message-ID: <20170209153101.GE27312@n2100.armlinux.org.uk>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Thu, 9 Feb 2017 09:36:45 -0600
+Subject: [PATCH v5 2/4] Documentation: dt: add bindings for ti-cpufreq
+In-Reply-To: <5995162.mH49F4H7nS@aspire.rjw.lan>
+References: <20170203172929.23940-1-d-gerlach@ti.com>
+ <CAL_Jsq+955fra0P8FFWd4-f2rLyJVMwo-FBRfeqqeO=a8m0NnA@mail.gmail.com>
+ <2aba1159-9a48-329f-2a54-8079b32b06e2@ti.com>
+ <5995162.mH49F4H7nS@aspire.rjw.lan>
+Message-ID: <804ab315-3202-8c6d-3954-97a452892aa8@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 12:48:49PM -0800, Stephen Boyd wrote:
-> 	connector: connector {
-> 		#gpio-cells = <2>;
-> 		gpio-map = <0 0 &soc_gpio1 1 0>,
-> 			   <1 0 &soc_gpio2 4 0>,
-> 			   <2 0 &soc_gpio1 3 0>,
-> 			   <3 0 &soc_gpio2 2 0>;
-> 		gpio-map-mask = <0xf 0x0>;
-> 		gpio-map-pass-thru = <0x0 0x1>
+On 02/08/2017 06:02 PM, Rafael J. Wysocki wrote:
+> On Wednesday, February 08, 2017 08:45:55 AM Dave Gerlach wrote:
+>> On 02/08/2017 08:44 AM, Rob Herring wrote:
+>>> On Fri, Feb 3, 2017 at 11:29 AM, Dave Gerlach <d-gerlach@ti.com> wrote:
+>>>> Add the device tree bindings document for the TI CPUFreq/OPP driver
+>>>> on AM33xx, AM43xx, DRA7xx, and AM57xx SoCs. The operating-points-v2
+>>>> binding allows us to provide an opp-supported-hw property for each OPP
+>>>> to define when it is available. This driver is responsible for reading
+>>>> and parsing registers to determine which OPPs can be selectively enabled
+>>>> based on the specific SoC in use by matching against the opp-supported-hw
+>>>> data.
+>>>>
+>>>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>>>> ---
+>>>
+>>> [...]
+>>>
+>>>> +/*
+>>>> + * cpu0 has different OPPs depending on SoC revision and some on revisions
+>>>> + * 0x2 and 0x4 have eFuse bits that indicate if they are available or not
+>>>> + */
+>>>> +cpu0_opp_table: opp_table {
+>>>
+>>> One step closer, but as I showed last time, use a '-', not '_'.
+>>
+>> I apologize I thought the comment was only about the 0, completely missed the
+>> underscore, you are correct, thanks.
+>
+> Please send an update of this patch, then.
 
-This -map-mask and -map-pass-thru mechanism needs documentation in
-Documentation/devicetree.  There's a bunch of users of -map-mask
-(eg, interrupt-map-mask) but there's nothing that actually describes
-how this works.
+Yes, sent an update of just this patch in reply to the original patch email, thanks.
 
-The "-map-pass-thru" thing also seems to be a new, undocumented idea.
+Regards,
+Dave
 
-So, NAK until this stuff goes through the same level of review WRT
-DT documentation as other bindings are required to.
-
-I'm not saying that it's a bad idea, but it's important for consistency
-that this stuff is well documented, and people don't end up having to
-interpret the code when writing their DT descriptions.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>
+> Thanks,
+> Rafael
+>
