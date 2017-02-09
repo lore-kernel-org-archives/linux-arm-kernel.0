@@ -1,113 +1,119 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  9 Feb 2017 14:59:23 +0000
-Subject: [PATCH 25/25] KVM: arm/arm64: Emulate the EL1 phys timer registers
+Date: Thu,  9 Feb 2017 14:59:12 +0000
+Subject: [PATCH 14/25] KVM: arm/arm64: Remove kvm_vgic_inject_mapped_irq
 In-Reply-To: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
 References: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1486652363-7696-26-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1486652363-7696-15-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jintack Lim <jintack@cs.columbia.edu>
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Emulate read and write operations to CNTP_TVAL, CNTP_CVAL and CNTP_CTL.
-Now VMs are able to use the EL1 physical timer.
+The only benefit of having kvm_vgic_inject_mapped_irq separate from
+kvm_vgic_inject_irq is that we pass a boolean that we use for error
+checking on the injection path.
 
-Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+While this could potentially help in some aspect of robustness, it's
+also a little bit of a defensive move, and arguably callers into the
+vgic should have make sure they have marked their virtual IRQs as mapped
+if required.
+
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c    | 37 ++++++++++++++++++++++++++++++++++---
- include/kvm/arm_arch_timer.h |  2 ++
- virt/kvm/arm/arch_timer.c    |  2 +-
- 3 files changed, 37 insertions(+), 4 deletions(-)
+ virt/kvm/arm/arch_timer.c |  3 ++-
+ virt/kvm/arm/vgic/vgic.c  | 50 +++++++++++++++--------------------------------
+ 2 files changed, 18 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 1cd3464..0e26f8c 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -824,7 +824,14 @@ static bool access_cntp_tval(struct kvm_vcpu *vcpu,
- 		struct sys_reg_params *p,
- 		const struct sys_reg_desc *r)
- {
--	kvm_inject_undefined(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-+	u64 now = kvm_phys_timer_read();
-+
-+	if (p->is_write)
-+		ptimer->cnt_cval = p->regval + now;
-+	else
-+		p->regval = ptimer->cnt_cval - now;
-+
- 	return true;
- }
- 
-@@ -832,7 +839,25 @@ static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
- 		struct sys_reg_params *p,
- 		const struct sys_reg_desc *r)
- {
--	kvm_inject_undefined(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-+
-+	if (p->is_write) {
-+		/* ISTATUS bit is read-only */
-+		ptimer->cnt_ctl = p->regval & ~ARCH_TIMER_CTRL_IT_STAT;
-+	} else {
-+		u64 now = kvm_phys_timer_read();
-+
-+		p->regval = ptimer->cnt_ctl;
-+		/*
-+		 * Set ISTATUS bit if it's expired.
-+		 * Note that according to ARMv8 ARM Issue A.k, ISTATUS bit is
-+		 * UNKNOWN when ENABLE bit is 0, so we chose to set ISTATUS bit
-+		 * regardless of ENABLE bit for our implementation convenience.
-+		 */
-+		if (ptimer->cnt_cval <= now)
-+			p->regval |= ARCH_TIMER_CTRL_IT_STAT;
-+	}
-+
- 	return true;
- }
- 
-@@ -840,7 +865,13 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
- 		struct sys_reg_params *p,
- 		const struct sys_reg_desc *r)
- {
--	kvm_inject_undefined(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-+
-+	if (p->is_write)
-+		ptimer->cnt_cval = p->regval;
-+	else
-+		p->regval = ptimer->cnt_cval;
-+
- 	return true;
- }
- 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index f1d2fba0..fe797d6 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -72,6 +72,8 @@ bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx);
- void kvm_timer_schedule(struct kvm_vcpu *vcpu);
- void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
- 
-+u64 kvm_phys_timer_read(void);
-+
- void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
- 
- void kvm_timer_init_vhe(void);
 diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 33257b5..35d7100 100644
+index 6a084cd..91ecf48 100644
 --- a/virt/kvm/arm/arch_timer.c
 +++ b/virt/kvm/arm/arch_timer.c
-@@ -40,7 +40,7 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
- 	vcpu_vtimer(vcpu)->active_cleared_last = false;
+@@ -175,7 +175,8 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
+ 	timer->irq.level = new_level;
+ 	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
+ 				   timer->irq.level);
+-	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
++
++	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+ 					 timer->irq.irq,
+ 					 timer->irq.level);
+ 	WARN_ON(ret);
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index dea12df..654dfd4 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -335,9 +335,22 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
+ 	return true;
  }
  
--static u64 kvm_phys_timer_read(void)
-+u64 kvm_phys_timer_read(void)
+-static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+-				   unsigned int intid, bool level,
+-				   bool mapped_irq)
++/**
++ * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
++ * @kvm:     The VM structure pointer
++ * @cpuid:   The CPU for PPIs
++ * @intid:   The INTID to inject a new state to.
++ * @level:   Edge-triggered:  true:  to trigger the interrupt
++ *			      false: to ignore the call
++ *	     Level-sensitive  true:  raise the input signal
++ *			      false: lower the input signal
++ *
++ * The VGIC is not concerned with devices being active-LOW or active-HIGH for
++ * level-sensitive interrupts.  You can think of the level parameter as 1
++ * being HIGH and 0 being LOW and all devices being active-HIGH.
++ */
++int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
++			bool level)
  {
- 	return timecounter->cc->read(timecounter->cc);
+ 	struct kvm_vcpu *vcpu;
+ 	struct vgic_irq *irq;
+@@ -357,11 +370,6 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+ 	if (!irq)
+ 		return -EINVAL;
+ 
+-	if (irq->hw != mapped_irq) {
+-		vgic_put_irq(kvm, irq);
+-		return -EINVAL;
+-	}
+-
+ 	spin_lock(&irq->irq_lock);
+ 
+ 	if (!vgic_validate_injection(irq, level)) {
+@@ -382,32 +390,6 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+ 	return 0;
  }
+ 
+-/**
+- * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
+- * @kvm:     The VM structure pointer
+- * @cpuid:   The CPU for PPIs
+- * @intid:   The INTID to inject a new state to.
+- * @level:   Edge-triggered:  true:  to trigger the interrupt
+- *			      false: to ignore the call
+- *	     Level-sensitive  true:  raise the input signal
+- *			      false: lower the input signal
+- *
+- * The VGIC is not concerned with devices being active-LOW or active-HIGH for
+- * level-sensitive interrupts.  You can think of the level parameter as 1
+- * being HIGH and 0 being LOW and all devices being active-HIGH.
+- */
+-int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+-			bool level)
+-{
+-	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
+-}
+-
+-int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+-			       bool level)
+-{
+-	return vgic_update_irq_pending(kvm, cpuid, intid, level, true);
+-}
+-
+ int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
+ {
+ 	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
 -- 
 2.1.4
