@@ -1,105 +1,51 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 9 Feb 2017 12:13:22 -0500
-Subject: [PATCHv3] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-In-Reply-To: <20170209162956.GH27312@n2100.armlinux.org.uk>
-References: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
- <20170209162956.GH27312@n2100.armlinux.org.uk>
-Message-ID: <20170209121322.5229e6cf@gandalf.local.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 09 Feb 2017 18:14:07 +0100
+Subject: [PATCH] [net-next] ARM: orion: fix PHYLIB dependency
+In-Reply-To: <20170209155751.GB29882@lunn.ch>
+References: <20170209150834.1158193-1-arnd@arndb.de>
+ <20170209155751.GB29882@lunn.ch>
+Message-ID: <1967873.WpTcGj2Cy4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Feb 2017 16:29:56 +0000
-Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+On Thursday, February 9, 2017 4:57:51 PM CET Andrew Lunn wrote:
+> On Thu, Feb 09, 2017 at 04:08:11PM +0100, Arnd Bergmann wrote:
+> > The newly introduced mdiobus_register_board_info() function is only available
+> > as part of PHYLIB, so we get a link error when we call that from a board while
+> > phylib is disabled:
+> > 
+> > arch/arm/plat-orion/common.o: In function `orion_ge00_switch_init':
+> > common.c:(.init.text+0x6a4): undefined reference to `mdiobus_register_board_info'
+> > 
+> > This adds a workaround that is made up of three parts:
+> > 
+> > - in plat-orion, the function for declaring the switch is hidden without
+> >   PHYLIB.
+> > - in mach-orion5x, the caller conditionally stubs out the call to
+> >   the removed function, so we can still build other orion5x boards
+> >   without PHYLIB
+> > - For the boards that actually declare the switch, we select PHYLIB
+> >   explicitly from Kconfig if NETDEVICES is set. Without NETDEVICES,
+> >   we cannot enable PHYLIB, but we also wouldn't need it.
+> 
+> Hi Arnd
+> 
+> Although all correct, would it not be simpler to just select PHYLIB
+> and NETDEVICES? These devices are all NAS boxes and WiFi access
+> points. What sense does it make to build a kernel without working
+> networking for these classes of devices?
 
-> On Tue, Feb 07, 2017 at 10:57:55PM +0000, Abel Vesa wrote:
-> > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> > +
-> > +.macro __ftrace_regs_caller
-> > +
-> > +	add 	ip, sp, #4	@ move in IP the value of SP as it was
-> > +				@ before the push {lr} of the mcount mechanism
-> > +	stmdb	sp!, {ip,lr,pc}
-> > +	stmdb	sp!, {r0-r11,lr}
-> > +
-> > +	@ stack content at this point:
-> > +	@ 0  4          44    48   52       56   60   64
-> > +	@ R0 | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |  
-> 
-> How important is this to be close to "struct pt_regs" ?  Do we care about
-> r12 being "wrong" ?  The other issue is that pt_regs is actually 72
-> bytes in size, not 68 bytes.  So, does that mean we end up inappropriately
-> leaking some of the kernel stack to userspace through ftrace?
+Adding a 'select' statement to something as broad as NETDEVICES sounds
+really bad, it has a significant risk of introducing dependency loops
+and may be confusing if you want to build a multiplatform config without
+networking support (note that NETDEVICES in turn depends on NET, which
+can also be disabled).
 
-The regs passed to the ftrace code isn't passed to userspace. It's used
-by kprobes as a "fake breakpoint" (like fake news?), and by kernel live
-patching to modify what function actually gets called after ftrace
-returns.
+One possibility would be to have a special Kconfig symbol that controls
+mdiobus_register_board_info() being present and have that symbol
+force PHYLIB to never be "=m". Then we can either have no networking
+support and no phylib, turning mdiobus_register_board_info() into a
+stub, or we have the function built-in and reachable from the board
+code.
 
-
-> 
-> It's possible to save all the registers like this if we need to provide
-> a complete picture of the register set at function entry:
-> 
-> 	str	ip, [sp, #-16]!
-> 	add	ip, sp, #20
-> 	stmia	sp, {ip, lr, pc}
-> 	stmdb	sp!, {r0 - r11}
-> 
-> However, is that even correct - don't we want pt_regs' LR and PC to be
-> related to the function call itself?  The "previous LR" as you describe
-> it is where the called function (the one that is being traced) will
-> return to.  The current LR at this point is the address within the
-> traced function.  So actually I think this is more strictly correct, if
-> I'm understanding the intention here correctly:
-> 
-> 	str	ip, [sp, #S_IP - PT_REGS_SIZE]!	@ save current IP
-> 	ldr	ip, [sp, #PT_REGS_SIZE - S_IP]	@ get LR at traced function entry
-> 	str	lr, [sp, #S_PC - S_IP]		@ save current LR as PC
-> 	str	ip, [sp, #S_LR - S_IP]		@ save traced function return
-> 	add	ip, sp, #PT_REGS_SIZE - S_IP + 4
-> 	str	ip, [sp, #S_SP - SP_IP]		@ save stack pointer at function entry
-> 	stmdb	sp!, {r0 - r11}
-> 	@ clear CPSR and old_r0 words
-> 	mov	r3, #0
-> 	str	r3, [sp, #S_PSR]
-> 	str	r3, [sp, #S_OLD_R0]
-> 
-> However, that has the side effect of misaligning the stack (the stack
-> needs to be aligned to 8 bytes).  So, if we decide we don't care about
-> the saved LR value (except as a mechanism to preserve it across the
-> call into the ftrace code):
-> 
-> 	str	ip, [sp, #S_IP - PT_REGS_SIZE + 4]!
-> 	str	lr, [sp, #S_PC - S_IP]
-> 	ldr	lr, [sp, #PT_REGS_SIZE - 4 - S_IP]
-> 	add	ip, sp, #PT_REGS_SIZE - S_IP
-> 	stmib	sp, {ip, lr}
-> 	stmdb	sp!, {r0 - r11}
-> 	@ clear CPSR and old_r0 words
-> 	mov	r3, #0
-> 	str	r3, [sp, #S_PSR]
-> 	str	r3, [sp, #S_OLD_R0]
-> 
-> and the return would be:
-> 
-> 	ldmia	sp, {r0 - pc}
-> 
-> That all said - maybe someone from the ftrace community can comment on
-> how much of pt_regs is actually necessary here?
-> 
-
-Matters about the users. The REGS was originally created for kprobes,
-to simulate a kprobe breakpoint. As calling kprobes directly is much
-faster than going through the breakpoint mechanism. As adding a kprobe
-to the start of a function is a very common practice, it made sense to
-have ftrace give it a boost.
-
-Then came along live kernel patching, which I believe this series is
-trying to support. What is needed by pt_regs is a way to "hijack" the
-function being called to instead call the patched function. That is,
-ftrace is not being used for tracing, but in reality, being used to
-modify the running kernel. It is being used to change what function
-gets called. ftrace is just a hook for that mechanism.
-
--- Steve
+	Arnd
