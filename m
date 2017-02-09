@@ -1,30 +1,35 @@
-From: miles.chen@mediatek.com (Miles Chen)
-Date: Thu, 9 Feb 2017 10:20:07 +0800
-Subject: [PATCH] arm64: use is_vmalloc_addr
-Message-ID: <1486606807-32097-1-git-send-email-miles.chen@mediatek.com>
+From: yuantian.tang@nxp.com (yuantian.tang at nxp.com)
+Date: Thu, 9 Feb 2017 10:33:01 +0800
+Subject: [PATCH 1/2 v3] cpufreq: qoriq: added arm64 socs support
+Message-ID: <1486607582-18367-1-git-send-email-yuantian.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To is_vmalloc_addr() to check if an address is a vmalloc address
-instead of checking VMALLOC_START and VMALLOC_END manually.
+From: Tang Yuantian <Yuantian.Tang@nxp.com>
 
-Signed-off-by: Miles Chen <miles.chen@mediatek.com>
+Add arm64 config to Kconfig to enable cpu frequency feature on
+nxp arm64 socs.
+
+Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
 ---
- arch/arm64/mm/ioremap.c | 2 +-
+v3: no change
+v2: no change
+
+ drivers/cpufreq/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
-index 01e88c8..71d6b04 100644
---- a/arch/arm64/mm/ioremap.c
-+++ b/arch/arm64/mm/ioremap.c
-@@ -88,7 +88,7 @@ void __iounmap(volatile void __iomem *io_addr)
- 	 * We could get an address outside vmalloc range in case
- 	 * of ioremap_cache() reusing a RAM mapping.
- 	 */
--	if (VMALLOC_START <= addr && addr < VMALLOC_END)
-+	if (is_vmalloc_addr(addr))
- 		vunmap((void *)addr);
- }
- EXPORT_SYMBOL(__iounmap);
+diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+index 15adef4..3964383 100644
+--- a/drivers/cpufreq/Kconfig
++++ b/drivers/cpufreq/Kconfig
+@@ -324,7 +324,7 @@ endif
+ 
+ config QORIQ_CPUFREQ
+ 	tristate "CPU frequency scaling driver for Freescale QorIQ SoCs"
+-	depends on OF && COMMON_CLK && (PPC_E500MC || ARM)
++	depends on OF && COMMON_CLK && (PPC_E500MC || ARM || ARM64)
+ 	depends on !CPU_THERMAL || THERMAL
+ 	select CLK_QORIQ
+ 	help
 -- 
-1.9.1
+2.1.0.27.g96db324
