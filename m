@@ -1,130 +1,154 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Thu, 9 Feb 2017 12:01:06 +0000
-Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy
- interrupts
-In-Reply-To: <4b04e834-08b6-a728-8fe5-13106d50b3b2@arm.com>
-References: <1486364596-19699-1-git-send-email-bharatku@xilinx.com>
- <4b04e834-08b6-a728-8fe5-13106d50b3b2@arm.com>
-Message-ID: <8520D5D51A55D047800579B094147198263E68AA@XAP-PVEXMBX02.xlnx.xilinx.com>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Thu, 9 Feb 2017 20:03:01 +0800
+Subject: [PATCH v20 2/4] mailbox: mediatek: Add Mediatek CMDQ driver
+In-Reply-To: <1486359476.11424.33.camel@mtksdaap41>
+References: <1483499169-16329-1-git-send-email-hs.liao@mediatek.com>
+ <1483499169-16329-3-git-send-email-hs.liao@mediatek.com>
+ <CABb+yY23TUB8NpmpiO=cCmVFAVJMqKPfGgX14j+_Yj7tJvMOuQ@mail.gmail.com>
+ <1485419833.990.1.camel@mtksdaap41>
+ <CABb+yY13VaFpYz6EExvAXLpAqEWDJ4R50WG0DYbXO6iCESbA5A@mail.gmail.com>
+ <1486359476.11424.33.camel@mtksdaap41>
+Message-ID: <1486641781.19890.12.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 06/02/17 07:03, Bharat Kumar Gogada wrote:
-> > - Adding spinlock for protecting legacy mask register
-> > - Few wifi end points which only support legacy interrupts,
-> > performs hardware reset functionalities after disabling interrupts
-> > by invoking disable_irq and then re-enable using enable_irq, they
-> > enable hardware interrupts first and then virtual irq line later.
-> > - The legacy irq line goes low only after DEASSERT_INTx is
-> > received.As the legacy irq line is high immediately after hardware
-> > interrupts are enabled but virq of EP is still in disabled state
-> > and EP handler is never executed resulting no DEASSERT_INTx.If dummy
-> > irq chip is used, interrutps are not masked and system is
-> > hanging with CPU stall.
-> > - Adding irq chip functions instead of dummy irq chip for legacy
-> > interrupts.
-> > - Legacy interrupts are level sensitive, so using handle_level_irq
-> > is more appropriate as it is masks interrupts until End point handles
-> > interrupts and unmasks interrutps after End point handler is executed.
-> > - Legacy interrupts are level triggered, virtual irq line of End
-> > Point shows as edge in /proc/interrupts.
-> > - Setting irq flags of virtual irq line of EP to level triggered
-> > at the time of mapping.
+On Mon, 2017-02-06 at 13:37 +0800, Horng-Shyang Liao wrote:
+> Hi Jassi,
 > 
-> I'm now OK with the code (modulo the small nit below), but the commit
-> message is a complete mess. How about something like:
+> On Wed, 2017-02-01 at 10:52 +0530, Jassi Brar wrote:
+> > On Thu, Jan 26, 2017 at 2:07 PM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+> > > Hi Jassi,
+> > >
+> > > On Thu, 2017-01-26 at 10:08 +0530, Jassi Brar wrote:
+> > >> On Wed, Jan 4, 2017 at 8:36 AM, HS Liao <hs.liao@mediatek.com> wrote:
+> > >>
+> > >> > diff --git a/drivers/mailbox/mtk-cmdq-mailbox.c b/drivers/mailbox/mtk-cmdq-mailbox.c
+> > >> > new file mode 100644
+> > >> > index 0000000..747bcd3
+> > >> > --- /dev/null
+> > >> > +++ b/drivers/mailbox/mtk-cmdq-mailbox.c
+> > >>
+> > >> ...
+> > >>
+> > >> > +static void cmdq_task_exec(struct cmdq_pkt *pkt, struct cmdq_thread *thread)
+> > >> > +{
+> > >> > +       struct cmdq *cmdq;
+> > >> > +       struct cmdq_task *task;
+> > >> > +       unsigned long curr_pa, end_pa;
+> > >> > +
+> > >> > +       cmdq = dev_get_drvdata(thread->chan->mbox->dev);
+> > >> > +
+> > >> > +       /* Client should not flush new tasks if suspended. */
+> > >> > +       WARN_ON(cmdq->suspended);
+> > >> > +
+> > >> > +       task = kzalloc(sizeof(*task), GFP_ATOMIC);
+> > >> > +       task->cmdq = cmdq;
+> > >> > +       INIT_LIST_HEAD(&task->list_entry);
+> > >> > +       task->pa_base = dma_map_single(cmdq->mbox.dev, pkt->va_base,
+> > >> > +                                      pkt->cmd_buf_size, DMA_TO_DEVICE);
+> > >> >
+> > >> You seem to parse the requests and responses, that should ideally be
+> > >> done in client driver.
+> > >> Also, we are here in atomic context, can you move it in client driver
+> > >> (before the spin_lock)?
+> > >> Maybe by adding a new 'pa_base' member as well in 'cmdq_pkt'.
+> > >
+> > > will do
 > 
-> The current handling of legacy interrupts in the Xilinx NWL driver is
-> completely dysfunctional: Interrupts are handled as edge instead of
-> level, and there is no way to mask an interrupt, leading to drivers
-> misbehaving.
+> I agree with moving dma_map_single out from spin_lock.
 > 
-> Let's address this by making it a full blown irqchip, implement
-> mask/unmask methods, and use handle_level_irq as the flow handler.
-Yes, will change the commit message.
+> However, mailbox clients cannot map virtual memory to mailbox
+> controller's device for DMA. In our previous discussion, we decided to
+> remove mailbox_controller.h from clients to restrict their capabilities.
 > 
-> >
-> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> > ---
-> >  drivers/pci/host/pcie-xilinx-nwl.c | 45
-> +++++++++++++++++++++++++++++++++++++-
-> >  1 file changed, 44 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-
-> nwl.c
-> > index 43eaa4a..36f4fb4 100644
-> > --- a/drivers/pci/host/pcie-xilinx-nwl.c
-> > +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-> > @@ -184,6 +184,7 @@ struct nwl_pcie {
-> >  	u8 root_busno;
-> >  	struct nwl_msi msi;
-> >  	struct irq_domain *legacy_irq_domain;
-> > +	raw_spinlock_t leg_mask_lock;
-> >  };
-> >
-> >  static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off)
-> > @@ -395,11 +396,52 @@ static void nwl_pcie_msi_handler_low(struct
-> irq_desc *desc)
-> >  	chained_irq_exit(chip, desc);
-> >  }
-> >
-> > +static void nwl_mask_leg_irq(struct irq_data *data)
-> > +{
-> > +	struct irq_desc *desc = irq_to_desc(data->irq);
-> > +	struct nwl_pcie *pcie;
-> > +	unsigned long flags;
-> > +	u32 mask;
-> > +	u32 val;
-> > +
-> > +	pcie = irq_desc_get_chip_data(desc);
-> > +	mask = 1 << (data->hwirq - 1);
-> > +	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
-> > +	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
-> > +	nwl_bridge_writel(pcie, (val & (~mask)), MSGF_LEG_MASK);
-> > +	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
-> > +}
-> > +
-> > +static void nwl_unmask_leg_irq(struct irq_data *data)
-> > +{
-> > +	struct irq_desc *desc = irq_to_desc(data->irq);
-> > +	struct nwl_pcie *pcie;
-> > +	unsigned long flags;
-> > +	u32 mask;
-> > +	u32 val;
-> > +
-> > +	pcie = irq_desc_get_chip_data(desc);
-> > +	mask = 1 << (data->hwirq - 1);
-> > +	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
-> > +	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
-> > +	nwl_bridge_writel(pcie, (val | mask), MSGF_LEG_MASK);
-> > +	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
-> > +}
-> > +
-> > +static struct irq_chip nwl_leg_irq_chip = {
-> > +	.name = "nwl_pcie:legacy",
-> > +	.irq_enable = nwl_unmask_leg_irq,
-> > +	.irq_disable = nwl_mask_leg_irq,
+> Please take a look at following link from 2016/9/22 to 2016/9/30 about
+> mailbox_controller.h.
+> https://patchwork.kernel.org/patch/9312953/
 > 
-> You don't need these two if they are implemented in terms of mask/unmask.
+> Is there any better place to do dma_map_single?
 
-These are being invoked by some drivers other than interrupt flow.
-Ex: drivers/net/wireless/ath/ath9k/main.c
-static int ath_reset_internal(struct ath_softc *sc, struct ath9k_channel *hchan) 
-{
-         ....
-         disable_irq(sc->irq);
-         tasklet_disable(&sc->intr_tq);
-        ...
-        ...
-        enable_irq(sc->irq);
-        spin_unlock_bh(&sc->sc_pcu_lock);
-}
-For us masking/unmasking is the way to enable/disable interrupts.
+Hi Jassi,
 
+According to previous discussion, we have two requirements:
+(1) CMDQ clients should not access mailbox_controller.h;
+(2) dma_map_single should not put inside spin_lock.
+
+I think a trade-off solution is to put in mtk-cmdq-helper.c.
+Although it is a mailbox client, it is not a CMDQ client.
+We can include mailbox_controller.h in mtk-cmdq-helper.c
+(instead of mtk-cmdq.h), and then map dma at cmdq_pkt_flush_async
+before mbox_send_message.
+
+pkt->pa_base = dma_map_single(client->chan->mbox->dev, pkt->va_base,
+                              pkt->cmd_buf_size, DMA_TO_DEVICE);
+
+What do you think?
+
+Thanks,
+HS
+
+> > >> ....
+> > >> > +
+> > >> > +       cmdq->mbox.num_chans = CMDQ_THR_MAX_COUNT;
+> > >> > +       cmdq->mbox.ops = &cmdq_mbox_chan_ops;
+> > >> > +       cmdq->mbox.of_xlate = cmdq_xlate;
+> > >> > +
+> > >> > +       /* make use of TXDONE_BY_ACK */
+> > >> > +       cmdq->mbox.txdone_irq = false;
+> > >> > +       cmdq->mbox.txdone_poll = false;
+> > >> > +
+> > >> > +       for (i = 0; i < ARRAY_SIZE(cmdq->thread); i++) {
+> > >> >
+> > >> You mean  i < CMDQ_THR_MAX_COUNT
+> > >
+> > > will do
+> > >
+> > >> > +               cmdq->thread[i].base = cmdq->base + CMDQ_THR_BASE +
+> > >> > +                               CMDQ_THR_SIZE * i;
+> > >> > +               INIT_LIST_HEAD(&cmdq->thread[i].task_busy_list);
+> > >> >
+> > >> You seem the queue mailbox requests in this controller driver? why not
+> > >> use the mailbox api for that?
+> > >>
+> > >> > +               init_timer(&cmdq->thread[i].timeout);
+> > >> > +               cmdq->thread[i].timeout.function = cmdq_thread_handle_timeout;
+> > >> > +               cmdq->thread[i].timeout.data = (unsigned long)&cmdq->thread[i];
+> > >> >
+> > >> Here again... you seem to ignore the polling mechanism provided by the
+> > >> mailbox api, and implement your own.
+> > >
+> > > The queue is used to record the tasks which are flushed into CMDQ
+> > > hardware (GCE). We are handling time critical tasks, so we have to
+> > > queue them in GCE rather than a software queue (e.g. mailbox buffer).
+> > > Let me use display as an example. Many display tasks are flushed into
+> > > CMDQ to wait next vsync event. When vsync event is triggered by display
+> > > hardware, GCE needs to process all flushed tasks "within vblank" to
+> > > prevent garbage on screen. This is all done by GCE (without CPU)
+> > > to fulfill time critical requirement. After GCE finish its work,
+> > > it will generate interrupts, and then CMDQ driver will let clients know
+> > > which tasks are done.
+> > >
+> > Does the GCE provide any 'lock' to prevent modifying (by adding tasks
+> > to) the GCE h/w buffer when it is processing it at vsync?  Otherwise
 > 
-> > +	.irq_mask = nwl_mask_leg_irq,
-> > +	.irq_unmask = nwl_unmask_leg_irq,
-> > +};
-> > +
-Thanks & Regards,
-Bharat
+> CPU will suspend GCE when adding a task (cmdq_thread_suspend),
+> and resume GCE after adding task is done (cmdq_thread_resume).
+> If GCE is processing task(s) at vsync and CPU wants to add a new task
+> at the same time, CPU will detect this situation
+> (by cmdq_thread_is_in_wfe), resume GCE immediately, and then add
+> following task(s) to wait for next vsync event.
+> All the above logic is implemented at cmdq_task_exec.
+> 
+> > there maybe race/error. If there is such a 'lock' flag/irq, that could
+> > help here. However, you are supposed to know your h/w better, so I
+> > will accept this implementation assuming it can't be done any better.
+> > 
+> > Please address other comments and resubmit.
+> > 
+> > Thanks
+> 
+> After we figure out a better solution for dma_map_single issue, I will
+> resubmit a new version.
+> 
+> Thanks,
+> HS
