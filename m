@@ -1,73 +1,115 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 9 Feb 2017 16:37:05 +0800
-Subject: [PATCH] arm64: use is_vmalloc_addr
-In-Reply-To: <1486606807-32097-1-git-send-email-miles.chen@mediatek.com>
-Message-ID: <201702091600.7Yg9Yj0D%fengguang.wu@intel.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 9 Feb 2017 09:40:29 +0100
+Subject: [PATCH 1/2] PM / Domains: Ignore domain-idle-states that are not
+ compatible
+In-Reply-To: <1486571692-33212-3-git-send-email-lina.iyer@linaro.org>
+References: <1486571692-33212-1-git-send-email-lina.iyer@linaro.org>
+ <1486571692-33212-3-git-send-email-lina.iyer@linaro.org>
+Message-ID: <CAPDyKFpj4LNPH-V2cziw1ULm9Ff9a3jeyrQK9XVp2G2OaQbtXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miles,
+On 8 February 2017 at 17:34, Lina Iyer <lina.iyer@linaro.org> wrote:
+> domain-idle-states property may have phandles to idle state bindings
+> that may not be compatible with idle state definition defined in [1].
 
-[auto build test WARNING on arm64/for-next/core]
-[also build test WARNING on v4.10-rc7 next-20170208]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+I don't find the reference to [1] in the change-log, could you please add it.
 
-url:    https://github.com/0day-ci/linux/commits/Miles-Chen/arm64-use-is_vmalloc_addr/20170209-103100
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+> Such phandles would just be ignored and not throw and error when read by
+> the domain core.
 
-All warnings (new ones prefixed by >>):
+Perhaps, you could also share a minimal snipped from a DTS as it helps
+to describe why and what this change is needed.
 
-   arch/arm64/mm/ioremap.c: In function '__iounmap':
->> arch/arm64/mm/ioremap.c:91:22: warning: passing argument 1 of 'is_vmalloc_addr' makes pointer from integer without a cast [-Wint-conversion]
-     if (is_vmalloc_addr(addr))
-                         ^~~~
-   In file included from arch/arm64/mm/ioremap.c:24:0:
-   include/linux/mm.h:472:20: note: expected 'const void *' but argument is of type 'long unsigned int'
-    static inline bool is_vmalloc_addr(const void *x)
-                       ^~~~~~~~~~~~~~~
+>
+> Cc: <devicetree@vger.kernel.org>
+> Cc: Rob Herring <robh@kernel.org>
+> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/power/power_domain.txt |  4 +++-
+>  drivers/base/power/domain.c                              | 16 +++++++++-------
+>  2 files changed, 12 insertions(+), 8 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
+> index 723e1ad..940707d 100644
+> --- a/Documentation/devicetree/bindings/power/power_domain.txt
+> +++ b/Documentation/devicetree/bindings/power/power_domain.txt
+> @@ -31,7 +31,9 @@ Optional properties:
+>
+>  - domain-idle-states : A phandle of an idle-state that shall be soaked into a
+>                  generic domain power state. The idle state definitions are
+> -                compatible with domain-idle-state specified in [1].
+> +                compatible with domain-idle-state specified in [1]. phandles
+> +                that are not compatible with domain-idle-state will be
+> +                ignored.
+>    The domain-idle-state property reflects the idle state of this PM domain and
+>    not the idle states of the devices or sub-domains in the PM domain. Devices
+>    and sub-domains have their own idle-states independent of the parent
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 6b23d82..3825bb9 100644
+> --- a/drivers/base/power/domain.c
 
-vim +/is_vmalloc_addr +91 arch/arm64/mm/ioremap.c
+Always split DT documentation changes from the code changes and make
+the DT doc changes precede the code changes in the series of patches.
 
-    75	
-    76	void __iomem *__ioremap(phys_addr_t phys_addr, size_t size, pgprot_t prot)
-    77	{
-    78		return __ioremap_caller(phys_addr, size, prot,
-    79					__builtin_return_address(0));
-    80	}
-    81	EXPORT_SYMBOL(__ioremap);
-    82	
-    83	void __iounmap(volatile void __iomem *io_addr)
-    84	{
-    85		unsigned long addr = (unsigned long)io_addr & PAGE_MASK;
-    86	
-    87		/*
-    88		 * We could get an address outside vmalloc range in case
-    89		 * of ioremap_cache() reusing a RAM mapping.
-    90		 */
-  > 91		if (is_vmalloc_addr(addr))
-    92			vunmap((void *)addr);
-    93	}
-    94	EXPORT_SYMBOL(__iounmap);
-    95	
-    96	void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size)
-    97	{
-    98		/* For normal memory we already have a cacheable mapping. */
-    99		if (pfn_valid(__phys_to_pfn(phys_addr)))
+> +++ b/drivers/base/power/domain.c
+> @@ -2065,11 +2065,6 @@ static int genpd_parse_state(struct genpd_power_state *genpd_state,
+>         int err;
+>         u32 residency;
+>         u32 entry_latency, exit_latency;
+> -       const struct of_device_id *match_id;
+> -
+> -       match_id = of_match_node(idle_state_match, state_node);
+> -       if (!match_id)
+> -               return -EINVAL;
+>
+>         err = of_property_read_u32(state_node, "entry-latency-us",
+>                                                 &entry_latency);
+> @@ -2118,6 +2113,7 @@ int of_genpd_parse_idle_states(struct device_node *dn,
+>         int err, ret;
+>         int count;
+>         struct of_phandle_iterator it;
+> +       const struct of_device_id *match_id;
+>
+>         count = of_count_phandle_with_args(dn, "domain-idle-states", NULL);
+>         if (count <= 0)
+> @@ -2130,6 +2126,9 @@ int of_genpd_parse_idle_states(struct device_node *dn,
+>         /* Loop over the phandles until all the requested entry is found */
+>         of_for_each_phandle(&it, err, dn, "domain-idle-states", NULL, 0) {
+>                 np = it.node;
+> +               match_id = of_match_node(idle_state_match, np);
+> +               if (!match_id)
+> +                       continue;
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 33971 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170209/d29382e6/attachment-0001.gz>
+Earlier we have allocated "count" numbers of struct genpd_power_state,
+by using a kcalloc().
+
+This change may lead to that we could have allocated more memory than
+actually needed - because there may be some nodes that doesn't match.
+
+Perhaps it's better to do a pre-iteration to find the real numbers of
+how many struct genpd_power_state we actually need to allocate!?
+
+>                 ret = genpd_parse_state(&st[i++], np);
+>                 if (ret) {
+>                         pr_err
+> @@ -2141,8 +2140,11 @@ int of_genpd_parse_idle_states(struct device_node *dn,
+>                 }
+>         }
+>
+> -       *n = count;
+> -       *states = st;
+> +       *n = i;
+> +       if (!i)
+> +               kfree(st);
+> +       else
+> +               *states = st;
+>
+>         return 0;
+>  }
+> --
+> 2.7.4
+>
+
+Kind regards
+Uffe
