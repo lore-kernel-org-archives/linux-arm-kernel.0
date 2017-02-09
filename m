@@ -1,73 +1,70 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Thu, 9 Feb 2017 20:20:47 +0100
-Subject: [PATCH 3/8] mm: cma: Export a few symbols
-In-Reply-To: <2dee6c0baaf08e2c7d48ceb7e97e511c914d0f87.1486655917.git-series.maxime.ripard@free-electrons.com>
-References: <cover.7101c7323e6f22e281ad70b93488cf44caca4ca0.1486655917.git-series.maxime.ripard@free-electrons.com>
- <2dee6c0baaf08e2c7d48ceb7e97e511c914d0f87.1486655917.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20170209192046.GB31906@dhcp22.suse.cz>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 9 Feb 2017 14:25:15 -0500 (EST)
+Subject: [PATCH 4/4] ARM: kuser: split the kuser support for Thumb-capable
+ and ARM-only
+In-Reply-To: <E1cbngY-00026G-HA@rmk-PC.armlinux.org.uk>
+References: <20170209121756.GC27312@n2100.armlinux.org.uk>
+ <E1cbngY-00026G-HA@rmk-PC.armlinux.org.uk>
+Message-ID: <alpine.LFD.2.20.1702091355110.9597@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[CC CMA people]
+On Thu, 9 Feb 2017, Russell King wrote:
 
-On Thu 09-02-17 17:39:17, Maxime Ripard wrote:
-> Modules might want to check their CMA pool size and address for debugging
-> and / or have additional checks.
-> 
-> The obvious way to do this would be through dev_get_cma_area and
-> cma_get_base and cma_get_size, that are currently not exported, which
-> results in a build failure.
-> 
-> Export them to prevent such a failure.
+[...]
+> +#ifdef GENERATE_FIXUPS
+> +/*
+> + * The .text section in this file is used for fixups of the various
+> + * helpers.  Do not place anything else in the .text section within
+> + * this file.
+> + */
+> +	.globl kuser_cmpxchg64_fixup
+> +kuser_cmpxchg64_fixup:
+> +#endif
 
-Who actually uses those exports. None of the follow up patches does
-AFAICS.
+[...]
 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/base/dma-contiguous.c | 1 +
->  mm/cma.c                      | 2 ++
->  2 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-> index e167a1e1bccb..60f5c2591ccd 100644
-> --- a/drivers/base/dma-contiguous.c
-> +++ b/drivers/base/dma-contiguous.c
-> @@ -35,6 +35,7 @@
->  #endif
->  
->  struct cma *dma_contiguous_default_area;
-> +EXPORT_SYMBOL(dma_contiguous_default_area);
->  
->  /*
->   * Default global CMA area size can be defined in kernel's .config.
-> diff --git a/mm/cma.c b/mm/cma.c
-> index c960459eda7e..b50245282a18 100644
-> --- a/mm/cma.c
-> +++ b/mm/cma.c
-> @@ -47,11 +47,13 @@ phys_addr_t cma_get_base(const struct cma *cma)
->  {
->  	return PFN_PHYS(cma->base_pfn);
->  }
-> +EXPORT_SYMBOL(cma_get_base);
->  
->  unsigned long cma_get_size(const struct cma *cma)
->  {
->  	return cma->count << PAGE_SHIFT;
->  }
-> +EXPORT_SYMBOL(cma_get_size);
->  
->  static unsigned long cma_bitmap_aligned_mask(const struct cma *cma,
->  					     int align_order)
-> -- 
-> git-series 0.8.11
-> 
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+> +#ifdef GENERATE_FIXUPS
+>  	.text
+> -	.globl kuser_cmpxchg64_fixup
+> -kuser_cmpxchg64_fixup:
+>  	@ Called from kuser_cmpxchg_check macro.
+>  	@ r4 = address of interrupted insn (must be preserved).
+>  	@ sp = saved regs. r7 and r8 are clobbered.
+> @@ -98,11 +97,9 @@ __kuser_cmpxchg64:				@ 0xffff0f60
+>  	subs	r8, r4, r7
+>  	rsbcss	r8, r8, #(2b - 1b)
+>  	strcs	r7, [sp, #S_PC]
+> -#if __LINUX_ARM_ARCH__ < 6
+> -	bcc	kuser_cmpxchg32_fixup
+> -#endif
+> -	ret	lr
+> +	retcs	lr
+>  	.previous
+> +#endif
 
--- 
-Michal Hocko
-SUSE Labs
+This construct gave me pause for a while.
+
+A few observations:
+
+- The kuser_cmpxchg32_fixup symbol is no longer referenced, so it can be 
+  removed from the next fixup code block too.
+
+- If __LINUX_ARM_ARCH__ >= 6 then the kuser_cmpxchg32 doesn't need any 
+  fixup and the above sequence will end in:
+
+	retcs	lr
+	ret	lr
+
+  Note a big deal though, and the increased code clarity is worth it.
+
+- Given a single linear fixup block it might be more appropriate to 
+  rename kuser_cmpxchg64_fixup to kuser_fixup so not to imply it is only 
+  for cmpxchg64.
+
+And you may add to the whole series:
+
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+
+
+Nicolas
