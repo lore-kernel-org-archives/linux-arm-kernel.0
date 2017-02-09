@@ -1,86 +1,65 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 9 Feb 2017 09:41:13 +0800
-Subject: [PATCH v12 6/9] usb: xhci: use bus->sysdev for DMA configuration
-In-Reply-To: <20170208204300.GC8068@usblab-sd-06.qualcomm.com>
-References: <1486372421-29073-1-git-send-email-peter.chen@nxp.com>
- <1486372421-29073-7-git-send-email-peter.chen@nxp.com>
- <20170208204300.GC8068@usblab-sd-06.qualcomm.com>
-Message-ID: <20170209014113.GB460@b29397-desktop>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 8 Feb 2017 17:42:04 -0800
+Subject: [PATCH 2/2] ARM: dts: Qualcomm APQ8060 DragonBoard ALS sensor
+In-Reply-To: <CACRpkdbH9WgC8EwERRNDUjnAAz7YAq-=S1Wja5Hq2w0uDeO7rg@mail.gmail.com>
+References: <20170131102114.25085-1-linus.walleij@linaro.org>
+ <20170131102114.25085-2-linus.walleij@linaro.org>
+ <20170201183631.GJ10531@minitux>
+ <CACRpkdbH9WgC8EwERRNDUjnAAz7YAq-=S1Wja5Hq2w0uDeO7rg@mail.gmail.com>
+Message-ID: <20170209014204.GK27837@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 12:43:00PM -0800, Jack Pham wrote:
-> Hi Peter, Sriram, Arnd,
+On Fri 03 Feb 05:05 PST 2017, Linus Walleij wrote:
+
+> On Wed, Feb 1, 2017 at 7:36 PM, Bjorn Andersson
+> <bjorn.andersson@linaro.org> wrote:
+> > On Tue 31 Jan 02:21 PST 2017, Linus Walleij wrote:
 > 
-> On Mon, Feb 06, 2017 at 05:13:38PM +0800, Peter Chen wrote:
-> > From: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > For xhci-hcd platform device, all the DMA parameters are not
-> > configured properly, notably dma ops for dwc3 devices. So, set
-> > the dma for xhci from sysdev. sysdev is pointing to device that
-> > is known to the system firmware or hardware.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
-> > Tested-by: Baolin Wang <baolin.wang@linaro.org>
-> > Tested-by: Vivek Gautam <vivek.gautam@codeaurora.org>
-> > Tested-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
-> > Signed-off-by: Mathias Nyman <mathias.nyman@linux.intel.com>
-> > ---
-> > diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> > index 6d33b42..7a9c860 100644
-> > --- a/drivers/usb/host/xhci-plat.c
-> > +++ b/drivers/usb/host/xhci-plat.c
+> >> +                                                     /* Let's use channel 5 */
+> >> +                                                     qcom,amux-route = <PMIC_MPP_AMUX_ROUTE_CH5>;
+> >
+> > Unrelated to this patch, I did look at how this works on later devices.
+> > It seems like we want to be able to switch the amux-route depending on
+> > which ADC "channel" we're querying - e.g. on DB820c we have thermistors
+> > on 3 different AMUX inputs but we don't have 3 mpps available.
+> >
+> > Any thoughts on how to deal with this?
 > 
-> > -	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
-> > +	hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
-> > +			       dev_name(&pdev->dev), NULL);
-> 
-> As mentioned already in [1], usb_create_shared_hcd() is called to create
-> the second bus, however it also needs to be converted.
-> 
-> Not exactly as Roger's suggestion but this worked for me:
-> 
-> -       xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
-> +       xhci->shared_hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
->                         dev_name(&pdev->dev), hcd);
->         if (!xhci->shared_hcd) {
->                 ret = -ENOMEM;
-> 
-> Without this, SuperSpeed devices fail to enumerate:
-> 
->  usb 2-1: new SuperSpeed USB device number 2 using xhci-hcd
->  usb 2-1: device descriptor read/8, error -11
->  usb 2-1: new SuperSpeed USB device number 2 using xhci-hcd
->  usb 2-1: device descriptor read/8, error -11
->  usb 2-1: new SuperSpeed USB device number 3 using xhci-hcd
->  usb 2-1: device descriptor read/8, error -11
->  usb 2-1: new SuperSpeed USB device number 3 using xhci-hcd
->  usb 2-1: device descriptor read/8, error -11
->  <and continues...>
-> 
-> Thanks,
-> Jack
+> The AMUX is just one big mystery to me, it's one of those areas where I
+> think a real datasheet would be extremely helpful.
 > 
 
-Do you work at same platform with Vivek Gautam? I see his tested-by
-tag in this patch.
+After additional research and a long chat with Stephen this is what I
+have come up with.
 
-I have no dwc3 platform to test, I only got patches from [1], and rebase to
-Greg's usb-next, the rebase has a conflict, and I made a 
-change which is similar to revert below patch, but it is definitely
-not your problem.
+On PM8058 you have 16 AMUX channels that can be either read as raw,
+scaled or dived by 3, this is selected by the 2 "premux" bits in the
+AMUX selector register.
 
-commit 488dc164914ff5ce5e913abd32048d28fc0d06b8
-Author: Mathias Nyman <mathias.nyman@linux.intel.com>
-Date:   Fri Jan 20 15:38:24 2017 +0200
-
-    xhci: remove WARN_ON if dma mask is not set for platform devices
+AMUX channel 5-9 are called MPP5-9,
+connected to a switching matrix so each MPP is configured to output its
+signal on one of the 5 mpp-amux-channels. I.e. it's probably better to
+rename these just "AMUX5" through "AMXU9".
 
 
-[1] http://www.spinics.net/lists/linux-usb/msg152375.html
 
--- 
+On PM8921 this changes somewhat and an additional mux is introduced.
+The first premux looks similar to pm8058, but with no direct MPP AMUXes
+to be selected. Premux 1 or 2 is used to select the second level mux.
 
-Best Regards,
-Peter Chen
+This mux has channels:
+ 1: usb_sns
+ 2: dcin_sns
+ 3: amux3 (reserved and called pa_therm)
+ 4: amux4 (reserved and called amux_in)
+ 5-8: amuxX (as configured output of MPPs)
+
+Premux 2 has the same set of channels, but with a divisor of 3.
+
+The MPP1/MPP2 AMUX channels in premux 0 found downstream are now
+reserved - likely they the hardware used to select unity and div/3 input
+from the second level mux.
+
+Regards,
+Bjorn
