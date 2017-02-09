@@ -1,34 +1,125 @@
-From: abelvesa@gmail.com (Abel Vesa)
-Date: Thu, 9 Feb 2017 18:18:15 +0000
-Subject: [PATCHv3] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-In-Reply-To: <20170209180644.GJ27312@n2100.armlinux.org.uk>
-References: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
- <20170209162956.GH27312@n2100.armlinux.org.uk>
- <20170209121322.5229e6cf@gandalf.local.home>
- <20170209180644.GJ27312@n2100.armlinux.org.uk>
-Message-ID: <20170209181815.GA3439@nuc>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 9 Feb 2017 10:22:52 -0800
+Subject: [PATCH] [net-next] ARM: orion: fix PHYLIB dependency
+In-Reply-To: <20170209150834.1158193-1-arnd@arndb.de>
+References: <20170209150834.1158193-1-arnd@arndb.de>
+Message-ID: <c6ab6498-8094-b23e-0b93-c3bf1c866992@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2017 at 06:06:44PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Feb 09, 2017 at 12:13:22PM -0500, Steven Rostedt wrote:
-> > Then came along live kernel patching, which I believe this series is
-> > trying to support. What is needed by pt_regs is a way to "hijack" the
-> > function being called to instead call the patched function. That is,
-> > ftrace is not being used for tracing, but in reality, being used to
-> > modify the running kernel. It is being used to change what function
-> > gets called. ftrace is just a hook for that mechanism.
+On 02/09/2017 07:08 AM, Arnd Bergmann wrote:
+> The newly introduced mdiobus_register_board_info() function is only available
+> as part of PHYLIB, so we get a link error when we call that from a board while
+> phylib is disabled:
 > 
-> So, would I be correct to assume that the only parts of pt_regs that
-> would be touched are those which contain arguments to the function,
-> and the register which would contain the return value?
-At this point, yeah, but I intend to come up with another patch series
-for livepatching which needs the exact same context as the function 
-livepatched. This means all the regs need to be saved and restored 
-before calling the replacing function.
+> arch/arm/plat-orion/common.o: In function `orion_ge00_switch_init':
+> common.c:(.init.text+0x6a4): undefined reference to `mdiobus_register_board_info'
+
+There is an empty stub provided in include/linux/phy.h when
+CONFIG_PHYLIB is disabled, I am not clear why this did not work here?
+
+I disabled CONFIG_NETDEVICES to force CONFIG_PHY not to be set here, and
+I was not able to reproduce this, what am I missing?
+
 > 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+> This adds a workaround that is made up of three parts:
+> 
+> - in plat-orion, the function for declaring the switch is hidden without
+>   PHYLIB.
+> - in mach-orion5x, the caller conditionally stubs out the call to
+>   the removed function, so we can still build other orion5x boards
+>   without PHYLIB
+> - For the boards that actually declare the switch, we select PHYLIB
+>   explicitly from Kconfig if NETDEVICES is set. Without NETDEVICES,
+>   we cannot enable PHYLIB, but we also wouldn't need it.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-orion5x/Kconfig  | 5 +++++
+>  arch/arm/mach-orion5x/common.c | 4 ++--
+>  arch/arm/plat-orion/common.c   | 2 ++
+>  3 files changed, 9 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-orion5x/Kconfig b/arch/arm/mach-orion5x/Kconfig
+> index 468b8cb7fd5f..b98a0057ef66 100644
+> --- a/arch/arm/mach-orion5x/Kconfig
+> +++ b/arch/arm/mach-orion5x/Kconfig
+> @@ -107,6 +107,7 @@ config MACH_TS409
+>  
+>  config MACH_WRT350N_V2
+>  	bool "Linksys WRT350N v2"
+> +	select PHYLIB if NETDEVICES
+>  	help
+>  	  Say 'Y' here if you want your kernel to support the
+>  	  Linksys WRT350N v2 platform.
+> @@ -146,24 +147,28 @@ config MACH_MSS2_DT
+>  
+>  config MACH_WNR854T
+>  	bool "Netgear WNR854T"
+> +	select PHYLIB if NETDEVICES
+>  	help
+>  	  Say 'Y' here if you want your kernel to support the
+>  	  Netgear WNR854T platform.
+>  
+>  config MACH_RD88F5181L_GE
+>  	bool "Marvell Orion-VoIP GE Reference Design"
+> +	select PHYLIB if NETDEVICES
+>  	help
+>  	  Say 'Y' here if you want your kernel to support the
+>  	  Marvell Orion-VoIP GE (88F5181L) RD.
+>  
+>  config MACH_RD88F5181L_FXO
+>  	bool "Marvell Orion-VoIP FXO Reference Design"
+> +	select PHYLIB if NETDEVICES
+>  	help
+>  	  Say 'Y' here if you want your kernel to support the
+>  	  Marvell Orion-VoIP FXO (88F5181L) RD.
+>  
+>  config MACH_RD88F6183AP_GE
+>  	bool "Marvell Orion-1-90 AP GE Reference Design"
+> +	select PHYLIB if NETDEVICES
+>  	help
+>  	  Say 'Y' here if you want your kernel to support the
+>  	  Marvell Orion-1-90 (88F6183) AP GE RD.
+> diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+> index 83a7ec4c16d0..e712c5adaf87 100644
+> --- a/arch/arm/mach-orion5x/common.c
+> +++ b/arch/arm/mach-orion5x/common.c
+> @@ -107,10 +107,10 @@ void __init orion5x_eth_init(struct mv643xx_eth_platform_data *eth_data)
+>   ****************************************************************************/
+>  void __init orion5x_eth_switch_init(struct dsa_chip_data *d)
+>  {
+> -	orion_ge00_switch_init(d);
+> +	if (IS_BUILTIN(CONFIG_PHYLIB))
+> +		orion_ge00_switch_init(d);
+>  }
+>  
+> -
+>  /*****************************************************************************
+>   * I2C
+>   ****************************************************************************/
+> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+> index 9255b6d67ba5..ab5af56f9b9d 100644
+> --- a/arch/arm/plat-orion/common.c
+> +++ b/arch/arm/plat-orion/common.c
+> @@ -471,6 +471,7 @@ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
+>  /*****************************************************************************
+>   * Ethernet switch
+>   ****************************************************************************/
+> +#if IS_BUILTIN(CONFIG_PHYLIB)
+>  static __initconst const char *orion_ge00_mvmdio_bus_name = "orion-mii";
+>  static __initdata struct mdio_board_info
+>  		  orion_ge00_switch_board_info;
+> @@ -493,6 +494,7 @@ void __init orion_ge00_switch_init(struct dsa_chip_data *d)
+>  
+>  	mdiobus_register_board_info(&orion_ge00_switch_board_info, 1);
+>  }
+> +#endif
+>  
+>  /*****************************************************************************
+>   * I2C
+> 
+
+
+-- 
+Florian
