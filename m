@@ -1,119 +1,185 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  9 Feb 2017 14:59:12 +0000
-Subject: [PATCH 14/25] KVM: arm/arm64: Remove kvm_vgic_inject_mapped_irq
+Date: Thu,  9 Feb 2017 14:59:16 +0000
+Subject: [PATCH 18/25] KVM: arm/arm64: Decouple kvm timer functions from
+ virtual timer
 In-Reply-To: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
 References: <1486652363-7696-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1486652363-7696-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1486652363-7696-19-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+From: Jintack Lim <jintack@cs.columbia.edu>
 
-The only benefit of having kvm_vgic_inject_mapped_irq separate from
-kvm_vgic_inject_irq is that we pass a boolean that we use for error
-checking on the injection path.
+Now that we have a separate structure for timer context, make functions
+generic so that they can work with any timer context, not just the
+virtual timer context.  This does not change the virtual timer
+functionality.
 
-While this could potentially help in some aspect of robustness, it's
-also a little bit of a defensive move, and arguably callers into the
-vgic should have make sure they have marked their virtual IRQs as mapped
-if required.
-
+Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/arch_timer.c |  3 ++-
- virt/kvm/arm/vgic/vgic.c  | 50 +++++++++++++++--------------------------------
- 2 files changed, 18 insertions(+), 35 deletions(-)
+ arch/arm/kvm/arm.c           |  2 +-
+ include/kvm/arm_arch_timer.h |  2 +-
+ virt/kvm/arm/arch_timer.c    | 54 ++++++++++++++++++++------------------------
+ 3 files changed, 27 insertions(+), 31 deletions(-)
 
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index f93f2171..0ecd6cf 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -300,7 +300,7 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
+ 
+ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
+ {
+-	return kvm_timer_should_fire(vcpu);
++	return kvm_timer_should_fire(vcpu_vtimer(vcpu));
+ }
+ 
+ void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index 2c8560b..f46fa3b 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -66,7 +66,7 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu);
+ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+ int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+ 
+-bool kvm_timer_should_fire(struct kvm_vcpu *vcpu);
++bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx);
+ void kvm_timer_schedule(struct kvm_vcpu *vcpu);
+ void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
+ 
 diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 6a084cd..91ecf48 100644
+index 5004a67..5261f98 100644
 --- a/virt/kvm/arm/arch_timer.c
 +++ b/virt/kvm/arm/arch_timer.c
-@@ -175,7 +175,8 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
- 	timer->irq.level = new_level;
- 	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
- 				   timer->irq.level);
--	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
-+
-+	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
- 					 timer->irq.irq,
- 					 timer->irq.level);
- 	WARN_ON(ret);
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index dea12df..654dfd4 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -335,9 +335,22 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
- 	return true;
+@@ -98,13 +98,12 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
+ 	kvm_vcpu_kick(vcpu);
  }
  
--static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
--				   unsigned int intid, bool level,
--				   bool mapped_irq)
-+/**
-+ * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
-+ * @kvm:     The VM structure pointer
-+ * @cpuid:   The CPU for PPIs
-+ * @intid:   The INTID to inject a new state to.
-+ * @level:   Edge-triggered:  true:  to trigger the interrupt
-+ *			      false: to ignore the call
-+ *	     Level-sensitive  true:  raise the input signal
-+ *			      false: lower the input signal
-+ *
-+ * The VGIC is not concerned with devices being active-LOW or active-HIGH for
-+ * level-sensitive interrupts.  You can think of the level parameter as 1
-+ * being HIGH and 0 being LOW and all devices being active-HIGH.
-+ */
-+int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-+			bool level)
+-static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
++static u64 kvm_timer_compute_delta(struct arch_timer_context *timer_ctx)
  {
- 	struct kvm_vcpu *vcpu;
- 	struct vgic_irq *irq;
-@@ -357,11 +370,6 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
- 	if (!irq)
- 		return -EINVAL;
+ 	u64 cval, now;
+-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
  
--	if (irq->hw != mapped_irq) {
--		vgic_put_irq(kvm, irq);
--		return -EINVAL;
--	}
+-	cval = vtimer->cnt_cval;
+-	now = kvm_phys_timer_read() - vtimer->cntvoff;
++	cval = timer_ctx->cnt_cval;
++	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
+ 
+ 	if (now < cval) {
+ 		u64 ns;
+@@ -133,7 +132,7 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+ 	 * PoV (NTP on the host may have forced it to expire
+ 	 * early). If we should have slept longer, restart it.
+ 	 */
+-	ns = kvm_timer_compute_delta(vcpu);
++	ns = kvm_timer_compute_delta(vcpu_vtimer(vcpu));
+ 	if (unlikely(ns)) {
+ 		hrtimer_forward_now(hrt, ns_to_ktime(ns));
+ 		return HRTIMER_RESTART;
+@@ -143,43 +142,39 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+ 	return HRTIMER_NORESTART;
+ }
+ 
+-static bool kvm_timer_irq_can_fire(struct kvm_vcpu *vcpu)
++static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
+ {
+-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 -
- 	spin_lock(&irq->irq_lock);
+-	return !(vtimer->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
+-		(vtimer->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
++	return !(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
++		(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
+ }
  
- 	if (!vgic_validate_injection(irq, level)) {
-@@ -382,32 +390,6 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+-bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
++bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
+ {
+-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 	u64 cval, now;
+ 
+-	if (!kvm_timer_irq_can_fire(vcpu))
++	if (!kvm_timer_irq_can_fire(timer_ctx))
+ 		return false;
+ 
+-	cval = vtimer->cnt_cval;
+-	now = kvm_phys_timer_read() - vtimer->cntvoff;
++	cval = timer_ctx->cnt_cval;
++	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
+ 
+ 	return cval <= now;
+ }
+ 
+-static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
++static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
++				 struct arch_timer_context *timer_ctx)
+ {
+ 	int ret;
+-	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 
+ 	BUG_ON(!vgic_initialized(vcpu->kvm));
+ 
+-	vtimer->active_cleared_last = false;
+-	vtimer->irq.level = new_level;
+-	trace_kvm_timer_update_irq(vcpu->vcpu_id, vtimer->irq.irq,
+-				   vtimer->irq.level);
++	timer_ctx->active_cleared_last = false;
++	timer_ctx->irq.level = new_level;
++	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
++				   timer_ctx->irq.level);
+ 
+-	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+-					 vtimer->irq.irq,
+-					 vtimer->irq.level);
++	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, timer_ctx->irq.irq,
++				  timer_ctx->irq.level);
+ 	WARN_ON(ret);
+ }
+ 
+@@ -201,8 +196,8 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	if (!vgic_initialized(vcpu->kvm) || !timer->enabled)
+ 		return -ENODEV;
+ 
+-	if (kvm_timer_should_fire(vcpu) != vtimer->irq.level)
+-		kvm_timer_update_irq(vcpu, !vtimer->irq.level);
++	if (kvm_timer_should_fire(vtimer) != vtimer->irq.level)
++		kvm_timer_update_irq(vcpu, !vtimer->irq.level, vtimer);
+ 
  	return 0;
  }
- 
--/**
-- * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
-- * @kvm:     The VM structure pointer
-- * @cpuid:   The CPU for PPIs
-- * @intid:   The INTID to inject a new state to.
-- * @level:   Edge-triggered:  true:  to trigger the interrupt
-- *			      false: to ignore the call
-- *	     Level-sensitive  true:  raise the input signal
-- *			      false: lower the input signal
-- *
-- * The VGIC is not concerned with devices being active-LOW or active-HIGH for
-- * level-sensitive interrupts.  You can think of the level parameter as 1
-- * being HIGH and 0 being LOW and all devices being active-HIGH.
-- */
--int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
--			bool level)
--{
--	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
--}
--
--int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
--			       bool level)
--{
--	return vgic_update_irq_pending(kvm, cpuid, intid, level, true);
--}
--
- int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
+@@ -215,6 +210,7 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
  {
- 	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 
+ 	BUG_ON(timer_is_armed(timer));
+ 
+@@ -223,18 +219,18 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+ 	 * already expired, because kvm_vcpu_block will return before putting
+ 	 * the thread to sleep.
+ 	 */
+-	if (kvm_timer_should_fire(vcpu))
++	if (kvm_timer_should_fire(vtimer))
+ 		return;
+ 
+ 	/*
+ 	 * If the timer is not capable of raising interrupts (disabled or
+ 	 * masked), then there's no more work for us to do.
+ 	 */
+-	if (!kvm_timer_irq_can_fire(vcpu))
++	if (!kvm_timer_irq_can_fire(vtimer))
+ 		return;
+ 
+ 	/*  The timer has not yet expired, schedule a background timer */
+-	timer_arm(timer, kvm_timer_compute_delta(vcpu));
++	timer_arm(timer, kvm_timer_compute_delta(vtimer));
+ }
+ 
+ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
 -- 
 2.1.4
