@@ -1,80 +1,111 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Thu, 9 Feb 2017 16:25:10 +0000
-Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy
- interrupts
-In-Reply-To: <2196f028-b834-9d32-cc3a-e3eb5ed6c3b1@arm.com>
-References: <1486364596-19699-1-git-send-email-bharatku@xilinx.com>
- <4b04e834-08b6-a728-8fe5-13106d50b3b2@arm.com>
- <8520D5D51A55D047800579B094147198263E68AA@XAP-PVEXMBX02.xlnx.xilinx.com>
- <131228fb-d3f8-3836-3713-e948ed30d398@arm.com>
- <8520D5D51A55D047800579B094147198263E6AF3@XAP-PVEXMBX02.xlnx.xilinx.com>
- <2196f028-b834-9d32-cc3a-e3eb5ed6c3b1@arm.com>
-Message-ID: <8520D5D51A55D047800579B094147198263E6BAC@XAP-PVEXMBX02.xlnx.xilinx.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 9 Feb 2017 21:58:47 +0530
+Subject: [PATCH v7 2/4] dmaengine: Forward slave device pointer to
+ of_xlate callback
+In-Reply-To: <ded8b3e8-2ef8-218b-fb6d-783825588fd8@samsung.com>
+References: <1485340088-25481-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170125102824eucas1p1cf027184286131ff628eb7113c3f9e60@eucas1p1.samsung.com>
+ <1485340088-25481-3-git-send-email-m.szyprowski@samsung.com>
+ <26397455-1237-2a66-acf8-215aacc7c9ce@metafoo.de>
+ <49c9c23d-ff0a-268a-5edd-931e04eb98b5@samsung.com>
+ <20170209041123.GK19244@localhost>
+ <ded8b3e8-2ef8-218b-fb6d-783825588fd8@samsung.com>
+Message-ID: <20170209162847.GL19244@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> Sent: Thursday, February 09, 2017 9:33 PM
-> To: Bharat Kumar Gogada <bharatku@xilinx.com>; bhelgaas at google.com;
-> robh at kernel.org; paul.gortmaker at windriver.com; colin.king at canonical.com;
-> linux-pci at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> michal.simek at xilinx.com; arnd at arndb.de; Ravikiran Gummaluri
-> <rgummal@xilinx.com>
-> Subject: Re: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy interrupts
+On Thu, Feb 09, 2017 at 10:22:38AM +0100, Marek Szyprowski wrote:
+> Hi Vinod,
 > 
-> On 09/02/17 15:16, Bharat Kumar Gogada wrote:
-> >>
-> >> On 09/02/17 12:01, Bharat Kumar Gogada wrote:
-> >>>> On 06/02/17 07:03, Bharat Kumar Gogada wrote:
-> >>>>> +static struct irq_chip nwl_leg_irq_chip = {
-> >>>>> +	.name = "nwl_pcie:legacy",
-> >>>>> +	.irq_enable = nwl_unmask_leg_irq,
-> >>>>> +	.irq_disable = nwl_mask_leg_irq,
-> >>>>
-> >>>> You don't need these two if they are implemented in terms of
-> mask/unmask.
+> On 2017-02-09 05:11, Vinod Koul wrote:
+> >On Thu, Jan 26, 2017 at 03:43:05PM +0100, Marek Szyprowski wrote:
+> >>On 2017-01-25 14:12, Lars-Peter Clausen wrote:
+> >>>On 01/25/2017 11:28 AM, Marek Szyprowski wrote:
+> >>>>Add pointer to slave device to of_dma_xlate to let DMA engine driver
+> >>>>to know which slave device is using given DMA channel. This will be
+> >>>>later used to implement non-irq-safe runtime PM for DMA engine driver.
+> >>>of_dma_xlate() is used to translate from a OF phandle and a specifier to a
+> >>>DMA channel. On one hand this does not necessarily mean that the channel is
+> >>>actually going to be used by the slave that called the xlate function.
+> >>>Modifying the driver state when a lookup of the channel is done is a
+> >>>layering violation. And this approach is also missing a way to disassociate
+> >>>a slave from a DMA channel, e.g. when it is no longer used.
 > >>>
-> >>> These are being invoked by some drivers other than interrupt flow.
-> >>> Ex: drivers/net/wireless/ath/ath9k/main.c
-> >>> static int ath_reset_internal(struct ath_softc *sc, struct
-> >>> ath9k_channel *hchan) {
-> >>>          ....
-> >>>          disable_irq(sc->irq);
-> >>>          tasklet_disable(&sc->intr_tq);
-> >>>         ...
-> >>>         ...
-> >>>         enable_irq(sc->irq);
-> >>>         spin_unlock_bh(&sc->sc_pcu_lock); } For us masking/unmasking
-> >>> is the way to enable/disable interrupts.
+> >>>On the other hand there are other mechanisms to translate between some kind
+> >>>of firmware handle to a DMA channel which are completely ignored here.
+> >>>
+> >>>So this approach does not work. This is something that needs to be done at
+> >>>the dmaengine level, not a the firmware resource translation level. And it
+> >>>needs a matching method that is called when the channel is disassociated
+> >>>from a device, when the device no longer uses the DMA channel.
 > >>
-> >> And if you looked at the way disable_irq is implemented, you would
-> >> have found out that it falls back to masking if there is no disable
-> >> method, preserving the semantic you expect.
-> >>
-> > Yes I did see, but this fall back requires extra "IRQ_DISABLE_UNLAZY" flag to
-> be set to each virq.
+> >>Frankly I agree that of_dma_xlate() should only return the requested channel
+> >>to the dmaengine core and do not do any modification in the the
+> >>driver state.
+> >True..
+> >
+> >>However the current dma engine design and implementation breaks this rule.
+> >>Please check the drivers - how do they implement of_xlate callback. They
+> >>usually call dma_get_any_slave_channel, dma_get_slave_channel or
+> >>__dma_request_channel there, which in turn calls dma_chan_get, which then
+> >>calls back to device_alloc_chan_resources callback. Some of the drivers also
+> >>do a hardware configuration or other resource allocation in of_xlate.
+> >>This is a bit messy design and leave no place in the core to set
+> >>slave device
+> >>before device_alloc_chan_resources callback, where one would expect to have
+> >>it already set.
+> >We shouldn't be doing much at this stage. We operate on a channel, so the
+> >channel is returned to the client. We need to do these HW configurations
+> >when the channel has to be prepred for a txn.
 > 
-> No it doesn't. If you do a disable_irq(), the interrupt is flagged as disabled, but
-> nothing gets done. If an interrupt actually fires, then the interrupts gets masked,
-> and the handler is not called.
-Yes agreed, this is where the problem comes for us. Here is the scenario
-Ex:drivers/net/wireless/ath/ath9k/main.c
-static int ath_reset_internal(struct ath_softc *sc, struct ath9k_channel *hchan)
-{
-  ....
-   ath9k_hw_set_interrupts(ah);
-   ath9k_hw_enable_interrupts(ah);
-   ...
-  enable_irq(sc->irq);
-  ...
-}
-If you observe this they enable hardware interrupts first and then call enable_irq, at this point of time
-virq is in disabled state. So, if interrupt is raised in this period of time the handler is never invoked 
-and DEASEERT_INTx will not be seen. As I mentioned in my subject the irq line between bridge and 
-GIC goes low only after it sees DEASSERT_INTx. But since DEASSERT_INTx is never seen line is always high
-causing cpu stall.
-So for this kind of EP's we need those two methods.
+> IMHO, any HW configurations should be done in alloc_chan_resources
+> callback and
+> it would be best if a pointer of slave device will come as a
+> parameter to it.
 
-Bharat
+HW configuration is dependent upon the parameters passed, which are not part
+of alloc_chan_resources(). Consider it as kind of open() to get a handle for
+dmaengine
+
+> 
+> >>The best place to add new calls to the dmaengine drivers to set slave device
+> >>would be just before device_alloc_chan_resources(), what in turn means that
+> >>the current dmaengine core should do in dma_chan_get(). This would
+> >>require to
+> >>forward the slave device pointer via even more layers including the of_xlate
+> >>callback too. IMHO this is not worth the effort.
+> >>
+> >>DMA engine core and API definitely needs some cleanup. During such cleanup
+> >>the slave device pointer might be moved out of xlate into separate callback
+> >>when the core gets ready for such operation.
+> >Yes agreed on that, plus the runtime handling needs to be built in, right
+> >now the APIs dont work well with it, we disucssed these during the KS and
+> >this goes without saying, patches are welcome :)
+> 
+> Okay, so what is the conclusion? Do you want me to do the whole
+> rework of dma
+> engine core to get this runtime pm patchset for pl330 merged??? Is there any
+> roadmap for this rework prepared, so I can at least take a look at
+> the amount
+> of work needed to be done?
+> 
+> I'm rather new to dma engine framework and I only wanted to fix pl330 driver
+> not to block turning off the power domain on Exynos5422/5433 SoCs.
+> 
+> I can also check again if there is any other way to find the slave device in
+> alloc_chan_resources, like for example scanning the device tree for
+> phandles,
+> to avoid changing dmaengine core as this turned out to be too problematic
+> before one will do the proper dma engine core rework.
+
+There are few things we need to do for making APIs cleaner.
+
+We have a mini discussion during KS/Plumbers, Here are the notes
+http://www.spinics.net/lists/dmaengine/msg11570.html
+
+I don't want to block your series for this, I will take a look at v8, first
+thing in morning..
+
+Thanks
+-- 
+~Vinod
