@@ -1,51 +1,43 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Thu, 9 Feb 2017 10:59:56 +0100
-Subject: [RFC][PATCH] treewide: Move set_memory_* functions away from
- cacheflush.h
-In-Reply-To: <1486501816-27600-1-git-send-email-labbott@redhat.com>
-References: <1486501816-27600-1-git-send-email-labbott@redhat.com>
-Message-ID: <20170209095956.GB4159@osiris>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 9 Feb 2017 11:14:19 +0100
+Subject: Aarch64 kernel with 32bit userspace question
+Message-ID: <0057242a-2e16-3b59-1f81-9f4ccf64216d@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2017 at 01:10:16PM -0800, Laura Abbott wrote:
-> The set_memory_* APIs came out of a desire to have a better way to
-> change memory attributes. Many of these attributes were linked to cache
-> functionality so the prototypes were put in cacheflush.h. These days,
-> the APIs have grown and have a much wider use than just cache APIs. To
-> support this growth, split off set_memory_* and friends into a separate
-> header file to avoid growing cacheflush.h for APIs that have nothing to
-> do with caches.
-> 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
-> This came out of a comment Russell made while reviewing RODATA test cases
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/480855.html
-> While the final result of that series was the rodata code was refactored into
-> its own header file, the set_memory_* APIs are still out of place.
-> 
-> This is a simple attempt at moving all the API stubs to their own file.
-> Another idea I had was throwing set_memory_{x,nx,ro,rw} in an asm-generic
-> file since those are commonly used for module setting across all arches.
-> 
-> This is an RFC to see if this is actually beneficial. The diffstat is not
-> negative unfortunately due to header guards in newer files.
-> I have patches to convert call sites over to set_memory.h instead of
-> cacheflush.h if there is sufficient interest.
-> ---
->  arch/arm/include/asm/cacheflush.h   |  21 +-------
->  arch/arm/include/asm/set_memory.h   |  32 ++++++++++++
->  arch/arm64/include/asm/cacheflush.h |   6 +--
->  arch/arm64/include/asm/set_memory.h |  26 ++++++++++
->  arch/s390/include/asm/cacheflush.h  |   6 +--
->  arch/s390/include/asm/set_memory.h  |   9 ++++
->  arch/x86/include/asm/cacheflush.h   |  96 +---------------------------------
->  arch/x86/include/asm/set_memory.h   | 100 ++++++++++++++++++++++++++++++++++++
->  8 files changed, 171 insertions(+), 125 deletions(-)
->  create mode 100644 arch/arm/include/asm/set_memory.h
->  create mode 100644 arch/arm64/include/asm/set_memory.h
->  create mode 100644 arch/s390/include/asm/set_memory.h
->  create mode 100644 arch/x86/include/asm/set_memory.h
+Hi,
 
-For s390:
-Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
+I'm trying multilib userland on aarch64, but I'm running into a problem.
+I have a simple test code:
+
+-->8--
+#include <signal.h>
+
+int main(void) {
+    return 0;
+}
+--8<--
+
+If I compile that with aarch64 gcc , it compiles just fine.
+
+If I compile the same thing with 32bit armv7ahf multilib gcc, the
+build fails on "unknown type name '__uint128_t'". This comes from
+arch/arm64/include/uapi/asm/sigcontext.h , which has __uint128_t in
+struct fpsimd_context {} . The signal.h includes that (through a few
+glibc headers) and that's what triggers the failure. __uint128_t is
+defined on aarch64 , but it is not on armv7a (32bit).
+
+Grepping through the kernel sources , __uint128_t is used in some three
+places on aarch64 (and in bluetooth/ecc.c , where it's defined as a
+struct of two u64 internally in that file, so irrelevant). I wonder
+whether the usage of __uint128_t is really correct in sigcontext.h and
+whether it shouldn't be replaced by some u64 array or such ?
+
+Or is there any other way to use aarch64 kernel (and kernel headers)
+with 32bit userspace ?
+
+Thanks!
+
+-- 
+Best regards,
+Marek Vasut
