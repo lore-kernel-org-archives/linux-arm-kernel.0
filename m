@@ -1,73 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 9 Feb 2017 18:56:18 +0000
-Subject: [PATCH] virtio: Try to untangle DMA coherency
-In-Reply-To: <20170209203752-mutt-send-email-mst@kernel.org>
-References: <20170201195732-mutt-send-email-mst@kernel.org>
- <20170201182659.GM8177@arm.com>
- <20170201210648-mutt-send-email-mst@kernel.org>
- <20170202112614.GB30577@arm.com>
- <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
- <20170202182224-mutt-send-email-mst@kernel.org>
- <20170202164049.GI13839@arm.com>
- <20170209201341-mutt-send-email-mst@kernel.org>
- <20170209183118.GI19397@arm.com>
- <20170209203752-mutt-send-email-mst@kernel.org>
-Message-ID: <20170209185618.GA1792@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 9 Feb 2017 20:56:54 +0200
+Subject: [GIT PULL 4/4] arm64: dts: exynos: DT64 for v4.11, third round
+In-Reply-To: <2382634.UqDUkYPZrI@wuerfel>
+References: <20170202183008.23500-1-krzk@kernel.org>
+ <20170202183008.23500-5-krzk@kernel.org>
+ <2382634.UqDUkYPZrI@wuerfel>
+Message-ID: <20170209185654.yxmubj3r4gjxcfm6@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2017 at 08:49:41PM +0200, Michael S. Tsirkin wrote:
-> On Thu, Feb 09, 2017 at 06:31:18PM +0000, Will Deacon wrote:
-> > On Thu, Feb 09, 2017 at 08:17:16PM +0200, Michael S. Tsirkin wrote:
-> > > On Thu, Feb 02, 2017 at 04:40:49PM +0000, Will Deacon wrote:
-> > > > On Thu, Feb 02, 2017 at 06:30:28PM +0200, Michael S. Tsirkin wrote:
-> > > > > I am inclined to say, for 4.10 let's revert
-> > > > > c7070619f3408d9a0dffbed9149e6f00479cf43b since what it fixes is not a
-> > > > > regression in 4.10.
-> > > > 
-> > > > No complaints there, as long as we can keep working to fix this for 4.11
-> > > > and onwards. You'll also need to cc stable on the revert.
-> > > > 
-> > > > > So I think we can defer the fix to 4.11.
-> > > > > I think we still want f7f6634d23830ff74335734fbdb28ea109c1f349
-> > > > > for hosts with virtio 1 support.
-> > > > > 
-> > > > > All this will hopefully push hosts to just implement virtio 1.
-> > > > > For mmio the changes are very small: several new registers,
-> > > > > that's all. You want this for proper 64 bit dma mask anyway.
-> > > > 
-> > > > As I've said, virtio 1 will have exactly the same issue unless we start
-> > > > requiring firmware to advertise dma-coherent/_CCA for virtio-mmio
-> > > > devices correctly.
-> > > > 
-> > > 
-> > > OK I read up on _CCA in ACPI spec. It says:
-> > > The _CCA object returns whether or not a bus-master device supports
-> > > hardware managed cache coherency. Expected values are 0 to indicate it
-> > > is not supported, and 1 to indicate that it is supported.
-> > > 
-> > > So if host is cache coherent, and guest thinks it isn't, we incur
-> > > unnecessary overhead by wasting coherent memory.
-> > > I get that but you said it actually breaks - why does it?
+On Thu, Feb 09, 2017 at 04:19:57PM +0100, Arnd Bergmann wrote:
+> On Thursday, February 2, 2017 8:30:08 PM CET Krzysztof Kozlowski wrote:
+> >  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      |  34 +++
+> >  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |  34 +++
+> >  arch/arm64/boot/dts/exynos/exynos7-espresso.dts    |  49 +++-
+> >  arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi    | 302 +++++++++++----------
+> >  arch/arm64/boot/dts/exynos/exynos7.dtsi            |  34 +++
+> >  drivers/clk/samsung/clk-exynos5433.c               |   8 +-
+> >  include/dt-bindings/clock/exynos5433.h             |   5 +-
+> >  include/dt-bindings/pinctrl/samsung.h              |   8 +
 > > 
-> > It breaks because QEMU doesn't set _CCA for virtio-mmio devices, and that
-> > only becomes a problem when we use the DMA API, because that results in the
-> > guest taking out a non-cacheable mapping. On ARM (and other archs such as
-> > Power), having a mismatch between a cacheable and a non-cacheable mapping
-> > can result in a loss of coherency between the two (for example, if the
-> > non-cacheable gues accesses bypass the cache, but the cacheable host
-> > accesses allocate in the cache).
-> > 
-> I see. And I guess using a cacheable mapping is significantly faster.
-> I would say we want to typically use cacheable for virtio then,
-> whether we bypass the IOMMU or not. I guess this is why we always set
-> _CCA/DT correctly, right?
+> 
+> It seems a drivers/clk change slipped in there in addition to the header changes.
+> We are trying to keep the next/dt branches free of driver changes, are you
+> able to rework the branch without this?
 
-At the moment, _CCA/DT is pretty much never set correctly for virtio-mmio
-(that is, it isn't set even though the device is cache coherent). If it
-*was* set correctly, then we wouldn't have needed to revert my patch.
++Cc Sylwester,
 
-Robin's patch to only use the DMA API if _CCA/DT is present would work
-(although the thing that he posted was buggy iirc).
+This came from clk tree from Sylwester. It contains two changes in
+clocks:
+1. Mew clock ID - we need only the header but Sylwester provided also
+   the source file change,
+2. Update of frequency (used in DTS as assigned clock rate) - this
+   is strictly source file change and we need it.
 
-Will
+Overall, rework would not be trivial and it would involve Sylwester.
+I think it is better to stay with this as is. I will remember the policy
+for future dependencies.
+
+Best regards,
+Krzysztof
