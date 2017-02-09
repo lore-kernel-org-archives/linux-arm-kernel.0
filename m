@@ -1,68 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 9 Feb 2017 18:26:26 +0000
-Subject: [PATCH 04/10] arm64: head.S: Enable EL1 (host) access to SPE
- when entered at EL2
-In-Reply-To: <1485540470-11469-5-git-send-email-will.deacon@arm.com>
-References: <1485540470-11469-1-git-send-email-will.deacon@arm.com>
- <1485540470-11469-5-git-send-email-will.deacon@arm.com>
-Message-ID: <20170209182626.GA26879@leverpostej>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 10 Feb 2017 02:29:08 +0800
+Subject: [stericsson:mmc-no-NULL 33/34] ERROR: "mmc_blk_rw_done_success"
+ [drivers/mmc/core/mmc_core.ko] undefined!
+Message-ID: <201702100205.lV06nr1C%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 06:07:43PM +0000, Will Deacon wrote:
-> The SPE architecture requires each exception level to enable access
-> to the SPE controls for the exception level below it, since additional
-> context-switch logic may be required to handle the buffer safely.
-> 
-> This patch allows EL1 (host) access to the SPE controls when entered at
-> EL2.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git mmc-no-NULL
+head:   1bec9a625b256f78d00c38b58caad7ccdae8aaf5
+commit: a2058ff91a2df34d5e26cca917b8fee35f051151 [33/34] mmc: queue: issue requests in massive parallel
+config: x86_64-rhel-7.2 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout a2058ff91a2df34d5e26cca917b8fee35f051151
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+All errors (new ones prefixed by >>):
 
-Mark.
+   ERROR: "mmc_queue_req_put" [drivers/mmc/core/mmc_core.ko] undefined!
+>> ERROR: "mmc_blk_rw_done_success" [drivers/mmc/core/mmc_core.ko] undefined!
+>> ERROR: "mmc_blk_rw_done_error" [drivers/mmc/core/mmc_core.ko] undefined!
 
-> ---
->  arch/arm64/kernel/head.S | 19 +++++++++++++++----
->  1 file changed, 15 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 4b1abac3485a..7f625d2e8e45 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -592,15 +592,26 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
->  #endif
->  
->  	/* EL2 debug */
-> -	mrs	x0, id_aa64dfr0_el1		// Check ID_AA64DFR0_EL1 PMUVer
-> -	sbfx	x0, x0, #8, #4
-> +	mrs	x1, id_aa64dfr0_el1		// Check ID_AA64DFR0_EL1 PMUVer
-> +	sbfx	x0, x1, #8, #4
->  	cmp	x0, #1
->  	b.lt	4f				// Skip if no PMU present
->  	mrs	x0, pmcr_el0			// Disable debug access traps
->  	ubfx	x0, x0, #11, #5			// to EL2 and allow access to
->  4:
-> -	csel	x0, xzr, x0, lt			// all PMU counters from EL1
-> -	msr	mdcr_el2, x0			// (if they exist)
-> +	csel	x3, xzr, x0, lt			// all PMU counters from EL1
-> +
-> +	/* Statistical profiling */
-> +	ubfx	x0, x1, #32, #4			// Check ID_AA64DFR0_EL1 PMSVer
-> +	cbz	x0, 6f				// Skip if SPE not present
-> +	cbnz	x2, 5f				// VHE?
-> +	mov	x1, #(MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT)
-> +	orr	x3, x3, x1			// If we don't have VHE, then
-> +	b	6f				// use EL1&0 translation.
-> +5:						// For VHE, use EL2 translation
-> +	orr	x3, x3, #MDCR_EL2_TPMS		// and disable access from EL1
-> +6:
-> +	msr	mdcr_el2, x3			// Configure debug traps
->  
->  	/* Stage-2 translation */
->  	msr	vttbr_el2, xzr
-> -- 
-> 2.1.4
-> 
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 38277 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170210/3a8565a6/attachment-0001.gz>
