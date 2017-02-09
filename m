@@ -1,35 +1,47 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  9 Feb 2017 17:39:15 +0100
-Subject: [PATCH 1/8] ARM: sun8i: Fix the mali clock rate
-In-Reply-To: <cover.7101c7323e6f22e281ad70b93488cf44caca4ca0.1486655917.git-series.maxime.ripard@free-electrons.com>
-References: <cover.7101c7323e6f22e281ad70b93488cf44caca4ca0.1486655917.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <4830ced34cc83058f7cad123be67fecc624a99d6.1486655917.git-series.maxime.ripard@free-electrons.com>
+Date: Thu,  9 Feb 2017 17:39:14 +0100
+Subject: [PATCH 0/8] ARM: sun8i: a33: Mali improvements
+Message-ID: <cover.7101c7323e6f22e281ad70b93488cf44caca4ca0.1486655917.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Mali clock rate was improperly assumed to be 408MHz, while it was
-really 384Mhz, 408MHz being the "extreme" frequency, and definitely not
-stable.
+Hi,
 
-Switch for the stable, correct frequency for the GPU.
+This serie is building on the recently merged bindings for the ARM Mali
+Utgard GPU.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The two features that are supported with this serie are DVFS and the fbdev
+support. The first one uses devfreq and is pretty standard, the only
+addition being the generic OPP mechanism we have, plus some DT and Kconfig
+patches.
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 35008b78d899..8a880ecc4dda 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -495,7 +495,7 @@
- 			resets = <&ccu RST_BUS_GPU>;
- 
- 			assigned-clocks = <&ccu CLK_GPU>;
--			assigned-clock-rates = <408000000>;
-+			assigned-clock-rates = <384000000>;
- 		};
- 
- 		gic: interrupt-controller at 01c81000 {
+Running on framebuffer is a bit more tedious, since we need to access the
+CMA memory region size and base. This is quite trivial to do as well
+through the memory-region bindings, but require to export a few symbols
+along the way to make sure our module builds properly.
+
+Let me know what you think,
+Maxime
+
+Maxime Ripard (8):
+  ARM: sun8i: Fix the mali clock rate
+  dt-bindings: gpu: mali: Add optional memory-region
+  mm: cma: Export a few symbols
+  drm/sun4i: Grab reserved memory region
+  ARM: sun8i: a33: Add shared display memory pool
+  dt-bindings: gpu: mali: Add optional OPPs
+  ARM: sunxi: Select PM_OPP
+  ARM: sun8i: a33: Add the Mali OPPs
+
+ Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt |  8 ++-
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi                      |  2 +-
+ arch/arm/boot/dts/sun8i-a33.dtsi                          | 34 ++++++++-
+ arch/arm/mach-sunxi/Kconfig                               |  1 +-
+ drivers/base/dma-contiguous.c                             |  1 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c                         | 19 ++--
+ mm/cma.c                                                  |  2 +-
+ 7 files changed, 61 insertions(+), 6 deletions(-)
+
+base-commit: a2138ce584d59571dd18a6cf3417cb90be7625d8
 -- 
 git-series 0.8.11
