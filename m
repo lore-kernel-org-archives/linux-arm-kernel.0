@@ -1,77 +1,105 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 10 Feb 2017 01:11:15 +0800
-Subject: [stericsson:mmc-no-NULL 32/34] drivers/mmc/core/queue.h:13:4: note:
- in expansion of macro 'req_op'
-Message-ID: <201702100108.pjGLvqhX%fengguang.wu@intel.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 9 Feb 2017 12:13:22 -0500
+Subject: [PATCHv3] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <20170209162956.GH27312@n2100.armlinux.org.uk>
+References: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
+ <20170209162956.GH27312@n2100.armlinux.org.uk>
+Message-ID: <20170209121322.5229e6cf@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git mmc-no-NULL
-head:   1bec9a625b256f78d00c38b58caad7ccdae8aaf5
-commit: 8b8bcac0e2f2356064488868b08c7d4fe8ef1f44 [32/34] mmc: queue: get/put struct mmc_queue_req
-config: x86_64-randconfig-x014-201706 (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout 8b8bcac0e2f2356064488868b08c7d4fe8ef1f44
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+On Thu, 9 Feb 2017 16:29:56 +0000
+Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
-All error/warnings (new ones prefixed by >>):
+> On Tue, Feb 07, 2017 at 10:57:55PM +0000, Abel Vesa wrote:
+> > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+> > +
+> > +.macro __ftrace_regs_caller
+> > +
+> > +	add 	ip, sp, #4	@ move in IP the value of SP as it was
+> > +				@ before the push {lr} of the mcount mechanism
+> > +	stmdb	sp!, {ip,lr,pc}
+> > +	stmdb	sp!, {r0-r11,lr}
+> > +
+> > +	@ stack content at this point:
+> > +	@ 0  4          44    48   52       56   60   64
+> > +	@ R0 | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |  
+> 
+> How important is this to be close to "struct pt_regs" ?  Do we care about
+> r12 being "wrong" ?  The other issue is that pt_regs is actually 72
+> bytes in size, not 68 bytes.  So, does that mean we end up inappropriately
+> leaking some of the kernel stack to userspace through ftrace?
 
-   In file included from drivers/mmc/core/core.c:42:0:
-   drivers/mmc/core/queue.h:10:46: warning: 'struct request' declared inside parameter list will not be visible outside of this definition or declaration
-    static inline bool mmc_req_is_special(struct request *req)
-                                                 ^~~~~~~
-   In file included from include/linux/writeback.h:12:0,
-                    from include/linux/memcontrol.h:30,
-                    from include/linux/swap.h:8,
-                    from include/linux/suspend.h:4,
-                    from drivers/mmc/core/core.c:27:
-   drivers/mmc/core/queue.h: In function 'mmc_req_is_special':
->> include/linux/blk_types.h:209:8: error: dereferencing pointer to incomplete type 'struct request'
-     ((req)->cmd_flags & REQ_OP_MASK)
-           ^
->> drivers/mmc/core/queue.h:13:4: note: in expansion of macro 'req_op'
-      (req_op(req) == REQ_OP_FLUSH ||
-       ^~~~~~
+The regs passed to the ftrace code isn't passed to userspace. It's used
+by kprobes as a "fake breakpoint" (like fake news?), and by kernel live
+patching to modify what function actually gets called after ftrace
+returns.
 
-vim +/req_op +13 drivers/mmc/core/queue.h
 
-^1da177e4 drivers/mmc/mmc_queue.h  Linus Torvalds 2005-04-16   1  #ifndef MMC_QUEUE_H
-^1da177e4 drivers/mmc/mmc_queue.h  Linus Torvalds 2005-04-16   2  #define MMC_QUEUE_H
-^1da177e4 drivers/mmc/mmc_queue.h  Linus Torvalds 2005-04-16   3  
-adc91efbc drivers/mmc/core/queue.h Ulf Hansson    2017-01-13   4  #include <linux/types.h>
-8b8bcac0e drivers/mmc/core/queue.h Linus Walleij  2017-02-09   5  #include <linux/spinlock.h>
-adc91efbc drivers/mmc/core/queue.h Ulf Hansson    2017-01-13   6  #include <linux/blkdev.h>
-adc91efbc drivers/mmc/core/queue.h Ulf Hansson    2017-01-13   7  #include <linux/mmc/core.h>
-adc91efbc drivers/mmc/core/queue.h Ulf Hansson    2017-01-13   8  #include <linux/mmc/host.h>
-adc91efbc drivers/mmc/core/queue.h Ulf Hansson    2017-01-13   9  
-c2df40dfb drivers/mmc/card/queue.h Mike Christie  2016-06-05  10  static inline bool mmc_req_is_special(struct request *req)
-c2df40dfb drivers/mmc/card/queue.h Mike Christie  2016-06-05  11  {
-3a5e02ced drivers/mmc/card/queue.h Mike Christie  2016-06-05  12  	return req &&
-7afafc8a4 drivers/mmc/card/queue.h Adrian Hunter  2016-08-16 @13  		(req_op(req) == REQ_OP_FLUSH ||
-7afafc8a4 drivers/mmc/card/queue.h Adrian Hunter  2016-08-16  14  		 req_op(req) == REQ_OP_DISCARD ||
-7afafc8a4 drivers/mmc/card/queue.h Adrian Hunter  2016-08-16  15  		 req_op(req) == REQ_OP_SECURE_ERASE);
-c2df40dfb drivers/mmc/card/queue.h Mike Christie  2016-06-05  16  }
-ef3a69c7a drivers/mmc/card/queue.h Seungwon Jeon  2013-03-14  17  
-^1da177e4 drivers/mmc/mmc_queue.h  Linus Torvalds 2005-04-16  18  struct task_struct;
-7db3028e0 drivers/mmc/card/queue.h Linus Walleij  2016-11-18  19  struct mmc_blk_data;
-^1da177e4 drivers/mmc/mmc_queue.h  Linus Torvalds 2005-04-16  20  
-97868a2bd drivers/mmc/card/queue.h Per Forlin     2011-07-09  21  struct mmc_blk_request {
+> 
+> It's possible to save all the registers like this if we need to provide
+> a complete picture of the register set at function entry:
+> 
+> 	str	ip, [sp, #-16]!
+> 	add	ip, sp, #20
+> 	stmia	sp, {ip, lr, pc}
+> 	stmdb	sp!, {r0 - r11}
+> 
+> However, is that even correct - don't we want pt_regs' LR and PC to be
+> related to the function call itself?  The "previous LR" as you describe
+> it is where the called function (the one that is being traced) will
+> return to.  The current LR at this point is the address within the
+> traced function.  So actually I think this is more strictly correct, if
+> I'm understanding the intention here correctly:
+> 
+> 	str	ip, [sp, #S_IP - PT_REGS_SIZE]!	@ save current IP
+> 	ldr	ip, [sp, #PT_REGS_SIZE - S_IP]	@ get LR at traced function entry
+> 	str	lr, [sp, #S_PC - S_IP]		@ save current LR as PC
+> 	str	ip, [sp, #S_LR - S_IP]		@ save traced function return
+> 	add	ip, sp, #PT_REGS_SIZE - S_IP + 4
+> 	str	ip, [sp, #S_SP - SP_IP]		@ save stack pointer at function entry
+> 	stmdb	sp!, {r0 - r11}
+> 	@ clear CPSR and old_r0 words
+> 	mov	r3, #0
+> 	str	r3, [sp, #S_PSR]
+> 	str	r3, [sp, #S_OLD_R0]
+> 
+> However, that has the side effect of misaligning the stack (the stack
+> needs to be aligned to 8 bytes).  So, if we decide we don't care about
+> the saved LR value (except as a mechanism to preserve it across the
+> call into the ftrace code):
+> 
+> 	str	ip, [sp, #S_IP - PT_REGS_SIZE + 4]!
+> 	str	lr, [sp, #S_PC - S_IP]
+> 	ldr	lr, [sp, #PT_REGS_SIZE - 4 - S_IP]
+> 	add	ip, sp, #PT_REGS_SIZE - S_IP
+> 	stmib	sp, {ip, lr}
+> 	stmdb	sp!, {r0 - r11}
+> 	@ clear CPSR and old_r0 words
+> 	mov	r3, #0
+> 	str	r3, [sp, #S_PSR]
+> 	str	r3, [sp, #S_OLD_R0]
+> 
+> and the return would be:
+> 
+> 	ldmia	sp, {r0 - pc}
+> 
+> That all said - maybe someone from the ftrace community can comment on
+> how much of pt_regs is actually necessary here?
+> 
 
-:::::: The code at line 13 was first introduced by commit
-:::::: 7afafc8a44bf0ab841b17d450b02aedb3a138985 block: Fix secure erase
+Matters about the users. The REGS was originally created for kprobes,
+to simulate a kprobe breakpoint. As calling kprobes directly is much
+faster than going through the breakpoint mechanism. As adding a kprobe
+to the start of a function is a very common practice, it made sense to
+have ftrace give it a boost.
 
-:::::: TO: Adrian Hunter <adrian.hunter@intel.com>
-:::::: CC: Jens Axboe <axboe@fb.com>
+Then came along live kernel patching, which I believe this series is
+trying to support. What is needed by pt_regs is a way to "hijack" the
+function being called to instead call the patched function. That is,
+ftrace is not being used for tracing, but in reality, being used to
+modify the running kernel. It is being used to change what function
+gets called. ftrace is just a hook for that mechanism.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 21694 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170210/ba56dc00/attachment-0001.gz>
+-- Steve
