@@ -1,46 +1,44 @@
 From: michael.heimpold@i2se.com (Michael Heimpold)
-Date: Thu,  9 Feb 2017 08:42:46 +0100
-Subject: [PATCH v4 6/9] ARM: dts: add support for I2SE Duckbill 2 boards
+Date: Thu,  9 Feb 2017 08:42:48 +0100
+Subject: [PATCH v4 8/9] ARM: dts: add support for I2SE Duckbill 2 EnOcean
 In-Reply-To: <1486626169-20022-1-git-send-email-michael.heimpold@i2se.com>
 References: <1486626169-20022-1-git-send-email-michael.heimpold@i2se.com>
-Message-ID: <1486626169-20022-7-git-send-email-michael.heimpold@i2se.com>
+Message-ID: <1486626169-20022-9-git-send-email-michael.heimpold@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Michael Heimpold <mhei@heimpold.de>
 
-This machine is an USB pen drive sized development board,
-based on NXP's i.MX28 CPU. In contrast to the previous
-model "Duckbill", the "Duckbill 2" series has internal
-eMMC storage.
+This machine is based on I2SE's Duckbill 2 board and features a
+EnOcean daugther board based on the popular TCM310 chipset.
+This product is intended to be used for e.g. home automation purposes.
 
 Signed-off-by: Michael Heimpold <mhei@heimpold.de>
 Cc: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/Makefile             |   1 +
- arch/arm/boot/dts/imx28-duckbill-2.dts | 183 +++++++++++++++++++++++++++++++++
- arch/arm/mach-mxs/mach-mxs.c           |   3 +-
- 3 files changed, 186 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/imx28-duckbill-2.dts
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/imx28-duckbill-2-enocean.dts | 220 +++++++++++++++++++++++++
+ 2 files changed, 221 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx28-duckbill-2-enocean.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f10fe85..fa4664b 100644
+index 5f758b9..d854dcd 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -475,6 +475,7 @@ dtb-$(CONFIG_ARCH_MXS) += \
- 	imx28-cfa10056.dtb \
- 	imx28-cfa10057.dtb \
+@@ -477,6 +477,7 @@ dtb-$(CONFIG_ARCH_MXS) += \
  	imx28-cfa10058.dtb \
-+	imx28-duckbill-2.dtb \
+ 	imx28-duckbill-2-485.dtb \
+ 	imx28-duckbill-2.dtb \
++	imx28-duckbill-2-enocean.dtb \
  	imx28-duckbill.dtb \
  	imx28-eukrea-mbmx283lc.dtb \
  	imx28-eukrea-mbmx287lc.dtb \
-diff --git a/arch/arm/boot/dts/imx28-duckbill-2.dts b/arch/arm/boot/dts/imx28-duckbill-2.dts
+diff --git a/arch/arm/boot/dts/imx28-duckbill-2-enocean.dts b/arch/arm/boot/dts/imx28-duckbill-2-enocean.dts
 new file mode 100644
-index 0000000..7fa3d75
+index 0000000..4450047
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx28-duckbill-2.dts
-@@ -0,0 +1,183 @@
++++ b/arch/arm/boot/dts/imx28-duckbill-2-enocean.dts
+@@ -0,0 +1,220 @@
 +/*
 + * Copyright (C) 2015-2017 I2SE GmbH <info@i2se.com>
 + * Copyright (C) 2016 Michael Heimpold <mhei@heimpold.de>
@@ -55,12 +53,13 @@ index 0000000..7fa3d75
 +
 +/dts-v1/;
 +#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/input/input.h>
 +#include <dt-bindings/gpio/gpio.h>
 +#include "imx28.dtsi"
 +
 +/ {
-+	model = "I2SE Duckbill 2";
-+	compatible = "i2se,duckbill-2", "fsl,imx28";
++	model = "I2SE Duckbill 2 EnOcean";
++	compatible = "i2se,duckbill-2-enocean", "i2se,duckbill-2", "fsl,imx28";
 +
 +	memory {
 +		reg = <0x40000000 0x08000000>;
@@ -128,6 +127,19 @@ index 0000000..7fa3d75
 +					fsl,pinmux-ids = <
 +						MX28_PAD_SAIF0_MCLK__GPIO_3_20
 +						MX28_PAD_SAIF0_LRCLK__GPIO_3_21
++						MX28_PAD_AUART0_CTS__GPIO_3_2
++						MX28_PAD_I2C0_SCL__GPIO_3_24
++						MX28_PAD_I2C0_SDA__GPIO_3_25
++					>;
++					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_DISABLE>;
++				};
++
++				enocean_button: enocean-button at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX28_PAD_AUART0_RTS__GPIO_3_3
 +					>;
 +					fsl,drive-strength = <MXS_DRIVE_4mA>;
 +					fsl,voltage = <MXS_VOLTAGE_HIGH>;
@@ -138,12 +150,6 @@ index 0000000..7fa3d75
 +
 +		apbx at 80040000 {
 +			lradc at 80050000 {
-+				status = "okay";
-+			};
-+
-+			i2c0: i2c at 80058000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&i2c0_pins_a>;
 +				status = "okay";
 +			};
 +
@@ -222,21 +228,36 @@ index 0000000..7fa3d75
 +			gpios = <&gpio3 20 GPIO_ACTIVE_HIGH>;
 +			linux,default-trigger = "heartbeat";
 +		};
++
++		enocean-blue {
++			label = "duckbill:blue:enocean";
++			gpios = <&gpio3 24 GPIO_ACTIVE_LOW>;
++		};
++
++		enocean-red {
++			label = "duckbill:red:enocean";
++			gpios = <&gpio3 25 GPIO_ACTIVE_LOW>;
++		};
++
++		enocean-green {
++			label = "duckbill:green:enocean";
++			gpios = <&gpio3 2 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&enocean_button>;
++
++		enocean {
++			label = "EnOcean";
++			linux,code = <KEY_NEW>;
++			gpios = <&gpio3 3 GPIO_ACTIVE_HIGH>;
++		};
 +	};
 +};
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index e4f2108..1c6062d 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -419,7 +419,8 @@ static void __init mxs_machine_init(void)
- 		crystalfontz_init();
- 	else if (of_machine_is_compatible("eukrea,mbmx283lc"))
- 		eukrea_mbmx283lc_init();
--	else if (of_machine_is_compatible("i2se,duckbill"))
-+	else if (of_machine_is_compatible("i2se,duckbill") ||
-+		 of_machine_is_compatible("i2se,duckbill-2"))
- 		duckbill_init();
- 	else if (of_machine_is_compatible("msr,m28cu3"))
- 		m28cu3_init();
 -- 
 2.6.1
