@@ -1,32 +1,38 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 9 Feb 2017 13:17:23 +0100
-Subject: [PATCH v3] staging: bcm2835-audio: Remove the initialization of
- static pointers.
-In-Reply-To: <1486511160-2992-1-git-send-email-abdallah.meziti.pro@gmail.com>
-References: <1486511160-2992-1-git-send-email-abdallah.meziti.pro@gmail.com>
-Message-ID: <20170209121723.GA32270@kroah.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Feb 2017 12:17:57 +0000
+Subject: [PATCH 0/4] kuser updates for ARM-only vs Thumb
+Message-ID: <20170209121756.GC27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 12:45:47AM +0100, AbdAllah-MEZITI wrote:
-> In C a static pointer will be initialized to NULL.
-> The ?6.7.8 of the ISO/IEC 9899:1999 (E) document says that:
-> If an object that has static storage duration is not initialized
-> explicitly, then:
->  __ if it has pointer type, it is initialized to a null pointer.
-> 
-> Signed-off-by: AbdAllah-MEZITI <abdallah.meziti.pro@gmail.com>
-> 
-> v2: -fix the line-wrapping of the changelog.
->     -fix the ref. documentation: C99 standards release,
-> 	and not the draft.
->     -this patch is the Task 10 Eudyptula Challenge
-> 	that only fix one code style problem.
-> v3: -fix the subject prefix: must be based on the previous submissions.
-> ---
->  drivers/staging/bcm2835-audio/bcm2835.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+A while back, an issue was raised about the return instruction used
+in the kuser page when building an ARMv4 and later environment.
 
-This patch does not apply to my tree at all, sorry.
+In order to fix this, I suggested building the kuser code for both
+variants and selecting the appropriate version at run time.  This
+seemed to be a simple solution, but due to the fix-ups and need to
+build the appropriate version for the Kconfig options selected,
+turned out to be not quite as trivial as I hoped.
 
-greg k-h
+Nevertheless, this patch series provides that solution.
+
+As a side effect of this, the first patch is one which should be
+merged irrespective of the remainder as it provides a useful cleanup
+to the large number of dependencies for the ARM_THUMB option.
+
+ arch/arm/kernel/Makefile     |  10 +++
+ arch/arm/kernel/entry-armv.S | 198 -------------------------------------------
+ arch/arm/kernel/kuser-t.S    |  13 +++
+ arch/arm/kernel/kuser-v4.S   |  11 +++
+ arch/arm/kernel/kuser.S      | 196 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/traps.c      |  37 +++++++-
+ arch/arm/mm/Kconfig          |  31 +++++--
+ 7 files changed, 289 insertions(+), 207 deletions(-)
+ create mode 100644 arch/arm/kernel/kuser-t.S
+ create mode 100644 arch/arm/kernel/kuser-v4.S
+ create mode 100644 arch/arm/kernel/kuser.S
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
