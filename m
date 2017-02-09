@@ -1,69 +1,87 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 9 Feb 2017 12:25:19 +0000
-Subject: [PATCH 1/2] clk: scpi: RfC - Allow to ignore invalid SCPI DVFS
- clock rates
-In-Reply-To: <f0c0ed0a-82d5-4814-3420-bae9aa65193b@poczta.onet.pl>
-References: <3b60654a-88b6-6262-396e-a058ade1c586@gmail.com>
- <d7b8f9db-7512-646c-bb96-ef74e7266661@gmail.com>
- <209248b8-2a1c-e00f-d8a8-b82759772b5d@arm.com> <m28tpgihzw.fsf@baylibre.com>
- <efe61325-eacd-2d4d-3ac0-71d54ef9d2bb@arm.com>
- <f0c0ed0a-82d5-4814-3420-bae9aa65193b@poczta.onet.pl>
-Message-ID: <6c360b3c-629c-03ea-3332-545da38ba283@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Feb 2017 12:25:10 +0000
+Subject: Aarch64 kernel with 32bit userspace question
+In-Reply-To: <CAKv+Gu_8cg2n=pjkwDFDm+oJ1EiYGKsfje2mOW0FJtHXEghLjg@mail.gmail.com>
+References: <0057242a-2e16-3b59-1f81-9f4ccf64216d@denx.de>
+ <CAKv+Gu-U484qCRJ+VS4kX3eRLzdJN=_1Z57atR8VgZidQfv7Dg@mail.gmail.com>
+ <0747bd41-7a87-6dd6-11bf-58729ad2c3d8@denx.de>
+ <CAKv+Gu_8cg2n=pjkwDFDm+oJ1EiYGKsfje2mOW0FJtHXEghLjg@mail.gmail.com>
+Message-ID: <20170209122509.GD27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 09/02/17 12:19, Micha? Zegan wrote:
+On Thu, Feb 09, 2017 at 11:24:43AM +0000, Ard Biesheuvel wrote:
+> On 9 February 2017 at 11:14, Marek Vasut <marex@denx.de> wrote:
+> > On 02/09/2017 11:51 AM, Ard Biesheuvel wrote:
+> >> On 9 February 2017 at 10:14, Marek Vasut <marex@denx.de> wrote:
+> >>> Hi,
+> >>>
+> >>> I'm trying multilib userland on aarch64, but I'm running into a problem.
+> >>> I have a simple test code:
+> >>>
+> >>> -->8--
+> >>> #include <signal.h>
+> >>>
+> >>> int main(void) {
+> >>>     return 0;
+> >>> }
+> >>> --8<--
+> >>>
+> >>> If I compile that with aarch64 gcc , it compiles just fine.
+> >>>
+> >>> If I compile the same thing with 32bit armv7ahf multilib gcc, the
+> >>> build fails on "unknown type name '__uint128_t'". This comes from
+> >>> arch/arm64/include/uapi/asm/sigcontext.h , which has __uint128_t in
+> >>> struct fpsimd_context {} . The signal.h includes that (through a few
+> >>> glibc headers) and that's what triggers the failure. __uint128_t is
+> >>> defined on aarch64 , but it is not on armv7a (32bit).
+> >>>
+> >>
+> >> This is a toolchain or glibc bug: the arm64 version of that header
+> >> should never be pulled in when using a AArch32 toolchain, regardless
+> >> of whether you run it on arm64, ARM (or x86, for that matter)
+> >
+> > Aha. So which version of the header should be pulled in ? The one from
+> > arch/arm/include/uapi/asm/sigcontext.h (that doesn't make much sense to
+> > me) ?
+> >
 > 
+> signal.h includes bits/sigcontext.h, of which several versions exists
+> on my system:
 > 
-> W dniu 09.02.2017 o 11:52, Sudeep Holla pisze:
->>
->>
->> On 08/02/17 19:45, Kevin Hilman wrote:
->>> Sudeep Holla <sudeep.holla@arm.com> writes:
->>>
->>>> On 04/02/17 21:03, Heiner Kallweit wrote:
->>>>> Introduce an optional property "clock-max-frequency" for SCPI DVFS
->>>>> clocks. All frequencies for the respective clock exceeding this
->>>>> threshold will be ignored.
->>>>>
->>>>> This is useful on systems where the firmware offers too optimistic
->>>>> clock rates causing instabilities and crashes.
->>>>>
->>>>
->>>> It clearly means the firmware/hardware(IOW platform) was not tested
->>>> correctly before firmware advertised the OPPs. It needs to fixed in the
->>>> firmware. The approach should be advertise the known minimal set working
->>>> rather than the set for which hardware was designed.
->>>>
->>>> That's the whole reason while these are kept in firmware so the OS need
->>>> not worry about such details.
->>>>
->>>> So NACK, go fix the firmware 
->>>
->>> Sorry, but "go fix the firmware" is not an option for most users of
->>> these boards.
->>>
->>
->> I knew this was coming :). I just wanted to shout at vendors who are not
->> validating their firmware. Sometimes I feel it's better have platform
->> driver and drive everything from Linux and don't use buggy firmware at
->> all instead of adding tons of workaround. It defeats the whole purpose
->> of having the firmware.
->>
-> Well, at least in the case of odroid c2 from hardkernel, I believe those
-> unstable frequencies are supported intentionally. The wiki of the board
-> lists them explicitly, and says when they are stable.
-> So if that was intentional, then a frequency capping set by default
-> would be needed, it can be lifted by a specific user if he wants. Unless
-> hk should disable that "feature" instead.
+> /usr/aarch64-linux-gnu/include/bits/sigcontext.h
+> /usr/arm-linux-gnueabi/include/bits/sigcontext.h
+> /usr/arm-linux-gnueabihf/include/bits/sigcontext.h
+> /usr/include/x86_64-linux-gnu/bits/sigcontext.h
+> 
+> each of which includes asm/sigcontext.h under the same root path.
+> 
+> It is up to the compiler to set the builtin include paths correctly:
+> arm-linux-gnueabi-gcc should never use the aarch64 or x86 one.
 
-If those frequency are known to cause any stability issues, they should
-be considered as *not supported*. If it's just thermal constraints then
-yes the user/developer should be allowed to use them as they can take
-care of thermal management so that the platform remains stable for usage.
+The issue may be where arch/arm*/include/uapi/asm/sigcontext.h has
+been installed to.
+
+GCC may be doing the right thing, so selecting the right include
+directory, but they all include "asm/sigcontext.h".
+
+If the ARM64 UAPI headers got dropped into /usr/include/asm, then
+the compiler may be picking these up rather than the proper ones
+in the appropriate directory.  For me:
+
+	/usr/include/arm-linux-gnueabihf/bits/sigcontext.h
+
+should be picking up on:
+
+	/usr/include/arm-linux-gnueabihf/asm/sigcontext.h
+
+and there should not be a /usr/include/asm directory.
+
+The default kernel headers_install will want to place the headers into
+<includepath>/asm along side <includepath>/asm-generic and
+<includepath>/linux which is not what modern ARM distros want.
 
 -- 
-Regards,
-Sudeep
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
