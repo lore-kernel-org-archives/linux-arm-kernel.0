@@ -1,63 +1,56 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Thu, 9 Feb 2017 19:05:23 +0000
-Subject: [PATCH v3 4/5] dt-bindings: arm64 ARCH_THUNDER2 platform
- documentation
-In-Reply-To: <CAK8P3a07eo0htv_y6H_aHvAaeo5two3vQTaySuFXpG+dzYguUQ@mail.gmail.com>
-References: <1486502399-2950-1-git-send-email-jnair@caviumnetworks.com>
- <1486502399-2950-5-git-send-email-jnair@caviumnetworks.com>
- <CAL_Jsq+i2evzVnQKf3qYMYJVZ=ecdSQObGy8CMn7aMoxBi_PTg@mail.gmail.com>
- <20170208053234.GA3102@localhost>
- <CAK8P3a07eo0htv_y6H_aHvAaeo5two3vQTaySuFXpG+dzYguUQ@mail.gmail.com>
-Message-ID: <20170209190523.GA6791@localhost>
+From: abelvesa@gmail.com (Abel Vesa)
+Date: Thu, 9 Feb 2017 19:09:12 +0000
+Subject: [PATCHv3] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <20170209190110.GC3439@nuc>
+References: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
+ <20170209162956.GH27312@n2100.armlinux.org.uk>
+ <20170209121322.5229e6cf@gandalf.local.home>
+ <20170209180644.GJ27312@n2100.armlinux.org.uk>
+ <20170209131414.098c848c@gandalf.local.home>
+ <20170209131452.472aa882@gandalf.local.home>
+ <20170209190110.GC3439@nuc>
+Message-ID: <20170209190912.GD3439@nuc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 09:42:38AM +0100, Arnd Bergmann wrote:
-> On Wed, Feb 8, 2017 at 6:32 AM, Jayachandran C <jnair@caviumnetworks.com> wrote:
-> > On Tue, Feb 07, 2017 at 04:35:24PM -0600, Rob Herring wrote:
-> >> On Tue, Feb 7, 2017 at 3:19 PM, Jayachandran C <jnair@caviumnetworks.com> wrote:
-> >> > diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder2.txt b/Documentation/devicetree/bindings/arm/cavium-thunder2.txt
-> >> > new file mode 100644
-> >> > index 0000000..82276a2
-> >> > --- /dev/null
-> >> > +++ b/Documentation/devicetree/bindings/arm/cavium-thunder2.txt
-> >> > @@ -0,0 +1,5 @@
-> >> > +Cavium Thunder2 Family device tree bindings
-> >> > +-------------------------------------------
-> >> > +
-> >> > +Boards with Cavium ThunderX2 CN99XX shall have the root property:
-> >> > +  compatible = "cavium,thunder-99xx";
-> >>
-> >> Is it ThunderX2 or Thunder2? What happened to "CN" in the compatible
-> >> string. There's a lot of inconsistencies here.
-> >
-> > I have followed the exiting Thunder naming as well as general DT
-> > conventions, Basically:
-> >
-> > Platform - ARCH_THUNDER2  (for ThunderX2 CN99XX, ARCH_THUNDER is
-> >            for ThunderX CN8?XX)
+On Thu, Feb 09, 2017 at 07:01:10PM +0000, Abel Vesa wrote:
+> On Thu, Feb 09, 2017 at 01:14:52PM -0500, Steven Rostedt wrote:
+> > 
+> > [ sending again with Masami Cc'd ]
+> > 
+> > On Thu, 9 Feb 2017 13:14:14 -0500
+> > Steven Rostedt <rostedt@goodmis.org> wrote:
+> > 
+> > > On Thu, 9 Feb 2017 18:06:44 +0000
+> > > Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+> > > 
+> > > > On Thu, Feb 09, 2017 at 12:13:22PM -0500, Steven Rostedt wrote:  
+> > > > > Then came along live kernel patching, which I believe this series is
+> > > > > trying to support. What is needed by pt_regs is a way to "hijack" the
+> > > > > function being called to instead call the patched function. That is,
+> > > > > ftrace is not being used for tracing, but in reality, being used to
+> > > > > modify the running kernel. It is being used to change what function
+> > > > > gets called. ftrace is just a hook for that mechanism.    
+> > > > 
+> > > > So, would I be correct to assume that the only parts of pt_regs that
+> > > > would be touched are those which contain arguments to the function,
+> > > > and the register which would contain the return value?
+> > > >   
+> > > 
+> > > For live kernel patching, perhaps.
+> > > 
+> > > But for kprobes, I think they can touch anything. Matters what the
+> > > creater of the kprobe wanted to do.
+> > > 
+> Thing is, by saving all of them is the easiest way to ensure that the
+> whole context is the same when the replacing function gets called, as
+> I said before.
 > 
-> The platform name is fine, we don't care too much about that as it is
-> easily changed
-> if necessary.
-> 
-> > Core - cavium,thunder2 (ThunderX2 cpu core, "cavium,thunder" is ThunderX core)
-> > Board/SoC - cavium,thunder-99xx (for ThunderX2, "cavium,thunder-88xx"
-> >           is existing ThunderX board)
-> >
-> > Thunder2 because it is based on the next generation Thunder core, and
-> > processor family is ThunderX2 CN99XX.
-> >
-> > I had thought thru other possibilities as well, this seems the best I
-> > could come up with.
-> 
-> We should really avoid having the 'xx' placeholder in there but instead put
-> actual chip names in the compatible string, preferably the real ID such as
-> "cn8890" for the older chip. I see that we got it wrong for thunder-88xx.dts,
-> but that is no reason to duplicate the mistake.
-
-Ok. Looks like 1,2,5 of the patchset is already applied. Thanks!
-
-I will follow up with v4 of 3,4 with a better ID.
-
-JC.
+> We can't be sure that while __ftrace_ops_list_func is executing, any of
+> the regs will have the value they had when the function-to-be-replaced
+> was called. That's the reason I say we need to save them all.
+Scratch that, I'm wrong, the reason is stupid. The context gets restored anyway after
+__ftrace_ops_list_func is done.
+> > > -- Steve
+> > 
