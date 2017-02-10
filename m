@@ -1,38 +1,44 @@
-From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Fri, 10 Feb 2017 22:06:40 +0100
-Subject: [PATCH] serial: efm32: Fix parity management in
- 'efm32_uart_console_get_options()'
-Message-ID: <20170210210640.17749-1-christophe.jaillet@wanadoo.fr>
+From: stefan@datenfreihafen.org (Stefan Schmidt)
+Date: Fri, 10 Feb 2017 22:24:01 +0100
+Subject: [PATCH] arm: MAINTAINERS: transfer maintainership for the EZX
+ platform
+In-Reply-To: <87a89u0wm7.fsf@belgarion.home>
+References: <1480802397-25575-1-git-send-email-stefan@datenfreihafen.org>
+ <87pol51cx8.fsf@belgarion.home>
+ <d9ca30c8-8a0b-58f7-1237-c723dc7113ba@datenfreihafen.org>
+ <87a89u0wm7.fsf@belgarion.home>
+Message-ID: <113b60aa-a47b-1814-531f-a8bc0214e3eb@datenfreihafen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-UARTn_FRAME_PARITY_ODD is 0x0300
-UARTn_FRAME_PARITY_EVEN is 0x0200
-So if the UART is configured for EVEN parity, it would be reported as ODD.
-Fix it by testing if the 2 bits are set in the ODD case.
+Hello.
 
-Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
----
-Un-tested
----
- drivers/tty/serial/efm32-uart.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On 10.02.2017 18:44, Robert Jarzmik wrote:
+> Stefan Schmidt <stefan@datenfreihafen.org> writes:
+> 
+>> Hello.
+>>
+>> On 06.12.2016 13:04, Robert Jarzmik wrote:
+>>> Stefan Schmidt <stefan@datenfreihafen.org> writes:
+>>>
+>>>> Neither Daniel, Harald or myself are looking into this anymore.
+>>>> Robert thankfully agreed to handle the maintenance from now on.
+>>>> Also remove the outdated entries for website, git tree and
+>>>> mailing list.
+>>>>
+>>>> Signed-off-by: Stefan Schmidt <stefan@datenfreihafen.org>
+>>>
+>>> Daniel and Harald, could we have your acks please for [1] ?
+>>
+>> It seems Daniel is to busy or no longer interested in this. Given how
+>> long this platform has been sitting without a real maintainer I think it
+>> should be fine to go ahead and apply this. Harald and myself are ok with
+>> this anyway. IN the end its up to you.
+> Hi Stefan,
+> 
+> The patch is already pulled into linux-next, it's all right.
 
-diff --git a/drivers/tty/serial/efm32-uart.c b/drivers/tty/serial/efm32-uart.c
-index ebd8569f9ad5..84034ef20c88 100644
---- a/drivers/tty/serial/efm32-uart.c
-+++ b/drivers/tty/serial/efm32-uart.c
-@@ -572,9 +572,9 @@ static void efm32_uart_console_get_options(struct efm32_uart_port *efm_port,
- 			16 * (4 + (clkdiv >> 6)));
- 
- 	frame = efm32_uart_read32(efm_port, UARTn_FRAME);
--	if (frame & UARTn_FRAME_PARITY_ODD)
-+	if ((frame & UARTn_FRAME_PARITY_ODD) == UARTn_FRAME_PARITY_ODD)
- 		*parity = 'o';
--	else if (frame & UARTn_FRAME_PARITY_EVEN)
-+	else if ((frame & UARTn_FRAME_PARITY_EVEN) == UARTn_FRAME_PARITY_EVEN)
- 		*parity = 'e';
- 	else
- 		*parity = 'n';
--- 
-2.9.3
+Ups, sorry, missed that. :)
+
+regards
+Stefan Schmidt
