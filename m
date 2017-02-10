@@ -1,37 +1,46 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 10 Feb 2017 10:59:15 -0800
-Subject: [PATCH v2] media: s5p_mfc print buf pointer in hex constistently
-In-Reply-To: <20170210154053.23735-1-shuahkh@osg.samsung.com>
-References: <20170210154053.23735-1-shuahkh@osg.samsung.com>
-Message-ID: <1486753155.2192.13.camel@perches.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 10 Feb 2017 11:07:46 -0800
+Subject: [PATCH 3/8] spi: davinci: limit the transfer size if DMA enabled
+In-Reply-To: <1486740584-17875-4-git-send-email-fisaksen@baylibre.com> (Frode
+ Isaksen's message of "Fri, 10 Feb 2017 16:29:39 +0100")
+References: <1486740584-17875-1-git-send-email-fisaksen@baylibre.com>
+ <1486740584-17875-4-git-send-email-fisaksen@baylibre.com>
+Message-ID: <m2tw81hnjx.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-02-10 at 08:40 -0700, Shuah Khan wrote:
-> Fix s5p_mfc_set_dec_frame_buffer_v6() to print buffer pointer in hex to be
-> consistent with the rest of the messages in the routine.
+Frode Isaksen <fisaksen@baylibre.com> writes:
 
-More curiously, why is buf_addr a size_t and not
-a dma_addr_t?
-
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> Limit the transfer size to 20 scatter/gather pages if
+> DMA is enabled.
+> The eDMA DMA engine is limited to 20 SG entries in one DMA
+> transaction. If this number is exceeded, DMA receive fails.
+> This error occurs with large vmalloc'ed buffers.
+>
+> Signed-off-by: Frode Isaksen <fisaksen@baylibre.com>
 > ---
-> 
-> Fixed commit log. No code changes. Thanks for the catch.
-> 
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> index d6f207e..fc45980 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> @@ -497,7 +497,7 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
->  		}
->  	}
+>  drivers/spi/spi-davinci.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+>
+> diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
+> index b7b2da1..f1b46f6 100644
+> --- a/drivers/spi/spi-davinci.c
+> +++ b/drivers/spi/spi-davinci.c
+> @@ -485,6 +485,16 @@ static bool davinci_spi_can_dma(struct spi_master *master,
+>  	return __davinci_spi_can_dma(spi);
+>  }
 >  
-> -	mfc_debug(2, "Buf1: %zu, buf_size1: %d (frames %d)\n",
-> +	mfc_debug(2, "Buf1: %zx, buf_size1: %d (frames %d)\n",
->  			buf_addr1, buf_size1, ctx->total_dpb_count);
->  	if (buf_size1 < 0) {
->  		mfc_debug(2, "Not enough memory has been allocated.\n");
+> +static size_t davinci_spi_max_transfer_size(struct spi_device *spi)
+> +{
+> +	/*
+> +	 * The eDMA DMA engine is limited to 20 SG entries in one DMA
+> +	 * transaction. If this number is exceeded, DMA receive fails.
+> +	 * An extra SG entry is needed when the buffer is not page aligned.
+> +	 */
+> +	return (__davinci_spi_can_dma(spi)) ? 19 * PAGE_SIZE : SIZE_MAX;
+
+The number here should be a #define.
+
+Also, comment says 20, code says 19.  This should be clarified.
+
+Kevin
