@@ -1,22 +1,25 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 10 Feb 2017 09:17:46 -0800
-Subject: [PATCH v4 1/3] clk: zte: add i2s clocks for zx296718
-In-Reply-To: <1486609978-18482-1-git-send-email-baoyou.xie@linaro.org>
-References: <1486609978-18482-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170210171746.GP25384@codeaurora.org>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Fri, 10 Feb 2017 11:35:26 -0600
+Subject: [PATCH] ARM: dts: socfpga: sodia: enable qspi
+In-Reply-To: <20170209004349.9772-1-iwamatsu@nigauri.org>
+References: <20170209004349.9772-1-iwamatsu@nigauri.org>
+Message-ID: <f434dc19-73f9-d51e-7a74-3d33c31ca738@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09, Baoyou Xie wrote:
-> The i2s related clock support is missing from the existing zx296718
-> clock driver. This patch adds it, so that the upstream ZX I2S driver
-> can work out.
+
+
+On 02/08/2017 06:43 PM, Nobuhiro Iwamatsu wrote:
+> Enable the qspi controller on sodia board and add the flash chip
+> (n25q512a).
 > 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> Signed-off-by: Nobuhiro Iwamatsu <iwamatsu@nigauri.org>
 > ---
+>  arch/arm/boot/dts/socfpga_cyclone5_sodia.dts | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+> 
 
-Applied to clk-next
+Applied!
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks,
+Dinh
