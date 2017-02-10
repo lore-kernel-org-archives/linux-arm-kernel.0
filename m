@@ -1,29 +1,60 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Fri, 10 Feb 2017 15:54:49 +0100
-Subject: [PATCH v2 9/9] ARM: configs: stm32: ADD LDTC support
+Date: Fri, 10 Feb 2017 15:54:41 +0100
+Subject: [PATCH v2 1/9] dt-bindings: display: add STM32 LTDC driver
 In-Reply-To: <1486738489-22154-1-git-send-email-yannick.fertre@st.com>
 References: <1486738489-22154-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1486738489-22154-10-git-send-email-yannick.fertre@st.com>
+Message-ID: <1486738489-22154-2-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 ---
- arch/arm/configs/stm32_defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+ .../devicetree/bindings/display/st,stm32-ltdc.txt  | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
 
-diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-index e995209..d6a00b8 100644
---- a/arch/arm/configs/stm32_defconfig
-+++ b/arch/arm/configs/stm32_defconfig
-@@ -70,3 +70,8 @@ CONFIG_MAGIC_SYSRQ=y
- # CONFIG_FTRACE is not set
- CONFIG_CRC_ITU_T=y
- CONFIG_CRC7=y
-+CONFIG_DRM=y
-+CONFIG_DRM_ST=y
-+CONFIG_DRM_PANEL=y
-+CONFIG_DRM_PANEL_SIMPLE=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
+diff --git a/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+new file mode 100644
+index 0000000..b93e1c8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+@@ -0,0 +1,37 @@
++* STMicroelectronics STM32 lcd-tft display controller
++
++- ltdc: lcd-tft display controller host
++  must be a sub-node of st-display-subsystem
++  Required properties:
++  - compatible: "st,stm32-ltdc"
++  - reg: Physical base address of the IP registers and length of memory mapped region.
++  - clocks: A list of phandle + clock-specifier pairs, one for each
++    entry in 'clock-names'.
++  - clock-names: A list of clock names. For ltdc it should contain:
++      - "clk-lcd" for the clock feeding the output pixel clock & IP clock.
++  - resets: reset to be used by the device (defined by use of RCC macro).
++  Required nodes:
++    - Video port for RGB output.
++
++Example:
++
++/ {
++	...
++	soc {
++	...
++		ltdc: stm32-ltdc at 40016800 {
++			compatible = "st,stm32-ltdc";
++			reg = <0x40016800 0x200>;
++			interrupts = <88>, <89>;
++			resets = <&rcc STM32F4_APB2_RESET(LTDC)>;
++			clocks = <&rcc 1 CLK_LCD>;
++			clock-names = "lcd";
++			status = "disabled";
++
++			port {
++				ltdc_out_rgb: endpoint {
++				};
++			};
++		};
++	};
++};
 -- 
 1.9.1
