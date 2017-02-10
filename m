@@ -1,7 +1,7 @@
 From: velibor.markovski@broadcom.com (Velibor Markovski)
-Date: Fri, 10 Feb 2017 12:36:25 -0800
+Date: Fri, 10 Feb 2017 12:42:46 -0800
 Subject: [PATCH 0/2] Add support for ARM CCN-502 interconnect
-Message-ID: <1486758987-23769-1-git-send-email-velibor.markovski@broadcom.com>
+Message-ID: <1486759368-24067-1-git-send-email-velibor.markovski@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
