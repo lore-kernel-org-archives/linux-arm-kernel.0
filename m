@@ -1,48 +1,49 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 10 Feb 2017 15:00:48 +0100
-Subject: [PATCH RESEND 4/5] mtd: nand: atmel: Document the new DT bindings
-In-Reply-To: <CAL_Jsq+cmS=o-ZN2PUCreRrWAEdEgV4pRCfWaJ9jHy_oSHMPfg@mail.gmail.com>
-References: <1485535324-28393-1-git-send-email-boris.brezillon@free-electrons.com>
- <1485535324-28393-5-git-send-email-boris.brezillon@free-electrons.com>
- <20170201153920.g26erfzxnxrmsu4z@rob-hp-laptop>
- <20170201164711.27e4b600@bbrezillon>
- <20170210135528.4ee6807b@bbrezillon>
- <CAL_Jsq+cmS=o-ZN2PUCreRrWAEdEgV4pRCfWaJ9jHy_oSHMPfg@mail.gmail.com>
-Message-ID: <20170210150048.40295070@bbrezillon>
+From: thibault.saunier@osg.samsung.com (Thibault Saunier)
+Date: Fri, 10 Feb 2017 11:10:18 -0300
+Subject: [PATCH v3 0/4] Fixes for colorspace logic in exynos-gsc and s5p-mfc
+ drivers
+Message-ID: <20170210141022.25412-1-thibault.saunier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Feb 2017 07:58:15 -0600
-Rob Herring <robh@kernel.org> wrote:
+Hello,
 
-> On Fri, Feb 10, 2017 at 6:55 AM, Boris Brezillon
-> <boris.brezillon@free-electrons.com> wrote:
-> > Hi Rob,
-> >
-> > On Wed, 1 Feb 2017 16:47:11 +0100
-> > Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> >  
-> >> On Wed, 1 Feb 2017 09:39:20 -0600
-> >> Rob Herring <robh@kernel.org> wrote:
-> >>  
-> >> > On Fri, Jan 27, 2017 at 05:42:03PM +0100, Boris Brezillon wrote:  
-> >> > > Document the new DT bindings for the Atmel NAND controller and
-> >> > > deprecate the old ones.  
-> >> >
-> >> > Why?  
-> >>
-> >> Because the existing representation is not only wrong, it also causes
-> >> pinmux conflicts between the NAND controller and other devices present
-> >> on the EBI bus.
-> >> It's explained in the cover letter, but maybe you want me to put that
-> >> in the commit message.  
-> >
-> > Do you need more explanation (A.K.A. ping).  
-> 
-> No, but it should be in the commit msg.
+This patchset fixes a few issues on the colorspace logic for the exynos-gsc
+and s5p-mfc drivers.
 
-Okay, will add more details in the commit msg then.
+We now handle the colorspace in those drivers, and make sure to respect user setting if
+possible.
 
-Thanks,
+We also now set the 'v4l2_pix_format:field' if userspace passed ANY, avoiding GStreamer
+spamming error at us about the driver not following the standard.
 
-Boris
+This is the third version of the patch serie.
+
+Best regards,
+
+Thibault Saunier
+
+Changes in v3:
+- Added 'Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>'
+- Do not check values in the g_fmt functions as Andrzej explained in previous review
+- Set colorspace if user passed V4L2_COLORSPACE_DEFAULT in
+
+Changes in v2:
+- Fix a silly build error that slipped in while rebasing the patches
+
+Javier Martinez Canillas (1):
+  [media] exynos-gsc: Use 576p instead 720p as a threshold for
+    colorspaces
+
+Thibault Saunier (3):
+  [media] exynos-gsc: Respect userspace colorspace setting in try_fmt
+  [media] s5p-mfc: Set colorspace in VIDIO_{G,TRY}_FMT
+  [media] s5p-mfc: Check and set 'v4l2_pix_format:field' field in
+    try_fmt
+
+ drivers/media/platform/exynos-gsc/gsc-core.c | 17 +++++++++++-----
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 29 ++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+), 5 deletions(-)
+
+-- 
+2.11.1
