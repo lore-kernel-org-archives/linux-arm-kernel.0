@@ -1,67 +1,80 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Fri, 10 Feb 2017 16:49:21 +0100
-Subject: [PATCH] atmel_serial: Use the fractional divider when possible
-In-Reply-To: <20170210152446.12674-1-romain.izard.pro@gmail.com>
-References: <20170210152446.12674-1-romain.izard.pro@gmail.com>
-Message-ID: <20170210154921.5gnlbhrjhk7yeke7@rfolt0960.corp.atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Feb 2017 16:53:50 +0100
+Subject: [PATCH 1/2] ARM: add ARM_SINGLE_ARMV7 as config option
+In-Reply-To: <SG2PR06MB11650D666A5942A0060A85368A440@SG2PR06MB1165.apcprd06.prod.outlook.com>
+References: <20170209033044.19513-1-chris.brandt@renesas.com>
+ <5d90aff5-63b7-83a8-7529-2ac61ef82021@gmail.com>
+ <SG2PR06MB11650C805DD754EE5C9E56C78A450@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <25202835.AdbHsoUg0y@wuerfel>
+ <SG2PR06MB11650D666A5942A0060A85368A440@SG2PR06MB1165.apcprd06.prod.outlook.com>
+Message-ID: <CAK8P3a1SNdc+P2hZ6iA5tB7YvL9h0=kJ5-mjQs694TZ34rTc0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2017 at 04:24:46PM +0100, Romain Izard wrote:
-> The fractional baud rate generator is available when using the
-> asynchronous mode of Atmel USART controllers. It makes it possible to
-> use higher baudrates, in exchange for a less precise clock with a
-> variable duty cycle.
-> 
-> The existing code restricts its use to the normal mode of the USART
-> controller, following the recommendation from the datasheet for the
-> first chip embedding this type of controller. This recommendation has
-> been removed from the documentation for the newer chips. After
-> verification, all revisions of this controller should be able to use the
-> fractional baud rate generator with the different asynchronous modes.
-> 
-> Removing the condition on ATMEL_US_USMODE makes it possible to get
-> correct baudrates at high speed in more cases.
-> 
-> This was tested with a board using an Atmel SAMA5D2 chip and a TI
-> WL1831 WiFi/Bluetooth combo chip at 3 Mbauds, with hardware flow control
-> enabled.
-> 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+On Fri, Feb 10, 2017 at 3:17 PM, Chris Brandt <Chris.Brandt@renesas.com> wrote:
+> On Friday, February 10, 2017, Arnd Bergmann wrote:
+>> I also couldn't come up with something working when I looked at this, and
+>> it wouldn't solve the related problem of platforms that we want to be able
+>> to use with or without MMU: You can't make the decision of whether allow
+>> an MMU based on the number of platforms since most platform options can
+>> only be offered depending on the setting of CONFIG_MMU.
+>
+>
+> How about this idea (from a high level only):
+>
+> 1. At a top level, you would have 2 options:
+>    * "Allow multiple platforms to be selected"
+>    * "Single platform Only"
+>
+> 2. If SINGLE is selected, you still get all the choices that you
+>    get with MULTI, except as soon as you click a single ARCH_xx, all
+>    other ARCH_yy options are automatically 'unselected' and disappear
+>    from the menus. To change your mind, you simply uncheck that box
+>    and magically everything re-appears.
+>
+> 3. The current single platform ARCHs that are currently still sitting
+>    at the top level get moved to go sit with everyone else, except
+>    they will have "depends on SINGLE" so they will not show up
+>    when MULTI is selected.
+>
+> 4. XIP_KERNEL can only be selected if you have SINGLE selected.
+>
+> The new restriction is that if you want XIP_KERNEL, you are
+> only going to get 1 (and only 1) ARCH_xx.
+>
+> Of course the only way this is going to happen is by modifying kbuild
+> system to create a new 'mode' or something (but let's not get concerned
+> with the details until a high level agreement can be made).
 
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+You can actually have a 'tristate' choice statement with semantics
+close to that, but actually using that here would get rather messy,
+as we'd have to move all the per-directory 'menuconfig' statements
+back into the top-level choice, and also add logic to detect whether
+we use =y or =m.
 
-Thanks
+>> - In some platforms, the decision would have to be done on a per-board
+>>   level, as each board can have its memory at a different location
+>>   base on which chipselect line got connected to the RAM and NOR flash
+>>   respectively
+>
+> This idea only effects ARCH_xx. You can still select multiple MACH_xx if
+> you want after you've selected your ARCH_xx.
 
-> ---
->  drivers/tty/serial/atmel_serial.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index fabbe76203bb..6684456dca9e 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -1758,7 +1758,9 @@ static void atmel_get_ip_name(struct uart_port *port)
->  
->  	/*
->  	 * Only USART devices from at91sam9260 SOC implement fractional
-> -	 * baudrate.
-> +	 * baudrate. It is available for all asynchronous modes, with the
-> +	 * following restriction: the sampling clock's duty cycle is not
-> +	 * constant.
->  	 */
->  	atmel_port->has_frac_baudrate = false;
->  	atmel_port->has_hw_timer = false;
-> @@ -2202,8 +2204,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
->  	 * then
->  	 * 8 CD + FP = selected clock / (2 * baudrate)
->  	 */
-> -	if (atmel_port->has_frac_baudrate &&
-> -	    (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
-> +	if (atmel_port->has_frac_baudrate) {
->  		div = DIV_ROUND_CLOSEST(port->uartclk, baud * 2);
->  		cd = div >> 3;
->  		fp = div & ATMEL_US_FP_MASK;
-> -- 
-> 2.9.3
-> 
+Yes, that's my point: we'd have to move some or all of the MACH_xx
+options into the top-level list as well, or repeat the same logic within
+each platform that may have incompatible boards.
+
+>> - CONFIG_DEBUG_UNCOMPRESS has a very similar requirements to
+>>   XIP_KERNEL and !MMU, and we currently allow it for any machine,
+>>   with a lot of flexibility in configuring that always breaks
+>>   running on any machine other than the one you are targetting.
+>
+> Since the purpose of this is "debugging" a single platform, could you
+> put this under the "depends on SINGLE" category?
+
+It would solve the problem of unusable configurations, but break one
+very important use case of DEBUG_LL: you have a problem with a
+running kernel and just want to turn on DEBUG_LL without changing
+anything else.
+
+       Arnd
