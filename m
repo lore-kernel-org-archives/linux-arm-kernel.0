@@ -1,416 +1,218 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Fri, 10 Feb 2017 14:29:34 +0800
-Subject: [PATCH v3 1/2] drm/rockchip: Do not use DMA mapping API if attached
- to IOMMU domain
+Date: Fri, 10 Feb 2017 14:29:35 +0800
+Subject: [PATCH v3 2/2] drm/rockchip: Use common IOMMU API to attach devices
 In-Reply-To: <1486708175-23857-1-git-send-email-mark.yao@rock-chips.com>
 References: <1486708175-23857-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1486708175-23857-2-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1486708175-23857-3-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tomasz Figa <tfiga@chromium.org>
+From: Shunqian Zheng <zhengsq@rock-chips.com>
 
-The API is not suitable for subsystems consisting of multiple devices
-and requires severe hacks to use it. To mitigate this, this patch
-implements allocation and address space management locally by using
-helpers provided by DRM framework, like other DRM drivers do, e.g.
-Tegra.
+Rockchip DRM used the arm special API, arm_iommu_*(), to attach
+iommu for ARM32 SoCs. This patch convert to common iommu API
+so it would support ARM64 like RK3399.
 
-This patch should not introduce any functional changes until the driver
-is made to attach subdevices into an IOMMU domain with the generic IOMMU
-API, which will happen in following patch. Based heavily on GEM
-implementation of Tegra DRM driver.
+Since previous patch added support for direct IOMMU address space
+management, there is no need to use DMA API anymore and this patch wires
+things to use the new method.
 
-Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+Signed-off-by: Tomasz Figa <tfiga@chromium.org>
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-Signed-off-by: rjan Eide <orjan.eide@arm.com>
 Tested-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   6 +-
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 244 ++++++++++++++++++++++++++--
- drivers/gpu/drm/rockchip/rockchip_drm_gem.h |   8 +
- 3 files changed, 244 insertions(+), 14 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 101 +++++++++++++++-------------
+ 1 file changed, 54 insertions(+), 47 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-index fb6226c..adc3930 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
-@@ -30,6 +30,7 @@
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index c30d649..b360e62 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -14,19 +14,19 @@
+  * GNU General Public License for more details.
+  */
  
- struct drm_device;
- struct drm_connector;
-+struct iommu_domain;
- 
- /*
-  * Rockchip drm private crtc funcs.
-@@ -60,7 +61,10 @@ struct rockchip_drm_private {
- 	struct drm_gem_object *fbdev_bo;
- 	const struct rockchip_crtc_funcs *crtc_funcs[ROCKCHIP_MAX_CRTC];
- 	struct drm_atomic_state *state;
+-#include <asm/dma-iommu.h>
 -
-+	struct iommu_domain *domain;
-+	/* protect drm_mm on multi-threads */
-+	struct mutex mm_lock;
-+	struct drm_mm mm;
- 	struct list_head psr_list;
- 	spinlock_t psr_list_lock;
- };
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-index b70f942..df9e570 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-@@ -16,11 +16,146 @@
  #include <drm/drmP.h>
- #include <drm/drm_gem.h>
- #include <drm/drm_vma_manager.h>
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_fb_helper.h>
+ #include <drm/drm_gem_cma_helper.h>
+ #include <drm/drm_of.h>
+ #include <linux/dma-mapping.h>
++#include <linux/dma-iommu.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/module.h>
+ #include <linux/of_graph.h>
+ #include <linux/component.h>
+ #include <linux/console.h>
 +#include <linux/iommu.h>
  
  #include "rockchip_drm_drv.h"
- #include "rockchip_drm_gem.h"
- 
--static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
-+static int rockchip_gem_iommu_map(struct rockchip_gem_object *rk_obj)
-+{
-+	struct drm_device *drm = rk_obj->base.dev;
-+	struct rockchip_drm_private *private = drm->dev_private;
-+	int prot = IOMMU_READ | IOMMU_WRITE;
-+	ssize_t ret;
-+
-+	mutex_lock(&private->mm_lock);
-+
-+	ret = drm_mm_insert_node_generic(&private->mm, &rk_obj->mm,
-+					 rk_obj->base.size, PAGE_SIZE,
-+					 0, 0);
-+
-+	mutex_unlock(&private->mm_lock);
-+	if (ret < 0) {
-+		DRM_ERROR("out of I/O virtual memory: %zd\n", ret);
-+		return ret;
-+	}
-+
-+	rk_obj->dma_addr = rk_obj->mm.start;
-+
-+	ret = iommu_map_sg(private->domain, rk_obj->dma_addr, rk_obj->sgt->sgl,
-+			   rk_obj->sgt->nents, prot);
-+	if (ret < rk_obj->base.size) {
-+		DRM_ERROR("failed to map buffer: size=%zd request_size=%zd\n",
-+			  ret, rk_obj->base.size);
-+		ret = -ENOMEM;
-+		goto err_remove_node;
-+	}
-+
-+	rk_obj->size = ret;
-+
-+	return 0;
-+
-+err_remove_node:
-+	drm_mm_remove_node(&rk_obj->mm);
-+
-+	return ret;
-+}
-+
-+static int rockchip_gem_iommu_unmap(struct rockchip_gem_object *rk_obj)
-+{
-+	struct drm_device *drm = rk_obj->base.dev;
-+	struct rockchip_drm_private *private = drm->dev_private;
-+
-+	iommu_unmap(private->domain, rk_obj->dma_addr, rk_obj->size);
-+
-+	mutex_lock(&private->mm_lock);
-+
-+	drm_mm_remove_node(&rk_obj->mm);
-+
-+	mutex_unlock(&private->mm_lock);
-+
-+	return 0;
-+}
-+
-+static int rockchip_gem_get_pages(struct rockchip_gem_object *rk_obj)
-+{
-+	struct drm_device *drm = rk_obj->base.dev;
-+	int ret, i;
-+	struct scatterlist *s;
-+
-+	rk_obj->pages = drm_gem_get_pages(&rk_obj->base);
-+	if (IS_ERR(rk_obj->pages))
-+		return PTR_ERR(rk_obj->pages);
-+
-+	rk_obj->num_pages = rk_obj->base.size >> PAGE_SHIFT;
-+
-+	rk_obj->sgt = drm_prime_pages_to_sg(rk_obj->pages, rk_obj->num_pages);
-+	if (IS_ERR(rk_obj->sgt)) {
-+		ret = PTR_ERR(rk_obj->sgt);
-+		goto err_put_pages;
-+	}
-+
-+	/*
-+	 * Fake up the SG table so that dma_sync_sg_for_device() can be used
-+	 * to flush the pages associated with it.
-+	 *
-+	 * TODO: Replace this by drm_clflush_sg() once it can be implemented
-+	 * without relying on symbols that are not exported.
-+	 */
-+	for_each_sg(rk_obj->sgt->sgl, s, rk_obj->sgt->nents, i)
-+		sg_dma_address(s) = sg_phys(s);
-+
-+	dma_sync_sg_for_device(drm->dev, rk_obj->sgt->sgl, rk_obj->sgt->nents,
-+			       DMA_TO_DEVICE);
-+
-+	return 0;
-+
-+err_put_pages:
-+	drm_gem_put_pages(&rk_obj->base, rk_obj->pages, false, false);
-+	return ret;
-+}
-+
-+static void rockchip_gem_put_pages(struct rockchip_gem_object *rk_obj)
-+{
-+	sg_free_table(rk_obj->sgt);
-+	kfree(rk_obj->sgt);
-+	drm_gem_put_pages(&rk_obj->base, rk_obj->pages, true, true);
-+}
-+
-+static int rockchip_gem_alloc_iommu(struct rockchip_gem_object *rk_obj,
-+				    bool alloc_kmap)
-+{
-+	int ret;
-+
-+	ret = rockchip_gem_get_pages(rk_obj);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = rockchip_gem_iommu_map(rk_obj);
-+	if (ret < 0)
-+		goto err_free;
-+
-+	if (alloc_kmap) {
-+		rk_obj->kvaddr = vmap(rk_obj->pages, rk_obj->num_pages, VM_MAP,
-+				      pgprot_writecombine(PAGE_KERNEL));
-+		if (!rk_obj->kvaddr) {
-+			DRM_ERROR("failed to vmap() buffer\n");
-+			ret = -ENOMEM;
-+			goto err_unmap;
-+		}
-+	}
-+
-+	return 0;
-+
-+err_unmap:
-+	rockchip_gem_iommu_unmap(rk_obj);
-+err_free:
-+	rockchip_gem_put_pages(rk_obj);
-+
-+	return ret;
-+}
-+
-+static int rockchip_gem_alloc_dma(struct rockchip_gem_object *rk_obj,
- 				  bool alloc_kmap)
+ #include "rockchip_drm_fb.h"
+@@ -50,28 +50,31 @@
+ int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
+ 				   struct device *dev)
  {
- 	struct drm_gem_object *obj = &rk_obj->base;
-@@ -42,7 +177,27 @@ static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
- 	return 0;
- }
- 
--static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
-+static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
-+				  bool alloc_kmap)
-+{
-+	struct drm_gem_object *obj = &rk_obj->base;
-+	struct drm_device *drm = obj->dev;
-+	struct rockchip_drm_private *private = drm->dev_private;
-+
-+	if (private->domain)
-+		return rockchip_gem_alloc_iommu(rk_obj, alloc_kmap);
-+	else
-+		return rockchip_gem_alloc_dma(rk_obj, alloc_kmap);
-+}
-+
-+static void rockchip_gem_free_iommu(struct rockchip_gem_object *rk_obj)
-+{
-+	vunmap(rk_obj->kvaddr);
-+	rockchip_gem_iommu_unmap(rk_obj);
-+	rockchip_gem_put_pages(rk_obj);
-+}
-+
-+static void rockchip_gem_free_dma(struct rockchip_gem_object *rk_obj)
- {
- 	struct drm_gem_object *obj = &rk_obj->base;
- 	struct drm_device *drm = obj->dev;
-@@ -51,23 +206,68 @@ static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
- 		       rk_obj->dma_attrs);
- }
- 
--static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
--					struct vm_area_struct *vma)
-+static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
-+{
-+	if (rk_obj->pages)
-+		rockchip_gem_free_iommu(rk_obj);
-+	else
-+		rockchip_gem_free_dma(rk_obj);
-+}
- 
-+static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
-+					      struct vm_area_struct *vma)
- {
-+	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
-+	unsigned int i, count = obj->size >> PAGE_SHIFT;
-+	unsigned long user_count = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-+	unsigned long uaddr = vma->vm_start;
-+	unsigned long offset = vma->vm_pgoff;
-+	unsigned long end = user_count + offset;
+-	struct dma_iommu_mapping *mapping = drm_dev->dev->archdata.mapping;
++	struct rockchip_drm_private *private = drm_dev->dev_private;
  	int ret;
-+
-+	if (user_count == 0)
-+		return -ENXIO;
-+	if (end > count)
-+		return -ENXIO;
-+
-+	for (i = offset; i < end; i++) {
-+		ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
-+		if (ret)
-+			return ret;
-+		uaddr += PAGE_SIZE;
+ 
+ 	if (!is_support_iommu)
+ 		return 0;
+ 
+-	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
+-	if (ret)
++	ret = iommu_attach_device(private->domain, dev);
++	if (ret) {
++		dev_err(dev, "Failed to attach iommu device\n");
+ 		return ret;
 +	}
-+
-+	return 0;
-+}
-+
-+static int rockchip_drm_gem_object_mmap_dma(struct drm_gem_object *obj,
-+					    struct vm_area_struct *vma)
-+{
- 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
- 	struct drm_device *drm = obj->dev;
  
-+	return dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
-+			      obj->size, rk_obj->dma_attrs);
-+}
-+
-+static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
-+					struct vm_area_struct *vma)
-+{
-+	int ret;
-+	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
-+
- 	/*
--	 * dma_alloc_attrs() allocated a struct page table for rk_obj, so clear
-+	 * We allocated a struct page table for rk_obj, so clear
- 	 * VM_PFNMAP flag that was set by drm_gem_mmap_obj()/drm_gem_mmap().
- 	 */
- 	vma->vm_flags &= ~VM_PFNMAP;
- 	vma->vm_pgoff = 0;
- 
--	ret = dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
--			     obj->size, rk_obj->dma_attrs);
-+	if (rk_obj->pages)
-+		ret = rockchip_drm_gem_object_mmap_iommu(obj, vma);
-+	else
-+		ret = rockchip_drm_gem_object_mmap_dma(obj, vma);
-+
- 	if (ret)
- 		drm_gem_vm_close(vma);
- 
-@@ -101,6 +301,12 @@ int rockchip_gem_mmap(struct file *filp, struct vm_area_struct *vma)
- 	return rockchip_drm_gem_object_mmap(obj, vma);
- }
- 
-+static void rockchip_gem_release_object(struct rockchip_gem_object *rk_obj)
-+{
-+	drm_gem_object_release(&rk_obj->base);
-+	kfree(rk_obj);
-+}
-+
- struct rockchip_gem_object *
- 	rockchip_gem_create_object(struct drm_device *drm, unsigned int size,
- 				   bool alloc_kmap)
-@@ -117,7 +323,7 @@ struct rockchip_gem_object *
- 
- 	obj = &rk_obj->base;
- 
--	drm_gem_private_object_init(drm, obj, size);
-+	drm_gem_object_init(drm, obj, size);
- 
- 	ret = rockchip_gem_alloc_buf(rk_obj, alloc_kmap);
- 	if (ret)
-@@ -126,7 +332,7 @@ struct rockchip_gem_object *
- 	return rk_obj;
- 
- err_free_rk_obj:
--	kfree(rk_obj);
-+	rockchip_gem_release_object(rk_obj);
- 	return ERR_PTR(ret);
- }
- 
-@@ -138,13 +344,11 @@ void rockchip_gem_free_object(struct drm_gem_object *obj)
- {
- 	struct rockchip_gem_object *rk_obj;
- 
--	drm_gem_free_mmap_offset(obj);
+-	dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
 -
- 	rk_obj = to_rockchip_obj(obj);
- 
- 	rockchip_gem_free_buf(rk_obj);
- 
--	kfree(rk_obj);
-+	rockchip_gem_release_object(rk_obj);
+-	return arm_iommu_attach_device(dev, mapping);
++	return 0;
  }
  
- /*
-@@ -253,6 +457,9 @@ struct sg_table *rockchip_gem_prime_get_sg_table(struct drm_gem_object *obj)
- 	struct sg_table *sgt;
+ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
+ 				    struct device *dev)
+ {
++	struct rockchip_drm_private *private = drm_dev->dev_private;
++	struct iommu_domain *domain = private->domain;
++
+ 	if (!is_support_iommu)
+ 		return;
+ 
+-	arm_iommu_detach_device(dev);
++	iommu_detach_device(domain, dev);
+ }
+ 
+ int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
+@@ -123,11 +126,46 @@ static void rockchip_drm_crtc_disable_vblank(struct drm_device *dev,
+ 		priv->crtc_funcs[pipe]->disable_vblank(crtc);
+ }
+ 
++static int rockchip_drm_init_iommu(struct drm_device *drm_dev)
++{
++	struct rockchip_drm_private *private = drm_dev->dev_private;
++	struct iommu_domain_geometry *geometry;
++	u64 start, end;
++
++	if (!is_support_iommu)
++		return 0;
++
++	private->domain = iommu_domain_alloc(&platform_bus_type);
++	if (!private->domain)
++		return -ENOMEM;
++
++	geometry = &private->domain->geometry;
++	start = geometry->aperture_start;
++	end = geometry->aperture_end;
++
++	DRM_DEBUG("IOMMU context initialized (aperture: %#llx-%#llx)\n",
++		  start, end);
++	drm_mm_init(&private->mm, start, end - start + 1);
++	mutex_init(&private->mm_lock);
++
++	return 0;
++}
++
++static void rockchip_iommu_cleanup(struct drm_device *drm_dev)
++{
++	struct rockchip_drm_private *private = drm_dev->dev_private;
++
++	if (!is_support_iommu)
++		return;
++
++	drm_mm_takedown(&private->mm);
++	iommu_domain_free(private->domain);
++}
++
+ static int rockchip_drm_bind(struct device *dev)
+ {
+ 	struct drm_device *drm_dev;
+ 	struct rockchip_drm_private *private;
+-	struct dma_iommu_mapping *mapping = NULL;
  	int ret;
  
-+	if (rk_obj->pages)
-+		return drm_prime_pages_to_sg(rk_obj->pages, rk_obj->num_pages);
-+
- 	sgt = kzalloc(sizeof(*sgt), GFP_KERNEL);
- 	if (!sgt)
- 		return ERR_PTR(-ENOMEM);
-@@ -273,6 +480,10 @@ void *rockchip_gem_prime_vmap(struct drm_gem_object *obj)
- {
- 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
+ 	drm_dev = drm_dev_alloc(&rockchip_drm_driver, dev);
+@@ -151,38 +189,14 @@ static int rockchip_drm_bind(struct device *dev)
  
-+	if (rk_obj->pages)
-+		return vmap(rk_obj->pages, rk_obj->num_pages, VM_MAP,
-+			    pgprot_writecombine(PAGE_KERNEL));
-+
- 	if (rk_obj->dma_attrs & DMA_ATTR_NO_KERNEL_MAPPING)
- 		return NULL;
+ 	rockchip_drm_mode_config_init(drm_dev);
  
-@@ -281,5 +492,12 @@ void *rockchip_gem_prime_vmap(struct drm_gem_object *obj)
+-	dev->dma_parms = devm_kzalloc(dev, sizeof(*dev->dma_parms),
+-				      GFP_KERNEL);
+-	if (!dev->dma_parms) {
+-		ret = -ENOMEM;
++	ret = rockchip_drm_init_iommu(drm_dev);
++	if (ret)
+ 		goto err_config_cleanup;
+-	}
+-
+-	if (is_support_iommu) {
+-		/* TODO(djkurtz): fetch the mapping start/size from somewhere */
+-		mapping = arm_iommu_create_mapping(&platform_bus_type,
+-						   0x00000000,
+-						   SZ_2G);
+-		if (IS_ERR(mapping)) {
+-			ret = PTR_ERR(mapping);
+-			goto err_config_cleanup;
+-		}
+-
+-		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
+-		if (ret)
+-			goto err_release_mapping;
+-
+-		dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
+-
+-		ret = arm_iommu_attach_device(dev, mapping);
+-		if (ret)
+-			goto err_release_mapping;
+-	}
  
- void rockchip_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr)
- {
--	/* Nothing to do */
-+	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
-+
-+	if (rk_obj->pages) {
-+		vunmap(vaddr);
-+		return;
-+	}
-+
-+	/* Nothing to do if allocated by DMA mapping API. */
- }
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.h b/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
-index 18b3488..3f6ea4d 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
-@@ -23,7 +23,15 @@ struct rockchip_gem_object {
+ 	/* Try to bind all sub drivers. */
+ 	ret = component_bind_all(dev, drm_dev);
+ 	if (ret)
+-		goto err_detach_device;
++		goto err_iommu_cleanup;
  
- 	void *kvaddr;
- 	dma_addr_t dma_addr;
-+	/* Used when IOMMU is disabled */
- 	unsigned long dma_attrs;
-+
-+	/* Used when IOMMU is enabled */
-+	struct drm_mm_node mm;
-+	unsigned long num_pages;
-+	struct page **pages;
-+	struct sg_table *sgt;
-+	size_t size;
- };
+ 	/* init kms poll for handling hpd */
+ 	drm_kms_helper_poll_init(drm_dev);
+@@ -207,8 +221,6 @@ static int rockchip_drm_bind(struct device *dev)
+ 	if (ret)
+ 		goto err_fbdev_fini;
  
- struct sg_table *rockchip_gem_prime_get_sg_table(struct drm_gem_object *obj);
+-	if (is_support_iommu)
+-		arm_iommu_release_mapping(mapping);
+ 	return 0;
+ err_fbdev_fini:
+ 	rockchip_drm_fbdev_fini(drm_dev);
+@@ -217,12 +229,8 @@ static int rockchip_drm_bind(struct device *dev)
+ err_kms_helper_poll_fini:
+ 	drm_kms_helper_poll_fini(drm_dev);
+ 	component_unbind_all(dev, drm_dev);
+-err_detach_device:
+-	if (is_support_iommu)
+-		arm_iommu_detach_device(dev);
+-err_release_mapping:
+-	if (is_support_iommu)
+-		arm_iommu_release_mapping(mapping);
++err_iommu_cleanup:
++	rockchip_iommu_cleanup(drm_dev);
+ err_config_cleanup:
+ 	drm_mode_config_cleanup(drm_dev);
+ 	drm_dev->dev_private = NULL;
+@@ -239,8 +247,7 @@ static void rockchip_drm_unbind(struct device *dev)
+ 	drm_vblank_cleanup(drm_dev);
+ 	drm_kms_helper_poll_fini(drm_dev);
+ 	component_unbind_all(dev, drm_dev);
+-	if (is_support_iommu)
+-		arm_iommu_detach_device(dev);
++	rockchip_iommu_cleanup(drm_dev);
+ 	drm_mode_config_cleanup(drm_dev);
+ 	drm_dev->dev_private = NULL;
+ 	drm_dev_unregister(drm_dev);
 -- 
 1.9.1
