@@ -1,40 +1,93 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Fri, 10 Feb 2017 15:54:43 +0100
-Subject: [PATCH v2 3/9] drm/st: Add STM32 LTDC driver
+Date: Fri, 10 Feb 2017 15:54:48 +0100
+Subject: [PATCH v2 8/9] ARM: dts: stm32: Enable ltdc & simple panel on
+ stm32f429-Eval board
 In-Reply-To: <1486738489-22154-1-git-send-email-yannick.fertre@st.com>
 References: <1486738489-22154-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1486738489-22154-4-git-send-email-yannick.fertre@st.com>
+Message-ID: <1486738489-22154-9-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the STM32 LCD-TFT display controller.
+Enable ltdc & enable am-480272h3tmqw-t01h panel.
 
 Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 ---
- drivers/gpu/drm/stm/ltdc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/stm32429i-eval.dts | 59 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
 
-diff --git a/drivers/gpu/drm/stm/ltdc.c b/drivers/gpu/drm/stm/ltdc.c
-index 0a393e2..148607d 100644
---- a/drivers/gpu/drm/stm/ltdc.c
-+++ b/drivers/gpu/drm/stm/ltdc.c
-@@ -1246,7 +1246,7 @@ int ltdc_load(struct drm_device *ddev)
+diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
+index 601a22a..5a5f941 100644
+--- a/arch/arm/boot/dts/stm32429i-eval.dts
++++ b/arch/arm/boot/dts/stm32429i-eval.dts
+@@ -110,6 +110,52 @@
+ 		clocks = <&rcc 0 30>;
+ 		clock-names = "main_clk";
+ 	};
++
++	panel_rgb: panel-rgb {
++		compatible = "ampire,am-480272h3tmqw-t01h";
++		status = "okay";
++		port {
++			panel_in_rgb: endpoint {
++				remote-endpoint = <&ltdc_out_rgb>;
++			};
++		};
++	};
++};
++
++&pinctrl {
++	pinctrl_ltdc: ltdc at 0 {
++		pins {
++			pinmux = <STM32F429_PI12_FUNC_LCD_HSYNC>,
++				 <STM32F429_PI13_FUNC_LCD_VSYNC>,
++				 <STM32F429_PI14_FUNC_LCD_CLK>,
++				 <STM32F429_PI15_FUNC_LCD_R0>,
++				 <STM32F429_PJ0_FUNC_LCD_R1>,
++				 <STM32F429_PJ1_FUNC_LCD_R2>,
++				 <STM32F429_PJ2_FUNC_LCD_R3>,
++				 <STM32F429_PJ3_FUNC_LCD_R4>,
++				 <STM32F429_PJ4_FUNC_LCD_R5>,
++				 <STM32F429_PJ5_FUNC_LCD_R6>,
++				 <STM32F429_PJ6_FUNC_LCD_R7>,
++				 <STM32F429_PJ7_FUNC_LCD_G0>,
++				 <STM32F429_PJ8_FUNC_LCD_G1>,
++				 <STM32F429_PJ9_FUNC_LCD_G2>,
++				 <STM32F429_PJ10_FUNC_LCD_G3>,
++				 <STM32F429_PJ11_FUNC_LCD_G4>,
++				 <STM32F429_PJ12_FUNC_LCD_B0>,
++				 <STM32F429_PJ13_FUNC_LCD_B1>,
++				 <STM32F429_PJ14_FUNC_LCD_B2>,
++				 <STM32F429_PJ15_FUNC_LCD_B3>,
++				 <STM32F429_PK0_FUNC_LCD_G5>,
++				 <STM32F429_PK1_FUNC_LCD_G6>,
++				 <STM32F429_PK2_FUNC_LCD_G7>,
++				 <STM32F429_PK3_FUNC_LCD_B4>,
++				 <STM32F429_PK4_FUNC_LCD_B5>,
++				 <STM32F429_PK5_FUNC_LCD_B6>,
++				 <STM32F429_PK6_FUNC_LCD_B7>,
++				 <STM32F429_PK7_FUNC_LCD_DE>;
++			slew-rate = <2>;
++		};
++	};
+ };
  
- 	mutex_init(&ltdc->err_lock);
- 
--	ltdc->pixel_clk = devm_clk_get(dev, "clk-lcd");
-+	ltdc->pixel_clk = devm_clk_get(dev, "lcd");
- 	if (IS_ERR(ltdc->pixel_clk)) {
- 		DRM_ERROR("Unable to get lcd clock\n");
- 		return -ENODEV;
-@@ -1263,7 +1263,7 @@ int ltdc_load(struct drm_device *ddev)
- 		return PTR_ERR(regs);
- 	}
- 
--	ltdc->map = devm_regmap_init_mmio_clk(dev, "clk-lcd", regs,
-+	ltdc->map = devm_regmap_init_mmio_clk(dev, "lcd", regs,
- 					      &ltdc_regmap_config);
- 	if (IS_ERR(ltdc->map)) {
- 		dev_err(dev, "Couldn't create ltdc register mapping\n");
+ &clk_hse {
+@@ -146,3 +192,16 @@
+ 	pinctrl-names = "default";
+ 	status = "okay";
+ };
++
++&ltdc {
++	status = "okay";
++	pinctrl-0 = <&pinctrl_ltdc>;
++	pinctrl-names = "default";
++	dma-ranges;
++
++	port {
++		ltdc_out_rgb: endpoint {
++			remote-endpoint = <&panel_in_rgb>;
++		};
++	};
++};
 -- 
 1.9.1
