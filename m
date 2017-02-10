@@ -1,32 +1,30 @@
-From: stefan@datenfreihafen.org (Stefan Schmidt)
-Date: Fri, 10 Feb 2017 17:13:19 +0100
-Subject: [PATCH] arm: MAINTAINERS: transfer maintainership for the EZX
- platform
-In-Reply-To: <87pol51cx8.fsf@belgarion.home>
-References: <1480802397-25575-1-git-send-email-stefan@datenfreihafen.org>
- <87pol51cx8.fsf@belgarion.home>
-Message-ID: <d9ca30c8-8a0b-58f7-1237-c723dc7113ba@datenfreihafen.org>
+From: abdallah.meziti.pro@gmail.com (AbdAllah-MEZITI)
+Date: Fri, 10 Feb 2017 17:14:12 +0100
+Subject: [PATCH] staging: bcm2835-audio: fix trailing statements
+Message-ID: <20170210161425.5711-1-abdallah.meziti.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Trailing statements should be on next line.
 
-On 06.12.2016 13:04, Robert Jarzmik wrote:
-> Stefan Schmidt <stefan@datenfreihafen.org> writes:
-> 
->> Neither Daniel, Harald or myself are looking into this anymore.
->> Robert thankfully agreed to handle the maintenance from now on.
->> Also remove the outdated entries for website, git tree and
->> mailing list.
->>
->> Signed-off-by: Stefan Schmidt <stefan@datenfreihafen.org>
-> 
-> Daniel and Harald, could we have your acks please for [1] ?
+Signed-off-by: AbdAllah-MEZITI <abdallah.meziti.pro@gmail.com>
+---
+ drivers/staging/bcm2835-audio/bcm2835-vchiq.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-It seems Daniel is to busy or no longer interested in this. Given how
-long this platform has been sitting without a real maintainer I think it
-should be fine to go ahead and apply this. Harald and myself are ok with
-this anyway. IN the end its up to you.
-
-regards
-Stefan Schmidt
+diff --git a/drivers/staging/bcm2835-audio/bcm2835-vchiq.c b/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
+index 6578246..95ad58c 100644
+--- a/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
++++ b/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
+@@ -563,7 +563,8 @@ int bcm2835_audio_set_ctls(struct bcm2835_chip *chip)
+ 			} else if (bcm2835_audio_set_ctls_chan(chip->alsa_stream[i], chip) != 0) {
+ 				LOG_ERR("Couldn't set the controls for stream %d\n", i);
+ 				ret = -1;
+-			} else LOG_DBG(" Controls set for stream %d\n", i);
++			} else
++				LOG_DBG(" Controls set for stream %d\n", i);
+ 		}
+ 	}
+ 	LOG_DBG(" .. OUT ret=%d\n", ret);
+-- 
+2.9.3
