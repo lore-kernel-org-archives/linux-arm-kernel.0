@@ -1,59 +1,250 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 10 Feb 2017 14:28:34 +0000
-Subject: [PATCH v2 08/14] arm64: efi: split Image code and data into
- separate PE/COFF sections
-In-Reply-To: <20170210104942.GF28753@leverpostej>
-References: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
- <1486554947-3964-9-git-send-email-ard.biesheuvel@linaro.org>
- <20170210104942.GF28753@leverpostej>
-Message-ID: <CAKv+Gu8b-8jrr341gg9E9QzbEtRtMhZy9xE2rM8TvQTb+1aJdQ@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 10 Feb 2017 15:28:57 +0100
+Subject: [PATCH v2 6/9] arm, arm64: factorize common cpu capacity default
+ code
+In-Reply-To: <20170209092525.6654-7-juri.lelli@arm.com>
+References: <20170209092525.6654-1-juri.lelli@arm.com>
+ <20170209092525.6654-7-juri.lelli@arm.com>
+Message-ID: <20170210142857.GA18321@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 February 2017 at 10:49, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Feb 08, 2017 at 11:55:41AM +0000, Ard Biesheuvel wrote:
->> To prevent unintended modifications to the kernel text (malicious or
->> otherwise) while running the EFI stub, describe the kernel image as
->> two separate sections: a .text section with read-execute permissions,
->> covering .text, .rodata and .init.text, and a .data section with
->> read-write permissions, covering .init.data, .data and .bss.
->>
->> This relies on the firmware to actually take the section permission
->> flags into account, but this is something that is currently being
->> implemented in EDK2, which means we will likely start seeing it in
->> the wild between one and two years from now.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->
->> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
->> index b8deffa9e1bf..a93cc2b6f50b 100644
->> --- a/arch/arm64/kernel/vmlinux.lds.S
->> +++ b/arch/arm64/kernel/vmlinux.lds.S
->> @@ -149,6 +149,9 @@ SECTIONS
->>               ARM_EXIT_KEEP(EXIT_TEXT)
->>       }
->>
->> +     . = ALIGN(SZ_4K);
->> +     __pecoff_data_start = .;
->> +
->
-> I understand that the stub needs to split the init text/data since
-> unlike the kernel it'll map those with separate permissions, but it
-> feels odd to do this specifically for the EFI stub.
->
+On Thu, Feb 09, 2017 at 09:25:22AM +0000, Juri Lelli wrote:
+> arm and arm64 share lot of code relative to parsing CPU capacity
+> information from DT, using that information for appropriate scaling and
+> exposing a sysfs interface for chaging such values at runtime.
+> 
+> Factorize such code in a common place (driver/base/arch_topology.c) in
+> preparation for further additions.
+> 
+> Suggested-by: Will Deacon <will.deacon@arm.com>
+> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+> ---
+> 
+> Changes from v1:
+>  - keep the original GPLv2 header
+> ---
+>  arch/arm/Kconfig             |   1 +
+>  arch/arm/kernel/topology.c   | 213 ++------------------------------------
+>  arch/arm64/Kconfig           |   1 +
+>  arch/arm64/kernel/topology.c | 219 +--------------------------------------
+>  drivers/base/Kconfig         |   8 ++
+>  drivers/base/Makefile        |   1 +
+>  drivers/base/arch_topology.c | 237 +++++++++++++++++++++++++++++++++++++++++++
+>  7 files changed, 257 insertions(+), 423 deletions(-)
+>  create mode 100644 drivers/base/arch_topology.c
 
-While the init code executes in a *much* more controlled environment
-than the stub (which invokes various UEFI boot services to load
-initrds/dtb from block storage, and may do god knows what during
-ExitBootServices()), I think it is not unreasonable to split the init
-mapping into rx/rw segments, given that it is the only place where we
-have a good chunk of memory that is both writable and executable.
+Ah, so you want _me_ to maintain this, ok, I better review it...
 
-> Yould it perhaps make more sense to always use separate segments for
-> init/exit text/data, and also apply the permission split in the kernel?
->
-> With that, I don't think we'd need additional stub-specific linker
-> script changes.
->
+> --- a/drivers/base/Kconfig
+> +++ b/drivers/base/Kconfig
+> @@ -339,4 +339,12 @@ config CMA_ALIGNMENT
+>  
+>  endif
+>  
+> +config GENERIC_ARCH_TOPOLOGY
+> +	bool
+> +	help
+> +	  Enable support for architectures common topology code: e.g., parsing
+> +	  CPU capacity information from DT, usage of such information for
+> +	  appropriate scaling, sysfs interface for changing capacity values at
+> +          runtime.
 
-I will prototype this
+Mix of spaces and tabs :(
+
+> +
+>  endmenu
+> diff --git a/drivers/base/Makefile b/drivers/base/Makefile
+> index f2816f6ff76a..397e5c344e6a 100644
+> --- a/drivers/base/Makefile
+> +++ b/drivers/base/Makefile
+> @@ -23,6 +23,7 @@ obj-$(CONFIG_SOC_BUS) += soc.o
+>  obj-$(CONFIG_PINCTRL) += pinctrl.o
+>  obj-$(CONFIG_DEV_COREDUMP) += devcoredump.o
+>  obj-$(CONFIG_GENERIC_MSI_IRQ_DOMAIN) += platform-msi.o
+> +obj-$(CONFIG_GENERIC_ARCH_TOPOLOGY) += arch_topology.o
+>  
+>  obj-y			+= test/
+>  
+> diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
+> new file mode 100644
+> index 000000000000..c1dd430adad2
+> --- /dev/null
+> +++ b/drivers/base/arch_topology.c
+> @@ -0,0 +1,237 @@
+> +/*
+> + * driver/base/arch_topology.c - Arch specific cpu topology information
+
+No need to keep the filename in the file, you know what it is called :)
+
+> + *
+> + * Copyright (C) 2016, ARM Ltd.
+> + * Written by: Juri Lelli, ARM Ltd.
+> + *
+> + * This file is subject to the terms and conditions of the GNU General Public
+> + * License.  See the file "COPYING" in the main directory of this archive
+> + * for more details.
+
+So, v2 only?  Please be specific.  Even better yet, use a SPDX header if
+you want to, those are always nice.
+
+> + */
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/cpu.h>
+> +#include <linux/cpufreq.h>
+> +#include <linux/device.h>
+> +#include <linux/of.h>
+> +#include <linux/slab.h>
+> +#include <linux/string.h>
+> +#include <linux/topology.h>
+> +
+> +static DEFINE_MUTEX(cpu_scale_mutex);
+> +static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
+> +
+> +unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
+
+Why do you have sd here?  You never use it:
+
+> +{
+> +	return per_cpu(cpu_scale, cpu);
+
+See?  What am I missing?
+
+> +}
+> +
+> +void set_capacity_scale(unsigned int cpu, unsigned long capacity)
+> +{
+> +	per_cpu(cpu_scale, cpu) = capacity;
+> +}
+> +
+> +static ssize_t cpu_capacity_show(struct device *dev,
+> +				 struct device_attribute *attr,
+> +				 char *buf)
+> +{
+> +	struct cpu *cpu = container_of(dev, struct cpu, dev);
+> +
+> +	return sprintf(buf, "%lu\n",
+> +			arch_scale_cpu_capacity(NULL, cpu->dev.id));
+> +}
+> +
+> +static ssize_t cpu_capacity_store(struct device *dev,
+> +				  struct device_attribute *attr,
+> +				  const char *buf,
+> +				  size_t count)
+> +{
+> +	struct cpu *cpu = container_of(dev, struct cpu, dev);
+> +	int this_cpu = cpu->dev.id, i;
+
+new line for:
+	int i;
+please.
+
+> +	unsigned long new_capacity;
+> +	ssize_t ret;
+> +
+> +	if (count) {
+
+	if (!count)
+		return 0;
+
+then you can get on with the rest of the logic.  Don't indent if you
+don't have to.
+
+> +		ret = kstrtoul(buf, 0, &new_capacity);
+> +		if (ret)
+> +			return ret;
+> +		if (new_capacity > SCHED_CAPACITY_SCALE)
+> +			return -EINVAL;
+> +
+> +		mutex_lock(&cpu_scale_mutex);
+> +		for_each_cpu(i, &cpu_topology[this_cpu].core_sibling)
+> +			set_capacity_scale(i, new_capacity);
+> +		mutex_unlock(&cpu_scale_mutex);
+> +	}
+> +
+> +	return count;
+> +}
+
+No documentation for these sysfs file?  Not good :(
+
+> +
+> +static DEVICE_ATTR_RW(cpu_capacity);
+> +
+> +static int register_cpu_capacity_sysctl(void)
+> +{
+> +	int i;
+> +	struct device *cpu;
+> +
+> +	for_each_possible_cpu(i) {
+> +		cpu = get_cpu_device(i);
+> +		if (!cpu) {
+> +			pr_err("%s: too early to get CPU%d device!\n",
+> +			       __func__, i);
+
+What is this going to help with?
+
+> +			continue;
+> +		}
+> +		device_create_file(cpu, &dev_attr_cpu_capacity);
+
+You realize you just raced userspace, right?  Why do it this way and not
+register the files when the CPU device is created/removed?
+
+> +	}
+> +
+> +	return 0;
+> +}
+> +subsys_initcall(register_cpu_capacity_sysctl);
+> +
+> +u32 capacity_scale;
+> +u32 *raw_capacity;
+> +bool cap_parsing_failed;
+
+globals?  really?  That's bold :(
+
+> +
+> +void normalize_cpu_capacity(void)
+
+naming is hard, but try to put a good, descriptive, prefix on everything
+you are exporting in the same file, the same prefix.
+
+cpu_capacity_normalize()?
+cpu_capacity_register_sysctl()?
+
+and so on.
+
+> +{
+> +	u64 capacity;
+> +	int cpu;
+> +
+> +	if (!raw_capacity || cap_parsing_failed)
+> +		return;
+> +
+> +	pr_debug("cpu_capacity: capacity_scale=%u\n", capacity_scale);
+> +	mutex_lock(&cpu_scale_mutex);
+> +	for_each_possible_cpu(cpu) {
+> +		pr_debug("cpu_capacity: cpu=%d raw_capacity=%u\n",
+> +			 cpu, raw_capacity[cpu]);
+> +		capacity = (raw_capacity[cpu] << SCHED_CAPACITY_SHIFT)
+> +			/ capacity_scale;
+> +		set_capacity_scale(cpu, capacity);
+> +		pr_debug("cpu_capacity: CPU%d cpu_capacity=%lu\n",
+> +			cpu, arch_scale_cpu_capacity(NULL, cpu));
+> +	}
+> +	mutex_unlock(&cpu_scale_mutex);
+> +}
+> +
+> +int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
+
+cpu_capacity_parse()?
+
+thanks,
+
+greg k-h
