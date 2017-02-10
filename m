@@ -1,101 +1,72 @@
-From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
-Date: Fri, 10 Feb 2017 11:36:12 +0100
-Subject: [PATCHv3] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-In-Reply-To: <20170209162956.GH27312@n2100.armlinux.org.uk>
-References: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
- <20170209162956.GH27312@n2100.armlinux.org.uk>
-Message-ID: <CACh+v5NJ5zi4nEQkG+y_SesFuW8NOophD1KDFRG+t7=CtjnNrg@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 10 Feb 2017 10:49:43 +0000
+Subject: [PATCH v2 08/14] arm64: efi: split Image code and data into
+ separate PE/COFF sections
+In-Reply-To: <1486554947-3964-9-git-send-email-ard.biesheuvel@linaro.org>
+References: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1486554947-3964-9-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170210104942.GF28753@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-02-09 17:29 GMT+01:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
-> On Tue, Feb 07, 2017 at 10:57:55PM +0000, Abel Vesa wrote:
->> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
->> +
->> +.macro __ftrace_regs_caller
->> +
->> +     add     ip, sp, #4      @ move in IP the value of SP as it was
->> +                             @ before the push {lr} of the mcount mechanism
->> +     stmdb   sp!, {ip,lr,pc}
->> +     stmdb   sp!, {r0-r11,lr}
->> +
->> +     @ stack content at this point:
->> +     @ 0  4          44    48   52       56   60   64
->> +     @ R0 | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |
->
-> How important is this to be close to "struct pt_regs" ?  Do we care about
-> r12 being "wrong" ?  The other issue is that pt_regs is actually 72
-> bytes in size, not 68 bytes.  So, does that mean we end up inappropriately
-> leaking some of the kernel stack to userspace through ftrace?
->
-> It's possible to save all the registers like this if we need to provide
-> a complete picture of the register set at function entry:
->
->         str     ip, [sp, #-16]!
->         add     ip, sp, #20
->         stmia   sp, {ip, lr, pc}
->         stmdb   sp!, {r0 - r11}
->
-> However, is that even correct - don't we want pt_regs' LR and PC to be
-> related to the function call itself?  The "previous LR" as you describe
-> it is where the called function (the one that is being traced) will
-> return to.  The current LR at this point is the address within the
-> traced function.  So actually I think this is more strictly correct, if
-> I'm understanding the intention here correctly:
->
->         str     ip, [sp, #S_IP - PT_REGS_SIZE]! @ save current IP
->         ldr     ip, [sp, #PT_REGS_SIZE - S_IP]  @ get LR at traced function entry
->         str     lr, [sp, #S_PC - S_IP]          @ save current LR as PC
->         str     ip, [sp, #S_LR - S_IP]          @ save traced function return
->         add     ip, sp, #PT_REGS_SIZE - S_IP + 4
->         str     ip, [sp, #S_SP - SP_IP]         @ save stack pointer at function entry
->         stmdb   sp!, {r0 - r11}
->         @ clear CPSR and old_r0 words
->         mov     r3, #0
->         str     r3, [sp, #S_PSR]
->         str     r3, [sp, #S_OLD_R0]
->
-> However, that has the side effect of misaligning the stack (the stack
-> needs to be aligned to 8 bytes).  So, if we decide we don't care about
-> the saved LR value (except as a mechanism to preserve it across the
-> call into the ftrace code):
->
->         str     ip, [sp, #S_IP - PT_REGS_SIZE + 4]!
->         str     lr, [sp, #S_PC - S_IP]
->         ldr     lr, [sp, #PT_REGS_SIZE - 4 - S_IP]
->         add     ip, sp, #PT_REGS_SIZE - S_IP
->         stmib   sp, {ip, lr}
->         stmdb   sp!, {r0 - r11}
->         @ clear CPSR and old_r0 words
->         mov     r3, #0
->         str     r3, [sp, #S_PSR]
->         str     r3, [sp, #S_OLD_R0]
->
-> and the return would be:
->
->         ldmia   sp, {r0 - pc}
->
-> That all said - maybe someone from the ftrace community can comment on
-> how much of pt_regs is actually necessary here?
+On Wed, Feb 08, 2017 at 11:55:41AM +0000, Ard Biesheuvel wrote:
+> To prevent unintended modifications to the kernel text (malicious or
+> otherwise) while running the EFI stub, describe the kernel image as
+> two separate sections: a .text section with read-execute permissions,
+> covering .text, .rodata and .init.text, and a .data section with
+> read-write permissions, covering .init.data, .data and .bss.
+> 
+> This relies on the firmware to actually take the section permission
+> flags into account, but this is something that is currently being
+> implemented in EDK2, which means we will likely start seeing it in
+> the wild between one and two years from now.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-I would suggest the following:
-r0-r11: filled with current values.
-r12 :  the value of r12 doesn't matter (Intra-procedure call scratch
-reg), we can either save it or not.
-r13 - sp: the value as it was when the instrumented function was
-entered. in the mcount case, it's the current sp value - 4, otherwise
-it'f sp -4
-r14 - lr: the value as it was when the instrumented function was
-entered. first element in stack or available in frame depending on
-GCC's version (mcount vs __gnu_mcount_nc)
-r15 - pc : the address after the modified instruction (value of lr
-when the ftrace caller is entered)
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index b8deffa9e1bf..a93cc2b6f50b 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -149,6 +149,9 @@ SECTIONS
+>  		ARM_EXIT_KEEP(EXIT_TEXT)
+>  	}
+>  
+> +	. = ALIGN(SZ_4K);
+> +	__pecoff_data_start = .;
+> +
 
-I don't think we need CSPR and ORIG_r0.
+I understand that the stub needs to split the init text/data since
+unlike the kernel it'll map those with separate permissions, but it
+feels odd to do this specifically for the EFI stub.
 
->
-> --
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+Yould it perhaps make more sense to always use separate segments for
+init/exit text/data, and also apply the permission split in the kernel?
+
+With that, I don't think we'd need additional stub-specific linker
+script changes.
+
+Thanks,
+Mark.
+
+>  	.init.data : {
+>  		INIT_DATA
+>  		INIT_SETUP(16)
+> @@ -206,6 +209,7 @@ SECTIONS
+>  	}
+>  
+>  	PECOFF_EDATA_PADDING
+> +	__pecoff_data_rawsize = ABSOLUTE(. - __pecoff_data_start);
+>  	_edata = .;
+>  
+>  	BSS_SECTION(0, 0, 0)
+> @@ -221,6 +225,7 @@ SECTIONS
+>  	. += RESERVED_TTBR0_SIZE;
+>  #endif
+>  
+> +	__pecoff_data_size = ABSOLUTE(. - __pecoff_data_start);
+>  	_end = .;
+>  
+>  	STABS_DEBUG
+> -- 
+> 2.7.4
+> 
