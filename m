@@ -1,30 +1,58 @@
-From: yannick.fertre@st.com (Yannick Fertre)
-Date: Fri, 10 Feb 2017 16:24:30 +0100
-Subject: [PATCH v2 3/7] dt-bindings: Add Ampire AM-480272H3TMQW-T01H panel
-In-Reply-To: <1486740274-25958-1-git-send-email-yannick.fertre@st.com>
-References: <1486740274-25958-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1486740274-25958-4-git-send-email-yannick.fertre@st.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Fri, 10 Feb 2017 16:24:46 +0100
+Subject: [PATCH] atmel_serial: Use the fractional divider when possible
+Message-ID: <20170210152446.12674-1-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
----
- .../bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt         | 7 +++++++
- 1 file changed, 7 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+The fractional baud rate generator is available when using the
+asynchronous mode of Atmel USART controllers. It makes it possible to
+use higher baudrates, in exchange for a less precise clock with a
+variable duty cycle.
 
-diff --git a/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
-new file mode 100644
-index 0000000..f59e3c4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
-@@ -0,0 +1,7 @@
-+Ampire AM-480272H3TMQW-T01H 4.3" WQVGA TFT LCD panel
-+
-+Required properties:
-+- compatible: should be "ampire,am-480272h3tmqw-t01h"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
+The existing code restricts its use to the normal mode of the USART
+controller, following the recommendation from the datasheet for the
+first chip embedding this type of controller. This recommendation has
+been removed from the documentation for the newer chips. After
+verification, all revisions of this controller should be able to use the
+fractional baud rate generator with the different asynchronous modes.
+
+Removing the condition on ATMEL_US_USMODE makes it possible to get
+correct baudrates at high speed in more cases.
+
+This was tested with a board using an Atmel SAMA5D2 chip and a TI
+WL1831 WiFi/Bluetooth combo chip at 3 Mbauds, with hardware flow control
+enabled.
+
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+---
+ drivers/tty/serial/atmel_serial.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index fabbe76203bb..6684456dca9e 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1758,7 +1758,9 @@ static void atmel_get_ip_name(struct uart_port *port)
+ 
+ 	/*
+ 	 * Only USART devices from at91sam9260 SOC implement fractional
+-	 * baudrate.
++	 * baudrate. It is available for all asynchronous modes, with the
++	 * following restriction: the sampling clock's duty cycle is not
++	 * constant.
+ 	 */
+ 	atmel_port->has_frac_baudrate = false;
+ 	atmel_port->has_hw_timer = false;
+@@ -2202,8 +2204,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	 * then
+ 	 * 8 CD + FP = selected clock / (2 * baudrate)
+ 	 */
+-	if (atmel_port->has_frac_baudrate &&
+-	    (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
++	if (atmel_port->has_frac_baudrate) {
+ 		div = DIV_ROUND_CLOSEST(port->uartclk, baud * 2);
+ 		cd = div >> 3;
+ 		fp = div & ATMEL_US_FP_MASK;
 -- 
-1.9.1
+2.9.3
