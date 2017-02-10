@@ -1,35 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Feb 2017 16:40:47 +0100
-Subject: [PATCH 4/4] ARM: dts: add PCI to the Gemini DTSI
-In-Reply-To: <alpine.LNX.2.00.1702061038590.7077@T420s>
-References: <20170128204839.18330-1-linus.walleij@linaro.org>
- <CACRpkdbrys49Yv5fJ_te2H1mEUqquc1jn2dP-uvkdLixFbtYFA@mail.gmail.com>
- <alpine.LNX.2.00.1702061038590.7077@T420s>
-Message-ID: <3236035.PSA6VtheyS@wuerfel>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Fri, 10 Feb 2017 08:40:53 -0700
+Subject: [PATCH v2] media: s5p_mfc print buf pointer in hex constistently
+Message-ID: <20170210154053.23735-1-shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, February 6, 2017 10:55:03 AM CET Hans Ulli Kroll wrote:
-> 
-> from my IB 4220 sources.
-> 
-> #define IRQ_PCI_INTA                                   PCI_IRQ_OFFSET + 0
-> #ifndef CONFIG_DUAL_PCI
-> #define IRQ_PCI_INTB                                   PCI_IRQ_OFFSET + 1
-> #define IRQ_PCI_INTC                                   PCI_IRQ_OFFSET + 2
-> #define IRQ_PCI_INTD                                   PCI_IRQ_OFFSET + 3
-> #else
-> #define IRQ_PCI_INTB                                   27
-> #define IRQ_PCI_INTC                                   28
-> #define IRQ_PCI_INTD                                   29
-> #endif
-> 
-> CONFIG_DUAL_PCI is never used
-> IRQ_PCIB - IRQ_PCID or IRQ_PCI_INTB - IRQ_PCI_INTD are also never used.
-> 
-> 
+Fix s5p_mfc_set_dec_frame_buffer_v6() to print buffer pointer in hex to be
+consistent with the rest of the messages in the routine.
 
-The source code that Linus quoted earlier had references to 
-'IRQ_PCI_INTA +n' though, which is basically the same thing.
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+---
 
-	Arnd
+Fixed commit log. No code changes. Thanks for the catch.
+
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+index d6f207e..fc45980 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+@@ -497,7 +497,7 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
+ 		}
+ 	}
+ 
+-	mfc_debug(2, "Buf1: %zu, buf_size1: %d (frames %d)\n",
++	mfc_debug(2, "Buf1: %zx, buf_size1: %d (frames %d)\n",
+ 			buf_addr1, buf_size1, ctx->total_dpb_count);
+ 	if (buf_size1 < 0) {
+ 		mfc_debug(2, "Not enough memory has been allocated.\n");
+-- 
+2.7.4
