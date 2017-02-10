@@ -1,93 +1,65 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Fri, 10 Feb 2017 15:54:48 +0100
-Subject: [PATCH v2 8/9] ARM: dts: stm32: Enable ltdc & simple panel on
- stm32f429-Eval board
-In-Reply-To: <1486738489-22154-1-git-send-email-yannick.fertre@st.com>
-References: <1486738489-22154-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1486738489-22154-9-git-send-email-yannick.fertre@st.com>
+Date: Fri, 10 Feb 2017 15:54:40 +0100
+Subject: [PATCH v2 0/9] STM32 LCD-TFT display controller
+Message-ID: <1486738489-22154-1-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable ltdc & enable am-480272h3tmqw-t01h panel.
+Version 2:
+- Rename driver directory from st to stm.
+- Rename compatiblity from st,ltdc to st,stm32-ltdc.
+- Remove compatibility st,display-subsystem.
+- Rename driver from st-drm to stm-drm.
+- Rework probe sequence & remove display-subsystem part.
+- I keep clock name which is necessary for devm_regmap_init_mmio_clk call.
 
-Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
----
- arch/arm/boot/dts/stm32429i-eval.dts | 59 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+Version 1:
+- Initial commit
 
-diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-index 601a22a..5a5f941 100644
---- a/arch/arm/boot/dts/stm32429i-eval.dts
-+++ b/arch/arm/boot/dts/stm32429i-eval.dts
-@@ -110,6 +110,52 @@
- 		clocks = <&rcc 0 30>;
- 		clock-names = "main_clk";
- 	};
-+
-+	panel_rgb: panel-rgb {
-+		compatible = "ampire,am-480272h3tmqw-t01h";
-+		status = "okay";
-+		port {
-+			panel_in_rgb: endpoint {
-+				remote-endpoint = <&ltdc_out_rgb>;
-+			};
-+		};
-+	};
-+};
-+
-+&pinctrl {
-+	pinctrl_ltdc: ltdc at 0 {
-+		pins {
-+			pinmux = <STM32F429_PI12_FUNC_LCD_HSYNC>,
-+				 <STM32F429_PI13_FUNC_LCD_VSYNC>,
-+				 <STM32F429_PI14_FUNC_LCD_CLK>,
-+				 <STM32F429_PI15_FUNC_LCD_R0>,
-+				 <STM32F429_PJ0_FUNC_LCD_R1>,
-+				 <STM32F429_PJ1_FUNC_LCD_R2>,
-+				 <STM32F429_PJ2_FUNC_LCD_R3>,
-+				 <STM32F429_PJ3_FUNC_LCD_R4>,
-+				 <STM32F429_PJ4_FUNC_LCD_R5>,
-+				 <STM32F429_PJ5_FUNC_LCD_R6>,
-+				 <STM32F429_PJ6_FUNC_LCD_R7>,
-+				 <STM32F429_PJ7_FUNC_LCD_G0>,
-+				 <STM32F429_PJ8_FUNC_LCD_G1>,
-+				 <STM32F429_PJ9_FUNC_LCD_G2>,
-+				 <STM32F429_PJ10_FUNC_LCD_G3>,
-+				 <STM32F429_PJ11_FUNC_LCD_G4>,
-+				 <STM32F429_PJ12_FUNC_LCD_B0>,
-+				 <STM32F429_PJ13_FUNC_LCD_B1>,
-+				 <STM32F429_PJ14_FUNC_LCD_B2>,
-+				 <STM32F429_PJ15_FUNC_LCD_B3>,
-+				 <STM32F429_PK0_FUNC_LCD_G5>,
-+				 <STM32F429_PK1_FUNC_LCD_G6>,
-+				 <STM32F429_PK2_FUNC_LCD_G7>,
-+				 <STM32F429_PK3_FUNC_LCD_B4>,
-+				 <STM32F429_PK4_FUNC_LCD_B5>,
-+				 <STM32F429_PK5_FUNC_LCD_B6>,
-+				 <STM32F429_PK6_FUNC_LCD_B7>,
-+				 <STM32F429_PK7_FUNC_LCD_DE>;
-+			slew-rate = <2>;
-+		};
-+	};
- };
- 
- &clk_hse {
-@@ -146,3 +192,16 @@
- 	pinctrl-names = "default";
- 	status = "okay";
- };
-+
-+&ltdc {
-+	status = "okay";
-+	pinctrl-0 = <&pinctrl_ltdc>;
-+	pinctrl-names = "default";
-+	dma-ranges;
-+
-+	port {
-+		ltdc_out_rgb: endpoint {
-+			remote-endpoint = <&panel_in_rgb>;
-+		};
-+	};
-+};
+The purpose of this set of patches is to add a new driver for stm32f429.
+This driver was developed and tested on evaluation board stm32429i.
+
+Stm32f4 is a MCU platform which don't have MMU so the last patches developed
+by Benjamin Gaignard regarding "DRM: allow to use mmuless devices"
+are necessary.
+
+The board stm429i embeds a Ampire AM-480272H3TMQW-T01H screen.
+A new simple panel am-480272h3tmqw-t01h have been added to support it.
+
+Yannick Fertre (9):
+  dt-bindings: display: add STM32 LTDC driver
+  drm/st: Add STM32 LTDC driver
+  drm/st: Add STM32 LTDC driver
+  dt-bindings: Add Ampire AM-480272H3TMQW-T01H panel
+  drm/panel: simple: Add support for Ampire AM-480272H3TMQW-T01H
+  ARM: dts: stm32: Add ltdc support on stm32f429 MCU
+  ARM: dts: stm32: Add ltdc support on stm32f429 MCU
+  ARM: dts: stm32: Enable ltdc & simple panel on stm32f429-Eval board
+  ARM: configs: stm32: ADD LDTC support
+
+ .../display/panel/ampire,am-480272h3tmqw-t01h.txt  |    7 +
+ .../devicetree/bindings/display/st,stm32-ltdc.txt  |   37 +
+ arch/arm/boot/dts/stm32429i-eval.dts               |   59 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |   19 +-
+ arch/arm/configs/stm32_defconfig                   |    5 +
+ drivers/gpu/drm/Kconfig                            |    2 +
+ drivers/gpu/drm/Makefile                           |    1 +
+ drivers/gpu/drm/panel/panel-simple.c               |   29 +
+ drivers/gpu/drm/stm/Kconfig                        |   14 +
+ drivers/gpu/drm/stm/Makefile                       |    7 +
+ drivers/gpu/drm/stm/drv.c                          |  232 ++++
+ drivers/gpu/drm/stm/drv.h                          |   24 +
+ drivers/gpu/drm/stm/ltdc.c                         | 1381 ++++++++++++++++++++
+ drivers/gpu/drm/stm/ltdc.h                         |   22 +
+ 14 files changed, 1838 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+ create mode 100644 Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+ create mode 100644 drivers/gpu/drm/stm/Kconfig
+ create mode 100644 drivers/gpu/drm/stm/Makefile
+ create mode 100644 drivers/gpu/drm/stm/drv.c
+ create mode 100644 drivers/gpu/drm/stm/drv.h
+ create mode 100644 drivers/gpu/drm/stm/ltdc.c
+ create mode 100644 drivers/gpu/drm/stm/ltdc.h
+
 -- 
 1.9.1
