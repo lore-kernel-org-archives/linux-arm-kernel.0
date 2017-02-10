@@ -1,137 +1,66 @@
-From: abelvesa@gmail.com (Abel Vesa)
-Date: Fri, 10 Feb 2017 17:27:43 +0000
-Subject: [PATCHv3] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-In-Reply-To: <CACh+v5OiiN2tYPLyXgZswFiJ1daVDgfSFRXuRCDMDoyDsQNGxw@mail.gmail.com>
-References: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
- <20170209162956.GH27312@n2100.armlinux.org.uk>
- <CACh+v5NJ5zi4nEQkG+y_SesFuW8NOophD1KDFRG+t7=CtjnNrg@mail.gmail.com>
- <20170210120306.GA6825@nuc>
- <CACh+v5OiiN2tYPLyXgZswFiJ1daVDgfSFRXuRCDMDoyDsQNGxw@mail.gmail.com>
-Message-ID: <20170210172743.GC6825@nuc>
+From: john@metanate.com (John Keeping)
+Date: Fri, 10 Feb 2017 17:27:47 +0000
+Subject: [PATCH v3 21/24] drm/rockchip: dw-mipi-dsi: defer probe if
+ panel is not loaded
+In-Reply-To: <20170131192117.GE20076@art_vandelay>
+References: <20170129132444.25251-1-john@metanate.com>
+ <20170129132444.25251-22-john@metanate.com>
+ <20170131192117.GE20076@art_vandelay>
+Message-ID: <20170210172747.5f0afb0a.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2017 at 02:57:38PM +0100, Jean-Jacques Hiblot wrote:
-> 2017-02-10 13:03 GMT+01:00 Abel Vesa <abelvesa@gmail.com>:
-> > On Fri, Feb 10, 2017 at 11:36:12AM +0100, Jean-Jacques Hiblot wrote:
-> >> 2017-02-09 17:29 GMT+01:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
-> >> > On Tue, Feb 07, 2017 at 10:57:55PM +0000, Abel Vesa wrote:
-> >> >> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> >> >> +
-> >> >> +.macro __ftrace_regs_caller
-> >> >> +
-> >> >> +     add     ip, sp, #4      @ move in IP the value of SP as it was
-> >> >> +                             @ before the push {lr} of the mcount mechanism
-> >> >> +     stmdb   sp!, {ip,lr,pc}
-> >> >> +     stmdb   sp!, {r0-r11,lr}
-> >> >> +
-> >> >> +     @ stack content at this point:
-> >> >> +     @ 0  4          44    48   52       56   60   64
-> >> >> +     @ R0 | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |
-> >> >
-> >> > How important is this to be close to "struct pt_regs" ?  Do we care about
-> >> > r12 being "wrong" ?  The other issue is that pt_regs is actually 72
-> >> > bytes in size, not 68 bytes.  So, does that mean we end up inappropriately
-> >> > leaking some of the kernel stack to userspace through ftrace?
-> >> >
-> >> > It's possible to save all the registers like this if we need to provide
-> >> > a complete picture of the register set at function entry:
-> >> >
-> >> >         str     ip, [sp, #-16]!
-> >> >         add     ip, sp, #20
-> >> >         stmia   sp, {ip, lr, pc}
-> >> >         stmdb   sp!, {r0 - r11}
-> >> >
-> >> > However, is that even correct - don't we want pt_regs' LR and PC to be
-> >> > related to the function call itself?  The "previous LR" as you describe
-> >> > it is where the called function (the one that is being traced) will
-> >> > return to.  The current LR at this point is the address within the
-> >> > traced function.  So actually I think this is more strictly correct, if
-> >> > I'm understanding the intention here correctly:
-> >> >
-> >> >         str     ip, [sp, #S_IP - PT_REGS_SIZE]! @ save current IP
-> >> >         ldr     ip, [sp, #PT_REGS_SIZE - S_IP]  @ get LR at traced function entry
-> >> >         str     lr, [sp, #S_PC - S_IP]          @ save current LR as PC
-> >> >         str     ip, [sp, #S_LR - S_IP]          @ save traced function return
-> >> >         add     ip, sp, #PT_REGS_SIZE - S_IP + 4
-> >> >         str     ip, [sp, #S_SP - SP_IP]         @ save stack pointer at function entry
-> >> >         stmdb   sp!, {r0 - r11}
-> >> >         @ clear CPSR and old_r0 words
-> >> >         mov     r3, #0
-> >> >         str     r3, [sp, #S_PSR]
-> >> >         str     r3, [sp, #S_OLD_R0]
-> >> >
-> >> > However, that has the side effect of misaligning the stack (the stack
-> >> > needs to be aligned to 8 bytes).  So, if we decide we don't care about
-> >> > the saved LR value (except as a mechanism to preserve it across the
-> >> > call into the ftrace code):
-> >> >
-> >> >         str     ip, [sp, #S_IP - PT_REGS_SIZE + 4]!
-> >> >         str     lr, [sp, #S_PC - S_IP]
-> >> >         ldr     lr, [sp, #PT_REGS_SIZE - 4 - S_IP]
-> >> >         add     ip, sp, #PT_REGS_SIZE - S_IP
-> >> >         stmib   sp, {ip, lr}
-> >> >         stmdb   sp!, {r0 - r11}
-> >> >         @ clear CPSR and old_r0 words
-> >> >         mov     r3, #0
-> >> >         str     r3, [sp, #S_PSR]
-> >> >         str     r3, [sp, #S_OLD_R0]
-> >> >
-> >> > and the return would be:
-> >> >
-> >> >         ldmia   sp, {r0 - pc}
-> >> >
-> >> > That all said - maybe someone from the ftrace community can comment on
-> >> > how much of pt_regs is actually necessary here?
-> >>
-> >> I would suggest the following:
-> >> r0-r11: filled with current values.
-> >> r12 :  the value of r12 doesn't matter (Intra-procedure call scratch
-> >> reg), we can either save it or not.
-> >> r13 - sp: the value as it was when the instrumented function was
-> >> entered. in the mcount case, it's the current sp value - 4, otherwise
-> >> it'f sp -4
-> >> r14 - lr: the value as it was when the instrumented function was
-> >> entered. first element in stack or available in frame depending on
-> >> GCC's version (mcount vs __gnu_mcount_nc)
-> >> r15 - pc : the address after the modified instruction (value of lr
-> >> when the ftrace caller is entered)
-> >>
-> > So basically you're saying: save all regs, r0 through r15, except r12.
-> > Based on that, I think it's easier to save all of them and then restore
-> > all of them except r12. Plus, you have to take into consideration all
-> > the possible users of ftrace with regs. At some point some implementation
-> > of ftrace_regs_call will probably need the value from r12.
-> >> I don't think we need CSPR and ORIG_r0.
-> > I think we do. As I said before, because PT_REGS is 72 and some function
-> > might (in the future) make use of CSPR or ORIG_r0, to ensure there is no
-> > stack corruption taking place, we have to provide whole pt_regs, that is
-> > 72 (including CSPR and ORIG_r0). Plus, the stack alignment thing Russell
-> > mentioned would be fixed.
-> You're right for the size of the structure. For the content, I don't
-> think we need all of them but it won't hurt to save more than
-> necessary.
-Exactly.
-> >
-> > The only problem I don't have a solution for at this point is OLD_LR (or previous LR
-> > as it is called in this patch). If we take the approach described earlier,
-> 
-> previous LR is the lr when the instrumented function is entered, it
-> should be stored in pt_regs as r14
-> 
-No, I disagree. I just realized I was also wrong. It doesn't have to be a part of 
-pt_regs at all. prepare_ftrace_return will receive it as first parameter due to this:
+On Tue, 31 Jan 2017 14:21:17 -0500, Sean Paul wrote:
 
- sub     r0, fp, #4              @ lr of instrumented routine (parent)
+> On Sun, Jan 29, 2017 at 01:24:41PM +0000, John Keeping wrote:
+> > This ensures that the output resolution is known before fbcon loads.
+> > 
+> > Signed-off-by: John Keeping <john@metanate.com>
+> > ---
+> > Unchanged in v3
+> > Unchanged in v2
+> > 
+> >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 11 +++++++++--
+> >  1 file changed, 9 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > index f5b15377ef85..5bad92e2370e 100644
+> > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > @@ -1176,10 +1176,17 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+> >  
+> >  	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
+> >  	dsi->dsi_host.dev = dev;
+> > -	return mipi_dsi_host_register(&dsi->dsi_host);
+> > +	ret = mipi_dsi_host_register(&dsi->dsi_host);
+> > +	if (!ret && !dsi->panel) {
+> > +		mipi_dsi_host_unregister(&dsi->dsi_host);
+> > +		drm_encoder_cleanup(&dsi->encoder);
+> > +		drm_connector_cleanup(&dsi->connector);  
+> 
+> Move the host registration up before dw_mipi_dsi_register() to avoid
+> having to clean up the encoder and connector?
 
-first instruction in __ftrace_graph_regs_caller.
-> > we need to add to pt_regs the OLD_LR which I really don't like because it is
-> > breaking the whole purpose of pt_regs (it should only contain one copy of each reg,
-> > though it already has the ORIG_r0 in it) and will also break the stack alignment.
-> >>
-> >> >
-> >> > --
-> >> > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> >> > FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> >> > according to speedtest.net.
+No, mipi_dsi_host_register() has to be called after the connector is
+registered because it is likely to result in a call to
+dw_mipi_dsi_host_attach() which attaches a panel to the connector.
+
+> > +		ret = -EPROBE_DEFER;
+> > +	}
+> >  
+> >  err_pllref:
+> > -	clk_disable_unprepare(dsi->pllref_clk);
+> > +	if (ret)  
+> 
+> I personally think it's cleaner to explicitly goto in the error conditional (or
+> in this case, the defer conditional) and have a return 0; right before the err_*
+> labels. Then you don't need to worry about a) checking ret in all of your
+> cleanups and b) someone adding code above the labels that you don't intend to
+> run.
+
+Agreed.  I'll change this to use a goto if we hit the EPROBE_DEFER case
+and keep all the cleanup together.
+
+> > +		clk_disable_unprepare(dsi->pllref_clk);
+> >  	return ret;
+> >  }
