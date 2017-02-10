@@ -1,58 +1,63 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri, 10 Feb 2017 16:24:46 +0100
-Subject: [PATCH] atmel_serial: Use the fractional divider when possible
-Message-ID: <20170210152446.12674-1-romain.izard.pro@gmail.com>
+From: yannick.fertre@st.com (Yannick Fertre)
+Date: Fri, 10 Feb 2017 16:24:27 +0100
+Subject: [PATCH v2 0/7] STM32 LCD-TFT display controller
+Message-ID: <1486740274-25958-1-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fractional baud rate generator is available when using the
-asynchronous mode of Atmel USART controllers. It makes it possible to
-use higher baudrates, in exchange for a less precise clock with a
-variable duty cycle.
+Version 2:
+- Rename driver directory from st to stm.
+- Rename compatiblity from st,ltdc to st,stm32-ltdc.
+- Remove compatibility st,display-subsystem.
+- Rename driver from st-drm to stm-drm.
+- Rework probe sequence & remove display-subsystem part.
+- I keep clock name which is necessary for devm_regmap_init_mmio_clk call.
 
-The existing code restricts its use to the normal mode of the USART
-controller, following the recommendation from the datasheet for the
-first chip embedding this type of controller. This recommendation has
-been removed from the documentation for the newer chips. After
-verification, all revisions of this controller should be able to use the
-fractional baud rate generator with the different asynchronous modes.
+Version 1:
+- Initial commit
 
-Removing the condition on ATMEL_US_USMODE makes it possible to get
-correct baudrates at high speed in more cases.
+The purpose of this set of patches is to add a new driver for stm32f429.
+This driver was developed and tested on evaluation board stm32429i.
 
-This was tested with a board using an Atmel SAMA5D2 chip and a TI
-WL1831 WiFi/Bluetooth combo chip at 3 Mbauds, with hardware flow control
-enabled.
+Stm32f4 is a MCU platform which don't have MMU so the last patches developed
+by Benjamin Gaignard regarding "DRM: allow to use mmuless devices"
+are necessary.
 
-Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
----
- drivers/tty/serial/atmel_serial.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+The board stm429i embeds a Ampire AM-480272H3TMQW-T01H screen.
+A new simple panel am-480272h3tmqw-t01h have been added to support it.
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index fabbe76203bb..6684456dca9e 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1758,7 +1758,9 @@ static void atmel_get_ip_name(struct uart_port *port)
- 
- 	/*
- 	 * Only USART devices from at91sam9260 SOC implement fractional
--	 * baudrate.
-+	 * baudrate. It is available for all asynchronous modes, with the
-+	 * following restriction: the sampling clock's duty cycle is not
-+	 * constant.
- 	 */
- 	atmel_port->has_frac_baudrate = false;
- 	atmel_port->has_hw_timer = false;
-@@ -2202,8 +2204,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
- 	 * then
- 	 * 8 CD + FP = selected clock / (2 * baudrate)
- 	 */
--	if (atmel_port->has_frac_baudrate &&
--	    (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
-+	if (atmel_port->has_frac_baudrate) {
- 		div = DIV_ROUND_CLOSEST(port->uartclk, baud * 2);
- 		cd = div >> 3;
- 		fp = div & ATMEL_US_FP_MASK;
+Yannick Fertre (9):
+  dt-bindings: display: add STM32 LTDC driver
+  drm/st: Add STM32 LTDC driver
+  dt-bindings: Add Ampire AM-480272H3TMQW-T01H panel
+  drm/panel: simple: Add support for Ampire AM-480272H3TMQW-T01H
+  ARM: dts: stm32: Add ltdc support on stm32f429 MCU
+  ARM: dts: stm32: Enable ltdc & simple panel on stm32f429-Eval board
+  ARM: configs: stm32: ADD LDTC support
+
+ .../display/panel/ampire,am-480272h3tmqw-t01h.txt  |    7 +
+ .../devicetree/bindings/display/st,stm32-ltdc.txt  |   37 +
+ arch/arm/boot/dts/stm32429i-eval.dts               |   59 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |   19 +-
+ arch/arm/configs/stm32_defconfig                   |    5 +
+ drivers/gpu/drm/Kconfig                            |    2 +
+ drivers/gpu/drm/Makefile                           |    1 +
+ drivers/gpu/drm/panel/panel-simple.c               |   29 +
+ drivers/gpu/drm/stm/Kconfig                        |   14 +
+ drivers/gpu/drm/stm/Makefile                       |    7 +
+ drivers/gpu/drm/stm/drv.c                          |  232 ++++
+ drivers/gpu/drm/stm/drv.h                          |   24 +
+ drivers/gpu/drm/stm/ltdc.c                         | 1381 ++++++++++++++++++++
+ drivers/gpu/drm/stm/ltdc.h                         |   22 +
+ 14 files changed, 1838 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+ create mode 100644 Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
+ create mode 100644 drivers/gpu/drm/stm/Kconfig
+ create mode 100644 drivers/gpu/drm/stm/Makefile
+ create mode 100644 drivers/gpu/drm/stm/drv.c
+ create mode 100644 drivers/gpu/drm/stm/drv.h
+ create mode 100644 drivers/gpu/drm/stm/ltdc.c
+ create mode 100644 drivers/gpu/drm/stm/ltdc.h
+
 -- 
-2.9.3
+1.9.1
