@@ -1,33 +1,38 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 10 Feb 2017 13:28 +0100
-Subject: [PATCH v6 2/4] Documentation: dt: add bindings for ti-cpufreq
-In-Reply-To: <20170210031349.GG14503@vireshk-i7>
-References: <20170203172929.23940-3-d-gerlach@ti.com>
- <CAJZ5v0hT4peuRQUrLHC32GmVSoa6Npv2qutNo2WEhne72hHi6A@mail.gmail.com>
- <20170210031349.GG14503@vireshk-i7>
-Message-ID: <3046998.7dExGlRDb3@aspire.rjw.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Feb 2017 13:39:37 +0100
+Subject: Aarch64 kernel with 32bit userspace question
+In-Reply-To: <78db1867-9bd2-b1f6-ea3f-86aa08c199f5@denx.de>
+References: <0057242a-2e16-3b59-1f81-9f4ccf64216d@denx.de>
+ <20170209122509.GD27312@n2100.armlinux.org.uk>
+ <78db1867-9bd2-b1f6-ea3f-86aa08c199f5@denx.de>
+Message-ID: <6172994.uov8zcY07Z@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, February 10, 2017 08:43:49 AM Viresh Kumar wrote:
-> On 09-02-17, 23:03, Rafael J. Wysocki wrote:
-> > In particular, Viresh, if you ACK something, please make sure that it
-> > doesn't conflict with your own patches.
+On Thursday, February 9, 2017 9:38:41 PM CET Marek Vasut wrote:
+> > 
+> > The default kernel headers_install will want to place the headers into
+> > <includepath>/asm along side <includepath>/asm-generic and
+> > <includepath>/linux which is not what modern ARM distros want.
 > 
-> I hope you are talking about the patch 3/4 for which Arnd also sent a
-> fix.  I acked it back on 18th of January and Dave has been carrying my
-> Ack since then. When he posted again, I didn't went into reviewing it
-> again as I saw my Ack being there.
+> Thanks for all the help, it at least helped me get a better picture how
+> the multilib stuff works on arm/aarch64 .
+> 
+> It turns out that OE is not yet able to generate multilib sdk, while it
+> is able to generate multilib system image. Therefore, while I had two
+> different compilers, only one sysroot was installed (aarch64 one) and
+> both were pointing into it. The 32bit compiler used the wrong headers,
+> so I ran into this issue.  I'll have to drill into the OE further to
+> figure out the proper solution.
 
-Well, OK, but you did know that the OPP API had changed in the meantime,
-so it wouldn't have hurt to double check I suppose?
+It seems the support for biarch headers was removed from the kernel
+a few years before arm64 got merged: https://lkml.org/lkml/2008/6/30/467
 
-> Yes, he ended up using an API which just got updated after 18th of Jan
-> and yes both me and Dave missed that. But I feel it is difficult to
-> take care of scenarios like this. Perhaps he should have made sure
-> that he base it of pm/linux-next and nothing would have gone wrong.
+You could still use "make headers_install_all" in place of
+"make headers_install" in 
+http://git.yoctoproject.org/cgit.cgi/poky/plain/meta/recipes-kernel/linux-libc-headers/linux-libc-headers.inc
+but you still have to figure out how to find the right headers,
+either by moving the two asm directories to /usr/{arm,aarch64}-linux-gnu/include/asm
+or by doing the same trick that we had before the 2008 patch.
 
-Yes, that would help, but then how to enforce that?
-
-Thanks,
-Rafael
+	Arnd
