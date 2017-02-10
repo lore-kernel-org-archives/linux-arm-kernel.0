@@ -1,55 +1,63 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 10 Feb 2017 07:49:44 +0100
-Subject: i.MX7 clock support broken
-In-Reply-To: <AM4PR0401MB22602ECF28CCB7172B917EC2FF440@AM4PR0401MB2260.eurprd04.prod.outlook.com>
-References: <20170207142225.zitac2r7g3kvowjw@pengutronix.de>
- <DB5PR04MB1431EB280E8B9BA929FF006D80420@DB5PR04MB1431.eurprd04.prod.outlook.com>
- <AM4PR0401MB22602ECF28CCB7172B917EC2FF440@AM4PR0401MB2260.eurprd04.prod.outlook.com>
-Message-ID: <20170210064944.vshtcr62xqcvjsmh@pengutronix.de>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Fri, 10 Feb 2017 07:58:41 +0100
+Subject: [PATCH v2 1/4] [media] exynos-gsc: Use 576p instead 720p as a
+ threshold for colorspaces
+In-Reply-To: <20170209200420.3046-2-thibault.saunier@osg.samsung.com>
+References: <20170209200420.3046-1-thibault.saunier@osg.samsung.com>
+ <CGME20170209200635epcas1p468de5bbd46e247ff583d3d97cfe1840b@epcas1p4.samsung.com>
+ <20170209200420.3046-2-thibault.saunier@osg.samsung.com>
+Message-ID: <9d2b9454-7ed0-b596-05eb-e0588311fc94@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2017 at 03:37:38AM +0000, Andy Duan wrote:
-> From: A.S. Dong Sent: Thursday, February 09, 2017 12:47 AM
-> >To: Sascha Hauer <s.hauer@pengutronix.de>; linux-arm-
-> >kernel at lists.infradead.org
-> >Cc: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
-> ><fabio.estevam@nxp.com>; kernel at pengutronix.de; Andy Duan
-> ><fugang.duan@nxp.com>; Frank Li <frank.li@nxp.com>
-> >Subject: RE: i.MX7 clock support broken
-> >
-> >Hi Sascha,
-> >
-> >> -----Original Message-----
-> >> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> >> Sent: Tuesday, February 07, 2017 10:22 PM
-> >> To: linux-arm-kernel at lists.infradead.org
-> >> Cc: Shawn Guo; A.S. Dong; Fabio Estevam; kernel at pengutronix.de
-> >> Subject: i.MX7 clock support broken
-> >>
-> >> Hi All,
-> >>
-> >> I recently adopted the i.MX7 clock tree from Linux to barebox and
-> >> wondered why ethernet doesn't work.
-> >
-> >I just reproduced the issue on MX7D SDB board with latest upstream kernel
-> >That kernel NULL point crash during boot on fec_enet_open->..-
-> >>phy_attach_direct.
-> >
-> 
-> The issue was caused by one patch submitted at 2017 Jan.31
+On 09.02.2017 21:04, Thibault Saunier wrote:
+> From: Javier Martinez Canillas <javier@osg.samsung.com>
+>
+> The media documentation says that the V4L2_COLORSPACE_SMPTE170M colorspace
+> should be used for SDTV and V4L2_COLORSPACE_REC709 for HDTV. But drivers
+> don't agree on the display resolution that should be used as a threshold.
+>
+> Some drivers set V4L2_COLORSPACE_REC709 for 720p and higher while others
+> set V4L2_COLORSPACE_REC709 for anything higher than 576p. Newers drivers
+> use the latter and that also matches what user-space multimedia programs
+> do (i.e: GStreamer), so change the driver logic to be aligned with this.
+>
+> Also, check for the resolution in G_FMT instead unconditionally setting
+> the V4L2_COLORSPACE_REC709 colorspace.
+>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-The issue I was talking about is that the clock driver does not control
-the real ethernet clocks, but instead some non existing clocks. This
-issue does not cause any problems in the kernel at all, because when
-the ethernet clocks have been enabled in the bootloader then everything
-runs smoothly in the kernel. Nevertheless the kernel driver is buggy of
-course, the actual clocks are never turned off when not needed.
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+--
+Regards
+Andrzej
+> ---
+>  drivers/media/platform/exynos-gsc/gsc-core.c | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
+> index cbb03768f5d7..2beb43401987 100644
+> --- a/drivers/media/platform/exynos-gsc/gsc-core.c
+> +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
+> @@ -445,7 +445,7 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
+>  
+>  	pix_mp->num_planes = fmt->num_planes;
+>  
+> -	if (pix_mp->width >= 1280) /* HD */
+> +	if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
+>  		pix_mp->colorspace = V4L2_COLORSPACE_REC709;
+>  	else /* SD */
+>  		pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
+> @@ -492,7 +492,10 @@ int gsc_g_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
+>  	pix_mp->height		= frame->f_height;
+>  	pix_mp->field		= V4L2_FIELD_NONE;
+>  	pix_mp->pixelformat	= frame->fmt->pixelformat;
+> -	pix_mp->colorspace	= V4L2_COLORSPACE_REC709;
+> +	if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
+> +		pix_mp->colorspace = V4L2_COLORSPACE_REC709;
+> +	else /* SD */
+> +		pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
+>  	pix_mp->num_planes	= frame->fmt->num_planes;
+>  
+>  	for (i = 0; i < pix_mp->num_planes; ++i) {
