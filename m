@@ -1,174 +1,128 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 10 Feb 2017 14:57:09 +0100
-Subject: [PATCH v8 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
-In-Reply-To: <d299ae6c-78dc-9049-6bed-dc84fff17db3@samsung.com>
-References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170209142309eucas1p2b1277d96139eafc0d1dcc14145600476@eucas1p2.samsung.com>
- <1486650171-20598-4-git-send-email-m.szyprowski@samsung.com>
- <20170210045004.GN19244@localhost>
- <d299ae6c-78dc-9049-6bed-dc84fff17db3@samsung.com>
-Message-ID: <CAPDyKFqW2av1mjDvRP=R1my2kepeX69TS6cchzoHmwaoydT5Sg@mail.gmail.com>
+From: jjhiblot@traphandler.com (Jean-Jacques Hiblot)
+Date: Fri, 10 Feb 2017 14:57:38 +0100
+Subject: [PATCHv3] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <20170210120306.GA6825@nuc>
+References: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
+ <20170209162956.GH27312@n2100.armlinux.org.uk>
+ <CACh+v5NJ5zi4nEQkG+y_SesFuW8NOophD1KDFRG+t7=CtjnNrg@mail.gmail.com>
+ <20170210120306.GA6825@nuc>
+Message-ID: <CACh+v5OiiN2tYPLyXgZswFiJ1daVDgfSFRXuRCDMDoyDsQNGxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 February 2017 at 12:51, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> Hi Vinod,
->
-> On 2017-02-10 05:50, Vinod Koul wrote:
+2017-02-10 13:03 GMT+01:00 Abel Vesa <abelvesa@gmail.com>:
+> On Fri, Feb 10, 2017 at 11:36:12AM +0100, Jean-Jacques Hiblot wrote:
+>> 2017-02-09 17:29 GMT+01:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
+>> > On Tue, Feb 07, 2017 at 10:57:55PM +0000, Abel Vesa wrote:
+>> >> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+>> >> +
+>> >> +.macro __ftrace_regs_caller
+>> >> +
+>> >> +     add     ip, sp, #4      @ move in IP the value of SP as it was
+>> >> +                             @ before the push {lr} of the mcount mechanism
+>> >> +     stmdb   sp!, {ip,lr,pc}
+>> >> +     stmdb   sp!, {r0-r11,lr}
+>> >> +
+>> >> +     @ stack content at this point:
+>> >> +     @ 0  4          44    48   52       56   60   64
+>> >> +     @ R0 | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |
+>> >
+>> > How important is this to be close to "struct pt_regs" ?  Do we care about
+>> > r12 being "wrong" ?  The other issue is that pt_regs is actually 72
+>> > bytes in size, not 68 bytes.  So, does that mean we end up inappropriately
+>> > leaking some of the kernel stack to userspace through ftrace?
+>> >
+>> > It's possible to save all the registers like this if we need to provide
+>> > a complete picture of the register set at function entry:
+>> >
+>> >         str     ip, [sp, #-16]!
+>> >         add     ip, sp, #20
+>> >         stmia   sp, {ip, lr, pc}
+>> >         stmdb   sp!, {r0 - r11}
+>> >
+>> > However, is that even correct - don't we want pt_regs' LR and PC to be
+>> > related to the function call itself?  The "previous LR" as you describe
+>> > it is where the called function (the one that is being traced) will
+>> > return to.  The current LR at this point is the address within the
+>> > traced function.  So actually I think this is more strictly correct, if
+>> > I'm understanding the intention here correctly:
+>> >
+>> >         str     ip, [sp, #S_IP - PT_REGS_SIZE]! @ save current IP
+>> >         ldr     ip, [sp, #PT_REGS_SIZE - S_IP]  @ get LR at traced function entry
+>> >         str     lr, [sp, #S_PC - S_IP]          @ save current LR as PC
+>> >         str     ip, [sp, #S_LR - S_IP]          @ save traced function return
+>> >         add     ip, sp, #PT_REGS_SIZE - S_IP + 4
+>> >         str     ip, [sp, #S_SP - SP_IP]         @ save stack pointer at function entry
+>> >         stmdb   sp!, {r0 - r11}
+>> >         @ clear CPSR and old_r0 words
+>> >         mov     r3, #0
+>> >         str     r3, [sp, #S_PSR]
+>> >         str     r3, [sp, #S_OLD_R0]
+>> >
+>> > However, that has the side effect of misaligning the stack (the stack
+>> > needs to be aligned to 8 bytes).  So, if we decide we don't care about
+>> > the saved LR value (except as a mechanism to preserve it across the
+>> > call into the ftrace code):
+>> >
+>> >         str     ip, [sp, #S_IP - PT_REGS_SIZE + 4]!
+>> >         str     lr, [sp, #S_PC - S_IP]
+>> >         ldr     lr, [sp, #PT_REGS_SIZE - 4 - S_IP]
+>> >         add     ip, sp, #PT_REGS_SIZE - S_IP
+>> >         stmib   sp, {ip, lr}
+>> >         stmdb   sp!, {r0 - r11}
+>> >         @ clear CPSR and old_r0 words
+>> >         mov     r3, #0
+>> >         str     r3, [sp, #S_PSR]
+>> >         str     r3, [sp, #S_OLD_R0]
+>> >
+>> > and the return would be:
+>> >
+>> >         ldmia   sp, {r0 - pc}
+>> >
+>> > That all said - maybe someone from the ftrace community can comment on
+>> > how much of pt_regs is actually necessary here?
 >>
->> On Thu, Feb 09, 2017 at 03:22:51PM +0100, Marek Szyprowski wrote:
+>> I would suggest the following:
+>> r0-r11: filled with current values.
+>> r12 :  the value of r12 doesn't matter (Intra-procedure call scratch
+>> reg), we can either save it or not.
+>> r13 - sp: the value as it was when the instrumented function was
+>> entered. in the mcount case, it's the current sp value - 4, otherwise
+>> it'f sp -4
+>> r14 - lr: the value as it was when the instrumented function was
+>> entered. first element in stack or available in frame depending on
+>> GCC's version (mcount vs __gnu_mcount_nc)
+>> r15 - pc : the address after the modified instruction (value of lr
+>> when the ftrace caller is entered)
 >>
->>> +static int pl330_set_slave(struct dma_chan *chan, struct device *slave)
->>> +{
->>> +       struct dma_pl330_chan *pch = to_pchan(chan);
->>> +       struct pl330_dmac *pl330 = pch->dmac;
->>> +       int i;
->>> +
->>> +       mutex_lock(&pl330->rpm_lock);
->>> +
->>> +       for (i = 0; i < pl330->num_peripherals; i++) {
->>> +               if (pl330->peripherals[i].chan.slave == slave &&
->>> +                   pl330->peripherals[i].slave_link) {
->>> +                       pch->slave_link =
->>> pl330->peripherals[i].slave_link;
->>> +                       goto done;
->>> +               }
->>> +       }
->>> +
->>> +       pch->slave_link = device_link_add(slave, pl330->ddma.dev,
->>> +                                      DL_FLAG_PM_RUNTIME |
->>> DL_FLAG_RPM_ACTIVE);
+> So basically you're saying: save all regs, r0 through r15, except r12.
+> Based on that, I think it's easier to save all of them and then restore
+> all of them except r12. Plus, you have to take into consideration all
+> the possible users of ftrace with regs. At some point some implementation
+> of ftrace_regs_call will probably need the value from r12.
+>> I don't think we need CSPR and ORIG_r0.
+> I think we do. As I said before, because PT_REGS is 72 and some function
+> might (in the future) make use of CSPR or ORIG_r0, to ensure there is no
+> stack corruption taking place, we have to provide whole pt_regs, that is
+> 72 (including CSPR and ORIG_r0). Plus, the stack alignment thing Russell
+> mentioned would be fixed.
+You're right for the size of the structure. For the content, I don't
+think we need all of them but it won't hurt to save more than
+necessary.
+>
+> The only problem I don't have a solution for at this point is OLD_LR (or previous LR
+> as it is called in this patch). If we take the approach described earlier,
+
+previous LR is the lr when the instrumented function is entered, it
+should be stored in pt_regs as r14
+
+> we need to add to pt_regs the OLD_LR which I really don't like because it is
+> breaking the whole purpose of pt_regs (it should only contain one copy of each reg,
+> though it already has the ORIG_r0 in it) and will also break the stack alignment.
 >>
->> So you are going to add the link on channel allocation and tear down on
->> the
->> freeup.
->
->
-> Right. Channel allocation is typically done once per driver operation and it
-> won't hurt system performance.
->
->>   I am not sure I really like the idea here.
->
->
-> Could you point what's wrong with it?
->
->> First, these thing shouldn't be handled in the drivers. These things
->> should
->> be set in core and each driver setting the links doesn't sound great to
->> me.
->
->
-> Which core? And what's wrong with the device links? They have been
-> introduced to
-> model relations between devices that are behind the usual parent/child/bus
-> topology.
-
-I think Vinod mean the dmaengine core. Which also would make perfect
-sense to me as it would benefit all dma drivers.
-
-The only related PM thing, that shall be the decision of the driver,
-is whether it wants to enable runtime PM or not, during ->probe().
-
->
->> Second, should the link be always there and we only mange the state? Here
->> it
->> seems that we have link being created and destroyed, so why not mark it
->> ACTIVE and DORMANT instead...
->
->
-> Link state is managed by device core and should not be touched by the
-> drivers.
-> It is related to both provider and consumer drivers states (probed/not
-> probed/etc).
->
-> Second we would need to create those links first. The question is where to
-> create them then.
-
-Just to fill in, to me this is really also the key question.
-
-If we could set up the device link already at device initialization,
-it should also be possible to avoid getting -EPROBE_DEFER for dma
-client drivers when requesting their dma channels.
-
->
->> Lastly, looking at th description of the issue here, am perceiving (maybe
->> my
->> understanding is not quite right here) that you have an IP block in SoC
->> which has multiple things and share common stuff and doing right PM is a
->> challenge for you, right?
->
->
-> Nope. Doing right PM in my SoC is not that complex and I would say it is
-> rather
-> typical for any embedded stuff. It works fine (in terms of the power
-> consumption reduction) when all drivers simply properly manage their runtime
-> PM state, thus if device is not in use, the state is set to suspended and
-> finally, the power domain gets turned off.
->
-> I've used device links for PM only because the current DMA engine API is
-> simply insufficient to implement it in the other way.
->
-> I want to let a power domain, which contains a few devices, among those a
-> PL330
-> device, to get turned off when there is no activity. Handling power domain
-> power
-> on / off requires non-atomic context, what is typical for runtime pm calls.
-> For
-> that I need to have non-irq-safe runtime pm implemented for all devices that
-> belongs to that domains.
-
-Again, allow me to fill in. This issue exists for all ARM SoC which
-has a dma controller residing in a PM domain. I think that is quite
-many.
-
-Currently the only solution I have seen for this problem, but which I
-really dislike. That is, each dma client driver requests/releases
-their dma channel from their respective ->runtime_suspend|resume()
-callbacks - then the dma driver can use the dma request/release hooks,
-to do pm_runtime_get|put() which then becomes non-irq-safe.
-
->
-> The problem with PL330 driver is that it use irq-safe runtime pm, which like
-> it
-> was stated in the patch description doesn't bring much benefits. To switch
-> to
-> standard (non-irq-safe) runtime pm, the pm_runtime calls have to be done
-> from
-> a context which permits sleeping. The problem with DMA engine driver API is
-> that
-> most of its callbacks have to be IRQ-safe and frankly only
-> device_{alloc,release}_chan_resources() what more or less maps to
-> dma_request_chan()/dma_release_channel() and friends. There are DMA engine
-> drivers which do runtime PM calls there (tegra20-apb-dma, sirf-dma, cppi41,
-> rcar-dmac), but this is not really efficient. DMA engine clients usually
-> allocate
-> dma channel during their probe() and keep them for the whole driver life. In
-> turn
-> this very similar to calling pm_runtime_get() in the DMA engine driver
-> probe().
-> The result of both approaches is that DMA engine device keeps its power
-> domain
-> enabled almost all the time. This problem is also mentioned in the DMA
-> engine
-> TODO list, you have pointed me yesterday.
->
-> To avoid such situation that DMA engine driver blocks turning off the power
-> domain and avoid changing DMA engine client API I came up with the device
-> links
-> pm based approach. I don't want to duplicate the description here, the
-> details
-> were in the patch description, however if you have any particular question
-> about
-> the details, let me know and I will try to clarify it more.
-
-So besides solving the irq-safe issue for dma driver, using the
-device-links has additionally two advantages. I already mentioned the
--EPROBE_DEFER issue above.
-
-The second thing, is the runtime/system PM relations we get for free
-by using the links. In other words, the dma driver/core don't need to
-care about dealing with pm_runtime_get|put() as that would be managed
-by the dma client driver.
-
-Kind regards
-Uffe
+>> >
+>> > --
+>> > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+>> > FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+>> > according to speedtest.net.
