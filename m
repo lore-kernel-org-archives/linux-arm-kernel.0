@@ -1,48 +1,74 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Feb 2017 19:38:50 +0000
-Subject: [PATCH v2 1/4] [media] exynos-gsc: Use 576p instead 720p as a
- threshold for colorspaces
-In-Reply-To: <20170209200420.3046-2-thibault.saunier@osg.samsung.com>
-References: <20170209200420.3046-1-thibault.saunier@osg.samsung.com>
- <20170209200420.3046-2-thibault.saunier@osg.samsung.com>
-Message-ID: <20170210193850.GN27312@n2100.armlinux.org.uk>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 10 Feb 2017 11:40:38 -0800
+Subject: [PATCH 10/10] ARM: davinci: add pdata-quirks for da850-evm vpif
+ display
+In-Reply-To: <1486485683-11427-11-git-send-email-bgolaszewski@baylibre.com>
+ (Bartosz Golaszewski's message of "Tue, 7 Feb 2017 17:41:23 +0100")
+References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
+ <1486485683-11427-11-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <m2bmu9hm15.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2017 at 05:04:17PM -0300, Thibault Saunier wrote:
-> From: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> The media documentation says that the V4L2_COLORSPACE_SMPTE170M colorspace
-> should be used for SDTV and V4L2_COLORSPACE_REC709 for HDTV. But drivers
-> don't agree on the display resolution that should be used as a threshold.
-> 
-> Some drivers set V4L2_COLORSPACE_REC709 for 720p and higher while others
-> set V4L2_COLORSPACE_REC709 for anything higher than 576p. Newers drivers
-> use the latter and that also matches what user-space multimedia programs
-> do (i.e: GStreamer), so change the driver logic to be aligned with this.
-> 
-> Also, check for the resolution in G_FMT instead unconditionally setting
-> the V4L2_COLORSPACE_REC709 colorspace.
+Hi Bartosz,
 
-It would be nice to refer to some specification to justify the change,
-rather than "let's follow what <random-piece-of-software> does".
+Bartosz Golaszewski <bgolaszewski@baylibre.com> writes:
 
-EIA CEA 861B talks about colorimetry for various resolutions:
+> Similarly to vpif capture: we need to register the vpif display driver
+> and the corresponding adv7343 encoder in pdata-quirks as the DT
+> support is not complete.
+>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/mach-davinci/pdata-quirks.c | 86 +++++++++++++++++++++++++++++++++++-
+>  1 file changed, 85 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
+> index 09f62ac..0a55546 100644
+> --- a/arch/arm/mach-davinci/pdata-quirks.c
+> +++ b/arch/arm/mach-davinci/pdata-quirks.c
+> @@ -9,13 +9,17 @@
+>   */
+>  #include <linux/kernel.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/gpio.h>
+>  
+>  #include <media/i2c/tvp514x.h>
+> +#include <media/i2c/adv7343.h>
+>  
+>  #include <mach/common.h>
+>  #include <mach/da8xx.h>
+>  #include <mach/mux.h>
+>  
+> +#define DA850_EVM_UI_EXP_SEL_VPIF_DISP 5
+> +
+>  struct pdata_init {
+>  	const char *compatible;
+>  	void (*fn)(void);
+> @@ -107,7 +111,78 @@ static struct vpif_capture_config da850_vpif_capture_config = {
+>  	},
+>  	.card_name = "DA850/OMAP-L138 Video Capture",
+>  };
+> +#endif /* IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) */
+> +
+> +#if defined(CONFIG_DA850_UI_SD_VIDEO_PORT)
+> +static void vpif_evm_display_setup(void)
+> +{
+> +	int gpio = DAVINCI_N_GPIO + DA850_EVM_UI_EXP_SEL_VPIF_DISP, ret;
+> +
+> +	ret = gpio_request(gpio, "sel_c");
+> +	if (ret) {
+> +		pr_warn("Cannot open UI expander pin %d\n", gpio);
+> +		return;
+> +	}
+> +
+> +	gpio_direction_output(gpio, 0);
+> +}
 
-5.1 480p, 480i, 576p, 576i, 240p, and 288p
-The color space used by the 480-line, 576-line, 240-line, and 288-line
-formats will likely be based on SMPTE 170M [1].
+I had a closer look at the UI board schematic, and it looks like the
+SEL_C line of the GPIO exapander is actualy to select the VPIF *input*
+source, not output, so I don't think it should be needed in this patch.
 
-5.2 1080i, 1080p, and 720p
-The color space used by the high definition formats will likely be based
-on ITU-R BT.709-4 [6].
+Can you test VPIF display works without calling this function?
 
-Notice, however, that it says "will likely be" - it's not a requirement,
-as it's expected that the colorspace will be part of the media metadata
-(eg, contained in the transport stream.)  In other words, it should be
-configurable or ultimately provided by the ultimate source of the image.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Kevin
