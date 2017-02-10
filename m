@@ -1,55 +1,236 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Feb 2017 16:39:08 +0000
-Subject: [PATCH 1/2] ARM: add ARM_SINGLE_ARMV7 as config option
-In-Reply-To: <25202835.AdbHsoUg0y@wuerfel>
-References: <20170209033044.19513-1-chris.brandt@renesas.com>
- <5d90aff5-63b7-83a8-7529-2ac61ef82021@gmail.com>
- <SG2PR06MB11650C805DD754EE5C9E56C78A450@SG2PR06MB1165.apcprd06.prod.outlook.com>
- <25202835.AdbHsoUg0y@wuerfel>
-Message-ID: <20170210163908.GL27312@n2100.armlinux.org.uk>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 10 Feb 2017 17:06:34 +0000
+Subject: [RFC v2 05/19] KVM: arm64: ITS: Implement vgic_its_has_attr_regs
+ and attr_regs_access
+In-Reply-To: <a0e30ac4-a970-4418-a6c0-ada69e45982f@redhat.com>
+References: <1486554212-2774-1-git-send-email-eric.auger@redhat.com>
+ <1486554212-2774-6-git-send-email-eric.auger@redhat.com>
+ <01d770b4-e70f-d084-778e-d849cf43d7ea@arm.com>
+ <a0e30ac4-a970-4418-a6c0-ada69e45982f@redhat.com>
+Message-ID: <91877f0f-8854-aa1d-74d5-98d740e267bb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2017 at 02:05:43PM +0100, Arnd Bergmann wrote:
-> And I really don't like adding new top-level for a platform here, it
-> brings us back to the same problems we had before we moved most platforms
-> to ARCH_MULTIPLATFORM, and it doesn't solve the remaining problems we still
-> have:
+Hi,
 
-It's the least evil solution.
+On 10/02/17 12:26, Auger Eric wrote:
+> Hi Andre,
+> 
+> On 10/02/2017 12:57, Andre Przywara wrote:
+>> On 08/02/17 11:43, Eric Auger wrote:
+>>
+>> Salut Eric,
+>>
+>> one minor thing below, but first a general question:
+>> I take it that the state of the ITS (enabled/disabled) shouldn't matter
+>> when it comes to reading/writing registers, right? Because this is
+>> totally under guest control and userland shouldn't mess with it?
+>>
+>> Maybe this is handled somewhere in the next patches, but how are we
+>> supposed to write CBASER and the BASERs, for instance, if the handler
+>> bails out early when the ITS is already enabled?
+> Well I mentioned in the KVM ITS device documentation 
 
-> - In some platforms, the decision would have to be done on a per-board
->   level, as each board can have its memory at a different location
->   base on which chipselect line got connected to the RAM and NOR flash
->   respectively
+Oh, I am one of those guys who read the documentation at the very end
+;-) Sorry, my bad.
 
-Right, but that's something we _had_ solved before multiplatform came
-along.
+> that userspace
+> accesses to those registers have the same behavior as guest accesses. As
+> such it is not possible to write into CBASER and BASERs when the ITS is
+> already enabled. But isn't it correct to forbid such userspace accesses
+> at this moment? What is the use case?
 
-> - Some (few) platforms actually have separate top-level Kconfig options
->   but are actually very closely related and you could have a kernel
->   for all of them even with !MMU and XIP_KERNEL. The most important
->   one here is ARM Versatile/Realview/Integrator/Vexpress that have
->   more in common than things we put behind a common Kconfig option in
->   other platforms.
+So the idea is to observe an order when restoring the registers? And
+relying on the ITS being disabled upon creation, so that we can write to
+those registers? Then restoring CTLR as the very last to get things going?
 
-If you think that Versatile + Realview + Integrator + Vexpress should
-be lumped into one kernel image for !MMU and XIP_KERNEL then you're
-wrong - from what I remember, their RAM and flash locations are quite
-different which rules it out.
+I think we need some special handling for CWRITER as well, but I just
+see that we have some bug in our ITS emulation (processing commands
+while the ITS being disabled and not triggering command processing upon
+ITS enablement). Waiting for Marc's verdict on this.
+I think the patch I came up with should fix this particular issue here.
 
-The biggest thing that matters for !MMU and XIP_KERNEL is the location
-of flash and RAM.  If those are not compatible, !MMU and XIP_KERNEL
-has no chance of working.
+But apart from that it should work, I think.
 
-> - CONFIG_DEBUG_UNCOMPRESS has a very similar requirements to
->   XIP_KERNEL and !MMU, and we currently allow it for any machine,
->   with a lot of flexibility in configuring that always breaks
->   running on any machine other than the one you are targetting.
+Cheers,
+Andre.
 
-Right, but that's debug, not core kernel configuration.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>>> This patch implements vgic_its_has_attr_regs and vgic_its_attr_regs_access
+>>> upon the MMIO framework. VGIC ITS KVM device KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+>>> group becomes functional.
+>>>
+>>> At least GITS_CREADR requires to differentiate a guest write action from a
+>>> user access. As such let's introduce a new uaccess_its_write
+>>> vgic_register_region callback.
+>>>
+>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>> ---
+>>>  virt/kvm/arm/vgic/vgic-its.c  | 74 ++++++++++++++++++++++++++++++++++++-------
+>>>  virt/kvm/arm/vgic/vgic-mmio.h |  9 ++++--
+>>>  2 files changed, 69 insertions(+), 14 deletions(-)
+>>>
+>>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>>> index 43bb17e..e9c8f9f 100644
+>>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>>> @@ -1287,13 +1287,14 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
+>>>  	*regptr = reg;
+>>>  }
+>>>  
+>>> -#define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
+>>> +#define REGISTER_ITS_DESC(off, rd, wr, uwr, length, acc)		\
+>>>  {								\
+>>>  	.reg_offset = off,					\
+>>>  	.len = length,						\
+>>>  	.access_flags = acc,					\
+>>>  	.its_read = rd,						\
+>>>  	.its_write = wr,					\
+>>> +	.uaccess_its_write = uwr,					\
+>>>  }
+>>>  
+>>>  static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
+>>> @@ -1304,28 +1305,28 @@ static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
+>>>  
+>>>  static struct vgic_register_region its_registers[] = {
+>>>  	REGISTER_ITS_DESC(GITS_CTLR,
+>>> -		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
+>>> +		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, NULL, 4,
+>>>  		VGIC_ACCESS_32bit),
+>>>  	REGISTER_ITS_DESC(GITS_IIDR,
+>>> -		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
+>>> +		vgic_mmio_read_its_iidr, its_mmio_write_wi, NULL, 4,
+>>>  		VGIC_ACCESS_32bit),
+>>>  	REGISTER_ITS_DESC(GITS_TYPER,
+>>> -		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
+>>> +		vgic_mmio_read_its_typer, its_mmio_write_wi, NULL, 8,
+>>>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>>>  	REGISTER_ITS_DESC(GITS_CBASER,
+>>> -		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, 8,
+>>> +		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, NULL, 8,
+>>>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>>>  	REGISTER_ITS_DESC(GITS_CWRITER,
+>>> -		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
+>>> -		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>>> +		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, NULL,
+>>> +		8, VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>>>  	REGISTER_ITS_DESC(GITS_CREADR,
+>>> -		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
+>>> +		vgic_mmio_read_its_creadr, its_mmio_write_wi, NULL, 8,
+>>>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>>>  	REGISTER_ITS_DESC(GITS_BASER,
+>>> -		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
+>>> +		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, NULL, 0x40,
+>>>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>>>  	REGISTER_ITS_DESC(GITS_IDREGS_BASE,
+>>> -		vgic_mmio_read_its_idregs, its_mmio_write_wi, 0x30,
+>>> +		vgic_mmio_read_its_idregs, its_mmio_write_wi, NULL, 0x30,
+>>>  		VGIC_ACCESS_32bit),
+>>>  };
+>>>  
+>>> @@ -1448,14 +1449,63 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
+>>>  int vgic_its_has_attr_regs(struct kvm_device *dev,
+>>>  			   struct kvm_device_attr *attr)
+>>>  {
+>>> -	return -ENXIO;
+>>> +	const struct vgic_register_region *region;
+>>> +	struct vgic_io_device iodev = {
+>>> +		.regions = its_registers,
+>>> +		.nr_regions = ARRAY_SIZE(its_registers),
+>>> +	};
+>>> +	gpa_t offset;
+>>> +
+>>> +	offset = attr->attr;
+>>> +
+>>> +	region = vgic_find_mmio_region(iodev.regions,
+>>> +				       iodev.nr_regions,
+>>> +				       offset);
+>>> +	if (!region)
+>>> +		return -ENXIO;
+>>> +	return 0;
+>>>  }
+>>>  
+>>>  int vgic_its_attr_regs_access(struct kvm_device *dev,
+>>>  			      struct kvm_device_attr *attr,
+>>>  			      u64 *reg, bool is_write)
+>>>  {
+>>> -	return -ENXIO;
+>>> +	const struct vgic_register_region *region;
+>>> +	struct vgic_io_device iodev = {
+>>> +		.regions = its_registers,
+>>> +		.nr_regions = ARRAY_SIZE(its_registers),
+>>> +	};
+>>> +	struct vgic_its *its = dev->private;
+>>> +	gpa_t addr, offset;
+>>> +	unsigned int len;
+>>> +
+>>> +	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
+>>> +		return -ENXIO;
+>>> +
+>>> +	offset = attr->attr;
+>>> +	if (offset & 0x7)
+>>> +		return -EINVAL;
+>>
+>> Isn't GITS_IIDR only 32-bit aligned?
+>> Is it expected to just avoid reading this from userland?
+>> If yes, it deserves a comment here, I guess.
+> No it was not made on purpose :-( I will fix that.
+> 
+> Thanks!
+> 
+> Eric
+>>
+>> Cheers,
+>> Andre.
+>>
+>>> +
+>>> +	addr = its->vgic_its_base + offset;
+>>> +
+>>> +	region = vgic_find_mmio_region(iodev.regions,
+>>> +				       iodev.nr_regions,
+>>> +				       offset);
+>>> +	if (!region)
+>>> +		return -ENXIO;
+>>> +
+>>> +	len = region->access_flags & VGIC_ACCESS_64bit ? 8 : 4;
+>>> +
+>>> +	if (is_write) {
+>>> +		if (region->uaccess_its_write)
+>>> +			region->uaccess_its_write(dev->kvm, its, addr,
+>>> +						  len, *reg);
+>>> +		else
+>>> +			region->its_write(dev->kvm, its, addr, len, *reg);
+>>> +	} else {
+>>> +		*reg = region->its_read(dev->kvm, its, addr, len);
+>>> +	}
+>>> +	return 0;
+>>>  }
+>>>  
+>>>  static int vgic_its_has_attr(struct kvm_device *dev,
+>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+>>> index 055ad42..ad8a585 100644
+>>> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+>>> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+>>> @@ -36,8 +36,13 @@ struct vgic_register_region {
+>>>  	};
+>>>  	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
+>>>  				      unsigned int len);
+>>> -	void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+>>> -			      unsigned int len, unsigned long val);
+>>> +	union {
+>>> +		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+>>> +				      unsigned int len, unsigned long val);
+>>> +		void (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
+>>> +					  gpa_t addr, unsigned int len,
+>>> +					  unsigned long val);
+>>> +	};
+>>>  };
+>>>  
+>>>  extern struct kvm_io_device_ops kvm_io_gic_ops;
+>>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
