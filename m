@@ -1,250 +1,58 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 10 Feb 2017 15:28:57 +0100
-Subject: [PATCH v2 6/9] arm, arm64: factorize common cpu capacity default
- code
-In-Reply-To: <20170209092525.6654-7-juri.lelli@arm.com>
-References: <20170209092525.6654-1-juri.lelli@arm.com>
- <20170209092525.6654-7-juri.lelli@arm.com>
-Message-ID: <20170210142857.GA18321@kroah.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Feb 2017 14:28:47 +0000
+Subject: [PATCHv3] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <20170210120306.GA6825@nuc>
+References: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
+ <20170209162956.GH27312@n2100.armlinux.org.uk>
+ <CACh+v5NJ5zi4nEQkG+y_SesFuW8NOophD1KDFRG+t7=CtjnNrg@mail.gmail.com>
+ <20170210120306.GA6825@nuc>
+Message-ID: <20170210142847.GK27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2017 at 09:25:22AM +0000, Juri Lelli wrote:
-> arm and arm64 share lot of code relative to parsing CPU capacity
-> information from DT, using that information for appropriate scaling and
-> exposing a sysfs interface for chaging such values at runtime.
-> 
-> Factorize such code in a common place (driver/base/arch_topology.c) in
-> preparation for further additions.
-> 
-> Suggested-by: Will Deacon <will.deacon@arm.com>
-> Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
-> ---
-> 
-> Changes from v1:
->  - keep the original GPLv2 header
-> ---
->  arch/arm/Kconfig             |   1 +
->  arch/arm/kernel/topology.c   | 213 ++------------------------------------
->  arch/arm64/Kconfig           |   1 +
->  arch/arm64/kernel/topology.c | 219 +--------------------------------------
->  drivers/base/Kconfig         |   8 ++
->  drivers/base/Makefile        |   1 +
->  drivers/base/arch_topology.c | 237 +++++++++++++++++++++++++++++++++++++++++++
->  7 files changed, 257 insertions(+), 423 deletions(-)
->  create mode 100644 drivers/base/arch_topology.c
+On Fri, Feb 10, 2017 at 12:03:06PM +0000, Abel Vesa wrote:
+> The only problem I don't have a solution for at this point is OLD_LR (or
+> previous LR as it is called in this patch).
 
-Ah, so you want _me_ to maintain this, ok, I better review it...
+If you want the context at function entry, then you need to save the
+registers as they were at that point.
 
-> --- a/drivers/base/Kconfig
-> +++ b/drivers/base/Kconfig
-> @@ -339,4 +339,12 @@ config CMA_ALIGNMENT
->  
->  endif
->  
-> +config GENERIC_ARCH_TOPOLOGY
-> +	bool
-> +	help
-> +	  Enable support for architectures common topology code: e.g., parsing
-> +	  CPU capacity information from DT, usage of such information for
-> +	  appropriate scaling, sysfs interface for changing capacity values at
-> +          runtime.
+The stacking of LR in the gnu_mcount thing is there to avoid this problem:
 
-Mix of spaces and tabs :(
+a:
+	push	{lr}
+	bl	__gnu_mcount_mc
 
-> +
->  endmenu
-> diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-> index f2816f6ff76a..397e5c344e6a 100644
-> --- a/drivers/base/Makefile
-> +++ b/drivers/base/Makefile
-> @@ -23,6 +23,7 @@ obj-$(CONFIG_SOC_BUS) += soc.o
->  obj-$(CONFIG_PINCTRL) += pinctrl.o
->  obj-$(CONFIG_DEV_COREDUMP) += devcoredump.o
->  obj-$(CONFIG_GENERIC_MSI_IRQ_DOMAIN) += platform-msi.o
-> +obj-$(CONFIG_GENERIC_ARCH_TOPOLOGY) += arch_topology.o
->  
->  obj-y			+= test/
->  
-> diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
-> new file mode 100644
-> index 000000000000..c1dd430adad2
-> --- /dev/null
-> +++ b/drivers/base/arch_topology.c
-> @@ -0,0 +1,237 @@
-> +/*
-> + * driver/base/arch_topology.c - Arch specific cpu topology information
+That "bl" instruction can be thought of as being effectively this:
 
-No need to keep the filename in the file, you know what it is called :)
+	adr	lr, 1f
+	b	__gnu_mcount_mc
+1:
 
-> + *
-> + * Copyright (C) 2016, ARM Ltd.
-> + * Written by: Juri Lelli, ARM Ltd.
-> + *
-> + * This file is subject to the terms and conditions of the GNU General Public
-> + * License.  See the file "COPYING" in the main directory of this archive
-> + * for more details.
+and from that, you can plainly see that "lr" gets corrupted by the call.
+So, to save the register state as it was at point "a", you need to
+save (in order):
 
-So, v2 only?  Please be specific.  Even better yet, use a SPDX header if
-you want to, those are always nice.
+	r0 through to sp
+	the saved lr on the stack (which was the value of lr at point a)
+	the current lr (which is the value of the PC _after_ __gnu_mcount_mc
+		returns)
+	cpsr
+	write zero to old_r0
 
-> + */
-> +
-> +#include <linux/acpi.h>
-> +#include <linux/cpu.h>
-> +#include <linux/cpufreq.h>
-> +#include <linux/device.h>
-> +#include <linux/of.h>
-> +#include <linux/slab.h>
-> +#include <linux/string.h>
-> +#include <linux/topology.h>
-> +
-> +static DEFINE_MUTEX(cpu_scale_mutex);
-> +static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
-> +
-> +unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
+Stacking actual value of the PC at the point that you're stacking these
+registers is really senseless - it doesn't convey any useful information
+about the context being saved.
 
-Why do you have sd here?  You never use it:
+Does it make sense to leave the compiler's saving of lr on the stack?
+Probably not - which I think my last iteration overwrote with the old_r0
+value.  The only thing my last iteration did not do was save a real value
+for CPSR.
 
-> +{
-> +	return per_cpu(cpu_scale, cpu);
+I didn't test it either...
 
-See?  What am I missing?
-
-> +}
-> +
-> +void set_capacity_scale(unsigned int cpu, unsigned long capacity)
-> +{
-> +	per_cpu(cpu_scale, cpu) = capacity;
-> +}
-> +
-> +static ssize_t cpu_capacity_show(struct device *dev,
-> +				 struct device_attribute *attr,
-> +				 char *buf)
-> +{
-> +	struct cpu *cpu = container_of(dev, struct cpu, dev);
-> +
-> +	return sprintf(buf, "%lu\n",
-> +			arch_scale_cpu_capacity(NULL, cpu->dev.id));
-> +}
-> +
-> +static ssize_t cpu_capacity_store(struct device *dev,
-> +				  struct device_attribute *attr,
-> +				  const char *buf,
-> +				  size_t count)
-> +{
-> +	struct cpu *cpu = container_of(dev, struct cpu, dev);
-> +	int this_cpu = cpu->dev.id, i;
-
-new line for:
-	int i;
-please.
-
-> +	unsigned long new_capacity;
-> +	ssize_t ret;
-> +
-> +	if (count) {
-
-	if (!count)
-		return 0;
-
-then you can get on with the rest of the logic.  Don't indent if you
-don't have to.
-
-> +		ret = kstrtoul(buf, 0, &new_capacity);
-> +		if (ret)
-> +			return ret;
-> +		if (new_capacity > SCHED_CAPACITY_SCALE)
-> +			return -EINVAL;
-> +
-> +		mutex_lock(&cpu_scale_mutex);
-> +		for_each_cpu(i, &cpu_topology[this_cpu].core_sibling)
-> +			set_capacity_scale(i, new_capacity);
-> +		mutex_unlock(&cpu_scale_mutex);
-> +	}
-> +
-> +	return count;
-> +}
-
-No documentation for these sysfs file?  Not good :(
-
-> +
-> +static DEVICE_ATTR_RW(cpu_capacity);
-> +
-> +static int register_cpu_capacity_sysctl(void)
-> +{
-> +	int i;
-> +	struct device *cpu;
-> +
-> +	for_each_possible_cpu(i) {
-> +		cpu = get_cpu_device(i);
-> +		if (!cpu) {
-> +			pr_err("%s: too early to get CPU%d device!\n",
-> +			       __func__, i);
-
-What is this going to help with?
-
-> +			continue;
-> +		}
-> +		device_create_file(cpu, &dev_attr_cpu_capacity);
-
-You realize you just raced userspace, right?  Why do it this way and not
-register the files when the CPU device is created/removed?
-
-> +	}
-> +
-> +	return 0;
-> +}
-> +subsys_initcall(register_cpu_capacity_sysctl);
-> +
-> +u32 capacity_scale;
-> +u32 *raw_capacity;
-> +bool cap_parsing_failed;
-
-globals?  really?  That's bold :(
-
-> +
-> +void normalize_cpu_capacity(void)
-
-naming is hard, but try to put a good, descriptive, prefix on everything
-you are exporting in the same file, the same prefix.
-
-cpu_capacity_normalize()?
-cpu_capacity_register_sysctl()?
-
-and so on.
-
-> +{
-> +	u64 capacity;
-> +	int cpu;
-> +
-> +	if (!raw_capacity || cap_parsing_failed)
-> +		return;
-> +
-> +	pr_debug("cpu_capacity: capacity_scale=%u\n", capacity_scale);
-> +	mutex_lock(&cpu_scale_mutex);
-> +	for_each_possible_cpu(cpu) {
-> +		pr_debug("cpu_capacity: cpu=%d raw_capacity=%u\n",
-> +			 cpu, raw_capacity[cpu]);
-> +		capacity = (raw_capacity[cpu] << SCHED_CAPACITY_SHIFT)
-> +			/ capacity_scale;
-> +		set_capacity_scale(cpu, capacity);
-> +		pr_debug("cpu_capacity: CPU%d cpu_capacity=%lu\n",
-> +			cpu, arch_scale_cpu_capacity(NULL, cpu));
-> +	}
-> +	mutex_unlock(&cpu_scale_mutex);
-> +}
-> +
-> +int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
-
-cpu_capacity_parse()?
-
-thanks,
-
-greg k-h
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
