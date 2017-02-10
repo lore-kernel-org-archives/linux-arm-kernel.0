@@ -1,77 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Feb 2017 14:05:43 +0100
-Subject: [PATCH 1/2] ARM: add ARM_SINGLE_ARMV7 as config option
-In-Reply-To: <SG2PR06MB11650C805DD754EE5C9E56C78A450@SG2PR06MB1165.apcprd06.prod.outlook.com>
-References: <20170209033044.19513-1-chris.brandt@renesas.com>
- <5d90aff5-63b7-83a8-7529-2ac61ef82021@gmail.com>
- <SG2PR06MB11650C805DD754EE5C9E56C78A450@SG2PR06MB1165.apcprd06.prod.outlook.com>
-Message-ID: <25202835.AdbHsoUg0y@wuerfel>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 10 Feb 2017 14:46:59 +0100
+Subject: [PATCH 10/11] iommu/exynos: Make use of iommu_device_register
+ interface
+In-Reply-To: <1486639981-32368-11-git-send-email-joro@8bytes.org>
+References: <1486639981-32368-1-git-send-email-joro@8bytes.org>
+ <CGME20170209113308epcas2p2cd79f382b04635bc7e973a62c093d557@epcas2p2.samsung.com>
+ <1486639981-32368-11-git-send-email-joro@8bytes.org>
+Message-ID: <9a1997dd-5835-cb9a-6478-7fb276151e52@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 9, 2017 8:21:43 PM CET Chris Brandt wrote:
-> On Thursday, February 09, 2017, Florian Fainelli worte:
-> > > I think the closest I might have come was to purposely break the build
-> > > if more then 1 was select, but that still didn't stop you from making
-> > > the selection.
-> > >
-> > > If someone smarter than me has a way to do (not just an idea...I
-> > received
-> > > lots of ideas but none of them worked), I'd be happy to hear it.
-> > 
-> > I am definitively not a Kbuild expert, but it would almost necessarily
-> > require introduce some kind of new type in the Kconfig/Kbuild syntax
-> > that does something like that:
-> > 
-> > - have a way to count the number of symbols that are selected and do a
-> > "if ARCH_MULTI_V6_V7" (or an arbitrary expression) this most likely
-> > should exist internally within Kconfig
-> > 
-> > - introduce a new type of Kconfig type which is a "count", and gets
-> > assigned this value that we just counted, something that could look like
-> > this:
-> > 
-> > count ARCH_MULTI_V6_V7_COUNT
-> >       tracks ARCH_MULTI_V6_V7
-> 
-> I did try the counting thing, but couldn't get it to work.
-> I admit though, I did stop when the next step was to create a new type
-> kind of thing that I could use for counting. That seemed to start going
-> down a deeper path than I was hoping for.
+Hi
 
-I also couldn't come up with something working when I looked at this,
-and it wouldn't solve the related problem of platforms that we want to
-be able to use with or without MMU: You can't make the decision of
-whether allow an MMU based on the number of platforms since most
-platform options can only be offered depending on the setting of
-CONFIG_MMU.
+On 2017-02-09 12:32, Joerg Roedel wrote:
+> From: Joerg Roedel <jroedel@suse.de>
+>
+> Register Exynos IOMMUs to the IOMMU core and make them
+> visible in sysfs. This patch does not add the links between
+> IOMMUs and translated devices yet.
+>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Signed-off-by: Joerg Roedel <jroedel@suse.de>
 
-> However,
-> I am hesitant to go and try anything else because everything I've submitted
-> so far has been NACKed. The only thing Russell said he'd agree to is a top
-> level single-platform option. But, since that all got taken out, I assume
-> there's some resistance to putting it back in.
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-And I really don't like adding new top-level for a platform here, it
-brings us back to the same problems we had before we moved most platforms
-to ARCH_MULTIPLATFORM, and it doesn't solve the remaining problems we still
-have:
+> ---
+>   drivers/iommu/exynos-iommu.c | 14 ++++++++++++++
+>   1 file changed, 14 insertions(+)
+>
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index 57ba0d3..64325d8 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -276,6 +276,8 @@ struct sysmmu_drvdata {
+>   	struct list_head owner_node;	/* node for owner controllers list */
+>   	phys_addr_t pgtable;		/* assigned page table structure */
+>   	unsigned int version;		/* our version */
+> +
+> +	struct iommu_device iommu;	/* IOMMU core handle */
+>   };
+>   
+>   static struct exynos_iommu_domain *to_exynos_domain(struct iommu_domain *dom)
+> @@ -611,6 +613,18 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
+>   	data->sysmmu = dev;
+>   	spin_lock_init(&data->lock);
+>   
+> +	ret = iommu_device_sysfs_add(&data->iommu, &pdev->dev, NULL,
+> +				     dev_name(data->sysmmu));
+> +	if (ret)
+> +		return ret;
+> +
+> +	iommu_device_set_ops(&data->iommu, &exynos_iommu_ops);
+> +	iommu_device_set_fwnode(&data->iommu, &dev->of_node->fwnode);
+> +
+> +	ret = iommu_device_register(&data->iommu);
+> +	if (ret)
+> +		return ret;
+> +
+>   	platform_set_drvdata(pdev, data);
+>   
+>   	__sysmmu_get_version(data);
 
-- In some platforms, the decision would have to be done on a per-board
-  level, as each board can have its memory at a different location
-  base on which chipselect line got connected to the RAM and NOR flash
-  respectively
-
-- Some (few) platforms actually have separate top-level Kconfig options
-  but are actually very closely related and you could have a kernel
-  for all of them even with !MMU and XIP_KERNEL. The most important
-  one here is ARM Versatile/Realview/Integrator/Vexpress that have
-  more in common than things we put behind a common Kconfig option in
-  other platforms.
-
-- CONFIG_DEBUG_UNCOMPRESS has a very similar requirements to
-  XIP_KERNEL and !MMU, and we currently allow it for any machine,
-  with a lot of flexibility in configuring that always breaks
-  running on any machine other than the one you are targetting.
-
-	Arnd
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
