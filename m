@@ -1,81 +1,62 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 10 Feb 2017 16:07:54 +0100
-Subject: [PATCH v3 1/4] [media] exynos-gsc: Use 576p instead 720p as a
- threshold for colorspaces
-In-Reply-To: <20170210141022.25412-2-thibault.saunier@osg.samsung.com>
-References: <20170210141022.25412-1-thibault.saunier@osg.samsung.com>
- <20170210141022.25412-2-thibault.saunier@osg.samsung.com>
-Message-ID: <4270fc60-579b-64d0-4256-403e4e5bf371@xs4all.nl>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Fri, 10 Feb 2017 15:07:54 +0000
+Subject: [PATCH v4 4/5] dt-bindings: arm64 ARCH_THUNDER2 platform
+ documentation
+In-Reply-To: <CAL_JsqKm-c6D_fki_TsRYKH3aGoC5GE7n0DazNi7P268aj-93g@mail.gmail.com>
+References: <CAK8P3a07eo0htv_y6H_aHvAaeo5two3vQTaySuFXpG+dzYguUQ@mail.gmail.com>
+ <1486667612-8168-1-git-send-email-jnair@caviumnetworks.com>
+ <CAL_JsqKm-c6D_fki_TsRYKH3aGoC5GE7n0DazNi7P268aj-93g@mail.gmail.com>
+Message-ID: <20170210150754.GA1874@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2017 03:10 PM, Thibault Saunier wrote:
-> From: Javier Martinez Canillas <javier@osg.samsung.com>
+On Fri, Feb 10, 2017 at 08:55:31AM -0600, Rob Herring wrote:
+> On Thu, Feb 9, 2017 at 1:13 PM, Jayachandran C <jnair@caviumnetworks.com> wrote:
+> > Add documentation for Cavium ThunderX2 CN99XX ARM64 processor family.
+> > The the SoC will use the ID "cavium,thunderx2-cn9900".
+> >
+> > Add documentation entry for the "cavium,thunder2" cpu core as well.
+> >
+> > Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+> > ---
+> >
+> > v3->v4
+> > Documentation updates to reflect changes in device tree.
+> >
+> >  Documentation/devicetree/bindings/arm/cavium-thunder2.txt | 8 ++++++++
+> >  Documentation/devicetree/bindings/arm/cpus.txt            | 1 +
+> >  2 files changed, 9 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder2.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder2.txt b/Documentation/devicetree/bindings/arm/cavium-thunder2.txt
+> > new file mode 100644
+> > index 0000000..dc5dd65
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/cavium-thunder2.txt
+> > @@ -0,0 +1,8 @@
+> > +Cavium ThunderX2 CN99XX platform tree bindings
+> > +----------------------------------------------
+> > +
+> > +Boards with Cavium ThunderX2 CN99XX SoC shall have the root property:
+> > +  compatible = "cavium,thunderx2-cn9900", "brcm,vulcan-soc";
+> > +
+> > +These SoC uses the "cavium,thunder2" core which will be compatible
+> > +with "brcm,vulcan".
+> > diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> > index a1bcfee..74f0b23 100644
+> > --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> > +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> > @@ -169,6 +169,7 @@ nodes to be present and contain the properties described below.
+> >                             "brcm,brahma-b15"
+> >                             "brcm,vulcan"
+> >                             "cavium,thunder"
+> > +                           "cavium,thunder2"
 > 
-> The media documentation says that the V4L2_COLORSPACE_SMPTE170M colorspace
-> should be used for SDTV and V4L2_COLORSPACE_REC709 for HDTV. But drivers
-> don't agree on the display resolution that should be used as a threshold.
-> 
-> Some drivers set V4L2_COLORSPACE_REC709 for 720p and higher while others
-> set V4L2_COLORSPACE_REC709 for anything higher than 576p. Newers drivers
-> use the latter and that also matches what user-space multimedia programs
-> do (i.e: GStreamer), so change the driver logic to be aligned with this.
-> 
-> Also, check for the resolution in G_FMT instead unconditionally setting
-> the V4L2_COLORSPACE_REC709 colorspace.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
-> 
-> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
-> ---
-> 
-> Changes in v3:
-> - Do not check values in the g_fmt functions as Andrzej explained in previous review
-> - Added 'Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>'
-> 
-> Changes in v2: None
-> 
->  drivers/media/platform/exynos-gsc/gsc-core.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
-> index 59a634201830..db7d9883861b 100644
-> --- a/drivers/media/platform/exynos-gsc/gsc-core.c
-> +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
-> @@ -472,7 +472,7 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
->  
->  	pix_mp->num_planes = fmt->num_planes;
->  
-> -	if (pix_mp->width >= 1280) /* HD */
-> +	if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
->  		pix_mp->colorspace = V4L2_COLORSPACE_REC709;
->  	else /* SD */
->  		pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
-> @@ -519,9 +519,13 @@ int gsc_g_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
->  	pix_mp->height		= frame->f_height;
->  	pix_mp->field		= V4L2_FIELD_NONE;
->  	pix_mp->pixelformat	= frame->fmt->pixelformat;
-> -	pix_mp->colorspace	= V4L2_COLORSPACE_REC709;
->  	pix_mp->num_planes	= frame->fmt->num_planes;
->  
-> +	if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
-> +		pix_mp->colorspace = V4L2_COLORSPACE_REC709;
-> +	else /* SD */
-> +		pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
-> +
->  	for (i = 0; i < pix_mp->num_planes; ++i) {
->  		pix_mp->plane_fmt[i].bytesperline = (frame->f_width *
->  			frame->fmt->depth[i]) / 8;
-> 
+> Is this the same as brcm,vulcan?
 
-This is a mem2mem device, right? In the case of mem2mem devices the driver should never
-set the colorspace, instead it just copies it from what the application provides (the
-video output side) to the capture side.
+It will have a different CPU ID, with different implementer and part num,
+but compatible with "brcm,vulcan". In the ThunderX2 dtsi file (once
+ARCH_VULCAN goes away), we want to be compatable = "cavium,thunder2", with
+maybe "brcm,vulcan" after that.
 
-After all, you are just scaling here so the input and output colorspaces are
-exactly the same, and the scaler doesn't care what the colorspace is.
-
-Regards,
-
-	Hans
+JC.
