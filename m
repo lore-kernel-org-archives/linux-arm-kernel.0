@@ -1,57 +1,51 @@
 From: briannorris@chromium.org (Brian Norris)
-Date: Thu,  9 Feb 2017 17:05:18 -0800
-Subject: [PATCH v2 3/6] dt-bindings: Document rk3399 Gru/Kevin
+Date: Thu,  9 Feb 2017 17:05:16 -0800
+Subject: [PATCH v2 1/6] arm64: dts: Add symlinks for cros-ec-keyboard and
+ cros-ec-sbs
 In-Reply-To: <20170210010521.78872-1-briannorris@chromium.org>
 References: <20170210010521.78872-1-briannorris@chromium.org>
-Message-ID: <20170210010521.78872-4-briannorris@chromium.org>
+Message-ID: <20170210010521.78872-2-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gru is a base dev board for a family of devices, including Kevin. Both
-utilize Rockchip RK3399, and they share much of their design.
+From: Douglas Anderson <dianders@chromium.org>
 
+We'd like to be able to use the cros-ec-keyboard.dtsi and
+cros-ec-sbs.dtsi snippets for arm64 devices.  Currently those files live
+in the arm/boot/dts directory.
+
+Let's follow the convention set by commit 8ee57b8182c4 ("ARM64: dts:
+vexpress: Use a symlink to vexpress-v2m-rs1.dtsi from arch=arm") and use
+a symlink.  Note that in this case we put the files in a new
+"include/common" directory since these snippets may need to be
+referenced by dts files in many different subdirectories.
+
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
 Signed-off-by: Brian Norris <briannorris@chromium.org>
+Reviewed-by: Heiko Stueber <heiko@sntech.de>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
 ---
- Documentation/devicetree/bindings/arm/rockchip.txt | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi | 1 +
+ arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi      | 1 +
+ 2 files changed, 2 insertions(+)
+ create mode 120000 arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi
+ create mode 120000 arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index cc4ace6397ab..5328e1f2badc 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -56,6 +56,17 @@ Rockchip platforms device tree bindings
-       - compatible = "google,veyron-brain-rev0", "google,veyron-brain",
- 		     "google,veyron", "rockchip,rk3288";
- 
-+- Google Gru (dev-board):
-+    Required root node properties:
-+      - compatible = "google,gru-rev15", "google,gru-rev14",
-+		     "google,gru-rev13", "google,gru-rev12",
-+		     "google,gru-rev11", "google,gru-rev10",
-+		     "google,gru-rev9", "google,gru-rev8",
-+		     "google,gru-rev7", "google,gru-rev6",
-+		     "google,gru-rev5", "google,gru-rev4",
-+		     "google,gru-rev3", "google,gru-rev2",
-+		     "google,gru", "rockchip,rk3399";
-+
- - Google Jaq (Haier Chromebook 11 and more):
-     Required root node properties:
-       - compatible = "google,veyron-jaq-rev5", "google,veyron-jaq-rev4",
-@@ -70,6 +81,15 @@ Rockchip platforms device tree bindings
- 		     "google,veyron-jerry-rev3", "google,veyron-jerry",
- 		     "google,veyron", "rockchip,rk3288";
- 
-+- Google Kevin:
-+    Required root node properties:
-+      - compatible = "google,kevin-rev15", "google,kevin-rev14",
-+		     "google,kevin-rev13", "google,kevin-rev12",
-+		     "google,kevin-rev11", "google,kevin-rev10",
-+		     "google,kevin-rev9", "google,kevin-rev8",
-+		     "google,kevin-rev7", "google,kevin-rev6",
-+		     "google,kevin", "google,gru", "rockchip,rk3399";
-+
- - Google Mickey (Asus Chromebit CS10):
-     Required root node properties:
-       - compatible = "google,veyron-mickey-rev8", "google,veyron-mickey-rev7",
+diff --git a/arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi b/arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi
+new file mode 120000
+index 000000000000..1c1889f0a791
+--- /dev/null
++++ b/arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi
+@@ -0,0 +1 @@
++../../../../../arm/boot/dts/cros-ec-keyboard.dtsi
+\ No newline at end of file
+diff --git a/arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi b/arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi
+new file mode 120000
+index 000000000000..3d7ae9c88bcd
+--- /dev/null
++++ b/arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi
+@@ -0,0 +1 @@
++../../../../../arm/boot/dts/cros-ec-sbs.dtsi
+\ No newline at end of file
 -- 
 2.11.0.483.g087da7b7c-goog
