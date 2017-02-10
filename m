@@ -1,41 +1,38 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 10 Feb 2017 13:55:28 +0100
-Subject: [PATCH RESEND 4/5] mtd: nand: atmel: Document the new DT bindings
-In-Reply-To: <20170201164711.27e4b600@bbrezillon>
-References: <1485535324-28393-1-git-send-email-boris.brezillon@free-electrons.com>
- <1485535324-28393-5-git-send-email-boris.brezillon@free-electrons.com>
- <20170201153920.g26erfzxnxrmsu4z@rob-hp-laptop>
- <20170201164711.27e4b600@bbrezillon>
-Message-ID: <20170210135528.4ee6807b@bbrezillon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 10 Feb 2017 13:55:53 +0100
+Subject: [PATCH 14/22] ARM: dts: add a devicetree for Raidsonic NAS
+ IB-4220-B
+In-Reply-To: <alpine.LNX.2.00.1702081353480.8463@T420s>
+References: <20170122122254.10764-1-linus.walleij@linaro.org>
+ <alpine.LNX.2.00.1702051051090.26313@T420s>
+ <CACRpkdb2YUSAD1eR8c11BsCb3yBmMJ7C_bEKkpgkiqX9B4GNwQ@mail.gmail.com>
+ <alpine.LNX.2.00.1702081353480.8463@T420s>
+Message-ID: <CACRpkdb6vfTsv=rBd_A7igSRQNYayXw=P8LJdY4-gVX5nnoCpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Wed, Feb 8, 2017 at 1:55 PM, Hans Ulli Kroll
+<ulli.kroll@googlemail.com> wrote:
+> On Tue, 7 Feb 2017, Linus Walleij wrote:
+>
+>> On Sun, Feb 5, 2017 at 10:53 AM, Hans Ulli Kroll
+>> <ulli.kroll@googlemail.com> wrote:
+>>
+>> > Hi Linus,
+>> >
+>> > please add right baudrate and partition scheme for NAS 4220
+>> >
+>> > Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+>>
+>> Thanks Hans! I folded this into the NAS 4220 device tree
+>> and added your Signed-off-by to the patch.
+>>
+>
+> You can remove the PCI entries I've seen on your git tree.
+> NAS 4220 has no PCI interface
 
-On Wed, 1 Feb 2017 16:47:11 +0100
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+OK! I just assumed it was on that machine since you were
+commenting on the driver, I cut it now.
 
-> On Wed, 1 Feb 2017 09:39:20 -0600
-> Rob Herring <robh@kernel.org> wrote:
-> 
-> > On Fri, Jan 27, 2017 at 05:42:03PM +0100, Boris Brezillon wrote:  
-> > > Document the new DT bindings for the Atmel NAND controller and
-> > > deprecate the old ones.    
-> > 
-> > Why?  
-> 
-> Because the existing representation is not only wrong, it also causes
-> pinmux conflicts between the NAND controller and other devices present
-> on the EBI bus.
-> It's explained in the cover letter, but maybe you want me to put that
-> in the commit message.
-
-Do you need more explanation (A.K.A. ping).
-
-> 
-> >   
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > ---
-> > >  .../devicetree/bindings/mtd/atmel-nand.txt         | 106 ++++++++++++++++++++-
-> > >  1 file changed, 105 insertions(+), 1 deletion(-)    
-> 
+Yours,
+Linus Walleij
