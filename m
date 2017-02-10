@@ -1,78 +1,73 @@
-From: aisheng.dong@nxp.com (A.S. Dong)
-Date: Fri, 10 Feb 2017 06:59:07 +0000
-Subject: i.MX7 clock support broken
-In-Reply-To: <20170210064944.vshtcr62xqcvjsmh@pengutronix.de>
-References: <20170207142225.zitac2r7g3kvowjw@pengutronix.de>
- <DB5PR04MB1431EB280E8B9BA929FF006D80420@DB5PR04MB1431.eurprd04.prod.outlook.com>
- <AM4PR0401MB22602ECF28CCB7172B917EC2FF440@AM4PR0401MB2260.eurprd04.prod.outlook.com>
- <20170210064944.vshtcr62xqcvjsmh@pengutronix.de>
-Message-ID: <DB5PR04MB1431CFDB4A49F44771B68F6B80440@DB5PR04MB1431.eurprd04.prod.outlook.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Fri, 10 Feb 2017 08:01:43 +0100
+Subject: [PATCH v2 2/4] [media] exynos-gsc: Respect userspace colorspace
+ setting
+In-Reply-To: <20170209200420.3046-3-thibault.saunier@osg.samsung.com>
+References: <20170209200420.3046-1-thibault.saunier@osg.samsung.com>
+ <CGME20170209200635epcas2p1686b5b5522efe835f7a0b4505e16cf12@epcas2p1.samsung.com>
+ <20170209200420.3046-3-thibault.saunier@osg.samsung.com>
+Message-ID: <6c959d34-146b-53f2-f932-7ab4ff9e931c@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> Sent: Friday, February 10, 2017 2:50 PM
-> To: Andy Duan
-> Cc: A.S. Dong; linux-arm-kernel at lists.infradead.org; Shawn Guo; Fabio
-> Estevam; kernel at pengutronix.de; Frank Li
-> Subject: Re: i.MX7 clock support broken
-> 
-> On Fri, Feb 10, 2017 at 03:37:38AM +0000, Andy Duan wrote:
-> > From: A.S. Dong Sent: Thursday, February 09, 2017 12:47 AM
-> > >To: Sascha Hauer <s.hauer@pengutronix.de>; linux-arm-
-> > >kernel at lists.infradead.org
-> > >Cc: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
-> > ><fabio.estevam@nxp.com>; kernel at pengutronix.de; Andy Duan
-> > ><fugang.duan@nxp.com>; Frank Li <frank.li@nxp.com>
-> > >Subject: RE: i.MX7 clock support broken
-> > >
-> > >Hi Sascha,
-> > >
-> > >> -----Original Message-----
-> > >> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> > >> Sent: Tuesday, February 07, 2017 10:22 PM
-> > >> To: linux-arm-kernel at lists.infradead.org
-> > >> Cc: Shawn Guo; A.S. Dong; Fabio Estevam; kernel at pengutronix.de
-> > >> Subject: i.MX7 clock support broken
-> > >>
-> > >> Hi All,
-> > >>
-> > >> I recently adopted the i.MX7 clock tree from Linux to barebox and
-> > >> wondered why ethernet doesn't work.
-> > >
-> > >I just reproduced the issue on MX7D SDB board with latest upstream
-> > >kernel That kernel NULL point crash during boot on fec_enet_open->..-
-> > >>phy_attach_direct.
-> > >
-> >
-> > The issue was caused by one patch submitted at 2017 Jan.31
-> 
-> The issue I was talking about is that the clock driver does not control
-> the real ethernet clocks, but instead some non existing clocks. This issue
-> does not cause any problems in the kernel at all, because when the
-> ethernet clocks have been enabled in the bootloader then everything runs
-> smoothly in the kernel. Nevertheless the kernel driver is buggy of course,
-> the actual clocks are never turned off when not needed.
-> 
+On 09.02.2017 21:04, Thibault Saunier wrote:
+> If the colorspace is specified by userspace we should respect
+> it and not reset it ourself if we can support it.
+>
+> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
+> ---
+>  drivers/media/platform/exynos-gsc/gsc-core.c | 25 +++++++++++++++++--------
+>  1 file changed, 17 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
+> index 2beb43401987..63bb4577827d 100644
+> --- a/drivers/media/platform/exynos-gsc/gsc-core.c
+> +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
+> @@ -445,10 +445,14 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
+>  
+>  	pix_mp->num_planes = fmt->num_planes;
+>  
+> -	if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
+> -		pix_mp->colorspace = V4L2_COLORSPACE_REC709;
+> -	else /* SD */
+> -		pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
+> +	if (pix_mp->colorspace != V4L2_COLORSPACE_REC709 &&
+> +		pix_mp->colorspace != V4L2_COLORSPACE_SMPTE170M &&
+> +		pix_mp->colorspace != V4L2_COLORSPACE_DEFAULT) {
+> +		if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
+> +		  pix_mp->colorspace = V4L2_COLORSPACE_REC709;
+> +		else /* SD */
+> +		  pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
+> +	  }
+>  
+>  	for (i = 0; i < pix_mp->num_planes; ++i) {
+>  		struct v4l2_plane_pix_format *plane_fmt = &pix_mp->plane_fmt[i];
+> @@ -492,12 +496,17 @@ int gsc_g_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
+>  	pix_mp->height		= frame->f_height;
+>  	pix_mp->field		= V4L2_FIELD_NONE;
+>  	pix_mp->pixelformat	= frame->fmt->pixelformat;
+> -	if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
+> -		pix_mp->colorspace = V4L2_COLORSPACE_REC709;
+> -	else /* SD */
+> -		pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
+>  	pix_mp->num_planes	= frame->fmt->num_planes;
+>  
+> +	if (pix_mp->colorspace != V4L2_COLORSPACE_REC709 &&
+> +		pix_mp->colorspace != V4L2_COLORSPACE_SMPTE170M &&
+> +		pix_mp->colorspace != V4L2_COLORSPACE_DEFAULT) {
+> +		if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
+> +		  pix_mp->colorspace = V4L2_COLORSPACE_REC709;
+> +		else /* SD */
+> +		  pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
+> +	  }
+> +
 
-The initial clk driver was developed based on the info provided by our IC
-Guys directly in early stage while RM is still not ready.
-It's possible the RM is not correct.
-
-I already sent an email to our IC guys yesterday to confirm it, but still
-No response...
-Will update you the result once there's a conclusion.
-
-Anyway, thanks a lot for pointing out this issue.
-
-> Sascha
-> 
-> --
-> Pengutronix e.K.                           |                             |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+This is g_fmt, so you set colorspace regardless of its current value, am
+I right?
 
 Regards
-Dong Aisheng
+Andrzej
+
+>  	for (i = 0; i < pix_mp->num_planes; ++i) {
+>  		pix_mp->plane_fmt[i].bytesperline = (frame->f_width *
+>  			frame->fmt->depth[i]) / 8;
