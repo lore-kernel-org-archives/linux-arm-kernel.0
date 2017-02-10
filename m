@@ -1,32 +1,42 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Fri, 10 Feb 2017 20:33:37 +1100
-Subject: [PATCH] ARM: sun7i: Enable audio codec on A20-OLinuXino-Micro
-Message-ID: <20170210093337.28821-1-net147@gmail.com>
+From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
+Date: Fri, 10 Feb 2017 10:41:32 +0100
+Subject: [PATCH 3/4] ASoC: sun8i-codec: Convert to SOC_MIXER_ARRAY
+In-Reply-To: <20170210094133.11382-1-mylene.josserand@free-electrons.com>
+References: <20170210094133.11382-1-mylene.josserand@free-electrons.com>
+Message-ID: <20170210094133.11382-4-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A20-OLinuXino-Micro has 3.5 mm sockets for headphone output and
-microphone input.
+SOC_MIXER_ARRAY is a simplified function of SND_SOC_DAPM_MIXER
+which handles automatically the ARRAY_SIZE of controls.
 
-Signed-off-by: Jonathan Liu <net147@gmail.com>
+Update the driver to use SOC_MIXER_ARRAY.
+
+Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
 ---
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ sound/soc/sunxi/sun8i-codec.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index 223fbd9f7c62..3c1680c340b1 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -85,6 +85,10 @@
- 	status = "okay";
- };
+diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+index 107fa8213600..a75a983974d9 100644
+--- a/sound/soc/sunxi/sun8i-codec.c
++++ b/sound/soc/sunxi/sun8i-codec.c
+@@ -288,12 +288,10 @@ static const struct snd_soc_dapm_widget sun8i_codec_dapm_widgets[] = {
+ 			 SUN8I_AIF1_DACDAT_CTRL_AIF1_DA0R_ENA, 0),
  
-+&codec {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
+ 	/* DAC Mixers */
+-	SND_SOC_DAPM_MIXER("Left Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
+-			   sun8i_dac_mixer_controls,
+-			   ARRAY_SIZE(sun8i_dac_mixer_controls)),
+-	SND_SOC_DAPM_MIXER("Right Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
+-			   sun8i_dac_mixer_controls,
+-			   ARRAY_SIZE(sun8i_dac_mixer_controls)),
++	SOC_MIXER_ARRAY("Left Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
++			sun8i_dac_mixer_controls),
++	SOC_MIXER_ARRAY("Right Digital DAC Mixer", SND_SOC_NOPM, 0, 0,
++			sun8i_dac_mixer_controls),
+ 
+ 	/* Clocks */
+ 	SND_SOC_DAPM_SUPPLY("MODCLK AFI1", SUN8I_MOD_CLK_ENA,
 -- 
-2.11.1
+2.11.0
