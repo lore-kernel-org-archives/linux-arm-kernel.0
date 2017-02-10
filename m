@@ -1,70 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 10 Feb 2017 18:53:38 +0000
-Subject: [PATCH 2/4] arm64: alternatives: apply boot time fixups via the
- linear mapping
-In-Reply-To: <3176bc0a-3c29-80af-9a1d-f6a35256bb15@arm.com>
-References: <1486747005-15973-1-git-send-email-ard.biesheuvel@linaro.org>
- <1486747005-15973-3-git-send-email-ard.biesheuvel@linaro.org>
- <3176bc0a-3c29-80af-9a1d-f6a35256bb15@arm.com>
-Message-ID: <6347B1C6-343A-47CF-9A2D-0DD749BE95B5@linaro.org>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 10 Feb 2017 10:59:15 -0800
+Subject: [PATCH v2] media: s5p_mfc print buf pointer in hex constistently
+In-Reply-To: <20170210154053.23735-1-shuahkh@osg.samsung.com>
+References: <20170210154053.23735-1-shuahkh@osg.samsung.com>
+Message-ID: <1486753155.2192.13.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 2017-02-10 at 08:40 -0700, Shuah Khan wrote:
+> Fix s5p_mfc_set_dec_frame_buffer_v6() to print buffer pointer in hex to be
+> consistent with the rest of the messages in the routine.
 
-> On 10 Feb 2017, at 18:49, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> 
->> On 10/02/17 17:16, Ard Biesheuvel wrote:
->> One important rule of thumb when designing a secure software system is
->> that memory should never be writable and executable at the same time.
->> We mostly adhere to this rule in the kernel, except at boot time, when
->> regions may be mapped RWX until after we are done applying alternatives
->> or making other one-off changes.
->> 
->> For the alternative patching, we can improve the situation by applying
->> the fixups via the linear mapping, which is never mapped with executable
->> permissions. So map the linear alias of .text with RW- permissions
->> initially, and remove the write permissions as soon as alternative
->> patching has completed.
->> 
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->> arch/arm64/include/asm/mmu.h    |  1 +
->> arch/arm64/kernel/alternative.c |  6 ++---
->> arch/arm64/kernel/smp.c         |  1 +
->> arch/arm64/mm/mmu.c             | 25 ++++++++++++++++----
->> 4 files changed, 25 insertions(+), 8 deletions(-)
->> 
->> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
->> index 47619411f0ff..5468c834b072 100644
->> --- a/arch/arm64/include/asm/mmu.h
->> +++ b/arch/arm64/include/asm/mmu.h
->> @@ -37,5 +37,6 @@ extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
->>                   unsigned long virt, phys_addr_t size,
->>                   pgprot_t prot, bool page_mappings_only);
->> extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
->> +extern void mark_linear_text_alias_ro(void);
->> 
->> #endif
->> diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
->> index 06d650f61da7..eacdbcc45630 100644
->> --- a/arch/arm64/kernel/alternative.c
->> +++ b/arch/arm64/kernel/alternative.c
->> @@ -122,7 +122,7 @@ static void __apply_alternatives(void *alt_region)
->> 
->>        pr_info_once("patching kernel code\n");
->> 
->> -        origptr = ALT_ORIG_PTR(alt);
->> +        origptr = lm_alias(ALT_ORIG_PTR(alt));
->>        replptr = ALT_REPL_PTR(alt);
->>        nr_inst = alt->alt_len / sizeof(insn);
-> 
-> Correct me if I am wrong, I think this would make "get_alt_insn" generate branch
-> instructions based on the  aliased linear mapped address, which could branch to linear
-> address of the branch target which doesn't have Execute permissions set.
-> I think we sould use ALT_ORIG_PTR(alt), instead of origptr for the calls to
-> get_alt_insn().
-> 
+More curiously, why is buf_addr a size_t and not
+a dma_addr_t?
 
-Good point, you are probably right.
-
-Will fix
+> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> ---
+> 
+> Fixed commit log. No code changes. Thanks for the catch.
+> 
+>  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+> index d6f207e..fc45980 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+> @@ -497,7 +497,7 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
+>  		}
+>  	}
+>  
+> -	mfc_debug(2, "Buf1: %zu, buf_size1: %d (frames %d)\n",
+> +	mfc_debug(2, "Buf1: %zx, buf_size1: %d (frames %d)\n",
+>  			buf_addr1, buf_size1, ctx->total_dpb_count);
+>  	if (buf_size1 < 0) {
+>  		mfc_debug(2, "Not enough memory has been allocated.\n");
