@@ -1,35 +1,48 @@
 From: fisaksen@baylibre.com (Frode Isaksen)
-Date: Fri, 10 Feb 2017 16:29:42 +0100
-Subject: [PATCH 6/8] spi: loopback-test: set HW loopback mode if loopback set
+Date: Fri, 10 Feb 2017 16:29:38 +0100
+Subject: [PATCH 2/8] spi: davinci: enable DMA when channels are defined in DT
 In-Reply-To: <1486740584-17875-1-git-send-email-fisaksen@baylibre.com>
 References: <1486740584-17875-1-git-send-email-fisaksen@baylibre.com>
-Message-ID: <1486740584-17875-7-git-send-email-fisaksen@baylibre.com>
+Message-ID: <1486740584-17875-3-git-send-email-fisaksen@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the internal HW loopback mode if the loopback option
-is set.
+From: Fabien Parent <fparent@baylibre.com>
 
-Signed-off-by: Frode Isaksen <fisaksen@baylibre.com>
+When booting with DT the SPI driver is always using
+the SPI_IO_TYPE_INTR mode to transfer data even if DMA channels are
+defined in the DT.
+
+This commit changes the behaviour to select the SPI_IO_TYPE_DMA mode
+if DMA channels are defined in the DT and will keep SPI_IO_TYPE_INTR
+if the channels are not defined in it.
+
+Signed-off-by: Fabien Parent <fparent@baylibre.com>
 ---
- drivers/spi/spi-loopback-test.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/spi/spi-davinci.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/spi/spi-loopback-test.c b/drivers/spi/spi-loopback-test.c
-index 50e620f..ce552af 100644
---- a/drivers/spi/spi-loopback-test.c
-+++ b/drivers/spi/spi-loopback-test.c
-@@ -285,6 +285,11 @@ static int spi_loopback_test_probe(struct spi_device *spi)
+diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
+index 84c0d76..b7b2da1 100644
+--- a/drivers/spi/spi-davinci.c
++++ b/drivers/spi/spi-davinci.c
+@@ -389,6 +389,7 @@ static int davinci_spi_of_setup(struct spi_device *spi)
+ {
+ 	struct davinci_spi_config *spicfg = spi->controller_data;
+ 	struct device_node *np = spi->dev.of_node;
++	struct davinci_spi *dspi = spi_master_get_devdata(spi->master);
+ 	u32 prop;
  
- 	dev_info(&spi->dev, "Executing spi-loopback-tests\n");
+ 	if (spicfg == NULL && np) {
+@@ -400,6 +401,9 @@ static int davinci_spi_of_setup(struct spi_device *spi)
+ 		if (!of_property_read_u32(np, "ti,spi-wdelay", &prop))
+ 			spicfg->wdelay = (u8)prop;
+ 		spi->controller_data = spicfg;
++
++		if (dspi->dma_rx && dspi->dma_tx)
++			spicfg->io_type = SPI_IO_TYPE_DMA;
+ 	}
  
-+	if (loopback) {
-+		spi->mode |= SPI_LOOP;
-+		ret = spi_setup(spi);
-+		dev_info(&spi->dev, "configure loopback return: %i\n", ret);
-+	}
- 	ret = spi_test_run_tests(spi, spi_tests);
- 
- 	dev_info(&spi->dev, "Finished spi-loopback-tests with return: %i\n",
+ 	return 0;
 -- 
 2.7.4
