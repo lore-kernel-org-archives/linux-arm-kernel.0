@@ -1,29 +1,41 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 10 Feb 2017 09:42:21 -0800
-Subject: [PATCH] [net-next] ARM: orion: fix PHYLIB dependency
-In-Reply-To: <CAK8P3a2Yss8r0qoubg2C7Jp+0JE3Fx+igWHQOscR+SB6d+W_HA@mail.gmail.com>
-References: <20170209150834.1158193-1-arnd@arndb.de>
- <c6ab6498-8094-b23e-0b93-c3bf1c866992@gmail.com>
- <CAK8P3a2Yss8r0qoubg2C7Jp+0JE3Fx+igWHQOscR+SB6d+W_HA@mail.gmail.com>
-Message-ID: <352146cc-845c-2860-44ca-7338eb53e260@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 10 Feb 2017 18:44:00 +0100
+Subject: [PATCH] arm: MAINTAINERS: transfer maintainership for the EZX
+ platform
+In-Reply-To: <d9ca30c8-8a0b-58f7-1237-c723dc7113ba@datenfreihafen.org> (Stefan
+ Schmidt's message of "Fri, 10 Feb 2017 17:13:19 +0100")
+References: <1480802397-25575-1-git-send-email-stefan@datenfreihafen.org>
+ <87pol51cx8.fsf@belgarion.home>
+ <d9ca30c8-8a0b-58f7-1237-c723dc7113ba@datenfreihafen.org>
+Message-ID: <87a89u0wm7.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2017 12:20 AM, Arnd Bergmann wrote:
-> On Thu, Feb 9, 2017 at 7:22 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> On 02/09/2017 07:08 AM, Arnd Bergmann wrote:
->> I disabled CONFIG_NETDEVICES to force CONFIG_PHY not to be set here, and
->> I was not able to reproduce this, what am I missing?
-> 
-> In the ARMv5 allmodconfig build, this fails because CONFIG_PHY=m, and
-> we can't call into it. You could use IS_BUILTIN instead of IS_ENABLED in
-> the header as a oneline workaround, but I think that would be more confusing
-> to real users that try to use CONFIG_PHY=m without realizing why they lose
-> access to their switch.
+Stefan Schmidt <stefan@datenfreihafen.org> writes:
 
-I see, this patch should also help fixing this:
+> Hello.
+>
+> On 06.12.2016 13:04, Robert Jarzmik wrote:
+>> Stefan Schmidt <stefan@datenfreihafen.org> writes:
+>> 
+>>> Neither Daniel, Harald or myself are looking into this anymore.
+>>> Robert thankfully agreed to handle the maintenance from now on.
+>>> Also remove the outdated entries for website, git tree and
+>>> mailing list.
+>>>
+>>> Signed-off-by: Stefan Schmidt <stefan@datenfreihafen.org>
+>> 
+>> Daniel and Harald, could we have your acks please for [1] ?
+>
+> It seems Daniel is to busy or no longer interested in this. Given how
+> long this platform has been sitting without a real maintainer I think it
+> should be fine to go ahead and apply this. Harald and myself are ok with
+> this anyway. IN the end its up to you.
+Hi Stefan,
 
-http://patchwork.ozlabs.org/patch/726381/
+The patch is already pulled into linux-next, it's all right.
+
+Cheers.
 
 -- 
-Florian
+Robert
