@@ -1,74 +1,71 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 10 Feb 2017 09:38:04 +0100
-Subject: [PATCH v2 1/4] ARM: pwm: sun4i: unification of register
- operations for support sun6i.
-In-Reply-To: <CAKNVLfaYoPf-b-mGc0eSmmAk0QPhMCRt5aT5Z3JBcfKhridWDA@mail.gmail.com>
-References: <1486489846-662-1-git-send-email-lis8215@gmail.com>
- <1486489846-662-2-git-send-email-lis8215@gmail.com>
- <20170208075219.oo234d5zartzmzsg@lukather>
- <CAKNVLfaYoPf-b-mGc0eSmmAk0QPhMCRt5aT5Z3JBcfKhridWDA@mail.gmail.com>
-Message-ID: <20170210083804.woe3bbc6b6c3vsp3@lukather>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 10 Feb 2017 16:38:23 +0800
+Subject: [PATCH 4/4] [media] s5p-mfc: Always check and set
+ 'v4l2_pix_format:field' field
+In-Reply-To: <20170209194314.5908-5-thibault.saunier@osg.samsung.com>
+Message-ID: <201702101610.pswKdr2D%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Thibault,
 
-On Wed, Feb 08, 2017 at 07:41:55PM +0300, ?????? ?????? wrote:
-> Hello all,
-> 
-> >> This patch not introduce new features, just prepare code for
-> >> adding sun6i PWM driver in next commits.
-> >>
-> >> A31 SoC have a different map of PWM registers than others ASoCs,
-> >> but register bits purposes are very similar.
-> >>
-> >> This patch introduce set of register access routines, which
-> >> are common for existing in driver ASoCs:
-> >>  - ctl_rdy   - checks the ready bit of specified PWM channel,
-> >>  - ctl_read  - reads value from control register of specified PWM
-> channel,
-> >>  - ctl_write - writes significant bits to control register of specified
-> PWM channel,
-> >>  - prd_read  - reads value from period register of specified PWM channel,
-> >>  - prd_write - writes value to period register of specified PWM channel.
-> >> Driver code redesigned to use the new routines.
-> >
-> > Why don't you use regmap for that?
-> 
-> First of all, i'm newbie and its my first patchset. I just remake
-> what i see in the driver. I even don't suspect about use regmap
-> here.
+[auto build test WARNING on linuxtv-media/master]
+[also build test WARNING on v4.10-rc7 next-20170210]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Don't worry, a review is here to point where things could be better,
-which doesn't mean that you did wrong :)
+url:    https://github.com/0day-ci/linux/commits/Thibault-Saunier/exynos-gsc-Use-576p-instead-720p-as-a-threshold-for-colorspaces/20170210-113658
+base:   git://linuxtv.org/media_tree.git master
+config: openrisc-allmodconfig (attached as .config)
+compiler: or32-linux-gcc (GCC) 4.5.1-or32-1.0rc1
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=openrisc 
 
-> Second thing - i can't test these driver on all existing sunxi SoCs,
-> i have only A31 and A20 based boards where only pwm0 is
-> accessible. Huge redesign cause bigger chance to make a mistake.
+All warnings (new ones prefixed by >>):
 
-Don't worry about that either. We have a good number of platforms
-using the PWMs already. If there's something broken at some point,
-we'll catch it as well.
+   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c: In function 'vidioc_try_fmt':
+>> drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:3: warning: comparison between pointer and integer
+>> drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:3: warning: comparison with string literal results in unspecified behavior
+   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:3: error: expected ')' before 'pix_mp'
+>> drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:3: warning: too few arguments for format
 
-> If you think regmap solution is a must, then i will do that. This
-> will be a good experience for me.
+vim +404 drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
 
-Yes, this really should cover what you're trying to do here,
-especially reg_field.
+   388		mfc_debug_leave();
+   389		return 0;
+   390	}
+   391	
+   392	/* Try format */
+   393	static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
+   394	{
+   395		struct s5p_mfc_dev *dev = video_drvdata(file);
+   396		struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
+   397		struct s5p_mfc_fmt *fmt;
+   398		enum v4l2_field field;
+   399	
+   400		field = f->fmt.pix.field;
+   401		if (field == V4L2_FIELD_ANY) {
+   402			field = V4L2_FIELD_NONE;
+   403		} else if (V4L2_FIELD_NONE != field) {
+ > 404			mfc_debug("Not supported field order(%d)\n", pix_mp->field);
+   405			return -EINVAL;
+   406		}
+   407	
+   408		/* V4L2 specification suggests the driver corrects the format struct
+   409		 * if any of the dimensions is unsupported */
+   410		f->fmt.pix.field = field;
+   411	
+   412		mfc_debug(2, "Type is %d\n", f->type);
 
-You can have a look at drivers/reset/sti/reset-syscfg.c if you want to
-have a look at a rather simple driver using it.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
+Name: .config.gz
+Type: application/gzip
+Size: 40023 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170210/12cba1ce/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170210/eac3a32b/attachment-0001.gz>
