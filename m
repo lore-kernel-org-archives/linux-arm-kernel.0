@@ -1,7 +1,7 @@
 From: abdallah.meziti.pro@gmail.com (AbdAllah-MEZITI)
-Date: Fri, 10 Feb 2017 19:50:50 +0100
+Date: Fri, 10 Feb 2017 19:52:51 +0100
 Subject: [PATCH v2] staging: bcm2835-audio: fix trailing statements
-Message-ID: <20170210185115.2281-1-abdallah.meziti.pro@gmail.com>
+Message-ID: <20170210185258.2337-1-abdallah.meziti.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
