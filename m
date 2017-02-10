@@ -1,93 +1,55 @@
-From: thibault.saunier@osg.samsung.com (Thibault Saunier)
-Date: Fri, 10 Feb 2017 13:37:44 -0300
-Subject: [PATCH v3 1/4] [media] exynos-gsc: Use 576p instead 720p as a
- threshold for colorspaces
-In-Reply-To: <4270fc60-579b-64d0-4256-403e4e5bf371@xs4all.nl>
-References: <20170210141022.25412-1-thibault.saunier@osg.samsung.com>
- <20170210141022.25412-2-thibault.saunier@osg.samsung.com>
- <4270fc60-579b-64d0-4256-403e4e5bf371@xs4all.nl>
-Message-ID: <37b11e67-7ed7-244d-b27e-ec3bb7732b0e@osg.samsung.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Feb 2017 16:39:08 +0000
+Subject: [PATCH 1/2] ARM: add ARM_SINGLE_ARMV7 as config option
+In-Reply-To: <25202835.AdbHsoUg0y@wuerfel>
+References: <20170209033044.19513-1-chris.brandt@renesas.com>
+ <5d90aff5-63b7-83a8-7529-2ac61ef82021@gmail.com>
+ <SG2PR06MB11650C805DD754EE5C9E56C78A450@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <25202835.AdbHsoUg0y@wuerfel>
+Message-ID: <20170210163908.GL27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2017 12:07 PM, Hans Verkuil wrote:
-> On 02/10/2017 03:10 PM, Thibault Saunier wrote:
->> From: Javier Martinez Canillas <javier@osg.samsung.com>
->>
->> The media documentation says that the V4L2_COLORSPACE_SMPTE170M colorspace
->> should be used for SDTV and V4L2_COLORSPACE_REC709 for HDTV. But drivers
->> don't agree on the display resolution that should be used as a threshold.
->>
->> Some drivers set V4L2_COLORSPACE_REC709 for 720p and higher while others
->> set V4L2_COLORSPACE_REC709 for anything higher than 576p. Newers drivers
->> use the latter and that also matches what user-space multimedia programs
->> do (i.e: GStreamer), so change the driver logic to be aligned with this.
->>
->> Also, check for the resolution in G_FMT instead unconditionally setting
->> the V4L2_COLORSPACE_REC709 colorspace.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
->>
->> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
->> ---
->>
->> Changes in v3:
->> - Do not check values in the g_fmt functions as Andrzej explained in previous review
->> - Added 'Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>'
->>
->> Changes in v2: None
->>
->>   drivers/media/platform/exynos-gsc/gsc-core.c | 8 ++++++--
->>   1 file changed, 6 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
->> index 59a634201830..db7d9883861b 100644
->> --- a/drivers/media/platform/exynos-gsc/gsc-core.c
->> +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
->> @@ -472,7 +472,7 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
->>   
->>   	pix_mp->num_planes = fmt->num_planes;
->>   
->> -	if (pix_mp->width >= 1280) /* HD */
->> +	if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
->>   		pix_mp->colorspace = V4L2_COLORSPACE_REC709;
->>   	else /* SD */
->>   		pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
->> @@ -519,9 +519,13 @@ int gsc_g_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
->>   	pix_mp->height		= frame->f_height;
->>   	pix_mp->field		= V4L2_FIELD_NONE;
->>   	pix_mp->pixelformat	= frame->fmt->pixelformat;
->> -	pix_mp->colorspace	= V4L2_COLORSPACE_REC709;
->>   	pix_mp->num_planes	= frame->fmt->num_planes;
->>   
->> +	if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
->> +		pix_mp->colorspace = V4L2_COLORSPACE_REC709;
->> +	else /* SD */
->> +		pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
->> +
->>   	for (i = 0; i < pix_mp->num_planes; ++i) {
->>   		pix_mp->plane_fmt[i].bytesperline = (frame->f_width *
->>   			frame->fmt->depth[i]) / 8;
->>
-> This is a mem2mem device, right? In the case of mem2mem devices the driver should never
-> set the colorspace, instead it just copies it from what the application provides (the
-> video output side) to the capture side.
->
-> After all, you are just scaling here so the input and output colorspaces are
-> exactly the same, and the scaler doesn't care what the colorspace is.
+On Fri, Feb 10, 2017 at 02:05:43PM +0100, Arnd Bergmann wrote:
+> And I really don't like adding new top-level for a platform here, it
+> brings us back to the same problems we had before we moved most platforms
+> to ARCH_MULTIPLATFORM, and it doesn't solve the remaining problems we still
+> have:
 
-This device also does color conversion so I think it matters here, am I 
-misunderstanding something?
-Also, is that comment only for the try_fmt part as it looks like in 
-g_fmt the driver should fill up the structure
-with its values?
+It's the least evil solution.
 
-Thanks for you review.
+> - In some platforms, the decision would have to be done on a per-board
+>   level, as each board can have its memory at a different location
+>   base on which chipselect line got connected to the RAM and NOR flash
+>   respectively
 
-Regards,
+Right, but that's something we _had_ solved before multiplatform came
+along.
 
-Thibault Saunier
-> Regards,
->
-> 	Hans
+> - Some (few) platforms actually have separate top-level Kconfig options
+>   but are actually very closely related and you could have a kernel
+>   for all of them even with !MMU and XIP_KERNEL. The most important
+>   one here is ARM Versatile/Realview/Integrator/Vexpress that have
+>   more in common than things we put behind a common Kconfig option in
+>   other platforms.
+
+If you think that Versatile + Realview + Integrator + Vexpress should
+be lumped into one kernel image for !MMU and XIP_KERNEL then you're
+wrong - from what I remember, their RAM and flash locations are quite
+different which rules it out.
+
+The biggest thing that matters for !MMU and XIP_KERNEL is the location
+of flash and RAM.  If those are not compatible, !MMU and XIP_KERNEL
+has no chance of working.
+
+> - CONFIG_DEBUG_UNCOMPRESS has a very similar requirements to
+>   XIP_KERNEL and !MMU, and we currently allow it for any machine,
+>   with a lot of flexibility in configuring that always breaks
+>   running on any machine other than the one you are targetting.
+
+Right, but that's debug, not core kernel configuration.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
