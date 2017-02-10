@@ -1,29 +1,37 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Fri, 10 Feb 2017 19:16:10 +0200
-Subject: [PATCH] virtio: Try to untangle DMA coherency
-In-Reply-To: <20170209183118.GI19397@arm.com>
-References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
- <20170201195732-mutt-send-email-mst@kernel.org>
- <20170201182659.GM8177@arm.com>
- <20170201210648-mutt-send-email-mst@kernel.org>
- <20170202112614.GB30577@arm.com>
- <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
- <20170202182224-mutt-send-email-mst@kernel.org>
- <20170202164049.GI13839@arm.com>
- <20170209201341-mutt-send-email-mst@kernel.org>
- <20170209183118.GI19397@arm.com>
-Message-ID: <20170210191409-mutt-send-email-mst@kernel.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 10 Feb 2017 17:16:41 +0000
+Subject: [PATCH 0/4] arm64: mmu: avoid writeable-executable mappings
+Message-ID: <1486747005-15973-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2017 at 06:31:18PM +0000, Will Deacon wrote:
-> On ARM (and other archs such as
-> Power), having a mismatch between a cacheable and a non-cacheable mapping
-> can result in a loss of coherency between the two (for example, if the
-> non-cacheable gues accesses bypass the cache, but the cacheable host
-> accesses allocate in the cache).
+Having memory that is writable and executable at the same time is a
+security hazard, and so we tend to avoid those when we can. However,
+at boot time, we keep .text mapped writable during the entire init
+phase, and the init region itself is mapped rwx as well.
 
-I guess it's an optimization to avoid cache snoops for non-cacheable accesses?
+Let's improve the situation by:
+- making the alternatives patching use the linear mapping
+- splitting the init region into separate text and data regions
+
+This removes all RWX mappings except the really early one created
+in head.S (which we could perhaps fix in the future as well)
+
+Ard Biesheuvel (4):
+  arm: kvm: move kvm_vgic_global_state out of .text section
+  arm64: alternatives: apply boot time fixups via the linear mapping
+  arm64: mmu: map .text as read-only from the outset
+  arm64: mmu: apply strict permissions to .init.text and .init.data
+
+ arch/arm64/include/asm/mmu.h      |  1 +
+ arch/arm64/include/asm/sections.h |  3 +-
+ arch/arm64/kernel/alternative.c   |  6 +--
+ arch/arm64/kernel/smp.c           |  1 +
+ arch/arm64/kernel/vmlinux.lds.S   | 32 ++++++++++-----
+ arch/arm64/mm/init.c              |  3 +-
+ arch/arm64/mm/mmu.c               | 42 ++++++++++++++------
+ virt/kvm/arm/vgic/vgic.c          |  4 +-
+ 8 files changed, 64 insertions(+), 28 deletions(-)
 
 -- 
-MST
+2.7.4
