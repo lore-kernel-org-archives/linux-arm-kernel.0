@@ -1,36 +1,50 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Fri, 10 Feb 2017 15:44:10 +0800
-Subject: [PATCH 0/4] Move DP phy switch to PHY driver
-Message-ID: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
+Date: Fri, 10 Feb 2017 15:44:11 +0800
+Subject: [PATCH 1/4] Documentation: bindings: add uphy-dp-sel for Rockchip USB
+ Type-C PHY
+In-Reply-To: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
+References: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <1486712654-15431-2-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+rockchip,uphy-dp-sel is the register of type-c phy enable DP function.
 
-There are 2 Type-c PHYs in RK3399, but only one DP controller. Hence
-only one PHY can connect to DP controller at one time, the other should
-be disconnected. The GRF_SOC_CON26 register has a switch bit to do it,
-set this bit means enable PHY 1, clear this bit means enable PHY 0.
-
-If the board has 2 Type-C ports, the DP driver get the phy id from
-devm_of_phy_get_by_index, and then control this switch according to
-this id. But some others board only has one Type-C port, it may be PHY 0
-or PHY 1. The dts node id can not tell us the correct PHY id. Hence move
-this switch to PHY driver, the PHY driver can distinguish between PHY 0
-and PHY 1, and then write the correct register bit.
-
-
-
-Chris Zhong (4):
-  Documentation: bindings: add uphy-dp-sel for Rockchip USB Type-C PHY
-  arm64: dts: rockchip: add rockchip,uphy-dp-sel for Type-C phy
-  phy: rockchip-typec: support DP phy switch
-  drm/rockchip: cdn-dp: remove the DP phy switch
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+---
 
  Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt | 5 +++++
- arch/arm64/boot/dts/rockchip/rk3399.dtsi                     | 2 ++
- drivers/gpu/drm/rockchip/cdn-dp-core.c                       | 7 -------
- drivers/phy/phy-rockchip-typec.c                             | 9 +++++++++
- 4 files changed, 16 insertions(+), 7 deletions(-)
+ 1 file changed, 5 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+index 6ea867e..c3be83b 100644
+--- a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
++++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+@@ -33,6 +33,9 @@ offset, enable bit, write mask bit.
+  - rockchip,pipe-status : the register of type-c phy pipe status.
+    for type-c phy0, it must be <0xe5c0 0 0>;
+    for type-c phy1, it must be <0xe5c0 16 16>;
++ - rockchip,uphy-dp-sel : the register of type-c phy enable DP function
++   for type-c phy0, it must be <0x6268 19 19>;
++   for type-c phy1, it must be <0x6268 3 19>;
+ 
+ Required nodes : a sub-node is required for each port the phy provides.
+ 		 The sub-node name is used to identify dp or usb3 port,
+@@ -62,6 +65,7 @@ Example:
+ 		rockchip,usb3tousb2-en = <0xe580 3 19>;
+ 		rockchip,external-psm = <0xe588 14 30>;
+ 		rockchip,pipe-status = <0xe5c0 0 0>;
++		rockchip,uphy-dp-sel = <0x6268 19 19>;
+ 
+ 		tcphy0_dp: dp-port {
+ 			#phy-cells = <0>;
+@@ -90,6 +94,7 @@ Example:
+ 		rockchip,usb3tousb2-en = <0xe58c 3 19>;
+ 		rockchip,external-psm = <0xe594 14 30>;
+ 		rockchip,pipe-status = <0xe5c0 16 16>;
++		rockchip,uphy-dp-sel = <0x6268 3 19>;
+ 
+ 		tcphy1_dp: dp-port {
+ 			#phy-cells = <0>;
 -- 
 2.6.3
