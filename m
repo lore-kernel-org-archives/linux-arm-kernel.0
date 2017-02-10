@@ -1,119 +1,147 @@
-From: abelvesa@gmail.com (Abel Vesa)
-Date: Fri, 10 Feb 2017 12:03:06 +0000
-Subject: [PATCHv3] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-In-Reply-To: <CACh+v5NJ5zi4nEQkG+y_SesFuW8NOophD1KDFRG+t7=CtjnNrg@mail.gmail.com>
-References: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
- <20170209162956.GH27312@n2100.armlinux.org.uk>
- <CACh+v5NJ5zi4nEQkG+y_SesFuW8NOophD1KDFRG+t7=CtjnNrg@mail.gmail.com>
-Message-ID: <20170210120306.GA6825@nuc>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 10 Feb 2017 13:07:41 +0100
+Subject: [PATCH v8 1/3] dmaengine: Add new device_{set,release}_slave
+ callbacks
+In-Reply-To: <20170210043442.GM19244@localhost>
+References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170209142307eucas1p180323d005f524760913b8d04ac966423@eucas1p1.samsung.com>
+ <1486650171-20598-2-git-send-email-m.szyprowski@samsung.com>
+ <20170210043442.GM19244@localhost>
+Message-ID: <05d42359-1e72-3ec1-7d86-86135a8f013e@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2017 at 11:36:12AM +0100, Jean-Jacques Hiblot wrote:
-> 2017-02-09 17:29 GMT+01:00 Russell King - ARM Linux <linux@armlinux.org.uk>:
-> > On Tue, Feb 07, 2017 at 10:57:55PM +0000, Abel Vesa wrote:
-> >> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> >> +
-> >> +.macro __ftrace_regs_caller
-> >> +
-> >> +     add     ip, sp, #4      @ move in IP the value of SP as it was
-> >> +                             @ before the push {lr} of the mcount mechanism
-> >> +     stmdb   sp!, {ip,lr,pc}
-> >> +     stmdb   sp!, {r0-r11,lr}
-> >> +
-> >> +     @ stack content at this point:
-> >> +     @ 0  4          44    48   52       56   60   64
-> >> +     @ R0 | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |
-> >
-> > How important is this to be close to "struct pt_regs" ?  Do we care about
-> > r12 being "wrong" ?  The other issue is that pt_regs is actually 72
-> > bytes in size, not 68 bytes.  So, does that mean we end up inappropriately
-> > leaking some of the kernel stack to userspace through ftrace?
-> >
-> > It's possible to save all the registers like this if we need to provide
-> > a complete picture of the register set at function entry:
-> >
-> >         str     ip, [sp, #-16]!
-> >         add     ip, sp, #20
-> >         stmia   sp, {ip, lr, pc}
-> >         stmdb   sp!, {r0 - r11}
-> >
-> > However, is that even correct - don't we want pt_regs' LR and PC to be
-> > related to the function call itself?  The "previous LR" as you describe
-> > it is where the called function (the one that is being traced) will
-> > return to.  The current LR at this point is the address within the
-> > traced function.  So actually I think this is more strictly correct, if
-> > I'm understanding the intention here correctly:
-> >
-> >         str     ip, [sp, #S_IP - PT_REGS_SIZE]! @ save current IP
-> >         ldr     ip, [sp, #PT_REGS_SIZE - S_IP]  @ get LR at traced function entry
-> >         str     lr, [sp, #S_PC - S_IP]          @ save current LR as PC
-> >         str     ip, [sp, #S_LR - S_IP]          @ save traced function return
-> >         add     ip, sp, #PT_REGS_SIZE - S_IP + 4
-> >         str     ip, [sp, #S_SP - SP_IP]         @ save stack pointer at function entry
-> >         stmdb   sp!, {r0 - r11}
-> >         @ clear CPSR and old_r0 words
-> >         mov     r3, #0
-> >         str     r3, [sp, #S_PSR]
-> >         str     r3, [sp, #S_OLD_R0]
-> >
-> > However, that has the side effect of misaligning the stack (the stack
-> > needs to be aligned to 8 bytes).  So, if we decide we don't care about
-> > the saved LR value (except as a mechanism to preserve it across the
-> > call into the ftrace code):
-> >
-> >         str     ip, [sp, #S_IP - PT_REGS_SIZE + 4]!
-> >         str     lr, [sp, #S_PC - S_IP]
-> >         ldr     lr, [sp, #PT_REGS_SIZE - 4 - S_IP]
-> >         add     ip, sp, #PT_REGS_SIZE - S_IP
-> >         stmib   sp, {ip, lr}
-> >         stmdb   sp!, {r0 - r11}
-> >         @ clear CPSR and old_r0 words
-> >         mov     r3, #0
-> >         str     r3, [sp, #S_PSR]
-> >         str     r3, [sp, #S_OLD_R0]
-> >
-> > and the return would be:
-> >
-> >         ldmia   sp, {r0 - pc}
-> >
-> > That all said - maybe someone from the ftrace community can comment on
-> > how much of pt_regs is actually necessary here?
-> 
-> I would suggest the following:
-> r0-r11: filled with current values.
-> r12 :  the value of r12 doesn't matter (Intra-procedure call scratch
-> reg), we can either save it or not.
-> r13 - sp: the value as it was when the instrumented function was
-> entered. in the mcount case, it's the current sp value - 4, otherwise
-> it'f sp -4
-> r14 - lr: the value as it was when the instrumented function was
-> entered. first element in stack or available in frame depending on
-> GCC's version (mcount vs __gnu_mcount_nc)
-> r15 - pc : the address after the modified instruction (value of lr
-> when the ftrace caller is entered)
-> 
-So basically you're saying: save all regs, r0 through r15, except r12.
-Based on that, I think it's easier to save all of them and then restore
-all of them except r12. Plus, you have to take into consideration all 
-the possible users of ftrace with regs. At some point some implementation
-of ftrace_regs_call will probably need the value from r12. 
-> I don't think we need CSPR and ORIG_r0.
-I think we do. As I said before, because PT_REGS is 72 and some function
-might (in the future) make use of CSPR or ORIG_r0, to ensure there is no
-stack corruption taking place, we have to provide whole pt_regs, that is
-72 (including CSPR and ORIG_r0). Plus, the stack alignment thing Russell
-mentioned would be fixed.
+Hi Vinod,
 
-The only problem I don't have a solution for at this point is OLD_LR (or previous LR
-as it is called in this patch). If we take the approach described earlier,
-we need to add to pt_regs the OLD_LR which I really don't like because it is 
-breaking the whole purpose of pt_regs (it should only contain one copy of each reg, 
-though it already has the ORIG_r0 in it) and will also break the stack alignment.
-> 
-> >
-> > --
-> > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> > FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> > according to speedtest.net.
+On 2017-02-10 05:34, Vinod Koul wrote:
+> On Thu, Feb 09, 2017 at 03:22:49PM +0100, Marek Szyprowski wrote:
+>> Add two new callbacks to DMA engine device. They will used to provide
+>> access to slave device (the device which requested given DMA channel)
+> You mean access to client devices?
+
+Yes. It looks that I was confused by the code, where the term 'slave'
+appears a few times. 'Client' is a bit more appropriate then.
+
+>> for DMA engine driver. Access to slave device might be useful for example
+>> for implementing advanced runtime power management.
+>>
+>> DMA slave channels are exclusive, so only one slave device can be set
+>> for a given DMA slave channel.
+> That is not a right assumption and my worry here. With virt-dma we don't
+> really assume a hardware channel and exclusive. Certain implementation may
+> do that but from framework we cannot assume that.
+
+Okay, I came to such conclusion basing one the dma engine code, but maybe
+I missed something. However in such case such callback will be called for
+each client device and it will be up to the driver to handle that.
+
+>> device_set_slave() will be called after the device_alloc_chan_resources()
+>> and device_release_slave() before the device_free_chan_resources().
+> Okay, I had to relook at the series to get around this part. Sorry but we
+> can't call it set_slave, it is actually set_client/consumer
+
+That's okay, the name of the callbacks should be changed.
+
+> In our context slaves means dmaengine slave devices aka provider.
+> Client would be the consumer and not slave.
+
+I'm a new to the DMA engine framework, I'm sorry for using wrong terms.
+
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> ---
+>>   drivers/dma/dmaengine.c   | 27 ++++++++++++++++++++++++---
+>>   include/linux/dmaengine.h | 10 ++++++++++
+>>   2 files changed, 34 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/dma/dmaengine.c b/drivers/dma/dmaengine.c
+>> index 24e0221fd66d..5b7089d8be4d 100644
+>> --- a/drivers/dma/dmaengine.c
+>> +++ b/drivers/dma/dmaengine.c
+>> @@ -705,6 +705,7 @@ struct dma_chan *dma_request_chan(struct device *dev, const char *name)
+>>   {
+>>   	struct dma_device *d, *_d;
+>>   	struct dma_chan *chan = NULL;
+>> +	int ret;
+>>   
+>>   	/* If device-tree is present get slave info from here */
+>>   	if (dev->of_node)
+>> @@ -715,8 +716,9 @@ struct dma_chan *dma_request_chan(struct device *dev, const char *name)
+>>   		chan = acpi_dma_request_slave_chan_by_name(dev, name);
+>>   
+>>   	if (chan) {
+>> -		/* Valid channel found or requester need to be deferred */
+>> -		if (!IS_ERR(chan) || PTR_ERR(chan) == -EPROBE_DEFER)
+>> +		if (!IS_ERR(chan))
+>> +			goto found;
+>> +		if (PTR_ERR(chan) == -EPROBE_DEFER)
+>>   			return chan;
+>>   	}
+>>   
+>> @@ -738,7 +740,21 @@ struct dma_chan *dma_request_chan(struct device *dev, const char *name)
+>>   	}
+>>   	mutex_unlock(&dma_list_mutex);
+>>   
+>> -	return chan ? chan : ERR_PTR(-EPROBE_DEFER);
+>> +	if (!chan)
+>> +		return ERR_PTR(-EPROBE_DEFER);
+>> +	if (IS_ERR(chan))
+>> +		return chan;
+>> +found:
+>> +	if (chan->device->device_set_slave) {
+>> +		chan->slave = dev;
+>> +		ret = chan->device->device_set_slave(chan, dev);
+>> +		if (ret) {
+>> +			chan->slave = NULL;
+>> +			dma_release_channel(chan);
+>> +			chan = ERR_PTR(ret);
+>> +		}
+>> +	}
+>> +	return chan;
+>>   }
+>>   EXPORT_SYMBOL_GPL(dma_request_chan);
+>>   
+>> @@ -786,6 +802,11 @@ void dma_release_channel(struct dma_chan *chan)
+>>   	mutex_lock(&dma_list_mutex);
+>>   	WARN_ONCE(chan->client_count != 1,
+>>   		  "chan reference count %d != 1\n", chan->client_count);
+>> +	if (chan->slave) {
+>> +		if (chan->device->device_release_slave)
+>> +			chan->device->device_release_slave(chan);
+>> +		chan->slave = NULL;
+>> +	}
+>>   	dma_chan_put(chan);
+>>   	/* drop PRIVATE cap enabled by __dma_request_channel() */
+>>   	if (--chan->device->privatecnt == 0)
+>> diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+>> index 533680860865..d22299e37e69 100644
+>> --- a/include/linux/dmaengine.h
+>> +++ b/include/linux/dmaengine.h
+>> @@ -277,6 +277,9 @@ struct dma_chan {
+>>   	struct dma_router *router;
+>>   	void *route_data;
+>>   
+>> +	/* Only for SLAVE channels */
+>> +	struct device *slave;
+> so assuming you refer to consumer aka client here, why do we need set if we
+> store it here.
+
+DMA engine driver might need to do something with it (like setting up a pm
+link for example) before starting any operations. It would be great if the
+pointer to client device is available in device_alloc_chan_resources(), but
+propagating it there is not possible without significant changes. That's why
+I came with this a separate callback.
+
+Maybe the client device shouldn't be stored in the dma_chan structure at all
+and left to the drivers to use or manage it if really needed. This will also
+solve the issue with virt-dma you have mentioned.
+
+In the previous version I managed to pass client device pointer to
+device_alloc_chan_resources() via of_xlate callback (please take a look into
+v7), but that approach was rejected by Lars-Peter Clausen.
+
+ > ...
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
