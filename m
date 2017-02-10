@@ -1,38 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Feb 2017 13:39:37 +0100
-Subject: Aarch64 kernel with 32bit userspace question
-In-Reply-To: <78db1867-9bd2-b1f6-ea3f-86aa08c199f5@denx.de>
-References: <0057242a-2e16-3b59-1f81-9f4ccf64216d@denx.de>
- <20170209122509.GD27312@n2100.armlinux.org.uk>
- <78db1867-9bd2-b1f6-ea3f-86aa08c199f5@denx.de>
-Message-ID: <6172994.uov8zcY07Z@wuerfel>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Fri, 10 Feb 2017 15:40:34 +0300
+Subject: [PATCH] staging: vc04_services: remove unused functions
+In-Reply-To: <78243491.gCbftNnyIb@wuerfel>
+References: <20170207115308.5208-1-alexander@alemayhu.com>
+ <20170207120943.GC11154@mwanda> <78243491.gCbftNnyIb@wuerfel>
+Message-ID: <20170210123928.GA4162@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 9, 2017 9:38:41 PM CET Marek Vasut wrote:
+On Wed, Feb 08, 2017 at 11:42:21AM +0100, Arnd Bergmann wrote:
+> On Tuesday, February 7, 2017 3:09:44 PM CET Dan Carpenter wrote:
+> > There is a bunch of vc04_services that we're still looking to merge in
+> > the near future.  Please hold off deleting these until we are further
+> > along on that.
 > > 
-> > The default kernel headers_install will want to place the headers into
-> > <includepath>/asm along side <includepath>/asm-generic and
-> > <includepath>/linux which is not what modern ARM distros want.
 > 
-> Thanks for all the help, it at least helped me get a better picture how
-> the multilib stuff works on arm/aarch64 .
+> More generally speaking, I'd like to see all the 
+> -Wmissing-declarations/-Wmissing-prototypes warnings addressed
+> in the kernel and turn on that warning by default.
 > 
-> It turns out that OE is not yet able to generate multilib sdk, while it
-> is able to generate multilib system image. Therefore, while I had two
-> different compilers, only one sysroot was installed (aarch64 one) and
-> both were pointing into it. The 32bit compiler used the wrong headers,
-> so I ran into this issue.  I'll have to drill into the OE further to
-> figure out the proper solution.
+> If there are parts of vc04_services that are intentionally
+> left in place but currently unused, adding a declaration in the
+> header file with a comment should be sufficient to prevent it
+> from getting deleted or seeing bogus warnings.
 
-It seems the support for biarch headers was removed from the kernel
-a few years before arm64 got merged: https://lkml.org/lkml/2008/6/30/467
+Yeah.  That's true.  There really isn't a good reason to have these
+warnings.
 
-You could still use "make headers_install_all" in place of
-"make headers_install" in 
-http://git.yoctoproject.org/cgit.cgi/poky/plain/meta/recipes-kernel/linux-libc-headers/linux-libc-headers.inc
-but you still have to figure out how to find the right headers,
-either by moving the two asm directories to /usr/{arm,aarch64}-linux-gnu/include/asm
-or by doing the same trick that we had before the 2008 patch.
-
-	Arnd
+regards,
+dan carpenter
