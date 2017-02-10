@@ -1,121 +1,100 @@
-From: rruigrok@codeaurora.org (Ruigrok, Richard)
-Date: Thu, 9 Feb 2017 17:42:01 -0700
-Subject: [PATCH v2 1/2] efi: arm-stub: Correct FDT and initrd allocation
- rules for arm64
-In-Reply-To: <1486676573-19237-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1486676573-19237-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <a7058407-a770-d413-e072-ba3edd7df197@codeaurora.org>
+From: briannorris@chromium.org (Brian Norris)
+Date: Thu,  9 Feb 2017 17:05:15 -0800
+Subject: [PATCH v2 0/6] arm64: dts: rockchip: support Google Kevin
+Message-ID: <20170210010521.78872-1-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+This is v2, adding basic support for Google Kevin, a board in the Gru device
+family. I do not add a leaf .dts board file for Gru, but I have retained the
+split between "things that apply to the Gru family" (rk3399-gru.dtsi) and
+"things that apply to Kevin only" (rk3399-gru-kevin.dtsi).
+
+I know it's close to the 4.11 merge window, so I expect this won't make it for
+that. But since I got it ready for testing anyway, I thought I might as well
+get it out the door, ready for 4.12.
+
+I've included resends of two patches (adding cros-ec*.dtsi symlinks, and adding
+RK3399 DWC3). The former is unmodified, but the latter is rewritten to match
+current upstream bindings better, and to allow it to function w/o extcon
+support (USB2 only).
+
+AFAICT, all these bindings are in -next, except for the root node compatible
+property (added doc in this series).
+
+I elaborate on what's working/not working below, but one of the big missing
+pieces is cpufreq support. We still need some more work on getting good
+bindings and driver support upstream for the PWM regulator + OVP circuit on
+these boards. See patch 5 for more info.
+
+Working and tested (to some extent):
+ * EC support -- including keyboard, battery, PWM, and probably more
+ * UART / console
+ * Thermal
+ * Touchscreen
+ * Touchpad
+ * Digitizer (regulator still WIP; working on this in another series)
+ * PCIe / Wifi
+ * Bluetooth / Webcam
+ * SD card
+ * eMMC
+ * USB2 on TypeC
+   - This works much of the time, but USB3 devices may or may not detect
+     properly. Waiting on proper extcon support for USB3 over TypeC.
+   - Depends on XHCI/DWC3 fixes for ARM64 that still haven't landed
+ * Backlight
+
+Not working:
+ * CPUFreq -- relies on special OVP support for our PWM regulator
+   circuits
+ * EC / extcon support -- and with it, USB3/TypeC/DP
+ * DRM -- won't even build on ARM64, so all display, eDP, etc. is not
+   enabled
+
+Not tested:
+ * Audio
 
 
-On 2/9/2017 2:42 PM, Ard Biesheuvel wrote:
-> On arm64, we have made some changes over the past year to the way the
-> kernel itself is allocated and to how it deals with the initrd and FDT.
-> This patch brings the allocation logic in the EFI stub in line with that,
-> which is necessary because the introduction of KASLR has created the
-> possibility for the initrd to be allocated in a place where the kernel
-> may not be able to map it. (This is mostly a theoretical scenario, since
-> it only affects systems where the physical memory footprint exceeds the
-> size of the linear mapping.)
->
-> Since we know the kernel itself will be covered by the linear mapping,
-> choose a suitably sized window (i.e., based on the size of the linear
-> region) covering the kernel when allocating memory for the initrd.
->
-> The FDT may be anywhere in memory on arm64 now that we map it via the
-> fixmap, so we can lift the address restriction there completely.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/include/asm/efi.h              | 14 +++++++++++++-
->  arch/arm64/include/asm/efi.h            | 18 +++++++++++++++++-
->  drivers/firmware/efi/libstub/arm-stub.c |  7 ++++---
->  3 files changed, 34 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
-> index 0b06f5341b45..2de0195dfd1e 100644
-> --- a/arch/arm/include/asm/efi.h
-> +++ b/arch/arm/include/asm/efi.h
-> @@ -84,6 +84,18 @@ static inline void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
->   */
->  #define ZIMAGE_OFFSET_LIMIT	SZ_128M
->  #define MIN_ZIMAGE_OFFSET	MAX_UNCOMP_KERNEL_SIZE
-> -#define MAX_FDT_OFFSET		ZIMAGE_OFFSET_LIMIT
-> +
-> +/* on ARM, the FDT should be located in the first 128 MB of RAM */
-> +static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
-> +{
-> +	return dram_base + ZIMAGE_OFFSET_LIMIT;
-> +}
-> +
-> +/* on ARM, the initrd should be loaded in a lowmem region */
-> +static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
-> +						    unsigned long image_addr)
-> +{
-> +	return dram_base + SZ_512M;
-> +}
->  
->  #endif /* _ASM_ARM_EFI_H */
-> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-> index 0b6b1633017f..342e90d6d204 100644
-> --- a/arch/arm64/include/asm/efi.h
-> +++ b/arch/arm64/include/asm/efi.h
-> @@ -46,7 +46,23 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
->   * 2MiB so we know it won't cross a 2MiB boundary.
->   */
->  #define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
-> -#define MAX_FDT_OFFSET	SZ_512M
-> +
-> +/* on arm64, the FDT may be located anywhere in system RAM */
-> +static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
-> +{
-> +	return ULONG_MAX;
-> +}
-> +
-> +/*
-> + * On arm64, we have to ensure that the initrd ends up in the linear region,
-> + * which is a 1 GB aligned region of size '1UL << (VA_BITS - 1)' that is
-> + * guaranteed to cover the kernel Image.
-> + */
-> +static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
-> +						    unsigned long image_addr)
-> +{
-> +	return (image_addr & ~(SZ_1G - 1UL)) + (1UL << (VA_BITS - 1));
-> +}
->  
-Please update booting.txt which specifies a window of 32G for ARM64
+I include a more detailed changelog in the patches themselves, but a rough
+summary:
 
->  #define efi_call_early(f, ...)		sys_table_arg->boottime->f(__VA_ARGS__)
->  #define __efi_call_early(f, ...)	f(__VA_ARGS__)
-> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-> index b4f7d78f9e8b..557281fe375f 100644
-> --- a/drivers/firmware/efi/libstub/arm-stub.c
-> +++ b/drivers/firmware/efi/libstub/arm-stub.c
-> @@ -333,8 +333,9 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
->  	if (!fdt_addr)
->  		pr_efi(sys_table, "Generating empty DTB\n");
->  
-> -	status = handle_cmdline_files(sys_table, image, cmdline_ptr,
-> -				      "initrd=", dram_base + SZ_512M,
-> +	status = handle_cmdline_files(sys_table, image, cmdline_ptr, "initrd=",
-> +				      efi_get_max_initrd_addr(dram_base,
-> +							      *image_addr),
->  				      (unsigned long *)&initrd_addr,
->  				      (unsigned long *)&initrd_size);
->  	if (status != EFI_SUCCESS)
-> @@ -344,7 +345,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
->  
->  	new_fdt_addr = fdt_addr;
->  	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
-> -				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
-> +				&new_fdt_addr, efi_get_max_fdt_addr(dram_base),
->  				initrd_addr, initrd_size, cmdline_ptr,
->  				fdt_addr, fdt_size);
->  
+v1 -> v2:
+ * merge the OPP and CPU regulators into 1 patch; don't support them on non-Gru
+   boards yet, as that will break them (and we're not sure if the same table is
+   applicable anyway)
+ * drop some patches that were applied already
+ * update copyrights
+ * match USB bindings more closely
+ * drop digitizer regulator patches; this isn't ready (working on in another
+   series)
+
+
+Brian Norris (5):
+  arm64: dts: rockchip: support dwc3 USB for rk3399
+  dt-bindings: Document rk3399 Gru/Kevin
+  arm64: dts: rockchip: add Gru/Kevin DTS
+  arm64: dts: rockchip: describe Gru/Kevin OPPs + CPU regulators
+  arm64: dts: rockchip: sort rk3399 by unit address
+
+Douglas Anderson (1):
+  arm64: dts: Add symlinks for cros-ec-keyboard and cros-ec-sbs
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |   20 +
+ .../boot/dts/include/common/cros-ec-keyboard.dtsi  |    1 +
+ .../arm64/boot/dts/include/common/cros-ec-sbs.dtsi |    1 +
+ arch/arm64/boot/dts/rockchip/Makefile              |    1 +
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts  |  312 ++++++
+ arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi       | 1165 ++++++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi       |  145 +++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  142 ++-
+ 8 files changed, 1743 insertions(+), 44 deletions(-)
+ create mode 120000 arch/arm64/boot/dts/include/common/cros-ec-keyboard.dtsi
+ create mode 120000 arch/arm64/boot/dts/include/common/cros-ec-sbs.dtsi
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399-opp.dtsi
 
 -- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.11.0.483.g087da7b7c-goog
