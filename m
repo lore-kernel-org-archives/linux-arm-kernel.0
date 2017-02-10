@@ -1,129 +1,55 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 10 Feb 2017 06:38:11 +0000
-Subject: [PATCH v2 1/2] efi: arm-stub: Correct FDT and initrd allocation
- rules for arm64
-In-Reply-To: <a7058407-a770-d413-e072-ba3edd7df197@codeaurora.org>
-References: <1486676573-19237-1-git-send-email-ard.biesheuvel@linaro.org>
- <a7058407-a770-d413-e072-ba3edd7df197@codeaurora.org>
-Message-ID: <A1A268D8-2B0B-4333-9E2D-A88CE6061F22@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 10 Feb 2017 07:49:44 +0100
+Subject: i.MX7 clock support broken
+In-Reply-To: <AM4PR0401MB22602ECF28CCB7172B917EC2FF440@AM4PR0401MB2260.eurprd04.prod.outlook.com>
+References: <20170207142225.zitac2r7g3kvowjw@pengutronix.de>
+ <DB5PR04MB1431EB280E8B9BA929FF006D80420@DB5PR04MB1431.eurprd04.prod.outlook.com>
+ <AM4PR0401MB22602ECF28CCB7172B917EC2FF440@AM4PR0401MB2260.eurprd04.prod.outlook.com>
+Message-ID: <20170210064944.vshtcr62xqcvjsmh@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Feb 10, 2017 at 03:37:38AM +0000, Andy Duan wrote:
+> From: A.S. Dong Sent: Thursday, February 09, 2017 12:47 AM
+> >To: Sascha Hauer <s.hauer@pengutronix.de>; linux-arm-
+> >kernel at lists.infradead.org
+> >Cc: Shawn Guo <shawnguo@kernel.org>; Fabio Estevam
+> ><fabio.estevam@nxp.com>; kernel at pengutronix.de; Andy Duan
+> ><fugang.duan@nxp.com>; Frank Li <frank.li@nxp.com>
+> >Subject: RE: i.MX7 clock support broken
+> >
+> >Hi Sascha,
+> >
+> >> -----Original Message-----
+> >> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> >> Sent: Tuesday, February 07, 2017 10:22 PM
+> >> To: linux-arm-kernel at lists.infradead.org
+> >> Cc: Shawn Guo; A.S. Dong; Fabio Estevam; kernel at pengutronix.de
+> >> Subject: i.MX7 clock support broken
+> >>
+> >> Hi All,
+> >>
+> >> I recently adopted the i.MX7 clock tree from Linux to barebox and
+> >> wondered why ethernet doesn't work.
+> >
+> >I just reproduced the issue on MX7D SDB board with latest upstream kernel
+> >That kernel NULL point crash during boot on fec_enet_open->..-
+> >>phy_attach_direct.
+> >
+> 
+> The issue was caused by one patch submitted at 2017 Jan.31
 
-> On 10 Feb 2017, at 00:42, Ruigrok, Richard <rruigrok@codeaurora.org> wrote:
-> 
-> 
-> 
->> On 2/9/2017 2:42 PM, Ard Biesheuvel wrote:
->> On arm64, we have made some changes over the past year to the way the
->> kernel itself is allocated and to how it deals with the initrd and FDT.
->> This patch brings the allocation logic in the EFI stub in line with that,
->> which is necessary because the introduction of KASLR has created the
->> possibility for the initrd to be allocated in a place where the kernel
->> may not be able to map it. (This is mostly a theoretical scenario, since
->> it only affects systems where the physical memory footprint exceeds the
->> size of the linear mapping.)
->> 
->> Since we know the kernel itself will be covered by the linear mapping,
->> choose a suitably sized window (i.e., based on the size of the linear
->> region) covering the kernel when allocating memory for the initrd.
->> 
->> The FDT may be anywhere in memory on arm64 now that we map it via the
->> fixmap, so we can lift the address restriction there completely.
->> 
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->> arch/arm/include/asm/efi.h              | 14 +++++++++++++-
->> arch/arm64/include/asm/efi.h            | 18 +++++++++++++++++-
->> drivers/firmware/efi/libstub/arm-stub.c |  7 ++++---
->> 3 files changed, 34 insertions(+), 5 deletions(-)
->> 
->> diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
->> index 0b06f5341b45..2de0195dfd1e 100644
->> --- a/arch/arm/include/asm/efi.h
->> +++ b/arch/arm/include/asm/efi.h
->> @@ -84,6 +84,18 @@ static inline void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
->>  */
->> #define ZIMAGE_OFFSET_LIMIT    SZ_128M
->> #define MIN_ZIMAGE_OFFSET    MAX_UNCOMP_KERNEL_SIZE
->> -#define MAX_FDT_OFFSET        ZIMAGE_OFFSET_LIMIT
->> +
->> +/* on ARM, the FDT should be located in the first 128 MB of RAM */
->> +static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
->> +{
->> +    return dram_base + ZIMAGE_OFFSET_LIMIT;
->> +}
->> +
->> +/* on ARM, the initrd should be loaded in a lowmem region */
->> +static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
->> +                            unsigned long image_addr)
->> +{
->> +    return dram_base + SZ_512M;
->> +}
->> 
->> #endif /* _ASM_ARM_EFI_H */
->> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
->> index 0b6b1633017f..342e90d6d204 100644
->> --- a/arch/arm64/include/asm/efi.h
->> +++ b/arch/arm64/include/asm/efi.h
->> @@ -46,7 +46,23 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
->>  * 2MiB so we know it won't cross a 2MiB boundary.
->>  */
->> #define EFI_FDT_ALIGN    SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
->> -#define MAX_FDT_OFFSET    SZ_512M
->> +
->> +/* on arm64, the FDT may be located anywhere in system RAM */
->> +static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
->> +{
->> +    return ULONG_MAX;
->> +}
->> +
->> +/*
->> + * On arm64, we have to ensure that the initrd ends up in the linear region,
->> + * which is a 1 GB aligned region of size '1UL << (VA_BITS - 1)' that is
->> + * guaranteed to cover the kernel Image.
->> + */
->> +static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
->> +                            unsigned long image_addr)
->> +{
->> +    return (image_addr & ~(SZ_1G - 1UL)) + (1UL << (VA_BITS - 1));
->> +}
->> 
-> Please update booting.txt which specifies a window of 32G for ARM64
-> 
+The issue I was talking about is that the clock driver does not control
+the real ethernet clocks, but instead some non existing clocks. This
+issue does not cause any problems in the kernel at all, because when
+the ethernet clocks have been enabled in the bootloader then everything
+runs smoothly in the kernel. Nevertheless the kernel driver is buggy of
+course, the actual clocks are never turned off when not needed.
 
-No. The efi stub is built into the kernel, so there we can be lax about these things. For boot loaders, 32GB remains a reasonable limit because some configurations require it
+Sascha
 
->> #define efi_call_early(f, ...)        sys_table_arg->boottime->f(__VA_ARGS__)
->> #define __efi_call_early(f, ...)    f(__VA_ARGS__)
->> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
->> index b4f7d78f9e8b..557281fe375f 100644
->> --- a/drivers/firmware/efi/libstub/arm-stub.c
->> +++ b/drivers/firmware/efi/libstub/arm-stub.c
->> @@ -333,8 +333,9 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
->>    if (!fdt_addr)
->>        pr_efi(sys_table, "Generating empty DTB\n");
->> 
->> -    status = handle_cmdline_files(sys_table, image, cmdline_ptr,
->> -                      "initrd=", dram_base + SZ_512M,
->> +    status = handle_cmdline_files(sys_table, image, cmdline_ptr, "initrd=",
->> +                      efi_get_max_initrd_addr(dram_base,
->> +                                  *image_addr),
->>                      (unsigned long *)&initrd_addr,
->>                      (unsigned long *)&initrd_size);
->>    if (status != EFI_SUCCESS)
->> @@ -344,7 +345,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
->> 
->>    new_fdt_addr = fdt_addr;
->>    status = allocate_new_fdt_and_exit_boot(sys_table, handle,
->> -                &new_fdt_addr, dram_base + MAX_FDT_OFFSET,
->> +                &new_fdt_addr, efi_get_max_fdt_addr(dram_base),
->>                initrd_addr, initrd_size, cmdline_ptr,
->>                fdt_addr, fdt_size);
->> 
-> 
-> -- 
-> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the
-> Code Aurora Forum, a Linux Foundation Collaborative Project.
-> 
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
