@@ -1,38 +1,122 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 10 Feb 2017 13:55:53 +0100
-Subject: [PATCH 14/22] ARM: dts: add a devicetree for Raidsonic NAS
- IB-4220-B
-In-Reply-To: <alpine.LNX.2.00.1702081353480.8463@T420s>
-References: <20170122122254.10764-1-linus.walleij@linaro.org>
- <alpine.LNX.2.00.1702051051090.26313@T420s>
- <CACRpkdb2YUSAD1eR8c11BsCb3yBmMJ7C_bEKkpgkiqX9B4GNwQ@mail.gmail.com>
- <alpine.LNX.2.00.1702081353480.8463@T420s>
-Message-ID: <CACRpkdb6vfTsv=rBd_A7igSRQNYayXw=P8LJdY4-gVX5nnoCpw@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 10 Feb 2017 14:02:17 +0100
+Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
+In-Reply-To: <20170119165155.GH27312@n2100.armlinux.org.uk>
+References: <20170114214713.28109-7-f.fainelli@gmail.com>
+ <20170115110628.GF26374@kroah.com>
+ <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
+ <20170115173949.GA19268@kroah.com>
+ <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
+ <20170115191632.GD5643@lunn.ch>
+ <912e6143-c67a-d909-2a6c-939de79efc5d@gmail.com>
+ <20170119142820.GA494@kroah.com> <20170119145315.GD21805@lunn.ch>
+ <20170119165155.GH27312@n2100.armlinux.org.uk>
+Message-ID: <20170210130217.GA4570@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 8, 2017 at 1:55 PM, Hans Ulli Kroll
-<ulli.kroll@googlemail.com> wrote:
-> On Tue, 7 Feb 2017, Linus Walleij wrote:
->
->> On Sun, Feb 5, 2017 at 10:53 AM, Hans Ulli Kroll
->> <ulli.kroll@googlemail.com> wrote:
->>
->> > Hi Linus,
->> >
->> > please add right baudrate and partition scheme for NAS 4220
->> >
->> > Signed-off-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
->>
->> Thanks Hans! I folded this into the NAS 4220 device tree
->> and added your Signed-off-by to the patch.
->>
->
-> You can remove the PCI entries I've seen on your git tree.
-> NAS 4220 has no PCI interface
+On Thu, Jan 19, 2017 at 04:51:55PM +0000, Russell King - ARM Linux wrote:
+> (This is mainly for Greg's benefit to help him understand the issue.)
+> 
+> I think the diagram you gave initially made this confusing, as it
+> talks about a CPU(sic) producing the "RGMII" and "MII-MGMT".
+> 
+> Let's instead show a better representation that hopefully helps Greg
+> understand networking. :)
+> 
+> 
+>   CPU
+> System <-B->  Ethernet controller <-P-> } PHY <---> network cable
+>                                         } - - - - - - - or - - - - - - -
+>                   MDIO bus -------M---> } Switch <-P-> PHYs <--> network
+>                                               `----M----^        cables
+> 
+> 'B' can be an on-SoC bus or something like PCI.
+> 
+> 'P' are the high-speed connectivity between the ethernet controller and
+> PHY which carries the packet data.  It has no addressing, it's a point
+> to point link.  RGMII is just one wiring example, there are many
+> different interfaces there (SGMII, AUI, XAUI, XGMII to name a few.)
+> 
+> 'M' are the MDIO bus, which is the bus by which ethernet PHYs and
+> switches can be identified and controlled.
+> 
+> The MDIO bus has a bus_type, has host drivers which are sometimes
+> part of the ethernet controller, but can also be stand-alone devices
+> shared between multiple ethernet controllers.
+> 
+> PHYs are a kind of MDIO device which are members of the MDIO bus
+> type.  Each PHY (and switch) has a numerical address, and identifying
+> numbers within its register set which identifies the manufacturer
+> and device type.  We have device_driver objects for these.
+> 
+> Expanding the above diagram to make it (hopefully) even clearer,
+> we can have this classic setup:
+> 
+>   CPU
+> System <-B-> Ethernet controller <-P-> PHY <---> network cable
+>                  MDIO bus -------M------^
+> 
+> Or, in the case of two DSA switches attached to an Ethernet controller:
+> 
+>                                      |~~~~~~~~|
+> System <-B-> Ethernet controller <-P-> Switch <-P-> PHY1 <--> network cable
+>                  MDIO bus ----+--M--->   1    <-P-> PHY2 <--> network cable
+>                               |      |        ...    |
+>                               |      |        <-P-> PHYn <--> network cable
+>                               |      |....^...|      |
+>                               |           |  `---M---'
+>                               |           P
+>                               |           |
+>                               |      |~~~~v~~~|
+>                               `------> Switch <-P-> PHY1 <--> network cable
+>                                      |   2    ...    |
+>                                      |        <-P-> PHYn <--> network cable
+>                                      |........|      |
+>                                              `---M---'
+> 
+> The problem that the DSA guys are trying to deal with is how to
+> represent the link between the DSA switches (which are devices
+> sitting off their controlling bus - the MDIO bus) and the ethernet
+> controller associated with that collection of devices, be it a
+> switch or PHY.
 
-OK! I just assumed it was on that machine since you were
-commenting on the driver, I cut it now.
+Why do they have to represent that link?  This is a driver that somehow
+binds the two togther in some sort of "control plane"?
 
-Yours,
-Linus Walleij
+> Merely changing the parent/child relationships to try and solve
+> one issue just creates exactly the same problem elsewhere.
+
+Fair enough.
+
+> So, I hope with these diagrams, you can see that trying to make
+> the ethernet controller a child device of the DSA switches
+> means that (eg) it's no longer a PCI device, which is rather
+> absurd, especially when considering that what happens to the
+> right of the ethernet controller in the diagrams above is
+> normally external chips to the SoC or ethernet device.
+
+Ok, thanks for the long explainations and diagrams.
+
+_BUT_ my original point remains.  These new functions you all are trying
+to get into the driver core, do NOT do what they say they are doing.
+They are mucking around with a "known topology" and just happen to work
+because the device you are trying to find shares a common parent with
+yourself.
+
+That is not what the function says it does, and as such, I do not want
+that function in the driver core at all.
+
+If you wish to keep it in your own subsystem, that's fine, but call it
+what it really is:
+	hack_to_find_peer_device_on_random_bus()
+and pass in a _real_ pointer to a bus type.  Not some random string
+please.
+
+Or better yet, have the DSA code accept pointers to the two devices in
+the first place, so it "knows" what to do here in a much better way.
+Right now it is a bad hack.  You all can not argue that is not true.
+
+thanks,
+
+greg k-h
