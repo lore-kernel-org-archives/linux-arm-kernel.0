@@ -1,153 +1,67 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 10 Feb 2017 16:43:59 +0100
-Subject: [PATCH v2 1/4] dt-bindings: add multidomain support to i.MX GPC
- DT binding
-In-Reply-To: <20170127183728.26701-1-l.stach@pengutronix.de>
-References: <20170127183728.26701-1-l.stach@pengutronix.de>
-Message-ID: <1486741439.3879.7.camel@pengutronix.de>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Fri, 10 Feb 2017 16:49:21 +0100
+Subject: [PATCH] atmel_serial: Use the fractional divider when possible
+In-Reply-To: <20170210152446.12674-1-romain.izard.pro@gmail.com>
+References: <20170210152446.12674-1-romain.izard.pro@gmail.com>
+Message-ID: <20170210154921.5gnlbhrjhk7yeke7@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-are you willing to take this series through your tree or do you think we
-need to get this in via some other tree?
-
-It would be good to queue this up somewhere as a reference, as I have
-some upcoming work for MX6SX and MX6QP, which depends on this series.
-
-Regards,
-Lucas
-
-Am Freitag, den 27.01.2017, 19:37 +0100 schrieb Lucas Stach:
-> This adds a new binding for the Freescale i.MX GPC block, which allows
-> to describe multiple power domains in a more natural way. The driver
-> will continue to support the old binding for existing DTBs, but new
-> features like the additional domains present on i.MX6SX will only be
-> usable with the new binding.
+On Fri, Feb 10, 2017 at 04:24:46PM +0100, Romain Izard wrote:
+> The fractional baud rate generator is available when using the
+> asynchronous mode of Atmel USART controllers. It makes it possible to
+> use higher baudrates, in exchange for a less precise clock with a
+> variable duty cycle.
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> The existing code restricts its use to the normal mode of the USART
+> controller, following the recommendation from the datasheet for the
+> first chip embedding this type of controller. This recommendation has
+> been removed from the documentation for the newer chips. After
+> verification, all revisions of this controller should be able to use the
+> fractional baud rate generator with the different asynchronous modes.
+> 
+> Removing the condition on ATMEL_US_USMODE makes it possible to get
+> correct baudrates at high speed in more cases.
+> 
+> This was tested with a board using an Atmel SAMA5D2 chip and a TI
+> WL1831 WiFi/Bluetooth combo chip at 3 Mbauds, with hardware flow control
+> enabled.
+> 
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+
+Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+
+Thanks
+
 > ---
-> v2:
-> - use 'power-supply' as name for the domain supply
-> - clarify that 'pgc' is a node, not a property
-> ---
->  .../devicetree/bindings/power/fsl,imx-gpc.txt      | 80 ++++++++++++++--------
->  1 file changed, 53 insertions(+), 27 deletions(-)
+>  drivers/tty/serial/atmel_serial.c | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> index 65cc0345747d..1598c8029add 100644
-> --- a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
-> @@ -1,22 +1,40 @@
->  Freescale i.MX General Power Controller
->  =======================================
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index fabbe76203bb..6684456dca9e 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -1758,7 +1758,9 @@ static void atmel_get_ip_name(struct uart_port *port)
 >  
-> -The i.MX6Q General Power Control (GPC) block contains DVFS load tracking
-> -counters and Power Gating Control (PGC) for the CPU and PU (GPU/VPU) power
-> -domains.
-> +The i.MX6 General Power Control (GPC) block contains DVFS load tracking
-> +counters and Power Gating Control (PGC).
->  
->  Required properties:
->  - compatible: Should be "fsl,imx6q-gpc" or "fsl,imx6sl-gpc"
->  - reg: should be register base and length as documented in the
->    datasheet
-> -- interrupts: Should contain GPC interrupt request 1
-> -- pu-supply: Link to the LDO regulator powering the PU power domain
-> -- clocks: Clock phandles to devices in the PU power domain that need
-> -	  to be enabled during domain power-up for reset propagation.
-> -- #power-domain-cells: Should be 1, see below:
-> +- interrupts: Should contain one interrupt specifier for the GPC interrupt
-> +- clocks: Must contain an entry for each entry in clock-names.
-> +  See Documentation/devicetree/bindings/clocks/clock-bindings.txt for details.
-> +- clock-names: Must include the following entries:
-> +  - ipg
->  
-> -The gpc node is a power-controller as documented by the generic power domain
-> -bindings in Documentation/devicetree/bindings/power/power_domain.txt.
-> +The power domains are generic power domain providers as documented in
-> +Documentation/devicetree/bindings/power/power_domain.txt. They are described as
-> +subnodes of the power gating controller 'pgc' node of the GPC and should
-> +contain the following:
-> +
-> +Required properties:
-> +- reg: the DOMAIN_INDEX as used by the client devices to refer to this
-> +  power domain
-> +  The following DOMAIN_INDEX values are valid for i.MX6Q:
-> +  ARM_DOMAIN     0
-> +  PU_DOMAIN      1
-> +  The following additional DOMAIN_INDEX value is valid for i.MX6SL:
-> +  DISPLAY_DOMAIN 2
-> +
-> +- #power-domain-cells: Should be 0
-> +
-> +Optional properties:
-> +- clocks: a number of phandles to clocks that need to be enabled during domain
-> +  power-up sequencing to ensure reset propagation into devices located inside
-> +  this power domain
-> +- power-supply: a phandle to the regulator powering this domain
->  
->  Example:
->  
-> @@ -25,14 +43,29 @@ Example:
->  		reg = <0x020dc000 0x4000>;
->  		interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
->  			     <0 90 IRQ_TYPE_LEVEL_HIGH>;
-> -		pu-supply = <&reg_pu>;
-> -		clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
-> -			 <&clks IMX6QDL_CLK_GPU3D_SHADER>,
-> -			 <&clks IMX6QDL_CLK_GPU2D_CORE>,
-> -			 <&clks IMX6QDL_CLK_GPU2D_AXI>,
-> -			 <&clks IMX6QDL_CLK_OPENVG_AXI>,
-> -			 <&clks IMX6QDL_CLK_VPU_AXI>;
-> -		#power-domain-cells = <1>;
-> +		clocks = <&clks IMX6QDL_CLK_IPG>;
-> +		clock-names = "ipg";
-> +		
-> +		pgc {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			power-domain at 0 {
-> +				reg = <0>;
-> +				#power-domain-cells = <0>;
-> +			};
-> +			pd_pu: power-domain at 1 {
-> +				reg = <1>;
-> +				#power-domain-cells = <0>;
-> +				power-supply = <&reg_pu>;
-> +				clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
-> +				         <&clks IMX6QDL_CLK_GPU3D_SHADER>,
-> +				         <&clks IMX6QDL_CLK_GPU2D_CORE>,
-> +				         <&clks IMX6QDL_CLK_GPU2D_AXI>,
-> +				         <&clks IMX6QDL_CLK_OPENVG_AXI>,
-> +				         <&clks IMX6QDL_CLK_VPU_AXI>;
-> +			};
-> +		};
->  	};
->  
+>  	/*
+>  	 * Only USART devices from at91sam9260 SOC implement fractional
+> -	 * baudrate.
+> +	 * baudrate. It is available for all asynchronous modes, with the
+> +	 * following restriction: the sampling clock's duty cycle is not
+> +	 * constant.
+>  	 */
+>  	atmel_port->has_frac_baudrate = false;
+>  	atmel_port->has_hw_timer = false;
+> @@ -2202,8 +2204,7 @@ static void atmel_set_termios(struct uart_port *port, struct ktermios *termios,
+>  	 * then
+>  	 * 8 CD + FP = selected clock / (2 * baudrate)
+>  	 */
+> -	if (atmel_port->has_frac_baudrate &&
+> -	    (mode & ATMEL_US_USMODE) == ATMEL_US_USMODE_NORMAL) {
+> +	if (atmel_port->has_frac_baudrate) {
+>  		div = DIV_ROUND_CLOSEST(port->uartclk, baud * 2);
+>  		cd = div >> 3;
+>  		fp = div & ATMEL_US_FP_MASK;
+> -- 
+> 2.9.3
 > 
-> @@ -40,20 +73,13 @@ Specifying power domain for IP modules
->  ======================================
->  
->  IP cores belonging to a power domain should contain a 'power-domains' property
-> -that is a phandle pointing to the gpc device node and a DOMAIN_INDEX specifying
-> -the power domain the device belongs to.
-> +that is a phandle pointing to the power domain the device belongs to.
->  
->  Example of a device that is part of the PU power domain:
->  
->  	vpu: vpu at 02040000 {
->  		reg = <0x02040000 0x3c000>;
->  		/* ... */
-> -		power-domains = <&gpc 1>;
-> +		power-domains = <&pd_pu>;
->  		/* ... */
->  	};
-> -
-> -The following DOMAIN_INDEX values are valid for i.MX6Q:
-> -ARM_DOMAIN     0
-> -PU_DOMAIN      1
-> -The following additional DOMAIN_INDEX value is valid for i.MX6SL:
-> -DISPLAY_DOMAIN 2
