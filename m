@@ -1,64 +1,40 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 10 Feb 2017 15:40:17 -0600
-Subject: [PATCH v4 0/3] i.MX7 PCI support
-In-Reply-To: <20170207155027.7734-1-andrew.smirnov@gmail.com>
-References: <20170207155027.7734-1-andrew.smirnov@gmail.com>
-Message-ID: <20170210214017.GO29169@bhelgaas-glaptop.roam.corp.google.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 10 Feb 2017 13:42:24 -0800
+Subject: [PATCH 0/4] arm64: mmu: avoid writeable-executable mappings
+In-Reply-To: <1486747005-15973-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1486747005-15973-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <07ca7d55-2f5a-057c-c5bf-f3348091f1a9@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2017 at 07:50:24AM -0800, Andrey Smirnov wrote:
-> Hello, everyone:
+On 02/10/2017 09:16 AM, Ard Biesheuvel wrote:
+> Having memory that is writable and executable at the same time is a
+> security hazard, and so we tend to avoid those when we can. However,
+> at boot time, we keep .text mapped writable during the entire init
+> phase, and the init region itself is mapped rwx as well.
 > 
-> This is a fourth iteration of the code that adds PCI-subsystem bits
-> necessary for enabling PCI support on i.MX7.
+> Let's improve the situation by:
+> - making the alternatives patching use the linear mapping
+> - splitting the init region into separate text and data regions
 > 
-> Changes since v3 (can be found at [version3]):
-> 	- Move all of the reset_control_assert's into imx6_pcie_assert_core_reset
-> 	- Documented required reset and power domain DT bindings
+> This removes all RWX mappings except the really early one created
+> in head.S (which we could perhaps fix in the future as well)
 > 
-> Changes since v2 (can be found at [version2]):
+> Ard Biesheuvel (4):
+>   arm: kvm: move kvm_vgic_global_state out of .text section
+>   arm64: alternatives: apply boot time fixups via the linear mapping
+>   arm64: mmu: map .text as read-only from the outset
+>   arm64: mmu: apply strict permissions to .init.text and .init.data
 > 
-> 	- Collected Reviewed-by for patch #2 from Lucas
-> 	- Reset logic implementation moved out into a reset controller
->           driver (see [reset1])
-> 	- Removed unused leftover code
+>  arch/arm64/include/asm/mmu.h      |  1 +
+>  arch/arm64/include/asm/sections.h |  3 +-
+>  arch/arm64/kernel/alternative.c   |  6 +--
+>  arch/arm64/kernel/smp.c           |  1 +
+>  arch/arm64/kernel/vmlinux.lds.S   | 32 ++++++++++-----
+>  arch/arm64/mm/init.c              |  3 +-
+>  arch/arm64/mm/mmu.c               | 42 ++++++++++++++------
+>  virt/kvm/arm/vgic/vgic.c          |  4 +-
+>  8 files changed, 64 insertions(+), 28 deletions(-)
 > 
-> Changes since v1 (can be found at [version1]):
-> 
-> 	- All GPC related code moved into a separate driver (see [gpc1])
-> 	- Removed GPIO probe deferral logging
-> 	- Fixed section mismatch warning
-> 	- Minor reformatting of fsl,imx6q-pcie.txt(as per Rob
->           Herring's request)
-> 
-> [version3] https://lkml.org/lkml/2017/2/6/565
-> [version2] https://lkml.org/lkml/2017/2/1/510
-> [version1] https://lkml.org/lkml/2017/1/19/488
-> [gpc1] https://lkml.org/lkml/2017/2/6/551
-> [reset1] https://lkml.org/lkml/2017/2/6/554
-> 
-> Andrey Smirnov (3):
->   PCI: imx6: Fix a typo in error message
->   PCI: imx6: Allow probe deferal by reset GPIO
->   PCI: imx6: Add code to support i.MX7D
-> 
->  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 +-
->  drivers/pci/host/pci-imx6.c                        | 131 ++++++++++++++++-----
->  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
->  3 files changed, 118 insertions(+), 30 deletions(-)
 
-I applied patches 1 & 3 (with reviewed-by and ack from Lucas and Lee)
-to pci/host-imx6 for v4.11, thanks!
-
-I didn't apply 2 because of the section mismatch found by the autobuilder:
-
-  >> WARNING: drivers/built-in.o(.data+0x6948c): Section mismatch in reference from the variable imx6_pcie_driver to the function .init.text:imx6_pcie_probe()
-     The variable imx6_pcie_driver references
-     the function __init imx6_pcie_probe()
-     If the reference is valid then annotate the
-     variable with or __refdata (see linux/init.h) or name the variable:
-
-Please repost it after you figure out how to deal with that.
-
-Bjorn
+Reviewed-by: Laura Abbott <labbott@redhat.com>
