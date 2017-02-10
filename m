@@ -1,46 +1,89 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 10 Feb 2017 11:07:46 -0800
-Subject: [PATCH 3/8] spi: davinci: limit the transfer size if DMA enabled
-In-Reply-To: <1486740584-17875-4-git-send-email-fisaksen@baylibre.com> (Frode
- Isaksen's message of "Fri, 10 Feb 2017 16:29:39 +0100")
-References: <1486740584-17875-1-git-send-email-fisaksen@baylibre.com>
- <1486740584-17875-4-git-send-email-fisaksen@baylibre.com>
-Message-ID: <m2tw81hnjx.fsf@baylibre.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Feb 2017 19:22:42 +0000
+Subject: [RFC] syscalls: Restore address limit after a syscall
+In-Reply-To: <CALCETrVS6J2_GPWBoxUFUhjdyce0TBdroA+FjfdNywr9_k6hew@mail.gmail.com>
+References: <20170209183358.103094-1-thgarnie@google.com>
+ <CAGXu5j+hyXxpyU1R+BeL9RwPhT6HSNE0c_b7MP_V0rYSAepYFw@mail.gmail.com>
+ <CALCETrWrbDnka=aqzQ5+7WN2N6RwFsQb7smcnjQMsjov+y=dTQ@mail.gmail.com>
+ <CAJcbSZHv7w5jYQ2AZ-g4Kc0mX0jRRbHCKwFKx1EFuOAby1yxXA@mail.gmail.com>
+ <CALCETrVS6J2_GPWBoxUFUhjdyce0TBdroA+FjfdNywr9_k6hew@mail.gmail.com>
+Message-ID: <20170210192242.GM27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frode Isaksen <fisaksen@baylibre.com> writes:
+On Thu, Feb 09, 2017 at 06:42:34PM -0800, Andy Lutomirski wrote:
+> On Thu, Feb 9, 2017 at 3:41 PM, Thomas Garnier <thgarnie@google.com> wrote:
+> > So by default it is in the wrapper. If selected, an architecture can
+> > disable the wrapper put it in the best places. Understood correctly?
+> 
+> Sounds good to me.
+> 
+> Presumably the result should go through -mm.  Want to cc: akpm and
+> linux-arch@ on the next version?
+> 
+> I've also cc'd arm and s390 folks -- those are the other arches that
+> try to be on top of hardening.
 
-> Limit the transfer size to 20 scatter/gather pages if
-> DMA is enabled.
-> The eDMA DMA engine is limited to 20 SG entries in one DMA
-> transaction. If this number is exceeded, DMA receive fails.
-> This error occurs with large vmalloc'ed buffers.
->
-> Signed-off-by: Frode Isaksen <fisaksen@baylibre.com>
-> ---
->  drivers/spi/spi-davinci.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
->
-> diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-> index b7b2da1..f1b46f6 100644
-> --- a/drivers/spi/spi-davinci.c
-> +++ b/drivers/spi/spi-davinci.c
-> @@ -485,6 +485,16 @@ static bool davinci_spi_can_dma(struct spi_master *master,
->  	return __davinci_spi_can_dma(spi);
->  }
->  
-> +static size_t davinci_spi_max_transfer_size(struct spi_device *spi)
-> +{
-> +	/*
-> +	 * The eDMA DMA engine is limited to 20 SG entries in one DMA
-> +	 * transaction. If this number is exceeded, DMA receive fails.
-> +	 * An extra SG entry is needed when the buffer is not page aligned.
-> +	 */
-> +	return (__davinci_spi_can_dma(spi)) ? 19 * PAGE_SIZE : SIZE_MAX;
+The best place for this on ARM is in the assembly code, rather than in
+the hundreds of system calls - having it in one place is surely better
+for reducing the cache impact.
 
-The number here should be a #define.
+This (untested) patch should be sufficient for ARM - there's two choices
+which I think make sense to do this:
+1. Immediately after returning the syscall
+2. Immediately before any returning to userspace
 
-Also, comment says 20, code says 19.  This should be clarified.
+(1) has the advantage that the address limit will be forced for the
+exit-path works that we do, preventing those making accesses to kernel
+space.
 
-Kevin
+(2) has the advantage that we'd guarantee that the address limit will
+be forced while userspace is running for the next entry into kernel
+space.
+
+There's actually a third option as well:
+
+(3) forcing the address limit on entry to the kernel from userspace.
+
+This patch implements option 1.
+
+ arch/arm/kernel/entry-common.S | 6 ++++++
+ 1 files changed, 6 insertions(+)
+
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index eb5cd77bf1d8..6a717a2ccb88 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -39,6 +39,8 @@
+ ret_fast_syscall:
+  UNWIND(.fnstart	)
+  UNWIND(.cantunwind	)
++	mov	r1, #TASK_SIZE
++	str	r1, [tsk, #TI_ADDR_LIMIT]
+ 	disable_irq_notrace			@ disable interrupts
+ 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
+ 	tst	r1, #_TIF_SYSCALL_WORK | _TIF_WORK_MASK
+@@ -64,6 +66,8 @@ ENDPROC(ret_fast_syscall)
+ ret_fast_syscall:
+  UNWIND(.fnstart	)
+  UNWIND(.cantunwind	)
++	mov	r1, #TASK_SIZE
++	str	r1, [tsk, #TI_ADDR_LIMIT]
+ 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
+ 	disable_irq_notrace			@ disable interrupts
+ 	ldr	r1, [tsk, #TI_FLAGS]		@ re-check for syscall tracing
+@@ -262,6 +266,8 @@ ENDPROC(vector_swi)
+ 	b	ret_slow_syscall
+ 
+ __sys_trace_return:
++	mov	r1, #TASK_SIZE
++	str	r1, [tsk, #TI_ADDR_LIMIT]
+ 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
+ 	mov	r0, sp
+ 	bl	syscall_trace_exit
+
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
