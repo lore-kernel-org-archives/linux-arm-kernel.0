@@ -1,49 +1,71 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 10 Feb 2017 09:29:32 -0800
-Subject: [PATCH 1/4] ARM: add CPU_THUMB_CAPABLE to indicate possible Thumb
- support
-In-Reply-To: <E1cbngI-00025v-UE@rmk-PC.armlinux.org.uk>
-References: <20170209121756.GC27312@n2100.armlinux.org.uk>
- <E1cbngI-00025v-UE@rmk-PC.armlinux.org.uk>
-Message-ID: <ac402201-ffc4-36fb-b657-2f8bc6ea51be@codeaurora.org>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 10 Feb 2017 11:32:29 -0600
+Subject: [PATCH v4 4/5] dt-bindings: arm64 ARCH_THUNDER2 platform
+ documentation
+In-Reply-To: <20170210150754.GA1874@localhost>
+References: <CAK8P3a07eo0htv_y6H_aHvAaeo5two3vQTaySuFXpG+dzYguUQ@mail.gmail.com>
+ <1486667612-8168-1-git-send-email-jnair@caviumnetworks.com>
+ <CAL_JsqKm-c6D_fki_TsRYKH3aGoC5GE7n0DazNi7P268aj-93g@mail.gmail.com>
+ <20170210150754.GA1874@localhost>
+Message-ID: <CAL_JsqLaLnzFzQbGVpxGRFjkjSEM7mmGMd+xJ_urwcX5Jq9L+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/09/2017 04:18 AM, Russell King wrote:
-> @@ -410,11 +429,17 @@ config CPU_V7M
->  
->  config CPU_THUMBONLY
->  	bool
-> +	select CPU_THUMB_CAPABLE
->  	# There are no CPUs available with MMU that don't implement an ARM ISA:
->  	depends on !MMU
->  	help
->  	  Select this if your CPU doesn't support the 32 bit ARM instructions.
->  
-> +config CPU_THUMB_CAPABLE
-> +	bool
-> +	help
-> +	  Selected this if your CPU can support Thumb mode
+On Fri, Feb 10, 2017 at 9:07 AM, Jayachandran C
+<jnair@caviumnetworks.com> wrote:
+> On Fri, Feb 10, 2017 at 08:55:31AM -0600, Rob Herring wrote:
+>> On Thu, Feb 9, 2017 at 1:13 PM, Jayachandran C <jnair@caviumnetworks.com> wrote:
+>> > Add documentation for Cavium ThunderX2 CN99XX ARM64 processor family.
+>> > The the SoC will use the ID "cavium,thunderx2-cn9900".
+>> >
+>> > Add documentation entry for the "cavium,thunder2" cpu core as well.
+>> >
+>> > Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+>> > ---
+>> >
+>> > v3->v4
+>> > Documentation updates to reflect changes in device tree.
+>> >
+>> >  Documentation/devicetree/bindings/arm/cavium-thunder2.txt | 8 ++++++++
+>> >  Documentation/devicetree/bindings/arm/cpus.txt            | 1 +
+>> >  2 files changed, 9 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder2.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder2.txt b/Documentation/devicetree/bindings/arm/cavium-thunder2.txt
+>> > new file mode 100644
+>> > index 0000000..dc5dd65
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/arm/cavium-thunder2.txt
+>> > @@ -0,0 +1,8 @@
+>> > +Cavium ThunderX2 CN99XX platform tree bindings
+>> > +----------------------------------------------
+>> > +
+>> > +Boards with Cavium ThunderX2 CN99XX SoC shall have the root property:
+>> > +  compatible = "cavium,thunderx2-cn9900", "brcm,vulcan-soc";
+>> > +
+>> > +These SoC uses the "cavium,thunder2" core which will be compatible
+>> > +with "brcm,vulcan".
+>> > diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+>> > index a1bcfee..74f0b23 100644
+>> > --- a/Documentation/devicetree/bindings/arm/cpus.txt
+>> > +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+>> > @@ -169,6 +169,7 @@ nodes to be present and contain the properties described below.
+>> >                             "brcm,brahma-b15"
+>> >                             "brcm,vulcan"
+>> >                             "cavium,thunder"
+>> > +                           "cavium,thunder2"
+>>
+>> Is this the same as brcm,vulcan?
+>
+> It will have a different CPU ID, with different implementer and part num,
+> but compatible with "brcm,vulcan". In the ThunderX2 dtsi file (once
+> ARCH_VULCAN goes away), we want to be compatable = "cavium,thunder2", with
+> maybe "brcm,vulcan" after that.
 
-s/Selected/Select/ ?Also add the full stop like the previous help text?
+Okay, new ID registers is good enough reason. I'd just let brcm,vulcan
+die though I have no idea how many Broadcom systems there are out in
+the wild (and ones that you care about DT on).
 
-> +
->  # Figure out what processor architecture version we should be using.
->  # This defines the compiler instruction set which depends on the machine type.
->  config CPU_32v3
-> @@ -655,11 +680,7 @@ config ARCH_DMA_ADDR_T_64BIT
->  
->  config ARM_THUMB
->  	bool "Support Thumb user binaries" if !CPU_THUMBONLY
-> -	depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || \
-> -		CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || \
-> -		CPU_ARM1020 || CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || \
-> -		CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || CPU_V6K || \
-> -		CPU_V7 || CPU_FEROCEON || CPU_V7M
-> +	depends on CPU_THUMB_CAPABLE
+Acked-by: Rob Herring <robh@kernel.org>
 
-Nice!
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Rob
