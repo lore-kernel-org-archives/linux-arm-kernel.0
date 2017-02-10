@@ -1,72 +1,148 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 10 Feb 2017 10:49:43 +0000
-Subject: [PATCH v2 08/14] arm64: efi: split Image code and data into
- separate PE/COFF sections
-In-Reply-To: <1486554947-3964-9-git-send-email-ard.biesheuvel@linaro.org>
-References: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
- <1486554947-3964-9-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170210104942.GF28753@leverpostej>
+Date: Fri, 10 Feb 2017 11:05:21 +0000
+Subject: [PATCH 1/3] drivers/perf: arm_pmu: rework per-cpu allocation
+In-Reply-To: <1486724723-29437-1-git-send-email-mark.rutland@arm.com>
+References: <1486724723-29437-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1486724723-29437-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 11:55:41AM +0000, Ard Biesheuvel wrote:
-> To prevent unintended modifications to the kernel text (malicious or
-> otherwise) while running the EFI stub, describe the kernel image as
-> two separate sections: a .text section with read-execute permissions,
-> covering .text, .rodata and .init.text, and a .data section with
-> read-write permissions, covering .init.data, .data and .bss.
-> 
-> This relies on the firmware to actually take the section permission
-> flags into account, but this is something that is currently being
-> implemented in EDK2, which means we will likely start seeing it in
-> the wild between one and two years from now.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+For historical reasons, we allocate per-cpu data associated with a PMU
+rather late, in cpu_pmu_init, after we've parsed whatever hardware
+information we were provided with.
 
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index b8deffa9e1bf..a93cc2b6f50b 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -149,6 +149,9 @@ SECTIONS
->  		ARM_EXIT_KEEP(EXIT_TEXT)
->  	}
->  
-> +	. = ALIGN(SZ_4K);
-> +	__pecoff_data_start = .;
-> +
+In order to allow use to store some per-cpu data early in the probe
+path, we need to allocate (and initialise) the per-cpu data earlier.
+This patch reworks the way we allocate the pmu and associated per-cpu
+data in order to make that possible.
 
-I understand that the stub needs to split the init text/data since
-unlike the kernel it'll map those with separate permissions, but it
-feels odd to do this specifically for the EFI stub.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ drivers/perf/arm_pmu.c | 66 +++++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 44 insertions(+), 22 deletions(-)
 
-Yould it perhaps make more sense to always use separate segments for
-init/exit text/data, and also apply the permission split in the kernel?
-
-With that, I don't think we'd need additional stub-specific linker
-script changes.
-
-Thanks,
-Mark.
-
->  	.init.data : {
->  		INIT_DATA
->  		INIT_SETUP(16)
-> @@ -206,6 +209,7 @@ SECTIONS
->  	}
->  
->  	PECOFF_EDATA_PADDING
-> +	__pecoff_data_rawsize = ABSOLUTE(. - __pecoff_data_start);
->  	_edata = .;
->  
->  	BSS_SECTION(0, 0, 0)
-> @@ -221,6 +225,7 @@ SECTIONS
->  	. += RESERVED_TTBR0_SIZE;
->  #endif
->  
-> +	__pecoff_data_size = ABSOLUTE(. - __pecoff_data_start);
->  	_end = .;
->  
->  	STABS_DEBUG
-> -- 
-> 2.7.4
-> 
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index 6d93358..91e7d78 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -827,29 +827,16 @@ static inline void cpu_pm_pmu_unregister(struct arm_pmu *cpu_pmu) { }
+ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	int err;
+-	int cpu;
+-	struct pmu_hw_events __percpu *cpu_hw_events;
+-
+-	cpu_hw_events = alloc_percpu(struct pmu_hw_events);
+-	if (!cpu_hw_events)
+-		return -ENOMEM;
+ 
+ 	err = cpuhp_state_add_instance_nocalls(CPUHP_AP_PERF_ARM_STARTING,
+ 					       &cpu_pmu->node);
+ 	if (err)
+-		goto out_free;
++		goto out;
+ 
+ 	err = cpu_pm_pmu_register(cpu_pmu);
+ 	if (err)
+ 		goto out_unregister;
+ 
+-	for_each_possible_cpu(cpu) {
+-		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
+-		raw_spin_lock_init(&events->pmu_lock);
+-		events->percpu_pmu = cpu_pmu;
+-	}
+-
+-	cpu_pmu->hw_events	= cpu_hw_events;
+ 	cpu_pmu->request_irq	= cpu_pmu_request_irq;
+ 	cpu_pmu->free_irq	= cpu_pmu_free_irq;
+ 
+@@ -875,8 +862,7 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
+ out_unregister:
+ 	cpuhp_state_remove_instance_nocalls(CPUHP_AP_PERF_ARM_STARTING,
+ 					    &cpu_pmu->node);
+-out_free:
+-	free_percpu(cpu_hw_events);
++out:
+ 	return err;
+ }
+ 
+@@ -885,7 +871,6 @@ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
+ 	cpu_pm_pmu_unregister(cpu_pmu);
+ 	cpuhp_state_remove_instance_nocalls(CPUHP_AP_PERF_ARM_STARTING,
+ 					    &cpu_pmu->node);
+-	free_percpu(cpu_pmu->hw_events);
+ }
+ 
+ /*
+@@ -1007,6 +992,45 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
+ 	return 0;
+ }
+ 
++struct arm_pmu *armpmu_alloc(void)
++{
++	struct arm_pmu *pmu;
++	int cpu;
++
++	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
++	if (!pmu) {
++		pr_info("failed to allocate PMU device!\n");
++		goto out;
++	}
++
++	pmu->hw_events = alloc_percpu(struct pmu_hw_events);
++	if (!pmu->hw_events) {
++		pr_info("failed to allocate per-cpu PMU data.\n");
++		goto out_free_pmu;
++	}
++
++	for_each_possible_cpu(cpu) {
++		struct pmu_hw_events *events;
++
++		events = per_cpu_ptr(pmu->hw_events, cpu);
++		raw_spin_lock_init(&events->pmu_lock);
++		events->percpu_pmu = pmu;
++	}
++
++	return pmu;
++
++out_free_pmu:
++	kfree(pmu);
++out:
++	return NULL;
++}
++
++void armpmu_free(struct arm_pmu *pmu)
++{
++	free_percpu(pmu->hw_events);
++	kfree(pmu);
++}
++
+ int arm_pmu_device_probe(struct platform_device *pdev,
+ 			 const struct of_device_id *of_table,
+ 			 const struct pmu_probe_info *probe_table)
+@@ -1017,11 +1041,9 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 	struct arm_pmu *pmu;
+ 	int ret = -ENODEV;
+ 
+-	pmu = kzalloc(sizeof(struct arm_pmu), GFP_KERNEL);
+-	if (!pmu) {
+-		pr_info("failed to allocate PMU device!\n");
++	pmu = armpmu_alloc();
++	if (!pmu)
+ 		return -ENOMEM;
+-	}
+ 
+ 	armpmu_init(pmu);
+ 
+@@ -1075,7 +1097,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 	pr_info("%s: failed to register PMU devices!\n",
+ 		of_node_full_name(node));
+ 	kfree(pmu->irq_affinity);
+-	kfree(pmu);
++	armpmu_free(pmu);
+ 	return ret;
+ }
+ 
+-- 
+1.9.1
