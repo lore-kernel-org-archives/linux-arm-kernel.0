@@ -1,43 +1,38 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Fri, 10 Feb 2017 11:36:36 +0530
-Subject: [PATCH v14 0/6] Enable PMUs in ACPI systems
-In-Reply-To: <cea38f4f-4696-baab-b539-f9d0a8db3f42@linaro.org>
-References: <1485210765-9422-1-git-send-email-jeremy.linton@arm.com>
- <cea38f4f-4696-baab-b539-f9d0a8db3f42@linaro.org>
-Message-ID: <CAFpQJXVjMuEKE-LqN57v8Txzj6A=Hccj07XWbBaR_dRgiCLNQg@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 10 Feb 2017 14:08:54 +0800
+Subject: [PATCH v4 4/8] ASoC: sun8i-codec-analog: Add amplifier event to
+ fix first delay
+In-Reply-To: <20170202092422.5588-5-mylene.josserand@free-electrons.com>
+References: <20170202092422.5588-1-mylene.josserand@free-electrons.com>
+ <20170202092422.5588-5-mylene.josserand@free-electrons.com>
+Message-ID: <CAGb2v66NXJ5RG8VUbvtZcqXzzOvhRc8A_M1R=2rRpfnHNbZDpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 1:19 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+On Thu, Feb 2, 2017 at 5:24 PM, Myl?ne Josserand
+<mylene.josserand@free-electrons.com> wrote:
+> When playing a sound for the first time, a short delay, where the audio
+> file is not played, can be noticed.
+> On a second play (right after), the sound is played correctly.
+> If we wait a short time (~5 sec which corresponds to the aplay
+> timeout), the delay is back.
 >
+> This patch fixes it by using an event on headphone amplifier.
+> It allows to keep the amplifier enable while playing a sound.
+> A delay of 700ms allows to wait that the amplifier is powered-up
+> before playing the sound.
 >
-> On 2017/1/24 6:32, Jeremy Linton wrote:
->>
->> This patch expands and reworks the patches published by Mark Salter
->> in order to clean up a few of the previous review comments, as well as
->> add support for newer CPUs and big/little configurations.
->>
->> v14:
->> - drop rename patch requested for v6
->> - Shuffle couple include lines from one patch to a later
->>   patch.
->
->
-> Test again on D03 and works fine as before,
->
-> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
->
-> Hanjun
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Tested this series on Cavium's ThunderX2 CN99XX platform.
+I get some static in my headphones in the time between when the
+amplifier is enabled and when sound starts playing. Wonder if
+this can be fixed in any way?
 
-Tested-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+One solution that might work is to mute the headphone output
+while the amp is being charged, by setting SUN8I_ADDA_HP_VOLC_HP_VOL
+to 0, and then restoring the value once it is charged. In other
+words, overriding the value for the duration of sun8i_headphone_amp_event.
 
-thanks
-Ganapat
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards
+ChenYu
