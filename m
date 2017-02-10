@@ -1,19 +1,43 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 10 Feb 2017 23:01:54 +0100
-Subject: [PATCH v2 2/6] arm64: dts: rockchip: support dwc3 USB for rk3399
-In-Reply-To: <20170210010521.78872-3-briannorris@chromium.org>
-References: <20170210010521.78872-1-briannorris@chromium.org>
- <20170210010521.78872-3-briannorris@chromium.org>
-Message-ID: <2384713.Q7s8nQmdof@phil>
+From: viniciusfre@gmail.com (Vinicius Maciel)
+Date: Fri, 10 Feb 2017 19:02:47 -0300
+Subject: [PATCH] Add Master Sample Data Mode for SPI
+Message-ID: <20170210220247.8478-1-viniciusfre@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 9. Februar 2017, 17:05:17 CET schrieb Brian Norris:
-> Add the dwc3 usb needed node information for rk3399.
-> 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
+In order to work appropriately, the max11043 ADC chip and probably
+others, needs SPI master samples the data at the correct edge. From
+max11043 datasheet: "The data at DIN is latched on the rising edge
+of SCLK". Same to DOUT.
 
-applied for 4.12
+This patch add Master Sample Data Mode bit in normal sample mode.
 
-Thanks
-Heiko
+Signed-off-by: Vinicius Maciel <viniciusfre@gmail.com>
+---
+ drivers/spi/spi-sun4i.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index c5cd635c28f3..6325be2ce8d9 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -44,6 +44,7 @@
+ #define SUN4I_CTL_CS_MANUAL			BIT(16)
+ #define SUN4I_CTL_CS_LEVEL			BIT(17)
+ #define SUN4I_CTL_TP				BIT(18)
++#define SUN4I_CTL_SDM				BIT(20)
+ 
+ #define SUN4I_INT_CTL_REG		0x0c
+ #define SUN4I_INT_CTL_RF_F34			BIT(4)
+@@ -407,7 +408,8 @@ static int sun4i_spi_runtime_resume(struct device *dev)
+ 	}
+ 
+ 	sun4i_spi_write(sspi, SUN4I_CTL_REG,
+-			SUN4I_CTL_ENABLE | SUN4I_CTL_MASTER | SUN4I_CTL_TP);
++			SUN4I_CTL_ENABLE | SUN4I_CTL_MASTER | SUN4I_CTL_TP |
++			SUN4I_CTL_SDM);
+ 
+ 	return 0;
+ 
+-- 
+2.11.0
