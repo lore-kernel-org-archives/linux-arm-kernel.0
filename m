@@ -1,35 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 10 Feb 2017 09:42:13 +0100
-Subject: [PATCH 4/4] ARM: multi_v7_defconfig: Switch AXP20x driver from
- module to built-in
-In-Reply-To: <49ad3e66452bd78da7b9e581129f76633c56e609.1486590875.git.rask@formelder.dk>
-References: <937914a68e4e7d6db2d12540cc6253b200978e2d.1486590875.git.rask@formelder.dk>
- <49ad3e66452bd78da7b9e581129f76633c56e609.1486590875.git.rask@formelder.dk>
-Message-ID: <20170210084213.uzf25soh7bl73a6g@lukather>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Fri, 10 Feb 2017 10:44:58 +0200
+Subject: [PATCH v4 3/3] USB3/DWC3: Enable undefined length INCR burst type
+In-Reply-To: <DB5PR0401MB1813965DDC8CC6CD0BD85980FE440@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+References: <1484727138-3264-1-git-send-email-jerry.huang@nxp.com>
+ <1484727138-3264-3-git-send-email-jerry.huang@nxp.com>
+ <DB5PR0401MB1813965DDC8CC6CD0BD85980FE440@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+Message-ID: <87y3xeqvsl.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 11:09:31PM +0100, Rask Ingemann Lambertsen wrote:
-> The AXP20X regulator support is currently built as a module, which means
-> it's not available until the root fs has been mounted, but the boot loader
-> might not have enabled the required regulators, so build their drivers
-> into the kernel.
-> 
-> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
 
-Queued for 4.12.
+Hi,
 
-Thanks!
-Maxime
+Jerry Huang <jerry.huang@nxp.com> writes:
+>> @@ struct dwc3 {
+>>  	enum usb_phy_interface	hsphy_mode;
+>> 
+>>  	u32			fladj;
+>> +	/*
+>> +	 * For INCR burst type.
+>> +	 * First field: for undefined length INCR burst type enable.
+>> +	 * Second field: for INCRx burst type enable
+>> +	 */
+>> +	u32			incrx_type[2];
+>>  	u32			irq_gadget;
+>>  	u32			nr_scratch;
+>>  	u32			u1u2;
+>> --
+>> 1.7.9.5
+> Hi, Balbi and all guys,
+> Any comment for these patches? Can they be accepted?
+
+Rob had comments which you didn't reply yet. I cannot take this patchset
+yet ;-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 801 bytes
+Size: 832 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170210/98211d4e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170210/8416f400/attachment.sig>
