@@ -1,122 +1,77 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Fri, 10 Feb 2017 14:02:17 +0100
-Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
-In-Reply-To: <20170119165155.GH27312@n2100.armlinux.org.uk>
-References: <20170114214713.28109-7-f.fainelli@gmail.com>
- <20170115110628.GF26374@kroah.com>
- <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
- <20170115173949.GA19268@kroah.com>
- <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
- <20170115191632.GD5643@lunn.ch>
- <912e6143-c67a-d909-2a6c-939de79efc5d@gmail.com>
- <20170119142820.GA494@kroah.com> <20170119145315.GD21805@lunn.ch>
- <20170119165155.GH27312@n2100.armlinux.org.uk>
-Message-ID: <20170210130217.GA4570@kroah.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Feb 2017 14:05:43 +0100
+Subject: [PATCH 1/2] ARM: add ARM_SINGLE_ARMV7 as config option
+In-Reply-To: <SG2PR06MB11650C805DD754EE5C9E56C78A450@SG2PR06MB1165.apcprd06.prod.outlook.com>
+References: <20170209033044.19513-1-chris.brandt@renesas.com>
+ <5d90aff5-63b7-83a8-7529-2ac61ef82021@gmail.com>
+ <SG2PR06MB11650C805DD754EE5C9E56C78A450@SG2PR06MB1165.apcprd06.prod.outlook.com>
+Message-ID: <25202835.AdbHsoUg0y@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 04:51:55PM +0000, Russell King - ARM Linux wrote:
-> (This is mainly for Greg's benefit to help him understand the issue.)
+On Thursday, February 9, 2017 8:21:43 PM CET Chris Brandt wrote:
+> On Thursday, February 09, 2017, Florian Fainelli worte:
+> > > I think the closest I might have come was to purposely break the build
+> > > if more then 1 was select, but that still didn't stop you from making
+> > > the selection.
+> > >
+> > > If someone smarter than me has a way to do (not just an idea...I
+> > received
+> > > lots of ideas but none of them worked), I'd be happy to hear it.
+> > 
+> > I am definitively not a Kbuild expert, but it would almost necessarily
+> > require introduce some kind of new type in the Kconfig/Kbuild syntax
+> > that does something like that:
+> > 
+> > - have a way to count the number of symbols that are selected and do a
+> > "if ARCH_MULTI_V6_V7" (or an arbitrary expression) this most likely
+> > should exist internally within Kconfig
+> > 
+> > - introduce a new type of Kconfig type which is a "count", and gets
+> > assigned this value that we just counted, something that could look like
+> > this:
+> > 
+> > count ARCH_MULTI_V6_V7_COUNT
+> >       tracks ARCH_MULTI_V6_V7
 > 
-> I think the diagram you gave initially made this confusing, as it
-> talks about a CPU(sic) producing the "RGMII" and "MII-MGMT".
-> 
-> Let's instead show a better representation that hopefully helps Greg
-> understand networking. :)
-> 
-> 
->   CPU
-> System <-B->  Ethernet controller <-P-> } PHY <---> network cable
->                                         } - - - - - - - or - - - - - - -
->                   MDIO bus -------M---> } Switch <-P-> PHYs <--> network
->                                               `----M----^        cables
-> 
-> 'B' can be an on-SoC bus or something like PCI.
-> 
-> 'P' are the high-speed connectivity between the ethernet controller and
-> PHY which carries the packet data.  It has no addressing, it's a point
-> to point link.  RGMII is just one wiring example, there are many
-> different interfaces there (SGMII, AUI, XAUI, XGMII to name a few.)
-> 
-> 'M' are the MDIO bus, which is the bus by which ethernet PHYs and
-> switches can be identified and controlled.
-> 
-> The MDIO bus has a bus_type, has host drivers which are sometimes
-> part of the ethernet controller, but can also be stand-alone devices
-> shared between multiple ethernet controllers.
-> 
-> PHYs are a kind of MDIO device which are members of the MDIO bus
-> type.  Each PHY (and switch) has a numerical address, and identifying
-> numbers within its register set which identifies the manufacturer
-> and device type.  We have device_driver objects for these.
-> 
-> Expanding the above diagram to make it (hopefully) even clearer,
-> we can have this classic setup:
-> 
->   CPU
-> System <-B-> Ethernet controller <-P-> PHY <---> network cable
->                  MDIO bus -------M------^
-> 
-> Or, in the case of two DSA switches attached to an Ethernet controller:
-> 
->                                      |~~~~~~~~|
-> System <-B-> Ethernet controller <-P-> Switch <-P-> PHY1 <--> network cable
->                  MDIO bus ----+--M--->   1    <-P-> PHY2 <--> network cable
->                               |      |        ...    |
->                               |      |        <-P-> PHYn <--> network cable
->                               |      |....^...|      |
->                               |           |  `---M---'
->                               |           P
->                               |           |
->                               |      |~~~~v~~~|
->                               `------> Switch <-P-> PHY1 <--> network cable
->                                      |   2    ...    |
->                                      |        <-P-> PHYn <--> network cable
->                                      |........|      |
->                                              `---M---'
-> 
-> The problem that the DSA guys are trying to deal with is how to
-> represent the link between the DSA switches (which are devices
-> sitting off their controlling bus - the MDIO bus) and the ethernet
-> controller associated with that collection of devices, be it a
-> switch or PHY.
+> I did try the counting thing, but couldn't get it to work.
+> I admit though, I did stop when the next step was to create a new type
+> kind of thing that I could use for counting. That seemed to start going
+> down a deeper path than I was hoping for.
 
-Why do they have to represent that link?  This is a driver that somehow
-binds the two togther in some sort of "control plane"?
+I also couldn't come up with something working when I looked at this,
+and it wouldn't solve the related problem of platforms that we want to
+be able to use with or without MMU: You can't make the decision of
+whether allow an MMU based on the number of platforms since most
+platform options can only be offered depending on the setting of
+CONFIG_MMU.
 
-> Merely changing the parent/child relationships to try and solve
-> one issue just creates exactly the same problem elsewhere.
+> However,
+> I am hesitant to go and try anything else because everything I've submitted
+> so far has been NACKed. The only thing Russell said he'd agree to is a top
+> level single-platform option. But, since that all got taken out, I assume
+> there's some resistance to putting it back in.
 
-Fair enough.
+And I really don't like adding new top-level for a platform here, it
+brings us back to the same problems we had before we moved most platforms
+to ARCH_MULTIPLATFORM, and it doesn't solve the remaining problems we still
+have:
 
-> So, I hope with these diagrams, you can see that trying to make
-> the ethernet controller a child device of the DSA switches
-> means that (eg) it's no longer a PCI device, which is rather
-> absurd, especially when considering that what happens to the
-> right of the ethernet controller in the diagrams above is
-> normally external chips to the SoC or ethernet device.
+- In some platforms, the decision would have to be done on a per-board
+  level, as each board can have its memory at a different location
+  base on which chipselect line got connected to the RAM and NOR flash
+  respectively
 
-Ok, thanks for the long explainations and diagrams.
+- Some (few) platforms actually have separate top-level Kconfig options
+  but are actually very closely related and you could have a kernel
+  for all of them even with !MMU and XIP_KERNEL. The most important
+  one here is ARM Versatile/Realview/Integrator/Vexpress that have
+  more in common than things we put behind a common Kconfig option in
+  other platforms.
 
-_BUT_ my original point remains.  These new functions you all are trying
-to get into the driver core, do NOT do what they say they are doing.
-They are mucking around with a "known topology" and just happen to work
-because the device you are trying to find shares a common parent with
-yourself.
+- CONFIG_DEBUG_UNCOMPRESS has a very similar requirements to
+  XIP_KERNEL and !MMU, and we currently allow it for any machine,
+  with a lot of flexibility in configuring that always breaks
+  running on any machine other than the one you are targetting.
 
-That is not what the function says it does, and as such, I do not want
-that function in the driver core at all.
-
-If you wish to keep it in your own subsystem, that's fine, but call it
-what it really is:
-	hack_to_find_peer_device_on_random_bus()
-and pass in a _real_ pointer to a bus type.  Not some random string
-please.
-
-Or better yet, have the DSA code accept pointers to the two devices in
-the first place, so it "knows" what to do here in a much better way.
-Right now it is a bad hack.  You all can not argue that is not true.
-
-thanks,
-
-greg k-h
+	Arnd
