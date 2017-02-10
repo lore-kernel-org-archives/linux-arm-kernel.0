@@ -1,43 +1,65 @@
-From: viniciusfre@gmail.com (Vinicius Maciel)
-Date: Fri, 10 Feb 2017 19:02:47 -0300
-Subject: [PATCH] Add Master Sample Data Mode for SPI
-Message-ID: <20170210220247.8478-1-viniciusfre@gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 10 Feb 2017 16:16:17 -0600
+Subject: [PATCH] PCI:MSI Return -ENOSPC when requested vectors is not
+ enough
+In-Reply-To: <1480558504-18691-1-git-send-email-dennis.chen@arm.com>
+References: <1480558504-18691-1-git-send-email-dennis.chen@arm.com>
+Message-ID: <20170210221617.GT29169@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to work appropriately, the max11043 ADC chip and probably
-others, needs SPI master samples the data at the correct edge. From
-max11043 datasheet: "The data at DIN is latched on the rising edge
-of SCLK". Same to DOUT.
+On Thu, Dec 01, 2016 at 10:15:04AM +0800, Dennis Chen wrote:
+> The __pci_enable_msi_range() should return -ENOSPC instead of -EINVAL
+> when the device doesn't have enough vectors as required, just as the 
+> MSI-X vector allocator does in __pci_enable_msix_range(). Otherwise, 
+> some drivers depending on that return value will probably fallback to
+> the legacy interrupt directly, for example, in commit 17a51f12cfbd2814
+> ("ahci: only try to use multi-MSI mode if there is more than 1 port"), the
+> ahci driver will fallback to single MSI mode only when the return value
+> is -ENOSPC in case of required vectors is not enough, else the driver will
+> use legacy interrupt which has been observed on a x86 box with 6-port SATA
+> controller.
+> 
+> With this patch, when a MSI-capable device doesn't have enough MSI
+> vectors as requested, it will fallback to single MSI mode while not
+> legacy interrupt.
+> 
+> Signed-off-by: Dennis Chen <dennis.chen@arm.com>
+> Cc: Tejun Heo <tj@kernel.org>
+> Cc: Christoph Hellwig <hch@lst.de>
+> Cc: Tom Long Nguyen <tom.l.nguyen@intel.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Steve Capper <steve.capper@arm.com>
+> Cc: linux-ide at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
 
-This patch add Master Sample Data Mode bit in normal sample mode.
+Applied to pci/msi for v4.11, thanks, Dennis!
 
-Signed-off-by: Vinicius Maciel <viniciusfre@gmail.com>
----
- drivers/spi/spi-sun4i.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
-index c5cd635c28f3..6325be2ce8d9 100644
---- a/drivers/spi/spi-sun4i.c
-+++ b/drivers/spi/spi-sun4i.c
-@@ -44,6 +44,7 @@
- #define SUN4I_CTL_CS_MANUAL			BIT(16)
- #define SUN4I_CTL_CS_LEVEL			BIT(17)
- #define SUN4I_CTL_TP				BIT(18)
-+#define SUN4I_CTL_SDM				BIT(20)
- 
- #define SUN4I_INT_CTL_REG		0x0c
- #define SUN4I_INT_CTL_RF_F34			BIT(4)
-@@ -407,7 +408,8 @@ static int sun4i_spi_runtime_resume(struct device *dev)
- 	}
- 
- 	sun4i_spi_write(sspi, SUN4I_CTL_REG,
--			SUN4I_CTL_ENABLE | SUN4I_CTL_MASTER | SUN4I_CTL_TP);
-+			SUN4I_CTL_ENABLE | SUN4I_CTL_MASTER | SUN4I_CTL_TP |
-+			SUN4I_CTL_SDM);
- 
- 	return 0;
- 
--- 
-2.11.0
+> ---
+>  drivers/pci/msi.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index ad70507..da37113 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -1084,7 +1084,7 @@ static int __pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec,
+>  	if (nvec < 0)
+>  		return nvec;
+>  	if (nvec < minvec)
+> -		return -EINVAL;
+> +		return -ENOSPC;
+>  
+>  	if (nvec > maxvec)
+>  		nvec = maxvec;
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
