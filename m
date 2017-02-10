@@ -1,123 +1,112 @@
-From: rruigrok@codeaurora.org (Ruigrok, Richard)
-Date: Thu, 9 Feb 2017 17:28:16 -0700
-Subject: [PATCH] efi: arm-stub: Correct FDT and initrd allocation rules
- for arm64
-In-Reply-To: <1486635389-26974-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1486635389-26974-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <c74a72db-c032-a55f-eee6-2441929c7d7c@codeaurora.org>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Thu, 9 Feb 2017 19:29:43 -0500
+Subject: [PATCH for-4.11 1/2] Revert "phy: Add USB3 PHY support for
+ Broadcom NSP SoC"
+In-Reply-To: <b2bdc1a7-4e5c-a13e-0cda-c90759d7308c@gmail.com>
+References: <20170208233023.31922-1-zajec5@gmail.com>
+ <82b47a03-c41b-378b-2d7c-f263eff514a9@gmail.com>
+ <1b66f9ab3a9efd1bd0817a114e5b9ec9@milecki.pl>
+ <06b6461c-9f43-3482-352f-374490056e90@gmail.com>
+ <b715c193196fb2de2b95cc3d15102e1b@milecki.pl>
+ <b2bdc1a7-4e5c-a13e-0cda-c90759d7308c@gmail.com>
+Message-ID: <CAC3K-4r6pkRiOqoOHTd79-qy_4mQAxJ5N5oCY8mDXFeXyuVpAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2/9/2017 3:16 AM, Ard Biesheuvel wrote:
-> On arm64, we have made some changes over the past year to the way the
-> kernel itself is allocated and to how it deals with the initrd and FDT.
-> This patch brings the allocation logic in the EFI stub in line with that,
-> which is necessary because the introduction of KASLR has created the
-> possibility for the initrd to be allocated in a place where the kernel
-> may not be able to map it. (This is currently a theoretical scenario,
-> since it only affects systems where the size of RAM exceeds the size of
-> the linear mapping.)
+On Thu, Feb 9, 2017 at 2:18 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 02/08/2017 11:21 PM, Rafa? Mi?ecki wrote:
+>> On 2017-02-09 00:44, Florian Fainelli wrote:
+>>> On 02/08/2017 03:39 PM, Rafa? Mi?ecki wrote:
+>>>> On 2017-02-09 00:32, Florian Fainelli wrote:
+>>>>> On 02/08/2017 03:30 PM, Rafa? Mi?ecki wrote:
+>>>>>> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>>>>>>
+>>>>>> This reverts commit d7bc1a7d41bf ("phy: Add USB3 PHY support for
+>>>>>> Broadcom NSP SoC") as we already have driver for this PHY (shared
+>>>>>> by NS
+>>>>>> and NSP). It was added in commit e5666281d9ea ("phy: bcm-ns-usb3: new
+>>>>>> driver for USB 3.0 PHY on Northstar").
+>>>>>>
+>>>>>> Instead of adding separated driver & duplicating code we should
+>>>>>> work on
+>>>>>> improving existing (old) one. Thanks to work done by Broadcom we know
+>>>>>> there is MDIO bus we weren't aware of & we know register names which
+>>>>>> makes initialization more clear. This is very valuable info and we
+>>>>>> should work on using it in existing driver afterwards.
+>>>>>
+>>>>> Should not we first extend the old driver to support NSP and then
+>>>>> revert
+>>>>> d7bc1a7d41bf ("phy: Add USB3 PHY support for Broadcom NSP SoC")?
+>>>>
+>>>> Sounds like a weird / dirty development method to me: adding duplicated
+>>>> code
+>>>> first then working on cleaning it. Unless you mean drivers/staging/.
+>>>
+>>> There was clearly a mistake in submitting this NSP USB PHY driver, and
+>>> it should have been a patch against the existing NS USB PHY driver, but
+>>> it was not, okay fair enough.
+>>>
+>>> It's one thing to address that in the future, and it's another thing to
+>>> flat out revert the driver just because you don't like the duplication.
+>>>
+>>> I don't like that either, and we can discuss on how to improve things
+>>> (like have the maintainer review that too), but duplication is a lesser
+>>> evil than not having the hardware supported at all, and even more so,
+>>> purposely reverting in the name of removing that duplication, that's
+>>> intentionally breaking working hardware!
+>>
+>> Hardware support is not excuse and I don't think it ever was in the Linux.
+>>
+>> We don't accept badly designed drivers just because they provide new hw
+>> support.
+>> We have various standards (for quality, style, design, code) at kernel
+>> and we
+>> stick to them unless it's drivers/staging/. As you said this driver
+>> shouldn't be
+>> pushed in the first place.
+>>
+>> Dropping hardware support in kernel happens. Sometimes it's about ancient
+>> devices, sometimes about code quality (some forgotten staging drivers
+>> used to be
+>> dropped AFAIK).
+>>
+>> Additionally you're talking about support that was *just* added and
+>> isn't used
+>> by anyone in the wild world yet.
 >
-> So adhere to the arm64 boot protocol, and make sure that the initrd is
-> fully inside a 1GB aligned 32 GB window that covers the kernel as well.
+> Except people working on it at Broadcom, but fair enough.
 >
-> The FDT may be anywhere in memory on arm64 now that we map it via the
-> fixmap, so we can lift the address restriction there completely.
+>>
+>> This hardware was missing upstream support for 4 years so 2 extra months
+>> won't
+>> really hurt anyone.
+>>
+>> I really don't see excusee or need for keeping this driver.
+>>
+>> If you want to (and you feel it's well designed), we can keep
+>> brcm,nsp-usb3-phy.txt
 >
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/include/asm/efi.h              | 14 +++++++++++++-
->  arch/arm64/include/asm/efi.h            | 19 ++++++++++++++++++-
->  drivers/firmware/efi/libstub/arm-stub.c |  7 ++++---
->  3 files changed, 35 insertions(+), 5 deletions(-)
+> No it's fine, let's drop it all and replace it with whatever you and Jon
+> come up with next.
 >
-> diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
-> index 0b06f5341b45..62620451f60b 100644
-> --- a/arch/arm/include/asm/efi.h
-> +++ b/arch/arm/include/asm/efi.h
-> @@ -84,6 +84,18 @@ static inline void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
->   */
->  #define ZIMAGE_OFFSET_LIMIT	SZ_128M
->  #define MIN_ZIMAGE_OFFSET	MAX_UNCOMP_KERNEL_SIZE
-> -#define MAX_FDT_OFFSET		ZIMAGE_OFFSET_LIMIT
-> +
-> +/* on ARM, the FDT should be located in the first 128 MB of RAM */
-> +static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
-> +{
-> +		return dram_base + ZIMAGE_OFFSET_LIMIT;
-> +}
-> +
-> +/* on ARM, the initrd should be loaded in a lowmem region */
-> +static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
-> +						    unsigned long image_addr)
-> +{
-> +	return dram_base + SZ_512M;
-> +}
->  
->  #endif /* _ASM_ARM_EFI_H */
-> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-> index 0b6b1633017f..6a6c8a0d1424 100644
-> --- a/arch/arm64/include/asm/efi.h
-> +++ b/arch/arm64/include/asm/efi.h
-> @@ -46,7 +46,24 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
->   * 2MiB so we know it won't cross a 2MiB boundary.
->   */
->  #define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
-> -#define MAX_FDT_OFFSET	SZ_512M
-> +
-> +/* on arm64, the FDT may be located anywhere in system RAM */
-> +static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
-> +{
-> +	return ULONG_MAX;
-> +}
-> +
-> +/*
-> + * On arm64, the initrd must be completely inside a 1 GB aligned 32 GB window
-> + * that covers Image as well. Since we allocate from the top down, set a max
-> + * address that is virtually guaranteed to produce a suitable allocation even
-> + * when the physical address of Image is randomized.
-> + */
-> +static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
-> +						    unsigned long image_addr)
-> +{
-> +	return ALIGN(image_addr, SZ_1G) + 31UL * SZ_1G;
-> +}
->  
->  #define efi_call_early(f, ...)		sys_table_arg->boottime->f(__VA_ARGS__)
->  #define __efi_call_early(f, ...)	f(__VA_ARGS__)
-> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-> index b4f7d78f9e8b..557281fe375f 100644
-> --- a/drivers/firmware/efi/libstub/arm-stub.c
-> +++ b/drivers/firmware/efi/libstub/arm-stub.c
-> @@ -333,8 +333,9 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
->  	if (!fdt_addr)
->  		pr_efi(sys_table, "Generating empty DTB\n");
->  
-> -	status = handle_cmdline_files(sys_table, image, cmdline_ptr,
-> -				      "initrd=", dram_base + SZ_512M,
-> +	status = handle_cmdline_files(sys_table, image, cmdline_ptr, "initrd=",
-> +				      efi_get_max_initrd_addr(dram_base,
-> +							      *image_addr),
->  				      (unsigned long *)&initrd_addr,
->  				      (unsigned long *)&initrd_size);
->  	if (status != EFI_SUCCESS)
-> @@ -344,7 +345,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
->  
->  	new_fdt_addr = fdt_addr;
->  	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
-> -				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
-> +				&new_fdt_addr, efi_get_max_fdt_addr(dram_base),
->  				initrd_addr, initrd_size, cmdline_ptr,
->  				fdt_addr, fdt_size);
->  
+>>
+>> I vote for focusing on existing driver improvements instead of looking for
+>> excuses for keeping driver that shouldn't be added in the first place.
+>> Jon seems to be already working on this, I'm willing to help him, I'm
+>> sure we
+>> can get you a proper support for the next merge window.
+>
+> Fair enough, I dropped Dhanajay's changes ("ARM: dts: NSP: Add USB nodes
+> for Northstar Plus") from devicetree/next so you and Jon can figure out
+> what is the best thing to move forward and we minimize the amount of
+> incompatible DT stuff to be sorted out later on. So as far as I am
+> concerned, there are no board/SoC DTS changes to be patched later on, we
+> could re-apply this patch as-is, or we could have to define a new binding.
+> --
+> Florian
 
-This was tested successfully on our QDT2400 system on which we found this failure.
+(previous email got caught in HTML filters)
 
-Tested-by: Richard Ruigrok <rruigrok@codeaurora.org>
+Per the discussion with Rafal, this is acceptable
 
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Acked-by: Jon Mason <jon.mason@broadcom.com>
