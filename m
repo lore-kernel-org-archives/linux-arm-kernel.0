@@ -1,48 +1,30 @@
-From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri, 10 Feb 2017 11:00:46 +0100
-Subject: [PATCH RESEND] ASoC: sun4i-i2s: Update binding documentation to
- include A31
-Message-ID: <20170210100046.32647-1-mylene.josserand@free-electrons.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 10 Feb 2017 11:04:42 +0100
+Subject: [PATCH 0/2] meson-gxbb: Add mali-450 support
+Message-ID: <1486721084-1383-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new compatible for sun4i-i2s driver to handle some
-SoCs that have a reset line that must be asserted/deasserted.
+Since the merge of the Mali dt bindings at [1], add support for Mali clocks
+and DT node.
 
-This new compatible, "allwinner,sun6i-a31-i2s", requires the
-property "resets" which should be a phandle to the reset line.
-Except these differences, the compatible is identical to previous one
-which will not handle a reset line.
+The Mali is clocked by two identical clock paths behind a glitch free mux
+to safely change frequency while running.
+So these clocks must be added to the meson-gxbb clock controller.
 
-Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/sound/sun4i-i2s.txt | 5 +++++
- 1 file changed, 5 insertions(+)
+[1] http://lkml.kernel.org/r/b098c4fa9fce88361cca20417978734d0e1b5cca.1485939041.git-series.maxime.ripard at free-electrons.com
 
-diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-index 7b526ec64991..f4adc58f82ba 100644
---- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-@@ -7,6 +7,7 @@ Required properties:
- 
- - compatible: should be one of the followings
-    - "allwinner,sun4i-a10-i2s"
-+   - "allwinner,sun6i-a31-i2s"
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: should contain the I2S interrupt.
-@@ -19,6 +20,10 @@ Required properties:
-    - "mod" : module clock for the I2S controller
- - #sound-dai-cells : Must be equal to 0
- 
-+Required properties for the following compatibles:
-+	- "allwinner,sun6i-a31-i2s"
-+- resets: phandle to the reset line for this codec
-+
- Example:
- 
- i2s0: i2s at 01c22400 {
+Neil Armstrong (2):
+  clk: meson-gxbb: Add MALI clocks and fix GP0 pll support
+  ARM64: dts: meson-gxbb: Add Mali node
+
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi |  37 +++++
+ drivers/clk/meson/clk-pll.c                 |  34 ++++-
+ drivers/clk/meson/clkc.h                    |   3 +
+ drivers/clk/meson/gxbb.c                    | 211 +++++++++++++++++++++++++++-
+ drivers/clk/meson/gxbb.h                    |   7 +-
+ include/dt-bindings/clock/gxbb-clkc.h       |   4 +
+ 6 files changed, 282 insertions(+), 14 deletions(-)
+
 -- 
-2.11.0
+1.9.1
