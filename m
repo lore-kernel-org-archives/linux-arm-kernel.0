@@ -1,46 +1,48 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 10 Feb 2017 09:21:20 -0800
-Subject: [PATCH 4/4] clk: mvebu: Expand mv98dx3236-core-clock support
-In-Reply-To: <aabc6853d7934507a4507b0ad4354b72@svr-chch-ex1.atlnz.lc>
-References: <20170203034012.29399-1-chris.packham@alliedtelesis.co.nz>
- <5a974d9d7260432087619486bf5d79ed@svr-chch-ex1.atlnz.lc>
- <6149d4126a214ac8b0b0184bd818bea6@svr-chch-ex1.atlnz.lc>
- <9294933.cXSW0amFbE@wuerfel>
- <aabc6853d7934507a4507b0ad4354b72@svr-chch-ex1.atlnz.lc>
-Message-ID: <20170210172120.GR25384@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 10 Feb 2017 17:26:52 +0000
+Subject: [PATCH 1/4] arm: kvm: move kvm_vgic_global_state out of .text
+ section
+In-Reply-To: <1486747005-15973-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1486747005-15973-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1486747005-15973-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <d578fb88-0af1-9161-fb6c-cc524a3ec7ea@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/08, Chris Packham wrote:
-> On 08/02/17 23:53, Arnd Bergmann wrote:
-> > On Tuesday, February 7, 2017 3:07:37 AM CET Chris Packham wrote:
-> >>>
-> >>> Actually I wonder if I can try a bit harder to keep a system booting.
-> >>> The following might work
-> >>> 1) add the compatible strings to the existing armada clock drivers.
-> >>> 2) update the dts to use the new compatible strings.
-> >>> 3) add the new driver and remove the compatible strings from the armada
-> >>> drivers.
-> >>>
-> >>> #1 would still upset checkpatch.pl because the documentation would only
-> >>> arrive in #2.
-> >>
-> >> Actually upon testing #1 is unnecessary. I lose some of the gated clocks
-> >> but nothing that prevents booting.
-> >
-> > Just to be sure: this means we can merge 2) and 3) independently and
-> > having just one of them will not cause regressions over what we have
-> > today?
-> >
+On 10/02/17 17:16, Ard Biesheuvel wrote:
+> The kvm_vgic_global_state struct contains a static key which is
+> written to by jump_label_init() at boot time. So in preparation of
+> making .text regions truly (well, almost truly) read-only, mark
+> kvm_vgic_global_state __ro_after_init so it moves to the .rodata
+> section instead.
 > 
-> Correct. And that's what I sent out as v2.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  virt/kvm/arm/vgic/vgic.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 > 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/486467.html
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/486471.html
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index 6440b56ec90e..2f373455ed4e 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -29,7 +29,9 @@
+>  #define DEBUG_SPINLOCK_BUG_ON(p)
+>  #endif
+>  
+> -struct vgic_global __section(.hyp.text) kvm_vgic_global_state = {.gicv3_cpuif = STATIC_KEY_FALSE_INIT,};
+> +struct vgic_global kvm_vgic_global_state __ro_after_init = {
+> +	.gicv3_cpuif = STATIC_KEY_FALSE_INIT,
+> +};
+>  
+>  /*
+>   * Locking order is always:
 > 
 
-Ok... so I'll apply the 6/6 patch now to the clk tree.
+I guess that's a nice way to find out if someone is playing with this
+structure (which indeed shouldn't change once KVM has initialized).
 
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Jazz is not dead. It just smells funny...
