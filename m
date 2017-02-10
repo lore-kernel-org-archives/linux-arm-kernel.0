@@ -1,32 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 10 Feb 2017 14:31:31 +0000
-Subject: [PATCH v2 05/14] arm64: efi: remove forbidden values from the
- PE/COFF header
-In-Reply-To: <20170210101329.GD28753@leverpostej>
-References: <1486554947-3964-1-git-send-email-ard.biesheuvel@linaro.org>
- <1486554947-3964-6-git-send-email-ard.biesheuvel@linaro.org>
- <20170210101329.GD28753@leverpostej>
-Message-ID: <CAKv+Gu8sT2CLquxAdneNSQ+YqasbPM96E3h9NMc0JMCR5Wa+bA@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 10 Feb 2017 15:45:15 +0100
+Subject: [PATCH v4 0/9] ARM: dts: support I2SE Duckbill devices
+In-Reply-To: <1486626169-20022-1-git-send-email-michael.heimpold@i2se.com>
+References: <1486626169-20022-1-git-send-email-michael.heimpold@i2se.com>
+Message-ID: <a6386810-1e99-130a-5fdf-02cce13d0fc4@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 February 2017 at 10:13, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Feb 08, 2017 at 11:55:38AM +0000, Ard Biesheuvel wrote:
->> Bring the PE/COFF header in line with the PE/COFF spec, by setting
->> NumberOfSymbols to 0, and removing the section alignment flags.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Am 09.02.2017 um 08:42 schrieb Michael Heimpold:
+> This series updates/adds Device Tree support for I2SE's Duckbill
+> device family.
 >
-> I take it that in practice EFI implementations don't care about these?
+> The Duckbill devices are small, pen-drive sized boards based on
+> NXP's i.MX28 SoC. While the initial variants (Duckbill series) were
+> equipped with a micro SD card slot only, the latest generation
+> (Duckbill 2 series) have an additional internal eMMC onboard.
+>
+> Both device generations consists of four "family members":
+>
+> - Duckbill/Duckbill 2: generic board, intended to be used as
+>   baseboard for custom designs and/or as development board
+>
+> - Duckbill EnOcean/Duckbill 2 EnOcean: come with an EnOcean
+>   daugther board equipped with the popular TCM310 module
+>
+> - Duckbill 485/Duckbill 2 485: as the name implies, these
+>   devices are intended to be used as Ethernet - RS485 converters
+>
+> - Duckbill SPI/Duckbill 2 SPI: not sold separately, but used
+>   in I2SE's development kits for Green PHY HomePlug Powerline
+>   communication
+>
+> Because the Duckbill series is EOL, this patch series only adds
+> support for the latest Duckbill 2 series devices. However,
+> support for the generic Duckbill board was already mainline,
+> so update it to match vendor tree DT.
 
-Not at all. I just spotted it when I was cleaning up the header.
+I'm fine with the complete series.
 
-> Assuming so:
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
->
-> Otherwise, we might want to fix this first, so that we can easily
-> backport it.
->
-
-I wouldn't bother
+Regards
