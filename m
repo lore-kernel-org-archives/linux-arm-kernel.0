@@ -1,45 +1,54 @@
 From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri, 10 Feb 2017 10:41:30 +0100
-Subject: [PATCH 1/4] ASoC: sun8i-codec: Remove analog "HP" widget
-In-Reply-To: <20170210094133.11382-1-mylene.josserand@free-electrons.com>
-References: <20170210094133.11382-1-mylene.josserand@free-electrons.com>
-Message-ID: <20170210094133.11382-2-mylene.josserand@free-electrons.com>
+Date: Fri, 10 Feb 2017 10:41:29 +0100
+Subject: [PATCH 0/4] ASoC: sun8i-codec: Clean-up
+Message-ID: <20170210094133.11382-1-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "HP" widget is already present and take part to
-the analog part (sun8i-codec-analog).
+Hi all,
 
-Remove it from the digital part as it is unnecessary.
+Thanks to Chen-Yu's review [1], here are some patches to clean-up
+my sun8i A33 audio driver.
 
-Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
----
- sound/soc/sunxi/sun8i-codec.c | 6 ------
- 1 file changed, 6 deletions(-)
+Patches tested on asoc/for-next branch with additionnal patches
+to apply before:
+https://patchwork.kernel.org/patch/9447631/
+https://patchwork.kernel.org/patch/9423999/
+https://patchwork.kernel.org/patch/9521121/
+https://www.spinics.net/lists/arm-kernel/msg560091.html
 
-diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-index b92bdc8361af..d60f6fbd36a2 100644
---- a/sound/soc/sunxi/sun8i-codec.c
-+++ b/sound/soc/sunxi/sun8i-codec.c
-@@ -321,8 +321,6 @@ static const struct snd_soc_dapm_widget sun8i_codec_dapm_widgets[] = {
- 			    SUN8I_MOD_RST_CTL_AIF1, 0, NULL, 0),
- 	SND_SOC_DAPM_SUPPLY("RST DAC", SUN8I_MOD_RST_CTL,
- 			    SUN8I_MOD_RST_CTL_DAC, 0, NULL, 0),
--
--	SND_SOC_DAPM_OUTPUT("HP"),
- };
- 
- static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
-@@ -344,10 +342,6 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
- 	/* DAC Mixer Routes */
- 	{ "Left DAC Mixer", "LSlot 0", "Digital Left DAC"},
- 	{ "Right DAC Mixer", "RSlot 0", "Digital Right DAC"},
--
--	/* End of route : HP out */
--	{ "HP", NULL, "Left DAC Mixer" },
--	{ "HP", NULL, "Right DAC Mixer" },
- };
- 
- static struct snd_soc_dai_ops sun8i_codec_dai_ops = {
+Patch 1: Removes the HP widget which is available in the analog part.
+
+Patch 2: Update the driver to use SOC_DAPM_DOUBLE and rename the
+controls accordingly.
+
+Patch 3: Convert SND_SOC_DAPM_MIXER to SOC_MIXER_ARRAY.
+
+Patch 3: Convert SND_SOC_DAPM_DAC to SND_SOC_DAPM_AIF_IN definition.
+
+The last Chen Yu's comments are still in progress (ie use of
+set_pll and set_sysclk and reworking the audio route).
+
+After this series, amixer commands to test an audio file:
+	amixer set 'Headphone' 75%
+	amixer set 'Headphone' on
+	amixer set 'DAC' on
+	amixer set 'AIF1 Slot 0 Digital DAC' on
+
+[1] https://lkml.org/lkml/2017/2/7/103
+
+Thank you in advance,
+Best regards,
+
+Myl?ne Josserand (4):
+  ASoC: sun8i-codec: Remove analog "HP" widget
+  ASoC: sun8i-codec: Update mixer to use SOC_DAPM_DOUBLE
+  ASoC: sun8i-codec: Convert to SOC_MIXER_ARRAY
+  ASoC: sun8i-codec: Convert to use SND_SOC_DAPM_AIF_IN
+
+ arch/arm/boot/dts/sun8i-a33.dtsi |  4 +--
+ sound/soc/sunxi/sun8i-codec.c    | 65 +++++++++++++++++-----------------------
+ 2 files changed, 30 insertions(+), 39 deletions(-)
+
 -- 
 2.11.0
