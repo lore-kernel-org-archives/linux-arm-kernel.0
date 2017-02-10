@@ -1,31 +1,25 @@
 From: velibor.markovski@broadcom.com (Velibor Markovski)
-Date: Fri, 10 Feb 2017 12:36:27 -0800
-Subject: [PATCH INTERNAL 2/2] bus: arm-ccn: Enable stats for CCN-502
- interconnect
-In-Reply-To: <1486758987-23769-1-git-send-email-velibor.markovski@broadcom.com>
-References: <1486758987-23769-1-git-send-email-velibor.markovski@broadcom.com>
-Message-ID: <1486758987-23769-3-git-send-email-velibor.markovski@broadcom.com>
+Date: Fri, 10 Feb 2017 12:36:25 -0800
+Subject: [PATCH 0/2] Add support for ARM CCN-502 interconnect
+Message-ID: <1486758987-23769-1-git-send-email-velibor.markovski@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add compatible string for the ARM CCN-502 interconnect
+Add compatible string for ARM CCN-502 interconnect.
+CCN-502 interconnect is already compatible with the 
+existing ARM CCN driver, which supports CCN-504.
 
-Signed-off-by: Velibor Markovski <velibor.markovski@broadcom.com>
----
- drivers/bus/arm-ccn.c | 1 +
- 1 file changed, 1 insertion(+)
+This patchset is based on v4.10-rc3 and is available from github:
+repo: https://github.com/Broadcom/arm64-linux
+branch: arm64-ccn502
 
-diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index 4d6a2b7..98a6995 100644
---- a/drivers/bus/arm-ccn.c
-+++ b/drivers/bus/arm-ccn.c
-@@ -1544,6 +1544,7 @@ static int arm_ccn_remove(struct platform_device *pdev)
- }
- 
- static const struct of_device_id arm_ccn_match[] = {
-+	{ .compatible = "arm,ccn-502", },
- 	{ .compatible = "arm,ccn-504", },
- 	{},
- };
+Velibor Markovski (2):
+  dt-bindings: arm-ccn: Add bindings info for CCN-502 compatible string
+  bus: arm-ccn: Enable stats for CCN-502 interconnect
+
+ Documentation/devicetree/bindings/arm/ccn.txt | 1 +
+ drivers/bus/arm-ccn.c                         | 1 +
+ 2 files changed, 2 insertions(+)
+
 -- 
 1.9.1
