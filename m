@@ -1,60 +1,61 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 10 Feb 2017 08:55:31 -0600
-Subject: [PATCH v4 4/5] dt-bindings: arm64 ARCH_THUNDER2 platform
- documentation
-In-Reply-To: <1486667612-8168-1-git-send-email-jnair@caviumnetworks.com>
-References: <CAK8P3a07eo0htv_y6H_aHvAaeo5two3vQTaySuFXpG+dzYguUQ@mail.gmail.com>
- <1486667612-8168-1-git-send-email-jnair@caviumnetworks.com>
-Message-ID: <CAL_JsqKm-c6D_fki_TsRYKH3aGoC5GE7n0DazNi7P268aj-93g@mail.gmail.com>
+From: yannick.fertre@st.com (Yannick Fertre)
+Date: Fri, 10 Feb 2017 15:54:46 +0100
+Subject: [PATCH v2 6/9] ARM: dts: stm32: Add ltdc support on stm32f429 MCU
+In-Reply-To: <1486738489-22154-1-git-send-email-yannick.fertre@st.com>
+References: <1486738489-22154-1-git-send-email-yannick.fertre@st.com>
+Message-ID: <1486738489-22154-7-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 9, 2017 at 1:13 PM, Jayachandran C <jnair@caviumnetworks.com> wrote:
-> Add documentation for Cavium ThunderX2 CN99XX ARM64 processor family.
-> The the SoC will use the ID "cavium,thunderx2-cn9900".
->
-> Add documentation entry for the "cavium,thunder2" cpu core as well.
->
-> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
-> ---
->
-> v3->v4
-> Documentation updates to reflect changes in device tree.
->
->  Documentation/devicetree/bindings/arm/cavium-thunder2.txt | 8 ++++++++
->  Documentation/devicetree/bindings/arm/cpus.txt            | 1 +
->  2 files changed, 9 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder2.txt
->
-> diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder2.txt b/Documentation/devicetree/bindings/arm/cavium-thunder2.txt
-> new file mode 100644
-> index 0000000..dc5dd65
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/cavium-thunder2.txt
-> @@ -0,0 +1,8 @@
-> +Cavium ThunderX2 CN99XX platform tree bindings
-> +----------------------------------------------
-> +
-> +Boards with Cavium ThunderX2 CN99XX SoC shall have the root property:
-> +  compatible = "cavium,thunderx2-cn9900", "brcm,vulcan-soc";
-> +
-> +These SoC uses the "cavium,thunder2" core which will be compatible
-> +with "brcm,vulcan".
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index a1bcfee..74f0b23 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -169,6 +169,7 @@ nodes to be present and contain the properties described below.
->                             "brcm,brahma-b15"
->                             "brcm,vulcan"
->                             "cavium,thunder"
-> +                           "cavium,thunder2"
+Add LTDC (Lcd-tft Display Controller) support.
 
-Is this the same as brcm,vulcan?
+Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+---
+ arch/arm/boot/dts/stm32f429.dtsi | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
->                             "faraday,fa526"
->                             "intel,sa110"
->                             "intel,sa1100"
-> --
-> 2.7.4
->
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index e4dae0e..47351e2 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -48,6 +48,7 @@
+ #include "skeleton.dtsi"
+ #include "armv7-m.dtsi"
+ #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
++#include <dt-bindings/clock/stm32f4-clock.h>
+ 
+ / {
+ 	clocks {
+@@ -206,7 +207,7 @@
+ 			reg = <0x40007000 0x400>;
+ 		};
+ 
+-		pin-controller {
++		pinctrl: pin-controller {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			compatible = "st,stm32f429-pinctrl";
+@@ -426,6 +427,21 @@
+ 			interrupts = <80>;
+ 			clocks = <&rcc 0 38>;
+ 		};
++
++		ltdc: stm32-ltdc at 40016800 {
++			compatible = "st,stm32-ltdc";
++			reg = <0x40016800 0x200>;
++			interrupts = <88>, <89>;
++			resets = <&rcc 314>;
++			clocks = <&rcc 1 CLK_LCD>;
++			clock-names = "clk-lcd";
++			status = "disabled";
++
++			port {
++				ltdc_out_rgb: endpoint {
++				};
++			};
++		};
+ 	};
+ };
+ 
+-- 
+1.9.1
