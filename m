@@ -1,126 +1,191 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 10 Feb 2017 12:51:26 +0100
-Subject: [PATCH v8 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
-In-Reply-To: <20170210045004.GN19244@localhost>
-References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170209142309eucas1p2b1277d96139eafc0d1dcc14145600476@eucas1p2.samsung.com>
- <1486650171-20598-4-git-send-email-m.szyprowski@samsung.com>
- <20170210045004.GN19244@localhost>
-Message-ID: <d299ae6c-78dc-9049-6bed-dc84fff17db3@samsung.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 10 Feb 2017 11:57:21 +0000
+Subject: [RFC v2 05/19] KVM: arm64: ITS: Implement vgic_its_has_attr_regs
+ and attr_regs_access
+In-Reply-To: <1486554212-2774-6-git-send-email-eric.auger@redhat.com>
+References: <1486554212-2774-1-git-send-email-eric.auger@redhat.com>
+ <1486554212-2774-6-git-send-email-eric.auger@redhat.com>
+Message-ID: <01d770b4-e70f-d084-778e-d849cf43d7ea@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On 08/02/17 11:43, Eric Auger wrote:
 
-On 2017-02-10 05:50, Vinod Koul wrote:
-> On Thu, Feb 09, 2017 at 03:22:51PM +0100, Marek Szyprowski wrote:
->
->> +static int pl330_set_slave(struct dma_chan *chan, struct device *slave)
->> +{
->> +	struct dma_pl330_chan *pch = to_pchan(chan);
->> +	struct pl330_dmac *pl330 = pch->dmac;
->> +	int i;
->> +
->> +	mutex_lock(&pl330->rpm_lock);
->> +
->> +	for (i = 0; i < pl330->num_peripherals; i++) {
->> +		if (pl330->peripherals[i].chan.slave == slave &&
->> +		    pl330->peripherals[i].slave_link) {
->> +			pch->slave_link = pl330->peripherals[i].slave_link;
->> +			goto done;
->> +		}
->> +	}
->> +
->> +	pch->slave_link = device_link_add(slave, pl330->ddma.dev,
->> +				       DL_FLAG_PM_RUNTIME | DL_FLAG_RPM_ACTIVE);
-> So you are going to add the link on channel allocation and tear down on the
-> freeup.
+Salut Eric,
 
-Right. Channel allocation is typically done once per driver operation and it
-won't hurt system performance.
+one minor thing below, but first a general question:
+I take it that the state of the ITS (enabled/disabled) shouldn't matter
+when it comes to reading/writing registers, right? Because this is
+totally under guest control and userland shouldn't mess with it?
 
->   I am not sure I really like the idea here.
+Maybe this is handled somewhere in the next patches, but how are we
+supposed to write CBASER and the BASERs, for instance, if the handler
+bails out early when the ITS is already enabled?
 
-Could you point what's wrong with it?
+> This patch implements vgic_its_has_attr_regs and vgic_its_attr_regs_access
+> upon the MMIO framework. VGIC ITS KVM device KVM_DEV_ARM_VGIC_GRP_ITS_REGS
+> group becomes functional.
+> 
+> At least GITS_CREADR requires to differentiate a guest write action from a
+> user access. As such let's introduce a new uaccess_its_write
+> vgic_register_region callback.
+> 
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c  | 74 ++++++++++++++++++++++++++++++++++++-------
+>  virt/kvm/arm/vgic/vgic-mmio.h |  9 ++++--
+>  2 files changed, 69 insertions(+), 14 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 43bb17e..e9c8f9f 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -1287,13 +1287,14 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
+>  	*regptr = reg;
+>  }
+>  
+> -#define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
+> +#define REGISTER_ITS_DESC(off, rd, wr, uwr, length, acc)		\
+>  {								\
+>  	.reg_offset = off,					\
+>  	.len = length,						\
+>  	.access_flags = acc,					\
+>  	.its_read = rd,						\
+>  	.its_write = wr,					\
+> +	.uaccess_its_write = uwr,					\
+>  }
+>  
+>  static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
+> @@ -1304,28 +1305,28 @@ static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
+>  
+>  static struct vgic_register_region its_registers[] = {
+>  	REGISTER_ITS_DESC(GITS_CTLR,
+> -		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
+> +		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, NULL, 4,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_ITS_DESC(GITS_IIDR,
+> -		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
+> +		vgic_mmio_read_its_iidr, its_mmio_write_wi, NULL, 4,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_ITS_DESC(GITS_TYPER,
+> -		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
+> +		vgic_mmio_read_its_typer, its_mmio_write_wi, NULL, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_ITS_DESC(GITS_CBASER,
+> -		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, 8,
+> +		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, NULL, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_ITS_DESC(GITS_CWRITER,
+> -		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
+> -		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+> +		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, NULL,
+> +		8, VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_ITS_DESC(GITS_CREADR,
+> -		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
+> +		vgic_mmio_read_its_creadr, its_mmio_write_wi, NULL, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_ITS_DESC(GITS_BASER,
+> -		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
+> +		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, NULL, 0x40,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_ITS_DESC(GITS_IDREGS_BASE,
+> -		vgic_mmio_read_its_idregs, its_mmio_write_wi, 0x30,
+> +		vgic_mmio_read_its_idregs, its_mmio_write_wi, NULL, 0x30,
+>  		VGIC_ACCESS_32bit),
+>  };
+>  
+> @@ -1448,14 +1449,63 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
+>  int vgic_its_has_attr_regs(struct kvm_device *dev,
+>  			   struct kvm_device_attr *attr)
+>  {
+> -	return -ENXIO;
+> +	const struct vgic_register_region *region;
+> +	struct vgic_io_device iodev = {
+> +		.regions = its_registers,
+> +		.nr_regions = ARRAY_SIZE(its_registers),
+> +	};
+> +	gpa_t offset;
+> +
+> +	offset = attr->attr;
+> +
+> +	region = vgic_find_mmio_region(iodev.regions,
+> +				       iodev.nr_regions,
+> +				       offset);
+> +	if (!region)
+> +		return -ENXIO;
+> +	return 0;
+>  }
+>  
+>  int vgic_its_attr_regs_access(struct kvm_device *dev,
+>  			      struct kvm_device_attr *attr,
+>  			      u64 *reg, bool is_write)
+>  {
+> -	return -ENXIO;
+> +	const struct vgic_register_region *region;
+> +	struct vgic_io_device iodev = {
+> +		.regions = its_registers,
+> +		.nr_regions = ARRAY_SIZE(its_registers),
+> +	};
+> +	struct vgic_its *its = dev->private;
+> +	gpa_t addr, offset;
+> +	unsigned int len;
+> +
+> +	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
+> +		return -ENXIO;
+> +
+> +	offset = attr->attr;
+> +	if (offset & 0x7)
+> +		return -EINVAL;
 
-> First, these thing shouldn't be handled in the drivers. These things should
-> be set in core and each driver setting the links doesn't sound great to me.
+Isn't GITS_IIDR only 32-bit aligned?
+Is it expected to just avoid reading this from userland?
+If yes, it deserves a comment here, I guess.
 
-Which core? And what's wrong with the device links? They have been 
-introduced to
-model relations between devices that are behind the usual parent/child/bus
-topology.
+Cheers,
+Andre.
 
-> Second, should the link be always there and we only mange the state? Here it
-> seems that we have link being created and destroyed, so why not mark it
-> ACTIVE and DORMANT instead...
-
-Link state is managed by device core and should not be touched by the 
-drivers.
-It is related to both provider and consumer drivers states (probed/not 
-probed/etc).
-
-Second we would need to create those links first. The question is where to
-create them then.
-
-> Lastly, looking at th description of the issue here, am perceiving (maybe my
-> understanding is not quite right here) that you have an IP block in SoC
-> which has multiple things and share common stuff and doing right PM is a
-> challenge for you, right?
-
-Nope. Doing right PM in my SoC is not that complex and I would say it is 
-rather
-typical for any embedded stuff. It works fine (in terms of the power
-consumption reduction) when all drivers simply properly manage their runtime
-PM state, thus if device is not in use, the state is set to suspended and
-finally, the power domain gets turned off.
-
-I've used device links for PM only because the current DMA engine API is
-simply insufficient to implement it in the other way.
-
-I want to let a power domain, which contains a few devices, among those 
-a PL330
-device, to get turned off when there is no activity. Handling power 
-domain power
-on / off requires non-atomic context, what is typical for runtime pm 
-calls. For
-that I need to have non-irq-safe runtime pm implemented for all devices that
-belongs to that domains.
-
-The problem with PL330 driver is that it use irq-safe runtime pm, which 
-like it
-was stated in the patch description doesn't bring much benefits. To 
-switch to
-standard (non-irq-safe) runtime pm, the pm_runtime calls have to be done 
-from
-a context which permits sleeping. The problem with DMA engine driver API 
-is that
-most of its callbacks have to be IRQ-safe and frankly only
-device_{alloc,release}_chan_resources() what more or less maps to
-dma_request_chan()/dma_release_channel() and friends. There are DMA engine
-drivers which do runtime PM calls there (tegra20-apb-dma, sirf-dma, cppi41,
-rcar-dmac), but this is not really efficient. DMA engine clients usually 
-allocate
-dma channel during their probe() and keep them for the whole driver 
-life. In turn
-this very similar to calling pm_runtime_get() in the DMA engine driver 
-probe().
-The result of both approaches is that DMA engine device keeps its power 
-domain
-enabled almost all the time. This problem is also mentioned in the DMA 
-engine
-TODO list, you have pointed me yesterday.
-
-To avoid such situation that DMA engine driver blocks turning off the power
-domain and avoid changing DMA engine client API I came up with the 
-device links
-pm based approach. I don't want to duplicate the description here, the 
-details
-were in the patch description, however if you have any particular 
-question about
-the details, let me know and I will try to clarify it more.
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+> +
+> +	addr = its->vgic_its_base + offset;
+> +
+> +	region = vgic_find_mmio_region(iodev.regions,
+> +				       iodev.nr_regions,
+> +				       offset);
+> +	if (!region)
+> +		return -ENXIO;
+> +
+> +	len = region->access_flags & VGIC_ACCESS_64bit ? 8 : 4;
+> +
+> +	if (is_write) {
+> +		if (region->uaccess_its_write)
+> +			region->uaccess_its_write(dev->kvm, its, addr,
+> +						  len, *reg);
+> +		else
+> +			region->its_write(dev->kvm, its, addr, len, *reg);
+> +	} else {
+> +		*reg = region->its_read(dev->kvm, its, addr, len);
+> +	}
+> +	return 0;
+>  }
+>  
+>  static int vgic_its_has_attr(struct kvm_device *dev,
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+> index 055ad42..ad8a585 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+> @@ -36,8 +36,13 @@ struct vgic_register_region {
+>  	};
+>  	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
+>  				      unsigned int len);
+> -	void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+> -			      unsigned int len, unsigned long val);
+> +	union {
+> +		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
+> +				      unsigned int len, unsigned long val);
+> +		void (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
+> +					  gpa_t addr, unsigned int len,
+> +					  unsigned long val);
+> +	};
+>  };
+>  
+>  extern struct kvm_io_device_ops kvm_io_gic_ops;
+> 
