@@ -1,50 +1,123 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Thu, 9 Feb 2017 15:51:47 -0800
-Subject: [PATCH v3 21/24] media: imx: Add MIPI CSI-2 Receiver subdev driver
-In-Reply-To: <d6dba77e-902c-7a4c-cc70-fe3a5c9649bb@gmail.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-22-git-send-email-steve_longerbeam@mentor.com>
- <1486036237.2289.37.camel@pengutronix.de>
- <ca0a2eb3-21b6-d312-c8e0-61da48c4c700@gmail.com>
- <20170208234235.GA27312@n2100.armlinux.org.uk>
- <d6dba77e-902c-7a4c-cc70-fe3a5c9649bb@gmail.com>
-Message-ID: <e9076980-ce84-f9ee-096d-865243b82a9e@gmail.com>
+From: rruigrok@codeaurora.org (Ruigrok, Richard)
+Date: Thu, 9 Feb 2017 17:28:16 -0700
+Subject: [PATCH] efi: arm-stub: Correct FDT and initrd allocation rules
+ for arm64
+In-Reply-To: <1486635389-26974-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1486635389-26974-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <c74a72db-c032-a55f-eee6-2441929c7d7c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 02/09/2017 03:49 PM, Steve Longerbeam wrote:
+On 2/9/2017 3:16 AM, Ard Biesheuvel wrote:
+> On arm64, we have made some changes over the past year to the way the
+> kernel itself is allocated and to how it deals with the initrd and FDT.
+> This patch brings the allocation logic in the EFI stub in line with that,
+> which is necessary because the introduction of KASLR has created the
+> possibility for the initrd to be allocated in a place where the kernel
+> may not be able to map it. (This is currently a theoretical scenario,
+> since it only affects systems where the size of RAM exceeds the size of
+> the linear mapping.)
 >
+> So adhere to the arm64 boot protocol, and make sure that the initrd is
+> fully inside a 1GB aligned 32 GB window that covers the kernel as well.
 >
-> On 02/08/2017 03:42 PM, Russell King - ARM Linux wrote:
->> On Wed, Feb 08, 2017 at 03:23:53PM -0800, Steve Longerbeam wrote:
->>>> Actually, this exact function already exists as 
->>>> dw_mipi_dsi_phy_write in
->>>> drivers/gpu/drm/rockchip/dw-mipi-dsi.c, and it looks like the D-PHY
->>>> register 0x44 might contain a field called HSFREQRANGE_SEL.
->>> Thanks for pointing out drivers/gpu/drm/rockchip/dw-mipi-dsi.c.
->>> It's clear from that driver that there probably needs to be a fuller
->>> treatment of the D-PHY programming here, but I don't know where
->>> to find the MIPI CSI-2 D-PHY documentation for the i.MX6. The code
->>> in imxcsi2_reset() was also pulled from FSL, and that's all I really 
->>> have
->>> to go on for the D-PHY programming. I assume the D-PHY is also a
->>> Synopsys core, like the host controller, but the i.MX6 manual doesn't
->>> cover it.
->> Why exactly?  What problems are you seeing that would necessitate a
->> more detailed programming of the D-PHY?  From my testing, I can wind
->> a 2-lane MIPI bus on iMX6D from 912Mbps per lane down to (eg) 308Mbps
->> per lane with your existing code without any issues.
+> The FDT may be anywhere in memory on arm64 now that we map it via the
+> fixmap, so we can lift the address restriction there completely.
 >
-> That's good to hear.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm/include/asm/efi.h              | 14 +++++++++++++-
+>  arch/arm64/include/asm/efi.h            | 19 ++++++++++++++++++-
+>  drivers/firmware/efi/libstub/arm-stub.c |  7 ++++---
+>  3 files changed, 35 insertions(+), 5 deletions(-)
 >
-> Just from my experience with struggles to get the CSI2 receiver
-> up and running with an active clock lane, and my suspicions that
-> some of that could be due to my lack of understanding of the D-PHY
-> programming.
+> diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
+> index 0b06f5341b45..62620451f60b 100644
+> --- a/arch/arm/include/asm/efi.h
+> +++ b/arch/arm/include/asm/efi.h
+> @@ -84,6 +84,18 @@ static inline void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
+>   */
+>  #define ZIMAGE_OFFSET_LIMIT	SZ_128M
+>  #define MIN_ZIMAGE_OFFSET	MAX_UNCOMP_KERNEL_SIZE
+> -#define MAX_FDT_OFFSET		ZIMAGE_OFFSET_LIMIT
+> +
+> +/* on ARM, the FDT should be located in the first 128 MB of RAM */
+> +static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
+> +{
+> +		return dram_base + ZIMAGE_OFFSET_LIMIT;
+> +}
+> +
+> +/* on ARM, the initrd should be loaded in a lowmem region */
+> +static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
+> +						    unsigned long image_addr)
+> +{
+> +	return dram_base + SZ_512M;
+> +}
+>  
+>  #endif /* _ASM_ARM_EFI_H */
+> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+> index 0b6b1633017f..6a6c8a0d1424 100644
+> --- a/arch/arm64/include/asm/efi.h
+> +++ b/arch/arm64/include/asm/efi.h
+> @@ -46,7 +46,24 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
+>   * 2MiB so we know it won't cross a 2MiB boundary.
+>   */
+>  #define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
+> -#define MAX_FDT_OFFSET	SZ_512M
+> +
+> +/* on arm64, the FDT may be located anywhere in system RAM */
+> +static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
+> +{
+> +	return ULONG_MAX;
+> +}
+> +
+> +/*
+> + * On arm64, the initrd must be completely inside a 1 GB aligned 32 GB window
+> + * that covers Image as well. Since we allocate from the top down, set a max
+> + * address that is virtually guaranteed to produce a suitable allocation even
+> + * when the physical address of Image is randomized.
+> + */
+> +static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
+> +						    unsigned long image_addr)
+> +{
+> +	return ALIGN(image_addr, SZ_1G) + 31UL * SZ_1G;
+> +}
+>  
+>  #define efi_call_early(f, ...)		sys_table_arg->boottime->f(__VA_ARGS__)
+>  #define __efi_call_early(f, ...)	f(__VA_ARGS__)
+> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+> index b4f7d78f9e8b..557281fe375f 100644
+> --- a/drivers/firmware/efi/libstub/arm-stub.c
+> +++ b/drivers/firmware/efi/libstub/arm-stub.c
+> @@ -333,8 +333,9 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+>  	if (!fdt_addr)
+>  		pr_efi(sys_table, "Generating empty DTB\n");
+>  
+> -	status = handle_cmdline_files(sys_table, image, cmdline_ptr,
+> -				      "initrd=", dram_base + SZ_512M,
+> +	status = handle_cmdline_files(sys_table, image, cmdline_ptr, "initrd=",
+> +				      efi_get_max_initrd_addr(dram_base,
+> +							      *image_addr),
+>  				      (unsigned long *)&initrd_addr,
+>  				      (unsigned long *)&initrd_size);
+>  	if (status != EFI_SUCCESS)
+> @@ -344,7 +345,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+>  
+>  	new_fdt_addr = fdt_addr;
+>  	status = allocate_new_fdt_and_exit_boot(sys_table, handle,
+> -				&new_fdt_addr, dram_base + MAX_FDT_OFFSET,
+> +				&new_fdt_addr, efi_get_max_fdt_addr(dram_base),
+>  				initrd_addr, initrd_size, cmdline_ptr,
+>  				fdt_addr, fdt_size);
+>  
 
-But I should add that after a re-org of the sequence, it looks more stable
-now. Tested on both the SabreSD and SabreLite with the OV5640.
+This was tested successfully on our QDT2400 system on which we found this failure.
 
-Steve
+Tested-by: Richard Ruigrok <rruigrok@codeaurora.org>
+
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
