@@ -1,66 +1,49 @@
-From: john@metanate.com (John Keeping)
-Date: Fri, 10 Feb 2017 17:27:47 +0000
-Subject: [PATCH v3 21/24] drm/rockchip: dw-mipi-dsi: defer probe if
- panel is not loaded
-In-Reply-To: <20170131192117.GE20076@art_vandelay>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-22-john@metanate.com>
- <20170131192117.GE20076@art_vandelay>
-Message-ID: <20170210172747.5f0afb0a.john@metanate.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 10 Feb 2017 09:29:32 -0800
+Subject: [PATCH 1/4] ARM: add CPU_THUMB_CAPABLE to indicate possible Thumb
+ support
+In-Reply-To: <E1cbngI-00025v-UE@rmk-PC.armlinux.org.uk>
+References: <20170209121756.GC27312@n2100.armlinux.org.uk>
+ <E1cbngI-00025v-UE@rmk-PC.armlinux.org.uk>
+Message-ID: <ac402201-ffc4-36fb-b657-2f8bc6ea51be@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 Jan 2017 14:21:17 -0500, Sean Paul wrote:
+On 02/09/2017 04:18 AM, Russell King wrote:
+> @@ -410,11 +429,17 @@ config CPU_V7M
+>  
+>  config CPU_THUMBONLY
+>  	bool
+> +	select CPU_THUMB_CAPABLE
+>  	# There are no CPUs available with MMU that don't implement an ARM ISA:
+>  	depends on !MMU
+>  	help
+>  	  Select this if your CPU doesn't support the 32 bit ARM instructions.
+>  
+> +config CPU_THUMB_CAPABLE
+> +	bool
+> +	help
+> +	  Selected this if your CPU can support Thumb mode
 
-> On Sun, Jan 29, 2017 at 01:24:41PM +0000, John Keeping wrote:
-> > This ensures that the output resolution is known before fbcon loads.
-> > 
-> > Signed-off-by: John Keeping <john@metanate.com>
-> > ---
-> > Unchanged in v3
-> > Unchanged in v2
-> > 
-> >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 11 +++++++++--
-> >  1 file changed, 9 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > index f5b15377ef85..5bad92e2370e 100644
-> > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > @@ -1176,10 +1176,17 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
-> >  
-> >  	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
-> >  	dsi->dsi_host.dev = dev;
-> > -	return mipi_dsi_host_register(&dsi->dsi_host);
-> > +	ret = mipi_dsi_host_register(&dsi->dsi_host);
-> > +	if (!ret && !dsi->panel) {
-> > +		mipi_dsi_host_unregister(&dsi->dsi_host);
-> > +		drm_encoder_cleanup(&dsi->encoder);
-> > +		drm_connector_cleanup(&dsi->connector);  
-> 
-> Move the host registration up before dw_mipi_dsi_register() to avoid
-> having to clean up the encoder and connector?
+s/Selected/Select/ ?Also add the full stop like the previous help text?
 
-No, mipi_dsi_host_register() has to be called after the connector is
-registered because it is likely to result in a call to
-dw_mipi_dsi_host_attach() which attaches a panel to the connector.
+> +
+>  # Figure out what processor architecture version we should be using.
+>  # This defines the compiler instruction set which depends on the machine type.
+>  config CPU_32v3
+> @@ -655,11 +680,7 @@ config ARCH_DMA_ADDR_T_64BIT
+>  
+>  config ARM_THUMB
+>  	bool "Support Thumb user binaries" if !CPU_THUMBONLY
+> -	depends on CPU_ARM720T || CPU_ARM740T || CPU_ARM920T || CPU_ARM922T || \
+> -		CPU_ARM925T || CPU_ARM926T || CPU_ARM940T || CPU_ARM946E || \
+> -		CPU_ARM1020 || CPU_ARM1020E || CPU_ARM1022 || CPU_ARM1026 || \
+> -		CPU_XSCALE || CPU_XSC3 || CPU_MOHAWK || CPU_V6 || CPU_V6K || \
+> -		CPU_V7 || CPU_FEROCEON || CPU_V7M
+> +	depends on CPU_THUMB_CAPABLE
 
-> > +		ret = -EPROBE_DEFER;
-> > +	}
-> >  
-> >  err_pllref:
-> > -	clk_disable_unprepare(dsi->pllref_clk);
-> > +	if (ret)  
-> 
-> I personally think it's cleaner to explicitly goto in the error conditional (or
-> in this case, the defer conditional) and have a return 0; right before the err_*
-> labels. Then you don't need to worry about a) checking ret in all of your
-> cleanups and b) someone adding code above the labels that you don't intend to
-> run.
+Nice!
 
-Agreed.  I'll change this to use a goto if we hit the EPROBE_DEFER case
-and keep all the cleanup together.
-
-> > +		clk_disable_unprepare(dsi->pllref_clk);
-> >  	return ret;
-> >  }
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
