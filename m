@@ -1,81 +1,59 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Fri, 10 Feb 2017 16:10:11 +0100
-Subject: [PATCH v3 3/4] [media] s5p-mfc: Set colorspace in
- VIDIO_{G,TRY}_FMT
-In-Reply-To: <20170210141022.25412-4-thibault.saunier@osg.samsung.com>
-References: <20170210141022.25412-1-thibault.saunier@osg.samsung.com>
- <20170210141022.25412-4-thibault.saunier@osg.samsung.com>
-Message-ID: <4b0714cf-d875-022c-eb73-1556568c0a51@xs4all.nl>
+From: jerry.huang@nxp.com (Jerry Huang)
+Date: Fri, 10 Feb 2017 15:16:36 +0000
+Subject: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
+ incr-burst-type-adjustment" for INCR burst type
+In-Reply-To: <CAL_JsqJLr7pFSd5DW2ghNmn5-Lggrefp=GMPLOiiQmmqyPU4iA@mail.gmail.com>
+References: <1482139554-13618-1-git-send-email-jerry.huang@nxp.com>
+ <1482139554-13618-2-git-send-email-jerry.huang@nxp.com>
+ <20161222184514.hfd4g7ifrz5cv627@rob-hp-laptop>
+ <DB5PR0401MB1813E210B2ADE1C9493F7768FE950@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+ <CAL_JsqJuifiSQAt-6FgtYYSukAnjzOLuTGEsO-Spn5LxkU-iwQ@mail.gmail.com>
+ <DB5PR0401MB181361EBAD1B2BFA8DC5ED7AFE610@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+ <CAL_JsqJLr7pFSd5DW2ghNmn5-Lggrefp=GMPLOiiQmmqyPU4iA@mail.gmail.com>
+Message-ID: <DB5PR0401MB181337ABF15D0C02DB4342E4FE440@DB5PR0401MB1813.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/10/2017 03:10 PM, Thibault Saunier wrote:
-> The media documentation says that the V4L2_COLORSPACE_SMPTE170M colorspace
-> should be used for SDTV and V4L2_COLORSPACE_REC709 for HDTV but the driver
-> didn't set the colorimetry, also respect usespace setting.
+> >> >> Why do you need the first field? Is the 2nd field used if the 1st is 0?
+> >> >> If not, then just use the presence of the property to enable or not.
+> >> > The first field is one switch.
+> >> > When it is 1, means undefined length INCR burst type enabled, we
+> >> > can use
+> >> any length less than or equal to the largest-enabled burst length of
+> >> INCR4/8/16/32/64/128/256.
+> >> > When it is zero, means INCRx burst mode enabled, we can use one
+> >> > fixed
+> >> burst length of 1/4/8/16/32/64/128/256 byte.
+> >> > So, the 2nd field is used if the 1st is 0, we need to select one
+> >> > largest burst
+> >> length the USB controller can support.
+> >> > If we don't want to change the value of this register (use the
+> >> > default value),
+> >> we don't need to add this property to usb node.
+> >>
+> >> Just make this a single value with 0 meaning INCR and 4/8/16/etc being
+> INCRx.
+> > Maybe, I didn't describe it clearly.
+> > According to DWC3 spec, the value "0" of field INCRBrstEna means INCRx
+> burst mode, 1 means INCR burst mode.
+> > Regardless of the value of INCRBrstEna [bit0], we need to modify the other
+> field bit[1,2,3,4,5,6,7] to one INCR burst type  for the platform supported.
+> > Ad you mentioned, if we just use a single value with 0 meaning INCR and
+> 4/8/16/etc being INCRx.
+> > I understand totally that when it is none-zero, we can use it for INCR burst
+> mode.
+> > Then, when it is 0, how to select the INCRx value?
 > 
-> Use 576p display resolution as a threshold to set this.
+> What I mean is:
+> <no prop> - burst disabled
+Yes, I understand it.
+> 0 - INCR burst. INCR is undefined length burst IIRC.
+When INCR is undefined length, we need to set the max INCR type, too, such as when setting INCR16, controller can use any length less than or equal to the 16 byte.
+> 4/8/16/etc. - INCR4/INCR8/INCR16/etc.
+I understand it, too.
 > 
-> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
-> 
-> ---
-> 
-> Changes in v3:
-> - Do not check values in the g_fmt functions as Andrzej explained in previous review
-> - Set colorspace if user passed V4L2_COLORSPACE_DEFAULT in
-> 
-> Changes in v2: None
-> 
->  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> index 367ef8e8dbf0..16bc3eaad0ff 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> @@ -354,6 +354,11 @@ static int vidioc_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
->  		pix_mp->plane_fmt[0].sizeimage = ctx->luma_size;
->  		pix_mp->plane_fmt[1].bytesperline = ctx->buf_width;
->  		pix_mp->plane_fmt[1].sizeimage = ctx->chroma_size;
-> +
-> +		if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
-> +			pix_mp->colorspace = V4L2_COLORSPACE_REC709;
-> +		else /* SD */
-> +			pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
->  	} else if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
->  		/* This is run on OUTPUT
->  		   The buffer contains compressed image
-> @@ -378,6 +383,7 @@ static int vidioc_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
->  static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
->  {
->  	struct s5p_mfc_dev *dev = video_drvdata(file);
-> +	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
->  	struct s5p_mfc_fmt *fmt;
->  
->  	mfc_debug(2, "Type is %d\n", f->type);
-> @@ -405,6 +411,15 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
->  			mfc_err("Unsupported format by this MFC version.\n");
->  			return -EINVAL;
->  		}
-> +
-> +		if (pix_mp->colorspace != V4L2_COLORSPACE_REC709 &&
-> +			pix_mp->colorspace != V4L2_COLORSPACE_SMPTE170M) {
-> +			if (pix_mp->width > 720 &&
-> +					pix_mp->height > 576) /* HD */
-> +				pix_mp->colorspace = V4L2_COLORSPACE_REC709;
-> +			else /* SD */
-> +				pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
-> +		}
->  	}
->  
->  	return 0;
-> 
-
-Same here: it is an mem2mem device, so it just preserves whatever colorspace the
-application passes in.
-
-Just look at what several other mem2mem device drivers do.
-
-Regards,
-
-	Hans
+> What case does this not cover?
+According to Balbi's suggestion, I changed the property like below, you can see the detail in v4 (sent by 1/18/2017)
+Property "snps,incr-burst-type-adjustment = <x>, <y>..." for USB3.0 DWC3.
+When Just one value means INCRx mode with fix burst type.
+When more than one value, means undefined length burst mode, USB controller can use the length less than or equal to the largest enabled burst length.
