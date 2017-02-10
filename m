@@ -1,27 +1,46 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 10 Feb 2017 09:18:46 -0800
-Subject: [PATCH] staging: bcm2835-audio: fix trailing statements
-In-Reply-To: <20170210161425.5711-1-abdallah.meziti.pro@gmail.com>
-References: <20170210161425.5711-1-abdallah.meziti.pro@gmail.com>
-Message-ID: <1486747126.2192.7.camel@perches.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 10 Feb 2017 09:21:20 -0800
+Subject: [PATCH 4/4] clk: mvebu: Expand mv98dx3236-core-clock support
+In-Reply-To: <aabc6853d7934507a4507b0ad4354b72@svr-chch-ex1.atlnz.lc>
+References: <20170203034012.29399-1-chris.packham@alliedtelesis.co.nz>
+ <5a974d9d7260432087619486bf5d79ed@svr-chch-ex1.atlnz.lc>
+ <6149d4126a214ac8b0b0184bd818bea6@svr-chch-ex1.atlnz.lc>
+ <9294933.cXSW0amFbE@wuerfel>
+ <aabc6853d7934507a4507b0ad4354b72@svr-chch-ex1.atlnz.lc>
+Message-ID: <20170210172120.GR25384@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-02-10 at 17:14 +0100, AbdAllah-MEZITI wrote:
-> Trailing statements should be on next line.
-[]
-> diff --git a/drivers/staging/bcm2835-audio/bcm2835-vchiq.c b/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
-[]
-> @@ -563,7 +563,8 @@ int bcm2835_audio_set_ctls(struct bcm2835_chip *chip)
->  			} else if (bcm2835_audio_set_ctls_chan(chip->alsa_stream[i], chip) != 0) {
->  				LOG_ERR("Couldn't set the controls for stream %d\n", i);
->  				ret = -1;
-> -			} else LOG_DBG(" Controls set for stream %d\n", i);
-> +			} else
-> +				LOG_DBG(" Controls set for stream %d\n", i);
->  		}
->  	}
->  	LOG_DBG(" .. OUT ret=%d\n", ret);
+On 02/08, Chris Packham wrote:
+> On 08/02/17 23:53, Arnd Bergmann wrote:
+> > On Tuesday, February 7, 2017 3:07:37 AM CET Chris Packham wrote:
+> >>>
+> >>> Actually I wonder if I can try a bit harder to keep a system booting.
+> >>> The following might work
+> >>> 1) add the compatible strings to the existing armada clock drivers.
+> >>> 2) update the dts to use the new compatible strings.
+> >>> 3) add the new driver and remove the compatible strings from the armada
+> >>> drivers.
+> >>>
+> >>> #1 would still upset checkpatch.pl because the documentation would only
+> >>> arrive in #2.
+> >>
+> >> Actually upon testing #1 is unnecessary. I lose some of the gated clocks
+> >> but nothing that prevents booting.
+> >
+> > Just to be sure: this means we can merge 2) and 3) independently and
+> > having just one of them will not cause regressions over what we have
+> > today?
+> >
+> 
+> Correct. And that's what I sent out as v2.
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/486467.html
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/486471.html
+> 
 
-It's curious that checkpatch doesn't catch this and
-ideally this would also use braces for the last else.
+Ok... so I'll apply the 6/6 patch now to the clk tree.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
