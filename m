@@ -1,323 +1,55 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 10 Feb 2017 11:05:23 +0000
-Subject: [PATCH 3/3] drivers/perf: arm_pmu: split irq request from enable
-In-Reply-To: <1486724723-29437-1-git-send-email-mark.rutland@arm.com>
-References: <1486724723-29437-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1486724723-29437-4-git-send-email-mark.rutland@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 10 Feb 2017 12:30:48 +0100
+Subject: [GIT PULL 4/4] arm64: dts: exynos: DT64 for v4.11, third round
+In-Reply-To: <20170209185654.yxmubj3r4gjxcfm6@kozik-lap>
+References: <20170202183008.23500-1-krzk@kernel.org>
+ <20170202183008.23500-5-krzk@kernel.org> <2382634.UqDUkYPZrI@wuerfel>
+ <CGME20170209185703epcas3p181b744c7022b24d383bdce8409ece2ec@epcas3p1.samsung.com>
+ <20170209185654.yxmubj3r4gjxcfm6@kozik-lap>
+Message-ID: <8a236294-a561-a857-403e-3a3a794b31f3@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For historical reasons, we lazily request and free interrupts in the
-arm pmu driver. This requires us to refcount use of the pmu (by way of
-counting the active events) in order to request/free interrupts at the
-correct times, which complicates the driver somewhat.
+On 02/09/2017 07:56 PM, Krzysztof Kozlowski wrote:
+> On Thu, Feb 09, 2017 at 04:19:57PM +0100, Arnd Bergmann wrote:
+>> On Thursday, February 2, 2017 8:30:08 PM CET Krzysztof Kozlowski wrote:
+>>>  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      |  34 +++
+>>>  arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |  34 +++
+>>>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts    |  49 +++-
+>>>  arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi    | 302 +++++++++++----------
+>>>  arch/arm64/boot/dts/exynos/exynos7.dtsi            |  34 +++
+>>>  drivers/clk/samsung/clk-exynos5433.c               |   8 +-
+>>>  include/dt-bindings/clock/exynos5433.h             |   5 +-
+>>>  include/dt-bindings/pinctrl/samsung.h              |   8 +
+>>>
+>> It seems a drivers/clk change slipped in there in addition to the header changes.
+>> We are trying to keep the next/dt branches free of driver changes, are you
+>> able to rework the branch without this?
+>
+> +Cc Sylwester,
+> 
+> This came from clk tree from Sylwester. It contains two changes in
+> clocks:
+> 1. Mew clock ID - we need only the header but Sylwester provided also
+>    the source file change,
 
-The existing logic is flawed, as it only considers currently online CPUs
-when requesting, freeing, or managing the affinity of interrupts.
-Intervening hotplug events can result in erroneous IRQ affinity, online
-CPUs for which interrupts have not been requested, or offline CPUs whose
-interrupts are still requested.
+That's a one patch made so there is no runtime regression.  If we stick
+to the next/dt branches being clean of driver changes I'm afraid we need
+to be prepared for the bisection breaks.
 
-To fix this, this patch splits the requesting of interrupts from any
-per-cpu management (i.e. per-cpu enable/disable, and configuration of
-cpu affinity). We now request all interrupts up-front at probe time (and
-never free them, since we never unregister PMUs).
+> 2. Update of frequency (used in DTS as assigned clock rate) - this
+>    is strictly source file change and we need it.
+> 
+> Overall, rework would not be trivial and it would involve Sylwester.
+> I think it is better to stay with this as is. I will remember the policy
+> for future dependencies.
 
-The management of affinity, and per-cpu enable/disable now happens in
-our cpu hotplug callback, ensuring it occurs consistently. This means
-that we must now invoke the CPU hotplug callback at boot time in order
-to configure IRQs, and since the callback also resets the PMU hardware,
-we can remove the duplicate reset in the probe path.
+The clk changes are already pulled into clk tree, we would get conflicts
+with commits that are already in the clock tree if the branch is reworked
+now.  This might not be a big issue but bisection would be broken for sure.
 
-This rework renders our event refcounting unnecessary, so this is
-removed.
+I'll also try to keep in future include/dt-bindings changes separate.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- drivers/perf/arm_pmu.c       | 153 ++++++++++++++-----------------------------
- include/linux/perf/arm_pmu.h |   4 --
- 2 files changed, 50 insertions(+), 107 deletions(-)
-
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 5de1038..3bb53b7c 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -351,37 +351,6 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
- 	return ret;
- }
- 
--static void
--armpmu_release_hardware(struct arm_pmu *armpmu)
--{
--	armpmu->free_irq(armpmu);
--}
--
--static int
--armpmu_reserve_hardware(struct arm_pmu *armpmu)
--{
--	int err = armpmu->request_irq(armpmu, armpmu_dispatch_irq);
--	if (err) {
--		armpmu_release_hardware(armpmu);
--		return err;
--	}
--
--	return 0;
--}
--
--static void
--hw_perf_event_destroy(struct perf_event *event)
--{
--	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
--	atomic_t *active_events	 = &armpmu->active_events;
--	struct mutex *pmu_reserve_mutex = &armpmu->reserve_mutex;
--
--	if (atomic_dec_and_mutex_lock(active_events, pmu_reserve_mutex)) {
--		armpmu_release_hardware(armpmu);
--		mutex_unlock(pmu_reserve_mutex);
--	}
--}
--
- static int
- event_requires_mode_exclusion(struct perf_event_attr *attr)
- {
-@@ -454,8 +423,6 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
- static int armpmu_event_init(struct perf_event *event)
- {
- 	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
--	int err = 0;
--	atomic_t *active_events = &armpmu->active_events;
- 
- 	/*
- 	 * Reject CPU-affine events for CPUs that are of a different class to
-@@ -475,26 +442,7 @@ static int armpmu_event_init(struct perf_event *event)
- 	if (armpmu->map_event(event) == -ENOENT)
- 		return -ENOENT;
- 
--	event->destroy = hw_perf_event_destroy;
--
--	if (!atomic_inc_not_zero(active_events)) {
--		mutex_lock(&armpmu->reserve_mutex);
--		if (atomic_read(active_events) == 0)
--			err = armpmu_reserve_hardware(armpmu);
--
--		if (!err)
--			atomic_inc(active_events);
--		mutex_unlock(&armpmu->reserve_mutex);
--	}
--
--	if (err)
--		return err;
--
--	err = __hw_perf_event_init(event);
--	if (err)
--		hw_perf_event_destroy(event);
--
--	return err;
-+	return __hw_perf_event_init(event);
- }
- 
- static void armpmu_enable(struct pmu *pmu)
-@@ -554,9 +502,6 @@ static ssize_t armpmu_cpumask_show(struct device *dev,
- 
- static void armpmu_init(struct arm_pmu *armpmu)
- {
--	atomic_set(&armpmu->active_events, 0);
--	mutex_init(&armpmu->reserve_mutex);
--
- 	armpmu->pmu = (struct pmu) {
- 		.pmu_enable	= armpmu_enable,
- 		.pmu_disable	= armpmu_disable,
-@@ -600,21 +545,7 @@ int perf_num_counters(void)
- }
- EXPORT_SYMBOL_GPL(perf_num_counters);
- 
--static void cpu_pmu_enable_percpu_irq(void *data)
--{
--	int irq = *(int *)data;
--
--	enable_percpu_irq(irq, IRQ_TYPE_NONE);
--}
--
--static void cpu_pmu_disable_percpu_irq(void *data)
--{
--	int irq = *(int *)data;
--
--	disable_percpu_irq(irq);
--}
--
--static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
-+static void cpu_pmu_free_irqs(struct arm_pmu *cpu_pmu)
- {
- 	int cpu;
- 	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
-@@ -625,10 +556,7 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
- 			continue;
- 
- 		if (irq_is_percpu(irq)) {
--			on_each_cpu_mask(&cpu_pmu->supported_cpus,
--					 cpu_pmu_disable_percpu_irq, &irq, 1);
- 			free_percpu_irq(irq, &hw_events->percpu_pmu);
--
- 			break;
- 		}
- 
-@@ -639,7 +567,7 @@ static void cpu_pmu_free_irq(struct arm_pmu *cpu_pmu)
- 	}
- }
- 
--static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
-+static int cpu_pmu_request_irqs(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- {
- 	int cpu, err;
- 	struct pmu_hw_events __percpu *hw_events = cpu_pmu->hw_events;
-@@ -655,25 +583,9 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- 			if (err) {
- 				pr_err("unable to request IRQ%d for ARM PMU counters\n",
- 					irq);
--				return err;
- 			}
- 
--			on_each_cpu_mask(&cpu_pmu->supported_cpus,
--					 cpu_pmu_enable_percpu_irq, &irq, 1);
--
--			break;
--		}
--
--		/*
--		 * If we have a single PMU interrupt that we can't shift,
--		 * assume that we're running on a uniprocessor machine and
--		 * continue. Otherwise, continue without this interrupt.
--		 */
--		if (irq_set_affinity(irq, cpumask_of(cpu)) &&
--		    num_possible_cpus() > 1) {
--			pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
--				irq, cpu);
--			continue;
-+			return err;
- 		}
- 
- 		err = request_irq(irq, handler,
-@@ -691,6 +603,12 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- 	return 0;
- }
- 
-+int armpmu_get_cpu_irq(struct arm_pmu *pmu, int cpu)
-+{
-+	struct pmu_hw_events __percpu *hw_events = pmu->hw_events;
-+	return per_cpu(hw_events->irq, cpu);
-+}
-+
- /*
-  * PMU hardware loses all context when a CPU goes offline.
-  * When a CPU is hotplugged back in, since some hardware registers are
-@@ -700,11 +618,42 @@ static int cpu_pmu_request_irq(struct arm_pmu *cpu_pmu, irq_handler_t handler)
- static int arm_perf_starting_cpu(unsigned int cpu, struct hlist_node *node)
- {
- 	struct arm_pmu *pmu = hlist_entry_safe(node, struct arm_pmu, node);
-+	int irq;
- 
- 	if (!cpumask_test_cpu(cpu, &pmu->supported_cpus))
- 		return 0;
- 	if (pmu->reset)
- 		pmu->reset(pmu);
-+
-+	irq = armpmu_get_cpu_irq(pmu, cpu);
-+	if (irq) {
-+		if (irq_is_percpu(irq)) {
-+			enable_percpu_irq(irq, IRQ_TYPE_NONE);
-+			return 0;
-+		}
-+
-+		if (irq_force_affinity(irq, cpumask_of(cpu)) &&
-+		    num_possible_cpus() > 1) {
-+			pr_warn("unable to set irq affinity (irq=%d, cpu=%u)\n",
-+				irq, cpu);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int arm_perf_teardown_cpu(unsigned int cpu, struct hlist_node *node)
-+{
-+	struct arm_pmu *pmu = hlist_entry_safe(node, struct arm_pmu, node);
-+	int irq;
-+
-+	if (!cpumask_test_cpu(cpu, &pmu->supported_cpus))
-+		return 0;
-+
-+	irq = armpmu_get_cpu_irq(pmu, cpu);
-+	if (irq && irq_is_percpu(irq))
-+		disable_percpu_irq(irq);
-+
- 	return 0;
- }
- 
-@@ -810,8 +759,12 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	int err;
- 
--	err = cpuhp_state_add_instance_nocalls(CPUHP_AP_PERF_ARM_STARTING,
--					       &cpu_pmu->node);
-+	err = cpu_pmu_request_irqs(cpu_pmu, armpmu_dispatch_irq);
-+	if (err)
-+		goto out;
-+
-+	err = cpuhp_state_add_instance(CPUHP_AP_PERF_ARM_STARTING,
-+				       &cpu_pmu->node);
- 	if (err)
- 		goto out;
- 
-@@ -819,14 +772,6 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 	if (err)
- 		goto out_unregister;
- 
--	cpu_pmu->request_irq	= cpu_pmu_request_irq;
--	cpu_pmu->free_irq	= cpu_pmu_free_irq;
--
--	/* Ensure the PMU has sane values out of reset. */
--	if (cpu_pmu->reset)
--		on_each_cpu_mask(&cpu_pmu->supported_cpus, cpu_pmu->reset,
--			 cpu_pmu, 1);
--
- 	/*
- 	 * This is a CPU PMU potentially in a heterogeneous configuration (e.g.
- 	 * big.LITTLE). This is not an uncore PMU, and we have taken ctx
-@@ -841,6 +786,7 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- 	cpuhp_state_remove_instance_nocalls(CPUHP_AP_PERF_ARM_STARTING,
- 					    &cpu_pmu->node);
- out:
-+	cpu_pmu_free_irqs(cpu_pmu);
- 	return err;
- }
- 
-@@ -1121,7 +1067,8 @@ static int arm_pmu_hp_init(void)
- 
- 	ret = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_STARTING,
- 				      "perf/arm/pmu:starting",
--				      arm_perf_starting_cpu, NULL);
-+				      arm_perf_starting_cpu,
-+				      arm_perf_teardown_cpu);
- 	if (ret)
- 		pr_err("CPU hotplug notifier for ARM PMU could not be registered: %d\n",
- 		       ret);
-diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index 05a3eb4..44f43fc 100644
---- a/include/linux/perf/arm_pmu.h
-+++ b/include/linux/perf/arm_pmu.h
-@@ -105,12 +105,8 @@ struct arm_pmu {
- 	void		(*start)(struct arm_pmu *);
- 	void		(*stop)(struct arm_pmu *);
- 	void		(*reset)(void *);
--	int		(*request_irq)(struct arm_pmu *, irq_handler_t handler);
--	void		(*free_irq)(struct arm_pmu *);
- 	int		(*map_event)(struct perf_event *event);
- 	int		num_events;
--	atomic_t	active_events;
--	struct mutex	reserve_mutex;
- 	u64		max_period;
- 	bool		secure_access; /* 32-bit ARM only */
- #define ARMV8_PMUV3_MAX_COMMON_EVENTS 0x40
 -- 
-1.9.1
+Regards,
+Sylwester
