@@ -1,171 +1,52 @@
-From: jerry.huang@nxp.com (Jerry Huang)
-Date: Fri, 10 Feb 2017 07:45:56 +0000
-Subject: [PATCH v4 3/3] USB3/DWC3: Enable undefined length INCR burst type
-In-Reply-To: <1484727138-3264-3-git-send-email-jerry.huang@nxp.com>
-References: <1484727138-3264-1-git-send-email-jerry.huang@nxp.com>
- <1484727138-3264-3-git-send-email-jerry.huang@nxp.com>
-Message-ID: <DB5PR0401MB1813965DDC8CC6CD0BD85980FE440@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 10 Feb 2017 09:05:14 +0100
+Subject: [PATCH v3 2/3] nvmem: sunxi-sid: add support for H3's SID
+ controller
+In-Reply-To: <4664661486474595@web28j.yandex.ru>
+References: <20170202131338.20234-1-icenowy@aosc.xyz>
+ <20170202131338.20234-2-icenowy@aosc.xyz>
+ <20170206085416.4qtd3wfhtinp42xv@lukather>
+ <5119511486371415@web15m.yandex.ru>
+ <20170207092503.3nh2g6orkgjgdi7q@lukather>
+ <4664661486474595@web28j.yandex.ru>
+Message-ID: <20170210080514.nrryisw4y2wbs5wk@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Changming Huang [mailto:jerry.huang at nxp.com]
-> Sent: Wednesday, January 18, 2017 4:12 PM
-> To: balbi at kernel.org; robh+dt at kernel.org; mark.rutland at arm.com;
-> catalin.marinas at arm.com
-> Cc: linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Jerry
-> Huang <jerry.huang@nxp.com>; Rajesh Bhagat <rajesh.bhagat@nxp.com>
-> Subject: [PATCH v4 3/3] USB3/DWC3: Enable undefined length INCR burst
-> type
+On Tue, Feb 07, 2017 at 09:36:35PM +0800, Icenowy Zheng wrote:
+> >> ?>> ?@@ -51,7 +64,8 @@ static u8 sunxi_sid_read_byte(const struct sunxi_sid *sid,
+> >> ?>> ??{
+> >> ?>> ??????????u32 sid_key;
+> >> ?>>
+> >> ?>> ?- sid_key = ioread32be(sid->base + round_down(offset, 4));
+> >> ?>> ?+ sid_key = ioread32be(sid->base + sid->value_offset +
+> >> ?>> ?+ round_down(offset, 4));
+> >> ?>
+> >> ?> This would probably be more logical to have this in sunxi_sid_read.
+> >>
+> >> ?But it's here which really access the memory...
+> >
+> > This function is made to read a single register. What you want is to
+> > offset all reads, and all the reads are made in sunxi_sid_read.
 > 
-> Enable the undefined length INCR burst type and set INCRx.
-> Different platform may has the different burst size type.
-> In order to get best performance, we need to tune the burst size to one
-> special value, instead of the default value.
-> 
-> Signed-off-by: Changming Huang <jerry.huang@nxp.com>
-> Signed-off-by: Rajesh Bhagat <rajesh.bhagat@nxp.com>
-> ---
-> Changes in v4:
->   - Modify the codes according to the definition of this property.
-> Changes in v3:
->   - add new property for INCR burst in usb node to reset GSBUSCFG0.
-> Changes in v2:
->   - split patch
->   - create one new function to handle soc bus configuration register.
-> 
->  drivers/usb/dwc3/core.c |   83
-> +++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/usb/dwc3/core.h |    7 ++++
->  2 files changed, 90 insertions(+)
-> 
-> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c index
-> 369bab1..446aec3 100644
-> --- a/drivers/usb/dwc3/core.c
-> +++ b/drivers/usb/dwc3/core.c
-> @@ -650,6 +650,87 @@ static void dwc3_core_setup_global_control(struct
-> dwc3 *dwc)
->  	dwc3_writel(dwc->regs, DWC3_GCTL, reg);  }
-> 
-> +/* set global soc bus configuration registers */ static void
-> +dwc3_set_soc_bus_cfg(struct dwc3 *dwc) {
-> +	struct device *dev = dwc->dev;
-> +	u32 *vals;
-> +	u32 cfg;
-> +	int ntype;
-> +	int ret;
-> +	int i;
-> +
-> +	cfg = dwc3_readl(dwc->regs, DWC3_GSBUSCFG0);
-> +
-> +	/*
-> +	 * Handle property "snps,incr-burst-type-adjustment".
-> +	 * Get the number of value from this property:
-> +	 * result <= 0, means this property is not supported.
-> +	 * result = 1, means INCRx burst mode supported.
-> +	 * result > 1, means undefined length burst mode supported.
-> +	 */
-> +	ntype = device_property_read_u32_array(dev,
-> +			"snps,incr-burst-type-adjustment", NULL, 0);
-> +	if (ntype > 0) {
-> +		vals = kcalloc(ntype, sizeof(u32), GFP_KERNEL);
-> +		if (!vals) {
-> +			dev_err(dev, "Error to get memory\n");
-> +			return;
-> +		}
-> +		/* Get INCR burst type, and parse it */
-> +		ret = device_property_read_u32_array(dev,
-> +			"snps,incr-burst-type-adjustment", vals, ntype);
-> +		if (ret) {
-> +			dev_err(dev, "Error to get property\n");
-> +			return;
-> +		}
-> +		*(dwc->incrx_type + 1) = vals[0];
-> +		if (ntype > 1) {
-> +			*dwc->incrx_type = 1;
-> +			for (i = 1; i < ntype; i++) {
-> +				if (vals[i] > *(dwc->incrx_type + 1))
-> +					*(dwc->incrx_type + 1) = vals[i];
-> +			}
-> +		} else
-> +			*dwc->incrx_type = 0;
-> +
-> +		/* Enable Undefined Length INCR Burst and Enable INCRx
-> Burst */
-> +		cfg &= ~DWC3_GSBUSCFG0_INCRBRST_MASK;
-> +		if (*dwc->incrx_type)
-> +			cfg |= DWC3_GSBUSCFG0_INCRBRSTENA;
-> +		switch (*(dwc->incrx_type + 1)) {
-> +		case 256:
-> +			cfg |= DWC3_GSBUSCFG0_INCR256BRSTENA;
-> +			break;
-> +		case 128:
-> +			cfg |= DWC3_GSBUSCFG0_INCR128BRSTENA;
-> +			break;
-> +		case 64:
-> +			cfg |= DWC3_GSBUSCFG0_INCR64BRSTENA;
-> +			break;
-> +		case 32:
-> +			cfg |= DWC3_GSBUSCFG0_INCR32BRSTENA;
-> +			break;
-> +		case 16:
-> +			cfg |= DWC3_GSBUSCFG0_INCR16BRSTENA;
-> +			break;
-> +		case 8:
-> +			cfg |= DWC3_GSBUSCFG0_INCR8BRSTENA;
-> +			break;
-> +		case 4:
-> +			cfg |= DWC3_GSBUSCFG0_INCR4BRSTENA;
-> +			break;
-> +		case 1:
-> +			break;
-> +		default:
-> +			dev_err(dev, "Invalid property\n");
-> +			break;
-> +		}
-> +	}
-> +
-> +	dwc3_writel(dwc->regs, DWC3_GSBUSCFG0, cfg); }
-> +
->  /**
->   * dwc3_core_init - Low-level initialization of DWC3 Core
->   * @dwc: Pointer to our controller context structure @@ -698,6 +779,8 @@
-> static int dwc3_core_init(struct dwc3 *dwc)
->  	/* Adjust Frame Length */
->  	dwc3_frame_length_adjustment(dwc);
-> 
-> +	dwc3_set_soc_bus_cfg(dwc);
-> +
->  	usb_phy_set_suspend(dwc->usb2_phy, 0);
->  	usb_phy_set_suspend(dwc->usb3_phy, 0);
->  	ret = phy_power_on(dwc->usb2_generic_phy);
-> diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h index
-> 065aa6f..9df6304 100644
-> --- a/drivers/usb/dwc3/core.h
-> +++ b/drivers/usb/dwc3/core.h
-> @@ -805,6 +805,7 @@ struct dwc3_scratchpad_array {
->   * @regs: base address for our registers
->   * @regs_size: address space size
->   * @fladj: frame length adjustment
-> + * @incrx_type: INCR burst type adjustment
->   * @irq_gadget: peripheral controller's IRQ number
->   * @nr_scratch: number of scratch buffers
->   * @u1u2: only used on revisions <1.83a for workaround @@ -928,6 +929,12
-> @@ struct dwc3 {
->  	enum usb_phy_interface	hsphy_mode;
-> 
->  	u32			fladj;
-> +	/*
-> +	 * For INCR burst type.
-> +	 * First field: for undefined length INCR burst type enable.
-> +	 * Second field: for INCRx burst type enable
-> +	 */
-> +	u32			incrx_type[2];
->  	u32			irq_gadget;
->  	u32			nr_scratch;
->  	u32			u1u2;
-> --
-> 1.7.9.5
-Hi, Balbi and all guys,
-Any comment for these patches? Can they be accepted?
+> I think the semantic of this function is to read out one byte from SID,
+> not read out a single register from SID; the parameter passed into it is
+> also a const struct *sunxi_sid, so I think make the offset here is right.
+
+You need to offset *all* register reads, it makes much more sense to
+do that offset in the function that reads all the registers, and not
+just one.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170210/616ea9da/attachment.sig>
