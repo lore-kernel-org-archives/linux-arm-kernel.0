@@ -1,99 +1,35 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 10 Feb 2017 14:18:34 +0800
-Subject: [PATCH 4/4] [media] s5p-mfc: Always check and set
- 'v4l2_pix_format:field' field
-In-Reply-To: <20170209194314.5908-5-thibault.saunier@osg.samsung.com>
-Message-ID: <201702101450.t5vJYZRR%fengguang.wu@intel.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Fri, 10 Feb 2017 14:29:33 +0800
+Subject: [PATCH v3 0/2] drm/rockchip: switch to drm_mm for support arm64 iommu
+Message-ID: <1486708175-23857-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thibault,
+Some iommu patches on the series[0] "iommu/rockchip: Fix bugs and
+enable on ARM64" already landed, So drm/rockchip related patches [1] and [2]
+ready to landed, this series just rebase them to lastest drm-next.
 
-[auto build test ERROR on linuxtv-media/master]
-[also build test ERROR on v4.10-rc7 next-20170209]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Thanks Heiko's Tested-by on rk3288 and rk3399 platform.
 
-url:    https://github.com/0day-ci/linux/commits/Thibault-Saunier/exynos-gsc-Use-576p-instead-720p-as-a-threshold-for-colorspaces/20170210-113658
-base:   git://linuxtv.org/media_tree.git master
-config: ia64-allmodconfig (attached as .config)
-compiler: ia64-linux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=ia64 
+Changes in v3:
+Advices by Tomasz and Thierry:
+  merge fixes into origin patch.
 
-All error/warnings (new ones prefixed by >>):
+Changes in v2:
+Advices by Tomasz:
+  add some fixes patches from chromeos project.
 
-   In file included from drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:28:0:
-   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c: In function 'vidioc_try_fmt':
->> drivers/media/platform/s5p-mfc/s5p_mfc_debug.h:25:23: warning: comparison between pointer and integer
-      if (mfc_debug_level >= level)   \
-                          ^
->> drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:3: note: in expansion of macro 'mfc_debug'
-      mfc_debug("Not supported field order(%d)\n", pix_mp->field);
-      ^~~~~~~~~
->> drivers/media/platform/s5p-mfc/s5p_mfc_debug.h:25:23: warning: comparison with string literal results in unspecified behavior [-Waddress]
-      if (mfc_debug_level >= level)   \
-                          ^
->> drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:3: note: in expansion of macro 'mfc_debug'
-      mfc_debug("Not supported field order(%d)\n", pix_mp->field);
-      ^~~~~~~~~
->> drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:48: error: expected ')' before 'pix_mp'
-      mfc_debug("Not supported field order(%d)\n", pix_mp->field);
-                                                   ^
-   drivers/media/platform/s5p-mfc/s5p_mfc_debug.h:26:32: note: in definition of macro 'mfc_debug'
-       printk(KERN_DEBUG "%s:%d: " fmt, \
-                                   ^~~
-   In file included from include/linux/printk.h:6:0,
-                    from include/linux/kernel.h:13,
-                    from include/linux/clk.h:16,
-                    from drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:14:
-   include/linux/kern_levels.h:4:18: warning: format '%s' expects a matching 'char *' argument [-Wformat=]
-    #define KERN_SOH "\001"  /* ASCII Start Of Header */
-                     ^
-   include/linux/kern_levels.h:14:20: note: in expansion of macro 'KERN_SOH'
-    #define KERN_DEBUG KERN_SOH "7" /* debug-level messages */
-                       ^~~~~~~~
-   drivers/media/platform/s5p-mfc/s5p_mfc_debug.h:26:11: note: in expansion of macro 'KERN_DEBUG'
-       printk(KERN_DEBUG "%s:%d: " fmt, \
-              ^~~~~~~~~~
->> drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:3: note: in expansion of macro 'mfc_debug'
-      mfc_debug("Not supported field order(%d)\n", pix_mp->field);
-      ^~~~~~~~~
-   include/linux/kern_levels.h:4:18: warning: format '%d' expects a matching 'int' argument [-Wformat=]
-    #define KERN_SOH "\001"  /* ASCII Start Of Header */
-                     ^
-   include/linux/kern_levels.h:14:20: note: in expansion of macro 'KERN_SOH'
-    #define KERN_DEBUG KERN_SOH "7" /* debug-level messages */
-                       ^~~~~~~~
-   drivers/media/platform/s5p-mfc/s5p_mfc_debug.h:26:11: note: in expansion of macro 'KERN_DEBUG'
-       printk(KERN_DEBUG "%s:%d: " fmt, \
-              ^~~~~~~~~~
->> drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:3: note: in expansion of macro 'mfc_debug'
-      mfc_debug("Not supported field order(%d)\n", pix_mp->field);
-      ^~~~~~~~~
+Shunqian Zheng (1):
+  drm/rockchip: Use common IOMMU API to attach devices
 
-vim +404 drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+Tomasz Figa (1):
+  drm/rockchip: Do not use DMA mapping API if attached to IOMMU domain
 
-   398		enum v4l2_field field;
-   399	
-   400		field = f->fmt.pix.field;
-   401		if (field == V4L2_FIELD_ANY) {
-   402			field = V4L2_FIELD_NONE;
-   403		} else if (V4L2_FIELD_NONE != field) {
- > 404			mfc_debug("Not supported field order(%d)\n", pix_mp->field);
-   405			return -EINVAL;
-   406		}
-   407	
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 101 ++++++------
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   6 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 244 ++++++++++++++++++++++++++--
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.h |   8 +
+ 4 files changed, 298 insertions(+), 61 deletions(-)
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 45920 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170210/8dd6e8c7/attachment-0001.gz>
+-- 
+1.9.1
