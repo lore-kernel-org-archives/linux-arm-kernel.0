@@ -1,43 +1,82 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Fri, 10 Feb 2017 08:18:07 +0100
-Subject: [PATCH] media: fix s5p_mfc_set_dec_frame_buffer_v6() to print buf
- size in hex
-In-Reply-To: <20170209221051.26234-1-shuahkh@osg.samsung.com>
-References: <CGME20170209221100epcas1p31efbe8cd7f29d67e830616af02865521@epcas1p3.samsung.com>
- <20170209221051.26234-1-shuahkh@osg.samsung.com>
-Message-ID: <80f7c198-0fd0-2101-de3d-998634ffcd92@samsung.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Fri, 10 Feb 2017 15:10:46 +0800
+Subject: [PATCH 2/2] arch_timer: acpi: add hisi timer erratum data
+In-Reply-To: <a2ac2a70-09fb-5cec-c090-b8ebde90e24f@arm.com>
+References: <1485254391-51551-1-git-send-email-guohanjun@huawei.com>
+ <1485254391-51551-3-git-send-email-guohanjun@huawei.com>
+ <20170124105717.GB6277@leverpostej>
+ <a2ac2a70-09fb-5cec-c090-b8ebde90e24f@arm.com>
+Message-ID: <589D6776.2010400@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09.02.2017 23:10, Shuah Khan wrote:
-> Fix s5p_mfc_set_dec_frame_buffer_v6() to print buffer size in hex to be
-> consistent with the rest of the messages in the routine.
+Hi Marc,
+
+On 2017/1/24 19:32, Marc Zyngier wrote:
+> On 24/01/17 10:57, Mark Rutland wrote:
+>> On Tue, Jan 24, 2017 at 06:39:51PM +0800, Hanjun Guo wrote:
+>>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>>
+>>> Add hisilicon timer specific erratum fixes.
+>>>
+>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>> ---
+>>>  drivers/clocksource/arm_arch_timer.c | 22 ++++++++++++++++++++++
+>>>  1 file changed, 22 insertions(+)
+>>>
+>>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>>> index 80d6f76..3e62a09 100644
+>>> --- a/drivers/clocksource/arm_arch_timer.c
+>>> +++ b/drivers/clocksource/arm_arch_timer.c
+>>> @@ -1156,10 +1156,32 @@ struct gtdt_arch_timer_fixup {
+>>>  	void *context;
+>>>  };
+>>>  
+>>> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
+>>> +static void __init hisi_erratum_workaroud_enable(void *context)
+>>> +{
+>>> +	int i;
+>>> +
+>>> +	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
+>>> +		if (!strcmp(context, ool_workarounds[i].id)) {
+>>> +			timer_unstable_counter_workaround = &ool_workarounds[i];
+>>> +			static_branch_enable(&arch_timer_read_ool_enabled);
+>>> +			pr_info("arch_timer: Enabling workaround for %s\n",
+>>> +				timer_unstable_counter_workaround->id);
+>>> +			break;
+>>> +		}
+>>> +	}
+>>> +}
+>>> +#endif
+>>> +
+>>>  /* note: this needs to be updated according to the doc of OEM ID
+>>>   * and TABLE ID for different board.
+>>>   */
+>>>  static struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
+>>> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
+>>> +	{"HISI  ", "HIP05   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+>>> +	{"HISI  ", "HIP06   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+>>> +	{"HISI  ", "HIP07   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+>>> +#endif
+>>>  };
+>> NAK. This duplicates logic unnecessarily (for enabling the workaround),
+>> and (ab)uses the id, which was intended to be specific to DT (since it
+>> is a DT property name).
+> Agreed, that's properly revolting.
 >
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+>> We should split the matching from the particular workaround (and
+>> enabling thereof), so that we can go straight from ACPI match to
+>> workaround (without having to use the DT id in this manner), and don't
+>> have to duplicate the logic to enable the workaround.
+>>
+>> I believe Marc is looking at some rework in this area which may enable
+>> this, so please wait for that to appear.
+> Yeah, I'm implementing a semi-flexible way to add new quirk types, and
+> the last thing I want to see is two (or more) tables describing the same
+> thing.
 
-As Nicolas said please fix the subject.
+Kindly ping, if you have patches in hand, I can test against our platforms,
+thank you very much.
 
-After this you can add my:
-Acked-by: Andrzej Hajda <a.hajda@samsung.com>
-
---
-Regards
-Andrzej
-
-> ---
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> index d6f207e..fc45980 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> @@ -497,7 +497,7 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
->  		}
->  	}
->  
-> -	mfc_debug(2, "Buf1: %zu, buf_size1: %d (frames %d)\n",
-> +	mfc_debug(2, "Buf1: %zx, buf_size1: %d (frames %d)\n",
->  			buf_addr1, buf_size1, ctx->total_dpb_count);
->  	if (buf_size1 < 0) {
->  		mfc_debug(2, "Not enough memory has been allocated.\n");
+Best Regards
+Hanjun
