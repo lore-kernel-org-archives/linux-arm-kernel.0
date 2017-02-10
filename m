@@ -1,59 +1,111 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 10 Feb 2017 10:27:54 +0100
-Subject: [PATCH] phy: meson8b-usb2: fix offsets for some of the registers
-In-Reply-To: <20170113185358.8362-1-martin.blumenstingl@googlemail.com>
-References: <20170113185358.8362-1-martin.blumenstingl@googlemail.com>
-Message-ID: <1486718874.4693.31.camel@baylibre.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 10 Feb 2017 17:30:42 +0800
+Subject: [PATCH 4/4] [media] s5p-mfc: Always check and set
+ 'v4l2_pix_format:field' field
+In-Reply-To: <20170209194314.5908-5-thibault.saunier@osg.samsung.com>
+Message-ID: <201702101749.p9AsAzh5%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-01-13 at 19:53 +0100, Martin Blumenstingl wrote:
-> The register offsets for REG_DBG_UART (and all following) were off by
-> 0x4. This was not a problem yet because these registers are currently
-> not used by the driver.
-> 
-> Signed-off-by: Martin Blumenstingl
-> <martin.blumenstingl@googlemail.com>
+Hi Thibault,
 
-Good catch ! Thx.
+[auto build test WARNING on linuxtv-media/master]
+[also build test WARNING on v4.10-rc7 next-20170209]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
+url:    https://github.com/0day-ci/linux/commits/Thibault-Saunier/exynos-gsc-Use-576p-instead-720p-as-a-threshold-for-colorspaces/20170210-113658
+base:   git://linuxtv.org/media_tree.git master
+reproduce:
+        # apt-get install sparse
+        make ARCH=x86_64 allmodconfig
+        make C=1 CF=-D__CHECK_ENDIAN__
 
-> ---
-> ?drivers/phy/phy-meson8b-usb2.c | 6 +++---
-> ?1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/phy/phy-meson8b-usb2.c b/drivers/phy/phy-
-> meson8b-usb2.c
-> index 33c9f4ba157d..30f56a6a411f 100644
-> --- a/drivers/phy/phy-meson8b-usb2.c
-> +++ b/drivers/phy/phy-meson8b-usb2.c
-> @@ -81,9 +81,9 @@
-> ?	#define REG_ADP_BC_ACA_PIN_GND			BIT(25
-> )
-> ?	#define REG_ADP_BC_ACA_PIN_FLOAT		BIT(26)
-> ?
-> -#define REG_DBG_UART					0x14
-> +#define REG_DBG_UART					0x10
-> ?
-> -#define REG_TEST					0x18
-> +#define REG_TEST					0x14
-> ?	#define REG_TEST_DATA_IN_MASK			GENMASK
-> (3, 0)
-> ?	#define REG_TEST_EN_MASK			GENMASK(7,
-> 4)
-> ?	#define REG_TEST_ADDR_MASK			GENMASK(11
-> , 8)
-> @@ -93,7 +93,7 @@
-> ?	#define REG_TEST_DATA_OUT_MASK			GENMAS
-> K(19, 16)
-> ?	#define REG_TEST_DISABLE_ID_PULLUP		BIT(20)
-> ?
-> -#define REG_TUNE					0x1c
-> +#define REG_TUNE					0x18
-> ?	#define REG_TUNE_TX_RES_TUNE_MASK		GENMASK(1,
-> 0)
-> ?	#define REG_TUNE_TX_HSXV_TUNE_MASK		GENMASK(3,
-> 2)
-> ?	#define REG_TUNE_TX_VREF_TUNE_MASK		GENMASK(7,
-> 4)
+
+sparse warnings: (new ones prefixed by >>)
+
+   include/linux/compiler.h:253:8: sparse: attribute 'no_sanitize_address': unknown attribute
+   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:17: sparse: Expected ) in function call
+   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:17: sparse: got pix_mp
+>> drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:17: sparse: incompatible types for operation (>=)
+   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:17:    left side has type int extern [signed] [addressable] [toplevel] mfc_debug_level
+   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:17:    right side has type char static *<noident>
+   In file included from drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:28:0:
+   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c: In function 'vidioc_try_fmt':
+   drivers/media/platform/s5p-mfc/s5p_mfc_debug.h:25:23: warning: comparison between pointer and integer
+      if (mfc_debug_level >= level)   \
+                          ^
+   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:3: note: in expansion of macro 'mfc_debug'
+      mfc_debug("Not supported field order(%d)\n", pix_mp->field);
+      ^~~~~~~~~
+   drivers/media/platform/s5p-mfc/s5p_mfc_debug.h:25:23: warning: comparison with string literal results in unspecified behavior [-Waddress]
+      if (mfc_debug_level >= level)   \
+                          ^
+   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:3: note: in expansion of macro 'mfc_debug'
+      mfc_debug("Not supported field order(%d)\n", pix_mp->field);
+      ^~~~~~~~~
+   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:48: error: expected ')' before 'pix_mp'
+      mfc_debug("Not supported field order(%d)\n", pix_mp->field);
+                                                   ^
+   drivers/media/platform/s5p-mfc/s5p_mfc_debug.h:26:32: note: in definition of macro 'mfc_debug'
+       printk(KERN_DEBUG "%s:%d: " fmt, \
+                                   ^~~
+   In file included from include/linux/printk.h:6:0,
+                    from include/linux/kernel.h:13,
+                    from include/linux/clk.h:16,
+                    from drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:14:
+   include/linux/kern_levels.h:4:18: warning: format '%s' expects a matching 'char *' argument [-Wformat=]
+    #define KERN_SOH "\001"  /* ASCII Start Of Header */
+                     ^
+   include/linux/kern_levels.h:14:20: note: in expansion of macro 'KERN_SOH'
+    #define KERN_DEBUG KERN_SOH "7" /* debug-level messages */
+                       ^~~~~~~~
+   drivers/media/platform/s5p-mfc/s5p_mfc_debug.h:26:11: note: in expansion of macro 'KERN_DEBUG'
+       printk(KERN_DEBUG "%s:%d: " fmt, \
+              ^~~~~~~~~~
+   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:3: note: in expansion of macro 'mfc_debug'
+      mfc_debug("Not supported field order(%d)\n", pix_mp->field);
+      ^~~~~~~~~
+   include/linux/kern_levels.h:4:18: warning: format '%d' expects a matching 'int' argument [-Wformat=]
+    #define KERN_SOH "\001"  /* ASCII Start Of Header */
+                     ^
+   include/linux/kern_levels.h:14:20: note: in expansion of macro 'KERN_SOH'
+    #define KERN_DEBUG KERN_SOH "7" /* debug-level messages */
+                       ^~~~~~~~
+   drivers/media/platform/s5p-mfc/s5p_mfc_debug.h:26:11: note: in expansion of macro 'KERN_DEBUG'
+       printk(KERN_DEBUG "%s:%d: " fmt, \
+              ^~~~~~~~~~
+   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c:404:3: note: in expansion of macro 'mfc_debug'
+      mfc_debug("Not supported field order(%d)\n", pix_mp->field);
+      ^~~~~~~~~
+
+vim +404 drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+
+   388		mfc_debug_leave();
+   389		return 0;
+   390	}
+   391	
+   392	/* Try format */
+   393	static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
+   394	{
+   395		struct s5p_mfc_dev *dev = video_drvdata(file);
+   396		struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
+   397		struct s5p_mfc_fmt *fmt;
+   398		enum v4l2_field field;
+   399	
+   400		field = f->fmt.pix.field;
+   401		if (field == V4L2_FIELD_ANY) {
+   402			field = V4L2_FIELD_NONE;
+   403		} else if (V4L2_FIELD_NONE != field) {
+ > 404			mfc_debug("Not supported field order(%d)\n", pix_mp->field);
+   405			return -EINVAL;
+   406		}
+   407	
+   408		/* V4L2 specification suggests the driver corrects the format struct
+   409		 * if any of the dimensions is unsupported */
+   410		f->fmt.pix.field = field;
+   411	
+   412		mfc_debug(2, "Type is %d\n", f->type);
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
