@@ -1,142 +1,96 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 10 Feb 2017 17:16:45 +0000
-Subject: [PATCH 4/4] arm64: mmu: apply strict permissions to .init.text and
- .init.data
-In-Reply-To: <1486747005-15973-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1486747005-15973-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1486747005-15973-5-git-send-email-ard.biesheuvel@linaro.org>
+From: abelvesa@gmail.com (Abel Vesa)
+Date: Fri, 10 Feb 2017 17:17:52 +0000
+Subject: [PATCHv3] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <20170210142847.GK27312@n2100.armlinux.org.uk>
+References: <1486508275-18449-1-git-send-email-abelvesa@linux.com>
+ <20170209162956.GH27312@n2100.armlinux.org.uk>
+ <CACh+v5NJ5zi4nEQkG+y_SesFuW8NOophD1KDFRG+t7=CtjnNrg@mail.gmail.com>
+ <20170210120306.GA6825@nuc>
+ <20170210142847.GK27312@n2100.armlinux.org.uk>
+Message-ID: <20170210171752.GB6825@nuc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid having mappings that are writable and executable at the same
-time, split the init region into a .init.text region that is mapped
-read-only, and a .init.data region that is mapped non-executable.
+On Fri, Feb 10, 2017 at 02:28:47PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 10, 2017 at 12:03:06PM +0000, Abel Vesa wrote:
+> > The only problem I don't have a solution for at this point is OLD_LR (or
+> > previous LR as it is called in this patch).
+> 
+> If you want the context at function entry, then you need to save the
+> registers as they were at that point.
+> 
+> The stacking of LR in the gnu_mcount thing is there to avoid this problem:
+> 
+> a:
+> 	push	{lr}
+> 	bl	__gnu_mcount_mc
+> 
+> That "bl" instruction can be thought of as being effectively this:
+> 
+> 	adr	lr, 1f
+> 	b	__gnu_mcount_mc
+> 1:
+> 
+> and from that, you can plainly see that "lr" gets corrupted by the call.
+> So, to save the register state as it was at point "a", you need to
+> save (in order):
+> 
+> 	r0 through to sp
+> 	the saved lr on the stack (which was the value of lr at point a)
+> 	the current lr (which is the value of the PC _after_ __gnu_mcount_mc
+> 		returns)
+> 	cpsr
+> 	write zero to old_r0
+> 
+> Stacking actual value of the PC at the point that you're stacking these
+> registers is really senseless - it doesn't convey any useful information
+> about the context being saved.
+> 
+> Does it make sense to leave the compiler's saving of lr on the stack?
+> Probably not - which I think my last iteration overwrote with the old_r0
+Actually, the "compiler's saving of lr" is needed by prepare_ftrace_return
+(which is called from __ftrace_graph_regs_caller/__ftrace_graph_caller) to
+be replaced by return_to_handler.
 
-This is possible now that the alternative patching occurs via the linear
-mapping, and the linear alias of the init region is always mapped writable
-(but never executable).
+> value.  The only thing my last iteration did not do was save a real value
+> for CPSR.
+> 
+The stack needs to look like this:
+Right before __gnu_mcount_mc is called:
 
-Since the alternatives descriptions themselves are read-only data, move
-those into the .init.text region. The .rela section does not have to be
-mapped at all after applying the relocations, so drop that from the init
-mapping entirely.
+  0			    4
+  | compiler's saving of lr | ... (we were wrong, stack was actually aligned to 8)
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/sections.h |  3 +-
- arch/arm64/kernel/vmlinux.lds.S   | 32 ++++++++++++++------
- arch/arm64/mm/init.c              |  3 +-
- arch/arm64/mm/mmu.c               | 12 +++++---
- 4 files changed, 35 insertions(+), 15 deletions(-)
+After regs saving in ftrace_regs_caller (the replacer of __gnu_mcount_mc):
 
-diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
-index 4e7e7067afdb..22582819b2e5 100644
---- a/arch/arm64/include/asm/sections.h
-+++ b/arch/arm64/include/asm/sections.h
-@@ -24,7 +24,8 @@ extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
- extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
- extern char __hyp_text_start[], __hyp_text_end[];
- extern char __idmap_text_start[], __idmap_text_end[];
-+extern char __initdata_begin[], __initdata_end[];
-+extern char __inittext_begin[], __inittext_end[];
- extern char __irqentry_text_start[], __irqentry_text_end[];
- extern char __mmuoff_data_start[], __mmuoff_data_end[];
--
- #endif /* __ASM_SECTIONS_H */
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index b8deffa9e1bf..fa144d16bc91 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -143,12 +143,27 @@ SECTIONS
- 
- 	. = ALIGN(SEGMENT_ALIGN);
- 	__init_begin = .;
-+	__inittext_begin = .;
- 
- 	INIT_TEXT_SECTION(8)
- 	.exit.text : {
- 		ARM_EXIT_KEEP(EXIT_TEXT)
- 	}
- 
-+	. = ALIGN(4);
-+	.altinstructions : {
-+		__alt_instructions = .;
-+		*(.altinstructions)
-+		__alt_instructions_end = .;
-+	}
-+	.altinstr_replacement : {
-+		*(.altinstr_replacement)
-+	}
-+
-+	. = ALIGN(PAGE_SIZE);
-+	__inittext_end = .;
-+	__initdata_begin = .;
-+
- 	.init.data : {
- 		INIT_DATA
- 		INIT_SETUP(16)
-@@ -164,15 +179,14 @@ SECTIONS
- 
- 	PERCPU_SECTION(L1_CACHE_BYTES)
- 
--	. = ALIGN(4);
--	.altinstructions : {
--		__alt_instructions = .;
--		*(.altinstructions)
--		__alt_instructions_end = .;
--	}
--	.altinstr_replacement : {
--		*(.altinstr_replacement)
--	}
-+	. = ALIGN(PAGE_SIZE);
-+	__initdata_end = .;
-+
-+	/*
-+	 * The .rela section is not covered by __inittext or __initdata since
-+	 * there is no reason to keep it mapped when we switch to the permanent
-+	 * swapper page tables.
-+	 */
- 	.rela : ALIGN(8) {
- 		*(.rela .rela*)
- 	}
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 8a2713018f2f..6a55feaf46c8 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -493,7 +493,8 @@ void free_initmem(void)
- 	 * prevents the region from being reused for kernel modules, which
- 	 * is not supported by kallsyms.
- 	 */
--	unmap_kernel_range((u64)__init_begin, (u64)(__init_end - __init_begin));
-+	unmap_kernel_range((u64)__inittext_begin,
-+			   (u64)(__initdata_end - __inittext_begin));
- }
- 
- #ifdef CONFIG_BLK_DEV_INITRD
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 5b0dbb9156ce..e6a4bf2acd59 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -482,12 +482,16 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
-  */
- static void __init map_kernel(pgd_t *pgd)
- {
--	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
-+	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_inittext,
-+				vmlinux_initdata, vmlinux_data;
- 
- 	map_kernel_segment(pgd, _text, _etext, PAGE_KERNEL_ROX, &vmlinux_text);
--	map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
--	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
--			   &vmlinux_init);
-+	map_kernel_segment(pgd, __start_rodata, __inittext_begin, PAGE_KERNEL,
-+			   &vmlinux_rodata);
-+	map_kernel_segment(pgd, __inittext_begin, __inittext_end, PAGE_KERNEL_ROX,
-+			   &vmlinux_inittext);
-+	map_kernel_segment(pgd, __initdata_begin, __initdata_end, PAGE_KERNEL,
-+			   &vmlinux_initdata);
- 	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
- 
- 	if (!pgd_val(*pgd_offset_raw(pgd, FIXADDR_START))) {
--- 
-2.7.4
+  0    4    8     52       56       60   64     68       72                        76
+  | R0 | R1 | ... | SP + 4 | new LR | PC | CPSR | OLD_R0 | compiler's saving of lr | ...
+
+  this means the saving needs to be something like this:
+
+   sub     sp, sp, #8        @ space for CPSR and OLD_R0 (not used at this point)
+   add     ip, sp, #12       @ move in IP the value of SP as it was ( compute "SP + 4" )
+   stmdb   sp!, {ip,lr,pc}   @ push PC, new LR, "SP + 4" (in this order)
+   stmdb   sp!, {r0-r11,lr}  @ push new LR, R11 through to R0 (in this order)
+
+And then the restoring needs to be like this:
+
+   ldr     lr, [sp, #PT_REGS_SIZE]  @ load "compiler's saved of lr"
+   ldmia   sp, {r0-r11, ip, sp, pc} @ pop r0-r11, "new LR" in ip, "SP + 4" in SP 
+                                    @ and "new LR" in PC
+
+After this, SP would be at '76', PC will contain the address of the next instruction
+after "b __gnu_mcount_mc", and LR will be "compiler's saved of lr". The only register
+that would have a different value than before would be IP.
+
+I know we can skip saving and restoring IP, but it doesn't seem to be worth it.
+
+I hope this time I'm not mistaken.
+
+> I didn't test it either...
+> 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
