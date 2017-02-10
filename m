@@ -1,70 +1,174 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 10 Feb 2017 14:46:59 +0100
-Subject: [PATCH 10/11] iommu/exynos: Make use of iommu_device_register
- interface
-In-Reply-To: <1486639981-32368-11-git-send-email-joro@8bytes.org>
-References: <1486639981-32368-1-git-send-email-joro@8bytes.org>
- <CGME20170209113308epcas2p2cd79f382b04635bc7e973a62c093d557@epcas2p2.samsung.com>
- <1486639981-32368-11-git-send-email-joro@8bytes.org>
-Message-ID: <9a1997dd-5835-cb9a-6478-7fb276151e52@samsung.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 10 Feb 2017 14:57:09 +0100
+Subject: [PATCH v8 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
+In-Reply-To: <d299ae6c-78dc-9049-6bed-dc84fff17db3@samsung.com>
+References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170209142309eucas1p2b1277d96139eafc0d1dcc14145600476@eucas1p2.samsung.com>
+ <1486650171-20598-4-git-send-email-m.szyprowski@samsung.com>
+ <20170210045004.GN19244@localhost>
+ <d299ae6c-78dc-9049-6bed-dc84fff17db3@samsung.com>
+Message-ID: <CAPDyKFqW2av1mjDvRP=R1my2kepeX69TS6cchzoHmwaoydT5Sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On 2017-02-09 12:32, Joerg Roedel wrote:
-> From: Joerg Roedel <jroedel@suse.de>
+On 10 February 2017 at 12:51, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> Hi Vinod,
 >
-> Register Exynos IOMMUs to the IOMMU core and make them
-> visible in sysfs. This patch does not add the links between
-> IOMMUs and translated devices yet.
+> On 2017-02-10 05:50, Vinod Koul wrote:
+>>
+>> On Thu, Feb 09, 2017 at 03:22:51PM +0100, Marek Szyprowski wrote:
+>>
+>>> +static int pl330_set_slave(struct dma_chan *chan, struct device *slave)
+>>> +{
+>>> +       struct dma_pl330_chan *pch = to_pchan(chan);
+>>> +       struct pl330_dmac *pl330 = pch->dmac;
+>>> +       int i;
+>>> +
+>>> +       mutex_lock(&pl330->rpm_lock);
+>>> +
+>>> +       for (i = 0; i < pl330->num_peripherals; i++) {
+>>> +               if (pl330->peripherals[i].chan.slave == slave &&
+>>> +                   pl330->peripherals[i].slave_link) {
+>>> +                       pch->slave_link =
+>>> pl330->peripherals[i].slave_link;
+>>> +                       goto done;
+>>> +               }
+>>> +       }
+>>> +
+>>> +       pch->slave_link = device_link_add(slave, pl330->ddma.dev,
+>>> +                                      DL_FLAG_PM_RUNTIME |
+>>> DL_FLAG_RPM_ACTIVE);
+>>
+>> So you are going to add the link on channel allocation and tear down on
+>> the
+>> freeup.
 >
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Signed-off-by: Joerg Roedel <jroedel@suse.de>
-
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-> ---
->   drivers/iommu/exynos-iommu.c | 14 ++++++++++++++
->   1 file changed, 14 insertions(+)
 >
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 57ba0d3..64325d8 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -276,6 +276,8 @@ struct sysmmu_drvdata {
->   	struct list_head owner_node;	/* node for owner controllers list */
->   	phys_addr_t pgtable;		/* assigned page table structure */
->   	unsigned int version;		/* our version */
-> +
-> +	struct iommu_device iommu;	/* IOMMU core handle */
->   };
->   
->   static struct exynos_iommu_domain *to_exynos_domain(struct iommu_domain *dom)
-> @@ -611,6 +613,18 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
->   	data->sysmmu = dev;
->   	spin_lock_init(&data->lock);
->   
-> +	ret = iommu_device_sysfs_add(&data->iommu, &pdev->dev, NULL,
-> +				     dev_name(data->sysmmu));
-> +	if (ret)
-> +		return ret;
-> +
-> +	iommu_device_set_ops(&data->iommu, &exynos_iommu_ops);
-> +	iommu_device_set_fwnode(&data->iommu, &dev->of_node->fwnode);
-> +
-> +	ret = iommu_device_register(&data->iommu);
-> +	if (ret)
-> +		return ret;
-> +
->   	platform_set_drvdata(pdev, data);
->   
->   	__sysmmu_get_version(data);
+> Right. Channel allocation is typically done once per driver operation and it
+> won't hurt system performance.
+>
+>>   I am not sure I really like the idea here.
+>
+>
+> Could you point what's wrong with it?
+>
+>> First, these thing shouldn't be handled in the drivers. These things
+>> should
+>> be set in core and each driver setting the links doesn't sound great to
+>> me.
+>
+>
+> Which core? And what's wrong with the device links? They have been
+> introduced to
+> model relations between devices that are behind the usual parent/child/bus
+> topology.
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+I think Vinod mean the dmaengine core. Which also would make perfect
+sense to me as it would benefit all dma drivers.
+
+The only related PM thing, that shall be the decision of the driver,
+is whether it wants to enable runtime PM or not, during ->probe().
+
+>
+>> Second, should the link be always there and we only mange the state? Here
+>> it
+>> seems that we have link being created and destroyed, so why not mark it
+>> ACTIVE and DORMANT instead...
+>
+>
+> Link state is managed by device core and should not be touched by the
+> drivers.
+> It is related to both provider and consumer drivers states (probed/not
+> probed/etc).
+>
+> Second we would need to create those links first. The question is where to
+> create them then.
+
+Just to fill in, to me this is really also the key question.
+
+If we could set up the device link already at device initialization,
+it should also be possible to avoid getting -EPROBE_DEFER for dma
+client drivers when requesting their dma channels.
+
+>
+>> Lastly, looking at th description of the issue here, am perceiving (maybe
+>> my
+>> understanding is not quite right here) that you have an IP block in SoC
+>> which has multiple things and share common stuff and doing right PM is a
+>> challenge for you, right?
+>
+>
+> Nope. Doing right PM in my SoC is not that complex and I would say it is
+> rather
+> typical for any embedded stuff. It works fine (in terms of the power
+> consumption reduction) when all drivers simply properly manage their runtime
+> PM state, thus if device is not in use, the state is set to suspended and
+> finally, the power domain gets turned off.
+>
+> I've used device links for PM only because the current DMA engine API is
+> simply insufficient to implement it in the other way.
+>
+> I want to let a power domain, which contains a few devices, among those a
+> PL330
+> device, to get turned off when there is no activity. Handling power domain
+> power
+> on / off requires non-atomic context, what is typical for runtime pm calls.
+> For
+> that I need to have non-irq-safe runtime pm implemented for all devices that
+> belongs to that domains.
+
+Again, allow me to fill in. This issue exists for all ARM SoC which
+has a dma controller residing in a PM domain. I think that is quite
+many.
+
+Currently the only solution I have seen for this problem, but which I
+really dislike. That is, each dma client driver requests/releases
+their dma channel from their respective ->runtime_suspend|resume()
+callbacks - then the dma driver can use the dma request/release hooks,
+to do pm_runtime_get|put() which then becomes non-irq-safe.
+
+>
+> The problem with PL330 driver is that it use irq-safe runtime pm, which like
+> it
+> was stated in the patch description doesn't bring much benefits. To switch
+> to
+> standard (non-irq-safe) runtime pm, the pm_runtime calls have to be done
+> from
+> a context which permits sleeping. The problem with DMA engine driver API is
+> that
+> most of its callbacks have to be IRQ-safe and frankly only
+> device_{alloc,release}_chan_resources() what more or less maps to
+> dma_request_chan()/dma_release_channel() and friends. There are DMA engine
+> drivers which do runtime PM calls there (tegra20-apb-dma, sirf-dma, cppi41,
+> rcar-dmac), but this is not really efficient. DMA engine clients usually
+> allocate
+> dma channel during their probe() and keep them for the whole driver life. In
+> turn
+> this very similar to calling pm_runtime_get() in the DMA engine driver
+> probe().
+> The result of both approaches is that DMA engine device keeps its power
+> domain
+> enabled almost all the time. This problem is also mentioned in the DMA
+> engine
+> TODO list, you have pointed me yesterday.
+>
+> To avoid such situation that DMA engine driver blocks turning off the power
+> domain and avoid changing DMA engine client API I came up with the device
+> links
+> pm based approach. I don't want to duplicate the description here, the
+> details
+> were in the patch description, however if you have any particular question
+> about
+> the details, let me know and I will try to clarify it more.
+
+So besides solving the irq-safe issue for dma driver, using the
+device-links has additionally two advantages. I already mentioned the
+-EPROBE_DEFER issue above.
+
+The second thing, is the runtime/system PM relations we get for free
+by using the links. In other words, the dma driver/core don't need to
+care about dealing with pm_runtime_get|put() as that would be managed
+by the dma client driver.
+
+Kind regards
+Uffe
