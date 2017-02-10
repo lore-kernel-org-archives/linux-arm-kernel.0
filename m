@@ -1,218 +1,129 @@
-From: mark.yao@rock-chips.com (Mark Yao)
-Date: Fri, 10 Feb 2017 14:29:35 +0800
-Subject: [PATCH v3 2/2] drm/rockchip: Use common IOMMU API to attach devices
-In-Reply-To: <1486708175-23857-1-git-send-email-mark.yao@rock-chips.com>
-References: <1486708175-23857-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1486708175-23857-3-git-send-email-mark.yao@rock-chips.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 10 Feb 2017 06:38:11 +0000
+Subject: [PATCH v2 1/2] efi: arm-stub: Correct FDT and initrd allocation
+ rules for arm64
+In-Reply-To: <a7058407-a770-d413-e072-ba3edd7df197@codeaurora.org>
+References: <1486676573-19237-1-git-send-email-ard.biesheuvel@linaro.org>
+ <a7058407-a770-d413-e072-ba3edd7df197@codeaurora.org>
+Message-ID: <A1A268D8-2B0B-4333-9E2D-A88CE6061F22@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shunqian Zheng <zhengsq@rock-chips.com>
 
-Rockchip DRM used the arm special API, arm_iommu_*(), to attach
-iommu for ARM32 SoCs. This patch convert to common iommu API
-so it would support ARM64 like RK3399.
+> On 10 Feb 2017, at 00:42, Ruigrok, Richard <rruigrok@codeaurora.org> wrote:
+> 
+> 
+> 
+>> On 2/9/2017 2:42 PM, Ard Biesheuvel wrote:
+>> On arm64, we have made some changes over the past year to the way the
+>> kernel itself is allocated and to how it deals with the initrd and FDT.
+>> This patch brings the allocation logic in the EFI stub in line with that,
+>> which is necessary because the introduction of KASLR has created the
+>> possibility for the initrd to be allocated in a place where the kernel
+>> may not be able to map it. (This is mostly a theoretical scenario, since
+>> it only affects systems where the physical memory footprint exceeds the
+>> size of the linear mapping.)
+>> 
+>> Since we know the kernel itself will be covered by the linear mapping,
+>> choose a suitably sized window (i.e., based on the size of the linear
+>> region) covering the kernel when allocating memory for the initrd.
+>> 
+>> The FDT may be anywhere in memory on arm64 now that we map it via the
+>> fixmap, so we can lift the address restriction there completely.
+>> 
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>> arch/arm/include/asm/efi.h              | 14 +++++++++++++-
+>> arch/arm64/include/asm/efi.h            | 18 +++++++++++++++++-
+>> drivers/firmware/efi/libstub/arm-stub.c |  7 ++++---
+>> 3 files changed, 34 insertions(+), 5 deletions(-)
+>> 
+>> diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
+>> index 0b06f5341b45..2de0195dfd1e 100644
+>> --- a/arch/arm/include/asm/efi.h
+>> +++ b/arch/arm/include/asm/efi.h
+>> @@ -84,6 +84,18 @@ static inline void efifb_setup_from_dmi(struct screen_info *si, const char *opt)
+>>  */
+>> #define ZIMAGE_OFFSET_LIMIT    SZ_128M
+>> #define MIN_ZIMAGE_OFFSET    MAX_UNCOMP_KERNEL_SIZE
+>> -#define MAX_FDT_OFFSET        ZIMAGE_OFFSET_LIMIT
+>> +
+>> +/* on ARM, the FDT should be located in the first 128 MB of RAM */
+>> +static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
+>> +{
+>> +    return dram_base + ZIMAGE_OFFSET_LIMIT;
+>> +}
+>> +
+>> +/* on ARM, the initrd should be loaded in a lowmem region */
+>> +static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
+>> +                            unsigned long image_addr)
+>> +{
+>> +    return dram_base + SZ_512M;
+>> +}
+>> 
+>> #endif /* _ASM_ARM_EFI_H */
+>> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+>> index 0b6b1633017f..342e90d6d204 100644
+>> --- a/arch/arm64/include/asm/efi.h
+>> +++ b/arch/arm64/include/asm/efi.h
+>> @@ -46,7 +46,23 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
+>>  * 2MiB so we know it won't cross a 2MiB boundary.
+>>  */
+>> #define EFI_FDT_ALIGN    SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
+>> -#define MAX_FDT_OFFSET    SZ_512M
+>> +
+>> +/* on arm64, the FDT may be located anywhere in system RAM */
+>> +static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
+>> +{
+>> +    return ULONG_MAX;
+>> +}
+>> +
+>> +/*
+>> + * On arm64, we have to ensure that the initrd ends up in the linear region,
+>> + * which is a 1 GB aligned region of size '1UL << (VA_BITS - 1)' that is
+>> + * guaranteed to cover the kernel Image.
+>> + */
+>> +static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
+>> +                            unsigned long image_addr)
+>> +{
+>> +    return (image_addr & ~(SZ_1G - 1UL)) + (1UL << (VA_BITS - 1));
+>> +}
+>> 
+> Please update booting.txt which specifies a window of 32G for ARM64
+> 
 
-Since previous patch added support for direct IOMMU address space
-management, there is no need to use DMA API anymore and this patch wires
-things to use the new method.
+No. The efi stub is built into the kernel, so there we can be lax about these things. For boot loaders, 32GB remains a reasonable limit because some configurations require it
 
-Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
-Signed-off-by: Tomasz Figa <tfiga@chromium.org>
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-Tested-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 101 +++++++++++++++-------------
- 1 file changed, 54 insertions(+), 47 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index c30d649..b360e62 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -14,19 +14,19 @@
-  * GNU General Public License for more details.
-  */
- 
--#include <asm/dma-iommu.h>
--
- #include <drm/drmP.h>
- #include <drm/drm_crtc_helper.h>
- #include <drm/drm_fb_helper.h>
- #include <drm/drm_gem_cma_helper.h>
- #include <drm/drm_of.h>
- #include <linux/dma-mapping.h>
-+#include <linux/dma-iommu.h>
- #include <linux/pm_runtime.h>
- #include <linux/module.h>
- #include <linux/of_graph.h>
- #include <linux/component.h>
- #include <linux/console.h>
-+#include <linux/iommu.h>
- 
- #include "rockchip_drm_drv.h"
- #include "rockchip_drm_fb.h"
-@@ -50,28 +50,31 @@
- int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
- 				   struct device *dev)
- {
--	struct dma_iommu_mapping *mapping = drm_dev->dev->archdata.mapping;
-+	struct rockchip_drm_private *private = drm_dev->dev_private;
- 	int ret;
- 
- 	if (!is_support_iommu)
- 		return 0;
- 
--	ret = dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
--	if (ret)
-+	ret = iommu_attach_device(private->domain, dev);
-+	if (ret) {
-+		dev_err(dev, "Failed to attach iommu device\n");
- 		return ret;
-+	}
- 
--	dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
--
--	return arm_iommu_attach_device(dev, mapping);
-+	return 0;
- }
- 
- void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
- 				    struct device *dev)
- {
-+	struct rockchip_drm_private *private = drm_dev->dev_private;
-+	struct iommu_domain *domain = private->domain;
-+
- 	if (!is_support_iommu)
- 		return;
- 
--	arm_iommu_detach_device(dev);
-+	iommu_detach_device(domain, dev);
- }
- 
- int rockchip_register_crtc_funcs(struct drm_crtc *crtc,
-@@ -123,11 +126,46 @@ static void rockchip_drm_crtc_disable_vblank(struct drm_device *dev,
- 		priv->crtc_funcs[pipe]->disable_vblank(crtc);
- }
- 
-+static int rockchip_drm_init_iommu(struct drm_device *drm_dev)
-+{
-+	struct rockchip_drm_private *private = drm_dev->dev_private;
-+	struct iommu_domain_geometry *geometry;
-+	u64 start, end;
-+
-+	if (!is_support_iommu)
-+		return 0;
-+
-+	private->domain = iommu_domain_alloc(&platform_bus_type);
-+	if (!private->domain)
-+		return -ENOMEM;
-+
-+	geometry = &private->domain->geometry;
-+	start = geometry->aperture_start;
-+	end = geometry->aperture_end;
-+
-+	DRM_DEBUG("IOMMU context initialized (aperture: %#llx-%#llx)\n",
-+		  start, end);
-+	drm_mm_init(&private->mm, start, end - start + 1);
-+	mutex_init(&private->mm_lock);
-+
-+	return 0;
-+}
-+
-+static void rockchip_iommu_cleanup(struct drm_device *drm_dev)
-+{
-+	struct rockchip_drm_private *private = drm_dev->dev_private;
-+
-+	if (!is_support_iommu)
-+		return;
-+
-+	drm_mm_takedown(&private->mm);
-+	iommu_domain_free(private->domain);
-+}
-+
- static int rockchip_drm_bind(struct device *dev)
- {
- 	struct drm_device *drm_dev;
- 	struct rockchip_drm_private *private;
--	struct dma_iommu_mapping *mapping = NULL;
- 	int ret;
- 
- 	drm_dev = drm_dev_alloc(&rockchip_drm_driver, dev);
-@@ -151,38 +189,14 @@ static int rockchip_drm_bind(struct device *dev)
- 
- 	rockchip_drm_mode_config_init(drm_dev);
- 
--	dev->dma_parms = devm_kzalloc(dev, sizeof(*dev->dma_parms),
--				      GFP_KERNEL);
--	if (!dev->dma_parms) {
--		ret = -ENOMEM;
-+	ret = rockchip_drm_init_iommu(drm_dev);
-+	if (ret)
- 		goto err_config_cleanup;
--	}
--
--	if (is_support_iommu) {
--		/* TODO(djkurtz): fetch the mapping start/size from somewhere */
--		mapping = arm_iommu_create_mapping(&platform_bus_type,
--						   0x00000000,
--						   SZ_2G);
--		if (IS_ERR(mapping)) {
--			ret = PTR_ERR(mapping);
--			goto err_config_cleanup;
--		}
--
--		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
--		if (ret)
--			goto err_release_mapping;
--
--		dma_set_max_seg_size(dev, DMA_BIT_MASK(32));
--
--		ret = arm_iommu_attach_device(dev, mapping);
--		if (ret)
--			goto err_release_mapping;
--	}
- 
- 	/* Try to bind all sub drivers. */
- 	ret = component_bind_all(dev, drm_dev);
- 	if (ret)
--		goto err_detach_device;
-+		goto err_iommu_cleanup;
- 
- 	/* init kms poll for handling hpd */
- 	drm_kms_helper_poll_init(drm_dev);
-@@ -207,8 +221,6 @@ static int rockchip_drm_bind(struct device *dev)
- 	if (ret)
- 		goto err_fbdev_fini;
- 
--	if (is_support_iommu)
--		arm_iommu_release_mapping(mapping);
- 	return 0;
- err_fbdev_fini:
- 	rockchip_drm_fbdev_fini(drm_dev);
-@@ -217,12 +229,8 @@ static int rockchip_drm_bind(struct device *dev)
- err_kms_helper_poll_fini:
- 	drm_kms_helper_poll_fini(drm_dev);
- 	component_unbind_all(dev, drm_dev);
--err_detach_device:
--	if (is_support_iommu)
--		arm_iommu_detach_device(dev);
--err_release_mapping:
--	if (is_support_iommu)
--		arm_iommu_release_mapping(mapping);
-+err_iommu_cleanup:
-+	rockchip_iommu_cleanup(drm_dev);
- err_config_cleanup:
- 	drm_mode_config_cleanup(drm_dev);
- 	drm_dev->dev_private = NULL;
-@@ -239,8 +247,7 @@ static void rockchip_drm_unbind(struct device *dev)
- 	drm_vblank_cleanup(drm_dev);
- 	drm_kms_helper_poll_fini(drm_dev);
- 	component_unbind_all(dev, drm_dev);
--	if (is_support_iommu)
--		arm_iommu_detach_device(dev);
-+	rockchip_iommu_cleanup(drm_dev);
- 	drm_mode_config_cleanup(drm_dev);
- 	drm_dev->dev_private = NULL;
- 	drm_dev_unregister(drm_dev);
--- 
-1.9.1
+>> #define efi_call_early(f, ...)        sys_table_arg->boottime->f(__VA_ARGS__)
+>> #define __efi_call_early(f, ...)    f(__VA_ARGS__)
+>> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+>> index b4f7d78f9e8b..557281fe375f 100644
+>> --- a/drivers/firmware/efi/libstub/arm-stub.c
+>> +++ b/drivers/firmware/efi/libstub/arm-stub.c
+>> @@ -333,8 +333,9 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+>>    if (!fdt_addr)
+>>        pr_efi(sys_table, "Generating empty DTB\n");
+>> 
+>> -    status = handle_cmdline_files(sys_table, image, cmdline_ptr,
+>> -                      "initrd=", dram_base + SZ_512M,
+>> +    status = handle_cmdline_files(sys_table, image, cmdline_ptr, "initrd=",
+>> +                      efi_get_max_initrd_addr(dram_base,
+>> +                                  *image_addr),
+>>                      (unsigned long *)&initrd_addr,
+>>                      (unsigned long *)&initrd_size);
+>>    if (status != EFI_SUCCESS)
+>> @@ -344,7 +345,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
+>> 
+>>    new_fdt_addr = fdt_addr;
+>>    status = allocate_new_fdt_and_exit_boot(sys_table, handle,
+>> -                &new_fdt_addr, dram_base + MAX_FDT_OFFSET,
+>> +                &new_fdt_addr, efi_get_max_fdt_addr(dram_base),
+>>                initrd_addr, initrd_size, cmdline_ptr,
+>>                fdt_addr, fdt_size);
+>> 
+> 
+> -- 
+> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the
+> Code Aurora Forum, a Linux Foundation Collaborative Project.
+> 
