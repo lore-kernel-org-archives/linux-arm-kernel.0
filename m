@@ -1,49 +1,43 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 10 Feb 2017 10:20:04 +0530
-Subject: [PATCH v8 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
-In-Reply-To: <1486650171-20598-4-git-send-email-m.szyprowski@samsung.com>
-References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170209142309eucas1p2b1277d96139eafc0d1dcc14145600476@eucas1p2.samsung.com>
- <1486650171-20598-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170210045004.GN19244@localhost>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Fri, 10 Feb 2017 11:36:36 +0530
+Subject: [PATCH v14 0/6] Enable PMUs in ACPI systems
+In-Reply-To: <cea38f4f-4696-baab-b539-f9d0a8db3f42@linaro.org>
+References: <1485210765-9422-1-git-send-email-jeremy.linton@arm.com>
+ <cea38f4f-4696-baab-b539-f9d0a8db3f42@linaro.org>
+Message-ID: <CAFpQJXVjMuEKE-LqN57v8Txzj6A=Hccj07XWbBaR_dRgiCLNQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2017 at 03:22:51PM +0100, Marek Szyprowski wrote:
-  
-> +static int pl330_set_slave(struct dma_chan *chan, struct device *slave)
-> +{
-> +	struct dma_pl330_chan *pch = to_pchan(chan);
-> +	struct pl330_dmac *pl330 = pch->dmac;
-> +	int i;
-> +
-> +	mutex_lock(&pl330->rpm_lock);
-> +
-> +	for (i = 0; i < pl330->num_peripherals; i++) {
-> +		if (pl330->peripherals[i].chan.slave == slave &&
-> +		    pl330->peripherals[i].slave_link) {
-> +			pch->slave_link = pl330->peripherals[i].slave_link;
-> +			goto done;
-> +		}
-> +	}
-> +
-> +	pch->slave_link = device_link_add(slave, pl330->ddma.dev,
-> +				       DL_FLAG_PM_RUNTIME | DL_FLAG_RPM_ACTIVE);
+On Tue, Jan 24, 2017 at 1:19 PM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>
+>
+> On 2017/1/24 6:32, Jeremy Linton wrote:
+>>
+>> This patch expands and reworks the patches published by Mark Salter
+>> in order to clean up a few of the previous review comments, as well as
+>> add support for newer CPUs and big/little configurations.
+>>
+>> v14:
+>> - drop rename patch requested for v6
+>> - Shuffle couple include lines from one patch to a later
+>>   patch.
+>
+>
+> Test again on D03 and works fine as before,
+>
+> Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+>
+> Hanjun
 
-So you are going to add the link on channel allocation and tear down on the
-freeup. I am not sure I really like the idea here.
+Tested this series on Cavium's ThunderX2 CN99XX platform.
 
-First, these thing shouldn't be handled in the drivers. These things should
-be set in core and each driver setting the links doesn't sound great to me.
+Tested-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 
-Second, should the link be always there and we only mange the state? Here it
-seems that we have link being created and destroyed, so why not mark it
-ACTIVE and DORMANT instead...
-
-Lastly, looking at th description of the issue here, am perceiving (maybe my
-understanding is not quite right here) that you have an IP block in SoC
-which has multiple things and share common stuff and doing right PM is a
-challenge for you, right?
-
--- 
-~Vinod
+thanks
+Ganapat
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
