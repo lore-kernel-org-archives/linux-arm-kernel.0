@@ -1,26 +1,43 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Sun, 12 Feb 2017 01:37:12 +0530
-Subject: ERROR: Recursive variable `CC_OPTION_CFLAGS' references itself
- (eventually). Stop.
-Message-ID: <CAOH+1jEOYjdxsO1uh63iXN+TiaLiSNLNk+VE2kmh+=ZnxD2hcA@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 11 Feb 2017 22:12:00 +0200
+Subject: [PATCH] thermal: exynos: Remove parsing unused samsung,
+ tmu_cal_mode property
+Message-ID: <20170211201200.27616-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The property samsung,tmu_cal_mode is not used and not used.  We can
+safely remove it.
 
-I ran the command "./make.cross ARCH=arm arch/arm/" on my 64 bit x86
-machine but got the following error:
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ drivers/thermal/samsung/exynos_tmu.c | 1 -
+ drivers/thermal/samsung/exynos_tmu.h | 1 -
+ 2 files changed, 2 deletions(-)
 
-scripts/Kbuild.include:113: *** Recursive variable `CC_OPTION_CFLAGS'
-references itself (eventually).  Stop.
-make: *** [arch/arm/] Error 2
-
-I commented out the line "CC_OPTION_CFLAGS = $(filter-out
-$(GCC_PLUGINS_CFLAGS),$(KBUILD_CFLAGS))" in the scripts/Kbuild.include
-file and the driver compiled.
-
-Is this the only solution to make the compilation work? What is this
-line signifying?
-
-Thanks,
-Bhumika
+diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
+index ad1186dd6132..7b8ef09d2b3c 100644
+--- a/drivers/thermal/samsung/exynos_tmu.c
++++ b/drivers/thermal/samsung/exynos_tmu.c
+@@ -1168,7 +1168,6 @@ static int exynos_of_sensor_conf(struct device_node *np,
+ 	pdata->default_temp_offset = (u8)value;
+ 
+ 	of_property_read_u32(np, "samsung,tmu_cal_type", &pdata->cal_type);
+-	of_property_read_u32(np, "samsung,tmu_cal_mode", &pdata->cal_mode);
+ 
+ 	of_node_put(np);
+ 	return 0;
+diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
+index 440c7140b660..5149c2a3030c 100644
+--- a/drivers/thermal/samsung/exynos_tmu.h
++++ b/drivers/thermal/samsung/exynos_tmu.h
+@@ -70,7 +70,6 @@ struct exynos_tmu_platform_data {
+ 
+ 	enum soc_type type;
+ 	u32 cal_type;
+-	u32 cal_mode;
+ };
+ 
+ #endif /* _EXYNOS_TMU_H */
+-- 
+2.9.3
