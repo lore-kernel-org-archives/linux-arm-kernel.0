@@ -1,83 +1,67 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Sat, 11 Feb 2017 09:27:22 +0800
-Subject: [PATCH v13 11/12] ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB
- property
-In-Reply-To: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
-References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1486776443-2280-12-git-send-email-peter.chen@nxp.com>
+From: siarhei.siamashka@gmail.com (Siarhei Siamashka)
+Date: Sat, 11 Feb 2017 04:53:16 +0200
+Subject: [linux-sunxi] [PATCH] Add Master Sample Data Mode for SPI
+In-Reply-To: <20170210220247.8478-1-viniciusfre@gmail.com>
+References: <20170210220247.8478-1-viniciusfre@gmail.com>
+Message-ID: <20170211045316.12d939ae@i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current dts describes USB HUB's property at USB controller's
-entry, it is improper. The USB HUB should be the child node
-under USB controller, and power sequence properties are under
-it. Besides, using gpio pinctrl setting for USB2415's reset pin.
+On Fri, 10 Feb 2017 19:02:47 -0300
+Vinicius Maciel <viniciusfre@gmail.com> wrote:
 
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
----
- arch/arm/boot/dts/imx6qdl-udoo.dtsi | 26 ++++++++++++--------------
- 1 file changed, 12 insertions(+), 14 deletions(-)
+> In order to work appropriately, the max11043 ADC chip and probably
+> others, needs SPI master samples the data at the correct edge. From
+> max11043 datasheet: "The data at DIN is latched on the rising edge
+> of SCLK". Same to DOUT.
+> 
+> This patch add Master Sample Data Mode bit in normal sample mode.
+> 
+> Signed-off-by: Vinicius Maciel <viniciusfre@gmail.com>
+> ---
+>  drivers/spi/spi-sun4i.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+> index c5cd635c28f3..6325be2ce8d9 100644
+> --- a/drivers/spi/spi-sun4i.c
+> +++ b/drivers/spi/spi-sun4i.c
+> @@ -44,6 +44,7 @@
+>  #define SUN4I_CTL_CS_MANUAL			BIT(16)
+>  #define SUN4I_CTL_CS_LEVEL			BIT(17)
+>  #define SUN4I_CTL_TP				BIT(18)
+> +#define SUN4I_CTL_SDM				BIT(20)
+>  
+>  #define SUN4I_INT_CTL_REG		0x0c
+>  #define SUN4I_INT_CTL_RF_F34			BIT(4)
+> @@ -407,7 +408,8 @@ static int sun4i_spi_runtime_resume(struct device *dev)
+>  	}
+>  
+>  	sun4i_spi_write(sspi, SUN4I_CTL_REG,
+> -			SUN4I_CTL_ENABLE | SUN4I_CTL_MASTER | SUN4I_CTL_TP);
+> +			SUN4I_CTL_ENABLE | SUN4I_CTL_MASTER | SUN4I_CTL_TP |
+> +			SUN4I_CTL_SDM);
+>  
+>  	return 0;
+>  
 
-diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-index c96c91d..a173de2 100644
---- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
-@@ -9,6 +9,8 @@
-  *
-  */
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- / {
- 	aliases {
- 		backlight = &backlight;
-@@ -58,17 +60,6 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		reg_usb_h1_vbus: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "usb_h1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			enable-active-high;
--			startup-delay-us = <2>; /* USB2415 requires a POR of 1 us minimum */
--			gpio = <&gpio7 12 0>;
--		};
--
- 		reg_panel: regulator at 1 {
- 			compatible = "regulator-fixed";
- 			reg = <1>;
-@@ -188,7 +179,7 @@
- 
- 		pinctrl_usbh: usbhgrp {
- 			fsl,pins = <
--				MX6QDL_PAD_GPIO_17__GPIO7_IO12 0x80000000
-+				MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x1b0b0
- 				MX6QDL_PAD_NANDF_CS2__CCM_CLKO2 0x130b0
- 			>;
- 		};
-@@ -259,9 +250,16 @@
- &usbh1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usbh>;
--	vbus-supply = <&reg_usb_h1_vbus>;
--	clocks = <&clks IMX6QDL_CLK_CKO>;
- 	status = "okay";
-+
-+	usb2415: hub at 1 {
-+		compatible = "usb424,2514";
-+		reg = <1>;
-+
-+		clocks = <&clks IMX6QDL_CLK_CKO>;
-+		reset-gpios = <&gpio7 12 GPIO_ACTIVE_LOW>;
-+		reset-duration-us = <3000>;
-+	};
- };
- 
- &usdhc3 {
+Thanks! That's a good catch. This particular bit is actually set in the
+reset default register value, according to the Allwinner A20 manual.
+But on Allwinner A10 and Allwinner A13 it is documented as unused and
+can't be changed (it remains zero even if we try to modify it).
+
+So looks like only A20 is affected, because the kernel currently sets a
+non-standard mode, deviating from both Allwinner's default and normal
+SPI behaviour.
+
+You still need to update the summary line to add all the necessary
+sunxi and spi specific prefixes (see similar commits). Also a similar
+fix most likely needs to be applied to the spi-sun6i.c file too (due
+to the copy-paste curse and code duplication), but I'm not sure if it
+needs to be a part of this patch or a separate one.
+
+Reviewed-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
+
 -- 
-2.7.4
+Best regards,
+Siarhei Siamashka
