@@ -1,91 +1,31 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Sat, 11 Feb 2017 18:57:26 +0100 (CET)
-Subject: [PATCH 00/22] Conversion of ARMv4 Gemini to DT and multiplatform
-In-Reply-To: <CACRpkdbUOR76fjb_UvuiQHq22oAji8zwMAxmJV1dRA5V9DEQQw@mail.gmail.com>
-References: <20170122121506.9995-1-linus.walleij@linaro.org>
- <8e705d3a-ff99-23b2-c4c9-2edccf134cac@gmail.com>
- <CACRpkdbdsNU6pOcewyZw_jpXzXvm_aj0FURY7Ty5FkT227iZ=Q@mail.gmail.com>
- <alpine.LNX.2.00.1701241734140.2736@T420s>
- <CACRpkdY1A8QbKVV0-ZFeH-n0zYpmJkoGj5vA0Ov-DDhBTJf5_w@mail.gmail.com>
- <6a6f3b79-18d7-3243-6a5c-2dc9a3755aa9@gmail.com>
- <alpine.LNX.2.00.1701301702420.14503@T420s>
- <CACRpkdbUOR76fjb_UvuiQHq22oAji8zwMAxmJV1dRA5V9DEQQw@mail.gmail.com>
-Message-ID: <alpine.LNX.2.00.1702111853460.32439@T420s>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 11 Feb 2017 18:05:26 +0000
+Subject: [PATCH v3 0/3] crypto: time invariant AES for CCM (and CMAC/XCBC)
+In-Reply-To: <20170211105339.GE855@gondor.apana.org.au>
+References: <1486133377-23290-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170211105339.GE855@gondor.apana.org.au>
+Message-ID: <CAKv+Gu-ONMC-5gstC4A0HCBSEsRf_wexw7pYk8Zmd3YE3Y67xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Linus,
+On 11 February 2017 at 10:53, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> On Fri, Feb 03, 2017 at 02:49:34PM +0000, Ard Biesheuvel wrote:
+>> This series is primarily directed at improving the performance and security
+>> of CCM on the Rasperry Pi 3. This involves splitting the MAC handling of
+>> CCM into a separate driver so that we can efficiently replace it by something
+>> else using the ordinary algo resolution machinery.
+>>
+>> Patch #1 adds some testcases for cbcmac(aes), which will be introduced later.
+>>
+>> Patch #2 replaces the open coded CBC MAC hashing routines in the CCM driver
+>> with calls to a cbcmac() hash, and implements a template for producing such
+>> cbcmac transforms. This eliminates all the fuzzy scatterwalk code as well.
+>>
+>> Patch #3 implements cbcmac(aes) using NEON on arm64, and CMAC/XCBC at the
+>> same time, since it is trivially implemented reusing the same core transform
+>
+> All applied.  Please send any fixups on top of these patches.
 
-On Sat, 11 Feb 2017, Linus Walleij wrote:
-
-> On Mon, Jan 30, 2017 at 5:35 PM, Hans Ulli Kroll
-> <ulli.kroll@googlemail.com> wrote:
-> > On Tue, 24 Jan 2017, Florian Fainelli wrote:
-> >> On 01/24/2017 12:47 PM, Linus Walleij wrote:
-> 
-> >> >> This is a dual GMAC !
-> >> >>
-> >> >> They are two different base address for each GMAC and one shared
-> >> >> base address for both of them.
-> >> >> This is all in one address space which remaps the driver.
-> >> >>
-> >> >> And to make it worse two interrupt lines, one of them is also shared.
-> >> >>
-> >> >> Any ideas to "convert" this into DT ??
-> >> >> Because I think it's impossible to split both GMAC interfaces ??
-> >> >
-> >> > Sounds odd.  Yeah hardware.h lists this:
-> >> >
-> >> > #define GEMINI_TOE_BASE         0x60000000
-> >> > #define GEMINI_GMAC0_BASE       0x6000A000
-> >> > #define GEMINI_GMAC1_BASE       0x6000E000
-> >> >
-> >> > I guess one approach is to make a driver handling all of it in one,
-> >> > let it ioremap all regions and support one or two GMACs on the same
-> >> > TOE. More complex solutions is to share the TOE using
-> >> > syscons regmap mechanism but it looks cumbersome.
-> >> >
-> >> > {
-> >> >    compatible = "cortina,genesis-gmac-ethernet";
-> >> >    reg = <0x60000000 0xa000>, <0x6000a000 0x4000>, <0x6000e000 0x4000>;
-> >> >    interrupts = <1 IRQ_TYPE_LEVEL_HIGH>, <2 IRQ_TYPE_LEVEL_HIGH>;
-> >> > }
-> >> >
-> >> > Or something like that?
-> >
-> > For addresses, base is here, for both interfaces
-> > #define GEMINI_TOE_BASE                 0x60000000
-> > and now for each interface, offset to the above
-> > code is from the headerfile of the openwrt driver.
-> > #define TOE_GMAC_DMA_BASE(x)            (0x8000 + 0x4000 * (x))
-> > #define TOE_GMAC_BASE(x)                (0xA000 + 0x4000 * (x))
-> >
-> > maybe some other registers to
-> > #define TOE_NONTOE_QUE_HDR_BASE         0x2000
-> > #define TOE_TOE_QUE_HDR_BASE            0x3000
-> > #define TOE_V_BIT_BASE                  0x4000
-> > #define TOE_A_BIT_BASE                  0x6000
-> >
-> > AFAICR
-> > The TOE part was "invented" for the gigabit interface.
-> > They need to speed up the NIC because without TCP offloading you will get
-> > only fast ethernet speed on a gigabit NIC.
-> 
-> I was suspecting that this ethernet is related to the Faraday ethernet driver
-> that was merged in drivers/net/ethernet/faraday since so many other
-> Gemini parts seems to be coming essentially directly from Faraday.
-> 
-> I looked through the header files etc there but the registers seem quite
-> different ... :/
-> 
-> Still it is using the same "GMAC" naming and I strongly suspect this is
-> an older Faraday IP that should go into the same driver folder.
-> 
-> Cc:ing some Faraday and Andestech emails to see if we can get some
-> clarity in this. It would be nice if someone could atleast say "oh it's this
-> IP FTxxx from Faraday" so we know what to name it.
-> 
-
-I must look/seach for the nas2000 SDK, maybe this brings some light.
-
-Greetings Hans Ulli Kroll
+Thanks Herbert. I do have a fixup for #2, which currently does not
+correctly take the alignmask of the MAC's subordinate cipher into
+account. I will send a fix for that shortly.
