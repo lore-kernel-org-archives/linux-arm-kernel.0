@@ -1,29 +1,27 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Sat, 11 Feb 2017 18:53:39 +0800
-Subject: [PATCH v3 0/3] crypto: time invariant AES for CCM (and CMAC/XCBC)
-In-Reply-To: <1486133377-23290-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1486133377-23290-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170211105339.GE855@gondor.apana.org.au>
+Date: Sat, 11 Feb 2017 18:51:02 +0800
+Subject: [PATCH] crypto: arm64/crc32 - merge CRC32 and PMULL instruction
+ based drivers
+In-Reply-To: <1485963340-25297-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1485963340-25297-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170211105102.GB855@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 03, 2017 at 02:49:34PM +0000, Ard Biesheuvel wrote:
-> This series is primarily directed at improving the performance and security
-> of CCM on the Rasperry Pi 3. This involves splitting the MAC handling of
-> CCM into a separate driver so that we can efficiently replace it by something
-> else using the ordinary algo resolution machinery.
+On Wed, Feb 01, 2017 at 03:35:40PM +0000, Ard Biesheuvel wrote:
+> The PMULL based CRC32 implementation already contains code based on the
+> separate, optional CRC32 instructions to fallback to when operating on
+> small quantities of data. We can expose these routines directly on systems
+> that lack the 64x64 PMULL instructions but do implement the CRC32 ones,
+> which makes the driver that is based solely on those CRC32 instructions
+> redundant. So remove it.
 > 
-> Patch #1 adds some testcases for cbcmac(aes), which will be introduced later.
+> Note that this aligns arm64 with ARM, whose accelerated CRC32 driver
+> also combines the CRC32 extension based and the PMULL based versions.
 > 
-> Patch #2 replaces the open coded CBC MAC hashing routines in the CCM driver
-> with calls to a cbcmac() hash, and implements a template for producing such
-> cbcmac transforms. This eliminates all the fuzzy scatterwalk code as well.
-> 
-> Patch #3 implements cbcmac(aes) using NEON on arm64, and CMAC/XCBC at the
-> same time, since it is trivially implemented reusing the same core transform
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-All applied.  Please send any fixups on top of these patches.
-Thanks.
+Patch applied.  Thanks.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
