@@ -1,39 +1,49 @@
 From: peter.chen@nxp.com (Peter Chen)
-Date: Sat, 11 Feb 2017 09:27:16 +0800
-Subject: [PATCH v13 05/12] usb: ehci: fsl: use bus->sysdev for DMA
- configuration
+Date: Sat, 11 Feb 2017 09:27:19 +0800
+Subject: [PATCH v13 08/12] binding-doc: usb: usb-device: add optional
+ properties for power sequence
 In-Reply-To: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
 References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1486776443-2280-6-git-send-email-peter.chen@nxp.com>
+Message-ID: <1486776443-2280-9-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+Add optional properties for power sequence.
 
-For the dual role ehci fsl driver, sysdev will handle the dma
-config.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
-Signed-off-by: Mathias Nyman <mathias.nyman@linux.intel.com>
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/usb/host/ehci-fsl.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/usb/usb-device.txt | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/usb/host/ehci-fsl.c b/drivers/usb/host/ehci-fsl.c
-index 3733aab..4a08b70 100644
---- a/drivers/usb/host/ehci-fsl.c
-+++ b/drivers/usb/host/ehci-fsl.c
-@@ -96,8 +96,8 @@ static int fsl_ehci_drv_probe(struct platform_device *pdev)
- 	}
- 	irq = res->start;
+diff --git a/Documentation/devicetree/bindings/usb/usb-device.txt b/Documentation/devicetree/bindings/usb/usb-device.txt
+index 1c35e7b..3661dd2 100644
+--- a/Documentation/devicetree/bindings/usb/usb-device.txt
++++ b/Documentation/devicetree/bindings/usb/usb-device.txt
+@@ -13,6 +13,10 @@ Required properties:
+ - reg: the port number which this device is connecting to, the range
+   is 1-31.
  
--	hcd = usb_create_hcd(&fsl_ehci_hc_driver, &pdev->dev,
--				dev_name(&pdev->dev));
-+	hcd = __usb_create_hcd(&fsl_ehci_hc_driver, pdev->dev.parent,
-+			       &pdev->dev, dev_name(&pdev->dev), NULL);
- 	if (!hcd) {
- 		retval = -ENOMEM;
- 		goto err1;
++Optional properties:
++power sequence properties, see
++Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt for detail
++
+ Example:
+ 
+ &usb1 {
+@@ -21,8 +25,12 @@ Example:
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
+ 
+-	hub: genesys at 1 {
++	genesys: hub at 1 {
+ 		compatible = "usb5e3,608";
+ 		reg = <1>;
++
++		clocks = <&clks IMX6SX_CLK_CKO>;
++		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
++		reset-duration-us = <10>;
+ 	};
+ }
 -- 
 2.7.4
