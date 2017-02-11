@@ -1,29 +1,24 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 11 Feb 2017 21:36:21 +0100 (CET)
-Subject: [PATCH] clocksource: add __ro_after_init to cyclecounter
-In-Reply-To: <CAKv+Gu99ZqLwzPtq1+MjvHt8BrzZDvCe=-Owy5mucsTqXSB+Qw@mail.gmail.com>
-References: <1486840818-22214-1-git-send-email-bhumirks@gmail.com>
- <CAKv+Gu99ZqLwzPtq1+MjvHt8BrzZDvCe=-Owy5mucsTqXSB+Qw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.20.1702112136090.3734@nanos>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Sat, 11 Feb 2017 15:32:15 -0600
+Subject: [PATCH] pinctrl: qcom: add get_direction function
+In-Reply-To: <8652c018-4051-5c77-3126-2d41d150518a@codeaurora.org>
+References: <1486768860-18237-1-git-send-email-timur@codeaurora.org>
+ <8652c018-4051-5c77-3126-2d41d150518a@codeaurora.org>
+Message-ID: <51200db0-552b-221d-1e81-f1a3ee286c6c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 11 Feb 2017, Ard Biesheuvel wrote:
+Stephen Boyd wrote:
+>> > +	/* 0 = output, 1 = input */
+>> > +	return val & BIT(g->oe_bit) ? 0 : 1;
+> Maybe we can use the macros GPIOF_DIR_IN and GPIOF_DIR_OUT here instead?
 
-> On 11 February 2017 at 19:20, Bhumika Goyal <bhumirks@gmail.com> wrote:
-> > The object cyclecounter of type cyclecounter is not getting modified
-> > after getting initialized by arch_counter_register. Apart from
-> > initialization in arch_counter_register it is also passed as an argument
-> > to the function timecounter_init but this argument is of type const.
-> > Therefore, add __ro_after_init to its declaration.
-> >
-> 
-> I think adding __ro_after_init is fine if this struct is never
-> modified after init. But the reference in the commit log to the
-> constness of the timecounter_init() argument  makes no sense: that
-> only means timecounter_init() will not modify the object, which allows
-> pointers to const objects to be passed to it as well. The opposite is
-> not true, though: there is no requirement whatsoever that objects
-> passed into const pointer arguments should be const themselves.
+Ok, I posted a v2.
 
-Indeed.
+Is it too late for this patch to make the 4.11 merge window, or maybe 4.11-rc2? 
+ From the perspective of our server platform, it's a bug fix.
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
