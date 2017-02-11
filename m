@@ -1,55 +1,39 @@
 From: peter.chen@nxp.com (Peter Chen)
-Date: Sat, 11 Feb 2017 09:27:21 +0800
-Subject: [PATCH v13 10/12] ARM: dts: imx6qdl: Enable usb node children with
- <reg>
+Date: Sat, 11 Feb 2017 09:27:16 +0800
+Subject: [PATCH v13 05/12] usb: ehci: fsl: use bus->sysdev for DMA
+ configuration
 In-Reply-To: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
 References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <1486776443-2280-11-git-send-email-peter.chen@nxp.com>
+Message-ID: <1486776443-2280-6-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joshua Clayton <stillcompiling@gmail.com>
+From: Arnd Bergmann <arnd@arndb.de>
 
-Give usb nodes #address and #size attributes, so that a child node
-representing a permanently connected device such as an onboard hub may
-be addressed with a <reg> attribute
+For the dual role ehci fsl driver, sysdev will handle the dma
+config.
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+Signed-off-by: Mathias Nyman <mathias.nyman@linux.intel.com>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/usb/host/ehci-fsl.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 89b834f..a00de77 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -936,6 +936,8 @@
+diff --git a/drivers/usb/host/ehci-fsl.c b/drivers/usb/host/ehci-fsl.c
+index 3733aab..4a08b70 100644
+--- a/drivers/usb/host/ehci-fsl.c
++++ b/drivers/usb/host/ehci-fsl.c
+@@ -96,8 +96,8 @@ static int fsl_ehci_drv_probe(struct platform_device *pdev)
+ 	}
+ 	irq = res->start;
  
- 			usbh1: usb at 02184200 {
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x02184200 0x200>;
- 				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
-@@ -950,6 +952,8 @@
- 
- 			usbh2: usb at 02184400 {
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x02184400 0x200>;
- 				interrupts = <0 41 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
-@@ -963,6 +967,8 @@
- 
- 			usbh3: usb at 02184600 {
- 				compatible = "fsl,imx6q-usb", "fsl,imx27-usb";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0x02184600 0x200>;
- 				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6QDL_CLK_USBOH3>;
+-	hcd = usb_create_hcd(&fsl_ehci_hc_driver, &pdev->dev,
+-				dev_name(&pdev->dev));
++	hcd = __usb_create_hcd(&fsl_ehci_hc_driver, pdev->dev.parent,
++			       &pdev->dev, dev_name(&pdev->dev), NULL);
+ 	if (!hcd) {
+ 		retval = -ENOMEM;
+ 		goto err1;
 -- 
 2.7.4
