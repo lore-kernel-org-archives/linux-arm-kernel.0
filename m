@@ -1,31 +1,88 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 11 Feb 2017 18:05:26 +0000
-Subject: [PATCH v3 0/3] crypto: time invariant AES for CCM (and CMAC/XCBC)
-In-Reply-To: <20170211105339.GE855@gondor.apana.org.au>
-References: <1486133377-23290-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170211105339.GE855@gondor.apana.org.au>
-Message-ID: <CAKv+Gu-ONMC-5gstC4A0HCBSEsRf_wexw7pYk8Zmd3YE3Y67xQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sat, 11 Feb 2017 19:30:17 +0100
+Subject: [PATCH] serial: efm32: Fix parity management in
+ 'efm32_uart_console_get_options()'
+In-Reply-To: <20170210210640.17749-1-christophe.jaillet@wanadoo.fr>
+References: <20170210210640.17749-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <20170211183017.sg5xjkox5zlkuvwa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 February 2017 at 10:53, Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> On Fri, Feb 03, 2017 at 02:49:34PM +0000, Ard Biesheuvel wrote:
->> This series is primarily directed at improving the performance and security
->> of CCM on the Rasperry Pi 3. This involves splitting the MAC handling of
->> CCM into a separate driver so that we can efficiently replace it by something
->> else using the ordinary algo resolution machinery.
->>
->> Patch #1 adds some testcases for cbcmac(aes), which will be introduced later.
->>
->> Patch #2 replaces the open coded CBC MAC hashing routines in the CCM driver
->> with calls to a cbcmac() hash, and implements a template for producing such
->> cbcmac transforms. This eliminates all the fuzzy scatterwalk code as well.
->>
->> Patch #3 implements cbcmac(aes) using NEON on arm64, and CMAC/XCBC at the
->> same time, since it is trivially implemented reusing the same core transform
->
-> All applied.  Please send any fixups on top of these patches.
+On Fri, Feb 10, 2017 at 10:06:40PM +0100, Christophe JAILLET wrote:
+> UARTn_FRAME_PARITY_ODD is 0x0300
+> UARTn_FRAME_PARITY_EVEN is 0x0200
+> So if the UART is configured for EVEN parity, it would be reported as ODD.
+> Fix it by testing if the 2 bits are set in the ODD case.
+> 
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> ---
+> Un-tested
+> ---
+>  drivers/tty/serial/efm32-uart.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/efm32-uart.c b/drivers/tty/serial/efm32-uart.c
+> index ebd8569f9ad5..84034ef20c88 100644
+> --- a/drivers/tty/serial/efm32-uart.c
+> +++ b/drivers/tty/serial/efm32-uart.c
+> @@ -572,9 +572,9 @@ static void efm32_uart_console_get_options(struct efm32_uart_port *efm_port,
+>  			16 * (4 + (clkdiv >> 6)));
+>  
+>  	frame = efm32_uart_read32(efm_port, UARTn_FRAME);
+> -	if (frame & UARTn_FRAME_PARITY_ODD)
+> +	if ((frame & UARTn_FRAME_PARITY_ODD) == UARTn_FRAME_PARITY_ODD)
+>  		*parity = 'o';
+> -	else if (frame & UARTn_FRAME_PARITY_EVEN)
+> +	else if ((frame & UARTn_FRAME_PARITY_EVEN) == UARTn_FRAME_PARITY_EVEN)
 
-Thanks Herbert. I do have a fixup for #2, which currently does not
-correctly take the alignmask of the MAC's subordinate cipher into
-account. I will send a fix for that shortly.
+There is really a bug, but the fix looks wrong (although it does the
+right thing). The check for UARTn_FRAME_PARITY_EVEN should check both
+bits, too.
+
+The right change that works independent of the actual
+values would be:
+
+diff --git a/drivers/tty/serial/efm32-uart.c b/drivers/tty/serial/efm32-uart.c
+index 195acc868763..00cdffbe4eda 100644
+--- a/drivers/tty/serial/efm32-uart.c
++++ b/drivers/tty/serial/efm32-uart.c
+@@ -27,6 +27,7 @@
+ #define UARTn_FRAME		0x04
+ #define UARTn_FRAME_DATABITS__MASK	0x000f
+ #define UARTn_FRAME_DATABITS(n)		((n) - 3)
++#define UARTn_FRAME_PARITY		0x0300
+ #define UARTn_FRAME_PARITY_NONE		0x0000
+ #define UARTn_FRAME_PARITY_EVEN		0x0200
+ #define UARTn_FRAME_PARITY_ODD		0x0300
+@@ -572,12 +573,16 @@ static void efm32_uart_console_get_options(struct efm32_uart_port *efm_port,
+ 			16 * (4 + (clkdiv >> 6)));
+ 
+ 	frame = efm32_uart_read32(efm_port, UARTn_FRAME);
+-	if (frame & UARTn_FRAME_PARITY_ODD)
++	switch (frame & UARTn_FRAME_PARITY) {
++	case UARTn_FRAME_PARITY_ODD:
+ 		*parity = 'o';
+-	else if (frame & UARTn_FRAME_PARITY_EVEN)
++		break;
++	case UARTn_FRAME_PARITY_EVEN:
+ 		*parity = 'e';
+-	else
++		break;
++	default:
+ 		*parity = 'n';
++	}
+ 
+ 	*bits = (frame & UARTn_FRAME_DATABITS__MASK) -
+ 			UARTn_FRAME_DATABITS(4) + 4;
+
+
+I'd suggest to add
+
+Fixes: 3afbd89c9639 ("serial/efm32: add new driver")
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
