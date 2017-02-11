@@ -1,62 +1,63 @@
 From: plaes@plaes.org (Priit Laes)
-Date: Sat, 11 Feb 2017 19:44:00 +0200
-Subject: [PATCH 3/8] drm/panel: simple: Add support for LG LP097x02-slq2 panel
+Date: Sat, 11 Feb 2017 19:44:02 +0200
+Subject: [PATCH 5/8] drm/sun4i: Add encoder type argument to
+ sun4i_tcon0_mode_set
 In-Reply-To: <20170211174405.28395-1-plaes@plaes.org>
 References: <20170211174405.28395-1-plaes@plaes.org>
-Message-ID: <20170211174405.28395-4-plaes@plaes.org>
+Message-ID: <20170211174405.28395-6-plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add simple-panel support for the LG LP097x02-slq2, which is 10"
-1024x768 LVDS panel.
+Depending on the output type, we have to enable/disable some
+bits conditionally.
 
 Signed-off-by: Priit Laes <plaes@plaes.org>
 ---
- drivers/gpu/drm/panel/panel-simple.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_rgb.c  | 2 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 3 ++-
+ drivers/gpu/drm/sun4i/sun4i_tcon.h | 3 ++-
+ 3 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index 06aaf79..2948fed 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -1205,6 +1205,28 @@ static const struct panel_desc lg_lp097qx1_spa1 = {
- 	},
- };
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index f5e86fe..3d4eb05 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -179,7 +179,7 @@ static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
+ 	struct sun4i_drv *drv = rgb->drv;
+ 	struct sun4i_tcon *tcon = drv->tcon;
  
-+static const struct drm_display_mode lg_lp097x02_slq2_mode = {
-+    .clock = 100000,
-+    .hdisplay = 1024,
-+    .hsync_start = 1024 + 260,
-+    .hsync_end = 1024 + 260 + 1,
-+    .htotal = 1024 + 260 + 1 + 799,
-+    .vdisplay = 768,
-+    .vsync_start = 768 + 16,
-+    .vsync_end = 768 + 16 + 1,
-+    .vtotal = 768 + 16 + 1 + 15,
-+    .vrefresh = 60,
-+};
-+
-+static const struct panel_desc lg_lp097x02_slq2 = {
-+    .modes = &lg_lp097x02_slq2_mode,
-+    .num_modes = 1,
-+    .size = {
-+        .width = 197,
-+        .height = 147,
-+    },
-+};
-+
- static const struct drm_display_mode lg_lp120up1_mode = {
- 	.clock = 162300,
- 	.hdisplay = 1920,
-@@ -1817,6 +1839,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "lg,lp097qx1-spa1",
- 		.data = &lg_lp097qx1_spa1,
- 	}, {
-+		.compatible = "lg,lp097x02-slq2",
-+		.data = &lg_lp097x02_slq2,
-+	}, {
- 		.compatible = "lg,lp120up1",
- 		.data = &lg_lp120up1,
- 	}, {
+-	sun4i_tcon0_mode_set(tcon, mode);
++	sun4i_tcon0_mode_set(tcon, mode, DRM_MODE_ENCODER_DAC);
+ 
+ 	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
+ 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index ea2906f..71d0087 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -124,7 +124,8 @@ static int sun4i_tcon_get_clk_delay(struct drm_display_mode *mode,
+ }
+ 
+ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+-			  struct drm_display_mode *mode)
++			  struct drm_display_mode *mode,
++			  int type)
+ {
+ 	unsigned int bp, hsync, vsync;
+ 	u8 clk_delay;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index 166064b..b040e10 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -188,7 +188,8 @@ void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable);
+ void sun4i_tcon_switch_interlace(struct sun4i_tcon *tcon,
+ 				 bool enable);
+ void sun4i_tcon0_mode_set(struct sun4i_tcon *tcon,
+-			  struct drm_display_mode *mode);
++			  struct drm_display_mode *mode,
++			  int type);
+ void sun4i_tcon1_mode_set(struct sun4i_tcon *tcon,
+ 			  struct drm_display_mode *mode);
+ 
 -- 
 2.9.3
