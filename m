@@ -1,112 +1,84 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 11 Feb 2017 13:52:20 +0100
-Subject: [PATCH 4/4] ARM: dts: add PCI to the Gemini device trees
-In-Reply-To: <20170211125220.10273-1-linus.walleij@linaro.org>
-References: <20170211125220.10273-1-linus.walleij@linaro.org>
-Message-ID: <20170211125220.10273-4-linus.walleij@linaro.org>
+Date: Sat, 11 Feb 2017 14:20:25 +0100
+Subject: [PATCH 00/22] Conversion of ARMv4 Gemini to DT and multiplatform
+In-Reply-To: <alpine.LNX.2.00.1701301702420.14503@T420s>
+References: <20170122121506.9995-1-linus.walleij@linaro.org>
+ <8e705d3a-ff99-23b2-c4c9-2edccf134cac@gmail.com>
+ <CACRpkdbdsNU6pOcewyZw_jpXzXvm_aj0FURY7Ty5FkT227iZ=Q@mail.gmail.com>
+ <alpine.LNX.2.00.1701241734140.2736@T420s>
+ <CACRpkdY1A8QbKVV0-ZFeH-n0zYpmJkoGj5vA0Ov-DDhBTJf5_w@mail.gmail.com>
+ <6a6f3b79-18d7-3243-6a5c-2dc9a3755aa9@gmail.com>
+ <alpine.LNX.2.00.1701301702420.14503@T420s>
+Message-ID: <CACRpkdbUOR76fjb_UvuiQHq22oAji8zwMAxmJV1dRA5V9DEQQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortina Gemini has an internal PCI root bus, add this to
-the device tree, and add interrupt mapping (swizzling) to the
-relevant systems device trees.
+On Mon, Jan 30, 2017 at 5:35 PM, Hans Ulli Kroll
+<ulli.kroll@googlemail.com> wrote:
+> On Tue, 24 Jan 2017, Florian Fainelli wrote:
+>> On 01/24/2017 12:47 PM, Linus Walleij wrote:
 
-Cc: Janos Laube <janos.dev@gmail.com>
-Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
-Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: Gavin Guo <gavinguo@andestech.com>
-Cc: Macpaul Lin <macpaul@andestech.com>
-Cc: Feng-Hsin Chiang <john453@faraday-tech.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Change bus-range to <0x00 0xff>
-- Drop the three extra IRQs that are unused
-- Implement the right interrupt mapping/swizzling
-- Push the interrupt mapping down to each affected system, only
-  SQ201 for now.
+>> >> This is a dual GMAC !
+>> >>
+>> >> They are two different base address for each GMAC and one shared
+>> >> base address for both of them.
+>> >> This is all in one address space which remaps the driver.
+>> >>
+>> >> And to make it worse two interrupt lines, one of them is also shared.
+>> >>
+>> >> Any ideas to "convert" this into DT ??
+>> >> Because I think it's impossible to split both GMAC interfaces ??
+>> >
+>> > Sounds odd.  Yeah hardware.h lists this:
+>> >
+>> > #define GEMINI_TOE_BASE         0x60000000
+>> > #define GEMINI_GMAC0_BASE       0x6000A000
+>> > #define GEMINI_GMAC1_BASE       0x6000E000
+>> >
+>> > I guess one approach is to make a driver handling all of it in one,
+>> > let it ioremap all regions and support one or two GMACs on the same
+>> > TOE. More complex solutions is to share the TOE using
+>> > syscons regmap mechanism but it looks cumbersome.
+>> >
+>> > {
+>> >    compatible = "cortina,genesis-gmac-ethernet";
+>> >    reg = <0x60000000 0xa000>, <0x6000a000 0x4000>, <0x6000e000 0x4000>;
+>> >    interrupts = <1 IRQ_TYPE_LEVEL_HIGH>, <2 IRQ_TYPE_LEVEL_HIGH>;
+>> > }
+>> >
+>> > Or something like that?
+>
+> For addresses, base is here, for both interfaces
+> #define GEMINI_TOE_BASE                 0x60000000
+> and now for each interface, offset to the above
+> code is from the headerfile of the openwrt driver.
+> #define TOE_GMAC_DMA_BASE(x)            (0x8000 + 0x4000 * (x))
+> #define TOE_GMAC_BASE(x)                (0xA000 + 0x4000 * (x))
+>
+> maybe some other registers to
+> #define TOE_NONTOE_QUE_HDR_BASE         0x2000
+> #define TOE_TOE_QUE_HDR_BASE            0x3000
+> #define TOE_V_BIT_BASE                  0x4000
+> #define TOE_A_BIT_BASE                  0x6000
+>
+> AFAICR
+> The TOE part was "invented" for the gigabit interface.
+> They need to speed up the NIC because without TCP offloading you will get
+> only fast ethernet speed on a gigabit NIC.
 
-PCI maintainers: this is FYI only, I will funnel this to the ARM
-SoC tree once we are done with the PCI driver.
----
- arch/arm/boot/dts/gemini-sq201.dts | 22 ++++++++++++++++++++++
- arch/arm/boot/dts/gemini.dtsi      | 32 ++++++++++++++++++++++++++++++++
- 2 files changed, 54 insertions(+)
+I was suspecting that this ethernet is related to the Faraday ethernet driver
+that was merged in drivers/net/ethernet/faraday since so many other
+Gemini parts seems to be coming essentially directly from Faraday.
 
-diff --git a/arch/arm/boot/dts/gemini-sq201.dts b/arch/arm/boot/dts/gemini-sq201.dts
-index dae2a70d8fbc..46309e79cc7b 100644
---- a/arch/arm/boot/dts/gemini-sq201.dts
-+++ b/arch/arm/boot/dts/gemini-sq201.dts
-@@ -92,5 +92,27 @@
- 				read-only;
- 			};
- 		};
-+
-+		pci at 50000000 {
-+			status = "okay";
-+			interrupt-map-mask = <0xf800 0 0 7>;
-+			interrupt-map =
-+				<0x4800 0 0 1 &pci_intc 0>, /* Slot 9 */
-+				<0x4800 0 0 2 &pci_intc 1>,
-+				<0x4800 0 0 3 &pci_intc 2>,
-+				<0x4800 0 0 4 &pci_intc 3>,
-+				<0x5000 0 0 1 &pci_intc 1>, /* Slot 10 */
-+				<0x5000 0 0 2 &pci_intc 2>,
-+				<0x5000 0 0 3 &pci_intc 3>,
-+				<0x5000 0 0 4 &pci_intc 0>,
-+				<0x5800 0 0 1 &pci_intc 2>, /* Slot 11 */
-+				<0x5800 0 0 2 &pci_intc 3>,
-+				<0x5800 0 0 3 &pci_intc 0>,
-+				<0x5800 0 0 4 &pci_intc 1>,
-+				<0x6000 0 0 1 &pci_intc 3>, /* Slot 12 */
-+				<0x6000 0 0 2 &pci_intc 0>,
-+				<0x6000 0 0 3 &pci_intc 1>,
-+				<0x6000 0 0 4 &pci_intc 2>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/gemini.dtsi b/arch/arm/boot/dts/gemini.dtsi
-index ed2314a3a804..2eddc698795e 100644
---- a/arch/arm/boot/dts/gemini.dtsi
-+++ b/arch/arm/boot/dts/gemini.dtsi
-@@ -104,5 +104,37 @@
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
- 		};
-+
-+		pci at 50000000 {
-+			compatible = "faraday,pci";
-+			/*
-+			 * The first 256 bytes in the IO range is actually used
-+			 * to configure the host bridge.
-+			 */
-+			reg = <0x50000000 0x100>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			#interrupt-cells = <1>;
-+			status = "disabled";
-+
-+			bus-range = <0x00 0xff>;
-+			/* PCI ranges mappings */
-+			ranges = /* 1MiB I/O space 0x50000000-0x500fffff */
-+			<0x01000000 0 0          0x50000000 0 0x00100000>,
-+			/* 128MiB non-prefetchable memory 0x58000000-0x5fffffff */
-+			<0x02000000 0 0x58000000 0x58000000 0 0x08000000>;
-+
-+			/*
-+			 * This PCI host bridge variant has a cascaded interrupt
-+			 * controller embedded in the host bridge.
-+			 */
-+			pci_intc: interrupt-controller {
-+				interrupt-parent = <&intcon>;
-+				interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
-+				interrupt-controller;
-+				#address-cells = <0>;
-+				#interrupt-cells = <1>;
-+			};
-+		};
- 	};
- };
--- 
-2.9.3
+I looked through the header files etc there but the registers seem quite
+different ... :/
+
+Still it is using the same "GMAC" naming and I strongly suspect this is
+an older Faraday IP that should go into the same driver folder.
+
+Cc:ing some Faraday and Andestech emails to see if we can get some
+clarity in this. It would be nice if someone could atleast say "oh it's this
+IP FTxxx from Faraday" so we know what to name it.
+
+Yours,
+Linus Walleij
