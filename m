@@ -1,42 +1,76 @@
-From: robsonde@gmail.com (Derek Robson)
-Date: Sat, 11 Feb 2017 14:10:42 +1300
-Subject: [PATCH] Staging: media: platform: bcm2835 - style fix
-Message-ID: <20170211011042.13512-1-robsonde@gmail.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Sat, 11 Feb 2017 09:27:12 +0800
+Subject: [PATCH v13 01/12] binding-doc: power: pwrseq-generic: add binding doc
+ for generic power sequence library
+In-Reply-To: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
+References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <1486776443-2280-2-git-send-email-peter.chen@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changed permissions to octal style
-Found using checkpatch
+Add binding doc for generic power sequence library.
 
-Signed-off-by: Derek Robson <robsonde@gmail.com>
+Signed-off-by: Peter Chen <peter.chen@nxp.com>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/staging/media/platform/bcm2835/bcm2835-camera.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ .../bindings/power/pwrseq/pwrseq-generic.txt       | 48 ++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
 
-diff --git a/drivers/staging/media/platform/bcm2835/bcm2835-camera.c b/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
-index ca15a698e018..7ef9147ddef7 100644
---- a/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
-+++ b/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
-@@ -61,9 +61,9 @@ MODULE_PARM_DESC(video_nr, "videoX start numbers, -1 is autodetect");
- 
- static int max_video_width = MAX_VIDEO_MODE_WIDTH;
- static int max_video_height = MAX_VIDEO_MODE_HEIGHT;
--module_param(max_video_width, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-+module_param(max_video_width, int, 0644);
- MODULE_PARM_DESC(max_video_width, "Threshold for video mode");
--module_param(max_video_height, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-+module_param(max_video_height, int, 0644);
- MODULE_PARM_DESC(max_video_height, "Threshold for video mode");
- 
- /* Gstreamer bug https://bugzilla.gnome.org/show_bug.cgi?id=726521
-@@ -76,7 +76,7 @@ MODULE_PARM_DESC(max_video_height, "Threshold for video mode");
-  * result).
-  */
- static int gst_v4l2src_is_broken;
--module_param(gst_v4l2src_is_broken, int, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-+module_param(gst_v4l2src_is_broken, int, 0644);
- MODULE_PARM_DESC(gst_v4l2src_is_broken, "If non-zero, enable workaround for Gstreamer");
- 
- /* global device data array */
+diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+new file mode 100644
+index 0000000..ebf0d47
+--- /dev/null
++++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+@@ -0,0 +1,48 @@
++The generic power sequence library
++
++Some hard-wired devices (eg USB/MMC) need to do power sequence before
++the device can be enumerated on the bus, the typical power sequence
++like: enable USB PHY clock, toggle reset pin, etc. But current
++Linux device driver lacks of such code to do it, it may cause some
++hard-wired devices works abnormal or can't be recognized by
++controller at all. The power sequence will be done before this device
++can be found at the bus.
++
++The power sequence properties is under the device node.
++
++Optional properties:
++- clocks: the input clocks for device.
++- reset-gpios: Should specify the GPIO for reset.
++- reset-duration-us: the duration in microsecond for assert reset signal.
++
++Below is the example of USB power sequence properties on USB device
++nodes which have two level USB hubs.
++
++&usbotg1 {
++	vbus-supply = <&reg_usb_otg1_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usb_otg1_id>;
++	status = "okay";
++
++	#address-cells = <1>;
++	#size-cells = <0>;
++	genesys: hub at 1 {
++		compatible = "usb5e3,608";
++		reg = <1>;
++
++		clocks = <&clks IMX6SX_CLK_CKO>;
++		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
++		reset-duration-us = <10>;
++
++		#address-cells = <1>;
++		#size-cells = <0>;
++		asix: ethernet at 1 {
++			compatible = "usbb95,1708";
++			reg = <1>;
++
++			clocks = <&clks IMX6SX_CLK_IPG>;
++			reset-gpios = <&gpio4 6 GPIO_ACTIVE_LOW>; /* ethernet_rst */
++			reset-duration-us = <15>;
++		};
++	};
++};
 -- 
-2.11.1
+2.7.4
