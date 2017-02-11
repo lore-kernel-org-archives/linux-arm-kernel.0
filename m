@@ -1,77 +1,79 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Sat, 11 Feb 2017 16:05:02 +0000
-Subject: [PATCH v4 4/5] dt-bindings: arm64 ARCH_THUNDER2 platform
- documentation
-In-Reply-To: <CAL_JsqLaLnzFzQbGVpxGRFjkjSEM7mmGMd+xJ_urwcX5Jq9L+w@mail.gmail.com>
-References: <CAK8P3a07eo0htv_y6H_aHvAaeo5two3vQTaySuFXpG+dzYguUQ@mail.gmail.com>
- <1486667612-8168-1-git-send-email-jnair@caviumnetworks.com>
- <CAL_JsqKm-c6D_fki_TsRYKH3aGoC5GE7n0DazNi7P268aj-93g@mail.gmail.com>
- <20170210150754.GA1874@localhost>
- <CAL_JsqLaLnzFzQbGVpxGRFjkjSEM7mmGMd+xJ_urwcX5Jq9L+w@mail.gmail.com>
-Message-ID: <20170211160501.GA2794@localhost>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 11 Feb 2017 17:30:25 +0100
+Subject: ARM: dts: rockchip: fix the MiQi board's LED definition
+In-Reply-To: <1486803405-14625-1-git-send-email-w@1wt.eu>
+References: <1486803405-14625-1-git-send-email-w@1wt.eu>
+Message-ID: <2094417.n6KR7CNSyF@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2017 at 11:32:29AM -0600, Rob Herring wrote:
-> On Fri, Feb 10, 2017 at 9:07 AM, Jayachandran C
-> <jnair@caviumnetworks.com> wrote:
-> > On Fri, Feb 10, 2017 at 08:55:31AM -0600, Rob Herring wrote:
-> >> On Thu, Feb 9, 2017 at 1:13 PM, Jayachandran C <jnair@caviumnetworks.com> wrote:
-> >> > Add documentation for Cavium ThunderX2 CN99XX ARM64 processor family.
-> >> > The the SoC will use the ID "cavium,thunderx2-cn9900".
-> >> >
-> >> > Add documentation entry for the "cavium,thunder2" cpu core as well.
-> >> >
-> >> > Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
-> >> > ---
-> >> >
-> >> > v3->v4
-> >> > Documentation updates to reflect changes in device tree.
-> >> >
-> >> >  Documentation/devicetree/bindings/arm/cavium-thunder2.txt | 8 ++++++++
-> >> >  Documentation/devicetree/bindings/arm/cpus.txt            | 1 +
-> >> >  2 files changed, 9 insertions(+)
-> >> >  create mode 100644 Documentation/devicetree/bindings/arm/cavium-thunder2.txt
-> >> >
-> >> > diff --git a/Documentation/devicetree/bindings/arm/cavium-thunder2.txt b/Documentation/devicetree/bindings/arm/cavium-thunder2.txt
-> >> > new file mode 100644
-> >> > index 0000000..dc5dd65
-> >> > --- /dev/null
-> >> > +++ b/Documentation/devicetree/bindings/arm/cavium-thunder2.txt
-> >> > @@ -0,0 +1,8 @@
-> >> > +Cavium ThunderX2 CN99XX platform tree bindings
-> >> > +----------------------------------------------
-> >> > +
-> >> > +Boards with Cavium ThunderX2 CN99XX SoC shall have the root property:
-> >> > +  compatible = "cavium,thunderx2-cn9900", "brcm,vulcan-soc";
-> >> > +
-> >> > +These SoC uses the "cavium,thunder2" core which will be compatible
-> >> > +with "brcm,vulcan".
-> >> > diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> >> > index a1bcfee..74f0b23 100644
-> >> > --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> >> > +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> >> > @@ -169,6 +169,7 @@ nodes to be present and contain the properties described below.
-> >> >                             "brcm,brahma-b15"
-> >> >                             "brcm,vulcan"
-> >> >                             "cavium,thunder"
-> >> > +                           "cavium,thunder2"
-> >>
-> >> Is this the same as brcm,vulcan?
-> >
-> > It will have a different CPU ID, with different implementer and part num,
-> > but compatible with "brcm,vulcan". In the ThunderX2 dtsi file (once
-> > ARCH_VULCAN goes away), we want to be compatable = "cavium,thunder2", with
-> > maybe "brcm,vulcan" after that.
+Am Samstag, 11. Februar 2017, 09:56:45 CET schrieb Willy Tarreau:
+> The MiQi board's green LED doesn't work at all with the mainline kernel.
+> There are multiple reasons to this. First, the gpio number is wrong, it
+> is declared on gpio220 (chip 7 pin 4) instead of gpio218 (chip 7 pin 2).
+> Second, a pinctrl is referenced, also declared with the same wrong value
+> while it is not unused. Third, the GPIO polarity was wrong (active low
+> instead of active high) with the default value set to "default-on",
+> resulting in the LED being turned off even when the GPIO is correct.
 > 
-> Okay, new ID registers is good enough reason. I'd just let brcm,vulcan
-> die though I have no idea how many Broadcom systems there are out in
-> the wild (and ones that you care about DT on).
+> This patch fixes all these inconsistencies at once since these they are
+> related to each other, and also restores the "timer" trigger which is
+> the same as the one used by the kernels shipped with the board.
+> 
+> It's important to note that during the port to mainline, the led's label
+> was changed from "System" to "miqi:green:user", so scripts making use of
+> the name will still not work until they're fixed.
+> 
+> Fixes: 162718c (v4.7)
 
-This is not an issue. Broadcom did not take the chip into production, and
-the eval systems are at the new habitat :)
- 
-> Acked-by: Rob Herring <robh@kernel.org>
+Fixes: b1a76f75d76e ("ARM: dts: rockchip: add MiQi board from mqmaker")
 
-Thanks,
-JC.
+Interestingly schematics for MiQi still point to GPIO7_A4 as led pin, but I 
+haven't looked at my pre-production miqi for quite some time.
+
+So anyway, applied for 4.12
+
+The led pinctrl could've simply be changed to also use the correct pin instead 
+of removing it, but as the pin is used as output only and not requested with 
+open-drain/open-source characteristics, this should not matter much.
+
+
+Heiko
+
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Willy Tarreau <w@1wt.eu>
+> ---
+>  arch/arm/boot/dts/rk3288-miqi.dts | 12 ++----------
+>  1 file changed, 2 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/rk3288-miqi.dts
+> b/arch/arm/boot/dts/rk3288-miqi.dts index f751372..2f4c635 100644
+> --- a/arch/arm/boot/dts/rk3288-miqi.dts
+> +++ b/arch/arm/boot/dts/rk3288-miqi.dts
+> @@ -68,11 +68,9 @@
+>  		compatible = "gpio-leds";
+> 
+>  		work {
+> -			gpios = <&gpio7 4 GPIO_ACTIVE_LOW>;
+> +			gpios = <&gpio7 2 GPIO_ACTIVE_HIGH>;
+>  			label = "miqi:green:user";
+> -			linux,default-trigger = "default-on";
+> -			pinctrl-names = "default";
+> -			pinctrl-0 = <&led_ctl>;
+> +			linux,default-trigger = "timer";
+>  		};
+>  	};
+> 
+> @@ -363,12 +361,6 @@
+>  		};
+>  	};
+> 
+> -	leds {
+> -		led_ctl: led-ctl {
+> -			rockchip,pins = <7 4 RK_FUNC_GPIO &pcfg_pull_none>;
+> -		};
+> -	};
+> -
+>  	sdmmc {
+>  		/*
+>  		 * Default drive strength isn't enough to achieve even
