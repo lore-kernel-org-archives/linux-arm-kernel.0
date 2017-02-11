@@ -1,84 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 11 Feb 2017 14:20:25 +0100
-Subject: [PATCH 00/22] Conversion of ARMv4 Gemini to DT and multiplatform
-In-Reply-To: <alpine.LNX.2.00.1701301702420.14503@T420s>
-References: <20170122121506.9995-1-linus.walleij@linaro.org>
- <8e705d3a-ff99-23b2-c4c9-2edccf134cac@gmail.com>
- <CACRpkdbdsNU6pOcewyZw_jpXzXvm_aj0FURY7Ty5FkT227iZ=Q@mail.gmail.com>
- <alpine.LNX.2.00.1701241734140.2736@T420s>
- <CACRpkdY1A8QbKVV0-ZFeH-n0zYpmJkoGj5vA0Ov-DDhBTJf5_w@mail.gmail.com>
- <6a6f3b79-18d7-3243-6a5c-2dc9a3755aa9@gmail.com>
- <alpine.LNX.2.00.1701301702420.14503@T420s>
-Message-ID: <CACRpkdbUOR76fjb_UvuiQHq22oAji8zwMAxmJV1dRA5V9DEQQw@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 11 Feb 2017 23:44:51 +0800
+Subject: [nomadik:gemini 28/37] pci-faraday.c:undefined reference to
+ `pci_fixup_irqs'
+Message-ID: <201702112348.69V0JZBG%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 5:35 PM, Hans Ulli Kroll
-<ulli.kroll@googlemail.com> wrote:
-> On Tue, 24 Jan 2017, Florian Fainelli wrote:
->> On 01/24/2017 12:47 PM, Linus Walleij wrote:
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini
+head:   b07f5b7299d773b7448d92ae002bbfda455daab9
+commit: c1ba994d16517166ea1920173566b60c73ac8f18 [28/37] PCI: add driver for Faraday Technology Host Bridge
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout c1ba994d16517166ea1920173566b60c73ac8f18
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
->> >> This is a dual GMAC !
->> >>
->> >> They are two different base address for each GMAC and one shared
->> >> base address for both of them.
->> >> This is all in one address space which remaps the driver.
->> >>
->> >> And to make it worse two interrupt lines, one of them is also shared.
->> >>
->> >> Any ideas to "convert" this into DT ??
->> >> Because I think it's impossible to split both GMAC interfaces ??
->> >
->> > Sounds odd.  Yeah hardware.h lists this:
->> >
->> > #define GEMINI_TOE_BASE         0x60000000
->> > #define GEMINI_GMAC0_BASE       0x6000A000
->> > #define GEMINI_GMAC1_BASE       0x6000E000
->> >
->> > I guess one approach is to make a driver handling all of it in one,
->> > let it ioremap all regions and support one or two GMACs on the same
->> > TOE. More complex solutions is to share the TOE using
->> > syscons regmap mechanism but it looks cumbersome.
->> >
->> > {
->> >    compatible = "cortina,genesis-gmac-ethernet";
->> >    reg = <0x60000000 0xa000>, <0x6000a000 0x4000>, <0x6000e000 0x4000>;
->> >    interrupts = <1 IRQ_TYPE_LEVEL_HIGH>, <2 IRQ_TYPE_LEVEL_HIGH>;
->> > }
->> >
->> > Or something like that?
->
-> For addresses, base is here, for both interfaces
-> #define GEMINI_TOE_BASE                 0x60000000
-> and now for each interface, offset to the above
-> code is from the headerfile of the openwrt driver.
-> #define TOE_GMAC_DMA_BASE(x)            (0x8000 + 0x4000 * (x))
-> #define TOE_GMAC_BASE(x)                (0xA000 + 0x4000 * (x))
->
-> maybe some other registers to
-> #define TOE_NONTOE_QUE_HDR_BASE         0x2000
-> #define TOE_TOE_QUE_HDR_BASE            0x3000
-> #define TOE_V_BIT_BASE                  0x4000
-> #define TOE_A_BIT_BASE                  0x6000
->
-> AFAICR
-> The TOE part was "invented" for the gigabit interface.
-> They need to speed up the NIC because without TCP offloading you will get
-> only fast ethernet speed on a gigabit NIC.
+All errors (new ones prefixed by >>):
 
-I was suspecting that this ethernet is related to the Faraday ethernet driver
-that was merged in drivers/net/ethernet/faraday since so many other
-Gemini parts seems to be coming essentially directly from Faraday.
+   drivers/built-in.o: In function `faraday_pci_probe':
+>> pci-faraday.c:(.text+0x53ec4): undefined reference to `pci_fixup_irqs'
 
-I looked through the header files etc there but the registers seem quite
-different ... :/
-
-Still it is using the same "GMAC" naming and I strongly suspect this is
-an older Faraday IP that should go into the same driver folder.
-
-Cc:ing some Faraday and Andestech emails to see if we can get some
-clarity in this. It would be nice if someone could atleast say "oh it's this
-IP FTxxx from Faraday" so we know what to name it.
-
-Yours,
-Linus Walleij
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 57922 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170211/fca3d5ab/attachment-0001.gz>
