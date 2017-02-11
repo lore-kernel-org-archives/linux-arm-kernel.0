@@ -1,44 +1,63 @@
 From: w@1wt.eu (Willy Tarreau)
-Date: Sat, 11 Feb 2017 09:56:55 +0100
-Subject: ARM: dts: rockchip: add the MiQi board's fan definition
-Message-ID: <1486803415-14680-1-git-send-email-w@1wt.eu>
+Date: Sat, 11 Feb 2017 09:56:45 +0100
+Subject: ARM: dts: rockchip: fix the MiQi board's LED definition
+Message-ID: <1486803405-14625-1-git-send-email-w@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MiQi board is sold with an enclosure in which a fan is connected
-to the second LED output, and configured by default in "heartbeat"
-mode so that it rotates slowly and increases when the CPU load
-increases, ensuring appropriate cooling by default. This LED output
-is called "Fan" in the original kernel and connected to GPIO18
-(gpiochip 0, pin 18). Here we called it "miqi:green:fan" to stay
-consistent with the kernel's naming conventions.
+The MiQi board's green LED doesn't work at all with the mainline kernel.
+There are multiple reasons to this. First, the gpio number is wrong, it
+is declared on gpio220 (chip 7 pin 4) instead of gpio218 (chip 7 pin 2).
+Second, a pinctrl is referenced, also declared with the same wrong value
+while it is not unused. Third, the GPIO polarity was wrong (active low
+instead of active high) with the default value set to "default-on",
+resulting in the LED being turned off even when the GPIO is correct.
 
-It's worth noting that without this patch the fan doesn't work at
-all, risking to make the board overheat.
+This patch fixes all these inconsistencies at once since these they are
+related to each other, and also restores the "timer" trigger which is
+the same as the one used by the kernels shipped with the board.
+
+It's important to note that during the port to mainline, the led's label
+was changed from "System" to "miqi:green:user", so scripts making use of
+the name will still not work until they're fixed.
 
 Fixes: 162718c (v4.7)
 Cc: Heiko Stuebner <heiko@sntech.de>
 Signed-off-by: Willy Tarreau <w@1wt.eu>
 ---
- arch/arm/boot/dts/rk3288-miqi.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/rk3288-miqi.dts | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm/boot/dts/rk3288-miqi.dts b/arch/arm/boot/dts/rk3288-miqi.dts
-index 2f4c635..ef702db 100644
+index f751372..2f4c635 100644
 --- a/arch/arm/boot/dts/rk3288-miqi.dts
 +++ b/arch/arm/boot/dts/rk3288-miqi.dts
-@@ -67,6 +67,12 @@
- 	leds {
+@@ -68,11 +68,9 @@
  		compatible = "gpio-leds";
  
-+		fan {
-+			gpios = <&gpio0 18 GPIO_ACTIVE_HIGH>;
-+			label = "miqi:green:fan";
-+			linux,default-trigger = "heartbeat";
-+		};
-+
  		work {
- 			gpios = <&gpio7 2 GPIO_ACTIVE_HIGH>;
+-			gpios = <&gpio7 4 GPIO_ACTIVE_LOW>;
++			gpios = <&gpio7 2 GPIO_ACTIVE_HIGH>;
  			label = "miqi:green:user";
+-			linux,default-trigger = "default-on";
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&led_ctl>;
++			linux,default-trigger = "timer";
+ 		};
+ 	};
+ 
+@@ -363,12 +361,6 @@
+ 		};
+ 	};
+ 
+-	leds {
+-		led_ctl: led-ctl {
+-			rockchip,pins = <7 4 RK_FUNC_GPIO &pcfg_pull_none>;
+-		};
+-	};
+-
+ 	sdmmc {
+ 		/*
+ 		 * Default drive strength isn't enough to achieve even
 -- 
 2.8.0.rc2.1.gbe9624a
