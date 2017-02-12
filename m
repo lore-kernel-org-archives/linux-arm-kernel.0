@@ -1,8 +1,8 @@
 From: w@1wt.eu (Willy Tarreau)
-Date: Sun, 12 Feb 2017 10:23:53 +0100
-Subject: [PATCH v2] ARM: dts: armada-385-synology-ds116: add support for
+Date: Sun, 12 Feb 2017 10:30:35 +0100
+Subject: [PATCH v3] ARM: dts: armada-385-synology-ds116: add support for
  Synology DS116 NAS
-Message-ID: <1486891433-6371-1-git-send-email-w@1wt.eu>
+Message-ID: <1486891835-6641-1-git-send-email-w@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -29,10 +29,13 @@ Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Willy Tarreau <w@1wt.eu>
 
 ---
+v3:
+  - rebased it on master, v2 was accidently sent for 4.9 and conflicts there
+
 v2, after Andrew's review:
   - added a poweroff node in addition to serial1 (tested and works)
   - changed the comment to mention that serial1's speed is 9600 not 115200 bps
-    after a new series of tests, don't know why I believed I tested it at 115k.
+    after a new series of test, don't know why I believed I tested it at 115k.
   - fixed a typo in a comment
 ---
  arch/arm/boot/dts/Makefile                      |   1 +
@@ -41,17 +44,17 @@ v2, after Andrew's review:
  create mode 100644 arch/arm/boot/dts/armada-385-synology-ds116.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 8cf288f..94784ef 100644
+index 01d178a..2bc2b33 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -920,6 +920,7 @@ dtb-$(CONFIG_MACH_ARMADA_38X) += \
+@@ -949,6 +949,7 @@ dtb-$(CONFIG_MACH_ARMADA_38X) += \
  	armada-385-db-ap.dtb \
  	armada-385-linksys-caiman.dtb \
  	armada-385-linksys-cobra.dtb \
 +	armada-385-synology-ds116.dtb \
+ 	armada-385-turris-omnia.dtb \
  	armada-388-clearfog.dtb \
- 	armada-388-clearfog-base.dtb \
- 	armada-388-clearfog-pro.dtb \
+ 	armada-388-db.dtb \
 diff --git a/arch/arm/boot/dts/armada-385-synology-ds116.dts b/arch/arm/boot/dts/armada-385-synology-ds116.dts
 new file mode 100644
 index 0000000..31510eb
