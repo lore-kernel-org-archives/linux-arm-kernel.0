@@ -1,25 +1,67 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Sun, 12 Feb 2017 02:24:18 +0100
-Subject: [PATCH] ARM: dts: armada-385-synology-ds116: add support for
- Synology DS116 NAS
-In-Reply-To: <20170212011744.GB7328@lunn.ch>
-References: <1486805073-15534-1-git-send-email-w@1wt.eu>
- <20170212004031.GA7328@lunn.ch> <20170212005350.GA18612@1wt.eu>
- <20170212011744.GB7328@lunn.ch>
-Message-ID: <20170212012418.GA17841@1wt.eu>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 12 Feb 2017 02:41:35 +0100
+Subject: ARM: dts: rockchip: add the MiQi board's fan definition
+In-Reply-To: <20170211174554.GA14513@1wt.eu>
+References: <1486803415-14680-1-git-send-email-w@1wt.eu>
+ <3614963.WjR2ddleWK@phil> <20170211174554.GA14513@1wt.eu>
+Message-ID: <1552549.5mxCAWQDxc@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 12, 2017 at 02:17:44AM +0100, Andrew Lunn wrote:
-> > But won't that squat the I/O address and prevent me from using all the
-> > other codes via the regular serial port ?
+Hi Willy,
+
+Am Samstag, 11. Februar 2017, 18:45:54 CET schrieb Willy Tarreau:
+> On Sat, Feb 11, 2017 at 05:33:16PM +0100, Heiko Stuebner wrote:
+> > Am Samstag, 11. Februar 2017, 09:56:55 CET schrieb Willy Tarreau:
+> > > The MiQi board is sold with an enclosure in which a fan is connected
+> > > to the second LED output, and configured by default in "heartbeat"
+> > > mode so that it rotates slowly and increases when the CPU load
+> > > increases, ensuring appropriate cooling by default. This LED output
+> > > is called "Fan" in the original kernel and connected to GPIO18
+> > > (gpiochip 0, pin 18). Here we called it "miqi:green:fan" to stay
+> > > consistent with the kernel's naming conventions.
+> > 
+> > I tend to disagree with this approach. A fan is not a led and the
+> > devicetree is about describing the hardware, not how a specific kernel
+> > likes to use things> 
+> > :-) .
 > 
-> Nope. That driver hijacks the serial port during shutdown to actually
-> turn the power off. The rest of the time, it does not touch the serial
-> port. Userspace, or the rest of the kernel is free to use it.
+> Sure but I was trying to stay as close as possible to the intended
+> purpose of the connector on the board as it is sold :-)
+>
+> > The kernel already has a gpio-fan driver (drivers/hwmon) or you could
+> > resurrect the gpio-pwm patch [0] from Olliver Schinagl and use the pwm-fan
+> > on top of that for more intermediate steps.
+> 
+> Ah it's great to know there has already been something like this because
+> I thought about developing one for the same reason.
+> 
+> > > It's worth noting that without this patch the fan doesn't work at
+> > > all, risking to make the board overheat.
+> > 
+> > At least cpufreq is already hooked to the thermal controller on the
+> > rk3288, so even without additional cooling it should select lower cpu
+> > frequencies keeping the heat in line and prevent overheating the board.
+> 
+> Well that's one way to see it, as for me throttling the CPU is the last
+> resort before seeing it die ;
 
-OK so I should declare both the serial and the power-off device at the
-same address ? Excuse-me for the dumb question but I'm not much used to
-doing uncommon things in DTS files :-/
+That's what I was trying to say :-) ... it won't overheat because cpufreq will 
+throttle it as a last resort.
 
-Willy
+
+> I find it sad to waste all the performance
+> of a 3288 that way, otherwise it's easier to use something like a dirt
+> a much slower and cheaper cortex A5. But I agree with the point regarding
+> the gpio-pwm.
+
+Even with the gpio-fan you should see results if you simply add the fan as 
+active trip point somewhere before the cpufreq trip points. So let the fan get 
+activated at 50/60? or so.
+
+
+Heiko
+
+> I think that mqmaker initially designed the GPIO to be used
+> as a led to benefit from the heartbeat trigger which more or less replaces
+> what a more efficient thermal control could achieve.
