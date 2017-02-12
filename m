@@ -1,37 +1,38 @@
-From: manchoyy@gmail.com (Man Choy)
-Date: Sun, 12 Feb 2017 04:34:09 +0800
-Subject: [PATCH] bcm2835-audio: Fix checkpatch errors
-Message-ID: <1486845362-25086-1-git-send-email-manchoyy@gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 12 Feb 2017 17:17:46 +0800
+Subject: [PATCH] ARM: dts: sun5i-gr8: Rename pwm0_pins_a to pwm0_pins
+In-Reply-To: <20170210034234.3612-1-wens@csie.org>
+Message-ID: <201702121759.13cBv97u%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix following errors:
+Hi Chen-Yu,
 
-ERROR: do not initialise statics to NULL
-+static struct snd_card *g_card = NULL;
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.10-rc7 next-20170210]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-ERROR: do not initialise statics to NULL
-+static struct bcm2835_chip *g_chip = NULL;
+url:    https://github.com/0day-ci/linux/commits/Chen-Yu-Tsai/ARM-dts-sun5i-gr8-Rename-pwm0_pins_a-to-pwm0_pins/20170210-122740
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm-allyesconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Signed-off-by: Man Choy <manchoyy@gmail.com>
+All errors (new ones prefixed by >>):
+
+>> ERROR: Input tree has errors, aborting (use -f to force output)
+
 ---
- drivers/staging/bcm2835-audio/bcm2835.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/staging/bcm2835-audio/bcm2835.c b/drivers/staging/bcm2835-audio/bcm2835.c
-index a84d74d..265fe55 100644
---- a/drivers/staging/bcm2835-audio/bcm2835.c
-+++ b/drivers/staging/bcm2835-audio/bcm2835.c
-@@ -28,8 +28,8 @@
-  * to debug if we run into issues
-  */
- 
--static struct snd_card *g_card = NULL;
--static struct bcm2835_chip *g_chip = NULL;
-+static struct snd_card *g_card;
-+static struct bcm2835_chip *g_chip;
- 
- static int snd_bcm2835_free(struct bcm2835_chip *chip)
- {
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 59747 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170212/f25cf3f2/attachment-0001.gz>
