@@ -1,48 +1,45 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sun, 12 Feb 2017 13:02:52 +0100
-Subject: [BUG] usb: gadget: Kernel oops with UVC USB gadget and configfs
-In-Reply-To: <3faadfcb-5e0d-8f92-3e91-4bd745026644@tul.cz> (Petr Cvek's
- message of "Sun, 12 Feb 2017 02:15:43 +0100")
-References: <497c3c61-31f0-4d40-9bab-5a0aa793e5e9@tul.cz>
- <87shnt1sue.fsf@belgarion.home>
- <3faadfcb-5e0d-8f92-3e91-4bd745026644@tul.cz>
-Message-ID: <8737fj1us3.fsf@belgarion.home>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sun, 12 Feb 2017 13:16:58 +0100
+Subject: [PATCH] bcm2835-audio: Fix checkpatch errors
+In-Reply-To: <1486845362-25086-1-git-send-email-manchoyy@gmail.com>
+References: <1486845362-25086-1-git-send-email-manchoyy@gmail.com>
+Message-ID: <20170212121658.GA19617@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
+On Sun, Feb 12, 2017 at 04:34:09AM +0800, Man Choy wrote:
+> Fix following errors:
+> 
+> ERROR: do not initialise statics to NULL
+> +static struct snd_card *g_card = NULL;
+> 
+> ERROR: do not initialise statics to NULL
+> +static struct bcm2835_chip *g_chip = NULL;
+> 
+> Signed-off-by: Man Choy <manchoyy@gmail.com>
+> ---
+>  drivers/staging/bcm2835-audio/bcm2835.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/staging/bcm2835-audio/bcm2835.c b/drivers/staging/bcm2835-audio/bcm2835.c
+> index a84d74d..265fe55 100644
+> --- a/drivers/staging/bcm2835-audio/bcm2835.c
+> +++ b/drivers/staging/bcm2835-audio/bcm2835.c
+> @@ -28,8 +28,8 @@
+>   * to debug if we run into issues
+>   */
+>  
+> -static struct snd_card *g_card = NULL;
+> -static struct bcm2835_chip *g_chip = NULL;
+> +static struct snd_card *g_card;
+> +static struct bcm2835_chip *g_chip;
+>  
+>  static int snd_bcm2835_free(struct bcm2835_chip *chip)
+>  {
 
-> Hi
->
-> any news?
+Someone sent this same fix in before you did, a few days ago.  Be sure
+to always use the most up-to-date tree.
 
-Yeah, I don't have the error on my mainstone, which kind of hinders my debug
-capability.
+sorry,
 
-I have tried your script, and this is what I get :
-  - dmesg | tail
-	random: crng init done
-	gadgetfs: USB Gadget filesystem, version 24 Aug 2004
-	configfs-gadget gadget: uvc_function_bind
-	[DEBUG] opts->streaming_maxpacket=256
-	====name: ep1in-int, mp=16
-	====name: ep1in-int, mp=16
-	====name: ep2in-int, mp=16
-	====name: ep3out-int, mp=16
-	====name: ep4in-iso, mp=256
-  - lsmod
-	Module                  Size  Used by    Not tainted
-	usb_f_uvc              40752  6 
-	libcomposite           38099 14 usb_f_uvc
-	pxa27x_udc             21131  0 
-	gadgetfs               16173  0 
-	videobuf2_vmalloc       4659  1 usb_f_uvc
-	videobuf2_memops        1421  1 videobuf2_vmalloc
-
-This was tried on a mainstone board, upon mainline kernel v4.8-rc3 with your
-patch. but without an actual camera nor the USB cable attached to a host USB.
-
-Cheers.
-
--- 
-Robert
+greg k-h
