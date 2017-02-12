@@ -1,63 +1,40 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Sun, 12 Feb 2017 01:53:50 +0100
-Subject: [PATCH] ARM: dts: armada-385-synology-ds116: add support for
- Synology DS116 NAS
-In-Reply-To: <20170212004031.GA7328@lunn.ch>
-References: <1486805073-15534-1-git-send-email-w@1wt.eu>
- <20170212004031.GA7328@lunn.ch>
-Message-ID: <20170212005350.GA18612@1wt.eu>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Sun, 12 Feb 2017 02:15:43 +0100
+Subject: [BUG] usb: gadget: Kernel oops with UVC USB gadget and configfs
+In-Reply-To: <87shnt1sue.fsf@belgarion.home>
+References: <497c3c61-31f0-4d40-9bab-5a0aa793e5e9@tul.cz>
+ <87shnt1sue.fsf@belgarion.home>
+Message-ID: <3faadfcb-5e0d-8f92-3e91-4bd745026644@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi
 
-On Sun, Feb 12, 2017 at 01:40:31AM +0100, Andrew Lunn wrote:
-> > +			serial at 12000 {
-> > +				pinctrl-names = "default";
-> > +				pinctrl-0 = <&uart0_pins>;
-> > +				status = "okay";
-> > +			};
-> > +
-> > +			serial at 12100 {
-> > +				/* A PIC16F1829 is connected to uart1 at 115200 bps,
-> > +				 * and takes single-character orders :
-> > +				 *   "1" : power off
+any news?
+
+Petr
+
+Dne 4.2.2017 v 23:42 Robert Jarzmik napsal(a):
+> Petr Cvek <petr.cvek@tul.cz> writes:
 > 
-> Hi Willy
+>> Setting the UVC gadget with configfs and then reloading UDC controler driver
+>> (pxa27x_udc) causes kernel to fail.
+>>
+>> UDC subsystem was patched only in decreasing maxpacket size for UVC, addition
+>> of more predefined endpoints for pxa27x_udc and addition of some debugging pr_info.
+>>
+>> Practically same behaviour was observed on 4.7.0 too.
+> Hi Petr,
 > 
-> The qnap-poweroff.c driver will support this. You need a new
-> compatible string, since 115200 is not the speed the current synology
-> devices use.
-
-But won't that squat the I/O address and prevent me from using all the
-other codes via the regular serial port ? They are particularly convenient
-in fact since they are the only way to access the LEDs, beeper and even
-to trigger a reset (even if this last one is less used in software form).
-
-> > +				 *   "2" : short beep
-> > +				 *   "3" : long beep
-> > +				 *   "4" : turn the power LED ON
-> > +				 *   "5" : flash the power LED
-> > +				 *   "6" : turn the power LED OFF
-> > +				 *   "7" : turn the status LED OFF
-> > +				 *   "8" : turn the status LED ON
-> > +				 *   "9" : flash the status LED
-> > +				 *   "A" : flash the motherboard LED (D8)
-> > +				 *   "B" : turn the motherboard LED OFF
-> > +				 *   "C" : hard reset
-> > +				 */
-> > +				pinctrl-names = "default";
-> > +				pinctrl-0 = <&uart1_pins>;
-> > +				status = "okay";
-> > +			};
+> If you could provide me your "debug patch" for the new endpoints, packet size
+> and pr_infos, I could try to reproduce on my platform and have a look.
 > 
-> > +		gpio-leds {
-> > +			compatible = "gpio-leds";
-> > +
-> > +			/* The greed part is on gpio0.20 which is also used by
+> I must say that I'm not familiar with uvc, so I can only suppose you're trying
+> to stream the magician camera to USB to "act" like a Webcam, is it what you're
+> trying to achieve ?
 > 
-> green?
-
-Oops, sorry, thanks for catching.
-
-Willy
+> Cheers.
+> 
+> --
+> Robert
+> 
