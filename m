@@ -1,50 +1,61 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon, 13 Feb 2017 15:39:49 -0600
-Subject: [RFC PATCH 02/33] irqchip/gic-v3: Add VLPI/DirectLPI discovery
-In-Reply-To: <1484648454-21216-3-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <778dd3ec-b395-6883-f047-bea56ac54572@codeaurora.org>
+From: rah@settrans.net (Bob Ham)
+Date: Mon, 13 Feb 2017 21:41:37 +0000
+Subject: Allwinner A31 framebuffer fails with new CCU clock bindings
+In-Reply-To: <20170213095207.tsqcigfhyftm5ohk@lukather>
+References: <1486814920.7145.19.camel@settrans.net>
+ <20170213095207.tsqcigfhyftm5ohk@lukather>
+Message-ID: <1487022097.7145.43.camel@settrans.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 2017-02-13 at 10:52 +0100, Maxime Ripard wrote:
+> On Sat, Feb 11, 2017 at 12:08:40PM +0000, Bob Ham wrote:
+> > On IRC, MoeIcenowy requested the contents
+> > of /sys/kernel/debug/clk/clk_summary.  I don't know how useful it will
+> > be but I've put up two versions, one from the bad commit and another
+> > from the previous, good commit in the bisect:
+> > 
+> > http://settrans.net/~rah/misc/sun6i-a31-bad-fb-clk_summary-good.txt
+> > http://settrans.net/~rah/misc/sun6i-a31-bad-fb-clk_summary-bad.txt
+> 
+> Are you sure the good one works? None of the display clocks are
+> enabled.
+
+Definitely.  Here's clk_summary from an even earlier kernel from Debian,
+4.7.8-1:
+
+http://settrans.net/~rah/misc/sun6i-a31-bad-fb-clk_summary-good-4.7.8-1.txt
+
+And to make super sure, he's a *screenshot* of a terminal in X running
+on that kernel, showing every line with "0" in the second column:
+
+http://settrans.net/~rah/misc/sun6i-a31-bad-fb-clk_summary-good-4.7.8-1.png
+
+Does this imply something odd in this hardware or a problem with the
+kernel?
 
 
-On 01/17/2017 04:20 AM, Marc Zyngier wrote:
-> Add helper functions that probe for VLPI and DirectLPI properties.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   drivers/irqchip/irq-gic-v3.c       | 22 ++++++++++++++++++++++
->   include/linux/irqchip/arm-gic-v3.h |  3 +++
->   2 files changed, 25 insertions(+)
->
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index 5cadec0..8a6de91 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -514,6 +514,24 @@ static int gic_populate_rdist(void)
->   	return -ENODEV;
->   }
->   
-> +static int __gic_update_vlpi_properties(struct redist_region *region,
-> +					void __iomem *ptr)
-> +{
-> +	u64 typer = gic_read_typer(ptr + GICR_TYPER);
-> +	gic_data.rdists.has_vlpis &= !!(typer & GICR_TYPER_VLPIS);
-> +	gic_data.rdists.has_direct_lpi &= !!(typer &
-> GICR_TYPER_DirectLPIS);
-> +
-> +	return 1;
-> +}
-> +
-> +static void gic_update_vlpi_properties(void)
-> +{
-> +	gic_scan_rdist_properties(__gic_update_vlpi_properties);
-> +	pr_info("%sVLPI support, %sdirect LPI support\n",
-Would be better if we keep one space after 'no'?
+> Could you add "clk_ignore_unused" to the kernel boot parameters and
+> see if it works?
 
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+That does indeed work.  On the same kernel which produced
+sun6i-a31-bad-fb-clk_summary-bad.txt, with clk_ignore_unused added to
+the boot parameters, the console continues to show output all through
+booting and X runs fine.  Here is the clk_summary:
+
+http://settrans.net/~rah/misc/sun6i-a31-bad-fb-clk_summary-clk_ignore_unused.txt
+
+Can I ask what clk_ignore_unused does that might have fixed this?
+
+
+Thanks,
+
+Bob
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170213/0eb4a29c/attachment.sig>
