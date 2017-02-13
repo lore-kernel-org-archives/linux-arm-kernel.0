@@ -1,114 +1,155 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Mon, 13 Feb 2017 10:20:32 +0100 (CET)
-Subject: [PATCH 00/22] Conversion of ARMv4 Gemini to DT and multiplatform
-In-Reply-To: <FC5B4F97116B48439B455474D032A2F1087BAD65@FTCPCS74.faraday.com.tw>
-References: <20170122121506.9995-1-linus.walleij@linaro.org>
- <8e705d3a-ff99-23b2-c4c9-2edccf134cac@gmail.com>
- <CACRpkdbdsNU6pOcewyZw_jpXzXvm_aj0FURY7Ty5FkT227iZ=Q@mail.gmail.com>
- <alpine.LNX.2.00.1701241734140.2736@T420s>
- <CACRpkdY1A8QbKVV0-ZFeH-n0zYpmJkoGj5vA0Ov-DDhBTJf5_w@mail.gmail.com>
- <6a6f3b79-18d7-3243-6a5c-2dc9a3755aa9@gmail.com>
- <alpine.LNX.2.00.1701301702420.14503@T420s>
- <CACRpkdbUOR76fjb_UvuiQHq22oAji8zwMAxmJV1dRA5V9DEQQw@mail.gmail.com>
- <alpine.LNX.2.00.1702111853460.32439@T420s>
- <FC5B4F97116B48439B455474D032A2F1087BAD65@FTCPCS74.faraday.com.tw>
-Message-ID: <alpine.LNX.2.00.1702131013210.25980@T420s>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 13 Feb 2017 10:20:17 +0100
+Subject: [PATCH v3 21/24] media: imx: Add MIPI CSI-2 Receiver subdev driver
+In-Reply-To: <e9076980-ce84-f9ee-096d-865243b82a9e@gmail.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-22-git-send-email-steve_longerbeam@mentor.com>
+ <1486036237.2289.37.camel@pengutronix.de>
+ <ca0a2eb3-21b6-d312-c8e0-61da48c4c700@gmail.com>
+ <20170208234235.GA27312@n2100.armlinux.org.uk>
+ <d6dba77e-902c-7a4c-cc70-fe3a5c9649bb@gmail.com>
+ <e9076980-ce84-f9ee-096d-865243b82a9e@gmail.com>
+Message-ID: <1486977617.2873.29.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+Hi Steve,
 
-On Mon, 13 Feb 2017, John Feng-Hsin Chiang(???) wrote:
+On Thu, 2017-02-09 at 15:51 -0800, Steve Longerbeam wrote:
+> 
+> On 02/09/2017 03:49 PM, Steve Longerbeam wrote:
+> >
+> >
+> > On 02/08/2017 03:42 PM, Russell King - ARM Linux wrote:
+> >> On Wed, Feb 08, 2017 at 03:23:53PM -0800, Steve Longerbeam wrote:
+> >>>> Actually, this exact function already exists as 
+> >>>> dw_mipi_dsi_phy_write in
+> >>>> drivers/gpu/drm/rockchip/dw-mipi-dsi.c, and it looks like the D-PHY
+> >>>> register 0x44 might contain a field called HSFREQRANGE_SEL.
+> >>> Thanks for pointing out drivers/gpu/drm/rockchip/dw-mipi-dsi.c.
+> >>> It's clear from that driver that there probably needs to be a fuller
+> >>> treatment of the D-PHY programming here, but I don't know where
+> >>> to find the MIPI CSI-2 D-PHY documentation for the i.MX6. The code
+> >>> in imxcsi2_reset() was also pulled from FSL, and that's all I really 
+> >>> have
+> >>> to go on for the D-PHY programming. I assume the D-PHY is also a
+> >>> Synopsys core, like the host controller, but the i.MX6 manual doesn't
+> >>> cover it.
+> >> Why exactly?  What problems are you seeing that would necessitate a
+> >> more detailed programming of the D-PHY?  From my testing, I can wind
+> >> a 2-lane MIPI bus on iMX6D from 912Mbps per lane down to (eg) 308Mbps
+> >> per lane with your existing code without any issues.
+> >
+> > That's good to hear.
+> >
+> > Just from my experience with struggles to get the CSI2 receiver
+> > up and running with an active clock lane, and my suspicions that
+> > some of that could be due to my lack of understanding of the D-PHY
+> > programming.
+> 
+> But I should add that after a re-org of the sequence, it looks more stable
+> now. Tested on both the SabreSD and SabreLite with the OV5640.
 
-> Hi Hans,
-> 
-> > HI Linus,
-> > 
-> > On Sat, 11 Feb 2017, Linus Walleij wrote:
-> > 
-> > > On Mon, Jan 30, 2017 at 5:35 PM, Hans Ulli Kroll
-> > > <ulli.kroll@googlemail.com> wrote:
-> > > > On Tue, 24 Jan 2017, Florian Fainelli wrote:
-> > > >> On 01/24/2017 12:47 PM, Linus Walleij wrote:
-> > >
-> > > >> >> This is a dual GMAC !
-> > > >> >>
-> > > >> >> They are two different base address for each GMAC and one shared
-> > > >> >> base address for both of them.
-> > > >> >> This is all in one address space which remaps the driver.
-> > > >> >>
-> > > >> >> And to make it worse two interrupt lines, one of them is also shared.
-> > > >> >>
-> > > >> >> Any ideas to "convert" this into DT ??
-> > > >> >> Because I think it's impossible to split both GMAC interfaces ??
-> > > >> >
-> > > >> > Sounds odd.  Yeah hardware.h lists this:
-> > > >> >
-> > > >> > #define GEMINI_TOE_BASE         0x60000000
-> > > >> > #define GEMINI_GMAC0_BASE       0x6000A000
-> > > >> > #define GEMINI_GMAC1_BASE       0x6000E000
-> > > >> >
-> > > >> > I guess one approach is to make a driver handling all of it in
-> > > >> > one, let it ioremap all regions and support one or two GMACs on
-> > > >> > the same TOE. More complex solutions is to share the TOE using
-> > > >> > syscons regmap mechanism but it looks cumbersome.
-> > > >> >
-> > > >> > {
-> > > >> >    compatible = "cortina,genesis-gmac-ethernet";
-> > > >> >    reg = <0x60000000 0xa000>, <0x6000a000 0x4000>,> <0x6000e000 0x4000>;
-> > > >> >    interrupts = <1 IRQ_TYPE_LEVEL_HIGH>, <2> IRQ_TYPE_LEVEL_HIGH>;
-> > > >> > }
-> > > >> >
-> > > >> > Or something like that?
-> > > >
-> > > > For addresses, base is here, for both interfaces
-> > > > #define GEMINI_TOE_BASE                 0x60000000
-> > > > and now for each interface, offset to the above code is from the
-> > > > headerfile of the openwrt driver.
-> > > > #define TOE_GMAC_DMA_BASE(x)            (0x8000 + 0x4000 * (x))
-> > > > #define TOE_GMAC_BASE(x)                (0xA000 + 0x4000 * (x))
-> > > >
-> > > > maybe some other registers to
-> > > > #define TOE_NONTOE_QUE_HDR_BASE         0x2000
-> > > > #define TOE_TOE_QUE_HDR_BASE            0x3000
-> > > > #define TOE_V_BIT_BASE                  0x4000
-> > > > #define TOE_A_BIT_BASE                  0x6000
-> > > >
-> > > > AFAICR
-> > > > The TOE part was "invented" for the gigabit interface.
-> > > > They need to speed up the NIC because without TCP offloading you
-> > > > will get only fast ethernet speed on a gigabit NIC.
-> > >
-> > > I was suspecting that this ethernet is related to the Faraday ethernet
-> > > driver that was merged in drivers/net/ethernet/faraday since so many
-> > > other Gemini parts seems to be coming essentially directly from Faraday.
-> 
-> 1. Faraday have no TOE design in GMAC, and the GMAC in Gemini is very old one (licensed to Storlink about 13 years ago)
-> 2. Storlink may modify the GMC design and add TOE function in it to fit their SoC.
-> 
+It seems the OV5640 driver never puts its the CSI-2 lanes into stop
+state while not streaming. With the recent s_stream reordering,
+streaming from TC358743 does not work anymore, since imx6-mipi-csi2
+s_stream is called before tc358743 s_stream, while all lanes are still
+in stop state. Then it waits for the clock lane to become active and
+fails. I have applied the following patch to revert the reordering
+locally to get it to work again.
 
-Yeah, this was also my idea.
-Storlink need to speed up their GMAC NIC, so they do some tricks here.
+The initialization order, as Russell pointed out, should be:
 
-> > >
-> > > I looked through the header files etc there but the registers seem
-> > > quite different ... :/
-> > >
-> > > Still it is using the same "GMAC" naming and I strongly suspect this
-> > > is an older Faraday IP that should go into the same driver folder.
-> 
-> Yes, This is not the same one as Faraday's.
-> 
-> > >
-> > > Cc:ing some Faraday and Andestech emails to see if we can get some
-> > > clarity in this. It would be nice if someone could atleast say "oh
-> > > it's this IP FTxxx from Faraday" so we know what to name it.
-> > >
-> 
-> You should think this IP is from Storlink
-> 
+1. reset the D-PHY.
+2. place MIPI sensor in LP-11 state
+3. perform D-PHY initialisation
+4. configure CSI2 lanes and de-assert resets and shutdown signals
 
-I'll do. Thanks for the hint here, John.
+So csi2_s_stream should wait for stop state on all lanes (the result of
+2.) before dphy_init (3.), not wait for active clock afterwards. That
+should happen only after sensor_s_stream was called. So unless we are
+allowed to reorder steps 1. and 2., we might need the prepare_stream
+callback after all.
 
-Greetings
-Hans Ulli Kroll
+More specifically, the chapter 40.3.1 "Startup Sequence" in the i.MX6DQ
+reference manual states:
+
+1. Deassert presetn signal (global reset)
+   - This is probably the APB global reset, so not something we have to
+     care about.
+2. Configure MIPI Camera Sensor to put all Tx lanes in PL-11 state
+3. D-PHY initialization (write 0x14 to address 0x44)
+4. CSI2 Controller programming
+   - Set N_LANES
+   - Deassert PHY_SHUTDOWNZ
+   - Deassert PHY_RSTZ
+   - Deassert CSI2_RESETN
+5. Read the PHY status register (PHY_STATE) to confirm that all data and
+   clock lanes of the D-PHY are in Stop State
+6. Configure the MIPI Camera Sensor to start transmitting a clock on the
+   D-PHY clock lane
+7. CSI2 Controller programming - Read the PHY status register
+   (PHY_STATE) to confirm that the D-PHY is receiving a clock on the
+   D-PHY clock lane
+
+2. can be done in sensor s_power (which tc358743 currently does) only if
+the sensor can still be configured in step 6.
+Also, 3./4./5. are csi2 code, 6. is sensor code, and 7. is csi2 code
+again. For reliable startup we need csi2 receiver code to be called on
+both sides of the sensor enabling its clock lane.
+
+----------8<----------
+>From f12758caa3e1d05980cd2ac07587d125449fc860 Mon Sep 17 00:00:00 2001
+From: Philipp Zabel <p.zabel@pengutronix.de>
+Date: Mon, 13 Feb 2017 09:28:27 +0100
+Subject: [PATCH] media: imx: revert streamon sequence change
+
+Without this patch, starting streaming from a TC358743 MIPI CSI-2 source
+fails with the following error messages:
+
+    imx6-mipi-csi2: clock lane timeout, phy_state = 0x000006f0
+    ipu1_csi0: pipeline_set_stream failed with -110
+
+The phy state above has the stopstateclk, rxulpsclknot, and
+stopstatedata[3:0] bits set: at this point all lanes are in stop state,
+no lane is in ultra low power state or active.
+This is no suprise, since tc358743 s_stream(sd, 1) has not been called
+due to the recently changed ordering. The imx6-mipi-csi2 s_stream does
+wait for the clock lane to become active, so csi2_s_stream must happen
+after tc358743_s_stream.
+
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+ drivers/staging/media/imx/imx-media-utils.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/staging/media/imx/imx-media-utils.c b/drivers/staging/media/imx/imx-media-utils.c
+index 81eabcf76a66f..495ccefa3cd2a 100644
+--- a/drivers/staging/media/imx/imx-media-utils.c
++++ b/drivers/staging/media/imx/imx-media-utils.c
+@@ -782,8 +782,8 @@ static const u32 stream_on_seq[] = {
+ 	IMX_MEDIA_GRP_ID_IC_PRPENC,
+ 	IMX_MEDIA_GRP_ID_IC_PRP,
+ 	IMX_MEDIA_GRP_ID_VDIC,
+-	IMX_MEDIA_GRP_ID_CSI2,
+ 	IMX_MEDIA_GRP_ID_SENSOR,
++	IMX_MEDIA_GRP_ID_CSI2,
+ 	IMX_MEDIA_GRP_ID_VIDMUX,
+ 	IMX_MEDIA_GRP_ID_CSI,
+ };
+@@ -795,8 +795,8 @@ static const u32 stream_off_seq[] = {
+ 	IMX_MEDIA_GRP_ID_VDIC,
+ 	IMX_MEDIA_GRP_ID_CSI,
+ 	IMX_MEDIA_GRP_ID_VIDMUX,
+-	IMX_MEDIA_GRP_ID_SENSOR,
+ 	IMX_MEDIA_GRP_ID_CSI2,
++	IMX_MEDIA_GRP_ID_SENSOR,
+ };
+ 
+ #define NUM_STREAM_ENTITIES ARRAY_SIZE(stream_on_seq)
+-- 
+2.11.0
+---------->8----------
+
+regards
+Philipp
