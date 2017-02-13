@@ -1,116 +1,305 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 13 Feb 2017 13:15:27 +0100
-Subject: [PATCH v8 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
-In-Reply-To: <CAPDyKFpt9O8GM-7xeNJ8bF0JqUJ7nPaRmmC+aMVsdMH-yWBCNg@mail.gmail.com>
-References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170209142309eucas1p2b1277d96139eafc0d1dcc14145600476@eucas1p2.samsung.com>
- <1486650171-20598-4-git-send-email-m.szyprowski@samsung.com>
- <20170210045004.GN19244@localhost>
- <d299ae6c-78dc-9049-6bed-dc84fff17db3@samsung.com>
- <CAPDyKFqW2av1mjDvRP=R1my2kepeX69TS6cchzoHmwaoydT5Sg@mail.gmail.com>
- <20170213020340.GH2843@localhost>
- <CAPDyKFpt9O8GM-7xeNJ8bF0JqUJ7nPaRmmC+aMVsdMH-yWBCNg@mail.gmail.com>
-Message-ID: <d6f67b70-92f2-7e9a-7082-ecca3d6b392b@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 13 Feb 2017 12:17:00 +0000
+Subject: [PATCH] mm: free reserved area's memmap if possiable
+In-Reply-To: <1486987349-58711-1-git-send-email-zhouxianrong@huawei.com>
+References: <1486987349-58711-1-git-send-email-zhouxianrong@huawei.com>
+Message-ID: <20170213121659.GM1512@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Adding linux-arm-kernel and devicetree (look for "raw-pfn"), since this
+impacts directly on those.
 
-On 2017-02-13 12:11, Ulf Hansson wrote:
->>> If we could set up the device link already at device initialization,
->>> it should also be possible to avoid getting -EPROBE_DEFER for dma
->>> client drivers when requesting their dma channels.
->> Well if we defer then driver will regiser with dmaengine after it is
->> probed, so a client will either get a channel or not. IOW we won't get
->> -EPROBE_DEFER.
-> I didn't quite get this. What do you mean by "if we defer..."?
->
-> Defer into *what* and defer of *what*?  Could you please elaborate.
->
-> [...]
->
->>> Again, allow me to fill in. This issue exists for all ARM SoC which
->>> has a dma controller residing in a PM domain. I think that is quite
->>> many.
->>>
->>> Currently the only solution I have seen for this problem, but which I
->>> really dislike. That is, each dma client driver requests/releases
->>> their dma channel from their respective ->runtime_suspend|resume()
->>> callbacks - then the dma driver can use the dma request/release hooks,
->>> to do pm_runtime_get|put() which then becomes non-irq-safe.
->> Yeah that is not the best way to do. But looking at it current one doesnt
->> seem best fit either.
->>
->> So on seeing the device_link_add() I was thinking that this is some SoC
->> dependent problem being solved whereas the problem statmement is non-atomic
->> channel prepare.
-> You may be right.
->
-> Although, I don't know of other examples, besides the runtime PM use
-> case, where non-atomic channel prepare/unprepare would make sense. Do
-> you?
+On Mon, Feb 13, 2017 at 08:02:29PM +0800, zhouxianrong at huawei.com wrote:
+> From: zhouxianrong <zhouxianrong@huawei.com>
+> 
+> just like freeing no-map area's memmap we could free reserved
+> area's memmap as well only when user of reserved area indicate
+> that we can do this in dts or drivers. that is, user of reserved
+> area know how to use the reserved area who could not memblock_free
+> or free_reserved_xxx the reserved area and regard the area as raw
+> pfn usage. the patch supply a way to users who want to utilize the
+> memmap memory corresponding to raw pfn reserved areas as many as
+> possible.
 
-Changing GFP_ATOMIC to GFP_KERNEL in some calls in the DMA engine drivers
-would be also a nice present for the memory management subsystem if there
-is no real reason to drain atomic pools.
+I don't really understand this. Can you point me at a specific use-case,
+please? Is CMA involved here?
 
->> As I said earlier, if we want to solve that problem a better idea is to
->> actually split the prepare as we discussed in [1]
->>
->> This way we can get a non atomic descriptor allocate/prepare and release.
->> Yes we need to redesign the APIs to solve this, but if you guys are up for
->> it, I think we can do it and avoid any further round abouts :)
-> Adding/re-designing dma APIs is a viable option to solve the runtime PM case.
->
-> Changes would be needed for all related dma client drivers as well,
-> although if that's what we need to do - let's do it.
->
-> [...]
->
->>> So besides solving the irq-safe issue for dma driver, using the
->>> device-links has additionally two advantages. I already mentioned the
->>> -EPROBE_DEFER issue above.
->>>
->>> The second thing, is the runtime/system PM relations we get for free
->>> by using the links. In other words, the dma driver/core don't need to
->>> care about dealing with pm_runtime_get|put() as that would be managed
->>> by the dma client driver.
->> Yeah sorry took me a while to figure that out :), If we do a different API
->> then dmaengine core can call pm_runtime_get|put() from non-atomic context.
-> Yes, it can and this works from runtime PM point of view. But the
-> following issues would remain unsolved.
->
-> 1)
-> Dependencies between dma drivers and dma client drivers during system
-> PM. For example, a dma client driver needs the dma controller to be
-> operational (remain system resumed), until the dma client driver
-> itself becomes system suspended.
->
-> The *only* currently available solution for this, is to try to system
-> suspend the dma controller later than the dma client, via using the
-> *late or the *noirq system PM callbacks. This works for most cases,
-> but it becomes a problem when the dma client also needs to be system
-> suspended at the *late or the *noirq phase. Clearly this solution that
-> doesn't scale.
->
-> Using device links explicitly solves this problem as it allows to
-> specify this dependency between devices.
+Will
 
-Frankly, then creating device links has to be added to EVERY subsystem,
-which involves getting access to the resources provided by the other
-device. More or less this will apply to all kernel frameworks, which
-provide kind of ABC_get_XYZ(dev, ...) functions (like clk_get, phy_get,
-dma_chan_get, ...). Sounds like a topic for another loooong discussion.
+(entire patch follows, for the benefit of the extra CCs)
 
-> 2)
-> We won't avoid dma clients from getting -EPROBE_DEFER when requesting
-> their dma channels in their ->probe() routines. This would be
-> possible, if we can set up the device links at device initialization.
-
-The question is which core (DMA engine?, kernel device subsystem?) and
-how to find all clients before they call dma_chan_get().
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+> Signed-off-by: zhouxianrong <zhouxianrong@huawei.com>
+> ---
+>  arch/arm64/mm/init.c         |   14 +++++++++++++-
+>  drivers/of/fdt.c             |   31 +++++++++++++++++++++++--------
+>  drivers/of/of_reserved_mem.c |   21 ++++++++++++++-------
+>  include/linux/memblock.h     |    3 +++
+>  include/linux/of_fdt.h       |    2 +-
+>  mm/memblock.c                |   24 ++++++++++++++++++++++++
+>  6 files changed, 78 insertions(+), 17 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 380ebe7..7e62ef8 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -358,7 +358,7 @@ static inline void free_memmap(unsigned long start_pfn, unsigned long end_pfn)
+>   */
+>  static void __init free_unused_memmap(void)
+>  {
+> -	unsigned long start, prev_end = 0;
+> +	unsigned long start, end, prev_end = 0;
+>  	struct memblock_region *reg;
+>  
+>  	for_each_memblock(memory, reg) {
+> @@ -391,6 +391,18 @@ static void __init free_unused_memmap(void)
+>  	if (!IS_ALIGNED(prev_end, PAGES_PER_SECTION))
+>  		free_memmap(prev_end, ALIGN(prev_end, PAGES_PER_SECTION));
+>  #endif
+> +
+> +	for_each_memblock(reserved, reg) {
+> +		if (!(reg->flags & MEMBLOCK_RAW_PFN))
+> +			continue;
+> +
+> +		start = memblock_region_memory_base_pfn(reg);
+> +		end = round_down(memblock_region_memory_end_pfn(reg),
+> +				 MAX_ORDER_NR_PAGES);
+> +
+> +		if (start < end)
+> +			free_memmap(start, end);
+> +	}
+>  }
+>  #endif	/* !CONFIG_SPARSEMEM_VMEMMAP */
+>  
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index c9b5cac..39e7474 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+> @@ -582,7 +582,7 @@ static int __init __reserved_mem_reserve_reg(unsigned long node,
+>  	phys_addr_t base, size;
+>  	int len;
+>  	const __be32 *prop;
+> -	int nomap, first = 1;
+> +	int nomap, raw_pfn, first = 1;
+>  
+>  	prop = of_get_flat_dt_prop(node, "reg", &len);
+>  	if (!prop)
+> @@ -595,13 +595,15 @@ static int __init __reserved_mem_reserve_reg(unsigned long node,
+>  	}
+>  
+>  	nomap = of_get_flat_dt_prop(node, "no-map", NULL) != NULL;
+> +	raw_pfn = of_get_flat_dt_prop(node, "raw-pfn", NULL) != NULL;
+>  
+>  	while (len >= t_len) {
+>  		base = dt_mem_next_cell(dt_root_addr_cells, &prop);
+>  		size = dt_mem_next_cell(dt_root_size_cells, &prop);
+>  
+>  		if (size &&
+> -		    early_init_dt_reserve_memory_arch(base, size, nomap) == 0)
+> +		    early_init_dt_reserve_memory_arch(base, size, nomap,
+> +				raw_pfn) == 0)
+>  			pr_debug("Reserved memory: reserved region for node '%s': base %pa, size %ld MiB\n",
+>  				uname, &base, (unsigned long)size / SZ_1M);
+>  		else
+> @@ -699,7 +701,7 @@ void __init early_init_fdt_scan_reserved_mem(void)
+>  		fdt_get_mem_rsv(initial_boot_params, n, &base, &size);
+>  		if (!size)
+>  			break;
+> -		early_init_dt_reserve_memory_arch(base, size, 0);
+> +		early_init_dt_reserve_memory_arch(base, size, 0, 0);
+>  	}
+>  
+>  	of_scan_flat_dt(__fdt_scan_reserved_mem, NULL);
+> @@ -717,6 +719,7 @@ void __init early_init_fdt_reserve_self(void)
+>  	/* Reserve the dtb region */
+>  	early_init_dt_reserve_memory_arch(__pa(initial_boot_params),
+>  					  fdt_totalsize(initial_boot_params),
+> +					  0,
+>  					  0);
+>  }
+>  
+> @@ -1161,11 +1164,21 @@ int __init __weak early_init_dt_mark_hotplug_memory_arch(u64 base, u64 size)
+>  }
+>  
+>  int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,
+> -					phys_addr_t size, bool nomap)
+> +					phys_addr_t size, bool nomap,
+> +					bool raw_pfn)
+>  {
+> +	int err;
+> +
+>  	if (nomap)
+>  		return memblock_remove(base, size);
+> -	return memblock_reserve(base, size);
+> +
+> +	err = memblock_reserve(base, size);
+> +	if (err == 0) {
+> +		if (raw_pfn)
+> +			memblock_mark_raw_pfn(base, size);
+> +	}
+> +
+> +	return err;
+>  }
+>  
+>  /*
+> @@ -1188,10 +1201,12 @@ int __init __weak early_init_dt_mark_hotplug_memory_arch(u64 base, u64 size)
+>  }
+>  
+>  int __init __weak early_init_dt_reserve_memory_arch(phys_addr_t base,
+> -					phys_addr_t size, bool nomap)
+> +					phys_addr_t size, bool nomap,
+> +					bool raw_pfn)
+>  {
+> -	pr_err("Reserved memory not supported, ignoring range %pa - %pa%s\n",
+> -		  &base, &size, nomap ? " (nomap)" : "");
+> +	pr_err("Reserved memory not supported, ignoring range %pa - %pa%s - %pa%s\n",
+> +		  &base, &size, nomap ? " (nomap)" : "",
+> +		  raw_pfn ? " (raw-pfn)" : "");
+>  	return -ENOSYS;
+>  }
+>  
+> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+> index 366d8c3..d7d9255 100644
+> --- a/drivers/of/of_reserved_mem.c
+> +++ b/drivers/of/of_reserved_mem.c
+> @@ -33,7 +33,7 @@
+>  #include <linux/memblock.h>
+>  int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
+>  	phys_addr_t align, phys_addr_t start, phys_addr_t end, bool nomap,
+> -	phys_addr_t *res_base)
+> +	bool raw_pfn, phys_addr_t *res_base)
+>  {
+>  	phys_addr_t base;
+>  	/*
+> @@ -56,15 +56,19 @@ int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
+>  	*res_base = base;
+>  	if (nomap)
+>  		return memblock_remove(base, size);
+> +
+> +	if (raw_pfn)
+> +		memblock_mark_raw_pfn(base, size);
+> +
+>  	return 0;
+>  }
+>  #else
+>  int __init __weak early_init_dt_alloc_reserved_memory_arch(phys_addr_t size,
+>  	phys_addr_t align, phys_addr_t start, phys_addr_t end, bool nomap,
+> -	phys_addr_t *res_base)
+> +	bool raw_pfn, phys_addr_t *res_base)
+>  {
+> -	pr_err("Reserved memory not supported, ignoring region 0x%llx%s\n",
+> -		  size, nomap ? " (nomap)" : "");
+> +	pr_err("Reserved memory not supported, ignoring region 0x%llx%s 0x%llx%s\n",
+> +		  size, nomap ? " (nomap)" : "", raw_pfn ? " (raw-pfn)" : "");
+>  	return -ENOSYS;
+>  }
+>  #endif
+> @@ -103,7 +107,7 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
+>  	phys_addr_t base = 0, align = 0, size;
+>  	int len;
+>  	const __be32 *prop;
+> -	int nomap;
+> +	int nomap, raw_pfn;
+>  	int ret;
+>  
+>  	prop = of_get_flat_dt_prop(node, "size", &len);
+> @@ -117,6 +121,7 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
+>  	size = dt_mem_next_cell(dt_root_size_cells, &prop);
+>  
+>  	nomap = of_get_flat_dt_prop(node, "no-map", NULL) != NULL;
+> +	raw_pfn = of_get_flat_dt_prop(node, "raw-pfn", NULL) != NULL;
+>  
+>  	prop = of_get_flat_dt_prop(node, "alignment", &len);
+>  	if (prop) {
+> @@ -156,7 +161,8 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
+>  						       &prop);
+>  
+>  			ret = early_init_dt_alloc_reserved_memory_arch(size,
+> -					align, start, end, nomap, &base);
+> +					align, start, end, nomap,
+> +					raw_pfn, &base);
+>  			if (ret == 0) {
+>  				pr_debug("allocated memory for '%s' node: base %pa, size %ld MiB\n",
+>  					uname, &base,
+> @@ -168,7 +174,8 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
+>  
+>  	} else {
+>  		ret = early_init_dt_alloc_reserved_memory_arch(size, align,
+> -							0, 0, nomap, &base);
+> +							0, 0, nomap,
+> +							raw_pfn, &base);
+>  		if (ret == 0)
+>  			pr_debug("allocated memory for '%s' node: base %pa, size %ld MiB\n",
+>  				uname, &base, (unsigned long)size / SZ_1M);
+> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+> index 5b759c9..7266be1 100644
+> --- a/include/linux/memblock.h
+> +++ b/include/linux/memblock.h
+> @@ -26,6 +26,7 @@ enum {
+>  	MEMBLOCK_HOTPLUG	= 0x1,	/* hotpluggable region */
+>  	MEMBLOCK_MIRROR		= 0x2,	/* mirrored region */
+>  	MEMBLOCK_NOMAP		= 0x4,	/* don't add to kernel direct mapping */
+> +	MEMBLOCK_RAW_PFN	= 0x8,	/* raw pfn region's memmap never used */
+>  };
+>  
+>  struct memblock_region {
+> @@ -92,6 +93,8 @@ bool memblock_overlaps_region(struct memblock_type *type,
+>  int memblock_clear_hotplug(phys_addr_t base, phys_addr_t size);
+>  int memblock_mark_mirror(phys_addr_t base, phys_addr_t size);
+>  int memblock_mark_nomap(phys_addr_t base, phys_addr_t size);
+> +int memblock_mark_raw_pfn(phys_addr_t base, phys_addr_t size);
+> +int memblock_clear_raw_pfn(phys_addr_t base, phys_addr_t size);
+>  ulong choose_memblock_flags(void);
+>  
+>  /* Low level functions */
+> diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+> index 271b3fd..29284d7 100644
+> --- a/include/linux/of_fdt.h
+> +++ b/include/linux/of_fdt.h
+> @@ -73,7 +73,7 @@ extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
+>  extern void early_init_dt_add_memory_arch(u64 base, u64 size);
+>  extern int early_init_dt_mark_hotplug_memory_arch(u64 base, u64 size);
+>  extern int early_init_dt_reserve_memory_arch(phys_addr_t base, phys_addr_t size,
+> -					     bool no_map);
+> +					     bool no_map, bool raw_pfn);
+>  extern void * early_init_dt_alloc_memory_arch(u64 size, u64 align);
+>  extern u64 dt_mem_next_cell(int s, const __be32 **cellp);
+>  
+> diff --git a/mm/memblock.c b/mm/memblock.c
+> index 7608bc3..c103b94 100644
+> --- a/mm/memblock.c
+> +++ b/mm/memblock.c
+> @@ -814,6 +814,30 @@ int __init_memblock memblock_mark_nomap(phys_addr_t base, phys_addr_t size)
+>  }
+>  
+>  /**
+> + * memblock_mark_raw_pfn - Mark raw pfn memory with flag MEMBLOCK_RAW_PFN.
+> + * @base: the base phys addr of the region
+> + * @size: the size of the region
+> + *
+> + * Return 0 on succees, -errno on failure.
+> + */
+> +int __init_memblock memblock_mark_raw_pfn(phys_addr_t base, phys_addr_t size)
+> +{
+> +	return memblock_setclr_flag(base, size, 1, MEMBLOCK_RAW_PFN);
+> +}
+> +
+> +/**
+> + * memblock_clear_raw_pfn - Clear flag MEMBLOCK_RAW_PFN for a specified region.
+> + * @base: the base phys addr of the region
+> + * @size: the size of the region
+> + *
+> + * Return 0 on succees, -errno on failure.
+> + */
+> +int __init_memblock memblock_clear_raw_pfn(phys_addr_t base, phys_addr_t size)
+> +{
+> +	return memblock_setclr_flag(base, size, 0, MEMBLOCK_RAW_PFN);
+> +}
+> +
+> +/**
+>   * __next_reserved_mem_region - next function for for_each_reserved_region()
+>   * @idx: pointer to u64 loop variable
+>   * @out_start: ptr to phys_addr_t for start address of the region, can be %NULL
+> -- 
+> 1.7.9.5
+> 
