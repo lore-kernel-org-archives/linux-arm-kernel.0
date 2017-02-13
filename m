@@ -1,37 +1,94 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 14 Feb 2017 06:33:25 +0800
-Subject: [PATCH 1/2] nvmem: Add driver for the i.MX IIM
-In-Reply-To: <20170213153149.11710-2-s.hauer@pengutronix.de>
-Message-ID: <201702140601.KZ5TOi45%fengguang.wu@intel.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Mon, 13 Feb 2017 15:45:44 -0700
+Subject: [PATCH V8 06/10] acpi: apei: panic OS with fatal error status
+ block
+In-Reply-To: <589C490A.9080109@arm.com>
+References: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
+ <1485969413-23577-7-git-send-email-tbaicar@codeaurora.org>
+ <589C490A.9080109@arm.com>
+Message-ID: <5b06372d-e389-5157-ccb4-a7b023990d4d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+Hello James,
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.10-rc8 next-20170213]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Sascha-Hauer/nvmem-Add-driver-for-the-i-MX-IIM/20170214-000520
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+On 2/9/2017 3:48 AM, James Morse wrote:
+> Hi Jonathan, Tyler,
+>
+> On 01/02/17 17:16, Tyler Baicar wrote:
+>> From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
+>>
+>> Even if an error status block's severity is fatal, the kernel does not
+>> honor the severity level and panic.
+>>
+>> With the firmware first model, the platform could inform the OS about a
+>> fatal hardware error through the non-NMI GHES notification type. The OS
+>> should panic when a hardware error record is received with this
+>> severity.
+>>
+>> Call panic() after CPER data in error status block is printed if
+>> severity is fatal, before each error section is handled.
+>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+>> index 8756172..86c1f15 100644
+>> --- a/drivers/acpi/apei/ghes.c
+>> +++ b/drivers/acpi/apei/ghes.c
+>> @@ -687,6 +689,13 @@ static int ghes_ack_error(struct acpi_hest_generic_v2 *generic_v2)
+>>   	return rc;
+>>   }
+>>   
+>> +static void __ghes_call_panic(void)
+>> +{
+>> +	if (panic_timeout == 0)
+>> +		panic_timeout = ghes_panic_timeout;
+>> +	panic("Fatal hardware error!");
+>> +}
+>> +
+> __ghes_panic() also has:
+>> 	__ghes_print_estatus(KERN_EMERG, ghes->generic, ghes->estatus);
+> Which prints this estatus regardless of rate limiting and cache-ing.
+>
+> [ ... ]
+>
+>> @@ -698,6 +707,10 @@ static int ghes_proc(struct ghes *ghes)
+>>   		if (ghes_print_estatus(NULL, ghes->generic, ghes->estatus))
+> ghes_print_estatus() uses some custom rate limiting '2 messages every 5
+> seconds', GHES_SEV_PANIC shares the same limit as GHES_SEV_RECOVERABLE.
+>
+> I think its possible to get 2 recoverable messages, then a panic in a 5 second
+> window. The rate limit will kick in to stop the panic estatus block being
+> printed, but we still go on to call panic() without the real reason being printed...
+>
+> (the caching thing only seems to consider identical messages, given we would
+> never see two panic messages, I don't think that will cause any problems.)
+>
+>>   			ghes_estatus_cache_add(ghes->generic, ghes->estatus);
+>>   	}
+>> +	if (ghes_severity(ghes->estatus->error_severity) >= GHES_SEV_PANIC) {
+>> +		__ghes_call_panic();
+>> +	}
+>> +
+> I think this ghes_severity() then panic() should go above the:
+>> 	if (!ghes_estatus_cached(ghes->estatus)) {
+> and we should call __ghes_print_estatus() here too, to make sure the message
+> definitely got out!
+Okay, that makes sense. If we move this up, is there a problem with 
+calling __ghes_panic() instead of making the __ghes_print_estatus() and 
+__ghes_call_panic() calls here? It looks like that will just add a call 
+to oops_begin() and ghes_print_queued_estatus() as well, but this is 
+what ghes_notify_nmi() does if the severity is panic.
 
-All errors (new ones prefixed by >>):
+Thanks,
+Tyler
+> With that,
+> Reviewed-by: James Morse <james.morse@arm.com>
+>
+>
+> Thanks,
+>
+> James
 
-   drivers/nvmem/nvmem-imx-iim: struct of_device_id is 196 bytes.  The last of 6 is:
-   0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x66 0x73 0x6c 0x2c 0x69 0x6d 0x78 0x35 0x33 0x2d 0x69 0x69 0x6d 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x5c 0x00 0x00 0x00 
->> FATAL: drivers/nvmem/nvmem-imx-iim: struct of_device_id is not terminated with a NULL entry!
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 57952 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170214/a023465e/attachment-0001.gz>
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
