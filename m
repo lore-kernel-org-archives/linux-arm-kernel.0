@@ -1,28 +1,30 @@
 From: miles.chen@mediatek.com (Miles Chen)
-Date: Mon, 13 Feb 2017 20:52:59 +0800
-Subject: [PATCH v2] arm64: use is_vmalloc_addr
-In-Reply-To: <ba5aeff9-4a02-8f5a-c5e4-e06c437875fc@suse.de>
-References: <1486640734-27637-1-git-send-email-miles.chen@mediatek.com>
- <ba5aeff9-4a02-8f5a-c5e4-e06c437875fc@suse.de>
-Message-ID: <1486990379.5429.1.camel@mtkswgap22>
+Date: Mon, 13 Feb 2017 20:58:35 +0800
+Subject: [PATCH v3] arm64: use is_vmalloc_addr
+Message-ID: <1486990715-2551-1-git-send-email-miles.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-02-13 at 06:20 +0100, Andreas F?rber wrote:
-> Hi,
-> 
-> Am 09.02.2017 um 12:45 schrieb Miles Chen:
-> > To is_vmalloc_addr() to check if an address is a vmalloc address
-> 
-> "Use ..."?
+Use is_vmalloc_addr() to check if an address is a vmalloc address
+instead of checking VMALLOC_START and VMALLOC_END manually.
 
-Yes, it should be "Use". I'll send another patch to fix this.
+Signed-off-by: Miles Chen <miles.chen@mediatek.com>
+---
+ arch/arm64/mm/ioremap.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> 
-> Regards,
-> Andreas
-> 
-> > instead of checking VMALLOC_START and VMALLOC_END manually.
-> > 
-> > Signed-off-by: Miles Chen <miles.chen@mediatek.com>
-> 
+diff --git a/arch/arm64/mm/ioremap.c b/arch/arm64/mm/ioremap.c
+index 01e88c8..c4c8cd4 100644
+--- a/arch/arm64/mm/ioremap.c
++++ b/arch/arm64/mm/ioremap.c
+@@ -88,7 +88,7 @@ void __iounmap(volatile void __iomem *io_addr)
+ 	 * We could get an address outside vmalloc range in case
+ 	 * of ioremap_cache() reusing a RAM mapping.
+ 	 */
+-	if (VMALLOC_START <= addr && addr < VMALLOC_END)
++	if (is_vmalloc_addr((void *)addr))
+ 		vunmap((void *)addr);
+ }
+ EXPORT_SYMBOL(__iounmap);
+-- 
+1.9.1
