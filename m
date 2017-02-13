@@ -1,126 +1,52 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 13 Feb 2017 17:57:42 +0530
-Subject: [PATCH v8 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
-In-Reply-To: <CAPDyKFpt9O8GM-7xeNJ8bF0JqUJ7nPaRmmC+aMVsdMH-yWBCNg@mail.gmail.com>
-References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170209142309eucas1p2b1277d96139eafc0d1dcc14145600476@eucas1p2.samsung.com>
- <1486650171-20598-4-git-send-email-m.szyprowski@samsung.com>
- <20170210045004.GN19244@localhost>
- <d299ae6c-78dc-9049-6bed-dc84fff17db3@samsung.com>
- <CAPDyKFqW2av1mjDvRP=R1my2kepeX69TS6cchzoHmwaoydT5Sg@mail.gmail.com>
- <20170213020340.GH2843@localhost>
- <CAPDyKFpt9O8GM-7xeNJ8bF0JqUJ7nPaRmmC+aMVsdMH-yWBCNg@mail.gmail.com>
-Message-ID: <20170213122742.GL2843@localhost>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 13 Feb 2017 13:22:23 +0100
+Subject: [PATCH v13 00/12] power: add power sequence library
+In-Reply-To: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
+References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <16530165.MCAOCP1KgW@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2017 at 12:11:54PM +0100, Ulf Hansson wrote:
-> >>
-> >> If we could set up the device link already at device initialization,
-> >> it should also be possible to avoid getting -EPROBE_DEFER for dma
-> >> client drivers when requesting their dma channels.
-> >
-> > Well if we defer then driver will regiser with dmaengine after it is
-> > probed, so a client will either get a channel or not. IOW we won't get
-> > -EPROBE_DEFER.
+On Saturday, February 11, 2017 09:27:11 AM Peter Chen wrote:
+> Hi all,
 > 
-> I didn't quite get this. What do you mean by "if we defer..."?
+> This is a follow-up for my last power sequence framework patch set [1].
+> According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
+> power sequence instances will be added at postcore_initcall, the match
+> criteria is compatible string first, if the compatible string is not
+> matched between dts and library, it will try to use generic power sequence.
+> 	 
+> The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+> if only one power sequence instance is needed, for more power sequences
+> are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
 > 
-> Defer into *what* and defer of *what*?  Could you please elaborate.
-
-Nevermind I think below is much interesting now..
-
-> >> Again, allow me to fill in. This issue exists for all ARM SoC which
-> >> has a dma controller residing in a PM domain. I think that is quite
-> >> many.
-> >>
-> >> Currently the only solution I have seen for this problem, but which I
-> >> really dislike. That is, each dma client driver requests/releases
-> >> their dma channel from their respective ->runtime_suspend|resume()
-> >> callbacks - then the dma driver can use the dma request/release hooks,
-> >> to do pm_runtime_get|put() which then becomes non-irq-safe.
-> >
-> > Yeah that is not the best way to do. But looking at it current one doesnt
-> > seem best fit either.
-> >
-> > So on seeing the device_link_add() I was thinking that this is some SoC
-> > dependent problem being solved whereas the problem statmement is non-atomic
-> > channel prepare.
+> In future, if there are special power sequence requirements, the special
+> power sequence library can be created.
 > 
-> You may be right.
+> This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+> two hot-plug devices to simulate this use case, the related binding
+> change is updated at patch [1/6], The udoo board changes were tested
+> using my last power sequence patch set.[3]
 > 
-> Although, I don't know of other examples, besides the runtime PM use
-> case, where non-atomic channel prepare/unprepare would make sense. Do
-> you?
-
-The primary ask for that has been to enable runtime_pm for drivers. It's not
-a new ask, but we somehow haven't gotten around to do it.
-
-> > As I said earlier, if we want to solve that problem a better idea is to
-> > actually split the prepare as we discussed in [1]
-> >
-> > This way we can get a non atomic descriptor allocate/prepare and release.
-> > Yes we need to redesign the APIs to solve this, but if you guys are up for
-> > it, I think we can do it and avoid any further round abouts :)
+> Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+> need to power on itself before it can be found by ULPI bus.
 > 
-> Adding/re-designing dma APIs is a viable option to solve the runtime PM case.
+> Changes for v13:
+> - Add more design descriptions at design doc and fix one build error
+>   introduced by v12 wrongly [Patch 2/12]
+> - Add the last three dts patches which were forgotten at last series
+> - Move the comment for usb_create_shared_hcd to correct place [Patch 3/12]
+> - Add sysdev for shared hcd too for xhci-plat.c [Patch 6/12]
 > 
-> Changes would be needed for all related dma client drivers as well,
-> although if that's what we need to do - let's do it.
+> Rafael, if the first two power sequence patches are ok for you, would you consider
+> accept these first, the other USB patches can go through USB tree at v4.12-rc1?
 
-Yes, but do bear in mind that some cases do need atomic prepare. The primary
-cases for DMA had that in mind and also submitting next transaction from the
-callback (tasklet) context, so that won't go away.
+OK, I'll look at the [1-2/12] in the first place, but please give me some time
+and stop sending new versions of the whole patchset continuously for the time
+being.
 
-It would help in other cases where clients know that they will not be in
-atomic context so we provide additional non-atomic "allocation" followed by
-prepare, so that drivers can split the work among these and people can do
-runtime_pm and other things..
+Also I'm not going to take anything from this series without the Greg's consent,
+just to be clear.
 
-> >> So besides solving the irq-safe issue for dma driver, using the
-> >> device-links has additionally two advantages. I already mentioned the
-> >> -EPROBE_DEFER issue above.
-> >>
-> >> The second thing, is the runtime/system PM relations we get for free by
-> >> using the links. In other words, the dma driver/core don't need to care
-> >> about dealing with pm_runtime_get|put() as that would be managed by the
-> >> dma client driver.
-> >
-> > Yeah sorry took me a while to figure that out :), If we do a different
-> > API then dmaengine core can call pm_runtime_get|put() from non-atomic
-> > context.
-> 
-> Yes, it can and this works from runtime PM point of view. But the
-> following issues would remain unsolved.
-> 
-> 1) Dependencies between dma drivers and dma client drivers during system
-> PM. For example, a dma client driver needs the dma controller to be
-> operational (remain system resumed), until the dma client driver itself
-> becomes system suspended.
-> 
-> The *only* currently available solution for this, is to try to system
-> suspend the dma controller later than the dma client, via using the *late
-> or the *noirq system PM callbacks. This works for most cases, but it
-> becomes a problem when the dma client also needs to be system suspended at
-> the *late or the *noirq phase. Clearly this solution that doesn't scale.
-> 
-> Using device links explicitly solves this problem as it allows to specify
-> this dependency between devices.
-
-Yes this is an interesting point. Yes till now people have been doing above
-to workaround this problem, but hey this is not a unique to dmaengine. Any
-subsystem which provides services to others has this issue, so the solution
-much be driver or pm framework and not unique to dmaengine.
-
-> 2) We won't avoid dma clients from getting -EPROBE_DEFER when requesting
-> their dma channels in their ->probe() routines. This would be possible, if
-> we can set up the device links at device initialization.
-
-Well setting those links is not practical at initialization time. Most
-modern dma controllers feature a SW mux, with multiple clients connecting
-and requesting, would we link all of them? Most of times dmaengine driver
-wont know about those..
-
-Thanks
--- 
-~Vinod
+Thanks,
+Rafael
