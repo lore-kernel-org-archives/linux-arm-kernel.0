@@ -1,99 +1,310 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 13 Feb 2017 16:32:32 +0100
-Subject: [PATCH v8 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
-In-Reply-To: <20170213122742.GL2843@localhost>
-References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170209142309eucas1p2b1277d96139eafc0d1dcc14145600476@eucas1p2.samsung.com>
- <1486650171-20598-4-git-send-email-m.szyprowski@samsung.com>
- <20170210045004.GN19244@localhost>
- <d299ae6c-78dc-9049-6bed-dc84fff17db3@samsung.com>
- <CAPDyKFqW2av1mjDvRP=R1my2kepeX69TS6cchzoHmwaoydT5Sg@mail.gmail.com>
- <20170213020340.GH2843@localhost>
- <CAPDyKFpt9O8GM-7xeNJ8bF0JqUJ7nPaRmmC+aMVsdMH-yWBCNg@mail.gmail.com>
- <20170213122742.GL2843@localhost>
-Message-ID: <CAPDyKFqnmhps5nhj-exZ0rnmkwdeD+iuz3CH7btjvxoJaZtVDg@mail.gmail.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Mon, 13 Feb 2017 07:33:37 -0800
+Subject: [PATCH v2] reset: Add i.MX7 SRC reset driver
+Message-ID: <20170213153338.13518-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+This driver exposes various reset faculties, impelented by System Reset
+Controller IP block, as a reset driver. Currently only PCIE related
+reset lines are implemented.
 
->> Although, I don't know of other examples, besides the runtime PM use
->> case, where non-atomic channel prepare/unprepare would make sense. Do
->> you?
->
-> The primary ask for that has been to enable runtime_pm for drivers. It's not
-> a new ask, but we somehow haven't gotten around to do it.
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
 
-Okay, I see.
+Changes since v1 (see [v1]):
 
->
->> > As I said earlier, if we want to solve that problem a better idea is to
->> > actually split the prepare as we discussed in [1]
->> >
->> > This way we can get a non atomic descriptor allocate/prepare and release.
->> > Yes we need to redesign the APIs to solve this, but if you guys are up for
->> > it, I think we can do it and avoid any further round abouts :)
->>
->> Adding/re-designing dma APIs is a viable option to solve the runtime PM case.
->>
->> Changes would be needed for all related dma client drivers as well,
->> although if that's what we need to do - let's do it.
->
-> Yes, but do bear in mind that some cases do need atomic prepare. The primary
-> cases for DMA had that in mind and also submitting next transaction from the
-> callback (tasklet) context, so that won't go away.
->
-> It would help in other cases where clients know that they will not be in
-> atomic context so we provide additional non-atomic "allocation" followed by
-> prepare, so that drivers can split the work among these and people can do
-> runtime_pm and other things..
+	- Various small DT bindings description fixes as per feedback
+          from Rob Herring
 
-That for sharing the details.
 
-It seems like some dma expert really need to be heavily involved if we
-ever are going to complete this work. :-)
+[v1] https://lkml.org/lkml/2017/2/6/554
 
-[...]
+ .../devicetree/bindings/reset/fsl,imx7-src.txt     |  47 +++++++
+ drivers/reset/Kconfig                              |   8 ++
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-imx7.c                         | 149 +++++++++++++++++++++
+ include/dt-bindings/reset/imx7-reset.h             |  28 ++++
+ 5 files changed, 233 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+ create mode 100644 drivers/reset/reset-imx7.c
+ create mode 100644 include/dt-bindings/reset/imx7-reset.h
 
->>
->> 1) Dependencies between dma drivers and dma client drivers during system
->> PM. For example, a dma client driver needs the dma controller to be
->> operational (remain system resumed), until the dma client driver itself
->> becomes system suspended.
->>
->> The *only* currently available solution for this, is to try to system
->> suspend the dma controller later than the dma client, via using the *late
->> or the *noirq system PM callbacks. This works for most cases, but it
->> becomes a problem when the dma client also needs to be system suspended at
->> the *late or the *noirq phase. Clearly this solution that doesn't scale.
->>
->> Using device links explicitly solves this problem as it allows to specify
->> this dependency between devices.
->
-> Yes this is an interesting point. Yes till now people have been doing above
-> to workaround this problem, but hey this is not a unique to dmaengine. Any
-> subsystem which provides services to others has this issue, so the solution
-> much be driver or pm framework and not unique to dmaengine.
-
-I definitely agree, these problems aren't unique to the dmaengine
-subsystem. Exactly how/where to manage them, that I guess, is the key
-question.
-
-However, I can't resist from finding the device links useful, as those
-really do address and solve our issues from a runtime/system PM point
-of view.
-
->
->> 2) We won't avoid dma clients from getting -EPROBE_DEFER when requesting
->> their dma channels in their ->probe() routines. This would be possible, if
->> we can set up the device links at device initialization.
->
-> Well setting those links is not practical at initialization time. Most
-> modern dma controllers feature a SW mux, with multiple clients connecting
-> and requesting, would we link all of them? Most of times dmaengine driver
-> wont know about those..
-
-Okay, I see!
-
-Kind regards
-Uffe
+diff --git a/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+new file mode 100644
+index 0000000..c38f7f0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+@@ -0,0 +1,47 @@
++Freescale i.MX7 System Reset Controller
++======================================
++
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
++
++Required properties:
++- compatible: Should be "fsl,imx7-src", "syscon"
++- reg: should be register base and length as documented in the
++  datasheet
++- interrupts: Should contain SRC interrupt
++- #reset-cells: 1, see below
++
++example:
++
++src: reset-controller at 30390000 {
++     compatible = "fsl,imx7d-src", "syscon";
++     reg = <0x30390000 0x2000>;
++     interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
++     #reset-cells = <1>;
++};
++
++
++Specifying reset lines connected to IP modules
++==============================================
++
++The system reset controller can be used to reset various set of
++peripherals. Device nodes that need access to reset lines should
++specify them as a reset phandle in their corresponding node as
++specified in reset.txt.
++
++Example:
++
++	pcie: pcie at 33800000 {
++
++		...
++
++		resets = <&src IMX7_RESET_PCIEPHY>,
++			 <&src IMX7_RESET_PCIE_CTRL_APPS>;
++		reset-names = "pciephy", "apps";
++
++		...
++        };
++
++
++For list of all valid reset indicies see
++<dt-bindings/reset/imx7-reset.h>
+diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+index 172dc96..664a88b 100644
+--- a/drivers/reset/Kconfig
++++ b/drivers/reset/Kconfig
+@@ -92,6 +92,14 @@ config RESET_ZYNQ
+ 	help
+ 	  This enables the reset controller driver for Xilinx Zynq SoCs.
+ 
++config RESET_IMX7
++	bool "i.MX7 Reset Driver"
++	depends on SOC_IMX7D || COMPILE_TEST
++	select MFD_SYSCON
++	default SOC_IMX7D
++	help
++	  This enables the reset controller driver for i.MX7 SoCs.
++
+ source "drivers/reset/sti/Kconfig"
+ source "drivers/reset/hisilicon/Kconfig"
+ source "drivers/reset/tegra/Kconfig"
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 13b346e..417c9d0 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -14,3 +14,4 @@ obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
+ obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
+ obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
+ obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
++obj-$(CONFIG_RESET_IMX7) += reset-imx7.o
+diff --git a/drivers/reset/reset-imx7.c b/drivers/reset/reset-imx7.c
+new file mode 100644
+index 0000000..6d90e57
+--- /dev/null
++++ b/drivers/reset/reset-imx7.c
+@@ -0,0 +1,149 @@
++/*
++ * Copyright (c) 2017, Impinj, Inc.
++ *
++ * i.MX7 System Reset Controller (SRC) driver
++ *
++ * Author: Andrey Smirnov <andrew.smirnov@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/init.h>
++#include <linux/mfd/syscon.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/reset-controller.h>
++#include <linux/regmap.h>
++#include <linux/types.h>
++#include <dt-bindings/reset/imx7-reset.h>
++
++struct imx7_src {
++	struct reset_controller_dev rcdev;
++	struct device *dev;
++	struct regmap *regmap;
++};
++
++enum imx7_src_registers {
++	SRC_PCIEPHY_RCR = 0x002c,
++	SRC_PCIEPHY_RCR_PCIEPHY_G_RST     = BIT(1),
++	SRC_PCIEPHY_RCR_PCIEPHY_BTN       = BIT(2),
++	SRC_PCIEPHY_RCR_PCIE_CTRL_APPS_EN = BIT(6),
++};
++
++static struct imx7_src *to_imx7_src(struct reset_controller_dev *rcdev)
++{
++	return container_of(rcdev, struct imx7_src, rcdev);
++}
++
++static int imx7_reset_assert(struct reset_controller_dev *rcdev,
++			     unsigned long id)
++{
++	struct imx7_src *imx7src = to_imx7_src(rcdev);
++
++	switch (id) {
++	case IMX7_RESET_PCIE_CTRL_APPS:
++		regmap_update_bits(imx7src->regmap,
++				   SRC_PCIEPHY_RCR,
++				   SRC_PCIEPHY_RCR_PCIE_CTRL_APPS_EN, 0);
++		return 0;
++
++	case IMX7_RESET_PCIEPHY:
++		regmap_update_bits(imx7src->regmap,
++				   SRC_PCIEPHY_RCR,
++				   SRC_PCIEPHY_RCR_PCIEPHY_G_RST,
++				   SRC_PCIEPHY_RCR_PCIEPHY_G_RST);
++		regmap_update_bits(imx7src->regmap,
++				   SRC_PCIEPHY_RCR,
++				   SRC_PCIEPHY_RCR_PCIEPHY_BTN,
++				   SRC_PCIEPHY_RCR_PCIEPHY_BTN);
++		return 0;
++	default:
++		dev_err(imx7src->dev, "Unknown reset ID %lu\n", id);
++		break;
++	}
++
++	return -EINVAL;
++}
++
++static int imx7_reset_deassert(struct reset_controller_dev *rcdev,
++			       unsigned long id)
++{
++	struct imx7_src *imx7src = to_imx7_src(rcdev);
++
++	switch (id) {
++	case IMX7_RESET_PCIE_CTRL_APPS:
++		regmap_update_bits(imx7src->regmap,
++				   SRC_PCIEPHY_RCR,
++				   SRC_PCIEPHY_RCR_PCIE_CTRL_APPS_EN,
++				   SRC_PCIEPHY_RCR_PCIE_CTRL_APPS_EN);
++		return 0;
++
++	case IMX7_RESET_PCIEPHY:
++		/* wait for more than 10us to release phy g_rst and btnrst */
++		udelay(10);
++		regmap_update_bits(imx7src->regmap,
++				   SRC_PCIEPHY_RCR,
++				   SRC_PCIEPHY_RCR_PCIEPHY_G_RST, 0);
++		regmap_update_bits(imx7src->regmap,
++				   SRC_PCIEPHY_RCR,
++				   SRC_PCIEPHY_RCR_PCIEPHY_BTN, 0);
++		return 0;
++	default:
++		dev_err(imx7src->dev, "Unknown reset ID %lu\n", id);
++		break;
++	};
++
++	return -EINVAL;
++}
++
++static const struct reset_control_ops imx7_reset_ops = {
++	.assert		= imx7_reset_assert,
++	.deassert	= imx7_reset_deassert,
++};
++
++static int imx7_reset_probe(struct platform_device *pdev)
++{
++	struct imx7_src *imx7src;
++	struct device *dev = &pdev->dev;
++
++	imx7src = devm_kzalloc(dev, sizeof(*imx7src), GFP_KERNEL);
++	if (!imx7src)
++		return -ENOMEM;
++
++	imx7src->dev = dev;
++	imx7src->regmap = syscon_node_to_regmap(dev->of_node);
++	if (IS_ERR(imx7src->regmap)) {
++		dev_err(dev, "Unable to get imx7-src regmap");
++		return PTR_ERR(imx7src->regmap);
++	}
++
++	imx7src->rcdev.owner     = THIS_MODULE;
++	imx7src->rcdev.nr_resets = IMX7_RESET_NUM;
++	imx7src->rcdev.ops       = &imx7_reset_ops;
++	imx7src->rcdev.of_node   = dev->of_node;
++
++	return devm_reset_controller_register(dev, &imx7src->rcdev);
++}
++
++static const struct of_device_id imx7_reset_dt_ids[] = {
++	{ .compatible = "fsl,imx7d-src", },
++	{ /* sentinel */ },
++};
++
++static struct platform_driver imx7_reset_driver = {
++	.probe	= imx7_reset_probe,
++	.driver = {
++		.name		= KBUILD_MODNAME,
++		.of_match_table	= imx7_reset_dt_ids,
++	},
++};
++builtin_platform_driver(imx7_reset_driver);
+diff --git a/include/dt-bindings/reset/imx7-reset.h b/include/dt-bindings/reset/imx7-reset.h
+new file mode 100644
+index 0000000..e20f2db
+--- /dev/null
++++ b/include/dt-bindings/reset/imx7-reset.h
+@@ -0,0 +1,28 @@
++/*
++ * Copyright (C) 2017 Impinj, Inc.
++ *
++ * Author: Andrey Smirnov <andrew.smirnov@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef DT_BINDING_RESET_IMX7_H
++#define DT_BINDING_RESET_IMX7_H
++
++#define IMX7_RESET_PCIE_CTRL_APPS	0
++#define IMX7_RESET_PCIEPHY		1
++
++#define IMX7_RESET_NUM			2
++
++#endif
++
+-- 
+2.9.3
