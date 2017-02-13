@@ -1,264 +1,65 @@
-From: yuanzhichang@hisilicon.com (zhichang.yuan)
-Date: Mon, 13 Feb 2017 22:17:09 +0800
-Subject: [PATCH V6 1/5] LIB: Indirect ISA/LPC port IO introduced
-In-Reply-To: <1a1f1e70-b6e7-f3c6-2b86-348b3d28edfe@suse.de>
-References: <1485241525-201782-1-git-send-email-yuanzhichang@hisilicon.com>
- <1485241525-201782-2-git-send-email-yuanzhichang@hisilicon.com>
- <5dc0dc9c-124e-398f-a3b2-40059268e859@suse.de>
- <6d5523be-1841-18b9-9b83-6f7e591ed66b@huawei.com>
- <1a1f1e70-b6e7-f3c6-2b86-348b3d28edfe@suse.de>
-Message-ID: <58A1BFE5.7050800@hisilicon.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 13 Feb 2017 15:31:20 +0100
+Subject: [PATCH] [net-next] ARM: orion: fix PHYLIB dependency
+In-Reply-To: <CAK8P3a2BAgtKmEeaom8kNQghLnjGWLGC782OTBTGcfcD_Z8WgQ@mail.gmail.com>
+References: <20170209150834.1158193-1-arnd@arndb.de>
+ <CAK8P3a2Yss8r0qoubg2C7Jp+0JE3Fx+igWHQOscR+SB6d+W_HA@mail.gmail.com>
+ <352146cc-845c-2860-44ca-7338eb53e260@gmail.com> <2626135.PlNJ5EMbcM@wuerfel>
+ <b78765e9-2696-5587-0485-e497eb4459db@gmail.com>
+ <CAK8P3a2BAgtKmEeaom8kNQghLnjGWLGC782OTBTGcfcD_Z8WgQ@mail.gmail.com>
+Message-ID: <CAK8P3a1tJ_DPb1aDngazF0UnfWzwY0+v0Oz1DOiUPpBdDyyu_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Alex,
-
-
-On 2017/2/1 3:37, Alexander Graf wrote:
-> 
-> 
-> On 31/01/2017 14:32, John Garry wrote:
->> On 30/01/2017 17:12, Alexander Graf wrote:
->>> On 01/24/2017 08:05 AM, zhichang.yuan wrote:
->>>> Low-pin-count interface is integrated into some SoCs. The accesses to
->>>> those
->>>> peripherals under LPC make use of I/O ports rather than the memory
->>>> mapped I/O.
+On Fri, Feb 10, 2017 at 10:32 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Fri, Feb 10, 2017 at 9:57 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>> On 02/10/2017 12:05 PM, Arnd Bergmann wrote:
+>>> On Friday, February 10, 2017 9:42:21 AM CET Florian Fainelli wrote:
+>>>> On 02/10/2017 12:20 AM, Arnd Bergmann wrote:
+>>>>> On Thu, Feb 9, 2017 at 7:22 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+>>>>>> On 02/09/2017 07:08 AM, Arnd Bergmann wrote:
+>>>>>> I disabled CONFIG_NETDEVICES to force CONFIG_PHY not to be set here, and
+>>>>>> I was not able to reproduce this, what am I missing?
+>>>>>
+>>>>> In the ARMv5 allmodconfig build, this fails because CONFIG_PHY=m, and
+>>>>> we can't call into it. You could use IS_BUILTIN instead of IS_ENABLED in
+>>>>> the header as a oneline workaround, but I think that would be more confusing
+>>>>> to real users that try to use CONFIG_PHY=m without realizing why they lose
+>>>>> access to their switch.
 >>>>
->>>> To drive these devices, this patch introduces a method named
->>>> indirect-IO.
->>>> In this method the in/out() accessor in include/asm-generic/io.h will be
->>>> redefined. When upper layer drivers call in/out() with those known
->>>> legacy port
->>>> addresses to access the peripherals, the I/O operations will be routed
->>>> to the
->>>> right hooks which are registered specific to the host device, such as
->>>> LPC.
->>>> Then the hardware relevant manupulations are finished by the
->>>> corresponding
->>>> host.
+>>>> I see, this patch should also help fixing this:
 >>>>
->>>> According to the comments on V5, this patch adds a common indirect-IO
->>>> driver
->>>> which support this I/O indirection to the generic directory.
->>>>
->>>> In the later pathches, some host-relevant drivers are implemented to
->>>> support
->>>> the specific I/O hooks and register them.
->>>> Based on these, the upper layer drivers which depend on in/out() can
->>>> work well
->>>> without any extra work or any changes.
->>>>
->>>> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
->>>> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
->>>> Signed-off-by: John Garry <john.garry@huawei.com>
+>>>> http://patchwork.ozlabs.org/patch/726381/
 >>>
->>> I like the extio idea. That allows us to handle all PIO requests on
->>> platforms that don't have native PIO support via different routes
->>> depending on the region they're in. Unfortunately we now we have 2
->>> frameworks for handling sparse PIO regions: One in extio, one in PCI.
->>>
->>> Why don't we just merge the two? Most of the code that has #ifdef
->>> PCI_IOBASE throughout the code base sounds like an ideal candidate to
->>> get migrated to extio instead. Then we only have a single framework to
->>> worry about ...
+>>> I think you still have the same problem, as you can still have the
+>>> boardinfo registration in a loadable module.
 >>
->> To be clear, are you suggesting we merge the functionality from
->> pci_register_io_range(), pci_pio_to_address(), pci_address_to_pio() into
->> extio, so extio manages all PIO?
-> 
-> Yes, I guess so.
-> 
->> And having a single type of node to
->> register PIO ranges, by amalgamating struct extio_node and io_range (as
->> Bjorn mentioned)?
-> 
-> I'm not quite sure I follow you here. Basically I think you want a generic "non-x86 PIO" framework that PCI just plugs into.
-> 
-> I don't think that necessarily means you want to statically allocate regions of that PIO space to separate (pseudo-)devices. Instead, everyone shares that space and should be able to fail gracefully if some space is already occupied.
-> 
->> It would make sense. We would be somewhat decoupling PIO from PCI.
-> 
-> Yes :).
-> 
->> I think that other architectures, like PPC, and other code would need to
->> be fixed up to handle this.
-> 
-> I think only PPC, Microblaze and ARM are using this. Grep for PCI_IOBASE. It's not that many.
-> 
->> We need to consider all the other challenges/obstacles to this.
-> 
-> Well, getting our abstraction levels right to me sounds like it's worth the obstacles.
-> 
->>
->>>
->>>> ---
->>>>   include/asm-generic/io.h |  50 ++++++++++++++++
->>>>   include/linux/extio.h    |  85 +++++++++++++++++++++++++++
->>>>   include/linux/io.h       |   1 +
->>>>   lib/Kconfig              |   8 +++
->>>>   lib/Makefile             |   2 +
->>>>   lib/extio.c              | 147
->>>> +++++++++++++++++++++++++++++++++++++++++++++++ xc>>   create mode
->>>> 100644 include/linux/extio.h
->>>>   create mode 100644 lib/extio.c
->>>>
->>
->> <snip>
->>
->>>> + * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
->>>> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
->>>> + *
->>>> + * This program is free software; you can redistribute it and/or modify
->>>> + * it under the terms of the GNU General Public License version 2 as
->>>> + * published by the Free Software Foundation.
->>>> + *
->>>> + * This program is distributed in the hope that it will be useful,
->>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>>> + * GNU General Public License for more details.
->>>> + *
->>>> + * You should have received a copy of the GNU General Public License
->>>> + * along with this program.  If not, see
->>>> <http://www.gnu.org/licenses/>.
->>>> + */
->>>> +
->>>> +#include <linux/io.h>
->>>> +#include <linux/spinlock.h>
->>>> +
->>>> +static LIST_HEAD(extio_dev_list);
->>>> +static DEFINE_RWLOCK(extio_list_lock);
->>>
->>> Why not just make the list an RCU list? Then you don't need read locks.
->>> We also wouldn't create potential lock contention between devices that
->>> could easily have parallel PIO operations (say a PCI device and an LPC
->>> device).
->>>
->>
->> OK
->>
->>>> +
->>>> +void register_extio(struct extio_node *node)
->>>> +{
->>>> +    write_lock(&extio_list_lock);
->>>> +    list_add_tail(&node->list, &extio_dev_list);
->>>> +    write_unlock(&extio_list_lock);
->>>> +}
->>>> +
->>>> +static struct extio_node *find_extio_token(unsigned long addr)
->>>> +{
->>>> +    struct extio_node *extio_entry;
->>>> +
->>>> +    read_lock(&extio_list_lock);
->>>> +    list_for_each_entry(extio_entry, &extio_dev_list, list) {
->>>> +        if ((addr < extio_entry->io_start + extio_entry->range_size) &&
->>>> +            (addr >= extio_entry->io_start))
->>>> +            break;
->>>> +    }
->>>> +    read_unlock(&extio_list_lock);
->>>> +    return (&extio_entry->list == &extio_dev_list) ? NULL :
->>>> extio_entry;
->>>> +}
->>>> +
->>>> +struct extio_node *extio_find_node(struct fwnode_handle *node)
->>>> +{
->>>> +    struct extio_node *entry;
->>>> +
->>>> +    read_lock(&extio_list_lock);
->>>> +    list_for_each_entry(entry, &extio_dev_list, list) {
->>>> +        if (entry->fwnode == node)
->>>> +            break;
->>>> +    }
->>>> +    read_unlock(&extio_list_lock);
->>>> +
->>>> +    return (&entry->list == &extio_dev_list) ? NULL : entry;
->>>> +}
->>>> +
->>>> +unsigned long extio_translate(struct fwnode_handle *node,
->>>> +        unsigned long bus_addr)
->>>> +{
->>>> +    struct extio_node *entry;
->>>> +    unsigned long port_id = -1;
->>>> +
->>>> +    read_lock(&extio_list_lock);
->>>> +    list_for_each_entry(entry, &extio_dev_list, list) {
->>>> +        if (entry->fwnode == node &&
->>>> +            bus_addr >= entry->bus_start &&
->>>> +            bus_addr - entry->bus_start < entry->range_size)
->>>> +            port_id = entry->io_start + bus_addr -
->>>> +                    entry->bus_start;
->>>> +    }
->>>> +    read_unlock(&extio_list_lock);
->>>> +
->>>> +    return port_id;
->>>> +}
->>>> +
->>>> +#ifdef PCI_IOBASE
->>>> +
->>>> +#define BUILD_EXTIO(bw, type)                        \
->>>> +type extio_in##bw(unsigned long addr)                    \
->>>> +{                                    \
->>>> +    struct extio_node *extio_entry = find_extio_token(addr);    \
->>>> +                                    \
->>>> +    if (!extio_entry)                        \
->>>> +        return read##bw(PCI_IOBASE + addr);            \
->>>> +    return extio_entry->ops->pfin ?                    \
->>>> +            extio_entry->ops->pfin(extio_entry->devpara,    \
->>>> +            addr, sizeof(type)) : -1;            \
->>>> +}                                    \
->>>> +                                    \
->>>> +void extio_out##bw(type value, unsigned long addr)            \
->>>> +{                                    \
->>>> +    struct extio_node *extio_entry = find_extio_token(addr);    \
->>>> +                                    \
->>>> +    if (!extio_entry)                        \
->>>> +        write##bw(value, PCI_IOBASE + addr);            \
->>>
->>> All of the fallback code would also disappear as a nice side effect of
->>> making pci pio handling a user of extio :).
->>
->> Is your idea that PCI IO space will also register accessors, which would
->> be the same read{b,w,l}/write{b,w,l}?
+>> The patch exports mdiobus_register_board_info() so that should solve
+>> your problem here, and I did verify this with a loadable module that
+>> references mdiobus_register_board_info() in that case.
+>
+> No, that's a different problem. What you get with arm allmodconfig
+> (try it!) is that mdio-bus.ko is a loadable module, but referenced
+> from built-in code rather than the other way around. Exporting
+> the symbol doesn't change anything since the module cannot
+> be loaded by the time we need the symbol.
 
-I am not so sure what is your ideas on this. Do you mean the snippet like these:
+I got another failure with my patch applied:
 
-#define BUILD_IO(bw, type)					\
-type extio_in##bw(unsigned long addr) 				\
-{ 								\
-	struct io_range *entry = find_io_range(addr); 		\
-								\
-	if (entry) 						\
-		return entry->ops->pfin(entry->devpara, 	\
-			addr, sizeof(type)); 			\
-	return read##bw(PCI_IOBASE + addr);			\
-}
+drivers/net/phy/mdio-boardinfo.o: In function
+`mdiobus_setup_mdiodev_from_board_info':
+mdio-boardinfo.c:(.text.mdiobus_setup_mdiodev_from_board_info+0x48):
+undefined reference to `mdio_device_create'
+mdio-boardinfo.c:(.text.mdiobus_setup_mdiodev_from_board_info+0x78):
+undefined reference to `mdio_device_register'
+mdio-boardinfo.c:(.text.mdiobus_setup_mdiodev_from_board_info+0x84):
+undefined reference to `mdio_device_free'
+mdio-boardinfo.c:(.text.mdiobus_setup_mdiodev_from_board_info+0xa8):
+undefined reference to `mdio_device_bus_match'
 
-we add the last 'return read##bw(PCI_IOBASE + addr);' to keep the original logic of inX() in asm-generic/io.h;
-In above snippet, all the hosts applied extio should register their own ops->pfin().
+I hadn't realized earlier that the function has to call back into
+the mdio layer. This is theoretically fixable too, but it's probably easier
+to make all of the MDIO bus layer builtin whenever there is a user of
+mdiobus_register_board_info().
 
-
-Thanks,
-Zhichang
-
-
-> 
-> Yes. If you need to later on accelerate that bit, you can always do something like
-> 
->   if (extio_entry->ops->pfin == pci_extio_in)
->     return pci_extio_in(...);
-> 
-> which should get you all the prefetcher and branch prediction benefits that the current version gives you. But for starters I'd leave that out, since I doubt it'll have measurable performance impact to go via an indirect function call.
-> 
->>
->>>
->>
->> It would be nice to have a quicker way to so the lookup from address to
->> node, as we loop all nodes in find_extio_token() every single time.
-> 
-> You can always replace the search with a tree. But to me that's an implementation detail that's easy enough to replace in a follow-up patch series.
-> 
-> 
-> Alex
-> 
-> .
-> 
+      Arnd
