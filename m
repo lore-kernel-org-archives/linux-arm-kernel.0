@@ -1,44 +1,27 @@
-From: noreply@caradsusa.com (Car Ads USA)
-Date: Sun, 12 Feb 2017 23:14:22 -0600
-Subject: Welcome car and truck users
-Message-ID: <E1cd8xy-0005P4-LJ@gator4234.hostgator.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 13 Feb 2017 06:20:47 +0100
+Subject: [PATCH v2] arm64: use is_vmalloc_addr
+In-Reply-To: <1486640734-27637-1-git-send-email-miles.chen@mediatek.com>
+References: <1486640734-27637-1-git-send-email-miles.chen@mediatek.com>
+Message-ID: <ba5aeff9-4a02-8f5a-c5e4-e06c437875fc@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greetings,
+Hi,
 
-Welcome to our site for cars and trucks in USA:
+Am 09.02.2017 um 12:45 schrieb Miles Chen:
+> To is_vmalloc_addr() to check if an address is a vmalloc address
 
-www.caradsusa.com
+"Use ..."?
 
-Sell It Yourself and online shopping site
-for cars, trucks, spare parts, accessories,
-services and rentals.
+Regards,
+Andreas
 
-Find your: cars for sale, new cars, used cars and 
-collector cars. Search for spare parts, accessories,
-services and rentals here.
+> instead of checking VMALLOC_START and VMALLOC_END manually.
+> 
+> Signed-off-by: Miles Chen <miles.chen@mediatek.com>
 
-Always free advertising for one week or longer 
-for a small fee.
-
-This site is also a very good resource for older cars,
-collector cars, veteran cars, antique cars, vintage cars 
-or classic cars, because we got world largest car maker 
-list included in our shopping and advertising site.
-
-If you are interested, do not forget to tell
-your friends about our site.
-
-Welcome to try this site and join us.
-
-Best Regards,
-
-Car Ads USA
-
-Unsubscribing:
-
-If you wish not to receive any more information
-from us simply use this link to unsubscribe:
-
-http://caradsusa.com/scripts/unsubscribe.php?email=linux-arm-kernel at lists.infradead.org
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
