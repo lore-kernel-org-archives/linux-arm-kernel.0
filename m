@@ -1,59 +1,42 @@
-From: richard@nod.at (Richard Weinberger)
-Date: Mon, 13 Feb 2017 11:54:46 +0100
-Subject: [PATCH] mtd: nand: tango: Enforce DMA direction type
-In-Reply-To: <1486979107-15362-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1486979107-15362-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <bef98482-c562-57c1-785b-087a720e3807@nod.at>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 13 Feb 2017 18:59:26 +0800
+Subject: [PATCH 0/7] Rename RK1108 to RV1108
+Message-ID: <1486983566-32265-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 13.02.2017 um 10:45 schrieb Boris Brezillon:
-> do_dma() use an integer to pass the DMA data direction information and
-> pass the same value to dmaengine_prep_slave_sg().
-> 
-> Currently, DMA_{FROM,TO}_DEVICE match DMA_{DEV_TO_MEM,MEM_TO_DEV}
-> definitions so it works fine, but assuming this will always be the case
-> is not safe.
-> 
-> Enforce enum dma_data_direction type in the function prototype and make
-> the enum dma_data_direction -> enum dma_transfer_direction conversion
-> explicit.
-> 
-> Reported-by: Richard Weinberger <richard@nod.at>
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  drivers/mtd/nand/tango_nand.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
-> index 4a5e948c62df..9a0e2f85d865 100644
-> --- a/drivers/mtd/nand/tango_nand.c
-> +++ b/drivers/mtd/nand/tango_nand.c
-> @@ -223,8 +223,8 @@ static void tango_dma_callback(void *arg)
->  	complete(arg);
->  }
->  
-> -static int do_dma(struct tango_nfc *nfc, int dir, int cmd, const void *buf,
-> -		  int len, int page)
-> +static int do_dma(struct tango_nfc *nfc, enum dma_data_direction dir, int cmd,
-> +		  const void *buf, int len, int page)
->  {
->  	void __iomem *addr = nfc->reg_base + NFC_STATUS;
->  	struct dma_chan *chan = nfc->chan;
-> @@ -238,7 +238,10 @@ static int do_dma(struct tango_nfc *nfc, int dir, int cmd, const void *buf,
->  	if (dma_map_sg(chan->device->dev, &sg, 1, dir) != 1)
->  		return -EIO;
->  
-> -	desc = dmaengine_prep_slave_sg(chan, &sg, 1, dir, DMA_PREP_INTERRUPT);
-> +	desc = dmaengine_prep_slave_sg(chan, &sg, 1,
-> +				       dir == DMA_FROM_DEVICE ?
-> +				       DMA_DEV_TO_MEM : DMA_MEM_TO_DEV,
-> +				       DMA_PREP_INTERRUPT);
->  	if (!desc)
->  		goto dma_unmap;
->  
 
-Reviewed-by: Richard Weinberger <richard@nod.at>
+Rockchip finally named this soc as RV1108, so change
+RK1108/rk1108 to RV1108/rv1108 for compatible.
 
-Thanks,
-//richard
+
+Andy Yan (7):
+  dt-bindings: rockchip-dw-mshc: rename RK1108 to RV1108
+  dt-bindings: rk1108-cru: rename RK1108 to RV1108
+  clk: rockchip: rename RK1108 to RV1108
+  dt-bindings: rockchip,pinctrl: rename RK1108 to RV1108
+  pinctrl: rockchip: rename RK1108 to RV1108
+  ARM: dts: rename RK1108 to RV1108
+  ARM: rockchip: reanme RK1108 to RV1108
+
+ Documentation/devicetree/bindings/arm/rockchip.txt |   4 +-
+ ...chip,rk1108-cru.txt => rockchip,rv1108-cru.txt} |  12 +-
+ .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |   2 +-
+ .../bindings/pinctrl/rockchip,pinctrl.txt          |  16 +-
+ arch/arm/boot/dts/Makefile                         |   2 +-
+ .../boot/dts/{rk1108-evb.dts => rv1108-evb.dts}    |   7 +-
+ arch/arm/boot/dts/{rk1108.dtsi => rv1108.dtsi}     |  24 +-
+ drivers/clk/rockchip/Makefile                      |   2 +-
+ .../clk/rockchip/{clk-rk1108.c => clk-rv1108.c}    | 414 ++++++++++-----------
+ drivers/clk/rockchip/clk.h                         |  28 +-
+ drivers/pinctrl/pinctrl-rockchip.c                 |  76 ++--
+ .../clock/{rk1108-cru.h => rv1108-cru.h}           |   6 +-
+ 12 files changed, 300 insertions(+), 293 deletions(-)
+ rename Documentation/devicetree/bindings/clock/{rockchip,rk1108-cru.txt => rockchip,rv1108-cru.txt} (83%)
+ rename arch/arm/boot/dts/{rk1108-evb.dts => rv1108-evb.dts} (89%)
+ rename arch/arm/boot/dts/{rk1108.dtsi => rv1108.dtsi} (94%)
+ rename drivers/clk/rockchip/{clk-rk1108.c => clk-rv1108.c} (57%)
+ rename include/dt-bindings/clock/{rk1108-cru.h => rv1108-cru.h} (97%)
+
+-- 
+2.7.4
