@@ -1,20 +1,48 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 13 Feb 2017 23:04:22 +0800
-Subject: [linux-sunxi] [PATCH 1/8] dt-bindings: fix for Allwinner H5
- pinctrl's compatible
-In-Reply-To: <20170208100009.29362-1-icenowy@aosc.xyz>
-References: <20170208100009.29362-1-icenowy@aosc.xyz>
-Message-ID: <CAGb2v65DEiE7wGqFiUqte_zvQEu+KGwLFc6GxG0RE4pRBo7mTg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 13 Feb 2017 16:31:49 +0100
+Subject: [PATCH 2/2] dt-bindings: nvmem: Add i.MX IIM binding doc
+In-Reply-To: <20170213153149.11710-1-s.hauer@pengutronix.de>
+References: <20170213153149.11710-1-s.hauer@pengutronix.de>
+Message-ID: <20170213153149.11710-3-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 8, 2017 at 6:00 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> The compatible for Allwinner H5 pin controller is wrong written as
-> allwinner,sun50i-h5-r-pinctrl, however, it's really a generic pinctrl
-> rather than a "r" one.
->
-> Fix this compatible string.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+The IIM is part of the i.MX device trees for long already, add a binding
+document for it.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ .../devicetree/bindings/nvmem/imx-iim.txt          | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/imx-iim.txt
+
+diff --git a/Documentation/devicetree/bindings/nvmem/imx-iim.txt b/Documentation/devicetree/bindings/nvmem/imx-iim.txt
+new file mode 100644
+index 000000000000..1978c5bcd96d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/nvmem/imx-iim.txt
+@@ -0,0 +1,22 @@
++Freescale i.MX IC Identification Module (IIM) device tree bindings
++
++This binding represents the IC Identification Module (IIM) found on
++i.MX25, i.MX27, i.MX31, i.MX35, i.MX51 and i.MX53 SoCs.
++
++Required properties:
++- compatible: should be one of
++	"fsl,imx25-iim", "fsl,imx27-iim",
++	"fsl,imx31-iim", "fsl,imx35-iim",
++	"fsl,imx51-iim", "fsl,imx53-iim",
++- reg: Should contain the register base and length.
++- interrupts: Should contain the interrupt for the IIM
++- clocks: Should contain a phandle pointing to the gated peripheral clock.
++
++Example:
++
++	iim: iim at 63f98000 {
++		compatible = "fsl,imx53-iim", "fsl,imx27-iim";
++		reg = <0x63f98000 0x4000>;
++		interrupts = <69>;
++                clocks = <&clks IMX5_CLK_IIM_GATE>;
++	};
+-- 
+2.11.0
