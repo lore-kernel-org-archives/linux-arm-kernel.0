@@ -1,61 +1,59 @@
-From: rah@settrans.net (Bob Ham)
-Date: Mon, 13 Feb 2017 21:41:37 +0000
-Subject: Allwinner A31 framebuffer fails with new CCU clock bindings
-In-Reply-To: <20170213095207.tsqcigfhyftm5ohk@lukather>
-References: <1486814920.7145.19.camel@settrans.net>
- <20170213095207.tsqcigfhyftm5ohk@lukather>
-Message-ID: <1487022097.7145.43.camel@settrans.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Feb 2017 13:50:13 -0800
+Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting cpu1 during
+ boot
+Message-ID: <20170213215013.19929-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-02-13 at 10:52 +0100, Maxime Ripard wrote:
-> On Sat, Feb 11, 2017 at 12:08:40PM +0000, Bob Ham wrote:
-> > On IRC, MoeIcenowy requested the contents
-> > of /sys/kernel/debug/clk/clk_summary.  I don't know how useful it will
-> > be but I've put up two versions, one from the bad commit and another
-> > from the previous, good commit in the bisect:
-> > 
-> > http://settrans.net/~rah/misc/sun6i-a31-bad-fb-clk_summary-good.txt
-> > http://settrans.net/~rah/misc/sun6i-a31-bad-fb-clk_summary-bad.txt
-> 
-> Are you sure the good one works? None of the display clocks are
-> enabled.
+Commit 3251885285e1 ("ARM: OMAP4+: Reset CPU1 properly for kexec") started
+resetting cpu1 because of a kexec boot issue I was seeing earlier in 2016
+on omap4 when doing kexec boot between two different kernel versions. The
+booted kernel ended up trying to use the old kernel start-up address unless
+cpu1 was reset before configuring the cpu1 start-up address.
 
-Definitely.  Here's clk_summary from an even earlier kernel from Debian,
-4.7.8-1:
+It seems the reset part was not correct but probably working around some
+other issue. I have not been able to reproduce this issue any longer despite
+testing with backported patches back to v4.6 kernel. So it is possible this
+issue was caused by other work in progress kexec patches I had applied. Or
+it is possible some other fixes have made the issue go way.
 
-http://settrans.net/~rah/misc/sun6i-a31-bad-fb-clk_summary-good-4.7.8-1.txt
+The unconditional reset of cpu1 can cause issues booting some devices. For
+example, bootloader configured secure OS running on cpu1 will fail as the
+configuration is not preserved as reported by Andrew F. Davis <afd@ti.com>.
 
-And to make super sure, he's a *screenshot* of a terminal in X running
-on that kernel, showing every line with "0" in the second column:
+Let's fix the issue by reverting the cpu1 reset parts. If it turns out we
+still need to reset cpu1 in some cases, we can add it back and do it
+conditionally.
 
-http://settrans.net/~rah/misc/sun6i-a31-bad-fb-clk_summary-good-4.7.8-1.png
+Fixes: 3251885285e1 ("ARM: OMAP4+: Reset CPU1 properly for kexec")
+Cc: Keerthy <j-keerthy@ti.com>
+Cc: Tero Kristo <t-kristo@ti.com>
+Reported-by: Andrew F. Davis <afd@ti.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/omap-smp.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-Does this imply something odd in this hardware or a problem with the
-kernel?
-
-
-> Could you add "clk_ignore_unused" to the kernel boot parameters and
-> see if it works?
-
-That does indeed work.  On the same kernel which produced
-sun6i-a31-bad-fb-clk_summary-bad.txt, with clk_ignore_unused added to
-the boot parameters, the console continues to show output all through
-booting and X runs fine.  Here is the clk_summary:
-
-http://settrans.net/~rah/misc/sun6i-a31-bad-fb-clk_summary-clk_ignore_unused.txt
-
-Can I ask what clk_ignore_unused does that might have fixed this?
-
-
-Thanks,
-
-Bob
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170213/0eb4a29c/attachment.sig>
+diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+--- a/arch/arm/mach-omap2/omap-smp.c
++++ b/arch/arm/mach-omap2/omap-smp.c
+@@ -300,16 +300,6 @@ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
+ 		scu_enable(cfg.scu_base);
+ 
+ 	/*
+-	 * Reset CPU1 before configuring, otherwise kexec will
+-	 * end up trying to use old kernel startup address.
+-	 */
+-	if (cfg.cpu1_rstctrl_va) {
+-		writel_relaxed(1, cfg.cpu1_rstctrl_va);
+-		readl_relaxed(cfg.cpu1_rstctrl_va);
+-		writel_relaxed(0, cfg.cpu1_rstctrl_va);
+-	}
+-
+-	/*
+ 	 * Write the address of secondary startup routine into the
+ 	 * AuxCoreBoot1 where ROM code will jump and start executing
+ 	 * on secondary core once out of WFE
+-- 
+2.11.1
