@@ -1,34 +1,203 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 13 Feb 2017 12:00:21 +0000
-Subject: [RFC PATCH v1] iommu/io-pgtable-arm: Check for leaf entry right
- after finding it
-In-Reply-To: <CAPD2p-=pVgJvVY7GFPWWqj9wp96JSsxD-SO5oNXxq9ag2wWT0Q@mail.gmail.com>
-References: <1486648600-27457-1-git-send-email-olekstysh@gmail.com>
- <CAPD2p-=TtT9ZHpLu8w9jUdKR5u6JG_BGtz0BDDKejmWS-jQ9WQ@mail.gmail.com>
- <20170213112728.GH1512@arm.com>
- <CAPD2p-=pVgJvVY7GFPWWqj9wp96JSsxD-SO5oNXxq9ag2wWT0Q@mail.gmail.com>
-Message-ID: <20170213120021.GL1512@arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 13 Feb 2017 13:01:25 +0100
+Subject: [PATCH v8 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
+In-Reply-To: <20170213020340.GH2843@localhost>
+References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170209142309eucas1p2b1277d96139eafc0d1dcc14145600476@eucas1p2.samsung.com>
+ <1486650171-20598-4-git-send-email-m.szyprowski@samsung.com>
+ <20170210045004.GN19244@localhost>
+ <d299ae6c-78dc-9049-6bed-dc84fff17db3@samsung.com>
+ <CAPDyKFqW2av1mjDvRP=R1my2kepeX69TS6cchzoHmwaoydT5Sg@mail.gmail.com>
+ <20170213020340.GH2843@localhost>
+Message-ID: <7b0b47b2-8025-31e2-8180-6b1df63aa45f@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2017 at 01:50:29PM +0200, Oleksandr Tyshchenko wrote:
-> On Mon, Feb 13, 2017 at 1:27 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Mon, Feb 13, 2017 at 01:07:02PM +0200, Oleksandr Tyshchenko wrote:
-> >> Any comments?
-> >
-> > Looks fine to me, but I don't think it's urgent and I already sent my
-> > SMMU pull for 4.11. I'll send this as a fix after the merge window.
-> OK. Thank you.
-> 
-> >
-> > I suspect we need something similar for io-pgtable-arm-v7s.c, too.
-> Agree. On the whole I will be able to make similar patch for arm-v7s,
-> but I won't be 100% sure
-> since I don't have any boards where arm-v7s compatible IOMMU installed.
-> 
-> Shall I make patch for arm-v7s too?
+Hi Vinod,
 
-Yes, please. Robin seems to enjoy using short-descriptor, so he might
-give it a spin for you if you ask nicely.
+On 2017-02-13 03:03, Vinod Koul wrote:
+> On Fri, Feb 10, 2017 at 02:57:09PM +0100, Ulf Hansson wrote:
+>> On 10 February 2017 at 12:51, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>>> On 2017-02-10 05:50, Vinod Koul wrote:
+>>>> On Thu, Feb 09, 2017 at 03:22:51PM +0100, Marek Szyprowski wrote:
+>>>>> +static int pl330_set_slave(struct dma_chan *chan, struct device *slave)
+>>>>> +{
+>>>>> +       struct dma_pl330_chan *pch = to_pchan(chan);
+>>>>> +       struct pl330_dmac *pl330 = pch->dmac;
+>>>>> +       int i;
+>>>>> +
+>>>>> +       mutex_lock(&pl330->rpm_lock);
+>>>>> +
+>>>>> +       for (i = 0; i < pl330->num_peripherals; i++) {
+>>>>> +               if (pl330->peripherals[i].chan.slave == slave &&
+>>>>> +                   pl330->peripherals[i].slave_link) {
+>>>>> +                       pch->slave_link =
+>>>>> pl330->peripherals[i].slave_link;
+>>>>> +                       goto done;
+>>>>> +               }
+>>>>> +       }
+>>>>> +
+>>>>> +       pch->slave_link = device_link_add(slave, pl330->ddma.dev,
+>>>>> +                                      DL_FLAG_PM_RUNTIME |
+>>>>> DL_FLAG_RPM_ACTIVE);
+>>>> So you are going to add the link on channel allocation and tear down on
+>>>> the
+>>>> freeup.
+>>>
+>>> Right. Channel allocation is typically done once per driver operation and it
+>>> won't hurt system performance.
+>>>
+>>>>    I am not sure I really like the idea here.
+>>>
+>>> Could you point what's wrong with it?
+>>>
+>>>> First, these thing shouldn't be handled in the drivers. These things
+>>>> should
+>>>> be set in core and each driver setting the links doesn't sound great to
+>>>> me.
+>>>
+>>> Which core? And what's wrong with the device links? They have been
+>>> introduced to
+>>> model relations between devices that are behind the usual parent/child/bus
+>>> topology.
+>> I think Vinod mean the dmaengine core. Which also would make perfect
+>> sense to me as it would benefit all dma drivers.
+> Right.
+>
+>> The only related PM thing, that shall be the decision of the driver,
+>> is whether it wants to enable runtime PM or not, during ->probe().
+> We can do pm_runtime_enabled() to check and that and do when enabled..
 
-Will
+Another subtle issue is that there can be only one link between devices, but
+it is common to request more than one channel per client device (for example
+"tx" and "rx"), but this can be handled by internal reference counting.
+
+>>>> Second, should the link be always there and we only mange the state? Here
+>>>> it
+>>>> seems that we have link being created and destroyed, so why not mark it
+>>>> ACTIVE and DORMANT instead...
+>>>
+>>> Link state is managed by device core and should not be touched by the
+>>> drivers.
+>>> It is related to both provider and consumer drivers states (probed/not
+>>> probed/etc).
+>>>
+>>> Second we would need to create those links first. The question is where to
+>>> create them then.
+>> Just to fill in, to me this is really also the key question.
+>>
+>> If we could set up the device link already at device initialization,
+>> it should also be possible to avoid getting -EPROBE_DEFER for dma
+>> client drivers when requesting their dma channels.
+> Well if we defer then driver will regiser with dmaengine after it is
+> probed, so a client will either get a channel or not. IOW we won't get
+> -EPROBE_DEFER.
+
+I don't get how this will work. IMHO the link should be created WHEN client
+driver requests the channel, because otherwise we will get links that might
+be not used at all (for example optional DMA usage, but the link will force
+DMA controller to active state even if client device doesn't want to use DMA
+at all). So if client requests it for the first time and the DMA engine has
+not been probed yet, there is no way to avoid -EPROBE_DEFER.
+
+>>>> Lastly, looking at th description of the issue here, am perceiving (maybe
+>>>> my
+>>>> understanding is not quite right here) that you have an IP block in SoC
+>>>> which has multiple things and share common stuff and doing right PM is a
+>>>> challenge for you, right?
+>>>
+>>> Nope. Doing right PM in my SoC is not that complex and I would say it is
+>>> rather
+>>> typical for any embedded stuff. It works fine (in terms of the power
+>>> consumption reduction) when all drivers simply properly manage their runtime
+>>> PM state, thus if device is not in use, the state is set to suspended and
+>>> finally, the power domain gets turned off.
+>>>
+>>> I've used device links for PM only because the current DMA engine API is
+>>> simply insufficient to implement it in the other way.
+>>>
+>>> I want to let a power domain, which contains a few devices, among those a
+>>> PL330
+>>> device, to get turned off when there is no activity. Handling power domain
+>>> power
+>>> on / off requires non-atomic context, what is typical for runtime pm calls.
+>>> For
+>>> that I need to have non-irq-safe runtime pm implemented for all devices that
+>>> belongs to that domains.
+>> Again, allow me to fill in. This issue exists for all ARM SoC which
+>> has a dma controller residing in a PM domain. I think that is quite
+>> many.
+>>
+>> Currently the only solution I have seen for this problem, but which I
+>> really dislike. That is, each dma client driver requests/releases
+>> their dma channel from their respective ->runtime_suspend|resume()
+>> callbacks - then the dma driver can use the dma request/release hooks,
+>> to do pm_runtime_get|put() which then becomes non-irq-safe.
+> Yeah that is not the best way to do. But looking at it current one doesnt
+> seem best fit either.
+>
+> So on seeing the device_link_add() I was thinking that this is some SoC
+> dependent problem being solved whereas the problem statmement is non-atomic
+> channel prepare.
+>
+> As I said earlier, if we want to solve that problem a better idea is to
+> actually split the prepare as we discussed in [1]
+>
+> This way we can get a non atomic descriptor allocate/prepare and release.
+> Yes we need to redesign the APIs to solve this, but if you guys are up for
+> it, I think we can do it and avoid any further round abouts :)
+
+I also agree that the main problem here is lack of non-atomic call for
+preparing the channel. However I don't feel I'm a right person for rewriting
+all the existing DMA engine drivers and clients for the new API. :/
+
+>>> The problem with PL330 driver is that it use irq-safe runtime pm, which like
+>>> it
+>>> was stated in the patch description doesn't bring much benefits. To switch
+>>> to
+>>> standard (non-irq-safe) runtime pm, the pm_runtime calls have to be done
+>>> from
+>>> a context which permits sleeping. The problem with DMA engine driver API is
+>>> that
+>>> most of its callbacks have to be IRQ-safe and frankly only
+>>> device_{alloc,release}_chan_resources() what more or less maps to
+>>> dma_request_chan()/dma_release_channel() and friends. There are DMA engine
+>>> drivers which do runtime PM calls there (tegra20-apb-dma, sirf-dma, cppi41,
+>>> rcar-dmac), but this is not really efficient. DMA engine clients usually
+>>> allocate
+>>> dma channel during their probe() and keep them for the whole driver life. In
+>>> turn
+>>> this very similar to calling pm_runtime_get() in the DMA engine driver
+>>> probe().
+>>> The result of both approaches is that DMA engine device keeps its power
+>>> domain
+>>> enabled almost all the time. This problem is also mentioned in the DMA
+>>> engine
+>>> TODO list, you have pointed me yesterday.
+>>>
+>>> To avoid such situation that DMA engine driver blocks turning off the power
+>>> domain and avoid changing DMA engine client API I came up with the device
+>>> links
+>>> pm based approach. I don't want to duplicate the description here, the
+>>> details
+>>> were in the patch description, however if you have any particular question
+>>> about
+>>> the details, let me know and I will try to clarify it more.
+>> So besides solving the irq-safe issue for dma driver, using the
+>> device-links has additionally two advantages. I already mentioned the
+>> -EPROBE_DEFER issue above.
+>>
+>> The second thing, is the runtime/system PM relations we get for free
+>> by using the links. In other words, the dma driver/core don't need to
+>> care about dealing with pm_runtime_get|put() as that would be managed
+>> by the dma client driver.
+> Yeah sorry took me a while to figure that out :), If we do a different API
+> then dmaengine core can call pm_runtime_get|put() from non-atomic context.
+>
+> [1]: http://www.spinics.net/lists/dmaengine/msg11570.html
+>
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
