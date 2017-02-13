@@ -1,55 +1,56 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 13 Feb 2017 17:20:56 +0800
-Subject: [PATCH 2/8] ARM: sun4i: Add display blocks for the sun4i dtsi.
-In-Reply-To: <20170213091612.d5ifc4oi63xf7boi@lukather>
-References: <20170211174405.28395-1-plaes@plaes.org>
- <20170211174405.28395-3-plaes@plaes.org>
- <20170213091612.d5ifc4oi63xf7boi@lukather>
-Message-ID: <CAGb2v648uAKxpYaU_qhTLAyfe5snW1LG1VWmm+UMLRSQ5a7DKg@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 13 Feb 2017 13:30:31 +0530
+Subject: [GIT PULL 1/4] DaVinci driver updates
+In-Reply-To: <20170202133348.32713-1-nsekhar@ti.com>
+References: <20170202133348.32713-1-nsekhar@ti.com>
+Message-ID: <100a0144-4a0e-757d-c555-823851d6c258@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2017 at 5:16 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Sat, Feb 11, 2017 at 07:43:59PM +0200, Priit Laes wrote:
->> Added basic display pipeline consisting of tcon, display backend and
->> frontend blocks.
->>
->> Signed-off-by: Priit Laes <plaes@plaes.org>
->> ---
->>  arch/arm/boot/dts/sun4i-a10.dtsi | 104 +++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 104 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
->> index ba20b48..70991c9 100644
->> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
->> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
->> @@ -779,6 +779,45 @@
->>                       #size-cells = <0>;
->>               };
->>
->> +             tcon0: lcd-controller at 1c0c000 {
->> +                     compatible = "allwinner,sun5i-a13-tcon";
->
-> There's a few bits here and there that need to be setup differently in
-> A10, so you cannot reuse that compatible (same thing for the other).
->
-> Also, I'd really like to have all the blocks listed here, and not only
-> the first pipeline. Ideally, on the A10, the two pipelines should be
-> enabled too.
+Hi Arnd, Olof,
 
-The display pipeline driver has to be fixed before that can happen
-though. And I haven't started to work on what I proposed yet. Though
-if someone wants to take over I can forward any design plans I have.
+A gentle ping on pulling this pull request set.
 
-ChenYu
+Thanks,
+Sekhar
 
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+On Thursday 02 February 2017 07:03 PM, Sekhar Nori wrote:
+> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+> 
+>   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.11/drivers
+> 
+> for you to fetch changes up to cdf0ead3747200d527f37170d3fdd41e368f88b0:
+> 
+>   sata: ahci-da850: un-hardcode the MPY bits (2017-01-31 20:41:52 +0530)
+> 
+> ----------------------------------------------------------------
+> Driver updates for SATA support on DA850.
+> 
+> These have been acked by SATA maintainer
+> Tejun Heo. Tejun preferred these be queued
+> through ARM-SoC because of the dependencies
+> with platform code.
+> 
+> ----------------------------------------------------------------
+> Bartosz Golaszewski (6):
+>       sata: ahci-da850: get the sata clock using a connection id
+>       sata: ahci-da850: add device tree match table
+>       sata: ahci-da850: implement a workaround for the softreset quirk
+>       sata: ahci: export ahci_do_hardreset() locally
+>       sata: ahci-da850: add a workaround for controller instability
+>       sata: ahci-da850: un-hardcode the MPY bits
+> 
+>  drivers/ata/ahci.h       |   3 +
+>  drivers/ata/ahci_da850.c | 175 ++++++++++++++++++++++++++++++++++++++++++-----
+>  drivers/ata/libahci.c    |  18 +++--
+>  3 files changed, 174 insertions(+), 22 deletions(-)
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
