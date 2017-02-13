@@ -1,24 +1,44 @@
-From: enter2017@s18534480.onlinehome-server.info (enter2017 at s18534480.onlinehome-server.info)
-Date: Sun, 12 Feb 2017 20:45:09 -0600
-Subject: UPS courier can not deliver parcel #06184957 to you
-Message-ID: <201702130245.v1D2j94V026947@s18534480.onlinehome-server.info>
+From: noreply@caradsusa.com (Car Ads USA)
+Date: Sun, 12 Feb 2017 23:14:22 -0600
+Subject: Welcome car and truck users
+Message-ID: <E1cd8xy-0005P4-LJ@gator4234.hostgator.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Customer,
+Greetings,
 
-Your item has arrived at the UPS Post Office at February 11, but the courier was unable to deliver parcel to you.
+Welcome to our site for cars and trucks in USA:
 
-You can download the shipment label attached!
+www.caradsusa.com
 
-With many thanks,
-Cory Oliver,
-UPS Senior Operation Agent.
+Sell It Yourself and online shopping site
+for cars, trucks, spare parts, accessories,
+services and rentals.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: UPS-Delivery-Details-06184957.zip
-Type: application/zip
-Size: 709 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170212/5bd95c57/attachment.zip>
+Find your: cars for sale, new cars, used cars and 
+collector cars. Search for spare parts, accessories,
+services and rentals here.
+
+Always free advertising for one week or longer 
+for a small fee.
+
+This site is also a very good resource for older cars,
+collector cars, veteran cars, antique cars, vintage cars 
+or classic cars, because we got world largest car maker 
+list included in our shopping and advertising site.
+
+If you are interested, do not forget to tell
+your friends about our site.
+
+Welcome to try this site and join us.
+
+Best Regards,
+
+Car Ads USA
+
+Unsubscribing:
+
+If you wish not to receive any more information
+from us simply use this link to unsubscribe:
+
+http://caradsusa.com/scripts/unsubscribe.php?email=linux-arm-kernel at lists.infradead.org
