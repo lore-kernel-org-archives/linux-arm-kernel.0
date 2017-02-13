@@ -1,59 +1,81 @@
 From: thibault.saunier@osg.samsung.com (Thibault Saunier)
-Date: Mon, 13 Feb 2017 16:08:32 -0300
-Subject: [PATCH v4 0/4] Fixes for colorspace logic in exynos-gsc and s5p-mfc
- drivers
-Message-ID: <20170213190836.26972-1-thibault.saunier@osg.samsung.com>
+Date: Mon, 13 Feb 2017 16:08:34 -0300
+Subject: [PATCH v4 2/4] [media] exynos-gsc: Respect userspace colorspace
+ setting in try_fmt
+In-Reply-To: <20170213190836.26972-1-thibault.saunier@osg.samsung.com>
+References: <20170213190836.26972-1-thibault.saunier@osg.samsung.com>
+Message-ID: <20170213190836.26972-3-thibault.saunier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+User userspace provided by the user as we are only doing scaling and
+color encoding conversion, we won't be able to transform the colorspace
+itself and the colorspace won't mater in that operation.
 
-This patchset fixes a few issues on the colorspace logic for the exynos-gsc
-and s5p-mfc drivers.
+Also always use output colorspace on the capture side.
 
-We now handle the colorspace in those drivers, and make sure to respect user setting if
-possible.
+Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
 
-We also now set the 'v4l2_pix_format:field' if userspace passed ANY, avoiding GStreamer
-spamming error at us about the driver not following the standard.
-
-This is the third version of the patch serie.
-
-Best regards,
-
-Thibault Saunier
+---
 
 Changes in v4:
-- Reword commit message to better back our assumptions on specifications
 - Use any colorspace provided by the user as it won't affect the way we
   handle our operations (guessing it if none is provided)
 - Always use output colorspace on the capture side
-- Set the colorspace only if the user passed V4L2_COLORSPACE_DEFAULT, in
-  all other cases just use what userspace provided.
 
 Changes in v3:
-- Added 'Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>'
-- Set colorspace if user passed V4L2_COLORSPACE_DEFAULT in
 - Do not check values in the g_fmt functions as Andrzej explained in previous review
+- Set colorspace if user passed V4L2_COLORSPACE_DEFAULT in
 
-Changes in v2:
-- Fix a silly build error that slipped in while rebasing the patches
+Changes in v2: None
 
-Javier Martinez Canillas (1):
-  [media] exynos-gsc: Use 576p instead 720p as a threshold for
-    colorspaces
-
-Thibault Saunier (3):
-  [media] exynos-gsc: Respect userspace colorspace setting in try_fmt
-  [media] s5p-mfc: Set colorspace in VIDIO_{G,TRY}_FMT if DEFAULT
-    provided
-  [media] s5p-mfc: Check and set 'v4l2_pix_format:field' field in
-    try_fmt
-
- drivers/media/platform/exynos-gsc/gsc-core.c | 20 +++++++++++++++-----
+ drivers/media/platform/exynos-gsc/gsc-core.c | 14 ++++++++++----
  drivers/media/platform/exynos-gsc/gsc-core.h |  1 +
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 28 ++++++++++++++++++++++++++++
- 3 files changed, 44 insertions(+), 5 deletions(-)
+ 2 files changed, 11 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
+index db7d9883861b..772599de8c13 100644
+--- a/drivers/media/platform/exynos-gsc/gsc-core.c
++++ b/drivers/media/platform/exynos-gsc/gsc-core.c
+@@ -454,6 +454,7 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
+ 	} else {
+ 		min_w = variant->pix_min->target_rot_dis_w;
+ 		min_h = variant->pix_min->target_rot_dis_h;
++		pix_mp->colorspace = ctx->out_colorspace;
+ 	}
+ 
+ 	pr_debug("mod_x: %d, mod_y: %d, max_w: %d, max_h = %d",
+@@ -472,10 +473,15 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
+ 
+ 	pix_mp->num_planes = fmt->num_planes;
+ 
+-	if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
+-		pix_mp->colorspace = V4L2_COLORSPACE_REC709;
+-	else /* SD */
+-		pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
++	if (pix_mp->colorspace == V4L2_COLORSPACE_DEFAULT) {
++		if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
++			pix_mp->colorspace = V4L2_COLORSPACE_REC709;
++		else /* SD */
++			pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
++	}
++
++	if (V4L2_TYPE_IS_OUTPUT(f->type))
++		ctx->out_colorspace = pix_mp->colorspace;
+ 
+ 	for (i = 0; i < pix_mp->num_planes; ++i) {
+ 		struct v4l2_plane_pix_format *plane_fmt = &pix_mp->plane_fmt[i];
+diff --git a/drivers/media/platform/exynos-gsc/gsc-core.h b/drivers/media/platform/exynos-gsc/gsc-core.h
+index 696217e9af66..715d9c9d8d30 100644
+--- a/drivers/media/platform/exynos-gsc/gsc-core.h
++++ b/drivers/media/platform/exynos-gsc/gsc-core.h
+@@ -376,6 +376,7 @@ struct gsc_ctx {
+ 	struct v4l2_ctrl_handler ctrl_handler;
+ 	struct gsc_ctrls	gsc_ctrls;
+ 	bool			ctrls_rdy;
++	enum v4l2_colorspace out_colorspace;
+ };
+ 
+ void gsc_set_prefbuf(struct gsc_dev *gsc, struct gsc_frame *frm);
 -- 
 2.11.1
