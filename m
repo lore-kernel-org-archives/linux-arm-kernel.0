@@ -1,169 +1,68 @@
-From: abhijitnaik27@gmail.com (Abhijit Naik)
-Date: Tue, 14 Feb 2017 00:42:17 +0530
-Subject: [PATCH 2/2] staging: bcm2835-audio: Fixed checkpatch warning due to
- line spacing
-In-Reply-To: <20170213191217.5201-1-abhijitnaik27@gmail.com>
-References: <20170213191217.5201-1-abhijitnaik27@gmail.com>
-Message-ID: <20170213191217.5201-2-abhijitnaik27@gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 13 Feb 2017 20:29:36 +0100
+Subject: [BUG] usb: gadget: Kernel oops with UVC USB gadget and configfs
+In-Reply-To: <840f1745-8792-9d7b-9f43-961614b6938d@tul.cz> (Petr Cvek's
+ message of "Mon, 13 Feb 2017 04:04:32 +0100")
+References: <497c3c61-31f0-4d40-9bab-5a0aa793e5e9@tul.cz>
+ <87shnt1sue.fsf@belgarion.home>
+ <3faadfcb-5e0d-8f92-3e91-4bd745026644@tul.cz>
+ <8737fj1us3.fsf@belgarion.home>
+ <840f1745-8792-9d7b-9f43-961614b6938d@tul.cz>
+Message-ID: <87r331zy73.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bcm2835-vchiq.c:
-fixing ERROR: Checkpatch warnings due to extra blank lines or absence of blank
-lines where needed.
+Petr Cvek <petr.cvek@tul.cz> writes:
 
-Signed-off-by: Abhijit Naik <abhijitnaik27@gmail.com>
----
- drivers/staging/bcm2835-audio/bcm2835-vchiq.c | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+> Dne 12.2.2017 v 13:02 Robert Jarzmik napsal(a):
+> That's weird I even removed pxa_set_udc_info() from magician machine init and it still fails.
+> Host cable and/or actual camera is not required. It fails without them.
+>
+> So you binded pxa27x-udc as UDC controller (= activated it) and then rmmoded
+> it and nobody complained?
+No, that usecase actually fails. I think you could submit a proper patch with
+the diff in [1], with which the pxa27x-udc unloading will work.
 
-diff --git a/drivers/staging/bcm2835-audio/bcm2835-vchiq.c b/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
-index d11f2cdd1014..af0cd0b36bc5 100644
---- a/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
-+++ b/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
-@@ -78,7 +78,6 @@ static int bcm2835_audio_start_worker(struct bcm2835_alsa_stream *alsa_stream);
- static int bcm2835_audio_write_worker(struct bcm2835_alsa_stream *alsa_stream,
- 				      unsigned int count, void *src);
+But it's not _your_ testcase, as per your provided callstack :
+[ 2152.826529] [<bf4a1914>] (udc_bind_to_driver [udc_core]) from [<bf4a1b08>] (usb_add_gadget_udc_release+0x138/0x21c [udc_core])
+[ 2152.826731] [<bf4a1b08>] (usb_add_gadget_udc_release [udc_core]) from [<bf4db838>] (pxa_udc_probe+0x290/0x2fc [pxa27x_udc])
+[ 2152.833554] [<bf4db838>] (pxa_udc_probe [pxa27x_udc]) from [<c02522d0>] (platform_drv_probe+0x38/0x84)
+[ 2152.833602] [<c02522d0>] (platform_drv_probe) from [<c0250784>] (driver_probe_device+0x1e0/0x3f4)
 
--
- // Routine to send a message across a service
+Your problem seems in the pxa_udc_probe(), which I would presume you're doing
+for a second time, ie. after modprobe pxa27x_udc + bind UDC controller + rmmod
+pxa27x_udc + modprobe pxa27x_udc.
 
- static int
-@@ -109,6 +108,7 @@ static void my_wq_function(struct work_struct *work)
- 	struct bcm2835_audio_work *w =
- 		container_of(work, struct bcm2835_audio_work, my_work);
- 	int ret = -9;
-+
- 	LOG_DBG(" .. IN %p:%d\n", w->alsa_stream, w->cmd);
- 	switch (w->cmd) {
- 	case BCM2835_AUDIO_START:
-@@ -132,6 +132,7 @@ static void my_wq_function(struct work_struct *work)
- int bcm2835_audio_start(struct bcm2835_alsa_stream *alsa_stream)
- {
- 	int ret = -1;
-+
- 	LOG_DBG(" .. IN\n");
- 	if (alsa_stream->my_wq) {
- 		struct bcm2835_audio_work *work =
-@@ -153,6 +154,7 @@ int bcm2835_audio_start(struct bcm2835_alsa_stream *alsa_stream)
- int bcm2835_audio_stop(struct bcm2835_alsa_stream *alsa_stream)
- {
- 	int ret = -1;
-+
- 	LOG_DBG(" .. IN\n");
- 	if (alsa_stream->my_wq) {
- 		struct bcm2835_audio_work *work =
-@@ -175,6 +177,7 @@ int bcm2835_audio_write(struct bcm2835_alsa_stream *alsa_stream,
- 			unsigned int count, void *src)
- {
- 	int ret = -1;
-+
- 	LOG_DBG(" .. IN\n");
- 	if (alsa_stream->my_wq) {
- 		struct bcm2835_audio_work *work =
-@@ -219,6 +222,7 @@ static void audio_vchi_callback(void *param,
- 	int status;
- 	int msg_len;
- 	struct vc_audio_msg m;
-+
- 	LOG_DBG(" .. IN instance=%p, handle=%p, alsa=%p, reason=%d, handle=%p\n",
- 		instance, instance ? instance->vchi_handle[0] : NULL, instance ? instance->alsa_stream : NULL, reason, msg_handle);
+I suspect that in this case, the problem is that the rmmod works while udc is
+still bound to the composite. The lsmod seems to prove that the refcount is
+still 0 while usb_f_uvc is is bound to pxa27x_udc.
 
-@@ -244,6 +248,7 @@ static void audio_vchi_callback(void *param,
- 		complete(&instance->msg_avail_comp);
- 	} else if (m.type == VC_AUDIO_MSG_TYPE_COMPLETE) {
- 		struct bcm2835_alsa_stream *alsa_stream = instance->alsa_stream;
-+
- 		LOG_DBG(" .. instance=%p, m.type=VC_AUDIO_MSG_TYPE_COMPLETE, complete=%d\n",
- 			instance, m.u.complete.count);
- 		if (m.u.complete.cookie1 != BCM2835_AUDIO_WRITE_COOKIE1 ||
-@@ -357,6 +362,7 @@ static int vc_vchi_audio_deinit(struct bcm2835_audio_instance *instance)
- 	/* Close all VCHI service connections */
- 	for (i = 0; i < instance->num_connections; i++) {
- 		int status;
-+
- 		LOG_DBG(" .. %i:closing %p\n", i, instance->vchi_handle[i]);
- 		vchi_service_use(instance->vchi_handle[i]);
+[@Felipe and @Laurent]
+I have no knowledge of usb_f_uvc, so would you tell me if binding usb_f_uvc to
+pxa27_udc should have incremented the module refcount of pxa27x_udc or not ?
 
-@@ -384,6 +390,7 @@ static int bcm2835_audio_open_connection(struct bcm2835_alsa_stream *alsa_stream
- 	struct bcm2835_audio_instance *instance =
- 		(struct bcm2835_audio_instance *)alsa_stream->instance;
- 	int ret;
-+
- 	LOG_DBG(" .. IN\n");
+> Can you try v4.10? Or send me exact commit on what you tested it so I can test
+> it too.
+My top commit (not counting yours) is : 61c04572de40 ("Merge branch 'for-rc' of
+git://git.kernel.org/pub/scm/linux/kernel/git/rzhang/linux")
 
- 	LOG_INFO("%s: start\n", __func__);
-@@ -445,6 +452,7 @@ int bcm2835_audio_open(struct bcm2835_alsa_stream *alsa_stream)
- 	struct vc_audio_msg m;
- 	int status;
- 	int ret;
-+
- 	LOG_DBG(" .. IN\n");
+Cheers.
 
- 	my_workqueue_init(alsa_stream);
-@@ -494,6 +502,7 @@ static int bcm2835_audio_set_ctls_chan(struct bcm2835_alsa_stream *alsa_stream,
- 	struct bcm2835_audio_instance *instance = alsa_stream->instance;
- 	int status;
- 	int ret;
-+
- 	LOG_DBG(" .. IN\n");
+-- 
+Robert
 
- 	LOG_INFO(" Setting ALSA dest(%d), volume(%d)\n",
-@@ -551,6 +560,7 @@ int bcm2835_audio_set_ctls(struct bcm2835_chip *chip)
- {
- 	int i;
- 	int ret = 0;
-+
- 	LOG_DBG(" .. IN\n");
- 	LOG_DBG(" Setting ALSA dest(%d), volume(%d)\n", chip->dest, chip->volume);
-
-@@ -580,6 +590,7 @@ int bcm2835_audio_set_params(struct bcm2835_alsa_stream *alsa_stream,
- 	struct bcm2835_audio_instance *instance = alsa_stream->instance;
- 	int status;
- 	int ret;
-+
- 	LOG_DBG(" .. IN\n");
-
- 	LOG_INFO(" Setting ALSA channels(%d), samplerate(%d), bits-per-sample(%d)\n",
-@@ -655,6 +666,7 @@ static int bcm2835_audio_start_worker(struct bcm2835_alsa_stream *alsa_stream)
- 	struct bcm2835_audio_instance *instance = alsa_stream->instance;
- 	int status;
- 	int ret;
-+
- 	LOG_DBG(" .. IN\n");
-
- 	if (mutex_lock_interruptible(&instance->vchi_mutex)) {
-@@ -693,6 +705,7 @@ static int bcm2835_audio_stop_worker(struct bcm2835_alsa_stream *alsa_stream)
- 	struct bcm2835_audio_instance *instance = alsa_stream->instance;
- 	int status;
- 	int ret;
-+
- 	LOG_DBG(" .. IN\n");
-
- 	if (mutex_lock_interruptible(&instance->vchi_mutex)) {
-@@ -732,6 +745,7 @@ int bcm2835_audio_close(struct bcm2835_alsa_stream *alsa_stream)
- 	struct bcm2835_audio_instance *instance = alsa_stream->instance;
- 	int status;
- 	int ret;
-+
- 	LOG_DBG(" .. IN\n");
-
- 	my_workqueue_quit(alsa_stream);
-@@ -839,6 +853,7 @@ static int bcm2835_audio_write_worker(struct bcm2835_alsa_stream *alsa_stream,
- 		} else {
- 			while (count > 0) {
- 				int bytes = min((int) m.u.write.max_packet, (int) count);
-+
- 				status = bcm2835_vchi_msg_queue(instance->vchi_handle[0],
- 								src, bytes);
- 				src = (char *)src + bytes;
-@@ -885,6 +900,7 @@ void bcm2835_audio_flush_playback_buffers(struct bcm2835_alsa_stream *alsa_strea
- unsigned int bcm2835_audio_retrieve_buffers(struct bcm2835_alsa_stream *alsa_stream)
- {
- 	unsigned int count = atomic_read(&alsa_stream->retrieved);
-+
- 	atomic_sub(count, &alsa_stream->retrieved);
- 	return count;
- }
---
-2.11.0
+[1]
+diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
+index 9fb103348b5d..a239eb836652 100644
+--- a/drivers/usb/gadget/udc/pxa27x_udc.c
++++ b/drivers/usb/gadget/udc/pxa27x_udc.c
+@@ -2512,7 +2512,8 @@ static int pxa_udc_remove(struct platform_device *_dev)
+        usb_del_gadget_udc(&udc->gadget);
+        pxa_cleanup_debugfs(udc);
+ 
+-       usb_put_phy(udc->transceiver);
++       if (!IS_ERR(udc->transceiver))
++               usb_put_phy(udc->transceiver);
+ 
+        udc->transceiver = NULL;
+        the_controller = NULL;
