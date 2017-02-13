@@ -1,105 +1,120 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon, 13 Feb 2017 06:54:49 -0800
-Subject: [PATCH] reset: Add i.MX7 SRC reset driver
-In-Reply-To: <20170210154354.nlcj2gq6dun7bc43@rob-hp-laptop>
-References: <20170206150836.10001-1-andrew.smirnov@gmail.com>
- <20170210154354.nlcj2gq6dun7bc43@rob-hp-laptop>
-Message-ID: <CAHQ1cqFAvo1_n5Qcm+za5NL+vnY9xV7XuLH4yfKCn8rh_OGLzw@mail.gmail.com>
+Date: Mon, 13 Feb 2017 07:05:07 -0800
+Subject: [PATCH] soc/imx: Add GPCv2 power gating driver
+In-Reply-To: <20170209212620.3xn3pom5oeiqnaf5@rob-hp-laptop>
+References: <20170206150529.9697-1-andrew.smirnov@gmail.com>
+ <20170209212620.3xn3pom5oeiqnaf5@rob-hp-laptop>
+Message-ID: <CAHQ1cqGtGdRUwvqfiXbjHjQ0uMNWejLxxWD_bCGAmQGfb3wD4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2017 at 7:43 AM, Rob Herring <robh@kernel.org> wrote:
-> On Mon, Feb 06, 2017 at 07:08:36AM -0800, Andrey Smirnov wrote:
->> This driver exposes various reset faculties, impelented by System Reset
->> Controller IP block, as a reset driver. Currently only PCIE related
->> reset lines are implemented.
+On Thu, Feb 9, 2017 at 1:26 PM, Rob Herring <robh@kernel.org> wrote:
+> On Mon, Feb 06, 2017 at 07:05:29AM -0800, Andrey Smirnov wrote:
+>> Add code allowing for control of various power domains managed by GPCv2
+>> IP block found in i.MX7 series of SoCs. Power domains covered by this
+>> patch are:
 >>
+>>     - PCIE PHY
+>>     - MIPI PHY
+>>     - USB HSIC PHY
+>>     - USB OTG1/2 PHY
+>>
+>> Support for any other power domain controlled by GPC is not present, and
+>> can be added at some later point.
+>>
+>> Testing of this code was done against a PCIe driver.
+>>
+>> Cc: yurovsky at gmail.com
 >> Cc: Lucas Stach <l.stach@pengutronix.de>
 >> Cc: Rob Herring <robh+dt@kernel.org>
 >> Cc: Mark Rutland <mark.rutland@arm.com>
 >> Cc: Fabio Estevam <fabio.estevam@nxp.com>
 >> Cc: devicetree at vger.kernel.org
->> Cc: linux-kernel at vger.kernel.org
 >> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
 >> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 >> ---
->>  .../devicetree/bindings/reset/fsl,imx7-src.txt     |  47 +++++++
->>  drivers/reset/Kconfig                              |   8 ++
->>  drivers/reset/Makefile                             |   1 +
->>  drivers/reset/reset-imx7.c                         | 149 +++++++++++++++++++++
->>  include/dt-bindings/reset/imx7-reset.h             |  28 ++++
->>  5 files changed, 233 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
->>  create mode 100644 drivers/reset/reset-imx7.c
->>  create mode 100644 include/dt-bindings/reset/imx7-reset.h
 >>
->> diff --git a/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+>> Shawn:
+>>
+>> Since this driver was modlelled after analogous driver for i.MX6 from
+>> Lucas Stach
+>>
+>> https://www.spinics.net/lists/arm-kernel/msg558548.html
+>>
+>> I made this patch to be applied on top of his. Please let me know if
+>> that was a bad idea.
+>>
+>>
+>>  .../devicetree/bindings/power/fsl,imx-gpcv2.txt    |  73 ++++
+>>  drivers/soc/imx/Makefile                           |   2 +-
+>>  drivers/soc/imx/gpcv2.c                            | 380 +++++++++++++++++++++
+>>  include/dt-bindings/power/imx7-power.h             |  18 +
+>>  4 files changed, 472 insertions(+), 1 deletion(-)
+>>  create mode 100644 Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
+>>  create mode 100644 drivers/soc/imx/gpcv2.c
+>>  create mode 100644 include/dt-bindings/power/imx7-power.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
 >> new file mode 100644
->> index 0000000..19a77f9
+>> index 0000000..949e190
 >> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
->> @@ -0,0 +1,47 @@
->> +Freescale i.MX7 System Reset Controller
->> +======================================
+>> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
+>> @@ -0,0 +1,73 @@
+>> +Freescale i.MX General Power Controller v2
+>> +==========================================
 >> +
->> +Please also refer to reset.txt in this directory for common reset
->> +controller binding usage.
+>> +The i.MX7S/D General Power Control (GPC) block contains Power Gating
+>> +Control (PGC) for various power domains.
 >> +
 >> +Required properties:
->> +- compatible: Should be "fsl,imx7-src", "syscon"
->
-> Doesn't match the example. This should be specific. I assume there's
-> more than one i.MX7?
->
+>> +
+>> +- compatible: Should be "fsl,imx7d-gpc"
+>> +
 >> +- reg: should be register base and length as documented in the
 >> +  datasheet
->> +- interrupts: Should contain SRC interrupt
->> +- #reset-cells: 1, see below
 >> +
->> +example:
+>> +- interrupts: Should contain GPC interrupt request 1
 >> +
->> +src: src at 30390000 {
+>> +- #power-domain-cells: Should be 1, see below:
 >
-> reset-controller at ...
+> Should be 1 or ...
 
-OK, will update in v2.
+This is an oversight on my part. The property is not needed for that
+node at all. Will fix in v2.
 
 >
->> +     compatible = "fsl,imx7d-src", "syscon";
->> +     reg = <0x30390000 0x10000>;
+>> +
+>> +Power domains contained within GPC node are generic power domain
+>> +providers, documented in
+>> +Documentation/devicetree/bindings/power/power_domain.txt, which are
+>> +described as subnoded of the power gating controller 'pgc' node,
 >
-> Really has 64KB of registers or that's just the block spacing. Assuming
-> the actual size is smaller, you are eating up valuable lowmem space by
-> mapping all 64KB.
+> s/subnoded/subnodes/
+
+Ugh. Sorry about that, will fix in v2.
+
 >
-
-There are definitely registers within first 8K of that window, and I
-have no idea if there are any more undocumented registers going even
-further, but IMHO you are very likely to be correct in your assumption
-that this is mostly block spacing. I borrowed already existing "src"
-node definition from i.MX7 device tree code and that is how it was
-defined there. I'll shrink the example to be only 8K.
-
->> +     interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
->> +     #reset-cells = <1>;
->> +};
->> +
->> +
->> +Specifying reset lines connected to IP modules
->> +==============================================
->> +
->> +The system reset controller can be used to reset various set of
->> +peripherals. Device nodes that need access to reset lines should
->> +specify them as a reset phandle in their corresponding node as
->> +specified in reset.txt.
->> +
->> +Example:
->> +
->> +     pcie: pcie at 0x33800000 {
+>> +which, in turn, is expected to conatine the following:
 >
-> Drop the 0x.
+> s/conatine/contain/
 
-OK, will do in v2.
+Ditto.
+
+>
+>> +
+>> +Required properties:
+>> +
+>> +- reg: Power domain index. Valid values are defined in
+>> +  include/dt-bindings/power/imx7-power.h
+>> +
+>> +- #power-domain-cells: Should be 0
+>
+> ... 0?
+
+Yeah, I can see how my description is confusing. This one is correct
+though and hopefully with the first mention of the property gone the
+description should become clear.
 
 Thanks,
 Andrey Smirnov
