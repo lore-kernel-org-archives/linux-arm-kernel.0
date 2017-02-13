@@ -1,175 +1,25 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 13 Feb 2017 15:22:37 +0200
-Subject: [PATCH DO NOT MERGE 6/6] ARM: OMAP4: hwmod_data: drop a few clkctrl
- setups replaced with clocks
-In-Reply-To: <1486992157-10673-1-git-send-email-t-kristo@ti.com>
-References: <1486992157-10673-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1486992157-10673-7-git-send-email-t-kristo@ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 13 Feb 2017 14:25:40 +0100
+Subject: [PATCH] ARM: dts: at91: Fix matrix compatible
+In-Reply-To: <1486983714-13314-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1486983714-13314-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20170213132540.yo2z4tstsgnuhj5s@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the clkctrl clocks being available as clocks now, the clkctrl
-data within hwmod can be dropped away. Do this for the few sample
-clocks that have been converted.
+On 13/02/2017 at 12:01:54 +0100, Boris Brezillon wrote:
+> The matrix node was defined before the documentation for the bus
+> matrix configuration was submitted. Patch the device tree to match
+> the DT doc.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/at91sam9261.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+Applied, thanks.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 30 ------------------------------
- 1 file changed, 30 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index dad871a..3625677 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -517,9 +517,7 @@
- 	.main_clk	= "func_dmic_abe_gfclk",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM1_ABE_DMIC_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_ABE_DMIC_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
- };
-@@ -1060,9 +1058,7 @@
- 	.main_clk	= "l4_div_ck",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM_L4PER_GPIO2_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_L4PER_GPIO2_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_HWCTRL,
- 		},
- 	},
- 	.opt_clks	= gpio2_opt_clks,
-@@ -1083,9 +1079,7 @@
- 	.main_clk	= "l4_div_ck",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM_L4PER_GPIO3_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_L4PER_GPIO3_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_HWCTRL,
- 		},
- 	},
- 	.opt_clks	= gpio3_opt_clks,
-@@ -1361,9 +1355,7 @@
- 	.main_clk	= "func_96m_fclk",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM_L4PER_I2C2_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_L4PER_I2C2_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
- 	.dev_attr	= &i2c_dev_attr,
-@@ -1378,9 +1370,7 @@
- 	.main_clk	= "func_96m_fclk",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM_L4PER_I2C3_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_L4PER_I2C3_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
- 	.dev_attr	= &i2c_dev_attr,
-@@ -1395,9 +1385,7 @@
- 	.main_clk	= "func_96m_fclk",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM_L4PER_I2C4_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_L4PER_I2C4_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
- 	.dev_attr	= &i2c_dev_attr,
-@@ -1659,9 +1647,7 @@
- 	.main_clk	= "func_mcbsp1_gfclk",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM1_ABE_MCBSP1_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_ABE_MCBSP1_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
- 	.opt_clks	= mcbsp1_opt_clks,
-@@ -1775,9 +1761,7 @@
- 	.main_clk	= "pad_clks_ck",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM1_ABE_PDM_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_ABE_PDM_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
- };
-@@ -2013,9 +1997,7 @@
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM_L4PER_MMCSD3_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_L4PER_MMCSD3_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
- };
-@@ -2035,9 +2017,7 @@
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM_L4PER_MMCSD4_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_L4PER_MMCSD4_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
- };
-@@ -2057,9 +2037,7 @@
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM_L4PER_MMCSD5_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_L4PER_MMCSD5_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
- };
-@@ -2799,9 +2777,7 @@
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM_L4PER_UART1_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_L4PER_UART1_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
- };
-@@ -2815,9 +2791,7 @@
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM_L4PER_UART2_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_L4PER_UART2_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
- };
-@@ -2831,9 +2805,7 @@
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM_L4PER_UART3_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_L4PER_UART3_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
- };
-@@ -2847,9 +2819,7 @@
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
--			.clkctrl_offs = OMAP4_CM_L4PER_UART4_CLKCTRL_OFFSET,
- 			.context_offs = OMAP4_RM_L4PER_UART4_CONTEXT_OFFSET,
--			.modulemode   = MODULEMODE_SWCTRL,
- 		},
- 	},
- };
 -- 
-1.9.1
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
