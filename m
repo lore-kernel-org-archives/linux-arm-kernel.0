@@ -1,40 +1,41 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 13 Feb 2017 04:03:40 -0800
-Subject: [PATCH] bcm2835-audio: Fix checkpatch errors
-In-Reply-To: <CAExP5d4F-8mkcDjyNMYT0Kah11oGwbbg6hRaveOZuq065-2=Zg@mail.gmail.com>
-References: <1486845362-25086-1-git-send-email-manchoyy@gmail.com>
- <20170212121658.GA19617@kroah.com>
- <CAExP5d4F-8mkcDjyNMYT0Kah11oGwbbg6hRaveOZuq065-2=Zg@mail.gmail.com>
-Message-ID: <20170213120340.GA25852@kroah.com>
+From: viniciusfre@gmail.com (Vinicius Maciel)
+Date: Mon, 13 Feb 2017 09:05:53 -0300
+Subject: [PATCH] spi/sun6i: Add Master Sample Data Mode for SPI
+Message-ID: <20170213120553.6479-1-viniciusfre@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2017 at 08:49:06AM +0800, Man Choy wrote:
-> A quick question, I just updated my linux-next tree last night,
-> checkout tag "next-20170210" and working on the cleanup. How do I
-> double check my current working file already been updated by someone
-> else to avoid the duplicate work? As of now, the latest linux-next
-> tree tag is still "next-20170210"
+In order to work appropriately, some SPI chips, such as
+max11043, require SPI master samples the data at the
+correct edge.
 
-linux-next is usually a day or so behind my tree, due to the time
-differences when it is created and why I usually do work.
+This patch add Master Sample Data Mode bit in normal sample mode.
 
-You can work off of my staging-next branch in my staging.git tree on
-git.kernel.org, that is the most up-to-date branch that ends up in
-linux-next.  I also use staging-testing, to test things, but I would not
-recommend that for you as it can be rebased and would be a pain to work
-against.
+Signed-off-by: Vinicius Maciel <viniciusfre@gmail.com>
+---
+ drivers/spi/spi-sun6i.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-It's ok that conflicts happen, that's how kernel development works,
-sometimes people send in the same change minutes from each other, so I
-have to take the one that was sent first.  It's ok, just move on and
-work on something else if you really want to.
-
-> I am on eudyptula challenge and this is my first attempt to send
-> kernel patch, sorry about the silly question ;)
-
-It's not silly, it comes up all the time.
-
-good luck!
-
-greg k-h
+diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
+index e3114832c485..170f4ad407dd 100644
+--- a/drivers/spi/spi-sun6i.c
++++ b/drivers/spi/spi-sun6i.c
+@@ -43,6 +43,7 @@
+ #define SUN6I_TFR_CTL_CS_LEVEL			BIT(7)
+ #define SUN6I_TFR_CTL_DHB			BIT(8)
+ #define SUN6I_TFR_CTL_FBS			BIT(12)
++#define SUN6I_TFR_CTL_SDM			BIT(13)
+ #define SUN6I_TFR_CTL_XCH			BIT(31)
+ 
+ #define SUN6I_INT_CTL_REG		0x10
+@@ -342,6 +343,8 @@ static int sun6i_spi_runtime_resume(struct device *dev)
+ 
+ 	sun6i_spi_write(sspi, SUN6I_GBL_CTL_REG,
+ 			SUN6I_GBL_CTL_BUS_ENABLE | SUN6I_GBL_CTL_MASTER | SUN6I_GBL_CTL_TP);
++        sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG,
++			SUN6I_TFR_CTL_SDM);
+ 
+ 	return 0;
+ 
+-- 
+2.11.0
