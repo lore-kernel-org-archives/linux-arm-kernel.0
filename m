@@ -1,35 +1,133 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 14 Feb 2017 01:30:38 +0800
-Subject: [stericsson:mmc-no-NULL 29/34] ERROR: "mmc_blk_rw_done"
- [drivers/mmc/core/mmc_core.ko] undefined!
-Message-ID: <201702140133.hITWgcna%fengguang.wu@intel.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 13 Feb 2017 10:28:00 -0800
+Subject: [PATCH 02/10] ARM: dts: da850-evm: fix whitespace errors
+In-Reply-To: <1486485683-11427-3-git-send-email-bgolaszewski@baylibre.com>
+ (Bartosz Golaszewski's message of "Tue, 7 Feb 2017 17:41:15 +0100")
+References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
+ <1486485683-11427-3-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <m24lzyeyj3.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git mmc-no-NULL
-head:   c8140f7069d2f17882ea16e78265b7e31c4b5e45
-commit: 4515dc6f7347baa369f13e489bfa5d431e03dbe0 [29/34] mmc: block: shuffle retry and error handling
-config: x86_64-rhel (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout 4515dc6f7347baa369f13e489bfa5d431e03dbe0
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+Bartosz Golaszewski <bgolaszewski@baylibre.com> writes:
 
-Note: the stericsson/mmc-no-NULL HEAD c8140f7069d2f17882ea16e78265b7e31c4b5e45 builds fine.
-      It only hurts bisectibility.
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-All errors (new ones prefixed by >>):
+Acked-by: Kevin Hilman <khilman@baylibre.com>
 
->> ERROR: "mmc_blk_rw_done" [drivers/mmc/core/mmc_core.ko] undefined!
+> ---
+>  arch/arm/boot/dts/da850-evm.dts | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+> index c970b6e..94938a3 100644
+> --- a/arch/arm/boot/dts/da850-evm.dts
+> +++ b/arch/arm/boot/dts/da850-evm.dts
+> @@ -301,14 +301,14 @@
+>  	/* VPIF capture port */
+>  	port {
+>  		vpif_ch0: endpoint at 0 {
+> -			  reg = <0>;
+> -			  bus-width = <8>;
+> +			reg = <0>;
+> +			bus-width = <8>;
+>  		};
+>  
+>  		vpif_ch1: endpoint at 1 {
+> -			  reg = <1>;
+> -			  bus-width = <8>;
+> -			  data-shift = <8>;
+> +			reg = <1>;
+> +			bus-width = <8>;
+> +			data-shift = <8>;
+>  		};
+>  	};
+>  };
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 38277 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170214/12211dd8/attachment-0001.gz>
+Bartosz Golaszewski <bgolaszewski@baylibre.com> writes:
+
+> Extend the vpif node with an output port with a single channel.
+>
+> NOTE: this is still just hardware description - the actual driver
+> is registered using pdata-quirks.
+>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/boot/dts/da850-evm.dts | 14 +++++++++++---
+>  arch/arm/boot/dts/da850.dtsi    |  8 +++++++-
+>  2 files changed, 18 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+> index 94938a3..3d6dd66 100644
+> --- a/arch/arm/boot/dts/da850-evm.dts
+> +++ b/arch/arm/boot/dts/da850-evm.dts
+> @@ -299,16 +299,24 @@
+>  	status = "okay";
+>  
+>  	/* VPIF capture port */
+> -	port {
+> -		vpif_ch0: endpoint at 0 {
+> +	port at 0 {
+> +		vpif_input_ch0: endpoint at 0 {
+>  			reg = <0>;
+>  			bus-width = <8>;
+>  		};
+>  
+> -		vpif_ch1: endpoint at 1 {
+> +		vpif_input_ch1: endpoint at 1 {
+>  			reg = <1>;
+>  			bus-width = <8>;
+>  			data-shift = <8>;
+>  		};
+>  	};
+> +
+> +	/* VPIF display port */
+> +	port at 1 {
+> +		vpif_output_ch0: endpoint at 0 {
+> +			reg = <0>;
+> +			bus-width = <8>;
+> +		};
+> +	};
+>  };
+> diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+> index 69ec5e7..768a58c 100644
+> --- a/arch/arm/boot/dts/da850.dtsi
+> +++ b/arch/arm/boot/dts/da850.dtsi
+> @@ -494,7 +494,13 @@
+>  			status = "disabled";
+>  
+>  			/* VPIF capture port */
+> -			port {
+> +			port at 0 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +			};
+> +
+> +			/* VPIF display port */
+> +			port at 1 {
+>  				#address-cells = <1>;
+>  				#size-cells = <0>;
+>  			};
+
+Bartosz Golaszewski <bgolaszewski@baylibre.com> writes:
+
+> There's a stray tab in da850_vpif_legacy_init(). Remove it.
+>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/mach-davinci/pdata-quirks.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
+> index a186513..94948c1 100644
+> --- a/arch/arm/mach-davinci/pdata-quirks.c
+> +++ b/arch/arm/mach-davinci/pdata-quirks.c
+> @@ -111,7 +111,7 @@ static struct vpif_capture_config da850_vpif_capture_config = {
+>  static void __init da850_vpif_legacy_init(void)
+>  {
+>  	int ret;
+> -	
+> +
+>  	/* LCDK doesn't have the 2nd TVP514x on CH1 */
+>  	if (of_machine_is_compatible("ti,da850-lcdk"))
+>  		da850_vpif_capture_config.subdev_count = 1;
