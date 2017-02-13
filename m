@@ -1,68 +1,57 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 13 Feb 2017 20:29:36 +0100
-Subject: [BUG] usb: gadget: Kernel oops with UVC USB gadget and configfs
-In-Reply-To: <840f1745-8792-9d7b-9f43-961614b6938d@tul.cz> (Petr Cvek's
- message of "Mon, 13 Feb 2017 04:04:32 +0100")
-References: <497c3c61-31f0-4d40-9bab-5a0aa793e5e9@tul.cz>
- <87shnt1sue.fsf@belgarion.home>
- <3faadfcb-5e0d-8f92-3e91-4bd745026644@tul.cz>
- <8737fj1us3.fsf@belgarion.home>
- <840f1745-8792-9d7b-9f43-961614b6938d@tul.cz>
-Message-ID: <87r331zy73.fsf@belgarion.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 13 Feb 2017 21:45:15 +0100
+Subject: [PATCH 1/2] ARM: add ARM_SINGLE_ARMV7 as config option
+In-Reply-To: <20170210163908.GL27312@n2100.armlinux.org.uk>
+References: <20170209033044.19513-1-chris.brandt@renesas.com>
+ <5d90aff5-63b7-83a8-7529-2ac61ef82021@gmail.com>
+ <SG2PR06MB11650C805DD754EE5C9E56C78A450@SG2PR06MB1165.apcprd06.prod.outlook.com>
+ <25202835.AdbHsoUg0y@wuerfel> <20170210163908.GL27312@n2100.armlinux.org.uk>
+Message-ID: <CAK8P3a352qqynDUGPXVFfn3Yu2+qZr9F1WkWCEqpj_YM61WgJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
+On Fri, Feb 10, 2017 at 5:39 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
 
-> Dne 12.2.2017 v 13:02 Robert Jarzmik napsal(a):
-> That's weird I even removed pxa_set_udc_info() from magician machine init and it still fails.
-> Host cable and/or actual camera is not required. It fails without them.
 >
-> So you binded pxa27x-udc as UDC controller (= activated it) and then rmmoded
-> it and nobody complained?
-No, that usecase actually fails. I think you could submit a proper patch with
-the diff in [1], with which the pxa27x-udc unloading will work.
+>> - Some (few) platforms actually have separate top-level Kconfig options
+>>   but are actually very closely related and you could have a kernel
+>>   for all of them even with !MMU and XIP_KERNEL. The most important
+>>   one here is ARM Versatile/Realview/Integrator/Vexpress that have
+>>   more in common than things we put behind a common Kconfig option in
+>>   other platforms.
+>
+> If you think that Versatile + Realview + Integrator + Vexpress should
+> be lumped into one kernel image for !MMU and XIP_KERNEL then you're
+> wrong - from what I remember, their RAM and flash locations are quite
+> different which rules it out.
 
-But it's not _your_ testcase, as per your provided callstack :
-[ 2152.826529] [<bf4a1914>] (udc_bind_to_driver [udc_core]) from [<bf4a1b08>] (usb_add_gadget_udc_release+0x138/0x21c [udc_core])
-[ 2152.826731] [<bf4a1b08>] (usb_add_gadget_udc_release [udc_core]) from [<bf4db838>] (pxa_udc_probe+0x290/0x2fc [pxa27x_udc])
-[ 2152.833554] [<bf4db838>] (pxa_udc_probe [pxa27x_udc]) from [<c02522d0>] (platform_drv_probe+0x38/0x84)
-[ 2152.833602] [<c02522d0>] (platform_drv_probe) from [<c0250784>] (driver_probe_device+0x1e0/0x3f4)
+They are not all the same, but the locations are not split according to
+the platform names either. The early realview platforms are like versatile
+here, while later realview platforms have the alias plus more, and vexpress
+has it in two other places depending on the generation.
 
-Your problem seems in the pxa_udc_probe(), which I would presume you're doing
-for a second time, ie. after modprobe pxa27x_udc + bind UDC controller + rmmod
-pxa27x_udc + modprobe pxa27x_udc.
+I misremembered vexpress and thought that it was like the later
+realview, but at least versatile and realview are basically the same
+thing (the story with NOR flash is similar).
 
-I suspect that in this case, the problem is that the rmmod works while udc is
-still bound to the composite. The lsmod seems to prove that the refcount is
-still 0 while usb_f_uvc is is bound to pxa27x_udc.
+>> - CONFIG_DEBUG_UNCOMPRESS has a very similar requirements to
+>>   XIP_KERNEL and !MMU, and we currently allow it for any machine,
+>>   with a lot of flexibility in configuring that always breaks
+>>   running on any machine other than the one you are targetting.
+>
+> Right, but that's debug, not core kernel configuration.
 
-[@Felipe and @Laurent]
-I have no knowledge of usb_f_uvc, so would you tell me if binding usb_f_uvc to
-pxa27_udc should have incremented the module refcount of pxa27x_udc or not ?
+I have not yet seen any argument why that is an important distinction, i.e.
+what is the downside of letting users just turn the MMU and XIP options
+on and off without changing everything else, other than this having been
+the default in the past?
 
-> Can you try v4.10? Or send me exact commit on what you tested it so I can test
-> it too.
-My top commit (not counting yours) is : 61c04572de40 ("Merge branch 'for-rc' of
-git://git.kernel.org/pub/scm/linux/kernel/git/rzhang/linux")
+Obviously you won't be able to boot on machines when configured for
+a different physical address (for RAM, flash or uart), but even that is
+no change from what we have on the NOMMU platforms: on any of them
+you have to manually type the address when configuring your kernel
+for a given target and change it again when you want to run on another
+board that doesn't share the exact address.
 
-Cheers.
-
--- 
-Robert
-
-[1]
-diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
-index 9fb103348b5d..a239eb836652 100644
---- a/drivers/usb/gadget/udc/pxa27x_udc.c
-+++ b/drivers/usb/gadget/udc/pxa27x_udc.c
-@@ -2512,7 +2512,8 @@ static int pxa_udc_remove(struct platform_device *_dev)
-        usb_del_gadget_udc(&udc->gadget);
-        pxa_cleanup_debugfs(udc);
- 
--       usb_put_phy(udc->transceiver);
-+       if (!IS_ERR(udc->transceiver))
-+               usb_put_phy(udc->transceiver);
- 
-        udc->transceiver = NULL;
-        the_controller = NULL;
+     Arnd
