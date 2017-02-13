@@ -1,169 +1,115 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 13 Feb 2017 11:35:07 +0200
-Subject: [PATCH 11/15] clk: ti: divider: convert TI divider clock to use its
- own data representation
+Date: Mon, 13 Feb 2017 11:35:05 +0200
+Subject: [PATCH 09/15] clk: ti: drop unnecessary MEMMAP_ADDRESSING flag
 In-Reply-To: <1486978511-29668-1-git-send-email-t-kristo@ti.com>
 References: <1486978511-29668-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1486978511-29668-12-git-send-email-t-kristo@ti.com>
+Message-ID: <1486978511-29668-10-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using the generic clock driver data struct, use one internal
-for the TI clock driver itself. This allows modifying the register access
-parts in subsequent patch.
+This has been superceded by the usage of ti_clk_ll_ops for now.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/ti/clock.h   | 11 +++++++++++
- drivers/clk/ti/divider.c | 22 +++++++++++-----------
- drivers/clk/ti/gate.c    |  4 ++--
- 3 files changed, 24 insertions(+), 13 deletions(-)
+ drivers/clk/ti/apll.c      | 1 -
+ drivers/clk/ti/dpll.c      | 2 --
+ drivers/clk/ti/gate.c      | 4 +---
+ drivers/clk/ti/interface.c | 1 -
+ include/linux/clk/ti.h     | 2 --
+ 5 files changed, 1 insertion(+), 9 deletions(-)
 
-diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
-index 4d0ace2..0f5f6d5 100644
---- a/drivers/clk/ti/clock.h
-+++ b/drivers/clk/ti/clock.h
-@@ -18,6 +18,17 @@
+diff --git a/drivers/clk/ti/apll.c b/drivers/clk/ti/apll.c
+index 62b5db7..5cba28c 100644
+--- a/drivers/clk/ti/apll.c
++++ b/drivers/clk/ti/apll.c
+@@ -194,7 +194,6 @@ static void __init of_dra7_apll_setup(struct device_node *node)
  
- #include <linux/clkdev.h>
+ 	clk_hw->dpll_data = ad;
+ 	clk_hw->hw.init = init;
+-	clk_hw->flags = MEMMAP_ADDRESSING;
  
-+struct clk_omap_divider {
-+	struct clk_hw		hw;
-+	void __iomem		*reg;
-+	u8			shift;
-+	u8			width;
-+	u8			flags;
-+	const struct clk_div_table	*table;
-+};
-+
-+#define to_clk_omap_divider(_hw) container_of(_hw, struct clk_omap_divider, hw)
-+
- struct clk_omap_mux {
- 	struct clk_hw		hw;
- 	void __iomem		*reg;
-diff --git a/drivers/clk/ti/divider.c b/drivers/clk/ti/divider.c
-index a6750f8..f33f139 100644
---- a/drivers/clk/ti/divider.c
-+++ b/drivers/clk/ti/divider.c
-@@ -39,7 +39,7 @@ static unsigned int _get_table_maxdiv(const struct clk_div_table *table)
- 	return maxdiv;
- }
+ 	init->name = node->name;
+ 	init->ops = &apll_ck_ops;
+diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
+index 37624e1..c149bd1 100644
+--- a/drivers/clk/ti/dpll.c
++++ b/drivers/clk/ti/dpll.c
+@@ -248,7 +248,6 @@ struct clk *ti_clk_register_dpll(struct ti_clk *setup)
+ 	clk_hw->dpll_data = dd;
+ 	clk_hw->ops = &clkhwops_omap3_dpll;
+ 	clk_hw->hw.init = &init;
+-	clk_hw->flags = MEMMAP_ADDRESSING;
  
--static unsigned int _get_maxdiv(struct clk_divider *divider)
-+static unsigned int _get_maxdiv(struct clk_omap_divider *divider)
- {
- 	if (divider->flags & CLK_DIVIDER_ONE_BASED)
- 		return div_mask(divider);
-@@ -61,7 +61,7 @@ static unsigned int _get_table_div(const struct clk_div_table *table,
- 	return 0;
- }
+ 	init.name = setup->name;
+ 	init.ops = ops;
+@@ -380,7 +379,6 @@ static void __init of_ti_dpll_setup(struct device_node *node,
+ 	clk_hw->dpll_data = dd;
+ 	clk_hw->ops = &clkhwops_omap3_dpll;
+ 	clk_hw->hw.init = init;
+-	clk_hw->flags = MEMMAP_ADDRESSING;
  
--static unsigned int _get_div(struct clk_divider *divider, unsigned int val)
-+static unsigned int _get_div(struct clk_omap_divider *divider, unsigned int val)
- {
- 	if (divider->flags & CLK_DIVIDER_ONE_BASED)
- 		return val;
-@@ -83,7 +83,7 @@ static unsigned int _get_table_val(const struct clk_div_table *table,
- 	return 0;
- }
- 
--static unsigned int _get_val(struct clk_divider *divider, u8 div)
-+static unsigned int _get_val(struct clk_omap_divider *divider, u8 div)
- {
- 	if (divider->flags & CLK_DIVIDER_ONE_BASED)
- 		return div;
-@@ -97,7 +97,7 @@ static unsigned int _get_val(struct clk_divider *divider, u8 div)
- static unsigned long ti_clk_divider_recalc_rate(struct clk_hw *hw,
- 						unsigned long parent_rate)
- {
--	struct clk_divider *divider = to_clk_divider(hw);
-+	struct clk_omap_divider *divider = to_clk_omap_divider(hw);
- 	unsigned int div, val;
- 
- 	val = ti_clk_ll_ops->clk_readl(divider->reg) >> divider->shift;
-@@ -131,7 +131,7 @@ static bool _is_valid_table_div(const struct clk_div_table *table,
- 	return false;
- }
- 
--static bool _is_valid_div(struct clk_divider *divider, unsigned int div)
-+static bool _is_valid_div(struct clk_omap_divider *divider, unsigned int div)
- {
- 	if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
- 		return is_power_of_2(div);
-@@ -143,7 +143,7 @@ static bool _is_valid_div(struct clk_divider *divider, unsigned int div)
- static int ti_clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
- 				  unsigned long *best_parent_rate)
- {
--	struct clk_divider *divider = to_clk_divider(hw);
-+	struct clk_omap_divider *divider = to_clk_omap_divider(hw);
- 	int i, bestdiv = 0;
- 	unsigned long parent_rate, best = 0, now, maxdiv;
- 	unsigned long parent_rate_saved = *best_parent_rate;
-@@ -210,14 +210,14 @@ static long ti_clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
- static int ti_clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
- 				   unsigned long parent_rate)
- {
--	struct clk_divider *divider;
-+	struct clk_omap_divider *divider;
- 	unsigned int div, value;
- 	u32 val;
- 
- 	if (!hw || !rate)
- 		return -EINVAL;
- 
--	divider = to_clk_divider(hw);
-+	divider = to_clk_omap_divider(hw);
- 
- 	div = DIV_ROUND_UP(parent_rate, rate);
- 	value = _get_val(divider, div);
-@@ -249,7 +249,7 @@ static struct clk *_register_divider(struct device *dev, const char *name,
- 				     u8 shift, u8 width, u8 clk_divider_flags,
- 				     const struct clk_div_table *table)
- {
--	struct clk_divider *div;
-+	struct clk_omap_divider *div;
- 	struct clk *clk;
- 	struct clk_init_data init;
- 
-@@ -350,7 +350,7 @@ static struct clk *_register_divider(struct device *dev, const char *name,
- 
- struct clk_hw *ti_clk_build_component_div(struct ti_clk_divider *setup)
- {
--	struct clk_divider *div;
-+	struct clk_omap_divider *div;
- 	struct clk_omap_reg *reg;
- 
- 	if (!setup)
-@@ -588,7 +588,7 @@ static void __init of_ti_divider_clk_setup(struct device_node *node)
- 
- static void __init of_ti_composite_divider_clk_setup(struct device_node *node)
- {
--	struct clk_divider *div;
-+	struct clk_omap_divider *div;
- 	u32 val;
- 
- 	div = kzalloc(sizeof(*div), GFP_KERNEL);
+ 	init->name = node->name;
+ 	init->ops = ops;
 diff --git a/drivers/clk/ti/gate.c b/drivers/clk/ti/gate.c
-index 5ff62e2..a65f082 100644
+index b3291db..5ff62e2 100644
 --- a/drivers/clk/ti/gate.c
 +++ b/drivers/clk/ti/gate.c
-@@ -62,7 +62,7 @@
+@@ -113,7 +113,7 @@ static struct clk *_register_gate(struct device *dev, const char *name,
+ 	clk_hw->enable_bit = bit_idx;
+ 	clk_hw->ops = hw_ops;
+ 
+-	clk_hw->flags = MEMMAP_ADDRESSING | clk_gate_flags;
++	clk_hw->flags = clk_gate_flags;
+ 
+ 	init.parent_names = &parent_name;
+ 	init.num_parents = 1;
+@@ -203,7 +203,6 @@ struct clk_hw *ti_clk_build_component_gate(struct ti_clk_gate *setup)
+ 		ops = &clkhwops_iclk_wait;
+ 
+ 	gate->ops = ops;
+-	gate->flags = MEMMAP_ADDRESSING;
+ 
+ 	return &gate->hw;
+ }
+@@ -269,7 +268,6 @@ static void __init _of_ti_gate_clk_setup(struct device_node *node,
+ 
+ 	gate->enable_bit = val;
+ 	gate->ops = hw_ops;
+-	gate->flags = MEMMAP_ADDRESSING;
+ 
+ 	if (!ti_clk_add_component(node, &gate->hw, CLK_COMPONENT_TYPE_GATE))
+ 		return;
+diff --git a/drivers/clk/ti/interface.c b/drivers/clk/ti/interface.c
+index 7927e1a..42d9fd4 100644
+--- a/drivers/clk/ti/interface.c
++++ b/drivers/clk/ti/interface.c
+@@ -47,7 +47,6 @@ static struct clk *_register_interface(struct device *dev, const char *name,
+ 
+ 	clk_hw->hw.init = &init;
+ 	clk_hw->ops = ops;
+-	clk_hw->flags = MEMMAP_ADDRESSING;
+ 	clk_hw->enable_reg = reg;
+ 	clk_hw->enable_bit = bit_idx;
+ 
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index 626ae94..affdabd 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -168,7 +168,6 @@ struct clk_hw_omap {
+  *     should be used.  This is a temporary solution - a better approach
+  *     would be to associate clock type-specific data with the clock,
+  *     similar to the struct dpll_data approach.
+- * MEMMAP_ADDRESSING: Use memmap addressing to access clock registers.
   */
- static int omap36xx_gate_clk_enable_with_hsdiv_restore(struct clk_hw *hw)
- {
--	struct clk_divider *parent;
-+	struct clk_omap_divider *parent;
- 	struct clk_hw *parent_hw;
- 	u32 dummy_v, orig_v;
- 	int ret;
-@@ -72,7 +72,7 @@ static int omap36xx_gate_clk_enable_with_hsdiv_restore(struct clk_hw *hw)
+ #define ENABLE_REG_32BIT	(1 << 0)	/* Use 32-bit access */
+ #define CLOCK_IDLE_CONTROL	(1 << 1)
+@@ -176,7 +175,6 @@ struct clk_hw_omap {
+ #define ENABLE_ON_INIT		(1 << 3)	/* Enable upon framework init */
+ #define INVERT_ENABLE		(1 << 4)	/* 0 enables, 1 disables */
+ #define CLOCK_CLKOUTX2		(1 << 5)
+-#define MEMMAP_ADDRESSING	(1 << 6)
  
- 	/* Parent is the x2 node, get parent of parent for the m2 div */
- 	parent_hw = clk_hw_get_parent(clk_hw_get_parent(hw));
--	parent = to_clk_divider(parent_hw);
-+	parent = to_clk_omap_divider(parent_hw);
- 
- 	/* Restore the dividers */
- 	if (!ret) {
+ /* CM_CLKEN_PLL*.EN* bit values - not all are available for every DPLL */
+ #define DPLL_LOW_POWER_STOP	0x1
 -- 
 1.9.1
