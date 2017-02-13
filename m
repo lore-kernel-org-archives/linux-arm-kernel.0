@@ -1,31 +1,33 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 13 Feb 2017 12:01:54 +0100
-Subject: [PATCH] ARM: dts: at91: Fix matrix compatible
-Message-ID: <1486983714-13314-1-git-send-email-boris.brezillon@free-electrons.com>
+From: andy.yan@rock-chips.com (Andy Yan)
+Date: Mon, 13 Feb 2017 19:02:39 +0800
+Subject: [PATCH 1/7] dt-bindings: rockchip-dw-mshc: rename RK1108 to RV1108
+In-Reply-To: <1486983566-32265-1-git-send-email-andy.yan@rock-chips.com>
+References: <1486983566-32265-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <1486983759-32337-1-git-send-email-andy.yan@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The matrix node was defined before the documentation for the bus
-matrix configuration was submitted. Patch the device tree to match
-the DT doc.
+Rockchip finally named the SOC as RV1108, so change it.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+
 ---
- arch/arm/boot/dts/at91sam9261.dtsi | 2 +-
+
+ Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
-index 2188bbe2a0b8..dfcbf922cd95 100644
---- a/arch/arm/boot/dts/at91sam9261.dtsi
-+++ b/arch/arm/boot/dts/at91sam9261.dtsi
-@@ -295,7 +295,7 @@
- 			};
- 
- 			matrix: matrix at ffffee00 {
--				compatible = "atmel,at91sam9260-bus-matrix", "syscon";
-+				compatible = "atmel,at91sam9261-matrix", "syscon";
- 				reg = <0xffffee00 0x200>;
- 			};
- 
+diff --git a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+index ea9c1c9..520d61d 100644
+--- a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
++++ b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+@@ -13,7 +13,7 @@ Required Properties:
+ 	- "rockchip,rk2928-dw-mshc": for Rockchip RK2928 and following,
+ 							before RK3288
+ 	- "rockchip,rk3288-dw-mshc": for Rockchip RK3288
+-	- "rockchip,rk1108-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK1108
++	- "rockchip,rv1108-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RV1108
+ 	- "rockchip,rk3036-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3036
+ 	- "rockchip,rk3368-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3368
+ 	- "rockchip,rk3399-dw-mshc", "rockchip,rk3288-dw-mshc": for Rockchip RK3399
 -- 
 2.7.4
