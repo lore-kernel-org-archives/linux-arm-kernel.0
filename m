@@ -1,44 +1,41 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 13 Feb 2017 12:51:12 -0800
-Subject: [PATCH v2] ASoC: bcm2835: Add 8 channel (multitrack) capability
-In-Reply-To: <1486942035-24038-1-git-send-email-flatmax@flatmax.org>
-References: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
- <1486942035-24038-1-git-send-email-flatmax@flatmax.org>
-Message-ID: <87tw7xzuf3.fsf@eliezer.anholt.net>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 13 Feb 2017 14:51:49 -0600
+Subject: [PATCH] efi/libstub/arm*: Set default address and size cells
+ values for an empty dtb
+In-Reply-To: <CAKv+Gu8OXn20JvtFkE_bS=cbWV3XZ5b7a+XaG7tvea+4BqrHfw@mail.gmail.com>
+References: <1486490390-25251-1-git-send-email-jhugo@codeaurora.org>
+ <CAKv+Gu963uZB4MaMDuwTGd5-AqEN53Er8tExVLMZNVx3krJrZw@mail.gmail.com>
+ <1f47fcdd-c5d8-4082-70a3-ca9b1746d7ca@codeaurora.org>
+ <20170207190113.GG26173@leverpostej>
+ <c49cc64e-4ca1-8d82-5faf-74c0355c35ef@codeaurora.org>
+ <20170207191320.GI26173@leverpostej>
+ <252539a6-72f6-1afa-6ed5-3cf6a1aa24c2@codeaurora.org>
+ <20170207195558.GK26173@leverpostej>
+ <20170208074301.GB18445@linaro.org>
+ <CAKv+Gu8OXn20JvtFkE_bS=cbWV3XZ5b7a+XaG7tvea+4BqrHfw@mail.gmail.com>
+Message-ID: <CAOZdJXUKkkgvv=uqjoxrFzpRWgZFHAc=y26gtVRJyor-faV4Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matt Flax <flatmax@flatmax.org> writes:
-
-> This patch adds multitrack capability if in DSP mode A and the
-> codec is master.
+On Wed, Feb 8, 2017 at 4:40 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
 >
-> In bcm2835_i2s_startup, snd_pcm_hw_constraint_minmax is used to set
-> max channels to 8 if both SND_SOC_DAIFMT_CBM_CFM and
-> SND_SOC_DAIFMT_DSP_A are set. Otherwise, max channels is set to 2.
-> Min channels is always set to 2. These settings are accomplished
-> using the SNDRV_PCM_HW_PARAM_CHANNELS variable.
->
-> In bcm2835_i2s_shutdown max channels is set to 2 by default.
->
-> In bcm2835_i2s_hw_params, DSP mode A format is now an option.
-> Before replicating the format variable (from ch2 to ch1) for
-> register loading, requested channels are checked to be either 2 or 8.
-> This can be expaneded later to accomodate other channel counts if
+> The point is that the tooling should take *existing* cell counts into
+> account: if there are no address-cells/size-cells properties under
+> /chosen or under the root node, the tooling should use 32-bit
+> quantities for address and size. If there are such properties, it
+> should emit reg tuples of the same size as the cells properties
+> describe.
 
-"expanded"
+I agree with this 100%, but that means that we need to be able to
+inject address-cells/size-cells properties at some point, otherwise
+we'll never be able to store 64-bit addresses.  And that's what
+Sameer's patch does.  It injects those properties at the appropriate
+time.  Any code that parses 'reg' properties without taking the
+address-cells/size-cells properties into account is technically
+incorrect and should be fixed..
 
-> supported by the sound card hardware.
-
-This is looking a lot nicer!  I'm totally deferring to the audio guys
-here for deciding if it's the right fix, but for what it's worth, from
-the platform side:
-
-Acked-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170213/f78424b1/attachment.sig>
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
