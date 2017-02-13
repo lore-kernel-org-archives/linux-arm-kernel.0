@@ -1,76 +1,19 @@
-From: alison.wang@nxp.com (Alison Wang)
-Date: Mon, 13 Feb 2017 08:01:17 +0000
-Subject: [PATCH v3 1/2] mtd: ifc: Update dependency of IFC for LS1021A
-In-Reply-To: <20170213085546.026865b8@bbrezillon>
-References: <1486968416-13536-1-git-send-email-b18965@freescale.com>
- <20170213083401.5adf8c31@bbrezillon>
- <DB6PR0401MB258411171005499F70EAE505F4590@DB6PR0401MB2584.eurprd04.prod.outlook.com>
- <20170213085546.026865b8@bbrezillon>
-Message-ID: <DB6PR0401MB2584CFFA50BD3B9A4205DE9FF4590@DB6PR0401MB2584.eurprd04.prod.outlook.com>
+From: wxf.wang@hisilicon.com (Wangxuefeng (E))
+Date: Mon, 13 Feb 2017 08:04:03 +0000
+Subject: Question about PTE_CONT in linux_4.10
+Message-ID: <B99C36949BCC8541A564076B659DD9706714ED6D@nkgeml514-mbx.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Mon, 13 Feb 2017 07:39:41 +0000
-> Alison Wang <alison.wang@nxp.com> wrote:
-> 
-> > Hi, Boris,
-> >
-> > 	Sorry, I forgot to change them. Should I resend them or you help
-> to fix that when applying?
-> 
-> I can fix that when applying, no need to resend.
-> Note that you missed 4.11 (already sent my PR to Brian), I'll queue it
-> for 4.12.
-> 
-[Alison Wang] Ok, I see. Thanks a lot.
+Hi Jeremy,
 
+	I has a question about change access permission(X-executable) in linux_4.10 when continuous bit enable.
+	In linux_4.10, the memories allocated by kmalloc are always set PTE_PXN and PTE_CONT. When I need change the access permission of the kmalloc area to make it has executable permission(clear PXN), what interface can I use?
+    The set_memory_x only change the PTE_PXN, but it doesn't change continuous bit. If only a 4K page change the permission, TLB conflict will happen. Is there any other interface can change the permission?
 
-Best Regards,
-Alison Wang
-> 
-> 
-> >
-> >
-> > Best Regards,
-> > Alison Wang
-> >
-> > >
-> > > Hi Alison,
-> > >
-> > > The subject prefix is still wrong, should be 'memory: ifc: '.
-> > >
-> > > On Mon, 13 Feb 2017 14:46:55 +0800
-> > > Alison Wang <b18965@freescale.com> wrote:
-> > >
-> > > > As Freescale/NXP IFC controller is available on LS1021A, the
-> > > > dependency for LS1021A is added.
-> > > >
-> > > > LS1021A is an earlier product and is not compatible with later
-> > > > LayerScape architecture. So ARCH_LAYERSCAPE can't cover LS1021A.
-> > > >
-> > > > Signed-off-by: Alison Wang <alison.wang@nxp.com>
-> > > > ---
-> > > > Changes in v3:
-> > > > - Update the commit message.
-> > > >
-> > > > Changes in v2:
-> > > > - New patch
-> > > >
-> > > >  drivers/memory/Kconfig | 2 +-
-> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > >
-> > > > diff --git a/drivers/memory/Kconfig b/drivers/memory/Kconfig
-> index
-> > > > ec80e35..fff8345 100644
-> > > > --- a/drivers/memory/Kconfig
-> > > > +++ b/drivers/memory/Kconfig
-> > > > @@ -115,7 +115,7 @@ config FSL_CORENET_CF
-> > > >
-> > > >  config FSL_IFC
-> > > >  	bool
-> > > > -	depends on FSL_SOC || ARCH_LAYERSCAPE
-> > > > +	depends on FSL_SOC || ARCH_LAYERSCAPE || SOC_LS1021A
-> > > >
-> > > >  config JZ4780_NEMC
-> > > >  	bool "Ingenic JZ4780 SoC NEMC driver"
-> >
+Thanks,
+Xuefeng
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
