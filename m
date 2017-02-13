@@ -1,41 +1,116 @@
-From: viniciusfre@gmail.com (Vinicius Maciel)
-Date: Mon, 13 Feb 2017 09:05:53 -0300
-Subject: [PATCH] spi/sun6i: Add Master Sample Data Mode for SPI
-Message-ID: <20170213120553.6479-1-viniciusfre@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 13 Feb 2017 13:15:27 +0100
+Subject: [PATCH v8 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
+In-Reply-To: <CAPDyKFpt9O8GM-7xeNJ8bF0JqUJ7nPaRmmC+aMVsdMH-yWBCNg@mail.gmail.com>
+References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170209142309eucas1p2b1277d96139eafc0d1dcc14145600476@eucas1p2.samsung.com>
+ <1486650171-20598-4-git-send-email-m.szyprowski@samsung.com>
+ <20170210045004.GN19244@localhost>
+ <d299ae6c-78dc-9049-6bed-dc84fff17db3@samsung.com>
+ <CAPDyKFqW2av1mjDvRP=R1my2kepeX69TS6cchzoHmwaoydT5Sg@mail.gmail.com>
+ <20170213020340.GH2843@localhost>
+ <CAPDyKFpt9O8GM-7xeNJ8bF0JqUJ7nPaRmmC+aMVsdMH-yWBCNg@mail.gmail.com>
+Message-ID: <d6f67b70-92f2-7e9a-7082-ecca3d6b392b@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to work appropriately, some SPI chips, such as
-max11043, require SPI master samples the data at the
-correct edge.
+Hi Ulf,
 
-This patch add Master Sample Data Mode bit in normal sample mode.
+On 2017-02-13 12:11, Ulf Hansson wrote:
+>>> If we could set up the device link already at device initialization,
+>>> it should also be possible to avoid getting -EPROBE_DEFER for dma
+>>> client drivers when requesting their dma channels.
+>> Well if we defer then driver will regiser with dmaengine after it is
+>> probed, so a client will either get a channel or not. IOW we won't get
+>> -EPROBE_DEFER.
+> I didn't quite get this. What do you mean by "if we defer..."?
+>
+> Defer into *what* and defer of *what*?  Could you please elaborate.
+>
+> [...]
+>
+>>> Again, allow me to fill in. This issue exists for all ARM SoC which
+>>> has a dma controller residing in a PM domain. I think that is quite
+>>> many.
+>>>
+>>> Currently the only solution I have seen for this problem, but which I
+>>> really dislike. That is, each dma client driver requests/releases
+>>> their dma channel from their respective ->runtime_suspend|resume()
+>>> callbacks - then the dma driver can use the dma request/release hooks,
+>>> to do pm_runtime_get|put() which then becomes non-irq-safe.
+>> Yeah that is not the best way to do. But looking at it current one doesnt
+>> seem best fit either.
+>>
+>> So on seeing the device_link_add() I was thinking that this is some SoC
+>> dependent problem being solved whereas the problem statmement is non-atomic
+>> channel prepare.
+> You may be right.
+>
+> Although, I don't know of other examples, besides the runtime PM use
+> case, where non-atomic channel prepare/unprepare would make sense. Do
+> you?
 
-Signed-off-by: Vinicius Maciel <viniciusfre@gmail.com>
----
- drivers/spi/spi-sun6i.c | 3 +++
- 1 file changed, 3 insertions(+)
+Changing GFP_ATOMIC to GFP_KERNEL in some calls in the DMA engine drivers
+would be also a nice present for the memory management subsystem if there
+is no real reason to drain atomic pools.
 
-diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
-index e3114832c485..170f4ad407dd 100644
---- a/drivers/spi/spi-sun6i.c
-+++ b/drivers/spi/spi-sun6i.c
-@@ -43,6 +43,7 @@
- #define SUN6I_TFR_CTL_CS_LEVEL			BIT(7)
- #define SUN6I_TFR_CTL_DHB			BIT(8)
- #define SUN6I_TFR_CTL_FBS			BIT(12)
-+#define SUN6I_TFR_CTL_SDM			BIT(13)
- #define SUN6I_TFR_CTL_XCH			BIT(31)
- 
- #define SUN6I_INT_CTL_REG		0x10
-@@ -342,6 +343,8 @@ static int sun6i_spi_runtime_resume(struct device *dev)
- 
- 	sun6i_spi_write(sspi, SUN6I_GBL_CTL_REG,
- 			SUN6I_GBL_CTL_BUS_ENABLE | SUN6I_GBL_CTL_MASTER | SUN6I_GBL_CTL_TP);
-+        sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG,
-+			SUN6I_TFR_CTL_SDM);
- 
- 	return 0;
- 
+>> As I said earlier, if we want to solve that problem a better idea is to
+>> actually split the prepare as we discussed in [1]
+>>
+>> This way we can get a non atomic descriptor allocate/prepare and release.
+>> Yes we need to redesign the APIs to solve this, but if you guys are up for
+>> it, I think we can do it and avoid any further round abouts :)
+> Adding/re-designing dma APIs is a viable option to solve the runtime PM case.
+>
+> Changes would be needed for all related dma client drivers as well,
+> although if that's what we need to do - let's do it.
+>
+> [...]
+>
+>>> So besides solving the irq-safe issue for dma driver, using the
+>>> device-links has additionally two advantages. I already mentioned the
+>>> -EPROBE_DEFER issue above.
+>>>
+>>> The second thing, is the runtime/system PM relations we get for free
+>>> by using the links. In other words, the dma driver/core don't need to
+>>> care about dealing with pm_runtime_get|put() as that would be managed
+>>> by the dma client driver.
+>> Yeah sorry took me a while to figure that out :), If we do a different API
+>> then dmaengine core can call pm_runtime_get|put() from non-atomic context.
+> Yes, it can and this works from runtime PM point of view. But the
+> following issues would remain unsolved.
+>
+> 1)
+> Dependencies between dma drivers and dma client drivers during system
+> PM. For example, a dma client driver needs the dma controller to be
+> operational (remain system resumed), until the dma client driver
+> itself becomes system suspended.
+>
+> The *only* currently available solution for this, is to try to system
+> suspend the dma controller later than the dma client, via using the
+> *late or the *noirq system PM callbacks. This works for most cases,
+> but it becomes a problem when the dma client also needs to be system
+> suspended at the *late or the *noirq phase. Clearly this solution that
+> doesn't scale.
+>
+> Using device links explicitly solves this problem as it allows to
+> specify this dependency between devices.
+
+Frankly, then creating device links has to be added to EVERY subsystem,
+which involves getting access to the resources provided by the other
+device. More or less this will apply to all kernel frameworks, which
+provide kind of ABC_get_XYZ(dev, ...) functions (like clk_get, phy_get,
+dma_chan_get, ...). Sounds like a topic for another loooong discussion.
+
+> 2)
+> We won't avoid dma clients from getting -EPROBE_DEFER when requesting
+> their dma channels in their ->probe() routines. This would be
+> possible, if we can set up the device links at device initialization.
+
+The question is which core (DMA engine?, kernel device subsystem?) and
+how to find all clients before they call dma_chan_get().
+
+Best regards
 -- 
-2.11.0
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
