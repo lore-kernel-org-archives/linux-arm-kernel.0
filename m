@@ -1,247 +1,109 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 13 Feb 2017 15:22:36 +0200
-Subject: [PATCH DO NOT MERGE 5/6] ARM: dts: omap4: add some sample clkctrl data
+Date: Mon, 13 Feb 2017 15:22:35 +0200
+Subject: [PATCH 4/6] ARM: OMAP2+: hwmod: assign hwmod-ck as main clock from DT
+ if available
 In-Reply-To: <1486992157-10673-1-git-send-email-t-kristo@ti.com>
 References: <1486992157-10673-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1486992157-10673-6-git-send-email-t-kristo@ti.com>
+Message-ID: <1486992157-10673-5-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds clkctrl nodes for cm_l4per and cm_abe as example. Peripherals using
-clocks from these nodes are modified also.
+Fix the main clock assignment to assign hwmod-ck from DT as the main clock
+if available. If main clock is assigned via DT, the direct PRCM access
+for module handling is not used on OMAP4+ architectures either, as it is
+assumed the main clock will be doing this instead.
+
+This patch also drops the obsolete "_mod_ck" search as the implementation
+required for this was not accepted upstream.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/omap4.dtsi | 72 ++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 70 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c | 38 ++++++++++++++++++--------------------
+ 1 file changed, 18 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 8087456..214e58d 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -9,6 +9,7 @@
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/pinctrl/omap.h>
-+#include <dt-bindings/clock/omap4.h>
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 759e1d4..0db56e7d 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -731,31 +731,29 @@ static int _del_initiator_dep(struct omap_hwmod *oh, struct omap_hwmod *init_oh)
+ /**
+  * _init_main_clk - get a struct clk * for the the hwmod's main functional clk
+  * @oh: struct omap_hwmod *
++ * @np: device node mapped to this hwmod
+  *
+  * Called from _init_clocks().  Populates the @oh _clk (main
+  * functional clock pointer) if a clock matching the hwmod name is found,
+  * or a main_clk is present.  Returns 0 on success or -EINVAL on error.
+  */
+-static int _init_main_clk(struct omap_hwmod *oh)
++static int _init_main_clk(struct omap_hwmod *oh, struct device_node *np)
+ {
+ 	int ret = 0;
+-	char name[MOD_CLK_MAX_NAME_LEN];
+-	struct clk *clk;
++	struct clk *clk = NULL;
  
- / {
- 	compatible = "ti,omap4430", "ti,omap4";
-@@ -131,27 +132,61 @@
- 			ranges = <0 0x4a000000 0x1000000>;
+-	/* +7 magic comes from '_mod_ck' suffix */
+-	if (strlen(oh->name) + 7 > MOD_CLK_MAX_NAME_LEN)
+-		pr_warn("%s: warning: cropping name for %s\n", __func__,
+-			oh->name);
+-
+-	strncpy(name, oh->name, MOD_CLK_MAX_NAME_LEN - 7);
+-	strcat(name, "_mod_ck");
++	if (np) {
++		clk = of_clk_get_by_name(np, "clkctrl");
++		if (!IS_ERR(clk)) {
++			pr_debug("%s: mapped main_clk %s for %s\n", __func__,
++				 __clk_get_name(clk), oh->name);
++			oh->main_clk = __clk_get_name(clk);
++			oh->_clk = clk;
++			soc_ops.disable_direct_prcm(oh);
++		}
++	}
  
- 			cm1: cm1 at 4000 {
--				compatible = "ti,omap4-cm1";
-+				compatible = "ti,omap4-cm1", "simple-bus";
- 				reg = <0x4000 0x2000>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0 0x4000 0x2000>;
+-	clk = clk_get(NULL, name);
+-	if (!IS_ERR(clk)) {
+-		oh->_clk = clk;
+-		soc_ops.disable_direct_prcm(oh);
+-		oh->main_clk = kstrdup(name, GFP_KERNEL);
+-	} else {
++	if (IS_ERR_OR_NULL(clk)) {
+ 		if (!oh->main_clk)
+ 			return 0;
  
- 				cm1_clocks: clocks {
- 					#address-cells = <1>;
- 					#size-cells = <0>;
- 				};
+@@ -1547,13 +1545,13 @@ static int _init_clkdm(struct omap_hwmod *oh)
+  * _init_clocks - clk_get() all clocks associated with this hwmod. Retrieve as
+  * well the clockdomain.
+  * @oh: struct omap_hwmod *
+- * @data: not used; pass NULL
++ * @np: device_node mapped to this hwmod
+  *
+  * Called by omap_hwmod_setup_*() (after omap2_clk_init()).
+  * Resolves all clock names embedded in the hwmod.  Returns 0 on
+  * success, or a negative error code on failure.
+  */
+-static int _init_clocks(struct omap_hwmod *oh, void *data)
++static int _init_clocks(struct omap_hwmod *oh, struct device_node *np)
+ {
+ 	int ret = 0;
  
-+				cm_abe: cm_abe at 0 {
-+					compatible = "ti,omap4-cm";
-+					reg = <0x500 0x100>;
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+					ranges = <0 0x500 0x100>;
-+
-+					cm_abe_clkctrl: cm_abe_clkctrl at 20 {
-+						compatible = "ti,omap4-clkctrl";
-+						reg = <0x20 0x6c>;
-+						#clock-cells = <2>;
-+					};
-+				};
-+
- 				cm1_clockdomains: clockdomains {
- 				};
- 			};
+@@ -1565,7 +1563,7 @@ static int _init_clocks(struct omap_hwmod *oh, void *data)
+ 	if (soc_ops.init_clkdm)
+ 		ret |= soc_ops.init_clkdm(oh);
  
- 			cm2: cm2 at 8000 {
--				compatible = "ti,omap4-cm2";
-+				compatible = "ti,omap4-cm2", "simple-bus";
- 				reg = <0x8000 0x3000>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges = <0 0x8000 0x3000>;
+-	ret |= _init_main_clk(oh);
++	ret |= _init_main_clk(oh, np);
+ 	ret |= _init_interface_clks(oh);
+ 	ret |= _init_opt_clks(oh);
  
- 				cm2_clocks: clocks {
- 					#address-cells = <1>;
- 					#size-cells = <0>;
- 				};
+@@ -2420,7 +2418,7 @@ static int __init _init(struct omap_hwmod *oh, void *data)
+ 		return 0;
+ 	}
  
-+				cm_l4per: cm_l4per at 0 {
-+					compatible = "ti,omap4-cm";
-+					reg = <0x1400 0x200>;
-+					#address-cells = <1>;
-+					#size-cells = <1>;
-+					ranges = <0 0x1400 0x200>;
-+
-+					cm_l4per_clkctrl: cm_l4per_clkctrl at 20 {
-+						compatible = "ti,omap4-clkctrl";
-+						reg = <0x20 0x1b0>;
-+						#clock-cells = <2>;
-+					};
-+				};
-+
- 				cm2_clockdomains: clockdomains {
- 				};
- 			};
-@@ -304,6 +339,8 @@
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-+			clocks = <&cm_l4per_clkctrl OMAP4_GPIO2_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 		};
- 
- 		gpio3: gpio at 48057000 {
-@@ -315,6 +352,8 @@
- 			#gpio-cells = <2>;
- 			interrupt-controller;
- 			#interrupt-cells = <2>;
-+			clocks = <&cm_l4per_clkctrl OMAP4_GPIO3_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 		};
- 
- 		gpio4: gpio at 48059000 {
-@@ -384,6 +423,8 @@
- 			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart1";
- 			clock-frequency = <48000000>;
-+			clocks = <&cm_l4per_clkctrl OMAP4_UART1_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 		};
- 
- 		uart2: serial at 4806c000 {
-@@ -392,6 +433,8 @@
- 			interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart2";
- 			clock-frequency = <48000000>;
-+			clocks = <&cm_l4per_clkctrl OMAP4_UART2_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 		};
- 
- 		uart3: serial at 48020000 {
-@@ -400,6 +443,8 @@
- 			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart3";
- 			clock-frequency = <48000000>;
-+			clocks = <&cm_l4per_clkctrl OMAP4_UART3_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 		};
- 
- 		uart4: serial at 4806e000 {
-@@ -408,6 +453,8 @@
- 			interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "uart4";
- 			clock-frequency = <48000000>;
-+			clocks = <&cm_l4per_clkctrl OMAP4_UART4_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 		};
- 
- 		hwspinlock: spinlock at 4a0f6000 {
-@@ -424,6 +471,8 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			ti,hwmods = "i2c1";
-+			clocks = <&cm_l4per_clkctrl OMAP4_I2C1_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 		};
- 
- 		i2c2: i2c at 48072000 {
-@@ -433,6 +482,8 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			ti,hwmods = "i2c2";
-+			clocks = <&cm_l4per_clkctrl OMAP4_I2C2_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 		};
- 
- 		i2c3: i2c at 48060000 {
-@@ -442,6 +493,8 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			ti,hwmods = "i2c3";
-+			clocks = <&cm_l4per_clkctrl OMAP4_I2C3_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 		};
- 
- 		i2c4: i2c at 48350000 {
-@@ -451,6 +504,8 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			ti,hwmods = "i2c4";
-+			clocks = <&cm_l4per_clkctrl OMAP4_I2C4_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 		};
- 
- 		mcspi1: spi at 48098000 {
-@@ -522,6 +577,7 @@
- 			dmas = <&sdma 61>, <&sdma 62>;
- 			dma-names = "tx", "rx";
- 			pbias-supply = <&pbias_mmc_reg>;
-+
- 		};
- 
- 		mmc2: mmc at 480b4000 {
-@@ -542,6 +598,8 @@
- 			ti,needs-special-reset;
- 			dmas = <&sdma 77>, <&sdma 78>;
- 			dma-names = "tx", "rx";
-+			clocks = <&cm_l4per_clkctrl OMAP4_MMC3_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 		};
- 
- 		mmc4: mmc at 480d1000 {
-@@ -552,6 +610,8 @@
- 			ti,needs-special-reset;
- 			dmas = <&sdma 57>, <&sdma 58>;
- 			dma-names = "tx", "rx";
-+			clocks = <&cm_l4per_clkctrl OMAP4_MMC4_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 		};
- 
- 		mmc5: mmc at 480d5000 {
-@@ -562,6 +622,8 @@
- 			ti,needs-special-reset;
- 			dmas = <&sdma 59>, <&sdma 60>;
- 			dma-names = "tx", "rx";
-+			clocks = <&cm_l4per_clkctrl OMAP4_MMC5_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 		};
- 
- 		mmu_dsp: mmu at 4a066000 {
-@@ -598,6 +660,8 @@
- 			dmas = <&sdma 65>,
- 			       <&sdma 66>;
- 			dma-names = "up_link", "dn_link";
-+			clocks = <&cm_abe_clkctrl OMAP4_MCPDM_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 			status = "disabled";
- 		};
- 
-@@ -610,6 +674,8 @@
- 			ti,hwmods = "dmic";
- 			dmas = <&sdma 67>;
- 			dma-names = "up_link";
-+			clocks = <&cm_abe_clkctrl OMAP4_DMIC_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 			status = "disabled";
- 		};
- 
-@@ -625,6 +691,8 @@
- 			dmas = <&sdma 33>,
- 			       <&sdma 34>;
- 			dma-names = "tx", "rx";
-+			clocks = <&cm_abe_clkctrl OMAP4_MCBSP1_CLKCTRL 0>;
-+			clock-names = "clkctrl";
- 			status = "disabled";
- 		};
- 
+-	r = _init_clocks(oh, NULL);
++	r = _init_clocks(oh, np);
+ 	if (r < 0) {
+ 		WARN(1, "omap_hwmod: %s: couldn't init clocks\n", oh->name);
+ 		return -EINVAL;
 -- 
 1.9.1
