@@ -1,41 +1,36 @@
-From: b18965@freescale.com (Alison Wang)
-Date: Mon, 13 Feb 2017 14:46:56 +0800
-Subject: [PATCH v3 2/2] mtd: nand: Update dependency of IFC for LS1021A
-In-Reply-To: <1486968416-13536-1-git-send-email-b18965@freescale.com>
-References: <1486968416-13536-1-git-send-email-b18965@freescale.com>
-Message-ID: <1486968416-13536-2-git-send-email-b18965@freescale.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 13 Feb 2017 08:12:38 +0100
+Subject: [PATCH v2] ARM: spi/sun7i: Add Master Sample Data Mode for SPI
+In-Reply-To: <20170211035447.3819-1-viniciusfre@gmail.com>
+References: <20170211035447.3819-1-viniciusfre@gmail.com>
+Message-ID: <20170213071238.7xppbzwmy2gatjdz@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As NAND support for Freescale/NXP IFC controller is available on
-LS1021A, the dependency for LS1021A is added.
+On Sat, Feb 11, 2017 at 12:54:47AM -0300, Vinicius Maciel wrote:
+> In order to work appropriately, the max11043 ADC chip and probably
+> others, needs SPI master samples the data at the correct edge. From
+> max11043 datasheet: "The data at DIN is latched on the rising edge
+> of SCLK". Same to DOUT.
+> 
+> This patch add Master Sample Data Mode bit in normal sample mode.
+> It will affect only A20.
+> 
+> Signed-off-by: Vinicius Maciel <viniciusfre@gmail.com>
+> Reviewed-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
 
-LS1021A is an earlier product and is not compatible with later
-LayerScape architecture. So ARCH_LAYERSCAPE can't cover LS1021A.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Signed-off-by: Alison Wang <alison.wang@nxp.com>
----
-Changes in v3:
-- Update the commit message.
+Maxime
 
-Changes in v2:
-- None
-
- drivers/mtd/nand/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 353a9dd..85e3860 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -441,7 +441,7 @@ config MTD_NAND_FSL_ELBC
- 
- config MTD_NAND_FSL_IFC
- 	tristate "NAND support for Freescale IFC controller"
--	depends on FSL_SOC || ARCH_LAYERSCAPE
-+	depends on FSL_SOC || ARCH_LAYERSCAPE || SOC_LS1021A
- 	select FSL_IFC
- 	select MEMORY
- 	help
 -- 
-2.1.0.27.g96db324
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170213/ff3a2910/attachment.sig>
