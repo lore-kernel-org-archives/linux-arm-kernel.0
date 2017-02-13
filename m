@@ -1,74 +1,192 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon, 13 Feb 2017 17:07:18 -0600
-Subject: [RFC PATCH 17/33] irqchip/gic-v3-its: Add VLPI configuration hook
-In-Reply-To: <1484648454-21216-18-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-18-git-send-email-marc.zyngier@arm.com>
-Message-ID: <a5783b6c-8276-0bc3-227d-7bf74465dae8@codeaurora.org>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Mon, 13 Feb 2017 15:20:05 -0800
+Subject: [PATCH v3 21/24] media: imx: Add MIPI CSI-2 Receiver subdev driver
+In-Reply-To: <1486977617.2873.29.camel@pengutronix.de>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-22-git-send-email-steve_longerbeam@mentor.com>
+ <1486036237.2289.37.camel@pengutronix.de>
+ <ca0a2eb3-21b6-d312-c8e0-61da48c4c700@gmail.com>
+ <20170208234235.GA27312@n2100.armlinux.org.uk>
+ <d6dba77e-902c-7a4c-cc70-fe3a5c9649bb@gmail.com>
+ <e9076980-ce84-f9ee-096d-865243b82a9e@gmail.com>
+ <1486977617.2873.29.camel@pengutronix.de>
+Message-ID: <04a4d130-0259-cbba-7815-e41c1c80c3c7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+(#!##* Thunderbird! resending text only)
+
+Hi Philipp,
 
 
-On 01/17/2017 04:20 AM, Marc Zyngier wrote:
-> Add the skeleton irq_set_vcpu_affinity method that will be used
-> to configure VLPIs.
+On 02/13/2017 01:20 AM, Philipp Zabel wrote:
+> Hi Steve,
 >
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> On Thu, 2017-02-09 at 15:51 -0800, Steve Longerbeam wrote:
+>> On 02/09/2017 03:49 PM, Steve Longerbeam wrote:
+>>> On 02/08/2017 03:42 PM, Russell King - ARM Linux wrote:
+>>>> On Wed, Feb 08, 2017 at 03:23:53PM -0800, Steve Longerbeam wrote:
+>>>>>> Actually, this exact function already exists as
+>>>>>> dw_mipi_dsi_phy_write in
+>>>>>> drivers/gpu/drm/rockchip/dw-mipi-dsi.c, and it looks like the D-PHY
+>>>>>> register 0x44 might contain a field called HSFREQRANGE_SEL.
+>>>>> Thanks for pointing out drivers/gpu/drm/rockchip/dw-mipi-dsi.c.
+>>>>> It's clear from that driver that there probably needs to be a fuller
+>>>>> treatment of the D-PHY programming here, but I don't know where
+>>>>> to find the MIPI CSI-2 D-PHY documentation for the i.MX6. The code
+>>>>> in imxcsi2_reset() was also pulled from FSL, and that's all I really
+>>>>> have
+>>>>> to go on for the D-PHY programming. I assume the D-PHY is also a
+>>>>> Synopsys core, like the host controller, but the i.MX6 manual doesn't
+>>>>> cover it.
+>>>> Why exactly?  What problems are you seeing that would necessitate a
+>>>> more detailed programming of the D-PHY?  From my testing, I can wind
+>>>> a 2-lane MIPI bus on iMX6D from 912Mbps per lane down to (eg) 308Mbps
+>>>> per lane with your existing code without any issues.
+>>> That's good to hear.
+>>>
+>>> Just from my experience with struggles to get the CSI2 receiver
+>>> up and running with an active clock lane, and my suspicions that
+>>> some of that could be due to my lack of understanding of the D-PHY
+>>> programming.
+>> But I should add that after a re-org of the sequence, it looks more stable
+>> now. Tested on both the SabreSD and SabreLite with the OV5640.
+> It seems the OV5640 driver never puts its the CSI-2 lanes into stop
+> state while not streaming.
+
+Yes I found that as well.
+
+But good news, I finally managed to coax the OV5640's clock lane
+into LP-11 state! It was accomplished by setting bit 5 in OV5640 register
+0x4800. The datasheet describes this bit as "Gate clock lane when no
+packet to transmit". But I may have also got this to work with the 
+additional
+write 1 to bits 4-6 in register 0x3019 ("MIPI CLK/data lane state in sleep
+mode" - setting 1 to these bits selects LP-11 for sleep mode).
+
+So I am now finally able to call csi2_dphy_wait_stopstate() in
+csi2_s_stream(ON).
+
+So for the TC35874, you shouldn't see a timeout in csi2_s_stream(ON)
+any longer.
+
+I have updated both ov5640.c and imx6-mipi-csi2.c in the wip branch.
+Can you try again? I have not applied your patch below, because I
+don't think that is needed anymore.
+
+And speaking of the TC35874, I received this module for the SabreLite
+from Boundary Devices (thanks BD!). So I can finally help you with
+debug/test. Are there any patches you need to send to me (against
+wip branch) for this support, or can I use what exists now in media
+tree? Also any scripts or help with running.
+
+
+>   With the recent s_stream reordering,
+> streaming from TC358743 does not work anymore, since imx6-mipi-csi2
+> s_stream is called before tc358743 s_stream, while all lanes are still
+> in stop state. Then it waits for the clock lane to become active and
+> fails. I have applied the following patch to revert the reordering
+> locally to get it to work again.
+>
+> The initialization order, as Russell pointed out, should be:
+>
+> 1. reset the D-PHY.
+> 2. place MIPI sensor in LP-11 state
+> 3. perform D-PHY initialisation
+> 4. configure CSI2 lanes and de-assert resets and shutdown signals
+>
+> So csi2_s_stream should wait for stop state on all lanes (the result of
+> 2.) before dphy_init (3.), not wait for active clock afterwards. That
+> should happen only after sensor_s_stream was called. So unless we are
+> allowed to reorder steps 1. and 2., we might need the prepare_stream
+> callback after all.
+
+Agreed!
+
+See my new FIXME comment in imx6-mipi-csi2.c.
+
+I agree we might need a new subdev op .prepare_stream(). This
+op would be implemented by imx6-mipi-csi2.c, and would carry
+out steps 3, 4, 5 (instead of currently by csi2_s_stream()). Then
+step 6 would finally become available as csi2_s_stream().
+
+And then we must re-order stream on to start sensor first, then
+csi2, as in your patch below.
+
+Steve
+
+> More specifically, the chapter 40.3.1 "Startup Sequence" in the i.MX6DQ
+> reference manual states:
+>
+> 1. Deassert presetn signal (global reset)
+>     - This is probably the APB global reset, so not something we have to
+>       care about.
+> 2. Configure MIPI Camera Sensor to put all Tx lanes in PL-11 state
+> 3. D-PHY initialization (write 0x14 to address 0x44)
+> 4. CSI2 Controller programming
+>     - Set N_LANES
+>     - Deassert PHY_SHUTDOWNZ
+>     - Deassert PHY_RSTZ
+>     - Deassert CSI2_RESETN
+> 5. Read the PHY status register (PHY_STATE) to confirm that all data and
+>     clock lanes of the D-PHY are in Stop State
+> 6. Configure the MIPI Camera Sensor to start transmitting a clock on the
+>     D-PHY clock lane
+> 7. CSI2 Controller programming - Read the PHY status register
+>     (PHY_STATE) to confirm that the D-PHY is receiving a clock on the
+>     D-PHY clock lane
+>
+> 2. can be done in sensor s_power (which tc358743 currently does) only if
+> the sensor can still be configured in step 6.
+> Also, 3./4./5. are csi2 code, 6. is sensor code, and 7. is csi2 code
+> again. For reliable startup we need csi2 receiver code to be called on
+> both sides of the sensor enabling its clock lane.
+> ----------8<----------
+>  From f12758caa3e1d05980cd2ac07587d125449fc860 Mon Sep 17 00:00:00 2001
+> From: Philipp Zabel<p.zabel@pengutronix.de>
+> Date: Mon, 13 Feb 2017 09:28:27 +0100
+> Subject: [PATCH] media: imx: revert streamon sequence change
+>
+> Without this patch, starting streaming from a TC358743 MIPI CSI-2 source
+> fails with the following error messages:
+>
+>      imx6-mipi-csi2: clock lane timeout, phy_state = 0x000006f0
+>      ipu1_csi0: pipeline_set_stream failed with -110
+>
+> The phy state above has the stopstateclk, rxulpsclknot, and
+> stopstatedata[3:0] bits set: at this point all lanes are in stop state,
+> no lane is in ultra low power state or active.
+> This is no suprise, since tc358743 s_stream(sd, 1) has not been called
+> due to the recently changed ordering. The imx6-mipi-csi2 s_stream does
+> wait for the clock lane to become active, so csi2_s_stream must happen
+> after tc358743_s_stream.
+>
+> Signed-off-by: Philipp Zabel<p.zabel@pengutronix.de>
 > ---
->   drivers/irqchip/irq-gic-v3-its.c | 33 +++++++++++++++++++++++++++++++++
->   1 file changed, 33 insertions(+)
+>   drivers/staging/media/imx/imx-media-utils.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c
-> b/drivers/irqchip/irq-gic-v3-its.c
-> index 0dbc8b0..1bd78ca 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -36,6 +36,7 @@
+> diff --git a/drivers/staging/media/imx/imx-media-utils.c b/drivers/staging/media/imx/imx-media-utils.c
+> index 81eabcf76a66f..495ccefa3cd2a 100644
+> --- a/drivers/staging/media/imx/imx-media-utils.c
+> +++ b/drivers/staging/media/imx/imx-media-utils.c
+> @@ -782,8 +782,8 @@ static const u32 stream_on_seq[] = {
+>   	IMX_MEDIA_GRP_ID_IC_PRPENC,
+>   	IMX_MEDIA_GRP_ID_IC_PRP,
+>   	IMX_MEDIA_GRP_ID_VDIC,
+> -	IMX_MEDIA_GRP_ID_CSI2,
+>   	IMX_MEDIA_GRP_ID_SENSOR,
+> +	IMX_MEDIA_GRP_ID_CSI2,
+>   	IMX_MEDIA_GRP_ID_VIDMUX,
+>   	IMX_MEDIA_GRP_ID_CSI,
+>   };
+> @@ -795,8 +795,8 @@ static const u32 stream_off_seq[] = {
+>   	IMX_MEDIA_GRP_ID_VDIC,
+>   	IMX_MEDIA_GRP_ID_CSI,
+>   	IMX_MEDIA_GRP_ID_VIDMUX,
+> -	IMX_MEDIA_GRP_ID_SENSOR,
+>   	IMX_MEDIA_GRP_ID_CSI2,
+> +	IMX_MEDIA_GRP_ID_SENSOR,
+>   };
 >   
->   #include <linux/irqchip.h>
->   #include <linux/irqchip/arm-gic-v3.h>
-> +#include <linux/irqchip/arm-gic-v4.h>
->   
->   #include <asm/cputype.h>
->   #include <asm/exception.h>
-> @@ -771,6 +772,37 @@ static int its_irq_set_irqchip_state(struct irq_data
-> *d,
->   	return 0;
->   }
->   
-> +static int its_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
-> +{
-> +	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-> +	struct its_cmd_info *info = vcpu_info;
-> +	u32 event = its_get_event_id(d);
-> +
-> +	/* Need a v4 ITS */
-> +	if (!its_dev->its->is_v4 || !info)
-> +		return -EINVAL;
-> +
-> +	switch (info->cmd_type) {
-> +	case MAP_VLPI:
-> +	{
-> +		return 0;
-> +	}
-> +
-> +	case UNMAP_VLPI:
-> +	{
-> +		return 0;
-> +	}
-> +
-> +	case PROP_UPDATE_VLPI:
-> +	{
-> +		return 0;
-> +	}
-> +
-> +	default:
-> +		return -EINVAL;
-> +	}
-Missing a return statement.
-
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+>   #define NUM_STREAM_ENTITIES ARRAY_SIZE(stream_on_seq)
