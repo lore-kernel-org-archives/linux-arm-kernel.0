@@ -1,28 +1,59 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 13 Feb 2017 11:48:10 +0100 (CET)
-Subject: [RFC PATCH 24/33] irqchip/gic-v3-its: Add VPE scheduling
-In-Reply-To: <1484648454-21216-25-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-25-git-send-email-marc.zyngier@arm.com>
-Message-ID: <alpine.DEB.2.20.1702131146250.3619@nanos>
+From: richard@nod.at (Richard Weinberger)
+Date: Mon, 13 Feb 2017 11:54:46 +0100
+Subject: [PATCH] mtd: nand: tango: Enforce DMA direction type
+In-Reply-To: <1486979107-15362-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1486979107-15362-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <bef98482-c562-57c1-785b-087a720e3807@nod.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Jan 2017, Marc Zyngier wrote:
-> +static int its_vpe_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
-> +{
-> +	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
-> +	struct its_cmd_info *info = vcpu_info;
-> +	u64 val;
-> +
-> +	switch (info->cmd_type) {
-> +	case SCHEDULE_VPE:
-> +	{
-> +		void * __iomem vlpi_base = gic_data_rdist_vlpi_base();
+Am 13.02.2017 um 10:45 schrieb Boris Brezillon:
+> do_dma() use an integer to pass the DMA data direction information and
+> pass the same value to dmaengine_prep_slave_sg().
+> 
+> Currently, DMA_{FROM,TO}_DEVICE match DMA_{DEV_TO_MEM,MEM_TO_DEV}
+> definitions so it works fine, but assuming this will always be the case
+> is not safe.
+> 
+> Enforce enum dma_data_direction type in the function prototype and make
+> the enum dma_data_direction -> enum dma_transfer_direction conversion
+> explicit.
+> 
+> Reported-by: Richard Weinberger <richard@nod.at>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/mtd/nand/tango_nand.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
+> index 4a5e948c62df..9a0e2f85d865 100644
+> --- a/drivers/mtd/nand/tango_nand.c
+> +++ b/drivers/mtd/nand/tango_nand.c
+> @@ -223,8 +223,8 @@ static void tango_dma_callback(void *arg)
+>  	complete(arg);
+>  }
+>  
+> -static int do_dma(struct tango_nfc *nfc, int dir, int cmd, const void *buf,
+> -		  int len, int page)
+> +static int do_dma(struct tango_nfc *nfc, enum dma_data_direction dir, int cmd,
+> +		  const void *buf, int len, int page)
+>  {
+>  	void __iomem *addr = nfc->reg_base + NFC_STATUS;
+>  	struct dma_chan *chan = nfc->chan;
+> @@ -238,7 +238,10 @@ static int do_dma(struct tango_nfc *nfc, int dir, int cmd, const void *buf,
+>  	if (dma_map_sg(chan->device->dev, &sg, 1, dir) != 1)
+>  		return -EIO;
+>  
+> -	desc = dmaengine_prep_slave_sg(chan, &sg, 1, dir, DMA_PREP_INTERRUPT);
+> +	desc = dmaengine_prep_slave_sg(chan, &sg, 1,
+> +				       dir == DMA_FROM_DEVICE ?
+> +				       DMA_DEV_TO_MEM : DMA_MEM_TO_DEV,
+> +				       DMA_PREP_INTERRUPT);
+>  	if (!desc)
+>  		goto dma_unmap;
+>  
 
-Moving the vlpi_base line on top of the fucntion spares you lines and
-brackets. No point in having the same thing twice
+Reviewed-by: Richard Weinberger <richard@nod.at>
 
 Thanks,
-
-	tglx
+//richard
