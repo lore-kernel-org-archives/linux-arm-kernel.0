@@ -1,64 +1,49 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 13 Feb 2017 11:29:24 +0530
-Subject: [PATCH 3/8] spi: davinci: limit the transfer size if DMA enabled
-In-Reply-To: <1486740584-17875-4-git-send-email-fisaksen@baylibre.com>
-References: <1486740584-17875-1-git-send-email-fisaksen@baylibre.com>
- <1486740584-17875-4-git-send-email-fisaksen@baylibre.com>
-Message-ID: <a17cca3a-d029-a2cd-583c-2672287d191c@ti.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Mon, 13 Feb 2017 14:11:35 +0800
+Subject: [PATCH RFC 0/3] coresight: enable debug module
+Message-ID: <1486966298-16767-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Peter
+This patch series is to enable coresight debug module. With debug
+module we can check CPU state and PC value, etc. So this is helpful for
+CPU lockup bugs, e.g. if one CPU has run into infinite loop with IRQ
+disabled. The hang CPU cannot switch context and handle any interrupt,
+so it cannot handle SMP call for stack dump, etc.
 
-On Friday 10 February 2017 08:59 PM, Frode Isaksen wrote:
-> Limit the transfer size to 20 scatter/gather pages if
-> DMA is enabled.
-> The eDMA DMA engine is limited to 20 SG entries in one DMA
-> transaction. If this number is exceeded, DMA receive fails.
-> This error occurs with large vmalloc'ed buffers.
+Furthermore, now ARMv8 introduces some runtime firmwares like ARM
+trusted firmware BL31, so sometime CPU lockup may happen in the
+firmware and cannot return back to kernel.
 
-This needs more explanation because there is support available in edma
-driver for long SG lists by breaking them down into transfers using 20
-PaRAM entries at a time. If thats not working for you, that needs
-further debug.
+This initial patch series enable debug module and registers call back
+notifier for PCSR register dumping when panic happens, so we can see
+below dumping info for panic:
 
-> 
-> Signed-off-by: Frode Isaksen <fisaksen@baylibre.com>
+[   13.751777] Coresight debug module:
+[   13.755275] CPU[0]: PSCR=0xffff000008090cbc
+[   13.759469] CPU[1]: PSCR=0xffff0000088bf9e4
+[   13.763662] CPU[2]: PSCR=0xffff000008090cc0
+[   13.767856] CPU[3]: PSCR=0xffff000008090cb8
+[   13.772049] CPU[4]: PSCR=0xffff000008090cc0
+[   13.776243] CPU[5]: PSCR=0xffff000008090cbc
+[   13.780436] CPU[6]: PSCR=0xffff000008090cc0
+[   13.784630] CPU[7]: PSCR=0xffff000008090cbc
 
-Thanks,
-Sekhar
+This patch series has been verified on 96boards Hikey.
 
-> ---
->  drivers/spi/spi-davinci.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-> index b7b2da1..f1b46f6 100644
-> --- a/drivers/spi/spi-davinci.c
-> +++ b/drivers/spi/spi-davinci.c
-> @@ -485,6 +485,16 @@ static bool davinci_spi_can_dma(struct spi_master *master,
->  	return __davinci_spi_can_dma(spi);
->  }
->  
-> +static size_t davinci_spi_max_transfer_size(struct spi_device *spi)
-> +{
-> +	/*
-> +	 * The eDMA DMA engine is limited to 20 SG entries in one DMA
-> +	 * transaction. If this number is exceeded, DMA receive fails.
-> +	 * An extra SG entry is needed when the buffer is not page aligned.
-> +	 */
-> +	return (__davinci_spi_can_dma(spi)) ? 19 * PAGE_SIZE : SIZE_MAX;
-> +}
-> +
->  static int davinci_spi_check_error(struct davinci_spi *dspi, int int_status)
->  {
->  	struct device *sdev = dspi->bitbang.master->dev.parent;
-> @@ -1010,6 +1020,7 @@ static int davinci_spi_probe(struct platform_device *pdev)
->  	master->setup = davinci_spi_setup;
->  	master->cleanup = davinci_spi_cleanup;
->  	master->can_dma = davinci_spi_can_dma;
-> +	master->max_transfer_size = davinci_spi_max_transfer_size;
->  
->  	dspi->bitbang.chipselect = davinci_spi_chipselect;
->  	dspi->bitbang.setup_transfer = davinci_spi_setup_transfer;
-> 
+
+Leo Yan (3):
+  coresight: binding for coresight debug driver
+  coresight: add support for debug module
+  arm64: dts: register Hi6220's coresight debug module
+
+ .../devicetree/bindings/arm/coresight.txt          |   9 +-
+ .../boot/dts/hisilicon/hikey_6220_coresight.dtsi   |  73 +++++++++
+ drivers/hwtracing/coresight/Kconfig                |   8 +
+ drivers/hwtracing/coresight/Makefile               |   1 +
+ drivers/hwtracing/coresight/coresight-debug.c      | 169 +++++++++++++++++++++
+ 5 files changed, 258 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/hwtracing/coresight/coresight-debug.c
+
+-- 
+2.7.4
