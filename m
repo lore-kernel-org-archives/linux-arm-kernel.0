@@ -1,8 +1,8 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 13 Feb 2017 14:51:49 -0600
+Date: Mon, 13 Feb 2017 14:55:08 -0600
 Subject: [PATCH] efi/libstub/arm*: Set default address and size cells
  values for an empty dtb
-In-Reply-To: <CAKv+Gu8OXn20JvtFkE_bS=cbWV3XZ5b7a+XaG7tvea+4BqrHfw@mail.gmail.com>
+In-Reply-To: <20170209082702.GC18445@linaro.org>
 References: <1486490390-25251-1-git-send-email-jhugo@codeaurora.org>
  <CAKv+Gu963uZB4MaMDuwTGd5-AqEN53Er8tExVLMZNVx3krJrZw@mail.gmail.com>
  <1f47fcdd-c5d8-4082-70a3-ca9b1746d7ca@codeaurora.org>
@@ -13,27 +13,23 @@ References: <1486490390-25251-1-git-send-email-jhugo@codeaurora.org>
  <20170207195558.GK26173@leverpostej>
  <20170208074301.GB18445@linaro.org>
  <CAKv+Gu8OXn20JvtFkE_bS=cbWV3XZ5b7a+XaG7tvea+4BqrHfw@mail.gmail.com>
-Message-ID: <CAOZdJXUKkkgvv=uqjoxrFzpRWgZFHAc=y26gtVRJyor-faV4Gw@mail.gmail.com>
+ <20170209082702.GC18445@linaro.org>
+Message-ID: <CAOZdJXW7gN7_62KA93sz-9TtpDp-p52-j=yFt_X7N7F-N5ZE1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 8, 2017 at 4:40 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
+On Thu, Feb 9, 2017 at 2:27 AM, AKASHI, Takahiro
+<takahiro.akashi@linaro.org> wrote:
 >
-> The point is that the tooling should take *existing* cell counts into
-> account: if there are no address-cells/size-cells properties under
-> /chosen or under the root node, the tooling should use 32-bit
-> quantities for address and size. If there are such properties, it
-> should emit reg tuples of the same size as the cells properties
-> describe.
+> is there a requirement that the root node must have #address-cells/
+> #size-cells?
+> I found such a statement, at least, in booting-without-of.txt
+> (only applied to ppc? See III-5-a).
 
-I agree with this 100%, but that means that we need to be able to
-inject address-cells/size-cells properties at some point, otherwise
-we'll never be able to store 64-bit addresses.  And that's what
-Sameer's patch does.  It injects those properties at the appropriate
-time.  Any code that parses 'reg' properties without taking the
-address-cells/size-cells properties into account is technically
-incorrect and should be fixed..
+If you want to be able to represent 64-bit 'reg' addresses anywhere in
+the device tree, then you will need #address-cells = <2> and
+#size-cells = <2> at any appropriate location, which is usually the
+root node for a 64-bit processor.
 
 -- 
 Qualcomm Innovation Center, Inc.
