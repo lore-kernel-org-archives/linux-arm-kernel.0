@@ -1,156 +1,49 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon, 13 Feb 2017 15:12:17 -0600
-Subject: [RFC PATCH 01/33] irqchip/gic-v3: Add redistributor iterator
-In-Reply-To: <1484648454-21216-2-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <4c667d88-625b-94f7-dd75-aab22fabbfd1@codeaurora.org>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 13 Feb 2017 22:24:40 +0100
+Subject: [PATCH 2/2 v4] cpufreq: qoriq: Don't look at clock implementation
+ details
+In-Reply-To: <1486956655-4261-2-git-send-email-yuantian.tang@nxp.com>
+References: <1486956655-4261-1-git-send-email-yuantian.tang@nxp.com>
+ <1486956655-4261-2-git-send-email-yuantian.tang@nxp.com>
+Message-ID: <CAJZ5v0gcJVDgQ7fXCkXcz4JguaQeqUHUaxYtkKS9ma_CqhbRgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-
-On 01/17/2017 04:20 AM, Marc Zyngier wrote:
-> In order to discover the VLPI properties, we need to iterate over
-> the redistributor regions. As we already have code that does this,
-> let's factor it out and make it slightly more generic.
+On Mon, Feb 13, 2017 at 4:30 AM,  <yuantian.tang@nxp.com> wrote:
+> From: Tang Yuantian <Yuantian.Tang@nxp.com>
 >
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Get the CPU clock's potential parent clocks from the clock interface
+> itself, rather than manually parsing the clocks property to find a
+> phandle, looking at the clock-names property of that, and assuming that
+> those are valid parent clocks for the cpu clock.
+>
+> This is necessary now that the clocks are generated based on the clock
+> driver's knowledge of the chip rather than a fragile device-tree
+> description of the mux options.
+>
+> We can now rely on the clock driver to ensure that the mux only exposes
+> options that are valid.  The cpufreq driver was currently being overly
+> conservative in some cases -- for example, the "min_cpufreq =
+> get_bus_freq()" restriction only applies to chips with erratum
+> A-004510, and whether the freq_mask used on p5020 is needed depends on
+> the actual frequencies of the PLLs (FWIW, p5040 has a similar
+> limitation but its .freq_mask was zero) -- and the frequency mask
+> mechanism made assumptions about particular parent clock indices that
+> are no longer valid.
+>
+> Signed-off-by: Scott Wood <scottwood@nxp.com>
+> Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->   drivers/irqchip/irq-gic-v3.c | 77
-> ++++++++++++++++++++++++++++++++------------
->   1 file changed, 56 insertions(+), 21 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index c132f29..5cadec0 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -421,24 +421,15 @@ static void __init gic_dist_init(void)
->   		gic_write_irouter(affinity, base + GICD_IROUTER + i * 8);
->   }
->   
-> -static int gic_populate_rdist(void)
-> +static int gic_scan_rdist_properties(int (*fn)(struct redist_region *,
-> +					       void __iomem *))
-I don't see this function is parsing GICR properties, may be it makes 
-readable on changing name to gic_redist_iterator().
+> v2: added more soc compatible strings
+> v3: Remove the now-unused pnode and the call to of_node_put()
+> v4: fixed warning:
+>         >> [-Werror=implicit-function-declaration]
+>         >      return get_hard_smp_processor_id(cpu);
 
->   {
-> -	unsigned long mpidr = cpu_logical_map(smp_processor_id());
-> -	u64 typer;
-> -	u32 aff;
-> +	int ret = 0;
-For readability purpose set  ret = ENODEV, to cover error case where 
-gic_data.nr_redist_regions == 0.
->   	int i;
->   
-> -	/*
-> -	 * Convert affinity to a 32bit value that can be matched to
-> -	 * GICR_TYPER bits [63:32].
-> -	 */
-> -	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
-> -	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
-> -	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
-> -	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
-> -
->   	for (i = 0; i < gic_data.nr_redist_regions; i++) {
->   		void __iomem *ptr =
-> gic_data.redist_regions[i].redist_base;
-> +		u64 typer;
->   		u32 reg;
->   
->   		reg = readl_relaxed(ptr + GICR_PIDR2) &
-> GIC_PIDR2_ARCH_MASK;
-> @@ -450,14 +441,14 @@ static int gic_populate_rdist(void)
->   
->   		do {
->   			typer = gic_read_typer(ptr + GICR_TYPER);
-> -			if ((typer >> 32) == aff) {
-> -				u64 offset = ptr -
-> gic_data.redist_regions[i].redist_base;
-> -				gic_data_rdist_rd_base() = ptr;
-> -				gic_data_rdist()->phys_base =
-> gic_data.redist_regions[i].phys_base + offset;
-> -				pr_info("CPU%d: found redistributor %lx
-> region %d:%pa\n",
-> -					smp_processor_id(), mpidr, i,
-> -					&gic_data_rdist()->phys_base);
-> +			ret = fn(gic_data.redist_regions + i, ptr);
-> +			switch (ret) {
-> +			case 0:
->   				return 0;
-> +			case -1:
-> +				break;
-> +			default:
-> +				ret = 0;
->   			}
->   
->   			if (gic_data.redist_regions[i].single_redist)
-> @@ -473,9 +464,53 @@ static int gic_populate_rdist(void)
->   		} while (!(typer & GICR_TYPER_LAST));
->   
->   
-> +	if (ret == -1)
-> +		ret = -ENODEV;
-> +
-__gic_populate_rdist() returns 1 to try next entry in the list. We 
-should not return value 0 here if no matching entry is found otherwise 
-the gic_populate_rdist() assumes that it found the corresponding GICR.
+The previous version of this is in my tree already and I'd rather not rebase it.
 
-+	return 0;
-+}
-+
-+static int __gic_populate_rdist(struct redist_region *region, void
-__iomem *ptr)
-+{
-+	unsigned long mpidr = cpu_logical_map(smp_processor_id());
-+	u64 typer;
-+	u32 aff;
-+
-+	/*
-+	 * Convert affinity to a 32bit value that can be matched to
-+	 * GICR_TYPER bits [63:32].
-+	 */
-+	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
-+	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
-+	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
-+	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
-+
-+	typer = gic_read_typer(ptr + GICR_TYPER);
-+	if ((typer >> 32) == aff) {
-+		u64 offset = ptr - region->redist_base;
-+		gic_data_rdist_rd_base() = ptr;
-+		gic_data_rdist()->phys_base = region->phys_base + offset;
-+
-+		pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
-+			smp_processor_id(), mpidr,
-+			(int)(region - gic_data.redist_regions),
-+			&gic_data_rdist()->phys_base);
-+		return 0;
-+	}
-+
-+	/* Try next one */
-+	return 1;
-+}
-+
-+static int gic_populate_rdist(void)
-+{
-+	if (gic_scan_rdist_properties(__gic_populate_rdist) == 0)
+Please send the fix as a separate patch on top of v3.
 
-what about 'if (!gic_scan_rdist_properties(__gic_populate_rdist))'?
-> +		return 0;
-> +
->   	/* We couldn't even deal with ourselves... */
->   	WARN(true, "CPU%d: mpidr %lx has no re-distributor!\n",
-> -	     smp_processor_id(), mpidr);
-> +	     smp_processor_id(),
-> +	     (unsigned long)cpu_logical_map(smp_processor_id()));
->   	return -ENODEV;
->   }
->   
-
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Thanks,
+Rafael
