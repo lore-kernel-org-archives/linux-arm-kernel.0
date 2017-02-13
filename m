@@ -1,66 +1,53 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 13 Feb 2017 11:35:03 +0200
-Subject: [PATCH 07/15] clk: ti: enforce const types on string arrays
+Date: Mon, 13 Feb 2017 11:35:10 +0200
+Subject: [PATCH 14/15] clk: ti: dpll44xx: fix clksel register initialization
 In-Reply-To: <1486978511-29668-1-git-send-email-t-kristo@ti.com>
 References: <1486978511-29668-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1486978511-29668-8-git-send-email-t-kristo@ti.com>
+Message-ID: <1486978511-29668-15-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Constant string arrays should use const char * const instead of just
-const char *. Change the implementations using these to proper type.
+clksel register pointer should be used for the DPLL-MX autoidle handling.
+Currently this is not setup at all. Fix by adding proper handling for the
+register.
 
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/clk/ti/clock.h     | 2 +-
- drivers/clk/ti/composite.c | 2 +-
- drivers/clk/ti/mux.c       | 8 ++++----
- 3 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/clk/ti/dpll.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/drivers/clk/ti/clock.h b/drivers/clk/ti/clock.h
-index 0385990..a2d16190 100644
---- a/drivers/clk/ti/clock.h
-+++ b/drivers/clk/ti/clock.h
-@@ -88,7 +88,7 @@ struct ti_clk_mux {
- 	int num_parents;
- 	u16 reg;
- 	u8 module;
--	const char **parents;
-+	const char * const *parents;
- 	u16 flags;
- };
+diff --git a/drivers/clk/ti/dpll.c b/drivers/clk/ti/dpll.c
+index c149bd1..778bc90 100644
+--- a/drivers/clk/ti/dpll.c
++++ b/drivers/clk/ti/dpll.c
+@@ -319,6 +319,7 @@ static void _register_dpll_x2(struct device_node *node,
+ 	struct clk_hw_omap *clk_hw;
+ 	const char *name = node->name;
+ 	const char *parent_name;
++	int ret;
  
-diff --git a/drivers/clk/ti/composite.c b/drivers/clk/ti/composite.c
-index 3f60f99..beea894 100644
---- a/drivers/clk/ti/composite.c
-+++ b/drivers/clk/ti/composite.c
-@@ -124,7 +124,7 @@ struct clk *ti_clk_register_composite(struct ti_clk *setup)
- 	struct clk_hw *mux;
- 	struct clk_hw *div;
- 	int num_parents = 1;
--	const char **parent_names = NULL;
-+	const char * const *parent_names = NULL;
- 	struct clk *clk;
- 	int ret;
+ 	parent_name = of_clk_get_parent_name(node, 0);
+ 	if (!parent_name) {
+@@ -338,6 +339,20 @@ static void _register_dpll_x2(struct device_node *node,
+ 	init.parent_names = &parent_name;
+ 	init.num_parents = 1;
  
-diff --git a/drivers/clk/ti/mux.c b/drivers/clk/ti/mux.c
-index 0da149e..3cc6db4 100644
---- a/drivers/clk/ti/mux.c
-+++ b/drivers/clk/ti/mux.c
-@@ -97,10 +97,10 @@ static int ti_clk_mux_set_parent(struct clk_hw *hw, u8 index)
- };
++	if (hw_ops == &clkhwops_omap4_dpllmx) {
++		/* Check if register defined, if not, drop hw-ops */
++		ret = of_property_count_elems_of_size(node, "reg", 1);
++		if (ret <= 0) {
++			hw_ops = NULL;
++		} else {
++			clk_hw->clksel_reg = ti_clk_get_reg_addr(node, 0);
++			if (IS_ERR(clk_hw->clksel_reg)) {
++				kfree(clk_hw);
++				return;
++			}
++		}
++	}
++
+ 	/* register the clock */
+ 	clk = ti_clk_register(NULL, &clk_hw->hw, name);
  
- static struct clk *_register_mux(struct device *dev, const char *name,
--				 const char **parent_names, u8 num_parents,
--				 unsigned long flags, void __iomem *reg,
--				 u8 shift, u32 mask, u8 clk_mux_flags,
--				 u32 *table)
-+				 const char * const *parent_names,
-+				 u8 num_parents, unsigned long flags,
-+				 void __iomem *reg, u8 shift, u32 mask,
-+				 u8 clk_mux_flags, u32 *table)
- {
- 	struct clk_mux *mux;
- 	struct clk *clk;
 -- 
 1.9.1
