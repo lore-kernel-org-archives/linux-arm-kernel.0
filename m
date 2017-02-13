@@ -1,29 +1,28 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 13 Feb 2017 12:52:39 +0000
-Subject: [PATCH v2] ARM: spi/sun7i: Add Master Sample Data Mode for SPI
-In-Reply-To: <20170211035447.3819-1-viniciusfre@gmail.com>
-References: <20170211035447.3819-1-viniciusfre@gmail.com>
-Message-ID: <20170213125239.f5vsxrfwz5t6gqyp@sirena.org.uk>
+From: miles.chen@mediatek.com (Miles Chen)
+Date: Mon, 13 Feb 2017 20:52:59 +0800
+Subject: [PATCH v2] arm64: use is_vmalloc_addr
+In-Reply-To: <ba5aeff9-4a02-8f5a-c5e4-e06c437875fc@suse.de>
+References: <1486640734-27637-1-git-send-email-miles.chen@mediatek.com>
+ <ba5aeff9-4a02-8f5a-c5e4-e06c437875fc@suse.de>
+Message-ID: <1486990379.5429.1.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 11, 2017 at 12:54:47AM -0300, Vinicius Maciel wrote:
-> In order to work appropriately, the max11043 ADC chip and probably
-> others, needs SPI master samples the data at the correct edge. From
-> max11043 datasheet: "The data at DIN is latched on the rising edge
-> of SCLK". Same to DOUT.
+On Mon, 2017-02-13 at 06:20 +0100, Andreas F?rber wrote:
+> Hi,
 > 
-> This patch add Master Sample Data Mode bit in normal sample mode.
-> It will affect only A20.
+> Am 09.02.2017 um 12:45 schrieb Miles Chen:
+> > To is_vmalloc_addr() to check if an address is a vmalloc address
+> 
+> "Use ..."?
 
-This should be controlled by the SPI mode settings, different chips have
-different requirements.  If the controller supports multiple modes then
-it should expose that and let the drivers and system integrations
-choose.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170213/aa159db6/attachment.sig>
+Yes, it should be "Use". I'll send another patch to fix this.
+
+> 
+> Regards,
+> Andreas
+> 
+> > instead of checking VMALLOC_START and VMALLOC_END manually.
+> > 
+> > Signed-off-by: Miles Chen <miles.chen@mediatek.com>
+> 
