@@ -1,14 +1,14 @@
 From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 13 Feb 2017 05:04:03 -0800
-Subject: [PATCH 4.9 31/60] ARM: 8642/1: LPAE: catch pending imprecise abort on
+Date: Mon, 13 Feb 2017 05:04:56 -0800
+Subject: [PATCH 4.4 11/20] ARM: 8642/1: LPAE: catch pending imprecise abort on
  unmask
-In-Reply-To: <20170213130333.057515084@linuxfoundation.org>
-References: <20170213130333.057515084@linuxfoundation.org>
-Message-ID: <20170213130337.364187148@linuxfoundation.org>
+In-Reply-To: <20170213130403.531813333@linuxfoundation.org>
+References: <20170213130403.531813333@linuxfoundation.org>
+Message-ID: <20170213130404.030256529@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.9-stable review patch.  If anyone has any objections, please let me know.
+4.4-stable review patch.  If anyone has any objections, please let me know.
 
 ------------------
 
