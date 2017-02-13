@@ -1,46 +1,37 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon, 13 Feb 2017 16:31:18 -0600
-Subject: [RFC PATCH 11/33] irqchip/gic-v3-its: Split out pending table
- allocation
-In-Reply-To: <1484648454-21216-12-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-12-git-send-email-marc.zyngier@arm.com>
-Message-ID: <659c374d-c437-4474-2c2f-4f1fd5e173dc@codeaurora.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 14 Feb 2017 06:33:25 +0800
+Subject: [PATCH 1/2] nvmem: Add driver for the i.MX IIM
+In-Reply-To: <20170213153149.11710-2-s.hauer@pengutronix.de>
+Message-ID: <201702140601.KZ5TOi45%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Michael,
 
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.10-rc8 next-20170213]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-On 01/17/2017 04:20 AM, Marc Zyngier wrote:
-> Just as for the property table, let's move the pending table
-> allocation to a separate function.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   drivers/irqchip/irq-gic-v3-its.c | 29 ++++++++++++++++++++---------
->   1 file changed, 20 insertions(+), 9 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c
-> b/drivers/irqchip/irq-gic-v3-its.c
-> index 14305db1..dce8f8c 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1188,6 +1188,24 @@ static int its_alloc_collections(struct its_node
-> *its)
->   	return 0;
->   }
->   
-> +static struct page *its_allocate_pending_table(gfp_t gfp_flags)
-> +{
-PEND and PROP table sizes are defined as compile time macros, but as per 
-ITS spec implementation 24bit LPI space is also possible. It would be 
-nicer to parametrize
-both the tables sizes so that it would easier to enable 24bit LPI later.
+url:    https://github.com/0day-ci/linux/commits/Sascha-Hauer/nvmem-Add-driver-for-the-i-MX-IIM/20170214-000520
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Actually Qualcomm server chips support 24bit IDBITS.
+All errors (new ones prefixed by >>):
 
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+   drivers/nvmem/nvmem-imx-iim: struct of_device_id is 196 bytes.  The last of 6 is:
+   0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x66 0x73 0x6c 0x2c 0x69 0x6d 0x78 0x35 0x33 0x2d 0x69 0x69 0x6d 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x5c 0x00 0x00 0x00 
+>> FATAL: drivers/nvmem/nvmem-imx-iim: struct of_device_id is not terminated with a NULL entry!
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 57952 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170214/a023465e/attachment-0001.gz>
