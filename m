@@ -1,53 +1,52 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 13 Feb 2017 10:45:07 +0100
-Subject: [PATCH] mtd: nand: tango: Enforce DMA direction type
-Message-ID: <1486979107-15362-1-git-send-email-boris.brezillon@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 13 Feb 2017 10:52:07 +0100
+Subject: Allwinner A31 framebuffer fails with new CCU clock bindings
+In-Reply-To: <1486814920.7145.19.camel@settrans.net>
+References: <1486814920.7145.19.camel@settrans.net>
+Message-ID: <20170213095207.tsqcigfhyftm5ohk@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-do_dma() use an integer to pass the DMA data direction information and
-pass the same value to dmaengine_prep_slave_sg().
+Hi,
 
-Currently, DMA_{FROM,TO}_DEVICE match DMA_{DEV_TO_MEM,MEM_TO_DEV}
-definitions so it works fine, but assuming this will always be the case
-is not safe.
+On Sat, Feb 11, 2017 at 12:08:40PM +0000, Bob Ham wrote:
+> Hi there,
+> 
+> I have a Mele A1000G Quad top set box with an Allwinner A31 chip.
+> Unfortunately, the framebuffer is failing on recent kernels.  I have a
+> 1080p monitor connected to the HDMI output.  During boot, the monitor
+> goes blank and reports "No Signal".
+> 
+> I've done a git bisect and determined that this is the offending commit:
+> 
+> # first bad commit: [78a9f0dbcd6015cdd1114dc7d78554fd5bb28010] ARM: dts: sun6i: switch A31/A31s to new CCU clock bindings
+> 
+> 
+> On IRC, MoeIcenowy requested the contents
+> of /sys/kernel/debug/clk/clk_summary.  I don't know how useful it will
+> be but I've put up two versions, one from the bad commit and another
+> from the previous, good commit in the bisect:
+> 
+> http://settrans.net/~rah/misc/sun6i-a31-bad-fb-clk_summary-good.txt
+> http://settrans.net/~rah/misc/sun6i-a31-bad-fb-clk_summary-bad.txt
 
-Enforce enum dma_data_direction type in the function prototype and make
-the enum dma_data_direction -> enum dma_transfer_direction conversion
-explicit.
+Are you sure the good one works? None of the display clocks are
+enabled.
 
-Reported-by: Richard Weinberger <richard@nod.at>
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/mtd/nand/tango_nand.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+Could you add "clk_ignore_unused" to the kernel boot parameters and
+see if it works?
 
-diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
-index 4a5e948c62df..9a0e2f85d865 100644
---- a/drivers/mtd/nand/tango_nand.c
-+++ b/drivers/mtd/nand/tango_nand.c
-@@ -223,8 +223,8 @@ static void tango_dma_callback(void *arg)
- 	complete(arg);
- }
- 
--static int do_dma(struct tango_nfc *nfc, int dir, int cmd, const void *buf,
--		  int len, int page)
-+static int do_dma(struct tango_nfc *nfc, enum dma_data_direction dir, int cmd,
-+		  const void *buf, int len, int page)
- {
- 	void __iomem *addr = nfc->reg_base + NFC_STATUS;
- 	struct dma_chan *chan = nfc->chan;
-@@ -238,7 +238,10 @@ static int do_dma(struct tango_nfc *nfc, int dir, int cmd, const void *buf,
- 	if (dma_map_sg(chan->device->dev, &sg, 1, dir) != 1)
- 		return -EIO;
- 
--	desc = dmaengine_prep_slave_sg(chan, &sg, 1, dir, DMA_PREP_INTERRUPT);
-+	desc = dmaengine_prep_slave_sg(chan, &sg, 1,
-+				       dir == DMA_FROM_DEVICE ?
-+				       DMA_DEV_TO_MEM : DMA_MEM_TO_DEV,
-+				       DMA_PREP_INTERRUPT);
- 	if (!desc)
- 		goto dma_unmap;
- 
+Thanks,
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170213/030fb381/attachment.sig>
