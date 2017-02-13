@@ -1,81 +1,114 @@
-From: andy.yan@rock-chips.com (Andy Yan)
-Date: Mon, 13 Feb 2017 19:10:34 +0800
-Subject: [PATCH 7/7] ARM: rockchip: reanme RK1108 to RV1108
-In-Reply-To: <1486983566-32265-1-git-send-email-andy.yan@rock-chips.com>
-References: <1486983566-32265-1-git-send-email-andy.yan@rock-chips.com>
-Message-ID: <1486984234-32693-1-git-send-email-andy.yan@rock-chips.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 13 Feb 2017 12:11:54 +0100
+Subject: [PATCH v8 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
+In-Reply-To: <20170213020340.GH2843@localhost>
+References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170209142309eucas1p2b1277d96139eafc0d1dcc14145600476@eucas1p2.samsung.com>
+ <1486650171-20598-4-git-send-email-m.szyprowski@samsung.com>
+ <20170210045004.GN19244@localhost>
+ <d299ae6c-78dc-9049-6bed-dc84fff17db3@samsung.com>
+ <CAPDyKFqW2av1mjDvRP=R1my2kepeX69TS6cchzoHmwaoydT5Sg@mail.gmail.com>
+ <20170213020340.GH2843@localhost>
+Message-ID: <CAPDyKFpt9O8GM-7xeNJ8bF0JqUJ7nPaRmmC+aMVsdMH-yWBCNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rockchip finally named the SOC as RV1108, so change it
-for compatible.
+>>
+>> If we could set up the device link already at device initialization,
+>> it should also be possible to avoid getting -EPROBE_DEFER for dma
+>> client drivers when requesting their dma channels.
+>
+> Well if we defer then driver will regiser with dmaengine after it is
+> probed, so a client will either get a channel or not. IOW we won't get
+> -EPROBE_DEFER.
 
-Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
----
+I didn't quite get this. What do you mean by "if we defer..."?
 
- Documentation/devicetree/bindings/arm/rockchip.txt   | 4 ++--
- arch/arm/boot/dts/Makefile                           | 2 +-
- arch/arm/boot/dts/{rk1108-evb.dts => rv1108-evb.dts} | 7 ++++---
- 3 files changed, 7 insertions(+), 6 deletions(-)
- rename arch/arm/boot/dts/{rk1108-evb.dts => rv1108-evb.dts} (89%)
+Defer into *what* and defer of *what*?  Could you please elaborate.
 
-diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-index cc4ace6..9901cbd 100644
---- a/Documentation/devicetree/bindings/arm/rockchip.txt
-+++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-@@ -111,9 +111,9 @@ Rockchip platforms device tree bindings
-     Required root node properties:
-       - compatible = "rockchip,px5-evb", "rockchip,px5", "rockchip,rk3368";
- 
--- Rockchip RK1108 Evaluation board
-+- Rockchip RV1108 Evaluation board
-     Required root node properties:
--      - compatible = "rockchip,rk1108-evb", "rockchip,rk1108";
-+      - compatible = "rockchip,rv1108-evb", "rockchip,rv1108";
- 
- - Rockchip RK3368 evb:
-     Required root node properties:
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f10fe85..7100227 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -658,7 +658,7 @@ dtb-$(CONFIG_ARCH_REALVIEW) += \
- 	arm-realview-pba8.dtb \
- 	arm-realview-pbx-a9.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += \
--	rk1108-evb.dtb \
-+	rv1108-evb.dtb \
- 	rk3036-evb.dtb \
- 	rk3036-kylin.dtb \
- 	rk3066a-bqcurie2.dtb \
-diff --git a/arch/arm/boot/dts/rk1108-evb.dts b/arch/arm/boot/dts/rv1108-evb.dts
-similarity index 89%
-rename from arch/arm/boot/dts/rk1108-evb.dts
-rename to arch/arm/boot/dts/rv1108-evb.dts
-index 3956cff..2f5d46b 100644
---- a/arch/arm/boot/dts/rk1108-evb.dts
-+++ b/arch/arm/boot/dts/rv1108-evb.dts
-@@ -40,11 +40,11 @@
- 
- /dts-v1/;
- 
--#include "rk1108.dtsi"
-+#include "rv1108.dtsi"
- 
- / {
--	model = "Rockchip RK1108 Evaluation board";
--	compatible = "rockchip,rk1108-evb", "rockchip,rk1108";
-+	model = "Rockchip RV1108 Evaluation board";
-+	compatible = "rockchip,rv1108-evb", "rockchip,rv1108";
- 
- 	memory at 60000000 {
- 		device_type = "memory";
-@@ -53,6 +53,7 @@
- 
- 	chosen {
- 		stdout-path = "serial2:1500000n8";
- 	};
- };
- 
--- 
-2.7.4
+[...]
+
+>>
+>> Again, allow me to fill in. This issue exists for all ARM SoC which
+>> has a dma controller residing in a PM domain. I think that is quite
+>> many.
+>>
+>> Currently the only solution I have seen for this problem, but which I
+>> really dislike. That is, each dma client driver requests/releases
+>> their dma channel from their respective ->runtime_suspend|resume()
+>> callbacks - then the dma driver can use the dma request/release hooks,
+>> to do pm_runtime_get|put() which then becomes non-irq-safe.
+>
+> Yeah that is not the best way to do. But looking at it current one doesnt
+> seem best fit either.
+>
+> So on seeing the device_link_add() I was thinking that this is some SoC
+> dependent problem being solved whereas the problem statmement is non-atomic
+> channel prepare.
+
+You may be right.
+
+Although, I don't know of other examples, besides the runtime PM use
+case, where non-atomic channel prepare/unprepare would make sense. Do
+you?
+
+>
+> As I said earlier, if we want to solve that problem a better idea is to
+> actually split the prepare as we discussed in [1]
+>
+> This way we can get a non atomic descriptor allocate/prepare and release.
+> Yes we need to redesign the APIs to solve this, but if you guys are up for
+> it, I think we can do it and avoid any further round abouts :)
+
+Adding/re-designing dma APIs is a viable option to solve the runtime PM case.
+
+Changes would be needed for all related dma client drivers as well,
+although if that's what we need to do - let's do it.
+
+[...]
+
+>>
+>> So besides solving the irq-safe issue for dma driver, using the
+>> device-links has additionally two advantages. I already mentioned the
+>> -EPROBE_DEFER issue above.
+>>
+>> The second thing, is the runtime/system PM relations we get for free
+>> by using the links. In other words, the dma driver/core don't need to
+>> care about dealing with pm_runtime_get|put() as that would be managed
+>> by the dma client driver.
+>
+> Yeah sorry took me a while to figure that out :), If we do a different API
+> then dmaengine core can call pm_runtime_get|put() from non-atomic context.
+
+Yes, it can and this works from runtime PM point of view. But the
+following issues would remain unsolved.
+
+1)
+Dependencies between dma drivers and dma client drivers during system
+PM. For example, a dma client driver needs the dma controller to be
+operational (remain system resumed), until the dma client driver
+itself becomes system suspended.
+
+The *only* currently available solution for this, is to try to system
+suspend the dma controller later than the dma client, via using the
+*late or the *noirq system PM callbacks. This works for most cases,
+but it becomes a problem when the dma client also needs to be system
+suspended at the *late or the *noirq phase. Clearly this solution that
+doesn't scale.
+
+Using device links explicitly solves this problem as it allows to
+specify this dependency between devices.
+
+2)
+We won't avoid dma clients from getting -EPROBE_DEFER when requesting
+their dma channels in their ->probe() routines. This would be
+possible, if we can set up the device links at device initialization.
+
+>
+> [1]: http://www.spinics.net/lists/dmaengine/msg11570.html
+>
+> --
+> ~Vinod
+
+Kind regards
+Uffe
