@@ -1,99 +1,63 @@
-From: flatmax@flatmax.org (Matt Flax)
-Date: Mon, 13 Feb 2017 10:27:15 +1100
-Subject: [PATCH v2] ASoC: bcm2835: Add 8 channel (multitrack) capability
-In-Reply-To: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
-References: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
-Message-ID: <1486942035-24038-1-git-send-email-flatmax@flatmax.org>
+From: manchoyy@gmail.com (Man Choy)
+Date: Mon, 13 Feb 2017 08:49:06 +0800
+Subject: [PATCH] bcm2835-audio: Fix checkpatch errors
+In-Reply-To: <20170212121658.GA19617@kroah.com>
+References: <1486845362-25086-1-git-send-email-manchoyy@gmail.com>
+ <20170212121658.GA19617@kroah.com>
+Message-ID: <CAExP5d4F-8mkcDjyNMYT0Kah11oGwbbg6hRaveOZuq065-2=Zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds multitrack capability if in DSP mode A and the
-codec is master.
+On Sun, Feb 12, 2017 at 8:16 PM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+> On Sun, Feb 12, 2017 at 04:34:09AM +0800, Man Choy wrote:
+>> Fix following errors:
+>>
+>> ERROR: do not initialise statics to NULL
+>> +static struct snd_card *g_card = NULL;
+>>
+>> ERROR: do not initialise statics to NULL
+>> +static struct bcm2835_chip *g_chip = NULL;
+>>
+>> Signed-off-by: Man Choy <manchoyy@gmail.com>
+>> ---
+>>  drivers/staging/bcm2835-audio/bcm2835.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/staging/bcm2835-audio/bcm2835.c b/drivers/staging/bcm2835-audio/bcm2835.c
+>> index a84d74d..265fe55 100644
+>> --- a/drivers/staging/bcm2835-audio/bcm2835.c
+>> +++ b/drivers/staging/bcm2835-audio/bcm2835.c
+>> @@ -28,8 +28,8 @@
+>>   * to debug if we run into issues
+>>   */
+>>
+>> -static struct snd_card *g_card = NULL;
+>> -static struct bcm2835_chip *g_chip = NULL;
+>> +static struct snd_card *g_card;
+>> +static struct bcm2835_chip *g_chip;
+>>
+>>  static int snd_bcm2835_free(struct bcm2835_chip *chip)
+>>  {
+>
+> Someone sent this same fix in before you did, a few days ago.  Be sure
+> to always use the most up-to-date tree.
+>
+> sorry,
+>
+> greg k-h
 
-In bcm2835_i2s_startup, snd_pcm_hw_constraint_minmax is used to set
-max channels to 8 if both SND_SOC_DAIFMT_CBM_CFM and
-SND_SOC_DAIFMT_DSP_A are set. Otherwise, max channels is set to 2.
-Min channels is always set to 2. These settings are accomplished
-using the SNDRV_PCM_HW_PARAM_CHANNELS variable.
+Please ignore previous email. It contains HTML.
 
-In bcm2835_i2s_shutdown max channels is set to 2 by default.
+Noted and thanks Greg.
 
-In bcm2835_i2s_hw_params, DSP mode A format is now an option.
-Before replicating the format variable (from ch2 to ch1) for
-register loading, requested channels are checked to be either 2 or 8.
-This can be expaneded later to accomodate other channel counts if
-supported by the sound card hardware.
+A quick question, I just updated my linux-next tree last night,
+checkout tag "next-20170210" and working on the cleanup. How do I
+double check my current working file already been updated by someone
+else to avoid the duplicate work? As of now, the latest linux-next
+tree tag is still "next-20170210"
 
-Signed-off-by: Matt Flax <flatmax@flatmax.org>
----
- sound/soc/bcm/bcm2835-i2s.c | 21 ++++++++++++++++-----
- 1 file changed, 16 insertions(+), 5 deletions(-)
+I am on eudyptula challenge and this is my first attempt to send
+kernel patch, sorry about the silly question ;)
 
-diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
-index 6ba2049..98a90b5 100644
---- a/sound/soc/bcm/bcm2835-i2s.c
-+++ b/sound/soc/bcm/bcm2835-i2s.c
-@@ -296,6 +296,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
- 
- 	switch (dev->fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
- 	case SND_SOC_DAIFMT_I2S:
-+	case SND_SOC_DAIFMT_DSP_A:
- 		data_delay = 1;
- 		break;
- 	default:
-@@ -312,6 +313,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
- 
- 	switch (params_channels(params)) {
- 	case 2:
-+	case 8:
- 		format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
- 		format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
- 		format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
-@@ -526,7 +528,16 @@ static int bcm2835_i2s_startup(struct snd_pcm_substream *substream,
- 	regmap_update_bits(dev->i2s_regmap, BCM2835_I2S_CS_A_REG,
- 			BCM2835_I2S_STBY, BCM2835_I2S_STBY);
- 
--	return 0;
-+	/* Set the max channels to 8 if the codec is master and
-+	 * we are in DSP A mode. Otherwise only allow 2 channels.
-+	 */
-+	if (dev->fmt &
-+		(SND_SOC_DAIFMT_CBM_CFM | SND_SOC_DAIFMT_DSP_A))
-+		return snd_pcm_hw_constraint_minmax(substream->runtime,
-+			SNDRV_PCM_HW_PARAM_CHANNELS, 2, 8);
-+	else
-+		return snd_pcm_hw_constraint_minmax(substream->runtime,
-+			SNDRV_PCM_HW_PARAM_CHANNELS, 2, 2);
- }
- 
- static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
-@@ -549,6 +560,10 @@ static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
- 	 * not stop the clock when SND_SOC_DAIFMT_CONT
- 	 */
- 	bcm2835_i2s_stop_clock(dev);
-+
-+	/* Default to 2 channels */
-+	snd_pcm_hw_constraint_minmax(substream->runtime,
-+			SNDRV_PCM_HW_PARAM_CHANNELS, 2, 2);
- }
- 
- static const struct snd_soc_dai_ops bcm2835_i2s_dai_ops = {
-@@ -576,16 +591,12 @@ static struct snd_soc_dai_driver bcm2835_i2s_dai = {
- 	.name	= "bcm2835-i2s",
- 	.probe	= bcm2835_i2s_dai_probe,
- 	.playback = {
--		.channels_min = 2,
--		.channels_max = 2,
- 		.rates =	SNDRV_PCM_RATE_8000_192000,
- 		.formats =	SNDRV_PCM_FMTBIT_S16_LE
- 				| SNDRV_PCM_FMTBIT_S24_LE
- 				| SNDRV_PCM_FMTBIT_S32_LE
- 		},
- 	.capture = {
--		.channels_min = 2,
--		.channels_max = 2,
- 		.rates =	SNDRV_PCM_RATE_8000_192000,
- 		.formats =	SNDRV_PCM_FMTBIT_S16_LE
- 				| SNDRV_PCM_FMTBIT_S24_LE
--- 
-2.7.4
+MC
