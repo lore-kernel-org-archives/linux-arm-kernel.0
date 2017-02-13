@@ -1,59 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 13 Feb 2017 09:14:47 +0100
-Subject: [PATCH 4/8] drm/sun4i: Add optional 'mode' property to TCON
-In-Reply-To: <20170211174405.28395-5-plaes@plaes.org>
-References: <20170211174405.28395-1-plaes@plaes.org>
- <20170211174405.28395-5-plaes@plaes.org>
-Message-ID: <20170213081447.r2jhkcx3ex5tsspi@lukather>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Mon, 13 Feb 2017 16:17:31 +0800
+Subject: [PATCH v1 1/3] ASoC: zx-tdm: add documentation for zte's tdm
+ controller
+Message-ID: <1486973853-25291-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds dt-binding documentation for zte's tdm controller.
 
-On Sat, Feb 11, 2017 at 07:44:01PM +0200, Priit Laes wrote:
-> Add variable to enable either 'rgb' or 'lvds' output.
-> 
-> Signed-off-by: Priit Laes <plaes@plaes.org>
-> ---
->  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> index b82c004..c367ede 100644
-> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> @@ -43,6 +43,9 @@ Required properties:
->   - reset-names: the reset names mentioned above
->   - clock-output-names: Name of the pixel clock created
->  
-> +- mode: Defines which encoder will be enabled. Values are 'rgb', 'lvds'.
-> +  Defaults to 'rgb' if not set.
-> +
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+ .../devicetree/bindings/sound/zte,tdm.txt          | 32 ++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/zte,tdm.txt
 
-Unfortunately, this won't really work. You could very well have two
-panels and switch from one to another by changing the pin muxing, so
-we have to use an enpoint for that.
-
-This is pretty much the same case that we have with the A10s where we
-need to have two output endpoints for the TV Encoder and HDMI,
-something we cannot support right now in our binding, since we assume
-that we have the two channels that only have one user, which turned
-out to be wrong.
-
-I guess an easy way would be to have an extra property defining which
-channel the endpoint is attached to.
-
-Thanks,
-Maxime
-
+diff --git a/Documentation/devicetree/bindings/sound/zte,tdm.txt b/Documentation/devicetree/bindings/sound/zte,tdm.txt
+new file mode 100644
+index 0000000..f6e4f7f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/zte,tdm.txt
+@@ -0,0 +1,32 @@
++ZTE TDM DAI driver
++
++Required properties:
++
++- compatible : should be one of the following.
++       * zte,zx-tdm
++- reg : physical base address of the controller and length of memory mapped
++    region.
++- clocks : Pairs of phandle and specifier referencing the controller's clocks.
++- clock-names: "tdm_wclk" for the wclk.
++               "tdm_pclk" for the pclk.
++-#clock-cells: should be 1.
++- zte,tdm-dma-sysctrl : Reference to the sysctrl controller controlling
++    the dma. includes:
++	phandle of sysctrl.
++	register offset in sysctrl for control dma.
++	mask of the register that be written to dma.
++	value of the register that be written to dma.
++
++Example:
++
++	tdm: tdm at 1487000 {
++		compatible = "zte,zx-tdm";
++		reg = <0x01487000 0x1000>;
++		clocks = <&audiocrm AUDIO_TDM_WCLK>, <&audiocrm AUDIO_TDM_PCLK>;
++		clock-names = "tdm_wclk", "tdm_pclk";
++		#clock-cells = <1>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&tdm_global_pin>;
++		zte,tdm-dma-sysctrl = <&sysctrl 0x10c 0xf 0xf>;
++		status = "ok";
++	};
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170213/232111eb/attachment.sig>
+2.7.4
