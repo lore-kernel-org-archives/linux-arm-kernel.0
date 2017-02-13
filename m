@@ -1,51 +1,34 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 13 Feb 2017 13:59:45 +0200
-Subject: [PATCH] ARM: dts: exynos: Use thermal fuse value for thermal zone
- 0 on Exynos5420
-In-Reply-To: <CANAwSgSJRv6XGKvysbw+cXYyVUEcNyGv=6tYSWsvOn42dX5f1w@mail.gmail.com>
-References: <20170211201456.27974-1-krzk@kernel.org>
- <CANAwSgSJRv6XGKvysbw+cXYyVUEcNyGv=6tYSWsvOn42dX5f1w@mail.gmail.com>
-Message-ID: <CAJKOXPeVLNRCWcWMT_subo2VRXdS1147MjFNCeGot8DpqguVNg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 13 Feb 2017 12:00:21 +0000
+Subject: [RFC PATCH v1] iommu/io-pgtable-arm: Check for leaf entry right
+ after finding it
+In-Reply-To: <CAPD2p-=pVgJvVY7GFPWWqj9wp96JSsxD-SO5oNXxq9ag2wWT0Q@mail.gmail.com>
+References: <1486648600-27457-1-git-send-email-olekstysh@gmail.com>
+ <CAPD2p-=TtT9ZHpLu8w9jUdKR5u6JG_BGtz0BDDKejmWS-jQ9WQ@mail.gmail.com>
+ <20170213112728.GH1512@arm.com>
+ <CAPD2p-=pVgJvVY7GFPWWqj9wp96JSsxD-SO5oNXxq9ag2wWT0Q@mail.gmail.com>
+Message-ID: <20170213120021.GL1512@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2017 at 1:38 PM, Anand Moon <linux.amoon@gmail.com> wrote:
-> Hi Krzysztof,
->
->
->
-> On 12 February 2017 at 01:44, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> In Odroid XU3 Lite board, the temperature levels reported for thermal
->> zone 0 were weird. In warm room:
->>         /sys/class/thermal/thermal_zone0/temp:32000
->>         /sys/class/thermal/thermal_zone1/temp:51000
->>         /sys/class/thermal/thermal_zone2/temp:55000
->>         /sys/class/thermal/thermal_zone3/temp:54000
->>         /sys/class/thermal/thermal_zone4/temp:51000
->>
->> Sometimes after booting the value was even equal to ambient temperature
->> which is highly unlikely to be a real temperature of sensor in SoC.
->>
->> The thermal sensor's calibration (trimming) is based on fused values.
->> In case of the board above, the fused values are: 35, 52, 43, 58 and 43
->> (corresponding to each TMU device).  However driver defined a minimum value
->> for fused data as 40 and for smaller values it was using a hard-coded 55
->> instead.  This lead to mapping data from sensor to wrong temperatures
->> for thermal zone 0.
->>
->> Various vendor 3.10 trees (Hardkernel's based on Samsung LSI, Artik 10)
->> do not impose any limits on fused values.  Since we do not have any
->> knowledge about these limits, use 0 as a minimum accepted fused value.
->> This should essentially allow accepting any reasonable fused value thus
->> behaving like vendor driver.
->>
->
-> On HK following values are define in drivers/thermal/exynos_thermal.c
->
-> #define EFUSE_MIN_VALUE                         40
-> #define EFUSE_MAX_VALUE                         100
+On Mon, Feb 13, 2017 at 01:50:29PM +0200, Oleksandr Tyshchenko wrote:
+> On Mon, Feb 13, 2017 at 1:27 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Mon, Feb 13, 2017 at 01:07:02PM +0200, Oleksandr Tyshchenko wrote:
+> >> Any comments?
+> >
+> > Looks fine to me, but I don't think it's urgent and I already sent my
+> > SMMU pull for 4.11. I'll send this as a fix after the merge window.
+> OK. Thank you.
+> 
+> >
+> > I suspect we need something similar for io-pgtable-arm-v7s.c, too.
+> Agree. On the whole I will be able to make similar patch for arm-v7s,
+> but I won't be 100% sure
+> since I don't have any boards where arm-v7s compatible IOMMU installed.
+> 
+> Shall I make patch for arm-v7s too?
 
-Are they being used?
+Yes, please. Robin seems to enjoy using short-descriptor, so he might
+give it a spin for you if you ask nicely.
 
-Best regards,
-Krzysztof
+Will
