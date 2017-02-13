@@ -1,33 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 13 Feb 2017 11:57:59 +0000
-Subject: [PATCH] virtio: Try to untangle DMA coherency
-In-Reply-To: <20170210191409-mutt-send-email-mst@kernel.org>
-References: <20170201195732-mutt-send-email-mst@kernel.org>
- <20170201182659.GM8177@arm.com>
- <20170201210648-mutt-send-email-mst@kernel.org>
- <20170202112614.GB30577@arm.com>
- <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
- <20170202182224-mutt-send-email-mst@kernel.org>
- <20170202164049.GI13839@arm.com>
- <20170209201341-mutt-send-email-mst@kernel.org>
- <20170209183118.GI19397@arm.com>
- <20170210191409-mutt-send-email-mst@kernel.org>
-Message-ID: <20170213115758.GK1512@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 13 Feb 2017 13:59:45 +0200
+Subject: [PATCH] ARM: dts: exynos: Use thermal fuse value for thermal zone
+ 0 on Exynos5420
+In-Reply-To: <CANAwSgSJRv6XGKvysbw+cXYyVUEcNyGv=6tYSWsvOn42dX5f1w@mail.gmail.com>
+References: <20170211201456.27974-1-krzk@kernel.org>
+ <CANAwSgSJRv6XGKvysbw+cXYyVUEcNyGv=6tYSWsvOn42dX5f1w@mail.gmail.com>
+Message-ID: <CAJKOXPeVLNRCWcWMT_subo2VRXdS1147MjFNCeGot8DpqguVNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2017 at 07:16:10PM +0200, Michael S. Tsirkin wrote:
-> On Thu, Feb 09, 2017 at 06:31:18PM +0000, Will Deacon wrote:
-> > On ARM (and other archs such as
-> > Power), having a mismatch between a cacheable and a non-cacheable mapping
-> > can result in a loss of coherency between the two (for example, if the
-> > non-cacheable gues accesses bypass the cache, but the cacheable host
-> > accesses allocate in the cache).
-> 
-> I guess it's an optimization to avoid cache snoops for non-cacheable accesses?
+On Mon, Feb 13, 2017 at 1:38 PM, Anand Moon <linux.amoon@gmail.com> wrote:
+> Hi Krzysztof,
+>
+>
+>
+> On 12 February 2017 at 01:44, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> In Odroid XU3 Lite board, the temperature levels reported for thermal
+>> zone 0 were weird. In warm room:
+>>         /sys/class/thermal/thermal_zone0/temp:32000
+>>         /sys/class/thermal/thermal_zone1/temp:51000
+>>         /sys/class/thermal/thermal_zone2/temp:55000
+>>         /sys/class/thermal/thermal_zone3/temp:54000
+>>         /sys/class/thermal/thermal_zone4/temp:51000
+>>
+>> Sometimes after booting the value was even equal to ambient temperature
+>> which is highly unlikely to be a real temperature of sensor in SoC.
+>>
+>> The thermal sensor's calibration (trimming) is based on fused values.
+>> In case of the board above, the fused values are: 35, 52, 43, 58 and 43
+>> (corresponding to each TMU device).  However driver defined a minimum value
+>> for fused data as 40 and for smaller values it was using a hard-coded 55
+>> instead.  This lead to mapping data from sensor to wrong temperatures
+>> for thermal zone 0.
+>>
+>> Various vendor 3.10 trees (Hardkernel's based on Samsung LSI, Artik 10)
+>> do not impose any limits on fused values.  Since we do not have any
+>> knowledge about these limits, use 0 as a minimum accepted fused value.
+>> This should essentially allow accepting any reasonable fused value thus
+>> behaving like vendor driver.
+>>
+>
+> On HK following values are define in drivers/thermal/exynos_thermal.c
+>
+> #define EFUSE_MIN_VALUE                         40
+> #define EFUSE_MAX_VALUE                         100
 
-The architecture doesn't rationalise the decision, but a micro-architecture
-could indeed implement the optimisation you suggest (and we do observe the
-loss of coherency in practice).
+Are they being used?
 
-Will
+Best regards,
+Krzysztof
