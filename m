@@ -1,65 +1,34 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 13 Feb 2017 05:04:56 -0800
-Subject: [PATCH 4.4 11/20] ARM: 8642/1: LPAE: catch pending imprecise abort on
- unmask
-In-Reply-To: <20170213130403.531813333@linuxfoundation.org>
-References: <20170213130403.531813333@linuxfoundation.org>
-Message-ID: <20170213130404.030256529@linuxfoundation.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 13 Feb 2017 21:05:36 +0800
+Subject: [PATCH v4 2/3] ASoC: zx-i2s: Add the info of pclk to the binding
+ document for zx2967 family
+In-Reply-To: <20170209164645.ztvockrd6jxpybwt@sirena.org.uk>
+References: <1486609978-18482-1-git-send-email-baoyou.xie@linaro.org>
+ <1486609978-18482-2-git-send-email-baoyou.xie@linaro.org>
+ <20170209164645.ztvockrd6jxpybwt@sirena.org.uk>
+Message-ID: <20170213130534.GA4151@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.4-stable review patch.  If anyone has any objections, please let me know.
+On Thu, Feb 09, 2017 at 04:46:45PM +0000, Mark Brown wrote:
+> On Thu, Feb 09, 2017 at 11:12:57AM +0800, Baoyou Xie wrote:
+> 
+> > - - compatible : Must be "zte,zx296702-i2s"
+> > + - compatible : Must be one of:
+> > +	"zte,zx296718-i2s", "zte,zx296702-i2s"
+> > +	"zte,zx296702-i2s"
+> 
+> You've added the new compatible twice here?
 
-------------------
+It's indeed a bit confusing.  Might be better if we add a couple of
+bullet like below.
 
-From: Alexander Sverdlin <alexander.sverdlin@gmail.com>
+ - compatible : Must be one of:
+	- "zte,zx296718-i2s", "zte,zx296702-i2s";
+	- "zte,zx296702-i2s";
 
-commit 97a98ae5b8acf08d07d972c087b2def060bc9b73 upstream.
+In this case, it's more easier for readers to understand that the first
+one is for I2S device on SoC ZX296718, while it's compatible with the
+I2S on ZX296702.
 
-Asynchronous external abort is coded differently in DFSR with LPAE enabled.
-
-Fixes: 9254970c "ARM: 8447/1: catch pending imprecise abort on unmask".
-Signed-off-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- arch/arm/mm/fault.c |    4 ++--
- arch/arm/mm/fault.h |    4 ++++
- 2 files changed, 6 insertions(+), 2 deletions(-)
-
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -610,9 +610,9 @@ static int __init early_abort_handler(un
- 
- void __init early_abt_enable(void)
- {
--	fsr_info[22].fn = early_abort_handler;
-+	fsr_info[FSR_FS_AEA].fn = early_abort_handler;
- 	local_abt_enable();
--	fsr_info[22].fn = do_bad;
-+	fsr_info[FSR_FS_AEA].fn = do_bad;
- }
- 
- #ifndef CONFIG_ARM_LPAE
---- a/arch/arm/mm/fault.h
-+++ b/arch/arm/mm/fault.h
-@@ -11,11 +11,15 @@
- #define FSR_FS5_0		(0x3f)
- 
- #ifdef CONFIG_ARM_LPAE
-+#define FSR_FS_AEA		17
-+
- static inline int fsr_fs(unsigned int fsr)
- {
- 	return fsr & FSR_FS5_0;
- }
- #else
-+#define FSR_FS_AEA		22
-+
- static inline int fsr_fs(unsigned int fsr)
- {
- 	return (fsr & FSR_FS3_0) | (fsr & FSR_FS4) >> 6;
+Shawn
