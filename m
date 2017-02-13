@@ -1,34 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 13 Feb 2017 11:36:24 +0000
-Subject: [PATCH/RESEND] arm64: defconfig: Enlarge CMA alignment to 2 MiB
-In-Reply-To: <1486983858-11362-1-git-send-email-geert+renesas@glider.be>
-References: <1486983858-11362-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170213113624.GI1512@arm.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Mon, 13 Feb 2017 17:08:36 +0530
+Subject: [PATCH] ARM: dts: exynos: Use thermal fuse value for thermal zone
+ 0 on Exynos5420
+In-Reply-To: <20170211201456.27974-1-krzk@kernel.org>
+References: <20170211201456.27974-1-krzk@kernel.org>
+Message-ID: <CANAwSgSJRv6XGKvysbw+cXYyVUEcNyGv=6tYSWsvOn42dX5f1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2017 at 12:04:18PM +0100, Geert Uytterhoeven wrote:
-> Some IOMMUs (e.g. Renesas IPMMU/VMSA) support only page sizes of 4 KiB,
-> 2 MiB, and 1 GiB.
-> 
-> With the default setting of CONFIG_CMA_ALIGNMENT = 8, allocations larger
-> than 1 MiB are aligned to a 1 MiB boundary only.  Hence a 2 MiB
-> allocation may not be aligned, leading to a mapping of 512 4 KiB pages.
-> 
-> Increase CONFIG_CMA_ALIGNMENT to allow mapping a 2 MiB buffer using a
-> single PTE, decreasing memory usage and TLB pressure.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Krzysztof,
+
+
+
+On 12 February 2017 at 01:44, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> In Odroid XU3 Lite board, the temperature levels reported for thermal
+> zone 0 were weird. In warm room:
+>         /sys/class/thermal/thermal_zone0/temp:32000
+>         /sys/class/thermal/thermal_zone1/temp:51000
+>         /sys/class/thermal/thermal_zone2/temp:55000
+>         /sys/class/thermal/thermal_zone3/temp:54000
+>         /sys/class/thermal/thermal_zone4/temp:51000
+>
+> Sometimes after booting the value was even equal to ambient temperature
+> which is highly unlikely to be a real temperature of sensor in SoC.
+>
+> The thermal sensor's calibration (trimming) is based on fused values.
+> In case of the board above, the fused values are: 35, 52, 43, 58 and 43
+> (corresponding to each TMU device).  However driver defined a minimum value
+> for fused data as 40 and for smaller values it was using a hard-coded 55
+> instead.  This lead to mapping data from sensor to wrong temperatures
+> for thermal zone 0.
+>
+> Various vendor 3.10 trees (Hardkernel's based on Samsung LSI, Artik 10)
+> do not impose any limits on fused values.  Since we do not have any
+> knowledge about these limits, use 0 as a minimum accepted fused value.
+> This should essentially allow accepting any reasonable fused value thus
+> behaving like vendor driver.
+>
+
+On HK following values are define in drivers/thermal/exynos_thermal.c
+
+#define EFUSE_MIN_VALUE                         40
+#define EFUSE_MAX_VALUE                         100
+
+> The exynos5420-tmu-sensor-conf.dtsi is copied directly from existing
+> exynso4412 with one change - the samsung,tmu_min_efuse_value.
+>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>
 > ---
-> Is this useful?
 
-I assume you're proposing it because you see an improvement? :)
-
-> Should there instead be different defaults in Kconfig, depending on
-> enabled platform support?
-
-I don't object to updating defconfig as a quick hack, but the right solution
-is probably to make the core Kconfig default value overridable by the
-architecture.
-
-Will
+Best Regards
+-Anand
