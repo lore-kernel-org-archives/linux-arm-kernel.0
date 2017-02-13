@@ -1,54 +1,108 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 13 Feb 2017 17:21:57 +0100
-Subject: [PATCH] thermal: exynos: Remove parsing unused
- samsung,tmu_cal_mode property
-In-Reply-To: <20170211201200.27616-1-krzk@kernel.org>
-References: <CGME20170211201214epcas4p19f97c2392bf0af211a0de6b0639dfe88@epcas4p1.samsung.com>
- <20170211201200.27616-1-krzk@kernel.org>
-Message-ID: <2102886.NukhHEJKXL@amdc3058>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Mon, 13 Feb 2017 17:38:26 +0100
+Subject: [RFC v2 4/7] ASoC: dmaengine_pcm: add copy support
+In-Reply-To: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
+References: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1487003909-11710-5-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, February 11, 2017 10:12:00 PM Krzysztof Kozlowski wrote:
-> The property samsung,tmu_cal_mode is not used and not used.  We can
-> safely remove it.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+From: olivier moysan <olivier.moysan@st.com>
 
-Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Add copy support in pcm damengine operations.
+As example, this allows to:
+- process data before rendering (IEC status insertion),
+- process captured sample ( sample mask and shift).
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Signed-off-by: olivier moysan <olivier.moysan@st.com>
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+---
+ include/sound/dmaengine_pcm.h         |  3 +++
+ sound/soc/soc-generic-dmaengine-pcm.c | 37 +++++++++++++++++++++++++++++++++--
+ 2 files changed, 38 insertions(+), 2 deletions(-)
 
-> ---
->  drivers/thermal/samsung/exynos_tmu.c | 1 -
->  drivers/thermal/samsung/exynos_tmu.h | 1 -
->  2 files changed, 2 deletions(-)
-> 
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c b/drivers/thermal/samsung/exynos_tmu.c
-> index ad1186dd6132..7b8ef09d2b3c 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.c
-> +++ b/drivers/thermal/samsung/exynos_tmu.c
-> @@ -1168,7 +1168,6 @@ static int exynos_of_sensor_conf(struct device_node *np,
->  	pdata->default_temp_offset = (u8)value;
->  
->  	of_property_read_u32(np, "samsung,tmu_cal_type", &pdata->cal_type);
-> -	of_property_read_u32(np, "samsung,tmu_cal_mode", &pdata->cal_mode);
->  
->  	of_node_put(np);
->  	return 0;
-> diff --git a/drivers/thermal/samsung/exynos_tmu.h b/drivers/thermal/samsung/exynos_tmu.h
-> index 440c7140b660..5149c2a3030c 100644
-> --- a/drivers/thermal/samsung/exynos_tmu.h
-> +++ b/drivers/thermal/samsung/exynos_tmu.h
-> @@ -70,7 +70,6 @@ struct exynos_tmu_platform_data {
->  
->  	enum soc_type type;
->  	u32 cal_type;
-> -	u32 cal_mode;
->  };
->  
->  #endif /* _EXYNOS_TMU_H */
+diff --git a/include/sound/dmaengine_pcm.h b/include/sound/dmaengine_pcm.h
+index 67be244..9d7bce8 100644
+--- a/include/sound/dmaengine_pcm.h
++++ b/include/sound/dmaengine_pcm.h
+@@ -137,6 +137,9 @@ struct snd_dmaengine_pcm_config {
+ 	int (*prepare_slave_config)(struct snd_pcm_substream *substream,
+ 			struct snd_pcm_hw_params *params,
+ 			struct dma_slave_config *slave_config);
++	int (*copy)(struct snd_pcm_substream *substream, int channel,
++		    snd_pcm_uframes_t pos,
++		    void __user *buf, snd_pcm_uframes_t count);
+ 	struct dma_chan *(*compat_request_channel)(
+ 			struct snd_soc_pcm_runtime *rtd,
+ 			struct snd_pcm_substream *substream);
+diff --git a/sound/soc/soc-generic-dmaengine-pcm.c b/sound/soc/soc-generic-dmaengine-pcm.c
+index 6cef397..bd8332ce 100644
+--- a/sound/soc/soc-generic-dmaengine-pcm.c
++++ b/sound/soc/soc-generic-dmaengine-pcm.c
+@@ -329,6 +329,16 @@ static snd_pcm_uframes_t dmaengine_pcm_pointer(
+ 		return snd_dmaengine_pcm_pointer(substream);
+ }
+ 
++int dmaengine_pcm_copy(struct snd_pcm_substream *substream, int channel,
++		       snd_pcm_uframes_t pos, void __user *buf,
++		       snd_pcm_uframes_t count)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct dmaengine_pcm *pcm = soc_platform_to_pcm(rtd->platform);
++
++	return pcm->config->copy(substream, channel, pos, buf, count);
++}
++
+ static const struct snd_pcm_ops dmaengine_pcm_ops = {
+ 	.open		= dmaengine_pcm_open,
+ 	.close		= snd_dmaengine_pcm_close,
+@@ -339,6 +349,17 @@ static snd_pcm_uframes_t dmaengine_pcm_pointer(
+ 	.pointer	= dmaengine_pcm_pointer,
+ };
+ 
++static const struct snd_pcm_ops dmaengine_pcm_ops_with_cpy = {
++	.open		= dmaengine_pcm_open,
++	.close		= snd_dmaengine_pcm_close,
++	.ioctl		= snd_pcm_lib_ioctl,
++	.hw_params	= dmaengine_pcm_hw_params,
++	.hw_free	= snd_pcm_lib_free_pages,
++	.trigger	= snd_dmaengine_pcm_trigger,
++	.pointer	= dmaengine_pcm_pointer,
++	.copy		= dmaengine_pcm_copy,
++};
++
+ static const struct snd_soc_platform_driver dmaengine_pcm_platform = {
+ 	.component_driver = {
+ 		.probe_order = SND_SOC_COMP_ORDER_LATE,
+@@ -347,6 +368,14 @@ static snd_pcm_uframes_t dmaengine_pcm_pointer(
+ 	.pcm_new	= dmaengine_pcm_new,
+ };
+ 
++static const struct snd_soc_platform_driver dmaengine_pcm_platform_with_cpy = {
++	.component_driver = {
++		.probe_order = SND_SOC_COMP_ORDER_LATE,
++	},
++	.ops		= &dmaengine_pcm_ops_with_cpy,
++	.pcm_new	= dmaengine_pcm_new,
++};
++
+ static const char * const dmaengine_pcm_dma_channel_names[] = {
+ 	[SNDRV_PCM_STREAM_PLAYBACK] = "tx",
+ 	[SNDRV_PCM_STREAM_CAPTURE] = "rx",
+@@ -439,8 +468,12 @@ int snd_dmaengine_pcm_register(struct device *dev,
+ 	if (ret)
+ 		goto err_free_dma;
+ 
+-	ret = snd_soc_add_platform(dev, &pcm->platform,
+-		&dmaengine_pcm_platform);
++	if (config && config->copy)
++		ret = snd_soc_add_platform(dev, &pcm->platform,
++					   &dmaengine_pcm_platform_with_cpy);
++	else
++		ret = snd_soc_add_platform(dev, &pcm->platform,
++					   &dmaengine_pcm_platform);
+ 	if (ret)
+ 		goto err_free_dma;
+ 
+-- 
+1.9.1
