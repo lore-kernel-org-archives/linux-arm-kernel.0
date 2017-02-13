@@ -1,38 +1,61 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 13 Feb 2017 14:52:57 +0530
-Subject: [PATCH 00/10] ARM: davinci: add vpif display support
-In-Reply-To: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <058423ca-c53b-93a2-035e-54fe3ce6dcfe@ti.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 13 Feb 2017 11:34:56 +0200
+Subject: [PATCH 00/15] clk: ti: cleanups / fixes for preparation of clkctrl
+ clocks
+Message-ID: <1486978511-29668-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz,
+Hi,
 
-On Tuesday 07 February 2017 10:11 PM, Bartosz Golaszewski wrote:
-> The following series adds support for v4l2 display on da850-evm with
-> a UI board in device tree boot mode.
-> 
-> Patches 1/10 - 5/10 deal with the device tree: we fix whitespace
-> errors in dts files and bindings, extend the example and the dts for
-> da850-evm with the output port and address the pinmuxing.
-> 
-> Patch 6/10 enables the relevant modules in the defconfig file.
-> 
-> Patches 7/10 and 8/10 fix two already existing bugs encountered
-> during development.
-> 
-> Patch 9/10 make it possible to use a different i2c adapter in the
-> vpif display driver.
-> 
-> The last patch adds the pdata quirks necessary to enable v4l2 display.
-> 
-> Tested with a modified version of yavta[1] as gstreamer support for
-> v4l2 seems to be broken and results in picture artifacts.
-> 
-> [1] https://github.com/brgl/yavta davinci/vpif-display
+This series provides a number of cleanups and fixes for TI clock drivers.
+There patches are mostly independent of anything else, but are required
+for the upcoming clkctrl support also. Targeted for 4.12 merge window.
 
-Can you also share the command line you used ?
+Main features provided by this series:
+- Dropped a few obsolete definitions
+- Cleanups for clock alias generation; after this most of the clock aliases
+  can be removed from the drivers/clk/ti/clk-xyz.c files. As a sample,
+  patch #08 is provided for cleaning up omap4 clock aliases, but this can
+  be done for all.
+- Convert mux/divider to use TI clock specific internal representation,
+  instead of re-using the generic clk_divider / clk_mux. This allows
+  better control over the contents of the struct and cleaning up the
+  register access code to be more readable.
+- Convert to use proper register definition instead of the overloaded
+  void *ptr which is dynamically cast into a bitmask (Patch #15.)
 
-Thanks,
-Sekhar
+Some of the patches touch mach-omap2 code, so Ack from Tony is needed for
+patch #5, #6 and patch #15.
+
+Boot tested on the omap2+ boards I have access to, no issues seen caused
+by this series.
+
+am335x-evm      : BOOT FAIL! (farm issue, failed to mount NFS rootfs)
+am335x-evmsk    : boot ok
+am37x-evm       : boot ok
+am437x-sk       : boot ok
+am437x-gp-evm   : boot ok
+am57xx-evm      : boot ok
+omap3-beagle-xm : boot ok
+omap3-beagle    : boot ok
+am335x-boneblack: boot ok
+am335x-bone     : boot ok
+craneboard      : boot ok
+dra72x-evm      : BOOT FAIL! (farm issue, failed to mount NFS rootfs)
+dra7xx-evm      : boot ok
+ldp3430         : BOOT FAIL! (farm issue, bootloader ethernet failure)
+omap3-n900      : boot ok
+omap5-uevm      : boot ok
+omap4-panda-es  : boot ok
+omap4-panda     : boot ok
+omap2430-sdp    : boot ok
+omap3430-sdp    : boot ok
+omap4-sdp-es23plus: boot ok
+
+Branch available against 4.10-rc2 here:
+
+tree: https://github.com/t-kristo/linux-pm.git
+branch: 4.10-rc2-ti-clk-cleanup
+
+-Tero
