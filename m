@@ -1,51 +1,24 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 13 Feb 2017 12:06:56 +0800
-Subject: [linux-sunxi] [PATCH 1/8] ARM: sunxi_defconfig: Enable simple
- panel
-In-Reply-To: <20170211174405.28395-2-plaes@plaes.org>
-References: <20170211174405.28395-1-plaes@plaes.org>
- <20170211174405.28395-2-plaes@plaes.org>
-Message-ID: <CAGb2v67WP1yPZEDTJd=kDR6uittTBNb1b3oXf_1dAg+4o=tsnA@mail.gmail.com>
+From: enter2017@s18534480.onlinehome-server.info (enter2017 at s18534480.onlinehome-server.info)
+Date: Sun, 12 Feb 2017 20:45:09 -0600
+Subject: UPS courier can not deliver parcel #06184957 to you
+Message-ID: <201702130245.v1D2j94V026947@s18534480.onlinehome-server.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 12, 2017 at 1:43 AM, Priit Laes <plaes@plaes.org> wrote:
-> From: Jonathan Liu <net147@gmail.com>
->
+Dear Customer,
 
-This needs a commit message about why these need to be enabled, like
+Your item has arrived at the UPS Post Office at February 11, but the courier was unable to deliver parcel to you.
 
-"Most Allwinner tablets use the same design of a dumb LCD panel coupled
- with a PWM controlled backlight."
+You can download the shipment label attached!
 
-Also the subject does not mention CONFIG_BACKLIGHT_PWM being enabled.
+With many thanks,
+Cory Oliver,
+UPS Senior Operation Agent.
 
-> Signed-off-by: Jonathan Liu <net147@gmail.com>
-
-Since you are resending the patch, you must also add your SoB.
-
-ChenYu
-
-> ---
->  arch/arm/configs/sunxi_defconfig | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-> index da92c25..7abe6a4 100644
-> --- a/arch/arm/configs/sunxi_defconfig
-> +++ b/arch/arm/configs/sunxi_defconfig
-> @@ -153,3 +153,7 @@ CONFIG_NLS_ISO8859_1=y
->  CONFIG_PRINTK_TIME=y
->  CONFIG_DEBUG_FS=y
->  CONFIG_CRYPTO_DEV_SUN4I_SS=y
-> +CONFIG_BACKLIGHT_CLASS_DEVICE=y
-> +CONFIG_BACKLIGHT_LCD_SUPPORT=y
-> +CONFIG_BACKLIGHT_PWM=y
-> +CONFIG_DRM_PANEL_SIMPLE=y
-> --
-> 2.9.3
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: UPS-Delivery-Details-06184957.zip
+Type: application/zip
+Size: 709 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170212/5bd95c57/attachment.zip>
