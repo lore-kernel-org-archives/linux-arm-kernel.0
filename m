@@ -1,26 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Feb 2017 23:06:31 +0100
-Subject: [PATCH] arm64: fix warning about swapper_pg_dir overflow
-In-Reply-To: <CAKv+Gu_FMk26Vbrb3mp5cSkSvmELP2iantX4kTyg+U8HO0J9ug@mail.gmail.com>
-References: <20170214212718.2792194-1-arnd@arndb.de>
- <CAKv+Gu_FMk26Vbrb3mp5cSkSvmELP2iantX4kTyg+U8HO0J9ug@mail.gmail.com>
-Message-ID: <CAK8P3a171gaVo0hOeqWQQGOnRaTTqc83u9r9dwMz0ZGE1O=R9g@mail.gmail.com>
+From: groeck@google.com (Guenter Roeck)
+Date: Tue, 14 Feb 2017 14:06:33 -0800
+Subject: [PATCH] drm/rockchip: add extcon dependency for DP
+In-Reply-To: <20170214213215.2888509-1-arnd@arndb.de>
+References: <20170214213215.2888509-1-arnd@arndb.de>
+Message-ID: <CABXOdTfebR3aA-txoAzLh=U30uLGWe=Lrz4EF8VYhR6bSJEwww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2017 at 10:33 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> On 14 February 2017 at 21:27, Arnd Bergmann <arnd@arndb.de> wrote:
+On Tue, Feb 14, 2017 at 1:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The newly added DP driver links against the extcon core, which fails when
+> extcon is a module and this driver is not:
+>
+> drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_get_port_lanes':
+> cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x24): undefined reference to `extcon_get_state'
+> cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x44): undefined reference to `extcon_get_property'
+>
+> Let's make Kconfig enforce correct behavior with a dependency.
+>
+> Fixes: 1a0f7ed3abe2 ("drm/rockchip: cdn-dp: add cdn DP support for rk3399")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> We should see the same issue with 64k/3 levels, since its PGD_SIZE is
-> also much smaller than its PAGE_SIZE. This is a much more common
-> configuration, so I am surprised you found it on 16k/4 levels first.
+Reviewed-by: Guenter Roeck <groeck@chromium.org>
 
-I hadn't been doing regular build tests on arm64 and just started up some
-randconfig builds, this was the first bug I ran into ;-)
-
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Thanks,
-
-   Arnd
+> ---
+>  drivers/gpu/drm/rockchip/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+> index ad31b3eb408f..0e4eb845cbb0 100644
+> --- a/drivers/gpu/drm/rockchip/Kconfig
+> +++ b/drivers/gpu/drm/rockchip/Kconfig
+> @@ -24,6 +24,7 @@ config ROCKCHIP_ANALOGIX_DP
+>  config ROCKCHIP_CDN_DP
+>          tristate "Rockchip cdn DP"
+>          depends on DRM_ROCKCHIP
+> +       depends on EXTCON
+>         select SND_SOC_HDMI_CODEC if SND_SOC
+>          help
+>           This selects support for Rockchip SoC specific extensions
+> --
+> 2.9.0
+>
