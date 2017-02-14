@@ -1,94 +1,76 @@
-From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Tue, 14 Feb 2017 23:23:34 +0530
-Subject: [RESEND][PATCH v2] ata: xgene: Enable NCQ support for APM X-Gene SATA
- controller hardware v1.1
-Message-ID: <1487094814-9145-1-git-send-email-rsahu@apm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 14 Feb 2017 14:26:49 +0200
+Subject: [PATCH v13 06/12] usb: xhci: use bus->sysdev for DMA configuration
+In-Reply-To: <CAK8P3a1D1v=LXrW=-t-fRJjbo_C6OpSuoqiGuZPOaBzQYCT-kA@mail.gmail.com>
+References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
+ <1486776443-2280-7-git-send-email-peter.chen@nxp.com>
+ <e532a212-cd15-ab42-6188-fc11a12633af@ti.com>
+ <CAK8P3a1D1v=LXrW=-t-fRJjbo_C6OpSuoqiGuZPOaBzQYCT-kA@mail.gmail.com>
+Message-ID: <cb7182c6-0236-26f2-4f96-9bc001994728@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables NCQ support for APM X-Gene SATA controller hardware v1.1
-that was broken with hardware v1.0. Second thing, here we should not assume
-XGENE_AHCI_V2 always in case of having valid _CID in ACPI table. I need to
-remove this assumption because V1_1 also has a valid _CID for backward
-compatibly with v1.
+On 14/02/17 13:44, Arnd Bergmann wrote:
+> On Tue, Feb 14, 2017 at 11:36 AM, Roger Quadros <rogerq@ti.com> wrote:
+>> On 11/02/17 03:27, Peter Chen wrote:
+>>> From: Arnd Bergmann <arnd@arndb.de>
+>>>
+>>> For xhci-hcd platform device, all the DMA parameters are not
+>>> configured properly, notably dma ops for dwc3 devices. So, set
+>>> the dma for xhci from sysdev. sysdev is pointing to device that
+>>> is known to the system firmware or hardware.
+>>>
+>>> Cc: Baolin Wang <baolin.wang@linaro.org>
+>>> Cc: Vivek Gautam <vivek.gautam@codeaurora.org>
+>>> Cc: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+>>> Cc: Mathias Nyman <mathias.nyman@linux.intel.com>
+>>>
+>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+>>> ---
+>>> Hi, Baolin, Vivek and Alexander,
+>>> I removed your tested-by tag due to add one change that adding sysdev
+>>> for shared hcd too, if your test shows this change works for you or
+>>> has no effect for you, please consider adding tested-by tag again,
+>>> thanks.
+> 
+>>> @@ -222,20 +241,20 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>>>
+>>>       xhci->clk = clk;
+>>>       xhci->main_hcd = hcd;
+>>> -     xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
+>>> +     xhci->shared_hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
+>>>                       dev_name(&pdev->dev), hcd);
+>>>       if (!xhci->shared_hcd) {
+>>>               ret = -ENOMEM;
+>>>               goto disable_clk;
+>>>       }
+>>>
+>>> -     if (device_property_read_bool(&pdev->dev, "usb3-lpm-capable"))
+>>> +     if (device_property_read_bool(sysdev, "usb3-lpm-capable"))
+>>
+>> Why are we using sysdev to read DT property? We should be using the
+>> XHCI device (&pdev->dev) here, no?
+> 
+> If I remember correctly, this is one of the cases where pdev does not
+> have a device node attached to it because it was created by the driver
+> of the parent device on the fly in case of dwc3. When you have a pure xhci
+> device in DT, the two pointers are the same.
 
-v2 changes:
-	1. Changed patch description
+>From drivers/usb/dwc3/host.c
 
-Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
----
- drivers/ata/ahci_xgene.c |   14 ++++++++------
- 1 files changed, 8 insertions(+), 6 deletions(-)
+>         if (dwc->usb3_lpm_capable) {
+>                 props[0].name = "usb3-lpm-capable";
+>                 ret = platform_device_add_properties(xhci, props);
+>                 if (ret) {
+>                         dev_err(dwc->dev, "failed to add properties to xHCI\n");
+>                         goto err1;
+>                 }
+>         }
 
-diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
-index 73b19b2..8b88be9 100644
---- a/drivers/ata/ahci_xgene.c
-+++ b/drivers/ata/ahci_xgene.c
-@@ -87,6 +87,7 @@
+So it is setting the usb3-lpm-capable property into the xhci platform device
+and we should be reading the property from there.
 
- enum xgene_ahci_version {
- 	XGENE_AHCI_V1 = 1,
-+	XGENE_AHCI_V1_1,
- 	XGENE_AHCI_V2,
- };
-
-@@ -734,6 +735,7 @@ static struct scsi_host_template ahci_platform_sht = {
- #ifdef CONFIG_ACPI
- static const struct acpi_device_id xgene_ahci_acpi_match[] = {
- 	{ "APMC0D0D", XGENE_AHCI_V1},
-+	{ "APMC0D67", XGENE_AHCI_V1_1},
- 	{ "APMC0D32", XGENE_AHCI_V2},
- 	{},
- };
-@@ -742,6 +744,7 @@ MODULE_DEVICE_TABLE(acpi, xgene_ahci_acpi_match);
-
- static const struct of_device_id xgene_ahci_of_match[] = {
- 	{.compatible = "apm,xgene-ahci", .data = (void *) XGENE_AHCI_V1},
-+	{.compatible = "apm,xgene-ahci-v1-1", .data = (void *) XGENE_AHCI_V1_1},
- 	{.compatible = "apm,xgene-ahci-v2", .data = (void *) XGENE_AHCI_V2},
- 	{},
- };
-@@ -755,8 +758,7 @@ static int xgene_ahci_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	const struct of_device_id *of_devid;
- 	enum xgene_ahci_version version = XGENE_AHCI_V1;
--	const struct ata_port_info *ppi[] = { &xgene_ahci_v1_port_info,
--					      &xgene_ahci_v2_port_info };
-+	const struct ata_port_info *ppi;
- 	int rc;
-
- 	hpriv = ahci_platform_get_resources(pdev);
-@@ -821,8 +823,6 @@ static int xgene_ahci_probe(struct platform_device *pdev)
- 				dev_warn(&pdev->dev, "%s: Error reading device info. Assume version1\n",
- 					__func__);
- 				version = XGENE_AHCI_V1;
--			} else if (info->valid & ACPI_VALID_CID) {
--				version = XGENE_AHCI_V2;
- 			}
- 		}
- 	}
-@@ -858,18 +858,20 @@ skip_clk_phy:
-
- 	switch (version) {
- 	case XGENE_AHCI_V1:
-+		ppi = &xgene_ahci_v1_port_info;
- 		hpriv->flags = AHCI_HFLAG_NO_NCQ;
- 		break;
- 	case XGENE_AHCI_V2:
-+		ppi = &xgene_ahci_v2_port_info;
- 		hpriv->flags |= AHCI_HFLAG_YES_FBS;
- 		hpriv->irq_handler = xgene_ahci_irq_intr;
- 		break;
- 	default:
-+		ppi = &xgene_ahci_v1_port_info;
- 		break;
- 	}
-
--	rc = ahci_platform_init_host(pdev, hpriv, ppi[version - 1],
--				     &ahci_platform_sht);
-+	rc = ahci_platform_init_host(pdev, hpriv, ppi, &ahci_platform_sht);
- 	if (rc)
- 		goto disable_resources;
-
---
-1.7.1
+-- 
+cheers,
+-roger
