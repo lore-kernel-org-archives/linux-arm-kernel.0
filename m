@@ -1,39 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Feb 2017 22:27:01 +0100
-Subject: [PATCH] arm64: fix warning about swapper_pg_dir overflow
-Message-ID: <20170214212718.2792194-1-arnd@arndb.de>
+Date: Tue, 14 Feb 2017 22:29:45 +0100
+Subject: [PATCH] clk: sunxi: ccu-sun5i needs nkmp
+Message-ID: <20170214213005.2848151-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With 4 levels of 16KB pages, we get this warning about the fact that we are
-copying a whole page into an array that is declared as having only two pointers
-for the top level of the page table:
+A randconfig build ran into this rare link error:
 
-arch/arm64/mm/mmu.c: In function 'paging_init':
-arch/arm64/mm/mmu.c:528:2: error: 'memcpy' writing 16384 bytes into a region of size 16 overflows the destination [-Werror=stringop-overflow=]
+drivers/clk/sunxi-ng/ccu-sun5i.o:(.data.__compound_literal.1+0x4): undefined reference to `ccu_nkmp_ops'
+drivers/clk/sunxi-ng/ccu-sun5i.o:(.data.__compound_literal.7+0x4): undefined reference to `ccu_nkmp_ops'
 
-This is harmless since we actually reserve a whole page in the definition of the
-array that comes from, and just the extern declaration is short. The pgdir
-is initialized to zero either way, so copying the actual entries here seems
-like the best solution.
+This adds the missing 'select'.
 
+Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm64/mm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/sunxi-ng/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 2131521ddc24..b805c017f789 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -525,7 +525,7 @@ void __init paging_init(void)
- 	 * To do this we need to go via a temporary pgd.
- 	 */
- 	cpu_replace_ttbr1(__va(pgd_phys));
--	memcpy(swapper_pg_dir, pgd, PAGE_SIZE);
-+	memcpy(swapper_pg_dir, pgd, PGD_SIZE);
- 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
- 
- 	pgd_clear_fixmap();
+diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+index 695bbf9ef428..b6e2aa5d0246 100644
+--- a/drivers/clk/sunxi-ng/Kconfig
++++ b/drivers/clk/sunxi-ng/Kconfig
+@@ -70,6 +70,7 @@ config SUN5I_CCU
+ 	select SUNXI_CCU_MULT
+ 	select SUNXI_CCU_NK
+ 	select SUNXI_CCU_NKM
++	select SUNXI_CCU_NKMP
+ 	select SUNXI_CCU_NM
+ 	select SUNXI_CCU_MP
+ 	select SUNXI_CCU_PHASE
 -- 
 2.9.0
