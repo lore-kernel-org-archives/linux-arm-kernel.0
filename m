@@ -1,85 +1,151 @@
-From: andrei-tiberiu.breana@nxp.com (Tiberiu Breana)
-Date: Tue, 14 Feb 2017 11:01:13 +0200
-Subject: [PATCH 2/2] Add AXI address filter support for MMDC profiling
-In-Reply-To: <1487062873-27641-1-git-send-email-andrei-tiberiu.breana@nxp.com>
-References: <1487062873-27641-1-git-send-email-andrei-tiberiu.breana@nxp.com>
-Message-ID: <1487062873-27641-3-git-send-email-andrei-tiberiu.breana@nxp.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 14 Feb 2017 09:03:15 +0000
+Subject: [PATCH] mm: free reserved area's memmap if possiable
+In-Reply-To: <1487055180-128750-1-git-send-email-zhouxianrong@huawei.com>
+References: <1486987349-58711-1-git-send-email-zhouxianrong@huawei.com>
+ <1487055180-128750-1-git-send-email-zhouxianrong@huawei.com>
+Message-ID: <CAKv+Gu9NF3dS_EWi4k42Ke+aagTScu-yk+UFZ_6sG6tK5zHP2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for an extra config parameter for perf commands:
-axi_id, which will be written in the MMDC's MADPCR1 register,
-to filter memory usage profiling (see i.MX6 reference manual,
-chapter 44.7 MMDC Profiling for AXI id usage).
+On 14 February 2017 at 06:53,  <zhouxianrong@huawei.com> wrote:
+> From: zhouxianrong <zhouxianrong@huawei.com>
+>
+> just like freeing no-map area's memmap (gaps of memblock.memory)
+> we could free reserved area's memmap (areas of memblock.reserved)
+> as well only when user of reserved area indicate that we can do
+> this in drivers. that is, user of reserved area know how to
+> use the reserved area who could not memblock_free or free_reserved_xxx
+> the reserved area and regard the area as raw pfn usage by kernel.
+> the patch supply a way to users who want to utilize the memmap
+> memory corresponding to raw pfn reserved areas as many as possible.
+> users can do this by memblock_mark_raw_pfn interface which mark the
+> reserved area as raw pfn and tell free_unused_memmap that this area's
+> memmap could be freeed.
+>
 
-Signed-off-by: Tiberiu Breana <andrei-tiberiu.breana@nxp.com>
----
- arch/arm/mach-imx/mmdc.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+Could you give an example how much memory we actually recover by doing
+this? I understand it depends on the size of the reserved regions, but
+I'm sure you have an actual example that inspired you to write this
+patch.
 
-diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
-index 89a926f..7826289 100644
---- a/arch/arm/mach-imx/mmdc.c
-+++ b/arch/arm/mach-imx/mmdc.c
-@@ -1,4 +1,5 @@
- /*
-+ * Copyright 2017 NXP
-  * Copyright 2011,2016 Freescale Semiconductor, Inc.
-  * Copyright 2011 Linaro Ltd.
-  *
-@@ -47,6 +48,7 @@
- #define PROFILE_SEL		0x10
- 
- #define MMDC_MADPCR0	0x410
-+#define MMDC_MADPCR1	0x414
- #define MMDC_MADPSR0	0x418
- #define MMDC_MADPSR1	0x41C
- #define MMDC_MADPSR2	0x420
-@@ -57,6 +59,7 @@
- #define MMDC_NUM_COUNTERS	6
- 
- #define MMDC_FLAG_PROFILE_SEL	0x1
-+#define MMDC_PRF_AXI_ID_CLEAR	0x0
- 
- #define to_mmdc_pmu(p) container_of(p, struct mmdc_pmu, pmu)
- 
-@@ -161,8 +164,11 @@ static struct attribute_group mmdc_pmu_events_attr_group = {
- };
- 
- PMU_FORMAT_ATTR(event, "config:0-63");
-+PMU_FORMAT_ATTR(axi_id, "config1:0-63");
-+
- static struct attribute *mmdc_pmu_format_attrs[] = {
- 	&format_attr_event.attr,
-+	&format_attr_axi_id.attr,
- 	NULL,
- };
- 
-@@ -345,6 +351,14 @@ static void mmdc_pmu_event_start(struct perf_event *event, int flags)
- 
- 	writel(DBG_RST, reg);
- 
-+	/*
-+	 * Write the AXI id parameter to MADPCR1.
-+	 */
-+	val = event->attr.config1;
-+	reg = mmdc_base + MMDC_MADPCR1;
-+	writel(val, reg);
-+
-+	reg = mmdc_base + MMDC_MADPCR0;
- 	val = DBG_EN;
- 	if (pmu_mmdc->devtype_data->flags & MMDC_FLAG_PROFILE_SEL)
- 		val |= PROFILE_SEL;
-@@ -382,6 +396,10 @@ static void mmdc_pmu_event_stop(struct perf_event *event, int flags)
- 	reg = mmdc_base + MMDC_MADPCR0;
- 
- 	writel(PRF_FRZ, reg);
-+
-+	reg = mmdc_base + MMDC_MADPCR1;
-+	writel(MMDC_PRF_AXI_ID_CLEAR, reg);
-+
- 	mmdc_pmu_event_update(event);
- }
- 
--- 
-2.7.4
+> Signed-off-by: zhouxianrong <zhouxianrong@huawei.com>
+> ---
+>  arch/arm64/mm/init.c     |   14 +++++++++++++-
+>  include/linux/memblock.h |    3 +++
+>  mm/memblock.c            |   24 ++++++++++++++++++++++++
+>  3 files changed, 40 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 380ebe7..7e62ef8 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -358,7 +358,7 @@ static inline void free_memmap(unsigned long start_pfn, unsigned long end_pfn)
+>   */
+>  static void __init free_unused_memmap(void)
+>  {
+> -       unsigned long start, prev_end = 0;
+> +       unsigned long start, end, prev_end = 0;
+>         struct memblock_region *reg;
+>
+>         for_each_memblock(memory, reg) {
+> @@ -391,6 +391,18 @@ static void __init free_unused_memmap(void)
+>         if (!IS_ALIGNED(prev_end, PAGES_PER_SECTION))
+>                 free_memmap(prev_end, ALIGN(prev_end, PAGES_PER_SECTION));
+>  #endif
+> +
+> +       for_each_memblock(reserved, reg) {
+> +               if (!(reg->flags & MEMBLOCK_RAW_PFN))
+> +                       continue;
+> +
+> +               start = memblock_region_memory_base_pfn(reg);
+> +               end = round_down(memblock_region_memory_end_pfn(reg),
+> +                                MAX_ORDER_NR_PAGES);
+> +
+
+Why are you rounding down end only? Shouldn't you round up start and
+round down end? Or does free_memmap() deal with that already?
+
+In any case, it is good to emphasize that on 4 KB pagesize kernels, we
+will only free multiples of 8 MB that are 8 MB aligned, resulting in
+128 KB of memmap backing to be released.
+
+
+> +               if (start < end)
+> +                       free_memmap(start, end);
+> +       }
+>  }
+>  #endif /* !CONFIG_SPARSEMEM_VMEMMAP */
+>
+> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+> index 5b759c9..9f8d277 100644
+> --- a/include/linux/memblock.h
+> +++ b/include/linux/memblock.h
+> @@ -26,6 +26,7 @@ enum {
+>         MEMBLOCK_HOTPLUG        = 0x1,  /* hotpluggable region */
+>         MEMBLOCK_MIRROR         = 0x2,  /* mirrored region */
+>         MEMBLOCK_NOMAP          = 0x4,  /* don't add to kernel direct mapping */
+> +       MEMBLOCK_RAW_PFN        = 0x8,  /* region whose memmap never be used */
+
+I think we should be *very* careful about the combinatorial explosion
+that results when combining all these flags, given that this is not a
+proper enum but a bit field.
+
+In any case, the generic memblock change should be in a separate patch
+from the arm64 change.
+
+>  };
+>
+>  struct memblock_region {
+> @@ -92,6 +93,8 @@ bool memblock_overlaps_region(struct memblock_type *type,
+>  int memblock_clear_hotplug(phys_addr_t base, phys_addr_t size);
+>  int memblock_mark_mirror(phys_addr_t base, phys_addr_t size);
+>  int memblock_mark_nomap(phys_addr_t base, phys_addr_t size);
+> +int memblock_mark_raw_pfn(phys_addr_t base, phys_addr_t size);
+> +int memblock_clear_raw_pfn(phys_addr_t base, phys_addr_t size);
+>  ulong choose_memblock_flags(void);
+>
+>  /* Low level functions */
+> diff --git a/mm/memblock.c b/mm/memblock.c
+> index 7608bc3..c103b94 100644
+> --- a/mm/memblock.c
+> +++ b/mm/memblock.c
+> @@ -814,6 +814,30 @@ int __init_memblock memblock_mark_nomap(phys_addr_t base, phys_addr_t size)
+>  }
+>
+>  /**
+> + * memblock_mark_raw_pfn - Mark raw pfn memory with flag MEMBLOCK_RAW_PFN.
+> + * @base: the base phys addr of the region
+> + * @size: the size of the region
+> + *
+> + * Return 0 on succees, -errno on failure.
+> + */
+> +int __init_memblock memblock_mark_raw_pfn(phys_addr_t base, phys_addr_t size)
+> +{
+> +       return memblock_setclr_flag(base, size, 1, MEMBLOCK_RAW_PFN);
+> +}
+> +
+> +/**
+> + * memblock_clear_raw_pfn - Clear flag MEMBLOCK_RAW_PFN for a specified region.
+> + * @base: the base phys addr of the region
+> + * @size: the size of the region
+> + *
+> + * Return 0 on succees, -errno on failure.
+> + */
+> +int __init_memblock memblock_clear_raw_pfn(phys_addr_t base, phys_addr_t size)
+> +{
+> +       return memblock_setclr_flag(base, size, 0, MEMBLOCK_RAW_PFN);
+> +}
+> +
+> +/**
+>   * __next_reserved_mem_region - next function for for_each_reserved_region()
+>   * @idx: pointer to u64 loop variable
+>   * @out_start: ptr to phys_addr_t for start address of the region, can be %NULL
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
