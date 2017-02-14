@@ -1,126 +1,66 @@
-From: w.egorov@phytec.de (Wadim Egorov)
-Date: Tue, 14 Feb 2017 15:12:37 +0100
-Subject: [PATCH V3 2/2] ARM: dts: rockchip: add dts for RK3288-Tinker board
-In-Reply-To: <1487066851-25142-3-git-send-email-eddie.cai.linux@gmail.com>
-References: <1487066851-25142-1-git-send-email-eddie.cai.linux@gmail.com>
- <1487066851-25142-3-git-send-email-eddie.cai.linux@gmail.com>
-Message-ID: <e555144a-b698-1fad-c377-8af2fd8697c5@phytec.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 14 Feb 2017 15:25:03 +0100
+Subject: [PATCHv2 net-next 01/16] dt-bindings: net: update Marvell PPv2
+ binding for PPv2.2 support
+In-Reply-To: <20170203164808.GD27312@n2100.armlinux.org.uk>
+References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482943592-12556-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170103201842.hdg2uzzesog2jund@rob-hp-laptop>
+ <20170202175650.1fc06c2d@free-electrons.com>
+ <20170203164808.GD27312@n2100.armlinux.org.uk>
+Message-ID: <20170214152503.602878cb@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eddie,
+Hello,
 
+On Fri, 3 Feb 2017 16:48:08 +0000, Russell King - ARM Linux wrote:
+> On Thu, Feb 02, 2017 at 05:56:50PM +0100, Thomas Petazzoni wrote:
+> > For PPv2.2, we wanted to simplify a little bit the register mappings,
+> > and simply reflect the memory map of the SoC. In the SoC datasheet,
+> > there are two memory areas for the networking subsystem, which are the
+> > two areas reflected in:
+> > 
+> >         reg = <0x0 0x100000>,
+> >               <0x100000 0x80000>;
+> > 
+> > The per-port registers are inside the second register area. But by
+> > exposing the entire register area in the Device Tree binding, we allow
+> > improvements in the driver that need additional registers to be made
+> > without changing the Device Tree description of the device.  
+> 
+> Are you sure that this makes sense?  You have the serdes block at
+> 0x120000-0x125fff, which sits within that range, and that needs to
+> be configured for SATA and PCIe, so it's not strictly just a network
+> thing.
+> 
+> I know from my experimentation that disabling the "serdes" by clearing
+> the SD_EXTERNAL_CONFIG1_REG and SD_EXTERNAL_CONFIG0_REG for SATA
+> channels prevents SATA working.
 
-On 14.02.2017 11:07, Eddie Cai wrote:
-> This patch add basic support for RK3288-Tinker board. We can boot in to rootfs
-> with this patch.
->
-> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
-> ---
->  arch/arm/boot/dts/Makefile          |   1 +
->  arch/arm/boot/dts/rk3288-tinker.dts | 536 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 537 insertions(+)
->  create mode 100644 arch/arm/boot/dts/rk3288-tinker.dts
->
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 01d178a..0dfef24 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -679,6 +679,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
->  	rk3288-popmetal.dtb \
->  	rk3288-r89.dtb \
->  	rk3288-rock2-square.dtb \
-> +	rk3288-tinker.dtb \
->  	rk3288-veyron-brain.dtb \
->  	rk3288-veyron-jaq.dtb \
->  	rk3288-veyron-jerry.dtb \
-> diff --git a/arch/arm/boot/dts/rk3288-tinker.dts b/arch/arm/boot/dts/rk3288-tinker.dts
-> new file mode 100644
-> index 0000000..9600d1f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/rk3288-tinker.dts
-> @@ -0,0 +1,536 @@
-> +/*
-> + * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "rk3288.dtsi"
-> +#include <dt-bindings/input/input.h>
-> +
-> +/ {
-> +	model = "Rockchip RK3288 Tinker Board";
-> +	compatible = "asus,rk3288-tinker", "rockchip,rk3288";
-> +
-> +	memory {
-> +		reg = <0x0 0x80000000>;
-> +		device_type = "memory";
-> +	};
-> +
-> +	ext_gmac: external-gmac-clock {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <125000000>;
-> +		clock-output-names = "ext_gmac";
-> +	};
-> +
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		autorepeat;
-> +
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pwrbtn>;
-> +
-> +		button at 0 {
-> +			gpios = <&gpio0 RK_PA5 GPIO_ACTIVE_LOW>;
-> +			linux,code = <KEY_POWER>;
-> +			label = "GPIO Key Power";
-> +			linux,input-type = <1>;
-> +			gpio-key,wakeup = <1>;
+I have simply/stupidly followed the datasheet, which says:
 
-you should replace this with wakeup-source as specified in
-Documentation/devicetree/bindings/power/wakeup-source.txt
+ Packet processor:        0xf2000000, 0xf4000000 (i.e offset 0x0 in the CP)
+ Networking interfaces:   0xf2100000, 0xf4100000 (i.e offset 0x100000 in the CP)
+ IO Bridge Addr Decoding: 0xf2190000, 0xf4190000
 
-Regards,
-Wadim
+And since there is no other block described, I assumed that the entire
+range 0xf2000000 to 0xf2100000 was dedicated to the "Packet processor",
+and that the range 0xf2100000 to 0xf2190000 was dedicated to the
+"Networking interfaces" (and I realize the size is 0x90000, not
+0x80000).
+
+On the other hand, there are registers after 0x125fff that are really
+networking related. For example, the driver is currently accessing
+0x12a204, which is after the SERDES related registers.
+
+I'll try to get some more information about this, but I suspect this is
+one case where we don't yet fully understand how all the HW works and
+what all registers are doing, so it's hard to do a perfect DT binding
+from day 1.
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
