@@ -1,82 +1,41 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Tue, 14 Feb 2017 09:32:01 +0000
-Subject: [alsa-devel] [PATCH v2] ASoC: bcm2835: Add 8 channel
- (multitrack) capability
-In-Reply-To: <1486942035-24038-1-git-send-email-flatmax@flatmax.org>
-References: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
- <1486942035-24038-1-git-send-email-flatmax@flatmax.org>
-Message-ID: <20170214093201.GY1754@localhost.localdomain>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 14 Feb 2017 10:34:38 +0100
+Subject: [PATCH 1/5] clk: sunxi-ng: mp: Adjust parent rate for pre-dividers
+In-Reply-To: <20170214033526.16977-2-wens@csie.org>
+References: <20170214033526.16977-1-wens@csie.org>
+ <20170214033526.16977-2-wens@csie.org>
+Message-ID: <20170214093438.4v6ykhqrstnkvzl6@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2017 at 10:27:15AM +1100, Matt Flax wrote:
-> This patch adds multitrack capability if in DSP mode A and the
-> codec is master.
+On Tue, Feb 14, 2017 at 11:35:22AM +0800, Chen-Yu Tsai wrote:
+> The MP style clocks support an mux with pre-dividers. While the driver
+> correctly accounted for them in the .determine_rate callback, it did
+> not in the .recalc_rate and .set_rate callbacks.
 > 
-> In bcm2835_i2s_startup, snd_pcm_hw_constraint_minmax is used to set
-> max channels to 8 if both SND_SOC_DAIFMT_CBM_CFM and
-> SND_SOC_DAIFMT_DSP_A are set. Otherwise, max channels is set to 2.
-> Min channels is always set to 2. These settings are accomplished
-> using the SNDRV_PCM_HW_PARAM_CHANNELS variable.
+> This means when calculating the factors in the .set_rate callback, they
+> would be off by a factor of the active pre-divider. Same goes for
+> reading back the clock rate after it is set.
 > 
-> In bcm2835_i2s_shutdown max channels is set to 2 by default.
-> 
-> In bcm2835_i2s_hw_params, DSP mode A format is now an option.
-> Before replicating the format variable (from ch2 to ch1) for
-> register loading, requested channels are checked to be either 2 or 8.
-> This can be expaneded later to accomodate other channel counts if
-> supported by the sound card hardware.
-> 
-> Signed-off-by: Matt Flax <flatmax@flatmax.org>
+> Fixes: 2ab836db5097 ("clk: sunxi-ng: Add M-P factor clock support")
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
-<snip>
-> @@ -312,6 +313,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
->  
->  	switch (params_channels(params)) {
->  	case 2:
-> +	case 8:
->  		format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
->  		format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
->  		format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
-> @@ -526,7 +528,16 @@ static int bcm2835_i2s_startup(struct snd_pcm_substream *substream,
->  	regmap_update_bits(dev->i2s_regmap, BCM2835_I2S_CS_A_REG,
->  			BCM2835_I2S_STBY, BCM2835_I2S_STBY);
->  
-> -	return 0;
-> +	/* Set the max channels to 8 if the codec is master and
-> +	 * we are in DSP A mode. Otherwise only allow 2 channels.
-> +	 */
-> +	if (dev->fmt &
-> +		(SND_SOC_DAIFMT_CBM_CFM | SND_SOC_DAIFMT_DSP_A))
-> +		return snd_pcm_hw_constraint_minmax(substream->runtime,
-> +			SNDRV_PCM_HW_PARAM_CHANNELS, 2, 8);
+> 
+> Maybe we want to Cc stable for this one?
 
-Would it be worth using snd_pcm_hw_constraint_list here? We are
-going to error out of hw_params if the user requests anything
-other than 2 or 8 channels so we should probably just constrain
-to those two.
+I've applied it and added the Cc.
 
-> +	else
-> +		return snd_pcm_hw_constraint_minmax(substream->runtime,
-> +			SNDRV_PCM_HW_PARAM_CHANNELS, 2, 2);
+Thanks!
+Maxime
 
-snd_pcm_hw_constraint_single, it's exactly the same thing but I
-guess we should probably use the helper if it exists.
-
->  }
->  
->  static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
-> @@ -549,6 +560,10 @@ static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
->  	 * not stop the clock when SND_SOC_DAIFMT_CONT
->  	 */
->  	bcm2835_i2s_stop_clock(dev);
-> +
-> +	/* Default to 2 channels */
-> +	snd_pcm_hw_constraint_minmax(substream->runtime,
-> +			SNDRV_PCM_HW_PARAM_CHANNELS, 2, 2);
->  }
-
-ditto.
-
-Thanks,
-Charles
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170214/1643bd2a/attachment.sig>
