@@ -1,151 +1,46 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 14 Feb 2017 09:03:15 +0000
-Subject: [PATCH] mm: free reserved area's memmap if possiable
-In-Reply-To: <1487055180-128750-1-git-send-email-zhouxianrong@huawei.com>
-References: <1486987349-58711-1-git-send-email-zhouxianrong@huawei.com>
- <1487055180-128750-1-git-send-email-zhouxianrong@huawei.com>
-Message-ID: <CAKv+Gu9NF3dS_EWi4k42Ke+aagTScu-yk+UFZ_6sG6tK5zHP2Q@mail.gmail.com>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Tue, 14 Feb 2017 17:19:07 +0800
+Subject: [PATCH 0/5] Add Spreadtrum SP9860G support
+Message-ID: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 February 2017 at 06:53,  <zhouxianrong@huawei.com> wrote:
-> From: zhouxianrong <zhouxianrong@huawei.com>
->
-> just like freeing no-map area's memmap (gaps of memblock.memory)
-> we could free reserved area's memmap (areas of memblock.reserved)
-> as well only when user of reserved area indicate that we can do
-> this in drivers. that is, user of reserved area know how to
-> use the reserved area who could not memblock_free or free_reserved_xxx
-> the reserved area and regard the area as raw pfn usage by kernel.
-> the patch supply a way to users who want to utilize the memmap
-> memory corresponding to raw pfn reserved areas as many as possible.
-> users can do this by memblock_mark_raw_pfn interface which mark the
-> reserved area as raw pfn and tell free_unused_memmap that this area's
-> memmap could be freeed.
->
+SC9860 is a Spreadtrum SoC with eight Cortex A53, which are divided
+into 4 Big cores and 4 little cores.
 
-Could you give an example how much memory we actually recover by doing
-this? I understand it depends on the size of the reserved regions, but
-I'm sure you have an actual example that inspired you to write this
-patch.
+In this patch-set, patch-1/5 only provides a basic configuration for SC9860
+in device tree to make it run to console.  After this we will continue
+to submit other drivers step by step, which are using on Spreadtrum's SoCs.
 
-> Signed-off-by: zhouxianrong <zhouxianrong@huawei.com>
-> ---
->  arch/arm64/mm/init.c     |   14 +++++++++++++-
->  include/linux/memblock.h |    3 +++
->  mm/memblock.c            |   24 ++++++++++++++++++++++++
->  3 files changed, 40 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 380ebe7..7e62ef8 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -358,7 +358,7 @@ static inline void free_memmap(unsigned long start_pfn, unsigned long end_pfn)
->   */
->  static void __init free_unused_memmap(void)
->  {
-> -       unsigned long start, prev_end = 0;
-> +       unsigned long start, end, prev_end = 0;
->         struct memblock_region *reg;
->
->         for_each_memblock(memory, reg) {
-> @@ -391,6 +391,18 @@ static void __init free_unused_memmap(void)
->         if (!IS_ALIGNED(prev_end, PAGES_PER_SECTION))
->                 free_memmap(prev_end, ALIGN(prev_end, PAGES_PER_SECTION));
->  #endif
-> +
-> +       for_each_memblock(reserved, reg) {
-> +               if (!(reg->flags & MEMBLOCK_RAW_PFN))
-> +                       continue;
-> +
-> +               start = memblock_region_memory_base_pfn(reg);
-> +               end = round_down(memblock_region_memory_end_pfn(reg),
-> +                                MAX_ORDER_NR_PAGES);
-> +
+This patch-set also adjusted the compatible string of sprd_serial from
+'sc9836-uart' to 'sc-uart', because this serial driver is not only for
+SC9836 but for all Spreadtrum SoCs so far.
 
-Why are you rounding down end only? Shouldn't you round up start and
-round down end? Or does free_memmap() deal with that already?
+Thanks,
+Chunyan
 
-In any case, it is good to emphasize that on 4 KB pagesize kernels, we
-will only free multiples of 8 MB that are 8 MB aligned, resulting in
-128 KB of memmap backing to be released.
+Chunyan Zhang (3):
+  Documentation: sprd: Add bindings for SP9860G
+  devicetree: bindings: revise compatible string of sprd uart
+  sprd_serial: switch comptible string to sc-uart
 
+Orson Zhai (1):
+  arm64: dts: Add basic DT to support Spreadtrum's SP9860G
 
-> +               if (start < end)
-> +                       free_memmap(start, end);
-> +       }
->  }
->  #endif /* !CONFIG_SPARSEMEM_VMEMMAP */
->
-> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-> index 5b759c9..9f8d277 100644
-> --- a/include/linux/memblock.h
-> +++ b/include/linux/memblock.h
-> @@ -26,6 +26,7 @@ enum {
->         MEMBLOCK_HOTPLUG        = 0x1,  /* hotpluggable region */
->         MEMBLOCK_MIRROR         = 0x2,  /* mirrored region */
->         MEMBLOCK_NOMAP          = 0x4,  /* don't add to kernel direct mapping */
-> +       MEMBLOCK_RAW_PFN        = 0x8,  /* region whose memmap never be used */
+Wei Qiao (1):
+  serial: sprd: adjust TIMEOUT to a big value
 
-I think we should be *very* careful about the combinatorial explosion
-that results when combining all these flags, given that this is not a
-proper enum but a bit field.
+ Documentation/devicetree/bindings/arm/sprd.txt     |  13 +-
+ .../devicetree/bindings/serial/sprd-uart.txt       |   2 +-
+ arch/arm64/boot/dts/sprd/Makefile                  |   3 +-
+ arch/arm64/boot/dts/sprd/sc9860.dtsi               | 534 +++++++++++++++++++++
+ arch/arm64/boot/dts/sprd/sp9860g-1h10.dts          |  58 +++
+ arch/arm64/boot/dts/sprd/whale2.dtsi               |  66 +++
+ drivers/tty/serial/sprd_serial.c                   |   6 +-
+ 7 files changed, 672 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/sprd/sc9860.dtsi
+ create mode 100644 arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+ create mode 100644 arch/arm64/boot/dts/sprd/whale2.dtsi
 
-In any case, the generic memblock change should be in a separate patch
-from the arm64 change.
-
->  };
->
->  struct memblock_region {
-> @@ -92,6 +93,8 @@ bool memblock_overlaps_region(struct memblock_type *type,
->  int memblock_clear_hotplug(phys_addr_t base, phys_addr_t size);
->  int memblock_mark_mirror(phys_addr_t base, phys_addr_t size);
->  int memblock_mark_nomap(phys_addr_t base, phys_addr_t size);
-> +int memblock_mark_raw_pfn(phys_addr_t base, phys_addr_t size);
-> +int memblock_clear_raw_pfn(phys_addr_t base, phys_addr_t size);
->  ulong choose_memblock_flags(void);
->
->  /* Low level functions */
-> diff --git a/mm/memblock.c b/mm/memblock.c
-> index 7608bc3..c103b94 100644
-> --- a/mm/memblock.c
-> +++ b/mm/memblock.c
-> @@ -814,6 +814,30 @@ int __init_memblock memblock_mark_nomap(phys_addr_t base, phys_addr_t size)
->  }
->
->  /**
-> + * memblock_mark_raw_pfn - Mark raw pfn memory with flag MEMBLOCK_RAW_PFN.
-> + * @base: the base phys addr of the region
-> + * @size: the size of the region
-> + *
-> + * Return 0 on succees, -errno on failure.
-> + */
-> +int __init_memblock memblock_mark_raw_pfn(phys_addr_t base, phys_addr_t size)
-> +{
-> +       return memblock_setclr_flag(base, size, 1, MEMBLOCK_RAW_PFN);
-> +}
-> +
-> +/**
-> + * memblock_clear_raw_pfn - Clear flag MEMBLOCK_RAW_PFN for a specified region.
-> + * @base: the base phys addr of the region
-> + * @size: the size of the region
-> + *
-> + * Return 0 on succees, -errno on failure.
-> + */
-> +int __init_memblock memblock_clear_raw_pfn(phys_addr_t base, phys_addr_t size)
-> +{
-> +       return memblock_setclr_flag(base, size, 0, MEMBLOCK_RAW_PFN);
-> +}
-> +
-> +/**
->   * __next_reserved_mem_region - next function for for_each_reserved_region()
->   * @idx: pointer to u64 loop variable
->   * @out_start: ptr to phys_addr_t for start address of the region, can be %NULL
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+2.7.4
