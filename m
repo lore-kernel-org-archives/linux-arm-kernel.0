@@ -1,444 +1,418 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 14 Feb 2017 14:27:04 +0100
-Subject: [PATCH RESEND 3/5] mtd: nand: Cleanup/rework the atmel_nand driver
-In-Reply-To: <1be79cf2-0318-8d07-0df4-911db18f5285@atmel.com>
-References: <1485535324-28393-1-git-send-email-boris.brezillon@free-electrons.com>
- <1485535324-28393-4-git-send-email-boris.brezillon@free-electrons.com>
- <1be79cf2-0318-8d07-0df4-911db18f5285@atmel.com>
-Message-ID: <20170214142704.621170dd@bbrezillon>
+From: agraf@suse.de (Alexander Graf)
+Date: Tue, 14 Feb 2017 14:29:14 +0100
+Subject: [PATCH V6 4/5] LPC: Support the device-tree LPC host on
+ Hip06/Hip07
+In-Reply-To: <58A1C50F.7090108@hisilicon.com>
+References: <1485241525-201782-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1485241525-201782-5-git-send-email-yuanzhichang@hisilicon.com>
+ <a5a24e73-013d-87b5-f65f-324417f4cc60@suse.de>
+ <58A1C50F.7090108@hisilicon.com>
+Message-ID: <43b981bc-72c0-c6e7-d6f6-9ba9c63d9bdb@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Feb 2017 13:58:30 +0100
-Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-
-[..]
-
-> >  obj-$(CONFIG_MTD_NAND_OMAP2) 		+= omap2_nand.o
-> > diff --git a/drivers/mtd/nand/atmel/Makefile b/drivers/mtd/nand/atmel/Makefile
-> > new file mode 100644
-> > index 000000000000..15bc4a014f33
-> > --- /dev/null
-> > +++ b/drivers/mtd/nand/atmel/Makefile
-> > @@ -0,0 +1,4 @@
-> > +obj-$(CONFIG_MTD_NAND_ATMEL)	+= atmel-nand-controller.o atmel-pmecc.o
-> > +
-> > +atmel-nand-controller-objs	:= nfc.o  
-> 
-> I have doubts about the name "nfc" as we have *a part* of the newest
-> nand flash controller and its associated register set that is named
-> "NFC" in the datasheet: it may lead to some kind of confusion...
-
-Okay, I'll rename it nand-controller.c.
-
-> 
-> 
-> > +atmel-pmecc-objs		:= pmecc.o
-> > diff --git a/drivers/mtd/nand/atmel/nfc.c b/drivers/mtd/nand/atmel/nfc.c
-> > new file mode 100644
-> > index 000000000000..3173e5f6c450
-> > --- /dev/null
-> > +++ b/drivers/mtd/nand/atmel/nfc.c
-> > @@ -0,0 +1,2168 @@
-> > +/*
-> > + * ? Copyright 2016 ATMEL  
-> 
-> Yes, I know it comes from the previous driver but could you please
-> remove the UTF-8 (or other character encoding).
-
-Sure.
-
-> 
-> > + * ? Copyright 2016 Free Electrons  
-> 
-> 2017?
-
-Yep. I started this work in 2016, hence the wrong year.
-
-[...]
-
-> > +static inline struct atmel_nand *to_atmel_nand(struct nand_chip *chip)
-> > +{
-> > +	return container_of(chip, struct atmel_nand, base);
-> > +}
-> > +
-> > +enum atmel_sama5_data_xfer {  
-> 
-> Well, sama5 would then mean "all controllers compatible with the one
-> found on sama5d3"... And even if some SoC doesn't contain the substrig
-> "sama5"... So maybe think about another way to generically call this
-> variant of the nand flash controller...
-
-How about enum atmel_nfc_data_xfer here ...
-
-> 
-> > +	ATMEL_NFC_NO_DATA,
-> > +	ATMEL_NFC_READ_DATA,
-> > +	ATMEL_NFC_WRITE_DATA,
-> > +};
-> > +
-> > +struct atmel_sama5_op {
-
-... struct atmel_nfc_op here ...
-
-> > +	u8 cs;
-> > +	u8 ncmds;
-> > +	u8 cmds[2];
-> > +	u8 naddrs;
-> > +	u8 addrs[5];
-> > +	enum atmel_sama5_data_xfer data;
-> > +};
-> > +
-> > +struct atmel_nfc;  
-> 
-> Here again: nitpicking about names, but nfc can be confusing with the
-> NFC register defined in the datasheet.
-
-... and struct atmel_smc_nand_controller here. This way the objects
-related to the NFC block (the one described in the datasheet) are
-containing the term 'nfc'.
-
-> 
-> An idea: when you find good naming scheme, you can add a little glossary
-> in the header to explain acronyms and naming convention of the driver like:
-> http://lxr.free-electrons.com/source/drivers/dma/at_hdmac.c#L33
-> 
-
-Sure.
-
-[...]
-
-> > +static int atmel_sama5_nfc_exec_op(struct atmel_sama5_nfc *nfc)
-> > +{
-> > +	u32 addr, val, wait = ATMEL_HSMC_NFC_SR_CMDDONE;
-> > +	u8 *addrs = nfc->op.addrs;
-> > +	unsigned int op = 0;
-> > +	int i, ret;
-> > +
-> > +	for (i = 0; i < nfc->op.ncmds; i++)
-> > +		op |= ATMEL_NFC_CMD(i, nfc->op.cmds[i]);
-> > +
-> > +	if (nfc->op.naddrs == 5)  
-> 
-> Use a #define for this value.
-
-Yep.
-
-> 
-> > +		regmap_write(nfc->base.smc, ATMEL_HSMC_NFC_ADDR, *addrs++);
-> > +
-> > +	op |= ATMEL_NFC_CSID(nfc->op.cs) |
-> > +	      ATMEL_NFC_ACYCLE(nfc->op.naddrs);
-> > +
-> > +	if (nfc->op.ncmds > 1)
-> > +		op |= ATMEL_NFC_VCMD2;
-> > +
-> > +	addr = addrs[0] | (addrs[1] << 8) | (addrs[2] << 16) |
-> > +	       (addrs[3] << 24);
-> > +
-> > +	if (nfc->op.data != ATMEL_NFC_NO_DATA) {
-> > +		op |= ATMEL_NFC_DATAEN;
-> > +		wait |= ATMEL_HSMC_NFC_SR_XFRDONE;
-> > +
-> > +		if (nfc->op.data == ATMEL_NFC_WRITE_DATA)
-> > +			op |= ATMEL_NFC_NFCWR;
-> > +	}
-> > +
-> > +	/* Clear all flags. */
-> > +	regmap_read(nfc->base.smc, ATMEL_HSMC_NFC_SR, &val);
-> > +
-> > +	/* Send the command. */
-> > +	regmap_write(nfc->io, op, addr);
-> > +
-> > +	ret = atmel_sama5_nfc_wait(nfc, wait, true, 0);
-> > +	if (ret)
-> > +		dev_err(nfc->base.dev,
-> > +			"Failed to send NAND command (err = %d)!",
-> > +			ret);
-> > +
-> > +	/* Reset the op state. */
-> > +	memset(&nfc->op, 0, sizeof(nfc->op));
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static void atmel_sama5_nfc_cmd_ctrl(struct mtd_info *mtd, int dat,
-> > +				     unsigned int ctrl)
-> > +{
-> > +	struct nand_chip *chip = mtd_to_nand(mtd);
-> > +	struct atmel_nand *nand = to_atmel_nand(chip);
-> > +	struct atmel_sama5_nfc *nfc = to_sama5_nfc(chip->controller);
-> > +
-> > +	if (ctrl & NAND_ALE) {
-> > +		if (nfc->op.naddrs > 4)  
-> 
-> Here also, I guess it's the same test as "if (nfc->op.naddrs == 5)"
-> above: so try to use same test to make us understand that it's the same
-> condition. With the #defined value it also should help...
-
-Indeed, we should have the same condition here.
-
-> 
-> > +			return;
-> > +
-> > +		nfc->op.addrs[nfc->op.naddrs++] = dat;
-> > +	} else if (ctrl & NAND_CLE) {
-> > +		if (nfc->op.ncmds > 1)
-> > +			return;
-> > +
-> > +		nfc->op.cmds[nfc->op.ncmds++] = dat;
-> > +	}
-> > +
-> > +	if (dat == NAND_CMD_NONE) {
-> > +		nfc->op.cs = nand->activecs->id;
-> > +		atmel_sama5_nfc_exec_op(nfc);
-> > +	}
-> > +}
-> > +
-
-[...]
-
-> > +static int atmel_sama5_nfc_pmecc_read_pg(struct nand_chip *chip, u8 *buf,
-> > +					 bool oob_required, int page, bool raw)
-> > +{
-> > +	struct mtd_info *mtd = nand_to_mtd(chip);
-> > +	struct atmel_nand *nand = to_atmel_nand(chip);
-> > +	struct atmel_sama5_nfc *nfc = to_sama5_nfc(chip->controller);
-> > +	int ret;
-> > +
-> > +	/*
-> > +	 * Optimized read page accessors only work when the NAND R/B pin is
-> > +	 * connected to a native SoC R/B pin. If that's not the case, fallback
-> > +	 * to the non-optimized one.
-> > +	 */
-> > +	if (nand->activecs->rb.type != ATMEL_NAND_NATIVE_RB) {  
-> 
-> Can't we optimize this path by not having to test this for each page read?
-
-Hm, it's really negligible to the amount of time you'll spend reading
-the page and correcting errors. Don't think it's worth trying to
-optimize that.
-
-> 
-> > +		chip->cmdfunc(mtd, NAND_CMD_READ0, 0x00, page);
-> > +
-> > +		return atmel_nfc_pmecc_read_pg(chip, buf, oob_required, page,
-> > +					       raw);
-> > +	}
-> > +
-> > +	nfc->op.cmds[nfc->op.ncmds++] = NAND_CMD_READ0;
-> > +
-> > +	if (mtd->writesize > 512)
-> > +		nfc->op.cmds[nfc->op.ncmds++] = NAND_CMD_READSTART;
-> > +
-> > +	atmel_sama5_nfc_set_op_addr(chip, page, 0x0);
-> > +	nfc->op.cs = nand->activecs->id;
-> > +	nfc->op.data = ATMEL_NFC_READ_DATA;
-> > +
-> > +	ret = atmel_nfc_pmecc_enable(chip, NAND_ECC_READ, raw);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	ret = atmel_sama5_nfc_exec_op(nfc);
-> > +	if (ret) {
-> > +		atmel_nfc_pmecc_disable(chip, raw);
-> > +		dev_err(nfc->base.dev,
-> > +			"Failed to load NAND page data (err = %d)\n",
-> > +			ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	atmel_sama5_nfc_copy_from_sram(chip, buf, false);
-> > +	atmel_nand_read_buf(mtd, chip->oob_poi, mtd->oobsize);
-> > +
-> > +	ret = atmel_nfc_pmecc_correct_data(chip, buf, raw);
-> > +
-> > +	atmel_nfc_pmecc_disable(chip, raw);
-> > +
-> > +	return ret;
-> > +}
 
 
-[...]
+On 13/02/2017 15:39, zhichang.yuan wrote:
+> Hi, Alex,
+>
+> Thanks for your review!
+>
+> John had replied most of your comments, I only mentioned those which haven't made clear.
+>
+>
+> On 2017/1/31 4:08, Alexander Graf wrote:
+>>
+>>
+>> On 24/01/2017 08:05, zhichang.yuan wrote:
+>>> The low-pin-count(LPC) interface of Hip06/Hip07 accesses the peripherals in
+>>> I/O port addresses. This patch implements the LPC host controller driver which
+>>> perform the I/O operations on the underlying hardware.
+>>> We don't want to touch those existing peripherals' driver, such as ipmi-bt. So
+>>> this driver applies the indirect-IO introduced in the previous patch after
+>>> registering an indirect-IO node to the indirect-IO devices list which will be
+>>> searched in the I/O accessors.
+>>> As the I/O translations for LPC children depend on the host I/O registration,
+>>> we should ensure the host I/O registration is finished before all the LPC
+>>> children scanning. That is why an arch_init() hook was added in this patch.
+>>>
+>>> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+>>> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+>>> ---
+>>>  .../arm/hisilicon/hisilicon-low-pin-count.txt      |  33 ++
+>>>  MAINTAINERS                                        |   9 +
+>>>  arch/arm64/boot/dts/hisilicon/hip06-d03.dts        |   4 +
+>>>  arch/arm64/boot/dts/hisilicon/hip06.dtsi           |  14 +
+>>>  drivers/bus/Kconfig                                |   8 +
+>>>  drivers/bus/Makefile                               |   1 +
+>>>  drivers/bus/hisi_lpc.c                             | 599 +++++++++++++++++++++
+>>>  7 files changed, 668 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
+>>>  create mode 100644 drivers/bus/hisi_lpc.c
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
+>>> new file mode 100644
+>>> index 0000000..213181f
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
+>>> @@ -0,0 +1,33 @@
+>>> +Hisilicon Hip06 low-pin-count device
+>>> +  Hisilicon Hip06 SoCs implement a Low Pin Count (LPC) controller, which
+>>> +  provides I/O access to some legacy ISA devices.
+>>> +  Hip06 is based on arm64 architecture where there is no I/O space. So, the
+>>> +  I/O ports here are not cpu addresses, and there is no 'ranges' property in
+>>> +  LPC device node.
+>>> +
+>>> +Required properties:
+>>> +- compatible:  value should be as follows:
+>>> +    (a) "hisilicon,hip06-lpc"
+>>> +    (b) "hisilicon,hip07-lpc"
+>>> +- #address-cells: must be 2 which stick to the ISA/EISA binding doc.
+>>> +- #size-cells: must be 1 which stick to the ISA/EISA binding doc.
+>>> +- reg: base memory range where the LPC register set is mapped.
+>>> +
+>>> +Note:
+>>> +  The node name before '@' must be "isa" to represent the binding stick to the
+>>> +  ISA/EISA binding specification.
+>>> +
+>>> +Example:
+>>> +
+>>> +isa at a01b0000 {
+>>> +    compatible = "hisilicon,hip06-lpc";
+>>> +    #address-cells = <2>;
+>>> +    #size-cells = <1>;
+>>> +    reg = <0x0 0xa01b0000 0x0 0x1000>;
+>>> +
+>>> +    ipmi0: bt at e4 {
+>>> +        compatible = "ipmi-bt";
+>>> +        device_type = "ipmi";
+>>> +        reg = <0x01 0xe4 0x04>;
+>>> +    };
+>>> +};
+>>> diff --git a/MAINTAINERS b/MAINTAINERS
+>>> index 26edd83..0153707 100644
+>>> --- a/MAINTAINERS
+>>> +++ b/MAINTAINERS
+>>> @@ -5855,6 +5855,15 @@ F:    include/uapi/linux/if_hippi.h
+>>>  F:    net/802/hippi.c
+>>>  F:    drivers/net/hippi/
+>>>
+>>> +HISILICON LPC BUS DRIVER
+>>> +M:    Zhichang Yuan <yuanzhichang@hisilicon.com>
+>>> +L:    linux-arm-kernel at lists.infradead.org
+>>> +W:    http://www.hisilicon.com
+>>> +S:    Maintained
+>>> +F:    drivers/bus/hisi_lpc.c
+>>> +F:    lib/extio.c
+>>> +F:    Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
+>>> +
+>>>  HISILICON NETWORK SUBSYSTEM DRIVER
+>>>  M:    Yisen Zhuang <yisen.zhuang@huawei.com>
+>>>  M:    Salil Mehta <salil.mehta@huawei.com>
+>>> diff --git a/arch/arm64/boot/dts/hisilicon/hip06-d03.dts b/arch/arm64/boot/dts/hisilicon/hip06-d03.dts
+>>> index 7c4114a..75b2b5c 100644
+>>> --- a/arch/arm64/boot/dts/hisilicon/hip06-d03.dts
+>>> +++ b/arch/arm64/boot/dts/hisilicon/hip06-d03.dts
+>>> @@ -52,3 +52,7 @@
+>>>  &usb_ehci {
+>>>      status = "ok";
+>>>  };
+>>> +
+>>> +&ipmi0 {
+>>> +    status = "ok";
+>>> +};
+>>> diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+>>> index a049b64..c450f8d 100644
+>>> --- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+>>> +++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+>>> @@ -318,6 +318,20 @@
+>>>          #size-cells = <2>;
+>>>          ranges;
+>>>
+>>> +        isa at a01b0000 {
+>>> +            compatible = "hisilicon,hip06-lpc";
+>>> +            #size-cells = <1>;
+>>> +            #address-cells = <2>;
+>>> +            reg = <0x0 0xa01b0000 0x0 0x1000>;
+>>> +
+>>> +            ipmi0: bt at e4 {
+>>> +                compatible = "ipmi-bt";
+>>> +                device_type = "ipmi";
+>>> +                reg = <0x01 0xe4 0x04>;
+>>> +                status = "disabled";
+>>> +            };
+>>> +        };
+>>> +
+>>>          refclk: refclk {
+>>>              compatible = "fixed-clock";
+>>>              clock-frequency = <50000000>;
+>>> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+>>> index b9e8cfc..58cee84 100644
+>>> --- a/drivers/bus/Kconfig
+>>> +++ b/drivers/bus/Kconfig
+>>> @@ -64,6 +64,14 @@ config BRCMSTB_GISB_ARB
+>>>        arbiter. This driver provides timeout and target abort error handling
+>>>        and internal bus master decoding.
+>>>
+>>> +config HISILICON_LPC
+>>> +    bool "Workaround for nonstandard ISA I/O space on Hisilicon Hip0X"
+>>
+>> It's not a workaround, it's support. Better word it like
+>>
+>>   "Support for ISA I/O space on Hisilicon HIP0X"
+>>
+>>> +    depends on (ARM64 && ARCH_HISI && PCI) || COMPILE_TEST
+>>> +    select INDIRECT_PIO
+>>> +    help
+>>> +      Driver needed for some legacy ISA devices attached to Low-Pin-Count
+>>> +      on Hisilicon Hip0X SoC.
+>>> +
+>>>  config IMX_WEIM
+>>>      bool "Freescale EIM DRIVER"
+>>>      depends on ARCH_MXC
+>>> diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+>>> index cc6364b..28e3862 100644
+>>> --- a/drivers/bus/Makefile
+>>> +++ b/drivers/bus/Makefile
+>>> @@ -7,6 +7,7 @@ obj-$(CONFIG_ARM_CCI)        += arm-cci.o
+>>>  obj-$(CONFIG_ARM_CCN)        += arm-ccn.o
+>>>
+>>>  obj-$(CONFIG_BRCMSTB_GISB_ARB)    += brcmstb_gisb.o
+>>> +obj-$(CONFIG_HISILICON_LPC)    += hisi_lpc.o
+>>>  obj-$(CONFIG_IMX_WEIM)        += imx-weim.o
+>>>  obj-$(CONFIG_MIPS_CDMM)        += mips_cdmm.o
+>>>  obj-$(CONFIG_MVEBU_MBUS)     += mvebu-mbus.o
+>>> diff --git a/drivers/bus/hisi_lpc.c b/drivers/bus/hisi_lpc.c
+>>> new file mode 100644
+>>> index 0000000..a96e384
+>>> --- /dev/null
+>>> +++ b/drivers/bus/hisi_lpc.c
+>>> @@ -0,0 +1,599 @@
+>>> +/*
+>>> + * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
+>>> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
+>>> + * Author: Zou Rongrong <zourongrong@huawei.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + *
+>>> + * You should have received a copy of the GNU General Public License
+>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>> + */
+>>> +
+>>> +#include <linux/acpi.h>
+>>> +#include <linux/console.h>
+>>> +#include <linux/delay.h>
+>>> +#include <linux/io.h>
+>>> +#include <linux/module.h>
+>>> +#include <linux/of.h>
+>>> +#include <linux/of_address.h>
+>>> +#include <linux/of_platform.h>
+>>> +#include <linux/pci.h>
+>>> +#include <linux/serial_8250.h>
+>>> +#include <linux/slab.h>
+>>> +
+>>> +/*
+>>> + * Setting this bit means each IO operation will target to a
+>>> + * different port address:
+>>> + * 0 means repeatedly IO operations will stick on the same port,
+>>> + * such as BT;
+>>> + */
+>>> +#define FG_INCRADDR_LPC        0x02
+>>> +
+>>> +struct lpc_cycle_para {
+>>> +    unsigned int opflags;
+>>> +    unsigned int csize; /* the data length of each operation */
+>>> +};
+>>> +
+>>> +struct hisilpc_dev {
+>>> +    spinlock_t cycle_lock;
+>>> +    void __iomem  *membase;
+>>> +    struct extio_node *extio;
+>>> +};
+>>> +
+>>> +/* bounds of the LPC bus address range */
+>>> +#define LPC_MIN_BUS_RANGE    0x0
+>>> +
+>>> +/*
+>>> + * The maximal IO size for each leagcy bus.
+>>
+>> legacy?
+>>
+>> I don't really understand why this bus is legacy though. It looks like a simple MMIO-to-LPC bridge to me.
+>
+> yes. The LPC bus is MMIO-to-LPC bridge.
+> My comment is not clear.
+>
+> How about "The maximal IO size of LPC bus"?
 
-> > +static void atmel_sama5_nfc_nand_init(struct atmel_nfc *nfc,
-> > +				      struct atmel_nand *nand)
-> > +{
-> > +	struct nand_chip *chip = &nand->base;
-> > +
-> > +	atmel_nfc_nand_init(nfc, nand);
-> > +
-> > +	/* Overload some methods for the SAMA5 controller. */  
-> 
-> "for the SAMA5D3-compatible controller"
+That sounds better, but doesn't really tell me what it's about yet ;).
 
-I'll probably change the comment after renaming everything as you
-suggested.
+>
+>>
+>>> + * The port size of legacy I/O devices is normally less than 0x400.
+>>> + * Defining the I/O range size as 0x400 here should be sufficient for
+>>> + * all peripherals under one bus.
+>>> + */
+>>
+>> This comment doesn't make a lot of sense. What is the limit? Is there a hardware limit?
+>>
+>> We don't dynamically allocate devices on the lpc bus, so why imply a limit at all?
+>
+> The limit here is to define an IO window for LPC.
+> It is not acceptable to describe the IO window with 'ranges' property in LPC host node, so we choose a fixable upper IO limit
+> for the static LPC IO space. Without this, LPC can't register its IO space through extio helpers.
+>
+> Why 0x400 is chosen? For our LPC, 0x400 cover all the peripherals under the LPC.
 
-> 
-> > +	chip->cmd_ctrl = atmel_sama5_nfc_cmd_ctrl;
-> > +	chip->select_chip = atmel_sama5_nfc_select_chip;
-> > +}
-> > +
+This is information that should come from firmware then. Whether by 
+coincidence addresses 0x0 - 0x400 include all devices is an 
+implementation detail that the driver shouldn't have to know about.
 
-[...]
+That said, as mentioned elsewhere, we don't need to define single 
+windows at all. Instead, can't we just do it like PCI BARs and declare 
+all PIO regions we get from firmware as readily allocated? Then we only 
+need to explicitly assign ports 0x80, 0x81, 0x99, etc to the LPC bridge 
+and leave the rest for grabs (by PCI hotplug for example)
 
-> > +static int atmel_nfc_nand_register(struct atmel_nand *nand)
-> > +{
-> > +	struct nand_chip *chip = &nand->base;
-> > +	struct atmel_nfc *nfc = to_nfc(chip->controller);
-> > +	struct atmel_nand_data *pdata = dev_get_platdata(nfc->dev);
-> > +	struct mtd_info *mtd = nand_to_mtd(chip);
-> > +	const struct mtd_partition *parts = NULL;
-> > +	int nparts = 0, ret;
-> > +
-> > +	if (nfc->caps->legacy_of_bindings || !nfc->dev->of_node) {
-> > +		/*
-> > +		 * We keep the MTD name unchanged to avoid breaking platforms
-> > +		 * where the MTD cmdline parser is used and the bootloader
-> > +		 * has not been updated to use the new naming scheme.
-> > +		 */
-> > +		mtd->name = "atmel_nand";
-> > +	} else if (!mtd->name) {
-> > +		/*
-> > +		 * If the new bindings are used and the bootloader has not been
-> > +		 * updated to pass a new mtdparts parameter on the cmdline, you
-> > +		 * should define the following property in your nand node:
-> > +		 *
-> > +		 *	label = "atmel_nand";  
-> 
-> I don't see this in the new binding documentation. It is useful to
-> document it.
+>
+>
+>
+>
+>>
+>>> +#define LPC_BUS_IO_SIZE        0x400
+>>> +
+>>> +/* The maximum continuous operations */
+>>> +#define LPC_MAX_OPCNT    16
+>>> +/* only support IO data unit length is four at maximum */
+>>> +#define LPC_MAX_DULEN    4
+>>> +#if LPC_MAX_DULEN > LPC_MAX_OPCNT
+>>> +#error "LPC.. MAX_DULEN must be not bigger than MAX_OPCNT!"
+>>> +#endif
+>>> +
+>>> +#define LPC_REG_START        0x00 /* start a new LPC cycle */
+>>> +#define LPC_REG_OP_STATUS    0x04 /* the current LPC status */
+>>> +#define LPC_REG_IRQ_ST        0x08 /* interrupt enable&status */
+>>> +#define LPC_REG_OP_LEN        0x10 /* how many LPC cycles each start */
+>>> +#define LPC_REG_CMD        0x14 /* command for the required LPC cycle */
+>>> +#define LPC_REG_ADDR        0x20 /* LPC target address */
+>>> +#define LPC_REG_WDATA        0x24 /* data to be written */
+>>> +#define LPC_REG_RDATA        0x28 /* data coming from peer */
+>>> +
+>>> +
+>>> +/* The command register fields */
+>>> +#define LPC_CMD_SAMEADDR    0x08
+>>> +#define LPC_CMD_TYPE_IO        0x00
+>>> +#define LPC_CMD_WRITE        0x01
+>>> +#define LPC_CMD_READ        0x00
+>>> +/* the bit attribute is W1C. 1 represents OK. */
+>>> +#define LPC_STAT_BYIRQ        0x02
+>>> +
+>>> +#define LPC_STATUS_IDLE        0x01
+>>> +#define LPC_OP_FINISHED        0x02
+>>> +
+>>> +#define START_WORK        0x01
+>>> +
+>>> +/*
+>>> + * The minimal waiting interval... Suggest it is not less than 10.
+>>> + * Bigger value probably will lower the performance.
+>>
+>> Are you sure you want this comment to be upstream? :)
+>>
+>>> + */
+>>> +#define LPC_NSEC_PERWAIT    100
+>>> +/*
+>>> + * The maximum waiting time is about 128us.
+>>> + * The fastest IO cycle time is about 390ns, but the worst case will wait
+>>> + * for extra 256 lpc clocks, so (256 + 13) * 30ns = 8 us. The maximum
+>>> + * burst cycles is 16. So, the maximum waiting time is about 128us under
+>>> + * worst case.
+>>> + * choose 1300 as the maximum.
+>>> + */
+>>> +#define LPC_MAX_WAITCNT        1300
+>>> +/* About 10us. This is specific for single IO operation, such as inb. */
+>>> +#define LPC_PEROP_WAITCNT    100
+>>> +
+>>> +
+>>> +static inline int wait_lpc_idle(unsigned char *mbase,
+>>
+>> No need to specify inline.
+>>
+>>> +                unsigned int waitcnt) {
+>>> +    u32 opstatus;
+>>> +
+>>> +    while (waitcnt--) {
+>>> +        ndelay(LPC_NSEC_PERWAIT);
+>>> +        opstatus = readl(mbase + LPC_REG_OP_STATUS);
+>>> +        if (opstatus & LPC_STATUS_IDLE)
+>>> +            return (opstatus & LPC_OP_FINISHED) ? 0 : (-EIO);
+>>
+>> It's a shame we have to busy loop, but I guess no calling code outside is prepared for rescheduling at this point.
+>>
+>>> +    }
+>>> +    return -ETIME;
+>>> +}
+>>> +
+>>> +/*
+>>> + * hisilpc_target_in - trigger a series of lpc cycles to read required data
+>>> + *               from target peripheral.
+>>> + * @pdev: pointer to hisi lpc device
+>>> + * @para: some parameters used to control the lpc I/O operations
+>>> + * @ptaddr: the lpc I/O target port address
+>>> + * @buf: where the read back data is stored
+>>> + * @opcnt: how many I/O operations required in this calling
+>>> + *
+>>> + * Only one byte data is read each I/O operation.
+>>> + *
+>>> + * Returns 0 on success, non-zero on fail.
+>>> + *
+>>> + */
+>>> +static int
+>>> +hisilpc_target_in(struct hisilpc_dev *lpcdev, struct lpc_cycle_para *para,
+>>> +          unsigned long ptaddr, unsigned char *buf,
+>>> +          unsigned long opcnt)
+>>> +{
+>>> +    unsigned long cnt_per_trans;
+>>> +    unsigned int cmd_word;
+>>> +    unsigned int waitcnt;
+>>> +    int ret;
+>>> +
+>>> +    if (!buf || !opcnt || !para || !para->csize || !lpcdev)
+>>> +        return -EINVAL;
+>>> +
+>>> +    if (opcnt  > LPC_MAX_OPCNT)
+>>> +        return -EINVAL;
+>>> +
+>>> +    cmd_word = LPC_CMD_TYPE_IO | LPC_CMD_READ;
+>>> +    waitcnt = LPC_PEROP_WAITCNT;
+>>> +    if (!(para->opflags & FG_INCRADDR_LPC)) {
+>>> +        cmd_word |= LPC_CMD_SAMEADDR;
+>>> +        waitcnt = LPC_MAX_WAITCNT;
+>>> +    }
+>>> +
+>>> +    ret = 0;
+>>> +    cnt_per_trans = (para->csize == 1) ? opcnt : para->csize;
+>>> +    for (; opcnt && !ret; cnt_per_trans = para->csize) {
+>>> +        unsigned long flags;
+>>> +
+>>> +        /* whole operation must be atomic */
+>>> +        spin_lock_irqsave(&lpcdev->cycle_lock, flags);
+>>
+>> Ouch. This is going to kill your RT jitter. Is there no better way?
+>
+> I think there is no other choices. We have to ensure the I/O cycles triggered in serial mode....
 
-Well, I'm not sure this is something we can/should document in the DT
-bindings doc.
+As nobody else accesses the LPC device in the meantime thanks to the 
+lock, you don't need to disable interrupts, right?
 
-> 
-> 
-> > +		 *
-> > +		 * This way, mtd->name will be set by the core when
-> > +		 * nand_set_flash_node() is called.
-> > +		 */
-> > +		mtd->name = devm_kasprintf(nfc->dev, GFP_KERNEL,
-> > +					   "%s:nand.%d", dev_name(nfc->dev),
-> > +					   nand->cs[0].id);
-> > +		if (!mtd->name) {
-> > +			dev_err(nfc->dev, "Failed to allocate mtd->name\n");
-> > +			return -ENOMEM;
-> > +		}
-> > +	}
-> > +
-> > +	ret = nand_scan_tail(mtd);
-> > +	if (ret) {
-> > +		dev_err(nfc->dev, "nand_scan_tail() failed: %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	if (pdata) {
-> > +		parts = pdata->parts;
-> > +		nparts = pdata->num_parts;
-> > +	}
-> > +
-> > +	ret = mtd_device_register(mtd, parts, nparts);
-> > +	if (ret) {
-> > +		dev_err(nfc->dev, "Failed to register mtd device: %d\n", ret);
-> > +		nand_cleanup(chip);
-> > +		return ret;
-> > +	}
-> > +
-> > +	list_add_tail(&nand->node, &nfc->chips);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +struct gpio_desc *atmel_nand_of_get_gpio(struct atmel_nfc *nfc,
-> > +					 struct device_node *np,
-> > +					 const char *name, int index,
-> > +					 enum gpiod_flags flags)
-> > +{
-> > +	struct gpio_desc *gpio;
-> > +	int ret;
-> > +
-> > +	gpio = devm_get_index_gpiod_from_child(nfc->dev, name, index,
-> > +					       &np->fwnode);
-> > +	if (IS_ERR(gpio)) {
-> > +		if (PTR_ERR(gpio) == -ENOENT)
-> > +			return NULL;
-> > +
-> > +		return gpio;
-> > +	}
-> > +
-> > +	if (!(flags & GPIOD_FLAGS_BIT_DIR_SET))
-> > +		return gpio;
-> > +
-> > +	/* Process flags */  
-> 
-> Nit: "." at the end like other comments in the file
+IIRC in PREEMPT_RT, a normal spinlock becomes a mutex and allows for 
+resched during the LPC transaction.
 
-I'll fix that.
 
-> 
-> > +	if (flags & GPIOD_FLAGS_BIT_DIR_OUT)
-> > +		ret = gpiod_direction_output(gpio,
-> > +					!!(flags & GPIOD_FLAGS_BIT_DIR_VAL));
-> > +	else
-> > +		ret = gpiod_direction_input(gpio);
-> > +
-> > +	if (ret)
-> > +		return ERR_PTR(ret);
-> > +
-> > +	return gpio;
-> > +}
-> > +
-[...]
-
-> > diff --git a/drivers/mtd/nand/atmel/pmecc.c b/drivers/mtd/nand/atmel/pmecc.c
-> > new file mode 100644
-> > index 000000000000..9baccae5d5a5
-> > --- /dev/null
-> > +++ b/drivers/mtd/nand/atmel/pmecc.c
-> > @@ -0,0 +1,1011 @@
-> > +/*
-> > + * ? Copyright 2016 ATMEL
-> > + * ? Copyright 2016 Free Electrons  
-> 
-> Ditto about (c)
-
-Will remove this UTF8 chars.
-
-[...]
-
-> > +
-> > +static void atmel_pmecc_gen_syndrome(struct atmel_pmecc_user *user, int sector)
-> > +{
-> > +	int strength = get_strength(user);
-> > +	u32 value;
-> > +	int i;
-> > +
-> > +	/* Fill odd syndromes */
-> > +	for (i = 0; i < strength; i++) {
-> > +		value = readl_relaxed(user->pmecc->regs.base +
-> > +				      ATMEL_PMECC_REM(sector, i / 2));
-> > +		if (i & 1)
-> > +			value >>= 16;
-> > +
-> > +		user->partial_syn[(2 * i) + 1] = value;
-> > +	}
-> > +}  
-> 
-> What about saying somewhere in this file (header?) that all this
-> computation is described in the product datasheet and that a hardware
-> software bit correction is put in place following the recomandation of
-> the datasheet?
-
-Sure.
-
-Actually, after looking at the software bch code (lib/bch.c), I think
-we can re-use a few things instead of open-coding it here, but that's
-not for this round ;-).
-
-Thanks for the review.
-
-Regards,
-
-Boris
+Alex
