@@ -1,62 +1,126 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 14 Feb 2017 15:46 +0200
-Subject: [BUG] usb: gadget: Kernel oops with UVC USB gadget and configfs
-In-Reply-To: <87r331zy73.fsf@belgarion.home>
-References: <497c3c61-31f0-4d40-9bab-5a0aa793e5e9@tul.cz>
- <840f1745-8792-9d7b-9f43-961614b6938d@tul.cz> <87r331zy73.fsf@belgarion.home>
-Message-ID: <2813264.gunpljLm9f@avalon>
+From: w.egorov@phytec.de (Wadim Egorov)
+Date: Tue, 14 Feb 2017 15:12:37 +0100
+Subject: [PATCH V3 2/2] ARM: dts: rockchip: add dts for RK3288-Tinker board
+In-Reply-To: <1487066851-25142-3-git-send-email-eddie.cai.linux@gmail.com>
+References: <1487066851-25142-1-git-send-email-eddie.cai.linux@gmail.com>
+ <1487066851-25142-3-git-send-email-eddie.cai.linux@gmail.com>
+Message-ID: <e555144a-b698-1fad-c377-8af2fd8697c5@phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Hi Eddie,
 
-On Monday 13 Feb 2017 20:29:36 Robert Jarzmik wrote:
-> Petr Cvek <petr.cvek@tul.cz> writes:
-> > Dne 12.2.2017 v 13:02 Robert Jarzmik napsal(a):
-> > That's weird I even removed pxa_set_udc_info() from magician machine init
-> > and it still fails. Host cable and/or actual camera is not required. It
-> > fails without them.
-> > 
-> > So you binded pxa27x-udc as UDC controller (= activated it) and then
-> > rmmoded it and nobody complained?
-> 
-> No, that usecase actually fails. I think you could submit a proper patch
-> with the diff in [1], with which the pxa27x-udc unloading will work.
-> 
-> But it's not _your_ testcase, as per your provided callstack :
-> [ 2152.826529] [<bf4a1914>] (udc_bind_to_driver [udc_core]) from
-> [<bf4a1b08>] (usb_add_gadget_udc_release+0x138/0x21c [udc_core]) [
-> 2152.826731] [<bf4a1b08>] (usb_add_gadget_udc_release [udc_core]) from
-> [<bf4db838>] (pxa_udc_probe+0x290/0x2fc [pxa27x_udc]) [ 2152.833554]
-> [<bf4db838>] (pxa_udc_probe [pxa27x_udc]) from [<c02522d0>]
-> (platform_drv_probe+0x38/0x84) [ 2152.833602] [<c02522d0>]
-> (platform_drv_probe) from [<c0250784>] (driver_probe_device+0x1e0/0x3f4)
-> 
-> Your problem seems in the pxa_udc_probe(), which I would presume you're
-> doing for a second time, ie. after modprobe pxa27x_udc + bind UDC
-> controller + rmmod pxa27x_udc + modprobe pxa27x_udc.
-> 
-> I suspect that in this case, the problem is that the rmmod works while udc
-> is still bound to the composite. The lsmod seems to prove that the refcount
-> is still 0 while usb_f_uvc is is bound to pxa27x_udc.
-> 
-> [@Felipe and @Laurent]
-> I have no knowledge of usb_f_uvc, so would you tell me if binding usb_f_uvc
-> to pxa27_udc should have incremented the module refcount of pxa27x_udc or
-> not ?
 
-I'm not familiar with how modules refcount is handled in the USB gadget 
-framework, that's more a question for Felipe. I don't think the problem is 
-specific to usb_f_uvc, all gadget drivers should behave the same way (and if 
-they don't that should be fixed).
+On 14.02.2017 11:07, Eddie Cai wrote:
+> This patch add basic support for RK3288-Tinker board. We can boot in to rootfs
+> with this patch.
+>
+> Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
+> ---
+>  arch/arm/boot/dts/Makefile          |   1 +
+>  arch/arm/boot/dts/rk3288-tinker.dts | 536 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 537 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/rk3288-tinker.dts
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 01d178a..0dfef24 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -679,6 +679,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
+>  	rk3288-popmetal.dtb \
+>  	rk3288-r89.dtb \
+>  	rk3288-rock2-square.dtb \
+> +	rk3288-tinker.dtb \
+>  	rk3288-veyron-brain.dtb \
+>  	rk3288-veyron-jaq.dtb \
+>  	rk3288-veyron-jerry.dtb \
+> diff --git a/arch/arm/boot/dts/rk3288-tinker.dts b/arch/arm/boot/dts/rk3288-tinker.dts
+> new file mode 100644
+> index 0000000..9600d1f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/rk3288-tinker.dts
+> @@ -0,0 +1,536 @@
+> +/*
+> + * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd.
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "rk3288.dtsi"
+> +#include <dt-bindings/input/input.h>
+> +
+> +/ {
+> +	model = "Rockchip RK3288 Tinker Board";
+> +	compatible = "asus,rk3288-tinker", "rockchip,rk3288";
+> +
+> +	memory {
+> +		reg = <0x0 0x80000000>;
+> +		device_type = "memory";
+> +	};
+> +
+> +	ext_gmac: external-gmac-clock {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <125000000>;
+> +		clock-output-names = "ext_gmac";
+> +	};
+> +
+> +	gpio-keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		autorepeat;
+> +
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pwrbtn>;
+> +
+> +		button at 0 {
+> +			gpios = <&gpio0 RK_PA5 GPIO_ACTIVE_LOW>;
+> +			linux,code = <KEY_POWER>;
+> +			label = "GPIO Key Power";
+> +			linux,input-type = <1>;
+> +			gpio-key,wakeup = <1>;
 
-> > Can you try v4.10? Or send me exact commit on what you tested it so I can
-> > test it too.
-> 
-> My top commit (not counting yours) is : 61c04572de40 ("Merge branch 'for-rc'
-> of git://git.kernel.org/pub/scm/linux/kernel/git/rzhang/linux")
+you should replace this with wakeup-source as specified in
+Documentation/devicetree/bindings/power/wakeup-source.txt
 
--- 
 Regards,
-
-Laurent Pinchart
+Wadim
