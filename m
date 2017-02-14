@@ -1,103 +1,57 @@
-From: flatmax@flatmax.org (Matt Flax)
-Date: Wed, 15 Feb 2017 08:00:36 +1100
-Subject: [alsa-devel] [PATCH v3] ASoC: bcm2835: Add 8 channel (multitrack)
- capability
-In-Reply-To: <1487105579-3728-1-git-send-email-flatmax@flatmax.org>
-References: <1486942035-24038-1-git-send-email-flatmax@flatmax.org>
- <1487105579-3728-1-git-send-email-flatmax@flatmax.org>
-Message-ID: <45e10ba8-aff7-e8fe-1ae3-38587bfa0957@flatmax.org>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Tue, 14 Feb 2017 13:01:14 -0800
+Subject: [PATCH] clk: rockchip: Set "ignore unused" for PMU M0 clocks on rk3399
+Message-ID: <20170214210114.5846-1-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/02/17 07:52, Matt Flax wrote:
-> This patch adds multitrack capability if in DSP mode A and the
-> codec is master.
->
-> In bcm2835_i2s_startup, snd_pcm_hw_constraint_minmax is used to set
-> max channels to 8 if both SND_SOC_DAIFMT_CBM_CFM and
-> SND_SOC_DAIFMT_DSP_A are set. Otherwise, max channels is set to 2.
-> Min channels is always set to 2. These settings are accomplished
-> using the SNDRV_PCM_HW_PARAM_CHANNELS variable.
->
-> In bcm2835_i2s_shutdown max channels is set to 2 by default.
->
-> In bcm2835_i2s_hw_params, DSP mode A format is now an option.
-> Before replicating the format variable (from ch2 to ch1) for
-> register loading, requested channels are checked to be either 2 or 8.
-> This can be expaneded later to accomodate other channel counts if
-> supported by the sound card hardware.
+The PMU Cortex M0 on rk3399 is intended to be used for things like
+DDRFreq transitions, suspend/resume, and other things that are the
+purview of ARM Trusted Firmware and not the kernel.  As such, the
+kernel shouldn't be messing with the clocks.  Add CLK_IGNORE_UNUSED to
+these clocks.
 
-I notice my commit message didn't update, will resend with an updated 
-commit message as v4.
+Without this change, the following was observed on a Chromebook with a
+rk3399 (using not-yet-upstream ARM Trusted Firmware code and
+not-yet-upstream kernel code based on kernel-4.4):
 
-> Signed-off-by: Matt Flax <flatmax@flatmax.org>
-> ---
->   sound/soc/bcm/bcm2835-i2s.c | 21 ++++++++++++++++-----
->   1 file changed, 16 insertions(+), 5 deletions(-)
->
-> diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
-> index 6ba2049..300516d 100644
-> --- a/sound/soc/bcm/bcm2835-i2s.c
-> +++ b/sound/soc/bcm/bcm2835-i2s.c
-> @@ -296,6 +296,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
->   
->   	switch (dev->fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
->   	case SND_SOC_DAIFMT_I2S:
-> +	case SND_SOC_DAIFMT_DSP_A:
->   		data_delay = 1;
->   		break;
->   	default:
-> @@ -312,6 +313,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
->   
->   	switch (params_channels(params)) {
->   	case 2:
-> +	case 8:
->   		format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
->   		format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
->   		format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
-> @@ -526,7 +528,16 @@ static int bcm2835_i2s_startup(struct snd_pcm_substream *substream,
->   	regmap_update_bits(dev->i2s_regmap, BCM2835_I2S_CS_A_REG,
->   			BCM2835_I2S_STBY, BCM2835_I2S_STBY);
->   
-> -	return 0;
-> +	/* Set the max channels to 8 if the codec is master and
-> +	 * we are in DSP A mode. Otherwise only allow 2 channels.
-> +	 */
-> +	if (dev->fmt &
-> +		(SND_SOC_DAIFMT_CBM_CFM | SND_SOC_DAIFMT_DSP_A))
-> +		return snd_pcm_hw_constraint_single(substream->runtime,
-> +			SNDRV_PCM_HW_PARAM_CHANNELS, 8);
-> +	else
-> +		return snd_pcm_hw_constraint_single(substream->runtime,
-> +			SNDRV_PCM_HW_PARAM_CHANNELS, 2);
->   }
->   
->   static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
-> @@ -549,6 +560,10 @@ static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
->   	 * not stop the clock when SND_SOC_DAIFMT_CONT
->   	 */
->   	bcm2835_i2s_stop_clock(dev);
-> +
-> +	/* Default to 2 channels */
-> +	snd_pcm_hw_constraint_single(substream->runtime,
-> +			SNDRV_PCM_HW_PARAM_CHANNELS, 2);
->   }
->   
->   static const struct snd_soc_dai_ops bcm2835_i2s_dai_ops = {
-> @@ -576,16 +591,12 @@ static struct snd_soc_dai_driver bcm2835_i2s_dai = {
->   	.name	= "bcm2835-i2s",
->   	.probe	= bcm2835_i2s_dai_probe,
->   	.playback = {
-> -		.channels_min = 2,
-> -		.channels_max = 2,
->   		.rates =	SNDRV_PCM_RATE_8000_192000,
->   		.formats =	SNDRV_PCM_FMTBIT_S16_LE
->   				| SNDRV_PCM_FMTBIT_S24_LE
->   				| SNDRV_PCM_FMTBIT_S32_LE
->   		},
->   	.capture = {
-> -		.channels_min = 2,
-> -		.channels_max = 2,
->   		.rates =	SNDRV_PCM_RATE_8000_192000,
->   		.formats =	SNDRV_PCM_FMTBIT_S16_LE
->   				| SNDRV_PCM_FMTBIT_S24_LE
+1. We init the clock framework.
+
+2. We start up "DDRFreq", which causes ATF to occasionally fire up the
+   M0 for transitions.  Each time ATF fires up the M0 it will turn on
+   these clocks and each time it is done it will turn them off.
+
+3. We finally get to the the part of the kernel that calls
+   clk_disable_unused() and we disables the clocks.
+
+You can see the race above.  Basically everything is fine as long as
+ARM Trusted Firmware isn't starting up the M0 at exactly the same time
+that the kernel is disabling unused clocks.  ...but if the race
+happens then we go boom.
+
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+ drivers/clk/rockchip/clk-rk3399.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+index 73121b144634..fa3cbef08776 100644
+--- a/drivers/clk/rockchip/clk-rk3399.c
++++ b/drivers/clk/rockchip/clk-rk3399.c
+@@ -1477,10 +1477,10 @@ static struct rockchip_clk_branch rk3399_clk_pmu_branches[] __initdata = {
+ 	GATE(PCLK_UART4_PMU, "pclk_uart4_pmu", "pclk_pmu_src", 0, RK3399_PMU_CLKGATE_CON(1), 14, GFLAGS),
+ 	GATE(PCLK_WDT_M0_PMU, "pclk_wdt_m0_pmu", "pclk_pmu_src", 0, RK3399_PMU_CLKGATE_CON(1), 15, GFLAGS),
+ 
+-	GATE(FCLK_CM0S_PMU, "fclk_cm0s_pmu", "fclk_cm0s_src_pmu", 0, RK3399_PMU_CLKGATE_CON(2), 0, GFLAGS),
+-	GATE(SCLK_CM0S_PMU, "sclk_cm0s_pmu", "fclk_cm0s_src_pmu", 0, RK3399_PMU_CLKGATE_CON(2), 1, GFLAGS),
+-	GATE(HCLK_CM0S_PMU, "hclk_cm0s_pmu", "fclk_cm0s_src_pmu", 0, RK3399_PMU_CLKGATE_CON(2), 2, GFLAGS),
+-	GATE(DCLK_CM0S_PMU, "dclk_cm0s_pmu", "fclk_cm0s_src_pmu", 0, RK3399_PMU_CLKGATE_CON(2), 3, GFLAGS),
++	GATE(FCLK_CM0S_PMU, "fclk_cm0s_pmu", "fclk_cm0s_src_pmu", CLK_IGNORE_UNUSED, RK3399_PMU_CLKGATE_CON(2), 0, GFLAGS),
++	GATE(SCLK_CM0S_PMU, "sclk_cm0s_pmu", "fclk_cm0s_src_pmu", CLK_IGNORE_UNUSED, RK3399_PMU_CLKGATE_CON(2), 1, GFLAGS),
++	GATE(HCLK_CM0S_PMU, "hclk_cm0s_pmu", "fclk_cm0s_src_pmu", CLK_IGNORE_UNUSED, RK3399_PMU_CLKGATE_CON(2), 2, GFLAGS),
++	GATE(DCLK_CM0S_PMU, "dclk_cm0s_pmu", "fclk_cm0s_src_pmu", CLK_IGNORE_UNUSED, RK3399_PMU_CLKGATE_CON(2), 3, GFLAGS),
+ 	GATE(HCLK_NOC_PMU, "hclk_noc_pmu", "fclk_cm0s_src_pmu", CLK_IGNORE_UNUSED, RK3399_PMU_CLKGATE_CON(2), 5, GFLAGS),
+ };
+ 
+-- 
+2.11.0.483.g087da7b7c-goog
