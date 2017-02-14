@@ -1,40 +1,55 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 14 Feb 2017 23:24:25 +0100
-Subject: sDMA on i.mx7d
-Message-ID: <20170214222425.hbkfkeq3l6sveo7n@piout.net>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Wed, 15 Feb 2017 00:35:39 +0100
+Subject: [PATCH v6 5/5] ARM: dts: sun9i: Initial support for the Sunchip
+ CX-A99 board
+In-Reply-To: <CAGb2v64AfBW+CHHkFvvNzCGBG09UK-sPcAZi2QgCR9wM=jguxw@mail.gmail.com>
+References: <cover.1486592470.git.rask@formelder.dk>
+ <d4211c5d57f80b0281d7d332edc7d69e66202d3d.1486592471.git.rask@formelder.dk>
+ <20170210085920.7l7gswm6yjuqgdfx@lukather>
+ <CAGb2v64AfBW+CHHkFvvNzCGBG09UK-sPcAZi2QgCR9wM=jguxw@mail.gmail.com>
+Message-ID: <20170214233538.enkffjiw3kkfromu@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Feb 10, 2017 at 05:22:21PM +0800, Chen-Yu Tsai wrote:
+> On Fri, Feb 10, 2017 at 4:59 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Thu, Feb 09, 2017 at 12:34:06AM +0100, Rask Ingemann Lambertsen wrote:
+[...]
+> >> diff --git a/arch/arm/boot/dts/sun9i-a80-cx-a99.dts b/arch/arm/boot/dts/sun9i-a80-cx-a99.dts
+> >> new file mode 100644
+> >> index 0000000..f5496d2
+> >> --- /dev/null
+> >> +++ b/arch/arm/boot/dts/sun9i-a80-cx-a99.dts
+[...]
+> >> +     pmic at 745 {
+> >> +             compatible = "x-powers,axp808", "x-powers,axp806";
+> 
+> As you mentioned elsewhere, they are not really compatible.
+> You should drop the latter compatible.
 
-I've been trying to get a PCM3168s codec with a Colibri iMX7 using TDM
-on SAI2.
-I've got it working properly with the 4.1.35 kernel from Toradex (based
-on the 4.1.15 from Freescale).
-It is working fine with and without providing a firmware to the sDMA.
+The compatibility is good enough that it works fine with the driver that
+went into kernel 4.9 and 4.10. Using this device tree file, I have built and
+booted 4.9.9 and 4.10-rc7 kernels as per the instructions here;
+https://linux-sunxi.org/Sunchip_CX-A99#Linux_kernel
+Likewise any other AXP806 driver which doesn't touch the register at address
+0xff will work fine.
 
-But, I couldn't get that to work with v4.9. I actually managed to
-reproduce the issue using the SGTL5000 so I don't have any patch on top
-of v4.9.
+So, the disadvantage of removing the "x-powers,axp806" compatible is that
+it breaks on two kernel versions where it works fine with the compatible.
+What is the advantage of removing the "x-powers,axp806" compatible?
 
-I really suspect the DMA driver as the issue varies with the selected
-period/buffer size.
+As to touching the register at 0xff, it would be interesting to know more
+precisely what goes wrong. The symptom is these messages in the log:
 
-Basically, the samples in a period are in the correct order but the
-periods are mixed up.
+[    3.209573] axp20x-rsb sunxi-rsb-745: AXP20x variant AXP806 found
+[    3.210153] axp20x-rsb sunxi-rsb-745: Failed to set masks in 0x40: -5
+[    3.210178] axp20x-rsb sunxi-rsb-745: failed to add irq chip: -5
+[    3.210306] axp20x-rsb: probe of sunxi-rsb-745 failed with error -5
 
-This is what I'm playing in a loop:
-http://free-electrons.com/~alexandre/source.png
-
-This is the output I get:
-http://free-electrons.com/~alexandre/playback.png
-
-The configuration for the cyclic transfer seems to be fine and I don't
-know enough about the sdma to investigate further.
-I can try to backport b7d2648ac3d4 "dmaengine: imx-sdma: Add i.MX7
-support" to v4.8 and test I you think that can be useful
+I haven't yet looked further into what happens at the RSB bus level.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Rask Ingemann Lambertsen
