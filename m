@@ -1,71 +1,42 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Wed, 15 Feb 2017 00:36:56 +0100
-Subject: [PATCH 10/14] phy: meson8b-usb2: simplify optional reset handling
-In-Reply-To: <20170130114116.22089-10-p.zabel@pengutronix.de>
-References: <20170130114116.22089-1-p.zabel@pengutronix.de>
- <20170130114116.22089-10-p.zabel@pengutronix.de>
-Message-ID: <CAFBinCAASGS19naW76vfynRj4Fg4KjpHcwGr5h+pWZae47rwRg@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 14 Feb 2017 18:43:06 -0500
+Subject: [PATCH 1/2] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
+In-Reply-To: <5e18324f-d09d-d652-df23-d4a3f8f053fd@codeaurora.org>
+References: <20170208005736.18724-1-cov@codeaurora.org>
+ <bd4a0127-0f32-a8be-c8ee-34c1cccc6d5d@codeaurora.org>
+ <6afb0a98-0973-33ec-0b76-fc6378e64309@codeaurora.org>
+ <5e18324f-d09d-d652-df23-d4a3f8f053fd@codeaurora.org>
+Message-ID: <5b771f8f-5a39-4c57-34a1-8e3f6d729a11@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On 02/08/2017 06:04 PM, Timur Tabi wrote:
+> On 02/08/2017 04:22 PM, Christopher Covington wrote:
+>>>> >> -    while (pl011_read(uap, REG_FR) & uap->vendor->fr_busy)
+>>>> >> +    while ((pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr)
+>>>> >> +                        & uap->vendor->fr_busy)
+>>> >
+>>> > I really think the XOR logic needs to be documented wherever it's
+>>> > used. It's just too confusing.
+>> References such as the following for basic bit operations like
+>> setting, clearing, and toggling are easy enough to come by.
+>>
+>> http://stackoverflow.com/questions/47981/how-do-you-set-clear-and-toggle-a-single-bit-in-c-c
+> 
+> I know what XOR does. I was thinking a more high-level comment would
+> be appropriate. With E44, we want to ignore the BUSY bit and use TXFE
+> instead. So was hoping to a comment that says that:
+> 
+> /* Normally, we poll until BUSY=0, but E44 says we should poll until
+> TXFE=1 instead. So with E44, we set fr_busy to TXFE, but we have to
+> invert it. */
 
-sorry for the late reply.
-unfortunately my GXBB board (which is supported by the driver below) is dead.
-I CC'ed Jerome Brunet - maybe he can give it a go on one of his (GXBB) boards.
+Oh, yeah, that'd be good. I'll include better comments in v2.
 
-On Mon, Jan 30, 2017 at 12:41 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> As of commit bb475230b8e5 ("reset: make optional functions really
-> optional"), the reset framework API calls use NULL pointers to describe
-> optional, non-present reset controls.
->
-> This allows to return errors from devm_reset_control_get_optional_shared
-> and to call reset_control_reset unconditionally.
->
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Cheers,
+Cov
 
-(based on reading the code along with the highly appreciated changes
-from bb475230b8e5)
-
-> Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/phy/phy-meson8b-usb2.c | 12 +++++-------
->  1 file changed, 5 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/phy/phy-meson8b-usb2.c b/drivers/phy/phy-meson8b-usb2.c
-> index 33c9f4ba157d1..87168f1fe3af6 100644
-> --- a/drivers/phy/phy-meson8b-usb2.c
-> +++ b/drivers/phy/phy-meson8b-usb2.c
-> @@ -141,12 +141,10 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
->         struct phy_meson8b_usb2_priv *priv = phy_get_drvdata(phy);
->         int ret;
->
-> -       if (!IS_ERR_OR_NULL(priv->reset)) {
-> -               ret = reset_control_reset(priv->reset);
-> -               if (ret) {
-> -                       dev_err(&phy->dev, "Failed to trigger USB reset\n");
-> -                       return ret;
-> -               }
-> +       ret = reset_control_reset(priv->reset);
-> +       if (ret) {
-> +               dev_err(&phy->dev, "Failed to trigger USB reset\n");
-> +               return ret;
->         }
->
->         ret = clk_prepare_enable(priv->clk_usb_general);
-> @@ -241,7 +239,7 @@ static int phy_meson8b_usb2_probe(struct platform_device *pdev)
->                 return PTR_ERR(priv->clk_usb);
->
->         priv->reset = devm_reset_control_get_optional_shared(&pdev->dev, NULL);
-> -       if (PTR_ERR(priv->reset) == -EPROBE_DEFER)
-> +       if (PTR_ERR(priv->reset))
->                 return PTR_ERR(priv->reset);
->
->         priv->dr_mode = of_usb_get_dr_mode_by_phy(pdev->dev.of_node, -1);
-> --
-> 2.11.0
->
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
+Aurora Forum, a Linux Foundation Collaborative Project.
