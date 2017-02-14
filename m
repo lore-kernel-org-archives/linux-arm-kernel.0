@@ -1,44 +1,55 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Tue, 14 Feb 2017 17:19:09 +0800
-Subject: [PATCH 2/5] Documentation: sprd: Add bindings for SP9860G
-In-Reply-To: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <1487063952-7113-3-git-send-email-chunyan.zhang@spreadtrum.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 14 Feb 2017 11:29:39 +0200
+Subject: [PATCH v6 3/3] i2c: zx2967: add i2c controller driver for ZTE's
+ zx2967 family
+In-Reply-To: <8322ae7c-a74d-c6a3-9cdb-4cd5584f37d4@linaro.org>
+References: <1486632753-17363-1-git-send-email-baoyou.xie@linaro.org>
+ <1486632753-17363-3-git-send-email-baoyou.xie@linaro.org>
+ <8322ae7c-a74d-c6a3-9cdb-4cd5584f37d4@linaro.org>
+Message-ID: <CAHp75VcwAym_ujHfyEJKypsvQftCY5JytDy922xqMM9yKz1GfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added support for Spreadtrum SP9860G board and SC9860 SoC.
-This patch also revised bindings of SC9836 to make the format
-more clear.
+On Tue, Feb 14, 2017 at 6:05 AM, Jun Nie <jun.nie@linaro.org> wrote:
+> On 2017?02?09? 17:32, Baoyou Xie wrote:
+>>
 
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
----
- Documentation/devicetree/bindings/arm/sprd.txt | 13 ++++++++-----
- 1 file changed, 8 insertions(+), 5 deletions(-)
+First of all, please, Jun, remove tons of lines of over quoting when
+answering to emails with one line question. Respect others time.
 
-diff --git a/Documentation/devicetree/bindings/arm/sprd.txt b/Documentation/devicetree/bindings/arm/sprd.txt
-index 31a629d..3df034b 100644
---- a/Documentation/devicetree/bindings/arm/sprd.txt
-+++ b/Documentation/devicetree/bindings/arm/sprd.txt
-@@ -1,11 +1,14 @@
- Spreadtrum SoC Platforms Device Tree Bindings
- ----------------------------------------------------
- 
--Sharkl64 is a Spreadtrum's SoC Platform which is based
--on ARM 64-bit processor.
-+SC9836 openphone Board
-+Required root node properties:
-+	- compatible = "sprd,sc9836-openphone", "sprd,sc9836";
- 
--SC9836 openphone board with SC9836 SoC based on the
--Sharkl64 Platform shall have the following properties.
-+SC9860 SoC
-+Required root node properties:
-+	- compatible = "sprd,sc9860"
- 
-+SP9860G 3GFHD Board
- Required root node properties:
--        - compatible = "sprd,sc9836-openphone", "sprd,sc9836";
-+	- compatible = "sprd,sp9860g-1h10", "sprd,sc9860";
+See below.
+
+>> +static irqreturn_t zx2967_i2c_isr(int irq, void *dev_id)
+>> +{
+>> +       u32 status;
+>> +       struct zx2967_i2c_info *zx_i2c = (struct zx2967_i2c_info *)dev_id;
+>> +       unsigned long flags;
+>> +
+>> +       spin_lock_irqsave(&zx_i2c->lock, flags);
+>
+>
+> Is this spin lock really necessary?
+
+If you protect IO and one CPU is in interrupt while another in some
+other function you need to have a spin lock.
+
+>> +
+>> +       status = zx2967_i2c_readl(zx_i2c, REG_STAT) & I2C_INT_MASK;
+>> +       zx2967_i2c_isr_clr(zx_i2c);
+>> +
+>> +       if (status & I2C_ERROR_MASK) {
+>> +               spin_unlock_irqrestore(&zx_i2c->lock, flags);
+>> +               return IRQ_HANDLED;
+>> +       }
+>> +
+>> +       if (status & I2C_TRANS_DONE)
+>> +               complete(&zx_i2c->complete);
+>> +
+>> +       spin_unlock_irqrestore(&zx_i2c->lock, flags);
+>> +
+>> +       return IRQ_HANDLED;
+>> +}
+
 -- 
-2.7.4
+With Best Regards,
+Andy Shevchenko
