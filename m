@@ -1,53 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Feb 2017 22:39:28 +0100
-Subject: [PATCH] arm64: define BUG() instruction without CONFIG_BUG
-Message-ID: <20170214213941.3026318-1-arnd@arndb.de>
+Date: Tue, 14 Feb 2017 23:06:31 +0100
+Subject: [PATCH] arm64: fix warning about swapper_pg_dir overflow
+In-Reply-To: <CAKv+Gu_FMk26Vbrb3mp5cSkSvmELP2iantX4kTyg+U8HO0J9ug@mail.gmail.com>
+References: <20170214212718.2792194-1-arnd@arndb.de>
+ <CAKv+Gu_FMk26Vbrb3mp5cSkSvmELP2iantX4kTyg+U8HO0J9ug@mail.gmail.com>
+Message-ID: <CAK8P3a171gaVo0hOeqWQQGOnRaTTqc83u9r9dwMz0ZGE1O=R9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This mirrors commit e9c38ceba8d9 ("ARM: 8455/1: define __BUG as
-asm(BUG_INSTR) without CONFIG_BUG") to make the behavior of
-arm64 consistent with arm and x86, and avoids lots of warnings in
-randconfig builds, such as:
+On Tue, Feb 14, 2017 at 10:33 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> On 14 February 2017 at 21:27, Arnd Bergmann <arnd@arndb.de> wrote:
 
-kernel/seccomp.c: In function '__seccomp_filter':
-kernel/seccomp.c:666:1: error: no return statement in function returning non-void [-Werror=return-type]
+> We should see the same issue with 64k/3 levels, since its PGD_SIZE is
+> also much smaller than its PAGE_SIZE. This is a much more common
+> configuration, so I am surprised you found it on 16k/4 levels first.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm64/include/asm/bug.h | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+I hadn't been doing regular build tests on arm64 and just started up some
+randconfig builds, this was the first bug I ran into ;-)
 
-diff --git a/arch/arm64/include/asm/bug.h b/arch/arm64/include/asm/bug.h
-index 561190d15881..461751429fc3 100644
---- a/arch/arm64/include/asm/bug.h
-+++ b/arch/arm64/include/asm/bug.h
-@@ -20,9 +20,10 @@
- 
- #include <asm/brk-imm.h>
- 
--#ifdef CONFIG_GENERIC_BUG
- #define HAVE_ARCH_BUG
- 
-+#ifdef CONFIG_GENERIC_BUG
-+
- #ifdef CONFIG_DEBUG_BUGVERBOSE
- #define _BUGVERBOSE_LOCATION(file, line) __BUGVERBOSE_LOCATION(file, line)
- #define __BUGVERBOSE_LOCATION(file, line)				\
-@@ -57,6 +58,14 @@ _BUGVERBOSE_LOCATION(__FILE__, __LINE__)		\
- 
- #define __WARN_TAINT(taint) _BUG_FLAGS(BUGFLAG_TAINT(taint))
- 
-+#else
-+
-+#define BUG() do {					\
-+	asm volatile("brk %[imm]"			\
-+		     :: [imm] "i" (BUG_BRK_IMM));	\
-+	unreachable();					\
-+} while (0)
-+
- #endif /* ! CONFIG_GENERIC_BUG */
- 
- #include <asm-generic/bug.h>
--- 
-2.9.0
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Thanks,
+
+   Arnd
