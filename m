@@ -1,100 +1,76 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 14 Feb 2017 16:44:53 +0000
-Subject: [PATCH 1/5] arm64: dts: Add basic DT to support Spreadtrum's
- SP9860G
-In-Reply-To: <1487063952-7113-2-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1487063952-7113-2-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <CAPKp9ub35nL8gc_TKx02pSHHNwBhiMacWL=CuEmNGnecWikfGQ@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Tue, 14 Feb 2017 17:49:05 +0100
+Subject: [PATCH 1/2] ARM: dts: BCM53573: Describe Tenda AC9 PCIe card in DT
+Message-ID: <20170214164906.19245-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2017 at 9:19 AM, Chunyan Zhang
-<chunyan.zhang@spreadtrum.com> wrote:
-> From: Orson Zhai <orson.zhai@spreadtrum.com>
->
-> SC9860G is a 8 cores of A53 SoC with 4G LTE support SoC from Spreadtrum.
->
-> According to regular hierarchy of sprd dts, whale2.dtsi contains SoC
-> peripherals IP nodes, sc9860.dtsi contains stuff related to ARM core stuff
-> and sp9860g dts is for the board level.
->
-> Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> ---
->  arch/arm64/boot/dts/sprd/Makefile         |   3 +-
->  arch/arm64/boot/dts/sprd/sc9860.dtsi      | 534 ++++++++++++++++++++++++++++++
->  arch/arm64/boot/dts/sprd/sp9860g-1h10.dts |  58 ++++
->  arch/arm64/boot/dts/sprd/whale2.dtsi      |  66 ++++
->  4 files changed, 660 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/boot/dts/sprd/sc9860.dtsi
->  create mode 100644 arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
->  create mode 100644 arch/arm64/boot/dts/sprd/whale2.dtsi
->
-> diff --git a/arch/arm64/boot/dts/sprd/Makefile b/arch/arm64/boot/dts/sprd/Makefile
-> index b658c5e..f0535e6 100644
-> --- a/arch/arm64/boot/dts/sprd/Makefile
-> +++ b/arch/arm64/boot/dts/sprd/Makefile
-> @@ -1,4 +1,5 @@
-> -dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb
-> +dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb \
-> +                       sp9860g-1h10.dtb
->
->  always         := $(dtb-y)
->  subdir-y       := $(dts-dirs)
-> diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
-> new file mode 100644
-> index 0000000..604a8c9
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
-> @@ -0,0 +1,534 @@
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-[...]
+Tenda AC9 has PCIe controller with just one device connected to it:
+0000:00:00.0		14e4:d145	Bridge Device
+?? 0000:01:00.0		14e4:a8db	Network Controller
 
-> +       idle-states{
-> +               entry-method = "arm,psci";
-> +
-> +               CORE_PD: core_pd {
-> +                       compatible = "arm,idle-state";
-> +                       entry-latency-us = <1000>;
-> +                       exit-latency-us = <700>;
-> +                       min-residency-us = <2500>;
-> +                       local-timer-stop;
-> +                       arm,psci-suspend-param = <0x00010002>;
-> +               };
-> +
-> +               CLUSTER_PD: cluster_pd {
-> +                       compatible = "arm,idle-state";
-> +                       entry-latency-us = <1000>;
-> +                       exit-latency-us = <1000>;
-> +                       min-residency-us = <3000>;
-> +                       local-timer-stop;
-> +                       arm,psci-suspend-param = <0x01010003>;
-> +               };
-> +
-> +               DEEP_SLEEP: deep_sleep {
-> +                       compatible = "arm,idle-state";
-> +                       wakeup-latency-us = <0xffffffff>;
+This card is directly on SoC (doesn't use physical connector) and has
+BCM43217 chipset with bcma bus. One of its components is ChipCommon core
+which is also a GPIO controller. We need to describe it to be able to
+add devices using its GPIO pins.
 
-A value > 4294 seconds(i.e >1 hour) seems suspicious.
-Are you working around the firmware issue with high latency value so
-that it's never entered ? Why not remove advertising the state from DT.
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+ arch/arm/boot/dts/bcm47189-tenda-ac9.dts | 27 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/bcm53573.dtsi          |  4 ++++
+ 2 files changed, 31 insertions(+)
 
-Can you get me the dump of:
-grep "" /sys/devices/system/cpu/cpu*/cpuidle/state*/{time,usage}
-
-IIUC, you might have seen boot issue without this values and workaround
-the issue with such high values ? If so please drop this state.
-
-> +                       entry-latency-us = <1500>;
-> +                       exit-latency-us = <1500>;
-> +                       min-residency-us = <0xffffffff>;
-> +                       local-timer-stop;
-> +                       arm,psci-suspend-param = <0x01010005>;
-> +               };
-> +       };
->
-
---
-Regards,
-Sudeep
+diff --git a/arch/arm/boot/dts/bcm47189-tenda-ac9.dts b/arch/arm/boot/dts/bcm47189-tenda-ac9.dts
+index 4403ae8790c2..ce8c155fcc01 100644
+--- a/arch/arm/boot/dts/bcm47189-tenda-ac9.dts
++++ b/arch/arm/boot/dts/bcm47189-tenda-ac9.dts
+@@ -72,3 +72,30 @@
+ 		};
+ 	};
+ };
++
++&pcie0 {
++	ranges = <0x00000000 0 0 0 0 0x00100000>;
++	#address-cells = <3>;
++	#size-cells = <2>;
++
++	bridge at 0,0,0 {
++		reg = <0x0000 0 0 0 0>;
++		ranges = <0x00000000 0 0 0 0 0 0 0x00100000>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++
++		wifi at 0,1,0 {
++			reg = <0x0000 0 0 0 0>;
++			ranges = <0x00000000 0 0 0 0x00100000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			pcie0_chipcommon: chipcommon at 0 {
++				reg = <0 0x1000>;
++
++				gpio-controller;
++				#gpio-cells = <2>;
++			};
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/bcm53573.dtsi b/arch/arm/boot/dts/bcm53573.dtsi
+index 2da04d0a7348..71ce23e46d30 100644
+--- a/arch/arm/boot/dts/bcm53573.dtsi
++++ b/arch/arm/boot/dts/bcm53573.dtsi
+@@ -113,6 +113,10 @@
+ 			};
+ 		};
+ 
++		pcie0: pcie at 2000 {
++			reg = <0x00002000 0x1000>;
++		};
++
+ 		usb2: usb2 at 4000 {
+ 			reg = <0x4000 0x1000>;
+ 			ranges;
+-- 
+2.11.0
