@@ -1,77 +1,48 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 14 Feb 2017 11:35:26 +0800
-Subject: [PATCH 5/5] ARM: dts: sun8i-a83t: Add CCU device nodes
-In-Reply-To: <20170214033526.16977-1-wens@csie.org>
-References: <20170214033526.16977-1-wens@csie.org>
-Message-ID: <20170214033526.16977-6-wens@csie.org>
+From: youlin.pei@mediatek.com (Youlin Pei)
+Date: Tue, 14 Feb 2017 10:56:01 +0800
+Subject: [PATCH v3 3/3] ARM: dts: mt2701: Add mtk-cirq node for mt2701
+In-Reply-To: <1487040961-18319-1-git-send-email-youlin.pei@mediatek.com>
+References: <1487040961-18319-1-git-send-email-youlin.pei@mediatek.com>
+Message-ID: <1487040961-18319-4-git-send-email-youlin.pei@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have support for the A83T CCU, add a device node for it,
-and replace any existing placeholder clock phandles with the correct
-ones.
+This commit add mtk-cirq node to mt2701 dtsi.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Youlin Pei <youlin.pei@mediatek.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/mt2701.dtsi |   12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 79eaa7139f43..b78c831e8294 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -47,7 +47,9 @@
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
-+#include <dt-bindings/clock/sun8i-a83t-ccu.h>
- #include <dt-bindings/pinctrl/sun4i-a10.h>
-+#include <dt-bindings/reset/sun8i-a83t-ccu.h>
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+index 7eab6f4..6ac9108 100644
+--- a/arch/arm/boot/dts/mt2701.dtsi
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -21,7 +21,7 @@
  
  / {
- 	interrupt-parent = <&gic>;
-@@ -123,6 +125,7 @@
- 			#clock-cells = <0>;
- 			compatible = "fixed-clock";
- 			clock-frequency = <24000000>;
-+			clock-accuracy = <50000>;
- 			clock-output-names = "osc24M";
- 		};
+ 	compatible = "mediatek,mt2701";
+-	interrupt-parent = <&sysirq>;
++	interrupt-parent = <&cirq>;
  
-@@ -154,13 +157,23 @@
- 		#size-cells = <1>;
- 		ranges;
+ 	cpus {
+ 		#address-cells = <1>;
+@@ -158,6 +158,16 @@
+ 		reg = <0 0x10200100 0 0x1c>;
+ 	};
  
-+		ccu: clock at 01c20000 {
-+			compatible = "allwinner,sun8i-a83t-ccu";
-+			reg = <0x01c20000 0x400>;
-+			clocks = <&osc24M>, <&osc16Md512>;
-+			clock-names = "hosc", "losc";
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
++	cirq: interrupt-controller at 10204000 {
++		compatible = "mediatek,mt2701-cirq",
++			     "mediatek,mtk-cirq";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		interrupt-parent = <&sysirq>;
++		reg = <0 0x10204000 0 0x400>;
++		mediatek,ext-irq-range = <32 200>;
++	};
 +
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun8i-a83t-pinctrl";
- 			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
- 			reg = <0x01c20800 0x400>;
--			clocks = <&osc24M>;
-+			clocks = <&ccu CLK_BUS_PIO>, <&osc24M>, <&osc16Md512>;
-+			clock-names = "apb", "hosc", "losc";
- 			gpio-controller;
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
-@@ -206,7 +219,8 @@
- 			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&osc24M>;
-+			clocks = <&ccu CLK_BUS_UART0>;
-+			resets = <&ccu RST_BUS_UART0>;
- 			status = "disabled";
- 		};
- 
+ 	apmixedsys: syscon at 10209000 {
+ 		compatible = "mediatek,mt2701-apmixedsys", "syscon";
+ 		reg = <0 0x10209000 0 0x1000>;
 -- 
-2.11.0
+1.7.9.5
