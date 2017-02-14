@@ -1,36 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 14 Feb 2017 17:54:05 +0000
-Subject: [PATCH v2 4/5] arm64: mmu: map .text as read-only from the outset
-In-Reply-To: <42A48E4E-EF3C-4F28-A660-AFEBB238B698@linaro.org>
-References: <1486844586-26135-1-git-send-email-ard.biesheuvel@linaro.org>
- <1486844586-26135-5-git-send-email-ard.biesheuvel@linaro.org>
- <20170214155704.GE23718@leverpostej>
- <651D9CBB-3E64-41CE-BF85-D2FF0CB927B7@linaro.org>
- <20170214174029.GJ23718@leverpostej>
- <42A48E4E-EF3C-4F28-A660-AFEBB238B698@linaro.org>
-Message-ID: <20170214175405.GL23718@leverpostej>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 14 Feb 2017 17:55:33 +0000
+Subject: [PATCH] ARM: mvebu: add support for the Linksys WRT1900ACS
+ (Shelby)
+In-Reply-To: <20170214085919.3997-1-ralph.sennhauser@gmail.com>
+References: <20170214085919.3997-1-ralph.sennhauser@gmail.com>
+Message-ID: <20170214175533.GF25924@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2017 at 05:49:19PM +0000, Ard Biesheuvel wrote:
+Hi Ralph, Imre,
+
+On Tue, Feb 14, 2017 at 09:59:17AM +0100, Ralph Sennhauser wrote:
+> The Linksys WRT1900ACS (Shelby) is another Armada 385 based router in
+> the Linksys WRT AC Series which got released in October 2015.
 > 
-> > On 14 Feb 2017, at 17:40, Mark Rutland <mark.rutland@arm.com> wrote:
-> > 
-> >> On Tue, Feb 14, 2017 at 04:15:11PM +0000, Ard Biesheuvel wrote:
-
-> >> Having trivial 'off' switches for security features makes me feel
-> >> uneasy (although this is orthogonal to this patch)
-> > 
-> > From my PoV, external debuggers are the sole reason to allow rodata=off
-> > for arm64, and we already allow rodata=off.
-> > 
-> > 
+> The file armada-385-linksys-shelby.dts is taken from OpenWrt as-is and
+> originally authored by Imre Kaloz.
 > 
-> Indeed. If that is how it works currently, we shouldn't interfere with
-> it. If we ever get anywhere with the lockdown patches, we should
-> blacklist this parameter (or rather, not whitelist it, since
-> blacklisting kernel params to enforce security is infeasible imo)
+> URL: http://tinyurl.com/j8lz83a
 
-Agreed on all counts!
+Could you please change this to:
 
-Mark.
+https://github.com/openwrt/openwrt/blob/8466384db1154a107b86bf3ca10b166a21bd81d0/target/linux/mvebu/files/arch/arm/boot/dts/armada-385-linksys-shelby.dts
+
+Or, say 'imported from
+
+ https://github.com/openwrt/openwrt
+
+commit 8466384db115 "mvebu: add support for 4.1 and switch over"'
+
+or something similar?
+
+Other than that,
+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
