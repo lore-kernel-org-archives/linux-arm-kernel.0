@@ -1,41 +1,40 @@
-From: rah@settrans.net (Bob Ham)
-Date: Tue, 14 Feb 2017 22:20:55 +0000
-Subject: [PATCH] clk: sunxi-ng: sun6i: Fix enable bit offset for
- hdmi-ddc module clock
-In-Reply-To: <20170214022332.13326-1-wens@csie.org>
-References: <20170214022332.13326-1-wens@csie.org>
-Message-ID: <1487110855.7145.46.camel@settrans.net>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 14 Feb 2017 23:24:25 +0100
+Subject: sDMA on i.mx7d
+Message-ID: <20170214222425.hbkfkeq3l6sveo7n@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-02-14 at 10:23 +0800, Chen-Yu Tsai wrote:
-> The enable bit offset for the hdmi-ddc module clock is wrong. It is
-> pointing to the main hdmi module clock enable bit.
-> 
-> Reported-by: Bob Ham <rah@settrans.net>
-> Fixes: c6e6c96d8fa6 ("clk: sunxi-ng: Add A31/A31s clocks")
-> Cc: stable at vger.kernel.org # 4.9.x-
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> 
-> Hi Bob,
-> 
-> Can you try this patch and see if it fixes your HDMI issue?
-> With the kernel running without "clk_ignore_unused" that is.
+Hi,
 
-Hi Chen-Yu,
+I've been trying to get a PCM3168s codec with a Colibri iMX7 using TDM
+on SAI2.
+I've got it working properly with the 4.1.35 kernel from Toradex (based
+on the 4.1.15 from Freescale).
+It is working fine with and without providing a firmware to the sDMA.
 
-Unfortunately, that doesn't fix it; I get the same behaviour as without
-clk_ignore_unused.
+But, I couldn't get that to work with v4.9. I actually managed to
+reproduce the issue using the SGTL5000 so I don't have any patch on top
+of v4.9.
 
-Thanks though,
+I really suspect the DMA driver as the issue varies with the selected
+period/buffer size.
 
-Bob
+Basically, the samples in a period are in the correct order but the
+periods are mixed up.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170214/806a4080/attachment.sig>
+This is what I'm playing in a loop:
+http://free-electrons.com/~alexandre/source.png
+
+This is the output I get:
+http://free-electrons.com/~alexandre/playback.png
+
+The configuration for the cyclic transfer seems to be fine and I don't
+know enough about the sdma to investigate further.
+I can try to backport b7d2648ac3d4 "dmaengine: imx-sdma: Add i.MX7
+support" to v4.8 and test I you think that can be useful
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
