@@ -1,70 +1,252 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Tue, 14 Feb 2017 10:54:27 +0530
-Subject: [PATCH v3 3/4] dmaengine: Add Broadcom SBA RAID driver
-In-Reply-To: <CAPcyv4hE5gDiHhfaiHDHbhA2xKa45UdzKcSxnQXK-W92sr3Z1g@mail.gmail.com>
-References: <1486717628-17580-1-git-send-email-anup.patel@broadcom.com>
- <1486717628-17580-4-git-send-email-anup.patel@broadcom.com>
- <CAPcyv4hE5gDiHhfaiHDHbhA2xKa45UdzKcSxnQXK-W92sr3Z1g@mail.gmail.com>
-Message-ID: <CAALAos-+7kL6C7ZOUgX1AMqzKR6kL82qcz4wvmx5p9Ujj77tuQ@mail.gmail.com>
+From: vivek.gautam@codeaurora.org (Vivek Gautam)
+Date: Tue, 14 Feb 2017 11:03:22 +0530
+Subject: [PATCH v13 06/12] usb: xhci: use bus->sysdev for DMA configuration
+In-Reply-To: <1486776443-2280-7-git-send-email-peter.chen@nxp.com>
+References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
+ <1486776443-2280-7-git-send-email-peter.chen@nxp.com>
+Message-ID: <e643c161-ce60-6706-6630-895a297dedcd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2017 at 11:20 PM, Dan Williams <dan.j.williams@intel.com> wrote:
-> On Fri, Feb 10, 2017 at 1:07 AM, Anup Patel <anup.patel@broadcom.com> wrote:
->> The Broadcom stream buffer accelerator (SBA) provides offloading
->> capabilities for RAID operations. This SBA offload engine is
->> accessible via Broadcom SoC specific ring manager.
->>
->> This patch adds Broadcom SBA RAID driver which provides one
->> DMA device with RAID capabilities using one or more Broadcom
->> SoC specific ring manager channels. The SBA RAID driver in its
->> current shape implements memcpy, xor, and pq operations.
->>
->> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->> ---
->>  drivers/dma/Kconfig        |   13 +
->>  drivers/dma/Makefile       |    1 +
->>  drivers/dma/bcm-sba-raid.c | 1711 ++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 1725 insertions(+)
->>  create mode 100644 drivers/dma/bcm-sba-raid.c
->>
->> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
->> index 263495d..bf8fb84 100644
->> --- a/drivers/dma/Kconfig
->> +++ b/drivers/dma/Kconfig
->> @@ -99,6 +99,19 @@ config AXI_DMAC
->>           controller is often used in Analog Device's reference designs for FPGA
->>           platforms.
->>
->> +config BCM_SBA_RAID
->> +       tristate "Broadcom SBA RAID engine support"
->> +       depends on (ARM64 && MAILBOX && RAID6_PQ) || COMPILE_TEST
->> +       select DMA_ENGINE
->> +       select DMA_ENGINE_RAID
->> +       select ASYNC_TX_ENABLE_CHANNEL_SWITCH
+
+
+On 02/11/2017 06:57 AM, Peter Chen wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
 >
-> ASYNC_TX_ENABLE_CHANNEL_SWITCH violates the DMA mapping API and
-> Russell has warned it's especially problematic on ARM [1].  If you
-> need channel switching for this offload engine to be useful then you
-> need to move DMA mapping and channel switching responsibilities to MD
-> itself.
+> For xhci-hcd platform device, all the DMA parameters are not
+> configured properly, notably dma ops for dwc3 devices. So, set
+> the dma for xhci from sysdev. sysdev is pointing to device that
+> is known to the system firmware or hardware.
 >
-> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-January/036753.html
+> Cc: Baolin Wang <baolin.wang@linaro.org>
+> Cc: Vivek Gautam <vivek.gautam@codeaurora.org>
+> Cc: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+> Cc: Mathias Nyman <mathias.nyman@linux.intel.com>
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+> ---
+> Hi, Baolin, Vivek and Alexander,
+> I removed your tested-by tag due to add one change that adding sysdev
+> for shared hcd too, if your test shows this change works for you or
+> has no effect for you, please consider adding tested-by tag again,
+> thanks.
 
-In case of BCM-SBA-RAID, the underlying "struct device" for each
-DMA channel is the mailbox controller "struct device" (i.e. Ring
-Manager device). This is because Ring Manager HW is the front
-facing device which we program to submit work to BCM-SBA-RAID
-HW.
+Works well with 4.10-rc8 branch merged with usb-next and the
+set of phy patches for msm8996 and corresponding dt patches.
 
-This means DMA channels provided by BCM-SBA-RAID driver
-will use same "struct device" for DMA mappings hence channel
-switching between BCM-SBA-RAID DMA channels is safe.
+Tested-by: Vivek Gautam <vivek.gautam@codeaurora.org>
 
-Due to above, we can safely enable
-ASYNC_TX_ENABLE_CHANNEL_SWITCH option for
-BCM-SBA-RAID driver.
+Thanks
+Vivek
 
-Regards,
-Anup
+>   drivers/usb/host/xhci-mem.c  | 12 ++++++------
+>   drivers/usb/host/xhci-plat.c | 35 +++++++++++++++++++++++++++--------
+>   drivers/usb/host/xhci.c      | 15 +++++++++++----
+>   3 files changed, 44 insertions(+), 18 deletions(-)
+>
+> diff --git a/drivers/usb/host/xhci-mem.c b/drivers/usb/host/xhci-mem.c
+> index ba1853f4..032a702 100644
+> --- a/drivers/usb/host/xhci-mem.c
+> +++ b/drivers/usb/host/xhci-mem.c
+> @@ -586,7 +586,7 @@ static void xhci_free_stream_ctx(struct xhci_hcd *xhci,
+>   		unsigned int num_stream_ctxs,
+>   		struct xhci_stream_ctx *stream_ctx, dma_addr_t dma)
+>   {
+> -	struct device *dev = xhci_to_hcd(xhci)->self.controller;
+> +	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
+>   	size_t size = sizeof(struct xhci_stream_ctx) * num_stream_ctxs;
+>   
+>   	if (size > MEDIUM_STREAM_ARRAY_SIZE)
+> @@ -614,7 +614,7 @@ static struct xhci_stream_ctx *xhci_alloc_stream_ctx(struct xhci_hcd *xhci,
+>   		unsigned int num_stream_ctxs, dma_addr_t *dma,
+>   		gfp_t mem_flags)
+>   {
+> -	struct device *dev = xhci_to_hcd(xhci)->self.controller;
+> +	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
+>   	size_t size = sizeof(struct xhci_stream_ctx) * num_stream_ctxs;
+>   
+>   	if (size > MEDIUM_STREAM_ARRAY_SIZE)
+> @@ -1686,7 +1686,7 @@ void xhci_slot_copy(struct xhci_hcd *xhci,
+>   static int scratchpad_alloc(struct xhci_hcd *xhci, gfp_t flags)
+>   {
+>   	int i;
+> -	struct device *dev = xhci_to_hcd(xhci)->self.controller;
+> +	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
+>   	int num_sp = HCS_MAX_SCRATCHPAD(xhci->hcs_params2);
+>   
+>   	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
+> @@ -1758,7 +1758,7 @@ static void scratchpad_free(struct xhci_hcd *xhci)
+>   {
+>   	int num_sp;
+>   	int i;
+> -	struct device *dev = xhci_to_hcd(xhci)->self.controller;
+> +	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
+>   
+>   	if (!xhci->scratchpad)
+>   		return;
+> @@ -1831,7 +1831,7 @@ void xhci_free_command(struct xhci_hcd *xhci,
+>   
+>   void xhci_mem_cleanup(struct xhci_hcd *xhci)
+>   {
+> -	struct device	*dev = xhci_to_hcd(xhci)->self.controller;
+> +	struct device	*dev = xhci_to_hcd(xhci)->self.sysdev;
+>   	int size;
+>   	int i, j, num_ports;
+>   
+> @@ -2373,7 +2373,7 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
+>   int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
+>   {
+>   	dma_addr_t	dma;
+> -	struct device	*dev = xhci_to_hcd(xhci)->self.controller;
+> +	struct device	*dev = xhci_to_hcd(xhci)->self.sysdev;
+>   	unsigned int	val, val2;
+>   	u64		val_64;
+>   	struct xhci_segment	*seg;
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index 6d33b42..4ecb3fd 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -14,6 +14,7 @@
+>   #include <linux/clk.h>
+>   #include <linux/dma-mapping.h>
+>   #include <linux/module.h>
+> +#include <linux/pci.h>
+>   #include <linux/of.h>
+>   #include <linux/platform_device.h>
+>   #include <linux/usb/phy.h>
+> @@ -148,6 +149,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>   {
+>   	const struct of_device_id *match;
+>   	const struct hc_driver	*driver;
+> +	struct device		*sysdev;
+>   	struct xhci_hcd		*xhci;
+>   	struct resource         *res;
+>   	struct usb_hcd		*hcd;
+> @@ -164,22 +166,39 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>   	if (irq < 0)
+>   		return -ENODEV;
+>   
+> +	/*
+> +	 * sysdev must point to a device that is known to the system firmware
+> +	 * or PCI hardware. We handle these three cases here:
+> +	 * 1. xhci_plat comes from firmware
+> +	 * 2. xhci_plat is child of a device from firmware (dwc3-plat)
+> +	 * 3. xhci_plat is grandchild of a pci device (dwc3-pci)
+> +	 */
+> +	sysdev = &pdev->dev;
+> +	if (sysdev->parent && !sysdev->of_node && sysdev->parent->of_node)
+> +		sysdev = sysdev->parent;
+> +#ifdef CONFIG_PCI
+> +	else if (sysdev->parent && sysdev->parent->parent &&
+> +		 sysdev->parent->parent->bus == &pci_bus_type)
+> +		sysdev = sysdev->parent->parent;
+> +#endif
+> +
+>   	/* Try to set 64-bit DMA first */
+> -	if (!pdev->dev.dma_mask)
+> +	if (WARN_ON(!sysdev->dma_mask))
+>   		/* Platform did not initialize dma_mask */
+> -		ret = dma_coerce_mask_and_coherent(&pdev->dev,
+> +		ret = dma_coerce_mask_and_coherent(sysdev,
+>   						   DMA_BIT_MASK(64));
+>   	else
+> -		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+> +		ret = dma_set_mask_and_coherent(sysdev, DMA_BIT_MASK(64));
+>   
+>   	/* If seting 64-bit DMA mask fails, fall back to 32-bit DMA mask */
+>   	if (ret) {
+> -		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> +		ret = dma_set_mask_and_coherent(sysdev, DMA_BIT_MASK(32));
+>   		if (ret)
+>   			return ret;
+>   	}
+>   
+> -	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
+> +	hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
+> +			       dev_name(&pdev->dev), NULL);
+>   	if (!hcd)
+>   		return -ENOMEM;
+>   
+> @@ -222,20 +241,20 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>   
+>   	xhci->clk = clk;
+>   	xhci->main_hcd = hcd;
+> -	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
+> +	xhci->shared_hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
+>   			dev_name(&pdev->dev), hcd);
+>   	if (!xhci->shared_hcd) {
+>   		ret = -ENOMEM;
+>   		goto disable_clk;
+>   	}
+>   
+> -	if (device_property_read_bool(&pdev->dev, "usb3-lpm-capable"))
+> +	if (device_property_read_bool(sysdev, "usb3-lpm-capable"))
+>   		xhci->quirks |= XHCI_LPM_SUPPORT;
+>   
+>   	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
+>   		xhci->quirks |= XHCI_BROKEN_PORT_PED;
+>   
+> -	hcd->usb_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
+> +	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
+>   	if (IS_ERR(hcd->usb_phy)) {
+>   		ret = PTR_ERR(hcd->usb_phy);
+>   		if (ret == -EPROBE_DEFER)
+> diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
+> index 6d6c460..ab0839c 100644
+> --- a/drivers/usb/host/xhci.c
+> +++ b/drivers/usb/host/xhci.c
+> @@ -237,6 +237,9 @@ static int xhci_free_msi(struct xhci_hcd *xhci)
+>   static int xhci_setup_msi(struct xhci_hcd *xhci)
+>   {
+>   	int ret;
+> +	/*
+> +	 * TODO:Check with MSI Soc for sysdev
+> +	 */
+>   	struct pci_dev  *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
+>   
+>   	ret = pci_enable_msi(pdev);
+> @@ -263,7 +266,7 @@ static int xhci_setup_msi(struct xhci_hcd *xhci)
+>    */
+>   static void xhci_free_irq(struct xhci_hcd *xhci)
+>   {
+> -	struct pci_dev *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
+> +	struct pci_dev *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
+>   	int ret;
+>   
+>   	/* return if using legacy interrupt */
+> @@ -748,7 +751,7 @@ void xhci_shutdown(struct usb_hcd *hcd)
+>   	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+>   
+>   	if (xhci->quirks & XHCI_SPURIOUS_REBOOT)
+> -		usb_disable_xhci_ports(to_pci_dev(hcd->self.controller));
+> +		usb_disable_xhci_ports(to_pci_dev(hcd->self.sysdev));
+>   
+>   	spin_lock_irq(&xhci->lock);
+>   	xhci_halt(xhci);
+> @@ -765,7 +768,7 @@ void xhci_shutdown(struct usb_hcd *hcd)
+>   
+>   	/* Yet another workaround for spurious wakeups at shutdown with HSW */
+>   	if (xhci->quirks & XHCI_SPURIOUS_WAKEUP)
+> -		pci_set_power_state(to_pci_dev(hcd->self.controller), PCI_D3hot);
+> +		pci_set_power_state(to_pci_dev(hcd->self.sysdev), PCI_D3hot);
+>   }
+>   
+>   #ifdef CONFIG_PM
+> @@ -4801,7 +4804,11 @@ int xhci_get_frame(struct usb_hcd *hcd)
+>   int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
+>   {
+>   	struct xhci_hcd		*xhci;
+> -	struct device		*dev = hcd->self.controller;
+> +	/*
+> +	 * TODO: Check with DWC3 clients for sysdev according to
+> +	 * quirks
+> +	 */
+> +	struct device		*dev = hcd->self.sysdev;
+>   	int			retval;
+>   
+>   	/* Accept arbitrarily long scatter-gather lists */
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
