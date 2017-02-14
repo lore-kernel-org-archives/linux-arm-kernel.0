@@ -1,72 +1,37 @@
 From: cristian.birsan@microchip.com (cristian.birsan at microchip.com)
-Date: Tue, 14 Feb 2017 18:09:03 +0200
-Subject: [PATCH 1/4 linux-next] usb: gadget: udc: atmel: Check fifo
- configuration values against device tree
+Date: Tue, 14 Feb 2017 18:09:06 +0200
+Subject: [PATCH 4/4 linux-next] usb: gadget: udc: atmel: Update Kconfig help
+ for fifo_mode = 0
 In-Reply-To: <cover.1487007870.git.cristian.birsan@microchip.com>
 References: <cover.1487007870.git.cristian.birsan@microchip.com>
-Message-ID: <f71b15dfe79e227491aced411af203297e746603.1487007870.git.cristian.birsan@microchip.com>
+Message-ID: <6ee2cab9ded640d183bf66865624a06ed6c62db8.1487007870.git.cristian.birsan@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cristian Birsan <cristian.birsan@microchip.com>
 
-Check fifo configuration values against device tree values for endpoint
-fifo in auto configuration mode (fifo_mode=0).
+Update Kconfig help for fifo_mode = 0 to explain the behavior better.
 
 Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
 ---
- drivers/usb/gadget/udc/atmel_usba_udc.c | 26 +++++++++++++++++++++++---
- 1 file changed, 23 insertions(+), 3 deletions(-)
+ drivers/usb/gadget/udc/Kconfig | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 11bbce2..ce8bf8b 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -371,7 +371,7 @@ static struct usba_fifo_cfg mode_4_cfg[] = {
- };
- /* Add additional configurations here */
+diff --git a/drivers/usb/gadget/udc/Kconfig b/drivers/usb/gadget/udc/Kconfig
+index 4b69f28..be94eb9 100644
+--- a/drivers/usb/gadget/udc/Kconfig
++++ b/drivers/usb/gadget/udc/Kconfig
+@@ -62,8 +62,9 @@ config USB_ATMEL_USBA
  
--int usba_config_fifo_table(struct usba_udc *udc)
-+static int usba_config_fifo_table(struct usba_udc *udc)
- {
- 	int n;
+ 	  The fifo_mode parameter is used to select endpoint allocation mode.
+ 	  fifo_mode = 0 is used to let the driver autoconfigure the endpoints.
+-	  In this case 2 banks are allocated for isochronous endpoints and
+-	  only one bank is allocated for the rest of the endpoints.
++	  In this case, for ep1 2 banks are allocated if it works in isochronous
++	  mode and only 1 bank otherwise. For the rest of the endpoints
++	  only 1 bank is allocated.
  
-@@ -2118,14 +2118,34 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
- 			dev_err(&pdev->dev, "of_probe: fifo-size error(%d)\n", ret);
- 			goto err;
- 		}
--		ep->fifo_size = fifo_mode ? udc->fifo_cfg[i].fifo_size : val;
-+		if (fifo_mode) {
-+			if (val < udc->fifo_cfg[i].fifo_size) {
-+				dev_warn(&pdev->dev,
-+					 "of_probe: fifo-size table value not supported by HW, using DT value\n");
-+				ep->fifo_size = val;
-+			} else {
-+				ep->fifo_size = udc->fifo_cfg[i].fifo_size;
-+			}
-+		} else {
-+			ep->fifo_size = val;
-+		}
- 
- 		ret = of_property_read_u32(pp, "atmel,nb-banks", &val);
- 		if (ret) {
- 			dev_err(&pdev->dev, "of_probe: nb-banks error(%d)\n", ret);
- 			goto err;
- 		}
--		ep->nr_banks = fifo_mode ? udc->fifo_cfg[i].nr_banks : val;
-+		if (fifo_mode) {
-+			if (val < udc->fifo_cfg[i].nr_banks) {
-+				dev_warn(&pdev->dev,
-+					 "of_probe: nb-banks table value not supported by HW, using DT value\n");
-+				ep->nr_banks = val;
-+			} else {
-+				ep->nr_banks = udc->fifo_cfg[i].nr_banks;
-+			}
-+		} else {
-+			ep->nr_banks = val;
-+		}
- 
- 		ep->can_dma = of_property_read_bool(pp, "atmel,can-dma");
- 		ep->can_isoc = of_property_read_bool(pp, "atmel,can-isoc");
+ 	  fifo_mode = 1 is a generic maximum fifo size (1024 bytes) configuration
+ 	  allowing the usage of ep1 - ep6
 -- 
 2.7.4
