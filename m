@@ -1,112 +1,252 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 14 Feb 2017 18:26:39 +0800
-Subject: [PATCH 4/5] clk: sunxi-ng: Add driver for A83T CCU
-In-Reply-To: <20170214095819.utsftcvti5zdmlmi@lukather>
-References: <20170214033526.16977-1-wens@csie.org>
- <20170214033526.16977-5-wens@csie.org>
- <20170214095819.utsftcvti5zdmlmi@lukather>
-Message-ID: <CAGb2v66PxbhUdqSwFc5iFN2wDVQbOsibDkckXpFsxXW1WJNe3w@mail.gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 14 Feb 2017 12:36:08 +0200
+Subject: [PATCH v13 06/12] usb: xhci: use bus->sysdev for DMA configuration
+In-Reply-To: <1486776443-2280-7-git-send-email-peter.chen@nxp.com>
+References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
+ <1486776443-2280-7-git-send-email-peter.chen@nxp.com>
+Message-ID: <e532a212-cd15-ab42-6188-fc11a12633af@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2017 at 5:58 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Feb 14, 2017 at 11:35:25AM +0800, Chen-Yu Tsai wrote:
->> +/* Some PLLs are input * N / div1 / P. Model them as NKMP with no K */
->
-> Is that even working?
+Hi,
 
-Looking at the nkmp clock code, only .recalc_rate will work properly though.
-Maybe I could fix up the code so it handles zero width factors.
+On 11/02/17 03:27, Peter Chen wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
+> 
+> For xhci-hcd platform device, all the DMA parameters are not
+> configured properly, notably dma ops for dwc3 devices. So, set
+> the dma for xhci from sysdev. sysdev is pointing to device that
+> is known to the system firmware or hardware.
+> 
+> Cc: Baolin Wang <baolin.wang@linaro.org>
+> Cc: Vivek Gautam <vivek.gautam@codeaurora.org>
+> Cc: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+> Cc: Mathias Nyman <mathias.nyman@linux.intel.com>
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
+> ---
+> Hi, Baolin, Vivek and Alexander,
+> I removed your tested-by tag due to add one change that adding sysdev
+> for shared hcd too, if your test shows this change works for you or
+> has no effect for you, please consider adding tested-by tag again,
+> thanks.
+> 
+>  drivers/usb/host/xhci-mem.c  | 12 ++++++------
+>  drivers/usb/host/xhci-plat.c | 35 +++++++++++++++++++++++++++--------
+>  drivers/usb/host/xhci.c      | 15 +++++++++++----
+>  3 files changed, 44 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/usb/host/xhci-mem.c b/drivers/usb/host/xhci-mem.c
+> index ba1853f4..032a702 100644
+> --- a/drivers/usb/host/xhci-mem.c
+> +++ b/drivers/usb/host/xhci-mem.c
+> @@ -586,7 +586,7 @@ static void xhci_free_stream_ctx(struct xhci_hcd *xhci,
+>  		unsigned int num_stream_ctxs,
+>  		struct xhci_stream_ctx *stream_ctx, dma_addr_t dma)
+>  {
+> -	struct device *dev = xhci_to_hcd(xhci)->self.controller;
+> +	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
+>  	size_t size = sizeof(struct xhci_stream_ctx) * num_stream_ctxs;
+>  
+>  	if (size > MEDIUM_STREAM_ARRAY_SIZE)
+> @@ -614,7 +614,7 @@ static struct xhci_stream_ctx *xhci_alloc_stream_ctx(struct xhci_hcd *xhci,
+>  		unsigned int num_stream_ctxs, dma_addr_t *dma,
+>  		gfp_t mem_flags)
+>  {
+> -	struct device *dev = xhci_to_hcd(xhci)->self.controller;
+> +	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
+>  	size_t size = sizeof(struct xhci_stream_ctx) * num_stream_ctxs;
+>  
+>  	if (size > MEDIUM_STREAM_ARRAY_SIZE)
+> @@ -1686,7 +1686,7 @@ void xhci_slot_copy(struct xhci_hcd *xhci,
+>  static int scratchpad_alloc(struct xhci_hcd *xhci, gfp_t flags)
+>  {
+>  	int i;
+> -	struct device *dev = xhci_to_hcd(xhci)->self.controller;
+> +	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
+>  	int num_sp = HCS_MAX_SCRATCHPAD(xhci->hcs_params2);
+>  
+>  	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
+> @@ -1758,7 +1758,7 @@ static void scratchpad_free(struct xhci_hcd *xhci)
+>  {
+>  	int num_sp;
+>  	int i;
+> -	struct device *dev = xhci_to_hcd(xhci)->self.controller;
+> +	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
+>  
+>  	if (!xhci->scratchpad)
+>  		return;
+> @@ -1831,7 +1831,7 @@ void xhci_free_command(struct xhci_hcd *xhci,
+>  
+>  void xhci_mem_cleanup(struct xhci_hcd *xhci)
+>  {
+> -	struct device	*dev = xhci_to_hcd(xhci)->self.controller;
+> +	struct device	*dev = xhci_to_hcd(xhci)->self.sysdev;
+>  	int size;
+>  	int i, j, num_ports;
+>  
+> @@ -2373,7 +2373,7 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
+>  int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
+>  {
+>  	dma_addr_t	dma;
+> -	struct device	*dev = xhci_to_hcd(xhci)->self.controller;
+> +	struct device	*dev = xhci_to_hcd(xhci)->self.sysdev;
+>  	unsigned int	val, val2;
+>  	u64		val_64;
+>  	struct xhci_segment	*seg;
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index 6d33b42..4ecb3fd 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/module.h>
+> +#include <linux/pci.h>
+>  #include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/usb/phy.h>
+> @@ -148,6 +149,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  {
+>  	const struct of_device_id *match;
+>  	const struct hc_driver	*driver;
+> +	struct device		*sysdev;
+>  	struct xhci_hcd		*xhci;
+>  	struct resource         *res;
+>  	struct usb_hcd		*hcd;
+> @@ -164,22 +166,39 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  	if (irq < 0)
+>  		return -ENODEV;
+>  
+> +	/*
+> +	 * sysdev must point to a device that is known to the system firmware
+> +	 * or PCI hardware. We handle these three cases here:
+> +	 * 1. xhci_plat comes from firmware
+> +	 * 2. xhci_plat is child of a device from firmware (dwc3-plat)
+> +	 * 3. xhci_plat is grandchild of a pci device (dwc3-pci)
+> +	 */
+> +	sysdev = &pdev->dev;
+> +	if (sysdev->parent && !sysdev->of_node && sysdev->parent->of_node)
+> +		sysdev = sysdev->parent;
+> +#ifdef CONFIG_PCI
+> +	else if (sysdev->parent && sysdev->parent->parent &&
+> +		 sysdev->parent->parent->bus == &pci_bus_type)
+> +		sysdev = sysdev->parent->parent;
+> +#endif
+> +
+>  	/* Try to set 64-bit DMA first */
+> -	if (!pdev->dev.dma_mask)
+> +	if (WARN_ON(!sysdev->dma_mask))
+>  		/* Platform did not initialize dma_mask */
+> -		ret = dma_coerce_mask_and_coherent(&pdev->dev,
+> +		ret = dma_coerce_mask_and_coherent(sysdev,
+>  						   DMA_BIT_MASK(64));
+>  	else
+> -		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+> +		ret = dma_set_mask_and_coherent(sysdev, DMA_BIT_MASK(64));
+>  
+>  	/* If seting 64-bit DMA mask fails, fall back to 32-bit DMA mask */
+>  	if (ret) {
+> -		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
+> +		ret = dma_set_mask_and_coherent(sysdev, DMA_BIT_MASK(32));
+>  		if (ret)
+>  			return ret;
+>  	}
+>  
+> -	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
+> +	hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
+> +			       dev_name(&pdev->dev), NULL);
+>  	if (!hcd)
+>  		return -ENOMEM;
+>  
+> @@ -222,20 +241,20 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  
+>  	xhci->clk = clk;
+>  	xhci->main_hcd = hcd;
+> -	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
+> +	xhci->shared_hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
+>  			dev_name(&pdev->dev), hcd);
+>  	if (!xhci->shared_hcd) {
+>  		ret = -ENOMEM;
+>  		goto disable_clk;
+>  	}
+>  
+> -	if (device_property_read_bool(&pdev->dev, "usb3-lpm-capable"))
+> +	if (device_property_read_bool(sysdev, "usb3-lpm-capable"))
 
-> I'm not quite sure we want to do that. We might model it as a NP clock
-> with a variable prediv?
+Why are we using sysdev to read DT property? We should be using the
+XHCI device (&pdev->dev) here, no?
 
-There's no NP clock type yet. And a problem with a variable prediv is that
-it doesn't participate in factor calculation. It's effectively fixed.
+>  		xhci->quirks |= XHCI_LPM_SUPPORT;
+>  
+>  	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
+>  		xhci->quirks |= XHCI_BROKEN_PORT_PED;
+>  
+> -	hcd->usb_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
+> +	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
 
-I did this for the A80 as well though. Fixing up the NKMP clock might be
-easier.
+Same here. The PHY is linked to the XHCI device (pdev->dev) and not its parent.
 
->
->> +/* Use a separate clock for the pre-divider on the AHB1 PLL-PERIPH input */
->> +static SUNXI_CCU_M(pll_periph_ahb1_clk, "pll-periph-ahb1", "pll-periph",
->> +                0x054, 6, 2, 0);
->> +
->> +static const char * const ahb1_parents[] = { "osc16M-d512", "osc24M",
->> +                                          "pll-periph-ahb1",
->> +                                          "pll-periph-ahb1" };
->> +static struct ccu_div ahb1_clk = {
->> +     .div            = _SUNXI_CCU_DIV_FLAGS(4, 2, CLK_DIVIDER_POWER_OF_TWO),
->> +     .mux            = _SUNXI_CCU_MUX(12, 2),
->> +     .common         = {
->> +             .reg            = 0x054,
->> +             .hw.init        = CLK_HW_INIT_PARENTS("ahb1",
->> +                                                   ahb1_parents,
->> +                                                   &ccu_div_ops,
->> +                                                   0),
->> +     },
->> +};
->
-> What's different from a pre divider only for a given index here?
+>  	if (IS_ERR(hcd->usb_phy)) {
+>  		ret = PTR_ERR(hcd->usb_phy);
+>  		if (ret == -EPROBE_DEFER)
+> diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
+> index 6d6c460..ab0839c 100644
+> --- a/drivers/usb/host/xhci.c
+> +++ b/drivers/usb/host/xhci.c
+> @@ -237,6 +237,9 @@ static int xhci_free_msi(struct xhci_hcd *xhci)
+>  static int xhci_setup_msi(struct xhci_hcd *xhci)
+>  {
+>  	int ret;
+> +	/*
+> +	 * TODO:Check with MSI Soc for sysdev
+> +	 */
+>  	struct pci_dev  *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
+>  
+>  	ret = pci_enable_msi(pdev);
+> @@ -263,7 +266,7 @@ static int xhci_setup_msi(struct xhci_hcd *xhci)
+>   */
+>  static void xhci_free_irq(struct xhci_hcd *xhci)
+>  {
+> -	struct pci_dev *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
+> +	struct pci_dev *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
+>  	int ret;
+>  
+>  	/* return if using legacy interrupt */
+> @@ -748,7 +751,7 @@ void xhci_shutdown(struct usb_hcd *hcd)
+>  	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+>  
+>  	if (xhci->quirks & XHCI_SPURIOUS_REBOOT)
+> -		usb_disable_xhci_ports(to_pci_dev(hcd->self.controller));
+> +		usb_disable_xhci_ports(to_pci_dev(hcd->self.sysdev));
+>  
+>  	spin_lock_irq(&xhci->lock);
+>  	xhci_halt(xhci);
+> @@ -765,7 +768,7 @@ void xhci_shutdown(struct usb_hcd *hcd)
+>  
+>  	/* Yet another workaround for spurious wakeups at shutdown with HSW */
+>  	if (xhci->quirks & XHCI_SPURIOUS_WAKEUP)
+> -		pci_set_power_state(to_pci_dev(hcd->self.controller), PCI_D3hot);
+> +		pci_set_power_state(to_pci_dev(hcd->self.sysdev), PCI_D3hot);
+>  }
+>  
+>  #ifdef CONFIG_PM
+> @@ -4801,7 +4804,11 @@ int xhci_get_frame(struct usb_hcd *hcd)
+>  int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
+>  {
+>  	struct xhci_hcd		*xhci;
+> -	struct device		*dev = hcd->self.controller;
+> +	/*
+> +	 * TODO: Check with DWC3 clients for sysdev according to
+> +	 * quirks
+> +	 */
+> +	struct device		*dev = hcd->self.sysdev;
+>  	int			retval;
+>  
+>  	/* Accept arbitrarily long scatter-gather lists */
+> 
 
-The variable pre-divider is shared for both pll-periph mux inputs.
-This is one way to handle it. The other would be to extend ccu_mux
-to handle multiple variable pre-dividers. I don't really want to do
-that if this is the only instance that needs it though.
-
->
->> +/*
->> + * MMC2 supports what's called the "new timing mode". The CCU and the MMC
->> + * controller must be in sync about which mode is used. The new mode moves
->> + * the clock delay controls (and possibly the delay lines) into the MMC
->> + * block. Also, the output of the clock is divided by 2. The output and
->> + * sample phase clocks are unused under this mode.
->> + *
->> + * This new mode seems to be preferred. Hence we force this clock to the
->> + * new mode. And we don't add the phase clocks.
->> + */
->
-> I'm sorry, but I said this several times, this isn't working. We
-> should model it properly, and not hack this around in the clock
-> driver.
->
-> As you say in your comment, the MMC driver needs to be aware about
-> which mode is used, in order to also set a bit in one of its registers
-> accordingly, and modify its sampling behaviour.
->
-> The new timing is preferred, but our previous clock implementations
-> didn't hardcode it, so we can't even rely on that behaviour to always
-> write it in our driver.
-
-Correct. With the A83T there has never been a merged clock driver though.
-I realize this is a one off thing.
-
-> This is not something specific to the A83T, but is found in all the
-> SoCs since the A23, so we need to come up with a good solution to
-> address that.
->
-> I'm not sure what a good solution would be though. One would be to
-> just have a private function of our own to switch in the new mode (if
-> relevant, because only the MMC2 controllers have it), but that would
-> lead to troubles with !sunxi-ng. Not something we can't deal with, but
-> some extra precautions should be taken (make sure to protect the call
-> through an ifdef / IS_DEFINED, check that the sunxi-ng driver has been
-> probed, etc.)
-
-If the custom function route is acceptable, I'll come up with something.
-
-Regards
-ChenYu
-
->
-> Or we could introduce a new clk_ops function pointer, but I'm not sure
-> if Mike and Stephen are going to be happy with that.
->
-> Thanks,
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+-- 
+cheers,
+-roger
