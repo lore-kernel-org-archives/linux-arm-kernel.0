@@ -1,70 +1,42 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 14 Feb 2017 08:50:43 +0100
-Subject: [PATCH v8 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
-In-Reply-To: <20170213154727.GN2843@localhost>
-References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170209142309eucas1p2b1277d96139eafc0d1dcc14145600476@eucas1p2.samsung.com>
- <1486650171-20598-4-git-send-email-m.szyprowski@samsung.com>
- <20170210045004.GN19244@localhost>
- <d299ae6c-78dc-9049-6bed-dc84fff17db3@samsung.com>
- <CAPDyKFqW2av1mjDvRP=R1my2kepeX69TS6cchzoHmwaoydT5Sg@mail.gmail.com>
- <20170213020340.GH2843@localhost>
- <CAPDyKFpt9O8GM-7xeNJ8bF0JqUJ7nPaRmmC+aMVsdMH-yWBCNg@mail.gmail.com>
- <20170213122742.GL2843@localhost>
- <CAPDyKFqnmhps5nhj-exZ0rnmkwdeD+iuz3CH7btjvxoJaZtVDg@mail.gmail.com>
- <20170213154727.GN2843@localhost>
-Message-ID: <ea75ca9a-efc0-2d47-d6ef-fd32e675db49@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 14 Feb 2017 09:00:10 +0100
+Subject: [PATCH 1/2] nvmem: Add driver for the i.MX IIM
+In-Reply-To: <201702140601.KZ5TOi45%fengguang.wu@intel.com>
+References: <20170213153149.11710-2-s.hauer@pengutronix.de>
+ <201702140601.KZ5TOi45%fengguang.wu@intel.com>
+Message-ID: <20170214080010.uiseljce5d6li7sc@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On Tue, Feb 14, 2017 at 06:33:25AM +0800, kbuild test robot wrote:
+> Hi Michael,
+> 
+> [auto build test ERROR on linus/master]
+> [also build test ERROR on v4.10-rc8 next-20170213]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> 
+> url:    https://github.com/0day-ci/linux/commits/Sascha-Hauer/nvmem-Add-driver-for-the-i-MX-IIM/20170214-000520
+> config: i386-allmodconfig (attached as .config)
+> compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+> reproduce:
+>         # save the attached .config to linux build tree
+>         make ARCH=i386 
+> 
+> All errors (new ones prefixed by >>):
+> 
+>    drivers/nvmem/nvmem-imx-iim: struct of_device_id is 196 bytes.  The last of 6 is:
+>    0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x66 0x73 0x6c 0x2c 0x69 0x6d 0x78 0x35 0x33 0x2d 0x69 0x69 0x6d 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0x5c 0x00 0x00 0x00 
+> >> FATAL: drivers/nvmem/nvmem-imx-iim: struct of_device_id is not terminated with a NULL entry!
+
+I'm amazed that the kbuild test is able to catch this kind of error :)
+
+Will fix in v2, but wait for other comments first.
+
+Sascha
 
 
-On 2017-02-13 16:47, Vinod Koul wrote:
-> On Mon, Feb 13, 2017 at 04:32:32PM +0100, Ulf Hansson wrote:
->> [...]
->>
->>>> Although, I don't know of other examples, besides the runtime PM use
->>>> case, where non-atomic channel prepare/unprepare would make sense. Do
->>>> you?
->>> The primary ask for that has been to enable runtime_pm for drivers. It's not
->>> a new ask, but we somehow haven't gotten around to do it.
->> Okay, I see.
->>
->>>>> As I said earlier, if we want to solve that problem a better idea is to
->>>>> actually split the prepare as we discussed in [1]
->>>>>
->>>>> This way we can get a non atomic descriptor allocate/prepare and release.
->>>>> Yes we need to redesign the APIs to solve this, but if you guys are up for
->>>>> it, I think we can do it and avoid any further round abouts :)
->>>> Adding/re-designing dma APIs is a viable option to solve the runtime PM case.
->>>>
->>>> Changes would be needed for all related dma client drivers as well,
->>>> although if that's what we need to do - let's do it.
->>> Yes, but do bear in mind that some cases do need atomic prepare. The primary
->>> cases for DMA had that in mind and also submitting next transaction from the
->>> callback (tasklet) context, so that won't go away.
->>>
->>> It would help in other cases where clients know that they will not be in
->>> atomic context so we provide additional non-atomic "allocation" followed by
->>> prepare, so that drivers can split the work among these and people can do
->>> runtime_pm and other things..
->> That for sharing the details.
->>
->> It seems like some dma expert really need to be heavily involved if we
->> ever are going to complete this work. :-)
-> Sure, I will help out :)
->
-> If anyone of you are in Portland next week, then we can discuss these f2f. I
-> will try taking a stab at the new API design next week.
-
-I'm not going to Portland, but I hope that you will have a fruitful 
-discussion
-there.
-
-[...]
-
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
