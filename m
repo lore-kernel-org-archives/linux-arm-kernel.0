@@ -1,205 +1,112 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 14 Feb 2017 12:21:48 +0200
-Subject: [PATCH v13 00/12] power: add power sequence library
-In-Reply-To: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
-References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
-Message-ID: <f34acc40-41e2-a7ea-a2aa-6cf604086182@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 14 Feb 2017 18:26:39 +0800
+Subject: [PATCH 4/5] clk: sunxi-ng: Add driver for A83T CCU
+In-Reply-To: <20170214095819.utsftcvti5zdmlmi@lukather>
+References: <20170214033526.16977-1-wens@csie.org>
+ <20170214033526.16977-5-wens@csie.org>
+ <20170214095819.utsftcvti5zdmlmi@lukather>
+Message-ID: <CAGb2v66PxbhUdqSwFc5iFN2wDVQbOsibDkckXpFsxXW1WJNe3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter,
+On Tue, Feb 14, 2017 at 5:58 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Tue, Feb 14, 2017 at 11:35:25AM +0800, Chen-Yu Tsai wrote:
+>> +/* Some PLLs are input * N / div1 / P. Model them as NKMP with no K */
+>
+> Is that even working?
 
-On 11/02/17 03:27, Peter Chen wrote:
-> Hi all,
-> 
-> This is a follow-up for my last power sequence framework patch set [1].
-> According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
-> power sequence instances will be added at postcore_initcall, the match
-> criteria is compatible string first, if the compatible string is not
-> matched between dts and library, it will try to use generic power sequence.
-> 	 
-> The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> if only one power sequence instance is needed, for more power sequences
-> are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
-> 
-> In future, if there are special power sequence requirements, the special
-> power sequence library can be created.
-> 
-> This patch set is tested on i.mx6 sabresx evk using a dts change, I use
-> two hot-plug devices to simulate this use case, the related binding
-> change is updated at patch [1/6], The udoo board changes were tested
-> using my last power sequence patch set.[3]
-> 
-> Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
-> need to power on itself before it can be found by ULPI bus.
+Looking at the nkmp clock code, only .recalc_rate will work properly though.
+Maybe I could fix up the code so it handles zero width factors.
 
-Can patches 3-7 can be sent independently of the power related patches?
+> I'm not quite sure we want to do that. We might model it as a NP clock
+> with a variable prediv?
 
-cheers,
--roger
+There's no NP clock type yet. And a problem with a variable prediv is that
+it doesn't participate in factor calculation. It's effectively fixed.
 
-> 
-> Changes for v13:
-> - Add more design descriptions at design doc and fix one build error
->   introduced by v12 wrongly [Patch 2/12]
-> - Add the last three dts patches which were forgotten at last series
-> - Move the comment for usb_create_shared_hcd to correct place [Patch 3/12]
-> - Add sysdev for shared hcd too for xhci-plat.c [Patch 6/12]
-> 
-> Rafael, if the first two power sequence patches are ok for you, would you consider
-> accept these first, the other USB patches can go through USB tree at v4.12-rc1?
-> 
-> Changes for v12:
-> - Add design doc and more comments at generic power sequence source file [Patch 2/9]
-> - Introduce four Arnd Bergmann patches and one my ehci related patches, these patches
->   are used to get property DT/firmware information at USB code, and these information
->   are needed for power sequence operation at USB. With these five patches, my chipidea
->   hack patch in previous patch set can be removed. [Patch 3-7/9]
-> - Add -ENOENT judgement to avoid USB error if no power sequence library is chosen [9/9]
-> 
-> Changes for v11:
-> - Fix warning: (USB) selects POWER_SEQUENCE which has unmet direct dependencies (OF)
-> - Delete redundant copyright statement.
-> - Change pr_warn to pr_debug at wrseq_find_available_instance
-> - Refine kerneldoc
-> - %s/ENONET/ENOENT 
-> - Allocate pwrseq list node before than carry out power sequence on 
-> - Add mutex_lock/mutex_lock for pwrseq node browse at pwrseq_find_available_instance
-> - Add pwrseq_suspend/resume for API both single instance and list 
-> - Add .pwrseq_suspend/resume for pwrseq_generic.c
-> - Add pwrseq_suspend_list and pwrseq_resume_list for USB hub suspend
->   and resume routine
-> 
-> Changes for v10:
-> - Improve the kernel-doc for power sequence core, including exported APIs and
->   main structure. [Patch 2/8]
-> - Change Kconfig, and let the user choose power sequence. [Patch 2/8]
-> - Delete EXPORT_SYMBOL and change related APIs as local, these APIs do not
->   be intended to export currently. [Patch 2/8]
-> - Selete POWER_SEQUENCE at USB core's Kconfig. [Patch 4/8]
-> 
-> Changes for v9:
-> - Add Vaibhav Hiremath's reviewed-by [Patch 4/8]
-> - Rebase to v4.9-rc1
-> 
-> Changes for v8:
-> - Allocate one extra pwrseq instance if pwrseq_get has succeed, it can avoid
->   preallocate instances problem which the number of instance is decided at
->   compile time, thanks for Heiko Stuebner's suggestion [Patch 2/8]
-> - Delete pwrseq_compatible_sample.c which is the demo purpose to show compatible
->   match method. [Patch 2/8]
-> - Add Maciej S. Szmigiero's tested-by. [Patch 7/8]
-> 
-> Changes for v7:
-> - Create kinds of power sequence instance at postcore_initcall, and match
->   the instance with node using compatible string, the beneit of this is
->   the host driver doesn't need to consider which pwrseq instance needs
->   to be used, and pwrseq core will match it, however, it eats some memories
->   if less power sequence instances are used. [Patch 2/8]
-> - Add pwrseq_compatible_sample.c to test match pwrseq using device_id. [Patch 2/8]
-> - Fix the comments Vaibhav Hiremath adds for error path for clock and do not
->   use device_node for parameters at pwrseq_on. [Patch 2/8]
-> - Simplify the caller to use power sequence, follows Alan's commnets [Patch 4/8]
-> - Tested three pwrseq instances together using both specific compatible string and
->   generic libraries.
-> 
-> Changes for v6:
-> - Add Matthias Kaehlcke's Reviewed-by and Tested-by. (patch [2/6])
-> - Change chipidea core of_node assignment for coming user. (patch [5/6])
-> - Applies Joshua Clayton's three dts changes for two boards,
->   the USB device's reg has only #address-cells, but without #size-cells.
-> 
-> Changes for v5:
-> - Delete pwrseq_register/pwrseq_unregister, which is useless currently
-> - Fix the linker error when the pwrseq user is compiled as module
-> 
-> Changes for v4:
-> - Create the patch on next-20160722 
-> - Fix the of_node is not NULL after chipidea driver is unbinded [Patch 5/6]
-> - Using more friendly wait method for reset gpio [Patch 2/6]
-> - Support multiple input clocks [Patch 2/6]
-> - Add Rob Herring's ack for DT changes
-> - Add Joshua Clayton's Tested-by
-> 
-> Changes for v3:
-> - Delete "power-sequence" property at binding-doc, and change related code
->   at both library and user code.
-> - Change binding-doc example node name with Rob's comments
-> - of_get_named_gpio_flags only gets the gpio, but without setting gpio flags,
->   add additional code request gpio with proper gpio flags
-> - Add Philipp Zabel's Ack and MAINTAINER's entry
-> 
-> Changes for v2:
-> - Delete "pwrseq" prefix and clock-names for properties at dt binding
-> - Should use structure not but its pointer for kzalloc
-> - Since chipidea core has no of_node, let core's of_node equals glue
->   layer's at core's probe
-> 
-> [1] http://www.spinics.net/lists/linux-usb/msg142755.html
-> [2] http://www.spinics.net/lists/linux-usb/msg143106.html
-> [3] http://www.spinics.net/lists/linux-usb/msg142815.html
-> [4] http://www.spinics.net/lists/linux-usb/msg152375.html
-> 
-> Arnd Bergmann (4):
->   usb: separate out sysdev pointer from usb_bus
->   usb: chipidea: use bus->sysdev for DMA configuration
->   usb: ehci: fsl: use bus->sysdev for DMA configuration
->   usb: xhci: use bus->sysdev for DMA configuration
-> 
-> Joshua Clayton (2):
->   ARM: dts: imx6qdl: Enable usb node children with <reg>
->   ARM: dts: imx6q-evi: Fix onboard hub reset line
-> 
-> Peter Chen (6):
->   binding-doc: power: pwrseq-generic: add binding doc for generic power
->     sequence library
->   power: add power sequence library
->   usb: ehci: use bus->sysdev for DMA configuration
->   binding-doc: usb: usb-device: add optional properties for power
->     sequence
->   usb: core: add power sequence handling for USB devices
->   ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
-> 
->  .../bindings/power/pwrseq/pwrseq-generic.txt       |  48 +++
->  .../devicetree/bindings/usb/usb-device.txt         |  10 +-
->  Documentation/power/power-sequence/design.rst      |  54 ++++
->  MAINTAINERS                                        |   9 +
->  arch/arm/boot/dts/imx6q-evi.dts                    |  25 +-
->  arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  26 +-
->  arch/arm/boot/dts/imx6qdl.dtsi                     |   6 +
->  drivers/power/Kconfig                              |   1 +
->  drivers/power/Makefile                             |   1 +
->  drivers/power/pwrseq/Kconfig                       |  20 ++
->  drivers/power/pwrseq/Makefile                      |   2 +
->  drivers/power/pwrseq/core.c                        | 335 +++++++++++++++++++++
->  drivers/power/pwrseq/pwrseq_generic.c              | 234 ++++++++++++++
->  drivers/usb/Kconfig                                |   1 +
->  drivers/usb/chipidea/core.c                        |   3 -
->  drivers/usb/chipidea/host.c                        |   3 +-
->  drivers/usb/chipidea/udc.c                         |  10 +-
->  drivers/usb/core/buffer.c                          |  12 +-
->  drivers/usb/core/hcd.c                             |  80 ++---
->  drivers/usb/core/hub.c                             |  49 ++-
->  drivers/usb/core/hub.h                             |   1 +
->  drivers/usb/core/usb.c                             |  18 +-
->  drivers/usb/host/ehci-fsl.c                        |   4 +-
->  drivers/usb/host/ehci-mem.c                        |  12 +-
->  drivers/usb/host/xhci-mem.c                        |  12 +-
->  drivers/usb/host/xhci-plat.c                       |  35 ++-
->  drivers/usb/host/xhci.c                            |  15 +-
->  include/linux/power/pwrseq.h                       |  81 +++++
->  include/linux/usb.h                                |   1 +
->  include/linux/usb/hcd.h                            |   3 +
->  30 files changed, 990 insertions(+), 121 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
->  create mode 100644 Documentation/power/power-sequence/design.rst
->  create mode 100644 drivers/power/pwrseq/Kconfig
->  create mode 100644 drivers/power/pwrseq/Makefile
->  create mode 100644 drivers/power/pwrseq/core.c
->  create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
->  create mode 100644 include/linux/power/pwrseq.h
-> 
+I did this for the A80 as well though. Fixing up the NKMP clock might be
+easier.
 
--- 
-cheers,
--roger
+>
+>> +/* Use a separate clock for the pre-divider on the AHB1 PLL-PERIPH input */
+>> +static SUNXI_CCU_M(pll_periph_ahb1_clk, "pll-periph-ahb1", "pll-periph",
+>> +                0x054, 6, 2, 0);
+>> +
+>> +static const char * const ahb1_parents[] = { "osc16M-d512", "osc24M",
+>> +                                          "pll-periph-ahb1",
+>> +                                          "pll-periph-ahb1" };
+>> +static struct ccu_div ahb1_clk = {
+>> +     .div            = _SUNXI_CCU_DIV_FLAGS(4, 2, CLK_DIVIDER_POWER_OF_TWO),
+>> +     .mux            = _SUNXI_CCU_MUX(12, 2),
+>> +     .common         = {
+>> +             .reg            = 0x054,
+>> +             .hw.init        = CLK_HW_INIT_PARENTS("ahb1",
+>> +                                                   ahb1_parents,
+>> +                                                   &ccu_div_ops,
+>> +                                                   0),
+>> +     },
+>> +};
+>
+> What's different from a pre divider only for a given index here?
+
+The variable pre-divider is shared for both pll-periph mux inputs.
+This is one way to handle it. The other would be to extend ccu_mux
+to handle multiple variable pre-dividers. I don't really want to do
+that if this is the only instance that needs it though.
+
+>
+>> +/*
+>> + * MMC2 supports what's called the "new timing mode". The CCU and the MMC
+>> + * controller must be in sync about which mode is used. The new mode moves
+>> + * the clock delay controls (and possibly the delay lines) into the MMC
+>> + * block. Also, the output of the clock is divided by 2. The output and
+>> + * sample phase clocks are unused under this mode.
+>> + *
+>> + * This new mode seems to be preferred. Hence we force this clock to the
+>> + * new mode. And we don't add the phase clocks.
+>> + */
+>
+> I'm sorry, but I said this several times, this isn't working. We
+> should model it properly, and not hack this around in the clock
+> driver.
+>
+> As you say in your comment, the MMC driver needs to be aware about
+> which mode is used, in order to also set a bit in one of its registers
+> accordingly, and modify its sampling behaviour.
+>
+> The new timing is preferred, but our previous clock implementations
+> didn't hardcode it, so we can't even rely on that behaviour to always
+> write it in our driver.
+
+Correct. With the A83T there has never been a merged clock driver though.
+I realize this is a one off thing.
+
+> This is not something specific to the A83T, but is found in all the
+> SoCs since the A23, so we need to come up with a good solution to
+> address that.
+>
+> I'm not sure what a good solution would be though. One would be to
+> just have a private function of our own to switch in the new mode (if
+> relevant, because only the MMC2 controllers have it), but that would
+> lead to troubles with !sunxi-ng. Not something we can't deal with, but
+> some extra precautions should be taken (make sure to protect the call
+> through an ifdef / IS_DEFINED, check that the sunxi-ng driver has been
+> probed, etc.)
+
+If the custom function route is acceptable, I'll come up with something.
+
+Regards
+ChenYu
+
+>
+> Or we could introduce a new clk_ops function pointer, but I'm not sure
+> if Mike and Stephen are going to be happy with that.
+>
+> Thanks,
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
