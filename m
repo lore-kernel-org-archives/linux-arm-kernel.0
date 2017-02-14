@@ -1,128 +1,103 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 14 Feb 2017 20:52:38 +0000
-Subject: [PATCH v3 5/5] arm64: mmu: apply strict permissions to .init.text and
- .init.data
-In-Reply-To: <1487105558-21897-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1487105558-21897-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1487105558-21897-6-git-send-email-ard.biesheuvel@linaro.org>
+From: flatmax@flatmax.org (Matt Flax)
+Date: Wed, 15 Feb 2017 08:00:36 +1100
+Subject: [alsa-devel] [PATCH v3] ASoC: bcm2835: Add 8 channel (multitrack)
+ capability
+In-Reply-To: <1487105579-3728-1-git-send-email-flatmax@flatmax.org>
+References: <1486942035-24038-1-git-send-email-flatmax@flatmax.org>
+ <1487105579-3728-1-git-send-email-flatmax@flatmax.org>
+Message-ID: <45e10ba8-aff7-e8fe-1ae3-38587bfa0957@flatmax.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To avoid having mappings that are writable and executable at the same
-time, split the init region into a .init.text region that is mapped
-read-only, and a .init.data region that is mapped non-executable.
+On 15/02/17 07:52, Matt Flax wrote:
+> This patch adds multitrack capability if in DSP mode A and the
+> codec is master.
+>
+> In bcm2835_i2s_startup, snd_pcm_hw_constraint_minmax is used to set
+> max channels to 8 if both SND_SOC_DAIFMT_CBM_CFM and
+> SND_SOC_DAIFMT_DSP_A are set. Otherwise, max channels is set to 2.
+> Min channels is always set to 2. These settings are accomplished
+> using the SNDRV_PCM_HW_PARAM_CHANNELS variable.
+>
+> In bcm2835_i2s_shutdown max channels is set to 2 by default.
+>
+> In bcm2835_i2s_hw_params, DSP mode A format is now an option.
+> Before replicating the format variable (from ch2 to ch1) for
+> register loading, requested channels are checked to be either 2 or 8.
+> This can be expaneded later to accomodate other channel counts if
+> supported by the sound card hardware.
 
-This is possible now that the alternative patching occurs via the linear
-mapping, and the linear alias of the init region is always mapped writable
-(but never executable).
+I notice my commit message didn't update, will resend with an updated 
+commit message as v4.
 
-Since the alternatives descriptions themselves are read-only data, move
-those into the .init.text region.
-
-Reviewed-by: Laura Abbott <labbott@redhat.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/sections.h |  3 ++-
- arch/arm64/kernel/vmlinux.lds.S   | 25 +++++++++++++-------
- arch/arm64/mm/mmu.c               | 12 ++++++----
- 3 files changed, 26 insertions(+), 14 deletions(-)
-
-diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
-index 4e7e7067afdb..22582819b2e5 100644
---- a/arch/arm64/include/asm/sections.h
-+++ b/arch/arm64/include/asm/sections.h
-@@ -24,7 +24,8 @@ extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
- extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
- extern char __hyp_text_start[], __hyp_text_end[];
- extern char __idmap_text_start[], __idmap_text_end[];
-+extern char __initdata_begin[], __initdata_end[];
-+extern char __inittext_begin[], __inittext_end[];
- extern char __irqentry_text_start[], __irqentry_text_end[];
- extern char __mmuoff_data_start[], __mmuoff_data_end[];
--
- #endif /* __ASM_SECTIONS_H */
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index b8deffa9e1bf..2c93d259046c 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -143,12 +143,27 @@ SECTIONS
- 
- 	. = ALIGN(SEGMENT_ALIGN);
- 	__init_begin = .;
-+	__inittext_begin = .;
- 
- 	INIT_TEXT_SECTION(8)
- 	.exit.text : {
- 		ARM_EXIT_KEEP(EXIT_TEXT)
- 	}
- 
-+	. = ALIGN(4);
-+	.altinstructions : {
-+		__alt_instructions = .;
-+		*(.altinstructions)
-+		__alt_instructions_end = .;
-+	}
-+	.altinstr_replacement : {
-+		*(.altinstr_replacement)
-+	}
-+
-+	. = ALIGN(PAGE_SIZE);
-+	__inittext_end = .;
-+	__initdata_begin = .;
-+
- 	.init.data : {
- 		INIT_DATA
- 		INIT_SETUP(16)
-@@ -164,15 +179,6 @@ SECTIONS
- 
- 	PERCPU_SECTION(L1_CACHE_BYTES)
- 
--	. = ALIGN(4);
--	.altinstructions : {
--		__alt_instructions = .;
--		*(.altinstructions)
--		__alt_instructions_end = .;
--	}
--	.altinstr_replacement : {
--		*(.altinstr_replacement)
--	}
- 	.rela : ALIGN(8) {
- 		*(.rela .rela*)
- 	}
-@@ -181,6 +187,7 @@ SECTIONS
- 	__rela_size	= SIZEOF(.rela);
- 
- 	. = ALIGN(SEGMENT_ALIGN);
-+	__initdata_end = .;
- 	__init_end = .;
- 
- 	_data = .;
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 70a492b36fe7..cb9f2716c4b6 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -485,14 +485,18 @@ early_param("rodata", parse_rodata);
-  */
- static void __init map_kernel(pgd_t *pgd)
- {
--	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
-+	static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_inittext,
-+				vmlinux_initdata, vmlinux_data;
- 
- 	pgprot_t text_prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
- 
- 	map_kernel_segment(pgd, _text, _etext, text_prot, &vmlinux_text);
--	map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
--	map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
--			   &vmlinux_init);
-+	map_kernel_segment(pgd, __start_rodata, __inittext_begin, PAGE_KERNEL,
-+			   &vmlinux_rodata);
-+	map_kernel_segment(pgd, __inittext_begin, __inittext_end, text_prot,
-+			   &vmlinux_inittext);
-+	map_kernel_segment(pgd, __initdata_begin, __initdata_end, PAGE_KERNEL,
-+			   &vmlinux_initdata);
- 	map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
- 
- 	if (!pgd_val(*pgd_offset_raw(pgd, FIXADDR_START))) {
--- 
-2.7.4
+> Signed-off-by: Matt Flax <flatmax@flatmax.org>
+> ---
+>   sound/soc/bcm/bcm2835-i2s.c | 21 ++++++++++++++++-----
+>   1 file changed, 16 insertions(+), 5 deletions(-)
+>
+> diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
+> index 6ba2049..300516d 100644
+> --- a/sound/soc/bcm/bcm2835-i2s.c
+> +++ b/sound/soc/bcm/bcm2835-i2s.c
+> @@ -296,6 +296,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
+>   
+>   	switch (dev->fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
+>   	case SND_SOC_DAIFMT_I2S:
+> +	case SND_SOC_DAIFMT_DSP_A:
+>   		data_delay = 1;
+>   		break;
+>   	default:
+> @@ -312,6 +313,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
+>   
+>   	switch (params_channels(params)) {
+>   	case 2:
+> +	case 8:
+>   		format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
+>   		format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
+>   		format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
+> @@ -526,7 +528,16 @@ static int bcm2835_i2s_startup(struct snd_pcm_substream *substream,
+>   	regmap_update_bits(dev->i2s_regmap, BCM2835_I2S_CS_A_REG,
+>   			BCM2835_I2S_STBY, BCM2835_I2S_STBY);
+>   
+> -	return 0;
+> +	/* Set the max channels to 8 if the codec is master and
+> +	 * we are in DSP A mode. Otherwise only allow 2 channels.
+> +	 */
+> +	if (dev->fmt &
+> +		(SND_SOC_DAIFMT_CBM_CFM | SND_SOC_DAIFMT_DSP_A))
+> +		return snd_pcm_hw_constraint_single(substream->runtime,
+> +			SNDRV_PCM_HW_PARAM_CHANNELS, 8);
+> +	else
+> +		return snd_pcm_hw_constraint_single(substream->runtime,
+> +			SNDRV_PCM_HW_PARAM_CHANNELS, 2);
+>   }
+>   
+>   static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
+> @@ -549,6 +560,10 @@ static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
+>   	 * not stop the clock when SND_SOC_DAIFMT_CONT
+>   	 */
+>   	bcm2835_i2s_stop_clock(dev);
+> +
+> +	/* Default to 2 channels */
+> +	snd_pcm_hw_constraint_single(substream->runtime,
+> +			SNDRV_PCM_HW_PARAM_CHANNELS, 2);
+>   }
+>   
+>   static const struct snd_soc_dai_ops bcm2835_i2s_dai_ops = {
+> @@ -576,16 +591,12 @@ static struct snd_soc_dai_driver bcm2835_i2s_dai = {
+>   	.name	= "bcm2835-i2s",
+>   	.probe	= bcm2835_i2s_dai_probe,
+>   	.playback = {
+> -		.channels_min = 2,
+> -		.channels_max = 2,
+>   		.rates =	SNDRV_PCM_RATE_8000_192000,
+>   		.formats =	SNDRV_PCM_FMTBIT_S16_LE
+>   				| SNDRV_PCM_FMTBIT_S24_LE
+>   				| SNDRV_PCM_FMTBIT_S32_LE
+>   		},
+>   	.capture = {
+> -		.channels_min = 2,
+> -		.channels_max = 2,
+>   		.rates =	SNDRV_PCM_RATE_8000_192000,
+>   		.formats =	SNDRV_PCM_FMTBIT_S16_LE
+>   				| SNDRV_PCM_FMTBIT_S24_LE
