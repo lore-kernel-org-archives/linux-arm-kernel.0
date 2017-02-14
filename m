@@ -1,418 +1,559 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 14 Feb 2017 14:29:14 +0100
-Subject: [PATCH V6 4/5] LPC: Support the device-tree LPC host on
- Hip06/Hip07
-In-Reply-To: <58A1C50F.7090108@hisilicon.com>
-References: <1485241525-201782-1-git-send-email-yuanzhichang@hisilicon.com>
- <1485241525-201782-5-git-send-email-yuanzhichang@hisilicon.com>
- <a5a24e73-013d-87b5-f65f-324417f4cc60@suse.de>
- <58A1C50F.7090108@hisilicon.com>
-Message-ID: <43b981bc-72c0-c6e7-d6f6-9ba9c63d9bdb@suse.de>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 14 Feb 2017 21:31:25 +0800
+Subject: [PATCH v1 3/3] ASoC: zx-tdm: add zte's tdm controller driver
+In-Reply-To: <1486973853-25291-3-git-send-email-baoyou.xie@linaro.org>
+References: <1486973853-25291-1-git-send-email-baoyou.xie@linaro.org>
+ <1486973853-25291-3-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170214133121.GC4151@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Feb 13, 2017 at 04:17:33PM +0800, Baoyou Xie wrote:
+> This patch adds tdm controller driver for zte's SoC family.
+> 
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 
+The patch looks rather pretty to me.  I have only a few small comments
+below.
 
-On 13/02/2017 15:39, zhichang.yuan wrote:
-> Hi, Alex,
->
-> Thanks for your review!
->
-> John had replied most of your comments, I only mentioned those which haven't made clear.
->
->
-> On 2017/1/31 4:08, Alexander Graf wrote:
->>
->>
->> On 24/01/2017 08:05, zhichang.yuan wrote:
->>> The low-pin-count(LPC) interface of Hip06/Hip07 accesses the peripherals in
->>> I/O port addresses. This patch implements the LPC host controller driver which
->>> perform the I/O operations on the underlying hardware.
->>> We don't want to touch those existing peripherals' driver, such as ipmi-bt. So
->>> this driver applies the indirect-IO introduced in the previous patch after
->>> registering an indirect-IO node to the indirect-IO devices list which will be
->>> searched in the I/O accessors.
->>> As the I/O translations for LPC children depend on the host I/O registration,
->>> we should ensure the host I/O registration is finished before all the LPC
->>> children scanning. That is why an arch_init() hook was added in this patch.
->>>
->>> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
->>> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
->>> ---
->>>  .../arm/hisilicon/hisilicon-low-pin-count.txt      |  33 ++
->>>  MAINTAINERS                                        |   9 +
->>>  arch/arm64/boot/dts/hisilicon/hip06-d03.dts        |   4 +
->>>  arch/arm64/boot/dts/hisilicon/hip06.dtsi           |  14 +
->>>  drivers/bus/Kconfig                                |   8 +
->>>  drivers/bus/Makefile                               |   1 +
->>>  drivers/bus/hisi_lpc.c                             | 599 +++++++++++++++++++++
->>>  7 files changed, 668 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
->>>  create mode 100644 drivers/bus/hisi_lpc.c
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
->>> new file mode 100644
->>> index 0000000..213181f
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
->>> @@ -0,0 +1,33 @@
->>> +Hisilicon Hip06 low-pin-count device
->>> +  Hisilicon Hip06 SoCs implement a Low Pin Count (LPC) controller, which
->>> +  provides I/O access to some legacy ISA devices.
->>> +  Hip06 is based on arm64 architecture where there is no I/O space. So, the
->>> +  I/O ports here are not cpu addresses, and there is no 'ranges' property in
->>> +  LPC device node.
->>> +
->>> +Required properties:
->>> +- compatible:  value should be as follows:
->>> +    (a) "hisilicon,hip06-lpc"
->>> +    (b) "hisilicon,hip07-lpc"
->>> +- #address-cells: must be 2 which stick to the ISA/EISA binding doc.
->>> +- #size-cells: must be 1 which stick to the ISA/EISA binding doc.
->>> +- reg: base memory range where the LPC register set is mapped.
->>> +
->>> +Note:
->>> +  The node name before '@' must be "isa" to represent the binding stick to the
->>> +  ISA/EISA binding specification.
->>> +
->>> +Example:
->>> +
->>> +isa at a01b0000 {
->>> +    compatible = "hisilicon,hip06-lpc";
->>> +    #address-cells = <2>;
->>> +    #size-cells = <1>;
->>> +    reg = <0x0 0xa01b0000 0x0 0x1000>;
->>> +
->>> +    ipmi0: bt at e4 {
->>> +        compatible = "ipmi-bt";
->>> +        device_type = "ipmi";
->>> +        reg = <0x01 0xe4 0x04>;
->>> +    };
->>> +};
->>> diff --git a/MAINTAINERS b/MAINTAINERS
->>> index 26edd83..0153707 100644
->>> --- a/MAINTAINERS
->>> +++ b/MAINTAINERS
->>> @@ -5855,6 +5855,15 @@ F:    include/uapi/linux/if_hippi.h
->>>  F:    net/802/hippi.c
->>>  F:    drivers/net/hippi/
->>>
->>> +HISILICON LPC BUS DRIVER
->>> +M:    Zhichang Yuan <yuanzhichang@hisilicon.com>
->>> +L:    linux-arm-kernel at lists.infradead.org
->>> +W:    http://www.hisilicon.com
->>> +S:    Maintained
->>> +F:    drivers/bus/hisi_lpc.c
->>> +F:    lib/extio.c
->>> +F:    Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
->>> +
->>>  HISILICON NETWORK SUBSYSTEM DRIVER
->>>  M:    Yisen Zhuang <yisen.zhuang@huawei.com>
->>>  M:    Salil Mehta <salil.mehta@huawei.com>
->>> diff --git a/arch/arm64/boot/dts/hisilicon/hip06-d03.dts b/arch/arm64/boot/dts/hisilicon/hip06-d03.dts
->>> index 7c4114a..75b2b5c 100644
->>> --- a/arch/arm64/boot/dts/hisilicon/hip06-d03.dts
->>> +++ b/arch/arm64/boot/dts/hisilicon/hip06-d03.dts
->>> @@ -52,3 +52,7 @@
->>>  &usb_ehci {
->>>      status = "ok";
->>>  };
->>> +
->>> +&ipmi0 {
->>> +    status = "ok";
->>> +};
->>> diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
->>> index a049b64..c450f8d 100644
->>> --- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
->>> +++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
->>> @@ -318,6 +318,20 @@
->>>          #size-cells = <2>;
->>>          ranges;
->>>
->>> +        isa at a01b0000 {
->>> +            compatible = "hisilicon,hip06-lpc";
->>> +            #size-cells = <1>;
->>> +            #address-cells = <2>;
->>> +            reg = <0x0 0xa01b0000 0x0 0x1000>;
->>> +
->>> +            ipmi0: bt at e4 {
->>> +                compatible = "ipmi-bt";
->>> +                device_type = "ipmi";
->>> +                reg = <0x01 0xe4 0x04>;
->>> +                status = "disabled";
->>> +            };
->>> +        };
->>> +
->>>          refclk: refclk {
->>>              compatible = "fixed-clock";
->>>              clock-frequency = <50000000>;
->>> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
->>> index b9e8cfc..58cee84 100644
->>> --- a/drivers/bus/Kconfig
->>> +++ b/drivers/bus/Kconfig
->>> @@ -64,6 +64,14 @@ config BRCMSTB_GISB_ARB
->>>        arbiter. This driver provides timeout and target abort error handling
->>>        and internal bus master decoding.
->>>
->>> +config HISILICON_LPC
->>> +    bool "Workaround for nonstandard ISA I/O space on Hisilicon Hip0X"
->>
->> It's not a workaround, it's support. Better word it like
->>
->>   "Support for ISA I/O space on Hisilicon HIP0X"
->>
->>> +    depends on (ARM64 && ARCH_HISI && PCI) || COMPILE_TEST
->>> +    select INDIRECT_PIO
->>> +    help
->>> +      Driver needed for some legacy ISA devices attached to Low-Pin-Count
->>> +      on Hisilicon Hip0X SoC.
->>> +
->>>  config IMX_WEIM
->>>      bool "Freescale EIM DRIVER"
->>>      depends on ARCH_MXC
->>> diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
->>> index cc6364b..28e3862 100644
->>> --- a/drivers/bus/Makefile
->>> +++ b/drivers/bus/Makefile
->>> @@ -7,6 +7,7 @@ obj-$(CONFIG_ARM_CCI)        += arm-cci.o
->>>  obj-$(CONFIG_ARM_CCN)        += arm-ccn.o
->>>
->>>  obj-$(CONFIG_BRCMSTB_GISB_ARB)    += brcmstb_gisb.o
->>> +obj-$(CONFIG_HISILICON_LPC)    += hisi_lpc.o
->>>  obj-$(CONFIG_IMX_WEIM)        += imx-weim.o
->>>  obj-$(CONFIG_MIPS_CDMM)        += mips_cdmm.o
->>>  obj-$(CONFIG_MVEBU_MBUS)     += mvebu-mbus.o
->>> diff --git a/drivers/bus/hisi_lpc.c b/drivers/bus/hisi_lpc.c
->>> new file mode 100644
->>> index 0000000..a96e384
->>> --- /dev/null
->>> +++ b/drivers/bus/hisi_lpc.c
->>> @@ -0,0 +1,599 @@
->>> +/*
->>> + * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
->>> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
->>> + * Author: Zou Rongrong <zourongrong@huawei.com>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + *
->>> + * You should have received a copy of the GNU General Public License
->>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>> + */
->>> +
->>> +#include <linux/acpi.h>
->>> +#include <linux/console.h>
->>> +#include <linux/delay.h>
->>> +#include <linux/io.h>
->>> +#include <linux/module.h>
->>> +#include <linux/of.h>
->>> +#include <linux/of_address.h>
->>> +#include <linux/of_platform.h>
->>> +#include <linux/pci.h>
->>> +#include <linux/serial_8250.h>
->>> +#include <linux/slab.h>
->>> +
->>> +/*
->>> + * Setting this bit means each IO operation will target to a
->>> + * different port address:
->>> + * 0 means repeatedly IO operations will stick on the same port,
->>> + * such as BT;
->>> + */
->>> +#define FG_INCRADDR_LPC        0x02
->>> +
->>> +struct lpc_cycle_para {
->>> +    unsigned int opflags;
->>> +    unsigned int csize; /* the data length of each operation */
->>> +};
->>> +
->>> +struct hisilpc_dev {
->>> +    spinlock_t cycle_lock;
->>> +    void __iomem  *membase;
->>> +    struct extio_node *extio;
->>> +};
->>> +
->>> +/* bounds of the LPC bus address range */
->>> +#define LPC_MIN_BUS_RANGE    0x0
->>> +
->>> +/*
->>> + * The maximal IO size for each leagcy bus.
->>
->> legacy?
->>
->> I don't really understand why this bus is legacy though. It looks like a simple MMIO-to-LPC bridge to me.
->
-> yes. The LPC bus is MMIO-to-LPC bridge.
-> My comment is not clear.
->
-> How about "The maximal IO size of LPC bus"?
+> ---
+>  sound/soc/zte/Kconfig  |   8 +
+>  sound/soc/zte/Makefile |   1 +
+>  sound/soc/zte/zx-tdm.c | 466 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 475 insertions(+)
+>  create mode 100644 sound/soc/zte/zx-tdm.c
+> 
+> diff --git a/sound/soc/zte/Kconfig b/sound/soc/zte/Kconfig
+> index 6d8a90d..75f67a5 100644
+> --- a/sound/soc/zte/Kconfig
+> +++ b/sound/soc/zte/Kconfig
+> @@ -15,3 +15,11 @@ config ZX_I2S
+>  	help
+>  	  Say Y or M if you want to add support for codecs attached to the
+>  	  ZTE ZX I2S interface
+> +
+> +config ZX_TDM
+> +        tristate "ZTE ZX TDM Driver Support"
+> +        depends on COMMON_CLK
+> +        select SND_SOC_GENERIC_DMAENGINE_PCM
+> +        help
+> +          Say Y or M if you want to add support for codecs attached to the
+> +          ZTE ZX TDM interface
+> diff --git a/sound/soc/zte/Makefile b/sound/soc/zte/Makefile
+> index 77768f5..1fc841a 100644
+> --- a/sound/soc/zte/Makefile
+> +++ b/sound/soc/zte/Makefile
+> @@ -1,2 +1,3 @@
+>  obj-$(CONFIG_ZX_SPDIF)	+= zx-spdif.o
+>  obj-$(CONFIG_ZX_I2S)	+= zx-i2s.o
+> +obj-$(CONFIG_ZX_TDM)	+= zx-tdm.o
+> diff --git a/sound/soc/zte/zx-tdm.c b/sound/soc/zte/zx-tdm.c
+> new file mode 100644
+> index 0000000..72e5136
+> --- /dev/null
+> +++ b/sound/soc/zte/zx-tdm.c
+> @@ -0,0 +1,466 @@
+> +/*
+> + * ZTE's TDM driver
+> + *
+> + * Copyright (C) 2017 ZTE Ltd
+> + *
+> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
+> + *
+> + * License terms: GNU General Public License (GPL) version 2
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/module.h>
+> +#include <sound/dmaengine_pcm.h>
+> +#include <sound/pcm_params.h>
+> +#include <sound/soc.h>
+> +#include <sound/soc-dai.h>
+> +
+> +#define REG_TIMING_CTRL		0x04
+> +#define	REG_TX_FIFO_CTRL	0x0C
+> +#define	REG_RX_FIFO_CTRL	0x10
 
-That sounds better, but doesn't really tell me what it's about yet ;).
+Please consistently use space instead of tab right after #define.
 
->
->>
->>> + * The port size of legacy I/O devices is normally less than 0x400.
->>> + * Defining the I/O range size as 0x400 here should be sufficient for
->>> + * all peripherals under one bus.
->>> + */
->>
->> This comment doesn't make a lot of sense. What is the limit? Is there a hardware limit?
->>
->> We don't dynamically allocate devices on the lpc bus, so why imply a limit at all?
->
-> The limit here is to define an IO window for LPC.
-> It is not acceptable to describe the IO window with 'ranges' property in LPC host node, so we choose a fixable upper IO limit
-> for the static LPC IO space. Without this, LPC can't register its IO space through extio helpers.
->
-> Why 0x400 is chosen? For our LPC, 0x400 cover all the peripherals under the LPC.
+> +#define REG_INT_EN		0x1C
+> +#define REG_INT_STATUS		0x20
+> +#define REG_DATABUF		0x24
+> +#define REG_TS_MASK0		0x44
+> +#define REG_PROCESS_CTRL	0x54
+> +
+> +#define FIFO_CTRL_TX_RST	BIT(0)
+> +#define FIFO_CTRL_RX_RST	BIT(0)
+> +#define DEAGULT_FIFO_THRES	GENMASK(4, 2)
+> +
+> +#define FIFO_CTRL_TX_DMA_EN	BIT(1)
+> +#define FIFO_CTRL_RX_DMA_EN	BIT(1)
+> +
+> +#define TX_FIFO_RST_MASK	BIT(0)
+> +#define RX_FIFO_RST_MASK	BIT(0)
+> +
+> +#define FIFOCTRL_TX_FIFO_RST	BIT(0)
+> +#define FIFOCTRL_RX_FIFO_RST	BIT(0)
+> +
+> +#define TXTH_MASK		GENMASK(5, 2)
+> +#define RXTH_MASK		GENMASK(5, 2)
+> +
+> +#define FIFOCTRL_THRESHOLD(x)	(x << 2)
 
-This is information that should come from firmware then. Whether by 
-coincidence addresses 0x0 - 0x400 include all devices is an 
-implementation detail that the driver shouldn't have to know about.
+((x) << 2)
 
-That said, as mentioned elsewhere, we don't need to define single 
-windows at all. Instead, can't we just do it like PCI BARs and declare 
-all PIO regions we get from firmware as readily allocated? Then we only 
-need to explicitly assign ports 0x80, 0x81, 0x99, etc to the LPC bridge 
-and leave the rest for grabs (by PCI hotplug for example)
+> +
+> +#define TIMING_MS_MASK		BIT(1)
+> +/*
+> + * 00: 8 clk cycles every timeslot
+> + * 01: 16 clk cycles every timeslot
+> + * 10: 32 clk cycles every timeslot
+> + */
+> +#define TIMING_SYNC_WIDTH_MASK	GENMASK(6, 5)
+> +#define TIMING_WIDTH_SHIFT      5
+> +#define TIMING_DEFAULT_WIDTH    0
+> +#define TIMING_TS_WIDTH(x)	((x) << TIMING_WIDTH_SHIFT)
+> +#define TIMING_WIDTH_FACTOR     8
+> +
+> +#define TIMING_MASTER_MODE	BIT(21)
+> +#define TIMING_LSB_FIRST	BIT(20)
+> +#define TIMING_TS_NUM(x)	((x - 1) << 7)
 
->
->
->
->
->>
->>> +#define LPC_BUS_IO_SIZE        0x400
->>> +
->>> +/* The maximum continuous operations */
->>> +#define LPC_MAX_OPCNT    16
->>> +/* only support IO data unit length is four at maximum */
->>> +#define LPC_MAX_DULEN    4
->>> +#if LPC_MAX_DULEN > LPC_MAX_OPCNT
->>> +#error "LPC.. MAX_DULEN must be not bigger than MAX_OPCNT!"
->>> +#endif
->>> +
->>> +#define LPC_REG_START        0x00 /* start a new LPC cycle */
->>> +#define LPC_REG_OP_STATUS    0x04 /* the current LPC status */
->>> +#define LPC_REG_IRQ_ST        0x08 /* interrupt enable&status */
->>> +#define LPC_REG_OP_LEN        0x10 /* how many LPC cycles each start */
->>> +#define LPC_REG_CMD        0x14 /* command for the required LPC cycle */
->>> +#define LPC_REG_ADDR        0x20 /* LPC target address */
->>> +#define LPC_REG_WDATA        0x24 /* data to be written */
->>> +#define LPC_REG_RDATA        0x28 /* data coming from peer */
->>> +
->>> +
->>> +/* The command register fields */
->>> +#define LPC_CMD_SAMEADDR    0x08
->>> +#define LPC_CMD_TYPE_IO        0x00
->>> +#define LPC_CMD_WRITE        0x01
->>> +#define LPC_CMD_READ        0x00
->>> +/* the bit attribute is W1C. 1 represents OK. */
->>> +#define LPC_STAT_BYIRQ        0x02
->>> +
->>> +#define LPC_STATUS_IDLE        0x01
->>> +#define LPC_OP_FINISHED        0x02
->>> +
->>> +#define START_WORK        0x01
->>> +
->>> +/*
->>> + * The minimal waiting interval... Suggest it is not less than 10.
->>> + * Bigger value probably will lower the performance.
->>
->> Are you sure you want this comment to be upstream? :)
->>
->>> + */
->>> +#define LPC_NSEC_PERWAIT    100
->>> +/*
->>> + * The maximum waiting time is about 128us.
->>> + * The fastest IO cycle time is about 390ns, but the worst case will wait
->>> + * for extra 256 lpc clocks, so (256 + 13) * 30ns = 8 us. The maximum
->>> + * burst cycles is 16. So, the maximum waiting time is about 128us under
->>> + * worst case.
->>> + * choose 1300 as the maximum.
->>> + */
->>> +#define LPC_MAX_WAITCNT        1300
->>> +/* About 10us. This is specific for single IO operation, such as inb. */
->>> +#define LPC_PEROP_WAITCNT    100
->>> +
->>> +
->>> +static inline int wait_lpc_idle(unsigned char *mbase,
->>
->> No need to specify inline.
->>
->>> +                unsigned int waitcnt) {
->>> +    u32 opstatus;
->>> +
->>> +    while (waitcnt--) {
->>> +        ndelay(LPC_NSEC_PERWAIT);
->>> +        opstatus = readl(mbase + LPC_REG_OP_STATUS);
->>> +        if (opstatus & LPC_STATUS_IDLE)
->>> +            return (opstatus & LPC_OP_FINISHED) ? 0 : (-EIO);
->>
->> It's a shame we have to busy loop, but I guess no calling code outside is prepared for rescheduling at this point.
->>
->>> +    }
->>> +    return -ETIME;
->>> +}
->>> +
->>> +/*
->>> + * hisilpc_target_in - trigger a series of lpc cycles to read required data
->>> + *               from target peripheral.
->>> + * @pdev: pointer to hisi lpc device
->>> + * @para: some parameters used to control the lpc I/O operations
->>> + * @ptaddr: the lpc I/O target port address
->>> + * @buf: where the read back data is stored
->>> + * @opcnt: how many I/O operations required in this calling
->>> + *
->>> + * Only one byte data is read each I/O operation.
->>> + *
->>> + * Returns 0 on success, non-zero on fail.
->>> + *
->>> + */
->>> +static int
->>> +hisilpc_target_in(struct hisilpc_dev *lpcdev, struct lpc_cycle_para *para,
->>> +          unsigned long ptaddr, unsigned char *buf,
->>> +          unsigned long opcnt)
->>> +{
->>> +    unsigned long cnt_per_trans;
->>> +    unsigned int cmd_word;
->>> +    unsigned int waitcnt;
->>> +    int ret;
->>> +
->>> +    if (!buf || !opcnt || !para || !para->csize || !lpcdev)
->>> +        return -EINVAL;
->>> +
->>> +    if (opcnt  > LPC_MAX_OPCNT)
->>> +        return -EINVAL;
->>> +
->>> +    cmd_word = LPC_CMD_TYPE_IO | LPC_CMD_READ;
->>> +    waitcnt = LPC_PEROP_WAITCNT;
->>> +    if (!(para->opflags & FG_INCRADDR_LPC)) {
->>> +        cmd_word |= LPC_CMD_SAMEADDR;
->>> +        waitcnt = LPC_MAX_WAITCNT;
->>> +    }
->>> +
->>> +    ret = 0;
->>> +    cnt_per_trans = (para->csize == 1) ? opcnt : para->csize;
->>> +    for (; opcnt && !ret; cnt_per_trans = para->csize) {
->>> +        unsigned long flags;
->>> +
->>> +        /* whole operation must be atomic */
->>> +        spin_lock_irqsave(&lpcdev->cycle_lock, flags);
->>
->> Ouch. This is going to kill your RT jitter. Is there no better way?
->
-> I think there is no other choices. We have to ensure the I/O cycles triggered in serial mode....
+Ditto
 
-As nobody else accesses the LPC device in the meantime thanks to the 
-lock, you don't need to disable interrupts, right?
+> +#define TIMING_CLK_SEL_MASK	GENMASK(2, 0)
+> +#define TIMING_CLK_SEL_DEF	BIT(2)
+> +
+> +#define PROCESS_TX_EN		BIT(0)
+> +#define PROCESS_RX_EN		BIT(1)
+> +#define PROCESS_TDM_EN		BIT(2)
+> +#define PROCESS_DISABLE_ALL	0
+> +
+> +#define INT_DISABLE_ALL		0
+> +#define INT_STATUS_MASK		GENMASK(6, 0)
+> +
+> +struct zx_tdm_info {
+> +	struct snd_dmaengine_dai_dma_data	dma_playback;
+> +	struct snd_dmaengine_dai_dma_data	dma_capture;
+> +	resource_size_t				phy_addr;
+> +	void __iomem				*regmap;
 
-IIRC in PREEMPT_RT, a normal spinlock becomes a mutex and allows for 
-resched during the LPC transaction.
+Variable name 'regmap' is usually used with 'struct regmap *' type.
 
+> +	struct clk				*dai_wclk;
+> +	struct clk				*dai_pclk;
+> +	int					master;
+> +	struct device				*dev;
+> +};
+> +
+> +static inline u32 zx_tdm_readl(struct zx_tdm_info *tdm, u16 reg)
+> +{
+> +	return readl_relaxed(tdm->regmap + reg);
+> +}
+> +
+> +static inline void zx_tdm_writel(struct zx_tdm_info *tdm, u16 reg, u32 val)
+> +{
+> +	writel_relaxed(val, tdm->regmap + reg);
+> +}
+> +
+> +static void zx_tdm_tx_en(struct zx_tdm_info *tdm, bool on)
+> +{
+> +	unsigned long val;
+> +
+> +	val = zx_tdm_readl(tdm, REG_PROCESS_CTRL);
+> +	if (on)
+> +		val |= PROCESS_TX_EN | PROCESS_TDM_EN;
+> +	else
+> +		val &= ~(PROCESS_TX_EN | PROCESS_TDM_EN);
+> +	zx_tdm_writel(tdm, REG_PROCESS_CTRL, val);
+> +}
+> +
+> +static void zx_tdm_rx_en(struct zx_tdm_info *tdm, bool on)
+> +{
+> +	unsigned long val;
+> +
+> +	val = zx_tdm_readl(tdm, REG_PROCESS_CTRL);
+> +	if (on)
+> +		val |= PROCESS_RX_EN | PROCESS_TDM_EN;
+> +	else
+> +		val &= ~(PROCESS_RX_EN | PROCESS_TDM_EN);
+> +	zx_tdm_writel(tdm, REG_PROCESS_CTRL, val);
+> +}
+> +
+> +static void zx_tdm_tx_dma_en(struct zx_tdm_info *tdm, bool on)
+> +{
+> +	unsigned long val;
+> +
+> +	val = zx_tdm_readl(tdm, REG_TX_FIFO_CTRL);
+> +	val |= FIFO_CTRL_TX_RST | DEAGULT_FIFO_THRES;
+> +	if (on)
+> +		val |= FIFO_CTRL_TX_DMA_EN;
+> +	else
+> +		val &= ~FIFO_CTRL_TX_DMA_EN;
+> +	zx_tdm_writel(tdm, REG_TX_FIFO_CTRL, val);
+> +}
+> +
+> +static void zx_tdm_rx_dma_en(struct zx_tdm_info *tdm, bool on)
+> +{
+> +	unsigned long val;
+> +
+> +	val = zx_tdm_readl(tdm, REG_RX_FIFO_CTRL);
+> +	val |= FIFO_CTRL_RX_RST | DEAGULT_FIFO_THRES;
+> +	if (on)
+> +		val |= FIFO_CTRL_RX_DMA_EN;
+> +	else
+> +		val &= ~FIFO_CTRL_RX_DMA_EN;
+> +	zx_tdm_writel(tdm, REG_RX_FIFO_CTRL, val);
+> +}
+> +
+> +#define ZX_TDM_RATES	(SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000)
+> +
+> +#define ZX_TDM_FMTBIT \
+> +	(SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FORMAT_MU_LAW | \
+> +	SNDRV_PCM_FORMAT_A_LAW)
+> +
+> +static int zx_tdm_dai_probe(struct snd_soc_dai *dai)
+> +{
+> +	struct zx_tdm_info *zx_tdm = dev_get_drvdata(dai->dev);
+> +
+> +	snd_soc_dai_set_drvdata(dai, zx_tdm);
+> +	zx_tdm->dma_playback.addr = zx_tdm->phy_addr + REG_DATABUF;
+> +	zx_tdm->dma_playback.maxburst = 16;
+> +	zx_tdm->dma_capture.addr = zx_tdm->phy_addr + REG_DATABUF;
+> +	zx_tdm->dma_capture.maxburst = 16;
+> +	snd_soc_dai_init_dma_data(dai, &zx_tdm->dma_playback,
+> +				  &zx_tdm->dma_capture);
+> +	return 0;
+> +}
+> +
+> +static int zx_tdm_set_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
+> +{
+> +	struct zx_tdm_info *tdm = snd_soc_dai_get_drvdata(cpu_dai);
+> +	unsigned long val;
+> +
+> +	val = zx_tdm_readl(tdm, REG_TIMING_CTRL);
+> +	val &= ~(TIMING_SYNC_WIDTH_MASK | TIMING_MS_MASK);
+> +	val |= TIMING_DEFAULT_WIDTH << TIMING_WIDTH_SHIFT;
+> +
+> +	switch (fmt & SND_SOC_DAIFMT_MASTER_MASK) {
+> +	case SND_SOC_DAIFMT_CBM_CFM:
+> +		tdm->master = 1;
+> +		val |= TIMING_MASTER_MODE;
+> +		break;
+> +	case SND_SOC_DAIFMT_CBS_CFS:
+> +		tdm->master = 0;
+> +		val &= (~TIMING_MASTER_MODE);
 
-Alex
+Unnecessary parenthesis.
+
+> +		break;
+> +	default:
+> +		dev_err(cpu_dai->dev, "Unknown master/slave format\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +
+> +	zx_tdm_writel(tdm, REG_TIMING_CTRL, val);
+> +
+> +	return 0;
+> +}
+> +
+> +static int zx_tdm_hw_params(struct snd_pcm_substream *substream,
+> +			    struct snd_pcm_hw_params *params,
+> +			    struct snd_soc_dai *socdai)
+> +{
+> +	struct zx_tdm_info *tdm = snd_soc_dai_get_drvdata(socdai);
+> +	struct snd_dmaengine_dai_dma_data *dma_data;
+> +	unsigned int ts_width = TIMING_DEFAULT_WIDTH;
+> +	unsigned int ch_num = 32;
+> +	unsigned int mask = 0;
+> +	unsigned int ret = 0;
+> +	unsigned long val;
+> +
+> +	dma_data = snd_soc_dai_get_dma_data(socdai, substream);
+> +	dma_data->addr_width = ch_num >> 3;
+> +
+> +	switch (params_format(params)) {
+> +	case SNDRV_PCM_FORMAT_MU_LAW:
+> +	case SNDRV_PCM_FORMAT_A_LAW:
+> +	case SNDRV_PCM_FORMAT_S16_LE:
+> +		ts_width = 1;
+> +		break;
+> +	default:
+> +		ts_width = 0;
+> +		dev_err(socdai->dev, "Unknown data format\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	val = zx_tdm_readl(tdm, REG_TIMING_CTRL);
+> +	val |= TIMING_TS_WIDTH(ts_width) | TIMING_TS_NUM(1);
+> +	zx_tdm_writel(tdm, REG_TIMING_CTRL, val);
+> +	zx_tdm_writel(tdm, REG_TS_MASK0, mask);
+> +
+> +	if (tdm->master)
+> +		ret = clk_set_rate(tdm->dai_wclk,
+> +			params_rate(params) * TIMING_WIDTH_FACTOR * ch_num);
+> +
+> +	return ret;
+> +}
+> +
+> +static int zx_tdm_trigger(struct snd_pcm_substream *substream, int cmd,
+> +			  struct snd_soc_dai *dai)
+> +{
+> +	int capture = (substream->stream == SNDRV_PCM_STREAM_CAPTURE);
+> +	struct zx_tdm_info *zx_tdm = dev_get_drvdata(dai->dev);
+> +	unsigned int val;
+> +	int ret = 0;
+> +
+> +	switch (cmd) {
+> +	case SNDRV_PCM_TRIGGER_START:
+> +		if (capture) {
+> +			val = zx_tdm_readl(zx_tdm, REG_RX_FIFO_CTRL);
+> +			val |= FIFOCTRL_RX_FIFO_RST;
+> +			zx_tdm_writel(zx_tdm, REG_RX_FIFO_CTRL, val);
+> +
+> +			zx_tdm_rx_dma_en(zx_tdm, true);
+> +		} else {
+> +			val = zx_tdm_readl(zx_tdm, REG_TX_FIFO_CTRL);
+> +			val |= FIFOCTRL_TX_FIFO_RST;
+> +			zx_tdm_writel(zx_tdm, REG_TX_FIFO_CTRL, val);
+> +
+> +			zx_tdm_tx_dma_en(zx_tdm, true);
+> +		}
+> +		break;
+> +	case SNDRV_PCM_TRIGGER_RESUME:
+> +	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+> +		if (capture)
+> +			zx_tdm_rx_en(zx_tdm, true);
+> +		else
+> +			zx_tdm_tx_en(zx_tdm, true);
+> +		break;
+> +	case SNDRV_PCM_TRIGGER_STOP:
+> +		if (capture)
+> +			zx_tdm_rx_dma_en(zx_tdm, false);
+> +		else
+> +			zx_tdm_tx_dma_en(zx_tdm, false);
+> +		break;
+> +	case SNDRV_PCM_TRIGGER_SUSPEND:
+> +	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+> +		if (capture)
+> +			zx_tdm_rx_en(zx_tdm, false);
+> +		else
+> +			zx_tdm_tx_en(zx_tdm, false);
+> +		break;
+> +	default:
+> +		ret = -EINVAL;
+> +		break;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static int zx_tdm_startup(struct snd_pcm_substream *substream,
+> +			  struct snd_soc_dai *dai)
+> +{
+> +	struct zx_tdm_info *zx_tdm = dev_get_drvdata(dai->dev);
+> +	int ret;
+> +
+> +	ret = clk_prepare_enable(zx_tdm->dai_wclk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = clk_prepare_enable(zx_tdm->dai_pclk);
+> +	if (ret) {
+> +		clk_disable_unprepare(zx_tdm->dai_wclk);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void zx_tdm_shutdown(struct snd_pcm_substream *substream,
+> +			    struct snd_soc_dai *dai)
+> +{
+> +	struct zx_tdm_info *zx_tdm = dev_get_drvdata(dai->dev);
+> +
+> +	clk_disable_unprepare(zx_tdm->dai_pclk);
+> +	clk_disable_unprepare(zx_tdm->dai_wclk);
+> +}
+> +
+> +static struct snd_soc_dai_ops zx_tdm_dai_ops = {
+> +	.trigger	= zx_tdm_trigger,
+> +	.hw_params	= zx_tdm_hw_params,
+> +	.set_fmt	= zx_tdm_set_fmt,
+> +	.startup	= zx_tdm_startup,
+> +	.shutdown	= zx_tdm_shutdown,
+> +};
+> +
+> +static const struct snd_soc_component_driver zx_tdm_component = {
+> +	.name			= "zx-tdm",
+> +};
+> +
+> +static void zx_tdm_init_state(struct zx_tdm_info *tdm)
+> +{
+> +	unsigned int val;
+> +
+> +	zx_tdm_writel(tdm, REG_PROCESS_CTRL, PROCESS_DISABLE_ALL);
+> +
+> +	val = zx_tdm_readl(tdm, REG_TIMING_CTRL);
+> +	val |= TIMING_LSB_FIRST;
+> +	val &= (~TIMING_CLK_SEL_MASK);
+
+Unnecessary parenthesis.
+
+> +	val |= TIMING_CLK_SEL_DEF;
+> +	zx_tdm_writel(tdm, REG_TIMING_CTRL, val);
+> +
+> +	zx_tdm_writel(tdm, REG_INT_EN, INT_DISABLE_ALL);
+> +	/*
+> +	 * write INT_STATUS register to clear it.
+> +	 */
+> +	zx_tdm_writel(tdm, REG_INT_STATUS, INT_STATUS_MASK);
+> +	zx_tdm_writel(tdm, REG_RX_FIFO_CTRL, FIFOCTRL_RX_FIFO_RST);
+> +	zx_tdm_writel(tdm, REG_TX_FIFO_CTRL, FIFOCTRL_TX_FIFO_RST);
+> +
+> +	val = zx_tdm_readl(tdm, REG_RX_FIFO_CTRL);
+> +	val &= ~(RXTH_MASK | RX_FIFO_RST_MASK);
+> +	val |= FIFOCTRL_THRESHOLD(8);
+> +	zx_tdm_writel(tdm, REG_RX_FIFO_CTRL, val);
+> +
+> +	val = zx_tdm_readl(tdm, REG_TX_FIFO_CTRL);
+> +	val &= ~(TXTH_MASK | TX_FIFO_RST_MASK);
+> +	val |= FIFOCTRL_THRESHOLD(8);
+> +	zx_tdm_writel(tdm, REG_TX_FIFO_CTRL, val);
+> +}
+> +
+> +static struct snd_soc_dai_driver zx_tdm_dai = {
+> +	.name	= "zx-tdm-dai",
+> +	.id	= 0,
+> +	.probe	= zx_tdm_dai_probe,
+> +	.playback   = {
+> +		.channels_min	= 1,
+> +		.channels_max	= 4,
+> +		.rates		= ZX_TDM_RATES,
+> +		.formats	= ZX_TDM_FMTBIT,
+> +	},
+> +	.capture = {
+> +		.channels_min	= 1,
+> +		.channels_max	= 4,
+> +		.rates		= ZX_TDM_RATES,
+> +		.formats	= ZX_TDM_FMTBIT,
+> +	},
+> +	.ops	= &zx_tdm_dai_ops,
+> +};
+> +
+> +static int zx_tdm_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct of_phandle_args out_args;
+> +	unsigned int dma_reg_offset;
+> +	struct zx_tdm_info *zx_tdm;
+> +	unsigned int dma_config;
+> +	unsigned int dma_mask;
+> +	struct resource *res;
+> +	void __iomem *regmap;
+
+Do not name it regmap.
+
+> +	int ret;
+> +
+> +	zx_tdm = devm_kzalloc(&pdev->dev, sizeof(*zx_tdm), GFP_KERNEL);
+> +	if (!zx_tdm)
+> +		return -ENOMEM;
+> +
+> +	zx_tdm->dev = dev;
+> +
+> +	zx_tdm->dai_wclk = devm_clk_get(&pdev->dev, "tdm_wclk");
+> +	if (IS_ERR(zx_tdm->dai_wclk)) {
+> +		dev_err(&pdev->dev, "Fail to get tdm_wclk\n");
+> +		return PTR_ERR(zx_tdm->dai_wclk);
+> +	}
+> +
+> +	zx_tdm->dai_pclk = devm_clk_get(&pdev->dev, "tdm_pclk");
+> +	if (IS_ERR(zx_tdm->dai_pclk)) {
+> +		dev_err(&pdev->dev, "Fail to get tdm_pclk\n");
+> +		return PTR_ERR(zx_tdm->dai_pclk);
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	zx_tdm->phy_addr = res->start;
+> +	zx_tdm->regmap = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(zx_tdm->regmap)) {
+> +		dev_err(&pdev->dev, "ioremap failed!\n");
+
+As function devm_ioremap_resource() already has error messages for all
+error conditions, we can save our own here.
+
+> +		return PTR_ERR(zx_tdm->regmap);
+> +	}
+> +
+> +	ret = of_parse_phandle_with_fixed_args(pdev->dev.of_node,
+> +				"zte,tdm-dma-sysctrl", 3, 0, &out_args);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Fail to get zte,tdm-dma-sysctrl\n");
+> +		return ret;
+> +	}
+> +
+> +	dma_reg_offset = out_args.args[0];
+> +	dma_mask = out_args.args[1];
+> +	dma_config = out_args.args[2];
+> +	regmap = syscon_node_to_regmap(out_args.np);
+> +	if (IS_ERR(regmap)) {
+> +		of_node_put(out_args.np);
+> +		return PTR_ERR(regmap);
+> +	}
+> +
+> +	regmap_update_bits(regmap, dma_reg_offset, dma_mask, dma_config);
+> +	of_node_put(out_args.np);
+> +
+> +	zx_tdm_init_state(zx_tdm);
+> +	platform_set_drvdata(pdev, zx_tdm);
+> +
+> +	ret = devm_snd_soc_register_component(&pdev->dev, &zx_tdm_component,
+> +						&zx_tdm_dai, 1);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Register DAI failed: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = devm_snd_dmaengine_pcm_register(&pdev->dev, NULL, 0);
+> +	if (ret)
+> +		dev_err(&pdev->dev, "Register platform PCM failed: %d\n", ret);
+> +
+> +	return ret;
+> +}
+> +
+> +static const struct of_device_id zx_tdm_dt_ids[] = {
+> +	{ .compatible = "zte,zx-tdm", },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, zx_tdm_dt_ids);
+> +
+> +static struct platform_driver tdm_driver = {
+> +	.probe = zx_tdm_probe,
+> +	.driver = {
+> +		.name = "zx-tdm",
+> +		.of_match_table = zx_tdm_dt_ids,
+> +	},
+> +};
+> +
+
+Drop this newline.
+
+Shawn
+
+> +module_platform_driver(tdm_driver);
+> +
+> +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
+> +MODULE_DESCRIPTION("ZTE TDM DAI driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
