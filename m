@@ -1,81 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 14 Feb 2017 15:57:43 +0000
-Subject: [PATCH 1/5] arm64: dts: Add basic DT to support Spreadtrum's
- SP9860G
-In-Reply-To: <1487063952-7113-2-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1487063952-7113-2-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <20170214155743.GG23718@leverpostej>
+From: cristian.birsan@microchip.com (cristian.birsan at microchip.com)
+Date: Tue, 14 Feb 2017 18:09:02 +0200
+Subject: [PATCH 0/4 linux-next] usb: gadget: udc: atmel: Endpoint allocation
+ scheme fixes
+Message-ID: <cover.1487007870.git.cristian.birsan@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Cristian Birsan <cristian.birsan@microchip.com>
 
-On Tue, Feb 14, 2017 at 05:19:08PM +0800, Chunyan Zhang wrote:
+This patch series provides fixes, based on the feedback received on the mailing list, for
+the following:
+	- fifo table parameters validation against device tree values
+	- coding style
+	- message display for EP configuration error
+	- Kconfig comments for fifo_mode=0
 
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8)
-> +					 | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8)
-> +					 | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8)
-> +					 | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8)
-> +					 | IRQ_TYPE_LEVEL_LOW)>;
-> +		clock-frequency = <26000000>;
-> +	};
+Cristian Birsan (4):
+  usb: gadget: udc: atmel: Check fifo configuration values against
+    device tree
+  usb: gadget: udc: atmel: Minor code cleanup
+  usb: gadget: udc: atmel: Use dev_warn() to display EP configuration
+    error
+  usb: gadget: udc: atmel: Update Kconfig help for fifo_mode = 0
 
-Your FW should program CNTFRQ on all CPUs, and this clock-frequency
-property should not be necessary. Please remove it.
+ drivers/usb/gadget/udc/Kconfig          |  5 ++--
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 47 ++++++++++++++++++++++-----------
+ 2 files changed, 35 insertions(+), 17 deletions(-)
 
-> +
-> +	pmu {
-> +		compatible = "arm,armv8-pmuv3";
-
-Please list "arm,cortex-a53-pmu" first.
-
-> +		interrupts = <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>,
-> +				<GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
-
-As you are using SPIs, please add an interrupt-affinity property, per
-Documentation/devicetree/bindings/arm/pmu.txt.
-
-> diff --git a/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts b/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
-> new file mode 100644
-> index 0000000..59390fc
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
-> @@ -0,0 +1,58 @@
-> +/*
-> + * Spreadtrum SP9860g board DTS file
-> + *
-> + * Copyright (C) 2017, Spreadtrum Communications Inc.
-> + *
-> + * This file is licensed under a dual GPLv2 or X11 license.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "sc9860.dtsi"
-> +
-> +/ {
-> +	model = "Spreadtrum SP9860G 3GFHD Board";
-> +
-> +	compatible = "sprd,sc9860", "sprd,sp9860g-1h10";
-> +
-> +	sprd,sc-id = <9860 1 0x20000>;
-
-What is this? I can't see any documentation or user of this property in
-mainline.
-
-
-Thanks,
-Mark.
+-- 
+2.7.4
