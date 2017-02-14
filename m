@@ -1,34 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Feb 2017 22:29:45 +0100
-Subject: [PATCH] clk: sunxi: ccu-sun5i needs nkmp
-Message-ID: <20170214213005.2848151-1-arnd@arndb.de>
+Date: Tue, 14 Feb 2017 22:31:51 +0100
+Subject: [PATCH] drm/rockchip: add extcon dependency for DP
+Message-ID: <20170214213215.2888509-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A randconfig build ran into this rare link error:
+The newly added DP driver links against the extcon core, which fails when
+extcon is a module and this driver is not:
 
-drivers/clk/sunxi-ng/ccu-sun5i.o:(.data.__compound_literal.1+0x4): undefined reference to `ccu_nkmp_ops'
-drivers/clk/sunxi-ng/ccu-sun5i.o:(.data.__compound_literal.7+0x4): undefined reference to `ccu_nkmp_ops'
+drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_get_port_lanes':
+cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x24): undefined reference to `extcon_get_state'
+cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x44): undefined reference to `extcon_get_property'
 
-This adds the missing 'select'.
+Let's make Kconfig enforce correct behavior with a dependency.
 
-Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
+Fixes: 1a0f7ed3abe2 ("drm/rockchip: cdn-dp: add cdn DP support for rk3399")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/clk/sunxi-ng/Kconfig | 1 +
+ drivers/gpu/drm/rockchip/Kconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
-index 695bbf9ef428..b6e2aa5d0246 100644
---- a/drivers/clk/sunxi-ng/Kconfig
-+++ b/drivers/clk/sunxi-ng/Kconfig
-@@ -70,6 +70,7 @@ config SUN5I_CCU
- 	select SUNXI_CCU_MULT
- 	select SUNXI_CCU_NK
- 	select SUNXI_CCU_NKM
-+	select SUNXI_CCU_NKMP
- 	select SUNXI_CCU_NM
- 	select SUNXI_CCU_MP
- 	select SUNXI_CCU_PHASE
+diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+index ad31b3eb408f..0e4eb845cbb0 100644
+--- a/drivers/gpu/drm/rockchip/Kconfig
++++ b/drivers/gpu/drm/rockchip/Kconfig
+@@ -24,6 +24,7 @@ config ROCKCHIP_ANALOGIX_DP
+ config ROCKCHIP_CDN_DP
+         tristate "Rockchip cdn DP"
+         depends on DRM_ROCKCHIP
++	depends on EXTCON
+ 	select SND_SOC_HDMI_CODEC if SND_SOC
+         help
+ 	  This selects support for Rockchip SoC specific extensions
 -- 
 2.9.0
