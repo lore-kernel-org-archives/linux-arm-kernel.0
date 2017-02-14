@@ -1,52 +1,53 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 14 Feb 2017 21:33:36 +0000
-Subject: [PATCH] arm64: fix warning about swapper_pg_dir overflow
-In-Reply-To: <20170214212718.2792194-1-arnd@arndb.de>
-References: <20170214212718.2792194-1-arnd@arndb.de>
-Message-ID: <CAKv+Gu_FMk26Vbrb3mp5cSkSvmELP2iantX4kTyg+U8HO0J9ug@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Feb 2017 22:39:28 +0100
+Subject: [PATCH] arm64: define BUG() instruction without CONFIG_BUG
+Message-ID: <20170214213941.3026318-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 February 2017 at 21:27, Arnd Bergmann <arnd@arndb.de> wrote:
-> With 4 levels of 16KB pages, we get this warning about the fact that we are
-> copying a whole page into an array that is declared as having only two pointers
-> for the top level of the page table:
->
-> arch/arm64/mm/mmu.c: In function 'paging_init':
-> arch/arm64/mm/mmu.c:528:2: error: 'memcpy' writing 16384 bytes into a region of size 16 overflows the destination [-Werror=stringop-overflow=]
->
-> This is harmless since we actually reserve a whole page in the definition of the
-> array that comes from, and just the extern declaration is short. The pgdir
-> is initialized to zero either way, so copying the actual entries here seems
-> like the best solution.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+This mirrors commit e9c38ceba8d9 ("ARM: 8455/1: define __BUG as
+asm(BUG_INSTR) without CONFIG_BUG") to make the behavior of
+arm64 consistent with arm and x86, and avoids lots of warnings in
+randconfig builds, such as:
 
-We should see the same issue with 64k/3 levels, since its PGD_SIZE is
-also much smaller than its PAGE_SIZE. This is a much more common
-configuration, so I am surprised you found it on 16k/4 levels first.
+kernel/seccomp.c: In function '__seccomp_filter':
+kernel/seccomp.c:666:1: error: no return statement in function returning non-void [-Werror=return-type]
 
-In any case, the fix is correct IMO, so
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm64/include/asm/bug.h | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-> ---
->  arch/arm64/mm/mmu.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 2131521ddc24..b805c017f789 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -525,7 +525,7 @@ void __init paging_init(void)
->          * To do this we need to go via a temporary pgd.
->          */
->         cpu_replace_ttbr1(__va(pgd_phys));
-> -       memcpy(swapper_pg_dir, pgd, PAGE_SIZE);
-> +       memcpy(swapper_pg_dir, pgd, PGD_SIZE);
->         cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
->
->         pgd_clear_fixmap();
-> --
-> 2.9.0
->
+diff --git a/arch/arm64/include/asm/bug.h b/arch/arm64/include/asm/bug.h
+index 561190d15881..461751429fc3 100644
+--- a/arch/arm64/include/asm/bug.h
++++ b/arch/arm64/include/asm/bug.h
+@@ -20,9 +20,10 @@
+ 
+ #include <asm/brk-imm.h>
+ 
+-#ifdef CONFIG_GENERIC_BUG
+ #define HAVE_ARCH_BUG
+ 
++#ifdef CONFIG_GENERIC_BUG
++
+ #ifdef CONFIG_DEBUG_BUGVERBOSE
+ #define _BUGVERBOSE_LOCATION(file, line) __BUGVERBOSE_LOCATION(file, line)
+ #define __BUGVERBOSE_LOCATION(file, line)				\
+@@ -57,6 +58,14 @@ _BUGVERBOSE_LOCATION(__FILE__, __LINE__)		\
+ 
+ #define __WARN_TAINT(taint) _BUG_FLAGS(BUGFLAG_TAINT(taint))
+ 
++#else
++
++#define BUG() do {					\
++	asm volatile("brk %[imm]"			\
++		     :: [imm] "i" (BUG_BRK_IMM));	\
++	unreachable();					\
++} while (0)
++
+ #endif /* ! CONFIG_GENERIC_BUG */
+ 
+ #include <asm-generic/bug.h>
+-- 
+2.9.0
