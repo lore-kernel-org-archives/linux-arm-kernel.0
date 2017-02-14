@@ -1,28 +1,75 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 14 Feb 2017 17:16:30 +0000
-Subject: [RFC v2 4/7] ASoC: dmaengine_pcm: add copy support
-In-Reply-To: <1487003909-11710-5-git-send-email-arnaud.pouliquen@st.com>
-References: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
- <1487003909-11710-5-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <20170214171630.qgkyoymxyqjiiblh@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 14 Feb 2017 17:40:30 +0000
+Subject: [PATCH v2 4/5] arm64: mmu: map .text as read-only from the outset
+In-Reply-To: <651D9CBB-3E64-41CE-BF85-D2FF0CB927B7@linaro.org>
+References: <1486844586-26135-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1486844586-26135-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20170214155704.GE23718@leverpostej>
+ <651D9CBB-3E64-41CE-BF85-D2FF0CB927B7@linaro.org>
+Message-ID: <20170214174029.GJ23718@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2017 at 05:38:26PM +0100, Arnaud Pouliquen wrote:
-> From: olivier moysan <olivier.moysan@st.com>
+On Tue, Feb 14, 2017 at 04:15:11PM +0000, Ard Biesheuvel wrote:
 > 
-> Add copy support in pcm damengine operations.
-> As example, this allows to:
-> - process data before rendering (IEC status insertion),
-> - process captured sample ( sample mask and shift).
+> > On 14 Feb 2017, at 15:57, Mark Rutland <mark.rutland@arm.com> wrote:
+> > 
+> >> On Sat, Feb 11, 2017 at 08:23:05PM +0000, Ard Biesheuvel wrote:
+> >> Now that alternatives patching code no longer relies on the primary
+> >> mapping of .text being writable, we can remove the code that removes
+> >> the writable permissions post-init time, and map it read-only from
+> >> the outset.
+> >> 
+> >> Reviewed-by: Laura Abbott <labbott@redhat.com>
+> >> Reviewed-by: Kees Cook <keescook@chromium.org>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > 
+> > This generally looks good.
+> > 
+> > One effect of this is that even with rodata=off, external debuggers
+> > can't install SW breakpoints via the executable mapping.
+> 
+> Interesting. For the sake of my education, could you elaborate on how
+> that works under the hood?
 
-dmaengine with copy...  so not DMA at all?  I'm a bit confused about why
-we're extending the dmaengine code to have a copy operation rather than
-just writing driver code.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170214/1121fff1/attachment.sig>
+There are details in ARM DDI 0487A.k_iss10775, Chapter H1, "About
+External Debug", page H1-4839 onwards. Otherwise, executive summary
+below.
+
+An external debugger can place a CPU into debug state. This is
+orthogonal to execution state and exception level, which are unchanged.
+While in this state, the CPU (only) executes instructions fed to it by
+the debugger through a special register.
+
+To install a SW breakpoint, the debugger makes the CPU enter debug
+state, then issues regular stores, barriers, and cache maintenance.
+These operate in the current execution state at the current EL, using
+the current translation regime.
+
+The external debugger can also trap exceptions (e.g. those caused by the
+SW breakpoint). The CPU enters debug state when these are trapped.
+
+> > We might want to allow that to be overridden. e.g. make rodata= an
+> > early param, and switch the permissions based on that in map_kernel(),
+> > e.g. have:
+> > 
+> >    pgprot_t text_prot = rodata_enabled ? PAGE_KERNEL_ROX
+> >                        : PAGE_KERNEL_EXEC);
+> > 
+> > ... and use that for .text and .init.text by default.
+> > 
+> > 
+> 
+> Is there any way we could restrict this privilege to external
+> debuggers?
+
+My understanding is that we cannot.
+
+> Having trivial 'off' switches for security features makes me feel
+> uneasy (although this is orthogonal to this patch)
+
+>From my PoV, external debuggers are the sole reason to allow rodata=off
+for arm64, and we already allow rodata=off.
+
+Thanks,
+Mark.
