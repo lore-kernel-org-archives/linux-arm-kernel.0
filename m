@@ -1,36 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Feb 2017 22:31:51 +0100
-Subject: [PATCH] drm/rockchip: add extcon dependency for DP
-Message-ID: <20170214213215.2888509-1-arnd@arndb.de>
+Date: Tue, 14 Feb 2017 22:32:58 +0100
+Subject: [PATCH] arm64: include asm/assembler.h in entry-ftrace.S
+Message-ID: <20170214213314.2910910-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added DP driver links against the extcon core, which fails when
-extcon is a module and this driver is not:
+In a randconfig build I ran into this build error:
 
-drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_get_port_lanes':
-cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x24): undefined reference to `extcon_get_state'
-cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x44): undefined reference to `extcon_get_property'
+arch/arm64/kernel/entry-ftrace.S: Assembler messages:
+arch/arm64/kernel/entry-ftrace.S:101: Error: unknown mnemonic `ldr_l' -- `ldr_l x2,ftrace_trace_function'
 
-Let's make Kconfig enforce correct behavior with a dependency.
+The macro is defined in asm/assembler.h, so we should include that file.
 
-Fixes: 1a0f7ed3abe2 ("drm/rockchip: cdn-dp: add cdn DP support for rk3399")
+Fixes: 829d2bd13392 ("arm64: entry-ftrace.S: avoid open-coded {adr,ldr}_l")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/gpu/drm/rockchip/Kconfig | 1 +
+ arch/arm64/kernel/entry-ftrace.S | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
-index ad31b3eb408f..0e4eb845cbb0 100644
---- a/drivers/gpu/drm/rockchip/Kconfig
-+++ b/drivers/gpu/drm/rockchip/Kconfig
-@@ -24,6 +24,7 @@ config ROCKCHIP_ANALOGIX_DP
- config ROCKCHIP_CDN_DP
-         tristate "Rockchip cdn DP"
-         depends on DRM_ROCKCHIP
-+	depends on EXTCON
- 	select SND_SOC_HDMI_CODEC if SND_SOC
-         help
- 	  This selects support for Rockchip SoC specific extensions
+diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
+index 8f1905b795f3..e1be42e11ff5 100644
+--- a/arch/arm64/kernel/entry-ftrace.S
++++ b/arch/arm64/kernel/entry-ftrace.S
+@@ -10,6 +10,7 @@
+  */
+ 
+ #include <linux/linkage.h>
++#include <asm/assembler.h>
+ #include <asm/ftrace.h>
+ #include <asm/insn.h>
+ 
 -- 
 2.9.0
