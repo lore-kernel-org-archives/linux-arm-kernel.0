@@ -1,39 +1,32 @@
-From: hendrik@consetetur.de (Hendrik v. Raven)
-Date: Tue, 14 Feb 2017 10:35:15 +0100
-Subject: [PATCH v2] staging: bcm2835-audio: remove unused macro
-In-Reply-To: <20170205104134.GA27798@kroah.com>
-References: <1486142858.22276.63.camel@perches.com>
- <20170203185009.5909-1-hendrik@consetetur.de>
- <20170205104134.GA27798@kroah.com>
-Message-ID: <20170214093514.GA10204@psyche>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 14 Feb 2017 10:39:48 +0100
+Subject: [PATCH 2/5] clk: sunxi-ng: gate: Support common pre-dividers
+In-Reply-To: <20170214033526.16977-3-wens@csie.org>
+References: <20170214033526.16977-1-wens@csie.org>
+ <20170214033526.16977-3-wens@csie.org>
+Message-ID: <20170214093948.d46xkfunpuj3nn7l@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VC_AUDIO_MAX_MSG_LEN macro is not used by anything in the
-bcm2835-audio driver.
+On Tue, Feb 14, 2017 at 11:35:23AM +0800, Chen-Yu Tsai wrote:
+> Some clock gates have a pre-divider between the source input and the
+> gate itself. A notable example is the HSIC 12 MHz clock found on the
+> A83T, which has the 24 MHz main oscillator as its input, and a /2
+> pre-divider.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Signed-off-by: Hendrik v. Raven <hendrik@consetetur.de>
----
-v2:
- - rebased against next-20170214
+Applied, thanks!
+Maxime
 
----
- drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h | 3 ---
- 1 file changed, 3 deletions(-)
-
-diff --git a/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h b/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h
-index 928dd6009510..da96f1bc2516 100644
---- a/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h
-+++ b/drivers/staging/bcm2835-audio/vc_vchi_audioserv_defs.h
-@@ -21,9 +21,6 @@
- /* FourCC code used for VCHI connection */
- #define VC_AUDIO_SERVER_NAME  MAKE_FOURCC("AUDS")
- 
--/* Maximum message length */
--#define VC_AUDIO_MAX_MSG_LEN  (sizeof(VC_AUDIO_MSG_T))
--
- /*
-  *  List of screens that are currently supported
-  *  All message types supported for HOST->VC direction
 -- 
-2.11.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170214/1967bfcd/attachment-0001.sig>
