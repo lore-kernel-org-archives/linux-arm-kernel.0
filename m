@@ -1,57 +1,65 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Tue, 14 Feb 2017 13:01:14 -0800
-Subject: [PATCH] clk: rockchip: Set "ignore unused" for PMU M0 clocks on rk3399
-Message-ID: <20170214210114.5846-1-dianders@chromium.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 15 Feb 2017 00:02:53 +0300
+Subject: [PATCH 1/1] arm64: dts: r8a7795: add IMR-LX4 support
+Message-ID: <20170214210301.620322370@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PMU Cortex M0 on rk3399 is intended to be used for things like
-DDRFreq transitions, suspend/resume, and other things that are the
-purview of ARM Trusted Firmware and not the kernel.  As such, the
-kernel shouldn't be messing with the clocks.  Add CLK_IGNORE_UNUSED to
-these clocks.
+Describe the IMR-LX4 devices in the R8A7795 device tree.
 
-Without this change, the following was observed on a Chromebook with a
-rk3399 (using not-yet-upstream ARM Trusted Firmware code and
-not-yet-upstream kernel code based on kernel-4.4):
+Based on the original (and large) patch by Konstantin Kozhevnikov
+<Konstantin.Kozhevnikov@cogentembedded.com>.
 
-1. We init the clock framework.
+Signed-off-by: Konstantin Kozhevnikov <Konstantin.Kozhevnikov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-2. We start up "DDRFreq", which causes ATF to occasionally fire up the
-   M0 for transitions.  Each time ATF fires up the M0 it will turn on
-   these clocks and each time it is done it will turn them off.
-
-3. We finally get to the the part of the kernel that calls
-   clk_disable_unused() and we disables the clocks.
-
-You can see the race above.  Basically everything is fine as long as
-ARM Trusted Firmware isn't starting up the M0 at exactly the same time
-that the kernel is disabling unused clocks.  ...but if the race
-happens then we go boom.
-
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
- drivers/clk/rockchip/clk-rk3399.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+This patch is against the 'renesas-devel-20170213-v4.10-rc8' tag of Simon
+Horman's 'renesas.git' repo.
 
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index 73121b144634..fa3cbef08776 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -1477,10 +1477,10 @@ static struct rockchip_clk_branch rk3399_clk_pmu_branches[] __initdata = {
- 	GATE(PCLK_UART4_PMU, "pclk_uart4_pmu", "pclk_pmu_src", 0, RK3399_PMU_CLKGATE_CON(1), 14, GFLAGS),
- 	GATE(PCLK_WDT_M0_PMU, "pclk_wdt_m0_pmu", "pclk_pmu_src", 0, RK3399_PMU_CLKGATE_CON(1), 15, GFLAGS),
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi |   32 +++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+Index: renesas/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+===================================================================
+--- renesas.orig/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ renesas/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1419,6 +1419,38 @@
+ 			status = "disabled";
+ 		};
  
--	GATE(FCLK_CM0S_PMU, "fclk_cm0s_pmu", "fclk_cm0s_src_pmu", 0, RK3399_PMU_CLKGATE_CON(2), 0, GFLAGS),
--	GATE(SCLK_CM0S_PMU, "sclk_cm0s_pmu", "fclk_cm0s_src_pmu", 0, RK3399_PMU_CLKGATE_CON(2), 1, GFLAGS),
--	GATE(HCLK_CM0S_PMU, "hclk_cm0s_pmu", "fclk_cm0s_src_pmu", 0, RK3399_PMU_CLKGATE_CON(2), 2, GFLAGS),
--	GATE(DCLK_CM0S_PMU, "dclk_cm0s_pmu", "fclk_cm0s_src_pmu", 0, RK3399_PMU_CLKGATE_CON(2), 3, GFLAGS),
-+	GATE(FCLK_CM0S_PMU, "fclk_cm0s_pmu", "fclk_cm0s_src_pmu", CLK_IGNORE_UNUSED, RK3399_PMU_CLKGATE_CON(2), 0, GFLAGS),
-+	GATE(SCLK_CM0S_PMU, "sclk_cm0s_pmu", "fclk_cm0s_src_pmu", CLK_IGNORE_UNUSED, RK3399_PMU_CLKGATE_CON(2), 1, GFLAGS),
-+	GATE(HCLK_CM0S_PMU, "hclk_cm0s_pmu", "fclk_cm0s_src_pmu", CLK_IGNORE_UNUSED, RK3399_PMU_CLKGATE_CON(2), 2, GFLAGS),
-+	GATE(DCLK_CM0S_PMU, "dclk_cm0s_pmu", "fclk_cm0s_src_pmu", CLK_IGNORE_UNUSED, RK3399_PMU_CLKGATE_CON(2), 3, GFLAGS),
- 	GATE(HCLK_NOC_PMU, "hclk_noc_pmu", "fclk_cm0s_src_pmu", CLK_IGNORE_UNUSED, RK3399_PMU_CLKGATE_CON(2), 5, GFLAGS),
- };
- 
--- 
-2.11.0.483.g087da7b7c-goog
++		imr-lx4 at fe860000 {
++			compatible = "renesas,imr-lx4";
++			reg = <0 0xfe860000 0 0x2000>;
++			interrupts = <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 823>;
++			power-domains = <&sysc R8A7795_PD_A3VC>;
++		};
++
++		imr-lx4 at fe870000 {
++			compatible = "renesas,imr-lx4";
++			reg = <0 0xfe870000 0 0x2000>;
++			interrupts = <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 822>;
++			power-domains = <&sysc R8A7795_PD_A3VC>;
++		};
++
++		imr-lx4 at fe880000 {
++			compatible = "renesas,imr-lx4";
++			reg = <0 0xfe880000 0 0x2000>;
++			interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 821>;
++			power-domains = <&sysc R8A7795_PD_A3VC>;
++		};
++
++		imr-lx4 at fe890000 {
++			compatible = "renesas,imr-lx4";
++			reg = <0 0xfe890000 0 0x2000>;
++			interrupts = <GIC_SPI 195 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 820>;
++			power-domains = <&sysc R8A7795_PD_A3VC>;
++		};
++
+ 		vspbc: vsp at fe920000 {
+ 			compatible = "renesas,vsp2";
+ 			reg = <0 0xfe920000 0 0x8000>;
