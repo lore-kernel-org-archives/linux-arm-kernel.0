@@ -1,279 +1,91 @@
-From: eddie.cai.linux@gmail.com (Eddie Cai)
-Date: Tue, 14 Feb 2017 17:54:41 +0800
-Subject: [PATCH V2 2/2] ARM: dts: rockchip: add dts for RK3288-Tinker board
-In-Reply-To: <10145131.LBiDzV4T0q@phil>
-References: <1486347287-31051-1-git-send-email-eddie.cai@rock-chips.com>
- <1486347287-31051-3-git-send-email-eddie.cai@rock-chips.com>
- <10145131.LBiDzV4T0q@phil>
-Message-ID: <CAJrj+DPi591xkHPH+F9KKYqoCjy1d0FrvRoBm-gq=J1-a_CbQA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 14 Feb 2017 10:58:19 +0100
+Subject: [PATCH 4/5] clk: sunxi-ng: Add driver for A83T CCU
+In-Reply-To: <20170214033526.16977-5-wens@csie.org>
+References: <20170214033526.16977-1-wens@csie.org>
+ <20170214033526.16977-5-wens@csie.org>
+Message-ID: <20170214095819.utsftcvti5zdmlmi@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Tue, Feb 14, 2017 at 11:35:25AM +0800, Chen-Yu Tsai wrote:
+> +/* Some PLLs are input * N / div1 / P. Model them as NKMP with no K */
 
-2017-02-09 7:07 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
-> Hi Eddie
->
-> Am Montag, 6. Februar 2017, 10:14:47 CET schrieb Eddie Cai:
->> This patch add basic support for RK3288-Tinker board. We can boot in to
->> rootfs with this patch.
->>
->> Signed-off-by: Eddie Cai <eddie.cai@rock-chips.com>
->> ---
->
-> [...]
->
->> +&hdmi {
->> +     #address-cells = <1>;
->> +     #size-cells = <0>;
->> +     #sound-dai-cells = <0>;
->
-> why are these needed. More importantly if they are needed, they should be in
-> rk3288.dtsi instead and not here.
-I will remove it in next version
->
->
->> +     ddc-i2c-bus = <&i2c5>;
->> +     status = "okay";
->> +     /* Don't use vopl for HDMI */
->> +     ports {
->> +             hdmi_in: port {
->> +                     /delete-node/ endpoint at 1;
->> +             };
->> +     };
->
-> See comment in previous iteration, about the link to vopl being there in
-> hardware and not wanting to use it for hdmi being a driver issue.
-> No working around driver issues in the devicetree, so leave the vop <-> hdmi
-> links intact please :-)
-Sorry, Lost this comment. I will remove it in next version
->
->> +};
->> +
->> +&i2c0 {
->> +     status = "okay";
->> +     clock-frequency = <400000>;
->> +
->> +     rk808: pmic at 1b {
->> +             compatible = "rockchip,rk808";
->> +             reg = <0x1b>;
->> +             interrupt-parent = <&gpio0>;
->> +             interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
->> +             pinctrl-names = "default";
->> +             pinctrl-0 = <&pmic_int &global_pwroff &dvs_1 &dvs_2>;
->> +             dvs-gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>,
->> +                             <&gpio0 12 GPIO_ACTIVE_HIGH>;
->> +
->> +             rockchip,system-power-controller;
->> +             wakeup-source;
->> +             #clock-cells = <1>;
->> +             clock-output-names = "xin32k", "rk808-clkout2";
->> +
->> +             vcc1-supply = <&vcc_sys>;
->> +             vcc2-supply = <&vcc_sys>;
->> +             vcc3-supply = <&vcc_sys>;
->> +             vcc4-supply = <&vcc_sys>;
->> +             vcc6-supply = <&vcc_sys>;
->> +             vcc7-supply = <&vcc_sys>;
->> +             vcc8-supply = <&vcc_io>;
->> +             vcc9-supply = <&vcc_io>;
->> +             vcc10-supply = <&vcc_io>;
->> +             vcc11-supply = <&vcc_sys>;
->> +             vcc12-supply = <&vcc_io>;
->> +             vddio-supply = <&vcc_io>;
->> +
->> +             regulators {
->> +                     vdd_cpu: DCDC_REG1 {
->> +                             regulator-always-on;
->> +                             regulator-boot-on;
->> +                             regulator-min-microvolt = <750000>;
->> +                             regulator-max-microvolt = <1350000>;
->> +                             regulator-name = "vdd_arm";
->> +                             regulator-ramp-delay = <6000>;
->> +                             regulator-state-mem {
->> +                                     regulator-off-in-suspend;
->> +                             };
->> +                     };
->> +
->> +                     vdd_gpu: DCDC_REG2 {
->> +                             regulator-always-on;
->> +                             regulator-boot-on;
->> +                             regulator-min-microvolt = <850000>;
->> +                             regulator-max-microvolt = <1250000>;
->> +                             regulator-name = "vdd_gpu";
->> +                             regulator-ramp-delay = <6000>;
->> +                             regulator-state-mem {
->> +                                     regulator-on-in-suspend;
->> +                                     regulator-suspend-microvolt = <1000000>;
->> +                             };
->> +                     };
->> +
->> +                     vcc_ddr: DCDC_REG3 {
->> +                             regulator-always-on;
->> +                             regulator-boot-on;
->> +                             regulator-name = "vcc_ddr";
->> +                             regulator-state-mem {
->> +                                     regulator-on-in-suspend;
->> +                             };
->> +                     };
->> +
->> +                     vcc_io: DCDC_REG4 {
->> +                             regulator-always-on;
->> +                             regulator-boot-on;
->> +                             regulator-min-microvolt = <3300000>;
->> +                             regulator-max-microvolt = <3300000>;
->> +                             regulator-name = "vcc_io";
->> +                             regulator-state-mem {
->> +                                     regulator-on-in-suspend;
->> +                                     regulator-suspend-microvolt = <3300000>;
->> +                             };
->> +                     };
->> +
->> +                     vcc18_ldo1: LDO_REG1 {
->> +                             regulator-always-on;
->> +                             regulator-boot-on;
->> +                             regulator-min-microvolt = <1800000>;
->> +                             regulator-max-microvolt = <1800000>;
->> +                             regulator-name = "vcc18_ldo1";
->> +                             regulator-state-mem {
->> +                                     regulator-on-in-suspend;
->> +                                     regulator-suspend-microvolt = <1800000>;
->> +                             };
->> +                     };
->> +
->> +                     vcc33_mipi: LDO_REG2 {
->> +                             regulator-always-on;
->> +                             regulator-boot-on;
->> +                             regulator-min-microvolt = <3300000>;
->> +                             regulator-max-microvolt = <3300000>;
->> +                             regulator-name = "vcc33_mipi";
->> +                             regulator-state-mem {
->> +                                     regulator-off-in-suspend;
->> +                             };
->> +                     };
->> +
->> +                     vdd_10: LDO_REG3 {
->> +                             regulator-always-on;
->> +                             regulator-boot-on;
->> +                             regulator-min-microvolt = <1000000>;
->> +                             regulator-max-microvolt = <1000000>;
->> +                             regulator-name = "vdd_10";
->> +                             regulator-state-mem {
->> +                                     regulator-on-in-suspend;
->> +                                     regulator-suspend-microvolt = <1000000>;
->> +                             };
->> +                     };
->> +
->> +                     vcc18_codec: LDO_REG4 {
->> +                             regulator-always-on;
->> +                             regulator-boot-on;
->> +                             regulator-min-microvolt = <1800000>;
->> +                             regulator-max-microvolt = <1800000>;
->> +                             regulator-name = "vcc18_codec";
->> +                             regulator-state-mem {
->> +                                     regulator-on-in-suspend;
->> +                                     regulator-suspend-microvolt = <1800000>;
->> +                             };
->> +                     };
->> +
->> +                     vccio_sd: LDO_REG5 {
->> +                             regulator-min-microvolt = <1800000>;
->> +                             regulator-max-microvolt = <3300000>;
->> +                             regulator-name = "vccio_sd";
->> +                             regulator-state-mem {
->> +                                     regulator-on-in-suspend;
->> +                                     regulator-suspend-microvolt = <3300000>;
->> +                             };
->> +                     };
->> +
->> +                     vdd10_lcd: LDO_REG6 {
->> +                             regulator-always-on;
->> +                             regulator-boot-on;
->> +                             regulator-min-microvolt = <1000000>;
->> +                             regulator-max-microvolt = <1000000>;
->> +                             regulator-name = "vdd10_lcd";
->> +                             regulator-state-mem {
->> +                                     regulator-on-in-suspend;
->> +                                     regulator-suspend-microvolt = <1000000>;
->> +                             };
->> +                     };
->> +
->> +                     vcc_18: LDO_REG7 {
->> +                             regulator-always-on;
->> +                             regulator-boot-on;
->> +                             regulator-min-microvolt = <1800000>;
->> +                             regulator-max-microvolt = <1800000>;
->> +                             regulator-name = "vcc_18";
->> +                             regulator-state-mem {
->> +                                     regulator-on-in-suspend;
->> +                                     regulator-suspend-microvolt = <1800000>;
->> +                             };
->> +                     };
->> +
->> +                     vcc18_lcd: LDO_REG8 {
->> +                             regulator-always-on;
->> +                             regulator-boot-on;
->> +                             regulator-min-microvolt = <1800000>;
->> +                             regulator-max-microvolt = <1800000>;
->> +                             regulator-name = "vcc18_lcd";
->> +                             regulator-state-mem {
->> +                                     regulator-on-in-suspend;
->> +                                     regulator-suspend-microvolt = <1800000>;
->> +                             };
->> +                     };
->> +
->> +                     vcc33_sd: SWITCH_REG1 {
->> +                             regulator-always-on;
->> +                             regulator-boot-on;
->> +                             regulator-name = "vcc33_sd";
->> +                             regulator-state-mem {
->> +                                     regulator-on-in-suspend;
->> +                             };
->> +                     };
->> +
->> +                     vcc33_lan: SWITCH_REG2 {
->> +                             regulator-always-on;
->> +                             regulator-boot-on;
->> +                             regulator-name = "vcc33_lan";
->> +                             regulator-state-mem {
->> +                                     regulator-on-in-suspend;
->> +                             };
->> +                     };
->> +             };
->> +     };
->> +};
->> +
->> +&i2c2 {
->> +     status = "okay";
->> +};
->> +
->> +&i2c5 {
->> +     status = "okay";
->> +};
->> +
->> +&i2s {
->> +     #sound-dai-cells = <0>;
->> +     status = "okay";
->> +};
->> +&vopb {
->> +     status = "okay";
->> +};
->> +
->> +&vopb_mmu {
->> +     status = "okay";
->> +};
->> +
->> +&vopl {
->> +     status = "okay";
->> +     /* Don't use vopl for HDMI */
->> +     vopl_out: port {
->> +             /delete-node/ endpoint at 0;
->> +     };
->
-> same here
-I will remove it in next version
->
->> +};
->> +
->
->
+Is that even working?
+
+I'm not quite sure we want to do that. We might model it as a NP clock
+with a variable prediv?
+
+> +/* Use a separate clock for the pre-divider on the AHB1 PLL-PERIPH input */
+> +static SUNXI_CCU_M(pll_periph_ahb1_clk, "pll-periph-ahb1", "pll-periph",
+> +		   0x054, 6, 2, 0);
+> +
+> +static const char * const ahb1_parents[] = { "osc16M-d512", "osc24M",
+> +					     "pll-periph-ahb1",
+> +					     "pll-periph-ahb1" };
+> +static struct ccu_div ahb1_clk = {
+> +	.div		= _SUNXI_CCU_DIV_FLAGS(4, 2, CLK_DIVIDER_POWER_OF_TWO),
+> +	.mux		= _SUNXI_CCU_MUX(12, 2),
+> +	.common		= {
+> +		.reg		= 0x054,
+> +		.hw.init	= CLK_HW_INIT_PARENTS("ahb1",
+> +						      ahb1_parents,
+> +						      &ccu_div_ops,
+> +						      0),
+> +	},
+> +};
+
+What's different from a pre divider only for a given index here?
+
+> +/*
+> + * MMC2 supports what's called the "new timing mode". The CCU and the MMC
+> + * controller must be in sync about which mode is used. The new mode moves
+> + * the clock delay controls (and possibly the delay lines) into the MMC
+> + * block. Also, the output of the clock is divided by 2. The output and
+> + * sample phase clocks are unused under this mode.
+> + *
+> + * This new mode seems to be preferred. Hence we force this clock to the
+> + * new mode. And we don't add the phase clocks.
+> + */
+
+I'm sorry, but I said this several times, this isn't working. We
+should model it properly, and not hack this around in the clock
+driver.
+
+As you say in your comment, the MMC driver needs to be aware about
+which mode is used, in order to also set a bit in one of its registers
+accordingly, and modify its sampling behaviour.
+
+The new timing is preferred, but our previous clock implementations
+didn't hardcode it, so we can't even rely on that behaviour to always
+write it in our driver.
+
+This is not something specific to the A83T, but is found in all the
+SoCs since the A23, so we need to come up with a good solution to
+address that.
+
+I'm not sure what a good solution would be though. One would be to
+just have a private function of our own to switch in the new mode (if
+relevant, because only the MMC2 controllers have it), but that would
+lead to troubles with !sunxi-ng. Not something we can't deal with, but
+some extra precautions should be taken (make sure to protect the call
+through an ifdef / IS_DEFINED, check that the sunxi-ng driver has been
+probed, etc.)
+
+Or we could introduce a new clk_ops function pointer, but I'm not sure
+if Mike and Stephen are going to be happy with that.
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170214/8bfdcb83/attachment-0001.sig>
