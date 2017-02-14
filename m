@@ -1,66 +1,87 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 14 Feb 2017 15:25:03 +0100
-Subject: [PATCHv2 net-next 01/16] dt-bindings: net: update Marvell PPv2
- binding for PPv2.2 support
-In-Reply-To: <20170203164808.GD27312@n2100.armlinux.org.uk>
-References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943592-12556-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170103201842.hdg2uzzesog2jund@rob-hp-laptop>
- <20170202175650.1fc06c2d@free-electrons.com>
- <20170203164808.GD27312@n2100.armlinux.org.uk>
-Message-ID: <20170214152503.602878cb@free-electrons.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Tue, 14 Feb 2017 14:29:19 +0000
+Subject: [PATCH] PCI: Xilinx NWL: Remove mask for messages not supported
+ by AXI
+In-Reply-To: <20170210202536.GI29169@bhelgaas-glaptop.roam.corp.google.com>
+References: <1485853170-31940-1-git-send-email-bharatku@xilinx.com>
+ <20170210202536.GI29169@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <8520D5D51A55D047800579B094147198263E9378@XAP-PVEXMBX02.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Fri, 3 Feb 2017 16:48:08 +0000, Russell King - ARM Linux wrote:
-> On Thu, Feb 02, 2017 at 05:56:50PM +0100, Thomas Petazzoni wrote:
-> > For PPv2.2, we wanted to simplify a little bit the register mappings,
-> > and simply reflect the memory map of the SoC. In the SoC datasheet,
-> > there are two memory areas for the networking subsystem, which are the
-> > two areas reflected in:
-> > 
-> >         reg = <0x0 0x100000>,
-> >               <0x100000 0x80000>;
-> > 
-> > The per-port registers are inside the second register area. But by
-> > exposing the entire register area in the Device Tree binding, we allow
-> > improvements in the driver that need additional registers to be made
-> > without changing the Device Tree description of the device.  
+> On Tue, Jan 31, 2017 at 02:29:30PM +0530, Bharat Kumar Gogada wrote:
+> > - Removing support for vendor defined messages which are not
+> > suppoerted by AXI
+> >
+> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
 > 
-> Are you sure that this makes sense?  You have the serdes block at
-> 0x120000-0x125fff, which sits within that range, and that needs to
-> be configured for SATA and PCIe, so it's not strictly just a network
-> thing.
+> Applied to pci/host-xilinx for v4.11, thanks.
 > 
-> I know from my experimentation that disabling the "serdes" by clearing
-> the SD_EXTERNAL_CONFIG1_REG and SD_EXTERNAL_CONFIG0_REG for SATA
-> channels prevents SATA working.
-
-I have simply/stupidly followed the datasheet, which says:
-
- Packet processor:        0xf2000000, 0xf4000000 (i.e offset 0x0 in the CP)
- Networking interfaces:   0xf2100000, 0xf4100000 (i.e offset 0x100000 in the CP)
- IO Bridge Addr Decoding: 0xf2190000, 0xf4190000
-
-And since there is no other block described, I assumed that the entire
-range 0xf2000000 to 0xf2100000 was dedicated to the "Packet processor",
-and that the range 0xf2100000 to 0xf2190000 was dedicated to the
-"Networking interfaces" (and I realize the size is 0x90000, not
-0x80000).
-
-On the other hand, there are registers after 0x125fff that are really
-networking related. For example, the driver is currently accessing
-0x12a204, which is after the SERDES related registers.
-
-I'll try to get some more information about this, but I suspect this is
-one case where we don't yet fully understand how all the HW works and
-what all registers are doing, so it's hard to do a perfect DT binding
-from day 1.
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks Bjorn.
+> Bharat, get_maintainer.pl lists you as a contributor, but not as a maintainer of
+> this file.  Should we update MAINTAINERS so it does?
+Yes, Please update MAINTAINERS list.
+> 
+>   $ ./scripts/get_maintainer.pl drivers/pci/host/pcie-xilinx-nwl.c
+>   Bjorn Helgaas <bhelgaas@google.com> (supporter:PCI
+> SUBSYSTEM,commit_signer:11/11=100%,authored:5/11=45%,added_lines:71/9
+> 99=7%,removed_lines:58/132=44%)
+>   Michal Simek <michal.simek@xilinx.com> (supporter:ARM/ZYNQ
+> ARCHITECTURE)
+>   "S?ren Brinkmann" <soren.brinkmann@xilinx.com> (reviewer:ARM/ZYNQ
+> ARCHITECTURE)
+>   Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
+> (commit_signer:4/11=36%,authored:4/11=36%,added_lines:924/999=92%,remo
+> ved_lines:23/132=17%)
+>   Rob Herring <robh@kernel.org> (commit_signer:1/11=9%)
+>   Colin Ian King <colin.king@canonical.com>
+> (commit_signer:1/11=9%,authored:1/11=9%)
+>   Paul Gortmaker <paul.gortmaker@windriver.com>
+> (commit_signer:1/11=9%,authored:1/11=9%,removed_lines:50/132=38%)
+>   linux-pci at vger.kernel.org (open list:PCI SUBSYSTEM)
+>   linux-arm-kernel at lists.infradead.org (moderated list:ARM/ZYNQ
+> ARCHITECTURE)
+>   linux-kernel at vger.kernel.org (open list)
+> 
+> 
+> > ---
+> >  drivers/pci/host/pcie-xilinx-nwl.c |   14 +-------------
+> >  1 files changed, 1 insertions(+), 13 deletions(-)
+> >
+> > diff --git a/drivers/pci/host/pcie-xilinx-nwl.c
+> > b/drivers/pci/host/pcie-xilinx-nwl.c
+> > index 76dd094..651486a 100644
+> > --- a/drivers/pci/host/pcie-xilinx-nwl.c
+> > +++ b/drivers/pci/host/pcie-xilinx-nwl.c
+> > @@ -62,21 +62,9 @@
+> >  #define CFG_ENABLE_PM_MSG_FWD		BIT(1)
+> >  #define CFG_ENABLE_INT_MSG_FWD		BIT(2)
+> >  #define CFG_ENABLE_ERR_MSG_FWD		BIT(3)
+> > -#define CFG_ENABLE_SLT_MSG_FWD		BIT(5)
+> > -#define CFG_ENABLE_VEN_MSG_FWD		BIT(7)
+> > -#define CFG_ENABLE_OTH_MSG_FWD		BIT(13)
+> > -#define CFG_ENABLE_VEN_MSG_EN		BIT(14)
+> > -#define CFG_ENABLE_VEN_MSG_VEN_INV	BIT(15)
+> > -#define CFG_ENABLE_VEN_MSG_VEN_ID	GENMASK(31, 16)
+> >  #define CFG_ENABLE_MSG_FILTER_MASK	(CFG_ENABLE_PM_MSG_FWD
+> | \
+> >  					CFG_ENABLE_INT_MSG_FWD | \
+> > -					CFG_ENABLE_ERR_MSG_FWD | \
+> > -					CFG_ENABLE_SLT_MSG_FWD | \
+> > -					CFG_ENABLE_VEN_MSG_FWD | \
+> > -					CFG_ENABLE_OTH_MSG_FWD | \
+> > -					CFG_ENABLE_VEN_MSG_EN | \
+> > -					CFG_ENABLE_VEN_MSG_VEN_INV | \
+> > -					CFG_ENABLE_VEN_MSG_VEN_ID)
+> > +					CFG_ENABLE_ERR_MSG_FWD)
+> >
+> >  /* Misc interrupt status mask bits */
+> >  #define MSGF_MISC_SR_RXMSG_AVAIL	BIT(0)
+> > --
+> > 1.7.1
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
