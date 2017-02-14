@@ -1,41 +1,70 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 14 Feb 2017 05:56:44 +0100
-Subject: [PATCH 4/4] ARM64: dts: Prepare Realtek RTD1295 and Zidoo X9S
-In-Reply-To: <20170214033440.18667-5-afaerber@suse.de>
-References: <20170214033440.18667-1-afaerber@suse.de>
- <20170214033440.18667-5-afaerber@suse.de>
-Message-ID: <0970cfc6-24e1-b290-87f1-02e9911e6405@suse.de>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Tue, 14 Feb 2017 10:54:27 +0530
+Subject: [PATCH v3 3/4] dmaengine: Add Broadcom SBA RAID driver
+In-Reply-To: <CAPcyv4hE5gDiHhfaiHDHbhA2xKa45UdzKcSxnQXK-W92sr3Z1g@mail.gmail.com>
+References: <1486717628-17580-1-git-send-email-anup.patel@broadcom.com>
+ <1486717628-17580-4-git-send-email-anup.patel@broadcom.com>
+ <CAPcyv4hE5gDiHhfaiHDHbhA2xKa45UdzKcSxnQXK-W92sr3Z1g@mail.gmail.com>
+Message-ID: <CAALAos-+7kL6C7ZOUgX1AMqzKR6kL82qcz4wvmx5p9Ujj77tuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 14.02.2017 um 04:34 schrieb Andreas F?rber:
-> A list of memory reservations is adopted from v1.2.11 vendor device tree:
-> 0x02200000 can be used for an initrd, 0x01b00000 is audio-related;
-> ion-related 0x02600000, 0x02c00000 and 0x11000000 are left out; others
-> remain to be investigated.
-[...]
-> diff --git a/arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts b/arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts
-> new file mode 100644
-> index 0000000..a86c97a
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts
-[...]
-> +/memreserve/	0x0000000000000000 0x0000000000030000;
-> +/memreserve/	0x000000000001f000 0x0000000000001000;
-> +/memreserve/	0x0000000000030000 0x00000000000d0000;
-> +/memreserve/	0x0000000001b00000 0x00000000004be000;
-> +/memreserve/	0x0000000001ffe000 0x0000000000004000;
+On Fri, Feb 10, 2017 at 11:20 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Fri, Feb 10, 2017 at 1:07 AM, Anup Patel <anup.patel@broadcom.com> wrote:
+>> The Broadcom stream buffer accelerator (SBA) provides offloading
+>> capabilities for RAID operations. This SBA offload engine is
+>> accessible via Broadcom SoC specific ring manager.
+>>
+>> This patch adds Broadcom SBA RAID driver which provides one
+>> DMA device with RAID capabilities using one or more Broadcom
+>> SoC specific ring manager channels. The SBA RAID driver in its
+>> current shape implements memcpy, xor, and pq operations.
+>>
+>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>> ---
+>>  drivers/dma/Kconfig        |   13 +
+>>  drivers/dma/Makefile       |    1 +
+>>  drivers/dma/bcm-sba-raid.c | 1711 ++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 1725 insertions(+)
+>>  create mode 100644 drivers/dma/bcm-sba-raid.c
+>>
+>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+>> index 263495d..bf8fb84 100644
+>> --- a/drivers/dma/Kconfig
+>> +++ b/drivers/dma/Kconfig
+>> @@ -99,6 +99,19 @@ config AXI_DMAC
+>>           controller is often used in Analog Device's reference designs for FPGA
+>>           platforms.
+>>
+>> +config BCM_SBA_RAID
+>> +       tristate "Broadcom SBA RAID engine support"
+>> +       depends on (ARM64 && MAILBOX && RAID6_PQ) || COMPILE_TEST
+>> +       select DMA_ENGINE
+>> +       select DMA_ENGINE_RAID
+>> +       select ASYNC_TX_ENABLE_CHANNEL_SWITCH
+>
+> ASYNC_TX_ENABLE_CHANNEL_SWITCH violates the DMA mapping API and
+> Russell has warned it's especially problematic on ARM [1].  If you
+> need channel switching for this offload engine to be useful then you
+> need to move DMA mapping and channel switching responsibilities to MD
+> itself.
+>
+> [1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2011-January/036753.html
 
-> +/memreserve/	0x0000000010000000 0x0000000000014000;
-[snip]
+In case of BCM-SBA-RAID, the underlying "struct device" for each
+DMA channel is the mailbox controller "struct device" (i.e. Ring
+Manager device). This is because Ring Manager HW is the front
+facing device which we program to submit work to BCM-SBA-RAID
+HW.
 
-This region appears to be used for exporting/importing the U-Boot
-environment between AArch32 and AArch64, thus could be dropped here.
+This means DMA channels provided by BCM-SBA-RAID driver
+will use same "struct device" for DMA mappings hence channel
+switching between BCM-SBA-RAID DMA channels is safe.
+
+Due to above, we can safely enable
+ASYNC_TX_ENABLE_CHANNEL_SWITCH option for
+BCM-SBA-RAID driver.
 
 Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Anup
