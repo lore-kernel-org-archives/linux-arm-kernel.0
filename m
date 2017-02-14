@@ -1,83 +1,73 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 14 Feb 2017 09:24:29 +0100
-Subject: [linux-sunxi] Re: [PATCH 2/8] ARM: sun4i: Add display blocks for
- the sun4i dtsi.
-In-Reply-To: <1487004405.20308.3.camel@plaes.org>
-References: <20170211174405.28395-1-plaes@plaes.org>
- <20170211174405.28395-3-plaes@plaes.org>
- <20170213091612.d5ifc4oi63xf7boi@lukather>
- <CAGb2v648uAKxpYaU_qhTLAyfe5snW1LG1VWmm+UMLRSQ5a7DKg@mail.gmail.com>
- <1487004405.20308.3.camel@plaes.org>
-Message-ID: <20170214082429.hoz4dvmszu3d7sz2@lukather>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 14 Feb 2017 09:24:35 +0100
+Subject: [PATCH v8 3/3] dmaengine: pl330: Don't require irq-safe runtime PM
+In-Reply-To: <20170213154727.GN2843@localhost>
+References: <1486650171-20598-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170209142309eucas1p2b1277d96139eafc0d1dcc14145600476@eucas1p2.samsung.com>
+ <1486650171-20598-4-git-send-email-m.szyprowski@samsung.com>
+ <20170210045004.GN19244@localhost>
+ <d299ae6c-78dc-9049-6bed-dc84fff17db3@samsung.com>
+ <CAPDyKFqW2av1mjDvRP=R1my2kepeX69TS6cchzoHmwaoydT5Sg@mail.gmail.com>
+ <20170213020340.GH2843@localhost>
+ <CAPDyKFpt9O8GM-7xeNJ8bF0JqUJ7nPaRmmC+aMVsdMH-yWBCNg@mail.gmail.com>
+ <20170213122742.GL2843@localhost>
+ <CAPDyKFqnmhps5nhj-exZ0rnmkwdeD+iuz3CH7btjvxoJaZtVDg@mail.gmail.com>
+ <20170213154727.GN2843@localhost>
+Message-ID: <CAPDyKFrvsTQ+fkOLpgguAMsSyeComEgNxQ-hTb_torVrwZwU6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 13 February 2017 at 16:47, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Mon, Feb 13, 2017 at 04:32:32PM +0100, Ulf Hansson wrote:
+>> [...]
+>>
+>> >> Although, I don't know of other examples, besides the runtime PM use
+>> >> case, where non-atomic channel prepare/unprepare would make sense. Do
+>> >> you?
+>> >
+>> > The primary ask for that has been to enable runtime_pm for drivers. It's not
+>> > a new ask, but we somehow haven't gotten around to do it.
+>>
+>> Okay, I see.
+>>
+>> >
+>> >> > As I said earlier, if we want to solve that problem a better idea is to
+>> >> > actually split the prepare as we discussed in [1]
+>> >> >
+>> >> > This way we can get a non atomic descriptor allocate/prepare and release.
+>> >> > Yes we need to redesign the APIs to solve this, but if you guys are up for
+>> >> > it, I think we can do it and avoid any further round abouts :)
+>> >>
+>> >> Adding/re-designing dma APIs is a viable option to solve the runtime PM case.
+>> >>
+>> >> Changes would be needed for all related dma client drivers as well,
+>> >> although if that's what we need to do - let's do it.
+>> >
+>> > Yes, but do bear in mind that some cases do need atomic prepare. The primary
+>> > cases for DMA had that in mind and also submitting next transaction from the
+>> > callback (tasklet) context, so that won't go away.
+>> >
+>> > It would help in other cases where clients know that they will not be in
+>> > atomic context so we provide additional non-atomic "allocation" followed by
+>> > prepare, so that drivers can split the work among these and people can do
+>> > runtime_pm and other things..
+>>
+>> That for sharing the details.
+>>
+>> It seems like some dma expert really need to be heavily involved if we
+>> ever are going to complete this work. :-)
+>
+> Sure, I will help out :)
 
-On Mon, Feb 13, 2017 at 06:46:45PM +0200, Priit Laes wrote:
-> On Mon, 2017-02-13 at 17:20 +0800, Chen-Yu Tsai wrote:
-> > On Mon, Feb 13, 2017 at 5:16 PM, Maxime Ripard
-> > <maxime.ripard@free-electrons.com> wrote:
-> > > Hi,
-> > > 
-> > > On Sat, Feb 11, 2017 at 07:43:59PM +0200, Priit Laes wrote:
-> > > > Added basic display pipeline consisting of tcon, display backend
-> > > > and
-> > > > frontend blocks.
-> > > > 
-> > > > Signed-off-by: Priit Laes <plaes@plaes.org>
-> > > > ---
-> > > > ?arch/arm/boot/dts/sun4i-a10.dtsi | 104
-> > > > +++++++++++++++++++++++++++++++++++++++
-> > > > ?1 file changed, 104 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi
-> > > > b/arch/arm/boot/dts/sun4i-a10.dtsi
-> > > > index ba20b48..70991c9 100644
-> > > > --- a/arch/arm/boot/dts/sun4i-a10.dtsi
-> > > > +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-> > > > @@ -779,6 +779,45 @@
-> > > > ??????????????????????#size-cells = <0>;
-> > > > ??????????????};
-> > > > 
-> > > > +?????????????tcon0: lcd-controller at 1c0c000 {
-> > > > +?????????????????????compatible = "allwinner,sun5i-a13-tcon";
-> > > 
-> > > There's a few bits here and there that need to be setup differently
-> > > in
-> > > A10, so you cannot reuse that compatible (same thing for the
-> > > other).
-> > > 
-> > > Also, I'd really like to have all the blocks listed here, and not
-> > > only
-> > > the first pipeline. Ideally, on the A10, the two pipelines should
-> > > be
-> > > enabled too.
-> > 
-> > The display pipeline driver has to be fixed before that can happen
-> > though. And I haven't started to work on what I proposed yet. Though
-> > if someone wants to take over I can forward any design plans I have.
-> 
-> Well, my plan was to get at least minimum bits mainlined and then build
-> additional features on top.
+That sounds great! :-)
 
-I understand that, but now that we have the DT stability to maintain,
-I want to make sure that everything is correctly represented from day
-one, with code that works.
+>
+> If anyone of you are in Portland next week, then we can discuss these f2f. I
+> will try taking a stab at the new API design next week.
+>
 
-Otherwise, we might or might not be able to fix things properly later
-down the road (or at the expense of ugly hacks).
+Unfortunate not. We will have to meet some other time. Anyway, please
+keep me posted on any related topics.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170214/015f821c/attachment.sig>
+Kind regards
+Uffe
