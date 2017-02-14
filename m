@@ -1,42 +1,28 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 14 Feb 2017 11:02:59 -0600
-Subject: [PATCH 3/5] devicetree: bindings: revise compatible string of
- sprd uart
-In-Reply-To: <1487063952-7113-4-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1487063952-7113-4-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <CAL_JsqKNfYSug4vd5uWXnxn-_z0e-Nk9TYkktudk+F1VBYcm8g@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 14 Feb 2017 17:16:30 +0000
+Subject: [RFC v2 4/7] ASoC: dmaengine_pcm: add copy support
+In-Reply-To: <1487003909-11710-5-git-send-email-arnaud.pouliquen@st.com>
+References: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
+ <1487003909-11710-5-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20170214171630.qgkyoymxyqjiiblh@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2017 at 3:19 AM, Chunyan Zhang
-<chunyan.zhang@spreadtrum.com> wrote:
-> This patch revise the compatible string of sprd uart to "sc-uart"
-> since this driver is not only for SC9836, but for all Spreadtrum
-> SoCs so far.
->
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> ---
->  Documentation/devicetree/bindings/serial/sprd-uart.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/Documentation/devicetree/bindings/serial/sprd-uart.txt b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-> index 2aff0f2..9b0ad52 100644
-> --- a/Documentation/devicetree/bindings/serial/sprd-uart.txt
-> +++ b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-> @@ -1,7 +1,7 @@
->  * Spreadtrum serial UART
->
->  Required properties:
-> -- compatible: must be "sprd,sc9836-uart"
-> +- compatible: must be "sprd,sc-uart"
+On Mon, Feb 13, 2017 at 05:38:26PM +0100, Arnaud Pouliquen wrote:
+> From: olivier moysan <olivier.moysan@st.com>
+> 
+> Add copy support in pcm damengine operations.
+> As example, this allows to:
+> - process data before rendering (IEC status insertion),
+> - process captured sample ( sample mask and shift).
 
-You can't just change compatible strings.
-
-You don't need a generic-ish compatible if other SoCs have "the same"
-uart. Then you just do: '"sprd,sc<new soc>-uart", "sprd,sc9836-uart"'
-in the DT. The existing driver will work matching on sprd,sc9836-uart
-and if you ever find some difference in the uarts you have the more
-specific compatible string to handle that.
-
-Rob
+dmaengine with copy...  so not DMA at all?  I'm a bit confused about why
+we're extending the dmaengine code to have a copy operation rather than
+just writing driver code.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170214/1121fff1/attachment.sig>
