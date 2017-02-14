@@ -1,34 +1,36 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Tue, 14 Feb 2017 17:19:10 +0800
-Subject: [PATCH 3/5] devicetree: bindings: revise compatible string of sprd
- uart
+Date: Tue, 14 Feb 2017 17:19:12 +0800
+Subject: [PATCH 5/5] serial: sprd: adjust TIMEOUT to a big value
 In-Reply-To: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
 References: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <1487063952-7113-4-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <1487063952-7113-6-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch revise the compatible string of sprd uart to "sc-uart"
-since this driver is not only for SC9836, but for all Spreadtrum
-SoCs so far.
+From: Wei Qiao <wei.qiao@spreadtrum.com>
 
+SPRD_TIMEOUT was 256, which is too small to wait until the status
+switched to workable in a while loop, so that the earlycon could
+not work correctly.
+
+Signed-off-by: Wei Qiao <wei.qiao@spreadtrum.com>
 Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 ---
- Documentation/devicetree/bindings/serial/sprd-uart.txt | 2 +-
+ drivers/tty/serial/sprd_serial.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/serial/sprd-uart.txt b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-index 2aff0f2..9b0ad52 100644
---- a/Documentation/devicetree/bindings/serial/sprd-uart.txt
-+++ b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-@@ -1,7 +1,7 @@
- * Spreadtrum serial UART
+diff --git a/drivers/tty/serial/sprd_serial.c b/drivers/tty/serial/sprd_serial.c
+index c0d63c01..f548e97 100644
+--- a/drivers/tty/serial/sprd_serial.c
++++ b/drivers/tty/serial/sprd_serial.c
+@@ -36,7 +36,7 @@
+ #define SPRD_FIFO_SIZE		128
+ #define SPRD_DEF_RATE		26000000
+ #define SPRD_BAUD_IO_LIMIT	3000000
+-#define SPRD_TIMEOUT		256
++#define SPRD_TIMEOUT		256000
  
- Required properties:
--- compatible: must be "sprd,sc9836-uart"
-+- compatible: must be "sprd,sc-uart"
- - reg: offset and length of the register set for the device
- - interrupts: exactly one interrupt specifier
- - clocks: phandles to input clocks.
+ /* the offset of serial registers and BITs for them */
+ /* data registers */
 -- 
 2.7.4
