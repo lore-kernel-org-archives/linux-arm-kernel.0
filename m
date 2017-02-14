@@ -1,42 +1,42 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Tue, 14 Feb 2017 09:24:15 -0600
-Subject: [PATCH 1/2] Fix mmdc_pmu_write_accesses event definition
-In-Reply-To: <1487062873-27641-2-git-send-email-andrei-tiberiu.breana@nxp.com>
-References: <1487062873-27641-1-git-send-email-andrei-tiberiu.breana@nxp.com>
- <1487062873-27641-2-git-send-email-andrei-tiberiu.breana@nxp.com>
-Message-ID: <CAHrpEqQh9vTmiLdrDHsOeuJ37Kq2PUGEdO=t6RZkjMMpMRhbJw@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 14 Feb 2017 16:27:18 +0100
+Subject: [PATCHv2 2/3] clk: mvebu: adjust clock handling for the CP110
+ system controller
+In-Reply-To: <20161222001456.GX8288@codeaurora.org>
+References: <1482316017-22154-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482316017-22154-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20161222001456.GX8288@codeaurora.org>
+Message-ID: <20170214162718.0777d95f@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Subject should add prefix like:
+Hello Stephen,
 
-ARM: imx: fix xxxx
+On Wed, 21 Dec 2016 16:14:56 -0800, Stephen Boyd wrote:
+> On 12/21, Thomas Petazzoni wrote:
+> > This commit:
+> > 
+> >  - makes the GOP_DP (bit 9) gatable clock a child clock of the
+> >    SD_MMC_GOP (bit 18) clock, as it should have been. The clock for bit
+> >    18 was just named SD_MMC, but since it also covers the GOP block, it
+> >    is renamed SD_MMC_GOP.
+> > 
+> >  - makes the MG (bit 5) gatable clock a child clock of the MG_CORE
+> >    clock (bit 6)
+> > 
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > ---  
+> 
+> Applied to clk-next
 
-best regards
-Frank Li
+I don't see my patch in clk-next at
+https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/log/drivers/clk/mvebu/cp110-system-controller.c?h=clk-next,
+nor in linux-next. Am I missing something?
 
-On Tue, Feb 14, 2017 at 3:01 AM, Tiberiu Breana
-<andrei-tiberiu.breana@nxp.com> wrote:
-> Fixed an error in the "write-accesses" event definition.
->
-> Signed-off-by: Tiberiu Breana <andrei-tiberiu.breana@nxp.com>
-> ---
->  arch/arm/mach-imx/mmdc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
-> index c03bf28..89a926f 100644
-> --- a/arch/arm/mach-imx/mmdc.c
-> +++ b/arch/arm/mach-imx/mmdc.c
-> @@ -87,7 +87,7 @@ static DEFINE_IDA(mmdc_ida);
->  PMU_EVENT_ATTR_STRING(total-cycles, mmdc_pmu_total_cycles, "event=0x00")
->  PMU_EVENT_ATTR_STRING(busy-cycles, mmdc_pmu_busy_cycles, "event=0x01")
->  PMU_EVENT_ATTR_STRING(read-accesses, mmdc_pmu_read_accesses, "event=0x02")
-> -PMU_EVENT_ATTR_STRING(write-accesses, mmdc_pmu_write_accesses, "config=0x03")
-> +PMU_EVENT_ATTR_STRING(write-accesses, mmdc_pmu_write_accesses, "event=0x03")
->  PMU_EVENT_ATTR_STRING(read-bytes, mmdc_pmu_read_bytes, "event=0x04")
->  PMU_EVENT_ATTR_STRING(read-bytes.unit, mmdc_pmu_read_bytes_unit, "MB");
->  PMU_EVENT_ATTR_STRING(read-bytes.scale, mmdc_pmu_read_bytes_scale, "0.000001");
-> --
-> 2.7.4
->
+Thanks a lot,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
