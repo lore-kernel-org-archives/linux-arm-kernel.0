@@ -1,51 +1,81 @@
-From: ralph.sennhauser@gmail.com (Ralph Sennhauser)
-Date: Tue, 14 Feb 2017 20:21:16 +0100
-Subject: [PATCH] ARM: mvebu: add support for the Linksys WRT1900ACS
- (Shelby)
-In-Reply-To: <20170214175533.GF25924@io.lakedaemon.net>
-References: <20170214085919.3997-1-ralph.sennhauser@gmail.com>
- <20170214175533.GF25924@io.lakedaemon.net>
-Message-ID: <20170214202116.035ab193@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Feb 2017 11:36:45 -0800
+Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting cpu1
+ during boot
+In-Reply-To: <20170213215013.19929-1-tony@atomide.com>
+References: <20170213215013.19929-1-tony@atomide.com>
+Message-ID: <20170214193645.GM21809@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Feb 2017 17:55:33 +0000
-Jason Cooper <jason@lakedaemon.net> wrote:
+* Tony Lindgren <tony@atomide.com> [170213 13:51]:
+> Commit 3251885285e1 ("ARM: OMAP4+: Reset CPU1 properly for kexec") started
+> resetting cpu1 because of a kexec boot issue I was seeing earlier in 2016
+> on omap4 when doing kexec boot between two different kernel versions. The
+> booted kernel ended up trying to use the old kernel start-up address unless
+> cpu1 was reset before configuring the cpu1 start-up address.
+> 
+> It seems the reset part was not correct but probably working around some
+> other issue. I have not been able to reproduce this issue any longer despite
+> testing with backported patches back to v4.6 kernel. So it is possible this
+> issue was caused by other work in progress kexec patches I had applied. Or
+> it is possible some other fixes have made the issue go way.
+> 
+> The unconditional reset of cpu1 can cause issues booting some devices. For
+> example, bootloader configured secure OS running on cpu1 will fail as the
+> configuration is not preserved as reported by Andrew F. Davis <afd@ti.com>.
+> 
+> Let's fix the issue by reverting the cpu1 reset parts. If it turns out we
+> still need to reset cpu1 in some cases, we can add it back and do it
+> conditionally.
 
-> Hi Ralph, Imre,
-> 
-> On Tue, Feb 14, 2017 at 09:59:17AM +0100, Ralph Sennhauser wrote:
-> > The Linksys WRT1900ACS (Shelby) is another Armada 385 based router
-> > in the Linksys WRT AC Series which got released in October 2015.
-> > 
-> > The file armada-385-linksys-shelby.dts is taken from OpenWrt as-is
-> > and originally authored by Imre Kaloz.
-> > 
-> > URL: http://tinyurl.com/j8lz83a  
-> 
-> Could you please change this to:
-> 
-> https://github.com/openwrt/openwrt/blob/8466384db1154a107b86bf3ca10b166a21bd81d0/target/linux/mvebu/files/arch/arm/boot/dts/armada-385-linksys-shelby.dts
+Actually with this I'm now seeing cpu1 not come up after a suspend/resume
+cycle on duovero:
 
-Is what I had first and thought were to long to pass, so I went with
-this one for V2.
+[  118.257415] CPU1: shutdown
+[  118.294616] Error taking CPU1 up: -2
+[  118.299072] PM: noirq resume of devices complete after 3.723 msecs
+[  118.303802] PM: early resume of devices complete after 3.723 msecs
 
-Thanks
-Ralph
+So this issue needs to be investigated more.
 
+Regards,
+
+Tony
+
+> Fixes: 3251885285e1 ("ARM: OMAP4+: Reset CPU1 properly for kexec")
+> Cc: Keerthy <j-keerthy@ti.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Reported-by: Andrew F. Davis <afd@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/omap-smp.c | 10 ----------
+>  1 file changed, 10 deletions(-)
 > 
-> Or, say 'imported from
+> diff --git a/arch/arm/mach-omap2/omap-smp.c b/arch/arm/mach-omap2/omap-smp.c
+> --- a/arch/arm/mach-omap2/omap-smp.c
+> +++ b/arch/arm/mach-omap2/omap-smp.c
+> @@ -300,16 +300,6 @@ static void __init omap4_smp_prepare_cpus(unsigned int max_cpus)
+>  		scu_enable(cfg.scu_base);
+>  
+>  	/*
+> -	 * Reset CPU1 before configuring, otherwise kexec will
+> -	 * end up trying to use old kernel startup address.
+> -	 */
+> -	if (cfg.cpu1_rstctrl_va) {
+> -		writel_relaxed(1, cfg.cpu1_rstctrl_va);
+> -		readl_relaxed(cfg.cpu1_rstctrl_va);
+> -		writel_relaxed(0, cfg.cpu1_rstctrl_va);
+> -	}
+> -
+> -	/*
+>  	 * Write the address of secondary startup routine into the
+>  	 * AuxCoreBoot1 where ROM code will jump and start executing
+>  	 * on secondary core once out of WFE
+> -- 
+> 2.11.1
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
->  https://github.com/openwrt/openwrt
-> 
-> commit 8466384db115 "mvebu: add support for 4.1 and switch over"'
-> 
-> or something similar?
-> 
-> Other than that,
-> 
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> 
-> thx,
-> 
-> Jason.
