@@ -1,146 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Feb 2017 09:44:47 -0800
-Subject: [PATCH 10/14] ARM: OMAP2+: Remove legacy data from hwmod for omap3
-In-Reply-To: <CAHCN7x+XEnu2agB6mjre8-RdS-MAE3Zh2HGPQcpohfxhmMM0PA@mail.gmail.com>
-References: <20161111191711.5079-1-tony@atomide.com>
- <20161111191711.5079-11-tony@atomide.com>
- <CAHCN7x+XEnu2agB6mjre8-RdS-MAE3Zh2HGPQcpohfxhmMM0PA@mail.gmail.com>
-Message-ID: <20170214174446.GJ21809@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 14 Feb 2017 17:45:34 +0000
+Subject: [RFC v2 5/7] ASoC: stm32: add DFSDM DAI support
+In-Reply-To: <1487003909-11710-6-git-send-email-arnaud.pouliquen@st.com>
+References: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
+ <1487003909-11710-6-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20170214174534.35ytbpax75mxcayg@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Adam Ford <aford173@gmail.com> [170214 09:01]:
-> On Fri, Nov 11, 2016 at 1:17 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > This data is now coming from device tree so we can remove the
-> > duplicate data. Let's keep the DSS and DMA related things for now
-> > until those have been converted to device tree completely.
-> >
-> > While at it, let's also add the trailing commas to data structures
-> > so further processing with scripts will be a bit easier.
-> >
-> Tony,
-> 
-> I am having some errors with this patch.
-> 
-> Smartreflex on a DM3730 drops a few errors:
-> 
-> [    1.209747] smartreflex smartreflex.0: invalid resource
-> [    1.215301] smartreflex smartreflex.0: omap_sr_probe: ioremap fail
-> [    1.221832] smartreflex smartreflex.1: invalid resource
-> [    1.227294] smartreflex smartreflex.1: omap_sr_probe: ioremap fail
-> [    1.233856] sr_init: platform driver register failed for SR
-> 
-> I used Git bisect to narrow it down to this patch, and I confirmed it
-> manually.  Sorry it took so long to get feedback on this, but I was on
-> vacation.
+On Mon, Feb 13, 2017 at 05:38:27PM +0100, Arnaud Pouliquen wrote:
 
-Oh OK sorry about that.
+This looks basically fine as a system specific driver but as some of the
+comments in here say there's bits of it could perhaps be genericised but
+I'm not sure we need to do that right now.  I'm not sure the abstraction
+is exactly comfortable but having another bit of hardware doing a bridge
+to IIO might be the best way to figure out something better.
 
-> I attempted to just add back the smartreflex stuff for the omap36xx,
-> but that didn't work.  I am going to assume something is missing or
-> wrong in the device tree, but I could be wrong. If you  have any
-> suggestions before I go down a rabbit hole, I am open for ideas.
+> +	.period_bytes_min = 40, /* 8 khz 5 ms */
+> +	.period_bytes_max = 4 * PAGE_SIZE,
+> +	.buffer_bytes_max = 16 * PAGE_SIZE
 
-That's all there is to it :) You must have missed some part of it.
-Below is a fix that seems to work for me, care to test?
+What's the physical minimum period limit?  The comment makes this sound
+like it's just made up.
 
-Regards,
+> +	unsigned int shift = 24 -priv->max_scaling;
+> +	
 
-Tony
+Missing space after -.
 
-8< -----------------------
->From tony Mon Sep 17 00:00:00 2001
-From: Tony Lindgren <tony@atomide.com>
-Date: Tue, 14 Feb 2017 09:33:25 -0800
-Subject: [PATCH] ARM: OMAP3: Fix smartreflex platform data regression
+> +	dev_dbg(dai->dev, "%s: enter\n", __func__);
+> +	return 0;
+> +	return snd_pcm_hw_constraint_list(substream->runtime, 0,
+> +					  SNDRV_PCM_HW_PARAM_RATE,
+> +					  &priv->rates_const);
 
-Commit d9d9cec02835 ("ARM: OMAP2+: Remove legacy data from hwmod for
-omap3") dropped platform data that should no longer be used as we're
-booting with device tree. It turns out that smartreflex is still
-using platform data and produces the following errors during probe:
+Looks like debug changes got left in?
 
-smartreflex smartreflex.0: invalid resource
-smartreflex smartreflex.0: omap_sr_probe: ioremap fail
-smartreflex: probe of smartreflex.0 failed with error -22
-smartreflex smartreflex.1: invalid resource
-smartreflex smartreflex.1: omap_sr_probe: ioremap fail
-smartreflex: probe of smartreflex.1 failed with error -22
+> +static int stm32_adfsdm_set_sysclk(struct snd_soc_dai *dai, int clk_id,
+> +				   unsigned int freq, int dir)
+> +{
+> +	struct stm32_adfsdm_priv *priv = snd_soc_dai_get_drvdata(dai);
+> +	struct stm32_adfsdm_pdata *pdata = priv->pdata;
+> +
+> +	dev_dbg(dai->dev, "%s: enter for dai %d\n", __func__, dai->id);
+> +	if (dir == SND_SOC_CLOCK_IN) {
+> +		pdata->ops->set_sysclk(pdata->adc, freq);
+> +		priv->dmic_clk = freq;
+> +	}
+> +
+> +	/* Determine supported rate which depends on SPI/manchester clock */
+> +	return stm32_adfsdm_get_supported_rates(dai, &priv->rates_const.mask);
 
-Let's fix the regression by adding back the smartreflex hwmod data.
-The long term is to update the smartreflex driver to use device tree
-based probing.
+Since the DAI is unidirectional it doesn't matter but obviously if it
+weren't then the fact that getting the supported rates involves setting
+the hwparams means this could become disruptive.  If we're going to
+genericise this to be a more general IIO/ASoC bridge that could matter.
 
-Reported-by: Adam Ford <aford173@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+> +static int stm32_adfsdm_dai_remove(struct snd_soc_dai *dai)
+> +{
+> +	dev_dbg(dai->dev, "%s: enter for dai %d\n", __func__, dai->id);
+> +
+> +	return 0;
+> +}
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -1946,6 +1946,7 @@ static struct omap_hwmod_ocp_if omap3xxx_dss__l3 = {
- };
- 
- /* l3_core -> usbhsotg interface */
-+
- static struct omap_hwmod_ocp_if omap3xxx_usbhsotg__l3 = {
- 	.master		= &omap3xxx_usbhsotg_hwmod,
- 	.slave		= &omap3xxx_l3_main_hwmod,
-@@ -2112,11 +2113,20 @@ static struct omap_hwmod_ocp_if omap3_l4_core__i2c3 = {
- };
- 
- /* L4 CORE -> SR1 interface */
-+static struct omap_hwmod_addr_space omap3_sr1_addr_space[] = {
-+	{
-+		.pa_start	= OMAP34XX_SR1_BASE,
-+		.pa_end		= OMAP34XX_SR1_BASE + SZ_1K - 1,
-+		.flags		= ADDR_TYPE_RT,
-+	},
-+	{ },
-+};
- 
- static struct omap_hwmod_ocp_if omap34xx_l4_core__sr1 = {
- 	.master		= &omap3xxx_l4_core_hwmod,
- 	.slave		= &omap34xx_sr1_hwmod,
- 	.clk		= "sr_l4_ick",
-+	.addr		= omap3_sr1_addr_space,
- 	.user		= OCP_USER_MPU,
- };
- 
-@@ -2124,15 +2134,25 @@ static struct omap_hwmod_ocp_if omap36xx_l4_core__sr1 = {
- 	.master		= &omap3xxx_l4_core_hwmod,
- 	.slave		= &omap36xx_sr1_hwmod,
- 	.clk		= "sr_l4_ick",
-+	.addr		= omap3_sr1_addr_space,
- 	.user		= OCP_USER_MPU,
- };
- 
- /* L4 CORE -> SR1 interface */
-+static struct omap_hwmod_addr_space omap3_sr2_addr_space[] = {
-+	{
-+		.pa_start	= OMAP34XX_SR2_BASE,
-+		.pa_end		= OMAP34XX_SR2_BASE + SZ_1K - 1,
-+		.flags		= ADDR_TYPE_RT,
-+	},
-+	{ },
-+};
- 
- static struct omap_hwmod_ocp_if omap34xx_l4_core__sr2 = {
- 	.master		= &omap3xxx_l4_core_hwmod,
- 	.slave		= &omap34xx_sr2_hwmod,
- 	.clk		= "sr_l4_ick",
-+	.addr		= omap3_sr2_addr_space,
- 	.user		= OCP_USER_MPU,
- };
- 
-@@ -2140,6 +2160,7 @@ static struct omap_hwmod_ocp_if omap36xx_l4_core__sr2 = {
- 	.master		= &omap3xxx_l4_core_hwmod,
- 	.slave		= &omap36xx_sr2_hwmod,
- 	.clk		= "sr_l4_ick",
-+	.addr		= omap3_sr2_addr_space,
- 	.user		= OCP_USER_MPU,
- };
- 
--- 
-2.11.1
+Remove empty functions, though in this case I think you want to add
+something to disconnect the XRUN callback just in order to be sure it
+can't be mistakenly called.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170214/934596be/attachment.sig>
