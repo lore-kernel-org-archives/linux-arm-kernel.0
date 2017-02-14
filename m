@@ -1,55 +1,71 @@
-From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Wed, 15 Feb 2017 00:35:39 +0100
-Subject: [PATCH v6 5/5] ARM: dts: sun9i: Initial support for the Sunchip
- CX-A99 board
-In-Reply-To: <CAGb2v64AfBW+CHHkFvvNzCGBG09UK-sPcAZi2QgCR9wM=jguxw@mail.gmail.com>
-References: <cover.1486592470.git.rask@formelder.dk>
- <d4211c5d57f80b0281d7d332edc7d69e66202d3d.1486592471.git.rask@formelder.dk>
- <20170210085920.7l7gswm6yjuqgdfx@lukather>
- <CAGb2v64AfBW+CHHkFvvNzCGBG09UK-sPcAZi2QgCR9wM=jguxw@mail.gmail.com>
-Message-ID: <20170214233538.enkffjiw3kkfromu@localhost>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Wed, 15 Feb 2017 00:36:56 +0100
+Subject: [PATCH 10/14] phy: meson8b-usb2: simplify optional reset handling
+In-Reply-To: <20170130114116.22089-10-p.zabel@pengutronix.de>
+References: <20170130114116.22089-1-p.zabel@pengutronix.de>
+ <20170130114116.22089-10-p.zabel@pengutronix.de>
+Message-ID: <CAFBinCAASGS19naW76vfynRj4Fg4KjpHcwGr5h+pWZae47rwRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2017 at 05:22:21PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Feb 10, 2017 at 4:59 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Thu, Feb 09, 2017 at 12:34:06AM +0100, Rask Ingemann Lambertsen wrote:
-[...]
-> >> diff --git a/arch/arm/boot/dts/sun9i-a80-cx-a99.dts b/arch/arm/boot/dts/sun9i-a80-cx-a99.dts
-> >> new file mode 100644
-> >> index 0000000..f5496d2
-> >> --- /dev/null
-> >> +++ b/arch/arm/boot/dts/sun9i-a80-cx-a99.dts
-[...]
-> >> +     pmic at 745 {
-> >> +             compatible = "x-powers,axp808", "x-powers,axp806";
-> 
-> As you mentioned elsewhere, they are not really compatible.
-> You should drop the latter compatible.
+Hi Philipp,
 
-The compatibility is good enough that it works fine with the driver that
-went into kernel 4.9 and 4.10. Using this device tree file, I have built and
-booted 4.9.9 and 4.10-rc7 kernels as per the instructions here;
-https://linux-sunxi.org/Sunchip_CX-A99#Linux_kernel
-Likewise any other AXP806 driver which doesn't touch the register at address
-0xff will work fine.
+sorry for the late reply.
+unfortunately my GXBB board (which is supported by the driver below) is dead.
+I CC'ed Jerome Brunet - maybe he can give it a go on one of his (GXBB) boards.
 
-So, the disadvantage of removing the "x-powers,axp806" compatible is that
-it breaks on two kernel versions where it works fine with the compatible.
-What is the advantage of removing the "x-powers,axp806" compatible?
+On Mon, Jan 30, 2017 at 12:41 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> As of commit bb475230b8e5 ("reset: make optional functions really
+> optional"), the reset framework API calls use NULL pointers to describe
+> optional, non-present reset controls.
+>
+> This allows to return errors from devm_reset_control_get_optional_shared
+> and to call reset_control_reset unconditionally.
+>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
-As to touching the register at 0xff, it would be interesting to know more
-precisely what goes wrong. The symptom is these messages in the log:
+(based on reading the code along with the highly appreciated changes
+from bb475230b8e5)
 
-[    3.209573] axp20x-rsb sunxi-rsb-745: AXP20x variant AXP806 found
-[    3.210153] axp20x-rsb sunxi-rsb-745: Failed to set masks in 0x40: -5
-[    3.210178] axp20x-rsb sunxi-rsb-745: failed to add irq chip: -5
-[    3.210306] axp20x-rsb: probe of sunxi-rsb-745 failed with error -5
-
-I haven't yet looked further into what happens at the RSB bus level.
-
--- 
-Rask Ingemann Lambertsen
+> Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: Carlo Caione <carlo@caione.org>
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/phy/phy-meson8b-usb2.c | 12 +++++-------
+>  1 file changed, 5 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/phy/phy-meson8b-usb2.c b/drivers/phy/phy-meson8b-usb2.c
+> index 33c9f4ba157d1..87168f1fe3af6 100644
+> --- a/drivers/phy/phy-meson8b-usb2.c
+> +++ b/drivers/phy/phy-meson8b-usb2.c
+> @@ -141,12 +141,10 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
+>         struct phy_meson8b_usb2_priv *priv = phy_get_drvdata(phy);
+>         int ret;
+>
+> -       if (!IS_ERR_OR_NULL(priv->reset)) {
+> -               ret = reset_control_reset(priv->reset);
+> -               if (ret) {
+> -                       dev_err(&phy->dev, "Failed to trigger USB reset\n");
+> -                       return ret;
+> -               }
+> +       ret = reset_control_reset(priv->reset);
+> +       if (ret) {
+> +               dev_err(&phy->dev, "Failed to trigger USB reset\n");
+> +               return ret;
+>         }
+>
+>         ret = clk_prepare_enable(priv->clk_usb_general);
+> @@ -241,7 +239,7 @@ static int phy_meson8b_usb2_probe(struct platform_device *pdev)
+>                 return PTR_ERR(priv->clk_usb);
+>
+>         priv->reset = devm_reset_control_get_optional_shared(&pdev->dev, NULL);
+> -       if (PTR_ERR(priv->reset) == -EPROBE_DEFER)
+> +       if (PTR_ERR(priv->reset))
+>                 return PTR_ERR(priv->reset);
+>
+>         priv->dr_mode = of_usb_get_dr_mode_by_phy(pdev->dev.of_node, -1);
+> --
+> 2.11.0
+>
