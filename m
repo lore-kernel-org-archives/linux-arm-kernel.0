@@ -1,46 +1,41 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Tue, 14 Feb 2017 17:19:07 +0800
-Subject: [PATCH 0/5] Add Spreadtrum SP9860G support
-Message-ID: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
+Date: Tue, 14 Feb 2017 17:19:11 +0800
+Subject: [PATCH 4/5] sprd_serial: switch comptible string to sc-uart
+In-Reply-To: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <1487063952-7113-5-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SC9860 is a Spreadtrum SoC with eight Cortex A53, which are divided
-into 4 Big cores and 4 little cores.
+This driver sprd_serial is not only for SC9836, but for all Spreadtrum
+SoCs so far.
 
-In this patch-set, patch-1/5 only provides a basic configuration for SC9860
-in device tree to make it run to console.  After this we will continue
-to submit other drivers step by step, which are using on Spreadtrum's SoCs.
+Signed-off-by: Chunyan Zhang <chunyan.chunyan@spreadtrum.com>
+---
+ drivers/tty/serial/sprd_serial.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-This patch-set also adjusted the compatible string of sprd_serial from
-'sc9836-uart' to 'sc-uart', because this serial driver is not only for
-SC9836 but for all Spreadtrum SoCs so far.
-
-Thanks,
-Chunyan
-
-Chunyan Zhang (3):
-  Documentation: sprd: Add bindings for SP9860G
-  devicetree: bindings: revise compatible string of sprd uart
-  sprd_serial: switch comptible string to sc-uart
-
-Orson Zhai (1):
-  arm64: dts: Add basic DT to support Spreadtrum's SP9860G
-
-Wei Qiao (1):
-  serial: sprd: adjust TIMEOUT to a big value
-
- Documentation/devicetree/bindings/arm/sprd.txt     |  13 +-
- .../devicetree/bindings/serial/sprd-uart.txt       |   2 +-
- arch/arm64/boot/dts/sprd/Makefile                  |   3 +-
- arch/arm64/boot/dts/sprd/sc9860.dtsi               | 534 +++++++++++++++++++++
- arch/arm64/boot/dts/sprd/sp9860g-1h10.dts          |  58 +++
- arch/arm64/boot/dts/sprd/whale2.dtsi               |  66 +++
- drivers/tty/serial/sprd_serial.c                   |   6 +-
- 7 files changed, 672 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm64/boot/dts/sprd/sc9860.dtsi
- create mode 100644 arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
- create mode 100644 arch/arm64/boot/dts/sprd/whale2.dtsi
-
+diff --git a/drivers/tty/serial/sprd_serial.c b/drivers/tty/serial/sprd_serial.c
+index 699447a..c0d63c01 100644
+--- a/drivers/tty/serial/sprd_serial.c
++++ b/drivers/tty/serial/sprd_serial.c
+@@ -624,7 +624,7 @@ static int __init sprd_early_console_setup(
+ 	device->con->write = sprd_early_write;
+ 	return 0;
+ }
+-OF_EARLYCON_DECLARE(sprd_serial, "sprd,sc9836-uart",
++OF_EARLYCON_DECLARE(sprd_serial, "sprd,sc-uart",
+ 		    sprd_early_console_setup);
+ 
+ #else /* !CONFIG_SERIAL_SPRD_CONSOLE */
+@@ -777,7 +777,7 @@ static int sprd_resume(struct device *dev)
+ static SIMPLE_DEV_PM_OPS(sprd_pm_ops, sprd_suspend, sprd_resume);
+ 
+ static const struct of_device_id serial_ids[] = {
+-	{.compatible = "sprd,sc9836-uart",},
++	{.compatible = "sprd,sc-uart",},
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, serial_ids);
 -- 
 2.7.4
