@@ -1,126 +1,23 @@
-From: zhouxianrong@huawei.com (zhouxianrong)
-Date: Tue, 14 Feb 2017 15:18:44 +0800
-Subject: [PATCH] mm: free reserved area's memmap if possiable
-In-Reply-To: <1487055180-128750-1-git-send-email-zhouxianrong@huawei.com>
-References: <1486987349-58711-1-git-send-email-zhouxianrong@huawei.com>
- <1487055180-128750-1-git-send-email-zhouxianrong@huawei.com>
-Message-ID: <7c560d70-ac7f-dbb2-2ff2-7daa32c85c3a@huawei.com>
+From: madhu.sk89@gmail.com (Madhu K)
+Date: Tue, 14 Feb 2017 13:05:43 +0530
+Subject: Debug kernel oops
+Message-ID: <CAA2oCO=48kuhqZC1pK4NhgWS=FFexRwoak4ks9aRaHoYNmESTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-if the reserved area by user were so big which caused the memmap big,
-and the reserved area's memamp did not be used by kernel, then user
-could free the the reserved area's memamp by memblock_mark_raw_pfn
-interface which is added by me.
+Hi All,
 
-On 2017/2/14 14:53, zhouxianrong at huawei.com wrote:
-> From: zhouxianrong <zhouxianrong@huawei.com>
->
-> just like freeing no-map area's memmap (gaps of memblock.memory)
-> we could free reserved area's memmap (areas of memblock.reserved)
-> as well only when user of reserved area indicate that we can do
-> this in drivers. that is, user of reserved area know how to
-> use the reserved area who could not memblock_free or free_reserved_xxx
-> the reserved area and regard the area as raw pfn usage by kernel.
-> the patch supply a way to users who want to utilize the memmap
-> memory corresponding to raw pfn reserved areas as many as possible.
-> users can do this by memblock_mark_raw_pfn interface which mark the
-> reserved area as raw pfn and tell free_unused_memmap that this area's
-> memmap could be freeed.
->
-> Signed-off-by: zhouxianrong <zhouxianrong@huawei.com>
-> ---
->  arch/arm64/mm/init.c     |   14 +++++++++++++-
->  include/linux/memblock.h |    3 +++
->  mm/memblock.c            |   24 ++++++++++++++++++++++++
->  3 files changed, 40 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 380ebe7..7e62ef8 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -358,7 +358,7 @@ static inline void free_memmap(unsigned long start_pfn, unsigned long end_pfn)
->   */
->  static void __init free_unused_memmap(void)
->  {
-> -	unsigned long start, prev_end = 0;
-> +	unsigned long start, end, prev_end = 0;
->  	struct memblock_region *reg;
->
->  	for_each_memblock(memory, reg) {
-> @@ -391,6 +391,18 @@ static void __init free_unused_memmap(void)
->  	if (!IS_ALIGNED(prev_end, PAGES_PER_SECTION))
->  		free_memmap(prev_end, ALIGN(prev_end, PAGES_PER_SECTION));
->  #endif
-> +
-> +	for_each_memblock(reserved, reg) {
-> +		if (!(reg->flags & MEMBLOCK_RAW_PFN))
-> +			continue;
-> +
-> +		start = memblock_region_memory_base_pfn(reg);
-> +		end = round_down(memblock_region_memory_end_pfn(reg),
-> +				 MAX_ORDER_NR_PAGES);
-> +
-> +		if (start < end)
-> +			free_memmap(start, end);
-> +	}
->  }
->  #endif	/* !CONFIG_SPARSEMEM_VMEMMAP */
->
-> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-> index 5b759c9..9f8d277 100644
-> --- a/include/linux/memblock.h
-> +++ b/include/linux/memblock.h
-> @@ -26,6 +26,7 @@ enum {
->  	MEMBLOCK_HOTPLUG	= 0x1,	/* hotpluggable region */
->  	MEMBLOCK_MIRROR		= 0x2,	/* mirrored region */
->  	MEMBLOCK_NOMAP		= 0x4,	/* don't add to kernel direct mapping */
-> +	MEMBLOCK_RAW_PFN	= 0x8,	/* region whose memmap never be used */
->  };
->
->  struct memblock_region {
-> @@ -92,6 +93,8 @@ bool memblock_overlaps_region(struct memblock_type *type,
->  int memblock_clear_hotplug(phys_addr_t base, phys_addr_t size);
->  int memblock_mark_mirror(phys_addr_t base, phys_addr_t size);
->  int memblock_mark_nomap(phys_addr_t base, phys_addr_t size);
-> +int memblock_mark_raw_pfn(phys_addr_t base, phys_addr_t size);
-> +int memblock_clear_raw_pfn(phys_addr_t base, phys_addr_t size);
->  ulong choose_memblock_flags(void);
->
->  /* Low level functions */
-> diff --git a/mm/memblock.c b/mm/memblock.c
-> index 7608bc3..c103b94 100644
-> --- a/mm/memblock.c
-> +++ b/mm/memblock.c
-> @@ -814,6 +814,30 @@ int __init_memblock memblock_mark_nomap(phys_addr_t base, phys_addr_t size)
->  }
->
->  /**
-> + * memblock_mark_raw_pfn - Mark raw pfn memory with flag MEMBLOCK_RAW_PFN.
-> + * @base: the base phys addr of the region
-> + * @size: the size of the region
-> + *
-> + * Return 0 on succees, -errno on failure.
-> + */
-> +int __init_memblock memblock_mark_raw_pfn(phys_addr_t base, phys_addr_t size)
-> +{
-> +	return memblock_setclr_flag(base, size, 1, MEMBLOCK_RAW_PFN);
-> +}
-> +
-> +/**
-> + * memblock_clear_raw_pfn - Clear flag MEMBLOCK_RAW_PFN for a specified region.
-> + * @base: the base phys addr of the region
-> + * @size: the size of the region
-> + *
-> + * Return 0 on succees, -errno on failure.
-> + */
-> +int __init_memblock memblock_clear_raw_pfn(phys_addr_t base, phys_addr_t size)
-> +{
-> +	return memblock_setclr_flag(base, size, 0, MEMBLOCK_RAW_PFN);
-> +}
-> +
-> +/**
->   * __next_reserved_mem_region - next function for for_each_reserved_region()
->   * @idx: pointer to u64 loop variable
->   * @out_start: ptr to phys_addr_t for start address of the region, can be %NULL
->
+How to debug the kernel oops for arm boards?
+
+Below is my board and setup details.
+
+1) I am using Beaglebone black board which is running with 4.9.2 kernel
+version.
+2) I wrote some i2c driver on host machine, it is cross compiled for arm
+and loaded on beaglebone black.
+3) Insmod is proper, but while unloading the module I am seeing some kernel
+oops.
+4) How to debug that oops? which tools we have to use?
+
+Thanks in advance
+Madhu
