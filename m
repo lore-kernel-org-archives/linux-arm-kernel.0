@@ -1,203 +1,207 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 14 Feb 2017 18:01:47 +0100
-Subject: [PATCH v6 07/14] dt: bindings: Add bindings for Marvell Xenon SD Host
- Controller
+Date: Tue, 14 Feb 2017 18:01:50 +0100
+Subject: [PATCH v6 10/14] mmc: sdhci-xenon: Add SoC PHY PAD voltage control
 In-Reply-To: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
 References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
-Message-ID: <3a4ce2fd25ed812482b0fc96f50dd305c8f40fe9.1487091464.git-series.gregory.clement@free-electrons.com>
+Message-ID: <3c21f3f9930373d6e6c28526c2e5b0aa2072daef.1487091464.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hu Ziji <huziji@marvell.com>
 
-Marvell Xenon SDHC can support eMMC/SD/SDIO.
-Add Xenon-specific properties.
-Also add properties for Xenon PHY setting.
+Some SoCs have PHY PAD outside Xenon IP.
+PHY PAD voltage should match signalling voltage in use.
+
+Add generic SoC PHY PAD voltage control interface.
+Implement Aramda-3700 SoC PHY PAD voltage control.
 
 Signed-off-by: Hu Ziji <huziji@marvell.com>
+Tested-by: Russell King <rmk+kernel@armlinux.org.uk>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt | 172 +++++++-
- 1 file changed, 172 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
+ drivers/mmc/host/sdhci-xenon-phy.c | 116 +++++++++++++++++++++++++++++-
+ drivers/mmc/host/sdhci-xenon.c     |   2 +-
+ drivers/mmc/host/sdhci-xenon.h     |   2 +-
+ 3 files changed, 119 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt b/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
-new file mode 100644
-index 000000000000..eabee8b64db6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
-@@ -0,0 +1,172 @@
-+Marvell Xenon SDHCI Controller device tree bindings
-+This file documents differences between the core mmc properties
-+described by mmc.txt and the properties used by the Xenon implementation.
+diff --git a/drivers/mmc/host/sdhci-xenon-phy.c b/drivers/mmc/host/sdhci-xenon-phy.c
+index c26ba3a180a0..c3b7e9a21f6b 100644
+--- a/drivers/mmc/host/sdhci-xenon-phy.c
++++ b/drivers/mmc/host/sdhci-xenon-phy.c
+@@ -143,6 +143,27 @@ enum phy_type_enum {
+ 	NR_PHY_TYPES
+ };
+ 
++enum soc_pad_ctrl_type {
++	SOC_PAD_SD,
++	SOC_PAD_FIXED_1_8V,
++};
 +
-+Multiple SDHCs might be put into a single Xenon IP, to save size and cost.
-+Each SDHC is independent and owns independent resources, such as register sets,
-+clock and PHY.
-+Each SDHC should have an independent device tree node.
++struct soc_pad_ctrl_table {
++	const char *soc;
++	void (*set_soc_pad)(struct sdhci_host *host,
++			    unsigned char signal_voltage);
++};
 +
-+Required Properties:
-+- compatible: should be one of the following
-+  - "marvell,armada-3700-sdhci": For controllers on Armada-3700 SoC.
-+  Must provide a second register area and marvell,pad-type.
-+  - "marvell,armada-ap806-sdhci": For controllers on Armada AP806.
-+  - "marvell,armada-cp110-sdhci": For controllers on Armada CP110.
++struct soc_pad_ctrl {
++	/* Register address of SoC PHY PAD ctrl */
++	void __iomem	*reg;
++	/* SoC PHY PAD ctrl type */
++	enum soc_pad_ctrl_type pad_type;
++	/* SoC specific operation to set SoC PHY PAD */
++	void (*set_soc_pad)(struct sdhci_host *host,
++			    unsigned char signal_voltage);
++};
 +
-+- clocks:
-+  Array of clocks required for SDHC.
-+  Require at least input clock for Xenon IP core.
+ static struct xenon_emmc_phy_regs xenon_emmc_5_0_phy_regs = {
+ 	.timing_adj	= XENON_EMMC_5_0_PHY_TIMING_ADJUST,
+ 	.func_ctrl	= XENON_EMMC_5_0_PHY_FUNC_CONTROL,
+@@ -176,6 +197,8 @@ struct emmc_phy_params {
+ 	u8	nr_tun_times;
+ 	/* Divider for calculating Tuning Step */
+ 	u8	tun_step_divider;
 +
-+- clock-names:
-+  Array of names corresponding to clocks property.
-+  The input clock for Xenon IP core should be named as "core".
++	struct soc_pad_ctrl pad_ctrl;
+ };
+ 
+ static int alloc_emmc_phy(struct sdhci_xenon_priv *priv)
+@@ -252,6 +275,45 @@ static int emmc_phy_init(struct sdhci_host *host)
+ 	return 0;
+ }
+ 
++#define ARMADA_3700_SOC_PAD_1_8V	0x1
++#define ARMADA_3700_SOC_PAD_3_3V	0x0
 +
-+- reg:
-+  * For "marvell,armada-3700-sdhci", two register areas.
-+    The first one for Xenon IP register. The second one for the Armada 3700 SoC
-+    PHY PAD Voltage Control register.
-+    Please follow the examples with compatible "marvell,armada-3700-sdhci"
-+    in below.
-+    Please also check property marvell,pad-type in below.
++static void armada_3700_soc_pad_voltage_set(struct sdhci_host *host,
++					    unsigned char signal_voltage)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
++	struct emmc_phy_params *params = priv->phy_params;
 +
-+  * For other compatible strings, one register area for Xenon IP.
++	if (params->pad_ctrl.pad_type == SOC_PAD_FIXED_1_8V) {
++		writel(ARMADA_3700_SOC_PAD_1_8V, params->pad_ctrl.reg);
++	} else if (params->pad_ctrl.pad_type == SOC_PAD_SD) {
++		if (signal_voltage == MMC_SIGNAL_VOLTAGE_180)
++			writel(ARMADA_3700_SOC_PAD_1_8V, params->pad_ctrl.reg);
++		else if (signal_voltage == MMC_SIGNAL_VOLTAGE_330)
++			writel(ARMADA_3700_SOC_PAD_3_3V, params->pad_ctrl.reg);
++	}
++}
 +
-+Optional Properties:
-+- marvell,xenon-sdhc-id:
-+  Indicate the corresponding bit index of current SDHC in
-+  SDHC System Operation Control Register Bit[7:0].
-+  Set/clear the corresponding bit to enable/disable current SDHC.
-+  If Xenon IP contains only one SDHC, this property is optional.
++/*
++ * Set SoC PHY voltage PAD control register,
++ * according to the operation voltage on PAD.
++ * The detailed operation depends on SoC implementation.
++ */
++static void emmc_phy_set_soc_pad(struct sdhci_host *host,
++				 unsigned char signal_voltage)
++{
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
++	struct emmc_phy_params *params = priv->phy_params;
 +
-+- marvell,xenon-phy-type:
-+  Xenon support multiple types of PHYs.
-+  To select eMMC 5.1 PHY, set:
-+  marvell,xenon-phy-type = "emmc 5.1 phy"
-+  eMMC 5.1 PHY is the default choice if this property is not provided.
-+  To select eMMC 5.0 PHY, set:
-+  marvell,xenon-phy-type = "emmc 5.0 phy"
++	if (!params->pad_ctrl.reg)
++		return;
 +
-+  All those types of PHYs can support eMMC, SD and SDIO.
-+  Please note that this property only presents the type of PHY.
-+  It doesn't stand for the entire SDHC type or property.
-+  For example, "emmc 5.1 phy" doesn't mean that this Xenon SDHC only
-+  supports eMMC 5.1.
++	if (params->pad_ctrl.set_soc_pad)
++		params->pad_ctrl.set_soc_pad(host, signal_voltage);
++}
 +
-+- marvell,xenon-phy-znr:
-+  Set PHY ZNR value.
-+  Only available for eMMC PHY.
-+  Valid range = [0:0x1F].
-+  ZNR is set as 0xF by default if this property is not provided.
+ /*
+  * Enable eMMC PHY HW DLL
+  * DLL should be enabled and stable before HS200/SDR104 tuning,
+@@ -584,6 +646,51 @@ static void emmc_phy_set(struct sdhci_host *host,
+ 	dev_dbg(mmc_dev(host->mmc), "eMMC PHY setting completes\n");
+ }
+ 
++static int get_dt_pad_ctrl_data(struct sdhci_host *host,
++				struct device_node *np,
++				struct emmc_phy_params *params)
++{
++	int ret = 0;
++	const char *name;
++	struct resource iomem;
 +
-+- marvell,xenon-phy-zpr:
-+  Set PHY ZPR value.
-+  Only available for eMMC PHY.
-+  Valid range = [0:0x1F].
-+  ZPR is set as 0xF by default if this property is not provided.
++	if (of_device_is_compatible(np, "marvell,armada-3700-sdhci"))
++		params->pad_ctrl.set_soc_pad = armada_3700_soc_pad_voltage_set;
++	else
++		return 0;
 +
-+- marvell,xenon-phy-nr-success-tun:
-+  Set the number of required consecutive successful sampling points
-+  used to identify a valid sampling window, in tuning process.
-+  Valid range = [1:7].
-+  Set as 0x4 by default if this property is not provided.
++	if (of_address_to_resource(np, 1, &iomem)) {
++		dev_err(mmc_dev(host->mmc), "Unable to find SoC PAD ctrl register address for %s\n",
++			np->name);
++		return -EINVAL;
++	}
 +
-+- marvell,xenon-phy-tun-step-divider:
-+  Set the divider for calculating TUN_STEP.
-+  Set as 64 by default if this property is not provided.
++	params->pad_ctrl.reg = devm_ioremap_resource(mmc_dev(host->mmc),
++						     &iomem);
++	if (IS_ERR(params->pad_ctrl.reg)) {
++		dev_err(mmc_dev(host->mmc), "Unable to get SoC PHY PAD ctrl register for %s\n",
++			np->name);
++		return PTR_ERR(params->pad_ctrl.reg);
++	}
 +
-+- marvell,xenon-phy-slow-mode:
-+  If this property is selected, transfers will bypass PHY.
-+  Only available when bus frequency lower than 55MHz in SDR mode.
-+  Disabled by default. Please only try this property if timing issues
-+  always occur with PHY enabled in eMMC HS SDR, SD SDR12, SD SDR25,
-+  SD Default Speed and HS mode and eMMC legacy speed mode.
++	ret = of_property_read_string(np, "marvell,pad-type", &name);
++	if (ret) {
++		dev_err(mmc_dev(host->mmc), "Unable to determine SoC PHY PAD ctrl type\n");
++		return ret;
++	}
++	if (!strcmp(name, "sd")) {
++		params->pad_ctrl.pad_type = SOC_PAD_SD;
++	} else if (!strcmp(name, "fixed-1-8v")) {
++		params->pad_ctrl.pad_type = SOC_PAD_FIXED_1_8V;
++	} else {
++		dev_err(mmc_dev(host->mmc), "Unsupported SoC PHY PAD ctrl type %s\n",
++			name);
++		return -EINVAL;
++	}
 +
-+- marvell,xenon-tun-count:
-+  Xenon SDHC SoC usually doesn't provide re-tuning counter in
-+  Capabilities Register 3 Bit[11:8].
-+  This property provides the re-tuning counter.
-+  If this property is not set, default re-tuning counter will
-+  be set as 0x9 in driver.
++	return ret;
++}
 +
-+- marvell,pad-type:
-+  Type of Armada 3700 SoC PHY PAD Voltage Controller register.
-+  Only valid when "marvell,armada-3700-sdhci" is selected.
-+  Two types: "sd" and "fixed-1-8v".
-+  If "sd" is selected, SoC PHY PAD is set as 3.3V at the beginning and is
-+  switched to 1.8V when later in higher speed mode.
-+  If "fixed-1-8v" is selected, SoC PHY PAD is fixed 1.8V, such as for eMMC.
-+  Please follow the examples with compatible "marvell,armada-3700-sdhci"
-+  in below.
+ static int emmc_phy_parse_param_dt(struct sdhci_host *host,
+ 				   struct device_node *np,
+ 				   struct emmc_phy_params *params)
+@@ -617,7 +724,14 @@ static int emmc_phy_parse_param_dt(struct sdhci_host *host,
+ 	else
+ 		params->tun_step_divider = XENON_TUNING_STEP_DIVIDER;
+ 
+-	return 0;
++	return get_dt_pad_ctrl_data(host, np, params);
++}
 +
-+Example:
-+- For eMMC:
++/* Set SoC PHY Voltage PAD */
++void xenon_soc_pad_ctrl(struct sdhci_host *host,
++			unsigned char signal_voltage)
++{
++	emmc_phy_set_soc_pad(host, signal_voltage);
+ }
+ 
+ /*
+diff --git a/drivers/mmc/host/sdhci-xenon.c b/drivers/mmc/host/sdhci-xenon.c
+index 99c18cad6460..f344d9fb0a1b 100644
+--- a/drivers/mmc/host/sdhci-xenon.c
++++ b/drivers/mmc/host/sdhci-xenon.c
+@@ -338,6 +338,8 @@ static int xenon_start_signal_voltage_switch(struct mmc_host *mmc,
+ 	 */
+ 	enable_xenon_internal_clk(host);
+ 
++	xenon_soc_pad_ctrl(host, ios->signal_voltage);
 +
-+	sdhci at aa0000 {
-+		compatible = "marvell,armada-ap806-sdhci";
-+		reg = <0xaa0000 0x1000>;
-+		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>
-+		clocks = <&emmc_clk>;
-+		clock-names = "core";
-+		bus-width = <4>;
-+		marvell,xenon-phy-slow-mode;
-+		marvell,xenon-tun-count = <11>;
-+
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		apm_mmccard: mmccard at 0 {
-+			compatible = "mmc-card";
-+			reg = <0>;
-+		};
-+	};
-+
-+- For SD/SDIO:
-+
-+	sdhci at ab0000 {
-+		compatible = "marvell,armada-cp110-sdhci";
-+		reg = <0xab0000 0x1000>;
-+		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
-+		vqmmc-supply = <&sd_regulator>;
-+		clocks = <&sdclk>;
-+		clock-names = "core";
-+		bus-width = <4>;
-+		marvell,xenon-tun-count = <9>;
-+	};
-+
-+- For eMMC with compatible "marvell,armada-3700-sdhci":
-+
-+	sdhci at aa0000 {
-+		compatible = "marvell,armada-3700-sdhci";
-+		reg = <0xaa0000 0x1000>,
-+		      <phy_addr 0x4>;
-+		interrupts = <GIC_SPI 13 IRQ_TYPE_LEVEL_HIGH>
-+		clocks = <&emmcclk>;
-+		clock-names = "core";
-+		bus-width = <8>;
-+		mmc-ddr-1_8v;
-+		mmc-hs400-1_8v;
-+
-+		marvell,pad-type = "fixed-1-8v";
-+
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		mmccard: mmccard at 0 {
-+			compatible = "mmc-card";
-+			reg = <0>;
-+		};
-+	};
-+
-+- For SD/SDIO with compatible "marvell,armada-3700-sdhci":
-+
-+	sdhci at ab0000 {
-+		compatible = "marvell,armada-3700-sdhci";
-+		reg = <0xab0000 0x1000>,
-+		      <phy_addr 0x4>;
-+		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>
-+		vqmmc-supply = <&sd_regulator>;
-+		clocks = <&sdclk>;
-+		clock-names = "core";
-+		bus-width = <4>;
-+
-+		marvell,pad-type = "sd";
-+	};
+ 	if (priv->init_card_type == MMC_TYPE_MMC)
+ 		return xenon_emmc_signal_voltage_switch(mmc, ios);
+ 
+diff --git a/drivers/mmc/host/sdhci-xenon.h b/drivers/mmc/host/sdhci-xenon.h
+index e87639774bca..57e7cb463413 100644
+--- a/drivers/mmc/host/sdhci-xenon.h
++++ b/drivers/mmc/host/sdhci-xenon.h
+@@ -104,4 +104,6 @@ struct sdhci_xenon_priv {
+ int xenon_phy_adj(struct sdhci_host *host, struct mmc_ios *ios);
+ int xenon_phy_parse_dt(struct device_node *np,
+ 		       struct sdhci_host *host);
++void xenon_soc_pad_ctrl(struct sdhci_host *host,
++			unsigned char signal_voltage);
+ #endif
 -- 
 git-series 0.9.1
