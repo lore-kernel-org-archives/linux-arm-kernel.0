@@ -1,575 +1,205 @@
-From: eddie.cai.linux@gmail.com (Eddie Cai)
-Date: Tue, 14 Feb 2017 18:07:31 +0800
-Subject: [PATCH V3 2/2] ARM: dts: rockchip: add dts for RK3288-Tinker board
-In-Reply-To: <1487066851-25142-1-git-send-email-eddie.cai.linux@gmail.com>
-References: <1487066851-25142-1-git-send-email-eddie.cai.linux@gmail.com>
-Message-ID: <1487066851-25142-3-git-send-email-eddie.cai.linux@gmail.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 14 Feb 2017 12:21:48 +0200
+Subject: [PATCH v13 00/12] power: add power sequence library
+In-Reply-To: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
+References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
+Message-ID: <f34acc40-41e2-a7ea-a2aa-6cf604086182@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add basic support for RK3288-Tinker board. We can boot in to rootfs
-with this patch.
+Peter,
 
-Signed-off-by: Eddie Cai <eddie.cai.linux@gmail.com>
----
- arch/arm/boot/dts/Makefile          |   1 +
- arch/arm/boot/dts/rk3288-tinker.dts | 536 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 537 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3288-tinker.dts
+On 11/02/17 03:27, Peter Chen wrote:
+> Hi all,
+> 
+> This is a follow-up for my last power sequence framework patch set [1].
+> According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
+> power sequence instances will be added at postcore_initcall, the match
+> criteria is compatible string first, if the compatible string is not
+> matched between dts and library, it will try to use generic power sequence.
+> 	 
+> The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+> if only one power sequence instance is needed, for more power sequences
+> are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
+> 
+> In future, if there are special power sequence requirements, the special
+> power sequence library can be created.
+> 
+> This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+> two hot-plug devices to simulate this use case, the related binding
+> change is updated at patch [1/6], The udoo board changes were tested
+> using my last power sequence patch set.[3]
+> 
+> Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+> need to power on itself before it can be found by ULPI bus.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 01d178a..0dfef24 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -679,6 +679,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
- 	rk3288-popmetal.dtb \
- 	rk3288-r89.dtb \
- 	rk3288-rock2-square.dtb \
-+	rk3288-tinker.dtb \
- 	rk3288-veyron-brain.dtb \
- 	rk3288-veyron-jaq.dtb \
- 	rk3288-veyron-jerry.dtb \
-diff --git a/arch/arm/boot/dts/rk3288-tinker.dts b/arch/arm/boot/dts/rk3288-tinker.dts
-new file mode 100644
-index 0000000..9600d1f
---- /dev/null
-+++ b/arch/arm/boot/dts/rk3288-tinker.dts
-@@ -0,0 +1,536 @@
-+/*
-+ * Copyright (c) 2017 Fuzhou Rockchip Electronics Co., Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "rk3288.dtsi"
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "Rockchip RK3288 Tinker Board";
-+	compatible = "asus,rk3288-tinker", "rockchip,rk3288";
-+
-+	memory {
-+		reg = <0x0 0x80000000>;
-+		device_type = "memory";
-+	};
-+
-+	ext_gmac: external-gmac-clock {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <125000000>;
-+		clock-output-names = "ext_gmac";
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		autorepeat;
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwrbtn>;
-+
-+		button at 0 {
-+			gpios = <&gpio0 RK_PA5 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_POWER>;
-+			label = "GPIO Key Power";
-+			linux,input-type = <1>;
-+			gpio-key,wakeup = <1>;
-+			debounce-interval = <100>;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		pwr-led {
-+			gpios = <&gpio0 RK_PA3 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+
-+		act-led {
-+			gpios=<&gpio1 RK_PD0 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger="mmc0";
-+		};
-+
-+
-+		heartbeat-led {
-+			gpios=<&gpio1 RK_PD1 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger="heartbeat";
-+		};
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,name = "rockchip,tinker-codec";
-+		simple-audio-card,mclk-fs = <512>;
-+		simple-audio-card,cpu {
-+			sound-dai = <&i2s>;
-+		};
-+		simple-audio-card,codec {
-+			sound-dai = <&hdmi>;
-+		};
-+	};
-+
-+	vcc_sys: vsys-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc_sys";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+		regulator-boot-on;
-+	};
-+
-+	vcc_sd: sdmmc-regulator {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio7 11 GPIO_ACTIVE_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&sdmmc_pwr>;
-+		regulator-name = "vcc_sd";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <100000>;
-+		vin-supply = <&vcc_io>;
-+	};
-+};
-+
-+&cpu0 {
-+	cpu0-supply = <&vdd_cpu>;
-+};
-+
-+&gmac {
-+	phy-supply = <&vcc33_lan>;
-+	phy-mode = "rgmii";
-+	clock_in_out = "input";
-+	snps,reset-gpio = <&gpio4 7 0>;
-+	snps,reset-active-low;
-+	snps,reset-delays-us = <0 10000 1000000>;
-+	assigned-clocks = <&cru SCLK_MAC>;
-+	assigned-clock-parents = <&ext_gmac>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&rgmii_pins>;
-+	tx_delay = <0x30>;
-+	rx_delay = <0x10>;
-+	status = "ok";
-+};
-+
-+&hdmi {
-+	ddc-i2c-bus = <&i2c5>;
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+
-+	rk808: pmic at 1b {
-+		compatible = "rockchip,rk808";
-+		reg = <0x1b>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <4 IRQ_TYPE_LEVEL_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmic_int &global_pwroff &dvs_1 &dvs_2>;
-+		dvs-gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>,
-+				<&gpio0 12 GPIO_ACTIVE_HIGH>;
-+
-+		rockchip,system-power-controller;
-+		wakeup-source;
-+		#clock-cells = <1>;
-+		clock-output-names = "xin32k", "rk808-clkout2";
-+
-+		vcc1-supply = <&vcc_sys>;
-+		vcc2-supply = <&vcc_sys>;
-+		vcc3-supply = <&vcc_sys>;
-+		vcc4-supply = <&vcc_sys>;
-+		vcc6-supply = <&vcc_sys>;
-+		vcc7-supply = <&vcc_sys>;
-+		vcc8-supply = <&vcc_io>;
-+		vcc9-supply = <&vcc_io>;
-+		vcc10-supply = <&vcc_io>;
-+		vcc11-supply = <&vcc_sys>;
-+		vcc12-supply = <&vcc_io>;
-+		vddio-supply = <&vcc_io>;
-+
-+		regulators {
-+			vdd_cpu: DCDC_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <750000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-name = "vdd_arm";
-+				regulator-ramp-delay = <6000>;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vdd_gpu: DCDC_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <850000>;
-+				regulator-max-microvolt = <1250000>;
-+				regulator-name = "vdd_gpu";
-+				regulator-ramp-delay = <6000>;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
-+			};
-+
-+			vcc_ddr: DCDC_REG3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc_ddr";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc_io: DCDC_REG4 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc_io";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
-+			};
-+
-+			vcc18_ldo1: LDO_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc18_ldo1";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc33_mipi: LDO_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vcc33_mipi";
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
-+			};
-+
-+			vdd_10: LDO_REG3 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-name = "vdd_10";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
-+			};
-+
-+			vcc18_codec: LDO_REG4 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc18_codec";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vccio_sd: LDO_REG5 {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-name = "vccio_sd";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <3300000>;
-+				};
-+			};
-+
-+			vdd10_lcd: LDO_REG6 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1000000>;
-+				regulator-name = "vdd10_lcd";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1000000>;
-+				};
-+			};
-+
-+			vcc_18: LDO_REG7 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc_18";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc18_lcd: LDO_REG8 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-name = "vcc18_lcd";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-microvolt = <1800000>;
-+				};
-+			};
-+
-+			vcc33_sd: SWITCH_REG1 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc33_sd";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+
-+			vcc33_lan: SWITCH_REG2 {
-+				regulator-always-on;
-+				regulator-boot-on;
-+				regulator-name = "vcc33_lan";
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
-+			};
-+		};
-+	};
-+};
-+
-+&i2c2 {
-+	status = "okay";
-+};
-+
-+&i2c5 {
-+	status = "okay";
-+};
-+
-+&i2s {
-+	#sound-dai-cells = <0>;
-+	status = "okay";
-+};
-+
-+&io_domains {
-+	status = "okay";
-+
-+	sdcard-supply = <&vccio_sd>;
-+};
-+
-+&pinctrl {
-+	pcfg_pull_none_drv_8ma: pcfg-pull-none-drv-8ma {
-+		drive-strength = <8>;
-+	};
-+
-+	pcfg_pull_up_drv_8ma: pcfg-pull-up-drv-8ma {
-+		bias-pull-up;
-+		drive-strength = <8>;
-+	};
-+
-+	backlight {
-+		bl_en: bl-en {
-+			rockchip,pins = <7 2 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	buttons {
-+		pwrbtn: pwrbtn {
-+			rockchip,pins = <0 5 RK_FUNC_GPIO &pcfg_pull_up>;
-+		};
-+	};
-+
-+	eth_phy {
-+		eth_phy_pwr: eth-phy-pwr {
-+			rockchip,pins = <0 6 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	pmic {
-+		pmic_int: pmic-int {
-+			rockchip,pins = <RK_GPIO0 4 RK_FUNC_GPIO \
-+					&pcfg_pull_up>;
-+		};
-+
-+		dvs_1: dvs-1 {
-+			rockchip,pins = <RK_GPIO0 11 RK_FUNC_GPIO \
-+					&pcfg_pull_down>;
-+		};
-+
-+		dvs_2: dvs-2 {
-+			rockchip,pins = <RK_GPIO0 12 RK_FUNC_GPIO \
-+					&pcfg_pull_down>;
-+		};
-+	};
-+
-+	sdmmc {
-+		sdmmc_bus4: sdmmc-bus4 {
-+			rockchip,pins = <6 16 RK_FUNC_1 &pcfg_pull_up_drv_8ma>,
-+					<6 17 RK_FUNC_1 &pcfg_pull_up_drv_8ma>,
-+					<6 18 RK_FUNC_1 &pcfg_pull_up_drv_8ma>,
-+					<6 19 RK_FUNC_1 &pcfg_pull_up_drv_8ma>;
-+		};
-+
-+		sdmmc_clk: sdmmc-clk {
-+			rockchip,pins = <6 20 RK_FUNC_1 \
-+					&pcfg_pull_none_drv_8ma>;
-+		};
-+
-+		sdmmc_cmd: sdmmc-cmd {
-+			rockchip,pins = <6 21 RK_FUNC_1 &pcfg_pull_up_drv_8ma>;
-+		};
-+
-+		sdmmc_pwr: sdmmc-pwr {
-+			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	usb {
-+		host_vbus_drv: host-vbus-drv {
-+			rockchip,pins = <0 14 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		pwr_3g: pwr-3g {
-+			rockchip,pins = <7 8 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+};
-+
-+&pwm0 {
-+	status = "okay";
-+};
-+
-+&saradc {
-+	vref-supply = <&vcc18_ldo1>;
-+	status ="okay";
-+};
-+
-+&sdmmc {
-+	bus-width = <4>;
-+	cap-mmc-highspeed;
-+	cap-sd-highspeed;
-+	card-detect-delay = <200>;
-+	disable-wp;			/* wp not hooked up */
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
-+	status = "okay";
-+	vmmc-supply = <&vcc33_sd>;
-+	vqmmc-supply = <&vccio_sd>;
-+};
-+
-+&tsadc {
-+	rockchip,hw-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
-+	rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
-+
-+&usb_host0_ehci {
-+	status = "okay";
-+};
-+
-+&usb_host1 {
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	status= "okay";
-+};
-+
-+&vopb {
-+	status = "okay";
-+};
-+
-+&vopb_mmu {
-+	status = "okay";
-+};
-+
-+&vopl {
-+	status = "okay";
-+};
-+
-+&vopl_mmu {
-+	status = "okay";
-+};
-+
-+&wdt {
-+	status = "okay";
-+};
+Can patches 3-7 can be sent independently of the power related patches?
+
+cheers,
+-roger
+
+> 
+> Changes for v13:
+> - Add more design descriptions at design doc and fix one build error
+>   introduced by v12 wrongly [Patch 2/12]
+> - Add the last three dts patches which were forgotten at last series
+> - Move the comment for usb_create_shared_hcd to correct place [Patch 3/12]
+> - Add sysdev for shared hcd too for xhci-plat.c [Patch 6/12]
+> 
+> Rafael, if the first two power sequence patches are ok for you, would you consider
+> accept these first, the other USB patches can go through USB tree at v4.12-rc1?
+> 
+> Changes for v12:
+> - Add design doc and more comments at generic power sequence source file [Patch 2/9]
+> - Introduce four Arnd Bergmann patches and one my ehci related patches, these patches
+>   are used to get property DT/firmware information at USB code, and these information
+>   are needed for power sequence operation at USB. With these five patches, my chipidea
+>   hack patch in previous patch set can be removed. [Patch 3-7/9]
+> - Add -ENOENT judgement to avoid USB error if no power sequence library is chosen [9/9]
+> 
+> Changes for v11:
+> - Fix warning: (USB) selects POWER_SEQUENCE which has unmet direct dependencies (OF)
+> - Delete redundant copyright statement.
+> - Change pr_warn to pr_debug at wrseq_find_available_instance
+> - Refine kerneldoc
+> - %s/ENONET/ENOENT 
+> - Allocate pwrseq list node before than carry out power sequence on 
+> - Add mutex_lock/mutex_lock for pwrseq node browse at pwrseq_find_available_instance
+> - Add pwrseq_suspend/resume for API both single instance and list 
+> - Add .pwrseq_suspend/resume for pwrseq_generic.c
+> - Add pwrseq_suspend_list and pwrseq_resume_list for USB hub suspend
+>   and resume routine
+> 
+> Changes for v10:
+> - Improve the kernel-doc for power sequence core, including exported APIs and
+>   main structure. [Patch 2/8]
+> - Change Kconfig, and let the user choose power sequence. [Patch 2/8]
+> - Delete EXPORT_SYMBOL and change related APIs as local, these APIs do not
+>   be intended to export currently. [Patch 2/8]
+> - Selete POWER_SEQUENCE at USB core's Kconfig. [Patch 4/8]
+> 
+> Changes for v9:
+> - Add Vaibhav Hiremath's reviewed-by [Patch 4/8]
+> - Rebase to v4.9-rc1
+> 
+> Changes for v8:
+> - Allocate one extra pwrseq instance if pwrseq_get has succeed, it can avoid
+>   preallocate instances problem which the number of instance is decided at
+>   compile time, thanks for Heiko Stuebner's suggestion [Patch 2/8]
+> - Delete pwrseq_compatible_sample.c which is the demo purpose to show compatible
+>   match method. [Patch 2/8]
+> - Add Maciej S. Szmigiero's tested-by. [Patch 7/8]
+> 
+> Changes for v7:
+> - Create kinds of power sequence instance at postcore_initcall, and match
+>   the instance with node using compatible string, the beneit of this is
+>   the host driver doesn't need to consider which pwrseq instance needs
+>   to be used, and pwrseq core will match it, however, it eats some memories
+>   if less power sequence instances are used. [Patch 2/8]
+> - Add pwrseq_compatible_sample.c to test match pwrseq using device_id. [Patch 2/8]
+> - Fix the comments Vaibhav Hiremath adds for error path for clock and do not
+>   use device_node for parameters at pwrseq_on. [Patch 2/8]
+> - Simplify the caller to use power sequence, follows Alan's commnets [Patch 4/8]
+> - Tested three pwrseq instances together using both specific compatible string and
+>   generic libraries.
+> 
+> Changes for v6:
+> - Add Matthias Kaehlcke's Reviewed-by and Tested-by. (patch [2/6])
+> - Change chipidea core of_node assignment for coming user. (patch [5/6])
+> - Applies Joshua Clayton's three dts changes for two boards,
+>   the USB device's reg has only #address-cells, but without #size-cells.
+> 
+> Changes for v5:
+> - Delete pwrseq_register/pwrseq_unregister, which is useless currently
+> - Fix the linker error when the pwrseq user is compiled as module
+> 
+> Changes for v4:
+> - Create the patch on next-20160722 
+> - Fix the of_node is not NULL after chipidea driver is unbinded [Patch 5/6]
+> - Using more friendly wait method for reset gpio [Patch 2/6]
+> - Support multiple input clocks [Patch 2/6]
+> - Add Rob Herring's ack for DT changes
+> - Add Joshua Clayton's Tested-by
+> 
+> Changes for v3:
+> - Delete "power-sequence" property at binding-doc, and change related code
+>   at both library and user code.
+> - Change binding-doc example node name with Rob's comments
+> - of_get_named_gpio_flags only gets the gpio, but without setting gpio flags,
+>   add additional code request gpio with proper gpio flags
+> - Add Philipp Zabel's Ack and MAINTAINER's entry
+> 
+> Changes for v2:
+> - Delete "pwrseq" prefix and clock-names for properties at dt binding
+> - Should use structure not but its pointer for kzalloc
+> - Since chipidea core has no of_node, let core's of_node equals glue
+>   layer's at core's probe
+> 
+> [1] http://www.spinics.net/lists/linux-usb/msg142755.html
+> [2] http://www.spinics.net/lists/linux-usb/msg143106.html
+> [3] http://www.spinics.net/lists/linux-usb/msg142815.html
+> [4] http://www.spinics.net/lists/linux-usb/msg152375.html
+> 
+> Arnd Bergmann (4):
+>   usb: separate out sysdev pointer from usb_bus
+>   usb: chipidea: use bus->sysdev for DMA configuration
+>   usb: ehci: fsl: use bus->sysdev for DMA configuration
+>   usb: xhci: use bus->sysdev for DMA configuration
+> 
+> Joshua Clayton (2):
+>   ARM: dts: imx6qdl: Enable usb node children with <reg>
+>   ARM: dts: imx6q-evi: Fix onboard hub reset line
+> 
+> Peter Chen (6):
+>   binding-doc: power: pwrseq-generic: add binding doc for generic power
+>     sequence library
+>   power: add power sequence library
+>   usb: ehci: use bus->sysdev for DMA configuration
+>   binding-doc: usb: usb-device: add optional properties for power
+>     sequence
+>   usb: core: add power sequence handling for USB devices
+>   ARM: dts: imx6qdl-udoo.dtsi: fix onboard USB HUB property
+> 
+>  .../bindings/power/pwrseq/pwrseq-generic.txt       |  48 +++
+>  .../devicetree/bindings/usb/usb-device.txt         |  10 +-
+>  Documentation/power/power-sequence/design.rst      |  54 ++++
+>  MAINTAINERS                                        |   9 +
+>  arch/arm/boot/dts/imx6q-evi.dts                    |  25 +-
+>  arch/arm/boot/dts/imx6qdl-udoo.dtsi                |  26 +-
+>  arch/arm/boot/dts/imx6qdl.dtsi                     |   6 +
+>  drivers/power/Kconfig                              |   1 +
+>  drivers/power/Makefile                             |   1 +
+>  drivers/power/pwrseq/Kconfig                       |  20 ++
+>  drivers/power/pwrseq/Makefile                      |   2 +
+>  drivers/power/pwrseq/core.c                        | 335 +++++++++++++++++++++
+>  drivers/power/pwrseq/pwrseq_generic.c              | 234 ++++++++++++++
+>  drivers/usb/Kconfig                                |   1 +
+>  drivers/usb/chipidea/core.c                        |   3 -
+>  drivers/usb/chipidea/host.c                        |   3 +-
+>  drivers/usb/chipidea/udc.c                         |  10 +-
+>  drivers/usb/core/buffer.c                          |  12 +-
+>  drivers/usb/core/hcd.c                             |  80 ++---
+>  drivers/usb/core/hub.c                             |  49 ++-
+>  drivers/usb/core/hub.h                             |   1 +
+>  drivers/usb/core/usb.c                             |  18 +-
+>  drivers/usb/host/ehci-fsl.c                        |   4 +-
+>  drivers/usb/host/ehci-mem.c                        |  12 +-
+>  drivers/usb/host/xhci-mem.c                        |  12 +-
+>  drivers/usb/host/xhci-plat.c                       |  35 ++-
+>  drivers/usb/host/xhci.c                            |  15 +-
+>  include/linux/power/pwrseq.h                       |  81 +++++
+>  include/linux/usb.h                                |   1 +
+>  include/linux/usb/hcd.h                            |   3 +
+>  30 files changed, 990 insertions(+), 121 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/power/pwrseq/pwrseq-generic.txt
+>  create mode 100644 Documentation/power/power-sequence/design.rst
+>  create mode 100644 drivers/power/pwrseq/Kconfig
+>  create mode 100644 drivers/power/pwrseq/Makefile
+>  create mode 100644 drivers/power/pwrseq/core.c
+>  create mode 100644 drivers/power/pwrseq/pwrseq_generic.c
+>  create mode 100644 include/linux/power/pwrseq.h
+> 
+
 -- 
-2.7.4
+cheers,
+-roger
