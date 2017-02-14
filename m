@@ -1,34 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Feb 2017 22:32:58 +0100
-Subject: [PATCH] arm64: include asm/assembler.h in entry-ftrace.S
-Message-ID: <20170214213314.2910910-1-arnd@arndb.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 14 Feb 2017 21:33:36 +0000
+Subject: [PATCH] arm64: fix warning about swapper_pg_dir overflow
+In-Reply-To: <20170214212718.2792194-1-arnd@arndb.de>
+References: <20170214212718.2792194-1-arnd@arndb.de>
+Message-ID: <CAKv+Gu_FMk26Vbrb3mp5cSkSvmELP2iantX4kTyg+U8HO0J9ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a randconfig build I ran into this build error:
+On 14 February 2017 at 21:27, Arnd Bergmann <arnd@arndb.de> wrote:
+> With 4 levels of 16KB pages, we get this warning about the fact that we are
+> copying a whole page into an array that is declared as having only two pointers
+> for the top level of the page table:
+>
+> arch/arm64/mm/mmu.c: In function 'paging_init':
+> arch/arm64/mm/mmu.c:528:2: error: 'memcpy' writing 16384 bytes into a region of size 16 overflows the destination [-Werror=stringop-overflow=]
+>
+> This is harmless since we actually reserve a whole page in the definition of the
+> array that comes from, and just the extern declaration is short. The pgdir
+> is initialized to zero either way, so copying the actual entries here seems
+> like the best solution.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-arch/arm64/kernel/entry-ftrace.S: Assembler messages:
-arch/arm64/kernel/entry-ftrace.S:101: Error: unknown mnemonic `ldr_l' -- `ldr_l x2,ftrace_trace_function'
+We should see the same issue with 64k/3 levels, since its PGD_SIZE is
+also much smaller than its PAGE_SIZE. This is a much more common
+configuration, so I am surprised you found it on 16k/4 levels first.
 
-The macro is defined in asm/assembler.h, so we should include that file.
+In any case, the fix is correct IMO, so
 
-Fixes: 829d2bd13392 ("arm64: entry-ftrace.S: avoid open-coded {adr,ldr}_l")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm64/kernel/entry-ftrace.S | 1 +
- 1 file changed, 1 insertion(+)
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
-index 8f1905b795f3..e1be42e11ff5 100644
---- a/arch/arm64/kernel/entry-ftrace.S
-+++ b/arch/arm64/kernel/entry-ftrace.S
-@@ -10,6 +10,7 @@
-  */
- 
- #include <linux/linkage.h>
-+#include <asm/assembler.h>
- #include <asm/ftrace.h>
- #include <asm/insn.h>
- 
--- 
-2.9.0
+> ---
+>  arch/arm64/mm/mmu.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 2131521ddc24..b805c017f789 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -525,7 +525,7 @@ void __init paging_init(void)
+>          * To do this we need to go via a temporary pgd.
+>          */
+>         cpu_replace_ttbr1(__va(pgd_phys));
+> -       memcpy(swapper_pg_dir, pgd, PAGE_SIZE);
+> +       memcpy(swapper_pg_dir, pgd, PGD_SIZE);
+>         cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
+>
+>         pgd_clear_fixmap();
+> --
+> 2.9.0
+>
