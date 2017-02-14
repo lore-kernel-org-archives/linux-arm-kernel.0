@@ -1,32 +1,46 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 14 Feb 2017 10:39:48 +0100
-Subject: [PATCH 2/5] clk: sunxi-ng: gate: Support common pre-dividers
-In-Reply-To: <20170214033526.16977-3-wens@csie.org>
-References: <20170214033526.16977-1-wens@csie.org>
- <20170214033526.16977-3-wens@csie.org>
-Message-ID: <20170214093948.d46xkfunpuj3nn7l@lukather>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 14 Feb 2017 10:40:55 +0100
+Subject: [PATCH v3 01/18] dt-bindings: power: battery: add
+ constant-charge-current property
+In-Reply-To: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
+References: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
+Message-ID: <20170214094112.27426-2-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2017 at 11:35:23AM +0800, Chen-Yu Tsai wrote:
-> Some clock gates have a pre-divider between the source input and the
-> gate itself. A notable example is the HSIC 12 MHz clock found on the
-> A83T, which has the 24 MHz main oscillator as its input, and a /2
-> pre-divider.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+This adds the constant-charge-current property to the list of optional
+properties of the battery.
 
-Applied, thanks!
-Maxime
+The constant charge current is critical for batteries as they can't
+handle all charge currents.
 
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+---
+
+added in v3
+
+ Documentation/devicetree/bindings/power/supply/battery.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/power/supply/battery.txt b/Documentation/devicetree/bindings/power/supply/battery.txt
+index d78a4aa..3e830fe 100644
+--- a/Documentation/devicetree/bindings/power/supply/battery.txt
++++ b/Documentation/devicetree/bindings/power/supply/battery.txt
+@@ -7,6 +7,7 @@ Optional Properties:
+  - voltage-min-design-microvolt: drained battery voltage
+  - energy-full-design-microwatt-hours: battery design energy
+  - charge-full-design-microamp-hours: battery design capacity
++ - constant-charge-current-microamp: battery constant charge current
+ 
+ Future Properties must be named for the corresponding elements in
+ enum power_supply_property, defined in include/linux/power_supply.h.
+@@ -22,6 +23,7 @@ Example:
+ 		voltage-min-design-microvolt = <3200000>;
+ 		energy-full-design-microwatt-hours = <5290000>;
+ 		charge-full-design-microamp-hours = <1430000>;
++		constant-charge-current-microamp = <300000>;
+ 	};
+ 
+ 	charger: charger at 11 {
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170214/1967bfcd/attachment-0001.sig>
+2.9.3
