@@ -1,252 +1,92 @@
-From: vivek.gautam@codeaurora.org (Vivek Gautam)
-Date: Tue, 14 Feb 2017 11:03:22 +0530
-Subject: [PATCH v13 06/12] usb: xhci: use bus->sysdev for DMA configuration
-In-Reply-To: <1486776443-2280-7-git-send-email-peter.chen@nxp.com>
-References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
- <1486776443-2280-7-git-send-email-peter.chen@nxp.com>
-Message-ID: <e643c161-ce60-6706-6630-895a297dedcd@codeaurora.org>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Tue, 14 Feb 2017 06:55:18 +0100
+Subject: [PATCH v6 5/5] ARM: dts: sun9i: Initial support for the Sunchip
+ CX-A99 board
+In-Reply-To: <CAGb2v64AfBW+CHHkFvvNzCGBG09UK-sPcAZi2QgCR9wM=jguxw@mail.gmail.com>
+References: <cover.1486592470.git.rask@formelder.dk>
+ <d4211c5d57f80b0281d7d332edc7d69e66202d3d.1486592471.git.rask@formelder.dk>
+ <20170210085920.7l7gswm6yjuqgdfx@lukather>
+ <CAGb2v64AfBW+CHHkFvvNzCGBG09UK-sPcAZi2QgCR9wM=jguxw@mail.gmail.com>
+Message-ID: <20170214055517.ahfz5fxajn3pv7fd@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Let me just answer the questions about the regulator names and get back to
+you about your other points.
 
+On Fri, Feb 10, 2017 at 05:22:21PM +0800, Chen-Yu Tsai wrote:
+> On Fri, Feb 10, 2017 at 4:59 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Thu, Feb 09, 2017 at 12:34:06AM +0100, Rask Ingemann Lambertsen wrote:
+[...]
+> >> +                     /* 1.8 V (enabled). */
+> >> +                     reg_aldo2: aldo2 {
+> >> +                             regulator-boot-on;
+> >> +                             regulator-min-microvolt = <1800000>;
+> >> +                             regulator-max-microvolt = <3600000>;
+> >> +                             regulator-name = "vcc-pg-pm-wifi+btio-audio";
+> >
+> > Usually, there is simpler names available on the schematics, or at
+> > least simpler names we can come up with.
+> >
+> > Something like vcc-wifi would be enough her.
+> 
+> It should be vddio-wifi. Looking at the pin groups it names, it likely
+> just drives the I/O pins on both ends.
 
-On 02/11/2017 06:57 AM, Peter Chen wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
->
-> For xhci-hcd platform device, all the DMA parameters are not
-> configured properly, notably dma ops for dwc3 devices. So, set
-> the dma for xhci from sysdev. sysdev is pointing to device that
-> is known to the system firmware or hardware.
->
-> Cc: Baolin Wang <baolin.wang@linaro.org>
-> Cc: Vivek Gautam <vivek.gautam@codeaurora.org>
-> Cc: Alexander Sverdlin <alexander.sverdlin@nokia.com>
-> Cc: Mathias Nyman <mathias.nyman@linux.intel.com>
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Sriram Dash <sriram.dash@nxp.com>
-> ---
-> Hi, Baolin, Vivek and Alexander,
-> I removed your tested-by tag due to add one change that adding sysdev
-> for shared hcd too, if your test shows this change works for you or
-> has no effect for you, please consider adding tested-by tag again,
-> thanks.
+Sys_config.fex lists is as supplying the audio codec as well, so
+"vddio-wifi-codec" perhaps?
 
-Works well with 4.10-rc8 branch merged with usb-next and the
-set of phy patches for msm8996 and corresponding dt patches.
+> >> +                     /* 2.5 V (enabled). */
+> >> +                     reg_aldo3: aldo3 {
+> >> +                             regulator-boot-on;
+> >> +                             regulator-min-microvolt = <2500000>;
+> >> +                             regulator-max-microvolt = <2500000>;
+> >> +                             regulator-name = "vcc-pa-gmac2v5";
+> >
+> > vcc-gmac
+> 
+> vcc-pa or vddio-gmac. 2.5V is for RGMII I/O. vcc-gmac is the "sw"
+> regulator @ 3.3V.
 
-Tested-by: Vivek Gautam <vivek.gautam@codeaurora.org>
+I think nothing else is connected to pin group A, so I'll call it
+"vddio-gmac".
 
-Thanks
-Vivek
+> >> +                     /* 1.8 V (enabled). */
+> >> +                     reg_bldo1: bldo1 {
+> >> +                             regulator-always-on;    /* Hang if disabled */
+> >> +                             regulator-min-microvolt = <1700000>;
+> >> +                             regulator-max-microvolt = <1900000>;
+> >> +                             regulator-name = "vdd18-dll-vcc18-pll";
+> >
+> > vdd-dll
+> 
+> PLLs and DLLs are different though. Maybe vcc-pll-dll?
 
->   drivers/usb/host/xhci-mem.c  | 12 ++++++------
->   drivers/usb/host/xhci-plat.c | 35 +++++++++++++++++++++++++++--------
->   drivers/usb/host/xhci.c      | 15 +++++++++++----
->   3 files changed, 44 insertions(+), 18 deletions(-)
->
-> diff --git a/drivers/usb/host/xhci-mem.c b/drivers/usb/host/xhci-mem.c
-> index ba1853f4..032a702 100644
-> --- a/drivers/usb/host/xhci-mem.c
-> +++ b/drivers/usb/host/xhci-mem.c
-> @@ -586,7 +586,7 @@ static void xhci_free_stream_ctx(struct xhci_hcd *xhci,
->   		unsigned int num_stream_ctxs,
->   		struct xhci_stream_ctx *stream_ctx, dma_addr_t dma)
->   {
-> -	struct device *dev = xhci_to_hcd(xhci)->self.controller;
-> +	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
->   	size_t size = sizeof(struct xhci_stream_ctx) * num_stream_ctxs;
->   
->   	if (size > MEDIUM_STREAM_ARRAY_SIZE)
-> @@ -614,7 +614,7 @@ static struct xhci_stream_ctx *xhci_alloc_stream_ctx(struct xhci_hcd *xhci,
->   		unsigned int num_stream_ctxs, dma_addr_t *dma,
->   		gfp_t mem_flags)
->   {
-> -	struct device *dev = xhci_to_hcd(xhci)->self.controller;
-> +	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
->   	size_t size = sizeof(struct xhci_stream_ctx) * num_stream_ctxs;
->   
->   	if (size > MEDIUM_STREAM_ARRAY_SIZE)
-> @@ -1686,7 +1686,7 @@ void xhci_slot_copy(struct xhci_hcd *xhci,
->   static int scratchpad_alloc(struct xhci_hcd *xhci, gfp_t flags)
->   {
->   	int i;
-> -	struct device *dev = xhci_to_hcd(xhci)->self.controller;
-> +	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
->   	int num_sp = HCS_MAX_SCRATCHPAD(xhci->hcs_params2);
->   
->   	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
-> @@ -1758,7 +1758,7 @@ static void scratchpad_free(struct xhci_hcd *xhci)
->   {
->   	int num_sp;
->   	int i;
-> -	struct device *dev = xhci_to_hcd(xhci)->self.controller;
-> +	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
->   
->   	if (!xhci->scratchpad)
->   		return;
-> @@ -1831,7 +1831,7 @@ void xhci_free_command(struct xhci_hcd *xhci,
->   
->   void xhci_mem_cleanup(struct xhci_hcd *xhci)
->   {
-> -	struct device	*dev = xhci_to_hcd(xhci)->self.controller;
-> +	struct device	*dev = xhci_to_hcd(xhci)->self.sysdev;
->   	int size;
->   	int i, j, num_ports;
->   
-> @@ -2373,7 +2373,7 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
->   int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
->   {
->   	dma_addr_t	dma;
-> -	struct device	*dev = xhci_to_hcd(xhci)->self.controller;
-> +	struct device	*dev = xhci_to_hcd(xhci)->self.sysdev;
->   	unsigned int	val, val2;
->   	u64		val_64;
->   	struct xhci_segment	*seg;
-> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-> index 6d33b42..4ecb3fd 100644
-> --- a/drivers/usb/host/xhci-plat.c
-> +++ b/drivers/usb/host/xhci-plat.c
-> @@ -14,6 +14,7 @@
->   #include <linux/clk.h>
->   #include <linux/dma-mapping.h>
->   #include <linux/module.h>
-> +#include <linux/pci.h>
->   #include <linux/of.h>
->   #include <linux/platform_device.h>
->   #include <linux/usb/phy.h>
-> @@ -148,6 +149,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
->   {
->   	const struct of_device_id *match;
->   	const struct hc_driver	*driver;
-> +	struct device		*sysdev;
->   	struct xhci_hcd		*xhci;
->   	struct resource         *res;
->   	struct usb_hcd		*hcd;
-> @@ -164,22 +166,39 @@ static int xhci_plat_probe(struct platform_device *pdev)
->   	if (irq < 0)
->   		return -ENODEV;
->   
-> +	/*
-> +	 * sysdev must point to a device that is known to the system firmware
-> +	 * or PCI hardware. We handle these three cases here:
-> +	 * 1. xhci_plat comes from firmware
-> +	 * 2. xhci_plat is child of a device from firmware (dwc3-plat)
-> +	 * 3. xhci_plat is grandchild of a pci device (dwc3-pci)
-> +	 */
-> +	sysdev = &pdev->dev;
-> +	if (sysdev->parent && !sysdev->of_node && sysdev->parent->of_node)
-> +		sysdev = sysdev->parent;
-> +#ifdef CONFIG_PCI
-> +	else if (sysdev->parent && sysdev->parent->parent &&
-> +		 sysdev->parent->parent->bus == &pci_bus_type)
-> +		sysdev = sysdev->parent->parent;
-> +#endif
-> +
->   	/* Try to set 64-bit DMA first */
-> -	if (!pdev->dev.dma_mask)
-> +	if (WARN_ON(!sysdev->dma_mask))
->   		/* Platform did not initialize dma_mask */
-> -		ret = dma_coerce_mask_and_coherent(&pdev->dev,
-> +		ret = dma_coerce_mask_and_coherent(sysdev,
->   						   DMA_BIT_MASK(64));
->   	else
-> -		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
-> +		ret = dma_set_mask_and_coherent(sysdev, DMA_BIT_MASK(64));
->   
->   	/* If seting 64-bit DMA mask fails, fall back to 32-bit DMA mask */
->   	if (ret) {
-> -		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
-> +		ret = dma_set_mask_and_coherent(sysdev, DMA_BIT_MASK(32));
->   		if (ret)
->   			return ret;
->   	}
->   
-> -	hcd = usb_create_hcd(driver, &pdev->dev, dev_name(&pdev->dev));
-> +	hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
-> +			       dev_name(&pdev->dev), NULL);
->   	if (!hcd)
->   		return -ENOMEM;
->   
-> @@ -222,20 +241,20 @@ static int xhci_plat_probe(struct platform_device *pdev)
->   
->   	xhci->clk = clk;
->   	xhci->main_hcd = hcd;
-> -	xhci->shared_hcd = usb_create_shared_hcd(driver, &pdev->dev,
-> +	xhci->shared_hcd = __usb_create_hcd(driver, sysdev, &pdev->dev,
->   			dev_name(&pdev->dev), hcd);
->   	if (!xhci->shared_hcd) {
->   		ret = -ENOMEM;
->   		goto disable_clk;
->   	}
->   
-> -	if (device_property_read_bool(&pdev->dev, "usb3-lpm-capable"))
-> +	if (device_property_read_bool(sysdev, "usb3-lpm-capable"))
->   		xhci->quirks |= XHCI_LPM_SUPPORT;
->   
->   	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
->   		xhci->quirks |= XHCI_BROKEN_PORT_PED;
->   
-> -	hcd->usb_phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
-> +	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
->   	if (IS_ERR(hcd->usb_phy)) {
->   		ret = PTR_ERR(hcd->usb_phy);
->   		if (ret == -EPROBE_DEFER)
-> diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
-> index 6d6c460..ab0839c 100644
-> --- a/drivers/usb/host/xhci.c
-> +++ b/drivers/usb/host/xhci.c
-> @@ -237,6 +237,9 @@ static int xhci_free_msi(struct xhci_hcd *xhci)
->   static int xhci_setup_msi(struct xhci_hcd *xhci)
->   {
->   	int ret;
-> +	/*
-> +	 * TODO:Check with MSI Soc for sysdev
-> +	 */
->   	struct pci_dev  *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
->   
->   	ret = pci_enable_msi(pdev);
-> @@ -263,7 +266,7 @@ static int xhci_setup_msi(struct xhci_hcd *xhci)
->    */
->   static void xhci_free_irq(struct xhci_hcd *xhci)
->   {
-> -	struct pci_dev *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
-> +	struct pci_dev *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.sysdev);
->   	int ret;
->   
->   	/* return if using legacy interrupt */
-> @@ -748,7 +751,7 @@ void xhci_shutdown(struct usb_hcd *hcd)
->   	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
->   
->   	if (xhci->quirks & XHCI_SPURIOUS_REBOOT)
-> -		usb_disable_xhci_ports(to_pci_dev(hcd->self.controller));
-> +		usb_disable_xhci_ports(to_pci_dev(hcd->self.sysdev));
->   
->   	spin_lock_irq(&xhci->lock);
->   	xhci_halt(xhci);
-> @@ -765,7 +768,7 @@ void xhci_shutdown(struct usb_hcd *hcd)
->   
->   	/* Yet another workaround for spurious wakeups at shutdown with HSW */
->   	if (xhci->quirks & XHCI_SPURIOUS_WAKEUP)
-> -		pci_set_power_state(to_pci_dev(hcd->self.controller), PCI_D3hot);
-> +		pci_set_power_state(to_pci_dev(hcd->self.sysdev), PCI_D3hot);
->   }
->   
->   #ifdef CONFIG_PM
-> @@ -4801,7 +4804,11 @@ int xhci_get_frame(struct usb_hcd *hcd)
->   int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
->   {
->   	struct xhci_hcd		*xhci;
-> -	struct device		*dev = hcd->self.controller;
-> +	/*
-> +	 * TODO: Check with DWC3 clients for sysdev according to
-> +	 * quirks
-> +	 */
-> +	struct device		*dev = hcd->self.sysdev;
->   	int			retval;
->   
->   	/* Accept arbitrarily long scatter-gather lists */
+The SoC data sheet uses the names "VDD18-DLL" and "VCC18-PLL". However, it's
+quite likely that more of the SoC's 1.8 V consumers are connected to bldo1,
+as I see no other likely 1.8 V supply for them. I'll call it "vdd18".
+
+> >> +                     /* 3.3 V (enabled). PLx pins control some regulators. */
+> >> +                     reg_cldo1: cldo1 {
+> >> +                             regulator-always-on;
+> >> +                             regulator-min-microvolt = <3300000>;
+> >> +                             regulator-max-microvolt = <3300000>;
+> >> +                             regulator-name = "vcc-pl-led";
+> >
+> > vcc-led, etc...
+> 
+> vcc-pl is probably better... One can figure out the LEDs are connected to the
+> PL group and maybe realize they are powered this way. Not that easy the other
+> way around.
+
+The LEDs are controlled by PG10 and PG11 but get their power from cldo1,
+which is connected to the (common) anode of the red and blue LED. Cldo1 also
+supplies the SoCs "VCC-PL", which powers pin group L that controls the USB
+2.0 Vbus and vdd-cpub regulators. Pin group L has nothing to do with the
+LEDs. Thus I think the regulator name is appropriate in this case.
 
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Rask Ingemann Lambertsen
