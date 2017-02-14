@@ -1,74 +1,121 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 14 Feb 2017 16:15:11 +0000
-Subject: [PATCH v2 4/5] arm64: mmu: map .text as read-only from the outset
-In-Reply-To: <20170214155704.GE23718@leverpostej>
-References: <1486844586-26135-1-git-send-email-ard.biesheuvel@linaro.org>
- <1486844586-26135-5-git-send-email-ard.biesheuvel@linaro.org>
- <20170214155704.GE23718@leverpostej>
-Message-ID: <651D9CBB-3E64-41CE-BF85-D2FF0CB927B7@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 14 Feb 2017 17:31:59 +0100
+Subject: [PATCH v2] reset: Add i.MX7 SRC reset driver
+In-Reply-To: <CAHQ1cqFXiu03902jWLkg8X6jdQ3+TiLj02dSDFBAVH98ABo70A@mail.gmail.com>
+References: <20170213153338.13518-1-andrew.smirnov@gmail.com>
+ <1487004643.2873.97.camel@pengutronix.de>
+ <CAHQ1cqFXiu03902jWLkg8X6jdQ3+TiLj02dSDFBAVH98ABo70A@mail.gmail.com>
+Message-ID: <1487089919.2305.22.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 2017-02-14 at 07:46 -0800, Andrey Smirnov wrote:
+[...]
+> >> +enum imx7_src_registers {
+> >> +     SRC_PCIEPHY_RCR = 0x002c,
+> >> +     SRC_PCIEPHY_RCR_PCIEPHY_G_RST     = BIT(1),
+> >
+> > What about the others resets? There's at least HSICPHY, MIPIPHY and
+> > USBOPHY registers before the PCIEPHY register.
+> 
+> I don't really have any code using anything but PCI reset related
+> functionality, so I can't test any of the resets you mention. In light
+> of that I didn't want to add any of the definitions that are not going
+> to be used anywhere in the code.
 
-> On 14 Feb 2017, at 15:57, Mark Rutland <mark.rutland@arm.com> wrote:
-> 
->> On Sat, Feb 11, 2017 at 08:23:05PM +0000, Ard Biesheuvel wrote:
->> Now that alternatives patching code no longer relies on the primary
->> mapping of .text being writable, we can remove the code that removes
->> the writable permissions post-init time, and map it read-only from
->> the outset.
->> 
->> Reviewed-by: Laura Abbott <labbott@redhat.com>
->> Reviewed-by: Kees Cook <keescook@chromium.org>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> 
-> This generally looks good.
-> 
-> One effect of this is that even with rodata=off, external debuggers
-> can't install SW breakpoints via the executable mapping.
-> 
+Since the device tree bindings are supposed to be descriptive of the
+hardware, not of the development history of the linux driver, I'd like
+the reset controls to be in a sensible order. From a quick scan of the
+chapter in the reference manual, this is the complete list of resets:
 
-Interesting. For the sake of my education, could you elaborate on how that works under the hood?
+A7_CORE_POR_RESET0
+A7_CORE_POR_RESET1
+A7_CORE_RESET0
+A7_CORE_RESET1
+A7_DBG_RESET0
+A7_DBG_RESET1
+A7_ETM_RESET0
+A7_ETM_RESET1
+A7_SOC_DBG_RESET
+A7_L2RESET
+SW_M4C_RST
+SW_M4P_RST
+EIM_RST
+HSICPHY_PORT_RST
+HSIC_PHY_POR (or Reserved, the manual is conflicted about this)
+USBPHY1_POR
+USBPHY1_PORT_RST
+USBPHY2_POR
+USBPHY2_PORT_RST
+MIPI_PHY_MRST
+MIPI_PHY_SRST
+PCIEPHY_G_RST
+PCIEPHY_BTN
+PCIEPHY_PERST
+PCIE_CTRL_APPS_RST/EN
 
-> We might want to allow that to be overridden. e.g. make rodata= an
-> early param, and switch the permissions based on that in map_kernel(),
-> e.g. have:
-> 
->    pgprot_t text_prot = rodata_enabled ? PAGE_KERNEL_ROX
->                        : PAGE_KERNEL_EXEC);
-> 
-> ... and use that for .text and .init.text by default.
-> 
-> 
+Arguably, the A7 resets should not be handled by the peripheral reset
+controller, but at least for the others I see no reason not to leave
+space for them in the index table. In fact, since unused reset controls
+don't use space, why not number them all?
 
-Is there any way we could restrict this privilege to external debuggers? Having trivial 'off' switches for security features makes me feel uneasy (although this is orthogonal to this patch)
->> ---
->> arch/arm64/mm/mmu.c | 5 +----
->> 1 file changed, 1 insertion(+), 4 deletions(-)
->> 
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index 7ed981c7f4c0..e97f1ce967ec 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -442,9 +442,6 @@ void mark_rodata_ro(void)
->> {
->>    unsigned long section_size;
->> 
->> -    section_size = (unsigned long)_etext - (unsigned long)_text;
->> -    create_mapping_late(__pa_symbol(_text), (unsigned long)_text,
->> -                section_size, PAGE_KERNEL_ROX);
->>    /*
->>     * mark .rodata as read only. Use __init_begin rather than __end_rodata
->>     * to cover NOTES and EXCEPTION_TABLE.
->> @@ -484,7 +481,7 @@ static void __init map_kernel(pgd_t *pgd)
->> {
->>    static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
->> 
->> -    map_kernel_segment(pgd, _text, _etext, PAGE_KERNEL_EXEC, &vmlinux_text);
->> +    map_kernel_segment(pgd, _text, _etext, PAGE_KERNEL_ROX, &vmlinux_text);
->>    map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
->>    map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
->>               &vmlinux_init);
->> -- 
->> 2.7.4
->> 
+> >
+> >> +     SRC_PCIEPHY_RCR_PCIEPHY_BTN       = BIT(2),
+> >> +     SRC_PCIEPHY_RCR_PCIE_CTRL_APPS_EN = BIT(6),
+> >
+> > Are those really resets? At least the PCIE_CTRL_APPS_EN has a bit called
+> > PCIE_CTRL_APPS_RST right next to it, so this warrants some explanation.
+>
+> Public documentation for that aspect of i.MX7 is nonexistent and,
+> unfortunately, that is my only source of information. Given that, I
+> can't really tell you what the difference between PCIE_CTRL_APPS_EN
+> and PCIE_CTRL_APPS_RST besides that the former is what downstream PCIe
+> driver uses to inhibit LTSSM and the latter is not referenced or used
+> by any code (as far as I am aware).
+
+Ok. That's unfortunate, but nothing we can do about that.
+After discussing with Lucas, I've come to the belief that APPS_EN stops
+the LTSSM, whereas APPS_RST might reset it into the initial state. Since
+the latter doesn't exist at all on i.MX6, and we can obviously live
+without it, I'm fine with just calling the enable bit an active low
+reset to hold it in place. It doesn't fit perfectly, but probably better
+to put it here than building i.MX7 specific fabric code around the DW
+PCIe driver.
+
+[...]
+> >> +             regmap_update_bits(imx7src->regmap,
+> >> +                                SRC_PCIEPHY_RCR,
+> >> +                                SRC_PCIEPHY_RCR_PCIEPHY_BTN,
+> >> +                                SRC_PCIEPHY_RCR_PCIEPHY_BTN);
+> >
+> > What is the PCIE PHY button, and why does it have to be set with the
+> > reset bit?
+> 
+> I am sorry, but just as above, I wouldn't be able to enlighten you any
+> more about the subject. I have no knowledge about the details of G_RST
+> and BTN signal (or even if BTN stands for "button") behavior beyond
+> the fact that that is how downstream driver performs PCIEPHY reset.
+
+The SRC_PCIEPHY_RCR register documentation in the i.MX 7Dual
+Applications Processor Reference Manual v0.1 describes this bit as "PCIE
+PHY button".
+
+[...]
+> >> +#define IMX7_RESET_PCIE_CTRL_APPS    0
+> >> +#define IMX7_RESET_PCIEPHY           1
+> >
+> > It would expect these to be numbered in the order they appear in the
+> > register map, not starting from the end. Could you add all available
+> > peripheral resets to this list, in the correct order?
+> 
+> The numbering is just a consequence of me adding only resets I could
+> exercise with my code and numbering then starting from zero. I also
+> was hesitant adding more sources since it seemed to me that some of
+> less trivial registers in that IP block might be best represented as a
+> single reset source doing something more sophisticated that just
+> setting a bit under the hood.
+
+Any in particular?
+
+regards
+Philipp
