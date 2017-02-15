@@ -1,106 +1,206 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed, 15 Feb 2017 17:55:20 +0100
-Subject: [PATCH 03/11] ARM: Prepare Actions Semi S500
+Date: Wed, 15 Feb 2017 17:55:23 +0100
+Subject: [PATCH 06/11] tty: serial: Add Actions Semi Owl UART earlycon
 In-Reply-To: <20170215165528.10052-1-afaerber@suse.de>
 References: <20170215165528.10052-1-afaerber@suse.de>
-Message-ID: <20170215165528.10052-4-afaerber@suse.de>
+Message-ID: <20170215165528.10052-7-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ARCH_OWL and mach-owl for "acts,s500".
+This implements an earlycon for Actions Semi S500/S900 SoCs.
+
+Based on LeMaker linux-actions tree.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm/Kconfig           |  2 ++
- arch/arm/Makefile          |  1 +
- arch/arm/mach-owl/Kconfig  |  9 +++++++++
- arch/arm/mach-owl/Makefile |  1 +
- arch/arm/mach-owl/owl.c    | 28 ++++++++++++++++++++++++++++
- 5 files changed, 41 insertions(+)
- create mode 100644 arch/arm/mach-owl/Kconfig
- create mode 100644 arch/arm/mach-owl/Makefile
- create mode 100644 arch/arm/mach-owl/owl.c
+ drivers/tty/serial/Kconfig    |  19 ++++++
+ drivers/tty/serial/Makefile   |   1 +
+ drivers/tty/serial/owl-uart.c | 135 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 155 insertions(+)
+ create mode 100644 drivers/tty/serial/owl-uart.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 71cea9e..1ea1e54 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -795,6 +795,8 @@ source "arch/arm/mach-omap2/Kconfig"
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 6117ac8..9d4213c 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1677,6 +1677,25 @@ config SERIAL_MVEBU_CONSOLE
+ 	  and warnings and which allows logins in single user mode)
+ 	  Otherwise, say 'N'.
  
- source "arch/arm/mach-orion5x/Kconfig"
- 
-+source "arch/arm/mach-owl/Kconfig"
-+
- source "arch/arm/mach-picoxcell/Kconfig"
- 
- source "arch/arm/mach-pxa/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index ab30cc6..de7fccf 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -195,6 +195,7 @@ machine-$(CONFIG_ARCH_OXNAS)		+= oxnas
- machine-$(CONFIG_ARCH_OMAP1)		+= omap1
- machine-$(CONFIG_ARCH_OMAP2PLUS)	+= omap2
- machine-$(CONFIG_ARCH_ORION5X)		+= orion5x
-+machine-$(CONFIG_ARCH_OWL)		+= owl
- machine-$(CONFIG_ARCH_PICOXCELL)	+= picoxcell
- machine-$(CONFIG_ARCH_PXA)		+= pxa
- machine-$(CONFIG_ARCH_QCOM)		+= qcom
-diff --git a/arch/arm/mach-owl/Kconfig b/arch/arm/mach-owl/Kconfig
-new file mode 100644
-index 0000000..8ecceda
---- /dev/null
-+++ b/arch/arm/mach-owl/Kconfig
-@@ -0,0 +1,9 @@
-+menuconfig ARCH_OWL
-+	bool "Actions Semi Owl family SoCs"
-+	depends on ARCH_MULTI_V7
-+	select GENERIC_IRQ_CHIP
-+	select ARM_GIC
-+	select CACHE_L2X0
-+	select COMMON_CLK
++config SERIAL_OWL
++	bool "Actions Semi Owl serial port support"
++	depends on ARCH_OWL || COMPILE_TEST
++	select SERIAL_CORE
 +	help
-+	  This enables support for the Actions Semiconductor S500 SoC family.
-diff --git a/arch/arm/mach-owl/Makefile b/arch/arm/mach-owl/Makefile
++	  This driver is for Actions Semi S500/S900 SoC's UART.
++	  Say 'Y' here if you wish to use the on-board serial port.
++	  Otherwise, say 'N'.
++
++config SERIAL_OWL_CONSOLE
++	bool "Console on Actions Semi Owl serial port"
++	depends on SERIAL_OWL=y
++	select SERIAL_CORE_CONSOLE
++	select SERIAL_EARLYCON
++	default y
++	help
++	  Say 'Y' here if you wish to use Actions Semi S500/S900 UART as the
++	  system console.
++
+ endmenu
+ 
+ config SERIAL_MCTRL_GPIO
+diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
+index 2d6288b..91f3571 100644
+--- a/drivers/tty/serial/Makefile
++++ b/drivers/tty/serial/Makefile
+@@ -91,6 +91,7 @@ obj-$(CONFIG_SERIAL_STM32)	+= stm32-usart.o
+ obj-$(CONFIG_SERIAL_MVEBU_UART)	+= mvebu-uart.o
+ obj-$(CONFIG_SERIAL_PIC32)	+= pic32_uart.o
+ obj-$(CONFIG_SERIAL_MPS2_UART)	+= mps2-uart.o
++obj-$(CONFIG_SERIAL_OWL)	+= owl-uart.o
+ 
+ # GPIOLIB helpers for modem control lines
+ obj-$(CONFIG_SERIAL_MCTRL_GPIO)	+= serial_mctrl_gpio.o
+diff --git a/drivers/tty/serial/owl-uart.c b/drivers/tty/serial/owl-uart.c
 new file mode 100644
-index 0000000..96ab18d
+index 0000000..f8b1bb6
 --- /dev/null
-+++ b/arch/arm/mach-owl/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_ARCH_OWL) += owl.o
-diff --git a/arch/arm/mach-owl/owl.c b/arch/arm/mach-owl/owl.c
-new file mode 100644
-index 0000000..2ada318
---- /dev/null
-+++ b/arch/arm/mach-owl/owl.c
-@@ -0,0 +1,28 @@
++++ b/drivers/tty/serial/owl-uart.c
+@@ -0,0 +1,135 @@
 +/*
-+ * Copyright (C) 2017 Andreas F?rber
++ * Actions Semi Owl family serial console
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ * Copyright 2013 Actions Semi Inc.
++ * Author: Actions Semi, Inc.
 + *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
++ * Copyright (c) 2016-2017 Andreas F?rber
 + *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/of_platform.h>
-+#include <asm/mach/arch.h>
++#include <linux/console.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/serial.h>
++#include <linux/serial_core.h>
 +
-+static const char * const owl_dt_compat[] = {
-+	"acts,s500",
-+	NULL
-+};
++#define OWL_UART_CTL	0x000
++#define OWL_UART_TXDAT	0x008
++#define OWL_UART_STAT	0x00c
 +
-+DT_MACHINE_START(MESON, "Actions Semi Owl platform")
-+	.dt_compat	= owl_dt_compat,
-+	.l2c_aux_val	= 0,
-+	.l2c_aux_mask	= ~0,
-+MACHINE_END
++#define OWL_UART_CTL_TRFS_TX		(1 << 14)
++#define OWL_UART_CTL_EN			(1 << 15)
++#define OWL_UART_CTL_RXIE		(1 << 18)
++#define OWL_UART_CTL_TXIE		(1 << 19)
++
++#define OWL_UART_STAT_RIP		(1 << 0)
++#define OWL_UART_STAT_TIP		(1 << 1)
++#define OWL_UART_STAT_TFFU		(1 << 6)
++#define OWL_UART_STAT_TRFL_MASK		(0x1f << 11)
++#define OWL_UART_STAT_UTBB		(1 << 17)
++
++static inline void owl_serial_write(struct uart_port *port, u32 val, unsigned int off)
++{
++	writel(val, port->membase + off);
++}
++
++static inline u32 owl_serial_read(struct uart_port *port, unsigned int off)
++{
++	return readl(port->membase + off);
++}
++
++#ifdef CONFIG_SERIAL_OWL_CONSOLE
++
++static void owl_console_putchar(struct uart_port *port, int ch)
++{
++	if (!port->membase)
++		return;
++
++	while (owl_serial_read(port, OWL_UART_STAT) & OWL_UART_STAT_TFFU)
++		cpu_relax();
++
++	owl_serial_write(port, ch, OWL_UART_TXDAT);
++}
++
++static void owl_serial_port_write(struct uart_port *port, const char *s,
++				  u_int count)
++{
++	u32 old_ctl, val;
++	unsigned long flags;
++	int locked;
++
++	local_irq_save(flags);
++
++	if (port->sysrq)
++		locked = 0;
++	else if (oops_in_progress)
++		locked = spin_trylock(&port->lock);
++	else {
++		spin_lock(&port->lock);
++		locked = 1;
++	}
++
++	old_ctl = owl_serial_read(port, OWL_UART_CTL);
++	val = old_ctl | OWL_UART_CTL_TRFS_TX;
++	/* disable IRQ */
++	val &= ~(OWL_UART_CTL_RXIE | OWL_UART_CTL_TXIE);
++	owl_serial_write(port, val, OWL_UART_CTL);
++
++	uart_console_write(port, s, count, owl_console_putchar);
++
++	/* wait until all contents have been sent out */
++	while (owl_serial_read(port, OWL_UART_STAT) & OWL_UART_STAT_TRFL_MASK)
++		cpu_relax();
++
++	/* clear IRQ pending */
++	val = owl_serial_read(port, OWL_UART_STAT);
++	val |= OWL_UART_STAT_TIP | OWL_UART_STAT_RIP;
++	owl_serial_write(port, val, OWL_UART_STAT);
++
++	owl_serial_write(port, old_ctl, OWL_UART_CTL);
++
++	if (locked)
++		spin_unlock(&port->lock);
++
++	local_irq_restore(flags);
++}
++
++static void owl_serial_early_console_write(struct console *co,
++					   const char *s,
++					   u_int count)
++{
++	struct earlycon_device *dev = co->data;
++
++	owl_serial_port_write(&dev->port, s, count);
++}
++
++static int __init
++owl_serial_early_console_setup(struct earlycon_device *device, const char *opt)
++{
++	if (!device->port.membase)
++		return -ENODEV;
++
++	device->con->write = owl_serial_early_console_write;
++
++	return 0;
++}
++OF_EARLYCON_DECLARE(owl, "acts,owl-uart",
++		    owl_serial_early_console_setup);
++
++#endif /* CONFIG_SERIAL_OWL_CONSOLE */
 -- 
 2.10.2
