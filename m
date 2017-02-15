@@ -1,52 +1,57 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 15 Feb 2017 12:07:36 +0100
-Subject: sDMA on i.mx7d
-In-Reply-To: <e9c36a33f2a49df2a517db5869eaea7f@agner.ch>
-References: <20170214222425.hbkfkeq3l6sveo7n@piout.net>
- <e9c36a33f2a49df2a517db5869eaea7f@agner.ch>
-Message-ID: <20170215110736.oumvvv7zordd2jdw@piout.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Feb 2017 11:13:44 +0000
+Subject: [PATCH RFC 1/3] coresight: binding for coresight debug driver
+In-Reply-To: <1486966298-16767-2-git-send-email-leo.yan@linaro.org>
+References: <1486966298-16767-1-git-send-email-leo.yan@linaro.org>
+ <1486966298-16767-2-git-send-email-leo.yan@linaro.org>
+Message-ID: <20170215111343.GD31733@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/02/2017 at 23:25:34 -0800, Stefan Agner wrote:
-> On 2017-02-14 14:24, Alexandre Belloni wrote:
-> > Hi,
-> > 
-> > I've been trying to get a PCM3168s codec with a Colibri iMX7 using TDM
-> > on SAI2.
-> > I've got it working properly with the 4.1.35 kernel from Toradex (based
-> > on the 4.1.15 from Freescale).
-> > It is working fine with and without providing a firmware to the sDMA.
-> > 
-> > But, I couldn't get that to work with v4.9. I actually managed to
-> > reproduce the issue using the SGTL5000 so I don't have any patch on top
-> > of v4.9.
+On Mon, Feb 13, 2017 at 02:11:36PM +0800, Leo Yan wrote:
+> Adding compatible string for new coresight debug driver.
+
+Please give a more thorough description of the hardware this binding
+this is intended to describe.
+
+It's not entirely clear which component this binding is intended to
+describe.
+
+Thanks,
+Mark.
+
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/arm/coresight.txt | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
 > 
-> I guess you are using the on module SGTL5000 to reproduce?
+> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
+> index fcbae6a..3ff15fd 100644
+> --- a/Documentation/devicetree/bindings/arm/coresight.txt
+> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
+> @@ -40,6 +40,9 @@ its hardware characteristcs.
+>  		- System Trace Macrocell:
+>  			"arm,coresight-stm", "arm,primecell"; [1]
+>  
+> +		- Debug Unit:
+> +			"arm,coresight-debug", "arm,primecell";
+> +
+>  	* reg: physical base address and length of the register
+>  	  set(s) of the component.
+>  
+> @@ -78,8 +81,10 @@ its hardware characteristcs.
+>  	* arm,cp14: must be present if the system accesses ETM/PTM management
+>  	  registers via co-processor 14.
+>  
+> -	* cpu: the cpu phandle this ETM/PTM is affined to. When omitted the
+> -	  source is considered to belong to CPU0.
+> +* Optional properties for ETM/PTM/Debugs:
+> +
+> +	* cpu: the cpu phandle this ETM/PTM/Debug is affined to. When omitted
+> +	  the source is considered to belong to CPU0.
+>  
+>  * Optional property for TMC:
+>  
+> -- 
+> 2.7.4
 > 
-
-Yes, using the on module sgtl5000 of a colibri on an iris.
-
-> When I added audio support I remember that the sound seemed to be ok to
-> me. Is the corruption such that you can hear it?
-> 
-
-You can hear it but not if you are playing a simple sine at a frequency
-that is a multiple of 10 (e.g. 440Hz)
-
-> > I really suspect the DMA driver as the issue varies with the selected
-> > period/buffer size.
-> > 
-> > Basically, the samples in a period are in the correct order but the
-> > periods are mixed up.
-> 
-> Maybe a endian issue?
-> 
-
-I don't think so.
-
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
