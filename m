@@ -1,74 +1,48 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 15 Feb 2017 17:00:03 -0600
-Subject: [PATCH 00/10] PCI: dwc: Rework and cleanup designware driver
-In-Reply-To: <1487164699-30708-1-git-send-email-kishon@ti.com>
-References: <1487164699-30708-1-git-send-email-kishon@ti.com>
-Message-ID: <20170215230003.GA26758@bhelgaas-glaptop.roam.corp.google.com>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Wed, 15 Feb 2017 15:01:40 -0800
+Subject: [PATCH v9 2/3] fpga manager: Add cyclone-ps-spi driver for Altera
+ FPGAs
+In-Reply-To: <CANk1AXQy1nLjZAEpy0CDpS7GqvL+0y7f7Q5EuOZ1AqjBOPDwEw@mail.gmail.com>
+References: <cover.1485295905.git.stillcompiling@gmail.com>
+ <94f1d92f502b64669467c467038c3aa766b312ad.1485295905.git.stillcompiling@gmail.com>
+ <20170215162641.5bc50cf3@crub>
+ <CANk1AXQy1nLjZAEpy0CDpS7GqvL+0y7f7Q5EuOZ1AqjBOPDwEw@mail.gmail.com>
+Message-ID: <347abcac-6f3c-29db-ed68-26d07831a04b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 06:48:09PM +0530, Kishon Vijay Abraham I wrote:
-> This series reworks designware driver in preparation for adding endpoint
-> mode support to designware driver.
-> 
-> This series was previously sent as part of endpoint support series
-> https://lkml.org/lkml/2017/1/13/562
-> 
-> Validate pci host only in pci-dra7xx. Any help in validating other
-> platforms would be highly appreciated.
-> 
-> This series is created after cherrypicking the following patch and
-> then applying pci/host-designware.
-> 
-> commit a782b5f986c3fa1cfa7f2b57941200c6a5809242
-> Author: Murali Karicheri <m-karicheri2@ti.com>
-> Date:   Wed Jan 4 14:32:30 2017 -0500
-> 
->     PCI: designware: Check for iATU unroll only on platforms that use ATU
-> 
-> The patches has been pushed to
-> git://git.ti.com/linux-phy/linux-phy.git dwc-rework
-> 
-> Kishon Vijay Abraham I (10):
->   PCI: dwc: designware: Move the register defines to designware header
->     file
->   PCI: dwc: *all*: Add platform_set_drvdata
->   PCI: dwc: *all*: Rename cfg_read/cfg_write to read/write
->   PCI: dwc: designware: Get device pointer at the start of
->     dw_pcie_host_init
->   PCI: dwc: *all*: Split *struct pcie_port* into host only and core
->     structures
->   PCI: dwc: designware: Parse *num-lanes* property in dw_pcie_setup_rc
->   PCI: dwc: designware: Fix style errors in pcie-designware.c
->   PCI: dwc: Split pcie-designware.c into host and core files
->   PCI: dwc: Create a new config symbol to enable pci dwc host
->   PCI: dwc: Remove dependency of designware to CONFIG_PCI
-> 
->  drivers/Makefile                       |    3 +
->  drivers/pci/Makefile                   |    3 -
->  drivers/pci/dwc/Kconfig                |   39 +-
->  drivers/pci/dwc/Makefile               |    1 +
->  drivers/pci/dwc/pci-dra7xx.c           |   91 ++--
->  drivers/pci/dwc/pci-exynos.c           |   81 ++--
->  drivers/pci/dwc/pci-imx6.c             |  131 ++---
->  drivers/pci/dwc/pci-keystone-dw.c      |   87 ++--
->  drivers/pci/dwc/pci-keystone.c         |   56 ++-
->  drivers/pci/dwc/pci-keystone.h         |    4 +-
->  drivers/pci/dwc/pci-layerscape.c       |   93 ++--
->  drivers/pci/dwc/pcie-armada8k.c        |   87 ++--
->  drivers/pci/dwc/pcie-artpec6.c         |   50 +-
->  drivers/pci/dwc/pcie-designware-host.c |  635 ++++++++++++++++++++++++
->  drivers/pci/dwc/pcie-designware-plat.c |   29 +-
->  drivers/pci/dwc/pcie-designware.c      |  823 +++-----------------------------
->  drivers/pci/dwc/pcie-designware.h      |  170 +++++--
->  drivers/pci/dwc/pcie-hisi.c            |   57 ++-
->  drivers/pci/dwc/pcie-qcom.c            |   72 ++-
->  drivers/pci/dwc/pcie-spear13xx.c       |   85 ++--
->  20 files changed, 1434 insertions(+), 1163 deletions(-)
->  create mode 100644 drivers/pci/dwc/pcie-designware-host.c
 
-I applied these to pci/host-designware with the intent of merging them
-for v4.11.  They're not in -next yet; I'll merge them into -next after
-the autobuilder completes.
-
-Bjorn
+On 02/15/2017 09:14 AM, Alan Tull wrote:
+> On Wed, Feb 15, 2017 at 9:26 AM, Anatolij Gustschin <agust@denx.de> wrote:
+>> Hi Joshua,
+>>
+>> On Tue, 24 Jan 2017 14:19:33 -0800
+>> Joshua Clayton stillcompiling at gmail.com wrote:
+>> ...
+>>> +static int cyclonespi_write(struct fpga_manager *mgr, const char *buf,
+>>> +                          size_t count)
+>>> +{
+>>> +      struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
+>>> +      const char *fw_data = buf;
+>>> +      const char *fw_data_end = fw_data + count;
+>>> +
+>>> +      while (fw_data < fw_data_end) {
+>>> +              int ret;
+>>> +              size_t stride = min(fw_data_end - fw_data, SZ_4K);
+>>> +
+>>> +              rev_buf(fw_data, stride);
+>> Can we make rev_buf() optional here? I've tested this driver with
+>> Stratix-V FPGA using orion_spi driver. It works without swapping
+>> the data.
+Thanks for testing!
+I'd be happy to make it an optional feature, rather than integral.
+> I replied earlier, but something in my email settings bounced.
+>
+> The way to make it optional is to add a bit to the flags of the
+> fpga_image_info struct.
+>
+> Alan
+OK.
+>
+>> Thanks,
+>> Anatolij
