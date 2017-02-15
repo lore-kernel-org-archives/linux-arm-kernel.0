@@ -1,206 +1,97 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed, 15 Feb 2017 17:55:23 +0100
-Subject: [PATCH 06/11] tty: serial: Add Actions Semi Owl UART earlycon
-In-Reply-To: <20170215165528.10052-1-afaerber@suse.de>
-References: <20170215165528.10052-1-afaerber@suse.de>
-Message-ID: <20170215165528.10052-7-afaerber@suse.de>
+Date: Wed, 15 Feb 2017 17:55:17 +0100
+Subject: [PATCH 00/11] ARM: Initial Actions Semi S500 and S900 enablement
+Message-ID: <20170215165528.10052-1-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements an earlycon for Actions Semi S500/S900 SoCs.
+Hello,
 
-Based on LeMaker linux-actions tree.
+Based on earlier work of mine for the LeMaker Guitar, this series adds initial
+support for the Actions Semiconductor S500 (ARMv7) and S900 (ARMv8) SoCs.
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- drivers/tty/serial/Kconfig    |  19 ++++++
- drivers/tty/serial/Makefile   |   1 +
- drivers/tty/serial/owl-uart.c | 135 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 155 insertions(+)
+Despite Actions Semi being a Linaro member since 2015, sadly I have not seen
+a single upstream kernel patch submission since. Nor has the XApple community
+taken any such initiative.
+
+The GitHub LeMaker/linux-actions and xapp-le/kernel trees have 3.10 based S500
+drivers in arch/arm/mach-owl/, whereas the 96boards-bubblegum/linux tree has
+new-style but still 3.10 based S900 drivers. I also spotted GPLv2+ vs. GPLv2
+license differences.
+
+This series therefore provides a proof of concept for a combined S500 and S900
+mainline implementation. Only earlycon serial output is available for now.
+
+Focusing on Bubblegum-96, no S500 clocksource implementation is provided yet,
+thus output on Guitar is less than on Bubblegum-96, but still it demonstrates
+that a single driver can be shared for both, using compatible strings for
+future differentiation.
+
+https://github.com/afaerber/linux/commits/bg96-next
+
+Booting from U-Boot is straightforward on both boards.
+
+https://en.opensuse.org/HCL:Guitar
+https://en.opensuse.org/HCL:Bubblegum-96
+
+Have a lot of fun!
+
+Cheers,
+Andreas
+
+Cc: mp-cs at actions-semi.com
+Cc: info at ucrobotics.com
+Cc: support at lemaker.org
+Cc: contact at linux-xapple.org
+Cc: devicetree at vger.kernel.org
+
+Andreas F?rber (11):
+  Documentation: devicetree: Add vendor prefix for Actions Semi
+  Documentation: devicetree: arm: Document Actions Semi S500
+  ARM: Prepare Actions Semi S500
+  ARM64: Prepare Actions Semi S900
+  Documentation: devicetree: serial: Document Actions Semi Owl UARTs
+  tty: serial: Add Actions Semi Owl UART earlycon
+  Documentation: kernel-parameters: Document owl earlycon
+  ARM: dts: Prepare Actions Semi S500 and LeMaker Guitar
+  Documentation: devicetree: Add vendor prefix for uCRobotics
+  Documentation: devicetree: arm: Document Actions Semi S900
+  ARM64: dts: Prepare Actions Semi S900 and Bubblegum-96
+
+ Documentation/admin-guide/kernel-parameters.txt    |   6 +
+ Documentation/devicetree/bindings/arm/acts.txt     |  32 +++++
+ .../devicetree/bindings/serial/acts,owl-uart.txt   |  16 +++
+ .../devicetree/bindings/vendor-prefixes.txt        |   2 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/s500-guitar-bb-rev-b.dts         |  63 ++++++++++
+ arch/arm/boot/dts/s500-guitar.dtsi                 |  49 ++++++++
+ arch/arm/boot/dts/s500.dtsi                        | 116 +++++++++++++++++
+ arch/arm/mach-owl/Kconfig                          |   9 ++
+ arch/arm/mach-owl/Makefile                         |   1 +
+ arch/arm/mach-owl/owl.c                            |  28 +++++
+ arch/arm64/Kconfig.platforms                       |   5 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/actions/Makefile               |   5 +
+ arch/arm64/boot/dts/actions/s900-bubblegum96.dts   |  62 +++++++++
+ arch/arm64/boot/dts/actions/s900.dtsi              | 140 +++++++++++++++++++++
+ drivers/tty/serial/Kconfig                         |  19 +++
+ drivers/tty/serial/Makefile                        |   1 +
+ drivers/tty/serial/owl-uart.c                      | 135 ++++++++++++++++++++
+ 21 files changed, 695 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/acts.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/acts,owl-uart.txt
+ create mode 100644 arch/arm/boot/dts/s500-guitar-bb-rev-b.dts
+ create mode 100644 arch/arm/boot/dts/s500-guitar.dtsi
+ create mode 100644 arch/arm/boot/dts/s500.dtsi
+ create mode 100644 arch/arm/mach-owl/Kconfig
+ create mode 100644 arch/arm/mach-owl/Makefile
+ create mode 100644 arch/arm/mach-owl/owl.c
+ create mode 100644 arch/arm64/boot/dts/actions/Makefile
+ create mode 100644 arch/arm64/boot/dts/actions/s900-bubblegum96.dts
+ create mode 100644 arch/arm64/boot/dts/actions/s900.dtsi
  create mode 100644 drivers/tty/serial/owl-uart.c
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index 6117ac8..9d4213c 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -1677,6 +1677,25 @@ config SERIAL_MVEBU_CONSOLE
- 	  and warnings and which allows logins in single user mode)
- 	  Otherwise, say 'N'.
- 
-+config SERIAL_OWL
-+	bool "Actions Semi Owl serial port support"
-+	depends on ARCH_OWL || COMPILE_TEST
-+	select SERIAL_CORE
-+	help
-+	  This driver is for Actions Semi S500/S900 SoC's UART.
-+	  Say 'Y' here if you wish to use the on-board serial port.
-+	  Otherwise, say 'N'.
-+
-+config SERIAL_OWL_CONSOLE
-+	bool "Console on Actions Semi Owl serial port"
-+	depends on SERIAL_OWL=y
-+	select SERIAL_CORE_CONSOLE
-+	select SERIAL_EARLYCON
-+	default y
-+	help
-+	  Say 'Y' here if you wish to use Actions Semi S500/S900 UART as the
-+	  system console.
-+
- endmenu
- 
- config SERIAL_MCTRL_GPIO
-diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
-index 2d6288b..91f3571 100644
---- a/drivers/tty/serial/Makefile
-+++ b/drivers/tty/serial/Makefile
-@@ -91,6 +91,7 @@ obj-$(CONFIG_SERIAL_STM32)	+= stm32-usart.o
- obj-$(CONFIG_SERIAL_MVEBU_UART)	+= mvebu-uart.o
- obj-$(CONFIG_SERIAL_PIC32)	+= pic32_uart.o
- obj-$(CONFIG_SERIAL_MPS2_UART)	+= mps2-uart.o
-+obj-$(CONFIG_SERIAL_OWL)	+= owl-uart.o
- 
- # GPIOLIB helpers for modem control lines
- obj-$(CONFIG_SERIAL_MCTRL_GPIO)	+= serial_mctrl_gpio.o
-diff --git a/drivers/tty/serial/owl-uart.c b/drivers/tty/serial/owl-uart.c
-new file mode 100644
-index 0000000..f8b1bb6
---- /dev/null
-+++ b/drivers/tty/serial/owl-uart.c
-@@ -0,0 +1,135 @@
-+/*
-+ * Actions Semi Owl family serial console
-+ *
-+ * Copyright 2013 Actions Semi Inc.
-+ * Author: Actions Semi, Inc.
-+ *
-+ * Copyright (c) 2016-2017 Andreas F?rber
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/console.h>
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/serial.h>
-+#include <linux/serial_core.h>
-+
-+#define OWL_UART_CTL	0x000
-+#define OWL_UART_TXDAT	0x008
-+#define OWL_UART_STAT	0x00c
-+
-+#define OWL_UART_CTL_TRFS_TX		(1 << 14)
-+#define OWL_UART_CTL_EN			(1 << 15)
-+#define OWL_UART_CTL_RXIE		(1 << 18)
-+#define OWL_UART_CTL_TXIE		(1 << 19)
-+
-+#define OWL_UART_STAT_RIP		(1 << 0)
-+#define OWL_UART_STAT_TIP		(1 << 1)
-+#define OWL_UART_STAT_TFFU		(1 << 6)
-+#define OWL_UART_STAT_TRFL_MASK		(0x1f << 11)
-+#define OWL_UART_STAT_UTBB		(1 << 17)
-+
-+static inline void owl_serial_write(struct uart_port *port, u32 val, unsigned int off)
-+{
-+	writel(val, port->membase + off);
-+}
-+
-+static inline u32 owl_serial_read(struct uart_port *port, unsigned int off)
-+{
-+	return readl(port->membase + off);
-+}
-+
-+#ifdef CONFIG_SERIAL_OWL_CONSOLE
-+
-+static void owl_console_putchar(struct uart_port *port, int ch)
-+{
-+	if (!port->membase)
-+		return;
-+
-+	while (owl_serial_read(port, OWL_UART_STAT) & OWL_UART_STAT_TFFU)
-+		cpu_relax();
-+
-+	owl_serial_write(port, ch, OWL_UART_TXDAT);
-+}
-+
-+static void owl_serial_port_write(struct uart_port *port, const char *s,
-+				  u_int count)
-+{
-+	u32 old_ctl, val;
-+	unsigned long flags;
-+	int locked;
-+
-+	local_irq_save(flags);
-+
-+	if (port->sysrq)
-+		locked = 0;
-+	else if (oops_in_progress)
-+		locked = spin_trylock(&port->lock);
-+	else {
-+		spin_lock(&port->lock);
-+		locked = 1;
-+	}
-+
-+	old_ctl = owl_serial_read(port, OWL_UART_CTL);
-+	val = old_ctl | OWL_UART_CTL_TRFS_TX;
-+	/* disable IRQ */
-+	val &= ~(OWL_UART_CTL_RXIE | OWL_UART_CTL_TXIE);
-+	owl_serial_write(port, val, OWL_UART_CTL);
-+
-+	uart_console_write(port, s, count, owl_console_putchar);
-+
-+	/* wait until all contents have been sent out */
-+	while (owl_serial_read(port, OWL_UART_STAT) & OWL_UART_STAT_TRFL_MASK)
-+		cpu_relax();
-+
-+	/* clear IRQ pending */
-+	val = owl_serial_read(port, OWL_UART_STAT);
-+	val |= OWL_UART_STAT_TIP | OWL_UART_STAT_RIP;
-+	owl_serial_write(port, val, OWL_UART_STAT);
-+
-+	owl_serial_write(port, old_ctl, OWL_UART_CTL);
-+
-+	if (locked)
-+		spin_unlock(&port->lock);
-+
-+	local_irq_restore(flags);
-+}
-+
-+static void owl_serial_early_console_write(struct console *co,
-+					   const char *s,
-+					   u_int count)
-+{
-+	struct earlycon_device *dev = co->data;
-+
-+	owl_serial_port_write(&dev->port, s, count);
-+}
-+
-+static int __init
-+owl_serial_early_console_setup(struct earlycon_device *device, const char *opt)
-+{
-+	if (!device->port.membase)
-+		return -ENODEV;
-+
-+	device->con->write = owl_serial_early_console_write;
-+
-+	return 0;
-+}
-+OF_EARLYCON_DECLARE(owl, "acts,owl-uart",
-+		    owl_serial_early_console_setup);
-+
-+#endif /* CONFIG_SERIAL_OWL_CONSOLE */
 -- 
 2.10.2
