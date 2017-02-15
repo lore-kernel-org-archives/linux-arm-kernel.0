@@ -1,119 +1,98 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Wed, 15 Feb 2017 12:36:13 -0700
-Subject: [PATCH 2/2] iommu: add warning when sharing groups
-In-Reply-To: <e7535138133c514c77004d64e40b4180@codeaurora.org>
-References: <1487107522-8695-1-git-send-email-okaya@codeaurora.org>
- <1487107522-8695-2-git-send-email-okaya@codeaurora.org>
- <20170214165155.7c49485e@t450s.home>
- <e7535138133c514c77004d64e40b4180@codeaurora.org>
-Message-ID: <20170215123613.1df4b33a@t450s.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Feb 2017 19:50:27 +0000
+Subject: [PATCH v3] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
+In-Reply-To: <20170215180159.11359-1-cov@codeaurora.org>
+References: <20170215180159.11359-1-cov@codeaurora.org>
+Message-ID: <20170215195026.GN31733@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Feb 2017 22:53:35 -0500
-okaya at codeaurora.org wrote:
-
-> On 2017-02-14 18:51, Alex Williamson wrote:
-> > On Tue, 14 Feb 2017 16:25:22 -0500
-> > Sinan Kaya <okaya@codeaurora.org> wrote:
-> >   
-> >> The ACS requirement has been obscured in the current code and is only
-> >> known by certain individuals who happen to read the code. Print out a
-> >> warning with ACS path failure when ACS requirement is not met.
-> >> 
-> >> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> >> ---
-> >>  drivers/iommu/iommu.c | 3 +++
-> >>  1 file changed, 3 insertions(+)
-> >> 
-> >> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> >> index dbe7f65..049ee0a 100644
-> >> --- a/drivers/iommu/iommu.c
-> >> +++ b/drivers/iommu/iommu.c
-> >> @@ -811,6 +811,9 @@ struct iommu_group *pci_device_group(struct device 
-> >> *dev)
-> >>  	if (IS_ERR(group))
-> >>  		return NULL;
-> >> 
-> >> +	if (pci_is_root_bus(bus))
-> >> +		dev_warn_once(&pdev->dev, "using shared group due to ACS path 
-> >> failure\n");
-> >> +
-> >>  	return group;
-> >>  }
-> >>   
-> > 
-> > The premise here is flawed.  An IOMMU group based at the root bus
-> > doesn't necessarily imply a lack of ACS.  There are devices on root
-> > buses, integrated endpoints and root ports.  Naturally an IOMMU group
-> > for these devices needs to be based at the root bus.  Additionally,
-> > there can be IOMMU groups developed around a lack of ACS that don't
-> > intersect with the root bus.  Since this is a warn_once, the false
-> > positives for root bus devices are going to be enumerated first.  On an
-> > Intel system there's typically a device as 00.0 that will always be
-> > pointlessly listed first.  Also, it's not clear that grouping devices
-> > together is always wrong, as Robin pointed out in the EHCI/OHCI
-> > example.  Lack of ACS on downtream ports is likely to cause problems,
-> > especially if that downstream port exposes a slot.  Maybe that would be
-> > a good place to start.  Also, what is someone supposed to do when they
-> > see this error?  If we can hope they'll look for the error in the code
-> > (unlikely) a big comment with useful external links might be
-> > necessary.  Based on how easily vendors ignore kernel warnings, I'm
-> > dubious there's any value to this path though.  Thanks,  
+On Wed, Feb 15, 2017 at 01:01:59PM -0500, Christopher Covington wrote:
+> The Qualcomm Datacenter Technologies QDF2400 family of SoCs contains a
+> custom (non-PrimeCell) implementation of the SBSA UART. Occasionally the
+> BUSY bit in the Flag Register gets stuck as 1, erratum 44 for both 2432v1
+> and 2400v1 SoCs.Checking that the Transmit FIFO Empty (TXFE) bit is 0,
+> instead of checking that the BUSY bit is 1, works around the issue.
 > 
-> Maybe, a better solution would be to add some sentences into vfio.txt 
-> documentation.
+> To facilitate this substitution of flags and values, introduce
+> vendor-specific inversion of Feature Register bits when UART AMBA Port
+> (UAP) data is available. For the earlycon case, prior to UAP availability,
+> implement alternative putc and early_write functions.
 > 
-> I'm ready to drop this patch. I just don't want ACS requirement to be 
-> hidden between the source code.
+> Similar to what how ARMv8 ACPI PCI quirks are detected during MCFG parsing,
+> check the OEM fields of the Serial Port Console Redirection (SPCR) ACPI
+> table to determine if the current platform is known to be affected by the
+> erratum.
 > 
-> Would you be willing to do that?
+> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+> Since v2: Formatting and other improvements per Timur's suggestions
+> Due to known (although trivial) conflicts in silicon-errata.txt, based on
+> http://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
+> ---
+>  Documentation/arm64/silicon-errata.txt |  2 ++
+>  drivers/acpi/spcr.c                    | 23 ++++++++++++
+>  drivers/tty/serial/amba-pl011.c        | 66 ++++++++++++++++++++++++++++++----
+>  3 files changed, 84 insertions(+), 7 deletions(-)
 > 
-> I know I read all pci and vfio documents in the past. I could have 
-> captured this requirement if it was there.
+> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+> index a71b8095dbd8..bc3d086bc624 100644
+> --- a/Documentation/arm64/silicon-errata.txt
+> +++ b/Documentation/arm64/silicon-errata.txt
+> @@ -68,3 +68,5 @@ stable kernels.
+>  |                |                 |                 |                             |
+>  | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
+>  | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
+> +| Qualcomm Tech. | QDF2432v1 UART  | SoC E44         | N/A                         |
+> +| Qualcomm Tech. | QDF2400v1 UART  | SoC E44         | N/A                         |
+> diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
+> index b8019c4c1d38..2b5d0fac81f0 100644
+> --- a/drivers/acpi/spcr.c
+> +++ b/drivers/acpi/spcr.c
+> @@ -16,6 +16,26 @@
+>  #include <linux/kernel.h>
+>  #include <linux/serial_core.h>
+>  
+> +/*
+> + * Some Qualcomm Datacenter Technologies SoCs have a defective UART BUSY bit.
+> + * Detect them by examining the OEM fields in the SPCR header, similiar to PCI
+> + * quirk detection in pci_mcfg.c.
+> + */
+> +static bool qdf2400_erratum_44_present(struct acpi_table_header *h)
+> +{
+> +	if (memcmp(h->oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
+> +		return false;
+> +
+> +	if (!memcmp(h->oem_table_id, "QDF2432 ", ACPI_OEM_TABLE_ID_SIZE))
+> +		return true;
+> +
+> +	if (!memcmp(h->oem_table_id, "QDF2400 ", ACPI_OEM_TABLE_ID_SIZE) &&
+> +			h->oem_revision == 0)
+> +		return true;
+> +
+> +	return false;
+> +}
+> +
+>  /**
+>   * parse_spcr() - parse ACPI SPCR table and add preferred console
+>   *
+> @@ -93,6 +113,9 @@ int __init parse_spcr(bool earlycon)
+>  		goto done;
+>  	}
+>  
+> +	if (qdf2400_erratum_44_present(&table->header))
+> +		uart = "qdf2400_e44";
+> +
 
-We already have this:
+This addresses my concern with using the MIDR; thanks for respinning
+this. FWIW:
 
-Documentation/vfio.txt:
-...
-This isolation is not always at the granularity of a single device
-though.  Even when an IOMMU is capable of this, properties of devices,
-interconnects, and IOMMU topologies can each reduce this isolation.
-For instance, an individual device may be part of a larger multi-
-function enclosure.  While the IOMMU may be able to distinguish
-between devices within the enclosure, the enclosure may not require
-transactions between devices to reach the IOMMU.  Examples of this
-could be anything from a multi-function PCI device with backdoors
-between functions to a non-PCI-ACS (Access Control Services) capable
-bridge allowing redirection without reaching the IOMMU.  Topology
-can also play a factor in terms of hiding devices.  A PCIe-to-PCI
-bridge masks the devices behind it, making transaction appear as if
-from the bridge itself.  Obviously IOMMU design plays a major factor
-as well.
-...
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Additionally if you google for "iommu group", this is the first hit:
+It might be best to split the silicon-errata doc into a separate patch.
+That can go via the arm64 tree without conflict whiel the driver patch
+can go via the tty tree.
 
-http://vfio.blogspot.com/2014/08/iommu-groups-inside-and-out.html
-
-This talks extensively about ACS.  A few hits below that you can find a
-presentation I've given with ACS examples.  What additional
-documentation do you think would have helped you discover or understand
-this problem earlier?
-
-I agree that device isolation is not a spec requirement.  The specs
-give us the tools that we need, but valid uses cases exist where a lack
-of isolation may be preferred.  If we logically deduce how we can give
-a device or set of devices to a user for an untrusted environment,
-isolated from other devices, I think it's pretty logical to come to the
-conclusion that ACS is the only way that PCIe hardware can allow that
-sort of control in a standard way.  Clearly we also recognize that this
-is a commonly overlooked area where hardware vendors may fail to
-incorporate this subtly into their platform design guidelines and thus
-we have numerous quirks for exposing virtual ACS-like isolation.  The
-hope is that adding a quirk for this devices means that feedback was
-provided to the hardware teams and system architects within the
-companies developing these devices to consider this use case and
-implement native ACS in the next generation.  Thanks,
-
-Alex
+Thanks,
+Mark.
