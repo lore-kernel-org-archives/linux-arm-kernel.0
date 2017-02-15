@@ -1,49 +1,115 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 15 Feb 2017 20:38:34 +0000
-Subject: [PATCH v2 0/5] ARM: add module autoloading support for crypto
- modules
-In-Reply-To: <20170215200732.GG27312@n2100.armlinux.org.uk>
-References: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170215200002.GF27312@n2100.armlinux.org.uk>
- <CAKv+Gu9b92hKiN0nyKEdjkszUzPVf3ODt7wtiqdLwnkrdhsyvA@mail.gmail.com>
- <20170215200732.GG27312@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu_d7W7T6kTS4BDNimtBtXuueO4+HVgW0-HsK9RKprvpLQ@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 15 Feb 2017 12:07:54 -0800
+Subject: [PATCH v3] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
+In-Reply-To: <20170215195026.GN31733@leverpostej>
+References: <20170215180159.11359-1-cov@codeaurora.org>
+ <20170215195026.GN31733@leverpostej>
+Message-ID: <20170215200754.GA23091@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 February 2017 at 20:07, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Wed, Feb 15, 2017 at 08:04:07PM +0000, Ard Biesheuvel wrote:
->> On 15 February 2017 at 20:00, Russell King - ARM Linux
->> <linux@armlinux.org.uk> wrote:
->> > On Wed, Jan 11, 2017 at 05:01:53PM +0000, Ard Biesheuvel wrote:
->> >> This series wires up the crypto modules that use the ARM 32-bit versions of
->> >> the ARMv8 Crypto Extensions to udev autoloading, by exposing the HWCAP2
->> >> feature bits via the CPU modalias. This is very similar to the arm64
->> >> implementation, with the notable exception that ARM has its CPU feature
->> >> definitions split across HWCAP and HWCAP2.
->> >
->> > Note that Aarch64 has:
->> >
->> > MODALIAS=cpu:type:aarch64:feature:,0000,0001,0002,0003,0004,0005,0006,0007
->> >
->> > which looks weird with the first numeric entry starting with a ','.
->> >
->>
->> IIRC this is deliberate, since the udev code matches the feature field
->> for *nnnn*, which is what the module alias exposes.
->
-> I noticed, feature:*0000* matches both "feature:0000" and "feature:,0000".
->
+On Wed, Feb 15, 2017 at 07:50:27PM +0000, Mark Rutland wrote:
+> On Wed, Feb 15, 2017 at 01:01:59PM -0500, Christopher Covington wrote:
+> > The Qualcomm Datacenter Technologies QDF2400 family of SoCs contains a
+> > custom (non-PrimeCell) implementation of the SBSA UART. Occasionally the
+> > BUSY bit in the Flag Register gets stuck as 1, erratum 44 for both 2432v1
+> > and 2400v1 SoCs.Checking that the Transmit FIFO Empty (TXFE) bit is 0,
+> > instead of checking that the BUSY bit is 1, works around the issue.
+> > 
+> > To facilitate this substitution of flags and values, introduce
+> > vendor-specific inversion of Feature Register bits when UART AMBA Port
+> > (UAP) data is available. For the earlycon case, prior to UAP availability,
+> > implement alternative putc and early_write functions.
+> > 
+> > Similar to what how ARMv8 ACPI PCI quirks are detected during MCFG parsing,
+> > check the OEM fields of the Serial Port Console Redirection (SPCR) ACPI
+> > table to determine if the current platform is known to be affected by the
+> > erratum.
+> > 
+> > Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> > Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > ---
+> > Since v2: Formatting and other improvements per Timur's suggestions
+> > Due to known (although trivial) conflicts in silicon-errata.txt, based on
+> > http://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
+> > ---
+> >  Documentation/arm64/silicon-errata.txt |  2 ++
+> >  drivers/acpi/spcr.c                    | 23 ++++++++++++
+> >  drivers/tty/serial/amba-pl011.c        | 66 ++++++++++++++++++++++++++++++----
+> >  3 files changed, 84 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+> > index a71b8095dbd8..bc3d086bc624 100644
+> > --- a/Documentation/arm64/silicon-errata.txt
+> > +++ b/Documentation/arm64/silicon-errata.txt
+> > @@ -68,3 +68,5 @@ stable kernels.
+> >  |                |                 |                 |                             |
+> >  | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
+> >  | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
+> > +| Qualcomm Tech. | QDF2432v1 UART  | SoC E44         | N/A                         |
+> > +| Qualcomm Tech. | QDF2400v1 UART  | SoC E44         | N/A                         |
+> > diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
+> > index b8019c4c1d38..2b5d0fac81f0 100644
+> > --- a/drivers/acpi/spcr.c
+> > +++ b/drivers/acpi/spcr.c
+> > @@ -16,6 +16,26 @@
+> >  #include <linux/kernel.h>
+> >  #include <linux/serial_core.h>
+> >  
+> > +/*
+> > + * Some Qualcomm Datacenter Technologies SoCs have a defective UART BUSY bit.
+> > + * Detect them by examining the OEM fields in the SPCR header, similiar to PCI
+> > + * quirk detection in pci_mcfg.c.
+> > + */
+> > +static bool qdf2400_erratum_44_present(struct acpi_table_header *h)
+> > +{
+> > +	if (memcmp(h->oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
+> > +		return false;
+> > +
+> > +	if (!memcmp(h->oem_table_id, "QDF2432 ", ACPI_OEM_TABLE_ID_SIZE))
+> > +		return true;
+> > +
+> > +	if (!memcmp(h->oem_table_id, "QDF2400 ", ACPI_OEM_TABLE_ID_SIZE) &&
+> > +			h->oem_revision == 0)
+> > +		return true;
+> > +
+> > +	return false;
+> > +}
+> > +
+> >  /**
+> >   * parse_spcr() - parse ACPI SPCR table and add preferred console
+> >   *
+> > @@ -93,6 +113,9 @@ int __init parse_spcr(bool earlycon)
+> >  		goto done;
+> >  	}
+> >  
+> > +	if (qdf2400_erratum_44_present(&table->header))
+> > +		uart = "qdf2400_e44";
+> > +
+> 
+> This addresses my concern with using the MIDR; thanks for respinning
+> this. FWIW:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> It might be best to split the silicon-errata doc into a separate patch.
+> That can go via the arm64 tree without conflict whiel the driver patch
+> can go via the tty tree.
 
-Right. It's been a while since I ported that code from x86 to generic,
-and I don't remember making many changes to it.
+Well, I can't take this as-is because I get conflicts in my tty tree
+with the doc, and with the driver itself:
 
->> Yes, I am aware of that. But there aren't /that/ many optional
->> features that lend themselves for module autoloading.
->
-> Yes.  Once we've exhausted the HWCAP2 space, we'll either have to add
-> HWCAP3 or finish off using the unused 11 in the HWCAP space.
->
+	checking file Documentation/arm64/silicon-errata.txt
+	Hunk #1 FAILED at 68.
+	1 out of 1 hunk FAILED
+	checking file drivers/acpi/spcr.c
+	checking file drivers/tty/serial/amba-pl011.c
+	Hunk #5 FAILED at 2370.
+	1 out of 8 hunks FAILED
 
-For now, we should be fine. I will respin with the + 32 added.
+I have no idea what the driver conflict is, what branch was this made
+against?
+
+thanks,
+
+greg k-h
