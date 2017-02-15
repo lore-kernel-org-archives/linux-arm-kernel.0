@@ -1,22 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 15 Feb 2017 17:30:08 -0600
-Subject: [PATCH 2/3] Documentation: DT: Add entry for FSL LS1088A RDB,
- QDS boards
-In-Reply-To: <1486638251-9688-1-git-send-email-harninder.rai@nxp.com>
-References: <1486638251-9688-1-git-send-email-harninder.rai@nxp.com>
-Message-ID: <20170215233008.ii42ot6mevw2gh76@rob-hp-laptop>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 15 Feb 2017 15:35:41 -0800
+Subject: [PATCH v2 6/9] arm, arm64: factorize common cpu capacity default
+ code
+In-Reply-To: <CAL_JsqKLiQ2cSffadMWbN2PkqBOiA-6Mx5YVMCehVQNpy7YqrQ@mail.gmail.com>
+References: <20170209092525.6654-1-juri.lelli@arm.com>
+ <20170209092525.6654-7-juri.lelli@arm.com>
+ <20170210142857.GA18321@kroah.com>
+ <CAL_JsqKLiQ2cSffadMWbN2PkqBOiA-6Mx5YVMCehVQNpy7YqrQ@mail.gmail.com>
+Message-ID: <20170215233541.GA7403@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2017 at 04:34:11PM +0530, Harninder Rai wrote:
-> Signed-off-by: Harninder Rai <harninder.rai@nxp.com>
+On Wed, Feb 15, 2017 at 05:17:05PM -0600, Rob Herring wrote:
+> On Fri, Feb 10, 2017 at 8:28 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> >> + *
+> >> + * Copyright (C) 2016, ARM Ltd.
+> >> + * Written by: Juri Lelli, ARM Ltd.
+> >> + *
+> >> + * This file is subject to the terms and conditions of the GNU General Public
+> >> + * License.  See the file "COPYING" in the main directory of this archive
+> >> + * for more details.
+> >
+> > So, v2 only?  Please be specific.  Even better yet, use a SPDX header if
+> > you want to, those are always nice.
+> 
+> Sorry to hijack this thread, but you're recommending SPDX now? You
+> seemed pretty negative on it last time it came up[1]. Or was that just
+> in context of the churn of converting existing files?
 
-Some consistency in the subject please "dt-bindings: arm: ..."
+It was in the context of someone trying to tell someone else to do the
+work for them of converting all of the existing files to use SPDX.  I've
+never refused a patch from someone adding SPDX identifiers to the
+kernel, in fact, _I'm_ the only one that has ever used such an
+identifier on a kernel file :)
 
-> ---
->  Documentation/devicetree/bindings/arm/fsl.txt | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+> Personally, I like the use of SPDX tags over free form license text
+> and would like to encourage it for dts files.
 
-With that,
+Sure, go ahead, I'd encourage it.
 
-Acked-by: Rob Herring <robh@kernel.org>
+thanks,
+
+greg k-h
