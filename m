@@ -1,130 +1,149 @@
-From: jun.gao@mediatek.com (Jun Gao)
-Date: Wed, 15 Feb 2017 10:32:56 +0800
-Subject: [PATCH v2 2/2] arm: dts: mt2701: Add i2c device node
-In-Reply-To: <1487125976-25243-1-git-send-email-jun.gao@mediatek.com>
-References: <1487125976-25243-1-git-send-email-jun.gao@mediatek.com>
-Message-ID: <1487125976-25243-3-git-send-email-jun.gao@mediatek.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 14 Feb 2017 20:39:40 -0600
+Subject: [PATCH v2] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
+In-Reply-To: <20170214235347.8812-1-cov@codeaurora.org>
+References: <20170214235347.8812-1-cov@codeaurora.org>
+Message-ID: <6a3ea0e5-f824-380e-1c4a-3e72b160e98a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jun Gao <jun.gao@mediatek.com>
+Christopher Covington wrote:
+> The Qualcomm Datacenter Technologies QDF2400 family of SoCs contains a
+> custom (non-PrimeCell) implementation of the SBSA UART. Occasionally the
+> BUSY bit in the Flag Register gets stuck as 1, erratum 44 for both 2432v1
+> and 2400v1 SoCs. Checking that the Transmit FIFO Empty (TXFE) bit is 0,
+> instead of checking that the BUSY bit is 1, works around the issue. To
+> facilitate this substitution when UART AMBA Port (UAP) data is available,
+> introduce vendor-specific inversion of Feature Register bits. For the
+> earlycon case, implement alternative putc and early_write functions.
+> Similar to what how ARMv8 ACPI PCI quirks are detected during MCFG parsing,
+> check the OEM fields of the Serial Port Console Redirection (SPCR) ACPI
+> table to determine if the current platform is known to be affected by the
+> erratum.
 
-Add i2c device node for MT2701.
+Please break this up into paragraphs.
 
-Change-Id: Idd33ad9010c43809328814350f9c29284891d171
-Signed-off-by: Jun Gao <jun.gao@mediatek.com>
----
- arch/arm/boot/dts/mt2701-evb.dts |   44 ++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/mt2701.dtsi    |   42 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 86 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-index 082ca88..a908e94 100644
---- a/arch/arm/boot/dts/mt2701-evb.dts
-+++ b/arch/arm/boot/dts/mt2701-evb.dts
-@@ -24,6 +24,50 @@
- 	};
- };
- 
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
-+
-+&pio {
-+	i2c0_pins_a: i2c0 at 0 {
-+		pins1 {
-+			pinmux = <MT2701_PIN_75_SDA0__FUNC_SDA0>,
-+				 <MT2701_PIN_76_SCL0__FUNC_SCL0>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2c1_pins_a: i2c1 at 0 {
-+		pins1 {
-+			pinmux = <MT2701_PIN_57_SDA1__FUNC_SDA1>,
-+				 <MT2701_PIN_58_SCL1__FUNC_SCL1>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2c2_pins_a: i2c2 at 0 {
-+		pins1 {
-+			pinmux = <MT2701_PIN_77_SDA2__FUNC_SDA2>,
-+				 <MT2701_PIN_78_SCL2__FUNC_SCL2>;
-+			bias-disable;
-+		};
-+	};
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index bdf8954..0d1539f 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -227,6 +227,48 @@
- 		status = "disabled";
- 	};
- 
-+	i2c0: i2c at 11007000 {
-+		compatible = "mediatek,mt2701-i2c",
-+			     "mediatek,mt6577-i2c";
-+		reg = <0 0x11007000 0 0x70>,
-+		      <0 0x11000200 0 0x80>;
-+		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
-+		clock-div = <16>;
-+		clocks = <&pericfg CLK_PERI_I2C0>, <&pericfg CLK_PERI_AP_DMA>;
-+		clock-names = "main", "dma";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	i2c1: i2c at 11008000 {
-+		compatible = "mediatek,mt2701-i2c",
-+			     "mediatek,mt6577-i2c";
-+		reg = <0 0x11008000 0 0x70>,
-+		      <0 0x11000280 0 0x80>;
-+		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_LOW>;
-+		clock-div = <16>;
-+		clocks = <&pericfg CLK_PERI_I2C1>, <&pericfg CLK_PERI_AP_DMA>;
-+		clock-names = "main", "dma";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	i2c2: i2c at 11009000 {
-+		compatible = "mediatek,mt2701-i2c",
-+			     "mediatek,mt6577-i2c";
-+		reg = <0 0x11009000 0 0x70>,
-+		      <0 0x11000300 0 0x80>;
-+		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_LOW>;
-+		clock-div = <16>;
-+		clocks = <&pericfg CLK_PERI_I2C2>, <&pericfg CLK_PERI_AP_DMA>;
-+		clock-names = "main", "dma";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	mmsys: syscon at 14000000 {
- 		compatible = "mediatek,mt2701-mmsys", "syscon";
- 		reg = <0 0x14000000 0 0x1000>;
+> +	if (!memcmp(table->header.oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
+> +		if (!memcmp(table->header.oem_table_id, "QDF2432 ",
+> +				ACPI_OEM_TABLE_ID_SIZE) ||
+> +				(!memcmp(table->header.oem_table_id,
+> +				"QDF2400 ", ACPI_OEM_TABLE_ID_SIZE) &&
+> +				table->header.oem_revision == 0))
+> +			uart = "qdf2400_e44";
+> +
+
+Hey, you just wrote this
+And it looks crazy
+But here's my function
+So call it, maybe?
+
+static bool needs_qdf2400_e44(struct acpi_table_header *h)
+{
+	const char *id;
+
+	/* The erratum only applies to Qualcomm Technologies SOCs */
+	if (memcmp(h->oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
+		return False;
+
+	id = h->oem_table_id;
+
+	if (!memcmp(id, "QDF2432 ", ACPI_OEM_TABLE_ID_SIZE))
+		return True;
+
+	if (!memcmp(id, "QDF2000 ", ACPI_OEM_TABLE_ID_SIZE) &&
+		h->oem_revision == 0)
+		return True;
+	
+	return False;
+}
+
+...
+
+	if (needs_qdf2400_e44(&table->header))
+		uart = "qdf2400_e44";
+
+
+> +/*
+> + * Erratum 44 for QDF2432v1 and QDF2400v1 SoCs describes the BUSY bit as
+> + * occasionally getting stuck as 1. To avoid the potential for a hang, check
+> + * TXFE == 0 instead of BUSY == 1. This may not be suitable for all UART
+> + * implementations, so only do so if an affected platform is detected in
+> + * parse_spcr().
+> + */
+> +static bool qdf2400_e44 = false;
+
+Please rename this to needs_qdf2400_e44
+
+>  static u16 pl011_st_offsets[REG_ARRAY_SIZE] = {
+>  	[REG_DR] = UART01x_DR,
+>  	[REG_ST_DMAWM] = ST_UART011_DMAWM,
+> @@ -1518,7 +1543,8 @@ static unsigned int pl011_tx_empty(struct uart_port *port)
+>  {
+>  	struct uart_amba_port *uap =
+>  	    container_of(port, struct uart_amba_port, port);
+> -	unsigned int status = pl011_read(uap, REG_FR);
+> +	/* Allow feature register bits to be inverted to work around errata */
+
+Blank line above the comment, please.
+
+> +	unsigned int status = pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr;
+>  	return status & (uap->vendor->fr_busy | UART01x_FR_TXFF) ?
+>  							0 : TIOCSER_TEMT;
+>  }
+> @@ -2215,10 +2241,12 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+>  	uart_console_write(&uap->port, s, count, pl011_console_putchar);
+>
+>  	/*
+> -	 *	Finally, wait for transmitter to become empty
+> -	 *	and restore the TCR
+> +	 *	Finally, wait for transmitter to become empty and restore the
+> +	 *	TCR. Allow feature register bits to be inverted to work around
+> +	 *	errata.
+>  	 */
+> -	while (pl011_read(uap, REG_FR) & uap->vendor->fr_busy)
+> +	while ((pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr)
+> +						& uap->vendor->fr_busy)
+>  		cpu_relax();
+>  	if (!uap->vendor->always_enabled)
+>  		pl011_write(old_cr, uap, REG_CR);
+> @@ -2340,8 +2368,13 @@ static int __init pl011_console_match(struct console *co, char *name, int idx,
+>  	resource_size_t addr;
+>  	int i;
+>
+> -	if (strcmp(name, "pl011") != 0)
+> +	if (strcmp(name, "qdf2400_e44") == 0) {
+> +		if (!qdf2400_e44)
+> +			pr_info("UART: Working around QDF2400 SoC erratum 44");
+
+Just use pr_once(), and you can skip the "if (!qdf2400_e44)".  Although I don't 
+understand why you need to do that.  pl011_console_match() should only be called 
+once anyway, right?
+
+> +		qdf2400_e44 = true;
+> +	} else if (strcmp(name, "pl011") != 0) {
+>  		return -ENODEV;
+> +	}
+>
+>  	if (uart_parse_earlycon(options, &iotype, &addr, &options))
+>  		return -ENODEV;
+> @@ -2383,6 +2416,25 @@ static struct console amba_console = {
+>
+>  #define AMBA_CONSOLE	(&amba_console)
+>
+> +static void qdf2400_e44_putc(struct uart_port *port, int c)
+> +{
+> +	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+> +		cpu_relax();
+> +	if (port->iotype == UPIO_MEM32)
+> +		writel(c, port->membase + UART01x_DR);
+> +	else
+> +		writeb(c, port->membase + UART01x_DR);
+
+I think you can ignore the UPIO_MEM32 test and always use writel(), even on the 
+QDF2400.
+
 -- 
-1.7.9.5
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
