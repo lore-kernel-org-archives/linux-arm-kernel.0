@@ -1,102 +1,277 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 15 Feb 2017 10:39:16 -0800
-Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting cpu1
- during boot
-In-Reply-To: <20170214193645.GM21809@atomide.com>
-References: <20170213215013.19929-1-tony@atomide.com>
- <20170214193645.GM21809@atomide.com>
-Message-ID: <20170215183915.GU3897@atomide.com>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Wed, 15 Feb 2017 10:44:45 -0700
+Subject: [PATCH V9 03/10] efi: parse ARM processor error
+In-Reply-To: <1487180692-16732-1-git-send-email-tbaicar@codeaurora.org>
+References: <1487180692-16732-1-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1487180692-16732-4-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [170214 11:39]:
-> * Tony Lindgren <tony@atomide.com> [170213 13:51]:
-> > Commit 3251885285e1 ("ARM: OMAP4+: Reset CPU1 properly for kexec") started
-> > resetting cpu1 because of a kexec boot issue I was seeing earlier in 2016
-> > on omap4 when doing kexec boot between two different kernel versions. The
-> > booted kernel ended up trying to use the old kernel start-up address unless
-> > cpu1 was reset before configuring the cpu1 start-up address.
-> > 
-> > It seems the reset part was not correct but probably working around some
-> > other issue. I have not been able to reproduce this issue any longer despite
-> > testing with backported patches back to v4.6 kernel. So it is possible this
-> > issue was caused by other work in progress kexec patches I had applied. Or
-> > it is possible some other fixes have made the issue go way.
-> > 
-> > The unconditional reset of cpu1 can cause issues booting some devices. For
-> > example, bootloader configured secure OS running on cpu1 will fail as the
-> > configuration is not preserved as reported by Andrew F. Davis <afd@ti.com>.
-> > 
-> > Let's fix the issue by reverting the cpu1 reset parts. If it turns out we
-> > still need to reset cpu1 in some cases, we can add it back and do it
-> > conditionally.
-> 
-> Actually with this I'm now seeing cpu1 not come up after a suspend/resume
-> cycle on duovero:
-> 
-> [  118.257415] CPU1: shutdown
-> [  118.294616] Error taking CPU1 up: -2
-> [  118.299072] PM: noirq resume of devices complete after 3.723 msecs
-> [  118.303802] PM: early resume of devices complete after 3.723 msecs
-> 
-> So this issue needs to be investigated more.
+Add support for ARM Common Platform Error Record (CPER).
+UEFI 2.6 specification adds support for ARM specific
+processor error information to be reported as part of the
+CPER records. This provides more detail on for processor error logs.
 
-And then today the omap4 suspend/resume issue is no longer reproducable..
-Go figure.
+Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+Reviewed-by: James Morse <james.morse@arm.com>
+---
+ drivers/firmware/efi/cper.c | 133 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/cper.h        |  54 ++++++++++++++++++
+ 2 files changed, 187 insertions(+)
 
-But then doing more testing I noticed that also omap5 needs the reset.
-Without it we get the following on omap5-uevm doing a kexec boot. So clearly
-the reset cannot be just removed at least for omap4 and omap5.
-
-Regards,
-
-Tony
-
-8< ---------------------
-[    0.156796] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-[    0.163396] Setting up static identity map for 0x80100000 - 0x80100070
-[    0.172246] smp: Bringing up secondary CPUs ...
-[    0.178970] Unable to handle kernel NULL pointer dereference at virtual address 00000000
-[    0.178974] pgd = c0004000
-[    0.178977] [00000000] *pgd=00000000
-[    0.178990] Internal error: Oops: 80000005 [#1] SMP ARM
-[    0.178995] Modules linked in:
-[    0.179005] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.10.0-rc8-next-20170215+ #120
-[    0.179008] Hardware name: Generic OMAP5 (Flattened Device Tree)
-[    0.179013] task: ee0c8ec0 task.stack: ee0ca000
-[    0.179018] PC is at 0x0
-[    0.179029] LR is@omap4_cpu_die+0x58/0x98
-[    0.179034] pc : [<00000000>]    lr : [<c01243dc>]    psr: 60000093
-[    0.179034] sp : ee0cbfb8  ip : 00000000  fp : 00000000
-[    0.179038] r10: 00000000  r9 : c0d50569  r8 : 00000000
-[    0.179042] r7 : c0c76448  r6 : c0d0792c  r5 : 00000001  r4 : c0b08054
-[    0.179046] r3 : 00000001  r2 : f0880000  r1 : 00000003  r0 : 00000001
-[    0.179051] Flags: nZCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
-[    0.179055] Control: 10c5387d  Table: 8000406a  DAC: 00000051
-[    0.179059] Process swapper/1 (pid: 0, stack limit = 0xee0ca218)
-[    0.179063] Stack: (0xee0cbfb8 to 0xee0cc000)
-[    0.179068] bfa0:                                                       00000000 00000000
-[    0.179075] bfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-[    0.179082] bfe0: 00000000 00000000 00000000 00000000 00000013 00000000 681b0041 cf3e4021
-[    0.179092] [<c01243dc>] (omap4_cpu_die) from [<00000000>] (  (null))
-[    0.179098] Code: bad PC value
-[    0.179115] ---[ end trace e14406c260ce69db ]---
-[    0.179121] Kernel panic - not syncing: Attempted to kill the idle task!
-[    0.179135] CPU0: stopping
-[    0.179141] ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
-[    0.339715] CPU: 0 PID: 0 Comm: swapper/0 Tainted: G      D         4.10.0-rc8-next-20170215+ #120
-[    0.348927] Hardware name: Generic OMAP5 (Flattened Device Tree)
-[    0.355112] [<c0110228>] (unwind_backtrace) from [<c010c224>] (show_stack+0x10/0x14)
-[    0.363083] [<c010c224>] (show_stack) from [<c04ca860>] (dump_stack+0xac/0xe0)
-[    0.370513] [<c04ca860>] (dump_stack) from [<c010e72c>] (handle_IPI+0x358/0x3f8)
-[    0.378120] [<c010e72c>] (handle_IPI) from [<c01015a4>] (gic_handle_irq+0x9c/0xb8)
-[    0.385909] [<c01015a4>] (gic_handle_irq) from [<c083b270>] (__irq_svc+0x70/0x98)
-[    0.393602] Exception stack(0xc0d01f38 to 0xc0d01f80)
-[    0.398794] 1f20:                                                       c0108284 00000000
-[    0.407205] 1f40: 00000000 00000000 c0d00000 c0d07994 c0d0792c c0c76448 c0d08560 c0d50569
-[    0.415616] 1f60: 00000000 00000000 00000000 c0d01f88 c0108284 c0108288 60000013 ffffffff
-[    0.424032] [<c083b270>] (__irq_svc) from [<c0108288>] (arch_cpu_idle+0x20/0x3c)
-[    0.431643] [<c0108288>] (arch_cpu_idle) from [<c0190bc4>] (do_idle+0x164/0x218)
-[    0.439251] [<c0190bc4>] (do_idle) from [<c0190ffc>] (cpu_startup_entry+0x18/0x1c)
-[    0.447040] [<c0190ffc>] (cpu_startup_entry) from [<c0c00c40>] (start_kernel+0x35c/0x3d4)
-[    0.455451] [<c0c00c40>] (start_kernel) from [<8000807c>] (0x8000807c)
+diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+index 8fa4e23..c2b0a12 100644
+--- a/drivers/firmware/efi/cper.c
++++ b/drivers/firmware/efi/cper.c
+@@ -110,12 +110,15 @@ void cper_print_bits(const char *pfx, unsigned int bits,
+ static const char * const proc_type_strs[] = {
+ 	"IA32/X64",
+ 	"IA64",
++	"ARM",
+ };
+ 
+ static const char * const proc_isa_strs[] = {
+ 	"IA32",
+ 	"IA64",
+ 	"X64",
++	"ARM A32/T32",
++	"ARM A64",
+ };
+ 
+ static const char * const proc_error_type_strs[] = {
+@@ -139,6 +142,18 @@ void cper_print_bits(const char *pfx, unsigned int bits,
+ 	"corrected",
+ };
+ 
++static const char * const arm_reg_ctx_strs[] = {
++	"AArch32 general purpose registers",
++	"AArch32 EL1 context registers",
++	"AArch32 EL2 context registers",
++	"AArch32 secure context registers",
++	"AArch64 general purpose registers",
++	"AArch64 EL1 context registers",
++	"AArch64 EL2 context registers",
++	"AArch64 EL3 context registers",
++	"Misc. system register structure",
++};
++
+ static void cper_print_proc_generic(const char *pfx,
+ 				    const struct cper_sec_proc_generic *proc)
+ {
+@@ -184,6 +199,114 @@ static void cper_print_proc_generic(const char *pfx,
+ 		printk("%s""IP: 0x%016llx\n", pfx, proc->ip);
+ }
+ 
++static void cper_print_proc_arm(const char *pfx,
++				const struct cper_sec_proc_arm *proc)
++{
++	int i, len, max_ctx_type;
++	struct cper_arm_err_info *err_info;
++	struct cper_arm_ctx_info *ctx_info;
++	char newpfx[64];
++
++	printk("%s""section length: %d\n", pfx, proc->section_length);
++	printk("%s""MIDR: 0x%016llx\n", pfx, proc->midr);
++
++	len = proc->section_length - (sizeof(*proc) +
++		proc->err_info_num * (sizeof(*err_info)));
++	if (len < 0) {
++		printk("%s""section length is too small\n", pfx);
++		printk("%s""firmware-generated error record is incorrect\n", pfx);
++		printk("%s""ERR_INFO_NUM is %d\n", pfx, proc->err_info_num);
++		return;
++	}
++
++	if (proc->validation_bits & CPER_ARM_VALID_MPIDR)
++		printk("%s""MPIDR: 0x%016llx\n", pfx, proc->mpidr);
++	if (proc->validation_bits & CPER_ARM_VALID_AFFINITY_LEVEL)
++		printk("%s""error affinity level: %d\n", pfx,
++			proc->affinity_level);
++	if (proc->validation_bits & CPER_ARM_VALID_RUNNING_STATE) {
++		printk("%s""running state: 0x%x\n", pfx, proc->running_state);
++		printk("%s""PSCI state: %d\n", pfx, proc->psci_state);
++	}
++
++	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
++
++	err_info = (struct cper_arm_err_info *)(proc + 1);
++	for (i = 0; i < proc->err_info_num; i++) {
++		printk("%s""Error info structure %d:\n", pfx, i);
++		printk("%s""version:%d\n", newpfx, err_info->version);
++		printk("%s""length:%d\n", newpfx, err_info->length);
++		if (err_info->validation_bits &
++		    CPER_ARM_INFO_VALID_MULTI_ERR) {
++			if (err_info->multiple_error == 0)
++				printk("%s""single error\n", newpfx);
++			else if (err_info->multiple_error == 1)
++				printk("%s""multiple errors\n", newpfx);
++			else
++				printk("%s""multiple errors count:%u\n",
++				newpfx, err_info->multiple_error);
++		}
++		if (err_info->validation_bits & CPER_ARM_INFO_VALID_FLAGS) {
++			if (err_info->flags & CPER_ARM_INFO_FLAGS_FIRST)
++				printk("%s""first error captured\n", newpfx);
++			if (err_info->flags & CPER_ARM_INFO_FLAGS_LAST)
++				printk("%s""last error captured\n", newpfx);
++			if (err_info->flags & CPER_ARM_INFO_FLAGS_PROPAGATED)
++				printk("%s""propagated error captured\n",
++				       newpfx);
++			if (err_info->flags & CPER_ARM_INFO_FLAGS_OVERFLOW)
++				printk("%s""overflow occurred, error info is incomplete\n",
++				       newpfx);
++		}
++		printk("%s""error_type: %d, %s\n", newpfx, err_info->type,
++			err_info->type < ARRAY_SIZE(proc_error_type_strs) ?
++			proc_error_type_strs[err_info->type] : "unknown");
++		if (err_info->validation_bits & CPER_ARM_INFO_VALID_ERR_INFO)
++			printk("%s""error_info: 0x%016llx\n", newpfx,
++			       err_info->error_info);
++		if (err_info->validation_bits & CPER_ARM_INFO_VALID_VIRT_ADDR)
++			printk("%s""virtual fault address: 0x%016llx\n",
++				newpfx, err_info->virt_fault_addr);
++		if (err_info->validation_bits &
++		    CPER_ARM_INFO_VALID_PHYSICAL_ADDR)
++			printk("%s""physical fault address: 0x%016llx\n",
++				newpfx, err_info->physical_fault_addr);
++		err_info += 1;
++	}
++	ctx_info = (struct cper_arm_ctx_info *)err_info;
++	max_ctx_type = ARRAY_SIZE(arm_reg_ctx_strs) - 1;
++	for (i = 0; i < proc->context_info_num; i++) {
++		int size = sizeof(*ctx_info) + ctx_info->size;
++
++		printk("%s""Context info structure %d:\n", pfx, i);
++		if (len < size) {
++			printk("%s""section length is too small\n", newpfx);
++			printk("%s""firmware-generated error record is incorrect\n", pfx);
++			return;
++		}
++		if (ctx_info->type > max_ctx_type) {
++			printk("%s""Invalid context type: %d\n", newpfx,
++							ctx_info->type);
++			printk("%s""Max context type: %d\n", newpfx,
++							max_ctx_type);
++			return;
++		}
++		printk("%s""register context type %d: %s\n", newpfx,
++			ctx_info->type, arm_reg_ctx_strs[ctx_info->type]);
++		print_hex_dump(newpfx, "", DUMP_PREFIX_OFFSET, 16, 4,
++				(ctx_info + 1), ctx_info->size, 0);
++		len -= size;
++		ctx_info = (struct cper_arm_ctx_info *)((long)ctx_info + size);
++	}
++
++	if (len > 0) {
++		printk("%s""Vendor specific error info has %u bytes:\n", pfx,
++		       len);
++		print_hex_dump(newpfx, "", DUMP_PREFIX_OFFSET, 16, 4, ctx_info,
++				len, 0);
++	}
++}
++
+ static const char * const mem_err_type_strs[] = {
+ 	"unknown",
+ 	"no error",
+@@ -458,6 +581,16 @@ static void cper_estatus_print_section(
+ 			cper_print_pcie(newpfx, pcie, gdata);
+ 		else
+ 			goto err_section_too_small;
++	} else if ((IS_ENABLED(CONFIG_ARM64) || IS_ENABLED(CONFIG_ARM)) &&
++		   !uuid_le_cmp(*sec_type, CPER_SEC_PROC_ARM)) {
++		struct cper_sec_proc_arm *arm_err;
++
++		arm_err = acpi_hest_generic_data_payload(gdata);
++		printk("%ssection_type: ARM processor error\n", newpfx);
++		if (gdata->error_data_length >= sizeof(*arm_err))
++			cper_print_proc_arm(newpfx, arm_err);
++		else
++			goto err_section_too_small;
+ 	} else
+ 		printk("%s""section type: unknown, %pUl\n", newpfx, sec_type);
+ 
+diff --git a/include/linux/cper.h b/include/linux/cper.h
+index dcacb1a..85450f3 100644
+--- a/include/linux/cper.h
++++ b/include/linux/cper.h
+@@ -180,6 +180,10 @@ enum {
+ #define CPER_SEC_PROC_IPF						\
+ 	UUID_LE(0xE429FAF1, 0x3CB7, 0x11D4, 0x0B, 0xCA, 0x07, 0x00,	\
+ 		0x80, 0xC7, 0x3C, 0x88, 0x81)
++/* Processor Specific: ARM */
++#define CPER_SEC_PROC_ARM						\
++	UUID_LE(0xE19E3D16, 0xBC11, 0x11E4, 0x9C, 0xAA, 0xC2, 0x05,	\
++		0x1D, 0x5D, 0x46, 0xB0)
+ /* Platform Memory */
+ #define CPER_SEC_PLATFORM_MEM						\
+ 	UUID_LE(0xA5BC1114, 0x6F64, 0x4EDE, 0xB8, 0x63, 0x3E, 0x83,	\
+@@ -255,6 +259,22 @@ enum {
+ 
+ #define CPER_PCIE_SLOT_SHIFT			3
+ 
++#define CPER_ARM_VALID_MPIDR			0x00000001
++#define CPER_ARM_VALID_AFFINITY_LEVEL		0x00000002
++#define CPER_ARM_VALID_RUNNING_STATE		0x00000004
++#define CPER_ARM_VALID_VENDOR_INFO		0x00000008
++
++#define CPER_ARM_INFO_VALID_MULTI_ERR		0x0001
++#define CPER_ARM_INFO_VALID_FLAGS		0x0002
++#define CPER_ARM_INFO_VALID_ERR_INFO		0x0004
++#define CPER_ARM_INFO_VALID_VIRT_ADDR		0x0008
++#define CPER_ARM_INFO_VALID_PHYSICAL_ADDR	0x0010
++
++#define CPER_ARM_INFO_FLAGS_FIRST		0x0001
++#define CPER_ARM_INFO_FLAGS_LAST		0x0002
++#define CPER_ARM_INFO_FLAGS_PROPAGATED		0x0004
++#define CPER_ARM_INFO_FLAGS_OVERFLOW		0x0008
++
+ /*
+  * All tables and structs must be byte-packed to match CPER
+  * specification, since the tables are provided by the system BIOS
+@@ -340,6 +360,40 @@ struct cper_ia_proc_ctx {
+ 	__u64	mm_reg_addr;
+ };
+ 
++/* ARM Processor Error Section */
++struct cper_sec_proc_arm {
++	__u32	validation_bits;
++	__u16	err_info_num; /* Number of Processor Error Info */
++	__u16	context_info_num; /* Number of Processor Context Info Records*/
++	__u32	section_length;
++	__u8	affinity_level;
++	__u8	reserved[3];	/* must be zero */
++	__u64	mpidr;
++	__u64	midr;
++	__u32	running_state; /* Bit 0 set - Processor running. PSCI = 0 */
++	__u32	psci_state;
++};
++
++/* ARM Processor Error Information Structure */
++struct cper_arm_err_info {
++	__u8	version;
++	__u8	length;
++	__u16	validation_bits;
++	__u8	type;
++	__u16	multiple_error;
++	__u8	flags;
++	__u64	error_info;
++	__u64	virt_fault_addr;
++	__u64	physical_fault_addr;
++};
++
++/* ARM Processor Context Information Structure */
++struct cper_arm_ctx_info {
++	__u16	version;
++	__u16	type;
++	__u32	size;
++};
++
+ /* Old Memory Error Section UEFI 2.1, 2.2 */
+ struct cper_sec_mem_err_old {
+ 	__u64	validation_bits;
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
