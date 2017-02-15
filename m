@@ -1,95 +1,74 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 15 Feb 2017 09:59:52 +0000
-Subject: [PATCH 7/7] ARM: dma-mapping: Remove traces of NOMMU code
-In-Reply-To: <1487152792-34214-1-git-send-email-vladimir.murzin@arm.com>
-References: <1487152792-34214-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1487152792-34214-8-git-send-email-vladimir.murzin@arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 15 Feb 2017 12:10:22 +0200
+Subject: [PATCH v13 06/12] usb: xhci: use bus->sysdev for DMA configuration
+In-Reply-To: <20170215085127.GA26227@b29397-desktop>
+References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
+ <1486776443-2280-7-git-send-email-peter.chen@nxp.com>
+ <e532a212-cd15-ab42-6188-fc11a12633af@ti.com>
+ <CAK8P3a1D1v=LXrW=-t-fRJjbo_C6OpSuoqiGuZPOaBzQYCT-kA@mail.gmail.com>
+ <cb7182c6-0236-26f2-4f96-9bc001994728@ti.com>
+ <CAK8P3a22f=sQXt+3-PeAuBFQN7_4iXDQhu41teExd6bxJXxDAQ@mail.gmail.com>
+ <20170215013514.GA6579@b29397-desktop>
+ <cb3ee971-6d97-fff1-64f7-1b527559b047@ti.com>
+ <20170215085127.GA26227@b29397-desktop>
+Message-ID: <2a3d2d65-e531-aaca-d5a1-a71f818cec61@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA operations for NOMMU case have been just factored out into
-separate compilation unit, so don't keep dead code.
++Felipe,
 
-Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Tested-by: Andras Szemzo <sza@esh.hu>
-Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/mm/dma-mapping.c | 26 ++------------------------
- 1 file changed, 2 insertions(+), 24 deletions(-)
+On 15/02/17 10:51, Peter Chen wrote:
+> On Wed, Feb 15, 2017 at 10:18:03AM +0200, Roger Quadros wrote:
+>> Peter,
+>>
+>> On 15/02/17 03:35, Peter Chen wrote:
+>>> On Tue, Feb 14, 2017 at 01:58:40PM +0100, Arnd Bergmann wrote:
+>>>> On Tue, Feb 14, 2017 at 1:26 PM, Roger Quadros <rogerq@ti.com> wrote:
+>>>>> On 14/02/17 13:44, Arnd Bergmann wrote:
+>>>>>> On Tue, Feb 14, 2017 at 11:36 AM, Roger Quadros <rogerq@ti.com> wrote:
+>>>>
+>>>>>>> Why are we using sysdev to read DT property? We should be using the
+>>>>>>> XHCI device (&pdev->dev) here, no?
+>>>>>>
+>>>>>> If I remember correctly, this is one of the cases where pdev does not
+>>>>>> have a device node attached to it because it was created by the driver
+>>>>>> of the parent device on the fly in case of dwc3. When you have a pure xhci
+>>>>>> device in DT, the two pointers are the same.
+>>>>>
+>>>>> From drivers/usb/dwc3/host.c
+>>>>>
+>>>>>>         if (dwc->usb3_lpm_capable) {
+>>>>>>                 props[0].name = "usb3-lpm-capable";
+>>>>>>                 ret = platform_device_add_properties(xhci, props);
+>>>>>>                 if (ret) {
+>>>>>>                         dev_err(dwc->dev, "failed to add properties to xHCI\n");
+>>>>>>                         goto err1;
+>>>>>>                 }
+>>>>>>         }
+>>>>>
+>>>>> So it is setting the usb3-lpm-capable property into the xhci platform device
+>>>>> and we should be reading the property from there.
+>>>
+>>> Why dwc3 needs another "snps,usb3_lpm_capable"? Why not using
+>>> "usb3-lpm-capable" at firmware directly?
+>>
+>> dwc3 is not setting "snps,usb3_lpm_capable" but "usb3-lpm-capable" for the
+>> xhci platform device.
+>>
+>> What did you mean by firmware? Did you mean something like BIOS?
+>> At least TI platforms don't use any firmware like BIOS. So dwc3 driver
+>> needs to create a platform device for xhci on the fly and set the DT properties.
+>>
+> 
+> By readying code, the dwc3 calls dwc3_get_properties to set
+> dwc->usb3_lpm_capable, and at dwc3/host.c, it sets property
+> "usb3-lpm-capable" according to this flag, why not let common
+> code xhci-plat.c to get this property from sysdev which is DT
+> nodes for dwc3?
+> 
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index ab77100..d8a755b 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -344,8 +344,6 @@ static void __dma_free_buffer(struct page *page, size_t size)
- 	}
- }
- 
--#ifdef CONFIG_MMU
--
- static void *__alloc_from_contiguous(struct device *dev, size_t size,
- 				     pgprot_t prot, struct page **ret_page,
- 				     const void *caller, bool want_vaddr,
-@@ -646,22 +644,6 @@ static inline pgprot_t __get_dma_pgprot(unsigned long attrs, pgprot_t prot)
- 	return prot;
- }
- 
--#define nommu() 0
--
--#else	/* !CONFIG_MMU */
--
--#define nommu() 1
--
--#define __get_dma_pgprot(attrs, prot)				__pgprot(0)
--#define __alloc_remap_buffer(dev, size, gfp, prot, ret, c, wv)	NULL
--#define __alloc_from_pool(size, ret_page)			NULL
--#define __alloc_from_contiguous(dev, size, prot, ret, c, wv, coherent_flag)	NULL
--#define __free_from_pool(cpu_addr, size)			do { } while (0)
--#define __free_from_contiguous(dev, page, cpu_addr, size, wv)	do { } while (0)
--#define __dma_free_remap(cpu_addr, size)			do { } while (0)
--
--#endif	/* CONFIG_MMU */
--
- static void *__alloc_simple_buffer(struct device *dev, size_t size, gfp_t gfp,
- 				   struct page **ret_page)
- {
-@@ -803,7 +785,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
- 
- 	if (cma)
- 		buf->allocator = &cma_allocator;
--	else if (nommu() || is_coherent)
-+	else if (is_coherent)
- 		buf->allocator = &simple_allocator;
- 	else if (allowblock)
- 		buf->allocator = &remap_allocator;
-@@ -852,8 +834,7 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 		 unsigned long attrs)
- {
--	int ret = -ENXIO;
--#ifdef CONFIG_MMU
-+	int ret;
- 	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
- 	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
- 	unsigned long pfn = dma_to_pfn(dev, dma_addr);
-@@ -868,7 +849,6 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 				      vma->vm_end - vma->vm_start,
- 				      vma->vm_page_prot);
- 	}
--#endif	/* CONFIG_MMU */
- 
- 	return ret;
- }
-@@ -887,9 +867,7 @@ int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 		 unsigned long attrs)
- {
--#ifdef CONFIG_MMU
- 	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
--#endif	/* CONFIG_MMU */
- 	return __arm_dma_mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
- }
- 
+Felipe, any comments?
+
 -- 
-2.0.0
+cheers,
+-roger
