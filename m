@@ -1,22 +1,34 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 15 Feb 2017 12:44:27 -0600
-Subject: [PATCH v3] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
-In-Reply-To: <20170215180159.11359-1-cov@codeaurora.org>
-References: <20170215180159.11359-1-cov@codeaurora.org>
-Message-ID: <f26b71df-9a5b-ced7-5364-699f5df8891a@codeaurora.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 15 Feb 2017 11:59:59 -0700
+Subject: [PATCH 0/2] coresight: Replace sprintf with scnprintf + bug fix
+In-Reply-To: <20170215022029.21744-1-ohaugan@codeaurora.org>
+References: <20170215022029.21744-1-ohaugan@codeaurora.org>
+Message-ID: <CANLsYkzrYypT8tk0ttiELfMgxKntFwMG2KMfEB1TKJ9WHbVHKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/15/2017 12:01 PM, Christopher Covington wrote:
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+On 14 February 2017 at 19:20, Olav Haugan <ohaugan@codeaurora.org> wrote:
+> Replaced all occurrences of s{n}printf with scnprintf for consistency
+> across coresight files.
+> While doing that found a bug in one of the show functions which I also
+> fixed (second patch).
+>
+> Olav Haugan (2):
+>   coresight: Replace sprintf with scnprintf
+>   coresight: etm3x: Correctly output counter values in sysfs node
+>
+>  drivers/hwtracing/coresight/coresight-etb10.c      |  2 +-
+>  drivers/hwtracing/coresight/coresight-etm-perf.c   |  2 +-
+>  .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 80 ++++++++++++----------
+>  drivers/hwtracing/coresight/coresight-funnel.c     |  4 +-
+>  drivers/hwtracing/coresight/coresight-stm.c        |  2 +-
+>  drivers/hwtracing/coresight/coresight-tmc.c        |  2 +-
+>  6 files changed, 51 insertions(+), 41 deletions(-)
+>
 
-Acked-by: Timur Tabi <timur@codeaurora.org>
+I have applied both patches - thanks,
+Mathieu
 
-It would great if we could get this into 4.11.  As crazy it sounds, it is the 
-only critical patch in 4.11 that we need for our platform.
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+> --
+> 2.11.0
+>
