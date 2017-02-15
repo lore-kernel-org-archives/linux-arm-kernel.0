@@ -1,94 +1,89 @@
-From: hsweeten@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 15 Feb 2017 09:22:53 -0700
-Subject: [PATCH] ARM: ep93xx: simone: let the mmc_spi driver handle the card
- detect
-Message-ID: <20170215162253.5410-1-hsweeten@visionengravers.com>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Wed, 15 Feb 2017 17:39:53 +0100
+Subject: [RFC v2 5/7] ASoC: stm32: add DFSDM DAI support
+In-Reply-To: <20170214174534.35ytbpax75mxcayg@sirena.org.uk>
+References: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
+ <1487003909-11710-6-git-send-email-arnaud.pouliquen@st.com>
+ <20170214174534.35ytbpax75mxcayg@sirena.org.uk>
+Message-ID: <9b875a75-294a-2f59-5830-cc0f6b3b62c7@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This board uses a GPIO for the MMC card detect. Let the mmc_spi
-driver handle it instead of the platform code.
 
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ep93xx/simone.c | 54 +++----------------------------------------
- 1 file changed, 3 insertions(+), 51 deletions(-)
 
-diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
-index 7bb540c..65ec16e 100644
---- a/arch/arm/mach-ep93xx/simone.c
-+++ b/arch/arm/mach-ep93xx/simone.c
-@@ -44,11 +44,6 @@ static struct ep93xxfb_mach_info __initdata simone_fb_info = {
- };
- 
- /*
-- * GPIO lines used for MMC card detection.
-- */
--#define MMC_CARD_DETECT_GPIO EP93XX_GPIO_LINE_EGPIO0
--
--/*
-  * Up to v1.3, the Sim.One used SFRMOUT as SD card chip select, but this goes
-  * low between multi-message command blocks. From v1.4, it uses a GPIO instead.
-  * v1.3 parts will still work, since the signal on SFRMOUT is automatic.
-@@ -98,55 +93,12 @@ static struct ep93xx_spi_chip_ops simone_mmc_spi_ops = {
- 	.cs_control	= simone_mmc_spi_cs_control,
- };
- 
--/*
-- * MMC card detection GPIO setup.
-- */
--
--static int simone_mmc_spi_init(struct device *dev,
--	irqreturn_t (*irq_handler)(int, void *), void *mmc)
--{
--	unsigned int gpio = MMC_CARD_DETECT_GPIO;
--	int irq, err;
--
--	err = gpio_request(gpio, dev_name(dev));
--	if (err)
--		return err;
--
--	err = gpio_direction_input(gpio);
--	if (err)
--		goto fail;
--
--	irq = gpio_to_irq(gpio);
--	if (irq < 0)
--		goto fail;
--
--	err = request_irq(irq, irq_handler, IRQF_TRIGGER_FALLING,
--			  "MMC card detect", mmc);
--	if (err)
--		goto fail;
--
--	printk(KERN_INFO "%s: using irq %d for MMC card detection\n",
--	       dev_name(dev), irq);
--
--	return 0;
--fail:
--	gpio_free(gpio);
--	return err;
--}
--
--static void simone_mmc_spi_exit(struct device *dev, void *mmc)
--{
--	unsigned int gpio = MMC_CARD_DETECT_GPIO;
--
--	free_irq(gpio_to_irq(gpio), mmc);
--	gpio_free(gpio);
--}
--
- static struct mmc_spi_platform_data simone_mmc_spi_data = {
--	.init		= simone_mmc_spi_init,
--	.exit		= simone_mmc_spi_exit,
- 	.detect_delay	= 500,
- 	.ocr_mask	= MMC_VDD_32_33 | MMC_VDD_33_34,
-+	.flags		= MMC_SPI_USE_CD_GPIO,
-+	.cd_gpio	= EP93XX_GPIO_LINE_EGPIO0,
-+	.cd_debounce	= 1,
- };
- 
- static struct spi_board_info simone_spi_devices[] __initdata = {
--- 
-2.10.0
+On 02/14/2017 06:45 PM, Mark Brown wrote:
+> On Mon, Feb 13, 2017 at 05:38:27PM +0100, Arnaud Pouliquen wrote:
+> 
+> This looks basically fine as a system specific driver but as some 
+> of the comments in here say there's bits of it could perhaps be 
+> genericised but I'm not sure we need to do that right now.  I'm not
+> sure the abstraction is exactly comfortable but having another bit
+> of hardware doing a bridge to IIO might be the best way to figure
+> out something better.
+> 
+Yes this is one point to clarify. I keep it as a specific API, as i
+don't know if another hardware needs to support it...
+I would say that objective of this version is to highlight interactions.
+Then i can rework it in a way that could be  genericised in future (
+i.e. using void* for params that would depend on platforms)...
+
+Extend IIO customer API would be also another alternative, but i did
+not find a generic way to do it. Some IIO attributes could be used for
+Hw params but DMA and IRQs seems tricky to handle through this IIO
+interface...
+
+
+
+
+>> +	.period_bytes_min = 40, /* 8 khz 5 ms */ +	.period_bytes_max =
+>>  4 * PAGE_SIZE, +	.buffer_bytes_max = 16 * PAGE_SIZE
+> 
+> What's the physical minimum period limit?  The comment makes this 
+> sound like it's just made up.
+I did not find physical minimum period limit, that why i considered
+this value from a scheduling point of view. I will re-check these values.
+
+> 
+>> +	unsigned int shift = 24 -priv->max_scaling; +
+> 
+> Missing space after -.
+> 
+>> +	dev_dbg(dai->dev, "%s: enter\n", __func__); +	return 0; + 
+>> return snd_pcm_hw_constraint_list(substream->runtime, 0, + 
+>> SNDRV_PCM_HW_PARAM_RATE, +					  &priv->rates_const);
+> 
+> Looks like debug changes got left in?
+yes exactly...
+> 
+>> +static int stm32_adfsdm_set_sysclk(struct snd_soc_dai *dai, int
+>>  clk_id, +				   unsigned int freq, int dir) +{ +	struct 
+>> stm32_adfsdm_priv *priv = snd_soc_dai_get_drvdata(dai); +	struct
+>>  stm32_adfsdm_pdata *pdata = priv->pdata; + +	dev_dbg(dai->dev, 
+>> "%s: enter for dai %d\n", __func__, dai->id); +	if (dir == 
+>> SND_SOC_CLOCK_IN) { +		pdata->ops->set_sysclk(pdata->adc, freq); 
+>> +		priv->dmic_clk = freq; +	} + +	/* Determine supported rate 
+>> which depends on SPI/manchester clock */ +	return 
+>> stm32_adfsdm_get_supported_rates(dai, &priv->rates_const.mask);
+> 
+> Since the DAI is unidirectional it doesn't matter but obviously if
+>  it weren't then the fact that getting the supported rates involves
+>  setting the hwparams means this could become disruptive.  If we're
+>  going to genericise this to be a more general IIO/ASoC bridge that
+>  could matter.
+I think that the driver itself can not be generic. ST DFSDM is too
+specific. Only API with IIO could be.
+
+> 
+>> +static int stm32_adfsdm_dai_remove(struct snd_soc_dai *dai) +{ +
+>> dev_dbg(dai->dev, "%s: enter for dai %d\n", __func__, dai->id); +
+>> +	return 0; +}
+> 
+> Remove empty functions, though in this case I think you want to
+> add something to disconnect the XRUN callback just in order to be
+> sure it can't be mistakenly called.
+
+Yes Completely unnecessary here. Furthermore the driver should be
+removed by the IIO driver.
+
+Regards
+Arnaud
