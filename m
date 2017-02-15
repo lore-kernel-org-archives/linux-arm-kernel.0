@@ -1,261 +1,83 @@
-From: zhengqiang10@huawei.com (Zhengqiang)
-Date: Wed, 15 Feb 2017 14:24:49 +0800
-Subject: [PATCH V8 05/10] acpi: apei: handle SEA notification type for
- ARMv8
-In-Reply-To: <1485969413-23577-6-git-send-email-tbaicar@codeaurora.org>
-References: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
- <1485969413-23577-6-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <58A3F431.9040808@huawei.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 14 Feb 2017 22:43:05 -0800
+Subject: [PATCH v4 3/4] dmaengine: Add Broadcom SBA RAID driver
+In-Reply-To: <CAALAos_=TN_ZfeJbRQEwuc+t5zaxKVgrgEMNPQQu8K8Q8+8F6A@mail.gmail.com>
+References: <1487055112-5185-1-git-send-email-anup.patel@broadcom.com>
+ <1487055112-5185-4-git-send-email-anup.patel@broadcom.com>
+ <CAPcyv4g5PU1EQWq-SCbt0QB=vSaMyafqa-ThJifDxEoQha-6Hw@mail.gmail.com>
+ <CAALAos_=TN_ZfeJbRQEwuc+t5zaxKVgrgEMNPQQu8K8Q8+8F6A@mail.gmail.com>
+Message-ID: <CAPcyv4jckb=sbocr3W43NZ2YyUVLbDdhbCAhLfgQwh-bRuvjYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler:
+On Tue, Feb 14, 2017 at 10:25 PM, Anup Patel <anup.patel@broadcom.com> wrote:
+> On Tue, Feb 14, 2017 at 10:04 PM, Dan Williams <dan.j.williams@intel.com> wrote:
+>> On Mon, Feb 13, 2017 at 10:51 PM, Anup Patel <anup.patel@broadcom.com> wrote:
+>>> The Broadcom stream buffer accelerator (SBA) provides offloading
+>>> capabilities for RAID operations. This SBA offload engine is
+>>> accessible via Broadcom SoC specific ring manager.
+>>>
+>>> This patch adds Broadcom SBA RAID driver which provides one
+>>> DMA device with RAID capabilities using one or more Broadcom
+>>> SoC specific ring manager channels. The SBA RAID driver in its
+>>> current shape implements memcpy, xor, and pq operations.
+>>>
+>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+>>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+>>> ---
+>>>  drivers/dma/Kconfig        |   13 +
+>>>  drivers/dma/Makefile       |    1 +
+>>>  drivers/dma/bcm-sba-raid.c | 1694 ++++++++++++++++++++++++++++++++++++++++++++
+>>>  3 files changed, 1708 insertions(+)
+>>>  create mode 100644 drivers/dma/bcm-sba-raid.c
+>>>
+>>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+>>> index 263495d..bf8fb84 100644
+>>> --- a/drivers/dma/Kconfig
+>>> +++ b/drivers/dma/Kconfig
+>>> @@ -99,6 +99,19 @@ config AXI_DMAC
+>>>           controller is often used in Analog Device's reference designs for FPGA
+>>>           platforms.
+>>>
+>>> +config BCM_SBA_RAID
+>>> +       tristate "Broadcom SBA RAID engine support"
+>>> +       depends on (ARM64 && MAILBOX && RAID6_PQ) || COMPILE_TEST
+>>> +       select DMA_ENGINE
+>>> +       select DMA_ENGINE_RAID
+>>> +       select ASYNC_TX_ENABLE_CHANNEL_SWITCH
+>>
+>> I thought you agreed to drop this. Its usage is broken.
+>
+> If ASYNC_TX_ENABLE_CHANNEL_SWITCH is not selected
+> then async_dma_find_channel() will only try to find channel
+> with DMA_ASYNC_TX capability.
+>
+> The DMA_ASYNC_TX capability is set by
+> dma_async_device_register() when all Async Tx
+> capabilities are supported by a DMA devices namely
+> DMA_INTERRUPT, DMA_MEMCPY, DMA_XOR,
+> DMA_XOR_VAL, DMA_PQ, and DMA_PQ_VAL.
+>
+> We only support DMA_MEMCPY, DMA_XOR, and
+> DMA_PQ capabilities in BCM-SBA-RAID driver so
+> DMA_ASYNC_TX capability is never set for the
+> DMA device registered by BCM-SBA-RAID driver.
+>
+> Due to above, if ASYNC_TX_ENABLE_CHANNEL_SWITCH
+> is not selected then Async Tx APIs fail to find DMA
+> channel provided by BCM-SBA-RAID hence the
+> option ASYNC_TX_ENABLE_CHANNEL_SWITCH is
+> required for BCM-SBA-RAID.
+>
+> The DMA mappings are violated by channel switching
+> only if we switch form DMA channel A to DMA channel
+> B and both these DMA channels have different underlying
+> "struct device". In most of the cases DMA mappings
+> are not violated because DMA channels having
+> Async Tx capabilities are provided using same
+> underlying "struct device".
 
-On 2017/2/2 1:16, Tyler Baicar wrote:
-> ARM APEI extension proposal added SEA (Synchronous External Abort)
-> notification type for ARMv8.
-> Add a new GHES error source handling function for SEA. If an error
-> source's notification type is SEA, then this function can be registered
-> into the SEA exception handler. That way GHES will parse and report
-> SEA exceptions when they occur.
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
-> ---
->  arch/arm64/Kconfig        |  2 ++
->  arch/arm64/mm/fault.c     | 11 +++++++
->  drivers/acpi/apei/Kconfig | 14 +++++++++
->  drivers/acpi/apei/ghes.c  | 78 ++++++++++++++++++++++++++++++++++++++++++-----
->  include/acpi/ghes.h       |  2 ++
->  5 files changed, 100 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 1117421..f92778d 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -53,6 +53,8 @@ config ARM64
->  	select HANDLE_DOMAIN_IRQ
->  	select HARDIRQS_SW_RESEND
->  	select HAVE_ACPI_APEI if (ACPI && EFI)
-> +	select HAVE_ACPI_APEI_SEA if (ACPI && EFI)
-> +	select HAVE_NMI if HAVE_ACPI_APEI_SEA
->  	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
->  	select HAVE_ARCH_AUDITSYSCALL
->  	select HAVE_ARCH_BITREVERSE
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 9ae7e65..5a5a096 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -30,6 +30,7 @@
->  #include <linux/highmem.h>
->  #include <linux/perf_event.h>
->  #include <linux/preempt.h>
-> +#include <linux/hardirq.h>
->  
->  #include <asm/bug.h>
->  #include <asm/cpufeature.h>
-> @@ -41,6 +42,8 @@
->  #include <asm/pgtable.h>
->  #include <asm/tlbflush.h>
->  
-> +#include <acpi/ghes.h>
-> +
->  static const char *fault_name(unsigned int esr);
->  
->  #ifdef CONFIG_KPROBES
-> @@ -500,6 +503,14 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->  	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
->  		 fault_name(esr), esr, addr);
->  
-> +	/*
-> +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
-> +	 * rcu_read_lock().
-> +	 */
-> +	nmi_enter();
-> +	ghes_notify_sea();
-> +	nmi_exit();
-> +
+No, fix the infrastructure. Do not put local hack in your driver for
+this global problem [1].
 
-For fatal error:
-ghes_notify_sea() -> ghes_proc() -> __ghes_call_panic(),cause panic;
-do_sea() function also call arm64_notify_die(), will cause panic too;
-Does it can happen, panic will be called twice ?
-
->  	info.si_signo = SIGBUS;
->  	info.si_errno = 0;
->  	info.si_code  = 0;
-> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-> index b0140c8..3786ff1 100644
-> --- a/drivers/acpi/apei/Kconfig
-> +++ b/drivers/acpi/apei/Kconfig
-> @@ -4,6 +4,20 @@ config HAVE_ACPI_APEI
->  config HAVE_ACPI_APEI_NMI
->  	bool
->  
-> +config HAVE_ACPI_APEI_SEA
-> +	bool "APEI Synchronous External Abort logging/recovering support"
-> +	depends on ARM64
-> +	help
-> +	  This option should be enabled if the system supports
-> +	  firmware first handling of SEA (Synchronous External Abort).
-> +	  SEA happens with certain faults of data abort or instruction
-> +	  abort synchronous exceptions on ARMv8 systems. If a system
-> +	  supports firmware first handling of SEA, the platform analyzes
-> +	  and handles hardware error notifications with SEA, and it may then
-> +	  form a HW error record for the OS to parse and handle. This
-> +	  option allows the OS to look for such HW error record, and
-> +	  take appropriate action.
-> +
->  config ACPI_APEI
->  	bool "ACPI Platform Error Interface (APEI)"
->  	select MISC_FILESYSTEMS
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index b25e7cf..8756172 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -114,11 +114,7 @@
->   * Two virtual pages are used, one for IRQ/PROCESS context, the other for
->   * NMI context (optionally).
->   */
-> -#ifdef CONFIG_HAVE_ACPI_APEI_NMI
->  #define GHES_IOREMAP_PAGES           2
-> -#else
-> -#define GHES_IOREMAP_PAGES           1
-> -#endif
->  #define GHES_IOREMAP_IRQ_PAGE(base)	(base)
->  #define GHES_IOREMAP_NMI_PAGE(base)	((base) + PAGE_SIZE)
->  
-> @@ -156,11 +152,14 @@ static void ghes_ioremap_exit(void)
->  
->  static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
->  {
-> -	unsigned long vaddr;
-> +	unsigned long vaddr, paddr;
-> +	pgprot_t prot;
->  
->  	vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
-> -	ioremap_page_range(vaddr, vaddr + PAGE_SIZE,
-> -			   pfn << PAGE_SHIFT, PAGE_KERNEL);
-> +
-> +	paddr = pfn << PAGE_SHIFT;
-> +	prot = arch_apei_get_mem_attribute(paddr);
-> +	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
->  
->  	return (void __iomem *)vaddr;
->  }
-> @@ -767,6 +766,48 @@ static int ghes_notify_sci(struct notifier_block *this,
->  	.notifier_call = ghes_notify_sci,
->  };
->  
-> +#ifdef CONFIG_HAVE_ACPI_APEI_SEA
-> +static LIST_HEAD(ghes_sea);
-> +
-> +void ghes_notify_sea(void)
-> +{
-> +	struct ghes *ghes;
-> +
-> +	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
-> +		ghes_proc(ghes);
-> +	}
-> +}
-> +
-> +static int ghes_sea_add(struct ghes *ghes)
-> +{
-> +	mutex_lock(&ghes_list_mutex);
-> +	list_add_rcu(&ghes->list, &ghes_sea);
-> +	mutex_unlock(&ghes_list_mutex);
-> +	return 0;
-> +}
-> +
-> +static void ghes_sea_remove(struct ghes *ghes)
-> +{
-> +	mutex_lock(&ghes_list_mutex);
-> +	list_del_rcu(&ghes->list);
-> +	mutex_unlock(&ghes_list_mutex);
-> +	synchronize_rcu();
-> +}
-> +#else /* CONFIG_HAVE_ACPI_APEI_SEA */
-> +static inline int ghes_sea_add(struct ghes *ghes)
-> +{
-> +	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not supported\n",
-> +	       ghes->generic->header.source_id);
-> +	return -ENOTSUPP;
-> +}
-> +
-> +static inline void ghes_sea_remove(struct ghes *ghes)
-> +{
-> +	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not supported\n",
-> +	       ghes->generic->header.source_id);
-> +}
-> +#endif /* CONFIG_HAVE_ACPI_APEI_SEA */
-> +
->  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
->  /*
->   * printk is not safe in NMI context.  So in NMI handler, we allocate
-> @@ -1012,6 +1053,14 @@ static int ghes_probe(struct platform_device *ghes_dev)
->  	case ACPI_HEST_NOTIFY_EXTERNAL:
->  	case ACPI_HEST_NOTIFY_SCI:
->  		break;
-> +	case ACPI_HEST_NOTIFY_SEA:
-> +		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_SEA)) {
-> +			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
-> +				generic->header.source_id);
-> +			rc = -ENOTSUPP;
-> +			goto err;
-> +		}
-> +		break;
->  	case ACPI_HEST_NOTIFY_NMI:
->  		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
->  			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
-> @@ -1023,6 +1072,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
->  		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
->  			   generic->header.source_id);
->  		goto err;
-> +	case ACPI_HEST_NOTIFY_GPIO:
-> +	case ACPI_HEST_NOTIFY_SEI:
-> +	case ACPI_HEST_NOTIFY_GSIV:
-> +		pr_warn(GHES_PFX "Generic hardware error source: %d notified via notification type %u is not supported\n",
-> +			generic->header.source_id, generic->header.source_id);
-> +		rc = -ENOTSUPP;
-> +		goto err;
->  	default:
->  		pr_warning(FW_WARN GHES_PFX "Unknown notification type: %u for generic hardware error source: %d\n",
->  			   generic->notify.type, generic->header.source_id);
-> @@ -1077,6 +1133,11 @@ static int ghes_probe(struct platform_device *ghes_dev)
->  		list_add_rcu(&ghes->list, &ghes_sci);
->  		mutex_unlock(&ghes_list_mutex);
->  		break;
-> +	case ACPI_HEST_NOTIFY_SEA:
-> +		rc = ghes_sea_add(ghes);
-> +		if (rc)
-> +			goto err_edac_unreg;
-> +		break;
->  	case ACPI_HEST_NOTIFY_NMI:
->  		ghes_nmi_add(ghes);
->  		break;
-> @@ -1119,6 +1180,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
->  			unregister_acpi_hed_notifier(&ghes_notifier_sci);
->  		mutex_unlock(&ghes_list_mutex);
->  		break;
-> +	case ACPI_HEST_NOTIFY_SEA:
-> +		ghes_sea_remove(ghes);
-> +		break;
->  	case ACPI_HEST_NOTIFY_NMI:
->  		ghes_nmi_remove(ghes);
->  		break;
-> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-> index 6ae318b..adf5455 100644
-> --- a/include/acpi/ghes.h
-> +++ b/include/acpi/ghes.h
-> @@ -95,3 +95,5 @@ static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data
->  		(void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
->  		gdata + 1;
->  }
-> +
-> +void ghes_notify_sea(void);
-> 
-
-Thanks,
-
-Zhengqiang
+[1]: https://lwn.net/Articles/443531/
