@@ -1,65 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Feb 2017 12:24:16 +0000
-Subject: [PATCH v2] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
-In-Reply-To: <6a3ea0e5-f824-380e-1c4a-3e72b160e98a@codeaurora.org>
-References: <20170214235347.8812-1-cov@codeaurora.org>
- <6a3ea0e5-f824-380e-1c4a-3e72b160e98a@codeaurora.org>
-Message-ID: <20170215122415.GG31733@leverpostej>
+From: florian.kauer@koalo.de (Florian Kauer)
+Date: Wed, 15 Feb 2017 13:37:08 +0100
+Subject: [PATCH v4] ASoC: bcm2835: Add 8 channel (multitrack) capability
+In-Reply-To: <1487106275-4260-1-git-send-email-flatmax@flatmax.org>
+References: <1486942035-24038-1-git-send-email-flatmax@flatmax.org>
+ <1487106275-4260-1-git-send-email-flatmax@flatmax.org>
+Message-ID: <88f46323-d243-e1af-c294-e1f844d366d0@koalo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Feb 14, 2017 at 08:39:40PM -0600, Timur Tabi wrote:
-> Christopher Covington wrote:
- 
-> >+	if (!memcmp(table->header.oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
-> >+		if (!memcmp(table->header.oem_table_id, "QDF2432 ",
-> >+				ACPI_OEM_TABLE_ID_SIZE) ||
-> >+				(!memcmp(table->header.oem_table_id,
-> >+				"QDF2400 ", ACPI_OEM_TABLE_ID_SIZE) &&
-> >+				table->header.oem_revision == 0))
-> >+			uart = "qdf2400_e44";
-> >+
-
-Thanks for reworking this. I'm much happier with this than the MIDR
-check.
-
-Splitting out the test into its own function, as Timur suggested, would
-generally be nicer. Minor comments on that below.
-
-> static bool needs_qdf2400_e44(struct acpi_table_header *h)
-> {
-
-This is detecting the presence of the erratum so, has_qdf2400_e44() or
-needs__qdf2400_e44_workaround() would be better names. I'd personally
-prefer the former, but either is fine.
-
-> 	const char *id;
+On 02/14/2017 10:04 PM, Matt Flax wrote:
+> This patch adds multitrack capability if in DSP mode A and the
+> codec is master.
 > 
-> 	/* The erratum only applies to Qualcomm Technologies SOCs */
-> 	if (memcmp(h->oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
-> 		return False;
+> In bcm2835_i2s_startup, snd_pcm_hw_constraint_single is used to set
+> channels to 8 if both SND_SOC_DAIFMT_CBM_CFM and SND_SOC_DAIFMT_DSP_A
+> are set. Otherwise, channels are set to 2. These settings are
+> accomplished using the SNDRV_PCM_HW_PARAM_CHANNELS variable.
 > 
-> 	id = h->oem_table_id;
+> In bcm2835_i2s_shutdown the channels are set to 2 by default.
 > 
-> 	if (!memcmp(id, "QDF2432 ", ACPI_OEM_TABLE_ID_SIZE))
-> 		return True;
+> In bcm2835_i2s_hw_params, DSP mode A format is now an option.
+> Before replicating the format variable (from ch2 to ch1) for
+> register loading, requested channels are checked to be either 2 or 8.
+> This can be expanded later to accomodate other channel counts if
+> supported by the sound card hardware.
 > 
-> 	if (!memcmp(id, "QDF2000 ", ACPI_OEM_TABLE_ID_SIZE) &&
-> 		h->oem_revision == 0)
-> 		return True;
-> 	
-> 	return False;
-> }
+> Signed-off-by: Matt Flax <flatmax@flatmax.org>
+> ---
 
-s/False/false/g
-s/True/true/g
+Acked-by: Florian Kauer <florian.kauer@koalo.de>
 
-With that, this looks fine to me. I'm not too familiar with the pl011
-driver. On the assumption the other changes have already been vetted:
+Looks good and is a much better approach than just adding the additional
+case.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+Greetings,
+Florian
