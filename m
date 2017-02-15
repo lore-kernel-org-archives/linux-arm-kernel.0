@@ -1,48 +1,34 @@
 From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Wed, 15 Feb 2017 18:55:08 +0800
-Subject: [PATCH v1 1/3] ASoC: zx-96p22: add documentation for zte's aud96p22
- controller
-Message-ID: <1487156110-12840-1-git-send-email-baoyou.xie@linaro.org>
+Date: Wed, 15 Feb 2017 18:55:09 +0800
+Subject: [PATCH v1 2/3] MAINTAINERS: add zte 96p22 controller driver to ARM
+ ZTE architecture
+In-Reply-To: <1487156110-12840-1-git-send-email-baoyou.xie@linaro.org>
+References: <1487156110-12840-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <1487156110-12840-2-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds dt-binding documentation for zte's aud96p22 controller.
+Add the zte 96p22 controller driver as maintained by ARM ZTE
+architecture maintainers, as they're parts of the core IP.
 
 Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 ---
- .../devicetree/bindings/sound/zte,zx-96p22.txt     | 24 ++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/zte,zx-96p22.txt
+ MAINTAINERS | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/zte,zx-96p22.txt b/Documentation/devicetree/bindings/sound/zte,zx-96p22.txt
-new file mode 100644
-index 0000000..4184566
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/zte,zx-96p22.txt
-@@ -0,0 +1,24 @@
-+ZTE zx96p22 controller
-+
-+Required properties:
-+ - compatible : Must be "zte,zx-aud96p22"
-+ - #sound-dai-cells: Should be 0
-+ - reg : Offset of I2C register for zx96p22
-+
-+Example:
-+
-+	audio_i2c0: audio_i2c0 at 1486000 {
-+		compatible = "zte,zx296718-i2c";
-+		reg = <0x01486000 0x1000>;
-+		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clocks = <&audiocrm AUDIO_I2C0_WCLK>;
-+		clock-frequency = <1600000>;
-+		status = "ok";
-+		inner_codec: aud96p22 at 22 {
-+			compatible = "zte,zx-aud96p22";
-+			#sound-dai-cells = <0>;
-+			reg = <0x22>;
-+		};
-+	};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index e63063b..8146377 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1991,7 +1991,9 @@ F:	drivers/soc/zte/
+ F:	Documentation/devicetree/bindings/arm/zte.txt
+ F:	Documentation/devicetree/bindings/clock/zx296702-clk.txt
+ F:	Documentation/devicetree/bindings/soc/zte/
++F:	Documentation/devicetree/bindings/sound/zte,zx-96p22.txt
+ F:	include/dt-bindings/soc/zx*.h
++F:	sound/soc/codecs/zx_aud96p22.c
+ 
+ ARM/ZYNQ ARCHITECTURE
+ M:	Michal Simek <michal.simek@xilinx.com>
 -- 
 2.7.4
