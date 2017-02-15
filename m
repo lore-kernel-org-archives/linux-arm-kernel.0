@@ -1,28 +1,22 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 15 Feb 2017 16:47:27 -0600
-Subject: [PATCH v2 5/6] ARM: dts: mvebu: Move mv98dx3236 clock bindings
-In-Reply-To: <20170207202815.20226-6-chris.packham@alliedtelesis.co.nz>
-References: <20170207202815.20226-1-chris.packham@alliedtelesis.co.nz>
- <20170207202815.20226-6-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170215224727.ijjzo7a4f35k63my@rob-hp-laptop>
+Date: Wed, 15 Feb 2017 16:48:02 -0600
+Subject: [PATCH 1/3] dt-bindings: Document the dmas and dma-names
+ properties for VC4 HDMI
+In-Reply-To: <20170207210703.7082-1-eric@anholt.net>
+References: <20170207210703.7082-1-eric@anholt.net>
+Message-ID: <20170215224802.yotkqh4pdhfrilrb@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 09:28:14AM +1300, Chris Packham wrote:
-> This moves the coreclk binding for the 98dx3236 SoC to the DFX block
-> where the sampled at reset register is located and switches to using the
-> correct gating clock compatible string.
-
-Moves why? It was wrong before?
-
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+On Tue, Feb 07, 2017 at 01:07:01PM -0800, Eric Anholt wrote:
+> From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> 
+> These are optional, but necessary for HDMI audio support.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 > ---
-> 
-> Notes:
->     Changes in v2:
->     - New. Split out from "clk: mvebu: Expand mv98dx3236-core-clock support"
-> 
->  .../devicetree/bindings/clock/mvebu-core-clock.txt         |  7 +++++++
->  .../devicetree/bindings/clock/mvebu-gated-clock.txt        | 11 +++++++++++
->  arch/arm/boot/dts/armada-xp-98dx3236.dtsi                  | 14 +++++++-------
->  3 files changed, 25 insertions(+), 7 deletions(-)
+>  Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt | 3 +++
+>  1 file changed, 3 insertions(+)
+
+Acked-by: Rob Herring <robh@kernel.org> 
