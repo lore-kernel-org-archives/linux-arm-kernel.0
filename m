@@ -1,127 +1,29 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Tue, 14 Feb 2017 23:25:56 -0800
-Subject: [PATCH v4 3/4] dmaengine: Add Broadcom SBA RAID driver
-In-Reply-To: <CAALAos-txDCs3QZ4HGBNicOD8t49NPT6E8RpjVMccMn1D-UTgQ@mail.gmail.com>
-References: <1487055112-5185-1-git-send-email-anup.patel@broadcom.com>
- <1487055112-5185-4-git-send-email-anup.patel@broadcom.com>
- <CAPcyv4g5PU1EQWq-SCbt0QB=vSaMyafqa-ThJifDxEoQha-6Hw@mail.gmail.com>
- <CAALAos_=TN_ZfeJbRQEwuc+t5zaxKVgrgEMNPQQu8K8Q8+8F6A@mail.gmail.com>
- <CAPcyv4jckb=sbocr3W43NZ2YyUVLbDdhbCAhLfgQwh-bRuvjYQ@mail.gmail.com>
- <CAALAos-txDCs3QZ4HGBNicOD8t49NPT6E8RpjVMccMn1D-UTgQ@mail.gmail.com>
-Message-ID: <CAPcyv4h83vgeB82KmEEFV196MsWdteRqypY5_tcSyaMM_QwYMA@mail.gmail.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 15 Feb 2017 09:04:32 +0100
+Subject: [PATCH] mfd: stm32-timers: fix max register
+Message-ID: <1487145872-1212-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2017 at 11:03 PM, Anup Patel <anup.patel@broadcom.com> wrote:
-> On Wed, Feb 15, 2017 at 12:13 PM, Dan Williams <dan.j.williams@intel.com> wrote:
->> On Tue, Feb 14, 2017 at 10:25 PM, Anup Patel <anup.patel@broadcom.com> wrote:
->>> On Tue, Feb 14, 2017 at 10:04 PM, Dan Williams <dan.j.williams@intel.com> wrote:
->>>> On Mon, Feb 13, 2017 at 10:51 PM, Anup Patel <anup.patel@broadcom.com> wrote:
->>>>> The Broadcom stream buffer accelerator (SBA) provides offloading
->>>>> capabilities for RAID operations. This SBA offload engine is
->>>>> accessible via Broadcom SoC specific ring manager.
->>>>>
->>>>> This patch adds Broadcom SBA RAID driver which provides one
->>>>> DMA device with RAID capabilities using one or more Broadcom
->>>>> SoC specific ring manager channels. The SBA RAID driver in its
->>>>> current shape implements memcpy, xor, and pq operations.
->>>>>
->>>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->>>>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->>>>> ---
->>>>>  drivers/dma/Kconfig        |   13 +
->>>>>  drivers/dma/Makefile       |    1 +
->>>>>  drivers/dma/bcm-sba-raid.c | 1694 ++++++++++++++++++++++++++++++++++++++++++++
->>>>>  3 files changed, 1708 insertions(+)
->>>>>  create mode 100644 drivers/dma/bcm-sba-raid.c
->>>>>
->>>>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
->>>>> index 263495d..bf8fb84 100644
->>>>> --- a/drivers/dma/Kconfig
->>>>> +++ b/drivers/dma/Kconfig
->>>>> @@ -99,6 +99,19 @@ config AXI_DMAC
->>>>>           controller is often used in Analog Device's reference designs for FPGA
->>>>>           platforms.
->>>>>
->>>>> +config BCM_SBA_RAID
->>>>> +       tristate "Broadcom SBA RAID engine support"
->>>>> +       depends on (ARM64 && MAILBOX && RAID6_PQ) || COMPILE_TEST
->>>>> +       select DMA_ENGINE
->>>>> +       select DMA_ENGINE_RAID
->>>>> +       select ASYNC_TX_ENABLE_CHANNEL_SWITCH
->>>>
->>>> I thought you agreed to drop this. Its usage is broken.
->>>
->>> If ASYNC_TX_ENABLE_CHANNEL_SWITCH is not selected
->>> then async_dma_find_channel() will only try to find channel
->>> with DMA_ASYNC_TX capability.
->>>
->>> The DMA_ASYNC_TX capability is set by
->>> dma_async_device_register() when all Async Tx
->>> capabilities are supported by a DMA devices namely
->>> DMA_INTERRUPT, DMA_MEMCPY, DMA_XOR,
->>> DMA_XOR_VAL, DMA_PQ, and DMA_PQ_VAL.
->>>
->>> We only support DMA_MEMCPY, DMA_XOR, and
->>> DMA_PQ capabilities in BCM-SBA-RAID driver so
->>> DMA_ASYNC_TX capability is never set for the
->>> DMA device registered by BCM-SBA-RAID driver.
->>>
->>> Due to above, if ASYNC_TX_ENABLE_CHANNEL_SWITCH
->>> is not selected then Async Tx APIs fail to find DMA
->>> channel provided by BCM-SBA-RAID hence the
->>> option ASYNC_TX_ENABLE_CHANNEL_SWITCH is
->>> required for BCM-SBA-RAID.
->>>
->>> The DMA mappings are violated by channel switching
->>> only if we switch form DMA channel A to DMA channel
->>> B and both these DMA channels have different underlying
->>> "struct device". In most of the cases DMA mappings
->>> are not violated because DMA channels having
->>> Async Tx capabilities are provided using same
->>> underlying "struct device".
->>
->> No, fix the infrastructure. Do not put local hack in your driver for
->> this global problem [1].
->
-> There is no hack in the driver. We need
-> ASYNC_TX_ENABLE_CHANNEL_SWITCH
-> based on current state of dmaengine framework.
->
-> The framework should be fixed as separate patchset.
->
-> We have other RAID drivers such as xgene-dma and
-> mv_xor_v2 who also require
-> ASYNC_TX_ENABLE_CHANNEL_SWITCH due
-> to same reason.
->
-> Fixing the framework and improving framework is
-> a ongoing process. I don't see why that should
-> stop this patchset.
->
+STM32 timers register bank size is 0x400. Fix regmap max_register.
 
-Because this driver is turning on a dangerous compile time option and
-is not using the functionality. If this silicon IP block appears in
-another product in the future paired with another DMA engine then the
-assumptions about a safe/single dma-device is violated.
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ drivers/mfd/stm32-timers.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The realization of how async_tx was breaking DMA mapping api
-assumptions came after some of these dma-drivers were added to the
-kernel. We should stop making the problem worse.
-
-I should have submitted a patch like the below at the time we
-discovered this problem, but unfortunately it languished when I
-stopped maintaining the iop-adma and ioat drivers.
-
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index 263495d0adbd..6b30eb9ad125 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -35,6 +35,7 @@ comment "DMA Devices"
-
- #core
- config ASYNC_TX_ENABLE_CHANNEL_SWITCH
-+       depends on BROKEN
-        bool
-
- config ARCH_HAS_ASYNC_TX_FIND_CHANNEL
+diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
+index 192cbb6..2182f00 100644
+--- a/drivers/mfd/stm32-timers.c
++++ b/drivers/mfd/stm32-timers.c
+@@ -15,7 +15,7 @@
+ 	.reg_bits = 32,
+ 	.val_bits = 32,
+ 	.reg_stride = sizeof(u32),
+-	.max_register = 0x400,
++	.max_register = 0x3fc,
+ };
+ 
+ static void stm32_timers_get_arr_size(struct stm32_timers *ddata)
+-- 
+1.9.1
