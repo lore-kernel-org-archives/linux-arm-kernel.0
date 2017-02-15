@@ -1,51 +1,93 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Feb 2017 17:36:11 +0000
-Subject: [PATCH 08/11] ARM: dts: Prepare Actions Semi S500 and LeMaker
- Guitar
-In-Reply-To: <9dbb7749-a58b-9e18-33c9-fd004a713ed1@suse.de>
-References: <20170215165528.10052-1-afaerber@suse.de>
- <20170215165528.10052-9-afaerber@suse.de>
- <20170215170742.GH31733@leverpostej>
- <9dbb7749-a58b-9e18-33c9-fd004a713ed1@suse.de>
-Message-ID: <20170215173610.GJ31733@leverpostej>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 15 Feb 2017 11:38:50 -0600
+Subject: [PATCH v4 3/3] PCI: imx6: Add code to support i.MX7D
+In-Reply-To: <20170215171700.5vz5seeihgtwn76p@rob-hp-laptop>
+References: <20170207155027.7734-1-andrew.smirnov@gmail.com>
+ <20170207155027.7734-4-andrew.smirnov@gmail.com>
+ <20170215171700.5vz5seeihgtwn76p@rob-hp-laptop>
+Message-ID: <20170215173850.GH19040@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 06:28:31PM +0100, Andreas F?rber wrote:
-> Hi Mark,
-> 
-> Am 15.02.2017 um 18:07 schrieb Mark Rutland:
-> > On Wed, Feb 15, 2017 at 05:55:25PM +0100, Andreas F?rber wrote:
-> >> +	arm-pmu {
-> >> +		compatible = "arm,cortex-a9-pmu";
-> >> +		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
-> >> +		             <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
-> >> +		             <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-> >> +		             <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-> >> +        };
+On Wed, Feb 15, 2017 at 11:17:00AM -0600, Rob Herring wrote:
+> On Tue, Feb 07, 2017 at 07:50:27AM -0800, Andrey Smirnov wrote:
+> > Add various bits of code needed to support i.MX7D variant of the IP.
 > > 
-> > Please add an interrupt-affinity property, as described in
-> > Documentation/devicetree/bindings/arm/pmu.txt
+> > Cc: yurovsky at gmail.com
+> > Cc: Lucas Stach <l.stach@pengutronix.de>
+> > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Lee Jones <lee.jones@linaro.org>
+> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: devicetree at vger.kernel.org
+> > Cc: linux-kernel at vger.kernel.org
+> > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> > ---
+> >  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 ++-
+> >  drivers/pci/host/pci-imx6.c                        | 121 ++++++++++++++++-----
+> >  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
+> >  3 files changed, 112 insertions(+), 26 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> > index 83aeb1f..11db2ab 100644
+> > --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> > +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> > @@ -4,7 +4,11 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
+> >  and thus inherits all the common properties defined in designware-pcie.txt.
+> >  
+> >  Required properties:
+> > -- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie", "fsl,imx6qp-pcie"
+> > +- compatible:
+> > +	- "fsl,imx6q-pcie"
+> > +	- "fsl,imx6sx-pcie",
+> > +	- "fsl,imx6qp-pcie"
+> > +	- "fsl,imx7d-pcie"
+> >  - reg: base address and length of the PCIe controller
+> >  - interrupts: A list of interrupt outputs of the controller. Must contain an
+> >    entry for each entry in the interrupt-names property.
+> > @@ -34,6 +38,13 @@ Additional required properties for imx6sx-pcie:
+> >  - clock names: Must include the following additional entries:
+> >  	- "pcie_inbound_axi"
+> >  
+> > +Additional required properties for imx7d-pcie:
+> > +- power-domains: Must be set to a phandle pointing to PCIE_PHY power domain
 > 
-> That's not in the vendor tree... My guess is it would be like this then?
+> This domain is just the PHY? Seems like this needs a separate PHY 
+> driver.
 > 
-> diff --git a/arch/arm/boot/dts/s500.dtsi b/arch/arm/boot/dts/s500.dtsi
-> index ee93984..959c6e3 100644
-> --- a/arch/arm/boot/dts/s500.dtsi
-> +++ b/arch/arm/boot/dts/s500.dtsi
-> @@ -82,7 +82,8 @@
->                              <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
->                              <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
->                              <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-> -        };
-> +               interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
-> +       };
+> > +- resets: Must contain phandles to PCIE related reset lines exposed by SRC IP block
+> > +- reset-names: Must contain the following entires:
+> > +  	       - "pciephy"
+> 
+> And for this too.
+> 
+> > +	       - "apps"
+> > +
+> >  Example:
+> >  
+> >  	pcie at 0x01000000 {
+> 
+> [...]
+> 
+> > @@ -251,6 +261,10 @@ static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
+> >  	u32 val, gpr1, gpr12;
+> >  
+> >  	switch (imx6_pcie->variant) {
+> > +	case IMX7D:
+> > +		reset_control_assert(imx6_pcie->pciephy_reset);
+> > +		reset_control_assert(imx6_pcie->apps_reset);
+> > +		break;
+> >  	case IMX6SX:
+> >  		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> >  				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN,
+> 
+> So the difference with i.MX7D is not really that it has a reset or not, 
+> but some platforms use a reset driver and some do not. The latter should 
+> be fixed.
 
-Assuming that's how they're wired up, yes.
+I have this patch queued for v4.11.  Are these things that should be
+fixed first?  If so, I can drop this.
 
-You should be able to test this by using perf record in per-cpu mode,
-on an application with its affintiy fixed to a particular CPU, and
-verifying that overflow interrupts are recevied on the same CPU.
-
-Thanks,
-Mark.
+Bjorn
