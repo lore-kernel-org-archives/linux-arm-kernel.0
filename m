@@ -1,72 +1,81 @@
-From: okaya@codeaurora.org (okaya at codeaurora.org)
-Date: Tue, 14 Feb 2017 22:53:35 -0500
-Subject: [PATCH 2/2] iommu: add warning when sharing groups
-In-Reply-To: <20170214165155.7c49485e@t450s.home>
-References: <1487107522-8695-1-git-send-email-okaya@codeaurora.org>
- <1487107522-8695-2-git-send-email-okaya@codeaurora.org>
- <20170214165155.7c49485e@t450s.home>
-Message-ID: <e7535138133c514c77004d64e40b4180@codeaurora.org>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Wed, 15 Feb 2017 12:12:22 +0800
+Subject: [PATCH v2 11/11] drm/rockchip/dsi: fix insufficient bandwidth of
+ some panel
+In-Reply-To: <20170117105450.360c6c69.john@metanate.com>
+References: <1484561311-494-1-git-send-email-zyw@rock-chips.com>
+ <1484561311-494-12-git-send-email-zyw@rock-chips.com>
+ <20170116124453.2154def9.john@metanate.com> <587DE489.2010004@rock-chips.com>
+ <20170117105450.360c6c69.john@metanate.com>
+Message-ID: <58A3D526.7060707@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-02-14 18:51, Alex Williamson wrote:
-> On Tue, 14 Feb 2017 16:25:22 -0500
-> Sinan Kaya <okaya@codeaurora.org> wrote:
-> 
->> The ACS requirement has been obscured in the current code and is only
->> known by certain individuals who happen to read the code. Print out a
->> warning with ACS path failure when ACS requirement is not met.
->> 
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  drivers/iommu/iommu.c | 3 +++
->>  1 file changed, 3 insertions(+)
->> 
->> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
->> index dbe7f65..049ee0a 100644
->> --- a/drivers/iommu/iommu.c
->> +++ b/drivers/iommu/iommu.c
->> @@ -811,6 +811,9 @@ struct iommu_group *pci_device_group(struct device 
->> *dev)
->>  	if (IS_ERR(group))
->>  		return NULL;
->> 
->> +	if (pci_is_root_bus(bus))
->> +		dev_warn_once(&pdev->dev, "using shared group due to ACS path 
->> failure\n");
->> +
->>  	return group;
->>  }
->> 
-> 
-> The premise here is flawed.  An IOMMU group based at the root bus
-> doesn't necessarily imply a lack of ACS.  There are devices on root
-> buses, integrated endpoints and root ports.  Naturally an IOMMU group
-> for these devices needs to be based at the root bus.  Additionally,
-> there can be IOMMU groups developed around a lack of ACS that don't
-> intersect with the root bus.  Since this is a warn_once, the false
-> positives for root bus devices are going to be enumerated first.  On an
-> Intel system there's typically a device as 00.0 that will always be
-> pointlessly listed first.  Also, it's not clear that grouping devices
-> together is always wrong, as Robin pointed out in the EHCI/OHCI
-> example.  Lack of ACS on downtream ports is likely to cause problems,
-> especially if that downstream port exposes a slot.  Maybe that would be
-> a good place to start.  Also, what is someone supposed to do when they
-> see this error?  If we can hope they'll look for the error in the code
-> (unlikely) a big comment with useful external links might be
-> necessary.  Based on how easily vendors ignore kernel warnings, I'm
-> dubious there's any value to this path though.  Thanks,
+Hi John
 
-Maybe, a better solution would be to add some sentences into vfio.txt 
-documentation.
+On 01/17/2017 06:54 PM, John Keeping wrote:
+> On Tue, 17 Jan 2017 17:31:53 +0800, Chris Zhong wrote:
+>
+>> On 01/16/2017 08:44 PM, John Keeping wrote:
+>>> On Mon, 16 Jan 2017 18:08:31 +0800, Chris Zhong wrote:
+>>>   
+>>>> Set the lanes bps to 1 / 0.9 times of pclk, the margin is not enough
+>>>> for some panel, it will cause the screen display is not normal, so
+>>>> increases the badnwidth to 1 / 0.8.
+>>>>
+>>>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>>>>
+>>>> ---
+>>>>
+>>>>    drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 ++--
+>>>>    1 file changed, 2 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>>>> index 9dfa73d..5a973fe 100644
+>>>> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>>>> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>>>> @@ -501,8 +501,8 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
+>>>>    
+>>>>    	mpclk = DIV_ROUND_UP(dsi->mode->clock, MSEC_PER_SEC);
+>>>>    	if (mpclk) {
+>>>> -		/* take 1 / 0.9, since mbps must big than bandwidth of RGB */
+>>>> -		tmp = mpclk * (bpp / dsi->lanes) * 10 / 9;
+>>>> +		/* take 1 / 0.8, since mbps must big than bandwidth of RGB */
+>>>> +		tmp = mpclk * (bpp / dsi->lanes) * 10 / 8;
+>>> This and patch 9 are just hacking around the underlying problem in order
+>>> to make particular panels work.  I'm pretty sure the actual issue is the
+>>> use of hardcoded values when configuring the PHY, since the PHY
+>>> parameters are specified in clock cycles but the MIPI spec requires
+>>> absolute time durations.
+>>>
+>>> I posted a series addressing this a while ago, although I screwed up
+>>> sending it so some patches were included twice and since no one
+>>> expressed any interest I didn't post a cleaned up version.
+>>>
+>>> The relevant patch is here:
+>>>
+>>> https://patchwork.kernel.org/patch/9340193/
+>> Thanks very much, your patches are very useful for me. It looks your
+>> method is correct.
+>> And I am very confused why Mark Yao and me did not receive your patches
+>> before,
+>> although we have subscribed the <linux-rockchip@lists.infradead.org>.
+>>
+>> In addition, could you tell me which device ware you testing with these
+>> mipi patches.
+>> I going to test them these day.
+> I'm using RK3288 and I tested my patches with three different MIPI
+> displays, two of which require commands to be sent in order to set up
+> the panel.
+>
+> Thanks for testing the patches.
+>
+>
+> John
+I think we really need this patch, one mipi panel hit this problem 
+again, with all your 24 patches
+and my 6 MIPI DSI patches
+So I will update my series to v7, and add this patch into it.
 
-I'm ready to drop this patch. I just don't want ACS requirement to be 
-hidden between the source code.
-
-Would you be willing to do that?
-
-I know I read all pci and vfio documents in the past. I could have 
-captured this requirement if it was there.
-
-> 
-> Alex
+>
+>
