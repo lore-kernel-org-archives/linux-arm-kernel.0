@@ -1,29 +1,220 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 15 Feb 2017 15:08:32 +0800
-Subject: [PATCH v2 1/4] dt-bindings: add multidomain support to i.MX GPC
- DT binding
-In-Reply-To: <1486741439.3879.7.camel@pengutronix.de>
-References: <20170127183728.26701-1-l.stach@pengutronix.de>
- <1486741439.3879.7.camel@pengutronix.de>
-Message-ID: <20170215070830.GA8398@dragon>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 15 Feb 2017 07:10:22 +0000
+Subject: [PATCH] mm: free reserved area's memmap if possiable
+In-Reply-To: <04630153-bc82-ac1f-2f80-344c90200732@huawei.com>
+References: <1486987349-58711-1-git-send-email-zhouxianrong@huawei.com>
+ <1487055180-128750-1-git-send-email-zhouxianrong@huawei.com>
+ <CAKv+Gu9NF3dS_EWi4k42Ke+aagTScu-yk+UFZ_6sG6tK5zHP2Q@mail.gmail.com>
+ <04630153-bc82-ac1f-2f80-344c90200732@huawei.com>
+Message-ID: <CAKv+Gu_X3fNhfUZ9+4Q_jdt2J12d9sxj1cgOq82HaQ8Gw_QaQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2017 at 04:43:59PM +0100, Lucas Stach wrote:
-> Hi Shawn,
-> 
-> are you willing to take this series through your tree or do you think we
-> need to get this in via some other tree?
+On 15 February 2017 at 01:44, zhouxianrong <zhouxianrong@huawei.com> wrote:
+>
+>
+> On 2017/2/14 17:03, Ard Biesheuvel wrote:
+>>
+>> On 14 February 2017 at 06:53,  <zhouxianrong@huawei.com> wrote:
+>>>
+>>> From: zhouxianrong <zhouxianrong@huawei.com>
+>>>
+>>> just like freeing no-map area's memmap (gaps of memblock.memory)
+>>> we could free reserved area's memmap (areas of memblock.reserved)
+>>> as well only when user of reserved area indicate that we can do
+>>> this in drivers. that is, user of reserved area know how to
+>>> use the reserved area who could not memblock_free or free_reserved_xxx
+>>> the reserved area and regard the area as raw pfn usage by kernel.
+>>> the patch supply a way to users who want to utilize the memmap
+>>> memory corresponding to raw pfn reserved areas as many as possible.
+>>> users can do this by memblock_mark_raw_pfn interface which mark the
+>>> reserved area as raw pfn and tell free_unused_memmap that this area's
+>>> memmap could be freeed.
+>>>
+>>
+>> Could you give an example how much memory we actually recover by doing
+>> this? I understand it depends on the size of the reserved regions, but
+>> I'm sure you have an actual example that inspired you to write this
+>> patch.
+>
+>
+> i did statistics in our platform, the memmap of reserved region that can be
+> freed
+> is about 6MB. it's fewer.
+>
 
-I'm willing to take it.  But I don't think it's been ready yet.  Since
-you insist on keeping the .remove hook for both imx_gpc_driver and
-imx_pgc_power_domain_driver, did you actually test it with manually
-bind/unbind the drivers?  I tested it a bit and found it doesn't work
-well for me.
+So if you round up the start and round down the end to 8 MB alignment,
+as you do in this patch, how much do you end up freeing?
 
-Also, there is a comment from Andrey that is not responded.
+>
+>>
+>>> Signed-off-by: zhouxianrong <zhouxianrong@huawei.com>
+>>> ---
+>>>  arch/arm64/mm/init.c     |   14 +++++++++++++-
+>>>  include/linux/memblock.h |    3 +++
+>>>  mm/memblock.c            |   24 ++++++++++++++++++++++++
+>>>  3 files changed, 40 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+>>> index 380ebe7..7e62ef8 100644
+>>> --- a/arch/arm64/mm/init.c
+>>> +++ b/arch/arm64/mm/init.c
+>>> @@ -358,7 +358,7 @@ static inline void free_memmap(unsigned long
+>>> start_pfn, unsigned long end_pfn)
+>>>   */
+>>>  static void __init free_unused_memmap(void)
+>>>  {
+>>> -       unsigned long start, prev_end = 0;
+>>> +       unsigned long start, end, prev_end = 0;
+>>>         struct memblock_region *reg;
+>>>
+>>>         for_each_memblock(memory, reg) {
+>>> @@ -391,6 +391,18 @@ static void __init free_unused_memmap(void)
+>>>         if (!IS_ALIGNED(prev_end, PAGES_PER_SECTION))
+>>>                 free_memmap(prev_end, ALIGN(prev_end,
+>>> PAGES_PER_SECTION));
+>>>  #endif
+>>> +
+>>> +       for_each_memblock(reserved, reg) {
+>>> +               if (!(reg->flags & MEMBLOCK_RAW_PFN))
+>>> +                       continue;
+>>> +
+>>> +               start = memblock_region_memory_base_pfn(reg);
+>>> +               end = round_down(memblock_region_memory_end_pfn(reg),
+>>> +                                MAX_ORDER_NR_PAGES);
+>>> +
+>>
+>>
+>> Why are you rounding down end only? Shouldn't you round up start and
+>> round down end? Or does free_memmap() deal with that already?
+>
+>
+> ok, i could round up start.
+>
 
-Shawn
+Yes, but is that necessary? Could you explain
+a) why you round down end, and
+b) why the reason under a) does not apply to start?
 
-> It would be good to queue this up somewhere as a reference, as I have
-> some upcoming work for MX6SX and MX6QP, which depends on this series.
+>>
+>> In any case, it is good to emphasize that on 4 KB pagesize kernels, we
+>> will only free multiples of 8 MB that are 8 MB aligned, resulting in
+>> 128 KB of memmap backing to be released.
+>
+>
+>
+>>
+>>
+>>> +               if (start < end)
+>>> +                       free_memmap(start, end);
+>>> +       }
+>>>  }
+>>>  #endif /* !CONFIG_SPARSEMEM_VMEMMAP */
+>>>
+>>> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+>>> index 5b759c9..9f8d277 100644
+>>> --- a/include/linux/memblock.h
+>>> +++ b/include/linux/memblock.h
+>>> @@ -26,6 +26,7 @@ enum {
+>>>         MEMBLOCK_HOTPLUG        = 0x1,  /* hotpluggable region */
+>>>         MEMBLOCK_MIRROR         = 0x2,  /* mirrored region */
+>>>         MEMBLOCK_NOMAP          = 0x4,  /* don't add to kernel direct
+>>> mapping */
+>>> +       MEMBLOCK_RAW_PFN        = 0x8,  /* region whose memmap never be
+>>> used */
+>>
+>>
+>> I think we should be *very* careful about the combinatorial explosion
+>> that results when combining all these flags, given that this is not a
+>> proper enum but a bit field.
+>>
+>> In any case, the generic memblock change should be in a separate patch
+>> from the arm64 change.
+>
+>
+> MEMBLOCK_RAW_PFN and MEMBLOCK_NOMAP can not be set at the same time
+>
+
+They should not. But if I call  memblock_mark_raw_pfn() on a
+MEMBLOCK_NOMAP region, it will have both flags set.
+
+In summary, I don't think we need this patch. And if you can convince
+us otherwise, you should really be more methodical and explicit in
+implementing this RAW_PFN flag, not add it as a byproduct of the arch
+code that uses it. Also, you should explain how RAW_PFN relates to
+NOMAP, and ensure that RAW_PFN and NOMAP regions don't intersect if
+that is an unsupported combination.
+
+Regards,
+Ard.
+
+
+>>
+>>>  };
+>>>
+>>>  struct memblock_region {
+>>> @@ -92,6 +93,8 @@ bool memblock_overlaps_region(struct memblock_type
+>>> *type,
+>>>  int memblock_clear_hotplug(phys_addr_t base, phys_addr_t size);
+>>>  int memblock_mark_mirror(phys_addr_t base, phys_addr_t size);
+>>>  int memblock_mark_nomap(phys_addr_t base, phys_addr_t size);
+>>> +int memblock_mark_raw_pfn(phys_addr_t base, phys_addr_t size);
+>>> +int memblock_clear_raw_pfn(phys_addr_t base, phys_addr_t size);
+>>>  ulong choose_memblock_flags(void);
+>>>
+>>>  /* Low level functions */
+>>> diff --git a/mm/memblock.c b/mm/memblock.c
+>>> index 7608bc3..c103b94 100644
+>>> --- a/mm/memblock.c
+>>> +++ b/mm/memblock.c
+>>> @@ -814,6 +814,30 @@ int __init_memblock memblock_mark_nomap(phys_addr_t
+>>> base, phys_addr_t size)
+>>>  }
+>>>
+>>>  /**
+>>> + * memblock_mark_raw_pfn - Mark raw pfn memory with flag
+>>> MEMBLOCK_RAW_PFN.
+>>> + * @base: the base phys addr of the region
+>>> + * @size: the size of the region
+>>> + *
+>>> + * Return 0 on succees, -errno on failure.
+>>> + */
+>>> +int __init_memblock memblock_mark_raw_pfn(phys_addr_t base, phys_addr_t
+>>> size)
+>>> +{
+>>> +       return memblock_setclr_flag(base, size, 1, MEMBLOCK_RAW_PFN);
+>>> +}
+>>> +
+>>> +/**
+>>> + * memblock_clear_raw_pfn - Clear flag MEMBLOCK_RAW_PFN for a specified
+>>> region.
+>>> + * @base: the base phys addr of the region
+>>> + * @size: the size of the region
+>>> + *
+>>> + * Return 0 on succees, -errno on failure.
+>>> + */
+>>> +int __init_memblock memblock_clear_raw_pfn(phys_addr_t base, phys_addr_t
+>>> size)
+>>> +{
+>>> +       return memblock_setclr_flag(base, size, 0, MEMBLOCK_RAW_PFN);
+>>> +}
+>>> +
+>>> +/**
+>>>   * __next_reserved_mem_region - next function for
+>>> for_each_reserved_region()
+>>>   * @idx: pointer to u64 loop variable
+>>>   * @out_start: ptr to phys_addr_t for start address of the region, can
+>>> be %NULL
+>>> --
+>>> 1.7.9.5
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>>
+>> .
+>>
+>
