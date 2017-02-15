@@ -1,58 +1,46 @@
 From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 15 Feb 2017 09:35:14 +0800
-Subject: [PATCH v13 06/12] usb: xhci: use bus->sysdev for DMA configuration
-In-Reply-To: <CAK8P3a22f=sQXt+3-PeAuBFQN7_4iXDQhu41teExd6bxJXxDAQ@mail.gmail.com>
+Date: Wed, 15 Feb 2017 09:38:09 +0800
+Subject: [PATCH v13 00/12] power: add power sequence library
+In-Reply-To: <f34acc40-41e2-a7ea-a2aa-6cf604086182@ti.com>
 References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
- <1486776443-2280-7-git-send-email-peter.chen@nxp.com>
- <e532a212-cd15-ab42-6188-fc11a12633af@ti.com>
- <CAK8P3a1D1v=LXrW=-t-fRJjbo_C6OpSuoqiGuZPOaBzQYCT-kA@mail.gmail.com>
- <cb7182c6-0236-26f2-4f96-9bc001994728@ti.com>
- <CAK8P3a22f=sQXt+3-PeAuBFQN7_4iXDQhu41teExd6bxJXxDAQ@mail.gmail.com>
-Message-ID: <20170215013514.GA6579@b29397-desktop>
+ <f34acc40-41e2-a7ea-a2aa-6cf604086182@ti.com>
+Message-ID: <20170215013808.GB6579@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2017 at 01:58:40PM +0100, Arnd Bergmann wrote:
-> On Tue, Feb 14, 2017 at 1:26 PM, Roger Quadros <rogerq@ti.com> wrote:
-> > On 14/02/17 13:44, Arnd Bergmann wrote:
-> >> On Tue, Feb 14, 2017 at 11:36 AM, Roger Quadros <rogerq@ti.com> wrote:
+On Tue, Feb 14, 2017 at 12:21:48PM +0200, Roger Quadros wrote:
+> Peter,
 > 
-> >>> Why are we using sysdev to read DT property? We should be using the
-> >>> XHCI device (&pdev->dev) here, no?
-> >>
-> >> If I remember correctly, this is one of the cases where pdev does not
-> >> have a device node attached to it because it was created by the driver
-> >> of the parent device on the fly in case of dwc3. When you have a pure xhci
-> >> device in DT, the two pointers are the same.
-> >
-> > From drivers/usb/dwc3/host.c
-> >
-> >>         if (dwc->usb3_lpm_capable) {
-> >>                 props[0].name = "usb3-lpm-capable";
-> >>                 ret = platform_device_add_properties(xhci, props);
-> >>                 if (ret) {
-> >>                         dev_err(dwc->dev, "failed to add properties to xHCI\n");
-> >>                         goto err1;
-> >>                 }
-> >>         }
-> >
-> > So it is setting the usb3-lpm-capable property into the xhci platform device
-> > and we should be reading the property from there.
+> On 11/02/17 03:27, Peter Chen wrote:
+> > Hi all,
+> > 
+> > This is a follow-up for my last power sequence framework patch set [1].
+> > According to Rob Herring and Ulf Hansson's comments[2]. The kinds of
+> > power sequence instances will be added at postcore_initcall, the match
+> > criteria is compatible string first, if the compatible string is not
+> > matched between dts and library, it will try to use generic power sequence.
+> > 	 
+> > The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+> > if only one power sequence instance is needed, for more power sequences
+> > are used, using of_pwrseq_on_list/of_pwrseq_off_list instead (eg, USB hub driver).
+> > 
+> > In future, if there are special power sequence requirements, the special
+> > power sequence library can be created.
+> > 
+> > This patch set is tested on i.mx6 sabresx evk using a dts change, I use
+> > two hot-plug devices to simulate this use case, the related binding
+> > change is updated at patch [1/6], The udoo board changes were tested
+> > using my last power sequence patch set.[3]
+> > 
+> > Except for hard-wired MMC and USB devices, I find the USB ULPI PHY also
+> > need to power on itself before it can be found by ULPI bus.
+> 
+> Can patches 3-7 can be sent independently of the power related patches?
+> 
 
-Why dwc3 needs another "snps,usb3_lpm_capable"? Why not using
-"usb3-lpm-capable" at firmware directly?
+Yes, I had planned to submit patches 3-7 for v4.11-rc1 today first, but it
+seems you still have comments for patch 6, let's wait a conclusion first.
 
-Peter
-
-> 
-> Hmm, ideally we would only have properties on one of the two, since we
-> refer to the sysdev for the properties regarding DMA and PHY among other
-> things, but I guess that's not an option here, since we can't call
-> platform_device_add_properties() on a dwc_pci device and have to
-> use the xhci pdev instead.
-> 
->      Arnd
-> 
 -- 
 
 Best Regards,
