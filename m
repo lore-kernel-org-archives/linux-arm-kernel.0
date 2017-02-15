@@ -1,115 +1,46 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 15 Feb 2017 14:19:58 -0700
-Subject: [PATCH RFC 3/3] arm64: dts: register Hi6220's coresight debug
- module
-In-Reply-To: <1486966298-16767-4-git-send-email-leo.yan@linaro.org>
-References: <1486966298-16767-1-git-send-email-leo.yan@linaro.org>
- <1486966298-16767-4-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170215211958.GC29730@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 15 Feb 2017 15:26:24 -0600
+Subject: [PATCH v4 3/3] PCI: imx6: Add code to support i.MX7D
+In-Reply-To: <20170215173850.GH19040@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170207155027.7734-1-andrew.smirnov@gmail.com>
+ <20170207155027.7734-4-andrew.smirnov@gmail.com>
+ <20170215171700.5vz5seeihgtwn76p@rob-hp-laptop>
+ <20170215173850.GH19040@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170215212624.btdhfn4xvuppv6hq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2017 at 02:11:38PM +0800, Leo Yan wrote:
-> Bind coresight debug driver for Hi6220.
+On Wed, Feb 15, 2017 at 11:38:50AM -0600, Bjorn Helgaas wrote:
+> On Wed, Feb 15, 2017 at 11:17:00AM -0600, Rob Herring wrote:
+> > On Tue, Feb 07, 2017 at 07:50:27AM -0800, Andrey Smirnov wrote:
+> > > Add various bits of code needed to support i.MX7D variant of the IP.
 
-Bindings for the coresight debug driver...
-
+> > 
+> > [...]
+> > 
+> > > @@ -251,6 +261,10 @@ static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
+> > >  	u32 val, gpr1, gpr12;
+> > >  
+> > >  	switch (imx6_pcie->variant) {
+> > > +	case IMX7D:
+> > > +		reset_control_assert(imx6_pcie->pciephy_reset);
+> > > +		reset_control_assert(imx6_pcie->apps_reset);
+> > > +		break;
+> > >  	case IMX6SX:
+> > >  		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > >  				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN,
+> > 
+> > So the difference with i.MX7D is not really that it has a reset or not, 
+> > but some platforms use a reset driver and some do not. The latter should 
+> > be fixed.
 > 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  .../boot/dts/hisilicon/hikey_6220_coresight.dtsi   | 73 ++++++++++++++++++++++
->  1 file changed, 73 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hikey_6220_coresight.dtsi b/arch/arm64/boot/dts/hisilicon/hikey_6220_coresight.dtsi
-> index 77c2aab..e14d75c 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hikey_6220_coresight.dtsi
-> +++ b/arch/arm64/boot/dts/hisilicon/hikey_6220_coresight.dtsi
-> @@ -15,6 +15,79 @@
->  		#size-cells = <2>;
->  		compatible = "arm,amba-bus";
->  		ranges;
-> +
-> +		debug at 0,f6590000 {
+> I have this patch queued for v4.11.  Are these things that should be
+> fixed first?  If so, I can drop this.
 
-Simply use "debug at f6590000", the "0," isn't required.
+Well, depends if you trust things will get fixed later and if the PHY 
+in fact should be separate as that affects the binding. It would affect 
+how the driver changes are done as instead of "if (IMX7D) ...", you'd 
+have "if (imx6_pcie->apps_reset) ..." for example. That part depends on
+how much churn you want there.
 
-> +			compatible = "arm,coresight-debug","arm,primecell";
-> +			reg = <0 0xf6590000 0 0x1000>;
-> +			default_enable;
-
-What is the "default_enable" for ?
-
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu0>;
-> +		};
-> +
-> +		debug at 1,f6592000 {
-> +			compatible = "arm,coresight-debug","arm,primecell";
-> +			reg = <0 0xf6592000 0 0x1000>;
-> +			default_enable;
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu1>;
-> +		};
-> +
-> +		debug at 2,f6594000 {
-> +			compatible = "arm,coresight-debug","arm,primecell";
-> +			reg = <0 0xf6594000 0 0x1000>;
-> +			default_enable;
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu2>;
-> +		};
-> +
-> +		debug at 3,f6596000 {
-> +			compatible = "arm,coresight-debug","arm,primecell";
-> +			reg = <0 0xf6596000 0 0x1000>;
-> +			default_enable;
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu3>;
-> +		};
-> +
-> +		debug at 4,f65d0000 {
-> +			compatible = "arm,coresight-debug","arm,primecell";
-> +			reg = <0 0xf65d0000 0 0x1000>;
-> +			default_enable;
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu4>;
-> +		};
-> +
-> +		debug at 5,f65d2000 {
-> +			compatible = "arm,coresight-debug","arm,primecell";
-> +			reg = <0 0xf65d2000 0 0x1000>;
-> +			default_enable;
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu5>;
-> +		};
-> +
-> +		debug at 6,f65d4000 {
-> +			compatible = "arm,coresight-debug","arm,primecell";
-> +			reg = <0 0xf65d4000 0 0x1000>;
-> +			default_enable;
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu6>;
-> +		};
-> +
-> +		debug at 7,f65d6000 {
-> +			compatible = "arm,coresight-debug","arm,primecell";
-> +			reg = <0 0xf65d6000 0 0x1000>;
-> +			default_enable;
-> +			clocks = <&sys_ctrl HI6220_CS_ATB>;
-> +			clock-names = "apb_pclk";
-> +			cpu = <&cpu7>;
-> +		};
-> +
->  		etm at 0,f659c000 {
->  			compatible = "arm,coresight-etm4x","arm,primecell";
->  			reg = <0 0xf659c000 0 0x1000>;
-> -- 
-> 2.7.4
-> 
+Rob
