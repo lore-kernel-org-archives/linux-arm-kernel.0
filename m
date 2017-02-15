@@ -1,38 +1,81 @@
 From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Wed, 15 Feb 2017 10:06:23 -0700
-Subject: [PATCH V8 08/10] ras: acpi / apei: generate trace event for
- unrecognized CPER section
-In-Reply-To: <20170215120342.48eff95d@gandalf.local.home>
+Date: Wed, 15 Feb 2017 10:07:25 -0700
+Subject: [PATCH V8 06/10] acpi: apei: panic OS with fatal error status
+ block
+In-Reply-To: <58A445D5.7030501@arm.com>
 References: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
- <1485969413-23577-9-git-send-email-tbaicar@codeaurora.org>
- <20170215105234.4921db1f@gandalf.local.home>
- <e50b7673-a441-3a6b-cf75-c267881c1a92@codeaurora.org>
- <20170215120342.48eff95d@gandalf.local.home>
-Message-ID: <b1e44c1f-ff88-e43b-6bd3-96ac5e6a31bd@codeaurora.org>
+ <1485969413-23577-7-git-send-email-tbaicar@codeaurora.org>
+ <589C490A.9080109@arm.com>
+ <5b06372d-e389-5157-ccb4-a7b023990d4d@codeaurora.org>
+ <58A445D5.7030501@arm.com>
+Message-ID: <c6af9776-abff-36b8-6ad6-148990664c04@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/15/2017 10:03 AM, Steven Rostedt wrote:
-> On Wed, 15 Feb 2017 09:54:09 -0700
-> "Baicar, Tyler" <tbaicar@codeaurora.org> wrote:
-> \
->> In v9 I currently have this and the ARM trace event from this series
->> both wrapped in an
->> ifdef verifying that CONFIG_RAS is enabled. This resolves the kbuild
->> failures and
->> will have this code compiled out when that config isn't enabled. Do you
->> think I
->> should use the ifdef or use these *_enabled() functions?
->>
-> I believe you need both. The *_enabled() functions wont prevent build
-> errors. But since tracing is seldom enabled (usually only when you want
-> to see what's happening), the *_enabled() functions optimize the code
-> to not perform tasks that are only needed when tracing is enabled. When
-> I say "enabled" I mean actively tracing, as supposed to being just
-> enabled in the kernel.
+On 2/15/2017 5:13 AM, James Morse wrote:
+> Hi Tyler,
 >
-> -- Steve
-Got it, I will add both!
+> On 13/02/17 22:45, Baicar, Tyler wrote:
+>> On 2/9/2017 3:48 AM, James Morse wrote:
+>>> On 01/02/17 17:16, Tyler Baicar wrote:
+>>>> From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
+>>>>
+>>>> Even if an error status block's severity is fatal, the kernel does not
+>>>> honor the severity level and panic.
+>>>>
+>>>> With the firmware first model, the platform could inform the OS about a
+>>>> fatal hardware error through the non-NMI GHES notification type. The OS
+>>>> should panic when a hardware error record is received with this
+>>>> severity.
+>>>>
+>>>> Call panic() after CPER data in error status block is printed if
+>>>> severity is fatal, before each error section is handled.
+>>>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+>>>> index 8756172..86c1f15 100644
+>>>> --- a/drivers/acpi/apei/ghes.c
+>>>> +++ b/drivers/acpi/apei/ghes.c
+>>>> @@ -687,6 +689,13 @@ static int ghes_ack_error(struct acpi_hest_generic_v2
+>>>> *generic_v2)
+>>>>        return rc;
+>>>>    }
+>>>>    +static void __ghes_call_panic(void)
+>>>> +{
+>>>> +    if (panic_timeout == 0)
+>>>> +        panic_timeout = ghes_panic_timeout;
+>>>> +    panic("Fatal hardware error!");
+>>>> +}
+>>>> +
+>>> __ghes_panic() also has:
+>>>>      __ghes_print_estatus(KERN_EMERG, ghes->generic, ghes->estatus);
+>>> Which prints this estatus regardless of rate limiting and cache-ing.
+> [...]
+>
+>>>>                ghes_estatus_cache_add(ghes->generic, ghes->estatus);
+>>>>        }
+>>>> +    if (ghes_severity(ghes->estatus->error_severity) >= GHES_SEV_PANIC) {
+>>>> +        __ghes_call_panic();
+>>>> +    }
+>>> I think this ghes_severity() then panic() should go above the:
+>>>>      if (!ghes_estatus_cached(ghes->estatus)) {
+>>> and we should call __ghes_print_estatus() here too, to make sure the message
+>>> definitely got out!
+>
+>> Okay, that makes sense. If we move this up, is there a problem with calling
+>> __ghes_panic() instead of making the __ghes_print_estatus() and
+>> __ghes_call_panic() calls here? It looks like that will just add a call to
+>> oops_begin() and ghes_print_queued_estatus() as well, but this is what
+>> ghes_notify_nmi() does if the severity is panic.
+>
+> I don't think the queued stuff is relevant, isn't that just for x86-NMI messages
+> that it doesn't print out directly?
+>
+> A quick grep shows arm64 doesn't have oops_begin(), you may have to add some
+> equivalent mechanism. Lets try and avoid that rabbit hole!
+>
+> Given __ghes_panic() calls __ghes_print_estatus() too, you could try moving that
+> into your new __ghes_call_panic().... or whatever results in the least lines
+> changed!
+Sounds good, I will just use __ghes_print_estatus() and __ghes_call_panic().
 
 Thanks,
 Tyler
