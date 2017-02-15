@@ -1,163 +1,231 @@
 From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Wed, 15 Feb 2017 10:44:50 -0700
-Subject: [PATCH V9 08/10] ras: acpi / apei: generate trace event for
- unrecognized CPER section
+Date: Wed, 15 Feb 2017 10:44:44 -0700
+Subject: [PATCH V9 02/10] ras: acpi/apei: cper: generic error data entry v3
+ per ACPI 6.1
 In-Reply-To: <1487180692-16732-1-git-send-email-tbaicar@codeaurora.org>
 References: <1487180692-16732-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1487180692-16732-9-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1487180692-16732-3-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-UEFI spec allows for non-standard section in Common Platform Error
-Record. This is defined in section N.2.3 of UEFI version 2.5.
-
-Currently if the CPER section's type (UUID) does not match with
-any section type that the kernel knows how to parse, trace event
-is not generated for such section. And thus user is not able to know
-happening of such hardware error, including error record of
-non-standard section.
-
-This commit generates a trace event which contains raw error data
-for unrecognized CPER section.
+Currently when a RAS error is reported it is not timestamped.
+The ACPI 6.1 spec adds the timestamp field to the generic error
+data entry v3 structure. The timestamp of when the firmware
+generated the error is now being reported.
 
 Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
 Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+Signed-off-by: Richard Ruigrok <rruigrok@codeaurora.org>
+Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+Reviewed-by: James Morse <james.morse@arm.com>
 ---
- drivers/acpi/apei/ghes.c | 24 ++++++++++++++++++++++--
- drivers/ras/ras.c        |  1 +
- include/ras/ras_event.h  | 45 +++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 68 insertions(+), 2 deletions(-)
+ drivers/acpi/apei/ghes.c    |  9 ++++---
+ drivers/firmware/efi/cper.c | 63 +++++++++++++++++++++++++++++++++++----------
+ include/acpi/ghes.h         | 22 ++++++++++++++++
+ 3 files changed, 77 insertions(+), 17 deletions(-)
 
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 9f105ce..be365e2 100644
+index 5e1ec41..b25e7cf 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -44,11 +44,13 @@
- #include <linux/pci.h>
- #include <linux/aer.h>
- #include <linux/nmi.h>
-+#include <linux/uuid.h>
- 
- #include <acpi/actbl1.h>
- #include <acpi/ghes.h>
- #include <acpi/apei.h>
- #include <asm/tlbflush.h>
-+#include <ras/ras_event.h>
- 
- #include "apei-internal.h"
- 
-@@ -453,11 +455,21 @@ static void ghes_do_proc(struct ghes *ghes,
- {
- 	int sev, sec_sev;
- 	struct acpi_hest_generic_data *gdata;
-+	uuid_le sec_type;
-+	uuid_le *fru_id = &NULL_UUID_LE;
-+	char *fru_text = "";
- 
- 	sev = ghes_severity(estatus->error_severity);
- 	apei_estatus_for_each_section(estatus, gdata) {
- 		sec_sev = ghes_severity(gdata->error_severity);
--		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
-+		sec_type = *(uuid_le *)gdata->section_type;
+@@ -420,7 +420,8 @@ static void ghes_handle_memory_failure(struct acpi_hest_generic_data *gdata, int
+ 	int flags = -1;
+ 	int sec_sev = ghes_severity(gdata->error_severity);
+ 	struct cper_sec_mem_err *mem_err;
+-	mem_err = (struct cper_sec_mem_err *)(gdata + 1);
 +
-+		if (gdata->validation_bits & CPER_SEC_VALID_FRU_ID)
-+			fru_id = (uuid_le *)gdata->fru_id;
-+		if (gdata->validation_bits & CPER_SEC_VALID_FRU_TEXT)
-+			fru_text = gdata->fru_text;
-+
-+		if (!uuid_le_cmp(sec_type,
++	mem_err = acpi_hest_generic_data_payload(gdata);
+ 
+ 	if (!(mem_err->validation_bits & CPER_MEM_VALID_PA))
+ 		return;
+@@ -457,7 +458,8 @@ static void ghes_do_proc(struct ghes *ghes,
+ 		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
  				 CPER_SEC_PLATFORM_MEM)) {
  			struct cper_sec_mem_err *mem_err;
+-			mem_err = (struct cper_sec_mem_err *)(gdata+1);
++
++			mem_err = acpi_hest_generic_data_payload(gdata);
+ 			ghes_edac_report_mem_error(ghes, sev, mem_err);
  
-@@ -468,7 +480,7 @@ static void ghes_do_proc(struct ghes *ghes,
- 			ghes_handle_memory_failure(gdata, sev);
- 		}
- #ifdef CONFIG_ACPI_APEI_PCIEAER
--		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
-+		else if (!uuid_le_cmp(sec_type,
+ 			arch_apei_report_mem_error(sev, mem_err);
+@@ -467,7 +469,8 @@ static void ghes_do_proc(struct ghes *ghes,
+ 		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
  				      CPER_SEC_PCIE)) {
  			struct cper_sec_pcie *pcie_err;
+-			pcie_err = (struct cper_sec_pcie *)(gdata+1);
++
++			pcie_err = acpi_hest_generic_data_payload(gdata);
+ 			if (sev == GHES_SEV_RECOVERABLE &&
+ 			    sec_sev == GHES_SEV_RECOVERABLE &&
+ 			    pcie_err->validation_bits & CPER_PCIE_VALID_DEVICE_ID &&
+diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+index d425374..8fa4e23 100644
+--- a/drivers/firmware/efi/cper.c
++++ b/drivers/firmware/efi/cper.c
+@@ -32,6 +32,9 @@
+ #include <linux/acpi.h>
+ #include <linux/pci.h>
+ #include <linux/aer.h>
++#include <linux/printk.h>
++#include <linux/bcd.h>
++#include <acpi/ghes.h>
  
-@@ -501,6 +513,14 @@ static void ghes_do_proc(struct ghes *ghes,
+ #define INDENT_SP	" "
  
- 		}
- #endif
-+#ifdef CONFIG_RAS
-+		else if(trace_unknown_sec_event_enabled()) {
-+			void *unknown_err = acpi_hest_generic_data_payload(gdata);
-+			trace_unknown_sec_event(&sec_type,
-+					fru_id, fru_text, sec_sev,
-+					unknown_err, gdata->error_data_length);
-+		}
-+#endif
- 	}
+@@ -386,13 +389,37 @@ static void cper_print_pcie(const char *pfx, const struct cper_sec_pcie *pcie,
+ 	pfx, pcie->bridge.secondary_status, pcie->bridge.control);
  }
  
-diff --git a/drivers/ras/ras.c b/drivers/ras/ras.c
-index b67dd36..fb2500b 100644
---- a/drivers/ras/ras.c
-+++ b/drivers/ras/ras.c
-@@ -27,3 +27,4 @@ static int __init ras_init(void)
- EXPORT_TRACEPOINT_SYMBOL_GPL(extlog_mem_event);
- #endif
- EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
-+EXPORT_TRACEPOINT_SYMBOL_GPL(unknown_sec_event);
-diff --git a/include/ras/ras_event.h b/include/ras/ras_event.h
-index 1791a12..5861b6f 100644
---- a/include/ras/ras_event.h
-+++ b/include/ras/ras_event.h
-@@ -162,6 +162,51 @@
- );
++static void cper_estatus_print_section_v300(const char *pfx,
++	const struct acpi_hest_generic_data_v300 *gdata)
++{
++	__u8 hour, min, sec, day, mon, year, century, *timestamp;
++
++	if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
++		timestamp = (__u8 *)&(gdata->time_stamp);
++		sec = bcd2bin(timestamp[0]);
++		min = bcd2bin(timestamp[1]);
++		hour = bcd2bin(timestamp[2]);
++		day = bcd2bin(timestamp[4]);
++		mon = bcd2bin(timestamp[5]);
++		year = bcd2bin(timestamp[6]);
++		century = bcd2bin(timestamp[7]);
++		printk("%stime: %7s %02d%02d-%02d-%02d %02d:%02d:%02d\n", pfx,
++			0x01 & *(timestamp + 3) ? "precise" : "", century,
++			year, mon, day, hour, min, sec);
++	}
++}
++
+ static void cper_estatus_print_section(
+-	const char *pfx, const struct acpi_hest_generic_data *gdata, int sec_no)
++	const char *pfx, struct acpi_hest_generic_data *gdata, int sec_no)
+ {
+ 	uuid_le *sec_type = (uuid_le *)gdata->section_type;
+ 	__u16 severity;
+ 	char newpfx[64];
  
- /*
-+ * Unknown Section Report
-+ *
-+ * This event is generated when hardware detected a hardware
-+ * error event, which may be of non-standard section as defined
-+ * in UEFI spec appendix "Common Platform Error Record", or may
-+ * be of sections for which TRACE_EVENT is not defined.
-+ *
-+ */
-+TRACE_EVENT(unknown_sec_event,
++	if (acpi_hest_generic_data_version(gdata) >= 3)
++		cper_estatus_print_section_v300(pfx,
++			(const struct acpi_hest_generic_data_v300 *)gdata);
 +
-+	TP_PROTO(const uuid_le *sec_type,
-+		 const uuid_le *fru_id,
-+		 const char *fru_text,
-+		 const u8 sev,
-+		 const u8 *err,
-+		 const u32 len),
+ 	severity = gdata->error_severity;
+ 	printk("%s""Error %d, type: %s\n", pfx, sec_no,
+ 	       cper_severity_str(severity));
+@@ -403,14 +430,18 @@ static void cper_estatus_print_section(
+ 
+ 	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
+ 	if (!uuid_le_cmp(*sec_type, CPER_SEC_PROC_GENERIC)) {
+-		struct cper_sec_proc_generic *proc_err = (void *)(gdata + 1);
++		struct cper_sec_proc_generic *proc_err;
 +
-+	TP_ARGS(sec_type, fru_id, fru_text, sev, err, len),
++		proc_err = acpi_hest_generic_data_payload(gdata);
+ 		printk("%s""section_type: general processor error\n", newpfx);
+ 		if (gdata->error_data_length >= sizeof(*proc_err))
+ 			cper_print_proc_generic(newpfx, proc_err);
+ 		else
+ 			goto err_section_too_small;
+ 	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PLATFORM_MEM)) {
+-		struct cper_sec_mem_err *mem_err = (void *)(gdata + 1);
++		struct cper_sec_mem_err *mem_err;
 +
-+	TP_STRUCT__entry(
-+		__array(char, sec_type, 16)
-+		__array(char, fru_id, 16)
-+		__string(fru_text, fru_text)
-+		__field(u8, sev)
-+		__field(u32, len)
-+		__dynamic_array(u8, buf, len)
-+	),
++		mem_err = acpi_hest_generic_data_payload(gdata);
+ 		printk("%s""section_type: memory error\n", newpfx);
+ 		if (gdata->error_data_length >=
+ 		    sizeof(struct cper_sec_mem_err_old))
+@@ -419,7 +450,9 @@ static void cper_estatus_print_section(
+ 		else
+ 			goto err_section_too_small;
+ 	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PCIE)) {
+-		struct cper_sec_pcie *pcie = (void *)(gdata + 1);
++		struct cper_sec_pcie *pcie;
 +
-+	TP_fast_assign(
-+		memcpy(__entry->sec_type, sec_type, sizeof(uuid_le));
-+		memcpy(__entry->fru_id, fru_id, sizeof(uuid_le));
-+		__assign_str(fru_text, fru_text);
-+		__entry->sev = sev;
-+		__entry->len = len;
-+		memcpy(__get_dynamic_array(buf), err, len);
-+	),
++		pcie = acpi_hest_generic_data_payload(gdata);
+ 		printk("%s""section_type: PCIe error\n", newpfx);
+ 		if (gdata->error_data_length >= sizeof(*pcie))
+ 			cper_print_pcie(newpfx, pcie, gdata);
+@@ -438,7 +471,7 @@ void cper_estatus_print(const char *pfx,
+ 			const struct acpi_hest_generic_status *estatus)
+ {
+ 	struct acpi_hest_generic_data *gdata;
+-	unsigned int data_len, gedata_len;
++	unsigned int data_len;
+ 	int sec_no = 0;
+ 	char newpfx[64];
+ 	__u16 severity;
+@@ -451,12 +484,13 @@ void cper_estatus_print(const char *pfx,
+ 	printk("%s""event severity: %s\n", pfx, cper_severity_str(severity));
+ 	data_len = estatus->data_length;
+ 	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
 +
-+	TP_printk("severity: %d; sec type:%pU; FRU: %pU %s; data len:%d; raw data:%s",
-+		  __entry->sev, __entry->sec_type,
-+		  __entry->fru_id, __get_str(fru_text),
-+		  __entry->len,
-+		  __print_hex(__get_dynamic_array(buf), __entry->len))
-+);
+ 	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
+-	while (data_len >= sizeof(*gdata)) {
+-		gedata_len = gdata->error_data_length;
 +
-+/*
-  * PCIe AER Trace event
-  *
-  * These events are generated when hardware detects a corrected or
++	while (data_len >= acpi_hest_generic_data_size(gdata)) {
+ 		cper_estatus_print_section(newpfx, gdata, sec_no);
+-		data_len -= gedata_len + sizeof(*gdata);
+-		gdata = (void *)(gdata + 1) + gedata_len;
++		data_len -= acpi_hest_generic_data_record_size(gdata);
++		gdata = acpi_hest_generic_data_next(gdata);
+ 		sec_no++;
+ 	}
+ }
+@@ -486,12 +520,13 @@ int cper_estatus_check(const struct acpi_hest_generic_status *estatus)
+ 		return rc;
+ 	data_len = estatus->data_length;
+ 	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
+-	while (data_len >= sizeof(*gdata)) {
+-		gedata_len = gdata->error_data_length;
+-		if (gedata_len > data_len - sizeof(*gdata))
++
++	while (data_len >= acpi_hest_generic_data_size(gdata)) {
++		gedata_len = acpi_hest_generic_data_error_length(gdata);
++		if (gedata_len > data_len - acpi_hest_generic_data_size(gdata))
+ 			return -EINVAL;
+-		data_len -= gedata_len + sizeof(*gdata);
+-		gdata = (void *)(gdata + 1) + gedata_len;
++		data_len -= gedata_len + acpi_hest_generic_data_size(gdata);
++		gdata = acpi_hest_generic_data_next(gdata);
+ 	}
+ 	if (data_len)
+ 		return -EINVAL;
+diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+index 68f088a..6ae318b 100644
+--- a/include/acpi/ghes.h
++++ b/include/acpi/ghes.h
+@@ -12,6 +12,18 @@
+ #define GHES_TO_CLEAR		0x0001
+ #define GHES_EXITING		0x0002
+ 
++#define acpi_hest_generic_data_error_length(gdata)	\
++	(((struct acpi_hest_generic_data *)(gdata))->error_data_length)
++#define acpi_hest_generic_data_size(gdata)		\
++	((acpi_hest_generic_data_version(gdata) >= 3) ?	\
++	sizeof(struct acpi_hest_generic_data_v300) :	\
++	sizeof(struct acpi_hest_generic_data))
++#define acpi_hest_generic_data_record_size(gdata)	\
++	(acpi_hest_generic_data_size(gdata) +		\
++	acpi_hest_generic_data_error_length(gdata))
++#define acpi_hest_generic_data_next(gdata)		\
++	((void *)(gdata) + acpi_hest_generic_data_record_size(gdata))
++
+ struct ghes {
+ 	union {
+ 		struct acpi_hest_generic *generic;
+@@ -73,3 +85,13 @@ static inline void ghes_edac_unregister(struct ghes *ghes)
+ {
+ }
+ #endif
++
++#define acpi_hest_generic_data_version(gdata)			\
++	(gdata->revision >> 8)
++
++static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data *gdata)
++{
++	return acpi_hest_generic_data_version(gdata) >= 3 ?
++		(void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
++		gdata + 1;
++}
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
