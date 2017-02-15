@@ -1,52 +1,91 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 15 Feb 2017 15:56:03 +0100
-Subject: [PATCH] ARM: dts: armada-385-linksys: fix DSA compatible property
-In-Reply-To: <20170209155155.GA29882@lunn.ch> (Andrew Lunn's message of "Thu,
- 9 Feb 2017 16:51:55 +0100")
-References: <20170209152702.23036-1-ralph.sennhauser@gmail.com>
- <20170209155155.GA29882@lunn.ch>
-Message-ID: <87r32zcxks.fsf@free-electrons.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 15 Feb 2017 15:57:00 +0100
+Subject: [PATCH] reset-socfpga: Fix nr_resets property
+In-Reply-To: <3302533.E0QKRXBlfc@pcimr>
+References: <3302533.E0QKRXBlfc@pcimr>
+Message-ID: <1487170620.2433.43.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ralph and Andrew,
- 
- On jeu., f?vr. 09 2017, Andrew Lunn <andrew@lunn.ch> wrote:
+[Added Dinh to Cc:]
 
-> On Thu, Feb 09, 2017 at 04:27:02PM +0100, Ralph Sennhauser wrote:
->> The switch to the new DSA binding used "marvell,mv88e6095" for the
->> compatible property which doesn't exist, use "marvell,mv88e6085"
->> instead.
->> 
->> Fixes: 455b82f03f52 ("ARM: dts: armada-385-linksys: Utilize new DSA binding")
->> Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
->
-> Hi Ralph
->
-> Good catch.
->
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
->
-> Gregory, this is in the mvebu dt branch and need fixing there.
+On Wed, 2017-02-15 at 14:06 +0100, Rojhalat Ibrahim wrote:
+> The SoC-FPGA reset controller driver defines NR_BANKS as 4 and uses that define
+> for two unrelated purposes. It is used
+> 1. as an increment for reset line banks which are 32-bit registers with 4-byte
+> aligned addresses.
+> 2. as the total number of reset line banks which together with the number of
+> resets per bank (32) limits the total number of useable resets to 96 and the
+> highest useable reset ID to 95.
+> This is clearly wrong as there are resets with higher IDs than 95 defined in
 
+128 and 127, respectively.
 
-Applied on mvebu/dt if it can't go through arm-soc I will submitted as a
-fix for v4.11-rc1.
+> include/dt-bindings/reset/altr,rst-mgr.h and altr,rst-mgr-a10.h.
+> 
+> The patch introduces a new define BANK_INCREMENT for calculating the register
+> addresses as before and increases NR_BANKS to 6 for useable reset IDs up to 191.
 
-Thanks,
+Actually, looking at the Arria 10 TRM, it looks like there are
+mpumodrst, per0modrst, per1modrst, brgmodrst, sysmodrst, coldmodrst,
+nrstmodrst, and dbgmodrst registers on that SoC, which would mean
+NR_BANKS should be changed to 8. Dinh, what do you think?
 
-Gregory
+regards
+Philipp
 
-
->
-> [Goes away to look at the other dts files]
->
-> O.K. Florian only made this typ0 once in the patchset.
->
->      Andrew
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> Signed-off-by: Rojhalat Ibrahim <imr@rtschenk.de>
+> ---
+>  reset-socfpga.c |   13 +++++++------
+>  1 file changed, 7 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/reset/reset-socfpga.c b/drivers/reset/reset-socfpga.c
+> index 43e4a9f..1c8e491 100644
+> --- a/drivers/reset/reset-socfpga.c
+> +++ b/drivers/reset/reset-socfpga.c
+> @@ -25,7 +25,8 @@
+>  #include <linux/spinlock.h>
+>  #include <linux/types.h>
+>  
+> -#define NR_BANKS		4
+> +#define BANK_INCREMENT		4
+> +#define NR_BANKS		6
+>  
+>  struct socfpga_reset_data {
+>  	spinlock_t			lock;
+> @@ -46,8 +47,8 @@ static int socfpga_reset_assert(struct reset_controller_dev *rcdev,
+>  
+>  	spin_lock_irqsave(&data->lock, flags);
+>  
+> -	reg = readl(data->membase + (bank * NR_BANKS));
+> -	writel(reg | BIT(offset), data->membase + (bank * NR_BANKS));
+> +	reg = readl(data->membase + (bank * BANK_INCREMENT));
+> +	writel(reg | BIT(offset), data->membase + (bank * BANK_INCREMENT));
+>  	spin_unlock_irqrestore(&data->lock, flags);
+>  
+>  	return 0;
+> @@ -67,8 +68,8 @@ static int socfpga_reset_deassert(struct reset_controller_dev *rcdev,
+>  
+>  	spin_lock_irqsave(&data->lock, flags);
+>  
+> -	reg = readl(data->membase + (bank * NR_BANKS));
+> -	writel(reg & ~BIT(offset), data->membase + (bank * NR_BANKS));
+> +	reg = readl(data->membase + (bank * BANK_INCREMENT));
+> +	writel(reg & ~BIT(offset), data->membase + (bank * BANK_INCREMENT));
+>  
+>  	spin_unlock_irqrestore(&data->lock, flags);
+>  
+> @@ -84,7 +85,7 @@ static int socfpga_reset_status(struct reset_controller_dev *rcdev,
+>  	int offset = id % BITS_PER_LONG;
+>  	u32 reg;
+>  
+> -	reg = readl(data->membase + (bank * NR_BANKS));
+> +	reg = readl(data->membase + (bank * BANK_INCREMENT));
+>  
+>  	return !(reg & BIT(offset));
+>  }
+> 
+> --
+> 2.10.2
+> 
+> 
