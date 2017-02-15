@@ -1,45 +1,59 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Wed, 15 Feb 2017 09:06:15 +0800
-Subject: [PATCH] drm/rockchip: add extcon dependency for DP
-In-Reply-To: <20170214213215.2888509-1-arnd@arndb.de>
-References: <20170214213215.2888509-1-arnd@arndb.de>
-Message-ID: <58A3A987.9020001@rock-chips.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 15 Feb 2017 09:35:14 +0800
+Subject: [PATCH v13 06/12] usb: xhci: use bus->sysdev for DMA configuration
+In-Reply-To: <CAK8P3a22f=sQXt+3-PeAuBFQN7_4iXDQhu41teExd6bxJXxDAQ@mail.gmail.com>
+References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
+ <1486776443-2280-7-git-send-email-peter.chen@nxp.com>
+ <e532a212-cd15-ab42-6188-fc11a12633af@ti.com>
+ <CAK8P3a1D1v=LXrW=-t-fRJjbo_C6OpSuoqiGuZPOaBzQYCT-kA@mail.gmail.com>
+ <cb7182c6-0236-26f2-4f96-9bc001994728@ti.com>
+ <CAK8P3a22f=sQXt+3-PeAuBFQN7_4iXDQhu41teExd6bxJXxDAQ@mail.gmail.com>
+Message-ID: <20170215013514.GA6579@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?02?15? 05:31, Arnd Bergmann wrote:
-> The newly added DP driver links against the extcon core, which fails when
-> extcon is a module and this driver is not:
->
-> drivers/gpu/drm/rockchip/cdn-dp-core.o: In function `cdn_dp_get_port_lanes':
-> cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x24): undefined reference to `extcon_get_state'
-> cdn-dp-core.c:(.text.cdn_dp_get_port_lanes+0x44): undefined reference to `extcon_get_property'
->
-> Let's make Kconfig enforce correct behavior with a dependency.
+On Tue, Feb 14, 2017 at 01:58:40PM +0100, Arnd Bergmann wrote:
+> On Tue, Feb 14, 2017 at 1:26 PM, Roger Quadros <rogerq@ti.com> wrote:
+> > On 14/02/17 13:44, Arnd Bergmann wrote:
+> >> On Tue, Feb 14, 2017 at 11:36 AM, Roger Quadros <rogerq@ti.com> wrote:
+> 
+> >>> Why are we using sysdev to read DT property? We should be using the
+> >>> XHCI device (&pdev->dev) here, no?
+> >>
+> >> If I remember correctly, this is one of the cases where pdev does not
+> >> have a device node attached to it because it was created by the driver
+> >> of the parent device on the fly in case of dwc3. When you have a pure xhci
+> >> device in DT, the two pointers are the same.
+> >
+> > From drivers/usb/dwc3/host.c
+> >
+> >>         if (dwc->usb3_lpm_capable) {
+> >>                 props[0].name = "usb3-lpm-capable";
+> >>                 ret = platform_device_add_properties(xhci, props);
+> >>                 if (ret) {
+> >>                         dev_err(dwc->dev, "failed to add properties to xHCI\n");
+> >>                         goto err1;
+> >>                 }
+> >>         }
+> >
+> > So it is setting the usb3-lpm-capable property into the xhci platform device
+> > and we should be reading the property from there.
 
-Thanks for the fix.
+Why dwc3 needs another "snps,usb3_lpm_capable"? Why not using
+"usb3-lpm-capable" at firmware directly?
 
-Applied to my drm-next.
+Peter
 
-> Fixes: 1a0f7ed3abe2 ("drm/rockchip: cdn-dp: add cdn DP support for rk3399")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->   drivers/gpu/drm/rockchip/Kconfig | 1 +
->   1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
-> index ad31b3eb408f..0e4eb845cbb0 100644
-> --- a/drivers/gpu/drm/rockchip/Kconfig
-> +++ b/drivers/gpu/drm/rockchip/Kconfig
-> @@ -24,6 +24,7 @@ config ROCKCHIP_ANALOGIX_DP
->   config ROCKCHIP_CDN_DP
->           tristate "Rockchip cdn DP"
->           depends on DRM_ROCKCHIP
-> +	depends on EXTCON
->   	select SND_SOC_HDMI_CODEC if SND_SOC
->           help
->   	  This selects support for Rockchip SoC specific extensions
-
-
+> 
+> Hmm, ideally we would only have properties on one of the two, since we
+> refer to the sysdev for the properties regarding DMA and PHY among other
+> things, but I guess that's not an option here, since we can't call
+> platform_device_add_properties() on a dwc_pci device and have to
+> use the xhci pdev instead.
+> 
+>      Arnd
+> 
 -- 
-?ark Yao
+
+Best Regards,
+Peter Chen
