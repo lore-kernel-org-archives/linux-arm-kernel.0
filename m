@@ -1,211 +1,134 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 15 Feb 2017 16:39:43 -0500
-Subject: [PATCH v4] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
-Message-ID: <20170215213944.17901-1-cov@codeaurora.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 15 Feb 2017 16:43:17 -0500
+Subject: [PATCH 2/2] iommu: add warning when sharing groups
+In-Reply-To: <20170215123613.1df4b33a@t450s.home>
+References: <1487107522-8695-1-git-send-email-okaya@codeaurora.org>
+ <1487107522-8695-2-git-send-email-okaya@codeaurora.org>
+ <20170214165155.7c49485e@t450s.home>
+ <e7535138133c514c77004d64e40b4180@codeaurora.org>
+ <20170215123613.1df4b33a@t450s.home>
+Message-ID: <9a327a29-ec4c-e936-13c1-675ec6d17df2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Qualcomm Datacenter Technologies QDF2400 family of SoCs contains a
-custom (non-PrimeCell) implementation of the SBSA UART. Occasionally the
-BUSY bit in the Flag Register gets stuck as 1, erratum 44 for both 2432v1
-and 2400v1 SoCs.Checking that the Transmit FIFO Empty (TXFE) bit is 0,
-instead of checking that the BUSY bit is 1, works around the issue.
+On 2/15/2017 2:36 PM, Alex Williamson wrote:
+> On Tue, 14 Feb 2017 22:53:35 -0500
+> okaya at codeaurora.org wrote:
+> 
+>> On 2017-02-14 18:51, Alex Williamson wrote:
+>>> On Tue, 14 Feb 2017 16:25:22 -0500
+>>> Sinan Kaya <okaya@codeaurora.org> wrote:
+>>>   
+>>>> The ACS requirement has been obscured in the current code and is only
+>>>> known by certain individuals who happen to read the code. Print out a
+>>>> warning with ACS path failure when ACS requirement is not met.
+>>>>
+>>>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>>>> ---
+>>>>  drivers/iommu/iommu.c | 3 +++
+>>>>  1 file changed, 3 insertions(+)
+>>>>
+>>>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+>>>> index dbe7f65..049ee0a 100644
+>>>> --- a/drivers/iommu/iommu.c
+>>>> +++ b/drivers/iommu/iommu.c
+>>>> @@ -811,6 +811,9 @@ struct iommu_group *pci_device_group(struct device 
+>>>> *dev)
+>>>>  	if (IS_ERR(group))
+>>>>  		return NULL;
+>>>>
+>>>> +	if (pci_is_root_bus(bus))
+>>>> +		dev_warn_once(&pdev->dev, "using shared group due to ACS path 
+>>>> failure\n");
+>>>> +
+>>>>  	return group;
+>>>>  }
+>>>>   
+>>>
+>>> The premise here is flawed.  An IOMMU group based at the root bus
+>>> doesn't necessarily imply a lack of ACS.  There are devices on root
+>>> buses, integrated endpoints and root ports.  Naturally an IOMMU group
+>>> for these devices needs to be based at the root bus.  Additionally,
+>>> there can be IOMMU groups developed around a lack of ACS that don't
+>>> intersect with the root bus.  Since this is a warn_once, the false
+>>> positives for root bus devices are going to be enumerated first.  On an
+>>> Intel system there's typically a device as 00.0 that will always be
+>>> pointlessly listed first.  Also, it's not clear that grouping devices
+>>> together is always wrong, as Robin pointed out in the EHCI/OHCI
+>>> example.  Lack of ACS on downtream ports is likely to cause problems,
+>>> especially if that downstream port exposes a slot.  Maybe that would be
+>>> a good place to start.  Also, what is someone supposed to do when they
+>>> see this error?  If we can hope they'll look for the error in the code
+>>> (unlikely) a big comment with useful external links might be
+>>> necessary.  Based on how easily vendors ignore kernel warnings, I'm
+>>> dubious there's any value to this path though.  Thanks,  
+>>
+>> Maybe, a better solution would be to add some sentences into vfio.txt 
+>> documentation.
+>>
+>> I'm ready to drop this patch. I just don't want ACS requirement to be 
+>> hidden between the source code.
+>>
+>> Would you be willing to do that?
+>>
+>> I know I read all pci and vfio documents in the past. I could have 
+>> captured this requirement if it was there.
+> 
+> We already have this:
+> 
+> Documentation/vfio.txt:
+> ...
+> This isolation is not always at the granularity of a single device
+> though.  Even when an IOMMU is capable of this, properties of devices,
+> interconnects, and IOMMU topologies can each reduce this isolation.
+> For instance, an individual device may be part of a larger multi-
+> function enclosure.  While the IOMMU may be able to distinguish
+> between devices within the enclosure, the enclosure may not require
+> transactions between devices to reach the IOMMU.  Examples of this
+> could be anything from a multi-function PCI device with backdoors
+> between functions to a non-PCI-ACS (Access Control Services) capable
+> bridge allowing redirection without reaching the IOMMU.  Topology
+> can also play a factor in terms of hiding devices.  A PCIe-to-PCI
+> bridge masks the devices behind it, making transaction appear as if
+> from the bridge itself.  Obviously IOMMU design plays a major factor
+> as well.
+> ...
+> 
+> Additionally if you google for "iommu group", this is the first hit:
+> 
+> http://vfio.blogspot.com/2014/08/iommu-groups-inside-and-out.html
+> 
+> This talks extensively about ACS.  A few hits below that you can find a
+> presentation I've given with ACS examples.  What additional
+> documentation do you think would have helped you discover or understand
+> this problem earlier?
+> 
+> I agree that device isolation is not a spec requirement.  The specs
+> give us the tools that we need, but valid uses cases exist where a lack
+> of isolation may be preferred.  If we logically deduce how we can give
+> a device or set of devices to a user for an untrusted environment,
+> isolated from other devices, I think it's pretty logical to come to the
+> conclusion that ACS is the only way that PCIe hardware can allow that
+> sort of control in a standard way.  Clearly we also recognize that this
+> is a commonly overlooked area where hardware vendors may fail to
+> incorporate this subtly into their platform design guidelines and thus
+> we have numerous quirks for exposing virtual ACS-like isolation.  The
+> hope is that adding a quirk for this devices means that feedback was
+> provided to the hardware teams and system architects within the
+> companies developing these devices to consider this use case and
+> implement native ACS in the next generation.  Thanks,
 
-To facilitate this substitution of flags and values, introduce
-vendor-specific inversion of Feature Register bits when UART AMBA Port
-(UAP) data is available. For the earlycon case, prior to UAP availability,
-implement alternative putc and early_write functions.
 
-Similar to what how ARMv8 ACPI PCI quirks are detected during MCFG parsing,
-check the OEM fields of the Serial Port Console Redirection (SPCR) ACPI
-table to determine if the current platform is known to be affected by the
-erratum.
+I see, Maybe I was not familiar with ACS to understand these words
+by the time I read it.
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-Acked-by: Timur Tabi <timur@codeaurora.org>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
----
-Changes in v4:
-* Added Acks from Mark and Timur
-* Dropped arm64/silicon-errata.txt change (will be sent separately)
-* Rebased onto gregkh/tty.git tty-next
-    http://git.kernel.org/cgit/linux/kernel/git/gregkh/tty.git/log/?h=tty-next
----
- drivers/acpi/spcr.c             | 23 ++++++++++++++
- drivers/tty/serial/amba-pl011.c | 66 ++++++++++++++++++++++++++++++++++++-----
- 2 files changed, 82 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
-index b8019c4c1d38..2b5d0fac81f0 100644
---- a/drivers/acpi/spcr.c
-+++ b/drivers/acpi/spcr.c
-@@ -16,6 +16,26 @@
- #include <linux/kernel.h>
- #include <linux/serial_core.h>
- 
-+/*
-+ * Some Qualcomm Datacenter Technologies SoCs have a defective UART BUSY bit.
-+ * Detect them by examining the OEM fields in the SPCR header, similiar to PCI
-+ * quirk detection in pci_mcfg.c.
-+ */
-+static bool qdf2400_erratum_44_present(struct acpi_table_header *h)
-+{
-+	if (memcmp(h->oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
-+		return false;
-+
-+	if (!memcmp(h->oem_table_id, "QDF2432 ", ACPI_OEM_TABLE_ID_SIZE))
-+		return true;
-+
-+	if (!memcmp(h->oem_table_id, "QDF2400 ", ACPI_OEM_TABLE_ID_SIZE) &&
-+			h->oem_revision == 0)
-+		return true;
-+
-+	return false;
-+}
-+
- /**
-  * parse_spcr() - parse ACPI SPCR table and add preferred console
-  *
-@@ -93,6 +113,9 @@ int __init parse_spcr(bool earlycon)
- 		goto done;
- 	}
- 
-+	if (qdf2400_erratum_44_present(&table->header))
-+		uart = "qdf2400_e44";
-+
- 	snprintf(opts, sizeof(opts), "%s,%s,0x%llx,%d", uart, iotype,
- 		 table->serial_port.address, baud_rate);
- 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 533b18d4a587..8789ea423ccf 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -97,6 +97,7 @@ struct vendor_data {
- 	unsigned int		fr_dsr;
- 	unsigned int		fr_cts;
- 	unsigned int		fr_ri;
-+	unsigned int		inv_fr;
- 	bool			access_32b;
- 	bool			oversampling;
- 	bool			dma_threshold;
-@@ -141,6 +142,30 @@ static struct vendor_data vendor_sbsa = {
- 	.fixed_options		= true,
- };
- 
-+/*
-+ * Erratum 44 for QDF2432v1 and QDF2400v1 SoCs describes the BUSY bit as
-+ * occasionally getting stuck as 1. To avoid the potential for a hang, check
-+ * TXFE == 0 instead of BUSY == 1. This may not be suitable for all UART
-+ * implementations, so only do so if an affected platform is detected in
-+ * parse_spcr().
-+ */
-+static bool qdf2400_e44_present = false;
-+
-+static struct vendor_data vendor_qdt_qdf2400_e44 = {
-+	.reg_offset		= pl011_std_offsets,
-+	.fr_busy		= UART011_FR_TXFE,
-+	.fr_dsr			= UART01x_FR_DSR,
-+	.fr_cts			= UART01x_FR_CTS,
-+	.fr_ri			= UART011_FR_RI,
-+	.inv_fr			= UART011_FR_TXFE,
-+	.access_32b		= true,
-+	.oversampling		= false,
-+	.dma_threshold		= false,
-+	.cts_event_workaround	= false,
-+	.always_enabled		= true,
-+	.fixed_options		= true,
-+};
-+
- static u16 pl011_st_offsets[REG_ARRAY_SIZE] = {
- 	[REG_DR] = UART01x_DR,
- 	[REG_ST_DMAWM] = ST_UART011_DMAWM,
-@@ -1518,7 +1543,10 @@ static unsigned int pl011_tx_empty(struct uart_port *port)
- {
- 	struct uart_amba_port *uap =
- 	    container_of(port, struct uart_amba_port, port);
--	unsigned int status = pl011_read(uap, REG_FR);
-+
-+	/* Allow feature register bits to be inverted to work around errata */
-+	unsigned int status = pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr;
-+
- 	return status & (uap->vendor->fr_busy | UART01x_FR_TXFF) ?
- 							0 : TIOCSER_TEMT;
- }
-@@ -2215,10 +2243,12 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
- 	uart_console_write(&uap->port, s, count, pl011_console_putchar);
- 
- 	/*
--	 *	Finally, wait for transmitter to become empty
--	 *	and restore the TCR
-+	 *	Finally, wait for transmitter to become empty and restore the
-+	 *	TCR. Allow feature register bits to be inverted to work around
-+	 *	errata.
- 	 */
--	while (pl011_read(uap, REG_FR) & uap->vendor->fr_busy)
-+	while ((pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr)
-+						& uap->vendor->fr_busy)
- 		cpu_relax();
- 	if (!uap->vendor->always_enabled)
- 		pl011_write(old_cr, uap, REG_CR);
-@@ -2340,8 +2370,12 @@ static int __init pl011_console_match(struct console *co, char *name, int idx,
- 	resource_size_t addr;
- 	int i;
- 
--	if (strcmp(name, "pl011") != 0 || strcmp(name, "ttyAMA") != 0)
-+	if (strcmp(name, "qdf2400_e44") == 0) {
-+		pr_info_once("UART: Working around QDF2400 SoC erratum 44");
-+		qdf2400_e44_present = true;
-+	} else if (strcmp(name, "pl011") != 0 || strcmp(name, "ttyAMA") != 0) {
- 		return -ENODEV;
-+	}
- 
- 	if (uart_parse_earlycon(options, &iotype, &addr, &options))
- 		return -ENODEV;
-@@ -2383,6 +2417,22 @@ static struct console amba_console = {
- 
- #define AMBA_CONSOLE	(&amba_console)
- 
-+static void qdf2400_e44_putc(struct uart_port *port, int c)
-+{
-+	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
-+		cpu_relax();
-+	writel(c, port->membase + UART01x_DR);
-+	while (!(readl(port->membase + UART01x_FR) & UART011_FR_TXFE))
-+		cpu_relax();
-+}
-+
-+static void qdf2400_e44_early_write(struct console *con, const char *s, unsigned n)
-+{
-+	struct earlycon_device *dev = con->data;
-+
-+	uart_console_write(&dev->port, s, n, qdf2400_e44_putc);
-+}
-+
- static void pl011_putc(struct uart_port *port, int c)
- {
- 	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
-@@ -2408,7 +2458,8 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
- 	if (!device->port.membase)
- 		return -ENODEV;
- 
--	device->con->write = pl011_early_write;
-+	device->con->write = qdf2400_e44_present ?
-+				qdf2400_e44_early_write : pl011_early_write;
- 	return 0;
- }
- OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
-@@ -2645,7 +2696,8 @@ static int sbsa_uart_probe(struct platform_device *pdev)
- 	uap->port.irq	= ret;
- 
- 	uap->reg_offset	= vendor_sbsa.reg_offset;
--	uap->vendor	= &vendor_sbsa;
-+	uap->vendor	= qdf2400_e44_present ?
-+					&vendor_qdt_qdf2400_e44 : &vendor_sbsa;
- 	uap->fifosize	= 32;
- 	uap->port.iotype = vendor_sbsa.access_32b ? UPIO_MEM32 : UPIO_MEM;
- 	uap->port.ops	= &sbsa_uart_pops;
+> 
+> Alex
+> 
+
+
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
-Forum, a Linux Foundation Collaborative Project.
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
