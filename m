@@ -1,34 +1,33 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 15 Feb 2017 18:01:25 +0100
-Subject: [PATCH] clk: rockchip: Set "ignore unused" for PMU M0 clocks on
- rk3399
-In-Reply-To: <CABxcv=kzW9SvrWYNasqCDkV7D6Y2zq+oRuqoPFdWuaWUhPehEA@mail.gmail.com>
-References: <20170214210114.5846-1-dianders@chromium.org>
- <CABxcv=kzW9SvrWYNasqCDkV7D6Y2zq+oRuqoPFdWuaWUhPehEA@mail.gmail.com>
-Message-ID: <1716357.fXUCSFMPB6@diego>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Wed, 15 Feb 2017 17:55:24 +0100
+Subject: [PATCH 07/11] Documentation: kernel-parameters: Document owl earlycon
+In-Reply-To: <20170215165528.10052-1-afaerber@suse.de>
+References: <20170215165528.10052-1-afaerber@suse.de>
+Message-ID: <20170215165528.10052-8-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 15. Februar 2017, 12:27:59 CET schrieb Javier Martinez Canillas:
-> Hello Doug,
-> 
-> On Tue, Feb 14, 2017 at 6:01 PM, Douglas Anderson <dianders@chromium.org> 
-wrote:
-> > The PMU Cortex M0 on rk3399 is intended to be used for things like
-> > DDRFreq transitions, suspend/resume, and other things that are the
-> > purview of ARM Trusted Firmware and not the kernel.  As such, the
-> > kernel shouldn't be messing with the clocks.  Add CLK_IGNORE_UNUSED to
-> > these clocks.
-> 
-> Isn't CLK_IS_CRITICAL a more suitable flag for this case?
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ Documentation/admin-guide/kernel-parameters.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
->From the patch description it looks like the clock is expected to be 
-controlled from firmware in most cases as I guess the Cortex M0 will be used 
-for that all the time now. And the clock is not expected to run all the time.
-
-So I'd think clk_ignore_unused is the correct one. The whole clock-subtree for 
-these clocks also does not get affected by other clocks, as it is 
-independendly coming from PLLs.
-
-
-Heiko
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 01f5788..c741166 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -952,6 +952,12 @@
+ 			must already be setup and configured. Options are not
+ 			yet supported.
+ 
++		owl,<addr>
++			Start an early, polled-mode console on an Owl serial
++			port at the specified address. The serial port must
++			already be setup and configured. Options are not yet
++			supported.
++
+ 		smh	Use ARM semihosting calls for early console.
+ 
+ 		s3c2410,<addr>
+-- 
+2.10.2
