@@ -1,111 +1,72 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Wed, 15 Feb 2017 11:38:45 +0800
-Subject: [PATCH v3 23/24] drm/rockchip: dw-mipi-dsi: add reset control
-In-Reply-To: <20170129132444.25251-24-john@metanate.com>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-24-john@metanate.com>
-Message-ID: <58A3CD45.9090309@rock-chips.com>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Tue, 14 Feb 2017 22:53:35 -0500
+Subject: [PATCH 2/2] iommu: add warning when sharing groups
+In-Reply-To: <20170214165155.7c49485e@t450s.home>
+References: <1487107522-8695-1-git-send-email-okaya@codeaurora.org>
+ <1487107522-8695-2-git-send-email-okaya@codeaurora.org>
+ <20170214165155.7c49485e@t450s.home>
+Message-ID: <e7535138133c514c77004d64e40b4180@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John
+On 2017-02-14 18:51, Alex Williamson wrote:
+> On Tue, 14 Feb 2017 16:25:22 -0500
+> Sinan Kaya <okaya@codeaurora.org> wrote:
+> 
+>> The ACS requirement has been obscured in the current code and is only
+>> known by certain individuals who happen to read the code. Print out a
+>> warning with ACS path failure when ACS requirement is not met.
+>> 
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>  drivers/iommu/iommu.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>> 
+>> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+>> index dbe7f65..049ee0a 100644
+>> --- a/drivers/iommu/iommu.c
+>> +++ b/drivers/iommu/iommu.c
+>> @@ -811,6 +811,9 @@ struct iommu_group *pci_device_group(struct device 
+>> *dev)
+>>  	if (IS_ERR(group))
+>>  		return NULL;
+>> 
+>> +	if (pci_is_root_bus(bus))
+>> +		dev_warn_once(&pdev->dev, "using shared group due to ACS path 
+>> failure\n");
+>> +
+>>  	return group;
+>>  }
+>> 
+> 
+> The premise here is flawed.  An IOMMU group based at the root bus
+> doesn't necessarily imply a lack of ACS.  There are devices on root
+> buses, integrated endpoints and root ports.  Naturally an IOMMU group
+> for these devices needs to be based at the root bus.  Additionally,
+> there can be IOMMU groups developed around a lack of ACS that don't
+> intersect with the root bus.  Since this is a warn_once, the false
+> positives for root bus devices are going to be enumerated first.  On an
+> Intel system there's typically a device as 00.0 that will always be
+> pointlessly listed first.  Also, it's not clear that grouping devices
+> together is always wrong, as Robin pointed out in the EHCI/OHCI
+> example.  Lack of ACS on downtream ports is likely to cause problems,
+> especially if that downstream port exposes a slot.  Maybe that would be
+> a good place to start.  Also, what is someone supposed to do when they
+> see this error?  If we can hope they'll look for the error in the code
+> (unlikely) a big comment with useful external links might be
+> necessary.  Based on how easily vendors ignore kernel warnings, I'm
+> dubious there's any value to this path though.  Thanks,
 
-On 01/29/2017 09:24 PM, John Keeping wrote:
-> In order to fully reset the state of the MIPI controller we must assert
-> this reset.
->
-> This is slightly more complicated than it could be in order to maintain
-> compatibility with device trees that do not specify the reset property.
->
-> Signed-off-by: John Keeping <john@metanate.com>
-> Reviewed-by: Chris Zhong <zyw@rock-chips.com>
-> ---
-> v3:
-> - Add Chris' Reviewed-by
-> Unchanged in v2
->
->   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 30 ++++++++++++++++++++++++++++++
->   1 file changed, 30 insertions(+)
->
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index 58cb8ace2fe8..cf3ca6b0cbdb 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -13,6 +13,7 @@
->   #include <linux/module.h>
->   #include <linux/of_device.h>
->   #include <linux/regmap.h>
-> +#include <linux/reset.h>
->   #include <linux/mfd/syscon.h>
->   #include <drm/drm_atomic_helper.h>
->   #include <drm/drm_crtc.h>
-> @@ -1124,6 +1125,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
->   			of_match_device(dw_mipi_dsi_dt_ids, dev);
->   	const struct dw_mipi_dsi_plat_data *pdata = of_id->data;
->   	struct platform_device *pdev = to_platform_device(dev);
-> +	struct reset_control *apb_rst;
->   	struct drm_device *drm = data;
->   	struct dw_mipi_dsi *dsi;
->   	struct resource *res;
-> @@ -1162,6 +1164,34 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
->   		return ret;
->   	}
->   
-> +	/*
-> +	 * Note that the reset was not defined in the initial device tree, so
-> +	 * we have to be prepared for it not being found.
-> +	 */
-> +	apb_rst = devm_reset_control_get(dev, "apb");
-> +	if (IS_ERR(apb_rst)) {
-> +		if (PTR_ERR(apb_rst) == -ENODEV) {
-According to [0], I think it should be -ENOENT here.
+Maybe, a better solution would be to add some sentences into vfio.txt 
+documentation.
 
-[0]
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=3d81216fde465e76c5eae98f61d3666163634395
+I'm ready to drop this patch. I just don't want ACS requirement to be 
+hidden between the source code.
 
-commit 3d81216fde465e76c5eae98f61d3666163634395
-Author: Alban Bedel <albeu@free.fr>
-Date:   Tue Sep 1 17:28:31 2015 +0200
+Would you be willing to do that?
 
-     reset: Fix of_reset_control_get() for consistent return values
+I know I read all pci and vfio documents in the past. I could have 
+captured this requirement if it was there.
 
-     When of_reset_control_get() is called without connection ID it returns
-     -ENOENT when the 'resets' property doesn't exists or is an empty entry.
-     However when a connection ID is given it returns -EINVAL when the 
-'resets'
-     property doesn't exists or the requested name can't be found. This is
-     because the error code returned by of_property_match_string() is just
-     passed down as an index to of_parse_phandle_with_args(), which then
-     returns -EINVAL.
-
-     To get a consistent return value with both code paths we must return
-     -ENOENT when of_property_match_string() fails.
-
-     Signed-off-by: Alban Bedel <albeu@free.fr>
-     Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-
-
-> +			apb_rst = NULL;
-> +		} else {
-> +			dev_err(dev, "Unable to get reset control: %d\n", ret);
-> +			return PTR_ERR(apb_rst);
-> +		}
-> +	}
-> +
-> +	if (apb_rst) {
-> +		ret = clk_prepare_enable(dsi->pclk);
-> +		if (ret) {
-> +			dev_err(dev, "%s: Failed to enable pclk\n", __func__);
-> +			return ret;
-> +		}
-> +
-> +		reset_control_assert(apb_rst);
-> +		usleep_range(10, 20);
-> +		reset_control_deassert(apb_rst);
-> +
-> +		clk_disable_unprepare(dsi->pclk);
-> +	}
-> +
->   	ret = clk_prepare_enable(dsi->pllref_clk);
->   	if (ret) {
->   		dev_err(dev, "%s: Failed to enable pllref_clk\n", __func__);
+> 
+> Alex
