@@ -1,74 +1,89 @@
-From: imr@rtschenk.de (Rojhalat Ibrahim)
-Date: Wed, 15 Feb 2017 14:06:08 +0100
-Subject: [PATCH] reset-socfpga: Fix nr_resets property
-Message-ID: <3302533.E0QKRXBlfc@pcimr>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Wed, 15 Feb 2017 18:34:50 +0530
+Subject: [PATCH 0/2] RFC: Move efi bgrt code out of arch/x86
+Message-ID: <1487163892-27701-1-git-send-email-bhsharma@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SoC-FPGA reset controller driver defines NR_BANKS as 4 and uses that define
-for two unrelated purposes. It is used
-1. as an increment for reset line banks which are 32-bit registers with 4-byte
-aligned addresses.
-2. as the total number of reset line banks which together with the number of
-resets per bank (32) limits the total number of useable resets to 96 and the
-highest useable reset ID to 95.
+This patchset presents a RFC approach to move the ACPI BGRT table
+handling related code out of 'arch/x86' and place it inside 
+'drivers/firmware/efi' so that it can be used to support
+ACPI BGRT table and BGRT logo across x86 and AARCH64 ARCHs.
 
-This is clearly wrong as there are resets with higher IDs than 95 defined in
-include/dt-bindings/reset/altr,rst-mgr.h and altr,rst-mgr-a10.h.
+Note that this patchset is primarily tested on Qemu VMs for x86_64
+and AARCH64 environments, while I try to get my hands on a real
+AARCH64 hardware which supports a graphic card and whose boot firmware
+I can modify to support the ACPI BGRT table to be passed to the kernel.
 
-The patch introduces a new define BANK_INCREMENT for calculating the register
-addresses as before and increases NR_BANKS to 6 for useable reset IDs up to 191.
+Here are some details/outputs about/from the test environment:
 
-Signed-off-by: Rojhalat Ibrahim <imr@rtschenk.de>
----
- reset-socfpga.c |   13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+AARCH64:
+========
+1. I used the latest Qemu (master branch) and compiled it for aarch64 with softmmu support.
+   Here is the command line I use to launch the same:
 
-diff --git a/drivers/reset/reset-socfpga.c b/drivers/reset/reset-socfpga.c
-index 43e4a9f..1c8e491 100644
---- a/drivers/reset/reset-socfpga.c
-+++ b/drivers/reset/reset-socfpga.c
-@@ -25,7 +25,8 @@
- #include <linux/spinlock.h>
- #include <linux/types.h>
- 
--#define NR_BANKS		4
-+#define BANK_INCREMENT		4
-+#define NR_BANKS		6
- 
- struct socfpga_reset_data {
- 	spinlock_t			lock;
-@@ -46,8 +47,8 @@ static int socfpga_reset_assert(struct reset_controller_dev *rcdev,
- 
- 	spin_lock_irqsave(&data->lock, flags);
- 
--	reg = readl(data->membase + (bank * NR_BANKS));
--	writel(reg | BIT(offset), data->membase + (bank * NR_BANKS));
-+	reg = readl(data->membase + (bank * BANK_INCREMENT));
-+	writel(reg | BIT(offset), data->membase + (bank * BANK_INCREMENT));
- 	spin_unlock_irqrestore(&data->lock, flags);
- 
- 	return 0;
-@@ -67,8 +68,8 @@ static int socfpga_reset_deassert(struct reset_controller_dev *rcdev,
- 
- 	spin_lock_irqsave(&data->lock, flags);
- 
--	reg = readl(data->membase + (bank * NR_BANKS));
--	writel(reg & ~BIT(offset), data->membase + (bank * NR_BANKS));
-+	reg = readl(data->membase + (bank * BANK_INCREMENT));
-+	writel(reg & ~BIT(offset), data->membase + (bank * BANK_INCREMENT));
- 
- 	spin_unlock_irqrestore(&data->lock, flags);
- 
-@@ -84,7 +85,7 @@ static int socfpga_reset_status(struct reset_controller_dev *rcdev,
- 	int offset = id % BITS_PER_LONG;
- 	u32 reg;
- 
--	reg = readl(data->membase + (bank * NR_BANKS));
-+	reg = readl(data->membase + (bank * BANK_INCREMENT));
- 
- 	return !(reg & BIT(offset));
- }
+# qemu-system-aarch64 -cpu cortex-a57 -M virt -m 2048 -bios QEMU_EFI.fd -kernel Image -initrd rootfs.cpio -serial stdio --append "acpi=force" -device virtio-gpu-pci
 
---
-2.10.2
+where, QEMU_EFI.fd is the DEBUG build of EDK2 ArmVirtQemu.dsc (master branch)
+       rootfs.cpio is the AARCH64 build of Buildroot (Little Endian AARCH64)
+       -device virtio-gpu-pci provides the Graphical support required to have BGRT logo.
+
+
+2. Here are some test results once Linux boots up, which show a valid BGRT table/logo being
+   seen by the kernel:
+
+# acpidump
+...
+
+BGRT @ 0x0000000000000000
+  0000: 42 47 52 54 38 00 00 00 01 B4 49 4E 54 45 4C 20  BGRT8.....INTEL 
+  0010: 45 44 4B 32 20 20 20 20 02 00 00 00 20 20 20 20  EDK2    ....    
+  0020: 13 00 00 01 01 00 01 00 00 80 B0 BA 00 00 00 00  ................
+  0030: 2F 01 00 00 0F 01 00 00                          /.......
+
+# dmesg | grep -i BGRT
+[    0.000000] ACPI: BGRT 0x00000000B8640000 000038 (v01 INTEL  EDK2     00000002      01000013)
+
+
+# ls -lah /sys/firmware/acpi/bgrt/image 
+-r--r--r--    1 root     root       32.9K Feb 15 11:27 /sys/firmware/acpi/bgrt/image
+
+x86:
+====
+1. I used the latest Qemu (master branch) and compiled it for x86.
+   Here is the command line I use to launch the same:
+
+# qemu-system-x86_64 -enable-kvm -sdl -m 2048 -vga std -boot c -cpu host -bios OVMF_CODE.fd -kernel bzImage -initrd rootfs.cpio -serial stdio
+
+where, OVMF_CODE.fd is the RELEASE build of EDK2 OvmfPkg (master branch)
+       rootfs.cpio is the x86_64 build of Buildroot
+
+2. Similar test results are seen as noted for the AARCH64 case above, which show a valid BGRT table/logo being
+   seen by the kernel.
+
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Ingo Molnar <mingo@kernel.org>
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Dave Young <dyoung@redhat.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+
+Bhupesh Sharma (2):
+  x86/efi-bgrt: Move efi-bgrt handling out of arch/x86
+  bgrt: Make ACPI BGRT parsing code common for ARCHs
+
+ arch/arm64/kernel/acpi.c                               | 3 +++
+ arch/x86/kernel/acpi/boot.c                            | 6 ------
+ arch/x86/platform/efi/Makefile                         | 1 -
+ drivers/acpi/Kconfig                                   | 2 +-
+ drivers/acpi/bgrt.c                                    | 6 ++++++
+ drivers/firmware/efi/Makefile                          | 1 +
+ {arch/x86/platform => drivers/firmware}/efi/efi-bgrt.c | 0
+ include/linux/efi-bgrt.h                               | 2 ++
+ 8 files changed, 13 insertions(+), 8 deletions(-)
+ rename {arch/x86/platform => drivers/firmware}/efi/efi-bgrt.c (100%)
+
+-- 
+2.7.4
