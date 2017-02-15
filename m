@@ -1,22 +1,91 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 16 Feb 2017 00:53:14 +0800
-Subject: [xlnx:master 289/322] drivers/bluetooth/btwilink.c:350:3-8: No need
- to set .owner here. The core will do it.
-Message-ID: <201702160012.bLzbbwbG%fengguang.wu@intel.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Wed, 15 Feb 2017 09:54:09 -0700
+Subject: [PATCH V8 08/10] ras: acpi / apei: generate trace event for
+ unrecognized CPER section
+In-Reply-To: <20170215105234.4921db1f@gandalf.local.home>
+References: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
+ <1485969413-23577-9-git-send-email-tbaicar@codeaurora.org>
+ <20170215105234.4921db1f@gandalf.local.home>
+Message-ID: <e50b7673-a441-3a6b-cf75-c267881c1a92@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   3b135b44d6c189c52994efe4ca1502cca8382633
-commit: 71678890658e79322d066fd6cd4fdef5ed6a8884 [289/322] btwilink: add minimal device tree support
+On 2/15/2017 8:52 AM, Steven Rostedt wrote:
+> On Wed,  1 Feb 2017 10:16:51 -0700
+> Tyler Baicar <tbaicar@codeaurora.org> wrote:
+>
+>> @@ -452,11 +454,21 @@ static void ghes_do_proc(struct ghes *ghes,
+>>   {
+>>   	int sev, sec_sev;
+>>   	struct acpi_hest_generic_data *gdata;
+>> +	uuid_le sec_type;
+>> +	uuid_le *fru_id = &NULL_UUID_LE;
+>> +	char *fru_text = "";
+>>   
+>>   	sev = ghes_severity(estatus->error_severity);
+>>   	apei_estatus_for_each_section(estatus, gdata) {
+>>   		sec_sev = ghes_severity(gdata->error_severity);
+>> -		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
+>> +		sec_type = *(uuid_le *)gdata->section_type;
+>> +
+>> +		if (gdata->validation_bits & CPER_SEC_VALID_FRU_ID)
+>> +			fru_id = (uuid_le *)gdata->fru_id;
+>> +		if (gdata->validation_bits & CPER_SEC_VALID_FRU_TEXT)
+>> +			fru_text = gdata->fru_text;
+>> +
+>> +		if (!uuid_le_cmp(sec_type,
+>>   				 CPER_SEC_PLATFORM_MEM)) {
+>>   			struct cper_sec_mem_err *mem_err;
+>>   
+>> @@ -467,7 +479,7 @@ static void ghes_do_proc(struct ghes *ghes,
+>>   			ghes_handle_memory_failure(gdata, sev);
+>>   		}
+>>   #ifdef CONFIG_ACPI_APEI_PCIEAER
+>> -		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
+>> +		else if (!uuid_le_cmp(sec_type,
+>>   				      CPER_SEC_PCIE)) {
+>>   			struct cper_sec_pcie *pcie_err;
+>>   
+>> @@ -500,6 +512,12 @@ static void ghes_do_proc(struct ghes *ghes,
+>>   
+>>   		}
+>>   #endif
+>> +		else {
+> As an optimization, you can add:
+>
+> 		else if (trace_unknown_sec_event_enabled()) {
+>
+> instead, as then this wont be called unless the tracepoint is
+> activated. Will keep the logic from doing anything with
+> acpi_hest_generic_data_payload().
+>
+> Note, that trace_*_enabled() is activated via a jump_label, thus
+> there's no branches involved.
+>
+> -- Steve
+Hello Steve,
 
+In v9 I currently have this and the ARM trace event from this series 
+both wrapped in an
+ifdef verifying that CONFIG_RAS is enabled. This resolves the kbuild 
+failures and
+will have this code compiled out when that config isn't enabled. Do you 
+think I
+should use the ifdef or use these *_enabled() functions?
 
-coccinelle warnings: (new ones prefixed by >>)
+Thanks,
+Tyler
+>> +			void *unknown_err = acpi_hest_generic_data_payload(gdata);
+>> +			trace_unknown_sec_event(&sec_type,
+>> +					fru_id, fru_text, sec_sev,
+>> +					unknown_err, gdata->error_data_length);
+>> +		}
+>>   	}
+>>   }
+>>   
+>>
 
->> drivers/bluetooth/btwilink.c:350:3-8: No need to set .owner here. The core will do it.
-
-Please review and possibly fold the followup patch.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
