@@ -1,134 +1,38 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 15 Feb 2017 17:55:57 +0100
-Subject: [PATCH 2/2] iio: adc: stm32: add dt option to set resolution
-In-Reply-To: <1487177757-19427-1-git-send-email-fabrice.gasnier@st.com>
-References: <1487177757-19427-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1487177757-19427-3-git-send-email-fabrice.gasnier@st.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Wed, 15 Feb 2017 17:55:27 +0100
+Subject: [PATCH 10/11] Documentation: devicetree: arm: Document Actions Semi
+ S900
+In-Reply-To: <20170215165528.10052-1-afaerber@suse.de>
+References: <20170215165528.10052-1-afaerber@suse.de>
+Message-ID: <20170215165528.10052-11-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-stm32 adc supports several resolution. Add 'st,adc-res' dt optional
-property to set it. Default to maximum resolution in case it isn't set.
-
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- drivers/iio/adc/stm32-adc.c | 50 ++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 49 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/acts.txt | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-index 9b49a6ad..268b457a 100644
---- a/drivers/iio/adc/stm32-adc.c
-+++ b/drivers/iio/adc/stm32-adc.c
-@@ -60,6 +60,8 @@
- #define STM32F4_EOC			BIT(1)
+diff --git a/Documentation/devicetree/bindings/arm/acts.txt b/Documentation/devicetree/bindings/arm/acts.txt
+index a34d647..cdbfe12 100644
+--- a/Documentation/devicetree/bindings/arm/acts.txt
++++ b/Documentation/devicetree/bindings/arm/acts.txt
+@@ -17,3 +17,16 @@ Modules:
+ Boards:
  
- /* STM32F4_ADC_CR1 - bit fields */
-+#define STM32F4_RES_SHIFT		24
-+#define STM32F4_RES_MASK		GENMASK(25, 24)
- #define STM32F4_SCAN			BIT(8)
- #define STM32F4_EOCIE			BIT(5)
- 
-@@ -141,6 +143,7 @@ struct stm32_adc_regs {
-  * @lock:		spinlock
-  * @bufi:		data buffer index
-  * @num_conv:		expected number of scan conversions
-+ * @res:		data resolution (e.g. RES bitfield value)
-  * @trigger_polarity:	external trigger polarity (e.g. exten)
-  * @dma_chan:		dma channel
-  * @rx_buf:		dma rx buffer cpu address
-@@ -157,6 +160,7 @@ struct stm32_adc {
- 	spinlock_t		lock;		/* interrupt lock */
- 	unsigned int		bufi;
- 	unsigned int		num_conv;
-+	u32			res;
- 	u32			trigger_polarity;
- 	struct dma_chan		*dma_chan;
- 	u8			*rx_buf;
-@@ -196,6 +200,11 @@ struct stm32_adc_chan_spec {
- 	{ IIO_VOLTAGE, 15, "in15" },
- };
- 
-+static const unsigned int stm32f4_adc_resolutions[] = {
-+	/* sorted values so the index matches RES[1:0] in STM32F4_ADC_CR1 */
-+	12, 10, 8, 6,
-+};
+  - LeMaker Guitar Base Board rev. B: "lemaker,guitar-bb-rev-b", "lemaker,guitar"
 +
- /**
-  * stm32f4_sq - describe regular sequence registers
-  * - L: sequence len (register & bit field)
-@@ -302,6 +311,14 @@ static void stm32_adc_conv_irq_disable(struct stm32_adc *adc)
- 	stm32_adc_clr_bits(adc, STM32F4_ADC_CR1, STM32F4_EOCIE);
- }
- 
-+static void stm32_adc_set_res(struct stm32_adc *adc)
-+{
-+	u32 val = stm32_adc_readl(adc, STM32F4_ADC_CR1);
 +
-+	val = (val & ~STM32F4_RES_MASK) | (adc->res << STM32F4_RES_SHIFT);
-+	stm32_adc_writel(adc, STM32F4_ADC_CR1, val);
-+}
++S900 SoC
++========
 +
- /**
-  * stm32_adc_start_conv() - Start conversions for regular channels.
-  * @adc: stm32 adc instance
-@@ -870,11 +887,37 @@ static irqreturn_t stm32_adc_trigger_handler(int irq, void *p)
- 	{},
- };
- 
-+static int stm32_adc_of_get_resolution(struct iio_dev *indio_dev)
-+{
-+	struct device_node *node = indio_dev->dev.of_node;
-+	struct stm32_adc *adc = iio_priv(indio_dev);
-+	unsigned int i;
-+	u32 res;
++Required root node properties:
 +
-+	if (of_property_read_u32(node, "st,adc-res", &res))
-+		res = stm32f4_adc_resolutions[0];
++- compatible :  "acts,s900"
 +
-+	for (i = 0; i < ARRAY_SIZE(stm32f4_adc_resolutions); i++)
-+		if (res == stm32f4_adc_resolutions[i])
-+			break;
-+	if (i >= ARRAY_SIZE(stm32f4_adc_resolutions)) {
-+		dev_err(&indio_dev->dev, "Bad resolution: %u bits\n", res);
-+		return -EINVAL;
-+	}
 +
-+	dev_dbg(&indio_dev->dev, "Using %u bits resolution\n", res);
-+	adc->res = i;
++Boards:
 +
-+	return 0;
-+}
-+
- static void stm32_adc_chan_init_one(struct iio_dev *indio_dev,
- 				    struct iio_chan_spec *chan,
- 				    const struct stm32_adc_chan_spec *channel,
- 				    int scan_index)
- {
-+	struct stm32_adc *adc = iio_priv(indio_dev);
-+
- 	chan->type = channel->type;
- 	chan->channel = channel->channel;
- 	chan->datasheet_name = channel->name;
-@@ -883,7 +926,7 @@ static void stm32_adc_chan_init_one(struct iio_dev *indio_dev,
- 	chan->info_mask_separate = BIT(IIO_CHAN_INFO_RAW);
- 	chan->info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE);
- 	chan->scan_type.sign = 'u';
--	chan->scan_type.realbits = 12;
-+	chan->scan_type.realbits = stm32f4_adc_resolutions[adc->res];
- 	chan->scan_type.storagebits = 16;
- 	chan->ext_info = stm32_adc_ext_info;
- }
-@@ -1022,6 +1065,11 @@ static int stm32_adc_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
-+	ret = stm32_adc_of_get_resolution(indio_dev);
-+	if (ret < 0)
-+		goto err_clk_disable;
-+	stm32_adc_set_res(adc);
-+
- 	ret = stm32_adc_chan_of_init(indio_dev);
- 	if (ret < 0)
- 		goto err_clk_disable;
++ - uCRobotics Bubblegum-96: "ucrobotics,bubblegum-96"
 -- 
-1.9.1
+2.10.2
