@@ -1,38 +1,67 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 15 Feb 2017 10:08:13 +0100
-Subject: [PATCH 0/4 linux-next] usb: gadget: udc: atmel: Endpoint
- allocation scheme fixes
-In-Reply-To: <cover.1487007870.git.cristian.birsan@microchip.com>
-References: <cover.1487007870.git.cristian.birsan@microchip.com>
-Message-ID: <38c7331c-0286-9874-c3b5-819c8dba6153@atmel.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 15 Feb 2017 10:15:53 +0100
+Subject: [PATCH v2] reset: Add i.MX7 SRC reset driver
+In-Reply-To: <CAHQ1cqGHujsDsC5dtXk3_1u0kKme8k96jgSctp5XFSHuYKeE=A@mail.gmail.com>
+References: <20170213153338.13518-1-andrew.smirnov@gmail.com>
+ <1487004643.2873.97.camel@pengutronix.de>
+ <CAHQ1cqFXiu03902jWLkg8X6jdQ3+TiLj02dSDFBAVH98ABo70A@mail.gmail.com>
+ <1487089919.2305.22.camel@pengutronix.de>
+ <CAHQ1cqGHujsDsC5dtXk3_1u0kKme8k96jgSctp5XFSHuYKeE=A@mail.gmail.com>
+Message-ID: <1487150153.2433.11.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 14/02/2017 ? 17:09, cristian.birsan at microchip.com a ?crit :
-> From: Cristian Birsan <cristian.birsan@microchip.com>
+On Tue, 2017-02-14 at 12:11 -0800, Andrey Smirnov wrote:
+[...]
+> > Arguably, the A7 resets should not be handled by the peripheral reset
+> > controller, but at least for the others I see no reason not to leave
+> > space for them in the index table.
 > 
-> This patch series provides fixes, based on the feedback received on the mailing list, for
-> the following:
-> 	- fifo table parameters validation against device tree values
-> 	- coding style
-> 	- message display for EP configuration error
-> 	- Kconfig comments for fifo_mode=0
+> If for some bizarre reason one was to run Linux on M4 and use A7 as
+> applications processor, resetting A7 might be useful. But that's a
+> very unlikely use-case.
+>
+> > In fact, since unused reset controls
+> > don't use space, why not number them all?
 > 
-> Cristian Birsan (4):
->   usb: gadget: udc: atmel: Check fifo configuration values against
->     device tree
->   usb: gadget: udc: atmel: Minor code cleanup
->   usb: gadget: udc: atmel: Use dev_warn() to display EP configuration
->     error
->   usb: gadget: udc: atmel: Update Kconfig help for fifo_mode = 0
+> IMHO because it is unused code and because those numbers constitute an
+> interface which once set will be hard to change if need be.
 > 
->  drivers/usb/gadget/udc/Kconfig          |  5 ++--
->  drivers/usb/gadget/udc/atmel_usba_udc.c | 47 ++++++++++++++++++++++-----------
->  2 files changed, 35 insertions(+), 17 deletions(-)
+> But that's not that important and I don't feel particularly strong
+> about that point, so I'll add those sources in v3.
 
-I'm okay with the whole series:
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Thanks.
 
-Thanks, regards,
--- 
-Nicolas Ferre
+> Do you insist that I split what I call IMX7_RESET_PCIEPHY into
+> PCIEPHY_G_RST and PCIEPHY_BTN or can I keep it as a single logical
+> reset?
+
+No, I say keep it as is. For now I'll assume this is not a reset, but
+some other interface signal that just happens to be routed out to the
+SRC and just happens to be toggled around the same time in the enable
+sequence.
+
+[...]
+> >> >> +#define IMX7_RESET_PCIE_CTRL_APPS    0
+> >> >> +#define IMX7_RESET_PCIEPHY           1
+> >> >
+> >> > It would expect these to be numbered in the order they appear in the
+> >> > register map, not starting from the end. Could you add all available
+> >> > peripheral resets to this list, in the correct order?
+> >>
+> >> The numbering is just a consequence of me adding only resets I could
+> >> exercise with my code and numbering then starting from zero. I also
+> >> was hesitant adding more sources since it seemed to me that some of
+> >> less trivial registers in that IP block might be best represented as a
+> >> single reset source doing something more sophisticated that just
+> >> setting a bit under the hood.
+> >
+> > Any in particular?
+> 
+> USBPHY1/2 and maybe MIPI resets? But that's no more than a gut feeling.
+
+Is there any downstream code that already handles these resets? At least
+for the USB PHYs I'd expect there has to be something we could look at.
+
+regards
+Philipp
