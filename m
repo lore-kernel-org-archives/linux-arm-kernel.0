@@ -1,160 +1,153 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 15 Feb 2017 18:48:16 +0530
-Subject: [PATCH 07/10] PCI: dwc: designware: Fix style errors in
- pcie-designware.c
+Date: Wed, 15 Feb 2017 18:48:19 +0530
+Subject: [PATCH 10/10] PCI: dwc: Remove dependency of designware to CONFIG_PCI
 In-Reply-To: <1487164699-30708-1-git-send-email-kishon@ti.com>
 References: <1487164699-30708-1-git-send-email-kishon@ti.com>
-Message-ID: <1487164699-30708-8-git-send-email-kishon@ti.com>
+Message-ID: <1487164699-30708-11-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional change. Fix all checkpatch warnings and check errors
-in pcie-designware.c
+CONFIG_PCI is used to enable the host mode PCI. In preparation for adding
+endpoint mode support to designware driver, remove the dependency of
+designware to CONFIG_PCI and make only the host specific part depend on
+CONFIG_PCI.
 
-Acked-By: Joao Pinto <jpinto@synopsys.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/pci/dwc/pcie-designware.c |   42 ++++++++++++++++++-------------------
- 1 file changed, 21 insertions(+), 21 deletions(-)
+ drivers/Makefile        |    3 +++
+ drivers/pci/Makefile    |    3 ---
+ drivers/pci/dwc/Kconfig |   13 ++++++++++++-
+ 3 files changed, 15 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
-index 237da48..622d416 100644
---- a/drivers/pci/dwc/pcie-designware.c
-+++ b/drivers/pci/dwc/pcie-designware.c
-@@ -40,13 +40,13 @@ int dw_pcie_read(void __iomem *addr, int size, u32 *val)
- 		return PCIBIOS_BAD_REGISTER_NUMBER;
- 	}
+diff --git a/drivers/Makefile b/drivers/Makefile
+index 060026a..f521cb0 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -15,6 +15,9 @@ obj-$(CONFIG_PINCTRL)		+= pinctrl/
+ obj-$(CONFIG_GPIOLIB)		+= gpio/
+ obj-y				+= pwm/
+ obj-$(CONFIG_PCI)		+= pci/
++# PCI dwc controller drivers
++obj-y				+= pci/dwc/
++
+ obj-$(CONFIG_PARISC)		+= parisc/
+ obj-$(CONFIG_RAPIDIO)		+= rapidio/
+ obj-y				+= video/
+diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
+index b7e9751..8db5079 100644
+--- a/drivers/pci/Makefile
++++ b/drivers/pci/Makefile
+@@ -66,8 +66,5 @@ obj-$(CONFIG_OF) += of.o
  
--	if (size == 4)
-+	if (size == 4) {
- 		*val = readl(addr);
--	else if (size == 2)
-+	} else if (size == 2) {
- 		*val = readw(addr);
--	else if (size == 1)
-+	} else if (size == 1) {
- 		*val = readb(addr);
--	else {
-+	} else {
- 		*val = 0;
- 		return PCIBIOS_BAD_REGISTER_NUMBER;
- 	}
-@@ -200,16 +200,15 @@ irqreturn_t dw_handle_msi_irq(struct pcie_port *pp)
+ ccflags-$(CONFIG_PCI_DEBUG) := -DDEBUG
  
- 	for (i = 0; i < MAX_MSI_CTRLS; i++) {
- 		dw_pcie_rd_own_conf(pp, PCIE_MSI_INTR0_STATUS + i * 12, 4,
--				(u32 *)&val);
-+				    (u32 *)&val);
- 		if (val) {
- 			ret = IRQ_HANDLED;
- 			pos = 0;
- 			while ((pos = find_next_bit(&val, 32, pos)) != 32) {
- 				irq = irq_find_mapping(pp->irq_domain,
--						i * 32 + pos);
--				dw_pcie_wr_own_conf(pp,
--						PCIE_MSI_INTR0_STATUS + i * 12,
--						4, 1 << pos);
-+						       i * 32 + pos);
-+				dw_pcie_wr_own_conf(pp, PCIE_MSI_INTR0_STATUS +
-+						    i * 12, 4, 1 << pos);
- 				generic_handle_irq(irq);
- 				pos++;
- 			}
-@@ -275,8 +274,9 @@ static void dw_pcie_msi_set_irq(struct pcie_port *pp, int irq)
- static int assign_irq(int no_irqs, struct msi_desc *desc, int *pos)
- {
- 	int irq, pos0, i;
--	struct pcie_port *pp = (struct pcie_port *) msi_desc_to_pci_sysdata(desc);
-+	struct pcie_port *pp;
+-# PCI dwc controller drivers
+-obj-y += dwc/
+-
+ # PCI host controller drivers
+ obj-y += host/
+diff --git a/drivers/pci/dwc/Kconfig b/drivers/pci/dwc/Kconfig
+index ab92a0c..dfb8a69 100644
+--- a/drivers/pci/dwc/Kconfig
++++ b/drivers/pci/dwc/Kconfig
+@@ -1,16 +1,17 @@
+ menu "DesignWare PCI Core Support"
+-	depends on PCI
  
-+	pp  = (struct pcie_port *)msi_desc_to_pci_sysdata(desc);
- 	pos0 = bitmap_find_free_region(pp->msi_irq_in_use, MAX_MSI_IRQS,
- 				       order_base_2(no_irqs));
- 	if (pos0 < 0)
-@@ -338,7 +338,7 @@ static void dw_msi_setup_msg(struct pcie_port *pp, unsigned int irq, u32 pos)
- }
+ config PCIE_DW
+ 	bool
  
- static int dw_msi_setup_irq(struct msi_controller *chip, struct pci_dev *pdev,
--			struct msi_desc *desc)
-+			    struct msi_desc *desc)
- {
- 	int irq, pos;
- 	struct pcie_port *pp = pdev->bus->sysdata;
-@@ -386,7 +386,7 @@ static void dw_msi_teardown_irq(struct msi_controller *chip, unsigned int irq)
- {
- 	struct irq_data *data = irq_get_irq_data(irq);
- 	struct msi_desc *msi = irq_data_get_msi_desc(data);
--	struct pcie_port *pp = (struct pcie_port *) msi_desc_to_pci_sysdata(msi);
-+	struct pcie_port *pp = (struct pcie_port *)msi_desc_to_pci_sysdata(msi);
+ config PCIE_DW_HOST
+         bool
++	depends on PCI
+ 	depends on PCI_MSI_IRQ_DOMAIN
+         select PCIE_DW
  
- 	clear_irq_range(pp, irq, 1, data->hwirq);
- }
-@@ -428,7 +428,7 @@ int dw_pcie_link_up(struct dw_pcie *pci)
- }
+ config PCI_DRA7XX
+ 	bool "TI DRA7xx PCIe controller"
++	depends on PCI
+ 	depends on OF && HAS_IOMEM && TI_PIPE3
+ 	depends on PCI_MSI_IRQ_DOMAIN
+ 	select PCIE_DW_HOST
+@@ -21,6 +22,7 @@ config PCI_DRA7XX
  
- static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
--			irq_hw_number_t hwirq)
-+			   irq_hw_number_t hwirq)
- {
- 	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
- 	irq_set_chip_data(irq, domain->host_data);
-@@ -465,8 +465,8 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ config PCIE_DW_PLAT
+ 	bool "Platform bus based DesignWare PCIe Controller"
++	depends on PCI
+ 	depends on PCI_MSI_IRQ_DOMAIN
+ 	select PCIE_DW_HOST
+ 	---help---
+@@ -33,6 +35,7 @@ config PCIE_DW_PLAT
  
- 	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
- 	if (cfg_res) {
--		pp->cfg0_size = resource_size(cfg_res)/2;
--		pp->cfg1_size = resource_size(cfg_res)/2;
-+		pp->cfg0_size = resource_size(cfg_res) / 2;
-+		pp->cfg1_size = resource_size(cfg_res) / 2;
- 		pp->cfg0_base = cfg_res->start;
- 		pp->cfg1_base = cfg_res->start + pp->cfg0_size;
- 	} else if (!pp->va_cfg0_base) {
-@@ -505,8 +505,8 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 			break;
- 		case 0:
- 			pp->cfg = win->res;
--			pp->cfg0_size = resource_size(pp->cfg)/2;
--			pp->cfg1_size = resource_size(pp->cfg)/2;
-+			pp->cfg0_size = resource_size(pp->cfg) / 2;
-+			pp->cfg1_size = resource_size(pp->cfg) / 2;
- 			pp->cfg0_base = pp->cfg->start;
- 			pp->cfg1_base = pp->cfg->start + pp->cfg0_size;
- 			break;
-@@ -612,7 +612,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- }
+ config PCI_EXYNOS
+ 	bool "Samsung Exynos PCIe controller"
++	depends on PCI
+ 	depends on SOC_EXYNOS5440
+ 	depends on PCI_MSI_IRQ_DOMAIN
+ 	select PCIEPORTBUS
+@@ -40,6 +43,7 @@ config PCI_EXYNOS
  
- static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
--		u32 devfn, int where, int size, u32 *val)
-+				 u32 devfn, int where, int size, u32 *val)
- {
- 	int ret, type;
- 	u32 busdev, cfg_size;
-@@ -651,7 +651,7 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
- }
+ config PCI_IMX6
+ 	bool "Freescale i.MX6 PCIe controller"
++	depends on PCI
+ 	depends on SOC_IMX6Q
+ 	depends on PCI_MSI_IRQ_DOMAIN
+ 	select PCIEPORTBUS
+@@ -47,6 +51,7 @@ config PCI_IMX6
  
- static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
--		u32 devfn, int where, int size, u32 val)
-+				 u32 devfn, int where, int size, u32 val)
- {
- 	int ret, type;
- 	u32 busdev, cfg_size;
-@@ -708,7 +708,7 @@ static int dw_pcie_valid_device(struct pcie_port *pp, struct pci_bus *bus,
- }
+ config PCIE_SPEAR13XX
+ 	bool "STMicroelectronics SPEAr PCIe controller"
++	depends on PCI
+ 	depends on ARCH_SPEAR13XX
+ 	depends on PCI_MSI_IRQ_DOMAIN
+ 	select PCIEPORTBUS
+@@ -56,6 +61,7 @@ config PCIE_SPEAR13XX
  
- static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
--			int size, u32 *val)
-+			   int size, u32 *val)
- {
- 	struct pcie_port *pp = bus->sysdata;
+ config PCI_KEYSTONE
+ 	bool "TI Keystone PCIe controller"
++	depends on PCI
+ 	depends on ARCH_KEYSTONE
+ 	depends on PCI_MSI_IRQ_DOMAIN
+ 	select PCIEPORTBUS
+@@ -68,6 +74,7 @@ config PCI_KEYSTONE
  
-@@ -724,7 +724,7 @@ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
- }
+ config PCI_LAYERSCAPE
+ 	bool "Freescale Layerscape PCIe controller"
++	depends on PCI
+ 	depends on OF && (ARM || ARCH_LAYERSCAPE)
+ 	depends on PCI_MSI_IRQ_DOMAIN
+ 	select MFD_SYSCON
+@@ -78,6 +85,7 @@ config PCI_LAYERSCAPE
+ config PCI_HISI
+ 	depends on OF && ARM64
+ 	bool "HiSilicon Hip05 and Hip06 SoCs PCIe controllers"
++	depends on PCI
+ 	depends on PCI_MSI_IRQ_DOMAIN
+ 	select PCIEPORTBUS
+ 	select PCIE_DW_HOST
+@@ -87,6 +95,7 @@ config PCI_HISI
  
- static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
--			int where, int size, u32 val)
-+			   int where, int size, u32 val)
- {
- 	struct pcie_port *pp = bus->sysdata;
+ config PCIE_QCOM
+ 	bool "Qualcomm PCIe controller"
++	depends on PCI
+ 	depends on ARCH_QCOM && OF
+ 	depends on PCI_MSI_IRQ_DOMAIN
+ 	select PCIEPORTBUS
+@@ -98,6 +107,7 @@ config PCIE_QCOM
  
+ config PCIE_ARMADA_8K
+ 	bool "Marvell Armada-8K PCIe controller"
++	depends on PCI
+ 	depends on ARCH_MVEBU
+ 	depends on PCI_MSI_IRQ_DOMAIN
+ 	select PCIEPORTBUS
+@@ -110,6 +120,7 @@ config PCIE_ARMADA_8K
+ 
+ config PCIE_ARTPEC6
+ 	bool "Axis ARTPEC-6 PCIe controller"
++	depends on PCI
+ 	depends on MACH_ARTPEC6
+ 	depends on PCI_MSI_IRQ_DOMAIN
+ 	select PCIEPORTBUS
 -- 
 1.7.9.5
