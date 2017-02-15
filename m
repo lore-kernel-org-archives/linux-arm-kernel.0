@@ -1,73 +1,211 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 15 Feb 2017 21:37:18 +0000
-Subject: [PATCH v3] ARM: wire up HWCAP2 feature bits to the CPU modalias
-Message-ID: <1487194638-19675-1-git-send-email-ard.biesheuvel@linaro.org>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 15 Feb 2017 16:39:43 -0500
+Subject: [PATCH v4] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
+Message-ID: <20170215213944.17901-1-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wire up the generic support for exposing CPU feature bits via the
-modalias in /sys/device/system/cpu. This allows udev to automatically
-load modules for things like crypto algorithms that are implemented
-using optional instructions.
+The Qualcomm Datacenter Technologies QDF2400 family of SoCs contains a
+custom (non-PrimeCell) implementation of the SBSA UART. Occasionally the
+BUSY bit in the Flag Register gets stuck as 1, erratum 44 for both 2432v1
+and 2400v1 SoCs.Checking that the Transmit FIFO Empty (TXFE) bit is 0,
+instead of checking that the BUSY bit is 1, works around the issue.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+To facilitate this substitution of flags and values, introduce
+vendor-specific inversion of Feature Register bits when UART AMBA Port
+(UAP) data is available. For the earlycon case, prior to UAP availability,
+implement alternative putc and early_write functions.
+
+Similar to what how ARMv8 ACPI PCI quirks are detected during MCFG parsing,
+check the OEM fields of the Serial Port Console Redirection (SPCR) ACPI
+table to determine if the current platform is known to be affected by the
+erratum.
+
+Signed-off-by: Christopher Covington <cov@codeaurora.org>
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Acked-by: Timur Tabi <timur@codeaurora.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
-v3: add offset of 32 so that ELF_HWCAP could be added in the future as
-    well
+Changes in v4:
+* Added Acks from Mark and Timur
+* Dropped arm64/silicon-errata.txt change (will be sent separately)
+* Rebased onto gregkh/tty.git tty-next
+    http://git.kernel.org/cgit/linux/kernel/git/gregkh/tty.git/log/?h=tty-next
+---
+ drivers/acpi/spcr.c             | 23 ++++++++++++++
+ drivers/tty/serial/amba-pl011.c | 66 ++++++++++++++++++++++++++++++++++++-----
+ 2 files changed, 82 insertions(+), 7 deletions(-)
 
- arch/arm/Kconfig                  |  1 +
- arch/arm/include/asm/cpufeature.h | 32 ++++++++++++++++++++
- 2 files changed, 33 insertions(+)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 186c4c214e0a..53689e386c47 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -21,6 +21,7 @@ config ARM
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
-+	select GENERIC_CPU_AUTOPROBE
- 	select GENERIC_EARLY_IOREMAP
- 	select GENERIC_IDLE_POLL_SETUP
- 	select GENERIC_IRQ_PROBE
-diff --git a/arch/arm/include/asm/cpufeature.h b/arch/arm/include/asm/cpufeature.h
-new file mode 100644
-index 000000000000..ec3ad45761aa
---- /dev/null
-+++ b/arch/arm/include/asm/cpufeature.h
-@@ -0,0 +1,32 @@
+diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
+index b8019c4c1d38..2b5d0fac81f0 100644
+--- a/drivers/acpi/spcr.c
++++ b/drivers/acpi/spcr.c
+@@ -16,6 +16,26 @@
+ #include <linux/kernel.h>
+ #include <linux/serial_core.h>
+ 
 +/*
-+ * Copyright (C) 2017 Linaro Ltd. <ard.biesheuvel@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * Some Qualcomm Datacenter Technologies SoCs have a defective UART BUSY bit.
++ * Detect them by examining the OEM fields in the SPCR header, similiar to PCI
++ * quirk detection in pci_mcfg.c.
 + */
-+
-+#ifndef __ASM_CPUFEATURE_H
-+#define __ASM_CPUFEATURE_H
-+
-+#include <asm/hwcap.h>
-+
-+/*
-+ * Due to the fact that ELF_HWCAP is a 32-bit type on ARM, and given the number
-+ * of optional CPU features it defines, ARM's CPU capability bits have been
-+ * distributed over separate elf_hwcap and elf_hwcap2 variables, each of which
-+ * covers a subset of the available CPU features.
-+ *
-+ * Currently, only a few of those are suitable for automatic module loading
-+ * (which is the primary use case of this facility) and those happen to be all
-+ * covered by HWCAP2. So let's only expose those via the CPU modalias for now.
-+ */
-+#define MAX_CPU_FEATURES	64
-+#define cpu_feature(x)		(32 + ilog2(HWCAP2_ ## x))
-+
-+static inline bool cpu_have_feature(unsigned int num)
++static bool qdf2400_erratum_44_present(struct acpi_table_header *h)
 +{
-+	return elf_hwcap2 & (1UL << (num - 32));
++	if (memcmp(h->oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
++		return false;
++
++	if (!memcmp(h->oem_table_id, "QDF2432 ", ACPI_OEM_TABLE_ID_SIZE))
++		return true;
++
++	if (!memcmp(h->oem_table_id, "QDF2400 ", ACPI_OEM_TABLE_ID_SIZE) &&
++			h->oem_revision == 0)
++		return true;
++
++	return false;
 +}
 +
-+#endif
+ /**
+  * parse_spcr() - parse ACPI SPCR table and add preferred console
+  *
+@@ -93,6 +113,9 @@ int __init parse_spcr(bool earlycon)
+ 		goto done;
+ 	}
+ 
++	if (qdf2400_erratum_44_present(&table->header))
++		uart = "qdf2400_e44";
++
+ 	snprintf(opts, sizeof(opts), "%s,%s,0x%llx,%d", uart, iotype,
+ 		 table->serial_port.address, baud_rate);
+ 
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 533b18d4a587..8789ea423ccf 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -97,6 +97,7 @@ struct vendor_data {
+ 	unsigned int		fr_dsr;
+ 	unsigned int		fr_cts;
+ 	unsigned int		fr_ri;
++	unsigned int		inv_fr;
+ 	bool			access_32b;
+ 	bool			oversampling;
+ 	bool			dma_threshold;
+@@ -141,6 +142,30 @@ static struct vendor_data vendor_sbsa = {
+ 	.fixed_options		= true,
+ };
+ 
++/*
++ * Erratum 44 for QDF2432v1 and QDF2400v1 SoCs describes the BUSY bit as
++ * occasionally getting stuck as 1. To avoid the potential for a hang, check
++ * TXFE == 0 instead of BUSY == 1. This may not be suitable for all UART
++ * implementations, so only do so if an affected platform is detected in
++ * parse_spcr().
++ */
++static bool qdf2400_e44_present = false;
++
++static struct vendor_data vendor_qdt_qdf2400_e44 = {
++	.reg_offset		= pl011_std_offsets,
++	.fr_busy		= UART011_FR_TXFE,
++	.fr_dsr			= UART01x_FR_DSR,
++	.fr_cts			= UART01x_FR_CTS,
++	.fr_ri			= UART011_FR_RI,
++	.inv_fr			= UART011_FR_TXFE,
++	.access_32b		= true,
++	.oversampling		= false,
++	.dma_threshold		= false,
++	.cts_event_workaround	= false,
++	.always_enabled		= true,
++	.fixed_options		= true,
++};
++
+ static u16 pl011_st_offsets[REG_ARRAY_SIZE] = {
+ 	[REG_DR] = UART01x_DR,
+ 	[REG_ST_DMAWM] = ST_UART011_DMAWM,
+@@ -1518,7 +1543,10 @@ static unsigned int pl011_tx_empty(struct uart_port *port)
+ {
+ 	struct uart_amba_port *uap =
+ 	    container_of(port, struct uart_amba_port, port);
+-	unsigned int status = pl011_read(uap, REG_FR);
++
++	/* Allow feature register bits to be inverted to work around errata */
++	unsigned int status = pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr;
++
+ 	return status & (uap->vendor->fr_busy | UART01x_FR_TXFF) ?
+ 							0 : TIOCSER_TEMT;
+ }
+@@ -2215,10 +2243,12 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ 	uart_console_write(&uap->port, s, count, pl011_console_putchar);
+ 
+ 	/*
+-	 *	Finally, wait for transmitter to become empty
+-	 *	and restore the TCR
++	 *	Finally, wait for transmitter to become empty and restore the
++	 *	TCR. Allow feature register bits to be inverted to work around
++	 *	errata.
+ 	 */
+-	while (pl011_read(uap, REG_FR) & uap->vendor->fr_busy)
++	while ((pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr)
++						& uap->vendor->fr_busy)
+ 		cpu_relax();
+ 	if (!uap->vendor->always_enabled)
+ 		pl011_write(old_cr, uap, REG_CR);
+@@ -2340,8 +2370,12 @@ static int __init pl011_console_match(struct console *co, char *name, int idx,
+ 	resource_size_t addr;
+ 	int i;
+ 
+-	if (strcmp(name, "pl011") != 0 || strcmp(name, "ttyAMA") != 0)
++	if (strcmp(name, "qdf2400_e44") == 0) {
++		pr_info_once("UART: Working around QDF2400 SoC erratum 44");
++		qdf2400_e44_present = true;
++	} else if (strcmp(name, "pl011") != 0 || strcmp(name, "ttyAMA") != 0) {
+ 		return -ENODEV;
++	}
+ 
+ 	if (uart_parse_earlycon(options, &iotype, &addr, &options))
+ 		return -ENODEV;
+@@ -2383,6 +2417,22 @@ static struct console amba_console = {
+ 
+ #define AMBA_CONSOLE	(&amba_console)
+ 
++static void qdf2400_e44_putc(struct uart_port *port, int c)
++{
++	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
++		cpu_relax();
++	writel(c, port->membase + UART01x_DR);
++	while (!(readl(port->membase + UART01x_FR) & UART011_FR_TXFE))
++		cpu_relax();
++}
++
++static void qdf2400_e44_early_write(struct console *con, const char *s, unsigned n)
++{
++	struct earlycon_device *dev = con->data;
++
++	uart_console_write(&dev->port, s, n, qdf2400_e44_putc);
++}
++
+ static void pl011_putc(struct uart_port *port, int c)
+ {
+ 	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+@@ -2408,7 +2458,8 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
+ 	if (!device->port.membase)
+ 		return -ENODEV;
+ 
+-	device->con->write = pl011_early_write;
++	device->con->write = qdf2400_e44_present ?
++				qdf2400_e44_early_write : pl011_early_write;
+ 	return 0;
+ }
+ OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
+@@ -2645,7 +2696,8 @@ static int sbsa_uart_probe(struct platform_device *pdev)
+ 	uap->port.irq	= ret;
+ 
+ 	uap->reg_offset	= vendor_sbsa.reg_offset;
+-	uap->vendor	= &vendor_sbsa;
++	uap->vendor	= qdf2400_e44_present ?
++					&vendor_qdt_qdf2400_e44 : &vendor_sbsa;
+ 	uap->fifosize	= 32;
+ 	uap->port.iotype = vendor_sbsa.access_32b ? UPIO_MEM32 : UPIO_MEM;
+ 	uap->port.ops	= &sbsa_uart_pops;
 -- 
-2.7.4
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
+Forum, a Linux Foundation Collaborative Project.
