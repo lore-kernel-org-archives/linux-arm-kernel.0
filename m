@@ -1,74 +1,41 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 15 Feb 2017 10:52:34 -0500
-Subject: [PATCH V8 08/10] ras: acpi / apei: generate trace event for
- unrecognized CPER section
-In-Reply-To: <1485969413-23577-9-git-send-email-tbaicar@codeaurora.org>
-References: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
- <1485969413-23577-9-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170215105234.4921db1f@gandalf.local.home>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Wed, 15 Feb 2017 09:57:50 -0600
+Subject: [PATCH] reset-socfpga: Fix nr_resets property
+In-Reply-To: <1487170620.2433.43.camel@pengutronix.de>
+References: <3302533.E0QKRXBlfc@pcimr>
+ <1487170620.2433.43.camel@pengutronix.de>
+Message-ID: <d9a873a0-8e71-840b-c54d-077a5ad77237@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  1 Feb 2017 10:16:51 -0700
-Tyler Baicar <tbaicar@codeaurora.org> wrote:
 
-> @@ -452,11 +454,21 @@ static void ghes_do_proc(struct ghes *ghes,
->  {
->  	int sev, sec_sev;
->  	struct acpi_hest_generic_data *gdata;
-> +	uuid_le sec_type;
-> +	uuid_le *fru_id = &NULL_UUID_LE;
-> +	char *fru_text = "";
->  
->  	sev = ghes_severity(estatus->error_severity);
->  	apei_estatus_for_each_section(estatus, gdata) {
->  		sec_sev = ghes_severity(gdata->error_severity);
-> -		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
-> +		sec_type = *(uuid_le *)gdata->section_type;
-> +
-> +		if (gdata->validation_bits & CPER_SEC_VALID_FRU_ID)
-> +			fru_id = (uuid_le *)gdata->fru_id;
-> +		if (gdata->validation_bits & CPER_SEC_VALID_FRU_TEXT)
-> +			fru_text = gdata->fru_text;
-> +
-> +		if (!uuid_le_cmp(sec_type,
->  				 CPER_SEC_PLATFORM_MEM)) {
->  			struct cper_sec_mem_err *mem_err;
->  
-> @@ -467,7 +479,7 @@ static void ghes_do_proc(struct ghes *ghes,
->  			ghes_handle_memory_failure(gdata, sev);
->  		}
->  #ifdef CONFIG_ACPI_APEI_PCIEAER
-> -		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
-> +		else if (!uuid_le_cmp(sec_type,
->  				      CPER_SEC_PCIE)) {
->  			struct cper_sec_pcie *pcie_err;
->  
-> @@ -500,6 +512,12 @@ static void ghes_do_proc(struct ghes *ghes,
->  
->  		}
->  #endif
-> +		else {
 
-As an optimization, you can add:
+On 02/15/2017 08:57 AM, Philipp Zabel wrote:
+> [Added Dinh to Cc:]
+> 
+> On Wed, 2017-02-15 at 14:06 +0100, Rojhalat Ibrahim wrote:
+>> The SoC-FPGA reset controller driver defines NR_BANKS as 4 and uses that define
+>> for two unrelated purposes. It is used
+>> 1. as an increment for reset line banks which are 32-bit registers with 4-byte
+>> aligned addresses.
+>> 2. as the total number of reset line banks which together with the number of
+>> resets per bank (32) limits the total number of useable resets to 96 and the
+>> highest useable reset ID to 95.
+>> This is clearly wrong as there are resets with higher IDs than 95 defined in
+> 
+> 128 and 127, respectively.
+> 
+>> include/dt-bindings/reset/altr,rst-mgr.h and altr,rst-mgr-a10.h.
+>>
+>> The patch introduces a new define BANK_INCREMENT for calculating the register
+>> addresses as before and increases NR_BANKS to 6 for useable reset IDs up to 191.
+> 
+> Actually, looking at the Arria 10 TRM, it looks like there are
+> mpumodrst, per0modrst, per1modrst, brgmodrst, sysmodrst, coldmodrst,
+> nrstmodrst, and dbgmodrst registers on that SoC, which would mean
+> NR_BANKS should be changed to 8. Dinh, what do you think?
+> 
 
-		else if (trace_unknown_sec_event_enabled()) {
+Yes, I agree. Should be 8. Thanks for the patch!
 
-instead, as then this wont be called unless the tracepoint is
-activated. Will keep the logic from doing anything with
-acpi_hest_generic_data_payload().
-
-Note, that trace_*_enabled() is activated via a jump_label, thus
-there's no branches involved.
-
--- Steve
-
-> +			void *unknown_err = acpi_hest_generic_data_payload(gdata);
-> +			trace_unknown_sec_event(&sec_type,
-> +					fru_id, fru_text, sec_sev,
-> +					unknown_err, gdata->error_data_length);
-> +		}
->  	}
->  }
->  
->
+Dinh
