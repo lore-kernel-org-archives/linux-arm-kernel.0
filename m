@@ -1,60 +1,64 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 15 Feb 2017 09:36:03 +0000
-Subject: [PATCH v3 00/18] add support for AXP20X and AXP22X power supply
- drivers
-In-Reply-To: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
+Date: Wed, 15 Feb 2017 09:37:01 +0000
+Subject: [PATCH v3 05/18] mfd: axp20x: add ADC cells for AXP20X and
+ AXP22X PMICs
+In-Reply-To: <20170214094112.27426-6-quentin.schulz@free-electrons.com>
 References: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170215093603.5bk5hqq6p3istxdi@dell>
+ <20170214094112.27426-6-quentin.schulz@free-electrons.com>
+Message-ID: <20170215093701.k33jmzeu4xz5guet@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 14 Feb 2017, Quentin Schulz wrote:
 
-[...]
-
-> Quentin Schulz (18):
->   dt-bindings: power: battery: add constant-charge-current property
->   power: supply: power_supply_core: add constant-current-charge optional
->     property
->   mfd: axp20x: correct name of temperature data ADC registers
->   iio: adc: add support for X-Powers AXP20X and AXP22X PMICs ADCs
->   mfd: axp20x: add ADC cells for AXP20X and AXP22X PMICs
->   mfd: axp20x: add AC power supply cells for AXP22X PMICs
->   ARM: dtsi: axp209: add AC power supply subnode
->   ARM: dtsi: axp22x: add AC power supply subnode
->   ARM: dts: sun8i: sina33: enable ACIN power supply subnode
->   ARM: sun5i: chip: enable ACIN power supply subnode
->   dt-bindings: power: supply: add AXP20X/AXP22X battery DT binding
->   mfd: axp20x: add CHRG_CTRL1/2/3 to writeable regs for AXP20X/AXP22X
->   power: supply: add battery driver for AXP20X and AXP22X PMICs
->   mfd: axp20x: add MFD cells for AXP20X and AXP22X battery driver
->   ARM: dtsi: axp209: add battery power supply subnode
->   ARM: dtsi: axp22x: add battery power supply subnode
->   ARM: dts: sun8i: sina33: enable battery power supply subnode
->   ARM: sun5i: chip: enable battery power supply subnode
-
-This set is still missing a bunch of Acks.
-
->  .../bindings/power/supply/axp20x_battery.txt       |  20 +
->  .../devicetree/bindings/power/supply/battery.txt   |   2 +
->  arch/arm/boot/dts/axp209.dtsi                      |  10 +
->  arch/arm/boot/dts/axp22x.dtsi                      |  10 +
->  arch/arm/boot/dts/sun5i-r8-chip.dts                |   8 +
->  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |   8 +
->  drivers/iio/adc/Kconfig                            |  10 +
->  drivers/iio/adc/Makefile                           |   1 +
->  drivers/iio/adc/axp20x_adc.c                       | 606 +++++++++++++++++++++
->  drivers/mfd/axp20x.c                               |  29 +-
->  drivers/power/supply/Kconfig                       |  12 +
->  drivers/power/supply/Makefile                      |   1 +
->  drivers/power/supply/axp20x_battery.c              | 492 +++++++++++++++++
->  drivers/power/supply/power_supply_core.c           |   3 +
->  include/linux/mfd/axp20x.h                         |   4 +-
->  include/linux/power_supply.h                       |   1 +
->  16 files changed, 1214 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
->  create mode 100644 drivers/iio/adc/axp20x_adc.c
->  create mode 100644 drivers/power/supply/axp20x_battery.c
+> This adds the AXP20X/AXP22x ADCs driver to the mfd cells of the AXP209,
+> AXP221 and AXP223 MFD.
 > 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+> 
+> v3:
+>  - removed of_compatible as DT node has been removed,
+>  - use different names to probe the ADC driver,
+> 
+>  drivers/mfd/axp20x.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 9c2fd37..a44a2fe 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -581,6 +581,8 @@ static struct mfd_cell axp20x_cells[] = {
+>  	}, {
+>  		.name		= "axp20x-regulator",
+>  	}, {
+> +		.name		= "axp20x-adc",
+> +	}, {
+>  		.name		= "axp20x-ac-power-supply",
+>  		.of_compatible	= "x-powers,axp202-ac-power-supply",
+>  		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
+> @@ -601,6 +603,8 @@ static struct mfd_cell axp221_cells[] = {
+>  	}, {
+>  		.name		= "axp20x-regulator",
+>  	}, {
+> +		.name		= "axp22x-adc"
+> +	}, {
+>  		.name		= "axp20x-usb-power-supply",
+>  		.of_compatible	= "x-powers,axp221-usb-power-supply",
+>  		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
+> @@ -614,6 +618,8 @@ static struct mfd_cell axp223_cells[] = {
+>  		.num_resources		= ARRAY_SIZE(axp22x_pek_resources),
+>  		.resources		= axp22x_pek_resources,
+>  	}, {
+> +		.name		= "axp22x-adc",
+> +	}, {
+>  		.name			= "axp20x-regulator",
+>  	}, {
+>  		.name		= "axp20x-usb-power-supply",
 
 -- 
 Lee Jones
