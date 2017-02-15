@@ -1,63 +1,119 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Feb 2017 19:35:36 +0000
-Subject: [PATCH v2 0/5] ARM: add module autoloading support for crypto
- modules
-In-Reply-To: <CAKv+Gu_dLm5iKWbt3C5snjRayedvu9QHpC9oOS=+OPASRgnmOA@mail.gmail.com>
-References: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu9q5sH2_=3TZNbPAf3fdFB=F7Ut5swnp7qiUgwbuqemnA@mail.gmail.com>
- <CAKv+Gu9XSjprPBHqHvTQhJ-ChXeFjVQ1K0LPNcTvru6TgUEBDA@mail.gmail.com>
- <CAKv+Gu9DFFM6LEKxs5E9jugfRj4CKHb-5nVoD4uzrjmbvk9rGg@mail.gmail.com>
- <20170215192425.GD27312@n2100.armlinux.org.uk>
- <CAKv+Gu_dLm5iKWbt3C5snjRayedvu9QHpC9oOS=+OPASRgnmOA@mail.gmail.com>
-Message-ID: <20170215193536.GE27312@n2100.armlinux.org.uk>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Wed, 15 Feb 2017 12:36:13 -0700
+Subject: [PATCH 2/2] iommu: add warning when sharing groups
+In-Reply-To: <e7535138133c514c77004d64e40b4180@codeaurora.org>
+References: <1487107522-8695-1-git-send-email-okaya@codeaurora.org>
+ <1487107522-8695-2-git-send-email-okaya@codeaurora.org>
+ <20170214165155.7c49485e@t450s.home>
+ <e7535138133c514c77004d64e40b4180@codeaurora.org>
+Message-ID: <20170215123613.1df4b33a@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 07:29:39PM +0000, Ard Biesheuvel wrote:
-> On 15 February 2017 at 19:24, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > On Wed, Feb 15, 2017 at 05:16:47PM +0000, Ard Biesheuvel wrote:
-> >> On 31 January 2017 at 13:47, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> >> > On 19 January 2017 at 18:23, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> >> >> On 11 January 2017 at 17:01, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> >> >>> This series wires up the crypto modules that use the ARM 32-bit versions of
-> >> >>> the ARMv8 Crypto Extensions to udev autoloading, by exposing the HWCAP2
-> >> >>> feature bits via the CPU modalias. This is very similar to the arm64
-> >> >>> implementation, with the notable exception that ARM has its CPU feature
-> >> >>> definitions split across HWCAP and HWCAP2.
-> >> >>>
-> >> >>> Given that the crypto feature bits are all exposed via HWCAP2, and considering
-> >> >>> that there are currently no features exposed via HWCAP that are relevant to
-> >> >>> udev module autoloading, exposing HWCAP2 only should be sufficient, at least
-> >> >>> for now.
-> >> >>>
-> >> >>> Changes since v1:
-> >> >>> - rebase onto v4.10-rc2
-> >> >>>
-> >> >>> Ard Biesheuvel (5):
-> >> >>>   ARM: wire up HWCAP2 feature bits to the CPU modalias
-> >> >>
-> >> >> Ping?
-> >> >>
-> >> >
-> >> > Ping?
-> >>
-> >> Ping?
-> >
-> > Sorry, but whom are you pinging?
-> >
-> 
-> You. This is something you were going to look at, then couldn't find
-> the email and asked me to resend, which I did.
-> 
-> http://marc.info/?l=linux-crypto-vger&m=147678795532341&w=2
-> http://marc.info/?l=linux-arm-kernel&m=148415420105771
+On Tue, 14 Feb 2017 22:53:35 -0500
+okaya at codeaurora.org wrote:
 
-Right, I'd forgotten, and as it wasn't sent _TO_ me, I wasn't paying
-attention.  If you want me to do something, then always send _TO_ me.
-Don't just CC me.
+> On 2017-02-14 18:51, Alex Williamson wrote:
+> > On Tue, 14 Feb 2017 16:25:22 -0500
+> > Sinan Kaya <okaya@codeaurora.org> wrote:
+> >   
+> >> The ACS requirement has been obscured in the current code and is only
+> >> known by certain individuals who happen to read the code. Print out a
+> >> warning with ACS path failure when ACS requirement is not met.
+> >> 
+> >> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> >> ---
+> >>  drivers/iommu/iommu.c | 3 +++
+> >>  1 file changed, 3 insertions(+)
+> >> 
+> >> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> >> index dbe7f65..049ee0a 100644
+> >> --- a/drivers/iommu/iommu.c
+> >> +++ b/drivers/iommu/iommu.c
+> >> @@ -811,6 +811,9 @@ struct iommu_group *pci_device_group(struct device 
+> >> *dev)
+> >>  	if (IS_ERR(group))
+> >>  		return NULL;
+> >> 
+> >> +	if (pci_is_root_bus(bus))
+> >> +		dev_warn_once(&pdev->dev, "using shared group due to ACS path 
+> >> failure\n");
+> >> +
+> >>  	return group;
+> >>  }
+> >>   
+> > 
+> > The premise here is flawed.  An IOMMU group based at the root bus
+> > doesn't necessarily imply a lack of ACS.  There are devices on root
+> > buses, integrated endpoints and root ports.  Naturally an IOMMU group
+> > for these devices needs to be based at the root bus.  Additionally,
+> > there can be IOMMU groups developed around a lack of ACS that don't
+> > intersect with the root bus.  Since this is a warn_once, the false
+> > positives for root bus devices are going to be enumerated first.  On an
+> > Intel system there's typically a device as 00.0 that will always be
+> > pointlessly listed first.  Also, it's not clear that grouping devices
+> > together is always wrong, as Robin pointed out in the EHCI/OHCI
+> > example.  Lack of ACS on downtream ports is likely to cause problems,
+> > especially if that downstream port exposes a slot.  Maybe that would be
+> > a good place to start.  Also, what is someone supposed to do when they
+> > see this error?  If we can hope they'll look for the error in the code
+> > (unlikely) a big comment with useful external links might be
+> > necessary.  Based on how easily vendors ignore kernel warnings, I'm
+> > dubious there's any value to this path though.  Thanks,  
+> 
+> Maybe, a better solution would be to add some sentences into vfio.txt 
+> documentation.
+> 
+> I'm ready to drop this patch. I just don't want ACS requirement to be 
+> hidden between the source code.
+> 
+> Would you be willing to do that?
+> 
+> I know I read all pci and vfio documents in the past. I could have 
+> captured this requirement if it was there.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+We already have this:
+
+Documentation/vfio.txt:
+...
+This isolation is not always at the granularity of a single device
+though.  Even when an IOMMU is capable of this, properties of devices,
+interconnects, and IOMMU topologies can each reduce this isolation.
+For instance, an individual device may be part of a larger multi-
+function enclosure.  While the IOMMU may be able to distinguish
+between devices within the enclosure, the enclosure may not require
+transactions between devices to reach the IOMMU.  Examples of this
+could be anything from a multi-function PCI device with backdoors
+between functions to a non-PCI-ACS (Access Control Services) capable
+bridge allowing redirection without reaching the IOMMU.  Topology
+can also play a factor in terms of hiding devices.  A PCIe-to-PCI
+bridge masks the devices behind it, making transaction appear as if
+from the bridge itself.  Obviously IOMMU design plays a major factor
+as well.
+...
+
+Additionally if you google for "iommu group", this is the first hit:
+
+http://vfio.blogspot.com/2014/08/iommu-groups-inside-and-out.html
+
+This talks extensively about ACS.  A few hits below that you can find a
+presentation I've given with ACS examples.  What additional
+documentation do you think would have helped you discover or understand
+this problem earlier?
+
+I agree that device isolation is not a spec requirement.  The specs
+give us the tools that we need, but valid uses cases exist where a lack
+of isolation may be preferred.  If we logically deduce how we can give
+a device or set of devices to a user for an untrusted environment,
+isolated from other devices, I think it's pretty logical to come to the
+conclusion that ACS is the only way that PCIe hardware can allow that
+sort of control in a standard way.  Clearly we also recognize that this
+is a commonly overlooked area where hardware vendors may fail to
+incorporate this subtly into their platform design guidelines and thus
+we have numerous quirks for exposing virtual ACS-like isolation.  The
+hope is that adding a quirk for this devices means that feedback was
+provided to the hardware teams and system architects within the
+companies developing these devices to consider this use case and
+implement native ACS in the next generation.  Thanks,
+
+Alex
