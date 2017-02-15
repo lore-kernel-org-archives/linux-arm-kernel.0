@@ -1,67 +1,34 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 15 Feb 2017 10:15:53 +0100
-Subject: [PATCH v2] reset: Add i.MX7 SRC reset driver
-In-Reply-To: <CAHQ1cqGHujsDsC5dtXk3_1u0kKme8k96jgSctp5XFSHuYKeE=A@mail.gmail.com>
-References: <20170213153338.13518-1-andrew.smirnov@gmail.com>
- <1487004643.2873.97.camel@pengutronix.de>
- <CAHQ1cqFXiu03902jWLkg8X6jdQ3+TiLj02dSDFBAVH98ABo70A@mail.gmail.com>
- <1487089919.2305.22.camel@pengutronix.de>
- <CAHQ1cqGHujsDsC5dtXk3_1u0kKme8k96jgSctp5XFSHuYKeE=A@mail.gmail.com>
-Message-ID: <1487150153.2433.11.camel@pengutronix.de>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Wed, 15 Feb 2017 09:24:39 +0000
+Subject: [PATCH v4] ASoC: bcm2835: Add 8 channel (multitrack) capability
+In-Reply-To: <1487106275-4260-1-git-send-email-flatmax@flatmax.org>
+References: <1486942035-24038-1-git-send-email-flatmax@flatmax.org>
+ <1487106275-4260-1-git-send-email-flatmax@flatmax.org>
+Message-ID: <20170215092439.GB30007@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-02-14 at 12:11 -0800, Andrey Smirnov wrote:
-[...]
-> > Arguably, the A7 resets should not be handled by the peripheral reset
-> > controller, but at least for the others I see no reason not to leave
-> > space for them in the index table.
+On Wed, Feb 15, 2017 at 08:04:35AM +1100, Matt Flax wrote:
+> This patch adds multitrack capability if in DSP mode A and the
+> codec is master.
 > 
-> If for some bizarre reason one was to run Linux on M4 and use A7 as
-> applications processor, resetting A7 might be useful. But that's a
-> very unlikely use-case.
->
-> > In fact, since unused reset controls
-> > don't use space, why not number them all?
+> In bcm2835_i2s_startup, snd_pcm_hw_constraint_single is used to set
+> channels to 8 if both SND_SOC_DAIFMT_CBM_CFM and SND_SOC_DAIFMT_DSP_A
+> are set. Otherwise, channels are set to 2. These settings are
+> accomplished using the SNDRV_PCM_HW_PARAM_CHANNELS variable.
 > 
-> IMHO because it is unused code and because those numbers constitute an
-> interface which once set will be hard to change if need be.
+> In bcm2835_i2s_shutdown the channels are set to 2 by default.
 > 
-> But that's not that important and I don't feel particularly strong
-> about that point, so I'll add those sources in v3.
-
-Thanks.
-
-> Do you insist that I split what I call IMX7_RESET_PCIEPHY into
-> PCIEPHY_G_RST and PCIEPHY_BTN or can I keep it as a single logical
-> reset?
-
-No, I say keep it as is. For now I'll assume this is not a reset, but
-some other interface signal that just happens to be routed out to the
-SRC and just happens to be toggled around the same time in the enable
-sequence.
-
-[...]
-> >> >> +#define IMX7_RESET_PCIE_CTRL_APPS    0
-> >> >> +#define IMX7_RESET_PCIEPHY           1
-> >> >
-> >> > It would expect these to be numbered in the order they appear in the
-> >> > register map, not starting from the end. Could you add all available
-> >> > peripheral resets to this list, in the correct order?
-> >>
-> >> The numbering is just a consequence of me adding only resets I could
-> >> exercise with my code and numbering then starting from zero. I also
-> >> was hesitant adding more sources since it seemed to me that some of
-> >> less trivial registers in that IP block might be best represented as a
-> >> single reset source doing something more sophisticated that just
-> >> setting a bit under the hood.
-> >
-> > Any in particular?
+> In bcm2835_i2s_hw_params, DSP mode A format is now an option.
+> Before replicating the format variable (from ch2 to ch1) for
+> register loading, requested channels are checked to be either 2 or 8.
+> This can be expanded later to accomodate other channel counts if
+> supported by the sound card hardware.
 > 
-> USBPHY1/2 and maybe MIPI resets? But that's no more than a gut feeling.
+> Signed-off-by: Matt Flax <flatmax@flatmax.org>
+> ---
 
-Is there any downstream code that already handles these resets? At least
-for the USB PHYs I'd expect there has to be something we could look at.
+Reviewed-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
 
-regards
-Philipp
+Thanks,
+Charles
