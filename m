@@ -1,41 +1,52 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 15 Feb 2017 16:54:07 -0500
-Subject: [PATCH] Documentation: Note QDF2400 SoC Erratum 44
-Message-ID: <20170215215407.25854-1-cov@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 15 Feb 2017 15:57:51 -0600
+Subject: [PATCH v4 3/3] PCI: imx6: Add code to support i.MX7D
+In-Reply-To: <20170215212624.btdhfn4xvuppv6hq@rob-hp-laptop>
+References: <20170207155027.7734-1-andrew.smirnov@gmail.com>
+ <20170207155027.7734-4-andrew.smirnov@gmail.com>
+ <20170215171700.5vz5seeihgtwn76p@rob-hp-laptop>
+ <20170215173850.GH19040@bhelgaas-glaptop.roam.corp.google.com>
+ <20170215212624.btdhfn4xvuppv6hq@rob-hp-laptop>
+Message-ID: <20170215215751.GD6981@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Qualcomm Datacenter Technologies QDF2400 family of SoCs contains a
-custom (non-PrimeCell) implementation of the SBSA UART. Occasionally the
-BUSY bit in the Flag Register gets stuck as 1, erratum 44 for both 2432v1
-and 2400v1 SoCs.Checking that the Transmit FIFO Empty (TXFE) bit is 0,
-instead of checking that the BUSY bit is 1, works around the issue. Note
-this in the customary location. To minimize conflicts, this documentation
-update is separate from the code changes, "tty: pl011: Work around QDF2400
-E44 stuck BUSY bit".
+On Wed, Feb 15, 2017 at 03:26:24PM -0600, Rob Herring wrote:
+> On Wed, Feb 15, 2017 at 11:38:50AM -0600, Bjorn Helgaas wrote:
+> > On Wed, Feb 15, 2017 at 11:17:00AM -0600, Rob Herring wrote:
+> > > On Tue, Feb 07, 2017 at 07:50:27AM -0800, Andrey Smirnov wrote:
+> > > > Add various bits of code needed to support i.MX7D variant of the IP.
+> 
+> > > 
+> > > [...]
+> > > 
+> > > > @@ -251,6 +261,10 @@ static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
+> > > >  	u32 val, gpr1, gpr12;
+> > > >  
+> > > >  	switch (imx6_pcie->variant) {
+> > > > +	case IMX7D:
+> > > > +		reset_control_assert(imx6_pcie->pciephy_reset);
+> > > > +		reset_control_assert(imx6_pcie->apps_reset);
+> > > > +		break;
+> > > >  	case IMX6SX:
+> > > >  		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> > > >  				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN,
+> > > 
+> > > So the difference with i.MX7D is not really that it has a reset or not, 
+> > > but some platforms use a reset driver and some do not. The latter should 
+> > > be fixed.
+> > 
+> > I have this patch queued for v4.11.  Are these things that should be
+> > fixed first?  If so, I can drop this.
+> 
+> Well, depends if you trust things will get fixed later and if the PHY 
+> in fact should be separate as that affects the binding. It would affect 
+> how the driver changes are done as instead of "if (IMX7D) ...", you'd 
+> have "if (imx6_pcie->apps_reset) ..." for example. That part depends on
+> how much churn you want there.
 
-Signed-off-by: Christopher Covington <cov@codeaurora.org>
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Timur Tabi <timur@codeaurora.org>
----
-Documentation to go with https://patchwork.kernel.org/patch/9575103/
-Based on http://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
----
- Documentation/arm64/silicon-errata.txt | 2 ++
- 1 file changed, 2 insertions(+)
+I dropped it for now, not that I don't trust it will get fixed, but it
+sounds like not completely trivial changes and will affect the binding
+as well, so the intermediate state sounds a little messy.
 
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index a71b8095dbd8..bc3d086bc624 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -68,3 +68,5 @@ stable kernels.
- |                |                 |                 |                             |
- | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
- | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
-+| Qualcomm Tech. | QDF2432v1 UART  | SoC E44         | N/A                         |
-+| Qualcomm Tech. | QDF2400v1 UART  | SoC E44         | N/A                         |
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
-Forum, a Linux Foundation Collaborative Project.
+Bjorn
