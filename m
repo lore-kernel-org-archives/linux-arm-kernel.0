@@ -1,53 +1,74 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Wed, 15 Feb 2017 16:46:44 +0100
-Subject: [RFC v2 4/7] ASoC: dmaengine_pcm: add copy support
-In-Reply-To: <20170215145341.sntwx7oqyqmw6azv@sirena.org.uk>
-References: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
- <1487003909-11710-5-git-send-email-arnaud.pouliquen@st.com>
- <20170214171630.qgkyoymxyqjiiblh@sirena.org.uk>
- <40633f7c-a2ac-1658-cc9d-b30eaff8a95a@st.com>
- <20170215145341.sntwx7oqyqmw6azv@sirena.org.uk>
-Message-ID: <338f8db7-2077-626f-986b-b4e3df40469c@st.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 15 Feb 2017 10:52:34 -0500
+Subject: [PATCH V8 08/10] ras: acpi / apei: generate trace event for
+ unrecognized CPER section
+In-Reply-To: <1485969413-23577-9-git-send-email-tbaicar@codeaurora.org>
+References: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
+ <1485969413-23577-9-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <20170215105234.4921db1f@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed,  1 Feb 2017 10:16:51 -0700
+Tyler Baicar <tbaicar@codeaurora.org> wrote:
 
+> @@ -452,11 +454,21 @@ static void ghes_do_proc(struct ghes *ghes,
+>  {
+>  	int sev, sec_sev;
+>  	struct acpi_hest_generic_data *gdata;
+> +	uuid_le sec_type;
+> +	uuid_le *fru_id = &NULL_UUID_LE;
+> +	char *fru_text = "";
+>  
+>  	sev = ghes_severity(estatus->error_severity);
+>  	apei_estatus_for_each_section(estatus, gdata) {
+>  		sec_sev = ghes_severity(gdata->error_severity);
+> -		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
+> +		sec_type = *(uuid_le *)gdata->section_type;
+> +
+> +		if (gdata->validation_bits & CPER_SEC_VALID_FRU_ID)
+> +			fru_id = (uuid_le *)gdata->fru_id;
+> +		if (gdata->validation_bits & CPER_SEC_VALID_FRU_TEXT)
+> +			fru_text = gdata->fru_text;
+> +
+> +		if (!uuid_le_cmp(sec_type,
+>  				 CPER_SEC_PLATFORM_MEM)) {
+>  			struct cper_sec_mem_err *mem_err;
+>  
+> @@ -467,7 +479,7 @@ static void ghes_do_proc(struct ghes *ghes,
+>  			ghes_handle_memory_failure(gdata, sev);
+>  		}
+>  #ifdef CONFIG_ACPI_APEI_PCIEAER
+> -		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
+> +		else if (!uuid_le_cmp(sec_type,
+>  				      CPER_SEC_PCIE)) {
+>  			struct cper_sec_pcie *pcie_err;
+>  
+> @@ -500,6 +512,12 @@ static void ghes_do_proc(struct ghes *ghes,
+>  
+>  		}
+>  #endif
+> +		else {
 
-On 02/15/2017 03:53 PM, Mark Brown wrote:
-> On Wed, Feb 15, 2017 at 02:59:18PM +0100, Arnaud Pouliquen wrote:
-> 
->> For DFSDM we need to re-arrange samples after DMA transfer,
->> before sending them to application. For this, a copy ops(called
->> in snd_pcm_lib_read_transfer) alreday exists in snd_pcm_ops
->> struct.
-> 
-> No, copy() is an alternative to doing DMA rather than something
-> that works with DMA.  If you want to have some sort of post
-> processing operation it shoudn't be called copy().  It's probably
-> worth considering just making a new format and letting userspace
-> convert things here.
-> 
-You mean using a plug-in alsa to do it? this seems not possible with
-tiny-alsa...
-Without a plug-in, driver will not be compatible with standard audio
-application.
+As an optimization, you can add:
 
-I'm newbies in alsa plugin But it seems quite tricky to do it. This
-solution means that userspace has to be aware on hardware constraint.
-Processing to do is a mask on 8 LSB + a left shift on bits. T shift
-value depends on several parameters: the SPI frequency, the sampling
-rate and the filter parameters.
-That means an alsa control to get scaling, handled by the plugin.
+		else if (trace_unknown_sec_event_enabled()) {
 
-So i would prefer to find a way to do it in driver...
+instead, as then this wont be called unless the tracepoint is
+activated. Will keep the logic from doing anything with
+acpi_hest_generic_data_payload().
 
-I saw that blackfin driver implements this kind of mechanism
-(bf5xx_pcm_copy) to support the TDM mode. if i well understood the code
-they process the TDM buffer filled by DMA. Samples are extracted from
-the good TDM slots and copied in buffer that will be sent to userland.
+Note, that trace_*_enabled() is activated via a jump_label, thus
+there's no branches involved.
 
-Do you think this would be reasonable if i implement something similar
-in my driver, without using the soc generic DMA engine?
+-- Steve
 
-Regards
-Arnaud
+> +			void *unknown_err = acpi_hest_generic_data_payload(gdata);
+> +			trace_unknown_sec_event(&sec_type,
+> +					fru_id, fru_text, sec_sev,
+> +					unknown_err, gdata->error_data_length);
+> +		}
+>  	}
+>  }
+>  
+>
