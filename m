@@ -1,24 +1,17 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 15 Feb 2017 17:28:06 -0600
-Subject: [PATCH v4 5/9] dt-bindings: arm: add entries for I2SE boards
-In-Reply-To: <1486626169-20022-6-git-send-email-michael.heimpold@i2se.com>
-References: <1486626169-20022-1-git-send-email-michael.heimpold@i2se.com>
- <1486626169-20022-6-git-send-email-michael.heimpold@i2se.com>
-Message-ID: <20170215232806.jvrcdka23lpcoscs@rob-hp-laptop>
+Date: Wed, 15 Feb 2017 17:28:35 -0600
+Subject: [PATCH 1/3] dt-bindings: clockgen: Add compatible string for
+ LS1088A
+In-Reply-To: <1486638229-7917-1-git-send-email-harninder.rai@nxp.com>
+References: <1486638229-7917-1-git-send-email-harninder.rai@nxp.com>
+Message-ID: <20170215232835.jqjxcphx4koyueco@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 09, 2017 at 08:42:45AM +0100, Michael Heimpold wrote:
-> From: Michael Heimpold <mhei@heimpold.de>
-> 
-> This patch adds the missing devicetree binding documentation for I2SE's
-> Duckbill and Duckbill 2 series boards.
-> 
-> Signed-off-by: Michael Heimpold <mhei@heimpold.de>
-> Cc: Stefan Wahren <stefan.wahren@i2se.com>
+On Thu, Feb 09, 2017 at 04:33:49PM +0530, Harninder Rai wrote:
+> Signed-off-by: Harninder Rai <harninder.rai@nxp.com>
 > ---
->  Documentation/devicetree/bindings/arm/i2se.txt | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/i2se.txt
+>  Documentation/devicetree/bindings/clock/qoriq-clock.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
