@@ -1,34 +1,48 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 15 Feb 2017 11:37:21 +0100
-Subject: [PATCH] mfd: stm32-timers: fix max register
-In-Reply-To: <1487145872-1212-1-git-send-email-fabrice.gasnier@st.com>
-References: <1487145872-1212-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <CA+M3ks50fANU6z0JTB01QH0+rABjEyFcrNyKFK18UHiE6Qqkog@mail.gmail.com>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Wed, 15 Feb 2017 18:55:08 +0800
+Subject: [PATCH v1 1/3] ASoC: zx-96p22: add documentation for zte's aud96p22
+ controller
+Message-ID: <1487156110-12840-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-02-15 9:04 GMT+01:00 Fabrice Gasnier <fabrice.gasnier@st.com>:
-> STM32 timers register bank size is 0x400. Fix regmap max_register.
->
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
->  drivers/mfd/stm32-timers.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
-> index 192cbb6..2182f00 100644
-> --- a/drivers/mfd/stm32-timers.c
-> +++ b/drivers/mfd/stm32-timers.c
-> @@ -15,7 +15,7 @@
->         .reg_bits = 32,
->         .val_bits = 32,
->         .reg_stride = sizeof(u32),
-> -       .max_register = 0x400,
-> +       .max_register = 0x3fc,
->  };
->
->  static void stm32_timers_get_arr_size(struct stm32_timers *ddata)
-> --
-> 1.9.1
->
-Acked-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+This patch adds dt-binding documentation for zte's aud96p22 controller.
+
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+ .../devicetree/bindings/sound/zte,zx-96p22.txt     | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/zte,zx-96p22.txt
+
+diff --git a/Documentation/devicetree/bindings/sound/zte,zx-96p22.txt b/Documentation/devicetree/bindings/sound/zte,zx-96p22.txt
+new file mode 100644
+index 0000000..4184566
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/zte,zx-96p22.txt
+@@ -0,0 +1,24 @@
++ZTE zx96p22 controller
++
++Required properties:
++ - compatible : Must be "zte,zx-aud96p22"
++ - #sound-dai-cells: Should be 0
++ - reg : Offset of I2C register for zx96p22
++
++Example:
++
++	audio_i2c0: audio_i2c0 at 1486000 {
++		compatible = "zte,zx296718-i2c";
++		reg = <0x01486000 0x1000>;
++		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clocks = <&audiocrm AUDIO_I2C0_WCLK>;
++		clock-frequency = <1600000>;
++		status = "ok";
++		inner_codec: aud96p22 at 22 {
++			compatible = "zte,zx-aud96p22";
++			#sound-dai-cells = <0>;
++			reg = <0x22>;
++		};
++	};
+-- 
+2.7.4
