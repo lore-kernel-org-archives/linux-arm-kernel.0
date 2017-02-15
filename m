@@ -1,87 +1,49 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Wed, 15 Feb 2017 13:31:27 -0700
-Subject: [PATCH V10 07/10] efi: print unrecognized CPER section
-In-Reply-To: <1487189223.6214.60.camel@perches.com>
-References: <1487188282-2568-1-git-send-email-tbaicar@codeaurora.org>
- <1487188282-2568-8-git-send-email-tbaicar@codeaurora.org>
- <1487189223.6214.60.camel@perches.com>
-Message-ID: <7c85d5e2-6616-e9cf-5ad9-c7c937dc657d@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 15 Feb 2017 20:38:34 +0000
+Subject: [PATCH v2 0/5] ARM: add module autoloading support for crypto
+ modules
+In-Reply-To: <20170215200732.GG27312@n2100.armlinux.org.uk>
+References: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170215200002.GF27312@n2100.armlinux.org.uk>
+ <CAKv+Gu9b92hKiN0nyKEdjkszUzPVf3ODt7wtiqdLwnkrdhsyvA@mail.gmail.com>
+ <20170215200732.GG27312@n2100.armlinux.org.uk>
+Message-ID: <CAKv+Gu_d7W7T6kTS4BDNimtBtXuueO4+HVgW0-HsK9RKprvpLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Joe,
-
-
-On 2/15/2017 1:07 PM, Joe Perches wrote:
-> On Wed, 2017-02-15 at 12:51 -0700, Tyler Baicar wrote:
->> UEFI spec allows for non-standard section in Common Platform Error
->> Record. This is defined in section N.2.3 of UEFI version 2.5.
+On 15 February 2017 at 20:07, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Wed, Feb 15, 2017 at 08:04:07PM +0000, Ard Biesheuvel wrote:
+>> On 15 February 2017 at 20:00, Russell King - ARM Linux
+>> <linux@armlinux.org.uk> wrote:
+>> > On Wed, Jan 11, 2017 at 05:01:53PM +0000, Ard Biesheuvel wrote:
+>> >> This series wires up the crypto modules that use the ARM 32-bit versions of
+>> >> the ARMv8 Crypto Extensions to udev autoloading, by exposing the HWCAP2
+>> >> feature bits via the CPU modalias. This is very similar to the arm64
+>> >> implementation, with the notable exception that ARM has its CPU feature
+>> >> definitions split across HWCAP and HWCAP2.
+>> >
+>> > Note that Aarch64 has:
+>> >
+>> > MODALIAS=cpu:type:aarch64:feature:,0000,0001,0002,0003,0004,0005,0006,0007
+>> >
+>> > which looks weird with the first numeric entry starting with a ','.
+>> >
 >>
->> Currently if the CPER section's type (UUID) does not match with
->> one of the section types that the kernel knows how to parse, the
->> section is skipped. Therefore, user is not able to see
->> such CPER data, for instance, error record of non-standard section.
->>
->> For above mentioned case, this change prints out the raw data in
->> hex in dmesg buffer. Data length is taken from Error Data length
->> field of Generic Error Data Entry.
->>
->> Following is a sample output from dmesg:
->> [  115.771702] {1}[Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
->> [  115.779042] {1}[Hardware Error]: It has been corrected by h/w and requires no further action
->> [  115.787456] {1}[Hardware Error]: event severity: corrected
->> [  115.792927] {1}[Hardware Error]:  Error 0, type: corrected
->> [  115.798415] {1}[Hardware Error]:  fru_id: 00000000-0000-0000-0000-000000000000
->> [  115.805596] {1}[Hardware Error]:  fru_text:
->> [  115.816105] {1}[Hardware Error]:  section type: d2e2621c-f936-468d-0d84-15a4ed015c8b
->> [  115.823880] {1}[Hardware Error]:  section length: 88
->> [  115.828779] {1}[Hardware Error]:   00000000: 01000001 00000002 5f434345 525f4543
->> [  115.836153] {1}[Hardware Error]:   00000010: 0000574d 00000000 00000000 00000000
->> [  115.843531] {1}[Hardware Error]:   00000020: 00000000 00000000 00000000 00000000
->> [  115.850908] {1}[Hardware Error]:   00000030: 00000000 00000000 00000000 00000000
->> [  115.858288] {1}[Hardware Error]:   00000040: fe800000 00000000 00000004 5f434345
->> [  115.865665] {1}[Hardware Error]:   00000050: 525f4543 0000574d
->>
->> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
->> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
->> ---
->>   drivers/firmware/efi/cper.c | 12 ++++++++++--
->>   1 file changed, 10 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
->> index c2b0a12..48cb8ee 100644
->> --- a/drivers/firmware/efi/cper.c
->> +++ b/drivers/firmware/efi/cper.c
->> @@ -591,8 +591,16 @@ static void cper_estatus_print_section(
->>   			cper_print_proc_arm(newpfx, arm_err);
->>   		else
->>   			goto err_section_too_small;
->> -	} else
->> -		printk("%s""section type: unknown, %pUl\n", newpfx, sec_type);
->> +	} else {
->> +		const void *unknown_err;
->> +
->> +		unknown_err = acpi_hest_generic_data_payload(gdata);
->> +		printk("%ssection type: %pUl\n", newpfx, sec_type);
->> +		printk("%ssection length: %d\n", newpfx,
->> +		       gdata->error_data_length);
->> +		print_hex_dump(newpfx, "", DUMP_PREFIX_OFFSET, 16, 4,
->> +			       unknown_err, gdata->error_data_length, 0);
-> I suggest using true instead of 0 for the last argument
+>> IIRC this is deliberate, since the udev code matches the feature field
+>> for *nnnn*, which is what the module alias exposes.
 >
-> 		print_hex_dump(newpfx, "", DUMP_PREFIX_OFFSET, 16, 4,
-> 			       unknown_err, gdata->error_data_length, true);
+> I noticed, feature:*0000* matches both "feature:0000" and "feature:,0000".
 >
-> It might help make deciphering the hex block a little easier.
+
+Right. It's been a while since I ported that code from x86 to generic,
+and I don't remember making many changes to it.
+
+>> Yes, I am aware of that. But there aren't /that/ many optional
+>> features that lend themselves for module autoloading.
 >
-Thank you for the suggestion, I agree and will make this change. There 
-is also a vendor specific portion of the ARM error which is just a hex 
-dump. I will enable the ascii printing there as well.
+> Yes.  Once we've exhausted the HWCAP2 space, we'll either have to add
+> HWCAP3 or finish off using the unused 11 in the HWCAP space.
+>
 
-Thanks,
-Tyler
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+For now, we should be fine. I will respin with the + 32 added.
