@@ -1,101 +1,29 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 15 Feb 2017 12:33:06 +0530
-Subject: [PATCH v4 3/4] dmaengine: Add Broadcom SBA RAID driver
-In-Reply-To: <CAPcyv4jckb=sbocr3W43NZ2YyUVLbDdhbCAhLfgQwh-bRuvjYQ@mail.gmail.com>
-References: <1487055112-5185-1-git-send-email-anup.patel@broadcom.com>
- <1487055112-5185-4-git-send-email-anup.patel@broadcom.com>
- <CAPcyv4g5PU1EQWq-SCbt0QB=vSaMyafqa-ThJifDxEoQha-6Hw@mail.gmail.com>
- <CAALAos_=TN_ZfeJbRQEwuc+t5zaxKVgrgEMNPQQu8K8Q8+8F6A@mail.gmail.com>
- <CAPcyv4jckb=sbocr3W43NZ2YyUVLbDdhbCAhLfgQwh-bRuvjYQ@mail.gmail.com>
-Message-ID: <CAALAos-txDCs3QZ4HGBNicOD8t49NPT6E8RpjVMccMn1D-UTgQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 15 Feb 2017 15:08:32 +0800
+Subject: [PATCH v2 1/4] dt-bindings: add multidomain support to i.MX GPC
+ DT binding
+In-Reply-To: <1486741439.3879.7.camel@pengutronix.de>
+References: <20170127183728.26701-1-l.stach@pengutronix.de>
+ <1486741439.3879.7.camel@pengutronix.de>
+Message-ID: <20170215070830.GA8398@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 12:13 PM, Dan Williams <dan.j.williams@intel.com> wrote:
-> On Tue, Feb 14, 2017 at 10:25 PM, Anup Patel <anup.patel@broadcom.com> wrote:
->> On Tue, Feb 14, 2017 at 10:04 PM, Dan Williams <dan.j.williams@intel.com> wrote:
->>> On Mon, Feb 13, 2017 at 10:51 PM, Anup Patel <anup.patel@broadcom.com> wrote:
->>>> The Broadcom stream buffer accelerator (SBA) provides offloading
->>>> capabilities for RAID operations. This SBA offload engine is
->>>> accessible via Broadcom SoC specific ring manager.
->>>>
->>>> This patch adds Broadcom SBA RAID driver which provides one
->>>> DMA device with RAID capabilities using one or more Broadcom
->>>> SoC specific ring manager channels. The SBA RAID driver in its
->>>> current shape implements memcpy, xor, and pq operations.
->>>>
->>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->>>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->>>> ---
->>>>  drivers/dma/Kconfig        |   13 +
->>>>  drivers/dma/Makefile       |    1 +
->>>>  drivers/dma/bcm-sba-raid.c | 1694 ++++++++++++++++++++++++++++++++++++++++++++
->>>>  3 files changed, 1708 insertions(+)
->>>>  create mode 100644 drivers/dma/bcm-sba-raid.c
->>>>
->>>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
->>>> index 263495d..bf8fb84 100644
->>>> --- a/drivers/dma/Kconfig
->>>> +++ b/drivers/dma/Kconfig
->>>> @@ -99,6 +99,19 @@ config AXI_DMAC
->>>>           controller is often used in Analog Device's reference designs for FPGA
->>>>           platforms.
->>>>
->>>> +config BCM_SBA_RAID
->>>> +       tristate "Broadcom SBA RAID engine support"
->>>> +       depends on (ARM64 && MAILBOX && RAID6_PQ) || COMPILE_TEST
->>>> +       select DMA_ENGINE
->>>> +       select DMA_ENGINE_RAID
->>>> +       select ASYNC_TX_ENABLE_CHANNEL_SWITCH
->>>
->>> I thought you agreed to drop this. Its usage is broken.
->>
->> If ASYNC_TX_ENABLE_CHANNEL_SWITCH is not selected
->> then async_dma_find_channel() will only try to find channel
->> with DMA_ASYNC_TX capability.
->>
->> The DMA_ASYNC_TX capability is set by
->> dma_async_device_register() when all Async Tx
->> capabilities are supported by a DMA devices namely
->> DMA_INTERRUPT, DMA_MEMCPY, DMA_XOR,
->> DMA_XOR_VAL, DMA_PQ, and DMA_PQ_VAL.
->>
->> We only support DMA_MEMCPY, DMA_XOR, and
->> DMA_PQ capabilities in BCM-SBA-RAID driver so
->> DMA_ASYNC_TX capability is never set for the
->> DMA device registered by BCM-SBA-RAID driver.
->>
->> Due to above, if ASYNC_TX_ENABLE_CHANNEL_SWITCH
->> is not selected then Async Tx APIs fail to find DMA
->> channel provided by BCM-SBA-RAID hence the
->> option ASYNC_TX_ENABLE_CHANNEL_SWITCH is
->> required for BCM-SBA-RAID.
->>
->> The DMA mappings are violated by channel switching
->> only if we switch form DMA channel A to DMA channel
->> B and both these DMA channels have different underlying
->> "struct device". In most of the cases DMA mappings
->> are not violated because DMA channels having
->> Async Tx capabilities are provided using same
->> underlying "struct device".
->
-> No, fix the infrastructure. Do not put local hack in your driver for
-> this global problem [1].
+On Fri, Feb 10, 2017 at 04:43:59PM +0100, Lucas Stach wrote:
+> Hi Shawn,
+> 
+> are you willing to take this series through your tree or do you think we
+> need to get this in via some other tree?
 
-There is no hack in the driver. We need
-ASYNC_TX_ENABLE_CHANNEL_SWITCH
-based on current state of dmaengine framework.
+I'm willing to take it.  But I don't think it's been ready yet.  Since
+you insist on keeping the .remove hook for both imx_gpc_driver and
+imx_pgc_power_domain_driver, did you actually test it with manually
+bind/unbind the drivers?  I tested it a bit and found it doesn't work
+well for me.
 
-The framework should be fixed as separate patchset.
+Also, there is a comment from Andrey that is not responded.
 
-We have other RAID drivers such as xgene-dma and
-mv_xor_v2 who also require
-ASYNC_TX_ENABLE_CHANNEL_SWITCH due
-to same reason.
+Shawn
 
-Fixing the framework and improving framework is
-a ongoing process. I don't see why that should
-stop this patchset.
-
-Regards,
-Anup
+> It would be good to queue this up somewhere as a reference, as I have
+> some upcoming work for MX6SX and MX6QP, which depends on this series.
