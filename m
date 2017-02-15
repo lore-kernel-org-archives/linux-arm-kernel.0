@@ -1,95 +1,49 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 15 Feb 2017 17:43:27 +0100
-Subject: [PATCH 10/14] phy: meson8b-usb2: simplify optional reset handling
-In-Reply-To: <CAFBinCAASGS19naW76vfynRj4Fg4KjpHcwGr5h+pWZae47rwRg@mail.gmail.com>
-References: <20170130114116.22089-1-p.zabel@pengutronix.de>
- <20170130114116.22089-10-p.zabel@pengutronix.de>
- <CAFBinCAASGS19naW76vfynRj4Fg4KjpHcwGr5h+pWZae47rwRg@mail.gmail.com>
-Message-ID: <1487177007.30202.1.camel@baylibre.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 15 Feb 2017 08:46:06 -0800
+Subject: [PATCH] clk: rockchip: Set "ignore unused" for PMU M0 clocks on
+ rk3399
+In-Reply-To: <CABxcv=kzW9SvrWYNasqCDkV7D6Y2zq+oRuqoPFdWuaWUhPehEA@mail.gmail.com>
+References: <20170214210114.5846-1-dianders@chromium.org>
+ <CABxcv=kzW9SvrWYNasqCDkV7D6Y2zq+oRuqoPFdWuaWUhPehEA@mail.gmail.com>
+Message-ID: <CAD=FV=WLN6r9DgRQSk2En1sJY=dQnkkWDMc1+KXVq2+JXyA0jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-02-15 at 00:36 +0100, Martin Blumenstingl wrote:
-> Hi Philipp,
-> 
-> sorry for the late reply.
-> unfortunately my GXBB board (which is supported by the driver below)
-> is dead.
-> I CC'ed Jerome Brunet - maybe he can give it a go on one of his
-> (GXBB) boards.
-> 
-> On Mon, Jan 30, 2017 at 12:41 PM, Philipp Zabel <p.zabel@pengutronix.
-> de> wrote:
-> > 
-> > As of commit bb475230b8e5 ("reset: make optional functions really
-> > optional"), the reset framework API calls use NULL pointers to
-> > describe
-> > optional, non-present reset controls.
-> > 
-> > This allows to return errors from
-> > devm_reset_control_get_optional_shared
-> > and to call reset_control_reset unconditionally.
-> > 
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> 
-> (based on reading the code along with the highly appreciated changes
-> from bb475230b8e5)
-> 
-> > 
-> > Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> > Cc: Kevin Hilman <khilman@baylibre.com>
-> > Cc: Carlo Caione <carlo@caione.org>
-> > Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> > ---
-> > ?drivers/phy/phy-meson8b-usb2.c | 12 +++++-------
-> > ?1 file changed, 5 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/drivers/phy/phy-meson8b-usb2.c b/drivers/phy/phy-
-> > meson8b-usb2.c
-> > index 33c9f4ba157d1..87168f1fe3af6 100644
-> > --- a/drivers/phy/phy-meson8b-usb2.c
-> > +++ b/drivers/phy/phy-meson8b-usb2.c
-> > @@ -141,12 +141,10 @@ static int phy_meson8b_usb2_power_on(struct
-> > phy *phy)
-> > ????????struct phy_meson8b_usb2_priv *priv = phy_get_drvdata(phy);
-> > ????????int ret;
-> > 
-> > -???????if (!IS_ERR_OR_NULL(priv->reset)) {
-> > -???????????????ret = reset_control_reset(priv->reset);
-> > -???????????????if (ret) {
-> > -???????????????????????dev_err(&phy->dev, "Failed to trigger USB
-> > reset\n");
-> > -???????????????????????return ret;
-> > -???????????????}
-> > +???????ret = reset_control_reset(priv->reset);
-> > +???????if (ret) {
-> > +???????????????dev_err(&phy->dev, "Failed to trigger USB
-> > reset\n");
-> > +???????????????return ret;
-> > ????????}
-> > 
-> > ????????ret = clk_prepare_enable(priv->clk_usb_general);
-> > @@ -241,7 +239,7 @@ static int phy_meson8b_usb2_probe(struct
-> > platform_device *pdev)
-> > ????????????????return PTR_ERR(priv->clk_usb);
-> > 
-> > ????????priv->reset = devm_reset_control_get_optional_shared(&pdev-
-> > >dev, NULL);
-> > -???????if (PTR_ERR(priv->reset) == -EPROBE_DEFER)
-> > +???????if (PTR_ERR(priv->reset))
+Hi,
 
-This is wrong and will always exit on error. It should be "IS_ERR".
-Clearly the bug was there before your patch, but since you are changing
-the faulty line, would you mind using IS_ERR instead ?
+On Wed, Feb 15, 2017 at 7:27 AM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> Hello Doug,
+>
+> On Tue, Feb 14, 2017 at 6:01 PM, Douglas Anderson <dianders@chromium.org> wrote:
+>> The PMU Cortex M0 on rk3399 is intended to be used for things like
+>> DDRFreq transitions, suspend/resume, and other things that are the
+>> purview of ARM Trusted Firmware and not the kernel.  As such, the
+>> kernel shouldn't be messing with the clocks.  Add CLK_IGNORE_UNUSED to
+>> these clocks.
+>>
+>
+> Isn't CLK_IS_CRITICAL a more suitable flag for this case?
 
-With this changed:
-Tested-by: Jerome Brunet <jbrunet@baylibre.com>
+As I understand it (AKA please correct me if I'm wrong)...
 
-> > ????????????????return PTR_ERR(priv->reset);
-> > 
-> > ????????priv->dr_mode = of_usb_get_dr_mode_by_phy(pdev-
-> > >dev.of_node, -1);
-> > --
-> > 2.11.0
-> > 
+Usually CLK_IS_CRITICAL is more suitable than CLK_IGNORE_UNUSED since
+lots of old code used CLK_IGNORE_UNUSED for critical clocks before
+CLK_IS_CRITICAL existed.
+
+...but in this case, I don't think it is more suitable.
+CLK_IS_CRITICAL means that the kernel should be in charge of keeping
+this clock on at all times.  The documentation I see says:
+
+#define CLK_IS_CRITICAL         BIT(11) /* do not gate, ever */
+
+In our case, as was so eloquently described in our private bug by our
+firmware engineer:
+
+  Just tell the kernel to keep its grubby hands off my clocks completely
+
+AKA: this isn't a clock that the kernel should touch--it is entirely
+managed by the firmware.  It's OK for the kernel to show it in the
+clock tree, but otherwise "hands off".
+
+-Doug
