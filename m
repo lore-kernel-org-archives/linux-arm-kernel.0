@@ -1,56 +1,33 @@
 From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
-Date: Wed, 15 Feb 2017 15:50:12 -0600
-Subject: [PATCH 1/5] dt-bindings: mfd: Add Altera Arria10 SR Reset Controller
- bindings
-In-Reply-To: <1487195416-23827-1-git-send-email-thor.thayer@linux.intel.com>
-References: <1487195416-23827-1-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <1487195416-23827-2-git-send-email-thor.thayer@linux.intel.com>
+Date: Wed, 15 Feb 2017 15:50:11 -0600
+Subject: [PATCH 0/5] Add Arria10 System Manager Reset Controller
+Message-ID: <1487195416-23827-1-git-send-email-thor.thayer@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <thor.thayer@linux.intel.com>
 
-This patch adds documentation for the Altera A10-SR Reset
-Controller DT bindings.
+This series of patches adds the Altera Arria10 Development Kit System
+Manager Reset Controller.
 
-Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
----
- Documentation/devicetree/bindings/mfd/altera-a10sr.txt | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Thor Thayer (5):
+  dt-bindings: mfd: Add Altera Arria10 SR Reset Controller bindings
+  dt-bindings: Add Arria10 System Resource reset manager offsets
+  reset: Add Altera Arria10 System Resource Reset Controller
+  mfd: altr_a10sr: Add Arria10 DevKit Resource Controller
+  ARM: socfpga: dts: Add Devkit A10-SR Reset Controller
 
-diff --git a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
-index ea151f2..c8a7365 100644
---- a/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
-+++ b/Documentation/devicetree/bindings/mfd/altera-a10sr.txt
-@@ -18,6 +18,7 @@ The A10SR consists of these sub-devices:
- Device                   Description
- ------                   ----------
- a10sr_gpio               GPIO Controller
-+a10sr_rst                Reset Controller
- 
- Arria10 GPIO
- Required Properties:
-@@ -27,6 +28,11 @@ Required Properties:
-                       the second cell is used to specify flags.
-                       See ../gpio/gpio.txt for more information.
- 
-+Arria10 Peripheral PHY Reset
-+Required Properties:
-+- compatible        : Should be "altr,a10sr-reset"
-+- #reset-cells      : Should be one.
-+
- Example:
- 
-         resource-manager at 0 {
-@@ -43,4 +49,9 @@ Example:
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 		};
-+
-+		a10sr_rst: reset-controller {
-+			compatible = "altr,a10sr-reset";
-+			#reset-cells = <1>;
-+		};
- 	};
+ .../devicetree/bindings/mfd/altera-a10sr.txt       |  11 ++
+ MAINTAINERS                                        |   2 +
+ arch/arm/boot/dts/socfpga_arria10_socdk.dtsi       |   5 +
+ drivers/mfd/altera-a10sr.c                         |   4 +
+ drivers/reset/Kconfig                              |   7 +
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/reset-a10sr.c                        | 176 +++++++++++++++++++++
+ include/dt-bindings/reset/altr,rst-mgr-a10sr.h     |  31 ++++
+ 8 files changed, 237 insertions(+)
+ create mode 100644 drivers/reset/reset-a10sr.c
+ create mode 100644 include/dt-bindings/reset/altr,rst-mgr-a10sr.h
+
 -- 
 1.9.1
