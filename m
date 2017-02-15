@@ -1,56 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 Feb 2017 11:22:53 +0000
-Subject: [PATCH] arm64: define BUG() instruction without CONFIG_BUG
-In-Reply-To: <20170214213941.3026318-1-arnd@arndb.de>
-References: <20170214213941.3026318-1-arnd@arndb.de>
-Message-ID: <20170215112253.GB9630@arm.com>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Wed, 15 Feb 2017 11:24:25 +0000
+Subject: [PATCH v1 3/3] ASoC: zx-96p22: add zte's aud96p22 controller
+ driver
+In-Reply-To: <1487156110-12840-3-git-send-email-baoyou.xie@linaro.org>
+References: <1487156110-12840-1-git-send-email-baoyou.xie@linaro.org>
+ <1487156110-12840-3-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170215112425.GC30007@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2017 at 10:39:28PM +0100, Arnd Bergmann wrote:
-> This mirrors commit e9c38ceba8d9 ("ARM: 8455/1: define __BUG as
-> asm(BUG_INSTR) without CONFIG_BUG") to make the behavior of
-> arm64 consistent with arm and x86, and avoids lots of warnings in
-> randconfig builds, such as:
+On Wed, Feb 15, 2017 at 06:55:10PM +0800, Baoyou Xie wrote:
+> This patch adds aud96p22 controller driver for zte's SoC family.
 > 
-> kernel/seccomp.c: In function '__seccomp_filter':
-> kernel/seccomp.c:666:1: error: no return statement in function returning non-void [-Werror=return-type]
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 > ---
->  arch/arm64/include/asm/bug.h | 11 ++++++++++-
->  1 file changed, 10 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/bug.h b/arch/arm64/include/asm/bug.h
-> index 561190d15881..461751429fc3 100644
-> --- a/arch/arm64/include/asm/bug.h
-> +++ b/arch/arm64/include/asm/bug.h
-> @@ -20,9 +20,10 @@
->  
->  #include <asm/brk-imm.h>
->  
-> -#ifdef CONFIG_GENERIC_BUG
->  #define HAVE_ARCH_BUG
->  
-> +#ifdef CONFIG_GENERIC_BUG
+<snip>
+> +static int zx_aud96p22_i2c_write(struct i2c_client *i2c_client,
+> +				 const void *data, size_t count)
+> +{
+> +	int xfer;
 > +
->  #ifdef CONFIG_DEBUG_BUGVERBOSE
->  #define _BUGVERBOSE_LOCATION(file, line) __BUGVERBOSE_LOCATION(file, line)
->  #define __BUGVERBOSE_LOCATION(file, line)				\
-> @@ -57,6 +58,14 @@ _BUGVERBOSE_LOCATION(__FILE__, __LINE__)		\
->  
->  #define __WARN_TAINT(taint) _BUG_FLAGS(BUGFLAG_TAINT(taint))
->  
-> +#else
+> +	xfer = i2c_master_send(i2c_client, data, count);
+> +	if (xfer == count)
+> +		return 0;
+> +	else if (xfer < 0)
+> +		return xfer;
+> +	else
+> +		return -EIO;
+> +}
 > +
-> +#define BUG() do {					\
-> +	asm volatile("brk %[imm]"			\
-> +		     :: [imm] "i" (BUG_BRK_IMM));	\
-> +	unreachable();					\
-> +} while (0)
+> +static int zx_aud96p22_i2c_read(struct i2c_client *i2c_client,
+> +				unsigned char addr)
+> +{
+> +	int xfer;
+> +
+> +	xfer = i2c_smbus_read_word_data(i2c_client, addr);
+> +	if (xfer < 0)
+> +		dev_warn(&i2c_client->dev, "transfer error %d\n", xfer);
+> +
+> +	return xfer;
+> +}
+> +
 
-Do we need to duplicate the asm, or can we reuse the existing BUG
-definition in this header? The only extra thing we do is push a __bug_table
-entry, but I can't see why that would be a problem.
+Is there any reason this isn't using regmap? It looks like it
+should be, have a look at any of the other mainline CODECs for an
+example.
 
-Will
+Thanks,
+Charles
