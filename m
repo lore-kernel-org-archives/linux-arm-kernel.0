@@ -1,232 +1,218 @@
-From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Wed, 15 Feb 2017 10:44:44 -0700
-Subject: [PATCH V9 02/10] ras: acpi/apei: cper: generic error data entry v3
- per ACPI 6.1
-In-Reply-To: <1487180692-16732-1-git-send-email-tbaicar@codeaurora.org>
-References: <1487180692-16732-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1487180692-16732-3-git-send-email-tbaicar@codeaurora.org>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 15 Feb 2017 13:01:59 -0500
+Subject: [PATCH v3] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
+Message-ID: <20170215180159.11359-1-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently when a RAS error is reported it is not timestamped.
-The ACPI 6.1 spec adds the timestamp field to the generic error
-data entry v3 structure. The timestamp of when the firmware
-generated the error is now being reported.
+The Qualcomm Datacenter Technologies QDF2400 family of SoCs contains a
+custom (non-PrimeCell) implementation of the SBSA UART. Occasionally the
+BUSY bit in the Flag Register gets stuck as 1, erratum 44 for both 2432v1
+and 2400v1 SoCs.Checking that the Transmit FIFO Empty (TXFE) bit is 0,
+instead of checking that the BUSY bit is 1, works around the issue.
 
-Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-Signed-off-by: Richard Ruigrok <rruigrok@codeaurora.org>
-Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
-Reviewed-by: James Morse <james.morse@arm.com>
+To facilitate this substitution of flags and values, introduce
+vendor-specific inversion of Feature Register bits when UART AMBA Port
+(UAP) data is available. For the earlycon case, prior to UAP availability,
+implement alternative putc and early_write functions.
+
+Similar to what how ARMv8 ACPI PCI quirks are detected during MCFG parsing,
+check the OEM fields of the Serial Port Console Redirection (SPCR) ACPI
+table to determine if the current platform is known to be affected by the
+erratum.
+
+Signed-off-by: Christopher Covington <cov@codeaurora.org>
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/acpi/apei/ghes.c    |  9 ++++---
- drivers/firmware/efi/cper.c | 63 +++++++++++++++++++++++++++++++++++----------
- include/acpi/ghes.h         | 22 ++++++++++++++++
- 3 files changed, 77 insertions(+), 17 deletions(-)
+Since v2: Formatting and other improvements per Timur's suggestions
+Due to known (although trivial) conflicts in silicon-errata.txt, based on
+http://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
+---
+ Documentation/arm64/silicon-errata.txt |  2 ++
+ drivers/acpi/spcr.c                    | 23 ++++++++++++
+ drivers/tty/serial/amba-pl011.c        | 66 ++++++++++++++++++++++++++++++----
+ 3 files changed, 84 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 5e1ec41..b25e7cf 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -420,7 +420,8 @@ static void ghes_handle_memory_failure(struct acpi_hest_generic_data *gdata, int
- 	int flags = -1;
- 	int sec_sev = ghes_severity(gdata->error_severity);
- 	struct cper_sec_mem_err *mem_err;
--	mem_err = (struct cper_sec_mem_err *)(gdata + 1);
-+
-+	mem_err = acpi_hest_generic_data_payload(gdata);
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index a71b8095dbd8..bc3d086bc624 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -68,3 +68,5 @@ stable kernels.
+ |                |                 |                 |                             |
+ | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
+ | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
++| Qualcomm Tech. | QDF2432v1 UART  | SoC E44         | N/A                         |
++| Qualcomm Tech. | QDF2400v1 UART  | SoC E44         | N/A                         |
+diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
+index b8019c4c1d38..2b5d0fac81f0 100644
+--- a/drivers/acpi/spcr.c
++++ b/drivers/acpi/spcr.c
+@@ -16,6 +16,26 @@
+ #include <linux/kernel.h>
+ #include <linux/serial_core.h>
  
- 	if (!(mem_err->validation_bits & CPER_MEM_VALID_PA))
- 		return;
-@@ -457,7 +458,8 @@ static void ghes_do_proc(struct ghes *ghes,
- 		if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
- 				 CPER_SEC_PLATFORM_MEM)) {
- 			struct cper_sec_mem_err *mem_err;
--			mem_err = (struct cper_sec_mem_err *)(gdata+1);
-+
-+			mem_err = acpi_hest_generic_data_payload(gdata);
- 			ghes_edac_report_mem_error(ghes, sev, mem_err);
- 
- 			arch_apei_report_mem_error(sev, mem_err);
-@@ -467,7 +469,8 @@ static void ghes_do_proc(struct ghes *ghes,
- 		else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
- 				      CPER_SEC_PCIE)) {
- 			struct cper_sec_pcie *pcie_err;
--			pcie_err = (struct cper_sec_pcie *)(gdata+1);
-+
-+			pcie_err = acpi_hest_generic_data_payload(gdata);
- 			if (sev == GHES_SEV_RECOVERABLE &&
- 			    sec_sev == GHES_SEV_RECOVERABLE &&
- 			    pcie_err->validation_bits & CPER_PCIE_VALID_DEVICE_ID &&
-diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-index d425374..8fa4e23 100644
---- a/drivers/firmware/efi/cper.c
-+++ b/drivers/firmware/efi/cper.c
-@@ -32,6 +32,9 @@
- #include <linux/acpi.h>
- #include <linux/pci.h>
- #include <linux/aer.h>
-+#include <linux/printk.h>
-+#include <linux/bcd.h>
-+#include <acpi/ghes.h>
- 
- #define INDENT_SP	" "
- 
-@@ -386,13 +389,37 @@ static void cper_print_pcie(const char *pfx, const struct cper_sec_pcie *pcie,
- 	pfx, pcie->bridge.secondary_status, pcie->bridge.control);
- }
- 
-+static void cper_estatus_print_section_v300(const char *pfx,
-+	const struct acpi_hest_generic_data_v300 *gdata)
++/*
++ * Some Qualcomm Datacenter Technologies SoCs have a defective UART BUSY bit.
++ * Detect them by examining the OEM fields in the SPCR header, similiar to PCI
++ * quirk detection in pci_mcfg.c.
++ */
++static bool qdf2400_erratum_44_present(struct acpi_table_header *h)
 +{
-+	__u8 hour, min, sec, day, mon, year, century, *timestamp;
++	if (memcmp(h->oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
++		return false;
 +
-+	if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
-+		timestamp = (__u8 *)&(gdata->time_stamp);
-+		sec = bcd2bin(timestamp[0]);
-+		min = bcd2bin(timestamp[1]);
-+		hour = bcd2bin(timestamp[2]);
-+		day = bcd2bin(timestamp[4]);
-+		mon = bcd2bin(timestamp[5]);
-+		year = bcd2bin(timestamp[6]);
-+		century = bcd2bin(timestamp[7]);
-+		printk("%stime: %7s %02d%02d-%02d-%02d %02d:%02d:%02d\n", pfx,
-+			0x01 & *(timestamp + 3) ? "precise" : "", century,
-+			year, mon, day, hour, min, sec);
++	if (!memcmp(h->oem_table_id, "QDF2432 ", ACPI_OEM_TABLE_ID_SIZE))
++		return true;
++
++	if (!memcmp(h->oem_table_id, "QDF2400 ", ACPI_OEM_TABLE_ID_SIZE) &&
++			h->oem_revision == 0)
++		return true;
++
++	return false;
++}
++
+ /**
+  * parse_spcr() - parse ACPI SPCR table and add preferred console
+  *
+@@ -93,6 +113,9 @@ int __init parse_spcr(bool earlycon)
+ 		goto done;
+ 	}
+ 
++	if (qdf2400_erratum_44_present(&table->header))
++		uart = "qdf2400_e44";
++
+ 	snprintf(opts, sizeof(opts), "%s,%s,0x%llx,%d", uart, iotype,
+ 		 table->serial_port.address, baud_rate);
+ 
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index d4171d71a258..fbd1ea251854 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -97,6 +97,7 @@ struct vendor_data {
+ 	unsigned int		fr_dsr;
+ 	unsigned int		fr_cts;
+ 	unsigned int		fr_ri;
++	unsigned int		inv_fr;
+ 	bool			access_32b;
+ 	bool			oversampling;
+ 	bool			dma_threshold;
+@@ -141,6 +142,30 @@ static struct vendor_data vendor_sbsa = {
+ 	.fixed_options		= true,
+ };
+ 
++/*
++ * Erratum 44 for QDF2432v1 and QDF2400v1 SoCs describes the BUSY bit as
++ * occasionally getting stuck as 1. To avoid the potential for a hang, check
++ * TXFE == 0 instead of BUSY == 1. This may not be suitable for all UART
++ * implementations, so only do so if an affected platform is detected in
++ * parse_spcr().
++ */
++static bool qdf2400_e44_present = false;
++
++static struct vendor_data vendor_qdt_qdf2400_e44 = {
++	.reg_offset		= pl011_std_offsets,
++	.fr_busy		= UART011_FR_TXFE,
++	.fr_dsr			= UART01x_FR_DSR,
++	.fr_cts			= UART01x_FR_CTS,
++	.fr_ri			= UART011_FR_RI,
++	.inv_fr			= UART011_FR_TXFE,
++	.access_32b		= true,
++	.oversampling		= false,
++	.dma_threshold		= false,
++	.cts_event_workaround	= false,
++	.always_enabled		= true,
++	.fixed_options		= true,
++};
++
+ static u16 pl011_st_offsets[REG_ARRAY_SIZE] = {
+ 	[REG_DR] = UART01x_DR,
+ 	[REG_ST_DMAWM] = ST_UART011_DMAWM,
+@@ -1518,7 +1543,10 @@ static unsigned int pl011_tx_empty(struct uart_port *port)
+ {
+ 	struct uart_amba_port *uap =
+ 	    container_of(port, struct uart_amba_port, port);
+-	unsigned int status = pl011_read(uap, REG_FR);
++
++	/* Allow feature register bits to be inverted to work around errata */
++	unsigned int status = pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr;
++
+ 	return status & (uap->vendor->fr_busy | UART01x_FR_TXFF) ?
+ 							0 : TIOCSER_TEMT;
+ }
+@@ -2215,10 +2243,12 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ 	uart_console_write(&uap->port, s, count, pl011_console_putchar);
+ 
+ 	/*
+-	 *	Finally, wait for transmitter to become empty
+-	 *	and restore the TCR
++	 *	Finally, wait for transmitter to become empty and restore the
++	 *	TCR. Allow feature register bits to be inverted to work around
++	 *	errata.
+ 	 */
+-	while (pl011_read(uap, REG_FR) & uap->vendor->fr_busy)
++	while ((pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr)
++						& uap->vendor->fr_busy)
+ 		cpu_relax();
+ 	if (!uap->vendor->always_enabled)
+ 		pl011_write(old_cr, uap, REG_CR);
+@@ -2340,8 +2370,12 @@ static int __init pl011_console_match(struct console *co, char *name, int idx,
+ 	resource_size_t addr;
+ 	int i;
+ 
+-	if (strcmp(name, "pl011") != 0)
++	if (strcmp(name, "qdf2400_e44") == 0) {
++		pr_info_once("UART: Working around QDF2400 SoC erratum 44");
++		qdf2400_e44_present = true;
++	} else if (strcmp(name, "pl011") != 0) {
+ 		return -ENODEV;
 +	}
-+}
-+
- static void cper_estatus_print_section(
--	const char *pfx, const struct acpi_hest_generic_data *gdata, int sec_no)
-+	const char *pfx, struct acpi_hest_generic_data *gdata, int sec_no)
- {
- 	uuid_le *sec_type = (uuid_le *)gdata->section_type;
- 	__u16 severity;
- 	char newpfx[64];
  
-+	if (acpi_hest_generic_data_version(gdata) >= 3)
-+		cper_estatus_print_section_v300(pfx,
-+			(const struct acpi_hest_generic_data_v300 *)gdata);
-+
- 	severity = gdata->error_severity;
- 	printk("%s""Error %d, type: %s\n", pfx, sec_no,
- 	       cper_severity_str(severity));
-@@ -403,14 +430,18 @@ static void cper_estatus_print_section(
+ 	if (uart_parse_earlycon(options, &iotype, &addr, &options))
+ 		return -ENODEV;
+@@ -2383,6 +2417,22 @@ static struct console amba_console = {
  
- 	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
- 	if (!uuid_le_cmp(*sec_type, CPER_SEC_PROC_GENERIC)) {
--		struct cper_sec_proc_generic *proc_err = (void *)(gdata + 1);
-+		struct cper_sec_proc_generic *proc_err;
-+
-+		proc_err = acpi_hest_generic_data_payload(gdata);
- 		printk("%s""section_type: general processor error\n", newpfx);
- 		if (gdata->error_data_length >= sizeof(*proc_err))
- 			cper_print_proc_generic(newpfx, proc_err);
- 		else
- 			goto err_section_too_small;
- 	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PLATFORM_MEM)) {
--		struct cper_sec_mem_err *mem_err = (void *)(gdata + 1);
-+		struct cper_sec_mem_err *mem_err;
-+
-+		mem_err = acpi_hest_generic_data_payload(gdata);
- 		printk("%s""section_type: memory error\n", newpfx);
- 		if (gdata->error_data_length >=
- 		    sizeof(struct cper_sec_mem_err_old))
-@@ -419,7 +450,9 @@ static void cper_estatus_print_section(
- 		else
- 			goto err_section_too_small;
- 	} else if (!uuid_le_cmp(*sec_type, CPER_SEC_PCIE)) {
--		struct cper_sec_pcie *pcie = (void *)(gdata + 1);
-+		struct cper_sec_pcie *pcie;
-+
-+		pcie = acpi_hest_generic_data_payload(gdata);
- 		printk("%s""section_type: PCIe error\n", newpfx);
- 		if (gdata->error_data_length >= sizeof(*pcie))
- 			cper_print_pcie(newpfx, pcie, gdata);
-@@ -438,7 +471,7 @@ void cper_estatus_print(const char *pfx,
- 			const struct acpi_hest_generic_status *estatus)
- {
- 	struct acpi_hest_generic_data *gdata;
--	unsigned int data_len, gedata_len;
-+	unsigned int data_len;
- 	int sec_no = 0;
- 	char newpfx[64];
- 	__u16 severity;
-@@ -451,12 +484,13 @@ void cper_estatus_print(const char *pfx,
- 	printk("%s""event severity: %s\n", pfx, cper_severity_str(severity));
- 	data_len = estatus->data_length;
- 	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
-+
- 	snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
--	while (data_len >= sizeof(*gdata)) {
--		gedata_len = gdata->error_data_length;
-+
-+	while (data_len >= acpi_hest_generic_data_size(gdata)) {
- 		cper_estatus_print_section(newpfx, gdata, sec_no);
--		data_len -= gedata_len + sizeof(*gdata);
--		gdata = (void *)(gdata + 1) + gedata_len;
-+		data_len -= acpi_hest_generic_data_record_size(gdata);
-+		gdata = acpi_hest_generic_data_next(gdata);
- 		sec_no++;
- 	}
- }
-@@ -486,12 +520,13 @@ int cper_estatus_check(const struct acpi_hest_generic_status *estatus)
- 		return rc;
- 	data_len = estatus->data_length;
- 	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
--	while (data_len >= sizeof(*gdata)) {
--		gedata_len = gdata->error_data_length;
--		if (gedata_len > data_len - sizeof(*gdata))
-+
-+	while (data_len >= acpi_hest_generic_data_size(gdata)) {
-+		gedata_len = acpi_hest_generic_data_error_length(gdata);
-+		if (gedata_len > data_len - acpi_hest_generic_data_size(gdata))
- 			return -EINVAL;
--		data_len -= gedata_len + sizeof(*gdata);
--		gdata = (void *)(gdata + 1) + gedata_len;
-+		data_len -= gedata_len + acpi_hest_generic_data_size(gdata);
-+		gdata = acpi_hest_generic_data_next(gdata);
- 	}
- 	if (data_len)
- 		return -EINVAL;
-diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index 68f088a..6ae318b 100644
---- a/include/acpi/ghes.h
-+++ b/include/acpi/ghes.h
-@@ -12,6 +12,18 @@
- #define GHES_TO_CLEAR		0x0001
- #define GHES_EXITING		0x0002
+ #define AMBA_CONSOLE	(&amba_console)
  
-+#define acpi_hest_generic_data_error_length(gdata)	\
-+	(((struct acpi_hest_generic_data *)(gdata))->error_data_length)
-+#define acpi_hest_generic_data_size(gdata)		\
-+	((acpi_hest_generic_data_version(gdata) >= 3) ?	\
-+	sizeof(struct acpi_hest_generic_data_v300) :	\
-+	sizeof(struct acpi_hest_generic_data))
-+#define acpi_hest_generic_data_record_size(gdata)	\
-+	(acpi_hest_generic_data_size(gdata) +		\
-+	acpi_hest_generic_data_error_length(gdata))
-+#define acpi_hest_generic_data_next(gdata)		\
-+	((void *)(gdata) + acpi_hest_generic_data_record_size(gdata))
-+
- struct ghes {
- 	union {
- 		struct acpi_hest_generic *generic;
-@@ -73,3 +85,13 @@ static inline void ghes_edac_unregister(struct ghes *ghes)
- {
- }
- #endif
-+
-+#define acpi_hest_generic_data_version(gdata)			\
-+	(gdata->revision >> 8)
-+
-+static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data *gdata)
++static void qdf2400_e44_putc(struct uart_port *port, int c)
 +{
-+	return acpi_hest_generic_data_version(gdata) >= 3 ?
-+		(void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
-+		gdata + 1;
++	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
++		cpu_relax();
++	writel(c, port->membase + UART01x_DR);
++	while (!(readl(port->membase + UART01x_FR) & UART011_FR_TXFE))
++		cpu_relax();
 +}
++
++static void qdf2400_e44_early_write(struct console *con, const char *s, unsigned n)
++{
++	struct earlycon_device *dev = con->data;
++
++	uart_console_write(&dev->port, s, n, qdf2400_e44_putc);
++}
++
+ static void pl011_putc(struct uart_port *port, int c)
+ {
+ 	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+@@ -2408,7 +2458,8 @@ static int __init pl011_early_console_setup(struct earlycon_device *device,
+ 	if (!device->port.membase)
+ 		return -ENODEV;
+ 
+-	device->con->write = pl011_early_write;
++	device->con->write = qdf2400_e44_present ?
++				qdf2400_e44_early_write : pl011_early_write;
+ 	return 0;
+ }
+ OF_EARLYCON_DECLARE(pl011, "arm,pl011", pl011_early_console_setup);
+@@ -2645,7 +2696,8 @@ static int sbsa_uart_probe(struct platform_device *pdev)
+ 	uap->port.irq	= ret;
+ 
+ 	uap->reg_offset	= vendor_sbsa.reg_offset;
+-	uap->vendor	= &vendor_sbsa;
++	uap->vendor	= qdf2400_e44_present ?
++					&vendor_qdt_qdf2400_e44 : &vendor_sbsa;
+ 	uap->fifosize	= 32;
+ 	uap->port.iotype = vendor_sbsa.access_32b ? UPIO_MEM32 : UPIO_MEM;
+ 	uap->port.ops	= &sbsa_uart_pops;
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
+Forum, a Linux Foundation Collaborative Project.
