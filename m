@@ -1,28 +1,48 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 14 Feb 2017 17:55:01 -0600
-Subject: [PATCH 00/37] PCI: Support for configurable PCI endpoint
-In-Reply-To: <5891D53E.5050409@ti.com>
-References: <1484216786-17292-1-git-send-email-kishon@ti.com>
- <5891D53E.5050409@ti.com>
-Message-ID: <20170214235501.GD19040@bhelgaas-glaptop.roam.corp.google.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 14 Feb 2017 16:41:57 -0800
+Subject: [PATCH] soc: bcm: brcmstb: Match additional compatible strings
+Message-ID: <20170215004159.11096-1-florian.fainelli@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 06:01:58PM +0530, Kishon Vijay Abraham I wrote:
-> - list
-> 
-> Hi Bjorn,
-> 
-> How do you want to handle this series? I'll send one more version of the series
-> including the directory restructuring in the same series. Should it be based on
-> your -next?
+From: Florian Fainelli <f.fainelli@gmail.com>
 
-I think if you base it on my pci/host-designware branch, it should
-work pretty well.  I haven't merged that into -next yet, but I will
-soon.
+Match all known sun-top-ctrl compatible strings from our MIPS chips
+counterparts. This allows us to properly report the SoC information to
+user-space through our SoC driver.
 
-I'm not sure there was consensus on all the patches yet, but if you
-can group the easy ones at the beginning, I should be able to at least
-get quite a few out of the way.
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+Ralf, James,
 
-Bjorn
+I usually take patches touching this file through an ARM SoC pull request,
+posting to linux-mips for people working on BMIPS STB to get a chance to review
+this.
+
+Thanks!
+
+ drivers/soc/bcm/brcmstb/common.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+index 94e7335553f4..b6195fdf0d00 100644
+--- a/drivers/soc/bcm/brcmstb/common.c
++++ b/drivers/soc/bcm/brcmstb/common.c
+@@ -41,6 +41,15 @@ bool soc_is_brcmstb(void)
+ }
+ 
+ static const struct of_device_id sun_top_ctrl_match[] = {
++	{ .compatible = "brcm,bcm7125-sun-top-ctrl", },
++	{ .compatible = "brcm,bcm7346-sun-top-ctrl", },
++	{ .compatible = "brcm,bcm7358-sun-top-ctrl", },
++	{ .compatible = "brcm,bcm7360-sun-top-ctrl", },
++	{ .compatible = "brcm,bcm7362-sun-top-ctrl", },
++	{ .compatible = "brcm,bcm7420-sun-top-ctrl", },
++	{ .compatible = "brcm,bcm7425-sun-top-ctrl", },
++	{ .compatible = "brcm,bcm7429-sun-top-ctrl", },
++	{ .compatible = "brcm,bcm7425-sun-top-ctrl", },
+ 	{ .compatible = "brcm,brcmstb-sun-top-ctrl", },
+ 	{ }
+ };
+-- 
+2.11.0
