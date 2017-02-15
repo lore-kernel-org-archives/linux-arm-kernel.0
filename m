@@ -1,35 +1,24 @@
-From: agust@denx.de (Anatolij Gustschin)
-Date: Wed, 15 Feb 2017 16:26:41 +0100
-Subject: [PATCH v9 2/3] fpga manager: Add cyclone-ps-spi driver for
- Altera FPGAs
-In-Reply-To: <94f1d92f502b64669467c467038c3aa766b312ad.1485295905.git.stillcompiling@gmail.com>
-References: <cover.1485295905.git.stillcompiling@gmail.com>
- <94f1d92f502b64669467c467038c3aa766b312ad.1485295905.git.stillcompiling@gmail.com>
-Message-ID: <20170215162641.5bc50cf3@crub>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 15 Feb 2017 12:27:59 -0300
+Subject: [PATCH] clk: rockchip: Set "ignore unused" for PMU M0 clocks on
+ rk3399
+In-Reply-To: <20170214210114.5846-1-dianders@chromium.org>
+References: <20170214210114.5846-1-dianders@chromium.org>
+Message-ID: <CABxcv=kzW9SvrWYNasqCDkV7D6Y2zq+oRuqoPFdWuaWUhPehEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joshua,
+Hello Doug,
 
-On Tue, 24 Jan 2017 14:19:33 -0800
-Joshua Clayton stillcompiling at gmail.com wrote:
-...
->+static int cyclonespi_write(struct fpga_manager *mgr, const char *buf,
->+			    size_t count)
->+{
->+	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
->+	const char *fw_data = buf;
->+	const char *fw_data_end = fw_data + count;
->+
->+	while (fw_data < fw_data_end) {
->+		int ret;
->+		size_t stride = min(fw_data_end - fw_data, SZ_4K);
->+
->+		rev_buf(fw_data, stride);
+On Tue, Feb 14, 2017 at 6:01 PM, Douglas Anderson <dianders@chromium.org> wrote:
+> The PMU Cortex M0 on rk3399 is intended to be used for things like
+> DDRFreq transitions, suspend/resume, and other things that are the
+> purview of ARM Trusted Firmware and not the kernel.  As such, the
+> kernel shouldn't be messing with the clocks.  Add CLK_IGNORE_UNUSED to
+> these clocks.
+>
 
-Can we make rev_buf() optional here? I've tested this driver with
-Stratix-V FPGA using orion_spi driver. It works without swapping
-the data.
+Isn't CLK_IS_CRITICAL a more suitable flag for this case?
 
-Thanks,
-Anatolij
+Best regards,
+Javier
