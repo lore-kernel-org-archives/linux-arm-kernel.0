@@ -1,146 +1,68 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Wed, 15 Feb 2017 14:03:18 +0530
-Subject: [PATCH v4 3/4] dmaengine: Add Broadcom SBA RAID driver
-In-Reply-To: <CAPcyv4h83vgeB82KmEEFV196MsWdteRqypY5_tcSyaMM_QwYMA@mail.gmail.com>
-References: <1487055112-5185-1-git-send-email-anup.patel@broadcom.com>
- <1487055112-5185-4-git-send-email-anup.patel@broadcom.com>
- <CAPcyv4g5PU1EQWq-SCbt0QB=vSaMyafqa-ThJifDxEoQha-6Hw@mail.gmail.com>
- <CAALAos_=TN_ZfeJbRQEwuc+t5zaxKVgrgEMNPQQu8K8Q8+8F6A@mail.gmail.com>
- <CAPcyv4jckb=sbocr3W43NZ2YyUVLbDdhbCAhLfgQwh-bRuvjYQ@mail.gmail.com>
- <CAALAos-txDCs3QZ4HGBNicOD8t49NPT6E8RpjVMccMn1D-UTgQ@mail.gmail.com>
- <CAPcyv4h83vgeB82KmEEFV196MsWdteRqypY5_tcSyaMM_QwYMA@mail.gmail.com>
-Message-ID: <CAALAos8z+z6Sh_tzXYv=CFT54NxT1XGT8uyiXFxcYKBmuDYZbg@mail.gmail.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 15 Feb 2017 16:51:27 +0800
+Subject: [PATCH v13 06/12] usb: xhci: use bus->sysdev for DMA configuration
+In-Reply-To: <cb3ee971-6d97-fff1-64f7-1b527559b047@ti.com>
+References: <1486776443-2280-1-git-send-email-peter.chen@nxp.com>
+ <1486776443-2280-7-git-send-email-peter.chen@nxp.com>
+ <e532a212-cd15-ab42-6188-fc11a12633af@ti.com>
+ <CAK8P3a1D1v=LXrW=-t-fRJjbo_C6OpSuoqiGuZPOaBzQYCT-kA@mail.gmail.com>
+ <cb7182c6-0236-26f2-4f96-9bc001994728@ti.com>
+ <CAK8P3a22f=sQXt+3-PeAuBFQN7_4iXDQhu41teExd6bxJXxDAQ@mail.gmail.com>
+ <20170215013514.GA6579@b29397-desktop>
+ <cb3ee971-6d97-fff1-64f7-1b527559b047@ti.com>
+Message-ID: <20170215085127.GA26227@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 12:55 PM, Dan Williams <dan.j.williams@intel.com> wrote:
-> On Tue, Feb 14, 2017 at 11:03 PM, Anup Patel <anup.patel@broadcom.com> wrote:
->> On Wed, Feb 15, 2017 at 12:13 PM, Dan Williams <dan.j.williams@intel.com> wrote:
->>> On Tue, Feb 14, 2017 at 10:25 PM, Anup Patel <anup.patel@broadcom.com> wrote:
->>>> On Tue, Feb 14, 2017 at 10:04 PM, Dan Williams <dan.j.williams@intel.com> wrote:
->>>>> On Mon, Feb 13, 2017 at 10:51 PM, Anup Patel <anup.patel@broadcom.com> wrote:
->>>>>> The Broadcom stream buffer accelerator (SBA) provides offloading
->>>>>> capabilities for RAID operations. This SBA offload engine is
->>>>>> accessible via Broadcom SoC specific ring manager.
->>>>>>
->>>>>> This patch adds Broadcom SBA RAID driver which provides one
->>>>>> DMA device with RAID capabilities using one or more Broadcom
->>>>>> SoC specific ring manager channels. The SBA RAID driver in its
->>>>>> current shape implements memcpy, xor, and pq operations.
->>>>>>
->>>>>> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
->>>>>> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->>>>>> ---
->>>>>>  drivers/dma/Kconfig        |   13 +
->>>>>>  drivers/dma/Makefile       |    1 +
->>>>>>  drivers/dma/bcm-sba-raid.c | 1694 ++++++++++++++++++++++++++++++++++++++++++++
->>>>>>  3 files changed, 1708 insertions(+)
->>>>>>  create mode 100644 drivers/dma/bcm-sba-raid.c
->>>>>>
->>>>>> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
->>>>>> index 263495d..bf8fb84 100644
->>>>>> --- a/drivers/dma/Kconfig
->>>>>> +++ b/drivers/dma/Kconfig
->>>>>> @@ -99,6 +99,19 @@ config AXI_DMAC
->>>>>>           controller is often used in Analog Device's reference designs for FPGA
->>>>>>           platforms.
->>>>>>
->>>>>> +config BCM_SBA_RAID
->>>>>> +       tristate "Broadcom SBA RAID engine support"
->>>>>> +       depends on (ARM64 && MAILBOX && RAID6_PQ) || COMPILE_TEST
->>>>>> +       select DMA_ENGINE
->>>>>> +       select DMA_ENGINE_RAID
->>>>>> +       select ASYNC_TX_ENABLE_CHANNEL_SWITCH
->>>>>
->>>>> I thought you agreed to drop this. Its usage is broken.
->>>>
->>>> If ASYNC_TX_ENABLE_CHANNEL_SWITCH is not selected
->>>> then async_dma_find_channel() will only try to find channel
->>>> with DMA_ASYNC_TX capability.
->>>>
->>>> The DMA_ASYNC_TX capability is set by
->>>> dma_async_device_register() when all Async Tx
->>>> capabilities are supported by a DMA devices namely
->>>> DMA_INTERRUPT, DMA_MEMCPY, DMA_XOR,
->>>> DMA_XOR_VAL, DMA_PQ, and DMA_PQ_VAL.
->>>>
->>>> We only support DMA_MEMCPY, DMA_XOR, and
->>>> DMA_PQ capabilities in BCM-SBA-RAID driver so
->>>> DMA_ASYNC_TX capability is never set for the
->>>> DMA device registered by BCM-SBA-RAID driver.
->>>>
->>>> Due to above, if ASYNC_TX_ENABLE_CHANNEL_SWITCH
->>>> is not selected then Async Tx APIs fail to find DMA
->>>> channel provided by BCM-SBA-RAID hence the
->>>> option ASYNC_TX_ENABLE_CHANNEL_SWITCH is
->>>> required for BCM-SBA-RAID.
->>>>
->>>> The DMA mappings are violated by channel switching
->>>> only if we switch form DMA channel A to DMA channel
->>>> B and both these DMA channels have different underlying
->>>> "struct device". In most of the cases DMA mappings
->>>> are not violated because DMA channels having
->>>> Async Tx capabilities are provided using same
->>>> underlying "struct device".
->>>
->>> No, fix the infrastructure. Do not put local hack in your driver for
->>> this global problem [1].
->>
->> There is no hack in the driver. We need
->> ASYNC_TX_ENABLE_CHANNEL_SWITCH
->> based on current state of dmaengine framework.
->>
->> The framework should be fixed as separate patchset.
->>
->> We have other RAID drivers such as xgene-dma and
->> mv_xor_v2 who also require
->> ASYNC_TX_ENABLE_CHANNEL_SWITCH due
->> to same reason.
->>
->> Fixing the framework and improving framework is
->> a ongoing process. I don't see why that should
->> stop this patchset.
->>
->
-> Because this driver is turning on a dangerous compile time option and
-> is not using the functionality. If this silicon IP block appears in
-> another product in the future paired with another DMA engine then the
-> assumptions about a safe/single dma-device is violated.
->
-> The realization of how async_tx was breaking DMA mapping api
-> assumptions came after some of these dma-drivers were added to the
-> kernel. We should stop making the problem worse.
->
-> I should have submitted a patch like the below at the time we
-> discovered this problem, but unfortunately it languished when I
-> stopped maintaining the iop-adma and ioat drivers.
->
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index 263495d0adbd..6b30eb9ad125 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -35,6 +35,7 @@ comment "DMA Devices"
->
->  #core
->  config ASYNC_TX_ENABLE_CHANNEL_SWITCH
-> +       depends on BROKEN
->         bool
->
->  config ARCH_HAS_ASYNC_TX_FIND_CHANNEL
+On Wed, Feb 15, 2017 at 10:18:03AM +0200, Roger Quadros wrote:
+> Peter,
+> 
+> On 15/02/17 03:35, Peter Chen wrote:
+> > On Tue, Feb 14, 2017 at 01:58:40PM +0100, Arnd Bergmann wrote:
+> >> On Tue, Feb 14, 2017 at 1:26 PM, Roger Quadros <rogerq@ti.com> wrote:
+> >>> On 14/02/17 13:44, Arnd Bergmann wrote:
+> >>>> On Tue, Feb 14, 2017 at 11:36 AM, Roger Quadros <rogerq@ti.com> wrote:
+> >>
+> >>>>> Why are we using sysdev to read DT property? We should be using the
+> >>>>> XHCI device (&pdev->dev) here, no?
+> >>>>
+> >>>> If I remember correctly, this is one of the cases where pdev does not
+> >>>> have a device node attached to it because it was created by the driver
+> >>>> of the parent device on the fly in case of dwc3. When you have a pure xhci
+> >>>> device in DT, the two pointers are the same.
+> >>>
+> >>> From drivers/usb/dwc3/host.c
+> >>>
+> >>>>         if (dwc->usb3_lpm_capable) {
+> >>>>                 props[0].name = "usb3-lpm-capable";
+> >>>>                 ret = platform_device_add_properties(xhci, props);
+> >>>>                 if (ret) {
+> >>>>                         dev_err(dwc->dev, "failed to add properties to xHCI\n");
+> >>>>                         goto err1;
+> >>>>                 }
+> >>>>         }
+> >>>
+> >>> So it is setting the usb3-lpm-capable property into the xhci platform device
+> >>> and we should be reading the property from there.
+> > 
+> > Why dwc3 needs another "snps,usb3_lpm_capable"? Why not using
+> > "usb3-lpm-capable" at firmware directly?
+> 
+> dwc3 is not setting "snps,usb3_lpm_capable" but "usb3-lpm-capable" for the
+> xhci platform device.
+> 
+> What did you mean by firmware? Did you mean something like BIOS?
+> At least TI platforms don't use any firmware like BIOS. So dwc3 driver
+> needs to create a platform device for xhci on the fly and set the DT properties.
+> 
 
-Instead of selecting
-ASYNC_TX_ENABLE_CHANNEL_SWITCH,
-we can select the following in BCM_SBA_RAID config
-option:
-1. ASYNC_TX_DISABLE_XOR_VAL
-2. ASYNC_TX_DISABLE_PQ_VAL
+By readying code, the dwc3 calls dwc3_get_properties to set
+dwc->usb3_lpm_capable, and at dwc3/host.c, it sets property
+"usb3-lpm-capable" according to this flag, why not let common
+code xhci-plat.c to get this property from sysdev which is DT
+nodes for dwc3?
 
-This will satisfy the needs of
-dma_async_device_register() when
-ASYNC_TX_ENABLE_CHANNEL_SWITCH is
-not selected.
+-- 
 
-Will this be acceptable ??
-
-Regards,
-Anup
+Best Regards,
+Peter Chen
