@@ -1,38 +1,88 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 15 Feb 2017 17:16:47 +0000
-Subject: [PATCH v2 0/5] ARM: add module autoloading support for crypto
- modules
-In-Reply-To: <CAKv+Gu9XSjprPBHqHvTQhJ-ChXeFjVQ1K0LPNcTvru6TgUEBDA@mail.gmail.com>
-References: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAKv+Gu9q5sH2_=3TZNbPAf3fdFB=F7Ut5swnp7qiUgwbuqemnA@mail.gmail.com>
- <CAKv+Gu9XSjprPBHqHvTQhJ-ChXeFjVQ1K0LPNcTvru6TgUEBDA@mail.gmail.com>
-Message-ID: <CAKv+Gu9DFFM6LEKxs5E9jugfRj4CKHb-5nVoD4uzrjmbvk9rGg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 15 Feb 2017 11:17:00 -0600
+Subject: [PATCH v4 3/3] PCI: imx6: Add code to support i.MX7D
+In-Reply-To: <20170207155027.7734-4-andrew.smirnov@gmail.com>
+References: <20170207155027.7734-1-andrew.smirnov@gmail.com>
+ <20170207155027.7734-4-andrew.smirnov@gmail.com>
+Message-ID: <20170215171700.5vz5seeihgtwn76p@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 January 2017 at 13:47, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 19 January 2017 at 18:23, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> On 11 January 2017 at 17:01, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->>> This series wires up the crypto modules that use the ARM 32-bit versions of
->>> the ARMv8 Crypto Extensions to udev autoloading, by exposing the HWCAP2
->>> feature bits via the CPU modalias. This is very similar to the arm64
->>> implementation, with the notable exception that ARM has its CPU feature
->>> definitions split across HWCAP and HWCAP2.
->>>
->>> Given that the crypto feature bits are all exposed via HWCAP2, and considering
->>> that there are currently no features exposed via HWCAP that are relevant to
->>> udev module autoloading, exposing HWCAP2 only should be sufficient, at least
->>> for now.
->>>
->>> Changes since v1:
->>> - rebase onto v4.10-rc2
->>>
->>> Ard Biesheuvel (5):
->>>   ARM: wire up HWCAP2 feature bits to the CPU modalias
->>
->> Ping?
->>
->
-> Ping?
+On Tue, Feb 07, 2017 at 07:50:27AM -0800, Andrey Smirnov wrote:
+> Add various bits of code needed to support i.MX7D variant of the IP.
+> 
+> Cc: yurovsky at gmail.com
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> ---
+>  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 ++-
+>  drivers/pci/host/pci-imx6.c                        | 121 ++++++++++++++++-----
+>  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
+>  3 files changed, 112 insertions(+), 26 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> index 83aeb1f..11db2ab 100644
+> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+> @@ -4,7 +4,11 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
+>  and thus inherits all the common properties defined in designware-pcie.txt.
+>  
+>  Required properties:
+> -- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie", "fsl,imx6qp-pcie"
+> +- compatible:
+> +	- "fsl,imx6q-pcie"
+> +	- "fsl,imx6sx-pcie",
+> +	- "fsl,imx6qp-pcie"
+> +	- "fsl,imx7d-pcie"
+>  - reg: base address and length of the PCIe controller
+>  - interrupts: A list of interrupt outputs of the controller. Must contain an
+>    entry for each entry in the interrupt-names property.
+> @@ -34,6 +38,13 @@ Additional required properties for imx6sx-pcie:
+>  - clock names: Must include the following additional entries:
+>  	- "pcie_inbound_axi"
+>  
+> +Additional required properties for imx7d-pcie:
+> +- power-domains: Must be set to a phandle pointing to PCIE_PHY power domain
 
-Ping?
+This domain is just the PHY? Seems like this needs a separate PHY 
+driver.
+
+> +- resets: Must contain phandles to PCIE related reset lines exposed by SRC IP block
+> +- reset-names: Must contain the following entires:
+> +  	       - "pciephy"
+
+And for this too.
+
+> +	       - "apps"
+> +
+>  Example:
+>  
+>  	pcie at 0x01000000 {
+
+[...]
+
+> @@ -251,6 +261,10 @@ static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
+>  	u32 val, gpr1, gpr12;
+>  
+>  	switch (imx6_pcie->variant) {
+> +	case IMX7D:
+> +		reset_control_assert(imx6_pcie->pciephy_reset);
+> +		reset_control_assert(imx6_pcie->apps_reset);
+> +		break;
+>  	case IMX6SX:
+>  		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+>  				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN,
+
+So the difference with i.MX7D is not really that it has a reset or not, 
+but some platforms use a reset driver and some do not. The latter should 
+be fixed.
+
+Rob
