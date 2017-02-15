@@ -1,24 +1,43 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 15 Feb 2017 12:27:59 -0300
-Subject: [PATCH] clk: rockchip: Set "ignore unused" for PMU M0 clocks on
- rk3399
-In-Reply-To: <20170214210114.5846-1-dianders@chromium.org>
-References: <20170214210114.5846-1-dianders@chromium.org>
-Message-ID: <CABxcv=kzW9SvrWYNasqCDkV7D6Y2zq+oRuqoPFdWuaWUhPehEA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 15 Feb 2017 15:37:58 +0000
+Subject: [RFC PATCH 0/3] arm64: eliminate early RWX mappings
+Message-ID: <1487173081-13425-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Doug,
+This series is a proof of concept that eliminates the RWX mappings from
+the early kernel mapping. I realize I got carried away a bit while hacking
+on this, and I am not convinced this is something we should merge, but since
+I did the work already, I am sharing this mostly as a discussion piece.
 
-On Tue, Feb 14, 2017 at 6:01 PM, Douglas Anderson <dianders@chromium.org> wrote:
-> The PMU Cortex M0 on rk3399 is intended to be used for things like
-> DDRFreq transitions, suspend/resume, and other things that are the
-> purview of ARM Trusted Firmware and not the kernel.  As such, the
-> kernel shouldn't be messing with the clocks.  Add CLK_IGNORE_UNUSED to
-> these clocks.
->
+Patch #1 updates the early mapping routines to map the kernel image
+non-executable initially, and selectively update permissions on regions
+that contain executable code.
 
-Isn't CLK_IS_CRITICAL a more suitable flag for this case?
+Patch #2 tweaks the text offset of relocatable kernels so that the init
+section (which could require a RWX mapping otherwise) appears at a swapper
+block boundary.
 
-Best regards,
-Javier
+Patch #3 updates the image loader in the EFI stub to take the modified text
+offset into account.
+
+Note that this approach interferes with the ability of external debuggers to
+set software breakpoints, but the early mapping is not very long lived anyway.
+
+Ard Biesheuvel (3):
+  arm64: mmu: restrict permissions of early kernel mappings
+  arm64: boot: align __inittext with swapper block on relocatable
+    kernels
+  arm64: efi: use effective text offset when allocating Image
+
+ arch/arm64/include/asm/kernel-pgtable.h   |  3 ++
+ arch/arm64/kernel/efi-entry.S             |  5 ++
+ arch/arm64/kernel/head.S                  | 53 +++++++++++++++++++-
+ arch/arm64/kernel/image.h                 | 24 +++++++--
+ arch/arm64/kernel/vmlinux.lds.S           | 14 +++---
+ drivers/firmware/efi/libstub/Makefile     |  1 -
+ drivers/firmware/efi/libstub/arm64-stub.c | 13 +++--
+ 7 files changed, 96 insertions(+), 17 deletions(-)
+
+-- 
+2.7.4
