@@ -1,93 +1,102 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 15 Feb 2017 11:38:50 -0600
-Subject: [PATCH v4 3/3] PCI: imx6: Add code to support i.MX7D
-In-Reply-To: <20170215171700.5vz5seeihgtwn76p@rob-hp-laptop>
-References: <20170207155027.7734-1-andrew.smirnov@gmail.com>
- <20170207155027.7734-4-andrew.smirnov@gmail.com>
- <20170215171700.5vz5seeihgtwn76p@rob-hp-laptop>
-Message-ID: <20170215173850.GH19040@bhelgaas-glaptop.roam.corp.google.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 15 Feb 2017 17:44:28 +0000
+Subject: [PATCH 0/2] RFC: Move efi bgrt code out of arch/x86
+In-Reply-To: <1487163892-27701-1-git-send-email-bhsharma@redhat.com>
+References: <1487163892-27701-1-git-send-email-bhsharma@redhat.com>
+Message-ID: <CAKv+Gu-qv83fi9qBugA=Od2htcLb966SPBpZXSnXdH=AYw-COw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 11:17:00AM -0600, Rob Herring wrote:
-> On Tue, Feb 07, 2017 at 07:50:27AM -0800, Andrey Smirnov wrote:
-> > Add various bits of code needed to support i.MX7D variant of the IP.
-> > 
-> > Cc: yurovsky at gmail.com
-> > Cc: Lucas Stach <l.stach@pengutronix.de>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Lee Jones <lee.jones@linaro.org>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: devicetree at vger.kernel.org
-> > Cc: linux-kernel at vger.kernel.org
-> > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> > ---
-> >  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 ++-
-> >  drivers/pci/host/pci-imx6.c                        | 121 ++++++++++++++++-----
-> >  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
-> >  3 files changed, 112 insertions(+), 26 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> > index 83aeb1f..11db2ab 100644
-> > --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> > +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> > @@ -4,7 +4,11 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
-> >  and thus inherits all the common properties defined in designware-pcie.txt.
-> >  
-> >  Required properties:
-> > -- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie", "fsl,imx6qp-pcie"
-> > +- compatible:
-> > +	- "fsl,imx6q-pcie"
-> > +	- "fsl,imx6sx-pcie",
-> > +	- "fsl,imx6qp-pcie"
-> > +	- "fsl,imx7d-pcie"
-> >  - reg: base address and length of the PCIe controller
-> >  - interrupts: A list of interrupt outputs of the controller. Must contain an
-> >    entry for each entry in the interrupt-names property.
-> > @@ -34,6 +38,13 @@ Additional required properties for imx6sx-pcie:
-> >  - clock names: Must include the following additional entries:
-> >  	- "pcie_inbound_axi"
-> >  
-> > +Additional required properties for imx7d-pcie:
-> > +- power-domains: Must be set to a phandle pointing to PCIE_PHY power domain
-> 
-> This domain is just the PHY? Seems like this needs a separate PHY 
-> driver.
-> 
-> > +- resets: Must contain phandles to PCIE related reset lines exposed by SRC IP block
-> > +- reset-names: Must contain the following entires:
-> > +  	       - "pciephy"
-> 
-> And for this too.
-> 
-> > +	       - "apps"
-> > +
-> >  Example:
-> >  
-> >  	pcie at 0x01000000 {
-> 
-> [...]
-> 
-> > @@ -251,6 +261,10 @@ static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
-> >  	u32 val, gpr1, gpr12;
-> >  
-> >  	switch (imx6_pcie->variant) {
-> > +	case IMX7D:
-> > +		reset_control_assert(imx6_pcie->pciephy_reset);
-> > +		reset_control_assert(imx6_pcie->apps_reset);
-> > +		break;
-> >  	case IMX6SX:
-> >  		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> >  				   IMX6SX_GPR12_PCIE_TEST_POWERDOWN,
-> 
-> So the difference with i.MX7D is not really that it has a reset or not, 
-> but some platforms use a reset driver and some do not. The latter should 
-> be fixed.
+Hello Bhupesh,
 
-I have this patch queued for v4.11.  Are these things that should be
-fixed first?  If so, I can drop this.
+On 15 February 2017 at 13:04, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+> This patchset presents a RFC approach to move the ACPI BGRT table
+> handling related code out of 'arch/x86' and place it inside
+> 'drivers/firmware/efi' so that it can be used to support
+> ACPI BGRT table and BGRT logo across x86 and AARCH64 ARCHs.
+>
+> Note that this patchset is primarily tested on Qemu VMs for x86_64
+> and AARCH64 environments, while I try to get my hands on a real
+> AARCH64 hardware which supports a graphic card and whose boot firmware
+> I can modify to support the ACPI BGRT table to be passed to the kernel.
+>
+> Here are some details/outputs about/from the test environment:
+>
+> AARCH64:
+> ========
+> 1. I used the latest Qemu (master branch) and compiled it for aarch64 with softmmu support.
+>    Here is the command line I use to launch the same:
+>
+> # qemu-system-aarch64 -cpu cortex-a57 -M virt -m 2048 -bios QEMU_EFI.fd -kernel Image -initrd rootfs.cpio -serial stdio --append "acpi=force" -device virtio-gpu-pci
+>
+> where, QEMU_EFI.fd is the DEBUG build of EDK2 ArmVirtQemu.dsc (master branch)
+>        rootfs.cpio is the AARCH64 build of Buildroot (Little Endian AARCH64)
+>        -device virtio-gpu-pci provides the Graphical support required to have BGRT logo.
+>
+>
+> 2. Here are some test results once Linux boots up, which show a valid BGRT table/logo being
+>    seen by the kernel:
+>
+> # acpidump
+> ...
+>
+> BGRT @ 0x0000000000000000
+>   0000: 42 47 52 54 38 00 00 00 01 B4 49 4E 54 45 4C 20  BGRT8.....INTEL
+>   0010: 45 44 4B 32 20 20 20 20 02 00 00 00 20 20 20 20  EDK2    ....
+>   0020: 13 00 00 01 01 00 01 00 00 80 B0 BA 00 00 00 00  ................
+>   0030: 2F 01 00 00 0F 01 00 00                          /.......
+>
+> # dmesg | grep -i BGRT
+> [    0.000000] ACPI: BGRT 0x00000000B8640000 000038 (v01 INTEL  EDK2     00000002      01000013)
+>
+>
+> # ls -lah /sys/firmware/acpi/bgrt/image
+> -r--r--r--    1 root     root       32.9K Feb 15 11:27 /sys/firmware/acpi/bgrt/image
+>
+> x86:
+> ====
+> 1. I used the latest Qemu (master branch) and compiled it for x86.
+>    Here is the command line I use to launch the same:
+>
+> # qemu-system-x86_64 -enable-kvm -sdl -m 2048 -vga std -boot c -cpu host -bios OVMF_CODE.fd -kernel bzImage -initrd rootfs.cpio -serial stdio
+>
+> where, OVMF_CODE.fd is the RELEASE build of EDK2 OvmfPkg (master branch)
+>        rootfs.cpio is the x86_64 build of Buildroot
+>
+> 2. Similar test results are seen as noted for the AARCH64 case above, which show a valid BGRT table/logo being
+>    seen by the kernel.
+>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Ingo Molnar <mingo@kernel.org>
+> Cc: Matt Fleming <matt@codeblueprint.co.uk>
+> Cc: Dan Williams <dan.j.williams@intel.com>
+> Cc: Dave Young <dyoung@redhat.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+>
+> Bhupesh Sharma (2):
+>   x86/efi-bgrt: Move efi-bgrt handling out of arch/x86
+>   bgrt: Make ACPI BGRT parsing code common for ARCHs
+>
+>  arch/arm64/kernel/acpi.c                               | 3 +++
+>  arch/x86/kernel/acpi/boot.c                            | 6 ------
+>  arch/x86/platform/efi/Makefile                         | 1 -
+>  drivers/acpi/Kconfig                                   | 2 +-
+>  drivers/acpi/bgrt.c                                    | 6 ++++++
+>  drivers/firmware/efi/Makefile                          | 1 +
+>  {arch/x86/platform => drivers/firmware}/efi/efi-bgrt.c | 0
+>  include/linux/efi-bgrt.h                               | 2 ++
+>  8 files changed, 13 insertions(+), 8 deletions(-)
+>  rename {arch/x86/platform => drivers/firmware}/efi/efi-bgrt.c (100%)
+>
 
-Bjorn
+These patches look fine to me, and I think we should be able to merge
+them without any changes.
+
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+You only failed to cc the ACPI maintainers, please add Len and Rafael next time.
+
+Thanks,
+Ard.
