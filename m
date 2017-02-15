@@ -1,89 +1,95 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Wed, 15 Feb 2017 17:39:53 +0100
-Subject: [RFC v2 5/7] ASoC: stm32: add DFSDM DAI support
-In-Reply-To: <20170214174534.35ytbpax75mxcayg@sirena.org.uk>
-References: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
- <1487003909-11710-6-git-send-email-arnaud.pouliquen@st.com>
- <20170214174534.35ytbpax75mxcayg@sirena.org.uk>
-Message-ID: <9b875a75-294a-2f59-5830-cc0f6b3b62c7@st.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 15 Feb 2017 17:43:27 +0100
+Subject: [PATCH 10/14] phy: meson8b-usb2: simplify optional reset handling
+In-Reply-To: <CAFBinCAASGS19naW76vfynRj4Fg4KjpHcwGr5h+pWZae47rwRg@mail.gmail.com>
+References: <20170130114116.22089-1-p.zabel@pengutronix.de>
+ <20170130114116.22089-10-p.zabel@pengutronix.de>
+ <CAFBinCAASGS19naW76vfynRj4Fg4KjpHcwGr5h+pWZae47rwRg@mail.gmail.com>
+Message-ID: <1487177007.30202.1.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/14/2017 06:45 PM, Mark Brown wrote:
-> On Mon, Feb 13, 2017 at 05:38:27PM +0100, Arnaud Pouliquen wrote:
+On Wed, 2017-02-15 at 00:36 +0100, Martin Blumenstingl wrote:
+> Hi Philipp,
 > 
-> This looks basically fine as a system specific driver but as some 
-> of the comments in here say there's bits of it could perhaps be 
-> genericised but I'm not sure we need to do that right now.  I'm not
-> sure the abstraction is exactly comfortable but having another bit
-> of hardware doing a bridge to IIO might be the best way to figure
-> out something better.
+> sorry for the late reply.
+> unfortunately my GXBB board (which is supported by the driver below)
+> is dead.
+> I CC'ed Jerome Brunet - maybe he can give it a go on one of his
+> (GXBB) boards.
 > 
-Yes this is one point to clarify. I keep it as a specific API, as i
-don't know if another hardware needs to support it...
-I would say that objective of this version is to highlight interactions.
-Then i can rework it in a way that could be  genericised in future (
-i.e. using void* for params that would depend on platforms)...
+> On Mon, Jan 30, 2017 at 12:41 PM, Philipp Zabel <p.zabel@pengutronix.
+> de> wrote:
+> > 
+> > As of commit bb475230b8e5 ("reset: make optional functions really
+> > optional"), the reset framework API calls use NULL pointers to
+> > describe
+> > optional, non-present reset controls.
+> > 
+> > This allows to return errors from
+> > devm_reset_control_get_optional_shared
+> > and to call reset_control_reset unconditionally.
+> > 
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> 
+> (based on reading the code along with the highly appreciated changes
+> from bb475230b8e5)
+> 
+> > 
+> > Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> > Cc: Kevin Hilman <khilman@baylibre.com>
+> > Cc: Carlo Caione <carlo@caione.org>
+> > Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> > ---
+> > ?drivers/phy/phy-meson8b-usb2.c | 12 +++++-------
+> > ?1 file changed, 5 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/drivers/phy/phy-meson8b-usb2.c b/drivers/phy/phy-
+> > meson8b-usb2.c
+> > index 33c9f4ba157d1..87168f1fe3af6 100644
+> > --- a/drivers/phy/phy-meson8b-usb2.c
+> > +++ b/drivers/phy/phy-meson8b-usb2.c
+> > @@ -141,12 +141,10 @@ static int phy_meson8b_usb2_power_on(struct
+> > phy *phy)
+> > ????????struct phy_meson8b_usb2_priv *priv = phy_get_drvdata(phy);
+> > ????????int ret;
+> > 
+> > -???????if (!IS_ERR_OR_NULL(priv->reset)) {
+> > -???????????????ret = reset_control_reset(priv->reset);
+> > -???????????????if (ret) {
+> > -???????????????????????dev_err(&phy->dev, "Failed to trigger USB
+> > reset\n");
+> > -???????????????????????return ret;
+> > -???????????????}
+> > +???????ret = reset_control_reset(priv->reset);
+> > +???????if (ret) {
+> > +???????????????dev_err(&phy->dev, "Failed to trigger USB
+> > reset\n");
+> > +???????????????return ret;
+> > ????????}
+> > 
+> > ????????ret = clk_prepare_enable(priv->clk_usb_general);
+> > @@ -241,7 +239,7 @@ static int phy_meson8b_usb2_probe(struct
+> > platform_device *pdev)
+> > ????????????????return PTR_ERR(priv->clk_usb);
+> > 
+> > ????????priv->reset = devm_reset_control_get_optional_shared(&pdev-
+> > >dev, NULL);
+> > -???????if (PTR_ERR(priv->reset) == -EPROBE_DEFER)
+> > +???????if (PTR_ERR(priv->reset))
 
-Extend IIO customer API would be also another alternative, but i did
-not find a generic way to do it. Some IIO attributes could be used for
-Hw params but DMA and IRQs seems tricky to handle through this IIO
-interface...
+This is wrong and will always exit on error. It should be "IS_ERR".
+Clearly the bug was there before your patch, but since you are changing
+the faulty line, would you mind using IS_ERR instead ?
 
+With this changed:
+Tested-by: Jerome Brunet <jbrunet@baylibre.com>
 
-
-
->> +	.period_bytes_min = 40, /* 8 khz 5 ms */ +	.period_bytes_max =
->>  4 * PAGE_SIZE, +	.buffer_bytes_max = 16 * PAGE_SIZE
-> 
-> What's the physical minimum period limit?  The comment makes this 
-> sound like it's just made up.
-I did not find physical minimum period limit, that why i considered
-this value from a scheduling point of view. I will re-check these values.
-
-> 
->> +	unsigned int shift = 24 -priv->max_scaling; +
-> 
-> Missing space after -.
-> 
->> +	dev_dbg(dai->dev, "%s: enter\n", __func__); +	return 0; + 
->> return snd_pcm_hw_constraint_list(substream->runtime, 0, + 
->> SNDRV_PCM_HW_PARAM_RATE, +					  &priv->rates_const);
-> 
-> Looks like debug changes got left in?
-yes exactly...
-> 
->> +static int stm32_adfsdm_set_sysclk(struct snd_soc_dai *dai, int
->>  clk_id, +				   unsigned int freq, int dir) +{ +	struct 
->> stm32_adfsdm_priv *priv = snd_soc_dai_get_drvdata(dai); +	struct
->>  stm32_adfsdm_pdata *pdata = priv->pdata; + +	dev_dbg(dai->dev, 
->> "%s: enter for dai %d\n", __func__, dai->id); +	if (dir == 
->> SND_SOC_CLOCK_IN) { +		pdata->ops->set_sysclk(pdata->adc, freq); 
->> +		priv->dmic_clk = freq; +	} + +	/* Determine supported rate 
->> which depends on SPI/manchester clock */ +	return 
->> stm32_adfsdm_get_supported_rates(dai, &priv->rates_const.mask);
-> 
-> Since the DAI is unidirectional it doesn't matter but obviously if
->  it weren't then the fact that getting the supported rates involves
->  setting the hwparams means this could become disruptive.  If we're
->  going to genericise this to be a more general IIO/ASoC bridge that
->  could matter.
-I think that the driver itself can not be generic. ST DFSDM is too
-specific. Only API with IIO could be.
-
-> 
->> +static int stm32_adfsdm_dai_remove(struct snd_soc_dai *dai) +{ +
->> dev_dbg(dai->dev, "%s: enter for dai %d\n", __func__, dai->id); +
->> +	return 0; +}
-> 
-> Remove empty functions, though in this case I think you want to
-> add something to disconnect the XRUN callback just in order to be
-> sure it can't be mistakenly called.
-
-Yes Completely unnecessary here. Furthermore the driver should be
-removed by the IIO driver.
-
-Regards
-Arnaud
+> > ????????????????return PTR_ERR(priv->reset);
+> > 
+> > ????????priv->dr_mode = of_usb_get_dr_mode_by_phy(pdev-
+> > >dev.of_node, -1);
+> > --
+> > 2.11.0
+> > 
