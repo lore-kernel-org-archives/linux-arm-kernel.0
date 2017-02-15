@@ -1,44 +1,25 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 15 Feb 2017 15:35:41 -0800
-Subject: [PATCH v2 6/9] arm, arm64: factorize common cpu capacity default
- code
-In-Reply-To: <CAL_JsqKLiQ2cSffadMWbN2PkqBOiA-6Mx5YVMCehVQNpy7YqrQ@mail.gmail.com>
-References: <20170209092525.6654-1-juri.lelli@arm.com>
- <20170209092525.6654-7-juri.lelli@arm.com>
- <20170210142857.GA18321@kroah.com>
- <CAL_JsqKLiQ2cSffadMWbN2PkqBOiA-6Mx5YVMCehVQNpy7YqrQ@mail.gmail.com>
-Message-ID: <20170215233541.GA7403@kroah.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 15 Feb 2017 17:37:51 -0600
+Subject: [PATCH 2/8] dt-bindings: gpu: mali: Add optional memory-region
+In-Reply-To: <49fd36f667c5ae46b0724c8204eabc51014aab92.1486655917.git-series.maxime.ripard@free-electrons.com>
+References: <cover.7101c7323e6f22e281ad70b93488cf44caca4ca0.1486655917.git-series.maxime.ripard@free-electrons.com>
+ <49fd36f667c5ae46b0724c8204eabc51014aab92.1486655917.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20170215233751.2sin5acaylsb5nqf@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 05:17:05PM -0600, Rob Herring wrote:
-> On Fri, Feb 10, 2017 at 8:28 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> >> + *
-> >> + * Copyright (C) 2016, ARM Ltd.
-> >> + * Written by: Juri Lelli, ARM Ltd.
-> >> + *
-> >> + * This file is subject to the terms and conditions of the GNU General Public
-> >> + * License.  See the file "COPYING" in the main directory of this archive
-> >> + * for more details.
-> >
-> > So, v2 only?  Please be specific.  Even better yet, use a SPDX header if
-> > you want to, those are always nice.
+On Thu, Feb 09, 2017 at 05:39:16PM +0100, Maxime Ripard wrote:
+> The reserved memory bindings allow us to specify which memory areas our
+> buffers can be allocated from.
 > 
-> Sorry to hijack this thread, but you're recommending SPDX now? You
-> seemed pretty negative on it last time it came up[1]. Or was that just
-> in context of the churn of converting existing files?
+> Let's use it.
 
-It was in the context of someone trying to tell someone else to do the
-work for them of converting all of the existing files to use SPDX.  I've
-never refused a patch from someone adding SPDX identifiers to the
-kernel, in fact, _I'm_ the only one that has ever used such an
-identifier on a kernel file :)
+You didn't think of this when you just added Mali binding? 
 
-> Personally, I like the use of SPDX tags over free form license text
-> and would like to encourage it for dts files.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 4 ++++
+>  1 file changed, 4 insertions(+), 0 deletions(-)
 
-Sure, go ahead, I'd encourage it.
-
-thanks,
-
-greg k-h
+Acked-by: Rob Herring <robh@kernel.org>
