@@ -1,95 +1,55 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 15 Feb 2017 16:40:25 -0600
-Subject: [PATCH v2 2/6] ARM: dts: armada-xp-98dx3236: combine dfx server
- nodes
-In-Reply-To: <20170207202815.20226-3-chris.packham@alliedtelesis.co.nz>
-References: <20170207202815.20226-1-chris.packham@alliedtelesis.co.nz>
- <20170207202815.20226-3-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170215224025.cwxzthotooiuvuq5@rob-hp-laptop>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 15 Feb 2017 14:44:12 -0800
+Subject: sDMA on i.mx7d
+In-Reply-To: <20170215110736.oumvvv7zordd2jdw@piout.net>
+References: <20170214222425.hbkfkeq3l6sveo7n@piout.net>
+ <e9c36a33f2a49df2a517db5869eaea7f@agner.ch>
+ <20170215110736.oumvvv7zordd2jdw@piout.net>
+Message-ID: <3513b2c01d86ad7312522d6be97e766f@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 09:28:11AM +1300, Chris Packham wrote:
-> Rather than having a separate node for the dfx server add a reg property
-> to the parent node. This give somes compatibility with the Marvell
-> supplied SDK.
+On 2017-02-15 03:07, Alexandre Belloni wrote:
+> On 14/02/2017 at 23:25:34 -0800, Stefan Agner wrote:
+>> On 2017-02-14 14:24, Alexandre Belloni wrote:
+>> > Hi,
+>> >
+>> > I've been trying to get a PCM3168s codec with a Colibri iMX7 using TDM
+>> > on SAI2.
+>> > I've got it working properly with the 4.1.35 kernel from Toradex (based
+>> > on the 4.1.15 from Freescale).
+>> > It is working fine with and without providing a firmware to the sDMA.
+>> >
+>> > But, I couldn't get that to work with v4.9. I actually managed to
+>> > reproduce the issue using the SGTL5000 so I don't have any patch on top
+>> > of v4.9.
+>>
+>> I guess you are using the on module SGTL5000 to reproduce?
+>>
+> 
+> Yes, using the on module sgtl5000 of a colibri on an iris.
+> 
+>> When I added audio support I remember that the sound seemed to be ok to
+>> me. Is the corruption such that you can hear it?
+>>
+> 
+> You can hear it but not if you are playing a simple sine at a frequency
+> that is a multiple of 10 (e.g. 440Hz)
+> 
 
-But breaks upstream compatibility. Need to explain why that's okay.
+Compiled v4.9 and played a song, I could clearly hear constant "noise"
+during playback.
 
-> 
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-> ---
-> 
-> Notes:
->     Changes in v2:
->     - none
-> 
->  Documentation/devicetree/bindings/net/marvell,prestera.txt | 13 +++++--------
->  arch/arm/boot/dts/armada-xp-98dx3236.dtsi                  |  8 ++------
->  2 files changed, 7 insertions(+), 14 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/marvell,prestera.txt b/Documentation/devicetree/bindings/net/marvell,prestera.txt
-> index 5fbab29718e8..c329608fa887 100644
-> --- a/Documentation/devicetree/bindings/net/marvell,prestera.txt
-> +++ b/Documentation/devicetree/bindings/net/marvell,prestera.txt
-> @@ -32,19 +32,16 @@ DFX Server bindings
->  -------------------
->  
->  Required properties:
-> -- compatible: must be "marvell,dfx-server"
-> +- compatible: must be "marvell,dfx-server", "simple-bus"
-> +- ranges: describes the address mapping of a memory-mapped bus.
->  - reg: address and length of the register set for the device.
->  
->  Example:
->  
-> -dfx-registers {
-> -	compatible = "simple-bus";
-> +dfx-server {
-> +	compatible = "marvell,dfx-server", "simple-bus";
->  	#address-cells = <1>;
->  	#size-cells = <1>;
->  	ranges = <0 MBUS_ID(0x08, 0x00) 0 0x100000>;
-> -
-> -	dfx: dfx at 0 {
-> -		compatible = "marvell,dfx-server";
-> -		reg = <0 0x100000>;
-> -	};
-> +	reg = <MBUS_ID(0x08, 0x00) 0 0x100000>;
->  };
-> diff --git a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-> index f6a03dcee5ef..bd8261fdec81 100644
-> --- a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-> @@ -195,11 +195,12 @@
->  			};
->  		};
->  
-> -		dfxr: dfx-registers at ac000000 {
-> +		dfx: dfx-server at ac000000 {
->  			compatible = "simple-bus";
+I went back to my v4.8-rc3 + some patches applied back when I tested
+audio and submitted the device tree change, and the noise isn't there.
 
-Missing marvell,dfx-server?
+In a "I feel lucky" manor I just reverted the last patch 5881826ded79
+("dmaengine: imx-sdma - update the residue calculation for cyclic
+channels") and the song sounded clean as always again!
 
->  			#address-cells = <1>;
->  			#size-cells = <1>;
->  			ranges = <0 MBUS_ID(0x08, 0x00) 0 0x100000>;
-> +			reg = <MBUS_ID(0x08, 0x00) 0 0x100000>;
->  
->  			dfx_coredivclk: corediv-clock at f8268 {
->  				compatible = "marvell,mv98dx3236-corediv-clock";
-> @@ -208,11 +209,6 @@
->  				clocks = <&mainpll>;
->  				clock-output-names = "nand";
->  			};
-> -
-> -			dfx: dfx at 0 {
-> -				compatible = "marvell,dfx-server";
-> -				reg = <0 0x100000>;
-> -			};
->  		};
->  
->  		switch: switch at a8000000 {
-> -- 
-> 2.11.0.24.ge6920cf
-> 
+Alexandre, does reverting this helps your issue too?
+
++Nandor, Author of said patch. Any idea?
+
+--
+Stefan
