@@ -1,86 +1,65 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 15 Feb 2017 12:13:09 +0000
-Subject: [PATCH V8 06/10] acpi: apei: panic OS with fatal error status
- block
-In-Reply-To: <5b06372d-e389-5157-ccb4-a7b023990d4d@codeaurora.org>
-References: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
- <1485969413-23577-7-git-send-email-tbaicar@codeaurora.org>
- <589C490A.9080109@arm.com>
- <5b06372d-e389-5157-ccb4-a7b023990d4d@codeaurora.org>
-Message-ID: <58A445D5.7030501@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Feb 2017 12:24:16 +0000
+Subject: [PATCH v2] tty: pl011: Work around QDF2400 E44 stuck BUSY bit
+In-Reply-To: <6a3ea0e5-f824-380e-1c4a-3e72b160e98a@codeaurora.org>
+References: <20170214235347.8812-1-cov@codeaurora.org>
+ <6a3ea0e5-f824-380e-1c4a-3e72b160e98a@codeaurora.org>
+Message-ID: <20170215122415.GG31733@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+Hi,
 
-On 13/02/17 22:45, Baicar, Tyler wrote:
-> On 2/9/2017 3:48 AM, James Morse wrote:
->> On 01/02/17 17:16, Tyler Baicar wrote:
->>> From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
->>>
->>> Even if an error status block's severity is fatal, the kernel does not
->>> honor the severity level and panic.
->>>
->>> With the firmware first model, the platform could inform the OS about a
->>> fatal hardware error through the non-NMI GHES notification type. The OS
->>> should panic when a hardware error record is received with this
->>> severity.
->>>
->>> Call panic() after CPER data in error status block is printed if
->>> severity is fatal, before each error section is handled.
+On Tue, Feb 14, 2017 at 08:39:40PM -0600, Timur Tabi wrote:
+> Christopher Covington wrote:
+ 
+> >+	if (!memcmp(table->header.oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
+> >+		if (!memcmp(table->header.oem_table_id, "QDF2432 ",
+> >+				ACPI_OEM_TABLE_ID_SIZE) ||
+> >+				(!memcmp(table->header.oem_table_id,
+> >+				"QDF2400 ", ACPI_OEM_TABLE_ID_SIZE) &&
+> >+				table->header.oem_revision == 0))
+> >+			uart = "qdf2400_e44";
+> >+
 
->>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->>> index 8756172..86c1f15 100644
->>> --- a/drivers/acpi/apei/ghes.c
->>> +++ b/drivers/acpi/apei/ghes.c
->>> @@ -687,6 +689,13 @@ static int ghes_ack_error(struct acpi_hest_generic_v2
->>> *generic_v2)
->>>       return rc;
->>>   }
->>>   +static void __ghes_call_panic(void)
->>> +{
->>> +    if (panic_timeout == 0)
->>> +        panic_timeout = ghes_panic_timeout;
->>> +    panic("Fatal hardware error!");
->>> +}
->>> +
+Thanks for reworking this. I'm much happier with this than the MIDR
+check.
 
->> __ghes_panic() also has:
->>>     __ghes_print_estatus(KERN_EMERG, ghes->generic, ghes->estatus);
->> Which prints this estatus regardless of rate limiting and cache-ing.
+Splitting out the test into its own function, as Timur suggested, would
+generally be nicer. Minor comments on that below.
 
-[...]
+> static bool needs_qdf2400_e44(struct acpi_table_header *h)
+> {
 
->>>               ghes_estatus_cache_add(ghes->generic, ghes->estatus);
->>>       }
->>> +    if (ghes_severity(ghes->estatus->error_severity) >= GHES_SEV_PANIC) {
->>> +        __ghes_call_panic();
->>> +    }
+This is detecting the presence of the erratum so, has_qdf2400_e44() or
+needs__qdf2400_e44_workaround() would be better names. I'd personally
+prefer the former, but either is fine.
 
->> I think this ghes_severity() then panic() should go above the:
->>>     if (!ghes_estatus_cached(ghes->estatus)) {
->> and we should call __ghes_print_estatus() here too, to make sure the message
->> definitely got out!
+> 	const char *id;
+> 
+> 	/* The erratum only applies to Qualcomm Technologies SOCs */
+> 	if (memcmp(h->oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
+> 		return False;
+> 
+> 	id = h->oem_table_id;
+> 
+> 	if (!memcmp(id, "QDF2432 ", ACPI_OEM_TABLE_ID_SIZE))
+> 		return True;
+> 
+> 	if (!memcmp(id, "QDF2000 ", ACPI_OEM_TABLE_ID_SIZE) &&
+> 		h->oem_revision == 0)
+> 		return True;
+> 	
+> 	return False;
+> }
 
+s/False/false/g
+s/True/true/g
 
-> Okay, that makes sense. If we move this up, is there a problem with calling
-> __ghes_panic() instead of making the __ghes_print_estatus() and
-> __ghes_call_panic() calls here? It looks like that will just add a call to
-> oops_begin() and ghes_print_queued_estatus() as well, but this is what
-> ghes_notify_nmi() does if the severity is panic.
+With that, this looks fine to me. I'm not too familiar with the pl011
+driver. On the assumption the other changes have already been vetted:
 
-
-I don't think the queued stuff is relevant, isn't that just for x86-NMI messages
-that it doesn't print out directly?
-
-A quick grep shows arm64 doesn't have oops_begin(), you may have to add some
-equivalent mechanism. Lets try and avoid that rabbit hole!
-
-Given __ghes_panic() calls __ghes_print_estatus() too, you could try moving that
-into your new __ghes_call_panic().... or whatever results in the least lines
-changed!
-
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
 Thanks,
-
-James
+Mark.
