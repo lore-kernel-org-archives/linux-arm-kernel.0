@@ -1,25 +1,17 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 15 Feb 2017 16:00:10 -0600
-Subject: [PATCH 1/2] power: reset: syscon-poweroff: add a mask property
-In-Reply-To: <1486482966-4497-1-git-send-email-guy.shapiro@mobi-wize.com>
-References: <1486472054-4367-1-git-send-email-guy.shapiro@mobi-wize.com>
- <1486482966-4497-1-git-send-email-guy.shapiro@mobi-wize.com>
-Message-ID: <20170215220010.psk37r4belykyquy@rob-hp-laptop>
+Date: Wed, 15 Feb 2017 16:01:10 -0600
+Subject: [PATCH 01/10] media: dt-bindings: vpif: fix whitespace errors
+In-Reply-To: <1486485683-11427-2-git-send-email-bgolaszewski@baylibre.com>
+References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
+ <1486485683-11427-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <20170215220110.n24xucktzsyyzm4q@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 07, 2017 at 05:56:05PM +0200, Guy Shapiro wrote:
-> Make the syscon-poweroff driver accept value and mask instead of
-> just value.
-> 
-> Prior to this patch, the property name for the value was 'mask'. If
-> only the mask property is defined on a node, maintain compatibility
-> by using it as the value.
-> 
-> Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
+On Tue, Feb 07, 2017 at 05:41:14PM +0100, Bartosz Golaszewski wrote:
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
->  .../bindings/power/reset/syscon-poweroff.txt          | 11 +++++++++--
->  drivers/power/reset/syscon-poweroff.c                 | 19 ++++++++++++++++---
->  2 files changed, 25 insertions(+), 5 deletions(-)
+>  Documentation/devicetree/bindings/media/ti,da850-vpif.txt | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
 
-Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Rob Herring <robh@kernel.org> 
