@@ -1,34 +1,40 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Wed, 15 Feb 2017 09:24:39 +0000
-Subject: [PATCH v4] ASoC: bcm2835: Add 8 channel (multitrack) capability
-In-Reply-To: <1487106275-4260-1-git-send-email-flatmax@flatmax.org>
-References: <1486942035-24038-1-git-send-email-flatmax@flatmax.org>
- <1487106275-4260-1-git-send-email-flatmax@flatmax.org>
-Message-ID: <20170215092439.GB30007@localhost.localdomain>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 15 Feb 2017 10:26:05 +0100
+Subject: [PATCH v2 1/4] dt-bindings: add multidomain support to i.MX GPC
+ DT binding
+In-Reply-To: <20170215070830.GA8398@dragon>
+References: <20170127183728.26701-1-l.stach@pengutronix.de>
+ <1486741439.3879.7.camel@pengutronix.de> <20170215070830.GA8398@dragon>
+Message-ID: <1487150765.2304.65.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 08:04:35AM +1100, Matt Flax wrote:
-> This patch adds multitrack capability if in DSP mode A and the
-> codec is master.
+Am Mittwoch, den 15.02.2017, 15:08 +0800 schrieb Shawn Guo:
+> On Fri, Feb 10, 2017 at 04:43:59PM +0100, Lucas Stach wrote:
+> > Hi Shawn,
+> > 
+> > are you willing to take this series through your tree or do you think we
+> > need to get this in via some other tree?
 > 
-> In bcm2835_i2s_startup, snd_pcm_hw_constraint_single is used to set
-> channels to 8 if both SND_SOC_DAIFMT_CBM_CFM and SND_SOC_DAIFMT_DSP_A
-> are set. Otherwise, channels are set to 2. These settings are
-> accomplished using the SNDRV_PCM_HW_PARAM_CHANNELS variable.
-> 
-> In bcm2835_i2s_shutdown the channels are set to 2 by default.
-> 
-> In bcm2835_i2s_hw_params, DSP mode A format is now an option.
-> Before replicating the format variable (from ch2 to ch1) for
-> register loading, requested channels are checked to be either 2 or 8.
-> This can be expanded later to accomodate other channel counts if
-> supported by the sound card hardware.
-> 
-> Signed-off-by: Matt Flax <flatmax@flatmax.org>
-> ---
+> I'm willing to take it.  But I don't think it's been ready yet.  Since
+> you insist on keeping the .remove hook for both imx_gpc_driver and
+> imx_pgc_power_domain_driver, did you actually test it with manually
+> bind/unbind the drivers?  I tested it a bit and found it doesn't work
+> well for me.
 
-Reviewed-by: Charles Keepax <ckeepax@opensource.wolfsonmicro.com>
+It works as well as it could at this point. The driver unloads fine, but
+obviously anything that depends on it is broken at that point. Try
+unloading a regulator driver, it's the same experience.
 
-Thanks,
-Charles
+This will get better once the functional dependency stuff is far enough
+to either block unloading of drivers providing resources to other
+devices, or unload the dependent drivers first.
+
+> 
+> Also, there is a comment from Andrey that is not responded.
+
+Yes, I'll take care of this. Just didn't want to roll a new version of
+this series before we know where it is going.
+
+Regards,
+Lucas
