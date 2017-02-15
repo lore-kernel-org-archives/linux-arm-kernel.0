@@ -1,83 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 15 Feb 2017 21:52:21 +0000
-Subject: [PATCH v3] ARM: wire up HWCAP2 feature bits to the CPU modalias
-In-Reply-To: <1487194638-19675-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1487194638-19675-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <8211F33E-4899-483F-8927-E0E6215797D9@linaro.org>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 15 Feb 2017 16:54:07 -0500
+Subject: [PATCH] Documentation: Note QDF2400 SoC Erratum 44
+Message-ID: <20170215215407.25854-1-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The Qualcomm Datacenter Technologies QDF2400 family of SoCs contains a
+custom (non-PrimeCell) implementation of the SBSA UART. Occasionally the
+BUSY bit in the Flag Register gets stuck as 1, erratum 44 for both 2432v1
+and 2400v1 SoCs.Checking that the Transmit FIFO Empty (TXFE) bit is 0,
+instead of checking that the BUSY bit is 1, works around the issue. Note
+this in the customary location. To minimize conflicts, this documentation
+update is separate from the code changes, "tty: pl011: Work around QDF2400
+E44 stuck BUSY bit".
 
+Signed-off-by: Christopher Covington <cov@codeaurora.org>
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Timur Tabi <timur@codeaurora.org>
+---
+Documentation to go with https://patchwork.kernel.org/patch/9575103/
+Based on http://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
+---
+ Documentation/arm64/silicon-errata.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> On 15 Feb 2017, at 21:37, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> 
-> Wire up the generic support for exposing CPU feature bits via the
-> modalias in /sys/device/system/cpu. This allows udev to automatically
-> load modules for things like crypto algorithms that are implemented
-> using optional instructions.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> v3: add offset of 32 so that ELF_HWCAP could be added in the future as
->    well
-> 
-> arch/arm/Kconfig                  |  1 +
-> arch/arm/include/asm/cpufeature.h | 32 ++++++++++++++++++++
-> 2 files changed, 33 insertions(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 186c4c214e0a..53689e386c47 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -21,6 +21,7 @@ config ARM
->    select GENERIC_ALLOCATOR
->    select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
->    select GENERIC_CLOCKEVENTS_BROADCAST if SMP
-> +    select GENERIC_CPU_AUTOPROBE
->    select GENERIC_EARLY_IOREMAP
->    select GENERIC_IDLE_POLL_SETUP
->    select GENERIC_IRQ_PROBE
-> diff --git a/arch/arm/include/asm/cpufeature.h b/arch/arm/include/asm/cpufeature.h
-> new file mode 100644
-> index 000000000000..ec3ad45761aa
-> --- /dev/null
-> +++ b/arch/arm/include/asm/cpufeature.h
-> @@ -0,0 +1,32 @@
-> +/*
-> + * Copyright (C) 2017 Linaro Ltd. <ard.biesheuvel@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __ASM_CPUFEATURE_H
-> +#define __ASM_CPUFEATURE_H
-> +
-> +#include <asm/hwcap.h>
-> +
-> +/*
-> + * Due to the fact that ELF_HWCAP is a 32-bit type on ARM, and given the number
-> + * of optional CPU features it defines, ARM's CPU capability bits have been
-> + * distributed over separate elf_hwcap and elf_hwcap2 variables, each of which
-> + * covers a subset of the available CPU features.
-> + *
-> + * Currently, only a few of those are suitable for automatic module loading
-> + * (which is the primary use case of this facility) and those happen to be all
-> + * covered by HWCAP2. So let's only expose those via the CPU modalias for now.
-> + */
-> +#define MAX_CPU_FEATURES    64
-> +#define cpu_feature(x)        (32 + ilog2(HWCAP2_ ## x))
-> +
-> +static inline bool cpu_have_feature(unsigned int num)
-> +{
-
-Grr forgot to handle num < 32 here
-
-> +    return elf_hwcap2 & (1UL << (num - 32));
-> +}
-> +
-> +#endif
-> -- 
-> 2.7.4
-> 
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index a71b8095dbd8..bc3d086bc624 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -68,3 +68,5 @@ stable kernels.
+ |                |                 |                 |                             |
+ | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
+ | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
++| Qualcomm Tech. | QDF2432v1 UART  | SoC E44         | N/A                         |
++| Qualcomm Tech. | QDF2400v1 UART  | SoC E44         | N/A                         |
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
+Forum, a Linux Foundation Collaborative Project.
