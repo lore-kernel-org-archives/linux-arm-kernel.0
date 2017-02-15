@@ -1,50 +1,122 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 15 Feb 2017 20:04:07 +0000
-Subject: [PATCH v2 0/5] ARM: add module autoloading support for crypto
- modules
-In-Reply-To: <20170215200002.GF27312@n2100.armlinux.org.uk>
-References: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170215200002.GF27312@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu9b92hKiN0nyKEdjkszUzPVf3ODt7wtiqdLwnkrdhsyvA@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 15 Feb 2017 12:05:57 -0800
+Subject: [PATCH] ARM: uaccess: consistently check object sizes
+Message-ID: <20170215200557.GA37325@beast>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 February 2017 at 20:00, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Wed, Jan 11, 2017 at 05:01:53PM +0000, Ard Biesheuvel wrote:
->> This series wires up the crypto modules that use the ARM 32-bit versions of
->> the ARMv8 Crypto Extensions to udev autoloading, by exposing the HWCAP2
->> feature bits via the CPU modalias. This is very similar to the arm64
->> implementation, with the notable exception that ARM has its CPU feature
->> definitions split across HWCAP and HWCAP2.
->
-> Note that Aarch64 has:
->
-> MODALIAS=cpu:type:aarch64:feature:,0000,0001,0002,0003,0004,0005,0006,0007
->
-> which looks weird with the first numeric entry starting with a ','.
->
+In commit 76624175dcae ("arm64: uaccess: consistently check object sizes"),
+the object size checks are moved outside the access_ok() so that bad
+destinations are detected before hitting the "memset(dest, 0, size)" in the
+copy_from_user() failure path.
 
-IIRC this is deliberate, since the udev code matches the feature field
-for *nnnn*, which is what the module alias exposes.
+This makes the same change for arm, with attention given to possibly
+extracting the uaccess routines into a common header file for all
+architectures in the future.
 
-> Now as for ARM, yes, we have the hwcap feature split across the two
-> (because HWCAP2 didn't exist originally.)  What I'm concerned about
-> is that restricting the initial implementation to HWCAP2 bits means
-> that we'd have to rework all users if we wanted to include the HWCAP
-> bits later on (consider what the change would be to add HWCAP_x
-> support to this later on.)
->
-> I would much rather we start out now with an offset of 32 on the
-> numeric value exposed to userspace, so that should we want to extend
-> it to the HWCAP field, we can do so safely.
->
+Suggested-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Kees Cook <keescook@chromium.org>
+---
+ arch/arm/include/asm/uaccess.h | 44 ++++++++++++++++++++++++++++++------------
+ 1 file changed, 32 insertions(+), 12 deletions(-)
 
-OK, that is easily done.
+diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+index 1f59ea051bab..b7e0125c0bbf 100644
+--- a/arch/arm/include/asm/uaccess.h
++++ b/arch/arm/include/asm/uaccess.h
+@@ -478,11 +478,10 @@ extern unsigned long __must_check
+ arm_copy_from_user(void *to, const void __user *from, unsigned long n);
+ 
+ static inline unsigned long __must_check
+-__copy_from_user(void *to, const void __user *from, unsigned long n)
++__arch_copy_from_user(void *to, const void __user *from, unsigned long n)
+ {
+ 	unsigned int __ua_flags;
+ 
+-	check_object_size(to, n, false);
+ 	__ua_flags = uaccess_save_and_enable();
+ 	n = arm_copy_from_user(to, from, n);
+ 	uaccess_restore(__ua_flags);
+@@ -495,18 +494,15 @@ extern unsigned long __must_check
+ __copy_to_user_std(void __user *to, const void *from, unsigned long n);
+ 
+ static inline unsigned long __must_check
+-__copy_to_user(void __user *to, const void *from, unsigned long n)
++__arch_copy_to_user(void __user *to, const void *from, unsigned long n)
+ {
+ #ifndef CONFIG_UACCESS_WITH_MEMCPY
+ 	unsigned int __ua_flags;
+-
+-	check_object_size(from, n, true);
+ 	__ua_flags = uaccess_save_and_enable();
+ 	n = arm_copy_to_user(to, from, n);
+ 	uaccess_restore(__ua_flags);
+ 	return n;
+ #else
+-	check_object_size(from, n, true);
+ 	return arm_copy_to_user(to, from, n);
+ #endif
+ }
+@@ -526,25 +522,49 @@ __clear_user(void __user *addr, unsigned long n)
+ }
+ 
+ #else
+-#define __copy_from_user(to, from, n)	(memcpy(to, (void __force *)from, n), 0)
+-#define __copy_to_user(to, from, n)	(memcpy((void __force *)to, from, n), 0)
++#define __arch_copy_from_user(to, from, n)	\
++					(memcpy(to, (void __force *)from, n), 0)
++#define __arch_copy_to_user(to, from, n)	\
++					(memcpy((void __force *)to, from, n), 0)
+ #define __clear_user(addr, n)		(memset((void __force *)addr, 0, n), 0)
+ #endif
+ 
+-static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
++static inline unsigned long __must_check
++__copy_from_user(void *to, const void __user *from, unsigned long n)
++{
++	check_object_size(to, n, false);
++	return __arch_copy_from_user(to, from, n);
++}
++
++static inline unsigned long __must_check
++copy_from_user(void *to, const void __user *from, unsigned long n)
+ {
+ 	unsigned long res = n;
++
++	check_object_size(to, n, false);
++
+ 	if (likely(access_ok(VERIFY_READ, from, n)))
+-		res = __copy_from_user(to, from, n);
++		res = __arch_copy_from_user(to, from, n);
+ 	if (unlikely(res))
+ 		memset(to + (n - res), 0, res);
+ 	return res;
+ }
+ 
+-static inline unsigned long __must_check copy_to_user(void __user *to, const void *from, unsigned long n)
++static inline unsigned long __must_check
++__copy_to_user(void __user *to, const void *from, unsigned long n)
+ {
++	check_object_size(from, n, true);
++
++	return __arch_copy_to_user(to, from, n);
++}
++
++static inline unsigned long __must_check
++copy_to_user(void __user *to, const void *from, unsigned long n)
++{
++	check_object_size(from, n, true);
++
+ 	if (access_ok(VERIFY_WRITE, to, n))
+-		n = __copy_to_user(to, from, n);
++		n = __arch_copy_to_user(to, from, n);
+ 	return n;
+ }
+ 
+-- 
+2.7.4
 
-> While we're stuffing HWCAP2 with new bits, please note that it is
-> also limited to 32 bits, just like the HWCAP field is.
->
 
-Yes, I am aware of that. But there aren't /that/ many optional
-features that lend themselves for module autoloading.
+-- 
+Kees Cook
+Pixel Security
