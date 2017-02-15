@@ -1,66 +1,39 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 15 Feb 2017 13:08:58 -0700
-Subject: [PATCH RFC 1/3] coresight: binding for coresight debug driver
-In-Reply-To: <1486966298-16767-2-git-send-email-leo.yan@linaro.org>
-References: <1486966298-16767-1-git-send-email-leo.yan@linaro.org>
- <1486966298-16767-2-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170215200858.GA29730@linaro.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 16 Feb 2017 04:52:27 +0800
+Subject: [PATCH V9 05/10] acpi: apei: handle SEA notification type for
+ ARMv8
+In-Reply-To: <1487180692-16732-6-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <201702160444.981pIc8k%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2017 at 02:11:36PM +0800, Leo Yan wrote:
-> Adding compatible string for new coresight debug driver.
-> 
+Hi Tyler,
 
-Hi Leo,
+[auto build test WARNING on pm/linux-next]
+[also build test WARNING on v4.10-rc8 next-20170215]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-I agree with Mark, this will need a better description.
+url:    https://github.com/0day-ci/linux/commits/Tyler-Baicar/Add-UEFI-2-6-and-ACPI-6-1-updates-for-RAS-on-ARM64/20170216-020811
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  Documentation/devicetree/bindings/arm/coresight.txt | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-> index fcbae6a..3ff15fd 100644
-> --- a/Documentation/devicetree/bindings/arm/coresight.txt
-> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
-> @@ -40,6 +40,9 @@ its hardware characteristcs.
->  		- System Trace Macrocell:
->  			"arm,coresight-stm", "arm,primecell"; [1]
->  
-> +		- Debug Unit:
-> +			"arm,coresight-debug", "arm,primecell";
-> +
+All warnings (new ones prefixed by >>):
 
-Humm...  The current CoreSight bindings are meant to describe IPs included in
-the HW assisted trace architecture.  This new driver, althought considered to be
-part of the CoreSight umbrella, falls under the debugging domain.
+warning: (ARM64) selects HAVE_ACPI_APEI_SEA which has unmet direct dependencies (ACPI && ARM64 && ACPI_APEI_GHES)
 
-Adding the bindings in this file may lead people to beleive this driver fits
-into the CoreSight framework currently supported, which isn't the case.
-
-As such it is probably a good idea to spin off a new file, "coresight-debug.txt"
-to handle this driver. 
-
-Mark, what's your take on this?
-
->  	* reg: physical base address and length of the register
->  	  set(s) of the component.
->  
-> @@ -78,8 +81,10 @@ its hardware characteristcs.
->  	* arm,cp14: must be present if the system accesses ETM/PTM management
->  	  registers via co-processor 14.
->  
-> -	* cpu: the cpu phandle this ETM/PTM is affined to. When omitted the
-> -	  source is considered to belong to CPU0.
-> +* Optional properties for ETM/PTM/Debugs:
-> +
-> +	* cpu: the cpu phandle this ETM/PTM/Debug is affined to. When omitted
-> +	  the source is considered to belong to CPU0.
->  
->  * Optional property for TMC:
->  
-> -- 
-> 2.7.4
-> 
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 33720 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170216/82217526/attachment-0001.gz>
