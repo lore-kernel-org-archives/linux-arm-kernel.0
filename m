@@ -1,57 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Feb 2017 11:13:44 +0000
-Subject: [PATCH RFC 1/3] coresight: binding for coresight debug driver
-In-Reply-To: <1486966298-16767-2-git-send-email-leo.yan@linaro.org>
-References: <1486966298-16767-1-git-send-email-leo.yan@linaro.org>
- <1486966298-16767-2-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170215111343.GD31733@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 15 Feb 2017 11:22:53 +0000
+Subject: [PATCH] arm64: define BUG() instruction without CONFIG_BUG
+In-Reply-To: <20170214213941.3026318-1-arnd@arndb.de>
+References: <20170214213941.3026318-1-arnd@arndb.de>
+Message-ID: <20170215112253.GB9630@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2017 at 02:11:36PM +0800, Leo Yan wrote:
-> Adding compatible string for new coresight debug driver.
-
-Please give a more thorough description of the hardware this binding
-this is intended to describe.
-
-It's not entirely clear which component this binding is intended to
-describe.
-
-Thanks,
-Mark.
-
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+On Tue, Feb 14, 2017 at 10:39:28PM +0100, Arnd Bergmann wrote:
+> This mirrors commit e9c38ceba8d9 ("ARM: 8455/1: define __BUG as
+> asm(BUG_INSTR) without CONFIG_BUG") to make the behavior of
+> arm64 consistent with arm and x86, and avoids lots of warnings in
+> randconfig builds, such as:
+> 
+> kernel/seccomp.c: In function '__seccomp_filter':
+> kernel/seccomp.c:666:1: error: no return statement in function returning non-void [-Werror=return-type]
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  Documentation/devicetree/bindings/arm/coresight.txt | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
+>  arch/arm64/include/asm/bug.h | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-> index fcbae6a..3ff15fd 100644
-> --- a/Documentation/devicetree/bindings/arm/coresight.txt
-> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
-> @@ -40,6 +40,9 @@ its hardware characteristcs.
->  		- System Trace Macrocell:
->  			"arm,coresight-stm", "arm,primecell"; [1]
+> diff --git a/arch/arm64/include/asm/bug.h b/arch/arm64/include/asm/bug.h
+> index 561190d15881..461751429fc3 100644
+> --- a/arch/arm64/include/asm/bug.h
+> +++ b/arch/arm64/include/asm/bug.h
+> @@ -20,9 +20,10 @@
 >  
-> +		- Debug Unit:
-> +			"arm,coresight-debug", "arm,primecell";
+>  #include <asm/brk-imm.h>
+>  
+> -#ifdef CONFIG_GENERIC_BUG
+>  #define HAVE_ARCH_BUG
+>  
+> +#ifdef CONFIG_GENERIC_BUG
 > +
->  	* reg: physical base address and length of the register
->  	  set(s) of the component.
+>  #ifdef CONFIG_DEBUG_BUGVERBOSE
+>  #define _BUGVERBOSE_LOCATION(file, line) __BUGVERBOSE_LOCATION(file, line)
+>  #define __BUGVERBOSE_LOCATION(file, line)				\
+> @@ -57,6 +58,14 @@ _BUGVERBOSE_LOCATION(__FILE__, __LINE__)		\
 >  
-> @@ -78,8 +81,10 @@ its hardware characteristcs.
->  	* arm,cp14: must be present if the system accesses ETM/PTM management
->  	  registers via co-processor 14.
+>  #define __WARN_TAINT(taint) _BUG_FLAGS(BUGFLAG_TAINT(taint))
 >  
-> -	* cpu: the cpu phandle this ETM/PTM is affined to. When omitted the
-> -	  source is considered to belong to CPU0.
-> +* Optional properties for ETM/PTM/Debugs:
+> +#else
 > +
-> +	* cpu: the cpu phandle this ETM/PTM/Debug is affined to. When omitted
-> +	  the source is considered to belong to CPU0.
->  
->  * Optional property for TMC:
->  
-> -- 
-> 2.7.4
-> 
+> +#define BUG() do {					\
+> +	asm volatile("brk %[imm]"			\
+> +		     :: [imm] "i" (BUG_BRK_IMM));	\
+> +	unreachable();					\
+> +} while (0)
+
+Do we need to duplicate the asm, or can we reuse the existing BUG
+definition in this header? The only extra thing we do is push a __bug_table
+entry, but I can't see why that would be a problem.
+
+Will
