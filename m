@@ -1,33 +1,35 @@
 From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
-Date: Wed, 15 Feb 2017 15:50:11 -0600
-Subject: [PATCH 0/5] Add Arria10 System Manager Reset Controller
-Message-ID: <1487195416-23827-1-git-send-email-thor.thayer@linux.intel.com>
+Date: Wed, 15 Feb 2017 15:50:15 -0600
+Subject: [PATCH 4/5] mfd: altr_a10sr: Add Arria10 DevKit Resource Controller
+In-Reply-To: <1487195416-23827-1-git-send-email-thor.thayer@linux.intel.com>
+References: <1487195416-23827-1-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <1487195416-23827-5-git-send-email-thor.thayer@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thor Thayer <thor.thayer@linux.intel.com>
 
-This series of patches adds the Altera Arria10 Development Kit System
-Manager Reset Controller.
+Add Arria10 System Resource Manager Reset Controller to MFD.
 
-Thor Thayer (5):
-  dt-bindings: mfd: Add Altera Arria10 SR Reset Controller bindings
-  dt-bindings: Add Arria10 System Resource reset manager offsets
-  reset: Add Altera Arria10 System Resource Reset Controller
-  mfd: altr_a10sr: Add Arria10 DevKit Resource Controller
-  ARM: socfpga: dts: Add Devkit A10-SR Reset Controller
+Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+---
+ drivers/mfd/altera-a10sr.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
- .../devicetree/bindings/mfd/altera-a10sr.txt       |  11 ++
- MAINTAINERS                                        |   2 +
- arch/arm/boot/dts/socfpga_arria10_socdk.dtsi       |   5 +
- drivers/mfd/altera-a10sr.c                         |   4 +
- drivers/reset/Kconfig                              |   7 +
- drivers/reset/Makefile                             |   1 +
- drivers/reset/reset-a10sr.c                        | 176 +++++++++++++++++++++
- include/dt-bindings/reset/altr,rst-mgr-a10sr.h     |  31 ++++
- 8 files changed, 237 insertions(+)
- create mode 100644 drivers/reset/reset-a10sr.c
- create mode 100644 include/dt-bindings/reset/altr,rst-mgr-a10sr.h
-
+diff --git a/drivers/mfd/altera-a10sr.c b/drivers/mfd/altera-a10sr.c
+index 06e1f7f..96e7d2c 100644
+--- a/drivers/mfd/altera-a10sr.c
++++ b/drivers/mfd/altera-a10sr.c
+@@ -33,6 +33,10 @@
+ 		.name = "altr_a10sr_gpio",
+ 		.of_compatible = "altr,a10sr-gpio",
+ 	},
++	{
++		.name = "altr_a10sr_reset",
++		.of_compatible = "altr,a10sr-reset",
++	},
+ };
+ 
+ static bool altr_a10sr_reg_readable(struct device *dev, unsigned int reg)
 -- 
 1.9.1
