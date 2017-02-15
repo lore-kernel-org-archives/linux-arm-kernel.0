@@ -1,92 +1,41 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 15 Feb 2017 18:48:15 +0530
-Subject: [PATCH 06/10] PCI: dwc: designware: Parse *num-lanes* property in
- dw_pcie_setup_rc
-In-Reply-To: <1487164699-30708-1-git-send-email-kishon@ti.com>
-References: <1487164699-30708-1-git-send-email-kishon@ti.com>
-Message-ID: <1487164699-30708-7-git-send-email-kishon@ti.com>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Wed, 15 Feb 2017 14:59:18 +0100
+Subject: [RFC v2 4/7] ASoC: dmaengine_pcm: add copy support
+In-Reply-To: <20170214171630.qgkyoymxyqjiiblh@sirena.org.uk>
+References: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
+ <1487003909-11710-5-git-send-email-arnaud.pouliquen@st.com>
+ <20170214171630.qgkyoymxyqjiiblh@sirena.org.uk>
+Message-ID: <40633f7c-a2ac-1658-cc9d-b30eaff8a95a@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-*num-lanes* dt property is parsed in dw_pcie_host_init. However
-*num-lanes* property is applicable to both root complex mode and
-endpoint mode. As a first step, move the parsing of this property
-outside dw_pcie_host_init. This is in preparation for splitting
-pcie-designware.c to pcie-designware.c and pcie-designware-host.c
+Hello Mark,
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- drivers/pci/dwc/pcie-designware.c |   18 +++++++++++-------
- drivers/pci/dwc/pcie-designware.h |    1 -
- 2 files changed, 11 insertions(+), 8 deletions(-)
+On 02/14/2017 06:16 PM, Mark Brown wrote:
+> On Mon, Feb 13, 2017 at 05:38:26PM +0100, Arnaud Pouliquen wrote:
+>> From: olivier moysan <olivier.moysan@st.com>
+>> 
+>> Add copy support in pcm damengine operations. As example, this
+>> allows to: - process data before rendering (IEC status
+>> insertion), - process captured sample ( sample mask and shift).
+> 
+> dmaengine with copy...  so not DMA at all?  I'm a bit confused
+> about why we're extending the dmaengine code to have a copy
+> operation rather than just writing driver code.
+> 
 
-diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
-index be61039..237da48 100644
---- a/drivers/pci/dwc/pcie-designware.c
-+++ b/drivers/pci/dwc/pcie-designware.c
-@@ -548,10 +548,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 		}
- 	}
- 
--	ret = of_property_read_u32(np, "num-lanes", &pci->lanes);
--	if (ret)
--		pci->lanes = 0;
--
- 	ret = of_property_read_u32(np, "num-viewport", &pci->num_viewport);
- 	if (ret)
- 		pci->num_viewport = 2;
-@@ -748,13 +744,21 @@ static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
- 
- void dw_pcie_setup_rc(struct pcie_port *pp)
- {
-+	int ret;
-+	u32 lanes;
- 	u32 val;
- 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
-+	struct device *dev = pci->dev;
-+	struct device_node *np = dev->of_node;
-+
-+	ret = of_property_read_u32(np, "num-lanes", &lanes);
-+	if (ret)
-+		lanes = 0;
- 
- 	/* set the number of lanes */
- 	val = dw_pcie_readl_dbi(pci, PCIE_PORT_LINK_CONTROL);
- 	val &= ~PORT_LINK_MODE_MASK;
--	switch (pci->lanes) {
-+	switch (lanes) {
- 	case 1:
- 		val |= PORT_LINK_MODE_1_LANES;
- 		break;
-@@ -768,7 +772,7 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
- 		val |= PORT_LINK_MODE_8_LANES;
- 		break;
- 	default:
--		dev_err(pci->dev, "num-lanes %u: invalid value\n", pci->lanes);
-+		dev_err(pci->dev, "num-lanes %u: invalid value\n", lanes);
- 		return;
- 	}
- 	dw_pcie_writel_dbi(pci, PCIE_PORT_LINK_CONTROL, val);
-@@ -776,7 +780,7 @@ void dw_pcie_setup_rc(struct pcie_port *pp)
- 	/* set link width speed control register */
- 	val = dw_pcie_readl_dbi(pci, PCIE_LINK_WIDTH_SPEED_CONTROL);
- 	val &= ~PORT_LOGIC_LINK_WIDTH_MASK;
--	switch (pci->lanes) {
-+	switch (lanes) {
- 	case 1:
- 		val |= PORT_LOGIC_LINK_WIDTH_1_LANES;
- 		break;
-diff --git a/drivers/pci/dwc/pcie-designware.h b/drivers/pci/dwc/pcie-designware.h
-index b23a5b3..1fbe3b8 100644
---- a/drivers/pci/dwc/pcie-designware.h
-+++ b/drivers/pci/dwc/pcie-designware.h
-@@ -147,7 +147,6 @@ struct dw_pcie_ops {
- struct dw_pcie {
- 	struct device		*dev;
- 	void __iomem		*dbi_base;
--	u32			lanes;
- 	u32			num_viewport;
- 	u8			iatu_unroll_enabled;
- 	struct pcie_port	pp;
--- 
-1.7.9.5
+For DFSDM we need to re-arrange samples after DMA transfer, before
+sending them to application.
+For this, a copy ops(called in snd_pcm_lib_read_transfer) alreday exists
+in snd_pcm_ops struct.
+This ops is not available at soc dma engine level, so at ASoC driver
+level.
+Aim of this patch is to expose the copy in driver. DMA is still used,
+copy ops just allows to handle the copy_to_user in driver.
+Advantage of this add-on is that we still able to take benefice of the
+generic DMA in DFSDM driver.
+Now if you estimate that it is too stm32 SOC specific, the other
+solution is to handle directly the PCM platform device in DFSDM driver.
+
+Regards
+Arnaud
