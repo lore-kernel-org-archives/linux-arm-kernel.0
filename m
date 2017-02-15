@@ -1,46 +1,198 @@
 From: yuantian.tang@nxp.com (yuantian.tang at nxp.com)
-Date: Wed, 15 Feb 2017 13:47:35 +0800
-Subject: [PATCH 1/2] dt-bindings: qoriq-clock: Add coreclk
-Message-ID: <1487137656-4006-1-git-send-email-yuantian.tang@nxp.com>
+Date: Wed, 15 Feb 2017 13:47:36 +0800
+Subject: [PATCH 2/2] clk: qoriq: Separate root input clock for core PLLs on
+ ls1012a
+In-Reply-To: <1487137656-4006-1-git-send-email-yuantian.tang@nxp.com>
+References: <1487137656-4006-1-git-send-email-yuantian.tang@nxp.com>
+Message-ID: <1487137656-4006-2-git-send-email-yuantian.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tang Yuantian <Yuantian.Tang@nxp.com>
 
-ls1012a has separate input root clocks for core PLLs versus the platform
-PLL, with the latter described as sysclk in the hw docs.
-Update the qoriq-clock binding to allow a second input clock, named
-"coreclk".  If present, this clock will be used for the core PLLs.
+ls1012a has separate input root clocks for core PLLs versus the
+platform PLL, with the latter described as sysclk in the hw docs.
+If a second input clock, named "coreclk", is present, this clock will be
+used for the core PLLs.
 
 Signed-off-by: Scott Wood <oss@buserror.net>
 Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
 ---
- Documentation/devicetree/bindings/clock/qoriq-clock.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/clk/clk-qoriq.c | 91 +++++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 77 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-index df9cb5a..97a9666 100644
---- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-@@ -55,6 +55,11 @@ Optional properties:
- - clocks: If clock-frequency is not specified, sysclk may be provided
- 	as an input clock.  Either clock-frequency or clocks must be
- 	provided.
-+	A second input clock, called "coreclk", may be provided if
-+	core PLLs are based on a different input clock from the
-+	platform PLL.
-+- clock-names: Required if a coreclk is present.  Valid names are
-+	"sysclk" and "coreclk".
+diff --git a/drivers/clk/clk-qoriq.c b/drivers/clk/clk-qoriq.c
+index d0bf8b1..f3931e3 100644
+--- a/drivers/clk/clk-qoriq.c
++++ b/drivers/clk/clk-qoriq.c
+@@ -87,7 +87,7 @@ struct clockgen {
+ 	struct device_node *node;
+ 	void __iomem *regs;
+ 	struct clockgen_chipinfo info; /* mutable copy */
+-	struct clk *sysclk;
++	struct clk *sysclk, *coreclk;
+ 	struct clockgen_pll pll[6];
+ 	struct clk *cmux[NUM_CMUX];
+ 	struct clk *hwaccel[NUM_HWACCEL];
+@@ -904,7 +904,12 @@ static void __init create_muxes(struct clockgen *cg)
  
- 2. Clock Provider
+ static void __init clockgen_init(struct device_node *np);
  
-@@ -71,6 +76,7 @@ second cell is the clock index for the specified type.
- 	2	hwaccel		index (n in CLKCGnHWACSR)
- 	3	fman		0 for fm1, 1 for fm2
- 	4	platform pll	0=pll, 1=pll/2, 2=pll/3, 3=pll/4
-+	5	coreclk		must be 0
+-/* Legacy nodes may get probed before the parent clockgen node */
++/*
++ * Legacy nodes may get probed before the parent clockgen node.
++ * It is assumed that device trees with legacy nodes will not
++ * contain a "clocks" property -- otherwise the input clocks may
++ * not be initialized at this point.
++ */
+ static void __init legacy_init_clockgen(struct device_node *np)
+ {
+ 	if (!clockgen.node)
+@@ -945,18 +950,13 @@ static struct clk __init
+ 	return clk_register_fixed_rate(NULL, name, NULL, 0, rate);
+ }
  
- 3. Example
+-static struct clk *sysclk_from_parent(const char *name)
++static struct clk __init *input_clock(const char *name, struct clk *clk)
+ {
+-	struct clk *clk;
+-	const char *parent_name;
+-
+-	clk = of_clk_get(clockgen.node, 0);
+-	if (IS_ERR(clk))
+-		return clk;
++	const char *input_name;
+ 
+ 	/* Register the input clock under the desired name. */
+-	parent_name = __clk_get_name(clk);
+-	clk = clk_register_fixed_factor(NULL, name, parent_name,
++	input_name = __clk_get_name(clk);
++	clk = clk_register_fixed_factor(NULL, name, input_name,
+ 					0, 1, 1);
+ 	if (IS_ERR(clk))
+ 		pr_err("%s: Couldn't register %s: %ld\n", __func__, name,
+@@ -965,6 +965,29 @@ static struct clk *sysclk_from_parent(const char *name)
+ 	return clk;
+ }
+ 
++static struct clk __init *input_clock_by_name(const char *name,
++					      const char *dtname)
++{
++	struct clk *clk;
++
++	clk = of_clk_get_by_name(clockgen.node, dtname);
++	if (IS_ERR(clk))
++		return clk;
++
++	return input_clock(name, clk);
++}
++
++static struct clk __init *input_clock_by_index(const char *name, int idx)
++{
++	struct clk *clk;
++
++	clk = of_clk_get(clockgen.node, 0);
++	if (IS_ERR(clk))
++		return clk;
++
++	return input_clock(name, clk);
++}
++
+ static struct clk * __init create_sysclk(const char *name)
+ {
+ 	struct device_node *sysclk;
+@@ -974,7 +997,11 @@ static struct clk * __init create_sysclk(const char *name)
+ 	if (!IS_ERR(clk))
+ 		return clk;
+ 
+-	clk = sysclk_from_parent(name);
++	clk = input_clock_by_name(name, "sysclk");
++	if (!IS_ERR(clk))
++		return clk;
++
++	clk = input_clock_by_index(name, 0);
+ 	if (!IS_ERR(clk))
+ 		return clk;
+ 
+@@ -985,7 +1012,27 @@ static struct clk * __init create_sysclk(const char *name)
+ 			return clk;
+ 	}
+ 
+-	pr_err("%s: No input clock\n", __func__);
++	pr_err("%s: No input sysclk\n", __func__);
++	return NULL;
++}
++
++static struct clk * __init create_coreclk(const char *name)
++{
++	struct clk *clk;
++
++	clk = input_clock_by_name(name, "coreclk");
++	if (!IS_ERR(clk))
++		return clk;
++
++	/*
++	 * This indicates a mix of legacy nodes with the new coreclk
++	 * mechanism, which should never happen.  If this error occurs,
++	 * don't use the wrong input clock just because coreclk isn't
++	 * ready yet.
++	 */
++	if (WARN_ON(PTR_ERR(clk) == -EPROBE_DEFER))
++		return clk;
++
+ 	return NULL;
+ }
+ 
+@@ -1008,11 +1055,19 @@ static void __init create_one_pll(struct clockgen *cg, int idx)
+ 	u32 __iomem *reg;
+ 	u32 mult;
+ 	struct clockgen_pll *pll = &cg->pll[idx];
++	const char *input = "cg-sysclk";
+ 	int i;
+ 
+ 	if (!(cg->info.pll_mask & (1 << idx)))
+ 		return;
+ 
++	if (cg->coreclk && idx != PLATFORM_PLL) {
++		if (IS_ERR(cg->coreclk))
++			return;
++
++		input = "cg-coreclk";
++	}
++
+ 	if (cg->info.flags & CG_VER3) {
+ 		switch (idx) {
+ 		case PLATFORM_PLL:
+@@ -1063,7 +1118,7 @@ static void __init create_one_pll(struct clockgen *cg, int idx)
+ 			 "cg-pll%d-div%d", idx, i + 1);
+ 
+ 		clk = clk_register_fixed_factor(NULL,
+-				pll->div[i].name, "cg-sysclk", 0, mult, i + 1);
++				pll->div[i].name, input, 0, mult, i + 1);
+ 		if (IS_ERR(clk)) {
+ 			pr_err("%s: %s: register failed %ld\n",
+ 			       __func__, pll->div[i].name, PTR_ERR(clk));
+@@ -1200,6 +1255,13 @@ static struct clk *clockgen_clk_get(struct of_phandle_args *clkspec, void *data)
+ 			goto bad_args;
+ 		clk = pll->div[idx].clk;
+ 		break;
++	case 5:
++		if (idx != 0)
++			goto bad_args;
++		clk = cg->coreclk;
++		if (IS_ERR(clk))
++			clk = NULL;
++		break;
+ 	default:
+ 		goto bad_args;
+ 	}
+@@ -1311,6 +1373,7 @@ static void __init clockgen_init(struct device_node *np)
+ 		clockgen.info.flags |= CG_CMUX_GE_PLAT;
+ 
+ 	clockgen.sysclk = create_sysclk("cg-sysclk");
++	clockgen.coreclk = create_coreclk("cg-coreclk");
+ 	create_plls(&clockgen);
+ 	create_muxes(&clockgen);
  
 -- 
 2.1.0.27.g96db324
