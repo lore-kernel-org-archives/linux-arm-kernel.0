@@ -1,33 +1,23 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 16 Feb 2017 23:21:19 +0800
+Date: Thu, 16 Feb 2017 23:26:23 +0800
 Subject: [PATCH RFC 2/3] coresight: add support for debug module
-In-Reply-To: <20170215114416.GF31733@leverpostej>
+In-Reply-To: <20170215210805.GB29730@linaro.org>
 References: <1486966298-16767-1-git-send-email-leo.yan@linaro.org>
  <1486966298-16767-3-git-send-email-leo.yan@linaro.org>
- <20170215114416.GF31733@leverpostej>
-Message-ID: <20170216152119.GC544@leoy-linaro>
+ <20170215210805.GB29730@linaro.org>
+Message-ID: <20170216152623.GD544@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Mathieu,
 
-On Wed, Feb 15, 2017 at 11:44:16AM +0000, Mark Rutland wrote:
-> [resending due to a mail server snafu]
-> 
+On Wed, Feb 15, 2017 at 02:08:05PM -0700, Mathieu Poirier wrote:
 > On Mon, Feb 13, 2017 at 02:11:37PM +0800, Leo Yan wrote:
 > > Coresight includes debug module and usually the module connects with CPU
 > > debug logic. ARMv8 architecture reference manual (ARMv8-ARM) has defined
 > > the debug registers in the chapter "H9: External Debug Register
 > > Descriptions".
-> 
-> This should have been in the binding description also.
-> 
-> The layout of the ARM ARM can change over time, so please refer to the
-> full document number, which can be found at the bottom of each page
-> (e.g. ARM DDI 0487A.j).
-
-Good to know this. Will use this way to connect code with spec.
-
+> > 
 > > After enable the debug module we can check CPU state and PC value, etc.
 > > So this is helpful for some CPU lockup bugs, e.g. if one CPU has run
 > > into infinite loop with IRQ disabled. So the CPU cannot switch context
@@ -35,23 +25,7 @@ Good to know this. Will use this way to connect code with spec.
 > > etc. Furthermore, now ARMv8 introduces some other runtime firmwares like
 > > ARM trusted firmware BL31, so sometime CPU hard lock may happen in the
 > > firmware and cannot return back to kernel.
-> 
-> I would generally expect that the secure world would lock down
-> debugging, as this poses a security risk.
-> 
-> I take it that this is only unlocked on development firmware.
-> 
-> Given that cores can be powered down outside of our control, I'm not
-> sure that accesses to these registers is safe in general.
-
-Mike Leach has gave method in another email to check CPU power state in
-register EDPRSR.PU before access EDPCSR register.
-
-For security state, I will check if EDSCR.NS bit can be use to
-distinguish CPU is secure or non-secure state. And also follow Mike's
-suggestion to use EDPCSR = 0xFFFF_FFFF as hint that the CPU is in
-secure state.
-
+> > 
 > > This patch is to enable coresight debug module and register callback
 > > notifier for panic; so when system detect the CPU lockup we can utilize
 > > debug module registers to get to know PC value for all CPUs; so we can
@@ -59,23 +33,109 @@ secure state.
 > > 
 > > This is initial driver for coresight debug module and could enhance it
 > > later according to debugging requirement.
+> > 
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > ---
+> >  drivers/hwtracing/coresight/Kconfig           |   8 ++
+> >  drivers/hwtracing/coresight/Makefile          |   1 +
+> >  drivers/hwtracing/coresight/coresight-debug.c | 169 ++++++++++++++++++++++++++
+> >  3 files changed, 178 insertions(+)
+> >  create mode 100644 drivers/hwtracing/coresight/coresight-debug.c
+> > 
+> > diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
+> > index 130cb21..dcf59cc 100644
+> > --- a/drivers/hwtracing/coresight/Kconfig
+> > +++ b/drivers/hwtracing/coresight/Kconfig
+> > @@ -89,4 +89,12 @@ config CORESIGHT_STM
+> >  	  logging useful software events or data coming from various entities
+> >  	  in the system, possibly running different OSs
+> >  
+> > +config CORESIGHT_DEBUG
+> > +	bool "CoreSight debug driver"
+> > +	depends on ARM || ARM64
+> > +	help
+> > +	  This driver provides support for coresight debugging module. This
+> > +	  is primarily used for printing out debug registers for panic and
+> > +	  soft and hard lockup.
+> > +
+> >  endif
+> > diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
+> > index af480d9..d540d45 100644
+> > --- a/drivers/hwtracing/coresight/Makefile
+> > +++ b/drivers/hwtracing/coresight/Makefile
+> > @@ -16,3 +16,4 @@ obj-$(CONFIG_CORESIGHT_SOURCE_ETM4X) += coresight-etm4x.o \
+> >  					coresight-etm4x-sysfs.o
+> >  obj-$(CONFIG_CORESIGHT_QCOM_REPLICATOR) += coresight-replicator-qcom.o
+> >  obj-$(CONFIG_CORESIGHT_STM) += coresight-stm.o
+> > +obj-$(CONFIG_CORESIGHT_DEBUG) += coresight-debug.o
+> > diff --git a/drivers/hwtracing/coresight/coresight-debug.c b/drivers/hwtracing/coresight/coresight-debug.c
+> > new file mode 100644
+> > index 0000000..28206a83
+> > --- /dev/null
+> > +++ b/drivers/hwtracing/coresight/coresight-debug.c
+> > @@ -0,0 +1,169 @@
+> > +/*
+> > + * Copyright(C) 2017 Linaro Limited. All rights reserved.
+> > + * Author: Leo Yan <leo.yan@linaro.org>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify it
+> > + * under the terms of the GNU General Public License version 2 as published by
+> > + * the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful, but WITHOUT
+> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> > + * more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License along with
+> > + * this program.  If not, see <http://www.gnu.org/licenses/>.
+> > + */
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/moduleparam.h>
+> > +#include <linux/init.h>
+> > +#include <linux/types.h>
+> > +#include <linux/device.h>
+> > +#include <linux/io.h>
+> > +#include <linux/err.h>
+> > +#include <linux/fs.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/smp.h>
+> > +#include <linux/sysfs.h>
+> > +#include <linux/stat.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/cpu.h>
+> > +#include <linux/coresight.h>
+> > +#include <linux/amba/bus.h>
+> > +#include <linux/uaccess.h>
 > 
-> How does this interact with an external debugger making use of these
-> registers?
+> When possible, please try to order the header files alphabetically.
 
-IIUC, external debugger also will access these registers, like use
-EDPCSR to display PC value. I have no idea for the connection between
-this driver with external debugger, except I think we can use this
-driver to enable clock for CPU debug module.
+Will fix.
 
-> [...]
+> > +
+> > +#include "coresight-priv.h"
+> > +
+> > +#define EDPCSR_LO	0x0A0
+> > +#define EDPCSR_HI	0x0AC
+> > +#define EDOSLAR		0x300
+> > +#define EDOSLSR		0x304
+> > +#define EDPDCR		0x310
+> > +#define EDPDSR		0x314
 > 
+> EDOSLSR, DEPDCR and EDPDSR aren't used in the code presented below.
+
+Will remove them.
+
+> > +
+> > +struct debug_drvdata {
+> > +	void __iomem	*base;
+> > +	struct device	*dev;
+> > +	int		cpu;
+> > +};
+> > +
 > > +static struct debug_drvdata *debug_drvdata[NR_CPUS];
-> 
-> A per-cpu variable is preferred to an NR_CPUS sized array.
-
-Will do.
-
 > > +
 > > +static void debug_os_unlock(struct debug_drvdata *drvdata)
 > > +{
@@ -83,19 +143,7 @@ Will do.
 > > +	writel_relaxed(0x0, drvdata->base + EDOSLAR);
 > > +	isb();
 > > +}
-> 
-> I do not believe this barrier is correct.
-
-I copied the code piece from coresight-etm4x.c.
-
-I guess here is to ensure the os unlock operations is finished before
-any sequential register accessing. I think isb() is redundant for
-debug module and we can only use writel_relaxed() will be enough for
-accessing EDOSLAR and EDPCSR, these two registers are in the same
-endpoint so we don't need add extra barrier for them. Is this correct?
-
-> [...]
-> 
+> > +
 > > +static void debug_read_pcsr(struct debug_drvdata *drvdata)
 > > +{
 > > +	u32 pcsr_hi, pcsr_lo;
@@ -118,21 +166,7 @@ endpoint so we don't need add extra barrier for them. Is this correct?
 > > +
 > > +	CS_LOCK(drvdata->base);
 > > +}
-> 
-> Per ARM DDI 0487A.k_iss10775, H9.2.32, "EDPCSR, External Debug Program
-> Counter Sample Register":
-> 
-> 	Implemented only if the OPTIONAL PC Sample-based Profiling
-> 	Extension is implemented.
-> 
-> So even if we have access to an MMIO debug interface, we cannot
-> necessarily acecess this register.
-
-Eventually this is a hardware feature, right? If so we can use one DT
-property to describe this.
-
-> [...]
-> 
+> > +
 > > +/*
 > > + * Dump out memory limit information on panic.
 > > + */
@@ -148,32 +182,77 @@ property to describe this.
 > > +			continue;
 > > +
 > > +		debug_read_pcsr(debug_drvdata[i]);
+> 
+> Mark and Mike have raised a number of problems with this.  If I get things
+> correctly the pseudocode (CreatePCSample() and EDPCSRlo[]), found in the
+> reference manual, should be dealing with most of them. 
+
+I reviewed the code for CreatePCSample() and EDPCSRlo[], they are
+likely the pseudo code for hardware logic for PC sampling, but not
+software code for how to read EDPCSR. But I think the code still
+can give us some hints.
+
+> One thing that is subtle in the peudocode is the memory-mapped access to these
+> registers and something else that should be checked here before proceeding. 
+
+Agree, I will follow Mike's suggestion.
+
 > > +	}
-> 
-> Is there no potential for deadlock with a CPU reading its own debug
-> interface registers?
-
-Have checked this, does not introduce deadlock.
-
-> [...]
-> 
-> > +static struct amba_id debug_ids[] = {
-> > +	{       /* Debug for Cortex-A53 */
-> > +		.id	= 0x000bbd03,
-> > +		.mask	= 0x000fffff,
-> > +		.data	= "debug",
-> > +	},
-> > +	{ 0, 0},
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct notifier_block debug_notifier = {
+> > +	.notifier_call = dump_debug,
 > > +};
+> > +
+> > +static int __init register_coresight_debug_dumper(void)
+> > +{
+> > +	atomic_notifier_chain_register(&panic_notifier_list,
+> > +				       &debug_notifier);
+> > +	return 0;
+> > +}
+> > +__initcall(register_coresight_debug_dumper);
+> > +
+> > +static int debug_probe(struct amba_device *adev, const struct amba_id *id)
+> > +{
+> > +	void __iomem *base;
+> > +	struct device *dev = &adev->dev;
+> > +	struct coresight_platform_data *pdata = NULL;
+> > +	struct debug_drvdata *drvdata;
+> > +	struct resource *res = &adev->res;
+> > +	struct device_node *np = adev->dev.of_node;
+> > +
+> > +	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
+> > +	if (!drvdata)
+> > +		return -ENOMEM;
+> > +
+> > +	if (np) {
+> > +		pdata = of_get_coresight_platform_data(dev, np);
+> > +		if (IS_ERR(pdata))
+> > +			return PTR_ERR(pdata);
+> > +		adev->dev.platform_data = pdata;
+> > +	}
+> > +
+> > +	drvdata->dev = &adev->dev;
+> > +	dev_set_drvdata(dev, drvdata);
+> > +
+> > +	/* Validity for the resource is already checked by the AMBA core */
+> > +	base = devm_ioremap_resource(dev, res);
+> > +	if (IS_ERR(base))
+> > +		return PTR_ERR(base);
+> > +
+> > +	drvdata->base = base;
+> > +	drvdata->cpu = pdata ? pdata->cpu : 0;
+> > +	debug_drvdata[drvdata->cpu] = drvdata;
 > 
-> The DT binding said nothing about Cortex-A53.
-> 
-> How variable are the MMIO registers in practice? Do we need to know the
-> particular CPU?
+> Add atomic_notifier_chain_register() here rather than letting the infrastructure
+> deal with it in an initcall.  That way we don't clutter the panic_notifier_list
+> needlessly if the IP is not present.
 
-We don't need know particular CPU for current driver; but I think the
-amba id is different for different CPU variants. Should I remove
-related binding for this?
+Good point. Will fix.
+
+[...]
 
 Thanks,
 Leo Yan
