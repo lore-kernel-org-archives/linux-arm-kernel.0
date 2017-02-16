@@ -1,96 +1,113 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Feb 2017 13:09:35 +0000
-Subject: [PATCH v4 20/36] media: imx: Add CSI subdev driver
-In-Reply-To: <20170216124027.GM27312@n2100.armlinux.org.uk>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-21-git-send-email-steve_longerbeam@mentor.com>
- <20170216115206.GL27312@n2100.armlinux.org.uk>
- <20170216124027.GM27312@n2100.armlinux.org.uk>
-Message-ID: <20170216130935.GN27312@n2100.armlinux.org.uk>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 16 Feb 2017 14:19:08 +0100
+Subject: [RFC PATCH 03/33] irqchip/gic-v3-its: Refactor command encoding
+In-Reply-To: <1484648454-21216-4-git-send-email-marc.zyngier@arm.com>
+References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+ <1484648454-21216-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <abcff5be-28fe-6bf5-76c1-2a65f86d05ee@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 12:40:27PM +0000, Russell King - ARM Linux wrote:
-> However, the following is primerily directed at Laurent as the one who
-> introduced the BUG_ON() in question...
-> 
-> NEVER EVER USE BUG_ON() IN A PATH THAT CAN RETURN AN ERROR.
-> 
-> It's possible to find Linus rants about this, eg,
-> https://www.spinics.net/lists/stable/msg146439.html
-> 
->  I should have reacted to the damn added BUG_ON() lines. I suspect I
->  will have to finally just remove the idiotic BUG_ON() concept once and
->  for all, because there is NO F*CKING EXCUSE to knowingly kill the
->  kernel.
-> 
-> Also: http://yarchive.net/comp/linux/BUG.html
-> 
->  Rule of thumb: BUG() is only good for something that never happens and
->  that we really have no other option for (ie state is so corrupt that
->  continuing is deadly).
-> 
-> So, _unless_ people want to see BUG_ON() removed from the kernel, I
-> strongly suggest to _STOP_ using it as "we didn't like the function
-> arguments, let's use it as an assert() statement instead of returning
-> an error."
-> 
-> There's no excuse what so ever to be killing the machine in
-> media_create_pad_link().  If it doesn't like a NULL pointer, it's damn
-> well got an error path to report that fact.  Use that mechanism and
-> stop needlessly killing the kernel.
-> 
-> BUG_ON() IS NOT ASSERT().  DO NOT USE IT AS SUCH.
-> 
-> Linus is absolutely right about BUG_ON() - it hurts debuggability,
-> because now the only way to do further tests is to reboot the damned
-> machine after removing those fscking BUG_ON()s that should *never*
-> have been there in the first place.
-> 
-> As Linus went on to say:
-> 
->  And dammit, if anybody else feels that they had done "debugging
->  messages with BUG_ON()", I would suggest you
-> 
->   (a) rethink your approach to programming
-> 
->   (b) send me patches to remove the crap entirely, or make them real
->  *DEBUGGING* messages, not "kill the whole machine" messages.
-> 
->  I've ranted against people using BUG_ON() for debugging in the past.
->  Why the f*ck does this still happen? And Andrew - please stop taking
->  those kinds of patches! Lookie here:
-> 
->      https://lwn.net/Articles/13183/
-> 
->  so excuse me for being upset that people still do this shit almost 15
->  years later.
-> 
-> So I suggest people heed that advice and start fixing these stupid
-> BUG_ON()s that they've created.
 
-More crap.
 
-If the "complete" method fails (or, in fact, anything in
-v4l2_async_test_notify() fails) then all hell breaks loose, because
-of the total lack of clean up (and no, this isn't anything to do with
-some stupid justification of those BUG_ON()s above.)
+On 17/01/2017 11:20, Marc Zyngier wrote:
+> The way we encode the various ITS command fields is both tedious
+> and error prone. Let's introduce a helper function that performs
+> the encoding, and convert the existing encoders to use that
+> helper.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 34 ++++++++++++++++------------------
+>  1 file changed, 16 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 69b040f..49b681e 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -193,58 +193,56 @@ struct its_cmd_block {
+>  typedef struct its_collection *(*its_cmd_builder_t)(struct its_cmd_block *,
+>  						    struct its_cmd_desc *);
+>  
+> +static void its_mask_encode(u64 *raw_cmd, u64 val, int h, int l)
+> +{
+> +	u64 mask = GENMASK_ULL(h, l);
+> +	*raw_cmd &= ~mask;
+> +	*raw_cmd |= (val << l) & mask;
+> +}
+> +
+>  static void its_encode_cmd(struct its_cmd_block *cmd, u8 cmd_nr)
+>  {
+> -	cmd->raw_cmd[0] &= ~0xffULL;
+> -	cmd->raw_cmd[0] |= cmd_nr;
+> +	its_mask_encode(&cmd->raw_cmd[0], cmd_nr, 7, 0);
+>  }
+>  
+>  static void its_encode_devid(struct its_cmd_block *cmd, u32 devid)
+>  {
+> -	cmd->raw_cmd[0] &= BIT_ULL(32) - 1;
+> -	cmd->raw_cmd[0] |= ((u64)devid) << 32;
+> +	its_mask_encode(&cmd->raw_cmd[0], devid, 63, 32);
+>  }
+>  
+>  static void its_encode_event_id(struct its_cmd_block *cmd, u32 id)
+>  {
+> -	cmd->raw_cmd[1] &= ~0xffffffffULL;
+> -	cmd->raw_cmd[1] |= id;
+> +	its_mask_encode(&cmd->raw_cmd[1], id, 31, 0);
+>  }
+>  
+>  static void its_encode_phys_id(struct its_cmd_block *cmd, u32 phys_id)
+>  {
+> -	cmd->raw_cmd[1] &= 0xffffffffULL;
+> -	cmd->raw_cmd[1] |= ((u64)phys_id) << 32;
+> +	its_mask_encode(&cmd->raw_cmd[1], phys_id, 63, 32);
+>  }
+>  
+>  static void its_encode_size(struct its_cmd_block *cmd, u8 size)
+>  {
+> -	cmd->raw_cmd[1] &= ~0x1fULL;
+> -	cmd->raw_cmd[1] |= size & 0x1f;
+> +	its_mask_encode(&cmd->raw_cmd[1], size, 4, 0);
+>  }
+>  
+>  static void its_encode_itt(struct its_cmd_block *cmd, u64 itt_addr)
+>  {
+> -	cmd->raw_cmd[2] &= ~0xffffffffffffULL;
+> -	cmd->raw_cmd[2] |= itt_addr & 0xffffffffff00ULL;
+> +	its_mask_encode(&cmd->raw_cmd[2], itt_addr >> 8, 50, 8);
+>  }
+>  
+>  static void its_encode_valid(struct its_cmd_block *cmd, int valid)
+>  {
+> -	cmd->raw_cmd[2] &= ~(1ULL << 63);
+> -	cmd->raw_cmd[2] |= ((u64)!!valid) << 63;
+> +	its_mask_encode(&cmd->raw_cmd[2], !!valid, 63, 63);
+>  }
+>  
+>  static void its_encode_target(struct its_cmd_block *cmd, u64 target_addr)
+>  {
+> -	cmd->raw_cmd[2] &= ~(0xffffffffULL << 16);
+> -	cmd->raw_cmd[2] |= (target_addr & (0xffffffffULL << 16));
+> +	its_mask_encode(&cmd->raw_cmd[2], target_addr >> 16, 50, 16);
+Theoretically isn't it 16:51? In the previous code this was encoded as
+16-47 I think.
 
-v4l2_async_notifier_register() gets called, it adds the notifier to
-the global notifier list.  v4l2_async_test_notify() gets called.  It
-returns an error, which is propagated out of
-v4l2_async_notifier_register().
+Besides
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-So the caller thinks that v4l2_async_notifier_register() failed, which
-will cause imx_media_probe() to fail, causing imxmd->subdev_notifier
-to be kfree()'d.  We now have a use-after free bug.
 
-Second case.  v4l2_async_register_subdev().  Almost exactly the same,
-except in this case adding sd->async_list to the notifier->done list
-may have succeeded, and failure after that, again, results in an
-in-use list_head being kfree()'d.
+Thanks
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Eric
+>  }
+>  
+>  static void its_encode_collection(struct its_cmd_block *cmd, u16 col)
+>  {
+> -	cmd->raw_cmd[2] &= ~0xffffULL;
+> -	cmd->raw_cmd[2] |= col;
+> +	its_mask_encode(&cmd->raw_cmd[2], col, 15, 0);
+>  }
+>  
+>  static inline void its_fixup_cmd(struct its_cmd_block *cmd)
+> 
