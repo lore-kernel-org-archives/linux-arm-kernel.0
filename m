@@ -1,37 +1,74 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Feb 2017 13:44:23 +0000
-Subject: [PATCH v4 18/36] media: Add i.MX media core driver
-In-Reply-To: <1487250123.2377.53.camel@pengutronix.de>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-19-git-send-email-steve_longerbeam@mentor.com>
- <1487250123.2377.53.camel@pengutronix.de>
-Message-ID: <20170216134422.GO27312@n2100.armlinux.org.uk>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 16 Feb 2017 14:46:03 +0100
+Subject: [RFC PATCH 06/33] irqchip/gic-v3-its: Add probing for VLPI
+ properties
+In-Reply-To: <alpine.DEB.2.20.1702131057290.3619@nanos>
+References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+ <1484648454-21216-7-git-send-email-marc.zyngier@arm.com>
+ <alpine.DEB.2.20.1702131057290.3619@nanos>
+Message-ID: <d04c4e22-49cd-13f8-f461-9ccf8057cb96@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 02:02:03PM +0100, Philipp Zabel wrote:
-> On Wed, 2017-02-15 at 18:19 -0800, Steve Longerbeam wrote:
-> > +- imx-csi subdev is not being autoloaded as a kernel module, probably
-> > +  because ipu_add_client_devices() does not register the IPU client
-> > +  platform devices, but only allocates those devices.
+Hi,
+
+On 13/02/2017 11:00, Thomas Gleixner wrote:
+> On Tue, 17 Jan 2017, Marc Zyngier wrote:
+>> +	typer = gic_read_typer(its_base + GITS_TYPER);
+>>  	its->base = its_base;
+>>  	its->phys_base = res->start;
+>> -	its->ite_size = ((gic_read_typer(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
+>> +	its->ite_size = ((typer >> 4) & 0xf) + 1;
+>> +	its->is_v4 = !!(typer & GITS_TYPER_VLPIS);
+>> +	if (its->is_v4 && !(typer & GITS_TYPER_VMOVP)) {
+>> +		int its_number;
+>> +
+>> +		its_number = find_first_zero_bit(&its_list_map, 16);
 > 
-> As Russell points out, this is an issue with the ipu-v3 driver, which
-> needs to be fixed to stop setting the ipu client devices' dev->of_node
-> field.
+> s/16/ITS_MAX_ENTITIES or whatever.
+> 
+>> +		if (its_number >= 16) {
+>> +			pr_err("ITS@%pa: No ITSList entry available!\n",
+>> +			       &res->start);
+>> +			err = -EINVAL;
+>> +			goto out_free_its;
+>> +		}
+>> +
+>> +		ctlr = readl_relaxed(its_base + GITS_CTLR);
+>> +		ctlr &= ~GITS_CTLR_ITS_NUMBER;
+>> +		ctlr |= its_number << GITS_CTLR_ITS_NUMBER_SHIFT;
+>> +		writel_relaxed(ctlr, its_base + GITS_CTLR);
+>> +		ctlr = readl_relaxed(its_base + GITS_CTLR);
+>> +		if ((ctlr & GITS_CTLR_ITS_NUMBER) != (its_number << GITS_CTLR_ITS_NUMBER_SHIFT)) {
+>> +			its_number = ctlr & GITS_CTLR_ITS_NUMBER;
+>> +			its_number >>= GITS_CTLR_ITS_NUMBER_SHIFT;
+>> +		}
+>> +
+>> +		if (test_and_set_bit(its_number, &its_list_map)) {
+> 
+> You just established above that the bit is not set. I assume that this is
+> code which has no concurrency concerns....
 
->From my local testing (albiet the shambles that is bits of v4l2) setting
-dev->of_node is not necessary for imx-drm - imx-drm comes up fine without.
+I understand this covers the case where the ITS_number field is RO. In
+such a case the its_number has changed just above compared to the first
+find_first_zero_bit?
 
-Fixing _this_ code for that is not too difficult - it's a matter of:
+Besides
 
-	priv->sd.of_node = pdata->of_node;
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-in imx_csi_probe().  However, the difficult bit is the poor state of
-code in v4l2, particularly the v4l2-async crap.  Right now, fixing the
-module autoloading will oops the kernel, so it's best that module
-autoloading remains broken for the time being.
+Thanks
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Eric
+
+
+> 
+> Thanks,
+> 
+> 	tglx
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
