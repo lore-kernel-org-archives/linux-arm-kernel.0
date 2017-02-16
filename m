@@ -1,23 +1,23 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Feb 2017 14:23:42 +0100
-Subject: [PATCH 3/4] serial: 8250-mtk: add uart DMA support
-In-Reply-To: <1487243251-964-4-git-send-email-long.cheng@mediatek.com>
-References: <1487243251-964-1-git-send-email-long.cheng@mediatek.com>
- <1487243251-964-4-git-send-email-long.cheng@mediatek.com>
-Message-ID: <2041319.BERnyvUuuK@wuerfel>
+Date: Thu, 16 Feb 2017 14:27:55 +0100
+Subject: [PATCH v3 5/6] ARM: mvebu: Add driver for mv98dx3236-soc-id
+In-Reply-To: <20170216085041.28337-6-chris.packham@alliedtelesis.co.nz>
+References: <20170216085041.28337-1-chris.packham@alliedtelesis.co.nz>
+ <20170216085041.28337-6-chris.packham@alliedtelesis.co.nz>
+Message-ID: <28604982.PnlvXC13kC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 16, 2017 7:07:30 PM CET Long Cheng wrote:
-> Modify uart register to support DMA function.
+On Thursday, February 16, 2017 9:50:39 PM CET Chris Packham wrote:
+> The DFX server on the 98dx3236 and compatible SoCs has an ID register
+> that provides revision information that the PCI based ID register
+> doesn't have. Use this if it's available.
 > 
-> Signed-off-by: Long Cheng <long.cheng@mediatek.com>
-> ---
->  drivers/tty/serial/8250/8250_mtk.c |  194 +++++++++++++++++++++++++++++++++++-
->  1 file changed, 193 insertions(+), 1 deletion(-)
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 > 
 
-This code looks a lot like the one in 8250_omap.c and 8250_dma.c.
-Could it be made more generic so we can share more of the implementation?
+How about putting this new code into a separate driver in
+drivers/soc/? I don't think you need the early probing we have
+here, and not that much is shared otherwise.
 
 	Arnd
