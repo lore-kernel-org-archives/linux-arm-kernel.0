@@ -1,122 +1,182 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 16 Feb 2017 11:58:15 +0000
-Subject: [PATCH 0/2] RFC: Move efi bgrt code out of arch/x86
-In-Reply-To: <CACi5LpMwvwm8RVi=OZTHhWsUUpkzhzrvhJ4m6Kcgf3=eW1O1gQ@mail.gmail.com>
-References: <1487163892-27701-1-git-send-email-bhsharma@redhat.com>
- <CAKv+Gu-qv83fi9qBugA=Od2htcLb966SPBpZXSnXdH=AYw-COw@mail.gmail.com>
- <4695986.Exl6llDaHp@aspire.rjw.lan>
- <CACi5LpMwvwm8RVi=OZTHhWsUUpkzhzrvhJ4m6Kcgf3=eW1O1gQ@mail.gmail.com>
-Message-ID: <CAKv+Gu8njGy25L1STfjb0Nk8g+avh0NuFEgcURJDtENYSj2rtQ@mail.gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 16 Feb 2017 13:22:02 +0100
+Subject: [PATCH] KVM: arm64: VGIC: fix command handling while ITS being
+ disabled
+In-Reply-To: <20170216104120.31952-1-andre.przywara@arm.com>
+References: <20170216104120.31952-1-andre.przywara@arm.com>
+Message-ID: <fd34e7f8-fe6f-354f-b49e-f898586d5c4d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 February 2017 at 04:34, Bhupesh Sharma <bhsharma@redhat.com> wrote:
-> Hi Ard, Rafael
->
-> On Thu, Feb 16, 2017 at 5:14 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
->> On Wednesday, February 15, 2017 05:44:28 PM Ard Biesheuvel wrote:
->>> Hello Bhupesh,
->>>
->>> On 15 February 2017 at 13:04, Bhupesh Sharma <bhsharma@redhat.com> wrote:
->>> > This patchset presents a RFC approach to move the ACPI BGRT table
->>> > handling related code out of 'arch/x86' and place it inside
->>> > 'drivers/firmware/efi' so that it can be used to support
->>> > ACPI BGRT table and BGRT logo across x86 and AARCH64 ARCHs.
->>> >
->>> > Note that this patchset is primarily tested on Qemu VMs for x86_64
->>> > and AARCH64 environments, while I try to get my hands on a real
->>> > AARCH64 hardware which supports a graphic card and whose boot firmware
->>> > I can modify to support the ACPI BGRT table to be passed to the kernel.
->>> >
->>> > Here are some details/outputs about/from the test environment:
->>> >
->>> > AARCH64:
->>> > ========
->>> > 1. I used the latest Qemu (master branch) and compiled it for aarch64 with softmmu support.
->>> >    Here is the command line I use to launch the same:
->>> >
->>> > # qemu-system-aarch64 -cpu cortex-a57 -M virt -m 2048 -bios QEMU_EFI.fd -kernel Image -initrd rootfs.cpio -serial stdio --append "acpi=force" -device virtio-gpu-pci
->>> >
->>> > where, QEMU_EFI.fd is the DEBUG build of EDK2 ArmVirtQemu.dsc (master branch)
->>> >        rootfs.cpio is the AARCH64 build of Buildroot (Little Endian AARCH64)
->>> >        -device virtio-gpu-pci provides the Graphical support required to have BGRT logo.
->>> >
->>> >
->>> > 2. Here are some test results once Linux boots up, which show a valid BGRT table/logo being
->>> >    seen by the kernel:
->>> >
->>> > # acpidump
->>> > ...
->>> >
->>> > BGRT @ 0x0000000000000000
->>> >   0000: 42 47 52 54 38 00 00 00 01 B4 49 4E 54 45 4C 20  BGRT8.....INTEL
->>> >   0010: 45 44 4B 32 20 20 20 20 02 00 00 00 20 20 20 20  EDK2    ....
->>> >   0020: 13 00 00 01 01 00 01 00 00 80 B0 BA 00 00 00 00  ................
->>> >   0030: 2F 01 00 00 0F 01 00 00                          /.......
->>> >
->>> > # dmesg | grep -i BGRT
->>> > [    0.000000] ACPI: BGRT 0x00000000B8640000 000038 (v01 INTEL  EDK2     00000002      01000013)
->>> >
->>> >
->>> > # ls -lah /sys/firmware/acpi/bgrt/image
->>> > -r--r--r--    1 root     root       32.9K Feb 15 11:27 /sys/firmware/acpi/bgrt/image
->>> >
->>> > x86:
->>> > ====
->>> > 1. I used the latest Qemu (master branch) and compiled it for x86.
->>> >    Here is the command line I use to launch the same:
->>> >
->>> > # qemu-system-x86_64 -enable-kvm -sdl -m 2048 -vga std -boot c -cpu host -bios OVMF_CODE.fd -kernel bzImage -initrd rootfs.cpio -serial stdio
->>> >
->>> > where, OVMF_CODE.fd is the RELEASE build of EDK2 OvmfPkg (master branch)
->>> >        rootfs.cpio is the x86_64 build of Buildroot
->>> >
->>> > 2. Similar test results are seen as noted for the AARCH64 case above, which show a valid BGRT table/logo being
->>> >    seen by the kernel.
->>> >
->>> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> > Cc: Ingo Molnar <mingo@kernel.org>
->>> > Cc: Matt Fleming <matt@codeblueprint.co.uk>
->>> > Cc: Dan Williams <dan.j.williams@intel.com>
->>> > Cc: Dave Young <dyoung@redhat.com>
->>> > Cc: Thomas Gleixner <tglx@linutronix.de>
->>> > Cc: Mark Rutland <mark.rutland@arm.com>
->>> > Cc: Will Deacon <will.deacon@arm.com>
->>> >
->>> > Bhupesh Sharma (2):
->>> >   x86/efi-bgrt: Move efi-bgrt handling out of arch/x86
->>> >   bgrt: Make ACPI BGRT parsing code common for ARCHs
->>> >
->>> >  arch/arm64/kernel/acpi.c                               | 3 +++
->>> >  arch/x86/kernel/acpi/boot.c                            | 6 ------
->>> >  arch/x86/platform/efi/Makefile                         | 1 -
->>> >  drivers/acpi/Kconfig                                   | 2 +-
->>> >  drivers/acpi/bgrt.c                                    | 6 ++++++
->>> >  drivers/firmware/efi/Makefile                          | 1 +
->>> >  {arch/x86/platform => drivers/firmware}/efi/efi-bgrt.c | 0
->>> >  include/linux/efi-bgrt.h                               | 2 ++
->>> >  8 files changed, 13 insertions(+), 8 deletions(-)
->>> >  rename {arch/x86/platform => drivers/firmware}/efi/efi-bgrt.c (100%)
->>> >
->>>
->>> These patches look fine to me, and I think we should be able to merge
->>> them without any changes.
->>>
->>> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>
->>> You only failed to cc the ACPI maintainers, please add Len and Rafael next time.
->
-> Oops. Will take care in future.
->
->> No worries.
->>
->> The changes are fine by me.
->>
->
+Hi Andre,
 
-Thanks Rafael
+On 16/02/2017 11:41, Andre Przywara wrote:
+> The ITS spec says that ITS commands are only processed when the ITS
+> is enabled (section 8.19.4, Enabled, bit[0]). Our emulation was not taking
+> this into account.
+> Fix this by checking the enabled state before handling CWRITER writes.
+nit: you actually check the ITS state before executing commands.
+> 
+> On the other hand that means that CWRITER could advance while the ITS
+> is disabled, and enabling it would need those commands to be processed.
+> Fix this case as well by refactoring actual command processing and
+> calling this from both the GITS_CWRITER and GITS_CTLR handlers.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-I will queue these for v4.12 in efi/next
+Thanks
 
--- 
-Ard.
+Eric
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 109 ++++++++++++++++++++++++++-----------------
+>  1 file changed, 65 insertions(+), 44 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 8c2b3cd..ff86106 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -360,29 +360,6 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
+>  	return ret;
+>  }
+>  
+> -static unsigned long vgic_mmio_read_its_ctlr(struct kvm *vcpu,
+> -					     struct vgic_its *its,
+> -					     gpa_t addr, unsigned int len)
+> -{
+> -	u32 reg = 0;
+> -
+> -	mutex_lock(&its->cmd_lock);
+> -	if (its->creadr == its->cwriter)
+> -		reg |= GITS_CTLR_QUIESCENT;
+> -	if (its->enabled)
+> -		reg |= GITS_CTLR_ENABLE;
+> -	mutex_unlock(&its->cmd_lock);
+> -
+> -	return reg;
+> -}
+> -
+> -static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
+> -				     gpa_t addr, unsigned int len,
+> -				     unsigned long val)
+> -{
+> -	its->enabled = !!(val & GITS_CTLR_ENABLE);
+> -}
+> -
+>  static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
+>  					      struct vgic_its *its,
+>  					      gpa_t addr, unsigned int len)
+> @@ -1161,33 +1138,16 @@ static void vgic_mmio_write_its_cbaser(struct kvm *kvm, struct vgic_its *its,
+>  #define ITS_CMD_SIZE			32
+>  #define ITS_CMD_OFFSET(reg)		((reg) & GENMASK(19, 5))
+>  
+> -/*
+> - * By writing to CWRITER the guest announces new commands to be processed.
+> - * To avoid any races in the first place, we take the its_cmd lock, which
+> - * protects our ring buffer variables, so that there is only one user
+> - * per ITS handling commands at a given time.
+> - */
+> -static void vgic_mmio_write_its_cwriter(struct kvm *kvm, struct vgic_its *its,
+> -					gpa_t addr, unsigned int len,
+> -					unsigned long val)
+> +/* Must be called with the cmd_lock held. */
+> +static void vgic_its_process_commands(struct kvm *kvm, struct vgic_its *its)
+>  {
+>  	gpa_t cbaser;
+>  	u64 cmd_buf[4];
+> -	u32 reg;
+>  
+> -	if (!its)
+> -		return;
+> -
+> -	mutex_lock(&its->cmd_lock);
+> -
+> -	reg = update_64bit_reg(its->cwriter, addr & 7, len, val);
+> -	reg = ITS_CMD_OFFSET(reg);
+> -	if (reg >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
+> -		mutex_unlock(&its->cmd_lock);
+> +	/* Commands are only processed when the ITS is enabled. */
+> +	if (!its->enabled)
+>  		return;
+> -	}
+>  
+> -	its->cwriter = reg;
+>  	cbaser = CBASER_ADDRESS(its->cbaser);
+>  
+>  	while (its->cwriter != its->creadr) {
+> @@ -1207,6 +1167,34 @@ static void vgic_mmio_write_its_cwriter(struct kvm *kvm, struct vgic_its *its,
+>  		if (its->creadr == ITS_CMD_BUFFER_SIZE(its->cbaser))
+>  			its->creadr = 0;
+>  	}
+> +}
+> +
+> +/*
+> + * By writing to CWRITER the guest announces new commands to be processed.
+> + * To avoid any races in the first place, we take the its_cmd lock, which
+> + * protects our ring buffer variables, so that there is only one user
+> + * per ITS handling commands at a given time.
+> + */
+> +static void vgic_mmio_write_its_cwriter(struct kvm *kvm, struct vgic_its *its,
+> +					gpa_t addr, unsigned int len,
+> +					unsigned long val)
+> +{
+> +	u64 reg;
+> +
+> +	if (!its)
+> +		return;
+> +
+> +	mutex_lock(&its->cmd_lock);
+> +
+> +	reg = update_64bit_reg(its->cwriter, addr & 7, len, val);
+> +	reg = ITS_CMD_OFFSET(reg);
+> +	if (reg >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
+> +		mutex_unlock(&its->cmd_lock);
+> +		return;
+> +	}
+> +	its->cwriter = reg;
+> +
+> +	vgic_its_process_commands(kvm, its);
+>  
+>  	mutex_unlock(&its->cmd_lock);
+>  }
+> @@ -1287,6 +1275,39 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
+>  	*regptr = reg;
+>  }
+>  
+> +static unsigned long vgic_mmio_read_its_ctlr(struct kvm *vcpu,
+> +					     struct vgic_its *its,
+> +					     gpa_t addr, unsigned int len)
+> +{
+> +	u32 reg = 0;
+> +
+> +	mutex_lock(&its->cmd_lock);
+> +	if (its->creadr == its->cwriter)
+> +		reg |= GITS_CTLR_QUIESCENT;
+> +	if (its->enabled)
+> +		reg |= GITS_CTLR_ENABLE;
+> +	mutex_unlock(&its->cmd_lock);
+> +
+> +	return reg;
+> +}
+> +
+> +static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
+> +				     gpa_t addr, unsigned int len,
+> +				     unsigned long val)
+> +{
+> +	mutex_lock(&its->cmd_lock);
+> +
+> +	its->enabled = !!(val & GITS_CTLR_ENABLE);
+> +
+> +	/*
+> +	 * Try to process any pending commands. This function bails out early
+> +	 * if the ITS is disabled or no commands have been queued.
+> +	 */
+> +	vgic_its_process_commands(kvm, its);
+> +
+> +	mutex_unlock(&its->cmd_lock);
+> +}
+> +
+>  #define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
+>  {								\
+>  	.reg_offset = off,					\
+> 
