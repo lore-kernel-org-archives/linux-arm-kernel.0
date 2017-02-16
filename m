@@ -1,62 +1,75 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 16 Feb 2017 21:50:38 +1300
-Subject: [PATCH v3 4/6] ARM: dts: mvebu: Add binding for mv98dx3236-soc-id
-In-Reply-To: <20170216085041.28337-1-chris.packham@alliedtelesis.co.nz>
-References: <20170216085041.28337-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170216085041.28337-5-chris.packham@alliedtelesis.co.nz>
+Date: Thu, 16 Feb 2017 21:50:34 +1300
+Subject: [PATCH v2 0/6] Updates for Marvell Switch SoCs
+Message-ID: <20170216085041.28337-1-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DFX server on the 98dx3236 and compatible SoCs has an ID register.
-Add documentation and a binding for this.
+Shortly after I posted my last series I got access to a more recent
+Marvell SDK which had some device tree support for the switch SoCs I'd
+been wanting. It was still based on an older kernel but it was a huge
+improvement over what came before.
 
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
+Patch 1/6 is a typo I noticed after my initial series was applied.
 
-Notes:
+Patch 2/6 is a bit of a cleanup. I did initially struggle with how to
+access individual parts of the DFX block as well as retaining a handle on
+the entire thing for the switch driver to use.
+
+Patch 3/6 is a re-jig of the dtsi files which is needed by 5/6. This is
+required because I need to use the coreclk label on a different node. It
+also means I don't have to disable nodes for blocks that only exist on
+the Armada-XP.
+
+Patch 4/6, 5/6 are split from the previous versions.
+
+Patch 6/6 is the device tree portion of a change already in clk-next.
+
+Chris Packham (6):
+  ARM: dts: Fix typo in armada-xp-98dx4251
+    Changes in v2
+    - new
+    Changes in v3:
+    - none
+  ARM: dts: armada-xp-98dx3236: combine dfx server nodes
+    Changes in v2:
+    - none
+    Changes in v3:
+    - none
+  ARM: dts: Use armada-370-xp as a base for armada-xp-98dx3236
+    Changes in v2:
+    - Update root compatible strings in armada-xp-98dx3336.dtsi,
+      armada-xp-98dx4251.dtsi, armada-xp-db-dxbc2.dts and
+      armada-xp-db-xc3-24g4xg.dts
+    Changes in v3:
+    - none
+  ARM: dts: mvebu: Add binding for mv98dx3236-soc-id
     Changes in v3:
     - new, split from driver
+  ARM: mvebu: Add driver for mv98dx3236-soc-id
+    Changes in v2:
+    - none
+    Changes in v3:
+    - split from dts changes
+  ARM: dts: mvebu: Move mv98dx3236 clock bindings
+    Changes in v2:
+    - New. Split out from "clk: mvebu: Expand mv98dx3236-core-clock support"
+    Changes in v3:
+    - Clarify why the old location was wrong (but worked).
 
- .../devicetree/bindings/arm/marvell/mv98dx3236-soc-id.txt  | 14 ++++++++++++++
- arch/arm/boot/dts/armada-xp-98dx3236.dtsi                  |  5 +++++
- 2 files changed, 19 insertions(+)
+
+ .../bindings/arm/marvell/mv98dx3236-soc-id.txt     |  14 ++
+ .../devicetree/bindings/clock/mvebu-core-clock.txt |   7 +
+ .../bindings/clock/mvebu-gated-clock.txt           |  11 ++
+ .../devicetree/bindings/net/marvell,prestera.txt   |  13 +-
+ arch/arm/boot/dts/armada-xp-98dx3236.dtsi          | 213 ++++++++++++++++-----
+ arch/arm/boot/dts/armada-xp-98dx3336.dtsi          |   2 +-
+ arch/arm/boot/dts/armada-xp-98dx4251.dtsi          |   2 +-
+ arch/arm/boot/dts/armada-xp-db-dxbc2.dts           |   2 +-
+ arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts      |   2 +-
+ arch/arm/mach-mvebu/mvebu-soc-id.c                 |  43 ++++-
+ 10 files changed, 242 insertions(+), 67 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/arm/marvell/mv98dx3236-soc-id.txt
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/mv98dx3236-soc-id.txt b/Documentation/devicetree/bindings/arm/marvell/mv98dx3236-soc-id.txt
-new file mode 100644
-index 000000000000..ed08cb126a83
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/marvell/mv98dx3236-soc-id.txt
-@@ -0,0 +1,14 @@
-+Marvell 98dx3236 SoC ID
-+---------------------------------------------------------------
-+
-+Required properties:
-+
-+- compatible: Should be "marvell,mv98dx3236-soc-id".
-+
-+- reg: should be the register base and length as documented in the
-+  datasheet for the Device ID Status
-+
-+soc-id at f8244 {
-+	compatible = "marvell,mv98dx3236-soc-id";
-+	reg = <0xf8244 0x4>;
-+};
-diff --git a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-index 5e7245524d46..6b81f7363d53 100644
---- a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-@@ -264,6 +264,11 @@
- 			ranges = <0 MBUS_ID(0x08, 0x00) 0 0x100000>;
- 			reg = <MBUS_ID(0x08, 0x00) 0 0x100000>;
- 
-+			soc-id at f8244 {
-+				compatible = "marvell,mv98dx3236-soc-id";
-+				reg = <0xf8244 0x4>;
-+			};
-+
- 			dfx_coredivclk: corediv-clock at f8268 {
- 				compatible = "marvell,mv98dx3236-corediv-clock";
- 				reg = <0xf8268 0xc>;
 -- 
 2.11.0.24.ge6920cf
