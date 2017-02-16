@@ -1,95 +1,60 @@
-From: olekstysh@gmail.com (Oleksandr Tyshchenko)
-Date: Thu, 16 Feb 2017 15:58:43 +0200
-Subject: [RFC PATCH v1] iommu/io-pgtable-arm-v7s: Check for leaf entry
- right after finding it
-In-Reply-To: <1487253137-13792-1-git-send-email-olekstysh@gmail.com>
-References: <1487253137-13792-1-git-send-email-olekstysh@gmail.com>
-Message-ID: <CAPD2p-mCOYOB7f6fvjvppHhOcaZ9pL-VR6Lpi2Kz3qj0hAQLMw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Feb 2017 15:08:48 +0100
+Subject: [PATCH 2/4] PCI: add driver for Cortina Gemini Host Bridge
+In-Reply-To: <CACRpkdb=BqihykWo3egtNW1VKE2-FV+nJQQVYOc2GdCvh1fMng@mail.gmail.com>
+References: <20170128204839.18330-1-linus.walleij@linaro.org>
+ <2695922.yyinjvNuJK@wuerfel>
+ <CACRpkdb=BqihykWo3egtNW1VKE2-FV+nJQQVYOc2GdCvh1fMng@mail.gmail.com>
+Message-ID: <3658176.ffWihUmtIa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Robin.
+On Saturday, February 4, 2017 7:43:15 PM CET Linus Walleij wrote:
+> On Wed, Feb 1, 2017 at 12:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Saturday, January 28, 2017 9:48:37 PM CET Linus Walleij wrote:
+> 
+> >> +     /* No clue what these do */
+> >> +     pcibios_min_io = 0x100;
+> >> +     pcibios_min_mem = 0;
+> >
+> > Don't touch these
+> 
+> OK I have a clue why this is there now, atleast the first one.
+> 
+> The first 0x100 in the IOspace is actually configuration registers
+> for the bridge. That is why we have this:
 
-It would be greatly appreciated if you could test this patch if nobody
-has objections to the patch itself.
+I see. It's normal to have the PCI config space done through
+ports 0cf8-0cff, but apparently this one uses other ports in
+the same range.
 
-On Thu, Feb 16, 2017 at 3:52 PM, Oleksandr Tyshchenko
-<olekstysh@gmail.com> wrote:
-> From: Oleksandr Tyshchenko <oleksandr_tyshchenko@epam.com>
->
-> Do a check for already installed leaf entry at the current level before
-> performing any actions when trying to map.
->
-> This check is already present in arm_v7s_init_pte(), i.e. before
-> installing new leaf entry at the current level if conditions to do so
-> are met (num_entries > 0).
->
-> But, this might be insufficient in case when we have already
-> installed block mapping at this level and it is not time to
-> install new leaf entry (num_entries == 0).
-> In that case we continue walking the page table down with wrong pointer
-> to the next level.
->
-> So, move check from arm_v7s_init_pte() to __arm_v7s_map() in order to
-> avoid all cases.
->
-> Signed-off-by: Oleksandr Tyshchenko <oleksandr_tyshchenko@epam.com>
-> ---
-> This patch does similar things as the patch I have pushed a week ago
-> for long-descriptor format [1].
-> The reason why this patch is RFC is because I am not sure I did the right
-> thing and I even didn't test it.
->
-> [1] https://lists.linuxfoundation.org/pipermail/iommu/2017-February/020411.html
-> ---
-> ---
->  drivers/iommu/io-pgtable-arm-v7s.c | 15 ++++++++++-----
->  1 file changed, 10 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-> index f50e51c..7f7594b 100644
-> --- a/drivers/iommu/io-pgtable-arm-v7s.c
-> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
-> @@ -364,10 +364,6 @@ static int arm_v7s_init_pte(struct arm_v7s_io_pgtable *data,
->                         if (WARN_ON(__arm_v7s_unmap(data, iova + i * sz,
->                                                     sz, lvl, tblp) != sz))
->                                 return -EINVAL;
-> -               } else if (ptep[i]) {
-> -                       /* We require an unmap first */
-> -                       WARN_ON(!selftest_running);
-> -                       return -EEXIST;
->                 }
->
->         pte |= ARM_V7S_PTE_TYPE_PAGE;
-> @@ -392,11 +388,20 @@ static int __arm_v7s_map(struct arm_v7s_io_pgtable *data, unsigned long iova,
->  {
->         struct io_pgtable_cfg *cfg = &data->iop.cfg;
->         arm_v7s_iopte pte, *cptep;
-> -       int num_entries = size >> ARM_V7S_LVL_SHIFT(lvl);
-> +       int i = 0, num_entries = size >> ARM_V7S_LVL_SHIFT(lvl);
->
->         /* Find our entry at the current level */
->         ptep += ARM_V7S_LVL_IDX(iova, lvl);
->
-> +       /* Check for already installed leaf entry */
-> +       do {
-> +               if (ptep[i] && !ARM_V7S_PTE_IS_TABLE(ptep[i], lvl)) {
-> +                       /* We require an unmap first */
-> +                       WARN_ON(!selftest_running);
-> +                       return -EEXIST;
-> +               }
-> +       } while (++i < num_entries);
-> +
->         /* If we can install a leaf entry at this level, then do so */
->         if (num_entries)
->                 return arm_v7s_init_pte(data, iova, paddr, prot,
-> --
-> 2.7.4
->
+> reg = <0x50000000 0x100>;
+> (...)
+> /* PCI ranges mappings */
+>                         ranges = /* 1MiB I/O space 0x50000000-0x500fffff */
+>                          <0x01000000 0 0          0x50000000 0 0x00100000>,
+> 
+> This is in all the vendor code I have located too.
+> 
+> So the pcibios_min_io is manipulated to avoid touching that
+> sensitive area. But I also see that arch/arm/mm/iomap.c
+> sets it to 0x1000, according to the commit because you said
+> it's the only valid value :D
+> 
+> I tried setting the IO range to <0x50000100 0x000FFF00>
+> instead of <0x50000000 0x00100000>
+> but predictably that doesn't work. Maybe it should, I don't
+> know really.
 
+It should work in theory, but then you'd have to update
+io_offset accordingly, and it would be a bit confusing.
 
+Did you notice my other comment below (quoting from my own
+message)?
 
--- 
-Regards,
+> > +
+> > +     bus = pci_scan_root_bus(&pdev->dev, 0, &gemini_pci_ops, p, &res);
+> 
+> Can you try using the new pci_register_host_bridge() API?
 
-Oleksandr Tyshchenko
+	Arnd
