@@ -1,26 +1,73 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 15 Feb 2017 20:20:16 -0600
-Subject: [PATCH 1/4] Documentation: bindings: add uphy-dp-sel for
- Rockchip USB Type-C PHY
-In-Reply-To: <1486712654-15431-2-git-send-email-zyw@rock-chips.com>
-References: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
- <1486712654-15431-2-git-send-email-zyw@rock-chips.com>
-Message-ID: <20170216022016.ubspejlr7no7ttgl@rob-hp-laptop>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Wed, 15 Feb 2017 18:19:14 -0800
+Subject: [PATCH v4 12/36] add mux and video interface bridge entity functions
+In-Reply-To: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1487211578-11360-13-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 10, 2017 at 03:44:11PM +0800, Chris Zhong wrote:
-> rockchip,uphy-dp-sel is the register of type-c phy enable DP function.
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
-"dt-bindings: phy:" is the preferred subject prefix.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-> 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> ---
-> 
->  Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt | 5 +++++
->  1 file changed, 5 insertions(+)
+- renamed MEDIA_ENT_F_MUX to MEDIA_ENT_F_VID_MUX
 
-Otherwise,
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+---
+ Documentation/media/uapi/mediactl/media-types.rst | 22 ++++++++++++++++++++++
+ include/uapi/linux/media.h                        |  6 ++++++
+ 2 files changed, 28 insertions(+)
 
-Acked-by: Rob Herring <robh@kernel.org> 
+diff --git a/Documentation/media/uapi/mediactl/media-types.rst b/Documentation/media/uapi/mediactl/media-types.rst
+index 3e03dc2..023be29 100644
+--- a/Documentation/media/uapi/mediactl/media-types.rst
++++ b/Documentation/media/uapi/mediactl/media-types.rst
+@@ -298,6 +298,28 @@ Types and flags used to represent the media graph elements
+ 	  received on its sink pad and outputs the statistics data on
+ 	  its source pad.
+ 
++    -  ..  row 29
++
++       ..  _MEDIA-ENT-F-MUX:
++
++       -  ``MEDIA_ENT_F_MUX``
++
++       - Video multiplexer. An entity capable of multiplexing must have at
++         least two sink pads and one source pad, and must pass the video
++         frame(s) received from the active sink pad to the source pad. Video
++         frame(s) from the inactive sink pads are discarded.
++
++    -  ..  row 30
++
++       ..  _MEDIA-ENT-F-VID-IF-BRIDGE:
++
++       -  ``MEDIA_ENT_F_VID_IF_BRIDGE``
++
++       - Video interface bridge. A video interface bridge entity must have at
++         least one sink pad and one source pad. It receives video frame(s) on
++         its sink pad in one bus format (HDMI, eDP, MIPI CSI-2, ...) and
++         converts them and outputs them on its source pad in another bus format
++         (eDP, MIPI CSI-2, parallel, ...).
+ 
+ ..  tabularcolumns:: |p{5.5cm}|p{12.0cm}|
+ 
+diff --git a/include/uapi/linux/media.h b/include/uapi/linux/media.h
+index 4890787..fac96c6 100644
+--- a/include/uapi/linux/media.h
++++ b/include/uapi/linux/media.h
+@@ -105,6 +105,12 @@ struct media_device_info {
+ #define MEDIA_ENT_F_PROC_VIDEO_STATISTICS	(MEDIA_ENT_F_BASE + 0x4006)
+ 
+ /*
++ * Switch and bridge entitites
++ */
++#define MEDIA_ENT_F_VID_MUX			(MEDIA_ENT_F_BASE + 0x5001)
++#define MEDIA_ENT_F_VID_IF_BRIDGE		(MEDIA_ENT_F_BASE + 0x5002)
++
++/*
+  * Connectors
+  */
+ /* It is a responsibility of the entity drivers to add connectors and links */
+-- 
+2.7.4
