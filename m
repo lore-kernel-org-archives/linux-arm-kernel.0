@@ -1,67 +1,62 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 16 Feb 2017 19:15:32 +0100
-Subject: [PATCH 4/4] ARM: dts: da850-evm: add the UI expander node
+Date: Thu, 16 Feb 2017 19:15:30 +0100
+Subject: [PATCH 2/4] ARM: dts: da850: add vpif video display pins
 In-Reply-To: <1487268932-6469-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1487268932-6469-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1487268932-6469-5-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1487268932-6469-3-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we're using the UI board and want vpif capture, we need to select
-the video capture functionality by driving the sel_c pin low on the
-tca6416 expander and sel_a & sel_b pins high. Do it statically by
-hogging relevant GPIOs in the device tree.
+Add a new pinctrl sub-node for vpif display pins. Move VP_CLKIN3 and
+VP_CLKIN2 to the display node where they actually belong (vide section
+35.2.2 of the da850 datasheet).
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/boot/dts/da850-evm.dts | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/boot/dts/da850-evm.dts |  2 +-
+ arch/arm/boot/dts/da850.dtsi    | 17 +++++++++++++++--
+ 2 files changed, 16 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index b549861..a90c764 100644
+index dece981..14f6f8ea 100644
 --- a/arch/arm/boot/dts/da850-evm.dts
 +++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -9,6 +9,7 @@
-  */
- /dts-v1/;
- #include "da850.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
+@@ -296,7 +296,7 @@
  
- / {
- 	compatible = "ti,da850-evm", "ti,da850";
-@@ -78,7 +79,33 @@
- 				DRVDD-supply = <&vbat>;
- 				DVDD-supply = <&vbat>;
- 			};
-+			ui_expander: tca6416 at 20 {
-+				compatible = "ti,tca6416";
-+				reg = <0x20>;
-+				gpio-controller;
-+				#gpio-cells = <2>;
+ &vpif {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&vpif_capture_pins>;
++	pinctrl-0 = <&vpif_capture_pins>, <&vpif_display_pins>;
+ 	status = "okay";
  
-+				sel_a {
-+					gpio-hog;
-+					gpios = <7 GPIO_ACTIVE_HIGH>;
-+					output-high;
-+					line-name = "sel_a";
-+				};
-+
-+				sel_b {
-+					gpio-hog;
-+					gpios = <6 GPIO_ACTIVE_HIGH>;
-+					output-high;
-+					line-name = "sel_b";
-+				};
-+
-+				sel_c {
-+					gpio-hog;
-+					gpios = <5 GPIO_ACTIVE_HIGH>;
-+					output-low;
-+					line-name = "sel_c";
-+				};
+ 	/* VPIF capture port */
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 92d633d..5150331 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -216,8 +216,21 @@
+ 					0x3c 0x11111111 0xffffffff
+ 					/* VP_DIN[8..9] */
+ 					0x40 0x00000011 0x000000ff
+-					/* VP_CLKIN3, VP_CLKIN2 */
+-					0x4c 0x00010100 0x000f0f00
++				>;
 +			};
++			vpif_display_pins: vpif_display_pins {
++				pinctrl-single,bits = <
++					/* VP_DOUT[2..7] */
++					0x40 0x11111100 0xffffff00
++					/* VP_DOUT[10..15,0..1] */
++					0x44 0x11111111 0xffffffff
++					/*  VP_DOUT[8..9] */
++					0x48 0x00000011 0x000000ff
++					/*
++					 * VP_CLKOUT3, VP_CLKIN3,
++					 * VP_CLKOUT2, VP_CLKIN2
++					 */
++					0x4c 0x00111100 0x00ffff00
+ 				>;
+ 			};
  		};
- 		wdt: wdt at 21000 {
- 			status = "okay";
 -- 
 2.9.3
