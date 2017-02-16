@@ -1,89 +1,77 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 16 Feb 2017 18:29:17 +0000
-Subject: [PATCH v4 3/3] arm64/uaccess: Add hardened usercopy check for bad
- stack accesses
-In-Reply-To: <20170216182917.19637-1-james.morse@arm.com>
-References: <20170216182917.19637-1-james.morse@arm.com>
-Message-ID: <20170216182917.19637-4-james.morse@arm.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Thu, 16 Feb 2017 10:30:56 -0800
+Subject: [PATCH v4 00/36] i.MX Media Driver
+In-Reply-To: <20170216113758.GK27312@n2100.armlinux.org.uk>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170216113758.GK27312@n2100.armlinux.org.uk>
+Message-ID: <67a4fa15-2745-a5e9-e894-be05150c3dac@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-lkdtm tests copy_{to,from}_user() by trying to copy an address range
-on the stack that isn't yet part of a stack frame.
 
-By the time the stack walker is invoked to check that the object being
-copied doesn't overlap stack frame, the invalid range is part of a valid
-stack frame. Discarding a constant number of frames is fragile as different
-compiler versions may make different inline choices.
 
-Instead, add a check that the object isn't between the current stack
-pointer and the end of the stack. Add this early enough that it should
-be inlined into the caller.
+On 02/16/2017 03:37 AM, Russell King - ARM Linux wrote:
+> Two problems.
+>
+> On Wed, Feb 15, 2017 at 06:19:02PM -0800, Steve Longerbeam wrote:
+>>   media: imx: propagate sink pad formats to source pads
+>
+> 1) It looks like all cases aren't being caught:
+>
+> - entity 74: ipu1_csi0 (3 pads, 4 links)
+>              type V4L2 subdev subtype Unknown flags 0
+>              device node name /dev/v4l-subdev13
+>         pad0: Sink
+>                 [fmt:SRGGB8/816x616 field:none]
+>                 <- "ipu1_csi0_mux":2 [ENABLED]
+>         pad1: Source
+>                 [fmt:AYUV32/816x616 field:none
+>                  crop.bounds:(0,0)/816x616
+>                  crop:(0,0)/816x616]
+>                 -> "ipu1_ic_prp":0 []
+>                 -> "ipu1_vdic":0 []
+>         pad2: Source
+>                 [fmt:SRGGB8/816x616 field:none
+>                  crop.bounds:(0,0)/816x616
+>                  crop:(0,0)/816x616]
+>                 -> "ipu1_csi0 capture":0 [ENABLED]
+>
+> While the size has been propagated to pad1, the format has not.
 
-CC: Sahara <keun-o.park@darkmatter.ae>
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/include/asm/uaccess.h | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+Right, Philipp also caught this. I need to finish propagating all
+params from sink to source pads (mbus code and field, and colorimetry
+eventually).
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 46da3ea638bb..d3494840a61c 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -356,6 +356,22 @@ do {									\
- 		-EFAULT;						\
- })
- 
-+static inline void check_obj_in_unused_stack(const void *obj, unsigned long len)
-+{
-+	unsigned long stack = (unsigned long)task_stack_page(current);
-+
-+	if (__builtin_constant_p(len) || !IS_ENABLED(CONFIG_HARDENED_USERCOPY) || !len)
-+		return;
-+
-+	/*
-+	 * If current_stack_pointer is on the task stack, obj must not lie
-+	 * between current_stack_pointer and the last stack address.
-+	 */
-+	if ((current_stack_pointer & ~(THREAD_SIZE-1)) == stack)
-+		BUG_ON(stack <= (unsigned long)obj &&
-+		       (unsigned long)obj < current_stack_pointer);
-+}
-+
- extern unsigned long __must_check __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
- extern unsigned long __must_check __arch_copy_to_user(void __user *to, const void *from, unsigned long n);
- extern unsigned long __must_check __copy_in_user(void __user *to, const void __user *from, unsigned long n);
-@@ -364,6 +380,7 @@ extern unsigned long __must_check __clear_user(void __user *addr, unsigned long
- static inline unsigned long __must_check __copy_from_user(void *to, const void __user *from, unsigned long n)
- {
- 	kasan_check_write(to, n);
-+	check_obj_in_unused_stack(to, n);
- 	check_object_size(to, n, false);
- 	return __arch_copy_from_user(to, from, n);
- }
-@@ -371,6 +388,7 @@ static inline unsigned long __must_check __copy_from_user(void *to, const void _
- static inline unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n)
- {
- 	kasan_check_read(from, n);
-+	check_obj_in_unused_stack(from, n);
- 	check_object_size(from, n, true);
- 	return __arch_copy_to_user(to, from, n);
- }
-@@ -381,6 +399,7 @@ static inline unsigned long __must_check copy_from_user(void *to, const void __u
- 	kasan_check_write(to, n);
- 
- 	if (access_ok(VERIFY_READ, from, n)) {
-+		check_obj_in_unused_stack(to, n);
- 		check_object_size(to, n, false);
- 		res = __arch_copy_from_user(to, from, n);
- 	}
-@@ -394,6 +413,7 @@ static inline unsigned long __must_check copy_to_user(void __user *to, const voi
- 	kasan_check_read(from, n);
- 
- 	if (access_ok(VERIFY_WRITE, to, n)) {
-+		check_obj_in_unused_stack(from, n);
- 		check_object_size(from, n, true);
- 		n = __arch_copy_to_user(to, from, n);
- 	}
--- 
-2.10.1
+>
+> 2) /dev/video* device node assignment
+>
+> I've no idea at the moment how the correct /dev/video* node should be
+> chosen - initially with Philipp and your previous code, it was
+> /dev/video3 after initial boot.  Philipp's was consistently /dev/video3.
+> Yours changed to /dev/video7 when removing and re-inserting the modules
+> (having fixed that locally.)  This version makes CSI0 be /dev/video7,
+> but after a remove+reinsert, it becomes (eg) /dev/video8.
+>
+> /dev/v4l/by-path/platform-capture-subsystem-video-index4 also is not a
+> stable path - the digit changes (it's supposed to be a stable path.)
+> After a remove+reinsert, it becomes (eg)
+> /dev/v4l/by-path/platform-capture-subsystem-video-index5.
+> /dev/v4l/by-id doesn't contain a symlink for this either.
+>
+> What this means is that it's very hard to script the setup, because
+> there's no easy way to know what device is the capture device.  While
+> it may be possible to do:
+>
+> 	media-ctl -d /dev/media1 -p | \
+> 		grep -A2 ': ipu1_csi0 capture' | \
+> 			sed -n 's|.*\(/dev/video[0-9]*\).*|\1|p'
+>
+> that's hardly a nice solution - while it fixes the setup script, it
+> doesn't stop the pain of having to delve around to find the correct
+> device to use for gstreamer to test with.
+>
+
+I'll try to nail down the main capture node numbers, even after module
+reload.
+
+Steve
