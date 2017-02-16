@@ -1,31 +1,26 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 16 Feb 2017 18:58:40 +0100
-Subject: [PATCH 2/2] ARM: davinci_all_defconfig: enable IRQ support for pca953x
-In-Reply-To: <1487267920-3952-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1487267920-3952-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1487267920-3952-3-git-send-email-bgolaszewski@baylibre.com>
+Date: Thu, 16 Feb 2017 19:03:55 +0100
+Subject: [PATCH 0/2] media: dt-bindings: extend the vpif bindings
+Message-ID: <1487268237-4240-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need IRQs from the tca6416 expander for vpif capture to work on the
-da850-evm board.
+The first patch just fixes a couple whitespace errors in the vpif
+bindings.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/configs/davinci_all_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+The second extends the example with an output port since we want
+to support vpif display too.
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index bf2c0ca..91557ae 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -121,6 +121,7 @@ CONFIG_PINCTRL_DA850_PUPD=m
- CONFIG_PINCTRL_SINGLE=y
- CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_PCA953X=y
-+CONFIG_GPIO_PCA953X_IRQ=y
- CONFIG_POWER_RESET=y
- CONFIG_POWER_RESET_GPIO=y
- CONFIG_WATCHDOG=y
+These patches were initially a part of a larger series. Resending
+separately with requested fixes i.e. removed the @0 from endpoint
+and unnecessary reg property.
+
+Bartosz Golaszewski (2):
+  media: dt-bindings: vpif: fix whitespace errors
+  media: dt-bindings: vpif: extend the example with an output port
+
+ .../devicetree/bindings/media/ti,da850-vpif.txt    | 46 ++++++++++++++++------
+ 1 file changed, 34 insertions(+), 12 deletions(-)
+
 -- 
 2.9.3
