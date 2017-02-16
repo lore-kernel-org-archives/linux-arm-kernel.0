@@ -1,112 +1,172 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 16 Feb 2017 10:39:30 +0000
-Subject: <Query> Looking more details and reasons for using orig_add_limit.
-In-Reply-To: <7c727e6043e58077d143e35de0ce632c@codeaurora.org>
-References: <def87360266193184dc013a055ec3869@codeaurora.org>
- <58A4450C.3040602@arm.com> <7c727e6043e58077d143e35de0ce632c@codeaurora.org>
-Message-ID: <58A58162.2020101@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 16 Feb 2017 10:41:20 +0000
+Subject: [PATCH] KVM: arm64: VGIC: fix command handling while ITS being
+ disabled
+Message-ID: <20170216104120.31952-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prasad,
+The ITS spec says that ITS commands are only processed when the ITS
+is enabled (section 8.19.4, Enabled, bit[0]). Our emulation was not taking
+this into account.
+Fix this by checking the enabled state before handling CWRITER writes.
 
-On 15/02/17 21:12, Sodagudi Prasad wrote:
-> On 2017-02-15 04:09, James Morse wrote:
->> On 15/02/17 05:52, Sodagudi Prasad wrote:
->>> that driver is calling set_fs(KERNEL_DS) and  then copy_to_user() to user space
->>> memory.
->>
->> Don't do this, its exactly the case PAN+UAO and the code you pointed to are
->> designed to catch. Accessing userspace needs doing carefully, setting USER_DS
->> and using the put_user()/copy_to_user() accessors are the required steps.
->>
->> Which driver is doing this? Is it in mainline?
-> 
-> Yes. It is mainline driver - drivers/media/v4l2-core/v4l2-compat-ioctl32.c
+On the other hand that means that CWRITER could advance while the ITS
+is disabled, and enabling it would need those commands to be processed.
+Fix this case as well by refactoring actual command processing and
+calling this from both the GITS_CWRITER and GITS_CTLR handlers.
 
-> In some v4l2 use-case kernel panic is observed. Below part
-> of the code has set_fs to KERNEL_DS before calling native_ioctl().
-> 
-> static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
-> {
-> ?
-> ?
->         if (compatible_arg)
->                 err = native_ioctl(file, cmd, (unsigned long)up);
->         else {
->                 mm_segment_t old_fs = get_fs();
-> 
->                 set_fs(KERNEL_DS);   ====> KERNEL_DS.
->                 err = native_ioctl(file, cmd, (unsigned long)&karg);
->                 set_fs(old_fs);
->         }
-> 
-> Here is the call stack which is resulting crash, because user space memory has
-> read only permissions.
-> [27249.920041] [<ffffff8008357890>] __arch_copy_to_user+0x110/0x180
-> [27249.920047] [<ffffff8008847c98>] video_ioctl2+0x38/0x44
-> [27249.920054] [<ffffff8008840968>] v4l2_ioctl+0x78/0xb4
-> [27249.920059] [<ffffff80088542d8>] do_video_ioctl+0x91c/0x1160
-> [27249.920064] [<ffffff8008854b7c>] v4l2_compat_ioctl32+0x60/0xcc
-> [27249.920071] [<ffffff800822553c>] compat_SyS_ioctl+0x124/0xd88
-> [27249.920077] [<ffffff8008084e30>] el0_svc_naked+0x24/0x2
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-its.c | 109 ++++++++++++++++++++++++++-----------------
+ 1 file changed, 65 insertions(+), 44 deletions(-)
 
-It's not totally clear to me what is going on here, but some observations:
-the ioctl is trying to copy_to_user() to some read-only memory.  This would
-normally fail gracefully with -EFAULT, but because KERNEL_DS has been set, the
-kernel checks this before calling the fault handler and calls die() on your ioctl().
-
-The ioctl code is doing this deliberately as a compat mechanism, but the code
-behind file->f_op->unlocked_ioctl() expects fs==USER_DS when it does its work.
-That code needs to be made aware of this compat translation, or a compat_ioctl
-call provided.
-
-Which v4l driver is this? Which ioctl is being called? Does the driver using the
-v4l framework have a compat_ioctl() call?
-
-What path does this call take through v4l2_compat_ioctl32()? It looks like
-compat_ioctl will be skipped in certain cases, v4l2_compat_ioctl32() has:
->	if (_IOC_TYPE(cmd) == 'V' && _IOC_NR(cmd) < BASE_VIDIOC_PRIVATE)
->		ret = do_video_ioctl(file, cmd, arg);
->	else if (vdev->fops->compat_ioctl32)
->		ret = vdev->fops->compat_ioctl32(file, cmd, arg);
-
-Is your ioctl matched by that top if()?
-
-
->>> If there is permission fault for user space address the above condition
->>> is leading to kernel crash. Because orig_add_limit is having KERNEL_DS as set_fs
->>> called before copy_to_user().
->>>
->>> 1)    So I would like to understand that,  is that user space pointer leading to
->>> permission fault not correct(condition_1) in this scenario?
->>
->> The correct thing has happened here. To access user space set_fs(USER_DS) first.
->> (and set it back to whatever it was afterwards).
->>
-> 
-> So, Any clean up needed to above call path similar to what was done in the below
-> commit?
-> commit a7f61e89af73e9bf760826b20dba4e637221fcb9 - compat_ioctl: don't call
-> do_ioctl under set_fs(KERNEL_DS)
-
-That's clever. Is that code doing a conversion, or do you have a compat_ioctl()
-in your driver?
-
-It's possible that fs/compat_ioctl.c has done this work, but do_video_ioctl()
-un-does it. Someone who knows about v4l and compat-ioctls should take a look...
-
-
-This looks like a case of:
-> The accidental invocation of an unlocked_ioctl handler that unexpectedly
-> calls copy_to_user could be a severe security issue.
-
-that Jann describes in the commit message. Fixing the code behind
-file->f_op->unlocked_ioctl() to consider compat calls from do_video_ioctl() is
-one way to solve this.
-
-
-
-Thanks,
-
-James
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 8c2b3cd..ff86106 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -360,29 +360,6 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
+ 	return ret;
+ }
+ 
+-static unsigned long vgic_mmio_read_its_ctlr(struct kvm *vcpu,
+-					     struct vgic_its *its,
+-					     gpa_t addr, unsigned int len)
+-{
+-	u32 reg = 0;
+-
+-	mutex_lock(&its->cmd_lock);
+-	if (its->creadr == its->cwriter)
+-		reg |= GITS_CTLR_QUIESCENT;
+-	if (its->enabled)
+-		reg |= GITS_CTLR_ENABLE;
+-	mutex_unlock(&its->cmd_lock);
+-
+-	return reg;
+-}
+-
+-static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
+-				     gpa_t addr, unsigned int len,
+-				     unsigned long val)
+-{
+-	its->enabled = !!(val & GITS_CTLR_ENABLE);
+-}
+-
+ static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
+ 					      struct vgic_its *its,
+ 					      gpa_t addr, unsigned int len)
+@@ -1161,33 +1138,16 @@ static void vgic_mmio_write_its_cbaser(struct kvm *kvm, struct vgic_its *its,
+ #define ITS_CMD_SIZE			32
+ #define ITS_CMD_OFFSET(reg)		((reg) & GENMASK(19, 5))
+ 
+-/*
+- * By writing to CWRITER the guest announces new commands to be processed.
+- * To avoid any races in the first place, we take the its_cmd lock, which
+- * protects our ring buffer variables, so that there is only one user
+- * per ITS handling commands at a given time.
+- */
+-static void vgic_mmio_write_its_cwriter(struct kvm *kvm, struct vgic_its *its,
+-					gpa_t addr, unsigned int len,
+-					unsigned long val)
++/* Must be called with the cmd_lock held. */
++static void vgic_its_process_commands(struct kvm *kvm, struct vgic_its *its)
+ {
+ 	gpa_t cbaser;
+ 	u64 cmd_buf[4];
+-	u32 reg;
+ 
+-	if (!its)
+-		return;
+-
+-	mutex_lock(&its->cmd_lock);
+-
+-	reg = update_64bit_reg(its->cwriter, addr & 7, len, val);
+-	reg = ITS_CMD_OFFSET(reg);
+-	if (reg >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
+-		mutex_unlock(&its->cmd_lock);
++	/* Commands are only processed when the ITS is enabled. */
++	if (!its->enabled)
+ 		return;
+-	}
+ 
+-	its->cwriter = reg;
+ 	cbaser = CBASER_ADDRESS(its->cbaser);
+ 
+ 	while (its->cwriter != its->creadr) {
+@@ -1207,6 +1167,34 @@ static void vgic_mmio_write_its_cwriter(struct kvm *kvm, struct vgic_its *its,
+ 		if (its->creadr == ITS_CMD_BUFFER_SIZE(its->cbaser))
+ 			its->creadr = 0;
+ 	}
++}
++
++/*
++ * By writing to CWRITER the guest announces new commands to be processed.
++ * To avoid any races in the first place, we take the its_cmd lock, which
++ * protects our ring buffer variables, so that there is only one user
++ * per ITS handling commands at a given time.
++ */
++static void vgic_mmio_write_its_cwriter(struct kvm *kvm, struct vgic_its *its,
++					gpa_t addr, unsigned int len,
++					unsigned long val)
++{
++	u64 reg;
++
++	if (!its)
++		return;
++
++	mutex_lock(&its->cmd_lock);
++
++	reg = update_64bit_reg(its->cwriter, addr & 7, len, val);
++	reg = ITS_CMD_OFFSET(reg);
++	if (reg >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
++		mutex_unlock(&its->cmd_lock);
++		return;
++	}
++	its->cwriter = reg;
++
++	vgic_its_process_commands(kvm, its);
+ 
+ 	mutex_unlock(&its->cmd_lock);
+ }
+@@ -1287,6 +1275,39 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
+ 	*regptr = reg;
+ }
+ 
++static unsigned long vgic_mmio_read_its_ctlr(struct kvm *vcpu,
++					     struct vgic_its *its,
++					     gpa_t addr, unsigned int len)
++{
++	u32 reg = 0;
++
++	mutex_lock(&its->cmd_lock);
++	if (its->creadr == its->cwriter)
++		reg |= GITS_CTLR_QUIESCENT;
++	if (its->enabled)
++		reg |= GITS_CTLR_ENABLE;
++	mutex_unlock(&its->cmd_lock);
++
++	return reg;
++}
++
++static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
++				     gpa_t addr, unsigned int len,
++				     unsigned long val)
++{
++	mutex_lock(&its->cmd_lock);
++
++	its->enabled = !!(val & GITS_CTLR_ENABLE);
++
++	/*
++	 * Try to process any pending commands. This function bails out early
++	 * if the ITS is disabled or no commands have been queued.
++	 */
++	vgic_its_process_commands(kvm, its);
++
++	mutex_unlock(&its->cmd_lock);
++}
++
+ #define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
+ {								\
+ 	.reg_offset = off,					\
+-- 
+2.9.0
