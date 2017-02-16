@@ -1,71 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 16 Feb 2017 19:04:51 +0000
-Subject: Applied "ASoC: mediatek: add power-domains for mt2701-afe-pcm.txt" to
- the asoc tree
-In-Reply-To: <1487222836-21174-3-git-send-email-garlic.tseng@mediatek.com>
-Message-ID: <E1ceRMJ-0007hQ-44@debutante>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Thu, 16 Feb 2017 11:06:20 -0800
+Subject: [PATCH] arm64: print a fault message when attempting to write RO
+ memory
+In-Reply-To: <20170216110612.GA32039@leverpostej>
+References: <20170216015408.12933-1-stephen.boyd@linaro.org>
+ <20170216110612.GA32039@leverpostej>
+Message-ID: <148727198031.14561.5684949806976862329@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Quoting Mark Rutland (2017-02-16 03:06:12)
+> Hi,
+> 
+> On Wed, Feb 15, 2017 at 05:54:08PM -0800, Stephen Boyd wrote:
+> > If a page is marked read only we should print out that fact,
+> > instead of printing out that there was a page fault. Right now we
+> > get a cryptic error message that something went wrong with an
+> > unhandled fault, but we don't evaluate the esr to figure out that
+> > it was a read/write permission fault.
+> >
+> > Instead of seeing:
+> >
+> >   Unable to handle kernel paging request at virtual address ffff000008e460d8
+> >   pgd = ffff800003504000
+> >   [ffff000008e460d8] *pgd=0000000083473003, *pud=0000000083503003, *pmd=0000000000000000
+> >   Internal error: Oops: 9600004f [#1] PREEMPT SMP
+> >
+> > we'll see:
+> >
+> >   Internal error: Attempting to write read-only memory: 9600004f [#1] PREEMPT SMP
+> 
+> It's less than ideal to lose the fault address here. Arguably we should
+> also log that for the userspace cases.
 
-   ASoC: mediatek: add power-domains for mt2701-afe-pcm.txt
+Agreed. I can look into fixing the userspace case too with another
+patch.
 
-has been applied to the asoc tree at
+> 
+> It would also be nice to keep the table dump for the kernel fault case,
+> since dodgy page tables are a likely case there.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+Ok.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+> 
+> > @@ -331,6 +331,11 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+> >
+> >               if (!search_exception_tables(regs->pc))
+> >                       die("Accessing user space memory outside uaccess.h routines", regs, esr);
+> > +     } else if (is_permission_fault(esr, regs)) {
+> > +             if (esr & ESR_ELx_WNR)
+> > +                     die("Attempting to write read-only memory", regs, esr);
+> > +             else
+> > +                     die("Attempting to read unreadable memory", regs, esr);
+> >       }
+> 
+> We won't have looked at the exception tables yet, so won't this make
+> probe_kernel_{read,write}(), or any other extable users unsafe?
+> 
+> Could we update __do_kernel_fault() to report faults more thoroughly
+> instead?
+> 
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From ee9dc31962ac7141df6926b8696edf8831dde76c Mon Sep 17 00:00:00 2001
-From: Garlic Tseng <garlic.tseng@mediatek.com>
-Date: Thu, 16 Feb 2017 13:27:16 +0800
-Subject: [PATCH] ASoC: mediatek: add power-domains for mt2701-afe-pcm.txt
-
-This add power-domains for mt2701-afe-pcm
-
-Signed-off-by: Garlic Tseng <garlic.tseng@mediatek.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt b/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
-index 3e623a724e55..9800a560e0c2 100644
---- a/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
-+++ b/Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt
-@@ -4,6 +4,7 @@ Required properties:
- - compatible = "mediatek,mt2701-audio";
- - reg: register location and size
- - interrupts: Should contain AFE interrupt
-+- power-domains: should define the power domain
- - clock-names: should have these clock names:
- 		"infra_sys_audio_clk",
- 		"top_audio_mux1_sel",
-@@ -58,6 +59,7 @@ Example:
- 		      <0 0x112A0000 0 0x20000>;
- 		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_SPI 132 IRQ_TYPE_LEVEL_LOW>;
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
- 		clocks = <&infracfg CLK_INFRA_AUDIO>,
- 			 <&topckgen CLK_TOP_AUD_MUX1_SEL>,
- 			 <&topckgen CLK_TOP_AUD_MUX2_SEL>,
--- 
-2.11.0
+Sounds like a plan. I'll move this hunk there and rework the message
+printed there a bit.
