@@ -1,44 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Feb 2017 14:46:00 +0100
-Subject: [PATCH 00/11] ARM: Initial Actions Semi S500 and S900 enablement
-In-Reply-To: <20170215165528.10052-1-afaerber@suse.de>
-References: <20170215165528.10052-1-afaerber@suse.de>
-Message-ID: <3039198.1W6tLqk8Fp@wuerfel>
+From: olekstysh@gmail.com (Oleksandr Tyshchenko)
+Date: Thu, 16 Feb 2017 15:52:17 +0200
+Subject: [RFC PATCH v1] iommu/io-pgtable-arm-v7s: Check for leaf entry right
+ after finding it
+Message-ID: <1487253137-13792-1-git-send-email-olekstysh@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 15, 2017 5:55:17 PM CET Andreas F?rber wrote:
-> Hello,
-> 
-> Based on earlier work of mine for the LeMaker Guitar, this series adds initial
-> support for the Actions Semiconductor S500 (ARMv7) and S900 (ARMv8) SoCs.
-> 
-> Despite Actions Semi being a Linaro member since 2015, sadly I have not seen
-> a single upstream kernel patch submission since. Nor has the XApple community
-> taken any such initiative.
-> 
-> The GitHub LeMaker/linux-actions and xapp-le/kernel trees have 3.10 based S500
-> drivers in arch/arm/mach-owl/, whereas the 96boards-bubblegum/linux tree has
-> new-style but still 3.10 based S900 drivers. I also spotted GPLv2+ vs. GPLv2
-> license differences.
-> 
-> This series therefore provides a proof of concept for a combined S500 and S900
-> mainline implementation. Only earlycon serial output is available for now.
-> 
-> Focusing on Bubblegum-96, no S500 clocksource implementation is provided yet,
-> thus output on Guitar is less than on Bubblegum-96, but still it demonstrates
-> that a single driver can be shared for both, using compatible strings for
-> future differentiation.
+From: Oleksandr Tyshchenko <oleksandr_tyshchenko@epam.com>
 
-Thanks for getting this started! It's unfortunately too late for 4.11 now,
-but there should be no problem getting this merged into arm-soc early on
-after the coming merge window.
+Do a check for already installed leaf entry at the current level before
+performing any actions when trying to map.
 
-I'd suggest keeping it as a set of patches for the moment, and we'll apply
-them to the respective arm-soc branches as needed, with the exception of
-the tty patch that should go through Greg's tree.
+This check is already present in arm_v7s_init_pte(), i.e. before
+installing new leaf entry at the current level if conditions to do so
+are met (num_entries > 0).
 
-When you have addressed the review comments, please send the updated series
-to arm at kernel.org.
+But, this might be insufficient in case when we have already
+installed block mapping at this level and it is not time to
+install new leaf entry (num_entries == 0).
+In that case we continue walking the page table down with wrong pointer
+to the next level.
 
-	Arnd
+So, move check from arm_v7s_init_pte() to __arm_v7s_map() in order to
+avoid all cases.
+
+Signed-off-by: Oleksandr Tyshchenko <oleksandr_tyshchenko@epam.com>
+---
+This patch does similar things as the patch I have pushed a week ago
+for long-descriptor format [1].
+The reason why this patch is RFC is because I am not sure I did the right
+thing and I even didn't test it.
+
+[1] https://lists.linuxfoundation.org/pipermail/iommu/2017-February/020411.html
+---
+---
+ drivers/iommu/io-pgtable-arm-v7s.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index f50e51c..7f7594b 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -364,10 +364,6 @@ static int arm_v7s_init_pte(struct arm_v7s_io_pgtable *data,
+ 			if (WARN_ON(__arm_v7s_unmap(data, iova + i * sz,
+ 						    sz, lvl, tblp) != sz))
+ 				return -EINVAL;
+-		} else if (ptep[i]) {
+-			/* We require an unmap first */
+-			WARN_ON(!selftest_running);
+-			return -EEXIST;
+ 		}
+ 
+ 	pte |= ARM_V7S_PTE_TYPE_PAGE;
+@@ -392,11 +388,20 @@ static int __arm_v7s_map(struct arm_v7s_io_pgtable *data, unsigned long iova,
+ {
+ 	struct io_pgtable_cfg *cfg = &data->iop.cfg;
+ 	arm_v7s_iopte pte, *cptep;
+-	int num_entries = size >> ARM_V7S_LVL_SHIFT(lvl);
++	int i = 0, num_entries = size >> ARM_V7S_LVL_SHIFT(lvl);
+ 
+ 	/* Find our entry at the current level */
+ 	ptep += ARM_V7S_LVL_IDX(iova, lvl);
+ 
++	/* Check for already installed leaf entry */
++	do {
++		if (ptep[i] && !ARM_V7S_PTE_IS_TABLE(ptep[i], lvl)) {
++			/* We require an unmap first */
++			WARN_ON(!selftest_running);
++			return -EEXIST;
++		}
++	} while (++i < num_entries);
++
+ 	/* If we can install a leaf entry@this level, then do so */
+ 	if (num_entries)
+ 		return arm_v7s_init_pte(data, iova, paddr, prot,
+-- 
+2.7.4
