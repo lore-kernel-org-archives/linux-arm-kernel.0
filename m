@@ -1,19 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Feb 2017 17:21:51 +0100
-Subject: [PATCH] ARM: multi_v7_defconfig: enable some newly added crypto
- modules
-In-Reply-To: <1487183412-25261-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1487183412-25261-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <2984474.o4uKWU7966@wuerfel>
+Date: Thu, 16 Feb 2017 17:22:59 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: enable pstore configs
+In-Reply-To: <20170209205250.GA118863@google.com>
+References: <20170209195646.GA39738@beast> <20170209205250.GA118863@google.com>
+Message-ID: <4740492.m49jFGWQak@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, February 15, 2017 6:30:12 PM CET Ard Biesheuvel wrote:
-> Enable the new accelerated CRC32(C), CRC-T10DIF and ChaCha20 drivers
-> as modules for multi_v7_defconfig builds.
+On Thursday, February 9, 2017 12:52:50 PM CET Brian Norris wrote:
+> It's useful to get testing on these features on various boards (e.g., on
+> KernelCI), and (when they're working) the ramoops feature is extremely
+> helpful for debugging live systems.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> 
+> Signed-off-by: Brian Norris <briannorris@chromium.org>
+> ---
+> + ARM folks
+> - Linus
 
 Applied to next/defconfig, thanks!
 
