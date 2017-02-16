@@ -1,49 +1,56 @@
-From: jonathan.richardson@broadcom.com (Jonathan Richardson)
-Date: Thu, 16 Feb 2017 12:08:40 -0800
-Subject: [PATCH v4 0/3] Add support for Broadcom iProc mailbox controller
-In-Reply-To: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
-References: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
-Message-ID: <75e8060f-7e9e-8e7c-2eee-a5c9321f3d3f@broadcom.com>
+From: slemieux.tyco@gmail.com (slemieux.tyco at gmail.com)
+Date: Thu, 16 Feb 2017 15:27:47 -0500
+Subject: [RESEND PATCH 1/3] dt: pwm: lpc32xx: add description of clocks and
+ #pwm-cells properties
+In-Reply-To: <20170216202749.20653-1-slemieux.tyco@gmail.com>
+References: <20170216202749.20653-1-slemieux.tyco@gmail.com>
+Message-ID: <20170216202749.20653-2-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pinging maintainer. Jassi, have you had a chance to look at this yet? Thanks.
+From: Vladimir Zapolskiy <vz@mleia.com>
 
-On 17-01-26 12:37 PM, Jonathan Richardson wrote:
-> This patch set contains mailbox support for Broadcom iProc based SoC's. The
-> mailbox controller handles all communication with a Cortex-M0 MCU processor that
-> provides support for power, clock, and reset management. The mailbox controller
-> for Cygnus is enabled in DT.
->
-> Changes from v3:
->  - DT changes merged into one commit.
->
-> Changes from v2:
->  - Fixed binding to remove leading 0 (Rob's comment). Also added more detail as
->    suggested by Jassi.
->  - Added changelog to dt binding and enable dts commits.
->  - Changed year in copyright in bcm_iproc_mailbox.h.
->  - Changes to bcm-cygnus.dtsi were prematurely merged into the mainline after
->    Rob acked the DT changes but Jassi suggested changes to the mailbox driver.
->    The result was that the mailbox controller node and changes to the crmu gpio
->    driver to enable interrupt handling were incorrectly added to the dtsi. A
->    commit is included in this patchset to revert those changes. Enabling
->    interrupt handling in the the crmu gpio driver will be introduced when the
->    interrupt controller driver is added to provide mailbox interrupt support.
->
-> Jonathan Richardson (3):
->   dt-bindings: Document Broadcom iProc mailbox controller driver
->   mailbox: Add iProc mailbox controller driver
->   ARM: dts: Enable Broadcom iProc mailbox controller
->
->  .../bindings/mailbox/brcm,iproc-mailbox.txt        |  18 ++
->  arch/arm/boot/dts/bcm-cygnus.dtsi                  |   8 +-
->  drivers/mailbox/Kconfig                            |  10 ++
->  drivers/mailbox/Makefile                           |   2 +
->  drivers/mailbox/bcm-iproc-mailbox.c                | 199 +++++++++++++++++++++
->  include/linux/mailbox/bcm_iproc_mailbox.h          |  32 ++++
->  6 files changed, 262 insertions(+), 7 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-mailbox.txt
->  create mode 100644 drivers/mailbox/bcm-iproc-mailbox.c
->  create mode 100644 include/linux/mailbox/bcm_iproc_mailbox.h
->
+NXP LPC32xx SoCs have two simple independent PWM controllers with a single
+output each, in this case there is no need to specify PWM channel argument
+on client side, one cell for setting PWM output frequency is sufficient.
+
+Another added to the description property 'clocks' has a standard meaning
+of a controller supply clock, in the LPC32xx User's Manual the clock is
+denoted as PWM1_CLK or PWM2_CLK clock.
+
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+Reviewed-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
+index 74b5bc5dd19a..523d79662861 100644
+--- a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
++++ b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
+@@ -3,15 +3,22 @@ LPC32XX PWM controller
+ Required properties:
+ - compatible: should be "nxp,lpc3220-pwm"
+ - reg: physical base address and length of the controller's registers
++- clocks: clock phandle and clock specifier pair
++- #pwm-cells: should be 1, the cell is used to specify the period in
++  nanoseconds.
+ 
+ Examples:
+ 
+ pwm at 4005c000 {
+ 	compatible = "nxp,lpc3220-pwm";
+ 	reg = <0x4005c000 0x4>;
++	clocks = <&clk LPC32XX_CLK_PWM1>;
++	#pwm-cells = <1>;
+ };
+ 
+ pwm at 4005c004 {
+ 	compatible = "nxp,lpc3220-pwm";
+ 	reg = <0x4005c004 0x4>;
++	clocks = <&clk LPC32XX_CLK_PWM2>;
++	#pwm-cells = <1>;
+ };
+-- 
+2.11.0
