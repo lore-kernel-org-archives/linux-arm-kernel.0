@@ -1,42 +1,47 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 16 Feb 2017 18:27:59 +0100
-Subject: [PATCH v2] i2c: at91: ensure state is restored after suspending
-Message-ID: <20170216172759.27837-1-alexandre.belloni@free-electrons.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 16 Feb 2017 18:29:05 +0100
+Subject: [GIT PULL] ARM: mvebu: late dt for v4.11
+Message-ID: <8760kacae6.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When going to suspend, the I2C registers may be lost because the power to
-VDDcore is cut. Restore them when resuming.
+Hi,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
-Changes in v2:
- - don't cache unecessary registers and simply call at91_init_twi_bus()
+Here is a late pull request for dt for mvebu for v4.11.
 
+As explained in the tag, these 2 commits are just fixing typo.
 
- drivers/i2c/busses/i2c-at91.c | 3 +++
- 1 file changed, 3 insertions(+)
+If they can't be merged now then considered merging them as fix for
+4.11.
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index 0b86c6173e07..c925a690cb32 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -1180,6 +1180,7 @@ static int at91_twi_suspend_noirq(struct device *dev)
- 
- static int at91_twi_resume_noirq(struct device *dev)
- {
-+	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
- 	int ret;
- 
- 	if (!pm_runtime_status_suspended(dev)) {
-@@ -1191,6 +1192,8 @@ static int at91_twi_resume_noirq(struct device *dev)
- 	pm_runtime_mark_last_busy(dev);
- 	pm_request_autosuspend(dev);
- 
-+	at91_init_twi_bus(twi_dev);
-+
- 	return 0;
- }
- 
--- 
-2.11.0
+Thanks,
+
+Gregory
+
+The following changes since commit 5cb13094484ba89d9a2623ddb72b36ea498e2bff:
+
+  ARM: dts: mvebu: Add device tree for db-dxbc2 and db-xc3-24g4xg boards (2017-01-31 14:45:04 +0100)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.11-4
+
+for you to fetch changes up to 04be87a83db6cbb7586db95b591467c58ae09aee:
+
+  ARM: dts: armada-385-linksys: fix DSA compatible property (2017-02-15 15:54:13 +0100)
+
+----------------------------------------------------------------
+mvebu dt for 4.11 (part 4)
+
+Fix typos introduced during the preparation of the 4.11 merge window.
+
+----------------------------------------------------------------
+Chris Packham (1):
+      ARM: dts: Fix typo in armada-xp-98dx4251
+
+Ralph Sennhauser (1):
+      ARM: dts: armada-385-linksys: fix DSA compatible property
+
+ arch/arm/boot/dts/armada-385-linksys.dtsi | 2 +-
+ arch/arm/boot/dts/armada-xp-98dx4251.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
