@@ -1,117 +1,123 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed, 15 Feb 2017 18:19:28 -0800
-Subject: [PATCH v4 26/36] media: imx: add support for bayer formats
+Date: Wed, 15 Feb 2017 18:19:29 -0800
+Subject: [PATCH v4 27/36] media: imx: csi: add support for bayer formats
 In-Reply-To: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1487211578-11360-27-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1487211578-11360-28-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Russell King <rmk+kernel@armlinux.org.uk>
 
-Add the bayer formats to imx-media's list of supported pixel and bus
-formats.
+Bayer formats must be treated as generic data and passthrough mode must
+be used.  Add the correct setup for these formats.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-- added a bayer boolean to struct imx_media_pixfmt.
+- added check to csi_link_validate() to verify that destination is
+  IDMAC output pad when passthrough conditions exist: bayer formats
+  and 16-bit parallel buses.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- drivers/staging/media/imx/imx-media-utils.c | 68 +++++++++++++++++++++++++++++
- drivers/staging/media/imx/imx-media.h       |  1 +
- 2 files changed, 69 insertions(+)
+ drivers/staging/media/imx/imx-media-csi.c | 50 ++++++++++++++++++++++++++-----
+ 1 file changed, 42 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/staging/media/imx/imx-media-utils.c b/drivers/staging/media/imx/imx-media-utils.c
-index 55603d9..6855560 100644
---- a/drivers/staging/media/imx/imx-media-utils.c
-+++ b/drivers/staging/media/imx/imx-media-utils.c
-@@ -61,6 +61,74 @@ static const struct imx_media_pixfmt imx_media_formats[] = {
- 		.cs     = IPUV3_COLORSPACE_RGB,
- 		.bpp    = 32,
- 		.ipufmt = true,
-+	}, {
-+		.fourcc = V4L2_PIX_FMT_SBGGR8,
-+		.codes  = {MEDIA_BUS_FMT_SBGGR8_1X8},
-+		.cs     = IPUV3_COLORSPACE_RGB,
-+		.bpp    = 8,
-+		.bayer  = true,
-+	}, {
-+		.fourcc = V4L2_PIX_FMT_SGBRG8,
-+		.codes  = {MEDIA_BUS_FMT_SGBRG8_1X8},
-+		.cs     = IPUV3_COLORSPACE_RGB,
-+		.bpp    = 8,
-+		.bayer  = true,
-+	}, {
-+		.fourcc = V4L2_PIX_FMT_SGRBG8,
-+		.codes  = {MEDIA_BUS_FMT_SGRBG8_1X8},
-+		.cs     = IPUV3_COLORSPACE_RGB,
-+		.bpp    = 8,
-+		.bayer  = true,
-+	}, {
-+		.fourcc = V4L2_PIX_FMT_SRGGB8,
-+		.codes  = {MEDIA_BUS_FMT_SRGGB8_1X8},
-+		.cs     = IPUV3_COLORSPACE_RGB,
-+		.bpp    = 8,
-+		.bayer  = true,
-+	}, {
-+		.fourcc = V4L2_PIX_FMT_SBGGR16,
-+		.codes  = {
-+			MEDIA_BUS_FMT_SBGGR10_1X10,
-+			MEDIA_BUS_FMT_SBGGR12_1X12,
-+			MEDIA_BUS_FMT_SBGGR14_1X14,
-+			MEDIA_BUS_FMT_SBGGR16_1X16
-+		},
-+		.cs     = IPUV3_COLORSPACE_RGB,
-+		.bpp    = 16,
-+		.bayer  = true,
-+	}, {
-+		.fourcc = V4L2_PIX_FMT_SGBRG16,
-+		.codes  = {
-+			MEDIA_BUS_FMT_SGBRG10_1X10,
-+			MEDIA_BUS_FMT_SGBRG12_1X12,
-+			MEDIA_BUS_FMT_SGBRG14_1X14,
-+			MEDIA_BUS_FMT_SGBRG16_1X16,
-+		},
-+		.cs     = IPUV3_COLORSPACE_RGB,
-+		.bpp    = 16,
-+		.bayer  = true,
-+	}, {
-+		.fourcc = V4L2_PIX_FMT_SGRBG16,
-+		.codes  = {
-+			MEDIA_BUS_FMT_SGRBG10_1X10,
-+			MEDIA_BUS_FMT_SGRBG12_1X12,
-+			MEDIA_BUS_FMT_SGRBG14_1X14,
-+			MEDIA_BUS_FMT_SGRBG16_1X16,
-+		},
-+		.cs     = IPUV3_COLORSPACE_RGB,
-+		.bpp    = 16,
-+		.bayer  = true,
-+	}, {
-+		.fourcc = V4L2_PIX_FMT_SRGGB16,
-+		.codes  = {
-+			MEDIA_BUS_FMT_SRGGB10_1X10,
-+			MEDIA_BUS_FMT_SRGGB12_1X12,
-+			MEDIA_BUS_FMT_SRGGB14_1X14,
-+			MEDIA_BUS_FMT_SRGGB16_1X16,
-+		},
-+		.cs     = IPUV3_COLORSPACE_RGB,
-+		.bpp    = 16,
-+		.bayer  = true,
- 	},
- 	/*** non-mbus formats start here ***/
- 	{
-diff --git a/drivers/staging/media/imx/imx-media.h b/drivers/staging/media/imx/imx-media.h
-index 3d4f3c7..ae3af0d 100644
---- a/drivers/staging/media/imx/imx-media.h
-+++ b/drivers/staging/media/imx/imx-media.h
-@@ -91,6 +91,7 @@ struct imx_media_pixfmt {
- 	int     bpp;     /* total bpp */
- 	enum ipu_color_space cs;
- 	bool    planar;  /* is a planar format */
-+	bool    bayer;   /* is a raw bayer format */
- 	bool    ipufmt;  /* is one of the IPU internal formats */
- };
+diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+index 0343fc3..ae24b42 100644
+--- a/drivers/staging/media/imx/imx-media-csi.c
++++ b/drivers/staging/media/imx/imx-media-csi.c
+@@ -2,6 +2,7 @@
+  * V4L2 Capture CSI Subdev for Freescale i.MX5/6 SOC
+  *
+  * Copyright (c) 2014-2016 Mentor Graphics Inc.
++ * Copyright (C) 2017 Pengutronix, Philipp Zabel <kernel@pengutronix.de>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -271,10 +272,11 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
+ 	struct imx_media_video_dev *vdev = priv->vdev;
+ 	struct v4l2_of_endpoint *sensor_ep;
+ 	struct v4l2_mbus_framefmt *infmt;
+-	unsigned int burst_size;
+ 	struct ipu_image image;
++	u32 passthrough_bits;
+ 	dma_addr_t phys[2];
+ 	bool passthrough;
++	u32 burst_size;
+ 	int ret;
  
+ 	infmt = &priv->format_mbus[CSI_SINK_PAD];
+@@ -301,15 +303,38 @@ static int csi_idmac_setup_channel(struct csi_priv *priv)
+ 	ipu_cpmem_set_burstsize(priv->idmac_ch, burst_size);
+ 
+ 	/*
+-	 * If the sensor uses 16-bit parallel CSI bus, we must handle
+-	 * the data internally in the IPU as 16-bit generic, aka
+-	 * passthrough mode.
++	 * Check for conditions that require the IPU to handle the
++	 * data internally as generic data, aka passthrough mode:
++	 * - raw bayer formats
++	 * - the sensor bus is 16-bit parallel
+ 	 */
+-	passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
+-		       sensor_ep->bus.parallel.bus_width >= 16);
++	switch (image.pix.pixelformat) {
++	case V4L2_PIX_FMT_SBGGR8:
++	case V4L2_PIX_FMT_SGBRG8:
++	case V4L2_PIX_FMT_SGRBG8:
++	case V4L2_PIX_FMT_SRGGB8:
++		burst_size = 8;
++		passthrough = true;
++		passthrough_bits = 8;
++		break;
++	case V4L2_PIX_FMT_SBGGR16:
++	case V4L2_PIX_FMT_SGBRG16:
++	case V4L2_PIX_FMT_SGRBG16:
++	case V4L2_PIX_FMT_SRGGB16:
++		burst_size = 4;
++		passthrough = true;
++		passthrough_bits = 16;
++		break;
++	default:
++		passthrough = (sensor_ep->bus_type != V4L2_MBUS_CSI2 &&
++			       sensor_ep->bus.parallel.bus_width >= 16);
++		passthrough_bits = 16;
++		break;
++	}
+ 
+ 	if (passthrough)
+-		ipu_cpmem_set_format_passthrough(priv->idmac_ch, 16);
++		ipu_cpmem_set_format_passthrough(priv->idmac_ch,
++						 passthrough_bits);
+ 
+ 	/*
+ 	 * Set the channel for the direct CSI-->memory via SMFC
+@@ -695,6 +720,7 @@ static int csi_link_validate(struct v4l2_subdev *sd,
+ 			     struct v4l2_subdev_format *sink_fmt)
+ {
+ 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
++	const struct imx_media_pixfmt *incc;
+ 	struct v4l2_of_endpoint *sensor_ep;
+ 	bool is_csi2;
+ 	int ret;
+@@ -713,8 +739,16 @@ static int csi_link_validate(struct v4l2_subdev *sd,
+ 	}
+ 
+ 	sensor_ep = &priv->sensor->sensor_ep;
+-
+ 	is_csi2 = (sensor_ep->bus_type == V4L2_MBUS_CSI2);
++	incc = priv->cc[CSI_SINK_PAD];
++
++	if (priv->dest != IPU_CSI_DEST_IDMAC &&
++	    (incc->bayer || (!is_csi2 &&
++			     sensor_ep->bus.parallel.bus_width >= 16))) {
++		v4l2_err(&priv->sd,
++			 "bayer/16-bit parallel buses must go to IDMAC pad\n");
++		return -EINVAL;
++	}
+ 
+ 	if (is_csi2) {
+ 		int vc_num = 0;
 -- 
 2.7.4
