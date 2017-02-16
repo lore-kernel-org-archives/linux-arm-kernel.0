@@ -1,146 +1,53 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 16 Feb 2017 13:47:44 +0100
-Subject: [RFC PATCH 01/33] irqchip/gic-v3: Add redistributor iterator
-In-Reply-To: <1484648454-21216-2-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <22a9cb20-f5f0-20e7-e34c-f14847a35e5e@redhat.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Thu, 16 Feb 2017 13:48:41 +0100
+Subject: [PATCH 03/21] net-next: stmmac: add optional setup function
+In-Reply-To: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
+References: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
+Message-ID: <20170216124859.14346-4-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Instead of ading more ifthen login for adding a new mac_device_info
+setup function, it is easier to add a function pointer to the function
+needed.
 
-On 17/01/2017 11:20, Marc Zyngier wrote:
-> In order to discover the VLPI properties, we need to iterate over
-> the redistributor regions. As we already have code that does this,
-> let's factor it out and make it slightly more generic.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/irq-gic-v3.c | 77 ++++++++++++++++++++++++++++++++------------
->  1 file changed, 56 insertions(+), 21 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index c132f29..5cadec0 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -421,24 +421,15 @@ static void __init gic_dist_init(void)
->  		gic_write_irouter(affinity, base + GICD_IROUTER + i * 8);
->  }
->  
-> -static int gic_populate_rdist(void)
-> +static int gic_scan_rdist_properties(int (*fn)(struct redist_region *,
-> +					       void __iomem *))
->  {
-> -	unsigned long mpidr = cpu_logical_map(smp_processor_id());
-> -	u64 typer;
-> -	u32 aff;
-> +	int ret = 0;
-in case
-if (reg != GIC_PIDR2_ARCH_GICv3 &&
-		    reg != GIC_PIDR2_ARCH_GICv4) is true you now return 0. Don' you
-want to return -ENODEV as before?
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ drivers/net/ethernet/stmicro/stmmac/stmmac_main.c | 7 ++++++-
+ include/linux/stmmac.h                            | 3 +++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-
->  	int i;
->  
-> -	/*
-> -	 * Convert affinity to a 32bit value that can be matched to
-> -	 * GICR_TYPER bits [63:32].
-> -	 */
-> -	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
-> -	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
-> -	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
-> -	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
-> -
->  	for (i = 0; i < gic_data.nr_redist_regions; i++) {
->  		void __iomem *ptr = gic_data.redist_regions[i].redist_base;
-> +		u64 typer;
->  		u32 reg;
->  
->  		reg = readl_relaxed(ptr + GICR_PIDR2) & GIC_PIDR2_ARCH_MASK;
-> @@ -450,14 +441,14 @@ static int gic_populate_rdist(void)
->  
->  		do {
->  			typer = gic_read_typer(ptr + GICR_TYPER);
-> -			if ((typer >> 32) == aff) {
-> -				u64 offset = ptr - gic_data.redist_regions[i].redist_base;
-> -				gic_data_rdist_rd_base() = ptr;
-> -				gic_data_rdist()->phys_base = gic_data.redist_regions[i].phys_base + offset;
-> -				pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
-> -					smp_processor_id(), mpidr, i,
-> -					&gic_data_rdist()->phys_base);
-> +			ret = fn(gic_data.redist_regions + i, ptr);
-> +			switch (ret) {
-> +			case 0:
->  				return 0;
-> +			case -1:
-> +				break;
-> +			default:
-> +				ret = 0;
->  			}
->  
->  			if (gic_data.redist_regions[i].single_redist)
-> @@ -473,9 +464,53 @@ static int gic_populate_rdist(void)
->  		} while (!(typer & GICR_TYPER_LAST));
->  	}
-Assuming you don't find the TYPER that matches the cpu (I don't know if
-it is possible), last fn() call will return 1 and the function will
-return 0. Before it returned -ENODEV I think.
-
-Thanks
-
-Eric
->  
-> +	if (ret == -1)
-> +		ret = -ENODEV;
-> +
-> +	return 0;
-> +}
-> +
-> +static int __gic_populate_rdist(struct redist_region *region, void __iomem *ptr)
-> +{
-> +	unsigned long mpidr = cpu_logical_map(smp_processor_id());
-> +	u64 typer;
-> +	u32 aff;
-> +
-> +	/*
-> +	 * Convert affinity to a 32bit value that can be matched to
-> +	 * GICR_TYPER bits [63:32].
-> +	 */
-> +	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
-> +	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
-> +	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
-> +	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
-> +
-> +	typer = gic_read_typer(ptr + GICR_TYPER);
-> +	if ((typer >> 32) == aff) {
-> +		u64 offset = ptr - region->redist_base;
-> +		gic_data_rdist_rd_base() = ptr;
-> +		gic_data_rdist()->phys_base = region->phys_base + offset;
-> +
-> +		pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
-> +			smp_processor_id(), mpidr,
-> +			(int)(region - gic_data.redist_regions),
-> +			&gic_data_rdist()->phys_base);
-> +		return 0;
-> +	}
-> +
-> +	/* Try next one */
-> +	return 1;
-> +}
-> +
-> +static int gic_populate_rdist(void)
-> +{
-> +	if (gic_scan_rdist_properties(__gic_populate_rdist) == 0)
-> +		return 0;
-> +
->  	/* We couldn't even deal with ourselves... */
->  	WARN(true, "CPU%d: mpidr %lx has no re-distributor!\n",
-> -	     smp_processor_id(), mpidr);
-> +	     smp_processor_id(),
-> +	     (unsigned long)cpu_logical_map(smp_processor_id()));
->  	return -ENODEV;
->  }
->  
-> 
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+index 942efb7..319394e 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+@@ -3117,7 +3117,12 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
+ 	struct mac_device_info *mac;
+ 
+ 	/* Identify the MAC HW device */
+-	if (priv->plat->has_gmac) {
++	if (priv->plat->setup) {
++		mac = priv->plat->setup(priv->ioaddr,
++					priv->plat->multicast_filter_bins,
++					priv->plat->unicast_filter_entries,
++					&priv->synopsys_id);
++	} else if (priv->plat->has_gmac) {
+ 		priv->dev->priv_flags |= IFF_UNICAST_FLT;
+ 		mac = dwmac1000_setup(priv->ioaddr,
+ 				      priv->plat->multicast_filter_bins,
+diff --git a/include/linux/stmmac.h b/include/linux/stmmac.h
+index fc273e9..95ee4c4 100644
+--- a/include/linux/stmmac.h
++++ b/include/linux/stmmac.h
+@@ -136,6 +136,9 @@ struct plat_stmmacenet_data {
+ 	void (*fix_mac_speed)(void *priv, unsigned int speed);
+ 	int (*init)(struct platform_device *pdev, void *priv);
+ 	void (*exit)(struct platform_device *pdev, void *priv);
++	struct mac_device_info *(*setup)(void __iomem *ioaddr, int mcbins,
++					 int perfect_uc_entries,
++					 int *synopsys_id);
+ 	void *bsp_priv;
+ 	struct clk *stmmac_clk;
+ 	struct clk *pclk;
+-- 
+2.10.2
