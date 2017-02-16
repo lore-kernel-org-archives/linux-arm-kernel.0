@@ -1,56 +1,77 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Thu, 16 Feb 2017 11:20:00 -0800
-Subject: [PATCH v4 01/36] [media] dt-bindings: Add bindings for i.MX media
- driver
-In-Reply-To: <1487246051.2377.41.camel@pengutronix.de>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-2-git-send-email-steve_longerbeam@mentor.com>
- <1487246051.2377.41.camel@pengutronix.de>
-Message-ID: <5349304b-1994-f207-e1bc-974999d1acfd@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 16 Feb 2017 20:30:53 +0100
+Subject: [PATCH v2 3/3] watchdog: sama5d4: Implement resume hook
+In-Reply-To: <20170216193053.5546-1-alexandre.belloni@free-electrons.com>
+References: <20170216193053.5546-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170216193053.5546-3-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When resuming for the deepest state on sama5d2, it is necessary to restore
+MR as the registers are lost.
 
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+Changes in v2:
+ - cache mr beofre suspending
 
-On 02/16/2017 03:54 AM, Philipp Zabel wrote:
-> On Wed, 2017-02-15 at 18:19 -0800, Steve Longerbeam wrote:
->> Add bindings documentation for the i.MX media driver.
->>
->> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
->> ---
->>  Documentation/devicetree/bindings/media/imx.txt | 66 +++++++++++++++++++++++++
->>  1 file changed, 66 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/media/imx.txt
->>
->> diff --git a/Documentation/devicetree/bindings/media/imx.txt b/Documentation/devicetree/bindings/media/imx.txt
->> new file mode 100644
->> index 0000000..fd5af50
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/media/imx.txt
->> @@ -0,0 +1,66 @@
->> +Freescale i.MX Media Video Device
->> +=================================
->> +
->> +Video Media Controller node
->> +---------------------------
->> +
->> +This is the media controller node for video capture support. It is a
->> +virtual device that lists the camera serial interface nodes that the
->> +media device will control.
->> +
->> +Required properties:
->> +- compatible : "fsl,imx-capture-subsystem";
->> +- ports      : Should contain a list of phandles pointing to camera
->> +		sensor interface ports of IPU devices
->> +
->> +example:
->> +
->> +capture-subsystem {
->> +	compatible = "fsl,capture-subsystem";
->
-> "fsl,imx-capture-subsystem"
+ drivers/watchdog/sama5d4_wdt.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-
-Fixed.
-
-Steve
+diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+index 2a60251806d2..5ddeb4803dc3 100644
+--- a/drivers/watchdog/sama5d4_wdt.c
++++ b/drivers/watchdog/sama5d4_wdt.c
+@@ -28,6 +28,7 @@
+ struct sama5d4_wdt {
+ 	struct watchdog_device	wdd;
+ 	void __iomem		*reg_base;
++	u32			mr;
+ };
+ 
+ static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
+@@ -248,11 +249,42 @@ static const struct of_device_id sama5d4_wdt_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, sama5d4_wdt_of_match);
+ 
++#ifdef CONFIG_PM_SLEEP
++static int sama5d4_wdt_suspend(struct device *dev)
++{
++	struct sama5d4_wdt *wdt = dev_get_drvdata(dev);
++
++	wdt->mr = wdt_read(wdt, AT91_WDT_MR);
++
++	return 0;
++}
++
++static int sama5d4_wdt_resume(struct device *dev)
++{
++	struct sama5d4_wdt *wdt = dev_get_drvdata(dev);
++	u32 reg;
++
++	reg = wdt_read(wdt, AT91_WDT_MR);
++	if (reg & AT91_WDT_WDDIS)
++		wdt_write(wdt, AT91_WDT_MR, reg & ~AT91_WDT_WDDIS);
++
++	wdt_write(wdt, AT91_WDT_MR, wdt->mr & ~AT91_WDT_WDDIS);
++	if (wdt->mr & AT91_WDT_WDDIS)
++		wdt_write(wdt, AT91_WDT_MR, wdt->mr);
++
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(sama5d4_wdt_pm_ops, sama5d4_wdt_suspend,
++			 sama5d4_wdt_resume);
++
+ static struct platform_driver sama5d4_wdt_driver = {
+ 	.probe		= sama5d4_wdt_probe,
+ 	.remove		= sama5d4_wdt_remove,
+ 	.driver		= {
+ 		.name	= "sama5d4_wdt",
++		.pm	= &sama5d4_wdt_pm_ops,
+ 		.of_match_table = sama5d4_wdt_of_match,
+ 	}
+ };
+-- 
+2.11.0
