@@ -1,32 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Feb 2017 14:31:38 +0100
-Subject: [PATCH 4/5] sprd_serial: switch comptible string to sc-uart
-In-Reply-To: <1487063952-7113-5-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1487063952-7113-5-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <1761969.45NG6Q1Iyc@wuerfel>
+Date: Thu, 16 Feb 2017 14:41:51 +0100
+Subject: [PATCH 06/11] tty: serial: Add Actions Semi Owl UART earlycon
+In-Reply-To: <20170215165528.10052-7-afaerber@suse.de>
+References: <20170215165528.10052-1-afaerber@suse.de>
+ <20170215165528.10052-7-afaerber@suse.de>
+Message-ID: <3685307.zVcugmQnxp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, February 14, 2017 5:19:11 PM CET Chunyan Zhang wrote:
->  static const struct of_device_id serial_ids[] = {
-> -       {.compatible = "sprd,sc9836-uart",},
-> +       {.compatible = "sprd,sc-uart",},
->         {}
+On Wednesday, February 15, 2017 5:55:23 PM CET Andreas F?rber wrote:
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 6117ac8..9d4213c 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -1677,6 +1677,25 @@ config SERIAL_MVEBU_CONSOLE
+>           and warnings and which allows logins in single user mode)
+>           Otherwise, say 'N'.
+>  
+> +config SERIAL_OWL
+> +       bool "Actions Semi Owl serial port support"
+> +       depends on ARCH_OWL || COMPILE_TEST
+> +       select SERIAL_CORE
+> +       help
+> +         This driver is for Actions Semi S500/S900 SoC's UART.
+> +         Say 'Y' here if you wish to use the on-board serial port.
+> +         Otherwise, say 'N'.
+> +
+> 
 
-We really need this to be specific, in case Spreadtrum ever
-makes a slightly different UART that is not 100% compatible
-with this one. Also, you can't remove the string you already have,
-only add to it.
+This could maybe use a word of information about how there isn't
+actually a uart driver in this series, only an earlycon driver.
 
-Normally when you have a new chip that is compatible with one
-we already have a driver for, we mark the device as compatible
-with the old one and avoid having to change the driver, e.g.
-
-	compatible = "sprd,sc9995-uart", "sprd,sc9836-uart";
-
-This way, the driver could later be changed to handle anything
-that is compatible with sc9995 differently from sc9836, but
-by default it would match the original string.
+Do you plan to add the actual tty driver soon? If not, maybe
+only add one Kconfig symbol for the earlycon support.
 
 	Arnd
