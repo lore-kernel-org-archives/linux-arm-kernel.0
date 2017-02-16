@@ -1,118 +1,242 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 16 Feb 2017 19:21:24 +0100
-Subject: [PATCH 4/4] ARM: davinci: add pdata-quirks for da850-evm vpif display
-In-Reply-To: <1487269285-6948-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1487269285-6948-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1487269285-6948-5-git-send-email-bgolaszewski@baylibre.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 16 Feb 2017 18:25:28 +0000
+Subject: [PATCH V10 02/10] ras: acpi/apei: cper: generic error data entry
+ v3 per ACPI 6.1
+In-Reply-To: <1487188282-2568-3-git-send-email-tbaicar@codeaurora.org>
+References: <1487188282-2568-1-git-send-email-tbaicar@codeaurora.org>
+ <1487188282-2568-3-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <CAKv+Gu8d-ObM4bGTmWUhZTmFMfKomBEpyj6OckXjOyhqYhF0KA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similarly to vpif capture: we need to register the vpif display driver
-and the corresponding adv7343 encoder in pdata-quirks as the DT
-support is not complete - there isn't currently a way to define the
-output_routing in the V4L2 drivers (c.f. s_routing) via DT.
+On 15 February 2017 at 19:51, Tyler Baicar <tbaicar@codeaurora.org> wrote:
+> Currently when a RAS error is reported it is not timestamped.
+> The ACPI 6.1 spec adds the timestamp field to the generic error
+> data entry v3 structure. The timestamp of when the firmware
+> generated the error is now being reported.
+>
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> Signed-off-by: Richard Ruigrok <rruigrok@codeaurora.org>
+> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+> Reviewed-by: James Morse <james.morse@arm.com>
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
----
- arch/arm/mach-davinci/pdata-quirks.c | 69 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 68 insertions(+), 1 deletion(-)
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
-index 3ca773f..c659c76 100644
---- a/arch/arm/mach-davinci/pdata-quirks.c
-+++ b/arch/arm/mach-davinci/pdata-quirks.c
-@@ -11,6 +11,7 @@
- #include <linux/of_platform.h>
- 
- #include <media/i2c/tvp514x.h>
-+#include <media/i2c/adv7343.h>
- 
- #include <mach/common.h>
- #include <mach/da8xx.h>
-@@ -106,7 +107,65 @@ static struct vpif_capture_config da850_vpif_capture_config = {
- 	},
- 	.card_name = "DA850/OMAP-L138 Video Capture",
- };
-+#endif /* IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) */
- 
-+#if IS_ENABLED(CONFIG_DA850_UI_SD_VIDEO_PORT)
-+static struct adv7343_platform_data adv7343_pdata = {
-+	.mode_config = {
-+		.dac = { 1, 1, 1 },
-+	},
-+	.sd_config = {
-+		.sd_dac_out = { 1 },
-+	},
-+};
-+
-+static struct vpif_subdev_info da850_vpif_subdev[] = {
-+	{
-+		.name = "adv7343",
-+		.board_info = {
-+			I2C_BOARD_INFO("adv7343", 0x2a),
-+			.platform_data = &adv7343_pdata,
-+		},
-+	},
-+};
-+
-+static const struct vpif_output da850_ch0_outputs[] = {
-+	{
-+		.output = {
-+			.index = 0,
-+			.name = "Composite",
-+			.type = V4L2_OUTPUT_TYPE_ANALOG,
-+			.capabilities = V4L2_OUT_CAP_STD,
-+			.std = V4L2_STD_ALL,
-+		},
-+		.subdev_name = "adv7343",
-+		.output_route = ADV7343_COMPOSITE_ID,
-+	},
-+	{
-+		.output = {
-+			.index = 1,
-+			.name = "S-Video",
-+			.type = V4L2_OUTPUT_TYPE_ANALOG,
-+			.capabilities = V4L2_OUT_CAP_STD,
-+			.std = V4L2_STD_ALL,
-+		},
-+		.subdev_name = "adv7343",
-+		.output_route = ADV7343_SVIDEO_ID,
-+	},
-+};
-+
-+static struct vpif_display_config da850_vpif_display_config = {
-+	.subdevinfo   = da850_vpif_subdev,
-+	.subdev_count = ARRAY_SIZE(da850_vpif_subdev),
-+	.chan_config[0] = {
-+		.outputs = da850_ch0_outputs,
-+		.output_count = ARRAY_SIZE(da850_ch0_outputs),
-+	},
-+	.card_name    = "DA850/OMAP-L138 Video Display",
-+};
-+#endif /* defined(CONFIG_DA850_UI_SD_VIDEO_PORT) */
-+
-+#if IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) || IS_ENABLED(CONFIG_DA850_UI_SD_VIDEO_PORT)
- static void __init da850_vpif_legacy_init(void)
- {
- 	int ret;
-@@ -119,8 +178,16 @@ static void __init da850_vpif_legacy_init(void)
- 	if (ret)
- 		pr_warn("%s: VPIF capture setup failed: %d\n",
- 			__func__, ret);
-+
-+	/* LCDK doesn't support VPIF display */
-+	if (of_machine_is_compatible("ti,da850-evm")) {
-+		ret = da850_register_vpif_display(&da850_vpif_display_config);
-+		if (ret)
-+			pr_warn("%s: VPIF display setup failed: %d\n",
-+				__func__, ret);
-+	}
- }
--#endif
-+#endif /* IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) || IS_ENABLED(CONFIG_DA850_UI_SD_VIDEO_PORT) */
- 
- static void pdata_quirks_check(struct pdata_init *quirks)
- {
--- 
-2.9.3
+> ---
+>  drivers/acpi/apei/ghes.c    |  9 ++++---
+>  drivers/firmware/efi/cper.c | 63 +++++++++++++++++++++++++++++++++++----------
+>  include/acpi/ghes.h         | 22 ++++++++++++++++
+>  3 files changed, 77 insertions(+), 17 deletions(-)
+>
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index 5e1ec41..b25e7cf 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -420,7 +420,8 @@ static void ghes_handle_memory_failure(struct acpi_hest_generic_data *gdata, int
+>         int flags = -1;
+>         int sec_sev = ghes_severity(gdata->error_severity);
+>         struct cper_sec_mem_err *mem_err;
+> -       mem_err = (struct cper_sec_mem_err *)(gdata + 1);
+> +
+> +       mem_err = acpi_hest_generic_data_payload(gdata);
+>
+>         if (!(mem_err->validation_bits & CPER_MEM_VALID_PA))
+>                 return;
+> @@ -457,7 +458,8 @@ static void ghes_do_proc(struct ghes *ghes,
+>                 if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
+>                                  CPER_SEC_PLATFORM_MEM)) {
+>                         struct cper_sec_mem_err *mem_err;
+> -                       mem_err = (struct cper_sec_mem_err *)(gdata+1);
+> +
+> +                       mem_err = acpi_hest_generic_data_payload(gdata);
+>                         ghes_edac_report_mem_error(ghes, sev, mem_err);
+>
+>                         arch_apei_report_mem_error(sev, mem_err);
+> @@ -467,7 +469,8 @@ static void ghes_do_proc(struct ghes *ghes,
+>                 else if (!uuid_le_cmp(*(uuid_le *)gdata->section_type,
+>                                       CPER_SEC_PCIE)) {
+>                         struct cper_sec_pcie *pcie_err;
+> -                       pcie_err = (struct cper_sec_pcie *)(gdata+1);
+> +
+> +                       pcie_err = acpi_hest_generic_data_payload(gdata);
+>                         if (sev == GHES_SEV_RECOVERABLE &&
+>                             sec_sev == GHES_SEV_RECOVERABLE &&
+>                             pcie_err->validation_bits & CPER_PCIE_VALID_DEVICE_ID &&
+> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+> index d425374..8fa4e23 100644
+> --- a/drivers/firmware/efi/cper.c
+> +++ b/drivers/firmware/efi/cper.c
+> @@ -32,6 +32,9 @@
+>  #include <linux/acpi.h>
+>  #include <linux/pci.h>
+>  #include <linux/aer.h>
+> +#include <linux/printk.h>
+> +#include <linux/bcd.h>
+> +#include <acpi/ghes.h>
+>
+>  #define INDENT_SP      " "
+>
+> @@ -386,13 +389,37 @@ static void cper_print_pcie(const char *pfx, const struct cper_sec_pcie *pcie,
+>         pfx, pcie->bridge.secondary_status, pcie->bridge.control);
+>  }
+>
+> +static void cper_estatus_print_section_v300(const char *pfx,
+> +       const struct acpi_hest_generic_data_v300 *gdata)
+> +{
+> +       __u8 hour, min, sec, day, mon, year, century, *timestamp;
+> +
+> +       if (gdata->validation_bits & ACPI_HEST_GEN_VALID_TIMESTAMP) {
+> +               timestamp = (__u8 *)&(gdata->time_stamp);
+> +               sec = bcd2bin(timestamp[0]);
+> +               min = bcd2bin(timestamp[1]);
+> +               hour = bcd2bin(timestamp[2]);
+> +               day = bcd2bin(timestamp[4]);
+> +               mon = bcd2bin(timestamp[5]);
+> +               year = bcd2bin(timestamp[6]);
+> +               century = bcd2bin(timestamp[7]);
+> +               printk("%stime: %7s %02d%02d-%02d-%02d %02d:%02d:%02d\n", pfx,
+> +                       0x01 & *(timestamp + 3) ? "precise" : "", century,
+> +                       year, mon, day, hour, min, sec);
+> +       }
+> +}
+> +
+>  static void cper_estatus_print_section(
+> -       const char *pfx, const struct acpi_hest_generic_data *gdata, int sec_no)
+> +       const char *pfx, struct acpi_hest_generic_data *gdata, int sec_no)
+>  {
+>         uuid_le *sec_type = (uuid_le *)gdata->section_type;
+>         __u16 severity;
+>         char newpfx[64];
+>
+> +       if (acpi_hest_generic_data_version(gdata) >= 3)
+> +               cper_estatus_print_section_v300(pfx,
+> +                       (const struct acpi_hest_generic_data_v300 *)gdata);
+> +
+>         severity = gdata->error_severity;
+>         printk("%s""Error %d, type: %s\n", pfx, sec_no,
+>                cper_severity_str(severity));
+> @@ -403,14 +430,18 @@ static void cper_estatus_print_section(
+>
+>         snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
+>         if (!uuid_le_cmp(*sec_type, CPER_SEC_PROC_GENERIC)) {
+> -               struct cper_sec_proc_generic *proc_err = (void *)(gdata + 1);
+> +               struct cper_sec_proc_generic *proc_err;
+> +
+> +               proc_err = acpi_hest_generic_data_payload(gdata);
+>                 printk("%s""section_type: general processor error\n", newpfx);
+>                 if (gdata->error_data_length >= sizeof(*proc_err))
+>                         cper_print_proc_generic(newpfx, proc_err);
+>                 else
+>                         goto err_section_too_small;
+>         } else if (!uuid_le_cmp(*sec_type, CPER_SEC_PLATFORM_MEM)) {
+> -               struct cper_sec_mem_err *mem_err = (void *)(gdata + 1);
+> +               struct cper_sec_mem_err *mem_err;
+> +
+> +               mem_err = acpi_hest_generic_data_payload(gdata);
+>                 printk("%s""section_type: memory error\n", newpfx);
+>                 if (gdata->error_data_length >=
+>                     sizeof(struct cper_sec_mem_err_old))
+> @@ -419,7 +450,9 @@ static void cper_estatus_print_section(
+>                 else
+>                         goto err_section_too_small;
+>         } else if (!uuid_le_cmp(*sec_type, CPER_SEC_PCIE)) {
+> -               struct cper_sec_pcie *pcie = (void *)(gdata + 1);
+> +               struct cper_sec_pcie *pcie;
+> +
+> +               pcie = acpi_hest_generic_data_payload(gdata);
+>                 printk("%s""section_type: PCIe error\n", newpfx);
+>                 if (gdata->error_data_length >= sizeof(*pcie))
+>                         cper_print_pcie(newpfx, pcie, gdata);
+> @@ -438,7 +471,7 @@ void cper_estatus_print(const char *pfx,
+>                         const struct acpi_hest_generic_status *estatus)
+>  {
+>         struct acpi_hest_generic_data *gdata;
+> -       unsigned int data_len, gedata_len;
+> +       unsigned int data_len;
+>         int sec_no = 0;
+>         char newpfx[64];
+>         __u16 severity;
+> @@ -451,12 +484,13 @@ void cper_estatus_print(const char *pfx,
+>         printk("%s""event severity: %s\n", pfx, cper_severity_str(severity));
+>         data_len = estatus->data_length;
+>         gdata = (struct acpi_hest_generic_data *)(estatus + 1);
+> +
+>         snprintf(newpfx, sizeof(newpfx), "%s%s", pfx, INDENT_SP);
+> -       while (data_len >= sizeof(*gdata)) {
+> -               gedata_len = gdata->error_data_length;
+> +
+> +       while (data_len >= acpi_hest_generic_data_size(gdata)) {
+>                 cper_estatus_print_section(newpfx, gdata, sec_no);
+> -               data_len -= gedata_len + sizeof(*gdata);
+> -               gdata = (void *)(gdata + 1) + gedata_len;
+> +               data_len -= acpi_hest_generic_data_record_size(gdata);
+> +               gdata = acpi_hest_generic_data_next(gdata);
+>                 sec_no++;
+>         }
+>  }
+> @@ -486,12 +520,13 @@ int cper_estatus_check(const struct acpi_hest_generic_status *estatus)
+>                 return rc;
+>         data_len = estatus->data_length;
+>         gdata = (struct acpi_hest_generic_data *)(estatus + 1);
+> -       while (data_len >= sizeof(*gdata)) {
+> -               gedata_len = gdata->error_data_length;
+> -               if (gedata_len > data_len - sizeof(*gdata))
+> +
+> +       while (data_len >= acpi_hest_generic_data_size(gdata)) {
+> +               gedata_len = acpi_hest_generic_data_error_length(gdata);
+> +               if (gedata_len > data_len - acpi_hest_generic_data_size(gdata))
+>                         return -EINVAL;
+> -               data_len -= gedata_len + sizeof(*gdata);
+> -               gdata = (void *)(gdata + 1) + gedata_len;
+> +               data_len -= gedata_len + acpi_hest_generic_data_size(gdata);
+> +               gdata = acpi_hest_generic_data_next(gdata);
+>         }
+>         if (data_len)
+>                 return -EINVAL;
+> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+> index 68f088a..6ae318b 100644
+> --- a/include/acpi/ghes.h
+> +++ b/include/acpi/ghes.h
+> @@ -12,6 +12,18 @@
+>  #define GHES_TO_CLEAR          0x0001
+>  #define GHES_EXITING           0x0002
+>
+> +#define acpi_hest_generic_data_error_length(gdata)     \
+> +       (((struct acpi_hest_generic_data *)(gdata))->error_data_length)
+> +#define acpi_hest_generic_data_size(gdata)             \
+> +       ((acpi_hest_generic_data_version(gdata) >= 3) ? \
+> +       sizeof(struct acpi_hest_generic_data_v300) :    \
+> +       sizeof(struct acpi_hest_generic_data))
+> +#define acpi_hest_generic_data_record_size(gdata)      \
+> +       (acpi_hest_generic_data_size(gdata) +           \
+> +       acpi_hest_generic_data_error_length(gdata))
+> +#define acpi_hest_generic_data_next(gdata)             \
+> +       ((void *)(gdata) + acpi_hest_generic_data_record_size(gdata))
+> +
+>  struct ghes {
+>         union {
+>                 struct acpi_hest_generic *generic;
+> @@ -73,3 +85,13 @@ static inline void ghes_edac_unregister(struct ghes *ghes)
+>  {
+>  }
+>  #endif
+> +
+> +#define acpi_hest_generic_data_version(gdata)                  \
+> +       (gdata->revision >> 8)
+> +
+> +static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data *gdata)
+> +{
+> +       return acpi_hest_generic_data_version(gdata) >= 3 ?
+> +               (void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
+> +               gdata + 1;
+> +}
+> --
+> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project.
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
