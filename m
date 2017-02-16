@@ -1,40 +1,24 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Feb 2017 20:08:27 +0100
-Subject: [PATCH 20/21] ARM: sunxi: Enable dwmac-sun8i driver on
- sunxi_defconfig
-In-Reply-To: <20170216124859.14346-21-clabbe.montjoie@gmail.com>
-References: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
- <20170216124859.14346-21-clabbe.montjoie@gmail.com>
-Message-ID: <20170216190827.jaky5xyzqtuzhy76@lukather>
+Date: Thu, 16 Feb 2017 18:53:18 +0100
+Subject: [PATCH] clk: sunxi: ccu-sun5i needs nkmp
+In-Reply-To: <20170214213005.2848151-1-arnd@arndb.de>
+References: <20170214213005.2848151-1-arnd@arndb.de>
+Message-ID: <20170216175318.fuj375743jt43um4@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Feb 16, 2017 at 01:48:58PM +0100, Corentin Labbe wrote:
-> From: LABBE Corentin <clabbe.montjoie@gmail.com>
+On Tue, Feb 14, 2017 at 10:29:45PM +0100, Arnd Bergmann wrote:
+> A randconfig build ran into this rare link error:
 > 
-> Enable the dwmac-sun8i driver in the sunxi default configuration
+> drivers/clk/sunxi-ng/ccu-sun5i.o:(.data.__compound_literal.1+0x4): undefined reference to `ccu_nkmp_ops'
+> drivers/clk/sunxi-ng/ccu-sun5i.o:(.data.__compound_literal.7+0x4): undefined reference to `ccu_nkmp_ops'
 > 
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> ---
->  arch/arm/configs/sunxi_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+> This adds the missing 'select'.
 > 
-> diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-> index da92c25..33bde86 100644
-> --- a/arch/arm/configs/sunxi_defconfig
-> +++ b/arch/arm/configs/sunxi_defconfig
-> @@ -40,6 +40,7 @@ CONFIG_ATA=y
->  CONFIG_AHCI_SUNXI=y
->  CONFIG_NETDEVICES=y
->  CONFIG_SUN4I_EMAC=y
-> +CONFIG_DWMAC_SUN8I=m
+> Fixes: 5e73761786d6 ("clk: sunxi-ng: Add sun5i CCU driver")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I think I'd prefer to have it compiled statically, just like the other
-net drivers, and drivers in general.
-
-Thanks!
+Queued as a fix for 4.11, thanks!
 Maxime
 
 -- 
@@ -47,4 +31,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170216/8e530cfb/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170216/df7755f6/attachment-0001.sig>
