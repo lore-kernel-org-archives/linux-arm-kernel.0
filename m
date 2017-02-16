@@ -1,117 +1,74 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Thu, 16 Feb 2017 10:04:23 +0530
-Subject: [PATCH 0/2] RFC: Move efi bgrt code out of arch/x86
-In-Reply-To: <4695986.Exl6llDaHp@aspire.rjw.lan>
-References: <1487163892-27701-1-git-send-email-bhsharma@redhat.com>
- <CAKv+Gu-qv83fi9qBugA=Od2htcLb966SPBpZXSnXdH=AYw-COw@mail.gmail.com>
- <4695986.Exl6llDaHp@aspire.rjw.lan>
-Message-ID: <CACi5LpMwvwm8RVi=OZTHhWsUUpkzhzrvhJ4m6Kcgf3=eW1O1gQ@mail.gmail.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Wed, 15 Feb 2017 20:58:32 -0800
+Subject: [PATCH v2] reset: Add i.MX7 SRC reset driver
+In-Reply-To: <1487150153.2433.11.camel@pengutronix.de>
+References: <20170213153338.13518-1-andrew.smirnov@gmail.com>
+ <1487004643.2873.97.camel@pengutronix.de>
+ <CAHQ1cqFXiu03902jWLkg8X6jdQ3+TiLj02dSDFBAVH98ABo70A@mail.gmail.com>
+ <1487089919.2305.22.camel@pengutronix.de>
+ <CAHQ1cqGHujsDsC5dtXk3_1u0kKme8k96jgSctp5XFSHuYKeE=A@mail.gmail.com>
+ <1487150153.2433.11.camel@pengutronix.de>
+Message-ID: <CAHQ1cqGhUFNQ=q6gTXRnkm3QRCstiPtpDQBtCfwZ+Fua+rbrxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard, Rafael
-
-On Thu, Feb 16, 2017 at 5:14 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Wednesday, February 15, 2017 05:44:28 PM Ard Biesheuvel wrote:
->> Hello Bhupesh,
+On Wed, Feb 15, 2017 at 1:15 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> On Tue, 2017-02-14 at 12:11 -0800, Andrey Smirnov wrote:
+> [...]
+>> > Arguably, the A7 resets should not be handled by the peripheral reset
+>> > controller, but at least for the others I see no reason not to leave
+>> > space for them in the index table.
 >>
->> On 15 February 2017 at 13:04, Bhupesh Sharma <bhsharma@redhat.com> wrote:
->> > This patchset presents a RFC approach to move the ACPI BGRT table
->> > handling related code out of 'arch/x86' and place it inside
->> > 'drivers/firmware/efi' so that it can be used to support
->> > ACPI BGRT table and BGRT logo across x86 and AARCH64 ARCHs.
->> >
->> > Note that this patchset is primarily tested on Qemu VMs for x86_64
->> > and AARCH64 environments, while I try to get my hands on a real
->> > AARCH64 hardware which supports a graphic card and whose boot firmware
->> > I can modify to support the ACPI BGRT table to be passed to the kernel.
->> >
->> > Here are some details/outputs about/from the test environment:
->> >
->> > AARCH64:
->> > ========
->> > 1. I used the latest Qemu (master branch) and compiled it for aarch64 with softmmu support.
->> >    Here is the command line I use to launch the same:
->> >
->> > # qemu-system-aarch64 -cpu cortex-a57 -M virt -m 2048 -bios QEMU_EFI.fd -kernel Image -initrd rootfs.cpio -serial stdio --append "acpi=force" -device virtio-gpu-pci
->> >
->> > where, QEMU_EFI.fd is the DEBUG build of EDK2 ArmVirtQemu.dsc (master branch)
->> >        rootfs.cpio is the AARCH64 build of Buildroot (Little Endian AARCH64)
->> >        -device virtio-gpu-pci provides the Graphical support required to have BGRT logo.
->> >
->> >
->> > 2. Here are some test results once Linux boots up, which show a valid BGRT table/logo being
->> >    seen by the kernel:
->> >
->> > # acpidump
->> > ...
->> >
->> > BGRT @ 0x0000000000000000
->> >   0000: 42 47 52 54 38 00 00 00 01 B4 49 4E 54 45 4C 20  BGRT8.....INTEL
->> >   0010: 45 44 4B 32 20 20 20 20 02 00 00 00 20 20 20 20  EDK2    ....
->> >   0020: 13 00 00 01 01 00 01 00 00 80 B0 BA 00 00 00 00  ................
->> >   0030: 2F 01 00 00 0F 01 00 00                          /.......
->> >
->> > # dmesg | grep -i BGRT
->> > [    0.000000] ACPI: BGRT 0x00000000B8640000 000038 (v01 INTEL  EDK2     00000002      01000013)
->> >
->> >
->> > # ls -lah /sys/firmware/acpi/bgrt/image
->> > -r--r--r--    1 root     root       32.9K Feb 15 11:27 /sys/firmware/acpi/bgrt/image
->> >
->> > x86:
->> > ====
->> > 1. I used the latest Qemu (master branch) and compiled it for x86.
->> >    Here is the command line I use to launch the same:
->> >
->> > # qemu-system-x86_64 -enable-kvm -sdl -m 2048 -vga std -boot c -cpu host -bios OVMF_CODE.fd -kernel bzImage -initrd rootfs.cpio -serial stdio
->> >
->> > where, OVMF_CODE.fd is the RELEASE build of EDK2 OvmfPkg (master branch)
->> >        rootfs.cpio is the x86_64 build of Buildroot
->> >
->> > 2. Similar test results are seen as noted for the AARCH64 case above, which show a valid BGRT table/logo being
->> >    seen by the kernel.
->> >
->> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > Cc: Ingo Molnar <mingo@kernel.org>
->> > Cc: Matt Fleming <matt@codeblueprint.co.uk>
->> > Cc: Dan Williams <dan.j.williams@intel.com>
->> > Cc: Dave Young <dyoung@redhat.com>
->> > Cc: Thomas Gleixner <tglx@linutronix.de>
->> > Cc: Mark Rutland <mark.rutland@arm.com>
->> > Cc: Will Deacon <will.deacon@arm.com>
->> >
->> > Bhupesh Sharma (2):
->> >   x86/efi-bgrt: Move efi-bgrt handling out of arch/x86
->> >   bgrt: Make ACPI BGRT parsing code common for ARCHs
->> >
->> >  arch/arm64/kernel/acpi.c                               | 3 +++
->> >  arch/x86/kernel/acpi/boot.c                            | 6 ------
->> >  arch/x86/platform/efi/Makefile                         | 1 -
->> >  drivers/acpi/Kconfig                                   | 2 +-
->> >  drivers/acpi/bgrt.c                                    | 6 ++++++
->> >  drivers/firmware/efi/Makefile                          | 1 +
->> >  {arch/x86/platform => drivers/firmware}/efi/efi-bgrt.c | 0
->> >  include/linux/efi-bgrt.h                               | 2 ++
->> >  8 files changed, 13 insertions(+), 8 deletions(-)
->> >  rename {arch/x86/platform => drivers/firmware}/efi/efi-bgrt.c (100%)
->> >
+>> If for some bizarre reason one was to run Linux on M4 and use A7 as
+>> applications processor, resetting A7 might be useful. But that's a
+>> very unlikely use-case.
 >>
->> These patches look fine to me, and I think we should be able to merge
->> them without any changes.
+>> > In fact, since unused reset controls
+>> > don't use space, why not number them all?
 >>
->> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> IMHO because it is unused code and because those numbers constitute an
+>> interface which once set will be hard to change if need be.
 >>
->> You only failed to cc the ACPI maintainers, please add Len and Rafael next time.
-
-Oops. Will take care in future.
-
-> No worries.
+>> But that's not that important and I don't feel particularly strong
+>> about that point, so I'll add those sources in v3.
 >
-> The changes are fine by me.
+> Thanks.
 >
+>> Do you insist that I split what I call IMX7_RESET_PCIEPHY into
+>> PCIEPHY_G_RST and PCIEPHY_BTN or can I keep it as a single logical
+>> reset?
+>
+> No, I say keep it as is. For now I'll assume this is not a reset, but
+> some other interface signal that just happens to be routed out to the
+> SRC and just happens to be toggled around the same time in the enable
+> sequence.
+>
+> [...]
+>> >> >> +#define IMX7_RESET_PCIE_CTRL_APPS    0
+>> >> >> +#define IMX7_RESET_PCIEPHY           1
+>> >> >
+>> >> > It would expect these to be numbered in the order they appear in the
+>> >> > register map, not starting from the end. Could you add all available
+>> >> > peripheral resets to this list, in the correct order?
+>> >>
+>> >> The numbering is just a consequence of me adding only resets I could
+>> >> exercise with my code and numbering then starting from zero. I also
+>> >> was hesitant adding more sources since it seemed to me that some of
+>> >> less trivial registers in that IP block might be best represented as a
+>> >> single reset source doing something more sophisticated that just
+>> >> setting a bit under the hood.
+>> >
+>> > Any in particular?
+>>
+>> USBPHY1/2 and maybe MIPI resets? But that's no more than a gut feeling.
+>
+> Is there any downstream code that already handles these resets? At least
+> for the USB PHYs I'd expect there has to be something we could look at.
 
-Thanks Rafael and Ard.
+Just went and double checked. Of the three that I mentioned, couldn't
+find anything besides MIPI and for that only one of the signals was
+being used, nothing fancy. I think I'll just expose all of the signals
+as discussed above and not worry about it in v3.
 
-Regards,
-Bhupesh
+Thanks,
+Andrey Smirnov
