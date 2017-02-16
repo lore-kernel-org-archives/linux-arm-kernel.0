@@ -1,74 +1,41 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 16 Feb 2017 14:46:03 +0100
-Subject: [RFC PATCH 06/33] irqchip/gic-v3-its: Add probing for VLPI
- properties
-In-Reply-To: <alpine.DEB.2.20.1702131057290.3619@nanos>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-7-git-send-email-marc.zyngier@arm.com>
- <alpine.DEB.2.20.1702131057290.3619@nanos>
-Message-ID: <d04c4e22-49cd-13f8-f461-9ccf8057cb96@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Feb 2017 14:51:08 +0100
+Subject: [PATCH 0/4] ARM64: Initial Realtek RTD1295 enablement
+In-Reply-To: <20170214033440.18667-1-afaerber@suse.de>
+References: <20170214033440.18667-1-afaerber@suse.de>
+Message-ID: <2627010.mZmgFkHdOI@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 13/02/2017 11:00, Thomas Gleixner wrote:
-> On Tue, 17 Jan 2017, Marc Zyngier wrote:
->> +	typer = gic_read_typer(its_base + GITS_TYPER);
->>  	its->base = its_base;
->>  	its->phys_base = res->start;
->> -	its->ite_size = ((gic_read_typer(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
->> +	its->ite_size = ((typer >> 4) & 0xf) + 1;
->> +	its->is_v4 = !!(typer & GITS_TYPER_VLPIS);
->> +	if (its->is_v4 && !(typer & GITS_TYPER_VMOVP)) {
->> +		int its_number;
->> +
->> +		its_number = find_first_zero_bit(&its_list_map, 16);
+On Tuesday, February 14, 2017 4:34:35 AM CET Andreas F?rber wrote:
 > 
-> s/16/ITS_MAX_ENTITIES or whatever.
+> This mini-series adds initial support for the Realtek RTD1295 SoC and
+> the Zidoo X9S TV box.
 > 
->> +		if (its_number >= 16) {
->> +			pr_err("ITS@%pa: No ITSList entry available!\n",
->> +			       &res->start);
->> +			err = -EINVAL;
->> +			goto out_free_its;
->> +		}
->> +
->> +		ctlr = readl_relaxed(its_base + GITS_CTLR);
->> +		ctlr &= ~GITS_CTLR_ITS_NUMBER;
->> +		ctlr |= its_number << GITS_CTLR_ITS_NUMBER_SHIFT;
->> +		writel_relaxed(ctlr, its_base + GITS_CTLR);
->> +		ctlr = readl_relaxed(its_base + GITS_CTLR);
->> +		if ((ctlr & GITS_CTLR_ITS_NUMBER) != (its_number << GITS_CTLR_ITS_NUMBER_SHIFT)) {
->> +			its_number = ctlr & GITS_CTLR_ITS_NUMBER;
->> +			its_number >>= GITS_CTLR_ITS_NUMBER_SHIFT;
->> +		}
->> +
->> +		if (test_and_set_bit(its_number, &its_list_map)) {
+> With these patches CPU0 can be booted with earlycon.
 > 
-> You just established above that the bit is not set. I assume that this is
-> code which has no concurrency concerns....
-
-I understand this covers the case where the ITS_number field is RO. In
-such a case the its_number has changed just above compared to the first
-find_first_zero_bit?
-
-Besides
-
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-Thanks
-
-Eric
-
-
+> PSCI doesn't work despite present in the vendor device tree; as enable-method
+> it instead used a custom "rtk-spin-table" that I sadly have no source code of.
 > 
-> Thanks,
+> The UARTs use a custom interrupt controller that I again lack source code of;
+> with interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH> it can boot into an initrd.
 > 
-> 	tglx
+> The boot process is slightly twisted: The files need to be loaded from a
+> 32-bit U-Boot, then boot into 64-bit U-Boot where the kernel can be booted.
+> Similar to my previous Amlogic S905 work, the TEXT_OFFSET poses a problem, so
+> a uImage needs to be used (or the kernel patched) for load address 0x00280000.
+> I haven't succeeded loading an initrd via bootm/booti; but as quick workaround
+> initrd=$rootfs_loadaddr,0x$filesize can manually be specified in $bootargs.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
+
+Nice!
+
+You can add my
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+please them to arm at kernel.org after the merge window as a patch
+set, so we can add them for 4.12.
+
+	Arnd
