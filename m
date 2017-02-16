@@ -1,40 +1,42 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 16 Feb 2017 13:48:53 +0100
-Subject: [PATCH 15/21] ARM64: dts: sun50i-a64: Add dt node for the syscon
- control module
+Date: Thu, 16 Feb 2017 13:48:55 +0100
+Subject: [PATCH 17/21] ARM: dts: sun50i-a64: enable dwmac-sun8i on pine64
 In-Reply-To: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
 References: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170216124859.14346-16-clabbe.montjoie@gmail.com>
+Message-ID: <20170216124859.14346-18-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the dt node for the syscon register present on the
-Allwinner A64.
-
-Only two register are present in this syscon and the only one useful is
-the one dedicated to EMAC clock.
+The dwmac-sun8i hardware is present on the pine64
+It uses an external PHY via RMII.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 1c64ea2..3b09af2 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -121,6 +121,12 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		syscon: syscon at 01c00000 {
-+			compatible = "syscon",
-+				"allwinner,sun8i-h3-system-controller";
-+			reg = <0x01c00000 0x1000>;
-+		};
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index c680ed3..b53994d 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -109,3 +109,18 @@
+ &usbphy {
+ 	status = "okay";
+ };
 +
- 		mmc0: mmc at 1c0f000 {
- 			compatible = "allwinner,sun50i-a64-mmc";
- 			reg = <0x01c0f000 0x1000>;
++&mdio {
++	ext_rmii_phy1: ethernet-phy at 1 {
++	      reg = <1>;
++	};
++};
++
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&rmii_pins>;
++	phy-mode = "rmii";
++	phy-handle = <&ext_rmii_phy1>;
++	status = "okay";
++
++};
 -- 
 2.10.2
