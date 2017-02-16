@@ -1,103 +1,101 @@
 From: john@metanate.com (John Keeping)
-Date: Thu, 16 Feb 2017 14:11:04 +0000
-Subject: [PATCH v3 23/24] drm/rockchip: dw-mipi-dsi: add reset control
-In-Reply-To: <58A50A91.6010202@rock-chips.com>
+Date: Thu, 16 Feb 2017 14:22:22 +0000
+Subject: [PATCH v3 22/24] drm/rockchip: dw-mipi-dsi: support non-burst
+ modes
+In-Reply-To: <58A5161A.3070205@rock-chips.com>
 References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-24-john@metanate.com>
- <58A3CD45.9090309@rock-chips.com>
- <20170215123944.798ae363.john@metanate.com>
- <58A50A91.6010202@rock-chips.com>
-Message-ID: <20170216141104.5ecca1df.john@metanate.com>
+ <20170129132444.25251-23-john@metanate.com>
+ <20170131192255.GF20076@art_vandelay>
+ <58A5161A.3070205@rock-chips.com>
+Message-ID: <20170216142222.2831e474.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Feb 2017 10:12:33 +0800, Chris Zhong wrote:
+On Thu, 16 Feb 2017 11:01:46 +0800, Chris Zhong wrote:
 
-> On 02/15/2017 08:39 PM, John Keeping wrote:
-> > On Wed, 15 Feb 2017 11:38:45 +0800, Chris Zhong wrote:
+> On 02/01/2017 03:22 AM, Sean Paul wrote:
+> > On Sun, Jan 29, 2017 at 01:24:42PM +0000, John Keeping wrote:
+> >
+> > Reviewed-by: Sean Paul <seanpaul@chromium.org>
 > >  
-> >> On 01/29/2017 09:24 PM, John Keeping wrote:  
-> >>> In order to fully reset the state of the MIPI controller we must assert
-> >>> this reset.
-> >>>
-> >>> This is slightly more complicated than it could be in order to maintain
-> >>> compatibility with device trees that do not specify the reset property.
-> >>>
-> >>> Signed-off-by: John Keeping <john@metanate.com>
-> >>> Reviewed-by: Chris Zhong <zyw@rock-chips.com>
-> >>> ---
-> >>> v3:
-> >>> - Add Chris' Reviewed-by
-> >>> Unchanged in v2
-> >>>
-> >>>    drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 30 ++++++++++++++++++++++++++++++
-> >>>    1 file changed, 30 insertions(+)
-> >>>
-> >>> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> >>> index 58cb8ace2fe8..cf3ca6b0cbdb 100644
-> >>> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> >>> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> >>> @@ -13,6 +13,7 @@
-> >>>    #include <linux/module.h>
-> >>>    #include <linux/of_device.h>
-> >>>    #include <linux/regmap.h>
-> >>> +#include <linux/reset.h>
-> >>>    #include <linux/mfd/syscon.h>
-> >>>    #include <drm/drm_atomic_helper.h>
-> >>>    #include <drm/drm_crtc.h>
-> >>> @@ -1124,6 +1125,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
-> >>>    			of_match_device(dw_mipi_dsi_dt_ids, dev);
-> >>>    	const struct dw_mipi_dsi_plat_data *pdata = of_id->data;
-> >>>    	struct platform_device *pdev = to_platform_device(dev);
-> >>> +	struct reset_control *apb_rst;
-> >>>    	struct drm_device *drm = data;
-> >>>    	struct dw_mipi_dsi *dsi;
-> >>>    	struct resource *res;
-> >>> @@ -1162,6 +1164,34 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
-> >>>    		return ret;
-> >>>    	}
-> >>>    
-> >>> +	/*
-> >>> +	 * Note that the reset was not defined in the initial device tree, so
-> >>> +	 * we have to be prepared for it not being found.
-> >>> +	 */
-> >>> +	apb_rst = devm_reset_control_get(dev, "apb");
-> >>> +	if (IS_ERR(apb_rst)) {
-> >>> +		if (PTR_ERR(apb_rst) == -ENODEV) {  
-> >> According to [0], I think it should be -ENOENT here.  
-> > Nice catch, I'll fix this.
-> >  
-> >> [0]
-> >> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=3d81216fde465e76c5eae98f61d3666163634395
+> >> Signed-off-by: John Keeping <john@metanate.com>
+> >> Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+> >> ---
+> >> v3:
+> >> - Add Chris' Reviewed-by
+> >> Unchanged in v2
 > >>
-> >> commit 3d81216fde465e76c5eae98f61d3666163634395
-> >> Author: Alban Bedel <albeu@free.fr>
-> >> Date:   Tue Sep 1 17:28:31 2015 +0200
+> >>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 16 +++++++++-------
+> >>   1 file changed, 9 insertions(+), 7 deletions(-)
 > >>
-> >>       reset: Fix of_reset_control_get() for consistent return values
-> >>
-> >>       When of_reset_control_get() is called without connection ID it returns
-> >>       -ENOENT when the 'resets' property doesn't exists or is an empty entry.
-> >>       However when a connection ID is given it returns -EINVAL when the
-> >> 'resets'
-> >>       property doesn't exists or the requested name can't be found. This is
-> >>       because the error code returned by of_property_match_string() is just
-> >>       passed down as an index to of_parse_phandle_with_args(), which then
-> >>       returns -EINVAL.
-> >>
-> >>       To get a consistent return value with both code paths we must return
-> >>       -ENOENT when of_property_match_string() fails.
-> >>
-> >>       Signed-off-by: Alban Bedel <albeu@free.fr>
-> >>       Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> >>
-> >>  
-> >>> +			apb_rst = NULL;
-> >>> +		} else {
-> >>> +			dev_err(dev, "Unable to get reset control: %d\n", ret);  
-> Also, we can not get error number from "ret" here.
+> >> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> >> index 5bad92e2370e..58cb8ace2fe8 100644
+> >> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> >> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> >> @@ -82,6 +82,7 @@
+> >>   #define FRAME_BTA_ACK			BIT(14)
+> >>   #define ENABLE_LOW_POWER		(0x3f << 8)
+> >>   #define ENABLE_LOW_POWER_MASK		(0x3f << 8)
+> >> +#define VID_MODE_TYPE_NON_BURST_SYNC_EVENTS	0x1
+> >>   #define VID_MODE_TYPE_BURST_SYNC_PULSES		0x2  
+> This field indicates the video mode transmission type as follows:
+> 00: Non-burst with sync pulses
+> 01: Non-burst with sync events
+> 10 and 11: Burst mode
+> 
+> So, I think define the macro like this is better:
+> 
+> #define VID_MODE_TYPE_NON_BURST_SYNC_PULSES    0x0
+> #define VID_MODE_TYPE_NON_BURST_SYNC_EVENTS    0x1
+> #define VID_MODE_TYPE_BURST            0x2
+> 
+> 
+> >>   #define VID_MODE_TYPE_MASK			0x3
+> >>   
+> >> @@ -286,6 +287,7 @@ struct dw_mipi_dsi {
+> >>   	u32 format;
+> >>   	u16 input_div;
+> >>   	u16 feedback_div;
+> >> +	unsigned long mode_flags;
+> >>   
+> >>   	const struct dw_mipi_dsi_plat_data *pdata;
+> >>   };
+> >> @@ -551,15 +553,10 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
+> >>   		return -EINVAL;
+> >>   	}
+> >>   
+> >> -	if (!(device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) ||
+> >> -	    !(device->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)) {
+> >> -		dev_err(dsi->dev, "device mode is unsupported\n");
+> >> -		return -EINVAL;
+> >> -	}
+> >> -
+> >>   	dsi->lanes = device->lanes;
+> >>   	dsi->channel = device->channel;
+> >>   	dsi->format = device->format;
+> >> +	dsi->mode_flags = device->mode_flags;
+> >>   	dsi->panel = of_drm_find_panel(device->dev.of_node);
+> >>   	if (dsi->panel)
+> >>   		return drm_panel_attach(dsi->panel, &dsi->connector);
+> >> @@ -716,7 +713,12 @@ static void dw_mipi_dsi_video_mode_config(struct dw_mipi_dsi *dsi)
+> >>   {
+> >>   	u32 val;
+> >>   
+> >> -	val = VID_MODE_TYPE_BURST_SYNC_PULSES | ENABLE_LOW_POWER;
+> >> +	val = ENABLE_LOW_POWER;
+> >> +
+> >> +	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
+> >> +		val |= VID_MODE_TYPE_BURST_SYNC_PULSES;
+> >> +	else if (!(dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE))
+> >> +		val |= VID_MODE_TYPE_NON_BURST_SYNC_EVENTS;  
+> 
+> if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
+> 	val |= VID_MODE_TYPE_BURST;
+> else if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)
+> 	val |= VID_MODE_TYPE_NON_BURST_SYNC_PULSES;
+> else
+> 	val |= VID_MODE_TYPE_NON_BURST_SYNC_EVENTS;
 
-Good point, I'll fix this.
-
-
-John
+OK, this is definitely clearer now that I've forgotten most of the
+datasheet; without your definitions at the top it's not clear that
+VID_MODE_TYPE_BURST_SYNC_PULSES is zero.
