@@ -1,49 +1,79 @@
-From: yuantian.tang@nxp.com (Y.T. Tang)
-Date: Thu, 16 Feb 2017 02:21:09 +0000
-Subject: [PATCH 2/2] clk: qoriq: Separate root input clock for core PLLs
- on ls1012a
-In-Reply-To: <1487183790.5636.13.camel@buserror.net>
-References: <1487137656-4006-1-git-send-email-yuantian.tang@nxp.com>
- <1487137656-4006-2-git-send-email-yuantian.tang@nxp.com>
- <1487183790.5636.13.camel@buserror.net>
-Message-ID: <DB6PR0402MB28374AECE0955BECE2C184E5F05A0@DB6PR0402MB2837.eurprd04.prod.outlook.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Wed, 15 Feb 2017 18:19:31 -0800
+Subject: [PATCH v4 29/36] media: imx: mipi-csi2: enable setting and getting of
+ frame rates
+In-Reply-To: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1487211578-11360-30-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
-> -----Original Message-----
-> From: Scott Wood [mailto:oss at buserror.net]
-> Sent: Thursday, February 16, 2017 2:37 AM
-> To: Y.T. Tang <yuantian.tang@nxp.com>; mturquette at baylibre.com
-> Cc: sboyd at codeaurora.org; robh+dt at kernel.org; mark.rutland at arm.com;
-> linux-clk at vger.kernel.org; devicetree at vger.kernel.org; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 2/2] clk: qoriq: Separate root input clock for core PLLs on
-> ls1012a
-> 
-> On Wed, 2017-02-15 at 13:47 +0800, yuantian.tang at nxp.com wrote:
-> > From: Tang Yuantian <Yuantian.Tang@nxp.com>
-> >
-> > ls1012a has separate input root clocks for core PLLs versus the
-> > platform PLL, with the latter described as sysclk in the hw docs.
-> > If a second input clock, named "coreclk", is present, this clock will
-> > be used for the core PLLs.
-> >
-> > Signed-off-by: Scott Wood <oss@buserror.net>
-> > Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
-> > ---
-> > ?drivers/clk/clk-qoriq.c | 91
-> > +++++++++++++++++++++++++++++++++++++++++-----
-> 
-> Why did you reset the author on these patches? ?Have you changed anything?
-> ?Why aren't they marked either v2 or resend?
-> 
+Setting and getting frame rates is part of the negotiation mechanism
+between subdevs.  The lack of support means that a frame rate at the
+sensor can't be negotiated through the subdev path.
 
-I should have marked as v2 or resend. If anything changed, I take it over and dropped the 2/3 patch in your original patch set to speed up the merge, which I think so.
-This patch set blocks other patches and 20 days passed, no any action on it. We can't account on you to push it. That's why I take it over and resend it.
+Add support at MIPI CSI2 level for handling this part of the
+negotiation.
 
-All in all, what you suggest to do to make them get accepted ASAP?
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+---
+ drivers/staging/media/imx/imx6-mipi-csi2.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-Regards,
-Yuantian
-> -Scott
+diff --git a/drivers/staging/media/imx/imx6-mipi-csi2.c b/drivers/staging/media/imx/imx6-mipi-csi2.c
+index 23dca80..c62f14e 100644
+--- a/drivers/staging/media/imx/imx6-mipi-csi2.c
++++ b/drivers/staging/media/imx/imx6-mipi-csi2.c
+@@ -34,6 +34,7 @@ struct csi2_dev {
+ 	struct v4l2_subdev      sd;
+ 	struct media_pad       pad[CSI2_NUM_PADS];
+ 	struct v4l2_mbus_framefmt format_mbus;
++	struct v4l2_fract      frame_interval;
+ 	struct clk             *dphy_clk;
+ 	struct clk             *cfg_clk;
+ 	struct clk             *pix_clk; /* what is this? */
+@@ -397,6 +398,30 @@ static int csi2_set_fmt(struct v4l2_subdev *sd,
+ 	return 0;
+ }
+ 
++static int csi2_g_frame_interval(struct v4l2_subdev *sd,
++				 struct v4l2_subdev_frame_interval *fi)
++{
++	struct csi2_dev *csi2 = sd_to_dev(sd);
++
++	fi->interval = csi2->frame_interval;
++
++	return 0;
++}
++
++static int csi2_s_frame_interval(struct v4l2_subdev *sd,
++				 struct v4l2_subdev_frame_interval *fi)
++{
++	struct csi2_dev *csi2 = sd_to_dev(sd);
++
++	/* Output pads mirror active input pad, no limits on input pads */
++	if (fi->pad != CSI2_SINK_PAD)
++		fi->interval = csi2->frame_interval;
++
++	csi2->frame_interval = fi->interval;
++
++	return 0;
++}
++
+ /*
+  * retrieve our pads parsed from the OF graph by the media device
+  */
+@@ -430,6 +455,8 @@ static struct v4l2_subdev_core_ops csi2_core_ops = {
+ 
+ static struct v4l2_subdev_video_ops csi2_video_ops = {
+ 	.s_stream = csi2_s_stream,
++	.g_frame_interval = csi2_g_frame_interval,
++	.s_frame_interval = csi2_s_frame_interval,
+ };
+ 
+ static struct v4l2_subdev_pad_ops csi2_pad_ops = {
+-- 
+2.7.4
