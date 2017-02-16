@@ -1,56 +1,73 @@
-From: chris.brandt@renesas.com (Chris Brandt)
-Date: Thu, 16 Feb 2017 10:37:26 -0500
-Subject: [PATCH v3 3/3] ARM: dts: r7s72100: add l2 cache
-In-Reply-To: <20170216153726.22919-1-chris.brandt@renesas.com>
-References: <20170216153726.22919-1-chris.brandt@renesas.com>
-Message-ID: <20170216153726.22919-4-chris.brandt@renesas.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Thu, 16 Feb 2017 17:06:20 +0100
+Subject: [PATCH 03/10] media: dt-bindings: vpif: extend the example with
+ an output port
+In-Reply-To: <20170215220822.nsws6kzrd6ihvmqt@rob-hp-laptop>
+References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
+ <1486485683-11427-4-git-send-email-bgolaszewski@baylibre.com>
+ <20170215220822.nsws6kzrd6ihvmqt@rob-hp-laptop>
+Message-ID: <CAMpxmJUuaa+aZQaPaYokfNrehzOTuvT7jJPpxpDLQiuEyY2Oqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note that early-bresp-disable and full-line-zero-disable are required
-because the sideband signals between the CPU and L2C were not connected
-in this SoC.
+2017-02-15 23:08 GMT+01:00 Rob Herring <robh@kernel.org>:
+> On Tue, Feb 07, 2017 at 05:41:16PM +0100, Bartosz Golaszewski wrote:
+>> This makes the example more or less correspond with the da850-evm
+>> hardware setup.
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> ---
+>>  .../devicetree/bindings/media/ti,da850-vpif.txt    | 35 ++++++++++++++++++----
+>>  1 file changed, 29 insertions(+), 6 deletions(-)
+>
+> Spoke too soon...
+>
+>>
+>> diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+>> index 9c7510b..543f6f3 100644
+>> --- a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+>> +++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+>> @@ -28,19 +28,27 @@ I2C-connected TVP5147 decoder:
+>>               reg = <0x217000 0x1000>;
+>>               interrupts = <92>;
+>>
+>> -             port {
+>> -                     vpif_ch0: endpoint at 0 {
+>> +             port at 0 {
+>> +                     vpif_input_ch0: endpoint at 0 {
+>>                               reg = <0>;
+>>                               bus-width = <8>;
+>> -                             remote-endpoint = <&composite>;
+>> +                             remote-endpoint = <&composite_in>;
+>>                       };
+>>
+>> -                     vpif_ch1: endpoint at 1 {
+>> +                     vpif_input_ch1: endpoint at 1 {
+>>                               reg = <1>;
+>>                               bus-width = <8>;
+>>                               data-shift = <8>;
+>>                       };
+>>               };
+>> +
+>> +             port at 1 {
+>
+> The binding doc says nothing about supporting a 2nd port.
+>
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v3:
-* split "arm,pl310-no-sideband" into "arm,early-bresp-disable" and
-  "arm,full-line-zero-disable"
-v2:
-* added "arm,pl310-no-sideband"
----
- arch/arm/boot/dts/r7s72100.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+I assumed that "It should contain at least one port child node" means
+there can be more than one.
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index 614ba79..ed62e19 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -180,6 +180,7 @@
- 			compatible = "arm,cortex-a9";
- 			reg = <0>;
- 			clock-frequency = <400000000>;
-+			next-level-cache = <&L2>;
- 		};
- 	};
- 
-@@ -371,6 +372,16 @@
- 			<0xe8202000 0x1000>;
- 	};
- 
-+	L2: cache-controller at 3ffff000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0x3ffff000 0x1000>;
-+		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+		arm,early-bresp-disable;
-+		arm,full-line-zero-disable;
-+		cache-unified;
-+		cache-level = <2>;
-+	};
-+
- 	i2c0: i2c at fcfee000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--- 
-2.10.1
+Thanks,
+Bartosz
+
+>
+>> +                     vpif_output_ch0: endpoint at 0 {
+>> +                             reg = <0>;
+>
+> Don't need reg here.
+>
+>> +                             bus-width = <8>;
+>> +                             remote-endpoint = <&composite_out>;
+>> +                     };
+>> +             };
+>>       };
