@@ -1,249 +1,78 @@
-From: zhouxianrong@huawei.com (zhouxianrong)
-Date: Thu, 16 Feb 2017 09:11:29 +0800
-Subject: [PATCH] mm: free reserved area's memmap if possiable
-In-Reply-To: <CAKv+Gu_X3fNhfUZ9+4Q_jdt2J12d9sxj1cgOq82HaQ8Gw_QaQA@mail.gmail.com>
-References: <1486987349-58711-1-git-send-email-zhouxianrong@huawei.com>
- <1487055180-128750-1-git-send-email-zhouxianrong@huawei.com>
- <CAKv+Gu9NF3dS_EWi4k42Ke+aagTScu-yk+UFZ_6sG6tK5zHP2Q@mail.gmail.com>
- <04630153-bc82-ac1f-2f80-344c90200732@huawei.com>
- <CAKv+Gu_X3fNhfUZ9+4Q_jdt2J12d9sxj1cgOq82HaQ8Gw_QaQA@mail.gmail.com>
-Message-ID: <a9c03f7d-355b-76c4-2a3a-771d57af1591@huawei.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 16 Feb 2017 09:23:07 +0800
+Subject: [PATCH v13 06/12] usb: xhci: use bus->sysdev for DMA configuration
+In-Reply-To: <87mvdnoenw.fsf@linux.intel.com>
+References: <1486776443-2280-7-git-send-email-peter.chen@nxp.com>
+ <e532a212-cd15-ab42-6188-fc11a12633af@ti.com>
+ <CAK8P3a1D1v=LXrW=-t-fRJjbo_C6OpSuoqiGuZPOaBzQYCT-kA@mail.gmail.com>
+ <cb7182c6-0236-26f2-4f96-9bc001994728@ti.com>
+ <CAK8P3a22f=sQXt+3-PeAuBFQN7_4iXDQhu41teExd6bxJXxDAQ@mail.gmail.com>
+ <20170215013514.GA6579@b29397-desktop>
+ <cb3ee971-6d97-fff1-64f7-1b527559b047@ti.com>
+ <20170215085127.GA26227@b29397-desktop>
+ <2a3d2d65-e531-aaca-d5a1-a71f818cec61@ti.com>
+ <87mvdnoenw.fsf@linux.intel.com>
+Message-ID: <20170216012307.GA30290@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 15, 2017 at 01:51:31PM +0200, Felipe Balbi wrote:
+> 
+> Hi,
+> 
+> Roger Quadros <rogerq@ti.com> writes:
+> >>>>>>>> Why are we using sysdev to read DT property? We should be using the
+> >>>>>>>> XHCI device (&pdev->dev) here, no?
+> >>>>>>>
+> >>>>>>> If I remember correctly, this is one of the cases where pdev does not
+> >>>>>>> have a device node attached to it because it was created by the driver
+> >>>>>>> of the parent device on the fly in case of dwc3. When you have a pure xhci
+> >>>>>>> device in DT, the two pointers are the same.
+> >>>>>>
+> >>>>>> From drivers/usb/dwc3/host.c
+> >>>>>>
+> >>>>>>>         if (dwc->usb3_lpm_capable) {
+> >>>>>>>                 props[0].name = "usb3-lpm-capable";
+> >>>>>>>                 ret = platform_device_add_properties(xhci, props);
+> >>>>>>>                 if (ret) {
+> >>>>>>>                         dev_err(dwc->dev, "failed to add properties to xHCI\n");
+> >>>>>>>                         goto err1;
+> >>>>>>>                 }
+> >>>>>>>         }
+> >>>>>>
+> >>>>>> So it is setting the usb3-lpm-capable property into the xhci platform device
+> >>>>>> and we should be reading the property from there.
+> >>>>
+> >>>> Why dwc3 needs another "snps,usb3_lpm_capable"? Why not using
+> >>>> "usb3-lpm-capable" at firmware directly?
+> >>>
+> >>> dwc3 is not setting "snps,usb3_lpm_capable" but "usb3-lpm-capable" for the
+> >>> xhci platform device.
+> >>>
+> >>> What did you mean by firmware? Did you mean something like BIOS?
+> >>> At least TI platforms don't use any firmware like BIOS. So dwc3 driver
+> >>> needs to create a platform device for xhci on the fly and set the DT properties.
+> >>>
+> >> 
+> >> By readying code, the dwc3 calls dwc3_get_properties to set
+> >> dwc->usb3_lpm_capable, and at dwc3/host.c, it sets property
+> >> "usb3-lpm-capable" according to this flag, why not let common
+> >> code xhci-plat.c to get this property from sysdev which is DT
+> >> nodes for dwc3?
+> >> 
+> >
+> > Felipe, any comments?
+> 
+> Won't work. We have quirk flags which are based on DWC3's revision which
+> is not accessible by xhci-plat. Also, we can't call
+> device_add_property() because it's not really *adding*. It's *setting*,
+> meaning that we would loose all other properties.
+> 
 
+Sorry, I am not clear by reading the code, here we just discuss
+"usb3-lpm-capable" property from DT or other firmwares.
 
-On 2017/2/15 15:10, Ard Biesheuvel wrote:
-> On 15 February 2017 at 01:44, zhouxianrong <zhouxianrong@huawei.com> wrote:
->>
->>
->> On 2017/2/14 17:03, Ard Biesheuvel wrote:
->>>
->>> On 14 February 2017 at 06:53,  <zhouxianrong@huawei.com> wrote:
->>>>
->>>> From: zhouxianrong <zhouxianrong@huawei.com>
->>>>
->>>> just like freeing no-map area's memmap (gaps of memblock.memory)
->>>> we could free reserved area's memmap (areas of memblock.reserved)
->>>> as well only when user of reserved area indicate that we can do
->>>> this in drivers. that is, user of reserved area know how to
->>>> use the reserved area who could not memblock_free or free_reserved_xxx
->>>> the reserved area and regard the area as raw pfn usage by kernel.
->>>> the patch supply a way to users who want to utilize the memmap
->>>> memory corresponding to raw pfn reserved areas as many as possible.
->>>> users can do this by memblock_mark_raw_pfn interface which mark the
->>>> reserved area as raw pfn and tell free_unused_memmap that this area's
->>>> memmap could be freeed.
->>>>
->>>
->>> Could you give an example how much memory we actually recover by doing
->>> this? I understand it depends on the size of the reserved regions, but
->>> I'm sure you have an actual example that inspired you to write this
->>> patch.
->>
->>
->> i did statistics in our platform, the memmap of reserved region that can be
->> freed
->> is about 6MB. it's fewer.
->>
->
-> So if you round up the start and round down the end to 8 MB alignment,
-> as you do in this patch, how much do you end up freeing?
->
+-- 
 
-yes, as you say, the size would get fewer if alignment to MAX_ORDER_NR_PAGES
-in fact, we could not benifit more from this patch because most reserved regions are
-cma (driver user want to multiplexing of memory with buddy) but cma regions could use struct
-page so we can not free whose memmap. in our platform only few reserved regions
-memmap could be freed. this patch aimed at some special big memory usages for reserved region.
-
->>
->>>
->>>> Signed-off-by: zhouxianrong <zhouxianrong@huawei.com>
->>>> ---
->>>>  arch/arm64/mm/init.c     |   14 +++++++++++++-
->>>>  include/linux/memblock.h |    3 +++
->>>>  mm/memblock.c            |   24 ++++++++++++++++++++++++
->>>>  3 files changed, 40 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
->>>> index 380ebe7..7e62ef8 100644
->>>> --- a/arch/arm64/mm/init.c
->>>> +++ b/arch/arm64/mm/init.c
->>>> @@ -358,7 +358,7 @@ static inline void free_memmap(unsigned long
->>>> start_pfn, unsigned long end_pfn)
->>>>   */
->>>>  static void __init free_unused_memmap(void)
->>>>  {
->>>> -       unsigned long start, prev_end = 0;
->>>> +       unsigned long start, end, prev_end = 0;
->>>>         struct memblock_region *reg;
->>>>
->>>>         for_each_memblock(memory, reg) {
->>>> @@ -391,6 +391,18 @@ static void __init free_unused_memmap(void)
->>>>         if (!IS_ALIGNED(prev_end, PAGES_PER_SECTION))
->>>>                 free_memmap(prev_end, ALIGN(prev_end,
->>>> PAGES_PER_SECTION));
->>>>  #endif
->>>> +
->>>> +       for_each_memblock(reserved, reg) {
->>>> +               if (!(reg->flags & MEMBLOCK_RAW_PFN))
->>>> +                       continue;
->>>> +
->>>> +               start = memblock_region_memory_base_pfn(reg);
->>>> +               end = round_down(memblock_region_memory_end_pfn(reg),
->>>> +                                MAX_ORDER_NR_PAGES);
->>>> +
->>>
->>>
->>> Why are you rounding down end only? Shouldn't you round up start and
->>> round down end? Or does free_memmap() deal with that already?
->>
->>
->> ok, i could round up start.
->>
->
-> Yes, but is that necessary? Could you explain
-> a) why you round down end, and
-> b) why the reason under a) does not apply to start?
-
-i made a mistake.
-
-for freeing memblock.memory gap, we need alignment by MAX_ORDER_NR_PAGES due to bank ending alignment requirement
-
-for freeing memblock.reserved area, because this is within bank, i think we do not need this alignment requirement.
-but if alignment, rounding up start and rounding down end are natural for memblock.reserved.
-
->
->>>
->>> In any case, it is good to emphasize that on 4 KB pagesize kernels, we
->>> will only free multiples of 8 MB that are 8 MB aligned, resulting in
->>> 128 KB of memmap backing to be released.
->>
->>
->>
->>>
->>>
->>>> +               if (start < end)
->>>> +                       free_memmap(start, end);
->>>> +       }
->>>>  }
->>>>  #endif /* !CONFIG_SPARSEMEM_VMEMMAP */
->>>>
->>>> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
->>>> index 5b759c9..9f8d277 100644
->>>> --- a/include/linux/memblock.h
->>>> +++ b/include/linux/memblock.h
->>>> @@ -26,6 +26,7 @@ enum {
->>>>         MEMBLOCK_HOTPLUG        = 0x1,  /* hotpluggable region */
->>>>         MEMBLOCK_MIRROR         = 0x2,  /* mirrored region */
->>>>         MEMBLOCK_NOMAP          = 0x4,  /* don't add to kernel direct
->>>> mapping */
->>>> +       MEMBLOCK_RAW_PFN        = 0x8,  /* region whose memmap never be
->>>> used */
->>>
->>>
->>> I think we should be *very* careful about the combinatorial explosion
->>> that results when combining all these flags, given that this is not a
->>> proper enum but a bit field.
->>>
->>> In any case, the generic memblock change should be in a separate patch
->>> from the arm64 change.
->>
->>
->> MEMBLOCK_RAW_PFN and MEMBLOCK_NOMAP can not be set at the same time
->>
->
-> They should not. But if I call  memblock_mark_raw_pfn() on a
-> MEMBLOCK_NOMAP region, it will have both flags set.
->
-> In summary, I don't think we need this patch. And if you can convince
-> us otherwise, you should really be more methodical and explicit in
-> implementing this RAW_PFN flag, not add it as a byproduct of the arch
-> code that uses it. Also, you should explain how RAW_PFN relates to
-> NOMAP, and ensure that RAW_PFN and NOMAP regions don't intersect if
-> that is an unsupported combination.
-
-yes, setting both MEMBLOCK_RAW_PFN and MEMBLOCK_NOMAP could meet some problems
-when gaps of memblock.memory intersect memblock.reserved. if they do not intersect,
-that's ok. so as you said this should be carefully considered.
-
-as you think this patch is not needed because, i have showed my idea, it's enough, thanks!
-
->
-> Regards,
-> Ard.
->
->
->>>
->>>>  };
->>>>
->>>>  struct memblock_region {
->>>> @@ -92,6 +93,8 @@ bool memblock_overlaps_region(struct memblock_type
->>>> *type,
->>>>  int memblock_clear_hotplug(phys_addr_t base, phys_addr_t size);
->>>>  int memblock_mark_mirror(phys_addr_t base, phys_addr_t size);
->>>>  int memblock_mark_nomap(phys_addr_t base, phys_addr_t size);
->>>> +int memblock_mark_raw_pfn(phys_addr_t base, phys_addr_t size);
->>>> +int memblock_clear_raw_pfn(phys_addr_t base, phys_addr_t size);
->>>>  ulong choose_memblock_flags(void);
->>>>
->>>>  /* Low level functions */
->>>> diff --git a/mm/memblock.c b/mm/memblock.c
->>>> index 7608bc3..c103b94 100644
->>>> --- a/mm/memblock.c
->>>> +++ b/mm/memblock.c
->>>> @@ -814,6 +814,30 @@ int __init_memblock memblock_mark_nomap(phys_addr_t
->>>> base, phys_addr_t size)
->>>>  }
->>>>
->>>>  /**
->>>> + * memblock_mark_raw_pfn - Mark raw pfn memory with flag
->>>> MEMBLOCK_RAW_PFN.
->>>> + * @base: the base phys addr of the region
->>>> + * @size: the size of the region
->>>> + *
->>>> + * Return 0 on succees, -errno on failure.
->>>> + */
->>>> +int __init_memblock memblock_mark_raw_pfn(phys_addr_t base, phys_addr_t
->>>> size)
->>>> +{
->>>> +       return memblock_setclr_flag(base, size, 1, MEMBLOCK_RAW_PFN);
->>>> +}
->>>> +
->>>> +/**
->>>> + * memblock_clear_raw_pfn - Clear flag MEMBLOCK_RAW_PFN for a specified
->>>> region.
->>>> + * @base: the base phys addr of the region
->>>> + * @size: the size of the region
->>>> + *
->>>> + * Return 0 on succees, -errno on failure.
->>>> + */
->>>> +int __init_memblock memblock_clear_raw_pfn(phys_addr_t base, phys_addr_t
->>>> size)
->>>> +{
->>>> +       return memblock_setclr_flag(base, size, 0, MEMBLOCK_RAW_PFN);
->>>> +}
->>>> +
->>>> +/**
->>>>   * __next_reserved_mem_region - next function for
->>>> for_each_reserved_region()
->>>>   * @idx: pointer to u64 loop variable
->>>>   * @out_start: ptr to phys_addr_t for start address of the region, can
->>>> be %NULL
->>>> --
->>>> 1.7.9.5
->>>>
->>>>
->>>> _______________________________________________
->>>> linux-arm-kernel mailing list
->>>> linux-arm-kernel at lists.infradead.org
->>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>>
->>> .
->>>
->>
->
-> .
->
+Best Regards,
+Peter Chen
