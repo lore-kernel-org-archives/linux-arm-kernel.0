@@ -1,34 +1,33 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 16 Feb 2017 19:21:23 +0100
-Subject: [PATCH 3/4] ARM: da850-evm: add a fixed regulator for the UI board IO
- expander
+Date: Thu, 16 Feb 2017 19:21:21 +0100
+Subject: [PATCH 1/4] ARM: davinci: board-da850-evm: add I2C ID for VPIF
 In-Reply-To: <1487269285-6948-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1487269285-6948-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1487269285-6948-4-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1487269285-6948-2-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this regulator the tca6416 GPIO expander on the UI board can't
-be probed in board file mode and we're not getting VPIF IRQs.
+From: Kevin Hilman <khilman@baylibre.com>
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+VPIF capture driver now has a way to specific I2C adapter ID (was
+previously hard-coded.)  Use the new interface.
+
+Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 ---
- arch/arm/mach-davinci/board-da850-evm.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mach-davinci/board-da850-evm.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 0b9ff2a..1b6a07b 100644
+index 6f1e129..0b9ff2a 100644
 --- a/arch/arm/mach-davinci/board-da850-evm.c
 +++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -828,6 +828,9 @@ static struct regulator_consumer_supply fixed_supplies[] = {
- 
- 	/* Baseboard 1.8V: 5V -> TPS73701DCQ -> 1.8V */
- 	REGULATOR_SUPPLY("DVDD", "1-0018"),
-+
-+	/* Dummy regulator for the UI board IO expander. */
-+	REGULATOR_SUPPLY("vcc", "1-0020"),
- };
- 
- /* TPS65070 voltage regulator support */
+@@ -1213,6 +1213,7 @@ static struct vpif_subdev_info da850_vpif_capture_sdev_info[] = {
+ static struct vpif_capture_config da850_vpif_capture_config = {
+ 	.subdev_info = da850_vpif_capture_sdev_info,
+ 	.subdev_count = ARRAY_SIZE(da850_vpif_capture_sdev_info),
++	.i2c_adapter_id = 1,
+ 	.chan_config[0] = {
+ 		.inputs = da850_ch0_inputs,
+ 		.input_count = ARRAY_SIZE(da850_ch0_inputs),
 -- 
 2.9.3
