@@ -1,145 +1,177 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed, 15 Feb 2017 18:19:38 -0800
-Subject: [PATCH v4 36/36] media: imx: propagate sink pad formats to source pads
+Date: Wed, 15 Feb 2017 18:19:34 -0800
+Subject: [PATCH v4 32/36] media: imx: csi/fim: add support for frame intervals
 In-Reply-To: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1487211578-11360-37-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1487211578-11360-33-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add support to CSI for negotiation of frame intervals, and use this
+information to configure the frame interval monitor.
+
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- drivers/staging/media/imx/imx-ic-prp.c      | 11 ++++++++++-
- drivers/staging/media/imx/imx-ic-prpencvf.c | 22 ++++++++++++++--------
- drivers/staging/media/imx/imx-media-csi.c   | 26 +++++++++++++++++---------
- drivers/staging/media/imx/imx-media-vdic.c  | 15 ++++++++++++++-
- 4 files changed, 55 insertions(+), 19 deletions(-)
+ drivers/staging/media/imx/imx-media-csi.c | 36 ++++++++++++++++++++++++++++---
+ drivers/staging/media/imx/imx-media-fim.c | 28 +++++++++---------------
+ drivers/staging/media/imx/imx-media.h     |  2 +-
+ 3 files changed, 44 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/staging/media/imx/imx-ic-prp.c b/drivers/staging/media/imx/imx-ic-prp.c
-index b9ee8fb..5c57d2b 100644
---- a/drivers/staging/media/imx/imx-ic-prp.c
-+++ b/drivers/staging/media/imx/imx-ic-prp.c
-@@ -196,8 +196,17 @@ static int prp_set_fmt(struct v4l2_subdev *sd,
- 	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
- 		cfg->try_fmt = sdformat->format;
- 	} else {
--		priv->format_mbus[sdformat->pad] = sdformat->format;
-+		struct v4l2_mbus_framefmt *f =
-+			&priv->format_mbus[sdformat->pad];
-+
-+		*f = sdformat->format;
- 		priv->cc[sdformat->pad] = cc;
-+
-+		/* propagate format to source pads */
-+		if (sdformat->pad == PRP_SINK_PAD) {
-+			priv->format_mbus[PRP_SRC_PAD_PRPENC] = *f;
-+			priv->format_mbus[PRP_SRC_PAD_PRPVF] = *f;
-+		}
- 	}
- 
- 	return 0;
-diff --git a/drivers/staging/media/imx/imx-ic-prpencvf.c b/drivers/staging/media/imx/imx-ic-prpencvf.c
-index dd9d499..c43f85f 100644
---- a/drivers/staging/media/imx/imx-ic-prpencvf.c
-+++ b/drivers/staging/media/imx/imx-ic-prpencvf.c
-@@ -806,16 +806,22 @@ static int prp_set_fmt(struct v4l2_subdev *sd,
- 	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
- 		cfg->try_fmt = sdformat->format;
- 	} else {
--		priv->format_mbus[sdformat->pad] = sdformat->format;
-+		struct v4l2_mbus_framefmt *f =
-+			&priv->format_mbus[sdformat->pad];
-+		struct v4l2_mbus_framefmt *outf =
-+			&priv->format_mbus[PRPENCVF_SRC_PAD];
-+
-+		*f = sdformat->format;
- 		priv->cc[sdformat->pad] = cc;
--		if (sdformat->pad == PRPENCVF_SRC_PAD) {
--			/*
--			 * update the capture device format if this is
--			 * the IDMAC output pad
--			 */
--			imx_media_mbus_fmt_to_pix_fmt(&vdev->fmt.fmt.pix,
--						      &sdformat->format, cc);
-+
-+		/* propagate format to source pad */
-+		if (sdformat->pad == PRPENCVF_SINK_PAD) {
-+			outf->width = f->width;
-+			outf->height = f->height;
- 		}
-+
-+		/* update the capture device format from output pad */
-+		imx_media_mbus_fmt_to_pix_fmt(&vdev->fmt.fmt.pix, outf, cc);
- 	}
- 
- 	return 0;
 diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
-index 3e6b607..9d9ec03 100644
+index b0aac82..040cca6 100644
 --- a/drivers/staging/media/imx/imx-media-csi.c
 +++ b/drivers/staging/media/imx/imx-media-csi.c
-@@ -1161,19 +1161,27 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
- 	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
- 		cfg->try_fmt = sdformat->format;
- 	} else {
-+		struct v4l2_mbus_framefmt *f_direct, *f_idmac;
+@@ -56,6 +56,7 @@ struct csi_priv {
+ 
+ 	struct v4l2_mbus_framefmt format_mbus[CSI_NUM_PADS];
+ 	const struct imx_media_pixfmt *cc[CSI_NUM_PADS];
++	struct v4l2_fract frame_interval;
+ 	struct v4l2_rect crop;
+ 
+ 	/* the video device at IDMAC output pad */
+@@ -565,7 +566,8 @@ static int csi_start(struct csi_priv *priv)
+ 
+ 	/* start the frame interval monitor */
+ 	if (priv->fim) {
+-		ret = imx_media_fim_set_stream(priv->fim, priv->sensor, true);
++		ret = imx_media_fim_set_stream(priv->fim,
++					       &priv->frame_interval, true);
+ 		if (ret)
+ 			goto idmac_stop;
+ 	}
+@@ -580,7 +582,8 @@ static int csi_start(struct csi_priv *priv)
+ 
+ fim_off:
+ 	if (priv->fim)
+-		imx_media_fim_set_stream(priv->fim, priv->sensor, false);
++		imx_media_fim_set_stream(priv->fim,
++					 &priv->frame_interval, false);
+ idmac_stop:
+ 	if (priv->dest == IPU_CSI_DEST_IDMAC)
+ 		csi_idmac_stop(priv);
+@@ -594,11 +597,36 @@ static void csi_stop(struct csi_priv *priv)
+ 
+ 	/* stop the frame interval monitor */
+ 	if (priv->fim)
+-		imx_media_fim_set_stream(priv->fim, priv->sensor, false);
++		imx_media_fim_set_stream(priv->fim,
++					 &priv->frame_interval, false);
+ 
+ 	ipu_csi_disable(priv->csi);
+ }
+ 
++static int csi_g_frame_interval(struct v4l2_subdev *sd,
++				struct v4l2_subdev_frame_interval *fi)
++{
++	struct csi_priv *priv = v4l2_get_subdevdata(sd);
 +
- 		priv->format_mbus[sdformat->pad] = sdformat->format;
- 		priv->cc[sdformat->pad] = cc;
--		/* Reset the crop window if this is the input pad */
--		if (sdformat->pad == CSI_SINK_PAD)
++	fi->interval = priv->frame_interval;
 +
-+		f_direct = &priv->format_mbus[CSI_SRC_PAD_DIRECT];
-+		f_idmac = &priv->format_mbus[CSI_SRC_PAD_IDMAC];
++	return 0;
++}
 +
-+		if (sdformat->pad == CSI_SINK_PAD) {
-+			/* reset the crop window */
- 			priv->crop = crop;
--		else if (sdformat->pad == CSI_SRC_PAD_IDMAC) {
--			/*
--			 * update the capture device format if this is
--			 * the IDMAC output pad
--			 */
--			imx_media_mbus_fmt_to_pix_fmt(&vdev->fmt.fmt.pix,
--						      &sdformat->format, cc);
++static int csi_s_frame_interval(struct v4l2_subdev *sd,
++				struct v4l2_subdev_frame_interval *fi)
++{
++	struct csi_priv *priv = v4l2_get_subdevdata(sd);
 +
-+			/* propagate format to source pads */
-+			f_direct->width = crop.width;
-+			f_direct->height = crop.height;
-+			f_idmac->width = crop.width;
-+			f_idmac->height = crop.height;
- 		}
++	/* Output pads mirror active input pad, no limits on input pads */
++	if (fi->pad == CSI_SRC_PAD_IDMAC || fi->pad == CSI_SRC_PAD_DIRECT)
++		fi->interval = priv->frame_interval;
 +
-+		/* update the capture device format from IDMAC output pad */
-+		imx_media_mbus_fmt_to_pix_fmt(&vdev->fmt.fmt.pix, f_idmac, cc);
++	priv->frame_interval = fi->interval;
++
++	return 0;
++}
++
+ static int csi_s_stream(struct v4l2_subdev *sd, int enable)
+ {
+ 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+@@ -1187,6 +1215,8 @@ static struct v4l2_subdev_core_ops csi_core_ops = {
+ };
+ 
+ static struct v4l2_subdev_video_ops csi_video_ops = {
++	.g_frame_interval = csi_g_frame_interval,
++	.s_frame_interval = csi_s_frame_interval,
+ 	.s_stream = csi_s_stream,
+ };
+ 
+diff --git a/drivers/staging/media/imx/imx-media-fim.c b/drivers/staging/media/imx/imx-media-fim.c
+index acc7e39..a6ed57e 100644
+--- a/drivers/staging/media/imx/imx-media-fim.c
++++ b/drivers/staging/media/imx/imx-media-fim.c
+@@ -67,26 +67,18 @@ struct imx_media_fim {
+ };
+ 
+ static void update_fim_nominal(struct imx_media_fim *fim,
+-			       struct imx_media_subdev *sensor)
++			       const struct v4l2_fract *fi)
+ {
+-	struct v4l2_streamparm parm;
+-	struct v4l2_fract tpf;
+-	int ret;
+-
+-	parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+-	ret = v4l2_subdev_call(sensor->sd, video, g_parm, &parm);
+-	tpf = parm.parm.capture.timeperframe;
+-
+-	if (ret || tpf.denominator == 0) {
+-		dev_dbg(fim->sd->dev, "no tpf from sensor, FIM disabled\n");
++	if (fi->denominator == 0) {
++		dev_dbg(fim->sd->dev, "no frame interval, FIM disabled\n");
+ 		fim->enabled = false;
+ 		return;
  	}
  
- 	return 0;
-diff --git a/drivers/staging/media/imx/imx-media-vdic.c b/drivers/staging/media/imx/imx-media-vdic.c
-index 61e6017..55fb522 100644
---- a/drivers/staging/media/imx/imx-media-vdic.c
-+++ b/drivers/staging/media/imx/imx-media-vdic.c
-@@ -649,8 +649,21 @@ static int vdic_set_fmt(struct v4l2_subdev *sd,
- 	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
- 		cfg->try_fmt = sdformat->format;
- 	} else {
--		priv->format_mbus[sdformat->pad] = sdformat->format;
-+		struct v4l2_mbus_framefmt *f =
-+			&priv->format_mbus[sdformat->pad];
-+		struct v4l2_mbus_framefmt *outf =
-+			&priv->format_mbus[VDIC_SRC_PAD_DIRECT];
-+
-+		*f = sdformat->format;
- 		priv->cc[sdformat->pad] = cc;
-+
-+		/* propagate format to source pad */
-+		if (sdformat->pad == VDIC_SINK_PAD_DIRECT ||
-+		    sdformat->pad == VDIC_SINK_PAD_IDMAC) {
-+			outf->width = f->width;
-+			outf->height = f->height;
-+			outf->field = V4L2_FIELD_NONE;
-+		}
- 	}
+-	fim->nominal = DIV_ROUND_CLOSEST(1000 * 1000 * tpf.numerator,
+-					 tpf.denominator);
++	fim->nominal = DIV_ROUND_CLOSEST_ULL(1000000ULL * (u64)fi->numerator,
++					     fi->denominator);
  
- 	return 0;
+-	dev_dbg(fim->sd->dev, "sensor FI=%lu usec\n", fim->nominal);
++	dev_dbg(fim->sd->dev, "FI=%lu usec\n", fim->nominal);
+ }
+ 
+ static void reset_fim(struct imx_media_fim *fim, bool curval)
+@@ -130,8 +122,8 @@ static void send_fim_event(struct imx_media_fim *fim, unsigned long error)
+ 
+ /*
+  * Monitor an averaged frame interval. If the average deviates too much
+- * from the sensor's nominal frame rate, send the frame interval error
+- * event. The frame intervals are averaged in order to quiet noise from
++ * from the nominal frame rate, send the frame interval error event. The
++ * frame intervals are averaged in order to quiet noise from
+  * (presumably random) interrupt latency.
+  */
+ static void frame_interval_monitor(struct imx_media_fim *fim,
+@@ -422,12 +414,12 @@ EXPORT_SYMBOL_GPL(imx_media_fim_set_power);
+ 
+ /* Called by the subdev in its s_stream callback */
+ int imx_media_fim_set_stream(struct imx_media_fim *fim,
+-			     struct imx_media_subdev *sensor,
++			     const struct v4l2_fract *fi,
+ 			     bool on)
+ {
+ 	if (on) {
+ 		reset_fim(fim, true);
+-		update_fim_nominal(fim, sensor);
++		update_fim_nominal(fim, fi);
+ 
+ 		if (fim->icap_channel >= 0)
+ 			fim_acquire_first_ts(fim);
+diff --git a/drivers/staging/media/imx/imx-media.h b/drivers/staging/media/imx/imx-media.h
+index ae3af0d..7f19739 100644
+--- a/drivers/staging/media/imx/imx-media.h
++++ b/drivers/staging/media/imx/imx-media.h
+@@ -259,7 +259,7 @@ struct imx_media_fim;
+ void imx_media_fim_eof_monitor(struct imx_media_fim *fim, struct timespec *ts);
+ int imx_media_fim_set_power(struct imx_media_fim *fim, bool on);
+ int imx_media_fim_set_stream(struct imx_media_fim *fim,
+-			     struct imx_media_subdev *sensor,
++			     const struct v4l2_fract *frame_interval,
+ 			     bool on);
+ struct imx_media_fim *imx_media_fim_init(struct v4l2_subdev *sd);
+ void imx_media_fim_free(struct imx_media_fim *fim);
 -- 
 2.7.4
