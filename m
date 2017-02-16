@@ -1,47 +1,34 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 16 Feb 2017 18:29:05 +0100
-Subject: [GIT PULL] ARM: mvebu: late dt for v4.11
-Message-ID: <8760kacae6.fsf@free-electrons.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Feb 2017 17:33:48 +0000
+Subject: [PATCH 0/3] Extend rtc-armada38x support for Armada 7K/8K
+In-Reply-To: <20170216153136.27009-1-gregory.clement@free-electrons.com>
+References: <20170216153136.27009-1-gregory.clement@free-electrons.com>
+Message-ID: <20170216173348.GT27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Feb 16, 2017 at 04:31:33PM +0100, Gregory CLEMENT wrote:
+> The Armada 7K/8K SoCs use the same RTC IP than the Armada 38x. However
+> the SOC integration differs in 2 points:
+>      - MBUS bridge timing initialization
+>      - IRQ configuration at SoC level
+> 
+> This patch set extends the driver support to these SoCs family.
 
-Here is a late pull request for dt for mvebu for v4.11.
+I've just tried merging this into my kernel, and...
 
-As explained in the tag, these 2 commits are just fixing typo.
+root at mcbin:~# date
+Thu Feb 16 17:33:00 GMT 2017
+root at mcbin:~# hwclock -uw
+root at mcbin:~# hwclock
+Sun 07 Feb 2106 01:49:51 GMT  -10.010475 seconds
+root at mcbin:~# hwclock
+Sun 07 Feb 2106 01:49:51 GMT  -10.010458 seconds
 
-If they can't be merged now then considered merging them as fix for
-4.11.
+I guess it needs the same hack that Armada38x needs - "date reset" twice
+in uboot?
 
-Thanks,
-
-Gregory
-
-The following changes since commit 5cb13094484ba89d9a2623ddb72b36ea498e2bff:
-
-  ARM: dts: mvebu: Add device tree for db-dxbc2 and db-xc3-24g4xg boards (2017-01-31 14:45:04 +0100)
-
-are available in the git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.11-4
-
-for you to fetch changes up to 04be87a83db6cbb7586db95b591467c58ae09aee:
-
-  ARM: dts: armada-385-linksys: fix DSA compatible property (2017-02-15 15:54:13 +0100)
-
-----------------------------------------------------------------
-mvebu dt for 4.11 (part 4)
-
-Fix typos introduced during the preparation of the 4.11 merge window.
-
-----------------------------------------------------------------
-Chris Packham (1):
-      ARM: dts: Fix typo in armada-xp-98dx4251
-
-Ralph Sennhauser (1):
-      ARM: dts: armada-385-linksys: fix DSA compatible property
-
- arch/arm/boot/dts/armada-385-linksys.dtsi | 2 +-
- arch/arm/boot/dts/armada-xp-98dx4251.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
