@@ -1,182 +1,140 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Thu, 16 Feb 2017 13:22:02 +0100
-Subject: [PATCH] KVM: arm64: VGIC: fix command handling while ITS being
- disabled
-In-Reply-To: <20170216104120.31952-1-andre.przywara@arm.com>
-References: <20170216104120.31952-1-andre.przywara@arm.com>
-Message-ID: <fd34e7f8-fe6f-354f-b49e-f898586d5c4d@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 16 Feb 2017 12:32:53 +0000
+Subject: [PATCH] ARM: uaccess: consistently check object sizes
+In-Reply-To: <20170215200557.GA37325@beast>
+References: <20170215200557.GA37325@beast>
+Message-ID: <20170216123253.GB588@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
-
-On 16/02/2017 11:41, Andre Przywara wrote:
-> The ITS spec says that ITS commands are only processed when the ITS
-> is enabled (section 8.19.4, Enabled, bit[0]). Our emulation was not taking
-> this into account.
-> Fix this by checking the enabled state before handling CWRITER writes.
-nit: you actually check the ITS state before executing commands.
+On Wed, Feb 15, 2017 at 12:05:57PM -0800, Kees Cook wrote:
+> In commit 76624175dcae ("arm64: uaccess: consistently check object sizes"),
+> the object size checks are moved outside the access_ok() so that bad
+> destinations are detected before hitting the "memset(dest, 0, size)" in the
+> copy_from_user() failure path.
 > 
-> On the other hand that means that CWRITER could advance while the ITS
-> is disabled, and enabling it would need those commands to be processed.
-> Fix this case as well by refactoring actual command processing and
-> calling this from both the GITS_CWRITER and GITS_CTLR handlers.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+> This makes the same change for arm, with attention given to possibly
+> extracting the uaccess routines into a common header file for all
+> architectures in the future.
 
-Thanks
+I take it here you're referring to aligning on the __arch_* naming for
+primitives manging arch-specific state and performing the copies. It
+might be worth calling that out explicitly, since it likely isn't
+obvious to others.
 
-Eric
+It may also be worth calling out that this also means we can now do the
+checks for !MMU, which we couldn't do before.
+
+The patch itself looks sane to me, so FWIW:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+> Suggested-by: Mark Rutland <mark.rutland@arm.com>
+> Signed-off-by: Kees Cook <keescook@chromium.org>
 > ---
->  virt/kvm/arm/vgic/vgic-its.c | 109 ++++++++++++++++++++++++++-----------------
->  1 file changed, 65 insertions(+), 44 deletions(-)
+>  arch/arm/include/asm/uaccess.h | 44 ++++++++++++++++++++++++++++++------------
+>  1 file changed, 32 insertions(+), 12 deletions(-)
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 8c2b3cd..ff86106 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -360,29 +360,6 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
->  	return ret;
->  }
+> diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
+> index 1f59ea051bab..b7e0125c0bbf 100644
+> --- a/arch/arm/include/asm/uaccess.h
+> +++ b/arch/arm/include/asm/uaccess.h
+> @@ -478,11 +478,10 @@ extern unsigned long __must_check
+>  arm_copy_from_user(void *to, const void __user *from, unsigned long n);
 >  
-> -static unsigned long vgic_mmio_read_its_ctlr(struct kvm *vcpu,
-> -					     struct vgic_its *its,
-> -					     gpa_t addr, unsigned int len)
-> -{
-> -	u32 reg = 0;
-> -
-> -	mutex_lock(&its->cmd_lock);
-> -	if (its->creadr == its->cwriter)
-> -		reg |= GITS_CTLR_QUIESCENT;
-> -	if (its->enabled)
-> -		reg |= GITS_CTLR_ENABLE;
-> -	mutex_unlock(&its->cmd_lock);
-> -
-> -	return reg;
-> -}
-> -
-> -static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
-> -				     gpa_t addr, unsigned int len,
-> -				     unsigned long val)
-> -{
-> -	its->enabled = !!(val & GITS_CTLR_ENABLE);
-> -}
-> -
->  static unsigned long vgic_mmio_read_its_typer(struct kvm *kvm,
->  					      struct vgic_its *its,
->  					      gpa_t addr, unsigned int len)
-> @@ -1161,33 +1138,16 @@ static void vgic_mmio_write_its_cbaser(struct kvm *kvm, struct vgic_its *its,
->  #define ITS_CMD_SIZE			32
->  #define ITS_CMD_OFFSET(reg)		((reg) & GENMASK(19, 5))
->  
-> -/*
-> - * By writing to CWRITER the guest announces new commands to be processed.
-> - * To avoid any races in the first place, we take the its_cmd lock, which
-> - * protects our ring buffer variables, so that there is only one user
-> - * per ITS handling commands at a given time.
-> - */
-> -static void vgic_mmio_write_its_cwriter(struct kvm *kvm, struct vgic_its *its,
-> -					gpa_t addr, unsigned int len,
-> -					unsigned long val)
-> +/* Must be called with the cmd_lock held. */
-> +static void vgic_its_process_commands(struct kvm *kvm, struct vgic_its *its)
+>  static inline unsigned long __must_check
+> -__copy_from_user(void *to, const void __user *from, unsigned long n)
+> +__arch_copy_from_user(void *to, const void __user *from, unsigned long n)
 >  {
->  	gpa_t cbaser;
->  	u64 cmd_buf[4];
-> -	u32 reg;
+>  	unsigned int __ua_flags;
 >  
-> -	if (!its)
-> -		return;
+> -	check_object_size(to, n, false);
+>  	__ua_flags = uaccess_save_and_enable();
+>  	n = arm_copy_from_user(to, from, n);
+>  	uaccess_restore(__ua_flags);
+> @@ -495,18 +494,15 @@ extern unsigned long __must_check
+>  __copy_to_user_std(void __user *to, const void *from, unsigned long n);
+>  
+>  static inline unsigned long __must_check
+> -__copy_to_user(void __user *to, const void *from, unsigned long n)
+> +__arch_copy_to_user(void __user *to, const void *from, unsigned long n)
+>  {
+>  #ifndef CONFIG_UACCESS_WITH_MEMCPY
+>  	unsigned int __ua_flags;
 > -
-> -	mutex_lock(&its->cmd_lock);
-> -
-> -	reg = update_64bit_reg(its->cwriter, addr & 7, len, val);
-> -	reg = ITS_CMD_OFFSET(reg);
-> -	if (reg >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
-> -		mutex_unlock(&its->cmd_lock);
-> +	/* Commands are only processed when the ITS is enabled. */
-> +	if (!its->enabled)
->  		return;
-> -	}
->  
-> -	its->cwriter = reg;
->  	cbaser = CBASER_ADDRESS(its->cbaser);
->  
->  	while (its->cwriter != its->creadr) {
-> @@ -1207,6 +1167,34 @@ static void vgic_mmio_write_its_cwriter(struct kvm *kvm, struct vgic_its *its,
->  		if (its->creadr == ITS_CMD_BUFFER_SIZE(its->cbaser))
->  			its->creadr = 0;
->  	}
-> +}
-> +
-> +/*
-> + * By writing to CWRITER the guest announces new commands to be processed.
-> + * To avoid any races in the first place, we take the its_cmd lock, which
-> + * protects our ring buffer variables, so that there is only one user
-> + * per ITS handling commands at a given time.
-> + */
-> +static void vgic_mmio_write_its_cwriter(struct kvm *kvm, struct vgic_its *its,
-> +					gpa_t addr, unsigned int len,
-> +					unsigned long val)
-> +{
-> +	u64 reg;
-> +
-> +	if (!its)
-> +		return;
-> +
-> +	mutex_lock(&its->cmd_lock);
-> +
-> +	reg = update_64bit_reg(its->cwriter, addr & 7, len, val);
-> +	reg = ITS_CMD_OFFSET(reg);
-> +	if (reg >= ITS_CMD_BUFFER_SIZE(its->cbaser)) {
-> +		mutex_unlock(&its->cmd_lock);
-> +		return;
-> +	}
-> +	its->cwriter = reg;
-> +
-> +	vgic_its_process_commands(kvm, its);
->  
->  	mutex_unlock(&its->cmd_lock);
+> -	check_object_size(from, n, true);
+>  	__ua_flags = uaccess_save_and_enable();
+>  	n = arm_copy_to_user(to, from, n);
+>  	uaccess_restore(__ua_flags);
+>  	return n;
+>  #else
+> -	check_object_size(from, n, true);
+>  	return arm_copy_to_user(to, from, n);
+>  #endif
 >  }
-> @@ -1287,6 +1275,39 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
->  	*regptr = reg;
+> @@ -526,25 +522,49 @@ __clear_user(void __user *addr, unsigned long n)
 >  }
 >  
-> +static unsigned long vgic_mmio_read_its_ctlr(struct kvm *vcpu,
-> +					     struct vgic_its *its,
-> +					     gpa_t addr, unsigned int len)
+>  #else
+> -#define __copy_from_user(to, from, n)	(memcpy(to, (void __force *)from, n), 0)
+> -#define __copy_to_user(to, from, n)	(memcpy((void __force *)to, from, n), 0)
+> +#define __arch_copy_from_user(to, from, n)	\
+> +					(memcpy(to, (void __force *)from, n), 0)
+> +#define __arch_copy_to_user(to, from, n)	\
+> +					(memcpy((void __force *)to, from, n), 0)
+>  #define __clear_user(addr, n)		(memset((void __force *)addr, 0, n), 0)
+>  #endif
+>  
+> -static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
+> +static inline unsigned long __must_check
+> +__copy_from_user(void *to, const void __user *from, unsigned long n)
 > +{
-> +	u32 reg = 0;
-> +
-> +	mutex_lock(&its->cmd_lock);
-> +	if (its->creadr == its->cwriter)
-> +		reg |= GITS_CTLR_QUIESCENT;
-> +	if (its->enabled)
-> +		reg |= GITS_CTLR_ENABLE;
-> +	mutex_unlock(&its->cmd_lock);
-> +
-> +	return reg;
+> +	check_object_size(to, n, false);
+> +	return __arch_copy_from_user(to, from, n);
 > +}
 > +
-> +static void vgic_mmio_write_its_ctlr(struct kvm *kvm, struct vgic_its *its,
-> +				     gpa_t addr, unsigned int len,
-> +				     unsigned long val)
-> +{
-> +	mutex_lock(&its->cmd_lock);
+> +static inline unsigned long __must_check
+> +copy_from_user(void *to, const void __user *from, unsigned long n)
+>  {
+>  	unsigned long res = n;
 > +
-> +	its->enabled = !!(val & GITS_CTLR_ENABLE);
+> +	check_object_size(to, n, false);
 > +
-> +	/*
-> +	 * Try to process any pending commands. This function bails out early
-> +	 * if the ITS is disabled or no commands have been queued.
-> +	 */
-> +	vgic_its_process_commands(kvm, its);
+>  	if (likely(access_ok(VERIFY_READ, from, n)))
+> -		res = __copy_from_user(to, from, n);
+> +		res = __arch_copy_from_user(to, from, n);
+>  	if (unlikely(res))
+>  		memset(to + (n - res), 0, res);
+>  	return res;
+>  }
+>  
+> -static inline unsigned long __must_check copy_to_user(void __user *to, const void *from, unsigned long n)
+> +static inline unsigned long __must_check
+> +__copy_to_user(void __user *to, const void *from, unsigned long n)
+>  {
+> +	check_object_size(from, n, true);
 > +
-> +	mutex_unlock(&its->cmd_lock);
+> +	return __arch_copy_to_user(to, from, n);
 > +}
 > +
->  #define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
->  {								\
->  	.reg_offset = off,					\
+> +static inline unsigned long __must_check
+> +copy_to_user(void __user *to, const void *from, unsigned long n)
+> +{
+> +	check_object_size(from, n, true);
+> +
+>  	if (access_ok(VERIFY_WRITE, to, n))
+> -		n = __copy_to_user(to, from, n);
+> +		n = __arch_copy_to_user(to, from, n);
+>  	return n;
+>  }
+>  
+> -- 
+> 2.7.4
 > 
+> 
+> -- 
+> Kees Cook
+> Pixel Security
