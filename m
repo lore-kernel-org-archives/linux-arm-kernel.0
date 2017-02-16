@@ -1,1009 +1,179 @@
-From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Thu, 16 Feb 2017 10:03:05 -0500
-Subject: [PATCH V2] perf: qcom: Add L3 cache PMU driver
-Message-ID: <1487257385-28930-1-git-send-email-agustinv@codeaurora.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 16 Feb 2017 23:21:19 +0800
+Subject: [PATCH RFC 2/3] coresight: add support for debug module
+In-Reply-To: <20170215114416.GF31733@leverpostej>
+References: <1486966298-16767-1-git-send-email-leo.yan@linaro.org>
+ <1486966298-16767-3-git-send-email-leo.yan@linaro.org>
+ <20170215114416.GF31733@leverpostej>
+Message-ID: <20170216152119.GC544@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a new dynamic PMU to the Perf Events framework to program
-and control the L3 cache PMUs in some Qualcomm Technologies SOCs.
+Hi Mark,
 
-The driver supports a distributed cache architecture where the overall
-cache is comprised of multiple slices each with its own PMU. The driver
-aggregates counts across the whole system to provide a global picture
-of the metrics selected by the user.
+On Wed, Feb 15, 2017 at 11:44:16AM +0000, Mark Rutland wrote:
+> [resending due to a mail server snafu]
+> 
+> On Mon, Feb 13, 2017 at 02:11:37PM +0800, Leo Yan wrote:
+> > Coresight includes debug module and usually the module connects with CPU
+> > debug logic. ARMv8 architecture reference manual (ARMv8-ARM) has defined
+> > the debug registers in the chapter "H9: External Debug Register
+> > Descriptions".
+> 
+> This should have been in the binding description also.
+> 
+> The layout of the ARM ARM can change over time, so please refer to the
+> full document number, which can be found at the bottom of each page
+> (e.g. ARM DDI 0487A.j).
 
-The driver exports formatting and event information to sysfs so it can
-be used by the perf user space tools with the syntaxes:
-   perf stat -a -e l3cache/read-miss/
-   perf stat -a -e l3cache/event=0x21/
+Good to know this. Will use this way to connect code with spec.
 
-Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
----
- drivers/perf/Kconfig       |   9 +
- drivers/perf/Makefile      |   1 +
- drivers/perf/qcom_l3_pmu.c | 931 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/cpuhotplug.h |   1 +
- 4 files changed, 942 insertions(+)
- create mode 100644 drivers/perf/qcom_l3_pmu.c
+> > After enable the debug module we can check CPU state and PC value, etc.
+> > So this is helpful for some CPU lockup bugs, e.g. if one CPU has run
+> > into infinite loop with IRQ disabled. So the CPU cannot switch context
+> > and handle any interrupt, so it cannot handle SMP call for stack dump,
+> > etc. Furthermore, now ARMv8 introduces some other runtime firmwares like
+> > ARM trusted firmware BL31, so sometime CPU hard lock may happen in the
+> > firmware and cannot return back to kernel.
+> 
+> I would generally expect that the secure world would lock down
+> debugging, as this poses a security risk.
+> 
+> I take it that this is only unlocked on development firmware.
+> 
+> Given that cores can be powered down outside of our control, I'm not
+> sure that accesses to these registers is safe in general.
 
-diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
-index 4d5c5f9..e5d8559 100644
---- a/drivers/perf/Kconfig
-+++ b/drivers/perf/Kconfig
-@@ -12,6 +12,15 @@ config ARM_PMU
- 	  Say y if you want to use CPU performance monitors on ARM-based
- 	  systems.
- 
-+config QCOM_L3_PMU
-+	 bool "Qualcomm Technologies L3-cache PMU"
-+	 depends on ARCH_QCOM && ARM64 && PERF_EVENTS && ACPI
-+	   help
-+	   Provides support for the L3 cache performance monitor unit (PMU)
-+	   in Qualcomm Technologies processors.
-+	   Adds the L3 cache PMU into the perf events subsystem for
-+	   monitoring L3 cache events.
-+
- config XGENE_PMU
-         depends on PERF_EVENTS && ARCH_XGENE
-         bool "APM X-Gene SoC PMU"
-diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
-index b116e98..89a2daa 100644
---- a/drivers/perf/Makefile
-+++ b/drivers/perf/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_ARM_PMU) += arm_pmu.o
-+obj-$(CONFIG_QCOM_L3_PMU) += qcom_l3_pmu.o
- obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
-diff --git a/drivers/perf/qcom_l3_pmu.c b/drivers/perf/qcom_l3_pmu.c
-new file mode 100644
-index 0000000..ef5fe05
---- /dev/null
-+++ b/drivers/perf/qcom_l3_pmu.c
-@@ -0,0 +1,931 @@
-+/* Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/bitops.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/list.h>
-+#include <linux/acpi.h>
-+#include <linux/perf_event.h>
-+#include <linux/platform_device.h>
-+
-+/*
-+ * Driver for the L3 cache PMUs in Qualcomm Technologies chips.
-+ *
-+ * The driver supports a distributed cache architecture where the overall
-+ * cache for a socket is comprised of multiple slices each with its own PMU.
-+ * The driver aggregates counts across the whole socket to provide a global
-+ * picture of the metrics selected by the user.
-+ * Access to individual PMUs is not necessary/required since all CPUs
-+ * share all the slices. The particular slice used by a given address
-+ * is determined by a hardware hashing algorithm based on the target
-+ * address.
-+ */
-+
-+/*
-+ * General constants
-+ */
-+
-+#define L3_NUM_COUNTERS  8
-+#define L3_MAX_EVTYPE    0xFF
-+
-+/*
-+ * Register offsets
-+ */
-+
-+/* Perfmon registers */
-+#define L3_HML3_PM_CR       0x000
-+#define L3_HML3_PM_EVCNTR(__cntr) (0x420 + ((__cntr) & 0x7) * 8)
-+#define L3_HML3_PM_CNTCTL(__cntr) (0x120 + ((__cntr) & 0x7) * 8)
-+#define L3_HML3_PM_EVTYPE(__cntr) (0x220 + ((__cntr) & 0x7) * 8)
-+#define L3_HML3_PM_FILTRA   0x300
-+#define L3_HML3_PM_FILTRB   0x308
-+#define L3_HML3_PM_FILTRC   0x310
-+#define L3_HML3_PM_FILTRAM  0x304
-+#define L3_HML3_PM_FILTRBM  0x30C
-+#define L3_HML3_PM_FILTRCM  0x314
-+
-+/* Basic counter registers */
-+#define L3_M_BC_CR         0x500
-+#define L3_M_BC_SATROLL_CR 0x504
-+#define L3_M_BC_CNTENSET   0x508
-+#define L3_M_BC_CNTENCLR   0x50C
-+#define L3_M_BC_INTENSET   0x510
-+#define L3_M_BC_INTENCLR   0x514
-+#define L3_M_BC_GANG       0x718
-+#define L3_M_BC_OVSR       0x740
-+#define L3_M_BC_IRQCTL     0x96C
-+
-+/*
-+ * Bit field definitions
-+ */
-+
-+/* L3_HML3_PM_CR */
-+#define PM_CR_RESET           (0)
-+
-+/* L3_HML3_PM_XCNTCTL/L3_HML3_PM_CNTCTLx */
-+#define PMCNT_RESET           (0)
-+
-+/* L3_HML3_PM_EVTYPEx */
-+#define EVSEL(__val)          ((u32)((__val) & 0xFF))
-+
-+/* Reset value for all the filter registers */
-+#define PM_FLTR_RESET         (0)
-+
-+/* L3_M_BC_CR */
-+#define BC_RESET              (((u32)1) << 1)
-+#define BC_ENABLE             ((u32)1)
-+
-+/* L3_M_BC_SATROLL_CR */
-+#define BC_SATROLL_CR_RESET   (0)
-+
-+/* L3_M_BC_CNTENSET */
-+#define PMCNTENSET(__cntr)    (((u32)1) << ((__cntr) & 0x7))
-+
-+/* L3_M_BC_CNTENCLR */
-+#define PMCNTENCLR(__cntr)    (((u32)1) << ((__cntr) & 0x7))
-+#define BC_CNTENCLR_RESET     (0xFF)
-+
-+/* L3_M_BC_INTENSET */
-+#define PMINTENSET(__cntr)    (((u32)1) << ((__cntr) & 0x7))
-+
-+/* L3_M_BC_INTENCLR */
-+#define PMINTENCLR(__cntr)    (((u32)1) << ((__cntr) & 0x7))
-+#define BC_INTENCLR_RESET     (0xFF)
-+
-+/* L3_M_BC_GANG */
-+#define GANG_EN(__cntr)       (((u32)1) << ((__cntr) & 0x7))
-+#define BC_GANG_RESET         (0)
-+
-+/* L3_M_BC_OVSR */
-+#define PMOVSRCLR(__cntr)     (((u32)1) << ((__cntr) & 0x7))
-+#define PMOVSRCLR_RESET       (0xFF)
-+
-+/* L3_M_BC_IRQCTL */
-+#define PMIRQONMSBEN(__cntr)  (((u32)1) << ((__cntr) & 0x7))
-+#define BC_IRQCTL_RESET       (0x0)
-+
-+/*
-+ * Events
-+ */
-+
-+#define L3_CYCLES		0x01
-+#define L3_READ_HIT		0x20
-+#define L3_READ_MISS		0x21
-+#define L3_READ_HIT_D		0x22
-+#define L3_READ_MISS_D		0x23
-+#define L3_WRITE_HIT		0x24
-+#define L3_WRITE_MISS		0x25
-+
-+/*
-+ * The cache is made-up of one or more slices, each slice has its own PMU.
-+ * This structure represents one of the hardware PMUs.
-+ */
-+struct hml3_pmu {
-+	struct list_head	entry;
-+	struct l3cache_pmu	*socket;
-+	void __iomem		*regs;
-+	atomic_t		prev_count[L3_NUM_COUNTERS];
-+};
-+
-+static void hml3_pmu__reset(struct hml3_pmu *pmu)
-+{
-+	int i;
-+
-+	writel_relaxed(BC_RESET, pmu->regs + L3_M_BC_CR);
-+
-+	/*
-+	 * Use writel for the first programming command to ensure the basic
-+	 * counter unit is stopped before proceeding
-+	 */
-+	writel(BC_SATROLL_CR_RESET, pmu->regs + L3_M_BC_SATROLL_CR);
-+
-+	writel_relaxed(BC_CNTENCLR_RESET, pmu->regs + L3_M_BC_CNTENCLR);
-+	writel_relaxed(BC_INTENCLR_RESET, pmu->regs + L3_M_BC_INTENCLR);
-+	writel_relaxed(PMOVSRCLR_RESET, pmu->regs + L3_M_BC_OVSR);
-+	writel_relaxed(BC_GANG_RESET, pmu->regs + L3_M_BC_GANG);
-+	writel_relaxed(BC_IRQCTL_RESET, pmu->regs + L3_M_BC_IRQCTL);
-+	writel_relaxed(PM_CR_RESET, pmu->regs + L3_HML3_PM_CR);
-+
-+	for (i = 0; i < L3_NUM_COUNTERS; ++i) {
-+		writel_relaxed(PMCNT_RESET, pmu->regs + L3_HML3_PM_CNTCTL(i));
-+		writel_relaxed(EVSEL(0), pmu->regs + L3_HML3_PM_EVTYPE(i));
-+	}
-+
-+	writel_relaxed(PM_FLTR_RESET, pmu->regs + L3_HML3_PM_FILTRA);
-+	writel_relaxed(PM_FLTR_RESET, pmu->regs + L3_HML3_PM_FILTRAM);
-+	writel_relaxed(PM_FLTR_RESET, pmu->regs + L3_HML3_PM_FILTRB);
-+	writel_relaxed(PM_FLTR_RESET, pmu->regs + L3_HML3_PM_FILTRBM);
-+	writel_relaxed(PM_FLTR_RESET, pmu->regs + L3_HML3_PM_FILTRC);
-+	writel_relaxed(PM_FLTR_RESET, pmu->regs + L3_HML3_PM_FILTRCM);
-+}
-+
-+static inline void hml3_pmu__init(struct hml3_pmu *pmu, struct l3cache_pmu *s,
-+				  void __iomem *regs)
-+{
-+	pmu->socket = s;
-+	pmu->regs = regs;
-+	hml3_pmu__reset(pmu);
-+
-+	/*
-+	 * Use writel here to ensure all programming commands are done
-+	 *  before proceeding
-+	 */
-+	writel(BC_ENABLE, pmu->regs + L3_M_BC_CR);
-+}
-+
-+static inline void hml3_pmu__enable(struct hml3_pmu *pmu)
-+{
-+	writel_relaxed(BC_ENABLE, pmu->regs + L3_M_BC_CR);
-+}
-+
-+static inline void hml3_pmu__disable(struct hml3_pmu *pmu)
-+{
-+	writel_relaxed(0, pmu->regs + L3_M_BC_CR);
-+}
-+
-+static inline void hml3_pmu__counter_set_event(struct hml3_pmu *pmu, u8 cnt,
-+					       u32 event)
-+{
-+	writel_relaxed(EVSEL(event), pmu->regs + L3_HML3_PM_EVTYPE(cnt));
-+}
-+
-+static inline void hml3_pmu__counter_set_value(struct hml3_pmu *pmu, u8 cnt,
-+					       u32 value)
-+{
-+	writel_relaxed(value, pmu->regs + L3_HML3_PM_EVCNTR(cnt));
-+}
-+
-+static inline u32 hml3_pmu__counter_get_value(struct hml3_pmu *pmu, u8 cnt)
-+{
-+	return readl_relaxed(pmu->regs + L3_HML3_PM_EVCNTR(cnt));
-+}
-+
-+static inline void hml3_pmu__counter_enable(struct hml3_pmu *pmu, u8 cnt)
-+{
-+	writel_relaxed(PMCNTENSET(cnt), pmu->regs + L3_M_BC_CNTENSET);
-+}
-+
-+static inline void hml3_pmu__counter_reset_trigger(struct hml3_pmu *pmu, u8 cnt)
-+{
-+	writel_relaxed(PMCNT_RESET, pmu->regs + L3_HML3_PM_CNTCTL(cnt));
-+}
-+
-+static inline void hml3_pmu__counter_disable(struct hml3_pmu *pmu, u8 cnt)
-+{
-+	writel_relaxed(PMCNTENCLR(cnt), pmu->regs + L3_M_BC_CNTENCLR);
-+}
-+
-+static inline void hml3_pmu__counter_enable_interrupt(struct hml3_pmu *pmu,
-+						      u8 cnt)
-+{
-+	writel_relaxed(PMINTENSET(cnt), pmu->regs + L3_M_BC_INTENSET);
-+}
-+
-+static inline void hml3_pmu__counter_disable_interrupt(struct hml3_pmu *pmu,
-+						       u8 cnt)
-+{
-+	writel_relaxed(PMINTENCLR(cnt), pmu->regs + L3_M_BC_INTENCLR);
-+}
-+
-+static inline void hml3_pmu__counter_enable_gang(struct hml3_pmu *pmu, u8 cnt)
-+{
-+	u32 value = readl_relaxed(pmu->regs + L3_M_BC_GANG);
-+
-+	value |= GANG_EN(cnt);
-+	writel_relaxed(value, pmu->regs + L3_M_BC_GANG);
-+}
-+
-+static inline void hml3_pmu__counter_disable_gang(struct hml3_pmu *pmu, u8 cnt)
-+{
-+	u32 value = readl_relaxed(pmu->regs + L3_M_BC_GANG);
-+
-+	value &= ~(GANG_EN(cnt));
-+	writel_relaxed(value, pmu->regs + L3_M_BC_GANG);
-+}
-+
-+static inline void hml3_pmu__counter_enable_irq_on_msb(struct hml3_pmu *pmu,
-+						       u8 cnt)
-+{
-+	u32 value = readl_relaxed(pmu->regs + L3_M_BC_IRQCTL);
-+
-+	value |= PMIRQONMSBEN(cnt);
-+	writel_relaxed(value, pmu->regs + L3_M_BC_IRQCTL);
-+}
-+
-+static inline void hml3_pmu__counter_disable_irq_on_msb(struct hml3_pmu *pmu,
-+							u8 cnt)
-+{
-+	u32 value = readl_relaxed(pmu->regs + L3_M_BC_IRQCTL);
-+
-+	value &= ~(PMIRQONMSBEN(cnt));
-+	writel_relaxed(value, pmu->regs + L3_M_BC_IRQCTL);
-+}
-+
-+static inline u32 hml3_pmu__getreset_ovsr(struct hml3_pmu *pmu)
-+{
-+	u32 result = readl_relaxed(pmu->regs + L3_M_BC_OVSR);
-+
-+	writel_relaxed(result, pmu->regs + L3_M_BC_OVSR);
-+	return result;
-+}
-+
-+static inline int hml3_pmu__has_overflowed(u32 ovsr)
-+{
-+	return (ovsr & PMOVSRCLR_RESET) != 0;
-+}
-+
-+/*
-+ * Hardware counter interface.
-+ *
-+ * This interface allows operations on counters to be polymorphic.
-+ * The hardware supports counter chaining to allow 64 bit virtual counters.
-+ * We expose this capability as a config option for each event, that way
-+ * a user can create perf events that use 32 bit counters for events that
-+ * increment at a slower rate, and perf events that use 64 bit counters
-+ * for events that increment faster and avoid IRQs.
-+ */
-+struct l3cache_pmu_hwc {
-+	struct perf_event	*event;
-+	/* Called to start event monitoring */
-+	void (*start)(struct perf_event *event);
-+	/* Called to stop event monitoring */
-+	void (*stop)(struct perf_event *event, int flags);
-+	/* Called to update the perf_event */
-+	void (*update)(struct perf_event *event);
-+};
-+
-+/*
-+ * Decoding of settings from perf_event_attr
-+ *
-+ * The config format for perf events is:
-+ * - config: bits 0-7: event type
-+ *           bit  32:  HW counter size requested, 0: 32 bits, 1: 64 bits
-+ */
-+static inline u32 get_event_type(struct perf_event *event)
-+{
-+	return (event->attr.config) & L3_MAX_EVTYPE;
-+}
-+
-+static inline int get_hw_counter_size(struct perf_event *event)
-+{
-+	return event->attr.config >> 32 & 1;
-+}
-+
-+/*
-+ * Aggregate PMU. Implements the core pmu functions and manages
-+ * the hardware PMUs, configuring each one in the same way and
-+ * aggregating events as needed.
-+ */
-+
-+struct l3cache_pmu {
-+	struct pmu		pmu;
-+	struct hlist_node	node;
-+	struct list_head	pmus;
-+	struct l3cache_pmu_hwc	counters[L3_NUM_COUNTERS];
-+	unsigned long		used_mask[BITS_TO_LONGS(L3_NUM_COUNTERS)];
-+	cpumask_t		cpu;
-+};
-+
-+#define to_l3cache_pmu(p) (container_of(p, struct l3cache_pmu, pmu))
-+
-+/*
-+ * 64 bit counter interface implementation.
-+ */
-+
-+static void qcom_l3_cache__64bit_counter_start(struct perf_event *event)
-+{
-+	struct l3cache_pmu *socket = to_l3cache_pmu(event->pmu);
-+	struct hml3_pmu *slice;
-+	int idx = event->hw.idx;
-+	u64 value = local64_read(&event->count);
-+
-+	list_for_each_entry(slice, &socket->pmus, entry) {
-+		hml3_pmu__counter_enable_gang(slice, idx+1);
-+
-+		if (value) {
-+			hml3_pmu__counter_set_value(slice, idx+1, value >> 32);
-+			hml3_pmu__counter_set_value(slice, idx, (u32)value);
-+			value = 0;
-+		} else {
-+			hml3_pmu__counter_set_value(slice, idx+1, 0);
-+			hml3_pmu__counter_set_value(slice, idx, 0);
-+		}
-+
-+		hml3_pmu__counter_set_event(slice, idx+1, 0);
-+		hml3_pmu__counter_set_event(slice, idx, get_event_type(event));
-+
-+		hml3_pmu__counter_enable(slice, idx+1);
-+		hml3_pmu__counter_enable(slice, idx);
-+	}
-+}
-+
-+static void qcom_l3_cache__64bit_counter_stop(struct perf_event *event,
-+					      int flags)
-+{
-+	struct l3cache_pmu *socket = to_l3cache_pmu(event->pmu);
-+	struct hml3_pmu *slice;
-+	int idx = event->hw.idx;
-+
-+	list_for_each_entry(slice, &socket->pmus, entry) {
-+		hml3_pmu__counter_disable_gang(slice, idx+1);
-+
-+		hml3_pmu__counter_disable(slice, idx);
-+		hml3_pmu__counter_disable(slice, idx+1);
-+	}
-+}
-+
-+static u64 qcom_l3_cache__64bit_counter_get_value(struct hml3_pmu *slice,
-+						  int idx)
-+{
-+	u32 hi_old, lo, hi_new;
-+	int i, retries = 2;
-+
-+	hi_new = hml3_pmu__counter_get_value(slice, idx+1);
-+	for (i = 0; i < retries; i++) {
-+		hi_old = hi_new;
-+		lo = hml3_pmu__counter_get_value(slice, idx);
-+		hi_new = hml3_pmu__counter_get_value(slice, idx+1);
-+		if (hi_old == hi_new)
-+			break;
-+	}
-+
-+	return ((u64)hi_new << 32) | lo;
-+}
-+
-+static void qcom_l3_cache__64bit_counter_update(struct perf_event *event)
-+{
-+	struct l3cache_pmu *socket = to_l3cache_pmu(event->pmu);
-+	struct hml3_pmu *slice;
-+	int idx = event->hw.idx;
-+	u64 new = 0;
-+
-+	list_for_each_entry(slice, &socket->pmus, entry)
-+		new += qcom_l3_cache__64bit_counter_get_value(slice, idx);
-+
-+	local64_set(&event->count, new);
-+}
-+
-+/*
-+ * 32 bit counter interface implementation
-+ */
-+
-+static void qcom_l3_cache__32bit_counter_start(struct perf_event *event)
-+{
-+	struct l3cache_pmu *socket = to_l3cache_pmu(event->pmu);
-+	struct hml3_pmu *slice;
-+	struct hw_perf_event *hwc = &event->hw;
-+
-+	slice = list_first_entry(&socket->pmus, struct hml3_pmu, entry);
-+
-+	list_for_each_entry(slice, &socket->pmus, entry) {
-+		atomic_set(&slice->prev_count[hwc->idx], 0);
-+		hml3_pmu__counter_set_value(slice, hwc->idx, 0);
-+		hml3_pmu__counter_enable_irq_on_msb(slice, hwc->idx);
-+		hml3_pmu__counter_set_event(slice, hwc->idx,
-+					    get_event_type(event));
-+		hml3_pmu__counter_enable_interrupt(slice, hwc->idx);
-+		hml3_pmu__counter_enable(slice, hwc->idx);
-+	}
-+}
-+
-+static void qcom_l3_cache__32bit_counter_stop(struct perf_event *event,
-+					      int flags)
-+{
-+	struct l3cache_pmu *socket = to_l3cache_pmu(event->pmu);
-+	struct hml3_pmu *slice;
-+	struct hw_perf_event *hwc = &event->hw;
-+
-+	list_for_each_entry(slice, &socket->pmus, entry) {
-+		hml3_pmu__counter_disable_irq_on_msb(slice, hwc->idx);
-+		hml3_pmu__counter_disable_interrupt(slice, hwc->idx);
-+		hml3_pmu__counter_disable(slice, hwc->idx);
-+	}
-+}
-+
-+static void qcom_l3_cache__32bit_counter_update_from_slice(
-+		struct perf_event *event, struct hml3_pmu *slice, int idx)
-+{
-+	u32 delta, prev, now;
-+
-+	do {
-+		prev = atomic_read(&slice->prev_count[idx]);
-+		now = hml3_pmu__counter_get_value(slice, idx);
-+	} while (atomic_cmpxchg(&slice->prev_count[idx], prev, now) != prev);
-+
-+	delta = now - prev;
-+	local64_add(delta, &event->count);
-+}
-+
-+static void qcom_l3_cache__32bit_counter_update(struct perf_event *event)
-+{
-+	struct l3cache_pmu *socket = to_l3cache_pmu(event->pmu);
-+	struct hml3_pmu *slice;
-+
-+	list_for_each_entry(slice, &socket->pmus, entry)
-+		qcom_l3_cache__32bit_counter_update_from_slice(event, slice,
-+							       event->hw.idx);
-+}
-+
-+/*
-+ * Top level PMU functions.
-+ */
-+
-+static irqreturn_t qcom_l3_cache__handle_irq(int irq_num, void *data)
-+{
-+	struct hml3_pmu *slice = data;
-+	u32 status;
-+	int idx;
-+
-+	status = hml3_pmu__getreset_ovsr(slice);
-+	if (!hml3_pmu__has_overflowed(status))
-+		return IRQ_NONE;
-+
-+	while (status) {
-+		struct perf_event *event;
-+
-+		idx = __ffs(status);
-+		status &= ~(1 << idx);
-+		event = slice->socket->counters[idx].event;
-+		if (!event)
-+			continue;
-+
-+		qcom_l3_cache__32bit_counter_update_from_slice(event, slice,
-+							       event->hw.idx);
-+	}
-+
-+	return IRQ_HANDLED;
-+}
-+
-+/*
-+ * Implementation of abstract pmu functionality required by
-+ * the core perf events code.
-+ */
-+
-+static void qcom_l3_cache__pmu_enable(struct pmu *pmu)
-+{
-+	struct l3cache_pmu *socket = to_l3cache_pmu(pmu);
-+	struct hml3_pmu *slice;
-+	int idx;
-+
-+	/*
-+	 * Re-write CNTCTL for all existing events to re-assert
-+	 * the start trigger.
-+	 */
-+	for (idx = 0; idx < L3_NUM_COUNTERS; idx++)
-+		if (socket->counters[idx].event)
-+			list_for_each_entry(slice, &socket->pmus, entry)
-+				hml3_pmu__counter_reset_trigger(slice, idx);
-+
-+	/* Ensure all programming commands are done before proceeding */
-+	wmb();
-+	list_for_each_entry(slice, &socket->pmus, entry)
-+		hml3_pmu__enable(slice);
-+}
-+
-+static void qcom_l3_cache__pmu_disable(struct pmu *pmu)
-+{
-+	struct l3cache_pmu *socket = to_l3cache_pmu(pmu);
-+	struct hml3_pmu *slice;
-+
-+	list_for_each_entry(slice, &socket->pmus, entry)
-+		hml3_pmu__disable(slice);
-+
-+	/* Ensure the basic counter unit is stopped before proceeding */
-+	wmb();
-+}
-+
-+static int qcom_l3_cache__event_init(struct perf_event *event)
-+{
-+	struct l3cache_pmu *socket;
-+	struct hw_perf_event *hwc = &event->hw;
-+
-+	/*
-+	 * Is the event for this PMU?
-+	 */
-+	if (event->attr.type != event->pmu->type)
-+		return -ENOENT;
-+
-+	/*
-+	 * There are no per-counter mode filters in the PMU.
-+	 */
-+	if (event->attr.exclude_user || event->attr.exclude_kernel ||
-+	    event->attr.exclude_hv || event->attr.exclude_idle)
-+		return -EINVAL;
-+
-+	hwc->idx = -1;
-+
-+	/*
-+	 * Sampling not supported since these events are not core-attributable.
-+	 */
-+	if (hwc->sample_period)
-+		return -EINVAL;
-+
-+	/*
-+	 * Task mode not available, we run the counters as socket counters,
-+	 * not attributable to any CPU and therefore cannot attribute per-task.
-+	 */
-+	if (event->cpu < 0)
-+		return -EINVAL;
-+
-+	/*
-+	 * Many perf core operations (eg. events rotation) operate on a
-+	 * single CPU context. This is obvious for CPU PMUs, where one
-+	 * expects the same sets of events being observed on all CPUs,
-+	 * but can lead to issues for off-core PMUs, like this one, where
-+	 * each event could be theoretically assigned to a different CPU.
-+	 * To mitigate this, we enforce CPU assignment to one designated
-+	 * processor (the one described in the "cpumask" attribute exported
-+	 * by the PMU device). perf user space tools honor this and avoid
-+	 * opening more than one copy of the events.
-+	 */
-+	socket = to_l3cache_pmu(event->pmu);
-+	event->cpu = cpumask_first(&socket->cpu);
-+
-+	return 0;
-+}
-+
-+static void qcom_l3_cache__event_start(struct perf_event *event, int flags)
-+{
-+	struct l3cache_pmu *socket = to_l3cache_pmu(event->pmu);
-+	struct hw_perf_event *hwc = &event->hw;
-+
-+	hwc->state = 0;
-+
-+	socket->counters[hwc->idx].start(event);
-+}
-+
-+static void qcom_l3_cache__event_stop(struct perf_event *event, int flags)
-+{
-+	struct l3cache_pmu *socket = to_l3cache_pmu(event->pmu);
-+	struct hw_perf_event *hwc = &event->hw;
-+
-+	if (!(hwc->state & PERF_HES_STOPPED)) {
-+		socket->counters[hwc->idx].stop(event, flags);
-+
-+		if (flags & PERF_EF_UPDATE)
-+			socket->counters[hwc->idx].update(event);
-+		hwc->state |= PERF_HES_STOPPED | PERF_HES_UPTODATE;
-+	}
-+}
-+
-+static int qcom_l3_cache__event_add(struct perf_event *event, int flags)
-+{
-+	struct l3cache_pmu *socket = to_l3cache_pmu(event->pmu);
-+	struct hw_perf_event *hwc = &event->hw;
-+	int idx;
-+	int sz;
-+
-+	/*
-+	 * Try to allocate a counter.
-+	 */
-+	sz = get_hw_counter_size(event);
-+	idx = bitmap_find_free_region(socket->used_mask, L3_NUM_COUNTERS, sz);
-+	if (idx < 0)
-+		/* The counters are all in use. */
-+		return -EAGAIN;
-+
-+	hwc->idx = idx;
-+	hwc->state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
-+
-+	if (sz == 0)
-+		socket->counters[idx] = (struct l3cache_pmu_hwc) {
-+			.event = event,
-+			.start = qcom_l3_cache__32bit_counter_start,
-+			.stop = qcom_l3_cache__32bit_counter_stop,
-+			.update = qcom_l3_cache__32bit_counter_update
-+		};
-+	else {
-+		socket->counters[idx] = (struct l3cache_pmu_hwc) {
-+			.event = event,
-+			.start = qcom_l3_cache__64bit_counter_start,
-+			.stop = qcom_l3_cache__64bit_counter_stop,
-+			.update = qcom_l3_cache__64bit_counter_update
-+		};
-+		socket->counters[idx+1] = socket->counters[idx];
-+	}
-+
-+	if (flags & PERF_EF_START)
-+		qcom_l3_cache__event_start(event, 0);
-+
-+	/* Propagate changes to the userspace mapping. */
-+	perf_event_update_userpage(event);
-+
-+	return 0;
-+}
-+
-+static void qcom_l3_cache__event_del(struct perf_event *event, int flags)
-+{
-+	struct l3cache_pmu *socket = to_l3cache_pmu(event->pmu);
-+	struct hw_perf_event *hwc = &event->hw;
-+	int sz;
-+
-+	qcom_l3_cache__event_stop(event,  flags | PERF_EF_UPDATE);
-+	sz = get_hw_counter_size(event);
-+	socket->counters[hwc->idx].event = NULL;
-+	if (sz)
-+		socket->counters[hwc->idx+1].event = NULL;
-+	bitmap_release_region(socket->used_mask, hwc->idx, sz);
-+
-+	perf_event_update_userpage(event);
-+}
-+
-+static void qcom_l3_cache__event_read(struct perf_event *event)
-+{
-+	struct l3cache_pmu *socket = to_l3cache_pmu(event->pmu);
-+	struct hw_perf_event *hwc = &event->hw;
-+
-+	socket->counters[hwc->idx].update(event);
-+}
-+
-+/*
-+ * Add support for creating events symbolically when using the perf
-+ * user space tools command line. E.g.:
-+ *   perf stat -a -e l3cache/event=read-miss/ ls
-+ *   perf stat -a -e l3cache/event=0x21/ ls
-+ */
-+
-+ssize_t l3cache_pmu_event_sysfs_show(struct device *dev,
-+				     struct device_attribute *attr, char *page)
-+{
-+	struct perf_pmu_events_attr *pmu_attr;
-+
-+	pmu_attr = container_of(attr, struct perf_pmu_events_attr, attr);
-+	return sprintf(page, "event=0x%02llx,name=%s\n",
-+		       pmu_attr->id, attr->attr.name);
-+}
-+
-+#define L3CACHE_EVENT_VAR(__id)	pmu_event_attr_##__id
-+#define L3CACHE_EVENT_PTR(__id)	(&L3CACHE_EVENT_VAR(__id).attr.attr)
-+
-+#define L3CACHE_EVENT_ATTR(__name, __id)			\
-+	PMU_EVENT_ATTR(__name, L3CACHE_EVENT_VAR(__id), __id,	\
-+		       l3cache_pmu_event_sysfs_show)
-+
-+
-+L3CACHE_EVENT_ATTR(cycles, L3_CYCLES);
-+L3CACHE_EVENT_ATTR(read-hit, L3_READ_HIT);
-+L3CACHE_EVENT_ATTR(read-miss, L3_READ_MISS);
-+L3CACHE_EVENT_ATTR(read-hit-d-side, L3_READ_HIT_D);
-+L3CACHE_EVENT_ATTR(read-miss-d-side, L3_READ_MISS_D);
-+L3CACHE_EVENT_ATTR(write-hit, L3_WRITE_HIT);
-+L3CACHE_EVENT_ATTR(write-miss, L3_WRITE_MISS);
-+
-+static struct attribute *qcom_l3_cache_pmu_events[] = {
-+	L3CACHE_EVENT_PTR(L3_CYCLES),
-+	L3CACHE_EVENT_PTR(L3_READ_HIT),
-+	L3CACHE_EVENT_PTR(L3_READ_MISS),
-+	L3CACHE_EVENT_PTR(L3_READ_HIT_D),
-+	L3CACHE_EVENT_PTR(L3_READ_MISS_D),
-+	L3CACHE_EVENT_PTR(L3_WRITE_HIT),
-+	L3CACHE_EVENT_PTR(L3_WRITE_MISS),
-+	NULL
-+};
-+
-+static struct attribute_group qcom_l3_cache_pmu_events_group = {
-+	.name = "events",
-+	.attrs = qcom_l3_cache_pmu_events,
-+};
-+
-+PMU_FORMAT_ATTR(event, "config:0-7");
-+PMU_FORMAT_ATTR(lc, "config:32");
-+
-+static struct attribute *qcom_l3_cache_pmu_formats[] = {
-+	&format_attr_event.attr,
-+	&format_attr_lc.attr,
-+	NULL,
-+};
-+
-+static struct attribute_group qcom_l3_cache_pmu_format_group = {
-+	.name = "format",
-+	.attrs = qcom_l3_cache_pmu_formats,
-+};
-+
-+static ssize_t qcom_l3_cache_pmu_cpumask_show(struct device *dev,
-+				     struct device_attribute *attr, char *buf)
-+{
-+	struct l3cache_pmu *socket = to_l3cache_pmu(dev_get_drvdata(dev));
-+
-+	return cpumap_print_to_pagebuf(true, buf, &socket->cpu);
-+}
-+
-+static struct device_attribute qcom_l3_cache_pmu_cpumask_attr =
-+		__ATTR(cpumask, 0444, qcom_l3_cache_pmu_cpumask_show, NULL);
-+
-+static struct attribute *qcom_l3_cache_pmu_cpumask_attrs[] = {
-+	&qcom_l3_cache_pmu_cpumask_attr.attr,
-+	NULL,
-+};
-+
-+static struct attribute_group qcom_l3_cache_pmu_cpumask_attr_group = {
-+	.attrs = qcom_l3_cache_pmu_cpumask_attrs,
-+};
-+
-+
-+static const struct attribute_group *qcom_l3_cache_pmu_attr_grps[] = {
-+	&qcom_l3_cache_pmu_format_group,
-+	&qcom_l3_cache_pmu_events_group,
-+	&qcom_l3_cache_pmu_cpumask_attr_group,
-+	NULL,
-+};
-+
-+/*
-+ * Probing functions and data.
-+ */
-+
-+static int qcom_l3_cache_pmu_offline_cpu(unsigned int cpu, struct hlist_node *n)
-+{
-+	struct l3cache_pmu *socket = hlist_entry_safe(n, struct l3cache_pmu, node);
-+	unsigned int target;
-+
-+	if (!cpumask_test_and_clear_cpu(cpu, &socket->cpu))
-+		return 0;
-+	target = cpumask_any_but(cpu_online_mask, cpu);
-+	if (target >= nr_cpu_ids)
-+		return 0;
-+	/*
-+	 * TODO: migrate context once core races on event->ctx have
-+	 * been fixed.
-+	 */
-+	cpumask_set_cpu(target, &socket->cpu);
-+	return 0;
-+}
-+
-+static int qcom_l3_cache_pmu_probe_slice(struct device *dev, void *data)
-+{
-+	struct platform_device *pdev = to_platform_device(dev->parent);
-+	struct platform_device *sdev = to_platform_device(dev);
-+	struct l3cache_pmu *socket = data;
-+	struct resource *memrc;
-+	void __iomem *regs;
-+	struct hml3_pmu *slice;
-+	int irq, err;
-+
-+	memrc = platform_get_resource(sdev, IORESOURCE_MEM, 0);
-+	slice = devm_kzalloc(&pdev->dev, sizeof(*slice), GFP_KERNEL);
-+	if (!slice)
-+		return -ENOMEM;
-+
-+	regs = devm_ioremap_resource(&pdev->dev, memrc);
-+	if (IS_ERR(regs)) {
-+		dev_err(&pdev->dev, "Can't map slice @%pa\n", &memrc->start);
-+		return PTR_ERR(regs);
-+	}
-+
-+	irq = platform_get_irq(sdev, 0);
-+	if (irq <= 0) {
-+		dev_err(&pdev->dev, "Failed to get valid irq for slice @%pa\n",
-+			&memrc->start);
-+		return irq;
-+	}
-+
-+	err = devm_request_irq(&pdev->dev, irq, qcom_l3_cache__handle_irq, 0,
-+			       "qcom-l3-cache-pmu", slice);
-+	if (err) {
-+		dev_err(&pdev->dev, "Request for IRQ failed for slice @%pa\n",
-+			&memrc->start);
-+		return err;
-+	}
-+
-+	hml3_pmu__init(slice, socket, regs);
-+	list_add(&slice->entry, &socket->pmus);
-+	return 0;
-+}
-+
-+static int qcom_l3_cache_pmu_probe(struct platform_device *pdev)
-+{
-+	struct l3cache_pmu *socket = devm_kzalloc(&pdev->dev, sizeof(*socket),
-+						  GFP_KERNEL);
-+	struct list_head *slice;
-+	int err, num_pmus = 0;
-+
-+	if (!socket)
-+		return -ENOMEM;
-+
-+	INIT_LIST_HEAD(&socket->pmus);
-+
-+	socket->pmu = (struct pmu) {
-+		.task_ctx_nr	= perf_invalid_context,
-+
-+		.pmu_enable	= qcom_l3_cache__pmu_enable,
-+		.pmu_disable	= qcom_l3_cache__pmu_disable,
-+		.event_init	= qcom_l3_cache__event_init,
-+		.add		= qcom_l3_cache__event_add,
-+		.del		= qcom_l3_cache__event_del,
-+		.start		= qcom_l3_cache__event_start,
-+		.stop		= qcom_l3_cache__event_stop,
-+		.read		= qcom_l3_cache__event_read,
-+
-+		.attr_groups	= qcom_l3_cache_pmu_attr_grps,
-+	};
-+
-+	/* Designate the probing CPU as the reader */
-+	cpumask_set_cpu(smp_processor_id(), &socket->cpu);
-+
-+	/* Iterate through slices and add */
-+	err = device_for_each_child(&pdev->dev, socket,
-+				    qcom_l3_cache_pmu_probe_slice);
-+
-+	list_for_each(slice, &socket->pmus)
-+		++num_pmus;
-+
-+	if (num_pmus == 0) {
-+		dev_err(&pdev->dev, "No hardware HML3 PMUs found\n");
-+		return -ENODEV;
-+	}
-+
-+	err = perf_pmu_register(&socket->pmu, "l3cache", -1);
-+	if (err < 0) {
-+		dev_err(&pdev->dev, "Failed to register L3 cache PMU (%d)\n", err);
-+		return err;
-+	}
-+
-+	/* Add this instance to the list used by the offline callback */
-+	cpuhp_state_add_instance_nocalls(CPUHP_AP_PERF_QCOM_L3CACHE_ONLINE,
-+					 &socket->node);
-+	dev_info(&pdev->dev,
-+		 "Registered L3 cache PMU, type: %d, using %d HW PMUs\n",
-+		 socket->pmu.type, num_pmus);
-+
-+	return 0;
-+}
-+
-+static const struct acpi_device_id qcom_l3_cache_pmu_acpi_match[] = {
-+	{ "QCOM8080", },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(acpi, qcom_l3_cache_pmu_acpi_match);
-+
-+static struct platform_driver qcom_l3_cache_pmu_driver = {
-+	.driver = {
-+		.name = "qcom-l3cache-pmu",
-+		.owner = THIS_MODULE,
-+		.acpi_match_table = ACPI_PTR(qcom_l3_cache_pmu_acpi_match),
-+	},
-+	.probe = qcom_l3_cache_pmu_probe,
-+};
-+
-+static int __init register_qcom_l3_cache_pmu_driver(void)
-+{
-+	int ret;
-+
-+	/* Install a hook to update the reader CPU in case it goes offline */
-+	ret = cpuhp_setup_state_multi(CPUHP_AP_PERF_QCOM_L3CACHE_ONLINE,
-+				      "perf/qcom/l3cache:online", NULL,
-+				      qcom_l3_cache_pmu_offline_cpu);
-+	if (ret)
-+		return ret;
-+
-+	return platform_driver_register(&qcom_l3_cache_pmu_driver);
-+}
-+device_initcall(register_qcom_l3_cache_pmu_driver);
-diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
-index 921acaa..be83438 100644
---- a/include/linux/cpuhotplug.h
-+++ b/include/linux/cpuhotplug.h
-@@ -137,6 +137,7 @@ enum cpuhp_state {
- 	CPUHP_AP_PERF_ARM_CCI_ONLINE,
- 	CPUHP_AP_PERF_ARM_CCN_ONLINE,
- 	CPUHP_AP_PERF_ARM_L2X0_ONLINE,
-+	CPUHP_AP_PERF_QCOM_L3CACHE_ONLINE,
- 	CPUHP_AP_WORKQUEUE_ONLINE,
- 	CPUHP_AP_RCUTREE_ONLINE,
- 	CPUHP_AP_ONLINE_DYN,
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Mike Leach has gave method in another email to check CPU power state in
+register EDPRSR.PU before access EDPCSR register.
+
+For security state, I will check if EDSCR.NS bit can be use to
+distinguish CPU is secure or non-secure state. And also follow Mike's
+suggestion to use EDPCSR = 0xFFFF_FFFF as hint that the CPU is in
+secure state.
+
+> > This patch is to enable coresight debug module and register callback
+> > notifier for panic; so when system detect the CPU lockup we can utilize
+> > debug module registers to get to know PC value for all CPUs; so we can
+> > quickly know the hang address for CPUs.
+> > 
+> > This is initial driver for coresight debug module and could enhance it
+> > later according to debugging requirement.
+> 
+> How does this interact with an external debugger making use of these
+> registers?
+
+IIUC, external debugger also will access these registers, like use
+EDPCSR to display PC value. I have no idea for the connection between
+this driver with external debugger, except I think we can use this
+driver to enable clock for CPU debug module.
+
+> [...]
+> 
+> > +static struct debug_drvdata *debug_drvdata[NR_CPUS];
+> 
+> A per-cpu variable is preferred to an NR_CPUS sized array.
+
+Will do.
+
+> > +
+> > +static void debug_os_unlock(struct debug_drvdata *drvdata)
+> > +{
+> > +	/* Unlocks the debug registers */
+> > +	writel_relaxed(0x0, drvdata->base + EDOSLAR);
+> > +	isb();
+> > +}
+> 
+> I do not believe this barrier is correct.
+
+I copied the code piece from coresight-etm4x.c.
+
+I guess here is to ensure the os unlock operations is finished before
+any sequential register accessing. I think isb() is redundant for
+debug module and we can only use writel_relaxed() will be enough for
+accessing EDOSLAR and EDPCSR, these two registers are in the same
+endpoint so we don't need add extra barrier for them. Is this correct?
+
+> [...]
+> 
+> > +static void debug_read_pcsr(struct debug_drvdata *drvdata)
+> > +{
+> > +	u32 pcsr_hi, pcsr_lo;
+> > +
+> > +	CS_UNLOCK(drvdata->base);
+> > +
+> > +	debug_os_unlock(drvdata);
+> > +
+> > +#ifdef CONFIG_64BIT
+> > +	pcsr_lo = readl_relaxed(drvdata->base + EDPCSR_LO);
+> > +	pcsr_hi = readl_relaxed(drvdata->base + EDPCSR_HI);
+> > +
+> > +	pr_emerg("CPU[%d]: PSCR=0x%lx\n", drvdata->cpu,
+> > +		 ((unsigned long)pcsr_hi << 32 | (unsigned long)pcsr_lo));
+> > +#else
+> > +	pcsr_lo = readl_relaxed(drvdata->base + EDPCSR_LO);
+> > +
+> > +	pr_emerg("CPU[%d]: PSCR=0x%lx\n", drvdata->cpu,	pcsr_lo);
+> > +#endif
+> > +
+> > +	CS_LOCK(drvdata->base);
+> > +}
+> 
+> Per ARM DDI 0487A.k_iss10775, H9.2.32, "EDPCSR, External Debug Program
+> Counter Sample Register":
+> 
+> 	Implemented only if the OPTIONAL PC Sample-based Profiling
+> 	Extension is implemented.
+> 
+> So even if we have access to an MMIO debug interface, we cannot
+> necessarily acecess this register.
+
+Eventually this is a hardware feature, right? If so we can use one DT
+property to describe this.
+
+> [...]
+> 
+> > +/*
+> > + * Dump out memory limit information on panic.
+> > + */
+> > +static int dump_debug(struct notifier_block *self, unsigned long v, void *p)
+> > +{
+> > +	int i;
+> > +
+> > +	pr_emerg("Coresight debug module:\n");
+> > +
+> > +	for_each_possible_cpu(i) {
+> > +
+> > +		if (!debug_drvdata[i])
+> > +			continue;
+> > +
+> > +		debug_read_pcsr(debug_drvdata[i]);
+> > +	}
+> 
+> Is there no potential for deadlock with a CPU reading its own debug
+> interface registers?
+
+Have checked this, does not introduce deadlock.
+
+> [...]
+> 
+> > +static struct amba_id debug_ids[] = {
+> > +	{       /* Debug for Cortex-A53 */
+> > +		.id	= 0x000bbd03,
+> > +		.mask	= 0x000fffff,
+> > +		.data	= "debug",
+> > +	},
+> > +	{ 0, 0},
+> > +};
+> 
+> The DT binding said nothing about Cortex-A53.
+> 
+> How variable are the MMIO registers in practice? Do we need to know the
+> particular CPU?
+
+We don't need know particular CPU for current driver; but I think the
+amba id is different for different CPU variants. Should I remove
+related binding for this?
+
+Thanks,
+Leo Yan
