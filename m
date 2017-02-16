@@ -1,28 +1,131 @@
-From: tsu.yubo@gmail.com (Bo YU)
-Date: Thu, 16 Feb 2017 09:59:07 -0500
-Subject: [PATCH] Staging: bcm2835-audio: fixed a code style issue:
-Message-ID: <20170216145904.GA5867@yubo-2>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 16 Feb 2017 15:59:23 +0100
+Subject: [RFC PATCH 07/33] irqchip/gic-v3-its: Macro-ize
+ its_send_single_command
+In-Reply-To: <1484648454-21216-8-git-send-email-marc.zyngier@arm.com>
+References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+ <1484648454-21216-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <5c8c5655-3c65-da3d-9e4c-fc14098ae32d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Missing a blank line after declarations
+Hi,
+On 17/01/2017 11:20, Marc Zyngier wrote:
+> Most ITS commands do operate on a collection object, and require
+> a SYNC command to be performed on that collection in order to
+> guarantee the execution of the first command.
+> 
+> With GICv4 ITS, another set of commands perform similar operations
+> on a VPE object, and a VSYNC operations must be executed to guarantee
+> their execution.
+> 
+> Given the similarities (post a command, perform a synchronization
+> operation on a sync object), it makes sense to reuse the same
+> mechanism for both class of commands.
+> 
+> Let's start with turning its_send_single_command into a huge macro
+> that performs the bulk of the work, and a set of helpers that
+> make this macro useeable for the GICv3 ITS commands.
+s/useeable/usable
 
-Signed-off-by: Bo YU <tsu.yubo@gmail.com>
----
-  drivers/staging/bcm2835-audio/bcm2835-pcm.c |    1 +
-  1 file changed, 1 insertion(+)
-
-diff --git a/drivers/staging/bcm2835-audio/bcm2835-pcm.c b/drivers/staging/bcm2835-audio/bcm2835-pcm.c
-index 014bf7ab69f4..16127e062661 100644
---- a/drivers/staging/bcm2835-audio/bcm2835-pcm.c
-+++ b/drivers/staging/bcm2835-audio/bcm2835-pcm.c
-@@ -450,6 +450,7 @@ static int snd_bcm2835_pcm_lib_ioctl(struct snd_pcm_substream *substream,
-  	unsigned int cmd, void *arg)
-  {
-  	int ret = snd_pcm_lib_ioctl(substream, cmd, arg);
-+
-  	audio_info(" .. substream=%p, cmd=%d, arg=%p (%x) ret=%d\n", substream,
-  		cmd, arg, arg ? *(unsigned *) arg : 0, ret);
-  	return ret;
---
-1.7.10.4
+Eric
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 82 ++++++++++++++++++++++------------------
+>  1 file changed, 45 insertions(+), 37 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 99f6130..520b764 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -484,43 +484,51 @@ static void its_wait_for_range_completion(struct its_node *its,
+>  	}
+>  }
+>  
+> -static void its_send_single_command(struct its_node *its,
+> -				    its_cmd_builder_t builder,
+> -				    struct its_cmd_desc *desc)
+> -{
+> -	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;
+> -	struct its_collection *sync_col;
+> -	unsigned long flags;
+> -
+> -	raw_spin_lock_irqsave(&its->lock, flags);
+> -
+> -	cmd = its_allocate_entry(its);
+> -	if (!cmd) {		/* We're soooooo screewed... */
+> -		pr_err_ratelimited("ITS can't allocate, dropping command\n");
+> -		raw_spin_unlock_irqrestore(&its->lock, flags);
+> -		return;
+> -	}
+> -	sync_col = builder(cmd, desc);
+> -	its_flush_cmd(its, cmd);
+> -
+> -	if (sync_col) {
+> -		sync_cmd = its_allocate_entry(its);
+> -		if (!sync_cmd) {
+> -			pr_err_ratelimited("ITS can't SYNC, skipping\n");
+> -			goto post;
+> -		}
+> -		its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
+> -		its_encode_target(sync_cmd, sync_col->target_address);
+> -		its_fixup_cmd(sync_cmd);
+> -		its_flush_cmd(its, sync_cmd);
+> -	}
+> -
+> -post:
+> -	next_cmd = its_post_commands(its);
+> -	raw_spin_unlock_irqrestore(&its->lock, flags);
+> -
+> -	its_wait_for_range_completion(its, cmd, next_cmd);
+> -}
+> +#define __its_send_single_cmd(name, buildtype, synctype, buildfn)	\
+> +void name(struct its_node *its,						\
+> +	  buildtype builder,						\
+> +	  struct its_cmd_desc *desc)					\
+> +{									\
+> +	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;		\
+> +	synctype *sync_obj;						\
+> +	unsigned long flags;						\
+> +									\
+> +	raw_spin_lock_irqsave(&its->lock, flags);			\
+> +									\
+> +	cmd = its_allocate_entry(its);					\
+> +	if (!cmd) {		/* We're soooooo screewed... */		\
+> +		raw_spin_unlock_irqrestore(&its->lock, flags);		\
+> +		return;							\
+> +	}								\
+> +	sync_obj = builder(cmd, desc);					\
+> +	its_flush_cmd(its, cmd);					\
+> +									\
+> +	if (sync_obj) {							\
+> +		sync_cmd = its_allocate_entry(its);			\
+> +		if (!sync_cmd)						\
+> +			goto post;					\
+> +									\
+> +		buildfn(sync_cmd, sync_obj);				\
+> +		its_fixup_cmd(sync_cmd);				\
+> +		its_flush_cmd(its, sync_cmd);				\
+> +	}								\
+> +									\
+> +post:									\
+> +	next_cmd = its_post_commands(its);				\
+> +	raw_spin_unlock_irqrestore(&its->lock, flags);			\
+> +									\
+> +	its_wait_for_range_completion(its, cmd, next_cmd);		\
+> +}
+> +
+> +static void its_build_sync_cmd(struct its_cmd_block *sync_cmd,
+> +			       struct its_collection *sync_col)
+> +{
+> +	its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
+> +	its_encode_target(sync_cmd, sync_col->target_address);
+> +}
+> +
+> +static __its_send_single_cmd(its_send_single_command, its_cmd_builder_t,
+> +			     struct its_collection, its_build_sync_cmd)
+>  
+>  static void its_send_inv(struct its_device *dev, u32 event_id)
+>  {
+> 
