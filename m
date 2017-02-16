@@ -1,69 +1,146 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 16 Feb 2017 20:44:48 +0800
-Subject: [PATCH 2/4] dmaengine: mtk_uart_dma: add Mediatek uart DMA support
-In-Reply-To: <1487243251-964-3-git-send-email-long.cheng@mediatek.com>
-Message-ID: <201702162047.nlCqKtwT%fengguang.wu@intel.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Thu, 16 Feb 2017 13:47:44 +0100
+Subject: [RFC PATCH 01/33] irqchip/gic-v3: Add redistributor iterator
+In-Reply-To: <1484648454-21216-2-git-send-email-marc.zyngier@arm.com>
+References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+ <1484648454-21216-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <22a9cb20-f5f0-20e7-e34c-f14847a35e5e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Long,
+Hi Marc,
 
-[auto build test WARNING on robh/for-next]
-[also build test WARNING on v4.10-rc8 next-20170216]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On 17/01/2017 11:20, Marc Zyngier wrote:
+> In order to discover the VLPI properties, we need to iterate over
+> the redistributor regions. As we already have code that does this,
+> let's factor it out and make it slightly more generic.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/irq-gic-v3.c | 77 ++++++++++++++++++++++++++++++++------------
+>  1 file changed, 56 insertions(+), 21 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+> index c132f29..5cadec0 100644
+> --- a/drivers/irqchip/irq-gic-v3.c
+> +++ b/drivers/irqchip/irq-gic-v3.c
+> @@ -421,24 +421,15 @@ static void __init gic_dist_init(void)
+>  		gic_write_irouter(affinity, base + GICD_IROUTER + i * 8);
+>  }
+>  
+> -static int gic_populate_rdist(void)
+> +static int gic_scan_rdist_properties(int (*fn)(struct redist_region *,
+> +					       void __iomem *))
+>  {
+> -	unsigned long mpidr = cpu_logical_map(smp_processor_id());
+> -	u64 typer;
+> -	u32 aff;
+> +	int ret = 0;
+in case
+if (reg != GIC_PIDR2_ARCH_GICv3 &&
+		    reg != GIC_PIDR2_ARCH_GICv4) is true you now return 0. Don' you
+want to return -ENODEV as before?
 
-url:    https://github.com/0day-ci/linux/commits/Long-Cheng/add-uart-DMA-function/20170216-200846
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: ia64-allmodconfig (attached as .config)
-compiler: ia64-linux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=ia64 
 
-All warnings (new ones prefixed by >>):
+>  	int i;
+>  
+> -	/*
+> -	 * Convert affinity to a 32bit value that can be matched to
+> -	 * GICR_TYPER bits [63:32].
+> -	 */
+> -	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
+> -	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
+> -	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
+> -	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
+> -
+>  	for (i = 0; i < gic_data.nr_redist_regions; i++) {
+>  		void __iomem *ptr = gic_data.redist_regions[i].redist_base;
+> +		u64 typer;
+>  		u32 reg;
+>  
+>  		reg = readl_relaxed(ptr + GICR_PIDR2) & GIC_PIDR2_ARCH_MASK;
+> @@ -450,14 +441,14 @@ static int gic_populate_rdist(void)
+>  
+>  		do {
+>  			typer = gic_read_typer(ptr + GICR_TYPER);
+> -			if ((typer >> 32) == aff) {
+> -				u64 offset = ptr - gic_data.redist_regions[i].redist_base;
+> -				gic_data_rdist_rd_base() = ptr;
+> -				gic_data_rdist()->phys_base = gic_data.redist_regions[i].phys_base + offset;
+> -				pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
+> -					smp_processor_id(), mpidr, i,
+> -					&gic_data_rdist()->phys_base);
+> +			ret = fn(gic_data.redist_regions + i, ptr);
+> +			switch (ret) {
+> +			case 0:
+>  				return 0;
+> +			case -1:
+> +				break;
+> +			default:
+> +				ret = 0;
+>  			}
+>  
+>  			if (gic_data.redist_regions[i].single_redist)
+> @@ -473,9 +464,53 @@ static int gic_populate_rdist(void)
+>  		} while (!(typer & GICR_TYPER_LAST));
+>  	}
+Assuming you don't find the TYPER that matches the cpu (I don't know if
+it is possible), last fn() call will return 1 and the function will
+return 0. Before it returned -ENODEV I think.
 
-   drivers/dma/mtk_uart_dma.c: In function 'mtk_dma_tx_write':
->> drivers/dma/mtk_uart_dma.c:230:37: warning: comparison of constant '1' with boolean expression is always false [-Wbool-compare]
-     if (atomic_inc_and_test(&c->entry) > 1) {
-                                        ^
+Thanks
 
-vim +/1 +230 drivers/dma/mtk_uart_dma.c
-
-   214			if (atomic_dec_and_test(&c->loopcnt))
-   215				complete(&c->done);
-   216		}
-   217	}
-   218	
-   219	static int mtk_dma_tx_write(struct dma_chan *chan)
-   220	{
-   221		struct mtk_chan *c = to_mtk_dma_chan(chan);
-   222		struct mtk_dmadev *mtkd = to_mtk_dma_dev(chan->device);
-   223		struct timespec a, b;
-   224		int txcount = c->remain_size;
-   225		unsigned int tx_size = c->cfg.dst_addr_width*1024;
-   226		unsigned int len, left;
-   227		unsigned int wpt;
-   228		ktime_t begin, end;
-   229	
- > 230		if (atomic_inc_and_test(&c->entry) > 1) {
-   231			if (vchan_issue_pending(&c->vc) && !c->desc) {
-   232				spin_lock(&mtkd->lock);
-   233				list_add_tail(&c->node, &mtkd->pending);
-   234				spin_unlock(&mtkd->lock);
-   235				tasklet_schedule(&mtkd->task);
-   236			}
-   237		} else {
-   238			while (mtk_dma_chan_read(c, VFF_LEFT_SIZE) >= c->trig) {
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 45853 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170216/e910819e/attachment-0001.gz>
+Eric
+>  
+> +	if (ret == -1)
+> +		ret = -ENODEV;
+> +
+> +	return 0;
+> +}
+> +
+> +static int __gic_populate_rdist(struct redist_region *region, void __iomem *ptr)
+> +{
+> +	unsigned long mpidr = cpu_logical_map(smp_processor_id());
+> +	u64 typer;
+> +	u32 aff;
+> +
+> +	/*
+> +	 * Convert affinity to a 32bit value that can be matched to
+> +	 * GICR_TYPER bits [63:32].
+> +	 */
+> +	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
+> +	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
+> +	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
+> +	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
+> +
+> +	typer = gic_read_typer(ptr + GICR_TYPER);
+> +	if ((typer >> 32) == aff) {
+> +		u64 offset = ptr - region->redist_base;
+> +		gic_data_rdist_rd_base() = ptr;
+> +		gic_data_rdist()->phys_base = region->phys_base + offset;
+> +
+> +		pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
+> +			smp_processor_id(), mpidr,
+> +			(int)(region - gic_data.redist_regions),
+> +			&gic_data_rdist()->phys_base);
+> +		return 0;
+> +	}
+> +
+> +	/* Try next one */
+> +	return 1;
+> +}
+> +
+> +static int gic_populate_rdist(void)
+> +{
+> +	if (gic_scan_rdist_properties(__gic_populate_rdist) == 0)
+> +		return 0;
+> +
+>  	/* We couldn't even deal with ourselves... */
+>  	WARN(true, "CPU%d: mpidr %lx has no re-distributor!\n",
+> -	     smp_processor_id(), mpidr);
+> +	     smp_processor_id(),
+> +	     (unsigned long)cpu_logical_map(smp_processor_id()));
+>  	return -ENODEV;
+>  }
+>  
+> 
