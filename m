@@ -1,62 +1,41 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 16 Feb 2017 19:15:30 +0100
-Subject: [PATCH 2/4] ARM: dts: da850: add vpif video display pins
-In-Reply-To: <1487268932-6469-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1487268932-6469-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1487268932-6469-3-git-send-email-bgolaszewski@baylibre.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Thu, 16 Feb 2017 10:16:10 -0800
+Subject: [PATCH v4 28/36] media: imx: csi: fix crop rectangle changes in
+ set_fmt
+In-Reply-To: <20170216110531.GJ27312@n2100.armlinux.org.uk>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-29-git-send-email-steve_longerbeam@mentor.com>
+ <20170216110531.GJ27312@n2100.armlinux.org.uk>
+Message-ID: <8285778f-ea44-a968-d2d1-b1a286edbfd8@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new pinctrl sub-node for vpif display pins. Move VP_CLKIN3 and
-VP_CLKIN2 to the display node where they actually belong (vide section
-35.2.2 of the da850 datasheet).
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/boot/dts/da850-evm.dts |  2 +-
- arch/arm/boot/dts/da850.dtsi    | 17 +++++++++++++++--
- 2 files changed, 16 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index dece981..14f6f8ea 100644
---- a/arch/arm/boot/dts/da850-evm.dts
-+++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -296,7 +296,7 @@
- 
- &vpif {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&vpif_capture_pins>;
-+	pinctrl-0 = <&vpif_capture_pins>, <&vpif_display_pins>;
- 	status = "okay";
- 
- 	/* VPIF capture port */
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 92d633d..5150331 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -216,8 +216,21 @@
- 					0x3c 0x11111111 0xffffffff
- 					/* VP_DIN[8..9] */
- 					0x40 0x00000011 0x000000ff
--					/* VP_CLKIN3, VP_CLKIN2 */
--					0x4c 0x00010100 0x000f0f00
-+				>;
-+			};
-+			vpif_display_pins: vpif_display_pins {
-+				pinctrl-single,bits = <
-+					/* VP_DOUT[2..7] */
-+					0x40 0x11111100 0xffffff00
-+					/* VP_DOUT[10..15,0..1] */
-+					0x44 0x11111111 0xffffffff
-+					/*  VP_DOUT[8..9] */
-+					0x48 0x00000011 0x000000ff
-+					/*
-+					 * VP_CLKOUT3, VP_CLKIN3,
-+					 * VP_CLKOUT2, VP_CLKIN2
-+					 */
-+					0x4c 0x00111100 0x00ffff00
- 				>;
- 			};
- 		};
--- 
-2.9.3
+On 02/16/2017 03:05 AM, Russell King - ARM Linux wrote:
+> On Wed, Feb 15, 2017 at 06:19:30PM -0800, Steve Longerbeam wrote:
+>> diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
+>> index ae24b42..3cb97e2 100644
+>> --- a/drivers/staging/media/imx/imx-media-csi.c
+>> +++ b/drivers/staging/media/imx/imx-media-csi.c
+>> @@ -531,6 +531,10 @@ static int csi_setup(struct csi_priv *priv)
+>>
+>>  	ipu_csi_set_window(priv->csi, &priv->crop);
+>>
+>> +	ipu_csi_set_downsize(priv->csi,
+>> +			     priv->crop.width == 2 * outfmt->width,
+>> +			     priv->crop.height == 2 * outfmt->height);
+>> +
+>
+> This fails to build:
+>
+> ERROR: "ipu_csi_set_downsize" [drivers/staging/media/imx/imx-media-csi.ko] undefined!
+>
+> ipu_csi_set_downsize needs to be exported if we're going to use it in
+> a module:
+>
+
+Yes I encountered the missing export too, forgot to mention it.
+Philipp submitted a patch to dri-devel separately.
+
+Steve
