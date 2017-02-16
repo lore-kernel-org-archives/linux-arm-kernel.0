@@ -1,44 +1,34 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 16 Feb 2017 18:08:28 +0100
-Subject: sDMA on i.mx7d
-In-Reply-To: <1487263639.13536.36.camel@pengutronix.de>
-References: <20170214222425.hbkfkeq3l6sveo7n@piout.net>
- <e9c36a33f2a49df2a517db5869eaea7f@agner.ch>
- <20170215110736.oumvvv7zordd2jdw@piout.net>
- <3513b2c01d86ad7312522d6be97e766f@agner.ch>
- <20170216104229.axwm3445yj6zrxoz@piout.net>
- <CAOMZO5CeqipfNJxM2Pc1g1606OjbN83ZtbbGRZFmqE3q4fNpRw@mail.gmail.com>
- <20170216164038.zbl2nb76now3glkk@piout.net>
- <1487263639.13536.36.camel@pengutronix.de>
-Message-ID: <20170216170828.bcbpvtdobmcxr2lu@piout.net>
+From: cristian.birsan@microchip.com (cristian.birsan at microchip.com)
+Date: Thu, 16 Feb 2017 19:16:28 +0200
+Subject: [PATCH] ARM: at91/dt: Disable SPI on at91sam9x5ek to allow MCI1 to
+ work.
+Message-ID: <1487265388-29390-1-git-send-email-cristian.birsan@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/2017 at 17:47:19 +0100, Lucas Stach wrote:
-> Am Donnerstag, den 16.02.2017, 17:40 +0100 schrieb Alexandre Belloni:
-> > On 16/02/2017 at 13:36:28 -0200, Fabio Estevam wrote:
-> > > Hi Alexandre,
-> > > 
-> > > On Thu, Feb 16, 2017 at 8:42 AM, Alexandre Belloni
-> > > <alexandre.belloni@free-electrons.com> wrote:
-> > > 
-> > > > I confirm it is the culprit.
-> > > 
-> > > Does this mean that PCM3168s codec works fine on imx7 using SAI on
-> > > 4.9.x plus the revert?
-> 
-> And there is already a fix for this in 4.10:
-> 85f57752b33c (dmaengine: imx-sdma - correct the dma transfer residue
-> calculation)
-> 
-> This fixes audio output on i.MX6 and should probably be sent to -stable.
-> Can you see if applying this patch gets rid of the issues on i.MX7?
-> 
+From: Cristian Birsan <cristian.birsan@microchip.com>
 
-It does too, thanks!
-It is probably worth having it on 4.9.
+The A13 hardware line is shared by SPI and MCI1 controller.This patch
+disables the SPI controller so that the MCI1 (the big MMC card slot) can
+be used.
 
+Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+---
+ arch/arm/boot/dts/at91sam9x5ek.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+index 696b8ba..9d2bbc4 100644
+--- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
+@@ -116,7 +116,7 @@
+ 			};
+ 
+ 			spi0: spi at f0000000 {
+-				status = "okay";
++				status = "disabled"; /* conflicts with mmc1 */
+ 				cs-gpios = <&pioA 14 0>, <0>, <0>, <0>;
+ 				m25p80 at 0 {
+ 					compatible = "atmel,at25df321a";
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.7.4
