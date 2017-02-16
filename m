@@ -1,21 +1,50 @@
-From: garlic.tseng@mediatek.com (Garlic Tseng)
-Date: Thu, 16 Feb 2017 13:27:14 +0800
-Subject: [alsa-devel] [PATCH 0/2] ASoC: mediatek: add power-domain ctrl for
- 2701
-Message-ID: <1487222836-21174-1-git-send-email-garlic.tseng@mediatek.com>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Thu, 16 Feb 2017 14:00:42 +0800
+Subject: [PATCH v7 1/3] dt: bindings: add documentation for zx2967 family i2c
+ controller
+Message-ID: <1487224844-10973-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add power-domain get/put ctrl for 2701 and add relative node description
-in binding doc.
+This patch adds dt-binding documentation for zx2967 family
+i2c controller.
 
-Garlic Tseng (2):
-  ASoC: mediatek: add power-domain get/put ctrl for mt2701
-  ASoC: mediatek: add power-domains for mt2701-afe-pcm.txt
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/i2c/i2c-zx2967.txt         | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-zx2967.txt
 
- Documentation/devicetree/bindings/sound/mt2701-afe-pcm.txt | 2 ++
- sound/soc/mediatek/mt2701/mt2701-afe-pcm.c                 | 2 ++
- 2 files changed, 4 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-zx2967.txt b/Documentation/devicetree/bindings/i2c/i2c-zx2967.txt
+new file mode 100644
+index 0000000..a528374
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-zx2967.txt
+@@ -0,0 +1,24 @@
++ZTE zx2967 I2C controller
++
++Required properties:
++ - compatible: must be "zte,zx296718-i2c"
++ - reg: physical address and length of the device registers
++ - interrupts: a single interrupt specifier
++ - clocks: clock for the device
++ - #address-cells: should be <1>
++ - #size-cells: should be <0>
++ - clock-frequency: the desired I2C bus clock frequency.
++
++Examples:
++
++	i2c at 112000 {
++		compatible = "zte,zx296718-i2c";
++		reg = <0x00112000 0x1000>;
++		interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&osc24m>;
++		#address-cells = <1>
++		#size-cells = <0>;
++		clock-frequency = <1600000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c_global_pin>;
++	};
 -- 
-1.9.1
+2.7.4
