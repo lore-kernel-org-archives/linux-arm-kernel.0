@@ -1,50 +1,87 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 16 Feb 2017 18:52:15 +0900
-Subject: [PATCH v32 07/13] arm64: hibernate: preserve kdump image around
- hibernation
-In-Reply-To: <58A445B3.4080608@arm.com>
-References: <20170207080601.5816-1-takahiro.akashi@linaro.org>
- <20170207080904.5974-5-takahiro.akashi@linaro.org>
- <58A445B3.4080608@arm.com>
-Message-ID: <20170216095214.GF18445@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 16 Feb 2017 10:52:11 +0100
+Subject: [PATCH v2] reset-socfpga: Fix nr_resets property
+In-Reply-To: <2816360.u3PAOk6bPt@pcimr>
+References: <2816360.u3PAOk6bPt@pcimr>
+Message-ID: <1487238731.2377.2.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 12:12:35PM +0000, James Morse wrote:
-> Hi Akashi,
+On Wed, 2017-02-15 at 19:10 +0100, Rojhalat Ibrahim wrote:
+> The SoC-FPGA reset controller driver defines NR_BANKS as 4 and uses that define
+> for two unrelated purposes. It is used
+> 1. as an increment for reset line banks which are 32-bit registers with 4-byte
+> aligned addresses.
+> 2. as the total number of reset line banks which together with the number of
+> resets per bank (32) limits the total number of useable resets to 128 and the
+> highest useable reset ID to 127.
 > 
-> On 07/02/17 08:08, AKASHI Takahiro wrote:
-> > Since arch_kexec_protect_crashkres() removes a mapping for crash dump
-> > kernel memory, the loaded contents won't be preserved around hibernation.
-> > 
-> > In this patch, arch_kexec_(un)protect_crashkres() are additionally called
-> > before/after hibernation so that the relevant region will be mapped again
-> > and restored just as the other memory regions are.
+> This is clearly wrong as there are resets with higher IDs than 127 defined in
+> include/dt-bindings/reset/altr,rst-mgr.h and altr,rst-mgr-a10.h.
 > 
-> Reviewed-by: James Morse <james.morse@arm.com>
+> The patch introduces a new define BANK_INCREMENT for calculating the register
+> addresses as before and increases NR_BANKS to 8 for useable reset IDs up to 255.
+> 
+> Signed-off-by: Rojhalat Ibrahim <imr@rtschenk.de>
+> ---
+> v2: change NR_BANKS to 8
 
-Thank you very much.
+Applied, thank you.
 
-> A quick test of this took longer than expected (writing to a slow usb device),
+regards
+Philipp
 
-Really? I use a uSD card on hikey as a swap device, and it takes just
-a few moments to save a hibernate image although I do the test right after
-the system comes up.
-
-> I
-> suspect it is save/restoring the whole crash region (which I don't think is a
-> problem).
-
-Now that we have only page-level mappings for the crash region,
-it might be possible to mark all the unused pages "reserved"
-in arch_kexec_unprotect_crashkres() if called in hibernate.
-
--Takahiro AKASHI
-
-> If someone turns out to use this combination of features I will look
-> at improving this, (almost certainly requires core-code changes).
+> 
+>  reset-socfpga.c |   13 +++++++------
+>  1 file changed, 7 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/reset/reset-socfpga.c b/drivers/reset/reset-socfpga.c
+> index 43e4a9f..07224c0 100644
+> --- a/drivers/reset/reset-socfpga.c
+> +++ b/drivers/reset/reset-socfpga.c
+> @@ -25,7 +25,8 @@
+>  #include <linux/spinlock.h>
+>  #include <linux/types.h>
+>  
+> -#define NR_BANKS		4
+> +#define BANK_INCREMENT		4
+> +#define NR_BANKS		8
+>  
+>  struct socfpga_reset_data {
+>  	spinlock_t			lock;
+> @@ -46,8 +47,8 @@ static int socfpga_reset_assert(struct reset_controller_dev *rcdev,
+>  
+>  	spin_lock_irqsave(&data->lock, flags);
+>  
+> -	reg = readl(data->membase + (bank * NR_BANKS));
+> -	writel(reg | BIT(offset), data->membase + (bank * NR_BANKS));
+> +	reg = readl(data->membase + (bank * BANK_INCREMENT));
+> +	writel(reg | BIT(offset), data->membase + (bank * BANK_INCREMENT));
+>  	spin_unlock_irqrestore(&data->lock, flags);
+>  
+>  	return 0;
+> @@ -67,8 +68,8 @@ static int socfpga_reset_deassert(struct reset_controller_dev *rcdev,
+>  
+>  	spin_lock_irqsave(&data->lock, flags);
+>  
+> -	reg = readl(data->membase + (bank * NR_BANKS));
+> -	writel(reg & ~BIT(offset), data->membase + (bank * NR_BANKS));
+> +	reg = readl(data->membase + (bank * BANK_INCREMENT));
+> +	writel(reg & ~BIT(offset), data->membase + (bank * BANK_INCREMENT));
+>  
+>  	spin_unlock_irqrestore(&data->lock, flags);
+>  
+> @@ -84,7 +85,7 @@ static int socfpga_reset_status(struct reset_controller_dev *rcdev,
+>  	int offset = id % BITS_PER_LONG;
+>  	u32 reg;
+>  
+> -	reg = readl(data->membase + (bank * NR_BANKS));
+> +	reg = readl(data->membase + (bank * BANK_INCREMENT));
+>  
+>  	return !(reg & BIT(offset));
+>  }
+> 
+> --
+> 2.10.2
 > 
 > 
-> Thanks,
-> 
-> James
