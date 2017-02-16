@@ -1,50 +1,122 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 16 Feb 2017 12:54:11 +0100
-Subject: [PATCH v4 01/36] [media] dt-bindings: Add bindings for i.MX
- media driver
-In-Reply-To: <1487211578-11360-2-git-send-email-steve_longerbeam@mentor.com>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-2-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1487246051.2377.41.camel@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 16 Feb 2017 11:58:15 +0000
+Subject: [PATCH 0/2] RFC: Move efi bgrt code out of arch/x86
+In-Reply-To: <CACi5LpMwvwm8RVi=OZTHhWsUUpkzhzrvhJ4m6Kcgf3=eW1O1gQ@mail.gmail.com>
+References: <1487163892-27701-1-git-send-email-bhsharma@redhat.com>
+ <CAKv+Gu-qv83fi9qBugA=Od2htcLb966SPBpZXSnXdH=AYw-COw@mail.gmail.com>
+ <4695986.Exl6llDaHp@aspire.rjw.lan>
+ <CACi5LpMwvwm8RVi=OZTHhWsUUpkzhzrvhJ4m6Kcgf3=eW1O1gQ@mail.gmail.com>
+Message-ID: <CAKv+Gu8njGy25L1STfjb0Nk8g+avh0NuFEgcURJDtENYSj2rtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-02-15 at 18:19 -0800, Steve Longerbeam wrote:
-> Add bindings documentation for the i.MX media driver.
-> 
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> ---
->  Documentation/devicetree/bindings/media/imx.txt | 66 +++++++++++++++++++++++++
->  1 file changed, 66 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/imx.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/media/imx.txt b/Documentation/devicetree/bindings/media/imx.txt
-> new file mode 100644
-> index 0000000..fd5af50
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/imx.txt
-> @@ -0,0 +1,66 @@
-> +Freescale i.MX Media Video Device
-> +=================================
-> +
-> +Video Media Controller node
-> +---------------------------
-> +
-> +This is the media controller node for video capture support. It is a
-> +virtual device that lists the camera serial interface nodes that the
-> +media device will control.
-> +
-> +Required properties:
-> +- compatible : "fsl,imx-capture-subsystem";
-> +- ports      : Should contain a list of phandles pointing to camera
-> +		sensor interface ports of IPU devices
-> +
-> +example:
-> +
-> +capture-subsystem {
-> +	compatible = "fsl,capture-subsystem";
+On 16 February 2017 at 04:34, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+> Hi Ard, Rafael
+>
+> On Thu, Feb 16, 2017 at 5:14 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>> On Wednesday, February 15, 2017 05:44:28 PM Ard Biesheuvel wrote:
+>>> Hello Bhupesh,
+>>>
+>>> On 15 February 2017 at 13:04, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+>>> > This patchset presents a RFC approach to move the ACPI BGRT table
+>>> > handling related code out of 'arch/x86' and place it inside
+>>> > 'drivers/firmware/efi' so that it can be used to support
+>>> > ACPI BGRT table and BGRT logo across x86 and AARCH64 ARCHs.
+>>> >
+>>> > Note that this patchset is primarily tested on Qemu VMs for x86_64
+>>> > and AARCH64 environments, while I try to get my hands on a real
+>>> > AARCH64 hardware which supports a graphic card and whose boot firmware
+>>> > I can modify to support the ACPI BGRT table to be passed to the kernel.
+>>> >
+>>> > Here are some details/outputs about/from the test environment:
+>>> >
+>>> > AARCH64:
+>>> > ========
+>>> > 1. I used the latest Qemu (master branch) and compiled it for aarch64 with softmmu support.
+>>> >    Here is the command line I use to launch the same:
+>>> >
+>>> > # qemu-system-aarch64 -cpu cortex-a57 -M virt -m 2048 -bios QEMU_EFI.fd -kernel Image -initrd rootfs.cpio -serial stdio --append "acpi=force" -device virtio-gpu-pci
+>>> >
+>>> > where, QEMU_EFI.fd is the DEBUG build of EDK2 ArmVirtQemu.dsc (master branch)
+>>> >        rootfs.cpio is the AARCH64 build of Buildroot (Little Endian AARCH64)
+>>> >        -device virtio-gpu-pci provides the Graphical support required to have BGRT logo.
+>>> >
+>>> >
+>>> > 2. Here are some test results once Linux boots up, which show a valid BGRT table/logo being
+>>> >    seen by the kernel:
+>>> >
+>>> > # acpidump
+>>> > ...
+>>> >
+>>> > BGRT @ 0x0000000000000000
+>>> >   0000: 42 47 52 54 38 00 00 00 01 B4 49 4E 54 45 4C 20  BGRT8.....INTEL
+>>> >   0010: 45 44 4B 32 20 20 20 20 02 00 00 00 20 20 20 20  EDK2    ....
+>>> >   0020: 13 00 00 01 01 00 01 00 00 80 B0 BA 00 00 00 00  ................
+>>> >   0030: 2F 01 00 00 0F 01 00 00                          /.......
+>>> >
+>>> > # dmesg | grep -i BGRT
+>>> > [    0.000000] ACPI: BGRT 0x00000000B8640000 000038 (v01 INTEL  EDK2     00000002      01000013)
+>>> >
+>>> >
+>>> > # ls -lah /sys/firmware/acpi/bgrt/image
+>>> > -r--r--r--    1 root     root       32.9K Feb 15 11:27 /sys/firmware/acpi/bgrt/image
+>>> >
+>>> > x86:
+>>> > ====
+>>> > 1. I used the latest Qemu (master branch) and compiled it for x86.
+>>> >    Here is the command line I use to launch the same:
+>>> >
+>>> > # qemu-system-x86_64 -enable-kvm -sdl -m 2048 -vga std -boot c -cpu host -bios OVMF_CODE.fd -kernel bzImage -initrd rootfs.cpio -serial stdio
+>>> >
+>>> > where, OVMF_CODE.fd is the RELEASE build of EDK2 OvmfPkg (master branch)
+>>> >        rootfs.cpio is the x86_64 build of Buildroot
+>>> >
+>>> > 2. Similar test results are seen as noted for the AARCH64 case above, which show a valid BGRT table/logo being
+>>> >    seen by the kernel.
+>>> >
+>>> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> > Cc: Ingo Molnar <mingo@kernel.org>
+>>> > Cc: Matt Fleming <matt@codeblueprint.co.uk>
+>>> > Cc: Dan Williams <dan.j.williams@intel.com>
+>>> > Cc: Dave Young <dyoung@redhat.com>
+>>> > Cc: Thomas Gleixner <tglx@linutronix.de>
+>>> > Cc: Mark Rutland <mark.rutland@arm.com>
+>>> > Cc: Will Deacon <will.deacon@arm.com>
+>>> >
+>>> > Bhupesh Sharma (2):
+>>> >   x86/efi-bgrt: Move efi-bgrt handling out of arch/x86
+>>> >   bgrt: Make ACPI BGRT parsing code common for ARCHs
+>>> >
+>>> >  arch/arm64/kernel/acpi.c                               | 3 +++
+>>> >  arch/x86/kernel/acpi/boot.c                            | 6 ------
+>>> >  arch/x86/platform/efi/Makefile                         | 1 -
+>>> >  drivers/acpi/Kconfig                                   | 2 +-
+>>> >  drivers/acpi/bgrt.c                                    | 6 ++++++
+>>> >  drivers/firmware/efi/Makefile                          | 1 +
+>>> >  {arch/x86/platform => drivers/firmware}/efi/efi-bgrt.c | 0
+>>> >  include/linux/efi-bgrt.h                               | 2 ++
+>>> >  8 files changed, 13 insertions(+), 8 deletions(-)
+>>> >  rename {arch/x86/platform => drivers/firmware}/efi/efi-bgrt.c (100%)
+>>> >
+>>>
+>>> These patches look fine to me, and I think we should be able to merge
+>>> them without any changes.
+>>>
+>>> Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>
+>>> You only failed to cc the ACPI maintainers, please add Len and Rafael next time.
+>
+> Oops. Will take care in future.
+>
+>> No worries.
+>>
+>> The changes are fine by me.
+>>
+>
 
-"fsl,imx-capture-subsystem"
+Thanks Rafael
 
-regards
-Philipp
+I will queue these for v4.12 in efi/next
+
+-- 
+Ard.
