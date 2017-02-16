@@ -1,87 +1,26 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 16 Feb 2017 10:52:11 +0100
-Subject: [PATCH v2] reset-socfpga: Fix nr_resets property
-In-Reply-To: <2816360.u3PAOk6bPt@pcimr>
-References: <2816360.u3PAOk6bPt@pcimr>
-Message-ID: <1487238731.2377.2.camel@pengutronix.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 16 Feb 2017 15:30:57 +0530
+Subject: [PATCH 37/37] ARM: dts: DRA7: Add pcie1 dt node for EP mode
+In-Reply-To: <20170120183000.GF7403@atomide.com>
+References: <1484216786-17292-1-git-send-email-kishon@ti.com>
+ <1484216786-17292-38-git-send-email-kishon@ti.com>
+ <20170120183000.GF7403@atomide.com>
+Message-ID: <58A57859.5090308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-02-15 at 19:10 +0100, Rojhalat Ibrahim wrote:
-> The SoC-FPGA reset controller driver defines NR_BANKS as 4 and uses that define
-> for two unrelated purposes. It is used
-> 1. as an increment for reset line banks which are 32-bit registers with 4-byte
-> aligned addresses.
-> 2. as the total number of reset line banks which together with the number of
-> resets per bank (32) limits the total number of useable resets to 128 and the
-> highest useable reset ID to 127.
-> 
-> This is clearly wrong as there are resets with higher IDs than 127 defined in
-> include/dt-bindings/reset/altr,rst-mgr.h and altr,rst-mgr-a10.h.
-> 
-> The patch introduces a new define BANK_INCREMENT for calculating the register
-> addresses as before and increases NR_BANKS to 8 for useable reset IDs up to 255.
-> 
-> Signed-off-by: Rojhalat Ibrahim <imr@rtschenk.de>
-> ---
-> v2: change NR_BANKS to 8
+Hi Tony,
 
-Applied, thank you.
+On Saturday 21 January 2017 12:00 AM, Tony Lindgren wrote:
+> * Kishon Vijay Abraham I <kishon@ti.com> [170112 02:34]:
+>> Add pcie1 dt node in order for the controller to operate in
+>> endpoint mode. However since none of the dra7 based boards have
+>> slots configured to operate in endpoint mode, keep EP mode
+>> disabled.
+> 
+> Can this be merged separately later on without breaking anything?
 
-regards
-Philipp
+yes, I'll resend this once rest of the EP support gets in.
 
-> 
->  reset-socfpga.c |   13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/reset/reset-socfpga.c b/drivers/reset/reset-socfpga.c
-> index 43e4a9f..07224c0 100644
-> --- a/drivers/reset/reset-socfpga.c
-> +++ b/drivers/reset/reset-socfpga.c
-> @@ -25,7 +25,8 @@
->  #include <linux/spinlock.h>
->  #include <linux/types.h>
->  
-> -#define NR_BANKS		4
-> +#define BANK_INCREMENT		4
-> +#define NR_BANKS		8
->  
->  struct socfpga_reset_data {
->  	spinlock_t			lock;
-> @@ -46,8 +47,8 @@ static int socfpga_reset_assert(struct reset_controller_dev *rcdev,
->  
->  	spin_lock_irqsave(&data->lock, flags);
->  
-> -	reg = readl(data->membase + (bank * NR_BANKS));
-> -	writel(reg | BIT(offset), data->membase + (bank * NR_BANKS));
-> +	reg = readl(data->membase + (bank * BANK_INCREMENT));
-> +	writel(reg | BIT(offset), data->membase + (bank * BANK_INCREMENT));
->  	spin_unlock_irqrestore(&data->lock, flags);
->  
->  	return 0;
-> @@ -67,8 +68,8 @@ static int socfpga_reset_deassert(struct reset_controller_dev *rcdev,
->  
->  	spin_lock_irqsave(&data->lock, flags);
->  
-> -	reg = readl(data->membase + (bank * NR_BANKS));
-> -	writel(reg & ~BIT(offset), data->membase + (bank * NR_BANKS));
-> +	reg = readl(data->membase + (bank * BANK_INCREMENT));
-> +	writel(reg & ~BIT(offset), data->membase + (bank * BANK_INCREMENT));
->  
->  	spin_unlock_irqrestore(&data->lock, flags);
->  
-> @@ -84,7 +85,7 @@ static int socfpga_reset_status(struct reset_controller_dev *rcdev,
->  	int offset = id % BITS_PER_LONG;
->  	u32 reg;
->  
-> -	reg = readl(data->membase + (bank * NR_BANKS));
-> +	reg = readl(data->membase + (bank * BANK_INCREMENT));
->  
->  	return !(reg & BIT(offset));
->  }
-> 
-> --
-> 2.10.2
-> 
-> 
+Thanks
+Kishon
