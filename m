@@ -1,60 +1,40 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 16 Feb 2017 13:48:45 +0100
-Subject: [PATCH 07/21] ARM: dts: sun8i-h3: add dwmac-sun8i ethernet driver
+Date: Thu, 16 Feb 2017 13:48:46 +0100
+Subject: [PATCH 08/21] ARM: dts: sun8i-h3: add dwmac-sun8i rgmii pins
 In-Reply-To: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
 References: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170216124859.14346-8-clabbe.montjoie@gmail.com>
+Message-ID: <20170216124859.14346-9-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: LABBE Corentin <clabbe.montjoie@gmail.com>
-
-The dwmac-sun8i is an ethernet MAC hardware that support 10/100/1000
-speed.
-
-This patch enable the dwmac-sun8i on the Allwinner H3 SoC Device-tree.
-The SoC H3 have an internal PHY, so optionals syscon and ephy are set.
+This patch add pinctrl node for dwmac-sun8i on H3.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/boot/dts/sun8i-h3.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 9f91aaa..61d56d2 100644
+index 61d56d2..59ed40e 100644
 --- a/arch/arm/boot/dts/sun8i-h3.dtsi
 +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -594,6 +594,31 @@
- 			#size-cells = <0>;
- 		};
+@@ -349,6 +349,17 @@
+ 				function = "i2c2";
+ 			};
  
-+		emac: ethernet at 1c30000 {
-+			compatible = "allwinner,sun8i-h3-emac";
-+			syscon = <&syscon>;
-+			reg = <0x01c30000 0x104>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "macirq";
-+			resets = <&ccu RST_BUS_EMAC>;
-+			reset-names = "stmmaceth";
-+			clocks = <&ccu CLK_BUS_EMAC>;
-+			clock-names = "stmmaceth";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+
-+			mdio: mdio {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				int_mii_phy: ethernet-phy at 1 {
-+					reg = <1>;
-+					clocks = <&ccu CLK_BUS_EPHY>;
-+					resets = <&ccu RST_BUS_EPHY>;
-+				};
++			emac_rgmii_pins: emac0 at 0 {
++				allwinner,pins = "PD0", "PD1", "PD2", "PD3",
++						"PD4", "PD5", "PD7",
++						"PD8", "PD9", "PD10",
++						"PD12", "PD13", "PD15",
++						"PD16", "PD17";
++				allwinner,function = "emac";
++				allwinner,drive = <SUN4I_PINCTRL_40_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 +			};
-+		};
 +
- 		gic: interrupt-controller at 01c81000 {
- 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
- 			reg = <0x01c81000 0x1000>,
+ 			mmc0_pins_a: mmc0 at 0 {
+ 				pins = "PF0", "PF1", "PF2", "PF3",
+ 				       "PF4", "PF5";
 -- 
 2.10.2
