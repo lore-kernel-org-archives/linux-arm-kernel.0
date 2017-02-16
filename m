@@ -1,45 +1,88 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 16 Feb 2017 14:03:57 +0530
-Subject: [PATCH 30/37] dt-bindings: PCI: dra7xx: Add dt bindings to enable
- legacy mode
-In-Reply-To: <20170118214603.qnewy3sm6sgw7lbg@rob-hp-laptop>
-References: <1484216786-17292-1-git-send-email-kishon@ti.com>
- <1484216786-17292-31-git-send-email-kishon@ti.com>
- <20170118214603.qnewy3sm6sgw7lbg@rob-hp-laptop>
-Message-ID: <58A563F5.5040504@ti.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Thu, 16 Feb 2017 09:42:11 +0100
+Subject: [PATCH 2/2] arch_timer: acpi: add hisi timer erratum data
+In-Reply-To: <589D6776.2010400@huawei.com>
+References: <1485254391-51551-1-git-send-email-guohanjun@huawei.com>
+ <1485254391-51551-3-git-send-email-guohanjun@huawei.com>
+ <20170124105717.GB6277@leverpostej>
+ <a2ac2a70-09fb-5cec-c090-b8ebde90e24f@arm.com> <589D6776.2010400@huawei.com>
+Message-ID: <e2780793-a8ac-4d75-b095-a534e36f8bf7@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Thursday 19 January 2017 03:16 AM, Rob Herring wrote:
-> On Thu, Jan 12, 2017 at 03:56:19PM +0530, Kishon Vijay Abraham I wrote:
->> Update device tree binding documentation of TI's dra7xx PCI
->> controller to include property for enabling legacy mode.
+
+On 10/02/2017 08:10, Hanjun Guo wrote:
+> Hi Marc,
+>
+> On 2017/1/24 19:32, Marc Zyngier wrote:
+>> On 24/01/17 10:57, Mark Rutland wrote:
+>>> On Tue, Jan 24, 2017 at 06:39:51PM +0800, Hanjun Guo wrote:
+>>>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>
+>>>> Add hisilicon timer specific erratum fixes.
+>>>>
+>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>> ---
+>>>>  drivers/clocksource/arm_arch_timer.c | 22 ++++++++++++++++++++++
+>>>>  1 file changed, 22 insertions(+)
+>>>>
+>>>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>>>> index 80d6f76..3e62a09 100644
+>>>> --- a/drivers/clocksource/arm_arch_timer.c
+>>>> +++ b/drivers/clocksource/arm_arch_timer.c
+>>>> @@ -1156,10 +1156,32 @@ struct gtdt_arch_timer_fixup {
+>>>>  	void *context;
+>>>>  };
+>>>>
+>>>> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
+>>>> +static void __init hisi_erratum_workaroud_enable(void *context)
+>>>> +{
+>>>> +	int i;
+>>>> +
+>>>> +	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
+>>>> +		if (!strcmp(context, ool_workarounds[i].id)) {
+>>>> +			timer_unstable_counter_workaround = &ool_workarounds[i];
+>>>> +			static_branch_enable(&arch_timer_read_ool_enabled);
+>>>> +			pr_info("arch_timer: Enabling workaround for %s\n",
+>>>> +				timer_unstable_counter_workaround->id);
+>>>> +			break;
+>>>> +		}
+>>>> +	}
+>>>> +}
+>>>> +#endif
+>>>> +
+>>>>  /* note: this needs to be updated according to the doc of OEM ID
+>>>>   * and TABLE ID for different board.
+>>>>   */
+>>>>  static struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
+>>>> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
+>>>> +	{"HISI  ", "HIP05   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+>>>> +	{"HISI  ", "HIP06   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+>>>> +	{"HISI  ", "HIP07   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+>>>> +#endif
+>>>>  };
+>>> NAK. This duplicates logic unnecessarily (for enabling the workaround),
+>>> and (ab)uses the id, which was intended to be specific to DT (since it
+>>> is a DT property name).
+>> Agreed, that's properly revolting.
 >>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  Documentation/devicetree/bindings/pci/ti-pci.txt |    4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
->> index 62f5f59..ed85e8e 100644
->> --- a/Documentation/devicetree/bindings/pci/ti-pci.txt
->> +++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
->> @@ -39,6 +39,10 @@ DEVICE MODE
->>   - interrupts : one interrupt entries must be specified for main interrupt.
->>   - num-ib-windows : number of inbound address translation windows
->>   - num-ob-windows : number of outbound address translation windows
->> + - syscon-legacy-mode: phandle to the syscon dt node. The 1st argument should
->> +		       contain the register offset within syscon and the 2nd
->> +		       argument should contain the bit field for setting the
->> +		       legacy mode
-> 
-> What's legacy mode?
+>>> We should split the matching from the particular workaround (and
+>>> enabling thereof), so that we can go straight from ACPI match to
+>>> workaround (without having to use the DT id in this manner), and don't
+>>> have to duplicate the logic to enable the workaround.
+>>>
+>>> I believe Marc is looking at some rework in this area which may enable
+>>> this, so please wait for that to appear.
+>> Yeah, I'm implementing a semi-flexible way to add new quirk types, and
+>> the last thing I want to see is two (or more) tables describing the same
+>> thing.
+>
+> Kindly ping, if you have patches in hand, I can test against our platforms,
+> thank you very much.
 
-It's the name of the bit-field defined in TRM used to add workaround for errata
-id i870 (See [PATCH 29/37] PCI: dwc: dra7xx: Workaround for errata id i870 of
-this series). I'm not sure what it does internally.
+Any progress on this? I'm not a big fan of stalling erratum fixes 
+upstream because of potential future refactoring.
 
-Thanks
-Kishon
+
+Alex
