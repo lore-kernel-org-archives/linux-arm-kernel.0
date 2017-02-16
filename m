@@ -1,96 +1,49 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed, 15 Feb 2017 18:19:27 -0800
-Subject: [PATCH v4 25/36] ARM: imx_v6_v7_defconfig: Enable staging video4linux
- drivers
-In-Reply-To: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1487211578-11360-26-git-send-email-steve_longerbeam@mentor.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Thu, 16 Feb 2017 02:48:59 +0000
+Subject: [PATCH v2 1/3] ARM: l2c: add pl310-no-sideband option
+In-Reply-To: <20170215221426.e3dk4zzmhgfuplti@rob-hp-laptop>
+References: <20170207170929.29525-1-chris.brandt@renesas.com>
+ <20170207170929.29525-2-chris.brandt@renesas.com>
+ <20170215221426.e3dk4zzmhgfuplti@rob-hp-laptop>
+Message-ID: <PS1PR06MB1162C067E31C504C865AB7C08A5A0@PS1PR06MB1162.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable i.MX v4l2 media staging driver. For video capture on i.MX, the
-video multiplexer subdev is required. On the SabreAuto, the ADV7180
-video decoder is required along with i2c-mux-gpio. The Sabrelite
-and SabreSD require the OV5640 and the SabreLite requires PWM clocks
-for the OV5640.
+On Wednesday, February 15, 2017, Rob Herring wrote:
+> On Tue, Feb 07, 2017 at 12:09:27PM -0500, Chris Brandt wrote:
+> > If a PL310 is added to a system, but the sideband signals are not
+> > connected, some Cortex A9 optimizations cannot be used. In particular,
+> > enabling Full Line Zeros in the CA9 without sidebands connected will
+> > crash the system since the CA9 will expect the L2C to perform
+> > operations, yet the L2C never gets the commands.
+> 
+> I assume you are talking about just the AxUSER signals, not the AxCACHE
+> signals too. That would be really broken. IIRC, the other AxUSER signals
+> are just hints and no connection would not be a problem. This is the only
+> one that requires coordination with enabling/disabling in the core.
 
-Increase max zoneorder to allow larger video buffer allocations.
+Yes, just the AxUSER, hence none of the "2.5.5 Cortex-A9 optimizations" work.
+Well, except "Store buffer device limitation" because that doesn't use sideband
+signals.
 
-Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+Like you mentioned, having 'Early BRESP' enabled but not used doesn't hurt
+anything. I was just blocking that so it would print out that it was enabled
+and give users false hope (not that they are looking at the boot log that closely
+anyway.) FLZ is the killer.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index cbe7faf..daeb164 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -51,6 +51,7 @@ CONFIG_PREEMPT_VOLUNTARY=y
- CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
- CONFIG_CMA=y
-+CONFIG_FORCE_MAX_ZONEORDER=14
- CONFIG_CMDLINE="noinitrd console=ttymxc0,115200"
- CONFIG_KEXEC=y
- CONFIG_CPU_FREQ=y
-@@ -174,13 +175,13 @@ CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MMA8450=y
- CONFIG_SERIO_SERPORT=m
- # CONFIG_LEGACY_PTYS is not set
--# CONFIG_DEVKMEM is not set
- CONFIG_SERIAL_IMX=y
- CONFIG_SERIAL_IMX_CONSOLE=y
- CONFIG_SERIAL_FSL_LPUART=y
- CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
- # CONFIG_I2C_COMPAT is not set
- CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_MUX=y
- CONFIG_I2C_MUX_GPIO=y
- # CONFIG_I2C_HELPER_AUTO is not set
- CONFIG_I2C_ALGOPCF=m
-@@ -194,11 +195,11 @@ CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_MC9S08DZ60=y
- CONFIG_GPIO_PCA953X=y
- CONFIG_GPIO_STMPE=y
--CONFIG_POWER_SUPPLY=y
- CONFIG_POWER_RESET=y
- CONFIG_POWER_RESET_IMX=y
- CONFIG_POWER_RESET_SYSCON=y
- CONFIG_POWER_RESET_SYSCON_POWEROFF=y
-+CONFIG_POWER_SUPPLY=y
- CONFIG_SENSORS_GPIO_FAN=y
- CONFIG_SENSORS_IIO_HWMON=y
- CONFIG_THERMAL=y
-@@ -221,14 +222,20 @@ CONFIG_REGULATOR_PFUZE100=y
- CONFIG_MEDIA_SUPPORT=y
- CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_MEDIA_RC_SUPPORT=y
-+CONFIG_MEDIA_CONTROLLER=y
-+CONFIG_VIDEO_V4L2_SUBDEV_API=y
- CONFIG_RC_DEVICES=y
- CONFIG_IR_GPIO_CIR=y
- CONFIG_MEDIA_USB_SUPPORT=y
- CONFIG_USB_VIDEO_CLASS=m
- CONFIG_V4L_PLATFORM_DRIVERS=y
-+CONFIG_VIDEO_MULTIPLEXER=y
- CONFIG_SOC_CAMERA=y
- CONFIG_V4L_MEM2MEM_DRIVERS=y
- CONFIG_VIDEO_CODA=y
-+# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
-+CONFIG_VIDEO_ADV7180=m
-+CONFIG_VIDEO_OV5640=m
- CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
-@@ -338,6 +345,9 @@ CONFIG_FSL_EDMA=y
- CONFIG_IMX_SDMA=y
- CONFIG_MXS_DMA=y
- CONFIG_STAGING=y
-+CONFIG_STAGING_MEDIA=y
-+CONFIG_VIDEO_IMX_MEDIA=y
-+CONFIG_COMMON_CLK_PWM=y
- CONFIG_IIO=y
- CONFIG_VF610_ADC=y
- CONFIG_MPL3115=y
--- 
-2.7.4
+
+> I think this should follow existing feature properties and explicitly
+> disable the specific properties rather than have this indirection.
+
+I can change the code to:
+
+  "arm,early-bresp-disable"
+  "arm,fill-line-zero-disable"
+
+
+As I said, blocking BRESP is only for keeping the log message from coming out.
+If it's preferred to not block anything that doesn't break anything, I can just
+add "arm,fill-line-zero-disable" only. Just let me know.
+
+
+Chris
