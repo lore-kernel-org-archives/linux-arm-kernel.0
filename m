@@ -1,73 +1,30 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 16 Feb 2017 17:06:20 +0100
-Subject: [PATCH 03/10] media: dt-bindings: vpif: extend the example with
- an output port
-In-Reply-To: <20170215220822.nsws6kzrd6ihvmqt@rob-hp-laptop>
-References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
- <1486485683-11427-4-git-send-email-bgolaszewski@baylibre.com>
- <20170215220822.nsws6kzrd6ihvmqt@rob-hp-laptop>
-Message-ID: <CAMpxmJUuaa+aZQaPaYokfNrehzOTuvT7jJPpxpDLQiuEyY2Oqw@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Feb 2017 16:06:19 +0000
+Subject: [PATCH v3 1/3] ARM: l2c: allow CA9 optimizations to be disabled
+In-Reply-To: <20170216153726.22919-2-chris.brandt@renesas.com>
+References: <20170216153726.22919-1-chris.brandt@renesas.com>
+ <20170216153726.22919-2-chris.brandt@renesas.com>
+Message-ID: <20170216160619.GQ27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-02-15 23:08 GMT+01:00 Rob Herring <robh@kernel.org>:
-> On Tue, Feb 07, 2017 at 05:41:16PM +0100, Bartosz Golaszewski wrote:
->> This makes the example more or less correspond with the da850-evm
->> hardware setup.
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>  .../devicetree/bindings/media/ti,da850-vpif.txt    | 35 ++++++++++++++++++----
->>  1 file changed, 29 insertions(+), 6 deletions(-)
->
-> Spoke too soon...
->
->>
->> diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
->> index 9c7510b..543f6f3 100644
->> --- a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
->> +++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
->> @@ -28,19 +28,27 @@ I2C-connected TVP5147 decoder:
->>               reg = <0x217000 0x1000>;
->>               interrupts = <92>;
->>
->> -             port {
->> -                     vpif_ch0: endpoint at 0 {
->> +             port at 0 {
->> +                     vpif_input_ch0: endpoint at 0 {
->>                               reg = <0>;
->>                               bus-width = <8>;
->> -                             remote-endpoint = <&composite>;
->> +                             remote-endpoint = <&composite_in>;
->>                       };
->>
->> -                     vpif_ch1: endpoint at 1 {
->> +                     vpif_input_ch1: endpoint at 1 {
->>                               reg = <1>;
->>                               bus-width = <8>;
->>                               data-shift = <8>;
->>                       };
->>               };
->> +
->> +             port at 1 {
->
-> The binding doc says nothing about supporting a 2nd port.
->
+On Thu, Feb 16, 2017 at 10:37:24AM -0500, Chris Brandt wrote:
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index 2290be3..486cc6d 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -57,6 +57,9 @@ static unsigned long sync_reg_offset = L2X0_CACHE_SYNC;
+>  
+>  struct l2x0_regs l2x0_saved_regs;
+>  
+> +static bool l2x0_bresp_dis;
+> +static bool l2x0_flz_dis;
 
-I assumed that "It should contain at least one port child node" means
-there can be more than one.
+Please use full "disable" here.
 
-Thanks,
-Bartosz
+Thanks.
 
->
->> +                     vpif_output_ch0: endpoint at 0 {
->> +                             reg = <0>;
->
-> Don't need reg here.
->
->> +                             bus-width = <8>;
->> +                             remote-endpoint = <&composite_out>;
->> +                     };
->> +             };
->>       };
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
