@@ -1,121 +1,92 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Thu, 16 Feb 2017 10:12:33 +0800
-Subject: [PATCH v3 23/24] drm/rockchip: dw-mipi-dsi: add reset control
-In-Reply-To: <20170215123944.798ae363.john@metanate.com>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-24-john@metanate.com> <58A3CD45.9090309@rock-chips.com>
- <20170215123944.798ae363.john@metanate.com>
-Message-ID: <58A50A91.6010202@rock-chips.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Wed, 15 Feb 2017 18:19:03 -0800
+Subject: [PATCH v4 01/36] [media] dt-bindings: Add bindings for i.MX media
+ driver
+In-Reply-To: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1487211578-11360-2-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John
+Add bindings documentation for the i.MX media driver.
 
-On 02/15/2017 08:39 PM, John Keeping wrote:
-> On Wed, 15 Feb 2017 11:38:45 +0800, Chris Zhong wrote:
->
->> On 01/29/2017 09:24 PM, John Keeping wrote:
->>> In order to fully reset the state of the MIPI controller we must assert
->>> this reset.
->>>
->>> This is slightly more complicated than it could be in order to maintain
->>> compatibility with device trees that do not specify the reset property.
->>>
->>> Signed-off-by: John Keeping <john@metanate.com>
->>> Reviewed-by: Chris Zhong <zyw@rock-chips.com>
->>> ---
->>> v3:
->>> - Add Chris' Reviewed-by
->>> Unchanged in v2
->>>
->>>    drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 30 ++++++++++++++++++++++++++++++
->>>    1 file changed, 30 insertions(+)
->>>
->>> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
->>> index 58cb8ace2fe8..cf3ca6b0cbdb 100644
->>> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
->>> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
->>> @@ -13,6 +13,7 @@
->>>    #include <linux/module.h>
->>>    #include <linux/of_device.h>
->>>    #include <linux/regmap.h>
->>> +#include <linux/reset.h>
->>>    #include <linux/mfd/syscon.h>
->>>    #include <drm/drm_atomic_helper.h>
->>>    #include <drm/drm_crtc.h>
->>> @@ -1124,6 +1125,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
->>>    			of_match_device(dw_mipi_dsi_dt_ids, dev);
->>>    	const struct dw_mipi_dsi_plat_data *pdata = of_id->data;
->>>    	struct platform_device *pdev = to_platform_device(dev);
->>> +	struct reset_control *apb_rst;
->>>    	struct drm_device *drm = data;
->>>    	struct dw_mipi_dsi *dsi;
->>>    	struct resource *res;
->>> @@ -1162,6 +1164,34 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
->>>    		return ret;
->>>    	}
->>>    
->>> +	/*
->>> +	 * Note that the reset was not defined in the initial device tree, so
->>> +	 * we have to be prepared for it not being found.
->>> +	 */
->>> +	apb_rst = devm_reset_control_get(dev, "apb");
->>> +	if (IS_ERR(apb_rst)) {
->>> +		if (PTR_ERR(apb_rst) == -ENODEV) {
->> According to [0], I think it should be -ENOENT here.
-> Nice catch, I'll fix this.
->
->> [0]
->> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=3d81216fde465e76c5eae98f61d3666163634395
->>
->> commit 3d81216fde465e76c5eae98f61d3666163634395
->> Author: Alban Bedel <albeu@free.fr>
->> Date:   Tue Sep 1 17:28:31 2015 +0200
->>
->>       reset: Fix of_reset_control_get() for consistent return values
->>
->>       When of_reset_control_get() is called without connection ID it returns
->>       -ENOENT when the 'resets' property doesn't exists or is an empty entry.
->>       However when a connection ID is given it returns -EINVAL when the
->> 'resets'
->>       property doesn't exists or the requested name can't be found. This is
->>       because the error code returned by of_property_match_string() is just
->>       passed down as an index to of_parse_phandle_with_args(), which then
->>       returns -EINVAL.
->>
->>       To get a consistent return value with both code paths we must return
->>       -ENOENT when of_property_match_string() fails.
->>
->>       Signed-off-by: Alban Bedel <albeu@free.fr>
->>       Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
->>
->>
->>> +			apb_rst = NULL;
->>> +		} else {
->>> +			dev_err(dev, "Unable to get reset control: %d\n", ret);
-Also, we can not get error number from "ret" here.
+Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+---
+ Documentation/devicetree/bindings/media/imx.txt | 66 +++++++++++++++++++++++++
+ 1 file changed, 66 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/imx.txt
 
->>> +			return PTR_ERR(apb_rst);
->>> +		}
->>> +	}
->>> +
->>> +	if (apb_rst) {
->>> +		ret = clk_prepare_enable(dsi->pclk);
->>> +		if (ret) {
->>> +			dev_err(dev, "%s: Failed to enable pclk\n", __func__);
->>> +			return ret;
->>> +		}
->>> +
->>> +		reset_control_assert(apb_rst);
->>> +		usleep_range(10, 20);
->>> +		reset_control_deassert(apb_rst);
->>> +
->>> +		clk_disable_unprepare(dsi->pclk);
->>> +	}
->>> +
->>>    	ret = clk_prepare_enable(dsi->pllref_clk);
->>>    	if (ret) {
->>>    		dev_err(dev, "%s: Failed to enable pllref_clk\n", __func__);
->>
->
->
+diff --git a/Documentation/devicetree/bindings/media/imx.txt b/Documentation/devicetree/bindings/media/imx.txt
+new file mode 100644
+index 0000000..fd5af50
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/imx.txt
+@@ -0,0 +1,66 @@
++Freescale i.MX Media Video Device
++=================================
++
++Video Media Controller node
++---------------------------
++
++This is the media controller node for video capture support. It is a
++virtual device that lists the camera serial interface nodes that the
++media device will control.
++
++Required properties:
++- compatible : "fsl,imx-capture-subsystem";
++- ports      : Should contain a list of phandles pointing to camera
++		sensor interface ports of IPU devices
++
++example:
++
++capture-subsystem {
++	compatible = "fsl,capture-subsystem";
++	ports = <&ipu1_csi0>, <&ipu1_csi1>;
++};
++
++fim child node
++--------------
++
++This is an optional child node of the ipu_csi port nodes. If present and
++available, it enables the Frame Interval Monitor. Its properties can be
++used to modify the method in which the FIM measures frame intervals.
++Refer to Documentation/media/v4l-drivers/imx.rst for more info on the
++Frame Interval Monitor.
++
++Optional properties:
++- fsl,input-capture-channel: an input capture channel and channel flags,
++			     specified as <chan flags>. The channel number
++			     must be 0 or 1. The flags can be
++			     IRQ_TYPE_EDGE_RISING, IRQ_TYPE_EDGE_FALLING, or
++			     IRQ_TYPE_EDGE_BOTH, and specify which input
++			     capture signal edge will trigger the input
++			     capture event. If an input capture channel is
++			     specified, the FIM will use this method to
++			     measure frame intervals instead of via the EOF
++			     interrupt. The input capture method is much
++			     preferred over EOF as it is not subject to
++			     interrupt latency errors. However it requires
++			     routing the VSYNC or FIELD output signals of
++			     the camera sensor to one of the i.MX input
++			     capture pads (SD1_DAT0, SD1_DAT1), which also
++			     gives up support for SD1.
++
++
++mipi_csi2 node
++--------------
++
++This is the device node for the MIPI CSI-2 Receiver, required for MIPI
++CSI-2 sensors.
++
++Required properties:
++- compatible	: "fsl,imx6-mipi-csi2", "snps,dw-mipi-csi2";
++- reg           : physical base address and length of the register set;
++- clocks	: the MIPI CSI-2 receiver requires three clocks: hsi_tx
++                  (the DPHY clock), video_27m, and eim_podf;
++- clock-names	: must contain "dphy", "cfg", "pix";
++
++Optional properties:
++- interrupts	: must contain two level-triggered interrupts,
++                  in order: 100 and 101;
+-- 
+2.7.4
