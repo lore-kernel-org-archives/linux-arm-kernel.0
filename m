@@ -1,29 +1,26 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Feb 2017 10:27:18 +0000
-Subject: [PATCH v4 18/36] media: Add i.MX media core driver
-In-Reply-To: <1487211578-11360-19-git-send-email-steve_longerbeam@mentor.com>
+Date: Thu, 16 Feb 2017 10:28:07 +0000
+Subject: [PATCH v4 23/36] media: imx: Add MIPI CSI-2 Receiver subdev driver
+In-Reply-To: <1487211578-11360-24-git-send-email-steve_longerbeam@mentor.com>
 References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-19-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170216102718.GH27312@n2100.armlinux.org.uk>
+ <1487211578-11360-24-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <20170216102806.GI27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 06:19:20PM -0800, Steve Longerbeam wrote:
-> Add the core media driver for i.MX SOC.
+On Wed, Feb 15, 2017 at 06:19:25PM -0800, Steve Longerbeam wrote:
+> Adds MIPI CSI-2 Receiver subdev driver. This subdev is required
+> for sensors with a MIPI CSI2 interface.
 > 
 > Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 
-Just as I reported on the 30th January:
+Just like I reported on the 30th January:
 
-Applying: media: Add i.MX media core driver
-.git/rebase-apply/patch:614: new blank line at EOF.
-+
-.git/rebase-apply/patch:626: new blank line at EOF.
-+
-.git/rebase-apply/patch:668: new blank line at EOF.
-+
+.git/rebase-apply/patch:236: trailing whitespace.
+ *
+warning: 1 line adds whitespace errors.
 
-These need fixing.
+This needs fixing.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
