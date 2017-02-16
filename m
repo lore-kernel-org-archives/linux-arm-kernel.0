@@ -1,40 +1,72 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 16 Feb 2017 19:15:28 +0100
-Subject: [PATCH 0/4] ARM: dts: da850-evm: vpif DT changes
-Message-ID: <1487268932-6469-1-git-send-email-bgolaszewski@baylibre.com>
+Date: Thu, 16 Feb 2017 19:15:31 +0100
+Subject: [PATCH 3/4] ARM: dts: da850-evm: add the output port to the vpif node
+In-Reply-To: <1487268932-6469-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1487268932-6469-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1487268932-6469-4-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds necessary changes to make vpif work on the da850-evm
-board.
+Extend the vpif node with an output port with a single channel.
 
-The first patch only contains whitespace error fixes.
+NOTE: this is still just hardware description - the actual driver
+is registered using pdata-quirks.
 
-The second patch add a pinctrl node for vpif display pins.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/boot/dts/da850-evm.dts | 13 ++++++++++---
+ arch/arm/boot/dts/da850.dtsi    |  8 +++++++-
+ 2 files changed, 17 insertions(+), 4 deletions(-)
 
-The third patch extends the vpif node with an output port.
-
-The last patch adds the UI expander node and GPIO hogs that are needed
-to select video capture functionality.
-
-The last patch might not be the correct approach - if we wanted to
-select camera input we'd need to have separate dts files in the
-future.
-
-In board file mode this is done at GPIO expander setup. We can't use
-pdata quirks neither as they are called before the expander is probed.
-
-Any ideas are welcome.
-
-Bartosz Golaszewski (4):
-  ARM: dts: da850-evm: fix whitespace errors
-  ARM: dts: da850: add vpif video display pins
-  ARM: dts: da850-evm: add the output port to the vpif node
-  ARM: dts: da850-evm: add the UI expander node
-
- arch/arm/boot/dts/da850-evm.dts | 52 ++++++++++++++++++++++++++++++++++-------
- arch/arm/boot/dts/da850.dtsi    | 25 +++++++++++++++++---
- 2 files changed, 65 insertions(+), 12 deletions(-)
-
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 14f6f8ea..b549861 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -300,16 +300,23 @@
+ 	status = "okay";
+ 
+ 	/* VPIF capture port */
+-	port {
+-		vpif_ch0: endpoint at 0 {
++	port at 0 {
++		vpif_input_ch0: endpoint at 0 {
+ 			reg = <0>;
+ 			bus-width = <8>;
+ 		};
+ 
+-		vpif_ch1: endpoint at 1 {
++		vpif_input_ch1: endpoint at 1 {
+ 			reg = <1>;
+ 			bus-width = <8>;
+ 			data-shift = <8>;
+ 		};
+ 	};
++
++	/* VPIF display port */
++	port at 1 {
++		vpif_output_ch0: endpoint {
++			bus-width = <8>;
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 5150331..c708155 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -358,7 +358,13 @@
+ 			status = "disabled";
+ 
+ 			/* VPIF capture port */
+-			port {
++			port at 0 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++
++			/* VPIF display port */
++			port at 1 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 			};
 -- 
 2.9.3
