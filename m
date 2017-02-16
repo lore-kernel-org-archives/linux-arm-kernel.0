@@ -1,35 +1,31 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 16 Feb 2017 18:58:39 +0100
-Subject: [PATCH 1/2] ARM: davinci_all_defconfig: enable VPIF display modules
+Date: Thu, 16 Feb 2017 18:58:40 +0100
+Subject: [PATCH 2/2] ARM: davinci_all_defconfig: enable IRQ support for pca953x
 In-Reply-To: <1487267920-3952-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1487267920-3952-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1487267920-3952-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1487267920-3952-3-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the VPIF display module and the video encoder present on the
-da850-evm UI board.
+We need IRQs from the tca6416 expander for vpif capture to work on the
+da850-evm board.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/configs/davinci_all_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/davinci_all_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index c8663ea..bf2c0ca 100644
+index bf2c0ca..91557ae 100644
 --- a/arch/arm/configs/davinci_all_defconfig
 +++ b/arch/arm/configs/davinci_all_defconfig
-@@ -133,9 +133,11 @@ CONFIG_REGULATOR_TPS6507X=y
- CONFIG_MEDIA_SUPPORT=m
- CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_V4L_PLATFORM_DRIVERS=y
-+CONFIG_VIDEO_DAVINCI_VPIF_DISPLAY=m
- CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE=m
- # CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
- CONFIG_VIDEO_TVP514X=m
-+CONFIG_VIDEO_ADV7343=m
- CONFIG_DRM=m
- CONFIG_DRM_TILCDC=m
- CONFIG_DRM_DUMB_VGA_DAC=m
+@@ -121,6 +121,7 @@ CONFIG_PINCTRL_DA850_PUPD=m
+ CONFIG_PINCTRL_SINGLE=y
+ CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_PCA953X=y
++CONFIG_GPIO_PCA953X_IRQ=y
+ CONFIG_POWER_RESET=y
+ CONFIG_POWER_RESET_GPIO=y
+ CONFIG_WATCHDOG=y
 -- 
 2.9.3
