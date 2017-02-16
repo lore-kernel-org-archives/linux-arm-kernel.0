@@ -1,56 +1,36 @@
 From: chris.brandt@renesas.com (Chris Brandt)
-Date: Thu, 16 Feb 2017 11:17:42 -0500
-Subject: [PATCH v4 3/3] ARM: dts: r7s72100: add l2 cache
+Date: Thu, 16 Feb 2017 11:17:41 -0500
+Subject: [PATCH v4 2/3] ARM: shmobile: r7s72100: Enable L2 cache
 In-Reply-To: <20170216161742.29320-1-chris.brandt@renesas.com>
 References: <20170216161742.29320-1-chris.brandt@renesas.com>
-Message-ID: <20170216161742.29320-4-chris.brandt@renesas.com>
+Message-ID: <20170216161742.29320-3-chris.brandt@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note that early-bresp-disable and full-line-zero-disable are required
-because the sideband signals between the CPU and L2C were not connected
-in this SoC.
+Even though L2C is specified in the DT, you still need to add the aux
+settings in the machine_desc.
 
 Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
-v3:
-* split "arm,pl310-no-sideband" into "arm,early-bresp-disable" and
-  "arm,full-line-zero-disable"
 v2:
-* added "arm,pl310-no-sideband"
+* removed dummy l2c_write_sec function
 ---
- arch/arm/boot/dts/r7s72100.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/mach-shmobile/setup-r7s72100.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index 614ba79..ed62e19 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -180,6 +180,7 @@
- 			compatible = "arm,cortex-a9";
- 			reg = <0>;
- 			clock-frequency = <400000000>;
-+			next-level-cache = <&L2>;
- 		};
- 	};
+diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
+index d46639f..319ca95 100644
+--- a/arch/arm/mach-shmobile/setup-r7s72100.c
++++ b/arch/arm/mach-shmobile/setup-r7s72100.c
+@@ -26,6 +26,8 @@ static const char *const r7s72100_boards_compat_dt[] __initconst = {
+ };
  
-@@ -371,6 +372,16 @@
- 			<0xe8202000 0x1000>;
- 	};
- 
-+	L2: cache-controller at 3ffff000 {
-+		compatible = "arm,pl310-cache";
-+		reg = <0x3ffff000 0x1000>;
-+		interrupts = <GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>;
-+		arm,early-bresp-disable;
-+		arm,full-line-zero-disable;
-+		cache-unified;
-+		cache-level = <2>;
-+	};
-+
- 	i2c0: i2c at fcfee000 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+ DT_MACHINE_START(R7S72100_DT, "Generic R7S72100 (Flattened Device Tree)")
++	.l2c_aux_val    = 0,
++	.l2c_aux_mask   = ~0,
+ 	.init_early	= shmobile_init_delay,
+ 	.init_late	= shmobile_init_late,
+ 	.dt_compat	= r7s72100_boards_compat_dt,
 -- 
 2.10.1
