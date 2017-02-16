@@ -1,28 +1,20 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Thu, 16 Feb 2017 10:12:57 -0600
-Subject: [PATCH 5/5] ARM: socfpga: dts: Add Devkit A10-SR Reset Controller
-In-Reply-To: <1487195416-23827-6-git-send-email-thor.thayer@linux.intel.com>
-References: <1487195416-23827-1-git-send-email-thor.thayer@linux.intel.com>
- <1487195416-23827-6-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <afa53338-8b54-1b12-9316-636f2f9b85e6@kernel.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Feb 2017 17:15:12 +0100
+Subject: [GIT PULL 1/4] DaVinci driver updates
+In-Reply-To: <20170202133348.32713-1-nsekhar@ti.com>
+References: <20170202133348.32713-1-nsekhar@ti.com>
+Message-ID: <1660182.EjP0bSNC1q@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/15/2017 03:50 PM, thor.thayer at linux.intel.com wrote:
-> From: Thor Thayer <thor.thayer@linux.intel.com>
+On Thursday, February 2, 2017 7:03:45 PM CET Sekhar Nori wrote:
+> Driver updates for SATA support on DA850.
 > 
-> Add the Altera Arria10 System Resource Reset Controller to the MFD
-> 
-> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+> These have been acked by SATA maintainer
+> Tejun Heo. Tejun preferred these be queued
+> through ARM-SoC because of the dependencies
+> with platform code.
 
-Nit:
+Ok, pulled into next/drivers now, thanks!
 
-Please have the commit header as "ARM: dts: socfpga:"
-
-Otherwise,
-
-Acked-by: Dinh Nguyen <dinguyen@kernel.org>
-
-Dinh
+	Arnd
