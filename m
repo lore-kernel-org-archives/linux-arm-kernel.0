@@ -1,56 +1,32 @@
 From: slemieux.tyco@gmail.com (slemieux.tyco at gmail.com)
-Date: Thu, 16 Feb 2017 15:27:47 -0500
-Subject: [RESEND PATCH 1/3] dt: pwm: lpc32xx: add description of clocks and
- #pwm-cells properties
-In-Reply-To: <20170216202749.20653-1-slemieux.tyco@gmail.com>
-References: <20170216202749.20653-1-slemieux.tyco@gmail.com>
-Message-ID: <20170216202749.20653-2-slemieux.tyco@gmail.com>
+Date: Thu, 16 Feb 2017 15:27:46 -0500
+Subject: [RESEND PATCH 0/3] pwm: lpc32xx: switch driver to one phandle
+ argument for PWM consumers
+Message-ID: <20170216202749.20653-1-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Zapolskiy <vz@mleia.com>
+From: Sylvain Lemieux <slemieux@tycoint.com>
 
-NXP LPC32xx SoCs have two simple independent PWM controllers with a single
-output each, in this case there is no need to specify PWM channel argument
-on client side, one cell for setting PWM output frequency is sufficient.
+The change adds private of_xlate() function to process one argument given along with a PWM phandle. LPC32xx SoCs have two independent single channel PWM controllers, the argument is used as a description of PWM output frequency, see previous discussion here:
 
-Another added to the description property 'clocks' has a standard meaning
-of a controller supply clock, in the LPC32xx User's Manual the clock is
-denoted as PWM1_CLK or PWM2_CLK clock.
+  http://www.spinics.net/lists/arm-kernel/msg534068.html
 
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-Reviewed-by: Sylvain Lemieux <slemieux.tyco@gmail.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
+The changes on actual board dts files are not needed at the moment, because all LPC32xx boards in upstream don't describe any PWM consumers.
 
-diff --git a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-index 74b5bc5dd19a..523d79662861 100644
---- a/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/lpc32xx-pwm.txt
-@@ -3,15 +3,22 @@ LPC32XX PWM controller
- Required properties:
- - compatible: should be "nxp,lpc3220-pwm"
- - reg: physical base address and length of the controller's registers
-+- clocks: clock phandle and clock specifier pair
-+- #pwm-cells: should be 1, the cell is used to specify the period in
-+  nanoseconds.
- 
- Examples:
- 
- pwm at 4005c000 {
- 	compatible = "nxp,lpc3220-pwm";
- 	reg = <0x4005c000 0x4>;
-+	clocks = <&clk LPC32XX_CLK_PWM1>;
-+	#pwm-cells = <1>;
- };
- 
- pwm at 4005c004 {
- 	compatible = "nxp,lpc3220-pwm";
- 	reg = <0x4005c004 0x4>;
-+	clocks = <&clk LPC32XX_CLK_PWM2>;
-+	#pwm-cells = <1>;
- };
+Please refer to the following URL to view the previous patch #1 review discussion:
+  http://www.spinics.net/lists/arm-kernel/msg549772.html
+
+The "Reviewed-by" and "Acked-by" from the original posting are added into this resend.
+
+Vladimir Zapolskiy (3):
+  dt: pwm: lpc32xx: add description of clocks and #pwm-cells properties
+  pwm: lpc32xx: switch driver to one phandle argument for PWM consumers
+  pwm: lpc32xx: remove handling of PWM channels
+
+ .../devicetree/bindings/pwm/lpc32xx-pwm.txt        |  7 +++++
+ drivers/pwm/pwm-lpc32xx.c                          | 36 +++++++++++++++-------
+ 2 files changed, 32 insertions(+), 11 deletions(-)
+
 -- 
 2.11.0
