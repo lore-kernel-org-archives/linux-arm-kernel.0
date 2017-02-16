@@ -1,36 +1,32 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 16 Feb 2017 23:25:29 +0100
-Subject: [PATCHv3 2/2] arch: Rename CONFIG_DEBUG_RODATA and
- CONFIG_DEBUG_MODULE_RONX
-In-Reply-To: <1486427518-14819-3-git-send-email-labbott@redhat.com>
-References: <1486427518-14819-1-git-send-email-labbott@redhat.com>
- <1486427518-14819-3-git-send-email-labbott@redhat.com>
-Message-ID: <20170216222529.GA7531@amd>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Thu, 16 Feb 2017 14:27:41 -0800
+Subject: [PATCH v4 00/36] i.MX Media Driver
+In-Reply-To: <20170216222006.GA21222@n2100.armlinux.org.uk>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170216222006.GA21222@n2100.armlinux.org.uk>
+Message-ID: <923326d6-43fe-7328-d959-14fd341e47ae@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
 
->  
-> -config DEBUG_RODATA
-> +config STRICT_KERNEL_RWX
->  	bool "Make kernel text and rodata read-only" if ARCH_OPTIONAL_KERNEL_RWX
->  	depends on ARCH_HAS_STRICT_KERNEL_RWX
->  	default !ARCH_OPTIONAL_KERNEL_RWX ||
 
-Debug features are expected to have runtime cost, so kconfig help is
-silent about those. But there are runtime costs, right? It would be
-nice to mention them in the help text...
+On 02/16/2017 02:20 PM, Russell King - ARM Linux wrote:
+> On Wed, Feb 15, 2017 at 06:19:02PM -0800, Steve Longerbeam wrote:
+>> In version 4:
+>
+> With this version, I get:
+>
+> [28762.892053] imx6-mipi-csi2: LP-11 timeout, phy_state = 0x00000000
+> [28762.899409] ipu1_csi0: pipeline_set_stream failed with -110
+>
 
-								Pavel
+Right, in the imx219, on exit from s_power(), the clock and data lanes
+must be placed in the LP-11 state. This has been done in the ov5640 and
+tc358743 subdevs.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170216/48ce1aeb/attachment.sig>
+If we want to bring in the patch that adds a .prepare_stream() op,
+the csi-2 bus would need to be placed in LP-11 in that op instead.
+
+Philipp, should I go ahead and add your .prepare_stream() patch?
+
+Steve
