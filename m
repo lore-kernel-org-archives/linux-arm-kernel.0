@@ -1,123 +1,269 @@
 From: long.cheng@mediatek.com (Long Cheng)
-Date: Thu, 16 Feb 2017 19:07:31 +0800
-Subject: [PATCH 4/4] arm: dts: mt2701: add uart APDMA to device tree
+Date: Thu, 16 Feb 2017 19:07:30 +0800
+Subject: [PATCH 3/4] serial: 8250-mtk: add uart DMA support
 In-Reply-To: <1487243251-964-1-git-send-email-long.cheng@mediatek.com>
 References: <1487243251-964-1-git-send-email-long.cheng@mediatek.com>
-Message-ID: <1487243251-964-5-git-send-email-long.cheng@mediatek.com>
+Message-ID: <1487243251-964-4-git-send-email-long.cheng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. add uart APDMA controller device node
-2. add uart 0/1/2/3 DMA function
-3. uart0 is console, So disable DMA
-4. enable uart2 port to test DMA function.
+Modify uart register to support DMA function.
 
 Signed-off-by: Long Cheng <long.cheng@mediatek.com>
 ---
- arch/arm/boot/dts/mt2701-evb.dts |   22 ++++++++++++++++++++++
- arch/arm/boot/dts/mt2701.dtsi    |   29 +++++++++++++++++++++++++++++
- 2 files changed, 51 insertions(+)
+ drivers/tty/serial/8250/8250_mtk.c |  194 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 193 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-index 082ca88..2f92bf9 100644
---- a/arch/arm/boot/dts/mt2701-evb.dts
-+++ b/arch/arm/boot/dts/mt2701-evb.dts
-@@ -24,6 +24,28 @@
- 	};
- };
+diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+index ce0cc47..7d7a864 100644
+--- a/drivers/tty/serial/8250/8250_mtk.c
++++ b/drivers/tty/serial/8250/8250_mtk.c
+@@ -23,6 +23,10 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/serial_8250.h>
+ #include <linux/serial_reg.h>
++#include <linux/console.h>
++#include <linux/dma-mapping.h>
++#include <linux/tty.h>
++#include <linux/tty_flip.h>
  
-+&pio {
-+	uart2_default_cfg: uart2default {
-+		pins_cmd_dat {
-+			pinmux = <MT2701_PIN_14_URXD2__FUNC_URXD2>,
-+				 <MT2701_PIN_15_UTXD2__FUNC_UTXD2>,
-+				 <MT2701_PIN_242_URTS2__FUNC_URTS2>,
-+				 <MT2701_PIN_243_UCTS2__FUNC_UCTS2>;
-+			bias-pull-up;
-+		};
-+	};
+ #include "8250.h"
+ 
+@@ -30,13 +34,165 @@
+ #define UART_MTK_SAMPLE_COUNT	0x0a	/* Sample count register */
+ #define UART_MTK_SAMPLE_POINT	0x0b	/* Sample point register */
+ #define MTK_UART_RATE_FIX	0x0d	/* UART Rate Fix Register */
+-
++#define UART_MTK_DMA_EN		0x13
++#define TX_TRIGGER		1
++#define RX_TRIGGER		8192
++
++#ifdef CONFIG_SERIAL_8250_DMA
++enum dma_rx_status {
++	DMA_RX_START = 0,
++	DMA_RX_RUNNING = 1,
++	DMA_RX_SHUTDOWN = 2,
 +};
-+
- &uart0 {
-+	dmas = "";
-+	dma-names = "";
-+
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_default_cfg>;
-+
- 	status = "okay";
++#endif
+ struct mtk8250_data {
+ 	int			line;
++	int			rxpos;
+ 	struct clk		*uart_clk;
+ 	struct clk		*bus_clk;
++	struct uart_8250_dma	*dma;
++#ifdef CONFIG_SERIAL_8250_DMA
++	enum dma_rx_status	rxstatus;
++#endif
  };
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 7eab6f4..62b3ec9 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -175,6 +175,23 @@
- 		      <0 0x10216000 0 0x2000>;
- 	};
  
-+	apdma: dma-controller at 11000380 {
-+		compatible = "mediatek,mt2701-uart-dma",
-+			     "mediatek,mt6577-uart-dma";
-+		reg = <0 0x11000380 0 0x400>;
-+		interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 64 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 65 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 66 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 67 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 68 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 69 IRQ_TYPE_LEVEL_LOW>,
-+			     <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_AP_DMA>;
-+		clock-names = "apdma";
-+		#dma-cells = <1>;
-+	};
++#ifdef CONFIG_SERIAL_8250_DMA
++static int mtk8250_rx_dma(struct uart_8250_port *up);
 +
- 	uart0: serial at 11002000 {
- 		compatible = "mediatek,mt2701-uart",
- 			     "mediatek,mt6577-uart";
-@@ -182,6 +199,9 @@
- 		interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&pericfg CLK_PERI_UART0_SEL>, <&pericfg CLK_PERI_UART0>;
- 		clock-names = "baud", "bus";
-+		dmas = <&apdma 0
-+			&apdma 1>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
++static void __mtkdma_rx_complete(void *param)
++{
++	struct uart_8250_port *up = param;
++	struct uart_8250_dma *dma = up->dma;
++	struct mtk8250_data *data = up->port.private_data;
++	struct tty_port *tty_port = &up->port.state->port;
++	struct dma_tx_state state;
++	unsigned char *ptr;
++	int copied;
++
++	dma_sync_single_for_cpu(dma->rxchan->device->dev, dma->rx_addr,
++				dma->rx_size, DMA_FROM_DEVICE);
++
++	dmaengine_tx_status(dma->rxchan, dma->rx_cookie, &state);
++	dmaengine_terminate_all(dma->rxchan);
++
++	if (data->rxstatus == DMA_RX_SHUTDOWN)
++		return;
++
++	if ((data->rxpos + state.residue) <= dma->rx_size) {
++		ptr = (unsigned char *)(data->rxpos + dma->rx_buf);
++		copied = tty_insert_flip_string(tty_port, ptr, state.residue);
++	} else {
++		ptr = (unsigned char *)(data->rxpos + dma->rx_buf);
++		copied = tty_insert_flip_string(tty_port, ptr,
++				(dma->rx_size - data->rxpos));
++		ptr = (unsigned char *)(dma->rx_buf);
++		copied += tty_insert_flip_string(tty_port, ptr,
++				(data->rxpos + state.residue - dma->rx_size));
++	}
++	up->port.icount.rx += copied;
++
++	tty_flip_buffer_push(tty_port);
++
++	mtk8250_rx_dma(up);
++}
++
++static int mtk8250_rx_dma(struct uart_8250_port *up)
++{
++	struct uart_8250_dma *dma = up->dma;
++	struct mtk8250_data *data = up->port.private_data;
++	struct dma_async_tx_descriptor	*desc;
++	struct dma_tx_state	 state;
++
++	desc = dmaengine_prep_slave_single(dma->rxchan, dma->rx_addr,
++					   dma->rx_size, DMA_DEV_TO_MEM,
++					   DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++	if (!desc)
++		return -EBUSY;
++
++	desc->callback = __mtkdma_rx_complete;
++	desc->callback_param = up;
++
++	dma->rx_cookie = dmaengine_submit(desc);
++
++	dmaengine_tx_status(dma->rxchan, dma->rx_cookie, &state);
++	data->rxpos = state.residue;
++
++	dma_sync_single_for_device(dma->rxchan->device->dev, dma->rx_addr,
++				   dma->rx_size, DMA_FROM_DEVICE);
++
++	dma_async_issue_pending(dma->rxchan);
++
++	return 0;
++}
++
++static void mtk_dma_enable(struct uart_8250_port *up)
++{
++	struct uart_port *port = &up->port;
++	struct uart_8250_dma *dma = up->dma;
++	struct mtk8250_data *data = up->port.private_data;
++	int tmp = 0;
++
++	if (data->rxstatus != DMA_RX_START)
++		return;
++
++	dma->rxconf.direction		= DMA_DEV_TO_MEM;
++	dma->rxconf.src_addr_width	= dma->rx_size/1024;
++	dma->rxconf.src_addr		= dma->rx_addr;
++
++	dma->txconf.direction		= DMA_MEM_TO_DEV;
++	dma->txconf.dst_addr_width	= UART_XMIT_SIZE/1024;
++	dma->txconf.dst_addr		= dma->tx_addr;
++
++	serial_port_out(port, UART_FCR, ((1 << 0)|(1 << 1)|(1 << 2)));
++	serial_port_out(port, UART_MTK_DMA_EN,
++			(serial_port_in(port, UART_MTK_DMA_EN) |
++			((1 << 0) | (1 << 2))));
++	serial_port_out(port, UART_MTK_DMA_EN,
++			(serial_port_in(port, UART_MTK_DMA_EN) |
++			(1 << 1)));
++
++	tmp = serial_port_in(port, UART_LCR);
++	serial_port_out(port, UART_LCR, UART_LCR_CONF_MODE_B);
++	serial_port_out(port, UART_EFR, UART_EFR_ECB);
++	serial_port_out(port, UART_LCR, tmp);
++
++	dmaengine_slave_config(dma->rxchan, &dma->rxconf);
++	dmaengine_slave_config(dma->txchan, &dma->txconf);
++
++	data->rxstatus = DMA_RX_RUNNING;
++	data->rxpos = 0;
++	mtk8250_rx_dma(up);
++}
++#endif
++
++static int mtk8250_startup(struct uart_port *port)
++{
++#ifdef CONFIG_SERIAL_8250_DMA
++	struct uart_8250_port *up =
++		container_of(port, struct uart_8250_port, port);
++	struct mtk8250_data *data = port->private_data;
++
++	if (up->dma != NULL)
++		data->rxstatus = DMA_RX_START;
++#endif
++
++	return serial8250_do_startup(port);
++}
++
++static void mtk8250_shutdown(struct uart_port *port)
++{
++#ifdef CONFIG_SERIAL_8250_DMA
++	struct uart_8250_port *up =
++		container_of(port, struct uart_8250_port, port);
++	struct mtk8250_data *data = port->private_data;
++
++	if (up->dma != NULL)
++		data->rxstatus = DMA_RX_SHUTDOWN;
++#endif
++
++	return serial8250_do_shutdown(port);
++}
++
+ static void
+ mtk8250_set_termios(struct uart_port *port, struct ktermios *termios,
+ 			struct ktermios *old)
+@@ -44,6 +200,10 @@ struct mtk8250_data {
+ 	struct uart_8250_port *up = up_to_u8250p(port);
+ 	unsigned long flags;
+ 	unsigned int baud, quot;
++#ifdef CONFIG_SERIAL_8250_DMA
++	if (up->dma != NULL)
++		mtk_dma_enable(up);
++#endif
  
-@@ -192,6 +212,9 @@
- 		interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&pericfg CLK_PERI_UART1_SEL>, <&pericfg CLK_PERI_UART1>;
- 		clock-names = "baud", "bus";
-+		dmas = <&apdma 2
-+			&apdma 3>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
+ 	serial8250_do_set_termios(port, termios, old);
  
-@@ -202,6 +225,9 @@
- 		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&pericfg CLK_PERI_UART2_SEL>, <&pericfg CLK_PERI_UART2>;
- 		clock-names = "baud", "bus";
-+		dmas = <&apdma 4
-+			&apdma 5>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
+@@ -152,9 +312,20 @@ static int __maybe_unused mtk8250_runtime_resume(struct device *dev)
+ 		pm_runtime_put_sync_suspend(port->dev);
+ }
  
-@@ -212,6 +238,9 @@
- 		interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&pericfg CLK_PERI_UART3_SEL>, <&pericfg CLK_PERI_UART3>;
- 		clock-names = "baud", "bus";
-+		dmas = <&apdma 6
-+			&apdma 7>;
-+		dma-names = "tx", "rx";
- 		status = "disabled";
- 	};
- };
++#ifdef CONFIG_SERIAL_8250_DMA
++static bool the_no_dma_filter_fn(struct dma_chan *chan, void *param)
++{
++	return false;
++}
++#endif
++
+ static int mtk8250_probe_of(struct platform_device *pdev, struct uart_port *p,
+ 			   struct mtk8250_data *data)
+ {
++#ifdef CONFIG_SERIAL_8250_DMA
++	int dmacnt;
++#endif
++
+ 	data->uart_clk = devm_clk_get(&pdev->dev, "baud");
+ 	if (IS_ERR(data->uart_clk)) {
+ 		/*
+@@ -174,6 +345,21 @@ static int mtk8250_probe_of(struct platform_device *pdev, struct uart_port *p,
+ 	if (IS_ERR(data->bus_clk))
+ 		return PTR_ERR(data->bus_clk);
+ 
++	data->dma = NULL;
++#ifdef CONFIG_SERIAL_8250_DMA
++	dmacnt = of_property_count_strings(pdev->dev.of_node, "dma-names");
++	if (dmacnt == 2) {
++		data->dma = devm_kzalloc(&pdev->dev,
++						sizeof(*(data->dma)),
++						GFP_KERNEL);
++		data->dma->fn = the_no_dma_filter_fn;
++		data->dma->rx_size = RX_TRIGGER;
++		data->dma->rxconf.src_maxburst = RX_TRIGGER;
++		data->dma->txconf.dst_maxburst = TX_TRIGGER;
++		data->dma->rx_dma = mtk8250_rx_dma;
++	}
++#endif
++
+ 	return 0;
+ }
+ 
+@@ -216,8 +402,14 @@ static int mtk8250_probe(struct platform_device *pdev)
+ 	uart.port.iotype = UPIO_MEM32;
+ 	uart.port.regshift = 2;
+ 	uart.port.private_data = data;
++	uart.port.shutdown = mtk8250_shutdown;
++	uart.port.startup = mtk8250_startup;
+ 	uart.port.set_termios = mtk8250_set_termios;
+ 	uart.port.uartclk = clk_get_rate(data->uart_clk);
++#ifdef CONFIG_SERIAL_8250_DMA
++	if (data->dma)
++		uart.dma = data->dma;
++#endif
+ 
+ 	/* Disable Rate Fix function */
+ 	writel(0x0, uart.port.membase +
 -- 
 1.7.9.5
