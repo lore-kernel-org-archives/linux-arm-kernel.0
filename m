@@ -1,23 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Feb 2017 14:27:55 +0100
-Subject: [PATCH v3 5/6] ARM: mvebu: Add driver for mv98dx3236-soc-id
-In-Reply-To: <20170216085041.28337-6-chris.packham@alliedtelesis.co.nz>
-References: <20170216085041.28337-1-chris.packham@alliedtelesis.co.nz>
- <20170216085041.28337-6-chris.packham@alliedtelesis.co.nz>
-Message-ID: <28604982.PnlvXC13kC@wuerfel>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 16 Feb 2017 18:59:08 +0530
+Subject: [PATCH 0/4] PCI: dwc: cleanup designware driver
+Message-ID: <1487251752-12478-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 16, 2017 9:50:39 PM CET Chris Packham wrote:
-> The DFX server on the 98dx3236 and compatible SoCs has an ID register
-> that provides revision information that the PCI based ID register
-> doesn't have. Use this if it's available.
-> 
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-> 
+This series does additional cleanup on top of [1] in preparation
+for adding endpoint mode support to designware driver.
 
-How about putting this new code into a separate driver in
-drivers/soc/? I don't think you need the early probing we have
-here, and not that much is shared otherwise.
+This series was previously sent as part of endpoint support series [2].
 
-	Arnd
+Once this series is merged, PCI endpoint series can be merged. I'll wait
+for this series to be merged before sending the next revision of endpoint
+series.
+
+The entire endpoint support is pushed here:
+git://git.kernel.org/pub/scm/linux/kernel/git/kishon/pci-endpoint.git next
+
+[1] -> https://lkml.org/lkml/2017/2/15/273
+[2] -> https://lkml.org/lkml/2017/1/13/562
+
+Kishon Vijay Abraham I (4):
+  PCI: dwc: designware: Add new *ops* for cpu addr fixup
+  PCI: dwc: dra7xx: Populate cpu_addr_fixup ops
+  PCI: dwc: all: Modify dbi accessors to take dbi_base as argument
+  PCI: dwc: all: Modify dbi accessors to access data of 4/2/1     
+    bytes
+
+ drivers/pci/dwc/pci-dra7xx.c           |   21 ++++---
+ drivers/pci/dwc/pci-exynos.c           |   14 +++--
+ drivers/pci/dwc/pci-imx6.c             |   67 +++++++++++---------
+ drivers/pci/dwc/pci-keystone-dw.c      |   16 +++--
+ drivers/pci/dwc/pcie-armada8k.c        |   39 +++++++-----
+ drivers/pci/dwc/pcie-artpec6.c         |    7 ++-
+ drivers/pci/dwc/pcie-designware-host.c |   20 +++---
+ drivers/pci/dwc/pcie-designware.c      |  108 ++++++++++++++++++++------------
+ drivers/pci/dwc/pcie-designware.h      |   13 ++--
+ drivers/pci/dwc/pcie-hisi.c            |   17 ++---
+ 10 files changed, 192 insertions(+), 130 deletions(-)
+
+-- 
+1.7.9.5
