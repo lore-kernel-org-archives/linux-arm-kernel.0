@@ -1,61 +1,46 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Feb 2017 17:37:48 +0000
-Subject: [PATCH 0/3] Extend rtc-armada38x support for Armada 7K/8K
-In-Reply-To: <20170216173348.GT27312@n2100.armlinux.org.uk>
-References: <20170216153136.27009-1-gregory.clement@free-electrons.com>
- <20170216173348.GT27312@n2100.armlinux.org.uk>
-Message-ID: <20170216173748.GU27312@n2100.armlinux.org.uk>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Thu, 16 Feb 2017 18:48:57 +0100
+Subject: [PATCH 00/10] ARM: davinci: add vpif display support
+In-Reply-To: <058423ca-c53b-93a2-035e-54fe3ce6dcfe@ti.com>
+References: <1486485683-11427-1-git-send-email-bgolaszewski@baylibre.com>
+ <058423ca-c53b-93a2-035e-54fe3ce6dcfe@ti.com>
+Message-ID: <CAMpxmJW14cVtZfoo7dDXzEgNfKCm8TgqT619SrLW0zD1svEBcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 05:33:48PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Feb 16, 2017 at 04:31:33PM +0100, Gregory CLEMENT wrote:
-> > The Armada 7K/8K SoCs use the same RTC IP than the Armada 38x. However
-> > the SOC integration differs in 2 points:
-> >      - MBUS bridge timing initialization
-> >      - IRQ configuration at SoC level
-> > 
-> > This patch set extends the driver support to these SoCs family.
-> 
-> I've just tried merging this into my kernel, and...
-> 
-> root at mcbin:~# date
-> Thu Feb 16 17:33:00 GMT 2017
-> root at mcbin:~# hwclock -uw
-> root at mcbin:~# hwclock
-> Sun 07 Feb 2106 01:49:51 GMT  -10.010475 seconds
-> root at mcbin:~# hwclock
-> Sun 07 Feb 2106 01:49:51 GMT  -10.010458 seconds
-> 
-> I guess it needs the same hack that Armada38x needs - "date reset" twice
-> in uboot?
+2017-02-13 10:22 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+> Hi Bartosz,
+>
+> On Tuesday 07 February 2017 10:11 PM, Bartosz Golaszewski wrote:
+>> The following series adds support for v4l2 display on da850-evm with
+>> a UI board in device tree boot mode.
+>>
+>> Patches 1/10 - 5/10 deal with the device tree: we fix whitespace
+>> errors in dts files and bindings, extend the example and the dts for
+>> da850-evm with the output port and address the pinmuxing.
+>>
+>> Patch 6/10 enables the relevant modules in the defconfig file.
+>>
+>> Patches 7/10 and 8/10 fix two already existing bugs encountered
+>> during development.
+>>
+>> Patch 9/10 make it possible to use a different i2c adapter in the
+>> vpif display driver.
+>>
+>> The last patch adds the pdata quirks necessary to enable v4l2 display.
+>>
+>> Tested with a modified version of yavta[1] as gstreamer support for
+>> v4l2 seems to be broken and results in picture artifacts.
+>>
+>> [1] https://github.com/brgl/yavta davinci/vpif-display
+>
+> Can you also share the command line you used ?
+>
+> Thanks,
+> Sekhar
 
-Hmm, even with that sorted:
+Will do. I'll also send separate sets of patches for your different
+branches as advised by Kevin.
 
-root at mcbin:~# hwclock
-Thu 16 Feb 2017 17:35:50 GMT  -0.786571 seconds
-root at mcbin:~# hwclock
-Thu 16 Feb 2017 17:35:51 GMT  -1.347541 seconds
-root at mcbin:~# hwclock
-Thu 16 Feb 2017 17:35:52 GMT  -1.889295 seconds
-root at mcbin:~# hwclock
-Thu 16 Feb 2017 17:35:53 GMT  -1.787338 seconds
-root at mcbin:~# hwclock
-Thu 16 Feb 2017 17:35:54 GMT  -1.444397 seconds
-root at mcbin:~# hwclock
-Thu 16 Feb 2017 17:35:55 GMT  -1.419772 seconds
-root at mcbin:~# hwclock
-Thu 16 Feb 2017 17:35:58 GMT  -2.555282 seconds
-root at mcbin:~# hwclock
-Thu 16 Feb 2017 17:36:09 GMT  -0.515289 seconds
-root at mcbin:~# hwclock
-Thu 16 Feb 2017 17:36:11 GMT  -1.773030 seconds
-root at mcbin:~#
-
-I think this RTC is a random number generator.  It's certainly not
-a reliable indication of time.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Bartosz
