@@ -1,78 +1,70 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 16 Feb 2017 13:48:54 +0100
-Subject: [PATCH 16/21] ARM64: dts: sun50i-a64: add dwmac-sun8i Ethernet driver
+Date: Thu, 16 Feb 2017 13:48:39 +0100
+Subject: [PATCH 01/21] net-next: stmmac add optional init_phy function
 In-Reply-To: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
 References: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170216124859.14346-17-clabbe.montjoie@gmail.com>
+Message-ID: <20170216124859.14346-2-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-sun8i is an Ethernet MAC that supports 10/100/1000 Mbit
-connections. It is very similar to the device found in the Allwinner
-H3, but lacks the internal 100 Mbit PHY and its associated control
-bits.
-This adds the necessary bits to the Allwinner A64 SoC .dtsi, but keeps
-it disabled at this level.
+For dwmac-sun8i, some actions must be done for enabling attached PHY.
+Thoses actions must be done after stmmac_probe_config_dt() and
+at start of stmmac_init_phy().
+
+The best way to handle that is to add an optional init_phy() function.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 37 +++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ drivers/net/ethernet/stmicro/stmmac/common.h      |  3 +++
+ drivers/net/ethernet/stmicro/stmmac/stmmac_main.c | 11 +++++++++++
+ 2 files changed, 14 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 3b09af2..57d69e5 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -277,6 +277,23 @@
- 				bias-pull-up;
- 			};
+diff --git a/drivers/net/ethernet/stmicro/stmmac/common.h b/drivers/net/ethernet/stmicro/stmmac/common.h
+index 144fe84..daaafa9 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/common.h
++++ b/drivers/net/ethernet/stmicro/stmmac/common.h
+@@ -483,6 +483,9 @@ struct stmmac_ops {
+ 			     bool loopback);
+ 	void (*pcs_rane)(void __iomem *ioaddr, bool restart);
+ 	void (*pcs_get_adv_lp)(void __iomem *ioaddr, struct rgmii_adv *adv);
++	/* optional function for powering/init PHY */
++	int (*init_phy)(struct net_device *ndev);
++	void (*uninit_phy)(struct net_device *ndev);
+ };
  
-+			rmii_pins: rmii_pins {
-+				pins = "PD10", "PD11", "PD13", "PD14",
-+						"PD17", "PD18", "PD19", "PD20",
-+						"PD22", "PD23";
-+				function = "emac";
-+				drive-strength = <40>;
-+			};
+ /* PTP and HW Timer helpers */
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+index 3cbe096..942efb7 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
+@@ -820,10 +820,18 @@ static int stmmac_init_phy(struct net_device *dev)
+ 	char bus_id[MII_BUS_ID_SIZE];
+ 	int interface = priv->plat->interface;
+ 	int max_speed = priv->plat->max_speed;
++	int ret;
 +
-+			rgmii_pins: rgmii_pins {
-+				pins = "PD8", "PD9", "PD10", "PD11",
-+						"PD12", "PD13", "PD15",
-+						"PD16", "PD17", "PD18", "PD19",
-+						"PD20", "PD21", "PD22", "PD23";
-+				function = "emac";
-+				drive-strength = <40>;
-+			};
-+
- 			uart0_pins_a: uart0 at 0 {
- 				pins = "PB8", "PB9";
- 				function = "uart0";
-@@ -381,6 +398,26 @@
- 			#size-cells = <0>;
- 		};
+ 	priv->oldlink = 0;
+ 	priv->speed = SPEED_UNKNOWN;
+ 	priv->oldduplex = DUPLEX_UNKNOWN;
  
-+		emac: ethernet at 1c30000 {
-+			compatible = "allwinner,sun50i-a64-emac";
-+			syscon = <&syscon>;
-+			reg = <0x01c30000 0x100>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "macirq";
-+			resets = <&ccu RST_BUS_EMAC>;
-+			reset-names = "stmmaceth";
-+			clocks = <&ccu CLK_BUS_EMAC>;
-+			clock-names = "stmmaceth";
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++	if (priv->hw->mac->init_phy) {
++		ret = priv->hw->mac->init_phy(dev);
++		if (ret)
++			return ret;
++	}
 +
-+			mdio: mdio {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
+ 	if (priv->plat->phy_node) {
+ 		phydev = of_phy_connect(dev, priv->plat->phy_node,
+ 					&stmmac_adjust_link, 0, interface);
+@@ -1892,6 +1900,9 @@ static int stmmac_release(struct net_device *dev)
+ 		phy_disconnect(dev->phydev);
+ 	}
+ 
++	if (priv->hw->mac->uninit_phy)
++		priv->hw->mac->uninit_phy(dev);
 +
- 		gic: interrupt-controller at 1c81000 {
- 			compatible = "arm,gic-400";
- 			reg = <0x01c81000 0x1000>,
+ 	netif_stop_queue(dev);
+ 
+ 	napi_disable(&priv->napi);
 -- 
 2.10.2
