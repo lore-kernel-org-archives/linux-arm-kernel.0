@@ -1,608 +1,697 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed, 15 Feb 2017 18:19:25 -0800
-Subject: [PATCH v4 23/36] media: imx: Add MIPI CSI-2 Receiver subdev driver
+Date: Wed, 15 Feb 2017 18:19:21 -0800
+Subject: [PATCH v4 19/36] media: imx: Add Capture Device Interface
 In-Reply-To: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1487211578-11360-24-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1487211578-11360-20-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds MIPI CSI-2 Receiver subdev driver. This subdev is required
-for sensors with a MIPI CSI2 interface.
+This is the capture device interface driver that provides the v4l2
+user interface. Frames can be received from various sources:
+
+- directly from CSI for capturing unconverted images directly from
+  camera sensors.
+
+- from the IC pre-process encode task.
+
+- from the IC pre-process viewfinder task.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- drivers/staging/media/imx/Makefile         |   1 +
- drivers/staging/media/imx/imx6-mipi-csi2.c | 573 +++++++++++++++++++++++++++++
- 2 files changed, 574 insertions(+)
- create mode 100644 drivers/staging/media/imx/imx6-mipi-csi2.c
+ drivers/staging/media/imx/Makefile            |   2 +-
+ drivers/staging/media/imx/imx-media-capture.c | 654 ++++++++++++++++++++++++++
+ 2 files changed, 655 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/staging/media/imx/imx-media-capture.c
 
 diff --git a/drivers/staging/media/imx/Makefile b/drivers/staging/media/imx/Makefile
-index 878a126..3569625 100644
+index ba8e4fb..4606a3a 100644
 --- a/drivers/staging/media/imx/Makefile
 +++ b/drivers/staging/media/imx/Makefile
-@@ -9,3 +9,4 @@ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-vdic.o
- obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-ic.o
+@@ -3,4 +3,4 @@ imx-media-common-objs := imx-media-utils.o imx-media-fim.o
  
- obj-$(CONFIG_VIDEO_IMX_CSI) += imx-media-csi.o
-+obj-$(CONFIG_VIDEO_IMX_CSI) += imx6-mipi-csi2.o
-diff --git a/drivers/staging/media/imx/imx6-mipi-csi2.c b/drivers/staging/media/imx/imx6-mipi-csi2.c
+ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media.o
+ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-common.o
+-
++obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-capture.o
+diff --git a/drivers/staging/media/imx/imx-media-capture.c b/drivers/staging/media/imx/imx-media-capture.c
 new file mode 100644
-index 0000000..23dca80
+index 0000000..fbf6067
 --- /dev/null
-+++ b/drivers/staging/media/imx/imx6-mipi-csi2.c
-@@ -0,0 +1,573 @@
++++ b/drivers/staging/media/imx/imx-media-capture.c
+@@ -0,0 +1,654 @@
 +/*
-+ * MIPI CSI-2 Receiver Subdev for Freescale i.MX6 SOC.
++ * Video Capture Subdev for Freescale i.MX5/6 SOC
 + *
-+ * Copyright (c) 2012-2017 Mentor Graphics Inc.
++ * Copyright (c) 2012-2016 Mentor Graphics Inc.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version.
 + */
-+#include <linux/clk.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/iopoll.h>
-+#include <linux/irq.h>
++#include <linux/delay.h>
++#include <linux/fs.h>
 +#include <linux/module.h>
++#include <linux/of_platform.h>
++#include <linux/pinctrl/consumer.h>
 +#include <linux/platform_device.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
++#include <linux/spinlock.h>
++#include <linux/timer.h>
++#include <media/v4l2-ctrls.h>
 +#include <media/v4l2-device.h>
++#include <media/v4l2-event.h>
++#include <media/v4l2-ioctl.h>
 +#include <media/v4l2-of.h>
++#include <media/v4l2-mc.h>
 +#include <media/v4l2-subdev.h>
++#include <media/videobuf2-dma-contig.h>
++#include <video/imx-ipu-v3.h>
++#include <media/imx.h>
 +#include "imx-media.h"
 +
-+/*
-+ * there must be 5 pads: 1 input pad from sensor, and
-+ * the 4 virtual channel output pads
-+ */
-+#define CSI2_SINK_PAD       0
-+#define CSI2_NUM_SINK_PADS  1
-+#define CSI2_NUM_SRC_PADS   4
-+#define CSI2_NUM_PADS       5
++struct capture_priv {
++	struct imx_media_video_dev vdev;
 +
-+struct csi2_dev {
-+	struct device          *dev;
-+	struct v4l2_subdev      sd;
-+	struct media_pad       pad[CSI2_NUM_PADS];
-+	struct v4l2_mbus_framefmt format_mbus;
-+	struct clk             *dphy_clk;
-+	struct clk             *cfg_clk;
-+	struct clk             *pix_clk; /* what is this? */
-+	void __iomem           *base;
-+	struct v4l2_of_bus_mipi_csi2 bus;
-+	bool                    on;
-+	bool                    stream_on;
-+	bool                    src_linked;
-+	bool                    sink_linked[CSI2_NUM_SRC_PADS];
++	struct v4l2_subdev    *src_sd;
++	int                   src_sd_pad;
++	struct device         *dev;
++
++	struct media_pipeline mp;
++	struct imx_media_dev  *md;
++
++	struct media_pad      vdev_pad;
++
++	struct mutex          mutex;       /* capture device mutex */
++
++	/* the videobuf2 queue */
++	struct vb2_queue       q;
++	/* list of ready imx_media_buffer's from q */
++	struct list_head       ready_q;
++	/* protect ready_q */
++	spinlock_t             q_lock;
++
++	/* controls inherited from subdevs */
++	struct v4l2_ctrl_handler ctrl_hdlr;
++
++	/* misc status */
++	bool                  stop;          /* streaming is stopping */
 +};
 +
-+#define DEVICE_NAME "imx6-mipi-csi2"
++#define to_capture_priv(v) container_of(v, struct capture_priv, vdev)
 +
-+/* Register offsets */
-+#define CSI2_VERSION            0x000
-+#define CSI2_N_LANES            0x004
-+#define CSI2_PHY_SHUTDOWNZ      0x008
-+#define CSI2_DPHY_RSTZ          0x00c
-+#define CSI2_RESETN             0x010
-+#define CSI2_PHY_STATE          0x014
-+#define PHY_STOPSTATEDATA_BIT   4
-+#define PHY_STOPSTATEDATA(n)    BIT(PHY_STOPSTATEDATA_BIT + (n))
-+#define PHY_RXCLKACTIVEHS       BIT(8)
-+#define PHY_RXULPSCLKNOT        BIT(9)
-+#define PHY_STOPSTATECLK        BIT(10)
-+#define CSI2_DATA_IDS_1         0x018
-+#define CSI2_DATA_IDS_2         0x01c
-+#define CSI2_ERR1               0x020
-+#define CSI2_ERR2               0x024
-+#define CSI2_MSK1               0x028
-+#define CSI2_MSK2               0x02c
-+#define CSI2_PHY_TST_CTRL0      0x030
-+#define PHY_TESTCLR		BIT(0)
-+#define PHY_TESTCLK		BIT(1)
-+#define CSI2_PHY_TST_CTRL1      0x034
-+#define PHY_TESTEN		BIT(16)
-+#define CSI2_SFT_RESET          0xf00
++/* In bytes, per queue */
++#define VID_MEM_LIMIT	SZ_64M
 +
-+static inline struct csi2_dev *sd_to_dev(struct v4l2_subdev *sdev)
++static struct vb2_ops capture_qops;
++
++/*
++ * Video ioctls follow
++ */
++
++static int vidioc_querycap(struct file *file, void *fh,
++			   struct v4l2_capability *cap)
 +{
-+	return container_of(sdev, struct csi2_dev, sd);
++	struct capture_priv *priv = video_drvdata(file);
++
++	strncpy(cap->driver, "imx-media-capture", sizeof(cap->driver) - 1);
++	strncpy(cap->card, "imx-media-capture", sizeof(cap->card) - 1);
++	snprintf(cap->bus_info, sizeof(cap->bus_info),
++		 "platform:%s", dev_name(priv->dev));
++
++	return 0;
 +}
 +
-+static void csi2_enable(struct csi2_dev *csi2, bool enable)
++static int capture_enum_fmt_vid_cap(struct file *file, void *fh,
++				    struct v4l2_fmtdesc *f)
 +{
-+	if (enable) {
-+		writel(0x1, csi2->base + CSI2_PHY_SHUTDOWNZ);
-+		writel(0x1, csi2->base + CSI2_DPHY_RSTZ);
-+		writel(0x1, csi2->base + CSI2_RESETN);
-+	} else {
-+		writel(0x0, csi2->base + CSI2_PHY_SHUTDOWNZ);
-+		writel(0x0, csi2->base + CSI2_DPHY_RSTZ);
-+		writel(0x0, csi2->base + CSI2_RESETN);
++	u32 fourcc;
++	int ret;
++
++	ret = imx_media_enum_format(&fourcc, NULL, f->index, true, true);
++	if (ret)
++		return ret;
++
++	f->pixelformat = fourcc;
++
++	return 0;
++}
++
++static int capture_g_fmt_vid_cap(struct file *file, void *fh,
++				 struct v4l2_format *f)
++{
++	struct capture_priv *priv = video_drvdata(file);
++
++	*f = priv->vdev.fmt;
++
++	return 0;
++}
++
++static int capture_try_fmt_vid_cap(struct file *file, void *fh,
++				   struct v4l2_format *f)
++{
++	struct capture_priv *priv = video_drvdata(file);
++	struct v4l2_subdev_format fmt_src;
++	const struct imx_media_pixfmt *cc, *src_cc;
++	u32 fourcc;
++	int ret;
++
++	fourcc = f->fmt.pix.pixelformat;
++	cc = imx_media_find_format(fourcc, 0, true, true);
++	if (!cc) {
++		imx_media_enum_format(&fourcc, NULL, 0, true, true);
++		cc = imx_media_find_format(fourcc, 0, true, true);
 +	}
-+}
 +
-+static void csi2_set_lanes(struct csi2_dev *csi2)
-+{
-+	int lanes = csi2->bus.num_data_lanes;
-+
-+	writel(lanes - 1, csi2->base + CSI2_N_LANES);
-+}
-+
-+static void dw_mipi_csi2_phy_write(struct csi2_dev *csi2,
-+				   u32 test_code, u32 test_data)
-+{
-+	/* Clear PHY test interface */
-+	writel(PHY_TESTCLR, csi2->base + CSI2_PHY_TST_CTRL0);
-+	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL1);
-+	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL0);
-+
-+	/* Raise test interface strobe signal */
-+	writel(PHY_TESTCLK, csi2->base + CSI2_PHY_TST_CTRL0);
-+
-+	/* Configure address write on falling edge and lower strobe signal */
-+	writel(PHY_TESTEN | test_code, csi2->base + CSI2_PHY_TST_CTRL1);
-+	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL0);
-+
-+	/* Configure data write on rising edge and raise strobe signal */
-+	writel(test_data, csi2->base + CSI2_PHY_TST_CTRL1);
-+	writel(PHY_TESTCLK, csi2->base + CSI2_PHY_TST_CTRL0);
-+
-+	/* Clear strobe signal */
-+	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL0);
-+}
-+
-+static void csi2_dphy_init(struct csi2_dev *csi2)
-+{
 +	/*
-+	 * FIXME: 0x14 is derived from a fixed D-PHY reference
-+	 * clock from the HSI_TX PLL, and a fixed target lane max
-+	 * bandwidth of 300 Mbps. This value should be derived
-+	 * from the dphy_clk rate and the desired max lane bandwidth.
-+	 * See drivers/gpu/drm/rockchip/dw-mipi-dsi.c for more info
-+	 * on how this value is derived.
++	 * user frame dimensions are the same as src_sd's pad.
 +	 */
-+	dw_mipi_csi2_phy_write(csi2, 0x44, 0x14);
-+}
-+
-+/*
-+ * Waits for ultra-low-power state on D-PHY clock lane. This is currently
-+ * unused and may not be needed at all, but keep around just in case.
-+ */
-+static int __maybe_unused csi2_dphy_wait_ulp(struct csi2_dev *csi2)
-+{
-+	u32 reg;
-+	int ret;
-+
-+	/* wait for ULP on clock lane */
-+	ret = readl_poll_timeout(csi2->base + CSI2_PHY_STATE, reg,
-+				 !(reg & PHY_RXULPSCLKNOT), 0, 500000);
-+	if (ret) {
-+		v4l2_err(&csi2->sd, "ULP timeout, phy_state = 0x%08x\n", reg);
++	fmt_src.pad = priv->src_sd_pad;
++	fmt_src.which = V4L2_SUBDEV_FORMAT_ACTIVE;
++	ret = v4l2_subdev_call(priv->src_sd, pad, get_fmt, NULL, &fmt_src);
++	if (ret)
 +		return ret;
-+	}
 +
-+	/* wait until no errors on bus */
-+	ret = readl_poll_timeout(csi2->base + CSI2_ERR1, reg,
-+				 reg == 0x0, 0, 500000);
-+	if (ret) {
-+		v4l2_err(&csi2->sd, "stable bus timeout, err1 = 0x%08x\n", reg);
-+		return ret;
++	/*
++	 * but we can allow planar pixel formats if the src_sd's
++	 * pad configured a YUV format
++	 */
++	src_cc = imx_media_find_format(0, fmt_src.format.code, true, false);
++	if (src_cc->cs == IPUV3_COLORSPACE_YUV &&
++	    cc->cs == IPUV3_COLORSPACE_YUV) {
++		imx_media_mbus_fmt_to_pix_fmt(&f->fmt.pix,
++					      &fmt_src.format, cc);
++	} else {
++		imx_media_mbus_fmt_to_pix_fmt(&f->fmt.pix,
++					      &fmt_src.format, src_cc);
 +	}
 +
 +	return 0;
 +}
 +
-+/*
-+ * Waits for low-power LP-11 state (aka STOPSTATE) on data and clock
-+ * lanes.
-+ */
-+static int csi2_dphy_wait_stopstate(struct csi2_dev *csi2)
++static int capture_s_fmt_vid_cap(struct file *file, void *fh,
++				 struct v4l2_format *f)
 +{
-+	u32 mask, reg;
++	struct capture_priv *priv = video_drvdata(file);
 +	int ret;
 +
-+	mask = PHY_STOPSTATECLK |
-+		((csi2->bus.num_data_lanes - 1) << PHY_STOPSTATEDATA_BIT);
-+
-+	ret = readl_poll_timeout(csi2->base + CSI2_PHY_STATE, reg,
-+				 (reg & mask) == mask, 0, 500000);
-+	if (ret) {
-+		v4l2_err(&csi2->sd, "LP-11 timeout, phy_state = 0x%08x\n", reg);
-+		return ret;
++	if (vb2_is_busy(&priv->q)) {
++		v4l2_err(priv->src_sd, "%s queue busy\n", __func__);
++		return -EBUSY;
 +	}
++
++	ret = capture_try_fmt_vid_cap(file, priv, f);
++	if (ret)
++		return ret;
++
++	priv->vdev.fmt.fmt.pix = f->fmt.pix;
++	priv->vdev.cc = imx_media_find_format(f->fmt.pix.pixelformat, 0,
++					      true, true);
 +
 +	return 0;
 +}
 +
-+/*
-+ * Wait for active clock on the clock lane.
-+ *
-+ * FIXME: Currently unused, but it should be! It should be called
-+ * from csi2_s_stream() below, at stream ON, but the required sequence
-+ * of MIPI CSI-2 startup does not allow for an opportunity for this to
-+ * be called. The sequence as specified in the i.MX6 reference manual
-+ * is as follows:
-+ *
-+ * 1. Deassert presetn signal (global reset).
-+ *        It's not clear what this "global reset" signal is (maybe APB
-+ *        global reset), but in any case this step corresponds to
-+ *        csi2_s_power(ON) here.
-+ *
-+ * 2. Configure MIPI Camera Sensor to put all Tx lanes in PL-11 state.
-+ *        This must be carried out by the MIPI sensor's s_power(ON) subdev
-+ *        op.
-+ *
-+ * 3. D-PHY initialization.
-+ * 4. CSI2 Controller programming (Set N_LANES, deassert PHY_SHUTDOWNZ,
-+ *    deassert PHY_RSTZ, deassert CSI2_RESETN).
-+ * 5. Read the PHY status register (PHY_STATE) to confirm that all data and
-+ *    clock lanes of the D-PHY are in Stop State.
-+ *        These steps (3,4,5) are carried out by csi2_s_stream(ON) here.
-+ *
-+ * 6. Configure the MIPI Camera Sensor to start transmitting a clock on the
-+ *    D-PHY clock lane.
-+ *        This must be carried out by the MIPI sensor's s_stream(ON) subdev
-+ *        op.
-+ * 
-+ * 7. CSI2 Controller programming - Read the PHY status register (PHY_STATE)
-+ *    to confirm that the D-PHY is receiving a clock on the D-PHY clock lane.
-+ *        This is implemented by this unused function, and _should_ be called
-+ *        by csi2_s_stream(ON) here, but csi2_s_stream(ON) has been taken up
-+ *        by steps 3,4,5 above already.
-+ *
-+ * In summary, a temporary solution would require a hard-coded delay in the
-+ * MIPI sensor's s_stream(ON) op, to allow time for a stable clock lane.
-+ *
-+ * A longer term solution might be to create a new subdev op, perhaps
-+ * called prepare_stream, that can be implemented here, and would be
-+ * assigned steps 3,4,5. Then csi2_s_stream(ON) would become available
-+ * as step 7.
-+ */
-+static int __maybe_unused csi2_dphy_wait_clock_lane(struct csi2_dev *csi2)
++static int capture_querystd(struct file *file, void *fh, v4l2_std_id *std)
 +{
-+	u32 reg;
-+	int ret;
++	struct capture_priv *priv = video_drvdata(file);
++	struct imx_media_subdev *sensor;
 +
-+	ret = readl_poll_timeout(csi2->base + CSI2_PHY_STATE, reg,
-+				 (reg & PHY_RXCLKACTIVEHS), 0, 500000);
-+	if (ret) {
-+		v4l2_err(&csi2->sd, "clock lane timeout, phy_state = 0x%08x\n",
-+			 reg);
-+		return ret;
++	sensor = imx_media_find_sensor(priv->md, &priv->src_sd->entity);
++	if (IS_ERR(sensor)) {
++		v4l2_err(priv->src_sd, "no sensor attached\n");
++		return PTR_ERR(sensor);
 +	}
++
++	return v4l2_subdev_call(sensor->sd, video, querystd, std);
++}
++
++static int capture_g_std(struct file *file, void *fh, v4l2_std_id *std)
++{
++	struct capture_priv *priv = video_drvdata(file);
++	struct imx_media_subdev *sensor;
++
++	sensor = imx_media_find_sensor(priv->md, &priv->src_sd->entity);
++	if (IS_ERR(sensor)) {
++		v4l2_err(priv->src_sd, "no sensor attached\n");
++		return PTR_ERR(sensor);
++	}
++
++	return v4l2_subdev_call(sensor->sd, video, g_std, std);
++}
++
++static int capture_s_std(struct file *file, void *fh, v4l2_std_id std)
++{
++	struct capture_priv *priv = video_drvdata(file);
++	struct imx_media_subdev *sensor;
++
++	if (vb2_is_busy(&priv->q))
++		return -EBUSY;
++
++	sensor = imx_media_find_sensor(priv->md, &priv->src_sd->entity);
++	if (IS_ERR(sensor)) {
++		v4l2_err(priv->src_sd, "no sensor attached\n");
++		return PTR_ERR(sensor);
++	}
++
++	return v4l2_subdev_call(sensor->sd, video, s_std, std);
++}
++
++static int capture_g_parm(struct file *file, void *fh,
++			  struct v4l2_streamparm *a)
++{
++	struct capture_priv *priv = video_drvdata(file);
++	struct imx_media_subdev *sensor;
++
++	sensor = imx_media_find_sensor(priv->md, &priv->src_sd->entity);
++	if (IS_ERR(sensor)) {
++		v4l2_err(priv->src_sd, "no sensor attached\n");
++		return PTR_ERR(sensor);
++	}
++
++	if (a->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
++		return -EINVAL;
++
++	return v4l2_subdev_call(sensor->sd, video, g_parm, a);
++}
++
++static int capture_s_parm(struct file *file, void *fh,
++			  struct v4l2_streamparm *a)
++{
++	struct capture_priv *priv = video_drvdata(file);
++	struct imx_media_subdev *sensor;
++
++	sensor = imx_media_find_sensor(priv->md, &priv->src_sd->entity);
++	if (IS_ERR(sensor)) {
++		v4l2_err(priv->src_sd, "no sensor attached\n");
++		return PTR_ERR(sensor);
++	}
++
++	if (a->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
++		return -EINVAL;
++
++	return v4l2_subdev_call(sensor->sd, video, s_parm, a);
++}
++
++static const struct v4l2_ioctl_ops capture_ioctl_ops = {
++	.vidioc_querycap	= vidioc_querycap,
++
++	.vidioc_enum_fmt_vid_cap        = capture_enum_fmt_vid_cap,
++	.vidioc_g_fmt_vid_cap           = capture_g_fmt_vid_cap,
++	.vidioc_try_fmt_vid_cap         = capture_try_fmt_vid_cap,
++	.vidioc_s_fmt_vid_cap           = capture_s_fmt_vid_cap,
++
++	.vidioc_querystd        = capture_querystd,
++	.vidioc_g_std           = capture_g_std,
++	.vidioc_s_std           = capture_s_std,
++
++	.vidioc_g_parm          = capture_g_parm,
++	.vidioc_s_parm          = capture_s_parm,
++
++	.vidioc_reqbufs		= vb2_ioctl_reqbufs,
++	.vidioc_create_bufs     = vb2_ioctl_create_bufs,
++	.vidioc_prepare_buf     = vb2_ioctl_prepare_buf,
++	.vidioc_querybuf	= vb2_ioctl_querybuf,
++	.vidioc_qbuf		= vb2_ioctl_qbuf,
++	.vidioc_dqbuf		= vb2_ioctl_dqbuf,
++	.vidioc_expbuf		= vb2_ioctl_expbuf,
++	.vidioc_streamon	= vb2_ioctl_streamon,
++	.vidioc_streamoff	= vb2_ioctl_streamoff,
++};
++
++/*
++ * Queue operations
++ */
++
++static int capture_queue_setup(struct vb2_queue *vq,
++			       unsigned int *nbuffers,
++			       unsigned int *nplanes,
++			       unsigned int sizes[],
++			       struct device *alloc_devs[])
++{
++	struct capture_priv *priv = vb2_get_drv_priv(vq);
++	struct v4l2_pix_format *pix = &priv->vdev.fmt.fmt.pix;
++	unsigned int count = *nbuffers;
++
++	if (vq->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
++		return -EINVAL;
++
++	if (*nplanes) {
++		if (*nplanes != 1 || sizes[0] < pix->sizeimage)
++			return -EINVAL;
++		count += vq->num_buffers;
++	}
++
++	count = min_t(__u32, VID_MEM_LIMIT / pix->sizeimage, count);
++
++	if (*nplanes)
++		*nbuffers = (count < vq->num_buffers) ? 0 :
++			count - vq->num_buffers;
++	else
++		*nbuffers = count;
++
++	*nplanes = 1;
++	sizes[0] = pix->sizeimage;
 +
 +	return 0;
 +}
 +
-+/*
-+ * V4L2 subdev operations.
-+ */
-+
-+/* Startup Sequence Step 1 */
-+static int csi2_s_power(struct v4l2_subdev *sd, int on)
++static int capture_buf_init(struct vb2_buffer *vb)
 +{
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
-+	int ret;
++	struct imx_media_buffer *buf = to_imx_media_vb(vb);
 +
-+	if (on && !csi2->on) {
-+		dev_dbg(csi2->dev, "power ON\n");
-+		ret = clk_prepare_enable(csi2->cfg_clk);
-+		if (ret)
-+			return ret;
-+		ret = clk_prepare_enable(csi2->dphy_clk);
-+		if (ret)
-+			goto cfg_clk_off;
-+	} else if (!on && csi2->on) {
-+		dev_dbg(csi2->dev, "power OFF\n");
-+		clk_disable_unprepare(csi2->dphy_clk);
-+		clk_disable_unprepare(csi2->cfg_clk);
++	INIT_LIST_HEAD(&buf->list);
++
++	return 0;
++}
++
++static int capture_buf_prepare(struct vb2_buffer *vb)
++{
++	struct vb2_queue *vq = vb->vb2_queue;
++	struct capture_priv *priv = vb2_get_drv_priv(vq);
++	struct v4l2_pix_format *pix = &priv->vdev.fmt.fmt.pix;
++
++	if (vb2_plane_size(vb, 0) < pix->sizeimage) {
++		v4l2_err(priv->src_sd,
++			 "data will not fit into plane (%lu < %lu)\n",
++			 vb2_plane_size(vb, 0), (long)pix->sizeimage);
++		return -EINVAL;
 +	}
 +
-+	csi2->on = on;
++	vb2_set_plane_payload(vb, 0, pix->sizeimage);
++
++	return 0;
++}
++
++static void capture_buf_queue(struct vb2_buffer *vb)
++{
++	struct capture_priv *priv = vb2_get_drv_priv(vb->vb2_queue);
++	struct imx_media_buffer *buf = to_imx_media_vb(vb);
++	unsigned long flags;
++
++	spin_lock_irqsave(&priv->q_lock, flags);
++
++	list_add_tail(&buf->list, &priv->ready_q);
++
++	spin_unlock_irqrestore(&priv->q_lock, flags);
++}
++
++static int capture_start_streaming(struct vb2_queue *vq, unsigned int count)
++{
++	struct capture_priv *priv = vb2_get_drv_priv(vq);
++	struct imx_media_buffer *buf, *tmp;
++	unsigned long flags;
++	int ret;
++
++	if (vb2_is_streaming(vq))
++		return 0;
++
++	ret = imx_media_pipeline_set_stream(priv->md, &priv->src_sd->entity,
++					    &priv->mp, true);
++	if (ret) {
++		v4l2_err(priv->src_sd, "pipeline_set_stream failed with %d\n",
++			 ret);
++		goto return_bufs;
++	}
++
++	priv->stop = false;
 +
 +	return 0;
 +
-+cfg_clk_off:
-+	clk_disable_unprepare(csi2->cfg_clk);
++return_bufs:
++	spin_lock_irqsave(&priv->q_lock, flags);
++	list_for_each_entry_safe(buf, tmp, &priv->ready_q, list) {
++		list_del(&buf->list);
++		vb2_buffer_done(&buf->vbuf.vb2_buf, VB2_BUF_STATE_QUEUED);
++	}
++	spin_unlock_irqrestore(&priv->q_lock, flags);
 +	return ret;
 +}
 +
-+/* Startup Sequence Steps 3, 4, 5 */
-+static int csi2_s_stream(struct v4l2_subdev *sd, int enable)
++static void capture_stop_streaming(struct vb2_queue *vq)
 +{
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
-+	int i, ret = 0;
-+
-+	if (!csi2->src_linked)
-+		return -EPIPE;
-+	for (i = 0; i < CSI2_NUM_SRC_PADS; i++) {
-+		if (csi2->sink_linked[i])
-+			break;
-+	}
-+	if (i >= CSI2_NUM_SRC_PADS)
-+		return -EPIPE;
-+
-+	if (enable && !csi2->stream_on) {
-+		dev_dbg(csi2->dev, "stream ON\n");
-+
-+		ret = clk_prepare_enable(csi2->pix_clk);
-+		if (ret)
-+			return ret;
-+
-+		/* Step 3 */
-+		csi2_dphy_init(csi2);
-+		/* Step 4 */
-+		csi2_set_lanes(csi2);
-+		csi2_enable(csi2, true);
-+
-+		/* Step 5 */
-+		ret = csi2_dphy_wait_stopstate(csi2);
-+		if (ret) {
-+			csi2_enable(csi2, false);
-+			clk_disable_unprepare(csi2->pix_clk);
-+			return ret;
-+		}
-+	} else if (!enable && csi2->stream_on) {
-+		dev_dbg(csi2->dev, "stream OFF\n");
-+		csi2_enable(csi2, false);
-+		clk_disable_unprepare(csi2->pix_clk);
-+	}
-+
-+	csi2->stream_on = enable;
-+	return 0;
-+}
-+
-+static int csi2_link_setup(struct media_entity *entity,
-+			   const struct media_pad *local,
-+			   const struct media_pad *remote, u32 flags)
-+{
-+	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
-+	struct v4l2_subdev *remote_sd;
-+
-+	dev_dbg(csi2->dev, "link setup %s -> %s", remote->entity->name,
-+		local->entity->name);
-+
-+	remote_sd = media_entity_to_v4l2_subdev(remote->entity);
-+
-+	if (local->flags & MEDIA_PAD_FL_SOURCE) {
-+		if (flags & MEDIA_LNK_FL_ENABLED) {
-+			if (csi2->sink_linked[local->index])
-+				return -EBUSY;
-+			csi2->sink_linked[local->index] = true;
-+		} else {
-+			csi2->sink_linked[local->index] = false;
-+		}
-+	} else {
-+		if (flags & MEDIA_LNK_FL_ENABLED) {
-+			if (csi2->src_linked)
-+				return -EBUSY;
-+			csi2->src_linked = true;
-+		} else {
-+			csi2->src_linked = false;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int csi2_get_fmt(struct v4l2_subdev *sd,
-+			struct v4l2_subdev_pad_config *cfg,
-+			struct v4l2_subdev_format *sdformat)
-+{
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
-+	struct v4l2_mbus_framefmt *fmt;
-+
-+	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY)
-+		fmt = v4l2_subdev_get_try_format(&csi2->sd, cfg,
-+						 sdformat->pad);
-+	else
-+		fmt = &csi2->format_mbus;
-+
-+	sdformat->format = *fmt;
-+
-+	return 0;
-+}
-+
-+static int csi2_set_fmt(struct v4l2_subdev *sd,
-+			struct v4l2_subdev_pad_config *cfg,
-+			struct v4l2_subdev_format *sdformat)
-+{
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
-+
-+	if (sdformat->pad >= CSI2_NUM_PADS)
-+		return -EINVAL;
-+
-+	if (csi2->stream_on)
-+		return -EBUSY;
-+
-+	/* Output pads mirror active input pad, no limits on input pads */
-+	if (sdformat->pad != CSI2_SINK_PAD)
-+		sdformat->format = csi2->format_mbus;
-+
-+	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY)
-+		cfg->try_fmt = sdformat->format;
-+	else
-+		csi2->format_mbus = sdformat->format;
-+
-+	return 0;
-+}
-+
-+/*
-+ * retrieve our pads parsed from the OF graph by the media device
-+ */
-+static int csi2_registered(struct v4l2_subdev *sd)
-+{
-+	struct csi2_dev *csi2 = sd_to_dev(sd);
-+	int i, ret;
-+
-+	for (i = 0; i < CSI2_NUM_PADS; i++) {
-+		csi2->pad[i].flags = (i == CSI2_SINK_PAD) ?
-+		MEDIA_PAD_FL_SINK : MEDIA_PAD_FL_SOURCE;
-+	}
-+
-+	/* set a default mbus format  */
-+	ret = imx_media_init_mbus_fmt(&csi2->format_mbus,
-+				      640, 480, 0, V4L2_FIELD_NONE, NULL);
-+	if (ret)
-+		return ret;
-+
-+	return media_entity_pads_init(&sd->entity, CSI2_NUM_PADS, csi2->pad);
-+}
-+
-+static struct media_entity_operations csi2_entity_ops = {
-+	.link_setup = csi2_link_setup,
-+	.link_validate = v4l2_subdev_link_validate,
-+};
-+
-+static struct v4l2_subdev_core_ops csi2_core_ops = {
-+	.s_power = csi2_s_power,
-+};
-+
-+static struct v4l2_subdev_video_ops csi2_video_ops = {
-+	.s_stream = csi2_s_stream,
-+};
-+
-+static struct v4l2_subdev_pad_ops csi2_pad_ops = {
-+	.get_fmt = csi2_get_fmt,
-+	.set_fmt = csi2_set_fmt,
-+};
-+
-+static struct v4l2_subdev_ops csi2_subdev_ops = {
-+	.core = &csi2_core_ops,
-+	.video = &csi2_video_ops,
-+	.pad = &csi2_pad_ops,
-+};
-+
-+static struct v4l2_subdev_internal_ops csi2_internal_ops = {
-+	.registered = csi2_registered,
-+};
-+
-+static int csi2_parse_endpoints(struct csi2_dev *csi2)
-+{
-+	struct device_node *node = csi2->dev->of_node;
-+	struct device_node *epnode;
-+	struct v4l2_of_endpoint ep;
-+
-+	epnode = of_graph_get_endpoint_by_regs(node, 0, -1);
-+	if (!epnode) {
-+		v4l2_err(&csi2->sd, "failed to get sink endpoint node\n");
-+		return -EINVAL;
-+	}
-+
-+	v4l2_of_parse_endpoint(epnode, &ep);
-+	of_node_put(epnode);
-+
-+	if (ep.bus_type != V4L2_MBUS_CSI2) {
-+		v4l2_err(&csi2->sd, "invalid bus type, must be MIPI CSI2\n");
-+		return -EINVAL;
-+	}
-+
-+	csi2->bus = ep.bus.mipi_csi2;
-+
-+	dev_dbg(csi2->dev, "data lanes: %d\n", csi2->bus.num_data_lanes);
-+	dev_dbg(csi2->dev, "flags: 0x%08x\n", csi2->bus.flags);
-+	return 0;
-+}
-+
-+static int csi2_probe(struct platform_device *pdev)
-+{
-+	struct csi2_dev *csi2;
-+	struct resource *res;
++	struct capture_priv *priv = vb2_get_drv_priv(vq);
++	struct imx_media_buffer *frame;
++	unsigned long flags;
 +	int ret;
 +
-+	csi2 = devm_kzalloc(&pdev->dev, sizeof(*csi2), GFP_KERNEL);
-+	if (!csi2)
-+		return -ENOMEM;
++	if (!vb2_is_streaming(vq))
++		return;
 +
-+	csi2->dev = &pdev->dev;
++	spin_lock_irqsave(&priv->q_lock, flags);
++	priv->stop = true;
++	spin_unlock_irqrestore(&priv->q_lock, flags);
 +
-+	v4l2_subdev_init(&csi2->sd, &csi2_subdev_ops);
-+	v4l2_set_subdevdata(&csi2->sd, &pdev->dev);
-+	csi2->sd.internal_ops = &csi2_internal_ops;
-+	csi2->sd.entity.ops = &csi2_entity_ops;
-+	csi2->sd.dev = &pdev->dev;
-+	csi2->sd.owner = THIS_MODULE;
-+	csi2->sd.flags = V4L2_SUBDEV_FL_HAS_DEVNODE;
-+	strcpy(csi2->sd.name, DEVICE_NAME);
-+	csi2->sd.entity.function = MEDIA_ENT_F_VID_IF_BRIDGE;
-+	csi2->sd.grp_id = IMX_MEDIA_GRP_ID_CSI2;
-+
-+	ret = csi2_parse_endpoints(csi2);
++	ret = imx_media_pipeline_set_stream(priv->md, &priv->src_sd->entity,
++					    &priv->mp, false);
 +	if (ret)
-+		return ret;
++		v4l2_warn(priv->src_sd, "pipeline_set_stream failed with %d\n",
++			  ret);
 +
-+	csi2->cfg_clk = devm_clk_get(&pdev->dev, "cfg");
-+	if (IS_ERR(csi2->cfg_clk)) {
-+		v4l2_err(&csi2->sd, "failed to get cfg clock\n");
-+		ret = PTR_ERR(csi2->cfg_clk);
-+		return ret;
++	/* release all active buffers */
++	spin_lock_irqsave(&priv->q_lock, flags);
++	while (!list_empty(&priv->ready_q)) {
++		frame = list_entry(priv->ready_q.next,
++				   struct imx_media_buffer, list);
++		list_del(&frame->list);
++		vb2_buffer_done(&frame->vbuf.vb2_buf, VB2_BUF_STATE_ERROR);
 +	}
-+
-+	csi2->dphy_clk = devm_clk_get(&pdev->dev, "dphy");
-+	if (IS_ERR(csi2->dphy_clk)) {
-+		v4l2_err(&csi2->sd, "failed to get dphy clock\n");
-+		ret = PTR_ERR(csi2->dphy_clk);
-+		return ret;
-+	}
-+
-+	csi2->pix_clk = devm_clk_get(&pdev->dev, "pix");
-+	if (IS_ERR(csi2->pix_clk)) {
-+		v4l2_err(&csi2->sd, "failed to get pixel clock\n");
-+		ret = PTR_ERR(csi2->pix_clk);
-+		return ret;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		v4l2_err(&csi2->sd, "failed to get platform resources\n");
-+		return -ENODEV;
-+	}
-+
-+	csi2->base = devm_ioremap(&pdev->dev, res->start, PAGE_SIZE);
-+	if (!csi2->base) {
-+		v4l2_err(&csi2->sd, "failed to map CSI-2 registers\n");
-+		return -ENOMEM;
-+	}
-+
-+	platform_set_drvdata(pdev, &csi2->sd);
-+
-+	return v4l2_async_register_subdev(&csi2->sd);
++	spin_unlock_irqrestore(&priv->q_lock, flags);
 +}
 +
-+static int csi2_remove(struct platform_device *pdev)
++static struct vb2_ops capture_qops = {
++	.queue_setup	 = capture_queue_setup,
++	.buf_init        = capture_buf_init,
++	.buf_prepare	 = capture_buf_prepare,
++	.buf_queue	 = capture_buf_queue,
++	.wait_prepare	 = vb2_ops_wait_prepare,
++	.wait_finish	 = vb2_ops_wait_finish,
++	.start_streaming = capture_start_streaming,
++	.stop_streaming  = capture_stop_streaming,
++};
++
++/*
++ * File operations
++ */
++static int capture_open(struct file *file)
 +{
-+	struct v4l2_subdev *sd = platform_get_drvdata(pdev);
++	struct capture_priv *priv = video_drvdata(file);
++	int ret;
 +
-+	csi2_s_power(sd, 0);
++	if (mutex_lock_interruptible(&priv->mutex))
++		return -ERESTARTSYS;
 +
-+	v4l2_async_unregister_subdev(sd);
-+	media_entity_cleanup(&sd->entity);
++	ret = v4l2_fh_open(file);
++	if (ret)
++		v4l2_err(priv->src_sd, "v4l2_fh_open failed\n");
++
++	mutex_unlock(&priv->mutex);
++	return ret;
++}
++
++static int capture_release(struct file *file)
++{
++	struct capture_priv *priv = video_drvdata(file);
++	struct vb2_queue *vq = &priv->q;
++	int ret = 0;
++
++	mutex_lock(&priv->mutex);
++
++	if (file->private_data == vq->owner) {
++		vb2_queue_release(vq);
++		vq->owner = NULL;
++	}
++
++	v4l2_fh_release(file);
++	mutex_unlock(&priv->mutex);
++	return ret;
++}
++
++static const struct v4l2_file_operations capture_fops = {
++	.owner		= THIS_MODULE,
++	.open		= capture_open,
++	.release	= capture_release,
++	.poll		= vb2_fop_poll,
++	.unlocked_ioctl	= video_ioctl2,
++	.mmap		= vb2_fop_mmap,
++};
++
++static struct video_device capture_videodev = {
++	.fops		= &capture_fops,
++	.ioctl_ops	= &capture_ioctl_ops,
++	.minor		= -1,
++	.release	= video_device_release,
++	.vfl_dir	= VFL_DIR_RX,
++	.tvnorms	= V4L2_STD_NTSC | V4L2_STD_PAL | V4L2_STD_SECAM,
++	.device_caps	= V4L2_CAP_VIDEO_CAPTURE | V4L2_CAP_STREAMING,
++};
++
++struct imx_media_buffer *
++imx_media_capture_device_next_buf(struct imx_media_video_dev *vdev)
++{
++	struct capture_priv *priv = to_capture_priv(vdev);
++	struct imx_media_buffer *buf = NULL;
++	unsigned long flags;
++
++	spin_lock_irqsave(&priv->q_lock, flags);
++
++	/* get next queued buffer */
++	if (!list_empty(&priv->ready_q)) {
++		buf = list_entry(priv->ready_q.next, struct imx_media_buffer,
++				 list);
++		list_del(&buf->list);
++	}
++
++	spin_unlock_irqrestore(&priv->q_lock, flags);
++
++	return buf;
++}
++EXPORT_SYMBOL_GPL(imx_media_capture_device_next_buf);
++
++int imx_media_capture_device_register(struct imx_media_video_dev *vdev)
++{
++	struct capture_priv *priv = to_capture_priv(vdev);
++	struct v4l2_subdev *sd = priv->src_sd;
++	struct video_device *vfd = vdev->vfd;
++	struct vb2_queue *vq = &priv->q;
++	struct v4l2_subdev_format fmt_src;
++	int ret;
++
++	/* get media device */
++	priv->md = dev_get_drvdata(sd->v4l2_dev->dev);
++
++	vfd->v4l2_dev = sd->v4l2_dev;
++
++	ret = video_register_device(vfd, VFL_TYPE_GRABBER, 0);
++	if (ret) {
++		v4l2_err(sd, "Failed to register video device\n");
++		return ret;
++	}
++
++	vq->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
++	vq->io_modes = VB2_MMAP | VB2_DMABUF;
++	vq->drv_priv = priv;
++	vq->buf_struct_size = sizeof(struct imx_media_buffer);
++	vq->ops = &capture_qops;
++	vq->mem_ops = &vb2_dma_contig_memops;
++	vq->timestamp_flags = V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
++	vq->lock = &priv->mutex;
++	vq->min_buffers_needed = 2;
++	vq->dev = priv->dev;
++
++	ret = vb2_queue_init(vq);
++	if (ret) {
++		v4l2_err(sd, "vb2_queue_init failed\n");
++		goto unreg;
++	}
++
++	INIT_LIST_HEAD(&priv->ready_q);
++
++	priv->vdev_pad.flags = MEDIA_PAD_FL_SINK;
++	ret = media_entity_pads_init(&vfd->entity, 1, &priv->vdev_pad);
++	if (ret) {
++		v4l2_err(sd, "failed to init dev pad\n");
++		goto unreg;
++	}
++
++	/* create the link from the src_sd devnode pad to device node */
++	ret = media_create_pad_link(&sd->entity, priv->src_sd_pad,
++				    &vfd->entity, 0, 0);
++	if (ret) {
++		v4l2_err(sd, "failed to create link to device node\n");
++		goto unreg;
++	}
++
++	/* setup default format */
++	fmt_src.pad = priv->src_sd_pad;
++	fmt_src.which = V4L2_SUBDEV_FORMAT_ACTIVE;
++	v4l2_subdev_call(sd, pad, get_fmt, NULL, &fmt_src);
++	if (ret) {
++		v4l2_err(sd, "failed to get src_sd format\n");
++		goto unreg;
++	}
++
++	vdev->fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
++	imx_media_mbus_fmt_to_pix_fmt(&vdev->fmt.fmt.pix,
++				      &fmt_src.format, NULL);
++	vdev->cc = imx_media_find_format(0, fmt_src.format.code,
++					 true, false);
++
++	v4l2_info(sd, "Registered %s as /dev/%s\n", vfd->name,
++		  video_device_node_name(vfd));
++
++	vfd->ctrl_handler = &priv->ctrl_hdlr;
 +
 +	return 0;
++unreg:
++	video_unregister_device(vfd);
++	return ret;
 +}
++EXPORT_SYMBOL_GPL(imx_media_capture_device_register);
 +
-+static const struct of_device_id csi2_dt_ids[] = {
-+	{ .compatible = "fsl,imx6-mipi-csi2", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, csi2_dt_ids);
++void imx_media_capture_device_unregister(struct imx_media_video_dev *vdev)
++{
++	struct capture_priv *priv = to_capture_priv(vdev);
++	struct video_device *vfd = priv->vdev.vfd;
 +
-+static struct platform_driver csi2_driver = {
-+	.driver = {
-+		.name = DEVICE_NAME,
-+		.of_match_table = csi2_dt_ids,
-+	},
-+	.probe = csi2_probe,
-+	.remove = csi2_remove,
-+};
++	mutex_lock(&priv->mutex);
 +
-+module_platform_driver(csi2_driver);
++	if (video_is_registered(vfd)) {
++		video_unregister_device(vfd);
++		media_entity_cleanup(&vfd->entity);
++	}
 +
-+MODULE_DESCRIPTION("i.MX5/6 MIPI CSI-2 Receiver driver");
++	mutex_unlock(&priv->mutex);
++}
++EXPORT_SYMBOL_GPL(imx_media_capture_device_unregister);
++
++struct imx_media_video_dev *
++imx_media_capture_device_init(struct v4l2_subdev *src_sd, int pad)
++{
++	struct capture_priv *priv;
++	struct video_device *vfd;
++
++	priv = devm_kzalloc(src_sd->dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return ERR_PTR(-ENOMEM);
++
++	priv->src_sd = src_sd;
++	priv->src_sd_pad = pad;
++	priv->dev = src_sd->dev;
++
++	mutex_init(&priv->mutex);
++	spin_lock_init(&priv->q_lock);
++
++	snprintf(capture_videodev.name, sizeof(capture_videodev.name),
++		 "%s capture", src_sd->name);
++
++	vfd = video_device_alloc();
++	if (!vfd)
++		return ERR_PTR(-ENOMEM);
++
++	*vfd = capture_videodev;
++	vfd->lock = &priv->mutex;
++	vfd->queue = &priv->q;
++	priv->vdev.vfd = vfd;
++
++	video_set_drvdata(vfd, priv);
++
++	v4l2_ctrl_handler_init(&priv->ctrl_hdlr, 0);
++
++	return &priv->vdev;
++}
++EXPORT_SYMBOL_GPL(imx_media_capture_device_init);
++
++void imx_media_capture_device_remove(struct imx_media_video_dev *vdev)
++{
++	struct capture_priv *priv = to_capture_priv(vdev);
++
++	v4l2_ctrl_handler_free(&priv->ctrl_hdlr);
++}
++EXPORT_SYMBOL_GPL(imx_media_capture_device_remove);
++
++MODULE_DESCRIPTION("i.MX5/6 v4l2 video capture interface driver");
 +MODULE_AUTHOR("Steve Longerbeam <steve_longerbeam@mentor.com>");
 +MODULE_LICENSE("GPL");
 -- 
