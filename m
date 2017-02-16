@@ -1,31 +1,45 @@
 From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 16 Feb 2017 13:48:59 +0100
-Subject: [PATCH 21/21] ARM: sunxi: Enable dwmac-sun8i driver on
- multi_v7_defconfig
+Date: Thu, 16 Feb 2017 13:48:57 +0100
+Subject: [PATCH 19/21] ARM: dts: sun50i-a64: enable dwmac-sun8i on the
+ BananaPi M64
 In-Reply-To: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
 References: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
-Message-ID: <20170216124859.14346-22-clabbe.montjoie@gmail.com>
+Message-ID: <20170216124859.14346-20-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the dwmac-sun8i driver in the multi_v7 default configuration
+The dwmac-sun8i  hardware is present on the BananaPi M64.
+It uses an external PHY rtl8211e via RGMII.
 
 Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 3a17555..72f974d 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -257,6 +257,7 @@ CONFIG_SMSC911X=y
- CONFIG_STMMAC_ETH=y
- CONFIG_STMMAC_PLATFORM=y
- CONFIG_DWMAC_DWC_QOS_ETH=y
-+CONFIG_DWMAC_SUN8I=m
- CONFIG_TI_CPSW=y
- CONFIG_XILINX_EMACLITE=y
- CONFIG_AT803X_PHY=y
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+index 6872135..347c262 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+@@ -77,6 +77,20 @@
+ 	bias-pull-up;
+ };
+ 
++&mdio {
++	ext_rgmii_phy: ethernet-phy at 1 {
++		reg = <1>;
++	};
++};
++
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&rgmii_pins>;
++	phy-mode = "rgmii";
++	phy-handle = <&ext_rgmii_phy>;
++	status = "okay";
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
 -- 
 2.10.2
