@@ -1,37 +1,36 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Feb 2017 16:44:24 +0000
-Subject: [PATCH v4 0/3] ARM: l2c: add l2c support for RZ/A1
-In-Reply-To: <20170216161742.29320-1-chris.brandt@renesas.com>
-References: <20170216161742.29320-1-chris.brandt@renesas.com>
-Message-ID: <20170216164424.GR27312@n2100.armlinux.org.uk>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 16 Feb 2017 17:47:19 +0100
+Subject: sDMA on i.mx7d
+In-Reply-To: <20170216164038.zbl2nb76now3glkk@piout.net>
+References: <20170214222425.hbkfkeq3l6sveo7n@piout.net>
+ <e9c36a33f2a49df2a517db5869eaea7f@agner.ch>
+ <20170215110736.oumvvv7zordd2jdw@piout.net>
+ <3513b2c01d86ad7312522d6be97e766f@agner.ch>
+ <20170216104229.axwm3445yj6zrxoz@piout.net>
+ <CAOMZO5CeqipfNJxM2Pc1g1606OjbN83ZtbbGRZFmqE3q4fNpRw@mail.gmail.com>
+ <20170216164038.zbl2nb76now3glkk@piout.net>
+Message-ID: <1487263639.13536.36.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 11:17:39AM -0500, Chris Brandt wrote:
-> The PL310 in the Renesas RZ/A1 SoC (R7S72100) does not have the sideband
-> signals connected between the CPU and L2C. According the PL310 TRM,
-> sideband signals are optional.
-> 
-> If a PL310 is added to a system, but the sideband signals are not
-> connected, some Cortex A9 optimizations cannot be used. In particular,
-> enabling Full Line Zeros in the CA9 without sidebands connected will
-> crash the system since the CA9 will expect the L2C to perform operations,
-> yet the L2C never gets the commands.
-> 
-> This series adds the option to not enable anything in the PL310 that
-> uses sidebands, and then adds L2C support to the RZ/A1 DT.
-> 
-> v4:
-> * changed l2x0_bresp_dis to l2x0_bresp_disable
-> * changed l2x0_flz_dis to l2x0_flz_disable
+Am Donnerstag, den 16.02.2017, 17:40 +0100 schrieb Alexandre Belloni:
+> On 16/02/2017 at 13:36:28 -0200, Fabio Estevam wrote:
+> > Hi Alexandre,
+> > 
+> > On Thu, Feb 16, 2017 at 8:42 AM, Alexandre Belloni
+> > <alexandre.belloni@free-electrons.com> wrote:
+> > 
+> > > I confirm it is the culprit.
+> > 
+> > Does this mean that PCM3168s codec works fine on imx7 using SAI on
+> > 4.9.x plus the revert?
 
-Looks good, thanks.
+And there is already a fix for this in 4.10:
+85f57752b33c (dmaengine: imx-sdma - correct the dma transfer residue
+calculation)
 
-I'll want to merge patch 1, but I suspect the other two patches need
-to go through arm-soc, which will cause a problem due to being merged
-independently...  Arnd?
+This fixes audio output on i.MX6 and should probably be sent to -stable.
+Can you see if applying this patch gets rid of the issues on i.MX7?
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Lucas
