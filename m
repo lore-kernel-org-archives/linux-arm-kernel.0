@@ -1,22 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Feb 2017 17:22:59 +0100
-Subject: [PATCH] ARM: multi_v7_defconfig: enable pstore configs
-In-Reply-To: <20170209205250.GA118863@google.com>
-References: <20170209195646.GA39738@beast> <20170209205250.GA118863@google.com>
-Message-ID: <4740492.m49jFGWQak@wuerfel>
+From: afd@ti.com (Andrew F. Davis)
+Date: Thu, 16 Feb 2017 10:29:16 -0600
+Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting cpu1
+ during boot
+In-Reply-To: <20170216161010.GU21809@atomide.com>
+References: <20170213215013.19929-1-tony@atomide.com>
+ <20170214193645.GM21809@atomide.com> <20170215183915.GU3897@atomide.com>
+ <20170215191242.GP21809@atomide.com>
+ <ca389104-df6f-b055-ec43-524d82cf1be7@ti.com>
+ <20170215222711.GQ21809@atomide.com> <20170216161010.GU21809@atomide.com>
+Message-ID: <fc1e75e8-87ef-59f1-3c8a-cb45f1749e50@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, February 9, 2017 12:52:50 PM CET Brian Norris wrote:
-> It's useful to get testing on these features on various boards (e.g., on
-> KernelCI), and (when they're working) the ramoops feature is extremely
-> helpful for debugging live systems.
+On 02/16/2017 10:10 AM, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [170215 14:28]:
+>> * Andrew F. Davis <afd@ti.com> [170215 14:14]:
+>>> On 02/15/2017 01:12 PM, Tony Lindgren wrote:
+>>>> And also the same issue happens doing kexec on beagle-x15 naturally if
+>>>> the cpu1 reset is removed.
+>>>>
+>>>
+>>> When a core actually powers up it idles in ROM code waiting for
+>>> OMAP_AUX_CORE_BOOT_0 to be set. When we shutdown a core it is not really
+>>> powered off, we just let it spin in omap4_cpu_die() or
+>>> omap4_secondary_startup() waiting on OMAP_AUX_CORE_BOOT_0, just like if
+>>> it were still trapped in ROM after a reset.
 > 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
-> ---
-> + ARM folks
-> - Linus
+> OK so I debugged this a bit more. We have CPU1 in omap_do_wfi()
+> as we don't currently have omap5_secondary_startup() or any deeper
+> idle mode support beyond retention for omap5 or dra7 in the mainline
+> kernel.
+> 
+>>> The issue with this fake startup idle loop is that, unlike the ROM based
+>>> startup idle loop, these do *not* jump to the address we stored in
+>>> OMAP_AUX_CORE_BOOT_1, they just make the assumption that they can safely
+>>> jump to the kernel startup function.
+> 
+> This does not seem to be the case here.
+> 
 
-Applied to next/defconfig, thanks!
+Well this is what I am seeing every time, this code only works when it
+is the same kernel we kexec, any changed addresses here will not work.
 
-	Arnd
+>>> So when we tell this core to boot, and it is not in the real ROM startup
+>>> loop, it breaks stuff as it jumps to the old kernel's
+>>> secondary_startup() even though we gave it the correct address in
+>>> OMAP_AUX_CORE_BOOT_1.
+> 
+> And this is not happening. I think this is what I was seeing earlier,
+> but it's not the omap5/dra7 issue.
+> 
+> What we have is cpu1 returning from previous kernel's omap_do_wfi()
+> in the kexec booted kernel's code and that's when things go wrong.
+> 
+
+We are the ones sending it to omap_do_wfi(), in omap4_cpu_die() it gets
+idled in a loop, it shouldn't be idled after it is shut off, it should
+get parked, we should do this like we do in omap5_secondary_startup().
+
+> So if cpu1 was configured for idle for any reason, it will never gets
+> to omap5_secondary_startup without the reset currently.
+> 
+> The reason kexec and suspend/resume mostly works for omap4 without
+> cpu1 reset is that we usually enter off mode for cpu1 and the context
+> is lost and then we properly go through omap4_secondary_startup. Or
+> that's my theory so far for the occasional flakeyness I've been seeing :)
+> 
+> Any ideas what we should try to check to see if cpu1 is in idle
+> mode so we can do the reset if needed?
+> 
+
+You can never reset the core, resetting the core is not allowed on HS
+devices and so it really doesn't matter what the core is doing. In no
+case is reseting the core a valid work-around for not correctly parking
+it. We need to fix the omap4_cpu_die() to not let the core go idle if
+the return from idle path is the problem.
+
+Andrew
+
+> Regards,
+> 
+> Tony
+> 
