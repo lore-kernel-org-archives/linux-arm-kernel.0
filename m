@@ -1,32 +1,268 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 16 Feb 2017 17:40:38 +0100
-Subject: sDMA on i.mx7d
-In-Reply-To: <CAOMZO5CeqipfNJxM2Pc1g1606OjbN83ZtbbGRZFmqE3q4fNpRw@mail.gmail.com>
-References: <20170214222425.hbkfkeq3l6sveo7n@piout.net>
- <e9c36a33f2a49df2a517db5869eaea7f@agner.ch>
- <20170215110736.oumvvv7zordd2jdw@piout.net>
- <3513b2c01d86ad7312522d6be97e766f@agner.ch>
- <20170216104229.axwm3445yj6zrxoz@piout.net>
- <CAOMZO5CeqipfNJxM2Pc1g1606OjbN83ZtbbGRZFmqE3q4fNpRw@mail.gmail.com>
-Message-ID: <20170216164038.zbl2nb76now3glkk@piout.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 16 Feb 2017 16:41:40 +0000
+Subject: [PATCH V2] perf: qcom: Add L3 cache PMU driver
+In-Reply-To: <1487257385-28930-1-git-send-email-agustinv@codeaurora.org>
+References: <1487257385-28930-1-git-send-email-agustinv@codeaurora.org>
+Message-ID: <20170216164140.GC588@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/2017 at 13:36:28 -0200, Fabio Estevam wrote:
-> Hi Alexandre,
-> 
-> On Thu, Feb 16, 2017 at 8:42 AM, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
-> 
-> > I confirm it is the culprit.
-> 
-> Does this mean that PCM3168s codec works fine on imx7 using SAI on
-> 4.9.x plus the revert?
+Hi,
 
-It does work after the revert but the driver needs a small modification
-to accommodate TDM instead of i2s. I'll send that.
+On Thu, Feb 16, 2017 at 10:03:05AM -0500, Agustin Vega-Frias wrote:
+> This adds a new dynamic PMU to the Perf Events framework to program
+> and control the L3 cache PMUs in some Qualcomm Technologies SOCs.
+> 
+> The driver supports a distributed cache architecture where the overall
+> cache is comprised of multiple slices each with its own PMU. The driver
+> aggregates counts across the whole system to provide a global picture
+> of the metrics selected by the user.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+At a quick glance, this looks *awfully* similar to the L2 PMU, modulo
+using MMIO rather than sysreg accesses. The basic shape of the hardware
+seems the same, and the register offsets are practically identical.
+
+I guess that the L2 and L3 are largely the same block?
+
+How exactly does this relate to the L2 PMU hardware? Could you please
+elaborate on any major differences?
+
+This has similar issues to earlier versions of the L2 PMU driver, such
+as permitting cross-{slice,pmu} groups, and aggregating per-slice
+events, which have been addressed in the upstreamed L2 PMU driver.
+
+Given that, could you please take a look at that (and discussions
+surrounding it), and try to address those common issues? I would hope
+that Neil can help you with that.
+
+Ideally, given the similarities, the two would be managed by the same
+driver (even if exposed as separate devices).
+
+Please also test this with Vince Weaver's perf fuzzer [1,2], as we did
+for the L2 PMU driver.
+
+Otherwise, I have some (additional) high-level comments/questions below.
+
+[1] http://web.eece.maine.edu/~vweaver/projects/perf_events/fuzzer/
+[2] https://github.com/deater/perf_event_tests
+
+> +static void hml3_pmu__reset(struct hml3_pmu *pmu)
+> +{
+> +	int i;
+> +
+> +	writel_relaxed(BC_RESET, pmu->regs + L3_M_BC_CR);
+> +
+> +	/*
+> +	 * Use writel for the first programming command to ensure the basic
+> +	 * counter unit is stopped before proceeding
+> +	 */
+> +	writel(BC_SATROLL_CR_RESET, pmu->regs + L3_M_BC_SATROLL_CR);
+> +
+> +	writel_relaxed(BC_CNTENCLR_RESET, pmu->regs + L3_M_BC_CNTENCLR);
+> +	writel_relaxed(BC_INTENCLR_RESET, pmu->regs + L3_M_BC_INTENCLR);
+> +	writel_relaxed(PMOVSRCLR_RESET, pmu->regs + L3_M_BC_OVSR);
+> +	writel_relaxed(BC_GANG_RESET, pmu->regs + L3_M_BC_GANG);
+> +	writel_relaxed(BC_IRQCTL_RESET, pmu->regs + L3_M_BC_IRQCTL);
+> +	writel_relaxed(PM_CR_RESET, pmu->regs + L3_HML3_PM_CR);
+> +
+> +	for (i = 0; i < L3_NUM_COUNTERS; ++i) {
+> +		writel_relaxed(PMCNT_RESET, pmu->regs + L3_HML3_PM_CNTCTL(i));
+> +		writel_relaxed(EVSEL(0), pmu->regs + L3_HML3_PM_EVTYPE(i));
+> +	}
+> +
+> +	writel_relaxed(PM_FLTR_RESET, pmu->regs + L3_HML3_PM_FILTRA);
+> +	writel_relaxed(PM_FLTR_RESET, pmu->regs + L3_HML3_PM_FILTRAM);
+> +	writel_relaxed(PM_FLTR_RESET, pmu->regs + L3_HML3_PM_FILTRB);
+> +	writel_relaxed(PM_FLTR_RESET, pmu->regs + L3_HML3_PM_FILTRBM);
+> +	writel_relaxed(PM_FLTR_RESET, pmu->regs + L3_HML3_PM_FILTRC);
+> +	writel_relaxed(PM_FLTR_RESET, pmu->regs + L3_HML3_PM_FILTRCM);
+> +}
+> +
+> +static inline void hml3_pmu__init(struct hml3_pmu *pmu, struct l3cache_pmu *s,
+> +				  void __iomem *regs)
+> +{
+> +	pmu->socket = s;
+> +	pmu->regs = regs;
+> +	hml3_pmu__reset(pmu);
+> +
+> +	/*
+> +	 * Use writel here to ensure all programming commands are done
+> +	 *  before proceeding
+> +	 */
+> +	writel(BC_ENABLE, pmu->regs + L3_M_BC_CR);
+> +}
+
+I assume that as with the L2, each slice is affine to a cluster. Is that
+correct?
+
+If so, what happens when all CPUs in a cluster are hotplugged off then
+back on? Can't the L3 lose state (as we expect the L2 may)?
+
+[...]
+
+> +static void qcom_l3_cache__64bit_counter_start(struct perf_event *event)
+> +{
+> +	struct l3cache_pmu *socket = to_l3cache_pmu(event->pmu);
+> +	struct hml3_pmu *slice;
+> +	int idx = event->hw.idx;
+> +	u64 value = local64_read(&event->count);
+> +
+> +	list_for_each_entry(slice, &socket->pmus, entry) {
+> +		hml3_pmu__counter_enable_gang(slice, idx+1);
+> +
+> +		if (value) {
+> +			hml3_pmu__counter_set_value(slice, idx+1, value >> 32);
+> +			hml3_pmu__counter_set_value(slice, idx, (u32)value);
+> +			value = 0;
+> +		} else {
+> +			hml3_pmu__counter_set_value(slice, idx+1, 0);
+> +			hml3_pmu__counter_set_value(slice, idx, 0);
+> +		}
+> +
+> +		hml3_pmu__counter_set_event(slice, idx+1, 0);
+> +		hml3_pmu__counter_set_event(slice, idx, get_event_type(event));
+> +
+> +		hml3_pmu__counter_enable(slice, idx+1);
+> +		hml3_pmu__counter_enable(slice, idx);
+> +	}
+> +}
+
+As with other PMU drivers, NAK to aggregating (separately-controlled) HW
+events behind a single event. We should not be aggregating across
+slices as we cannot start/stop those atomically.
+
+Similarly, all events in a group must be started/stopped by the same HW
+controls. All events in a group should be part of the same slice, as we
+cannot start/stop those atomically.
+
+Assuming slices are cluster-affine, is it safe to access the L3 for a
+cluster which is offlined? Is the L3 still in use if its associated CPUs
+are offline?
+
+[...]
+
+> +static int qcom_l3_cache__event_add(struct perf_event *event, int flags)
+> +{
+> +	struct l3cache_pmu *socket = to_l3cache_pmu(event->pmu);
+> +	struct hw_perf_event *hwc = &event->hw;
+> +	int idx;
+> +	int sz;
+> +
+> +	/*
+> +	 * Try to allocate a counter.
+> +	 */
+> +	sz = get_hw_counter_size(event);
+> +	idx = bitmap_find_free_region(socket->used_mask, L3_NUM_COUNTERS, sz);
+> +	if (idx < 0)
+> +		/* The counters are all in use. */
+> +		return -EAGAIN;
+> +
+> +	hwc->idx = idx;
+> +	hwc->state = PERF_HES_STOPPED | PERF_HES_UPTODATE;
+> +
+> +	if (sz == 0)
+> +		socket->counters[idx] = (struct l3cache_pmu_hwc) {
+> +			.event = event,
+> +			.start = qcom_l3_cache__32bit_counter_start,
+> +			.stop = qcom_l3_cache__32bit_counter_stop,
+> +			.update = qcom_l3_cache__32bit_counter_update
+> +		};
+> +	else {
+> +		socket->counters[idx] = (struct l3cache_pmu_hwc) {
+> +			.event = event,
+> +			.start = qcom_l3_cache__64bit_counter_start,
+> +			.stop = qcom_l3_cache__64bit_counter_stop,
+> +			.update = qcom_l3_cache__64bit_counter_update
+> +		};
+> +		socket->counters[idx+1] = socket->counters[idx];
+> +	}
+> +
+> +	if (flags & PERF_EF_START)
+> +		qcom_l3_cache__event_start(event, 0);
+> +
+> +	/* Propagate changes to the userspace mapping. */
+> +	perf_event_update_userpage(event);
+> +
+> +	return 0;
+> +}
+
+So IIUC this doesn't follow the row/column event model of the L2, and
+doesn't have a dedicated cycle counter?
+
+[...]
+
+> +PMU_FORMAT_ATTR(event, "config:0-7");
+> +PMU_FORMAT_ATTR(lc, "config:32");
+
+What is this 'lc' field?
+
+> +static int qcom_l3_cache_pmu_offline_cpu(unsigned int cpu, struct hlist_node *n)
+> +{
+> +	struct l3cache_pmu *socket = hlist_entry_safe(n, struct l3cache_pmu, node);
+> +	unsigned int target;
+> +
+> +	if (!cpumask_test_and_clear_cpu(cpu, &socket->cpu))
+> +		return 0;
+> +	target = cpumask_any_but(cpu_online_mask, cpu);
+> +	if (target >= nr_cpu_ids)
+> +		return 0;
+> +	/*
+> +	 * TODO: migrate context once core races on event->ctx have
+> +	 * been fixed.
+> +	 */
+> +	cpumask_set_cpu(target, &socket->cpu);
+> +	return 0;
+> +}
+
+The event->ctx race has been fixed for a while now.
+
+Please follow the example of the L2 PMU's hotplug callback, and also
+fold the reset into the hotplug callback.
+
+[...]
+
+> +static int qcom_l3_cache_pmu_probe_slice(struct device *dev, void *data)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev->parent);
+> +	struct platform_device *sdev = to_platform_device(dev);
+> +	struct l3cache_pmu *socket = data;
+> +	struct resource *memrc;
+> +	void __iomem *regs;
+> +	struct hml3_pmu *slice;
+> +	int irq, err;
+> +
+> +	memrc = platform_get_resource(sdev, IORESOURCE_MEM, 0);
+> +	slice = devm_kzalloc(&pdev->dev, sizeof(*slice), GFP_KERNEL);
+> +	if (!slice)
+> +		return -ENOMEM;
+> +
+> +	regs = devm_ioremap_resource(&pdev->dev, memrc);
+> +	if (IS_ERR(regs)) {
+> +		dev_err(&pdev->dev, "Can't map slice @%pa\n", &memrc->start);
+> +		return PTR_ERR(regs);
+> +	}
+> +
+> +	irq = platform_get_irq(sdev, 0);
+> +	if (irq <= 0) {
+> +		dev_err(&pdev->dev, "Failed to get valid irq for slice @%pa\n",
+> +			&memrc->start);
+> +		return irq;
+> +	}
+> +
+> +	err = devm_request_irq(&pdev->dev, irq, qcom_l3_cache__handle_irq, 0,
+> +			       "qcom-l3-cache-pmu", slice);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "Request for IRQ failed for slice @%pa\n",
+> +			&memrc->start);
+> +		return err;
+> +	}
+> +
+> +	hml3_pmu__init(slice, socket, regs);
+> +	list_add(&slice->entry, &socket->pmus);
+> +	return 0;
+> +}
+
+No cluster affinity to probe out of the ACPI tables?
+
+Thanks,
+Mark.
