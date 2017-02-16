@@ -1,101 +1,117 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed, 15 Feb 2017 18:19:30 -0800
-Subject: [PATCH v4 28/36] media: imx: csi: fix crop rectangle changes in
- set_fmt
+Date: Wed, 15 Feb 2017 18:19:28 -0800
+Subject: [PATCH v4 26/36] media: imx: add support for bayer formats
 In-Reply-To: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1487211578-11360-29-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1487211578-11360-27-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
-The cropping rectangle was being modified by the output pad's
-set_fmt, which is the wrong pad to do this. The crop rectangle
-should not be modified by the output pad set_fmt. It instead
-should be reset to the full input frame when the input pad format
-is set.
+Add the bayer formats to imx-media's list of supported pixel and bus
+formats.
 
-The output pad set_fmt should set width/height to the current
-crop dimensions, or 1/2 the crop width/height to enable
-downscaling.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-So the other part of this patch is to enable downscaling if
-the output pad dimension(s) are 1/2 the crop dimension(s) at
-csi_setup() time.
+- added a bayer boolean to struct imx_media_pixfmt.
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- drivers/staging/media/imx/imx-media-csi.c | 35 ++++++++++++++++++++-----------
- 1 file changed, 23 insertions(+), 12 deletions(-)
+ drivers/staging/media/imx/imx-media-utils.c | 68 +++++++++++++++++++++++++++++
+ drivers/staging/media/imx/imx-media.h       |  1 +
+ 2 files changed, 69 insertions(+)
 
-diff --git a/drivers/staging/media/imx/imx-media-csi.c b/drivers/staging/media/imx/imx-media-csi.c
-index ae24b42..3cb97e2 100644
---- a/drivers/staging/media/imx/imx-media-csi.c
-+++ b/drivers/staging/media/imx/imx-media-csi.c
-@@ -531,6 +531,10 @@ static int csi_setup(struct csi_priv *priv)
- 
- 	ipu_csi_set_window(priv->csi, &priv->crop);
- 
-+	ipu_csi_set_downsize(priv->csi,
-+			     priv->crop.width == 2 * outfmt->width,
-+			     priv->crop.height == 2 * outfmt->height);
-+
- 	ipu_csi_init_interface(priv->csi, &sensor_mbus_cfg, &if_fmt);
- 
- 	ipu_csi_set_dest(priv->csi, priv->dest);
-@@ -890,15 +894,15 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
- 	switch (sdformat->pad) {
- 	case CSI_SRC_PAD_DIRECT:
- 	case CSI_SRC_PAD_IDMAC:
--		crop.left = priv->crop.left;
--		crop.top = priv->crop.top;
--		crop.width = sdformat->format.width;
--		crop.height = sdformat->format.height;
--		ret = csi_try_crop(priv, &crop, sensor);
--		if (ret)
--			return ret;
--		sdformat->format.width = crop.width;
--		sdformat->format.height = crop.height;
-+		if (sdformat->format.width < priv->crop.width * 3 / 4)
-+			sdformat->format.width = priv->crop.width / 2;
-+		else
-+			sdformat->format.width = priv->crop.width;
-+
-+		if (sdformat->format.height < priv->crop.height * 3 / 4)
-+			sdformat->format.height = priv->crop.height / 2;
-+		else
-+			sdformat->format.height = priv->crop.height;
- 
- 		if (sdformat->pad == CSI_SRC_PAD_IDMAC) {
- 			cc = imx_media_find_format(0, sdformat->format.code,
-@@ -948,6 +952,14 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
- 		}
- 		break;
- 	case CSI_SINK_PAD:
-+		crop.left = 0;
-+		crop.top = 0;
-+		crop.width = sdformat->format.width;
-+		crop.height = sdformat->format.height;
-+		ret = csi_try_crop(priv, &crop, sensor);
-+		if (ret)
-+			return ret;
-+
- 		cc = imx_media_find_format(0, sdformat->format.code,
- 					   true, false);
- 		if (!cc) {
-@@ -965,9 +977,8 @@ static int csi_set_fmt(struct v4l2_subdev *sd,
- 	} else {
- 		priv->format_mbus[sdformat->pad] = sdformat->format;
- 		priv->cc[sdformat->pad] = cc;
--		/* Update the crop window if this is an output pad  */
--		if (sdformat->pad == CSI_SRC_PAD_DIRECT ||
--		    sdformat->pad == CSI_SRC_PAD_IDMAC)
-+		/* Reset the crop window if this is the input pad */
-+		if (sdformat->pad == CSI_SINK_PAD)
- 			priv->crop = crop;
- 	}
+diff --git a/drivers/staging/media/imx/imx-media-utils.c b/drivers/staging/media/imx/imx-media-utils.c
+index 55603d9..6855560 100644
+--- a/drivers/staging/media/imx/imx-media-utils.c
++++ b/drivers/staging/media/imx/imx-media-utils.c
+@@ -61,6 +61,74 @@ static const struct imx_media_pixfmt imx_media_formats[] = {
+ 		.cs     = IPUV3_COLORSPACE_RGB,
+ 		.bpp    = 32,
+ 		.ipufmt = true,
++	}, {
++		.fourcc = V4L2_PIX_FMT_SBGGR8,
++		.codes  = {MEDIA_BUS_FMT_SBGGR8_1X8},
++		.cs     = IPUV3_COLORSPACE_RGB,
++		.bpp    = 8,
++		.bayer  = true,
++	}, {
++		.fourcc = V4L2_PIX_FMT_SGBRG8,
++		.codes  = {MEDIA_BUS_FMT_SGBRG8_1X8},
++		.cs     = IPUV3_COLORSPACE_RGB,
++		.bpp    = 8,
++		.bayer  = true,
++	}, {
++		.fourcc = V4L2_PIX_FMT_SGRBG8,
++		.codes  = {MEDIA_BUS_FMT_SGRBG8_1X8},
++		.cs     = IPUV3_COLORSPACE_RGB,
++		.bpp    = 8,
++		.bayer  = true,
++	}, {
++		.fourcc = V4L2_PIX_FMT_SRGGB8,
++		.codes  = {MEDIA_BUS_FMT_SRGGB8_1X8},
++		.cs     = IPUV3_COLORSPACE_RGB,
++		.bpp    = 8,
++		.bayer  = true,
++	}, {
++		.fourcc = V4L2_PIX_FMT_SBGGR16,
++		.codes  = {
++			MEDIA_BUS_FMT_SBGGR10_1X10,
++			MEDIA_BUS_FMT_SBGGR12_1X12,
++			MEDIA_BUS_FMT_SBGGR14_1X14,
++			MEDIA_BUS_FMT_SBGGR16_1X16
++		},
++		.cs     = IPUV3_COLORSPACE_RGB,
++		.bpp    = 16,
++		.bayer  = true,
++	}, {
++		.fourcc = V4L2_PIX_FMT_SGBRG16,
++		.codes  = {
++			MEDIA_BUS_FMT_SGBRG10_1X10,
++			MEDIA_BUS_FMT_SGBRG12_1X12,
++			MEDIA_BUS_FMT_SGBRG14_1X14,
++			MEDIA_BUS_FMT_SGBRG16_1X16,
++		},
++		.cs     = IPUV3_COLORSPACE_RGB,
++		.bpp    = 16,
++		.bayer  = true,
++	}, {
++		.fourcc = V4L2_PIX_FMT_SGRBG16,
++		.codes  = {
++			MEDIA_BUS_FMT_SGRBG10_1X10,
++			MEDIA_BUS_FMT_SGRBG12_1X12,
++			MEDIA_BUS_FMT_SGRBG14_1X14,
++			MEDIA_BUS_FMT_SGRBG16_1X16,
++		},
++		.cs     = IPUV3_COLORSPACE_RGB,
++		.bpp    = 16,
++		.bayer  = true,
++	}, {
++		.fourcc = V4L2_PIX_FMT_SRGGB16,
++		.codes  = {
++			MEDIA_BUS_FMT_SRGGB10_1X10,
++			MEDIA_BUS_FMT_SRGGB12_1X12,
++			MEDIA_BUS_FMT_SRGGB14_1X14,
++			MEDIA_BUS_FMT_SRGGB16_1X16,
++		},
++		.cs     = IPUV3_COLORSPACE_RGB,
++		.bpp    = 16,
++		.bayer  = true,
+ 	},
+ 	/*** non-mbus formats start here ***/
+ 	{
+diff --git a/drivers/staging/media/imx/imx-media.h b/drivers/staging/media/imx/imx-media.h
+index 3d4f3c7..ae3af0d 100644
+--- a/drivers/staging/media/imx/imx-media.h
++++ b/drivers/staging/media/imx/imx-media.h
+@@ -91,6 +91,7 @@ struct imx_media_pixfmt {
+ 	int     bpp;     /* total bpp */
+ 	enum ipu_color_space cs;
+ 	bool    planar;  /* is a planar format */
++	bool    bayer;   /* is a raw bayer format */
+ 	bool    ipufmt;  /* is one of the IPU internal formats */
+ };
  
 -- 
 2.7.4
