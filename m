@@ -1,66 +1,50 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 16 Feb 2017 10:49:10 +0100
-Subject: [PATCH 2/2] arch_timer: acpi: add hisi timer erratum data
-In-Reply-To: <58A574D9.10300@huawei.com>
-References: <1485254391-51551-1-git-send-email-guohanjun@huawei.com>
- <1485254391-51551-3-git-send-email-guohanjun@huawei.com>
- <20170124105717.GB6277@leverpostej>
- <a2ac2a70-09fb-5cec-c090-b8ebde90e24f@arm.com> <589D6776.2010400@huawei.com>
- <e2780793-a8ac-4d75-b095-a534e36f8bf7@suse.de> <20170216091454.GA2160@mai>
- <48bb19c9-d1f3-a5c1-ec82-4b19d45f88fd@suse.de>
- <ee8f0a16-8ed4-8300-74af-cdb404516ae2@huawei.com> <58A574D9.10300@huawei.com>
-Message-ID: <8cc0c3eb-c279-5cb1-4d6f-1a6419e0874e@linaro.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 16 Feb 2017 18:52:15 +0900
+Subject: [PATCH v32 07/13] arm64: hibernate: preserve kdump image around
+ hibernation
+In-Reply-To: <58A445B3.4080608@arm.com>
+References: <20170207080601.5816-1-takahiro.akashi@linaro.org>
+ <20170207080904.5974-5-takahiro.akashi@linaro.org>
+ <58A445B3.4080608@arm.com>
+Message-ID: <20170216095214.GF18445@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/02/2017 10:46, Sanil Kumar wrote:
-> On 2/16/2017 3:11 PM, Ding Tianhong wrote:
->>
->> On 2017/2/16 17:32, Alexander Graf wrote:
->>>
->>> On 16/02/2017 10:14, Daniel Lezcano wrote:
->>>> On Thu, Feb 16, 2017 at 09:42:11AM +0100, Alexander Graf wrote:
->>>>
->>>> [ ... ]
->>>>
->>>>>>>> I believe Marc is looking at some rework in this area which may
->>>>>>>> enable
->>>>>>>> this, so please wait for that to appear.
->>>>>>> Yeah, I'm implementing a semi-flexible way to add new quirk
->>>>>>> types, and
->>>>>>> the last thing I want to see is two (or more) tables describing
->>>>>>> the same
->>>>>>> thing.
->>>>>> Kindly ping, if you have patches in hand, I can test against our
->>>>>> platforms,
->>>>>> thank you very much.
->>>>> Any progress on this? I'm not a big fan of stalling erratum fixes
->>>>> upstream
->>>>> because of potential future refactoring.
->>>> The fix is in the tip tree, soon in v4.11-rc1 when the merge will be
->>>> finished.
->>>>
->>>> http://goo.gl/x90qwE
->>>> http://goo.gl/asCBBD
->>> Oh, I missed that. Sorry for the fuss :).
->>>
->>>
->>> Alex
->>>
->> Hi, I thinks the tip tree is only applied the erratum for DT, not for
->> ACPI, the patch
->> for ACPI is not applied yet, so the work isn't finished. ??
-> Yes, initial thread was about ACPI part. I think Alex was asking about
-> that.
+On Wed, Feb 15, 2017 at 12:12:35PM +0000, James Morse wrote:
+> Hi Akashi,
+> 
+> On 07/02/17 08:08, AKASHI Takahiro wrote:
+> > Since arch_kexec_protect_crashkres() removes a mapping for crash dump
+> > kernel memory, the loaded contents won't be preserved around hibernation.
+> > 
+> > In this patch, arch_kexec_(un)protect_crashkres() are additionally called
+> > before/after hibernation so that the relevant region will be mapped again
+> > and restored just as the other memory regions are.
+> 
+> Reviewed-by: James Morse <james.morse@arm.com>
 
-Ah yes. Indeed.
+Thank you very much.
 
-Thanks.
+> A quick test of this took longer than expected (writing to a slow usb device),
 
+Really? I use a uSD card on hikey as a swap device, and it takes just
+a few moments to save a hibernate image although I do the test right after
+the system comes up.
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> I
+> suspect it is save/restoring the whole crash region (which I don't think is a
+> problem).
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Now that we have only page-level mappings for the crash region,
+it might be possible to mark all the unused pages "reserved"
+in arch_kexec_unprotect_crashkres() if called in hibernate.
+
+-Takahiro AKASHI
+
+> If someone turns out to use this combination of features I will look
+> at improving this, (almost certainly requires core-code changes).
+> 
+> 
+> Thanks,
+> 
+> James
