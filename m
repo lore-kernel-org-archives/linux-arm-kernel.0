@@ -1,50 +1,42 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed, 15 Feb 2017 18:19:11 -0800
-Subject: [PATCH v4 09/36] ARM: dts: imx6-sabreauto: add reset-gpios property
- for max7310_b
+Date: Wed, 15 Feb 2017 18:19:12 -0800
+Subject: [PATCH v4 10/36] ARM: dts: imx6-sabreauto: add pinctrl for gpt input
+ capture
 In-Reply-To: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
 References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1487211578-11360-10-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1487211578-11360-11-git-send-email-steve_longerbeam@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The reset pin to the port expander chip (MAX7310) is controlled by a gpio,
-so define a reset-gpios property to control it. There are three MAX7310's
-on the SabreAuto CPU card (max7310_[abc]), but all use the same pin for
-their reset. Since all can't acquire the same pin, assign it to max7310_b,
-that chip is needed by more functions (usb and adv7180).
+Add pinctrl groups for both GPT input capture channels.
 
 Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
 ---
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index cace88c..967c3b8 100644
+index 967c3b8..495709f 100644
 --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -136,6 +136,9 @@
- 				reg = <0x32>;
- 				gpio-controller;
- 				#gpio-cells = <2>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_max7310>;
-+				reset-gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
- 			};
- 
- 			max7310_c: gpio at 34 {
-@@ -442,6 +445,12 @@
+@@ -457,6 +457,18 @@
  			>;
  		};
  
-+		pinctrl_max7310: max7310grp {
++		pinctrl_gpt_input_capture0: gptinputcapture0grp {
 +			fsl,pins = <
-+				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15 0x1b0b0
++				MX6QDL_PAD_SD1_DAT0__GPT_CAPTURE1	0x1b0b0
 +			>;
 +		};
 +
- 		pinctrl_pwm3: pwm1grp {
++		pinctrl_gpt_input_capture1: gptinputcapture1grp {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_DAT1__GPT_CAPTURE2	0x1b0b0
++			>;
++		};
++
+ 		pinctrl_spdif: spdifgrp {
  			fsl,pins = <
- 				MX6QDL_PAD_SD4_DAT1__PWM3_OUT		0x1b0b1
+ 				MX6QDL_PAD_KEY_COL3__SPDIF_IN 0x1b0b0
 -- 
 2.7.4
