@@ -1,35 +1,32 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 16 Feb 2017 17:38:26 +0100
-Subject: [PATCH] ARM: dts: armada-38x: Adjust mbus controller description on
- Armada 38x
-Message-ID: <20170216163826.28071-1-gregory.clement@free-electrons.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 16 Feb 2017 17:40:38 +0100
+Subject: sDMA on i.mx7d
+In-Reply-To: <CAOMZO5CeqipfNJxM2Pc1g1606OjbN83ZtbbGRZFmqE3q4fNpRw@mail.gmail.com>
+References: <20170214222425.hbkfkeq3l6sveo7n@piout.net>
+ <e9c36a33f2a49df2a517db5869eaea7f@agner.ch>
+ <20170215110736.oumvvv7zordd2jdw@piout.net>
+ <3513b2c01d86ad7312522d6be97e766f@agner.ch>
+ <20170216104229.axwm3445yj6zrxoz@piout.net>
+ <CAOMZO5CeqipfNJxM2Pc1g1606OjbN83ZtbbGRZFmqE3q4fNpRw@mail.gmail.com>
+Message-ID: <20170216164038.zbl2nb76now3glkk@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mbus binding had been extended more than two years ago, but the
-device tree files for Armada 38x didn't change.
+On 16/02/2017 at 13:36:28 -0200, Fabio Estevam wrote:
+> Hi Alexandre,
+> 
+> On Thu, Feb 16, 2017 at 8:42 AM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+> 
+> > I confirm it is the culprit.
+> 
+> Does this mean that PCM3168s codec works fine on imx7 using SAI on
+> 4.9.x plus the revert?
 
-Adding this third entry will allow the mbus going to suspend which was
-the last thing preventing the SoC going to standby mode
+It does work after the revert but the driver needs a small modification
+to accommodate TDM instead of i2s. I'll send that.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/armada-38x.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index c558a5d6a21f..ba27ec104981 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -360,7 +360,8 @@
- 
- 			mbusc: mbus-controller at 20000 {
- 				compatible = "marvell,mbus-controller";
--				reg = <0x20000 0x100>, <0x20180 0x20>;
-+				reg = <0x20000 0x100>, <0x20180 0x20>,
-+				      <0x20250 0x8>;
- 			};
- 
- 			mpic: interrupt-controller at 20a00 {
 -- 
-2.11.0
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
