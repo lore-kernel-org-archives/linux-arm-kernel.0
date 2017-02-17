@@ -1,106 +1,188 @@
 From: joe@perches.com (Joe Perches)
-Date: Thu, 16 Feb 2017 23:11:16 -0800
-Subject: [PATCH 03/35] arm64: Convert remaining uses of pr_warning to pr_warn
-In-Reply-To: <cover.1487314666.git.joe@perches.com>
-References: <cover.1487314666.git.joe@perches.com>
-Message-ID: <74c2cc72b91dbe639f153c601900f7f46a920fb9.1487314666.git.joe@perches.com>
+Date: Thu, 16 Feb 2017 23:11:13 -0800
+Subject: [PATCH 00/35] treewide trivial patches converting pr_warning to
+ pr_warn
+Message-ID: <cover.1487314666.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable eventual removal of pr_warning
+There are ~4300 uses of pr_warn and ~250 uses of the older
+pr_warning in the kernel source tree.
 
-This makes pr_warn use consistent for arch/arm64
+Make the use of pr_warn consistent across all kernel files.
 
-Prior to this patch, there were 7 uses of pr_warning and
-27 uses of pr_warn in arch/arm64
+This excludes all files in tools/ as there is a separate
+define pr_warning for that directory tree and pr_warn is
+not used in tools/.
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
- arch/arm64/include/asm/syscall.h  | 8 ++++----
- arch/arm64/kernel/hw_breakpoint.c | 8 ++++----
- arch/arm64/kernel/smp.c           | 4 ++--
- 3 files changed, 10 insertions(+), 10 deletions(-)
+Done with 'sed s/\bpr_warning\b/pr_warn/' and some emacsing.
 
-diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
-index 709a574468f0..231f2c3fcf81 100644
---- a/arch/arm64/include/asm/syscall.h
-+++ b/arch/arm64/include/asm/syscall.h
-@@ -68,8 +68,8 @@ static inline void syscall_get_arguments(struct task_struct *task,
- 	if (i + n > SYSCALL_MAX_ARGS) {
- 		unsigned long *args_bad = args + SYSCALL_MAX_ARGS - i;
- 		unsigned int n_bad = n + i - SYSCALL_MAX_ARGS;
--		pr_warning("%s called with max args %d, handling only %d\n",
--			   __func__, i + n, SYSCALL_MAX_ARGS);
-+		pr_warn("%s called with max args %d, handling only %d\n",
-+			__func__, i + n, SYSCALL_MAX_ARGS);
- 		memset(args_bad, 0, n_bad * sizeof(args[0]));
- 	}
- 
-@@ -92,8 +92,8 @@ static inline void syscall_set_arguments(struct task_struct *task,
- 		return;
- 
- 	if (i + n > SYSCALL_MAX_ARGS) {
--		pr_warning("%s called with max args %d, handling only %d\n",
--			   __func__, i + n, SYSCALL_MAX_ARGS);
-+		pr_warn("%s called with max args %d, handling only %d\n",
-+			__func__, i + n, SYSCALL_MAX_ARGS);
- 		n = SYSCALL_MAX_ARGS - i;
- 	}
- 
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index 0296e7924240..6fa79ffd0c43 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -62,7 +62,7 @@ int hw_breakpoint_slots(int type)
- 	case TYPE_DATA:
- 		return get_num_wrps();
- 	default:
--		pr_warning("unknown slot type: %d\n", type);
-+		pr_warn("unknown slot type: %d\n", type);
- 		return 0;
- 	}
- }
-@@ -123,7 +123,7 @@ static u64 read_wb_reg(int reg, int n)
- 	GEN_READ_WB_REG_CASES(AARCH64_DBG_REG_WVR, AARCH64_DBG_REG_NAME_WVR, val);
- 	GEN_READ_WB_REG_CASES(AARCH64_DBG_REG_WCR, AARCH64_DBG_REG_NAME_WCR, val);
- 	default:
--		pr_warning("attempt to read from unknown breakpoint register %d\n", n);
-+		pr_warn("attempt to read from unknown breakpoint register %d\n", n);
- 	}
- 
- 	return val;
-@@ -138,7 +138,7 @@ static void write_wb_reg(int reg, int n, u64 val)
- 	GEN_WRITE_WB_REG_CASES(AARCH64_DBG_REG_WVR, AARCH64_DBG_REG_NAME_WVR, val);
- 	GEN_WRITE_WB_REG_CASES(AARCH64_DBG_REG_WCR, AARCH64_DBG_REG_NAME_WCR, val);
- 	default:
--		pr_warning("attempt to write to unknown breakpoint register %d\n", n);
-+		pr_warn("attempt to write to unknown breakpoint register %d\n", n);
- 	}
- 	isb();
- }
-@@ -156,7 +156,7 @@ static enum dbg_active_el debug_exception_level(int privilege)
- 	case AARCH64_BREAKPOINT_EL1:
- 		return DBG_ACTIVE_EL1;
- 	default:
--		pr_warning("invalid breakpoint privilege level %d\n", privilege);
-+		pr_warn("invalid breakpoint privilege level %d\n", privilege);
- 		return -EINVAL;
- 	}
- }
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 827d52d78b67..9c396e34c090 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -925,8 +925,8 @@ void smp_send_stop(void)
- 		udelay(1);
- 
- 	if (num_online_cpus() > 1)
--		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
--			   cpumask_pr_args(cpu_online_mask));
-+		pr_warn("SMP: failed to stop secondary CPUs %*pbl\n",
-+			cpumask_pr_args(cpu_online_mask));
- }
- 
- /*
+Miscellanea:
+
+o Coalesce formats and realign arguments
+
+Some files not compiled - no cross-compilers
+
+Joe Perches (35):
+  alpha: Convert remaining uses of pr_warning to pr_warn
+  ARM: ep93xx: Convert remaining uses of pr_warning to pr_warn
+  arm64: Convert remaining uses of pr_warning to pr_warn
+  arch/blackfin: Convert remaining uses of pr_warning to pr_warn
+  ia64: Convert remaining use of pr_warning to pr_warn
+  powerpc: Convert remaining uses of pr_warning to pr_warn
+  sh: Convert remaining uses of pr_warning to pr_warn
+  sparc: Convert remaining use of pr_warning to pr_warn
+  x86: Convert remaining uses of pr_warning to pr_warn
+  drivers/acpi: Convert remaining uses of pr_warning to pr_warn
+  block/drbd: Convert remaining uses of pr_warning to pr_warn
+  gdrom: Convert remaining uses of pr_warning to pr_warn
+  drivers/char: Convert remaining use of pr_warning to pr_warn
+  clocksource: Convert remaining use of pr_warning to pr_warn
+  drivers/crypto: Convert remaining uses of pr_warning to pr_warn
+  fmc: Convert remaining use of pr_warning to pr_warn
+  drivers/gpu: Convert remaining uses of pr_warning to pr_warn
+  drivers/ide: Convert remaining uses of pr_warning to pr_warn
+  drivers/input: Convert remaining uses of pr_warning to pr_warn
+  drivers/isdn: Convert remaining uses of pr_warning to pr_warn
+  drivers/macintosh: Convert remaining uses of pr_warning to pr_warn
+  drivers/media: Convert remaining use of pr_warning to pr_warn
+  drivers/mfd: Convert remaining uses of pr_warning to pr_warn
+  drivers/mtd: Convert remaining uses of pr_warning to pr_warn
+  drivers/of: Convert remaining uses of pr_warning to pr_warn
+  drivers/oprofile: Convert remaining uses of pr_warning to pr_warn
+  drivers/platform: Convert remaining uses of pr_warning to pr_warn
+  drivers/rapidio: Convert remaining use of pr_warning to pr_warn
+  drivers/scsi: Convert remaining use of pr_warning to pr_warn
+  drivers/sh: Convert remaining use of pr_warning to pr_warn
+  drivers/tty: Convert remaining uses of pr_warning to pr_warn
+  drivers/video: Convert remaining uses of pr_warning to pr_warn
+  kernel/trace: Convert remaining uses of pr_warning to pr_warn
+  lib: Convert remaining uses of pr_warning to pr_warn
+  sound/soc: Convert remaining uses of pr_warning to pr_warn
+
+ arch/alpha/kernel/perf_event.c                     |  4 +-
+ arch/arm/mach-ep93xx/core.c                        |  4 +-
+ arch/arm64/include/asm/syscall.h                   |  8 ++--
+ arch/arm64/kernel/hw_breakpoint.c                  |  8 ++--
+ arch/arm64/kernel/smp.c                            |  4 +-
+ arch/blackfin/kernel/nmi.c                         |  2 +-
+ arch/blackfin/kernel/ptrace.c                      |  2 +-
+ arch/blackfin/mach-bf533/boards/stamp.c            |  2 +-
+ arch/blackfin/mach-bf537/boards/cm_bf537e.c        |  2 +-
+ arch/blackfin/mach-bf537/boards/cm_bf537u.c        |  2 +-
+ arch/blackfin/mach-bf537/boards/stamp.c            |  2 +-
+ arch/blackfin/mach-bf537/boards/tcm_bf537.c        |  2 +-
+ arch/blackfin/mach-bf561/boards/cm_bf561.c         |  2 +-
+ arch/blackfin/mach-bf561/boards/ezkit.c            |  2 +-
+ arch/blackfin/mm/isram-driver.c                    |  4 +-
+ arch/ia64/kernel/setup.c                           |  6 +--
+ arch/powerpc/kernel/pci-common.c                   |  4 +-
+ arch/powerpc/mm/init_64.c                          |  5 +--
+ arch/powerpc/mm/mem.c                              |  3 +-
+ arch/powerpc/platforms/512x/mpc512x_shared.c       |  4 +-
+ arch/powerpc/platforms/85xx/socrates_fpga_pic.c    |  7 ++--
+ arch/powerpc/platforms/86xx/mpc86xx_hpcn.c         |  2 +-
+ arch/powerpc/platforms/pasemi/dma_lib.c            |  4 +-
+ arch/powerpc/platforms/powernv/opal.c              |  8 ++--
+ arch/powerpc/platforms/powernv/pci-ioda.c          | 10 ++---
+ arch/powerpc/platforms/ps3/device-init.c           | 14 +++----
+ arch/powerpc/platforms/ps3/mm.c                    |  4 +-
+ arch/powerpc/platforms/ps3/os-area.c               |  2 +-
+ arch/powerpc/platforms/pseries/iommu.c             |  8 ++--
+ arch/powerpc/platforms/pseries/setup.c             |  4 +-
+ arch/powerpc/sysdev/fsl_pci.c                      |  9 ++---
+ arch/powerpc/sysdev/mpic.c                         | 10 ++---
+ arch/powerpc/sysdev/xics/icp-native.c              | 10 ++---
+ arch/powerpc/sysdev/xics/ics-opal.c                |  4 +-
+ arch/powerpc/sysdev/xics/ics-rtas.c                |  4 +-
+ arch/powerpc/sysdev/xics/xics-common.c             |  8 ++--
+ arch/sh/boards/mach-sdk7786/nmi.c                  |  2 +-
+ arch/sh/drivers/pci/fixups-sdk7786.c               |  2 +-
+ arch/sh/kernel/io_trapped.c                        |  2 +-
+ arch/sh/kernel/setup.c                             |  2 +-
+ arch/sh/mm/consistent.c                            |  5 +--
+ arch/sparc/kernel/smp_64.c                         |  5 +--
+ arch/x86/kernel/amd_gart_64.c                      | 12 ++----
+ arch/x86/kernel/apic/apic.c                        | 46 ++++++++++------------
+ arch/x86/kernel/apic/apic_noop.c                   |  2 +-
+ arch/x86/kernel/setup_percpu.c                     |  4 +-
+ arch/x86/kernel/tboot.c                            | 15 ++++---
+ arch/x86/kernel/tsc_sync.c                         |  8 ++--
+ arch/x86/mm/kmmio.c                                |  8 ++--
+ arch/x86/mm/mmio-mod.c                             |  5 +--
+ arch/x86/mm/numa.c                                 | 12 +++---
+ arch/x86/mm/numa_emulation.c                       |  6 +--
+ arch/x86/mm/testmmiotrace.c                        |  5 +--
+ arch/x86/oprofile/op_x86_model.h                   |  6 +--
+ arch/x86/platform/olpc/olpc-xo15-sci.c             |  2 +-
+ arch/x86/platform/sfi/sfi.c                        |  3 +-
+ arch/x86/xen/debugfs.c                             |  2 +-
+ arch/x86/xen/setup.c                               |  2 +-
+ drivers/acpi/apei/apei-base.c                      | 32 +++++++--------
+ drivers/acpi/apei/einj.c                           |  4 +-
+ drivers/acpi/apei/erst-dbg.c                       |  4 +-
+ drivers/acpi/apei/ghes.c                           | 30 +++++++-------
+ drivers/acpi/apei/hest.c                           | 10 ++---
+ drivers/acpi/resource.c                            |  4 +-
+ drivers/block/drbd/drbd_nl.c                       | 13 +++---
+ drivers/cdrom/gdrom.c                              |  4 +-
+ drivers/char/virtio_console.c                      |  2 +-
+ drivers/clocksource/samsung_pwm_timer.c            |  4 +-
+ drivers/crypto/n2_core.c                           | 12 +++---
+ drivers/fmc/fmc-fakedev.c                          |  2 +-
+ drivers/gpu/drm/amd/powerplay/hwmgr/smu7_hwmgr.c   |  2 +-
+ drivers/gpu/drm/amd/powerplay/inc/pp_debug.h       |  2 +-
+ drivers/gpu/drm/amd/powerplay/smumgr/fiji_smc.c    |  4 +-
+ drivers/gpu/drm/amd/powerplay/smumgr/iceland_smc.c | 14 +++----
+ .../gpu/drm/amd/powerplay/smumgr/polaris10_smc.c   |  4 +-
+ drivers/gpu/drm/amd/powerplay/smumgr/tonga_smc.c   |  4 +-
+ drivers/ide/tx4938ide.c                            |  2 +-
+ drivers/ide/tx4939ide.c                            |  5 +--
+ drivers/input/gameport/gameport.c                  |  4 +-
+ drivers/input/joystick/gamecon.c                   |  3 +-
+ drivers/input/misc/apanel.c                        |  3 +-
+ drivers/input/misc/xen-kbdfront.c                  |  8 ++--
+ drivers/input/serio/serio.c                        |  8 ++--
+ drivers/isdn/gigaset/interface.c                   |  2 +-
+ drivers/isdn/hardware/mISDN/avmfritz.c             | 17 ++++----
+ drivers/isdn/hardware/mISDN/hfcmulti.c             |  8 ++--
+ drivers/isdn/hardware/mISDN/hfcpci.c               |  4 +-
+ drivers/isdn/hardware/mISDN/hfcsusb.c              |  4 +-
+ drivers/isdn/hardware/mISDN/mISDNipac.c            |  4 +-
+ drivers/isdn/hardware/mISDN/mISDNisar.c            | 10 ++---
+ drivers/isdn/hardware/mISDN/netjet.c               |  8 ++--
+ drivers/isdn/hardware/mISDN/w6692.c                | 12 +++---
+ drivers/isdn/mISDN/hwchannel.c                     |  8 ++--
+ drivers/macintosh/windfarm_fcu_controls.c          |  5 +--
+ drivers/macintosh/windfarm_lm87_sensor.c           |  4 +-
+ drivers/macintosh/windfarm_pm72.c                  | 22 +++++------
+ drivers/macintosh/windfarm_rm31.c                  |  6 +--
+ drivers/media/platform/sh_vou.c                    |  4 +-
+ drivers/mfd/db8500-prcmu.c                         |  2 +-
+ drivers/mfd/sta2x11-mfd.c                          |  4 +-
+ drivers/mfd/twl4030-power.c                        |  7 +---
+ drivers/mtd/chips/cfi_cmdset_0002.c                | 12 ++++--
+ drivers/mtd/nand/cmx270_nand.c                     |  4 +-
+ drivers/mtd/ofpart.c                               |  4 +-
+ drivers/of/fdt.c                                   | 20 +++++-----
+ drivers/oprofile/oprofile_perf.c                   |  8 ++--
+ drivers/platform/x86/asus-laptop.c                 |  2 +-
+ drivers/platform/x86/eeepc-laptop.c                |  2 +-
+ drivers/platform/x86/intel_oaktrail.c              | 10 ++---
+ drivers/rapidio/rio-sysfs.c                        |  4 +-
+ drivers/scsi/a3000.c                               |  2 +-
+ drivers/sh/intc/core.c                             |  4 +-
+ drivers/tty/hvc/hvcs.c                             |  2 +-
+ drivers/tty/tty_io.c                               |  4 +-
+ drivers/video/fbdev/aty/radeon_base.c              |  4 +-
+ drivers/video/fbdev/core/fbmon.c                   |  4 +-
+ drivers/video/fbdev/pxafb.c                        |  7 ++--
+ kernel/trace/trace_benchmark.c                     |  4 +-
+ lib/cpu_rmap.c                                     |  2 +-
+ lib/dma-debug.c                                    |  2 +-
+ sound/soc/fsl/imx-audmux.c                         |  6 +--
+ sound/soc/samsung/s3c-i2s-v2.c                     |  6 +--
+ 122 files changed, 367 insertions(+), 397 deletions(-)
+
 -- 
 2.10.0.rc2.1.g053435c
