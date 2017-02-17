@@ -1,49 +1,57 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Fri, 17 Feb 2017 09:24:39 +0100
-Subject: [PATCH v2] i2c: at91: ensure state is restored after suspending
-In-Reply-To: <20170216172759.27837-1-alexandre.belloni@free-electrons.com>
-References: <20170216172759.27837-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170217082439.mcfxoccwiwoj5ako@rfolt0960.corp.atmel.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 17 Feb 2017 09:34:36 +0100
+Subject: [PATCH v4 18/36] media: Add i.MX media core driver
+In-Reply-To: <c22dfd68-a41c-08d2-4b8d-c7ee1884ea31@gmail.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-19-git-send-email-steve_longerbeam@mentor.com>
+ <1487250123.2377.53.camel@pengutronix.de>
+ <c22dfd68-a41c-08d2-4b8d-c7ee1884ea31@gmail.com>
+Message-ID: <1487320476.3107.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 06:27:59PM +0100, Alexandre Belloni wrote:
-> When going to suspend, the I2C registers may be lost because the power to
-> VDDcore is cut. Restore them when resuming.
+On Thu, 2017-02-16 at 17:33 -0800, Steve Longerbeam wrote:
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> On 02/16/2017 05:02 AM, Philipp Zabel wrote:
+> > On Wed, 2017-02-15 at 18:19 -0800, Steve Longerbeam wrote:
+> <snip>
+> >> +
+> >> +- Clean up and move the ov5642 subdev driver to drivers/media/i2c, and
+> >> +  create the binding docs for it.
+> >
+> > This is done already, right?
+> 
+> 
+> I cleaned up ov5640 and moved it to drivers/media/i2c with binding docs,
+> but not the ov5642 yet.
 
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+Ok, thanks.
 
-> ---
-> Changes in v2:
->  - don't cache unecessary registers and simply call at91_init_twi_bus()
+> >> +- The Frame Interval Monitor could be exported to v4l2-core for
+> >> +  general use.
+> >> +
+> >> +- The subdev that is the original source of video data (referred to as
+> >> +  the "sensor" in the code), is called from various subdevs in the
+> >> +  pipeline in order to set/query the video standard ({g|s|enum}_std)
+> >> +  and to get/set the original frame interval from the capture interface
+> >> +  ([gs]_parm). Instead, the entities that need this info should call its
+> >> +  direct neighbor, and the neighbor should propagate the call to its
+> >> +  neighbor in turn if necessary.
+> >
+> > Especially the [gs]_parm fix is necessary to present userspace with the
+> > correct frame interval in case of frame skipping in the CSI.
 > 
 > 
->  drivers/i2c/busses/i2c-at91.c | 3 +++
->  1 file changed, 3 insertions(+)
+> Right, understood. I've added this to list of fixes for version 5.
 > 
-> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-> index 0b86c6173e07..c925a690cb32 100644
-> --- a/drivers/i2c/busses/i2c-at91.c
-> +++ b/drivers/i2c/busses/i2c-at91.c
-> @@ -1180,6 +1180,7 @@ static int at91_twi_suspend_noirq(struct device *dev)
->  
->  static int at91_twi_resume_noirq(struct device *dev)
->  {
-> +	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
->  	int ret;
->  
->  	if (!pm_runtime_status_suspended(dev)) {
-> @@ -1191,6 +1192,8 @@ static int at91_twi_resume_noirq(struct device *dev)
->  	pm_runtime_mark_last_busy(dev);
->  	pm_request_autosuspend(dev);
->  
-> +	at91_init_twi_bus(twi_dev);
-> +
->  	return 0;
->  }
->  
-> -- 
-> 2.11.0
-> 
+> What a pain though! It means propagating every call to g_frame_interval
+> upstream until a subdev "that cares" returns ret == 0 or
+> ret != -ENOIOCTLCMD. And that goes for any other chained subdev call
+> as well.
+
+Not at all. Since the frame interval is a property of the pad, that had
+to be propagated downstream by media-ctl along with media bus format,
+frame size, and colorimetry earlier.
+
+regards
+Philipp
