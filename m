@@ -1,55 +1,147 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 17 Feb 2017 18:00:53 +0100
-Subject: Pointers for writing a good PCIe driver
-In-Reply-To: <20170217143803.GA10663@bhelgaas-glaptop.roam.corp.google.com>
-References: <ff099b5f-efc8-bb5f-41e3-493398844cc0@free.fr>
- <05046a8a-ba9f-26f9-4c93-f657f9da6294@free.fr>
- <20170207200656.GA11659@bhelgaas-glaptop.roam.corp.google.com>
- <20170207214758.GC11659@bhelgaas-glaptop.roam.corp.google.com>
- <0f22720c-e47d-59f6-b5f7-5e40f4a1759d@free.fr>
- <20170212165033.GA31833@kroah.com>
- <0d785dab-c830-b887-d9f3-a2cd5338695c@free.fr>
- <20170217143803.GA10663@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <eff9861e-043a-7ecd-5d52-c8e18a52ece8@free.fr>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Fri, 17 Feb 2017 09:04:59 -0800
+Subject: [PATCH v2 03/22] PCI: endpoint: Introduce configfs entry for
+ configuring EP functions
+In-Reply-To: <1487325042-28227-4-git-send-email-kishon@ti.com>
+References: <1487325042-28227-1-git-send-email-kishon@ti.com>
+ <1487325042-28227-4-git-send-email-kishon@ti.com>
+Message-ID: <20170217170459.GA15276@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/02/2017 15:38, Bjorn Helgaas wrote:
-
-> On Fri, Feb 17, 2017 at 10:20:20AM +0100, Mason wrote:
->
->> There might be some kind of misunderstanding.
->>
->> I don't plan to write a driver for a device that plugs into a PCIe slot.
->>
->> I intend to write a driver for the PCIe controller itself, which is
->> embedded in the SoC. (In order to support different types of PCIe
->> devices, with their respective drivers already upstream.)
->>
->> I think the controller driver belongs in drivers/pci/host ?
+On Fri, Feb 17, 2017 at 03:20:23PM +0530, Kishon Vijay Abraham I wrote:
+> Introduce a new configfs entry to configure the EP function (like
+> configuring the standard configuration header entries) and to
+> bind the EP function with EP controller.
 > 
-> Sorry, I indeed misunderstood you.
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/pci/endpoint/Kconfig      |   14 +-
+>  drivers/pci/endpoint/Makefile     |    1 +
+>  drivers/pci/endpoint/pci-ep-cfs.c |  427 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 440 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/pci/endpoint/pci-ep-cfs.c
 > 
-> The native PCI host controller drivers indeed live in
-> drivers/pci/host/.
-> 
-> I don't know anything about your hardware or environment, but I highly
-> encourage you to use ACPI (drivers/acpi/pci_root.c, with a little bit
-> of arch support) or generic DT (drivers/pci/host/pci-host-generic.c)
-> instead of writing a custom host controller driver.
-> 
-> The native drivers in drivers/pci/host are a huge maintenance hassle
-> for no real benefit.
+> diff --git a/drivers/pci/endpoint/Kconfig b/drivers/pci/endpoint/Kconfig
+> index 7eb1c79..8470f0b 100644
+> --- a/drivers/pci/endpoint/Kconfig
+> +++ b/drivers/pci/endpoint/Kconfig
+> @@ -6,7 +6,6 @@ menu "PCI Endpoint"
+>  
+>  config PCI_ENDPOINT
+>  	bool "PCI Endpoint Support"
+> -	select CONFIGFS_FS
+>  	help
+>  	   Enable this configuration option to support configurable PCI
+>  	   endpoint. This should be enabled if the platform has a PCI
+> @@ -14,8 +13,19 @@ config PCI_ENDPOINT
+>  
+>  	   Enabling this option will build the endpoint library, which
+>  	   includes endpoint controller library and endpoint function
+> -	   library.
+> +	   library. This will also enable the configfs entry required to
+> +	   configure the endpoint function and used to bind the
+> +	   function with a endpoint controller.
+>  
+>  	   If in doubt, say "N" to disable Endpoint support.
+>  
+> +config PCI_ENDPOINT_CONFIGFS
+> +	bool "PCI Endpoint Configfs Support"
+> +	depends on PCI_ENDPOINT
+> +	select CONFIGFS_FS
+> +	help
+> +	   This will enable the configfs entry that can be used to
+> +	   configure the endpoint function and used to bind the
+> +	   function with a endpoint controller.
+> +
+>  endmenu
+> diff --git a/drivers/pci/endpoint/Makefile b/drivers/pci/endpoint/Makefile
+> index dc1bc16..dd9163c 100644
+> --- a/drivers/pci/endpoint/Makefile
+> +++ b/drivers/pci/endpoint/Makefile
+> @@ -4,3 +4,4 @@
+>  
+>  obj-$(CONFIG_PCI_ENDPOINT)		+= pci-epc-core.o pci-epf-core.o\
+>  					   pci-epc-mem.o
+> +obj-$(CONFIG_PCI_ENDPOINT_CONFIGFS)	+= pci-ep-cfs.o
+> diff --git a/drivers/pci/endpoint/pci-ep-cfs.c b/drivers/pci/endpoint/pci-ep-cfs.c
+> new file mode 100644
+> index 0000000..ed0f8c2
+> --- /dev/null
+> +++ b/drivers/pci/endpoint/pci-ep-cfs.c
+> @@ -0,0 +1,427 @@
+> +/**
+> + * configfs to configure the PCI endpoint
+> + *
+> + * Copyright (C) 2017 Texas Instruments
+> + * Author: Kishon Vijay Abraham I <kishon@ti.com>
+> + *
+> + * This program is free software: you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 of
+> + * the License as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/configfs.h>
+> +#include <linux/module.h>
+> +#include <linux/slab.h>
+> +
+> +#include <linux/pci-epc.h>
+> +#include <linux/pci-epf.h>
+> +
+> +struct pci_epf_info {
+> +	struct config_group group;
+> +	struct list_head list;
+> +	struct pci_epf *epf;
+> +};
+> +
+> +struct pci_ep_info {
+> +	struct config_group group;
+> +	struct config_group pci_epf_group;
+> +	/* mutex to protect pci_epf list */
+> +	struct mutex lock;
+> +	struct list_head pci_epf;
+> +	const char *epc_name;
+> +	struct pci_epc *epc;
+> +};
+> +
+> +static inline struct pci_epf_info *to_pci_epf_info(struct config_item *item)
+> +{
+> +	return container_of(to_config_group(item), struct pci_epf_info, group);
+> +}
+> +
+> +static inline struct pci_ep_info *to_pci_ep_info(struct config_item *item)
+> +{
+> +	return container_of(to_config_group(item), struct pci_ep_info, group);
+> +}
+> +
+> +#define PCI_EPF_HEADER_R(_name)						       \
+> +static ssize_t pci_epf_##_name##_show(struct config_item *item,	char *page)    \
+> +{									       \
+> +	struct pci_epf *epf = to_pci_epf_info(item)->epf;		       \
+> +	if (!epf->header) {						       \
+> +		WARN_ON_ONCE("epf device not bound to function driver\n");     \
 
-My SoC is built around an ARM Cortex A9.
-I don't think (?) this platform has any support for ACPI.
+WARN_ON_ONCE takes a string to evaluate as argument, not a message
 
-I'm currently using this DT description:
-http://lxr.free-electrons.com/source/arch/arm/boot/dts/tango4-common.dtsi
+> +		return 0;					
 
-The "legacy" driver sits at ~700 lines. It would be awesome to be able
-to discard all of it, and rely on generic upstream code. But I don't
-understand how it is possible for a generic driver to support whatever
-crazy solution some random vendor has come up with?
+and if we return 0 here the callers will retry because that is
+interpreted as a short read.  The code should be something like:
 
-Regards.
+	if (WARN_ON_ONCE(!epf->header))
+		return -EINVAL;
+
+> +	if (!epf->header) {						       \
+> +		WARN_ON_ONCE("epf device not bound to function driver\n");     \
+> +		return 0;						       \
+> +	}								       \
+
+Same here, and a couple more instances down below.
