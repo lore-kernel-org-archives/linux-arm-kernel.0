@@ -1,99 +1,109 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 17 Feb 2017 18:45:03 +0530
-Subject: [PATCH v2 08/22] PCI: dwc: designware: Add EP mode support
-In-Reply-To: <1487325042-28227-9-git-send-email-kishon@ti.com>
-References: <1487325042-28227-1-git-send-email-kishon@ti.com>
- <1487325042-28227-9-git-send-email-kishon@ti.com>
-Message-ID: <58A6F757.2060705@ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 17 Feb 2017 18:45:51 +0530
+Subject: [PATCH 4/4] ARM: davinci: add pdata-quirks for da850-evm vpif
+ display
+In-Reply-To: <1487269285-6948-5-git-send-email-bgolaszewski@baylibre.com>
+References: <1487269285-6948-1-git-send-email-bgolaszewski@baylibre.com>
+ <1487269285-6948-5-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <42c3c8dc-9681-0f4b-e43c-ae95197c727d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Friday 17 February 2017 03:20 PM, Kishon Vijay Abraham I wrote:
-> Add endpoint mode support to designware driver. This uses the
-> EP Core layer introduced recently to add endpoint mode support.
-> *Any* function driver can now use this designware device
-> in order to achieve the EP functionality.
+On Thursday 16 February 2017 11:51 PM, Bartosz Golaszewski wrote:
+> Similarly to vpif capture: we need to register the vpif display driver
+> and the corresponding adv7343 encoder in pdata-quirks as the DT
+> support is not complete - there isn't currently a way to define the
+> output_routing in the V4L2 drivers (c.f. s_routing) via DT.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
 > ---
->  drivers/pci/dwc/Kconfig              |    5 +
->  drivers/pci/dwc/Makefile             |    1 +
->  drivers/pci/dwc/pcie-designware-ep.c |  342 ++++++++++++++++++++++++++++++++++
->  drivers/pci/dwc/pcie-designware.c    |   51 +++++
->  drivers/pci/dwc/pcie-designware.h    |   72 +++++++
->  5 files changed, 471 insertions(+)
->  create mode 100644 drivers/pci/dwc/pcie-designware-ep.c
+>  arch/arm/mach-davinci/pdata-quirks.c | 69 +++++++++++++++++++++++++++++++++++-
+>  1 file changed, 68 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/pci/dwc/Kconfig b/drivers/pci/dwc/Kconfig
-> index dfb8a69..00335c7 100644
-> --- a/drivers/pci/dwc/Kconfig
-> +++ b/drivers/pci/dwc/Kconfig
-> @@ -9,6 +9,11 @@ config PCIE_DW_HOST
->  	depends on PCI_MSI_IRQ_DOMAIN
->          select PCIE_DW
+> diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
+> index 3ca773f..c659c76 100644
+> --- a/arch/arm/mach-davinci/pdata-quirks.c
+> +++ b/arch/arm/mach-davinci/pdata-quirks.c
+
+> +#endif /* IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) */
 >  
-> +config PCIE_DW_EP
-> +	bool
-> +	depends on PCI_ENDPOINT
-> +	select PCIE_DW
+> +#if IS_ENABLED(CONFIG_DA850_UI_SD_VIDEO_PORT)
+> +static struct adv7343_platform_data adv7343_pdata = {
+> +	.mode_config = {
+> +		.dac = { 1, 1, 1 },
+> +	},
+> +	.sd_config = {
+> +		.sd_dac_out = { 1 },
+> +	},
+> +};
 > +
->  config PCI_DRA7XX
->  	bool "TI DRA7xx PCIe controller"
->  	depends on PCI
-> diff --git a/drivers/pci/dwc/Makefile b/drivers/pci/dwc/Makefile
-> index a2df13c..b38425d 100644
-> --- a/drivers/pci/dwc/Makefile
-> +++ b/drivers/pci/dwc/Makefile
-> @@ -1,5 +1,6 @@
->  obj-$(CONFIG_PCIE_DW) += pcie-designware.o
->  obj-$(CONFIG_PCIE_DW_HOST) += pcie-designware-host.o
-> +obj-$(CONFIG_PCIE_DW_EP) += pcie-designware-ep.o
->  obj-$(CONFIG_PCIE_DW_PLAT) += pcie-designware-plat.o
->  obj-$(CONFIG_PCI_DRA7XX) += pci-dra7xx.o
->  obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
-> diff --git a/drivers/pci/dwc/pcie-designware-ep.c b/drivers/pci/dwc/pcie-designware-ep.c
-> new file mode 100644
-> index 0000000..e465c5e
-> --- /dev/null
-> +++ b/drivers/pci/dwc/pcie-designware-ep.c
-> @@ -0,0 +1,342 @@
-> +/**
-> + * Synopsys Designware PCIe Endpoint controller driver
-> + *
-> + * Copyright (C) 2017 Texas Instruments
-> + * Author: Kishon Vijay Abraham I <kishon@ti.com>
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 of
-> + * the License as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
+> +static struct vpif_subdev_info da850_vpif_subdev[] = {
+> +	{
+> +		.name = "adv7343",
+> +		.board_info = {
+> +			I2C_BOARD_INFO("adv7343", 0x2a),
+> +			.platform_data = &adv7343_pdata,
+> +		},
+> +	},
+> +};
 > +
-> +#include <linux/of.h>
+> +static const struct vpif_output da850_ch0_outputs[] = {
+> +	{
+> +		.output = {
+> +			.index = 0,
+> +			.name = "Composite",
+> +			.type = V4L2_OUTPUT_TYPE_ANALOG,
+> +			.capabilities = V4L2_OUT_CAP_STD,
+> +			.std = V4L2_STD_ALL,
+> +		},
+> +		.subdev_name = "adv7343",
+> +		.output_route = ADV7343_COMPOSITE_ID,
+> +	},
+> +	{
+> +		.output = {
+> +			.index = 1,
+> +			.name = "S-Video",
+> +			.type = V4L2_OUTPUT_TYPE_ANALOG,
+> +			.capabilities = V4L2_OUT_CAP_STD,
+> +			.std = V4L2_STD_ALL,
+> +		},
+> +		.subdev_name = "adv7343",
+> +		.output_route = ADV7343_SVIDEO_ID,
+> +	},
+> +};
 > +
-> +#include "pcie-designware.h"
-> +#include <linux/pci-epc.h>
-> +#include <linux/pci-epf.h>
+> +static struct vpif_display_config da850_vpif_display_config = {
+> +	.subdevinfo   = da850_vpif_subdev,
+> +	.subdev_count = ARRAY_SIZE(da850_vpif_subdev),
+> +	.chan_config[0] = {
+> +		.outputs = da850_ch0_outputs,
+> +		.output_count = ARRAY_SIZE(da850_ch0_outputs),
+> +	},
+> +	.card_name    = "DA850/OMAP-L138 Video Display",
+> +};
+> +#endif /* defined(CONFIG_DA850_UI_SD_VIDEO_PORT) */
 > +
-> +void dw_pcie_ep_linkup(struct dw_pcie_ep *ep)
-> +{
-> +	struct pci_epc *epc = ep->epc;
-> +	struct pci_epf *epf;
+> +#if IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) || IS_ENABLED(CONFIG_DA850_UI_SD_VIDEO_PORT)
+>  static void __init da850_vpif_legacy_init(void)
+>  {
+>  	int ret;
+> @@ -119,8 +178,16 @@ static void __init da850_vpif_legacy_init(void)
+>  	if (ret)
+>  		pr_warn("%s: VPIF capture setup failed: %d\n",
+>  			__func__, ret);
 > +
-> +	list_for_each_entry(epf, &epc->pci_epf, list)
-> +		pci_epf_linkup(epf);
+> +	/* LCDK doesn't support VPIF display */
+> +	if (of_machine_is_compatible("ti,da850-evm")) {
+> +		ret = da850_register_vpif_display(&da850_vpif_display_config);
 
-Just notices, the right place to use this list should be pci-epc-core. Will fix
-this in the next revision.
+This fails to build when CONFIG_DA850_UI_SD_VIDEO_PORT is switched off.
+Probably means you need separate functions for registering capture and
+display parts.
 
-Thanks
-Kishon
+I haven't reviewed rest of the patchset yet. Just noticed these while
+applying them for some testing. You may want to wait sometime before
+sending the next version.
+
+Thanks,
+Sekhar
