@@ -1,54 +1,41 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Feb 2017 12:32:49 +0000
-Subject: [BOOTWRAPPER PATCH 1/3] FDT.pm: add helper to get untranslated reg
-In-Reply-To: <1487334771-25789-1-git-send-email-mark.rutland@arm.com>
-References: <1487334771-25789-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1487334771-25789-2-git-send-email-mark.rutland@arm.com>
+Date: Fri, 17 Feb 2017 12:32:48 +0000
+Subject: [BOOTWRAPPER PATCH 0/3] Clean up CPU node management
+Message-ID: <1487334771-25789-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases, we'll want to parse a reg property that cannot be
-translated, e.g. for cpu nodes. Add a helper to extract the reg without
-attempting translation, factoring this logic out of
-Node::get_translated_reg().
+The bootwrapper still has some hard-coded assumptions regarding the
+model, assuming things match the old RTSM VE AEMv8-A model it was
+originally written for. Notably, by default it assumes a fixed
+configuration of CPU IDs.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- FDT.pm | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+We tried to bodge around this with the addition of the --with-cpu-ids
+option to the configure script, but in practice this turns out to be
+fragile, with a number of non-obvious failure modes.
 
-diff --git a/FDT.pm b/FDT.pm
-index b814ef8..f498f09 100755
---- a/FDT.pm
-+++ b/FDT.pm
-@@ -348,7 +348,7 @@ sub translate_address
- 	return undef;
- }
- 
--sub get_translated_reg
-+sub get_untranslated_reg
- {
- 	my $self = shift;
- 	my $idx = shift;
-@@ -361,7 +361,18 @@ sub get_translated_reg
- 
- 	return undef if ($off + $ac + $sc > $reg->num_cells());
- 
--	my ($addr, $size) = $reg->read_cell_list($off, [$ac, $sc]);
-+	return $reg->read_cell_list($off, [$ac, $sc]);
-+}
-+
-+sub get_translated_reg
-+{
-+	my $self = shift;
-+	my $idx = shift;
-+	my $parent = $self->{parent};
-+
-+	my ($addr, $size) = $self->get_untranslated_reg($idx);
-+
-+	return undef if (not defined($addr) && defined($size));
- 
- 	for (my $parent = $self->{parent}; $parent; $parent = $parent->{parent}) {
- 		last if (not defined($addr));
+These patches attempt to fix this properly, by dynamically detecting the
+set of CPUs from the DTB provided to the boot wrapper. The newly
+redundant --with-cpu-ids option is then removed.
+
+Thanks,
+Mark.
+
+Mark Rutland (3):
+  FDT.pm: add helper to get untranslated reg
+  FDT.pm: add helper to get a node's full path
+  Dynamically determine the set of CPUs
+
+ FDT.pm           | 34 ++++++++++++++++++++++++++++++++--
+ Makefile.am      | 14 ++++++--------
+ addpsci.pl       | 29 +++++++++++++++++++++++++++++
+ configure.ac     |  8 --------
+ findcpuids.pl    | 32 ++++++++++++++++++++++++++++++++
+ gen-cpu-nodes.sh | 24 ------------------------
+ 6 files changed, 99 insertions(+), 42 deletions(-)
+ create mode 100755 addpsci.pl
+ create mode 100755 findcpuids.pl
+ delete mode 100755 gen-cpu-nodes.sh
+
 -- 
 1.9.1
