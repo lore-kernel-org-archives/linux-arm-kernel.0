@@ -1,125 +1,51 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 17 Feb 2017 11:00:39 +0000
-Subject: [PATCH v2] arm64: print a fault message when attempting to write
- RO memory
-In-Reply-To: <20170217011959.26754-1-stephen.boyd@linaro.org>
-References: <20170217011959.26754-1-stephen.boyd@linaro.org>
-Message-ID: <58A6D7D7.1030704@arm.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Fri, 17 Feb 2017 11:01:10 +0000
+Subject: [BUGFIX PATCH V2 0/3] kprobes/arm: Improve kprobes
+ implementation on arm
+In-Reply-To: <148711844284.5814.10387227824715177703.stgit@devbox>
+References: <148711844284.5814.10387227824715177703.stgit@devbox>
+Message-ID: <1487329270.3113.5.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On 17/02/17 01:19, Stephen Boyd wrote:
-> If a page is marked read only we should print out that fact,
-> instead of printing out that there was a page fault. Right now we
-> get a cryptic error message that something went wrong with an
-> unhandled fault, but we don't evaluate the esr to figure out that
-> it was a read/write permission fault.
+On Wed, 2017-02-15 at 09:27 +0900, Masami Hiramatsu wrote:
+> Hi,
 > 
-> Instead of seeing:
+> Here is the 2nd version of the patches which improve kprobe
+> on arm implementation (a kind of bugfix). Version 1 is here;
 > 
->   Unable to handle kernel paging request at virtual address ffff000008e460d8
->   pgd = ffff800003504000
->   [ffff000008e460d8] *pgd=0000000083473003, *pud=0000000083503003, *pmd=0000000000000000
->   Internal error: Oops: 9600004f [#1] PREEMPT SMP
+> https://lkml.org/lkml/2017/2/13/538
 > 
-> we'll see:
+> In this version I didn't update the code, just update the
+> patch description according to Tixy's comment and add his Ack.
 > 
->   Unable to handle kernel write to read-only memory at virtual address ffff000008e760d8
->   pgd = ffff80003d3de000
->   [ffff000008e760d8] *pgd=0000000083472003, *pud=0000000083435003, *pmd=0000000000000000
->   Internal error: Oops: 9600004f [#1] PREEMPT SMP
+> Thank you,
+> 
+> ---
+> 
+> Masami Hiramatsu (3):
+>       kprobes/arm: Allow to handle reentered kprobe on single-stepping
+>       kprobes/arm: Skip single-stepping in recursing path if possible
+>       kprobes/arm: Fix the return address of multiple kretprobes
+> 
 
-This looks like a good idea..
+Thanks for doing these. Am I correct in assuming we don't need to
+consider these fixes urgent or critical? Only the first looks like it
+could be serious, and the x86 fix for that is 3 years old and ARM has
+gone without it all this time. So I'm guessing it's fine to wait for the
+normal development process and deal with it after the about to open
+merge window is completed?
 
+If so, I propose that I put the patches in a branch for Russell to pull
+later (unless he pipes up with objections or says otherwise). Meantime
+I'll investigate the kprobes test failures I see (which actually looks
+like cache/TLB issues and not test code problems after all).
 
+BTW, I added the?ARM kernel list to the CC. I spotted you didn't add it
+to you patch postings, which means people interested in ARM (other than
+Russell) wouldn't have seen them.
 
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 156169c6981b..8bd4e7f11c70 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
+Thanks
 
->  /*
->   * The kernel tried to access some page that wasn't present.
->   */
->  static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
->  			      unsigned int esr, struct pt_regs *regs)
->  {
-> +	const char *msg;
->  	/*
->  	 * Are we prepared to handle this kernel fault?
->  	 * We are almost certainly not prepared to handle instruction faults.
-> @@ -177,9 +193,19 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
->  	 * No handler, we'll have to terminate things with extreme prejudice.
->  	 */
->  	bust_spinlocks(1);
-> -	pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
-> -		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
-> -		 "paging request", addr);
-> +
-> +	if (is_permission_fault(esr, regs)) {
-
-is_permission_fault() was previously guarded with a 'addr<USER_DS' check, this
-is because it assumes software-PAN is relevant.
-
-The corner case is when the kernel accesses TTBR1-mapped memory while
-software-PAN happens to have swivelled TTBR0. Translation faults will be matched
-by is_permission_fault(), but permission faults won't.
-
-Juggling is_permission_fault() to look something like:
----%<---
-	if (fsc_type == ESR_ELx_FSC_PERM)
-		return true;
-
-	if (addr < USER_DS && system_uses_ttbr0_pan())
-		return fsc_type == ESR_ELx_FSC_FAULT &&
-			(regs->pstate & PSR_PAN_BIT);
-
-	return false;
----%<---
-... should fix this.
-
-
-
-> +		if (esr & ESR_ELx_WNR)
-> +			msg = "write to read-only memory";
-> +		else
-> +			msg = "read from unreadable memory";
-> +	} else if (addr < PAGE_SIZE)
-> +		msg = "NULL pointer dereference";
-> +	else
-> +		msg = "paging request";
-
-Nit: {} all the way down!
-
-
-> +
-> +	pr_alert("Unable to handle kernel %s at virtual address %08lx\n", msg,
-> +		 addr);
->  
->  	show_pte(mm, addr);
->  	die("Oops", regs, esr);
-> @@ -269,21 +295,6 @@ static int __do_page_fault(struct mm_struct *mm, unsigned long addr,
->  	return fault;
->  }
-
-> -static inline bool is_permission_fault(unsigned int esr, struct pt_regs *regs)
-> -{
-> -	unsigned int ec       = ESR_ELx_EC(esr);
-> -	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
-> -
-> -	if (ec != ESR_ELx_EC_DABT_CUR && ec != ESR_ELx_EC_IABT_CUR)
-> -		return false;
-> -
-> -	if (system_uses_ttbr0_pan())
-> -		return fsc_type == ESR_ELx_FSC_FAULT &&
-> -			(regs->pstate & PSR_PAN_BIT);
-> -	else
-> -		return fsc_type == ESR_ELx_FSC_PERM;
-> -}
-
-
-Thanks!
-
-James
+-- 
+Tixy
