@@ -1,52 +1,128 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Fri, 17 Feb 2017 13:45:44 +0100
-Subject: [PATCH 0/8] ARM: sun8i: a33: Mali improvements
-In-Reply-To: <20170216184524.cxcy2ux37yrwutla@lukather>
-References: <10fd28cb-269a-ec38-ecfb-b7c86be3e716@math.uni-bielefeld.de>
- <20170216184524.cxcy2ux37yrwutla@lukather>
-Message-ID: <2cecfc48-576f-3888-08aa-1fe2edc3c752@math.uni-bielefeld.de>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Fri, 17 Feb 2017 13:05:32 +0000
+Subject: [PATCH v2 04/22] Documentation: PCI: Guide to use pci endpoint
+ configfs
+In-Reply-To: <1487325042-28227-5-git-send-email-kishon@ti.com>
+References: <1487325042-28227-1-git-send-email-kishon@ti.com>
+ <1487325042-28227-5-git-send-email-kishon@ti.com>
+Message-ID: <ac16c03a-e415-327c-27b3-bcc700a6f953@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maxime,
-
-Maxime Ripard wrote:
-> Hi,
+?s 9:50 AM de 2/17/2017, Kishon Vijay Abraham I escreveu:
+> Add Documentation to help users use pci endpoint to configure
+> pci endpoint function and to bind the endpoint function
+> with endpoint controller.
 > 
-> On Thu, Feb 16, 2017 at 01:43:06PM +0100, Tobias Jakobi wrote:
->> I was wondering about the following. Wasn't there some strict
->> requirement about code going upstream, which also included that there
->> was a full open-source driver stack for it?
->>
->> I don't see how this is the case for Mali, neither in the kernel, nor in
->> userspace. I'm aware that the Mali kernel driver is open-source. But it
->> is not upstream, maintained out of tree, and won't land upstream in its
->> current form (no resemblence to a DRM driver at all). And let's not talk
->> about the userspace part.
->>
->> So, why should this be here?
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  Documentation/PCI/00-INDEX                      |    2 +
+>  Documentation/PCI/endpoint/pci-endpoint-cfs.txt |   84 +++++++++++++++++++++++
+>  2 files changed, 86 insertions(+)
+>  create mode 100644 Documentation/PCI/endpoint/pci-endpoint-cfs.txt
 > 
-> The device tree is a representation of the hardware itself. The state
-> of the driver support doesn't change the hardware you're running on,
-> just like your BIOS/UEFI on x86 won't change the device it reports to
-> Linux based on whether it has a driver for it.
-Like Emil already said, the new bindings and the DT entries are solely
-introduced to support a proprietary out-of-tree module.
-
-The current workflow when introducing new DT entries is the following:
-- upstream a driver that uses the entries
-- THEN add the new entries
-
-I'm against adding such entries without having any upstream "consumer".
-
-
-With best wishes,
-Tobias
-
-
-> So yes, unfortunately, we don't have a driver upstream at the
-> moment. But that doesn't prevent us from describing the hardware
-> accurately.
+> diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
+> index ba950b2..f84a23c 100644
+> --- a/Documentation/PCI/00-INDEX
+> +++ b/Documentation/PCI/00-INDEX
+> @@ -14,3 +14,5 @@ pcieaer-howto.txt
+>  	- the PCI Express Advanced Error Reporting Driver Guide HOWTO
+>  endpoint/pci-endpoint.txt
+>  	- guide to add endpoint controller driver and endpoint function driver.
+> +endpoint/pci-endpoint-cfs.txt
+> +	- guide to use configfs to configure the pci endpoint function.
+> diff --git a/Documentation/PCI/endpoint/pci-endpoint-cfs.txt b/Documentation/PCI/endpoint/pci-endpoint-cfs.txt
+> new file mode 100644
+> index 0000000..d9f8734
+> --- /dev/null
+> +++ b/Documentation/PCI/endpoint/pci-endpoint-cfs.txt
+> @@ -0,0 +1,84 @@
+> +                   CONFIGURING PCI ENDPOINT USING CONFIGFS
+> +                    Kishon Vijay Abraham I <kishon@ti.com>
+> +
+> +The PCI Endpoint Core exposes configfs entry (pci_ep) in order to configure the
+> +PCI endpoint function and in order to bind the endpoint function
+> +with the endpoint controller. (For introducing other mechanisms to
+> +configure the PCI Endpoint Function refer [1]).
+> +
+> +*) Mounting configfs
+> +
+> +The PCI Endpoint Core layer creates pci_ep directory in the mounted configfs
+> +directory. configfs can be mounted using the following command.
+> +
+> +	mount -t configfs none /sys/kernel/config
+> +
+> +*) Directory Structure
+> +
+> +The pci_ep configfs directory structure has been created to reflect the
+> +natural tree like structure of PCI devices. So every directory created
+> +inside pci_ep represents a EPC device and every directory created inside
+> +epf directory represents EPF device.
+> +
+> +/sys/kernel/config/pci_ep/
+> +			 | <dir>/ --------------------------------------> [2]
+> +				| epc
+> +				| epf/
+> +				     | <dir>/ --------------------------> [3]
+> +					    | vendorid
+> +					    | deviceid
+> +					    | revid
+> +					    | progif_code
+> +					    | subclass_code
+> +					    | baseclass_code
+> +					    | cache_line_size
+> +					    | subsys_vendor_id
+> +					    | subsys_id
+> +					    | interrupt_pin
+> +					    | function
+> +
+> +*) Creating configfs entry for EPC
+> +
+> +Any directory created inside *pci_ep* represents an EPC device. In the above
+> +directory structure [2] represents an EPC device. It consists of
+> +
+> +	*) epc: Use it to associate the configfs entry to an actual EPC device.
+> +		The list of valid entries for this field can be obtained from
+> +			ls /sys/class/pci_epc/
+> +
+> +	*) epf: Directory that contains all the endpoint functions. The name
+> +		of the created directory determines the driver this particular
+> +		epf device will be bound to. The name can be obtained either
+> +		from the function binding documentation [4] or
+> +			ls /sys/bus/pci-epf/drivers
+> +
+> +		If more than one endpoint function device has to be bound to
+> +		the same driver, then the directory should be created using
+> +		the following notation
+> +			mkdir <name>.<num>
+> +
+> +*) Creating configfs entry for EPF
+> +
+> +Any directory created inside *epf* directory represents an EPF device. In the
+> +above directory structure, [3] represents an EPF device. It consists of the
+> +following entries that can be used to configure the standard configuration
+> +header of the endpoint function. (These entries are created by the
+> +framework when any new directory is created inside epf directory.)
+> +
+> +        | vendorid
+> +        | deviceid
+> +        | revid
+> +        | progif_code
+> +        | subclass_code
+> +        | baseclass_code
+> +        | cache_line_size
+> +        | subsys_vendor_id
+> +        | subsys_id
+> +        | interrupt_pin
+> +
+> +The following entry identifies the function driver that is bound to the
+> +function device
+> +	| function
+> +
+> +[1] -> Documentation/PCI/endpoint/pci-endpoint.txt
+> +[4] -> Documentation/PCI/endpoint/function/binding/
 > 
-> Maxime
-> 
+
+Good content.
+
+Acked-By: Joao Pinto <jpinto@synopsys.com>
