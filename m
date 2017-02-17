@@ -1,126 +1,47 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 17 Feb 2017 16:04:30 +0100
-Subject: [PATCH v4 00/36] i.MX Media Driver
-In-Reply-To: <20170217122213.GQ16975@valkosipuli.retiisi.org.uk>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <20170216222006.GA21222@n2100.armlinux.org.uk>
- <923326d6-43fe-7328-d959-14fd341e47ae@gmail.com>
- <1487331818.3107.46.camel@pengutronix.de>
- <20170217122213.GQ16975@valkosipuli.retiisi.org.uk>
-Message-ID: <1487343870.3107.95.camel@pengutronix.de>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Fri, 17 Feb 2017 16:59:24 +0200
+Subject: [PATCH 07/10] perf: Directly pass PERF_AUX_* flags to
+ perf_aux_output_end
+In-Reply-To: <20170217144255.GI15431@arm.com>
+References: <1485540470-11469-1-git-send-email-will.deacon@arm.com>
+ <1485540470-11469-8-git-send-email-will.deacon@arm.com>
+ <8737fdj5q0.fsf@ashishki-desk.ger.corp.intel.com>
+ <20170217140001.GD15431@arm.com>
+ <87y3x4j4ho.fsf@ashishki-desk.ger.corp.intel.com>
+ <20170217144255.GI15431@arm.com>
+Message-ID: <87vas8j22b.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-02-17 at 14:22 +0200, Sakari Ailus wrote:
-> Hi Philipp, Steve and Russell,
-> 
-> On Fri, Feb 17, 2017 at 12:43:38PM +0100, Philipp Zabel wrote:
-> > On Thu, 2017-02-16 at 14:27 -0800, Steve Longerbeam wrote:
-> > > 
-> > > On 02/16/2017 02:20 PM, Russell King - ARM Linux wrote:
-> > > > On Wed, Feb 15, 2017 at 06:19:02PM -0800, Steve Longerbeam wrote:
-> > > >> In version 4:
-> > > >
-> > > > With this version, I get:
-> > > >
-> > > > [28762.892053] imx6-mipi-csi2: LP-11 timeout, phy_state = 0x00000000
-> > > > [28762.899409] ipu1_csi0: pipeline_set_stream failed with -110
-> > > >
-> > > 
-> > > Right, in the imx219, on exit from s_power(), the clock and data lanes
-> > > must be placed in the LP-11 state. This has been done in the ov5640 and
-> > > tc358743 subdevs.
-> > > 
-> > > If we want to bring in the patch that adds a .prepare_stream() op,
-> > > the csi-2 bus would need to be placed in LP-11 in that op instead.
-> > > 
-> > > Philipp, should I go ahead and add your .prepare_stream() patch?
-> > 
-> > I think with Russell's explanation of how the imx219 sensor operates,
-> > we'll have to do something before calling the sensor s_stream, but right
-> > now I'm still unsure what exactly.
-> 
-> Indeed there appears to be no other way to achieve the LP-11 state than
-> going through the streaming state for this particular sensor, apart from
-> starting streaming.
-> 
-> Is there a particular reason why you're waiting for the transmitter to
-> transfer to LP-11 state? That appears to be the last step which is done in
-> the csi2_s_stream() callback.
-> 
-> What the sensor does next is to start streaming, and the first thing it does
-> in that process is to switch to LP-11 state.
-> 
-> Have you tried what happens if you simply drop the LP-11 check? To me that
-> would seem the right thing to do.
+Will Deacon <will.deacon@arm.com> writes:
 
-Removing the wait for LP-11 alone might not be an issue in my case, as
-the TC358743 is known to be in stop state all along. So I just have to
-make sure that the time between s_stream(csi2) starting the receiver and
-s_stream(tc358743) causing LP-11 to be changed to the next state is long
-enough for the receiver to detect LP-11 (which I really can't, I just
-have to pray I2C transmissions are slow enough).
+> On Fri, Feb 17, 2017 at 04:06:59PM +0200, Alexander Shishkin wrote:
+>> Will Deacon <will.deacon@arm.com> writes:
+>> 
+>> > On Fri, Feb 17, 2017 at 03:40:23PM +0200, Alexander Shishkin wrote:
+>> >> Will Deacon <will.deacon@arm.com> writes:
+>> >> 
+>> >> > @@ -485,7 +485,8 @@ int intel_bts_interrupt(void)
+>> >> >  		return handled;
+>> >> >  
+>> >> >  	perf_aux_output_end(&bts->handle, local_xchg(&buf->data_size, 0),
+>> >> > -			    !!local_xchg(&buf->lost, 0));
+>> >> > +			    local_xchg(&buf->lost, 0) ?
+>> >> > +			    PERF_AUX_FLAG_OVERWRITE : 0);
+>> >> 
+>> >> Heh, this one would have taken some time to debug. :)
+>> >
+>> > Don't worry, this isn't a bug fix! This patch changes the prototype for
+>> > perf_aux_output_end so that it takes the flag instead of a "bool truncated"
+>> > parameter, so this is just fixing up the callers at the same time.
+>> 
+>> Yeah, I got that, what I'm saying is that the above should be
+>> PERF_AUX_FLAG_TRUNCATED, not OVERWRITE. I only spotted it by accident.
+>
+> D'oh, quite right, I'll fix that now. Thanks for having a look.
 
-The problems start if we have to enable the D-PHY and deassert resets
-either before the sensor enters LP-11 state or after it already started
-streaming, because we don't know when the sensor drives that state on
-the bus.
+Wait a bit with the fixing, I'm about to post an amended version.
 
-The latter case I is simulated easily by again changing the order so
-that the "sensor" (tc358743) is enabled before the CSI-2 receiver D-PHY
-initialization. The result is that captures time out, presumably because
-the receiver never entered HS mode because it didn't see LP-11. The
-PHY_STATE register contains 0x200, meaning RXCLKACTIVEHS (which we
-should wait for in step 7.) is never set.
-
-I tried to test the former by instead modifying the tc358743 driver a
-bit:
-
-----------8<----------
-diff --git a/drivers/media/i2c/tc358743.c b/drivers/media/i2c/tc358743.c
-index 39d4cdd328c0f..43df80903215b 100644
---- a/drivers/media/i2c/tc358743.c
-+++ b/drivers/media/i2c/tc358743.c
-@@ -1378,8 +1378,6 @@ static int tc358743_s_dv_timings(struct v4l2_subdev *sd,
-        state->timings = *timings;
- 
-        enable_stream(sd, false);
--       tc358743_set_pll(sd);
--       tc358743_set_csi(sd);
- 
-        return 0;
- }
-@@ -1469,6 +1467,11 @@ static int tc358743_g_mbus_config(struct v4l2_subdev *sd,
- 
- static int tc358743_s_stream(struct v4l2_subdev *sd, int enable)
- {
-+       if (enable) {
-+               tc358743_set_pll(sd);
-+               tc358743_set_csi(sd);
-+               tc358743_set_csi_color_space(sd);
-+       }
-        enable_stream(sd, enable);
-        if (!enable) {
-                /* Put all lanes in PL-11 state (STOPSTATE) */
-@@ -1657,9 +1660,6 @@ static int tc358743_set_fmt(struct v4l2_subdev *sd,
-        state->vout_color_sel = vout_color_sel;
- 
-        enable_stream(sd, false);
--       tc358743_set_pll(sd);
--       tc358743_set_csi(sd);
--       tc358743_set_csi_color_space(sd);
- 
-        return 0;
- }
----------->8----------
-
-That should enable the CSI-2 Tx and put it in LP-11 only after the CSI-2
-receiver is enabled, right before starting streaming.
-
-That did seem to work the few times I tested, but I have no idea how
-this will behave with other chips that do something else to the bus
-while not streaming, and whether it is ok to enable the CSI right after
-the sensor without waiting for the CSI-2 bus to settle.
-
-regards
-Philipp
+Regards,
+--
+Alex
