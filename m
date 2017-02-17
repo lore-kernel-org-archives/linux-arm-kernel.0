@@ -1,60 +1,61 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 17 Feb 2017 16:16:50 +0100
-Subject: [PATCH v2 2/3] watchdog: sama5d4: Fix setting timeout when
- watchdog is disabled
-In-Reply-To: <968ef53e-c3c4-5322-020a-8382ce367931@roeck-us.net>
-References: <20170216193053.5546-1-alexandre.belloni@free-electrons.com>
- <20170216193053.5546-2-alexandre.belloni@free-electrons.com>
- <968ef53e-c3c4-5322-020a-8382ce367931@roeck-us.net>
-Message-ID: <20170217151625.hv2vn5imx2kyeftt@piout.net>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 17 Feb 2017 16:20:34 +0100
+Subject: [PATCH net-next v2 2/2] net: mvneta: Use cacheable memory to
+ store the rx buffer DMA address
+In-Reply-To: <20170217145501.5b90a977@free-electrons.com> (Thomas Petazzoni's
+ message of "Fri, 17 Feb 2017 14:55:01 +0100")
+References: <20170217100233.2325-1-jszhang@marvell.com>
+ <20170217100233.2325-3-jszhang@marvell.com>
+ <87o9y1aqsk.fsf@free-electrons.com>
+ <20170217145501.5b90a977@free-electrons.com>
+Message-ID: <87fujcc08t.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/02/2017 at 06:40:33 -0800, Guenter Roeck wrote:
-> On 02/16/2017 11:30 AM, Alexandre Belloni wrote:
-> > The datasheet states: "When setting the WDDIS bit, and while it is set, the
-> > fields WDV and WDD must not be modified."
-> > 
-> > Ensure WDDIS is not set when changing the timeout and set it afterwards if
-> > the watchdog was disabled.
-> > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> > Changes in v2:
-> >  - new patch
-> >  drivers/watchdog/sama5d4_wdt.c | 9 ++++++++-
-> >  1 file changed, 8 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-> > index 2c6f5a70ae67..2a60251806d2 100644
-> > --- a/drivers/watchdog/sama5d4_wdt.c
-> > +++ b/drivers/watchdog/sama5d4_wdt.c
-> > @@ -90,11 +90,18 @@ static int sama5d4_wdt_set_timeout(struct watchdog_device *wdd,
-> >  	u32 reg;
-> > 
-> >  	reg = wdt_read(wdt, AT91_WDT_MR);
-> > +
-> > +	if (reg & AT91_WDT_WDDIS)
-> > +		wdt_write(wdt, AT91_WDT_MR, reg & ~AT91_WDT_WDDIS);
-> > +
-> >  	reg &= ~AT91_WDT_WDV;
-> >  	reg &= ~AT91_WDT_WDD;
-> >  	reg |= AT91_WDT_SET_WDV(value);
-> >  	reg |= AT91_WDT_SET_WDD(value);
-> > -	wdt_write(wdt, AT91_WDT_MR, reg);
-> > +	wdt_write(wdt, AT91_WDT_MR, reg & ~AT91_WDT_WDDIS);
-> > +
-> > +	if (reg & AT91_WDT_WDDIS)
-> > +		wdt_write(wdt, AT91_WDT_MR, reg);
-> > 
-> That means if the watchdog is running, the timeout would not be updated.
-> It should be updated no matter if it is running or not.
-> 
+Hi Thomas,
+ 
+ On ven., f?vr. 17 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
 
-No, it is enabling the watchdog, then changing WDV and WDD and finally
-disabling the watchdog if necessary. So, WDV and WDD are always changed.
+> Does not make sense, because it's not the SW that refills the RX
+> descriptors with the address of the RX buffers. It's done by the HW.
+>
+> With HWBM, I believe you have no choice but to read the physical
+> address from the RX descriptor. But you can probably optimize things a
+> little bit by reading it only once, and then storing it into a
+> cacheable variable.
+>
+> So maybe:
+>
+>  - For SWBM, use the strategy proposed by Jisheng
+>  - For HWBM, at the beginning of the RX completion path, read once the
+>    rx_desc->buf_phys_addr, and store it in rxq->buf_dma_addr[index]
+
+
+For the HWBM path storing rx_desc->buf_phys_addr in
+rxq->buf_dma_addr[index] is not useful as we only use it in a single
+function.
+
+But a quick improvement could be to use the phys_addr variable. Indeed
+we store the value of rx_desc->buf_phys_addr in it and we never used it,
+instead we always use rx_desc->buf_phys_addr.
+
+Gregory
+
+>
+> Of course that's just a very rough proposal. I've been looking mainly
+> at mvpp2 lately, and I'm not sure I still remember how mvneta works in
+> the details.
+>
+> Best regards,
+>
+> Thomas
+> -- 
+> Thomas Petazzoni, CTO, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
 http://free-electrons.com
