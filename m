@@ -1,41 +1,25 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Fri, 17 Feb 2017 15:35:11 +0800
-Subject: [PATCH 4/5] sprd_serial: switch comptible string to sc-uart
-In-Reply-To: <1761969.45NG6Q1Iyc@wuerfel>
-References: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1487063952-7113-5-git-send-email-chunyan.zhang@spreadtrum.com>
- <1761969.45NG6Q1Iyc@wuerfel>
-Message-ID: <20170217073511.GB8767@spreadtrum.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 17 Feb 2017 09:18:21 +0100
+Subject: [linux-sunxi] [PATCH 03/21] net-next: stmmac: add optional setup
+ function
+In-Reply-To: <87mvdlg9bq.fsf@dell.be.48ers.dk>
+References: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
+ <20170216124859.14346-4-clabbe.montjoie@gmail.com>
+ <87mvdlg9bq.fsf@dell.be.48ers.dk>
+Message-ID: <20170217081821.GA22723@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ?,  2? 16, 2017 at 02:31:38?? +0100, Arnd Bergmann wrote:
-> On Tuesday, February 14, 2017 5:19:11 PM CET Chunyan Zhang wrote:
-> >  static const struct of_device_id serial_ids[] = {
-> > -       {.compatible = "sprd,sc9836-uart",},
-> > +       {.compatible = "sprd,sc-uart",},
-> >         {}
+On Thu, Feb 16, 2017 at 09:38:33PM +0100, Peter Korsgaard wrote:
+> >>>>> "Corentin" == Corentin Labbe <clabbe.montjoie@gmail.com> writes:
 > 
-> We really need this to be specific, in case Spreadtrum ever
-> makes a slightly different UART that is not 100% compatible
-> with this one. Also, you can't remove the string you already have,
-> only add to it.
->
-> Normally when you have a new chip that is compatible with one
-> we already have a driver for, we mark the device as compatible
-> with the old one and avoid having to change the driver, e.g.
+>  > Instead of ading more ifthen login for adding a new mac_device_info
 > 
-> 	compatible = "sprd,sc9995-uart", "sprd,sc9836-uart";
+> s/login/logic/
 > 
-> This way, the driver could later be changed to handle anything
-> that is compatible with sc9995 differently from sc9836, but
-> by default it would match the original string.
-> 
+> -- 
+> Bye, Peter Korsgaard
 
-Right, I've addressed this when I received the same comments from
-Rob Herring :)
-
-Thanks for your comments,
-Chunyan
- 
-> 	Arnd
+Thanks, will fix it.
+Regards
+Corentin Labbe
