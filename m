@@ -1,38 +1,44 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 17 Feb 2017 11:13:27 +0800
-Subject: [PATCH 4/7] drm/sun4i: Fix kcalloc element size in sun4i_layers_init
+Date: Fri, 17 Feb 2017 11:13:24 +0800
+Subject: [PATCH 1/7] drm/sun4i: Move drm_mode_config_cleanup call to main
+ driver
 In-Reply-To: <20170217031330.14087-1-wens@csie.org>
 References: <20170217031330.14087-1-wens@csie.org>
-Message-ID: <20170217031330.14087-5-wens@csie.org>
+Message-ID: <20170217031330.14087-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In sun4i_layers_init we are allocating an array of pointers to struct
-sun4i_layer:
-
-	layers = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes),
-	                      sizeof(**layers), GFP_KERNEL);
-
-The element size should be the size of an individual element of the
-array. Change it to sizeof(*layers) to avoid wasting a lot of memory.
+drm_mode_config_cleanup is the complement of drm_mode_config_init, which
+is called in the bind function of sun4i_drv. drm_mode_config_cleanup
+should be put in the unbind function to match.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_layer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun4i_drv.c         | 1 +
+ drivers/gpu/drm/sun4i/sun4i_framebuffer.c | 1 -
+ 2 files changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 5d53c977bca5..62552a356d66 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -140,7 +140,7 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device *drm)
- 	int i;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 4ce665349f6b..99a0f1861be2 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -188,6 +188,7 @@ static void sun4i_drv_unbind(struct device *dev)
+ 	drm_dev_unregister(drm);
+ 	drm_kms_helper_poll_fini(drm);
+ 	sun4i_framebuffer_free(drm);
++	drm_mode_config_cleanup(drm);
+ 	drm_vblank_cleanup(drm);
+ 	drm_dev_unref(drm);
+ }
+diff --git a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+index 8b6ce619ad81..0c72b54c047d 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_framebuffer.c
+@@ -50,5 +50,4 @@ void sun4i_framebuffer_free(struct drm_device *drm)
+ 	struct sun4i_drv *drv = drm->dev_private;
  
- 	layers = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes),
--			      sizeof(**layers), GFP_KERNEL);
-+			      sizeof(*layers), GFP_KERNEL);
- 	if (!layers)
- 		return ERR_PTR(-ENOMEM);
- 
+ 	drm_fbdev_cma_fini(drv->fbdev);
+-	drm_mode_config_cleanup(drm);
+ }
 -- 
 2.11.0
