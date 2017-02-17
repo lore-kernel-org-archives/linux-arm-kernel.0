@@ -1,60 +1,67 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri, 17 Feb 2017 09:46:23 -0800
-Subject: [PATCH] arm64: traps: Mark __le16, __le32,
- __user variables properly
-In-Reply-To: <20170217173101.GH21222@n2100.armlinux.org.uk>
-References: <20170217165112.17512-1-stephen.boyd@linaro.org>
- <20170217173101.GH21222@n2100.armlinux.org.uk>
-Message-ID: <148735358362.27221.13132782733927847712@sboyd-linaro>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 17 Feb 2017 11:50:54 -0600
+Subject: Pointers for writing a good PCIe driver
+In-Reply-To: <eff9861e-043a-7ecd-5d52-c8e18a52ece8@free.fr>
+References: <ff099b5f-efc8-bb5f-41e3-493398844cc0@free.fr>
+ <05046a8a-ba9f-26f9-4c93-f657f9da6294@free.fr>
+ <20170207200656.GA11659@bhelgaas-glaptop.roam.corp.google.com>
+ <20170207214758.GC11659@bhelgaas-glaptop.roam.corp.google.com>
+ <0f22720c-e47d-59f6-b5f7-5e40f4a1759d@free.fr>
+ <20170212165033.GA31833@kroah.com>
+ <0d785dab-c830-b887-d9f3-a2cd5338695c@free.fr>
+ <20170217143803.GA10663@bhelgaas-glaptop.roam.corp.google.com>
+ <eff9861e-043a-7ecd-5d52-c8e18a52ece8@free.fr>
+Message-ID: <20170217175054.GA16671@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Russell King - ARM Linux (2017-02-17 09:31:01)
-> On Fri, Feb 17, 2017 at 08:51:12AM -0800, Stephen Boyd wrote:
-> > diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> > index 659b2e6b6cf7..23959cb70ded 100644
-> > --- a/arch/arm64/kernel/traps.c
-> > +++ b/arch/arm64/kernel/traps.c
-> > @@ -84,7 +84,7 @@ static void dump_mem(const char *lvl, const char *str, unsigned long bottom,
-> >                       if (p >= bottom && p < top) {
-> >                               unsigned long val;
-> >  
-> > -                             if (__get_user(val, (unsigned long *)p) == 0)
-> > +                             if (__get_user(val, (unsigned long __user *)p) == 0)
-> >                                       sprintf(str + i * 17, " %016lx", val);
-> >                               else
-> >                                       sprintf(str + i * 17, " ????????????????");
-> > @@ -113,7 +113,7 @@ static void __dump_instr(const char *lvl, struct pt_regs *regs)
-> >       for (i = -4; i < 1; i++) {
-> >               unsigned int val, bad;
-> >  
-> > -             bad = __get_user(val, &((u32 *)addr)[i]);
-> > +             bad = __get_user(val, &((u32 __user *)addr)[i]);
-> >  
-> >               if (!bad)
-> >                       p += sprintf(p, i == 0 ? "(%08x) " : "%08x ", val);
+On Fri, Feb 17, 2017 at 06:00:53PM +0100, Mason wrote:
+> On 17/02/2017 15:38, Bjorn Helgaas wrote:
 > 
-> For the majority of causes, these are _not_ user addresses, they are
-> kernel addresses.  The use of get_user() at these locations is a way
-> to safely access these kernel addresses when something has gone wrong
-> without causing a further oops.
+> > On Fri, Feb 17, 2017 at 10:20:20AM +0100, Mason wrote:
+> >
+> >> There might be some kind of misunderstanding.
+> >>
+> >> I don't plan to write a driver for a device that plugs into a PCIe slot.
+> >>
+> >> I intend to write a driver for the PCIe controller itself, which is
+> >> embedded in the SoC. (In order to support different types of PCIe
+> >> devices, with their respective drivers already upstream.)
+> >>
+> >> I think the controller driver belongs in drivers/pci/host ?
+> > 
+> > Sorry, I indeed misunderstood you.
+> > 
+> > The native PCI host controller drivers indeed live in
+> > drivers/pci/host/.
+> > 
+> > I don't know anything about your hardware or environment, but I highly
+> > encourage you to use ACPI (drivers/acpi/pci_root.c, with a little bit
+> > of arch support) or generic DT (drivers/pci/host/pci-host-generic.c)
+> > instead of writing a custom host controller driver.
+> > 
+> > The native drivers in drivers/pci/host are a huge maintenance hassle
+> > for no real benefit.
+> 
+> My SoC is built around an ARM Cortex A9.
+> I don't think (?) this platform has any support for ACPI.
 
-Understood. It looks like a custom version of probe_kernel_read() (where
-we force the pointer to __user BTW). Is that to only set_fs() once
-instead of many times? Maybe we need a ____probe_kernel_read() that
-forces it to __user under the covers and doesn't do any set_fs() and
-also indicates we know what we're doing?
+There's ACPI support on ARM64, but none that I know of for ARM32.
 
+> I'm currently using this DT description:
+> http://lxr.free-electrons.com/source/arch/arm/boot/dts/tango4-common.dtsi
 > 
-> Annotating them with __user to shut up sparse is incorrect.  The point
-> with sparse is _not_ to end up with a warning free kernel, but for it
-> to warn where things are not quite right in terms of semantics.  These
-> warnings should stay.
-> 
-> So, the warnings about lack of __user should stay.
-> 
+> The "legacy" driver sits at ~700 lines. It would be awesome to be able
+> to discard all of it, and rely on generic upstream code. But I don't
+> understand how it is possible for a generic driver to support whatever
+> crazy solution some random vendor has come up with?
 
-Ok. I usually compile things with 'make -s' and C=2 and then if sparse
-complains I want to keep it quiet so I don't have to worry about looking
-through the warnings. So in my workflow I _do_ want a warning free
-kernel.
+You're right that the programming model of the host bridge itself is
+not specified by PCI specs, so it's impossible to have a generic
+driver that can manage it completely by itself.
+
+If you have firmware that initializes the bridge and tells the OS what
+the windows are (bus numbers, memory space, I/O space) and where the
+PCIe-specified ECAM space is, a generic driver can take it from there.
+
+Bjorn
