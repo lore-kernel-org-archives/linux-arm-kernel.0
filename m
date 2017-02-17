@@ -1,76 +1,125 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 Feb 2017 10:56:24 +0000
-Subject: [PATCH v4 00/36] i.MX Media Driver
-In-Reply-To: <1487327951.3107.19.camel@pengutronix.de>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <20170216222006.GA21222@n2100.armlinux.org.uk>
- <923326d6-43fe-7328-d959-14fd341e47ae@gmail.com>
- <20170216225742.GB21222@n2100.armlinux.org.uk>
- <1487327951.3107.19.camel@pengutronix.de>
-Message-ID: <20170217105624.GC21222@n2100.armlinux.org.uk>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 17 Feb 2017 11:00:39 +0000
+Subject: [PATCH v2] arm64: print a fault message when attempting to write
+ RO memory
+In-Reply-To: <20170217011959.26754-1-stephen.boyd@linaro.org>
+References: <20170217011959.26754-1-stephen.boyd@linaro.org>
+Message-ID: <58A6D7D7.1030704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2017 at 11:39:11AM +0100, Philipp Zabel wrote:
-> On Thu, 2017-02-16 at 22:57 +0000, Russell King - ARM Linux wrote:
-> > On Thu, Feb 16, 2017 at 02:27:41PM -0800, Steve Longerbeam wrote:
-> > > 
-> > > 
-> > > On 02/16/2017 02:20 PM, Russell King - ARM Linux wrote:
-> > > >On Wed, Feb 15, 2017 at 06:19:02PM -0800, Steve Longerbeam wrote:
-> > > >>In version 4:
-> > > >
-> > > >With this version, I get:
-> > > >
-> > > >[28762.892053] imx6-mipi-csi2: LP-11 timeout, phy_state = 0x00000000
-> > > >[28762.899409] ipu1_csi0: pipeline_set_stream failed with -110
-> > > >
-> > > 
-> > > Right, in the imx219, on exit from s_power(), the clock and data lanes
-> > > must be placed in the LP-11 state. This has been done in the ov5640 and
-> > > tc358743 subdevs.
-> > 
-> > The only way to do that is to enable streaming from the sensor, wait
-> > an initialisation time, and then disable streaming, and wait for the
-> > current line to finish.  There is _no_ other way to get the sensor to
-> > place its clock and data lines into LP-11 state.
+Hi Stephen,
+
+On 17/02/17 01:19, Stephen Boyd wrote:
+> If a page is marked read only we should print out that fact,
+> instead of printing out that there was a page fault. Right now we
+> get a cryptic error message that something went wrong with an
+> unhandled fault, but we don't evaluate the esr to figure out that
+> it was a read/write permission fault.
 > 
-> I thought going through LP-11 is part of the D-PHY transmitter
-> initialization, during the LP->HS wakeup sequence. But then I have no
-> access to MIPI specs.
+> Instead of seeing:
+> 
+>   Unable to handle kernel paging request at virtual address ffff000008e460d8
+>   pgd = ffff800003504000
+>   [ffff000008e460d8] *pgd=0000000083473003, *pud=0000000083503003, *pmd=0000000000000000
+>   Internal error: Oops: 9600004f [#1] PREEMPT SMP
+> 
+> we'll see:
+> 
+>   Unable to handle kernel write to read-only memory at virtual address ffff000008e760d8
+>   pgd = ffff80003d3de000
+>   [ffff000008e760d8] *pgd=0000000083472003, *pud=0000000083435003, *pmd=0000000000000000
+>   Internal error: Oops: 9600004f [#1] PREEMPT SMP
 
-The D-PHY transmitter initialisation *only* happens as part of the
-wake-up from standby to streaming mode.  That is because Sony expect
-that you program the sensor, and then when you switch it to streaming
-mode, it computes the D-PHY parameters from the PLL, input clock rate
-(you have to tell it the clock rate in 1/256 MHz units), number of
-lanes, and other parameters.
+This looks like a good idea..
 
-It is possible to program the D-PHY parameters manually, but that
-doesn't change the above sequence in any way (it just avoids the
-chip computing the values, it doesn't result in any change of
-behaviour on the bus.)
 
-The IMX219 specifications are clear: the clock and data lines are
-held low (LP-00 state) after releasing the hardware enable signal.
-There's a period of chip initialisation, and then you can access the
-I2C bus and configure it.  There's a further period of initialisation
-where charge pumps are getting to their operating state.  Then, you
-set the streaming bit, and a load more initialisation happens before
-the CSI bus enters LP-11 state and the first frame pops out.  When
-entering standby, the last frame is completed, and then the CSI bus
-enters LP-11 state.
 
-SMIA are slightly different - mostly following what I've said above,
-but the clock and data lines are tristated after releasing the
-xshutdown signal, and they remain tristated until the clock line
-starts toggling before the first frame appears.  There appears to
-be no point that the clock line enters LP-11 state before it starts
-toggling.  When entering standby, the last frame is completed, and
-the CSI bus enters tristate mode (so floating.)  There is no way to
-get these sensors into LP-11 state.
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 156169c6981b..8bd4e7f11c70 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>  /*
+>   * The kernel tried to access some page that wasn't present.
+>   */
+>  static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+>  			      unsigned int esr, struct pt_regs *regs)
+>  {
+> +	const char *msg;
+>  	/*
+>  	 * Are we prepared to handle this kernel fault?
+>  	 * We are almost certainly not prepared to handle instruction faults.
+> @@ -177,9 +193,19 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+>  	 * No handler, we'll have to terminate things with extreme prejudice.
+>  	 */
+>  	bust_spinlocks(1);
+> -	pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
+> -		 (addr < PAGE_SIZE) ? "NULL pointer dereference" :
+> -		 "paging request", addr);
+> +
+> +	if (is_permission_fault(esr, regs)) {
+
+is_permission_fault() was previously guarded with a 'addr<USER_DS' check, this
+is because it assumes software-PAN is relevant.
+
+The corner case is when the kernel accesses TTBR1-mapped memory while
+software-PAN happens to have swivelled TTBR0. Translation faults will be matched
+by is_permission_fault(), but permission faults won't.
+
+Juggling is_permission_fault() to look something like:
+---%<---
+	if (fsc_type == ESR_ELx_FSC_PERM)
+		return true;
+
+	if (addr < USER_DS && system_uses_ttbr0_pan())
+		return fsc_type == ESR_ELx_FSC_FAULT &&
+			(regs->pstate & PSR_PAN_BIT);
+
+	return false;
+---%<---
+... should fix this.
+
+
+
+> +		if (esr & ESR_ELx_WNR)
+> +			msg = "write to read-only memory";
+> +		else
+> +			msg = "read from unreadable memory";
+> +	} else if (addr < PAGE_SIZE)
+> +		msg = "NULL pointer dereference";
+> +	else
+> +		msg = "paging request";
+
+Nit: {} all the way down!
+
+
+> +
+> +	pr_alert("Unable to handle kernel %s at virtual address %08lx\n", msg,
+> +		 addr);
+>  
+>  	show_pte(mm, addr);
+>  	die("Oops", regs, esr);
+> @@ -269,21 +295,6 @@ static int __do_page_fault(struct mm_struct *mm, unsigned long addr,
+>  	return fault;
+>  }
+
+> -static inline bool is_permission_fault(unsigned int esr, struct pt_regs *regs)
+> -{
+> -	unsigned int ec       = ESR_ELx_EC(esr);
+> -	unsigned int fsc_type = esr & ESR_ELx_FSC_TYPE;
+> -
+> -	if (ec != ESR_ELx_EC_DABT_CUR && ec != ESR_ELx_EC_IABT_CUR)
+> -		return false;
+> -
+> -	if (system_uses_ttbr0_pan())
+> -		return fsc_type == ESR_ELx_FSC_FAULT &&
+> -			(regs->pstate & PSR_PAN_BIT);
+> -	else
+> -		return fsc_type == ESR_ELx_FSC_PERM;
+> -}
+
+
+Thanks!
+
+James
