@@ -1,65 +1,69 @@
-From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Fri, 17 Feb 2017 22:28:03 +0100
-Subject: AXP808 vs. AXP806 debugged, no difference? (Was: [PATCH v6 5/5]
- ARM: dts: sun9i: Initial support for the Sunchip CX-A99 board)
-In-Reply-To: <CAGb2v65gpJKs8yf35cHkowxjEYNYH33nZGtmM7E6rwfTPfPdug@mail.gmail.com>
-References: <cover.1486592470.git.rask@formelder.dk>
- <d4211c5d57f80b0281d7d332edc7d69e66202d3d.1486592471.git.rask@formelder.dk>
- <20170210085920.7l7gswm6yjuqgdfx@lukather>
- <CAGb2v64AfBW+CHHkFvvNzCGBG09UK-sPcAZi2QgCR9wM=jguxw@mail.gmail.com>
- <20170214233538.enkffjiw3kkfromu@localhost>
- <20170216211630.u3xddzzcpazlodkz@localhost>
- <CAGb2v65gpJKs8yf35cHkowxjEYNYH33nZGtmM7E6rwfTPfPdug@mail.gmail.com>
-Message-ID: <20170217212802.erggx2hdjrmisfhn@localhost>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Sat, 18 Feb 2017 06:43:52 +0900
+Subject: [BUGFIX PATCH V2 0/3] kprobes/arm: Improve kprobes
+ implementation on arm
+In-Reply-To: <1487329270.3113.5.camel@linaro.org>
+References: <148711844284.5814.10387227824715177703.stgit@devbox>
+ <1487329270.3113.5.camel@linaro.org>
+Message-ID: <20170218064352.b1685bbd17c0189b1937ce3b@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2017 at 11:08:59AM +0800, Chen-Yu Tsai wrote:
-> On Fri, Feb 17, 2017 at 5:16 AM, Rask Ingemann Lambertsen
-> <rask@formelder.dk> wrote:
-> > In summary: I'll propose a new property "extended-address" or so to the
-> > existing "x-powers,axp806" compatible, because the axp808 does seem to have
-> > the register at 0xff after all, it just needs a value of 0 instead of the 16
-> > which drivers/mfd/axp20x.c as of recently is now writing unconditionally
-> > to 0xff. A new "x-powers,axp808" compatible and new AXP808_ID is therefore
-> > not needed. This should make for a simpler and smaller patch.
+On Fri, 17 Feb 2017 11:01:10 +0000
+"Jon Medhurst (Tixy)" <tixy@linaro.org> wrote:
+
+> On Wed, 2017-02-15 at 09:27 +0900, Masami Hiramatsu wrote:
+> > Hi,
+> > 
+> > Here is the 2nd version of the patches which improve kprobe
+> > on arm implementation (a kind of bugfix). Version 1 is here;
+> > 
+> > https://lkml.org/lkml/2017/2/13/538
+> > 
+> > In this version I didn't update the code, just update the
+> > patch description according to Tixy's comment and add his Ack.
+> > 
+> > Thank you,
+> > 
+> > ---
+> > 
+> > Masami Hiramatsu (3):
+> >       kprobes/arm: Allow to handle reentered kprobe on single-stepping
+> >       kprobes/arm: Skip single-stepping in recursing path if possible
+> >       kprobes/arm: Fix the return address of multiple kretprobes
+> > 
 > 
-> It might be the same core as the AXP806, though without a datasheet to actually
-> confirm it, it might be best to stick to a new compatible.
+> Thanks for doing these. Am I correct in assuming we don't need to
+> consider these fixes urgent or critical? Only the first looks like it
+> could be serious, and the x86 fix for that is 3 years old and ARM has
+> gone without it all this time. So I'm guessing it's fine to wait for the
+> normal development process and deal with it after the about to open
+> merge window is completed?
 
-Yes, an extra compatible is cheap. Also, it occurs to me that either could
-turn out to have features that the other one doesn't.
+Agreed. I'm not sure how frequently FIQ is used in ARM, but anyway
+it happens only when root user intensively uses kprobes on FIQ handlers.
 
-FWIW, both are 56-pin devices going by board photos. I'd say they differ in
-the power-on voltages. On the AXP808, I've measured (in FEL mode, assuming
-that the BROM doesn't have any PMIC code at all):
+> If so, I propose that I put the patches in a branch for Russell to pull
+> later (unless he pipes up with objections or says otherwise). Meantime
+> I'll investigate the kprobes test failures I see (which actually looks
+> like cache/TLB issues and not test code problems after all).
 
-aldo1	3.0 V
-aldo2	off
-aldo3	off
-bldo1	1.8 V
-bldo2	0.9 V	(here the AXP806 gives 1.8 V for DLL and PLL)
-bldo3	off
-bldo4	?	(haven't found it yet)
-cldo1	3.3 V
-cldo2	off
-cldo3	off
-dcdca	0.9 V
-dcdcb	1.5 V
-dcdcc	0.9 V
-dcdcd	0.9 V
-dcdce	3.3 V	(AXP806 set to 2.1 V in Optimus and Cubieboard4 dts)
-sw0	?	(haven't found it yet)
+OK, btw, I couldn't reproduce the kprobes test failure with
+CONFIG_DEBUG_RODATA=y on qemu...
 
-It would also explain why they were given the same chip ID, as from driver
-point of view, they behave in the same way. The Allwinner kernel tree also
-uses the same driver (confusingly called axp15) for both.
+> 
+> BTW, I added the?ARM kernel list to the CC. I spotted you didn't add it
+> to you patch postings, which means people interested in ARM (other than
+> Russell) wouldn't have seen them.
 
-> However, we could add a new property "x-powers,master-mode". If the driver
-> sees it, it would clear bit 4, instead of setting it. The hardware bit is
-> latched from the external pin, so this would be per board.
+Ah, I forgot that, Thank you!
 
-Patch coming.
+> 
+> Thanks
+> 
+> -- 
+> Tixy
+
 
 -- 
-Rask Ingemann Lambertsen
+Masami Hiramatsu <mhiramat@kernel.org>
