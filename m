@@ -1,109 +1,236 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 17 Feb 2017 18:45:51 +0530
-Subject: [PATCH 4/4] ARM: davinci: add pdata-quirks for da850-evm vpif
- display
-In-Reply-To: <1487269285-6948-5-git-send-email-bgolaszewski@baylibre.com>
-References: <1487269285-6948-1-git-send-email-bgolaszewski@baylibre.com>
- <1487269285-6948-5-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <42c3c8dc-9681-0f4b-e43c-ae95197c727d@ti.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 17 Feb 2017 14:18:02 +0100
+Subject: [PATCH 05/21] net-next: stmmac: Add dwmac-sun8i
+In-Reply-To: <20170216190524.l2ddzhwabzdpdphx@lukather>
+References: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
+ <20170216124859.14346-6-clabbe.montjoie@gmail.com>
+ <20170216190524.l2ddzhwabzdpdphx@lukather>
+Message-ID: <20170217131802.GB24993@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 February 2017 11:51 PM, Bartosz Golaszewski wrote:
-> Similarly to vpif capture: we need to register the vpif display driver
-> and the corresponding adv7343 encoder in pdata-quirks as the DT
-> support is not complete - there isn't currently a way to define the
-> output_routing in the V4L2 drivers (c.f. s_routing) via DT.
+On Thu, Feb 16, 2017 at 08:05:24PM +0100, Maxime Ripard wrote:
+> Hi,
 > 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-> ---
->  arch/arm/mach-davinci/pdata-quirks.c | 69 +++++++++++++++++++++++++++++++++++-
->  1 file changed, 68 insertions(+), 1 deletion(-)
+
+[...]
+> > +
+> > +struct emac_variant {
+> > +	u32 default_syscon_value;
 > 
-> diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
-> index 3ca773f..c659c76 100644
-> --- a/arch/arm/mach-davinci/pdata-quirks.c
-> +++ b/arch/arm/mach-davinci/pdata-quirks.c
+> Why do you need a default value? Can't you read it from the syscon
+> directly?
+> 
 
-> +#endif /* IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) */
->  
-> +#if IS_ENABLED(CONFIG_DA850_UI_SD_VIDEO_PORT)
-> +static struct adv7343_platform_data adv7343_pdata = {
-> +	.mode_config = {
-> +		.dac = { 1, 1, 1 },
-> +	},
-> +	.sd_config = {
-> +		.sd_dac_out = { 1 },
-> +	},
-> +};
-> +
-> +static struct vpif_subdev_info da850_vpif_subdev[] = {
-> +	{
-> +		.name = "adv7343",
-> +		.board_info = {
-> +			I2C_BOARD_INFO("adv7343", 0x2a),
-> +			.platform_data = &adv7343_pdata,
-> +		},
-> +	},
-> +};
-> +
-> +static const struct vpif_output da850_ch0_outputs[] = {
-> +	{
-> +		.output = {
-> +			.index = 0,
-> +			.name = "Composite",
-> +			.type = V4L2_OUTPUT_TYPE_ANALOG,
-> +			.capabilities = V4L2_OUT_CAP_STD,
-> +			.std = V4L2_STD_ALL,
-> +		},
-> +		.subdev_name = "adv7343",
-> +		.output_route = ADV7343_COMPOSITE_ID,
-> +	},
-> +	{
-> +		.output = {
-> +			.index = 1,
-> +			.name = "S-Video",
-> +			.type = V4L2_OUTPUT_TYPE_ANALOG,
-> +			.capabilities = V4L2_OUT_CAP_STD,
-> +			.std = V4L2_STD_ALL,
-> +		},
-> +		.subdev_name = "adv7343",
-> +		.output_route = ADV7343_SVIDEO_ID,
-> +	},
-> +};
-> +
-> +static struct vpif_display_config da850_vpif_display_config = {
-> +	.subdevinfo   = da850_vpif_subdev,
-> +	.subdev_count = ARRAY_SIZE(da850_vpif_subdev),
-> +	.chan_config[0] = {
-> +		.outputs = da850_ch0_outputs,
-> +		.output_count = ARRAY_SIZE(da850_ch0_outputs),
-> +	},
-> +	.card_name    = "DA850/OMAP-L138 Video Display",
-> +};
-> +#endif /* defined(CONFIG_DA850_UI_SD_VIDEO_PORT) */
-> +
-> +#if IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) || IS_ENABLED(CONFIG_DA850_UI_SD_VIDEO_PORT)
->  static void __init da850_vpif_legacy_init(void)
->  {
->  	int ret;
-> @@ -119,8 +178,16 @@ static void __init da850_vpif_legacy_init(void)
->  	if (ret)
->  		pr_warn("%s: VPIF capture setup failed: %d\n",
->  			__func__, ret);
-> +
-> +	/* LCDK doesn't support VPIF display */
-> +	if (of_machine_is_compatible("ti,da850-evm")) {
-> +		ret = da850_register_vpif_display(&da850_vpif_display_config);
+Why not, but you can see the default value as "value for disabled state".
+My fear is that something (uboot) modify it (keep it activated) before driver load.
 
-This fails to build when CONFIG_DA850_UI_SD_VIDEO_PORT is switched off.
-Probably means you need separate functions for registering capture and
-display parts.
+[...]
+> > +static void sun8i_dwmac_dump_regs(void __iomem *ioaddr)
+> > +{
+> > +	int i;
+> > +
+> > +	pr_info(" DMA registers\n");
+> 
+> Logging this as pr_info is bad already...
+> 
+> > +	for (i = 0; i < 0xC8; i += 4) {
+> > +		if (i == 0x32 || i == 0x3C)
+> > +			continue;
+> > +		pr_err("Reg 0x%x: 0x%08x\n", i, readl(ioaddr + i));
+> 
+> ... But this is worse.
+> 
+> Why do you need to do that? Can't you create a file in debugfs
+> instead?
+> 
 
-I haven't reviewed rest of the patchset yet. Just noticed these while
-applying them for some testing. You may want to wait sometime before
-sending the next version.
+I just do as other glue does. But yes this is uglyi, no excuse.
+Reworking all stmmac register dump (ethtool, stmmac_ops->dump_regs and stmmac_dma_ops->dump_regs) was on my todo list,
+but I postponed it.
 
-Thanks,
-Sekhar
+I will propose something better based on debugfs.
+
+[...]
+> > +static void sun8i_dwmac_dma_start_tx(void __iomem *ioaddr)
+> > +{
+> > +	u32 v;
+> > +
+> > +	v = readl(ioaddr + EMAC_TX_CTL0);
+> > +	v |= EMAC_TX_TRANSMITTER_EN;
+> > +	writel(v, ioaddr + EMAC_TX_CTL0);
+> > +
+> > +	v = readl(ioaddr + EMAC_TX_CTL1);
+> > +	v |= EMAC_TX_DMA_START;
+> > +	v |= EMAC_TX_DMA_EN;
+> > +	writel(v, ioaddr + EMAC_TX_CTL1);
+> 
+> This is a bit worrying. There's not a single lock in your driver,
+> while you have a significant number of read / modify / write.
+> 
+> Where is the locking handled?
+> 
+
+All thoses function are handled by the "stmmac_ops framework", all other glue drivers does not lock anything.
+The few functions that need locking already got it on the calling stmmac side.
+
+[...]
+> > +static int sun8i_dwmac_init(struct platform_device *pdev, void *priv)
+> > +{
+> > +	struct sunxi_priv_data *gmac = priv;
+> > +	int ret;
+> > +
+> > +	if (gmac->regulator) {
+> > +		ret = regulator_enable(gmac->regulator);
+> > +		if (ret) {
+> > +			dev_err(&pdev->dev, "Fail to enable regulator\n");
+> > +			return ret;
+> > +		}
+> > +	}
+> > +
+> > +	ret = clk_prepare_enable(gmac->tx_clk);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "Could not enable AHB clock\n");
+> 
+> If that call fails, you leave the regulator (if there was any) enabled.
+> 
+
+I will fix it
+
+> > +		return ret;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void sun8i_dwmac_core_init(struct mac_device_info *hw, int mtu)
+> > +{
+> > +	void __iomem *ioaddr = hw->pcsr;
+> > +	u32 v;
+> > +
+> > +	v = (8 << 24);/* burst len */
+> > +	writel(v, ioaddr + EMAC_BASIC_CTL1);
+> 
+> do you need an intermediate value? you should make a define for that
+> too.
+> 
+
+I will fix it
+
+[...]
+> > +static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
+> > +{
+> > +	struct sunxi_priv_data *gmac = priv->plat->bsp_priv;
+> > +	struct device_node *node = priv->device->of_node;
+> > +	int ret;
+> > +	u32 reg, val;
+> > +
+> > +	reg = gmac->variant->default_syscon_value;
+> > +
+> > +	if (gmac->variant->internal_phy) {
+> > +		if (!gmac->use_internal_phy) {
+> > +			/* switch to external PHY interface */
+> > +			reg &= ~H3_EPHY_SELECT;
+> > +		} else {
+> > +			reg |= H3_EPHY_SELECT;
+> > +			reg &= ~H3_EPHY_SHUTDOWN;
+> > +			dev_info(priv->device, "Select internal_phy %x\n", reg);
+> 
+> The logging level is too high
+> 
+
+I will reduce it
+
+> > +
+> > +			if (of_property_read_bool(priv->plat->phy_node,
+> > +						  "allwinner,leds-active-low"))
+> > +				reg |= H3_EPHY_LED_POL;
+> > +			else
+> > +				reg &= ~H3_EPHY_LED_POL;
+> > +
+> > +			ret = of_mdio_parse_addr(priv->device,
+> > +						 priv->plat->phy_node);
+> > +			if (ret < 0) {
+> > +				dev_err(priv->device, "Could not parse MDIO addr\n");
+> > +				return ret;
+> > +			}
+> > +			/* of_mdio_parse_addr returns a valid (0 ~ 31) PHY
+> > +			 * address. No need to mask it again.
+> > +			 */
+> > +			reg |= ret << H3_EPHY_ADDR_SHIFT;
+> > +		}
+> > +	}
+> > +
+> > +	if (!of_property_read_u32(node, "allwinner,tx-delay", &val)) {
+> 
+> How do you compute it? Can't this be done through auto-training?
+> 
+
+The value is the same as used in vendor BSP kernel.
+I do not understand what you mean by auto-training.
+
+> > +		dev_info(priv->device, "set tx-delay to %x\n", val);
+> 
+> change the logging level here too.
+> 
+
+I agree
+
+> > +		if (val <= SYSCON_ETXDC_MASK) {
+> > +			reg &= ~(SYSCON_ETXDC_MASK << SYSCON_ETXDC_SHIFT);
+> > +			reg |= (val << SYSCON_ETXDC_SHIFT);
+> > +		} else {
+> > +			dev_warn(priv->device, "Invalid TX clock delay: %d\n",
+> > +				 val);
+> 
+> If it's invalid, why don't you treat it as an error and return?
+> 
+
+Ok
+
+[...]
+> > +static struct mac_device_info *sun8i_dwmac_setup(void __iomem *ioaddr,
+> > +						 int mcbins,
+> > +						 int perfect_uc_entries,
+> > +						 int *synopsys_id)
+> > +{
+> > +	struct mac_device_info *mac;
+> > +
+> > +	mac = kzalloc(sizeof(const struct mac_device_info), GFP_KERNEL);
+> > +	if (!mac)
+> > +		return NULL;
+> 
+> Do you ever free that memory?
+> 
+
+Good catch, I believed that the "stmmac framework" would free it.
+I will send a fix for this memory leak.
+
+[...]
+> > diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_ethtool.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_ethtool.c
+> > index 5ff6bc4..11db658 100644
+> > --- a/drivers/net/ethernet/stmicro/stmmac/stmmac_ethtool.c
+> > +++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_ethtool.c
+> > @@ -450,6 +450,9 @@ static void stmmac_ethtool_gregs(struct net_device *dev,
+> >  		for (i = 0; i < 22; i++)
+> >  			reg_space[i + 55] =
+> >  			    readl(priv->ioaddr + (DMA_BUS_MODE + (i * 4)));
+> > +	} else if (priv->plat->has_sun8i) {
+> 
+> Surely we don't want to add a new flag to the common structure for
+> every new platform supported.
+> 
+> Can't you base that on the compatible instead?
+
+This part will be fixed with the debugfs speaked early in the mail.
+
+But yes I have tried to avoid use of has_sun8i at maximum.
+
+> 
+> Thanks a lot for your work,
+> Maxime
+> 
+
+Thanks for the review
+
+Corentin Labbe
