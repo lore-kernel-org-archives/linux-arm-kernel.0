@@ -1,117 +1,78 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri, 17 Feb 2017 14:34:35 +0100
-Subject: [PATCH 4/4] ARM: davinci: add pdata-quirks for da850-evm vpif
- display
-In-Reply-To: <42c3c8dc-9681-0f4b-e43c-ae95197c727d@ti.com>
-References: <1487269285-6948-1-git-send-email-bgolaszewski@baylibre.com>
- <1487269285-6948-5-git-send-email-bgolaszewski@baylibre.com>
- <42c3c8dc-9681-0f4b-e43c-ae95197c727d@ti.com>
-Message-ID: <CAMpxmJXeuDBbUh0R8Rexjx5qwVjqkM_f4dr7-nwP80pdPcWcPQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 17 Feb 2017 14:35:21 +0100
+Subject: [PATCH net-next v2 1/2] net: mvneta: avoid getting status from
+ rx_desc as much as possible
+In-Reply-To: <20170217100233.2325-2-jszhang@marvell.com> (Jisheng Zhang's
+ message of "Fri, 17 Feb 2017 18:02:32 +0800")
+References: <20170217100233.2325-1-jszhang@marvell.com>
+ <20170217100233.2325-2-jszhang@marvell.com>
+Message-ID: <87k28paqjq.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-02-17 14:15 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
-> On Thursday 16 February 2017 11:51 PM, Bartosz Golaszewski wrote:
->> Similarly to vpif capture: we need to register the vpif display driver
->> and the corresponding adv7343 encoder in pdata-quirks as the DT
->> support is not complete - there isn't currently a way to define the
->> output_routing in the V4L2 drivers (c.f. s_routing) via DT.
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
->> ---
->>  arch/arm/mach-davinci/pdata-quirks.c | 69 +++++++++++++++++++++++++++++++++++-
->>  1 file changed, 68 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
->> index 3ca773f..c659c76 100644
->> --- a/arch/arm/mach-davinci/pdata-quirks.c
->> +++ b/arch/arm/mach-davinci/pdata-quirks.c
+Hi Jisheng,
+ 
+ On ven., f?vr. 17 2017, Jisheng Zhang <jszhang@marvell.com> wrote:
+
+> In hot code path mvneta_rx_hwbm(), the rx_desc->status is read twice.
+> The rx_desc is allocated by dma_alloc_coherent, it's uncacheable if
+> the device isn't cache-coherent, reading from uncached memory is
+> fairly slow. So reuse the read out rx_status to avoid the second
+> reading from uncached memory.
 >
->> +#endif /* IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) */
->>
->> +#if IS_ENABLED(CONFIG_DA850_UI_SD_VIDEO_PORT)
->> +static struct adv7343_platform_data adv7343_pdata = {
->> +     .mode_config = {
->> +             .dac = { 1, 1, 1 },
->> +     },
->> +     .sd_config = {
->> +             .sd_dac_out = { 1 },
->> +     },
->> +};
->> +
->> +static struct vpif_subdev_info da850_vpif_subdev[] = {
->> +     {
->> +             .name = "adv7343",
->> +             .board_info = {
->> +                     I2C_BOARD_INFO("adv7343", 0x2a),
->> +                     .platform_data = &adv7343_pdata,
->> +             },
->> +     },
->> +};
->> +
->> +static const struct vpif_output da850_ch0_outputs[] = {
->> +     {
->> +             .output = {
->> +                     .index = 0,
->> +                     .name = "Composite",
->> +                     .type = V4L2_OUTPUT_TYPE_ANALOG,
->> +                     .capabilities = V4L2_OUT_CAP_STD,
->> +                     .std = V4L2_STD_ALL,
->> +             },
->> +             .subdev_name = "adv7343",
->> +             .output_route = ADV7343_COMPOSITE_ID,
->> +     },
->> +     {
->> +             .output = {
->> +                     .index = 1,
->> +                     .name = "S-Video",
->> +                     .type = V4L2_OUTPUT_TYPE_ANALOG,
->> +                     .capabilities = V4L2_OUT_CAP_STD,
->> +                     .std = V4L2_STD_ALL,
->> +             },
->> +             .subdev_name = "adv7343",
->> +             .output_route = ADV7343_SVIDEO_ID,
->> +     },
->> +};
->> +
->> +static struct vpif_display_config da850_vpif_display_config = {
->> +     .subdevinfo   = da850_vpif_subdev,
->> +     .subdev_count = ARRAY_SIZE(da850_vpif_subdev),
->> +     .chan_config[0] = {
->> +             .outputs = da850_ch0_outputs,
->> +             .output_count = ARRAY_SIZE(da850_ch0_outputs),
->> +     },
->> +     .card_name    = "DA850/OMAP-L138 Video Display",
->> +};
->> +#endif /* defined(CONFIG_DA850_UI_SD_VIDEO_PORT) */
->> +
->> +#if IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) || IS_ENABLED(CONFIG_DA850_UI_SD_VIDEO_PORT)
->>  static void __init da850_vpif_legacy_init(void)
->>  {
->>       int ret;
->> @@ -119,8 +178,16 @@ static void __init da850_vpif_legacy_init(void)
->>       if (ret)
->>               pr_warn("%s: VPIF capture setup failed: %d\n",
->>                       __func__, ret);
->> +
->> +     /* LCDK doesn't support VPIF display */
->> +     if (of_machine_is_compatible("ti,da850-evm")) {
->> +             ret = da850_register_vpif_display(&da850_vpif_display_config);
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Suggested-by: Arnd Bergmann <arnd@arndb.de>
+
+This one is OK and I didn't see a regression:
+
+Tested-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Gregory
+
+
+> ---
+>  drivers/net/ethernet/marvell/mvneta.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 >
-> This fails to build when CONFIG_DA850_UI_SD_VIDEO_PORT is switched off.
-> Probably means you need separate functions for registering capture and
-> display parts.
->
-> I haven't reviewed rest of the patchset yet. Just noticed these while
-> applying them for some testing. You may want to wait sometime before
-> sending the next version.
->
-> Thanks,
-> Sekhar
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index 61dd4462411c..06df72b8da85 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -313,8 +313,8 @@
+>  	((addr >= txq->tso_hdrs_phys) && \
+>  	 (addr < txq->tso_hdrs_phys + txq->size * TSO_HEADER_SIZE))
+>  
+> -#define MVNETA_RX_GET_BM_POOL_ID(rxd) \
+> -	(((rxd)->status & MVNETA_RXD_BM_POOL_MASK) >> MVNETA_RXD_BM_POOL_SHIFT)
+> +#define MVNETA_RX_GET_BM_POOL_ID(status) \
+> +	(((status) & MVNETA_RXD_BM_POOL_MASK) >> MVNETA_RXD_BM_POOL_SHIFT)
+>  
+>  struct mvneta_statistic {
+>  	unsigned short offset;
+> @@ -1900,7 +1900,7 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
+>  		for (i = 0; i < rx_done; i++) {
+>  			struct mvneta_rx_desc *rx_desc =
+>  						  mvneta_rxq_next_desc_get(rxq);
+> -			u8 pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
+> +			u8 pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc->status);
+>  			struct mvneta_bm_pool *bm_pool;
+>  
+>  			bm_pool = &pp->bm_priv->bm_pools[pool_id];
+> @@ -2075,7 +2075,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
+>  		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
+>  		data = (u8 *)(uintptr_t)rx_desc->buf_cookie;
+>  		phys_addr = rx_desc->buf_phys_addr;
+> -		pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc);
+> +		pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_status);
+>  		bm_pool = &pp->bm_priv->bm_pools[pool_id];
+>  
+>  		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
+> -- 
+> 2.11.0
 >
 
-Eek! My bad, didn't test different configs with that.
-
-Thanks,
-Bartosz
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
