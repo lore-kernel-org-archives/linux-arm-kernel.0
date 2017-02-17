@@ -1,72 +1,84 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 17 Feb 2017 15:44:10 +0000
-Subject: [PATCH 01/20] arm64: hyp-stub: Implement HVC_RESET_VECTORS stub
- hypercall
-In-Reply-To: <20170217154429.5000-1-marc.zyngier@arm.com>
-References: <20170217154429.5000-1-marc.zyngier@arm.com>
-Message-ID: <20170217154429.5000-2-marc.zyngier@arm.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Fri, 17 Feb 2017 07:53:05 -0800
+Subject: [PATCH v2] arm64: print a fault message when attempting to write
+ RO memory
+In-Reply-To: <58A6D7D7.1030704@arm.com>
+References: <20170217011959.26754-1-stephen.boyd@linaro.org>
+ <58A6D7D7.1030704@arm.com>
+Message-ID: <148734678579.30076.8827985106565313944@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's define a new stub hypercall that resets the HYP configuration
-to its default: hyp-stub vectors, and MMU disabled.
+Quoting James Morse (2017-02-17 03:00:39)
+> On 17/02/17 01:19, Stephen Boyd wrote:
+> > diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> > index 156169c6981b..8bd4e7f11c70 100644
+> > --- a/arch/arm64/mm/fault.c
+> > +++ b/arch/arm64/mm/fault.c
+> 
+> >  /*
+> >   * The kernel tried to access some page that wasn't present.
+> >   */
+> >  static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+> >                             unsigned int esr, struct pt_regs *regs)
+> >  {
+> > +     const char *msg;
+> >       /*
+> >        * Are we prepared to handle this kernel fault?
+> >        * We are almost certainly not prepared to handle instruction faults.
+> > @@ -177,9 +193,19 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+> >        * No handler, we'll have to terminate things with extreme prejudice.
+> >        */
+> >       bust_spinlocks(1);
+> > -     pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
+> > -              (addr < PAGE_SIZE) ? "NULL pointer dereference" :
+> > -              "paging request", addr);
+> > +
+> > +     if (is_permission_fault(esr, regs)) {
+> 
+> is_permission_fault() was previously guarded with a 'addr<USER_DS' check, this
+> is because it assumes software-PAN is relevant.
+> 
+> The corner case is when the kernel accesses TTBR1-mapped memory while
+> software-PAN happens to have swivelled TTBR0. Translation faults will be matched
+> by is_permission_fault(), but permission faults won't.
 
-Of course, for the hyp-stub itself, this is a trivial no-op.
-Hypervisors will have a bit more work to do.
+If I understand correctly, and I most definitely don't because there are
+quite a few combinations, you're saying that __do_kernel_fault() could
+be called if the kernel attempts to access some userspace address with
+software PAN? That won't be caught in do_page_fault() with the previous
+is_permission_fault() check?
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/virt.h |  8 ++++++++
- arch/arm64/kernel/hyp-stub.S  | 13 ++++++++++++-
- 2 files changed, 20 insertions(+), 1 deletion(-)
+> 
+> Juggling is_permission_fault() to look something like:
+> ---%<---
+>         if (fsc_type == ESR_ELx_FSC_PERM)
+>                 return true;
+> 
+>         if (addr < USER_DS && system_uses_ttbr0_pan())
+>                 return fsc_type == ESR_ELx_FSC_FAULT &&
+>                         (regs->pstate & PSR_PAN_BIT);
+> 
+>         return false;
+> ---%<---
+> ... should fix this.
 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 439f6b5d31f6..6d085a4d6cf1 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -39,6 +39,14 @@
-  */
- #define HVC_SOFT_RESTART 2
- 
-+/*
-+ * HVC_RESET_VECTORS - Restore the vectors to the original HYP stubs
-+ */
-+#define HVC_RESET_VECTORS 3
-+
-+/* Max number of HYP stub hypercalls */
-+#define HVC_STUB_HCALL_NR 4
-+
- #define BOOT_CPU_MODE_EL1	(0xe11)
- #define BOOT_CPU_MODE_EL2	(0xe12)
- 
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index d3b5f75e652e..a162182d5662 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -79,8 +79,11 @@ el1_sync:
- 	mov	x1, x3
- 	br	x4				// no return
- 
-+3:	cmp	x0, #HVC_RESET_VECTORS
-+	beq	9f				// Nothing to reset!
-+
- 	/* Someone called kvm_call_hyp() against the hyp-stub... */
--3:	mov	x0, #ARM_EXCEPTION_HYP_GONE
-+	mov	x0, #ARM_EXCEPTION_HYP_GONE
- 
- 9:	eret
- ENDPROC(el1_sync)
-@@ -137,3 +140,11 @@ ENTRY(__hyp_set_vectors)
- 	ldr	lr, [sp], #16
- 	ret
- ENDPROC(__hyp_set_vectors)
-+
-+ENTRY(__hyp_reset_vectors)
-+	str	lr, [sp, #-16]!
-+	mov	x0, #HVC_RESET_VECTORS
-+	hvc	#0
-+	ldr	lr, [sp], #16
-+	ret
-+ENDPROC(__hyp_reset_vectors)
--- 
-2.11.0
+But we don't need to check ec anymore?
+
+	if (ec != ESR_ELx_EC_DABT_CUR && ec != ESR_ELx_EC_IABT_CUR)
+		return false;
+
+> 
+> 
+> > +             if (esr & ESR_ELx_WNR)
+> > +                     msg = "write to read-only memory";
+> > +             else
+> > +                     msg = "read from unreadable memory";
+> > +     } else if (addr < PAGE_SIZE)
+> > +             msg = "NULL pointer dereference";
+> > +     else
+> > +             msg = "paging request";
+> 
+> Nit: {} all the way down!
+
+Ok.
