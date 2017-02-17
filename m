@@ -1,21 +1,22 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 16 Feb 2017 16:57:18 -0800
-Subject: [PATCH] staging: bcm2835-audio: bcm2835.h: fix various coding
- style issues
-In-Reply-To: <1487286834-7490-1-git-send-email-adanhawthorn@gmail.com>
-References: <1487286834-7490-1-git-send-email-adanhawthorn@gmail.com>
-Message-ID: <20170217005718.GA17863@kroah.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 16 Feb 2017 23:04:31 -0200
+Subject: [PATCH] ARM: imx25: set default phy_type and dr_mode for usbotg
+ port
+In-Reply-To: <20170216211858.8563-1-u.kleine-koenig@pengutronix.de>
+References: <20170216211858.8563-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <CAOMZO5ASKSZcdHdZqbdwc12YgJa2gucG5Ww1Uvobjc8MPFTq9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 06:12:58PM -0500, Nathan Howard wrote:
-> Fix various coding style issues as per checkpatch.pl.
+On Thu, Feb 16, 2017 at 7:18 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> All currently supported i.MX25-based machines use phy_type = "utmi" and
+> dr_mode = "otg".  So this seems to be a sensible default.
+>
+> This also doesn't hurt out-of-tree machines because up to now they had
+> to specify these two properties in the machine.dts which still takes
+> precedence by just overwriting the defaults added here.
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-You need to be very specific as to exactly what you are fixing here.
-And please only do one type of thing per patch.
-
-Please fix up and resend.
-
-thanks,
-
-greg k-h
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
