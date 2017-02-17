@@ -1,149 +1,170 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 17 Feb 2017 17:57:27 +0800
-Subject: [PATCH net-next 2/2] net: mvneta: Use cacheable memory to store the
- rx buffer DMA address
-In-Reply-To: <20170217095727.2226-1-jszhang@marvell.com>
-References: <20170217095727.2226-1-jszhang@marvell.com>
-Message-ID: <20170217095727.2226-3-jszhang@marvell.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 17 Feb 2017 11:47:59 +0100
+Subject: [PATCH v4 23/36] media: imx: Add MIPI CSI-2 Receiver subdev driver
+In-Reply-To: <1487211578-11360-24-git-send-email-steve_longerbeam@mentor.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-24-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1487328479.3107.21.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In hot code path such as mvneta_rx_hwbm() and mvneta_rx_swbm, the
-buf_phys_addr field of rx_dec is accessed. The rx_desc is allocated by
-dma_alloc_coherent, it's uncacheable if the device isn't cache
-coherent, reading from uncached memory is fairly slow. This patch uses
-cacheable memory to store the rx buffer DMA address. We get the
-following performance data on Marvell BG4CT Platforms (tested with
-iperf):
+On Wed, 2017-02-15 at 18:19 -0800, Steve Longerbeam wrote:
+> Adds MIPI CSI-2 Receiver subdev driver. This subdev is required
+> for sensors with a MIPI CSI2 interface.
+> 
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> ---
+>  drivers/staging/media/imx/Makefile         |   1 +
+>  drivers/staging/media/imx/imx6-mipi-csi2.c | 573 +++++++++++++++++++++++++++++
+>  2 files changed, 574 insertions(+)
+>  create mode 100644 drivers/staging/media/imx/imx6-mipi-csi2.c
+> 
+> diff --git a/drivers/staging/media/imx/Makefile b/drivers/staging/media/imx/Makefile
+> index 878a126..3569625 100644
+> --- a/drivers/staging/media/imx/Makefile
+> +++ b/drivers/staging/media/imx/Makefile
+> @@ -9,3 +9,4 @@ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-vdic.o
+>  obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-ic.o
+>  
+>  obj-$(CONFIG_VIDEO_IMX_CSI) += imx-media-csi.o
+> +obj-$(CONFIG_VIDEO_IMX_CSI) += imx6-mipi-csi2.o
+> diff --git a/drivers/staging/media/imx/imx6-mipi-csi2.c b/drivers/staging/media/imx/imx6-mipi-csi2.c
+> new file mode 100644
+> index 0000000..23dca80
+> --- /dev/null
+> +++ b/drivers/staging/media/imx/imx6-mipi-csi2.c
+> @@ -0,0 +1,573 @@
+> +/*
+> + * MIPI CSI-2 Receiver Subdev for Freescale i.MX6 SOC.
+> + *
+> + * Copyright (c) 2012-2017 Mentor Graphics Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +#include <linux/clk.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/iopoll.h>
+> +#include <linux/irq.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <media/v4l2-device.h>
+> +#include <media/v4l2-of.h>
+> +#include <media/v4l2-subdev.h>
+> +#include "imx-media.h"
+> +
+> +/*
+> + * there must be 5 pads: 1 input pad from sensor, and
+> + * the 4 virtual channel output pads
+> + */
+> +#define CSI2_SINK_PAD       0
+> +#define CSI2_NUM_SINK_PADS  1
+> +#define CSI2_NUM_SRC_PADS   4
+> +#define CSI2_NUM_PADS       5
+> +
+> +struct csi2_dev {
+> +	struct device          *dev;
+> +	struct v4l2_subdev      sd;
+> +	struct media_pad       pad[CSI2_NUM_PADS];
+> +	struct v4l2_mbus_framefmt format_mbus;
+> +	struct clk             *dphy_clk;
+> +	struct clk             *cfg_clk;
+> +	struct clk             *pix_clk; /* what is this? */
+> +	void __iomem           *base;
+> +	struct v4l2_of_bus_mipi_csi2 bus;
+> +	bool                    on;
+> +	bool                    stream_on;
+> +	bool                    src_linked;
+> +	bool                    sink_linked[CSI2_NUM_SRC_PADS];
+> +};
+> +
+> +#define DEVICE_NAME "imx6-mipi-csi2"
+> +
+> +/* Register offsets */
+> +#define CSI2_VERSION            0x000
+> +#define CSI2_N_LANES            0x004
+> +#define CSI2_PHY_SHUTDOWNZ      0x008
+> +#define CSI2_DPHY_RSTZ          0x00c
+> +#define CSI2_RESETN             0x010
+> +#define CSI2_PHY_STATE          0x014
+> +#define PHY_STOPSTATEDATA_BIT   4
+> +#define PHY_STOPSTATEDATA(n)    BIT(PHY_STOPSTATEDATA_BIT + (n))
+> +#define PHY_RXCLKACTIVEHS       BIT(8)
+> +#define PHY_RXULPSCLKNOT        BIT(9)
+> +#define PHY_STOPSTATECLK        BIT(10)
+> +#define CSI2_DATA_IDS_1         0x018
+> +#define CSI2_DATA_IDS_2         0x01c
+> +#define CSI2_ERR1               0x020
+> +#define CSI2_ERR2               0x024
+> +#define CSI2_MSK1               0x028
+> +#define CSI2_MSK2               0x02c
+> +#define CSI2_PHY_TST_CTRL0      0x030
+> +#define PHY_TESTCLR		BIT(0)
+> +#define PHY_TESTCLK		BIT(1)
+> +#define CSI2_PHY_TST_CTRL1      0x034
+> +#define PHY_TESTEN		BIT(16)
+> +#define CSI2_SFT_RESET          0xf00
+> +
+> +static inline struct csi2_dev *sd_to_dev(struct v4l2_subdev *sdev)
+> +{
+> +	return container_of(sdev, struct csi2_dev, sd);
+> +}
+> +
+> +static void csi2_enable(struct csi2_dev *csi2, bool enable)
+> +{
+> +	if (enable) {
+> +		writel(0x1, csi2->base + CSI2_PHY_SHUTDOWNZ);
+> +		writel(0x1, csi2->base + CSI2_DPHY_RSTZ);
+> +		writel(0x1, csi2->base + CSI2_RESETN);
+> +	} else {
+> +		writel(0x0, csi2->base + CSI2_PHY_SHUTDOWNZ);
+> +		writel(0x0, csi2->base + CSI2_DPHY_RSTZ);
+> +		writel(0x0, csi2->base + CSI2_RESETN);
+> +	}
+> +}
+> +
+> +static void csi2_set_lanes(struct csi2_dev *csi2)
+> +{
+> +	int lanes = csi2->bus.num_data_lanes;
+> +
+> +	writel(lanes - 1, csi2->base + CSI2_N_LANES);
+> +}
+> +
+> +static void dw_mipi_csi2_phy_write(struct csi2_dev *csi2,
+> +				   u32 test_code, u32 test_data)
+> +{
+> +	/* Clear PHY test interface */
+> +	writel(PHY_TESTCLR, csi2->base + CSI2_PHY_TST_CTRL0);
+> +	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL1);
+> +	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL0);
+> +
+> +	/* Raise test interface strobe signal */
+> +	writel(PHY_TESTCLK, csi2->base + CSI2_PHY_TST_CTRL0);
+> +
+> +	/* Configure address write on falling edge and lower strobe signal */
+> +	writel(PHY_TESTEN | test_code, csi2->base + CSI2_PHY_TST_CTRL1);
+> +	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL0);
+> +
+> +	/* Configure data write on rising edge and raise strobe signal */
+> +	writel(test_data, csi2->base + CSI2_PHY_TST_CTRL1);
+> +	writel(PHY_TESTCLK, csi2->base + CSI2_PHY_TST_CTRL0);
+> +
+> +	/* Clear strobe signal */
+> +	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL0);
+> +}
+> +
+> +static void csi2_dphy_init(struct csi2_dev *csi2)
+> +{
+> +	/*
+> +	 * FIXME: 0x14 is derived from a fixed D-PHY reference
+> +	 * clock from the HSI_TX PLL, and a fixed target lane max
+> +	 * bandwidth of 300 Mbps. This value should be derived
 
-before the patch:
-recving 1GB in mvneta_rx_swbm() costs 149265960 ns
+If the table in https://community.nxp.com/docs/DOC-94312 is correct,
+this should be 850 Mbps. Where does this 300 Mbps value come from?
 
-after the patch:
-recving 1GB in mvneta_rx_swbm() costs 1421565640 ns
-
-We saved 4.76% time.
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/net/ethernet/marvell/mvneta.c | 28 +++++++++++++++++-----------
- 1 file changed, 17 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 06df72b8da85..e24c3028fe1d 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -580,6 +580,9 @@ struct mvneta_rx_queue {
- 	/* Virtual address of the RX buffer */
- 	void  **buf_virt_addr;
- 
-+	/* DMA address of the RX buffer */
-+	dma_addr_t *buf_dma_addr;
-+
- 	/* Virtual address of the RX DMA descriptors array */
- 	struct mvneta_rx_desc *descs;
- 
-@@ -1617,6 +1620,7 @@ static void mvneta_rx_desc_fill(struct mvneta_rx_desc *rx_desc,
- 
- 	rx_desc->buf_phys_addr = phys_addr;
- 	i = rx_desc - rxq->descs;
-+	rxq->buf_dma_addr[i] = phys_addr;
- 	rxq->buf_virt_addr[i] = virt_addr;
- }
- 
-@@ -1900,22 +1904,22 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
- 		for (i = 0; i < rx_done; i++) {
- 			struct mvneta_rx_desc *rx_desc =
- 						  mvneta_rxq_next_desc_get(rxq);
-+			int index = rx_desc - rxq->descs;
- 			u8 pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc->status);
- 			struct mvneta_bm_pool *bm_pool;
- 
- 			bm_pool = &pp->bm_priv->bm_pools[pool_id];
- 			/* Return dropped buffer to the pool */
- 			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
--					      rx_desc->buf_phys_addr);
-+					      rxq->buf_dma_addr[index]);
- 		}
- 		return;
- 	}
- 
- 	for (i = 0; i < rxq->size; i++) {
--		struct mvneta_rx_desc *rx_desc = rxq->descs + i;
- 		void *data = rxq->buf_virt_addr[i];
- 
--		dma_unmap_single(pp->dev->dev.parent, rx_desc->buf_phys_addr,
-+		dma_unmap_single(pp->dev->dev.parent, rxq->buf_dma_addr[i],
- 				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
- 		mvneta_frag_free(pp->frag_size, data);
- 	}
-@@ -1953,7 +1957,7 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
- 		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
- 		index = rx_desc - rxq->descs;
- 		data = rxq->buf_virt_addr[index];
--		phys_addr = rx_desc->buf_phys_addr;
-+		phys_addr = rxq->buf_dma_addr[index];
- 
- 		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
- 		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
-@@ -2062,6 +2066,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
- 	/* Fairness NAPI loop */
- 	while (rx_done < rx_todo) {
- 		struct mvneta_rx_desc *rx_desc = mvneta_rxq_next_desc_get(rxq);
-+		int index = rx_desc - rxq->descs;
- 		struct mvneta_bm_pool *bm_pool = NULL;
- 		struct sk_buff *skb;
- 		unsigned char *data;
-@@ -2074,7 +2079,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
- 		rx_status = rx_desc->status;
- 		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
- 		data = (u8 *)(uintptr_t)rx_desc->buf_cookie;
--		phys_addr = rx_desc->buf_phys_addr;
-+		phys_addr = rxq->buf_dma_addr[index];
- 		pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_status);
- 		bm_pool = &pp->bm_priv->bm_pools[pool_id];
- 
-@@ -2082,8 +2087,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
- 		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
- err_drop_frame_ret_pool:
- 			/* Return the buffer to the pool */
--			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
--					      rx_desc->buf_phys_addr);
-+			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool, phys_addr);
- err_drop_frame:
- 			dev->stats.rx_errors++;
- 			mvneta_rx_error(pp, rx_desc);
-@@ -2098,7 +2102,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
- 				goto err_drop_frame_ret_pool;
- 
- 			dma_sync_single_range_for_cpu(dev->dev.parent,
--			                              rx_desc->buf_phys_addr,
-+			                              phys_addr,
- 			                              MVNETA_MH_SIZE + NET_SKB_PAD,
- 			                              rx_bytes,
- 			                              DMA_FROM_DEVICE);
-@@ -2114,8 +2118,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
- 			rcvd_bytes += rx_bytes;
- 
- 			/* Return the buffer to the pool */
--			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
--					      rx_desc->buf_phys_addr);
-+			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool, phys_addr);
- 
- 			/* leave the descriptor and buffer untouched */
- 			continue;
-@@ -4019,7 +4022,10 @@ static int mvneta_init(struct device *dev, struct mvneta_port *pp)
- 		rxq->buf_virt_addr = devm_kmalloc(pp->dev->dev.parent,
- 						  rxq->size * sizeof(void *),
- 						  GFP_KERNEL);
--		if (!rxq->buf_virt_addr)
-+		rxq->buf_dma_addr = devm_kmalloc(pp->dev->dev.parent,
-+						 rxq->size * sizeof(dma_addr_t),
-+						 GFP_KERNEL);
-+		if (!rxq->buf_virt_addr || !rxq->buf_dma_addr)
- 			return -ENOMEM;
- 	}
- 
--- 
-2.11.0
+regards
+Philipp
