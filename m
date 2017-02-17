@@ -1,33 +1,21 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 17 Feb 2017 17:10:36 +0100
-Subject: [PATCH 3/3] ARM: socfpga: PM: Drop useless check for
- PM_SUSPEND_STANDBY
-In-Reply-To: <1487347836-14427-1-git-send-email-geert+renesas@glider.be>
-References: <1487347836-14427-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1487347836-14427-4-git-send-email-geert+renesas@glider.be>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Fri, 17 Feb 2017 17:16:26 +0100
+Subject: [RFC 4/4] iio: trigger: add GPIO trigger
+In-Reply-To: <1487347429-31761-5-git-send-email-fabrice.gasnier@st.com>
+References: <1487347429-31761-1-git-send-email-fabrice.gasnier@st.com>
+ <1487347429-31761-5-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <06f74b54-91fa-31c5-f015-52a6524059ef@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As SoCFPGA uses the standard suspend_valid_only_mem() for its
-platform_suspend_ops.valid() callback, its platform_suspend_ops.enter()
-callback will never be called with state equal to PM_SUSPEND_STANDBY.
+On 02/17/2017 05:03 PM, Fabrice Gasnier wrote:
+> GPIOs can be used to generate triggers for any IIO device.
+> Introduce generic GPIO trigger driver. It offers some options
+> to tune polarity (e.g. rising/falling edge), and label so trigger
+> name may be customized.
+> By default, gpio triggers will be named gpiotrigX, where X is gpio
+> number as returned by desc_to_gpio() call.
+> Rising edge is selected if polarity isn't set.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/mach-socfpga/pm.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/mach-socfpga/pm.c b/arch/arm/mach-socfpga/pm.c
-index c378ab0c24317ccf..d4866788702cb87a 100644
---- a/arch/arm/mach-socfpga/pm.c
-+++ b/arch/arm/mach-socfpga/pm.c
-@@ -116,7 +116,6 @@ static int socfpga_pm_suspend(unsigned long arg)
- static int socfpga_pm_enter(suspend_state_t state)
- {
- 	switch (state) {
--	case PM_SUSPEND_STANDBY:
- 	case PM_SUSPEND_MEM:
- 		outer_disable();
- 		cpu_suspend(0, socfpga_pm_suspend);
--- 
-1.9.1
+If you want to use the GPIO only as an interrupt, just use it as an
+interrupt directly, no need to go the route via the GPIO.
