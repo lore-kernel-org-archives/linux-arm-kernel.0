@@ -1,55 +1,40 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 17 Feb 2017 06:40:33 -0800
-Subject: [PATCH v2 2/3] watchdog: sama5d4: Fix setting timeout when
- watchdog is disabled
-In-Reply-To: <20170216193053.5546-2-alexandre.belloni@free-electrons.com>
-References: <20170216193053.5546-1-alexandre.belloni@free-electrons.com>
- <20170216193053.5546-2-alexandre.belloni@free-electrons.com>
-Message-ID: <968ef53e-c3c4-5322-020a-8382ce367931@roeck-us.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 Feb 2017 14:42:55 +0000
+Subject: [PATCH 07/10] perf: Directly pass PERF_AUX_* flags to
+ perf_aux_output_end
+In-Reply-To: <87y3x4j4ho.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1485540470-11469-1-git-send-email-will.deacon@arm.com>
+ <1485540470-11469-8-git-send-email-will.deacon@arm.com>
+ <8737fdj5q0.fsf@ashishki-desk.ger.corp.intel.com>
+ <20170217140001.GD15431@arm.com>
+ <87y3x4j4ho.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <20170217144255.GI15431@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/16/2017 11:30 AM, Alexandre Belloni wrote:
-> The datasheet states: "When setting the WDDIS bit, and while it is set, the
-> fields WDV and WDD must not be modified."
->
-> Ensure WDDIS is not set when changing the timeout and set it afterwards if
-> the watchdog was disabled.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
-> Changes in v2:
->  - new patch
->  drivers/watchdog/sama5d4_wdt.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-> index 2c6f5a70ae67..2a60251806d2 100644
-> --- a/drivers/watchdog/sama5d4_wdt.c
-> +++ b/drivers/watchdog/sama5d4_wdt.c
-> @@ -90,11 +90,18 @@ static int sama5d4_wdt_set_timeout(struct watchdog_device *wdd,
->  	u32 reg;
->
->  	reg = wdt_read(wdt, AT91_WDT_MR);
-> +
-> +	if (reg & AT91_WDT_WDDIS)
-> +		wdt_write(wdt, AT91_WDT_MR, reg & ~AT91_WDT_WDDIS);
-> +
->  	reg &= ~AT91_WDT_WDV;
->  	reg &= ~AT91_WDT_WDD;
->  	reg |= AT91_WDT_SET_WDV(value);
->  	reg |= AT91_WDT_SET_WDD(value);
-> -	wdt_write(wdt, AT91_WDT_MR, reg);
-> +	wdt_write(wdt, AT91_WDT_MR, reg & ~AT91_WDT_WDDIS);
-> +
-> +	if (reg & AT91_WDT_WDDIS)
-> +		wdt_write(wdt, AT91_WDT_MR, reg);
->
-That means if the watchdog is running, the timeout would not be updated.
-It should be updated no matter if it is running or not.
+On Fri, Feb 17, 2017 at 04:06:59PM +0200, Alexander Shishkin wrote:
+> Will Deacon <will.deacon@arm.com> writes:
+> 
+> > On Fri, Feb 17, 2017 at 03:40:23PM +0200, Alexander Shishkin wrote:
+> >> Will Deacon <will.deacon@arm.com> writes:
+> >> 
+> >> > @@ -485,7 +485,8 @@ int intel_bts_interrupt(void)
+> >> >  		return handled;
+> >> >  
+> >> >  	perf_aux_output_end(&bts->handle, local_xchg(&buf->data_size, 0),
+> >> > -			    !!local_xchg(&buf->lost, 0));
+> >> > +			    local_xchg(&buf->lost, 0) ?
+> >> > +			    PERF_AUX_FLAG_OVERWRITE : 0);
+> >> 
+> >> Heh, this one would have taken some time to debug. :)
+> >
+> > Don't worry, this isn't a bug fix! This patch changes the prototype for
+> > perf_aux_output_end so that it takes the flag instead of a "bool truncated"
+> > parameter, so this is just fixing up the callers at the same time.
+> 
+> Yeah, I got that, what I'm saying is that the above should be
+> PERF_AUX_FLAG_TRUNCATED, not OVERWRITE. I only spotted it by accident.
 
-Guenter
+D'oh, quite right, I'll fix that now. Thanks for having a look.
 
->  	wdd->timeout = timeout;
->
->
+Will
