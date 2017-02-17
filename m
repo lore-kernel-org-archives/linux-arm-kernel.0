@@ -1,43 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Feb 2017 17:17:32 +0100
-Subject: [PATCH v3 5/6] ARM: mvebu: Add driver for mv98dx3236-soc-id
-In-Reply-To: <be262173372a46be97f635e8ce9e36af@svr-chch-ex1.atlnz.lc>
-References: <20170216085041.28337-1-chris.packham@alliedtelesis.co.nz>
- <20170216085041.28337-6-chris.packham@alliedtelesis.co.nz>
- <28604982.PnlvXC13kC@wuerfel>
- <be262173372a46be97f635e8ce9e36af@svr-chch-ex1.atlnz.lc>
-Message-ID: <CAK8P3a0Zyii5QbGAtR0TCEsUnGwkH1G5+_bPku4VYPKM-aTS8g@mail.gmail.com>
+From: daniel.baluta@gmail.com (Daniel Baluta)
+Date: Fri, 17 Feb 2017 18:23:41 +0200
+Subject: [RFC 0/4] iio: trigger: Add OF support and GPIO based trigger
+In-Reply-To: <1487347429-31761-1-git-send-email-fabrice.gasnier@st.com>
+References: <1487347429-31761-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <CAEnQRZDey70TR=nU4rpFyVMqDuUFAGc2SpNCmraUO5x29n1+ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2017 at 5:22 AM, Chris Packham
-<Chris.Packham@alliedtelesis.co.nz> wrote:
-> Hi Arnd,
-> On 17/02/17 02:28, Arnd Bergmann wrote:
->> On Thursday, February 16, 2017 9:50:39 PM CET Chris Packham wrote:
->>> The DFX server on the 98dx3236 and compatible SoCs has an ID register
->>> that provides revision information that the PCI based ID register
->>> doesn't have. Use this if it's available.
->>>
->>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->>>
->>
->> How about putting this new code into a separate driver in
->> drivers/soc/? I don't think you need the early probing we have
->> here, and not that much is shared otherwise.
->>
+On Fri, Feb 17, 2017 at 6:03 PM, Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+> Hi,
 >
-> Not putting it there means we'll get the pci fall-back behaviour which
-> will result in a incorrect rev value. Having said that no callers of
-> mvebu_get_soc_id() currently care about these specific SoCs so not
-> having the right rev is not an issue at the moment.
+> I send this as an RFC, as I'm digging to try to get as generic
+> as possible GPIO based trigger support, as discussed earlier in
+> other patchset "Add EXTI GPIO trigger support to STM32 ADC":
+> https://www.spinics.net/lists/arm-kernel/msg559091.html
+>
+> Following various comments on this, I sent this RFC to address two
+> topics, that I see as possible prerequisite:
+> - Add trigger OF support
+> - GPIO based trigger
 
-We should still care about incorrect IDs as they are shown to user space,
-which could start relying on it in theory.
+I wonder if we could use configfs to create and configure
+a GPIO based trigger.
 
-However, the PCI ID should only be used on chips that have a PCI
-host with an ID known to be correct, so maybe we can restrict
-get_soc_id_by_pci() in a way that the mvebu_pcie_of_match_table
-matching does not trigger on chips on which we don't want it to.
+You should just create another trigger type (look into
+drivers/iio/trigger/iio-trig-hrtimer.c)
+the userspace API will look like this:
 
-     Arnd
+# cd /config/iio/triggers
+# insert your iio-trig-gpio
+# setup the global parameters for the GPIO (the local params can be
+set via dts/acpi)
+# cd /config/iio/trigers/gpios/
+
+#mkdir t1
+
+And this will create an io-gpio-trigger named t1.
+
+Not sure this fits your usecase but would be nice to consider.
+
+thanks,
+Daniel.
