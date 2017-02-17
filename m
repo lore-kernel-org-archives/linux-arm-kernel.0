@@ -1,130 +1,179 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 17 Feb 2017 23:32:58 +0800
-Subject: [xlnx:master 329/356] arch/x86/include/asm/pgtable_types.h:56:43:
- warning: left shift count >= width of type
-Message-ID: <201702172353.qvnibe3l%fengguang.wu@intel.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 17 Feb 2017 16:35:05 +0100
+Subject: [PATCH v2 1/3] watchdog: sama5d4: Cleanup init
+In-Reply-To: <14ea461a-5a95-ca85-1eb3-1c34e382bc48@roeck-us.net>
+References: <20170216193053.5546-1-alexandre.belloni@free-electrons.com>
+ <14ea461a-5a95-ca85-1eb3-1c34e382bc48@roeck-us.net>
+Message-ID: <20170217153505.gv4kftvk3z6emmii@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   330ed0834e0eb0745a7111c2a21bbbf839024ad6
-commit: 18e575b575916fa70eb4e9bbab4759c20e40d7bd [329/356] of: changesets: Introduce changeset helper methods
-config: x86_64-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout 18e575b575916fa70eb4e9bbab4759c20e40d7bd
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+On 17/02/2017 at 06:48:36 -0800, Guenter Roeck wrote:
+> On 02/16/2017 11:30 AM, Alexandre Belloni wrote:
+> > .config is used to cache a part of WDT_MR at probe time and is not used
+> > afterwards. Also functions are used while they always return 0. Simplify
+> > the flow by having everything in .probe().
+> > 
+> 
+> Does that really improve anything ? It makes the code harder to read
+> and, ultimately, the dropped value in sama5d4_wdt is added back in a
+> later patch as 'mr'.
+> 
 
-All warnings (new ones prefixed by >>):
+I don't find the current code to be particularly easy to read but maybe
+it is a matter of taste.
 
-   In file included from arch/x86/include/asm/paravirt_types.h:44:0,
-                    from arch/x86/include/asm/ptrace.h:71,
-                    from arch/x86/include/asm/math_emu.h:4,
-                    from arch/x86/include/asm/processor.h:11,
-                    from arch/x86/include/asm/cpufeature.h:4,
-                    from arch/x86/include/asm/thread_info.h:52,
-                    from include/linux/thread_info.h:58,
-                    from arch/x86/include/asm/preempt.h:6,
-                    from include/linux/preempt.h:59,
-                    from include/linux/spinlock.h:50,
-                    from include/linux/seqlock.h:35,
-                    from include/linux/time.h:5,
-                    from include/uapi/linux/timex.h:56,
-                    from include/linux/timex.h:56,
-                    from include/linux/clocksource.h:12,
-                    from arch/x86/include/asm/vgtod.h:5,
-                    from arch/x86/entry/vdso/vdso32/../vclock_gettime.c:15,
-                    from arch/x86/entry/vdso/vdso32/vclock_gettime.c:32:
-   arch/x86/include/asm/pgtable.h: In function 'pte_flags_pkey':
->> arch/x86/include/asm/pgtable_types.h:56:43: warning: left shift count >= width of type [-Wshift-count-overflow]
-    #define _PAGE_PKEY_BIT0 (_AT(pteval_t, 1) << _PAGE_BIT_PKEY_BIT0)
-                                              ^
->> arch/x86/include/asm/pgtable_types.h:68:26: note: in expansion of macro '_PAGE_PKEY_BIT0'
-    #define _PAGE_PKEY_MASK (_PAGE_PKEY_BIT0 | \
-                             ^~~~~~~~~~~~~~~
->> arch/x86/include/asm/pgtable.h:977:22: note: in expansion of macro '_PAGE_PKEY_MASK'
-     return (pte_flags & _PAGE_PKEY_MASK) >> _PAGE_BIT_PKEY_BIT0;
-                         ^~~~~~~~~~~~~~~
-   arch/x86/include/asm/pgtable_types.h:57:43: warning: left shift count >= width of type [-Wshift-count-overflow]
-    #define _PAGE_PKEY_BIT1 (_AT(pteval_t, 1) << _PAGE_BIT_PKEY_BIT1)
-                                              ^
->> arch/x86/include/asm/pgtable_types.h:69:5: note: in expansion of macro '_PAGE_PKEY_BIT1'
-        _PAGE_PKEY_BIT1 | \
-        ^~~~~~~~~~~~~~~
->> arch/x86/include/asm/pgtable.h:977:22: note: in expansion of macro '_PAGE_PKEY_MASK'
-     return (pte_flags & _PAGE_PKEY_MASK) >> _PAGE_BIT_PKEY_BIT0;
-                         ^~~~~~~~~~~~~~~
-   arch/x86/include/asm/pgtable_types.h:58:43: warning: left shift count >= width of type [-Wshift-count-overflow]
-    #define _PAGE_PKEY_BIT2 (_AT(pteval_t, 1) << _PAGE_BIT_PKEY_BIT2)
-                                              ^
->> arch/x86/include/asm/pgtable_types.h:70:5: note: in expansion of macro '_PAGE_PKEY_BIT2'
-        _PAGE_PKEY_BIT2 | \
-        ^~~~~~~~~~~~~~~
->> arch/x86/include/asm/pgtable.h:977:22: note: in expansion of macro '_PAGE_PKEY_MASK'
-     return (pte_flags & _PAGE_PKEY_MASK) >> _PAGE_BIT_PKEY_BIT0;
-                         ^~~~~~~~~~~~~~~
-   arch/x86/include/asm/pgtable_types.h:59:43: warning: left shift count >= width of type [-Wshift-count-overflow]
-    #define _PAGE_PKEY_BIT3 (_AT(pteval_t, 1) << _PAGE_BIT_PKEY_BIT3)
-                                              ^
->> arch/x86/include/asm/pgtable_types.h:71:5: note: in expansion of macro '_PAGE_PKEY_BIT3'
-        _PAGE_PKEY_BIT3)
-        ^~~~~~~~~~~~~~~
->> arch/x86/include/asm/pgtable.h:977:22: note: in expansion of macro '_PAGE_PKEY_MASK'
-     return (pte_flags & _PAGE_PKEY_MASK) >> _PAGE_BIT_PKEY_BIT0;
-                         ^~~~~~~~~~~~~~~
-   In file included from include/linux/kasan.h:16:0,
-                    from include/linux/slab.h:118,
-                    from include/linux/of.h:1187,
-                    from include/linux/clocksource.h:18,
-                    from arch/x86/include/asm/vgtod.h:5,
-                    from arch/x86/entry/vdso/vdso32/../vclock_gettime.c:15,
-                    from arch/x86/entry/vdso/vdso32/vclock_gettime.c:32:
->> arch/x86/include/asm/pgtable.h:977:39: warning: right shift count >= width of type [-Wshift-count-overflow]
-     return (pte_flags & _PAGE_PKEY_MASK) >> _PAGE_BIT_PKEY_BIT0;
-                                          ^~
+I would still remove the test on pdev->dev.of_node because it will never
+be false anyway.
 
-vim +56 arch/x86/include/asm/pgtable_types.h
 
-f955371ca David Vrabel        2014-01-07  50  #define _PAGE_SOFTW2	(_AT(pteval_t, 1) << _PAGE_BIT_SOFTW2)
-8d19c99fa Jeremy Fitzhardinge 2009-02-08  51  #define _PAGE_PAT	(_AT(pteval_t, 1) << _PAGE_BIT_PAT)
-8d19c99fa Jeremy Fitzhardinge 2009-02-08  52  #define _PAGE_PAT_LARGE (_AT(pteval_t, 1) << _PAGE_BIT_PAT_LARGE)
-8d19c99fa Jeremy Fitzhardinge 2009-02-08  53  #define _PAGE_SPECIAL	(_AT(pteval_t, 1) << _PAGE_BIT_SPECIAL)
-8d19c99fa Jeremy Fitzhardinge 2009-02-08  54  #define _PAGE_CPA_TEST	(_AT(pteval_t, 1) << _PAGE_BIT_CPA_TEST)
-5c1d90f51 Dave Hansen         2016-02-12  55  #ifdef CONFIG_X86_INTEL_MEMORY_PROTECTION_KEYS
-5c1d90f51 Dave Hansen         2016-02-12 @56  #define _PAGE_PKEY_BIT0	(_AT(pteval_t, 1) << _PAGE_BIT_PKEY_BIT0)
-5c1d90f51 Dave Hansen         2016-02-12  57  #define _PAGE_PKEY_BIT1	(_AT(pteval_t, 1) << _PAGE_BIT_PKEY_BIT1)
-5c1d90f51 Dave Hansen         2016-02-12  58  #define _PAGE_PKEY_BIT2	(_AT(pteval_t, 1) << _PAGE_BIT_PKEY_BIT2)
-5c1d90f51 Dave Hansen         2016-02-12  59  #define _PAGE_PKEY_BIT3	(_AT(pteval_t, 1) << _PAGE_BIT_PKEY_BIT3)
-5c1d90f51 Dave Hansen         2016-02-12  60  #else
-5c1d90f51 Dave Hansen         2016-02-12  61  #define _PAGE_PKEY_BIT0	(_AT(pteval_t, 0))
-5c1d90f51 Dave Hansen         2016-02-12  62  #define _PAGE_PKEY_BIT1	(_AT(pteval_t, 0))
-5c1d90f51 Dave Hansen         2016-02-12  63  #define _PAGE_PKEY_BIT2	(_AT(pteval_t, 0))
-5c1d90f51 Dave Hansen         2016-02-12  64  #define _PAGE_PKEY_BIT3	(_AT(pteval_t, 0))
-5c1d90f51 Dave Hansen         2016-02-12  65  #endif
-8d19c99fa Jeremy Fitzhardinge 2009-02-08  66  #define __HAVE_ARCH_PTE_SPECIAL
-8d19c99fa Jeremy Fitzhardinge 2009-02-08  67  
-019132ff3 Dave Hansen         2016-02-12 @68  #define _PAGE_PKEY_MASK (_PAGE_PKEY_BIT0 | \
-019132ff3 Dave Hansen         2016-02-12 @69  			 _PAGE_PKEY_BIT1 | \
-019132ff3 Dave Hansen         2016-02-12 @70  			 _PAGE_PKEY_BIT2 | \
-019132ff3 Dave Hansen         2016-02-12 @71  			 _PAGE_PKEY_BIT3)
-019132ff3 Dave Hansen         2016-02-12  72  
-97e3c602c Dave Hansen         2016-07-07  73  #if defined(CONFIG_X86_64) || defined(CONFIG_X86_PAE)
-97e3c602c Dave Hansen         2016-07-07  74  #define _PAGE_KNL_ERRATUM_MASK (_PAGE_DIRTY | _PAGE_ACCESSED)
+> Guenter
+> 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > ---
+> > Changes in v2:
+> >  - completely get rid of .config instead of caching it
+> >  - merge init functions in probe()
+> > 
+> >  drivers/watchdog/sama5d4_wdt.c | 92 ++++++++++++++++--------------------------
+> >  1 file changed, 34 insertions(+), 58 deletions(-)
+> > 
+> > diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+> > index a49634cdc1cc..2c6f5a70ae67 100644
+> > --- a/drivers/watchdog/sama5d4_wdt.c
+> > +++ b/drivers/watchdog/sama5d4_wdt.c
+> > @@ -28,7 +28,6 @@
+> >  struct sama5d4_wdt {
+> >  	struct watchdog_device	wdd;
+> >  	void __iomem		*reg_base;
+> > -	u32	config;
+> >  };
+> > 
+> >  static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
+> > @@ -128,57 +127,15 @@ static irqreturn_t sama5d4_wdt_irq_handler(int irq, void *dev_id)
+> >  	return IRQ_HANDLED;
+> >  }
+> > 
+> > -static int of_sama5d4_wdt_init(struct device_node *np, struct sama5d4_wdt *wdt)
+> > -{
+> > -	const char *tmp;
+> > -
+> > -	wdt->config = AT91_WDT_WDDIS;
+> > -
+> > -	if (!of_property_read_string(np, "atmel,watchdog-type", &tmp) &&
+> > -	    !strcmp(tmp, "software"))
+> > -		wdt->config |= AT91_WDT_WDFIEN;
+> > -	else
+> > -		wdt->config |= AT91_WDT_WDRSTEN;
+> > -
+> > -	if (of_property_read_bool(np, "atmel,idle-halt"))
+> > -		wdt->config |= AT91_WDT_WDIDLEHLT;
+> > -
+> > -	if (of_property_read_bool(np, "atmel,dbg-halt"))
+> > -		wdt->config |= AT91_WDT_WDDBGHLT;
+> > -
+> > -	return 0;
+> > -}
+> > -
+> > -static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)
+> > -{
+> > -	struct watchdog_device *wdd = &wdt->wdd;
+> > -	u32 value = WDT_SEC2TICKS(wdd->timeout);
+> > -	u32 reg;
+> > -
+> > -	/*
+> > -	 * Because the fields WDV and WDD must not be modified when the WDDIS
+> > -	 * bit is set, so clear the WDDIS bit before writing the WDT_MR.
+> > -	 */
+> > -	reg = wdt_read(wdt, AT91_WDT_MR);
+> > -	reg &= ~AT91_WDT_WDDIS;
+> > -	wdt_write(wdt, AT91_WDT_MR, reg);
+> > -
+> > -	reg = wdt->config;
+> > -	reg |= AT91_WDT_SET_WDD(value);
+> > -	reg |= AT91_WDT_SET_WDV(value);
+> > -
+> > -	wdt_write(wdt, AT91_WDT_MR, reg);
+> > -
+> > -	return 0;
+> > -}
+> > -
+> >  static int sama5d4_wdt_probe(struct platform_device *pdev)
+> >  {
+> >  	struct watchdog_device *wdd;
+> >  	struct sama5d4_wdt *wdt;
+> >  	struct resource *res;
+> >  	void __iomem *regs;
+> > -	u32 irq = 0;
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +	const char *tmp;
+> > +	u32 mr, reg, irq = 0;
+> >  	int ret;
+> > 
+> >  	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+> > @@ -201,17 +158,26 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+> > 
+> >  	wdt->reg_base = regs;
+> > 
+> > -	if (pdev->dev.of_node) {
+> > -		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+> > -		if (!irq)
+> > -			dev_warn(&pdev->dev, "failed to get IRQ from DT\n");
+> > +	irq = irq_of_parse_and_map(np, 0);
+> > +	if (!irq)
+> > +		dev_warn(&pdev->dev, "failed to get IRQ from DT\n");
+> > 
+> > -		ret = of_sama5d4_wdt_init(pdev->dev.of_node, wdt);
+> > -		if (ret)
+> > -			return ret;
+> > -	}
+> > 
+> > -	if ((wdt->config & AT91_WDT_WDFIEN) && irq) {
+> > +	mr = AT91_WDT_WDDIS;
+> > +
+> > +	if (!of_property_read_string(np, "atmel,watchdog-type", &tmp) &&
+> > +	    !strcmp(tmp, "software"))
+> > +		mr |= AT91_WDT_WDFIEN;
+> > +	else
+> > +		mr |= AT91_WDT_WDRSTEN;
+> > +
+> > +	if (of_property_read_bool(np, "atmel,idle-halt"))
+> > +		mr |= AT91_WDT_WDIDLEHLT;
+> > +
+> > +	if (of_property_read_bool(np, "atmel,dbg-halt"))
+> > +		mr |= AT91_WDT_WDDBGHLT;
+> > +
+> > +	if ((mr & AT91_WDT_WDFIEN) && irq) {
+> >  		ret = devm_request_irq(&pdev->dev, irq, sama5d4_wdt_irq_handler,
+> >  				       IRQF_SHARED | IRQF_IRQPOLL |
+> >  				       IRQF_NO_SUSPEND, pdev->name, pdev);
+> > @@ -228,9 +194,19 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+> >  		return ret;
+> >  	}
+> > 
+> > -	ret = sama5d4_wdt_init(wdt);
+> > -	if (ret)
+> > -		return ret;
+> > +	/*
+> > +	 * WDV and WDD must not be modified when the WDDIS bit is set, so clear
+> > +	 * the WDDIS bit before writing the WDT_MR.
+> > +	 */
+> > +	reg = wdt_read(wdt, AT91_WDT_MR);
+> > +	reg &= ~AT91_WDT_WDDIS;
+> > +	wdt_write(wdt, AT91_WDT_MR, reg);
+> > +
+> > +	reg = mr;
+> > +	reg |= AT91_WDT_SET_WDD(WDT_SEC2TICKS(wdd->timeout));
+> > +	reg |= AT91_WDT_SET_WDV(WDT_SEC2TICKS(wdd->timeout));
+> > +
+> > +	wdt_write(wdt, AT91_WDT_MR, reg);
+> > 
+> >  	watchdog_set_nowayout(wdd, nowayout);
+> > 
+> > 
+> 
 
-:::::: The code at line 56 was first introduced by commit
-:::::: 5c1d90f51027e197e1299ab1235a2fed78910905 x86/mm/pkeys: Add PTE bits for storing protection key
-
-:::::: TO: Dave Hansen <dave.hansen@linux.intel.com>
-:::::: CC: Ingo Molnar <mingo@kernel.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 56895 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170217/3bc43872/attachment-0001.gz>
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
