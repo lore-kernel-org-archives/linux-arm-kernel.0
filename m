@@ -1,69 +1,26 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 16 Feb 2017 16:47:33 -0800
-Subject: [PATCH v4 2/3] arm64: Add arch_within_stack_frames() for hardened
- usercopy
-In-Reply-To: <20170216182917.19637-3-james.morse@arm.com>
-References: <20170216182917.19637-1-james.morse@arm.com>
- <20170216182917.19637-3-james.morse@arm.com>
-Message-ID: <CAGXu5jJaywA3xC418G4h=EXHU-rovHW27wwQs3yUb-Jj+75_2Q@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 16 Feb 2017 22:51:47 -0200
+Subject: [PATCH v4 07/36] ARM: dts: imx6-sabresd: add OV5642 and OV5640
+ camera sensors
+In-Reply-To: <1487211578-11360-8-git-send-email-steve_longerbeam@mentor.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-8-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <CAOMZO5AHJ2jSWvF1iZKhYyDAMmpg99R4-gz4ZyDZAcB4b3d0ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 10:29 AM, James Morse <james.morse@arm.com> wrote:
-> Hardened usercopy tests that an object being copied to/from userspace
-> doesn't overlap multiple stack frames.
->
-> Add arch_within_stack_frames() to do this using arm64's stackwalker. The
-> callback looks for 'fp' appearing with the range occupied by the object.
->
-> (This isn't enough to trip the lkdtm tests on arm64)
->
-> CC: Sahara <keun-o.park@darkmatter.ae>
-> Based-on-a-patch-from: Sahara <keun-o.park@darkmatter.ae>
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->  arch/arm64/Kconfig                   |  1 +
->  arch/arm64/include/asm/thread_info.h |  7 ++++-
->  arch/arm64/kernel/stacktrace.c       | 54 ++++++++++++++++++++++++++++++++++--
->  3 files changed, 58 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 111742126897..378caa9c0563 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -67,6 +67,7 @@ config ARM64
->         select HAVE_ARCH_TRACEHOOK
->         select HAVE_ARCH_TRANSPARENT_HUGEPAGE
->         select HAVE_ARM_SMCCC
-> +       select HAVE_ARCH_WITHIN_STACK_FRAMES
->         select HAVE_EBPF_JIT
->         select HAVE_C_RECORDMCOUNT
->         select HAVE_CC_STACKPROTECTOR
-> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-> index 46c3b93cf865..3540c46027fc 100644
-> --- a/arch/arm64/include/asm/thread_info.h
-> +++ b/arch/arm64/include/asm/thread_info.h
-> @@ -68,7 +68,12 @@ struct thread_info {
->  #define thread_saved_fp(tsk)   \
->         ((unsigned long)(tsk->thread.cpu_context.fp))
->
-> -#endif
-> +
-> +extern enum stack_type arch_within_stack_frames(const void * const stack,
-> +                                               const void * const stackend,
-> +                                               const void *obj,
-> +                                               unsigned long len);
+Hi Steve,
 
-The caller of arch_within_stack_frames expects this to be inlined...
-could that be changed and then move the special stack check from the
-third patch into check_stack_object() directly?
+On Thu, Feb 16, 2017 at 12:19 AM, Steve Longerbeam
+<slongerbeam@gmail.com> wrote:
+> Enables the OV5642 parallel-bus sensor, and the OV5640 MIPI CSI-2 sensor.
+>
+> The OV5642 connects to the parallel-bus mux input port on ipu1_csi0_mux.
+>
+> The OV5640 connects to the input port on the MIPI CSI-2 receiver on
+> mipi_csi.
+>
+> Until the OV5652 sensor module compatible with the SabreSD becomes
+> available for testing, the ov5642 node is currently disabled.
 
-Regardless, I'm fine with reusing the existing walker. I just want to
-avoid special cases in the uaccess code (so we can consolidate it in
-the future).
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+You missed your Signed-off-by.
