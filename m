@@ -1,38 +1,35 @@
 From: adanhawthorn@gmail.com (Nathan Howard)
-Date: Fri, 17 Feb 2017 15:16:19 -0500
-Subject: [PATCH 3/5] staging: bcm2835-audio: bcm2835.h: fix macro coding style
- issue
+Date: Fri, 17 Feb 2017 15:16:20 -0500
+Subject: [PATCH 4/5] staging: bcm2835-audio: bcm2835.h: fix volatile coding
+ style issue
 In-Reply-To: <1487362603-15967-1-git-send-email-adanhawthorn@gmail.com>
 References: <1487362603-15967-1-git-send-email-adanhawthorn@gmail.com>
-Message-ID: <1487362603-15967-3-git-send-email-adanhawthorn@gmail.com>
+Message-ID: <1487362603-15967-4-git-send-email-adanhawthorn@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix checkpatch.pl warning of the form "CHECK: Macro argument 'vol' may be
-better as '(vol)' to avoid precedence issues."
+Fix checkpatch.pl warning of the form "WARNING: Use of volatile is
+usually wrong: see Documentation/process/volatile-considered-harmful.rst."
 
 Signed-off-by: Nathan Howard <adanhawthorn@gmail.com>
 ---
- drivers/staging/bcm2835-audio/bcm2835.h | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ drivers/staging/bcm2835-audio/bcm2835.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/staging/bcm2835-audio/bcm2835.h b/drivers/staging/bcm2835-audio/bcm2835.h
-index 81fdb10..2f9d1c9 100644
+index 2f9d1c9..08f7ad6 100644
 --- a/drivers/staging/bcm2835-audio/bcm2835.h
 +++ b/drivers/staging/bcm2835-audio/bcm2835.h
-@@ -77,8 +77,11 @@ enum {
+@@ -125,8 +125,8 @@ struct bcm2835_alsa_stream {
+ 	struct semaphore buffers_update_sem;
+ 	struct semaphore control_sem;
+ 	spinlock_t lock;
+-	volatile unsigned int control;
+-	volatile unsigned int status;
++	unsigned int control;
++	unsigned int status;
  
- /* macros for alsa2chip and chip2alsa, instead of functions */
- 
--#define alsa2chip(vol) (uint)(-((vol << 8) / 100)) /* convert alsa to chip volume (defined as macro rather than function call) */
--#define chip2alsa(vol) -((vol * 100) >> 8)   /* convert chip to alsa volume */
-+// convert alsa to chip volume (defined as macro rather than function call)
-+#define alsa2chip(vol) (uint)(-(((vol) << 8) / 100))
-+
-+// convert chip to alsa volume
-+#define chip2alsa(vol) -(((vol) * 100) >> 8)
- 
- /* Some constants for values .. */
- enum snd_bcm2835_route {
+ 	int open;
+ 	int running;
 -- 
 2.7.4
