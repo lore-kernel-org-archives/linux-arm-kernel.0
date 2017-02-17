@@ -1,153 +1,101 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 17 Feb 2017 12:09:35 +0000
-Subject: [PATCH v4] arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to
- IOMMU
-In-Reply-To: <1486481916-1892-1-git-send-email-geert+renesas@glider.be>
-References: <1486481916-1892-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <d5bc031c-e6c1-d0a1-b77a-2ef2b6e22bf5@arm.com>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Fri, 17 Feb 2017 13:18:39 +0100
+Subject: [PATCH 04/21] ARM: sun8i: dt: Add DT bindings documentation for
+ Allwinner dwmac-sun8i
+In-Reply-To: <20170216184818.hwexzuqacbemsxo7@lukather>
+References: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
+ <20170216124859.14346-5-clabbe.montjoie@gmail.com>
+ <20170216184818.hwexzuqacbemsxo7@lukather>
+Message-ID: <20170217121839.GA24993@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/17 15:38, Geert Uytterhoeven wrote:
-> Add support for allocating physically contiguous DMA buffers on arm64
-> systems with an IOMMU.  This can be useful when two or more devices
-> with different memory requirements are involved in buffer sharing.
+On Thu, Feb 16, 2017 at 07:48:18PM +0100, Maxime Ripard wrote:
+> Hi,
 > 
-> Note that as this uses the CMA allocator, setting the
-> DMA_ATTR_FORCE_CONTIGUOUS attribute has a runtime-dependency on
-> CONFIG_DMA_CMA, just like on arm32.
+> On Thu, Feb 16, 2017 at 01:48:42PM +0100, Corentin Labbe wrote:
+> > This patch adds documentation for Device-Tree bindings for the
+> > Allwinner dwmac-sun8i driver.
+> > 
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > ---
+> >  .../devicetree/bindings/net/dwmac-sun8i.txt        | 86 ++++++++++++++++++++++
+> >  1 file changed, 86 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/net/dwmac-sun8i.txt b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> > new file mode 100644
+> > index 0000000..ac806c6
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/dwmac-sun8i.txt
+> > @@ -0,0 +1,86 @@
+> > +* Allwinner sun8i GMAC ethernet controller
+> > +
+> > +This device is a platform glue layer for stmmac.
+> > +Please see stmmac.txt for the other unchanged properties.
+> > +
+> > +Required properties:
+> > +- compatible: should be one of the following string:
+> > +		"allwinner,sun8i-a83t-emac"
+> > +		"allwinner,sun8i-h3-emac"
+> > +		"allwinner,sun50i-a64-emac"
+> > +- reg: address and length of the register for the device.
+> > +- interrupts: interrupt for the device
+> > +- interrupt-names: should be "macirq"
+> > +- clocks: A phandle to the reference clock for this device
+> > +- clock-names: should be "stmmaceth"
+> > +- resets: A phandle to the reset control for this device
+> > +- reset-names: should be "stmmaceth"
+> > +- phy-mode: See ethernet.txt
+> > +- phy-handle: See ethernet.txt
+> > +- #address-cells: shall be 1
+> > +- #size-cells: shall be 0
+> > +- syscon: A phandle to the syscon of the SoC with one of the following
+> > + compatible string:
+> > +  - allwinner,sun8i-h3-system-controller
+> > +  - allwinner,sun8i-a64-system-controller
+> > +  - allwinner,sun8i-a83t-system-controller
+> > +
+> > +Optional properties:
+> > +- allwinner,tx-delay: TX clock delay chain value. Range value is 0-0x07. Default is 0)
+> > +- allwinner,rx-delay: RX clock delay chain value. Range value is 0-0x1F. Default is 0)
+> > +Both delay properties does not have units, there are arbitrary value.
+> > +The TX/RX clock delay chain settings are board specific and could be found
+> > +in vendor FEX files.
+> > +
+> > +Optional properties for "allwinner,sun8i-h3-emac":
+> > +- allwinner,leds-active-low: EPHY LEDs are active low
+> > +
+> > +Required child node of emac:
+> > +- mdio bus node: should be named mdio
+> > +
+> > +Required properties of the mdio node:
+> > +- #address-cells: shall be 1
+> > +- #size-cells: shall be 0
+> > +
+> > +The device node referenced by "phy" or "phy-handle" should be a child node
+> > +of the mdio node. See phy.txt for the generic PHY bindings.
+> > +
+> > +Required properties of the phy node with "allwinner,sun8i-h3-emac":
+> > +- clocks: an extra phandle to the reference clock for the EPHY
+> > +- resets: an extra phandle to the reset control for the EPHY
+> > +
+> > +Required properties for the system controller:
+> > +- reg: address and length of the register for the device.
+> > +- compatible: should be "syscon" and one of the following string:
+> > +		"allwinner,sun8i-h3-system-controller"
+> > +		"allwinner,sun8i-a64-system-controller"
+> > +		"allwinner,sun8i-a83t-system-controller"
 > 
-> For arm64 systems using swiotlb, no changes are needed to support the
-> allocation of physically contiguous DMA buffers:
->   - swiotlb always uses physically contiguous buffers (up to
->     IO_TLB_SEGSIZE = 128 pages),
->   - arm64's __dma_alloc_coherent() already calls
->     dma_alloc_from_contiguous() when CMA is available.
+> This should be in a separate binding document.
+> 
+> What does it describe / represent?
+> 
+> Thanks,
+> Maxime
+> 
 
-I think this looks about as good as it ever could now :)
+I agree, I will split it in two one for syscon, one for emac
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-Thanks,
-Robin.
-
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> ---
-> v4:
->   - Replace dma_to_phys()/phys_to_page() by vmalloc_to_page(), to pass
->     the correct page pointer to dma_release_from_contiguous().
->     Note that the latter doesn't scream when passed a wrong pointer, but
->     just returns false.  While this makes life easier for callers who
->     may want to call another deallocator, it makes it harder catching
->     bugs.
-> 
-> v3:
->   - Add Acked-by,
->   - Update comment to "one of _4_ things",
->   - Call dma_alloc_from_contiguous() and iommu_dma_map_page() directly,
->     as suggested by Robin Murphy,
-> 
-> v2:
->   - New, handle dispatching in the arch (arm64) code, as requested by
->     Robin Murphy.
-> ---
->  arch/arm64/mm/dma-mapping.c | 63 ++++++++++++++++++++++++++++++++++-----------
->  1 file changed, 48 insertions(+), 15 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index 351f7595cb3ebdb9..fb76e82c90edd514 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -584,20 +584,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
->  	 */
->  	gfp |= __GFP_ZERO;
->  
-> -	if (gfpflags_allow_blocking(gfp)) {
-> -		struct page **pages;
-> -		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
-> -
-> -		pages = iommu_dma_alloc(dev, iosize, gfp, attrs, ioprot,
-> -					handle, flush_page);
-> -		if (!pages)
-> -			return NULL;
-> -
-> -		addr = dma_common_pages_remap(pages, size, VM_USERMAP, prot,
-> -					      __builtin_return_address(0));
-> -		if (!addr)
-> -			iommu_dma_free(dev, pages, iosize, handle);
-> -	} else {
-> +	if (!gfpflags_allow_blocking(gfp)) {
->  		struct page *page;
->  		/*
->  		 * In atomic context we can't remap anything, so we'll only
-> @@ -621,6 +608,45 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
->  				__free_from_pool(addr, size);
->  			addr = NULL;
->  		}
-> +	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-> +		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
-> +		struct page *page;
-> +
-> +		page = dma_alloc_from_contiguous(dev, size >> PAGE_SHIFT,
-> +						 get_order(size));
-> +		if (!page)
-> +			return NULL;
-> +
-> +		*handle = iommu_dma_map_page(dev, page, 0, iosize, ioprot);
-> +		if (iommu_dma_mapping_error(dev, *handle)) {
-> +			dma_release_from_contiguous(dev, page,
-> +						    size >> PAGE_SHIFT);
-> +			return NULL;
-> +		}
-> +		if (!coherent)
-> +			__dma_flush_area(page_to_virt(page), iosize);
-> +
-> +		addr = dma_common_contiguous_remap(page, size, VM_USERMAP,
-> +						   prot,
-> +						   __builtin_return_address(0));
-> +		if (!addr) {
-> +			iommu_dma_unmap_page(dev, *handle, iosize, 0, attrs);
-> +			dma_release_from_contiguous(dev, page,
-> +						    size >> PAGE_SHIFT);
-> +		}
-> +	} else {
-> +		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
-> +		struct page **pages;
-> +
-> +		pages = iommu_dma_alloc(dev, iosize, gfp, attrs, ioprot,
-> +					handle, flush_page);
-> +		if (!pages)
-> +			return NULL;
-> +
-> +		addr = dma_common_pages_remap(pages, size, VM_USERMAP, prot,
-> +					      __builtin_return_address(0));
-> +		if (!addr)
-> +			iommu_dma_free(dev, pages, iosize, handle);
->  	}
->  	return addr;
->  }
-> @@ -632,7 +658,8 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
->  
->  	size = PAGE_ALIGN(size);
->  	/*
-> -	 * @cpu_addr will be one of 3 things depending on how it was allocated:
-> +	 * @cpu_addr will be one of 4 things depending on how it was allocated:
-> +	 * - A remapped array of pages for contiguous allocations.
->  	 * - A remapped array of pages from iommu_dma_alloc(), for all
->  	 *   non-atomic allocations.
->  	 * - A non-cacheable alias from the atomic pool, for atomic
-> @@ -644,6 +671,12 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
->  	if (__in_atomic_pool(cpu_addr, size)) {
->  		iommu_dma_unmap_page(dev, handle, iosize, 0, 0);
->  		__free_from_pool(cpu_addr, size);
-> +	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-> +		struct page *page = vmalloc_to_page(cpu_addr);
-> +
-> +		iommu_dma_unmap_page(dev, handle, iosize, 0, attrs);
-> +		dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT);
-> +		dma_common_free_remap(cpu_addr, size, VM_USERMAP);
->  	} else if (is_vmalloc_addr(cpu_addr)){
->  		struct vm_struct *area = find_vm_area(cpu_addr);
->  
-> 
+Thanks
+Corentin Labbe
