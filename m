@@ -1,47 +1,62 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 17 Feb 2017 09:55:19 +0100
-Subject: [PATCH 20/21] ARM: sunxi: Enable dwmac-sun8i driver on
- sunxi_defconfig
-In-Reply-To: <20170216190827.jaky5xyzqtuzhy76@lukather>
-References: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
- <20170216124859.14346-21-clabbe.montjoie@gmail.com>
- <20170216190827.jaky5xyzqtuzhy76@lukather>
-Message-ID: <20170217085519.GD22723@Red>
+From: nandor.han@ge.com (Han, Nandor (GE Healthcare))
+Date: Fri, 17 Feb 2017 11:13:43 +0200
+Subject: EXT: Re: sDMA on i.mx7d
+In-Reply-To: <20170216170828.bcbpvtdobmcxr2lu@piout.net>
+References: <20170214222425.hbkfkeq3l6sveo7n@piout.net>
+ <e9c36a33f2a49df2a517db5869eaea7f@agner.ch>
+ <20170215110736.oumvvv7zordd2jdw@piout.net>
+ <3513b2c01d86ad7312522d6be97e766f@agner.ch>
+ <20170216104229.axwm3445yj6zrxoz@piout.net>
+ <CAOMZO5CeqipfNJxM2Pc1g1606OjbN83ZtbbGRZFmqE3q4fNpRw@mail.gmail.com>
+ <20170216164038.zbl2nb76now3glkk@piout.net>
+ <1487263639.13536.36.camel@pengutronix.de>
+ <20170216170828.bcbpvtdobmcxr2lu@piout.net>
+Message-ID: <b60d1bc3-e23f-0ce5-2905-b6c0025bdc84@ge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 08:08:27PM +0100, Maxime Ripard wrote:
-> Hi,
-> 
-> On Thu, Feb 16, 2017 at 01:48:58PM +0100, Corentin Labbe wrote:
-> > From: LABBE Corentin <clabbe.montjoie@gmail.com>
-> > 
-> > Enable the dwmac-sun8i driver in the sunxi default configuration
-> > 
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > ---
-> >  arch/arm/configs/sunxi_defconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-> > index da92c25..33bde86 100644
-> > --- a/arch/arm/configs/sunxi_defconfig
-> > +++ b/arch/arm/configs/sunxi_defconfig
-> > @@ -40,6 +40,7 @@ CONFIG_ATA=y
-> >  CONFIG_AHCI_SUNXI=y
-> >  CONFIG_NETDEVICES=y
-> >  CONFIG_SUN4I_EMAC=y
-> > +CONFIG_DWMAC_SUN8I=m
-> 
-> I think I'd prefer to have it compiled statically, just like the other
-> net drivers, and drivers in general.
-> 
-> Thanks!
-> Maxime
-> 
 
-In previous sun8i-emac, someone request that CONFIG must be set as module because kernel went too big.
-But I do not care to set it statically.
 
-Regards
-Corentin Labbe
+On 16/02/2017 19:08, Alexandre Belloni wrote:
+> On 16/02/2017 at 17:47:19 +0100, Lucas Stach wrote:
+>> Am Donnerstag, den 16.02.2017, 17:40 +0100 schrieb Alexandre Belloni:
+>>> On 16/02/2017 at 13:36:28 -0200, Fabio Estevam wrote:
+>>>> Hi Alexandre,
+>>>>
+>>>> On Thu, Feb 16, 2017 at 8:42 AM, Alexandre Belloni
+>>>> <alexandre.belloni@free-electrons.com> wrote:
+>>>>
+>>>>> I confirm it is the culprit.
+>>>>
+>>>> Does this mean that PCM3168s codec works fine on imx7 using SAI on
+>>>> 4.9.x plus the revert?
+>>
+>> And there is already a fix for this in 4.10:
+>> 85f57752b33c (dmaengine: imx-sdma - correct the dma transfer residue
+>> calculation)
+>>
+>> This fixes audio output on i.MX6 and should probably be sent to -stable.
+>> Can you see if applying this patch gets rid of the issues on i.MX7?
+>>
+>
+> It does too, thanks!
+> It is probably worth having it on 4.9.
+>
+
+Hi,
+   Thanks for mention the problem and confirm that the above patch fixed 
+the issue.
+
+I'm a bit surprised about the issue that Stefan mention, which in his 
+case was a "noise". In my case was more like a sound interruption (I was 
+testing on a iMX6).
+
+But good to hear that works :)
+
+Regards,
+    Nandor
+
+
+-- 
+Regards,
+     Nandi
