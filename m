@@ -1,17 +1,17 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 17 Feb 2017 18:00:31 +0100
-Subject: [PATCH 1/2] arm64: dts: r8a7795: Upgrade to PSCI v1.0 to support
+Date: Fri, 17 Feb 2017 18:00:32 +0100
+Subject: [PATCH 2/2] arm64: dts: r8a7796: Upgrade to PSCI v1.0 to support
  Suspend-to-RAM
 In-Reply-To: <1487350832-29820-1-git-send-email-geert+renesas@glider.be>
 References: <1487350832-29820-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1487350832-29820-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <1487350832-29820-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Khiem Nguyen <khiem.nguyen.xt@renesas.com>
 
 >From PSCI v1.0, Suspend-to-RAM is supported via SYSTEM_SUSPEND PSCI
-function call. Hence, upgrade PSCI version for R-Car H3 to support
+function call. Hence, upgrade PSCI version for R-Car M3 to support
 Suspend-to-RAM.
 
 The Suspend-to-RAM is highly dependent on ARM Trusted Firwmare support
@@ -27,13 +27,13 @@ Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 Khiem: I've updated your email address.
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 2 +-
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 98cd42f586b5fd62..4eae2d471d41ee55 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 0cd83974e42154c0..0cfcc15e9177159a 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
 @@ -29,7 +29,7 @@
  	};
  
