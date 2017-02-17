@@ -1,64 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Feb 2017 18:23:13 +0000
-Subject: [PATCHv3 2/2] arch: Rename CONFIG_DEBUG_RODATA and
- CONFIG_DEBUG_MODULE_RONX
-In-Reply-To: <CAGXu5jJ4FD=6HLK_21T079JrO569DwWBTeiD18x3WRrYBsaAqw@mail.gmail.com>
-References: <1486427518-14819-1-git-send-email-labbott@redhat.com>
- <1486427518-14819-3-git-send-email-labbott@redhat.com>
- <20170216222529.GA7531@amd>
- <CAGXu5jJ4FD=6HLK_21T079JrO569DwWBTeiD18x3WRrYBsaAqw@mail.gmail.com>
-Message-ID: <20170217182313.GB25876@leverpostej>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Fri, 17 Feb 2017 10:27:01 -0800
+Subject: [PATCH v4 23/36] media: imx: Add MIPI CSI-2 Receiver subdev driver
+In-Reply-To: <1487340970.3107.73.camel@pengutronix.de>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-24-git-send-email-steve_longerbeam@mentor.com>
+ <1487328479.3107.21.camel@pengutronix.de>
+ <1487340970.3107.73.camel@pengutronix.de>
+Message-ID: <c858831f-6ce3-54b7-ef03-857129edb0bf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 05:08:20PM -0800, Kees Cook wrote:
-> On Thu, Feb 16, 2017 at 2:25 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> > Hi!
-> >
-> >>
-> >> -config DEBUG_RODATA
-> >> +config STRICT_KERNEL_RWX
-> >>       bool "Make kernel text and rodata read-only" if ARCH_OPTIONAL_KERNEL_RWX
-> >>       depends on ARCH_HAS_STRICT_KERNEL_RWX
-> >>       default !ARCH_OPTIONAL_KERNEL_RWX ||
-> >
-> > Debug features are expected to have runtime cost, so kconfig help is
-> > silent about those. But there are runtime costs, right? It would be
-> > nice to mention them in the help text...
-> 
-> It depends on the architecture. The prior help text for arm said:
-> 
->          The tradeoff is that each region is padded to section-size (1MiB)
->          boundaries (because their permissions are different and splitting
->          the 1M pages into 4K ones causes TLB performance problems), which
->          can waste memory.
-> 
-> parisc (somewhat inaccurately) said:
-> 
->          This option may have a slight performance impact because a
->          portion of the kernel code won't be covered by a TLB anymore.
-> 
-> IIUC, arm64 does what parisc is hinting at: mappings at the end are
-> broken down to PAGE_SIZE. On x86, IIUC, there's actually no change to
-> TLB performance due to how the mappings are already set up.
 
-On arm64, we split down to page granularity if needed, but use the
-largest possible mapping we can (e.g. if we can use a 2M block, we do).
 
-Because of the way we freed the init area, we already couldn't use
-larger mappings anyway. Applying the strict permissions didn't come at a
-measureable overhead in any real testing.
+On 02/17/2017 06:16 AM, Philipp Zabel wrote:
+> On Fri, 2017-02-17 at 11:47 +0100, Philipp Zabel wrote:
+>> On Wed, 2017-02-15 at 18:19 -0800, Steve Longerbeam wrote:
+>>> +static void csi2_dphy_init(struct csi2_dev *csi2)
+>>> +{
+>>> +	/*
+>>> +	 * FIXME: 0x14 is derived from a fixed D-PHY reference
+>>> +	 * clock from the HSI_TX PLL, and a fixed target lane max
+>>> +	 * bandwidth of 300 Mbps. This value should be derived
+>>
+>> If the table in https://community.nxp.com/docs/DOC-94312 is correct,
+>> this should be 850 Mbps. Where does this 300 Mbps value come from?
+>
+> I got it, the dptdin_map value for 300 Mbps is 0x14 in the Rockchip DSI
+> driver. But that value is written to the register as HSFREQRANGE_SEL(x):
+>
+> #define HSFREQRANGE_SEL(val)    (((val) & 0x3f) << 1)
 
-> I'm not sure the best way to express this in the new help text. Do you
-> have some suggestions on wording? Personally, I don't really think
-> it's worth mentioning this in Kconfig help, which, in theory, is
-> supposed to limit how technical it gets. And I think the performance
-> impact is almost entirely negligible compared to the risks addressed.
+Ah you are right, 0x14 would be a "testdin" value of 0x0a, which from
+the Rockchip table would be 950 MHz per lane.
 
-I also don't see much point in describing some hypothetical architecture
-specific overhead here. In most cases this can't be turned off (so there
-isn't anything to comapre it to, and hence no cost). Where people want
-to turn it off, they already know why they wish to do so.
+But thanks for pointing the table at
+https://community.nxp.com/docs/DOC-94312. That table is what
+should be referenced in the above comment (850 MHz per lane
+for a 27MHz reference clock). I will update the comment based
+on that table.
 
-Thanks,
-Mark.
+Steve
+
+
+
+>
+> which is 0x28. Further, the Rockchip D-PHY probably is another version,
+> as its max_mbps goes up to 1500.
+>
+>
