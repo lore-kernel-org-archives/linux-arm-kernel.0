@@ -1,32 +1,55 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 17 Feb 2017 15:25:08 +0100
-Subject: [PATCH] arm64: kernel: Update kerneldoc for cpu_suspend() rename
-Message-ID: <1487341508-20148-1-git-send-email-geert+renesas@glider.be>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 17 Feb 2017 06:40:33 -0800
+Subject: [PATCH v2 2/3] watchdog: sama5d4: Fix setting timeout when
+ watchdog is disabled
+In-Reply-To: <20170216193053.5546-2-alexandre.belloni@free-electrons.com>
+References: <20170216193053.5546-1-alexandre.belloni@free-electrons.com>
+ <20170216193053.5546-2-alexandre.belloni@free-electrons.com>
+Message-ID: <968ef53e-c3c4-5322-020a-8382ce367931@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit af391b15f7b56ce1 ("arm64: kernel: rename __cpu_suspend to keep it
-aligned with arm") renamed cpu_suspend() to arm_cpuidle_suspend(), but
-forgot to update the kerneldoc header.
+On 02/16/2017 11:30 AM, Alexandre Belloni wrote:
+> The datasheet states: "When setting the WDDIS bit, and while it is set, the
+> fields WDV and WDD must not be modified."
+>
+> Ensure WDDIS is not set when changing the timeout and set it afterwards if
+> the watchdog was disabled.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+> Changes in v2:
+>  - new patch
+>  drivers/watchdog/sama5d4_wdt.c | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+> index 2c6f5a70ae67..2a60251806d2 100644
+> --- a/drivers/watchdog/sama5d4_wdt.c
+> +++ b/drivers/watchdog/sama5d4_wdt.c
+> @@ -90,11 +90,18 @@ static int sama5d4_wdt_set_timeout(struct watchdog_device *wdd,
+>  	u32 reg;
+>
+>  	reg = wdt_read(wdt, AT91_WDT_MR);
+> +
+> +	if (reg & AT91_WDT_WDDIS)
+> +		wdt_write(wdt, AT91_WDT_MR, reg & ~AT91_WDT_WDDIS);
+> +
+>  	reg &= ~AT91_WDT_WDV;
+>  	reg &= ~AT91_WDT_WDD;
+>  	reg |= AT91_WDT_SET_WDV(value);
+>  	reg |= AT91_WDT_SET_WDD(value);
+> -	wdt_write(wdt, AT91_WDT_MR, reg);
+> +	wdt_write(wdt, AT91_WDT_MR, reg & ~AT91_WDT_WDDIS);
+> +
+> +	if (reg & AT91_WDT_WDDIS)
+> +		wdt_write(wdt, AT91_WDT_MR, reg);
+>
+That means if the watchdog is running, the timeout would not be updated.
+It should be updated no matter if it is running or not.
 
-Fixes: af391b15f7b56ce1 ("arm64: kernel: rename __cpu_suspend to keep it aligned with arm")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm64/kernel/cpuidle.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Guenter
 
-diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
-index 75a0f8acef669ce5..fd691087dc9ad58f 100644
---- a/arch/arm64/kernel/cpuidle.c
-+++ b/arch/arm64/kernel/cpuidle.c
-@@ -30,7 +30,7 @@ int arm_cpuidle_init(unsigned int cpu)
- }
- 
- /**
-- * cpu_suspend() - function to enter a low-power idle state
-+ * arm_cpuidle_suspend() - function to enter a low-power idle state
-  * @arg: argument to pass to CPU suspend operations
-  *
-  * Return: 0 on success, -EOPNOTSUPP if CPU suspend hook not initialized, CPU
--- 
-1.9.1
+>  	wdd->timeout = timeout;
+>
+>
