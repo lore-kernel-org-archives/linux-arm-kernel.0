@@ -1,35 +1,36 @@
 From: adanhawthorn@gmail.com (Nathan Howard)
-Date: Fri, 17 Feb 2017 15:16:20 -0500
-Subject: [PATCH 4/5] staging: bcm2835-audio: bcm2835.h: fix volatile coding
+Date: Fri, 17 Feb 2017 15:16:21 -0500
+Subject: [PATCH 5/5] staging: bcm2835-audio: bcm2835.h: fix line length coding
  style issue
 In-Reply-To: <1487362603-15967-1-git-send-email-adanhawthorn@gmail.com>
 References: <1487362603-15967-1-git-send-email-adanhawthorn@gmail.com>
-Message-ID: <1487362603-15967-4-git-send-email-adanhawthorn@gmail.com>
+Message-ID: <1487362603-15967-5-git-send-email-adanhawthorn@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix checkpatch.pl warning of the form "WARNING: Use of volatile is
-usually wrong: see Documentation/process/volatile-considered-harmful.rst."
+Fix checkpatch.pl warning of the form "WARNING: line over 80 characters."
 
 Signed-off-by: Nathan Howard <adanhawthorn@gmail.com>
 ---
- drivers/staging/bcm2835-audio/bcm2835.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/bcm2835-audio/bcm2835.h | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/staging/bcm2835-audio/bcm2835.h b/drivers/staging/bcm2835-audio/bcm2835.h
-index 2f9d1c9..08f7ad6 100644
+index 08f7ad6..16d7006 100644
 --- a/drivers/staging/bcm2835-audio/bcm2835.h
 +++ b/drivers/staging/bcm2835-audio/bcm2835.h
-@@ -125,8 +125,8 @@ struct bcm2835_alsa_stream {
- 	struct semaphore buffers_update_sem;
- 	struct semaphore control_sem;
- 	spinlock_t lock;
--	volatile unsigned int control;
--	volatile unsigned int status;
-+	unsigned int control;
-+	unsigned int status;
+@@ -163,8 +163,10 @@ int bcm2835_audio_write(struct bcm2835_alsa_stream *alsa_stream,
+ 			unsigned int count,
+ 			void *src);
+ void bcm2835_playback_fifo(struct bcm2835_alsa_stream *alsa_stream);
+-unsigned int bcm2835_audio_retrieve_buffers(struct bcm2835_alsa_stream *alsa_stream);
++unsigned int bcm2835_audio_retrieve_buffers(
++		struct bcm2835_alsa_stream *alsa_stream);
+ void bcm2835_audio_flush_buffers(struct bcm2835_alsa_stream *alsa_stream);
+-void bcm2835_audio_flush_playback_buffers(struct bcm2835_alsa_stream *alsa_stream);
++void bcm2835_audio_flush_playback_buffers(
++		struct bcm2835_alsa_stream *alsa_stream);
  
- 	int open;
- 	int running;
+ #endif /* __SOUND_ARM_BCM2835_H */
 -- 
 2.7.4
