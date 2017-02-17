@@ -1,55 +1,72 @@
-From: ansuelsmth@gmail.com (Ansuel Smith)
-Date: Fri, 17 Feb 2017 21:42:17 +0100
-Subject: [PATCH] DTS: Linksys Board: Add default trigger for sata led
-Message-ID: <1487364137-3008-1-git-send-email-ansuelsmth@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 17 Feb 2017 13:09:40 -0800
+Subject: [PATCH] ARM: omap2+: Revert omap-smp.c changes resetting cpu1
+ during boot
+In-Reply-To: <45e4f34e-833d-77df-bc3d-f5852f614d5d@ti.com>
+References: <20170215183915.GU3897@atomide.com>
+ <20170215191242.GP21809@atomide.com>
+ <ca389104-df6f-b055-ec43-524d82cf1be7@ti.com>
+ <20170215222711.GQ21809@atomide.com>
+ <20170216161010.GU21809@atomide.com>
+ <fc1e75e8-87ef-59f1-3c8a-cb45f1749e50@ti.com>
+ <20170216165409.GW21809@atomide.com>
+ <20170216190701.GY21809@atomide.com>
+ <20170217155502.GD21809@atomide.com>
+ <45e4f34e-833d-77df-bc3d-f5852f614d5d@ti.com>
+Message-ID: <20170217210939.GG21809@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In others board we have the sata led set to funcion with the sata led trigger by default.
-This patch makes the same for these board that have sata led but disabled by not associating it to any trigger
+* Andrew F. Davis <afd@ti.com> [170217 12:28]:
+> On 02/17/2017 09:55 AM, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [170216 11:08]:
+> >> * Tony Lindgren <tony@atomide.com> [170216 08:55]:
+> >>> For your use case, probably all we need is runtime checks for HS in
+> >>> addition to parking cpu1 for kexec. If that's not enough, then maybe
+> >>> a device specific DT property for never-reset-no-matter-what.
+> >>
+> >> Below is a first take on the last resort cpu1 reset done based on
+> >> configured CPU1_WAKEUP_NS_PA_ADDR_OFFSET for omap4 and 5. Note that
+> >> we can't merge it yet as it will break kexec boot for dra7. To fix that,
+> >> we need to first do what you're suggesting and properly park cpu1 for
+> >> kexec.
+> > 
+> > Something like the patch below might be doable for the first fix
+> > before we have something to park cpu1 for kexec. I've added more checks
+> > to attemp to detect cpu1 being in WFI. At least things keep on working
+> > for kexec on omap4/5 and GP dra7.
+> > 
+> > Andrew, care to give it a try and see if can add some HS dra7 checks
+> > there too to have kexec work on it? Basically we want to attempt to
+> > detect if there's a chance cpu1 is in WFI, and if I think the only
+> > optino is to reset it before bringing it up as otherwise outcome will
+> > be unpredictable.
+> > 
+> 
+> This patch seems stop the reset issue on my boards, so as long as it is
+> just a temporary workaround until we can fix the real issue (a core that
+> should be off going into omap_do_wfi() instead of parking), then this
+> patch works for me.
 
-Signed-off-by: Ansuel Smith <ansuelsmth@gmail.com>
----
- arch/arm/boot/dts/armada-385-linksys-caiman.dts | 1 +
- arch/arm/boot/dts/armada-385-linksys-cobra.dts  | 1 +
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts   | 1 +
- 3 files changed, 3 insertions(+)
+OK
 
-diff --git a/arch/arm/boot/dts/armada-385-linksys-caiman.dts b/arch/arm/boot/dts/armada-385-linksys-caiman.dts
-index f3cee91..a1b6e68 100644
---- a/arch/arm/boot/dts/armada-385-linksys-caiman.dts
-+++ b/arch/arm/boot/dts/armada-385-linksys-caiman.dts
-@@ -109,6 +109,7 @@
- 
- 		sata {
- 			label = "caiman:white:sata";
-+			linux,default-trigger = "disk-activity";
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-385-linksys-cobra.dts b/arch/arm/boot/dts/armada-385-linksys-cobra.dts
-index 1110718..a1a75af 100644
---- a/arch/arm/boot/dts/armada-385-linksys-cobra.dts
-+++ b/arch/arm/boot/dts/armada-385-linksys-cobra.dts
-@@ -109,6 +109,7 @@
- 
- 		sata {
- 			label = "cobra:white:sata";
-+			linux,default-trigger = "disk-activity";
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-index 83ac884..dcd73ab 100644
---- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-+++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
-@@ -156,6 +156,7 @@
- 					esata at 4 {
- 						label = "mamba:white:esata";
- 						reg = <0x4>;
-+						linux,default-trigger = "disk-activity";
- 					};
- 
- 					usb2 at 5 {
--- 
-1.9.1
+> > +
+> > +	/* REVISIT: Anything to check for HS dra7? */
+> > +	if (soc_is_dra74x() && omap_secure_apis_support())
+> > +		return;
+> 
+> omap_secure_apis_support() only returns true when cpu_is_omap44xx() is
+> true, so this will never be true. Someday we may add the secure APIs to
+> secure DRA7xx devices, but I don't know of a good way to detect this
+> from kernel right now.
+
+OK so that can be removed.
+
+Can you check what happens with suspend/resume cycle? Based on what
+I've seen omap5 and dra7 currently always hit the "smp_ops.cpu_die()
+returned, trying to resuscitate" on resume meaning it will get sent to
+secondary_start_kernel on resume.
+
+Regards,
+
+Tony
