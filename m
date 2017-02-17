@@ -1,56 +1,49 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sat, 18 Feb 2017 01:37:13 +0800
-Subject: [RFC PATCH 0/9] Add support for Allwinner R40 SoC
-Message-ID: <20170217173722.6477-1-icenowy@aosc.xyz>
+Date: Sat, 18 Feb 2017 01:37:14 +0800
+Subject: [PATCH 1/9] arm: sunxi: add support for R40 SoC
+In-Reply-To: <20170217173722.6477-1-icenowy@aosc.xyz>
+References: <20170217173722.6477-1-icenowy@aosc.xyz>
+Message-ID: <20170217173722.6477-2-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is an experiment to add R40 support to mainline Linux.
+Allwinner R40 is a new SoC, with Quad Core Cortex-A7 and peripherals
+like A20.
 
-As we have still no user manual for R40, the patchset is developed
-by reading the BSP source code and device tree, educated guess and
-try and error.
+Add support for it.
 
-Note: the PATCH 1~3 and 7 is not RFC (I want them to be merged now),
-but they are sent together as they have functional dependency by
-RFC patches.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ Documentation/arm/sunxi/README | 4 ++++
+ arch/arm/mach-sunxi/sunxi.c    | 1 +
+ 2 files changed, 5 insertions(+)
 
-Icenowy Zheng (9):
-  arm: sunxi: add support for R40 SoC
-  pinctrl: sunxi: rename sun7i-a20 driver to sunxi-a20-r40
-  pinctrl: sunxi: add support for R40 pinctrl
-  clk: sunxi-ng: support R40 SoC
-  ARM: dts: sun8i: add DTSI file for R40 SoC
-  ARM: dts: sun8i: add DTS file for Banana Pi M2 Ultra
-  phy: sun4i-usb: add support for R40 USB PHY
-  ARM: dts: sun8i: add USB nodes for R40
-  ARM: dts: sun8i: enable USB host for Banana Pi M2 Ultra
-
- Documentation/arm/sunxi/README                     |    4 +
- .../devicetree/bindings/phy/sun4i-usb-phy.txt      |    1 +
- arch/arm/boot/dts/Makefile                         |    1 +
- arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts  |  184 ++++
- arch/arm/boot/dts/sun8i-r40.dtsi                   |  493 +++++++++
- arch/arm/mach-sunxi/sunxi.c                        |    1 +
- drivers/clk/sunxi-ng/Kconfig                       |   10 +
- drivers/clk/sunxi-ng/Makefile                      |    1 +
- drivers/clk/sunxi-ng/ccu-sun8i-r40.c               | 1140 ++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun8i-r40.h               |   68 ++
- drivers/phy/phy-sun4i-usb.c                        |   17 +-
- drivers/pinctrl/sunxi/Kconfig                      |    2 +-
- drivers/pinctrl/sunxi/Makefile                     |    2 +-
- ...pinctrl-sun7i-a20.c => pinctrl-sunxi-a20-r40.c} |   69 +-
- drivers/pinctrl/sunxi/pinctrl-sunxi.h              |    2 +
- include/dt-bindings/clock/sun8i-r40-ccu.h          |  189 ++++
- include/dt-bindings/reset/sun8i-r40-ccu.h          |  128 +++
- 17 files changed, 2286 insertions(+), 26 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun8i-r40-bananapi-m2-ultra.dts
- create mode 100644 arch/arm/boot/dts/sun8i-r40.dtsi
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-r40.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-r40.h
- rename drivers/pinctrl/sunxi/{pinctrl-sun7i-a20.c => pinctrl-sunxi-a20-r40.c} (95%)
- create mode 100644 include/dt-bindings/clock/sun8i-r40-ccu.h
- create mode 100644 include/dt-bindings/reset/sun8i-r40-ccu.h
-
+diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+index d7b1f016bd62..25c814adcd47 100644
+--- a/Documentation/arm/sunxi/README
++++ b/Documentation/arm/sunxi/README
+@@ -75,6 +75,10 @@ SunXi family
+         + Datasheet
+           http://linux-sunxi.org/File:Allwinner_V3s_Datasheet_V1.0.pdf
+ 
++      - Allwinner R40 (sun8i)
++        + Datasheet Draft
++          http://linux-sunxi.org/File:Allwinner_R40_Datasheet_V0.1.pdf
++
+     * Quad ARM Cortex-A15, Quad ARM Cortex-A7 based SoCs
+       - Allwinner A80
+         + Datasheet
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index f44e3acb5c90..aea616759451 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -66,6 +66,7 @@ static const char * const sun8i_board_dt_compat[] = {
+ 	"allwinner,sun8i-h2-plus",
+ 	"allwinner,sun8i-h3",
+ 	"allwinner,sun8i-v3s",
++	"allwinner,sun8i-r40",
+ 	NULL,
+ };
+ 
 -- 
 2.11.1
