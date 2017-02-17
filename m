@@ -1,43 +1,60 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri, 17 Feb 2017 16:12:50 +0100
-Subject: [PATCH] Revert "ARM: at91/dt: sama5d2: Use new compatible for ohci
- node"
-Message-ID: <20170217151250.8572-1-romain.izard.pro@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 17 Feb 2017 16:16:50 +0100
+Subject: [PATCH v2 2/3] watchdog: sama5d4: Fix setting timeout when
+ watchdog is disabled
+In-Reply-To: <968ef53e-c3c4-5322-020a-8382ce367931@roeck-us.net>
+References: <20170216193053.5546-1-alexandre.belloni@free-electrons.com>
+ <20170216193053.5546-2-alexandre.belloni@free-electrons.com>
+ <968ef53e-c3c4-5322-020a-8382ce367931@roeck-us.net>
+Message-ID: <20170217151625.hv2vn5imx2kyeftt@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit cab43282682e ("ARM: at91/dt: sama5d2: Use new
-compatible for ohci node")
+On 17/02/2017 at 06:40:33 -0800, Guenter Roeck wrote:
+> On 02/16/2017 11:30 AM, Alexandre Belloni wrote:
+> > The datasheet states: "When setting the WDDIS bit, and while it is set, the
+> > fields WDV and WDD must not be modified."
+> > 
+> > Ensure WDDIS is not set when changing the timeout and set it afterwards if
+> > the watchdog was disabled.
+> > 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > ---
+> > Changes in v2:
+> >  - new patch
+> >  drivers/watchdog/sama5d4_wdt.c | 9 ++++++++-
+> >  1 file changed, 8 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+> > index 2c6f5a70ae67..2a60251806d2 100644
+> > --- a/drivers/watchdog/sama5d4_wdt.c
+> > +++ b/drivers/watchdog/sama5d4_wdt.c
+> > @@ -90,11 +90,18 @@ static int sama5d4_wdt_set_timeout(struct watchdog_device *wdd,
+> >  	u32 reg;
+> > 
+> >  	reg = wdt_read(wdt, AT91_WDT_MR);
+> > +
+> > +	if (reg & AT91_WDT_WDDIS)
+> > +		wdt_write(wdt, AT91_WDT_MR, reg & ~AT91_WDT_WDDIS);
+> > +
+> >  	reg &= ~AT91_WDT_WDV;
+> >  	reg &= ~AT91_WDT_WDD;
+> >  	reg |= AT91_WDT_SET_WDV(value);
+> >  	reg |= AT91_WDT_SET_WDD(value);
+> > -	wdt_write(wdt, AT91_WDT_MR, reg);
+> > +	wdt_write(wdt, AT91_WDT_MR, reg & ~AT91_WDT_WDDIS);
+> > +
+> > +	if (reg & AT91_WDT_WDDIS)
+> > +		wdt_write(wdt, AT91_WDT_MR, reg);
+> > 
+> That means if the watchdog is running, the timeout would not be updated.
+> It should be updated no matter if it is running or not.
+> 
 
-It depends from commit 7150bc9b4d43 ("usb: ohci-at91: Forcibly suspend
-ports while USB suspend") which was reverted and implemented
-differently. With the new implementation, the compatible string must
-remain the same.
+No, it is enabling the watchdog, then changing WDV and WDD and finally
+disabling the watchdog if necessary. So, WDV and WDD are always changed.
 
-The compatible string introduced by this commit has been used in the
-default SAMA5D2 dtsi starting from Linux 4.8. As it has never been
-working correctly in an official release, removing it should not be
-breaking the stability rules.
-
-Fixes: cab43282682e ("ARM: at91/dt: sama5d2: Use new compatible for ohci node")
-Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-cc: <stable@vger.kernel.org>
----
- arch/arm/boot/dts/sama5d2.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index ceb9783ff7e1..ff7eae833a6d 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -266,7 +266,7 @@
- 		};
- 
- 		usb1: ohci at 00400000 {
--			compatible = "atmel,sama5d2-ohci", "usb-ohci";
-+			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
- 			reg = <0x00400000 0x100000>;
- 			interrupts = <41 IRQ_TYPE_LEVEL_HIGH 2>;
- 			clocks = <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
 -- 
-2.9.3
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
