@@ -1,50 +1,108 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri, 17 Feb 2017 10:27:01 -0800
-Subject: [PATCH v4 23/36] media: imx: Add MIPI CSI-2 Receiver subdev driver
-In-Reply-To: <1487340970.3107.73.camel@pengutronix.de>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-24-git-send-email-steve_longerbeam@mentor.com>
- <1487328479.3107.21.camel@pengutronix.de>
- <1487340970.3107.73.camel@pengutronix.de>
-Message-ID: <c858831f-6ce3-54b7-ef03-857129edb0bf@gmail.com>
+From: adanhawthorn@gmail.com (Nathan Howard)
+Date: Fri, 17 Feb 2017 13:39:07 -0500
+Subject: [PATCH] staging: bcm2835-audio: bcm2835.h: fix various coding style
+ issues
+Message-ID: <1487356776-11449-1-git-send-email-adanhawthorn@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The following coding style issues (as per checkpatch.pl) were resolved.
 
+WARNING: Block comments use * on subsequent lines
+WARNING: Prefer [subsystem eg: netdev]_info([subsystem]dev, ...
+WARNING: Missing a blank line after declarations
+WARNING: Use of volatile is usually wrong:...
+WARNING: line over 80 characters
+CHECK: Concatenated strings should use spaces between elements
+CHECK: Macro argument 'vol' may be better as '(vol)' to avoid precedence issues
 
-On 02/17/2017 06:16 AM, Philipp Zabel wrote:
-> On Fri, 2017-02-17 at 11:47 +0100, Philipp Zabel wrote:
->> On Wed, 2017-02-15 at 18:19 -0800, Steve Longerbeam wrote:
->>> +static void csi2_dphy_init(struct csi2_dev *csi2)
->>> +{
->>> +	/*
->>> +	 * FIXME: 0x14 is derived from a fixed D-PHY reference
->>> +	 * clock from the HSI_TX PLL, and a fixed target lane max
->>> +	 * bandwidth of 300 Mbps. This value should be derived
->>
->> If the table in https://community.nxp.com/docs/DOC-94312 is correct,
->> this should be 850 Mbps. Where does this 300 Mbps value come from?
->
-> I got it, the dptdin_map value for 300 Mbps is 0x14 in the Rockchip DSI
-> driver. But that value is written to the register as HSFREQRANGE_SEL(x):
->
-> #define HSFREQRANGE_SEL(val)    (((val) & 0x3f) << 1)
+Signed-off-by: Nathan Howard <adanhawthorn@gmail.com>
+---
+ drivers/staging/bcm2835-audio/bcm2835.h | 31 ++++++++++++++++++-------------
+ 1 file changed, 18 insertions(+), 13 deletions(-)
 
-Ah you are right, 0x14 would be a "testdin" value of 0x0a, which from
-the Rockchip table would be 950 MHz per lane.
-
-But thanks for pointing the table at
-https://community.nxp.com/docs/DOC-94312. That table is what
-should be referenced in the above comment (850 MHz per lane
-for a 27MHz reference clock). I will update the comment based
-on that table.
-
-Steve
-
-
-
->
-> which is 0x28. Further, the Rockchip D-PHY probably is another version,
-> as its max_mbps goes up to 1500.
->
->
+diff --git a/drivers/staging/bcm2835-audio/bcm2835.h b/drivers/staging/bcm2835-audio/bcm2835.h
+index 36e3ef8..16d7006 100644
+--- a/drivers/staging/bcm2835-audio/bcm2835.h
++++ b/drivers/staging/bcm2835-audio/bcm2835.h
+@@ -27,8 +27,8 @@
+ #include <linux/workqueue.h>
+ 
+ /*
+-#define AUDIO_DEBUG_ENABLE
+-#define AUDIO_VERBOSE_DEBUG_ENABLE
++ * #define AUDIO_DEBUG_ENABLE
++ * #define AUDIO_VERBOSE_DEBUG_ENABLE
+  */
+ 
+ /* Debug macros */
+@@ -37,10 +37,10 @@
+ #ifdef AUDIO_VERBOSE_DEBUG_ENABLE
+ 
+ #define audio_debug(fmt, arg...) \
+-	printk(KERN_INFO"%s:%d " fmt, __func__, __LINE__, ##arg)
++	pr_info("%s:%d " fmt, __func__, __LINE__, ##arg)
+ 
+ #define audio_info(fmt, arg...) \
+-	printk(KERN_INFO"%s:%d " fmt, __func__, __LINE__, ##arg)
++	pr_info("%s:%d " fmt, __func__, __LINE__, ##arg)
+ 
+ #else
+ 
+@@ -59,13 +59,13 @@
+ #endif /* AUDIO_DEBUG_ENABLE */
+ 
+ #define audio_error(fmt, arg...) \
+-	printk(KERN_ERR"%s:%d " fmt, __func__, __LINE__, ##arg)
++	pr_err("%s:%d " fmt, __func__, __LINE__, ##arg)
+ 
+ #define audio_warning(fmt, arg...) \
+-	printk(KERN_WARNING"%s:%d " fmt, __func__, __LINE__, ##arg)
++	pr_warn("%s:%d " fmt, __func__, __LINE__, ##arg)
+ 
+ #define audio_alert(fmt, arg...) \
+-	printk(KERN_ALERT"%s:%d " fmt, __func__, __LINE__, ##arg)
++	pr_alert("%s:%d " fmt, __func__, __LINE__, ##arg)
+ 
+ #define MAX_SUBSTREAMS   (8)
+ #define AVAIL_SUBSTREAMS_MASK  (0xff)
+@@ -77,8 +77,11 @@ enum {
+ 
+ /* macros for alsa2chip and chip2alsa, instead of functions */
+ 
+-#define alsa2chip(vol) (uint)(-((vol << 8) / 100)) /* convert alsa to chip volume (defined as macro rather than function call) */
+-#define chip2alsa(vol) -((vol * 100) >> 8)   /* convert chip to alsa volume */
++// convert alsa to chip volume (defined as macro rather than function call)
++#define alsa2chip(vol) (uint)(-(((vol) << 8) / 100))
++
++// convert chip to alsa volume
++#define chip2alsa(vol) -(((vol) * 100) >> 8)
+ 
+ /* Some constants for values .. */
+ enum snd_bcm2835_route {
+@@ -122,8 +125,8 @@ struct bcm2835_alsa_stream {
+ 	struct semaphore buffers_update_sem;
+ 	struct semaphore control_sem;
+ 	spinlock_t lock;
+-	volatile unsigned int control;
+-	volatile unsigned int status;
++	unsigned int control;
++	unsigned int status;
+ 
+ 	int open;
+ 	int running;
+@@ -160,8 +163,10 @@ int bcm2835_audio_write(struct bcm2835_alsa_stream *alsa_stream,
+ 			unsigned int count,
+ 			void *src);
+ void bcm2835_playback_fifo(struct bcm2835_alsa_stream *alsa_stream);
+-unsigned int bcm2835_audio_retrieve_buffers(struct bcm2835_alsa_stream *alsa_stream);
++unsigned int bcm2835_audio_retrieve_buffers(
++		struct bcm2835_alsa_stream *alsa_stream);
+ void bcm2835_audio_flush_buffers(struct bcm2835_alsa_stream *alsa_stream);
+-void bcm2835_audio_flush_playback_buffers(struct bcm2835_alsa_stream *alsa_stream);
++void bcm2835_audio_flush_playback_buffers(
++		struct bcm2835_alsa_stream *alsa_stream);
+ 
+ #endif /* __SOUND_ARM_BCM2835_H */
+-- 
+2.7.4
