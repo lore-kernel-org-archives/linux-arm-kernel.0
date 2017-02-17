@@ -1,72 +1,45 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 17 Feb 2017 17:07:01 +0530
-Subject: [PATCH v2 01/22] PCI: endpoint: Add EP core layer to enable EP
- controller and EP functions
-In-Reply-To: <ece23395-7ebc-c9f3-bd9f-4f24e44d763a@synopsys.com>
-References: <1487325042-28227-1-git-send-email-kishon@ti.com>
- <1487325042-28227-2-git-send-email-kishon@ti.com>
- <ece23395-7ebc-c9f3-bd9f-4f24e44d763a@synopsys.com>
-Message-ID: <58A6E05D.5010803@ti.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 17 Feb 2017 12:38:20 +0100
+Subject: [PATCH v4 23/36] media: imx: Add MIPI CSI-2 Receiver subdev driver
+In-Reply-To: <20170217110616.GD21222@n2100.armlinux.org.uk>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-24-git-send-email-steve_longerbeam@mentor.com>
+ <1487328479.3107.21.camel@pengutronix.de>
+ <20170217110616.GD21222@n2100.armlinux.org.uk>
+Message-ID: <1487331500.3107.43.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joao,
-
-On Friday 17 February 2017 04:56 PM, Joao Pinto wrote:
+On Fri, 2017-02-17 at 11:06 +0000, Russell King - ARM Linux wrote:
+> On Fri, Feb 17, 2017 at 11:47:59AM +0100, Philipp Zabel wrote:
+> > On Wed, 2017-02-15 at 18:19 -0800, Steve Longerbeam wrote:
+> > > +static void csi2_dphy_init(struct csi2_dev *csi2)
+> > > +{
+> > > +	/*
+> > > +	 * FIXME: 0x14 is derived from a fixed D-PHY reference
+> > > +	 * clock from the HSI_TX PLL, and a fixed target lane max
+> > > +	 * bandwidth of 300 Mbps. This value should be derived
+> > 
+> > If the table in https://community.nxp.com/docs/DOC-94312 is correct,
+> > this should be 850 Mbps. Where does this 300 Mbps value come from?
 > 
-> Hi Kishon,
-> 
-> ?s 9:50 AM de 2/17/2017, Kishon Vijay Abraham I escreveu:
->> Introduce a new EP core layer in order to support endpoint functions
->> in linux kernel. This comprises of EPC library
->> (Endpoint Controller Library) and EPF library (Endpoint
->> Function Library). EPC library implements functions that is specific
->> to an endpoint controller and EPF library implements functions
->> that is specific to an endpoint function.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  drivers/Makefile                    |    2 +
->>  drivers/pci/Kconfig                 |    1 +
->>  drivers/pci/endpoint/Kconfig        |   21 ++
->>  drivers/pci/endpoint/Makefile       |    6 +
->>  drivers/pci/endpoint/pci-epc-core.c |  548 +++++++++++++++++++++++++++++++++++
->>  drivers/pci/endpoint/pci-epc-mem.c  |  143 +++++++++
->>  drivers/pci/endpoint/pci-epf-core.c |  347 ++++++++++++++++++++++
->>  include/linux/mod_devicetable.h     |   10 +
->>  include/linux/pci-epc.h             |  141 +++++++++
->>  include/linux/pci-epf.h             |  160 ++++++++++
->>  10 files changed, 1379 insertions(+)
->>  create mode 100644 drivers/pci/endpoint/Kconfig
->>  create mode 100644 drivers/pci/endpoint/Makefile
->>  create mode 100644 drivers/pci/endpoint/pci-epc-core.c
->>  create mode 100644 drivers/pci/endpoint/pci-epc-mem.c
->>  create mode 100644 drivers/pci/endpoint/pci-epf-core.c
->>  create mode 100644 include/linux/pci-epc.h
->>  create mode 100644 include/linux/pci-epf.h
->>
->> diff --git a/drivers/Makefile b/drivers/Makefile
->> index f521cb0..a300bb1 100644
->> --- a/drivers/Makefile
->> +++ b/drivers/Makefile
->> @@ -14,7 +14,9 @@ obj-$(CONFIG_GENERIC_PHY)	+= phy/
->>  obj-$(CONFIG_PINCTRL)		+= pinctrl/
->>  obj-$(CONFIG_GPIOLIB)		+= gpio/
->>  obj-y				+= pwm/
->> +
->>  obj-$(CONFIG_PCI)		+= pci/
->> +obj-$(CONFIG_PCI_ENDPOINT)	+= pci/endpoint/
->>  # PCI dwc controller drivers
->>  obj-y				+= pci/dwc/
-> 
-> Any special reason to include pci/endpoint and pci/dwc in drivers/Makefile
-> instead of being inside pci/Makefile? pci/host is still inside pci/Makefile.
+> I thought you had some code to compute the correct value, although
+> I guess we've lost the ability to know how fast the sensor is going
+> to drive the link.
 
-CONFIG_PCI enables all the pcie host support. Endpoint support should be
-enabled independent of the host support. Moving pci/endpoint inside
-pci/Makefile will build endpoint support only if CONFIG_PCI is enabled. For the
-same reason kept pci/dwc in drivers/Makefile since dwc drivers can be used
-either in host mode or device mode (or both).
+I had code to calculate the number of needed lanes from the bit rate and
+link frequency. I did not actually change the D-PHY register value.
+And as you pointed out, calculating the number of lanes is not useful
+without input from the sensor driver, as some lane configurations might
+not be supported.
 
-Thanks
-Kishon
+> Note that the IMX219 currently drives the data lanes at 912Mbps almost
+> exclusively, as I've yet to finish working out how to derive the PLL
+> parameters.  (I have something that works, but it currently takes on
+> the order of 100k iterations to derive the parameters.  gcd() doesn't
+> help you in this instance.)
+
+The tc358743 also currently only implements a fixed rate (of 594 Mbps).
+
+regards
+Philipp
