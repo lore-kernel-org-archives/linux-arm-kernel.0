@@ -1,38 +1,46 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 17 Feb 2017 13:36:08 +0100
-Subject: [PATCH] pata: remove the at91 driver
-In-Reply-To: <1487324200-17517-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <CGME20170217093732epcas5p463c32b21e7c71000d01d15c54333c1f6@epcas5p4.samsung.com>
- <1487324200-17517-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1599704.hbkP4KrUDJ@amdc3058>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 17 Feb 2017 13:37:33 +0100
+Subject: [PATCH 00/35] treewide trivial patches converting pr_warning to
+ pr_warn
+In-Reply-To: <CAJZ5v0gNcGtnXpE1n6LSq7ey+UDKx+oQfmTg0_PgFwzB0Dd_5A@mail.gmail.com>
+References: <cover.1487314666.git.joe@perches.com>
+ <CAJZ5v0gNcGtnXpE1n6LSq7ey+UDKx+oQfmTg0_PgFwzB0Dd_5A@mail.gmail.com>
+Message-ID: <CAMuHMdWsG0DboaLqXag53Vejwvc5PPY2k2gy9PSdHWbNEx6nRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rafael,
 
-Hi,
+On Fri, Feb 17, 2017 at 1:27 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> On Fri, Feb 17, 2017 at 8:11 AM, Joe Perches <joe@perches.com> wrote:
+>> There are ~4300 uses of pr_warn and ~250 uses of the older
+>> pr_warning in the kernel source tree.
+>>
+>> Make the use of pr_warn consistent across all kernel files.
+>>
+>> This excludes all files in tools/ as there is a separate
+>> define pr_warning for that directory tree and pr_warn is
+>> not used in tools/.
+>>
+>> Done with 'sed s/\bpr_warning\b/pr_warn/' and some emacsing.
+>
+> Sorry about asking if that has been asked already.
+>
+> Wouldn't it be slightly less intrusive to simply redefined
+> pr_warning() as a synonym for pr_warn()?
 
-On Friday, February 17, 2017 10:36:40 AM Boris Brezillon wrote:
-> This driver is orphan since commit 2e591e7b3ac2 ("ARM: at91: remove
-> at91sam9261/at91sam9g10 legacy board support"). Given that nobody cared
-> adding DT support to it, it probably means it's no longer used and is
-> thus a good candidate for removal.
+That's already the case.
 
-The exact commit which removed PATA support for AT91SAM9260 seems to
-be b2026f708e09 ("ARM: at91: remove at91sam9260/at91sam9g20 legacy
-board support").
+This series cleans up the cruft, so we can catch all users with
+"git grep -w pr_warn".
 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Gr{oetje,eeting}s,
 
-Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+                        Geert
 
-> ---
-> Note that I'm removing this driver because I plan to rework the macro
-> definitions in atmel-smc.h, and some of them are used in this driver.
-> Since I can't test it, and this drivers is not used anymore, it's probably
-> better to remove it.
-
-Best regards,
 --
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
