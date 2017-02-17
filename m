@@ -1,43 +1,44 @@
-From: daniel.baluta@gmail.com (Daniel Baluta)
-Date: Fri, 17 Feb 2017 18:23:41 +0200
-Subject: [RFC 0/4] iio: trigger: Add OF support and GPIO based trigger
-In-Reply-To: <1487347429-31761-1-git-send-email-fabrice.gasnier@st.com>
-References: <1487347429-31761-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <CAEnQRZDey70TR=nU4rpFyVMqDuUFAGc2SpNCmraUO5x29n1+ow@mail.gmail.com>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Fri, 17 Feb 2017 16:26:53 +0000
+Subject: [PATCH 02/35] ARM: ep93xx: Convert remaining uses of pr_warning
+ to pr_warn
+In-Reply-To: <aa5b8db51f4ee0aaf27ebacbe0d1d35112147952.1487314666.git.joe@perches.com>
+References: <cover.1487314666.git.joe@perches.com>
+ <aa5b8db51f4ee0aaf27ebacbe0d1d35112147952.1487314666.git.joe@perches.com>
+Message-ID: <BLUPR0101MB1554C39CF31F603BF7AB0046D05D0@BLUPR0101MB1554.prod.exchangelabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2017 at 6:03 PM, Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
-> Hi,
+On Friday, February 17, 2017 12:11 AM, Joe Perches wrote:
+> To enable eventual removal of pr_warning.
 >
-> I send this as an RFC, as I'm digging to try to get as generic
-> as possible GPIO based trigger support, as discussed earlier in
-> other patchset "Add EXTI GPIO trigger support to STM32 ADC":
-> https://www.spinics.net/lists/arm-kernel/msg559091.html
+> This makes pr_warn use consistent for arch/arm
 >
-> Following various comments on this, I sent this RFC to address two
-> topics, that I see as possible prerequisite:
-> - Add trigger OF support
-> - GPIO based trigger
+> Prior to this patch, there were 2 uses of pr_warning and
+> 405 uses of pr_warn in arch/arm
+>
+> Signed-off-by: Joe Perches <joe@perches.com>
+> ---
+>  arch/arm/mach-ep93xx/core.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> index c393b1b0310d..d6e907b6cc31 100644
+> --- a/arch/arm/mach-ep93xx/core.c
+> +++ b/arch/arm/mach-ep93xx/core.c
+> @@ -346,9 +346,9 @@ void __init ep93xx_register_i2c(struct i2c_gpio_platform_data *data,
+>  	 * CMOS driver.
+>  	 */
+>  	if (data->sda_is_open_drain && data->sda_pin != EP93XX_GPIO_LINE_EEDAT)
+> -		pr_warning("sda != EEDAT, open drain has no effect\n");
+> +		pr_warn("sda != EEDAT, open drain has no effect\n");
+>  	if (data->scl_is_open_drain && data->scl_pin != EP93XX_GPIO_LINE_EECLK)
+> -		pr_warning("scl != EECLK, open drain has no effect\n");
+> +		pr_warn("scl != EECLK, open drain has no effect\n");
+>  
+>  	__raw_writel((data->sda_is_open_drain << 1) |
+>  		     (data->scl_is_open_drain << 0),
 
-I wonder if we could use configfs to create and configure
-a GPIO based trigger.
+For the ep93xx part:
 
-You should just create another trigger type (look into
-drivers/iio/trigger/iio-trig-hrtimer.c)
-the userspace API will look like this:
-
-# cd /config/iio/triggers
-# insert your iio-trig-gpio
-# setup the global parameters for the GPIO (the local params can be
-set via dts/acpi)
-# cd /config/iio/trigers/gpios/
-
-#mkdir t1
-
-And this will create an io-gpio-trigger named t1.
-
-Not sure this fits your usecase but would be nice to consider.
-
-thanks,
-Daniel.
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
