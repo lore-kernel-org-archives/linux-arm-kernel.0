@@ -1,54 +1,71 @@
 From: andrew_gabbasov@mentor.com (Andrew Gabbasov)
-Date: Fri, 17 Feb 2017 06:09:39 -0700
-Subject: [PATCH 3/3] ARM: mm: Fix checks for supporting caches for mapping
- color alignment
-In-Reply-To: <1487336979-14245-1-git-send-email-andrew_gabbasov@mentor.com>
-References: <1487336979-14245-1-git-send-email-andrew_gabbasov@mentor.com>
-Message-ID: <1487336979-14245-4-git-send-email-andrew_gabbasov@mentor.com>
+Date: Fri, 17 Feb 2017 06:09:36 -0700
+Subject: [PATCH 0/3] ARM: mm: Fix ARMv7+ aliasing instuction cache invalidation
+Message-ID: <1487336979-14245-1-git-send-email-andrew_gabbasov@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When making memory mapping, the page is aligned to the appropriate
-page color for the cases of cache types, supporting memory aliasing.
-Initially the cache type checking was implemented by looking at
-appropriate color restriction indicating bits for both data and
-instruction caches, but after checking macros were introduced
-and later split to separate aliasing support for data and instuction
-caches, page alignment is done for aliasing data cache only.
+ARMv7+ instruction cache supports memory location aliases
+(when different virtual memory locations, mapped to the same
+physical location, are stored in different cache lines).
+But, unlike ARMv6, there is no page coloring restrictions,
+and virtual address based instruction cache maintenance
+operations does not affect all the aliases.
 
-Handling of aliasing instruction cache case is added to page mapping
-color alignment, but, on the other hand, the case of instruction
-cache, supporting aliasing, but not having page color restrictions
-(namely, ARMv7+), is excluded from color alignment.
+ARMv7-A and ARMv7-R Architecture Reference Manual, section B3.11.2:
 
-Signed-off-by: Andrew Gabbasov <andrew_gabbasov@mentor.com>
----
- arch/arm/mm/mmap.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+"If instruction cache invalidation by address is performed on a memory
+location, the effect of that invalidation is visible only to the virtual
+address supplied with the operation. The effect of the invalidation might
+not be visible to any other aliases of that physical memory location.
 
-diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
-index 66353ca..97e440a 100644
---- a/arch/arm/mm/mmap.c
-+++ b/arch/arm/mm/mmap.c
-@@ -58,7 +58,8 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
- 	struct mm_struct *mm = current->mm;
- 	struct vm_area_struct *vma;
- 	int do_align = 0;
--	int aliasing = cache_is_vipt_aliasing();
-+	int aliasing = cache_is_vipt_aliasing() ||
-+		       (icache_is_vipt_aliasing() && icache_is_vipt_coloring());
- 	struct vm_unmapped_area_info info;
- 
- 	/*
-@@ -111,7 +112,8 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
- 	struct mm_struct *mm = current->mm;
- 	unsigned long addr = addr0;
- 	int do_align = 0;
--	int aliasing = cache_is_vipt_aliasing();
-+	int aliasing = cache_is_vipt_aliasing() ||
-+		       (icache_is_vipt_aliasing() && icache_is_vipt_coloring());
- 	struct vm_unmapped_area_info info;
- 
- 	/*
+The only architecturally-guaranteed way to invalidate all aliases
+of a physical address from a VIPT instruction cache is to invalidate
+the entire instruction cache."
+
+So, instruction cache invalidation after modification of instructions
+in memory should be done differently from ARMv6. The correct way
+is similar to what is now done for arm64 architecture.
+
+This patch series implements necessary changes.
+The third patch actually is not directly related to ARMv7 instruction
+cache invalidation, but is a fix rather for ARMv6, but in related area.
+
+Andrew Gabbasov (3):
+  ARM: mm: Add a separate API function for DCCMVAU cache operation
+  ARM: mm: Support VIPT aliasing but not coloring instruction cache
+  ARM: mm: Fix checks for supporting caches for mapping color alignment
+
+ arch/arm/include/asm/cacheflush.h |  3 +++
+ arch/arm/include/asm/cachetype.h  |  4 +++-
+ arch/arm/include/asm/glue-cache.h |  3 +++
+ arch/arm/kernel/setup.c           | 17 ++++++++---------
+ arch/arm/mm/cache-fa.S            |  3 +++
+ arch/arm/mm/cache-nop.S           |  3 +++
+ arch/arm/mm/cache-v4.S            |  3 +++
+ arch/arm/mm/cache-v4wb.S          |  3 +++
+ arch/arm/mm/cache-v4wt.S          |  3 +++
+ arch/arm/mm/cache-v6.S            |  3 +++
+ arch/arm/mm/cache-v7.S            | 27 +++++++++++++++++++++++++++
+ arch/arm/mm/cache-v7m.S           | 23 +++++++++++++++++++++++
+ arch/arm/mm/flush.c               | 11 ++++++++++-
+ arch/arm/mm/mmap.c                |  6 ++++--
+ arch/arm/mm/proc-arm1020.S        |  3 +++
+ arch/arm/mm/proc-arm1020e.S       |  3 +++
+ arch/arm/mm/proc-arm1022.S        |  3 +++
+ arch/arm/mm/proc-arm1026.S        |  3 +++
+ arch/arm/mm/proc-arm920.S         |  3 +++
+ arch/arm/mm/proc-arm922.S         |  3 +++
+ arch/arm/mm/proc-arm925.S         |  3 +++
+ arch/arm/mm/proc-arm926.S         |  3 +++
+ arch/arm/mm/proc-arm940.S         |  3 +++
+ arch/arm/mm/proc-arm946.S         |  3 +++
+ arch/arm/mm/proc-feroceon.S       |  6 ++++++
+ arch/arm/mm/proc-macros.S         |  1 +
+ arch/arm/mm/proc-mohawk.S         |  3 +++
+ arch/arm/mm/proc-xsc3.S           |  3 +++
+ arch/arm/mm/proc-xscale.S         |  4 ++++
+ 29 files changed, 146 insertions(+), 13 deletions(-)
+
 -- 
 2.1.0
