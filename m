@@ -1,36 +1,26 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 17 Feb 2017 14:42:35 +0100
-Subject: [PATCH] pata: remove the at91 driver
-In-Reply-To: <1599704.hbkP4KrUDJ@amdc3058>
-References: <CGME20170217093732epcas5p463c32b21e7c71000d01d15c54333c1f6@epcas5p4.samsung.com>
- <1487324200-17517-1-git-send-email-boris.brezillon@free-electrons.com>
- <1599704.hbkP4KrUDJ@amdc3058>
-Message-ID: <20170217144235.1fd12c80@bbrezillon>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Fri, 17 Feb 2017 15:40:23 +0200
+Subject: [PATCH 07/10] perf: Directly pass PERF_AUX_* flags to
+ perf_aux_output_end
+In-Reply-To: <1485540470-11469-8-git-send-email-will.deacon@arm.com>
+References: <1485540470-11469-1-git-send-email-will.deacon@arm.com>
+ <1485540470-11469-8-git-send-email-will.deacon@arm.com>
+Message-ID: <8737fdj5q0.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Feb 2017 13:36:08 +0100
-Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> wrote:
+Will Deacon <will.deacon@arm.com> writes:
 
-> Hi,
-> 
-> On Friday, February 17, 2017 10:36:40 AM Boris Brezillon wrote:
-> > This driver is orphan since commit 2e591e7b3ac2 ("ARM: at91: remove
-> > at91sam9261/at91sam9g10 legacy board support"). Given that nobody cared
-> > adding DT support to it, it probably means it's no longer used and is
-> > thus a good candidate for removal.  
-> 
-> The exact commit which removed PATA support for AT91SAM9260 seems to
-> be b2026f708e09 ("ARM: at91: remove at91sam9260/at91sam9g20 legacy
-> board support").
+> @@ -485,7 +485,8 @@ int intel_bts_interrupt(void)
+>  		return handled;
+>  
+>  	perf_aux_output_end(&bts->handle, local_xchg(&buf->data_size, 0),
+> -			    !!local_xchg(&buf->lost, 0));
+> +			    local_xchg(&buf->lost, 0) ?
+> +			    PERF_AUX_FLAG_OVERWRITE : 0);
 
-Indeed. I'll fix the commit message and send a new version.
+Heh, this one would have taken some time to debug. :)
 
-> 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>  
-> 
-> Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-
-Thanks,
-
-Boris
+Regards,
+--
+Alex
