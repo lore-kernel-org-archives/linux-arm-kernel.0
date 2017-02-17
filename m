@@ -1,52 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Feb 2017 12:32:05 +0100
-Subject: [PATCH 04/11] ARM64: Prepare Actions Semi S900
-In-Reply-To: <07efabbe-1c1f-40ea-339e-1c09dbbfce30@suse.de>
-References: <20170215165528.10052-1-afaerber@suse.de>
- <20170215165528.10052-5-afaerber@suse.de>
- <6175161.4SuqJTY84p@wuerfel> <07efabbe-1c1f-40ea-339e-1c09dbbfce30@suse.de>
-Message-ID: <CAK8P3a0oTnGFrmmpGhQBG6vKiu=Z1PEqKL89vKsDXLd91H3-hw@mail.gmail.com>
+From: fisaksen@baylibre.com (Frode Isaksen)
+Date: Fri, 17 Feb 2017 12:36:17 +0100
+Subject: [PATCH v2 4/6] spi: davinci: flush caches when performing DMA
+In-Reply-To: <20170217112247.GE21222@n2100.armlinux.org.uk>
+References: <1487327904-28311-1-git-send-email-fisaksen@baylibre.com>
+ <1487327904-28311-5-git-send-email-fisaksen@baylibre.com>
+ <5fab0c33-6e1d-c63a-8758-6672236045a7@ti.com>
+ <20170217112247.GE21222@n2100.armlinux.org.uk>
+Message-ID: <eaf93c6c-52a7-826b-9c53-2b13c0b280ca@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2017 at 1:34 AM, Andreas F?rber <afaerber@suse.de> wrote:
-> Am 16.02.2017 um 14:43 schrieb Arnd Bergmann:
->> On Wednesday, February 15, 2017 5:55:21 PM CET Andreas F?rber wrote:
->>>
->>> +config ARCH_OWL
->>> +       bool "Actions Semi S900 SoC Family"
->>> +       help
->>> +         This enables support for the Actions Semiconductor S900 SoC family.
+
+
+On 17/02/2017 12:22, Russell King - ARM Linux wrote:
+> On Fri, Feb 17, 2017 at 04:27:28PM +0530, Vignesh R wrote:
+>> On Friday 17 February 2017 04:08 PM, Frode Isaksen wrote:
+>>> @@ -650,6 +651,10 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
+>>>  		dmaengine_slave_config(dspi->dma_rx, &dma_rx_conf);
+>>>  		dmaengine_slave_config(dspi->dma_tx, &dma_tx_conf);
+>>>  
+>>> +		if (is_vmalloc_addr(t->rx_buf))
+>>> +			/* VIVT cache: flush since addr. may be aliased */
+>>> +			flush_kernel_vmap_range((void *)t->rx_buf, t->len);
 >>> +
->>>
->>
->> There seem to be a couple of other SoCs in the same family, so
->> maybe use a more generic name than S900 in the one-line
->> Kconfig description.
+>>>  		rxdesc = dmaengine_prep_slave_sg(dspi->dma_rx,
+>>>  				t->rx_sg.sgl, t->rx_sg.nents, DMA_DEV_TO_MEM,
+>>>  				DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
+>>> @@ -660,7 +665,9 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
+>>>  			/* use rx buffer as dummy tx buffer */
+>>>  			t->tx_sg.sgl = t->rx_sg.sgl;
+>>>  			t->tx_sg.nents = t->rx_sg.nents;
+>>> -		}
+>>> +		} else if (is_vmalloc_addr(t->tx_buf))
+>>> +			/* VIVT cache: flush since addr. may be aliased */
+>>> +			flush_kernel_vmap_range((void *)t->tx_buf, t->len);
+>>>  
+>> SPI core calls dma_unmap_sg(), that is supposed to flush caches.
+>> If flush_kernel_vmap_range() call is required here to flush actual cache
+>> lines, then what does dma_unmap_* calls in SPI core end up flushing?
+> The DMA API deals with the _kernel_ lowmem mapping.  It has no knowledge
+> of any other aliases in the system.  When you have a VIVT cache (as all
+> old ARM CPUs have) then if you access the memory through a different
+> alias from the kernel lowmem mapping (iow, vmalloc) then the DMA API
+> can't help you.
 >
-> Good point. I only tested with `make oldconfig`, so using "Owl" should
-> tidy the sort order in `make menuconfig` while at it. (I believe there
-> were more inconsistent examples, such as Armada 3700 vs. MVEBU...)
->
-> Note that I have not come across any explanation for "OWL" as an
-> acronym, so I'm guessing it's the bird and therefore capitalizing it.
->
-> Apart from S900, actions-semi.com shows V series S900VR and S700 as well
-> as GT series GT7 Cortex-A53 based SoCs. My guess[*] is these could all
-> be handled as ARCH_OWL, adding further differentiation below if
-> necessary; but Bubblegum-96 seemed the only available arm64 board for
-> testing so far, so any comments from Actions will be appreciated.
->
-> [*] The S500 vendor device tree was actually using ATM series models for
-> various nodes, so I'm inferring that the product series are closely
-> enough related.
->
-> However, if you would prefer ARCH_ACTIONS I wouldn't mind either - we
-> just need to keep it consistent across arm and arm64.
+> However, the correct place to use flush_kernel_vmap_range() etc is not
+> in drivers - it's supposed to be done in the callers that know that
+> the memory is aliased.
+OK, so this should be done in the ubifs layer instead ? xfs already does this, but no other fs.
 
-ARCH_ACTIONS seems best to me. We tend to go for the broader names
-per company these days even when things are not closely related. This
-avoids having to rename things when a new line of products comes up
-that shares a subset of the components but doesn't fit under the old name.
+Thanks,
+Frode
 
-      Arnd
+>
+> For full details on these flushing functions, see cachetlb.txt.  This
+> does not remove the requirement to also use the DMA API.
+>
+> === cachetlb.txt ===
+>
+> The final category of APIs is for I/O to deliberately aliased address
+> ranges inside the kernel.  Such aliases are set up by use of the
+> vmap/vmalloc API.  Since kernel I/O goes via physical pages, the I/O
+> subsystem assumes that the user mapping and kernel offset mapping are
+> the only aliases.  This isn't true for vmap aliases, so anything in
+> the kernel trying to do I/O to vmap areas must manually manage
+> coherency.  It must do this by flushing the vmap range before doing
+> I/O and invalidating it after the I/O returns.
+>
+>   void flush_kernel_vmap_range(void *vaddr, int size)
+>        flushes the kernel cache for a given virtual address range in
+>        the vmap area.  This is to make sure that any data the kernel
+>        modified in the vmap range is made visible to the physical
+>        page.  The design is to make this area safe to perform I/O on.
+>        Note that this API does *not* also flush the offset map alias
+>        of the area.
+>
+>   void invalidate_kernel_vmap_range(void *vaddr, int size) invalidates
+>        the cache for a given virtual address range in the vmap area
+>        which prevents the processor from making the cache stale by
+>        speculatively reading data while the I/O was occurring to the
+>        physical pages.  This is only necessary for data reads into the
+>        vmap area.
+>
+>
