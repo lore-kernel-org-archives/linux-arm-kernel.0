@@ -1,51 +1,33 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 17 Feb 2017 10:14:39 +0100
-Subject: [PATCH 08/21] ARM: dts: sun8i-h3: add dwmac-sun8i rgmii pins
-In-Reply-To: <20170216190632.hezcacn3hw5uhxcn@lukather>
-References: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
- <20170216124859.14346-9-clabbe.montjoie@gmail.com>
- <20170216190632.hezcacn3hw5uhxcn@lukather>
-Message-ID: <20170217091439.GE22723@Red>
+From: danielperezdeandres@gmail.com (Daniel Perez de Andres)
+Date: Fri, 17 Feb 2017 10:18:19 +0100
+Subject: [PATCH] Staging: BCM2835-Audio: bcm2835-pcm: single line block
+ statement braces fix
+Message-ID: <1487323099-12721-1-git-send-email-danielperezdeandres@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 08:06:32PM +0100, Maxime Ripard wrote:
-> On Thu, Feb 16, 2017 at 01:48:46PM +0100, Corentin Labbe wrote:
-> > This patch add pinctrl node for dwmac-sun8i on H3.
-> > 
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/sun8i-h3.dtsi | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> > index 61d56d2..59ed40e 100644
-> > --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> > @@ -349,6 +349,17 @@
-> >  				function = "i2c2";
-> >  			};
-> >  
-> > +			emac_rgmii_pins: emac0 at 0 {
-> > +				allwinner,pins = "PD0", "PD1", "PD2", "PD3",
-> > +						"PD4", "PD5", "PD7",
-> > +						"PD8", "PD9", "PD10",
-> > +						"PD12", "PD13", "PD15",
-> > +						"PD16", "PD17";
-> > +				allwinner,function = "emac";
-> 
-> Please use the generic pin config properties (ie. pins and functions).
-> 
-> > +				allwinner,drive = <SUN4I_PINCTRL_40_MA>;
-> 
-> Why do you need to use 40mA?
-> 
-> > +				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> 
-> This is the default now.
-> 
+A single line statement under an if clause doesn't require braces {}
 
-Will fix that in all DT
+Signed-off-by: Daniel Perez de Andres <danielperezdeandres@gmail.com>
+---
+ drivers/staging/bcm2835-audio/bcm2835-pcm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Thanks
-Corentin Labbe
+diff --git a/drivers/staging/bcm2835-audio/bcm2835-pcm.c b/drivers/staging/bcm2835-audio/bcm2835-pcm.c
+index 014bf7a..a2a8694 100644
+--- a/drivers/staging/bcm2835-audio/bcm2835-pcm.c
++++ b/drivers/staging/bcm2835-audio/bcm2835-pcm.c
+@@ -317,9 +317,9 @@ static int snd_bcm2835_pcm_prepare(struct snd_pcm_substream *substream)
+ 	err = bcm2835_audio_set_params(alsa_stream, channels,
+ 		alsa_stream->params_rate,
+ 		alsa_stream->pcm_format_width);
+-	if (err < 0) {
++	if (err < 0)
+ 		audio_error(" error setting hw params\n");
+-	}
++
+ 
+ 	bcm2835_audio_setup(alsa_stream);
+ 
+-- 
+2.7.4
