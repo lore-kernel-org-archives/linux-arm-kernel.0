@@ -1,128 +1,142 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Fri, 17 Feb 2017 13:05:32 +0000
-Subject: [PATCH v2 04/22] Documentation: PCI: Guide to use pci endpoint
- configfs
-In-Reply-To: <1487325042-28227-5-git-send-email-kishon@ti.com>
-References: <1487325042-28227-1-git-send-email-kishon@ti.com>
- <1487325042-28227-5-git-send-email-kishon@ti.com>
-Message-ID: <ac16c03a-e415-327c-27b3-bcc700a6f953@synopsys.com>
+From: andrew_gabbasov@mentor.com (Andrew Gabbasov)
+Date: Fri, 17 Feb 2017 06:09:38 -0700
+Subject: [PATCH 2/3] ARM: mm: Support VIPT aliasing but not coloring
+ instruction cache
+In-Reply-To: <1487336979-14245-1-git-send-email-andrew_gabbasov@mentor.com>
+References: <1487336979-14245-1-git-send-email-andrew_gabbasov@mentor.com>
+Message-ID: <1487336979-14245-3-git-send-email-andrew_gabbasov@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?s 9:50 AM de 2/17/2017, Kishon Vijay Abraham I escreveu:
-> Add Documentation to help users use pci endpoint to configure
-> pci endpoint function and to bind the endpoint function
-> with endpoint controller.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  Documentation/PCI/00-INDEX                      |    2 +
->  Documentation/PCI/endpoint/pci-endpoint-cfs.txt |   84 +++++++++++++++++++++++
->  2 files changed, 86 insertions(+)
->  create mode 100644 Documentation/PCI/endpoint/pci-endpoint-cfs.txt
-> 
-> diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
-> index ba950b2..f84a23c 100644
-> --- a/Documentation/PCI/00-INDEX
-> +++ b/Documentation/PCI/00-INDEX
-> @@ -14,3 +14,5 @@ pcieaer-howto.txt
->  	- the PCI Express Advanced Error Reporting Driver Guide HOWTO
->  endpoint/pci-endpoint.txt
->  	- guide to add endpoint controller driver and endpoint function driver.
-> +endpoint/pci-endpoint-cfs.txt
-> +	- guide to use configfs to configure the pci endpoint function.
-> diff --git a/Documentation/PCI/endpoint/pci-endpoint-cfs.txt b/Documentation/PCI/endpoint/pci-endpoint-cfs.txt
-> new file mode 100644
-> index 0000000..d9f8734
-> --- /dev/null
-> +++ b/Documentation/PCI/endpoint/pci-endpoint-cfs.txt
-> @@ -0,0 +1,84 @@
-> +                   CONFIGURING PCI ENDPOINT USING CONFIGFS
-> +                    Kishon Vijay Abraham I <kishon@ti.com>
-> +
-> +The PCI Endpoint Core exposes configfs entry (pci_ep) in order to configure the
-> +PCI endpoint function and in order to bind the endpoint function
-> +with the endpoint controller. (For introducing other mechanisms to
-> +configure the PCI Endpoint Function refer [1]).
-> +
-> +*) Mounting configfs
-> +
-> +The PCI Endpoint Core layer creates pci_ep directory in the mounted configfs
-> +directory. configfs can be mounted using the following command.
-> +
-> +	mount -t configfs none /sys/kernel/config
-> +
-> +*) Directory Structure
-> +
-> +The pci_ep configfs directory structure has been created to reflect the
-> +natural tree like structure of PCI devices. So every directory created
-> +inside pci_ep represents a EPC device and every directory created inside
-> +epf directory represents EPF device.
-> +
-> +/sys/kernel/config/pci_ep/
-> +			 | <dir>/ --------------------------------------> [2]
-> +				| epc
-> +				| epf/
-> +				     | <dir>/ --------------------------> [3]
-> +					    | vendorid
-> +					    | deviceid
-> +					    | revid
-> +					    | progif_code
-> +					    | subclass_code
-> +					    | baseclass_code
-> +					    | cache_line_size
-> +					    | subsys_vendor_id
-> +					    | subsys_id
-> +					    | interrupt_pin
-> +					    | function
-> +
-> +*) Creating configfs entry for EPC
-> +
-> +Any directory created inside *pci_ep* represents an EPC device. In the above
-> +directory structure [2] represents an EPC device. It consists of
-> +
-> +	*) epc: Use it to associate the configfs entry to an actual EPC device.
-> +		The list of valid entries for this field can be obtained from
-> +			ls /sys/class/pci_epc/
-> +
-> +	*) epf: Directory that contains all the endpoint functions. The name
-> +		of the created directory determines the driver this particular
-> +		epf device will be bound to. The name can be obtained either
-> +		from the function binding documentation [4] or
-> +			ls /sys/bus/pci-epf/drivers
-> +
-> +		If more than one endpoint function device has to be bound to
-> +		the same driver, then the directory should be created using
-> +		the following notation
-> +			mkdir <name>.<num>
-> +
-> +*) Creating configfs entry for EPF
-> +
-> +Any directory created inside *epf* directory represents an EPF device. In the
-> +above directory structure, [3] represents an EPF device. It consists of the
-> +following entries that can be used to configure the standard configuration
-> +header of the endpoint function. (These entries are created by the
-> +framework when any new directory is created inside epf directory.)
-> +
-> +        | vendorid
-> +        | deviceid
-> +        | revid
-> +        | progif_code
-> +        | subclass_code
-> +        | baseclass_code
-> +        | cache_line_size
-> +        | subsys_vendor_id
-> +        | subsys_id
-> +        | interrupt_pin
-> +
-> +The following entry identifies the function driver that is bound to the
-> +function device
-> +	| function
-> +
-> +[1] -> Documentation/PCI/endpoint/pci-endpoint.txt
-> +[4] -> Documentation/PCI/endpoint/function/binding/
-> 
+ARMv7+ instruction cache can have virtual memory location aliases,
+but, unlike ARMv6, does not have page coloring restrictions, and
+instruction cache line invalidation does not affect all the aliases.
+So, for ARMv7+ modification of instruction in memory requires
+invalidation of the whole instruction cache (after flushing of
+data cache line to the point of unification) to be sure all
+the lines for alias memory locations are affected. This is
+already implemented this way for arm64 architecture.
 
-Good content.
+The cases of aliasing instruction cache supporting and not supporing
+page coloring are marked by a separate flag in cacheid, and depending
+on it different actions are taken for instruction cache invalidation.
 
-Acked-By: Joao Pinto <jpinto@synopsys.com>
+Signed-off-by: Andrew Gabbasov <andrew_gabbasov@mentor.com>
+---
+ arch/arm/include/asm/cachetype.h |  4 +++-
+ arch/arm/kernel/setup.c          | 17 ++++++++---------
+ arch/arm/mm/flush.c              | 11 ++++++++++-
+ 3 files changed, 21 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/include/asm/cachetype.h b/arch/arm/include/asm/cachetype.h
+index 01509ae..03fb2ca 100644
+--- a/arch/arm/include/asm/cachetype.h
++++ b/arch/arm/include/asm/cachetype.h
+@@ -8,6 +8,7 @@
+ #define CACHEID_ASID_TAGGED		(1 << 3)
+ #define CACHEID_VIPT_I_ALIASING		(1 << 4)
+ #define CACHEID_PIPT			(1 << 5)
++#define CACHEID_VIPT_I_COLORING		(1 << 6)
+ 
+ extern unsigned int cacheid;
+ 
+@@ -18,12 +19,13 @@ extern unsigned int cacheid;
+ #define icache_is_vivt_asid_tagged()	cacheid_is(CACHEID_ASID_TAGGED)
+ #define icache_is_vipt_aliasing()	cacheid_is(CACHEID_VIPT_I_ALIASING)
+ #define icache_is_pipt()		cacheid_is(CACHEID_PIPT)
++#define icache_is_vipt_coloring()	cacheid_is(CACHEID_VIPT_I_COLORING)
+ 
+ /*
+  * __LINUX_ARM_ARCH__ is the minimum supported CPU architecture
+  * Mask out support which will never be present on newer CPUs.
+  * - v6+ is never VIVT
+- * - v7+ VIPT never aliases on D-side
++ * - v7+ VIPT never aliases on D-side and never colors
+  */
+ #if __LINUX_ARM_ARCH__ >= 7
+ #define __CACHEID_ARCH_MIN	(CACHEID_VIPT_NONALIASING |\
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 34e3f3c..4c7a588 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -278,9 +278,9 @@ int __pure cpu_architecture(void)
+ 	return __cpu_architecture;
+ }
+ 
+-static int cpu_has_aliasing_icache(unsigned int arch)
++static int cpu_aliasing_icache(unsigned int arch)
+ {
+-	int aliasing_icache;
++	int aliasing_icache = 0;
+ 	unsigned int id_reg, num_sets, line_size;
+ 
+ 	/* PIPT caches never alias. */
+@@ -295,14 +295,14 @@ static int cpu_has_aliasing_icache(unsigned int arch)
+ 		id_reg = read_ccsidr();
+ 		line_size = 4 << ((id_reg & 0x7) + 2);
+ 		num_sets = ((id_reg >> 13) & 0x7fff) + 1;
+-		aliasing_icache = (line_size * num_sets) > PAGE_SIZE;
++		if ((line_size * num_sets) > PAGE_SIZE)
++			aliasing_icache = CACHEID_VIPT_I_ALIASING;
+ 		break;
+ 	case CPU_ARCH_ARMv6:
+-		aliasing_icache = read_cpuid_cachetype() & (1 << 11);
++		if (read_cpuid_cachetype() & (1 << 11))
++			aliasing_icache = CACHEID_VIPT_I_ALIASING |
++					  CACHEID_VIPT_I_COLORING;
+ 		break;
+-	default:
+-		/* I-cache aliases will be handled by D-cache aliasing code */
+-		aliasing_icache = 0;
+ 	}
+ 
+ 	return aliasing_icache;
+@@ -336,8 +336,7 @@ static void __init cacheid_init(void)
+ 			else
+ 				cacheid = CACHEID_VIPT_NONALIASING;
+ 		}
+-		if (cpu_has_aliasing_icache(arch))
+-			cacheid |= CACHEID_VIPT_I_ALIASING;
++		cacheid |= cpu_aliasing_icache(arch);
+ 	} else {
+ 		cacheid = CACHEID_VIVT;
+ 	}
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 3cced84..3a46bba 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -63,6 +63,12 @@ static void flush_icache_alias(unsigned long pfn, unsigned long vaddr, unsigned
+ 	flush_icache_range(to, to + len);
+ }
+ 
++static void flush_icache_alias_nocolor(unsigned long addr, unsigned long len)
++{
++	__cpuc_flush_dcache_area_pou((void *)addr, len);
++	__flush_icache_all();
++}
++
+ void flush_cache_mm(struct mm_struct *mm)
+ {
+ 	if (cache_is_vivt()) {
+@@ -117,6 +123,7 @@ void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr, unsig
+ #else
+ #define flush_pfn_alias(pfn,vaddr)		do { } while (0)
+ #define flush_icache_alias(pfn,vaddr,len)	do { } while (0)
++#define flush_icache_alias_nocolor(addr,len)	do { } while (0)
+ #endif
+ 
+ #define FLAG_PA_IS_EXEC 1
+@@ -148,8 +155,10 @@ void __flush_ptrace_access(struct page *page, unsigned long uaddr, void *kaddr,
+ 	/* VIPT non-aliasing D-cache */
+ 	if (flags & FLAG_PA_IS_EXEC) {
+ 		unsigned long addr = (unsigned long)kaddr;
+-		if (icache_is_vipt_aliasing())
++		if (icache_is_vipt_coloring())
+ 			flush_icache_alias(page_to_pfn(page), uaddr, len);
++		else if (icache_is_vipt_aliasing())
++			flush_icache_alias_nocolor(addr, len);
+ 		else
+ 			__cpuc_coherent_kern_range(addr, addr + len);
+ 		if (cache_ops_need_broadcast())
+-- 
+2.1.0
