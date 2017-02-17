@@ -1,44 +1,72 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 17 Feb 2017 15:44:19 +0000
-Subject: [PATCH 10/20] ARM: hyp-stub: Use r1 for the soft-restart address
+Date: Fri, 17 Feb 2017 15:44:24 +0000
+Subject: [PATCH 15/20] ARM: KVM: Allow the main HYP code to use the init hyp
+ stub implementation
 In-Reply-To: <20170217154429.5000-1-marc.zyngier@arm.com>
 References: <20170217154429.5000-1-marc.zyngier@arm.com>
-Message-ID: <20170217154429.5000-11-marc.zyngier@arm.com>
+Message-ID: <20170217154429.5000-16-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not really obvious why the restart address should be in r3
-when communicated to the hyp-stub. r1 should be perfectly adequate,
-and consistent with the rest of the code.
+We now have a full hyp-stub implementation in the KVM init code,
+but the main KVM code only supports HVC_GET_VECTORS, which is not
+enough.
+
+Instead of reinventing the wheel, let's reuse the init implementation
+by branching to the idmap page when called with a hyp-stub hypercall.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kernel/hyp-stub.S | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm/kvm/hyp/hyp-entry.S | 29 ++++++++++++++++++++++++-----
+ 1 file changed, 24 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 8301db963d83..8fa521bd63d2 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -214,7 +214,7 @@ __hyp_stub_do_trap:
+diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
+index 1f8db7d21fc5..a35baa81fd23 100644
+--- a/arch/arm/kvm/hyp/hyp-entry.S
++++ b/arch/arm/kvm/hyp/hyp-entry.S
+@@ -126,11 +126,30 @@ hyp_hvc:
+ 	 */
+ 	pop	{r0, r1, r2}
  
- 1:	teq	r0, #HVC_SOFT_RESTART
- 	bne	1f
--	bx	r3
-+	bx	r1
+-	/* Check for __hyp_get_vectors */
+-	cmp	r0, #HVC_GET_VECTORS
+-	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+-	beq	1f
++	/*
++	 * Check if we have a kernel function, which is guaranteed to be
++	 * bigger than the maximum hyp stub hypercall
++	 */
++	cmp	r0, #HVC_STUB_HCALL_NR
++	bhs	1f
  
- 1:	mov	r0, #-1
++	/*
++	 * Not a kernel function, treat it as a stub hypercall.
++	 * Compute the physical address for __kvm_handle_stub_hvc
++	 * (as the code lives in the idmaped page) and branch there.
++	 * We hijack ip (r12) as a tmp register.
++	 */
++	push	{r1}
++	ldr	r1, =kimage_voffset
++	ldr	r1, [r1]
++	ldr	ip, =__kvm_handle_stub_hvc
++	sub	ip, ip, r1
++THUMB(	add	ip, ip, #1)
++	pop	{r1}
++
++	bx	ip
++
++1:
+ 	push	{lr}
  
-@@ -258,10 +258,8 @@ ENTRY(__hyp_set_vectors)
- ENDPROC(__hyp_set_vectors)
+ 	mov	lr, r0
+@@ -142,7 +161,7 @@ THUMB(	orr	lr, #1)
+ 	blx	lr			@ Call the HYP function
  
- ENTRY(__hyp_soft_restart)
--	mov	r3, r0
- 	mov	r0, #HVC_SOFT_RESTART
- 	__HVC(0)
--	mov	r0, r3
- 	ret	lr
- ENDPROC(__hyp_soft_restart)
+ 	pop	{lr}
+-1:	eret
++	eret
  
+ guest_trap:
+ 	load_vcpu r0			@ Load VCPU pointer to r0
 -- 
 2.11.0
