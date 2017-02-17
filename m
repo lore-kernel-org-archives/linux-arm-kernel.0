@@ -1,25 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Feb 2017 17:55:01 +0100
-Subject: [PATCH v2 5/6] spi: davinci: do not use DMA if transfer length is
- less than 16
-In-Reply-To: <3358b5f1-c7b6-0955-0c36-6f135a585762@baylibre.com>
-References: <1487327904-28311-1-git-send-email-fisaksen@baylibre.com>
- <1487327904-28311-6-git-send-email-fisaksen@baylibre.com>
- <CAK8P3a24HkxrU-6a727RY5JqwQgyf9SpprPXvurSqf1Q_W_AMQ@mail.gmail.com>
- <3358b5f1-c7b6-0955-0c36-6f135a585762@baylibre.com>
-Message-ID: <CAK8P3a2_FL2rBcHdmK040LMRMZCV-70pOBFVUh=VpO+q45nQ0Q@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 17 Feb 2017 18:00:31 +0100
+Subject: [PATCH 1/2] arm64: dts: r8a7795: Upgrade to PSCI v1.0 to support
+ Suspend-to-RAM
+In-Reply-To: <1487350832-29820-1-git-send-email-geert+renesas@glider.be>
+References: <1487350832-29820-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1487350832-29820-2-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2017 at 5:43 PM, Frode Isaksen <fisaksen@baylibre.com> wrote:
-> On 17/02/2017 17:37, Arnd Bergmann wrote:
->> On Fri, Feb 17, 2017 at 11:38 AM, Frode Isaksen <fisaksen@baylibre.com> wrote:
->> 16 seems low as the cutoff. Have you found this experimentally and
->> tested that for e.g. 32
->> bytes there is actually an advantage in using DMA?
-> Yes, I have tested for different sizes. Actually 32 bytes is better @30MHz, but if the bit rate goes down, DMA wins over PIO. Do you prefer 32 bytes ?
+From: Khiem Nguyen <khiem.nguyen.xt@renesas.com>
 
-No, I don't care about the specific value, just making sure that you had
-actually tested this, as I had expected PIO to be faster here.
+>From PSCI v1.0, Suspend-to-RAM is supported via SYSTEM_SUSPEND PSCI
+function call. Hence, upgrade PSCI version for R-Car H3 to support
+Suspend-to-RAM.
 
-     Arnd
+The Suspend-to-RAM is highly dependent on ARM Trusted Firwmare support
+since necessary callback functions will be registered after a query
+to ARM Trusted Firmware about SYSTEM_SUSPEND support.
+
+Since PSCI v1.0 is backward compatible with PSCI v0.2, CPU Hotplug and
+CPUIdle should be able to work normally with this change.
+
+Signed-off-by: Khiem Nguyen <khiem.nguyen.xt@renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Khiem: I've updated your email address.
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 98cd42f586b5fd62..4eae2d471d41ee55 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -29,7 +29,7 @@
+ 	};
+ 
+ 	psci {
+-		compatible = "arm,psci-0.2";
++		compatible = "arm,psci-1.0";
+ 		method = "smc";
+ 	};
+ 
+-- 
+1.9.1
