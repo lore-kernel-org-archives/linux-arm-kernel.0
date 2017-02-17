@@ -1,105 +1,55 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 17 Feb 2017 15:20:25 +0530
-Subject: [PATCH v2 05/22] Documentation: PCI: Add specification for the *pci
- test* function device
+Date: Fri, 17 Feb 2017 15:20:27 +0530
+Subject: [PATCH v2 07/22] Documentation: PCI: Add binding documentation for
+ pci-test endpoint function
 In-Reply-To: <1487325042-28227-1-git-send-email-kishon@ti.com>
 References: <1487325042-28227-1-git-send-email-kishon@ti.com>
-Message-ID: <1487325042-28227-6-git-send-email-kishon@ti.com>
+Message-ID: <1487325042-28227-8-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add specification for the *pci test* virtual function device. The endpoint
-function driver and the host pci driver should be created based on this
-specification.
+Add binding documentation for pci-test endpoint function that helps in
+adding and configuring pci-test endpoint function.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/PCI/00-INDEX                       |    2 +
- Documentation/PCI/endpoint/pci-test-function.txt |   66 ++++++++++++++++++++++
- 2 files changed, 68 insertions(+)
- create mode 100644 Documentation/PCI/endpoint/pci-test-function.txt
+ Documentation/PCI/00-INDEX                         |    2 ++
+ .../PCI/endpoint/function/binding/pci-test.txt     |   17 +++++++++++++++++
+ 2 files changed, 19 insertions(+)
+ create mode 100644 Documentation/PCI/endpoint/function/binding/pci-test.txt
 
 diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
-index f84a23c..4e5a283 100644
+index 4e5a283..53717b7 100644
 --- a/Documentation/PCI/00-INDEX
 +++ b/Documentation/PCI/00-INDEX
-@@ -16,3 +16,5 @@ endpoint/pci-endpoint.txt
- 	- guide to add endpoint controller driver and endpoint function driver.
- endpoint/pci-endpoint-cfs.txt
+@@ -18,3 +18,5 @@ endpoint/pci-endpoint-cfs.txt
  	- guide to use configfs to configure the pci endpoint function.
-+endpoint/pci-test-function.txt
-+	- specification of *pci test* function device.
-diff --git a/Documentation/PCI/endpoint/pci-test-function.txt b/Documentation/PCI/endpoint/pci-test-function.txt
+ endpoint/pci-test-function.txt
+ 	- specification of *pci test* function device.
++endpoint/function/binding/
++	- binding documentation for pci endpoint function
+diff --git a/Documentation/PCI/endpoint/function/binding/pci-test.txt b/Documentation/PCI/endpoint/function/binding/pci-test.txt
 new file mode 100644
-index 0000000..1324376
+index 0000000..7358240
 --- /dev/null
-+++ b/Documentation/PCI/endpoint/pci-test-function.txt
-@@ -0,0 +1,66 @@
-+				PCI TEST
-+		    Kishon Vijay Abraham I <kishon@ti.com>
++++ b/Documentation/PCI/endpoint/function/binding/pci-test.txt
+@@ -0,0 +1,17 @@
++PCI TEST ENDPOINT FUNCTION
 +
-+Traditionally PCI RC has always been validated by using standard
-+PCI cards like ethernet PCI cards or USB PCI cards or SATA PCI cards.
-+However with the addition of EP-core in linux kernel, it is possible
-+to configure a PCI controller that can operate in EP mode to work as
-+a test device.
++name: Should be "pci_epf_test" to bind to the pci_epf_test driver.
 +
-+The PCI endpoint test device is a virtual device (defined in software)
-+used to test the endpoint functionality and serve as a sample driver
-+for other PCI endpoint devices (to use the EP framework).
-+
-+The PCI endpoint test device has the following registers:
-+
-+	1) PCI_ENDPOINT_TEST_MAGIC
-+	2) PCI_ENDPOINT_TEST_COMMAND
-+	3) PCI_ENDPOINT_TEST_STATUS
-+	4) PCI_ENDPOINT_TEST_SRC_ADDR
-+	5) PCI_ENDPOINT_TEST_DST_ADDR
-+	6) PCI_ENDPOINT_TEST_SIZE
-+	7) PCI_ENDPOINT_TEST_CHECKSUM
-+
-+*) PCI_ENDPOINT_TEST_MAGIC
-+
-+This register will be used to test BAR0. A known pattern will be written
-+and read back from MAGIC register to verify BAR0.
-+
-+*) PCI_ENDPOINT_TEST_COMMAND:
-+
-+This register will be used by the host driver to indicate the function
-+that the endpoint device must perform.
-+
-+Bitfield Description:
-+  Bit 0		: raise legacy irq
-+  Bit 1		: raise MSI irq
-+  Bit 2 - 7	: MSI interrupt number
-+  Bit 8		: read command (read data from RC buffer)
-+  Bit 9		: write command (write data to RC buffer)
-+  Bit 10	: copy command (copy data from one RC buffer to another
-+		  RC buffer)
-+
-+*) PCI_ENDPOINT_TEST_STATUS
-+
-+This register reflects the status of the PCI endpoint device.
-+
-+Bitfield Description:
-+  Bit 0		: read success
-+  Bit 1		: read fail
-+  Bit 2		: write success
-+  Bit 3		: write fail
-+  Bit 4		: copy success
-+  Bit 5		: copy fail
-+  Bit 6		: irq raised
-+  Bit 7		: source address is invalid
-+  Bit 8		: destination address is invalid
-+
-+*) PCI_ENDPOINT_TEST_SRC_ADDR
-+
-+This register contains the source address (RC buffer address) for the
-+COPY/READ command.
-+
-+*) PCI_ENDPOINT_TEST_DST_ADDR
-+
-+This register contains the destination address (RC buffer address) for
-+the COPY/WRITE command.
++Configurable Fields:
++vendorid	 : should be 0x104c
++deviceid	 : should be 0xffff
++revid		 : dont't care
++progif_code	 : don't care
++subclass_code	 : don't care
++baseclass_code	 : should be 0xff
++cache_line_size	 : don't care
++subsys_vendor_id : don't care
++subsys_id	 : don't care
++interrupt_pin	 : Should be 1 - INTA, 2 - INTB, 3 - INTC, 4 -INTD
++msi_interrupts	 : Should be 1 to 32 depending on the number of msi interrupts
++		   to test
 -- 
 1.7.9.5
