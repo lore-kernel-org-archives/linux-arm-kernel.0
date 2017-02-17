@@ -1,53 +1,34 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 16 Feb 2017 16:54:21 -0800
-Subject: [PATCH v4 0/3] arm64: usercopy: Implement stack frame object
- validation
-In-Reply-To: <20170216182917.19637-1-james.morse@arm.com>
-References: <20170216182917.19637-1-james.morse@arm.com>
-Message-ID: <CAGXu5jJ9xis_X9qd-GxCM=oDDoynMrW=GZbfeOKKt_FpAuK83Q@mail.gmail.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Thu, 16 Feb 2017 16:56:56 -0800
+Subject: [PATCH v4 07/36] ARM: dts: imx6-sabresd: add OV5642 and OV5640
+ camera sensors
+In-Reply-To: <CAOMZO5AHJ2jSWvF1iZKhYyDAMmpg99R4-gz4ZyDZAcB4b3d0ag@mail.gmail.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-8-git-send-email-steve_longerbeam@mentor.com>
+ <CAOMZO5AHJ2jSWvF1iZKhYyDAMmpg99R4-gz4ZyDZAcB4b3d0ag@mail.gmail.com>
+Message-ID: <3b28b30f-55ab-aa5d-6042-146fe2c9e18d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 10:29 AM, James Morse <james.morse@arm.com> wrote:
-> Hi all,
->
-> This version of Sahara's arch_within_stack_frames() series replaces the
-> open-coded stack walker with a call to arm64's existing walker.
->
-> Patch 2 can be tested independently with this change[0].
->
-> lkdtm's use of unallocated stack regions is a separate problem, patch 3
-> tries to address this.
->
-> Sahara, it would be good to get your review of this!
-> I'm afraid I omitted your patch-3 as it stopped the lkdtm test from working,
-> I suspect its not tricking the compiler, but I haven't investigated.
->
->
-> Thanks,
->
-> James
->
-> [0] Change to lkdtm to generate accesses that overlap stack frames.
-> --------------%<--------------
-> diff --git a/drivers/misc/lkdtm_usercopy.c b/drivers/misc/lkdtm_usercopy.c
-> index 1dd611423d8b..fcbba3a14387 100644
-> --- a/drivers/misc/lkdtm_usercopy.c
-> +++ b/drivers/misc/lkdtm_usercopy.c
-> @@ -57,7 +57,8 @@ static noinline void do_usercopy_stack(bool to_user, bool bad_frame)
->
->         /* This is a pointer to outside our current stack frame. */
->         if (bad_frame) {
-> -               bad_stack = do_usercopy_stack_callee((uintptr_t)&bad_stack);
-> +               bad_stack = __builtin_frame_address(0);
-> +               bad_stack -= sizeof(good_stack)/2;
 
-Ah, sneaky, yeah, that'll work nicely.
 
-(Though it should likely get wrapped in a CONFIG_STACK_GROWSUP/DOWN test...)
+On 02/16/2017 04:51 PM, Fabio Estevam wrote:
+> Hi Steve,
+>
+> On Thu, Feb 16, 2017 at 12:19 AM, Steve Longerbeam
+> <slongerbeam@gmail.com> wrote:
+>> Enables the OV5642 parallel-bus sensor, and the OV5640 MIPI CSI-2 sensor.
+>>
+>> The OV5642 connects to the parallel-bus mux input port on ipu1_csi0_mux.
+>>
+>> The OV5640 connects to the input port on the MIPI CSI-2 receiver on
+>> mipi_csi.
+>>
+>> Until the OV5652 sensor module compatible with the SabreSD becomes
+>> available for testing, the ov5642 node is currently disabled.
+>
+> You missed your Signed-off-by.
 
--Kees
+Thanks, fixed.
 
--- 
-Kees Cook
-Pixel Security
+Steve
