@@ -1,52 +1,70 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 17 Feb 2017 17:31:13 +0530
-Subject: [PATCH v2 03/22] PCI: endpoint: Introduce configfs entry for
- configuring EP functions
-In-Reply-To: <1487325042-28227-4-git-send-email-kishon@ti.com>
-References: <1487325042-28227-1-git-send-email-kishon@ti.com>
- <1487325042-28227-4-git-send-email-kishon@ti.com>
-Message-ID: <58A6E609.9070709@ti.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 Feb 2017 12:07:49 +0000
+Subject: [PATCH v2 4/6] spi: davinci: flush caches when performing DMA
+In-Reply-To: <eaf93c6c-52a7-826b-9c53-2b13c0b280ca@baylibre.com>
+References: <1487327904-28311-1-git-send-email-fisaksen@baylibre.com>
+ <1487327904-28311-5-git-send-email-fisaksen@baylibre.com>
+ <5fab0c33-6e1d-c63a-8758-6672236045a7@ti.com>
+ <20170217112247.GE21222@n2100.armlinux.org.uk>
+ <eaf93c6c-52a7-826b-9c53-2b13c0b280ca@baylibre.com>
+Message-ID: <20170217120749.GF21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Friday 17 February 2017 03:20 PM, Kishon Vijay Abraham I wrote:
-> Introduce a new configfs entry to configure the EP function (like
-> configuring the standard configuration header entries) and to
-> bind the EP function with EP controller.
+On Fri, Feb 17, 2017 at 12:36:17PM +0100, Frode Isaksen wrote:
+> On 17/02/2017 12:22, Russell King - ARM Linux wrote:
+> > The DMA API deals with the _kernel_ lowmem mapping.  It has no knowledge
+> > of any other aliases in the system.  When you have a VIVT cache (as all
+> > old ARM CPUs have) then if you access the memory through a different
+> > alias from the kernel lowmem mapping (iow, vmalloc) then the DMA API
+> > can't help you.
+> >
+> > However, the correct place to use flush_kernel_vmap_range() etc is not
+> > in drivers - it's supposed to be done in the callers that know that
+> > the memory is aliased.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/pci/endpoint/Kconfig      |   14 +-
->  drivers/pci/endpoint/Makefile     |    1 +
->  drivers/pci/endpoint/pci-ep-cfs.c |  427 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 440 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/pci/endpoint/pci-ep-cfs.c
-> 
-> diff --git a/drivers/pci/endpoint/Kconfig b/drivers/pci/endpoint/Kconfig
-> index 7eb1c79..8470f0b 100644
-> --- a/drivers/pci/endpoint/Kconfig
-> +++ b/drivers/pci/endpoint/Kconfig
-> @@ -6,7 +6,6 @@ menu "PCI Endpoint"
->  
->  config PCI_ENDPOINT
->  	bool "PCI Endpoint Support"
-> -	select CONFIGFS_FS
->  	help
->  	   Enable this configuration option to support configurable PCI
->  	   endpoint. This should be enabled if the platform has a PCI
-> @@ -14,8 +13,19 @@ config PCI_ENDPOINT
->  
->  	   Enabling this option will build the endpoint library, which
->  	   includes endpoint controller library and endpoint function
-> -	   library.
-> +	   library. This will also enable the configfs entry required to
-> +	   configure the endpoint function and used to bind the
-> +	   function with a endpoint controller.
+> OK, so this should be done in the ubifs layer instead ? xfs already does
+> this, but no other fs.
 
-This chunk shouldn't be added. I've missed removing this (it's added below).
-I'll wait to get other review comments before sending a new revision.
+These APIs were created when XFS was being used on older ARMs and people
+experienced corruption.  XFS was the only filesystem driver which wanted
+to do this (horrid, imho) DMA to memory that it accessed via a vmalloc
+area mapping.
 
-Thanks
-Kishon
+If ubifs is also doing this, it's followed XFS down the same route, but
+ignored the need for additional flushing.
+
+The down-side to adding this at the filesystem layer is that you get the
+impact whether or not the driver does DMA.  However, for XFS that's
+absolutely necessary, as block devices will transfer to the kernel lowmem
+mapping, which itself will alias with the vmalloc area mapping.
+
+SPI is rather another special case - rather than SPI following the
+established mechanism of passing data references via scatterlists or
+similar, it also passes them via virtual addresses, which means SPI
+can directly access the vmalloc area when performing PIO.  This
+really makes the problem more complex, because it means that if you
+do have a SPI driver that does that, it's going to be reading/writing
+direct from vmalloc space.
+
+That's not a problem as long as the data is only accessed via vmalloc
+space, but it will definitely go totally wrong if the data is
+subsequently mapped into userspace.
+
+The other important thing to realise is that the interfaces in
+cachetlb.txt assume that it's the lowmem mapping that will be accessed,
+and the IO device will push that data out to physical memory (either via
+the DMA API, or flush_kernel_dcache_page()).  That's not true of SPI,
+as it passes virtual addresses around.
+
+So... overall, I'm not sure that this problem is properly solvable given
+SPIs insistance on passing virtual addresses and the differences in this
+area between SPI and block.
+
+What I'm quite sure about is that adding yet more cache flushing
+interfaces for legacy cache types really isn't the way forward.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
