@@ -1,170 +1,88 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 17 Feb 2017 11:47:59 +0100
-Subject: [PATCH v4 23/36] media: imx: Add MIPI CSI-2 Receiver subdev driver
-In-Reply-To: <1487211578-11360-24-git-send-email-steve_longerbeam@mentor.com>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-24-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1487328479.3107.21.camel@pengutronix.de>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 17 Feb 2017 18:44:51 +0800
+Subject: [PATCH net-next v2 0/2] net: mvneta: improve rx performance
+In-Reply-To: <87shndayse.fsf@free-electrons.com>
+References: <20170217100233.2325-1-jszhang@marvell.com>
+ <87shndayse.fsf@free-electrons.com>
+Message-ID: <20170217184451.55217e0e@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-02-15 at 18:19 -0800, Steve Longerbeam wrote:
-> Adds MIPI CSI-2 Receiver subdev driver. This subdev is required
-> for sensors with a MIPI CSI2 interface.
-> 
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> ---
->  drivers/staging/media/imx/Makefile         |   1 +
->  drivers/staging/media/imx/imx6-mipi-csi2.c | 573 +++++++++++++++++++++++++++++
->  2 files changed, 574 insertions(+)
->  create mode 100644 drivers/staging/media/imx/imx6-mipi-csi2.c
-> 
-> diff --git a/drivers/staging/media/imx/Makefile b/drivers/staging/media/imx/Makefile
-> index 878a126..3569625 100644
-> --- a/drivers/staging/media/imx/Makefile
-> +++ b/drivers/staging/media/imx/Makefile
-> @@ -9,3 +9,4 @@ obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-vdic.o
->  obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-ic.o
+On Fri, 17 Feb 2017 11:37:21 +0100 Gregory CLEMENT wrote:
+
+> Hi Jisheng,
 >  
->  obj-$(CONFIG_VIDEO_IMX_CSI) += imx-media-csi.o
-> +obj-$(CONFIG_VIDEO_IMX_CSI) += imx6-mipi-csi2.o
-> diff --git a/drivers/staging/media/imx/imx6-mipi-csi2.c b/drivers/staging/media/imx/imx6-mipi-csi2.c
-> new file mode 100644
-> index 0000000..23dca80
-> --- /dev/null
-> +++ b/drivers/staging/media/imx/imx6-mipi-csi2.c
-> @@ -0,0 +1,573 @@
-> +/*
-> + * MIPI CSI-2 Receiver Subdev for Freescale i.MX6 SOC.
-> + *
-> + * Copyright (c) 2012-2017 Mentor Graphics Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +#include <linux/clk.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/iopoll.h>
-> +#include <linux/irq.h>
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <media/v4l2-device.h>
-> +#include <media/v4l2-of.h>
-> +#include <media/v4l2-subdev.h>
-> +#include "imx-media.h"
-> +
-> +/*
-> + * there must be 5 pads: 1 input pad from sensor, and
-> + * the 4 virtual channel output pads
-> + */
-> +#define CSI2_SINK_PAD       0
-> +#define CSI2_NUM_SINK_PADS  1
-> +#define CSI2_NUM_SRC_PADS   4
-> +#define CSI2_NUM_PADS       5
-> +
-> +struct csi2_dev {
-> +	struct device          *dev;
-> +	struct v4l2_subdev      sd;
-> +	struct media_pad       pad[CSI2_NUM_PADS];
-> +	struct v4l2_mbus_framefmt format_mbus;
-> +	struct clk             *dphy_clk;
-> +	struct clk             *cfg_clk;
-> +	struct clk             *pix_clk; /* what is this? */
-> +	void __iomem           *base;
-> +	struct v4l2_of_bus_mipi_csi2 bus;
-> +	bool                    on;
-> +	bool                    stream_on;
-> +	bool                    src_linked;
-> +	bool                    sink_linked[CSI2_NUM_SRC_PADS];
-> +};
-> +
-> +#define DEVICE_NAME "imx6-mipi-csi2"
-> +
-> +/* Register offsets */
-> +#define CSI2_VERSION            0x000
-> +#define CSI2_N_LANES            0x004
-> +#define CSI2_PHY_SHUTDOWNZ      0x008
-> +#define CSI2_DPHY_RSTZ          0x00c
-> +#define CSI2_RESETN             0x010
-> +#define CSI2_PHY_STATE          0x014
-> +#define PHY_STOPSTATEDATA_BIT   4
-> +#define PHY_STOPSTATEDATA(n)    BIT(PHY_STOPSTATEDATA_BIT + (n))
-> +#define PHY_RXCLKACTIVEHS       BIT(8)
-> +#define PHY_RXULPSCLKNOT        BIT(9)
-> +#define PHY_STOPSTATECLK        BIT(10)
-> +#define CSI2_DATA_IDS_1         0x018
-> +#define CSI2_DATA_IDS_2         0x01c
-> +#define CSI2_ERR1               0x020
-> +#define CSI2_ERR2               0x024
-> +#define CSI2_MSK1               0x028
-> +#define CSI2_MSK2               0x02c
-> +#define CSI2_PHY_TST_CTRL0      0x030
-> +#define PHY_TESTCLR		BIT(0)
-> +#define PHY_TESTCLK		BIT(1)
-> +#define CSI2_PHY_TST_CTRL1      0x034
-> +#define PHY_TESTEN		BIT(16)
-> +#define CSI2_SFT_RESET          0xf00
-> +
-> +static inline struct csi2_dev *sd_to_dev(struct v4l2_subdev *sdev)
-> +{
-> +	return container_of(sdev, struct csi2_dev, sd);
-> +}
-> +
-> +static void csi2_enable(struct csi2_dev *csi2, bool enable)
-> +{
-> +	if (enable) {
-> +		writel(0x1, csi2->base + CSI2_PHY_SHUTDOWNZ);
-> +		writel(0x1, csi2->base + CSI2_DPHY_RSTZ);
-> +		writel(0x1, csi2->base + CSI2_RESETN);
-> +	} else {
-> +		writel(0x0, csi2->base + CSI2_PHY_SHUTDOWNZ);
-> +		writel(0x0, csi2->base + CSI2_DPHY_RSTZ);
-> +		writel(0x0, csi2->base + CSI2_RESETN);
-> +	}
-> +}
-> +
-> +static void csi2_set_lanes(struct csi2_dev *csi2)
-> +{
-> +	int lanes = csi2->bus.num_data_lanes;
-> +
-> +	writel(lanes - 1, csi2->base + CSI2_N_LANES);
-> +}
-> +
-> +static void dw_mipi_csi2_phy_write(struct csi2_dev *csi2,
-> +				   u32 test_code, u32 test_data)
-> +{
-> +	/* Clear PHY test interface */
-> +	writel(PHY_TESTCLR, csi2->base + CSI2_PHY_TST_CTRL0);
-> +	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL1);
-> +	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL0);
-> +
-> +	/* Raise test interface strobe signal */
-> +	writel(PHY_TESTCLK, csi2->base + CSI2_PHY_TST_CTRL0);
-> +
-> +	/* Configure address write on falling edge and lower strobe signal */
-> +	writel(PHY_TESTEN | test_code, csi2->base + CSI2_PHY_TST_CTRL1);
-> +	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL0);
-> +
-> +	/* Configure data write on rising edge and raise strobe signal */
-> +	writel(test_data, csi2->base + CSI2_PHY_TST_CTRL1);
-> +	writel(PHY_TESTCLK, csi2->base + CSI2_PHY_TST_CTRL0);
-> +
-> +	/* Clear strobe signal */
-> +	writel(0x0, csi2->base + CSI2_PHY_TST_CTRL0);
-> +}
-> +
-> +static void csi2_dphy_init(struct csi2_dev *csi2)
-> +{
-> +	/*
-> +	 * FIXME: 0x14 is derived from a fixed D-PHY reference
-> +	 * clock from the HSI_TX PLL, and a fixed target lane max
-> +	 * bandwidth of 300 Mbps. This value should be derived
+>  On ven., f?vr. 17 2017, Jisheng Zhang <jszhang@marvell.com> wrote:
+> 
+> > In hot code path such as mvneta_rx_hwbm() and mvneta_rx_swbm(), we may
+> > access fields of rx_desc. The rx_desc is allocated by
+> > dma_alloc_coherent, it's uncacheable if the device isn't cache
+> > coherent, reading from uncached memory is fairly slow.  
+> 
+> Did you test it with HWBM support?
 
-If the table in https://community.nxp.com/docs/DOC-94312 is correct,
-this should be 850 Mbps. Where does this 300 Mbps value come from?
+No I didn't test it for lacking of such HW, so it's appreciated if someone
+can test with HWBM capable HW.
 
-regards
-Philipp
+> 
+> I am not sure ti will work in this case.
+
+IMHO, if mvneta HW doesn't update rx_desc->buf_phys_addr, it can still work.
+I don't have HWBM background, so above may be wrong. If this case doesn't
+work for HWBM, I'll submit v3 to modify mvneta_rx_swbm() only.
+
+Thanks,
+Jisheng
+
+> 
+> Gregory
+> 
+> >
+> > patch1 reuses the read out status to getting status field of rx_desc
+> > again.
+> >
+> > patch2 uses cacheable memory to store the rx buffer DMA address.
+> >
+> > We get the following performance data on Marvell BG4CT Platforms
+> > (tested with iperf):
+> >
+> > before the patch:
+> > recving 1GB in mvneta_rx_swbm() costs 149265960 ns
+> >
+> > after the patch:
+> > recving 1GB in mvneta_rx_swbm() costs 1421565640 ns
+> >
+> > We saved 4.76% time.
+> >
+> > RFC: can we do similar modification for tx? If yes, I can prepare a v2.
+> >
+> >
+> > Basically, these two patches do what Arnd mentioned in [1].
+> >
+> > Hi Arnd,
+> >
+> > I added "Suggested-by you" tag, I hope you don't mind ;)
+> >
+> > Thanks
+> >
+> > [1] https://www.spinics.net/lists/netdev/msg405889.html
+> >
+> > Since v1:
+> >   - correct the performance data typo
+> >
+> > Jisheng Zhang (2):
+> >   net: mvneta: avoid getting status from rx_desc as much as possible
+> >   net: mvneta: Use cacheable memory to store the rx buffer DMA address
+> >
+> >  drivers/net/ethernet/marvell/mvneta.c | 36 ++++++++++++++++++++---------------
+> >  1 file changed, 21 insertions(+), 15 deletions(-)
+> >
+> > -- 
+> > 2.11.0
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel  
+> 
