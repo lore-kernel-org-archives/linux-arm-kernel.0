@@ -1,116 +1,41 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Fri, 17 Feb 2017 15:28:39 +0800
-Subject: [PATCH 1/5] arm64: dts: Add basic DT to support Spreadtrum's
- SP9860G
-In-Reply-To: <CAPKp9ub35nL8gc_TKx02pSHHNwBhiMacWL=CuEmNGnecWikfGQ@mail.gmail.com>
+Date: Fri, 17 Feb 2017 15:35:11 +0800
+Subject: [PATCH 4/5] sprd_serial: switch comptible string to sc-uart
+In-Reply-To: <1761969.45NG6Q1Iyc@wuerfel>
 References: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1487063952-7113-2-git-send-email-chunyan.zhang@spreadtrum.com>
- <CAPKp9ub35nL8gc_TKx02pSHHNwBhiMacWL=CuEmNGnecWikfGQ@mail.gmail.com>
-Message-ID: <20170217072839.GA8767@spreadtrum.com>
+ <1487063952-7113-5-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1761969.45NG6Q1Iyc@wuerfel>
+Message-ID: <20170217073511.GB8767@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
-
-On ?,  2? 14, 2017 at 04:44:53?? +0000, Sudeep Holla wrote:
-> On Tue, Feb 14, 2017 at 9:19 AM, Chunyan Zhang
-> <chunyan.zhang@spreadtrum.com> wrote:
-> > From: Orson Zhai <orson.zhai@spreadtrum.com>
-> >
-> > SC9860G is a 8 cores of A53 SoC with 4G LTE support SoC from Spreadtrum.
-> >
-> > According to regular hierarchy of sprd dts, whale2.dtsi contains SoC
-> > peripherals IP nodes, sc9860.dtsi contains stuff related to ARM core stuff
-> > and sp9860g dts is for the board level.
-> >
-> > Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
-> > Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> > ---
-> >  arch/arm64/boot/dts/sprd/Makefile         |   3 +-
-> >  arch/arm64/boot/dts/sprd/sc9860.dtsi      | 534 ++++++++++++++++++++++++++++++
-> >  arch/arm64/boot/dts/sprd/sp9860g-1h10.dts |  58 ++++
-> >  arch/arm64/boot/dts/sprd/whale2.dtsi      |  66 ++++
-> >  4 files changed, 660 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm64/boot/dts/sprd/sc9860.dtsi
-> >  create mode 100644 arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
-> >  create mode 100644 arch/arm64/boot/dts/sprd/whale2.dtsi
-> >
-> > diff --git a/arch/arm64/boot/dts/sprd/Makefile b/arch/arm64/boot/dts/sprd/Makefile
-> > index b658c5e..f0535e6 100644
-> > --- a/arch/arm64/boot/dts/sprd/Makefile
-> > +++ b/arch/arm64/boot/dts/sprd/Makefile
-> > @@ -1,4 +1,5 @@
-> > -dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb
-> > +dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb \
-> > +                       sp9860g-1h10.dtb
-> >
-> >  always         := $(dtb-y)
-> >  subdir-y       := $(dts-dirs)
-> > diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
-> > new file mode 100644
-> > index 0000000..604a8c9
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
-> > @@ -0,0 +1,534 @@
+On ?,  2? 16, 2017 at 02:31:38?? +0100, Arnd Bergmann wrote:
+> On Tuesday, February 14, 2017 5:19:11 PM CET Chunyan Zhang wrote:
+> >  static const struct of_device_id serial_ids[] = {
+> > -       {.compatible = "sprd,sc9836-uart",},
+> > +       {.compatible = "sprd,sc-uart",},
+> >         {}
 > 
-> [...]
-> 
-> > +       idle-states{
-> > +               entry-method = "arm,psci";
-> > +
-> > +               CORE_PD: core_pd {
-> > +                       compatible = "arm,idle-state";
-> > +                       entry-latency-us = <1000>;
-> > +                       exit-latency-us = <700>;
-> > +                       min-residency-us = <2500>;
-> > +                       local-timer-stop;
-> > +                       arm,psci-suspend-param = <0x00010002>;
-> > +               };
-> > +
-> > +               CLUSTER_PD: cluster_pd {
-> > +                       compatible = "arm,idle-state";
-> > +                       entry-latency-us = <1000>;
-> > +                       exit-latency-us = <1000>;
-> > +                       min-residency-us = <3000>;
-> > +                       local-timer-stop;
-> > +                       arm,psci-suspend-param = <0x01010003>;
-> > +               };
-> > +
-> > +               DEEP_SLEEP: deep_sleep {
-> > +                       compatible = "arm,idle-state";
-> > +                       wakeup-latency-us = <0xffffffff>;
-> 
-> A value > 4294 seconds(i.e >1 hour) seems suspicious.
-> Are you working around the firmware issue with high latency value so
-> that it's never entered ? Why not remove advertising the state from DT.
+> We really need this to be specific, in case Spreadtrum ever
+> makes a slightly different UART that is not 100% compatible
+> with this one. Also, you can't remove the string you already have,
+> only add to it.
 >
-
-Haved checked with related colleagues, this node 'deep_sleep' was not for working
-around any firmware issue, but was a trick utilization of idle subsystem, and that
-was definitely not elegant, the author indeed intendly didn't want CPU entered this
-state, I will remove this node therefore.
- 
-> Can you get me the dump of:
-> grep "" /sys/devices/system/cpu/cpu*/cpuidle/state*/{time,usage}
+> Normally when you have a new chip that is compatible with one
+> we already have a driver for, we mark the device as compatible
+> with the old one and avoid having to change the driver, e.g.
+> 
+> 	compatible = "sprd,sc9995-uart", "sprd,sc9836-uart";
+> 
+> This way, the driver could later be changed to handle anything
+> that is compatible with sc9995 differently from sc9836, but
+> by default it would match the original string.
 > 
 
-FYI: https://www.irccloud.com/pastebin/XyEMLzfq/
+Right, I've addressed this when I received the same comments from
+Rob Herring :)
 
-Thanks,
+Thanks for your comments,
 Chunyan
-
-> IIUC, you might have seen boot issue without this values and workaround
-> the issue with such high values ? If so please drop this state.
-> 
-> > +                       entry-latency-us = <1500>;
-> > +                       exit-latency-us = <1500>;
-> > +                       min-residency-us = <0xffffffff>;
-> > +                       local-timer-stop;
-> > +                       arm,psci-suspend-param = <0x01010005>;
-> > +               };
-> > +       };
-> >
-> 
-> --
-> Regards,
-> Sudeep
+ 
+> 	Arnd
