@@ -1,129 +1,126 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 17 Feb 2017 16:04:09 +0100
-Subject: [PATCH v3] arm64: dts: r8a7795: Add Cortex-A53 CPU cores
-Message-ID: <1487343849-32616-1-git-send-email-geert+renesas@glider.be>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 17 Feb 2017 16:04:30 +0100
+Subject: [PATCH v4 00/36] i.MX Media Driver
+In-Reply-To: <20170217122213.GQ16975@valkosipuli.retiisi.org.uk>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170216222006.GA21222@n2100.armlinux.org.uk>
+ <923326d6-43fe-7328-d959-14fd341e47ae@gmail.com>
+ <1487331818.3107.46.camel@pengutronix.de>
+ <20170217122213.GQ16975@valkosipuli.retiisi.org.uk>
+Message-ID: <1487343870.3107.95.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+On Fri, 2017-02-17 at 14:22 +0200, Sakari Ailus wrote:
+> Hi Philipp, Steve and Russell,
+> 
+> On Fri, Feb 17, 2017 at 12:43:38PM +0100, Philipp Zabel wrote:
+> > On Thu, 2017-02-16 at 14:27 -0800, Steve Longerbeam wrote:
+> > > 
+> > > On 02/16/2017 02:20 PM, Russell King - ARM Linux wrote:
+> > > > On Wed, Feb 15, 2017 at 06:19:02PM -0800, Steve Longerbeam wrote:
+> > > >> In version 4:
+> > > >
+> > > > With this version, I get:
+> > > >
+> > > > [28762.892053] imx6-mipi-csi2: LP-11 timeout, phy_state = 0x00000000
+> > > > [28762.899409] ipu1_csi0: pipeline_set_stream failed with -110
+> > > >
+> > > 
+> > > Right, in the imx219, on exit from s_power(), the clock and data lanes
+> > > must be placed in the LP-11 state. This has been done in the ov5640 and
+> > > tc358743 subdevs.
+> > > 
+> > > If we want to bring in the patch that adds a .prepare_stream() op,
+> > > the csi-2 bus would need to be placed in LP-11 in that op instead.
+> > > 
+> > > Philipp, should I go ahead and add your .prepare_stream() patch?
+> > 
+> > I think with Russell's explanation of how the imx219 sensor operates,
+> > we'll have to do something before calling the sensor s_stream, but right
+> > now I'm still unsure what exactly.
+> 
+> Indeed there appears to be no other way to achieve the LP-11 state than
+> going through the streaming state for this particular sensor, apart from
+> starting streaming.
+> 
+> Is there a particular reason why you're waiting for the transmitter to
+> transfer to LP-11 state? That appears to be the last step which is done in
+> the csi2_s_stream() callback.
+> 
+> What the sensor does next is to start streaming, and the first thing it does
+> in that process is to switch to LP-11 state.
+> 
+> Have you tried what happens if you simply drop the LP-11 check? To me that
+> would seem the right thing to do.
 
-This patch adds Cortex-A53 CPU cores to r8a7795 SoC for a total of 8
-cores (4 x Cortex-A57 + 4 x Cortex-A53).
+Removing the wait for LP-11 alone might not be an issue in my case, as
+the TC358743 is known to be in stop state all along. So I just have to
+make sure that the time between s_stream(csi2) starting the receiver and
+s_stream(tc358743) causing LP-11 to be changed to the next state is long
+enough for the receiver to detect LP-11 (which I really can't, I just
+have to pray I2C transmissions are slow enough).
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Dirk Behme <dirk.behme@gmail.com>
-[geert: Add power-domains and next-level-cache properties]
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-This patch describes the hardware; actual enabling of the CPU depends on
-the PSCI firmware.
+The problems start if we have to enable the D-PHY and deassert resets
+either before the sensor enters LP-11 state or after it already started
+streaming, because we don't know when the sensor drives that state on
+the bus.
 
-With the current firmware version (v2.16.0), only the CA57 CPU cores are
-enabled, hence this patch does not introduce undeterministic scheduling
-behavior due to migration between big and LITTLE cores.
+The latter case I is simulated easily by again changing the order so
+that the "sensor" (tc358743) is enabled before the CSI-2 receiver D-PHY
+initialization. The result is that captures time out, presumably because
+the receiver never entered HS mode because it didn't see LP-11. The
+PHY_STATE register contains 0x200, meaning RXCLKACTIVEHS (which we
+should wait for in step 7.) is never set.
 
-v3:
-  - Link recently added CPU nodes 100-103 to their L2 cache nodes,
+I tried to test the former by instead modifying the tc358743 driver a
+bit:
 
-v2:
-  - Rebased.
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 58 ++++++++++++++++++++++++++++----
- 1 file changed, 51 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 7f2434adb757498f..6148e514eb648288 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -73,6 +73,42 @@
- 			enable-method = "psci";
- 		};
+----------8<----------
+diff --git a/drivers/media/i2c/tc358743.c b/drivers/media/i2c/tc358743.c
+index 39d4cdd328c0f..43df80903215b 100644
+--- a/drivers/media/i2c/tc358743.c
++++ b/drivers/media/i2c/tc358743.c
+@@ -1378,8 +1378,6 @@ static int tc358743_s_dv_timings(struct v4l2_subdev *sd,
+        state->timings = *timings;
  
-+		a53_0: cpu at 100 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x100>;
-+			device_type = "cpu";
-+			power-domains = <&sysc R8A7795_PD_CA53_CPU0>;
-+			next-level-cache = <&L2_CA53>;
-+			enable-method = "psci";
-+		};
-+
-+		a53_1: cpu at 101 {
-+			compatible = "arm,cortex-a53","arm,armv8";
-+			reg = <0x101>;
-+			device_type = "cpu";
-+			power-domains = <&sysc R8A7795_PD_CA53_CPU1>;
-+			next-level-cache = <&L2_CA53>;
-+			enable-method = "psci";
-+		};
-+
-+		a53_2: cpu at 102 {
-+			compatible = "arm,cortex-a53","arm,armv8";
-+			reg = <0x102>;
-+			device_type = "cpu";
-+			power-domains = <&sysc R8A7795_PD_CA53_CPU2>;
-+			next-level-cache = <&L2_CA53>;
-+			enable-method = "psci";
-+		};
-+
-+		a53_3: cpu at 103 {
-+			compatible = "arm,cortex-a53","arm,armv8";
-+			reg = <0x103>;
-+			device_type = "cpu";
-+			power-domains = <&sysc R8A7795_PD_CA53_CPU3>;
-+			next-level-cache = <&L2_CA53>;
-+			enable-method = "psci";
-+		};
-+
- 		L2_CA57: cache-controller at 0 {
- 			compatible = "cache";
- 			reg = <0>;
-@@ -166,7 +202,7 @@
- 			      <0x0 0xf1040000 0 0x20000>,
- 			      <0x0 0xf1060000 0 0x20000>;
- 			interrupts = <GIC_PPI 9
--					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+					(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
- 			clocks = <&cpg CPG_MOD 408>;
- 			clock-names = "clk";
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-@@ -307,23 +343,31 @@
- 			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
--				     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-+				     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-affinity = <&a57_0>,
- 					     <&a57_1>,
- 					     <&a57_2>,
--					     <&a57_3>;
-+					     <&a57_3>,
-+					     <&a53_0>,
-+					     <&a53_1>,
-+					     <&a53_2>,
-+					     <&a53_3>;
- 		};
+        enable_stream(sd, false);
+-       tc358743_set_pll(sd);
+-       tc358743_set_csi(sd);
  
- 		timer {
- 			compatible = "arm,armv8-timer";
- 			interrupts = <GIC_PPI 13
--					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+					(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
- 				     <GIC_PPI 14
--					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+					(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
- 				     <GIC_PPI 11
--					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+					(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
- 				     <GIC_PPI 10
--					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+					(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
- 		};
+        return 0;
+ }
+@@ -1469,6 +1467,11 @@ static int tc358743_g_mbus_config(struct v4l2_subdev *sd,
  
- 		cpg: clock-controller at e6150000 {
--- 
-1.9.1
+ static int tc358743_s_stream(struct v4l2_subdev *sd, int enable)
+ {
++       if (enable) {
++               tc358743_set_pll(sd);
++               tc358743_set_csi(sd);
++               tc358743_set_csi_color_space(sd);
++       }
+        enable_stream(sd, enable);
+        if (!enable) {
+                /* Put all lanes in PL-11 state (STOPSTATE) */
+@@ -1657,9 +1660,6 @@ static int tc358743_set_fmt(struct v4l2_subdev *sd,
+        state->vout_color_sel = vout_color_sel;
+ 
+        enable_stream(sd, false);
+-       tc358743_set_pll(sd);
+-       tc358743_set_csi(sd);
+-       tc358743_set_csi_color_space(sd);
+ 
+        return 0;
+ }
+---------->8----------
+
+That should enable the CSI-2 Tx and put it in LP-11 only after the CSI-2
+receiver is enabled, right before starting streaming.
+
+That did seem to work the few times I tested, but I have no idea how
+this will behave with other chips that do something else to the bus
+while not streaming, and whether it is ok to enable the CSI right after
+the sensor without waiting for the CSI-2 bus to settle.
+
+regards
+Philipp
