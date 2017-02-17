@@ -1,79 +1,26 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 17 Feb 2017 11:37:21 +0100
-Subject: [PATCH net-next v2 0/2] net: mvneta: improve rx performance
-In-Reply-To: <20170217100233.2325-1-jszhang@marvell.com> (Jisheng Zhang's
- message of "Fri, 17 Feb 2017 18:02:31 +0800")
-References: <20170217100233.2325-1-jszhang@marvell.com>
-Message-ID: <87shndayse.fsf@free-electrons.com>
+From: fisaksen@baylibre.com (Frode Isaksen)
+Date: Fri, 17 Feb 2017 11:38:18 +0100
+Subject: [PATCH v2 0/6] Enable DMA for daVinci SPI controller 
+Message-ID: <1487327904-28311-1-git-send-email-fisaksen@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
- 
- On ven., f?vr. 17 2017, Jisheng Zhang <jszhang@marvell.com> wrote:
+Enable DMA for the daVinci SPI using the SPI framework DMA mapping
+function. Add fixes caused by large numer of SG entries
+and VIVT cache.
+Also, add some extra options to the spi-loopback-test
+module to catch errors caused by many SG entries.
+This has been tested using spidev_test, spi-loopback-test and
+mounting and read/write UBIFS volume over SPI flash.
 
-> In hot code path such as mvneta_rx_hwbm() and mvneta_rx_swbm(), we may
-> access fields of rx_desc. The rx_desc is allocated by
-> dma_alloc_coherent, it's uncacheable if the device isn't cache
-> coherent, reading from uncached memory is fairly slow.
+v2 changes:
+- Use SPI_MASTER_MUST_ flag(s) for dummy buffer allocation (thanks
+Mark Brown).
+- For rx-only transfers, use rx buffer as dummy tx buffer to avoid
+errors with more than 20 SG entries.
+- Improved comments and use #define for contants.
+- Abandon patches to set loopback and limit transfer size in
+spi-loopback-test.
 
-Did you test it with HWBM support?
-
-I am  not sure ti will work in this case.
-
-Gregory
-
->
-> patch1 reuses the read out status to getting status field of rx_desc
-> again.
->
-> patch2 uses cacheable memory to store the rx buffer DMA address.
->
-> We get the following performance data on Marvell BG4CT Platforms
-> (tested with iperf):
->
-> before the patch:
-> recving 1GB in mvneta_rx_swbm() costs 149265960 ns
->
-> after the patch:
-> recving 1GB in mvneta_rx_swbm() costs 1421565640 ns
->
-> We saved 4.76% time.
->
-> RFC: can we do similar modification for tx? If yes, I can prepare a v2.
->
->
-> Basically, these two patches do what Arnd mentioned in [1].
->
-> Hi Arnd,
->
-> I added "Suggested-by you" tag, I hope you don't mind ;)
->
-> Thanks
->
-> [1] https://www.spinics.net/lists/netdev/msg405889.html
->
-> Since v1:
->   - correct the performance data typo
->
-> Jisheng Zhang (2):
->   net: mvneta: avoid getting status from rx_desc as much as possible
->   net: mvneta: Use cacheable memory to store the rx buffer DMA address
->
->  drivers/net/ethernet/marvell/mvneta.c | 36 ++++++++++++++++++++---------------
->  1 file changed, 21 insertions(+), 15 deletions(-)
->
-> -- 
-> 2.11.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks,
+Frode
