@@ -1,32 +1,25 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 17 Feb 2017 00:53:23 -0800
-Subject: [PATCH] arm64: dts: qcom: pm8994: Add rtc node
-Message-ID: <20170217085323.4123-1-bjorn.andersson@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Feb 2017 17:55:01 +0100
+Subject: [PATCH v2 5/6] spi: davinci: do not use DMA if transfer length is
+ less than 16
+In-Reply-To: <3358b5f1-c7b6-0955-0c36-6f135a585762@baylibre.com>
+References: <1487327904-28311-1-git-send-email-fisaksen@baylibre.com>
+ <1487327904-28311-6-git-send-email-fisaksen@baylibre.com>
+ <CAK8P3a24HkxrU-6a727RY5JqwQgyf9SpprPXvurSqf1Q_W_AMQ@mail.gmail.com>
+ <3358b5f1-c7b6-0955-0c36-6f135a585762@baylibre.com>
+Message-ID: <CAK8P3a2_FL2rBcHdmK040LMRMZCV-70pOBFVUh=VpO+q45nQ0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
- arch/arm64/boot/dts/qcom/pm8994.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+On Fri, Feb 17, 2017 at 5:43 PM, Frode Isaksen <fisaksen@baylibre.com> wrote:
+> On 17/02/2017 17:37, Arnd Bergmann wrote:
+>> On Fri, Feb 17, 2017 at 11:38 AM, Frode Isaksen <fisaksen@baylibre.com> wrote:
+>> 16 seems low as the cutoff. Have you found this experimentally and
+>> tested that for e.g. 32
+>> bytes there is actually an advantage in using DMA?
+> Yes, I have tested for different sizes. Actually 32 bytes is better @30MHz, but if the bit rate goes down, DMA wins over PIO. Do you prefer 32 bytes ?
 
-diff --git a/arch/arm64/boot/dts/qcom/pm8994.dtsi b/arch/arm64/boot/dts/qcom/pm8994.dtsi
-index 0f1866024ae3..b413e44fd09e 100644
---- a/arch/arm64/boot/dts/qcom/pm8994.dtsi
-+++ b/arch/arm64/boot/dts/qcom/pm8994.dtsi
-@@ -9,6 +9,13 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
-+		rtc at 6000 {
-+			compatible = "qcom,pm8941-rtc";
-+			reg = <0x6000>, <0x6100>;
-+			reg-names = "rtc", "alarm";
-+			interrupts = <0x0 0x61 0x1 IRQ_TYPE_EDGE_RISING>;
-+		};
-+
- 		pm8994_gpios: gpios at c000 {
- 			compatible = "qcom,pm8994-gpio";
- 			reg = <0xc000>;
--- 
-2.11.1
+No, I don't care about the specific value, just making sure that you had
+actually tested this, as I had expected PIO to be faster here.
+
+     Arnd
