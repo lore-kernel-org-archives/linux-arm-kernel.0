@@ -1,60 +1,66 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Thu, 16 Feb 2017 16:44:04 -0800
-Subject: [PATCH v4 3/3] arm64/uaccess: Add hardened usercopy check for bad
- stack accesses
-In-Reply-To: <20170216182917.19637-4-james.morse@arm.com>
+Date: Thu, 16 Feb 2017 16:47:33 -0800
+Subject: [PATCH v4 2/3] arm64: Add arch_within_stack_frames() for hardened
+ usercopy
+In-Reply-To: <20170216182917.19637-3-james.morse@arm.com>
 References: <20170216182917.19637-1-james.morse@arm.com>
- <20170216182917.19637-4-james.morse@arm.com>
-Message-ID: <CAGXu5jJJ72w+uGKf90DR-uY6VTOVF3QKV9_1bLUsucs_zg4uAA@mail.gmail.com>
+ <20170216182917.19637-3-james.morse@arm.com>
+Message-ID: <CAGXu5jJaywA3xC418G4h=EXHU-rovHW27wwQs3yUb-Jj+75_2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Feb 16, 2017 at 10:29 AM, James Morse <james.morse@arm.com> wrote:
-> lkdtm tests copy_{to,from}_user() by trying to copy an address range
-> on the stack that isn't yet part of a stack frame.
+> Hardened usercopy tests that an object being copied to/from userspace
+> doesn't overlap multiple stack frames.
 >
-> By the time the stack walker is invoked to check that the object being
-> copied doesn't overlap stack frame, the invalid range is part of a valid
-> stack frame. Discarding a constant number of frames is fragile as different
-> compiler versions may make different inline choices.
+> Add arch_within_stack_frames() to do this using arm64's stackwalker. The
+> callback looks for 'fp' appearing with the range occupied by the object.
 >
-> Instead, add a check that the object isn't between the current stack
-> pointer and the end of the stack. Add this early enough that it should
-> be inlined into the caller.
+> (This isn't enough to trip the lkdtm tests on arm64)
 >
 > CC: Sahara <keun-o.park@darkmatter.ae>
+> Based-on-a-patch-from: Sahara <keun-o.park@darkmatter.ae>
 > Signed-off-by: James Morse <james.morse@arm.com>
 > ---
->  arch/arm64/include/asm/uaccess.h | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
+>  arch/arm64/Kconfig                   |  1 +
+>  arch/arm64/include/asm/thread_info.h |  7 ++++-
+>  arch/arm64/kernel/stacktrace.c       | 54 ++++++++++++++++++++++++++++++++++--
+>  3 files changed, 58 insertions(+), 4 deletions(-)
 >
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index 46da3ea638bb..d3494840a61c 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -356,6 +356,22 @@ do {                                                                       \
->                 -EFAULT;                                                \
->  })
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 111742126897..378caa9c0563 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -67,6 +67,7 @@ config ARM64
+>         select HAVE_ARCH_TRACEHOOK
+>         select HAVE_ARCH_TRANSPARENT_HUGEPAGE
+>         select HAVE_ARM_SMCCC
+> +       select HAVE_ARCH_WITHIN_STACK_FRAMES
+>         select HAVE_EBPF_JIT
+>         select HAVE_C_RECORDMCOUNT
+>         select HAVE_CC_STACKPROTECTOR
+> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
+> index 46c3b93cf865..3540c46027fc 100644
+> --- a/arch/arm64/include/asm/thread_info.h
+> +++ b/arch/arm64/include/asm/thread_info.h
+> @@ -68,7 +68,12 @@ struct thread_info {
+>  #define thread_saved_fp(tsk)   \
+>         ((unsigned long)(tsk->thread.cpu_context.fp))
 >
-> +static inline void check_obj_in_unused_stack(const void *obj, unsigned long len)
-> +{
-> +       unsigned long stack = (unsigned long)task_stack_page(current);
+> -#endif
 > +
-> +       if (__builtin_constant_p(len) || !IS_ENABLED(CONFIG_HARDENED_USERCOPY) || !len)
-> +               return;
-> +
-> +       /*
-> +        * If current_stack_pointer is on the task stack, obj must not lie
-> +        * between current_stack_pointer and the last stack address.
-> +        */
-> +       if ((current_stack_pointer & ~(THREAD_SIZE-1)) == stack)
-> +               BUG_ON(stack <= (unsigned long)obj &&
-> +                      (unsigned long)obj < current_stack_pointer);
-> +}
+> +extern enum stack_type arch_within_stack_frames(const void * const stack,
+> +                                               const void * const stackend,
+> +                                               const void *obj,
+> +                                               unsigned long len);
 
-It seems like this would be a valid test on all architecture, yes? I
-wonder if this could be reworked so we don't have a special case for
-ARM here...
+The caller of arch_within_stack_frames expects this to be inlined...
+could that be changed and then move the special stack check from the
+third patch into check_stack_object() directly?
+
+Regardless, I'm fine with reusing the existing walker. I just want to
+avoid special cases in the uaccess code (so we can consolidate it in
+the future).
 
 -Kees
 
