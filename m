@@ -1,47 +1,43 @@
-From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
-Date: Fri, 17 Feb 2017 16:59:24 +0200
-Subject: [PATCH 07/10] perf: Directly pass PERF_AUX_* flags to
- perf_aux_output_end
-In-Reply-To: <20170217144255.GI15431@arm.com>
-References: <1485540470-11469-1-git-send-email-will.deacon@arm.com>
- <1485540470-11469-8-git-send-email-will.deacon@arm.com>
- <8737fdj5q0.fsf@ashishki-desk.ger.corp.intel.com>
- <20170217140001.GD15431@arm.com>
- <87y3x4j4ho.fsf@ashishki-desk.ger.corp.intel.com>
- <20170217144255.GI15431@arm.com>
-Message-ID: <87vas8j22b.fsf@ashishki-desk.ger.corp.intel.com>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Fri, 17 Feb 2017 16:12:50 +0100
+Subject: [PATCH] Revert "ARM: at91/dt: sama5d2: Use new compatible for ohci
+ node"
+Message-ID: <20170217151250.8572-1-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon <will.deacon@arm.com> writes:
+This reverts commit cab43282682e ("ARM: at91/dt: sama5d2: Use new
+compatible for ohci node")
 
-> On Fri, Feb 17, 2017 at 04:06:59PM +0200, Alexander Shishkin wrote:
->> Will Deacon <will.deacon@arm.com> writes:
->> 
->> > On Fri, Feb 17, 2017 at 03:40:23PM +0200, Alexander Shishkin wrote:
->> >> Will Deacon <will.deacon@arm.com> writes:
->> >> 
->> >> > @@ -485,7 +485,8 @@ int intel_bts_interrupt(void)
->> >> >  		return handled;
->> >> >  
->> >> >  	perf_aux_output_end(&bts->handle, local_xchg(&buf->data_size, 0),
->> >> > -			    !!local_xchg(&buf->lost, 0));
->> >> > +			    local_xchg(&buf->lost, 0) ?
->> >> > +			    PERF_AUX_FLAG_OVERWRITE : 0);
->> >> 
->> >> Heh, this one would have taken some time to debug. :)
->> >
->> > Don't worry, this isn't a bug fix! This patch changes the prototype for
->> > perf_aux_output_end so that it takes the flag instead of a "bool truncated"
->> > parameter, so this is just fixing up the callers at the same time.
->> 
->> Yeah, I got that, what I'm saying is that the above should be
->> PERF_AUX_FLAG_TRUNCATED, not OVERWRITE. I only spotted it by accident.
->
-> D'oh, quite right, I'll fix that now. Thanks for having a look.
+It depends from commit 7150bc9b4d43 ("usb: ohci-at91: Forcibly suspend
+ports while USB suspend") which was reverted and implemented
+differently. With the new implementation, the compatible string must
+remain the same.
 
-Wait a bit with the fixing, I'm about to post an amended version.
+The compatible string introduced by this commit has been used in the
+default SAMA5D2 dtsi starting from Linux 4.8. As it has never been
+working correctly in an official release, removing it should not be
+breaking the stability rules.
 
-Regards,
---
-Alex
+Fixes: cab43282682e ("ARM: at91/dt: sama5d2: Use new compatible for ohci node")
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+cc: <stable@vger.kernel.org>
+---
+ arch/arm/boot/dts/sama5d2.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index ceb9783ff7e1..ff7eae833a6d 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -266,7 +266,7 @@
+ 		};
+ 
+ 		usb1: ohci at 00400000 {
+-			compatible = "atmel,sama5d2-ohci", "usb-ohci";
++			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00400000 0x100000>;
+ 			interrupts = <41 IRQ_TYPE_LEVEL_HIGH 2>;
+ 			clocks = <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
+-- 
+2.9.3
