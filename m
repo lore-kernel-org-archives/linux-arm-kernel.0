@@ -1,80 +1,93 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 17 Feb 2017 11:52:09 -0800
-Subject: [PATCH] staging: bcm2835-audio: bcm2835.h: fix various coding
- style issues
-In-Reply-To: <1487356776-11449-1-git-send-email-adanhawthorn@gmail.com>
-References: <1487356776-11449-1-git-send-email-adanhawthorn@gmail.com>
-Message-ID: <1487361129.2198.4.camel@perches.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 17 Feb 2017 14:10:47 -0600
+Subject: [PATCH V2] PCI: add QCOM root port quirks for ACS
+In-Reply-To: <1487282505-26634-1-git-send-email-okaya@codeaurora.org>
+References: <1487282505-26634-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20170217201047.GC17762@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-02-17 at 13:39 -0500, Nathan Howard wrote:
-> The following coding style issues (as per checkpatch.pl) were resolved.
+On Thu, Feb 16, 2017 at 05:01:45PM -0500, Sinan Kaya wrote:
+> PCI Express defines an optional featured called Access Control Services
+> described in 6.12. Access Control Services (ACS) section of the PCIe 3.1
+> Specification.
+> 
+> Linux kernel uses ACS to validate/prohibit data transfers among PCIe
+> functions. This becomes especially useful when running guest machines
+> with PCI device passthrough. It provides security guarantee that only
+> OS allowed PCIe devices can talk to each other.
+> 
+> QCOM root ports do provide ACS-like features to disable peer
+> transactions and validate bus numbers in requests, but do not provide an
+> actual PCIe ACS capability.
+> 
+> To be specific:
+> * Hardware supports source validation but it will report the issue as
+> Completer Abort instead of ACS Violation.
+> 
+> * Hardware doesn't support peer-to-peer and each root port is a root
+> complex with unique segment numbers.
+> 
+> * It is not possible for one root port to pass traffic to the other root
+> port. All PCIe transactions are terminated inside the root port.
+> 
+> Adding an ACS quirk for the QDF2400 and QDF2432 products.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 
-What Greg said is true, and the volatile conversion
-especially needs to be verified.
+Applied to pci/virtualization with Alex's reviewed-by for v4.11, thanks!
 
-> diff --git a/drivers/staging/bcm2835-audio/bcm2835.h b/drivers/staging/bcm2835-audio/bcm2835.h
-[]
-> @@ -27,8 +27,8 @@
->  #include <linux/workqueue.h>
+> ---
+>  drivers/pci/quirks.c | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+> index 1800bef..2df06cb 100644
+> --- a/drivers/pci/quirks.c
+> +++ b/drivers/pci/quirks.c
+> @@ -4136,6 +4136,27 @@ static int pci_quirk_intel_pch_acs(struct pci_dev *dev, u16 acs_flags)
+>  }
 >  
 >  /*
-> -#define AUDIO_DEBUG_ENABLE
-> -#define AUDIO_VERBOSE_DEBUG_ENABLE
-> + * #define AUDIO_DEBUG_ENABLE
-> + * #define AUDIO_VERBOSE_DEBUG_ENABLE
->   */
-
-Using #define DEBUG would be more common.
- 
->  /* Debug macros */
-> @@ -37,10 +37,10 @@
->  #ifdef AUDIO_VERBOSE_DEBUG_ENABLE
->  
->  #define audio_debug(fmt, arg...) \
-> -	printk(KERN_INFO"%s:%d " fmt, __func__, __LINE__, ##arg)
-> +	pr_info("%s:%d " fmt, __func__, __LINE__, ##arg)
->  
->  #define audio_info(fmt, arg...) \
-> -	printk(KERN_INFO"%s:%d " fmt, __func__, __LINE__, ##arg)
-> +	pr_info("%s:%d " fmt, __func__, __LINE__, ##arg)
->  
->  #else
->  
-> @@ -59,13 +59,13 @@
->  #endif /* AUDIO_DEBUG_ENABLE */
->  
->  #define audio_error(fmt, arg...) \
-> -	printk(KERN_ERR"%s:%d " fmt, __func__, __LINE__, ##arg)
-> +	pr_err("%s:%d " fmt, __func__, __LINE__, ##arg)
->  
->  #define audio_warning(fmt, arg...) \
-> -	printk(KERN_WARNING"%s:%d " fmt, __func__, __LINE__, ##arg)
-> +	pr_warn("%s:%d " fmt, __func__, __LINE__, ##arg)
->  
->  #define audio_alert(fmt, arg...) \
-> -	printk(KERN_ALERT"%s:%d " fmt, __func__, __LINE__, ##arg)
-> +	pr_alert("%s:%d " fmt, __func__, __LINE__, ##arg)
-
-These might as well be removed and converted to
-the direct pr_<level> equivalents and have
-
-#define pr_fmt(fmt) "%s:%d: " fmt, __func__, __LINE__
-
-added before any include, but honestly the
-__func__ and __LINE__ aren't particularly useful.
-
-> @@ -122,8 +125,8 @@ struct bcm2835_alsa_stream {
->  	struct semaphore buffers_update_sem;
->  	struct semaphore control_sem;
->  	spinlock_t lock;
-> -	volatile unsigned int control;
-> -	volatile unsigned int status;
-> +	unsigned int control;
-> +	unsigned int status;
-
-Unless you can absolutely verify that that
-doesn't change hardware access, you should
-leave this alone.
-'
+> + * These QCOM root ports do provide ACS-like features to disable peer
+> + * transactions and validate bus numbers in requests, but do not provide an
+> + * actual PCIe ACS capability.
+> + * Hardware supports source validation but it will report the issue as
+> + * Completer Abort instead of ACS Violation.
+> + * Hardware doesn't support peer-to-peer and each root port is a root complex
+> + * with unique segment numbers.
+> + * It is not possible for one root port to pass traffic to the other root
+> + * port. All PCIe transactions are terminated inside the root port.
+> + */
+> +static int pci_quirk_qcom_rp_acs(struct pci_dev *dev, u16 acs_flags)
+> +{
+> +	u16 flags = (PCI_ACS_RR | PCI_ACS_CR | PCI_ACS_UF | PCI_ACS_SV);
+> +	int ret = acs_flags & ~flags ? 0 : 1;
+> +
+> +	dev_info(&dev->dev, "Using QCOM ACS Quirk (%d)\n", ret);
+> +
+> +	return ret;
+> +}
+> +
+> +/*
+>   * Sunrise Point PCH root ports implement ACS, but unfortunately as shown in
+>   * the datasheet (Intel 100 Series Chipset Family PCH Datasheet, Vol. 2,
+>   * 12.1.46, 12.1.47)[1] this chipset uses dwords for the ACS capability and
+> @@ -4271,6 +4292,9 @@ static int pci_quirk_mf_endpoint_acs(struct pci_dev *dev, u16 acs_flags)
+>  	/* I219 */
+>  	{ PCI_VENDOR_ID_INTEL, 0x15b7, pci_quirk_mf_endpoint_acs },
+>  	{ PCI_VENDOR_ID_INTEL, 0x15b8, pci_quirk_mf_endpoint_acs },
+> +	/* QCOM QDF2xxx root ports */
+> +	{ 0x17CB, 0x400, pci_quirk_qcom_rp_acs },
+> +	{ 0x17CB, 0x401, pci_quirk_qcom_rp_acs },
+>  	/* Intel PCH root ports */
+>  	{ PCI_VENDOR_ID_INTEL, PCI_ANY_ID, pci_quirk_intel_pch_acs },
+>  	{ PCI_VENDOR_ID_INTEL, PCI_ANY_ID, pci_quirk_intel_spt_pch_acs },
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
