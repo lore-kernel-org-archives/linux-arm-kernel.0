@@ -1,55 +1,73 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 17 Feb 2017 15:20:27 +0530
-Subject: [PATCH v2 07/22] Documentation: PCI: Add binding documentation for
- pci-test endpoint function
+Date: Fri, 17 Feb 2017 15:20:29 +0530
+Subject: [PATCH v2 09/22] dt-bindings: PCI: Add dt bindings for pci designware
+ EP mode
 In-Reply-To: <1487325042-28227-1-git-send-email-kishon@ti.com>
 References: <1487325042-28227-1-git-send-email-kishon@ti.com>
-Message-ID: <1487325042-28227-8-git-send-email-kishon@ti.com>
+Message-ID: <1487325042-28227-10-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add binding documentation for pci-test endpoint function that helps in
-adding and configuring pci-test endpoint function.
+Add device tree binding documentation for pci designware EP mode.
 
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/PCI/00-INDEX                         |    2 ++
- .../PCI/endpoint/function/binding/pci-test.txt     |   17 +++++++++++++++++
- 2 files changed, 19 insertions(+)
- create mode 100644 Documentation/PCI/endpoint/function/binding/pci-test.txt
+ .../devicetree/bindings/pci/designware-pcie.txt    |   26 ++++++++++++++------
+ 1 file changed, 18 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/PCI/00-INDEX b/Documentation/PCI/00-INDEX
-index 4e5a283..53717b7 100644
---- a/Documentation/PCI/00-INDEX
-+++ b/Documentation/PCI/00-INDEX
-@@ -18,3 +18,5 @@ endpoint/pci-endpoint-cfs.txt
- 	- guide to use configfs to configure the pci endpoint function.
- endpoint/pci-test-function.txt
- 	- specification of *pci test* function device.
-+endpoint/function/binding/
-+	- binding documentation for pci endpoint function
-diff --git a/Documentation/PCI/endpoint/function/binding/pci-test.txt b/Documentation/PCI/endpoint/function/binding/pci-test.txt
-new file mode 100644
-index 0000000..7358240
---- /dev/null
-+++ b/Documentation/PCI/endpoint/function/binding/pci-test.txt
-@@ -0,0 +1,17 @@
-+PCI TEST ENDPOINT FUNCTION
-+
-+name: Should be "pci_epf_test" to bind to the pci_epf_test driver.
-+
-+Configurable Fields:
-+vendorid	 : should be 0x104c
-+deviceid	 : should be 0xffff
-+revid		 : dont't care
-+progif_code	 : don't care
-+subclass_code	 : don't care
-+baseclass_code	 : should be 0xff
-+cache_line_size	 : don't care
-+subsys_vendor_id : don't care
-+subsys_id	 : don't care
-+interrupt_pin	 : Should be 1 - INTA, 2 - INTB, 3 - INTC, 4 -INTD
-+msi_interrupts	 : Should be 1 to 32 depending on the number of msi interrupts
-+		   to test
+diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+index 1392c70..b2480dd 100644
+--- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+@@ -6,30 +6,40 @@ Required properties:
+ - reg-names: Must be "config" for the PCIe configuration space.
+     (The old way of getting the configuration address space from "ranges"
+     is deprecated and should be avoided.)
++- num-lanes: number of lanes to use
++RC mode:
+ - #address-cells: set to <3>
+ - #size-cells: set to <2>
+ - device_type: set to "pci"
+ - ranges: ranges for the PCI memory and I/O regions
+ - #interrupt-cells: set to <1>
+-- interrupt-map-mask and interrupt-map: standard PCI properties
+-	to define the mapping of the PCIe interface to interrupt
++- interrupt-map-mask and interrupt-map: standard PCI
++	properties to define the mapping of the PCIe interface to interrupt
+ 	numbers.
+-- num-lanes: number of lanes to use
++EP mode:
++- num-ib-windows: number of inbound address translation
++        windows
++- num-ob-windows: number of outbound address translation
++        windows
+ 
+ Optional properties:
+-- num-viewport: number of view ports configured in hardware.  If a platform
+-  does not specify it, the driver assumes 2.
+ - num-lanes: number of lanes to use (this property should be specified unless
+   the link is brought already up in BIOS)
+ - reset-gpio: gpio pin number of power good signal
+-- bus-range: PCI bus numbers covered (it is recommended for new devicetrees to
+-  specify this property, to keep backwards compatibility a range of 0x00-0xff
+-  is assumed if not present)
+ - clocks: Must contain an entry for each entry in clock-names.
+ 	See ../clocks/clock-bindings.txt for details.
+ - clock-names: Must include the following entries:
+ 	- "pcie"
+ 	- "pcie_bus"
++RC mode:
++- num-viewport: number of view ports configured in
++  hardware. If a platform does not specify it, the driver assumes 2.
++- bus-range: PCI bus numbers covered (it is recommended
++  for new devicetrees to specify this property, to keep backwards
++  compatibility a range of 0x00-0xff is assumed if not present)
++EP mode:
++- max-functions: maximum number of functions that can be
++  configured
+ 
+ Example configuration:
+ 
 -- 
 1.7.9.5
