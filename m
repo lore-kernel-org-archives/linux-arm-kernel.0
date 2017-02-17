@@ -1,10 +1,10 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 17 Feb 2017 17:57:26 +0800
-Subject: [PATCH net-next 1/2] net: mvneta: avoid getting status from rx_desc
- as much as possible
-In-Reply-To: <20170217095727.2226-1-jszhang@marvell.com>
-References: <20170217095727.2226-1-jszhang@marvell.com>
-Message-ID: <20170217095727.2226-2-jszhang@marvell.com>
+Date: Fri, 17 Feb 2017 18:02:32 +0800
+Subject: [PATCH net-next v2 1/2] net: mvneta: avoid getting status from
+ rx_desc as much as possible
+In-Reply-To: <20170217100233.2325-1-jszhang@marvell.com>
+References: <20170217100233.2325-1-jszhang@marvell.com>
+Message-ID: <20170217100233.2325-2-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
