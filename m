@@ -1,88 +1,117 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 17 Feb 2017 18:44:51 +0800
-Subject: [PATCH net-next v2 0/2] net: mvneta: improve rx performance
-In-Reply-To: <87shndayse.fsf@free-electrons.com>
-References: <20170217100233.2325-1-jszhang@marvell.com>
- <87shndayse.fsf@free-electrons.com>
-Message-ID: <20170217184451.55217e0e@xhacker>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 17 Feb 2017 10:52:28 +0000
+Subject: [PATCH 03/35] arm64: Convert remaining uses of pr_warning to
+ pr_warn
+In-Reply-To: <74c2cc72b91dbe639f153c601900f7f46a920fb9.1487314666.git.joe@perches.com>
+References: <cover.1487314666.git.joe@perches.com>
+ <74c2cc72b91dbe639f153c601900f7f46a920fb9.1487314666.git.joe@perches.com>
+Message-ID: <20170217105228.GF588@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Feb 2017 11:37:21 +0100 Gregory CLEMENT wrote:
+On Thu, Feb 16, 2017 at 11:11:16PM -0800, Joe Perches wrote:
+> To enable eventual removal of pr_warning
+> 
+> This makes pr_warn use consistent for arch/arm64
+> 
+> Prior to this patch, there were 7 uses of pr_warning and
+> 27 uses of pr_warn in arch/arm64
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
 
-> Hi Jisheng,
+Looks nicer to me.
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> ---
+>  arch/arm64/include/asm/syscall.h  | 8 ++++----
+>  arch/arm64/kernel/hw_breakpoint.c | 8 ++++----
+>  arch/arm64/kernel/smp.c           | 4 ++--
+>  3 files changed, 10 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
+> index 709a574468f0..231f2c3fcf81 100644
+> --- a/arch/arm64/include/asm/syscall.h
+> +++ b/arch/arm64/include/asm/syscall.h
+> @@ -68,8 +68,8 @@ static inline void syscall_get_arguments(struct task_struct *task,
+>  	if (i + n > SYSCALL_MAX_ARGS) {
+>  		unsigned long *args_bad = args + SYSCALL_MAX_ARGS - i;
+>  		unsigned int n_bad = n + i - SYSCALL_MAX_ARGS;
+> -		pr_warning("%s called with max args %d, handling only %d\n",
+> -			   __func__, i + n, SYSCALL_MAX_ARGS);
+> +		pr_warn("%s called with max args %d, handling only %d\n",
+> +			__func__, i + n, SYSCALL_MAX_ARGS);
+>  		memset(args_bad, 0, n_bad * sizeof(args[0]));
+>  	}
 >  
->  On ven., f?vr. 17 2017, Jisheng Zhang <jszhang@marvell.com> wrote:
-> 
-> > In hot code path such as mvneta_rx_hwbm() and mvneta_rx_swbm(), we may
-> > access fields of rx_desc. The rx_desc is allocated by
-> > dma_alloc_coherent, it's uncacheable if the device isn't cache
-> > coherent, reading from uncached memory is fairly slow.  
-> 
-> Did you test it with HWBM support?
-
-No I didn't test it for lacking of such HW, so it's appreciated if someone
-can test with HWBM capable HW.
-
-> 
-> I am not sure ti will work in this case.
-
-IMHO, if mvneta HW doesn't update rx_desc->buf_phys_addr, it can still work.
-I don't have HWBM background, so above may be wrong. If this case doesn't
-work for HWBM, I'll submit v3 to modify mvneta_rx_swbm() only.
-
-Thanks,
-Jisheng
-
-> 
-> Gregory
-> 
-> >
-> > patch1 reuses the read out status to getting status field of rx_desc
-> > again.
-> >
-> > patch2 uses cacheable memory to store the rx buffer DMA address.
-> >
-> > We get the following performance data on Marvell BG4CT Platforms
-> > (tested with iperf):
-> >
-> > before the patch:
-> > recving 1GB in mvneta_rx_swbm() costs 149265960 ns
-> >
-> > after the patch:
-> > recving 1GB in mvneta_rx_swbm() costs 1421565640 ns
-> >
-> > We saved 4.76% time.
-> >
-> > RFC: can we do similar modification for tx? If yes, I can prepare a v2.
-> >
-> >
-> > Basically, these two patches do what Arnd mentioned in [1].
-> >
-> > Hi Arnd,
-> >
-> > I added "Suggested-by you" tag, I hope you don't mind ;)
-> >
-> > Thanks
-> >
-> > [1] https://www.spinics.net/lists/netdev/msg405889.html
-> >
-> > Since v1:
-> >   - correct the performance data typo
-> >
-> > Jisheng Zhang (2):
-> >   net: mvneta: avoid getting status from rx_desc as much as possible
-> >   net: mvneta: Use cacheable memory to store the rx buffer DMA address
-> >
-> >  drivers/net/ethernet/marvell/mvneta.c | 36 ++++++++++++++++++++---------------
-> >  1 file changed, 21 insertions(+), 15 deletions(-)
-> >
-> > -- 
-> > 2.11.0
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel  
+> @@ -92,8 +92,8 @@ static inline void syscall_set_arguments(struct task_struct *task,
+>  		return;
+>  
+>  	if (i + n > SYSCALL_MAX_ARGS) {
+> -		pr_warning("%s called with max args %d, handling only %d\n",
+> -			   __func__, i + n, SYSCALL_MAX_ARGS);
+> +		pr_warn("%s called with max args %d, handling only %d\n",
+> +			__func__, i + n, SYSCALL_MAX_ARGS);
+>  		n = SYSCALL_MAX_ARGS - i;
+>  	}
+>  
+> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+> index 0296e7924240..6fa79ffd0c43 100644
+> --- a/arch/arm64/kernel/hw_breakpoint.c
+> +++ b/arch/arm64/kernel/hw_breakpoint.c
+> @@ -62,7 +62,7 @@ int hw_breakpoint_slots(int type)
+>  	case TYPE_DATA:
+>  		return get_num_wrps();
+>  	default:
+> -		pr_warning("unknown slot type: %d\n", type);
+> +		pr_warn("unknown slot type: %d\n", type);
+>  		return 0;
+>  	}
+>  }
+> @@ -123,7 +123,7 @@ static u64 read_wb_reg(int reg, int n)
+>  	GEN_READ_WB_REG_CASES(AARCH64_DBG_REG_WVR, AARCH64_DBG_REG_NAME_WVR, val);
+>  	GEN_READ_WB_REG_CASES(AARCH64_DBG_REG_WCR, AARCH64_DBG_REG_NAME_WCR, val);
+>  	default:
+> -		pr_warning("attempt to read from unknown breakpoint register %d\n", n);
+> +		pr_warn("attempt to read from unknown breakpoint register %d\n", n);
+>  	}
+>  
+>  	return val;
+> @@ -138,7 +138,7 @@ static void write_wb_reg(int reg, int n, u64 val)
+>  	GEN_WRITE_WB_REG_CASES(AARCH64_DBG_REG_WVR, AARCH64_DBG_REG_NAME_WVR, val);
+>  	GEN_WRITE_WB_REG_CASES(AARCH64_DBG_REG_WCR, AARCH64_DBG_REG_NAME_WCR, val);
+>  	default:
+> -		pr_warning("attempt to write to unknown breakpoint register %d\n", n);
+> +		pr_warn("attempt to write to unknown breakpoint register %d\n", n);
+>  	}
+>  	isb();
+>  }
+> @@ -156,7 +156,7 @@ static enum dbg_active_el debug_exception_level(int privilege)
+>  	case AARCH64_BREAKPOINT_EL1:
+>  		return DBG_ACTIVE_EL1;
+>  	default:
+> -		pr_warning("invalid breakpoint privilege level %d\n", privilege);
+> +		pr_warn("invalid breakpoint privilege level %d\n", privilege);
+>  		return -EINVAL;
+>  	}
+>  }
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 827d52d78b67..9c396e34c090 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -925,8 +925,8 @@ void smp_send_stop(void)
+>  		udelay(1);
+>  
+>  	if (num_online_cpus() > 1)
+> -		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
+> -			   cpumask_pr_args(cpu_online_mask));
+> +		pr_warn("SMP: failed to stop secondary CPUs %*pbl\n",
+> +			cpumask_pr_args(cpu_online_mask));
+>  }
+>  
+>  /*
+> -- 
+> 2.10.0.rc2.1.g053435c
 > 
