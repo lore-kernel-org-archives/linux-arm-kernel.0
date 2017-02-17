@@ -1,173 +1,117 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 17 Feb 2017 14:30:03 +0100
-Subject: [PATCH net-next v2 2/2] net: mvneta: Use cacheable memory to
- store the rx buffer DMA address
-In-Reply-To: <20170217100233.2325-3-jszhang@marvell.com> (Jisheng Zhang's
- message of "Fri, 17 Feb 2017 18:02:33 +0800")
-References: <20170217100233.2325-1-jszhang@marvell.com>
- <20170217100233.2325-3-jszhang@marvell.com>
-Message-ID: <87o9y1aqsk.fsf@free-electrons.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Fri, 17 Feb 2017 14:34:35 +0100
+Subject: [PATCH 4/4] ARM: davinci: add pdata-quirks for da850-evm vpif
+ display
+In-Reply-To: <42c3c8dc-9681-0f4b-e43c-ae95197c727d@ti.com>
+References: <1487269285-6948-1-git-send-email-bgolaszewski@baylibre.com>
+ <1487269285-6948-5-git-send-email-bgolaszewski@baylibre.com>
+ <42c3c8dc-9681-0f4b-e43c-ae95197c727d@ti.com>
+Message-ID: <CAMpxmJXeuDBbUh0R8Rexjx5qwVjqkM_f4dr7-nwP80pdPcWcPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
- 
- On ven., f?vr. 17 2017, Jisheng Zhang <jszhang@marvell.com> wrote:
+2017-02-17 14:15 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+> On Thursday 16 February 2017 11:51 PM, Bartosz Golaszewski wrote:
+>> Similarly to vpif capture: we need to register the vpif display driver
+>> and the corresponding adv7343 encoder in pdata-quirks as the DT
+>> support is not complete - there isn't currently a way to define the
+>> output_routing in the V4L2 drivers (c.f. s_routing) via DT.
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+>> ---
+>>  arch/arm/mach-davinci/pdata-quirks.c | 69 +++++++++++++++++++++++++++++++++++-
+>>  1 file changed, 68 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
+>> index 3ca773f..c659c76 100644
+>> --- a/arch/arm/mach-davinci/pdata-quirks.c
+>> +++ b/arch/arm/mach-davinci/pdata-quirks.c
+>
+>> +#endif /* IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) */
+>>
+>> +#if IS_ENABLED(CONFIG_DA850_UI_SD_VIDEO_PORT)
+>> +static struct adv7343_platform_data adv7343_pdata = {
+>> +     .mode_config = {
+>> +             .dac = { 1, 1, 1 },
+>> +     },
+>> +     .sd_config = {
+>> +             .sd_dac_out = { 1 },
+>> +     },
+>> +};
+>> +
+>> +static struct vpif_subdev_info da850_vpif_subdev[] = {
+>> +     {
+>> +             .name = "adv7343",
+>> +             .board_info = {
+>> +                     I2C_BOARD_INFO("adv7343", 0x2a),
+>> +                     .platform_data = &adv7343_pdata,
+>> +             },
+>> +     },
+>> +};
+>> +
+>> +static const struct vpif_output da850_ch0_outputs[] = {
+>> +     {
+>> +             .output = {
+>> +                     .index = 0,
+>> +                     .name = "Composite",
+>> +                     .type = V4L2_OUTPUT_TYPE_ANALOG,
+>> +                     .capabilities = V4L2_OUT_CAP_STD,
+>> +                     .std = V4L2_STD_ALL,
+>> +             },
+>> +             .subdev_name = "adv7343",
+>> +             .output_route = ADV7343_COMPOSITE_ID,
+>> +     },
+>> +     {
+>> +             .output = {
+>> +                     .index = 1,
+>> +                     .name = "S-Video",
+>> +                     .type = V4L2_OUTPUT_TYPE_ANALOG,
+>> +                     .capabilities = V4L2_OUT_CAP_STD,
+>> +                     .std = V4L2_STD_ALL,
+>> +             },
+>> +             .subdev_name = "adv7343",
+>> +             .output_route = ADV7343_SVIDEO_ID,
+>> +     },
+>> +};
+>> +
+>> +static struct vpif_display_config da850_vpif_display_config = {
+>> +     .subdevinfo   = da850_vpif_subdev,
+>> +     .subdev_count = ARRAY_SIZE(da850_vpif_subdev),
+>> +     .chan_config[0] = {
+>> +             .outputs = da850_ch0_outputs,
+>> +             .output_count = ARRAY_SIZE(da850_ch0_outputs),
+>> +     },
+>> +     .card_name    = "DA850/OMAP-L138 Video Display",
+>> +};
+>> +#endif /* defined(CONFIG_DA850_UI_SD_VIDEO_PORT) */
+>> +
+>> +#if IS_ENABLED(CONFIG_VIDEO_DAVINCI_VPIF_CAPTURE) || IS_ENABLED(CONFIG_DA850_UI_SD_VIDEO_PORT)
+>>  static void __init da850_vpif_legacy_init(void)
+>>  {
+>>       int ret;
+>> @@ -119,8 +178,16 @@ static void __init da850_vpif_legacy_init(void)
+>>       if (ret)
+>>               pr_warn("%s: VPIF capture setup failed: %d\n",
+>>                       __func__, ret);
+>> +
+>> +     /* LCDK doesn't support VPIF display */
+>> +     if (of_machine_is_compatible("ti,da850-evm")) {
+>> +             ret = da850_register_vpif_display(&da850_vpif_display_config);
+>
+> This fails to build when CONFIG_DA850_UI_SD_VIDEO_PORT is switched off.
+> Probably means you need separate functions for registering capture and
+> display parts.
+>
+> I haven't reviewed rest of the patchset yet. Just noticed these while
+> applying them for some testing. You may want to wait sometime before
+> sending the next version.
+>
+> Thanks,
+> Sekhar
+>
 
-> In hot code path such as mvneta_rx_hwbm() and mvneta_rx_swbm, the
-> buf_phys_addr field of rx_dec is accessed. The rx_desc is allocated by
-> dma_alloc_coherent, it's uncacheable if the device isn't cache
-> coherent, reading from uncached memory is fairly slow. This patch uses
-> cacheable memory to store the rx buffer DMA address. We get the
-> following performance data on Marvell BG4CT Platforms (tested with
-> iperf):
->
-> before the patch:
-> recving 1GB in mvneta_rx_swbm() costs 1492659600 ns
->
-> after the patch:
-> recving 1GB in mvneta_rx_swbm() costs 1421565640 ns
->
-> We saved 4.76% time.
+Eek! My bad, didn't test different configs with that.
 
-I have just tested it and as I feared, with HWBM enabled, a simple iperf
-just doesn't work.
-
-Gregory
-
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> Suggested-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/net/ethernet/marvell/mvneta.c | 28 +++++++++++++++++-----------
->  1 file changed, 17 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index 06df72b8da85..e24c3028fe1d 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -580,6 +580,9 @@ struct mvneta_rx_queue {
->  	/* Virtual address of the RX buffer */
->  	void  **buf_virt_addr;
->  
-> +	/* DMA address of the RX buffer */
-> +	dma_addr_t *buf_dma_addr;
-> +
->  	/* Virtual address of the RX DMA descriptors array */
->  	struct mvneta_rx_desc *descs;
->  
-> @@ -1617,6 +1620,7 @@ static void mvneta_rx_desc_fill(struct mvneta_rx_desc *rx_desc,
->  
->  	rx_desc->buf_phys_addr = phys_addr;
->  	i = rx_desc - rxq->descs;
-> +	rxq->buf_dma_addr[i] = phys_addr;
->  	rxq->buf_virt_addr[i] = virt_addr;
->  }
->  
-> @@ -1900,22 +1904,22 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
->  		for (i = 0; i < rx_done; i++) {
->  			struct mvneta_rx_desc *rx_desc =
->  						  mvneta_rxq_next_desc_get(rxq);
-> +			int index = rx_desc - rxq->descs;
->  			u8 pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc->status);
->  			struct mvneta_bm_pool *bm_pool;
->  
->  			bm_pool = &pp->bm_priv->bm_pools[pool_id];
->  			/* Return dropped buffer to the pool */
->  			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
-> -					      rx_desc->buf_phys_addr);
-> +					      rxq->buf_dma_addr[index]);
->  		}
->  		return;
->  	}
->  
->  	for (i = 0; i < rxq->size; i++) {
-> -		struct mvneta_rx_desc *rx_desc = rxq->descs + i;
->  		void *data = rxq->buf_virt_addr[i];
->  
-> -		dma_unmap_single(pp->dev->dev.parent, rx_desc->buf_phys_addr,
-> +		dma_unmap_single(pp->dev->dev.parent, rxq->buf_dma_addr[i],
->  				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
->  		mvneta_frag_free(pp->frag_size, data);
->  	}
-> @@ -1953,7 +1957,7 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
->  		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
->  		index = rx_desc - rxq->descs;
->  		data = rxq->buf_virt_addr[index];
-> -		phys_addr = rx_desc->buf_phys_addr;
-> +		phys_addr = rxq->buf_dma_addr[index];
->  
->  		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
->  		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
-> @@ -2062,6 +2066,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
->  	/* Fairness NAPI loop */
->  	while (rx_done < rx_todo) {
->  		struct mvneta_rx_desc *rx_desc = mvneta_rxq_next_desc_get(rxq);
-> +		int index = rx_desc - rxq->descs;
->  		struct mvneta_bm_pool *bm_pool = NULL;
->  		struct sk_buff *skb;
->  		unsigned char *data;
-> @@ -2074,7 +2079,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
->  		rx_status = rx_desc->status;
->  		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
->  		data = (u8 *)(uintptr_t)rx_desc->buf_cookie;
-> -		phys_addr = rx_desc->buf_phys_addr;
-> +		phys_addr = rxq->buf_dma_addr[index];
->  		pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_status);
->  		bm_pool = &pp->bm_priv->bm_pools[pool_id];
->  
-> @@ -2082,8 +2087,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
->  		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
->  err_drop_frame_ret_pool:
->  			/* Return the buffer to the pool */
-> -			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
-> -					      rx_desc->buf_phys_addr);
-> +			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool, phys_addr);
->  err_drop_frame:
->  			dev->stats.rx_errors++;
->  			mvneta_rx_error(pp, rx_desc);
-> @@ -2098,7 +2102,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
->  				goto err_drop_frame_ret_pool;
->  
->  			dma_sync_single_range_for_cpu(dev->dev.parent,
-> -			                              rx_desc->buf_phys_addr,
-> +			                              phys_addr,
->  			                              MVNETA_MH_SIZE + NET_SKB_PAD,
->  			                              rx_bytes,
->  			                              DMA_FROM_DEVICE);
-> @@ -2114,8 +2118,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
->  			rcvd_bytes += rx_bytes;
->  
->  			/* Return the buffer to the pool */
-> -			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
-> -					      rx_desc->buf_phys_addr);
-> +			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool, phys_addr);
->  
->  			/* leave the descriptor and buffer untouched */
->  			continue;
-> @@ -4019,7 +4022,10 @@ static int mvneta_init(struct device *dev, struct mvneta_port *pp)
->  		rxq->buf_virt_addr = devm_kmalloc(pp->dev->dev.parent,
->  						  rxq->size * sizeof(void *),
->  						  GFP_KERNEL);
-> -		if (!rxq->buf_virt_addr)
-> +		rxq->buf_dma_addr = devm_kmalloc(pp->dev->dev.parent,
-> +						 rxq->size * sizeof(dma_addr_t),
-> +						 GFP_KERNEL);
-> +		if (!rxq->buf_virt_addr || !rxq->buf_dma_addr)
->  			return -ENOMEM;
->  	}
->  
-> -- 
-> 2.11.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thanks,
+Bartosz
