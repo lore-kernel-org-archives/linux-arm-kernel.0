@@ -1,41 +1,52 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 17 Feb 2017 14:48:35 +0100
-Subject: [PATCH 1/3] ARM: dts: imx6qp: reference PCIe node by handle
-Message-ID: <20170217134837.14173-1-l.stach@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 17 Feb 2017 14:55:01 +0100
+Subject: [PATCH net-next v2 2/2] net: mvneta: Use cacheable memory to
+ store the rx buffer DMA address
+In-Reply-To: <87o9y1aqsk.fsf@free-electrons.com>
+References: <20170217100233.2325-1-jszhang@marvell.com>
+ <20170217100233.2325-3-jszhang@marvell.com>
+ <87o9y1aqsk.fsf@free-electrons.com>
+Message-ID: <20170217145501.5b90a977@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By using the handle, we can avoid some duplication of the base DT
-and so avoid any maintenance overhead in the QP DT if the referenced
-node changes.
+Hello,
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/boot/dts/imx6qp.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+On Fri, 17 Feb 2017 14:30:03 +0100, Gregory CLEMENT wrote:
 
-diff --git a/arch/arm/boot/dts/imx6qp.dtsi b/arch/arm/boot/dts/imx6qp.dtsi
-index 24d071f5d9cd..bceab2d87af4 100644
---- a/arch/arm/boot/dts/imx6qp.dtsi
-+++ b/arch/arm/boot/dts/imx6qp.dtsi
-@@ -82,10 +82,6 @@
- 				      "ldb_di0", "ldb_di1", "prg";
- 		};
- 
--		pcie: pcie at 0x01000000 {
--			compatible = "fsl,imx6qp-pcie", "snps,dw-pcie";
--		};
--
- 		aips-bus at 02100000 {
- 			mmdc0: mmdc at 021b0000 { /* MMDC0 */
- 				compatible = "fsl,imx6qp-mmdc", "fsl,imx6q-mmdc";
-@@ -110,3 +106,7 @@
- 		      "di0_sel", "di1_sel", "di2_sel", "di3_sel",
- 		      "di0", "di1";
- };
-+
-+&pcie {
-+	compatible = "fsl,imx6qp-pcie", "snps,dw-pcie";
-+};
+> I have just tested it and as I feared, with HWBM enabled, a simple iperf
+> just doesn't work.
+
+And that's expected: the whole point of HWBM is that the buffer into
+which a RX packet is placed is allocated by the HW, and its address
+stored in the RX descriptor. So the following code:
+
+> >  	rx_desc->buf_phys_addr = phys_addr;
+> >  	i = rx_desc - rxq->descs;
+> > +	rxq->buf_dma_addr[i] = phys_addr;
+
+Does not make sense, because it's not the SW that refills the RX
+descriptors with the address of the RX buffers. It's done by the HW.
+
+With HWBM, I believe you have no choice but to read the physical
+address from the RX descriptor. But you can probably optimize things a
+little bit by reading it only once, and then storing it into a
+cacheable variable.
+
+So maybe:
+
+ - For SWBM, use the strategy proposed by Jisheng
+ - For HWBM, at the beginning of the RX completion path, read once the
+   rx_desc->buf_phys_addr, and store it in rxq->buf_dma_addr[index]
+
+Of course that's just a very rough proposal. I've been looking mainly
+at mvpp2 lately, and I'm not sure I still remember how mvneta works in
+the details.
+
+Best regards,
+
+Thomas
 -- 
-2.11.0
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
