@@ -1,53 +1,39 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 17 Feb 2017 17:51:36 +0000
-Subject: [PATCH 2/3] arm64: dts: r8a7796: Add CA53 L2 cache-controller node
-In-Reply-To: <1487345435-1088-3-git-send-email-geert+renesas@glider.be>
-References: <1487345435-1088-1-git-send-email-geert+renesas@glider.be>
- <1487345435-1088-3-git-send-email-geert+renesas@glider.be>
-Message-ID: <05e43b97-eaa3-f1df-1fc8-b7bab05cc89c@arm.com>
+Date: Fri, 17 Feb 2017 17:54:59 +0000
+Subject: [PATCH] arm64: kernel: Update kerneldoc for cpu_suspend() rename
+In-Reply-To: <1487341508-20148-1-git-send-email-geert+renesas@glider.be>
+References: <1487341508-20148-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <58b72e17-7578-b7e3-b244-b034ef1d809c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 17/02/17 15:30, Geert Uytterhoeven wrote:
-> Add a device node for the Cortex-A53 L2 cache-controller.
+On 17/02/17 14:25, Geert Uytterhoeven wrote:
+> Commit af391b15f7b56ce1 ("arm64: kernel: rename __cpu_suspend to keep it
+> aligned with arm") renamed cpu_suspend() to arm_cpuidle_suspend(), but
+> forgot to update the kerneldoc header.
 > 
-> The L2 cache for the Cortex-A53 CPU cores is 512 KiB large (organized as
-> 32 KiB x 16 ways).
-> 
-> Extracted from a patch by Takeshi Kihara in the BSP.
-> 
+> Fixes: af391b15f7b56ce1 ("arm64: kernel: rename __cpu_suspend to keep it aligned with arm")
 > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
->  arch/arm64/boot/dts/renesas/r8a7796.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
+>  arch/arm64/kernel/cpuidle.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> index 6c0a65abf9fd09eb..d848e94d7282e5aa 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> @@ -62,6 +62,14 @@
->  			cache-unified;
->  			cache-level = <2>;
->  		};
-> +
-> +		L2_CA53: cache-controller at 100 {
-> +			compatible = "cache";
-> +			reg = <0x100>;
-
-Is this not integrated L2 cache ? IIUC reg is MPIDR of the cpu and
-representing it as cache controller with some reg value doesn't sound
-correct IMO.
-
-> +			power-domains = <&sysc R8A7796_PD_CA53_SCU>;
-> +			cache-unified;
-> +			cache-level = <2>;
-> +		};
->  	};
+> diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
+> index 75a0f8acef669ce5..fd691087dc9ad58f 100644
+> --- a/arch/arm64/kernel/cpuidle.c
+> +++ b/arch/arm64/kernel/cpuidle.c
+> @@ -30,7 +30,7 @@ int arm_cpuidle_init(unsigned int cpu)
+>  }
 >  
->  	extal_clk: extal {
-> 
+>  /**
+> - * cpu_suspend() - function to enter a low-power idle state
+> + * arm_cpuidle_suspend() - function to enter a low-power idle state
+
+Sorry for that. Looks good to me.
+
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 
 -- 
 Regards,
