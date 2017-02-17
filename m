@@ -1,48 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 Feb 2017 08:40:19 -0800
-Subject: [PATCH 0/3] ARM: PM: Drop useless checks for PM_SUSPEND_STANDBY
-In-Reply-To: <1487347836-14427-1-git-send-email-geert+renesas@glider.be>
-References: <1487347836-14427-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20170217164018.GE21809@atomide.com>
+From: fisaksen@baylibre.com (Frode Isaksen)
+Date: Fri, 17 Feb 2017 17:43:31 +0100
+Subject: [PATCH v2 5/6] spi: davinci: do not use DMA if transfer length is
+ less than 16
+In-Reply-To: <CAK8P3a24HkxrU-6a727RY5JqwQgyf9SpprPXvurSqf1Q_W_AMQ@mail.gmail.com>
+References: <1487327904-28311-1-git-send-email-fisaksen@baylibre.com>
+ <1487327904-28311-6-git-send-email-fisaksen@baylibre.com>
+ <CAK8P3a24HkxrU-6a727RY5JqwQgyf9SpprPXvurSqf1Q_W_AMQ@mail.gmail.com>
+Message-ID: <3358b5f1-c7b6-0955-0c36-6f135a585762@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Geert Uytterhoeven <geert+renesas@glider.be> [170217 08:12]:
-> 	Hi all,
-> 
-> The system suspend implementations for DaVinci, OMAP, and SoCFPGA use
-> the standard suspend_valid_only_mem() for their
-> platform_suspend_ops.valid() callbacks.  Hence their
-> platform_suspend_ops.enter() callbacks will never be called with state
-> equal to PM_SUSPEND_STANDBY, and checks for this can thus be removed.
-> 
-> Thanks for your comments!
 
-Seems safe to remove:
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+On 17/02/2017 17:37, Arnd Bergmann wrote:
+> On Fri, Feb 17, 2017 at 11:38 AM, Frode Isaksen <fisaksen@baylibre.com> wrote:
+>> Higher bitrate and lower CPU load if using PIO in this case.
+>>
+>> Signed-off-by: Frode Isaksen <fisaksen@baylibre.com>
+>> ---
+>>  drivers/spi/spi-davinci.c | 13 +++++++------
+>>  1 file changed, 7 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
+>> index b69a370..826bff1 100644
+>> --- a/drivers/spi/spi-davinci.c
+>> +++ b/drivers/spi/spi-davinci.c
+>> @@ -110,6 +110,8 @@
+>>  #define SPIDEF         0x4c
+>>  #define SPIFMT0                0x50
+>>
+>> +#define DMA_MIN_BYTES  16
+> 16 seems low as the cutoff. Have you found this experimentally and
+> tested that for e.g. 32
+> bytes there is actually an advantage in using DMA?
+Yes, I have tested for different sizes. Actually 32 bytes is better @30MHz, but if the bit rate goes down, DMA wins over PIO. Do you prefer 32 bytes ?
 
-> Geert Uytterhoeven (3):
->   ARM: davinci: PM: Drop useless check for PM_SUSPEND_STANDBY
->   ARM: OMAP: PM: Drop useless check for PM_SUSPEND_STANDBY
->   ARM: socfpga: PM: Drop useless check for PM_SUSPEND_STANDBY
-> 
->  arch/arm/mach-davinci/pm.c | 1 -
->  arch/arm/mach-omap1/pm.c   | 1 -
->  arch/arm/mach-omap2/pm.c   | 1 -
->  arch/arm/mach-socfpga/pm.c | 1 -
->  4 files changed, 4 deletions(-)
-> 
-> -- 
-> 1.9.1
-> 
-> Gr{oetje,eeting}s,
-> 
-> 						Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
-> 							    -- Linus Torvalds
+Frode
+>
+>     Arnd
