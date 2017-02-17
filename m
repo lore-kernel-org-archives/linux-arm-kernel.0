@@ -1,47 +1,72 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 17 Feb 2017 15:44:26 +0000
-Subject: [PATCH 17/20] ARM: KVM: Implement HVC_SOFT_RESTART in the init code
+Date: Fri, 17 Feb 2017 15:44:10 +0000
+Subject: [PATCH 01/20] arm64: hyp-stub: Implement HVC_RESET_VECTORS stub
+ hypercall
 In-Reply-To: <20170217154429.5000-1-marc.zyngier@arm.com>
 References: <20170217154429.5000-1-marc.zyngier@arm.com>
-Message-ID: <20170217154429.5000-18-marc.zyngier@arm.com>
+Message-ID: <20170217154429.5000-2-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Another missing stub hypercall is HVC_SOFT_RESTART. It turns out
-that it is pretty easy to implement in terms of HVC_RESET_VECTORS
-(since it needs to turn the MMU off).
+Let's define a new stub hypercall that resets the HYP configuration
+to its default: hyp-stub vectors, and MMU disabled.
+
+Of course, for the hyp-stub itself, this is a trivial no-op.
+Hypervisors will have a bit more work to do.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/init.S | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm64/include/asm/virt.h |  8 ++++++++
+ arch/arm64/kernel/hyp-stub.S  | 13 ++++++++++++-
+ 2 files changed, 20 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 0ec1a83d03ea..489e0f79ac2c 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -127,8 +127,22 @@ ENTRY(__kvm_handle_stub_hvc)
- 	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
- 	b	exit
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 439f6b5d31f6..6d085a4d6cf1 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -39,6 +39,14 @@
+  */
+ #define HVC_SOFT_RESTART 2
  
-+1:	cmp	r0, #HVC_SOFT_RESTART
-+	bne	1f
++/*
++ * HVC_RESET_VECTORS - Restore the vectors to the original HYP stubs
++ */
++#define HVC_RESET_VECTORS 3
 +
-+	/* The target is expected in r1 */
-+	msr	ELR_hyp, r1
-+	mrs	r0, cpsr
-+	bic	r0, r0, #MODE_MASK
-+	orr	r0, r0, #HYP_MODE
-+THUMB(	orr	r0, r0, #PSR_T_BIT	)
-+	msr	spsr_cxsf, r0
-+	b	reset
++/* Max number of HYP stub hypercalls */
++#define HVC_STUB_HCALL_NR 4
 +
- 1:	cmp	r0, #HVC_RESET_VECTORS
- 	bne	1f
+ #define BOOT_CPU_MODE_EL1	(0xe11)
+ #define BOOT_CPU_MODE_EL2	(0xe12)
+ 
+diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+index d3b5f75e652e..a162182d5662 100644
+--- a/arch/arm64/kernel/hyp-stub.S
++++ b/arch/arm64/kernel/hyp-stub.S
+@@ -79,8 +79,11 @@ el1_sync:
+ 	mov	x1, x3
+ 	br	x4				// no return
+ 
++3:	cmp	x0, #HVC_RESET_VECTORS
++	beq	9f				// Nothing to reset!
 +
-+reset:
- 	/* We're now in idmap, disable MMU */
- 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
- 	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
+ 	/* Someone called kvm_call_hyp() against the hyp-stub... */
+-3:	mov	x0, #ARM_EXCEPTION_HYP_GONE
++	mov	x0, #ARM_EXCEPTION_HYP_GONE
+ 
+ 9:	eret
+ ENDPROC(el1_sync)
+@@ -137,3 +140,11 @@ ENTRY(__hyp_set_vectors)
+ 	ldr	lr, [sp], #16
+ 	ret
+ ENDPROC(__hyp_set_vectors)
++
++ENTRY(__hyp_reset_vectors)
++	str	lr, [sp, #-16]!
++	mov	x0, #HVC_RESET_VECTORS
++	hvc	#0
++	ldr	lr, [sp], #16
++	ret
++ENDPROC(__hyp_reset_vectors)
 -- 
 2.11.0
