@@ -1,51 +1,173 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Fri, 17 Feb 2017 13:20:55 +0000
-Subject: [PATCH 0/8] ARM: sun8i: a33: Mali improvements
-In-Reply-To: <2cecfc48-576f-3888-08aa-1fe2edc3c752@math.uni-bielefeld.de>
-References: <10fd28cb-269a-ec38-ecfb-b7c86be3e716@math.uni-bielefeld.de>
- <20170216184524.cxcy2ux37yrwutla@lukather>
- <2cecfc48-576f-3888-08aa-1fe2edc3c752@math.uni-bielefeld.de>
-Message-ID: <CACvgo51VRwMneHuS2jrM9ug8OEBsh5AD0ncpYfAZkGBFGKYMsg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 17 Feb 2017 14:30:03 +0100
+Subject: [PATCH net-next v2 2/2] net: mvneta: Use cacheable memory to
+ store the rx buffer DMA address
+In-Reply-To: <20170217100233.2325-3-jszhang@marvell.com> (Jisheng Zhang's
+ message of "Fri, 17 Feb 2017 18:02:33 +0800")
+References: <20170217100233.2325-1-jszhang@marvell.com>
+ <20170217100233.2325-3-jszhang@marvell.com>
+Message-ID: <87o9y1aqsk.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 February 2017 at 12:45, Tobias Jakobi
-<tjakobi@math.uni-bielefeld.de> wrote:
-> Hello Maxime,
->
-> Maxime Ripard wrote:
->> Hi,
->>
->> On Thu, Feb 16, 2017 at 01:43:06PM +0100, Tobias Jakobi wrote:
->>> I was wondering about the following. Wasn't there some strict
->>> requirement about code going upstream, which also included that there
->>> was a full open-source driver stack for it?
->>>
->>> I don't see how this is the case for Mali, neither in the kernel, nor in
->>> userspace. I'm aware that the Mali kernel driver is open-source. But it
->>> is not upstream, maintained out of tree, and won't land upstream in its
->>> current form (no resemblence to a DRM driver at all). And let's not talk
->>> about the userspace part.
->>>
->>> So, why should this be here?
->>
->> The device tree is a representation of the hardware itself. The state
->> of the driver support doesn't change the hardware you're running on,
->> just like your BIOS/UEFI on x86 won't change the device it reports to
->> Linux based on whether it has a driver for it.
-> Like Emil already said, the new bindings and the DT entries are solely
-> introduced to support a proprietary out-of-tree module.
->
-> The current workflow when introducing new DT entries is the following:
-> - upstream a driver that uses the entries
-> - THEN add the new entries
->
-That's the ideal route that I was thinking of.
+Hi Jisheng,
+ 
+ On ven., f?vr. 17 2017, Jisheng Zhang <jszhang@marvell.com> wrote:
 
-At the same time, if prominent DRM people believe that we can/should
-turn a blind eye, so be it.
-I'm not trying to make Maxime's life hard, but point out that things
-feel iffy IMHO.
+> In hot code path such as mvneta_rx_hwbm() and mvneta_rx_swbm, the
+> buf_phys_addr field of rx_dec is accessed. The rx_desc is allocated by
+> dma_alloc_coherent, it's uncacheable if the device isn't cache
+> coherent, reading from uncached memory is fairly slow. This patch uses
+> cacheable memory to store the rx buffer DMA address. We get the
+> following performance data on Marvell BG4CT Platforms (tested with
+> iperf):
+>
+> before the patch:
+> recving 1GB in mvneta_rx_swbm() costs 1492659600 ns
+>
+> after the patch:
+> recving 1GB in mvneta_rx_swbm() costs 1421565640 ns
+>
+> We saved 4.76% time.
 
-Thanks
-Emil
+I have just tested it and as I feared, with HWBM enabled, a simple iperf
+just doesn't work.
+
+Gregory
+
+>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/net/ethernet/marvell/mvneta.c | 28 +++++++++++++++++-----------
+>  1 file changed, 17 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+> index 06df72b8da85..e24c3028fe1d 100644
+> --- a/drivers/net/ethernet/marvell/mvneta.c
+> +++ b/drivers/net/ethernet/marvell/mvneta.c
+> @@ -580,6 +580,9 @@ struct mvneta_rx_queue {
+>  	/* Virtual address of the RX buffer */
+>  	void  **buf_virt_addr;
+>  
+> +	/* DMA address of the RX buffer */
+> +	dma_addr_t *buf_dma_addr;
+> +
+>  	/* Virtual address of the RX DMA descriptors array */
+>  	struct mvneta_rx_desc *descs;
+>  
+> @@ -1617,6 +1620,7 @@ static void mvneta_rx_desc_fill(struct mvneta_rx_desc *rx_desc,
+>  
+>  	rx_desc->buf_phys_addr = phys_addr;
+>  	i = rx_desc - rxq->descs;
+> +	rxq->buf_dma_addr[i] = phys_addr;
+>  	rxq->buf_virt_addr[i] = virt_addr;
+>  }
+>  
+> @@ -1900,22 +1904,22 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
+>  		for (i = 0; i < rx_done; i++) {
+>  			struct mvneta_rx_desc *rx_desc =
+>  						  mvneta_rxq_next_desc_get(rxq);
+> +			int index = rx_desc - rxq->descs;
+>  			u8 pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_desc->status);
+>  			struct mvneta_bm_pool *bm_pool;
+>  
+>  			bm_pool = &pp->bm_priv->bm_pools[pool_id];
+>  			/* Return dropped buffer to the pool */
+>  			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
+> -					      rx_desc->buf_phys_addr);
+> +					      rxq->buf_dma_addr[index]);
+>  		}
+>  		return;
+>  	}
+>  
+>  	for (i = 0; i < rxq->size; i++) {
+> -		struct mvneta_rx_desc *rx_desc = rxq->descs + i;
+>  		void *data = rxq->buf_virt_addr[i];
+>  
+> -		dma_unmap_single(pp->dev->dev.parent, rx_desc->buf_phys_addr,
+> +		dma_unmap_single(pp->dev->dev.parent, rxq->buf_dma_addr[i],
+>  				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
+>  		mvneta_frag_free(pp->frag_size, data);
+>  	}
+> @@ -1953,7 +1957,7 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
+>  		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
+>  		index = rx_desc - rxq->descs;
+>  		data = rxq->buf_virt_addr[index];
+> -		phys_addr = rx_desc->buf_phys_addr;
+> +		phys_addr = rxq->buf_dma_addr[index];
+>  
+>  		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
+>  		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
+> @@ -2062,6 +2066,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
+>  	/* Fairness NAPI loop */
+>  	while (rx_done < rx_todo) {
+>  		struct mvneta_rx_desc *rx_desc = mvneta_rxq_next_desc_get(rxq);
+> +		int index = rx_desc - rxq->descs;
+>  		struct mvneta_bm_pool *bm_pool = NULL;
+>  		struct sk_buff *skb;
+>  		unsigned char *data;
+> @@ -2074,7 +2079,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
+>  		rx_status = rx_desc->status;
+>  		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
+>  		data = (u8 *)(uintptr_t)rx_desc->buf_cookie;
+> -		phys_addr = rx_desc->buf_phys_addr;
+> +		phys_addr = rxq->buf_dma_addr[index];
+>  		pool_id = MVNETA_RX_GET_BM_POOL_ID(rx_status);
+>  		bm_pool = &pp->bm_priv->bm_pools[pool_id];
+>  
+> @@ -2082,8 +2087,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
+>  		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
+>  err_drop_frame_ret_pool:
+>  			/* Return the buffer to the pool */
+> -			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
+> -					      rx_desc->buf_phys_addr);
+> +			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool, phys_addr);
+>  err_drop_frame:
+>  			dev->stats.rx_errors++;
+>  			mvneta_rx_error(pp, rx_desc);
+> @@ -2098,7 +2102,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
+>  				goto err_drop_frame_ret_pool;
+>  
+>  			dma_sync_single_range_for_cpu(dev->dev.parent,
+> -			                              rx_desc->buf_phys_addr,
+> +			                              phys_addr,
+>  			                              MVNETA_MH_SIZE + NET_SKB_PAD,
+>  			                              rx_bytes,
+>  			                              DMA_FROM_DEVICE);
+> @@ -2114,8 +2118,7 @@ static int mvneta_rx_hwbm(struct mvneta_port *pp, int rx_todo,
+>  			rcvd_bytes += rx_bytes;
+>  
+>  			/* Return the buffer to the pool */
+> -			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool,
+> -					      rx_desc->buf_phys_addr);
+> +			mvneta_bm_pool_put_bp(pp->bm_priv, bm_pool, phys_addr);
+>  
+>  			/* leave the descriptor and buffer untouched */
+>  			continue;
+> @@ -4019,7 +4022,10 @@ static int mvneta_init(struct device *dev, struct mvneta_port *pp)
+>  		rxq->buf_virt_addr = devm_kmalloc(pp->dev->dev.parent,
+>  						  rxq->size * sizeof(void *),
+>  						  GFP_KERNEL);
+> -		if (!rxq->buf_virt_addr)
+> +		rxq->buf_dma_addr = devm_kmalloc(pp->dev->dev.parent,
+> +						 rxq->size * sizeof(dma_addr_t),
+> +						 GFP_KERNEL);
+> +		if (!rxq->buf_virt_addr || !rxq->buf_dma_addr)
+>  			return -ENOMEM;
+>  	}
+>  
+> -- 
+> 2.11.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
