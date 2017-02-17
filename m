@@ -1,138 +1,59 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 17 Feb 2017 07:15:47 +0100
-Subject: [RFC PATCH 07/33] irqchip/gic-v3-its: Macro-ize
- its_send_single_command
-In-Reply-To: <1484648454-21216-8-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
- <1484648454-21216-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <44927f3a-a1db-f7b8-b9d6-53f0dd7a4ac0@redhat.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 17 Feb 2017 11:50:26 +0530
+Subject: [PATCH v4 2/3] mailbox: Add iProc mailbox controller driver
+In-Reply-To: <1485463082-27067-3-git-send-email-jonathan.richardson@broadcom.com>
+References: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
+ <1485463082-27067-3-git-send-email-jonathan.richardson@broadcom.com>
+Message-ID: <CABb+yY0rmAFutskhVkQ926QfsvtJ-WnXrQc=+PQNg=7NZEXC+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jan 27, 2017 at 2:08 AM, Jonathan Richardson
+<jonathan.richardson@broadcom.com> wrote:
 
-
-On 17/01/2017 11:20, Marc Zyngier wrote:
-> Most ITS commands do operate on a collection object, and require
-> a SYNC command to be performed on that collection in order to
-> guarantee the execution of the first command.
-> 
-> With GICv4 ITS, another set of commands perform similar operations
-> on a VPE object, and a VSYNC operations must be executed to guarantee
-> their execution.
-> 
-> Given the similarities (post a command, perform a synchronization
-> operation on a sync object), it makes sense to reuse the same
-> mechanism for both class of commands.
-> 
-> Let's start with turning its_send_single_command into a huge macro
-> that performs the bulk of the work, and a set of helpers that
-> make this macro useeable for the GICv3 ITS commands.
-s/useeable/usable
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 82 ++++++++++++++++++++++------------------
->  1 file changed, 45 insertions(+), 37 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 99f6130..520b764 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -484,43 +484,51 @@ static void its_wait_for_range_completion(struct its_node *its,
->  	}
->  }
->  
-> -static void its_send_single_command(struct its_node *its,
-> -				    its_cmd_builder_t builder,
-> -				    struct its_cmd_desc *desc)
-> -{
-> -	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;
-> -	struct its_collection *sync_col;
-> -	unsigned long flags;
-> -
-> -	raw_spin_lock_irqsave(&its->lock, flags);
-> -
-> -	cmd = its_allocate_entry(its);
-> -	if (!cmd) {		/* We're soooooo screewed... */
-> -		pr_err_ratelimited("ITS can't allocate, dropping command\n");
-> -		raw_spin_unlock_irqrestore(&its->lock, flags);
-> -		return;
-> -	}
-> -	sync_col = builder(cmd, desc);
-> -	its_flush_cmd(its, cmd);
-> -
-> -	if (sync_col) {
-> -		sync_cmd = its_allocate_entry(its);
-> -		if (!sync_cmd) {
-> -			pr_err_ratelimited("ITS can't SYNC, skipping\n");
-> -			goto post;
-> -		}
-> -		its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
-> -		its_encode_target(sync_cmd, sync_col->target_address);
-> -		its_fixup_cmd(sync_cmd);
-> -		its_flush_cmd(its, sync_cmd);
-> -	}
-> -
-> -post:
-> -	next_cmd = its_post_commands(its);
-> -	raw_spin_unlock_irqrestore(&its->lock, flags);
-> -
-> -	its_wait_for_range_completion(its, cmd, next_cmd);
-> -}
-> +#define __its_send_single_cmd(name, buildtype, synctype, buildfn)	\
-> +void name(struct its_node *its,						\
-> +	  buildtype builder,						\
-> +	  struct its_cmd_desc *desc)					\
-> +{									\
-> +	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;		\
-> +	synctype *sync_obj;						\
-> +	unsigned long flags;						\
-> +									\
-> +	raw_spin_lock_irqsave(&its->lock, flags);			\
-> +									\
-> +	cmd = its_allocate_entry(its);					\
-Not related to this patch but I see that its_allocate_entry can spin for
-up to 1s waiting for the ITS queue to drain. What are the circumstances
-that can cause this? Also isn't it an issue in that case to hold the
-spinlock for so long?
-
-Thanks
-
-Eric
-> +	if (!cmd) {		/* We're soooooo screewed... */		\
-> +		raw_spin_unlock_irqrestore(&its->lock, flags);		\
-> +		return;							\
-> +	}								\
-> +	sync_obj = builder(cmd, desc);					\
-> +	its_flush_cmd(its, cmd);					\
-> +									\
-> +	if (sync_obj) {							\
-> +		sync_cmd = its_allocate_entry(its);			\
-> +		if (!sync_cmd)						\
-> +			goto post;					\
-> +									\
-> +		buildfn(sync_cmd, sync_obj);				\
-> +		its_fixup_cmd(sync_cmd);				\
-> +		its_flush_cmd(its, sync_cmd);				\
-> +	}								\
-> +									\
-> +post:									\
-> +	next_cmd = its_post_commands(its);				\
-> +	raw_spin_unlock_irqrestore(&its->lock, flags);			\
-> +									\
-> +	its_wait_for_range_completion(its, cmd, next_cmd);		\
-> +}
-> +
-> +static void its_build_sync_cmd(struct its_cmd_block *sync_cmd,
-> +			       struct its_collection *sync_col)
+> +static int iproc_mbox_send_data_m0(struct mbox_chan *chan, void *data)
 > +{
-> +	its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
-> +	its_encode_target(sync_cmd, sync_col->target_address);
-> +}
+> +       struct iproc_mbox *mbox = dev_get_drvdata(chan->mbox->dev);
+> +       struct iproc_mbox_msg *msg = (struct iproc_mbox_msg *)data;
+> +               unsigned long flags;
+> +       int err = 0;
+> +       const int poll_period_us = 5;
+> +       const int max_retries = (MAX_M0_TIMEOUT_MS * 1000) / poll_period_us;
 > +
-> +static __its_send_single_cmd(its_send_single_command, its_cmd_builder_t,
-> +			     struct its_collection, its_build_sync_cmd)
->  
->  static void its_send_inv(struct its_device *dev, u32 event_id)
->  {
-> 
+> +       if (!msg)
+> +               return -EINVAL;
+> +
+> +       spin_lock_irqsave(&mbox->lock, flags);
+> +
+> +       dev_dbg(mbox->dev, "Send msg to M0: cmd=0x%x, param=0x%x, wait_ack=%d\n",
+> +               msg->cmd, msg->param, msg->wait_ack);
+> +
+prints should be outside the spinlocks.
+
+> +       writel(msg->cmd, mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
+> +       writel(msg->param, mbox->base + IPROC_CRMU_MAILBOX1_OFFSET);
+> +
+> +       if (msg->wait_ack) {
+> +               int retries;
+> +
+move poll_period_us and max_retries in here or just define' them
+
+> +               err = msg->reply_code = -ETIMEDOUT;
+> +               for (retries = 0; retries < max_retries; retries++) {
+> +                       u32 val = readl(
+> +                               mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
+> +                       if (val & M0_IPC_CMD_DONE_MASK) {
+> +                               /*
+> +                                * M0 replied - save reply code and
+> +                                * clear error.
+> +                                */
+> +                               msg->reply_code = (val &
+> +                                       M0_IPC_CMD_REPLY_MASK) >>
+> +                                       M0_IPC_CMD_REPLY_SHIFT;
+> +                               err = 0;
+> +                               break;
+> +                       }
+> +                       udelay(poll_period_us);
+>
+potentially 2ms inside spin_lock_irqsave. Alternative is to implement
+a simple 'peek_data' and call it for requests with 'wait_ack'
