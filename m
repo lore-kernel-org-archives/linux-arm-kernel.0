@@ -1,32 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Feb 2017 18:14:41 +0000
-Subject: [PATCH] Documentation: Note QDF2400 SoC Erratum 44
-In-Reply-To: <20170215215407.25854-1-cov@codeaurora.org>
-References: <20170215215407.25854-1-cov@codeaurora.org>
-Message-ID: <20170217181440.GP15431@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 17 Feb 2017 18:23:13 +0000
+Subject: [PATCHv3 2/2] arch: Rename CONFIG_DEBUG_RODATA and
+ CONFIG_DEBUG_MODULE_RONX
+In-Reply-To: <CAGXu5jJ4FD=6HLK_21T079JrO569DwWBTeiD18x3WRrYBsaAqw@mail.gmail.com>
+References: <1486427518-14819-1-git-send-email-labbott@redhat.com>
+ <1486427518-14819-3-git-send-email-labbott@redhat.com>
+ <20170216222529.GA7531@amd>
+ <CAGXu5jJ4FD=6HLK_21T079JrO569DwWBTeiD18x3WRrYBsaAqw@mail.gmail.com>
+Message-ID: <20170217182313.GB25876@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 04:54:07PM -0500, Christopher Covington wrote:
-> The Qualcomm Datacenter Technologies QDF2400 family of SoCs contains a
-> custom (non-PrimeCell) implementation of the SBSA UART. Occasionally the
-> BUSY bit in the Flag Register gets stuck as 1, erratum 44 for both 2432v1
-> and 2400v1 SoCs.Checking that the Transmit FIFO Empty (TXFE) bit is 0,
-> instead of checking that the BUSY bit is 1, works around the issue. Note
-> this in the customary location. To minimize conflicts, this documentation
-> update is separate from the code changes, "tty: pl011: Work around QDF2400
-> E44 stuck BUSY bit".
+On Thu, Feb 16, 2017 at 05:08:20PM -0800, Kees Cook wrote:
+> On Thu, Feb 16, 2017 at 2:25 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> > Hi!
+> >
+> >>
+> >> -config DEBUG_RODATA
+> >> +config STRICT_KERNEL_RWX
+> >>       bool "Make kernel text and rodata read-only" if ARCH_OPTIONAL_KERNEL_RWX
+> >>       depends on ARCH_HAS_STRICT_KERNEL_RWX
+> >>       default !ARCH_OPTIONAL_KERNEL_RWX ||
+> >
+> > Debug features are expected to have runtime cost, so kconfig help is
+> > silent about those. But there are runtime costs, right? It would be
+> > nice to mention them in the help text...
 > 
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Timur Tabi <timur@codeaurora.org>
-> ---
-> Documentation to go with https://patchwork.kernel.org/patch/9575103/
+> It depends on the architecture. The prior help text for arm said:
+> 
+>          The tradeoff is that each region is padded to section-size (1MiB)
+>          boundaries (because their permissions are different and splitting
+>          the 1M pages into 4K ones causes TLB performance problems), which
+>          can waste memory.
+> 
+> parisc (somewhat inaccurately) said:
+> 
+>          This option may have a slight performance impact because a
+>          portion of the kernel code won't be covered by a TLB anymore.
+> 
+> IIUC, arm64 does what parisc is hinting at: mappings at the end are
+> broken down to PAGE_SIZE. On x86, IIUC, there's actually no change to
+> TLB performance due to how the mappings are already set up.
 
-Please poke me when that goes into -next. I don't want to merge the doc
-until the patch is queued too.
+On arm64, we split down to page granularity if needed, but use the
+largest possible mapping we can (e.g. if we can use a 2M block, we do).
+
+Because of the way we freed the init area, we already couldn't use
+larger mappings anyway. Applying the strict permissions didn't come at a
+measureable overhead in any real testing.
+
+> I'm not sure the best way to express this in the new help text. Do you
+> have some suggestions on wording? Personally, I don't really think
+> it's worth mentioning this in Kconfig help, which, in theory, is
+> supposed to limit how technical it gets. And I think the performance
+> impact is almost entirely negligible compared to the risks addressed.
+
+I also don't see much point in describing some hypothetical architecture
+specific overhead here. In most cases this can't be turned off (so there
+isn't anything to comapre it to, and hence no cost). Where people want
+to turn it off, they already know why they wish to do so.
 
 Thanks,
-
-Will
+Mark.
