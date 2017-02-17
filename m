@@ -1,39 +1,30 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 17 Feb 2017 11:56:14 +0100
-Subject: [GIT PULL] Reset controller fixes for 4.10
-Message-ID: <1487328974.3107.24.camel@pengutronix.de>
+From: sophian.yoma@gmail.com (yoma sophian)
+Date: Fri, 17 Feb 2017 18:57:15 +0800
+Subject: some question about arm stacktrace.c
+Message-ID: <CADUS3okcFOUUKV0yxyXJXEr54UzHzTFSEsrhqvXjPaNybDFLVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear arm-soc maintainers,
+hi all:
+I found in commit 07b403415884e961920f55e6db462dff15d9df5a,
+we add below modification in function, save_trace,
 
-any chance this small fix can still make it into v4.10?
++       regs = (struct pt_regs *)frame->sp;
++
++       trace->entries[trace->nr_entries++] = regs->ARM_pc;
++
 
-regards
-Philipp
+what makes me curious is with framepointer enabled, a simple function
+prologue looks like this:
+     mov    ip, sp
+     stmdb    sp!, {fp, ip, lr, pc}
+     sub    fp, ip, #4
+and  simple function epilogue looks like this:
+    ldm    sp, {fp, sp, pc}
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+it seems ARM only save pt_regs while entering usr_entry in entry-armv.S.
+if above are correct, I cannot tell the reason why we use (struct
+pt_regs *) to map fram->sp to get pc counter for each frame when
+backtrace.
 
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-
-are available in the git repository at:
-
-  https://git.pengutronix.de/git/pza/linux tags/reset-for-4.10-fixes
-
-for you to fetch changes up to e5a1dadec3648019a838b85357b67f241fbb02e8:
-
-  reset: fix shared reset triggered_count decrement on error (2017-02-17 08:11:47 +0100)
-
-----------------------------------------------------------------
-Reset controller fixes for v4.10
-
-- Remove erroneous negation of the error check of the reset function
-  to decrement trigger_count in the error case, not on success. This
-  fixes shared resets to actually only trigger once, as intended.
-
-----------------------------------------------------------------
-Jerome Brunet (1):
-      reset: fix shared reset triggered_count decrement on error
-
- drivers/reset/core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+thanks for your help in advance,
