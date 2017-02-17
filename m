@@ -1,38 +1,79 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 17 Feb 2017 12:43:38 +0100
-Subject: [PATCH v4 00/36] i.MX Media Driver
-In-Reply-To: <923326d6-43fe-7328-d959-14fd341e47ae@gmail.com>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <20170216222006.GA21222@n2100.armlinux.org.uk>
- <923326d6-43fe-7328-d959-14fd341e47ae@gmail.com>
-Message-ID: <1487331818.3107.46.camel@pengutronix.de>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Fri, 17 Feb 2017 11:39:39 +0000
+Subject: [PATCH v2 01/22] PCI: endpoint: Add EP core layer to enable EP
+ controller and EP functions
+In-Reply-To: <58A6E05D.5010803@ti.com>
+References: <1487325042-28227-1-git-send-email-kishon@ti.com>
+ <1487325042-28227-2-git-send-email-kishon@ti.com>
+ <ece23395-7ebc-c9f3-bd9f-4f24e44d763a@synopsys.com> <58A6E05D.5010803@ti.com>
+Message-ID: <03f543b5-ae86-47cc-e3cf-e3b5cfff5ee4@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-02-16 at 14:27 -0800, Steve Longerbeam wrote:
+?s 11:37 AM de 2/17/2017, Kishon Vijay Abraham I escreveu:
+> Hi Joao,
 > 
-> On 02/16/2017 02:20 PM, Russell King - ARM Linux wrote:
-> > On Wed, Feb 15, 2017 at 06:19:02PM -0800, Steve Longerbeam wrote:
-> >> In version 4:
-> >
-> > With this version, I get:
-> >
-> > [28762.892053] imx6-mipi-csi2: LP-11 timeout, phy_state = 0x00000000
-> > [28762.899409] ipu1_csi0: pipeline_set_stream failed with -110
-> >
+> On Friday 17 February 2017 04:56 PM, Joao Pinto wrote:
+>>
+>> Hi Kishon,
+>>
+>> ?s 9:50 AM de 2/17/2017, Kishon Vijay Abraham I escreveu:
+>>> Introduce a new EP core layer in order to support endpoint functions
+>>> in linux kernel. This comprises of EPC library
+>>> (Endpoint Controller Library) and EPF library (Endpoint
+>>> Function Library). EPC library implements functions that is specific
+>>> to an endpoint controller and EPF library implements functions
+>>> that is specific to an endpoint function.
+>>>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> ---
+>>>  drivers/Makefile                    |    2 +
+>>>  drivers/pci/Kconfig                 |    1 +
+>>>  drivers/pci/endpoint/Kconfig        |   21 ++
+>>>  drivers/pci/endpoint/Makefile       |    6 +
+>>>  drivers/pci/endpoint/pci-epc-core.c |  548 +++++++++++++++++++++++++++++++++++
+>>>  drivers/pci/endpoint/pci-epc-mem.c  |  143 +++++++++
+>>>  drivers/pci/endpoint/pci-epf-core.c |  347 ++++++++++++++++++++++
+>>>  include/linux/mod_devicetable.h     |   10 +
+>>>  include/linux/pci-epc.h             |  141 +++++++++
+>>>  include/linux/pci-epf.h             |  160 ++++++++++
+>>>  10 files changed, 1379 insertions(+)
+>>>  create mode 100644 drivers/pci/endpoint/Kconfig
+>>>  create mode 100644 drivers/pci/endpoint/Makefile
+>>>  create mode 100644 drivers/pci/endpoint/pci-epc-core.c
+>>>  create mode 100644 drivers/pci/endpoint/pci-epc-mem.c
+>>>  create mode 100644 drivers/pci/endpoint/pci-epf-core.c
+>>>  create mode 100644 include/linux/pci-epc.h
+>>>  create mode 100644 include/linux/pci-epf.h
+>>>
+>>> diff --git a/drivers/Makefile b/drivers/Makefile
+>>> index f521cb0..a300bb1 100644
+>>> --- a/drivers/Makefile
+>>> +++ b/drivers/Makefile
+>>> @@ -14,7 +14,9 @@ obj-$(CONFIG_GENERIC_PHY)	+= phy/
+>>>  obj-$(CONFIG_PINCTRL)		+= pinctrl/
+>>>  obj-$(CONFIG_GPIOLIB)		+= gpio/
+>>>  obj-y				+= pwm/
+>>> +
+>>>  obj-$(CONFIG_PCI)		+= pci/
+>>> +obj-$(CONFIG_PCI_ENDPOINT)	+= pci/endpoint/
+>>>  # PCI dwc controller drivers
+>>>  obj-y				+= pci/dwc/
+>>
+>> Any special reason to include pci/endpoint and pci/dwc in drivers/Makefile
+>> instead of being inside pci/Makefile? pci/host is still inside pci/Makefile.
 > 
-> Right, in the imx219, on exit from s_power(), the clock and data lanes
-> must be placed in the LP-11 state. This has been done in the ov5640 and
-> tc358743 subdevs.
-> 
-> If we want to bring in the patch that adds a .prepare_stream() op,
-> the csi-2 bus would need to be placed in LP-11 in that op instead.
-> 
-> Philipp, should I go ahead and add your .prepare_stream() patch?
+> CONFIG_PCI enables all the pcie host support. Endpoint support should be
+> enabled independent of the host support. Moving pci/endpoint inside
+> pci/Makefile will build endpoint support only if CONFIG_PCI is enabled. For the
+> same reason kept pci/dwc in drivers/Makefile since dwc drivers can be used
+> either in host mode or device mode (or both).
 
-I think with Russell's explanation of how the imx219 sensor operates,
-we'll have to do something before calling the sensor s_stream, but right
-now I'm still unsure what exactly.
+Good point! Very well.
 
-regards
-Philipp
+Acked-By: Joao Pinto <jpinto@synopsys.com>
+
+> 
+> Thanks
+> Kishon
+> 
