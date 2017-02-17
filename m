@@ -1,22 +1,53 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 16 Feb 2017 23:04:31 -0200
-Subject: [PATCH] ARM: imx25: set default phy_type and dr_mode for usbotg
- port
-In-Reply-To: <20170216211858.8563-1-u.kleine-koenig@pengutronix.de>
-References: <20170216211858.8563-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAOMZO5ASKSZcdHdZqbdwc12YgJa2gucG5Ww1Uvobjc8MPFTq9A@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 16 Feb 2017 17:08:20 -0800
+Subject: [PATCHv3 2/2] arch: Rename CONFIG_DEBUG_RODATA and
+ CONFIG_DEBUG_MODULE_RONX
+In-Reply-To: <20170216222529.GA7531@amd>
+References: <1486427518-14819-1-git-send-email-labbott@redhat.com>
+ <1486427518-14819-3-git-send-email-labbott@redhat.com>
+ <20170216222529.GA7531@amd>
+Message-ID: <CAGXu5jJ4FD=6HLK_21T079JrO569DwWBTeiD18x3WRrYBsaAqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 7:18 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> All currently supported i.MX25-based machines use phy_type = "utmi" and
-> dr_mode = "otg".  So this seems to be a sensible default.
+On Thu, Feb 16, 2017 at 2:25 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> Hi!
 >
-> This also doesn't hurt out-of-tree machines because up to now they had
-> to specify these two properties in the machine.dts which still takes
-> precedence by just overwriting the defaults added here.
+>>
+>> -config DEBUG_RODATA
+>> +config STRICT_KERNEL_RWX
+>>       bool "Make kernel text and rodata read-only" if ARCH_OPTIONAL_KERNEL_RWX
+>>       depends on ARCH_HAS_STRICT_KERNEL_RWX
+>>       default !ARCH_OPTIONAL_KERNEL_RWX ||
 >
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Debug features are expected to have runtime cost, so kconfig help is
+> silent about those. But there are runtime costs, right? It would be
+> nice to mention them in the help text...
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+It depends on the architecture. The prior help text for arm said:
+
+         The tradeoff is that each region is padded to section-size (1MiB)
+         boundaries (because their permissions are different and splitting
+         the 1M pages into 4K ones causes TLB performance problems), which
+         can waste memory.
+
+parisc (somewhat inaccurately) said:
+
+         This option may have a slight performance impact because a
+         portion of the kernel code won't be covered by a TLB anymore.
+
+IIUC, arm64 does what parisc is hinting at: mappings at the end are
+broken down to PAGE_SIZE. On x86, IIUC, there's actually no change to
+TLB performance due to how the mappings are already set up.
+
+I'm not sure the best way to express this in the new help text. Do you
+have some suggestions on wording? Personally, I don't really think
+it's worth mentioning this in Kconfig help, which, in theory, is
+supposed to limit how technical it gets. And I think the performance
+impact is almost entirely negligible compared to the risks addressed.
+
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
