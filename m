@@ -1,208 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Feb 2017 12:32:51 +0000
-Subject: [BOOTWRAPPER PATCH 3/3] Dynamically determine the set of CPUs
-In-Reply-To: <1487334771-25789-1-git-send-email-mark.rutland@arm.com>
-References: <1487334771-25789-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1487334771-25789-4-git-send-email-mark.rutland@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 17 Feb 2017 13:36:08 +0100
+Subject: [PATCH] pata: remove the at91 driver
+In-Reply-To: <1487324200-17517-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <CGME20170217093732epcas5p463c32b21e7c71000d01d15c54333c1f6@epcas5p4.samsung.com>
+ <1487324200-17517-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1599704.hbkP4KrUDJ@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we hard-code the set of CPUs we expect, and we have some
-strong expectations on the formatting of nodes.
 
-As we can configure models with differing sets of CPUs, we added the
-with-cpu-ids configure option to override this assumption, though in
-practice it turns out this is very fragile.
+Hi,
 
-Instead, we can parse the DTB to discover the set of CPU nodes (and
-hence the set of CPU IDs, and the number of CPUs). This is far more
-robust.
+On Friday, February 17, 2017 10:36:40 AM Boris Brezillon wrote:
+> This driver is orphan since commit 2e591e7b3ac2 ("ARM: at91: remove
+> at91sam9261/at91sam9g10 legacy board support"). Given that nobody cared
+> adding DT support to it, it probably means it's no longer used and is
+> thus a good candidate for removal.
 
-This patch changes the bootwrapper to do this, removing the newly
-redundant --with-cpu-ids configure option.
+The exact commit which removed PATA support for AT91SAM9260 seems to
+be b2026f708e09 ("ARM: at91: remove at91sam9260/at91sam9g20 legacy
+board support").
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- Makefile.am      | 14 ++++++--------
- addpsci.pl       | 29 +++++++++++++++++++++++++++++
- configure.ac     |  8 --------
- findcpuids.pl    | 32 ++++++++++++++++++++++++++++++++
- gen-cpu-nodes.sh | 24 ------------------------
- 5 files changed, 67 insertions(+), 40 deletions(-)
- create mode 100755 addpsci.pl
- create mode 100755 findcpuids.pl
- delete mode 100755 gen-cpu-nodes.sh
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-diff --git a/Makefile.am b/Makefile.am
-index 9910caf..49cfa84 100644
---- a/Makefile.am
-+++ b/Makefile.am
-@@ -13,7 +13,8 @@ UART_BASE	:= $(shell perl -I $(top_srcdir) $(top_srcdir)/findbase.pl $(KERNEL_DT
- SYSREGS_BASE	:= $(shell perl -I $(top_srcdir) $(top_srcdir)/findbase.pl $(KERNEL_DTB) 0 'arm,vexpress-sysreg')
- CNTFRQ		:= 0x01800000	# 24Mhz
- 
--NR_CPUS		:= $(shell echo $(CPU_IDS) | tr ',' ' ' | wc -w)
-+CPU_IDS		:= $(shell perl -I $(top_srcdir) $(top_srcdir)/findcpuids.pl $(KERNEL_DTB))
-+NR_CPUS         := $(shell echo $(CPU_IDS) | tr ',' ' ' | wc -w)
- 
- DEFINES		= -DCNTFRQ=$(CNTFRQ)
- DEFINES		+= -DCPU_IDS=$(CPU_IDS)
-@@ -50,14 +51,11 @@ PSCI_NODE	:= psci {				\
- 			cpu_on = <$(PSCI_CPU_ON)>;	\
- 			cpu_off = <$(PSCI_CPU_OFF)>;	\
- 		   };
--CPU_NODES	:= $(shell $(top_srcdir)/gen-cpu-nodes.sh $(CPU_IDS))
--CPUS_NODE	:= cpus {		\
--			$(CPU_NODES)	\
--		   };
-+CPU_NODES	:= $(shell perl -I $(top_srcdir) $(top_srcdir)/addpsci.pl $(KERNEL_DTB))
- else
- BOOTMETHOD	:= spin.o
- PSCI_NODE	:=
--CPUS_NODE	:=
-+CPU_NODES	:=
- endif
- 
- if GICV3
-@@ -144,8 +142,8 @@ $(IMAGE): $(OFILES) model.lds fdt.dtb $(KERNEL_IMAGE) $(FILESYSTEM) $(XEN_IMAGE)
- model.lds: $(LD_SCRIPT) Makefile
- 	$(CPP) $(CPPFLAGS) -ansi -DPHYS_OFFSET=$(PHYS_OFFSET) -DMBOX_OFFSET=$(MBOX_OFFSET) -DKERNEL_OFFSET=$(KERNEL_OFFSET) -DFDT_OFFSET=$(FDT_OFFSET) -DFS_OFFSET=$(FS_OFFSET) $(XEN) -DXEN_OFFSET=$(XEN_OFFSET) -DKERNEL=$(KERNEL_IMAGE) -DFILESYSTEM=$(FILESYSTEM) -DTEXT_LIMIT=$(TEXT_LIMIT) -P -C -o $@ $<
- 
--fdt.dtb: $(KERNEL_DTB) Makefile gen-cpu-nodes.sh
--	( $(DTC) -O dts -I dtb $(KERNEL_DTB) ; echo "/ { $(CHOSEN_NODE) $(PSCI_NODE) $(CPUS_NODE) };" ) | $(DTC) -O dtb -o $@ -
-+fdt.dtb: $(KERNEL_DTB) Makefile
-+	( $(DTC) -O dts -I dtb $(KERNEL_DTB) ; echo "/ { $(CHOSEN_NODE) $(PSCI_NODE) }; $(CPU_NODES)" ) | $(DTC) -O dtb -o $@ -
- 
- # The filesystem archive might not exist if INITRD is not being used
- .PHONY: all clean $(FILESYSTEM)
-diff --git a/addpsci.pl b/addpsci.pl
-new file mode 100755
-index 0000000..06270ca
---- /dev/null
-+++ b/addpsci.pl
-@@ -0,0 +1,29 @@
-+#!/usr/bin/perl -w
-+# Generate additions to add a PSCI enable-method to cpu nodes.
-+#
-+# Usage: ./$0 <DTB>
-+#
-+# Copyright (C) 2014 ARM Limited. All rights reserved.
-+#
-+# Use of this source code is governed by a BSD-style license that can be
-+# found in the LICENSE.txt file.
-+
-+use warnings;
-+use strict;
-+
-+use FDT;
-+
-+my $filename = shift;
-+die("No filename provided") unless defined($filename);
-+
-+open (my $fh, "<:raw", $filename) or die("Unable to open file '$filename'");
-+
-+my $fdt = FDT->parse($fh) or die("Unable to parse DTB");
-+
-+my $root = $fdt->get_root();
-+
-+my @cpus = $root->find_by_device_type('cpu');
-+
-+foreach my $cpu (@cpus) {
-+	printf("&{%s} { enable-method = \\\"psci\\\"; };\n", $cpu->get_full_path());
-+}
-diff --git a/configure.ac b/configure.ac
-index bbf4308..6914eb4 100644
---- a/configure.ac
-+++ b/configure.ac
-@@ -91,13 +91,6 @@ AS_IF([test "x$USE_PSCI" != "xyes" -a "x$KERNEL_ES" = "x32"],
- 	[AC_MSG_ERROR([With an AArch32 kernel, boot method must be PSCI.])]
- )
- 
--# Allow a user to pass --with-cpu-ids
--C_CPU_IDS="0x0,0x1,0x2,0x3"
--AC_ARG_WITH(cpu-ids,
--	AS_HELP_STRING([--with-cpu-ids], [Specify a comma seperated list of CPU IDs]),
--	[C_CPU_IDS="$withval"])
--AC_SUBST([CPU_IDS], [$C_CPU_IDS])
--
- # Allow a user to pass --with-initrd
- AC_ARG_WITH([initrd],
- 	AS_HELP_STRING([--with-initrd], [embed an initrd in the kernel image]),
-@@ -151,7 +144,6 @@ echo "  Device tree blob:                  ${KERN_DTB}"
- echo "  Linux kernel command line:         ${CMDLINE}"
- echo "  Embedded initrd:                   ${FILESYSTEM:-NONE}"
- echo "  Use PSCI?                          ${USE_PSCI}"
--echo "  CPU IDs:                           ${CPU_IDS}"
- echo "  Use GICv3?                         ${USE_GICV3}"
- echo "  Boot-wrapper execution state:      AArch${BOOTWRAPPER_ES}"
- echo "  Kernel execution state:            AArch${KERNEL_ES}"
-diff --git a/findcpuids.pl b/findcpuids.pl
-new file mode 100755
-index 0000000..709db69
---- /dev/null
-+++ b/findcpuids.pl
-@@ -0,0 +1,32 @@
-+#!/usr/bin/perl -w
-+# Find CPU IDs
-+#
-+# Usage: ./$0 <DTB>
-+#
-+# Copyright (C) 2014 ARM Limited. All rights reserved.
-+#
-+# Use of this source code is governed by a BSD-style license that can be
-+# found in the LICENSE.txt file.
-+
-+use warnings;
-+use strict;
-+
-+use FDT;
-+
-+my $filename = shift;
-+die("No filename provided") unless defined($filename);
-+
-+open (my $fh, "<:raw", $filename) or die("Unable to open file '$filename'");
-+
-+my $fdt = FDT->parse($fh) or die("Unable to parse DTB");
-+
-+my $root = $fdt->get_root();
-+
-+my @cpus = $root->find_by_device_type('cpu');
-+
-+my @ids = map {
-+	my ($addr, $size) = $_->get_untranslated_reg(0);
-+	sprintf("0x%x", $addr);
-+} @cpus;
-+
-+printf("%s\n", join(',', @ids));
-diff --git a/gen-cpu-nodes.sh b/gen-cpu-nodes.sh
-deleted file mode 100755
-index eaa2e7c..0000000
---- a/gen-cpu-nodes.sh
-+++ /dev/null
-@@ -1,24 +0,0 @@
--#!/bin/sh
--# Very dumb shell script to generate DTB nodes that changes the
--# boot-method to PSCI.
--#
--# Copyright (C) 2014 ARM Limited. All rights reserved.
--#
--# Use of this source code is governed by a BSD-style license that can be
--# found in the LICENSE.txt file.
--
--CPU_IDS=$1;
--CPU_IDS_NO_HEX=$(echo $CPU_IDS | sed s/0x//g);
--CPU_IDS_NO_HEX=$(echo $CPU_IDS_NO_HEX | sed s/\,/\ /g);
--
--echo '#address-cells = <0x1>;'
--echo '#size-cells = <0>;'
--
--for id in $CPU_IDS_NO_HEX;
--do
--	echo "cpu@$id {"
--	echo '	device_type = \"cpu\";'
--	echo '	enable-method = \"psci\";'
--	echo "	reg = <0x$id>;"
--	echo "};"
--done
--- 
-1.9.1
+Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
+> ---
+> Note that I'm removing this driver because I plan to rework the macro
+> definitions in atmel-smc.h, and some of them are used in this driver.
+> Since I can't test it, and this drivers is not used anymore, it's probably
+> better to remove it.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
