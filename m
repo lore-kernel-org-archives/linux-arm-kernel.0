@@ -1,82 +1,79 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 17 Feb 2017 10:28:00 +0000
-Subject: [PATCH 1/5] arm64: dts: Add basic DT to support Spreadtrum's
- SP9860G
-In-Reply-To: <20170217072839.GA8767@spreadtrum.com>
-References: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1487063952-7113-2-git-send-email-chunyan.zhang@spreadtrum.com>
- <CAPKp9ub35nL8gc_TKx02pSHHNwBhiMacWL=CuEmNGnecWikfGQ@mail.gmail.com>
- <20170217072839.GA8767@spreadtrum.com>
-Message-ID: <b5940598-f3e7-b2c5-9914-7bcbe3471f9e@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 17 Feb 2017 11:37:21 +0100
+Subject: [PATCH net-next v2 0/2] net: mvneta: improve rx performance
+In-Reply-To: <20170217100233.2325-1-jszhang@marvell.com> (Jisheng Zhang's
+ message of "Fri, 17 Feb 2017 18:02:31 +0800")
+References: <20170217100233.2325-1-jszhang@marvell.com>
+Message-ID: <87shndayse.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jisheng,
+ 
+ On ven., f?vr. 17 2017, Jisheng Zhang <jszhang@marvell.com> wrote:
 
+> In hot code path such as mvneta_rx_hwbm() and mvneta_rx_swbm(), we may
+> access fields of rx_desc. The rx_desc is allocated by
+> dma_alloc_coherent, it's uncacheable if the device isn't cache
+> coherent, reading from uncached memory is fairly slow.
 
-On 17/02/17 07:28, Chunyan Zhang wrote:
-> Hi Sudeep,
-> 
-> On ?,  2? 14, 2017 at 04:44:53?? +0000, Sudeep Holla wrote:
->> On Tue, Feb 14, 2017 at 9:19 AM, Chunyan Zhang
->> <chunyan.zhang@spreadtrum.com> wrote:
+Did you test it with HWBM support?
 
-[..]
+I am  not sure ti will work in this case.
 
->>
->>> +       idle-states{
->>> +               entry-method = "arm,psci";
->>> +
->>> +               CORE_PD: core_pd {
->>> +                       compatible = "arm,idle-state";
->>> +                       entry-latency-us = <1000>;
->>> +                       exit-latency-us = <700>;
->>> +                       min-residency-us = <2500>;
->>> +                       local-timer-stop;
->>> +                       arm,psci-suspend-param = <0x00010002>;
->>> +               };
->>> +
->>> +               CLUSTER_PD: cluster_pd {
->>> +                       compatible = "arm,idle-state";
->>> +                       entry-latency-us = <1000>;
->>> +                       exit-latency-us = <1000>;
->>> +                       min-residency-us = <3000>;
->>> +                       local-timer-stop;
->>> +                       arm,psci-suspend-param = <0x01010003>;
->>> +               };
->>> +
->>> +               DEEP_SLEEP: deep_sleep {
->>> +                       compatible = "arm,idle-state";
->>> +                       wakeup-latency-us = <0xffffffff>;
->>
->> A value > 4294 seconds(i.e >1 hour) seems suspicious.
->> Are you working around the firmware issue with high latency value so
->> that it's never entered ? Why not remove advertising the state from DT.
->>
-> 
-> Haved checked with related colleagues, this node 'deep_sleep' was not for working
-> around any firmware issue, but was a trick utilization of idle subsystem, and that
+Gregory
 
-Really ? Any latency greater few milliseconds are sounds useless. I
-still don't understand what you mean by "trick utilization of idle
-subsystem".
-
-> was definitely not elegant, the author indeed intendly didn't want CPU entered this
-> state, I will remove this node therefore.
-
-It's quick and dirty "HACK* to retain and advertise the state but
-ensure it's never entered and obstruct the boot. It's not a trick to
-exploit any idle subsystem utilization.
-
->  
->> Can you get me the dump of:
->> grep "" /sys/devices/system/cpu/cpu*/cpuidle/state*/{time,usage}
->>
-> 
-> FYI: https://www.irccloud.com/pastebin/XyEMLzfq/
-> 
-
-As expected, state3(deep_sleep) is never entered.
+>
+> patch1 reuses the read out status to getting status field of rx_desc
+> again.
+>
+> patch2 uses cacheable memory to store the rx buffer DMA address.
+>
+> We get the following performance data on Marvell BG4CT Platforms
+> (tested with iperf):
+>
+> before the patch:
+> recving 1GB in mvneta_rx_swbm() costs 149265960 ns
+>
+> after the patch:
+> recving 1GB in mvneta_rx_swbm() costs 1421565640 ns
+>
+> We saved 4.76% time.
+>
+> RFC: can we do similar modification for tx? If yes, I can prepare a v2.
+>
+>
+> Basically, these two patches do what Arnd mentioned in [1].
+>
+> Hi Arnd,
+>
+> I added "Suggested-by you" tag, I hope you don't mind ;)
+>
+> Thanks
+>
+> [1] https://www.spinics.net/lists/netdev/msg405889.html
+>
+> Since v1:
+>   - correct the performance data typo
+>
+> Jisheng Zhang (2):
+>   net: mvneta: avoid getting status from rx_desc as much as possible
+>   net: mvneta: Use cacheable memory to store the rx buffer DMA address
+>
+>  drivers/net/ethernet/marvell/mvneta.c | 36 ++++++++++++++++++++---------------
+>  1 file changed, 21 insertions(+), 15 deletions(-)
+>
+> -- 
+> 2.11.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
-Regards,
-Sudeep
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
