@@ -1,10 +1,10 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 17 Feb 2017 15:44:25 +0000
-Subject: [PATCH 16/20] ARM: KVM: Convert __cpu_reset_hyp_mode to using
+Date: Fri, 17 Feb 2017 15:44:14 +0000
+Subject: [PATCH 05/20] arm64: KVM: Convert __cpu_reset_hyp_mode to using
  __hyp_reset_vectors
 In-Reply-To: <20170217154429.5000-1-marc.zyngier@arm.com>
 References: <20170217154429.5000-1-marc.zyngier@arm.com>
-Message-ID: <20170217154429.5000-17-marc.zyngier@arm.com>
+Message-ID: <20170217154429.5000-6-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,57 +13,87 @@ kiss __kvm_hyp_reset goodbye, and use __hyp_reset_vectors.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_asm.h  | 2 --
- arch/arm/include/asm/kvm_host.h | 3 ++-
- arch/arm/kvm/init.S             | 2 --
- 3 files changed, 2 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/kvm_asm.h  |  1 -
+ arch/arm64/include/asm/kvm_host.h |  4 ++--
+ arch/arm64/kvm/hyp-init.S         |  2 --
+ arch/arm64/kvm/hyp/hyp-entry.S    | 15 ---------------
+ 4 files changed, 2 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 8ef05381984b..7ccb6f1aac5b 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -72,8 +72,6 @@ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index ec3553eb9349..3e242f6613b3 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -47,7 +47,6 @@ struct kvm_vcpu;
  
- extern void __init_stage2_translation(void);
+ extern char __kvm_hyp_init[];
+ extern char __kvm_hyp_init_end[];
+-extern char __kvm_hyp_reset[];
  
--extern void __kvm_hyp_reset(unsigned long);
--
- extern u64 __vgic_v3_get_ich_vtr_el2(void);
- extern void __vgic_v3_init_lrs(void);
- #endif
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index d5423ab15ed5..1962c5086897 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -277,7 +277,8 @@ static inline void __cpu_init_stage2(void)
+ extern char __kvm_hyp_vector[];
+ 
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index e5050388e062..2e493e9a671e 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -361,11 +361,11 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+ 	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
+ }
+ 
+-void __kvm_hyp_teardown(void);
  static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
  					phys_addr_t phys_idmap_start)
  {
--	kvm_call_hyp((void *)virt_to_idmap(__kvm_hyp_reset), vector_ptr);
+-	kvm_call_hyp(__kvm_hyp_teardown, phys_idmap_start);
 +	extern void __hyp_reset_vectors(void);
 +	__hyp_reset_vectors();
  }
  
- static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 438b148d47fd..0ec1a83d03ea 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -129,7 +129,6 @@ ENTRY(__kvm_handle_stub_hvc)
- 
- 1:	cmp	r0, #HVC_RESET_VECTORS
- 	bne	1f
+ static inline void kvm_arch_hardware_unsetup(void) {}
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 2c7b86bb5483..d12a232abd81 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -134,7 +134,6 @@ ENTRY(__kvm_handle_stub_hvc)
+ 	/*
+ 	 * Reset kvm back to the hyp stub.
+ 	 */
 -ENTRY(__kvm_hyp_reset)
  	/* We're now in idmap, disable MMU */
- 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
- 	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
-@@ -153,7 +152,6 @@ ENTRY(__kvm_hyp_reset)
+ 	mrs	x0, sctlr_el2
+ 	ldr	x1, =SCTLR_ELx_FLAGS
+@@ -151,7 +150,6 @@ ENTRY(__kvm_hyp_reset)
+ 
  exit:
  	eret
- ENDPROC(__kvm_handle_stub_hvc)
 -ENDPROC(__kvm_hyp_reset)
+ ENDPROC(__kvm_handle_stub_hvc)
  
  	.ltorg
- .L__va2pa:
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 21eeb2552f33..1277f81b63b7 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -53,21 +53,6 @@ ENTRY(__vhe_hyp_call)
+ 	ret
+ ENDPROC(__vhe_hyp_call)
+ 
+-/*
+- * Compute the idmap address of __kvm_hyp_reset based on the idmap
+- * start passed as a parameter, and jump there.
+- *
+- * x0: HYP phys_idmap_start
+- */
+-ENTRY(__kvm_hyp_teardown)
+-	mov	x4, x0
+-	adr_l	x3, __kvm_hyp_reset
+-
+-	/* insert __kvm_hyp_reset()s offset into phys_idmap_start */
+-	bfi	x4, x3, #0, #PAGE_SHIFT
+-	br	x4
+-ENDPROC(__kvm_hyp_teardown)
+-	
+ el1_sync:				// Guest trapped into EL2
+ 	stp	x0, x1, [sp, #-16]!
+ 
 -- 
 2.11.0
