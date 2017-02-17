@@ -1,63 +1,41 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 17 Feb 2017 17:03:46 +0100
-Subject: [RFC 1/4] dt-bindings: iio: introduce trigger providers, consumers
-In-Reply-To: <1487347429-31761-1-git-send-email-fabrice.gasnier@st.com>
-References: <1487347429-31761-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1487347429-31761-2-git-send-email-fabrice.gasnier@st.com>
+Date: Fri, 17 Feb 2017 17:03:45 +0100
+Subject: [RFC 0/4] iio: trigger: Add OF support and GPIO based trigger
+Message-ID: <1487347429-31761-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document iio provider and consumer bindings.
+Hi,
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- .../devicetree/bindings/iio/iio-bindings.txt       | 37 ++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+I send this as an RFC, as I'm digging to try to get as generic
+as possible GPIO based trigger support, as discussed earlier in
+other patchset "Add EXTI GPIO trigger support to STM32 ADC":
+https://www.spinics.net/lists/arm-kernel/msg559091.html
 
-diff --git a/Documentation/devicetree/bindings/iio/iio-bindings.txt b/Documentation/devicetree/bindings/iio/iio-bindings.txt
-index 68d6f8c..3125390 100644
---- a/Documentation/devicetree/bindings/iio/iio-bindings.txt
-+++ b/Documentation/devicetree/bindings/iio/iio-bindings.txt
-@@ -95,3 +95,40 @@ vdd channel is connected to output 0 of the &ref device.
- 		io-channels = <&adc 10>, <&adc 11>;
- 		io-channel-names = "adc1", "adc2";
- 	};
-+
-+==IIO trigger providers==
-+Sources of IIO triggers can be represented by any node in the device
-+tree. Those nodes are designated as IIO trigger providers. IIO trigger
-+consumer uses a phandle and an IIO trigger specifier to connect to an
-+IIO trigger provider.
-+An IIO trigger specifier is an array of one or more cells identifying
-+the IIO trigger output on a device. The length of an IIO trigger
-+specifier is defined by the value of a #io-trigger-cells property in
-+the IIO trigger provider node.
-+
-+Required properties:
-+#io-trigger-cells:
-+		Number of cells in an IIO trigger specifier; Typically
-+		0 for nodes with a simple IIO trigger output.
-+
-+Example:
-+	gpiotrig0: iio-gpio-trigger0 {
-+		#io-trigger-cells = <0>;
-+		compatible = "iio-gpio-trigger";
-+		gpios = <&gpioa 11 0>;
-+	}
-+
-+==IIO trigger consumers==
-+Required properties:
-+- io-triggers:	List of phandle representing the IIO trigger specifier.
-+
-+Optional properties:
-+- io-trigger-names :
-+		List of IIO trigger name strings that matches elements
-+		in 'io-triggers' list property.
-+
-+Example:
-+	some_trigger_consumer {
-+		io-triggers = <&gpiotrig0>;
-+		io-trigger-names = "mytrig";
-+	}
+Following various comments on this, I sent this RFC to address two
+topics, that I see as possible prerequisite:
+- Add trigger OF support
+- GPIO based trigger
+
+Please feel free to advise.
+Best Regards.
+
+Fabrice Gasnier (4):
+  dt-bindings: iio: introduce trigger providers, consumers
+  iio: trigger: add OF support
+  dt-bindings: iio: add support for GPIO triggers
+  iio: trigger: add GPIO trigger
+
+ .../devicetree/bindings/iio/iio-bindings.txt       |  37 +++++++
+ .../bindings/iio/trigger/iio-trig-gpio.txt         |  26 +++++
+ drivers/iio/industrialio-trigger.c                 | 100 ++++++++++++++++++
+ drivers/iio/trigger/Kconfig                        |   9 ++
+ drivers/iio/trigger/Makefile                       |   1 +
+ drivers/iio/trigger/iio-trig-gpio.c                | 112 +++++++++++++++++++++
+ include/linux/iio/trigger.h                        |   4 +
+ 7 files changed, 289 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/trigger/iio-trig-gpio.txt
+ create mode 100644 drivers/iio/trigger/iio-trig-gpio.c
+
 -- 
 1.9.1
