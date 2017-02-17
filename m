@@ -1,79 +1,116 @@
-From: joe@perches.com (Joe Perches)
-Date: Thu, 16 Feb 2017 23:11:36 -0800
-Subject: [PATCH 23/35] drivers/mfd: Convert remaining uses of pr_warning to
- pr_warn
-In-Reply-To: <cover.1487314666.git.joe@perches.com>
-References: <cover.1487314666.git.joe@perches.com>
-Message-ID: <a6c827c14d0b9f4be42e549ec4c629245516e979.1487314667.git.joe@perches.com>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Fri, 17 Feb 2017 15:28:39 +0800
+Subject: [PATCH 1/5] arm64: dts: Add basic DT to support Spreadtrum's
+ SP9860G
+In-Reply-To: <CAPKp9ub35nL8gc_TKx02pSHHNwBhiMacWL=CuEmNGnecWikfGQ@mail.gmail.com>
+References: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1487063952-7113-2-git-send-email-chunyan.zhang@spreadtrum.com>
+ <CAPKp9ub35nL8gc_TKx02pSHHNwBhiMacWL=CuEmNGnecWikfGQ@mail.gmail.com>
+Message-ID: <20170217072839.GA8767@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To enable eventual removal of pr_warning
+Hi Sudeep,
 
-This makes pr_warn use consistent for drivers/mfd
+On ?,  2? 14, 2017 at 04:44:53?? +0000, Sudeep Holla wrote:
+> On Tue, Feb 14, 2017 at 9:19 AM, Chunyan Zhang
+> <chunyan.zhang@spreadtrum.com> wrote:
+> > From: Orson Zhai <orson.zhai@spreadtrum.com>
+> >
+> > SC9860G is a 8 cores of A53 SoC with 4G LTE support SoC from Spreadtrum.
+> >
+> > According to regular hierarchy of sprd dts, whale2.dtsi contains SoC
+> > peripherals IP nodes, sc9860.dtsi contains stuff related to ARM core stuff
+> > and sp9860g dts is for the board level.
+> >
+> > Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
+> > Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> > ---
+> >  arch/arm64/boot/dts/sprd/Makefile         |   3 +-
+> >  arch/arm64/boot/dts/sprd/sc9860.dtsi      | 534 ++++++++++++++++++++++++++++++
+> >  arch/arm64/boot/dts/sprd/sp9860g-1h10.dts |  58 ++++
+> >  arch/arm64/boot/dts/sprd/whale2.dtsi      |  66 ++++
+> >  4 files changed, 660 insertions(+), 1 deletion(-)
+> >  create mode 100644 arch/arm64/boot/dts/sprd/sc9860.dtsi
+> >  create mode 100644 arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+> >  create mode 100644 arch/arm64/boot/dts/sprd/whale2.dtsi
+> >
+> > diff --git a/arch/arm64/boot/dts/sprd/Makefile b/arch/arm64/boot/dts/sprd/Makefile
+> > index b658c5e..f0535e6 100644
+> > --- a/arch/arm64/boot/dts/sprd/Makefile
+> > +++ b/arch/arm64/boot/dts/sprd/Makefile
+> > @@ -1,4 +1,5 @@
+> > -dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb
+> > +dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb \
+> > +                       sp9860g-1h10.dtb
+> >
+> >  always         := $(dtb-y)
+> >  subdir-y       := $(dts-dirs)
+> > diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+> > new file mode 100644
+> > index 0000000..604a8c9
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+> > @@ -0,0 +1,534 @@
+> 
+> [...]
+> 
+> > +       idle-states{
+> > +               entry-method = "arm,psci";
+> > +
+> > +               CORE_PD: core_pd {
+> > +                       compatible = "arm,idle-state";
+> > +                       entry-latency-us = <1000>;
+> > +                       exit-latency-us = <700>;
+> > +                       min-residency-us = <2500>;
+> > +                       local-timer-stop;
+> > +                       arm,psci-suspend-param = <0x00010002>;
+> > +               };
+> > +
+> > +               CLUSTER_PD: cluster_pd {
+> > +                       compatible = "arm,idle-state";
+> > +                       entry-latency-us = <1000>;
+> > +                       exit-latency-us = <1000>;
+> > +                       min-residency-us = <3000>;
+> > +                       local-timer-stop;
+> > +                       arm,psci-suspend-param = <0x01010003>;
+> > +               };
+> > +
+> > +               DEEP_SLEEP: deep_sleep {
+> > +                       compatible = "arm,idle-state";
+> > +                       wakeup-latency-us = <0xffffffff>;
+> 
+> A value > 4294 seconds(i.e >1 hour) seems suspicious.
+> Are you working around the firmware issue with high latency value so
+> that it's never entered ? Why not remove advertising the state from DT.
+>
 
-Prior to this patch, there were 4 uses of pr_warning and
-9 uses of pr_warn in drivers/mfd
-
-Signed-off-by: Joe Perches <joe@perches.com>
----
- drivers/mfd/db8500-prcmu.c  | 2 +-
- drivers/mfd/sta2x11-mfd.c   | 4 ++--
- drivers/mfd/twl4030-power.c | 7 ++-----
- 3 files changed, 5 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index ca38a6a14110..5c739ac752e8 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -2377,7 +2377,7 @@ static void ack_dbb_wakeup(void)
+Haved checked with related colleagues, this node 'deep_sleep' was not for working
+around any firmware issue, but was a trick utilization of idle subsystem, and that
+was definitely not elegant, the author indeed intendly didn't want CPU entered this
+state, I will remove this node therefore.
  
- static inline void print_unknown_header_warning(u8 n, u8 header)
- {
--	pr_warning("prcmu: Unknown message header (%d) in mailbox %d.\n",
-+	pr_warn("prcmu: Unknown message header (%d) in mailbox %d\n",
- 		header, n);
- }
- 
-diff --git a/drivers/mfd/sta2x11-mfd.c b/drivers/mfd/sta2x11-mfd.c
-index 9292202039ee..3aeafa228baf 100644
---- a/drivers/mfd/sta2x11-mfd.c
-+++ b/drivers/mfd/sta2x11-mfd.c
-@@ -60,8 +60,8 @@ static struct sta2x11_mfd *sta2x11_mfd_find(struct pci_dev *pdev)
- 	struct sta2x11_mfd *mfd;
- 
- 	if (!pdev && !list_empty(&sta2x11_mfd_list)) {
--		pr_warning("%s: Unspecified device, "
--			    "using first instance\n", __func__);
-+		pr_warn("%s: Unspecified device, using first instance\n",
-+			__func__);
- 		return list_entry(sta2x11_mfd_list.next,
- 				  struct sta2x11_mfd, list);
- 	}
-diff --git a/drivers/mfd/twl4030-power.c b/drivers/mfd/twl4030-power.c
-index 1beb722f6080..8be023ba8e3e 100644
---- a/drivers/mfd/twl4030-power.c
-+++ b/drivers/mfd/twl4030-power.c
-@@ -502,9 +502,7 @@ static int load_twl4030_script(const struct twl4030_power_data *pdata,
- 	}
- 	if (tscript->flags & TWL4030_SLEEP_SCRIPT) {
- 		if (!order)
--			pr_warning("TWL4030: Bad order of scripts (sleep "\
--					"script before wakeup) Leads to boot"\
--					"failure on some boards\n");
-+			pr_warn("TWL4030: Bad order of scripts (sleep script before wakeup) Leads to boot failure on some boards\n");
- 		err = twl4030_config_sleep_sequence(address);
- 	}
- out:
-@@ -929,8 +927,7 @@ static int twl4030_power_probe(struct platform_device *pdev)
- 		err = twl_i2c_read_u8(TWL_MODULE_PM_MASTER, &val,
- 				      TWL4030_PM_MASTER_CFG_P123_TRANSITION);
- 		if (err) {
--			pr_warning("TWL4030 Unable to read registers\n");
--
-+			pr_warn("TWL4030 Unable to read registers\n");
- 		} else if (!(val & SEQ_OFFSYNC)) {
- 			val |= SEQ_OFFSYNC;
- 			err = twl_i2c_write_u8(TWL_MODULE_PM_MASTER, val,
--- 
-2.10.0.rc2.1.g053435c
+> Can you get me the dump of:
+> grep "" /sys/devices/system/cpu/cpu*/cpuidle/state*/{time,usage}
+> 
+
+FYI: https://www.irccloud.com/pastebin/XyEMLzfq/
+
+Thanks,
+Chunyan
+
+> IIUC, you might have seen boot issue without this values and workaround
+> the issue with such high values ? If so please drop this state.
+> 
+> > +                       entry-latency-us = <1500>;
+> > +                       exit-latency-us = <1500>;
+> > +                       min-residency-us = <0xffffffff>;
+> > +                       local-timer-stop;
+> > +                       arm,psci-suspend-param = <0x01010005>;
+> > +               };
+> > +       };
+> >
+> 
+> --
+> Regards,
+> Sudeep
