@@ -1,81 +1,53 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 17 Feb 2017 16:22:01 +0100
-Subject: [PATCH v2 3/3] watchdog: sama5d4: Implement resume hook
-In-Reply-To: <0fe51486-2de0-eda6-2310-823fc4fd7c82@roeck-us.net>
-References: <20170216193053.5546-1-alexandre.belloni@free-electrons.com>
- <20170216193053.5546-3-alexandre.belloni@free-electrons.com>
- <0fe51486-2de0-eda6-2310-823fc4fd7c82@roeck-us.net>
-Message-ID: <20170217152201.ue5ujd5ia3iqcduh@piout.net>
+Date: Fri, 17 Feb 2017 16:26:40 +0100
+Subject: [PATCH] Revert "ARM: at91/dt: sama5d2: Use new compatible for
+ ohci node"
+In-Reply-To: <20170217151250.8572-1-romain.izard.pro@gmail.com>
+References: <20170217151250.8572-1-romain.izard.pro@gmail.com>
+Message-ID: <20170217152640.3zlfjtqr575c432t@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/02/2017 at 06:47:03 -0800, Guenter Roeck wrote:
-> On 02/16/2017 11:30 AM, Alexandre Belloni wrote:
-> > When resuming for the deepest state on sama5d2, it is necessary to restore
-> > MR as the registers are lost.
-> > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> > Changes in v2:
-> >  - cache mr beofre suspending
-> > 
-> >  drivers/watchdog/sama5d4_wdt.c | 32 ++++++++++++++++++++++++++++++++
-> >  1 file changed, 32 insertions(+)
-> > 
-> > diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-> > index 2a60251806d2..5ddeb4803dc3 100644
-> > --- a/drivers/watchdog/sama5d4_wdt.c
-> > +++ b/drivers/watchdog/sama5d4_wdt.c
-> > @@ -28,6 +28,7 @@
-> >  struct sama5d4_wdt {
-> >  	struct watchdog_device	wdd;
-> >  	void __iomem		*reg_base;
-> > +	u32			mr;
+On 17/02/2017 at 16:12:50 +0100, Romain Izard wrote:
+> This reverts commit cab43282682e ("ARM: at91/dt: sama5d2: Use new
+> compatible for ohci node")
 > 
-> Makes me wonder if we shouldn't just retain the original 'config'
-> (and maybe rename it to 'mr). After all, it _is_ used now.
+> It depends from commit 7150bc9b4d43 ("usb: ohci-at91: Forcibly suspend
+> ports while USB suspend") which was reverted and implemented
+> differently. With the new implementation, the compatible string must
+> remain the same.
 > 
-> >  };
-> > 
-> >  static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
-> > @@ -248,11 +249,42 @@ static const struct of_device_id sama5d4_wdt_of_match[] = {
-> >  };
-> >  MODULE_DEVICE_TABLE(of, sama5d4_wdt_of_match);
-> > 
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static int sama5d4_wdt_suspend(struct device *dev)
-> > +{
-> > +	struct sama5d4_wdt *wdt = dev_get_drvdata(dev);
-> > +
-> > +	wdt->mr = wdt_read(wdt, AT91_WDT_MR);
-> > +
+> The compatible string introduced by this commit has been used in the
+> default SAMA5D2 dtsi starting from Linux 4.8. As it has never been
+> working correctly in an official release, removing it should not be
+> breaking the stability rules.
 > 
-> Wouldn't you want to stop the watchdog here if it is running,
-> ie set AT91_WDT_WDDIS ?
+> Fixes: cab43282682e ("ARM: at91/dt: sama5d2: Use new compatible for ohci node")
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+> cc: <stable@vger.kernel.org>
+> ---
+>  arch/arm/boot/dts/sama5d2.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
 
-Some existing customers want the watchdog to continue to run while the
-system is suspended.
+Sure, I'll take it as a fix once 4.11-rc1 is released.
 
-> > +	return 0;
-> > +}
-> > +
-> > +static int sama5d4_wdt_resume(struct device *dev)
-> > +{
-> > +	struct sama5d4_wdt *wdt = dev_get_drvdata(dev);
-> > +	u32 reg;
-> > +
-> > +	reg = wdt_read(wdt, AT91_WDT_MR);
-> > +	if (reg & AT91_WDT_WDDIS)
-> > +		wdt_write(wdt, AT91_WDT_MR, reg & ~AT91_WDT_WDDIS);
-> > +
-> > +	wdt_write(wdt, AT91_WDT_MR, wdt->mr & ~AT91_WDT_WDDIS);
+> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+> index ceb9783ff7e1..ff7eae833a6d 100644
+> --- a/arch/arm/boot/dts/sama5d2.dtsi
+> +++ b/arch/arm/boot/dts/sama5d2.dtsi
+> @@ -266,7 +266,7 @@
+>  		};
+>  
+>  		usb1: ohci at 00400000 {
+> -			compatible = "atmel,sama5d2-ohci", "usb-ohci";
+> +			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+>  			reg = <0x00400000 0x100000>;
+>  			interrupts = <41 IRQ_TYPE_LEVEL_HIGH 2>;
+>  			clocks = <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
+> -- 
+> 2.9.3
 > 
-> Is that necessary ? Why not just write wdt->mr unconditionally ?
-> 
-
-Because you can change WDV and WDD *OR* WDDIS but not both at the same
-time.
 
 -- 
 Alexandre Belloni, Free Electrons
