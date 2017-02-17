@@ -1,50 +1,55 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 17 Feb 2017 18:00:30 +0100
-Subject: [PATCH 0/2] arm64: dts: renesas: Upgrade to PSCI v1.0 to support
- Suspend-to-RAM
-Message-ID: <1487350832-29820-1-git-send-email-geert+renesas@glider.be>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 17 Feb 2017 18:00:53 +0100
+Subject: Pointers for writing a good PCIe driver
+In-Reply-To: <20170217143803.GA10663@bhelgaas-glaptop.roam.corp.google.com>
+References: <ff099b5f-efc8-bb5f-41e3-493398844cc0@free.fr>
+ <05046a8a-ba9f-26f9-4c93-f657f9da6294@free.fr>
+ <20170207200656.GA11659@bhelgaas-glaptop.roam.corp.google.com>
+ <20170207214758.GC11659@bhelgaas-glaptop.roam.corp.google.com>
+ <0f22720c-e47d-59f6-b5f7-5e40f4a1759d@free.fr>
+ <20170212165033.GA31833@kroah.com>
+ <0d785dab-c830-b887-d9f3-a2cd5338695c@free.fr>
+ <20170217143803.GA10663@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <eff9861e-043a-7ecd-5d52-c8e18a52ece8@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+On 17/02/2017 15:38, Bjorn Helgaas wrote:
 
-This patch series upgrades the version of the PSCI firmware, as
-advertised in DT on Renesas R-Car Gen3 systems, from v0.2 to v1.0.
+> On Fri, Feb 17, 2017 at 10:20:20AM +0100, Mason wrote:
+>
+>> There might be some kind of misunderstanding.
+>>
+>> I don't plan to write a driver for a device that plugs into a PCIe slot.
+>>
+>> I intend to write a driver for the PCIe controller itself, which is
+>> embedded in the SoC. (In order to support different types of PCIe
+>> devices, with their respective drivers already upstream.)
+>>
+>> I think the controller driver belongs in drivers/pci/host ?
+> 
+> Sorry, I indeed misunderstood you.
+> 
+> The native PCI host controller drivers indeed live in
+> drivers/pci/host/.
+> 
+> I don't know anything about your hardware or environment, but I highly
+> encourage you to use ACPI (drivers/acpi/pci_root.c, with a little bit
+> of arch support) or generic DT (drivers/pci/host/pci-host-generic.c)
+> instead of writing a custom host controller driver.
+> 
+> The native drivers in drivers/pci/host are a huge maintenance hassle
+> for no real benefit.
 
-Note that this series does not have any runtime effects: as of PSCI
-v0.2, PSCI provides a VERSION API.  Hence Linux always detected the
-actual version, regardless of what was stated in DT, and enabled v1.0
-features like system suspend:
+My SoC is built around an ARM Cortex A9.
+I don't think (?) this platform has any support for ACPI.
 
-    PSCIv1.0 detected in firmware.
+I'm currently using this DT description:
+http://lxr.free-electrons.com/source/arch/arm/boot/dts/tango4-common.dtsi
 
-However, it is better to have the real hardware^H^H^H^H^H^H^H^Hfirmware
-description in DT.
+The "legacy" driver sits at ~700 lines. It would be awesome to be able
+to discard all of it, and rely on generic upstream code. But I don't
+understand how it is possible for a generic driver to support whatever
+crazy solution some random vendor has come up with?
 
-Tested on Salvator-X (both H3 and M3-W) with firmware v2.16.0, but I do
-have old boot logs showing that PSCIv1.0 has been detected for a long
-time.
-
-Thanks for applying!
-
-Khiem Nguyen (2):
-  arm64: dts: r8a7795: Upgrade to PSCI v1.0 to support Suspend-to-RAM
-  arm64: dts: r8a7796: Upgrade to PSCI v1.0 to support Suspend-to-RAM
-
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 2 +-
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
--- 
-1.9.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+Regards.
