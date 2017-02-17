@@ -1,59 +1,106 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 17 Feb 2017 11:50:26 +0530
-Subject: [PATCH v4 2/3] mailbox: Add iProc mailbox controller driver
-In-Reply-To: <1485463082-27067-3-git-send-email-jonathan.richardson@broadcom.com>
-References: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
- <1485463082-27067-3-git-send-email-jonathan.richardson@broadcom.com>
-Message-ID: <CABb+yY0rmAFutskhVkQ926QfsvtJ-WnXrQc=+PQNg=7NZEXC+Q@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 16 Feb 2017 23:11:16 -0800
+Subject: [PATCH 03/35] arm64: Convert remaining uses of pr_warning to pr_warn
+In-Reply-To: <cover.1487314666.git.joe@perches.com>
+References: <cover.1487314666.git.joe@perches.com>
+Message-ID: <74c2cc72b91dbe639f153c601900f7f46a920fb9.1487314666.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 2:08 AM, Jonathan Richardson
-<jonathan.richardson@broadcom.com> wrote:
+To enable eventual removal of pr_warning
 
-> +static int iproc_mbox_send_data_m0(struct mbox_chan *chan, void *data)
-> +{
-> +       struct iproc_mbox *mbox = dev_get_drvdata(chan->mbox->dev);
-> +       struct iproc_mbox_msg *msg = (struct iproc_mbox_msg *)data;
-> +               unsigned long flags;
-> +       int err = 0;
-> +       const int poll_period_us = 5;
-> +       const int max_retries = (MAX_M0_TIMEOUT_MS * 1000) / poll_period_us;
-> +
-> +       if (!msg)
-> +               return -EINVAL;
-> +
-> +       spin_lock_irqsave(&mbox->lock, flags);
-> +
-> +       dev_dbg(mbox->dev, "Send msg to M0: cmd=0x%x, param=0x%x, wait_ack=%d\n",
-> +               msg->cmd, msg->param, msg->wait_ack);
-> +
-prints should be outside the spinlocks.
+This makes pr_warn use consistent for arch/arm64
 
-> +       writel(msg->cmd, mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
-> +       writel(msg->param, mbox->base + IPROC_CRMU_MAILBOX1_OFFSET);
-> +
-> +       if (msg->wait_ack) {
-> +               int retries;
-> +
-move poll_period_us and max_retries in here or just define' them
+Prior to this patch, there were 7 uses of pr_warning and
+27 uses of pr_warn in arch/arm64
 
-> +               err = msg->reply_code = -ETIMEDOUT;
-> +               for (retries = 0; retries < max_retries; retries++) {
-> +                       u32 val = readl(
-> +                               mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
-> +                       if (val & M0_IPC_CMD_DONE_MASK) {
-> +                               /*
-> +                                * M0 replied - save reply code and
-> +                                * clear error.
-> +                                */
-> +                               msg->reply_code = (val &
-> +                                       M0_IPC_CMD_REPLY_MASK) >>
-> +                                       M0_IPC_CMD_REPLY_SHIFT;
-> +                               err = 0;
-> +                               break;
-> +                       }
-> +                       udelay(poll_period_us);
->
-potentially 2ms inside spin_lock_irqsave. Alternative is to implement
-a simple 'peek_data' and call it for requests with 'wait_ack'
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ arch/arm64/include/asm/syscall.h  | 8 ++++----
+ arch/arm64/kernel/hw_breakpoint.c | 8 ++++----
+ arch/arm64/kernel/smp.c           | 4 ++--
+ 3 files changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
+index 709a574468f0..231f2c3fcf81 100644
+--- a/arch/arm64/include/asm/syscall.h
++++ b/arch/arm64/include/asm/syscall.h
+@@ -68,8 +68,8 @@ static inline void syscall_get_arguments(struct task_struct *task,
+ 	if (i + n > SYSCALL_MAX_ARGS) {
+ 		unsigned long *args_bad = args + SYSCALL_MAX_ARGS - i;
+ 		unsigned int n_bad = n + i - SYSCALL_MAX_ARGS;
+-		pr_warning("%s called with max args %d, handling only %d\n",
+-			   __func__, i + n, SYSCALL_MAX_ARGS);
++		pr_warn("%s called with max args %d, handling only %d\n",
++			__func__, i + n, SYSCALL_MAX_ARGS);
+ 		memset(args_bad, 0, n_bad * sizeof(args[0]));
+ 	}
+ 
+@@ -92,8 +92,8 @@ static inline void syscall_set_arguments(struct task_struct *task,
+ 		return;
+ 
+ 	if (i + n > SYSCALL_MAX_ARGS) {
+-		pr_warning("%s called with max args %d, handling only %d\n",
+-			   __func__, i + n, SYSCALL_MAX_ARGS);
++		pr_warn("%s called with max args %d, handling only %d\n",
++			__func__, i + n, SYSCALL_MAX_ARGS);
+ 		n = SYSCALL_MAX_ARGS - i;
+ 	}
+ 
+diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
+index 0296e7924240..6fa79ffd0c43 100644
+--- a/arch/arm64/kernel/hw_breakpoint.c
++++ b/arch/arm64/kernel/hw_breakpoint.c
+@@ -62,7 +62,7 @@ int hw_breakpoint_slots(int type)
+ 	case TYPE_DATA:
+ 		return get_num_wrps();
+ 	default:
+-		pr_warning("unknown slot type: %d\n", type);
++		pr_warn("unknown slot type: %d\n", type);
+ 		return 0;
+ 	}
+ }
+@@ -123,7 +123,7 @@ static u64 read_wb_reg(int reg, int n)
+ 	GEN_READ_WB_REG_CASES(AARCH64_DBG_REG_WVR, AARCH64_DBG_REG_NAME_WVR, val);
+ 	GEN_READ_WB_REG_CASES(AARCH64_DBG_REG_WCR, AARCH64_DBG_REG_NAME_WCR, val);
+ 	default:
+-		pr_warning("attempt to read from unknown breakpoint register %d\n", n);
++		pr_warn("attempt to read from unknown breakpoint register %d\n", n);
+ 	}
+ 
+ 	return val;
+@@ -138,7 +138,7 @@ static void write_wb_reg(int reg, int n, u64 val)
+ 	GEN_WRITE_WB_REG_CASES(AARCH64_DBG_REG_WVR, AARCH64_DBG_REG_NAME_WVR, val);
+ 	GEN_WRITE_WB_REG_CASES(AARCH64_DBG_REG_WCR, AARCH64_DBG_REG_NAME_WCR, val);
+ 	default:
+-		pr_warning("attempt to write to unknown breakpoint register %d\n", n);
++		pr_warn("attempt to write to unknown breakpoint register %d\n", n);
+ 	}
+ 	isb();
+ }
+@@ -156,7 +156,7 @@ static enum dbg_active_el debug_exception_level(int privilege)
+ 	case AARCH64_BREAKPOINT_EL1:
+ 		return DBG_ACTIVE_EL1;
+ 	default:
+-		pr_warning("invalid breakpoint privilege level %d\n", privilege);
++		pr_warn("invalid breakpoint privilege level %d\n", privilege);
+ 		return -EINVAL;
+ 	}
+ }
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 827d52d78b67..9c396e34c090 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -925,8 +925,8 @@ void smp_send_stop(void)
+ 		udelay(1);
+ 
+ 	if (num_online_cpus() > 1)
+-		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
+-			   cpumask_pr_args(cpu_online_mask));
++		pr_warn("SMP: failed to stop secondary CPUs %*pbl\n",
++			cpumask_pr_args(cpu_online_mask));
+ }
+ 
+ /*
+-- 
+2.10.0.rc2.1.g053435c
