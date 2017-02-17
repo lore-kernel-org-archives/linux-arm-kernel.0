@@ -1,177 +1,35 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 17 Feb 2017 16:35:05 +0100
-Subject: [PATCH v2 1/3] watchdog: sama5d4: Cleanup init
-In-Reply-To: <14ea461a-5a95-ca85-1eb3-1c34e382bc48@roeck-us.net>
-References: <20170216193053.5546-1-alexandre.belloni@free-electrons.com>
- <14ea461a-5a95-ca85-1eb3-1c34e382bc48@roeck-us.net>
-Message-ID: <20170217153505.gv4kftvk3z6emmii@piout.net>
+Date: Fri, 17 Feb 2017 16:42:19 +0100
+Subject: [PATCH 0/8] ARM: sun8i: a33: Mali improvements
+In-Reply-To: <2cecfc48-576f-3888-08aa-1fe2edc3c752@math.uni-bielefeld.de>
+References: <10fd28cb-269a-ec38-ecfb-b7c86be3e716@math.uni-bielefeld.de>
+ <20170216184524.cxcy2ux37yrwutla@lukather>
+ <2cecfc48-576f-3888-08aa-1fe2edc3c752@math.uni-bielefeld.de>
+Message-ID: <20170217154219.d4z2gylzcrzntlt3@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/02/2017 at 06:48:36 -0800, Guenter Roeck wrote:
-> On 02/16/2017 11:30 AM, Alexandre Belloni wrote:
-> > .config is used to cache a part of WDT_MR at probe time and is not used
-> > afterwards. Also functions are used while they always return 0. Simplify
-> > the flow by having everything in .probe().
-> > 
-> 
-> Does that really improve anything ? It makes the code harder to read
-> and, ultimately, the dropped value in sama5d4_wdt is added back in a
-> later patch as 'mr'.
+On 17/02/2017 at 13:45:44 +0100, Tobias Jakobi wrote:
+> > The device tree is a representation of the hardware itself. The state
+> > of the driver support doesn't change the hardware you're running on,
+> > just like your BIOS/UEFI on x86 won't change the device it reports to
+> > Linux based on whether it has a driver for it.
+> Like Emil already said, the new bindings and the DT entries are solely
+> introduced to support a proprietary out-of-tree module.
 > 
 
-I don't find the current code to be particularly easy to read but maybe
-it is a matter of taste.
+Because device tree describes the hardware, the added binding doesn't
+support any particular module. The eventually upstreamed drvier will
+share the same bindings.
 
-I would still remove the test on pdev->dev.of_node because it will never
-be false anyway.
-
-
-> Guenter
+> The current workflow when introducing new DT entries is the following:
+> - upstream a driver that uses the entries
+> - THEN add the new entries
 > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> > Changes in v2:
-> >  - completely get rid of .config instead of caching it
-> >  - merge init functions in probe()
-> > 
-> >  drivers/watchdog/sama5d4_wdt.c | 92 ++++++++++++++++--------------------------
-> >  1 file changed, 34 insertions(+), 58 deletions(-)
-> > 
-> > diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-> > index a49634cdc1cc..2c6f5a70ae67 100644
-> > --- a/drivers/watchdog/sama5d4_wdt.c
-> > +++ b/drivers/watchdog/sama5d4_wdt.c
-> > @@ -28,7 +28,6 @@
-> >  struct sama5d4_wdt {
-> >  	struct watchdog_device	wdd;
-> >  	void __iomem		*reg_base;
-> > -	u32	config;
-> >  };
-> > 
-> >  static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
-> > @@ -128,57 +127,15 @@ static irqreturn_t sama5d4_wdt_irq_handler(int irq, void *dev_id)
-> >  	return IRQ_HANDLED;
-> >  }
-> > 
-> > -static int of_sama5d4_wdt_init(struct device_node *np, struct sama5d4_wdt *wdt)
-> > -{
-> > -	const char *tmp;
-> > -
-> > -	wdt->config = AT91_WDT_WDDIS;
-> > -
-> > -	if (!of_property_read_string(np, "atmel,watchdog-type", &tmp) &&
-> > -	    !strcmp(tmp, "software"))
-> > -		wdt->config |= AT91_WDT_WDFIEN;
-> > -	else
-> > -		wdt->config |= AT91_WDT_WDRSTEN;
-> > -
-> > -	if (of_property_read_bool(np, "atmel,idle-halt"))
-> > -		wdt->config |= AT91_WDT_WDIDLEHLT;
-> > -
-> > -	if (of_property_read_bool(np, "atmel,dbg-halt"))
-> > -		wdt->config |= AT91_WDT_WDDBGHLT;
-> > -
-> > -	return 0;
-> > -}
-> > -
-> > -static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)
-> > -{
-> > -	struct watchdog_device *wdd = &wdt->wdd;
-> > -	u32 value = WDT_SEC2TICKS(wdd->timeout);
-> > -	u32 reg;
-> > -
-> > -	/*
-> > -	 * Because the fields WDV and WDD must not be modified when the WDDIS
-> > -	 * bit is set, so clear the WDDIS bit before writing the WDT_MR.
-> > -	 */
-> > -	reg = wdt_read(wdt, AT91_WDT_MR);
-> > -	reg &= ~AT91_WDT_WDDIS;
-> > -	wdt_write(wdt, AT91_WDT_MR, reg);
-> > -
-> > -	reg = wdt->config;
-> > -	reg |= AT91_WDT_SET_WDD(value);
-> > -	reg |= AT91_WDT_SET_WDV(value);
-> > -
-> > -	wdt_write(wdt, AT91_WDT_MR, reg);
-> > -
-> > -	return 0;
-> > -}
-> > -
-> >  static int sama5d4_wdt_probe(struct platform_device *pdev)
-> >  {
-> >  	struct watchdog_device *wdd;
-> >  	struct sama5d4_wdt *wdt;
-> >  	struct resource *res;
-> >  	void __iomem *regs;
-> > -	u32 irq = 0;
-> > +	struct device_node *np = pdev->dev.of_node;
-> > +	const char *tmp;
-> > +	u32 mr, reg, irq = 0;
-> >  	int ret;
-> > 
-> >  	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
-> > @@ -201,17 +158,26 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
-> > 
-> >  	wdt->reg_base = regs;
-> > 
-> > -	if (pdev->dev.of_node) {
-> > -		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
-> > -		if (!irq)
-> > -			dev_warn(&pdev->dev, "failed to get IRQ from DT\n");
-> > +	irq = irq_of_parse_and_map(np, 0);
-> > +	if (!irq)
-> > +		dev_warn(&pdev->dev, "failed to get IRQ from DT\n");
-> > 
-> > -		ret = of_sama5d4_wdt_init(pdev->dev.of_node, wdt);
-> > -		if (ret)
-> > -			return ret;
-> > -	}
-> > 
-> > -	if ((wdt->config & AT91_WDT_WDFIEN) && irq) {
-> > +	mr = AT91_WDT_WDDIS;
-> > +
-> > +	if (!of_property_read_string(np, "atmel,watchdog-type", &tmp) &&
-> > +	    !strcmp(tmp, "software"))
-> > +		mr |= AT91_WDT_WDFIEN;
-> > +	else
-> > +		mr |= AT91_WDT_WDRSTEN;
-> > +
-> > +	if (of_property_read_bool(np, "atmel,idle-halt"))
-> > +		mr |= AT91_WDT_WDIDLEHLT;
-> > +
-> > +	if (of_property_read_bool(np, "atmel,dbg-halt"))
-> > +		mr |= AT91_WDT_WDDBGHLT;
-> > +
-> > +	if ((mr & AT91_WDT_WDFIEN) && irq) {
-> >  		ret = devm_request_irq(&pdev->dev, irq, sama5d4_wdt_irq_handler,
-> >  				       IRQF_SHARED | IRQF_IRQPOLL |
-> >  				       IRQF_NO_SUSPEND, pdev->name, pdev);
-> > @@ -228,9 +194,19 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
-> >  		return ret;
-> >  	}
-> > 
-> > -	ret = sama5d4_wdt_init(wdt);
-> > -	if (ret)
-> > -		return ret;
-> > +	/*
-> > +	 * WDV and WDD must not be modified when the WDDIS bit is set, so clear
-> > +	 * the WDDIS bit before writing the WDT_MR.
-> > +	 */
-> > +	reg = wdt_read(wdt, AT91_WDT_MR);
-> > +	reg &= ~AT91_WDT_WDDIS;
-> > +	wdt_write(wdt, AT91_WDT_MR, reg);
-> > +
-> > +	reg = mr;
-> > +	reg |= AT91_WDT_SET_WDD(WDT_SEC2TICKS(wdd->timeout));
-> > +	reg |= AT91_WDT_SET_WDV(WDT_SEC2TICKS(wdd->timeout));
-> > +
-> > +	wdt_write(wdt, AT91_WDT_MR, reg);
-> > 
-> >  	watchdog_set_nowayout(wdd, nowayout);
-> > 
-> > 
-> 
+
+Exactly not, if you do that, checkpatch will complain loudly. Because
+you must not add a driver using bindings that are not documented first.
+
 
 -- 
 Alexandre Belloni, Free Electrons
