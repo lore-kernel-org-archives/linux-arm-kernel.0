@@ -1,51 +1,63 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 17 Feb 2017 17:03:48 +0100
-Subject: [RFC 3/4] dt-bindings: iio: add support for GPIO triggers
+Date: Fri, 17 Feb 2017 17:03:46 +0100
+Subject: [RFC 1/4] dt-bindings: iio: introduce trigger providers, consumers
 In-Reply-To: <1487347429-31761-1-git-send-email-fabrice.gasnier@st.com>
 References: <1487347429-31761-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1487347429-31761-4-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1487347429-31761-2-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document Industrial I/O GPIO trigger support.
+Document iio provider and consumer bindings.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- .../bindings/iio/trigger/iio-trig-gpio.txt         | 26 ++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/trigger/iio-trig-gpio.txt
+ .../devicetree/bindings/iio/iio-bindings.txt       | 37 ++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/iio/trigger/iio-trig-gpio.txt b/Documentation/devicetree/bindings/iio/trigger/iio-trig-gpio.txt
-new file mode 100644
-index 0000000..a8dbf5c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/trigger/iio-trig-gpio.txt
-@@ -0,0 +1,26 @@
-+Industrial I/O - GPIO based trigger
+diff --git a/Documentation/devicetree/bindings/iio/iio-bindings.txt b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+index 68d6f8c..3125390 100644
+--- a/Documentation/devicetree/bindings/iio/iio-bindings.txt
++++ b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+@@ -95,3 +95,40 @@ vdd channel is connected to output 0 of the &ref device.
+ 		io-channels = <&adc 10>, <&adc 11>;
+ 		io-channel-names = "adc1", "adc2";
+ 	};
 +
-+GPIOs may be used as IIO trigger provider, when trigger is connected to
-+GPIO lines.
++==IIO trigger providers==
++Sources of IIO triggers can be represented by any node in the device
++tree. Those nodes are designated as IIO trigger providers. IIO trigger
++consumer uses a phandle and an IIO trigger specifier to connect to an
++IIO trigger provider.
++An IIO trigger specifier is an array of one or more cells identifying
++the IIO trigger output on a device. The length of an IIO trigger
++specifier is defined by the value of a #io-trigger-cells property in
++the IIO trigger provider node.
 +
 +Required properties:
-+- compatible: Should be "iio-gpio-trigger"
-+- gpios: Should specify one GPIO line used as trigger source.
-+  See Documentation/devicetree/bindings/gpio/gpio.txt
-+- #io-trigger-cells: Should be 0, as simple trigger provider.
-+  See Documentation/devicetree/bindings/iio/iio-bindings.txt
-+
-+Optional properties:
-+- label: String to specifiy trigger name.
-+- gpio-trigger-rising-edge: A rising edge on GPIO will trigger.
-+- gpio-trigger-falling-edge: A falling edge on GPIO will trigger.
-+  Note: Both rising and falling edge may be used. In case none of
-+  rising or falling edge is selected, rising edge is selected by
-+  default.
++#io-trigger-cells:
++		Number of cells in an IIO trigger specifier; Typically
++		0 for nodes with a simple IIO trigger output.
 +
 +Example:
 +	gpiotrig0: iio-gpio-trigger0 {
 +		#io-trigger-cells = <0>;
 +		compatible = "iio-gpio-trigger";
 +		gpios = <&gpioa 11 0>;
++	}
++
++==IIO trigger consumers==
++Required properties:
++- io-triggers:	List of phandle representing the IIO trigger specifier.
++
++Optional properties:
++- io-trigger-names :
++		List of IIO trigger name strings that matches elements
++		in 'io-triggers' list property.
++
++Example:
++	some_trigger_consumer {
++		io-triggers = <&gpiotrig0>;
++		io-trigger-names = "mytrig";
 +	}
 -- 
 1.9.1
