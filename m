@@ -1,11 +1,11 @@
-From: steve_longerbeam@mentor.com (Steve Longerbeam)
-Date: Fri, 17 Feb 2017 17:11:03 -0800
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Fri, 17 Feb 2017 17:12:44 -0800
 Subject: [PATCH v4 29/36] media: imx: mipi-csi2: enable setting and
  getting of frame rates
 In-Reply-To: <1487211578-11360-30-git-send-email-steve_longerbeam@mentor.com>
 References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
  <1487211578-11360-30-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <f009ada9-a480-3961-d42c-8c4f117e9134@mentor.com>
+Message-ID: <24d42948-a77d-445f-e3e9-ab595b0cfc3e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
