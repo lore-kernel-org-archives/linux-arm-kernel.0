@@ -1,63 +1,47 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 18 Feb 2017 19:22:35 +0000
-Subject: [RFC 3/4] dt-bindings: iio: add support for GPIO triggers
-In-Reply-To: <1487347429-31761-4-git-send-email-fabrice.gasnier@st.com>
-References: <1487347429-31761-1-git-send-email-fabrice.gasnier@st.com>
- <1487347429-31761-4-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <01819bd3-3d24-b1fc-04aa-52348ff7f3bf@kernel.org>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Sat, 18 Feb 2017 20:45:01 +0100 (CET)
+Subject: [PATCH 0/2] mfd: axp20x: Restore master mode support on AXP806
+Message-ID: <cover.1487428238.git.rask@formelder.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/02/17 16:03, Fabrice Gasnier wrote:
-> Document Industrial I/O GPIO trigger support.
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Whilst I think this needs redoing for the interrupt trigger driver,
-please be aware that bindings must be OS agnostic i.e. you can't
-name things after linux specific subsystem.  We get a lot
-of stick for the iio-hwmon bindings specifically for doing this!
+The AXP806 (and very similar AXP808) PMICs can be wired to either master
+mode or slave mode on a board-by-board basis. A register on the PMIC needs
+to be set accordingly for the PMIC to respond to other register accesses.
+The "xpowers,master-mode" property introduced in this patch series lets a
+board's device tree specify the correct operating mode to use.
 
-Which makes this 'interesting' to describe.
+Known boards with the Allwinner A80 SoC include an AXP806 or AXP808.
+The AXP806 support used to rely on the vendor boot loader to set the
+operating mode, but nowadays, mainline U-Boot (since V2016.11) is usable
+on boards using the A80 SoC, but doesn't yet have any support for the
+AXP806 PMIC. So for kernel 4.11, a patch went in to always set the
+AXP806 to slave mode to keep those two boards working (see below). That,
+however, broke support for boards where the PMIC is wired for master mode.
 
-Once we have it updated feedback from Rob and Mark will definitely be needed on
-this one.
+There are so far three boards using the AXP806 PMIC support:
+- Merrii A80 Optimus and Cubieboard4 developer boards with an AXP809
+  paired with an AXP806 in slave mode. A device tree for each of these
+  boards have been in the tree for a while now.
+- Sunchip CX-A99 which uses just an AXP808 in master mode. An
+  out-of-tree device tree works with the 4.9.9 and 4.10-rc7 kernels.
+  A device tree will be submitted along with support for *-supply
+  properties taking a regulator list.
 
-Jonathan
-> ---
->  .../bindings/iio/trigger/iio-trig-gpio.txt         | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/trigger/iio-trig-gpio.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/iio/trigger/iio-trig-gpio.txt b/Documentation/devicetree/bindings/iio/trigger/iio-trig-gpio.txt
-> new file mode 100644
-> index 0000000..a8dbf5c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/trigger/iio-trig-gpio.txt
-> @@ -0,0 +1,26 @@
-> +Industrial I/O - GPIO based trigger
-> +
-> +GPIOs may be used as IIO trigger provider, when trigger is connected to
-> +GPIO lines.
-> +
-> +Required properties:
-> +- compatible: Should be "iio-gpio-trigger"
-> +- gpios: Should specify one GPIO line used as trigger source.
-> +  See Documentation/devicetree/bindings/gpio/gpio.txt
-> +- #io-trigger-cells: Should be 0, as simple trigger provider.
-> +  See Documentation/devicetree/bindings/iio/iio-bindings.txt
-> +
-> +Optional properties:
-> +- label: String to specifiy trigger name.
-> +- gpio-trigger-rising-edge: A rising edge on GPIO will trigger.
-> +- gpio-trigger-falling-edge: A falling edge on GPIO will trigger.
-> +  Note: Both rising and falling edge may be used. In case none of
-> +  rising or falling edge is selected, rising edge is selected by
-> +  default.
-> +
-> +Example:
-> +	gpiotrig0: iio-gpio-trigger0 {
-> +		#io-trigger-cells = <0>;
-> +		compatible = "iio-gpio-trigger";
-> +		gpios = <&gpioa 11 0>;
-> +	}
-> 
+The default needs to be slave mode for compatibility with the two boards'
+device trees that are using the "xpowers,axp806" compatible since kernel
+4.9 when the AXP806 support was added.
+
+Patch 1 adds the "xpowers,master-mode" property to the AXP806 binding.
+Patch 2 adds support for it to the axp20x driver.
+
+Rask Ingemann Lambertsen (2):
+  dts: mfd: axp20x: Add xpowers,master-mode property for AXP806 PMICs
+  mfd: axp20x: Add support for dts property "xpowers,master-mode"
+
+ Documentation/devicetree/bindings/mfd/axp20x.txt |  3 +++
+ drivers/mfd/axp20x.c                             | 21 +++++++++++++--------
+ 2 files changed, 16 insertions(+), 8 deletions(-)
+
+-- 
+2.10.2
