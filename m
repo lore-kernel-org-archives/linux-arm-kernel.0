@@ -1,31 +1,63 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 18 Feb 2017 19:19:07 +0000
-Subject: [RFC 4/4] iio: trigger: add GPIO trigger
-In-Reply-To: <06f74b54-91fa-31c5-f015-52a6524059ef@metafoo.de>
+Date: Sat, 18 Feb 2017 19:22:35 +0000
+Subject: [RFC 3/4] dt-bindings: iio: add support for GPIO triggers
+In-Reply-To: <1487347429-31761-4-git-send-email-fabrice.gasnier@st.com>
 References: <1487347429-31761-1-git-send-email-fabrice.gasnier@st.com>
- <1487347429-31761-5-git-send-email-fabrice.gasnier@st.com>
- <06f74b54-91fa-31c5-f015-52a6524059ef@metafoo.de>
-Message-ID: <3e2653fe-874c-d761-b274-ffe889df18a7@kernel.org>
+ <1487347429-31761-4-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <01819bd3-3d24-b1fc-04aa-52348ff7f3bf@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/02/17 16:16, Lars-Peter Clausen wrote:
-> On 02/17/2017 05:03 PM, Fabrice Gasnier wrote:
->> GPIOs can be used to generate triggers for any IIO device.
->> Introduce generic GPIO trigger driver. It offers some options
->> to tune polarity (e.g. rising/falling edge), and label so trigger
->> name may be customized.
->> By default, gpio triggers will be named gpiotrigX, where X is gpio
->> number as returned by desc_to_gpio() call.
->> Rising edge is selected if polarity isn't set.
+On 17/02/17 16:03, Fabrice Gasnier wrote:
+> Document Industrial I/O GPIO trigger support.
 > 
-> If you want to use the GPIO only as an interrupt, just use it as an
-> interrupt directly, no need to go the route via the GPIO.
-Absolutely.  The majority of the bindings will then just become standard
-interrupt bindings and will be effectively handled for you.
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Whilst I think this needs redoing for the interrupt trigger driver,
+please be aware that bindings must be OS agnostic i.e. you can't
+name things after linux specific subsystem.  We get a lot
+of stick for the iio-hwmon bindings specifically for doing this!
 
-Please work to extend the existing interrupt trigger driver rather than adding
-this new one.  That one actually started as a gpio trigger then got
-generalised into a interrupt trigger later so lets not do that again ;)
+Which makes this 'interesting' to describe.
+
+Once we have it updated feedback from Rob and Mark will definitely be needed on
+this one.
 
 Jonathan
+> ---
+>  .../bindings/iio/trigger/iio-trig-gpio.txt         | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/trigger/iio-trig-gpio.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/trigger/iio-trig-gpio.txt b/Documentation/devicetree/bindings/iio/trigger/iio-trig-gpio.txt
+> new file mode 100644
+> index 0000000..a8dbf5c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iio/trigger/iio-trig-gpio.txt
+> @@ -0,0 +1,26 @@
+> +Industrial I/O - GPIO based trigger
+> +
+> +GPIOs may be used as IIO trigger provider, when trigger is connected to
+> +GPIO lines.
+> +
+> +Required properties:
+> +- compatible: Should be "iio-gpio-trigger"
+> +- gpios: Should specify one GPIO line used as trigger source.
+> +  See Documentation/devicetree/bindings/gpio/gpio.txt
+> +- #io-trigger-cells: Should be 0, as simple trigger provider.
+> +  See Documentation/devicetree/bindings/iio/iio-bindings.txt
+> +
+> +Optional properties:
+> +- label: String to specifiy trigger name.
+> +- gpio-trigger-rising-edge: A rising edge on GPIO will trigger.
+> +- gpio-trigger-falling-edge: A falling edge on GPIO will trigger.
+> +  Note: Both rising and falling edge may be used. In case none of
+> +  rising or falling edge is selected, rising edge is selected by
+> +  default.
+> +
+> +Example:
+> +	gpiotrig0: iio-gpio-trigger0 {
+> +		#io-trigger-cells = <0>;
+> +		compatible = "iio-gpio-trigger";
+> +		gpios = <&gpioa 11 0>;
+> +	}
+> 
