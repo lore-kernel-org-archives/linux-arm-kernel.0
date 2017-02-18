@@ -1,65 +1,44 @@
-From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Sat, 18 Feb 2017 21:11:32 +0100 (CET)
-Subject: [PATCH 2/2] mfd: axp20x: Add support for dts property
- "xpowers,master-mode"
-In-Reply-To: <cover.1487428238.git.rask@formelder.dk>
-References: <cover.1487428238.git.rask@formelder.dk>
-Message-ID: <10a2231445e8ccbb83d54bb84d91b4d61b4d642f.1487428239.git.rask@formelder.dk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 18 Feb 2017 22:41:22 +0100
+Subject: ARM: SoC fixes for v4.10
+Message-ID: <5133141.CpkHmg62Ix@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit b101829a029a ("mfd: axp20x: Fix AXP806 access errors on cold boot")
-was intended to fix the case where a board uses an AXP806 in slave mode,
-but the boot loader leaves it in master mode for lack of AXP806 support.
-But now the driver breaks on boards where the PMIC is operating in master
-mode. This patch lets the driver use the new device tree property
-"xpowers,master-mode" to set the correct operating mode for the board.
+The following changes since commit 7089db84e356562f8ba737c29e472cc42d530dbc:
 
-Fixes: b101829a029a ("mfd: axp20x: Fix AXP806 access errors on cold boot")
-Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
----
- drivers/mfd/axp20x.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+  Linux 4.10-rc8 (2017-02-12 13:03:20 -0800)
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 25115fe..0512900 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -31,6 +31,7 @@
- 
- #define AXP20X_OFF	0x80
- 
-+#define AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE	0
- #define AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE	BIT(4)
- 
- static const char * const axp20x_model_names[] = {
-@@ -877,15 +878,19 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
- 	 * the these device addressing bits (in the upper 4 bits of the
- 	 * registers) match.
- 	 *
--	 * Since we only support an AXP806 chained to an AXP809 in slave
--	 * mode, and there isn't any existing hardware which uses AXP806
--	 * in master mode, or has 2 AXP806s in the same system, we can
--	 * just program the register address extension to the slave mode
--	 * address.
-+	 * By default we support an AXP806 chained to an AXP809 in slave
-+	 * mode. Boards which use an AXP806 in master mode can set the
-+	 * property "x-powers,master-mode" to override the default.
- 	 */
--	if (axp20x->variant == AXP806_ID)
--		regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
--			     AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
-+	if (axp20x->variant == AXP806_ID) {
-+		if (of_property_read_bool(axp20x->dev->of_node,
-+					  "x-powers,master-mode"))
-+			regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
-+				     AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE);
-+		else
-+			regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
-+				     AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
-+	}
- 
- 	ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
- 			  IRQF_ONESHOT | IRQF_SHARED | axp20x->irq_flags,
--- 
-2.10.2
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+
+for you to fetch changes up to 69e05170ef0d0c00e1098dd6a625b44f39903a6a:
+
+  ARM: multi_v7_defconfig: enable Qualcomm RPMCC (2017-02-18 22:34:52 +0100)
+
+----------------------------------------------------------------
+ARM: SoC fixes for v4.10
+
+Two more bugfixes that came in during this week:
+
+- one defconfig change to enable a vital driver used on some Qualcomm
+  based phones. This was already queued for 4.11, but the maintainer
+  asked to have it in 4.10 after all.
+
+- One regression fix for the reset controller framework, this got
+  broken by a typo in the 4.10 merge window.
+
+----------------------------------------------------------------
+Andy Gross (1):
+      ARM: multi_v7_defconfig: enable Qualcomm RPMCC
+
+Arnd Bergmann (1):
+      Merge tag 'reset-for-4.10-fixes' of https://git.pengutronix.de/git/pza/linux into fixes
+
+Jerome Brunet (1):
+      reset: fix shared reset triggered_count decrement on error
+
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ drivers/reset/core.c                | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
