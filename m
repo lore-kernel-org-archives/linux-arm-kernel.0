@@ -1,28 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 18 Feb 2017 15:05:18 +0100
-Subject: [PATCH 2/4] PCI: add driver for Cortina Gemini Host Bridge
-In-Reply-To: <3658176.ffWihUmtIa@wuerfel>
-References: <20170128204839.18330-1-linus.walleij@linaro.org>
- <2695922.yyinjvNuJK@wuerfel>
- <CACRpkdb=BqihykWo3egtNW1VKE2-FV+nJQQVYOc2GdCvh1fMng@mail.gmail.com>
- <3658176.ffWihUmtIa@wuerfel>
-Message-ID: <CACRpkdZ4OKCifVogYN3MCnyZ6y9U_Pg2tNsjy5f02wxGOykAhg@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 18 Feb 2017 14:12:13 +0000
+Subject: [PATCH] DTS: Linksys Board: Add default trigger for sata led
+In-Reply-To: <1487364137-3008-1-git-send-email-ansuelsmth@gmail.com>
+References: <1487364137-3008-1-git-send-email-ansuelsmth@gmail.com>
+Message-ID: <20170218141213.GK25924@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 3:08 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday, February 4, 2017 7:43:15 PM CET Linus Walleij wrote:
+Hi Ansuel,
 
-> Did you notice my other comment below (quoting from my own
-> message)?
->
->> > +
->> > +     bus = pci_scan_root_bus(&pdev->dev, 0, &gemini_pci_ops, p, &res);
->>
->> Can you try using the new pci_register_host_bridge() API?
+On Fri, Feb 17, 2017 at 09:42:17PM +0100, Ansuel Smith wrote:
+> In others board we have the sata led set to funcion with the sata led trigger by default.
+> This patch makes the same for these board that have sata led but disabled by not associating it to any trigger
 
-Yes. It crashes badly when I try it so I'm still trying to figure this out...
-If I do I will send an iteration.
+Please line wrap the commit message.  Other than that,
 
-Yours,
-Linus Walleij
+> 
+> Signed-off-by: Ansuel Smith <ansuelsmth@gmail.com>
+
+Acked-by: Jason Cooper <jason@lakedaemon.net>
+
+thx,
+
+Jason.
+
+> ---
+>  arch/arm/boot/dts/armada-385-linksys-caiman.dts | 1 +
+>  arch/arm/boot/dts/armada-385-linksys-cobra.dts  | 1 +
+>  arch/arm/boot/dts/armada-xp-linksys-mamba.dts   | 1 +
+>  3 files changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/armada-385-linksys-caiman.dts b/arch/arm/boot/dts/armada-385-linksys-caiman.dts
+> index f3cee91..a1b6e68 100644
+> --- a/arch/arm/boot/dts/armada-385-linksys-caiman.dts
+> +++ b/arch/arm/boot/dts/armada-385-linksys-caiman.dts
+> @@ -109,6 +109,7 @@
+>  
+>  		sata {
+>  			label = "caiman:white:sata";
+> +			linux,default-trigger = "disk-activity";
+>  		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/armada-385-linksys-cobra.dts b/arch/arm/boot/dts/armada-385-linksys-cobra.dts
+> index 1110718..a1a75af 100644
+> --- a/arch/arm/boot/dts/armada-385-linksys-cobra.dts
+> +++ b/arch/arm/boot/dts/armada-385-linksys-cobra.dts
+> @@ -109,6 +109,7 @@
+>  
+>  		sata {
+>  			label = "cobra:white:sata";
+> +			linux,default-trigger = "disk-activity";
+>  		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> index 83ac884..dcd73ab 100644
+> --- a/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> +++ b/arch/arm/boot/dts/armada-xp-linksys-mamba.dts
+> @@ -156,6 +156,7 @@
+>  					esata at 4 {
+>  						label = "mamba:white:esata";
+>  						reg = <0x4>;
+> +						linux,default-trigger = "disk-activity";
+>  					};
+>  
+>  					usb2 at 5 {
+> -- 
+> 1.9.1
+> 
