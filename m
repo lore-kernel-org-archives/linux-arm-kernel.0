@@ -1,44 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 18 Feb 2017 22:41:22 +0100
-Subject: ARM: SoC fixes for v4.10
-Message-ID: <5133141.CpkHmg62Ix@wuerfel>
+From: marex@denx.de (Marek Vasut)
+Date: Sat, 18 Feb 2017 23:20:32 +0100
+Subject: Aarch64 kernel with 32bit userspace question
+In-Reply-To: <6172994.uov8zcY07Z@wuerfel>
+References: <0057242a-2e16-3b59-1f81-9f4ccf64216d@denx.de>
+ <20170209122509.GD27312@n2100.armlinux.org.uk>
+ <78db1867-9bd2-b1f6-ea3f-86aa08c199f5@denx.de> <6172994.uov8zcY07Z@wuerfel>
+Message-ID: <0a76940b-8f45-2ca0-a011-271f9da7517e@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7089db84e356562f8ba737c29e472cc42d530dbc:
+On 02/10/2017 01:39 PM, Arnd Bergmann wrote:
+> On Thursday, February 9, 2017 9:38:41 PM CET Marek Vasut wrote:
+>>>
+>>> The default kernel headers_install will want to place the headers into
+>>> <includepath>/asm along side <includepath>/asm-generic and
+>>> <includepath>/linux which is not what modern ARM distros want.
+>>
+>> Thanks for all the help, it at least helped me get a better picture how
+>> the multilib stuff works on arm/aarch64 .
+>>
+>> It turns out that OE is not yet able to generate multilib sdk, while it
+>> is able to generate multilib system image. Therefore, while I had two
+>> different compilers, only one sysroot was installed (aarch64 one) and
+>> both were pointing into it. The 32bit compiler used the wrong headers,
+>> so I ran into this issue.  I'll have to drill into the OE further to
+>> figure out the proper solution.
+> 
+> It seems the support for biarch headers was removed from the kernel
+> a few years before arm64 got merged: https://lkml.org/lkml/2008/6/30/467
+> 
+> You could still use "make headers_install_all" in place of
+> "make headers_install" in 
 
-  Linux 4.10-rc8 (2017-02-12 13:03:20 -0800)
+Whoa, I didn't know about this trick, nice :)
 
-are available in the git repository at:
+> http://git.yoctoproject.org/cgit.cgi/poky/plain/meta/recipes-kernel/linux-libc-headers/linux-libc-headers.inc
+> but you still have to figure out how to find the right headers,
+> either by moving the two asm directories to /usr/{arm,aarch64}-linux-gnu/include/asm
+> or by doing the same trick that we had before the 2008 patch.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+Well, I think I will wait for the multilib support to be fixed in OE
+(someone is already working on it). Until then, I will stick with 32bit
+userspace, which should be good enough for now.
 
-for you to fetch changes up to 69e05170ef0d0c00e1098dd6a625b44f39903a6a:
+Thanks for the help!
 
-  ARM: multi_v7_defconfig: enable Qualcomm RPMCC (2017-02-18 22:34:52 +0100)
-
-----------------------------------------------------------------
-ARM: SoC fixes for v4.10
-
-Two more bugfixes that came in during this week:
-
-- one defconfig change to enable a vital driver used on some Qualcomm
-  based phones. This was already queued for 4.11, but the maintainer
-  asked to have it in 4.10 after all.
-
-- One regression fix for the reset controller framework, this got
-  broken by a typo in the 4.10 merge window.
-
-----------------------------------------------------------------
-Andy Gross (1):
-      ARM: multi_v7_defconfig: enable Qualcomm RPMCC
-
-Arnd Bergmann (1):
-      Merge tag 'reset-for-4.10-fixes' of https://git.pengutronix.de/git/pza/linux into fixes
-
-Jerome Brunet (1):
-      reset: fix shared reset triggered_count decrement on error
-
- arch/arm/configs/multi_v7_defconfig | 1 +
- drivers/reset/core.c                | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+-- 
+Best regards,
+Marek Vasut
