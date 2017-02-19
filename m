@@ -1,30 +1,39 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun, 19 Feb 2017 04:19:58 +0100
-Subject: [PATCH 2/4] Documentation: devicetree: arm: Document Marvell IAP140
+Date: Sun, 19 Feb 2017 04:20:00 +0100
+Subject: [PATCH 4/4] ARM64: dts: marvell: iap140-andromeda-box-edge: Add uart0
+ clock
 In-Reply-To: <20170219032000.4674-1-afaerber@suse.de>
 References: <20170219032000.4674-1-afaerber@suse.de>
-Message-ID: <20170219032000.4674-3-afaerber@suse.de>
+Message-ID: <20170219032000.4674-5-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Use a fixed clock to enable ttyS0 output.
+
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- Documentation/devicetree/bindings/arm/marvell/iap140.txt | 7 +++++++
+ arch/arm64/boot/dts/marvell/iap140-andromeda-box-edge.dts | 7 +++++++
  1 file changed, 7 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/marvell/iap140.txt
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell/iap140.txt b/Documentation/devicetree/bindings/arm/marvell/iap140.txt
-new file mode 100644
-index 0000000..25d307c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/marvell/iap140.txt
-@@ -0,0 +1,7 @@
-+Marvell IAP140 Device Tree Bindings
-+-----------------------------------
+diff --git a/arch/arm64/boot/dts/marvell/iap140-andromeda-box-edge.dts b/arch/arm64/boot/dts/marvell/iap140-andromeda-box-edge.dts
+index de01d93..dceab69 100644
+--- a/arch/arm64/boot/dts/marvell/iap140-andromeda-box-edge.dts
++++ b/arch/arm64/boot/dts/marvell/iap140-andromeda-box-edge.dts
+@@ -63,8 +63,15 @@
+ 		device_type = "memory";
+ 		reg = <0x0 0x0 0x0 0x40000000>;
+ 	};
 +
-+Boards using a SoC of the Marvell IAP140 family must carry the following
-+root node property:
-+
-+ - compatible :  must contain "mrvl,iap140"
++	uart0_clk: uart0-clk {
++		compatible = "fixed-clock";
++		clock-frequency = <14740000>;
++		#clock-cells = <0>;
++	};
+ };
+ 
+ &uart0 {
+ 	status = "okay";
++	clocks = <&uart0_clk>;
+ };
 -- 
 2.10.2
