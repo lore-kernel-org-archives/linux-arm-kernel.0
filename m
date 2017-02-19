@@ -1,60 +1,36 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 19 Feb 2017 22:41:46 +0100
-Subject: [PATCH v5 6/9] ARM64: dts: meson-gxbb-wetek-play2: add the ethernet
- PHY's reset GPIO
+Date: Sun, 19 Feb 2017 22:41:49 +0100
+Subject: [PATCH v5 9/9] ARM64: dts: meson-gx: remove the phy-mode property
+ from meson-gx
 In-Reply-To: <20170219214149.30418-1-martin.blumenstingl@googlemail.com>
 References: <20170122181028.5014-1-martin.blumenstingl@googlemail.com>
  <20170219214149.30418-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170219214149.30418-7-martin.blumenstingl@googlemail.com>
+Message-ID: <20170219214149.30418-10-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This resets the ethernet PHY during boot to get the PHY into a "clean"
-state.
-While here also specify the phy-handle of the ethmac node to make the
-PHY configuration similar to the one we have on GXL devices. This will
-allow us to specify OF-properties for the PHY itself.
+The ethmac node has to be configured for each board due to different
+pinctrl nodes for RGMII/RMII. Thus the phy-mode should be specified at
+the same place (= in the board .dts), making it easier to read the board
+.dts file (because the phy-mode is stated explicitly, without requiring
+developers to read all "parent" .dtsi as well).
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Tested-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../boot/dts/amlogic/meson-gxbb-wetek-play2.dts    | 24 ++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
-index ea79fdd2c248..ee86af928722 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
-@@ -87,6 +87,30 @@
- 	};
- };
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+index 5d995f7724af..d544b8f2ffbf 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+@@ -410,7 +410,6 @@
+ 			       0x0 0xc8834540 0x0 0x4>;
+ 			interrupts = <0 8 1>;
+ 			interrupt-names = "macirq";
+-			phy-mode = "rgmii";
+ 			status = "disabled";
+ 		};
  
-+&ethmac {
-+	status = "okay";
-+	pinctrl-0 = <&eth_rgmii_pins>;
-+	pinctrl-names = "default";
-+
-+	phy-handle = <&eth_phy0>;
-+	phy-mode = "rgmii";
-+
-+	snps,reset-gpio = <&gpio GPIOZ_14 0>;
-+	snps,reset-delays-us = <0 10000 1000000>;
-+	snps,reset-active-low;
-+
-+	mdio {
-+		compatible = "snps,dwmac-mdio";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		eth_phy0: ethernet-phy at 0 {
-+			/* Realtek RTL8211F (0x001cc916) */
-+			reg = <0>;
-+		};
-+	};
-+};
-+
- &i2c_A {
- 	status = "okay";
- 	pinctrl-0 = <&i2c_a_pins>;
 -- 
 2.11.1
