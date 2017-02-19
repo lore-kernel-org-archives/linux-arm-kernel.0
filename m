@@ -1,261 +1,190 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 19 Feb 2017 14:13:07 +0000
-Subject: [RFC v2 1/7] iio: Add hardware consumer support
-In-Reply-To: <1487003909-11710-2-git-send-email-arnaud.pouliquen@st.com>
+Date: Sun, 19 Feb 2017 14:20:43 +0000
+Subject: [RFC v2 3/7] IIO: ADC: add sigma delta modulator support
+In-Reply-To: <1487003909-11710-4-git-send-email-arnaud.pouliquen@st.com>
 References: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
- <1487003909-11710-2-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <f796e9ec-72b3-85f9-237f-8d19d89a9846@kernel.org>
+ <1487003909-11710-4-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <46e0c35c-6f77-3fde-161c-4db32a124aa7@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 13/02/17 16:38, Arnaud Pouliquen wrote:
-> Hardware consumer's can be used when one IIO device has a direct connection
-> to another device in hardware.
+> Add dummy driver to support sigma delta modulators.
+Interesting to see how you are pulling this together.
+
+Trivial bits inline.
 > 
-> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
-Quick process point. If you are 'handling' a patch like this from someone
-else you should also sign off on it as well as the original author. We
-need to keep track of the path a patch took as well as who originally wrote
-it.
-
-Clearly this is an RFC so some of the comments below don't really apply at
-this stage. It's easy to note them whilst reading though so I have done
-so!
-
-It's interesting to see explicit support in here for multiplexing streams
-from different iio_devs.
-
-Anyhow, guess I'd better look at how it is used before drawing too many
-conclusions :)
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 > ---
->  drivers/iio/Kconfig             |   6 ++
->  drivers/iio/Makefile            |   1 +
->  drivers/iio/hw_consumer.c       | 156 ++++++++++++++++++++++++++++++++++++++++
->  include/linux/iio/hw_consumer.h |  12 ++++
->  4 files changed, 175 insertions(+)
->  create mode 100644 drivers/iio/hw_consumer.c
->  create mode 100644 include/linux/iio/hw_consumer.h
+>  drivers/iio/adc/Kconfig         |  11 ++++
+>  drivers/iio/adc/Makefile        |   1 +
+>  drivers/iio/adc/simple_sd_adc.c | 112 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 124 insertions(+)
+>  create mode 100644 drivers/iio/adc/simple_sd_adc.c
 > 
-> diff --git a/drivers/iio/Kconfig b/drivers/iio/Kconfig
-> index 6743b18..956dd18 100644
-> --- a/drivers/iio/Kconfig
-> +++ b/drivers/iio/Kconfig
-> @@ -30,6 +30,12 @@ config IIO_CONFIGFS
->  	  (e.g. software triggers). For more info see
->  	  Documentation/iio/iio_configfs.txt.
+> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+> index e0b3c09..d4366ac 100644
+> --- a/drivers/iio/adc/Kconfig
+> +++ b/drivers/iio/adc/Kconfig
+> @@ -419,6 +419,17 @@ config ROCKCHIP_SARADC
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called rockchip_saradc.
 >  
-> +config IIO_HW_CONSUMER
-> +	tristate
+> +config SIMPLE_SD_ADC
+> +	tristate "Simple sigma delta modulator"
+> +	depends on OF
+> +        select IIO_BUFFER
+> +        select IIO_TRIGGERED_BUFFER
 > +	help
-> +	  Hardware consumer buffer
-Needs some proper help that actually tells us what it is for.
+> +	  Select this option to enables generic sigma delta modulator.
 > +
+> +	  This driver can also be built as a module.  If so, the module
+> +	  will be called simple-sd-adc.
 > +
->  config IIO_TRIGGER
->  	bool "Enable triggered sampling support"
->  	help
-> diff --git a/drivers/iio/Makefile b/drivers/iio/Makefile
-> index 87e4c43..8472b97 100644
-> --- a/drivers/iio/Makefile
-> +++ b/drivers/iio/Makefile
-> @@ -6,6 +6,7 @@ obj-$(CONFIG_IIO) += industrialio.o
->  industrialio-y := industrialio-core.o industrialio-event.o inkern.o
->  industrialio-$(CONFIG_IIO_BUFFER) += industrialio-buffer.o
->  industrialio-$(CONFIG_IIO_TRIGGER) += industrialio-trigger.o
-> +obj-$(CONFIG_IIO_HW_CONSUMER) += hw_consumer.o
->  
->  obj-$(CONFIG_IIO_CONFIGFS) += industrialio-configfs.o
->  obj-$(CONFIG_IIO_SW_DEVICE) += industrialio-sw-device.o
-> diff --git a/drivers/iio/hw_consumer.c b/drivers/iio/hw_consumer.c
+>  config STM32_ADC_CORE
+>  	tristate "STMicroelectronics STM32 adc core"
+>  	depends on ARCH_STM32 || COMPILE_TEST
+> diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
+> index 8e02a94..bd67144 100644
+> --- a/drivers/iio/adc/Makefile
+> +++ b/drivers/iio/adc/Makefile
+> @@ -57,3 +57,4 @@ obj-$(CONFIG_VF610_ADC) += vf610_adc.o
+>  obj-$(CONFIG_VIPERBOARD_ADC) += viperboard_adc.o
+>  xilinx-xadc-y := xilinx-xadc-core.o xilinx-xadc-events.o
+>  obj-$(CONFIG_XILINX_XADC) += xilinx-xadc.o
+> +obj-$(CONFIG_SIMPLE_SD_ADC) += simple_sd_adc.o
+> diff --git a/drivers/iio/adc/simple_sd_adc.c b/drivers/iio/adc/simple_sd_adc.c
 > new file mode 100644
-> index 0000000..66f0732
+> index 0000000..4bc8b3c
 > --- /dev/null
-> +++ b/drivers/iio/hw_consumer.c
-> @@ -0,0 +1,156 @@
-> +#include <linux/err.h>
-> +#include <linux/export.h>
-> +#include <linux/slab.h>
-> +#include <linux/mutex.h>
-> +#include <linux/of.h>
+> +++ b/drivers/iio/adc/simple_sd_adc.c
+> @@ -0,0 +1,112 @@
+> +/*
+> + * simple sigma delta modulator driver
+> + *
+> + * Copyright (C) 2016, STMicroelectronics - All Rights Reserved
+> + * Author: Arnaud Pouliquen <arnaud.pouliquen@st.com>.
+> + *
+> + * License type: GPLv2
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms of the GNU General Public License version 2 as published by
+> + * the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+> + * or FITNESS FOR A PARTICULAR PURPOSE.
+> + * See the GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along with
+> + * this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
 > +
 > +#include <linux/iio/iio.h>
-> +#include "iio_core.h"
-> +#include <linux/iio/machine.h>
-> +#include <linux/iio/driver.h>
-> +#include <linux/iio/consumer.h>
-> +#include <linux/iio/hw_consumer.h>
-> +#include <linux/iio/buffer.h>
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
 > +
-> +struct iio_hw_consumer {
-> +	struct list_head buffers;
-> +	struct iio_channel *channels;
-> +};
+> +#include <linux/iio/triggered_buffer.h>
 > +
-> +struct hw_consumer_buffer {
-> +	struct list_head head;
-> +	struct iio_dev *indio_dev;
-> +	struct iio_buffer buffer;
-> +};
-> +
-> +static struct hw_consumer_buffer *iio_buffer_to_hw_consumer_buffer(
-> +	struct iio_buffer *buffer)
+> +static int simple_sd_of_xlate(struct iio_dev *iio,
+> +			      const struct of_phandle_args *iiospec)
 > +{
-> +	return container_of(buffer, struct hw_consumer_buffer, buffer);
-> +}
-> +
-> +static void iio_hw_buf_release(struct iio_buffer *buffer)
-> +{
-> +	struct hw_consumer_buffer *hw_buf =
-> +		iio_buffer_to_hw_consumer_buffer(buffer);
-> +	kfree(hw_buf->buffer.scan_mask);
-> +	kfree(hw_buf);
-> +}
-> +
-> +static const struct iio_buffer_access_funcs iio_hw_buf_access = {
-> +	.release = &iio_hw_buf_release,
-> +	.modes = INDIO_BUFFER_HARDWARE,
-> +};
-> +
-I would like to see some kernel-doc description here. In particular the
-fact that it is only getting buffers if they haven't already been obtained
-should be highlighted.
-> +static struct hw_consumer_buffer *iio_hw_consumer_get_buffer(
-> +	struct iio_hw_consumer *hwc, struct iio_dev *indio_dev)
-> +{
-> +	struct hw_consumer_buffer *buf;
-> +
-> +	list_for_each_entry(buf, &hwc->buffers, head) {
-> +		if (buf->indio_dev == indio_dev)
-> +			return buf;
-> +	}
-> +
-> +	buf = kzalloc(sizeof(*buf), GFP_KERNEL);
-> +	if (!buf)
-> +		return NULL;
-> +
-> +	buf->buffer.access = &iio_hw_buf_access;
-> +	buf->indio_dev = indio_dev;
-> +	buf->buffer.scan_mask = kcalloc(BITS_TO_LONGS(indio_dev->masklength),
-> +		sizeof(long), GFP_KERNEL);
-> +	if (!buf->buffer.scan_mask)
-> +		goto err_free_buf;
-> +
-> +	iio_buffer_init(&buf->buffer);
-> +	list_add_tail(&buf->head, &hwc->buffers);
-> +
-> +	return buf;
-> +
-> +err_free_buf:
-> +	kfree(buf);
-> +	return NULL;
-> +}
-> +
-> +struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev)
-> +{
-> +	struct hw_consumer_buffer *buf;
-> +	struct iio_hw_consumer *hwc;
-> +	struct iio_channel *chan;
-> +	int ret;
-> +
-> +	hwc = kzalloc(sizeof(*hwc), GFP_KERNEL);
-> +	if (!hwc)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	INIT_LIST_HEAD(&hwc->buffers);
-> +
-> +	hwc->channels = iio_channel_get_all(dev);
-> +	if (IS_ERR(hwc->channels)) {
-> +		ret = PTR_ERR(hwc->channels);
-> +		goto err_free_hwc;
-> +	}
-> +
-> +	chan = &hwc->channels[0];
-> +	while (chan->indio_dev) {
-> +		buf = iio_hw_consumer_get_buffer(hwc, chan->indio_dev);
-Chances are these are all from the same provider device so this is a little
-interesting at first glance.  Ah, the get_buffer is handling that. Fair enough
-though will want comments to make that clear.
-> +		if (buf == NULL) {
-> +			ret = -ENOMEM;
-> +			goto err_put_buffers;
-> +		}
-> +		set_bit(chan->channel->scan_index, buf->buffer.scan_mask);
-> +		chan++;
-> +	}
-> +
-> +	return hwc;
-> +
-> +err_put_buffers:
-> +	list_for_each_entry(buf, &hwc->buffers, head)
-> +		iio_buffer_put(&buf->buffer);
-This seems to be putting a lot of buffers we don't (at first glance)
-seem to have 'gotten' - hence please add a comment saying where they came
-from.
-> +	iio_channel_release_all(hwc->channels);
-> +err_free_hwc:
-> +	kfree(hwc);
-> +	return ERR_PTR(ret);
-> +}
-> +EXPORT_SYMBOL_GPL(iio_hw_consumer_alloc);
-> +
-> +void iio_hw_consumer_free(struct iio_hw_consumer *hwc)
-> +{
-> +	struct hw_consumer_buffer *buf;
-> +
-> +	iio_channel_release_all(hwc->channels);
-> +	list_for_each_entry(buf, &hwc->buffers, head)
-> +		iio_buffer_put(&buf->buffer);
-> +	kfree(hwc);
-> +}
-> +EXPORT_SYMBOL_GPL(iio_hw_consumer_free);
-> +
-> +int iio_hw_consumer_enable(struct iio_hw_consumer *hwc)
-> +{
-> +	struct hw_consumer_buffer *buf;
-> +	int ret;
-> +
-> +	list_for_each_entry(buf, &hwc->buffers, head) {
-> +		ret = iio_update_buffers(buf->indio_dev, &buf->buffer, NULL);
-This is interesting.  It will build the demux table etc, but I suppose
-that doesn't matter if the very nature of thing is that we don't actually
-have any data flowing...
-> +		if (ret)
-> +			goto err_disable_buffers;
+> +	dev_dbg(&iio->dev, "%s:\n", __func__);
+> +	if (iiospec->args[0] != 0) {
+> +		dev_err(&iio->dev, "Only one channel supported\n");
+> +		return -EINVAL;
 > +	}
 > +
 > +	return 0;
-> +
-> +err_disable_buffers:
-> +	list_for_each_entry_continue_reverse(buf, &hwc->buffers, head)
-> +		iio_update_buffers(buf->indio_dev, NULL, &buf->buffer);
-> +	return ret;
 > +}
-> +EXPORT_SYMBOL_GPL(iio_hw_consumer_enable);
 > +
-> +void iio_hw_consumer_disable(struct iio_hw_consumer *hwc)
+> +static const struct iio_info simple_sd_iio_info = {
+> +	.of_xlate = simple_sd_of_xlate,
+> +};
+> +
+> +static const struct iio_buffer_setup_ops simple_sd_buffer_ops;
+I guess we insist on having some setup ops. We could relax
+that reasonably easily if this is going to become remotely
+common (perhaps by providing such a default in the core).
+> +
+> +static int simple_sd_probe(struct platform_device *pdev)
 > +{
-> +	struct hw_consumer_buffer *buf;
+> +	struct device *dev = &pdev->dev;
+> +	struct iio_dev *iio;
+> +	struct iio_chan_spec *ch;
 > +
-> +	list_for_each_entry(buf, &hwc->buffers, head)
-> +		iio_update_buffers(buf->indio_dev, NULL, &buf->buffer);
+> +	dev_dbg(&pdev->dev, "%s:\n", __func__);
+it's an RFC so fair enough, but please remember to drop this
+sort of output in the final version.
+
+> +	iio = devm_iio_device_alloc(dev, 0);
+> +	if (!iio)
+> +		return -ENOMEM;
+> +
+> +	/* Define one channel */
+> +	ch = devm_kzalloc(&iio->dev, sizeof(*ch), GFP_KERNEL);
+> +	if (!ch)
+> +		return -ENOMEM;
+> +
+> +	iio->dev.parent = dev;
+> +	iio->dev.of_node = dev->of_node;
+> +	iio->name = dev_name(dev);
+> +	iio->info = &simple_sd_iio_info;
+> +	iio->modes = INDIO_BUFFER_HARDWARE;
+> +
+> +	ch->type = IIO_VOLTAGE;
+> +	ch->indexed = 1;
+> +	ch->scan_index = 0;
+> +	ch->scan_type.sign = 'u';
+> +	ch->scan_type.realbits = 1;
+> +	ch->scan_type.storagebits = 1;
+> +	ch->scan_type.shift = 0;
+> +
+> +	iio->num_channels = 1;
+Static data (at lease currently) so do it as static const iio_chan_spec etc.
+Interesting to see it being described like this.
+
+I'd drop storagebits as it isn't 'stored' as such so this feels wrong and shift
+is the default so drop that too.
+
+> +	iio->channels = ch;
+> +
+> +	platform_set_drvdata(pdev, iio);
+> +
+> +	return iio_device_register(iio);
 > +}
-> +EXPORT_SYMBOL_GPL(iio_hw_consumer_disable);
-> diff --git a/include/linux/iio/hw_consumer.h b/include/linux/iio/hw_consumer.h
-> new file mode 100644
-> index 0000000..f12653d
-> --- /dev/null
-> +++ b/include/linux/iio/hw_consumer.h
-> @@ -0,0 +1,12 @@
-> +#ifndef LINUX_IIO_HW_CONSUMER_BUFFER_H
-> +#define LINUX_IIO_HW_CONSUMER_BUFFER_H
 > +
-> +struct device;
-> +struct iio_hw_consumer;
+> +static int simple_sd_remove(struct platform_device *pdev)
+> +{
+> +	struct iio_dev *iio = platform_get_drvdata(pdev);
 > +
-> +struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev);
-> +void iio_hw_consumer_free(struct iio_hw_consumer *hwc);
-> +int iio_hw_consumer_enable(struct iio_hw_consumer *hwc);
-> +void iio_hw_consumer_disable(struct iio_hw_consumer *hwc);
+> +	iio_device_unregister(iio);
+Having just the iio_device_unregister in a remove is a clear
+indication that you could have gotten away with
+devm_iio_device_register and dropped the remove entirely
+as there would be nothing to do.
 > +
-> +#endif
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id sd_adc_of_match[] = {
+> +	{ .compatible = "sd-modulator" },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, adc081c_of_match);
+> +
+> +static struct platform_driver simple_sd_adc = {
+> +	.driver = {
+> +		.name = "simple_sd_adc",
+> +		.of_match_table = of_match_ptr(sd_adc_of_match),
+> +	},
+> +	.probe = simple_sd_probe,
+> +	.remove = simple_sd_remove,
+> +};
+> +
+> +module_platform_driver(simple_sd_adc);
+> +
+> +MODULE_DESCRIPTION("simple signma delta modulator");
+> +MODULE_AUTHOR("Arnaud Pouliquen <arnaud.pouliquen@st.com>");
+> +MODULE_LICENSE("GPL v2");
 > 
