@@ -1,40 +1,460 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Sun, 19 Feb 2017 14:15:01 -0600
-Subject: [PATCH 3/3] ARM: socfpga: PM: Drop useless check for
- PM_SUSPEND_STANDBY
-In-Reply-To: <1487347836-14427-4-git-send-email-geert+renesas@glider.be>
-References: <1487347836-14427-1-git-send-email-geert+renesas@glider.be>
- <1487347836-14427-4-git-send-email-geert+renesas@glider.be>
-Message-ID: <d66793eb-dc03-e5ba-76e4-904acf6a5de9@kernel.org>
+From: plaes@plaes.org (Priit Laes)
+Date: Sun, 19 Feb 2017 22:28:00 +0200
+Subject: [PATCH 3/4] arm: dts: imx: Add iMX6Q-based Kontron SMARC-sAMX6i module
+In-Reply-To: <20170219202801.2082-1-plaes@plaes.org>
+References: <20170219202801.2082-1-plaes@plaes.org>
+Message-ID: <20170219202801.2082-4-plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+SMARC-sAMX6i is a SMARC (Smart Mobility Architecture) compliant
+module.
 
+Signed-off-by: Priit Laes <plaes@plaes.org>
+---
+ arch/arm/boot/dts/imx6q-smarc-sam6xi.dtsi | 434 ++++++++++++++++++++++++++++++
+ 1 file changed, 434 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-smarc-sam6xi.dtsi
 
-On 02/17/2017 10:10 AM, Geert Uytterhoeven wrote:
-> As SoCFPGA uses the standard suspend_valid_only_mem() for its
-> platform_suspend_ops.valid() callback, its platform_suspend_ops.enter()
-> callback will never be called with state equal to PM_SUSPEND_STANDBY.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  arch/arm/mach-socfpga/pm.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-socfpga/pm.c b/arch/arm/mach-socfpga/pm.c
-> index c378ab0c24317ccf..d4866788702cb87a 100644
-> --- a/arch/arm/mach-socfpga/pm.c
-> +++ b/arch/arm/mach-socfpga/pm.c
-> @@ -116,7 +116,6 @@ static int socfpga_pm_suspend(unsigned long arg)
->  static int socfpga_pm_enter(suspend_state_t state)
->  {
->  	switch (state) {
-> -	case PM_SUSPEND_STANDBY:
->  	case PM_SUSPEND_MEM:
->  		outer_disable();
->  		cpu_suspend(0, socfpga_pm_suspend);
->
-
-Acked-by: Dinh Nguyen <dinguyen@kernel.org>
-
-Dinh
+diff --git a/arch/arm/boot/dts/imx6q-smarc-sam6xi.dtsi b/arch/arm/boot/dts/imx6q-smarc-sam6xi.dtsi
+new file mode 100644
+index 0000000..e3d7a35
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-smarc-sam6xi.dtsi
+@@ -0,0 +1,434 @@
++/*
++ * Copyright 2017 Priit Laes <plaes@plaes.org>
++ *
++ * Based on initial work by Nikita Yushchenko <nyushchenko@dev.rtsoft.ru>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of
++ *     the License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ *
++ */
++
++#include "imx6q.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	/* TODO: Figure out proper name for this model... */
++	model = "Kontron SMARC-sAMX6i module";
++	compatible = "kontron,imx6-smx6", "fsl,imx6q";
++
++	memory {
++		reg = <0x10000000 0x40000000>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_3v3_s5: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "V_3V3_S5";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
++
++		reg_1v8_s5: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "V_1V8_S5";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
++
++		reg_3v3_s0: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "V_3V3_S0";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
++
++		reg_1v0_s0: regulator at 3 {
++			compatible = "regulator-fixed";
++			reg = <3>;
++			regulator-name = "V_1V0_S0";
++			regulator-min-microvolt = <1000000>;
++			regulator-max-microvolt = <1000000>;
++			regulator-boot-on;
++			regulator-always-on;
++		};
++	};
++
++	i2c_pfuze: i2c-gpio-0 {
++		compatible = "i2c-gpio";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_i2c_gpio_0>;
++		gpios =
++			<&gpio1 28 0>, // sda
++			<&gpio1 30 0>; // scl
++		#address-cells = <1>;
++		#size-cells = <0>;
++		i2c-gpio,delay-us = <2>;
++	};
++};
++
++&can1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan1>;
++	status = "disabled";
++};
++
++&can2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan2>;
++	status = "disabled";
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet_smarc>;
++	phy-mode = "rgmii";
++	status = "disabled";
++};
++
++&i2c_pfuze {
++	pfuze100 at 08 {
++		compatible = "fsl,pfuze100";
++		reg = <0x08>;
++
++		regulators {
++			reg_v_core_s0: sw1ab {
++				regulator-name = "V_CORE_S0";
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			reg_vddsoc_s0: sw1c {
++				regulator-name = "V_VDDSOC_S0";
++				regulator-min-microvolt = <300000>;
++				regulator-max-microvolt = <1875000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			reg_3v15_s0: sw2 {
++				regulator-name = "V_3V15_S0";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			/* sw3a/b is used in dual mode, but driver does not
++			 * support it? Although, there's no need to control
++			 * DDR power - so just leaving dummy entries for sw3a
++			 * and sw3b for now.
++			 */
++			sw3a {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			sw3b {
++				regulator-min-microvolt = <400000>;
++				regulator-max-microvolt = <1975000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			reg_1v8_s0: sw4 {
++				regulator-name = "V_1V8_S0";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			/* Regulator for USB */
++			reg_5v0_s0: swbst {
++				regulator-name = "V_5V0_S0";
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5150000>;
++				regulator-boot-on;
++			};
++
++			reg_vsnvs: vsnvs {
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			reg_vrefddr: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			/* Per schematics, of all VGEN's, only VGEN5 has some
++			 * usage ... but even that - over DNI resistor
++			 */
++			vgen1 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen2 {
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1550000>;
++			};
++
++			vgen3 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			vgen4 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			reg_2v5_s0: vgen5 {
++				regulator-name = "V_2V5_S0";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++
++			vgen6 {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3300000>;
++			};
++		};
++	};
++};
++
++&i2c3 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "disabled";
++};
++
++&pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pcie>;
++	wake-up-gpio = <&gpio6 18 GPIO_ACTIVE_HIGH>;
++	reset-gpio = <&gpio3 13 GPIO_ACTIVE_HIGH>;
++	status = "disabled";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1_smarc>;
++	fsl,uart-has-rtscts;
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2_smarc>;
++	status = "disabled";
++};
++
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart4_smarc>;
++	fsl,uart-has-rtscts;
++	status = "disabled";
++};
++
++&uart5 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart5_smarc>;
++	status = "disabled";
++};
++
++&usbotg {
++	/*
++	 * no 'imx6-usb-charger-detection'
++	 * since USB_OTG_CHD_B pin is not wired
++	 */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg>;
++	status = "disabled";
++};
++
++&usbh1 {
++	vbus-supply = <&reg_5v0_s0>;
++	status = "disabled";
++};
++
++&usdhc4 {
++	/* Internal eMMC, optional on some boards */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc4>;
++	bus-width = <8>;
++	no-1-8-v;
++	non-removable;
++	status = "disabled";
++};
++
++&iomuxc {
++	pinctrl_flexcan1: flexcan1-smarc {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_7__FLEXCAN1_TX 0x80000000
++			MX6QDL_PAD_GPIO_8__FLEXCAN1_RX 0x80000000
++		>;
++	};
++
++	pinctrl_flexcan2: flexcan2-smarc {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX 0x80000000
++			MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX 0x80000000
++		>;
++	};
++
++	pinctrl_enet_smarc: fecgrp-smarc {
++		fsl,pins = <
++			MX6QDL_PAD_ENET_MDIO__ENET_MDIO       0x1b0b0
++			MX6QDL_PAD_ENET_MDC__ENET_MDC         0x1b0b0
++			MX6QDL_PAD_RGMII_TXC__RGMII_TXC       0x1b0b0
++			MX6QDL_PAD_RGMII_TD0__RGMII_TD0       0x1b0b0
++			MX6QDL_PAD_RGMII_TD1__RGMII_TD1       0x1b0b0
++			MX6QDL_PAD_RGMII_TD2__RGMII_TD2       0x1b0b0
++			MX6QDL_PAD_RGMII_TD3__RGMII_TD3       0x1b0b0
++			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x1b0b0
++			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK  0x1b0b0
++			MX6QDL_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
++			MX6QDL_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
++			MX6QDL_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
++			MX6QDL_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
++			MX6QDL_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
++			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
++		>;
++	};
++
++	pinctrl_i2c_gpio_0: i2c-gpio-0-smarc {
++		fsl,pins = <
++			/* SCL GPIO */
++			MX6QDL_PAD_ENET_TXD0__GPIO1_IO30  0x80000000
++			/* SDA GPIO */
++			MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28 0x80000000
++		>;
++	};
++
++	pinctrl_i2c3: i2c3-smarc {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_D17__I2C3_SCL		0x4001b8b1
++			MX6QDL_PAD_EIM_D18__I2C3_SDA		0x4001b8b1
++		>;
++	};
++
++	pinctrl_pcie: pcie-smarc {
++		fsl,pins = <
++			/* RST_PCIE_A# */
++			MX6QDL_PAD_EIM_DA13__GPIO3_IO13 0x80000000
++			/* PCIE_WAKE# */
++			MX6QDL_PAD_SD3_DAT6__GPIO6_IO18 0x80000000
++		>;
++	};
++
++	pinctrl_uart1_smarc: uart1grp-smarc {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA 0x1b0b1
++			MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA 0x1b0b1
++			MX6QDL_PAD_EIM_D20__UART1_RTS_B 0x1b0b1
++			MX6QDL_PAD_EIM_D19__UART1_CTS_B 0x1b0b1
++		>;
++	};
++
++	pinctrl_uart2_smarc: uart2grp-smarc {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_D27__UART2_RX_DATA 0x1b0b1
++			MX6QDL_PAD_EIM_D26__UART2_TX_DATA 0x1b0b1
++		>;
++	};
++
++	pinctrl_uart4_smarc: uart4grp-smarc {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA 0x1b0b1
++			MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
++			MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B 0x1b0b1
++			MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B 0x1b0b1
++		>;
++	};
++
++	pinctrl_uart5_smarc: uart5grp-smarc {
++		fsl,pins = <
++			MX6QDL_PAD_CSI0_DAT15__UART5_RX_DATA 0x1b0b1
++			MX6QDL_PAD_CSI0_DAT14__UART5_TX_DATA 0x1b0b1
++		>;
++	};
++
++	pinctrl_usbotg: usbotg-grp-smarc {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x1f8b0
++			/* TODO: Comment out power and OC gpio's for now, since
++			 * these are not used by driver
++			 */
++			/* USB power */
++			// MX6QDL_PAD_CSI0_PIXCLK__GPIO5_IO18 0x80000000
++			/* USB OC */
++			// MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20 0x80000000
++		>;
++	};
++
++	pinctrl_usdhc4: usdhc4grp-smarc {
++		fsl,pins = <
++			MX6QDL_PAD_SD4_CLK__SD4_CLK 0x17059
++			MX6QDL_PAD_SD4_CMD__SD4_CMD 0x17059
++			MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x17059
++			MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x17059
++			MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x17059
++			MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x17059
++			MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x17059
++			MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x17059
++			MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x17059
++			MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x17059
++		>;
++	};
++};
+-- 
+2.9.3
