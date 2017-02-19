@@ -1,30 +1,39 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Sun, 19 Feb 2017 22:27:58 +0200
-Subject: [PATCH 1/4] arm: defconfig: imx6: Added CONFIG_FHANDLE
-In-Reply-To: <20170219202801.2082-1-plaes@plaes.org>
-References: <20170219202801.2082-1-plaes@plaes.org>
-Message-ID: <20170219202801.2082-2-plaes@plaes.org>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Sun, 19 Feb 2017 21:29:28 +0100
+Subject: [PATCH] iio: adc: xilinx: Fix error handling
+Message-ID: <20170219202928.20296-1-christophe.jaillet@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_FHANDLE is a must-have for newer distributions with systemd
-support (including Debian stable).
+Reorder error handling labels in order to match the way resources have
+been allocated.
 
-Signed-off-by: Priit Laes <plaes@plaes.org>
+Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/iio/adc/xilinx-xadc-core.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index cbe7faf..701db9a 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -1,5 +1,6 @@
- CONFIG_KERNEL_LZO=y
- CONFIG_SYSVIPC=y
-+CONFIG_FHANDLE=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_IKCONFIG=y
+diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
+index 0a6beb3d99cb..515b91963db5 100644
+--- a/drivers/iio/adc/xilinx-xadc-core.c
++++ b/drivers/iio/adc/xilinx-xadc-core.c
+@@ -1268,6 +1268,8 @@ static int xadc_probe(struct platform_device *pdev)
+ 
+ err_free_irq:
+ 	free_irq(irq, indio_dev);
++err_clk_disable_unprepare:
++	clk_disable_unprepare(xadc->clk);
+ err_free_samplerate_trigger:
+ 	if (xadc->ops->flags & XADC_FLAGS_BUFFERED)
+ 		iio_trigger_free(xadc->samplerate_trigger);
+@@ -1277,8 +1279,6 @@ static int xadc_probe(struct platform_device *pdev)
+ err_triggered_buffer_cleanup:
+ 	if (xadc->ops->flags & XADC_FLAGS_BUFFERED)
+ 		iio_triggered_buffer_cleanup(indio_dev);
+-err_clk_disable_unprepare:
+-	clk_disable_unprepare(xadc->clk);
+ err_device_free:
+ 	kfree(indio_dev->channels);
+ 
 -- 
 2.9.3
