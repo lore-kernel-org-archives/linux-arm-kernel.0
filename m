@@ -1,109 +1,189 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 19 Feb 2017 16:34:54 +0000
-Subject: Applied "ASoC: sun4i-spdif: drop unnessary
- snd_soc_unregister_component()" to the asoc tree
-In-Reply-To: <20170206152224.7566-1-weiyj.lk@gmail.com>
-Message-ID: <E1cfURq-0004f9-8x@finisterre>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 19 Feb 2017 08:53:52 -0800
+Subject: [PATCH v2 1/3] watchdog: sama5d4: Cleanup init
+In-Reply-To: <20170217153505.gv4kftvk3z6emmii@piout.net>
+References: <20170216193053.5546-1-alexandre.belloni@free-electrons.com>
+ <14ea461a-5a95-ca85-1eb3-1c34e382bc48@roeck-us.net>
+ <20170217153505.gv4kftvk3z6emmii@piout.net>
+Message-ID: <c488ef1f-0ce1-23d7-8105-89efd0f5a769@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On 02/17/2017 07:35 AM, Alexandre Belloni wrote:
+> On 17/02/2017 at 06:48:36 -0800, Guenter Roeck wrote:
+>> On 02/16/2017 11:30 AM, Alexandre Belloni wrote:
+>>> .config is used to cache a part of WDT_MR at probe time and is not used
+>>> afterwards. Also functions are used while they always return 0. Simplify
+>>> the flow by having everything in .probe().
+>>>
+>>
+>> Does that really improve anything ? It makes the code harder to read
+>> and, ultimately, the dropped value in sama5d4_wdt is added back in a
+>> later patch as 'mr'.
+>>
+>
+> I don't find the current code to be particularly easy to read but maybe
+> it is a matter of taste.
+>
+I always thought it is commonly accepted that splitting code into smaller
+functions tends to improve readability. I for my part still think it does,
+and splitting out reading configuration data and initializing the chip
+are good candidates.
 
-   ASoC: sun4i-spdif: drop unnessary snd_soc_unregister_component()
+[ Not that the functions are necessarily named well here, but that is
+a different issue ]
 
-has been applied to the asoc tree at
+> I would still remove the test on pdev->dev.of_node because it will never
+> be false anyway.
+>
+Agreed.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+Guenter
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From c97c4604c008f3d489cc3201de80e313aeb501d6 Mon Sep 17 00:00:00 2001
-From: Wei Yongjun <weiyongjun1@huawei.com>
-Date: Mon, 6 Feb 2017 15:22:24 +0000
-Subject: [PATCH] ASoC: sun4i-spdif: drop unnessary
- snd_soc_unregister_component()
-
-It's not necessary to unregister a component registered
-with devm_snd_soc_register_component(). Also removed
-pointness clk_disable_unprepare() from error path and
-snd_soc_unregister_platform() from the remove.
-
-Fixes: f8260afa444b ("ASoC: sunxi: Add support for the SPDIF block")
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/sunxi/sun4i-spdif.c | 13 +++----------
- 1 file changed, 3 insertions(+), 10 deletions(-)
-
-diff --git a/sound/soc/sunxi/sun4i-spdif.c b/sound/soc/sunxi/sun4i-spdif.c
-index c03cd07a9b19..eaefd07a5ed0 100644
---- a/sound/soc/sunxi/sun4i-spdif.c
-+++ b/sound/soc/sunxi/sun4i-spdif.c
-@@ -510,8 +510,7 @@ static int sun4i_spdif_probe(struct platform_device *pdev)
- 	host->spdif_clk = devm_clk_get(&pdev->dev, "spdif");
- 	if (IS_ERR(host->spdif_clk)) {
- 		dev_err(&pdev->dev, "failed to get a spdif clock.\n");
--		ret = PTR_ERR(host->spdif_clk);
--		goto err_disable_apb_clk;
-+		return PTR_ERR(host->spdif_clk);
- 	}
- 
- 	host->dma_params_tx.addr = res->start + quirks->reg_dac_txdata;
-@@ -525,7 +524,7 @@ static int sun4i_spdif_probe(struct platform_device *pdev)
- 		if (IS_ERR(host->rst) && PTR_ERR(host->rst) == -EPROBE_DEFER) {
- 			ret = -EPROBE_DEFER;
- 			dev_err(&pdev->dev, "Failed to get reset: %d\n", ret);
--			goto err_disable_apb_clk;
-+			return ret;
- 		}
- 		if (!IS_ERR(host->rst))
- 			reset_control_deassert(host->rst);
-@@ -534,7 +533,7 @@ static int sun4i_spdif_probe(struct platform_device *pdev)
- 	ret = devm_snd_soc_register_component(&pdev->dev,
- 				&sun4i_spdif_component, &sun4i_spdif_dai, 1);
- 	if (ret)
--		goto err_disable_apb_clk;
-+		return ret;
- 
- 	pm_runtime_enable(&pdev->dev);
- 	if (!pm_runtime_enabled(&pdev->dev)) {
-@@ -552,9 +551,6 @@ static int sun4i_spdif_probe(struct platform_device *pdev)
- 		sun4i_spdif_runtime_suspend(&pdev->dev);
- err_unregister:
- 	pm_runtime_disable(&pdev->dev);
--	snd_soc_unregister_component(&pdev->dev);
--err_disable_apb_clk:
--	clk_disable_unprepare(host->apb_clk);
- 	return ret;
- }
- 
-@@ -564,9 +560,6 @@ static int sun4i_spdif_remove(struct platform_device *pdev)
- 	if (!pm_runtime_status_suspended(&pdev->dev))
- 		sun4i_spdif_runtime_suspend(&pdev->dev);
- 
--	snd_soc_unregister_platform(&pdev->dev);
--	snd_soc_unregister_component(&pdev->dev);
--
- 	return 0;
- }
- 
--- 
-2.11.0
+>
+>> Guenter
+>>
+>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>> ---
+>>> Changes in v2:
+>>>  - completely get rid of .config instead of caching it
+>>>  - merge init functions in probe()
+>>>
+>>>  drivers/watchdog/sama5d4_wdt.c | 92 ++++++++++++++++--------------------------
+>>>  1 file changed, 34 insertions(+), 58 deletions(-)
+>>>
+>>> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+>>> index a49634cdc1cc..2c6f5a70ae67 100644
+>>> --- a/drivers/watchdog/sama5d4_wdt.c
+>>> +++ b/drivers/watchdog/sama5d4_wdt.c
+>>> @@ -28,7 +28,6 @@
+>>>  struct sama5d4_wdt {
+>>>  	struct watchdog_device	wdd;
+>>>  	void __iomem		*reg_base;
+>>> -	u32	config;
+>>>  };
+>>>
+>>>  static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
+>>> @@ -128,57 +127,15 @@ static irqreturn_t sama5d4_wdt_irq_handler(int irq, void *dev_id)
+>>>  	return IRQ_HANDLED;
+>>>  }
+>>>
+>>> -static int of_sama5d4_wdt_init(struct device_node *np, struct sama5d4_wdt *wdt)
+>>> -{
+>>> -	const char *tmp;
+>>> -
+>>> -	wdt->config = AT91_WDT_WDDIS;
+>>> -
+>>> -	if (!of_property_read_string(np, "atmel,watchdog-type", &tmp) &&
+>>> -	    !strcmp(tmp, "software"))
+>>> -		wdt->config |= AT91_WDT_WDFIEN;
+>>> -	else
+>>> -		wdt->config |= AT91_WDT_WDRSTEN;
+>>> -
+>>> -	if (of_property_read_bool(np, "atmel,idle-halt"))
+>>> -		wdt->config |= AT91_WDT_WDIDLEHLT;
+>>> -
+>>> -	if (of_property_read_bool(np, "atmel,dbg-halt"))
+>>> -		wdt->config |= AT91_WDT_WDDBGHLT;
+>>> -
+>>> -	return 0;
+>>> -}
+>>> -
+>>> -static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)
+>>> -{
+>>> -	struct watchdog_device *wdd = &wdt->wdd;
+>>> -	u32 value = WDT_SEC2TICKS(wdd->timeout);
+>>> -	u32 reg;
+>>> -
+>>> -	/*
+>>> -	 * Because the fields WDV and WDD must not be modified when the WDDIS
+>>> -	 * bit is set, so clear the WDDIS bit before writing the WDT_MR.
+>>> -	 */
+>>> -	reg = wdt_read(wdt, AT91_WDT_MR);
+>>> -	reg &= ~AT91_WDT_WDDIS;
+>>> -	wdt_write(wdt, AT91_WDT_MR, reg);
+>>> -
+>>> -	reg = wdt->config;
+>>> -	reg |= AT91_WDT_SET_WDD(value);
+>>> -	reg |= AT91_WDT_SET_WDV(value);
+>>> -
+>>> -	wdt_write(wdt, AT91_WDT_MR, reg);
+>>> -
+>>> -	return 0;
+>>> -}
+>>> -
+>>>  static int sama5d4_wdt_probe(struct platform_device *pdev)
+>>>  {
+>>>  	struct watchdog_device *wdd;
+>>>  	struct sama5d4_wdt *wdt;
+>>>  	struct resource *res;
+>>>  	void __iomem *regs;
+>>> -	u32 irq = 0;
+>>> +	struct device_node *np = pdev->dev.of_node;
+>>> +	const char *tmp;
+>>> +	u32 mr, reg, irq = 0;
+>>>  	int ret;
+>>>
+>>>  	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+>>> @@ -201,17 +158,26 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+>>>
+>>>  	wdt->reg_base = regs;
+>>>
+>>> -	if (pdev->dev.of_node) {
+>>> -		irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+>>> -		if (!irq)
+>>> -			dev_warn(&pdev->dev, "failed to get IRQ from DT\n");
+>>> +	irq = irq_of_parse_and_map(np, 0);
+>>> +	if (!irq)
+>>> +		dev_warn(&pdev->dev, "failed to get IRQ from DT\n");
+>>>
+>>> -		ret = of_sama5d4_wdt_init(pdev->dev.of_node, wdt);
+>>> -		if (ret)
+>>> -			return ret;
+>>> -	}
+>>>
+>>> -	if ((wdt->config & AT91_WDT_WDFIEN) && irq) {
+>>> +	mr = AT91_WDT_WDDIS;
+>>> +
+>>> +	if (!of_property_read_string(np, "atmel,watchdog-type", &tmp) &&
+>>> +	    !strcmp(tmp, "software"))
+>>> +		mr |= AT91_WDT_WDFIEN;
+>>> +	else
+>>> +		mr |= AT91_WDT_WDRSTEN;
+>>> +
+>>> +	if (of_property_read_bool(np, "atmel,idle-halt"))
+>>> +		mr |= AT91_WDT_WDIDLEHLT;
+>>> +
+>>> +	if (of_property_read_bool(np, "atmel,dbg-halt"))
+>>> +		mr |= AT91_WDT_WDDBGHLT;
+>>> +
+>>> +	if ((mr & AT91_WDT_WDFIEN) && irq) {
+>>>  		ret = devm_request_irq(&pdev->dev, irq, sama5d4_wdt_irq_handler,
+>>>  				       IRQF_SHARED | IRQF_IRQPOLL |
+>>>  				       IRQF_NO_SUSPEND, pdev->name, pdev);
+>>> @@ -228,9 +194,19 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+>>>  		return ret;
+>>>  	}
+>>>
+>>> -	ret = sama5d4_wdt_init(wdt);
+>>> -	if (ret)
+>>> -		return ret;
+>>> +	/*
+>>> +	 * WDV and WDD must not be modified when the WDDIS bit is set, so clear
+>>> +	 * the WDDIS bit before writing the WDT_MR.
+>>> +	 */
+>>> +	reg = wdt_read(wdt, AT91_WDT_MR);
+>>> +	reg &= ~AT91_WDT_WDDIS;
+>>> +	wdt_write(wdt, AT91_WDT_MR, reg);
+>>> +
+>>> +	reg = mr;
+>>> +	reg |= AT91_WDT_SET_WDD(WDT_SEC2TICKS(wdd->timeout));
+>>> +	reg |= AT91_WDT_SET_WDV(WDT_SEC2TICKS(wdd->timeout));
+>>> +
+>>> +	wdt_write(wdt, AT91_WDT_MR, reg);
+>>>
+>>>  	watchdog_set_nowayout(wdd, nowayout);
+>>>
+>>>
+>>
+>
