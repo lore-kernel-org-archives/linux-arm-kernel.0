@@ -1,76 +1,42 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Mon, 20 Feb 2017 07:09:50 +0800
-Subject: [xlnx:master 93/356] drivers/spi/spi-zynqmp-gqspi.c:285: undefined
- reference to `zynqmp_pm_mmio_read'
-Message-ID: <201702200746.Zkw6zoiq%fengguang.wu@intel.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 20 Feb 2017 00:52:13 +0100
+Subject: [PATCH v2 2/3] watchdog: sama5d4: Fix setting timeout when
+ watchdog is disabled
+In-Reply-To: <c9f336fd-8761-7999-4ac0-cf68eb6c8ba1@roeck-us.net>
+References: <20170216193053.5546-1-alexandre.belloni@free-electrons.com>
+ <20170216193053.5546-2-alexandre.belloni@free-electrons.com>
+ <968ef53e-c3c4-5322-020a-8382ce367931@roeck-us.net>
+ <20170217151625.hv2vn5imx2kyeftt@piout.net>
+ <c9f336fd-8761-7999-4ac0-cf68eb6c8ba1@roeck-us.net>
+Message-ID: <20170219235213.qcxfne5yvs3uzwg3@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   330ed0834e0eb0745a7111c2a21bbbf839024ad6
-commit: 061577cf00d48e8d7e5501cb3bae88ee82ce8eb9 [93/356] ARM64: zynqmp: Fix i2c node's compatible string
-config: i386-randconfig-i0-201708+CONFIG_DEBUG_INFO_REDUCED (attached as .config)
-compiler: gcc-4.8 (Debian 4.8.4-1) 4.8.4
-reproduce:
-        git checkout 061577cf00d48e8d7e5501cb3bae88ee82ce8eb9
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+On 19/02/2017 at 08:57:35 -0800, Guenter Roeck wrote:
+> > > That means if the watchdog is running, the timeout would not be updated.
+> > > It should be updated no matter if it is running or not.
+> > > 
+> > 
+> > No, it is enabling the watchdog, then changing WDV and WDD and finally
+> > disabling the watchdog if necessary. So, WDV and WDD are always changed.
+> > 
+> You are correct. Sorry for the noise.
+> 
+> Seems odd that the watchdog must be _running_ to change the timeout.
+> Usually, if there is a restriction, it is the opposite. I hope this
+> doesn't cause race conditions, where the watchdog fires immediately
+> after being enabled due to a low timeout.
+> 
 
-Note: the xlnx/master HEAD 330ed0834e0eb0745a7111c2a21bbbf839024ad6 builds fine.
-      It only hurts bisectibility.
+While it is difficult to reproduce, I can confirm it races and sometimes
+reset the SoC without any good reason. It doesn't matter whether it is
+disabled or not
 
-All errors (new ones prefixed by >>):
+I've raised the issue at Atmel last Thursday so I don't have any answer
+yet.
 
-   drivers/built-in.o: In function `zynqmp_qspi_set_tapdelay':
->> drivers/spi/spi-zynqmp-gqspi.c:285: undefined reference to `zynqmp_pm_mmio_read'
-   drivers/spi/spi-zynqmp-gqspi.c:289: undefined reference to `zynqmp_pm_mmio_read'
->> drivers/spi/spi-zynqmp-gqspi.c:304: undefined reference to `zynqmp_pm_mmio_write'
 
-vim +285 drivers/spi/spi-zynqmp-gqspi.c
-
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  279  	u32 reqhz = 0;
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  280  
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  281  	clk_rate = clk_get_rate(xqspi->refclk);
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  282  	reqhz = (clk_rate / (GQSPI_BAUD_DIV_SHIFT << baudrateval));
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  283  
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  284  	if (reqhz < GQSPI_FREQ_40MHZ) {
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18 @285  		zynqmp_pm_mmio_read(IOU_TAPDLY_BYPASS_OFST, &tapdlybypass);
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  286  		tapdlybypass |= (TAP_DLY_BYPASS_LQSPI_RX_VALUE <<
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  287  				TAP_DLY_BYPASS_LQSPI_RX_SHIFT);
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  288  	} else if (reqhz < GQSPI_FREQ_100MHZ) {
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  289  		zynqmp_pm_mmio_read(IOU_TAPDLY_BYPASS_OFST, &tapdlybypass);
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  290  		tapdlybypass |= (TAP_DLY_BYPASS_LQSPI_RX_VALUE <<
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  291  				TAP_DLY_BYPASS_LQSPI_RX_SHIFT);
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  292  		lpbkdlyadj = zynqmp_gqspi_read(xqspi, GQSPI_LPBK_DLY_ADJ_OFST);
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  293  		lpbkdlyadj |= (GQSPI_LPBK_DLY_ADJ_USE_LPBK_MASK);
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  294  		datadlyadj = zynqmp_gqspi_read(xqspi, GQSPI_DATA_DLY_ADJ_OFST);
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  295  		datadlyadj |= ((GQSPI_USE_DATA_DLY << GQSPI_USE_DATA_DLY_SHIFT)
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  296  				| (GQSPI_DATA_DLY_ADJ_VALUE <<
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  297  					GQSPI_DATA_DLY_ADJ_SHIFT));
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  298  	} else if (reqhz < GQSPI_FREQ_150MHZ) {
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  299  		lpbkdlyadj = zynqmp_gqspi_read(xqspi, GQSPI_LPBK_DLY_ADJ_OFST);
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  300  		lpbkdlyadj |= ((GQSPI_LPBK_DLY_ADJ_USE_LPBK_MASK) |
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  301  				GQSPI_LPBK_DLY_ADJ_DLY_0);
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  302  	}
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  303  
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18 @304  	zynqmp_pm_mmio_write(IOU_TAPDLY_BYPASS_OFST, IOU_TAPDLY_BYPASS_MASK,
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  305  			tapdlybypass);
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  306  	zynqmp_gqspi_write(xqspi, GQSPI_LPBK_DLY_ADJ_OFST, lpbkdlyadj);
-8f0c7fe9 Naga Sureshkumar Relli 2016-08-18  307  	zynqmp_gqspi_write(xqspi, GQSPI_DATA_DLY_ADJ_OFST, datadlyadj);
-
-:::::: The code at line 285 was first introduced by commit
-:::::: 8f0c7fe90b9fde8a17df65c6c6829afb5e3b323f spi: zynqmp: Add tapdelay support
-
-:::::: TO: Naga Sureshkumar Relli <naga.sureshkumar.relli@xilinx.com>
-:::::: CC: Michal Simek <michal.simek@xilinx.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 20922 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170220/044cb5d9/attachment-0001.gz>
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
