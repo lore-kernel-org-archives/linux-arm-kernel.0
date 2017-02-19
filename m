@@ -1,11 +1,11 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 19 Feb 2017 22:41:43 +0100
-Subject: [PATCH v5 3/9] ARM64: dts: meson-gxbb-vega-s95: add the ethernet
+Date: Sun, 19 Feb 2017 22:41:45 +0100
+Subject: [PATCH v5 5/9] ARM64: dts: meson-gxbb-wetek-hub: add the ethernet
  PHY's reset GPIO
 In-Reply-To: <20170219214149.30418-1-martin.blumenstingl@googlemail.com>
 References: <20170122181028.5014-1-martin.blumenstingl@googlemail.com>
  <20170219214149.30418-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170219214149.30418-4-martin.blumenstingl@googlemail.com>
+Message-ID: <20170219214149.30418-6-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,25 +17,22 @@ allow us to specify OF-properties for the PHY itself.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi | 19 ++++++++++++++++++-
- 1 file changed, 18 insertions(+), 1 deletion(-)
+ .../boot/dts/amlogic/meson-gxbb-wetek-hub.dts      | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-index 86709929fd20..aa571970c5e9 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
-@@ -115,7 +115,6 @@
- 	status = "okay";
- 	pinctrl-0 = <&uart_ao_a_pins>;
- 	pinctrl-names = "default";
--
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
+index 56f855901262..50eb8f06d35b 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
+@@ -64,3 +64,27 @@
+ 		status = "disabled";
+ 	};
  };
- 
- &ir {
-@@ -128,6 +127,24 @@
- 	status = "okay";
- 	pinctrl-0 = <&eth_rgmii_pins>;
- 	pinctrl-names = "default";
++
++&ethmac {
++	status = "okay";
++	pinctrl-0 = <&eth_rgmii_pins>;
++	pinctrl-names = "default";
 +
 +	phy-handle = <&eth_phy0>;
 +	phy-mode = "rgmii";
@@ -54,8 +51,6 @@ index 86709929fd20..aa571970c5e9 100644
 +			reg = <0>;
 +		};
 +	};
- };
- 
- &usb0_phy {
++};
 -- 
 2.11.1
