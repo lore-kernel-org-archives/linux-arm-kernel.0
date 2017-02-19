@@ -1,98 +1,313 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun, 19 Feb 2017 04:19:56 +0100
-Subject: [PATCH 0/4] ARM64: Initial Marvell IAP140 enablement
-Message-ID: <20170219032000.4674-1-afaerber@suse.de>
+Date: Sun, 19 Feb 2017 04:19:59 +0100
+Subject: [PATCH 3/4] ARM64: dts: marvell: Add IAP140 and Andromeda Box Edge
+In-Reply-To: <20170219032000.4674-1-afaerber@suse.de>
+References: <20170219032000.4674-1-afaerber@suse.de>
+Message-ID: <20170219032000.4674-4-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+PPI interrupts 11, 10, 9 are guesses, and so are the second two memory
+regions of the GIC.
 
-This mini-series adds initial support for the Marvell IAP140 SoC (aka PXA1908)
-and the Andromeda Box Edge development board.
-
-In order to enable the 8250 UART driver, it reuses ARCH_PXA; but some drivers
-enabled with ARCH_PXA don't build due to arm assembly or arm64's lack of mach-,
-so their dependencies need to be limited to ARM alongside (blacklisted). The
-alternative would of course be to choose a new ARCH_ symbol and to selectively
-add it to drivers known working (whitelisting). The latter would require
-finding a suitable name.
-
-Both earlycon and serial are working, but an explicit console=ttyS0,115200n8
-is needed; with just "earlycon" and stdout-path the earlycon stops early and
-switches to a tty0, long before disabling the bootconsole...
-
-All four CPUs come up, and an initrd can be reached.
-
-However, there are errors about CPUs 1-3 having a zero SYS_CNTFRQ_EL0:
-
-[    0.095812] smp: Bringing up secondary CPUs ...
-======pxa1908_pmu_core_pwr_on: mpidr = 0x1
-======pxa1908_pmu_core_pwr_on: mpidr = 0x2
-======pxa1908_pmu_core_pwr_on: mpidr = 0x3
-[    0.133419] Detected VIPT I-cache on CPU1
-[    0.133430] CPU features: SANITY CHECK: Unexpected variation in SYS_CNTFRQ_EL0. Boot CPU: 0x000000018cba80, CPU1: 0x00000000000000
-[    0.133447] Unsupported CPU feature variation.
-...
-[    0.133748] CPU1: Booted secondary processor [410fd032]
-[    0.165465] Detected VIPT I-cache on CPU2
-[    0.165474] CPU features: SANITY CHECK: Unexpected variation in SYS_CNTFRQ_EL0. Boot CPU: 0x000000018cba80, CPU2: 0x00000000000000
-[    0.165505] CPU2: Booted secondary processor [410fd032]
-[    0.197539] Detected VIPT I-cache on CPU3
-[    0.197546] CPU features: SANITY CHECK: Unexpected variation in SYS_CNTFRQ_EL0. Boot CPU: 0x000000018cba80, CPU3: 0x00000000000000
-[    0.197573] CPU3: Booted secondary processor [410fd032]
-[    0.197625] smp: Brought up 1 node, 4 CPUs
-[    0.522514] SMP: Total of 4 processors activated.
-[    0.527212] CPU features: detected feature: 32-bit EL0 Support
-[    0.533105] CPU: All CPU(s) started at EL2
-
-KVM appears to initialize okay, but was not yet tested with guests.
-
-[    0.865255] kvm [1]: 8-bit VMID
-[    0.868401] kvm [1]: IDMAP page: d23000
-[    0.872233] kvm [1]: HYP VA range: 800000000000:ffffffffffff
-[    0.878262] kvm [1]: Hyp mode initialized successfully
-[    0.883429] kvm [1]: vgic-v2 at d1dfc000
-[    0.887179] kvm [1]: vgic interrupt IRQ1
-[    0.891120] kvm [1]: virtual timer IRQ4
-
-More Marvell drivers may be available in-tree for reuse - besides build errors
-the limitation is currently the lack of an IAP140 clk driver though. Patch 4/4
-works around that for UART0 with a fixed-clock.
-
-A 3.14 based tree is available on GitHub acorn-marvell/brillo_pxa_kernel. No
-driver comparisons to mainline have been attempted yet.
-
-Booting required changes to the vendor U-Boot,
-cf. https://en.opensuse.org/HCL:AndromedaBoxEdge
-
-https://github.com/afaerber/linux/commits/edge-next
-
-Have a lot of fun!
-
-Cheers,
-Andreas
-
-Cc: info at andromedabox.org
-Cc: devicetree at vger.kernel.org
-
-Andreas F?rber (4):
-  ARM64: Prepare Marvell IAP140 aka PXA1908
-  Documentation: devicetree: arm: Document Marvell IAP140
-  ARM64: dts: marvell: Add IAP140 and Andromeda Box Edge
-  ARM64: dts: marvell: iap140-andromeda-box-edge: Add uart0 clock
-
- .../devicetree/bindings/arm/marvell/iap140.txt     |   7 +
- arch/arm64/Kconfig.platforms                       |   5 +
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
  arch/arm64/boot/dts/marvell/Makefile               |   2 +
- .../boot/dts/marvell/iap140-andromeda-box-edge.dts |  77 ++++++++
+ .../boot/dts/marvell/iap140-andromeda-box-edge.dts |  70 ++++++++
  arch/arm64/boot/dts/marvell/iap140.dtsi            | 195 +++++++++++++++++++++
- drivers/clk/Kconfig                                |   2 +-
- drivers/mmc/host/Kconfig                           |   2 +-
- drivers/tty/serial/Kconfig                         |   2 +-
- 8 files changed, 289 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/marvell/iap140.txt
+ 3 files changed, 267 insertions(+)
  create mode 100644 arch/arm64/boot/dts/marvell/iap140-andromeda-box-edge.dts
  create mode 100644 arch/arm64/boot/dts/marvell/iap140.dtsi
 
+diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
+index 3e6ce6c..d2046be 100644
+--- a/arch/arm64/boot/dts/marvell/Makefile
++++ b/arch/arm64/boot/dts/marvell/Makefile
+@@ -9,6 +9,8 @@ dtb-$(CONFIG_ARCH_MVEBU) += armada-7040-db.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-db.dtb
+ dtb-$(CONFIG_ARCH_MVEBU) += armada-8040-mcbin.dtb
+ 
++dtb-$(CONFIG_ARCH_PXA) += iap140-andromeda-box-edge.dtb
++
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+ clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/marvell/iap140-andromeda-box-edge.dts b/arch/arm64/boot/dts/marvell/iap140-andromeda-box-edge.dts
+new file mode 100644
+index 0000000..de01d93
+--- /dev/null
++++ b/arch/arm64/boot/dts/marvell/iap140-andromeda-box-edge.dts
+@@ -0,0 +1,70 @@
++/*
++ * Copyright (c) 2016-2017 Andreas F?rber
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++/memreserve/ 0x09000000 0x01000000;
++/memreserve/ 0x0a000000 0x00080000;
++
++#include "iap140.dtsi"
++
++/ {
++	compatible = "mrvl,andromeda-box-edge", "mrvl,iap140";
++	model = "Andromeda Box Edge";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 0 {
++		device_type = "memory";
++		reg = <0x0 0x0 0x0 0x40000000>;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/marvell/iap140.dtsi b/arch/arm64/boot/dts/marvell/iap140.dtsi
+new file mode 100644
+index 0000000..38acb14
+--- /dev/null
++++ b/arch/arm64/boot/dts/marvell/iap140.dtsi
+@@ -0,0 +1,195 @@
++/*
++ * Copyright (c) 2016-2017 Andreas F?rber
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	compatible = "mrvl,iap140";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x0>;
++			enable-method = "psci";
++		};
++
++		cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x1>;
++			enable-method = "psci";
++		};
++
++		cpu2: cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x2>;
++			enable-method = "psci";
++		};
++
++		cpu3: cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a53", "arm,armv8";
++			reg = <0x0 0x3>;
++			enable-method = "psci";
++		};
++	};
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	arm-pmu {
++		compatible = "arm,cortex-a53-pmu";
++		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
++		             <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
++		             <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>,
++		             <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13
++			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14
++			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11
++			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10
++			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		smmu: iommu at c0010000 {
++			compatible = "arm,mmu-400";
++			reg = <0x0 0xc0010000 0x0 0x10000>;
++			#global-interrupts = <1>;
++			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>,
++			             <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		asram: sram at d12a0000 {
++			compatible = "mmio-sram";
++			reg = <0x0 0xd12a0000 0x0 0x10000>;
++			status = "disabled";
++		};
++
++		gic: interrupt-controller at d1df9000 {
++			compatible = "arm,gic-400";
++			reg = <0x0 0xd1df9000 0x0 0x1000>,
++			      <0x0 0xd1dfa000 0x0 0x2000>,
++			      <0x0 0xd1dfc000 0x0 0x2000>,
++			      <0x0 0xd1dfe000 0x0 0x2000>;
++			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++		};
++
++		apb at d4000000 {
++			compatible = "simple-bus";
++			reg = <0x0 0xd4000000 0x0 0x00200000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x0 0x0 0xd4000000 0x00200000>;
++
++			pdma: dma-controller at 0 {
++				compatible = "marvell,pdma-1.0";
++				reg = <0x0 0x10000>;
++				interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
++				#dma-cells = <2>;
++				#dma-channels = <30>;
++			};
++
++			uart0: serial at 17000 {
++				compatible = "mrvl,mmp-uart", "mrvl,pxa-uart";
++				reg = <0x17000 0x1000>;
++				interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&pdma 21 1>,
++				       <&pdma 22 1>;
++				dma-names = "rx", "tx";
++				status = "disabled";
++			};
++
++			uart1: serial at 18000 {
++				compatible = "mrvl,mmp-uart", "mrvl,pxa-uart";
++				reg = <0x18000 0x1000>;
++				interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&pdma 23 1>,
++				       <&pdma 24 1>;
++				dma-names = "rx", "tx";
++				status = "disabled";
++			};
++
++			uart2: serial at 36000 {
++				compatible = "mrvl,mmp-uart", "mrvl,pxa-uart";
++				reg = <0x36000 0x1000>;
++				interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
++				dmas = <&pdma 4 1>,
++				       <&pdma 5 1>;
++				dma-names = "rx", "tx";
++				status = "disabled";
++			};
++		};
++
++		axi at d4200000 {
++			compatible = "simple-bus";
++			reg = <0x0 0xd4200000 0x0 0x00200000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x0 0x0 0xd4200000 0x00200000>;
++		};
++	};
++};
 -- 
 2.10.2
