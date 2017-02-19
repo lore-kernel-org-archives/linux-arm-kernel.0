@@ -1,130 +1,56 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 19 Feb 2017 11:42:02 +0000
-Subject: [PATCH 13/20] ARM: KVM: Implement HVC_RESET_VECTORS stub hypercall
-In-Reply-To: <20170217154429.5000-14-marc.zyngier@arm.com>
-References: <20170217154429.5000-1-marc.zyngier@arm.com>
- <20170217154429.5000-14-marc.zyngier@arm.com>
-Message-ID: <CAKv+Gu96uNzqvV0KabJWmnr-9NBcifeh+-9mCEFga7BY+gyQ8g@mail.gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 19 Feb 2017 12:09:09 +0000
+Subject: [PATCH 1/2] dt-bindings: iio: stm32-adc: add option to set
+ resolution
+In-Reply-To: <1487177757-19427-2-git-send-email-fabrice.gasnier@st.com>
+References: <1487177757-19427-1-git-send-email-fabrice.gasnier@st.com>
+ <1487177757-19427-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <c2b73482-ae01-34b5-3c16-b7e63893259e@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 February 2017 at 15:44, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> In order to restore HYP mode to its original condition, KVM currently
-> implements __kvm_hyp_reset(). As we're moving towards a hyp-stub
-> defined API, it becomes necessary to implement HVC_RESET_VECTORS.
->
-> This patch adds the HVC_RESET_VECTORS hypercall to the KVM init
-> code, which so far lacked any form of hypercall support.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On 15/02/17 16:55, Fabrice Gasnier wrote:
+> Add documentation for 'st,adc-res' dt optional property.
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+I'm happy with this, but would like to leave time for a device tree review.
+
+Ultimately we may well want to make this a generic property and call it something
+like adc-resolution but perhaps we need to wait until we have a few more devices
+supporting setting it via device tree to figure out what the best interface is.
+It would exactly be a problem to support this as a deprecated binding at that
+point.
+
+Give me a poke if we hear nothing from Rob or Mark for say another week.
+
+Thanks,
+
+Jonathan
+
 > ---
->  arch/arm/kernel/hyp-stub.S |  1 +
->  arch/arm/kvm/init.S        | 37 +++++++++++++++++++++++++++++++------
->  2 files changed, 32 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-> index cf6d801f89e8..171a09cdf6b3 100644
-> --- a/arch/arm/kernel/hyp-stub.S
-> +++ b/arch/arm/kernel/hyp-stub.S
-> @@ -280,6 +280,7 @@ ENDPROC(__hyp_reset_vectors)
->
->  .align 5
->  __hyp_stub_vectors:
-> +.global __hyp_stub_vectors
-
-Oh, and (nit:) perhaps use
-
-ENTRY(__hyp_stub_vectors)
-
-here?
-
->  __hyp_stub_reset:      W(b)    .
->  __hyp_stub_und:                W(b)    .
->  __hyp_stub_svc:                W(b)    .
-> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-> index bf89c919efc1..b0138118fac4 100644
-> --- a/arch/arm/kvm/init.S
-> +++ b/arch/arm/kvm/init.S
-> @@ -23,6 +23,7 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_arm.h>
->  #include <asm/kvm_mmu.h>
-> +#include <asm/virt.h>
->
->  /********************************************************************
->   * Hypervisor initialization
-> @@ -39,6 +40,10 @@
->   * - Setup the page tables
->   * - Enable the MMU
->   * - Profit! (or eret, if you only care about the code).
-> + *
-> + * Another possibility is to get a HYP stub hypercall.
-> + * We discriminate between the two by checking if r0 contains a value
-> + * that is less than HVC_STUB_HCALL_NR.
->   */
->
->         .text
-> @@ -58,6 +63,10 @@ __kvm_hyp_init:
->         W(b)    .
->
->  __do_hyp_init:
-> +       @ Check for a stub hypercall
-> +       cmp     r0, #HVC_STUB_HCALL_NR
-> +       blo     __kvm_handle_stub_hvc
-> +
->         @ Set stack pointer
->         mov     sp, r0
->
-> @@ -112,22 +121,38 @@ __do_hyp_init:
->
->         eret
->
-> -       @ r0 : stub vectors address
-> +ENTRY(__kvm_handle_stub_hvc)
-> +       cmp     r0, #HVC_RESET_VECTORS
-> +       bne     1f
->  ENTRY(__kvm_hyp_reset)
->         /* We're now in idmap, disable MMU */
->         mrc     p15, 4, r1, c1, c0, 0   @ HSCTLR
-> -       ldr     r2, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
-> -       bic     r1, r1, r2
-> +       ldr     r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
-> +       bic     r1, r1, r0
->         mcr     p15, 4, r1, c1, c0, 0   @ HSCTLR
->
-> -       /* Install stub vectors */
-> -       mcr     p15, 4, r0, c12, c0, 0  @ HVBAR
-> -       isb
-> +       /*
-> +        * Install stub vectors. We cannot use 'adr' to get to the
-> +        * stub vectors, hence having to play the VA->PA game.
-> +        */
-> +       adr     r0, .L__va2pa   @ PA
-> +       ldr     r1, [r0]        @ VA
-> +       sub     r0, r0, r1      @ PA - VA
-> +       ldr     r1, =__hyp_stub_vectors
-> +       add     r1, r1, r0
-> +       mcr     p15, 4, r1, c12, c0, 0  @ HVBAR
-> +       b       exit
-> +
-> +1:     mov     r0, #-1
->
-> +exit:
->         eret
-> +ENDPROC(__kvm_handle_stub_hvc)
->  ENDPROC(__kvm_hyp_reset)
->
->         .ltorg
-> +.L__va2pa:
-> +       .word   .
->
->         .globl __kvm_hyp_init_end
->  __kvm_hyp_init_end:
-> --
-> 2.11.0
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> index 5dfc88e..45f7ff2 100644
+> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+> @@ -57,6 +57,9 @@ Optional properties:
+>  - dmas: Phandle to dma channel for this ADC instance.
+>    See ../../dma/dma.txt for details.
+>  - dma-names: Must be "rx" when dmas property is being used.
+> +- st,adc-res: Resolution (bits) to use for conversions. Must match device
+> +  available resolutions (e.g. can be 6, 8, 10 or 12 on stm32f4). Default
+> +  is maximum resolution if unset.
+>  
+>  Example:
+>  	adc: adc at 40012000 {
+> @@ -84,6 +87,7 @@ Example:
+>  			st,adc-channels = <8>;
+>  			dmas = <&dma2 0 0 0x400 0x0>;
+>  			dma-names = "rx";
+> +			st,adc-res = <8>;
+>  		};
+>  		...
+>  		other adc child nodes follow...
+> 
