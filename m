@@ -1,88 +1,130 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 19 Feb 2017 11:35:51 +0000
-Subject: [RFC 7/7] arm64: map seperately rodata sections for
- __ro_mostly_after_init section
-In-Reply-To: <1487498660-16600-7-git-send-email-hoeun.ryu@gmail.com>
-References: <1487498660-16600-1-git-send-email-hoeun.ryu@gmail.com>
- <1487498660-16600-7-git-send-email-hoeun.ryu@gmail.com>
-Message-ID: <CAKv+Gu9umycZm_UP99ZUifLUBb8MuOZHXgU9nB6XioVMa4eeVw@mail.gmail.com>
+Date: Sun, 19 Feb 2017 11:42:02 +0000
+Subject: [PATCH 13/20] ARM: KVM: Implement HVC_RESET_VECTORS stub hypercall
+In-Reply-To: <20170217154429.5000-14-marc.zyngier@arm.com>
+References: <20170217154429.5000-1-marc.zyngier@arm.com>
+ <20170217154429.5000-14-marc.zyngier@arm.com>
+Message-ID: <CAKv+Gu96uNzqvV0KabJWmnr-9NBcifeh+-9mCEFga7BY+gyQ8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 February 2017 at 10:04, Hoeun Ryu <hoeun.ryu@gmail.com> wrote:
-> Map rodata sections seperately for the new __ro_mostly_after_init section.
-> Attribute of memory for __ro_mostly_after_init section can be changed later
-> so we need a dedicated vmalloced region for set_memory_rw/ro api.
+On 17 February 2017 at 15:44, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> In order to restore HYP mode to its original condition, KVM currently
+> implements __kvm_hyp_reset(). As we're moving towards a hyp-stub
+> defined API, it becomes necessary to implement HVC_RESET_VECTORS.
 >
-> Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
+> This patch adds the HVC_RESET_VECTORS hypercall to the KVM init
+> code, which so far lacked any form of hypercall support.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm64/mm/mmu.c | 30 ++++++++++++++++++++++++++----
->  1 file changed, 26 insertions(+), 4 deletions(-)
+>  arch/arm/kernel/hyp-stub.S |  1 +
+>  arch/arm/kvm/init.S        | 37 +++++++++++++++++++++++++++++++------
+>  2 files changed, 32 insertions(+), 6 deletions(-)
 >
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 91271b1..4a89a2e 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -434,8 +434,22 @@ void mark_rodata_ro(void)
->          * mark .rodata as read only. Use __init_begin rather than __end_rodata
->          * to cover NOTES and EXCEPTION_TABLE.
->          */
-> -       section_size = (unsigned long)__init_begin - (unsigned long)__start_rodata;
-> -       create_mapping_late(__pa_symbol(__start_rodata), (unsigned long)__start_rodata,
-> +       section_size = (unsigned long)__start_data_ro_mostly_after_init -
-> +               (unsigned long)__start_rodata;
-> +       create_mapping_late(__pa_symbol(__start_rodata),
-> +                           (unsigned long)__start_rodata,
-> +                           section_size, PAGE_KERNEL_RO);
-> +
-> +       section_size = (unsigned long)__end_data_ro_mostly_after_init -
-> +               (unsigned long)__start_data_ro_mostly_after_init;
-> +       create_mapping_late(__pa_symbol(__start_data_ro_mostly_after_init),
-> +                           (unsigned long)__start_data_ro_mostly_after_init,
-> +                           section_size, PAGE_KERNEL_RO);
-> +
-> +       section_size = (unsigned long)__init_begin -
-> +               (unsigned long)__end_data_ro_mostly_after_init;
-> +       create_mapping_late(__pa_symbol(__end_data_ro_mostly_after_init),
-> +                           (unsigned long)__end_data_ro_mostly_after_init,
->                             section_size, PAGE_KERNEL_RO);
+> diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+> index cf6d801f89e8..171a09cdf6b3 100644
+> --- a/arch/arm/kernel/hyp-stub.S
+> +++ b/arch/arm/kernel/hyp-stub.S
+> @@ -280,6 +280,7 @@ ENDPROC(__hyp_reset_vectors)
 >
->         /* flush the TLBs after updating live kernel mappings */
-> @@ -478,10 +492,18 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
+>  .align 5
+>  __hyp_stub_vectors:
+> +.global __hyp_stub_vectors
+
+Oh, and (nit:) perhaps use
+
+ENTRY(__hyp_stub_vectors)
+
+here?
+
+>  __hyp_stub_reset:      W(b)    .
+>  __hyp_stub_und:                W(b)    .
+>  __hyp_stub_svc:                W(b)    .
+> diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+> index bf89c919efc1..b0138118fac4 100644
+> --- a/arch/arm/kvm/init.S
+> +++ b/arch/arm/kvm/init.S
+> @@ -23,6 +23,7 @@
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_arm.h>
+>  #include <asm/kvm_mmu.h>
+> +#include <asm/virt.h>
+>
+>  /********************************************************************
+>   * Hypervisor initialization
+> @@ -39,6 +40,10 @@
+>   * - Setup the page tables
+>   * - Enable the MMU
+>   * - Profit! (or eret, if you only care about the code).
+> + *
+> + * Another possibility is to get a HYP stub hypercall.
+> + * We discriminate between the two by checking if r0 contains a value
+> + * that is less than HVC_STUB_HCALL_NR.
 >   */
->  static void __init map_kernel(pgd_t *pgd)
->  {
-> -       static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
-> +       static struct vm_struct vmlinux_text, vmlinux_rodata1, vmlinux_rodata2, vmlinux_ro_mostly_after_init, vmlinux_init, vmlinux_data;
 >
->         map_kernel_segment(pgd, _text, _etext, PAGE_KERNEL_EXEC, &vmlinux_text);
-> -       map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
-> +       map_kernel_segment(pgd, __start_rodata, __start_data_ro_mostly_after_init, PAGE_KERNEL, &vmlinux_rodata1);
-> +       __map_kernel_segment(pgd,
-> +                            __start_data_ro_mostly_after_init,
-> +                            __end_data_ro_mostly_after_init,
-> +                            PAGE_KERNEL,
-> +                            &vmlinux_ro_mostly_after_init,
-> +                            VM_MAP | VM_ALLOC);
-> +       map_kernel_segment(pgd, __end_data_ro_mostly_after_init, __init_begin, PAGE_KERNEL, &vmlinux_rodata2);
+>         .text
+> @@ -58,6 +63,10 @@ __kvm_hyp_init:
+>         W(b)    .
+>
+>  __do_hyp_init:
+> +       @ Check for a stub hypercall
+> +       cmp     r0, #HVC_STUB_HCALL_NR
+> +       blo     __kvm_handle_stub_hvc
 > +
->         map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
->                            &vmlinux_init);
->         map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
-> --
-> 2.7.4
+>         @ Set stack pointer
+>         mov     sp, r0
 >
-
-While it is correct that you are splitting this into three separate
-segments (otherwise we would not be able to change the permissions
-later without risking splitting to occur), I think this leads to
-unnecessary fragmentation.
-
-If there is demand for this feature (but you still need to make the
-argument for that), I wonder if it wouldn't be sufficient, and much
-more straightforward, to redefine the __ro_after_init semantics to
-include the kind of subsystem registration and module init context you
-are targeting, and implement some hooks to temporarily lift the
-__ro_after_init r/o permission restrictions in a controlled manner.
-
-Kees: any thoughts?
+> @@ -112,22 +121,38 @@ __do_hyp_init:
+>
+>         eret
+>
+> -       @ r0 : stub vectors address
+> +ENTRY(__kvm_handle_stub_hvc)
+> +       cmp     r0, #HVC_RESET_VECTORS
+> +       bne     1f
+>  ENTRY(__kvm_hyp_reset)
+>         /* We're now in idmap, disable MMU */
+>         mrc     p15, 4, r1, c1, c0, 0   @ HSCTLR
+> -       ldr     r2, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
+> -       bic     r1, r1, r2
+> +       ldr     r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
+> +       bic     r1, r1, r0
+>         mcr     p15, 4, r1, c1, c0, 0   @ HSCTLR
+>
+> -       /* Install stub vectors */
+> -       mcr     p15, 4, r0, c12, c0, 0  @ HVBAR
+> -       isb
+> +       /*
+> +        * Install stub vectors. We cannot use 'adr' to get to the
+> +        * stub vectors, hence having to play the VA->PA game.
+> +        */
+> +       adr     r0, .L__va2pa   @ PA
+> +       ldr     r1, [r0]        @ VA
+> +       sub     r0, r0, r1      @ PA - VA
+> +       ldr     r1, =__hyp_stub_vectors
+> +       add     r1, r1, r0
+> +       mcr     p15, 4, r1, c12, c0, 0  @ HVBAR
+> +       b       exit
+> +
+> +1:     mov     r0, #-1
+>
+> +exit:
+>         eret
+> +ENDPROC(__kvm_handle_stub_hvc)
+>  ENDPROC(__kvm_hyp_reset)
+>
+>         .ltorg
+> +.L__va2pa:
+> +       .word   .
+>
+>         .globl __kvm_hyp_init_end
+>  __kvm_hyp_init_end:
+> --
+> 2.11.0
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
