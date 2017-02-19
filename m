@@ -1,77 +1,30 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sun, 19 Feb 2017 04:19:57 +0100
-Subject: [PATCH 1/4] ARM64: Prepare Marvell IAP140 aka PXA1908
+Date: Sun, 19 Feb 2017 04:19:58 +0100
+Subject: [PATCH 2/4] Documentation: devicetree: arm: Document Marvell IAP140
 In-Reply-To: <20170219032000.4674-1-afaerber@suse.de>
 References: <20170219032000.4674-1-afaerber@suse.de>
-Message-ID: <20170219032000.4674-2-afaerber@suse.de>
+Message-ID: <20170219032000.4674-3-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suppress COMMON_CLK_PXA and MMC_PXA for now as they don't build on arm64.
-Also suppress the deprecated SERIAL_PXA in favor of SERIAL_8250_PXA.
-
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm64/Kconfig.platforms | 5 +++++
- drivers/clk/Kconfig          | 2 +-
- drivers/mmc/host/Kconfig     | 2 +-
- drivers/tty/serial/Kconfig   | 2 +-
- 4 files changed, 8 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/arm/marvell/iap140.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell/iap140.txt
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 129cc5a..841b6c8 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -111,6 +111,11 @@ config ARCH_MVEBU
- 	   - Armada 7K SoC Family
- 	   - Armada 8K SoC Family
- 
-+config ARCH_PXA
-+	bool "Marvell PXA SoC Family"
-+	help
-+	  This enables support for the Marvell PXA family.
+diff --git a/Documentation/devicetree/bindings/arm/marvell/iap140.txt b/Documentation/devicetree/bindings/arm/marvell/iap140.txt
+new file mode 100644
+index 0000000..25d307c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/marvell/iap140.txt
+@@ -0,0 +1,7 @@
++Marvell IAP140 Device Tree Bindings
++-----------------------------------
 +
- config ARCH_QCOM
- 	bool "Qualcomm Platforms"
- 	select GPIOLIB
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 9356ab4..3d25f20 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -185,7 +185,7 @@ config COMMON_CLK_PWM
- 	  at 50% duty cycle.
- 
- config COMMON_CLK_PXA
--	def_bool COMMON_CLK && ARCH_PXA
-+	def_bool COMMON_CLK && ARCH_PXA && ARM
- 	---help---
- 	  Support for the Marvell PXA SoC.
- 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index f08691a..a650eca 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -27,7 +27,7 @@ config MMC_QCOM_DML
- 
- config MMC_PXA
- 	tristate "Intel PXA25x/26x/27x Multimedia Card Interface support"
--	depends on ARCH_PXA
-+	depends on ARCH_PXA && ARM
- 	help
- 	  This selects the Intel(R) PXA(R) Multimedia card Interface.
- 	  If you have a PXA(R) platform with a Multimedia Card slot,
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index 6117ac8..0713a05 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -439,7 +439,7 @@ config SERIAL_MPSC_CONSOLE
- 
- config SERIAL_PXA
- 	bool "PXA serial port support (DEPRECATED)"
--	depends on ARCH_PXA || ARCH_MMP
-+	depends on (ARCH_PXA && ARM) || ARCH_MMP
- 	select SERIAL_CORE
- 	select SERIAL_8250_PXA if SERIAL_8250=y
- 	select SERIAL_PXA_NON8250 if !SERIAL_8250=y
++Boards using a SoC of the Marvell IAP140 family must carry the following
++root node property:
++
++ - compatible :  must contain "mrvl,iap140"
 -- 
 2.10.2
