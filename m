@@ -1,73 +1,88 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 19 Feb 2017 11:21:18 +0000
-Subject: [RFC 6/7] arm64: add __map_kernel_segment to accept additional vm
- flags
-In-Reply-To: <1487498660-16600-6-git-send-email-hoeun.ryu@gmail.com>
+Date: Sun, 19 Feb 2017 11:35:51 +0000
+Subject: [RFC 7/7] arm64: map seperately rodata sections for
+ __ro_mostly_after_init section
+In-Reply-To: <1487498660-16600-7-git-send-email-hoeun.ryu@gmail.com>
 References: <1487498660-16600-1-git-send-email-hoeun.ryu@gmail.com>
- <1487498660-16600-6-git-send-email-hoeun.ryu@gmail.com>
-Message-ID: <CAKv+Gu-10eLtEa-=LChCL1q=4awARp3y8pqVdhVZfmmBFs6VzA@mail.gmail.com>
+ <1487498660-16600-7-git-send-email-hoeun.ryu@gmail.com>
+Message-ID: <CAKv+Gu9umycZm_UP99ZUifLUBb8MuOZHXgU9nB6XioVMa4eeVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 19 February 2017 at 10:04, Hoeun Ryu <hoeun.ryu@gmail.com> wrote:
->  Memory attribute for `__ro_mostly_after_init` section should be changed
-> via set_memory_rw/ro that doesn't work against vm areas which don't have
-> VM_ALLOC.
-
-This is for a good reason: VMALLOC regions are guaranteed to be mapped
-down to pages, which is the only thing set_memory_rX() supports. On
-arm64, kernel segments may be mapped using contiguous page mappings or
-block mappings, which cannot be modified like this.
-
-> Add this function to map `__ro_mostly_after_init` section with
-> VM_ALLOC flag set in map_kernel.
+> Map rodata sections seperately for the new __ro_mostly_after_init section.
+> Attribute of memory for __ro_mostly_after_init section can be changed later
+> so we need a dedicated vmalloced region for set_memory_rw/ro api.
 >
-
-If we add this functionality, I'd rather we have a special handler for
-the __ro_mostly_after_init section and not use set_memory_rX().
-
 > Signed-off-by: Hoeun Ryu <hoeun.ryu@gmail.com>
 > ---
->  arch/arm64/mm/mmu.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
+>  arch/arm64/mm/mmu.c | 30 ++++++++++++++++++++++++++----
+>  1 file changed, 26 insertions(+), 4 deletions(-)
 >
 > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index b805c01..91271b1 100644
+> index 91271b1..4a89a2e 100644
 > --- a/arch/arm64/mm/mmu.c
 > +++ b/arch/arm64/mm/mmu.c
-> @@ -444,8 +444,10 @@ void mark_rodata_ro(void)
->         debug_checkwx();
->  }
->
-> -static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
-> -                                     pgprot_t prot, struct vm_struct *vma)
-> +static void __init __map_kernel_segment(pgd_t *pgd,
-> +                                       void *va_start, void *va_end,
-> +                                       pgprot_t prot, struct vm_struct *vma,
-> +                                       unsigned long flags)
->  {
->         phys_addr_t pa_start = __pa_symbol(va_start);
->         unsigned long size = va_end - va_start;
-> @@ -459,12 +461,18 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
->         vma->addr       = va_start;
->         vma->phys_addr  = pa_start;
->         vma->size       = size;
-> -       vma->flags      = VM_MAP;
-> +       vma->flags      = flags;
->         vma->caller     = __builtin_return_address(0);
->
->         vm_area_add_early(vma);
->  }
->
-> +static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
-> +                                     pgprot_t prot, struct vm_struct *vma)
-> +{
-> +       return __map_kernel_segment(pgd, va_start, va_end, prot, vma, VM_MAP);
-> +}
+> @@ -434,8 +434,22 @@ void mark_rodata_ro(void)
+>          * mark .rodata as read only. Use __init_begin rather than __end_rodata
+>          * to cover NOTES and EXCEPTION_TABLE.
+>          */
+> -       section_size = (unsigned long)__init_begin - (unsigned long)__start_rodata;
+> -       create_mapping_late(__pa_symbol(__start_rodata), (unsigned long)__start_rodata,
+> +       section_size = (unsigned long)__start_data_ro_mostly_after_init -
+> +               (unsigned long)__start_rodata;
+> +       create_mapping_late(__pa_symbol(__start_rodata),
+> +                           (unsigned long)__start_rodata,
+> +                           section_size, PAGE_KERNEL_RO);
 > +
->  /*
->   * Create fine-grained mappings for the kernel.
+> +       section_size = (unsigned long)__end_data_ro_mostly_after_init -
+> +               (unsigned long)__start_data_ro_mostly_after_init;
+> +       create_mapping_late(__pa_symbol(__start_data_ro_mostly_after_init),
+> +                           (unsigned long)__start_data_ro_mostly_after_init,
+> +                           section_size, PAGE_KERNEL_RO);
+> +
+> +       section_size = (unsigned long)__init_begin -
+> +               (unsigned long)__end_data_ro_mostly_after_init;
+> +       create_mapping_late(__pa_symbol(__end_data_ro_mostly_after_init),
+> +                           (unsigned long)__end_data_ro_mostly_after_init,
+>                             section_size, PAGE_KERNEL_RO);
+>
+>         /* flush the TLBs after updating live kernel mappings */
+> @@ -478,10 +492,18 @@ static void __init map_kernel_segment(pgd_t *pgd, void *va_start, void *va_end,
 >   */
+>  static void __init map_kernel(pgd_t *pgd)
+>  {
+> -       static struct vm_struct vmlinux_text, vmlinux_rodata, vmlinux_init, vmlinux_data;
+> +       static struct vm_struct vmlinux_text, vmlinux_rodata1, vmlinux_rodata2, vmlinux_ro_mostly_after_init, vmlinux_init, vmlinux_data;
+>
+>         map_kernel_segment(pgd, _text, _etext, PAGE_KERNEL_EXEC, &vmlinux_text);
+> -       map_kernel_segment(pgd, __start_rodata, __init_begin, PAGE_KERNEL, &vmlinux_rodata);
+> +       map_kernel_segment(pgd, __start_rodata, __start_data_ro_mostly_after_init, PAGE_KERNEL, &vmlinux_rodata1);
+> +       __map_kernel_segment(pgd,
+> +                            __start_data_ro_mostly_after_init,
+> +                            __end_data_ro_mostly_after_init,
+> +                            PAGE_KERNEL,
+> +                            &vmlinux_ro_mostly_after_init,
+> +                            VM_MAP | VM_ALLOC);
+> +       map_kernel_segment(pgd, __end_data_ro_mostly_after_init, __init_begin, PAGE_KERNEL, &vmlinux_rodata2);
+> +
+>         map_kernel_segment(pgd, __init_begin, __init_end, PAGE_KERNEL_EXEC,
+>                            &vmlinux_init);
+>         map_kernel_segment(pgd, _data, _end, PAGE_KERNEL, &vmlinux_data);
 > --
 > 2.7.4
 >
+
+While it is correct that you are splitting this into three separate
+segments (otherwise we would not be able to change the permissions
+later without risking splitting to occur), I think this leads to
+unnecessary fragmentation.
+
+If there is demand for this feature (but you still need to make the
+argument for that), I wonder if it wouldn't be sufficient, and much
+more straightforward, to redefine the __ro_after_init semantics to
+include the kind of subsystem registration and module init context you
+are targeting, and implement some hooks to temporarily lift the
+__ro_after_init r/o permission restrictions in a controlled manner.
+
+Kees: any thoughts?
