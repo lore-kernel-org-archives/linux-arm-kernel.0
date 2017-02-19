@@ -1,65 +1,77 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Sun, 19 Feb 2017 02:58:09 +0100
-Subject: [PATCH] arm64: traps: Mark __le16, __le32, __user variables
- properly
-In-Reply-To: <20170217165112.17512-1-stephen.boyd@linaro.org>
-References: <20170217165112.17512-1-stephen.boyd@linaro.org>
-Message-ID: <20170219015808.2vc2kvpde7nlrey4@macbook.local>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Sun, 19 Feb 2017 04:19:57 +0100
+Subject: [PATCH 1/4] ARM64: Prepare Marvell IAP140 aka PXA1908
+In-Reply-To: <20170219032000.4674-1-afaerber@suse.de>
+References: <20170219032000.4674-1-afaerber@suse.de>
+Message-ID: <20170219032000.4674-2-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2017 at 08:51:12AM -0800, Stephen Boyd wrote:
-> Sparse complains a bit on this file about endian issues and
-> __user casting:
-> 
-> arch/arm64/kernel/traps.c:87:37: warning: incorrect type in argument 1 (different address spaces)
-> arch/arm64/kernel/traps.c:87:37:    expected void const volatile [noderef] <asn:1>*<noident>
-> arch/arm64/kernel/traps.c:87:37:    got unsigned long *<noident>
-> arch/arm64/kernel/traps.c:116:23: warning: incorrect type in argument 1 (different address spaces)
-> arch/arm64/kernel/traps.c:116:23:    expected void const volatile [noderef] <asn:1>*<noident>
-> arch/arm64/kernel/traps.c:116:23:    got unsigned int [usertype] *
+Suppress COMMON_CLK_PXA and MMC_PXA for now as they don't build on arm64.
+Also suppress the deprecated SERIAL_PXA in favor of SERIAL_8250_PXA.
 
-The fact that __get_user() can and is used for both __kernel & __user pointers
-defeat any sensible annotation. The proper way would be to have a special
-version of __get_user() which would ignore the __user part of the pointer,
-something like "__get_user_but_accept_any_pointer()" ...
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ arch/arm64/Kconfig.platforms | 5 +++++
+ drivers/clk/Kconfig          | 2 +-
+ drivers/mmc/host/Kconfig     | 2 +-
+ drivers/tty/serial/Kconfig   | 2 +-
+ 4 files changed, 8 insertions(+), 3 deletions(-)
 
-
-> arch/arm64/kernel/traps.c:346:25: warning: cast to restricted __le16
-> arch/arm64/kernel/traps.c:352:34: warning: cast to restricted __le16
-> arch/arm64/kernel/traps.c:359:25: warning: cast to restricted __le32
-
-Your patch looked correct to me for those.
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 129cc5a..841b6c8 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -111,6 +111,11 @@ config ARCH_MVEBU
+ 	   - Armada 7K SoC Family
+ 	   - Armada 8K SoC Family
  
-> Mark the types appropriately, and force the cast in get_user()
-> when assigning to 0 so sparse doesn't complain.
-I didn't looked deeply at this one but I don't think it is needed.
-Care to give more details?
-
-
-> Noticed while making other changes to this file. There are other issues still
-> about marking symbols static, but I'm not sure we want to introduce another
-> header file for the asmlinkage functions?
-Probably not, indeed.
-
-> arch/arm64/kernel/traps.c:567:10: warning: Initializer entry defined twice
-> arch/arm64/kernel/traps.c:568:10:   also defined here
-This one I find strange. Can you tell which are those two entries?
-
++config ARCH_PXA
++	bool "Marvell PXA SoC Family"
++	help
++	  This enables support for the Marvell PXA family.
++
+ config ARCH_QCOM
+ 	bool "Qualcomm Platforms"
+ 	select GPIOLIB
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 9356ab4..3d25f20 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -185,7 +185,7 @@ config COMMON_CLK_PWM
+ 	  at 50% duty cycle.
  
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index 46da3ea638bb..2f5b4ae98ee0 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -287,7 +287,7 @@ do {									\
->  	might_fault();							\
->  	access_ok(VERIFY_READ, __p, sizeof(*__p)) ?			\
->  		__get_user((x), __p) :					\
-> -		((x) = 0, -EFAULT);					\
-> +		((x) = (__force __typeof__(*(ptr)))0, -EFAULT);		\
->  })
-
-As said above, this one is dubious.
-
-
-Luc Van Oostenryck
+ config COMMON_CLK_PXA
+-	def_bool COMMON_CLK && ARCH_PXA
++	def_bool COMMON_CLK && ARCH_PXA && ARM
+ 	---help---
+ 	  Support for the Marvell PXA SoC.
+ 
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index f08691a..a650eca 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -27,7 +27,7 @@ config MMC_QCOM_DML
+ 
+ config MMC_PXA
+ 	tristate "Intel PXA25x/26x/27x Multimedia Card Interface support"
+-	depends on ARCH_PXA
++	depends on ARCH_PXA && ARM
+ 	help
+ 	  This selects the Intel(R) PXA(R) Multimedia card Interface.
+ 	  If you have a PXA(R) platform with a Multimedia Card slot,
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 6117ac8..0713a05 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -439,7 +439,7 @@ config SERIAL_MPSC_CONSOLE
+ 
+ config SERIAL_PXA
+ 	bool "PXA serial port support (DEPRECATED)"
+-	depends on ARCH_PXA || ARCH_MMP
++	depends on (ARCH_PXA && ARM) || ARCH_MMP
+ 	select SERIAL_CORE
+ 	select SERIAL_8250_PXA if SERIAL_8250=y
+ 	select SERIAL_PXA_NON8250 if !SERIAL_8250=y
+-- 
+2.10.2
