@@ -1,742 +1,418 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 19 Feb 2017 12:40:33 +0000
-Subject: [PATCH v3 04/18] iio: adc: add support for X-Powers AXP20X and
- AXP22X PMICs ADCs
-In-Reply-To: <20170214094112.27426-5-quentin.schulz@free-electrons.com>
-References: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
- <20170214094112.27426-5-quentin.schulz@free-electrons.com>
-Message-ID: <b76264cc-9c6c-169c-d490-91852c052890@kernel.org>
+Date: Sun, 19 Feb 2017 12:49:39 +0000
+Subject: [PATCH v2 4/5] iio: trigger: add support for STM32 EXTI triggers
+In-Reply-To: <b2685b44-35c2-b8c1-6479-8dd3b56974d9@st.com>
+References: <1485786840-4557-1-git-send-email-fabrice.gasnier@st.com>
+ <1485786840-4557-5-git-send-email-fabrice.gasnier@st.com>
+ <CACRpkdZeiFYFdRWCEgYWDWh4Wn2gT29KAFao9mgj7sTi768kFQ@mail.gmail.com>
+ <1236cee4-41bf-b3b9-51e4-7e585234b0c7@kernel.org>
+ <b035b596-6b48-2671-93af-24b52b1ffab8@st.com>
+ <a2b1a05f-ba8e-7b0d-11bf-479cbc5ce079@kernel.org>
+ <b2685b44-35c2-b8c1-6479-8dd3b56974d9@st.com>
+Message-ID: <6e75f5d8-75a0-7948-bb27-ee3c831ddf10@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/02/17 09:40, Quentin Schulz wrote:
-> The X-Powers AXP20X and AXP22X PMICs have multiple ADCs. They expose the
-> battery voltage, battery charge and discharge currents, AC-in and VBUS
-> voltages and currents, 2 GPIOs muxable in ADC mode and PMIC temperature.
+On 17/02/17 16:05, Fabrice Gasnier wrote:
+> On 02/11/2017 11:29 AM, Jonathan Cameron wrote:
+>> On 06/02/17 16:01, Fabrice Gasnier wrote:
+>>> On 02/04/2017 12:39 PM, Jonathan Cameron wrote:
+>>>> On 03/02/17 19:40, Linus Walleij wrote:
+>>>>> On Mon, Jan 30, 2017 at 3:33 PM, Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+>>>>>
+>>>>>> EXTi[0..15] gpio signal can be routed internally as trigger source for
+>>>>>> ADC or DAC conversions. Configure them as interrupts to configure
+>>>>>> trigger path in HW.
+>>>>>>
+>>>>>> Note: interrupt handler isn't required here, and corresponding interrupt
+>>>>>> can be kept masked at exti controller level.
+>>>>>>
+>>>>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>>>>>
+>>>>> But I see nothing STM32-specific about this driver?
+>>>>>
+>>>>> I think we should do everone a service and just create
+>>>>> drivers/iio/trigger/gpio-trigger.c
+>>>>>
+>>>>> I wondered before why we don't have a generic GPIO IIO trigger,
+>>>>> it seems like such an intuitive and useful thing to have.
+>>>> We do, it just got renamed at some point a while back to be
+>>>> iio-trig-interrupt after it became clear that it didn't need
+>>>> to be a gpio either - just an interrupt.  Can't remember which
+>>>> part provided a non gpio interrupt pin and hence drove that
+>>>> change.  Was quite a while back!
+>>>> d4fd73bf25c3aafc891ef4443fc744d427ec1df0 specifically in 2013
+>>>>
+>>>> Handling of the gpio stuff should be handled in the interrupt
+>>>> description itself.
+>>>>
+>>>> However, it's a bit different - in that in the below it
+>>>> would be the equivalent of triggering on the unused exti
+>>>> interrupt rather than on the end of conversion.
+>>>>
+>>>> In this case, because of the hardware linkage we can effectively
+>>>> skip the first interrupt.
+>>>>
+>>>> Arguably to make this a general purpose trigger we should enable
+>>>> that interrupt if anything other than the STM devices that can
+>>>> use it in hardware are hooked on to it.
+>>>>
+>>>> So this is an interrupt trigger without the interrupt ever
+>>>> being visible to software.
+>>>>
+>>>> It might be easy enough to add that support to the generic version
+>>>> except that linking said trigger requires some register changes
+>>>> in the STM side. + there is a kicker in the various last bit
+>>>> of this patch - we need a way to find out if it's the interrupt
+>>>> we think it is (i.e. an exti interrupt)
+>>>
+>>> Hi Jonathan, Linus, all,
+>>>
+>>> First, many thanks for reviewing.
+>>>
+>>> In this patch-set, I choose to implement this hardware trigger line
+>>> into separate driver... Thinking out loud:
+>>> If I try to summarize, as you perfectly describe here before, I see
+>>> two items to address: - this is pure HW line, that can either
+>>> generate interrupts, and/or start conversions in HW. This may be hard
+>>> to combine both, an interrupt handler to call iio_trigger_poll() from
+>>> there, for generic devices, but not for stm devices (not sure if this
+>>> can benefit to others?).
+>> Wouldn't have thought it was that hard to do, but fair enough  + it
+>> can definitely be added later if anyone cares.
 > 
-> This adds support for most of AXP20X and AXP22X ADCs.
+> Hi Jonathan,
 > 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Hi Quentin,
-
-A few bits and bobs inline.  The bigest one is that I don't think
-you need to carry your struct axp_data pointer around in the iio_priv
-structure as it only seems to be used in probe.
-
-Anyhow, tidy these little bits up (quite a few are optional in the
-sense that they are a matter or personal taste and I don't feel
-strongly about them) and you can add
-
-Reviewed-by: Jonathan Cameron <jic23@kernel.org>
-
-A nice driver.
-
-Jonathan
-> ---
+> I hope I'd give some more trials ;-).
 > 
-> v3:
->  - moved from switch to if condition in axp20x_adc_raw and
->  axp22x_adc_raw,
->  - removed DT support as DT node has been dropped,
->    - use of platform_device_id
->  - correctly defined the name of the iio device (name used to probe the
->  driver),
->  - added goto for errors in probe,
->  - added iio_map_array_unregister to the remove function,
+>>
+>>  - there is need to do some register changes
+>>> on stm device side (ADC) as well, when choosing a particular trigger
+>>> (EXTI line for instance) e.g. in validate_trigger().
+>>>
+>>> I'm starting to wonder if this can be separate driver. Maybe this
+>>> should be part of device driver (e.g. ADC), at least for the time being.
+>> Sure, if it ends up easier that way then do so.  We don't really have
+>>  support yet for triggered DACs anyway and as you say this could be
+>> modified later - subject to the need to end up with device tree bindings
+>> that make sense in that case as well.
 > 
-> v2:
->  - removed unused defines,
->  - changed BIT(x) to 1 << x when describing bits purpose for which 2 <<
->  x or 3 << x exists, to be consistent,
->  - changed ADC rate defines to macro formulas,
->  - reordered IIO channels, now different measures (current/voltage) of
->  the same part of the PMIC (e.g. battery), have the same IIO channel in
->  their respective IIO type. When a part of the PMIC have only one
->  measure, a number is jumped,
->  - left IIO channel mapping in DT to use iio_map structure,
->  - removed indexing of ADC internal temperature,
->  - removed unused iio_dev structure in axp20x_adc_iio,
->  - added a structure for data specific to AXP20X or AXP22X PMICs instead
->  of using an ID and an if condition when needing to separate the
->  behaviour of both,
->  - added a comment on batt_chrg_i really being on 12bits rather than
->  what the Chinese datasheets say (13 bits),
->  - corrected the offset for AXP22X PMIC temperature,
->  - set the ADC rate to a value (100Hz) shared by the AXP20X and AXP22X,
->  - created macro formulas to compute the ADC rate for each,
->  - added a condition on presence of ADC_EN2 reg before setting/resetting
->  it,
->  - switched from devm_iio_device_unregister to the non-devm function
->  because of the need for a remove function,
->  - removed some dead code,
-> 
->  drivers/iio/adc/Kconfig      |  10 +
->  drivers/iio/adc/Makefile     |   1 +
->  drivers/iio/adc/axp20x_adc.c | 606 +++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 617 insertions(+)
->  create mode 100644 drivers/iio/adc/axp20x_adc.c
-> 
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 9c8b558..ed17fe1 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -154,6 +154,16 @@ config AT91_SAMA5D2_ADC
->  	  To compile this driver as a module, choose M here: the module will be
->  	  called at91-sama5d2_adc.
->  
-> +config AXP20X_ADC
-> +	tristate "X-Powers AXP20X and AXP22X ADC driver"
-> +	depends on MFD_AXP20X
-> +	help
-> +	  Say yes here to have support for X-Powers power management IC (PMIC)
-> +	  AXP20X and AXP22X ADC devices.
-> +
-> +	  To compile this driver as a module, choose M here: the module will be
-> +	  called axp20x_adc.
-> +
->  config AXP288_ADC
->  	tristate "X-Powers AXP288 ADC driver"
->  	depends on MFD_AXP20X
-> diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-> index d36c4be..f5c28a5 100644
-> --- a/drivers/iio/adc/Makefile
-> +++ b/drivers/iio/adc/Makefile
-> @@ -16,6 +16,7 @@ obj-$(CONFIG_AD7887) += ad7887.o
->  obj-$(CONFIG_AD799X) += ad799x.o
->  obj-$(CONFIG_AT91_ADC) += at91_adc.o
->  obj-$(CONFIG_AT91_SAMA5D2_ADC) += at91-sama5d2_adc.o
-> +obj-$(CONFIG_AXP20X_ADC) += axp20x_adc.o
->  obj-$(CONFIG_AXP288_ADC) += axp288_adc.o
->  obj-$(CONFIG_BCM_IPROC_ADC) += bcm_iproc_adc.o
->  obj-$(CONFIG_BERLIN2_ADC) += berlin2-adc.o
-> diff --git a/drivers/iio/adc/axp20x_adc.c b/drivers/iio/adc/axp20x_adc.c
-> new file mode 100644
-> index 0000000..5ef6af8
-> --- /dev/null
-> +++ b/drivers/iio/adc/axp20x_adc.c
-> @@ -0,0 +1,606 @@
-> +/* ADC driver for AXP20X and AXP22X PMICs
-> + *
-> + * Copyright (c) 2016 Free Electrons NextThing Co.
-> + *	Quentin Schulz <quentin.schulz@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it under
-> + * the terms of the GNU General Public License version 2 as published by the
-> + * Free Software Foundation.
-> + */
-> +
-> +#include <linux/completion.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pm_runtime.h>
-> +#include <linux/regmap.h>
-> +#include <linux/thermal.h>
-> +
-> +#include <linux/iio/iio.h>
-> +#include <linux/iio/driver.h>
-> +#include <linux/iio/machine.h>
-> +#include <linux/mfd/axp20x.h>
-> +
-> +#define AXP20X_ADC_EN1_MASK			GENMASK(7, 0)
-> +
-> +#define AXP20X_ADC_EN2_MASK			(GENMASK(3, 2) | BIT(7))
-> +#define AXP22X_ADC_EN1_MASK			(GENMASK(7, 5) | BIT(0))
-> +
-> +#define AXP20X_GPIO10_IN_RANGE_GPIO0		BIT(0)
-> +#define AXP20X_GPIO10_IN_RANGE_GPIO1		BIT(1)
-> +#define AXP20X_GPIO10_IN_RANGE_GPIO0_VAL(x)	((x) & BIT(0))
-> +#define AXP20X_GPIO10_IN_RANGE_GPIO1_VAL(x)	(((x) & BIT(0)) << 1)
-> +
-> +#define AXP20X_ADC_RATE_MASK			GENMASK(7, 6)
-> +#define AXP20X_ADC_RATE_HZ(x)			((ilog2((x) / 25) << 6) & AXP20X_ADC_RATE_MASK)
-> +#define AXP22X_ADC_RATE_HZ(x)			((ilog2((x) / 100) << 6) & AXP20X_ADC_RATE_MASK)
-> +
-> +#define AXP20X_ADC_CHANNEL(_channel, _name, _type, _reg)	\
-> +	{							\
-> +		.type = _type,					\
-> +		.indexed = 1,					\
-> +		.channel = _channel,				\
-> +		.address = _reg,				\
-> +		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |	\
-> +				      BIT(IIO_CHAN_INFO_SCALE),	\
-> +		.datasheet_name = _name,			\
-> +	}
-> +
-> +#define AXP20X_ADC_CHANNEL_OFFSET(_channel, _name, _type, _reg) \
-> +	{							\
-> +		.type = _type,					\
-> +		.indexed = 1,					\
-> +		.channel = _channel,				\
-> +		.address = _reg,				\
-> +		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |	\
-> +				      BIT(IIO_CHAN_INFO_SCALE) |\
-> +				      BIT(IIO_CHAN_INFO_OFFSET),\
-> +		.datasheet_name = _name,			\
-> +	}
-> +
-> +struct axp_data;
-> +
-> +struct axp20x_adc_iio {
-> +	struct regmap		*regmap;
-I 'think' you only actually use data in probe.  As such it doesn't need
-to be in here at all..
+> I've just posted an RFC, to add device tree bindings for trigger.
+> "iio: trigger: Add OF support and GPIO based trigger"
+> I think this is a prerequisite, trying to get more generic implementation.
+This is interesting.  Previously in the vast majority of cases we have
+left the trigger connectivity up to userspace to define.  The only real
+exception has been where we are playing nasty games to do some control and
+sampling of a particular analog circuit beyond the ADC.
 
-At that point you could just have the regmap pointer directly as your
-private data and drop this structure entirely.  Whether you want to do
-that though is up to you.
-> +	struct axp_data		*data;
-> +};
-> +
-> +enum axp20x_adc_channel_v {
-> +	AXP20X_ACIN_V = 0,
-> +	AXP20X_VBUS_V,
-> +	AXP20X_TS_IN,
-> +	AXP20X_GPIO0_V,
-> +	AXP20X_GPIO1_V,
-> +	AXP20X_IPSOUT_V,
-> +	AXP20X_BATT_V,
-> +};
-> +
-> +enum axp20x_adc_channel_i {
-> +	AXP20X_ACIN_I = 0,
-> +	AXP20X_VBUS_I,
-> +	AXP20X_BATT_CHRG_I,
-> +	AXP20X_BATT_DISCHRG_I,
-> +};
-> +
-> +enum axp22x_adc_channel_v {
-> +	AXP22X_TS_IN = 0,
-> +	AXP22X_BATT_V,
-> +};
-> +
-> +enum axp22x_adc_channel_i {
-> +	AXP22X_BATT_CHRG_I = 1,
-> +	AXP22X_BATT_DISCHRG_I,
-> +};
-> +
-> +static struct iio_map axp20x_maps[] = {
-> +	{
-> +		.consumer_dev_name = "axp20x-usb-power-supply",
-> +		.consumer_channel = "vbus_v",
-> +		.adc_channel_label = "vbus_v",
-> +	}, {
-> +		.consumer_dev_name = "axp20x-usb-power-supply",
-> +		.consumer_channel = "vbus_i",
-> +		.adc_channel_label = "vbus_i",
-> +	}, {
-> +		.consumer_dev_name = "axp20x-ac-power-supply",
-> +		.consumer_channel = "acin_v",
-> +		.adc_channel_label = "acin_v",
-> +	}, {
-> +		.consumer_dev_name = "axp20x-ac-power-supply",
-> +		.consumer_channel = "acin_i",
-> +		.adc_channel_label = "acin_i",
-> +	}, {
-> +		.consumer_dev_name = "axp20x-battery-power-supply",
-> +		.consumer_channel = "batt_v",
-> +		.adc_channel_label = "batt_v",
-> +	}, {
-> +		.consumer_dev_name = "axp20x-battery-power-supply",
-> +		.consumer_channel = "batt_chrg_i",
-> +		.adc_channel_label = "batt_chrg_i",
-> +	}, {
-> +		.consumer_dev_name = "axp20x-battery-power-supply",
-> +		.consumer_channel = "batt_dischrg_i",
-> +		.adc_channel_label = "batt_dischrg_i",
-> +	}, { /* sentinel */ }
-> +};
-> +
-> +static struct iio_map axp22x_maps[] = {
-> +	{
-> +		.consumer_dev_name = "axp20x-battery-power-supply",
-> +		.consumer_channel = "batt_v",
-> +		.adc_channel_label = "batt_v",
-> +	}, {
-> +		.consumer_dev_name = "axp20x-battery-power-supply",
-> +		.consumer_channel = "batt_chrg_i",
-> +		.adc_channel_label = "batt_chrg_i",
-> +	}, {
-> +		.consumer_dev_name = "axp20x-battery-power-supply",
-> +		.consumer_channel = "batt_dischrg_i",
-> +		.adc_channel_label = "batt_dischrg_i",
-> +	}, { /* sentinel */ }
-> +};
-> +
-> +/*
-> + * Channels are mapped by physical system. Their channels share the same index.
-> + * i.e. acin_i is in_current0_raw and acin_v is in_voltage0_raw.
-> + * The only exception is for the battery. batt_v will be in_voltage6_raw and
-> + * charge current in_current6_raw and discharge current will be in_current7_raw.
-> + */
-> +static const struct iio_chan_spec axp20x_adc_channels[] = {
-> +	AXP20X_ADC_CHANNEL(AXP20X_ACIN_V, "acin_v", IIO_VOLTAGE,
-> +			   AXP20X_ACIN_V_ADC_H),
-> +	AXP20X_ADC_CHANNEL(AXP20X_ACIN_I, "acin_i", IIO_CURRENT,
-> +			   AXP20X_ACIN_I_ADC_H),
-> +	AXP20X_ADC_CHANNEL(AXP20X_VBUS_V, "vbus_v", IIO_VOLTAGE,
-> +			   AXP20X_VBUS_V_ADC_H),
-> +	AXP20X_ADC_CHANNEL(AXP20X_VBUS_I, "vbus_i", IIO_CURRENT,
-> +			   AXP20X_VBUS_I_ADC_H),
-> +	{
-> +		.type = IIO_TEMP,
-> +		.address = AXP20X_TEMP_ADC_H,
-> +		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-> +				      BIT(IIO_CHAN_INFO_SCALE) |
-> +				      BIT(IIO_CHAN_INFO_OFFSET),
-> +		.datasheet_name = "pmic_temp",
-> +	},
-> +	AXP20X_ADC_CHANNEL_OFFSET(AXP20X_GPIO0_V, "gpio0_v", IIO_VOLTAGE,
-> +				  AXP20X_GPIO0_V_ADC_H),
-> +	AXP20X_ADC_CHANNEL_OFFSET(AXP20X_GPIO1_V, "gpio1_v", IIO_VOLTAGE,
-> +				  AXP20X_GPIO1_V_ADC_H),
-> +	AXP20X_ADC_CHANNEL(AXP20X_IPSOUT_V, "ipsout_v", IIO_VOLTAGE,
-> +			   AXP20X_IPSOUT_V_HIGH_H),
-> +	AXP20X_ADC_CHANNEL(AXP20X_BATT_V, "batt_v", IIO_VOLTAGE,
-> +			   AXP20X_BATT_V_H),
-> +	AXP20X_ADC_CHANNEL(AXP20X_BATT_CHRG_I, "batt_chrg_i", IIO_CURRENT,
-> +			   AXP20X_BATT_CHRG_I_H),
-> +	AXP20X_ADC_CHANNEL(AXP20X_BATT_DISCHRG_I, "batt_dischrg_i", IIO_CURRENT,
-> +			   AXP20X_BATT_DISCHRG_I_H),
-> +};
-> +
-> +static const struct iio_chan_spec axp22x_adc_channels[] = {
-> +	{
-> +		.type = IIO_TEMP,
-> +		.address = AXP22X_PMIC_TEMP_H,
-> +		.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
-> +				      BIT(IIO_CHAN_INFO_SCALE) |
-> +				      BIT(IIO_CHAN_INFO_OFFSET),
-> +		.datasheet_name = "pmic_temp",
-> +	},
-> +	AXP20X_ADC_CHANNEL(AXP22X_BATT_V, "batt_v", IIO_VOLTAGE,
-> +			   AXP20X_BATT_V_H),
-> +	AXP20X_ADC_CHANNEL(AXP22X_BATT_CHRG_I, "batt_chrg_i", IIO_CURRENT,
-> +			   AXP20X_BATT_CHRG_I_H),
-> +	AXP20X_ADC_CHANNEL(AXP22X_BATT_DISCHRG_I, "batt_dischrg_i", IIO_CURRENT,
-> +			   AXP20X_BATT_DISCHRG_I_H),
-> +};
-> +
-> +static int axp20x_adc_raw(struct iio_dev *indio_dev,
-> +			  struct iio_chan_spec const *chan, int *val)
-> +{
-> +	struct axp20x_adc_iio *info = iio_priv(indio_dev);
-> +	int size = 12;
-> +
-> +	/*
-> +	 *N.B.:  Unlike the Chinese datasheets tell, the charging current is
-Space before the N
-> +	 * stored on 12 bits, not 13 bits. Only discharging current is on 13
-> +	 * bits.
-> +	 */
-> +	if (chan->type == IIO_CURRENT && chan->channel == AXP20X_BATT_DISCHRG_I)
-> +		size = 13;
-> +	else
-> +		size = 12;
-> +
-> +	*val = axp20x_read_variable_width(info->regmap, chan->address, size);
-> +	if (*val < 0)
-> +		return *val;
-> +
-> +	return IIO_VAL_INT;
-> +}
-> +
-> +static int axp22x_adc_raw(struct iio_dev *indio_dev,
-> +			  struct iio_chan_spec const *chan, int *val)
-> +{
-> +	struct axp20x_adc_iio *info = iio_priv(indio_dev);
-> +	int size;
-> +
-> +	/*
-> +	 * N.B.: Unlike the Chinese datasheets tell, the charging current is
-> +	 * stored on 12 bits, not 13 bits. Only discharging current is on 13
-> +	 * bits.
-> +	 */
-> +	if (chan->type == IIO_CURRENT && chan->channel == AXP22X_BATT_DISCHRG_I)
-> +		size = 13;
-> +	else
-> +		size = 12;
-> +
-> +	*val = axp20x_read_variable_width(info->regmap, chan->address, size);
-> +	if (*val < 0)
-> +		return *val;
-> +
-> +	return IIO_VAL_INT;
-> +}
-> +
-> +static int axp20x_adc_scale_voltage(int channel, int *val, int *val2)
-> +{
-> +	switch (channel) {
-> +	case AXP20X_ACIN_V:
-> +	case AXP20X_VBUS_V:
-> +		*val = 1;
-> +		*val2 = 700000;
-> +		return IIO_VAL_INT_PLUS_MICRO;
-> +
-> +	case AXP20X_GPIO0_V:
-> +	case AXP20X_GPIO1_V:
-> +		*val = 0;
-> +		*val2 = 500000;
-> +		return IIO_VAL_INT_PLUS_MICRO;
-> +
-> +	case AXP20X_BATT_V:
-> +		*val = 1;
-> +		*val2 = 100000;
-> +		return IIO_VAL_INT_PLUS_MICRO;
-> +
-> +	case AXP20X_IPSOUT_V:
-> +		*val = 1;
-> +		*val2 = 400000;
-> +		return IIO_VAL_INT_PLUS_MICRO;
-> +
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +}
-> +
-> +static int axp20x_adc_scale_current(int channel, int *val, int *val2)
-> +{
-> +	switch (channel) {
-> +	case AXP20X_ACIN_I:
-> +		*val = 0;
-> +		*val2 = 625000;
-> +		return IIO_VAL_INT_PLUS_MICRO;
-> +
-> +	case AXP20X_VBUS_I:
-> +		*val = 0;
-> +		*val2 = 375000;
-> +		return IIO_VAL_INT_PLUS_MICRO;
-> +
-> +	case AXP20X_BATT_DISCHRG_I:
-> +	case AXP20X_BATT_CHRG_I:
-> +		*val = 0;
-> +		*val2 = 500000;
-> +		return IIO_VAL_INT_PLUS_MICRO;
-> +
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +}
-> +
-> +static int axp20x_adc_scale(struct iio_chan_spec const *chan, int *val,
-> +			    int *val2)
-> +{
-> +	switch (chan->type) {
-> +	case IIO_VOLTAGE:
-> +		return axp20x_adc_scale_voltage(chan->channel, val, val2);
-> +
-> +	case IIO_CURRENT:
-> +		return axp20x_adc_scale_current(chan->channel, val, val2);
-> +
-> +	case IIO_TEMP:
-> +		*val = 100;
-> +		return IIO_VAL_INT;
-> +
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +}
-> +
-> +static int axp22x_adc_scale(struct iio_chan_spec const *chan, int *val,
-> +			    int *val2)
-> +{
-> +	switch (chan->type) {
-> +	case IIO_VOLTAGE:
-> +		if (chan->channel != AXP22X_BATT_V)
-> +			return -EINVAL;
-> +
-> +		*val = 1;
-> +		*val2 = 100000;
-> +		return IIO_VAL_INT_PLUS_MICRO;
-> +
-> +	case IIO_CURRENT:
-> +		*val = 0;
-> +		*val2 = 500000;
-> +		return IIO_VAL_INT_PLUS_MICRO;
-> +
-> +	case IIO_TEMP:
-> +		*val = 100;
-> +		return IIO_VAL_INT;
-> +
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +}
-> +
-> +static int axp20x_adc_offset_voltage(struct iio_dev *indio_dev, int channel,
-> +				     int *val)
-> +{
-> +	struct axp20x_adc_iio *info = iio_priv(indio_dev);
-> +	int ret, reg;
-> +
-> +	if (channel != AXP20X_GPIO0_V && channel != AXP20X_GPIO1_V)
-> +		return -EINVAL;
-Again, you could mess with the ordering here to only check the channel
-value once. (i.e. use a switch after the register read). Might be ever
-so slightly tidier.  Up to you.
-> +
-> +	ret = regmap_read(info->regmap, AXP20X_GPIO10_IN_RANGE, &reg);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	if (channel == AXP20X_GPIO0_V)
-> +		*val = reg & AXP20X_GPIO10_IN_RANGE_GPIO0;
-> +	else
-> +		*val = reg & AXP20X_GPIO10_IN_RANGE_GPIO1;
-> +
-> +	*val = !!(*val) * 700000;
-> +
-> +	return IIO_VAL_INT;
-> +}
-> +
-> +static int axp20x_adc_offset(struct iio_dev *indio_dev,
-> +			     struct iio_chan_spec const *chan, int *val)
-> +{
-> +	switch (chan->type) {
-> +	case IIO_VOLTAGE:
-> +		return axp20x_adc_offset_voltage(indio_dev, chan->channel, val);
-> +
-> +	case IIO_TEMP:
-> +		*val = -1447;
-> +		return IIO_VAL_INT;
-> +
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +}
-> +
-> +static int axp20x_read_raw(struct iio_dev *indio_dev,
-> +			   struct iio_chan_spec const *chan, int *val,
-> +			   int *val2, long mask)
-> +{
-> +	switch (mask) {
-> +	case IIO_CHAN_INFO_OFFSET:
-> +		return axp20x_adc_offset(indio_dev, chan, val);
-> +
-> +	case IIO_CHAN_INFO_SCALE:
-> +		return axp20x_adc_scale(chan, val, val2);
-> +
-> +	case IIO_CHAN_INFO_RAW:
-> +		return axp20x_adc_raw(indio_dev, chan, val);
-> +
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +}
-> +
-> +static int axp22x_read_raw(struct iio_dev *indio_dev,
-> +			   struct iio_chan_spec const *chan, int *val,
-> +			   int *val2, long mask)
-> +{
-> +	switch (mask) {
-> +	case IIO_CHAN_INFO_OFFSET:
-> +		*val = -2677;
-> +		return IIO_VAL_INT;
-> +
-> +	case IIO_CHAN_INFO_SCALE:
-> +		return axp22x_adc_scale(chan, val, val2);
-> +
-> +	case IIO_CHAN_INFO_RAW:
-> +		return axp22x_adc_raw(indio_dev, chan, val);
-> +
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +}
-> +
-> +static int axp20x_write_raw(struct iio_dev *indio_dev,
-> +			    struct iio_chan_spec const *chan, int val, int val2,
-> +			    long mask)
-> +{
-> +	struct axp20x_adc_iio *info = iio_priv(indio_dev);
-> +
-> +	/*
-> +	 * The AXP20X PMIC allows the user to choose between 0V and 0.7V offsets
-> +	 * for (independently) GPIO0 and GPIO1 when in ADC mode.
-> +	 */
-> +	if (mask != IIO_CHAN_INFO_OFFSET)
-> +		return -EINVAL;
-> +
-> +	if (chan->channel != AXP20X_GPIO0_V && chan->channel != AXP20X_GPIO1_V)
-> +		return -EINVAL;
-Might be a tiny bit nicer to move this down to where you are chosing between
-the two channels, then make that a switch with a default that returns -EINVAL.
-> +
-> +	if (val != 0 && val != 700000)
-> +		return -EINVAL;
-> +
-> +	if (chan->channel == AXP20X_GPIO0_V)
-> +		return regmap_update_bits(info->regmap, AXP20X_GPIO10_IN_RANGE,
-> +					  AXP20X_GPIO10_IN_RANGE_GPIO0,
-> +					  AXP20X_GPIO10_IN_RANGE_GPIO0_VAL(!!val));
-> +
-> +	return regmap_update_bits(info->regmap, AXP20X_GPIO10_IN_RANGE,
-> +				  AXP20X_GPIO10_IN_RANGE_GPIO1,
-> +				  AXP20X_GPIO10_IN_RANGE_GPIO1_VAL(!!val));
-> +}
-> +
-> +static const struct iio_info axp20x_adc_iio_info = {
-> +	.read_raw = axp20x_read_raw,
-> +	.write_raw = axp20x_write_raw,
-> +	.driver_module = THIS_MODULE,
-> +};
-> +
-> +static const struct iio_info axp22x_adc_iio_info = {
-> +	.read_raw = axp22x_read_raw,
-> +	.driver_module = THIS_MODULE,
-> +};
-> +
-> +static int axp20x_adc_rate(int rate)
-> +{
-> +	return AXP20X_ADC_RATE_HZ(rate);
-> +}
-> +
-> +static int axp22x_adc_rate(int rate)
-> +{
-> +	return AXP22X_ADC_RATE_HZ(rate);
-> +}
-> +
-> +struct axp_data {
-> +	const struct iio_info		*iio_info;
-> +	int				num_channels;
-> +	struct iio_chan_spec const	*channels;
-> +	unsigned long			adc_en1_mask;
-> +	int				(*adc_rate)(int rate);
-> +	bool				adc_en2;
-> +	struct iio_map			*maps;
-> +};
-> +
-> +static const struct axp_data axp20x_data = {
-> +	.iio_info = &axp20x_adc_iio_info,
-> +	.num_channels = ARRAY_SIZE(axp20x_adc_channels),
-> +	.channels = axp20x_adc_channels,
-> +	.adc_en1_mask = AXP20X_ADC_EN1_MASK,
-> +	.adc_rate = axp20x_adc_rate,
-> +	.adc_en2 = true,
-> +	.maps = axp20x_maps,
-> +};
-> +
-> +static const struct axp_data axp22x_data = {
-> +	.iio_info = &axp22x_adc_iio_info,
-> +	.num_channels = ARRAY_SIZE(axp22x_adc_channels),
-> +	.channels = axp22x_adc_channels,
-> +	.adc_en1_mask = AXP22X_ADC_EN1_MASK,
-> +	.adc_rate = axp22x_adc_rate,
-> +	.adc_en2 = false,
-> +	.maps = axp22x_maps,
-> +};
-> +
-> +static const struct platform_device_id axp20x_adc_id_match[] = {
-> +	{ .name = "axp20x-adc", .driver_data = (kernel_ulong_t)&axp20x_data, },
-> +	{ .name = "axp22x-adc", .driver_data = (kernel_ulong_t)&axp22x_data, },
-> +	{ /* sentinel */ },
-> +};
-> +
-> +static int axp20x_probe(struct platform_device *pdev)
-> +{
-> +	struct axp20x_adc_iio *info;
-> +	struct iio_dev *indio_dev;
-> +	struct axp20x_dev *axp20x_dev;
-> +	int ret;
-> +
-> +	axp20x_dev = dev_get_drvdata(pdev->dev.parent);
-> +
-> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
-> +	if (!indio_dev)
-> +		return -ENOMEM;
-> +
-> +	info = iio_priv(indio_dev);
-> +	platform_set_drvdata(pdev, indio_dev);
-> +
-> +	info->regmap = axp20x_dev->regmap;
-> +	indio_dev->dev.parent = &pdev->dev;
-> +	indio_dev->dev.of_node = pdev->dev.of_node;
-> +	indio_dev->modes = INDIO_DIRECT_MODE;
-> +
-> +	info->data = (struct axp_data *)platform_get_device_id(pdev)->driver_data;
-I think this is only actually used in probe, so could be handled more
-neatly with a local variable rather than sticking it in info.
-
-> +
-> +	indio_dev->name = platform_get_device_id(pdev)->name;
-> +	indio_dev->info = info->data->iio_info;
-> +	indio_dev->num_channels = info->data->num_channels;
-> +	indio_dev->channels = info->data->channels;
-> +
-> +	/* Enable the ADCs on IP */
-> +	regmap_write(info->regmap, AXP20X_ADC_EN1, info->data->adc_en1_mask);
-> +
-> +	if (info->data->adc_en2)
-> +		/* Enable GPIO0/1 and internal temperature ADCs */
-> +		regmap_update_bits(info->regmap, AXP20X_ADC_EN2,
-> +				   AXP20X_ADC_EN2_MASK, AXP20X_ADC_EN2_MASK);
-> +
-> +	/* Configure ADCs rate */
-> +	regmap_update_bits(info->regmap, AXP20X_ADC_RATE, AXP20X_ADC_RATE_MASK,
-> +			   info->data->adc_rate(100));
-> +
-> +	ret = iio_map_array_register(indio_dev, info->data->maps);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "failed to register IIO maps: %d\n", ret);
-> +		goto fail_map;
-> +	}
-> +
-> +	ret = iio_device_register(indio_dev);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "could not register the device\n");
-> +		goto fail_register;
-> +	}
-> +
-> +	return 0;
-> +
-> +fail_register:
-> +	iio_map_array_unregister(indio_dev);
-> +
-> +fail_map:
-> +	regmap_write(info->regmap, AXP20X_ADC_EN1, 0);
-> +
-> +	if (info->data->adc_en2)
-> +		regmap_write(info->regmap, AXP20X_ADC_EN2, 0);
-> +
-> +	return ret;
-> +}
-> +
-> +static int axp20x_remove(struct platform_device *pdev)
-> +{
-> +	struct axp20x_adc_iio *info;
-> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-> +
-> +	info = iio_priv(indio_dev);
-Reorder the two lines above this one and then you could just do this
-inline. (really trivial so feel free to not bother ;)
-> +
-> +	iio_device_unregister(indio_dev);
-> +	iio_map_array_unregister(indio_dev);
-> +
-> +	regmap_write(info->regmap, AXP20X_ADC_EN1, 0);
-> +
-> +	if (info->data->adc_en2)
-> +		regmap_write(info->regmap, AXP20X_ADC_EN2, 0);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver axp20x_adc_driver = {
-> +	.driver = {
-> +		.name = "axp20x-adc",
-> +	},
-> +	.id_table = axp20x_adc_id_match,
-> +	.probe = axp20x_probe,
-> +	.remove = axp20x_remove,
-> +};
-> +
-> +module_platform_driver(axp20x_adc_driver);
-> +
-> +MODULE_DESCRIPTION("ADC driver for AXP20X and AXP22X PMICs");
-> +MODULE_AUTHOR("Quentin Schulz <quentin.schulz@free-electrons.com>");
-> +MODULE_LICENSE("GPL");
+Will need to think on this and gather opinions on whether it makes sense to
+do this.
 > 
+>>>
+>>>>>
+>>>>> Let's see what Jonathan says.
+>>>>
+>>>>
+>>>>>
+>>>>>> +config IIO_STM32_EXTI_TRIGGER
+>>>>>> +       tristate "STM32 EXTI Trigger"
+>>>>>> +       depends on (ARCH_STM32 && OF) || COMPILE_TEST
+>>>>>
+>>>>> config IIO_GPIO_TRIGGER
+>>>>>     depends on GPIOLIB
+>>>>>
+>>>>>> +       select STM32_EXTI
+>>>>>
+>>>>> Isn't the dependency actually the other way around?
+>>>>>
+>>>>> default STM32_EXTI makes more sense, or just put it into the
+>>>>> defconfig.
+>>>>>
+>>>>>> +#include <linux/gpio/consumer.h>
+>>>>>> +#include <linux/iio/iio.h>
+>>>>>> +#include <linux/iio/trigger.h>
+>>>>>> +#include <linux/interrupt.h>
+>>>>>> +#include <linux/module.h>
+>>>>>> +#include <linux/platform_device.h>
+>>>>>> +
+>>>>>> +/* STM32 has up to 16 EXTI triggers on GPIOs */
+>>>>>> +#define STM32_MAX_EXTI_TRIGGER 16
+>>>>>
+>>>>> Just don't put any restrictions like this so it can be widely
+>>>>> reused.
+>>>>>
+>>>>>> +static irqreturn_t stm32_exti_trigger_handler(int irq, void *data)
+>>>>>> +{
+>>>>>> +       /* Exti handler shouldn't be invoked, and isn't used */
+>>>>>> +       return IRQ_HANDLED;
+>>>>>> +}
+>>>>>
+>>>>> It could be a good idea to capture the timestamp here if we were
+>>>>> actually using this IRQ.
+>>>>>
+>>>>>> +static int stm32_exti_trigger_probe(struct platform_device *pdev)
+>>>>>> +{
+>>>>>> +       int irq, ret;
+>>>>>> +       char name[8];
+>>>>>> +       struct gpio_desc *gpio;
+>>>>>> +       struct iio_trigger *trig;
+>>>>>> +       unsigned int i;
+>>>>>> +
+>>>>>> +       for (i = 0; i < STM32_MAX_EXTI_TRIGGER; i++) {
+>>>>>
+>>>>> Why not just run this until devm_gpiod_get() returns -ERRNO
+>>>>> or something?
+>>>>>
+>>>>>> +               snprintf(name, sizeof(name), "exti%d", i);
+>>>>>> +
+>>>>>> +               gpio = devm_gpiod_get_optional(&pdev->dev, name, GPIOD_IN);
+>>>>>
+>>>>> Why would it be optional?
+>>>>>
+>>>>> Either it is there in the device tree or we get -EINVAL or something
+>>>>> if there is no
+>>>>> such index in the device tree. We can get -EPROBE_DEEER too, and then
+>>>>> we should exit silently or just print that deferring is happening.
+>>>>>
+>>>>>> +               if (IS_ERR_OR_NULL(gpio)) {
+>>>>>> +                       if (IS_ERR(gpio)) {
+>>>>>> +                               dev_err(&pdev->dev, "gpio %s get error %ld\n",
+>>>>>> +                                       name, PTR_ERR(gpio));
+>>>>>> +                               return PTR_ERR(gpio);
+>>>>>> +                       }
+>>>>>> +                       dev_dbg(&pdev->dev, "No %s gpio\n", name);
+>>>>>> +                       continue;
+>>>>>> +               }
+>>>>>
+>>>>> Good
+>>>>>
+>>>>>> +               irq = gpiod_to_irq(gpio);
+>>>>>> +               if (irq < 0) {
+>>>>>> +                       dev_err(&pdev->dev, "gpio %d to irq failed\n", i);
+>>>>>> +                       return irq;
+>>>>>> +               }
+>>>>>> +
+>>>>>> +               ret = devm_request_irq(&pdev->dev, irq,
+>>>>>> +                                      stm32_exti_trigger_handler,
+>>>>>> +                                      0, dev_name(&pdev->dev), pdev);
+>>>> Hmm. So this is a trick to set the interrupt mapping up inside the device.
+>>>> The whole thing doesn't really exist.
+>>>>
+>>>> Rather feels like there ought to be some generic interface for
+>>>> 'I want to pretend I want a particular interrupt but not actually get one'.
+>>>>
+>>>> But that would only work in this weird case where there is also a real interrupt
+>>>> associated with it - just one we elect not to use.
+>>>>>> +               if (ret) {
+>>>>>> +                       dev_err(&pdev->dev, "request IRQ %d failed\n", irq);
+>>>>>> +                       return ret;
+>>>>>> +               }
+>>>>>
+>>>>> Here you need some elaborate trigger edge handling.
+>>>>>
+>>>>> The flags that you define as "0" here, how do we say that we
+>>>>> want to handle rising or falling edges, for example?
+>>>>>
+>>>>> I think you might want to establish these DT properties for
+>>>>> GPIO triggers:
+>>>>>
+>>>>> gpio-trigger-rising-edge;
+>>>>> gpio-trigger-falling-edge;
+>>>>>
+>>>>> Then:
+>>>>>
+>>>>> int irq_flags = 0;
+>>>>>
+>>>>> if (of_property_read_bool(np, "gpio-trigger-rising-edge")
+>>>>>    irq_flags |= IRQF_TRIGGER_RISING;
+>>>>> else if (of_property_read_bool(np, "gpio-trigger-falling-edge")
+>>>>>    irq_flags |= IRQF_TRIGGER_FALLING;
+>>>> Should this not all be part of the interrupt specification rather
+>>>> than down here in the specific driver?
+>>>>>
+>>>>> To pass along to the devm_request_irq() function as flags.
+>>>>>
+>>>>> I find it weird that it even works without. Most GPIO interrupts
+>>>>> should require you to set a trigger type. But I guess it is because
+>>>>> of the other weirdness you describe below.
+>>>>>
+>>>>>> +               /*
+>>>>>> +                * gpios are configured as interrupts, so exti trigger path is
+>>>>>> +                * configured in HW, and can now be used as external trigger
+>>>>>> +                * source by other IPs. But getting interrupts when trigger
+>>>>>> +                * occurs is unused here, so mask irq on exti controller by
+>>>>>> +                * default.
+>>>>>> +                */
+>>>>>> +               disable_irq(irq);
+>>>>>
+>>>>> Aha. That is not generic. But what about just adding:
+>>>>>
+>>>>> if (of_property_read_bool(np, "gpio-trigger-numb-irq")
+>>>>>     disable_irq();
+>>>>>
+>>>>> (Plus add the binding for that something like "this makes the
+>>>>> GPIO mentioned get requested, translated to an IRQ, get the
+>>>>> IRQ requested, and then immediately just disabled as other
+>>>>> hardware will actually hande the IRQ line".)
+>>>>>
+>>>>> I understand that this is kind of weird: we're making a whole generic
+>>>>> GPIO trigger driver just to use it with hardware that grabs and disabled
+>>>>> the irq immediately.
+>>>>>
+>>>>> But I think that in the long run it makes for more reusable code.
+>>>> I'd go a step further.  Whether it is numbed or not will depend on what
+>>>> is downstream.  We should be providing this interrupt like normal if
+>>>> we have other devices triggering off it.  In that case it becomes a standard
+>>>> interrupt trigger.
+>>>
+>>> Hmm, in case stm device is using this trigger, iio_trigger_poll()
+>>> will be called. If I understand your point here, this interrupt
+>>> should be enabled, when stm device isn't using this trigger (for
+>>> generic devices).
+>> Exactly - or when both STM and generic drivers are using it, then it
+>> would be better to trigger the generic consumer of the trigger at this
+>> interrupt, not on the EOC interrupt from the ADC.
+> 
+> I just have one doubt about this. If I summarize:
+> 1 - In case "any device" driver uses a gpio trigger, then, only gpio
+> interrupt shall call trigger_poll.
+> 2 - In case STM32 ADC device uses gpio trigger, only EOC interrupt shall
+> call trigger_poll.
+> 3 - In case both 1 + 2, "any device" and STM32 ADC use same trigger...
+> Shouldn't trigger_poll() be called only once ? (e.g. not twice ?)
+> Then I would rather rely on EOC to call trigger_poll() only once...
+> Please advise on this.
+You'd drop using the EOC as a trigger at all.  Logically a trigger
+is meant to be the event that causes an ADC read to happen.  Now
+in some cases the only exposure we have to this is indeed the EOC
+type data ready signal, so we hook on to that on the basis it is better
+than nothing.  Now if we can get it earlier we are all happy.
+
+In this case, because of the weird and wonderful many options that
+exist for triggering the device, it may strangely make sense to have
+two triggers. One corresponds to a conventional interrupt trigger (using
+the GPIO) and the other to the EOC interrupt for cases when it is being
+triggered in a way that isn't 'visible' outside of the hardware module.
+
+Then it would be up to userspace to pick the right one if it wants
+to do concurrent sampling.
+
+I'd not worry too much about this though as I think the number of users
+actually doing it with any given set of hardware is probably low so
+if we don't support doing a particular combination it can be up to the
+person who cares to add the support they need!
+> 
+>>
+>>> May validate_device()/set_trigger_state() be used
+>>> to enable or disable this interrupt ? Then, what criteria may be used
+>>> for that purpose ?>
+>>>>
+>>>> Polling off the back of the dataready interrupt is fine if there is nothing
+>>>> earlier available. Here there is so we should really be triggering other
+>>>> devices off this earlier interrupt.
+>>>
+>>> I fear it can add complexity, because it will depend on user choice to
+>>> select this trigger for an stm32 adc, or another device, or both ?
+>>> Not sure how to distinguish both from within this trigger driver.
+>>> In the end, best maybe to implement this closer in stm32 adc/dac
+>>> driver, and limit trigger usage with .validate_device().
+>> That is certainly a valid choice.  Not as nice in some ways, but you
+>> get to decide on what you work on rather than me ;)
+>>
+>> I'm not entirely sure how we'd do the magic to identify the trigger
+>> and deliberately not hook in the pollfunc if it had nothing to do.
+> 
+> I hope exposing the GPIO/EXTI trigger -> ADC HW connection to device
+> tree can help on this. DT should reflect HW.
+> Adding some trigger ops, to inform trigger inhibit the trigger_poll()
+> call (and possibly mask the interrupt as well) may do the job ?
+Might do (he says without really diving into it ;)
+> 
+>>>
+>>>>>
+>>>>>> +static const struct of_device_id stm32_exti_trigger_of_match[] = {
+>>>>>> +       { .compatible = "st,stm32-exti-trigger" },
+>>>>>> +       {},
+>>>>>
+>>>>> "iio-gpio-trigger"
+>>>>>
+>>>>> Should fit anyone, given the above amendments.
+>>>>>
+>>>>>> +#if IS_ENABLED(CONFIG_IIO_STM32_EXTI_TRIGGER)
+>>>>>> +bool is_stm32_exti_trigger(struct iio_trigger *trig);
+>>>>>> +#else
+>>>>>> +static inline bool is_stm32_exti_trigger(struct iio_trigger *trig)
+>>>>>> +{
+>>>>>> +       return false;
+>>>>>> +}
+>>>>>> +#endif
+>>>>>
+>>>>> This seems unnecessary to broadcast to the entire kernel.
+>>>> This one section is the only really non generic element that
+>>>> isn't supported by the existing interrupt trigger.
+>>>> Mind you that doesn't have device tree bindings yet :(
+> 
+> Please kindly look at RFC I just sent, and let me know your opinion.
+Done so.
+> 
+>>>
+>>> Yes, then I suppose simple approach is to rework this, and put it
+>>> inside stm32 adc core driver ?
+>>> Then, register trigger from there, and read from dt child node.
+>>> Is something like the following suitable ?
+>>> adc at 0xhhhh {
+>>>     compatible = "st,stm32f4-adc-core"
+>>>     ...
+>>>     adc1 {
+>>>         ...
+>>>     }
+>>>
+>>>     trigger {
+>>>         gpios = <...>;
+>>>         st,trigger-value = <11>; /* e.g. EXTI nb */
+>>>         st,trigger-polarity = <1>;
+>>>     }
+>>> }
+>>>
+>>> Please let me know your opinion.
+>> That works for me.  Could conceive of more complex situations that
+>> doesn't describe (driving both the ADC and a DAC for example - if
+>> that's possible in the hardware).  Can figure out how to do that when it
+>> matters.
+> 
+> I hope I can give some more tries, try to do as generic as possible.
+> About your remark on ADC/DAC: Well, I think only possible case is the
+> above 1, 2 & 3. DAC isn't there yet. But anyway, it doesn't share same
+> lines as ADC in hw :-).
+Ah. That makes life easier.
+> 
+> Best Regards,
+> Fabrice
+> 
+>>
+>> Jonathan
+>>>
+>>> Best regards,
+>>> Fabrice
+>>>
+>>>>
+>>>> I wonder if we can add some sort of flag in there to identify hardware
+>>>> blocks for tricks like this. Or at a push provide the interrupt
+>>>> to both bits of kit so they can compare and see if they are looking
+>>>> at the same one?
+>>>>>
+>>>>> Why? (Maybe I can find explanations in later patches.
+>>>>>
+>>>>> Yours,
+>>>>> Linus Walleij
+>>>>>
+>>>>
+>>> -- 
+>>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+> -- 
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
