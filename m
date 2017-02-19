@@ -1,30 +1,49 @@
-From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
-Date: Sun, 19 Feb 2017 18:30:22 +0100
-Subject: [PATCH] [media] s5p-g2d: Fix error handling
-Message-ID: <20170219173022.18707-1-christophe.jaillet@wanadoo.fr>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 19 Feb 2017 20:58:19 +0300
+Subject: [PATCH 1/1] arm64: dts: r8a7795: add IMR-LX4 support
+In-Reply-To: <3f007932-d120-b0c0-2080-ce8eeb9418af@cogentembedded.com>
+References: <20170214210301.620322370@cogentembedded.com>
+ <3f007932-d120-b0c0-2080-ce8eeb9418af@cogentembedded.com>
+Message-ID: <d685231a-4509-7728-0f68-29d13703db27@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the surrounding goto, it is likely that 'unprep_clk_gate' was
-expected here.
+On 02/15/2017 12:45 PM, Sergei Shtylyov wrote:
 
-Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
----
- drivers/media/platform/s5p-g2d/g2d.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>> Describe the IMR-LX4 devices in the R8A7795 device tree.
+>>
+>> Based on the original (and large) patch by Konstantin Kozhevnikov
+>> <Konstantin.Kozhevnikov@cogentembedded.com>.
+>>
+>> Signed-off-by: Konstantin Kozhevnikov
+>> <Konstantin.Kozhevnikov@cogentembedded.com>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>> This patch is against the 'renesas-devel-20170213-v4.10-rc8' tag of Simon
+>> Horman's 'renesas.git' repo.
+>
+>    The binding was documented in the IMR driver patch. I don't expect it to
+> change even if the driver would be rewritten for DRM.
+>
+> [...]
+>> Index: renesas/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>> ===================================================================
+>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>> +++ renesas/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+>> @@ -1419,6 +1419,38 @@
+>>              status = "disabled";
+>>          };
+>>
+>> +        imr-lx4 at fe860000 {
+>> +            compatible = "renesas,imr-lx4";
+>
+>    The manual seems to suggest that IMR-LX4 devicec are different between 7795
 
-diff --git a/drivers/media/platform/s5p-g2d/g2d.c b/drivers/media/platform/s5p-g2d/g2d.c
-index 62c0dec30b59..81ed5cd5cd5d 100644
---- a/drivers/media/platform/s5p-g2d/g2d.c
-+++ b/drivers/media/platform/s5p-g2d/g2d.c
-@@ -679,7 +679,7 @@ static int g2d_probe(struct platform_device *pdev)
- 						0, pdev->name, dev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to install IRQ\n");
--		goto put_clk_gate;
-+		goto unprep_clk_gate;
- 	}
- 
- 	vb2_dma_contig_set_max_seg_size(&pdev->dev, DMA_BIT_MASK(32));
--- 
-2.9.3
+    Devices, of course. :-)
+
+> and 7796 SoCs, so we may need SoC specific compatibility. I'll look into this...
+
+    Found no difference between 7795/7796 (other than performance).
+
+MBR, Sergei
