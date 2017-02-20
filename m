@@ -1,61 +1,56 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Mon, 20 Feb 2017 16:07:51 +0100
-Subject: [PATCH 04/21] ARM: sun8i: dt: Add DT bindings documentation for
- Allwinner dwmac-sun8i
-In-Reply-To: <783a717d-f1f4-e265-bf94-0b3080cea542@gmail.com>
-References: <20170216124859.14346-1-clabbe.montjoie@gmail.com>
- <20170216124859.14346-5-clabbe.montjoie@gmail.com>
- <783a717d-f1f4-e265-bf94-0b3080cea542@gmail.com>
-Message-ID: <20170220150751.GB31799@Red>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 20 Feb 2017 16:17:06 +0100
+Subject: [PATCH 06/11] tty: serial: Add Actions Semi Owl UART earlycon
+In-Reply-To: <072e4c03-74b7-c7d8-0e40-8944f8319159@suse.de>
+References: <20170215165528.10052-1-afaerber@suse.de>
+ <20170215165528.10052-7-afaerber@suse.de>
+ <3685307.zVcugmQnxp@wuerfel> <072e4c03-74b7-c7d8-0e40-8944f8319159@suse.de>
+Message-ID: <CAK8P3a3v=c4hNVotywiU7QmyhD5sFcqTWg2A=No-nzi235C9Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 12:58:46PM -0800, Florian Fainelli wrote:
-> On 02/16/2017 04:48 AM, Corentin Labbe wrote:
-> > +
-> > +Optional properties:
-> > +- allwinner,tx-delay: TX clock delay chain value. Range value is 0-0x07. Default is 0)
-> > +- allwinner,rx-delay: RX clock delay chain value. Range value is 0-0x1F. Default is 0)
-> 
-> Delays should be specified in nanosecond units, and should not be a
-> value that maps directly to a HW register value, you need to convert the
-> property value into the appropriate register value.
-> 
+On Mon, Feb 20, 2017 at 2:40 PM, Andreas F?rber <afaerber@suse.de> wrote:
+> Am 16.02.2017 um 14:41 schrieb Arnd Bergmann:
+>> On Wednesday, February 15, 2017 5:55:23 PM CET Andreas F?rber wrote:
+>>> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+>>> index 6117ac8..9d4213c 100644
+>>> --- a/drivers/tty/serial/Kconfig
+>>> +++ b/drivers/tty/serial/Kconfig
+>>> @@ -1677,6 +1677,25 @@ config SERIAL_MVEBU_CONSOLE
+>>>           and warnings and which allows logins in single user mode)
+>>>           Otherwise, say 'N'.
+>>>
+>>> +config SERIAL_OWL
+>>> +       bool "Actions Semi Owl serial port support"
+>>> +       depends on ARCH_OWL || COMPILE_TEST
+>>> +       select SERIAL_CORE
+>>> +       help
+>>> +         This driver is for Actions Semi S500/S900 SoC's UART.
+>>> +         Say 'Y' here if you wish to use the on-board serial port.
+>>> +         Otherwise, say 'N'.
+>>> +
+>>>
+>>
+>> This could maybe use a word of information about how there isn't
+>> actually a uart driver in this series, only an earlycon driver.
+>
+> Yeah, I have added a sentence to the other one. Maybe also add a select?
 
-This question already raised multiple times in sun8i-emac development, I do not have any information on how to decode thoses values. (and so the comment below in documentation)
-I will try to contact Allwinner for more details.
+I generally only use 'select' to avoid build failures, not to save the user
+the time to make a choice.
 
-> > +Both delay properties does not have units, there are arbitrary value.
-> > +The TX/RX clock delay chain settings are board specific and could be found
-> > +in vendor FEX files.
-> > +
-> > +Optional properties for "allwinner,sun8i-h3-emac":
-> > +- allwinner,leds-active-low: EPHY LEDs are active low
-> 
-> Are you sure this is appropriate at the MAC node level and this is not
-> something that follows the PHY instead?
-> 
+>> Do you plan to add the actual tty driver soon? If not, maybe
+>> only add one Kconfig symbol for the earlycon support.
+>
+> So, I completed the driver the weekend and can see the full console
+> output, but there are still output glitches, possible locking issues up
+> to RCU stalls and soft lockups, and only stubbed out baudrate support.
+>
+> Therefore I would rather keep the full driver as follow-up RFC in v2,
+> unless I get it fixed during Hackweek. In the earlycon I am confident,
+> and the only Kconfig change then is to switch from bool to tristate and
+> to drop the newly added sentence again.
 
-As said by MoeIcenowy, an internal PHY is present. At early stage of development, wens tried to create a PHY driver for it, but finaly it was too much over complicated and with few interest to split in two.
+Ok, sounds good.
 
-> > +
-> > +Required child node of emac:
-> > +- mdio bus node: should be named mdio
-> > +
-> > +Required properties of the mdio node:
-> > +- #address-cells: shall be 1
-> > +- #size-cells: shall be 0
-> > +
-> > +The device node referenced by "phy" or "phy-handle" should be a child node
-> > +of the mdio node. See phy.txt for the generic PHY bindings.
-> > +
-> > +Required properties of the phy node with "allwinner,sun8i-h3-emac":
-> > +- clocks: an extra phandle to the reference clock for the EPHY
-> 
-> s/an extra/a phandle/
-> 
-
-Thanks, will fix
-
-Regards
-Corentin Labbe
+     Arnd
