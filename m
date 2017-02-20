@@ -1,59 +1,38 @@
-From: jagan@openedev.com (Jagan Teki)
-Date: Tue, 21 Feb 2017 01:35:21 +0530
-Subject: [PATCH v2 4/4] arm: dts: imx6q-icore: Add LVDS support
-In-Reply-To: <1487621121-6051-1-git-send-email-jagan@openedev.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 20 Feb 2017 17:11:20 -0300
+Subject: [PATCH v2 2/4] arm: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual
+ OpenFrame Cap 10.1 initial support
+In-Reply-To: <1487621121-6051-2-git-send-email-jagan@openedev.com>
 References: <1487621121-6051-1-git-send-email-jagan@openedev.com>
-Message-ID: <1487621121-6051-4-git-send-email-jagan@openedev.com>
+ <1487621121-6051-2-git-send-email-jagan@openedev.com>
+Message-ID: <CAOMZO5CKQaDvnr2-EzO_3ZOwQWb4RM1ytKiLfvXCj9Azwco8zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add LVDS display support for OpenFrame Capacitive touch 7 inc
-display which is supported by Engicam i.CoreM6 QDL Starter Kit.
+On Mon, Feb 20, 2017 at 5:05 PM, Jagan Teki <jagan@openedev.com> wrote:
 
-Cc: Domenico Acri <domenico.acri@engicam.com>
-Cc: Matteo Lisi <matteo.lisi@engicam.com>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Signed-off-by: Jagan Teki <jagan@openedev.com>
----
-Changes for v2:
-- newly added patch
+> +&ldb {
+> +       status = "okay";
+> +
+> +       lvds-channel at 0 {
+> +               fsl,data-mapping = "spwg";
+> +               fsl,data-width = <24>;
+> +               status = "okay";
+> +
+> +               display-timings {
+> +                        native-mode = <&timing1>;
+> +                        timing1: hsd100pxn1 {
+> +                                clock-frequency = <60000000>;
+> +                                hactive = <1280>;
+> +                                vactive = <800>;
+> +                                hback-porch = <40>;
+> +                                hfront-porch = <40>;
+> +                                vback-porch = <10>;
+> +                                vfront-porch = <3>;
+> +                                hsync-len = <80>;
+> +                                vsync-len = <10>;
 
- arch/arm/boot/dts/imx6q-icore.dts | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+hsd100pxn1 is supported by the drm simple panel driver.
 
-diff --git a/arch/arm/boot/dts/imx6q-icore.dts b/arch/arm/boot/dts/imx6q-icore.dts
-index 59eb7ad..e6216da 100644
---- a/arch/arm/boot/dts/imx6q-icore.dts
-+++ b/arch/arm/boot/dts/imx6q-icore.dts
-@@ -57,3 +57,28 @@
- &can2 {
- 	status = "okay";
- };
-+
-+&ldb {
-+	status = "okay";
-+
-+	lvds-channel at 0 {
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <18>;
-+		status = "okay";
-+
-+		display-timings {
-+                        native-mode = <&timing1>;
-+                        timing1: hsd100pxn1 {
-+                                clock-frequency = <60000000>;
-+                                hactive = <800>;
-+                                vactive = <480>;
-+                                hback-porch = <30>;
-+                                hfront-porch = <30>;
-+                                vback-porch = <5>;
-+                                vfront-porch = <5>;
-+                                hsync-len = <64>;
-+                                vsync-len = <20>;
-+                        };
-+                };
-+	};
-+};
--- 
-1.9.1
+This allows you to remove the display-timings from the dts and use
+compatible = "hannstar,hsd100pxn1" instead.
