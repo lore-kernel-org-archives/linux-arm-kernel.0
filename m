@@ -1,100 +1,68 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Mon, 20 Feb 2017 14:58:21 +0800
-Subject: [PATCH] drm/rockchip: cdn-dp: Fix error handling
-In-Reply-To: <a3eca2d9-0cd2-925c-0b9b-b23893710382@wanadoo.fr>
-References: <20170219165942.17268-1-christophe.jaillet@wanadoo.fr>
- <58AA4908.2000808@rock-chips.com>
- <a3eca2d9-0cd2-925c-0b9b-b23893710382@wanadoo.fr>
-Message-ID: <58AA938D.5010902@rock-chips.com>
+From: jagan@openedev.com (Jagan Teki)
+Date: Mon, 20 Feb 2017 12:32:59 +0530
+Subject: [PATCH 1/2] arm: dts: imx6qdl-icore: Add backlight support for lvds
+Message-ID: <1487574180-5182-1-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?02?20? 14:41, Christophe JAILLET wrote:
-> Le 20/02/2017 ? 02:40, Mark yao a ?crit :
->> On 2017?02?20? 00:59, Christophe JAILLET wrote:
->>> It is likely that both 'clk_disable_unprepare()' should be called if
->>> 'pm_runtime_get_sync()' fails.
->>>
->>> Add a new label for that, because 'err_set_rate' is not meaningful 
->>> in this
->>> case.
->>>
->>>
->>> Fixes: 1a0f7ed3abe2 ("drm/rockchip: cdn-dp: add cdn DP support for 
->>> rk3399")
->>>
->>> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
->>> ---
->>> Not sure but a 'pm_runtime_get_sync()' is maybe also required in the
->>> 'err_set_rate' path.
->>> ---
->>>   drivers/gpu/drm/rockchip/cdn-dp-core.c | 3 ++-
->>>   1 file changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c 
->>> b/drivers/gpu/drm/rockchip/cdn-dp-core.c
->>> index 9ab67a670885..0fe1ec8b8fb1 100644
->>> --- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
->>> +++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
->>> @@ -111,7 +111,7 @@ static int cdn_dp_clk_enable(struct 
->>> cdn_dp_device *dp)
->>>       ret = pm_runtime_get_sync(dp->dev);
->>>       if (ret < 0) {
->>>           DRM_DEV_ERROR(dp->dev, "cannot get pm runtime %d\n", ret);
->>> -        goto err_pclk;
->>> +        goto err_sync;
->>
->> I think the name err_pm_runtime_get is better.
->> err_sync is not a clear name for the pm_runtime_get_sync.
->>
-> I will change it.
->
->>>       }
->>>         reset_control_assert(dp->core_rst);
->>> @@ -133,6 +133,7 @@ static int cdn_dp_clk_enable(struct 
->>> cdn_dp_device *dp)
->>>       return 0;
->>>     err_set_rate:
->>> +err_sync:
->>
->> miss pm_runtime_put, it should be:
->>
-> I am wondering if 'pm_runtime_put_sync' should be added, instead.
-> We want to revert the 'pm_runtime_get_sync' of line 111. According to 
-> the naming of the function, the _sync version looks more logical to me.
-> Using ccoccinelle shows that 2/3 of functions calling both 
-> 'pm_runtime_get_sync' and 'pm_runtime_get[_sync]' and using the _sync 
-> variant.
->
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-pm_runtime_get_sync will block until hardware actually done power configure,
-we need make sure power is enable before use the hardware, So we should 
-use pm_runtime_get_sync at power on.
+This patch add support for lvds backlight on i.CoreM6 QDL
+variant boards.
 
-At power off time, use pm_runtime_put is enough, it can be async, no 
-need block.
+Cc: Domenico Acri <domenico.acri@engicam.com>
+Cc: Matteo Lisi <matteo.lisi@engicam.com>
+Cc: Michael Trimarchi <michael@amarulasolutions.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ arch/arm/boot/dts/imx6qdl-icore.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-Thanks.
-
-> Which semantic is the correct one?
->
->
->> err_set_rate:
->>     pm_runtime_put(dp->dev);
->> err_pm_runtime_get:
->>     clk_disable_unprepare(dp->core_clk);
->> err_core_clk:
->>
->>> clk_disable_unprepare(dp->core_clk);
->>>   err_core_clk:
->>>       clk_disable_unprepare(dp->pclk);
->>
->>
->
->
->
->
-
-
+diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+index 55bebfc..7dda608 100644
+--- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+@@ -48,6 +48,14 @@
+ 		reg = <0x10000000 0x80000000>;
+ 	};
+ 
++	backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm3 0 100000>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <7>;
++		status = "okay";
++	};
++
+ 	reg_3p3v: regulator-3p3v {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "3P3V";
+@@ -136,6 +144,12 @@
+ 	status = "okay";
+ };
+ 
++&pwm3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm3>;
++	status = "okay";
++};
++
+ &uart4 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart4>;
+@@ -246,6 +260,12 @@
+ 		>;
+ 	};
+ 
++	pinctrl_pwm3: pwm3grp-1 {
++		fsl,pins = <
++			MX6QDL_PAD_SD4_DAT1__PWM3_OUT 0x1b0b1
++		>;
++	};
++
+ 	pinctrl_usbotg: usbotggrp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x17059
 -- 
-?ark Yao
+1.9.1
