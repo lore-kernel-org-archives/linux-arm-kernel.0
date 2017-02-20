@@ -1,37 +1,47 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 20 Feb 2017 21:58:39 +0100
-Subject: [PATCH] iio: adc: xilinx: Fix error handling
-In-Reply-To: <63f3a01d-4b78-f069-5aa1-c7f703b4e78e@wanadoo.fr>
-References: <20170219202928.20296-1-christophe.jaillet@wanadoo.fr>
- <63f3a01d-4b78-f069-5aa1-c7f703b4e78e@wanadoo.fr>
-Message-ID: <83cb9e79-bf21-0c15-2086-4da4da484b18@metafoo.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 20 Feb 2017 21:59:34 +0100
+Subject: [RESEND PATCH 0/3] mtd: nand: atmel: Add
+ ->setup_data_interface() + PM ops
+In-Reply-To: <1487611322-12688-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1487611322-12688-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20170220215934.53961d69@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2017 09:25 PM, Christophe JAILLET wrote:
-> Le 20/02/2017 ? 09:35, Lars-Peter Clausen a ?crit :
->> On 02/19/2017 09:29 PM, Christophe JAILLET wrote:
->>> Reorder error handling labels in order to match the way resources have
->>> been allocated.
->>>
->>> Signed-off-by: Christophe JAILLET
->>> <christophe.jaillet-39ZsbGIQGT5GWvitb5QawA@public.gmane.org>
->> Thanks, looks good.
->>
->> Acked-by: Lars-Peter Clausen <lars-Qo5EllUWu/uELgA04lAiVw@public.gmane.org>
->>
->> I think there is one more issue
->>
->>      ret = xadc->ops->setup(pdev, indio_dev, irq);
->>      if (ret)
->>          goto err_free_samplerate_trigger;
->>
->> should be
->>
->>     goto err_clk_disable_unprepare;
->>
-> I agree.
-> 
-> Would you like me to send a V2 with both fixes or a sepparate patch?
+On Mon, 20 Feb 2017 18:21:59 +0100
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 
-Up to you.
+> Hello,
+> 
+> Sorry for the noise, but I forgot to remove old patches before using
+> git send-email on the directory containing the patches generated with
+> git format-patch :-/.
+
+And ignore this version as well. These are still not the patches I
+wanted to send :-(.
+
+> 
+> This patch series is adding to important features to the new Atmel NAND
+> controller driver:
+> 1/ automatic SMC timings configuration based on information retrieved
+>    during NAND detection
+> 2/ proper ->suspend()/->resume(). Timings are properly restored when
+>    resuming the system
+> 
+> This series depends on [1] and [2].
+> 
+> Regards,
+> 
+> Boris
+> 
+> [1]https://www.spinics.net/lists/arm-kernel/msg563780.html
+> [2]https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1337235.html
+> 
+> Boris Brezillon (3):
+>   memory: atmel-ebi: Change naming scheme
+>   memory: atmel-ebi: Add missing ->numcs assignment
+>   memory: atmel-ebi: Add PM ops
+> 
+>  drivers/memory/atmel-ebi.c | 141 ++++++++++++++++++++++++++-------------------
+>  1 file changed, 81 insertions(+), 60 deletions(-)
+> 
