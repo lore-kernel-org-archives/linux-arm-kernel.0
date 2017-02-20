@@ -1,59 +1,76 @@
-From: minyard@acm.org (Corey Minyard)
-Date: Mon, 20 Feb 2017 11:06:08 -0600
-Subject: [PATCH] ipmi: bt-bmc: Use a regmap for register access
-In-Reply-To: <1487602379.21631.2.camel@aj.id.au>
-References: <20161206025715.2002-1-andrew@aj.id.au>
- <36014e0c-82f8-eeaf-ee2a-6c1e413b957d@kaod.org>
- <1487565939.3779.4.camel@aj.id.au>
- <1fe8fe1f-e035-8ef1-cecd-d3d29bcda075@acm.org>
- <1487602379.21631.2.camel@aj.id.au>
-Message-ID: <9eaac4c7-d274-94b7-17a1-02b00342ce05@acm.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 20 Feb 2017 18:06:11 +0100
+Subject: [PATCH v2 0/3] Extend rtc-armada38x support for Armada 7K/8K
+In-Reply-To: <20170217101907.8963-1-gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Fri, 17 Feb 2017 11:19:04 +0100")
+References: <20170217101907.8963-1-gregory.clement@free-electrons.com>
+Message-ID: <87tw7oaj24.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2017 08:52 AM, Andrew Jeffery wrote:
-> On Mon, 2017-02-20 at 07:35 -0600, Corey Minyard wrote:
->> On 02/19/2017 10:45 PM, Andrew Jeffery wrote:
->>> Hi Cory,
->>>
->>> On Tue, 2016-12-06 at 16:02 +0100, C?dric Le Goater wrote:
->>>> [ this is a resend bc of some mailing list issues]
->>>>
->>>> On 12/06/2016 03:57 AM, Andrew Jeffery wrote:
->>>>> The registers for the bt-bmc device live under the Aspeed LPC
->>>>> controller. Devicetree bindings have recently been introduced for the
->>>>> LPC controller where the "host" portion of the LPC register space is
->>>>> described as a syscon device. Future devicetrees describing the bt-bmc
->>>>> device should nest its node under the appropriate "simple-mfd", "syscon"
->>>>> compatible node.
->>>>>
->>>>> This change allows the bt-bmc driver to function with both syscon and
->>>>> non-syscon- based devicetree descriptions by always using a regmap for
->>>>> register access, either retrieved from the parent syscon device or
->>>>> instantiated if none exists.
->>>>>
->>>>> The patch has been tested on an OpenPOWER Palmetto machine, successfully
->>>>> booting, rebooting and powering down the host.
->>>>>
->>>>> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
->>>> It would be nice to have an example of the associated binding.
->>>> I did not see it. A part from that :
->>>>
->>>> Reviewed-by: C?dric Le Goater <clg@kaod.org>
->>> Will this make it into 4.11?
->> I thought you were doing a v2 with a few little fixes.  Get it to me
->> quickly, if you can.
-> Reading back it was a bit ambiguous. No worries, I'll roll in the small
-> fixes and send a v2.
+Hi,
+ 
+ On ven., f?vr. 17 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-Yeah, it was, sorry, I should have been clear there.
+> The Armada 7K/8K SoCs use the same RTC IP than the Armada 38x. However
+> the SOC integration differs in 2 points:
+>      - MBUS bridge timing initialization
+>      - IRQ configuration at SoC level
+>
+> This patch set extends the driver support to these SoCs family.
+>
+> In this second version the device tree was updated allowing to use the
+> RTC on Armada 80x0 SoCs. Indeed on the Armada 80x0, the RTC clock in
+> CP master is not connected (by package) to the oscillator. So this one
+> is disabled for the Armada 8020 and the Armada 8040. On these SoCs it
+> will be the RTC clock in CP slave connected to the oscillator which
+> will be used.
 
-I'll leave it in the linux-next tree for a bit, then ask Linus for a pull.
+I saw on IRC than Russell managed to have a more coherent date with this
+series on his 8040 based board. For the record, as the U-Boot on this
+board didn't provide a "date reset" command for the RTC located on CP
+slave, then Russell needed to do the following:
+
+devmem2 0xf428401c w 0
+devmem2 0xf4284018 w 0x2000
+followed by:
+date 021612342017; ntpdate ...; hwclock -uw
+
+But this issue was related to the bootloader not to the kernel. The
+other potential issue seen by Russell was about the GIC mapping for the
+interrupt, but here again this mapping was done by the 1st stage
+bootloader.
+
+Given this information would it be OK to applied this series?
 
 Thanks,
 
--corey
+Gregory
 
-> Cheers,
 >
-> Andrew
+> Thanks,
+>
+> Gregory
+>
+> Gregory CLEMENT (3):
+>   rtc: armada38x: Prepare driver to manage different versions
+>   rtc: armada38x: Add support for Armada 7K/8K
+>   arm64: dts: marvell: add RTC description for Armada 7K/8K
+>
+>  .../devicetree/bindings/rtc/armada-380-rtc.txt     |   8 +-
+>  arch/arm64/boot/dts/marvell/armada-8020.dtsi       |  10 +
+>  arch/arm64/boot/dts/marvell/armada-8040.dtsi       |   9 +
+>  .../boot/dts/marvell/armada-cp110-master.dtsi      |   7 +
+>  .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi |   7 +
+>  drivers/rtc/rtc-armada38x.c                        | 217 ++++++++++++++++-----
+>  6 files changed, 202 insertions(+), 56 deletions(-)
+>
+> -- 
+> 2.11.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
