@@ -1,449 +1,260 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Feb 2017 18:16:16 +0100
-Subject: [PATCH 2/3] mtd: nand: atmel: Add ->setup_data_interface() hooks
+Date: Mon, 20 Feb 2017 18:16:14 +0100
+Subject: [PATCH 1/3] mtd: nand: Pass the CS line to ->setup_data_interface()
 In-Reply-To: <1487610978-12423-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1487610978-12423-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1487610978-12423-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1487610978-12423-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NAND controller IP can adapt the NAND controller timings dynamically.
-Implement the ->setup_data_interface() hook to support this feature.
-
-Note that it's not supported on at91rm9200 because this SoC has a
-completely different SMC block, which is not supported yet.
+Some NAND controllers can assign different NAND timings to different
+CS lines. Pass the CS line information to ->setup_data_interface() so
+that the NAND controller driver knows which CS line is concerned by
+the setup_data_interface() request.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/atmel/nand-controller.c | 333 ++++++++++++++++++++++++++++++-
- 1 file changed, 328 insertions(+), 5 deletions(-)
+ drivers/mtd/nand/mxc_nand.c   | 12 +++++-------
+ drivers/mtd/nand/nand_base.c  | 22 +++++++++++++---------
+ drivers/mtd/nand/s3c2410.c    |  5 ++---
+ drivers/mtd/nand/sunxi_nand.c |  7 +++----
+ drivers/mtd/nand/tango_nand.c |  7 +++----
+ include/linux/mtd/nand.h      | 12 ++++++++----
+ 6 files changed, 34 insertions(+), 31 deletions(-)
 
-diff --git a/drivers/mtd/nand/atmel/nand-controller.c b/drivers/mtd/nand/atmel/nand-controller.c
-index 4207c0d37826..ae46ef711d67 100644
---- a/drivers/mtd/nand/atmel/nand-controller.c
-+++ b/drivers/mtd/nand/atmel/nand-controller.c
-@@ -57,6 +57,7 @@
- #include <linux/interrupt.h>
- #include <linux/mfd/syscon.h>
- #include <linux/mfd/syscon/atmel-matrix.h>
-+#include <linux/mfd/syscon/atmel-smc.h>
- #include <linux/module.h>
- #include <linux/mtd/nand.h>
- #include <linux/of_address.h>
-@@ -147,6 +148,8 @@ struct atmel_nand_cs {
- 		void __iomem *virt;
- 		dma_addr_t dma;
- 	} io;
-+
-+	struct atmel_smc_cs_conf smcconf;
- };
- 
- struct atmel_nand {
-@@ -190,6 +193,8 @@ struct atmel_nand_controller_ops {
- 	void (*nand_init)(struct atmel_nand_controller *nc,
- 			  struct atmel_nand *nand);
- 	int (*ecc_init)(struct atmel_nand *nand);
-+	int (*setup_data_interface)(struct atmel_nand *nand, int csline,
+diff --git a/drivers/mtd/nand/mxc_nand.c b/drivers/mtd/nand/mxc_nand.c
+index 61ca020c5272..a764d5ca7536 100644
+--- a/drivers/mtd/nand/mxc_nand.c
++++ b/drivers/mtd/nand/mxc_nand.c
+@@ -152,9 +152,8 @@ struct mxc_nand_devtype_data {
+ 	void (*select_chip)(struct mtd_info *mtd, int chip);
+ 	int (*correct_data)(struct mtd_info *mtd, u_char *dat,
+ 			u_char *read_ecc, u_char *calc_ecc);
+-	int (*setup_data_interface)(struct mtd_info *mtd,
+-				    const struct nand_data_interface *conf,
+-				    bool check_only);
++	int (*setup_data_interface)(struct mtd_info *mtd, int csline,
 +				    const struct nand_data_interface *conf);
- };
  
- struct atmel_nand_controller_caps {
-@@ -1144,6 +1149,293 @@ static int atmel_hsmc_nand_ecc_init(struct atmel_nand *nand)
- 	return 0;
+ 	/*
+ 	 * On i.MX21 the CONFIG2:INT bit cannot be read if interrupts are masked
+@@ -1015,9 +1014,8 @@ static void preset_v1(struct mtd_info *mtd)
+ 	writew(0x4, NFC_V1_V2_WRPROT);
  }
  
-+static int atmel_smc_nand_prepare_smcconf(struct atmel_nand *nand,
-+					const struct nand_data_interface *conf,
-+					struct atmel_smc_cs_conf *smcconf)
-+{
-+	u32 ncycles, totalcycles, timeps, mckperiodps;
-+	struct atmel_nand_controller *nc;
-+	int ret;
-+
-+	nc = to_nand_controller(nand->base.controller);
-+
-+	/* DDR interface not supported. */
-+	if (conf->type != NAND_SDR_IFACE)
-+		return -ENOTSUPP;
-+
-+	/*
-+	 * tRC < 30ns implies EDO mode. This controller does not support this
-+	 * mode.
-+	 */
-+	if (conf->timings.sdr.tRC_min < 30)
-+		return -ENOTSUPP;
-+
-+	atmel_smc_cs_conf_init(smcconf);
-+
-+	mckperiodps = NSEC_PER_SEC / clk_get_rate(nc->mck);
-+	mckperiodps *= 1000;
-+
-+	/*
-+	 * Set write pulse timing. This one is easy to extract:
-+	 *
-+	 * NWE_PULSE = tWP
-+	 */
-+	ncycles = DIV_ROUND_UP(conf->timings.sdr.tWP_min, mckperiodps);
-+	totalcycles = ncycles;
-+	ret = atmel_smc_cs_conf_set_pulse(smcconf, ATMEL_SMC_NWE_SHIFT,
-+					  ncycles);
-+	if (ret)
-+		return ret;
-+
-+	/*
-+	 * The write setup timing depends on the operation done on the NAND.
-+	 * All operations goes through the same data bus, but the operation
-+	 * type depends on the address we are writing to (ALE/CLE address
-+	 * lines).
-+	 * Since we have no way to differentiate the different operations at
-+	 * the SMC level, we must consider the worst case (the biggest setup
-+	 * time among all operation types):
-+	 *
-+	 * NWE_SETUP = max(tCLS, tCS, tALS, tDS) - NWE_PULSE
-+	 */
-+	timeps = max3(conf->timings.sdr.tCLS_min, conf->timings.sdr.tCS_min,
-+		      conf->timings.sdr.tALS_min);
-+	timeps = max(timeps, conf->timings.sdr.tDS_min);
-+	ncycles = DIV_ROUND_UP(timeps, mckperiodps);
-+	ncycles = ncycles > totalcycles ? ncycles - totalcycles : 0;
-+	totalcycles += ncycles;
-+	ret = atmel_smc_cs_conf_set_setup(smcconf, ATMEL_SMC_NWE_SHIFT,
-+					  ncycles);
-+	if (ret)
-+		return ret;
-+
-+	/*
-+	 * As for the write setup timing, the write hold timing depends on the
-+	 * operation done on the NAND:
-+	 *
-+	 * NWE_HOLD = max(tCLH, tCH, tALH, tDH, tWH)
-+	 */
-+	timeps = max3(conf->timings.sdr.tCLH_min, conf->timings.sdr.tCH_min,
-+		      conf->timings.sdr.tALH_min);
-+	timeps = max3(timeps, conf->timings.sdr.tDH_min,
-+		      conf->timings.sdr.tWH_min);
-+	ncycles = DIV_ROUND_UP(timeps, mckperiodps);
-+	totalcycles += ncycles;
-+
-+	/*
-+	 * The write cycle timing is directly matching tWC, but is also
-+	 * dependent on the other timings on the setup and hold timings we
-+	 * calculated earlier, which gives:
-+	 *
-+	 * NWE_CYCLE = max(tWC, NWE_SETUP + NWE_PULSE + NWE_HOLD)
-+	 */
-+	ncycles = DIV_ROUND_UP(conf->timings.sdr.tWC_min, mckperiodps);
-+	ncycles = max(totalcycles, ncycles);
-+	ret = atmel_smc_cs_conf_set_cycle(smcconf, ATMEL_SMC_NWE_SHIFT,
-+					  ncycles);
-+	if (ret)
-+		return ret;
-+
-+	/*
-+	 * We don't want the CS line to be toggled between each byte/word
-+	 * transfer to the NAND. The only way to guarantee that is to have the
-+	 * NCS_{WR,RD}_{SETUP,HOLD} timings set to 0, which in turn means:
-+	 *
-+	 * NCS_WR_PULSE = NWE_CYCLE
-+	 */
-+	ret = atmel_smc_cs_conf_set_pulse(smcconf, ATMEL_SMC_NCS_WR_SHIFT,
-+					  ncycles);
-+	if (ret)
-+		return ret;
-+
-+	/*
-+	 * As for the write setup timing, the read hold timing depends on the
-+	 * operation done on the NAND:
-+	 *
-+	 * NRD_HOLD = max(tREH, tRHOH)
-+	 */
-+	timeps = max(conf->timings.sdr.tREH_min, conf->timings.sdr.tRHOH_min);
-+	ncycles = DIV_ROUND_UP(timeps, mckperiodps);
-+	totalcycles = ncycles;
-+
-+	/*
-+	 * TDF = tRHZ - NRD_HOLD
-+	 */
-+	ncycles = DIV_ROUND_UP(conf->timings.sdr.tRHZ_max, mckperiodps);
-+	ncycles -= totalcycles;
-+
-+	/*
-+	 * In ONFI 4.0 specs, tRHZ has been increased to support EDO NANDs and
-+	 * we might end up with a config that does not fit in the TDF field.
-+	 * Just take the max value in this case and hope that the NAND is more
-+	 * tolerant than advertised.
-+	 */
-+	if (ncycles > ATMEL_SMC_MODE_TDF_MAX)
-+		ncycles = ATMEL_SMC_MODE_TDF_MAX;
-+
-+	smcconf->mode |= ATMEL_SMC_MODE_TDF(ncycles) |
-+			 ATMEL_SMC_MODE_TDFMODE_OPTIMIZED;
-+
-+	/*
-+	 * Read pulse timing directly matches tRP:
-+	 *
-+	 * NRD_PULSE = tRP
-+	 */
-+	ncycles = DIV_ROUND_UP(conf->timings.sdr.tRP_min, mckperiodps);
-+	totalcycles += ncycles;
-+	ret = atmel_smc_cs_conf_set_pulse(smcconf, ATMEL_SMC_NRD_SHIFT,
-+					  ncycles);
-+	if (ret)
-+		return ret;
-+
-+	/*
-+	 * The write cycle timing is directly matching tWC, but is also
-+	 * dependent on the setup and hold timings we calculated earlier,
-+	 * which gives:
-+	 *
-+	 * NRD_CYCLE = max(tRC, NRD_PULSE + NRD_HOLD)
-+	 *
-+	 * NRD_SETUP is always 0.
-+	 */
-+	ncycles = DIV_ROUND_UP(conf->timings.sdr.tRC_min, mckperiodps);
-+	ncycles = max(totalcycles, ncycles);
-+	ret = atmel_smc_cs_conf_set_cycle(smcconf, ATMEL_SMC_NRD_SHIFT,
-+					  ncycles);
-+	if (ret)
-+		return ret;
-+
-+	/*
-+	 * We don't want the CS line to be toggled between each byte/word
-+	 * transfer from the NAND. The only way to guarantee that is to have
-+	 * the NCS_{WR,RD}_{SETUP,HOLD} timings set to 0, which in turn means:
-+	 *
-+	 * NCS_RD_PULSE = NRD_CYCLE
-+	 */
-+	ret = atmel_smc_cs_conf_set_pulse(smcconf, ATMEL_SMC_NCS_RD_SHIFT,
-+					  ncycles);
-+	if (ret)
-+		return ret;
-+
-+	/* Txxx timings are directly matching tXXX ones. */
-+	ncycles = DIV_ROUND_UP(conf->timings.sdr.tCLR_min, mckperiodps);
-+	ret = atmel_smc_cs_conf_set_timing(smcconf,
-+					   ATMEL_HSMC_TIMINGS_TCLR_SHIFT,
-+					   ncycles);
-+	if (ret)
-+		return ret;
-+
-+	ncycles = DIV_ROUND_UP(conf->timings.sdr.tADL_min, mckperiodps);
-+	ret = atmel_smc_cs_conf_set_timing(smcconf,
-+					   ATMEL_HSMC_TIMINGS_TADL_SHIFT,
-+					   ncycles);
-+	if (ret)
-+		return ret;
-+
-+	ncycles = DIV_ROUND_UP(conf->timings.sdr.tAR_min, mckperiodps);
-+	ret = atmel_smc_cs_conf_set_timing(smcconf,
-+					   ATMEL_HSMC_TIMINGS_TAR_SHIFT,
-+					   ncycles);
-+	if (ret)
-+		return ret;
-+
-+	ncycles = DIV_ROUND_UP(conf->timings.sdr.tRR_min, mckperiodps);
-+	ret = atmel_smc_cs_conf_set_timing(smcconf,
-+					   ATMEL_HSMC_TIMINGS_TRR_SHIFT,
-+					   ncycles);
-+	if (ret)
-+		return ret;
-+
-+	ncycles = DIV_ROUND_UP(conf->timings.sdr.tWB_max, mckperiodps);
-+	ret = atmel_smc_cs_conf_set_timing(smcconf,
-+					   ATMEL_HSMC_TIMINGS_TWB_SHIFT,
-+					   ncycles);
-+	if (ret)
-+		return ret;
-+
-+	/* Attach the CS line to the NFC logic. */
-+	smcconf->timings |= ATMEL_HSMC_TIMINGS_NFSEL;
-+
-+	/* Set the appropriate data bus width. */
-+	if (nand->base.options & NAND_BUSWIDTH_16)
-+		smcconf->mode |= ATMEL_SMC_MODE_DBW_16;
-+
-+	/* Operate in NRD/NWE READ/WRITEMODE. */
-+	smcconf->mode |= ATMEL_SMC_MODE_READMODE_NRD |
-+			 ATMEL_SMC_MODE_WRITEMODE_NWE;
-+
-+	return 0;
-+}
-+
-+static int atmel_smc_nand_setup_data_interface(struct atmel_nand *nand,
-+					int csline,
+-static int mxc_nand_v2_setup_data_interface(struct mtd_info *mtd,
+-					const struct nand_data_interface *conf,
+-					bool check_only)
++static int mxc_nand_v2_setup_data_interface(struct mtd_info *mtd, int csline,
 +					const struct nand_data_interface *conf)
-+{
-+	struct atmel_nand_controller *nc;
-+	struct atmel_smc_cs_conf smcconf;
-+	struct atmel_nand_cs *cs;
-+	int ret;
-+
-+	nc = to_nand_controller(nand->base.controller);
-+
-+	ret = atmel_smc_nand_prepare_smcconf(nand, conf, &smcconf);
-+	if (ret)
-+		return ret;
-+
-+	if (csline == NAND_DATA_IFACE_CHECK_ONLY)
-+		return 0;
-+
-+	cs = &nand->cs[csline];
-+	cs->smcconf = smcconf;
-+	atmel_smc_cs_conf_apply(nc->smc, cs->id, &cs->smcconf);
-+
-+	return 0;
-+}
-+
-+static int atmel_hsmc_nand_setup_data_interface(struct atmel_nand *nand,
-+					int csline,
-+					const struct nand_data_interface *conf)
-+{
-+	struct atmel_nand_controller *nc;
-+	struct atmel_smc_cs_conf smcconf;
-+	struct atmel_nand_cs *cs;
-+	int ret;
-+
-+	nc = to_nand_controller(nand->base.controller);
-+
-+	ret = atmel_smc_nand_prepare_smcconf(nand, conf, &smcconf);
-+	if (ret)
-+		return ret;
-+
-+	if (csline == NAND_DATA_IFACE_CHECK_ONLY)
-+		return 0;
-+
-+	cs = &nand->cs[csline];
-+	cs->smcconf = smcconf;
-+
-+	if (cs->rb.type == ATMEL_NAND_NATIVE_RB)
-+		cs->smcconf.timings |= ATMEL_HSMC_TIMINGS_RBNSEL(cs->rb.id);
-+
-+	atmel_hsmc_cs_conf_apply(nc->smc, cs->id, &cs->smcconf);
-+
-+	return 0;
-+}
-+
-+static int atmel_nand_setup_data_interface(struct mtd_info *mtd, int csline,
-+					const struct nand_data_interface *conf)
-+{
-+	struct nand_chip *chip = mtd_to_nand(mtd);
-+	struct atmel_nand *nand = to_atmel_nand(chip);
-+	struct atmel_nand_controller *nc;
-+
-+	nc = to_nand_controller(nand->base.controller);
-+
-+	if (csline >= nand->numcs ||
-+	    (csline < 0 && csline != NAND_DATA_IFACE_CHECK_ONLY))
-+		return -EINVAL;
-+
-+	return nc->caps->ops->setup_data_interface(nand, csline, conf);
-+}
-+
- static void atmel_nand_init(struct atmel_nand_controller *nc,
- 			    struct atmel_nand *nand)
  {
-@@ -1161,6 +1453,9 @@ static void atmel_nand_init(struct atmel_nand_controller *nc,
- 	chip->write_buf = atmel_nand_write_buf;
- 	chip->select_chip = atmel_nand_select_chip;
+ 	struct nand_chip *nand_chip = mtd_to_nand(mtd);
+ 	struct mxc_nand_host *host = nand_get_controller_data(nand_chip);
+@@ -1075,7 +1073,7 @@ static int mxc_nand_v2_setup_data_interface(struct mtd_info *mtd,
+ 		return -EINVAL;
+ 	}
  
-+	if (nc->mck && nc->caps->ops->setup_data_interface)
-+		chip->setup_data_interface = atmel_nand_setup_data_interface;
-+
- 	/* Some NANDs require a longer delay than the default one (20us). */
- 	chip->chip_delay = 40;
- 
-@@ -1735,6 +2030,12 @@ static int atmel_nand_controller_init(struct atmel_nand_controller *nc,
- 	if (nc->caps->legacy_of_bindings || !nc->dev->of_node)
+-	if (check_only)
++	if (csline == NAND_DATA_IFACE_CHECK_ONLY)
  		return 0;
  
-+	nc->mck = of_clk_get(dev->parent->of_node, 0);
-+	if (IS_ERR(nc->mck)) {
-+		dev_err(dev, "Failed to retrieve MCK clk\n");
-+		return PTR_ERR(nc->mck);
-+	}
-+
- 	np = of_parse_phandle(dev->parent->of_node, "atmel,smc", 0);
- 	if (!np) {
- 		dev_err(dev, "Missing or invalid atmel,smc property\n");
-@@ -2045,6 +2346,7 @@ const struct atmel_nand_controller_ops atmel_hsmc_nc_ops = {
- 	.remove = atmel_hsmc_nand_controller_remove,
- 	.ecc_init = atmel_hsmc_nand_ecc_init,
- 	.nand_init = atmel_hsmc_nand_init,
-+	.setup_data_interface = atmel_hsmc_nand_setup_data_interface,
- };
+ 	ret = clk_set_rate(host->clk, rate);
+diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+index c8894f31392e..d62a1c7c5c5c 100644
+--- a/drivers/mtd/nand/nand_base.c
++++ b/drivers/mtd/nand/nand_base.c
+@@ -977,12 +977,13 @@ static int nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
+ /**
+  * nand_reset_data_interface - Reset data interface and timings
+  * @chip: The NAND chip
++ * @chipnr: Internal die id
+  *
+  * Reset the Data interface and timings to ONFI mode 0.
+  *
+  * Returns 0 for success or negative error code otherwise.
+  */
+-static int nand_reset_data_interface(struct nand_chip *chip)
++static int nand_reset_data_interface(struct nand_chip *chip, int chipnr)
+ {
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+ 	const struct nand_data_interface *conf;
+@@ -1006,7 +1007,7 @@ static int nand_reset_data_interface(struct nand_chip *chip)
+ 	 */
  
- static const struct atmel_nand_controller_caps atmel_sama5_nc_caps = {
-@@ -2099,7 +2401,14 @@ atmel_smc_nand_controller_remove(struct atmel_nand_controller *nc)
- 	return 0;
+ 	conf = nand_get_default_data_interface();
+-	ret = chip->setup_data_interface(mtd, conf, false);
++	ret = chip->setup_data_interface(mtd, chipnr, conf);
+ 	if (ret)
+ 		pr_err("Failed to configure data interface to SDR timing mode 0\n");
+ 
+@@ -1016,6 +1017,7 @@ static int nand_reset_data_interface(struct nand_chip *chip)
+ /**
+  * nand_setup_data_interface - Setup the best data interface and timings
+  * @chip: The NAND chip
++ * @chipnr: Internal die id
+  *
+  * Find and configure the best data interface and NAND timings supported by
+  * the chip and the driver.
+@@ -1025,7 +1027,7 @@ static int nand_reset_data_interface(struct nand_chip *chip)
+  *
+  * Returns 0 for success or negative error code otherwise.
+  */
+-static int nand_setup_data_interface(struct nand_chip *chip)
++static int nand_setup_data_interface(struct nand_chip *chip, int chipnr)
+ {
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+ 	int ret;
+@@ -1049,7 +1051,7 @@ static int nand_setup_data_interface(struct nand_chip *chip)
+ 			goto err;
+ 	}
+ 
+-	ret = chip->setup_data_interface(mtd, chip->data_interface, false);
++	ret = chip->setup_data_interface(mtd, chipnr, chip->data_interface);
+ err:
+ 	return ret;
+ }
+@@ -1100,8 +1102,10 @@ static int nand_init_data_interface(struct nand_chip *chip)
+ 		if (ret)
+ 			continue;
+ 
+-		ret = chip->setup_data_interface(mtd, chip->data_interface,
+-						 true);
++		/* Pass -1 to only */
++		ret = chip->setup_data_interface(mtd,
++						 NAND_DATA_IFACE_CHECK_ONLY,
++						 chip->data_interface);
+ 		if (!ret) {
+ 			chip->onfi_timing_mode_default = mode;
+ 			break;
+@@ -1128,7 +1132,7 @@ int nand_reset(struct nand_chip *chip, int chipnr)
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+ 	int ret;
+ 
+-	ret = nand_reset_data_interface(chip);
++	ret = nand_reset_data_interface(chip, chipnr);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -1141,7 +1145,7 @@ int nand_reset(struct nand_chip *chip, int chipnr)
+ 	chip->select_chip(mtd, -1);
+ 
+ 	chip->select_chip(mtd, chipnr);
+-	ret = nand_setup_data_interface(chip);
++	ret = nand_setup_data_interface(chip, chipnr);
+ 	chip->select_chip(mtd, -1);
+ 	if (ret)
+ 		return ret;
+@@ -4376,7 +4380,7 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
+ 	 * For the other dies, nand_reset() will automatically switch to the
+ 	 * best mode for us.
+ 	 */
+-	ret = nand_setup_data_interface(chip);
++	ret = nand_setup_data_interface(chip, 0);
+ 	if (ret)
+ 		return ret;
+ 
+diff --git a/drivers/mtd/nand/s3c2410.c b/drivers/mtd/nand/s3c2410.c
+index f0b030d44f71..9e0c849607b9 100644
+--- a/drivers/mtd/nand/s3c2410.c
++++ b/drivers/mtd/nand/s3c2410.c
+@@ -812,9 +812,8 @@ static int s3c2410_nand_add_partition(struct s3c2410_nand_info *info,
+ 	return -ENODEV;
  }
  
--const struct atmel_nand_controller_ops atmel_smc_nc_ops = {
-+/*
-+ * The SMC reg layout of at91rm9200 is completely different which prevents us
-+ * from re-using atmel_smc_nand_setup_data_interface() for the
-+ * ->setup_data_interface() hook.
-+ * At this point, there's no support for the at91rm9200 SMC IP, so we leave
-+ * ->setup_data_interface() unassigned.
-+ */
-+const struct atmel_nand_controller_ops at91rm9200_nc_ops = {
- 	.probe = atmel_smc_nand_controller_probe,
- 	.remove = atmel_smc_nand_controller_remove,
- 	.ecc_init = atmel_nand_ecc_init,
-@@ -2109,6 +2418,20 @@ const struct atmel_nand_controller_ops atmel_smc_nc_ops = {
- static const struct atmel_nand_controller_caps atmel_rm9200_nc_caps = {
- 	.ale_offs = 1 << 21,
- 	.cle_offs = 1 << 22,
-+	.ops = &at91rm9200_nc_ops,
-+};
+-static int s3c2410_nand_setup_data_interface(struct mtd_info *mtd,
+-					const struct nand_data_interface *conf,
+-					bool check_only)
++static int s3c2410_nand_setup_data_interface(struct mtd_info *mtd, int csline,
++					const struct nand_data_interface *conf)
+ {
+ 	struct s3c2410_nand_info *info = s3c2410_nand_mtd_toinfo(mtd);
+ 	struct s3c2410_platform_nand *pdata = info->platform;
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index e40482a65de6..4495c6111e32 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -1576,9 +1576,8 @@ static int _sunxi_nand_lookup_timing(const s32 *lut, int lut_size, u32 duration,
+ #define sunxi_nand_lookup_timing(l, p, c) \
+ 			_sunxi_nand_lookup_timing(l, ARRAY_SIZE(l), p, c)
+ 
+-static int sunxi_nfc_setup_data_interface(struct mtd_info *mtd,
+-					const struct nand_data_interface *conf,
+-					bool check_only)
++static int sunxi_nfc_setup_data_interface(struct mtd_info *mtd, int csline,
++					const struct nand_data_interface *conf)
+ {
+ 	struct nand_chip *nand = mtd_to_nand(mtd);
+ 	struct sunxi_nand_chip *chip = to_sunxi_nand(nand);
+@@ -1691,7 +1690,7 @@ static int sunxi_nfc_setup_data_interface(struct mtd_info *mtd,
+ 		return tRHW;
+ 	}
+ 
+-	if (check_only)
++	if (csline == NAND_DATA_IFACE_CHECK_ONLY)
+ 		return 0;
+ 
+ 	/*
+diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
+index 4a5e948c62df..4f37b5e80ac6 100644
+--- a/drivers/mtd/nand/tango_nand.c
++++ b/drivers/mtd/nand/tango_nand.c
+@@ -474,9 +474,8 @@ static u32 to_ticks(int kHz, int ps)
+ 	return DIV_ROUND_UP_ULL((u64)kHz * ps, NSEC_PER_SEC);
+ }
+ 
+-static int tango_set_timings(struct mtd_info *mtd,
+-			     const struct nand_data_interface *conf,
+-			     bool check_only)
++static int tango_set_timings(struct mtd_info *mtd, int csline,
++			     const struct nand_data_interface *conf)
+ {
+ 	const struct nand_sdr_timings *sdr = nand_get_sdr_timings(conf);
+ 	struct nand_chip *chip = mtd_to_nand(mtd);
+@@ -488,7 +487,7 @@ static int tango_set_timings(struct mtd_info *mtd,
+ 	if (IS_ERR(sdr))
+ 		return PTR_ERR(sdr);
+ 
+-	if (check_only)
++	if (csline == NAND_DATA_IFACE_CHECK_ONLY)
+ 		return 0;
+ 
+ 	Trdy = to_ticks(kHz, sdr->tCEA_max - sdr->tREA_max);
+diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+index 9d51dee53be4..3ea1c176e591 100644
+--- a/include/linux/mtd/nand.h
++++ b/include/linux/mtd/nand.h
+@@ -107,6 +107,8 @@ int nand_unlock(struct mtd_info *mtd, loff_t ofs, uint64_t len);
+ #define NAND_STATUS_READY	0x40
+ #define NAND_STATUS_WP		0x80
+ 
++#define NAND_DATA_IFACE_CHECK_ONLY	-1
 +
-+const struct atmel_nand_controller_ops atmel_smc_nc_ops = {
-+	.probe = atmel_smc_nand_controller_probe,
-+	.remove = atmel_smc_nand_controller_remove,
-+	.ecc_init = atmel_nand_ecc_init,
-+	.nand_init = atmel_smc_nand_init,
-+	.setup_data_interface = atmel_smc_nand_setup_data_interface,
-+};
-+
-+static const struct atmel_nand_controller_caps atmel_sam9260_nc_caps = {
-+	.ale_offs = 1 << 21,
-+	.cle_offs = 1 << 22,
- 	.ops = &atmel_smc_nc_ops,
- };
+ /*
+  * Constants for ECC_MODES
+  */
+@@ -804,7 +806,10 @@ nand_get_sdr_timings(const struct nand_data_interface *conf)
+  * @read_retries:	[INTERN] the number of read retry modes supported
+  * @onfi_set_features:	[REPLACEABLE] set the features for ONFI nand
+  * @onfi_get_features:	[REPLACEABLE] get the features for ONFI nand
+- * @setup_data_interface: [OPTIONAL] setup the data interface and timing
++ * @setup_data_interface: [OPTIONAL] setup the data interface and timing. If
++ * 			  chipnr is set to %NAND_DATA_IFACE_CHECK_ONLY this
++ * 			  means the configuration should not be applied but
++ * 			  only checked.
+  * @bbt:		[INTERN] bad block table pointer
+  * @bbt_td:		[REPLACEABLE] bad block table descriptor for flash
+  *			lookup.
+@@ -847,9 +852,8 @@ struct nand_chip {
+ 	int (*onfi_get_features)(struct mtd_info *mtd, struct nand_chip *chip,
+ 			int feature_addr, uint8_t *subfeature_para);
+ 	int (*setup_read_retry)(struct mtd_info *mtd, int retry_mode);
+-	int (*setup_data_interface)(struct mtd_info *mtd,
+-				    const struct nand_data_interface *conf,
+-				    bool check_only);
++	int (*setup_data_interface)(struct mtd_info *mtd, int chipnr,
++				    const struct nand_data_interface *conf);
  
-@@ -2129,14 +2452,14 @@ static const struct atmel_nand_controller_caps atmel_sam9g45_nc_caps = {
- static const struct atmel_nand_controller_caps atmel_rm9200_nand_caps = {
- 	.ale_offs = 1 << 21,
- 	.cle_offs = 1 << 22,
--	.ops = &atmel_smc_nc_ops,
-+	.ops = &at91rm9200_nc_ops,
- 	.legacy_of_bindings = true,
- };
  
- static const struct atmel_nand_controller_caps atmel_sam9261_nand_caps = {
- 	.ale_offs = 1 << 22,
- 	.cle_offs = 1 << 21,
--	.ops = &atmel_smc_nc_ops,
-+	.ops = &at91rm9200_nc_ops,
- 	.legacy_of_bindings = true,
- };
- 
-@@ -2144,7 +2467,7 @@ static const struct atmel_nand_controller_caps atmel_sam9g45_nand_caps = {
- 	.has_dma = true,
- 	.ale_offs = 1 << 21,
- 	.cle_offs = 1 << 22,
--	.ops = &atmel_smc_nc_ops,
-+	.ops = &at91rm9200_nc_ops,
- 	.legacy_of_bindings = true,
- };
- 
-@@ -2155,7 +2478,7 @@ static const struct of_device_id atmel_nand_controller_of_ids[] = {
- 	},
- 	{
- 		.compatible = "atmel,at91sam9260-nand-controller",
--		.data = &atmel_rm9200_nc_caps,
-+		.data = &atmel_sam9260_nc_caps,
- 	},
- 	{
- 		.compatible = "atmel,at91sam9261-nand-controller",
+ 	int chip_delay;
 -- 
 2.7.4
