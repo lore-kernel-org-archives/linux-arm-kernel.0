@@ -1,24 +1,50 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 20 Feb 2017 19:24:32 +0100
-Subject: [PATCH v2] i2c: at91: ensure state is restored after suspending
-In-Reply-To: <20170216172759.27837-1-alexandre.belloni@free-electrons.com>
-References: <20170216172759.27837-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170220182432.4md345efgej236hc@ninjato>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 20 Feb 2017 11:46:49 -0700
+Subject: [PATCH] hwtracing: coresight: Fixes coresight DT parse to get
+ correct output port ID.
+In-Reply-To: <1487358611-2537-1-git-send-email-mike.leach@linaro.org>
+References: <1487358611-2537-1-git-send-email-mike.leach@linaro.org>
+Message-ID: <CANLsYkypKVhfFYPs3vuHzdrULsB-837coRdruhMdgRKF9rmWUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 06:27:59PM +0100, Alexandre Belloni wrote:
-> When going to suspend, the I2C registers may be lost because the power to
-> VDDcore is cut. Restore them when resuming.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On 17 February 2017 at 12:10, Mike Leach <mike.leach@linaro.org> wrote:
+> Corrected to get the port numbering to allow programmable replicator driver
+> to operate correctly.
+>
+> By convention, CoreSight devices number ports, not endpoints in
+> the .dts files:-
+>
+> port {
+>      reg<N>
+>      endpoint {
+>      }
+> }
+>
+> Existing code read endpoint number - always 0x0, rather than the correct
+> port number.
+>
+> Signed-off-by: Mike Leach <mike.leach@linaro.org>
+> ---
+>  drivers/hwtracing/coresight/of_coresight.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/hwtracing/coresight/of_coresight.c b/drivers/hwtracing/coresight/of_coresight.c
+> index 629e031..09142e9 100644
+> --- a/drivers/hwtracing/coresight/of_coresight.c
+> +++ b/drivers/hwtracing/coresight/of_coresight.c
+> @@ -149,7 +149,7 @@ struct coresight_platform_data *of_get_coresight_platform_data(
+>                                 continue;
+>
+>                         /* The local out port number */
+> -                       pdata->outports[i] = endpoint.id;
+> +                       pdata->outports[i] = endpoint.port;
+>
+>                         /*
+>                          * Get a handle on the remote port and parent
+> --
+> 2.7.4
+>
 
-Applied to for-next, thanks (will be in 4.11)!
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170220/41785246/attachment.sig>
+Applied - thanks
+Mathieu.
