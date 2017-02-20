@@ -1,26 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 20 Feb 2017 17:50:49 +0100
-Subject: [PATCH] ARM: dts: kirkwood: Fix SATA pinmux-ing for TS419
-In-Reply-To: <1487608825.2885.1.camel@decadent.org.uk>
-References: <20170218003251.GC4152@decadent.org.uk>
- <20170220135955.63fbcaa3@free-electrons.com>
- <1487608825.2885.1.camel@decadent.org.uk>
-Message-ID: <20170220175049.45f319bb@free-electrons.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 20 Feb 2017 16:54:30 +0000
+Subject: [PATCH 02/20] arm64: KVM: Implement HVC_RESET_VECTORS stub
+ hypercall
+In-Reply-To: <20170217154429.5000-3-marc.zyngier@arm.com>
+References: <20170217154429.5000-1-marc.zyngier@arm.com>
+ <20170217154429.5000-3-marc.zyngier@arm.com>
+Message-ID: <58AB1F46.5000509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Marc,
 
-On Mon, 20 Feb 2017 16:40:25 +0000, Ben Hutchings wrote:
+On 17/02/17 15:44, Marc Zyngier wrote:
+> In order to restore HYP mode to its original condition, KVM currently
+> implements __kvm_hyp_reset(). As we're moving towards a hyp-stub
+> defined API, it becomes necessary to implement HVC_RESET_VECTORS.
+> 
+> This patch adds the HVC_RESET_VECTORS hypercall to the KVM init
+> code, which so far lacked any form of hypercall support.
 
-> That is precisely what I intended.  20-23 are used by the second
-> Ethernet port.  The old board code doesn't assign 4 or 5 at all.
+> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+> index 6b29d3d9e1f2..948f331c7f32 100644
+> --- a/arch/arm64/kvm/hyp-init.S
+> +++ b/arch/arm64/kvm/hyp-init.S
+> @@ -58,6 +59,9 @@ __invalid:
+>  	 * x2: HYP vectors
+>  	 */
+>  __do_hyp_init:
+> +	/* Check for a stub HVC call */
+> +	cmp	x2, #HVC_STUB_HCALL_NR
 
-Then I believe it would be more explicit to have separate pin muxing
-configurations for SATA on this board.
+Nit: x2 -> x0?
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+
+> +	b.lo	__kvm_handle_stub_hvc
+>  
+>  	msr	ttbr0_el2, x0
+>  
+> @@ -119,6 +123,9 @@ __do_hyp_init:
+>  	eret
+>  ENDPROC(__kvm_hyp_init)
+>  
+> +ENTRY(__kvm_handle_stub_hvc)
+> +	cmp	x0, #HVC_RESET_VECTORS
+> +	b.ne	1f
+>  	/*
+>  	 * Reset kvm back to the hyp stub.
+>  	 */
+
+Thanks,
+
+James
