@@ -1,51 +1,47 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Mon, 20 Feb 2017 15:15:39 +1030
-Subject: [PATCH] ipmi: bt-bmc: Use a regmap for register access
-In-Reply-To: <36014e0c-82f8-eeaf-ee2a-6c1e413b957d@kaod.org>
-References: <20161206025715.2002-1-andrew@aj.id.au>
- <36014e0c-82f8-eeaf-ee2a-6c1e413b957d@kaod.org>
-Message-ID: <1487565939.3779.4.camel@aj.id.au>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 19 Feb 2017 20:46:13 -0800
+Subject: [PATCH v2 2/3] watchdog: sama5d4: Fix setting timeout when
+ watchdog is disabled
+In-Reply-To: <20170219235213.qcxfne5yvs3uzwg3@piout.net>
+References: <20170216193053.5546-1-alexandre.belloni@free-electrons.com>
+ <20170216193053.5546-2-alexandre.belloni@free-electrons.com>
+ <968ef53e-c3c4-5322-020a-8382ce367931@roeck-us.net>
+ <20170217151625.hv2vn5imx2kyeftt@piout.net>
+ <c9f336fd-8761-7999-4ac0-cf68eb6c8ba1@roeck-us.net>
+ <20170219235213.qcxfne5yvs3uzwg3@piout.net>
+Message-ID: <cc75a19f-0d99-4d26-0789-6cd750983990@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cory,
+On 02/19/2017 03:52 PM, Alexandre Belloni wrote:
+> On 19/02/2017 at 08:57:35 -0800, Guenter Roeck wrote:
+>>>> That means if the watchdog is running, the timeout would not be updated.
+>>>> It should be updated no matter if it is running or not.
+>>>>
+>>>
+>>> No, it is enabling the watchdog, then changing WDV and WDD and finally
+>>> disabling the watchdog if necessary. So, WDV and WDD are always changed.
+>>>
+>> You are correct. Sorry for the noise.
+>>
+>> Seems odd that the watchdog must be _running_ to change the timeout.
+>> Usually, if there is a restriction, it is the opposite. I hope this
+>> doesn't cause race conditions, where the watchdog fires immediately
+>> after being enabled due to a low timeout.
+>>
+>
+> While it is difficult to reproduce, I can confirm it races and sometimes
+> reset the SoC without any good reason. It doesn't matter whether it is
+> disabled or not
+>
 
-On Tue, 2016-12-06 at 16:02 +0100, C?dric Le Goater wrote:
-> [ this is a resend bc of some mailing list issues]?
-> 
-> On 12/06/2016 03:57 AM, Andrew Jeffery wrote:
-> > The registers for the bt-bmc device live under the Aspeed LPC
-> > controller. Devicetree bindings have recently been introduced for the
-> > LPC controller where the "host" portion of the LPC register space is
-> > described as a syscon device. Future devicetrees describing the bt-bmc
-> > device should nest its node under the appropriate "simple-mfd", "syscon"
-> > compatible node.
-> > 
-> > This change allows the bt-bmc driver to function with both syscon and
-> > non-syscon- based devicetree descriptions by always using a regmap for
-> > register access, either retrieved from the parent syscon device or
-> > instantiated if none exists.
-> > 
-> > The patch has been tested on an OpenPOWER Palmetto machine, successfully
-> > booting, rebooting and powering down the host.
-> > 
-> > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-> 
-> It would be nice to have an example of the associated binding.?
-> I did not see it. A part from that :
-> 
-> Reviewed-by: C?dric Le Goater <clg@kaod.org>
+Outch :-(.
 
+> I've raised the issue at Atmel last Thursday so I don't have any answer
+> yet.
+>
 
-Will this make it into 4.11?
+Please keep us in the loop.
 
-Cheers,
-
-Andrew
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170220/1e44fe24/attachment.sig>
+Thanks,
+Guenter
