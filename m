@@ -1,61 +1,68 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 20 Feb 2017 10:08:39 +0100
-Subject: [PATCH v5 0/9] meson-gx: reset RGMII PHYs and configure TX delay
-In-Reply-To: <20170219214149.30418-1-martin.blumenstingl@googlemail.com>
-References: <20170122181028.5014-1-martin.blumenstingl@googlemail.com>
- <20170219214149.30418-1-martin.blumenstingl@googlemail.com>
-Message-ID: <1487581719.3734.1.camel@baylibre.com>
+From: fisaksen@baylibre.com (Frode Isaksen)
+Date: Mon, 20 Feb 2017 10:26:11 +0100
+Subject: [PATCH v2 4/6] spi: davinci: flush caches when performing DMA
+In-Reply-To: <0f3607fd-4542-be92-da2e-b2da6f8ac26f@ti.com>
+References: <1487327904-28311-1-git-send-email-fisaksen@baylibre.com>
+ <1487327904-28311-5-git-send-email-fisaksen@baylibre.com>
+ <5fab0c33-6e1d-c63a-8758-6672236045a7@ti.com>
+ <20170217112247.GE21222@n2100.armlinux.org.uk>
+ <eaf93c6c-52a7-826b-9c53-2b13c0b280ca@baylibre.com>
+ <20170217120749.GF21222@n2100.armlinux.org.uk>
+ <0f3607fd-4542-be92-da2e-b2da6f8ac26f@ti.com>
+Message-ID: <f0fcc000-6c07-647a-ada2-04b61f0e2e3b@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2017-02-19 at 22:41 +0100, Martin Blumenstingl wrote:
-> This series adds the reset GPIOs for the (external) ethernet PHYs on
-> all
-> GXBB boards.
-> Additionally it provides a ethernet PHY node which can be used to
-> specify
-> PHY-specific properties (this may be required if more boards require
-> the
-> "eee-broken-1000t" for the RTL8211F ethernet PHY). To make all board
-> .dts
-> consistent I chose to add the PHY node also for boards which don't
-> have a
-> RTL8211F PHY.
-> 
 
-Looks good to me. For the patchset:
-Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
 
-> 
-> Martin Blumenstingl (9):
-> ? ARM64: dts: meson-gxbb-odroidc2: add the ethernet PHY's reset GPIO
-> ? ARM64: dts: meson-gxbb-p200: add the ethernet PHY's reset GPIO
-> ? ARM64: dts: meson-gxbb-vega-s95: add the ethernet PHY's reset GPIO
-> ? ARM64: dts: meson-gxbb-nexbox-a95x: add the ethernet PHY's reset
-> GPIO
-> ? ARM64: dts: meson-gxbb-wetek-hub: add the ethernet PHY's reset GPIO
-> ? ARM64: dts: meson-gxbb-wetek-play2: add the ethernet PHY's reset
-> GPIO
-> ? ARM64: dts: meson-gxbb-p201: fix ethernet support
-> ? ARM64: dts: amlogic: add the ethernet TX delay configuration
-> ? ARM64: dts: meson-gx: remove the phy-mode property from meson-gx
-> 
-> ?arch/arm64/boot/dts/amlogic/meson-gx.dtsi??????????|??1 -
-> ?.../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts????| 17
-> ++++++++++++++
-> ?.../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts |??7 ++++++
-> ?arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts????| 25
-> +++++++++++++++++++++
-> ?arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts????| 11 +++++++++
-> ?arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi???|??6 -----
-> ?.../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi??????| 21
-> ++++++++++++++++-
-> ?.../boot/dts/amlogic/meson-gxbb-wetek-hub.dts??????| 26
-> ++++++++++++++++++++++
-> ?.../boot/dts/amlogic/meson-gxbb-wetek-play2.dts????| 26
-> ++++++++++++++++++++++
-> ?.../boot/dts/amlogic/meson-gxl-s905d-p230.dts??????|??2 ++
-> ?.../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts |??2 ++
-> ?arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts?????|??2 ++
-> ?12 files changed, 138 insertions(+), 8 deletions(-)
-> 
+On 20/02/2017 07:55, Vignesh R wrote:
+>
+> On Friday 17 February 2017 05:37 PM, Russell King - ARM Linux wrote:
+> [...]
+>> SPI is rather another special case - rather than SPI following the 
+>> established mechanism of passing data references via scatterlists or 
+>> similar, it also passes them via virtual addresses, which means SPI 
+>> can directly access the vmalloc area when performing PIO.  This 
+>> really makes the problem more complex, because it means that if you 
+>> do have a SPI driver that does that, it's going to be
+>> reading/writing direct from vmalloc space.
+>>
+>> That's not a problem as long as the data is only accessed via
+>> vmalloc space, but it will definitely go totally wrong if the data
+>> is subsequently mapped into userspace.
+>>
+>> The other important thing to realise is that the interfaces in 
+>> cachetlb.txt assume that it's the lowmem mapping that will be
+>> accessed, and the IO device will push that data out to physical
+>> memory (either via the DMA API, or flush_kernel_dcache_page()).
+>> That's not true of SPI, as it passes virtual addresses around.
+>>
+>> So... overall, I'm not sure that this problem is properly solvable
+>> given SPIs insistance on passing virtual addresses and the
+>> differences in this area between SPI and block.
+>>
+> I am debugging another issue with UBIFS wherein pages allocated by
+> vmalloc are in highmem region that are not addressable using 32 bit
+> addresses and is backed by LPAE. So, a 32 bit DMA cannot access these
+> buffers at all.
+> When dma_map_sg() is called to map these pages by spi_map_buf() the
+> physical address is just truncated to 32 bit in pfn_to_dma() (as part of
+> dma_map_sg() call). This results in random crashes as DMA starts
+> accessing random memory during SPI read.
+>
+> Given, the above problem and also issue surrounding VIVT caches, I am
+> thinking of may be using pre-allocated fixed size bounce buffer to
+> handle buffers not in lowmem mapping.
+> I have tried using 64KB pre-allocated buffer on TI DRA74 EVM with QSPI
+> running at 76.8MHz and do not see any significant degradation in
+> performance with UBIFS. Mainly because UBIFS seems to use vmalloc'd
+> buffers only during initial preparing and mounting phase and not during
+> file read/write.
+I am seeing a bug caused by VIVT cache in 'read_ltab()' function. In this function, the vmalloc'ed buffer is of size 11. Isn't it better to use kmalloc in this case ?
+
+Thanks,
+Frode
+>
+> So, is it an acceptable solution to modify spi_map_buf() to use bounce
+> buffer when buffer does not belong to lowmem region?
+>
