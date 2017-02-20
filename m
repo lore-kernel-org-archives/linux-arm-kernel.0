@@ -1,215 +1,405 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Tue, 21 Feb 2017 01:53:00 +1030
-Subject: [PATCH v2] ipmi: bt-bmc: Use a regmap for register access
-Message-ID: <20170220152300.3422-1-andrew@aj.id.au>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Mon, 20 Feb 2017 07:26:53 -0800
+Subject: [PATCH v3] reset: Add i.MX7 SRC reset driver
+Message-ID: <20170220152653.31739-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The registers for the bt-bmc device live under the Aspeed LPC
-controller. Devicetree bindings have recently been introduced for the
-LPC controller where the "host" portion of the LPC register space is
-described as a syscon device. Future devicetrees describing the bt-bmc
-device should nest its node under the appropriate "simple-mfd", "syscon"
-compatible node.
+Add reset controller driver exposing various reset faculties,
+implemented by System Reset Controller IP block.
 
-This change allows the bt-bmc driver to function with both syscon and
-non-syscon- based devicetree descriptions by always using a regmap for
-register access, either retrieved from the parent syscon device or
-instantiated if none exists.
-
-Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
-Reviewed-by: C?dric Le Goater <clg@kaod.org>
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
 
-v2: Address Joel's review with some minor cleanups
+Changes since v2 (see [v2]):
 
-* Add '|| COMPILE_TEST' to Kconfig depends
-* Const-ify the regmap configuration struct
-* Remove some redundant output from the WARN formatting
+	- Fix typos
 
-Propagating regmap_{read,write}() failures makes the change more invasive than
-I would like, so I have favoured keeping the WARN()s
+	- Kconfig/Makefile chagnes account for alphabetical sorting of
+          those files
 
- drivers/char/ipmi/Kconfig  |  3 +-
- drivers/char/ipmi/bt-bmc.c | 80 ++++++++++++++++++++++++++++++++++------------
- 2 files changed, 61 insertions(+), 22 deletions(-)
+	- Remove redundant includes
 
-diff --git a/drivers/char/ipmi/Kconfig b/drivers/char/ipmi/Kconfig
-index 7f816655cbbf..90f3edffb067 100644
---- a/drivers/char/ipmi/Kconfig
-+++ b/drivers/char/ipmi/Kconfig
-@@ -78,7 +78,8 @@ config IPMI_POWEROFF
- endif # IPMI_HANDLER
- 
- config ASPEED_BT_IPMI_BMC
--	depends on ARCH_ASPEED
-+	depends on ARCH_ASPEED || COMPILE_TEST
-+       depends on REGMAP && REGMAP_MMIO && MFD_SYSCON
- 	tristate "BT IPMI bmc driver"
- 	help
- 	  Provides a driver for the BT (Block Transfer) IPMI interface
-diff --git a/drivers/char/ipmi/bt-bmc.c b/drivers/char/ipmi/bt-bmc.c
-index fc9e8891eae3..d6f5d9eb102d 100644
---- a/drivers/char/ipmi/bt-bmc.c
-+++ b/drivers/char/ipmi/bt-bmc.c
-@@ -12,10 +12,13 @@
- #include <linux/errno.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/miscdevice.h>
- #include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/poll.h>
-+#include <linux/regmap.h>
- #include <linux/sched.h>
- #include <linux/timer.h>
- 
-@@ -60,7 +63,8 @@
- struct bt_bmc {
- 	struct device		dev;
- 	struct miscdevice	miscdev;
--	void __iomem		*base;
-+	struct regmap		*map;
-+	int			offset;
- 	int			irq;
- 	wait_queue_head_t	queue;
- 	struct timer_list	poll_timer;
-@@ -69,14 +73,29 @@ struct bt_bmc {
- 
- static atomic_t open_count = ATOMIC_INIT(0);
- 
-+static const struct regmap_config bt_regmap_cfg = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
+	- Make use of regmap_attach_dev and avoid storing refernce to
+          struct *dev in private data
+
+	- Change code and headers to expose almost all of the reset
+          related bits in SRC IP block
+
+Changes since v1 (see [v1]):
+
+	- Various small DT bindings description fixes as per feedback
+          from Rob Herring
+
+
+[v1] https://lkml.org/lkml/2017/2/6/554
+[v2] https://lkml.org/lkml/2017/2/13/488
+
+
+ .../devicetree/bindings/reset/fsl,imx7-src.txt     |  47 ++++++
+ drivers/reset/Kconfig                              |   8 +
+ drivers/reset/Makefile                             |   2 +
+ drivers/reset/reset-imx7.c                         | 186 +++++++++++++++++++++
+ include/dt-bindings/reset/imx7-reset.h             |  62 +++++++
+ 5 files changed, 305 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+ create mode 100644 drivers/reset/reset-imx7.c
+ create mode 100644 include/dt-bindings/reset/imx7-reset.h
+
+diff --git a/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+new file mode 100644
+index 0000000..5e1afc3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+@@ -0,0 +1,47 @@
++Freescale i.MX7 System Reset Controller
++======================================
++
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
++
++Required properties:
++- compatible: Should be "fsl,imx7-src", "syscon"
++- reg: should be register base and length as documented in the
++  datasheet
++- interrupts: Should contain SRC interrupt
++- #reset-cells: 1, see below
++
++example:
++
++src: reset-controller at 30390000 {
++     compatible = "fsl,imx7d-src", "syscon";
++     reg = <0x30390000 0x2000>;
++     interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
++     #reset-cells = <1>;
 +};
 +
- static u8 bt_inb(struct bt_bmc *bt_bmc, int reg)
- {
--	return ioread8(bt_bmc->base + reg);
-+	uint32_t val = 0;
-+	int rc;
 +
-+	rc = regmap_read(bt_bmc->map, bt_bmc->offset + reg, &val);
-+	WARN(rc != 0, "regmap_read() failed: %d\n", rc);
++Specifying reset lines connected to IP modules
++==============================================
 +
-+	return rc == 0 ? (u8) val : 0;
- }
- 
- static void bt_outb(struct bt_bmc *bt_bmc, u8 data, int reg)
- {
--	iowrite8(data, bt_bmc->base + reg);
-+	int rc;
++The system reset controller can be used to reset various set of
++peripherals. Device nodes that need access to reset lines should
++specify them as a reset phandle in their corresponding node as
++specified in reset.txt.
 +
-+	rc = regmap_write(bt_bmc->map, bt_bmc->offset + reg, data);
-+	WARN(rc != 0, "regmap_write() failed: %d\n", rc);
- }
- 
- static void clr_rd_ptr(struct bt_bmc *bt_bmc)
-@@ -367,14 +386,18 @@ static irqreturn_t bt_bmc_irq(int irq, void *arg)
- {
- 	struct bt_bmc *bt_bmc = arg;
- 	u32 reg;
-+	int rc;
++Example:
 +
-+	rc = regmap_read(bt_bmc->map, bt_bmc->offset + BT_CR2, &reg);
-+	if (rc)
-+		return IRQ_NONE;
- 
--	reg = ioread32(bt_bmc->base + BT_CR2);
- 	reg &= BT_CR2_IRQ_H2B | BT_CR2_IRQ_HBUSY;
- 	if (!reg)
- 		return IRQ_NONE;
- 
- 	/* ack pending IRQs */
--	iowrite32(reg, bt_bmc->base + BT_CR2);
-+	regmap_write(bt_bmc->map, bt_bmc->offset + BT_CR2, reg);
- 
- 	wake_up(&bt_bmc->queue);
- 	return IRQ_HANDLED;
-@@ -384,7 +407,6 @@ static int bt_bmc_config_irq(struct bt_bmc *bt_bmc,
- 			     struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
--	u32 reg;
- 	int rc;
- 
- 	bt_bmc->irq = platform_get_irq(pdev, 0);
-@@ -405,18 +427,17 @@ static int bt_bmc_config_irq(struct bt_bmc *bt_bmc,
- 	 * will be cleared (along with B2H) when we can write the next
- 	 * message to the BT buffer
- 	 */
--	reg = ioread32(bt_bmc->base + BT_CR1);
--	reg |= BT_CR1_IRQ_H2B | BT_CR1_IRQ_HBUSY;
--	iowrite32(reg, bt_bmc->base + BT_CR1);
-+	rc = regmap_update_bits(bt_bmc->map, bt_bmc->offset + BT_CR1,
-+				(BT_CR1_IRQ_H2B | BT_CR1_IRQ_HBUSY),
-+				(BT_CR1_IRQ_H2B | BT_CR1_IRQ_HBUSY));
- 
--	return 0;
-+	return rc;
- }
- 
- static int bt_bmc_probe(struct platform_device *pdev)
- {
- 	struct bt_bmc *bt_bmc;
- 	struct device *dev;
--	struct resource *res;
- 	int rc;
- 
- 	if (!pdev || !pdev->dev.of_node)
-@@ -431,10 +452,27 @@ static int bt_bmc_probe(struct platform_device *pdev)
- 
- 	dev_set_drvdata(&pdev->dev, bt_bmc);
- 
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	bt_bmc->base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(bt_bmc->base))
--		return PTR_ERR(bt_bmc->base);
-+	bt_bmc->map = syscon_node_to_regmap(pdev->dev.parent->of_node);
-+	if (IS_ERR(bt_bmc->map)) {
-+		struct resource *res;
-+		void __iomem *base;
++	pcie: pcie at 33800000 {
 +
-+		/*
-+		 * Assume it's not the MFD-based devicetree description, in
-+		 * which case generate a regmap ourselves
-+		 */
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+		base = devm_ioremap_resource(&pdev->dev, res);
-+		if (IS_ERR(base))
-+			return PTR_ERR(base);
++		...
 +
-+		bt_bmc->map = devm_regmap_init_mmio(dev, base, &bt_regmap_cfg);
-+		bt_bmc->offset = 0;
-+	} else {
-+		rc = of_property_read_u32(dev->of_node, "reg", &bt_bmc->offset);
-+		if (rc)
-+			return rc;
++		resets = <&src IMX7_RESET_PCIEPHY>,
++			 <&src IMX7_RESET_PCIE_CTRL_APPS_EN>;
++		reset-names = "pciephy", "apps";
++
++		...
++        };
++
++
++For list of all valid reset indicies see
++<dt-bindings/reset/imx7-reset.h>
+diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+index 172dc96..bea1800 100644
+--- a/drivers/reset/Kconfig
++++ b/drivers/reset/Kconfig
+@@ -27,6 +27,14 @@ config RESET_BERLIN
+ 	help
+ 	  This enables the reset controller driver for Marvell Berlin SoCs.
+ 
++config RESET_IMX7
++	bool "i.MX7 Reset Driver"
++	depends on SOC_IMX7D || COMPILE_TEST
++	select MFD_SYSCON
++	default SOC_IMX7D
++	help
++	  This enables the reset controller driver for i.MX7 SoCs.
++
+ config RESET_LPC18XX
+ 	bool "LPC18xx/43xx Reset Driver" if COMPILE_TEST
+ 	default ARCH_LPC18XX
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index 13b346e..a24aa80 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -4,6 +4,7 @@ obj-$(CONFIG_ARCH_STI) += sti/
+ obj-$(CONFIG_ARCH_TEGRA) += tegra/
+ obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
+ obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
++obj-$(CONFIG_RESET_IMX7) += reset-imx7.o
+ obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
+ obj-$(CONFIG_RESET_MESON) += reset-meson.o
+ obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
+@@ -14,3 +15,4 @@ obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
+ obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
+ obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
+ obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
++
+diff --git a/drivers/reset/reset-imx7.c b/drivers/reset/reset-imx7.c
+new file mode 100644
+index 0000000..6e26796
+--- /dev/null
++++ b/drivers/reset/reset-imx7.c
+@@ -0,0 +1,186 @@
++/*
++ * Copyright (c) 2017, Impinj, Inc.
++ *
++ * i.MX7 System Reset Controller (SRC) driver
++ *
++ * Author: Andrey Smirnov <andrew.smirnov@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/mfd/syscon.h>
++#include <linux/platform_device.h>
++#include <linux/reset-controller.h>
++#include <linux/regmap.h>
++#include <dt-bindings/reset/imx7-reset.h>
++
++struct imx7_src {
++	struct reset_controller_dev rcdev;
++	struct regmap *regmap;
++};
++
++enum imx7_src_registers {
++	SRC_A7RCR0		= 0x0004,
++	SRC_M4RCR		= 0x000c,
++	SRC_ERCR		= 0x0014,
++	SRC_HSICPHY_RCR		= 0x001c,
++	SRC_USBOPHY1_RCR	= 0x0020,
++	SRC_USBOPHY2_RCR	= 0x0024,
++	SRC_MIPIPHY_RCR		= 0x0028,
++	SRC_PCIEPHY_RCR		= 0x002c,
++	SRC_DDRC_RCR		= 0x1000,
++
++	SRC_PCIEPHY_RCR_PCIEPHY_G_RST   = BIT(1),
++	SRC_PCIEPHY_RCR_PCIEPHY_BTN     = BIT(2),
++};
++
++struct imx7_src_signal {
++	unsigned int offset, bit;
++};
++
++static const struct imx7_src_signal imx7_src_signals[IMX7_RESET_NUM] = {
++	[IMX7_RESET_A7_CORE_POR_RESET0] = { SRC_A7RCR0, BIT(0) },
++	[IMX7_RESET_A7_CORE_POR_RESET1] = { SRC_A7RCR0, BIT(1) },
++	[IMX7_RESET_A7_CORE_RESET0]     = { SRC_A7RCR0, BIT(4) },
++	[IMX7_RESET_A7_CORE_RESET1]	= { SRC_A7RCR0, BIT(5) },
++	[IMX7_RESET_A7_DBG_RESET0]	= { SRC_A7RCR0, BIT(8) },
++	[IMX7_RESET_A7_DBG_RESET1]	= { SRC_A7RCR0, BIT(9) },
++	[IMX7_RESET_A7_ETM_RESET0]	= { SRC_A7RCR0, BIT(12) },
++	[IMX7_RESET_A7_ETM_RESET1]	= { SRC_A7RCR0, BIT(13) },
++	[IMX7_RESET_A7_SOC_DBG_RESET]	= { SRC_A7RCR0, BIT(20) },
++	[IMX7_RESET_A7_L2RESET]		= { SRC_A7RCR0, BIT(21) },
++	[IMX7_RESET_SW_M4C_RST]		= { SRC_M4RCR, BIT(1) },
++	[IMX7_RESET_SW_M4P_RST]		= { SRC_M4RCR, BIT(2) },
++	[IMX7_RESET_EIM_RST]		= { SRC_ERCR, BIT(0) },
++	[IMX7_RESET_HSICPHY_PORT_RST]	= { SRC_HSICPHY_RCR, BIT(1) },
++	[IMX7_RESET_USBPHY1_POR]	= { SRC_USBOPHY1_RCR, BIT(0) },
++	[IMX7_RESET_USBPHY1_PORT_RST]	= { SRC_USBOPHY1_RCR, BIT(1) },
++	[IMX7_RESET_USBPHY2_POR]	= { SRC_USBOPHY2_RCR, BIT(0) },
++	[IMX7_RESET_USBPHY2_PORT_RST]	= { SRC_USBOPHY2_RCR, BIT(1) },
++	[IMX7_RESET_MIPI_PHY_MRST]	= { SRC_MIPIPHY_RCR, BIT(1) },
++	[IMX7_RESET_MIPI_PHY_SRST]	= { SRC_MIPIPHY_RCR, BIT(2) },
++	[IMX7_RESET_PCIEPHY]		= { /* Placeholder */ },
++	[IMX7_RESET_PCIEPHY_PERST]	= { SRC_PCIEPHY_RCR, BIT(3) },
++	[IMX7_RESET_PCIE_CTRL_APPS_EN]	= { SRC_PCIEPHY_RCR, BIT(6) },
++	[IMX7_RESET_DDRC_PRST]		= { SRC_DDRC_RCR, BIT(0) },
++	[IMX7_RESET_DDRC_CORE_RST]	= { SRC_DDRC_RCR, BIT(1) },
++};
++
++static struct imx7_src *to_imx7_src(struct reset_controller_dev *rcdev)
++{
++	return container_of(rcdev, struct imx7_src, rcdev);
++}
++
++static int imx7_reset_assert(struct reset_controller_dev *rcdev,
++			     unsigned long id)
++{
++	struct imx7_src *imx7src = to_imx7_src(rcdev);
++	const struct imx7_src_signal *signal = &imx7_src_signals[id];
++	unsigned int value = signal->bit;
++
++	switch (id) {
++	case IMX7_RESET_PCIEPHY:
++		regmap_update_bits(imx7src->regmap,
++				   SRC_PCIEPHY_RCR,
++				   SRC_PCIEPHY_RCR_PCIEPHY_G_RST,
++				   SRC_PCIEPHY_RCR_PCIEPHY_G_RST);
++		regmap_update_bits(imx7src->regmap,
++				   SRC_PCIEPHY_RCR,
++				   SRC_PCIEPHY_RCR_PCIEPHY_BTN,
++				   SRC_PCIEPHY_RCR_PCIEPHY_BTN);
++		break;
++
++	case IMX7_RESET_PCIE_CTRL_APPS_EN:
++		value = 0;
++	default:		/* FALLTHROUGH */
++		regmap_update_bits(imx7src->regmap,
++				   signal->offset, signal->bit, value);
++		break;
 +	}
- 
- 	mutex_init(&bt_bmc->mutex);
- 	init_waitqueue_head(&bt_bmc->queue);
-@@ -461,12 +499,12 @@ static int bt_bmc_probe(struct platform_device *pdev)
- 		add_timer(&bt_bmc->poll_timer);
- 	}
- 
--	iowrite32((BT_IO_BASE << BT_CR0_IO_BASE) |
--		  (BT_IRQ << BT_CR0_IRQ) |
--		  BT_CR0_EN_CLR_SLV_RDP |
--		  BT_CR0_EN_CLR_SLV_WRP |
--		  BT_CR0_ENABLE_IBT,
--		  bt_bmc->base + BT_CR0);
-+	regmap_write(bt_bmc->map, bt_bmc->offset + BT_CR0,
-+		     (BT_IO_BASE << BT_CR0_IO_BASE) |
-+		     (BT_IRQ << BT_CR0_IRQ) |
-+		     BT_CR0_EN_CLR_SLV_RDP |
-+		     BT_CR0_EN_CLR_SLV_WRP |
-+		     BT_CR0_ENABLE_IBT);
- 
- 	clr_b_busy(bt_bmc);
- 
++
++	return 0;
++}
++
++static int imx7_reset_deassert(struct reset_controller_dev *rcdev,
++			       unsigned long id)
++{
++	struct imx7_src *imx7src = to_imx7_src(rcdev);
++	const struct imx7_src_signal *signal = &imx7_src_signals[id];
++	unsigned int value = 0;
++
++	switch (id) {
++	case IMX7_RESET_PCIEPHY:
++		/* 
++		 * wait for more than 10us to release phy g_rst and
++		 * btnrst
++		 */
++		udelay(10);
++		regmap_update_bits(imx7src->regmap,
++				   SRC_PCIEPHY_RCR,
++				   SRC_PCIEPHY_RCR_PCIEPHY_G_RST, 0);
++		regmap_update_bits(imx7src->regmap,
++				   SRC_PCIEPHY_RCR,
++				   SRC_PCIEPHY_RCR_PCIEPHY_BTN, 0);
++		break;
++	case IMX7_RESET_PCIE_CTRL_APPS_EN:
++		value = signal->bit;
++	default:		/* FALLTHROUGH */
++		regmap_update_bits(imx7src->regmap,
++				   signal->offset, signal->bit, value);
++
++		break;
++	};
++
++	return 0;
++}
++
++static const struct reset_control_ops imx7_reset_ops = {
++	.assert		= imx7_reset_assert,
++	.deassert	= imx7_reset_deassert,
++};
++
++static int imx7_reset_probe(struct platform_device *pdev)
++{
++	struct imx7_src *imx7src;
++	struct device *dev = &pdev->dev;
++	struct regmap_config config = { .name = "src" };
++
++	imx7src = devm_kzalloc(dev, sizeof(*imx7src), GFP_KERNEL);
++	if (!imx7src)
++		return -ENOMEM;
++
++	imx7src->regmap = syscon_node_to_regmap(dev->of_node);
++	if (IS_ERR(imx7src->regmap)) {
++		dev_err(dev, "Unable to get imx7-src regmap");
++		return PTR_ERR(imx7src->regmap);
++	}
++	regmap_attach_dev(dev, imx7src->regmap, &config);
++
++	imx7src->rcdev.owner     = THIS_MODULE;
++	imx7src->rcdev.nr_resets = IMX7_RESET_NUM;
++	imx7src->rcdev.ops       = &imx7_reset_ops;
++	imx7src->rcdev.of_node   = dev->of_node;
++
++	return devm_reset_controller_register(dev, &imx7src->rcdev);
++}
++
++static const struct of_device_id imx7_reset_dt_ids[] = {
++	{ .compatible = "fsl,imx7d-src", },
++	{ /* sentinel */ },
++};
++
++static struct platform_driver imx7_reset_driver = {
++	.probe	= imx7_reset_probe,
++	.driver = {
++		.name		= KBUILD_MODNAME,
++		.of_match_table	= imx7_reset_dt_ids,
++	},
++};
++builtin_platform_driver(imx7_reset_driver);
+diff --git a/include/dt-bindings/reset/imx7-reset.h b/include/dt-bindings/reset/imx7-reset.h
+new file mode 100644
+index 0000000..6394817
+--- /dev/null
++++ b/include/dt-bindings/reset/imx7-reset.h
+@@ -0,0 +1,62 @@
++/*
++ * Copyright (C) 2017 Impinj, Inc.
++ *
++ * Author: Andrey Smirnov <andrew.smirnov@gmail.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef DT_BINDING_RESET_IMX7_H
++#define DT_BINDING_RESET_IMX7_H
++
++#define IMX7_RESET_A7_CORE_POR_RESET0	0
++#define IMX7_RESET_A7_CORE_POR_RESET1	1
++#define IMX7_RESET_A7_CORE_RESET0	2
++#define IMX7_RESET_A7_CORE_RESET1	3
++#define IMX7_RESET_A7_DBG_RESET0	4
++#define IMX7_RESET_A7_DBG_RESET1	5
++#define IMX7_RESET_A7_ETM_RESET0	6
++#define IMX7_RESET_A7_ETM_RESET1	7
++#define IMX7_RESET_A7_SOC_DBG_RESET	8
++#define IMX7_RESET_A7_L2RESET		9
++#define IMX7_RESET_SW_M4C_RST		10
++#define IMX7_RESET_SW_M4P_RST		11
++#define IMX7_RESET_EIM_RST		12
++#define IMX7_RESET_HSICPHY_PORT_RST	13
++#define IMX7_RESET_USBPHY1_POR		14
++#define IMX7_RESET_USBPHY1_PORT_RST	15
++#define IMX7_RESET_USBPHY2_POR		16
++#define IMX7_RESET_USBPHY2_PORT_RST	17
++#define IMX7_RESET_MIPI_PHY_MRST	18
++#define IMX7_RESET_MIPI_PHY_SRST	19
++
++/*
++ * IMX7_RESET_PCIEPHY is a logical reset line combining PCIEPHY_BTN
++ * and PCIEPHY_G_RST
++ */
++#define IMX7_RESET_PCIEPHY		20
++#define IMX7_RESET_PCIEPHY_PERST	21
++
++/*
++ * IMX7_RESET_PCIE_CTRL_APPS_EN is not strictly a reset line, but it
++ * can be used to inhibit PCIe LTTSM, so, in a way, it can be thoguht
++ * of as one
++ */
++#define IMX7_RESET_PCIE_CTRL_APPS_EN	22
++#define IMX7_RESET_DDRC_PRST		23
++#define IMX7_RESET_DDRC_CORE_RST	24
++
++#define IMX7_RESET_NUM			25
++
++#endif
++
 -- 
 2.9.3
