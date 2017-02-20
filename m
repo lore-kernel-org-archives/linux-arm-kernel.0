@@ -1,28 +1,40 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Mon, 20 Feb 2017 09:35:04 +0100
-Subject: [PATCH] iio: adc: xilinx: Fix error handling
-In-Reply-To: <20170219202928.20296-1-christophe.jaillet@wanadoo.fr>
-References: <20170219202928.20296-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <880c338e-7e81-83c7-613a-d8030c14bac0@metafoo.de>
+From: jerry.huang@nxp.com (Jerry Huang)
+Date: Mon, 20 Feb 2017 08:39:24 +0000
+Subject: [PATCH v4 3/3] USB3/DWC3: Enable undefined length INCR burst type
+References: <1484727138-3264-1-git-send-email-jerry.huang@nxp.com>
+ <1484727138-3264-3-git-send-email-jerry.huang@nxp.com>
+ <DB5PR0401MB1813965DDC8CC6CD0BD85980FE440@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+ <87y3xeqvsl.fsf@linux.intel.com>
+Message-ID: <DB5PR0401MB18134EB0CFBA8D8CFA73A1A7FE5E0@DB5PR0401MB1813.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2017 09:29 PM, Christophe JAILLET wrote:
-> Reorder error handling labels in order to match the way resources have
-> been allocated.
+> -----Original Message-----
+> From: Jerry Huang
+> Sent: Friday, February 10, 2017 11:30 PM
+> To: 'Felipe Balbi' <balbi@kernel.org>; robh+dt at kernel.org;
+> mark.rutland at arm.com; catalin.marinas at arm.com
+> Cc: linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Rajesh
+> Bhagat <rajesh.bhagat@nxp.com>
+> Subject: RE: [PATCH v4 3/3] USB3/DWC3: Enable undefined length INCR burst
+> type
 > 
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-
-Thanks, looks good.
-
-Acked-by: Lars-Peter Clausen <lars@metafoo.de>
-
-I think there is one more issue
-
-    ret = xadc->ops->setup(pdev, indio_dev, irq);
-    if (ret)
-        goto err_free_samplerate_trigger;
-
-should be
-
-	goto err_clk_disable_unprepare;
+> > >> --
+> > >> 1.7.9.5
+> > > Hi, Balbi and all guys,
+> > > Any comment for these patches? Can they be accepted?
+> >
+> > Rob had comments which you didn't reply yet. I cannot take this
+> > patchset yet ;-)
+> >
+> Balbi,
+> I look into his mail again, which was based v3, and I replied it.
+> He had different understanding for undefined length burst mode.
+> It seems he think for this mode, just setting bit[0] (INCRBrstEna) and don't
+> need to set other field.
+> However, according to the DWC USB3.0 controller databook, when it is
+> undefined length INCR burst mode, we still need to set one max burst type,
+> such as INCR8, which means controller will use any length less than or equal
+> to this INCR8.
+Any comment for it? Ten days passed away again :)
