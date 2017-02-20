@@ -1,61 +1,31 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Feb 2017 18:22:02 +0100
-Subject: [RESEND PATCH 3/3] memory: atmel-ebi: Add PM ops
-In-Reply-To: <1487611322-12688-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1487611322-12688-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1487611322-12688-4-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon, 20 Feb 2017 17:55:00 +0100
+Subject: [PATCH 6/7] memory: atmel-ebi: Add missing ->numcs assignment
+In-Reply-To: <1487609701-10300-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1487609701-10300-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1487609701-10300-7-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a ->resume() hook to make sure the EBI dev configs are correctly
-restored when resuming the platform.
+ebid->numcs is never assigned, set it to numcs after allocating the
+EBI dev object.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/memory/atmel-ebi.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ drivers/memory/atmel-ebi.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
-index 06a1a136d448..15120cb37cf0 100644
+index 833af8d02424..06a1a136d448 100644
 --- a/drivers/memory/atmel-ebi.c
 +++ b/drivers/memory/atmel-ebi.c
-@@ -506,6 +506,8 @@ static int atmel_ebi_probe(struct platform_device *pdev)
- 	if (!ebi)
+@@ -331,6 +331,7 @@ static int atmel_ebi_dev_setup(struct atmel_ebi *ebi, struct device_node *np,
  		return -ENOMEM;
  
-+	platform_set_drvdata(pdev, ebi);
-+
- 	INIT_LIST_HEAD(&ebi->devs);
- 	ebi->caps = match->data;
- 	ebi->dev = dev;
-@@ -578,10 +580,28 @@ static int atmel_ebi_probe(struct platform_device *pdev)
- 	return of_platform_populate(np, NULL, NULL, dev);
- }
+ 	ebid->ebi = ebi;
++	ebid->numcs = numcs;
  
-+static int atmel_ebi_resume(struct device *dev)
-+{
-+	struct atmel_ebi *ebi = dev_get_drvdata(dev);
-+	struct atmel_ebi_dev *ebid;
-+
-+	list_for_each_entry(ebid, &ebi->devs, node) {
-+		int i;
-+
-+		for (i = 0; i < ebid->numcs; i++)
-+			ebid->ebi->caps->apply_config(ebid, &ebid->configs[i]);
-+	}
-+
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(atmel_ebi_pm_ops, NULL, atmel_ebi_resume);
-+
- static struct platform_driver atmel_ebi_driver = {
- 	.driver = {
- 		.name = "atmel-ebi",
- 		.of_match_table	= atmel_ebi_id_table,
-+		.pm = &atmel_ebi_pm_ops,
- 	},
- };
- builtin_platform_driver_probe(atmel_ebi_driver, atmel_ebi_probe);
+ 	ret = caps->xlate_config(ebid, np, &conf);
+ 	if (ret < 0)
 -- 
 2.7.4
