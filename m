@@ -1,271 +1,214 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 20 Feb 2017 17:12:07 +0100
-Subject: Pointers for writing a good PCIe driver
-In-Reply-To: <20170217175054.GA16671@bhelgaas-glaptop.roam.corp.google.com>
-References: <ff099b5f-efc8-bb5f-41e3-493398844cc0@free.fr>
- <05046a8a-ba9f-26f9-4c93-f657f9da6294@free.fr>
- <20170207200656.GA11659@bhelgaas-glaptop.roam.corp.google.com>
- <20170207214758.GC11659@bhelgaas-glaptop.roam.corp.google.com>
- <0f22720c-e47d-59f6-b5f7-5e40f4a1759d@free.fr>
- <20170212165033.GA31833@kroah.com>
- <0d785dab-c830-b887-d9f3-a2cd5338695c@free.fr>
- <20170217143803.GA10663@bhelgaas-glaptop.roam.corp.google.com>
- <eff9861e-043a-7ecd-5d52-c8e18a52ece8@free.fr>
- <20170217175054.GA16671@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <0552ee82-a73a-ad06-4cb2-7eff05931877@free.fr>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Tue, 21 Feb 2017 00:20:52 +0800
+Subject: [PATCH v21 00/13] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <20170206185015.12296-1-fu.wei@linaro.org>
+References: <20170206185015.12296-1-fu.wei@linaro.org>
+Message-ID: <CADyBb7t_zrLetPQQ8=k8oN6iMHhuMHO8O3XTZqGYvTT9p0evKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/02/2017 18:50, Bjorn Helgaas wrote:
+Hi Mark, Marc
 
-> On Fri, Feb 17, 2017 at 06:00:53PM +0100, Mason wrote:
+On 7 February 2017 at 02:50,  <fu.wei@linaro.org> wrote:
+> From: Fu Wei <fu.wei@linaro.org>
 >
->> On 17/02/2017 15:38, Bjorn Helgaas wrote:
->>
->>> The native PCI host controller drivers indeed live in drivers/pci/host/
->>>
->>> I don't know anything about your hardware or environment, but I highly
->>> encourage you to use ACPI (drivers/acpi/pci_root.c, with a little bit
->>> of arch support) or generic DT (drivers/pci/host/pci-host-generic.c)
->>> instead of writing a custom host controller driver.
->>>
->>> The native drivers in drivers/pci/host are a huge maintenance hassle
->>> for no real benefit.
->>
->> I'm currently using this DT description:
->> http://lxr.free-electrons.com/source/arch/arm/boot/dts/tango4-common.dtsi
->>
->> The "legacy" driver sits at ~700 lines. It would be awesome to be able
->> to discard all of it, and rely on generic upstream code. But I don't
->> understand how it is possible for a generic driver to support whatever
->> crazy solution some random vendor has come up with?
-> 
-> You're right that the programming model of the host bridge itself is
-> not specified by PCI specs, so it's impossible to have a generic
-> driver that can manage it completely by itself.
-> 
-> If you have firmware that initializes the bridge and tells the OS what
-> the windows are (bus numbers, memory space, I/O space) and where the
-> PCIe-specified ECAM space is, a generic driver can take it from there.
+> This patchset:
+>     (1)Preparation for adding GTDT support in arm_arch_timer:
+>         1. Introduce two functions to get the frequency from mmio and sysreg.
+>         2. separate out device-tree code from arch_timer_detect_rate
+>         3. remove arch_timer_detect_rate use arch_timer_get_*_freq directly
+>         4. split arch_timer_rate for different types of timer
+>         5. Refactor arch_timer_needs_probing, and move it into DT init call
+>         6. Introduce some new structs and refactor the MMIO timer init code
+>         for reusing some common code.
+>
+>     (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
+>     memory-mapped timer and SBSA Generic Watchdog timer.
+>     This driver can help to simplify all the relevant timer drivers,
+>     and separate all the ACPI GTDT knowledge from them.
+>
+>     (3)Simplify ACPI code for arm_arch_timer
+>
+>     (4)Add GTDT support for ARM memory-mapped timer.
+>
+> This patchset has been tested on the following platforms with ACPI enabled:
+>     (1)ARM Foundation v8 model
+>
+> Changelog:
+> v21: https://lkml.org/lkml/2017/2/6/
+>      Introduce two functions to get the frequency from mmio and sysreg.
+>      Remove arch_timer_detect_rate use arch_timer_get_*_freq directly
+>      Split arch_timer_rate for different types of timer.
+>      Skip secure timer frame in GTDT driver.
+>      Rebase to git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arch-timer/cleanup
+>      (The first 6 patches in v20 have been merged into arch-timer/cleanup branch)
 
-(Mostly walking myself through the code and documentation,
-noting references along the way.)
+Did I follow your suggestion correctly?
+I wonder how to improve this patchset. May I have your some suggestion
+or feedback on v21? :-)
 
-I took a look at drivers/pci/host/pci-host-generic.c
-which is a tiny file, so the magic must be happening elsewhere.
-=> drivers/pci/host/pci-host-common.c (for starters)
+Great thanks for your help!
 
-gen_pci_cfg_cam_bus_ops and pci_generic_ecam_ops have the same
-.pci_ops, but different .bus_shift
-
-$ git grep pci-host-cam-generic
-Documentation/devicetree/bindings/pci/host-generic-pci.txt:- compatible     : Must be "pci-host-cam-generic" or "pci-host-ecam-generic"
-Documentation/devicetree/bindings/pci/host-generic-pci.txt:    compatible = "pci-host-cam-generic"
-drivers/pci/host/pci-host-generic.c:    { .compatible = "pci-host-cam-generic",
-
-$ git grep pci-host-ecam-generic
-Documentation/devicetree/bindings/pci/host-generic-pci.txt:- compatible     : Must be "pci-host-cam-generic" or "pci-host-ecam-generic"
-arch/arm/boot/dts/alpine.dtsi:                  compatible = "pci-host-ecam-generic";
-arch/arm64/boot/dts/al/alpine-v2.dtsi:                  compatible = "pci-host-ecam-generic";
-arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi:                   compatible = "pci-host-ecam-generic";
-arch/arm64/boot/dts/arm/juno-base.dtsi:         compatible = "arm,juno-r1-pcie", "plda,xpressrich3-axi", "pci-host-ecam-generic";
-arch/arm64/boot/dts/broadcom/vulcan.dtsi:               compatible = "pci-host-ecam-generic";
-drivers/pci/host/pci-host-generic.c:    { .compatible = "pci-host-ecam-generic",
-
-https://www.kernel.org/doc/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-
-> Firmware-initialised PCI host controllers and PCI emulations, such as the
-> virtio-pci implementations found in kvmtool and other para-virtualised
-> systems, do not require driver support for complexities such as regulator
-> and clock management. In fact, the controller may not even require the
-> configuration of a control interface by the operating system, instead
-> presenting a set of fixed windows describing a subset of IO, Memory and
-> Configuration Spaces.
-
-For the only arm32 user, arch/arm/boot/dts/alpine.dtsi:
-
-		/* Internal PCIe Controller */
-		pcie-internal at 0xfbc00000 {
-			compatible = "pci-host-ecam-generic";
-			device_type = "pci";
-			#size-cells = <2>;
-			#address-cells = <3>;
-			#interrupt-cells = <1>;
-			reg = <0x0 0xfbc00000 0x0 0x100000>;
-			interrupt-map-mask = <0xf800 0 0 7>;
-			/* Add legacy interrupts for SATA devices only */
-			interrupt-map =	<0x4000 0 0 1 &gic 0 43 4>,
-					<0x4800 0 0 1 &gic 0 44 4>;
-
-			/* 32 bit non prefetchable memory space */
-			ranges = <0x02000000 0x0 0xfe000000 0x0 0xfe000000 0x0 0x1000000>;
-
-			bus-range = <0x00 0x00>;
-			msi-parent = <&msix>;
-		};
-
-
-Compatible string depends on "the layout of configuration space
-(CAM vs ECAM respectively)"
-
-https://en.wikipedia.org/wiki/PCI_configuration_space
-
-
-The register interface to my PCIe controller is:
-
-0x2e000	REGION_0_BASE_REG
-0x2e004	REGION_1_BASE_REG
-0x2e008	REGION_2_BASE_REG
-0x2e00c	REGION_3_BASE_REG
-0x2e010	REGION_4_BASE_REG
-0x2e014	REGION_5_BASE_REG
-0x2e018	REGION_6_BASE_REG
-0x2e01c	REGION_7_BASE_REG
-0x2e020	DMA_RD_MBUS_ADDR_REG
-0x2e024	DMA_RD_ADDR_LO_REG
-0x2e028	DMA_RD_ADDR_HI_REG
-0x2e02c	DMA_RD_CNT_REG
-0x2e030	DMA_WR_MBUS_ADDR_REG
-0x2e034	DMA_WR_ADDR_LO_REG
-0x2e038	DMA_WR_ADDR_HI_REG
-0x2e03c	DMA_WR_CNT_REG
-0x2e040	DMA_RD_EN_REG
-0x2e044	DMA_WR_EN_REG
-0x2e048	PCI_ADDR_LO_BASE_REG
-0x2e04c	PCI_ADDR_HI_BASE_REG
-0x2e050	PM_REG
-0x2e054	MAX_CPL_TIMEOUT_REG
-0x2e058	CORE_CONF_0_REG
-0x2e05c	CORE_CONF_1_REG
-0x2e060	CBA_ADDR_REG
-0x2e064	CBA_DATA_REG
-0x2e068	DEBUG_0_REG
-0x2e06c	DEBUG_1_REG
-0x2e070	DEBUG_2_REG
-0x2e074	CORE_TEST_OUT_REG
-0x2e078	INT_NOT_MSI_REG
-0x2e07c	MSI_REG
-0x2e080	MSI_0_REG
-0x2e084	MSI_1_REG
-0x2e088	MSI_2_REG
-0x2e08c	MSI_3_REG
-0x2e090	MSI_4_REG
-0x2e094	MSI_5_REG
-0x2e098	MSI_6_REG
-0x2e09c	MSI_7_REG
-0x2e0a0	MSI_0_MASK_REG
-0x2e0a4	MSI_1_MASK_REG
-0x2e0a8	MSI_2_MASK_REG
-0x2e0ac	MSI_3_MASK_REG
-0x2e0b0	MSI_4_MASK_REG
-0x2e0b4	MSI_5_MASK_REG
-0x2e0b8	MSI_6_MASK_REG
-0x2e0bc	MSI_7_MASK_REG
-0x2e0c0	PHY_HW_TRAPS_REG
-0x2e0c4	COMMON_BIST_0_REG
-0x2e0c8	COMMON_BIST_1_REG
-0x2e0cc	LANE_0_BIST_REG
-0x2e0d0	CUSTOM_CONF_LINK_REG
-0x2e0d4	CUSTOM_CONF_LANE_0_REG
-0x2e0e0	PLL_SETTING_REG
-0x2e0e4	DEBUG_3_REG
-0x2e0e8	DEBUG_4_REG
-0x2e0ec	DEBUG_5_REG
-
-
-In the "legacy" driver (for kernel v3.4), I see
-
-static struct pci_ops tangox_pcie_ops = {
-	.read	= tangox_pcie_read_conf,
-	.write	= tangox_pcie_write_conf,
-};
-
-#define TANGOX_PCIE_ENABLE_CONFIG_IO()      WR_PCIE_REG32(TANGOX_PCIE_PCI_ADDR_LO_BASE_REG, ((TANGOX_PCIE_ADDR_BASE & 0xff000000) | 0x1))
-#define TANGOX_PCIE_DISABLE_CONFIG_IO()     WR_PCIE_REG32(TANGOX_PCIE_PCI_ADDR_LO_BASE_REG, ((TANGOX_PCIE_ADDR_BASE & 0xff000000) & ~0x1))
-
-static int tangox_pcie_read_conf(struct pci_bus *bus, unsigned int devfn,
-                                 int where, int size, u32 *val)
-{
-    void __iomem *addr;
-
-    TANGOX_PCIE_ENABLE_CONFIG_IO();
-
-    addr =  (void __iomem *)(
-            tangox_pcie.regs +
-            PCIE_CONF_BUS(bus->number) +
-            PCIE_CONF_DEV(PCI_SLOT(devfn)) +
-            PCIE_CONF_FUNC(PCI_FUNC(devfn)) +
-            PCIE_CONF_REG(where));
-
-    *val = readl( addr );
-
-	if (size == 1)
-		*val = (*val >> (8 * (where & 3))) & 0xff;
-	else if (size == 2)
-		*val = (*val >> (8 * (where & 3))) & 0xffff;
-
-    TANGOX_PCIE_DISABLE_CONFIG_IO();
-
-    return PCIBIOS_SUCCESSFUL;
-}
-
-
-I see that pci-host-common.c calls:
-pci_scan_root_bus(dev, cfg->busr.start, &ops->pci_ops, cfg, &resources);
-
-whereas the legacy driver calls:
-pci_scan_root_bus(NULL, sys->busnr, &tangox_pcie_ops, sys, &sys->resources);
-
-So the generic equivalent of
-tangox_pcie_read_conf() and tangox_pcie_write_conf()
-should be
-pci_generic_config_read() and pci_generic_config_write()
+>
+> v20: https://lkml.org/lkml/2017/1/18/534
+>      Reorder the first 4 patches and split the 4th patches.
+>      Leave CNTHCTL_* as they originally were.
+>      Fix the bug in arch_timer_select_ppi.
+>      Split "Rework counter frequency detection" patch.
+>      Rework the arch_timer_detect_rate function.
+>      Improve the commit message of "Refactor MMIO timer probing".
+>      Rebase to 4.10.0-rc4
+>
+> v19: https://lkml.org/lkml/2016/12/21/25
+>      Fix a '\n' missing in a error message in arch_timer_mem_init.
+>      Add "request_mem_region" for ioremapping cntbase, according to
+>      f947ee1 clocksource/drivers/arm_arch_timer: Map frame with of_io_request_and_map()
+>      Rebase to 4.9.0-gfb779ff
+>
+> v18: https://lkml.org/lkml/2016/12/8/446
+>      Fix 8/15 patch problem of "int ret;" in arch_timer_acpi_init.
+>      Rebase to 4.9.0-rc8-g9269898
+>
+> v17: https://lkml.org/lkml/2016/11/25/140
+>      Take out some cleanups from 4/15.
+>      Merge 5/15 and 6/15, improve PPI determination code,
+>      improve commit message.
+>      Rework counter frequency detection.
+>      Move arch_timer_needs_of_probing into DT init call.
+>      Move Platform Timer scan loop back to timer init call to avoid allocating
+>      and free memory.
+>      Improve all the exported functions' comment.
+>
+> v16: https://lkml.org/lkml/2016/11/16/268
+>      Fix patchset problem about static enum ppi_nr of 01/13 in v15.
+>      Refactor arch_timer_detect_rate.
+>      Refactor arch_timer_needs_probing.
+>
+> v15: https://lkml.org/lkml/2016/11/15/366
+>      Re-order patches
+>      Add arm_arch_timer refactoring patches to prepare for GTDT:
+>          1. rename some  enums and defines, and some cleanups
+>          2. separate out arch_timer_uses_ppi init code and fix a potential bug
+>          3. Improve some new structs, refactor the timer init code.
+>      Since the some structs have been changed, GTDT parser for memory-mapped
+>      timer and SBSA Generic Watchdog timer have been update.
+>
+> v14: https://lkml.org/lkml/2016/9/28/573
+>      Separate memory-mapped timer GTDT support into two patches
+>          1. Refactor the timer init code to prepare for GTDT
+>          2. Add GTDT support for memory-mapped timer
+>
+> v13: http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1231717.html
+>      Improve arm_arch_timer code for memory-mapped
+>      timer GTDT support, refactor original memory-mapped timer
+>      dt support for reusing some common code.
+>
+> v12: https://lkml.org/lkml/2016/9/13/250
+>      Rebase to latest Linux 4.8-rc6
+>      Delete the confusing "skipping" in the error message.
+>
+> V11: https://lkml.org/lkml/2016/9/6/354
+>      Rebase to latest Linux 4.8-rc5
+>      Delete typedef (suggested by checkpatch.pl)
+>
+> V10: https://lkml.org/lkml/2016/7/26/215
+>      Drop the "readq" patch.
+>      Rebase to latest Linux 4.7.
+>
+> V9: https://lkml.org/lkml/2016/7/25/345
+>     Improve pr_err message in acpi gtdt driver.
+>     Update Commit message for 7/9
+>     shorten the irq mapping function name
+>     Improve GTDT driver for memory-mapped timer
+>
+> v8: https://lkml.org/lkml/2016/7/19/660
+>     Improve "pr_fmt(fmt)" definition: add "ACPI" in front of "GTDT",
+>     and also improve printk message.
+>     Simplify is_timer_block and is_watchdog.
+>     Merge acpi_gtdt_desc_init and gtdt_arch_timer_init into acpi_gtdt_init();
+>     Delete __init in include/linux/acpi.h for GTDT API
+>     Make ARM64 select GTDT.
+>     Delete "#include <linux/module.h>" from acpi_gtdt.c
+>     Simplify GT block parse code.
+>
+> v7: https://lkml.org/lkml/2016/7/13/769
+>     Move the GTDT driver to drivers/acpi/arm64
+>     Add add the ARM64-specific ACPI Support maintainers in MAINTAINERS
+>     Merge 3 patches of GTDT parser driver.
+>     Fix the for_each_platform_timer bug.
+>
+> v6: https://lkml.org/lkml/2016/6/29/580
+>     split the GTDT driver to 4 parts: basic, arch_timer, memory-mapped timer,
+>     and SBSA Generic Watchdog timer
+>     Improve driver by suggestions and example code from Daniel Lezcano
+>
+> v5: https://lkml.org/lkml/2016/5/24/356
+>     Sorting out all patches, simplify the API of GTDT driver:
+>     GTDT driver just fills the data struct for arm_arch_timer driver.
+>
+> v4: https://lists.linaro.org/pipermail/linaro-acpi/2016-March/006667.html
+>     Delete the kvm relevant patches
+>     Separate two patches for sorting out the code for arm_arch_timer.
+>     Improve irq info export code to allow missing irq info in GTDT table.
+>
+> v3: https://lkml.org/lkml/2016/2/1/658
+>     Improve GTDT driver code:
+>       (1)improve pr_* by defining pr_fmt(fmt)
+>       (2)simplify gtdt_sbsa_gwdt_init
+>       (3)improve gtdt_arch_timer_data_init, if table is NULL, it will try
+>       to get GTDT table.
+>     Move enum ppi_nr to arm_arch_timer.h, and add enum spi_nr.
+>     Add arm_arch_timer get ppi from DT and GTDT support for kvm.
+>
+> v2: https://lkml.org/lkml/2015/12/2/10
+>     Rebase to latest kernel version(4.4-rc3).
+>     Fix the bug about the config problem,
+>     use CONFIG_ACPI_GTDT instead of CONFIG_ACPI in arm_arch_timer.c
+>
+> v1: The first upstreaming version: https://lkml.org/lkml/2015/10/28/553
+>
+> Fu Wei (13):
+>   clocksource: arm_arch_timer: introduce two functions to get the
+>     frequency from mmio and sysreg.
+>   clocksource: arm_arch_timer: separate out device-tree code from
+>     arch_timer_detect_rate
+>   clocksource: arm_arch_timer: remove arch_timer_detect_rate
+>   clocksource: arm_arch_timer: split arch_timer_rate for different types
+>     of timer
+>   clocksource: arm_arch_timer: refactor arch_timer_needs_probing
+>   clocksource: arm_arch_timer: move arch_timer_needs_of_probing into DT
+>     init call
+>   clocksource: arm_arch_timer: introduce some new structs to prepare for
+>     GTDT
+>   clocksource: arm_arch_timer: refactor MMIO timer probing.
+>   acpi/arm64: Add GTDT table parse driver
+>   clocksource: arm_arch_timer: simplify ACPI support code.
+>   acpi/arm64: Add memory-mapped timer support in GTDT driver
+>   clocksource: arm_arch_timer: add GTDT support for memory-mapped timer
+>   acpi/arm64: Add SBSA Generic Watchdog support in GTDT driver
+>
+>  arch/arm64/Kconfig                   |   1 +
+>  drivers/acpi/arm64/Kconfig           |   3 +
+>  drivers/acpi/arm64/Makefile          |   1 +
+>  drivers/acpi/arm64/gtdt.c            | 378 +++++++++++++++++++++++++++++++++++
+>  drivers/clocksource/arm_arch_timer.c | 354 ++++++++++++++++++++------------
+>  drivers/watchdog/Kconfig             |   1 +
+>  include/clocksource/arm_arch_timer.h |  17 ++
+>  include/linux/acpi.h                 |   7 +
+>  8 files changed, 635 insertions(+), 127 deletions(-)
+>  create mode 100644 drivers/acpi/arm64/gtdt.c
+>
+> --
+> 2.9.3
+>
 
 
-int pci_generic_config_read(struct pci_bus *bus, unsigned int devfn,
-			    int where, int size, u32 *val)
-{
-	void __iomem *addr;
 
-	addr = bus->ops->map_bus(bus, devfn, where);
-	if (!addr) {
-		*val = ~0;
-		return PCIBIOS_DEVICE_NOT_FOUND;
-	}
+-- 
+Best regards,
 
-	if (size == 1)
-		*val = readb(addr);
-	else if (size == 2)
-		*val = readw(addr);
-	else
-		*val = readl(addr);
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-
-Problem might come from the
-TANGOX_PCIE_ENABLE_CONFIG_IO() / TANGOX_PCIE_DISABLE_CONFIG_IO()
-shenanigans.
-
-Also, I see that the legacy implementation reads 32 bits,
-then performs the shift & mask in software. I'm hoping that
-the ARM core does the right thing for readb/readw.
-
-
-Taking a closer look at TANGOX_PCIE_ENABLE_CONFIG_IO()
-WR_PCIE_REG32(TANGOX_PCIE_PCI_ADDR_LO_BASE_REG, ((TANGOX_PCIE_ADDR_BASE & 0xff000000) | 0x1))
-
-Register "PCI_ADDR_LO_BASE_REG" is composed of
-pci_addr_base_lo[31:28] and pci_conf[0]
-
-  pci_conf : if 1, the access by LBUS is a configuration request. If 0, the access by LBUS is a memory request.
-  pci_addr_base_lo : lower part of the PCI address for access by LBUS.
-
-So it looks like I need to fudge something, perhaps override map_bus method?
-
-What is a "memory request", in PCIe lingo?
-In other words, when do I need to clear the "pci_conf" bit?
-(Maybe firmware can just set it to 1, and be done with it?)
-
-Regards.
+Fu Wei
+Software Engineer
+Red Hat
