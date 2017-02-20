@@ -1,49 +1,55 @@
-From: minyard@acm.org (Corey Minyard)
-Date: Mon, 20 Feb 2017 07:35:16 -0600
-Subject: [PATCH] ipmi: bt-bmc: Use a regmap for register access
-In-Reply-To: <1487565939.3779.4.camel@aj.id.au>
-References: <20161206025715.2002-1-andrew@aj.id.au>
- <36014e0c-82f8-eeaf-ee2a-6c1e413b957d@kaod.org>
- <1487565939.3779.4.camel@aj.id.au>
-Message-ID: <1fe8fe1f-e035-8ef1-cecd-d3d29bcda075@acm.org>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 20 Feb 2017 14:40:20 +0100
+Subject: [PATCH 06/11] tty: serial: Add Actions Semi Owl UART earlycon
+In-Reply-To: <3685307.zVcugmQnxp@wuerfel>
+References: <20170215165528.10052-1-afaerber@suse.de>
+ <20170215165528.10052-7-afaerber@suse.de> <3685307.zVcugmQnxp@wuerfel>
+Message-ID: <072e4c03-74b7-c7d8-0e40-8944f8319159@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2017 10:45 PM, Andrew Jeffery wrote:
-> Hi Cory,
->
-> On Tue, 2016-12-06 at 16:02 +0100, C?dric Le Goater wrote:
->> [ this is a resend bc of some mailing list issues]
+Am 16.02.2017 um 14:41 schrieb Arnd Bergmann:
+> On Wednesday, February 15, 2017 5:55:23 PM CET Andreas F?rber wrote:
+>> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+>> index 6117ac8..9d4213c 100644
+>> --- a/drivers/tty/serial/Kconfig
+>> +++ b/drivers/tty/serial/Kconfig
+>> @@ -1677,6 +1677,25 @@ config SERIAL_MVEBU_CONSOLE
+>>           and warnings and which allows logins in single user mode)
+>>           Otherwise, say 'N'.
+>>  
+>> +config SERIAL_OWL
+>> +       bool "Actions Semi Owl serial port support"
+>> +       depends on ARCH_OWL || COMPILE_TEST
+>> +       select SERIAL_CORE
+>> +       help
+>> +         This driver is for Actions Semi S500/S900 SoC's UART.
+>> +         Say 'Y' here if you wish to use the on-board serial port.
+>> +         Otherwise, say 'N'.
+>> +
 >>
->> On 12/06/2016 03:57 AM, Andrew Jeffery wrote:
->>> The registers for the bt-bmc device live under the Aspeed LPC
->>> controller. Devicetree bindings have recently been introduced for the
->>> LPC controller where the "host" portion of the LPC register space is
->>> described as a syscon device. Future devicetrees describing the bt-bmc
->>> device should nest its node under the appropriate "simple-mfd", "syscon"
->>> compatible node.
->>>
->>> This change allows the bt-bmc driver to function with both syscon and
->>> non-syscon- based devicetree descriptions by always using a regmap for
->>> register access, either retrieved from the parent syscon device or
->>> instantiated if none exists.
->>>
->>> The patch has been tested on an OpenPOWER Palmetto machine, successfully
->>> booting, rebooting and powering down the host.
->>>
->>> Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
->> It would be nice to have an example of the associated binding.
->> I did not see it. A part from that :
->>
->> Reviewed-by: C?dric Le Goater <clg@kaod.org>
->
-> Will this make it into 4.11?
+> 
+> This could maybe use a word of information about how there isn't
+> actually a uart driver in this series, only an earlycon driver.
 
-I thought you were doing a v2 with a few little fixes.  Get it to me 
-quickly, if you can.
+Yeah, I have added a sentence to the other one. Maybe also add a select?
 
--corey
+> Do you plan to add the actual tty driver soon? If not, maybe
+> only add one Kconfig symbol for the earlycon support.
 
-> Cheers,
->
-> Andrew
+So, I completed the driver the weekend and can see the full console
+output, but there are still output glitches, possible locking issues up
+to RCU stalls and soft lockups, and only stubbed out baudrate support.
+
+Therefore I would rather keep the full driver as follow-up RFC in v2,
+unless I get it fixed during Hackweek. In the earlycon I am confident,
+and the only Kconfig change then is to switch from bool to tristate and
+to drop the newly added sentence again.
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
