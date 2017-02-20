@@ -1,75 +1,97 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon, 20 Feb 2017 08:08:56 -0800
-Subject: [RESEND PATCH v5 0/4] i.MX7 PCI support
-Message-ID: <20170220160900.7014-1-andrew.smirnov@gmail.com>
+Date: Mon, 20 Feb 2017 08:08:59 -0800
+Subject: [RESEND PATCH v5 3/4] PCI: imx6: Do not switch speed if Gen2 is
+ disabled
+In-Reply-To: <20170220160900.7014-1-andrew.smirnov@gmail.com>
+References: <20170220160900.7014-1-andrew.smirnov@gmail.com>
+Message-ID: <20170220160900.7014-4-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ RESEND becasue I messed up CC list of patches 2,3 of the original
-  submission as well as not adding Reviewed-by to patch 1 and droping
-  it from patch 4 ]
+Save a bit of time and avoid going through link speed change procedure
+in configuration where link max speed is limited to Gen1 in DT.
 
-Hello, everyone:
+Cc: yurovsky at gmail.com
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ drivers/pci/host/pci-imx6.c | 52 ++++++++++++++++++++++-----------------------
+ 1 file changed, 26 insertions(+), 26 deletions(-)
 
-This is a fifth iteration of the code that adds PCI-subsystem bits
-necessary for enabling PCI support on i.MX7.
-
-Rob, Bjorn, power domain and reset bindings remained the same, please
-let me know if you still think that PHY aspect of the driver needs to
-be moved into a separate abstraction.
-
-Changes since v4 (can be found at [version4]):
-
-	- Dropped typo-fix patch (originally patch #1 of the
-          series). Bjorn, I am assuming that patch from v4 survived
-          and stayed in your tree, let me know if that is not true.
-
-	- Added patch with workaround to address speed change false
-          failures (I kept it as a separate patch to better document
-          exchange with NXP/Freescale that lead to that patch)
-
-	- Added patch to avoid speed change on links configured Gen1
-          only (Let me know if that is a terrible idea)
-
-	- Addressed section mismatch problem by moving call to
-          hook_fault_code to happend before driver registration.
-
-Changes since v3 (can be found at [version3]):
-	- Move all of the reset_control_assert's into imx6_pcie_assert_core_reset
-	- Documented required reset and power domain DT bindings
-
-Changes since v2 (can be found at [version2]):
-
-	- Collected Reviewed-by for patch #2 from Lucas
-	- Reset logic implementation moved out into a reset controller
-          driver (see [reset1])
-	- Removed unused leftover code
-
-Changes since v1 (can be found at [version1]):
-
-	- All GPC related code moved into a separate driver (see [gpc1])
-	- Removed GPIO probe deferral logging
-	- Fixed section mismatch warning
-	- Minor reformatting of fsl,imx6q-pcie.txt(as per Rob
-          Herring's request)
-
-[version4] https://lkml.org/lkml/2017/2/7/478
-[version3] https://lkml.org/lkml/2017/2/6/565
-[version2] https://lkml.org/lkml/2017/2/1/510
-[version1] https://lkml.org/lkml/2017/1/19/488
-[gpc1] https://lkml.org/lkml/2017/2/6/551
-[reset1] https://lkml.org/lkml/2017/2/6/554
-
-Andrey Smirnov (4):
-  PCI: imx6: Add code to support i.MX7D
-  PCI: imx6: Do not wait for speed change on i.MX7
-  PCI: imx6: Do not switch speed if Gen2 is disabled
-  PCI: imx6: Allow probe deferal by reset GPIO
-
- .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 +-
- drivers/pci/host/pci-imx6.c                        | 199 +++++++++++++++------
- include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
- 3 files changed, 161 insertions(+), 55 deletions(-)
-
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index 473bbdc..071251f3 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -565,40 +565,40 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
+ 		tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
+ 		tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2;
+ 		dw_pcie_writel_rc(pp, PCIE_RC_LCR, tmp);
+-	} else {
+-		dev_info(dev, "Link: Gen2 disabled\n");
+-	}
+-
+-	/*
+-	 * Start Directed Speed Change so the best possible speed both link
+-	 * partners support can be negotiated.
+-	 */
+-	tmp = dw_pcie_readl_rc(pp, PCIE_LINK_WIDTH_SPEED_CONTROL);
+-	tmp |= PORT_LOGIC_SPEED_CHANGE;
+-	dw_pcie_writel_rc(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, tmp);
+ 
+-	if (imx6_pcie->variant != IMX7D) {
+ 		/*
+-		 * On i.MX7, DIRECT_SPEED_CHANGE behaves differently
+-		 * from i.MX6 family when no link speed transition
+-		 * occurs and we go Gen1 -> yep, Gen1. The difference
+-		 * is that, in such case, it will not be cleared by HW
+-		 * which will cause the following code to report false
+-		 * failure.
++		 * Start Directed Speed Change so the best possible
++		 * speed both link partners support can be negotiated.
+ 		 */
++		tmp = dw_pcie_readl_rc(pp, PCIE_LINK_WIDTH_SPEED_CONTROL);
++		tmp |= PORT_LOGIC_SPEED_CHANGE;
++		dw_pcie_writel_rc(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, tmp);
++
++		if (imx6_pcie->variant != IMX7D) {
++			/*
++			 * On i.MX7, DIRECT_SPEED_CHANGE behaves differently
++			 * from i.MX6 family when no link speed transition
++			 * occurs and we go Gen1 -> yep, Gen1. The difference
++			 * is that, in such case, it will not be cleared by HW
++			 * which will cause the following code to report false
++			 * failure.
++			 */
++
++			ret = imx6_pcie_wait_for_speed_change(imx6_pcie);
++			if (ret) {
++				dev_err(dev, "Failed to bring link up!\n");
++				goto err_reset_phy;
++			}
++		}
+ 
+-		ret = imx6_pcie_wait_for_speed_change(imx6_pcie);
++		/* Make sure link training is finished as well! */
++		ret = imx6_pcie_wait_for_link(imx6_pcie);
+ 		if (ret) {
+ 			dev_err(dev, "Failed to bring link up!\n");
+ 			goto err_reset_phy;
+ 		}
+-	}
+-
+-	/* Make sure link training is finished as well! */
+-	ret = imx6_pcie_wait_for_link(imx6_pcie);
+-	if (ret) {
+-		dev_err(dev, "Failed to bring link up!\n");
+-		goto err_reset_phy;
++	} else {
++		dev_info(dev, "Link: Gen2 disabled\n");
+ 	}
+ 
+ 	tmp = dw_pcie_readl_rc(pp, PCIE_RC_LCSR);
 -- 
 2.9.3
