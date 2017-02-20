@@ -1,107 +1,51 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Mon, 20 Feb 2017 10:08:05 +0800
-Subject: [PATCH] PM / AVS: rockchip-io: add io selectors and supplies for
- rk3328
-Message-ID: <1487556485-18871-1-git-send-email-david.wu@rock-chips.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Mon, 20 Feb 2017 15:15:39 +1030
+Subject: [PATCH] ipmi: bt-bmc: Use a regmap for register access
+In-Reply-To: <36014e0c-82f8-eeaf-ee2a-6c1e413b957d@kaod.org>
+References: <20161206025715.2002-1-andrew@aj.id.au>
+ <36014e0c-82f8-eeaf-ee2a-6c1e413b957d@kaod.org>
+Message-ID: <1487565939.3779.4.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "david.wu" <david.wu@rock-chips.com>
+Hi Cory,
 
-This adds the necessary data for handling io voltage domains on the rk3328.
-As interesting tidbit, the rk3328 only contains one iodomain area in the
-regular General Register Files (GRF).
+On Tue, 2016-12-06 at 16:02 +0100, C?dric Le Goater wrote:
+> [ this is a resend bc of some mailing list issues]?
+> 
+> On 12/06/2016 03:57 AM, Andrew Jeffery wrote:
+> > The registers for the bt-bmc device live under the Aspeed LPC
+> > controller. Devicetree bindings have recently been introduced for the
+> > LPC controller where the "host" portion of the LPC register space is
+> > described as a syscon device. Future devicetrees describing the bt-bmc
+> > device should nest its node under the appropriate "simple-mfd", "syscon"
+> > compatible node.
+> > 
+> > This change allows the bt-bmc driver to function with both syscon and
+> > non-syscon- based devicetree descriptions by always using a regmap for
+> > register access, either retrieved from the parent syscon device or
+> > instantiated if none exists.
+> > 
+> > The patch has been tested on an OpenPOWER Palmetto machine, successfully
+> > booting, rebooting and powering down the host.
+> > 
+> > Signed-off-by: Andrew Jeffery <andrew@aj.id.au>
+> 
+> It would be nice to have an example of the associated binding.?
+> I did not see it. A part from that :
+> 
+> Reviewed-by: C?dric Le Goater <clg@kaod.org>
 
-Signed-off-by: david.wu <david.wu@rock-chips.com>
----
- .../bindings/power/rockchip-io-domain.txt          |  1 +
- drivers/power/avs/rockchip-io-domain.c             | 41 ++++++++++++++++++++++
- 2 files changed, 42 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-index d23dc00..d3a5a93 100644
---- a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-+++ b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-@@ -33,6 +33,7 @@ Required properties:
- - compatible: should be one of:
-   - "rockchip,rk3188-io-voltage-domain" for rk3188
-   - "rockchip,rk3288-io-voltage-domain" for rk3288
-+  - "rockchip,rk3328-io-voltage-domain" for rk3328
-   - "rockchip,rk3368-io-voltage-domain" for rk3368
-   - "rockchip,rk3368-pmu-io-voltage-domain" for rk3368 pmu-domains
-   - "rockchip,rk3399-io-voltage-domain" for rk3399
-diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
-index 56bce19..8581252 100644
---- a/drivers/power/avs/rockchip-io-domain.c
-+++ b/drivers/power/avs/rockchip-io-domain.c
-@@ -43,6 +43,10 @@
- #define RK3288_SOC_CON2_FLASH0		BIT(7)
- #define RK3288_SOC_FLASH_SUPPLY_NUM	2
- 
-+#define RK3328_SOC_CON4			0x410
-+#define RK3328_SOC_CON4_VCCIO2		BIT(7)
-+#define RK3328_SOC_VCCIO2_SUPPLY_NUM	1
-+
- #define RK3368_SOC_CON15		0x43c
- #define RK3368_SOC_CON15_FLASH0		BIT(14)
- #define RK3368_SOC_FLASH_SUPPLY_NUM	2
-@@ -166,6 +170,25 @@ static void rk3288_iodomain_init(struct rockchip_iodomain *iod)
- 		dev_warn(iod->dev, "couldn't update flash0 ctrl\n");
- }
- 
-+static void rk3328_iodomain_init(struct rockchip_iodomain *iod)
-+{
-+	int ret;
-+	u32 val;
-+
-+	/* if no vccio2 supply we should leave things alone */
-+	if (!iod->supplies[RK3328_SOC_VCCIO2_SUPPLY_NUM].reg)
-+		return;
-+
-+	/*
-+	 * set vccio2 iodomain to also use this framework
-+	 * instead of a special gpio.
-+	 */
-+	val = RK3328_SOC_CON4_VCCIO2 | (RK3328_SOC_CON4_VCCIO2 << 16);
-+	ret = regmap_write(iod->grf, RK3328_SOC_CON4, val);
-+	if (ret < 0)
-+		dev_warn(iod->dev, "couldn't update vccio2 vsel ctrl\n");
-+}
-+
- static void rk3368_iodomain_init(struct rockchip_iodomain *iod)
- {
- 	int ret;
-@@ -247,6 +270,20 @@ static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
- 	.init = rk3288_iodomain_init,
- };
- 
-+static const struct rockchip_iodomain_soc_data soc_data_rk3328 = {
-+	.grf_offset = 0x410,
-+	.supply_names = {
-+		"vccio1",
-+		"vccio2",
-+		"vccio3",
-+		"vccio4",
-+		"vccio5",
-+		"vccio6",
-+		"pmuio",
-+	},
-+	.init = rk3328_iodomain_init,
-+};
-+
- static const struct rockchip_iodomain_soc_data soc_data_rk3368 = {
- 	.grf_offset = 0x900,
- 	.supply_names = {
-@@ -312,6 +349,10 @@ static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
- 		.data = (void *)&soc_data_rk3288
- 	},
- 	{
-+		.compatible = "rockchip,rk3328-io-voltage-domain",
-+		.data = (void *)&soc_data_rk3328
-+	},
-+	{
- 		.compatible = "rockchip,rk3368-io-voltage-domain",
- 		.data = (void *)&soc_data_rk3368
- 	},
--- 
-1.9.1
+Will this make it into 4.11?
+
+Cheers,
+
+Andrew
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170220/1e44fe24/attachment.sig>
