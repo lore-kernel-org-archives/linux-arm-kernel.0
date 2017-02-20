@@ -1,20 +1,18 @@
 From: xuejiancheng@hisilicon.com (Jiancheng Xue)
-Date: Mon, 20 Feb 2017 17:46:23 +0800
+Date: Mon, 20 Feb 2017 17:55:57 +0800
 Subject: [PATCH] arm64: dts: hisilicon: add dts files for
  hi3798cv200-poplar board
-In-Reply-To: <9f2ee9e4-964a-35e8-6783-c78f7fb93a3e@suse.de>
+In-Reply-To: <20170215232649.rmvdel2cyxyzuord@rob-hp-laptop>
 References: <1486624027-15156-1-git-send-email-xuejiancheng@hisilicon.com>
- <9f2ee9e4-964a-35e8-6783-c78f7fb93a3e@suse.de>
-Message-ID: <e6163a8a-31fc-c7af-54df-4328400db23b@hisilicon.com>
+ <20170215232649.rmvdel2cyxyzuord@rob-hp-laptop>
+Message-ID: <166c4e19-f1df-e3bc-59c3-4c952f8a1cf5@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
+Hi Rob,
 
-On 2017/2/19 7:22, Andreas F?rber wrote:
-> Hi Jiancheng,
-> 
-> Am 09.02.2017 um 08:07 schrieb Jiancheng Xue:
+On 2017/2/16 7:26, Rob Herring wrote:
+> On Thu, Feb 09, 2017 at 03:07:07PM +0800, Jiancheng Xue wrote:
 >> Add basic dts files for hi3798cv200-poplar board. Poplar is the
 >> first development board compliant with the 96Boards Enterprise
 >> Edition TV Platform specification. The board features the
@@ -23,42 +21,15 @@ On 2017/2/19 7:22, Andreas F?rber wrote:
 >>
 >> Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
 >> Reviewed-by: Alex Elder <elder@linaro.org>
-> 
-> Thanks for this patch! Some comments below. Do you have instructions for
-> how to test? In my tries I so far only got resets like for example:
-> 
-> fastboot# bootm 0x01000000 - 0x20000000
-> ## Booting kernel from Legacy Image at 01000000 ...
->    Image Name:   linux-next
->    Image Type:   AArch64 Linux Kernel Image (uncompressed)
->    Data Size:    8741376 Bytes = 8.3 MiB
->    Load Address: 02000000
->    Entry Point:  02000000
-> ## Flattened Device Tree blob at 20000000
->    Booting using the fdt blob at 0x20000000
->    Loading Kernel Image from 0x16777280 to 0x33554432 ... OK
-> OK
-> 
-> Starting kernel ...
-> 
-> 
-> *** irq: undefined instruction
-> undefined instruction
-> pc : [<600001d3>]          lr : [<00c661ec>]
-> sp : 00bfffb8  ip : 00000036     fp : 00000000
-> r10: 00000000  r9 : 00000000     r8 : 00000000
-> r7 : 00000080  r6 : 005fffc4     r5 : f36e6f75  r4 : 00000000
-> r3 : 0000001e  r2 : 00000100     r1 : 00000000  r0 : 00000000
-> Flags: nzcv  IRQs off  FIQs off  Mode UK12_32
-> Resetting CPU ...
-> 
-> resetting ...
-> 
-> Does U-Boot need to be updated for this to work?
-> 
-Yes. The kernel should run with the corresponding U-Boot and Trusted Firmware.
-If you were using the Poplar board, I think you can't load the kernel in this way now.
-
+>> ---
+>>  .../bindings/arm/hisilicon/hisilicon.txt           |   4 +
+>>  arch/arm64/boot/dts/hisilicon/Makefile             |   1 +
+>>  .../boot/dts/hisilicon/hi3798cv200-poplar.dts      | 169 +++++++++
+>>  arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi     | 413 +++++++++++++++++++++
+>>  4 files changed, 587 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+>>  create mode 100644 arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
+>>
 >> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
 >> index 7df79a7..7d90bf1 100644
 >> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
@@ -70,21 +41,6 @@ If you were using the Poplar board, I think you can't load the kernel in this wa
 >> +Required root node properties:
 >> +	- compatible = "hisilicon,hi3798cv200-poplar", "hisilicon,hi3798cv200";
 >> +
-> 
-> Shouldn't this rather be "tocoding,poplar", "hisilicon,hi3798cv200"?
-> 
-Poplar was designed by HiSilicon and manufactured by Tocoding. I am not sure
-what should be used here. I will discuss about this with our team. Thank you.
-
-> linux-next.git already has Hi3660 here, so you'll need to rebase.
-> 
-Thanks for your information. I'll do when I prepare the new version patch.
-
-> Also, theoretically bindings documentation should be in a separate,
-> preceding patch.
-> 
-OK. I will seperate it from this patch.
-
 >>  Hi4511 Board
 >>  Required root node properties:
 >>  	- compatible = "hisilicon,hi3620-hi4511";
@@ -97,12 +53,6 @@ OK. I will seperate it from this patch.
 >>  dtb-$(CONFIG_ARCH_HISI) += hip06-d03.dtb
 >>  dtb-$(CONFIG_ARCH_HISI) += hip07-d05.dtb
 >> +dtb-$(CONFIG_ARCH_HISI) += hi3798cv200-poplar.dtb
-> 
-> Please keep this sorted alphabetically.
-> 
-
-You are right. Thank you.
-
 >>  
 >>  always		:= $(dtb-y)
 >>  subdir-y	:= $(dts-dirs)
@@ -138,11 +88,6 @@ You are right. Thank you.
 >> +
 >> +/ {
 >> +	model = "HiSilicon Poplar Development Board";
-> 
-> Ditto: HiSilicon?
-> 
-Same as above mentioned. I will discuss about this with our team.
-
 >> +	compatible = "hisilicon,hi3798cv200-poplar", "hisilicon,hi3798cv200";
 >> +
 >> +	aliases {
@@ -154,26 +99,58 @@ Same as above mentioned. I will discuss about this with our team.
 >> +	};
 >> +
 >> +	memory {
+> 
+> memory at 0 unless the base address is variable.
+> 
+
+Thanks for your comments. I'll change this in the next version.
+
 >> +		device_type = "memory";
 >> +		reg = <0x000000000 0x00000000 0x00000000 0x80000000>;
-> 
-> First one has one zero too much.
-> 
-
-reg = <0x0, 0x0, 0x0, 0x80000000>  ?
-
 >> +	};
 >> +
 >> +	soc {
-> [...]
+>> +		leds {
+> 
+> These aren't part of the SoC, but the board, so move up a level.
+> 
+OK.
+
+>> +			compatible = "gpio-leds";
+>> +
+>> +			user-led0 {
+>> +				label = "USER-LED0";
+>> +				gpios = <&gpio6 3 GPIO_ACTIVE_LOW>;
+>> +				linux,default-trigger = "heartbeat";
+>> +				default-state = "off";
+>> +			};
+>> +
+>> +			user-led1 {
+>> +				label = "USER-LED1";
+>> +				gpios = <&gpio5 1 GPIO_ACTIVE_LOW>;
+>> +				linux,default-trigger = "mmc0";
+>> +				default-state = "off";
+>> +			};
+>> +
+>> +			user-led2 {
+>> +				label = "USER-LED2";
+>> +				gpios = <&gpio5 2 GPIO_ACTIVE_LOW>;
+>> +				linux,default-trigger = "none";
+>> +				default-state = "off";
+>> +			};
+>> +
+>> +			user-led3 {
+>> +				label = "USER-LED3";
+>> +				gpios = <&gpio10 6 GPIO_ACTIVE_LOW>;
+>> +				linux,default-trigger = "cpu0";
+>> +				default-state = "off";
+>> +			};
+>> +		};
 >> +	};
 >> +};
 >> +
 >> +&uart0 {
 >> +	status = "ok";
-> 
-> I believe the canonical form is "okay".
-> 
 >> +};
 >> +
 >> +&uart2 {
@@ -259,16 +236,9 @@ reg = <0x0, 0x0, 0x0, 0x80000000>  ?
 >> +	phy-handle = <&eth_phy1>;
 >> +	phy-mode = "rgmii";
 >> +	hisilicon,phy-reset-delays-us = <10000 10000 30000>;
-> 
 >> +	status = "ok";
-> 
-> Move this to the top for consistency?
-> 
 >> +
 >> +	eth_phy1: phy at 3{
-> 
-> Space before brace missing.
-> 
 >> +		reg = <3>;
 >> +	};
 >> +};
@@ -280,9 +250,6 @@ reg = <0x0, 0x0, 0x0, 0x80000000>  ?
 >> @@ -0,0 +1,413 @@
 >> +/*
 >> + * DTS File for HiSilicon Hi3798cv200 SOC.
-> 
-> "SoC"?
-> 
 >> + *
 >> + * Copyright (c) 2016-2017 HiSilicon Technologies Co., Ltd.
 >> + *
@@ -303,9 +270,6 @@ reg = <0x0, 0x0, 0x0, 0x80000000>  ?
 >> +#include <dt-bindings/interrupt-controller/arm-gic.h>
 >> +#include <dt-bindings/clock/histb-clock.h>
 >> +#include <dt-bindings/reset/ti-syscon.h>
-> 
-> Sort alphabetically?
-> 
 >> +
 >> +/ {
 >> +	compatible = "hisilicon,hi3798cv200";
@@ -325,12 +289,6 @@ reg = <0x0, 0x0, 0x0, 0x80000000>  ?
 >> +		cpu at 0 {
 >> +			compatible = "arm,cortex-a53";
 >> +			device_type = "cpu";
-> 
-> Nit: Elsewhere I've seen device_type before compatible?
-> 
-I also found many examples like this. Both two ways are okay for me.
-If it's not required, I'd like to keep it unchanged.
-
 >> +			reg = <0x0 0x0>;
 >> +			enable-method = "psci";
 >> +		};
@@ -361,39 +319,9 @@ If it's not required, I'd like to keep it unchanged.
 >> +		compatible = "arm,gic-400";
 >> +		reg = <0x0 0xf1001000 0x0 0x1000>,  /*GICD*/
 >> +		      <0x0 0xf1002000 0x0 0x100>;   /*GICC*/
-> 
-> Please leave spaces inside the comments for readability.
-> 
-OK.
-
-> Are you sure about the size of the second region? 
-
-We only used this range of the registers.
-
-> And are there really
-> only two, not four? (1k, 2k, 2k, 2k elsewhere [0])
-> 
-GICH (Virtural interface control register) and GICV (Virtual CPU interface) were
-not used. So I didn't supply them here.
-
-> [0]
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/480590.html
-> 
 >> +		#address-cells = <0>;
-> 
-> Unneeded since there are no subnodes?
-> 
-OK.
-
 >> +		#interrupt-cells = <3>;
 >> +		interrupt-controller;
-> 
-> No interrupts property with PPI 9 here?
-> 
-I found this was required to suppport GIC virtualization extensions. I didn't
-consider this feature before. I will also disscuss about this issue with our team.
-Thank you.
-
 >> +	};
 >> +
 >> +	timer {
@@ -405,13 +333,23 @@ Thank you.
 >> +	};
 >> +
 >> +	soc {
+> 
+> soc at 0
+> 
 >> +		compatible = "simple-bus";
 >> +		#address-cells = <1>;
 >> +		#size-cells = <1>;
 >> +		ranges = <0x0 0x00000000 0x0 0xffffffff>;
 > 
-> ranges = <0x0 0x0 0x00000000 0xffffffff>? (addr, parent addr, size)
+> Looks like everything is within 0xf8000000-0xfa000000. Can this range be 
+> further restrained?
 > 
+Actually, some modules of the SoC will be added in later. This range could be restrained
+to "0xf0000000-0xffffffff". If so, should soc node be named soc at f0000000?
+
+Regards,
+Jiancheng
+
 >> +
 >> +		crg: clock-reset-controller at f8a22000 {
 >> +			compatible = "hisilicon,hi3798cv200-crg", "simple-mfd";
@@ -426,18 +364,323 @@ Thank you.
 >> +					0xcc 12 0xcc 12 0 0 (ASSERT_CLEAR|DEASSERT_SET|STATUS_NONE)  /* 0: gmac0-phy-rst */
 >> +					0xcc 13 0xcc 13 0 0 (ASSERT_CLEAR|DEASSERT_SET|STATUS_NONE)  /* 1: gmac1-phy-rst */
 >> +				>;
-> 
-> Use <>, <> tuple syntax for the two lines instead?
-> 
-Appreciated it.
-
-Regards,
-Jiancheng
-
 >> +			};
 >> +		};
-> [snip]
+>> +
+>> +		sysctrl: system-controller at f8000000 {
+>> +			compatible = "hisilicon,hi3798cv200-sysctrl", "syscon";
+>> +			reg = <0xf8000000 0x1000>;
+>> +			#clock-cells = <1>;
+>> +			#reset-cells = <2>;
+>> +		};
+>> +
+>> +		uart0: serial at f8b00000 {
+>> +			compatible = "arm,pl011", "arm,primecell";
+>> +			reg = <0xf8b00000 0x1000>;
+>> +			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&sysctrl HISTB_UART0_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		uart2: serial at f8b02000 {
+>> +			compatible = "arm,pl011", "arm,primecell";
+>> +			reg = <0xf8b02000 0x1000>;
+>> +			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&crg HISTB_UART2_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		i2c0: i2c at f8b10000 {
+>> +			compatible = "hisilicon,hix5hd2-i2c";
+>> +			reg = <0xf8b10000 0x1000>;
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clock-frequency = <400000>;
+>> +			clocks = <&crg HISTB_I2C0_CLK>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		i2c1: i2c at f8b11000 {
+>> +			compatible = "hisilicon,hix5hd2-i2c";
+>> +			reg = <0xf8b11000 0x1000>;
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clock-frequency = <400000>;
+>> +			clocks = <&crg HISTB_I2C1_CLK>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		i2c2: i2c at f8b12000 {
+>> +			compatible = "hisilicon,hix5hd2-i2c";
+>> +			reg = <0xf8b12000 0x1000>;
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clock-frequency = <400000>;
+>> +			clocks = <&crg HISTB_I2C2_CLK>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		i2c3: i2c at f8b13000 {
+>> +			compatible = "hisilicon,hix5hd2-i2c";
+>> +			reg = <0xf8b13000 0x1000>;
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			interrupts = <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clock-frequency = <400000>;
+>> +			clocks = <&crg HISTB_I2C3_CLK>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		i2c4: i2c at f8b14000 {
+>> +			compatible = "hisilicon,hix5hd2-i2c";
+>> +			reg = <0xf8b14000 0x1000>;
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clock-frequency = <400000>;
+>> +			clocks = <&crg HISTB_I2C4_CLK>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		spi0: spi at f8b1a000 {
+>> +			compatible = "arm,pl022", "arm,primecell";
+>> +			reg = <0xf8b1a000 0x1000>;
+>> +			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+>> +			num-cs = <1>;
+>> +			cs-gpios = <&gpio7 1 0>;
+>> +			clocks = <&crg HISTB_SPI0_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		emmc: mmc at f9830000 {
+>> +			compatible = "snps,dw-mshc";
+>> +			reg = <0xf9830000 0x10000>;
+>> +			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&crg HISTB_MMC_CIU_CLK>,
+>> +				 <&crg HISTB_MMC_BIU_CLK>;
+>> +			clock-names = "ciu", "biu";
+>> +		};
+>> +
+>> +		gpio0: gpio at f8b20000 {
+>> +			compatible = "arm,pl061", "arm,primecell";
+>> +			reg = <0xf8b20000 0x1000>;
+>> +			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			clocks = <&crg HISTB_APB_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		gpio1: gpio at f8b21000 {
+>> +			compatible = "arm,pl061", "arm,primecell";
+>> +			reg = <0xf8b21000 0x1000>;
+>> +			interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			clocks = <&crg HISTB_APB_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		gpio2: gpio at f8b22000 {
+>> +			compatible = "arm,pl061", "arm,primecell";
+>> +			reg = <0xf8b22000 0x1000>;
+>> +			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			clocks = <&crg HISTB_APB_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		gpio3: gpio at f8b23000 {
+>> +			compatible = "arm,pl061", "arm,primecell";
+>> +			reg = <0xf8b23000 0x1000>;
+>> +			interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			clocks = <&crg HISTB_APB_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		gpio4: gpio at f8b24000 {
+>> +			compatible = "arm,pl061", "arm,primecell";
+>> +			reg = <0xf8b24000 0x1000>;
+>> +			interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			clocks = <&crg HISTB_APB_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		gpio5: gpio at f8004000 {
+>> +			compatible = "arm,pl061", "arm,primecell";
+>> +			reg = <0xf8004000 0x1000>;
+>> +			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			clocks = <&crg HISTB_APB_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		gpio6: gpio at f8b26000 {
+>> +			compatible = "arm,pl061", "arm,primecell";
+>> +			reg = <0xf8b26000 0x1000>;
+>> +			interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			clocks = <&crg HISTB_APB_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		gpio7: gpio at f8b27000 {
+>> +			compatible = "arm,pl061", "arm,primecell";
+>> +			reg = <0xf8b27000 0x1000>;
+>> +			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			clocks = <&crg HISTB_APB_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		gpio8: gpio at f8b28000 {
+>> +			compatible = "arm,pl061", "arm,primecell";
+>> +			reg = <0xf8b28000 0x1000>;
+>> +			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			clocks = <&crg HISTB_APB_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		gpio9: gpio at f8b29000 {
+>> +			compatible = "arm,pl061", "arm,primecell";
+>> +			reg = <0xf8b29000 0x1000>;
+>> +			interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			clocks = <&crg HISTB_APB_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		gpio10: gpio at f8b2a000 {
+>> +			compatible = "arm,pl061", "arm,primecell";
+>> +			reg = <0xf8b2a000 0x1000>;
+>> +			interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			clocks = <&crg HISTB_APB_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		gpio11: gpio at f8b2b000 {
+>> +			compatible = "arm,pl061", "arm,primecell";
+>> +			reg = <0xf8b2b000 0x1000>;
+>> +			interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			clocks = <&crg HISTB_APB_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		gpio12: gpio at f8b2c000 {
+>> +			compatible = "arm,pl061", "arm,primecell";
+>> +			reg = <0xf8b2c000 0x1000>;
+>> +			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+>> +			gpio-controller;
+>> +			#gpio-cells = <2>;
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <2>;
+>> +			clocks = <&crg HISTB_APB_CLK>;
+>> +			clock-names = "apb_pclk";
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		gmac0: ethernet at f9840000 {
+>> +			compatible = "hisilicon,hi3798cv200-gmac", "hisilicon,hisi-gmac-v2";
+>> +			reg = <0xf9840000 0x1000>,
+>> +			      <0xf984300c 0x4>;
+>> +			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&crg HISTB_ETH0_MAC_CLK>,
+>> +				 <&crg HISTB_ETH0_MACIF_CLK>;
+>> +			clock-names = "mac_core", "mac_ifc";
+>> +			resets = <&crg 0xcc 8>,
+>> +				 <&crg 0xcc 10>,
+>> +				 <&gmacphyrst 0>;
+>> +			reset-names = "mac_core", "mac_ifc", "phy";
+>> +		};
+>> +
+>> +		gmac1: ethernet at f9841000 {
+>> +			compatible = "hisilicon,hi3798cv200-gmac", "hisilicon,hisi-gmac-v2";
+>> +			reg = <0xf9841000 0x1000>,
+>> +			      <0xf9843010 0x4>;
+>> +			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&crg HISTB_ETH1_MAC_CLK>,
+>> +				 <&crg HISTB_ETH1_MACIF_CLK>;
+>> +			clock-names = "mac_core", "mac_ifc";
+>> +			resets = <&crg 0xcc 9>,
+>> +				 <&crg 0xcc 11>,
+>> +				 <&gmacphyrst 1>;
+>> +			reset-names = "mac_core", "mac_ifc", "phy";
+>> +		};
+>> +
+>> +		ir: ir at f8001000 {
+>> +			compatible = "hisilicon,hix5hd2-ir";
+>> +			reg = <0xf8001000 0x1000>;
+>> +			interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+>> +			clocks = <&sysctrl HISTB_IR_CLK>;
+>> +		};
+>> +	};
+>> +};
+>> -- 
+>> 1.9.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> Regards,
-> Andreas
+> .
 > 
