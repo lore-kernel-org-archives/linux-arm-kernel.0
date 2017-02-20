@@ -1,56 +1,29 @@
-From: yannick.fertre@st.com (Yannick FERTRE)
-Date: Mon, 20 Feb 2017 11:01:25 +0000
-Subject: [PATCH v2 4/9] dt-bindings: Add Ampire AM-480272H3TMQW-T01H panel
-In-Reply-To: <20170216023408.apqukipi5zzkrk7j@rob-hp-laptop>
-References: <1486738489-22154-1-git-send-email-yannick.fertre@st.com>
- <1486738489-22154-5-git-send-email-yannick.fertre@st.com>
- <20170216023408.apqukipi5zzkrk7j@rob-hp-laptop>
-Message-ID: <2b409ff7-54fe-4110-6495-1cc54585e5e2@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Feb 2017 11:09:43 +0000
+Subject: [PATCH v4 08/11] drivers: perf: hisi: use poll method to avoid
+ L3C counter overflow
+In-Reply-To: <1487530263-42643-1-git-send-email-anurup.m@huawei.com>
+References: <1487530263-42643-1-git-send-email-anurup.m@huawei.com>
+Message-ID: <20170220110942.GF9003@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Feb 19, 2017 at 01:51:03PM -0500, Anurup M wrote:
+> The L3 cache PMU use N-N SPI interrupt which has no support
+> in kernel mainline.
 
+Could you elaborate on what you mean by this?
 
-On 02/16/2017 03:34 AM, Rob Herring wrote:
-> On Fri, Feb 10, 2017 at 03:54:44PM +0100, Yannick Fertre wrote:
->> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
->> ---
->>  .../bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt         | 7 +++++++
->>  1 file changed, 7 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
->>
->> diff --git a/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
->> new file mode 100644
->> index 0000000..f59e3c4
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
->> @@ -0,0 +1,7 @@
->> +Ampire AM-480272H3TMQW-T01H 4.3" WQVGA TFT LCD panel
->> +
->> +Required properties:
->> +- compatible: should be "ampire,am-480272h3tmqw-t01h"
->
-> No GPIO controls or power supply for this panel?
->
-> Rob
->
+I don't understand what is meant here. How exactly are the interrupts
+wired up in HW, and what exactly is not supported by Linux?
 
-Hi Rob,
-thank for your reply.
-There is no gpio or power supply control for this panel with the eval 
-board stm429x9i.
-This binding is similar to all panel bindings which are link to panel 
-simple. Details on gpio & power supply are describe with simple-panel 
-binding.
+> So use hrtimer to poll and update event
+> counter to avoid overflow condition for L3 cache PMU.
+> A interval of 10 seconds is used for the hrtimer.
+> The time interval can be configured in the sysfs.
 
-Best regards
+I'm not too keen on giving userspace the ability to control this, since
+it gives an awful lot of rope for userspace to tie around itself.
 
-Example nvd,9128.txt:
-
-New Vision Display 7.0" 800 RGB x 480 TFT LCD panel
-
-Required properties:
-- compatible: should be "nvd,9128"
-
-This binding is compatible with the simple-panel binding, which is specified
-in simple-panel.txt in this directory.
+Thanks,
+Mark.
