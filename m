@@ -1,45 +1,75 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Mon, 20 Feb 2017 16:02:17 +0800
-Subject: [RESEND PATCH v7 1/7] dt-bindings: add rk3399 support for
- dw-mipi-rockchip
-In-Reply-To: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
-References: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1487577744-2855-2-git-send-email-zyw@rock-chips.com>
+Date: Mon, 20 Feb 2017 16:02:16 +0800
+Subject: [RESEND PATCH v7 0/7] Rockchip dw-mipi-dsi driver
+Message-ID: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dw-mipi-dsi of rk3399 is almost the same as rk3288, the rk3399 has
-additional phy config clock.
+Hi all
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
+[Resend this v7 version series, since there are 5 mails have gone missing, last
+week]
 
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3: None
+This version does not change the existing v6 patches, just to add the
+"bandwidth fix" patch back, since we really need it.
 
- .../devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt     | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+This patch serial is for RK3399 MIPI DSI. The MIPI DSI controller of
+RK3399 is almost the same as RK3288, except a little bit of difference
+in phy clock controlling and port id selection register. These patches
+add RK3399 support and the power domain support.
 
-diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
-index 1753f0c..0f82568 100644
---- a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
-@@ -5,10 +5,12 @@ Required properties:
- - #address-cells: Should be <1>.
- - #size-cells: Should be <0>.
- - compatible: "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi".
-+	      "rockchip,rk3399-mipi-dsi", "snps,dw-mipi-dsi".
- - reg: Represent the physical address range of the controller.
- - interrupts: Represent the controller's interrupt to the CPU(s).
- - clocks, clock-names: Phandles to the controller's pll reference
--  clock(ref) and APB clock(pclk), as described in [1].
-+  clock(ref) and APB clock(pclk). For RK3399, a phy config clock
-+  (phy_cfg) is additional required. As described in [1].
- - rockchip,grf: this soc should set GRF regs to mux vopl/vopb.
- - ports: contain a port node with endpoint definitions as defined in [2].
-   For vopb,set the reg = <0> and set the reg = <1> for vopl.
+And these patches base on John Keeping's v3 patches[0], it fixes many bugs,
+they have been tested on rk3288 evb board.
+
+[0]:
+[01/24] https://patchwork.kernel.org/patch/9544089
+[02/24] https://patchwork.kernel.org/patch/9544061
+[03/24] https://patchwork.kernel.org/patch/9544065
+[04/24] https://patchwork.kernel.org/patch/9544077
+[05/24] https://patchwork.kernel.org/patch/9544033
+[06/24] https://patchwork.kernel.org/patch/9544037
+[07/24] https://patchwork.kernel.org/patch/9544029
+[08/24] https://patchwork.kernel.org/patch/9544031
+[09/24] https://patchwork.kernel.org/patch/9544083
+[10/24] https://patchwork.kernel.org/patch/9544063
+[11/24] https://patchwork.kernel.org/patch/9544085
+[12/24] https://patchwork.kernel.org/patch/9544093
+[13/24] https://patchwork.kernel.org/patch/9544081
+[14/24] https://patchwork.kernel.org/patch/9544057
+[15/24] https://patchwork.kernel.org/patch/9544079
+[16/24] https://patchwork.kernel.org/patch/9544035
+[17/24] https://patchwork.kernel.org/patch/9544105
+[18/24] https://patchwork.kernel.org/patch/9544059
+[21/24] https://patchwork.kernel.org/patch/9544009
+[22/24] https://patchwork.kernel.org/patch/9544049
+[23/24] https://patchwork.kernel.org/patch/9544055
+[24/24] https://patchwork.kernel.org/patch/9544109
+
+
+Changes in v6:
+- no need check phy_cfg_clk before enable/disable
+
+Changes in v5:
+- check the error of phy_cfg_clk in dw_mipi_dsi_bind
+
+Changes in v4:
+- remove the unrelated change
+
+Changes in v3:
+- base on John Keeping's patch series
+
+Chris Zhong (7):
+  dt-bindings: add rk3399 support for dw-mipi-rockchip
+  drm/rockchip/dsi: dw-mipi: support RK3399 mipi dsi
+  drm/rockchip/dsi: dw-mipi: correct the coding style
+  drm/rockchip/dsi: remove mode_valid function
+  dt-bindings: add power domain node for dw-mipi-rockchip
+  drm/rockchip/dsi: fix insufficient bandwidth of some panel
+  drm/rockchip/dsi: add dw-mipi power domain support
+
+ .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   7 +-
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 160 ++++++++++++---------
+ 2 files changed, 100 insertions(+), 67 deletions(-)
+
 -- 
 2.6.3
