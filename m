@@ -1,47 +1,80 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 19 Feb 2017 20:46:13 -0800
-Subject: [PATCH v2 2/3] watchdog: sama5d4: Fix setting timeout when
- watchdog is disabled
-In-Reply-To: <20170219235213.qcxfne5yvs3uzwg3@piout.net>
-References: <20170216193053.5546-1-alexandre.belloni@free-electrons.com>
- <20170216193053.5546-2-alexandre.belloni@free-electrons.com>
- <968ef53e-c3c4-5322-020a-8382ce367931@roeck-us.net>
- <20170217151625.hv2vn5imx2kyeftt@piout.net>
- <c9f336fd-8761-7999-4ac0-cf68eb6c8ba1@roeck-us.net>
- <20170219235213.qcxfne5yvs3uzwg3@piout.net>
-Message-ID: <cc75a19f-0d99-4d26-0789-6cd750983990@roeck-us.net>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Mon, 20 Feb 2017 07:41:16 +0100
+Subject: [PATCH] drm/rockchip: cdn-dp: Fix error handling
+In-Reply-To: <58AA4908.2000808@rock-chips.com>
+References: <20170219165942.17268-1-christophe.jaillet@wanadoo.fr>
+ <58AA4908.2000808@rock-chips.com>
+Message-ID: <a3eca2d9-0cd2-925c-0b9b-b23893710382@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2017 03:52 PM, Alexandre Belloni wrote:
-> On 19/02/2017 at 08:57:35 -0800, Guenter Roeck wrote:
->>>> That means if the watchdog is running, the timeout would not be updated.
->>>> It should be updated no matter if it is running or not.
->>>>
->>>
->>> No, it is enabling the watchdog, then changing WDV and WDD and finally
->>> disabling the watchdog if necessary. So, WDV and WDD are always changed.
->>>
->> You are correct. Sorry for the noise.
+Le 20/02/2017 ? 02:40, Mark yao a ?crit :
+> On 2017?02?20? 00:59, Christophe JAILLET wrote:
+>> It is likely that both 'clk_disable_unprepare()' should be called if
+>> 'pm_runtime_get_sync()' fails.
 >>
->> Seems odd that the watchdog must be _running_ to change the timeout.
->> Usually, if there is a restriction, it is the opposite. I hope this
->> doesn't cause race conditions, where the watchdog fires immediately
->> after being enabled due to a low timeout.
+>> Add a new label for that, because 'err_set_rate' is not meaningful in 
+>> this
+>> case.
 >>
+>>
+>> Fixes: 1a0f7ed3abe2 ("drm/rockchip: cdn-dp: add cdn DP support for 
+>> rk3399")
+>>
+>> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+>> ---
+>> Not sure but a 'pm_runtime_get_sync()' is maybe also required in the
+>> 'err_set_rate' path.
+>> ---
+>>   drivers/gpu/drm/rockchip/cdn-dp-core.c | 3 ++-
+>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c 
+>> b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+>> index 9ab67a670885..0fe1ec8b8fb1 100644
+>> --- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
+>> +++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+>> @@ -111,7 +111,7 @@ static int cdn_dp_clk_enable(struct cdn_dp_device 
+>> *dp)
+>>       ret = pm_runtime_get_sync(dp->dev);
+>>       if (ret < 0) {
+>>           DRM_DEV_ERROR(dp->dev, "cannot get pm runtime %d\n", ret);
+>> -        goto err_pclk;
+>> +        goto err_sync;
 >
-> While it is difficult to reproduce, I can confirm it races and sometimes
-> reset the SoC without any good reason. It doesn't matter whether it is
-> disabled or not
+> I think the name err_pm_runtime_get is better.
+> err_sync is not a clear name for the pm_runtime_get_sync.
 >
+I will change it.
 
-Outch :-(.
-
-> I've raised the issue at Atmel last Thursday so I don't have any answer
-> yet.
+>>       }
+>>         reset_control_assert(dp->core_rst);
+>> @@ -133,6 +133,7 @@ static int cdn_dp_clk_enable(struct cdn_dp_device 
+>> *dp)
+>>       return 0;
+>>     err_set_rate:
+>> +err_sync:
 >
+> miss pm_runtime_put, it should be:
+>
+I am wondering if 'pm_runtime_put_sync' should be added, instead.
+We want to revert the 'pm_runtime_get_sync' of line 111. According to 
+the naming of the function, the _sync version looks more logical to me.
+Using ccoccinelle shows that 2/3 of functions calling both 
+'pm_runtime_get_sync' and 'pm_runtime_get[_sync]' and using the _sync 
+variant.
 
-Please keep us in the loop.
+Which semantic is the correct one?
 
-Thanks,
-Guenter
+
+> err_set_rate:
+>     pm_runtime_put(dp->dev);
+> err_pm_runtime_get:
+>     clk_disable_unprepare(dp->core_clk);
+> err_core_clk:
+>
+>> clk_disable_unprepare(dp->core_clk);
+>>   err_core_clk:
+>>       clk_disable_unprepare(dp->pclk);
+>
+>
