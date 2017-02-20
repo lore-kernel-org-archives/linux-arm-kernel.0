@@ -1,31 +1,30 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Mon, 20 Feb 2017 17:08:41 +0100
-Subject: [PATCH v3 7/7] ARM: configs: stm32: ADD LDTC support
+Date: Mon, 20 Feb 2017 17:08:37 +0100
+Subject: [PATCH v3 3/7] dt-bindings: Add Ampire AM-480272H3TMQW-T01H panel
 In-Reply-To: <1487606921-26981-1-git-send-email-yannick.fertre@st.com>
 References: <1487606921-26981-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1487606921-26981-8-git-send-email-yannick.fertre@st.com>
+Message-ID: <1487606921-26981-4-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds STM32 LTDC support & simple panel support in stm32_defconfig file
-
 Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 ---
- arch/arm/configs/stm32_defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+ .../bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt         | 7 +++++++
+ 1 file changed, 7 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
 
-diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-index e995209..d6a00b8 100644
---- a/arch/arm/configs/stm32_defconfig
-+++ b/arch/arm/configs/stm32_defconfig
-@@ -70,3 +70,8 @@ CONFIG_MAGIC_SYSRQ=y
- # CONFIG_FTRACE is not set
- CONFIG_CRC_ITU_T=y
- CONFIG_CRC7=y
-+CONFIG_DRM=y
-+CONFIG_DRM_ST=y
-+CONFIG_DRM_PANEL=y
-+CONFIG_DRM_PANEL_SIMPLE=y
-+CONFIG_BACKLIGHT_LCD_SUPPORT=y
+diff --git a/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+new file mode 100644
+index 0000000..f59e3c4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+@@ -0,0 +1,7 @@
++Ampire AM-480272H3TMQW-T01H 4.3" WQVGA TFT LCD panel
++
++Required properties:
++- compatible: should be "ampire,am-480272h3tmqw-t01h"
++
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
 -- 
 1.9.1
