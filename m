@@ -1,47 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 20 Feb 2017 17:18:38 -0300
-Subject: [PATCH v2 2/4] arm: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual
- OpenFrame Cap 10.1 initial support
-In-Reply-To: <CAOMZO5CKQaDvnr2-EzO_3ZOwQWb4RM1ytKiLfvXCj9Azwco8zw@mail.gmail.com>
-References: <1487621121-6051-1-git-send-email-jagan@openedev.com>
- <1487621121-6051-2-git-send-email-jagan@openedev.com>
- <CAOMZO5CKQaDvnr2-EzO_3ZOwQWb4RM1ytKiLfvXCj9Azwco8zw@mail.gmail.com>
-Message-ID: <CAOMZO5AKVzd7fJ5-GTu1DTYx9JPd9p3od-1yu_p9gOiV65SLoQ@mail.gmail.com>
+From: christophe.jaillet@wanadoo.fr (Christophe JAILLET)
+Date: Mon, 20 Feb 2017 21:25:12 +0100
+Subject: [PATCH] iio: adc: xilinx: Fix error handling
+In-Reply-To: <880c338e-7e81-83c7-613a-d8030c14bac0@metafoo.de>
+References: <20170219202928.20296-1-christophe.jaillet@wanadoo.fr>
+ <880c338e-7e81-83c7-613a-d8030c14bac0@metafoo.de>
+Message-ID: <1dc35727-a5ed-1486-f707-7ec0566d4cca@wanadoo.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2017 at 5:11 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Mon, Feb 20, 2017 at 5:05 PM, Jagan Teki <jagan@openedev.com> wrote:
+Le 20/02/2017 ? 09:35, Lars-Peter Clausen a ?crit :
+> On 02/19/2017 09:29 PM, Christophe JAILLET wrote:
+>> Reorder error handling labels in order to match the way resources have
+>> been allocated.
+>>
+>> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> Thanks, looks good.
 >
->> +&ldb {
->> +       status = "okay";
->> +
->> +       lvds-channel at 0 {
->> +               fsl,data-mapping = "spwg";
->> +               fsl,data-width = <24>;
->> +               status = "okay";
->> +
->> +               display-timings {
->> +                        native-mode = <&timing1>;
->> +                        timing1: hsd100pxn1 {
->> +                                clock-frequency = <60000000>;
->> +                                hactive = <1280>;
->> +                                vactive = <800>;
->> +                                hback-porch = <40>;
->> +                                hfront-porch = <40>;
->> +                                vback-porch = <10>;
->> +                                vfront-porch = <3>;
->> +                                hsync-len = <80>;
->> +                                vsync-len = <10>;
+> Acked-by: Lars-Peter Clausen <lars@metafoo.de>
 >
-> hsd100pxn1 is supported by the drm simple panel driver.
+> I think there is one more issue
 >
-> This allows you to remove the display-timings from the dts and use
-> compatible = "hannstar,hsd100pxn1" instead.
+>      ret = xadc->ops->setup(pdev, indio_dev, irq);
+>      if (ret)
+>          goto err_free_samplerate_trigger;
+>
+> should be
+>
+> 	goto err_clk_disable_unprepare;
+>
+I agree.
 
-After looking at the timings you provided they do not match with the
-timings from hsd100pxn1, so it seems you have a different panel on
-this board.
+Would you like me to send a V2 with both fixes or a sepparate patch?
 
-If this is the case, then you should not put a 'hsd100pxn1' reference
-in the dts.
+CJ
