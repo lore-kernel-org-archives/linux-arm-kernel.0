@@ -1,69 +1,43 @@
-From: jonathan.richardson@broadcom.com (Jonathan Richardson)
-Date: Mon, 20 Feb 2017 13:58:32 -0800
-Subject: [PATCH v4 2/3] mailbox: Add iProc mailbox controller driver
-In-Reply-To: <CABb+yY0rmAFutskhVkQ926QfsvtJ-WnXrQc=+PQNg=7NZEXC+Q@mail.gmail.com>
-References: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
- <1485463082-27067-3-git-send-email-jonathan.richardson@broadcom.com>
- <CABb+yY0rmAFutskhVkQ926QfsvtJ-WnXrQc=+PQNg=7NZEXC+Q@mail.gmail.com>
-Message-ID: <f60c80a2-536d-d9c7-26f6-ad0788e6004e@broadcom.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 20 Feb 2017 22:00:39 +0000
+Subject: [RFT PATCH 0/2] ARM/arm64: module-plt: split core and init PLT
+ sections
+Message-ID: <1487628041-2147-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This fixes a thinko on my part in both the ARM and the arm64 implementations
+of module PLTs. What I failed to realise is that the core module sections and
+the init sections are allocated independently, which means they could end up
+further away from each other than the range of a branch instruction. This
+implies that they cannot share a single array of PLT entries, and so this
+series splits them into core and init PLT sections.
 
+For ARM, this is actually a revert of commit 35fa91eed817 ("ARM: kernel:
+merge core and init PLTs") [although the patch in this series is not a
+straight revert.] This means that the issue is a regression, and the patch
+should probably go to -stable.
 
-On 17-02-16 10:20 PM, Jassi Brar wrote:
-> On Fri, Jan 27, 2017 at 2:08 AM, Jonathan Richardson
-> <jonathan.richardson@broadcom.com> wrote:
->
->> +static int iproc_mbox_send_data_m0(struct mbox_chan *chan, void *data)
->> +{
->> +       struct iproc_mbox *mbox = dev_get_drvdata(chan->mbox->dev);
->> +       struct iproc_mbox_msg *msg = (struct iproc_mbox_msg *)data;
->> +               unsigned long flags;
->> +       int err = 0;
->> +       const int poll_period_us = 5;
->> +       const int max_retries = (MAX_M0_TIMEOUT_MS * 1000) / poll_period_us;
->> +
->> +       if (!msg)
->> +               return -EINVAL;
->> +
->> +       spin_lock_irqsave(&mbox->lock, flags);
->> +
->> +       dev_dbg(mbox->dev, "Send msg to M0: cmd=0x%x, param=0x%x, wait_ack=%d\n",
->> +               msg->cmd, msg->param, msg->wait_ack);
->> +
-> prints should be outside the spinlocks.
-Will fix.
->
->> +       writel(msg->cmd, mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
->> +       writel(msg->param, mbox->base + IPROC_CRMU_MAILBOX1_OFFSET);
->> +
->> +       if (msg->wait_ack) {
->> +               int retries;
->> +
-> move poll_period_us and max_retries in here or just define' them
-Will fix.
->
->> +               err = msg->reply_code = -ETIMEDOUT;
->> +               for (retries = 0; retries < max_retries; retries++) {
->> +                       u32 val = readl(
->> +                               mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
->> +                       if (val & M0_IPC_CMD_DONE_MASK) {
->> +                               /*
->> +                                * M0 replied - save reply code and
->> +                                * clear error.
->> +                                */
->> +                               msg->reply_code = (val &
->> +                                       M0_IPC_CMD_REPLY_MASK) >>
->> +                                       M0_IPC_CMD_REPLY_SHIFT;
->> +                               err = 0;
->> +                               break;
->> +                       }
->> +                       udelay(poll_period_us);
->>
-> potentially 2ms inside spin_lock_irqsave. Alternative is to implement
-> a simple 'peek_data' and call it for requests with 'wait_ack'
-The M0 responds in very few microseconds. The 2ms is an arbitrary value that came from the clients tx_tout being specified in ms. I can reduce the timeout to something smaller. No need to peek for data.
+For arm64, the likelihood of this issue ever occurring is very small, due
+to the 128 MB range of its branch instructions. Also, the arm64 version of
+the code was never correct, so it is not a regression. But for correctness,
+it is fixed in the same way as for ARM.
 
-Thanks,
-Jon
+For now, these are build tested only. I was hoping Angus could check whether
+1/2 makes his problems go away.
+
+Ard Biesheuvel (2):
+  ARM: module: split core and init PLT sections
+  arm64: module: split core and init PLT sections
+
+ arch/arm/include/asm/module.h   |  9 ++-
+ arch/arm/kernel/module-plts.c   | 62 ++++++++++++++------
+ arch/arm/kernel/module.lds      |  1 +
+ arch/arm64/include/asm/module.h |  9 ++-
+ arch/arm64/kernel/module-plts.c | 56 ++++++++++++------
+ arch/arm64/kernel/module.c      |  2 +-
+ arch/arm64/kernel/module.lds    |  1 +
+ 7 files changed, 99 insertions(+), 41 deletions(-)
+
+-- 
+2.7.4
