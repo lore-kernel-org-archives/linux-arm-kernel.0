@@ -1,61 +1,48 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Feb 2017 18:16:17 +0100
-Subject: [PATCH 3/3] memory: atmel-ebi: Add PM ops
+Date: Mon, 20 Feb 2017 18:16:18 +0100
+Subject: [PATCH 3/3] mtd: nand: atmel: Add PM ops
 In-Reply-To: <1487610978-12423-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1487610978-12423-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1487610978-12423-6-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1487610978-12423-7-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a ->resume() hook to make sure the EBI dev configs are correctly
-restored when resuming the platform.
+Provide a ->resume() hook to make sure the NAND timings are correctly
+restored by resetting all chips connected to the controller.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/memory/atmel-ebi.c | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ drivers/mtd/nand/atmel/nand-controller.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
-index 06a1a136d448..15120cb37cf0 100644
---- a/drivers/memory/atmel-ebi.c
-+++ b/drivers/memory/atmel-ebi.c
-@@ -506,6 +506,8 @@ static int atmel_ebi_probe(struct platform_device *pdev)
- 	if (!ebi)
- 		return -ENOMEM;
- 
-+	platform_set_drvdata(pdev, ebi);
-+
- 	INIT_LIST_HEAD(&ebi->devs);
- 	ebi->caps = match->data;
- 	ebi->dev = dev;
-@@ -578,10 +580,28 @@ static int atmel_ebi_probe(struct platform_device *pdev)
- 	return of_platform_populate(np, NULL, NULL, dev);
+diff --git a/drivers/mtd/nand/atmel/nand-controller.c b/drivers/mtd/nand/atmel/nand-controller.c
+index ae46ef711d67..cd107e6edcbc 100644
+--- a/drivers/mtd/nand/atmel/nand-controller.c
++++ b/drivers/mtd/nand/atmel/nand-controller.c
+@@ -2575,6 +2575,24 @@ static int atmel_nand_controller_remove(struct platform_device *pdev)
+ 	return nc->caps->ops->remove(nc);
  }
  
-+static int atmel_ebi_resume(struct device *dev)
++static int atmel_nand_controller_resume(struct device *dev)
 +{
-+	struct atmel_ebi *ebi = dev_get_drvdata(dev);
-+	struct atmel_ebi_dev *ebid;
++	struct atmel_nand_controller *nc = dev_get_drvdata(dev);
++	struct atmel_nand *nand;
 +
-+	list_for_each_entry(ebid, &ebi->devs, node) {
++	list_for_each_entry(nand, &nc->chips, node) {
 +		int i;
 +
-+		for (i = 0; i < ebid->numcs; i++)
-+			ebid->ebi->caps->apply_config(ebid, &ebid->configs[i]);
++		for (i = 0; i < nand->numcs; i++)
++			nand_reset(&nand->base, i);
 +	}
 +
 +	return 0;
 +}
 +
-+static SIMPLE_DEV_PM_OPS(atmel_ebi_pm_ops, NULL, atmel_ebi_resume);
++static SIMPLE_DEV_PM_OPS(atmel_nand_controller_pm_ops, NULL,
++			 atmel_nand_controller_resume);
 +
- static struct platform_driver atmel_ebi_driver = {
+ static struct platform_driver atmel_nand_controller_driver = {
  	.driver = {
- 		.name = "atmel-ebi",
- 		.of_match_table	= atmel_ebi_id_table,
-+		.pm = &atmel_ebi_pm_ops,
- 	},
- };
- builtin_platform_driver_probe(atmel_ebi_driver, atmel_ebi_probe);
+ 		.name = "atmel-nand-controller",
 -- 
 2.7.4
