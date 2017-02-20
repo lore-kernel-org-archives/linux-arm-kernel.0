@@ -1,67 +1,67 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Mon, 20 Feb 2017 17:08:34 +0100
-Subject: [PATCH v3 0/7] STM32 LCD-TFT display controller
-Message-ID: <1487606921-26981-1-git-send-email-yannick.fertre@st.com>
+Date: Mon, 20 Feb 2017 17:08:38 +0100
+Subject: [PATCH v3 4/7] drm/panel: simple: Add support for Ampire
+ AM-480272H3TMQW-T01H
+In-Reply-To: <1487606921-26981-1-git-send-email-yannick.fertre@st.com>
+References: <1487606921-26981-1-git-send-email-yannick.fertre@st.com>
+Message-ID: <1487606921-26981-5-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Version 3:
-- Update "st,stm32-ltdc.txt" binding.
-- Add a commit to "ARM: configs: stm32: ADD LDTC support" patch.
+Add simple-panel support for the Ampire AM-480272H3TMQW-T01H,
+which is a 4.3" WQVGA panel.
 
-Version 2:
-- Rename driver directory from st to stm.
-- Rename compatiblity from st,ltdc to st,stm32-ltdc.
-- Remove compatibility st,display-subsystem.
-- Rename driver from st-drm to stm-drm.
-- Rework probe sequence & remove display-subsystem part.
-- I keep clock name which is necessary for devm_regmap_init_mmio_clk call.
+Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+---
+ drivers/gpu/drm/panel/panel-simple.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-Version 1:
-- Initial commit
-
-The purpose of this set of patches is to add a new driver for stm32f429.
-This driver was developed and tested on evaluation board stm32429i.
-
-Stm32f4 is a MCU platform which don't have MMU so the last patches developed
-by Benjamin Gaignard regarding "DRM: allow to use mmuless devices"
-are necessary.
-
-The board stm429i embeds a Ampire AM-480272H3TMQW-T01H screen.
-A new simple panel am-480272h3tmqw-t01h have been added to support it.
-
-Yannick Fertre (7):
-  dt-bindings: display: add STM32 LTDC driver
-  drm/st: Add STM32 LTDC driver
-  dt-bindings: Add Ampire AM-480272H3TMQW-T01H panel
-  drm/panel: simple: Add support for Ampire AM-480272H3TMQW-T01H
-  ARM: dts: stm32: Add ltdc support on stm32f429 MCU
-  ARM: dts: stm32: Enable ltdc & simple panel on stm32f429-Eval board
-  ARM: configs: stm32: ADD LDTC support
-
- .../display/panel/ampire,am-480272h3tmqw-t01h.txt  |    7 +
- .../devicetree/bindings/display/st,stm32-ltdc.txt  |   36 +
- arch/arm/boot/dts/stm32429i-eval.dts               |   59 +
- arch/arm/boot/dts/stm32f429.dtsi                   |   19 +-
- arch/arm/configs/stm32_defconfig                   |    5 +
- drivers/gpu/drm/Kconfig                            |    2 +
- drivers/gpu/drm/Makefile                           |    1 +
- drivers/gpu/drm/panel/panel-simple.c               |   29 +
- drivers/gpu/drm/stm/Kconfig                        |   14 +
- drivers/gpu/drm/stm/Makefile                       |    7 +
- drivers/gpu/drm/stm/drv.c                          |  232 ++++
- drivers/gpu/drm/stm/drv.h                          |   24 +
- drivers/gpu/drm/stm/ltdc.c                         | 1381 ++++++++++++++++++++
- drivers/gpu/drm/stm/ltdc.h                         |   22 +
- 14 files changed, 1837 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
- create mode 100644 Documentation/devicetree/bindings/display/st,stm32-ltdc.txt
- create mode 100644 drivers/gpu/drm/stm/Kconfig
- create mode 100644 drivers/gpu/drm/stm/Makefile
- create mode 100644 drivers/gpu/drm/stm/drv.c
- create mode 100644 drivers/gpu/drm/stm/drv.h
- create mode 100644 drivers/gpu/drm/stm/ltdc.c
- create mode 100644 drivers/gpu/drm/stm/ltdc.h
-
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index 06aaf79..ee5d2ff 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -386,6 +386,32 @@ static void panel_simple_shutdown(struct device *dev)
+ 	panel_simple_disable(&panel->base);
+ }
+ 
++static const struct drm_display_mode ampire_am_480272h3tmqw_t01h_mode = {
++	.clock = 9000,
++	.hdisplay = 480,
++	.hsync_start = 480 + 2,
++	.hsync_end = 480 + 2 + 41,
++	.htotal = 480 + 2 + 41 + 2,
++	.vdisplay = 272,
++	.vsync_start = 272 + 2,
++	.vsync_end = 272 + 2 + 10,
++	.vtotal = 272 + 2 + 10 + 2,
++	.vrefresh = 60,
++	.flags = DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC,
++};
++
++static const struct panel_desc ampire_am_480272h3tmqw_t01h = {
++	.modes = &ampire_am_480272h3tmqw_t01h_mode,
++	.num_modes = 1,
++	.bpc = 8,
++
++	.size = {
++		.width = 105,
++		.height = 67,
++	},
++	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
++};
++
+ static const struct drm_display_mode ampire_am800480r3tmqwa1h_mode = {
+ 	.clock = 33333,
+ 	.hdisplay = 800,
+@@ -1715,6 +1741,9 @@ static void panel_simple_shutdown(struct device *dev)
+ 
+ static const struct of_device_id platform_of_match[] = {
+ 	{
++		.compatible = "ampire,am-480272h3tmqw-t01h",
++		.data = &ampire_am_480272h3tmqw_t01h,
++	}, {
+ 		.compatible = "ampire,am800480r3tmqwa1h",
+ 		.data = &ampire_am800480r3tmqwa1h,
+ 	}, {
 -- 
 1.9.1
