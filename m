@@ -1,45 +1,51 @@
-From: hias@horus.com (Matthias Reichl)
-Date: Mon, 20 Feb 2017 20:01:16 +0100
-Subject: [RESEND PATCH] dmaengine: bcm2835: Fix cyclic DMA period splitting
-Message-ID: <20170220190115.GB4170@camel2.lan>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 20 Feb 2017 21:20:01 +0200
+Subject: imx: Race when disabling RX in IMX.6 UART in half duplex
+In-Reply-To: <c07c95e2-3463-222b-c78a-b5716b4c5a14@camlintechnologies.com>
+References: <c07c95e2-3463-222b-c78a-b5716b4c5a14@camlintechnologies.com>
+Message-ID: <20170220192001.eqomprbgrqkefkas@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code responsible for splitting periods into chunks that
-can be handled by the DMA controller missed to update total_len,
-the number of bytes processed in the current period, when there
-are more chunks to follow.
+Hi Piotr,
 
-Therefore total_len was stuck at 0 and the code didn't work at all.
-This resulted in a wrong control block layout and audio issues because
-the cyclic DMA callback wasn't executing on period boundaries.
+On Mon, Feb 20, 2017 at 02:54:02PM +0100, Piotr Figiel wrote:
+>  I'm looking to find a correct way to disable RX in the I.MX6 UART during
+> TX-ing. I stumbled on the issue described below when working on
+> ~SER_RS485_RX_DURING_TX on custom 3.10 tree (branched from Freescale's/NXP's
+> BSP release) independently to what is now in the main line imx.c, but I see
+> now that the implementation in mainline also seem to have the same problem
+> I'm trying to solve now. I would like to request for comments to
+> confirm/deny whether the issue I raise here is valid and how to best
+> approach this.
+> 
+>  I'm mostly concerned about the fact that the URXD register must not be
+> accessed (as documented in IMX.6 RM) when RX is disabled (RXEN=0). The issue
+> is that in the following sequence happening during imx_start_tx with
+> ~SER_RS485_RX_DURING_TX set:
+> 
+> 1. Acquire spinlock, disable local interrupts (from serial_core.c),
+> 2. Disable RX receiver (RXEN=0 in UCR2),
+> 3. Release spinlock, reenable interrupts.
+> 
+> The RX fifo may become not empty between #1 and #2. This will raise
+> interrupt which will be handled after re-enabling interrupts (after #3). ISR
+> in this case will check the status bit of the interrupt and fetch RX FIFO
+> contents, which I understand is forbidden by the documentation and may raise
+> error on the bus [1]. In addition disabling RX IRQ in this procedure, e.g.
+> after #1 doesn't seem to be enough, as the IRQ still may trigger after #1
+> and will need to be serviced.
 
-Fix this by adding the missing total_len update.
+As I understand it, SER_RS485_RX_DURING_TX is for half-duplex RS-485 where 
+only one device is allowed to transmit at any given time. Higher level code 
+determines when any given device on the bus is allowed to transmit. If Rx FIFO 
+becomes non-empty during Tx enable, you have a contention problem to solve.
 
-Signed-off-by: Matthias Reichl <hias@horus.com>
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-Tested-by: Clive Messer <clive.messer@digitaldreamtime.co.uk>
-Reviewed-by: Eric Anholt <eric@anholt.net>
----
- drivers/dma/bcm2835-dma.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+What is your use case?
 
-diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-index 80d35f7..599c218 100644
---- a/drivers/dma/bcm2835-dma.c
-+++ b/drivers/dma/bcm2835-dma.c
-@@ -253,8 +253,11 @@ static void bcm2835_dma_create_cb_set_length(
- 	 */
- 
- 	/* have we filled in period_length yet? */
--	if (*total_len + control_block->length < period_len)
-+	if (*total_len + control_block->length < period_len) {
-+		/* update number of bytes in this period so far */
-+		*total_len += control_block->length;
- 		return;
-+	}
- 
- 	/* calculate the length that remains to reach period_length */
- 	control_block->length = period_len - *total_len;
+baruch
+
 -- 
-2.1.4
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
