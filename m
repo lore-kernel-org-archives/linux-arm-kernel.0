@@ -1,59 +1,89 @@
-From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Mon, 20 Feb 2017 19:52:03 +0100
-Subject: [PATCH] ARM: dts: sun8i: NanoPi NEO Air add WiFi / eMMC
-In-Reply-To: <20170219143848.25911-1-jelle@vdwaa.nl>
-References: <20170219143848.25911-1-jelle@vdwaa.nl>
-Message-ID: <20170220185202.ficvrxkb26v6enz2@localhost>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Feb 2017 18:59:49 +0000
+Subject: [BUG] hdlcd gets confused about base address
+In-Reply-To: <20170220180558.GB31595@intel.com>
+References: <20161118233733.GP1041@n2100.armlinux.org.uk>
+ <20170220121603.GA1132@n2100.armlinux.org.uk>
+ <20170220175331.GC963@e110455-lin.cambridge.arm.com>
+ <20170220180558.GB31595@intel.com>
+Message-ID: <20170220185948.GR21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 19, 2017 at 03:38:48PM +0100, Jelle van der Waa wrote:
-> Enable the WiFi (AP6212) chip and eMMC support for the NanoPi NEO Air.
+On Mon, Feb 20, 2017 at 08:05:58PM +0200, Ville Syrj?l? wrote:
+> This stuff should be using the clipped coordinates, not the user
+> coordinates. And it doesn't look like this guy is even calling the
+> clip helper thing.
 > 
-> Signed-off-by: Jelle van der Waa <jelle@vdwaa.nl>
-> ---
->  arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts | 45 +++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
+> malidp seems to be calling that thing, but it still doesn't
+> manage to program the hw with the right coordinates from what
+> I can see.
 > 
-> diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
-> index 3ba081c1f555..3813156f5d35 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
-> @@ -73,6 +73,13 @@
->  			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>; /* PA10 */
->  		};
->  	};
-> +
-> +	wifi_pwrseq: wifi_pwrseq {
+> /me feels a bit like a broken record...
 
-There should not be underscores in node names. See e.g.:
-https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1122967.html
-https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1145633.html
-https://www.mail-archive.com/netdev%40vger.kernel.org/msg90319.html
+If you mean drm_plane_helper_check_state(), then...
 
-> +&r_pio {
-> +	wifi_en_nanopi_neo_air: wifi_en_pin {
-> +		allwinner,pins = "PL7";
-> +		allwinner,function = "gpio_out";
-> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-> +	};
-> +};
+$ grep drm_plane_helper_check_state Documentation/gpu/ -r
 
-1. Underscores in the node name.
-2. Pinmux nodes for GPIO usage is considered unnecessary or even harmful
-these days. As a bonus, you avoid a duplicate definition.
-3. Please use the generic properties, as in
+So nothing there... but in drivers/gpu/drm/drm_plane_helper.c, there's
+the following, and I think this really isn't helping people understand
+what's required:
 
-	pins = "PL7";
-	function ="gpio_out";
-	drive-strength = <10>;
-	bias-disable;
+ * This helper library has two parts. The first part has support to implement
+ * primary plane support on top of the normal CRTC configuration interface.
+ * Since the legacy ->set_config interface ties the primary plane together with
+ * the CRTC state this does not allow userspace to disable the primary plane
+ * itself.  To avoid too much duplicated code use
+ * drm_plane_helper_check_update() which can be used to enforce the same
+ * restrictions as primary planes had thus. The default primary plane only
+ * expose XRBG8888 and ARGB8888 as valid pixel formats for the attached
+ * framebuffer.
+ *
+ * Drivers are highly recommended to implement proper support for primary
+ * planes, and newly merged drivers must not rely upon these transitional
+ * helpers.
 
-(but you should just drop the node in this case).
+Which functions are defined as "these transitional helpers" - the above
+is rather ambiguous.  Is drm_plane_helper_check_state() a "transitional
+helper" or is it not?  (It probably isn't, but the documentation does not
+make that clear.)
 
-(Do we not usually address the dts maintainers directly when submitting
-device tree patches? Just wondering.)
+It then goes on to:
+
+ * The second part also implements transitional helpers which allow drivers to
+
+So maybe the second paragraph needs to be moved after this line to
+remove the confusion?
+
+If you find that you're repeating something to many people, it's always
+a good idea to re-read the documentation that's supposed to be giving
+people guidance.
+
+Now, when you say that we're supposed to program "clipped coordinates"
+maybe you can give a hint what those are and where they come from?
+Is that the vaguely documented "clip" parameter in
+drm_plane_helper_check_state() ?
+
+ * @clip: integer clipping coordinates
+
+If it is, that doesn't really describe it, and neither does the
+description of what the function does, nor what it returns:
+
+ * Checks that a desired plane update is valid.  Drivers that provide
+ * their own plane handling rather than helper-provided implementations may
+ * still wish to call this function to avoid duplication of error checking
+ * code.
+ *
+ * RETURNS:
+ * Zero if update appears valid, error code on failure
+
+So, some improvement there could go a long way towards eliminating
+some of these issues...
+
+Atomic modeset is hideously complex... having poor documentation doesn't
+help.
 
 -- 
-Rask Ingemann Lambertsen
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
