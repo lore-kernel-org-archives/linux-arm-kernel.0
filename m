@@ -1,79 +1,75 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon, 20 Feb 2017 08:08:58 -0800
-Subject: [RESEND PATCH v5 2/4] PCI: imx6: Do not wait for speed change on i.MX7
-In-Reply-To: <20170220160900.7014-1-andrew.smirnov@gmail.com>
-References: <20170220160900.7014-1-andrew.smirnov@gmail.com>
-Message-ID: <20170220160900.7014-3-andrew.smirnov@gmail.com>
+Date: Mon, 20 Feb 2017 08:08:56 -0800
+Subject: [RESEND PATCH v5 0/4] i.MX7 PCI support
+Message-ID: <20170220160900.7014-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As can be seen from [1]:
+[ RESEND becasue I messed up CC list of patches 2,3 of the original
+  submission as well as not adding Reviewed-by to patch 1 and droping
+  it from patch 4 ]
 
-"...the different behavior between iMX6Q PCIe and iMX7D PCIe maybe
-caused by the different controller version.
+Hello, everyone:
 
-Regarding to the DOC description, the DIRECT_SPEED_CHANGE should be
-cleared after the speed change from GEN1 to GEN2. Unfortunately, when
-GEN1 device is used, the behavior is not documented.
+This is a fifth iteration of the code that adds PCI-subsystem bits
+necessary for enabling PCI support on i.MX7.
 
-So, IC design guys run the simulation and
-find out the following behaviors:
+Rob, Bjorn, power domain and reset bindings remained the same, please
+let me know if you still think that PHY aspect of the driver needs to
+be moved into a separate abstraction.
 
-     1. DIRECT_SPEED_CHANGE will be cleared in 7D after speed change
-     	from GEN1 to GEN2. This matches doc?s description
+Changes since v4 (can be found at [version4]):
 
-     2. set MAX link speed(PCIE_CAP_TARGET_LINK_SPEED=0x01) as GEN1 and
-     	re-run the simulation, DIRECT_SPEED_CHANGE will not be cleared;
-     	remain as 1, this matches your result, but function test is
-     	passed, so this bit should not affect the normal PCIe function.
-..."
+	- Dropped typo-fix patch (originally patch #1 of the
+          series). Bjorn, I am assuming that patch from v4 survived
+          and stayed in your tree, let me know if that is not true.
 
-imx6_pcie_wait_for_speed_change will report false failures for Gen1 ->
-Gen1 speed transition, so avoid doing that check and just rely on
-imx6_pcie_wait_for_link only.
+	- Added patch with workaround to address speed change false
+          failures (I kept it as a separate patch to better document
+          exchange with NXP/Freescale that lead to that patch)
 
-[1] https://community.nxp.com/message/867943
+	- Added patch to avoid speed change on links configured Gen1
+          only (Let me know if that is a terrible idea)
 
-Cc: yurovsky at gmail.com
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- drivers/pci/host/pci-imx6.c | 19 +++++++++++++++----
- 1 file changed, 15 insertions(+), 4 deletions(-)
+	- Addressed section mismatch problem by moving call to
+          hook_fault_code to happend before driver registration.
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 2f3f375..473bbdc 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -577,10 +577,21 @@ static int imx6_pcie_establish_link(struct imx6_pcie *imx6_pcie)
- 	tmp |= PORT_LOGIC_SPEED_CHANGE;
- 	dw_pcie_writel_rc(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, tmp);
- 
--	ret = imx6_pcie_wait_for_speed_change(imx6_pcie);
--	if (ret) {
--		dev_err(dev, "Failed to bring link up!\n");
--		goto err_reset_phy;
-+	if (imx6_pcie->variant != IMX7D) {
-+		/*
-+		 * On i.MX7, DIRECT_SPEED_CHANGE behaves differently
-+		 * from i.MX6 family when no link speed transition
-+		 * occurs and we go Gen1 -> yep, Gen1. The difference
-+		 * is that, in such case, it will not be cleared by HW
-+		 * which will cause the following code to report false
-+		 * failure.
-+		 */
-+
-+		ret = imx6_pcie_wait_for_speed_change(imx6_pcie);
-+		if (ret) {
-+			dev_err(dev, "Failed to bring link up!\n");
-+			goto err_reset_phy;
-+		}
- 	}
- 
- 	/* Make sure link training is finished as well! */
+Changes since v3 (can be found at [version3]):
+	- Move all of the reset_control_assert's into imx6_pcie_assert_core_reset
+	- Documented required reset and power domain DT bindings
+
+Changes since v2 (can be found at [version2]):
+
+	- Collected Reviewed-by for patch #2 from Lucas
+	- Reset logic implementation moved out into a reset controller
+          driver (see [reset1])
+	- Removed unused leftover code
+
+Changes since v1 (can be found at [version1]):
+
+	- All GPC related code moved into a separate driver (see [gpc1])
+	- Removed GPIO probe deferral logging
+	- Fixed section mismatch warning
+	- Minor reformatting of fsl,imx6q-pcie.txt(as per Rob
+          Herring's request)
+
+[version4] https://lkml.org/lkml/2017/2/7/478
+[version3] https://lkml.org/lkml/2017/2/6/565
+[version2] https://lkml.org/lkml/2017/2/1/510
+[version1] https://lkml.org/lkml/2017/1/19/488
+[gpc1] https://lkml.org/lkml/2017/2/6/551
+[reset1] https://lkml.org/lkml/2017/2/6/554
+
+Andrey Smirnov (4):
+  PCI: imx6: Add code to support i.MX7D
+  PCI: imx6: Do not wait for speed change on i.MX7
+  PCI: imx6: Do not switch speed if Gen2 is disabled
+  PCI: imx6: Allow probe deferal by reset GPIO
+
+ .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 +-
+ drivers/pci/host/pci-imx6.c                        | 199 +++++++++++++++------
+ include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
+ 3 files changed, 161 insertions(+), 55 deletions(-)
+
 -- 
 2.9.3
