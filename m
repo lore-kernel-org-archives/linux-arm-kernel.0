@@ -1,41 +1,24 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 20 Feb 2017 19:17:12 +0100
-Subject: [PATCH v2 0/3] Extend rtc-armada38x support for Armada 7K/8K
-In-Reply-To: <20170220175054.GP21222@n2100.armlinux.org.uk>
-References: <20170217101907.8963-1-gregory.clement@free-electrons.com>
- <87tw7oaj24.fsf@free-electrons.com>
- <20170220173633.d4ke4eohaacgsw3h@piout.net>
- <20170220175054.GP21222@n2100.armlinux.org.uk>
-Message-ID: <20170220181712.yejnobmj3dhm5ev6@piout.net>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 20 Feb 2017 19:24:32 +0100
+Subject: [PATCH v2] i2c: at91: ensure state is restored after suspending
+In-Reply-To: <20170216172759.27837-1-alexandre.belloni@free-electrons.com>
+References: <20170216172759.27837-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170220182432.4md345efgej236hc@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/02/2017 at 17:50:54 +0000, Russell King - ARM Linux wrote:
-> > The question being what does that do and whether it could be done in the
-> > driver instead.
+On Thu, Feb 16, 2017 at 06:27:59PM +0100, Alexandre Belloni wrote:
+> When going to suspend, the I2C registers may be lost because the power to
+> VDDcore is cut. Restore them when resuming.
 > 
-> It's not specific to the Armada 8040, the same problem exists with
-> Armada 38x, so holding this up for that reason does not make sense.
-> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-I agree, I will not delay the patch for that.
+Applied to for-next, thanks (will be in 4.11)!
 
-> I suspect that the errata is "RTC is not reset at power up" for the RTC
-> power domain.
-> 
-> I don't know where the value of 0x2000 comes from for the correction
-> value, all I know is that's the value uboot uses with "date reset".
-> We probably do _not_ want the driver writing that each time the
-> kernel boots, since that's a tuning parameter.
-> 
-
-It is probably a calibration offset. It may be worth exposing to
-userspace but without more information, I doubt we can make something
-useful out of it.
-
-
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170220/41785246/attachment.sig>
