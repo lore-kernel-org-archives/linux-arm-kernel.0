@@ -1,36 +1,31 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Feb 2017 17:07:39 +0000
-Subject: [PATCH v6 00/14] mmc: Add support to Marvell Xenon SD Host
- Controller
-In-Reply-To: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
-References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20170220170739.GL21222@n2100.armlinux.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 20 Feb 2017 18:16:15 +0100
+Subject: [PATCH 2/3] memory: atmel-ebi: Add missing ->numcs assignment
+In-Reply-To: <1487610978-12423-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1487610978-12423-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1487610978-12423-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2017 at 06:01:40PM +0100, Gregory CLEMENT wrote:
-> Hello,
-> 
-> This the sixth version of the series adding support for the SDHCI
-> Xenon controller. It can be currently found on the Armada 37xx and the
-> Armada 7K/8K but will be also used in more Marvell SoC (and not only
-> the mvebu ones actually).
-> 
-> Most of the following changes had been discussed on the mailing list,
-> except the new compatible string.
-> 
-> It occurred that the xenon controller was integrated in a different
-> way in the AP806 and the CP110 which both are part of the Armada 7K/8K
-> SoCs. For example the Xenon controller in CP110 doesn't not support
-> HS200.
+ebid->numcs is never assigned, set it to numcs after allocating the
+EBI dev object.
 
-Seems to continnue to work on the Macchiatobin board.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/memory/atmel-ebi.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Tested-by: Russell King <rmk+kernel@armlinux.org.uk>
-
-Thanks.
-
+diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
+index 833af8d02424..06a1a136d448 100644
+--- a/drivers/memory/atmel-ebi.c
++++ b/drivers/memory/atmel-ebi.c
+@@ -331,6 +331,7 @@ static int atmel_ebi_dev_setup(struct atmel_ebi *ebi, struct device_node *np,
+ 		return -ENOMEM;
+ 
+ 	ebid->ebi = ebi;
++	ebid->numcs = numcs;
+ 
+ 	ret = caps->xlate_config(ebid, np, &conf);
+ 	if (ret < 0)
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
