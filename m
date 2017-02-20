@@ -1,73 +1,57 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Feb 2017 17:24:03 +0000
-Subject: [PATCH 0/4] kuser updates for ARM-only vs Thumb
-In-Reply-To: <20170220170632.GA6558@botnar.kaiser.cx>
-References: <20170209121756.GC27312@n2100.armlinux.org.uk>
- <20170220170632.GA6558@botnar.kaiser.cx>
-Message-ID: <20170220172403.GM21222@n2100.armlinux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 20 Feb 2017 18:36:33 +0100
+Subject: [PATCH v2 0/3] Extend rtc-armada38x support for Armada 7K/8K
+In-Reply-To: <20170220172739.GN21222@n2100.armlinux.org.uk> (Russell King's
+ message of "Mon, 20 Feb 2017 17:27:39 +0000")
+References: <20170217101907.8963-1-gregory.clement@free-electrons.com>
+ <87tw7oaj24.fsf@free-electrons.com>
+ <20170220172739.GN21222@n2100.armlinux.org.uk>
+Message-ID: <87mvdgahni.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2017 at 06:06:32PM +0100, Martin Kaiser wrote:
-> Thus wrote Russell King - ARM Linux (linux at armlinux.org.uk):
-> 
-> > A while back, an issue was raised about the return instruction used
-> > in the kuser page when building an ARMv4 and later environment.
-> 
-> > In order to fix this, I suggested building the kuser code for both
-> > variants and selecting the appropriate version at run time.  This
-> > seemed to be a simple solution, but due to the fix-ups and need to
-> > build the appropriate version for the Kconfig options selected,
-> > turned out to be not quite as trivial as I hoped.
-> 
-> > Nevertheless, this patch series provides that solution.
-> 
-> > As a side effect of this, the first patch is one which should be
-> > merged irrespective of the remainder as it provides a useful cleanup
-> > to the large number of dependencies for the ARM_THUMB option.
-> 
-> Since this was merged (commit bf4b17749f8632696134c8705f294ce02c85c1fa),
-> linux-next would stop working on my imx258 (ARM926T).
+Hi Russell King,
+ 
+ On lun., f?vr. 20 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
 
-Thanks for the report.
+> On Mon, Feb 20, 2017 at 06:06:11PM +0100, Gregory CLEMENT wrote:
+>> I saw on IRC than Russell managed to have a more coherent date with this
+>> series on his 8040 based board. For the record, as the U-Boot on this
+>> board didn't provide a "date reset" command for the RTC located on CP
+>> slave, then Russell needed to do the following:
+>> 
+>> devmem2 0xf428401c w 0
+>> devmem2 0xf4284018 w 0x2000
+>> followed by:
+>> date 021612342017; ntpdate ...; hwclock -uw
+>> 
+>> But this issue was related to the bootloader not to the kernel. The
+>> other potential issue seen by Russell was about the GIC mapping for the
+>> interrupt, but here again this mapping was done by the 1st stage
+>> bootloader.
+>> 
+>> Given this information would it be OK to applied this series?
+>
+> No it is not.  As I already pointed out, the interrupt for the 8040 is
+> GIC_SPI 71 _not_ GIC_SPI 77 as you have it in this series.
+>
+> Both CP110's on Armada 8040 have a default mapping of ICU 77 to GIC
+> 71.
 
-> Kernel panic - not syncing: Attempted to kill init!  exitcode=0x00000004
-> 
-> It turned out that CONFIG_ARM_THUMB was not set in my kernel config,
-> enabling it fixed the problem.
-> 
-> Does this mean the kuser helpers now use thumb instructions and a user
-> space binary crashes when it uses the helpers and thumb binaries are not
-> supported?
-> 
-> If CONFIG_CPU_THUMB_CAPABLE requires CONFIG_ARM_THUMB, should we make
-> this more explicit in the code?
+OK so I am sending a v2 with this fix.
 
-No, that makes no sense:
+Thanks,
 
-"CPU_THUMB_CAPABLE" => "is this CPU capable of thumb support?"
-"ARM_THUMB" => "this CPU supports thumb and we want userspace support"
+Gregory
 
-Clearly, it does _not_ make sense to turn that upside down, especially
-given that ARM_THUMB depends on CPU_THUMB_CAPABLE being set.
-
-The problem here is that this test:
-
-        if (!(elf_hwcap & HWCAP_THUMB))
-                kuser_v4_init(vectors);
-        else
-                kuser_thumb_init(vectors);
-
-is insufficient - if CONFIG_ARM_THUMB is disabled, we clear the thumb
-bit in elf_hwcap, so we try to use the v4 code.  The v4 code is only
-built into the kernel if we're supporting an ARMv3 or ARMv4 CPU, so
-we end up with no kuser helpers at all.
-
-This is not the point in the cycle to start messing around trying to
-fix this, so I'll have to drop it for 4.11, and we'll have another go
-for 4.12.
+>
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
