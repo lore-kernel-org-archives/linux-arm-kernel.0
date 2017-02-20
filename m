@@ -1,323 +1,292 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 20 Feb 2017 18:38:48 +0100
-Subject: [PATCH v3 1/3] rtc: armada38x: Prepare driver to manage different
- versions
-In-Reply-To: <20170220173850.8640-1-gregory.clement@free-electrons.com>
-References: <20170220173850.8640-1-gregory.clement@free-electrons.com>
-Message-ID: <20170220173850.8640-2-gregory.clement@free-electrons.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Feb 2017 17:42:40 +0000
+Subject: [PATCH v2 0/3] Extend rtc-armada38x support for Armada 7K/8K
+In-Reply-To: <20170220172739.GN21222@n2100.armlinux.org.uk>
+References: <20170217101907.8963-1-gregory.clement@free-electrons.com>
+ <87tw7oaj24.fsf@free-electrons.com>
+ <20170220172739.GN21222@n2100.armlinux.org.uk>
+Message-ID: <20170220174240.GO21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to prepare the introduction of the A7K/A8K version of the RTC,
-this commit introduces a new data structure. This structure allows to
-handle the differences between the integration of the RTC IP in the
-SoCs. It will be:
- - MBUS bridge timing initialization
- - IRQ configuration at SoC level
+On Mon, Feb 20, 2017 at 05:27:39PM +0000, Russell King - ARM Linux wrote:
+> No it is not.  As I already pointed out, the interrupt for the 8040 is
+> GIC_SPI 71 _not_ GIC_SPI 77 as you have it in this series.
+> 
+> Both CP110's on Armada 8040 have a default mapping of ICU 77 to GIC 71.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/rtc/rtc-armada38x.c | 152 +++++++++++++++++++++++++++++---------------
- 1 file changed, 99 insertions(+), 53 deletions(-)
+For reference, here's the full boot-time mapping of the ICU.  I don't
+know what's responsible for this mapping, but this is read directly
+out of the ICU at kernel boot.
 
-diff --git a/drivers/rtc/rtc-armada38x.c b/drivers/rtc/rtc-armada38x.c
-index 7cb5b27189db..b2a8e2ed71ca 100644
---- a/drivers/rtc/rtc-armada38x.c
-+++ b/drivers/rtc/rtc-armada38x.c
-@@ -16,6 +16,7 @@
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/rtc.h>
- 
-@@ -23,23 +24,23 @@
- #define RTC_STATUS_ALARM1	    BIT(0)
- #define RTC_STATUS_ALARM2	    BIT(1)
- #define RTC_IRQ1_CONF	    0x4
--#define RTC_IRQ1_AL_EN		    BIT(0)
--#define RTC_IRQ1_FREQ_EN	    BIT(1)
--#define RTC_IRQ1_FREQ_1HZ	    BIT(2)
-+#define RTC_IRQ_AL_EN		    BIT(0)
-+#define RTC_IRQ_FREQ_EN		    BIT(1)
-+#define RTC_IRQ_FREQ_1HZ	    BIT(2)
-+
- #define RTC_TIME	    0xC
- #define RTC_ALARM1	    0x10
--
--#define SOC_RTC_BRIDGE_TIMING_CTL   0x0
--#define SOC_RTC_PERIOD_OFFS		0
--#define SOC_RTC_PERIOD_MASK		(0x3FF << SOC_RTC_PERIOD_OFFS)
--#define SOC_RTC_READ_DELAY_OFFS		26
--#define SOC_RTC_READ_DELAY_MASK		(0x1F << SOC_RTC_READ_DELAY_OFFS)
--
--#define SOC_RTC_INTERRUPT   0x8
--#define SOC_RTC_ALARM1		BIT(0)
--#define SOC_RTC_ALARM2		BIT(1)
--#define SOC_RTC_ALARM1_MASK	BIT(2)
--#define SOC_RTC_ALARM2_MASK	BIT(3)
-+#define RTC_38X_BRIDGE_TIMING_CTL   0x0
-+#define RTC_38X_PERIOD_OFFS		0
-+#define RTC_38X_PERIOD_MASK		(0x3FF << RTC_38X_PERIOD_OFFS)
-+#define RTC_38X_READ_DELAY_OFFS		26
-+#define RTC_38X_READ_DELAY_MASK		(0x1F << RTC_38X_READ_DELAY_OFFS)
-+
-+#define SOC_RTC_INTERRUPT	    0x8
-+#define SOC_RTC_ALARM1			BIT(0)
-+#define SOC_RTC_ALARM2			BIT(1)
-+#define SOC_RTC_ALARM1_MASK		BIT(2)
-+#define SOC_RTC_ALARM2_MASK		BIT(3)
- 
- #define SAMPLE_NR 100
- 
-@@ -55,6 +56,19 @@ struct armada38x_rtc {
- 	spinlock_t	    lock;
- 	int		    irq;
- 	struct value_to_freq *val_to_freq;
-+	struct armada38x_rtc_data *data;
-+};
-+
-+#define ALARM1	0
-+#define ALARM_REG(base, alarm)	 ((base) + (alarm) * sizeof(u32))
-+
-+struct armada38x_rtc_data {
-+	/* Initialize the RTC-MBUS bridge timing */
-+	void (*update_mbus_timing)(struct armada38x_rtc *rtc);
-+	u32 (*read_rtc_reg)(struct armada38x_rtc *rtc, u8 rtc_reg);
-+	void (*clear_isr)(struct armada38x_rtc *rtc);
-+	void (*unmask_interrupt)(struct armada38x_rtc *rtc);
-+	u32 alarm;
- };
- 
- /*
-@@ -76,19 +90,19 @@ static void rtc_delayed_write(u32 val, struct armada38x_rtc *rtc, int offset)
- }
- 
- /* Update RTC-MBUS bridge timing parameters */
--static void rtc_update_mbus_timing_params(struct armada38x_rtc *rtc)
-+static void rtc_update_38x_mbus_timing_params(struct armada38x_rtc *rtc)
- {
- 	u32 reg;
- 
--	reg = readl(rtc->regs_soc + SOC_RTC_BRIDGE_TIMING_CTL);
--	reg &= ~SOC_RTC_PERIOD_MASK;
--	reg |= 0x3FF << SOC_RTC_PERIOD_OFFS; /* Maximum value */
--	reg &= ~SOC_RTC_READ_DELAY_MASK;
--	reg |= 0x1F << SOC_RTC_READ_DELAY_OFFS; /* Maximum value */
--	writel(reg, rtc->regs_soc + SOC_RTC_BRIDGE_TIMING_CTL);
-+	reg = readl(rtc->regs_soc + RTC_38X_BRIDGE_TIMING_CTL);
-+	reg &= ~RTC_38X_PERIOD_MASK;
-+	reg |= 0x3FF << RTC_38X_PERIOD_OFFS; /* Maximum value */
-+	reg &= ~RTC_38X_READ_DELAY_MASK;
-+	reg |= 0x1F << RTC_38X_READ_DELAY_OFFS; /* Maximum value */
-+	writel(reg, rtc->regs_soc + RTC_38X_BRIDGE_TIMING_CTL);
- }
- 
--static u32 read_rtc_register_wa(struct armada38x_rtc *rtc, u8 rtc_reg)
-+static u32 read_rtc_register_38x_wa(struct armada38x_rtc *rtc, u8 rtc_reg)
- {
- 	int i, index_max = 0, max = 0;
- 
-@@ -130,13 +144,26 @@ static u32 read_rtc_register_wa(struct armada38x_rtc *rtc, u8 rtc_reg)
- 	return rtc->val_to_freq[index_max].value;
- }
- 
-+static void armada38x_clear_isr(struct armada38x_rtc *rtc)
-+{
-+	u32 val = readl(rtc->regs_soc + SOC_RTC_INTERRUPT);
-+
-+	writel(val & ~SOC_RTC_ALARM1, rtc->regs_soc + SOC_RTC_INTERRUPT);
-+}
-+
-+static void armada38x_unmask_interrupt(struct armada38x_rtc *rtc)
-+{
-+	u32 val = readl(rtc->regs_soc + SOC_RTC_INTERRUPT);
-+
-+	writel(val | SOC_RTC_ALARM1_MASK, rtc->regs_soc + SOC_RTC_INTERRUPT);
-+}
- static int armada38x_rtc_read_time(struct device *dev, struct rtc_time *tm)
- {
- 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
- 	unsigned long time, flags;
- 
- 	spin_lock_irqsave(&rtc->lock, flags);
--	time = read_rtc_register_wa(rtc, RTC_TIME);
-+	time = rtc->data->read_rtc_reg(rtc, RTC_TIME);
- 	spin_unlock_irqrestore(&rtc->lock, flags);
- 
- 	rtc_time_to_tm(time, tm);
-@@ -167,12 +194,14 @@ static int armada38x_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
- {
- 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
- 	unsigned long time, flags;
-+	u32 reg = ALARM_REG(RTC_ALARM1, rtc->data->alarm);
-+	u32 reg_irq = ALARM_REG(RTC_IRQ1_CONF, rtc->data->alarm);
- 	u32 val;
- 
- 	spin_lock_irqsave(&rtc->lock, flags);
- 
--	time = read_rtc_register_wa(rtc, RTC_ALARM1);
--	val = read_rtc_register_wa(rtc, RTC_IRQ1_CONF) & RTC_IRQ1_AL_EN;
-+	time = rtc->data->read_rtc_reg(rtc, reg);
-+	val = rtc->data->read_rtc_reg(rtc, reg_irq) & RTC_IRQ_AL_EN;
- 
- 	spin_unlock_irqrestore(&rtc->lock, flags);
- 
-@@ -185,9 +214,10 @@ static int armada38x_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
- static int armada38x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
- {
- 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
-+	u32 reg = ALARM_REG(RTC_ALARM1, rtc->data->alarm);
-+	u32 reg_irq = ALARM_REG(RTC_IRQ1_CONF, rtc->data->alarm);
- 	unsigned long time, flags;
- 	int ret = 0;
--	u32 val;
- 
- 	ret = rtc_tm_to_time(&alrm->time, &time);
- 
-@@ -196,13 +226,11 @@ static int armada38x_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
- 
- 	spin_lock_irqsave(&rtc->lock, flags);
- 
--	rtc_delayed_write(time, rtc, RTC_ALARM1);
-+	rtc_delayed_write(time, rtc, reg);
- 
- 	if (alrm->enabled) {
--			rtc_delayed_write(RTC_IRQ1_AL_EN, rtc, RTC_IRQ1_CONF);
--			val = readl(rtc->regs_soc + SOC_RTC_INTERRUPT);
--			writel(val | SOC_RTC_ALARM1_MASK,
--			       rtc->regs_soc + SOC_RTC_INTERRUPT);
-+		rtc_delayed_write(RTC_IRQ_AL_EN, rtc, reg_irq);
-+		rtc->data->unmask_interrupt(rtc);
- 	}
- 
- 	spin_unlock_irqrestore(&rtc->lock, flags);
-@@ -215,14 +243,15 @@ static int armada38x_rtc_alarm_irq_enable(struct device *dev,
- 					 unsigned int enabled)
- {
- 	struct armada38x_rtc *rtc = dev_get_drvdata(dev);
-+	u32 reg_irq = ALARM_REG(RTC_IRQ1_CONF, rtc->data->alarm);
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&rtc->lock, flags);
- 
- 	if (enabled)
--		rtc_delayed_write(RTC_IRQ1_AL_EN, rtc, RTC_IRQ1_CONF);
-+		rtc_delayed_write(RTC_IRQ_AL_EN, rtc, reg_irq);
- 	else
--		rtc_delayed_write(0, rtc, RTC_IRQ1_CONF);
-+		rtc_delayed_write(0, rtc, reg_irq);
- 
- 	spin_unlock_irqrestore(&rtc->lock, flags);
- 
-@@ -234,24 +263,23 @@ static irqreturn_t armada38x_rtc_alarm_irq(int irq, void *data)
- 	struct armada38x_rtc *rtc = data;
- 	u32 val;
- 	int event = RTC_IRQF | RTC_AF;
-+	u32 reg_irq = ALARM_REG(RTC_IRQ1_CONF, rtc->data->alarm);
- 
- 	dev_dbg(&rtc->rtc_dev->dev, "%s:irq(%d)\n", __func__, irq);
- 
- 	spin_lock(&rtc->lock);
- 
--	val = readl(rtc->regs_soc + SOC_RTC_INTERRUPT);
--
--	writel(val & ~SOC_RTC_ALARM1, rtc->regs_soc + SOC_RTC_INTERRUPT);
--	val = read_rtc_register_wa(rtc, RTC_IRQ1_CONF);
--	/* disable all the interrupts for alarm 1 */
--	rtc_delayed_write(0, rtc, RTC_IRQ1_CONF);
-+	rtc->data->clear_isr(rtc);
-+	val = rtc->data->read_rtc_reg(rtc, reg_irq);
-+	/* disable all the interrupts for alarm*/
-+	rtc_delayed_write(0, rtc, reg_irq);
- 	/* Ack the event */
--	rtc_delayed_write(RTC_STATUS_ALARM1, rtc, RTC_STATUS);
-+	rtc_delayed_write(1 << rtc->data->alarm, rtc, RTC_STATUS);
- 
- 	spin_unlock(&rtc->lock);
- 
--	if (val & RTC_IRQ1_FREQ_EN) {
--		if (val & RTC_IRQ1_FREQ_1HZ)
-+	if (val & RTC_IRQ_FREQ_EN) {
-+		if (val & RTC_IRQ_FREQ_1HZ)
- 			event |= RTC_UF;
- 		else
- 			event |= RTC_PF;
-@@ -276,13 +304,37 @@ static const struct rtc_class_ops armada38x_rtc_ops_noirq = {
- 	.read_alarm = armada38x_rtc_read_alarm,
- };
- 
-+static const struct armada38x_rtc_data armada38x_data = {
-+	.update_mbus_timing = rtc_update_38x_mbus_timing_params,
-+	.read_rtc_reg = read_rtc_register_38x_wa,
-+	.clear_isr = armada38x_clear_isr,
-+	.unmask_interrupt = armada38x_unmask_interrupt,
-+	.alarm = ALARM1,
-+};
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id armada38x_rtc_of_match_table[] = {
-+	{
-+		.compatible = "marvell,armada-380-rtc",
-+		.data = &armada38x_data,
-+	},
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, armada38x_rtc_of_match_table);
-+#endif
-+
- static __init int armada38x_rtc_probe(struct platform_device *pdev)
- {
- 	const struct rtc_class_ops *ops;
- 	struct resource *res;
- 	struct armada38x_rtc *rtc;
-+	const struct of_device_id *match;
- 	int ret;
- 
-+	match = of_match_device(armada38x_rtc_of_match_table, &pdev->dev);
-+	if (!match)
-+		return -ENODEV;
-+
- 	rtc = devm_kzalloc(&pdev->dev, sizeof(struct armada38x_rtc),
- 			    GFP_KERNEL);
- 	if (!rtc)
-@@ -327,9 +379,11 @@ static __init int armada38x_rtc_probe(struct platform_device *pdev)
- 		 */
- 		ops = &armada38x_rtc_ops_noirq;
- 	}
-+	rtc->data = (struct armada38x_rtc_data *)match->data;
-+
- 
- 	/* Update RTC-MBUS bridge timing parameters */
--	rtc_update_mbus_timing_params(rtc);
-+	rtc->data->update_mbus_timing(rtc);
- 
- 	rtc->rtc_dev = devm_rtc_device_register(&pdev->dev, pdev->name,
- 						ops, THIS_MODULE);
-@@ -359,7 +413,7 @@ static int armada38x_rtc_resume(struct device *dev)
- 		struct armada38x_rtc *rtc = dev_get_drvdata(dev);
- 
- 		/* Update RTC-MBUS bridge timing parameters */
--		rtc_update_mbus_timing_params(rtc);
-+		rtc->data->update_mbus_timing(rtc);
- 
- 		return disable_irq_wake(rtc->irq);
- 	}
-@@ -371,14 +425,6 @@ static int armada38x_rtc_resume(struct device *dev)
- static SIMPLE_DEV_PM_OPS(armada38x_rtc_pm_ops,
- 			 armada38x_rtc_suspend, armada38x_rtc_resume);
- 
--#ifdef CONFIG_OF
--static const struct of_device_id armada38x_rtc_of_match_table[] = {
--	{ .compatible = "marvell,armada-380-rtc", },
--	{}
--};
--MODULE_DEVICE_TABLE(of, armada38x_rtc_of_match_table);
--#endif
--
- static struct platform_driver armada38x_rtc_driver = {
- 	.driver		= {
- 		.name	= "armada38x-rtc",
+Format of the following table is:
+
+ICU-irq => GIC-SPI-num Enable Edge/Level ICU-group
+
+ICU mapping (/cp110-master/config-space at f2000000/interrupt-controller at 1e0000)
+    0 =>  32    Lv 0
+    1 =>  32    Lv 0
+    2 =>  32    Lv 0
+    3 =>  32    Lv 0
+    4 =>  32    Lv 0
+    5 =>  32    Lv 0
+    6 =>  32    Lv 0
+    7 =>  32    Lv 0
+    8 =>  32    Lv 0
+    9 =>  32    Lv 0
+   10 =>  32    Lv 0
+   11 =>  53 En Lv 4
+   12 =>  32 En Lv 5
+   13 =>  32    Lv 0
+   14 =>  32    Lv 0
+   15 =>  54 En Lv 4
+   16 =>  55 En Lv 4
+   17 =>  56 En Lv 4
+   18 =>  57 En Lv 4
+   19 =>  58 En Lv 4
+   20 =>  59 En Lv 4
+   21 =>  60 En Lv 4
+   22 =>  32 En Lv 0
+   23 =>  33 En Lv 0
+   24 =>  34 En Lv 0
+   25 =>  61 En Lv 4
+   26 =>  33 En Lv 5
+   27 =>  69 En Lv 0
+   28 =>  32    Lv 0
+   29 =>  32    Lv 0
+   30 =>  32    Lv 0
+   31 =>  32    Lv 0
+   32 =>  32    Lv 0
+   33 =>  35 En Lv 0
+   34 =>  35 En Lv 0
+   35 =>  35 En Lv 0
+   36 =>  35 En Lv 0
+   37 =>  32    Lv 0
+   38 =>  36 En Lv 0
+   39 =>  37 En Lv 0
+   40 =>  38 En Lv 0
+   41 =>  39 En Lv 0
+   42 =>  40 En Lv 0
+   43 =>  41 En Lv 0
+   44 =>  42 En Lv 0
+   45 =>  43 En Lv 0
+   46 =>  44 En Lv 0
+   47 =>  45 En Lv 0
+   48 =>  46 En Lv 0
+   49 =>  47 En Lv 0
+   50 =>  48 En Lv 0
+   51 =>  49 En Lv 0
+   52 =>  50 En Lv 0
+   53 =>  51 En Lv 0
+   54 =>  52 En Lv 0
+   55 =>  92 En Lv 0
+   56 =>  93 En Lv 0
+   57 =>  94 En Lv 0
+   58 =>  95 En Lv 0
+   59 =>  32    Lv 0
+   60 =>  32    Lv 0
+   61 =>  32    Lv 0
+   62 =>  32    Lv 0
+   63 =>  32    Lv 0
+   64 =>  32    Lv 0
+   65 =>  32    Lv 0
+   66 =>  32    Lv 0
+   67 =>  32    Lv 0
+   68 =>  32    Lv 0
+   69 =>  32    Lv 0
+   70 =>  32    Lv 0
+   71 =>  32    Lv 0
+   72 =>  32    Lv 0
+   73 =>  32    Lv 0
+   74 =>  32    Lv 0
+   75 =>  62 En Lv 4
+   76 =>  70 En Lv 0
+   77 =>  71 En Lv 0
+   78 =>  53 En Lv 0
+   79 =>  72 En Lv 0
+   80 =>  73 En Lv 0
+   81 =>  74 En Lv 0
+   82 =>  75 En Lv 0
+   83 =>  76 En Lv 0
+   84 =>  77 En Lv 0
+   85 =>  78 En Lv 0
+   86 =>  79 En Lv 0
+   87 =>  34 En Lv 5
+   88 =>  54 En Lv 0
+   89 =>  55 En Lv 0
+   90 =>  56 En Lv 0
+   91 =>  57 En Lv 0
+   92 =>  58 En Lv 0
+   93 =>  35 En Ed 5
+   94 =>  63 En Lv 4
+   95 =>  59 En Lv 0
+   96 =>  36 En Lv 5
+   97 =>  64 En Lv 4
+   98 =>  37 En Lv 5
+   99 =>  65 En Lv 4
+  100 =>  38 En Ed 5
+  101 =>  39 En Ed 5
+  102 =>  60 En Lv 0
+  103 =>  40 En Ed 5
+  104 =>  41 En Ed 5
+  105 =>  61 En Lv 0
+  106 =>  62 En Lv 0
+  107 =>  63 En Lv 0
+  108 =>  66 En Lv 4
+  109 =>  63 En Lv 0
+  110 =>  67 En Lv 4
+  111 =>  80 En Lv 0
+  112 =>  81 En Lv 0
+  113 =>  82 En Lv 0
+  114 =>  68 En Lv 4
+  115 =>  83 En Lv 0
+  116 =>  69 En Lv 4
+  117 =>  70 En Lv 4
+  118 =>  85 En Lv 0
+  119 =>  32    Lv 0
+  120 =>  86 En Lv 0
+  121 =>  87 En Lv 0
+  122 =>  88 En Lv 0
+  123 =>  89 En Lv 0
+  124 =>  90 En Lv 0
+  125 =>  91 En Lv 0
+  126 =>  65 En Lv 0
+  127 =>  66 En Lv 0
+  128 =>  67 En Lv 0
+  129 =>  68 En Lv 0
+ICU mapping (/cp110-slave/config-space at f4000000/interrupt-controller at 1e0000)
+    0 =>  32    Lv 0
+    1 =>  32    Lv 0
+    2 =>  32    Lv 0
+    3 =>  32    Lv 0
+    4 =>  32    Lv 0
+    5 =>  32    Lv 0
+    6 =>  32    Lv 0
+    7 =>  32    Lv 0
+    8 =>  32    Lv 0
+    9 =>  32    Lv 0
+   10 =>  32    Lv 0
+   11 =>  53 En Lv 4
+   12 =>  32 En Lv 5
+   13 =>  32    Lv 0
+   14 =>  32    Lv 0
+   15 =>  54 En Lv 4
+   16 =>  55 En Lv 4
+   17 =>  56 En Lv 4
+   18 =>  57 En Lv 4
+   19 =>  58 En Lv 4
+   20 =>  59 En Lv 4
+   21 =>  60 En Lv 4
+   22 => 256 En Lv 0
+   23 => 257 En Lv 0
+   24 => 258 En Lv 0
+   25 =>  61 En Lv 4
+   26 =>  33 En Lv 5
+   27 =>  69 En Lv 0
+   28 =>  32    Lv 0
+   29 =>  32    Lv 0
+   30 =>  32    Lv 0
+   31 =>  32    Lv 0
+   32 =>  32    Lv 0
+   33 => 259 En Lv 0
+   34 => 259 En Lv 0
+   35 => 259 En Lv 0
+   36 => 259 En Lv 0
+   37 =>  32    Lv 0
+   38 => 260 En Lv 0
+   39 => 261 En Lv 0
+   40 => 262 En Lv 0
+   41 => 263 En Lv 0
+   42 => 264 En Lv 0
+   43 => 265 En Lv 0
+   44 => 266 En Lv 0
+   45 => 267 En Lv 0
+   46 => 268 En Lv 0
+   47 => 269 En Lv 0
+   48 => 270 En Lv 0
+   49 => 271 En Lv 0
+   50 => 272 En Lv 0
+   51 => 273 En Lv 0
+   52 => 274 En Lv 0
+   53 => 275 En Lv 0
+   54 => 276 En Lv 0
+   55 => 316 En Lv 0
+   56 => 317 En Lv 0
+   57 => 318 En Lv 0
+   58 => 319 En Lv 0
+   59 =>  32    Lv 0
+   60 =>  32    Lv 0
+   61 =>  32    Lv 0
+   62 =>  32    Lv 0
+   63 =>  32    Lv 0
+   64 =>  32    Lv 0
+   65 =>  32    Lv 0
+   66 =>  32    Lv 0
+   67 =>  32    Lv 0
+   68 =>  32    Lv 0
+   69 =>  32    Lv 0
+   70 =>  32    Lv 0
+   71 =>  32    Lv 0
+   72 =>  32    Lv 0
+   73 =>  32    Lv 0
+   74 =>  32    Lv 0
+   75 =>  62 En Lv 4
+   76 =>  70 En Lv 0
+   77 =>  71 En Lv 0
+   78 => 277 En Lv 0
+   79 =>  72 En Lv 0
+   80 =>  73 En Lv 0
+   81 =>  74 En Lv 0
+   82 =>  75 En Lv 0
+   83 =>  76 En Lv 0
+   84 =>  77 En Lv 0
+   85 =>  78 En Lv 0
+   86 =>  79 En Lv 0
+   87 =>  34 En Lv 5
+   88 => 278 En Lv 0
+   89 => 279 En Lv 0
+   90 => 280 En Lv 0
+   91 => 281 En Lv 0
+   92 => 282 En Lv 0
+   93 =>  35 En Ed 5
+   94 =>  63 En Lv 4
+   95 => 283 En Lv 0
+   96 =>  36 En Lv 5
+   97 =>  64 En Lv 4
+   98 =>  37 En Lv 5
+   99 =>  65 En Lv 4
+  100 =>  38 En Ed 5
+  101 =>  39 En Ed 5
+  102 => 284 En Lv 0
+  103 =>  40 En Ed 5
+  104 =>  41 En Ed 5
+  105 => 285 En Lv 0
+  106 => 286 En Lv 0
+  107 => 287 En Lv 0
+  108 =>  66 En Lv 4
+  109 => 287 En Lv 0
+  110 =>  67 En Lv 4
+  111 =>  80 En Lv 0
+  112 =>  81 En Lv 0
+  113 =>  82 En Lv 0
+  114 =>  68 En Lv 4
+  115 =>  83 En Lv 0
+  116 =>  69 En Lv 4
+  117 =>  70 En Lv 4
+  118 =>  85 En Lv 0
+  119 =>  32    Lv 0
+  120 =>  86 En Lv 0
+  121 =>  87 En Lv 0
+  122 =>  88 En Lv 0
+  123 =>  89 En Lv 0
+  124 =>  90 En Lv 0
+  125 =>  91 En Lv 0
+  126 => 289 En Lv 0
+  127 => 290 En Lv 0
+  128 => 291 En Lv 0
+  129 => 292 En Lv 0
+
 -- 
-2.11.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
