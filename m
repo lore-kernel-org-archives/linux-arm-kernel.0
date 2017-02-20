@@ -1,426 +1,271 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 20 Feb 2017 17:11:39 +0100
-Subject: [PATCH v3] reset: Add i.MX7 SRC reset driver
-In-Reply-To: <20170220152653.31739-1-andrew.smirnov@gmail.com>
-References: <20170220152653.31739-1-andrew.smirnov@gmail.com>
-Message-ID: <1487607099.3878.44.camel@pengutronix.de>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 20 Feb 2017 17:12:07 +0100
+Subject: Pointers for writing a good PCIe driver
+In-Reply-To: <20170217175054.GA16671@bhelgaas-glaptop.roam.corp.google.com>
+References: <ff099b5f-efc8-bb5f-41e3-493398844cc0@free.fr>
+ <05046a8a-ba9f-26f9-4c93-f657f9da6294@free.fr>
+ <20170207200656.GA11659@bhelgaas-glaptop.roam.corp.google.com>
+ <20170207214758.GC11659@bhelgaas-glaptop.roam.corp.google.com>
+ <0f22720c-e47d-59f6-b5f7-5e40f4a1759d@free.fr>
+ <20170212165033.GA31833@kroah.com>
+ <0d785dab-c830-b887-d9f3-a2cd5338695c@free.fr>
+ <20170217143803.GA10663@bhelgaas-glaptop.roam.corp.google.com>
+ <eff9861e-043a-7ecd-5d52-c8e18a52ece8@free.fr>
+ <20170217175054.GA16671@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <0552ee82-a73a-ad06-4cb2-7eff05931877@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
+On 17/02/2017 18:50, Bjorn Helgaas wrote:
 
-On Mon, 2017-02-20 at 07:26 -0800, Andrey Smirnov wrote:
-> Add reset controller driver exposing various reset faculties,
-> implemented by System Reset Controller IP block.
+> On Fri, Feb 17, 2017 at 06:00:53PM +0100, Mason wrote:
 >
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> ---
+>> On 17/02/2017 15:38, Bjorn Helgaas wrote:
+>>
+>>> The native PCI host controller drivers indeed live in drivers/pci/host/
+>>>
+>>> I don't know anything about your hardware or environment, but I highly
+>>> encourage you to use ACPI (drivers/acpi/pci_root.c, with a little bit
+>>> of arch support) or generic DT (drivers/pci/host/pci-host-generic.c)
+>>> instead of writing a custom host controller driver.
+>>>
+>>> The native drivers in drivers/pci/host are a huge maintenance hassle
+>>> for no real benefit.
+>>
+>> I'm currently using this DT description:
+>> http://lxr.free-electrons.com/source/arch/arm/boot/dts/tango4-common.dtsi
+>>
+>> The "legacy" driver sits at ~700 lines. It would be awesome to be able
+>> to discard all of it, and rely on generic upstream code. But I don't
+>> understand how it is possible for a generic driver to support whatever
+>> crazy solution some random vendor has come up with?
 > 
-> Changes since v2 (see [v2]):
+> You're right that the programming model of the host bridge itself is
+> not specified by PCI specs, so it's impossible to have a generic
+> driver that can manage it completely by itself.
 > 
-> 	- Fix typos
-> 
-> 	- Kconfig/Makefile chagnes account for alphabetical sorting of
->           those files
-> 
-> 	- Remove redundant includes
-> 
-> 	- Make use of regmap_attach_dev and avoid storing refernce to
->           struct *dev in private data
-> 
-> 	- Change code and headers to expose almost all of the reset
->           related bits in SRC IP block
+> If you have firmware that initializes the bridge and tells the OS what
+> the windows are (bus numbers, memory space, I/O space) and where the
+> PCIe-specified ECAM space is, a generic driver can take it from there.
 
-Thank you, this is looking much better!
+(Mostly walking myself through the code and documentation,
+noting references along the way.)
 
-> Changes since v1 (see [v1]):
-> 
-> 	- Various small DT bindings description fixes as per feedback
->           from Rob Herring
-> 
-> 
-> [v1] https://lkml.org/lkml/2017/2/6/554
-> [v2] https://lkml.org/lkml/2017/2/13/488
-> 
-> 
->  .../devicetree/bindings/reset/fsl,imx7-src.txt     |  47 ++++++
->  drivers/reset/Kconfig                              |   8 +
->  drivers/reset/Makefile                             |   2 +
->  drivers/reset/reset-imx7.c                         | 186 +++++++++++++++++++++
->  include/dt-bindings/reset/imx7-reset.h             |  62 +++++++
->  5 files changed, 305 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
->  create mode 100644 drivers/reset/reset-imx7.c
->  create mode 100644 include/dt-bindings/reset/imx7-reset.h
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
-> new file mode 100644
-> index 0000000..5e1afc3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
-> @@ -0,0 +1,47 @@
-> +Freescale i.MX7 System Reset Controller
-> +======================================
-> +
-> +Please also refer to reset.txt in this directory for common reset
-> +controller binding usage.
-> +
-> +Required properties:
-> +- compatible: Should be "fsl,imx7-src", "syscon"
-> +- reg: should be register base and length as documented in the
-> +  datasheet
-> +- interrupts: Should contain SRC interrupt
-> +- #reset-cells: 1, see below
-> +
-> +example:
-> +
-> +src: reset-controller at 30390000 {
-> +     compatible = "fsl,imx7d-src", "syscon";
-> +     reg = <0x30390000 0x2000>;
-> +     interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
-> +     #reset-cells = <1>;
-> +};
-> +
-> +
-> +Specifying reset lines connected to IP modules
-> +==============================================
-> +
-> +The system reset controller can be used to reset various set of
-> +peripherals. Device nodes that need access to reset lines should
-> +specify them as a reset phandle in their corresponding node as
-> +specified in reset.txt.
-> +
-> +Example:
-> +
-> +	pcie: pcie at 33800000 {
-> +
-> +		...
-> +
-> +		resets = <&src IMX7_RESET_PCIEPHY>,
-> +			 <&src IMX7_RESET_PCIE_CTRL_APPS_EN>;
-> +		reset-names = "pciephy", "apps";
-> +
-> +		...
-> +        };
-> +
-> +
-> +For list of all valid reset indicies see
-> +<dt-bindings/reset/imx7-reset.h>
-> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-> index 172dc96..bea1800 100644
-> --- a/drivers/reset/Kconfig
-> +++ b/drivers/reset/Kconfig
-> @@ -27,6 +27,14 @@ config RESET_BERLIN
->  	help
->  	  This enables the reset controller driver for Marvell Berlin SoCs.
->  
-> +config RESET_IMX7
-> +	bool "i.MX7 Reset Driver"
-> +	depends on SOC_IMX7D || COMPILE_TEST
-> +	select MFD_SYSCON
-> +	default SOC_IMX7D
-> +	help
-> +	  This enables the reset controller driver for i.MX7 SoCs.
-> +
->  config RESET_LPC18XX
->  	bool "LPC18xx/43xx Reset Driver" if COMPILE_TEST
->  	default ARCH_LPC18XX
-> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> index 13b346e..a24aa80 100644
-> --- a/drivers/reset/Makefile
-> +++ b/drivers/reset/Makefile
-> @@ -4,6 +4,7 @@ obj-$(CONFIG_ARCH_STI) += sti/
->  obj-$(CONFIG_ARCH_TEGRA) += tegra/
->  obj-$(CONFIG_RESET_ATH79) += reset-ath79.o
->  obj-$(CONFIG_RESET_BERLIN) += reset-berlin.o
-> +obj-$(CONFIG_RESET_IMX7) += reset-imx7.o
->  obj-$(CONFIG_RESET_LPC18XX) += reset-lpc18xx.o
->  obj-$(CONFIG_RESET_MESON) += reset-meson.o
->  obj-$(CONFIG_RESET_OXNAS) += reset-oxnas.o
-> @@ -14,3 +15,4 @@ obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
->  obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
->  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
->  obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
-> +
-> diff --git a/drivers/reset/reset-imx7.c b/drivers/reset/reset-imx7.c
-> new file mode 100644
-> index 0000000..6e26796
-> --- /dev/null
-> +++ b/drivers/reset/reset-imx7.c
-> @@ -0,0 +1,186 @@
-> +/*
-> + * Copyright (c) 2017, Impinj, Inc.
-> + *
-> + * i.MX7 System Reset Controller (SRC) driver
-> + *
-> + * Author: Andrey Smirnov <andrew.smirnov@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; version 2 of the License.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reset-controller.h>
-> +#include <linux/regmap.h>
-> +#include <dt-bindings/reset/imx7-reset.h>
-> +
-> +struct imx7_src {
-> +	struct reset_controller_dev rcdev;
-> +	struct regmap *regmap;
-> +};
-> +
-> +enum imx7_src_registers {
-> +	SRC_A7RCR0		= 0x0004,
-> +	SRC_M4RCR		= 0x000c,
-> +	SRC_ERCR		= 0x0014,
-> +	SRC_HSICPHY_RCR		= 0x001c,
-> +	SRC_USBOPHY1_RCR	= 0x0020,
-> +	SRC_USBOPHY2_RCR	= 0x0024,
-> +	SRC_MIPIPHY_RCR		= 0x0028,
-> +	SRC_PCIEPHY_RCR		= 0x002c,
-> +	SRC_DDRC_RCR		= 0x1000,
-> +
-> +	SRC_PCIEPHY_RCR_PCIEPHY_G_RST   = BIT(1),
-> +	SRC_PCIEPHY_RCR_PCIEPHY_BTN     = BIT(2),
-> +};
-> +
-> +struct imx7_src_signal {
-> +	unsigned int offset, bit;
-> +};
-> +
-> +static const struct imx7_src_signal imx7_src_signals[IMX7_RESET_NUM] = {
-> +	[IMX7_RESET_A7_CORE_POR_RESET0] = { SRC_A7RCR0, BIT(0) },
-> +	[IMX7_RESET_A7_CORE_POR_RESET1] = { SRC_A7RCR0, BIT(1) },
-> +	[IMX7_RESET_A7_CORE_RESET0]     = { SRC_A7RCR0, BIT(4) },
-> +	[IMX7_RESET_A7_CORE_RESET1]	= { SRC_A7RCR0, BIT(5) },
-> +	[IMX7_RESET_A7_DBG_RESET0]	= { SRC_A7RCR0, BIT(8) },
-> +	[IMX7_RESET_A7_DBG_RESET1]	= { SRC_A7RCR0, BIT(9) },
-> +	[IMX7_RESET_A7_ETM_RESET0]	= { SRC_A7RCR0, BIT(12) },
-> +	[IMX7_RESET_A7_ETM_RESET1]	= { SRC_A7RCR0, BIT(13) },
-> +	[IMX7_RESET_A7_SOC_DBG_RESET]	= { SRC_A7RCR0, BIT(20) },
-> +	[IMX7_RESET_A7_L2RESET]		= { SRC_A7RCR0, BIT(21) },
-> +	[IMX7_RESET_SW_M4C_RST]		= { SRC_M4RCR, BIT(1) },
-> +	[IMX7_RESET_SW_M4P_RST]		= { SRC_M4RCR, BIT(2) },
-> +	[IMX7_RESET_EIM_RST]		= { SRC_ERCR, BIT(0) },
-> +	[IMX7_RESET_HSICPHY_PORT_RST]	= { SRC_HSICPHY_RCR, BIT(1) },
-> +	[IMX7_RESET_USBPHY1_POR]	= { SRC_USBOPHY1_RCR, BIT(0) },
-> +	[IMX7_RESET_USBPHY1_PORT_RST]	= { SRC_USBOPHY1_RCR, BIT(1) },
-> +	[IMX7_RESET_USBPHY2_POR]	= { SRC_USBOPHY2_RCR, BIT(0) },
-> +	[IMX7_RESET_USBPHY2_PORT_RST]	= { SRC_USBOPHY2_RCR, BIT(1) },
-> +	[IMX7_RESET_MIPI_PHY_MRST]	= { SRC_MIPIPHY_RCR, BIT(1) },
-> +	[IMX7_RESET_MIPI_PHY_SRST]	= { SRC_MIPIPHY_RCR, BIT(2) },
-> +	[IMX7_RESET_PCIEPHY]		= { /* Placeholder */ },
-> +	[IMX7_RESET_PCIEPHY_PERST]	= { SRC_PCIEPHY_RCR, BIT(3) },
-> +	[IMX7_RESET_PCIE_CTRL_APPS_EN]	= { SRC_PCIEPHY_RCR, BIT(6) },
-> +	[IMX7_RESET_DDRC_PRST]		= { SRC_DDRC_RCR, BIT(0) },
-> +	[IMX7_RESET_DDRC_CORE_RST]	= { SRC_DDRC_RCR, BIT(1) },
-> +};
-> +
-> +static struct imx7_src *to_imx7_src(struct reset_controller_dev *rcdev)
-> +{
-> +	return container_of(rcdev, struct imx7_src, rcdev);
-> +}
-> +
-> +static int imx7_reset_assert(struct reset_controller_dev *rcdev,
-> +			     unsigned long id)
-> +{
-> +	struct imx7_src *imx7src = to_imx7_src(rcdev);
-> +	const struct imx7_src_signal *signal = &imx7_src_signals[id];
-> +	unsigned int value = signal->bit;
-> +
-> +	switch (id) {
-> +	case IMX7_RESET_PCIEPHY:
-> +		regmap_update_bits(imx7src->regmap,
-> +				   SRC_PCIEPHY_RCR,
-> +				   SRC_PCIEPHY_RCR_PCIEPHY_G_RST,
-> +				   SRC_PCIEPHY_RCR_PCIEPHY_G_RST);
-> +		regmap_update_bits(imx7src->regmap,
-> +				   SRC_PCIEPHY_RCR,
-> +				   SRC_PCIEPHY_RCR_PCIEPHY_BTN,
-> +				   SRC_PCIEPHY_RCR_PCIEPHY_BTN);
+I took a look at drivers/pci/host/pci-host-generic.c
+which is a tiny file, so the magic must be happening elsewhere.
+=> drivers/pci/host/pci-host-common.c (for starters)
 
-Is it possible to assert (and deassert) both bits at the same time?
-That would allow to use the default case here.
+gen_pci_cfg_cam_bus_ops and pci_generic_ecam_ops have the same
+.pci_ops, but different .bus_shift
 
-> +		break;
-> +
-> +	case IMX7_RESET_PCIE_CTRL_APPS_EN:
-> +		value = 0;
-> +	default:		/* FALLTHROUGH */
-> +		regmap_update_bits(imx7src->regmap,
-> +				   signal->offset, signal->bit, value);
-> +		break;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int imx7_reset_deassert(struct reset_controller_dev *rcdev,
-> +			       unsigned long id)
-> +{
-> +	struct imx7_src *imx7src = to_imx7_src(rcdev);
-> +	const struct imx7_src_signal *signal = &imx7_src_signals[id];
-> +	unsigned int value = 0;
-> +
-> +	switch (id) {
-> +	case IMX7_RESET_PCIEPHY:
-> +		/* 
-> +		 * wait for more than 10us to release phy g_rst and
-> +		 * btnrst
-> +		 */
-> +		udelay(10);
+$ git grep pci-host-cam-generic
+Documentation/devicetree/bindings/pci/host-generic-pci.txt:- compatible     : Must be "pci-host-cam-generic" or "pci-host-ecam-generic"
+Documentation/devicetree/bindings/pci/host-generic-pci.txt:    compatible = "pci-host-cam-generic"
+drivers/pci/host/pci-host-generic.c:    { .compatible = "pci-host-cam-generic",
 
-What is the purpose of this delay?
+$ git grep pci-host-ecam-generic
+Documentation/devicetree/bindings/pci/host-generic-pci.txt:- compatible     : Must be "pci-host-cam-generic" or "pci-host-ecam-generic"
+arch/arm/boot/dts/alpine.dtsi:                  compatible = "pci-host-ecam-generic";
+arch/arm64/boot/dts/al/alpine-v2.dtsi:                  compatible = "pci-host-ecam-generic";
+arch/arm64/boot/dts/amd/amd-seattle-soc.dtsi:                   compatible = "pci-host-ecam-generic";
+arch/arm64/boot/dts/arm/juno-base.dtsi:         compatible = "arm,juno-r1-pcie", "plda,xpressrich3-axi", "pci-host-ecam-generic";
+arch/arm64/boot/dts/broadcom/vulcan.dtsi:               compatible = "pci-host-ecam-generic";
+drivers/pci/host/pci-host-generic.c:    { .compatible = "pci-host-ecam-generic",
 
-> +		regmap_update_bits(imx7src->regmap,
-> +				   SRC_PCIEPHY_RCR,
-> +				   SRC_PCIEPHY_RCR_PCIEPHY_G_RST, 0);
-> +		regmap_update_bits(imx7src->regmap,
-> +				   SRC_PCIEPHY_RCR,
-> +				   SRC_PCIEPHY_RCR_PCIEPHY_BTN, 0);
+https://www.kernel.org/doc/Documentation/devicetree/bindings/pci/host-generic-pci.txt
 
-Same as above. Assert and deassert using the same order makes me think
-that the order may not be important at all. If they do on the other hand
-have to be flipped in a certain order, it would be better to expose them
-separately.
+> Firmware-initialised PCI host controllers and PCI emulations, such as the
+> virtio-pci implementations found in kvmtool and other para-virtualised
+> systems, do not require driver support for complexities such as regulator
+> and clock management. In fact, the controller may not even require the
+> configuration of a control interface by the operating system, instead
+> presenting a set of fixed windows describing a subset of IO, Memory and
+> Configuration Spaces.
 
-> +		break;
-> +	case IMX7_RESET_PCIE_CTRL_APPS_EN:
-> +		value = signal->bit;
-> +	default:		/* FALLTHROUGH */
-> +		regmap_update_bits(imx7src->regmap,
-> +				   signal->offset, signal->bit, value);
-> +
-> +		break;
-> +	};
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct reset_control_ops imx7_reset_ops = {
-> +	.assert		= imx7_reset_assert,
-> +	.deassert	= imx7_reset_deassert,
-> +};
-> +
-> +static int imx7_reset_probe(struct platform_device *pdev)
-> +{
-> +	struct imx7_src *imx7src;
-> +	struct device *dev = &pdev->dev;
-> +	struct regmap_config config = { .name = "src" };
-> +
-> +	imx7src = devm_kzalloc(dev, sizeof(*imx7src), GFP_KERNEL);
-> +	if (!imx7src)
-> +		return -ENOMEM;
-> +
-> +	imx7src->regmap = syscon_node_to_regmap(dev->of_node);
-> +	if (IS_ERR(imx7src->regmap)) {
-> +		dev_err(dev, "Unable to get imx7-src regmap");
-> +		return PTR_ERR(imx7src->regmap);
-> +	}
-> +	regmap_attach_dev(dev, imx7src->regmap, &config);
-> +
-> +	imx7src->rcdev.owner     = THIS_MODULE;
-> +	imx7src->rcdev.nr_resets = IMX7_RESET_NUM;
-> +	imx7src->rcdev.ops       = &imx7_reset_ops;
-> +	imx7src->rcdev.of_node   = dev->of_node;
-> +
-> +	return devm_reset_controller_register(dev, &imx7src->rcdev);
-> +}
-> +
-> +static const struct of_device_id imx7_reset_dt_ids[] = {
-> +	{ .compatible = "fsl,imx7d-src", },
-> +	{ /* sentinel */ },
-> +};
-> +
-> +static struct platform_driver imx7_reset_driver = {
-> +	.probe	= imx7_reset_probe,
-> +	.driver = {
-> +		.name		= KBUILD_MODNAME,
-> +		.of_match_table	= imx7_reset_dt_ids,
-> +	},
-> +};
-> +builtin_platform_driver(imx7_reset_driver);
-> diff --git a/include/dt-bindings/reset/imx7-reset.h b/include/dt-bindings/reset/imx7-reset.h
-> new file mode 100644
-> index 0000000..6394817
-> --- /dev/null
-> +++ b/include/dt-bindings/reset/imx7-reset.h
-> @@ -0,0 +1,62 @@
-> +/*
-> + * Copyright (C) 2017 Impinj, Inc.
-> + *
-> + * Author: Andrey Smirnov <andrew.smirnov@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef DT_BINDING_RESET_IMX7_H
-> +#define DT_BINDING_RESET_IMX7_H
-> +
-> +#define IMX7_RESET_A7_CORE_POR_RESET0	0
-> +#define IMX7_RESET_A7_CORE_POR_RESET1	1
-> +#define IMX7_RESET_A7_CORE_RESET0	2
-> +#define IMX7_RESET_A7_CORE_RESET1	3
-> +#define IMX7_RESET_A7_DBG_RESET0	4
-> +#define IMX7_RESET_A7_DBG_RESET1	5
-> +#define IMX7_RESET_A7_ETM_RESET0	6
-> +#define IMX7_RESET_A7_ETM_RESET1	7
-> +#define IMX7_RESET_A7_SOC_DBG_RESET	8
-> +#define IMX7_RESET_A7_L2RESET		9
-> +#define IMX7_RESET_SW_M4C_RST		10
-> +#define IMX7_RESET_SW_M4P_RST		11
-> +#define IMX7_RESET_EIM_RST		12
-> +#define IMX7_RESET_HSICPHY_PORT_RST	13
-> +#define IMX7_RESET_USBPHY1_POR		14
-> +#define IMX7_RESET_USBPHY1_PORT_RST	15
-> +#define IMX7_RESET_USBPHY2_POR		16
-> +#define IMX7_RESET_USBPHY2_PORT_RST	17
-> +#define IMX7_RESET_MIPI_PHY_MRST	18
-> +#define IMX7_RESET_MIPI_PHY_SRST	19
-> +
-> +/*
-> + * IMX7_RESET_PCIEPHY is a logical reset line combining PCIEPHY_BTN
-> + * and PCIEPHY_G_RST
-> + */
-> +#define IMX7_RESET_PCIEPHY		20
-> +#define IMX7_RESET_PCIEPHY_PERST	21
-> +
-> +/*
-> + * IMX7_RESET_PCIE_CTRL_APPS_EN is not strictly a reset line, but it
-> + * can be used to inhibit PCIe LTTSM, so, in a way, it can be thoguht
-> + * of as one
-> + */
-> +#define IMX7_RESET_PCIE_CTRL_APPS_EN	22
-> +#define IMX7_RESET_DDRC_PRST		23
-> +#define IMX7_RESET_DDRC_CORE_RST	24
-> +
-> +#define IMX7_RESET_NUM			25
-> +
-> +#endif
-> +
+For the only arm32 user, arch/arm/boot/dts/alpine.dtsi:
 
-regards
-Philipp
+		/* Internal PCIe Controller */
+		pcie-internal at 0xfbc00000 {
+			compatible = "pci-host-ecam-generic";
+			device_type = "pci";
+			#size-cells = <2>;
+			#address-cells = <3>;
+			#interrupt-cells = <1>;
+			reg = <0x0 0xfbc00000 0x0 0x100000>;
+			interrupt-map-mask = <0xf800 0 0 7>;
+			/* Add legacy interrupts for SATA devices only */
+			interrupt-map =	<0x4000 0 0 1 &gic 0 43 4>,
+					<0x4800 0 0 1 &gic 0 44 4>;
+
+			/* 32 bit non prefetchable memory space */
+			ranges = <0x02000000 0x0 0xfe000000 0x0 0xfe000000 0x0 0x1000000>;
+
+			bus-range = <0x00 0x00>;
+			msi-parent = <&msix>;
+		};
+
+
+Compatible string depends on "the layout of configuration space
+(CAM vs ECAM respectively)"
+
+https://en.wikipedia.org/wiki/PCI_configuration_space
+
+
+The register interface to my PCIe controller is:
+
+0x2e000	REGION_0_BASE_REG
+0x2e004	REGION_1_BASE_REG
+0x2e008	REGION_2_BASE_REG
+0x2e00c	REGION_3_BASE_REG
+0x2e010	REGION_4_BASE_REG
+0x2e014	REGION_5_BASE_REG
+0x2e018	REGION_6_BASE_REG
+0x2e01c	REGION_7_BASE_REG
+0x2e020	DMA_RD_MBUS_ADDR_REG
+0x2e024	DMA_RD_ADDR_LO_REG
+0x2e028	DMA_RD_ADDR_HI_REG
+0x2e02c	DMA_RD_CNT_REG
+0x2e030	DMA_WR_MBUS_ADDR_REG
+0x2e034	DMA_WR_ADDR_LO_REG
+0x2e038	DMA_WR_ADDR_HI_REG
+0x2e03c	DMA_WR_CNT_REG
+0x2e040	DMA_RD_EN_REG
+0x2e044	DMA_WR_EN_REG
+0x2e048	PCI_ADDR_LO_BASE_REG
+0x2e04c	PCI_ADDR_HI_BASE_REG
+0x2e050	PM_REG
+0x2e054	MAX_CPL_TIMEOUT_REG
+0x2e058	CORE_CONF_0_REG
+0x2e05c	CORE_CONF_1_REG
+0x2e060	CBA_ADDR_REG
+0x2e064	CBA_DATA_REG
+0x2e068	DEBUG_0_REG
+0x2e06c	DEBUG_1_REG
+0x2e070	DEBUG_2_REG
+0x2e074	CORE_TEST_OUT_REG
+0x2e078	INT_NOT_MSI_REG
+0x2e07c	MSI_REG
+0x2e080	MSI_0_REG
+0x2e084	MSI_1_REG
+0x2e088	MSI_2_REG
+0x2e08c	MSI_3_REG
+0x2e090	MSI_4_REG
+0x2e094	MSI_5_REG
+0x2e098	MSI_6_REG
+0x2e09c	MSI_7_REG
+0x2e0a0	MSI_0_MASK_REG
+0x2e0a4	MSI_1_MASK_REG
+0x2e0a8	MSI_2_MASK_REG
+0x2e0ac	MSI_3_MASK_REG
+0x2e0b0	MSI_4_MASK_REG
+0x2e0b4	MSI_5_MASK_REG
+0x2e0b8	MSI_6_MASK_REG
+0x2e0bc	MSI_7_MASK_REG
+0x2e0c0	PHY_HW_TRAPS_REG
+0x2e0c4	COMMON_BIST_0_REG
+0x2e0c8	COMMON_BIST_1_REG
+0x2e0cc	LANE_0_BIST_REG
+0x2e0d0	CUSTOM_CONF_LINK_REG
+0x2e0d4	CUSTOM_CONF_LANE_0_REG
+0x2e0e0	PLL_SETTING_REG
+0x2e0e4	DEBUG_3_REG
+0x2e0e8	DEBUG_4_REG
+0x2e0ec	DEBUG_5_REG
+
+
+In the "legacy" driver (for kernel v3.4), I see
+
+static struct pci_ops tangox_pcie_ops = {
+	.read	= tangox_pcie_read_conf,
+	.write	= tangox_pcie_write_conf,
+};
+
+#define TANGOX_PCIE_ENABLE_CONFIG_IO()      WR_PCIE_REG32(TANGOX_PCIE_PCI_ADDR_LO_BASE_REG, ((TANGOX_PCIE_ADDR_BASE & 0xff000000) | 0x1))
+#define TANGOX_PCIE_DISABLE_CONFIG_IO()     WR_PCIE_REG32(TANGOX_PCIE_PCI_ADDR_LO_BASE_REG, ((TANGOX_PCIE_ADDR_BASE & 0xff000000) & ~0x1))
+
+static int tangox_pcie_read_conf(struct pci_bus *bus, unsigned int devfn,
+                                 int where, int size, u32 *val)
+{
+    void __iomem *addr;
+
+    TANGOX_PCIE_ENABLE_CONFIG_IO();
+
+    addr =  (void __iomem *)(
+            tangox_pcie.regs +
+            PCIE_CONF_BUS(bus->number) +
+            PCIE_CONF_DEV(PCI_SLOT(devfn)) +
+            PCIE_CONF_FUNC(PCI_FUNC(devfn)) +
+            PCIE_CONF_REG(where));
+
+    *val = readl( addr );
+
+	if (size == 1)
+		*val = (*val >> (8 * (where & 3))) & 0xff;
+	else if (size == 2)
+		*val = (*val >> (8 * (where & 3))) & 0xffff;
+
+    TANGOX_PCIE_DISABLE_CONFIG_IO();
+
+    return PCIBIOS_SUCCESSFUL;
+}
+
+
+I see that pci-host-common.c calls:
+pci_scan_root_bus(dev, cfg->busr.start, &ops->pci_ops, cfg, &resources);
+
+whereas the legacy driver calls:
+pci_scan_root_bus(NULL, sys->busnr, &tangox_pcie_ops, sys, &sys->resources);
+
+So the generic equivalent of
+tangox_pcie_read_conf() and tangox_pcie_write_conf()
+should be
+pci_generic_config_read() and pci_generic_config_write()
+
+
+int pci_generic_config_read(struct pci_bus *bus, unsigned int devfn,
+			    int where, int size, u32 *val)
+{
+	void __iomem *addr;
+
+	addr = bus->ops->map_bus(bus, devfn, where);
+	if (!addr) {
+		*val = ~0;
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	}
+
+	if (size == 1)
+		*val = readb(addr);
+	else if (size == 2)
+		*val = readw(addr);
+	else
+		*val = readl(addr);
+
+	return PCIBIOS_SUCCESSFUL;
+}
+
+
+Problem might come from the
+TANGOX_PCIE_ENABLE_CONFIG_IO() / TANGOX_PCIE_DISABLE_CONFIG_IO()
+shenanigans.
+
+Also, I see that the legacy implementation reads 32 bits,
+then performs the shift & mask in software. I'm hoping that
+the ARM core does the right thing for readb/readw.
+
+
+Taking a closer look at TANGOX_PCIE_ENABLE_CONFIG_IO()
+WR_PCIE_REG32(TANGOX_PCIE_PCI_ADDR_LO_BASE_REG, ((TANGOX_PCIE_ADDR_BASE & 0xff000000) | 0x1))
+
+Register "PCI_ADDR_LO_BASE_REG" is composed of
+pci_addr_base_lo[31:28] and pci_conf[0]
+
+  pci_conf : if 1, the access by LBUS is a configuration request. If 0, the access by LBUS is a memory request.
+  pci_addr_base_lo : lower part of the PCI address for access by LBUS.
+
+So it looks like I need to fudge something, perhaps override map_bus method?
+
+What is a "memory request", in PCIe lingo?
+In other words, when do I need to clear the "pci_conf" bit?
+(Maybe firmware can just set it to 1, and be done with it?)
+
+Regards.
