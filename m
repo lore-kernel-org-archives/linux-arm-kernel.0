@@ -1,43 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Feb 2017 12:45:32 +0000
-Subject: [RFC 7/7] arm64: map seperately rodata sections for
- __ro_mostly_after_init section
-In-Reply-To: <CAKv+Gu9umycZm_UP99ZUifLUBb8MuOZHXgU9nB6XioVMa4eeVw@mail.gmail.com>
-References: <1487498660-16600-1-git-send-email-hoeun.ryu@gmail.com>
- <1487498660-16600-7-git-send-email-hoeun.ryu@gmail.com>
- <CAKv+Gu9umycZm_UP99ZUifLUBb8MuOZHXgU9nB6XioVMa4eeVw@mail.gmail.com>
-Message-ID: <20170220124531.GH9003@leverpostej>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 20 Feb 2017 13:56:46 +0100
+Subject: [PATCH 2/4] Documentation: devicetree: arm: Document Marvell
+ IAP140
+In-Reply-To: <20170219032000.4674-3-afaerber@suse.de>
+References: <20170219032000.4674-1-afaerber@suse.de>
+ <20170219032000.4674-3-afaerber@suse.de>
+Message-ID: <20170220135646.2b0219c1@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 19, 2017 at 11:35:51AM +0000, Ard Biesheuvel wrote:
-> On 19 February 2017 at 10:04, Hoeun Ryu <hoeun.ryu@gmail.com> wrote:
-> > Map rodata sections seperately for the new __ro_mostly_after_init section.
-> > Attribute of memory for __ro_mostly_after_init section can be changed later
-> > so we need a dedicated vmalloced region for set_memory_rw/ro api.
+Hello,
 
-> While it is correct that you are splitting this into three separate
-> segments (otherwise we would not be able to change the permissions
-> later without risking splitting to occur), I think this leads to
-> unnecessary fragmentation.
-> 
-> If there is demand for this feature (but you still need to make the
-> argument for that), I wonder if it wouldn't be sufficient, and much
-> more straightforward, to redefine the __ro_after_init semantics to
-> include the kind of subsystem registration and module init context you
-> are targeting, and implement some hooks to temporarily lift the
-> __ro_after_init r/o permission restrictions in a controlled manner.
+On Sun, 19 Feb 2017 04:19:58 +0100, Andreas F?rber wrote:
 
->From a look over the series, I think this is just __write_rarely in
-disguise. I personally think that we should keep __write_rarely and
-__ro_after_init separate, the later being a strictly one-shot affair.
+> + - compatible :  must contain "mrvl,iap140"
 
-I had some ideas [1] as to how we could implement __write_rarely without
-carving up the kernel mapping further (and keeping the RW permissions
-local to the thread needing it), but I have not had the time to look
-into that further.
+Even though there's indeed a good number of existing "mrvl," compatible
+strings in the tree, the official vendor prefix according to
+Documentation/devicetree/bindings/vendor-prefixes.txt is "marvell".
+Probably you should use that instead for new bindings?
 
 Thanks,
-Mark.
 
-[1] http://www.openwall.com/lists/kernel-hardening/2016/11/18/3
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
