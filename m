@@ -1,51 +1,43 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 20 Feb 2017 21:20:01 +0200
-Subject: imx: Race when disabling RX in IMX.6 UART in half duplex
-In-Reply-To: <c07c95e2-3463-222b-c78a-b5716b4c5a14@camlintechnologies.com>
-References: <c07c95e2-3463-222b-c78a-b5716b4c5a14@camlintechnologies.com>
-Message-ID: <20170220192001.eqomprbgrqkefkas@tarshish>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 20 Feb 2017 20:32:58 +0100
+Subject: [PATCH v6 00/14] mmc: Add support to Marvell Xenon SD Host
+ Controller
+In-Reply-To: <87y3x0ajdv.fsf@free-electrons.com>
+References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
+ <87y3x0ajdv.fsf@free-electrons.com>
+Message-ID: <CAPDyKFqXQmuxWFZwcnTgQcKU_t5MKCtBj6s+tv5gzVWS11x0qA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Piotr,
+On 20 February 2017 at 17:59, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Ulf,
+>
+>  On mar., f?vr. 14 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+>
+>> Hello,
+>>
+>> This the sixth version of the series adding support for the SDHCI
+>> Xenon controller. It can be currently found on the Armada 37xx and the
+>> Armada 7K/8K but will be also used in more Marvell SoC (and not only
+>> the mvebu ones actually).
+>>
+>> Most of the following changes had been discussed on the mailing list,
+>> except the new compatible string.
+>>
+>
+> I think that with this version we addressed all the concerns expressed
+> about the previous version. Do you think that you will be able to apply
+> this series for 4.11 or do you still see any issues?
+>
+> Thanks,
+>
+> Gregory
 
-On Mon, Feb 20, 2017 at 02:54:02PM +0100, Piotr Figiel wrote:
->  I'm looking to find a correct way to disable RX in the I.MX6 UART during
-> TX-ing. I stumbled on the issue described below when working on
-> ~SER_RS485_RX_DURING_TX on custom 3.10 tree (branched from Freescale's/NXP's
-> BSP release) independently to what is now in the main line imx.c, but I see
-> now that the implementation in mainline also seem to have the same problem
-> I'm trying to solve now. I would like to request for comments to
-> confirm/deny whether the issue I raise here is valid and how to best
-> approach this.
-> 
->  I'm mostly concerned about the fact that the URXD register must not be
-> accessed (as documented in IMX.6 RM) when RX is disabled (RXEN=0). The issue
-> is that in the following sequence happening during imx_start_tx with
-> ~SER_RS485_RX_DURING_TX set:
-> 
-> 1. Acquire spinlock, disable local interrupts (from serial_core.c),
-> 2. Disable RX receiver (RXEN=0 in UCR2),
-> 3. Release spinlock, reenable interrupts.
-> 
-> The RX fifo may become not empty between #1 and #2. This will raise
-> interrupt which will be handled after re-enabling interrupts (after #3). ISR
-> in this case will check the status bit of the interrupt and fetch RX FIFO
-> contents, which I understand is forbidden by the documentation and may raise
-> error on the bus [1]. In addition disabling RX IRQ in this procedure, e.g.
-> after #1 doesn't seem to be enough, as the IRQ still may trigger after #1
-> and will need to be serviced.
+We are in the merge window for v4.11, so new material is out of the
+question. I am preparing the PR to Linus as this very moment.
 
-As I understand it, SER_RS485_RX_DURING_TX is for half-duplex RS-485 where 
-only one device is allowed to transmit at any given time. Higher level code 
-determines when any given device on the bus is allowed to transmit. If Rx FIFO 
-becomes non-empty during Tx enable, you have a contention problem to solve.
+Anyway, I will look into the series as soon as I can.
 
-What is your use case?
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+Kind regards
+Uffe
