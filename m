@@ -1,73 +1,46 @@
-From: niklas.cassel@axis.com (Niklas Cassel)
-Date: Mon, 20 Feb 2017 09:32:35 +0100
-Subject: [PATCH 2/4] PCI: dwc: dra7xx: Populate cpu_addr_fixup ops
-In-Reply-To: <1487251752-12478-3-git-send-email-kishon@ti.com>
-References: <1487251752-12478-1-git-send-email-kishon@ti.com>
- <1487251752-12478-3-git-send-email-kishon@ti.com>
-Message-ID: <2636ef0f-78e1-b38a-5864-c53a645e7073@axis.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Mon, 20 Feb 2017 00:47:57 -0800
+Subject: [PATCH] arm64: traps: Mark __le16, __le32,
+ __user variables properly
+In-Reply-To: <20170219015808.2vc2kvpde7nlrey4@macbook.local>
+References: <20170217165112.17512-1-stephen.boyd@linaro.org>
+ <20170219015808.2vc2kvpde7nlrey4@macbook.local>
+Message-ID: <148758047729.2988.16966413648865610904@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kishon!
-
-
-It's nice to see that you are improving the dwc framework+drivers.
-
-pcie-artpec6.c has the same quirk as dra7xx,
-see define ARTPEC6_CPU_TO_BUS_ADDR.
-
-I could create a patch, but I guess it would make more sense
-if it's part of this series.
-
-Keep up the good work!
-
-
-Regards,
-Niklas
-
-
-On 02/16/2017 02:29 PM, Kishon Vijay Abraham I wrote:
-> Populate cpu_addr_fixup ops to extract the least 28 bits of the
-> corresponding cpu address.
->
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/pci/dwc/pci-dra7xx.c |   11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
-> index 0984baf..07c45ec 100644
-> --- a/drivers/pci/dwc/pci-dra7xx.c
-> +++ b/drivers/pci/dwc/pci-dra7xx.c
-> @@ -88,6 +88,11 @@ static inline void dra7xx_pcie_writel(struct dra7xx_pcie *pcie, u32 offset,
->  	writel(value, pcie->base + offset);
->  }
+Quoting Luc Van Oostenryck (2017-02-18 17:58:09)
+> On Fri, Feb 17, 2017 at 08:51:12AM -0800, Stephen Boyd wrote:
 >  
-> +static u64 dra7xx_pcie_cpu_addr_fixup(u64 pci_addr)
-> +{
-> +	return pci_addr & DRA7XX_CPU_TO_BUS_ADDR;
-> +}
-> +
->  static int dra7xx_pcie_link_up(struct dw_pcie *pci)
->  {
->  	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pci);
-> @@ -152,11 +157,6 @@ static void dra7xx_pcie_host_init(struct pcie_port *pp)
->  	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
->  	struct dra7xx_pcie *dra7xx = to_dra7xx_pcie(pci);
->  
-> -	pp->io_base &= DRA7XX_CPU_TO_BUS_ADDR;
-> -	pp->mem_base &= DRA7XX_CPU_TO_BUS_ADDR;
-> -	pp->cfg0_base &= DRA7XX_CPU_TO_BUS_ADDR;
-> -	pp->cfg1_base &= DRA7XX_CPU_TO_BUS_ADDR;
-> -
->  	dw_pcie_setup_rc(pp);
->  
->  	dra7xx_pcie_establish_link(dra7xx);
-> @@ -329,6 +329,7 @@ static int __init dra7xx_add_pcie_port(struct dra7xx_pcie *dra7xx,
->  }
->  
->  static const struct dw_pcie_ops dw_pcie_ops = {
-> +	.cpu_addr_fixup = dra7xx_pcie_cpu_addr_fixup,
->  	.link_up = dra7xx_pcie_link_up,
->  };
->  
+> > Mark the types appropriately, and force the cast in get_user()
+> > when assigning to 0 so sparse doesn't complain.
+> I didn't looked deeply at this one but I don't think it is needed.
+> Care to give more details?
+
+I think my sparse is old. I was using v0.5.0 from my distro, but using
+sparse-next branch from git.kernel.org doesn't show the problem anymore.
+I suppose I'll upgrade this machine's sparse version manually to avoid
+this problem in the future and withdraw my other patch to asm-generic.
+
+> 
+> 
+> > Noticed while making other changes to this file. There are other issues still
+> > about marking symbols static, but I'm not sure we want to introduce another
+> > header file for the asmlinkage functions?
+> Probably not, indeed.
+> 
+> > arch/arm64/kernel/traps.c:567:10: warning: Initializer entry defined twice
+> > arch/arm64/kernel/traps.c:568:10:   also defined here
+> This one I find strange. Can you tell which are those two entries?
+> 
+
+This is:
+
+ static const char *esr_class_str[] = {
+         [0 ... ESR_ELx_EC_MAX]          = "UNRECOGNIZED EC",
+         [ESR_ELx_EC_UNKNOWN]            = "Unknown/Uncategorized",
+
+where we initialize the entire array to an "unknown" value once, and
+then fill in the known values after that. This isn't a very common
+pattern, but it is used from time to time to avoid having lots of lines
+to do the same thing.
