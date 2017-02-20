@@ -1,60 +1,43 @@
-From: p.figiel@camlintechnologies.com (Piotr Figiel)
-Date: Mon, 20 Feb 2017 14:54:02 +0100
-Subject: imx: Race when disabling RX in IMX.6 UART in half duplex
-Message-ID: <c07c95e2-3463-222b-c78a-b5716b4c5a14@camlintechnologies.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 20 Feb 2017 14:58:25 +0100
+Subject: [PATCH 2/4] Documentation: devicetree: arm: Document Marvell
+ IAP140
+In-Reply-To: <cac4ed13-5952-cccc-fee7-d9c29e77d8bb@suse.de>
+References: <20170219032000.4674-1-afaerber@suse.de>
+ <20170219032000.4674-3-afaerber@suse.de>
+ <20170220135646.2b0219c1@free-electrons.com>
+ <cac4ed13-5952-cccc-fee7-d9c29e77d8bb@suse.de>
+Message-ID: <20170220145825.5f7cbe74@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-  I'm looking to find a correct way to disable RX in the I.MX6 UART 
-during TX-ing. I stumbled on the issue described below when working on 
-~SER_RS485_RX_DURING_TX on custom 3.10 tree (branched from 
-Freescale's/NXP's BSP release) independently to what is now in the main 
-line imx.c, but I see now that the implementation in mainline also seem 
-to have the same problem I'm trying to solve now. I would like to 
-request for comments to confirm/deny whether the issue I raise here is 
-valid and how to best approach this.
+On Mon, 20 Feb 2017 14:16:13 +0100, Andreas F?rber wrote:
 
-  I'm mostly concerned about the fact that the URXD register must not be 
-accessed (as documented in IMX.6 RM) when RX is disabled (RXEN=0). The 
-issue is that in the following sequence happening during imx_start_tx 
-with ~SER_RS485_RX_DURING_TX set:
+> I'm confused now. According to Marvell IR [0] they are NASDAQ-listed as
+> MRVL. My understanding is that in that case the official vendor prefix
+> becomes mrvl. Why not here?
 
-1. Acquire spinlock, disable local interrupts (from serial_core.c),
-2. Disable RX receiver (RXEN=0 in UCR2),
-3. Release spinlock, reenable interrupts.
+Not sure why, but as of today, we have a mix of "mrvl" and "marvell" in
+the tree, and "marvell" is the one official listed in
+vendor-prefixes.txt.
 
-The RX fifo may become not empty between #1 and #2. This will raise 
-interrupt which will be handled after re-enabling interrupts (after #3). 
-ISR in this case will check the status bit of the interrupt and fetch RX 
-FIFO contents, which I understand is forbidden by the documentation and 
-may raise error on the bus [1]. In addition disabling RX IRQ in this 
-procedure, e.g. after #1 doesn't seem to be enough, as the IRQ still may 
-trigger after #1 and will need to be serviced.
+> Any comments on the iap140 vs. pxa1908 naming? The Communication
+> Processors section has disappeared from marvell.com, so I couldn't
+> verify whether IAP140 was renamed from PXA1908 or whether both coexist
+> and we should add a second compatible string here?
 
-I came to the conclusion that the above problem can be solved by 
-adjusting the procedure so that it's:
+I don't have an opinion on this because I'm not familiar with this
+family of Marvell SoCs. However, the only thing I would recommend is
+that you send a patch to update Documentation/arm/Marvell/README to
+document this PXA1908/IAP140 thing. This is particularly important
+since this document mentions PXA1908 already.
 
-1. Acquire spinlock, disable local interrupts,
-2. Disable RX interrupt,
-3. Fetch RX fifo contents,
-4. Disable RX receiver,
-5. Check if RX fifo is not-empty by use of USR2, if it's not-empty it 
-means the characters were not added between steps #3 and #4. If RX FIFO 
-is not empty re-enable RX receiver and go to 3. Otherwise continue.
-6. Release spinlock, reenable interrupts.
+Thanks!
 
-I wonder is this the only way to do that, as it doesn't seem clean. 
-Other option would be to check in the ISR whether the RX is enabled 
-before getting FIFO contents, but what would be correct behavior if it 
-is not empty? (Interrupt would be handled but FIFO contents wouldn't be 
-cleaned, when those should be fetched?).
-
-Could you please comment?
-
-Best regards, Piotr.
-
-[1] 
-http://www.nxp.com/assets/documents/data/en/reference-manuals/IMX6DQRM.pdf 
-(64.15.1)
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
