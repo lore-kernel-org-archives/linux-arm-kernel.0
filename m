@@ -1,89 +1,94 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Feb 2017 18:59:49 +0000
-Subject: [BUG] hdlcd gets confused about base address
-In-Reply-To: <20170220180558.GB31595@intel.com>
-References: <20161118233733.GP1041@n2100.armlinux.org.uk>
- <20170220121603.GA1132@n2100.armlinux.org.uk>
- <20170220175331.GC963@e110455-lin.cambridge.arm.com>
- <20170220180558.GB31595@intel.com>
-Message-ID: <20170220185948.GR21222@n2100.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 20 Feb 2017 19:00:55 +0000
+Subject: [PATCH 2/2] arch_timer: acpi: add hisi timer erratum data
+In-Reply-To: <589D6776.2010400@huawei.com>
+References: <1485254391-51551-1-git-send-email-guohanjun@huawei.com>
+ <1485254391-51551-3-git-send-email-guohanjun@huawei.com>
+ <20170124105717.GB6277@leverpostej>
+ <a2ac2a70-09fb-5cec-c090-b8ebde90e24f@arm.com> <589D6776.2010400@huawei.com>
+Message-ID: <6c3a2952-731b-dfae-ba22-f9d7df25d691@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2017 at 08:05:58PM +0200, Ville Syrj?l? wrote:
-> This stuff should be using the clipped coordinates, not the user
-> coordinates. And it doesn't look like this guy is even calling the
-> clip helper thing.
+On 10/02/17 07:10, Hanjun Guo wrote:
+> Hi Marc,
 > 
-> malidp seems to be calling that thing, but it still doesn't
-> manage to program the hw with the right coordinates from what
-> I can see.
+> On 2017/1/24 19:32, Marc Zyngier wrote:
+>> On 24/01/17 10:57, Mark Rutland wrote:
+>>> On Tue, Jan 24, 2017 at 06:39:51PM +0800, Hanjun Guo wrote:
+>>>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>
+>>>> Add hisilicon timer specific erratum fixes.
+>>>>
+>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>> ---
+>>>>  drivers/clocksource/arm_arch_timer.c | 22 ++++++++++++++++++++++
+>>>>  1 file changed, 22 insertions(+)
+>>>>
+>>>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>>>> index 80d6f76..3e62a09 100644
+>>>> --- a/drivers/clocksource/arm_arch_timer.c
+>>>> +++ b/drivers/clocksource/arm_arch_timer.c
+>>>> @@ -1156,10 +1156,32 @@ struct gtdt_arch_timer_fixup {
+>>>>  	void *context;
+>>>>  };
+>>>>  
+>>>> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
+>>>> +static void __init hisi_erratum_workaroud_enable(void *context)
+>>>> +{
+>>>> +	int i;
+>>>> +
+>>>> +	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
+>>>> +		if (!strcmp(context, ool_workarounds[i].id)) {
+>>>> +			timer_unstable_counter_workaround = &ool_workarounds[i];
+>>>> +			static_branch_enable(&arch_timer_read_ool_enabled);
+>>>> +			pr_info("arch_timer: Enabling workaround for %s\n",
+>>>> +				timer_unstable_counter_workaround->id);
+>>>> +			break;
+>>>> +		}
+>>>> +	}
+>>>> +}
+>>>> +#endif
+>>>> +
+>>>>  /* note: this needs to be updated according to the doc of OEM ID
+>>>>   * and TABLE ID for different board.
+>>>>   */
+>>>>  static struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
+>>>> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
+>>>> +	{"HISI  ", "HIP05   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+>>>> +	{"HISI  ", "HIP06   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+>>>> +	{"HISI  ", "HIP07   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+>>>> +#endif
+>>>>  };
+>>> NAK. This duplicates logic unnecessarily (for enabling the workaround),
+>>> and (ab)uses the id, which was intended to be specific to DT (since it
+>>> is a DT property name).
+>> Agreed, that's properly revolting.
+>>
+>>> We should split the matching from the particular workaround (and
+>>> enabling thereof), so that we can go straight from ACPI match to
+>>> workaround (without having to use the DT id in this manner), and don't
+>>> have to duplicate the logic to enable the workaround.
+>>>
+>>> I believe Marc is looking at some rework in this area which may enable
+>>> this, so please wait for that to appear.
+>> Yeah, I'm implementing a semi-flexible way to add new quirk types, and
+>> the last thing I want to see is two (or more) tables describing the same
+>> thing.
 > 
-> /me feels a bit like a broken record...
+> Kindly ping, if you have patches in hand, I can test against our platforms,
+> thank you very much.
 
-If you mean drm_plane_helper_check_state(), then...
+I've just pushed out a branch based on arm64/for-next/core, plus the
+HiSi timer workaround:
 
-$ grep drm_plane_helper_check_state Documentation/gpu/ -r
+https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=timers/errata-rework
 
-So nothing there... but in drivers/gpu/drm/drm_plane_helper.c, there's
-the following, and I think this really isn't helping people understand
-what's required:
+I'll post the patches for review once the merge window is open, but
+hopefully that should get you going.
 
- * This helper library has two parts. The first part has support to implement
- * primary plane support on top of the normal CRTC configuration interface.
- * Since the legacy ->set_config interface ties the primary plane together with
- * the CRTC state this does not allow userspace to disable the primary plane
- * itself.  To avoid too much duplicated code use
- * drm_plane_helper_check_update() which can be used to enforce the same
- * restrictions as primary planes had thus. The default primary plane only
- * expose XRBG8888 and ARGB8888 as valid pixel formats for the attached
- * framebuffer.
- *
- * Drivers are highly recommended to implement proper support for primary
- * planes, and newly merged drivers must not rely upon these transitional
- * helpers.
+Thanks,
 
-Which functions are defined as "these transitional helpers" - the above
-is rather ambiguous.  Is drm_plane_helper_check_state() a "transitional
-helper" or is it not?  (It probably isn't, but the documentation does not
-make that clear.)
-
-It then goes on to:
-
- * The second part also implements transitional helpers which allow drivers to
-
-So maybe the second paragraph needs to be moved after this line to
-remove the confusion?
-
-If you find that you're repeating something to many people, it's always
-a good idea to re-read the documentation that's supposed to be giving
-people guidance.
-
-Now, when you say that we're supposed to program "clipped coordinates"
-maybe you can give a hint what those are and where they come from?
-Is that the vaguely documented "clip" parameter in
-drm_plane_helper_check_state() ?
-
- * @clip: integer clipping coordinates
-
-If it is, that doesn't really describe it, and neither does the
-description of what the function does, nor what it returns:
-
- * Checks that a desired plane update is valid.  Drivers that provide
- * their own plane handling rather than helper-provided implementations may
- * still wish to call this function to avoid duplication of error checking
- * code.
- *
- * RETURNS:
- * Zero if update appears valid, error code on failure
-
-So, some improvement there could go a long way towards eliminating
-some of these issues...
-
-Atomic modeset is hideously complex... having poor documentation doesn't
-help.
-
+	M.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Jazz is not dead. It just smells funny...
