@@ -1,43 +1,39 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Mon, 20 Feb 2017 11:20:04 +0100
-Subject: [PATCH] ARM: at91/dt: Disable SPI on at91sam9x5ek to allow MCI1
- to work.
-In-Reply-To: <1487265388-29390-1-git-send-email-cristian.birsan@microchip.com>
-References: <1487265388-29390-1-git-send-email-cristian.birsan@microchip.com>
-Message-ID: <95353208-6734-aec5-a41b-e62d28dd747c@microchip.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 20 Feb 2017 15:51:03 +0530
+Subject: [PATCH 3/4] ARM: da850-evm: add a fixed regulator for the UI
+ board IO expander
+In-Reply-To: <1487269285-6948-4-git-send-email-bgolaszewski@baylibre.com>
+References: <1487269285-6948-1-git-send-email-bgolaszewski@baylibre.com>
+ <1487269285-6948-4-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <850248e4-b0e7-2e42-40a3-f0ede456b391@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 16/02/2017 ? 18:16, cristian.birsan at microchip.com a ?crit :
-> From: Cristian Birsan <cristian.birsan@microchip.com>
+On Thursday 16 February 2017 11:51 PM, Bartosz Golaszewski wrote:
+> Without this regulator the tca6416 GPIO expander on the UI board can't
+> be probed in board file mode and we're not getting VPIF IRQs.
 > 
-> The A13 hardware line is shared by SPI and MCI1 controller.This patch
-> disables the SPI controller so that the MCI1 (the big MMC card slot) can
-> be used.
-> 
-> Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
->  arch/arm/boot/dts/at91sam9x5ek.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/mach-davinci/board-da850-evm.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> index 696b8ba..9d2bbc4 100644
-> --- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-> @@ -116,7 +116,7 @@
->  			};
+> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+> index 0b9ff2a..1b6a07b 100644
+> --- a/arch/arm/mach-davinci/board-da850-evm.c
+> +++ b/arch/arm/mach-davinci/board-da850-evm.c
+> @@ -828,6 +828,9 @@ static struct regulator_consumer_supply fixed_supplies[] = {
 >  
->  			spi0: spi at f0000000 {
-> -				status = "okay";
-> +				status = "disabled"; /* conflicts with mmc1 */
->  				cs-gpios = <&pioA 14 0>, <0>, <0>, <0>;
->  				m25p80 at 0 {
->  					compatible = "atmel,at25df321a";
-> 
+>  	/* Baseboard 1.8V: 5V -> TPS73701DCQ -> 1.8V */
+>  	REGULATOR_SUPPLY("DVDD", "1-0018"),
+> +
+> +	/* Dummy regulator for the UI board IO expander. */
 
+Instead may be:
 
--- 
-Nicolas Ferre
+	/* UI card 3.3V: 5V -> TPS73701DCQ -> 3.3V */
+
+> +	REGULATOR_SUPPLY("vcc", "1-0020"),
+
+Thanks,
+Sekhar
