@@ -1,51 +1,87 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 20 Feb 2017 13:35:50 +0100
-Subject: [PATCH 3/8] mm: cma: Export a few symbols
-In-Reply-To: <20170213134416.akgmtv3lv5m65fwx@lukather>
-References: <cover.7101c7323e6f22e281ad70b93488cf44caca4ca0.1486655917.git-series.maxime.ripard@free-electrons.com>
- <2dee6c0baaf08e2c7d48ceb7e97e511c914d0f87.1486655917.git-series.maxime.ripard@free-electrons.com>
- <20170209192046.GB31906@dhcp22.suse.cz>
- <20170213134416.akgmtv3lv5m65fwx@lukather>
-Message-ID: <20170220123550.GH2431@dhcp22.suse.cz>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 20 Feb 2017 13:35:47 +0100
+Subject: [PATCH] mtd: nand: tango: Enforce DMA direction type
+In-Reply-To: <aebe65d0-19c9-e1a7-b98a-c25ff616dad0@sigmadesigns.com>
+References: <1486979107-15362-1-git-send-email-boris.brezillon@free-electrons.com>
+ <aebe65d0-19c9-e1a7-b98a-c25ff616dad0@sigmadesigns.com>
+Message-ID: <20170220133547.06c17a12@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 13-02-17 14:44:16, Maxime Ripard wrote:
-> Hi Michal,
+On Mon, 20 Feb 2017 13:30:25 +0100
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> wrote:
+
+> On 13/02/2017 10:45, Boris Brezillon wrote:
 > 
-> On Thu, Feb 09, 2017 at 08:20:47PM +0100, Michal Hocko wrote:
-> > [CC CMA people]
+> > do_dma() use an integer to pass the DMA data direction information and
+> > pass the same value to dmaengine_prep_slave_sg().
 > > 
-> > On Thu 09-02-17 17:39:17, Maxime Ripard wrote:
-> > > Modules might want to check their CMA pool size and address for debugging
-> > > and / or have additional checks.
-> > > 
-> > > The obvious way to do this would be through dev_get_cma_area and
-> > > cma_get_base and cma_get_size, that are currently not exported, which
-> > > results in a build failure.
-> > > 
-> > > Export them to prevent such a failure.
+> > Currently, DMA_{FROM,TO}_DEVICE match DMA_{DEV_TO_MEM,MEM_TO_DEV}
+> > definitions so it works fine, but assuming this will always be the case
+> > is not safe.
 > > 
-> > Who actually uses those exports. None of the follow up patches does
-> > AFAICS.
+> > Enforce enum dma_data_direction type in the function prototype and make
+> > the enum dma_data_direction -> enum dma_transfer_direction conversion
+> > explicit.
+> > 
+> > Reported-by: Richard Weinberger <richard@nod.at>
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  drivers/mtd/nand/tango_nand.c | 9 ++++++---
+> >  1 file changed, 6 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
+> > index 4a5e948c62df..9a0e2f85d865 100644
+> > --- a/drivers/mtd/nand/tango_nand.c
+> > +++ b/drivers/mtd/nand/tango_nand.c
+> > @@ -223,8 +223,8 @@ static void tango_dma_callback(void *arg)
+> >  	complete(arg);
+> >  }
+> >  
+> > -static int do_dma(struct tango_nfc *nfc, int dir, int cmd, const void *buf,
+> > -		  int len, int page)
+> > +static int do_dma(struct tango_nfc *nfc, enum dma_data_direction dir, int cmd,
+> > +		  const void *buf, int len, int page)
+> >  {
+> >  	void __iomem *addr = nfc->reg_base + NFC_STATUS;
+> >  	struct dma_chan *chan = nfc->chan;
+> > @@ -238,7 +238,10 @@ static int do_dma(struct tango_nfc *nfc, int dir, int cmd, const void *buf,
+> >  	if (dma_map_sg(chan->device->dev, &sg, 1, dir) != 1)
+> >  		return -EIO;
+> >  
+> > -	desc = dmaengine_prep_slave_sg(chan, &sg, 1, dir, DMA_PREP_INTERRUPT);
+> > +	desc = dmaengine_prep_slave_sg(chan, &sg, 1,
+> > +				       dir == DMA_FROM_DEVICE ?
+> > +				       DMA_DEV_TO_MEM : DMA_MEM_TO_DEV,
+> > +				       DMA_PREP_INTERRUPT);
+> >  	if (!desc)
+> >  		goto dma_unmap;
+> >  
+> >   
 > 
-> This is for the ARM Mali GPU driver that is out of tree, unfortunately.
+> How about evaluating the ternary conditional into a temp var?
 
-We do not export symbols which do not have any in-tree users.
+Works for me.
 
-> In one case (using the legacy fbdev API), the driver wants to (and
-> probably should) validate that the buffer as indeed been allocated
-> from the memory allocation pool.
 > 
-> Rob suggested that instead of hardcoding it to cover the whole RAM
-> (which defeats the purpose of that check in the first place), we used
-> the memory-region bindings in the DT and follow that, which does work
-> great, but we still have to retrieve the base address and size of that
-> region, hence why this patches are needed.
-
-Anyway I would suggest talking to CMA people to find a better API for
-modules to use...
-
--- 
-Michal Hocko
-SUSE Labs
+> diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
+> index 4a5e948c62df..c3f145528f1d 100644
+> --- a/drivers/mtd/nand/tango_nand.c
+> +++ b/drivers/mtd/nand/tango_nand.c
+> @@ -231,6 +231,7 @@ static int do_dma(struct tango_nfc *nfc, int dir, int cmd, const void *buf,
+>         struct dma_async_tx_descriptor *desc;
+>         struct scatterlist sg;
+>         struct completion tx_done;
+> +       int xdir = dir == DMA_TO_DEVICE ? DMA_MEM_TO_DEV : DMA_DEV_TO_MEM;
+>         int err = -EIO;
+>         u32 res, val;
+>  
+> @@ -238,7 +239,7 @@ static int do_dma(struct tango_nfc *nfc, int dir, int cmd, const void *buf,
+>         if (dma_map_sg(chan->device->dev, &sg, 1, dir) != 1)
+>                 return -EIO;
+>  
+> -       desc = dmaengine_prep_slave_sg(chan, &sg, 1, dir, DMA_PREP_INTERRUPT);
+> +       desc = dmaengine_prep_slave_sg(chan, &sg, 1, xdir, DMA_PREP_INTERRUPT);
+>         if (!desc)
+>                 goto dma_unmap;
+>  
