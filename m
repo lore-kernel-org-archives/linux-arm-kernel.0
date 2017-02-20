@@ -1,320 +1,449 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Feb 2017 18:16:13 +0100
-Subject: [PATCH 1/3] memory: atmel-ebi: Change naming scheme
+Date: Mon, 20 Feb 2017 18:16:16 +0100
+Subject: [PATCH 2/3] mtd: nand: atmel: Add ->setup_data_interface() hooks
 In-Reply-To: <1487610978-12423-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1487610978-12423-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1487610978-12423-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1487610978-12423-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EBI block is not only available on at91 SoCs, but also on avr32 ones.
-Change the structure and function prefixes from at91_ebi to atmel_ebi to
-match this fact and make the prefix and driver name consistent.
+The NAND controller IP can adapt the NAND controller timings dynamically.
+Implement the ->setup_data_interface() hook to support this feature.
+
+Note that it's not supported on at91rm9200 because this SoC has a
+completely different SMC block, which is not supported yet.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/memory/atmel-ebi.c | 120 ++++++++++++++++++++++-----------------------
- 1 file changed, 60 insertions(+), 60 deletions(-)
+ drivers/mtd/nand/atmel/nand-controller.c | 333 ++++++++++++++++++++++++++++++-
+ 1 file changed, 328 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
-index 6b3c9fc7a602..833af8d02424 100644
---- a/drivers/memory/atmel-ebi.c
-+++ b/drivers/memory/atmel-ebi.c
-@@ -18,34 +18,34 @@
- #include <linux/of_device.h>
- #include <linux/regmap.h>
- 
--struct at91_ebi_dev_config {
-+struct atmel_ebi_dev_config {
- 	int cs;
- 	struct atmel_smc_cs_conf smcconf;
+diff --git a/drivers/mtd/nand/atmel/nand-controller.c b/drivers/mtd/nand/atmel/nand-controller.c
+index 4207c0d37826..ae46ef711d67 100644
+--- a/drivers/mtd/nand/atmel/nand-controller.c
++++ b/drivers/mtd/nand/atmel/nand-controller.c
+@@ -57,6 +57,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/mfd/syscon/atmel-matrix.h>
++#include <linux/mfd/syscon/atmel-smc.h>
+ #include <linux/module.h>
+ #include <linux/mtd/nand.h>
+ #include <linux/of_address.h>
+@@ -147,6 +148,8 @@ struct atmel_nand_cs {
+ 		void __iomem *virt;
+ 		dma_addr_t dma;
+ 	} io;
++
++	struct atmel_smc_cs_conf smcconf;
  };
  
--struct at91_ebi;
-+struct atmel_ebi;
- 
--struct at91_ebi_dev {
-+struct atmel_ebi_dev {
- 	struct list_head node;
--	struct at91_ebi *ebi;
-+	struct atmel_ebi *ebi;
- 	u32 mode;
- 	int numcs;
--	struct at91_ebi_dev_config configs[];
-+	struct atmel_ebi_dev_config configs[];
+ struct atmel_nand {
+@@ -190,6 +193,8 @@ struct atmel_nand_controller_ops {
+ 	void (*nand_init)(struct atmel_nand_controller *nc,
+ 			  struct atmel_nand *nand);
+ 	int (*ecc_init)(struct atmel_nand *nand);
++	int (*setup_data_interface)(struct atmel_nand *nand, int csline,
++				    const struct nand_data_interface *conf);
  };
  
--struct at91_ebi_caps {
-+struct atmel_ebi_caps {
- 	unsigned int available_cs;
- 	unsigned int ebi_csa_offs;
--	void (*get_config)(struct at91_ebi_dev *ebid,
--			   struct at91_ebi_dev_config *conf);
--	int (*xlate_config)(struct at91_ebi_dev *ebid,
-+	void (*get_config)(struct atmel_ebi_dev *ebid,
-+			   struct atmel_ebi_dev_config *conf);
-+	int (*xlate_config)(struct atmel_ebi_dev *ebid,
- 			    struct device_node *configs_np,
--			    struct at91_ebi_dev_config *conf);
--	void (*apply_config)(struct at91_ebi_dev *ebid,
--			     struct at91_ebi_dev_config *conf);
-+			    struct atmel_ebi_dev_config *conf);
-+	void (*apply_config)(struct atmel_ebi_dev *ebid,
-+			     struct atmel_ebi_dev_config *conf);
- };
- 
--struct at91_ebi {
-+struct atmel_ebi {
- 	struct clk *clk;
- 	struct regmap *matrix;
- 	struct  {
-@@ -54,7 +54,7 @@ struct at91_ebi {
- 	} smc;
- 
- 	struct device *dev;
--	const struct at91_ebi_caps *caps;
-+	const struct atmel_ebi_caps *caps;
- 	struct list_head devs;
- };
- 
-@@ -74,15 +74,15 @@ struct atmel_smc_timing_xlate {
- #define ATMEL_SMC_CYCLE_XLATE(nm, pos)	\
- 	{ .name = nm, .converter = atmel_smc_cs_conf_set_setup, .shift = pos}
- 
--static void at91sam9_ebi_get_config(struct at91_ebi_dev *ebid,
--				    struct at91_ebi_dev_config *conf)
-+static void at91sam9_ebi_get_config(struct atmel_ebi_dev *ebid,
-+				    struct atmel_ebi_dev_config *conf)
- {
- 	atmel_smc_cs_conf_get(ebid->ebi->smc.regmap, conf->cs,
- 			      &conf->smcconf);
- }
- 
--static void sama5_ebi_get_config(struct at91_ebi_dev *ebid,
--				 struct at91_ebi_dev_config *conf)
-+static void sama5_ebi_get_config(struct atmel_ebi_dev *ebid,
-+				 struct atmel_ebi_dev_config *conf)
- {
- 	atmel_hsmc_cs_conf_get(ebid->ebi->smc.regmap, conf->cs,
- 			       &conf->smcconf);
-@@ -105,9 +105,9 @@ static const struct atmel_smc_timing_xlate timings_xlate_table[] = {
- 	ATMEL_SMC_CYCLE_XLATE("atmel,smc-nwe-cycle-ns", ATMEL_SMC_NWE_SHIFT),
- };
- 
--static int at91_ebi_xslate_smc_timings(struct at91_ebi_dev *ebid,
--				       struct device_node *np,
--				       struct atmel_smc_cs_conf *smcconf)
-+static int atmel_ebi_xslate_smc_timings(struct atmel_ebi_dev *ebid,
-+					struct device_node *np,
-+					struct atmel_smc_cs_conf *smcconf)
- {
- 	unsigned int clk_rate = clk_get_rate(ebid->ebi->clk);
- 	unsigned int clk_period_ns = NSEC_PER_SEC / clk_rate;
-@@ -163,9 +163,9 @@ static int at91_ebi_xslate_smc_timings(struct at91_ebi_dev *ebid,
- 	return required;
- }
- 
--static int at91_ebi_xslate_smc_config(struct at91_ebi_dev *ebid,
--				      struct device_node *np,
--				      struct at91_ebi_dev_config *conf)
-+static int atmel_ebi_xslate_smc_config(struct atmel_ebi_dev *ebid,
-+				       struct device_node *np,
-+				       struct atmel_ebi_dev_config *conf)
- {
- 	struct atmel_smc_cs_conf *smcconf = &conf->smcconf;
- 	bool required = false;
-@@ -261,7 +261,7 @@ static int at91_ebi_xslate_smc_config(struct at91_ebi_dev *ebid,
- 		required = true;
- 	}
- 
--	ret = at91_ebi_xslate_smc_timings(ebid, np, &conf->smcconf);
-+	ret = atmel_ebi_xslate_smc_timings(ebid, np, &conf->smcconf);
- 	if (ret)
- 		return -EINVAL;
- 
-@@ -274,27 +274,27 @@ static int at91_ebi_xslate_smc_config(struct at91_ebi_dev *ebid,
- 	return required;
- }
- 
--static void at91sam9_ebi_apply_config(struct at91_ebi_dev *ebid,
--				      struct at91_ebi_dev_config *conf)
-+static void at91sam9_ebi_apply_config(struct atmel_ebi_dev *ebid,
-+				      struct atmel_ebi_dev_config *conf)
- {
- 	atmel_smc_cs_conf_apply(ebid->ebi->smc.regmap, conf->cs,
- 				&conf->smcconf);
- }
- 
--static void sama5_ebi_apply_config(struct at91_ebi_dev *ebid,
--				   struct at91_ebi_dev_config *conf)
-+static void sama5_ebi_apply_config(struct atmel_ebi_dev *ebid,
-+				   struct atmel_ebi_dev_config *conf)
- {
- 	atmel_hsmc_cs_conf_apply(ebid->ebi->smc.regmap, conf->cs,
- 				 &conf->smcconf);
- }
- 
--static int at91_ebi_dev_setup(struct at91_ebi *ebi, struct device_node *np,
--			      int reg_cells)
-+static int atmel_ebi_dev_setup(struct atmel_ebi *ebi, struct device_node *np,
-+			       int reg_cells)
- {
--	const struct at91_ebi_caps *caps = ebi->caps;
--	struct at91_ebi_dev_config conf = { };
-+	const struct atmel_ebi_caps *caps = ebi->caps;
-+	struct atmel_ebi_dev_config conf = { };
- 	struct device *dev = ebi->dev;
--	struct at91_ebi_dev *ebid;
-+	struct atmel_ebi_dev *ebid;
- 	unsigned long cslines = 0;
- 	int ret, numcs = 0, nentries, i;
- 	bool apply = false;
-@@ -366,70 +366,70 @@ static int at91_ebi_dev_setup(struct at91_ebi *ebi, struct device_node *np,
+ struct atmel_nand_controller_caps {
+@@ -1144,6 +1149,293 @@ static int atmel_hsmc_nand_ecc_init(struct atmel_nand *nand)
  	return 0;
  }
  
--static const struct at91_ebi_caps at91sam9260_ebi_caps = {
-+static const struct atmel_ebi_caps at91sam9260_ebi_caps = {
- 	.available_cs = 0xff,
- 	.ebi_csa_offs = AT91SAM9260_MATRIX_EBICSA,
- 	.get_config = at91sam9_ebi_get_config,
--	.xlate_config = at91_ebi_xslate_smc_config,
-+	.xlate_config = atmel_ebi_xslate_smc_config,
- 	.apply_config = at91sam9_ebi_apply_config,
- };
- 
--static const struct at91_ebi_caps at91sam9261_ebi_caps = {
-+static const struct atmel_ebi_caps at91sam9261_ebi_caps = {
- 	.available_cs = 0xff,
- 	.ebi_csa_offs = AT91SAM9261_MATRIX_EBICSA,
- 	.get_config = at91sam9_ebi_get_config,
--	.xlate_config = at91_ebi_xslate_smc_config,
-+	.xlate_config = atmel_ebi_xslate_smc_config,
- 	.apply_config = at91sam9_ebi_apply_config,
- };
- 
--static const struct at91_ebi_caps at91sam9263_ebi0_caps = {
-+static const struct atmel_ebi_caps at91sam9263_ebi0_caps = {
- 	.available_cs = 0x3f,
- 	.ebi_csa_offs = AT91SAM9263_MATRIX_EBI0CSA,
- 	.get_config = at91sam9_ebi_get_config,
--	.xlate_config = at91_ebi_xslate_smc_config,
-+	.xlate_config = atmel_ebi_xslate_smc_config,
- 	.apply_config = at91sam9_ebi_apply_config,
- };
- 
--static const struct at91_ebi_caps at91sam9263_ebi1_caps = {
-+static const struct atmel_ebi_caps at91sam9263_ebi1_caps = {
- 	.available_cs = 0x7,
- 	.ebi_csa_offs = AT91SAM9263_MATRIX_EBI1CSA,
- 	.get_config = at91sam9_ebi_get_config,
--	.xlate_config = at91_ebi_xslate_smc_config,
-+	.xlate_config = atmel_ebi_xslate_smc_config,
- 	.apply_config = at91sam9_ebi_apply_config,
- };
- 
--static const struct at91_ebi_caps at91sam9rl_ebi_caps = {
-+static const struct atmel_ebi_caps at91sam9rl_ebi_caps = {
- 	.available_cs = 0x3f,
- 	.ebi_csa_offs = AT91SAM9RL_MATRIX_EBICSA,
- 	.get_config = at91sam9_ebi_get_config,
--	.xlate_config = at91_ebi_xslate_smc_config,
-+	.xlate_config = atmel_ebi_xslate_smc_config,
- 	.apply_config = at91sam9_ebi_apply_config,
- };
- 
--static const struct at91_ebi_caps at91sam9g45_ebi_caps = {
-+static const struct atmel_ebi_caps at91sam9g45_ebi_caps = {
- 	.available_cs = 0x3f,
- 	.ebi_csa_offs = AT91SAM9G45_MATRIX_EBICSA,
- 	.get_config = at91sam9_ebi_get_config,
--	.xlate_config = at91_ebi_xslate_smc_config,
-+	.xlate_config = atmel_ebi_xslate_smc_config,
- 	.apply_config = at91sam9_ebi_apply_config,
- };
- 
--static const struct at91_ebi_caps at91sam9x5_ebi_caps = {
-+static const struct atmel_ebi_caps at91sam9x5_ebi_caps = {
- 	.available_cs = 0x3f,
- 	.ebi_csa_offs = AT91SAM9X5_MATRIX_EBICSA,
- 	.get_config = at91sam9_ebi_get_config,
--	.xlate_config = at91_ebi_xslate_smc_config,
-+	.xlate_config = atmel_ebi_xslate_smc_config,
- 	.apply_config = at91sam9_ebi_apply_config,
- };
- 
--static const struct at91_ebi_caps sama5d3_ebi_caps = {
-+static const struct atmel_ebi_caps sama5d3_ebi_caps = {
- 	.available_cs = 0xf,
- 	.get_config = sama5_ebi_get_config,
--	.xlate_config = at91_ebi_xslate_smc_config,
-+	.xlate_config = atmel_ebi_xslate_smc_config,
- 	.apply_config = sama5_ebi_apply_config,
- };
- 
--static const struct of_device_id at91_ebi_id_table[] = {
-+static const struct of_device_id atmel_ebi_id_table[] = {
- 	{
- 		.compatible = "atmel,at91sam9260-ebi",
- 		.data = &at91sam9260_ebi_caps,
-@@ -465,7 +465,7 @@ static const struct of_device_id at91_ebi_id_table[] = {
- 	{ /* sentinel */ }
- };
- 
--static int at91_ebi_dev_disable(struct at91_ebi *ebi, struct device_node *np)
-+static int atmel_ebi_dev_disable(struct atmel_ebi *ebi, struct device_node *np)
++static int atmel_smc_nand_prepare_smcconf(struct atmel_nand *nand,
++					const struct nand_data_interface *conf,
++					struct atmel_smc_cs_conf *smcconf)
++{
++	u32 ncycles, totalcycles, timeps, mckperiodps;
++	struct atmel_nand_controller *nc;
++	int ret;
++
++	nc = to_nand_controller(nand->base.controller);
++
++	/* DDR interface not supported. */
++	if (conf->type != NAND_SDR_IFACE)
++		return -ENOTSUPP;
++
++	/*
++	 * tRC < 30ns implies EDO mode. This controller does not support this
++	 * mode.
++	 */
++	if (conf->timings.sdr.tRC_min < 30)
++		return -ENOTSUPP;
++
++	atmel_smc_cs_conf_init(smcconf);
++
++	mckperiodps = NSEC_PER_SEC / clk_get_rate(nc->mck);
++	mckperiodps *= 1000;
++
++	/*
++	 * Set write pulse timing. This one is easy to extract:
++	 *
++	 * NWE_PULSE = tWP
++	 */
++	ncycles = DIV_ROUND_UP(conf->timings.sdr.tWP_min, mckperiodps);
++	totalcycles = ncycles;
++	ret = atmel_smc_cs_conf_set_pulse(smcconf, ATMEL_SMC_NWE_SHIFT,
++					  ncycles);
++	if (ret)
++		return ret;
++
++	/*
++	 * The write setup timing depends on the operation done on the NAND.
++	 * All operations goes through the same data bus, but the operation
++	 * type depends on the address we are writing to (ALE/CLE address
++	 * lines).
++	 * Since we have no way to differentiate the different operations at
++	 * the SMC level, we must consider the worst case (the biggest setup
++	 * time among all operation types):
++	 *
++	 * NWE_SETUP = max(tCLS, tCS, tALS, tDS) - NWE_PULSE
++	 */
++	timeps = max3(conf->timings.sdr.tCLS_min, conf->timings.sdr.tCS_min,
++		      conf->timings.sdr.tALS_min);
++	timeps = max(timeps, conf->timings.sdr.tDS_min);
++	ncycles = DIV_ROUND_UP(timeps, mckperiodps);
++	ncycles = ncycles > totalcycles ? ncycles - totalcycles : 0;
++	totalcycles += ncycles;
++	ret = atmel_smc_cs_conf_set_setup(smcconf, ATMEL_SMC_NWE_SHIFT,
++					  ncycles);
++	if (ret)
++		return ret;
++
++	/*
++	 * As for the write setup timing, the write hold timing depends on the
++	 * operation done on the NAND:
++	 *
++	 * NWE_HOLD = max(tCLH, tCH, tALH, tDH, tWH)
++	 */
++	timeps = max3(conf->timings.sdr.tCLH_min, conf->timings.sdr.tCH_min,
++		      conf->timings.sdr.tALH_min);
++	timeps = max3(timeps, conf->timings.sdr.tDH_min,
++		      conf->timings.sdr.tWH_min);
++	ncycles = DIV_ROUND_UP(timeps, mckperiodps);
++	totalcycles += ncycles;
++
++	/*
++	 * The write cycle timing is directly matching tWC, but is also
++	 * dependent on the other timings on the setup and hold timings we
++	 * calculated earlier, which gives:
++	 *
++	 * NWE_CYCLE = max(tWC, NWE_SETUP + NWE_PULSE + NWE_HOLD)
++	 */
++	ncycles = DIV_ROUND_UP(conf->timings.sdr.tWC_min, mckperiodps);
++	ncycles = max(totalcycles, ncycles);
++	ret = atmel_smc_cs_conf_set_cycle(smcconf, ATMEL_SMC_NWE_SHIFT,
++					  ncycles);
++	if (ret)
++		return ret;
++
++	/*
++	 * We don't want the CS line to be toggled between each byte/word
++	 * transfer to the NAND. The only way to guarantee that is to have the
++	 * NCS_{WR,RD}_{SETUP,HOLD} timings set to 0, which in turn means:
++	 *
++	 * NCS_WR_PULSE = NWE_CYCLE
++	 */
++	ret = atmel_smc_cs_conf_set_pulse(smcconf, ATMEL_SMC_NCS_WR_SHIFT,
++					  ncycles);
++	if (ret)
++		return ret;
++
++	/*
++	 * As for the write setup timing, the read hold timing depends on the
++	 * operation done on the NAND:
++	 *
++	 * NRD_HOLD = max(tREH, tRHOH)
++	 */
++	timeps = max(conf->timings.sdr.tREH_min, conf->timings.sdr.tRHOH_min);
++	ncycles = DIV_ROUND_UP(timeps, mckperiodps);
++	totalcycles = ncycles;
++
++	/*
++	 * TDF = tRHZ - NRD_HOLD
++	 */
++	ncycles = DIV_ROUND_UP(conf->timings.sdr.tRHZ_max, mckperiodps);
++	ncycles -= totalcycles;
++
++	/*
++	 * In ONFI 4.0 specs, tRHZ has been increased to support EDO NANDs and
++	 * we might end up with a config that does not fit in the TDF field.
++	 * Just take the max value in this case and hope that the NAND is more
++	 * tolerant than advertised.
++	 */
++	if (ncycles > ATMEL_SMC_MODE_TDF_MAX)
++		ncycles = ATMEL_SMC_MODE_TDF_MAX;
++
++	smcconf->mode |= ATMEL_SMC_MODE_TDF(ncycles) |
++			 ATMEL_SMC_MODE_TDFMODE_OPTIMIZED;
++
++	/*
++	 * Read pulse timing directly matches tRP:
++	 *
++	 * NRD_PULSE = tRP
++	 */
++	ncycles = DIV_ROUND_UP(conf->timings.sdr.tRP_min, mckperiodps);
++	totalcycles += ncycles;
++	ret = atmel_smc_cs_conf_set_pulse(smcconf, ATMEL_SMC_NRD_SHIFT,
++					  ncycles);
++	if (ret)
++		return ret;
++
++	/*
++	 * The write cycle timing is directly matching tWC, but is also
++	 * dependent on the setup and hold timings we calculated earlier,
++	 * which gives:
++	 *
++	 * NRD_CYCLE = max(tRC, NRD_PULSE + NRD_HOLD)
++	 *
++	 * NRD_SETUP is always 0.
++	 */
++	ncycles = DIV_ROUND_UP(conf->timings.sdr.tRC_min, mckperiodps);
++	ncycles = max(totalcycles, ncycles);
++	ret = atmel_smc_cs_conf_set_cycle(smcconf, ATMEL_SMC_NRD_SHIFT,
++					  ncycles);
++	if (ret)
++		return ret;
++
++	/*
++	 * We don't want the CS line to be toggled between each byte/word
++	 * transfer from the NAND. The only way to guarantee that is to have
++	 * the NCS_{WR,RD}_{SETUP,HOLD} timings set to 0, which in turn means:
++	 *
++	 * NCS_RD_PULSE = NRD_CYCLE
++	 */
++	ret = atmel_smc_cs_conf_set_pulse(smcconf, ATMEL_SMC_NCS_RD_SHIFT,
++					  ncycles);
++	if (ret)
++		return ret;
++
++	/* Txxx timings are directly matching tXXX ones. */
++	ncycles = DIV_ROUND_UP(conf->timings.sdr.tCLR_min, mckperiodps);
++	ret = atmel_smc_cs_conf_set_timing(smcconf,
++					   ATMEL_HSMC_TIMINGS_TCLR_SHIFT,
++					   ncycles);
++	if (ret)
++		return ret;
++
++	ncycles = DIV_ROUND_UP(conf->timings.sdr.tADL_min, mckperiodps);
++	ret = atmel_smc_cs_conf_set_timing(smcconf,
++					   ATMEL_HSMC_TIMINGS_TADL_SHIFT,
++					   ncycles);
++	if (ret)
++		return ret;
++
++	ncycles = DIV_ROUND_UP(conf->timings.sdr.tAR_min, mckperiodps);
++	ret = atmel_smc_cs_conf_set_timing(smcconf,
++					   ATMEL_HSMC_TIMINGS_TAR_SHIFT,
++					   ncycles);
++	if (ret)
++		return ret;
++
++	ncycles = DIV_ROUND_UP(conf->timings.sdr.tRR_min, mckperiodps);
++	ret = atmel_smc_cs_conf_set_timing(smcconf,
++					   ATMEL_HSMC_TIMINGS_TRR_SHIFT,
++					   ncycles);
++	if (ret)
++		return ret;
++
++	ncycles = DIV_ROUND_UP(conf->timings.sdr.tWB_max, mckperiodps);
++	ret = atmel_smc_cs_conf_set_timing(smcconf,
++					   ATMEL_HSMC_TIMINGS_TWB_SHIFT,
++					   ncycles);
++	if (ret)
++		return ret;
++
++	/* Attach the CS line to the NFC logic. */
++	smcconf->timings |= ATMEL_HSMC_TIMINGS_NFSEL;
++
++	/* Set the appropriate data bus width. */
++	if (nand->base.options & NAND_BUSWIDTH_16)
++		smcconf->mode |= ATMEL_SMC_MODE_DBW_16;
++
++	/* Operate in NRD/NWE READ/WRITEMODE. */
++	smcconf->mode |= ATMEL_SMC_MODE_READMODE_NRD |
++			 ATMEL_SMC_MODE_WRITEMODE_NWE;
++
++	return 0;
++}
++
++static int atmel_smc_nand_setup_data_interface(struct atmel_nand *nand,
++					int csline,
++					const struct nand_data_interface *conf)
++{
++	struct atmel_nand_controller *nc;
++	struct atmel_smc_cs_conf smcconf;
++	struct atmel_nand_cs *cs;
++	int ret;
++
++	nc = to_nand_controller(nand->base.controller);
++
++	ret = atmel_smc_nand_prepare_smcconf(nand, conf, &smcconf);
++	if (ret)
++		return ret;
++
++	if (csline == NAND_DATA_IFACE_CHECK_ONLY)
++		return 0;
++
++	cs = &nand->cs[csline];
++	cs->smcconf = smcconf;
++	atmel_smc_cs_conf_apply(nc->smc, cs->id, &cs->smcconf);
++
++	return 0;
++}
++
++static int atmel_hsmc_nand_setup_data_interface(struct atmel_nand *nand,
++					int csline,
++					const struct nand_data_interface *conf)
++{
++	struct atmel_nand_controller *nc;
++	struct atmel_smc_cs_conf smcconf;
++	struct atmel_nand_cs *cs;
++	int ret;
++
++	nc = to_nand_controller(nand->base.controller);
++
++	ret = atmel_smc_nand_prepare_smcconf(nand, conf, &smcconf);
++	if (ret)
++		return ret;
++
++	if (csline == NAND_DATA_IFACE_CHECK_ONLY)
++		return 0;
++
++	cs = &nand->cs[csline];
++	cs->smcconf = smcconf;
++
++	if (cs->rb.type == ATMEL_NAND_NATIVE_RB)
++		cs->smcconf.timings |= ATMEL_HSMC_TIMINGS_RBNSEL(cs->rb.id);
++
++	atmel_hsmc_cs_conf_apply(nc->smc, cs->id, &cs->smcconf);
++
++	return 0;
++}
++
++static int atmel_nand_setup_data_interface(struct mtd_info *mtd, int csline,
++					const struct nand_data_interface *conf)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct atmel_nand *nand = to_atmel_nand(chip);
++	struct atmel_nand_controller *nc;
++
++	nc = to_nand_controller(nand->base.controller);
++
++	if (csline >= nand->numcs ||
++	    (csline < 0 && csline != NAND_DATA_IFACE_CHECK_ONLY))
++		return -EINVAL;
++
++	return nc->caps->ops->setup_data_interface(nand, csline, conf);
++}
++
+ static void atmel_nand_init(struct atmel_nand_controller *nc,
+ 			    struct atmel_nand *nand)
  {
- 	struct device *dev = ebi->dev;
- 	struct property *newprop;
-@@ -487,17 +487,17 @@ static int at91_ebi_dev_disable(struct at91_ebi *ebi, struct device_node *np)
- 	return of_update_property(np, newprop);
+@@ -1161,6 +1453,9 @@ static void atmel_nand_init(struct atmel_nand_controller *nc,
+ 	chip->write_buf = atmel_nand_write_buf;
+ 	chip->select_chip = atmel_nand_select_chip;
+ 
++	if (nc->mck && nc->caps->ops->setup_data_interface)
++		chip->setup_data_interface = atmel_nand_setup_data_interface;
++
+ 	/* Some NANDs require a longer delay than the default one (20us). */
+ 	chip->chip_delay = 40;
+ 
+@@ -1735,6 +2030,12 @@ static int atmel_nand_controller_init(struct atmel_nand_controller *nc,
+ 	if (nc->caps->legacy_of_bindings || !nc->dev->of_node)
+ 		return 0;
+ 
++	nc->mck = of_clk_get(dev->parent->of_node, 0);
++	if (IS_ERR(nc->mck)) {
++		dev_err(dev, "Failed to retrieve MCK clk\n");
++		return PTR_ERR(nc->mck);
++	}
++
+ 	np = of_parse_phandle(dev->parent->of_node, "atmel,smc", 0);
+ 	if (!np) {
+ 		dev_err(dev, "Missing or invalid atmel,smc property\n");
+@@ -2045,6 +2346,7 @@ const struct atmel_nand_controller_ops atmel_hsmc_nc_ops = {
+ 	.remove = atmel_hsmc_nand_controller_remove,
+ 	.ecc_init = atmel_hsmc_nand_ecc_init,
+ 	.nand_init = atmel_hsmc_nand_init,
++	.setup_data_interface = atmel_hsmc_nand_setup_data_interface,
+ };
+ 
+ static const struct atmel_nand_controller_caps atmel_sama5_nc_caps = {
+@@ -2099,7 +2401,14 @@ atmel_smc_nand_controller_remove(struct atmel_nand_controller *nc)
+ 	return 0;
  }
  
--static int at91_ebi_probe(struct platform_device *pdev)
-+static int atmel_ebi_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
- 	struct device_node *child, *np = dev->of_node, *smc_np;
- 	const struct of_device_id *match;
--	struct at91_ebi *ebi;
-+	struct atmel_ebi *ebi;
- 	int ret, reg_cells;
- 	struct clk *clk;
- 	u32 val;
+-const struct atmel_nand_controller_ops atmel_smc_nc_ops = {
++/*
++ * The SMC reg layout of at91rm9200 is completely different which prevents us
++ * from re-using atmel_smc_nand_setup_data_interface() for the
++ * ->setup_data_interface() hook.
++ * At this point, there's no support for the at91rm9200 SMC IP, so we leave
++ * ->setup_data_interface() unassigned.
++ */
++const struct atmel_nand_controller_ops at91rm9200_nc_ops = {
+ 	.probe = atmel_smc_nand_controller_probe,
+ 	.remove = atmel_smc_nand_controller_remove,
+ 	.ecc_init = atmel_nand_ecc_init,
+@@ -2109,6 +2418,20 @@ const struct atmel_nand_controller_ops atmel_smc_nc_ops = {
+ static const struct atmel_nand_controller_caps atmel_rm9200_nc_caps = {
+ 	.ale_offs = 1 << 21,
+ 	.cle_offs = 1 << 22,
++	.ops = &at91rm9200_nc_ops,
++};
++
++const struct atmel_nand_controller_ops atmel_smc_nc_ops = {
++	.probe = atmel_smc_nand_controller_probe,
++	.remove = atmel_smc_nand_controller_remove,
++	.ecc_init = atmel_nand_ecc_init,
++	.nand_init = atmel_smc_nand_init,
++	.setup_data_interface = atmel_smc_nand_setup_data_interface,
++};
++
++static const struct atmel_nand_controller_caps atmel_sam9260_nc_caps = {
++	.ale_offs = 1 << 21,
++	.cle_offs = 1 << 22,
+ 	.ops = &atmel_smc_nc_ops,
+ };
  
--	match = of_match_device(at91_ebi_id_table, dev);
-+	match = of_match_device(atmel_ebi_id_table, dev);
- 	if (!match || !match->data)
- 		return -EINVAL;
+@@ -2129,14 +2452,14 @@ static const struct atmel_nand_controller_caps atmel_sam9g45_nc_caps = {
+ static const struct atmel_nand_controller_caps atmel_rm9200_nand_caps = {
+ 	.ale_offs = 1 << 21,
+ 	.cle_offs = 1 << 22,
+-	.ops = &atmel_smc_nc_ops,
++	.ops = &at91rm9200_nc_ops,
+ 	.legacy_of_bindings = true,
+ };
  
-@@ -563,12 +563,12 @@ static int at91_ebi_probe(struct platform_device *pdev)
- 		if (!of_find_property(child, "reg", NULL))
- 			continue;
+ static const struct atmel_nand_controller_caps atmel_sam9261_nand_caps = {
+ 	.ale_offs = 1 << 22,
+ 	.cle_offs = 1 << 21,
+-	.ops = &atmel_smc_nc_ops,
++	.ops = &at91rm9200_nc_ops,
+ 	.legacy_of_bindings = true,
+ };
  
--		ret = at91_ebi_dev_setup(ebi, child, reg_cells);
-+		ret = atmel_ebi_dev_setup(ebi, child, reg_cells);
- 		if (ret) {
- 			dev_err(dev, "failed to configure EBI bus for %s, disabling the device",
- 				child->full_name);
+@@ -2144,7 +2467,7 @@ static const struct atmel_nand_controller_caps atmel_sam9g45_nand_caps = {
+ 	.has_dma = true,
+ 	.ale_offs = 1 << 21,
+ 	.cle_offs = 1 << 22,
+-	.ops = &atmel_smc_nc_ops,
++	.ops = &at91rm9200_nc_ops,
+ 	.legacy_of_bindings = true,
+ };
  
--			ret = at91_ebi_dev_disable(ebi, child);
-+			ret = atmel_ebi_dev_disable(ebi, child);
- 			if (ret)
- 				return ret;
- 		}
-@@ -577,10 +577,10 @@ static int at91_ebi_probe(struct platform_device *pdev)
- 	return of_platform_populate(np, NULL, NULL, dev);
- }
- 
--static struct platform_driver at91_ebi_driver = {
-+static struct platform_driver atmel_ebi_driver = {
- 	.driver = {
- 		.name = "atmel-ebi",
--		.of_match_table	= at91_ebi_id_table,
-+		.of_match_table	= atmel_ebi_id_table,
+@@ -2155,7 +2478,7 @@ static const struct of_device_id atmel_nand_controller_of_ids[] = {
  	},
- };
--builtin_platform_driver_probe(at91_ebi_driver, at91_ebi_probe);
-+builtin_platform_driver_probe(atmel_ebi_driver, atmel_ebi_probe);
+ 	{
+ 		.compatible = "atmel,at91sam9260-nand-controller",
+-		.data = &atmel_rm9200_nc_caps,
++		.data = &atmel_sam9260_nc_caps,
+ 	},
+ 	{
+ 		.compatible = "atmel,at91sam9261-nand-controller",
 -- 
 2.7.4
