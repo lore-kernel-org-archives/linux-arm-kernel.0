@@ -1,66 +1,98 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 20 Feb 2017 21:33:24 +0100
-Subject: [PATCH/RFC 1/6] alarmtimer: Postpone wake-up source registration
- until really available
+Date: Mon, 20 Feb 2017 21:33:27 +0100
+Subject: [PATCH/RFC 4/6] drivers: firmware: psci: Fix non-PMIC wake-up if
+ SYSTEM_SUSPEND cuts power
 In-Reply-To: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
 References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1487622809-25127-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <1487622809-25127-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the alarmtimer registers a wake-up source unconditionally,
-regardless of the system having a (wake-up capable) RTC or not.
-To fix this, postpone registration until a wake-up capable RTC device is
-added.
+Nothing in the PSCI specification requires the SoC to remain powered and
+to support wake-up sources when suspended using SYSTEM_SUSPEND.
+If the firmware implements the PSCI SYSTEM_SUSPEND operation by cutting
+power to the SoC, the only possibly wake-up sources are thus the ones
+connected to the PMIC.
 
-After this, the alarmtimer no longer shows up in
-/sys/kernel/debug/wakeup_sources, unless it is available for real.
+Document and add support for an "arm,psci-system-suspend-is-power-down"
+DT property, so Linux uses a different suspend method when other wake-up
+sources (e.g. wake on LAN, UART or GPIO) are enabled.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- kernel/time/alarmtimer.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/psci.txt | 11 +++++++++++
+ drivers/firmware/psci.c                        | 13 ++++++++++---
+ 2 files changed, 21 insertions(+), 3 deletions(-)
 
-diff --git a/kernel/time/alarmtimer.c b/kernel/time/alarmtimer.c
-index e6dc9a538efa2116..5e0ce78607da5b5d 100644
---- a/kernel/time/alarmtimer.c
-+++ b/kernel/time/alarmtimer.c
-@@ -82,6 +82,7 @@ static int alarmtimer_rtc_add_device(struct device *dev,
+diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
+index a2c4f1d524929bb7..16e390ecb7531028 100644
+--- a/Documentation/devicetree/bindings/arm/psci.txt
++++ b/Documentation/devicetree/bindings/arm/psci.txt
+@@ -68,6 +68,17 @@ state nodes, as per bindings in [1]) must specify the following properties:
+ 		Definition: power_state parameter to pass to the PSCI
+ 			    suspend call.
+ 
++ - arm,psci-system-suspend-is-power-down
++		Nothing in the PSCI specification requires the SoC to remain
++		powered and to support wake-up sources when suspended using
++		SYSTEM_SUSPEND.
++		If your firmware implements the PSCI SYSTEM_SUSPEND operation
++		by cutting power to the SoC, the only possibly wake-up sources
++		are thus the ones connected to the PMIC.  In such case you
++		should specify this property, so the operating system is aware
++		it should use a different suspend method when other wake-up
++		sources (e.g. wake on LAN, UART or GPIO) are enabled.
++
+ Example:
+ 
+ Case 1: PSCI v0.1 only.
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 13b4d50bb3577384..0a74c23fd5fe043e 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -20,6 +20,7 @@
+ #include <linux/linkage.h>
+ #include <linux/of.h>
+ #include <linux/pm.h>
++#include <linux/pm_wakeup.h>
+ #include <linux/printk.h>
+ #include <linux/psci.h>
+ #include <linux/reboot.h>
+@@ -86,6 +87,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
+ 
+ static u32 psci_cpu_suspend_feature;
+ static bool psci_suspend_mem_supported;
++static bool psci_system_suspend_is_power_down;
+ 
+ static inline bool psci_has_ext_power_state(void)
  {
- 	unsigned long flags;
- 	struct rtc_device *rtc = to_rtc_device(dev);
-+	struct wakeup_source *__ws;
- 
- 	if (rtcdev)
- 		return -EBUSY;
-@@ -91,13 +92,20 @@ static int alarmtimer_rtc_add_device(struct device *dev,
- 	if (!device_may_wakeup(rtc->dev.parent))
- 		return -1;
- 
-+	__ws = wakeup_source_register("alarmtimer");
-+
- 	spin_lock_irqsave(&rtcdev_lock, flags);
- 	if (!rtcdev) {
- 		rtcdev = rtc;
- 		/* hold a reference so it doesn't go away */
- 		get_device(dev);
-+		ws = __ws;
-+		__ws = NULL;
+@@ -440,12 +442,14 @@ static int psci_system_suspend_valid(suspend_state_t state)
+ static int psci_system_suspend_enter(suspend_state_t state)
+ {
+ 	switch (state) {
++	case PM_SUSPEND_MEM:
++		if (!psci_system_suspend_is_power_down ||
++		    !wakeup_source_available())
++			return cpu_suspend(0, psci_system_suspend);
++		/* fall through */
+ 	case PM_SUSPEND_STANDBY:
+ 		cpu_do_idle();
+ 		break;
+-
+-	case PM_SUSPEND_MEM:
+-		return cpu_suspend(0, psci_system_suspend);
  	}
- 	spin_unlock_irqrestore(&rtcdev_lock, flags);
-+
-+	wakeup_source_unregister(__ws);
-+
- 	return 0;
- }
  
-@@ -908,7 +916,6 @@ static int __init alarmtimer_init(void)
- 		error = PTR_ERR(pdev);
- 		goto out_drv;
- 	}
--	ws = wakeup_source_register("alarmtimer");
  	return 0;
+@@ -596,6 +600,9 @@ static int __init psci_0_2_init(struct device_node *np)
+ 	 */
+ 	err = psci_probe();
  
- out_drv:
++	psci_system_suspend_is_power_down = of_property_read_bool(np,
++		"arm,psci-system-suspend-is-power-down");
++
+ out_put_node:
+ 	of_node_put(np);
+ 	return err;
 -- 
 2.7.4
