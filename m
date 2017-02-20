@@ -1,65 +1,59 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 20 Feb 2017 11:50:14 -0700
-Subject: [PATCH] arm64: dts: juno: update definition for programmable
- replicator.
-In-Reply-To: <1487358790-2618-1-git-send-email-mike.leach@linaro.org>
-References: <1487358790-2618-1-git-send-email-mike.leach@linaro.org>
-Message-ID: <CANLsYkz7cLiyR2i-B6x9kK5gmWCLz_4WF-Q4hwi-w=NHMojW2g@mail.gmail.com>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Mon, 20 Feb 2017 19:52:03 +0100
+Subject: [PATCH] ARM: dts: sun8i: NanoPi NEO Air add WiFi / eMMC
+In-Reply-To: <20170219143848.25911-1-jelle@vdwaa.nl>
+References: <20170219143848.25911-1-jelle@vdwaa.nl>
+Message-ID: <20170220185202.ficvrxkb26v6enz2@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 February 2017 at 12:13, Mike Leach <mike.leach@linaro.org> wrote:
-> Juno platforms have a programmable replicator splitting the trace output to
-> TPIU and ETR. Currently this is not being programmed as it is being treated
-> as a none-programmable replicator - which is the default operational mode
-> for these devices. The TPIU in the system is enabled by default, and this
-> combination is causing back-pressure in the trace system resulting in
-> overflows at the source.
->
-> Replaces the existing definition with one that defines the programmable
-> replicator, using the "qcom,coresight-replicator1x" driver that provides
-> the correct functionality for CoreSight programmable replicators.
->
-> Signed-off-by: Mike Leach <mike.leach@linaro.org>
+On Sun, Feb 19, 2017 at 03:38:48PM +0100, Jelle van der Waa wrote:
+> Enable the WiFi (AP6212) chip and eMMC support for the NanoPi NEO Air.
+> 
+> Signed-off-by: Jelle van der Waa <jelle@vdwaa.nl>
 > ---
->  arch/arm64/boot/dts/arm/juno-base.dtsi | 14 ++++++++------
->  1 file changed, 8 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> index 9d799d9..6546e23 100644
-> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> @@ -372,12 +372,14 @@
->                 };
->         };
->
-> -       coresight-replicator {
-> -               /*
-> -                * Non-configurable replicators don't show up on the
-> -                * AMBA bus.  As such no need to add "arm,primecell".
-> -                */
-> -               compatible = "arm,coresight-replicator";
-> +       coresight-replicator at 20120000 {
+>  arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts | 45 +++++++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
+> index 3ba081c1f555..3813156f5d35 100644
+> --- a/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
+> +++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo-air.dts
+> @@ -73,6 +73,13 @@
+>  			gpios = <&pio 0 10 GPIO_ACTIVE_HIGH>; /* PA10 */
+>  		};
+>  	};
 > +
+> +	wifi_pwrseq: wifi_pwrseq {
 
-There is an extra line that is not needed here.  And we can probably
-change "coresight-replicator" to "replicator" now that it can be
-discovered on the AMBA bus.
+There should not be underscores in node names. See e.g.:
+https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1122967.html
+https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1145633.html
+https://www.mail-archive.com/netdev%40vger.kernel.org/msg90319.html
 
-Other than that:
+> +&r_pio {
+> +	wifi_en_nanopi_neo_air: wifi_en_pin {
+> +		allwinner,pins = "PL7";
+> +		allwinner,function = "gpio_out";
+> +		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+> +		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+> +	};
+> +};
 
-Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+1. Underscores in the node name.
+2. Pinmux nodes for GPIO usage is considered unnecessary or even harmful
+these days. As a bonus, you avoid a duplicate definition.
+3. Please use the generic properties, as in
 
-> +               compatible = "qcom,coresight-replicator1x", "arm,primecell";
-> +               reg = <0 0x20120000 0 0x1000>;
-> +
-> +               clocks = <&soc_smc50mhz>;
-> +               clock-names = "apb_pclk";
-> +               power-domains = <&scpi_devpd 0>;
->
->                 ports {
->                         #address-cells = <1>;
-> --
-> 2.7.4
->
+	pins = "PL7";
+	function ="gpio_out";
+	drive-strength = <10>;
+	bias-disable;
+
+(but you should just drop the node in this case).
+
+(Do we not usually address the dts maintainers directly when submitting
+device tree patches? Just wondering.)
+
+-- 
+Rask Ingemann Lambertsen
