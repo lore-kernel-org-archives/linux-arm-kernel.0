@@ -1,54 +1,65 @@
-From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
-Date: Mon, 20 Feb 2017 01:12:52 +0000
-Subject: iproute2 not function on CAN FD
-Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB4D7587@CHN-SV-EXMX07.mchp-main.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Mon, 20 Feb 2017 09:40:24 +0800
+Subject: [PATCH] drm/rockchip: cdn-dp: Fix error handling
+In-Reply-To: <20170219165942.17268-1-christophe.jaillet@wanadoo.fr>
+References: <20170219165942.17268-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <58AA4908.2000808@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 2017?02?20? 00:59, Christophe JAILLET wrote:
+> It is likely that both 'clk_disable_unprepare()' should be called if
+> 'pm_runtime_get_sync()' fails.
+>
+> Add a new label for that, because 'err_set_rate' is not meaningful in this
+> case.
+>
+>
+> Fixes: 1a0f7ed3abe2 ("drm/rockchip: cdn-dp: add cdn DP support for rk3399")
+>
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> ---
+> Not sure but a 'pm_runtime_get_sync()' is maybe also required in the
+> 'err_set_rate' path.
+> ---
+>   drivers/gpu/drm/rockchip/cdn-dp-core.c | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+> index 9ab67a670885..0fe1ec8b8fb1 100644
+> --- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
+> +++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+> @@ -111,7 +111,7 @@ static int cdn_dp_clk_enable(struct cdn_dp_device *dp)
+>   	ret = pm_runtime_get_sync(dp->dev);
+>   	if (ret < 0) {
+>   		DRM_DEV_ERROR(dp->dev, "cannot get pm runtime %d\n", ret);
+> -		goto err_pclk;
+> +		goto err_sync;
 
-I am testing the CAN FD of M_CAN on the SAMA5D2 Xplained board, 
-when using the ip tool from iprounte2 suite to set the CAN interface,
-it doesn't work with the message "RTNETLINK answers: Operation not supported".
---->8----
-# ip link set can0 type can bitrate 125000 dbitrate 8000000 fd on
-RTNETLINK answers: Operation not supported
----8<---
+I think the name err_pm_runtime_get is better.
+err_sync is not a clear name for the pm_runtime_get_sync.
 
-The version of iproute2 suite: 4.5.0 (iproute2-4.5.0)
---->8----
-# ip -V
-ip utility, iproute2-ss160314
----8<----
+>   	}
+>   
+>   	reset_control_assert(dp->core_rst);
+> @@ -133,6 +133,7 @@ static int cdn_dp_clk_enable(struct cdn_dp_device *dp)
+>   	return 0;
+>   
+>   err_set_rate:
+> +err_sync:
 
-The kernel version: 4.9.0
+miss pm_runtime_put, it should be:
 
-I have looked on google to try to find a solution, it seems that my kernel configuration is missing something, 
-http://superuser.com/questions/232807/iproute2-not-functioning-rtnetlink-answers-operation-not-supported
+err_set_rate:
+     pm_runtime_put(dp->dev);
+err_pm_runtime_get:
+     clk_disable_unprepare(dp->core_clk);
+err_core_clk:
 
-According to the document, I enabled the below options based on arch/arm/configs/sama5_defconfig, it still doesn't work.
-
---->8----
-CONFIG_IP_ADVANCED_ROUTER=y
-CONFIG_IP_MULTIPLE_TABLES=y
-
-CONFIG_NETFILTER=y
-CONFIG_NETFILTER_NETLINK_QUEUE=y
-CONFIG_NETFILTER_NETLINK_LOG=y
-CONFIG_NF_CONNTRACK=y
-CONFIG_NF_CT_NETLINK=y
-CONFIG_NETFILTER_XTABLES=y
-CONFIG_NETFILTER_XT_TARGET_MARK=y
-CONFIG_NET_SCHED=y
-CONFIG_NET_SCH_INGRESS=y
-CONFIG_NET_CLS_ACT=y
-
-CONFIG_SCSI_FC_ATTRS=y
----8<----
-
-Any help would be really appreciated.
+>   	clk_disable_unprepare(dp->core_clk);
+>   err_core_clk:
+>   	clk_disable_unprepare(dp->pclk);
 
 
-
-Best Regards,
-Wenyou Yang
+-- 
+?ark Yao
