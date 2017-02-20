@@ -1,60 +1,27 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 20 Feb 2017 21:33:25 +0100
-Subject: [PATCH/RFC 2/6] PM / Wakeup: Add wakeup_source_available()
-In-Reply-To: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1487622809-25127-3-git-send-email-geert+renesas@glider.be>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 20 Feb 2017 21:38:03 +0100
+Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
+In-Reply-To: <CAHp75VdwQGP-qa0c0KQwrdpZmCGc3RuEsJ-E-XLbBzQSn4Yxcg@mail.gmail.com>
+References: <1487593718-20752-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1487593718-20752-2-git-send-email-boris.brezillon@free-electrons.com>
+ <CAHp75VdwQGP-qa0c0KQwrdpZmCGc3RuEsJ-E-XLbBzQSn4Yxcg@mail.gmail.com>
+Message-ID: <20170220213803.7ba5591e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper function to find out if any wake-up sources have been
-registered.
+On Mon, 20 Feb 2017 22:27:17 +0200
+Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- drivers/base/power/wakeup.c | 8 ++++++++
- include/linux/pm_wakeup.h   | 3 +++
- 2 files changed, 11 insertions(+)
+> On Mon, Feb 20, 2017 at 2:28 PM, Boris Brezillon
+> <boris.brezillon@free-electrons.com> wrote:
+> 
+> >  drivers/mtd/nand/atmel/nand-controller.c | 2269 +++++++++++++++++++++++++++
+> >  drivers/mtd/nand/atmel_nand.c            | 2479 ------------------------------  
+> 
+> Does -M -C help you?
+> At least it would help reviewers
+> 
 
-diff --git a/drivers/base/power/wakeup.c b/drivers/base/power/wakeup.c
-index f546f8f107b06a45..1cf8320ed1a67dc4 100644
---- a/drivers/base/power/wakeup.c
-+++ b/drivers/base/power/wakeup.c
-@@ -232,6 +232,14 @@ void wakeup_source_unregister(struct wakeup_source *ws)
- EXPORT_SYMBOL_GPL(wakeup_source_unregister);
- 
- /**
-+ * wakeup_source_available - Check if any wakeup sources have been registered
-+ */
-+bool wakeup_source_available(void)
-+{
-+	return !list_empty(&wakeup_sources);
-+}
-+
-+/**
-  * device_wakeup_attach - Attach a wakeup source object to a device object.
-  * @dev: Device to handle.
-  * @ws: Wakeup source object to attach to @dev.
-diff --git a/include/linux/pm_wakeup.h b/include/linux/pm_wakeup.h
-index a3447932df1ff0a0..c5eaa8dbf27033df 100644
---- a/include/linux/pm_wakeup.h
-+++ b/include/linux/pm_wakeup.h
-@@ -97,6 +97,7 @@ extern void wakeup_source_add(struct wakeup_source *ws);
- extern void wakeup_source_remove(struct wakeup_source *ws);
- extern struct wakeup_source *wakeup_source_register(const char *name);
- extern void wakeup_source_unregister(struct wakeup_source *ws);
-+extern bool wakeup_source_available(void);
- extern int device_wakeup_enable(struct device *dev);
- extern int device_wakeup_disable(struct device *dev);
- extern void device_set_wakeup_capable(struct device *dev, bool capable);
-@@ -144,6 +145,8 @@ static inline struct wakeup_source *wakeup_source_register(const char *name)
- 
- static inline void wakeup_source_unregister(struct wakeup_source *ws) {}
- 
-+static inline bool wakeup_source_available(void) { return false; }
-+
- static inline int device_wakeup_enable(struct device *dev)
- {
- 	dev->power.should_wakeup = true;
--- 
-2.7.4
+No it doesn't, because files were not just moved around using git mv,
+it's a complete rewrite of the driver. IIUC, you're about to review
+this submission, or are you just trolling like last time?
