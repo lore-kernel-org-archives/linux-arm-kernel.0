@@ -1,72 +1,65 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 20 Feb 2017 11:10:10 +0000
-Subject: [PATCH v2] arm64: print a fault message when attempting to write
- RO memory
-In-Reply-To: <148734678579.30076.8827985106565313944@sboyd-linaro>
-References: <20170217011959.26754-1-stephen.boyd@linaro.org>
- <58A6D7D7.1030704@arm.com>
- <148734678579.30076.8827985106565313944@sboyd-linaro>
-Message-ID: <58AACE92.4040608@arm.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Mon, 20 Feb 2017 16:57:43 +0530
+Subject: [PATCH v2 4/6] spi: davinci: flush caches when performing DMA
+In-Reply-To: <2a1954a3-edbd-7ac4-6fde-9b6d046a6560@baylibre.com>
+References: <1487327904-28311-1-git-send-email-fisaksen@baylibre.com>
+ <1487327904-28311-5-git-send-email-fisaksen@baylibre.com>
+ <5fab0c33-6e1d-c63a-8758-6672236045a7@ti.com>
+ <20170217112247.GE21222@n2100.armlinux.org.uk>
+ <eaf93c6c-52a7-826b-9c53-2b13c0b280ca@baylibre.com>
+ <20170217120749.GF21222@n2100.armlinux.org.uk>
+ <0f3607fd-4542-be92-da2e-b2da6f8ac26f@ti.com>
+ <f0fcc000-6c07-647a-ada2-04b61f0e2e3b@baylibre.com>
+ <57721a60-52bb-c9d1-d5a7-ae450e7adcc0@ti.com>
+ <2a1954a3-edbd-7ac4-6fde-9b6d046a6560@baylibre.com>
+Message-ID: <954333da-4d15-ce77-4021-268530365edc@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
 
-On 17/02/17 15:53, Stephen Boyd wrote:
-> Quoting James Morse (2017-02-17 03:00:39)
->> On 17/02/17 01:19, Stephen Boyd wrote:
->>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->>> index 156169c6981b..8bd4e7f11c70 100644
->>> --- a/arch/arm64/mm/fault.c
->>> +++ b/arch/arm64/mm/fault.c
->>> @@ -177,9 +193,19 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
->>>        * No handler, we'll have to terminate things with extreme prejudice.
->>>        */
->>>       bust_spinlocks(1);
->>> -     pr_alert("Unable to handle kernel %s at virtual address %08lx\n",
->>> -              (addr < PAGE_SIZE) ? "NULL pointer dereference" :
->>> -              "paging request", addr);
->>> +
->>> +     if (is_permission_fault(esr, regs)) {
->>
->> is_permission_fault() was previously guarded with a 'addr<USER_DS' check, this
->> is because it assumes software-PAN is relevant.
->>
->> The corner case is when the kernel accesses TTBR1-mapped memory while
->> software-PAN happens to have swivelled TTBR0. Translation faults will be matched
->> by is_permission_fault(), but permission faults won't.
+
+On Monday 20 February 2017 04:04 PM, Frode Isaksen wrote:
 > 
-> If I understand correctly, and I most definitely don't because there are
-> quite a few combinations, you're saying that __do_kernel_fault() could
-> be called if the kernel attempts to access some userspace address with
-> software PAN? That won't be caught in do_page_fault() with the previous
-> is_permission_fault() check?
-
-You're right the user-address side of things will get caught in do_page_fault().
-I was trying to badly-explain 'is_permission_fault(esr)' isn't as general
-purpose as its name and prototype suggest, it only gives the results that the
-PAN checks expect when called with a user address.
-
-
->> Juggling is_permission_fault() to look something like:
->> ---%<---
->>         if (fsc_type == ESR_ELx_FSC_PERM)
->>                 return true;
->>
->>         if (addr < USER_DS && system_uses_ttbr0_pan())
->>                 return fsc_type == ESR_ELx_FSC_FAULT &&
->>                         (regs->pstate & PSR_PAN_BIT);
->>
->>         return false;
->> ---%<---
->> ... should fix this.
 > 
-> But we don't need to check ec anymore?
+> On 20/02/2017 10:47, Vignesh R wrote:
+>>
+>> On Monday 20 February 2017 02:56 PM, Frode Isaksen wrote:
+>>>
+>>> On 20/02/2017 07:55, Vignesh R wrote:
+>>>> On Friday 17 February 2017 05:37 PM, Russell King - ARM Linux wrote:
+[...]
+>>>> I am debugging another issue with UBIFS wherein pages allocated by
+>>>> vmalloc are in highmem region that are not addressable using 32 bit
+>>>> addresses and is backed by LPAE. So, a 32 bit DMA cannot access these
+>>>> buffers at all.
+>>>> When dma_map_sg() is called to map these pages by spi_map_buf() the
+>>>> physical address is just truncated to 32 bit in pfn_to_dma() (as part of
+>>>> dma_map_sg() call). This results in random crashes as DMA starts
+>>>> accessing random memory during SPI read.
+>>>>
+>>>> Given, the above problem and also issue surrounding VIVT caches, I am
+>>>> thinking of may be using pre-allocated fixed size bounce buffer to
+>>>> handle buffers not in lowmem mapping.
+>>>> I have tried using 64KB pre-allocated buffer on TI DRA74 EVM with QSPI
+>>>> running at 76.8MHz and do not see any significant degradation in
+>>>> performance with UBIFS. Mainly because UBIFS seems to use vmalloc'd
+>>>> buffers only during initial preparing and mounting phase and not during
+>>>> file read/write.
+>>> I am seeing a bug caused by VIVT cache in 'read_ltab()' function. In this function, the vmalloc'ed buffer is of size 11. Isn't it better to use kmalloc in this case ?
+>> read_ltab() isn't the only place where vmalloc() is used. A quick grep
+>> for vmalloc on fs/ubifs/ shows about ~19 occurrence. I guess every
+>> vmalloc() call can potentially allocate memory from highmem and might
+>> potentially cause issue for VIVT and such aliasing caches.
+>> Fixing just one such case isn't going to help IMHO.
+> Of course fixing it only in one place is of course not going to help..
+> For the moment there are 3 solutions to the UBIFS DMA problem:
+> 1) Always use bounce buffer for vmalloc'ed buffers - impacts everyone.
+> 2) Remove use of vmalloc'ed buffers in UBIFS - is it possible ?
 
-Sorry, I was being sloppy, something like the above could replace the if/else
-block at the end of is_permission_fault(). You're right we still need the ec check!
+Maybe. But what about mtdblock with JFFS2 on top of it, mtdblock still
+uses vmalloc'd buffers?
 
 
-Thanks,
-
-James
+-- 
+Regards
+Vignesh
