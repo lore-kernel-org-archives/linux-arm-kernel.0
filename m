@@ -1,62 +1,41 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Mon, 20 Feb 2017 17:22:38 +0000
-Subject: [PATCH] ARM: dts: kirkwood: Fix SATA pinmux-ing for TS419
-In-Reply-To: <20170220175049.45f319bb@free-electrons.com>
-References: <20170218003251.GC4152@decadent.org.uk>
- <20170220135955.63fbcaa3@free-electrons.com>
- <1487608825.2885.1.camel@decadent.org.uk>
- <20170220175049.45f319bb@free-electrons.com>
-Message-ID: <1487611358.2885.3.camel@decadent.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 20 Feb 2017 18:22:47 +0100
+Subject: [PATCH 0/3] mtd: nand: atmel: Add ->setup_data_interface() + PM
+ ops
+In-Reply-To: <1487610978-12423-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1487610978-12423-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20170220182247.58a4f980@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-02-20 at 17:50 +0100, Thomas Petazzoni wrote:
+Please ignore this version.
+
+On Mon, 20 Feb 2017 18:16:12 +0100
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+
 > Hello,
 > 
-> On Mon, 20 Feb 2017 16:40:25 +0000, Ben Hutchings wrote:
+> This patch series is adding to important features to the new Atmel NAND
+> controller driver:
+> 1/ automatic SMC timings configuration based on information retrieved
+>    during NAND detection
+> 2/ proper ->suspend()/->resume(). Timings are properly restored when
+>    resuming the system
 > 
-> > That is precisely what I intended.??20-23 are used by the second
-> > Ethernet port.??The old board code doesn't assign 4 or 5 at all.
+> This series depends on [1] and [2].
 > 
-> Then I believe it would be more explicit to have separate pin muxing
-> configurations for SATA on this board.
-
-You mean, define additional pinmux nodes and override the pinctrl-0
-property of &sata?  More like this:
-
---- a/arch/arm/boot/dts/kirkwood-ts419.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-ts419.dtsi
-@@ -73,3 +73,19 @@
- 		phy-handle = <&ethphy1>;
- 	};
- };
-+
-+&pinctrl {
-+	pmx_sata0_ts419: pmx-sata0-ts419 {
-+		marvell,pins = "mpp15";
-+		marvell,function = "sata0";
-+	};
-+
-+	pmx_sata1_ts419: pmx-sata1-ts419 {
-+		marvell,pins = "mpp16";
-+		marvell,function = "sata1";
-+	};
-+};
-+
-+&sata {
-+	pinctrl-0 = <&pmx_sata0_ts419 &pmx_sata1_ts419>;
-+};
---- END ---
-
-Ben.
-
--- 
-Ben Hutchings
-If at first you don't succeed, you're doing about average.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170220/f795a5b5/attachment-0001.sig>
+> Regards,
+> 
+> Boris
+> 
+> [1]https://www.spinics.net/lists/arm-kernel/msg563780.html
+> [2]https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1337235.html
+> 
+> Boris Brezillon (3):
+>   memory: atmel-ebi: Change naming scheme
+>   memory: atmel-ebi: Add missing ->numcs assignment
+>   memory: atmel-ebi: Add PM ops
+> 
+>  drivers/memory/atmel-ebi.c | 141 ++++++++++++++++++++++++++-------------------
+>  1 file changed, 81 insertions(+), 60 deletions(-)
+> 
