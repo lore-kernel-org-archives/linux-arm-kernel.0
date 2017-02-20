@@ -1,14 +1,12 @@
 From: jagan@openedev.com (Jagan Teki)
-Date: Tue, 21 Feb 2017 01:35:19 +0530
-Subject: [PATCH v2 2/4] arm: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual
- OpenFrame Cap 10.1 initial support
+Date: Tue, 21 Feb 2017 01:35:20 +0530
+Subject: [PATCH v2 3/4] arm: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual
+ OpenFrame Cap 12.3 initial support
 In-Reply-To: <1487621121-6051-1-git-send-email-jagan@openedev.com>
 References: <1487621121-6051-1-git-send-email-jagan@openedev.com>
-Message-ID: <1487621121-6051-2-git-send-email-jagan@openedev.com>
+Message-ID: <1487621121-6051-3-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-From: Jagan Teki <jagan@amarulasolutions.com>
 
 i.CoreM6 Quad/Dual OpenFrame modules are "system on modules plus
 openframe display carriers" which are good solution for develop
@@ -18,7 +16,7 @@ General features:
 CPU           NXP i.MX6Q rev1.2 at 792 MHz
 RAM           1GB, 32, 64 bit, DDR3-800/1066
 NAND          SLC,512MB
-LVDS Display  TFT 10.1" industrial, 1280x800 resolution
+LVDS Display  TFT 12.3" industrial, 1280x480 resolution
 Backlight     LED backlight, brightness 350 Cd/m2
 Power supply  15 to 30 Vdc
 
@@ -26,33 +24,33 @@ Cc: Domenico Acri <domenico.acri@engicam.com>
 Cc: Matteo Lisi <matteo.lisi@engicam.com>
 Cc: Michael Trimarchi <michael@amarulasolutions.com>
 Cc: Shawn Guo <shawnguo@kernel.org>
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Signed-off-by: Jagan Teki <jagan@openedev.com>
 ---
 Changes for v2:
-- none
+- newly added patch
 
  arch/arm/boot/dts/Makefile                |  1 +
- arch/arm/boot/dts/imx6q-icore-ofcap10.dts | 76 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6q-icore-ofcap12.dts | 76 +++++++++++++++++++++++++++++++
  2 files changed, 77 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-icore-ofcap10.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-icore-ofcap12.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0118084..458ec09 100644
+index 458ec09..adfdaee 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -398,6 +398,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-h100.dtb \
+@@ -399,6 +399,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
  	imx6q-hummingboard.dtb \
  	imx6q-icore.dtb \
-+	imx6q-icore-ofcap10.dtb \
+ 	imx6q-icore-ofcap10.dtb \
++	imx6q-icore-ofcap12.dtb \
  	imx6q-icore-rqs.dtb \
  	imx6q-marsboard.dtb \
  	imx6q-mccmon6.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-icore-ofcap10.dts b/arch/arm/boot/dts/imx6q-icore-ofcap10.dts
+diff --git a/arch/arm/boot/dts/imx6q-icore-ofcap12.dts b/arch/arm/boot/dts/imx6q-icore-ofcap12.dts
 new file mode 100644
-index 0000000..70600e2
+index 0000000..d0995b2
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-icore-ofcap10.dts
++++ b/arch/arm/boot/dts/imx6q-icore-ofcap12.dts
 @@ -0,0 +1,76 @@
 +/*
 + * Copyright (C) 2016 Amarula Solutions B.V.
@@ -102,7 +100,7 @@ index 0000000..70600e2
 +#include "imx6qdl-icore.dtsi"
 +
 +/ {
-+	model = "Engicam i.CoreM6 Quad/Dual OpenFrame Capacitive touch 10.1 Kit";
++	model = "Engicam i.CoreM6 Quad/Dual OpenFrame Capacitive touch 12 Kit";
 +	compatible = "engicam,imx6-icore", "fsl,imx6q";
 +};
 +
@@ -111,21 +109,21 @@ index 0000000..70600e2
 +
 +	lvds-channel at 0 {
 +		fsl,data-mapping = "spwg";
-+		fsl,data-width = <24>;
++		fsl,data-width = <18>;
 +		status = "okay";
 +
 +		display-timings {
 +                        native-mode = <&timing1>;
 +                        timing1: hsd100pxn1 {
-+                                clock-frequency = <60000000>;
++                                clock-frequency = <46800000>;
 +                                hactive = <1280>;
-+                                vactive = <800>;
-+                                hback-porch = <40>;
-+                                hfront-porch = <40>;
-+                                vback-porch = <10>;
-+                                vfront-porch = <3>;
-+                                hsync-len = <80>;
-+                                vsync-len = <10>;
++                                vactive = <480>;
++                                hback-porch = <353>;
++                                hfront-porch = <47>;
++                                vback-porch = <39>;
++                                vfront-porch = <4>;
++                                hsync-len = <8>;
++                                vsync-len = <2>;
 +                        };
 +                };
 +	};
