@@ -1,94 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Feb 2017 19:00:55 +0000
-Subject: [PATCH 2/2] arch_timer: acpi: add hisi timer erratum data
-In-Reply-To: <589D6776.2010400@huawei.com>
-References: <1485254391-51551-1-git-send-email-guohanjun@huawei.com>
- <1485254391-51551-3-git-send-email-guohanjun@huawei.com>
- <20170124105717.GB6277@leverpostej>
- <a2ac2a70-09fb-5cec-c090-b8ebde90e24f@arm.com> <589D6776.2010400@huawei.com>
-Message-ID: <6c3a2952-731b-dfae-ba22-f9d7df25d691@arm.com>
+From: hias@horus.com (Matthias Reichl)
+Date: Mon, 20 Feb 2017 20:01:16 +0100
+Subject: [RESEND PATCH] dmaengine: bcm2835: Fix cyclic DMA period splitting
+Message-ID: <20170220190115.GB4170@camel2.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/02/17 07:10, Hanjun Guo wrote:
-> Hi Marc,
-> 
-> On 2017/1/24 19:32, Marc Zyngier wrote:
->> On 24/01/17 10:57, Mark Rutland wrote:
->>> On Tue, Jan 24, 2017 at 06:39:51PM +0800, Hanjun Guo wrote:
->>>> From: Hanjun Guo <hanjun.guo@linaro.org>
->>>>
->>>> Add hisilicon timer specific erratum fixes.
->>>>
->>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>> ---
->>>>  drivers/clocksource/arm_arch_timer.c | 22 ++++++++++++++++++++++
->>>>  1 file changed, 22 insertions(+)
->>>>
->>>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->>>> index 80d6f76..3e62a09 100644
->>>> --- a/drivers/clocksource/arm_arch_timer.c
->>>> +++ b/drivers/clocksource/arm_arch_timer.c
->>>> @@ -1156,10 +1156,32 @@ struct gtdt_arch_timer_fixup {
->>>>  	void *context;
->>>>  };
->>>>  
->>>> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
->>>> +static void __init hisi_erratum_workaroud_enable(void *context)
->>>> +{
->>>> +	int i;
->>>> +
->>>> +	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
->>>> +		if (!strcmp(context, ool_workarounds[i].id)) {
->>>> +			timer_unstable_counter_workaround = &ool_workarounds[i];
->>>> +			static_branch_enable(&arch_timer_read_ool_enabled);
->>>> +			pr_info("arch_timer: Enabling workaround for %s\n",
->>>> +				timer_unstable_counter_workaround->id);
->>>> +			break;
->>>> +		}
->>>> +	}
->>>> +}
->>>> +#endif
->>>> +
->>>>  /* note: this needs to be updated according to the doc of OEM ID
->>>>   * and TABLE ID for different board.
->>>>   */
->>>>  static struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
->>>> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
->>>> +	{"HISI  ", "HIP05   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
->>>> +	{"HISI  ", "HIP06   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
->>>> +	{"HISI  ", "HIP07   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
->>>> +#endif
->>>>  };
->>> NAK. This duplicates logic unnecessarily (for enabling the workaround),
->>> and (ab)uses the id, which was intended to be specific to DT (since it
->>> is a DT property name).
->> Agreed, that's properly revolting.
->>
->>> We should split the matching from the particular workaround (and
->>> enabling thereof), so that we can go straight from ACPI match to
->>> workaround (without having to use the DT id in this manner), and don't
->>> have to duplicate the logic to enable the workaround.
->>>
->>> I believe Marc is looking at some rework in this area which may enable
->>> this, so please wait for that to appear.
->> Yeah, I'm implementing a semi-flexible way to add new quirk types, and
->> the last thing I want to see is two (or more) tables describing the same
->> thing.
-> 
-> Kindly ping, if you have patches in hand, I can test against our platforms,
-> thank you very much.
+The code responsible for splitting periods into chunks that
+can be handled by the DMA controller missed to update total_len,
+the number of bytes processed in the current period, when there
+are more chunks to follow.
 
-I've just pushed out a branch based on arm64/for-next/core, plus the
-HiSi timer workaround:
+Therefore total_len was stuck at 0 and the code didn't work at all.
+This resulted in a wrong control block layout and audio issues because
+the cyclic DMA callback wasn't executing on period boundaries.
 
-https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=timers/errata-rework
+Fix this by adding the missing total_len update.
 
-I'll post the patches for review once the merge window is open, but
-hopefully that should get you going.
+Signed-off-by: Matthias Reichl <hias@horus.com>
+Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+Tested-by: Clive Messer <clive.messer@digitaldreamtime.co.uk>
+Reviewed-by: Eric Anholt <eric@anholt.net>
+---
+ drivers/dma/bcm2835-dma.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Thanks,
-
-	M.
+diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+index 80d35f7..599c218 100644
+--- a/drivers/dma/bcm2835-dma.c
++++ b/drivers/dma/bcm2835-dma.c
+@@ -253,8 +253,11 @@ static void bcm2835_dma_create_cb_set_length(
+ 	 */
+ 
+ 	/* have we filled in period_length yet? */
+-	if (*total_len + control_block->length < period_len)
++	if (*total_len + control_block->length < period_len) {
++		/* update number of bytes in this period so far */
++		*total_len += control_block->length;
+ 		return;
++	}
+ 
+ 	/* calculate the length that remains to reach period_length */
+ 	control_block->length = period_len - *total_len;
 -- 
-Jazz is not dead. It just smells funny...
+2.1.4
