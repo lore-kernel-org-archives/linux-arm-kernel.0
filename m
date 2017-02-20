@@ -1,47 +1,64 @@
-From: nandor.han@ge.com (Han, Nandor (GE Healthcare))
-Date: Mon, 20 Feb 2017 10:27:38 +0200
-Subject: EXT: Re: sDMA on i.mx7d
-In-Reply-To: <CAOMZO5A8NRmTWSxdxr=gfhA9kd6GbQgNs69jujewHN9hVpc1kw@mail.gmail.com>
-References: <20170214222425.hbkfkeq3l6sveo7n@piout.net>
- <e9c36a33f2a49df2a517db5869eaea7f@agner.ch>
- <20170215110736.oumvvv7zordd2jdw@piout.net>
- <3513b2c01d86ad7312522d6be97e766f@agner.ch>
- <20170216104229.axwm3445yj6zrxoz@piout.net>
- <CAOMZO5CeqipfNJxM2Pc1g1606OjbN83ZtbbGRZFmqE3q4fNpRw@mail.gmail.com>
- <20170216164038.zbl2nb76now3glkk@piout.net>
- <1487263639.13536.36.camel@pengutronix.de>
- <20170216170828.bcbpvtdobmcxr2lu@piout.net>
- <b60d1bc3-e23f-0ce5-2905-b6c0025bdc84@ge.com>
- <CAOMZO5A8NRmTWSxdxr=gfhA9kd6GbQgNs69jujewHN9hVpc1kw@mail.gmail.com>
-Message-ID: <1d525aaf-fa0a-5ef9-a3bf-67522686969f@ge.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Mon, 20 Feb 2017 16:28:52 +0800
+Subject: [PATCH] drm/rockchip: vop: no need wait vblank on crtc enable
+Message-ID: <1487579332-8578-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Since atomic framework, crtc enable and disable are in pairs,
+no need to wait vblank.
 
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 36 -----------------------------
+ 1 file changed, 36 deletions(-)
 
-On 19/02/2017 23:55, Fabio Estevam wrote:
-> Nandor,
->
-> On Fri, Feb 17, 2017 at 7:13 AM, Han, Nandor (GE Healthcare)
-> <nandor.han@ge.com> wrote:
->
->> Hi,
->>   Thanks for mention the problem and confirm that the above patch fixed the
->> issue.
->>
->> I'm a bit surprised about the issue that Stefan mention, which in his case
->> was a "noise". In my case was more like a sound interruption (I was testing
->> on a iMX6).
->>
->> But good to hear that works :)
->
-> As 4.9 is broken, could you please submit the fix to kernel 4.9 and Cc stable?
->
-
-Fabio,
-   I will try to send it ASAP when I find some free time (I will try 
-this week)
-
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 76c79ac..8dab2af 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -900,42 +900,6 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
+ 		return;
+ 	}
+ 
+-	/*
+-	 * If dclk rate is zero, mean that scanout is stop,
+-	 * we don't need wait any more.
+-	 */
+-	if (clk_get_rate(vop->dclk)) {
+-		/*
+-		 * Rk3288 vop timing register is immediately, when configure
+-		 * display timing on display time, may cause tearing.
+-		 *
+-		 * Vop standby will take effect at end of current frame,
+-		 * if dsp hold valid irq happen, it means standby complete.
+-		 *
+-		 * mode set:
+-		 *    standby and wait complete --> |----
+-		 *                                  | display time
+-		 *                                  |----
+-		 *                                  |---> dsp hold irq
+-		 *     configure display timing --> |
+-		 *         standby exit             |
+-		 *                                  | new frame start.
+-		 */
+-
+-		reinit_completion(&vop->dsp_hold_completion);
+-		vop_dsp_hold_valid_irq_enable(vop);
+-
+-		spin_lock(&vop->reg_lock);
+-
+-		VOP_CTRL_SET(vop, standby, 1);
+-
+-		spin_unlock(&vop->reg_lock);
+-
+-		wait_for_completion(&vop->dsp_hold_completion);
+-
+-		vop_dsp_hold_valid_irq_disable(vop);
+-	}
+-
+ 	pin_pol = BIT(DCLK_INVERT);
+ 	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC) ?
+ 		   0 : BIT(HSYNC_POSITIVE);
 -- 
-Regards,
-     Nandi
+1.9.1
