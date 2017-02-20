@@ -1,28 +1,56 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 20 Feb 2017 11:12:26 -0500 (EST)
-Subject: [PATCHv3 net-next 00/12] net: mvpp2: misc improvements and
- preparation patches
-In-Reply-To: <20170220164741.11b40d07@free-electrons.com>
-References: <20170220100742.0b1fce4a@free-electrons.com>
- <20170220.095357.2175678121216081406.davem@davemloft.net>
- <20170220164741.11b40d07@free-electrons.com>
-Message-ID: <20170220.111226.239035932737797178.davem@davemloft.net>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Mon, 20 Feb 2017 16:40:25 +0000
+Subject: [PATCH] ARM: dts: kirkwood: Fix SATA pinmux-ing for TS419
+In-Reply-To: <20170220135955.63fbcaa3@free-electrons.com>
+References: <20170218003251.GC4152@decadent.org.uk>
+ <20170220135955.63fbcaa3@free-electrons.com>
+Message-ID: <1487608825.2885.1.camel@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Date: Mon, 20 Feb 2017 16:47:41 +0100
-
+On Mon, 2017-02-20 at 13:59 +0100, Thomas Petazzoni wrote:
 > Hello,
 > 
-> On Mon, 20 Feb 2017 09:53:57 -0500 (EST), David Miller wrote:
+> Adding in Cc all the maintainers of the Kirkwood platforms.
 > 
->> > This series has been on the list for a while, and has received review
->> > and a Acked-by. Would it be possible to merge it?  
->> 
->> You need to repost the series if it isn't in patchwork in state
->> "Under Review".
+> On Sat, 18 Feb 2017 00:32:51 +0000, Ben Hutchings wrote:
 > 
-> Is net-next still open? I.e can I resend today/tomorrow?
+> > +&pmx_sata0 {
+> > +	marvell,pins = "mpp15";
+> > +};
+> > +
+> > +&pmx_sata1 {
+> > +	marvell,pins = "mpp16";
+> > +};
+> 
+> This is not only muxing mpp15 as sata0 and mpp16 as sata1, but also
+> removes the muxing of sata0/sata1 pins described in kirkwood-6282.dtsi:
+> 
+> ????????????????????????pmx_sata0: pmx-sata0 {
+> ????????????????????????????????marvell,pins = "mpp5", "mpp21", "mpp23";
+> ????????????????????????????????marvell,function = "sata0";
+> ????????????????????????};
+> ????????????????????????pmx_sata1: pmx-sata1 {
+> ????????????????????????????????marvell,pins = "mpp4", "mpp20", "mpp22";
+> ????????????????????????????????marvell,function = "sata1";
+> ????????????????????????};
+> 
+> So it means that MPP 4, 5, 20, 21, 22 and 23 will no longer be muxed as
+> sata0/sata1. Is this really what you want?
 
-For your particular case I'll accept a resubmit.
+That is precisely what I intended.  20-23 are used by the second
+Ethernet port.  The old board code doesn't assign 4 or 5 at all.
+
+Ben.
+
+-- 
+Ben Hutchings
+If at first you don't succeed, you're doing about average.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170220/13dad357/attachment.sig>
