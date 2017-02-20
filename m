@@ -1,40 +1,39 @@
-From: jerry.huang@nxp.com (Jerry Huang)
-Date: Mon, 20 Feb 2017 08:39:24 +0000
-Subject: [PATCH v4 3/3] USB3/DWC3: Enable undefined length INCR burst type
-References: <1484727138-3264-1-git-send-email-jerry.huang@nxp.com>
- <1484727138-3264-3-git-send-email-jerry.huang@nxp.com>
- <DB5PR0401MB1813965DDC8CC6CD0BD85980FE440@DB5PR0401MB1813.eurprd04.prod.outlook.com>
- <87y3xeqvsl.fsf@linux.intel.com>
-Message-ID: <DB5PR0401MB18134EB0CFBA8D8CFA73A1A7FE5E0@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 20 Feb 2017 09:40:44 +0100
+Subject: [PATCH 1/3] ARM: davinci: PM: Drop useless check for
+ PM_SUSPEND_STANDBY
+In-Reply-To: <76eb3b09-80bd-eb5a-db32-744a7b9e1f2c@ti.com>
+References: <1487347836-14427-1-git-send-email-geert+renesas@glider.be>
+ <1487347836-14427-2-git-send-email-geert+renesas@glider.be>
+ <76eb3b09-80bd-eb5a-db32-744a7b9e1f2c@ti.com>
+Message-ID: <CAMuHMdVdMeY0WFrpG_k_Ahd_EcLVTgaTW7+Z1imGmzs67uLuHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Jerry Huang
-> Sent: Friday, February 10, 2017 11:30 PM
-> To: 'Felipe Balbi' <balbi@kernel.org>; robh+dt at kernel.org;
-> mark.rutland at arm.com; catalin.marinas at arm.com
-> Cc: linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Rajesh
-> Bhagat <rajesh.bhagat@nxp.com>
-> Subject: RE: [PATCH v4 3/3] USB3/DWC3: Enable undefined length INCR burst
-> type
-> 
-> > >> --
-> > >> 1.7.9.5
-> > > Hi, Balbi and all guys,
-> > > Any comment for these patches? Can they be accepted?
-> >
-> > Rob had comments which you didn't reply yet. I cannot take this
-> > patchset yet ;-)
-> >
-> Balbi,
-> I look into his mail again, which was based v3, and I replied it.
-> He had different understanding for undefined length burst mode.
-> It seems he think for this mode, just setting bit[0] (INCRBrstEna) and don't
-> need to set other field.
-> However, according to the DWC USB3.0 controller databook, when it is
-> undefined length INCR burst mode, we still need to set one max burst type,
-> such as INCR8, which means controller will use any length less than or equal
-> to this INCR8.
-Any comment for it? Ten days passed away again :)
+Hi Sekhar,
+
+On Mon, Feb 20, 2017 at 9:30 AM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On Friday 17 February 2017 09:40 PM, Geert Uytterhoeven wrote:
+>> As DaVinci uses the standard suspend_valid_only_mem() for its
+>> platform_suspend_ops.valid() callback, its platform_suspend_ops.enter()
+>> callback will never be called with state equal to PM_SUSPEND_STANDBY.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> Looks good to me. Whats the plan for applying the series. Do you want
+> the individual machine maintainers to apply their parts. Or some other?
+
+I think the individual machine maintainers is the simplest.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
