@@ -1,94 +1,60 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 20 Feb 2017 21:33:23 +0100
-Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
- power
-Message-ID: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+Date: Mon, 20 Feb 2017 21:33:25 +0100
+Subject: [PATCH/RFC 2/6] PM / Wakeup: Add wakeup_source_available()
+In-Reply-To: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1487622809-25127-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi all,
+Add a helper function to find out if any wake-up sources have been
+registered.
 
-This patch series adds support for using non-PMIC wake-up sources on the
-Renesas R-Car Gen3 (H3 or M3-W) Salvator-X development boards.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ drivers/base/power/wakeup.c | 8 ++++++++
+ include/linux/pm_wakeup.h   | 3 +++
+ 2 files changed, 11 insertions(+)
 
-Nothing in the PSCI specification requires the SoC to remain powered and
-to support wake-up sources when suspended using SYSTEM_SUSPEND.
-If the firmware implements the PSCI SYSTEM_SUSPEND operation by cutting
-power to the SoC, the only possibly wake-up sources are thus the ones
-connected to the PMIC.
-
-To allow other wake-up sources, this patch series documents and adds
-support for an "arm,psci-system-suspend-is-power-down" DT property, so
-Linux uses a different suspend method when other wake-up sources (e.g.
-wake on LAN, UART or GPIO) are enabled.  Hence the user no longer has to
-manually restrict "mem" suspend to "s2idle" or "shallow" states using:
-
-    $ echo s2idle > /sys/power/mem_sleep # or "shallow"
-
-Contents:
-  - Patch 1 prevents the alarmtimer from showing up as a wake-up source
-    when no wake-up capable RTC device is present in the system,
-  - Patch 2 provides an API to check if any wake-up sources have been
-    registered,
-  - Patch 3 implements "shallow" suspend mode on systems using PSCI,
-    in addition to the existing "s2idle" and "deep" suspend modes,
-  - Patch 4 makes the system use "shallow" instead of "deep" suspend
-    mode on systems where this is needed to support non-PMIC wake-up
-    sources,
-  - Patches 5 and 6 enable the above on Renesas R-Car H3 and M3-W
-    systems.
-
-Dependencies:
-  - The three first patches are independent,
-  - The fourth patch depends on the first three patches,
-  - The DTS patches depend on acceptance of the DT bindings in patch 4.
-
-This has been tested on both the Renesas R-Car H3 (quad A57*)
-and M3-W (dual A57*) Salvator-X development boards
-(*A53 cores are unused).
-
-Power consumption:
-
-		H3	M3-W
-		--	----
-  - idle:	9.2 W	7.6 W
-  - s2idle:	8.6 W	6.3 W
-  - shallow:	8.4 W	6.2 W	(secondary CPU cores off)
-  - deep:	1.4 W	1.2 W	(PSCI_SYSTEM_SUSPEND)
-  - shutdown:	7.7 W	5.6 W	(PSCI SYSTEM_OFF: needs improvement)
-  - poweroff:	1.3 W	1.1 W	(fan running)
-
-Thanks for your comments!
-
-Geert Uytterhoeven (6):
-  alarmtimer: Postpone wake-up source registration until really
-    available
-  PM / Wakeup: Add wakeup_source_available()
-  drivers: firmware: psci: Implement shallow suspend mode
-  drivers: firmware: psci: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
-    power
-  arm64: dts: r8a7795: Fix non-PMIC wake-up sources
-  arm64: dts: r8a7796: Fix non-PMIC wake-up sources
-
- Documentation/devicetree/bindings/arm/psci.txt | 11 ++++++++
- arch/arm64/boot/dts/renesas/r8a7795.dtsi       |  1 +
- arch/arm64/boot/dts/renesas/r8a7796.dtsi       |  1 +
- drivers/base/power/wakeup.c                    |  8 ++++++
- drivers/firmware/psci.c                        | 39 ++++++++++++++++++++++++--
- include/linux/pm_wakeup.h                      |  3 ++
- kernel/time/alarmtimer.c                       |  9 +++++-
- 7 files changed, 68 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/base/power/wakeup.c b/drivers/base/power/wakeup.c
+index f546f8f107b06a45..1cf8320ed1a67dc4 100644
+--- a/drivers/base/power/wakeup.c
++++ b/drivers/base/power/wakeup.c
+@@ -232,6 +232,14 @@ void wakeup_source_unregister(struct wakeup_source *ws)
+ EXPORT_SYMBOL_GPL(wakeup_source_unregister);
+ 
+ /**
++ * wakeup_source_available - Check if any wakeup sources have been registered
++ */
++bool wakeup_source_available(void)
++{
++	return !list_empty(&wakeup_sources);
++}
++
++/**
+  * device_wakeup_attach - Attach a wakeup source object to a device object.
+  * @dev: Device to handle.
+  * @ws: Wakeup source object to attach to @dev.
+diff --git a/include/linux/pm_wakeup.h b/include/linux/pm_wakeup.h
+index a3447932df1ff0a0..c5eaa8dbf27033df 100644
+--- a/include/linux/pm_wakeup.h
++++ b/include/linux/pm_wakeup.h
+@@ -97,6 +97,7 @@ extern void wakeup_source_add(struct wakeup_source *ws);
+ extern void wakeup_source_remove(struct wakeup_source *ws);
+ extern struct wakeup_source *wakeup_source_register(const char *name);
+ extern void wakeup_source_unregister(struct wakeup_source *ws);
++extern bool wakeup_source_available(void);
+ extern int device_wakeup_enable(struct device *dev);
+ extern int device_wakeup_disable(struct device *dev);
+ extern void device_set_wakeup_capable(struct device *dev, bool capable);
+@@ -144,6 +145,8 @@ static inline struct wakeup_source *wakeup_source_register(const char *name)
+ 
+ static inline void wakeup_source_unregister(struct wakeup_source *ws) {}
+ 
++static inline bool wakeup_source_available(void) { return false; }
++
+ static inline int device_wakeup_enable(struct device *dev)
+ {
+ 	dev->power.should_wakeup = true;
 -- 
 2.7.4
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
