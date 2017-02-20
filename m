@@ -1,67 +1,28 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 20 Feb 2017 21:00:42 +0900
-Subject: [RESEND PATCH] pinctrl: uniphier: change pin names of aio/xirq for
- LD11
-Message-ID: <1487592042-22828-1-git-send-email-yamada.masahiro@socionext.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Feb 2017 12:16:03 +0000
+Subject: [BUG] hdlcd gets confused about base address
+In-Reply-To: <20161118233733.GP1041@n2100.armlinux.org.uk>
+References: <20161118233733.GP1041@n2100.armlinux.org.uk>
+Message-ID: <20170220121603.GA1132@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+On Fri, Nov 18, 2016 at 11:37:33PM +0000, Russell King - ARM Linux wrote:
+> Something I also noticed is this:
+> 
+>         scanout_start = gem->paddr + plane->state->fb->offsets[0] +
+>                 plane->state->crtc_y * plane->state->fb->pitches[0] +
+>                 plane->state->crtc_x * bpp / 8;
+> 
+> Surely this should be using src_[xy] (which are the position in the
+> source - iow, memory, and not crtc_[xy] which is the position on the
+> CRTC displayed window.  To put it another way, the src_* define the
+> region of the source material that is mapped onto a rectangular area
+> on the display defined by crtc_*.
 
-This patch changes pin names of AIO and XIRQ according to updated
-specification.
+This problem still exists...
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
-Hi Linus,
-
-If it is not too late, please queue up this patch
-for Linux 4.11-rc1.
-
-(Please discard the previous one.)
-
-
-Thanks,
-Masahiro
-
-
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-index 77a0236..83f8864 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-@@ -390,22 +390,22 @@ static const struct pinctrl_pin_desc uniphier_ld11_pins[] = {
- 	UNIPHIER_PINCTRL_PIN(140, "AO1D0", 140,
- 			     140, UNIPHIER_PIN_DRV_1BIT,
- 			     140, UNIPHIER_PIN_PULL_DOWN),
--	UNIPHIER_PINCTRL_PIN(141, "TCON0", 141,
-+	UNIPHIER_PINCTRL_PIN(141, "AO1D1", 141,
- 			     141, UNIPHIER_PIN_DRV_1BIT,
- 			     141, UNIPHIER_PIN_PULL_DOWN),
--	UNIPHIER_PINCTRL_PIN(142, "TCON1", 142,
-+	UNIPHIER_PINCTRL_PIN(142, "AO1D2", 142,
- 			     142, UNIPHIER_PIN_DRV_1BIT,
- 			     142, UNIPHIER_PIN_PULL_DOWN),
--	UNIPHIER_PINCTRL_PIN(143, "TCON2", 143,
-+	UNIPHIER_PINCTRL_PIN(143, "XIRQ9", 143,
- 			     143, UNIPHIER_PIN_DRV_1BIT,
- 			     143, UNIPHIER_PIN_PULL_DOWN),
--	UNIPHIER_PINCTRL_PIN(144, "TCON3", 144,
-+	UNIPHIER_PINCTRL_PIN(144, "XIRQ10", 144,
- 			     144, UNIPHIER_PIN_DRV_1BIT,
- 			     144, UNIPHIER_PIN_PULL_DOWN),
--	UNIPHIER_PINCTRL_PIN(145, "TCON4", 145,
-+	UNIPHIER_PINCTRL_PIN(145, "XIRQ11", 145,
- 			     145, UNIPHIER_PIN_DRV_1BIT,
- 			     145, UNIPHIER_PIN_PULL_DOWN),
--	UNIPHIER_PINCTRL_PIN(146, "TCON5", 146,
-+	UNIPHIER_PINCTRL_PIN(146, "XIRQ13", 146,
- 			     146, UNIPHIER_PIN_DRV_1BIT,
- 			     146, UNIPHIER_PIN_PULL_DOWN),
- 	UNIPHIER_PINCTRL_PIN(147, "PWMA", 147,
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
