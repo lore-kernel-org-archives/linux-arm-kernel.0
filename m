@@ -1,39 +1,37 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Mon, 20 Feb 2017 18:28:05 +0100
-Subject: [PATCH] pata: remove the at91 driver
-In-Reply-To: <20170217144235.1fd12c80@bbrezillon>
-References: <CGME20170217093732epcas5p463c32b21e7c71000d01d15c54333c1f6@epcas5p4.samsung.com>
- <1487324200-17517-1-git-send-email-boris.brezillon@free-electrons.com>
- <1599704.hbkP4KrUDJ@amdc3058> <20170217144235.1fd12c80@bbrezillon>
-Message-ID: <c0566bd6-f1e5-8508-d9fb-19a938018322@microchip.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Feb 2017 17:27:39 +0000
+Subject: [PATCH v2 0/3] Extend rtc-armada38x support for Armada 7K/8K
+In-Reply-To: <87tw7oaj24.fsf@free-electrons.com>
+References: <20170217101907.8963-1-gregory.clement@free-electrons.com>
+ <87tw7oaj24.fsf@free-electrons.com>
+Message-ID: <20170220172739.GN21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 17/02/2017 ? 14:42, Boris Brezillon a ?crit :
-> On Fri, 17 Feb 2017 13:36:08 +0100
-> Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com> wrote:
+On Mon, Feb 20, 2017 at 06:06:11PM +0100, Gregory CLEMENT wrote:
+> I saw on IRC than Russell managed to have a more coherent date with this
+> series on his 8040 based board. For the record, as the U-Boot on this
+> board didn't provide a "date reset" command for the RTC located on CP
+> slave, then Russell needed to do the following:
 > 
->> Hi,
->>
->> On Friday, February 17, 2017 10:36:40 AM Boris Brezillon wrote:
->>> This driver is orphan since commit 2e591e7b3ac2 ("ARM: at91: remove
->>> at91sam9261/at91sam9g10 legacy board support"). Given that nobody cared
->>> adding DT support to it, it probably means it's no longer used and is
->>> thus a good candidate for removal.  
->>
->> The exact commit which removed PATA support for AT91SAM9260 seems to
->> be b2026f708e09 ("ARM: at91: remove at91sam9260/at91sam9g20 legacy
->> board support").
+> devmem2 0xf428401c w 0
+> devmem2 0xf4284018 w 0x2000
+> followed by:
+> date 021612342017; ntpdate ...; hwclock -uw
 > 
-> Indeed. I'll fix the commit message and send a new version.
+> But this issue was related to the bootloader not to the kernel. The
+> other potential issue seen by Russell was about the GIC mapping for the
+> interrupt, but here again this mapping was done by the 1st stage
+> bootloader.
 > 
->>
->>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>  
->>
->> Acked-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Given this information would it be OK to applied this series?
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+No it is not.  As I already pointed out, the interrupt for the 8040 is
+GIC_SPI 71 _not_ GIC_SPI 77 as you have it in this series.
 
+Both CP110's on Armada 8040 have a default mapping of ICU 77 to GIC 71.
 
 -- 
-Nicolas Ferre
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
