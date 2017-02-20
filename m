@@ -1,7 +1,8 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 20 Feb 2017 20:58:31 +0900
-Subject: [PATCH] pinctrl: uniphier: change pin names of aio/xirq for LD11
-Message-ID: <1487591911-22658-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon, 20 Feb 2017 21:00:42 +0900
+Subject: [RESEND PATCH] pinctrl: uniphier: change pin names of aio/xirq for
+ LD11
+Message-ID: <1487592042-22828-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,13 +13,15 @@ specification.
 
 Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
 Hi Linus,
 
 If it is not too late, please queue up this patch
 for Linux 4.11-rc1.
+
+(Please discard the previous one.)
+
 
 Thanks,
 Masahiro
