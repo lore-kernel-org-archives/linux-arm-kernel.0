@@ -1,27 +1,33 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 20 Feb 2017 21:31:29 +0100
-Subject: [PATCH] ARM: dts: kirkwood: Fix SATA pinmux-ing for TS419
-In-Reply-To: <1487611358.2885.3.camel@decadent.org.uk>
-References: <20170218003251.GC4152@decadent.org.uk>
- <20170220135955.63fbcaa3@free-electrons.com>
- <1487608825.2885.1.camel@decadent.org.uk>
- <20170220175049.45f319bb@free-electrons.com>
- <1487611358.2885.3.camel@decadent.org.uk>
-Message-ID: <20170220213129.70273362@free-electrons.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Mon, 20 Feb 2017 21:33:28 +0100
+Subject: [PATCH/RFC 5/6] arm64: dts: r8a7795: Fix non-PMIC wake-up sources
+In-Reply-To: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1487622809-25127-6-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The PSCI firmware on boards equipped with an R-Car H3 SoC implements the
+PSCI SYSTEM_SUSPEND operation by cutting power to the SoC.  Hence the
+only possibly wake-up sources are the ones connected to the PMIC, unless
+the "arm,psci-system-suspend-is-power-down" property is specified.
 
-On Mon, 20 Feb 2017 17:22:38 +0000, Ben Hutchings wrote:
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-> You mean, define additional pinmux nodes and override the pinctrl-0
-> property of &sata?  More like this:
-
-Yes, exactly.
-
-Thomas
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index f05a9c4dd3b60c82..cf43e9c7cab224b2 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -31,6 +31,7 @@
+ 	psci {
+ 		compatible = "arm,psci-0.2";
+ 		method = "smc";
++		arm,psci-system-suspend-is-power-down;
+ 	};
+ 
+ 	cpus {
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.7.4
