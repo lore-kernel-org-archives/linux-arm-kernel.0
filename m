@@ -1,64 +1,69 @@
-From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Mon, 20 Feb 2017 22:57:12 +0100
-Subject: [linux-sunxi][PATCH] ARM: dts: sun8i-h3: orange-pi-2: Enable
- audio codec
-In-Reply-To: <20170220162052.21932-1-codekipper@gmail.com>
-References: <20170220162052.21932-1-codekipper@gmail.com>
-Message-ID: <20170220215711.7i253mkl2ahcd766@localhost>
+From: jonathan.richardson@broadcom.com (Jonathan Richardson)
+Date: Mon, 20 Feb 2017 13:58:32 -0800
+Subject: [PATCH v4 2/3] mailbox: Add iProc mailbox controller driver
+In-Reply-To: <CABb+yY0rmAFutskhVkQ926QfsvtJ-WnXrQc=+PQNg=7NZEXC+Q@mail.gmail.com>
+References: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
+ <1485463082-27067-3-git-send-email-jonathan.richardson@broadcom.com>
+ <CABb+yY0rmAFutskhVkQ926QfsvtJ-WnXrQc=+PQNg=7NZEXC+Q@mail.gmail.com>
+Message-ID: <f60c80a2-536d-d9c7-26f6-ad0788e6004e@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2017 at 05:20:52PM +0100, codekipper at gmail.com wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
-> 
-> The Orange Pi 2 routes the LINEOUT pins through a SGM8900 PA which
-> needs to be enabled. The onboard microphone is routed to MIC1, with
-> MBIAS providing power.
-> 
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-h3-orangepi-2.dts | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-> index 047e9e1c6093..b0d2b99990cc 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-2.dts
-> @@ -105,6 +105,16 @@
->  	};
->  };
->  
-> +&codec {
-> +	pinctrl-0 = <&codec_pa_pin>;
-> +	allwinner,pa-gpios = <&pio 0 16 GPIO_ACTIVE_HIGH>; /* PA16 */
-> +	allwinner,audio-routing =
-> +		"Speaker", "LINEOUT",
-> +		"MIC1", "Mic",
-> +		"Mic",  "MBIAS";
-> +	status = "okay";
-> +};
-> +
->  &ehci1 {
->  	status = "okay";
->  };
-> @@ -144,6 +154,11 @@
->  };
->  
->  &pio {
-> +	codec_pa_pin: codec_pa_pin at 0 {
-> +		pins = "PA16";
-> +		function = "gpio_out";
-> +	};
-> +
 
-There should not be underscores in node names. See e.g.:
-https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1122967.html
-https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1145633.html
-https://www.mail-archive.com/netdev%40vger.kernel.org/msg90319.html
 
-Pinmux nodes for GPIO usage are considered unnecessary or even harmful
-these days, so you should just drop the node in this case (as well as the
-reference to it). As a bonus, you avoid a duplicate definition.
+On 17-02-16 10:20 PM, Jassi Brar wrote:
+> On Fri, Jan 27, 2017 at 2:08 AM, Jonathan Richardson
+> <jonathan.richardson@broadcom.com> wrote:
+>
+>> +static int iproc_mbox_send_data_m0(struct mbox_chan *chan, void *data)
+>> +{
+>> +       struct iproc_mbox *mbox = dev_get_drvdata(chan->mbox->dev);
+>> +       struct iproc_mbox_msg *msg = (struct iproc_mbox_msg *)data;
+>> +               unsigned long flags;
+>> +       int err = 0;
+>> +       const int poll_period_us = 5;
+>> +       const int max_retries = (MAX_M0_TIMEOUT_MS * 1000) / poll_period_us;
+>> +
+>> +       if (!msg)
+>> +               return -EINVAL;
+>> +
+>> +       spin_lock_irqsave(&mbox->lock, flags);
+>> +
+>> +       dev_dbg(mbox->dev, "Send msg to M0: cmd=0x%x, param=0x%x, wait_ack=%d\n",
+>> +               msg->cmd, msg->param, msg->wait_ack);
+>> +
+> prints should be outside the spinlocks.
+Will fix.
+>
+>> +       writel(msg->cmd, mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
+>> +       writel(msg->param, mbox->base + IPROC_CRMU_MAILBOX1_OFFSET);
+>> +
+>> +       if (msg->wait_ack) {
+>> +               int retries;
+>> +
+> move poll_period_us and max_retries in here or just define' them
+Will fix.
+>
+>> +               err = msg->reply_code = -ETIMEDOUT;
+>> +               for (retries = 0; retries < max_retries; retries++) {
+>> +                       u32 val = readl(
+>> +                               mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
+>> +                       if (val & M0_IPC_CMD_DONE_MASK) {
+>> +                               /*
+>> +                                * M0 replied - save reply code and
+>> +                                * clear error.
+>> +                                */
+>> +                               msg->reply_code = (val &
+>> +                                       M0_IPC_CMD_REPLY_MASK) >>
+>> +                                       M0_IPC_CMD_REPLY_SHIFT;
+>> +                               err = 0;
+>> +                               break;
+>> +                       }
+>> +                       udelay(poll_period_us);
+>>
+> potentially 2ms inside spin_lock_irqsave. Alternative is to implement
+> a simple 'peek_data' and call it for requests with 'wait_ack'
+The M0 responds in very few microseconds. The 2ms is an arbitrary value that came from the clients tx_tout being specified in ms. I can reduce the timeout to something smaller. No need to peek for data.
 
--- 
-Rask Ingemann Lambertsen
+Thanks,
+Jon
