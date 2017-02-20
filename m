@@ -1,48 +1,44 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Feb 2017 22:12:29 +0100
-Subject: [RESEND PATCH 3/3] mtd: nand: atmel: Add PM ops
-In-Reply-To: <1487625149-7234-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1487625149-7234-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1487625149-7234-4-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon, 20 Feb 2017 22:12:26 +0100
+Subject: [RESEND PATCH 0/3] mtd: nand: atmel: Add ->setup_data_interface() +
+ PM ops
+Message-ID: <1487625149-7234-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a ->resume() hook to make sure the NAND timings are correctly
-restored by resetting all chips connected to the controller.
+Hello,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/mtd/nand/atmel/nand-controller.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+Hopefully the last resend. I double checked everything this time :-).
 
-diff --git a/drivers/mtd/nand/atmel/nand-controller.c b/drivers/mtd/nand/atmel/nand-controller.c
-index ae46ef711d67..cd107e6edcbc 100644
---- a/drivers/mtd/nand/atmel/nand-controller.c
-+++ b/drivers/mtd/nand/atmel/nand-controller.c
-@@ -2575,6 +2575,24 @@ static int atmel_nand_controller_remove(struct platform_device *pdev)
- 	return nc->caps->ops->remove(nc);
- }
- 
-+static int atmel_nand_controller_resume(struct device *dev)
-+{
-+	struct atmel_nand_controller *nc = dev_get_drvdata(dev);
-+	struct atmel_nand *nand;
-+
-+	list_for_each_entry(nand, &nc->chips, node) {
-+		int i;
-+
-+		for (i = 0; i < nand->numcs; i++)
-+			nand_reset(&nand->base, i);
-+	}
-+
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(atmel_nand_controller_pm_ops, NULL,
-+			 atmel_nand_controller_resume);
-+
- static struct platform_driver atmel_nand_controller_driver = {
- 	.driver = {
- 		.name = "atmel-nand-controller",
+This patch series is adding to important features to the new Atmel NAND
+controller driver:
+1/ automatic SMC timings configuration based on information retrieved
+   during NAND detection
+2/ proper ->suspend()/->resume(). Timings are properly restored when
+   resuming the system
+
+This series depends on [1] and [2].
+
+Regards,
+
+Boris
+
+[1]https://www.spinics.net/lists/arm-kernel/msg563780.html
+[2]https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1337235.html
+
+Boris Brezillon (3):
+  mtd: nand: Pass the CS line to ->setup_data_interface()
+  mtd: nand: atmel: Add ->setup_data_interface() hooks
+  mtd: nand: atmel: Add PM ops
+
+ drivers/mtd/nand/atmel/nand-controller.c | 351 ++++++++++++++++++++++++++++++-
+ drivers/mtd/nand/mxc_nand.c              |  12 +-
+ drivers/mtd/nand/nand_base.c             |  22 +-
+ drivers/mtd/nand/s3c2410.c               |   5 +-
+ drivers/mtd/nand/sunxi_nand.c            |   7 +-
+ drivers/mtd/nand/tango_nand.c            |   7 +-
+ include/linux/mtd/nand.h                 |  12 +-
+ 7 files changed, 380 insertions(+), 36 deletions(-)
+
 -- 
 2.7.4
