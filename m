@@ -1,62 +1,76 @@
-From: xuejiancheng@hisilicon.com (Jiancheng Xue)
-Date: Mon, 20 Feb 2017 17:14:50 +0800
-Subject: [PATCH v2 1/2] arm: hisi: add ARCH_MULTI_V5 support
-In-Reply-To: <1487582091-24695-1-git-send-email-xuejiancheng@hisilicon.com>
-References: <1487582091-24695-1-git-send-email-xuejiancheng@hisilicon.com>
-Message-ID: <1487582091-24695-2-git-send-email-xuejiancheng@hisilicon.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Mon, 20 Feb 2017 15:17:49 +0530
+Subject: [PATCH v2 4/6] spi: davinci: flush caches when performing DMA
+In-Reply-To: <f0fcc000-6c07-647a-ada2-04b61f0e2e3b@baylibre.com>
+References: <1487327904-28311-1-git-send-email-fisaksen@baylibre.com>
+ <1487327904-28311-5-git-send-email-fisaksen@baylibre.com>
+ <5fab0c33-6e1d-c63a-8758-6672236045a7@ti.com>
+ <20170217112247.GE21222@n2100.armlinux.org.uk>
+ <eaf93c6c-52a7-826b-9c53-2b13c0b280ca@baylibre.com>
+ <20170217120749.GF21222@n2100.armlinux.org.uk>
+ <0f3607fd-4542-be92-da2e-b2da6f8ac26f@ti.com>
+ <f0fcc000-6c07-647a-ada2-04b61f0e2e3b@baylibre.com>
+Message-ID: <57721a60-52bb-c9d1-d5a7-ae450e7adcc0@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pan Wen <wenpan@hisilicon.com>
 
-Add support for some HiSilicon SoCs which depend on ARCH_MULTI_V5.
 
-Signed-off-by: Pan Wen <wenpan@hisilicon.com>
----
+On Monday 20 February 2017 02:56 PM, Frode Isaksen wrote:
+> 
+> 
+> On 20/02/2017 07:55, Vignesh R wrote:
+>>
+>> On Friday 17 February 2017 05:37 PM, Russell King - ARM Linux wrote:
+>> [...]
+>>> SPI is rather another special case - rather than SPI following the 
+>>> established mechanism of passing data references via scatterlists or 
+>>> similar, it also passes them via virtual addresses, which means SPI 
+>>> can directly access the vmalloc area when performing PIO.  This 
+>>> really makes the problem more complex, because it means that if you 
+>>> do have a SPI driver that does that, it's going to be
+>>> reading/writing direct from vmalloc space.
+>>>
+>>> That's not a problem as long as the data is only accessed via
+>>> vmalloc space, but it will definitely go totally wrong if the data
+>>> is subsequently mapped into userspace.
+>>>
+>>> The other important thing to realise is that the interfaces in 
+>>> cachetlb.txt assume that it's the lowmem mapping that will be
+>>> accessed, and the IO device will push that data out to physical
+>>> memory (either via the DMA API, or flush_kernel_dcache_page()).
+>>> That's not true of SPI, as it passes virtual addresses around.
+>>>
+>>> So... overall, I'm not sure that this problem is properly solvable
+>>> given SPIs insistance on passing virtual addresses and the
+>>> differences in this area between SPI and block.
+>>>
+>> I am debugging another issue with UBIFS wherein pages allocated by
+>> vmalloc are in highmem region that are not addressable using 32 bit
+>> addresses and is backed by LPAE. So, a 32 bit DMA cannot access these
+>> buffers at all.
+>> When dma_map_sg() is called to map these pages by spi_map_buf() the
+>> physical address is just truncated to 32 bit in pfn_to_dma() (as part of
+>> dma_map_sg() call). This results in random crashes as DMA starts
+>> accessing random memory during SPI read.
+>>
+>> Given, the above problem and also issue surrounding VIVT caches, I am
+>> thinking of may be using pre-allocated fixed size bounce buffer to
+>> handle buffers not in lowmem mapping.
+>> I have tried using 64KB pre-allocated buffer on TI DRA74 EVM with QSPI
+>> running at 76.8MHz and do not see any significant degradation in
+>> performance with UBIFS. Mainly because UBIFS seems to use vmalloc'd
+>> buffers only during initial preparing and mounting phase and not during
+>> file read/write.
+> I am seeing a bug caused by VIVT cache in 'read_ltab()' function. In this function, the vmalloc'ed buffer is of size 11. Isn't it better to use kmalloc in this case ?
 
-This patch is same as the first version.
+read_ltab() isn't the only place where vmalloc() is used. A quick grep
+for vmalloc on fs/ubifs/ shows about ~19 occurrence. I guess every
+vmalloc() call can potentially allocate memory from highmem and might
+potentially cause issue for VIVT and such aliasing caches.
+Fixing just one such case isn't going to help IMHO.
 
- arch/arm/mach-hisi/Kconfig | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-hisi/Kconfig b/arch/arm/mach-hisi/Kconfig
-index a3b091a..03d8379 100644
---- a/arch/arm/mach-hisi/Kconfig
-+++ b/arch/arm/mach-hisi/Kconfig
-@@ -1,12 +1,14 @@
- config ARCH_HISI
- 	bool "Hisilicon SoC Support"
--	depends on ARCH_MULTI_V7
- 	select ARM_AMBA
--	select ARM_GIC
-+	select ARM_GIC if ARCH_MULTI_V7
-+	select ARM_VIC if ARCH_MULTI_V5
- 	select ARM_TIMER_SP804
- 	select POWER_RESET
- 	select POWER_RESET_HISI
- 	select POWER_SUPPLY
-+	select PINCTRL
-+	select PINCTRL_SINGLE
- 
- if ARCH_HISI
- 
-@@ -18,8 +20,6 @@ config ARCH_HI3xxx
- 	select CACHE_L2X0
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
--	select PINCTRL
--	select PINCTRL_SINGLE
- 	help
- 	  Support for Hisilicon Hi36xx SoC family
- 
-@@ -48,8 +48,6 @@ config ARCH_HIX5HD2
- 	select CACHE_L2X0
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
--	select PINCTRL
--	select PINCTRL_SINGLE
- 	help
- 	  Support for Hisilicon HIX5HD2 SoC family
- endmenu
 -- 
-1.9.1
+Regards
+Vignesh
