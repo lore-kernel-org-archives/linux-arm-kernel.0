@@ -1,39 +1,29 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 20 Feb 2017 15:51:03 +0530
-Subject: [PATCH 3/4] ARM: da850-evm: add a fixed regulator for the UI
- board IO expander
-In-Reply-To: <1487269285-6948-4-git-send-email-bgolaszewski@baylibre.com>
-References: <1487269285-6948-1-git-send-email-bgolaszewski@baylibre.com>
- <1487269285-6948-4-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <850248e4-b0e7-2e42-40a3-f0ede456b391@ti.com>
+Date: Mon, 20 Feb 2017 15:59:36 +0530
+Subject: [PATCH 2/4] ARM: dts: da850: add vpif video display pins
+In-Reply-To: <1487268932-6469-3-git-send-email-bgolaszewski@baylibre.com>
+References: <1487268932-6469-1-git-send-email-bgolaszewski@baylibre.com>
+ <1487268932-6469-3-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <318d9f87-ad2a-c0e1-255a-097056c0f85f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 February 2017 11:51 PM, Bartosz Golaszewski wrote:
-> Without this regulator the tca6416 GPIO expander on the UI board can't
-> be probed in board file mode and we're not getting VPIF IRQs.
+On Thursday 16 February 2017 11:45 PM, Bartosz Golaszewski wrote:
+> Add a new pinctrl sub-node for vpif display pins. Move VP_CLKIN3 and
+> VP_CLKIN2 to the display node where they actually belong (vide section
+> 35.2.2 of the da850 datasheet).
+
+You mean 36.2.2. Also, its in the technical reference manual (TRM). The
+datahseet is another document.
+
 > 
 > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
->  arch/arm/mach-davinci/board-da850-evm.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-> index 0b9ff2a..1b6a07b 100644
-> --- a/arch/arm/mach-davinci/board-da850-evm.c
-> +++ b/arch/arm/mach-davinci/board-da850-evm.c
-> @@ -828,6 +828,9 @@ static struct regulator_consumer_supply fixed_supplies[] = {
->  
->  	/* Baseboard 1.8V: 5V -> TPS73701DCQ -> 1.8V */
->  	REGULATOR_SUPPLY("DVDD", "1-0018"),
-> +
-> +	/* Dummy regulator for the UI board IO expander. */
+>  arch/arm/boot/dts/da850-evm.dts |  2 +-
+>  arch/arm/boot/dts/da850.dtsi    | 17 +++++++++++++++--
 
-Instead may be:
-
-	/* UI card 3.3V: 5V -> TPS73701DCQ -> 3.3V */
-
-> +	REGULATOR_SUPPLY("vcc", "1-0020"),
+Can you separate out the board and SoC specific changes? The board
+changes could be done in patch 3/4 where other video output parts are added.
 
 Thanks,
 Sekhar
