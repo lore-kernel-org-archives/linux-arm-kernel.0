@@ -1,48 +1,31 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Feb 2017 18:16:18 +0100
-Subject: [PATCH 3/3] mtd: nand: atmel: Add PM ops
-In-Reply-To: <1487610978-12423-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1487610978-12423-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1487610978-12423-7-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon, 20 Feb 2017 18:22:01 +0100
+Subject: [RESEND PATCH 2/3] memory: atmel-ebi: Add missing ->numcs assignment
+In-Reply-To: <1487611322-12688-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1487611322-12688-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1487611322-12688-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a ->resume() hook to make sure the NAND timings are correctly
-restored by resetting all chips connected to the controller.
+ebid->numcs is never assigned, set it to numcs after allocating the
+EBI dev object.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/atmel/nand-controller.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ drivers/memory/atmel-ebi.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/mtd/nand/atmel/nand-controller.c b/drivers/mtd/nand/atmel/nand-controller.c
-index ae46ef711d67..cd107e6edcbc 100644
---- a/drivers/mtd/nand/atmel/nand-controller.c
-+++ b/drivers/mtd/nand/atmel/nand-controller.c
-@@ -2575,6 +2575,24 @@ static int atmel_nand_controller_remove(struct platform_device *pdev)
- 	return nc->caps->ops->remove(nc);
- }
+diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
+index 833af8d02424..06a1a136d448 100644
+--- a/drivers/memory/atmel-ebi.c
++++ b/drivers/memory/atmel-ebi.c
+@@ -331,6 +331,7 @@ static int atmel_ebi_dev_setup(struct atmel_ebi *ebi, struct device_node *np,
+ 		return -ENOMEM;
  
-+static int atmel_nand_controller_resume(struct device *dev)
-+{
-+	struct atmel_nand_controller *nc = dev_get_drvdata(dev);
-+	struct atmel_nand *nand;
-+
-+	list_for_each_entry(nand, &nc->chips, node) {
-+		int i;
-+
-+		for (i = 0; i < nand->numcs; i++)
-+			nand_reset(&nand->base, i);
-+	}
-+
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(atmel_nand_controller_pm_ops, NULL,
-+			 atmel_nand_controller_resume);
-+
- static struct platform_driver atmel_nand_controller_driver = {
- 	.driver = {
- 		.name = "atmel-nand-controller",
+ 	ebid->ebi = ebi;
++	ebid->numcs = numcs;
+ 
+ 	ret = caps->xlate_config(ebid, np, &conf);
+ 	if (ret < 0)
 -- 
 2.7.4
