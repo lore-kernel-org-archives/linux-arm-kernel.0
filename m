@@ -1,12 +1,15 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Mon, 20 Feb 2017 21:33:27 +0100
-Subject: [PATCH/RFC 4/6] drivers: firmware: psci: Fix non-PMIC wake-up if
- SYSTEM_SUSPEND cuts power
-In-Reply-To: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1487622809-25127-5-git-send-email-geert+renesas@glider.be>
+Date: Mon, 20 Feb 2017 21:33:23 +0100
+Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
+ power
+Message-ID: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+	Hi all,
+
+This patch series adds support for using non-PMIC wake-up sources on the
+Renesas R-Car Gen3 (H3 or M3-W) Salvator-X development boards.
 
 Nothing in the PSCI specification requires the SoC to remain powered and
 to support wake-up sources when suspended using SYSTEM_SUSPEND.
@@ -14,85 +17,78 @@ If the firmware implements the PSCI SYSTEM_SUSPEND operation by cutting
 power to the SoC, the only possibly wake-up sources are thus the ones
 connected to the PMIC.
 
-Document and add support for an "arm,psci-system-suspend-is-power-down"
-DT property, so Linux uses a different suspend method when other wake-up
-sources (e.g. wake on LAN, UART or GPIO) are enabled.
+To allow other wake-up sources, this patch series documents and adds
+support for an "arm,psci-system-suspend-is-power-down" DT property, so
+Linux uses a different suspend method when other wake-up sources (e.g.
+wake on LAN, UART or GPIO) are enabled.  Hence the user no longer has to
+manually restrict "mem" suspend to "s2idle" or "shallow" states using:
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- Documentation/devicetree/bindings/arm/psci.txt | 11 +++++++++++
- drivers/firmware/psci.c                        | 13 ++++++++++---
- 2 files changed, 21 insertions(+), 3 deletions(-)
+    $ echo s2idle > /sys/power/mem_sleep # or "shallow"
 
-diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-index a2c4f1d524929bb7..16e390ecb7531028 100644
---- a/Documentation/devicetree/bindings/arm/psci.txt
-+++ b/Documentation/devicetree/bindings/arm/psci.txt
-@@ -68,6 +68,17 @@ state nodes, as per bindings in [1]) must specify the following properties:
- 		Definition: power_state parameter to pass to the PSCI
- 			    suspend call.
- 
-+ - arm,psci-system-suspend-is-power-down
-+		Nothing in the PSCI specification requires the SoC to remain
-+		powered and to support wake-up sources when suspended using
-+		SYSTEM_SUSPEND.
-+		If your firmware implements the PSCI SYSTEM_SUSPEND operation
-+		by cutting power to the SoC, the only possibly wake-up sources
-+		are thus the ones connected to the PMIC.  In such case you
-+		should specify this property, so the operating system is aware
-+		it should use a different suspend method when other wake-up
-+		sources (e.g. wake on LAN, UART or GPIO) are enabled.
-+
- Example:
- 
- Case 1: PSCI v0.1 only.
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 13b4d50bb3577384..0a74c23fd5fe043e 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -20,6 +20,7 @@
- #include <linux/linkage.h>
- #include <linux/of.h>
- #include <linux/pm.h>
-+#include <linux/pm_wakeup.h>
- #include <linux/printk.h>
- #include <linux/psci.h>
- #include <linux/reboot.h>
-@@ -86,6 +87,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
- 
- static u32 psci_cpu_suspend_feature;
- static bool psci_suspend_mem_supported;
-+static bool psci_system_suspend_is_power_down;
- 
- static inline bool psci_has_ext_power_state(void)
- {
-@@ -440,12 +442,14 @@ static int psci_system_suspend_valid(suspend_state_t state)
- static int psci_system_suspend_enter(suspend_state_t state)
- {
- 	switch (state) {
-+	case PM_SUSPEND_MEM:
-+		if (!psci_system_suspend_is_power_down ||
-+		    !wakeup_source_available())
-+			return cpu_suspend(0, psci_system_suspend);
-+		/* fall through */
- 	case PM_SUSPEND_STANDBY:
- 		cpu_do_idle();
- 		break;
--
--	case PM_SUSPEND_MEM:
--		return cpu_suspend(0, psci_system_suspend);
- 	}
- 
- 	return 0;
-@@ -596,6 +600,9 @@ static int __init psci_0_2_init(struct device_node *np)
- 	 */
- 	err = psci_probe();
- 
-+	psci_system_suspend_is_power_down = of_property_read_bool(np,
-+		"arm,psci-system-suspend-is-power-down");
-+
- out_put_node:
- 	of_node_put(np);
- 	return err;
+Contents:
+  - Patch 1 prevents the alarmtimer from showing up as a wake-up source
+    when no wake-up capable RTC device is present in the system,
+  - Patch 2 provides an API to check if any wake-up sources have been
+    registered,
+  - Patch 3 implements "shallow" suspend mode on systems using PSCI,
+    in addition to the existing "s2idle" and "deep" suspend modes,
+  - Patch 4 makes the system use "shallow" instead of "deep" suspend
+    mode on systems where this is needed to support non-PMIC wake-up
+    sources,
+  - Patches 5 and 6 enable the above on Renesas R-Car H3 and M3-W
+    systems.
+
+Dependencies:
+  - The three first patches are independent,
+  - The fourth patch depends on the first three patches,
+  - The DTS patches depend on acceptance of the DT bindings in patch 4.
+
+This has been tested on both the Renesas R-Car H3 (quad A57*)
+and M3-W (dual A57*) Salvator-X development boards
+(*A53 cores are unused).
+
+Power consumption:
+
+		H3	M3-W
+		--	----
+  - idle:	9.2 W	7.6 W
+  - s2idle:	8.6 W	6.3 W
+  - shallow:	8.4 W	6.2 W	(secondary CPU cores off)
+  - deep:	1.4 W	1.2 W	(PSCI_SYSTEM_SUSPEND)
+  - shutdown:	7.7 W	5.6 W	(PSCI SYSTEM_OFF: needs improvement)
+  - poweroff:	1.3 W	1.1 W	(fan running)
+
+Thanks for your comments!
+
+Geert Uytterhoeven (6):
+  alarmtimer: Postpone wake-up source registration until really
+    available
+  PM / Wakeup: Add wakeup_source_available()
+  drivers: firmware: psci: Implement shallow suspend mode
+  drivers: firmware: psci: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
+    power
+  arm64: dts: r8a7795: Fix non-PMIC wake-up sources
+  arm64: dts: r8a7796: Fix non-PMIC wake-up sources
+
+ Documentation/devicetree/bindings/arm/psci.txt | 11 ++++++++
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi       |  1 +
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi       |  1 +
+ drivers/base/power/wakeup.c                    |  8 ++++++
+ drivers/firmware/psci.c                        | 39 ++++++++++++++++++++++++--
+ include/linux/pm_wakeup.h                      |  3 ++
+ kernel/time/alarmtimer.c                       |  9 +++++-
+ 7 files changed, 68 insertions(+), 4 deletions(-)
+
 -- 
 2.7.4
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
