@@ -1,35 +1,45 @@
-From: socketcan@hartkopp.net (Oliver Hartkopp)
-Date: Mon, 20 Feb 2017 08:56:43 +0100
-Subject: iproute2 not function on CAN FD
-In-Reply-To: <F9F4555C4E01D7469D37975B62D0EFBB4D7587@CHN-SV-EXMX07.mchp-main.com>
-References: <F9F4555C4E01D7469D37975B62D0EFBB4D7587@CHN-SV-EXMX07.mchp-main.com>
-Message-ID: <f4c78670-8c25-8ee3-5167-126d49ad5b00@hartkopp.net>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Mon, 20 Feb 2017 16:02:17 +0800
+Subject: [RESEND PATCH v7 1/7] dt-bindings: add rk3399 support for
+ dw-mipi-rockchip
+In-Reply-To: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
+References: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <1487577744-2855-2-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2017 02:12 AM, Wenyou.Yang at microchip.com wrote:
+The dw-mipi-dsi of rk3399 is almost the same as rk3288, the rk3399 has
+additional phy config clock.
 
-> I am testing the CAN FD of M_CAN on the SAMA5D2 Xplained board,
-> when using the ip tool from iprounte2 suite to set the CAN interface,
-> it doesn't work with the message "RTNETLINK answers: Operation not supported".
-> --->8----
-> # ip link set can0 type can bitrate 125000 dbitrate 8000000 fd on
-> RTNETLINK answers: Operation not supported
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
-Please try:
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
 
-# ip link set can0 type can bitrate 125000 dbitrate 8000000 fd on 
-fd-non-iso on
+ .../devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt     | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-The driver for the M_CAN IP core 3.0.x in the mainline kernel supports a 
-NON_ISO IP core.
-
-This non-iso setting is fixed with this v3.0.x M_CAN and we decided to 
-make this configuration explicit - as all other options run into a mess.
-
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit?id=bb208f144cf3f59d8f89a09a80efd04389718907
-
-Did that help?
-
-Regards,
-Oliver
+diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+index 1753f0c..0f82568 100644
+--- a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
++++ b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+@@ -5,10 +5,12 @@ Required properties:
+ - #address-cells: Should be <1>.
+ - #size-cells: Should be <0>.
+ - compatible: "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi".
++	      "rockchip,rk3399-mipi-dsi", "snps,dw-mipi-dsi".
+ - reg: Represent the physical address range of the controller.
+ - interrupts: Represent the controller's interrupt to the CPU(s).
+ - clocks, clock-names: Phandles to the controller's pll reference
+-  clock(ref) and APB clock(pclk), as described in [1].
++  clock(ref) and APB clock(pclk). For RK3399, a phy config clock
++  (phy_cfg) is additional required. As described in [1].
+ - rockchip,grf: this soc should set GRF regs to mux vopl/vopb.
+ - ports: contain a port node with endpoint definitions as defined in [2].
+   For vopb,set the reg = <0> and set the reg = <1> for vopl.
+-- 
+2.6.3
