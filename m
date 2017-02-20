@@ -1,41 +1,29 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Feb 2017 18:22:47 +0100
-Subject: [PATCH 0/3] mtd: nand: atmel: Add ->setup_data_interface() + PM
- ops
-In-Reply-To: <1487610978-12423-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1487610978-12423-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20170220182247.58a4f980@bbrezillon>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 20 Feb 2017 18:27:17 +0100
+Subject: [PATCH] arm64: defconfig: enable MVNETA
+Message-ID: <20170220172717.8252-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please ignore this version.
+Now that the Armada 37xx SoCs support the mvneta driver, enable it by
+default. It is especially useful when booting on an NFS root.
 
-On Mon, 20 Feb 2017 18:16:12 +0100
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-> Hello,
-> 
-> This patch series is adding to important features to the new Atmel NAND
-> controller driver:
-> 1/ automatic SMC timings configuration based on information retrieved
->    during NAND detection
-> 2/ proper ->suspend()/->resume(). Timings are properly restored when
->    resuming the system
-> 
-> This series depends on [1] and [2].
-> 
-> Regards,
-> 
-> Boris
-> 
-> [1]https://www.spinics.net/lists/arm-kernel/msg563780.html
-> [2]https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1337235.html
-> 
-> Boris Brezillon (3):
->   memory: atmel-ebi: Change naming scheme
->   memory: atmel-ebi: Add missing ->numcs assignment
->   memory: atmel-ebi: Add PM ops
-> 
->  drivers/memory/atmel-ebi.c | 141 ++++++++++++++++++++++++++-------------------
->  1 file changed, 81 insertions(+), 60 deletions(-)
-> 
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 7c48028ec64a..0ebe737d3778 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -185,6 +185,7 @@ CONFIG_HNS_ENET=y
+ CONFIG_E1000E=y
+ CONFIG_IGB=y
+ CONFIG_IGBVF=y
++CONFIG_MVNETA=y
+ CONFIG_SKY2=y
+ CONFIG_RAVB=y
+ CONFIG_SMC91X=y
+-- 
+2.11.0
