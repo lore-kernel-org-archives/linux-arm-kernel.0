@@ -1,65 +1,154 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 20 Feb 2017 16:57:43 +0530
-Subject: [PATCH v2 4/6] spi: davinci: flush caches when performing DMA
-In-Reply-To: <2a1954a3-edbd-7ac4-6fde-9b6d046a6560@baylibre.com>
-References: <1487327904-28311-1-git-send-email-fisaksen@baylibre.com>
- <1487327904-28311-5-git-send-email-fisaksen@baylibre.com>
- <5fab0c33-6e1d-c63a-8758-6672236045a7@ti.com>
- <20170217112247.GE21222@n2100.armlinux.org.uk>
- <eaf93c6c-52a7-826b-9c53-2b13c0b280ca@baylibre.com>
- <20170217120749.GF21222@n2100.armlinux.org.uk>
- <0f3607fd-4542-be92-da2e-b2da6f8ac26f@ti.com>
- <f0fcc000-6c07-647a-ada2-04b61f0e2e3b@baylibre.com>
- <57721a60-52bb-c9d1-d5a7-ae450e7adcc0@ti.com>
- <2a1954a3-edbd-7ac4-6fde-9b6d046a6560@baylibre.com>
-Message-ID: <954333da-4d15-ce77-4021-268530365edc@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Feb 2017 11:29:19 +0000
+Subject: [PATCH v4 10/11] drivers: perf: hisi: Handle counter overflow
+ IRQ in MN PMU
+In-Reply-To: <1487530282-42731-1-git-send-email-anurup.m@huawei.com>
+References: <1487530282-42731-1-git-send-email-anurup.m@huawei.com>
+Message-ID: <20170220112918.GG9003@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+On Sun, Feb 19, 2017 at 01:51:22PM -0500, Anurup M wrote:
+> +static irqreturn_t hisi_pmu_mn_isr(int irq, void *dev_id)
+> +{
+> +	struct hisi_pmu *mn_pmu = dev_id;
+> +	struct hisi_mn_data *mn_data = mn_pmu->hwmod_data;
+> +	struct hisi_djtag_client *client = mn_data->client;
+> +	struct perf_event *event;
+> +	u32 module_id = GET_MODULE_ID(mn_data);
+> +	unsigned long flags;
+> +	u32 value = 0;
+> +	int bit_pos;
+> +
+> +	raw_spin_lock_irqsave(&mn_pmu->lock, flags);
+> +
+> +	/* Read the INTS register */
+> +	hisi_djtag_readreg(module_id, MN1_BANK_SELECT, MN1_INTS_REG_OFF,
+> +							client, &value);
+
+Weird alignment here. Please only align up to the '('.
+
+> +	if (!value) {
+> +		raw_spin_unlock_irqrestore(&mn_pmu->lock, flags);
+> +		return IRQ_NONE;
+> +	}
+> +
+> +	/* Find the counter index which overflowed and handle them */
+> +	for (bit_pos = 0; bit_pos < HISI_MAX_CFG_MN_CNTR; bit_pos++) {
+> +		if (test_bit(bit_pos, (void *)&value)) {
+
+This casting is incorrect. Please listen to the compiler in future, and
+don't bodge around it like this.
+
+Make value an unsigned long, and use another temporary variable for the
+hisi_djtag_readreg() call (i.e. don't cast to a u32 there either).
+
+e.g.
+	unsigned long overflown;
+	u32 ints;
+	int idx;
+
+	hisi_djtag_readreg(module_id, MN1_BANK_SELECT, MN1_INTS_REG_OFF,
+	                   client, &ints);
+	
+	...
+
+	overflown = ints;
+
+	for_each_set_bit(idx, &overflown, HISI_MAX_CFG_MN_CNTR) {
+
+		...
+
+	}
 
 
-On Monday 20 February 2017 04:04 PM, Frode Isaksen wrote:
-> 
-> 
-> On 20/02/2017 10:47, Vignesh R wrote:
->>
->> On Monday 20 February 2017 02:56 PM, Frode Isaksen wrote:
->>>
->>> On 20/02/2017 07:55, Vignesh R wrote:
->>>> On Friday 17 February 2017 05:37 PM, Russell King - ARM Linux wrote:
+> +			/* Clear the IRQ status flag */
+> +			hisi_djtag_writereg(module_id, MN1_BANK_SELECT,
+> +				MN1_INTC_REG_OFF, (1 << bit_pos), client);
+> +
+> +			/* Get the corresponding event struct */
+> +			event = mn_pmu->hw_perf_events[bit_pos];
+> +			if (!event)
+> +				continue;
+
+Do we expect to take interrupts for an event which does not exist?
+
+Elsewhere we do not, and we WARN_ON_ONCE() for this case.
+
 [...]
->>>> I am debugging another issue with UBIFS wherein pages allocated by
->>>> vmalloc are in highmem region that are not addressable using 32 bit
->>>> addresses and is backed by LPAE. So, a 32 bit DMA cannot access these
->>>> buffers at all.
->>>> When dma_map_sg() is called to map these pages by spi_map_buf() the
->>>> physical address is just truncated to 32 bit in pfn_to_dma() (as part of
->>>> dma_map_sg() call). This results in random crashes as DMA starts
->>>> accessing random memory during SPI read.
->>>>
->>>> Given, the above problem and also issue surrounding VIVT caches, I am
->>>> thinking of may be using pre-allocated fixed size bounce buffer to
->>>> handle buffers not in lowmem mapping.
->>>> I have tried using 64KB pre-allocated buffer on TI DRA74 EVM with QSPI
->>>> running at 76.8MHz and do not see any significant degradation in
->>>> performance with UBIFS. Mainly because UBIFS seems to use vmalloc'd
->>>> buffers only during initial preparing and mounting phase and not during
->>>> file read/write.
->>> I am seeing a bug caused by VIVT cache in 'read_ltab()' function. In this function, the vmalloc'ed buffer is of size 11. Isn't it better to use kmalloc in this case ?
->> read_ltab() isn't the only place where vmalloc() is used. A quick grep
->> for vmalloc on fs/ubifs/ shows about ~19 occurrence. I guess every
->> vmalloc() call can potentially allocate memory from highmem and might
->> potentially cause issue for VIVT and such aliasing caches.
->> Fixing just one such case isn't going to help IMHO.
-> Of course fixing it only in one place is of course not going to help..
-> For the moment there are 3 solutions to the UBIFS DMA problem:
-> 1) Always use bounce buffer for vmalloc'ed buffers - impacts everyone.
-> 2) Remove use of vmalloc'ed buffers in UBIFS - is it possible ?
 
-Maybe. But what about mtdblock with JFFS2 on top of it, mtdblock still
-uses vmalloc'd buffers?
+> +static int hisi_mn_init_irq(int irq, struct hisi_pmu *mn_pmu,
+> +				     struct hisi_djtag_client *client)
+> +{
+> +	struct hisi_mn_data *mn_data = mn_pmu->hwmod_data;
+> +	u32 module_id = GET_MODULE_ID(mn_data);
+> +	struct device *dev = &client->dev;
+> +	int rc;
+> +
+> +	rc = devm_request_irq(dev, irq, hisi_pmu_mn_isr,
+> +			       IRQF_NOBALANCING | IRQF_NO_THREAD,
+> +					       dev_name(dev), mn_pmu);
+> +	if (rc) {
+> +		dev_err(dev, "Could not request IRQ:%d\n", irq);
+> +		return rc;
+> +	}
+> +
+> +	/* Overflow interrupt also should use the same CPU */
+> +	rc = irq_set_affinity(irq, &mn_pmu->cpu);
+> +	if (rc) {
+> +		dev_err(dev, "could not set IRQ affinity!\n");
+> +		return rc;
+> +	}
+> +
+> +	/*
+> +	 * Unmask all interrupts in Mask register
+> +	 * Enable all IRQ's
+> +	 */
+> +	hisi_mn_enable_interrupts(module_id, client);
 
+Nit: s/IRQ's/IRQs/
 
--- 
-Regards
-Vignesh
+We've only requested one interrupt. Why are we manipulating others?
+
+[...]
+
+> +static int hisi_mn_init_irqs_fdt(struct device *dev,
+> +				struct hisi_pmu *mn_pmu)
+> +{
+> +	struct hisi_mn_data *mn_data = mn_pmu->hwmod_data;
+> +	struct hisi_djtag_client *client = mn_data->client;
+> +	int irq = -1, num_irqs, i;
+> +
+> +	num_irqs = of_irq_count(dev->of_node);
+
+Surely we expect a specific number of interrupts?
+
+> +	for (i = 0; i < num_irqs; i++) {
+> +		irq = of_irq_get(dev->of_node, i);
+> +		if (irq < 0)
+> +			dev_info(dev, "No IRQ resource!\n");
+> +	}
+
+Why are we throwing these away?
+
+> +
+> +	if (irq < 0)
+> +		return 0;
+> +
+> +	/* The last entry in the IRQ list to be chosen
+> +	 * This is as per mbigen-v2 IRQ mapping
+> +	 */
+> +	return hisi_mn_init_irq(irq, mn_pmu, client);
+
+I don't understand this comment.
+
+Why do we only use the list IRQ?
+
+What does this have to do with the mbigen?
+
+No ordering requirement was described in the DT binding.
+
+Thanks,
+Mark.
