@@ -1,43 +1,36 @@
-From: lists@kaiser.cx (Martin Kaiser)
-Date: Mon, 20 Feb 2017 18:06:32 +0100
-Subject: [PATCH 0/4] kuser updates for ARM-only vs Thumb
-In-Reply-To: <20170209121756.GC27312@n2100.armlinux.org.uk>
-References: <20170209121756.GC27312@n2100.armlinux.org.uk>
-Message-ID: <20170220170632.GA6558@botnar.kaiser.cx>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Feb 2017 17:07:39 +0000
+Subject: [PATCH v6 00/14] mmc: Add support to Marvell Xenon SD Host
+ Controller
+In-Reply-To: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
+References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20170220170739.GL21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thus wrote Russell King - ARM Linux (linux at armlinux.org.uk):
+On Tue, Feb 14, 2017 at 06:01:40PM +0100, Gregory CLEMENT wrote:
+> Hello,
+> 
+> This the sixth version of the series adding support for the SDHCI
+> Xenon controller. It can be currently found on the Armada 37xx and the
+> Armada 7K/8K but will be also used in more Marvell SoC (and not only
+> the mvebu ones actually).
+> 
+> Most of the following changes had been discussed on the mailing list,
+> except the new compatible string.
+> 
+> It occurred that the xenon controller was integrated in a different
+> way in the AP806 and the CP110 which both are part of the Armada 7K/8K
+> SoCs. For example the Xenon controller in CP110 doesn't not support
+> HS200.
 
-> A while back, an issue was raised about the return instruction used
-> in the kuser page when building an ARMv4 and later environment.
+Seems to continnue to work on the Macchiatobin board.
 
-> In order to fix this, I suggested building the kuser code for both
-> variants and selecting the appropriate version at run time.  This
-> seemed to be a simple solution, but due to the fix-ups and need to
-> build the appropriate version for the Kconfig options selected,
-> turned out to be not quite as trivial as I hoped.
+Tested-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-> Nevertheless, this patch series provides that solution.
+Thanks.
 
-> As a side effect of this, the first patch is one which should be
-> merged irrespective of the remainder as it provides a useful cleanup
-> to the large number of dependencies for the ARM_THUMB option.
-
-Since this was merged (commit bf4b17749f8632696134c8705f294ce02c85c1fa),
-linux-next would stop working on my imx258 (ARM926T).
-
-Kernel panic - not syncing: Attempted to kill init!  exitcode=0x00000004
-
-It turned out that CONFIG_ARM_THUMB was not set in my kernel config,
-enabling it fixed the problem.
-
-Does this mean the kuser helpers now use thumb instructions and a user
-space binary crashes when it uses the helpers and thumb binaries are not
-supported?
-
-If CONFIG_CPU_THUMB_CAPABLE requires CONFIG_ARM_THUMB, should we make
-this more explicit in the code?
-
-Thanks,
-Martin
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
