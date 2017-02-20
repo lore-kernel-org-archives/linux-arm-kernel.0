@@ -1,166 +1,88 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 20 Feb 2017 20:53:43 +0800
-Subject: [PATCH net-next v3 3/4] net: mvneta: avoid reading from tx_desc as
- much as possible
+Date: Mon, 20 Feb 2017 20:53:44 +0800
+Subject: [PATCH net-next v3 4/4] net: mvneta: Use cacheable memory to store
+ the rx buffer DMA address
 In-Reply-To: <20170220125344.3555-1-jszhang@marvell.com>
 References: <20170220125344.3555-1-jszhang@marvell.com>
-Message-ID: <20170220125344.3555-4-jszhang@marvell.com>
+Message-ID: <20170220125344.3555-5-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In hot code path such as mvneta_tx(), mvneta_txq_bufs_free() etc. we
-access tx_desc several times. The tx_desc is allocated by
-dma_alloc_coherent, it's uncacheable if the device isn't cache-coherent,
-reading from uncached memory is fairly slow. So use local variable to
-store what we need to avoid extra reading from uncached memory.
-
-We get the following performance data on Marvell BG4CT Platforms
-(tested with iperf):
+In hot code path such as mvneta_rx_swbm(), the buf_phys_addr field of
+rx_dec is accessed. The rx_desc is allocated by dma_alloc_coherent,
+it's uncacheable if the device isn't cache coherent, reading from
+uncached memory is fairly slow. This patch uses cacheable memory to
+store the rx buffer DMA address. We get the following performance data
+on Marvell BG4CT Platforms (tested with iperf):
 
 before the patch:
-sending 1GB in mvneta_tx()(disabled TSO) costs 793553760ns
+recving 1GB in mvneta_rx_swbm() costs 1492659600 ns
 
 after the patch:
-sending 1GB in mvneta_tx()(disabled TSO) costs 719953800ns
+recving 1GB in mvneta_rx_swbm() costs 1421565640 ns
 
-we saved 9.2% time.
+We saved 4.76% time.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/net/ethernet/marvell/mvneta.c | 50 ++++++++++++++++++-----------------
- 1 file changed, 26 insertions(+), 24 deletions(-)
+ drivers/net/ethernet/marvell/mvneta.c | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index a25042801eec..b6cda4131c78 100644
+index b6cda4131c78..ccd3f2601446 100644
 --- a/drivers/net/ethernet/marvell/mvneta.c
 +++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -1770,6 +1770,7 @@ static void mvneta_txq_bufs_free(struct mvneta_port *pp,
- 		struct mvneta_tx_desc *tx_desc = txq->descs +
- 			txq->txq_get_index;
- 		struct sk_buff *skb = txq->tx_skb[txq->txq_get_index];
-+		u32 dma_addr = tx_desc->buf_phys_addr;
+@@ -580,6 +580,9 @@ struct mvneta_rx_queue {
+ 	/* Virtual address of the RX buffer */
+ 	void  **buf_virt_addr;
  
- 		if (skb) {
- 			bytes_compl += skb->len;
-@@ -1778,9 +1779,8 @@ static void mvneta_txq_bufs_free(struct mvneta_port *pp,
- 
- 		mvneta_txq_inc_get(txq);
- 
--		if (!IS_TSO_HEADER(txq, tx_desc->buf_phys_addr))
--			dma_unmap_single(pp->dev->dev.parent,
--					 tx_desc->buf_phys_addr,
-+		if (!IS_TSO_HEADER(txq, dma_addr))
-+			dma_unmap_single(pp->dev->dev.parent, dma_addr,
- 					 tx_desc->data_size, DMA_TO_DEVICE);
- 		if (!skb)
- 			continue;
-@@ -2191,17 +2191,18 @@ mvneta_tso_put_data(struct net_device *dev, struct mvneta_tx_queue *txq,
- 		    bool last_tcp, bool is_last)
- {
- 	struct mvneta_tx_desc *tx_desc;
-+	dma_addr_t dma_addr;
- 
- 	tx_desc = mvneta_txq_next_desc_get(txq);
- 	tx_desc->data_size = size;
--	tx_desc->buf_phys_addr = dma_map_single(dev->dev.parent, data,
--						size, DMA_TO_DEVICE);
--	if (unlikely(dma_mapping_error(dev->dev.parent,
--		     tx_desc->buf_phys_addr))) {
++	/* DMA address of the RX buffer */
++	dma_addr_t *buf_dma_addr;
 +
-+	dma_addr = dma_map_single(dev->dev.parent, data, size, DMA_TO_DEVICE);
-+	if (unlikely(dma_mapping_error(dev->dev.parent, dma_addr))) {
- 		mvneta_txq_desc_put(txq);
- 		return -ENOMEM;
+ 	/* Virtual address of the RX DMA descriptors array */
+ 	struct mvneta_rx_desc *descs;
+ 
+@@ -1617,6 +1620,7 @@ static void mvneta_rx_desc_fill(struct mvneta_rx_desc *rx_desc,
+ 
+ 	rx_desc->buf_phys_addr = phys_addr;
+ 	i = rx_desc - rxq->descs;
++	rxq->buf_dma_addr[i] = phys_addr;
+ 	rxq->buf_virt_addr[i] = virt_addr;
+ }
+ 
+@@ -1912,10 +1916,9 @@ static void mvneta_rxq_drop_pkts(struct mvneta_port *pp,
  	}
  
-+	tx_desc->buf_phys_addr = dma_addr;
- 	tx_desc->command = 0;
- 	txq->tx_skb[txq->txq_put_index] = NULL;
+ 	for (i = 0; i < rxq->size; i++) {
+-		struct mvneta_rx_desc *rx_desc = rxq->descs + i;
+ 		void *data = rxq->buf_virt_addr[i];
  
-@@ -2278,9 +2279,10 @@ static int mvneta_tx_tso(struct sk_buff *skb, struct net_device *dev,
- 	 */
- 	for (i = desc_count - 1; i >= 0; i--) {
- 		struct mvneta_tx_desc *tx_desc = txq->descs + i;
--		if (!IS_TSO_HEADER(txq, tx_desc->buf_phys_addr))
-+		u32 dma_addr = tx_desc->buf_phys_addr;
-+		if (!IS_TSO_HEADER(txq, dma_addr))
- 			dma_unmap_single(pp->dev->dev.parent,
--					 tx_desc->buf_phys_addr,
-+					 dma_addr,
- 					 tx_desc->data_size,
- 					 DMA_TO_DEVICE);
- 		mvneta_txq_desc_put(txq);
-@@ -2296,21 +2298,20 @@ static int mvneta_tx_frag_process(struct mvneta_port *pp, struct sk_buff *skb,
- 	int i, nr_frags = skb_shinfo(skb)->nr_frags;
- 
- 	for (i = 0; i < nr_frags; i++) {
-+		dma_addr_t dma_addr;
- 		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
- 		void *addr = page_address(frag->page.p) + frag->page_offset;
- 
- 		tx_desc = mvneta_txq_next_desc_get(txq);
- 		tx_desc->data_size = frag->size;
- 
--		tx_desc->buf_phys_addr =
--			dma_map_single(pp->dev->dev.parent, addr,
--				       tx_desc->data_size, DMA_TO_DEVICE);
--
--		if (dma_mapping_error(pp->dev->dev.parent,
--				      tx_desc->buf_phys_addr)) {
-+		dma_addr = dma_map_single(pp->dev->dev.parent, addr,
-+					  frag->size, DMA_TO_DEVICE);
-+		if (dma_mapping_error(pp->dev->dev.parent, dma_addr)) {
- 			mvneta_txq_desc_put(txq);
- 			goto error;
- 		}
-+		tx_desc->buf_phys_addr = dma_addr;
- 
- 		if (i == nr_frags - 1) {
- 			/* Last descriptor */
-@@ -2351,7 +2352,8 @@ static int mvneta_tx(struct sk_buff *skb, struct net_device *dev)
- 	struct mvneta_tx_desc *tx_desc;
- 	int len = skb->len;
- 	int frags = 0;
--	u32 tx_cmd;
-+	u32 tx_cmd, size;
-+	dma_addr_t dma_addr;
- 
- 	if (!netif_running(dev))
- 		goto out;
-@@ -2368,17 +2370,17 @@ static int mvneta_tx(struct sk_buff *skb, struct net_device *dev)
- 
- 	tx_cmd = mvneta_skb_tx_csum(pp, skb);
- 
--	tx_desc->data_size = skb_headlen(skb);
-+	size = skb_headlen(skb);
-+	tx_desc->data_size = size;
- 
--	tx_desc->buf_phys_addr = dma_map_single(dev->dev.parent, skb->data,
--						tx_desc->data_size,
--						DMA_TO_DEVICE);
--	if (unlikely(dma_mapping_error(dev->dev.parent,
--				       tx_desc->buf_phys_addr))) {
-+	dma_addr = dma_map_single(dev->dev.parent, skb->data,
-+				  size, DMA_TO_DEVICE);
-+	if (unlikely(dma_mapping_error(dev->dev.parent, dma_addr))) {
- 		mvneta_txq_desc_put(txq);
- 		frags = 0;
- 		goto out;
+-		dma_unmap_single(pp->dev->dev.parent, rx_desc->buf_phys_addr,
++		dma_unmap_single(pp->dev->dev.parent, rxq->buf_dma_addr[i],
+ 				 MVNETA_RX_BUF_SIZE(pp->pkt_size), DMA_FROM_DEVICE);
+ 		mvneta_frag_free(pp->frag_size, data);
  	}
-+	tx_desc->buf_phys_addr = dma_addr;
+@@ -1953,7 +1956,7 @@ static int mvneta_rx_swbm(struct mvneta_port *pp, int rx_todo,
+ 		rx_bytes = rx_desc->data_size - (ETH_FCS_LEN + MVNETA_MH_SIZE);
+ 		index = rx_desc - rxq->descs;
+ 		data = rxq->buf_virt_addr[index];
+-		phys_addr = rx_desc->buf_phys_addr;
++		phys_addr = rxq->buf_dma_addr[index];
  
- 	if (frags == 1) {
- 		/* First and Last descriptor */
-@@ -2395,8 +2397,8 @@ static int mvneta_tx(struct sk_buff *skb, struct net_device *dev)
- 		/* Continue with other skb fragments */
- 		if (mvneta_tx_frag_process(pp, skb, txq)) {
- 			dma_unmap_single(dev->dev.parent,
--					 tx_desc->buf_phys_addr,
--					 tx_desc->data_size,
-+					 dma_addr,
-+					 size,
- 					 DMA_TO_DEVICE);
- 			mvneta_txq_desc_put(txq);
- 			frags = 0;
+ 		if (!mvneta_rxq_desc_is_first_last(rx_status) ||
+ 		    (rx_status & MVNETA_RXD_ERR_SUMMARY)) {
+@@ -4019,7 +4022,10 @@ static int mvneta_init(struct device *dev, struct mvneta_port *pp)
+ 		rxq->buf_virt_addr = devm_kmalloc(pp->dev->dev.parent,
+ 						  rxq->size * sizeof(void *),
+ 						  GFP_KERNEL);
+-		if (!rxq->buf_virt_addr)
++		rxq->buf_dma_addr = devm_kmalloc(pp->dev->dev.parent,
++						 rxq->size * sizeof(dma_addr_t),
++						 GFP_KERNEL);
++		if (!rxq->buf_virt_addr || !rxq->buf_dma_addr)
+ 			return -ENOMEM;
+ 	}
+ 
 -- 
 2.11.0
