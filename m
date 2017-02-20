@@ -1,75 +1,157 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Mon, 20 Feb 2017 16:02:16 +0800
-Subject: [RESEND PATCH v7 0/7] Rockchip dw-mipi-dsi driver
-Message-ID: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
+Date: Mon, 20 Feb 2017 16:02:19 +0800
+Subject: [RESEND PATCH v7 3/7] drm/rockchip/dsi: dw-mipi: correct the coding
+ style
+In-Reply-To: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
+References: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <1487577744-2855-4-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all
+correct the coding style, according the checkpatch scripts
 
-[Resend this v7 version series, since there are 5 mails have gone missing, last
-week]
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
+---
 
-This version does not change the existing v6 patches, just to add the
-"bandwidth fix" patch back, since we really need it.
+Changes in v6: None
+Changes in v5: None
+Changes in v4: None
+Changes in v3: None
 
-This patch serial is for RK3399 MIPI DSI. The MIPI DSI controller of
-RK3399 is almost the same as RK3288, except a little bit of difference
-in phy clock controlling and port id selection register. These patches
-add RK3399 support and the power domain support.
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 29 ++++++++++++++---------------
+ 1 file changed, 14 insertions(+), 15 deletions(-)
 
-And these patches base on John Keeping's v3 patches[0], it fixes many bugs,
-they have been tested on rk3288 evb board.
-
-[0]:
-[01/24] https://patchwork.kernel.org/patch/9544089
-[02/24] https://patchwork.kernel.org/patch/9544061
-[03/24] https://patchwork.kernel.org/patch/9544065
-[04/24] https://patchwork.kernel.org/patch/9544077
-[05/24] https://patchwork.kernel.org/patch/9544033
-[06/24] https://patchwork.kernel.org/patch/9544037
-[07/24] https://patchwork.kernel.org/patch/9544029
-[08/24] https://patchwork.kernel.org/patch/9544031
-[09/24] https://patchwork.kernel.org/patch/9544083
-[10/24] https://patchwork.kernel.org/patch/9544063
-[11/24] https://patchwork.kernel.org/patch/9544085
-[12/24] https://patchwork.kernel.org/patch/9544093
-[13/24] https://patchwork.kernel.org/patch/9544081
-[14/24] https://patchwork.kernel.org/patch/9544057
-[15/24] https://patchwork.kernel.org/patch/9544079
-[16/24] https://patchwork.kernel.org/patch/9544035
-[17/24] https://patchwork.kernel.org/patch/9544105
-[18/24] https://patchwork.kernel.org/patch/9544059
-[21/24] https://patchwork.kernel.org/patch/9544009
-[22/24] https://patchwork.kernel.org/patch/9544049
-[23/24] https://patchwork.kernel.org/patch/9544055
-[24/24] https://patchwork.kernel.org/patch/9544109
-
-
-Changes in v6:
-- no need check phy_cfg_clk before enable/disable
-
-Changes in v5:
-- check the error of phy_cfg_clk in dw_mipi_dsi_bind
-
-Changes in v4:
-- remove the unrelated change
-
-Changes in v3:
-- base on John Keeping's patch series
-
-Chris Zhong (7):
-  dt-bindings: add rk3399 support for dw-mipi-rockchip
-  drm/rockchip/dsi: dw-mipi: support RK3399 mipi dsi
-  drm/rockchip/dsi: dw-mipi: correct the coding style
-  drm/rockchip/dsi: remove mode_valid function
-  dt-bindings: add power domain node for dw-mipi-rockchip
-  drm/rockchip/dsi: fix insufficient bandwidth of some panel
-  drm/rockchip/dsi: add dw-mipi power domain support
-
- .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   7 +-
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 160 ++++++++++++---------
- 2 files changed, 100 insertions(+), 67 deletions(-)
-
+diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+index 4e74681..836cb83 100644
+--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+@@ -157,7 +157,6 @@
+ #define LPRX_TO_CNT(p)			((p) & 0xffff)
+ 
+ #define DSI_BTA_TO_CNT			0x8c
+-
+ #define DSI_LPCLK_CTRL			0x94
+ #define AUTO_CLKLANE_CTRL		BIT(1)
+ #define PHY_TXREQUESTCLKHS		BIT(0)
+@@ -223,11 +222,11 @@
+ 
+ #define HSFREQRANGE_SEL(val)	(((val) & 0x3f) << 1)
+ 
+-#define INPUT_DIVIDER(val)	((val - 1) & 0x7f)
++#define INPUT_DIVIDER(val)	(((val) - 1) & 0x7f)
+ #define LOW_PROGRAM_EN		0
+ #define HIGH_PROGRAM_EN		BIT(7)
+-#define LOOP_DIV_LOW_SEL(val)	((val - 1) & 0x1f)
+-#define LOOP_DIV_HIGH_SEL(val)	(((val - 1) >> 5) & 0x1f)
++#define LOOP_DIV_LOW_SEL(val)	(((val) - 1) & 0x1f)
++#define LOOP_DIV_HIGH_SEL(val)	((((val) - 1) >> 5) & 0x1f)
+ #define PLL_LOOP_DIV_EN		BIT(5)
+ #define PLL_INPUT_DIV_EN	BIT(4)
+ 
+@@ -369,6 +368,7 @@ static inline struct dw_mipi_dsi *encoder_to_dsi(struct drm_encoder *encoder)
+ {
+ 	return container_of(encoder, struct dw_mipi_dsi, encoder);
+ }
++
+ static inline void dsi_write(struct dw_mipi_dsi *dsi, u32 reg, u32 val)
+ {
+ 	writel(val, dsi->base + reg);
+@@ -380,7 +380,7 @@ static inline u32 dsi_read(struct dw_mipi_dsi *dsi, u32 reg)
+ }
+ 
+ static void dw_mipi_dsi_phy_write(struct dw_mipi_dsi *dsi, u8 test_code,
+-				 u8 test_data)
++				  u8 test_data)
+ {
+ 	/*
+ 	 * With the falling edge on TESTCLK, the TESTDIN[7:0] signal content
+@@ -496,7 +496,6 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+ 	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
+ 				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
+ 
+-
+ 	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
+ 				 val, val & LOCK, 1000, PHY_STATUS_TIMEOUT_US);
+ 	if (ret < 0) {
+@@ -571,7 +570,7 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
+ 
+ 	if (device->lanes > dsi->pdata->max_data_lanes) {
+ 		dev_err(dsi->dev, "the number of data lanes(%u) is too many\n",
+-				device->lanes);
++			device->lanes);
+ 		return -EINVAL;
+ 	}
+ 
+@@ -1060,14 +1059,14 @@ dw_mipi_dsi_encoder_atomic_check(struct drm_encoder *encoder,
+ 	return 0;
+ }
+ 
+-static struct drm_encoder_helper_funcs
++static const struct drm_encoder_helper_funcs
+ dw_mipi_dsi_encoder_helper_funcs = {
+ 	.enable = dw_mipi_dsi_encoder_enable,
+ 	.disable = dw_mipi_dsi_encoder_disable,
+ 	.atomic_check = dw_mipi_dsi_encoder_atomic_check,
+ };
+ 
+-static struct drm_encoder_funcs dw_mipi_dsi_encoder_funcs = {
++static const struct drm_encoder_funcs dw_mipi_dsi_encoder_funcs = {
+ 	.destroy = drm_encoder_cleanup,
+ };
+ 
+@@ -1103,7 +1102,7 @@ static void dw_mipi_dsi_drm_connector_destroy(struct drm_connector *connector)
+ 	drm_connector_cleanup(connector);
+ }
+ 
+-static struct drm_connector_funcs dw_mipi_dsi_atomic_connector_funcs = {
++static const struct drm_connector_funcs dw_mipi_dsi_atomic_connector_funcs = {
+ 	.dpms = drm_atomic_helper_connector_dpms,
+ 	.fill_modes = drm_helper_probe_single_connector_modes,
+ 	.destroy = dw_mipi_dsi_drm_connector_destroy,
+@@ -1113,7 +1112,7 @@ static struct drm_connector_funcs dw_mipi_dsi_atomic_connector_funcs = {
+ };
+ 
+ static int dw_mipi_dsi_register(struct drm_device *drm,
+-				      struct dw_mipi_dsi *dsi)
++				struct dw_mipi_dsi *dsi)
+ {
+ 	struct drm_encoder *encoder = &dsi->encoder;
+ 	struct drm_connector *connector = &dsi->connector;
+@@ -1134,14 +1133,14 @@ static int dw_mipi_dsi_register(struct drm_device *drm,
+ 	drm_encoder_helper_add(&dsi->encoder,
+ 			       &dw_mipi_dsi_encoder_helper_funcs);
+ 	ret = drm_encoder_init(drm, &dsi->encoder, &dw_mipi_dsi_encoder_funcs,
+-			 DRM_MODE_ENCODER_DSI, NULL);
++			       DRM_MODE_ENCODER_DSI, NULL);
+ 	if (ret) {
+ 		dev_err(dev, "Failed to initialize encoder with drm\n");
+ 		return ret;
+ 	}
+ 
+ 	drm_connector_helper_add(connector,
+-			&dw_mipi_dsi_connector_helper_funcs);
++				 &dw_mipi_dsi_connector_helper_funcs);
+ 
+ 	drm_connector_init(drm, &dsi->connector,
+ 			   &dw_mipi_dsi_atomic_connector_funcs,
+@@ -1216,7 +1215,7 @@ static const struct of_device_id dw_mipi_dsi_dt_ids[] = {
+ MODULE_DEVICE_TABLE(of, dw_mipi_dsi_dt_ids);
+ 
+ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+-			     void *data)
++			    void *data)
+ {
+ 	const struct of_device_id *of_id =
+ 			of_match_device(dw_mipi_dsi_dt_ids, dev);
+@@ -1331,7 +1330,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+ }
+ 
+ static void dw_mipi_dsi_unbind(struct device *dev, struct device *master,
+-	void *data)
++			       void *data)
+ {
+ 	struct dw_mipi_dsi *dsi = dev_get_drvdata(dev);
+ 
 -- 
 2.6.3
