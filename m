@@ -1,107 +1,67 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 20 Feb 2017 10:47:56 +0000
-Subject: [PATCH 1/5] arm64: dts: Add basic DT to support Spreadtrum's
- SP9860G
-In-Reply-To: <20170220093750.GA9600@spreadtrum.com>
-References: <1487063952-7113-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1487063952-7113-2-git-send-email-chunyan.zhang@spreadtrum.com>
- <CAPKp9ub35nL8gc_TKx02pSHHNwBhiMacWL=CuEmNGnecWikfGQ@mail.gmail.com>
- <20170217072839.GA8767@spreadtrum.com>
- <b5940598-f3e7-b2c5-9914-7bcbe3471f9e@arm.com>
- <20170220093750.GA9600@spreadtrum.com>
-Message-ID: <c28ee4e9-9abe-c019-2439-f9cb239b67e9@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Feb 2017 10:49:47 +0000
+Subject: [PATCH] arm64: traps: Mark __le16, __le32, __user variables
+ properly
+In-Reply-To: <148758047729.2988.16966413648865610904@sboyd-linaro>
+References: <20170217165112.17512-1-stephen.boyd@linaro.org>
+ <20170219015808.2vc2kvpde7nlrey4@macbook.local>
+ <148758047729.2988.16966413648865610904@sboyd-linaro>
+Message-ID: <20170220104947.GE9003@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 20/02/17 09:37, Chunyan Zhang wrote:
-> Hi Sudeep,
+On Mon, Feb 20, 2017 at 12:47:57AM -0800, Stephen Boyd wrote:
+> Quoting Luc Van Oostenryck (2017-02-18 17:58:09)
+> > On Fri, Feb 17, 2017 at 08:51:12AM -0800, Stephen Boyd wrote:
+> >  
+> > > arch/arm64/kernel/traps.c:567:10: warning: Initializer entry defined twice
+> > > arch/arm64/kernel/traps.c:568:10:   also defined here
+> > This one I find strange. Can you tell which are those two entries?
 > 
-> On ?,  2? 17, 2017 at 10:28:00?? +0000, Sudeep Holla wrote:
->>
->>
->> On 17/02/17 07:28, Chunyan Zhang wrote:
->>> Hi Sudeep,
->>>
->>> On ?,  2? 14, 2017 at 04:44:53?? +0000, Sudeep Holla wrote:
->>>> On Tue, Feb 14, 2017 at 9:19 AM, Chunyan Zhang
->>>> <chunyan.zhang@spreadtrum.com> wrote:
->>
->> [..]
->>
->>>>
->>>>> +       idle-states{
->>>>> +               entry-method = "arm,psci";
->>>>> +
->>>>> +               CORE_PD: core_pd {
->>>>> +                       compatible = "arm,idle-state";
->>>>> +                       entry-latency-us = <1000>;
->>>>> +                       exit-latency-us = <700>;
->>>>> +                       min-residency-us = <2500>;
->>>>> +                       local-timer-stop;
->>>>> +                       arm,psci-suspend-param = <0x00010002>;
->>>>> +               };
->>>>> +
->>>>> +               CLUSTER_PD: cluster_pd {
->>>>> +                       compatible = "arm,idle-state";
->>>>> +                       entry-latency-us = <1000>;
->>>>> +                       exit-latency-us = <1000>;
->>>>> +                       min-residency-us = <3000>;
->>>>> +                       local-timer-stop;
->>>>> +                       arm,psci-suspend-param = <0x01010003>;
->>>>> +               };
->>>>> +
->>>>> +               DEEP_SLEEP: deep_sleep {
->>>>> +                       compatible = "arm,idle-state";
->>>>> +                       wakeup-latency-us = <0xffffffff>;
->>>>
->>>> A value > 4294 seconds(i.e >1 hour) seems suspicious.
->>>> Are you working around the firmware issue with high latency value so
->>>> that it's never entered ? Why not remove advertising the state from DT.
->>>>
->>>
->>> Haved checked with related colleagues, this node 'deep_sleep' was not for working
->>> around any firmware issue, but was a trick utilization of idle subsystem, and that
->>
->> Really ? Any latency greater few milliseconds are sounds useless. I
->> still don't understand what you mean by "trick utilization of idle
->> subsystem".
->>
+> This is:
 > 
-> Sorry for confused expression, I meant it was not a right way to utilize idle mechanism
-> and shouldn't be upstreamed.
+>  static const char *esr_class_str[] = {
+>          [0 ... ESR_ELx_EC_MAX]          = "UNRECOGNIZED EC",
+>          [ESR_ELx_EC_UNKNOWN]            = "Unknown/Uncategorized",
 > 
+> where we initialize the entire array to an "unknown" value once, and
+> then fill in the known values after that. This isn't a very common
+> pattern, but it is used from time to time to avoid having lots of lines
+> to do the same thing.
 
-No problem.
+FWIW, it's a fairly common trick for syscall tables, which is where I
+copied it from for the above. Certainly it's not that common elsewhere.
 
->>> was definitely not elegant, the author indeed intendly didn't want CPU entered this
->>> state, I will remove this node therefore.
->>
->> It's quick and dirty "HACK* to retain and advertise the state but
->> ensure it's never entered and obstruct the boot. It's not a trick to
->> exploit any idle subsystem utilization.
->>
-> 
+[mark at leverpostej:~/src/linux]% tail -n 11  arch/arm64/kernel/sys.c
+#undef __SYSCALL
+#define __SYSCALL(nr, sym)      [nr] = sym,
 
-> Right, actually deep_sleep was for 'suspend' (forces idleness upon 
-> the OS until a wake-up event resumes the OS from suspend), for 
-> example when users press power key on mobile phone to turn off the
-> screen. So the author implemented 'suspend' using cpu_psci_ops::cpu_suspend
-> I figure that this  way is not correct, I will remove this state from DT.
+/*
+ * The sys_call_table array must be 4K aligned to be accessible from
+ * kernel/entry.S.
+ */
+void * const sys_call_table[__NR_syscalls] __aligned(4096) = {
+        [0 ... __NR_syscalls - 1] = sys_ni_syscall,
+#include <asm/unistd.h>
+};
 
-OK.
+[mark at leverpostej:~/src/linux]% git grep '\[0 \.\.\. ' | grep sys
+arch/arc/kernel/sys.c:  [0 ... NR_syscalls-1] = sys_ni_syscall,
+arch/arm64/kernel/sys.c:        [0 ... __NR_syscalls - 1] = sys_ni_syscall,
+arch/arm64/kernel/sys32.c:      [0 ... __NR_compat_syscalls - 1] = sys_ni_syscall,
+arch/c6x/kernel/sys_c6x.c:      [0 ... __NR_syscalls-1] = sys_ni_syscall,
+arch/metag/kernel/sys_metag.c:  [0 ... __NR_syscalls-1] = sys_ni_syscall,
+arch/tile/kernel/compat.c:      [0 ... __NR_syscalls-1] = sys_ni_syscall,
+arch/tile/kernel/sys.c: [0 ... __NR_syscalls-1] = sys_ni_syscall,
+arch/unicore32/kernel/sys.c:    [0 ... __NR_syscalls-1] = sys_ni_syscall,
+arch/x86/entry/syscall_32.c:    [0 ... __NR_syscall_compat_max] = &sys_ni_syscall,
+arch/x86/entry/syscall_64.c:    [0 ... __NR_syscall_max] = &sys_ni_syscall,
+arch/x86/um/sys_call_table_32.c:        [0 ... __NR_syscall_max] = &sys_ni_syscall,
+arch/x86/um/sys_call_table_64.c:        [0 ... __NR_syscall_max] = &sys_ni_syscall,
+arch/xtensa/kernel/syscall.c:   [0 ... __NR_syscall_count - 1] = (syscall_t)&sys_ni_syscall,
 
-> I would appreciate any suggestion for how to implement this kind of
-> function properly.
+It would be nice to make sparse aware of this somehow, even if it
+requires some annotation.
 
-
-For the 'suspend' functionality you have described above, all you need
-is the firmware to implement PSCI SYSTEM_SUSPEND API in the firmware.
-The kernel psci driver detects the presence of the same and registers
-the suspend ops automatically. You need not add anything in the code or
-DT for the same.
-
--- 
-Regards,
-Sudeep
+Thanks,
+Mark.
