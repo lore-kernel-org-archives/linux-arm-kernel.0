@@ -1,68 +1,59 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 20 Feb 2017 15:47:39 -0800
-Subject: [PATCH v4 29/36] media: imx: mipi-csi2: enable setting and
- getting of frame rates
-In-Reply-To: <6892fb15-2d18-4898-c328-3acff9d6cc39@gmail.com>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-30-git-send-email-steve_longerbeam@mentor.com>
- <20170220220409.GX16975@valkosipuli.retiisi.org.uk>
- <6892fb15-2d18-4898-c328-3acff9d6cc39@gmail.com>
-Message-ID: <028a05fb-f5e8-d4ed-b0bd-39b93b56dfac@gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 21 Feb 2017 01:54:37 +0200
+Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
+In-Reply-To: <CAHp75VczsC9WdZWR9iCRh2JoNLFZyOtodrsDRYQoyaN7nkyf=A@mail.gmail.com>
+References: <1487593718-20752-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1487593718-20752-2-git-send-email-boris.brezillon@free-electrons.com>
+ <CAHp75VdwQGP-qa0c0KQwrdpZmCGc3RuEsJ-E-XLbBzQSn4Yxcg@mail.gmail.com>
+ <20170220213803.7ba5591e@bbrezillon> <20170220215009.0ecbf5a1@bbrezillon>
+ <CAHp75VczsC9WdZWR9iCRh2JoNLFZyOtodrsDRYQoyaN7nkyf=A@mail.gmail.com>
+Message-ID: <CAHp75Vc_q-bEzA2-hVpHyR0GZ8mXxwJ8-UjECe31T04mb67q4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/20/2017 02:56 PM, Steve Longerbeam wrote:
->
->
-> On 02/20/2017 02:04 PM, Sakari Ailus wrote:
->> Hi Steve,
+On Tue, Feb 21, 2017 at 1:40 AM, Andy Shevchenko
+<andy.shevchenko@gmail.com> wrote:
+> On Mon, Feb 20, 2017 at 10:50 PM, Boris Brezillon
+> <boris.brezillon@free-electrons.com> wrote:
+>> On Mon, 20 Feb 2017 21:38:03 +0100
+>> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 >>
->> On Wed, Feb 15, 2017 at 06:19:31PM -0800, Steve Longerbeam wrote:
->>> From: Russell King <rmk+kernel@armlinux.org.uk>
+>>> On Mon, 20 Feb 2017 22:27:17 +0200
+>>> Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
 >>>
->>> Setting and getting frame rates is part of the negotiation mechanism
->>> between subdevs.  The lack of support means that a frame rate at the
->>> sensor can't be negotiated through the subdev path.
+>>> > On Mon, Feb 20, 2017 at 2:28 PM, Boris Brezillon
+>>> > <boris.brezillon@free-electrons.com> wrote:
+>>> >
+>>> > >  drivers/mtd/nand/atmel/nand-controller.c | 2269 +++++++++++++++++++++++++++
+>>> > >  drivers/mtd/nand/atmel_nand.c            | 2479 ------------------------------
+>>> >
+>>> > Does -M -C help you?
+>>> > At least it would help reviewers
+>>> >
+>>>
+>>> No it doesn't, because files were not just moved around using git mv,
+>>> it's a complete rewrite of the driver. IIUC, you're about to review
+>>> this submission, or are you just trolling like last time?
 >>
->> Just wondering --- what do you need this for?
+>> My bad, I mistaken you with someone else. Sorry for being harsh, but my
+>> explanation stands ;-).
 >
->
-> Hi Sakari,
->
-> i.MX does need the ability to negotiate the frame rates in the
-> pipelines. The CSI has the ability to skip frames at the output,
-> which is something Philipp added to the CSI subdev. That affects
-> frame interval at the CSI output.
->
-> But as Russell pointed out, the lack of [gs]_frame_interval op
-> causes media-ctl to fail:
->
-> media-ctl -v -d /dev/media1 --set-v4l2
-> '"imx6-mipi-csi2":1[fmt:SGBRG8/512x512 at 1/30]'
->
-> Opening media device /dev/media1
-> Enumerating entities
-> Found 29 entities
-> Enumerating pads and links
-> Setting up format SGBRG8 512x512 on pad imx6-mipi-csi2/1
-> Format set: SGBRG8 512x512
-> Setting up frame interval 1/30 on entity imx6-mipi-csi2
-> Unable to set frame interval: Inappropriate ioctl for device (-25)Unable
-> to setup formats: Inappropriate ioctl for device (25)
->
->
-> So i.MX needs to implement this op in every subdev in the
-> pipeline, otherwise it's not possible to configure the
-> pipeline with media-ctl.
->
+> No problem. I was asking since it so big and on first glance looks
+> like a partial copy (I dunno if parameter to -C makes it somehow
+> useful), though I can't review this. It's too big to me. Sorry I'm
+> really not trolling, just didn't read commit message carefully.
+
+Okay, I very quickly looked into the code, what I noticed
+- you like extra parens and empty lines in some cases (not big deal)
+- some functions perhaps might have been refactored to have common
+pieces in error handling, though I didn't read core carefully.
+
+Most important part I have noticed is a GPIO request.
+I didn't get why you almost repeat gpiod_get() in case of platform data?
+Shouldn't we have GPIO look up table?
+Can we use builtin device properties (for GPIO and/or overall)?
 
 
-Hi Russell,
-
-But Sakari brings up a good point. The mipi csi-2 receiver doesn't
-have any control over frame rate, so why do you even need to
-give it this information via media-ctl?
-
-Steve
+-- 
+With Best Regards,
+Andy Shevchenko
