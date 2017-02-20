@@ -1,63 +1,43 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Mon, 20 Feb 2017 14:10:07 +0100
-Subject: [PATCH v2] mtd: nand: tango: Enforce DMA direction type
-In-Reply-To: <20170220133547.06c17a12@bbrezillon>
-References: <1486979107-15362-1-git-send-email-boris.brezillon@free-electrons.com>
- <aebe65d0-19c9-e1a7-b98a-c25ff616dad0@sigmadesigns.com>
- <20170220133547.06c17a12@bbrezillon>
-Message-ID: <72b68483-8a02-f6b8-f6b7-da492585c802@sigmadesigns.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 20 Feb 2017 14:16:13 +0100
+Subject: [PATCH 2/4] Documentation: devicetree: arm: Document Marvell
+ IAP140
+In-Reply-To: <20170220135646.2b0219c1@free-electrons.com>
+References: <20170219032000.4674-1-afaerber@suse.de>
+ <20170219032000.4674-3-afaerber@suse.de>
+ <20170220135646.2b0219c1@free-electrons.com>
+Message-ID: <cac4ed13-5952-cccc-fee7-d9c29e77d8bb@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
+Hi,
 
-do_dma() uses an int to pass the DMA data direction information and
-pass the same value to dmaengine_prep_slave_sg().
+Am 20.02.2017 um 13:56 schrieb Thomas Petazzoni:
+> On Sun, 19 Feb 2017 04:19:58 +0100, Andreas F?rber wrote:
+> 
+>> + - compatible :  must contain "mrvl,iap140"
+> 
+> Even though there's indeed a good number of existing "mrvl," compatible
+> strings in the tree, the official vendor prefix according to
+> Documentation/devicetree/bindings/vendor-prefixes.txt is "marvell".
+> Probably you should use that instead for new bindings?
 
-Currently, DMA_{FROM,TO}_DEVICE match DMA_{DEV_TO_MEM,MEM_TO_DEV}
-definitions so it works fine, but assuming this will always be the case
-is not safe.
+I'm confused now. According to Marvell IR [0] they are NASDAQ-listed as
+MRVL. My understanding is that in that case the official vendor prefix
+becomes mrvl. Why not here? Would be good to understand for other
+pending vendors such as Actions Semi.
 
-Enforce enum dma_data_direction type in the function prototype and make
-the enum dma_data_direction -> enum dma_transfer_direction conversion
-explicit.
+Any comments on the iap140 vs. pxa1908 naming? The Communication
+Processors section has disappeared from marvell.com, so I couldn't
+verify whether IAP140 was renamed from PXA1908 or whether both coexist
+and we should add a second compatible string here?
 
-Reported-by: Richard Weinberger <richard@nod.at>
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
- drivers/mtd/nand/tango_nand.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+Thanks,
+Andreas
 
-diff --git a/drivers/mtd/nand/tango_nand.c b/drivers/mtd/nand/tango_nand.c
-index 4a5e948c62df..05b6e1065203 100644
---- a/drivers/mtd/nand/tango_nand.c
-+++ b/drivers/mtd/nand/tango_nand.c
-@@ -223,12 +223,13 @@ static void tango_dma_callback(void *arg)
- 	complete(arg);
- }
- 
--static int do_dma(struct tango_nfc *nfc, int dir, int cmd, const void *buf,
--		  int len, int page)
-+static int do_dma(struct tango_nfc *nfc, enum dma_data_direction dir, int cmd,
-+		  const void *buf, int len, int page)
- {
- 	void __iomem *addr = nfc->reg_base + NFC_STATUS;
- 	struct dma_chan *chan = nfc->chan;
- 	struct dma_async_tx_descriptor *desc;
-+	enum dma_transfer_direction tdir;
- 	struct scatterlist sg;
- 	struct completion tx_done;
- 	int err = -EIO;
-@@ -238,7 +239,8 @@ static int do_dma(struct tango_nfc *nfc, int dir, int cmd, const void *buf,
- 	if (dma_map_sg(chan->device->dev, &sg, 1, dir) != 1)
- 		return -EIO;
- 
--	desc = dmaengine_prep_slave_sg(chan, &sg, 1, dir, DMA_PREP_INTERRUPT);
-+	tdir = dir == DMA_TO_DEVICE ? DMA_MEM_TO_DEV : DMA_DEV_TO_MEM;
-+	desc = dmaengine_prep_slave_sg(chan, &sg, 1, tdir, DMA_PREP_INTERRUPT);
- 	if (!desc)
- 		goto dma_unmap;
- 
+[0] http://investor.marvell.com/phoenix.zhtml?c=120802&p=irol-irhome
+
 -- 
-3.14159265358979
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
