@@ -1,55 +1,58 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Tue, 21 Feb 2017 10:40:10 -0500
-Subject: [RESEND PATCH v7 6/7] drm/rockchip/dsi: fix insufficient
- bandwidth of some panel
-In-Reply-To: <1487577744-2855-7-git-send-email-zyw@rock-chips.com>
-References: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
- <1487577744-2855-7-git-send-email-zyw@rock-chips.com>
-Message-ID: <20170221154010.GB25168@art_vandelay>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 21 Feb 2017 16:44:53 +0100
+Subject: [PATCH 2/2] ARM: dts: Qualcomm APQ8060 DragonBoard ALS sensor
+In-Reply-To: <20170209014204.GK27837@minitux>
+References: <20170131102114.25085-1-linus.walleij@linaro.org>
+ <20170131102114.25085-2-linus.walleij@linaro.org>
+ <20170201183631.GJ10531@minitux>
+ <CACRpkdbH9WgC8EwERRNDUjnAAz7YAq-=S1Wja5Hq2w0uDeO7rg@mail.gmail.com>
+ <20170209014204.GK27837@minitux>
+Message-ID: <CACRpkdZxjeRvUoMLn90V1B-uoB-9UEsxzHwty9wdct7VUtC78w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2017 at 04:02:22PM +0800, Chris Zhong wrote:
-> Set the lanes bps to 1 / 0.9 times of pclk, the margin is not enough
-> for some panel, it will cause the screen display is not normal, so
-> increases the badnwidth to 1 / 0.8.
-> 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+On Thu, Feb 9, 2017 at 2:42 AM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
 
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
+>> The AMUX is just one big mystery to me, it's one of those areas where I
+>> think a real datasheet would be extremely helpful.
+>>
+>
+> After additional research and a long chat with Stephen this is what I
+> have come up with.
+>
+> On PM8058 you have 16 AMUX channels that can be either read as raw,
+> scaled or dived by 3, this is selected by the 2 "premux" bits in the
+> AMUX selector register.
+>
+> AMUX channel 5-9 are called MPP5-9,
+> connected to a switching matrix so each MPP is configured to output its
+> signal on one of the 5 mpp-amux-channels. I.e. it's probably better to
+> rename these just "AMUX5" through "AMXU9".
 
-> ---
-> 
-> Changes in v6: None
-> Changes in v5: None
-> Changes in v4: None
-> Changes in v3: None
-> 
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index c2d7674..a653384 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -532,8 +532,8 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi,
->  
->  	mpclk = DIV_ROUND_UP(mode->clock, MSEC_PER_SEC);
->  	if (mpclk) {
-> -		/* take 1 / 0.9, since mbps must big than bandwidth of RGB */
-> -		tmp = mpclk * (bpp / dsi->lanes) * 10 / 9;
-> +		/* take 1 / 0.8, since mbps must big than bandwidth of RGB */
-> +		tmp = mpclk * (bpp / dsi->lanes) * 10 / 8;
->  		if (tmp < max_mbps)
->  			target_mbps = tmp;
->  		else
-> -- 
-> 2.6.3
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+Awesome, that part is encoded into the next iteration of the driver.
 
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+> On PM8921 this changes somewhat and an additional mux is introduced.
+> The first premux looks similar to pm8058, but with no direct MPP AMUXes
+> to be selected. Premux 1 or 2 is used to select the second level mux.
+>
+> This mux has channels:
+>  1: usb_sns
+>  2: dcin_sns
+>  3: amux3 (reserved and called pa_therm)
+>  4: amux4 (reserved and called amux_in)
+>  5-8: amuxX (as configured output of MPPs)
+>
+> Premux 2 has the same set of channels, but with a divisor of 3.
+>
+> The MPP1/MPP2 AMUX channels in premux 0 found downstream are now
+> reserved - likely they the hardware used to select unity and div/3 input
+> from the second level mux.
+
+That is some serious silicon duct tape work going on here...
+
+OK I am trying to accomodate it, but I will likely need verification on
+real hardware making use of the premuxed thingies.
+
+Yours,
+Linus Walleij
