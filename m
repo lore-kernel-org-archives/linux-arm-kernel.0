@@ -1,48 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 21 Feb 2017 11:32:43 +0100
-Subject: [PATCHv3 net-next 00/12] net: mvpp2: misc improvements and
- preparation patches
-In-Reply-To: <20170220.111226.239035932737797178.davem@davemloft.net>
-References: <20170220100742.0b1fce4a@free-electrons.com>
- <20170220.095357.2175678121216081406.davem@davemloft.net>
- <20170220164741.11b40d07@free-electrons.com>
- <20170220.111226.239035932737797178.davem@davemloft.net>
-Message-ID: <20170221113243.20d2e569@free-electrons.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 21 Feb 2017 10:38:54 +0000
+Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
+ power
+In-Reply-To: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <69ab75a1-2e04-19e2-d1ad-12ca1cfc7625@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Geert,
 
-On Mon, 20 Feb 2017 11:12:26 -0500 (EST), David Miller wrote:
+On 20/02/17 20:33, Geert Uytterhoeven wrote:
+> 	Hi all,
+> 
+> This patch series adds support for using non-PMIC wake-up sources on the
+> Renesas R-Car Gen3 (H3 or M3-W) Salvator-X development boards.
+> 
+> Nothing in the PSCI specification requires the SoC to remain powered and
+> to support wake-up sources when suspended using SYSTEM_SUSPEND.
+> If the firmware implements the PSCI SYSTEM_SUSPEND operation by cutting
+> power to the SoC, the only possibly wake-up sources are thus the ones
+> connected to the PMIC.
+> 
 
-> For your particular case I'll accept a resubmit.
+OK, but I don't see any issue with that. That's exactly how it works on
+ARM Juno platform. The SoC is powered down.
 
-Resubmit done, patches are now in patchwork. Changes since v3 (also in
-the cover letter of v4) :
+> To allow other wake-up sources, this patch series documents and adds
+> support for an "arm,psci-system-suspend-is-power-down" DT property, so
 
- - Addition of a patch "net: mvpp2: fix DMA address calculation in
-   mvpp2_txq_inc_put()", which fixes a bug in the driver in the
-   calculation of DMA addresses. This bug was found using
-   DMA_API_DEBUG.
+NACK, you don't need any such properties.
 
- - Modify the "net: mvpp2: switch to build_skb() in the RX path" patch
-   to recalculate the fragment size when the MTU is changed in
-   mvpp2_bm_update_mtu().
+> Linux uses a different suspend method when other wake-up sources (e.g.
+> wake on LAN, UART or GPIO) are enabled.  Hence the user no longer has to
+> manually restrict "mem" suspend to "s2idle" or "shallow" states using:
+> 
 
- - Added Acked-by from Russell King on all patches, except:
+Have you explored suspend-to-idle instead ? It looks like thats exactly
+what you are doing in this patch set. You also get low latency for free
+as it just enters the deepest idle state on all CPUs instead of
+hotplugging out all the secondaries.
 
-    * "net: mvpp2: fix DMA address calculation in
-      mvpp2_txq_inc_put()", because it's a new patch
-
-    * "net: mvpp2: switch to build_skb() in the RX path" because I
-      modified it since the v3.
-
- - Rebased on top of 4.10.
-
-Thanks!
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Regards,
+Sudeep
