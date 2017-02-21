@@ -1,138 +1,51 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 20 Feb 2017 16:18:53 -0800
-Subject: [PATCH v4 29/36] media: imx: mipi-csi2: enable setting and
- getting of frame rates
-In-Reply-To: <20170221001332.GS21222@n2100.armlinux.org.uk>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-30-git-send-email-steve_longerbeam@mentor.com>
- <20170220220409.GX16975@valkosipuli.retiisi.org.uk>
- <20170221001332.GS21222@n2100.armlinux.org.uk>
-Message-ID: <25596b21-70de-5e46-f149-f9ce3a86ecb7@gmail.com>
+From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
+Date: Tue, 21 Feb 2017 00:37:23 +0000
+Subject: iproute2 not function on CAN FD
+In-Reply-To: <f4c78670-8c25-8ee3-5167-126d49ad5b00@hartkopp.net>
+References: <F9F4555C4E01D7469D37975B62D0EFBB4D7587@CHN-SV-EXMX07.mchp-main.com>
+ <f4c78670-8c25-8ee3-5167-126d49ad5b00@hartkopp.net>
+Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB4DB003@CHN-SV-EXMX07.mchp-main.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Oliver,
+
+> -----Original Message-----
+> From: Oliver Hartkopp [mailto:socketcan at hartkopp.net]
+> Sent: 2017?2?20? 15:57
+> To: Wenyou Yang - A41535 <Wenyou.Yang@microchip.com>;
+> mkl at pengutronix.de; wg at grandegger.com
+> Cc: linux-can at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: iproute2 not function on CAN FD
+> 
+> On 02/20/2017 02:12 AM, Wenyou.Yang at microchip.com wrote:
+> 
+> > I am testing the CAN FD of M_CAN on the SAMA5D2 Xplained board, when
+> > using the ip tool from iprounte2 suite to set the CAN interface, it
+> > doesn't work with the message "RTNETLINK answers: Operation not supported".
+> > --->8----
+> > # ip link set can0 type can bitrate 125000 dbitrate 8000000 fd on
+> > RTNETLINK answers: Operation not supported
+> 
+> Please try:
+> 
+> # ip link set can0 type can bitrate 125000 dbitrate 8000000 fd on fd-non-iso on
+> 
+> The driver for the M_CAN IP core 3.0.x in the mainline kernel supports a
+> NON_ISO IP core.
+> 
+> This non-iso setting is fixed with this v3.0.x M_CAN and we decided to make this
+> configuration explicit - as all other options run into a mess.
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit?id=bb208f144cf
+> 3f59d8f89a09a80efd04389718907
+> 
+> Did that help?
+
+Thank you very much!
+
+You are very helpful!
 
 
-On 02/20/2017 04:13 PM, Russell King - ARM Linux wrote:
-> On Tue, Feb 21, 2017 at 12:04:10AM +0200, Sakari Ailus wrote:
->> On Wed, Feb 15, 2017 at 06:19:31PM -0800, Steve Longerbeam wrote:
->>> From: Russell King <rmk+kernel@armlinux.org.uk>
->>>
->>> Setting and getting frame rates is part of the negotiation mechanism
->>> between subdevs.  The lack of support means that a frame rate at the
->>> sensor can't be negotiated through the subdev path.
->>
->> Just wondering --- what do you need this for?
->
-> The v4l2 documentation contradicts the media-ctl implementation.
->
-> While v4l2 documentation says:
->
->   These ioctls are used to get and set the frame interval at specific
->   subdev pads in the image pipeline. The frame interval only makes sense
->   for sub-devices that can control the frame period on their own. This
->   includes, for instance, image sensors and TV tuners. Sub-devices that
->   don't support frame intervals must not implement these ioctls.
->
-> However, when trying to configure the pipeline using media-ctl, eg:
->
-> media-ctl -d /dev/media1 --set-v4l2 '"imx219 pixel 0-0010":0[crop:(0,0)/3264x2464]'
-> media-ctl -d /dev/media1 --set-v4l2 '"imx219 0-0010":1[fmt:SRGGB10/3264x2464 at 1/30]'
-> media-ctl -d /dev/media1 --set-v4l2 '"imx219 0-0010":0[fmt:SRGGB8/816x616 at 1/30]'
-> media-ctl -d /dev/media1 --set-v4l2 '"imx6-mipi-csi2":1[fmt:SRGGB8/816x616 at 1/30]'
-> Unable to setup formats: Inappropriate ioctl for device (25)
-> media-ctl -d /dev/media1 --set-v4l2 '"ipu1_csi0_mux":2[fmt:SRGGB8/816x616 at 1/30]'
-> media-ctl -d /dev/media1 --set-v4l2 '"ipu1_csi0":2[fmt:SRGGB8/816x616 at 1/30]'
->
-> The problem there is that the format setting for the csi2 does not get
-> propagated forward:
->
-> $ strace media-ctl -d /dev/media1 --set-v4l2 '"imx6-mipi-csi2":1[fmt:SRGGB8/816x616 at 1/30]'
-> ...
-> open("/dev/v4l-subdev16", O_RDWR)       = 3
-> ioctl(3, VIDIOC_SUBDEV_S_FMT, 0xbec16244) = 0
-> ioctl(3, VIDIOC_SUBDEV_S_FRAME_INTERVAL, 0xbec162a4) = -1 ENOTTY (Inappropriate
-> ioctl for device)
-> fstat64(1, {st_mode=S_IFCHR|0600, st_rdev=makedev(136, 2), ...}) = 0
-> write(1, "Unable to setup formats: Inappro"..., 61) = 61
-> Unable to setup formats: Inappropriate ioctl for device (25)
-> close(3)                                = 0
-> exit_group(1)                           = ?
-> +++ exited with 1 +++
->
-> because media-ctl exits as soon as it encouters the error while trying
-> to set the frame rate.
->
-> This makes implementing setup of the media pipeline in shell scripts
-> unnecessarily difficult - as you need to then know whether an entity
-> is likely not to support the VIDIOC_SUBDEV_S_FRAME_INTERVAL call,
-> and either avoid specifying a frame rate:
->
-> $ strace media-ctl -d /dev/media1 --set-v4l2 '"imx6-mipi-csi2":1[fmt:SRGGB8/816x616]'
-> ...
-> open("/dev/v4l-subdev16", O_RDWR)       = 3
-> ioctl(3, VIDIOC_SUBDEV_S_FMT, 0xbeb1a254) = 0
-> open("/dev/v4l-subdev0", O_RDWR)        = 4
-> ioctl(4, VIDIOC_SUBDEV_S_FMT, 0xbeb1a254) = 0
-> close(4)                                = 0
-> close(3)                                = 0
-> exit_group(0)                           = ?
-> +++ exited with 0 +++
->
-> or manually setting the format on the sink.
->
-> Allowing the S_FRAME_INTERVAL call seems to me to be more in keeping
-> with the negotiation mechanism that is implemented in subdevs, and
-> IMHO should be implemented inside the kernel as a pad operation along
-> with the format negotiation, especially so as frame skipping is
-> defined as scaling, in just the same way as the frame size is also
-> scaling:
->
->        -  ``MEDIA_ENT_F_PROC_VIDEO_SCALER``
->
->        -  Video scaler. An entity capable of video scaling must have
->           at least one sink pad and one source pad, and scale the
->           video frame(s) received on its sink pad(s) to a different
->           resolution output on its source pad(s). The range of
->           supported scaling ratios is entity-specific and can differ
->           between the horizontal and vertical directions (in particular
->           scaling can be supported in one direction only). Binning and
->           skipping are considered as scaling.
->
-> Although, this is vague, as it doesn't define what it means by "skipping",
-> whether that's skipping pixels (iow, sub-sampling) or whether that's
-> frame skipping.
->
-> Then there's the issue where, if you have this setup:
->
->  camera --> csi2 receiver --> csi --> capture
->
-> and the "csi" subdev can skip frames, you need to know (a) at the CSI
-> sink pad what the frame rate is of the source (b) what the desired
-> source pad frame rate is, so you can configure the frame skipping.
-> So, does the csi subdev have to walk back through the media graph
-> looking for the frame rate?  Does the capture device have to walk back
-> through the media graph looking for some subdev to tell it what the
-> frame rate is - the capture device certainly can't go straight to the
-> sensor to get an answer to that question, because that bypasses the
-> effect of the CSI frame skipping (which will lower the frame rate.)
->
-> IMHO, frame rate is just another format property, just like the
-> resolution and data format itself, and v4l2 should be treating it no
-> differently.
->
-
-I agree, frame rate, if indicated/specified by both sides of a link,
-should match. So maybe this should be part of v4l2 link validation.
-
-This might be a good time to propose the following patch.
-
-Steve
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0015-media-v4l-subdev-Add-function-to-validate-frame-inte.patch
-Type: text/x-patch
-Size: 4620 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170220/6026ed58/attachment-0001.bin>
+Best Regards,
+Wenyou Yang
