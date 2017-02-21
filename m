@@ -1,95 +1,116 @@
-From: Mike.Leach@arm.com (Mike Leach)
-Date: Tue, 21 Feb 2017 12:34:25 +0000
-Subject: [PATCH] arm64: dts: juno: update definition for programmable
- replicator.
-In-Reply-To: <2ba59da5-fc79-ab53-2f2a-2ddc6e5e9c3d@arm.com>
-References: <1487358790-2618-1-git-send-email-mike.leach@linaro.org>
- <2ba59da5-fc79-ab53-2f2a-2ddc6e5e9c3d@arm.com>
-Message-ID: <DB6PR0802MB219850A35C8DAD5CB2858C1C8C510@DB6PR0802MB2198.eurprd08.prod.outlook.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 21 Feb 2017 12:37:04 +0000
+Subject: [PATCH 3/7] drivers: dma-coherent: Account dma_pfn_offset when
+ used with device tree
+In-Reply-To: <1487152792-34214-4-git-send-email-vladimir.murzin@arm.com>
+References: <1487152792-34214-1-git-send-email-vladimir.murzin@arm.com>
+ <1487152792-34214-4-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <c7f1bc2f-6729-c01d-25a5-d07efd319828@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep
+On 15/02/17 09:59, Vladimir Murzin wrote:
+> dma_declare_coherent_memory() and friends are designed to account
+> difference in CPU and device addresses. However, when it is used with
+> reserved memory regions there is assumption that CPU and device have
+> the same view on address space. This assumption gets invalid when
+> reserved memory for coherent DMA allocations is referenced by device
+> with non-empty "dma-range" property.
+> 
+> Simply feeding device address as rmem->base + dev->dma_pfn_offset
+> would not work due to reserved memory region can be shared, so this
+> patch turns device address to be expressed with help of CPU address
+> and device's dma_pfn_offset.
+> 
+> For the case where device tree is not used and device sees memory
+> different to CPU we explicitly set device's dma_pfn_offset to
+> accomplish such difference. The latter might look controversial, but
+> it seems only a few drivers set device address different to CPU's:
+> - drivers/usb/host/ohci-sm501.c
+> - arch/sh/drivers/pci/fixups-dreamcast.c
+> so they can be screwed only if dma_pfn_offset there is set and not in
+> sync with device address range - we try to catch such cases with
+> WARN_ON.
+> 
+> Cc: Michal Nazarewicz <mina86@mina86.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+> Cc: Rich Felker <dalias@libc.org>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> Tested-by: Andras Szemzo <sza@esh.hu>
+> Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> ---
+>  drivers/base/dma-coherent.c | 17 +++++++++++++++--
+>  1 file changed, 15 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+> index 640a7e6..c59708c 100644
+> --- a/drivers/base/dma-coherent.c
+> +++ b/drivers/base/dma-coherent.c
+> @@ -18,6 +18,12 @@ struct dma_coherent_mem {
+>  	spinlock_t	spinlock;
+>  };
+>  
+> +static inline dma_addr_t dma_get_device_base(struct device *dev,
+> +					     struct dma_coherent_mem * mem)
+> +{
+> +	return (mem->pfn_base - dev->dma_pfn_offset) << PAGE_SHIFT;
+> +}
+> +
+>  static bool dma_init_coherent_memory(
+>  	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
+>  	struct dma_coherent_mem **mem)
+> @@ -83,9 +89,16 @@ static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
+>  static int dma_assign_coherent_memory(struct device *dev,
+>  				      struct dma_coherent_mem *mem)
+>  {
+> +	unsigned long dma_pfn_offset = mem->pfn_base - PFN_DOWN(mem->device_base);
+> +
+>  	if (dev->dma_mem)
+>  		return -EBUSY;
+>  
+> +	if (dev->dma_pfn_offset)
+> +		WARN_ON(dma_pfn_offset && (dev->dma_pfn_offset != dma_pfn_offset));
+> +	else
+> +		dev->dma_pfn_offset = dma_pfn_offset;
 
-> -----Original Message-----
-> From: CoreSight [mailto:coresight-bounces at lists.linaro.org] On Behalf Of
-> Sudeep Holla
-> Sent: 21 February 2017 11:03
-> To: Mike Leach; linux-arm-kernel at lists.infradead.org
-> Cc: devicetree at vger.kernel.org; coresight at lists.linaro.org;
-> robh+dt at kernel.org; Sudeep Holla
-> Subject: Re: [PATCH] arm64: dts: juno: update definition for programmable
-> replicator.
->
-> Hi Mike,
->
-> On 17/02/17 19:13, Mike Leach wrote:
-> > Juno platforms have a programmable replicator splitting the trace
-> > output to TPIU and ETR. Currently this is not being programmed as it
-> > is being treated as a none-programmable replicator - which is the
-> > default operational mode for these devices. The TPIU in the system is
-> > enabled by default, and this combination is causing back-pressure in
-> > the trace system resulting in overflows at the source.
-> >
-> > Replaces the existing definition with one that defines the
-> > programmable replicator, using the "qcom,coresight-replicator1x"
-> > driver that provides the correct functionality for CoreSight programmable
-> replicators.
-> >
->
-> I assume this is just enhancement and not a fix.
+This makes me rather uneasy - I can well imagine a device sharing the
+CPU physical address map of external system memory, but having its own
+view of its local coherent memory such that pfn_base != device_base
+still. I know for a fact we've had internal FPGA tiles set up that way,
+although whether it was entirely intentional is another matter... ;)
 
-I guess it depends on your point of view - with this update the trace overflows I was seeing disappear, as the trace path to TPIU is blocked.
-So it affects the quality of collected trace using the ETR rather than a binary didn't work / works now change.
+In that situation, setting dev->dma_pfn_offset like this would break
+streaming DMA for such devices. Could we not keep the pool-specific
+offset and the device-specific offset independent, apply whichever is
+non-zero, and scream if both are set?
 
->  Since it's too late for
-> v4.11 (already in merge window now), I will queue this for v4.12
->
+Robin.
 
-Thanks.
-
-Mike
-
-
-
-> > Signed-off-by: Mike Leach <mike.leach@linaro.org>
-> > ---
-> >  arch/arm64/boot/dts/arm/juno-base.dtsi | 14 ++++++++------
-> >  1 file changed, 8 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi
-> > b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> > index 9d799d9..6546e23 100644
-> > --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-> > +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-> > @@ -372,12 +372,14 @@
-> >  };
-> >  };
-> >
-> > -coresight-replicator {
-> > -/*
-> > - * Non-configurable replicators don't show up on the
-> > - * AMBA bus.  As such no need to add "arm,primecell".
-> > - */
-> > -compatible = "arm,coresight-replicator";
-> > +coresight-replicator at 20120000 {
-> > +
-> > +compatible = "qcom,coresight-replicator1x", "arm,primecell";
-> > +reg = <0 0x20120000 0 0x1000>;
-> > +
-> > +clocks = <&soc_smc50mhz>;
-> > +clock-names = "apb_pclk";
-> > +power-domains = <&scpi_devpd 0>;
-> >
-> >  ports {
-> >  #address-cells = <1>;
-> >
->
-> --
-> Regards,
-> Sudeep
-> _______________________________________________
-> CoreSight mailing list
-> CoreSight at lists.linaro.org
-> https://lists.linaro.org/mailman/listinfo/coresight
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+> +
+>  	dev->dma_mem = mem;
+>  	/* FIXME: this routine just ignores DMA_MEMORY_INCLUDES_CHILDREN */
+>  
+> @@ -133,7 +146,7 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
+>  		return ERR_PTR(-EINVAL);
+>  
+>  	spin_lock_irqsave(&mem->spinlock, flags);
+> -	pos = (device_addr - mem->device_base) >> PAGE_SHIFT;
+> +	pos = PFN_DOWN(device_addr - dma_get_device_base(dev, mem));
+>  	err = bitmap_allocate_region(mem->bitmap, pos, get_order(size));
+>  	spin_unlock_irqrestore(&mem->spinlock, flags);
+>  
+> @@ -186,7 +199,7 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+>  	/*
+>  	 * Memory was found in the per-device area.
+>  	 */
+> -	*dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
+> +	*dma_handle = dma_get_device_base(dev, mem) + (pageno << PAGE_SHIFT);
+>  	*ret = mem->virt_base + (pageno << PAGE_SHIFT);
+>  	dma_memory_map = (mem->flags & DMA_MEMORY_MAP);
+>  	spin_unlock_irqrestore(&mem->spinlock, flags);
+> 
