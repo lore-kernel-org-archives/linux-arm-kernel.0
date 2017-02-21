@@ -1,208 +1,44 @@
-From: angus@angusclark.org (Angus Clark)
-Date: Tue, 21 Feb 2017 14:26:21 +0000
-Subject: [RFT PATCH 1/2] ARM: module: split core and init PLT sections
-In-Reply-To: <1487628041-2147-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1487628041-2147-1-git-send-email-ard.biesheuvel@linaro.org>
- <1487628041-2147-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAMZqy1CWNC2aL4Qhp2C9M0POuU4juz2=L8WpoihRUdWT6uhiGg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 21 Feb 2017 08:39:30 -0600
+Subject: [PATCH] arm64: dts: hisilicon: add dts files for
+ hi3798cv200-poplar board
+In-Reply-To: <166c4e19-f1df-e3bc-59c3-4c952f8a1cf5@hisilicon.com>
+References: <1486624027-15156-1-git-send-email-xuejiancheng@hisilicon.com>
+ <20170215232649.rmvdel2cyxyzuord@rob-hp-laptop>
+ <166c4e19-f1df-e3bc-59c3-4c952f8a1cf5@hisilicon.com>
+Message-ID: <CAL_JsqLVdrEiYyg-RVx7iz9toAtecnMdFLbbXCxjTc=b9=m01w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Mon, Feb 20, 2017 at 3:55 AM, Jiancheng Xue
+<xuejiancheng@hisilicon.com> wrote:
+> Hi Rob,
+>
+> On 2017/2/16 7:26, Rob Herring wrote:
+>> On Thu, Feb 09, 2017 at 03:07:07PM +0800, Jiancheng Xue wrote:
+>>> Add basic dts files for hi3798cv200-poplar board. Poplar is the
+>>> first development board compliant with the 96Boards Enterprise
+>>> Edition TV Platform specification. The board features the
+>>> Hi3798CV200 with an integrated quad-core 64-bit ARM Cortex A53
+>>> processor and high performance Mali T720 GPU.
 
-I have tested the patch and I think there is still a small issue.  At
-present, count_plts() assumes a PLT entry would only be required for
-undefined symbols.  However, if 'init' and 'core' are located far
-apart, then we may need an entry in the init PLT if some init code
-makes a call to a defined symbol in the core section.
+[...]
 
-As a quick test, I added an 'include_defined' argument to count_plts()
-which gets set for init relocs.  With this in place, the module loads
-fine and appears to function as expected.
+>>> +    soc {
+>>
+>> soc at 0
+>>
+>>> +            compatible = "simple-bus";
+>>> +            #address-cells = <1>;
+>>> +            #size-cells = <1>;
+>>> +            ranges = <0x0 0x00000000 0x0 0xffffffff>;
+>>
+>> Looks like everything is within 0xf8000000-0xfa000000. Can this range be
+>> further restrained?
+>>
+> Actually, some modules of the SoC will be added in later. This range could be restrained
+> to "0xf0000000-0xffffffff". If so, should soc node be named soc at f0000000?
 
-Happy to test any further versions :-)
+Yes.
 
-Cheers,
-
-Angus
-
-On 20 February 2017 at 22:00, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Since commit 35fa91eed817 ("ARM: kernel: merge core and init PLTs"),
-> the ARM module PLT code allocates all PLT entries in a single core
-> section, since the overhead of having a separate init PLT section is
-> not justified by the small number of PLT entries usually required for
-> init code.
->
-> However, the core and init module regions are allocated independently,
-> and there is a corner case where the core region may be allocated from
-> the VMALLOC region if the dedicated module region is exhausted, but the
-> init region, being much smaller, can still be allocated from the module
-> region. This puts the PLT entries out of reach of the relocated branch
-> instructions, defeating the whole purpose of PLTs.
->
-> So split the core and init PLT regions, and name the latter ".init.plt"
-> so it gets allocated along with (and sufficiently close to) the .init
-> sections that it serves. This is not a straight revert, given that the
-> PLT code was heavily modified since the commit in question was merged.
->
-> Fixes: 35fa91eed817 ("ARM: kernel: merge core and init PLTs")
-> Reported-by: Angus Clark <angus@angusclark.org>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/include/asm/module.h |  9 ++-
->  arch/arm/kernel/module-plts.c | 62 ++++++++++++++------
->  arch/arm/kernel/module.lds    |  1 +
->  3 files changed, 51 insertions(+), 21 deletions(-)
->
-> diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
-> index 464748b9fd7d..ed2319663a1e 100644
-> --- a/arch/arm/include/asm/module.h
-> +++ b/arch/arm/include/asm/module.h
-> @@ -18,13 +18,18 @@ enum {
->  };
->  #endif
->
-> +struct mod_plt_sec {
-> +       struct elf32_shdr       *plt;
-> +       int                     plt_count;
-> +};
-> +
->  struct mod_arch_specific {
->  #ifdef CONFIG_ARM_UNWIND
->         struct unwind_table *unwind[ARM_SEC_MAX];
->  #endif
->  #ifdef CONFIG_ARM_MODULE_PLTS
-> -       struct elf32_shdr   *plt;
-> -       int                 plt_count;
-> +       struct mod_plt_sec      core;
-> +       struct mod_plt_sec      init;
->  #endif
->  };
->
-> diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
-> index 3a5cba90c971..1a79f2789325 100644
-> --- a/arch/arm/kernel/module-plts.c
-> +++ b/arch/arm/kernel/module-plts.c
-> @@ -31,9 +31,17 @@ struct plt_entries {
->         u32     lit[PLT_ENT_COUNT];
->  };
->
-> +static bool in_init(const struct module *mod, void *loc)
-> +{
-> +       return (u32)loc - (u32)mod->init_layout.base < mod->init_layout.size;
-> +}
-> +
->  u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
->  {
-> -       struct plt_entries *plt = (struct plt_entries *)mod->arch.plt->sh_addr;
-> +       struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
-> +                                                         &mod->arch.init;
-> +
-> +       struct plt_entries *plt = (struct plt_entries *)pltsec->plt->sh_addr;
->         int idx = 0;
->
->         /*
-> @@ -41,9 +49,9 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
->          * relocations are sorted, this will be the last entry we allocated.
->          * (if one exists).
->          */
-> -       if (mod->arch.plt_count > 0) {
-> -               plt += (mod->arch.plt_count - 1) / PLT_ENT_COUNT;
-> -               idx = (mod->arch.plt_count - 1) % PLT_ENT_COUNT;
-> +       if (pltsec->plt_count > 0) {
-> +               plt += (pltsec->plt_count - 1) / PLT_ENT_COUNT;
-> +               idx = (pltsec->plt_count - 1) % PLT_ENT_COUNT;
->
->                 if (plt->lit[idx] == val)
->                         return (u32)&plt->ldr[idx];
-> @@ -53,8 +61,8 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
->                         plt++;
->         }
->
-> -       mod->arch.plt_count++;
-> -       BUG_ON(mod->arch.plt_count * PLT_ENT_SIZE > mod->arch.plt->sh_size);
-> +       pltsec->plt_count++;
-> +       BUG_ON(pltsec->plt_count * PLT_ENT_SIZE > pltsec->plt->sh_size);
->
->         if (!idx)
->                 /* Populate a new set of entries */
-> @@ -174,7 +182,8 @@ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
->  int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
->                               char *secstrings, struct module *mod)
->  {
-> -       unsigned long plts = 0;
-> +       unsigned long core_plts = 0;
-> +       unsigned long init_plts = 0;
->         Elf32_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
->         Elf32_Sym *syms = NULL;
->
-> @@ -184,13 +193,15 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
->          */
->         for (s = sechdrs; s < sechdrs_end; ++s) {
->                 if (strcmp(".plt", secstrings + s->sh_name) == 0)
-> -                       mod->arch.plt = s;
-> +                       mod->arch.core.plt = s;
-> +               else if (strcmp(".init.plt", secstrings + s->sh_name) == 0)
-> +                       mod->arch.init.plt = s;
->                 else if (s->sh_type == SHT_SYMTAB)
->                         syms = (Elf32_Sym *)s->sh_addr;
->         }
->
-> -       if (!mod->arch.plt) {
-> -               pr_err("%s: module PLT section missing\n", mod->name);
-> +       if (!mod->arch.core.plt || !mod->arch.init.plt) {
-> +               pr_err("%s: module PLT section(s) missing\n", mod->name);
->                 return -ENOEXEC;
->         }
->         if (!syms) {
-> @@ -213,16 +224,29 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
->                 /* sort by type and symbol index */
->                 sort(rels, numrels, sizeof(Elf32_Rel), cmp_rel, NULL);
->
-> -               plts += count_plts(syms, dstsec->sh_addr, rels, numrels);
-> +               if (strncmp(secstrings + dstsec->sh_name, ".init", 5) != 0)
-> +                       core_plts += count_plts(syms, dstsec->sh_addr, rels,
-> +                                               numrels);
-> +               else
-> +                       init_plts += count_plts(syms, dstsec->sh_addr, rels,
-> +                                               numrels);
->         }
->
-> -       mod->arch.plt->sh_type = SHT_NOBITS;
-> -       mod->arch.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> -       mod->arch.plt->sh_addralign = L1_CACHE_BYTES;
-> -       mod->arch.plt->sh_size = round_up(plts * PLT_ENT_SIZE,
-> -                                         sizeof(struct plt_entries));
-> -       mod->arch.plt_count = 0;
-> -
-> -       pr_debug("%s: plt=%x\n", __func__, mod->arch.plt->sh_size);
-> +       mod->arch.core.plt->sh_type = SHT_NOBITS;
-> +       mod->arch.core.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> +       mod->arch.core.plt->sh_addralign = L1_CACHE_BYTES;
-> +       mod->arch.core.plt->sh_size = round_up(core_plts * PLT_ENT_SIZE,
-> +                                              sizeof(struct plt_entries));
-> +       mod->arch.core.plt_count = 0;
-> +
-> +       mod->arch.init.plt->sh_type = SHT_NOBITS;
-> +       mod->arch.init.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> +       mod->arch.init.plt->sh_addralign = L1_CACHE_BYTES;
-> +       mod->arch.init.plt->sh_size = round_up(init_plts * PLT_ENT_SIZE,
-> +                                              sizeof(struct plt_entries));
-> +       mod->arch.init.plt_count = 0;
-> +
-> +       pr_debug("%s: plt=%x, init.plt=%x\n", __func__,
-> +                mod->arch.core.plt->sh_size, mod->arch.init.plt->sh_size);
->         return 0;
->  }
-> diff --git a/arch/arm/kernel/module.lds b/arch/arm/kernel/module.lds
-> index 05881e2b414c..eacb5c67f61e 100644
-> --- a/arch/arm/kernel/module.lds
-> +++ b/arch/arm/kernel/module.lds
-> @@ -1,3 +1,4 @@
->  SECTIONS {
->         .plt : { BYTE(0) }
-> +       .init.plt : { BYTE(0) }
->  }
-> --
-> 2.7.4
->
+Rob
