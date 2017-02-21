@@ -1,159 +1,208 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Tue, 21 Feb 2017 08:21:35 -0600
-Subject: [RESEND PATCH v2] arm64: cache: Skip an unnecessary data cache clean
- PoU operation
-Message-ID: <1487686895-18065-1-git-send-email-shankerd@codeaurora.org>
+From: angus@angusclark.org (Angus Clark)
+Date: Tue, 21 Feb 2017 14:26:21 +0000
+Subject: [RFT PATCH 1/2] ARM: module: split core and init PLT sections
+In-Reply-To: <1487628041-2147-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1487628041-2147-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1487628041-2147-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAMZqy1CWNC2aL4Qhp2C9M0POuU4juz2=L8WpoihRUdWT6uhiGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cache management functions always do the data cache PoU
-(point of unification) operations even though it is not required
-on some systems. No need to clean data cache till PoU if all the
-cache levels below PoUIS are WT (Write-Through) caches. It causes
-a huge performance degradation when operating on a larger memory
-area, especially THP with 64K page size kernel.
+Hi Ard,
 
-For each online CPU, check the need of 'dc cvau' instruction and
-update a global variable __dcache_flags. The two functions
-__flush_cache_user_range() and __clean_dcache_area_pou() are
-modified to skip an unnecessary code execution based on flags.
-It won't change the existing behavior if any one of the online
-CPU is capable of WB cache below PoUIS level.
+I have tested the patch and I think there is still a small issue.  At
+present, count_plts() assumes a PLT entry would only be required for
+undefined symbols.  However, if 'init' and 'core' are located far
+apart, then we may need an entry in the init PLT if some init code
+makes a call to a defined symbol in the core section.
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
-Changes since v1:
-    handle skipping a dcache clean POU operation by checking the
-    global variable __dcache_flags in cache.S instead of patching
-    the code segment.
+As a quick test, I added an 'include_defined' argument to count_plts()
+which gets set for init relocs.  With this in place, the module loads
+fine and appears to function as expected.
 
- arch/arm64/include/asm/cachetype.h |  8 ++++++++
- arch/arm64/kernel/cpuinfo.c        | 30 ++++++++++++++++++++++++++++++
- arch/arm64/mm/cache.S              |  8 +++++++-
- 3 files changed, 45 insertions(+), 1 deletion(-)
+Happy to test any further versions :-)
 
-diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
-index f558869..352fb23 100644
---- a/arch/arm64/include/asm/cachetype.h
-+++ b/arch/arm64/include/asm/cachetype.h
-@@ -28,6 +28,8 @@
- #define ICACHE_POLICY_VIPT	2
- #define ICACHE_POLICY_PIPT	3
- 
-+#define DCACHE_SKIP_POU		0
-+
- #ifndef __ASSEMBLY__
- 
- #include <linux/bitops.h>
-@@ -39,6 +41,12 @@
- 
- extern unsigned long __icache_flags;
- 
-+extern unsigned long __dcache_flags;
-+
-+#define CLIDR_LOUIS_SHIFT	(21)
-+#define CLIDR_LOUIS_MASK	(0x7)
-+#define CLIDR_LOUIS(x)		(((x) >> CLIDR_LOUIS_SHIFT) & CLIDR_LOUIS_MASK)
-+
- /*
-  * NumSets, bits[27:13] - (Number of sets in cache) - 1
-  * Associativity, bits[12:3] - (Associativity of cache) - 1
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 7b7be71..0e1a30a 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -50,6 +50,7 @@
- };
- 
- unsigned long __icache_flags;
-+unsigned long __dcache_flags;
- 
- static const char *const hwcap_str[] = {
- 	"fp",
-@@ -305,6 +306,33 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
- 	pr_info("Detected %s I-cache on CPU%d\n", icache_policy_str[l1ip], cpu);
- }
- 
-+/*
-+ * Check if all the data cache levels below LoUIS doesn't support WB.
-+ * The flag DCACHE_SKIP_POU set to 0 if any one of the online CPU
-+ * doesn't support WB cache below LoUIS.
-+ */
-+static void cpuinfo_ckeck_dcache_pou(struct cpuinfo_arm64 *info)
-+{
-+	u32 louis = CLIDR_LOUIS(read_sysreg(clidr_el1));
-+	static bool update_pou_once;
-+	u32 lvl, csidr;
-+
-+	/* Set the DCACHE_SKIP_POU flag only first time */
-+	if (!update_pou_once) {
-+		set_bit(DCACHE_SKIP_POU, &__dcache_flags);
-+		update_pou_once = true;
-+	}
-+
-+	/* Go through all the cache level below LoUIS */
-+	for (lvl = 0; lvl < louis; lvl++) {
-+		csidr = cache_get_ccsidr(lvl << 1);
-+		if (csidr & CCSIDR_EL1_WRITE_BACK) {
-+			clear_bit(DCACHE_SKIP_POU, &__dcache_flags);
-+			break;
-+		}
-+	}
-+}
-+
- static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
- {
- 	info->reg_cntfrq = arch_timer_get_cntfrq();
-@@ -345,6 +373,8 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
- 	}
- 
- 	cpuinfo_detect_icache_policy(info);
-+	cpuinfo_ckeck_dcache_pou(info);
-+
- }
- 
- void cpuinfo_store_cpu(void)
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index 83c27b6e..1884da2 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -24,6 +24,7 @@
- #include <asm/cpufeature.h>
- #include <asm/alternative.h>
- #include <asm/asm-uaccess.h>
-+#include <asm/cachetype.h>
- 
- /*
-  *	flush_icache_range(start,end)
-@@ -50,6 +51,8 @@ ENTRY(flush_icache_range)
-  */
- ENTRY(__flush_cache_user_range)
- 	uaccess_ttbr0_enable x2, x3
-+	ldr_l	x4, __dcache_flags
-+	tbnz	x4, #DCACHE_SKIP_POU, 2f
- 	dcache_line_size x2, x3
- 	sub	x3, x2, #1
- 	bic	x4, x0, x3
-@@ -60,6 +63,7 @@ user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
- 	b.lo	1b
- 	dsb	ish
- 
-+2:
- 	icache_line_size x2, x3
- 	sub	x3, x2, #1
- 	bic	x4, x0, x3
-@@ -104,8 +108,10 @@ ENDPIPROC(__flush_dcache_area)
-  *	- size    - size in question
-  */
- ENTRY(__clean_dcache_area_pou)
-+	ldr_l	x2, __dcache_flags
-+	tbnz	x2, #DCACHE_SKIP_POU, 1f
- 	dcache_by_line_op cvau, ish, x0, x1, x2, x3
--	ret
-+1:	ret
- ENDPROC(__clean_dcache_area_pou)
- 
- /*
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Cheers,
+
+Angus
+
+On 20 February 2017 at 22:00, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Since commit 35fa91eed817 ("ARM: kernel: merge core and init PLTs"),
+> the ARM module PLT code allocates all PLT entries in a single core
+> section, since the overhead of having a separate init PLT section is
+> not justified by the small number of PLT entries usually required for
+> init code.
+>
+> However, the core and init module regions are allocated independently,
+> and there is a corner case where the core region may be allocated from
+> the VMALLOC region if the dedicated module region is exhausted, but the
+> init region, being much smaller, can still be allocated from the module
+> region. This puts the PLT entries out of reach of the relocated branch
+> instructions, defeating the whole purpose of PLTs.
+>
+> So split the core and init PLT regions, and name the latter ".init.plt"
+> so it gets allocated along with (and sufficiently close to) the .init
+> sections that it serves. This is not a straight revert, given that the
+> PLT code was heavily modified since the commit in question was merged.
+>
+> Fixes: 35fa91eed817 ("ARM: kernel: merge core and init PLTs")
+> Reported-by: Angus Clark <angus@angusclark.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm/include/asm/module.h |  9 ++-
+>  arch/arm/kernel/module-plts.c | 62 ++++++++++++++------
+>  arch/arm/kernel/module.lds    |  1 +
+>  3 files changed, 51 insertions(+), 21 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
+> index 464748b9fd7d..ed2319663a1e 100644
+> --- a/arch/arm/include/asm/module.h
+> +++ b/arch/arm/include/asm/module.h
+> @@ -18,13 +18,18 @@ enum {
+>  };
+>  #endif
+>
+> +struct mod_plt_sec {
+> +       struct elf32_shdr       *plt;
+> +       int                     plt_count;
+> +};
+> +
+>  struct mod_arch_specific {
+>  #ifdef CONFIG_ARM_UNWIND
+>         struct unwind_table *unwind[ARM_SEC_MAX];
+>  #endif
+>  #ifdef CONFIG_ARM_MODULE_PLTS
+> -       struct elf32_shdr   *plt;
+> -       int                 plt_count;
+> +       struct mod_plt_sec      core;
+> +       struct mod_plt_sec      init;
+>  #endif
+>  };
+>
+> diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
+> index 3a5cba90c971..1a79f2789325 100644
+> --- a/arch/arm/kernel/module-plts.c
+> +++ b/arch/arm/kernel/module-plts.c
+> @@ -31,9 +31,17 @@ struct plt_entries {
+>         u32     lit[PLT_ENT_COUNT];
+>  };
+>
+> +static bool in_init(const struct module *mod, void *loc)
+> +{
+> +       return (u32)loc - (u32)mod->init_layout.base < mod->init_layout.size;
+> +}
+> +
+>  u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
+>  {
+> -       struct plt_entries *plt = (struct plt_entries *)mod->arch.plt->sh_addr;
+> +       struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
+> +                                                         &mod->arch.init;
+> +
+> +       struct plt_entries *plt = (struct plt_entries *)pltsec->plt->sh_addr;
+>         int idx = 0;
+>
+>         /*
+> @@ -41,9 +49,9 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
+>          * relocations are sorted, this will be the last entry we allocated.
+>          * (if one exists).
+>          */
+> -       if (mod->arch.plt_count > 0) {
+> -               plt += (mod->arch.plt_count - 1) / PLT_ENT_COUNT;
+> -               idx = (mod->arch.plt_count - 1) % PLT_ENT_COUNT;
+> +       if (pltsec->plt_count > 0) {
+> +               plt += (pltsec->plt_count - 1) / PLT_ENT_COUNT;
+> +               idx = (pltsec->plt_count - 1) % PLT_ENT_COUNT;
+>
+>                 if (plt->lit[idx] == val)
+>                         return (u32)&plt->ldr[idx];
+> @@ -53,8 +61,8 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
+>                         plt++;
+>         }
+>
+> -       mod->arch.plt_count++;
+> -       BUG_ON(mod->arch.plt_count * PLT_ENT_SIZE > mod->arch.plt->sh_size);
+> +       pltsec->plt_count++;
+> +       BUG_ON(pltsec->plt_count * PLT_ENT_SIZE > pltsec->plt->sh_size);
+>
+>         if (!idx)
+>                 /* Populate a new set of entries */
+> @@ -174,7 +182,8 @@ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
+>  int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+>                               char *secstrings, struct module *mod)
+>  {
+> -       unsigned long plts = 0;
+> +       unsigned long core_plts = 0;
+> +       unsigned long init_plts = 0;
+>         Elf32_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
+>         Elf32_Sym *syms = NULL;
+>
+> @@ -184,13 +193,15 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+>          */
+>         for (s = sechdrs; s < sechdrs_end; ++s) {
+>                 if (strcmp(".plt", secstrings + s->sh_name) == 0)
+> -                       mod->arch.plt = s;
+> +                       mod->arch.core.plt = s;
+> +               else if (strcmp(".init.plt", secstrings + s->sh_name) == 0)
+> +                       mod->arch.init.plt = s;
+>                 else if (s->sh_type == SHT_SYMTAB)
+>                         syms = (Elf32_Sym *)s->sh_addr;
+>         }
+>
+> -       if (!mod->arch.plt) {
+> -               pr_err("%s: module PLT section missing\n", mod->name);
+> +       if (!mod->arch.core.plt || !mod->arch.init.plt) {
+> +               pr_err("%s: module PLT section(s) missing\n", mod->name);
+>                 return -ENOEXEC;
+>         }
+>         if (!syms) {
+> @@ -213,16 +224,29 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+>                 /* sort by type and symbol index */
+>                 sort(rels, numrels, sizeof(Elf32_Rel), cmp_rel, NULL);
+>
+> -               plts += count_plts(syms, dstsec->sh_addr, rels, numrels);
+> +               if (strncmp(secstrings + dstsec->sh_name, ".init", 5) != 0)
+> +                       core_plts += count_plts(syms, dstsec->sh_addr, rels,
+> +                                               numrels);
+> +               else
+> +                       init_plts += count_plts(syms, dstsec->sh_addr, rels,
+> +                                               numrels);
+>         }
+>
+> -       mod->arch.plt->sh_type = SHT_NOBITS;
+> -       mod->arch.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
+> -       mod->arch.plt->sh_addralign = L1_CACHE_BYTES;
+> -       mod->arch.plt->sh_size = round_up(plts * PLT_ENT_SIZE,
+> -                                         sizeof(struct plt_entries));
+> -       mod->arch.plt_count = 0;
+> -
+> -       pr_debug("%s: plt=%x\n", __func__, mod->arch.plt->sh_size);
+> +       mod->arch.core.plt->sh_type = SHT_NOBITS;
+> +       mod->arch.core.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
+> +       mod->arch.core.plt->sh_addralign = L1_CACHE_BYTES;
+> +       mod->arch.core.plt->sh_size = round_up(core_plts * PLT_ENT_SIZE,
+> +                                              sizeof(struct plt_entries));
+> +       mod->arch.core.plt_count = 0;
+> +
+> +       mod->arch.init.plt->sh_type = SHT_NOBITS;
+> +       mod->arch.init.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
+> +       mod->arch.init.plt->sh_addralign = L1_CACHE_BYTES;
+> +       mod->arch.init.plt->sh_size = round_up(init_plts * PLT_ENT_SIZE,
+> +                                              sizeof(struct plt_entries));
+> +       mod->arch.init.plt_count = 0;
+> +
+> +       pr_debug("%s: plt=%x, init.plt=%x\n", __func__,
+> +                mod->arch.core.plt->sh_size, mod->arch.init.plt->sh_size);
+>         return 0;
+>  }
+> diff --git a/arch/arm/kernel/module.lds b/arch/arm/kernel/module.lds
+> index 05881e2b414c..eacb5c67f61e 100644
+> --- a/arch/arm/kernel/module.lds
+> +++ b/arch/arm/kernel/module.lds
+> @@ -1,3 +1,4 @@
+>  SECTIONS {
+>         .plt : { BYTE(0) }
+> +       .init.plt : { BYTE(0) }
+>  }
+> --
+> 2.7.4
+>
