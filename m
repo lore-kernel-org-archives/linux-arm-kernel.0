@@ -1,72 +1,146 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 21 Feb 2017 09:06:10 +0100
-Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
-In-Reply-To: <CAHp75Vc_q-bEzA2-hVpHyR0GZ8mXxwJ8-UjECe31T04mb67q4w@mail.gmail.com>
-References: <1487593718-20752-1-git-send-email-boris.brezillon@free-electrons.com>
- <1487593718-20752-2-git-send-email-boris.brezillon@free-electrons.com>
- <CAHp75VdwQGP-qa0c0KQwrdpZmCGc3RuEsJ-E-XLbBzQSn4Yxcg@mail.gmail.com>
- <20170220213803.7ba5591e@bbrezillon>
- <20170220215009.0ecbf5a1@bbrezillon>
- <CAHp75VczsC9WdZWR9iCRh2JoNLFZyOtodrsDRYQoyaN7nkyf=A@mail.gmail.com>
- <CAHp75Vc_q-bEzA2-hVpHyR0GZ8mXxwJ8-UjECe31T04mb67q4w@mail.gmail.com>
-Message-ID: <20170221090610.6d531b94@bbrezillon>
+Date: Tue, 21 Feb 2017 09:13:40 +0100
+Subject: [RESEND PATCH 2/3] mtd: nand: atmel: Add
+ ->setup_data_interface() hooks
+In-Reply-To: <4db51424-0e59-bad7-45ff-92516424dead@gmail.com>
+References: <1487625149-7234-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1487625149-7234-3-git-send-email-boris.brezillon@free-electrons.com>
+ <4db51424-0e59-bad7-45ff-92516424dead@gmail.com>
+Message-ID: <20170221091340.2d6d3fdf@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Feb 2017 01:54:37 +0200
-Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
+On Mon, 20 Feb 2017 23:47:10 +0100
+Marek Vasut <marek.vasut@gmail.com> wrote:
 
-> On Tue, Feb 21, 2017 at 1:40 AM, Andy Shevchenko
-> <andy.shevchenko@gmail.com> wrote:
-> > On Mon, Feb 20, 2017 at 10:50 PM, Boris Brezillon
-> > <boris.brezillon@free-electrons.com> wrote:  
-> >> On Mon, 20 Feb 2017 21:38:03 +0100
-> >> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> >>  
-> >>> On Mon, 20 Feb 2017 22:27:17 +0200
-> >>> Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
-> >>>  
-> >>> > On Mon, Feb 20, 2017 at 2:28 PM, Boris Brezillon
-> >>> > <boris.brezillon@free-electrons.com> wrote:
-> >>> >  
-> >>> > >  drivers/mtd/nand/atmel/nand-controller.c | 2269 +++++++++++++++++++++++++++
-> >>> > >  drivers/mtd/nand/atmel_nand.c            | 2479 ------------------------------  
-> >>> >
-> >>> > Does -M -C help you?
-> >>> > At least it would help reviewers
-> >>> >  
-> >>>
-> >>> No it doesn't, because files were not just moved around using git mv,
-> >>> it's a complete rewrite of the driver. IIUC, you're about to review
-> >>> this submission, or are you just trolling like last time?  
-> >>
-> >> My bad, I mistaken you with someone else. Sorry for being harsh, but my
-> >> explanation stands ;-).  
-> >
-> > No problem. I was asking since it so big and on first glance looks
-> > like a partial copy (I dunno if parameter to -C makes it somehow
-> > useful), though I can't review this. It's too big to me. Sorry I'm
-> > really not trolling, just didn't read commit message carefully.  
+> On 02/20/2017 10:12 PM, Boris Brezillon wrote:
+> > The NAND controller IP can adapt the NAND controller timings dynamically.
+> > Implement the ->setup_data_interface() hook to support this feature.
+> > 
+> > Note that it's not supported on at91rm9200 because this SoC has a
+> > completely different SMC block, which is not supported yet.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  drivers/mtd/nand/atmel/nand-controller.c | 333 ++++++++++++++++++++++++++++++-
+> >  1 file changed, 328 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/drivers/mtd/nand/atmel/nand-controller.c b/drivers/mtd/nand/atmel/nand-controller.c
+> > index 4207c0d37826..ae46ef711d67 100644
+> > --- a/drivers/mtd/nand/atmel/nand-controller.c
+> > +++ b/drivers/mtd/nand/atmel/nand-controller.c
+> > @@ -57,6 +57,7 @@
+> >  #include <linux/interrupt.h>
+> >  #include <linux/mfd/syscon.h>
+> >  #include <linux/mfd/syscon/atmel-matrix.h>
+> > +#include <linux/mfd/syscon/atmel-smc.h>
+> >  #include <linux/module.h>
+> >  #include <linux/mtd/nand.h>
+> >  #include <linux/of_address.h>
+> > @@ -147,6 +148,8 @@ struct atmel_nand_cs {
+> >  		void __iomem *virt;
+> >  		dma_addr_t dma;
+> >  	} io;
+> > +
+> > +	struct atmel_smc_cs_conf smcconf;
+> >  };
+> >  
+> >  struct atmel_nand {
+> > @@ -190,6 +193,8 @@ struct atmel_nand_controller_ops {
+> >  	void (*nand_init)(struct atmel_nand_controller *nc,
+> >  			  struct atmel_nand *nand);
+> >  	int (*ecc_init)(struct atmel_nand *nand);
+> > +	int (*setup_data_interface)(struct atmel_nand *nand, int csline,
+> > +				    const struct nand_data_interface *conf);
+> >  };
+> >  
+> >  struct atmel_nand_controller_caps {
+> > @@ -1144,6 +1149,293 @@ static int atmel_hsmc_nand_ecc_init(struct atmel_nand *nand)
+> >  	return 0;
+> >  }
+> >  
+> > +static int atmel_smc_nand_prepare_smcconf(struct atmel_nand *nand,
+> > +					const struct nand_data_interface *conf,
+> > +					struct atmel_smc_cs_conf *smcconf)
+> > +{
+> > +	u32 ncycles, totalcycles, timeps, mckperiodps;
+> > +	struct atmel_nand_controller *nc;
+> > +	int ret;
+> > +
+> > +	nc = to_nand_controller(nand->base.controller);
+> > +
+> > +	/* DDR interface not supported. */
+> > +	if (conf->type != NAND_SDR_IFACE)
+> > +		return -ENOTSUPP;
+> > +
+> > +	/*
+> > +	 * tRC < 30ns implies EDO mode. This controller does not support this
+> > +	 * mode.
+> > +	 */
+> > +	if (conf->timings.sdr.tRC_min < 30)
+> > +		return -ENOTSUPP;
+> > +
+> > +	atmel_smc_cs_conf_init(smcconf);
+> > +
+> > +	mckperiodps = NSEC_PER_SEC / clk_get_rate(nc->mck);
+> > +	mckperiodps *= 1000;  
 > 
-> Okay, I very quickly looked into the code, what I noticed
-> - you like extra parens and empty lines in some cases (not big deal)
+> You probably want to multiply before dividing to retain precision.
 
-Can you point specific places where you think these are not needed?
-
-> - some functions perhaps might have been refactored to have common
-> pieces in error handling, though I didn't read core carefully.
-
-Again, be more precise.
+Doing the multiplication first implies using an u64, and nanosecond
+granularity is fine here (AFAIR, mck <= 166MHz).
 
 > 
-> Most important part I have noticed is a GPIO request.
-> I didn't get why you almost repeat gpiod_get() in case of platform data?
-> Shouldn't we have GPIO look up table?
-> Can we use builtin device properties (for GPIO and/or overall)?
+> > +	/*
+> > +	 * Set write pulse timing. This one is easy to extract:
+> > +	 *
+> > +	 * NWE_PULSE = tWP
+> > +	 */
+> > +	ncycles = DIV_ROUND_UP(conf->timings.sdr.tWP_min, mckperiodps);
+> > +	totalcycles = ncycles;
+> > +	ret = atmel_smc_cs_conf_set_pulse(smcconf, ATMEL_SMC_NWE_SHIFT,
+> > +					  ncycles);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	/*
+> > +	 * The write setup timing depends on the operation done on the NAND.
+> > +	 * All operations goes through the same data bus, but the operation
+> > +	 * type depends on the address we are writing to (ALE/CLE address
+> > +	 * lines).
+> > +	 * Since we have no way to differentiate the different operations at
+> > +	 * the SMC level, we must consider the worst case (the biggest setup
+> > +	 * time among all operation types):
+> > +	 *
+> > +	 * NWE_SETUP = max(tCLS, tCS, tALS, tDS) - NWE_PULSE
+> > +	 */
+> > +	timeps = max3(conf->timings.sdr.tCLS_min, conf->timings.sdr.tCS_min,
+> > +		      conf->timings.sdr.tALS_min);
+> > +	timeps = max(timeps, conf->timings.sdr.tDS_min);
+> > +	ncycles = DIV_ROUND_UP(timeps, mckperiodps);
+> > +	ncycles = ncycles > totalcycles ? ncycles - totalcycles : 0;  
+> 
+> Ew, that's totally cryptic here ...
 
-Sorry but I don't get it. Can give an example of what you'd like me to
-do?
+totalcycles contains the NWE_PULSE value (see above), and we don't want
+to end up with a negative value in ncycles, hence the
+ncycles > totalcycles test before doing the subtraction.
 
-Thanks,
+> 
+> > +	totalcycles += ncycles;
+> > +	ret = atmel_smc_cs_conf_set_setup(smcconf, ATMEL_SMC_NWE_SHIFT,
+> > +					  ncycles);
+> > +	if (ret)
+> > +		return ret;  
+> 
+> [...]
+> 
+> > +static const struct atmel_nand_controller_caps atmel_sam9260_nc_caps = {
+> > +	.ale_offs = 1 << 21,
+> > +	.cle_offs = 1 << 22,  
+> 
+> BIT(22) ?
 
-Boris
+Yep. Actually, this should be changed in [1].
+
+[1]https://www.spinics.net/lists/arm-kernel/msg563780.html
