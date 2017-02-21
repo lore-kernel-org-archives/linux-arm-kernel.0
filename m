@@ -1,81 +1,130 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 21 Feb 2017 17:44:20 +0100
-Subject: [PATCH v4 3/3] PCI: imx6: Add code to support i.MX7D
-In-Reply-To: <CAL_Jsq+zo9cVEiT3p4oEL8UWqHNEVqszkC3htO-p+C2oFXPuSw@mail.gmail.com>
-References: <20170207155027.7734-1-andrew.smirnov@gmail.com>
- <20170207155027.7734-4-andrew.smirnov@gmail.com>
- <20170215171700.5vz5seeihgtwn76p@rob-hp-laptop>
- <1487236340.13536.5.camel@pengutronix.de>
- <CAL_Jsq+zo9cVEiT3p4oEL8UWqHNEVqszkC3htO-p+C2oFXPuSw@mail.gmail.com>
-Message-ID: <1487695460.2268.21.camel@pengutronix.de>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 21 Feb 2017 16:45:13 +0000
+Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
+ power
+In-Reply-To: <CAMuHMdWjseO3XSOH2XCbM411Aj12RpdZZbHkpfFUfej58myz5Q@mail.gmail.com>
+References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+ <69ab75a1-2e04-19e2-d1ad-12ca1cfc7625@arm.com>
+ <CAMuHMdWjseO3XSOH2XCbM411Aj12RpdZZbHkpfFUfej58myz5Q@mail.gmail.com>
+Message-ID: <445b2f49-5d15-30af-a431-1c4edcd049a4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 21.02.2017, 10:38 -0600 schrieb Rob Herring:
-> On Thu, Feb 16, 2017 at 3:12 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> > Am Mittwoch, den 15.02.2017, 11:17 -0600 schrieb Rob Herring:
-> >> On Tue, Feb 07, 2017 at 07:50:27AM -0800, Andrey Smirnov wrote:
-> >> > Add various bits of code needed to support i.MX7D variant of the IP.
-> >> >
-> >> > Cc: yurovsky at gmail.com
-> >> > Cc: Lucas Stach <l.stach@pengutronix.de>
-> >> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> >> > Cc: Rob Herring <robh+dt@kernel.org>
-> >> > Cc: Mark Rutland <mark.rutland@arm.com>
-> >> > Cc: Lee Jones <lee.jones@linaro.org>
-> >> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> >> > Cc: linux-arm-kernel at lists.infradead.org
-> >> > Cc: devicetree at vger.kernel.org
-> >> > Cc: linux-kernel at vger.kernel.org
-> >> > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> >> > ---
-> >> >  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 ++-
-> >> >  drivers/pci/host/pci-imx6.c                        | 121 ++++++++++++++++-----
-> >> >  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
-> >> >  3 files changed, 112 insertions(+), 26 deletions(-)
-> >> >
-> >> > diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> >> > index 83aeb1f..11db2ab 100644
-> >> > --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> >> > +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> >> > @@ -4,7 +4,11 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
-> >> >  and thus inherits all the common properties defined in designware-pcie.txt.
-> >> >
-> >> >  Required properties:
-> >> > -- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie", "fsl,imx6qp-pcie"
-> >> > +- compatible:
-> >> > +   - "fsl,imx6q-pcie"
-> >> > +   - "fsl,imx6sx-pcie",
-> >> > +   - "fsl,imx6qp-pcie"
-> >> > +   - "fsl,imx7d-pcie"
-> >> >  - reg: base address and length of the PCIe controller
-> >> >  - interrupts: A list of interrupt outputs of the controller. Must contain an
-> >> >    entry for each entry in the interrupt-names property.
-> >> > @@ -34,6 +38,13 @@ Additional required properties for imx6sx-pcie:
-> >> >  - clock names: Must include the following additional entries:
-> >> >     - "pcie_inbound_axi"
-> >> >
-> >> > +Additional required properties for imx7d-pcie:
-> >> > +- power-domains: Must be set to a phandle pointing to PCIE_PHY power domain
-> >>
-> >> This domain is just the PHY? Seems like this needs a separate PHY
-> >> driver.
-> >>
-> > No, it's called the PHY power domain, as that is probably the part that
-> > draws the most power, but the PCIe core also looses it's state when this
-> > domain is powered down. So it's probably the complete core that is
-> > inside this domain.
+Hi Geert,
+
+On 21/02/17 16:21, Geert Uytterhoeven wrote:
+> Hi Sudeep,
 > 
-> A shared domain doesn't mean the phy and core should be 1 node. It is
-> the separate reset and clock for the PHY that tell me they should be
-> separate. And I'm pretty sure the DW block and PHY are separate. If
-> the PHY registers were part of the same register range, then I'd say
-> they should be one.
+> On Tue, Feb 21, 2017 at 11:38 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> On 20/02/17 20:33, Geert Uytterhoeven wrote:
+>>> This patch series adds support for using non-PMIC wake-up sources on the
+>>> Renesas R-Car Gen3 (H3 or M3-W) Salvator-X development boards.
+>>>
+>>> Nothing in the PSCI specification requires the SoC to remain powered and
+>>> to support wake-up sources when suspended using SYSTEM_SUSPEND.
+>>> If the firmware implements the PSCI SYSTEM_SUSPEND operation by cutting
+>>> power to the SoC, the only possibly wake-up sources are thus the ones
+>>> connected to the PMIC.
+>>
+>> OK, but I don't see any issue with that. That's exactly how it works on
+> 
+> How do you use other wake-up sources, like wake on LAN, UART or GPIO?
+> 
 
-Then we are on the same page of _not_ splitting out the PHY. :)
-The DW PCIe PHY has no separate register range on i.MX. In fact the PHY
-registers are only accessible through a indirection register in the PCIe
-host controller register range.
+>From wakeup source configuration/management perspective, s2ram and
+s2idle are exactly same.
 
+>> ARM Juno platform. The SoC is powered down.
+> 
+> Good to hear this is not limited to Renesas platforms, so there's a common
+> problem to solve.
+> 
+
+No, there's no problem to solve. Firmware should enter deepest sleep
+state in the system with SYSTEM_SUSPEND from which it can wakeup of course.
+
+>>> To allow other wake-up sources, this patch series documents and adds
+>>> support for an "arm,psci-system-suspend-is-power-down" DT property, so
+>>
+>> NACK, you don't need any such properties.
+> 
+> If this is true for all PSCI platforms, there's indeed no need for such a
+> property, and drivers/firmware/psci.c should default to this case.
+> 
+
+Cool.
+
+>>> Linux uses a different suspend method when other wake-up sources (e.g.
+>>> wake on LAN, UART or GPIO) are enabled.  Hence the user no longer has to
+>>> manually restrict "mem" suspend to "s2idle" or "shallow" states using:
+>>
+>> Have you explored suspend-to-idle instead ? It looks like thats exactly
+>> what you are doing in this patch set. You also get low latency for free
+>> as it just enters the deepest idle state on all CPUs instead of
+>> hotplugging out all the secondaries.
+> 
+> Yes, cfr. "s2idle" above.
+> The user can specify to use "s2idle" manually:
+> 
+>     $ echo s2idle > /sys/power/mem_sleep # or "shallow"
+> 
+
+This looks like custom file for me.
+IIUC, the standard sysfs file for the system PM state is:
+	/sys/power/state
+1. s2ram:
+	$ echo mem > /sys/power/state
+2. s2idle
+	$ echo freeze > /sys/power/state
+
+> However, how to handle this automatically, e.g. by a distro?
+
+As above
+
+> On most other platforms, userspace can just do e.g.
+> 
+>     ethtool -s eth0 wol g
+> 
+
+That should work.
+
+> to enable wake-on-LAN, and suspend to the deepest supported state using:
+> 
+>     echo mem > /sys/power/state
+> 
+
+This will work only if PSCI SYSTEM_SUPEND is implemented. If the SoC
+can't wakeup if it's powered down, then it should not use that state
+to implement SYSTEM_SUSPEND in PSCI firmware or just return the
+SYSTEM_SUSPEND feature is not implemented in which case "freeze" is the
+next available state to enter.
+
+Just botching whatever shallow state you can enter on a particular SoC
+into standard "mem" state sounds *horrible* to me.
+
+> On systems where PSCI SYSTEM_SUSPEND powers down the SoC, userspace must
+> make sure to configure to use "s2idle" (or "shallow) instead, else the
+> configured wake-up sources won't work.
+
+That's perfect. I was worried that user-space is not doing that. So to
+summarize, PSCI firmware either:
+1. enters a sane and resumable state in SYSTEM_SUSPEND api
+or
+2. just don't implement SYSTEM_SYSTEM. Use the cpuidle+s2idle framework
+   in Linux to enter the deepest idle state.
+
+You literally need no extra work to enter this "freeze" state if the
+CPU_SUSPEND in PSCI can enter the deepest idle state you want to enter
+in this "s2idle" you are referring so far.
+Just start with:
+
+	$ cat /sys/power/state
+
+and you should see "freeze" there, if not that's the first thing to
+check provided the platform has cpuidle working.
+
+Hope this helps.
+
+-- 
 Regards,
-Lucas
+Sudeep
