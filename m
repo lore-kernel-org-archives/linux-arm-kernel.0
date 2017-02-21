@@ -1,45 +1,33 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 21 Feb 2017 17:32:50 +0100
-Subject: [PATCH/RFC 3/6] drivers: firmware: psci: Implement shallow
- suspend mode
-In-Reply-To: <de2a15d4-9ac2-9ba9-a47a-eacbf478f601@arm.com>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <1487622809-25127-4-git-send-email-geert+renesas@glider.be>
- <20170221110712.GB5021@amd> <de2a15d4-9ac2-9ba9-a47a-eacbf478f601@arm.com>
-Message-ID: <CAMuHMdVmu4AYZ6MZHd79N2-2gELR6s3oZ46UnEszCfLvHymY1w@mail.gmail.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue, 21 Feb 2017 17:35:20 +0100
+Subject: [PATCH net-next v3 0/4] net: mvneta: improve rx/tx performance
+In-Reply-To: <20170221.111602.860315087619854954.davem@davemloft.net>
+References: <20170220125344.3555-1-jszhang@marvell.com>
+ <877f4laqog.fsf@free-electrons.com>
+ <20170221123726.2db7db19@xhacker>
+ <20170221.111602.860315087619854954.davem@davemloft.net>
+Message-ID: <CAPv3WKekgKBNmmc0DhcFy5DW=5nmuFjmcAsAh45dhhnCEk4bLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+Hi Jisheng,
 
-On Tue, Feb 21, 2017 at 12:14 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> On 21/02/17 11:07, Pavel Machek wrote:
->>> Enable support for "shallow" suspend mode, also known as "Standby" or
->>> "Power-On Suspend".
->>>
->>> As secondary CPU cores are taken offline, "shallow" suspend mode saves
->>> slightly more power than "s2idle", but less than "deep" suspend mode.
->>> However, unlike "deep" suspend mode, "shallow" suspend mode can be used
->>> regardless of the presence of support for PSCI_SYSTEM_SUSPEND, which is
->>> an optional API in PSCI v1.0.
->>
->> If system supports "shallow" suspend, why does not PSCI implement it?
+2017-02-21 17:16 GMT+01:00 David Miller <davem@davemloft.net>:
+> From: Jisheng Zhang <jszhang@marvell.com>
+> Date: Tue, 21 Feb 2017 12:37:40 +0800
 >
-> Yes it can, and IIUC it already does on this platform with CPU_SUSPEND.
-> All it now needs is just to use existing "freeze" suspend mode in Linux.
+>> Thanks for your review.
+>>
+>> The measurement is simple: record how much time we spent in mvneta_rx_swbm()
+>> for receiving 1GB data, something as below:
+>
+> Please use a standard tool for measuring performance, rather than profiling
+> the driver and trying to derive numbers that way.
 
-How can Linux know if using "deep" suspend will allow to wake-up the system
-according to configured wake-up sources, or not?
+If possible in your setup, I suggest pushing 64B (and other sizes)
+packets uni or bidirectionally via 2 ports in L2 bridge mode. It's a
+good stress test, you'd get some meaningful numbers (also check cpu
+consumption with mpstat in the meantime).
 
-Note that "it will not, ever" is an accepted answer.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Marcin
