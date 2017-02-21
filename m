@@ -1,34 +1,44 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue, 21 Feb 2017 19:20:29 +0100
-Subject: [PATCH v3 17/18] ARM: dts: sun8i: sina33: enable battery power
- supply subnode
-In-Reply-To: <CAGb2v64SnsrckN7+cv5woHzLTWrM455xjUQFh3dKHUNhjgBB7w@mail.gmail.com>
-References: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
- <20170214094112.27426-18-quentin.schulz@free-electrons.com>
- <CAGb2v64SnsrckN7+cv5woHzLTWrM455xjUQFh3dKHUNhjgBB7w@mail.gmail.com>
-Message-ID: <4512847d-45b7-c51e-10df-f5f47ae01a38@free-electrons.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 21 Feb 2017 19:23:42 +0100
+Subject: [PATCH/RFC 3/6] drivers: firmware: psci: Implement shallow
+ suspend mode
+In-Reply-To: <20170221181849.GG8605@leverpostej>
+References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+ <1487622809-25127-4-git-send-email-geert+renesas@glider.be>
+ <20170221110712.GB5021@amd> <de2a15d4-9ac2-9ba9-a47a-eacbf478f601@arm.com>
+ <CAMuHMdVmu4AYZ6MZHd79N2-2gELR6s3oZ46UnEszCfLvHymY1w@mail.gmail.com>
+ <20170221172012.GD8605@leverpostej>
+ <CAMuHMdX_pot+=rJfY1Kor4gYD4CgBYivngzCLwV36LELx+AA5Q@mail.gmail.com>
+ <20170221181849.GG8605@leverpostej>
+Message-ID: <CAMuHMdUsWTYrUO9JtCDA5J6iPcRJMMevk9XDfiup=NpJKAkMPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/02/2017 05:50, Chen-Yu Tsai wrote:
-> On Tue, Feb 14, 2017 at 5:41 PM, Quentin Schulz
-> <quentin.schulz@free-electrons.com> wrote:
->> The Sinlinx SinA33 has an AXP223 PMIC and a battery connector, thus, we
->> enable the battery power supply subnode in its Device Tree.
->>
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Battery charger enabled without any description of the associated battery...
-> In this case I think the driver should use the lowest charge current to be
-> safe?
-> 
+Hi Mark,
 
-Seems fair.
+On Tue, Feb 21, 2017 at 7:18 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On top of that, the Linux PM subsystem allows to configure wakeup by writing
+>> "enabled" to a device's "wakeup" file in sysfs.  Or you can use ethtool for
+>> Wake-on-LAN.
+>
+> Sure; userspace can always do something silly here.
 
-Quentin
+Not that silly: you can wake up using these sources, but not necessarily from
+all states.
 
--- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> As I mentioned in my other reply, we could/should add an interface to
+> allow userspace to determine if it has a guaranteed wakeup, which would
+> allow us to do the right thing.
+
+Right.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
