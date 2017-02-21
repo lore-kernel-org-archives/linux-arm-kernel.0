@@ -1,43 +1,46 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 21 Feb 2017 14:47:45 +0100
-Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
-In-Reply-To: <20170221122050.421dae48@bbrezillon>
-References: <1487593718-20752-1-git-send-email-boris.brezillon@free-electrons.com>
- <1487593718-20752-2-git-send-email-boris.brezillon@free-electrons.com>
- <CAHp75VdwQGP-qa0c0KQwrdpZmCGc3RuEsJ-E-XLbBzQSn4Yxcg@mail.gmail.com>
- <20170220213803.7ba5591e@bbrezillon> <20170220215009.0ecbf5a1@bbrezillon>
- <CAHp75VczsC9WdZWR9iCRh2JoNLFZyOtodrsDRYQoyaN7nkyf=A@mail.gmail.com>
- <CAHp75Vc_q-bEzA2-hVpHyR0GZ8mXxwJ8-UjECe31T04mb67q4w@mail.gmail.com>
- <20170221090610.6d531b94@bbrezillon>
- <CAHp75VfZfj-8ih3vg63w_dAq8xXE2Whu1bANXRcXS1_EGNq43A@mail.gmail.com>
- <20170221112641.6276c001@bbrezillon>
- <CAHp75Vcb9gtzF7LvH74JwL4dTUyQvKmg=dnTXKfjhVHuyK3WXg@mail.gmail.com>
- <20170221122050.421dae48@bbrezillon>
-Message-ID: <79c21ac6-88ac-c75b-ebcb-aabdd842f6ca@microchip.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 21 Feb 2017 14:49:34 +0100
+Subject: [PATCH -next v2] pinctrl: samsung: Fix return value check in
+ samsung_pinctrl_get_soc_data()
+In-Reply-To: <CACRpkda0BYLNpPFwpNaEMdeyx61KDUQz_6Y=FQj340pViFjVVQ@mail.gmail.com>
+References: <20170125140321.23911-1-weiyj.lk@gmail.com>
+ <20170205155849.4362-1-weiyj.lk@gmail.com>
+ <CGME20170213145008epcas3p119bdd6f76468a00fb8d796308ad37698@epcas3p1.samsung.com>
+ <CACRpkda0BYLNpPFwpNaEMdeyx61KDUQz_6Y=FQj340pViFjVVQ@mail.gmail.com>
+Message-ID: <c4dd122b-0312-fcca-08e2-4d4586949a88@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 21/02/2017 ? 12:20, Boris Brezillon a ?crit :
->>> (in this case, avr32).  
->> It's dead de facto.
+Hi All,
+
+On 2017-02-13 15:49, Linus Walleij wrote:
+> On Sun, Feb 5, 2017 at 4:58 PM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
+>
+>> From: Wei Yongjun <weiyongjun1@huawei.com>
 >>
->> When last time did you compile kernel for it? What was the version of kernel?
->> Did it get successfully?
+>> In case of error, the function devm_ioremap() returns NULL pointer not
+>> ERR_PTR(). Fix by using devm_ioremap_resource instead of devm_ioremap.
+>>
+>> Fixes: 8b1bd11c1f8f ("pinctrl: samsung: Add the support the multiple
+>> IORESOURCE_MEM for one pin-bank")
+>> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+>> ---
+>> v1 -> v2: use devm_ioremap_resource instead of devm_ioremap
+> Patch applied with Krzysztof's ACK.
 
-Alexandre answered to this one.
+Sadly this patch breaks support for IMEM pinctrl block on Exynos5433/TM2
+and it took us some time to find the source of the problem.
 
->> When are we going to remove avr32 support from kernel completely?
-> I'll let Nicolas answer that one.
+devm_ioremap_resource() is not functionally a full equivalent of
+devm_ioremap(). The problem here is that registers for IMEM and ALIVE
+pin controllers are shared and both devices have <0x11090000 0x1000>
+range in their reg property. devm_ioremap_resource() maps given
+resource exclusively for the device, while devm_ioremap() allows
+non-exclusive mappings.
 
-It's not up to me to decide this, the community only can decide to
-remove the support from the kernel.
-What I can tell, and it's been the case for a handful of years now, is
-that Atmel/Microchip will not work on this platform anymore and won't
-stop a removal of this platform from the Linux kernel.
+This patch has to be reverted asap.
 
-I know that the dual approach DT/non-DT for some drivers is somehow
-painful but I don't see AVR32 moving to DT in the near future...
-
-Regards,
+Best regards
 -- 
-Nicolas Ferre
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
