@@ -1,69 +1,135 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 21 Feb 2017 15:54:11 +0000
-Subject: [PATCH] arm64: dts: juno: update definition for programmable
- replicator.
-In-Reply-To: <CANLsYkzRayLerx7+gLiqJ9yVSCf+GEiyRqnFZopQ1i3EB-yGFw@mail.gmail.com>
-References: <1487358790-2618-1-git-send-email-mike.leach@linaro.org>
- <2ba59da5-fc79-ab53-2f2a-2ddc6e5e9c3d@arm.com>
- <CANLsYkzRayLerx7+gLiqJ9yVSCf+GEiyRqnFZopQ1i3EB-yGFw@mail.gmail.com>
-Message-ID: <1754732c-9271-d462-b4e1-0f019771c73e@arm.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 21 Feb 2017 17:55:15 +0200
+Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
+In-Reply-To: <20170221122050.421dae48@bbrezillon>
+References: <1487593718-20752-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1487593718-20752-2-git-send-email-boris.brezillon@free-electrons.com>
+ <CAHp75VdwQGP-qa0c0KQwrdpZmCGc3RuEsJ-E-XLbBzQSn4Yxcg@mail.gmail.com>
+ <20170220213803.7ba5591e@bbrezillon> <20170220215009.0ecbf5a1@bbrezillon>
+ <CAHp75VczsC9WdZWR9iCRh2JoNLFZyOtodrsDRYQoyaN7nkyf=A@mail.gmail.com>
+ <CAHp75Vc_q-bEzA2-hVpHyR0GZ8mXxwJ8-UjECe31T04mb67q4w@mail.gmail.com>
+ <20170221090610.6d531b94@bbrezillon>
+ <CAHp75VfZfj-8ih3vg63w_dAq8xXE2Whu1bANXRcXS1_EGNq43A@mail.gmail.com>
+ <20170221112641.6276c001@bbrezillon>
+ <CAHp75Vcb9gtzF7LvH74JwL4dTUyQvKmg=dnTXKfjhVHuyK3WXg@mail.gmail.com>
+ <20170221122050.421dae48@bbrezillon>
+Message-ID: <CAHp75VfHf9qN+sRd6cymr9ziO9Xi7gw+O-yOp+1zEAduxEMfJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 21, 2017 at 1:20 PM, Boris Brezillon
+<boris.brezillon@free-electrons.com> wrote:
+> On Tue, 21 Feb 2017 13:02:21 +0200
+> Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
+>> On Tue, Feb 21, 2017 at 12:26 PM, Boris Brezillon
+>> <boris.brezillon@free-electrons.com> wrote:
+>> > On Tue, 21 Feb 2017 12:03:45 +0200
+>> > Andy Shevchenko <andy.shevchenko@gmail.com> wrote:
 
+> So, it's a matter of taste.
 
-On 21/02/17 15:47, Mathieu Poirier wrote:
-> On 21 February 2017 at 04:02, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> Hi Mike,
+Yes, and I'm not objecting this.
+
+>> >> 4. First of all, why do you need this function in the first place?
+>> >>
+>> >> +struct gpio_desc *
+>> >> +atmel_nand_pdata_get_gpio(struct atmel_nand_controller *nc, int gpioid,
+>> >> +                         const char *name, bool active_low,
+>> >> +                         enum gpiod_flags flags)
+>> >
+>> > Because I don't want to duplicate the code done in
+>> > atmel_nand_pdata_get_gpio() each time I have to convert a GPIO number
+>> > into a GPIO descriptor, and that is needed to support platforms that
+>> > haven't moved to DT yet
 >>
->> On 17/02/17 19:13, Mike Leach wrote:
->>> Juno platforms have a programmable replicator splitting the trace output to
->>> TPIU and ETR. Currently this is not being programmed as it is being treated
->>> as a none-programmable replicator - which is the default operational mode
->>> for these devices. The TPIU in the system is enabled by default, and this
->>> combination is causing back-pressure in the trace system resulting in
->>> overflows at the source.
->>>
->>> Replaces the existing definition with one that defines the programmable
->>> replicator, using the "qcom,coresight-replicator1x" driver that provides
->>> the correct functionality for CoreSight programmable replicators.
->>>
+>> They should use GPIO lookup tables.
 >>
->> I assume this is just enhancement and not a fix. Since it's too late for
->> v4.11 (already in merge window now), I will queue this for v4.12
+>> We don't encourage people to use platform data anymore.
 >>
->>> Signed-off-by: Mike Leach <mike.leach@linaro.org>
->>> ---
->>>  arch/arm64/boot/dts/arm/juno-base.dtsi | 14 ++++++++------
->>>  1 file changed, 8 insertions(+), 6 deletions(-)
->>>
->>> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
->>> index 9d799d9..6546e23 100644
->>> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
->>> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
->>> @@ -372,12 +372,14 @@
->>>               };
->>>       };
->>>
->>> -     coresight-replicator {
->>> -             /*
->>> -              * Non-configurable replicators don't show up on the
->>> -              * AMBA bus.  As such no need to add "arm,primecell".
->>> -              */
->>> -             compatible = "arm,coresight-replicator";
->>> +     coresight-replicator at 20120000 {
->>> +
-> 
-> As stated in a previous post please remove the extra line and the
-> "coresight-".  Since programmable replicators show up on the AMBA bus
-> there is no need to differentiate them from other CoreSight devices.
-> 
+>> We have unified device properties for something like "timeout-us", we
+>> have look up tables when you need specifics like pwm, gpio, pinctrl,
+>> ...
+>>
+>> Abusing platform data with pointers is also not welcome.
+>>
+>> > (in this case, avr32).
+>>
+>> It's dead de facto.
+>>
+>> When last time did you compile kernel for it? What was the version of kernel?
+>> Did it get successfully?
+>>
+>> When are we going to remove avr32 support from kernel completely?
+>
+> I'll let Nicolas answer that one.
 
-Already done in my local branch ;) along with you tags.
+In any case it's discouraging to use platform data for GPIOs and plain
+GPIO pin numbering.
 
-Also I away when merge window closes, so I will be able to send only at
--rc2. ARM SoC team generally prefer to rebase fixes on top of -rc1.
+> Note that I sometime prefer to keep (1 << X).
+>
+> Example:
+>
+> #define PMECC_CFG_READ_OP                       (0 << 12)
+> #define PMECC_CFG_WRITE_OP                      (1 << 12)
+
+I understand that.
+
+> Okay, so the code in pmecc.c. See, it's hard to follow a review when
+> you don't comment inline.
+
+It's hard to review (n+1) thousands of LOC.
+
+>> >> 8. Have you checked what kernel library provides?
+>> >
+>> > I think so, but again, this is really vague, what kind of
+>> > open-coded functions do you think could be replaced with core libraries
+>> > helpers?
+>>
+>> I dunno, I'm asking you. Usually if I see a pattern I got a clue to
+>> check lib/ and similar places. From time to time I discover something
+>> new and interesting there.
+>
+> If you're talking about the code in pmecc.c, yes, I already mentioned
+> in the header that it should be reworked to use some helpers from
+> lib/bch.c, but that's not the point of this series, and is left as
+> future improvements.
+
+OK.
+
+>> Yes, because my point is *split* this to be reviewable.
+
+> And how do you do with new drivers?
+
+To be more pedantic the new drivers do not have "minus" thousands LOC.
+
+> Do you ask people to split their
+> submissions in micro changes?
+
+To logical ones.
+
+> I'm regularly reviewing drivers that are
+> several thousands LOC, and I don't ask people to split things just
+> because it's too long. When I ask them to split in different commits,
+> it's because they are doing several unrelated changes at once.
+
+What did prevent you to:
+1. Introduce new driver
+2. Switch to new driver
+3. Remove old one.
+
+...if you are not splitting it in the first place?
+
+> Note that I considered refactoring the existing driver in smaller
+> steps, but it's almost impossible, because the code is too messy and I
+> would end up with a huge series of patches that is not easier to review.
+
+I can object this, but it will be no point except waste of time to
+this discussion.
+
+It's good that you considered several options. I suppose someone who
+is on topic can do comprehensive review.
 
 -- 
-Regards,
-Sudeep
+With Best Regards,
+Andy Shevchenko
