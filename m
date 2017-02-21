@@ -1,40 +1,42 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 21 Feb 2017 13:03:57 +0100
-Subject: [PATCH] tty/serial: atmel: remove cache when unnecessary
-In-Reply-To: <20170221120357.13623-1-alexandre.belloni@free-electrons.com>
-References: <20170221120357.13623-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170221120357.13623-2-alexandre.belloni@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 Feb 2017 12:09:28 +0000
+Subject: [PATCH v4 08/11] drivers: perf: hisi: use poll method to avoid
+ L3C counter overflow
+In-Reply-To: <20170220110942.GF9003@leverpostej>
+References: <1487530263-42643-1-git-send-email-anurup.m@huawei.com>
+ <20170220110942.GF9003@leverpostej>
+Message-ID: <20170221120927.GF300@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct cache is only used in suspend/resume. Exclude it when PM is not
-selected.
+On Mon, Feb 20, 2017 at 11:09:43AM +0000, Mark Rutland wrote:
+> On Sun, Feb 19, 2017 at 01:51:03PM -0500, Anurup M wrote:
+> > The L3 cache PMU use N-N SPI interrupt which has no support
+> > in kernel mainline.
+> 
+> Could you elaborate on what you mean by this?
+> 
+> I don't understand what is meant here. How exactly are the interrupts
+> wired up in HW, and what exactly is not supported by Linux?
+> 
+> > So use hrtimer to poll and update event
+> > counter to avoid overflow condition for L3 cache PMU.
+> > A interval of 10 seconds is used for the hrtimer.
+> > The time interval can be configured in the sysfs.
+> 
+> I'm not too keen on giving userspace the ability to control this, since
+> it gives an awful lot of rope for userspace to tie around itself.
 
-Suggested-by: Richard Genoud <richard.genoud@gmail.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/tty/serial/atmel_serial.c | 2 ++
- 1 file changed, 2 insertions(+)
+Agreed. I'd also go a step further and say that for PMUs with either
+terminally broken interrupts (like this one) or just missing interrupts
+(like the CPU PMU on raspberry pi iirc), then the perf core should take
+care of an hrtimer in an attempt to generate samples often enough. We
+already have PERF_PMU_CAP_NO_INTERRUPT, but it currently just disables
+sampling events.
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index dcebb28ffbc4..f0d4894267c2 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -175,6 +175,7 @@ struct atmel_uart_port {
- 	unsigned int		pending_status;
- 	spinlock_t		lock_suspended;
- 
-+#ifdef CONFIG_PM
- 	struct {
- 		u32		cr;
- 		u32		mr;
-@@ -185,6 +186,7 @@ struct atmel_uart_port {
- 		u32		fmr;
- 		u32		fimr;
- 	} cache;
-+#endif
- 
- 	int (*prepare_rx)(struct uart_port *port);
- 	int (*prepare_tx)(struct uart_port *port);
--- 
-2.11.0
+The fiddly part is knowing how to program the timer, and I think you'd
+need the PMU driver to provide an upper-bound on events per nanosecond.
+I'm pretty sure that would be highly unreliable (especially for shared
+resources such as the L3), at which point, is it worth the hassle?
+
+Will
