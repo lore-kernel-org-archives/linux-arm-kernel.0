@@ -1,128 +1,43 @@
-From: olekstysh@gmail.com (Oleksandr Tyshchenko)
-Date: Tue, 21 Feb 2017 15:31:26 +0200
-Subject: [RFC PATCH v1] iommu/io-pgtable-arm-v7s: Check for leaf entry
- right after finding it
-In-Reply-To: <bc24299c-748a-4b86-fead-a9ed6b5e5b9f@arm.com>
-References: <1487253137-13792-1-git-send-email-olekstysh@gmail.com>
- <bc24299c-748a-4b86-fead-a9ed6b5e5b9f@arm.com>
-Message-ID: <CAPD2p-nPoiSanU4jYvnaYtAbbERE8c=4mLjTC3NX2bGYkZM5UA@mail.gmail.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Tue, 21 Feb 2017 14:47:45 +0100
+Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
+In-Reply-To: <20170221122050.421dae48@bbrezillon>
+References: <1487593718-20752-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1487593718-20752-2-git-send-email-boris.brezillon@free-electrons.com>
+ <CAHp75VdwQGP-qa0c0KQwrdpZmCGc3RuEsJ-E-XLbBzQSn4Yxcg@mail.gmail.com>
+ <20170220213803.7ba5591e@bbrezillon> <20170220215009.0ecbf5a1@bbrezillon>
+ <CAHp75VczsC9WdZWR9iCRh2JoNLFZyOtodrsDRYQoyaN7nkyf=A@mail.gmail.com>
+ <CAHp75Vc_q-bEzA2-hVpHyR0GZ8mXxwJ8-UjECe31T04mb67q4w@mail.gmail.com>
+ <20170221090610.6d531b94@bbrezillon>
+ <CAHp75VfZfj-8ih3vg63w_dAq8xXE2Whu1bANXRcXS1_EGNq43A@mail.gmail.com>
+ <20170221112641.6276c001@bbrezillon>
+ <CAHp75Vcb9gtzF7LvH74JwL4dTUyQvKmg=dnTXKfjhVHuyK3WXg@mail.gmail.com>
+ <20170221122050.421dae48@bbrezillon>
+Message-ID: <79c21ac6-88ac-c75b-ebcb-aabdd842f6ca@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Robin.
+Le 21/02/2017 ? 12:20, Boris Brezillon a ?crit :
+>>> (in this case, avr32).  
+>> It's dead de facto.
+>>
+>> When last time did you compile kernel for it? What was the version of kernel?
+>> Did it get successfully?
 
-On Tue, Feb 21, 2017 at 2:00 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 16/02/17 13:52, Oleksandr Tyshchenko wrote:
->> From: Oleksandr Tyshchenko <oleksandr_tyshchenko@epam.com>
->>
->> Do a check for already installed leaf entry at the current level before
->> performing any actions when trying to map.
->>
->> This check is already present in arm_v7s_init_pte(), i.e. before
->> installing new leaf entry at the current level if conditions to do so
->> are met (num_entries > 0).
->>
->> But, this might be insufficient in case when we have already
->> installed block mapping at this level and it is not time to
->> install new leaf entry (num_entries == 0).
->> In that case we continue walking the page table down with wrong pointer
->> to the next level.
->>
->> So, move check from arm_v7s_init_pte() to __arm_v7s_map() in order to
->> avoid all cases.
->
-> Would it not be more logical (and simpler) to just check that the thing
-> we dereference is valid to dereference when we dereference it? i.e.:
->
-> -----8<-----
-> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c
-> b/drivers/iommu/io-pgtable-arm-v7s.c
-> index 0769276c0537..f3112f9ff494 100644
-> --- a/drivers/iommu/io-pgtable-arm-v7s.c
-> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
-> @@ -418,8 +418,10 @@ static int __arm_v7s_map(struct arm_v7s_io_pgtable
-> *data, unsigned long iova,
->                         pte |= ARM_V7S_ATTR_NS_TABLE;
->
->                 __arm_v7s_set_pte(ptep, pte, 1, cfg);
-> -       } else {
-> +       } else if (ARM_V7S_PTE_IS_TABLE(pte, lvl)) {
->                 cptep = iopte_deref(pte, lvl);
-> +       } else {
-> +               return -EEXIST;
->         }
->
->         /* Rinse, repeat */
-> ----->8-----
+Alexandre answered to this one.
 
-Agree. Sounds reasonable.
+>> When are we going to remove avr32 support from kernel completely?
+> I'll let Nicolas answer that one.
 
->
-> I think the equivalent could be done in LPAE as well.
+It's not up to me to decide this, the community only can decide to
+remove the support from the kernel.
+What I can tell, and it's been the case for a handful of years now, is
+that Atmel/Microchip will not work on this platform anymore and won't
+stop a removal of this platform from the Linux kernel.
 
-OK.
+I know that the dual approach DT/non-DT for some drivers is somehow
+painful but I don't see AVR32 moving to DT in the near future...
 
-I will resend both modified patches without RFC prefix, right?
-
->
-> Robin.
->
->> Signed-off-by: Oleksandr Tyshchenko <oleksandr_tyshchenko@epam.com>
->> ---
->> This patch does similar things as the patch I have pushed a week ago
->> for long-descriptor format [1].
->> The reason why this patch is RFC is because I am not sure I did the right
->> thing and I even didn't test it.
->>
->> [1] https://lists.linuxfoundation.org/pipermail/iommu/2017-February/020411.html
->> ---
->> ---
->>  drivers/iommu/io-pgtable-arm-v7s.c | 15 ++++++++++-----
->>  1 file changed, 10 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
->> index f50e51c..7f7594b 100644
->> --- a/drivers/iommu/io-pgtable-arm-v7s.c
->> +++ b/drivers/iommu/io-pgtable-arm-v7s.c
->> @@ -364,10 +364,6 @@ static int arm_v7s_init_pte(struct arm_v7s_io_pgtable *data,
->>                       if (WARN_ON(__arm_v7s_unmap(data, iova + i * sz,
->>                                                   sz, lvl, tblp) != sz))
->>                               return -EINVAL;
->> -             } else if (ptep[i]) {
->> -                     /* We require an unmap first */
->> -                     WARN_ON(!selftest_running);
->> -                     return -EEXIST;
->>               }
->>
->>       pte |= ARM_V7S_PTE_TYPE_PAGE;
->> @@ -392,11 +388,20 @@ static int __arm_v7s_map(struct arm_v7s_io_pgtable *data, unsigned long iova,
->>  {
->>       struct io_pgtable_cfg *cfg = &data->iop.cfg;
->>       arm_v7s_iopte pte, *cptep;
->> -     int num_entries = size >> ARM_V7S_LVL_SHIFT(lvl);
->> +     int i = 0, num_entries = size >> ARM_V7S_LVL_SHIFT(lvl);
->>
->>       /* Find our entry at the current level */
->>       ptep += ARM_V7S_LVL_IDX(iova, lvl);
->>
->> +     /* Check for already installed leaf entry */
->> +     do {
->> +             if (ptep[i] && !ARM_V7S_PTE_IS_TABLE(ptep[i], lvl)) {
->> +                     /* We require an unmap first */
->> +                     WARN_ON(!selftest_running);
->> +                     return -EEXIST;
->> +             }
->> +     } while (++i < num_entries);
->> +
->>       /* If we can install a leaf entry at this level, then do so */
->>       if (num_entries)
->>               return arm_v7s_init_pte(data, iova, paddr, prot,
->>
->
-
-
-
--- 
 Regards,
-
-Oleksandr Tyshchenko
+-- 
+Nicolas Ferre
