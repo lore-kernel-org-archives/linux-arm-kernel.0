@@ -1,65 +1,106 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 21 Feb 2017 13:47:43 +0100
-Subject: [RESEND PATCH 1/3] mtd: nand: Pass the CS line to
- ->setup_data_interface()
-In-Reply-To: <45a843fb-c43e-711f-ce3a-4c0d44c48144@sigmadesigns.com>
-References: <1487625149-7234-1-git-send-email-boris.brezillon@free-electrons.com>
- <1487625149-7234-2-git-send-email-boris.brezillon@free-electrons.com>
- <a5a9d822-a73c-4fd1-201c-7a17d9517f24@sigmadesigns.com>
- <20170221120648.19e0d32c@bbrezillon>
- <45a843fb-c43e-711f-ce3a-4c0d44c48144@sigmadesigns.com>
-Message-ID: <20170221134743.3c88472e@bbrezillon>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Tue, 21 Feb 2017 20:46:24 +0800
+Subject: [PATCH 2/2] arch_timer: acpi: add hisi timer erratum data
+In-Reply-To: <6c3a2952-731b-dfae-ba22-f9d7df25d691@arm.com>
+References: <1485254391-51551-1-git-send-email-guohanjun@huawei.com>
+ <1485254391-51551-3-git-send-email-guohanjun@huawei.com>
+ <20170124105717.GB6277@leverpostej>
+ <a2ac2a70-09fb-5cec-c090-b8ebde90e24f@arm.com> <589D6776.2010400@huawei.com>
+ <6c3a2952-731b-dfae-ba22-f9d7df25d691@arm.com>
+Message-ID: <599c7375-3594-294d-3eb5-575663f5f970@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Feb 2017 13:02:48 +0100
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> wrote:
 
-> On 21/02/2017 12:06, Boris Brezillon wrote:
-> 
-> > Marc Gonzalez wrote:
-> >   
-> >> On 20/02/2017 22:12, Boris Brezillon wrote:
-> >>  
-> >>> Some NAND controllers can assign different NAND timings to different
-> >>> CS lines. Pass the CS line information to ->setup_data_interface() so
-> >>> that the NAND controller driver knows which CS line is concerned by
-> >>> the setup_data_interface() request.    
-> >>
-> >> I'm confused, because I thought I was already doing that.
-> >> On my platform, I have different timings for each chip.
-> >> (thus, for each CS, right?)
-> >>
-> >> In chip->select_chip, I program the appropriate timings
-> >> which the controller will be using.
-> >>
-> >> What am I missing?  
-> > 
-> > Maybe you don't have multi-dies chips, which is the case I'm fixing
-> > here. If you have 2 separate chips, the existing hook should work just
-> > fine.  
-> 
-> Right. You asked me to add an explicit:
-> 
-> 	res = of_property_count_u32_elems(np, "reg");
-> 	if (res < 0)
-> 		return res;
-> 
-> 	if (res != 1)
-> 		return -ENOTSUPP; /* Multi-CS chips are not supported */
-> 
-> I was under the impression that multi-die chips are seen as a single
-> larger "composite" chip. And I had assumed that different dies would
-> not only require identical timings, but would also be identical in
-> all other aspects. This it incorrect?
 
-This is correct, except some chips (that's true at least for ONFI
-compatible ones) allow dynamic configuration of timings, and each die
-can be configured in a different timing mode.
+On 2017/2/21 3:00, Marc Zyngier wrote:
+> On 10/02/17 07:10, Hanjun Guo wrote:
+>> Hi Marc,
+>>
+>> On 2017/1/24 19:32, Marc Zyngier wrote:
+>>> On 24/01/17 10:57, Mark Rutland wrote:
+>>>> On Tue, Jan 24, 2017 at 06:39:51PM +0800, Hanjun Guo wrote:
+>>>>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>>
+>>>>> Add hisilicon timer specific erratum fixes.
+>>>>>
+>>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>> ---
+>>>>>  drivers/clocksource/arm_arch_timer.c | 22 ++++++++++++++++++++++
+>>>>>  1 file changed, 22 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>>>>> index 80d6f76..3e62a09 100644
+>>>>> --- a/drivers/clocksource/arm_arch_timer.c
+>>>>> +++ b/drivers/clocksource/arm_arch_timer.c
+>>>>> @@ -1156,10 +1156,32 @@ struct gtdt_arch_timer_fixup {
+>>>>>  	void *context;
+>>>>>  };
+>>>>>  
+>>>>> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
+>>>>> +static void __init hisi_erratum_workaroud_enable(void *context)
+>>>>> +{
+>>>>> +	int i;
+>>>>> +
+>>>>> +	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
+>>>>> +		if (!strcmp(context, ool_workarounds[i].id)) {
+>>>>> +			timer_unstable_counter_workaround = &ool_workarounds[i];
+>>>>> +			static_branch_enable(&arch_timer_read_ool_enabled);
+>>>>> +			pr_info("arch_timer: Enabling workaround for %s\n",
+>>>>> +				timer_unstable_counter_workaround->id);
+>>>>> +			break;
+>>>>> +		}
+>>>>> +	}
+>>>>> +}
+>>>>> +#endif
+>>>>> +
+>>>>>  /* note: this needs to be updated according to the doc of OEM ID
+>>>>>   * and TABLE ID for different board.
+>>>>>   */
+>>>>>  static struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
+>>>>> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
+>>>>> +	{"HISI  ", "HIP05   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+>>>>> +	{"HISI  ", "HIP06   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+>>>>> +	{"HISI  ", "HIP07   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+>>>>> +#endif
+>>>>>  };
+>>>> NAK. This duplicates logic unnecessarily (for enabling the workaround),
+>>>> and (ab)uses the id, which was intended to be specific to DT (since it
+>>>> is a DT property name).
+>>> Agreed, that's properly revolting.
+>>>
+>>>> We should split the matching from the particular workaround (and
+>>>> enabling thereof), so that we can go straight from ACPI match to
+>>>> workaround (without having to use the DT id in this manner), and don't
+>>>> have to duplicate the logic to enable the workaround.
+>>>>
+>>>> I believe Marc is looking at some rework in this area which may enable
+>>>> this, so please wait for that to appear.
+>>> Yeah, I'm implementing a semi-flexible way to add new quirk types, and
+>>> the last thing I want to see is two (or more) tables describing the same
+>>> thing.
+>>
+>> Kindly ping, if you have patches in hand, I can test against our platforms,
+>> thank you very much.
+> 
+> I've just pushed out a branch based on arm64/for-next/core, plus the
+> HiSi timer workaround:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=timers/errata-rework
+> 
+> I'll post the patches for review once the merge window is open, but
+> hopefully that should get you going.
+> 
+> Thanks,
+> 
 
-That's what's happening when you reset dies. They will automatically
-enter timing mode 0 (the slowest mode), and you have to explicitly set
-them back to timing mode X (the fastest supported mode). While doing
-that, you'll have some of your dies configured in timing 0, while
-others have already been switched to timing mode X, and that's the main
-reason for having per-die timing configuration.
+
+Test this branch and could work fine for Hisilicon board, great work !
+
+Still need time to review the details, but this should not seem very difficult. :)
+
+Thanks
+Ding
+
+> 	M.
+> 
