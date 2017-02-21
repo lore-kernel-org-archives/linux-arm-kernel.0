@@ -1,9 +1,10 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Tue, 21 Feb 2017 10:07:04 +0100
-Subject: [PATCH v3 5/7] arm64: set CONFIG_MMC_BCM2835=y in defconfig
+Date: Tue, 21 Feb 2017 10:07:03 +0100
+Subject: [PATCH v3 4/7] arm: set CONFIG_MMC_BCM2835=y in bcm2835_defconfig and
+ multi_v7_defconfig
 In-Reply-To: <1487668026-7100-1-git-send-email-kraxel@redhat.com>
 References: <1487668026-7100-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1487668026-7100-6-git-send-email-kraxel@redhat.com>
+Message-ID: <1487668026-7100-5-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,20 +19,33 @@ Differences on write access are pretty much in the noise.
 
 Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/bcm2835_defconfig  | 1 +
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 33b744d..75131a6 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -391,6 +391,7 @@ CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_K3=y
- CONFIG_MMC_DW_ROCKCHIP=y
- CONFIG_MMC_SUNXI=y
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+index 4b89f4e..3767c24 100644
+--- a/arch/arm/configs/bcm2835_defconfig
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -92,6 +92,7 @@ CONFIG_MMC=y
+ CONFIG_MMC_SDHCI=y
+ CONFIG_MMC_SDHCI_PLTFM=y
+ CONFIG_MMC_SDHCI_IPROC=y
 +CONFIG_MMC_BCM2835=y
  CONFIG_NEW_LEDS=y
  CONFIG_LEDS_CLASS=y
  CONFIG_LEDS_GPIO=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 028d2b7..5d13894 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -727,6 +727,7 @@ CONFIG_MMC_DW_EXYNOS=y
+ CONFIG_MMC_DW_ROCKCHIP=y
+ CONFIG_MMC_SH_MMCIF=y
+ CONFIG_MMC_SUNXI=y
++CONFIG_MMC_BCM2835=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_CLASS_FLASH=m
 -- 
 1.8.3.1
