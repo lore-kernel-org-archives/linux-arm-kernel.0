@@ -1,41 +1,28 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 21 Feb 2017 18:47:13 +0100
-Subject: [PATCH] clk: rockchip: Set "ignore unused" for PMU M0 clocks on
- rk3399
-In-Reply-To: <20170214210114.5846-1-dianders@chromium.org>
-References: <20170214210114.5846-1-dianders@chromium.org>
-Message-ID: <6585236.hCVu3AsgCt@phil>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 21 Feb 2017 09:47:37 -0800
+Subject: next-20170221 build: 2 failures 9 warnings (next-20170221)
+In-Reply-To: <E1cg6WK-0000gP-QT@optimist>
+References: <E1cg6WK-0000gP-QT@optimist>
+Message-ID: <20170221174737.2gf63ywzdjrh33ub@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 14. Februar 2017, 13:01:14 CET schrieb Douglas Anderson:
-> The PMU Cortex M0 on rk3399 is intended to be used for things like
-> DDRFreq transitions, suspend/resume, and other things that are the
-> purview of ARM Trusted Firmware and not the kernel.  As such, the
-> kernel shouldn't be messing with the clocks.  Add CLK_IGNORE_UNUSED to
-> these clocks.
-> 
-> Without this change, the following was observed on a Chromebook with a
-> rk3399 (using not-yet-upstream ARM Trusted Firmware code and
-> not-yet-upstream kernel code based on kernel-4.4):
-> 
-> 1. We init the clock framework.
-> 
-> 2. We start up "DDRFreq", which causes ATF to occasionally fire up the
->    M0 for transitions.  Each time ATF fires up the M0 it will turn on
->    these clocks and each time it is done it will turn them off.
-> 
-> 3. We finally get to the the part of the kernel that calls
->    clk_disable_unused() and we disables the clocks.
-> 
-> You can see the race above.  Basically everything is fine as long as
-> ARM Trusted Firmware isn't starting up the M0 at exactly the same time
-> that the kernel is disabling unused clocks.  ...but if the race
-> happens then we go boom.
-> 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+On Tue, Feb 21, 2017 at 09:14:04AM +0000, Build bot for Mark Brown wrote:
 
-applied for 4.12
+Today's -next fails to build an ARM allmodconfig due to:
 
-Thanks
-Heiko
+> 	arm-allmodconfig
+> ../drivers/pci/dwc/pci-exynos.c:132:25: error: 'struct exynos_pcie' has no member named 'pp'
+> ../drivers/pci/dwc/pci-exynos.c:162:25: error: 'struct exynos_pcie' has no member named 'pp'
+> ../drivers/pci/dwc/pci-exynos.c:185:25: error: 'struct exynos_pcie' has no member named 'pp'
+
+due to b09d4ac91a3934e9 (PCI: dwc: all: Split struct pcie_port into
+host-only and core structures) which replaced the struct member pp with
+*pci but has missed some users.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170221/778ec710/attachment.sig>
