@@ -1,35 +1,41 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 21 Feb 2017 15:05:40 -0800
-Subject: [RFC PATCH 9/9] ARM: dts: sun8i: enable USB host for Banana Pi
- M2 Ultra
-In-Reply-To: <20170217173722.6477-10-icenowy@aosc.xyz>
-References: <20170217173722.6477-1-icenowy@aosc.xyz>
- <20170217173722.6477-10-icenowy@aosc.xyz>
-Message-ID: <20170221230540.fqvzismg2p4qdmnh@lukather>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Wed, 22 Feb 2017 00:21:11 +0100
+Subject: [PATCH v2] MAINTAINERS: Add Jon Mason to BCM5301X maintainers
+In-Reply-To: <1486597403-9607-1-git-send-email-jon.mason@broadcom.com>
+References: <1486597403-9607-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <d6d49f2a-0444-a630-1de3-ed81f7407822@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 18, 2017 at 01:37:22AM +0800, Icenowy Zheng wrote:
-> Banana Pi M2 Ultra board features two USB host ports, connected to the
-> two USB host ports on the SoC.
+On 02/09/2017 12:43 AM, Jon Mason wrote:
+> Adding myself as a maintainer for Broadcom Northstar SoCs.  Also, adding
+> a regex entry to discover the SVK DTs already present.
 > 
-> Add support for them.
+> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
+
+Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
+
+> ---
+>  MAINTAINERS | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-
-Same comment than for the DTSI. This should be merged with the rest of
-the DTS' patch.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170221/a2a4a32e/attachment.sig>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 2abda6c..70f4b62 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2641,12 +2641,14 @@ F:	arch/mips/include/asm/mach-bcm47xx/*
+>  BROADCOM BCM5301X ARM ARCHITECTURE
+>  M:	Hauke Mehrtens <hauke@hauke-m.de>
+>  M:	Rafa? Mi?ecki <zajec5@gmail.com>
+> +M:	Jon Mason <jonmason@broadcom.com>
+>  M:	bcm-kernel-feedback-list at broadcom.com
+>  L:	linux-arm-kernel at lists.infradead.org
+>  S:	Maintained
+>  F:	arch/arm/mach-bcm/bcm_5301x.c
+>  F:	arch/arm/boot/dts/bcm5301x*.dtsi
+>  F:	arch/arm/boot/dts/bcm470*
+> +F:	arch/arm/boot/dts/bcm953012*
+>  
+>  BROADCOM BCM53573 ARM ARCHITECTURE
+>  M:	Rafa? Mi?ecki <rafal@milecki.pl>
+> 
