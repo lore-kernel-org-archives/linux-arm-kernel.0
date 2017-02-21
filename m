@@ -1,101 +1,87 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Tue, 21 Feb 2017 11:29:20 -0800
-Subject: [Linaro-mm-sig] [RFCv3][PATCH 3/5] arm64: Implement
- ARCH_HAS_FORCE_CACHE
-In-Reply-To: <58ABD8B8.6050204@hisilicon.com>
-References: <1473715978-11633-1-git-send-email-labbott@redhat.com>
- <1473715978-11633-4-git-send-email-labbott@redhat.com>
- <20160913091946.GB7467@arm.com>
- <27805ccf-1f2d-81ea-044e-b21207be8e7f@redhat.com>
- <20160913151325.GF17731@arm.com>
- <b4a92c52-cbe8-9009-43bf-4c7b49e31916@redhat.com>
- <58ABD8B8.6050204@hisilicon.com>
-Message-ID: <3551e685-fed1-de9c-a30e-12025ee480fb@redhat.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Tue, 21 Feb 2017 12:39:28 -0700
+Subject: [PATCH V10 07/10] efi: print unrecognized CPER section
+In-Reply-To: <58AC9093.5020303@arm.com>
+References: <1487188282-2568-1-git-send-email-tbaicar@codeaurora.org>
+ <1487188282-2568-8-git-send-email-tbaicar@codeaurora.org>
+ <58AC9093.5020303@arm.com>
+Message-ID: <9b8aee3f-9ab6-121a-cad0-96a39743de55@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/20/2017 10:05 PM, Chen Feng wrote:
-> Hi Laura,
-> 
-> When we enable kernel v4.4 or newer version on our platform, we meet the issue
-> of flushing cache without reference device. It seems that this patch set is
-> a solution. I'm curious the progress of the discussion. Do you have any plan
-> to fix it in v4.4 and newer kernel verison?
-> 
+Hello James,
 
-No, I've abandoned this approach based on feedback. The APIs had too much
-potential for incorrect usage. I'm ripping out the implicit caching in Ion
-and switching it to a model where there should always be a device available.
 
-What's your use case where you don't have a device structure?
+On 2/21/2017 12:10 PM, James Morse wrote:
+> Hi Tyler,
+>
+> On 15/02/17 19:51, Tyler Baicar wrote:
+>> UEFI spec allows for non-standard section in Common Platform Error
+>> Record. This is defined in section N.2.3 of UEFI version 2.5.
+>>
+>> Currently if the CPER section's type (UUID) does not match with
+>> one of the section types that the kernel knows how to parse, the
+>> section is skipped. Therefore, user is not able to see
+>> such CPER data, for instance, error record of non-standard section.
+>>
+>> For above mentioned case, this change prints out the raw data in
+>> hex in dmesg buffer. Data length is taken from Error Data length
+>> field of Generic Error Data Entry.
+>>
+>> Following is a sample output from dmesg:
+>> [  115.771702] {1}[Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
+>> [  115.779042] {1}[Hardware Error]: It has been corrected by h/w and requires no further action
+>> [  115.787456] {1}[Hardware Error]: event severity: corrected
+>> [  115.792927] {1}[Hardware Error]:  Error 0, type: corrected
+>> [  115.798415] {1}[Hardware Error]:  fru_id: 00000000-0000-0000-0000-000000000000
+>> [  115.805596] {1}[Hardware Error]:  fru_text:
+>> [  115.816105] {1}[Hardware Error]:  section type: d2e2621c-f936-468d-0d84-15a4ed015c8b
+>> [  115.823880] {1}[Hardware Error]:  section length: 88
+>> [  115.828779] {1}[Hardware Error]:   00000000: 01000001 00000002 5f434345 525f4543
+>> [  115.836153] {1}[Hardware Error]:   00000010: 0000574d 00000000 00000000 00000000
+>> [  115.843531] {1}[Hardware Error]:   00000020: 00000000 00000000 00000000 00000000
+>> [  115.850908] {1}[Hardware Error]:   00000030: 00000000 00000000 00000000 00000000
+>> [  115.858288] {1}[Hardware Error]:   00000040: fe800000 00000000 00000004 5f434345
+>> [  115.865665] {1}[Hardware Error]:   00000050: 525f4543 0000574d
+> The use-case for this is to capture the data and decode it with a vendor tool?
+> (if so, please mention that in the commit message!)
+Yes, that is the intention here. I will add that to the commit message.
+>> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+>> index c2b0a12..48cb8ee 100644
+>> --- a/drivers/firmware/efi/cper.c
+>> +++ b/drivers/firmware/efi/cper.c
+>> @@ -591,8 +591,16 @@ static void cper_estatus_print_section(
+>>   			cper_print_proc_arm(newpfx, arm_err);
+>>   		else
+>>   			goto err_section_too_small;
+>> -	} else
+>> -		printk("%s""section type: unknown, %pUl\n", newpfx, sec_type);
+> Nit: Its odd that you remove the 'unknown' from this, but we don't get told what
+> it is, so surely its still unknown.
+>
+I'll add the unknown print back in.
+>> +	} else {
+>> +		const void *unknown_err;
+>> +
+>> +		unknown_err = acpi_hest_generic_data_payload(gdata);
+>> +		printk("%ssection type: %pUl\n", newpfx, sec_type);
+>> +		printk("%ssection length: %d\n", newpfx,
+> Nit: please use the "%s""section... that this file consistently uses. This means
+> this code will still work as expected when someone adds '%ss' support to printk!
+Will do.
+>> +		       gdata->error_data_length);
+>> +		print_hex_dump(newpfx, "", DUMP_PREFIX_OFFSET, 16, 4,
+>> +			       unknown_err, gdata->error_data_length, 0);
+>> +	}
+>>   
+>>   	return;
+>
+> FWIW:
+> Reviewed-by: James Morse <james.morse@arm.com>
+Thanks!
+Tyler
 
-Thanks,
-Laura
-
-> On 2016/9/14 2:41, Laura Abbott wrote:
->> On 09/13/2016 08:14 AM, Will Deacon wrote:
->>> On Tue, Sep 13, 2016 at 08:02:20AM -0700, Laura Abbott wrote:
->>>> On 09/13/2016 02:19 AM, Will Deacon wrote:
->>>>> On Mon, Sep 12, 2016 at 02:32:56PM -0700, Laura Abbott wrote:
->>>>>>
->>>>>> arm64 may need to guarantee the caches are synced. Implement versions of
->>>>>> the kernel_force_cache API to allow this.
->>>>>>
->>>>>> Signed-off-by: Laura Abbott <labbott@redhat.com>
->>>>>> ---
->>>>>> v3: Switch to calling cache operations directly instead of relying on
->>>>>> DMA mapping.
->>>>>> ---
->>>>>> arch/arm64/include/asm/cacheflush.h |  8 ++++++++
->>>>>> arch/arm64/mm/cache.S               | 24 ++++++++++++++++++++----
->>>>>> arch/arm64/mm/flush.c               | 11 +++++++++++
->>>>>> 3 files changed, 39 insertions(+), 4 deletions(-)
->>>>>
->>>>> I'm really hesitant to expose these cache routines as an API solely to
->>>>> support a driver sitting in staging/. I appreciate that there's a chicken
->>>>> and egg problem here, but we *really* don't want people using these routines
->>>>> in preference to the DMA API, and I fear that we'll simply grow a bunch
->>>>> more users of these things if we promote it as an API like you're proposing.
->>>>>
->>>>> Can the code not be contained under staging/, as part of ion?
->>>>>
->>>>
->>>> I proposed that in V1 and it was suggested I make it a proper API
->>>>
->>>> http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47654.html
->>>> http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47672.html
->>>
->>> :/ then I guess we're in disagreement. If ion really needs this stuff
->>> (which I don't fully grok), perhaps we should be exposing something at
->>> a higher level from the architecture, so it really can't be used for
->>> anything other than ion.
->>
->> I talked/complained about this at a past plumbers. The gist is that Ion
->> ends up acting as a fake DMA layer for clients. It doesn't match nicely
->> because clients can allocate both coherent and non-coherent memory.
->> Trying to use dma_map doesn't work because a) a device for coherency isn't
->> known at allocation time b) it kills performance. Part of the motivation
->> for taking this approach is to avoid the need to rework the existing
->> Android userspace and keep the existing behavior, as terrible as it
->> is. Having Ion out of staging and not actually usable isn't helpful.
->>
->> I'll give this all some more thought and hopefully have one or two more
->> proposals before Connect/Plumbers.
->>
->>>
->>> Will
->>>
->>
->> Thanks,
->> Laura
->> _______________________________________________
->> Linaro-mm-sig mailing list
->> Linaro-mm-sig at lists.linaro.org
->> https://lists.linaro.org/mailman/listinfo/linaro-mm-sig
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
