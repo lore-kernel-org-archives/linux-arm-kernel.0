@@ -1,71 +1,72 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 21 Feb 2017 12:04:24 -0500
-Subject: [PATCH V3 2/2] PCI: handle CRS returned by device after FLR
-In-Reply-To: <1475473021-14251-3-git-send-email-okaya@codeaurora.org>
-References: <1475473021-14251-1-git-send-email-okaya@codeaurora.org>
- <1475473021-14251-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <ac667a77-028d-d5da-f574-61f787fec72c@codeaurora.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 21 Feb 2017 18:05:22 +0100
+Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
+In-Reply-To: <CAHp75VeB4eVuN5NMfAfQUtssuHezTyAM8FUswuR8FheUk1V-oA@mail.gmail.com>
+References: <CAHp75VczsC9WdZWR9iCRh2JoNLFZyOtodrsDRYQoyaN7nkyf=A@mail.gmail.com>
+ <CAHp75Vc_q-bEzA2-hVpHyR0GZ8mXxwJ8-UjECe31T04mb67q4w@mail.gmail.com>
+ <20170221090610.6d531b94@bbrezillon>
+ <CAHp75VfZfj-8ih3vg63w_dAq8xXE2Whu1bANXRcXS1_EGNq43A@mail.gmail.com>
+ <20170221112641.6276c001@bbrezillon>
+ <CAHp75Vcb9gtzF7LvH74JwL4dTUyQvKmg=dnTXKfjhVHuyK3WXg@mail.gmail.com>
+ <20170221112720.ynehsryprhrhzjla@piout.net>
+ <CAHp75VcKjYYAw8gw8yYXrd-vzZo50WOQ06AzPx+0g9Zakzjm-w@mail.gmail.com>
+ <20170221162133.jch6yzpotj4s7zob@piout.net>
+ <CAHp75VeB4eVuN5NMfAfQUtssuHezTyAM8FUswuR8FheUk1V-oA@mail.gmail.com>
+Message-ID: <20170221170522.fphb37d266fyg3to@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-
-I'm coming back to work on this. 
-
-On 10/3/2016 1:37 AM, Sinan Kaya wrote:
-> An endpoint is allowed to issue CRS following an FLR request to indicate
-> that it is not ready to accept new requests. Changing the polling mechanism
-> in FLR wait function to go read the vendor ID instead of the command/status
-> register. A CRS indication will only be given if the address to be read is
-> vendor ID.
+On 21/02/2017 at 18:32:26 +0200, Andy Shevchenko wrote:
+> I did it ~year or so before where another relocation bug was discovered (fixed).
 > 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/pci/pci.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> > please feel free to
+> > send a patch to remove the whole architecture.
+> > The benefits for atmel will be: proper big endian support, removal of
+> > platform data from all the drivers, better clocksource handling.
 > 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index c8749b9..7580b00 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -3725,7 +3725,8 @@ static void pci_flr_wait(struct pci_dev *dev)
->  
->  	do {
->  		msleep(100);
-> -		pci_read_config_dword(dev, PCI_COMMAND, &id);
-
-Your comment here puzzled me. 
-
-https://patchwork.kernel.org/patch/8331851/
-
-"Self nak on this one, didn't account for VFs not implementing the first
-dword.  Thanks,"
-
-I'm trying to add Configuration Request Retry Status (CRS) support to FLR
-with this patch. 
-
-Basically, the root port will return 0xFFFF0001 only when a config read
-request is sent to the vendor ID register and CRS visibility is set.
-The SW needs to poll until this special read ID disappears. See the
-implementation note on Configuration Request Retry Status in PCIE
-specification for details.
-
-pci_bus_read_dev_vendor_id implements this loop for us.
-
-You are saying that there are VFs that do not implement vendor ID register.
-Can you give some history on this?
-
-
-> +		pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
-> +					   60 * 1000);
->  	} while (i++ < 10 && id == ~0);
->  
->  	if (id == ~0)
+> That is good point, but if maintainers don't care, why anyone else should?
+> Neither do I.
+> 
+> >> > It can be frustrating at times to handle that platform but if it is
+> >> > working for someone, I don't see why we would remove it.
+> >>
+> >> How it's working if it's not linked?
+> >>
+> >
+> > Come on, v4.10 has just been release and v4.9 was building just fine. Do
+> > you really expect everybody to closely follow linux-next or update
+> > overnight?
+> 
+> What version do you use as compiler?
+> 
+> Today's linux-next:
+> $ make O=~/prj/TMP/out/avr32 C=1 CF=-D__CHECK_ENDIAN__ -j64 CONFIG_DEBUG_INFO=
+> y CONFIG_DEBUG_SECTION_MISMATCH=y
+> 
+>   CC      lib/sbitmap.o
+> {standard input}: Assembler messages:
+> {standard input}:378: Warning: Unary operator + ignored because bad
+> operand follows
+> {standard input}:378: Warning: missing operand; zero assumed
+> {standard input}:378: Internal error!
+> Assertion failure in finish_insn at .././gas/config/tc-avr32.c line 3498.
+> Please report this bug.
+> scripts/Makefile.build:294: recipe for target 'lib/sbitmap.o' failed
+> 
+> $ avr32-linux-gcc --version
+> avr32-linux-gcc (GCC) 4.2.2-atmel.1.0.8
 > 
 
-Sinan
+avr32-linux-gcc (GCC) 4.2.4-atmel.1.1.3.avr32linux.1
+
+Today's linux-next built without network support, the issue still being:
+virt/built-in.o: warning: input is not relaxable net/built-in.o: In function `rtnl_fill_vfinfo':
+rtnetlink.c:(.text+0x21974): relocation truncated to fit: R_AVR32_11H_PCREL against `.text'+2156c
+rtnetlink.c:(.text+0x2198a): relocation truncated to fit: R_AVR32_11H_PCREL against `.text'+2156c
+Makefile:983: recipe for target 'vmlinux' failed
+
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
