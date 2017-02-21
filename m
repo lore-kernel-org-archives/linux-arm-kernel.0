@@ -1,42 +1,65 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 21 Feb 2017 13:46:26 +0100
-Subject: [PATCH] tty/serial: atmel: increase ATMEL_MAX_UART
-In-Reply-To: <20170221120357.13623-1-alexandre.belloni@free-electrons.com>
-References: <20170221120357.13623-1-alexandre.belloni@free-electrons.com>
-Message-ID: <CACQ1gAgkqRPdVCU+cmUdaANVXygB4pC40+u1pPwpervAJ4+Q8g@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 21 Feb 2017 13:47:43 +0100
+Subject: [RESEND PATCH 1/3] mtd: nand: Pass the CS line to
+ ->setup_data_interface()
+In-Reply-To: <45a843fb-c43e-711f-ce3a-4c0d44c48144@sigmadesigns.com>
+References: <1487625149-7234-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1487625149-7234-2-git-send-email-boris.brezillon@free-electrons.com>
+ <a5a9d822-a73c-4fd1-201c-7a17d9517f24@sigmadesigns.com>
+ <20170221120648.19e0d32c@bbrezillon>
+ <45a843fb-c43e-711f-ce3a-4c0d44c48144@sigmadesigns.com>
+Message-ID: <20170221134743.3c88472e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-02-21 13:03 GMT+01:00 Alexandre Belloni
-<alexandre.belloni@free-electrons.com>:
-> The samx7 family uses the same UART/USART IP as the at91/sama5 families but
-> has 8 of those.
->
-> Suggested-by: Szemz? Andr?s <sza@esh.hu>
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Richard Genoud <richard.genoud@gmail.com>
+On Tue, 21 Feb 2017 13:02:48 +0100
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> wrote:
 
-> ---
->  drivers/tty/serial/atmel_serial.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index f0d4894267c2..8cc152e67bfb 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -119,8 +119,9 @@ struct atmel_uart_char {
->  /*
->   * at91: 6 USARTs and one DBGU port (SAM9260)
->   * avr32: 4
-> + * samx7: 3 USARTs and 5 UARTs
->   */
-> -#define ATMEL_MAX_UART         7
-> +#define ATMEL_MAX_UART         8
->
->  /*
->   * We wrap our port structure around the generic uart_port.
-> --
-> 2.11.0
->
+> On 21/02/2017 12:06, Boris Brezillon wrote:
+> 
+> > Marc Gonzalez wrote:
+> >   
+> >> On 20/02/2017 22:12, Boris Brezillon wrote:
+> >>  
+> >>> Some NAND controllers can assign different NAND timings to different
+> >>> CS lines. Pass the CS line information to ->setup_data_interface() so
+> >>> that the NAND controller driver knows which CS line is concerned by
+> >>> the setup_data_interface() request.    
+> >>
+> >> I'm confused, because I thought I was already doing that.
+> >> On my platform, I have different timings for each chip.
+> >> (thus, for each CS, right?)
+> >>
+> >> In chip->select_chip, I program the appropriate timings
+> >> which the controller will be using.
+> >>
+> >> What am I missing?  
+> > 
+> > Maybe you don't have multi-dies chips, which is the case I'm fixing
+> > here. If you have 2 separate chips, the existing hook should work just
+> > fine.  
+> 
+> Right. You asked me to add an explicit:
+> 
+> 	res = of_property_count_u32_elems(np, "reg");
+> 	if (res < 0)
+> 		return res;
+> 
+> 	if (res != 1)
+> 		return -ENOTSUPP; /* Multi-CS chips are not supported */
+> 
+> I was under the impression that multi-die chips are seen as a single
+> larger "composite" chip. And I had assumed that different dies would
+> not only require identical timings, but would also be identical in
+> all other aspects. This it incorrect?
 
-Thanks !
+This is correct, except some chips (that's true at least for ONFI
+compatible ones) allow dynamic configuration of timings, and each die
+can be configured in a different timing mode.
+
+That's what's happening when you reset dies. They will automatically
+enter timing mode 0 (the slowest mode), and you have to explicitly set
+them back to timing mode X (the fastest supported mode). While doing
+that, you'll have some of your dies configured in timing 0, while
+others have already been switched to timing mode X, and that's the main
+reason for having per-die timing configuration.
