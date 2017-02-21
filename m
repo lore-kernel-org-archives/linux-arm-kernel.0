@@ -1,120 +1,131 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 21 Feb 2017 10:38:31 -0600
-Subject: [PATCH v4 3/3] PCI: imx6: Add code to support i.MX7D
-In-Reply-To: <1487236340.13536.5.camel@pengutronix.de>
-References: <20170207155027.7734-1-andrew.smirnov@gmail.com>
- <20170207155027.7734-4-andrew.smirnov@gmail.com>
- <20170215171700.5vz5seeihgtwn76p@rob-hp-laptop>
- <1487236340.13536.5.camel@pengutronix.de>
-Message-ID: <CAL_Jsq+zo9cVEiT3p4oEL8UWqHNEVqszkC3htO-p+C2oFXPuSw@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 21 Feb 2017 18:43:35 +0200
+Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
+In-Reply-To: <CAHp75VeB4eVuN5NMfAfQUtssuHezTyAM8FUswuR8FheUk1V-oA@mail.gmail.com>
+References: <20170220213803.7ba5591e@bbrezillon>
+ <20170220215009.0ecbf5a1@bbrezillon>
+ <CAHp75VczsC9WdZWR9iCRh2JoNLFZyOtodrsDRYQoyaN7nkyf=A@mail.gmail.com>
+ <CAHp75Vc_q-bEzA2-hVpHyR0GZ8mXxwJ8-UjECe31T04mb67q4w@mail.gmail.com>
+ <20170221090610.6d531b94@bbrezillon>
+ <CAHp75VfZfj-8ih3vg63w_dAq8xXE2Whu1bANXRcXS1_EGNq43A@mail.gmail.com>
+ <20170221112641.6276c001@bbrezillon>
+ <CAHp75Vcb9gtzF7LvH74JwL4dTUyQvKmg=dnTXKfjhVHuyK3WXg@mail.gmail.com>
+ <20170221112720.ynehsryprhrhzjla@piout.net>
+ <CAHp75VcKjYYAw8gw8yYXrd-vzZo50WOQ06AzPx+0g9Zakzjm-w@mail.gmail.com>
+ <20170221162133.jch6yzpotj4s7zob@piout.net>
+ <CAHp75VeB4eVuN5NMfAfQUtssuHezTyAM8FUswuR8FheUk1V-oA@mail.gmail.com>
+Message-ID: <CAHp75Vc54+GR99qM8vUDfQnehFx0g5q137k-w5XY3023UZyr5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 3:12 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Am Mittwoch, den 15.02.2017, 11:17 -0600 schrieb Rob Herring:
->> On Tue, Feb 07, 2017 at 07:50:27AM -0800, Andrey Smirnov wrote:
->> > Add various bits of code needed to support i.MX7D variant of the IP.
->> >
->> > Cc: yurovsky at gmail.com
->> > Cc: Lucas Stach <l.stach@pengutronix.de>
->> > Cc: Bjorn Helgaas <bhelgaas@google.com>
->> > Cc: Rob Herring <robh+dt@kernel.org>
->> > Cc: Mark Rutland <mark.rutland@arm.com>
->> > Cc: Lee Jones <lee.jones@linaro.org>
->> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
->> > Cc: linux-arm-kernel at lists.infradead.org
->> > Cc: devicetree at vger.kernel.org
->> > Cc: linux-kernel at vger.kernel.org
->> > Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
->> > ---
->> >  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 ++-
->> >  drivers/pci/host/pci-imx6.c                        | 121 ++++++++++++++++-----
->> >  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
->> >  3 files changed, 112 insertions(+), 26 deletions(-)
->> >
->> > diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
->> > index 83aeb1f..11db2ab 100644
->> > --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
->> > +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
->> > @@ -4,7 +4,11 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
->> >  and thus inherits all the common properties defined in designware-pcie.txt.
->> >
->> >  Required properties:
->> > -- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie", "fsl,imx6qp-pcie"
->> > +- compatible:
->> > +   - "fsl,imx6q-pcie"
->> > +   - "fsl,imx6sx-pcie",
->> > +   - "fsl,imx6qp-pcie"
->> > +   - "fsl,imx7d-pcie"
->> >  - reg: base address and length of the PCIe controller
->> >  - interrupts: A list of interrupt outputs of the controller. Must contain an
->> >    entry for each entry in the interrupt-names property.
->> > @@ -34,6 +38,13 @@ Additional required properties for imx6sx-pcie:
->> >  - clock names: Must include the following additional entries:
->> >     - "pcie_inbound_axi"
->> >
->> > +Additional required properties for imx7d-pcie:
->> > +- power-domains: Must be set to a phandle pointing to PCIE_PHY power domain
->>
->> This domain is just the PHY? Seems like this needs a separate PHY
->> driver.
->>
-> No, it's called the PHY power domain, as that is probably the part that
-> draws the most power, but the PCIe core also looses it's state when this
-> domain is powered down. So it's probably the complete core that is
-> inside this domain.
-
-A shared domain doesn't mean the phy and core should be 1 node. It is
-the separate reset and clock for the PHY that tell me they should be
-separate. And I'm pretty sure the DW block and PHY are separate. If
-the PHY registers were part of the same register range, then I'd say
-they should be one.
-
->> > +- resets: Must contain phandles to PCIE related reset lines exposed by SRC IP block
->> > +- reset-names: Must contain the following entires:
->> > +          - "pciephy"
->>
->> And for this too.
->>
->> > +          - "apps"
->> > +
->> >  Example:
->> >
->> >     pcie at 0x01000000 {
->>
->> [...]
->>
->> > @@ -251,6 +261,10 @@ static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
->> >     u32 val, gpr1, gpr12;
->> >
->> >     switch (imx6_pcie->variant) {
->> > +   case IMX7D:
->> > +           reset_control_assert(imx6_pcie->pciephy_reset);
->> > +           reset_control_assert(imx6_pcie->apps_reset);
->> > +           break;
->> >     case IMX6SX:
->> >             regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
->> >                                IMX6SX_GPR12_PCIE_TEST_POWERDOWN,
->>
->> So the difference with i.MX7D is not really that it has a reset or not,
->> but some platforms use a reset driver and some do not. The latter should
->> be fixed.
+On Tue, Feb 21, 2017 at 6:32 PM, Andy Shevchenko
+<andy.shevchenko@gmail.com> wrote:
+> On Tue, Feb 21, 2017 at 6:21 PM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+>> On 21/02/2017 at 18:09:09 +0200, Andy Shevchenko wrote:
+>>> On Tue, Feb 21, 2017 at 1:27 PM, Alexandre Belloni
+>>> <alexandre.belloni@free-electrons.com> wrote:
+>>> > On 21/02/2017 at 13:02:21 +0200, Andy Shevchenko wrote:
+>>> >> Abusing platform data with pointers is also not welcome.
 >
-> The resets on anything before i.MX7 are not in a separate reset driver,
-> but are just some signals from the PCIe core wired into a syscon (IOMUX
-> GPR) area. While we could invent a reset controller for those, I don't
-> see how this would improve things. Especially as the reset on i.MX6
-> seems to be some side-effect of the "power-down" signal of the core, so
-> not strictly a reset.
+>>> >> > (in this case, avr32).
+>>> >>
+>>> >> It's dead de facto.
+>>> >>
+>>> >> When last time did you compile kernel for it? What was the version of kernel?
+>>> >> Did it get successfully?
+>>> >>
+>>> >
+>>> > v4.10-rc3 was building successfully but had some issues in the network
+>>> > code.
+>>>
+>>> Newer kernel doesn't link...
+>>>
+>>> >> When are we going to remove avr32 support from kernel completely?
+>>>
+>>> > Ask that to the avr32 maintainers. It still builds and is still booted
+>>> > by some people. And that actually seems to be you as you reported a bug
+>>> > we introduced in 4.3. I don't think we had any other report after that.
+>>>
+>>> https://patchwork.kernel.org/patch/9505727/
+>>>
+>>> After that I gave up on it. Next time I will escalate directly to
+>>> Linus. It's a complete necrophilia. I spent already enough time to
+>>> look at that code. It brings now more burden than supports someone
+>>> somewhere.
+>>>
+>>
+>> As said, it builds fine without networking.
 >
-> Also I don't see why we should change the binding for the driver with a
-> long history of deployed DTs. That seems like a total waste of manpower.
+> It sounds a bit sarcastic. Irony is that I *have* hardware here which
+> was dedicated as Network Gateway (ATNGW100). I'm accessing to it
+> remotely.
+> How useful it would be?
+>
+>> Maybe the first step is to
+>> ask the avr32 maintainers. If you already did so,
+>
+> I did it ~year or so before where another relocation bug was discovered (fixed).
+>
+>> please feel free to
+>> send a patch to remove the whole architecture.
+>> The benefits for atmel will be: proper big endian support, removal of
+>> platform data from all the drivers, better clocksource handling.
+>
+> That is good point, but if maintainers don't care, why anyone else should?
+> Neither do I.
+>
+>>> > It can be frustrating at times to handle that platform but if it is
+>>> > working for someone, I don't see why we would remove it.
+>>>
+>>> How it's working if it's not linked?
+>>>
+>>
+>> Come on, v4.10 has just been release and
 
-We can debate whether or not we change existing platforms. Maybe that
-doesn't make sense now. But best practices should be considered when
-adding new bindings rather than just extending existing bindings. We
-didn't split out PHYs at one time and now we generally do. I'm not so
-concerned with just adding i.MX7D, but really the next chip (and the
-next).
+It doesn't build anymore. And current case even worse
+Face it. It's dead.
 
-Rob
+  MODPOST vmlinux.o
+WARNING: vmlinux.o(.text+0x1f2bd4): Section mismatch in reference from
+the variable __param_ops_mtd to the functio
+n .init.text:ubi_mtd_param_parse()
+The function __param_ops_mtd() references
+the function __init ubi_mtd_param_parse().
+This is often because __param_ops_mtd lacks a __init
+annotation or the annotation of ubi_mtd_param_parse is wrong.
+
+crypto/built-in.o: warning: input is not relaxable
+virt/built-in.o: warning: input is not relaxable
+net/built-in.o: In function `rtnl_fill_ifinfo':
+net/socket.c:451: relocation truncated to fit: R_AVR32_11H_PCREL
+against `.text'+22768
+Makefile:969: recipe for target 'vmlinux' failed
+
+
+> v4.9 was building just fine. Do
+>> you really expect everybody to closely follow linux-next or update
+>> overnight?
+>
+> What version do you use as compiler?
+>
+> Today's linux-next:
+> $ make O=~/prj/TMP/out/avr32 C=1 CF=-D__CHECK_ENDIAN__ -j64 CONFIG_DEBUG_INFO=
+> y CONFIG_DEBUG_SECTION_MISMATCH=y
+>
+>   CC      lib/sbitmap.o
+> {standard input}: Assembler messages:
+> {standard input}:378: Warning: Unary operator + ignored because bad
+> operand follows
+> {standard input}:378: Warning: missing operand; zero assumed
+> {standard input}:378: Internal error!
+> Assertion failure in finish_insn at .././gas/config/tc-avr32.c line 3498.
+> Please report this bug.
+> scripts/Makefile.build:294: recipe for target 'lib/sbitmap.o' failed
+>
+> $ avr32-linux-gcc --version
+> avr32-linux-gcc (GCC) 4.2.2-atmel.1.0.8
+
+-- 
+With Best Regards,
+Andy Shevchenko
