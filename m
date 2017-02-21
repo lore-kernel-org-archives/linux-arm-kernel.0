@@ -1,56 +1,37 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Tue, 21 Feb 2017 10:06:59 +0100
-Subject: [PATCH v3 0/7] mmc: bcm2835: Add new driver for the sdhost controller
-Message-ID: <1487668026-7100-1-git-send-email-kraxel@redhat.com>
+Date: Tue, 21 Feb 2017 10:07:04 +0100
+Subject: [PATCH v3 5/7] arm64: set CONFIG_MMC_BCM2835=y in defconfig
+In-Reply-To: <1487668026-7100-1-git-send-email-kraxel@redhat.com>
+References: <1487668026-7100-1-git-send-email-kraxel@redhat.com>
+Message-ID: <1487668026-7100-6-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi,
+We need to enable this controller so that we can switch the SD card's
+pinmux over to it by default, which will improve storage performance.
 
-Next version if the bcm2835 sdhost patch series.
+Read access (dd with 64k blocks on rpi2):
+  CONFIG_MMC_SDHCI_IPROC: 11-12 MB/s
+  CONFIG_MMC_BCM2835:     19-20 MB/s
 
-New in v3:
- * squashed in cleanups by Stefan.
- * use one dma channel only.
- * improve commit messages.
+Differences on write access are pretty much in the noise.
 
-New in v2:
- * DMA fixed.
- * updated docs (kconfig, file comment, commit message) clarifying
-   the two sd controller situation.
- * some code cleanups, as pointed out by Stefan.
- * dt bindings use mmc at ... now.
- * added patches to update defconfigs.
- * added patch for rpi3 device tree, so wifi is actually enabled.
+Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-please review & test,
-  Gerd
-
-Eric Anholt (2):
-  dt-bindings: Add binding for brcm,bcm2835-sdhost.
-  mmc: bcm2835: Add new driver for the sdhost controller.
-
-Gerd Hoffmann (5):
-  mmc: bcm2835: add sdhost controller to devicetree
-  arm: set CONFIG_MMC_BCM2835=y in bcm2835_defconfig and
-    multi_v7_defconfig
-  arm64: set CONFIG_MMC_BCM2835=y in defconfig
-  ARM: dts: bcm283x: switch from &sdhci to &sdhost
-  ARM: dts: bcm2837: add &sdhci and &sdhost
-
- .../bindings/mmc/brcm,bcm2835-sdhost.txt           |   23 +
- arch/arm/boot/dts/bcm2835-rpi.dtsi                 |    6 +
- arch/arm/boot/dts/bcm283x.dtsi                     |   10 +
- arch/arm/configs/bcm2835_defconfig                 |    1 +
- arch/arm/configs/multi_v7_defconfig                |    1 +
- arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts   |   17 +
- arch/arm64/configs/defconfig                       |    1 +
- drivers/mmc/host/Kconfig                           |   14 +
- drivers/mmc/host/Makefile                          |    1 +
- drivers/mmc/host/bcm2835.c                         | 1471 ++++++++++++++++++++
- 10 files changed, 1545 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
- create mode 100644 drivers/mmc/host/bcm2835.c
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 33b744d..75131a6 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -391,6 +391,7 @@ CONFIG_MMC_DW_EXYNOS=y
+ CONFIG_MMC_DW_K3=y
+ CONFIG_MMC_DW_ROCKCHIP=y
+ CONFIG_MMC_SUNXI=y
++CONFIG_MMC_BCM2835=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
 -- 
 1.8.3.1
