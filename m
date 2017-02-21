@@ -1,47 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 21 Feb 2017 11:03:56 +0000
-Subject: [PATCH] arm64: traps: Mark __le16, __le32, __user variables
- properly
-In-Reply-To: <20170220213344.dqp4pzxr2dj6vbd3@macpro.local>
-References: <20170217165112.17512-1-stephen.boyd@linaro.org>
- <20170219015808.2vc2kvpde7nlrey4@macbook.local>
- <148758047729.2988.16966413648865610904@sboyd-linaro>
- <20170220104947.GE9003@leverpostej>
- <20170220213344.dqp4pzxr2dj6vbd3@macpro.local>
-Message-ID: <20170221110355.GD300@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 21 Feb 2017 12:06:48 +0100
+Subject: [RESEND PATCH 1/3] mtd: nand: Pass the CS line to
+ ->setup_data_interface()
+In-Reply-To: <a5a9d822-a73c-4fd1-201c-7a17d9517f24@sigmadesigns.com>
+References: <1487625149-7234-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1487625149-7234-2-git-send-email-boris.brezillon@free-electrons.com>
+ <a5a9d822-a73c-4fd1-201c-7a17d9517f24@sigmadesigns.com>
+Message-ID: <20170221120648.19e0d32c@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2017 at 10:33:45PM +0100, Luc Van Oostenryck wrote:
-> I just checked this and I'm not very sure what's best.
-> Sparse is very well aware of the '...' to specify a range
-> in an array initializer or in switch-case. The warning
-> is there only because those entries are later overridden
-> with some value.
-> When checking what GCC is doing in this situation is saw
-> that by default even in cases like:
-> 	static in ref[] = {
-> 		[1] = 1,
-> 		[2] = 2,
-> 	};
-> GCC doesn't issue a warning. You need to use the flag
-> -Woverride-init for that. But then you also have a warning
-> for our current case:
-> 	static in foo[] = {
-> 		[0 ... 3] = 1,
-> 		[0] = 2,
-> 	};
+On Tue, 21 Feb 2017 11:57:23 +0100
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> wrote:
+
+> On 20/02/2017 22:12, Boris Brezillon wrote:
 > 
-> It's easy enough to patch sparse to not issue a warning when the
-> override concerns a range (which would be perfect for the situation here),
-> Controlled or not by a new warning flag. But I'm far from convinced
-> that all uses of such "ranged-initialization" is used for default values
-> that may be later overridden.
+> > Some NAND controllers can assign different NAND timings to different
+> > CS lines. Pass the CS line information to ->setup_data_interface() so
+> > that the NAND controller driver knows which CS line is concerned by
+> > the setup_data_interface() request.  
+> 
+> I'm confused, because I thought I was already doing that.
+> On my platform, I have different timings for each chip.
+> (thus, for each CS, right?)
+> 
+> In chip->select_chip, I program the appropriate timings
+> which the controller will be using.
+> 
+> What am I missing?
 
-How about not warning only when the overridden range covers the entire
-length of the array? The only broken case I can think of that slips
-through the cracks then is if somebody typoed the range so that it
-accidentally covered the whole array and therefore suppressed the override
-warning.
+Maybe you don't have multi-dies chips, which is the case I'm fixing
+here. If you have 2 separate chips, the existing hook should work just
+fine.
 
-Will
+> 
+> > diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+> > index c8894f31392e..d62a1c7c5c5c 100644
+> > --- a/drivers/mtd/nand/nand_base.c
+> > +++ b/drivers/mtd/nand/nand_base.c
+> > @@ -1100,8 +1102,10 @@ static int nand_init_data_interface(struct nand_chip *chip)
+> >  		if (ret)
+> >  			continue;
+> >  
+> > -		ret = chip->setup_data_interface(mtd, chip->data_interface,
+> > -						 true);
+> > +		/* Pass -1 to only */  
+> 
+> "Pass -1 to only" what?
+> 
+> I suppose -1 means NAND_DATA_IFACE_CHECK_ONLY since
+> #define NAND_DATA_IFACE_CHECK_ONLY -1
+> 
+> Maybe you meant "Pass -1 to check only" here?
+> The comment may need a slight rework.
+
+Yep, didn't finish my sentence.
+Since I decided to define a macro with a self-descriptive name, I
+don't think I need this comment anymore.
+
+> 
+> > +		ret = chip->setup_data_interface(mtd,
+> > +						 NAND_DATA_IFACE_CHECK_ONLY,
+> > +						 chip->data_interface);
+> >  		if (!ret) {
+> >  			chip->onfi_timing_mode_default = mode;
+> >  			break;  
