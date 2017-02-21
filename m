@@ -1,88 +1,90 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 21 Feb 2017 12:55:44 +0800
-Subject: [PATCH v3 01/18] dt-bindings: power: battery: add
- constant-charge-current property
-In-Reply-To: <6a678b03-124a-76b3-066e-858731fc6c80@free-electrons.com>
-References: <20170215004646.23607-1-liam@networkimprov.net>
- <6a678b03-124a-76b3-066e-858731fc6c80@free-electrons.com>
-Message-ID: <CAGb2v67913XnRNv9bYty5WcGLAWHYMM6=M9BVmTZ3wjReh_UBg@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 21 Feb 2017 10:33:10 +0530
+Subject: [PATCH 4/4] ARM: dts: da850-evm: add the UI expander node
+In-Reply-To: <CAMpxmJX3p03YiPL5X9=pKud4A7bXh9bV=qk7qAEAnA3OF3Hgbw@mail.gmail.com>
+References: <1487268932-6469-1-git-send-email-bgolaszewski@baylibre.com>
+ <1487268932-6469-5-git-send-email-bgolaszewski@baylibre.com>
+ <5f194c6d-0937-bac2-31cd-2f1658f68d0d@ti.com>
+ <CAMpxmJX3p03YiPL5X9=pKud4A7bXh9bV=qk7qAEAnA3OF3Hgbw@mail.gmail.com>
+Message-ID: <2d708416-401a-d2df-5694-9896df47a673@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 4:53 PM, Quentin Schulz
-<quentin.schulz@free-electrons.com> wrote:
-> Hi,
->
-> On 15/02/2017 01:46, Liam Breck wrote:
->>
->> On Tue, 14 Feb 2017 10:40:55 +0100 Quentin Schulz wrote:
->>> This adds the constant-charge-current property to the list of optional
->>> properties of the battery.
+On Monday 20 February 2017 09:08 PM, Bartosz Golaszewski wrote:
+> 2017-02-20 10:36 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+>> On Thursday 16 February 2017 11:45 PM, Bartosz Golaszewski wrote:
+>>> If we're using the UI board and want vpif capture, we need to select
+>>> the video capture functionality by driving the sel_c pin low on the
+>>> tca6416 expander and sel_a & sel_b pins high. Do it statically by
+>>> hogging relevant GPIOs in the device tree.
 >>>
->>> The constant charge current is critical for batteries as they can't
->>> handle all charge currents.
->>>
->>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 >>> ---
+> 
+> [snip]
+> 
 >>>
->>> added in v3
->>>
->>>  Documentation/devicetree/bindings/power/supply/battery.txt | 2 ++
+>>> +                             sel_a {
+>>> +                                     gpio-hog;
+>>> +                                     gpios = <7 GPIO_ACTIVE_HIGH>;
+>>> +                                     output-high;
+>>> +                                     line-name = "sel_a";
+>>> +                             };
+>>> +
+>>> +                             sel_b {
+>>> +                                     gpio-hog;
+>>> +                                     gpios = <6 GPIO_ACTIVE_HIGH>;
+>>> +                                     output-high;
+>>> +                                     line-name = "sel_b";
+>>> +                             };
+>>> +
+>>> +                             sel_c {
+>>> +                                     gpio-hog;
+>>> +                                     gpios = <5 GPIO_ACTIVE_HIGH>;
+>>> +                                     output-low;
+>>> +                                     line-name = "sel_c";
 >>
->> Is constant-charge-current dependent on the battery (e.g. capacity, nominal voltage, etc) or the
->> system (charger chip, input current/voltage, etc)?
+>> I think this is better handled by using an enable-gpios property in vpif
+>> capture device-tree node. So in the vpif capture node you would have:
 >>
->> It belongs in Doc.../power/supply/battery.txt if it's a characteristic of the battery.
+>>         enable-gpios =  <&tca6416 7 GPIO_ACTIVE_HIGH
+>>                          &tca6416 6 GPIO_ACTIVE_HIGH
+>>                          &tca6416 5 GPIO_ACTIVE_LOW>;
 >>
->> Note, this page asserts that constant-current charging applies to NiMH batteries:
->> http://power-topics.blogspot.com/2016/05/constant-voltage-constant-current.html
+>> and in the vpif capture driver, you would request each of these gpios
+>> using: devm_gpiod_get_array_optional(.., .., GPIOD_OUT_HIGH);
 >>
->> Related properties to be added to battery.txt near-future in a patchset for the BQ24190
->> charger are as follows. These are not currently in enum power_supply_property, so the actual names
->> are still to be decided.
->>
->> precharge-current-microamp:
->>    maximum charge current during precharge phase (typically 20% of battery capacity)
->>
->> termination-current-microamp (or endcharge-current):
->>    a charge cycle terminates when the battery voltage is above recharge threshold,
->>    and the current is below this setting (typically 10% of battery capacity)
->>
->
-> We have a client with a board whose battery accepts a maximum of 300mA
-> for charging. So depending on the battery, we cannot have any charging
-> current we want. The AXP PmMICs set constant charge current in a range
-> of 300mA-1800mA, so it is enforced by the charger but needs to be
-> adapted depending on the battery present in the system.
+> 
+> I'm not sure about this one - the result is the same (function still
+> defined statically in the DT) while now it requires changes to the
+> vpif driver too.
+> 
+> Is there any other reason we'd prefer this approach?
 
-May I ask the capacity of the battery in question?
+The GPIO hog functionality can race with driver probe. Based on probe
+order, you may have a situation where VPIF probes before tca6416 so we
+have an erroneous situation where probe is successful, but hardware is
+not really available.
 
-Typically one charges LiPo batteries at no more than 1C. So if it's
-a 1800 mAh battery, the charge current should be no more than 1800 mA.
+Using enable-gpios lets you handle probe deferral so VPIF capture probe
+completes only when hardware is ready. So if for some reason tca6416
+driver or hardware is misbehaving, VPIF will know about it through some
+error value rather than just assuming that everything went well.
 
-ChenYu
+So, yes, in the "all goes well" scenario, there is not much difference
+in the two approaches. But the difference will be apparent when
+something goes wrong.
 
-> The AXP PMICs charge battery with constant current (Ichrg) between the
-> trickle voltage (Vtrkl which is ~3.0V) and the targeted voltage (Vtrgt;
-> which seems to be the voltage telling the battery is fully charged).
->
-> So if I understand correctly, "my" constant-charge-current would be
-> located in the charging cycle between your precharge-current-microamp
-> and the termination-current-microamp as it is the current for the
-> charging process as a whole.
->
-> See here[1] for the explanation in the datasheet (page 20).
->
-> That would definitely match what is explained in your link for constant
-> current.
->
-> [1] http://dl.linux-sunxi.org/AXP/AXP209_Datasheet_v1.0en.pdf
->
-> Let me know if something seems odd,
-> Thanks,
-> Quentin
->
-> --
-> Quentin Schulz, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Probe order will also influence the shutdown and suspend order. So
+kernel will automatically make sure that shutdown happens in reverse
+probe order. This may or may not matter in this case. But in  general,
+it will be nice to make sure VPIF shuts down before tca6416 does so that
+hardware is available for VPIF to cleanly shutdown (and not disconnected
+behind its back because tca6416 decided to put all its lines to off as
+part of its shutdown).
+
+I think GPIO hog should only be used for pins which are really "system
+level". IOW, not related to any driver functionality.
+
+Thanks,
+Sekhar
