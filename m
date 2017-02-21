@@ -1,75 +1,51 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 21 Feb 2017 11:21:54 +0800
-Subject: [PATCH 2/2] mfd: axp20x: Add support for dts property "xpowers,
- master-mode"
-In-Reply-To: <10a2231445e8ccbb83d54bb84d91b4d61b4d642f.1487428239.git.rask@formelder.dk>
-References: <cover.1487428238.git.rask@formelder.dk>
- <10a2231445e8ccbb83d54bb84d91b4d61b4d642f.1487428239.git.rask@formelder.dk>
-Message-ID: <CAGb2v66nu3rYnNPwcYQww7pA172csrc77ti=2S4+9r8T2aMtYQ@mail.gmail.com>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Tue, 21 Feb 2017 04:16:39 +0000
+Subject: [PATCH v3 5/6] ARM: mvebu: Add driver for mv98dx3236-soc-id
+References: <20170216085041.28337-1-chris.packham@alliedtelesis.co.nz>
+ <20170216085041.28337-6-chris.packham@alliedtelesis.co.nz>
+ <28604982.PnlvXC13kC@wuerfel>
+ <be262173372a46be97f635e8ce9e36af@svr-chch-ex1.atlnz.lc>
+ <CAK8P3a0Zyii5QbGAtR0TCEsUnGwkH1G5+_bPku4VYPKM-aTS8g@mail.gmail.com>
+Message-ID: <e8aa98ec22214e77ae4b060dccec8a78@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 19, 2017 at 4:11 AM, Rask Ingemann Lambertsen
-<rask@formelder.dk> wrote:
-> commit b101829a029a ("mfd: axp20x: Fix AXP806 access errors on cold boot")
-> was intended to fix the case where a board uses an AXP806 in slave mode,
-> but the boot loader leaves it in master mode for lack of AXP806 support.
-> But now the driver breaks on boards where the PMIC is operating in master
-> mode. This patch lets the driver use the new device tree property
-> "xpowers,master-mode" to set the correct operating mode for the board.
+On 18/02/17 05:17, Arnd Bergmann wrote:
+> On Fri, Feb 17, 2017 at 5:22 AM, Chris Packham
+> <Chris.Packham@alliedtelesis.co.nz> wrote:
+>> Hi Arnd,
+>> On 17/02/17 02:28, Arnd Bergmann wrote:
+>>> On Thursday, February 16, 2017 9:50:39 PM CET Chris Packham wrote:
+>>>> The DFX server on the 98dx3236 and compatible SoCs has an ID register
+>>>> that provides revision information that the PCI based ID register
+>>>> doesn't have. Use this if it's available.
+>>>>
+>>>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>>>>
+>>>
+>>> How about putting this new code into a separate driver in
+>>> drivers/soc/? I don't think you need the early probing we have
+>>> here, and not that much is shared otherwise.
+>>>
+>>
+>> Not putting it there means we'll get the pci fall-back behaviour which
+>> will result in a incorrect rev value. Having said that no callers of
+>> mvebu_get_soc_id() currently care about these specific SoCs so not
+>> having the right rev is not an issue at the moment.
 >
-> Fixes: b101829a029a ("mfd: axp20x: Fix AXP806 access errors on cold boot")
+> We should still care about incorrect IDs as they are shown to user space,
+> which could start relying on it in theory.
+>
+> However, the PCI ID should only be used on chips that have a PCI
+> host with an ID known to be correct, so maybe we can restrict
+> get_soc_id_by_pci() in a way that the mvebu_pcie_of_match_table
+> matching does not trigger on chips on which we don't want it to.
+>
 
-Same comment as the previous patch. You are fixing or adding something that
-we should've had from the beginning.
+I think we'd need to add some kind of soc-id-from-pci node to indicate 
+devices where the best ID is from the PCI registers. We'd also need to 
+worry about backwards compatibility etc.
 
-ChenYu
-
-> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
-> ---
->  drivers/mfd/axp20x.c | 21 +++++++++++++--------
->  1 file changed, 13 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index 25115fe..0512900 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -31,6 +31,7 @@
->
->  #define AXP20X_OFF     0x80
->
-> +#define AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE   0
->  #define AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE    BIT(4)
->
->  static const char * const axp20x_model_names[] = {
-> @@ -877,15 +878,19 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
->          * the these device addressing bits (in the upper 4 bits of the
->          * registers) match.
->          *
-> -        * Since we only support an AXP806 chained to an AXP809 in slave
-> -        * mode, and there isn't any existing hardware which uses AXP806
-> -        * in master mode, or has 2 AXP806s in the same system, we can
-> -        * just program the register address extension to the slave mode
-> -        * address.
-> +        * By default we support an AXP806 chained to an AXP809 in slave
-> +        * mode. Boards which use an AXP806 in master mode can set the
-> +        * property "x-powers,master-mode" to override the default.
->          */
-> -       if (axp20x->variant == AXP806_ID)
-> -               regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
-> -                            AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
-> +       if (axp20x->variant == AXP806_ID) {
-> +               if (of_property_read_bool(axp20x->dev->of_node,
-> +                                         "x-powers,master-mode"))
-> +                       regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
-> +                                    AXP806_REG_ADDR_EXT_ADDR_MASTER_MODE);
-> +               else
-> +                       regmap_write(axp20x->regmap, AXP806_REG_ADDR_EXT,
-> +                                    AXP806_REG_ADDR_EXT_ADDR_SLAVE_MODE);
-> +       }
->
->         ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
->                           IRQF_ONESHOT | IRQF_SHARED | axp20x->irq_flags,
-> --
-> 2.10.2
->
+For now since nothing is relying on the rev and the SoC ID is correct 
+coming from the PCI registers I'm happy to sit on this patch until a 
+need to get the rev arises.
