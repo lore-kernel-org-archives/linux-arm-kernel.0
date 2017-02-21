@@ -1,37 +1,95 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 21 Feb 2017 17:54:29 +0000
-Subject: [PATCH/RFC 4/6] drivers: firmware: psci: Fix non-PMIC wake-up if
- SYSTEM_SUSPEND cuts power
-In-Reply-To: <20170221110730.GF5021@amd>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <1487622809-25127-5-git-send-email-geert+renesas@glider.be>
- <20170221110730.GF5021@amd>
-Message-ID: <20170221175429.GF8605@leverpostej>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 21 Feb 2017 19:03:22 +0100
+Subject: [PATCH v3 04/18] iio: adc: add support for X-Powers AXP20X and
+ AXP22X PMICs ADCs
+In-Reply-To: <b76264cc-9c6c-169c-d490-91852c052890@kernel.org>
+References: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
+ <20170214094112.27426-5-quentin.schulz@free-electrons.com>
+ <b76264cc-9c6c-169c-d490-91852c052890@kernel.org>
+Message-ID: <cd4eac68-0155-d032-6d49-91e3ebdee72e@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2017 at 12:07:30PM +0100, Pavel Machek wrote:
-> On Mon 2017-02-20 21:33:27, Geert Uytterhoeven wrote:
-> > Nothing in the PSCI specification requires the SoC to remain powered and
-> > to support wake-up sources when suspended using SYSTEM_SUSPEND.
-> > If the firmware implements the PSCI SYSTEM_SUSPEND operation by cutting
-> > power to the SoC, the only possibly wake-up sources are thus the ones
-> > connected to the PMIC.
-> > 
-> > Document and add support for an "arm,psci-system-suspend-is-power-down"
-> > DT property, so Linux uses a different suspend method when other wake-up
-> > sources (e.g. wake on LAN, UART or GPIO) are enabled.
+Hi Jonathan,
+
+On 19/02/2017 13:40, Jonathan Cameron wrote:
+> On 14/02/17 09:40, Quentin Schulz wrote:
+>> The X-Powers AXP20X and AXP22X PMICs have multiple ADCs. They expose the
+>> battery voltage, battery charge and discharge currents, AC-in and VBUS
+>> voltages and currents, 2 GPIOs muxable in ADC mode and PMIC temperature.
+>>
+>> This adds support for most of AXP20X and AXP22X ADCs.
+>>
+>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Hi Quentin,
 > 
-> Should we make PSCI return that information? (At least in next
-> specification version?)
+> A few bits and bobs inline.  The bigest one is that I don't think
+> you need to carry your struct axp_data pointer around in the iio_priv
+> structure as it only seems to be used in probe.
+> 
+> Anyhow, tidy these little bits up (quite a few are optional in the
+> sense that they are a matter or personal taste and I don't feel
+> strongly about them) and you can add
+> 
+> Reviewed-by: Jonathan Cameron <jic23@kernel.org>
+> 
+> A nice driver.
+> 
+> Jonathan
+[...]
+>> +static int axp20x_probe(struct platform_device *pdev)
+>> +{
+>> +	struct axp20x_adc_iio *info;
+>> +	struct iio_dev *indio_dev;
+>> +	struct axp20x_dev *axp20x_dev;
+>> +	int ret;
+>> +
+>> +	axp20x_dev = dev_get_drvdata(pdev->dev.parent);
+>> +
+>> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
+>> +	if (!indio_dev)
+>> +		return -ENOMEM;
+>> +
+>> +	info = iio_priv(indio_dev);
+>> +	platform_set_drvdata(pdev, indio_dev);
+>> +
+>> +	info->regmap = axp20x_dev->regmap;
+>> +	indio_dev->dev.parent = &pdev->dev;
+>> +	indio_dev->dev.of_node = pdev->dev.of_node;
+>> +	indio_dev->modes = INDIO_DIRECT_MODE;
+>> +
+>> +	info->data = (struct axp_data *)platform_get_device_id(pdev)->driver_data;
+> I think this is only actually used in probe, so could be handled more
+> neatly with a local variable rather than sticking it in info.
+> 
+[...]
+>> +static int axp20x_remove(struct platform_device *pdev)
+>> +{
+>> +	struct axp20x_adc_iio *info;
+>> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+>> +
+>> +	info = iio_priv(indio_dev);
+> Reorder the two lines above this one and then you could just do this
+> inline. (really trivial so feel free to not bother ;)
+>> +
+>> +	iio_device_unregister(indio_dev);
+>> +	iio_map_array_unregister(indio_dev);
+>> +
+>> +	regmap_write(info->regmap, AXP20X_ADC_EN1, 0);
+>> +
+>> +	if (info->data->adc_en2)
 
-Largely, this is somewhat ill-defined, so it's not something that can be
-easily (or correctly) described by a limited firmware call interface.
+data is used here to know if I should disable misc ADCs (if supported by
+the PMIC). So kinda need it only for that purpose, maybe I can use a
+slightly simpler structure to only store regmap and this adc_en2 boolean.
 
-I believe that the correct way to describe this is to describe the
-wakeup capabilities on devices. Both ACPI and DT have mechanisms for
-that today, though it seems that there is confusion as to precisely how
-to use them.
+Ack for everything else.
 
 Thanks,
-Mark.
+Quentin
+
+-- 
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
