@@ -1,222 +1,155 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 21 Feb 2017 12:32:13 +0800
-Subject: [PATCH v3 04/18] iio: adc: add support for X-Powers AXP20X and
- AXP22X PMICs ADCs
-In-Reply-To: <20170214094112.27426-5-quentin.schulz@free-electrons.com>
-References: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
- <20170214094112.27426-5-quentin.schulz@free-electrons.com>
-Message-ID: <CAGb2v66D-11CcuPoTWGtBuy4z3uUu4Srgg-CZv-B9ua8p0dhzg@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 21 Feb 2017 12:37:40 +0800
+Subject: [PATCH net-next v3 0/4] net: mvneta: improve rx/tx performance
+In-Reply-To: <877f4laqog.fsf@free-electrons.com>
+References: <20170220125344.3555-1-jszhang@marvell.com>
+ <877f4laqog.fsf@free-electrons.com>
+Message-ID: <20170221123726.2db7db19@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2017 at 5:40 PM, Quentin Schulz
-<quentin.schulz@free-electrons.com> wrote:
-> The X-Powers AXP20X and AXP22X PMICs have multiple ADCs. They expose the
-> battery voltage, battery charge and discharge currents, AC-in and VBUS
-> voltages and currents, 2 GPIOs muxable in ADC mode and PMIC temperature.
->
-> This adds support for most of AXP20X and AXP22X ADCs.
->
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->
-> v3:
->  - moved from switch to if condition in axp20x_adc_raw and
->  axp22x_adc_raw,
->  - removed DT support as DT node has been dropped,
->    - use of platform_device_id
->  - correctly defined the name of the iio device (name used to probe the
->  driver),
->  - added goto for errors in probe,
->  - added iio_map_array_unregister to the remove function,
->
-> v2:
->  - removed unused defines,
->  - changed BIT(x) to 1 << x when describing bits purpose for which 2 <<
->  x or 3 << x exists, to be consistent,
->  - changed ADC rate defines to macro formulas,
->  - reordered IIO channels, now different measures (current/voltage) of
->  the same part of the PMIC (e.g. battery), have the same IIO channel in
->  their respective IIO type. When a part of the PMIC have only one
->  measure, a number is jumped,
->  - left IIO channel mapping in DT to use iio_map structure,
->  - removed indexing of ADC internal temperature,
->  - removed unused iio_dev structure in axp20x_adc_iio,
->  - added a structure for data specific to AXP20X or AXP22X PMICs instead
->  of using an ID and an if condition when needing to separate the
->  behaviour of both,
->  - added a comment on batt_chrg_i really being on 12bits rather than
->  what the Chinese datasheets say (13 bits),
->  - corrected the offset for AXP22X PMIC temperature,
->  - set the ADC rate to a value (100Hz) shared by the AXP20X and AXP22X,
->  - created macro formulas to compute the ADC rate for each,
->  - added a condition on presence of ADC_EN2 reg before setting/resetting
->  it,
->  - switched from devm_iio_device_unregister to the non-devm function
->  because of the need for a remove function,
->  - removed some dead code,
->
->  drivers/iio/adc/Kconfig      |  10 +
->  drivers/iio/adc/Makefile     |   1 +
->  drivers/iio/adc/axp20x_adc.c | 606 +++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 617 insertions(+)
->  create mode 100644 drivers/iio/adc/axp20x_adc.c
->
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 9c8b558..ed17fe1 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -154,6 +154,16 @@ config AT91_SAMA5D2_ADC
->           To compile this driver as a module, choose M here: the module will be
->           called at91-sama5d2_adc.
->
-> +config AXP20X_ADC
-> +       tristate "X-Powers AXP20X and AXP22X ADC driver"
-> +       depends on MFD_AXP20X
-> +       help
-> +         Say yes here to have support for X-Powers power management IC (PMIC)
-> +         AXP20X and AXP22X ADC devices.
-> +
-> +         To compile this driver as a module, choose M here: the module will be
-> +         called axp20x_adc.
-> +
->  config AXP288_ADC
->         tristate "X-Powers AXP288 ADC driver"
->         depends on MFD_AXP20X
-> diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-> index d36c4be..f5c28a5 100644
-> --- a/drivers/iio/adc/Makefile
-> +++ b/drivers/iio/adc/Makefile
-> @@ -16,6 +16,7 @@ obj-$(CONFIG_AD7887) += ad7887.o
->  obj-$(CONFIG_AD799X) += ad799x.o
->  obj-$(CONFIG_AT91_ADC) += at91_adc.o
->  obj-$(CONFIG_AT91_SAMA5D2_ADC) += at91-sama5d2_adc.o
-> +obj-$(CONFIG_AXP20X_ADC) += axp20x_adc.o
->  obj-$(CONFIG_AXP288_ADC) += axp288_adc.o
->  obj-$(CONFIG_BCM_IPROC_ADC) += bcm_iproc_adc.o
->  obj-$(CONFIG_BERLIN2_ADC) += berlin2-adc.o
-> diff --git a/drivers/iio/adc/axp20x_adc.c b/drivers/iio/adc/axp20x_adc.c
-> new file mode 100644
-> index 0000000..5ef6af8
-> --- /dev/null
-> +++ b/drivers/iio/adc/axp20x_adc.c
-> @@ -0,0 +1,606 @@
+Hi Gregory,
 
-[...]
+On Mon, 20 Feb 2017 15:21:35 +0100 Gregory CLEMENT wrote:
 
-> +
-> +static const struct platform_device_id axp20x_adc_id_match[] = {
-> +       { .name = "axp20x-adc", .driver_data = (kernel_ulong_t)&axp20x_data, },
-> +       { .name = "axp22x-adc", .driver_data = (kernel_ulong_t)&axp22x_data, },
-> +       { /* sentinel */ },
-> +};
+> Hi Jisheng,
+>  
+>  On lun., f?vr. 20 2017, Jisheng Zhang <jszhang@marvell.com> wrote:
+> 
+> > In hot code path such as mvneta_rx_swbm(), we access fields of rx_desc
+> > and tx_desc. These DMA descs are allocated by dma_alloc_coherent, they
+> > are uncacheable if the device isn't cache coherent, reading from
+> > uncached memory is fairly slow.
+> >
+> > patch1 reuses the read out status to getting status field of rx_desc
+> > again.
+> >
+> > patch2 avoids getting buf_phys_addr from rx_desc again in
+> > mvneta_rx_hwbm by reusing the phys_addr variable.
+> >
+> > patch3 avoids reading from tx_desc as much as possible by store what
+> > we need in local variable.
+> >
+> > We get the following performance data on Marvell BG4CT Platforms
+> > (tested with iperf):
+> >
+> > before the patch:
+> > sending 1GB in mvneta_tx()(disabled TSO) costs 793553760ns
+> >
+> > after the patch:
+> > sending 1GB in mvneta_tx()(disabled TSO) costs 719953800ns
+> >
+> > we saved 9.2% time.
+> >
+> > patch4 uses cacheable memory to store the rx buffer DMA address.
+> >
+> > We get the following performance data on Marvell BG4CT Platforms
+> > (tested with iperf):
+> >
+> > before the patch:
+> > recving 1GB in mvneta_rx_swbm() costs 1492659600 ns
+> >
+> > after the patch:
+> > recving 1GB in mvneta_rx_swbm() costs 1421565640 ns  
+> 
+> Could you explain who you get this number?
 
-MODULE_DEVICE_TABLE(platform, axp20x_adc_id_match);
+Thanks for your review.
 
-So module autoloading works. Otherwise,
+The measurement is simple: record how much time we spent in mvneta_rx_swbm()
+for receiving 1GB data, something as below:
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+mvneta_rx_swbm()
+{
+	static u64 total_time;
+	u64 t1, t2;
+	static u64 count;
 
-> +
-> +static int axp20x_probe(struct platform_device *pdev)
-> +{
-> +       struct axp20x_adc_iio *info;
-> +       struct iio_dev *indio_dev;
-> +       struct axp20x_dev *axp20x_dev;
-> +       int ret;
-> +
-> +       axp20x_dev = dev_get_drvdata(pdev->dev.parent);
-> +
-> +       indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
-> +       if (!indio_dev)
-> +               return -ENOMEM;
-> +
-> +       info = iio_priv(indio_dev);
-> +       platform_set_drvdata(pdev, indio_dev);
-> +
-> +       info->regmap = axp20x_dev->regmap;
-> +       indio_dev->dev.parent = &pdev->dev;
-> +       indio_dev->dev.of_node = pdev->dev.of_node;
-> +       indio_dev->modes = INDIO_DIRECT_MODE;
-> +
-> +       info->data = (struct axp_data *)platform_get_device_id(pdev)->driver_data;
-> +
-> +       indio_dev->name = platform_get_device_id(pdev)->name;
-> +       indio_dev->info = info->data->iio_info;
-> +       indio_dev->num_channels = info->data->num_channels;
-> +       indio_dev->channels = info->data->channels;
-> +
-> +       /* Enable the ADCs on IP */
-> +       regmap_write(info->regmap, AXP20X_ADC_EN1, info->data->adc_en1_mask);
-> +
-> +       if (info->data->adc_en2)
-> +               /* Enable GPIO0/1 and internal temperature ADCs */
-> +               regmap_update_bits(info->regmap, AXP20X_ADC_EN2,
-> +                                  AXP20X_ADC_EN2_MASK, AXP20X_ADC_EN2_MASK);
-> +
-> +       /* Configure ADCs rate */
-> +       regmap_update_bits(info->regmap, AXP20X_ADC_RATE, AXP20X_ADC_RATE_MASK,
-> +                          info->data->adc_rate(100));
-> +
-> +       ret = iio_map_array_register(indio_dev, info->data->maps);
-> +       if (ret < 0) {
-> +               dev_err(&pdev->dev, "failed to register IIO maps: %d\n", ret);
-> +               goto fail_map;
-> +       }
-> +
-> +       ret = iio_device_register(indio_dev);
-> +       if (ret < 0) {
-> +               dev_err(&pdev->dev, "could not register the device\n");
-> +               goto fail_register;
-> +       }
-> +
-> +       return 0;
-> +
-> +fail_register:
-> +       iio_map_array_unregister(indio_dev);
-> +
-> +fail_map:
-> +       regmap_write(info->regmap, AXP20X_ADC_EN1, 0);
-> +
-> +       if (info->data->adc_en2)
-> +               regmap_write(info->regmap, AXP20X_ADC_EN2, 0);
-> +
-> +       return ret;
-> +}
-> +
-> +static int axp20x_remove(struct platform_device *pdev)
-> +{
-> +       struct axp20x_adc_iio *info;
-> +       struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-> +
-> +       info = iio_priv(indio_dev);
-> +
-> +       iio_device_unregister(indio_dev);
-> +       iio_map_array_unregister(indio_dev);
-> +
-> +       regmap_write(info->regmap, AXP20X_ADC_EN1, 0);
-> +
-> +       if (info->data->adc_en2)
-> +               regmap_write(info->regmap, AXP20X_ADC_EN2, 0);
-> +
-> +       return 0;
-> +}
-> +
-> +static struct platform_driver axp20x_adc_driver = {
-> +       .driver = {
-> +               .name = "axp20x-adc",
-> +       },
-> +       .id_table = axp20x_adc_id_match,
-> +       .probe = axp20x_probe,
-> +       .remove = axp20x_remove,
-> +};
-> +
-> +module_platform_driver(axp20x_adc_driver);
-> +
-> +MODULE_DESCRIPTION("ADC driver for AXP20X and AXP22X PMICs");
-> +MODULE_AUTHOR("Quentin Schulz <quentin.schulz@free-electrons.com>");
-> +MODULE_LICENSE("GPL");
-> --
-> 2.9.3
->
+	t1 = sched_clock();
+	...
+
+	if (rcvd_pkts) {
+		...
+		t2 = sched_clock() - t1;
+		total_time += t2;
+		count += rcvd_bytes;;
+		if (count >= 0x40000000) {
+			printk("!!!! %lld %lld\n", total_time, count);
+			total_time = 0;
+			count = 0;
+		}
+	...
+}
+
+> 
+> receiving 1GB in 1.42 second means having a bandwidth of
+> 8/1.42=5.63 Gb/s, that means that you are using at least a 10Gb
+> interface.
+
+hmmm, we just measured the time spent in mvneta_rx_swbm(), so we can't solve
+the bandwidth as 8/1.42, what do you think?
+
+> 
+> When I used iperf I didn't have this kind of granularity:
+> iperf -c 192.168.10.1 -n 1024M
+> ------------------------------------------------------------
+> Client connecting to 192.168.10.19, TCP port 5001
+> TCP window size: 43.8 KByte (default)
+> ------------------------------------------------------------
+> [  3] local 192.168.10.28 port 53086 connected with 192.168.10.1 port 5001
+> [ ID] Interval       Transfer     Bandwidth
+> [  3]  0.0- 9.1 sec  1.00 GBytes   942 Mbits/sec
+> 
+> Also without HWBM enabled (so with the same configuration of your test),
+> I didn't noticed any improvement with the patch set applied. But at
+
+>From bandwidth point of view, yes, there's no improvement. But from cpu
+time/load point of view, I do see a trivial improvement. Could you also
+did a simple test from your side to see whether we have similar improvement
+data?
+
+Thanks,
+Jisheng
+
+
+
+> least I didn't see any regression with or without HWBM.
+> 
+> Gregory
+> 
+> >
+> > We saved 4.76% time.
+> >
+> > Basically, patch1 and patch4 do what Arnd mentioned in [1].
+> >
+> > Hi Arnd,
+> >
+> > I added "Suggested-by you" tag, I hope you don't mind ;)
+> >
+> > Thanks
+> >
+> > [1] https://www.spinics.net/lists/netdev/msg405889.html
+> >
+> > Since v2:
+> >   - add Gregory's ack to patch1
+> >   - only get rx buffer DMA address from cacheable memory for mvneta_rx_swbm()
+> >   - add patch 2 to read rx_desc->buf_phys_addr once in mvneta_rx_hwbm()
+> >   - add patch 3 to avoid reading from tx_desc as much as possible
+> >
+> > Since v1:
+> >   - correct the performance data typo
+> >
+> >
+> > Jisheng Zhang (4):
+> >   net: mvneta: avoid getting status from rx_desc as much as possible
+> >   net: mvneta: avoid getting buf_phys_addr from rx_desc again
+> >   net: mvneta: avoid reading from tx_desc as much as possible
+> >   net: mvneta: Use cacheable memory to store the rx buffer DMA address
+> >
+> >  drivers/net/ethernet/marvell/mvneta.c | 80 +++++++++++++++++++----------------
+> >  1 file changed, 43 insertions(+), 37 deletions(-)
+> >
+> > -- 
+> > 2.11.0
+> >  
+> 
