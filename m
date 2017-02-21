@@ -1,36 +1,34 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Tue, 21 Feb 2017 14:55:04 +0800
-Subject: [PATCH V2 3/3] serial: sprd: adjust TIMEOUT to a big value
-In-Reply-To: <1487660104-15693-1-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1487660104-15693-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <1487660104-15693-4-git-send-email-chunyan.zhang@spreadtrum.com>
+From: yuantian.tang@nxp.com (yuantian.tang at nxp.com)
+Date: Tue, 21 Feb 2017 14:51:24 +0800
+Subject: [PATCH] cpufreq: qoriq: clean up unused code
+Message-ID: <1487659884-29040-1-git-send-email-yuantian.tang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Qiao <wei.qiao@spreadtrum.com>
+From: Tang Yuantian <Yuantian.Tang@nxp.com>
 
-SPRD_TIMEOUT was 256, which is too small to wait until the status
-switched to workable in a while loop, so that the earlycon could
-not work correctly.
+This snip code is not needed anymore since its user
+get_hard_smp_processor_id() has been removed.
 
-Signed-off-by: Wei Qiao <wei.qiao@spreadtrum.com>
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
 ---
- drivers/tty/serial/sprd_serial.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/cpufreq/qoriq-cpufreq.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/tty/serial/sprd_serial.c b/drivers/tty/serial/sprd_serial.c
-index 699447a..cc1a55e 100644
---- a/drivers/tty/serial/sprd_serial.c
-+++ b/drivers/tty/serial/sprd_serial.c
-@@ -36,7 +36,7 @@
- #define SPRD_FIFO_SIZE		128
- #define SPRD_DEF_RATE		26000000
- #define SPRD_BAUD_IO_LIMIT	3000000
--#define SPRD_TIMEOUT		256
-+#define SPRD_TIMEOUT		256000
+diff --git a/drivers/cpufreq/qoriq-cpufreq.c b/drivers/cpufreq/qoriq-cpufreq.c
+index 53d8c3f..02031a3 100644
+--- a/drivers/cpufreq/qoriq-cpufreq.c
++++ b/drivers/cpufreq/qoriq-cpufreq.c
+@@ -22,10 +22,6 @@
+ #include <linux/slab.h>
+ #include <linux/smp.h>
  
- /* the offset of serial registers and BITs for them */
- /* data registers */
+-#if !defined(CONFIG_ARM)
+-#include <asm/smp.h>	/* for get_hard_smp_processor_id() in UP configs */
+-#endif
+-
+ /**
+  * struct cpu_data
+  * @pclk: the parent clock of cpu
 -- 
-2.7.4
+2.1.0.27.g96db324
