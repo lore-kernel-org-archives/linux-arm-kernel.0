@@ -1,32 +1,36 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 21 Feb 2017 15:31:58 -0600
-Subject: next-20170221 build: 2 failures 9 warnings (next-20170221)
-In-Reply-To: <20170221174737.2gf63ywzdjrh33ub@sirena.org.uk>
-References: <E1cg6WK-0000gP-QT@optimist>
- <20170221174737.2gf63ywzdjrh33ub@sirena.org.uk>
-Message-ID: <20170221213158.GA26036@bhelgaas-glaptop.roam.corp.google.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 Feb 2017 23:00:46 +0100
+Subject: [PATCH] ASoC: mediatek: add I2C dependency for CS42XX8
+Message-ID: <20170221220108.200734-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2017 at 09:47:37AM -0800, Mark Brown wrote:
-> On Tue, Feb 21, 2017 at 09:14:04AM +0000, Build bot for Mark Brown wrote:
-> 
-> Today's -next fails to build an ARM allmodconfig due to:
-> 
-> > 	arm-allmodconfig
-> > ../drivers/pci/dwc/pci-exynos.c:132:25: error: 'struct exynos_pcie' has no member named 'pp'
-> > ../drivers/pci/dwc/pci-exynos.c:162:25: error: 'struct exynos_pcie' has no member named 'pp'
-> > ../drivers/pci/dwc/pci-exynos.c:185:25: error: 'struct exynos_pcie' has no member named 'pp'
-> 
-> due to b09d4ac91a3934e9 (PCI: dwc: all: Split struct pcie_port into
-> host-only and core structures) which replaced the struct member pp with
-> *pci but has missed some users.
+We should not select drivers that depend on I2C when that is disabled,
+as it results in a build error:
 
-Thanks a lot, Mark!
+warning: (SND_SOC_MT2701_CS42448) selects SND_SOC_CS42XX8_I2C which has unmet direct dependencies (SOUND && !M68K && !UML && SND && SND_SOC && I2C)
+sound/soc/codecs/cs42xx8-i2c.c:60:1: warning: data definition has no type or storage class
+ module_i2c_driver(cs42xx8_i2c_driver);
+sound/soc/codecs/cs42xx8-i2c.c:60:1: error: type defaults to 'int' in declaration of 'module_i2c_driver' [-Werror=implicit-int]
 
-b09d4ac91a3934e9 converted all the users at the time, but 327847808474
-("PCI: exynos: Refactor to make it easier to support other SoCs") from
-another branch added some new uses, and I missed those when I merged the
-branches together.  I think I fixed it but I can't build it personally.
+Fixes: 1f458d53f76c ("ASoC: mediatek: Add mt2701-cs42448 driver and config option.")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ sound/soc/mediatek/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Bjorn
+diff --git a/sound/soc/mediatek/Kconfig b/sound/soc/mediatek/Kconfig
+index 05cf809cf9e1..d7013bde6f45 100644
+--- a/sound/soc/mediatek/Kconfig
++++ b/sound/soc/mediatek/Kconfig
+@@ -13,7 +13,7 @@ config SND_SOC_MT2701
+ 
+ config SND_SOC_MT2701_CS42448
+ 	tristate "ASoc Audio driver for MT2701 with CS42448 codec"
+-	depends on SND_SOC_MT2701
++	depends on SND_SOC_MT2701 && I2C
+ 	select SND_SOC_CS42XX8_I2C
+ 	select SND_SOC_BT_SCO
+ 	help
+-- 
+2.9.0
