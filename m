@@ -1,69 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 21 Feb 2017 19:06:04 +0100
-Subject: [PATCH/RFC 3/6] drivers: firmware: psci: Implement shallow
- suspend mode
-In-Reply-To: <20170221172012.GD8605@leverpostej>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <1487622809-25127-4-git-send-email-geert+renesas@glider.be>
- <20170221110712.GB5021@amd> <de2a15d4-9ac2-9ba9-a47a-eacbf478f601@arm.com>
- <CAMuHMdVmu4AYZ6MZHd79N2-2gELR6s3oZ46UnEszCfLvHymY1w@mail.gmail.com>
- <20170221172012.GD8605@leverpostej>
-Message-ID: <CAMuHMdX_pot+=rJfY1Kor4gYD4CgBYivngzCLwV36LELx+AA5Q@mail.gmail.com>
+From: hsweeten@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 21 Feb 2017 11:15:26 -0700
+Subject: [PATCH 1/4] ARM: ep93xx: switch to SPARSEMEM
+In-Reply-To: <20170221181529.6780-1-hsweeten@visionengravers.com>
+References: <20170221181529.6780-1-hsweeten@visionengravers.com>
+Message-ID: <20170221181529.6780-2-hsweeten@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+The EP93xx has four chip selects that can be used for the SDRAM memory.
+These chip selects are decoded to specify an address domain:
 
-On Tue, Feb 21, 2017 at 6:20 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Feb 21, 2017 at 05:32:50PM +0100, Geert Uytterhoeven wrote:
->> On Tue, Feb 21, 2017 at 12:14 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> > On 21/02/17 11:07, Pavel Machek wrote:
->> >>> Enable support for "shallow" suspend mode, also known as "Standby" or
->> >>> "Power-On Suspend".
->> >>>
->> >>> As secondary CPU cores are taken offline, "shallow" suspend mode saves
->> >>> slightly more power than "s2idle", but less than "deep" suspend mode.
->> >>> However, unlike "deep" suspend mode, "shallow" suspend mode can be used
->> >>> regardless of the presence of support for PSCI_SYSTEM_SUSPEND, which is
->> >>> an optional API in PSCI v1.0.
->> >>
->> >> If system supports "shallow" suspend, why does not PSCI implement it?
->> >
->> > Yes it can, and IIUC it already does on this platform with CPU_SUSPEND.
->> > All it now needs is just to use existing "freeze" suspend mode in Linux.
->>
->> How can Linux know if using "deep" suspend will allow to wake-up the system
->> according to configured wake-up sources, or not?
->
-> My understanding is that if a device can wake the system from
-> PSCI_SYSTEM_SUSPEND, it should be described in the DT as a wakeup source
-> [1]. So we should be able to determine the set of devices which can wake
-> the system from a suspend. We shouldn't assume that other devices can
-> (though I don't precisely what we do currently).
->
-> Otherwise, where PSCI_CPU_SUSPEND, we'd expect that most devices
-> (barring cpu-local timers) can wake up CPUs, and hence the system, by
-> raising an interrupt.
+  SDCS3  0x00000000-0x0fffffff with Boot Option ASDO=1
+  SDCS0  0xc0000000-0xcfffffff
+  SDCS1  0xd0000000-0xdfffffff
+  SDCS2  0xe0000000-x0efffffff
+  SDCS3  0xf0000000-0xffffffff with Boot Option ASDO=0
 
-> [1] Documentation/devicetree/bindings/power/wakeup-source.txt
+Because of the row/column/bank architecture of SDRAM, the mapping of
+these memories into the processor's memory space is discontiguous.
 
-"wakeup-source" in DT is used as a mix of hardware description and software
-policy.  E.g. some keys on a keyboard may have it, others don't, while there's
-not always a technical reason for that.
+Most ep93xx systems only use one of the chip selects. For these systems,
+ARCH_HAS_HOLES_MEMORYMODEL has worked fine to handle the discontiguous
+memory.
 
-Also, it doesn't specify from which suspend state it can wake-up.
+But, some of the TS-72xx boards use multiple chip selects. The TS-7300 in
+particular uses SDCS3 (with ASDO=1) and SDCS2. On that system with
+ARCH_HAS_HOLES_MEMORYMODEL the SDCS2 memory does not get handled correctly
+and results in the system not booting.
 
-On top of that, the Linux PM subsystem allows to configure wakeup by writing
-"enabled" to a device's "wakeup" file in sysfs.  Or you can use ethtool for
-Wake-on-LAN.
+Change the EP93xx to ARCH_SPARSEMEM_ENABLE. This handles the discontiguous
+memory for all configurations.
 
-Gr{oetje,eeting}s,
+This has been tested on the following ep93xx platforms:
 
-                        Geert
+EDB9307A with 64 MiB on SDCS0
+Vision EP9307 with 64 MiB on SDCS0
+TS-7300 with 64 MiB on SDCS3 (with ASDO=1) and 64 MiB on SDCS2
+sim.one with 64 MiB on SDCS0
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
+Cc: Russell King <linux@armlinux.org.uk>
+---
+ arch/arm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 71cea9e..cc8a88f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -383,7 +383,7 @@ config ARCH_EBSA110
+ 
+ config ARCH_EP93XX
+ 	bool "EP93xx-based"
+-	select ARCH_HAS_HOLES_MEMORYMODEL
++	select ARCH_SPARSEMEM_ENABLE
+ 	select ARM_AMBA
+ 	select ARM_PATCH_PHYS_VIRT
+ 	select ARM_VIC
+-- 
+2.10.0
