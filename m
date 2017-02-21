@@ -1,79 +1,82 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 21 Feb 2017 10:38:27 +0530
-Subject: [PATCH v2 4/6] spi: davinci: flush caches when performing DMA
-In-Reply-To: <69d41f8a-371b-abd9-7e78-f8701652877f@baylibre.com>
-References: <1487327904-28311-1-git-send-email-fisaksen@baylibre.com>
- <1487327904-28311-5-git-send-email-fisaksen@baylibre.com>
- <5fab0c33-6e1d-c63a-8758-6672236045a7@ti.com>
- <20170217112247.GE21222@n2100.armlinux.org.uk>
- <eaf93c6c-52a7-826b-9c53-2b13c0b280ca@baylibre.com>
- <20170217120749.GF21222@n2100.armlinux.org.uk>
- <0f3607fd-4542-be92-da2e-b2da6f8ac26f@ti.com>
- <f0fcc000-6c07-647a-ada2-04b61f0e2e3b@baylibre.com>
- <57721a60-52bb-c9d1-d5a7-ae450e7adcc0@ti.com>
- <2a1954a3-edbd-7ac4-6fde-9b6d046a6560@baylibre.com>
- <954333da-4d15-ce77-4021-268530365edc@ti.com>
- <69d41f8a-371b-abd9-7e78-f8701652877f@baylibre.com>
-Message-ID: <e713a1da-5774-a489-343f-de9aa0f0a141@ti.com>
+From: puck.chen@hisilicon.com (Chen Feng)
+Date: Tue, 21 Feb 2017 14:05:44 +0800
+Subject: [Linaro-mm-sig] [RFCv3][PATCH 3/5] arm64: Implement
+ ARCH_HAS_FORCE_CACHE
+In-Reply-To: <b4a92c52-cbe8-9009-43bf-4c7b49e31916@redhat.com>
+References: <1473715978-11633-1-git-send-email-labbott@redhat.com>
+ <1473715978-11633-4-git-send-email-labbott@redhat.com>
+ <20160913091946.GB7467@arm.com>
+ <27805ccf-1f2d-81ea-044e-b21207be8e7f@redhat.com>
+ <20160913151325.GF17731@arm.com>
+ <b4a92c52-cbe8-9009-43bf-4c7b49e31916@redhat.com>
+Message-ID: <58ABD8B8.6050204@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Laura,
 
+When we enable kernel v4.4 or newer version on our platform, we meet the issue
+of flushing cache without reference device. It seems that this patch set is
+a solution. I'm curious the progress of the discussion. Do you have any plan
+to fix it in v4.4 and newer kernel verison?
 
-On Monday 20 February 2017 09:19 PM, Frode Isaksen wrote:
-> 
-> 
-> On 20/02/2017 12:27, Vignesh R wrote:
->>
->> On Monday 20 February 2017 04:04 PM, Frode Isaksen wrote:
+On 2016/9/14 2:41, Laura Abbott wrote:
+> On 09/13/2016 08:14 AM, Will Deacon wrote:
+>> On Tue, Sep 13, 2016 at 08:02:20AM -0700, Laura Abbott wrote:
+>>> On 09/13/2016 02:19 AM, Will Deacon wrote:
+>>>> On Mon, Sep 12, 2016 at 02:32:56PM -0700, Laura Abbott wrote:
+>>>>>
+>>>>> arm64 may need to guarantee the caches are synced. Implement versions of
+>>>>> the kernel_force_cache API to allow this.
+>>>>>
+>>>>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>>>>> ---
+>>>>> v3: Switch to calling cache operations directly instead of relying on
+>>>>> DMA mapping.
+>>>>> ---
+>>>>> arch/arm64/include/asm/cacheflush.h |  8 ++++++++
+>>>>> arch/arm64/mm/cache.S               | 24 ++++++++++++++++++++----
+>>>>> arch/arm64/mm/flush.c               | 11 +++++++++++
+>>>>> 3 files changed, 39 insertions(+), 4 deletions(-)
+>>>>
+>>>> I'm really hesitant to expose these cache routines as an API solely to
+>>>> support a driver sitting in staging/. I appreciate that there's a chicken
+>>>> and egg problem here, but we *really* don't want people using these routines
+>>>> in preference to the DMA API, and I fear that we'll simply grow a bunch
+>>>> more users of these things if we promote it as an API like you're proposing.
+>>>>
+>>>> Can the code not be contained under staging/, as part of ion?
+>>>>
 >>>
->>> On 20/02/2017 10:47, Vignesh R wrote:
->>>> On Monday 20 February 2017 02:56 PM, Frode Isaksen wrote:
->>>>> On 20/02/2017 07:55, Vignesh R wrote:
->>>>>> On Friday 17 February 2017 05:37 PM, Russell King - ARM Linux wrote:
->> [...]
->>>>>> I am debugging another issue with UBIFS wherein pages allocated by
->>>>>> vmalloc are in highmem region that are not addressable using 32 bit
->>>>>> addresses and is backed by LPAE. So, a 32 bit DMA cannot access these
->>>>>> buffers at all.
->>>>>> When dma_map_sg() is called to map these pages by spi_map_buf() the
->>>>>> physical address is just truncated to 32 bit in pfn_to_dma() (as part of
->>>>>> dma_map_sg() call). This results in random crashes as DMA starts
->>>>>> accessing random memory during SPI read.
->>>>>>
->>>>>> Given, the above problem and also issue surrounding VIVT caches, I am
->>>>>> thinking of may be using pre-allocated fixed size bounce buffer to
->>>>>> handle buffers not in lowmem mapping.
->>>>>> I have tried using 64KB pre-allocated buffer on TI DRA74 EVM with QSPI
->>>>>> running at 76.8MHz and do not see any significant degradation in
->>>>>> performance with UBIFS. Mainly because UBIFS seems to use vmalloc'd
->>>>>> buffers only during initial preparing and mounting phase and not during
->>>>>> file read/write.
->>>>> I am seeing a bug caused by VIVT cache in 'read_ltab()' function. In this function, the vmalloc'ed buffer is of size 11. Isn't it better to use kmalloc in this case ?
->>>> read_ltab() isn't the only place where vmalloc() is used. A quick grep
->>>> for vmalloc on fs/ubifs/ shows about ~19 occurrence. I guess every
->>>> vmalloc() call can potentially allocate memory from highmem and might
->>>> potentially cause issue for VIVT and such aliasing caches.
->>>> Fixing just one such case isn't going to help IMHO.
->>> Of course fixing it only in one place is of course not going to help..
->>> For the moment there are 3 solutions to the UBIFS DMA problem:
->>> 1) Always use bounce buffer for vmalloc'ed buffers - impacts everyone.
->>> 2) Remove use of vmalloc'ed buffers in UBIFS - is it possible ?
->> Maybe. But what about mtdblock with JFFS2 on top of it, mtdblock still
->> uses vmalloc'd buffers?
-> That's why I put the cache flush in the SPI driver in the first try..
-> FYI, I replaced the use of vmalloc with kmalloc in a few places in the UBIFS layer and it seems to work. The size of the buffers allocated varies from 11 (?) to 65408 bytes.
-
-FYI, here is the discussion on DMA + UBIFS:
-http://lists.infradead.org/pipermail/linux-mtd/2016-October/069856.html
-
-> Maybe the best place to handle this is in the SPI flash drivers(s). These drivers knows that they may handle vmalloc'ed buffers and the should assume that the underlying SPI driver may use DMA.
+>>> I proposed that in V1 and it was suggested I make it a proper API
+>>>
+>>> http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47654.html
+>>> http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47672.html
+>>
+>> :/ then I guess we're in disagreement. If ion really needs this stuff
+>> (which I don't fully grok), perhaps we should be exposing something at
+>> a higher level from the architecture, so it really can't be used for
+>> anything other than ion.
 > 
-
-I guess so, NAND core already seems to use bounce buffer for vmalloc'd
-addresses.
-
-
--- 
-Regards
-Vignesh
+> I talked/complained about this at a past plumbers. The gist is that Ion
+> ends up acting as a fake DMA layer for clients. It doesn't match nicely
+> because clients can allocate both coherent and non-coherent memory.
+> Trying to use dma_map doesn't work because a) a device for coherency isn't
+> known at allocation time b) it kills performance. Part of the motivation
+> for taking this approach is to avoid the need to rework the existing
+> Android userspace and keep the existing behavior, as terrible as it
+> is. Having Ion out of staging and not actually usable isn't helpful.
+> 
+> I'll give this all some more thought and hopefully have one or two more
+> proposals before Connect/Plumbers.
+> 
+>>
+>> Will
+>>
+> 
+> Thanks,
+> Laura
+> _______________________________________________
+> Linaro-mm-sig mailing list
+> Linaro-mm-sig at lists.linaro.org
+> https://lists.linaro.org/mailman/listinfo/linaro-mm-sig
