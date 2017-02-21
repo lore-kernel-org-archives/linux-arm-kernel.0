@@ -1,178 +1,159 @@
-From: psodagud@codeaurora.org (Sodagudi Prasad)
-Date: Tue, 21 Feb 2017 06:20:58 -0800
-Subject: <Query> Looking more details and reasons for using orig_add_limit.
-In-Reply-To: <58A58162.2020101@arm.com>
-References: <def87360266193184dc013a055ec3869@codeaurora.org>
- <58A4450C.3040602@arm.com> <7c727e6043e58077d143e35de0ce632c@codeaurora.org>
- <58A58162.2020101@arm.com>
-Message-ID: <568205ddc2e7af6a57a71b8c5cd47d68@codeaurora.org>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue, 21 Feb 2017 08:21:35 -0600
+Subject: [RESEND PATCH v2] arm64: cache: Skip an unnecessary data cache clean
+ PoU operation
+Message-ID: <1487686895-18065-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi mchehab/linux-media,
+The cache management functions always do the data cache PoU
+(point of unification) operations even though it is not required
+on some systems. No need to clean data cache till PoU if all the
+cache levels below PoUIS are WT (Write-Through) caches. It causes
+a huge performance degradation when operating on a larger memory
+area, especially THP with 64K page size kernel.
 
-It is not clear why KERNEL_DS was set explicitly here. In this path 
-video_usercopy() gets  called  and it
-copies the ?struct v4l2_buffer? struct to user space stack memory.
+For each online CPU, check the need of 'dc cvau' instruction and
+update a global variable __dcache_flags. The two functions
+__flush_cache_user_range() and __clean_dcache_area_pou() are
+modified to skip an unnecessary code execution based on flags.
+It won't change the existing behavior if any one of the online
+CPU is capable of WB cache below PoUIS level.
 
-Can you please share reasons for setting to KERNEL_DS here?
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+Changes since v1:
+    handle skipping a dcache clean POU operation by checking the
+    global variable __dcache_flags in cache.S instead of patching
+    the code segment.
 
-static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned 
-long arg)
-{
-?
-?
+ arch/arm64/include/asm/cachetype.h |  8 ++++++++
+ arch/arm64/kernel/cpuinfo.c        | 30 ++++++++++++++++++++++++++++++
+ arch/arm64/mm/cache.S              |  8 +++++++-
+ 3 files changed, 45 insertions(+), 1 deletion(-)
 
-         if (compatible_arg)
-                 err = native_ioctl(file, cmd, (unsigned long)up);
-         else {
-                 mm_segment_t old_fs = get_fs();
-
-                 set_fs(KERNEL_DS);
-                 err = native_ioctl(file, cmd, (unsigned long)&karg);
-                 set_fs(old_fs);
-         }
-?
-}
-
-On 2017-02-16 02:39, James Morse wrote:
-> Hi Prasad,
-> 
-> On 15/02/17 21:12, Sodagudi Prasad wrote:
->> On 2017-02-15 04:09, James Morse wrote:
->>> On 15/02/17 05:52, Sodagudi Prasad wrote:
->>>> that driver is calling set_fs(KERNEL_DS) and  then copy_to_user() to 
->>>> user space
->>>> memory.
->>> 
->>> Don't do this, its exactly the case PAN+UAO and the code you pointed 
->>> to are
->>> designed to catch. Accessing userspace needs doing carefully, setting 
->>> USER_DS
->>> and using the put_user()/copy_to_user() accessors are the required 
->>> steps.
->>> 
->>> Which driver is doing this? Is it in mainline?
->> 
->> Yes. It is mainline driver - 
->> drivers/media/v4l2-core/v4l2-compat-ioctl32.c
-> 
->> In some v4l2 use-case kernel panic is observed. Below part
->> of the code has set_fs to KERNEL_DS before calling native_ioctl().
->> 
->> static long do_video_ioctl(struct file *file, unsigned int cmd, 
->> unsigned long arg)
->> {
->> ?
->> ?
->>         if (compatible_arg)
->>                 err = native_ioctl(file, cmd, (unsigned long)up);
->>         else {
->>                 mm_segment_t old_fs = get_fs();
->> 
->>                 set_fs(KERNEL_DS);   ====> KERNEL_DS.
->>                 err = native_ioctl(file, cmd, (unsigned long)&karg);
->>                 set_fs(old_fs);
->>         }
->> 
->> Here is the call stack which is resulting crash, because user space 
->> memory has
->> read only permissions.
->> [27249.920041] [<ffffff8008357890>] __arch_copy_to_user+0x110/0x180
->> [27249.920047] [<ffffff8008847c98>] video_ioctl2+0x38/0x44
->> [27249.920054] [<ffffff8008840968>] v4l2_ioctl+0x78/0xb4
->> [27249.920059] [<ffffff80088542d8>] do_video_ioctl+0x91c/0x1160
->> [27249.920064] [<ffffff8008854b7c>] v4l2_compat_ioctl32+0x60/0xcc
->> [27249.920071] [<ffffff800822553c>] compat_SyS_ioctl+0x124/0xd88
->> [27249.920077] [<ffffff8008084e30>] el0_svc_naked+0x24/0x2
-> 
-> It's not totally clear to me what is going on here, but some 
-> observations:
-> the ioctl is trying to copy_to_user() to some read-only memory.  This 
-> would
-> normally fail gracefully with -EFAULT, but because KERNEL_DS has been 
-> set, the
-> kernel checks this before calling the fault handler and calls die() on
-> your ioctl().
-> 
-> The ioctl code is doing this deliberately as a compat mechanism, but 
-> the code
-> behind file->f_op->unlocked_ioctl() expects fs==USER_DS when it does 
-> its work.
-> That code needs to be made aware of this compat translation, or a 
-> compat_ioctl
-> call provided.
-
-> 
-> Which v4l driver is this? Which ioctl is being called? Does the driver 
-> using the
-> v4l framework have a compat_ioctl() call?
-Yes. Same kernel crash is seen with both video and camera use cases. 
-Yes. Driver have compact_ioctl().
-
-> What path does this call take through v4l2_compat_ioctl32()? It looks 
-> like
-> compat_ioctl will be skipped in certain cases, v4l2_compat_ioctl32() 
-> has:
->> 	if (_IOC_TYPE(cmd) == 'V' && _IOC_NR(cmd) < BASE_VIDIOC_PRIVATE)
->> 		ret = do_video_ioctl(file, cmd, arg);
->> 	else if (vdev->fops->compat_ioctl32)
->> 		ret = vdev->fops->compat_ioctl32(file, cmd, arg);
-> 
-> Is your ioctl matched by that top if()?
-Yes.  Top if condition in true and do_video_ioctl() getting called.
-
-> 
->>>> If there is permission fault for user space address the above 
->>>> condition
->>>> is leading to kernel crash. Because orig_add_limit is having 
->>>> KERNEL_DS as set_fs
->>>> called before copy_to_user().
->>>> 
->>>> 1)    So I would like to understand that,  is that user space 
->>>> pointer leading to
->>>> permission fault not correct(condition_1) in this scenario?
->>> 
->>> The correct thing has happened here. To access user space 
->>> set_fs(USER_DS) first.
->>> (and set it back to whatever it was afterwards).
->>> 
->> 
->> So, Any clean up needed to above call path similar to what was done in 
->> the below
->> commit?
->> commit a7f61e89af73e9bf760826b20dba4e637221fcb9 - compat_ioctl: don't 
->> call
->> do_ioctl under set_fs(KERNEL_DS)
-> 
-> That's clever. Is that code doing a conversion, or do you have a 
-> compat_ioctl()
-> in your driver?
-> 
-> It's possible that fs/compat_ioctl.c has done this work, but 
-> do_video_ioctl()
-> un-does it. Someone who knows about v4l and compat-ioctls should take a 
-> look...
-> 
-> 
-> This looks like a case of:
->> The accidental invocation of an unlocked_ioctl handler that 
->> unexpectedly
->> calls copy_to_user could be a severe security issue.
-> 
-> that Jann describes in the commit message. Fixing the code behind
-> file->f_op->unlocked_ioctl() to consider compat calls from 
-> do_video_ioctl() is
-> one way to solve this.
-> 
-> 
-> 
-> Thanks,
-> 
-> James
-
--Thanks, Prasad
+diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
+index f558869..352fb23 100644
+--- a/arch/arm64/include/asm/cachetype.h
++++ b/arch/arm64/include/asm/cachetype.h
+@@ -28,6 +28,8 @@
+ #define ICACHE_POLICY_VIPT	2
+ #define ICACHE_POLICY_PIPT	3
+ 
++#define DCACHE_SKIP_POU		0
++
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/bitops.h>
+@@ -39,6 +41,12 @@
+ 
+ extern unsigned long __icache_flags;
+ 
++extern unsigned long __dcache_flags;
++
++#define CLIDR_LOUIS_SHIFT	(21)
++#define CLIDR_LOUIS_MASK	(0x7)
++#define CLIDR_LOUIS(x)		(((x) >> CLIDR_LOUIS_SHIFT) & CLIDR_LOUIS_MASK)
++
+ /*
+  * NumSets, bits[27:13] - (Number of sets in cache) - 1
+  * Associativity, bits[12:3] - (Associativity of cache) - 1
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 7b7be71..0e1a30a 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -50,6 +50,7 @@
+ };
+ 
+ unsigned long __icache_flags;
++unsigned long __dcache_flags;
+ 
+ static const char *const hwcap_str[] = {
+ 	"fp",
+@@ -305,6 +306,33 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
+ 	pr_info("Detected %s I-cache on CPU%d\n", icache_policy_str[l1ip], cpu);
+ }
+ 
++/*
++ * Check if all the data cache levels below LoUIS doesn't support WB.
++ * The flag DCACHE_SKIP_POU set to 0 if any one of the online CPU
++ * doesn't support WB cache below LoUIS.
++ */
++static void cpuinfo_ckeck_dcache_pou(struct cpuinfo_arm64 *info)
++{
++	u32 louis = CLIDR_LOUIS(read_sysreg(clidr_el1));
++	static bool update_pou_once;
++	u32 lvl, csidr;
++
++	/* Set the DCACHE_SKIP_POU flag only first time */
++	if (!update_pou_once) {
++		set_bit(DCACHE_SKIP_POU, &__dcache_flags);
++		update_pou_once = true;
++	}
++
++	/* Go through all the cache level below LoUIS */
++	for (lvl = 0; lvl < louis; lvl++) {
++		csidr = cache_get_ccsidr(lvl << 1);
++		if (csidr & CCSIDR_EL1_WRITE_BACK) {
++			clear_bit(DCACHE_SKIP_POU, &__dcache_flags);
++			break;
++		}
++	}
++}
++
+ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
+ {
+ 	info->reg_cntfrq = arch_timer_get_cntfrq();
+@@ -345,6 +373,8 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
+ 	}
+ 
+ 	cpuinfo_detect_icache_policy(info);
++	cpuinfo_ckeck_dcache_pou(info);
++
+ }
+ 
+ void cpuinfo_store_cpu(void)
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 83c27b6e..1884da2 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -24,6 +24,7 @@
+ #include <asm/cpufeature.h>
+ #include <asm/alternative.h>
+ #include <asm/asm-uaccess.h>
++#include <asm/cachetype.h>
+ 
+ /*
+  *	flush_icache_range(start,end)
+@@ -50,6 +51,8 @@ ENTRY(flush_icache_range)
+  */
+ ENTRY(__flush_cache_user_range)
+ 	uaccess_ttbr0_enable x2, x3
++	ldr_l	x4, __dcache_flags
++	tbnz	x4, #DCACHE_SKIP_POU, 2f
+ 	dcache_line_size x2, x3
+ 	sub	x3, x2, #1
+ 	bic	x4, x0, x3
+@@ -60,6 +63,7 @@ user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
+ 	b.lo	1b
+ 	dsb	ish
+ 
++2:
+ 	icache_line_size x2, x3
+ 	sub	x3, x2, #1
+ 	bic	x4, x0, x3
+@@ -104,8 +108,10 @@ ENDPIPROC(__flush_dcache_area)
+  *	- size    - size in question
+  */
+ ENTRY(__clean_dcache_area_pou)
++	ldr_l	x2, __dcache_flags
++	tbnz	x2, #DCACHE_SKIP_POU, 1f
+ 	dcache_by_line_op cvau, ish, x0, x1, x2, x3
+-	ret
++1:	ret
+ ENDPROC(__clean_dcache_area_pou)
+ 
+ /*
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum,
-Linux Foundation Collaborative Project
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
