@@ -1,46 +1,101 @@
-From: thibault.saunier@osg.samsung.com (Thibault Saunier)
-Date: Tue, 21 Feb 2017 16:20:59 -0300
-Subject: [PATCH v5 3/3] [media] s5p-mfc: Check and set 'v4l2_pix_format:field'
- field in try_fmt
-In-Reply-To: <20170221192059.29745-1-thibault.saunier@osg.samsung.com>
-References: <20170221192059.29745-1-thibault.saunier@osg.samsung.com>
-Message-ID: <20170221192059.29745-4-thibault.saunier@osg.samsung.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue, 21 Feb 2017 11:29:20 -0800
+Subject: [Linaro-mm-sig] [RFCv3][PATCH 3/5] arm64: Implement
+ ARCH_HAS_FORCE_CACHE
+In-Reply-To: <58ABD8B8.6050204@hisilicon.com>
+References: <1473715978-11633-1-git-send-email-labbott@redhat.com>
+ <1473715978-11633-4-git-send-email-labbott@redhat.com>
+ <20160913091946.GB7467@arm.com>
+ <27805ccf-1f2d-81ea-044e-b21207be8e7f@redhat.com>
+ <20160913151325.GF17731@arm.com>
+ <b4a92c52-cbe8-9009-43bf-4c7b49e31916@redhat.com>
+ <58ABD8B8.6050204@hisilicon.com>
+Message-ID: <3551e685-fed1-de9c-a30e-12025ee480fb@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is required by the standard that the field order is set by the
-driver.
+On 02/20/2017 10:05 PM, Chen Feng wrote:
+> Hi Laura,
+> 
+> When we enable kernel v4.4 or newer version on our platform, we meet the issue
+> of flushing cache without reference device. It seems that this patch set is
+> a solution. I'm curious the progress of the discussion. Do you have any plan
+> to fix it in v4.4 and newer kernel verison?
+> 
 
-Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
+No, I've abandoned this approach based on feedback. The APIs had too much
+potential for incorrect usage. I'm ripping out the implicit caching in Ion
+and switching it to a model where there should always be a device available.
 
----
+What's your use case where you don't have a device structure?
 
-Changes in v5:
-- Just adapt the field and never error out.
+Thanks,
+Laura
 
-Changes in v4: None
-Changes in v3:
-- Do not check values in the g_fmt functions as Andrzej explained in previous review
-
-Changes in v2:
-- Fix a silly build error that slipped in while rebasing the patches
-
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-index 0976c3e0a5ce..44ed2afe0780 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-@@ -386,6 +386,9 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
- 	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
- 	struct s5p_mfc_fmt *fmt;
- 
-+	if (f->fmt.pix.field == V4L2_FIELD_ANY)
-+		f->fmt.pix.field = V4L2_FIELD_NONE;
-+
- 	mfc_debug(2, "Type is %d\n", f->type);
- 	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
- 		fmt = find_format(f, MFC_FMT_DEC);
--- 
-2.11.1
+> On 2016/9/14 2:41, Laura Abbott wrote:
+>> On 09/13/2016 08:14 AM, Will Deacon wrote:
+>>> On Tue, Sep 13, 2016 at 08:02:20AM -0700, Laura Abbott wrote:
+>>>> On 09/13/2016 02:19 AM, Will Deacon wrote:
+>>>>> On Mon, Sep 12, 2016 at 02:32:56PM -0700, Laura Abbott wrote:
+>>>>>>
+>>>>>> arm64 may need to guarantee the caches are synced. Implement versions of
+>>>>>> the kernel_force_cache API to allow this.
+>>>>>>
+>>>>>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>>>>>> ---
+>>>>>> v3: Switch to calling cache operations directly instead of relying on
+>>>>>> DMA mapping.
+>>>>>> ---
+>>>>>> arch/arm64/include/asm/cacheflush.h |  8 ++++++++
+>>>>>> arch/arm64/mm/cache.S               | 24 ++++++++++++++++++++----
+>>>>>> arch/arm64/mm/flush.c               | 11 +++++++++++
+>>>>>> 3 files changed, 39 insertions(+), 4 deletions(-)
+>>>>>
+>>>>> I'm really hesitant to expose these cache routines as an API solely to
+>>>>> support a driver sitting in staging/. I appreciate that there's a chicken
+>>>>> and egg problem here, but we *really* don't want people using these routines
+>>>>> in preference to the DMA API, and I fear that we'll simply grow a bunch
+>>>>> more users of these things if we promote it as an API like you're proposing.
+>>>>>
+>>>>> Can the code not be contained under staging/, as part of ion?
+>>>>>
+>>>>
+>>>> I proposed that in V1 and it was suggested I make it a proper API
+>>>>
+>>>> http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47654.html
+>>>> http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47672.html
+>>>
+>>> :/ then I guess we're in disagreement. If ion really needs this stuff
+>>> (which I don't fully grok), perhaps we should be exposing something at
+>>> a higher level from the architecture, so it really can't be used for
+>>> anything other than ion.
+>>
+>> I talked/complained about this at a past plumbers. The gist is that Ion
+>> ends up acting as a fake DMA layer for clients. It doesn't match nicely
+>> because clients can allocate both coherent and non-coherent memory.
+>> Trying to use dma_map doesn't work because a) a device for coherency isn't
+>> known at allocation time b) it kills performance. Part of the motivation
+>> for taking this approach is to avoid the need to rework the existing
+>> Android userspace and keep the existing behavior, as terrible as it
+>> is. Having Ion out of staging and not actually usable isn't helpful.
+>>
+>> I'll give this all some more thought and hopefully have one or two more
+>> proposals before Connect/Plumbers.
+>>
+>>>
+>>> Will
+>>>
+>>
+>> Thanks,
+>> Laura
+>> _______________________________________________
+>> Linaro-mm-sig mailing list
+>> Linaro-mm-sig at lists.linaro.org
+>> https://lists.linaro.org/mailman/listinfo/linaro-mm-sig
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
