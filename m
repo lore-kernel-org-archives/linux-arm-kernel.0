@@ -1,46 +1,242 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 21 Feb 2017 22:12:55 +0000
-Subject: [PATCH v2 0/2] ARM/arm64: module-plt: split core and init PLT sections
-Message-ID: <1487715177-30790-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Tue, 21 Feb 2017 22:12:56 +0000
+Subject: [PATCH v2 1/2] ARM: module: split core and init PLT sections
+In-Reply-To: <1487715177-30790-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1487715177-30790-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1487715177-30790-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes a thinko on my part in both the ARM and the arm64 implementations
-of module PLTs. What I failed to realise is that the core module sections and
-the init sections are allocated independently, which means they could end up
-further away from each other than the range of a branch instruction. This
-implies that they cannot share a single array of PLT entries, and so this
-series splits them into core and init PLT sections. To complicate matters
-further, this also means that .init.text code may require PLT entries to branch
-into the .text section of the same module.
+Since commit 35fa91eed817 ("ARM: kernel: merge core and init PLTs"),
+the ARM module PLT code allocates all PLT entries in a single core
+section, since the overhead of having a separate init PLT section is
+not justified by the small number of PLT entries usually required for
+init code.
 
-For ARM, this is actually a revert of commit 35fa91eed817 ("ARM: kernel:
-merge core and init PLTs") [although the patch in this series is not a
-straight revert.] This means that the issue is a regression, and the patch
-should probably go to -stable.
+However, the core and init module regions are allocated independently,
+and there is a corner case where the core region may be allocated from
+the VMALLOC region if the dedicated module region is exhausted, but the
+init region, being much smaller, can still be allocated from the module
+region. This puts the PLT entries out of reach of the relocated branch
+instructions, defeating the whole purpose of PLTs.
 
-For arm64, the likelihood of this issue ever occurring is very small, due
-to the 128 MB range of its branch instructions. Also, the arm64 version of
-the code was never correct, so it is not a regression. But for correctness,
-it is fixed in the same way as for ARM.
+So split the core and init PLT regions, and name the latter ".init.plt"
+so it gets allocated along with (and sufficiently close to) the .init
+sections that it serves. Also, given that init PLT entries may need to
+be emitted for branches that target the core module, modify the logic
+that disregards defined symbols to only disregard symbols that are
+defined in the same section.
 
-Build tested on ARM+arm64, and runtime tested on arm64.
+Fixes: 35fa91eed817 ("ARM: kernel: merge core and init PLTs")
+Reported-by: Angus Clark <angus@angusclark.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/include/asm/module.h |  9 +-
+ arch/arm/kernel/module-plts.c | 87 ++++++++++++++------
+ arch/arm/kernel/module.lds    |  1 +
+ 3 files changed, 68 insertions(+), 29 deletions(-)
 
-v2: deal with init PLT entries referring to .text symbols of the same module
-    fix warning in ARM code
-
-Ard Biesheuvel (2):
-  ARM: module: split core and init PLT sections
-  arm64: module: split core and init PLT sections
-
- arch/arm/include/asm/module.h   |   9 +-
- arch/arm/kernel/module-plts.c   |  87 +++++++++++-----
- arch/arm/kernel/module.lds      |   1 +
- arch/arm64/include/asm/module.h |   9 +-
- arch/arm64/kernel/module-plts.c | 108 ++++++++++++--------
- arch/arm64/kernel/module.c      |   2 +-
- arch/arm64/kernel/module.lds    |   1 +
- 7 files changed, 140 insertions(+), 77 deletions(-)
-
+diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
+index 464748b9fd7d..ed2319663a1e 100644
+--- a/arch/arm/include/asm/module.h
++++ b/arch/arm/include/asm/module.h
+@@ -18,13 +18,18 @@ enum {
+ };
+ #endif
+ 
++struct mod_plt_sec {
++	struct elf32_shdr	*plt;
++	int			plt_count;
++};
++
+ struct mod_arch_specific {
+ #ifdef CONFIG_ARM_UNWIND
+ 	struct unwind_table *unwind[ARM_SEC_MAX];
+ #endif
+ #ifdef CONFIG_ARM_MODULE_PLTS
+-	struct elf32_shdr   *plt;
+-	int		    plt_count;
++	struct mod_plt_sec	core;
++	struct mod_plt_sec	init;
+ #endif
+ };
+ 
+diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
+index 3a5cba90c971..3d0c2e4dda1d 100644
+--- a/arch/arm/kernel/module-plts.c
++++ b/arch/arm/kernel/module-plts.c
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2014 Linaro Ltd. <ard.biesheuvel@linaro.org>
++ * Copyright (C) 2014-2017 Linaro Ltd. <ard.biesheuvel@linaro.org>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -31,9 +31,17 @@ struct plt_entries {
+ 	u32	lit[PLT_ENT_COUNT];
+ };
+ 
++static bool in_init(const struct module *mod, unsigned long loc)
++{
++	return loc - (u32)mod->init_layout.base < mod->init_layout.size;
++}
++
+ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
+ {
+-	struct plt_entries *plt = (struct plt_entries *)mod->arch.plt->sh_addr;
++	struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
++							  &mod->arch.init;
++
++	struct plt_entries *plt = (struct plt_entries *)pltsec->plt->sh_addr;
+ 	int idx = 0;
+ 
+ 	/*
+@@ -41,9 +49,9 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
+ 	 * relocations are sorted, this will be the last entry we allocated.
+ 	 * (if one exists).
+ 	 */
+-	if (mod->arch.plt_count > 0) {
+-		plt += (mod->arch.plt_count - 1) / PLT_ENT_COUNT;
+-		idx = (mod->arch.plt_count - 1) % PLT_ENT_COUNT;
++	if (pltsec->plt_count > 0) {
++		plt += (pltsec->plt_count - 1) / PLT_ENT_COUNT;
++		idx = (pltsec->plt_count - 1) % PLT_ENT_COUNT;
+ 
+ 		if (plt->lit[idx] == val)
+ 			return (u32)&plt->ldr[idx];
+@@ -53,8 +61,8 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
+ 			plt++;
+ 	}
+ 
+-	mod->arch.plt_count++;
+-	BUG_ON(mod->arch.plt_count * PLT_ENT_SIZE > mod->arch.plt->sh_size);
++	pltsec->plt_count++;
++	BUG_ON(pltsec->plt_count * PLT_ENT_SIZE > pltsec->plt->sh_size);
+ 
+ 	if (!idx)
+ 		/* Populate a new set of entries */
+@@ -129,7 +137,7 @@ static bool duplicate_rel(Elf32_Addr base, const Elf32_Rel *rel, int num)
+ 
+ /* Count how many PLT entries we may need */
+ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
+-			       const Elf32_Rel *rel, int num)
++			       const Elf32_Rel *rel, int num, Elf32_Word dstidx)
+ {
+ 	unsigned int ret = 0;
+ 	const Elf32_Sym *s;
+@@ -144,13 +152,17 @@ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
+ 		case R_ARM_THM_JUMP24:
+ 			/*
+ 			 * We only have to consider branch targets that resolve
+-			 * to undefined symbols. This is not simply a heuristic,
+-			 * it is a fundamental limitation, since the PLT itself
+-			 * is part of the module, and needs to be within range
+-			 * as well, so modules can never grow beyond that limit.
++			 * to symbols that are defined in a different section.
++			 * This is not simply a heuristic, it is a fundamental
++			 * limitation, since there is no guaranteed way to emit
++			 * PLT entries sufficiently close to the branch if the
++			 * section size exceeds the range of a branch
++			 * instruction. So ignore relocations against defined
++			 * symbols if they live in the same section as the
++			 * relocation target.
+ 			 */
+ 			s = syms + ELF32_R_SYM(rel[i].r_info);
+-			if (s->st_shndx != SHN_UNDEF)
++			if (s->st_shndx == dstidx)
+ 				break;
+ 
+ 			/*
+@@ -161,7 +173,12 @@ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
+ 			 * So we need to support them, but there is no need to
+ 			 * take them into consideration when trying to optimize
+ 			 * this code. So let's only check for duplicates when
+-			 * the addend is zero.
++			 * the addend is zero. (Note that calls into the core
++			 * module via init PLT entries could involve section
++			 * relative symbol references with non-zero addends, for
++			 * which we may end up emitting duplicates, but the init
++			 * PLT is released along with the rest of the .init
++			 * region as soon as module loading completes.)
+ 			 */
+ 			if (!is_zero_addend_relocation(base, rel + i) ||
+ 			    !duplicate_rel(base, rel, i))
+@@ -174,7 +191,8 @@ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
+ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 			      char *secstrings, struct module *mod)
+ {
+-	unsigned long plts = 0;
++	unsigned long core_plts = 0;
++	unsigned long init_plts = 0;
+ 	Elf32_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
+ 	Elf32_Sym *syms = NULL;
+ 
+@@ -184,13 +202,15 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 	 */
+ 	for (s = sechdrs; s < sechdrs_end; ++s) {
+ 		if (strcmp(".plt", secstrings + s->sh_name) == 0)
+-			mod->arch.plt = s;
++			mod->arch.core.plt = s;
++		else if (strcmp(".init.plt", secstrings + s->sh_name) == 0)
++			mod->arch.init.plt = s;
+ 		else if (s->sh_type == SHT_SYMTAB)
+ 			syms = (Elf32_Sym *)s->sh_addr;
+ 	}
+ 
+-	if (!mod->arch.plt) {
+-		pr_err("%s: module PLT section missing\n", mod->name);
++	if (!mod->arch.core.plt || !mod->arch.init.plt) {
++		pr_err("%s: module PLT section(s) missing\n", mod->name);
+ 		return -ENOEXEC;
+ 	}
+ 	if (!syms) {
+@@ -213,16 +233,29 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 		/* sort by type and symbol index */
+ 		sort(rels, numrels, sizeof(Elf32_Rel), cmp_rel, NULL);
+ 
+-		plts += count_plts(syms, dstsec->sh_addr, rels, numrels);
++		if (strncmp(secstrings + dstsec->sh_name, ".init", 5) != 0)
++			core_plts += count_plts(syms, dstsec->sh_addr, rels,
++						numrels, s->sh_info);
++		else
++			init_plts += count_plts(syms, dstsec->sh_addr, rels,
++						numrels, s->sh_info);
+ 	}
+ 
+-	mod->arch.plt->sh_type = SHT_NOBITS;
+-	mod->arch.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
+-	mod->arch.plt->sh_addralign = L1_CACHE_BYTES;
+-	mod->arch.plt->sh_size = round_up(plts * PLT_ENT_SIZE,
+-					  sizeof(struct plt_entries));
+-	mod->arch.plt_count = 0;
+-
+-	pr_debug("%s: plt=%x\n", __func__, mod->arch.plt->sh_size);
++	mod->arch.core.plt->sh_type = SHT_NOBITS;
++	mod->arch.core.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
++	mod->arch.core.plt->sh_addralign = L1_CACHE_BYTES;
++	mod->arch.core.plt->sh_size = round_up(core_plts * PLT_ENT_SIZE,
++					       sizeof(struct plt_entries));
++	mod->arch.core.plt_count = 0;
++
++	mod->arch.init.plt->sh_type = SHT_NOBITS;
++	mod->arch.init.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
++	mod->arch.init.plt->sh_addralign = L1_CACHE_BYTES;
++	mod->arch.init.plt->sh_size = round_up(init_plts * PLT_ENT_SIZE,
++					       sizeof(struct plt_entries));
++	mod->arch.init.plt_count = 0;
++
++	pr_debug("%s: plt=%x, init.plt=%x\n", __func__,
++		 mod->arch.core.plt->sh_size, mod->arch.init.plt->sh_size);
+ 	return 0;
+ }
+diff --git a/arch/arm/kernel/module.lds b/arch/arm/kernel/module.lds
+index 05881e2b414c..eacb5c67f61e 100644
+--- a/arch/arm/kernel/module.lds
++++ b/arch/arm/kernel/module.lds
+@@ -1,3 +1,4 @@
+ SECTIONS {
+ 	.plt : { BYTE(0) }
++	.init.plt : { BYTE(0) }
+ }
 -- 
 2.7.4
