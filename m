@@ -1,34 +1,24 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 21 Feb 2017 10:19:12 +0530
-Subject: [PATCH 2/4] ARM: dts: da850: add vpif video display pins
-In-Reply-To: <CAMpxmJXjRYG5tteGNbG3gxAqeoB9Qx9bND6PHJih7dyU+ZuD4w@mail.gmail.com>
-References: <1487268932-6469-1-git-send-email-bgolaszewski@baylibre.com>
- <1487268932-6469-3-git-send-email-bgolaszewski@baylibre.com>
- <318d9f87-ad2a-c0e1-255a-097056c0f85f@ti.com>
- <CAMpxmJXjRYG5tteGNbG3gxAqeoB9Qx9bND6PHJih7dyU+ZuD4w@mail.gmail.com>
-Message-ID: <e6988d47-00e1-e4b6-e343-1f358faa5556@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 21 Feb 2017 12:50:28 +0800
+Subject: [PATCH v3 17/18] ARM: dts: sun8i: sina33: enable battery power
+ supply subnode
+In-Reply-To: <20170214094112.27426-18-quentin.schulz@free-electrons.com>
+References: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
+ <20170214094112.27426-18-quentin.schulz@free-electrons.com>
+Message-ID: <CAGb2v64SnsrckN7+cv5woHzLTWrM455xjUQFh3dKHUNhjgBB7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 February 2017 09:12 PM, Bartosz Golaszewski wrote:
-> 2017-02-20 11:29 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
->> On Thursday 16 February 2017 11:45 PM, Bartosz Golaszewski wrote:
->>> Add a new pinctrl sub-node for vpif display pins. Move VP_CLKIN3 and
->>> VP_CLKIN2 to the display node where they actually belong (vide section
->>> 35.2.2 of the da850 datasheet).
->>
->> You mean 36.2.2. Also, its in the technical reference manual (TRM). The
->> datahseet is another document.
->>
-> 
-> I'm looking at the revision from September 2016 and it's 35.2.2: VPIF
-> -> Architecture -> signal descriptions.
+On Tue, Feb 14, 2017 at 5:41 PM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
+> The Sinlinx SinA33 has an AXP223 PMIC and a battery connector, thus, we
+> enable the battery power supply subnode in its Device Tree.
+>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Is this the document ?
+Battery charger enabled without any description of the associated battery...
+In this case I think the driver should use the lowest charge current to be
+safe?
 
-http://www.ti.com/lit/ug/spruh77c/spruh77c.pdf
-
-In this VPIF is chapter 36.
-
-Thanks,
-Sekhar
+Acked-by: Chen-Yu Tsai <wens@csie.org>
