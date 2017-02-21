@@ -1,32 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 21 Feb 2017 17:35:44 +0000
-Subject: [RFT PATCH 1/2] ARM: module: split core and init PLT sections
-In-Reply-To: <CAMZqy1CWNC2aL4Qhp2C9M0POuU4juz2=L8WpoihRUdWT6uhiGg@mail.gmail.com>
-References: <1487628041-2147-1-git-send-email-ard.biesheuvel@linaro.org>
- <1487628041-2147-2-git-send-email-ard.biesheuvel@linaro.org>
- <CAMZqy1CWNC2aL4Qhp2C9M0POuU4juz2=L8WpoihRUdWT6uhiGg@mail.gmail.com>
-Message-ID: <CAKv+Gu-qPuVjw4BMdDkWx8jmW2Vt-Uiv7xz-PcTCvMm18+SLWQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 21 Feb 2017 18:47:13 +0100
+Subject: [PATCH] clk: rockchip: Set "ignore unused" for PMU M0 clocks on
+ rk3399
+In-Reply-To: <20170214210114.5846-1-dianders@chromium.org>
+References: <20170214210114.5846-1-dianders@chromium.org>
+Message-ID: <6585236.hCVu3AsgCt@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 February 2017 at 14:26, Angus Clark <angus@angusclark.org> wrote:
-> Hi Ard,
->
-> I have tested the patch and I think there is still a small issue.  At
-> present, count_plts() assumes a PLT entry would only be required for
-> undefined symbols.  However, if 'init' and 'core' are located far
-> apart, then we may need an entry in the init PLT if some init code
-> makes a call to a defined symbol in the core section.
->
+Am Dienstag, 14. Februar 2017, 13:01:14 CET schrieb Douglas Anderson:
+> The PMU Cortex M0 on rk3399 is intended to be used for things like
+> DDRFreq transitions, suspend/resume, and other things that are the
+> purview of ARM Trusted Firmware and not the kernel.  As such, the
+> kernel shouldn't be messing with the clocks.  Add CLK_IGNORE_UNUSED to
+> these clocks.
+> 
+> Without this change, the following was observed on a Chromebook with a
+> rk3399 (using not-yet-upstream ARM Trusted Firmware code and
+> not-yet-upstream kernel code based on kernel-4.4):
+> 
+> 1. We init the clock framework.
+> 
+> 2. We start up "DDRFreq", which causes ATF to occasionally fire up the
+>    M0 for transitions.  Each time ATF fires up the M0 it will turn on
+>    these clocks and each time it is done it will turn them off.
+> 
+> 3. We finally get to the the part of the kernel that calls
+>    clk_disable_unused() and we disables the clocks.
+> 
+> You can see the race above.  Basically everything is fine as long as
+> ARM Trusted Firmware isn't starting up the M0 at exactly the same time
+> that the kernel is disabling unused clocks.  ...but if the race
+> happens then we go boom.
+> 
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 
-Argh. You're absolutely right, another complication I did not
-anticipate, unfortunately.
+applied for 4.12
 
-> As a quick test, I added an 'include_defined' argument to count_plts()
-> which gets set for init relocs.  With this in place, the module loads
-> fine and appears to function as expected.
->
-> Happy to test any further versions :-)
->
-
-Thanks, v2 coming up
+Thanks
+Heiko
