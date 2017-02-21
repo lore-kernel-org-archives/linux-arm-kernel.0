@@ -1,38 +1,85 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 21 Feb 2017 14:16:38 +0100
-Subject: [PATCH] ARM: dma-mapping: Fix dma_get_sgtable() for regions without
- struct page
-References: <CGME20170221131655eucas1p2f2ca6e3c819aeae227c5e5c5f2bc7d3f@eucas1p2.samsung.com>
-Message-ID: <1487682998-2564-1-git-send-email-m.szyprowski@samsung.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 21 Feb 2017 13:20:21 +0000
+Subject: [PATCH 1/7] dma: Take into account dma_pfn_offset
+In-Reply-To: <af20706d-398a-9ca7-ff42-57c916f366e7@arm.com>
+References: <1487152792-34214-1-git-send-email-vladimir.murzin@arm.com>
+ <1487152792-34214-2-git-send-email-vladimir.murzin@arm.com>
+ <af20706d-398a-9ca7-ff42-57c916f366e7@arm.com>
+Message-ID: <77af42b6-d37e-c6b3-eec7-a6b9e80d10a6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some DMA regions, for example those created by dma_declare_coherent_memory,
-might not be possible to be represented by struct page pointers. Getting
-scatterlist for the buffer allocated from such region is not possible.
-This patch adds a simple check in arm_dma_get_sgtable() function if the
-exported struct page pointer is valid.
+On 21/02/17 13:07, Robin Murphy wrote:
+> On 15/02/17 09:59, Vladimir Murzin wrote:
+>> Even though dma-noop-ops assumes 1:1 memory mapping DMA memory range
+>> can be different to RAM. For example, ARM STM32F4 MCU offers the
+>> possibility to remap SDRAM from 0xc000_0000 to 0x0 to get CPU
+>> performance boost, but DMA continue to see SDRAM at 0xc000_0000. This
+>> difference in mapping is handled via device-tree "dma-range" property
+>> which leads to dev->dma_pfn_offset is set nonzero. To handle such
+>> cases take dma_pfn_offset into account.
+> 
+> Modulo trivial style nits (include order, line length) which I'll leave
+> for others to object to if they wish, this looks correct to me.
+> 
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
-Fixes: dc2832e1e7db3 ("ARM: dma-mapping: add support for dma_get_sgtable()")
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/mm/dma-mapping.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Much appreciated!
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index fc4a4eaa9934..4b2cf82fbca6 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -942,6 +942,10 @@ int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
- 	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
- 	int ret;
- 
-+	/* Check if DMA handle has been properly translated to page. */
-+	if (pfn_to_dma(dev, page_to_pfn(page)) != handle)
-+		return -ENXIO;
-+
- 	ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
- 	if (unlikely(ret))
- 		return ret;
--- 
-1.9.1
+Vladimir
+
+> 
+>> Cc: Joerg Roedel <jroedel@suse.de>
+>> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+>> Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+>> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+>> Tested-by: Andras Szemzo <sza@esh.hu>
+>> Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+>> ---
+>>  lib/dma-noop.c | 8 +++++---
+>>  1 file changed, 5 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/lib/dma-noop.c b/lib/dma-noop.c
+>> index 3d766e7..a14eee5 100644
+>> --- a/lib/dma-noop.c
+>> +++ b/lib/dma-noop.c
+>> @@ -7,6 +7,7 @@
+>>  #include <linux/mm.h>
+>>  #include <linux/dma-mapping.h>
+>>  #include <linux/scatterlist.h>
+>> +#include <linux/pfn.h>
+>>  
+>>  static void *dma_noop_alloc(struct device *dev, size_t size,
+>>  			    dma_addr_t *dma_handle, gfp_t gfp,
+>> @@ -16,7 +17,8 @@ static void *dma_noop_alloc(struct device *dev, size_t size,
+>>  
+>>  	ret = (void *)__get_free_pages(gfp, get_order(size));
+>>  	if (ret)
+>> -		*dma_handle = virt_to_phys(ret);
+>> +		*dma_handle = virt_to_phys(ret) - PFN_PHYS(dev->dma_pfn_offset);
+>> +
+>>  	return ret;
+>>  }
+>>  
+>> @@ -32,7 +34,7 @@ static dma_addr_t dma_noop_map_page(struct device *dev, struct page *page,
+>>  				      enum dma_data_direction dir,
+>>  				      unsigned long attrs)
+>>  {
+>> -	return page_to_phys(page) + offset;
+>> +	return page_to_phys(page) + offset - PFN_PHYS(dev->dma_pfn_offset);
+>>  }
+>>  
+>>  static int dma_noop_map_sg(struct device *dev, struct scatterlist *sgl, int nents,
+>> @@ -47,7 +49,7 @@ static int dma_noop_map_sg(struct device *dev, struct scatterlist *sgl, int nent
+>>  
+>>  		BUG_ON(!sg_page(sg));
+>>  		va = sg_virt(sg);
+>> -		sg_dma_address(sg) = (dma_addr_t)virt_to_phys(va);
+>> +		sg_dma_address(sg) = (dma_addr_t)(virt_to_phys(va) - PFN_PHYS(dev->dma_pfn_offset));
+>>  		sg_dma_len(sg) = sg->length;
+>>  	}
+>>  
+>>
+> 
+> 
