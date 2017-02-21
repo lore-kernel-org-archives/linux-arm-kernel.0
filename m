@@ -1,56 +1,56 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Tue, 21 Feb 2017 10:07:02 +0100
-Subject: [PATCH v3 3/7] mmc: bcm2835: add sdhost controller to devicetree
-In-Reply-To: <1487668026-7100-1-git-send-email-kraxel@redhat.com>
-References: <1487668026-7100-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1487668026-7100-4-git-send-email-kraxel@redhat.com>
+Date: Tue, 21 Feb 2017 10:06:59 +0100
+Subject: [PATCH v3 0/7] mmc: bcm2835: Add new driver for the sdhost controller
+Message-ID: <1487668026-7100-1-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
-Acked-by: Eric Anholt <eric@anholt.net>
----
- arch/arm/boot/dts/bcm2835-rpi.dtsi |  6 ++++++
- arch/arm/boot/dts/bcm283x.dtsi     | 10 ++++++++++
- 2 files changed, 16 insertions(+)
+  Hi,
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index 0b73f9c..7d89af2 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -69,6 +69,12 @@
- 	bus-width = <4>;
- };
- 
-+&sdhost {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdhost_gpio48>;
-+	bus-width = <4>;
-+};
-+
- &pwm {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index a3106aa..3f4fbff 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -450,6 +450,16 @@
- 			status = "disabled";
- 		};
- 
-+		sdhost: mmc at 7e202000 {
-+			compatible = "brcm,bcm2835-sdhost";
-+			reg = <0x7e202000 0x100>;
-+			interrupts = <2 24>;
-+			clocks = <&clocks BCM2835_CLOCK_VPU>;
-+			dmas = <&dma 13>;
-+			dma-names = "rx-tx";
-+			status = "disabled";
-+		};
-+
- 		hvs at 7e400000 {
- 			compatible = "brcm,bcm2835-hvs";
- 			reg = <0x7e400000 0x6000>;
+Next version if the bcm2835 sdhost patch series.
+
+New in v3:
+ * squashed in cleanups by Stefan.
+ * use one dma channel only.
+ * improve commit messages.
+
+New in v2:
+ * DMA fixed.
+ * updated docs (kconfig, file comment, commit message) clarifying
+   the two sd controller situation.
+ * some code cleanups, as pointed out by Stefan.
+ * dt bindings use mmc at ... now.
+ * added patches to update defconfigs.
+ * added patch for rpi3 device tree, so wifi is actually enabled.
+
+please review & test,
+  Gerd
+
+Eric Anholt (2):
+  dt-bindings: Add binding for brcm,bcm2835-sdhost.
+  mmc: bcm2835: Add new driver for the sdhost controller.
+
+Gerd Hoffmann (5):
+  mmc: bcm2835: add sdhost controller to devicetree
+  arm: set CONFIG_MMC_BCM2835=y in bcm2835_defconfig and
+    multi_v7_defconfig
+  arm64: set CONFIG_MMC_BCM2835=y in defconfig
+  ARM: dts: bcm283x: switch from &sdhci to &sdhost
+  ARM: dts: bcm2837: add &sdhci and &sdhost
+
+ .../bindings/mmc/brcm,bcm2835-sdhost.txt           |   23 +
+ arch/arm/boot/dts/bcm2835-rpi.dtsi                 |    6 +
+ arch/arm/boot/dts/bcm283x.dtsi                     |   10 +
+ arch/arm/configs/bcm2835_defconfig                 |    1 +
+ arch/arm/configs/multi_v7_defconfig                |    1 +
+ arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts   |   17 +
+ arch/arm64/configs/defconfig                       |    1 +
+ drivers/mmc/host/Kconfig                           |   14 +
+ drivers/mmc/host/Makefile                          |    1 +
+ drivers/mmc/host/bcm2835.c                         | 1471 ++++++++++++++++++++
+ 10 files changed, 1545 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
+ create mode 100644 drivers/mmc/host/bcm2835.c
+
 -- 
 1.8.3.1
