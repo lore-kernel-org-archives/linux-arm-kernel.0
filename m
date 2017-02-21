@@ -1,167 +1,124 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 21 Feb 2017 16:49:30 +0100
-Subject: [PATCH v2 3/5] ARM: davinci: da8xx: add pdata-quirks for VPIF capture
+Date: Tue, 21 Feb 2017 16:49:32 +0100
+Subject: [PATCH v2 5/5] ARM: davinci: add pdata-quirks for da850-evm vpif
+ display
 In-Reply-To: <1487692172-11772-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1487692172-11772-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1487692172-11772-4-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1487692172-11772-6-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@baylibre.com>
+Similarly to vpif capture: we need to register the vpif display driver
+and the corresponding adv7343 encoder in pdata-quirks as the DT
+support is not complete - there isn't currently a way to define the
+output_routing in the V4L2 drivers (c.f. s_routing) via DT.
 
-For da8xx DT platforms, use pdata-quirks to add legacy platform data for
-vpif_capture driver.
-
-Passing legacy platform_data is required until the V4L2 framework, and
-subdevice drivers (such as the tvp514x) grow a way of selecting input
-and output routing  (c.f. V4L2 s_routing API)
-
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-[Bartosz: removed unnecessary #ifdefs]
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/da8xx-dt.c     |   1 +
- arch/arm/mach-davinci/pdata-quirks.c | 104 +++++++++++++++++++++++++++++++++++
- 2 files changed, 105 insertions(+)
+ arch/arm/mach-davinci/pdata-quirks.c | 72 ++++++++++++++++++++++++++++++++++--
+ 1 file changed, 69 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index e3cef50..5699ce3 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -53,6 +53,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,da830-musb", 0x01e00000, "musb-da8xx", NULL),
- 	OF_DEV_AUXDATA("ti,da830-usb-phy", 0x01c1417c, "da8xx-usb-phy", NULL),
- 	OF_DEV_AUXDATA("ti,da850-ahci", 0x01e18000, "ahci_da850", NULL),
-+	OF_DEV_AUXDATA("ti,da850-vpif", 0x01e17000, "vpif", NULL),
- 	{}
- };
- 
 diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
-index 36fb217..cf88195 100644
+index cf88195..e2160ce 100644
 --- a/arch/arm/mach-davinci/pdata-quirks.c
 +++ b/arch/arm/mach-davinci/pdata-quirks.c
-@@ -10,13 +10,115 @@
- #include <linux/kernel.h>
+@@ -11,6 +11,7 @@
  #include <linux/of_platform.h>
  
-+#include <media/i2c/tvp514x.h>
-+
- #include <mach/common.h>
-+#include <mach/da8xx.h>
+ #include <media/i2c/tvp514x.h>
++#include <media/i2c/adv7343.h>
  
- struct pdata_init {
- 	const char *compatible;
- 	void (*fn)(void);
+ #include <mach/common.h>
+ #include <mach/da8xx.h>
+@@ -105,7 +106,7 @@ static struct vpif_capture_config da850_vpif_capture_config = {
+ 	.card_name = "DA850/OMAP-L138 Video Capture",
  };
  
-+#define TVP5147_CH0		"tvp514x-0"
-+#define TVP5147_CH1		"tvp514x-1"
-+
-+/* VPIF capture configuration */
-+static struct tvp514x_platform_data tvp5146_pdata = {
-+		.clk_polarity = 0,
-+		.hs_polarity  = 1,
-+		.vs_polarity  = 1,
-+};
-+
-+#define TVP514X_STD_ALL (V4L2_STD_NTSC | V4L2_STD_PAL)
-+
-+static const struct vpif_input da850_ch0_inputs[] = {
-+	{
-+		.input = {
-+			.index = 0,
-+			.name  = "Composite",
-+			.type  = V4L2_INPUT_TYPE_CAMERA,
-+			.capabilities = V4L2_IN_CAP_STD,
-+			.std   = TVP514X_STD_ALL,
-+		},
-+		.input_route = INPUT_CVBS_VI2B,
-+		.output_route = OUTPUT_10BIT_422_EMBEDDED_SYNC,
-+		.subdev_name = TVP5147_CH0,
+-static void __init da850_vpif_legacy_init(void)
++static void __init da850_vpif_capture_legacy_init(void)
+ {
+ 	int ret;
+ 
+@@ -119,6 +120,70 @@ static void __init da850_vpif_legacy_init(void)
+ 			__func__, ret);
+ }
+ 
++static struct adv7343_platform_data adv7343_pdata = {
++	.mode_config = {
++		.dac = { 1, 1, 1 },
++	},
++	.sd_config = {
++		.sd_dac_out = { 1 },
 +	},
 +};
 +
-+static const struct vpif_input da850_ch1_inputs[] = {
++static struct vpif_subdev_info da850_vpif_subdev[] = {
 +	{
-+		.input = {
-+			.index = 0,
-+			.name  = "S-Video",
-+			.type  = V4L2_INPUT_TYPE_CAMERA,
-+			.capabilities = V4L2_IN_CAP_STD,
-+			.std   = TVP514X_STD_ALL,
-+		},
-+		.input_route = INPUT_SVIDEO_VI2C_VI1C,
-+		.output_route = OUTPUT_10BIT_422_EMBEDDED_SYNC,
-+		.subdev_name = TVP5147_CH1,
-+	},
-+};
-+
-+static struct vpif_subdev_info da850_vpif_capture_sdev_info[] = {
-+	{
-+		.name = TVP5147_CH0,
++		.name = "adv7343",
 +		.board_info = {
-+			I2C_BOARD_INFO("tvp5146", 0x5d),
-+			.platform_data = &tvp5146_pdata,
-+		},
-+	},
-+	{
-+		.name = TVP5147_CH1,
-+		.board_info = {
-+			I2C_BOARD_INFO("tvp5146", 0x5c),
-+			.platform_data = &tvp5146_pdata,
++			I2C_BOARD_INFO("adv7343", 0x2a),
++			.platform_data = &adv7343_pdata,
 +		},
 +	},
 +};
 +
-+static struct vpif_capture_config da850_vpif_capture_config = {
-+	.subdev_info = da850_vpif_capture_sdev_info,
-+	.subdev_count = ARRAY_SIZE(da850_vpif_capture_sdev_info),
++static const struct vpif_output da850_ch0_outputs[] = {
++	{
++		.output = {
++			.index = 0,
++			.name = "Composite",
++			.type = V4L2_OUTPUT_TYPE_ANALOG,
++			.capabilities = V4L2_OUT_CAP_STD,
++			.std = V4L2_STD_ALL,
++		},
++		.subdev_name = "adv7343",
++		.output_route = ADV7343_COMPOSITE_ID,
++	},
++	{
++		.output = {
++			.index = 1,
++			.name = "S-Video",
++			.type = V4L2_OUTPUT_TYPE_ANALOG,
++			.capabilities = V4L2_OUT_CAP_STD,
++			.std = V4L2_STD_ALL,
++		},
++		.subdev_name = "adv7343",
++		.output_route = ADV7343_SVIDEO_ID,
++	},
++};
++
++static struct vpif_display_config da850_vpif_display_config = {
++	.subdevinfo   = da850_vpif_subdev,
++	.subdev_count = ARRAY_SIZE(da850_vpif_subdev),
 +	.chan_config[0] = {
-+		.inputs = da850_ch0_inputs,
-+		.input_count = ARRAY_SIZE(da850_ch0_inputs),
-+		.vpif_if = {
-+			.if_type = VPIF_IF_BT656,
-+			.hd_pol  = 1,
-+			.vd_pol  = 1,
-+			.fid_pol = 0,
-+		},
++		.outputs = da850_ch0_outputs,
++		.output_count = ARRAY_SIZE(da850_ch0_outputs),
 +	},
-+	.chan_config[1] = {
-+		.inputs = da850_ch1_inputs,
-+		.input_count = ARRAY_SIZE(da850_ch1_inputs),
-+		.vpif_if = {
-+			.if_type = VPIF_IF_BT656,
-+			.hd_pol  = 1,
-+			.vd_pol  = 1,
-+			.fid_pol = 0,
-+		},
-+	},
-+	.card_name = "DA850/OMAP-L138 Video Capture",
++	.card_name    = "DA850/OMAP-L138 Video Display",
 +};
 +
-+static void __init da850_vpif_legacy_init(void)
++static void __init da850_vpif_display_legacy_init(void)
 +{
 +	int ret;
 +
-+	/* LCDK doesn't have the 2nd TVP514x on CH1 */
-+	if (of_machine_is_compatible("ti,da850-lcdk"))
-+		da850_vpif_capture_config.subdev_count = 1;
-+
-+	ret = da850_register_vpif_capture(&da850_vpif_capture_config);
++	ret = da850_register_vpif_display(&da850_vpif_display_config);
 +	if (ret)
-+		pr_warn("%s: VPIF capture setup failed: %d\n",
++		pr_warn("%s: VPIF display setup failed: %d\n",
 +			__func__, ret);
 +}
 +
  static void pdata_quirks_check(struct pdata_init *quirks)
  {
  	while (quirks->compatible) {
-@@ -29,6 +131,8 @@ static void pdata_quirks_check(struct pdata_init *quirks)
+@@ -131,8 +196,9 @@ static void pdata_quirks_check(struct pdata_init *quirks)
  }
  
  static struct pdata_init pdata_quirks[] __initdata = {
-+	{ "ti,da850-lcdk", da850_vpif_legacy_init, },
-+	{ "ti,da850-evm", da850_vpif_legacy_init, },
+-	{ "ti,da850-lcdk", da850_vpif_legacy_init, },
+-	{ "ti,da850-evm", da850_vpif_legacy_init, },
++	{ "ti,da850-lcdk", da850_vpif_capture_legacy_init, },
++	{ "ti,da850-evm", da850_vpif_display_legacy_init, },
++	{ "ti,da850-evm", da850_vpif_capture_legacy_init, },
  	{ /* sentinel */ },
  };
  
