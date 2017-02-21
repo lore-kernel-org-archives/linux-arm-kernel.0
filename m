@@ -1,52 +1,85 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 21 Feb 2017 13:02:48 +0100
-Subject: [RESEND PATCH 1/3] mtd: nand: Pass the CS line to
- ->setup_data_interface()
-In-Reply-To: <20170221120648.19e0d32c@bbrezillon>
-References: <1487625149-7234-1-git-send-email-boris.brezillon@free-electrons.com>
- <1487625149-7234-2-git-send-email-boris.brezillon@free-electrons.com>
- <a5a9d822-a73c-4fd1-201c-7a17d9517f24@sigmadesigns.com>
- <20170221120648.19e0d32c@bbrezillon>
-Message-ID: <45a843fb-c43e-711f-ce3a-4c0d44c48144@sigmadesigns.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 21 Feb 2017 12:03:34 +0000
+Subject: [PATCH v4 10/11] drivers: perf: hisi: Handle counter overflow
+ IRQ in MN PMU
+In-Reply-To: <58AC2966.3060200@gmail.com>
+References: <1487530282-42731-1-git-send-email-anurup.m@huawei.com>
+ <20170220112918.GG9003@leverpostej> <58AC2966.3060200@gmail.com>
+Message-ID: <20170221120334.GB8605@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/02/2017 12:06, Boris Brezillon wrote:
+On Tue, Feb 21, 2017 at 05:19:58PM +0530, Anurup M wrote:
+> On Monday 20 February 2017 04:59 PM, Mark Rutland wrote:
+> >On Sun, Feb 19, 2017 at 01:51:22PM -0500, Anurup M wrote:
 
-> Marc Gonzalez wrote:
+> >>+			/* Clear the IRQ status flag */
+> >>+			hisi_djtag_writereg(module_id, MN1_BANK_SELECT,
+> >>+				MN1_INTC_REG_OFF, (1 << bit_pos), client);
+> >>+
+> >>+			/* Get the corresponding event struct */
+> >>+			event = mn_pmu->hw_perf_events[bit_pos];
+> >>+			if (!event)
+> >>+				continue;
+> >Do we expect to take interrupts for an event which does not exist?
 > 
->> On 20/02/2017 22:12, Boris Brezillon wrote:
->>
->>> Some NAND controllers can assign different NAND timings to different
->>> CS lines. Pass the CS line information to ->setup_data_interface() so
->>> that the NAND controller driver knows which CS line is concerned by
->>> the setup_data_interface() request.  
->>
->> I'm confused, because I thought I was already doing that.
->> On my platform, I have different timings for each chip.
->> (thus, for each CS, right?)
->>
->> In chip->select_chip, I program the appropriate timings
->> which the controller will be using.
->>
->> What am I missing?
+> Here I ignore if the event does not exist. I have seen it is handled
+> in arm_pmu and other reference
+> implementations to ignore if there is no event.
+> The event is cleared in .del. So if .del is called before the IRQ
+> handler, this check is required right?
+> Please comment.
+
+If there's a particular case whre we'd see the overflow bit set for an
+event, please add a comment describing that case here.
+
+[...]
+
+> >>+static int hisi_mn_init_irqs_fdt(struct device *dev,
+> >>+				struct hisi_pmu *mn_pmu)
+> >>+{
+> >>+	struct hisi_mn_data *mn_data = mn_pmu->hwmod_data;
+> >>+	struct hisi_djtag_client *client = mn_data->client;
+> >>+	int irq = -1, num_irqs, i;
+> >>+
+> >>+	num_irqs = of_irq_count(dev->of_node);
+> >Surely we expect a specific number of interrupts?
+> >
+> >>+	for (i = 0; i < num_irqs; i++) {
+> >>+		irq = of_irq_get(dev->of_node, i);
+> >>+		if (irq < 0)
+> >>+			dev_info(dev, "No IRQ resource!\n");
+> >>+	}
+> >Why are we throwing these away?
+> >
+> >>+
+> >>+	if (irq < 0)
+> >>+		return 0;
+> >>+
+> >>+	/* The last entry in the IRQ list to be chosen
+> >>+	 * This is as per mbigen-v2 IRQ mapping
+> >>+	 */
+> >>+	return hisi_mn_init_irq(irq, mn_pmu, client);
+> >I don't understand this comment.
+> >
+> >Why do we only use the list IRQ?
+> >
+> >What does this have to do with the mbigen?
+> >
+> >No ordering requirement was described in the DT binding.
 > 
-> Maybe you don't have multi-dies chips, which is the case I'm fixing
-> here. If you have 2 separate chips, the existing hook should work just
-> fine.
+> There is a defect in the mbigen hardware to handle the IRQ mapping
+> for MN.
+> Due to this the IRQ property
+> of MN is made as a list and we read all IRQs and use only the last one.
+> I shall mention it in the comment and also add note in the DT bindings.
 
-Right. You asked me to add an explicit:
+You'll need to elaborate on that a bit further; I don't understand.
 
-	res = of_property_count_u32_elems(np, "reg");
-	if (res < 0)
-		return res;
+If the interrupts aren't usable, there's arguably not much point listing
+them in the DT.
 
-	if (res != 1)
-		return -ENOTSUPP; /* Multi-CS chips are not supported */
+Regardless, the order of the list *must* be specified in the DT binding.
 
-I was under the impression that multi-die chips are seen as a single
-larger "composite" chip. And I had assumed that different dies would
-not only require identical timings, but would also be identical in
-all other aspects. This it incorrect?
-
-Regards.
+Thanks,
+Mark.
