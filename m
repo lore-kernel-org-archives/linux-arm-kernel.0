@@ -1,51 +1,51 @@
-From: Wenyou.Yang@microchip.com (Wenyou.Yang at microchip.com)
-Date: Tue, 21 Feb 2017 00:37:23 +0000
-Subject: iproute2 not function on CAN FD
-In-Reply-To: <f4c78670-8c25-8ee3-5167-126d49ad5b00@hartkopp.net>
-References: <F9F4555C4E01D7469D37975B62D0EFBB4D7587@CHN-SV-EXMX07.mchp-main.com>
- <f4c78670-8c25-8ee3-5167-126d49ad5b00@hartkopp.net>
-Message-ID: <F9F4555C4E01D7469D37975B62D0EFBB4DB003@CHN-SV-EXMX07.mchp-main.com>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Tue, 21 Feb 2017 10:41:25 +0800
+Subject: [PATCH 2/2] drm/rockchip: vop: verify pixelclock for hdmi and
+ displayport
+In-Reply-To: <1487644885-22492-1-git-send-email-mark.yao@rock-chips.com>
+References: <1487644885-22492-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1487644885-22492-2-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oliver,
+Hdmi or DisplayPort request a accurate clock,
+reject the display mode if clock is not good.
 
-> -----Original Message-----
-> From: Oliver Hartkopp [mailto:socketcan at hartkopp.net]
-> Sent: 2017?2?20? 15:57
-> To: Wenyou Yang - A41535 <Wenyou.Yang@microchip.com>;
-> mkl at pengutronix.de; wg at grandegger.com
-> Cc: linux-can at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: iproute2 not function on CAN FD
-> 
-> On 02/20/2017 02:12 AM, Wenyou.Yang at microchip.com wrote:
-> 
-> > I am testing the CAN FD of M_CAN on the SAMA5D2 Xplained board, when
-> > using the ip tool from iprounte2 suite to set the CAN interface, it
-> > doesn't work with the message "RTNETLINK answers: Operation not supported".
-> > --->8----
-> > # ip link set can0 type can bitrate 125000 dbitrate 8000000 fd on
-> > RTNETLINK answers: Operation not supported
-> 
-> Please try:
-> 
-> # ip link set can0 type can bitrate 125000 dbitrate 8000000 fd on fd-non-iso on
-> 
-> The driver for the M_CAN IP core 3.0.x in the mainline kernel supports a
-> NON_ISO IP core.
-> 
-> This non-iso setting is fixed with this v3.0.x M_CAN and we decided to make this
-> configuration explicit - as all other options run into a mess.
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit?id=bb208f144cf
-> 3f59d8f89a09a80efd04389718907
-> 
-> Did that help?
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-Thank you very much!
-
-You are very helpful!
-
-
-Best Regards,
-Wenyou Yang
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 7ec5d7f..a7c118e 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -868,14 +868,24 @@ static bool vop_crtc_mode_fixup(struct drm_crtc *crtc,
+ {
+ 	struct vop *vop = to_vop(crtc);
+ 	const struct vop_data *vop_data = vop->data;
++	struct rockchip_crtc_state *s = to_rockchip_crtc_state(crtc->state);
++	int clock;
+ 
+ 	if (mode->hdisplay > vop_data->max_output.width)
+ 		return false;
+ 	if (mode->vdisplay > vop_data->max_output.height)
+ 		return false;
+ 
+-	adjusted_mode->clock =
+-		clk_round_rate(vop->dclk, mode->clock * 1000) / 1000;
++	clock = clk_round_rate(vop->dclk, mode->clock * 1000) / 1000;
++	/*
++	 * Hdmi or DisplayPort request a Accurate clock.
++	 */
++	if (s->output_type == DRM_MODE_CONNECTOR_HDMIA ||
++	    s->output_type == DRM_MODE_CONNECTOR_DisplayPort)
++		if (clock != mode->clock)
++			return false;
++
++	adjusted_mode->clock = clock;
+ 
+ 	return true;
+ }
+-- 
+1.9.1
