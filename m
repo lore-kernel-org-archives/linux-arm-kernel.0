@@ -1,39 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 21 Feb 2017 12:20:18 -0800
-Subject: [PATCH 2/7] drm/sun4i: Fix up error path cleanup for master bind
- function
-In-Reply-To: <20170217031330.14087-3-wens@csie.org>
-References: <20170217031330.14087-1-wens@csie.org>
- <20170217031330.14087-3-wens@csie.org>
-Message-ID: <20170221202018.eu42zc35reanrgsp@lukather>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 21 Feb 2017 12:38:03 -0800
+Subject: [RFC 7/7] arm64: map seperately rodata sections for
+ __ro_mostly_after_init section
+In-Reply-To: <20170220124531.GH9003@leverpostej>
+References: <1487498660-16600-1-git-send-email-hoeun.ryu@gmail.com>
+ <1487498660-16600-7-git-send-email-hoeun.ryu@gmail.com>
+ <CAKv+Gu9umycZm_UP99ZUifLUBb8MuOZHXgU9nB6XioVMa4eeVw@mail.gmail.com>
+ <20170220124531.GH9003@leverpostej>
+Message-ID: <CAGXu5jKFEB5bno40TdMTmsfqHOWK92mmpK3KMnd05VnQNmHypQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2017 at 11:13:25AM +0800, Chen-Yu Tsai wrote:
-> The master bind function calls numerous drm functions which initialize
-> underlying structures. It also tries to bind the various components
-> of the display pipeline, some of which may add additional drm objects.
-> 
-> This patch adds proper cleanup functions in the error path of the
-> master bind function.
-> 
-> This requires the patch "drm/sun4i: Move drm_mode_config_cleanup call
-> to main driver", which splits out drm_mode_config_cleanup from
-> sun4i_framebuffer_free so we can call it separately.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Mon, Feb 20, 2017 at 4:45 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Sun, Feb 19, 2017 at 11:35:51AM +0000, Ard Biesheuvel wrote:
+>> On 19 February 2017 at 10:04, Hoeun Ryu <hoeun.ryu@gmail.com> wrote:
+>> > Map rodata sections seperately for the new __ro_mostly_after_init section.
+>> > Attribute of memory for __ro_mostly_after_init section can be changed later
+>> > so we need a dedicated vmalloced region for set_memory_rw/ro api.
+>
+>> While it is correct that you are splitting this into three separate
+>> segments (otherwise we would not be able to change the permissions
+>> later without risking splitting to occur), I think this leads to
+>> unnecessary fragmentation.
+>>
+>> If there is demand for this feature (but you still need to make the
+>> argument for that), I wonder if it wouldn't be sufficient, and much
+>> more straightforward, to redefine the __ro_after_init semantics to
+>> include the kind of subsystem registration and module init context you
+>> are targeting, and implement some hooks to temporarily lift the
+>> __ro_after_init r/o permission restrictions in a controlled manner.
+>
+> From a look over the series, I think this is just __write_rarely in
+> disguise. I personally think that we should keep __write_rarely and
+> __ro_after_init separate, the later being a strictly one-shot affair.
 
-Applied, thanks!
-Maxime
+That's my thinking too.
+
+> I had some ideas [1] as to how we could implement __write_rarely without
+> carving up the kernel mapping further (and keeping the RW permissions
+> local to the thread needing it), but I have not had the time to look
+> into that further.
+
+I'm working on a series to do this for x86, but I keep getting
+distracted. I hope to get an RFC posted this week.
+
+-Kees
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170221/9445a1c8/attachment.sig>
+Kees Cook
+Pixel Security
