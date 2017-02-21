@@ -1,51 +1,68 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 21 Feb 2017 12:38:03 -0800
-Subject: [RFC 7/7] arm64: map seperately rodata sections for
- __ro_mostly_after_init section
-In-Reply-To: <20170220124531.GH9003@leverpostej>
-References: <1487498660-16600-1-git-send-email-hoeun.ryu@gmail.com>
- <1487498660-16600-7-git-send-email-hoeun.ryu@gmail.com>
- <CAKv+Gu9umycZm_UP99ZUifLUBb8MuOZHXgU9nB6XioVMa4eeVw@mail.gmail.com>
- <20170220124531.GH9003@leverpostej>
-Message-ID: <CAGXu5jKFEB5bno40TdMTmsfqHOWK92mmpK3KMnd05VnQNmHypQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 21 Feb 2017 21:42:30 +0100
+Subject: [PATCH] ARM: deconfig: fix the moxart defconfig
+Message-ID: <20170221204230.1861-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2017 at 4:45 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Sun, Feb 19, 2017 at 11:35:51AM +0000, Ard Biesheuvel wrote:
->> On 19 February 2017 at 10:04, Hoeun Ryu <hoeun.ryu@gmail.com> wrote:
->> > Map rodata sections seperately for the new __ro_mostly_after_init section.
->> > Attribute of memory for __ro_mostly_after_init section can be changed later
->> > so we need a dedicated vmalloced region for set_memory_rw/ro api.
->
->> While it is correct that you are splitting this into three separate
->> segments (otherwise we would not be able to change the permissions
->> later without risking splitting to occur), I think this leads to
->> unnecessary fragmentation.
->>
->> If there is demand for this feature (but you still need to make the
->> argument for that), I wonder if it wouldn't be sufficient, and much
->> more straightforward, to redefine the __ro_after_init semantics to
->> include the kind of subsystem registration and module init context you
->> are targeting, and implement some hooks to temporarily lift the
->> __ro_after_init r/o permission restrictions in a controlled manner.
->
-> From a look over the series, I think this is just __write_rarely in
-> disguise. I personally think that we should keep __write_rarely and
-> __ro_after_init separate, the later being a strictly one-shot affair.
+The moxart defconfig wasn't even building a kernel for Moxart,
+it was building a kernel for V4T on the nothing platform. Switch
+to MULTI_V4 and keep the right drivers, update a few selections.
+Now it (presumably) builds a minimalist Moxart kernel again.
 
-That's my thinking too.
+Cc: Jonas Jensen <jonas.jensen@gmail.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC folks: ran into this when doing some moxart testing.
+Please apply this directly for fixes or defconfigs wherever it
+is applicable.
+---
+ arch/arm/configs/moxart_defconfig | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-> I had some ideas [1] as to how we could implement __write_rarely without
-> carving up the kernel mapping further (and keeping the RW permissions
-> local to the thread needing it), but I have not had the time to look
-> into that further.
-
-I'm working on a series to do this for x86, but I keep getting
-distracted. I hope to get an RFC posted this week.
-
--Kees
-
+diff --git a/arch/arm/configs/moxart_defconfig b/arch/arm/configs/moxart_defconfig
+index a3cb76cfb828..b2ddd534867f 100644
+--- a/arch/arm/configs/moxart_defconfig
++++ b/arch/arm/configs/moxart_defconfig
+@@ -18,9 +18,8 @@ CONFIG_EMBEDDED=y
+ # CONFIG_LBDAF is not set
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
+-CONFIG_ARCH_MULTI_V4T=y
++CONFIG_ARCH_MULTI_V4=y
+ # CONFIG_ARCH_MULTI_V7 is not set
+-CONFIG_KEYBOARD_GPIO_POLLED=y
+ CONFIG_ARCH_MOXART=y
+ CONFIG_MACH_UC7112LX=y
+ CONFIG_PREEMPT=y
+@@ -94,12 +93,10 @@ CONFIG_SERIAL_8250_EXTENDED=y
+ CONFIG_SERIAL_8250_SHARE_IRQ=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+ # CONFIG_HW_RANDOM is not set
+-CONFIG_DEBUG_GPIO=y
+-CONFIG_GPIO_SYSFS=y
+ CONFIG_GPIO_MOXART=y
+-CONFIG_POWER_SUPPLY=y
+ CONFIG_POWER_RESET=y
+ CONFIG_POWER_RESET_GPIO=y
++CONFIG_POWER_SUPPLY=y
+ # CONFIG_HWMON is not set
+ CONFIG_WATCHDOG=y
+ CONFIG_WATCHDOG_CORE=y
+@@ -107,10 +104,13 @@ CONFIG_WATCHDOG_NOWAYOUT=y
+ CONFIG_MOXART_WDT=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_MMC=y
+-CONFIG_MMC_SDHCI_MOXART=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_MOXART=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_TIMER=y
+ CONFIG_LEDS_TRIGGER_ONESHOT=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
 -- 
-Kees Cook
-Pixel Security
+2.9.3
