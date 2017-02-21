@@ -1,129 +1,97 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 21 Feb 2017 10:11:05 +0100
-Subject: [PATCH v4 15/36] platform: add video-multiplexer subdevice driver
-In-Reply-To: <20170219220237.GD32327@amd>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-16-git-send-email-steve_longerbeam@mentor.com>
- <20170219220237.GD32327@amd>
-Message-ID: <1487668265.2331.23.camel@pengutronix.de>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Tue, 21 Feb 2017 10:22:59 +0100
+Subject: [PATCH 4/4] ARM: dts: da850-evm: add the UI expander node
+In-Reply-To: <2d708416-401a-d2df-5694-9896df47a673@ti.com>
+References: <1487268932-6469-1-git-send-email-bgolaszewski@baylibre.com>
+ <1487268932-6469-5-git-send-email-bgolaszewski@baylibre.com>
+ <5f194c6d-0937-bac2-31cd-2f1658f68d0d@ti.com>
+ <CAMpxmJX3p03YiPL5X9=pKud4A7bXh9bV=qk7qAEAnA3OF3Hgbw@mail.gmail.com>
+ <2d708416-401a-d2df-5694-9896df47a673@ti.com>
+Message-ID: <CAMpxmJWtJ=NJJvY13mmdGc3+nRB+-KSfjfNMCRJeOz=+Op-NQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2017-02-19 at 23:02 +0100, Pavel Machek wrote:
-> Hi!
-> 
-> > From: Philipp Zabel <p.zabel@pengutronix.de>
-> > 
-> > This driver can handle SoC internal and external video bus multiplexers,
-> > controlled either by register bit fields or by a GPIO. The subdevice
-> > passes through frame interval and mbus configuration of the active input
-> > to the output side.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > --
-> >
-> 
-> Again, this is slightly non-standard format. Normally changes from v1
-> go below ---, but in your case it would cut off the signoff...
-> 
-> > diff --git a/Documentation/devicetree/bindings/media/video-multiplexer.txt b/Documentation/devicetree/bindings/media/video-multiplexer.txt
-> > new file mode 100644
-> > index 0000000..9d133d9
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/media/video-multiplexer.txt
-> > @@ -0,0 +1,59 @@
-> > +Video Multiplexer
-> > +=================
-> > +
-> > +Video multiplexers allow to select between multiple input ports. Video received
-> > +on the active input port is passed through to the output port. Muxes described
-> > +by this binding may be controlled by a syscon register bitfield or by a GPIO.
-> > +
-> > +Required properties:
-> > +- compatible : should be "video-multiplexer"
-> > +- reg: should be register base of the register containing the control bitfield
-> > +- bit-mask: bitmask of the control bitfield in the control register
-> > +- bit-shift: bit offset of the control bitfield in the control register
-> > +- gpios: alternatively to reg, bit-mask, and bit-shift, a single GPIO phandle
-> > +  may be given to switch between two inputs
-> > +- #address-cells: should be <1>
-> > +- #size-cells: should be <0>
-> > +- port@*: at least three port nodes containing endpoints connecting to the
-> > +  source and sink devices according to of_graph bindings. The last port is
-> > +  the output port, all others are inputs.
-> 
-> At least three? I guess it is exactly three with the gpio?
-
-Yes. With the mmio bitfield muxes there can be more.
-
-> Plus you might want to describe which port correspond to which gpio
-> state/bitfield values...
-> 
-> > +struct vidsw {
-> 
-> I knew it: it is secretely a switch! :-).
-
-This driver started as a two-input gpio controlled bus switch.
-I changed the name when adding support for bitfield controlled
-multiplexers with more than two inputs.
-
-> > +static void vidsw_set_active(struct vidsw *vidsw, int active)
-> > +{
-> > +	vidsw->active = active;
-> > +	if (active < 0)
-> > +		return;
-> > +
-> > +	dev_dbg(vidsw->subdev.dev, "setting %d active\n", active);
-> > +
-> > +	if (vidsw->field)
-> > +		regmap_field_write(vidsw->field, active);
-> > +	else if (vidsw->gpio)
-> > +		gpiod_set_value(vidsw->gpio, active);
-> 
->          else dev_err()...?
-
-If neither field nor gpio are set, probe will have failed and this will
-never be called.
-
-> > +static int vidsw_async_init(struct vidsw *vidsw, struct device_node *node)
-> > +{
-> > +	struct device_node *ep;
-> > +	u32 portno;
-> > +	int numports;
-> 
-> numbports is int, so I guess portno should be, too?
-
-We could change both to unsigned int, as both vidsw->num_pads and
-endpoint.base.port are unsigned int, and they are only compared/assigned
-to those and each other.
-
-> > +		portno = endpoint.base.port;
-> > +		if (portno >= numports - 1)
-> > +			continue;
-> 
-     I. 
-> > +	if (!pad) {
-> > +		/* Mirror the input side on the output side */
-> > +		cfg->type = vidsw->endpoint[vidsw->active].bus_type;
-> > +		if (cfg->type == V4L2_MBUS_PARALLEL ||
-> > +		    cfg->type == V4L2_MBUS_BT656)
-> > +			cfg->flags = vidsw->endpoint[vidsw->active].bus.parallel.flags;
-> > +	}
-> 
-> Will this need support for other V4L2_MBUS_ values?
-
-To support CSI-2 multiplexers, yes.
-
-> > +MODULE_AUTHOR("Sascha Hauer, Pengutronix");
-> > +MODULE_AUTHOR("Philipp Zabel, Pengutronix");
-> 
-> Normally, MODULE_AUTHOR contains comma separated names of authors,
-> perhaps with <email@addresses>. Not sure two MODULE_AUTHORs per file
-> will work.
-> 
+2017-02-21 6:03 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+> On Monday 20 February 2017 09:08 PM, Bartosz Golaszewski wrote:
+>> 2017-02-20 10:36 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+>>> On Thursday 16 February 2017 11:45 PM, Bartosz Golaszewski wrote:
+>>>> If we're using the UI board and want vpif capture, we need to select
+>>>> the video capture functionality by driving the sel_c pin low on the
+>>>> tca6416 expander and sel_a & sel_b pins high. Do it statically by
+>>>> hogging relevant GPIOs in the device tree.
+>>>>
+>>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>> ---
+>>
+>> [snip]
+>>
+>>>>
+>>>> +                             sel_a {
+>>>> +                                     gpio-hog;
+>>>> +                                     gpios = <7 GPIO_ACTIVE_HIGH>;
+>>>> +                                     output-high;
+>>>> +                                     line-name = "sel_a";
+>>>> +                             };
+>>>> +
+>>>> +                             sel_b {
+>>>> +                                     gpio-hog;
+>>>> +                                     gpios = <6 GPIO_ACTIVE_HIGH>;
+>>>> +                                     output-high;
+>>>> +                                     line-name = "sel_b";
+>>>> +                             };
+>>>> +
+>>>> +                             sel_c {
+>>>> +                                     gpio-hog;
+>>>> +                                     gpios = <5 GPIO_ACTIVE_HIGH>;
+>>>> +                                     output-low;
+>>>> +                                     line-name = "sel_c";
+>>>
+>>> I think this is better handled by using an enable-gpios property in vpif
+>>> capture device-tree node. So in the vpif capture node you would have:
+>>>
+>>>         enable-gpios =  <&tca6416 7 GPIO_ACTIVE_HIGH
+>>>                          &tca6416 6 GPIO_ACTIVE_HIGH
+>>>                          &tca6416 5 GPIO_ACTIVE_LOW>;
+>>>
+>>> and in the vpif capture driver, you would request each of these gpios
+>>> using: devm_gpiod_get_array_optional(.., .., GPIOD_OUT_HIGH);
+>>>
+>>
+>> I'm not sure about this one - the result is the same (function still
+>> defined statically in the DT) while now it requires changes to the
+>> vpif driver too.
+>>
+>> Is there any other reason we'd prefer this approach?
+>
+> The GPIO hog functionality can race with driver probe. Based on probe
+> order, you may have a situation where VPIF probes before tca6416 so we
+> have an erroneous situation where probe is successful, but hardware is
+> not really available.
+>
+> Using enable-gpios lets you handle probe deferral so VPIF capture probe
+> completes only when hardware is ready. So if for some reason tca6416
+> driver or hardware is misbehaving, VPIF will know about it through some
+> error value rather than just assuming that everything went well.
+>
+> So, yes, in the "all goes well" scenario, there is not much difference
+> in the two approaches. But the difference will be apparent when
+> something goes wrong.
+>
+> Probe order will also influence the shutdown and suspend order. So
+> kernel will automatically make sure that shutdown happens in reverse
+> probe order. This may or may not matter in this case. But in  general,
+> it will be nice to make sure VPIF shuts down before tca6416 does so that
+> hardware is available for VPIF to cleanly shutdown (and not disconnected
+> behind its back because tca6416 decided to put all its lines to off as
+> part of its shutdown).
+>
+> I think GPIO hog should only be used for pins which are really "system
+> level". IOW, not related to any driver functionality.
+>
 > Thanks,
-> 								Pavel
+> Sekhar
 
-regards
-Philipp
+Ok, I'll extend the driver then.
+
+Thanks,
+Bartosz
