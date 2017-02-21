@@ -1,46 +1,47 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 21 Feb 2017 12:57:59 +0000
-Subject: [PATCH 6/7] ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class
- cpus
-In-Reply-To: <1487152792-34214-7-git-send-email-vladimir.murzin@arm.com>
-References: <1487152792-34214-1-git-send-email-vladimir.murzin@arm.com>
- <1487152792-34214-7-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <63bebf6f-8dc5-7a03-ba7b-e05d83fdfce8@arm.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Tue, 21 Feb 2017 14:00:30 +0100
+Subject: [PATCH] tty/serial: atmel: remove cache when unnecessary
+In-Reply-To: <20170221120357.13623-2-alexandre.belloni@free-electrons.com>
+References: <20170221120357.13623-1-alexandre.belloni@free-electrons.com>
+ <20170221120357.13623-2-alexandre.belloni@free-electrons.com>
+Message-ID: <CACQ1gAht2b425Zx20rfqXP5UabgPYeh4+Q2VV3-noq5+srf5Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/02/17 09:59, Vladimir Murzin wrote:
-> Now, we have dedicated non-cacheable region for consistent DMA
-> operations. However, that region can still be marked as bufferable by
-> MPU, so it'd be safer to have barriers by default.
-
-Makes sense - plenty of cases want their DMA buffers to still be
-write-combining (e.g. framebuffers have already been mentioned here),
-for which strongly-ordered mappings won't do. Plus you don't exactly
-have a choice if you've no MPU and have fixed Normal attributes for your
-RAM region.
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> Tested-by: Andras Szemzo <sza@esh.hu>
-> Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+2017-02-21 13:03 GMT+01:00 Alexandre Belloni
+<alexandre.belloni@free-electrons.com>:
+> struct cache is only used in suspend/resume. Exclude it when PM is not
+> selected.
+>
+> Suggested-by: Richard Genoud <richard.genoud@gmail.com>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Richard Genoud <richard.genoud@gmail.com>
 > ---
->  arch/arm/mm/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-> index 0b79f12..64a1465c 100644
-> --- a/arch/arm/mm/Kconfig
-> +++ b/arch/arm/mm/Kconfig
-> @@ -1029,7 +1029,7 @@ config ARM_L1_CACHE_SHIFT
->  
->  config ARM_DMA_MEM_BUFFERABLE
->  	bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K) && !CPU_V7
-> -	default y if CPU_V6 || CPU_V6K || CPU_V7
-> +	default y if CPU_V6 || CPU_V6K || CPU_V7 || CPU_V7M
->  	help
->  	  Historically, the kernel has used strongly ordered mappings to
->  	  provide DMA coherent memory.  With the advent of ARMv7, mapping
-> 
+>  drivers/tty/serial/atmel_serial.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index dcebb28ffbc4..f0d4894267c2 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -175,6 +175,7 @@ struct atmel_uart_port {
+>         unsigned int            pending_status;
+>         spinlock_t              lock_suspended;
+>
+> +#ifdef CONFIG_PM
+>         struct {
+>                 u32             cr;
+>                 u32             mr;
+> @@ -185,6 +186,7 @@ struct atmel_uart_port {
+>                 u32             fmr;
+>                 u32             fimr;
+>         } cache;
+> +#endif
+>
+>         int (*prepare_rx)(struct uart_port *port);
+>         int (*prepare_tx)(struct uart_port *port);
+> --
+> 2.11.0
+>
+
+Thanks !
