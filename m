@@ -1,53 +1,44 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Tue, 21 Feb 2017 10:07:00 +0100
-Subject: [PATCH v3 1/7] dt-bindings: Add binding for brcm,bcm2835-sdhost.
+Date: Tue, 21 Feb 2017 10:07:05 +0100
+Subject: [PATCH v3 6/7] ARM: dts: bcm283x: switch from &sdhci to &sdhost
 In-Reply-To: <1487668026-7100-1-git-send-email-kraxel@redhat.com>
 References: <1487668026-7100-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1487668026-7100-2-git-send-email-kraxel@redhat.com>
+Message-ID: <1487668026-7100-7-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Anholt <eric@anholt.net>
+sdcard access with the sdhost controller is faster.
 
-This is the other SD controller on the platform, which can be swapped
-to the role of SD card host using pin muxing.
+Read access (dd with 64k blocks on rpi2):
+   CONFIG_MMC_SDHCI_IPROC: 11-12 MB/s
+   CONFIG_MMC_BCM2835:     19-20 MB/s
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
+Differences on write access are pretty much in the noise.
+
 Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Eric Anholt <eric@anholt.net>
 ---
- .../bindings/mmc/brcm,bcm2835-sdhost.txt           | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
+ arch/arm/boot/dts/bcm2835-rpi.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
-new file mode 100644
-index 0000000..d876580
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
-@@ -0,0 +1,23 @@
-+Broadcom BCM2835 SDHOST controller
-+
-+This file documents differences between the core properties described
-+by mmc.txt and the properties that represent the BCM2835 controller.
-+
-+Required properties:
-+- compatible: Should be "brcm,bcm2835-sdhost".
-+- clocks: The clock feeding the SDHOST controller.
-+
-+Optional properties:
-+- dmas: DMA channel for read and write.
-+          See Documentation/devicetree/bindings/dma/dma.txt for details
-+
-+Example:
-+
-+sdhost: mmc at 7e202000 {
-+	compatible = "brcm,bcm2835-sdhost";
-+	reg = <0x7e202000 0x100>;
-+	interrupts = <2 24>;
-+	clocks = <&clocks BCM2835_CLOCK_VPU>;
-+	dmas = <&dma 13>;
-+	dma-names = "rx-tx";
-+};
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index 7d89af2..e6beecb 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -65,13 +65,13 @@
+ &sdhci {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&emmc_gpio48>;
+-	status = "okay";
+ 	bus-width = <4>;
+ };
+ 
+ &sdhost {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sdhost_gpio48>;
++	status = "okay";
+ 	bus-width = <4>;
+ };
+ 
 -- 
 1.8.3.1
