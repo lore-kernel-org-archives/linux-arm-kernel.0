@@ -1,51 +1,88 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 21 Feb 2017 16:51:48 +0000
-Subject: [PATCH/RFC 3/6] drivers: firmware: psci: Implement shallow
- suspend mode
-In-Reply-To: <CAMuHMdUAcRVLzDZCZucAt0agGZynQtqhWeh7yPaBrogCYhRW4g@mail.gmail.com>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <1487622809-25127-4-git-send-email-geert+renesas@glider.be>
- <08c5dcf3-9d7c-33ff-f801-8f94f630f49b@arm.com>
- <CAMuHMdUAcRVLzDZCZucAt0agGZynQtqhWeh7yPaBrogCYhRW4g@mail.gmail.com>
-Message-ID: <016dd5fc-08c2-0084-5332-2992ab95f134@arm.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Tue, 21 Feb 2017 09:52:54 -0700
+Subject: [PATCH V10 05/10] acpi: apei: handle SEA notification type for
+ ARMv8
+In-Reply-To: <CAKv+Gu_+w4UW4ds-2hLe+c36Ch+H4Zx-pMzrkTkqDYbzTHrxnA@mail.gmail.com>
+References: <1487188282-2568-1-git-send-email-tbaicar@codeaurora.org>
+ <1487188282-2568-6-git-send-email-tbaicar@codeaurora.org>
+ <CAKv+Gu_+w4UW4ds-2hLe+c36Ch+H4Zx-pMzrkTkqDYbzTHrxnA@mail.gmail.com>
+Message-ID: <8c6130c4-7ccd-1f8a-7c7b-7d097f9b298a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Ard,
 
 
-On 21/02/17 16:23, Geert Uytterhoeven wrote:
-> Hi Sudeep,
-> 
-> On Tue, Feb 21, 2017 at 11:42 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> On 20/02/17 20:33, Geert Uytterhoeven wrote:
->>> Enable support for "shallow" suspend mode, also known as "Standby" or
->>> "Power-On Suspend".
->>>
->>> As secondary CPU cores are taken offline, "shallow" suspend mode saves
->>> slightly more power than "s2idle", but less than "deep" suspend mode.
->>> However, unlike "deep" suspend mode, "shallow" suspend mode can be used
->>> regardless of the presence of support for PSCI_SYSTEM_SUSPEND, which is
->>> an optional API in PSCI v1.0.
->>>
->>> List the available system suspend modes:
->>>
->>>     $ cat /sys/power/mem_sleep
->>>     s2idle shallow [deep]
->>>
->>> Suspend to "shallow" mode:
->>>
->>>     $ echo shallow > /sys/power/mem_sleep
->>>     $ echo mem > /sys/power/state
->>>
+On 2/16/2017 11:32 AM, Ard Biesheuvel wrote:
+> On 15 February 2017 at 19:51, Tyler Baicar <tbaicar@codeaurora.org> wrote:
+>> ARM APEI extension proposal added SEA (Synchronous External Abort)
+>> notification type for ARMv8.
+>> Add a new GHES error source handling function for SEA. If an error
+>> source's notification type is SEA, then this function can be registered
+>> into the SEA exception handler. That way GHES will parse and report
+>> SEA exceptions when they occur.
+>> An SEA can interrupt code that had interrupts masked and is treated as
+>> an NMI. To aid this the page of address space for mapping APEI buffers
+>> while in_nmi() is always reserved, and ghes_ioremap_pfn_nmi() is
+>> changed to use the helper methods to find the prot_t to map with in
+>> the same way as ghes_ioremap_pfn_irq().
 >>
->> I don't have the links to such previous attempts handy, but we have
-> 
-> Don't worry, I did read earlier discussions about implementing shallow mode.
-> 
+>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+>> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+>> ---
+>>   arch/arm64/Kconfig        |  2 ++
+>>   arch/arm64/mm/fault.c     | 13 ++++++++
+>>   drivers/acpi/apei/Kconfig | 14 +++++++++
+>>   drivers/acpi/apei/ghes.c  | 77 +++++++++++++++++++++++++++++++++++++++++++----
+>>   include/acpi/ghes.h       |  7 +++++
+>>   5 files changed, 107 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 1117421..8557556 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>>
+>> @@ -498,6 +500,17 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>>          pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+>>                   fault_name(esr), esr, addr);
+>>
+>> +       /*
+>> +        * Synchronous aborts may interrupt code which had interrupts masked.
+>> +        * Before calling out into the wider kernel tell the interested
+>> +        * subsystems.
+>> +        */
+>> +       if(IS_ENABLED(HAVE_ACPI_APEI_SEA)) {
+> Missing space after 'if'
+I'll add that in.
+>> +               nmi_enter();
+>> +               ghes_notify_sea();
+>> +               nmi_exit();
+>> +       }
+>> +
+>>          info.si_signo = SIGBUS;
+>>          info.si_errno = 0;
+>>          info.si_code  = 0;
+>> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+>> index b0140c8..ef7f7bd 100644
+>> --- a/drivers/acpi/apei/Kconfig
+>> +++ b/drivers/acpi/apei/Kconfig
+>> @@ -4,6 +4,20 @@ config HAVE_ACPI_APEI
+>>   config HAVE_ACPI_APEI_NMI
+>>          bool
+>>
+>> +config HAVE_ACPI_APEI_SEA
+> HAVE_xxx Kconfig options are typically non user selectable, so I
+> suggest to drop the HAVE_ prefix here. Also, you should probably make
+> it 'default y' rather than select it elsewhere; this will still honour
+> the dependency on ARM64 && ACPI_APEI_GHES
+>
+Okay, I will drop the HAVE_ and add in the default y
 
-In short or just to summarize in one line, just use "freeze"(a.k.a
-suspend-to-idle suspend mode)
+Thanks,
+Tyler
 
 -- 
-Regards,
-Sudeep
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
