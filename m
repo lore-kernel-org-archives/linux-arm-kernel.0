@@ -1,146 +1,60 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 21 Feb 2017 09:13:40 +0100
-Subject: [RESEND PATCH 2/3] mtd: nand: atmel: Add
- ->setup_data_interface() hooks
-In-Reply-To: <4db51424-0e59-bad7-45ff-92516424dead@gmail.com>
-References: <1487625149-7234-1-git-send-email-boris.brezillon@free-electrons.com>
- <1487625149-7234-3-git-send-email-boris.brezillon@free-electrons.com>
- <4db51424-0e59-bad7-45ff-92516424dead@gmail.com>
-Message-ID: <20170221091340.2d6d3fdf@bbrezillon>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 21 Feb 2017 10:18:21 +0200
+Subject: imx: Race when disabling RX in IMX.6 UART in half duplex
+In-Reply-To: <e95b9a6f-9d61-3759-3eae-48e2900ca9b4@camlintechnologies.com>
+References: <c07c95e2-3463-222b-c78a-b5716b4c5a14@camlintechnologies.com>
+ <20170220192001.eqomprbgrqkefkas@tarshish>
+ <e95b9a6f-9d61-3759-3eae-48e2900ca9b4@camlintechnologies.com>
+Message-ID: <20170221081821.7n2345o4zacnfcvl@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Feb 2017 23:47:10 +0100
-Marek Vasut <marek.vasut@gmail.com> wrote:
+Hi Piotr,
 
-> On 02/20/2017 10:12 PM, Boris Brezillon wrote:
-> > The NAND controller IP can adapt the NAND controller timings dynamically.
-> > Implement the ->setup_data_interface() hook to support this feature.
-> > 
-> > Note that it's not supported on at91rm9200 because this SoC has a
-> > completely different SMC block, which is not supported yet.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  drivers/mtd/nand/atmel/nand-controller.c | 333 ++++++++++++++++++++++++++++++-
-> >  1 file changed, 328 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/mtd/nand/atmel/nand-controller.c b/drivers/mtd/nand/atmel/nand-controller.c
-> > index 4207c0d37826..ae46ef711d67 100644
-> > --- a/drivers/mtd/nand/atmel/nand-controller.c
-> > +++ b/drivers/mtd/nand/atmel/nand-controller.c
-> > @@ -57,6 +57,7 @@
-> >  #include <linux/interrupt.h>
-> >  #include <linux/mfd/syscon.h>
-> >  #include <linux/mfd/syscon/atmel-matrix.h>
-> > +#include <linux/mfd/syscon/atmel-smc.h>
-> >  #include <linux/module.h>
-> >  #include <linux/mtd/nand.h>
-> >  #include <linux/of_address.h>
-> > @@ -147,6 +148,8 @@ struct atmel_nand_cs {
-> >  		void __iomem *virt;
-> >  		dma_addr_t dma;
-> >  	} io;
-> > +
-> > +	struct atmel_smc_cs_conf smcconf;
-> >  };
-> >  
-> >  struct atmel_nand {
-> > @@ -190,6 +193,8 @@ struct atmel_nand_controller_ops {
-> >  	void (*nand_init)(struct atmel_nand_controller *nc,
-> >  			  struct atmel_nand *nand);
-> >  	int (*ecc_init)(struct atmel_nand *nand);
-> > +	int (*setup_data_interface)(struct atmel_nand *nand, int csline,
-> > +				    const struct nand_data_interface *conf);
-> >  };
-> >  
-> >  struct atmel_nand_controller_caps {
-> > @@ -1144,6 +1149,293 @@ static int atmel_hsmc_nand_ecc_init(struct atmel_nand *nand)
-> >  	return 0;
-> >  }
-> >  
-> > +static int atmel_smc_nand_prepare_smcconf(struct atmel_nand *nand,
-> > +					const struct nand_data_interface *conf,
-> > +					struct atmel_smc_cs_conf *smcconf)
-> > +{
-> > +	u32 ncycles, totalcycles, timeps, mckperiodps;
-> > +	struct atmel_nand_controller *nc;
-> > +	int ret;
-> > +
-> > +	nc = to_nand_controller(nand->base.controller);
-> > +
-> > +	/* DDR interface not supported. */
-> > +	if (conf->type != NAND_SDR_IFACE)
-> > +		return -ENOTSUPP;
-> > +
-> > +	/*
-> > +	 * tRC < 30ns implies EDO mode. This controller does not support this
-> > +	 * mode.
-> > +	 */
-> > +	if (conf->timings.sdr.tRC_min < 30)
-> > +		return -ENOTSUPP;
-> > +
-> > +	atmel_smc_cs_conf_init(smcconf);
-> > +
-> > +	mckperiodps = NSEC_PER_SEC / clk_get_rate(nc->mck);
-> > +	mckperiodps *= 1000;  
+On Tue, Feb 21, 2017 at 09:00:39AM +0100, Piotr Figiel wrote:
+> On 20.02.2017 20:20, Baruch Siach wrote:
+> > On Mon, Feb 20, 2017 at 02:54:02PM +0100, Piotr Figiel wrote:
+> > >   I'm looking to find a correct way to disable RX in the I.MX6 UART during
+> > > TX-ing. I stumbled on the issue described below when working on
+> > > ~SER_RS485_RX_DURING_TX on custom 3.10 tree (branched from Freescale's/NXP's
+> > > BSP release) independently to what is now in the main line imx.c, but I see
+> > > now that the implementation in mainline also seem to have the same problem
+> > > I'm trying to solve now. I would like to request for comments to
+> > > confirm/deny whether the issue I raise here is valid and how to best
+> > > approach this.
+> > > 
+> > >   I'm mostly concerned about the fact that the URXD register must not be
+> > > accessed (as documented in IMX.6 RM) when RX is disabled (RXEN=0). The issue
+> > > is that in the following sequence happening during imx_start_tx with
+> > > ~SER_RS485_RX_DURING_TX set:
+> > > 
+> > > 1. Acquire spinlock, disable local interrupts (from serial_core.c),
+> > > 2. Disable RX receiver (RXEN=0 in UCR2),
+> > > 3. Release spinlock, reenable interrupts.
+> > > 
+> > > The RX fifo may become not empty between #1 and #2. This will raise
+> > > interrupt which will be handled after re-enabling interrupts (after #3). ISR
+> > > in this case will check the status bit of the interrupt and fetch RX FIFO
+> > > contents, which I understand is forbidden by the documentation and may raise
+> > > error on the bus [1]. In addition disabling RX IRQ in this procedure, e.g.
+> > > after #1 doesn't seem to be enough, as the IRQ still may trigger after #1
+> > > and will need to be serviced.
+> > As I understand it, SER_RS485_RX_DURING_TX is for half-duplex RS-485 where
+> > only one device is allowed to transmit at any given time. Higher level code
+> > determines when any given device on the bus is allowed to transmit. If Rx FIFO
+> > becomes non-empty during Tx enable, you have a contention problem to solve.
 > 
-> You probably want to multiply before dividing to retain precision.
+> That's correct, although I don't want bugs from the user-space or
+> misbehaving devices on RS-485 to cause errors on the AXI/AHB bus resulting
+> with possible crash/exception on the CPU core. The reason I write about this
+> is that the RM explicitly forbids accessing those registers in such case.
 
-Doing the multiplication first implies using an u64, and nanosecond
-granularity is fine here (AFAIR, mck <= 166MHz).
+The trivial solution might be to return early from imx_rxint() when RXEN=0. 
+Would that be sufficient?
 
-> 
-> > +	/*
-> > +	 * Set write pulse timing. This one is easy to extract:
-> > +	 *
-> > +	 * NWE_PULSE = tWP
-> > +	 */
-> > +	ncycles = DIV_ROUND_UP(conf->timings.sdr.tWP_min, mckperiodps);
-> > +	totalcycles = ncycles;
-> > +	ret = atmel_smc_cs_conf_set_pulse(smcconf, ATMEL_SMC_NWE_SHIFT,
-> > +					  ncycles);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	/*
-> > +	 * The write setup timing depends on the operation done on the NAND.
-> > +	 * All operations goes through the same data bus, but the operation
-> > +	 * type depends on the address we are writing to (ALE/CLE address
-> > +	 * lines).
-> > +	 * Since we have no way to differentiate the different operations at
-> > +	 * the SMC level, we must consider the worst case (the biggest setup
-> > +	 * time among all operation types):
-> > +	 *
-> > +	 * NWE_SETUP = max(tCLS, tCS, tALS, tDS) - NWE_PULSE
-> > +	 */
-> > +	timeps = max3(conf->timings.sdr.tCLS_min, conf->timings.sdr.tCS_min,
-> > +		      conf->timings.sdr.tALS_min);
-> > +	timeps = max(timeps, conf->timings.sdr.tDS_min);
-> > +	ncycles = DIV_ROUND_UP(timeps, mckperiodps);
-> > +	ncycles = ncycles > totalcycles ? ncycles - totalcycles : 0;  
-> 
-> Ew, that's totally cryptic here ...
+baruch
 
-totalcycles contains the NWE_PULSE value (see above), and we don't want
-to end up with a negative value in ncycles, hence the
-ncycles > totalcycles test before doing the subtraction.
-
-> 
-> > +	totalcycles += ncycles;
-> > +	ret = atmel_smc_cs_conf_set_setup(smcconf, ATMEL_SMC_NWE_SHIFT,
-> > +					  ncycles);
-> > +	if (ret)
-> > +		return ret;  
-> 
-> [...]
-> 
-> > +static const struct atmel_nand_controller_caps atmel_sam9260_nc_caps = {
-> > +	.ale_offs = 1 << 21,
-> > +	.cle_offs = 1 << 22,  
-> 
-> BIT(22) ?
-
-Yep. Actually, this should be changed in [1].
-
-[1]https://www.spinics.net/lists/arm-kernel/msg563780.html
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
