@@ -1,46 +1,35 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 21 Feb 2017 14:49:34 +0100
-Subject: [PATCH -next v2] pinctrl: samsung: Fix return value check in
- samsung_pinctrl_get_soc_data()
-In-Reply-To: <CACRpkda0BYLNpPFwpNaEMdeyx61KDUQz_6Y=FQj340pViFjVVQ@mail.gmail.com>
-References: <20170125140321.23911-1-weiyj.lk@gmail.com>
- <20170205155849.4362-1-weiyj.lk@gmail.com>
- <CGME20170213145008epcas3p119bdd6f76468a00fb8d796308ad37698@epcas3p1.samsung.com>
- <CACRpkda0BYLNpPFwpNaEMdeyx61KDUQz_6Y=FQj340pViFjVVQ@mail.gmail.com>
-Message-ID: <c4dd122b-0312-fcca-08e2-4d4586949a88@samsung.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 21 Feb 2017 13:53:00 +0000
+Subject: [PATCH] arm64: dts: juno: update definition for programmable
+ replicator.
+In-Reply-To: <CAJ9a7VhKtS-nrSBWQzMWkO1E1BajZY2aGBurdRAB05tGy2xs9A@mail.gmail.com>
+References: <1487358790-2618-1-git-send-email-mike.leach@linaro.org>
+ <2ba59da5-fc79-ab53-2f2a-2ddc6e5e9c3d@arm.com>
+ <DB6PR0802MB219850A35C8DAD5CB2858C1C8C510@DB6PR0802MB2198.eurprd08.prod.outlook.com>
+ <798053cd-ae5a-dc04-12c9-9df9e0d66b4d@arm.com>
+ <CAJ9a7VhKtS-nrSBWQzMWkO1E1BajZY2aGBurdRAB05tGy2xs9A@mail.gmail.com>
+Message-ID: <2c0e2e3a-f852-7184-036f-536d94e80c23@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi Mike,
 
-On 2017-02-13 15:49, Linus Walleij wrote:
-> On Sun, Feb 5, 2017 at 4:58 PM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
->
->> From: Wei Yongjun <weiyongjun1@huawei.com>
->>
->> In case of error, the function devm_ioremap() returns NULL pointer not
->> ERR_PTR(). Fix by using devm_ioremap_resource instead of devm_ioremap.
->>
->> Fixes: 8b1bd11c1f8f ("pinctrl: samsung: Add the support the multiple
->> IORESOURCE_MEM for one pin-bank")
->> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
->> ---
->> v1 -> v2: use devm_ioremap_resource instead of devm_ioremap
-> Patch applied with Krzysztof's ACK.
+On 21/02/17 12:46, Mike Leach wrote:
+> The messages are not a normal linux / kernel warning message, but a
+> result of the offline trace decode process:-
+> 
+>   110739: I_OVERFLOW : Overflow.
+>   110741: I_ASYNC : Alignment Synchronisation.
+>   110754: I_TRACE_INFO : Trace Info.; PCTL=0x0
+>   110757: I_TRACE_ON : Trace On.
+> 
+> If this is sufficient with an explanation I'm happy to add it to the patch.
+> 
 
-Sadly this patch breaks support for IMEM pinctrl block on Exynos5433/TM2
-and it took us some time to find the source of the problem.
+Oh OK, then no need to add to changelog as it requires the knowledge of
+this tool to understand which is not part of the kernel tree. I will try
+to push it as a fix and lets see how that goes.
 
-devm_ioremap_resource() is not functionally a full equivalent of
-devm_ioremap(). The problem here is that registers for IMEM and ALIVE
-pin controllers are shared and both devices have <0x11090000 0x1000>
-range in their reg property. devm_ioremap_resource() maps given
-resource exclusively for the device, while devm_ioremap() allows
-non-exclusive mappings.
-
-This patch has to be reverted asap.
-
-Best regards
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Regards,
+Sudeep
