@@ -1,33 +1,73 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 21 Feb 2017 12:51:49 +0800
-Subject: [PATCH v3 05/18] mfd: axp20x: add ADC cells for AXP20X and AXP22X
- PMICs
-In-Reply-To: <20170215093701.k33jmzeu4xz5guet@dell>
-References: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
- <20170214094112.27426-6-quentin.schulz@free-electrons.com>
- <20170215093701.k33jmzeu4xz5guet@dell>
-Message-ID: <CAGb2v64zeOG+JtifgtdtxDMvi=+i6aeJ9_5UqghqB2oeBTjA3Q@mail.gmail.com>
+From: jagan@openedev.com (Jagan Teki)
+Date: Tue, 21 Feb 2017 10:36:30 +0530
+Subject: [PATCH v3 1/4] arm: dts: imx6qdl-icore: Add backlight support for lvds
+Message-ID: <1487653593-3457-1-git-send-email-jagan@openedev.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 5:37 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Tue, 14 Feb 2017, Quentin Schulz wrote:
->
->> This adds the AXP20X/AXP22x ADCs driver to the mfd cells of the AXP209,
->> AXP221 and AXP223 MFD.
->>
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>
->> v3:
->>  - removed of_compatible as DT node has been removed,
->>  - use different names to probe the ADC driver,
->>
->>  drivers/mfd/axp20x.c | 6 ++++++
->>  1 file changed, 6 insertions(+)
->
-> For my own reference:
->   Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+From: Jagan Teki <jagan@amarulasolutions.com>
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+This patch add support for lvds backlight on i.CoreM6 QDL
+variant boards.
+
+Cc: Domenico Acri <domenico.acri@engicam.com>
+Cc: Matteo Lisi <matteo.lisi@engicam.com>
+Cc: Michael Trimarchi <michael@amarulasolutions.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v3:
+- none
+Changes for v2:
+- none
+
+ arch/arm/boot/dts/imx6qdl-icore.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-icore.dtsi b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+index 55bebfc..7dda608 100644
+--- a/arch/arm/boot/dts/imx6qdl-icore.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-icore.dtsi
+@@ -48,6 +48,14 @@
+ 		reg = <0x10000000 0x80000000>;
+ 	};
+ 
++	backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm3 0 100000>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <7>;
++		status = "okay";
++	};
++
+ 	reg_3p3v: regulator-3p3v {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "3P3V";
+@@ -136,6 +144,12 @@
+ 	status = "okay";
+ };
+ 
++&pwm3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm3>;
++	status = "okay";
++};
++
+ &uart4 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart4>;
+@@ -246,6 +260,12 @@
+ 		>;
+ 	};
+ 
++	pinctrl_pwm3: pwm3grp-1 {
++		fsl,pins = <
++			MX6QDL_PAD_SD4_DAT1__PWM3_OUT 0x1b0b1
++		>;
++	};
++
+ 	pinctrl_usbotg: usbotggrp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_GPIO_1__USB_OTG_ID 0x17059
+-- 
+1.9.1
