@@ -1,62 +1,87 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 21 Feb 2017 18:18:49 +0000
-Subject: [PATCH/RFC 3/6] drivers: firmware: psci: Implement shallow
- suspend mode
-In-Reply-To: <CAMuHMdX_pot+=rJfY1Kor4gYD4CgBYivngzCLwV36LELx+AA5Q@mail.gmail.com>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <1487622809-25127-4-git-send-email-geert+renesas@glider.be>
- <20170221110712.GB5021@amd>
- <de2a15d4-9ac2-9ba9-a47a-eacbf478f601@arm.com>
- <CAMuHMdVmu4AYZ6MZHd79N2-2gELR6s3oZ46UnEszCfLvHymY1w@mail.gmail.com>
- <20170221172012.GD8605@leverpostej>
- <CAMuHMdX_pot+=rJfY1Kor4gYD4CgBYivngzCLwV36LELx+AA5Q@mail.gmail.com>
-Message-ID: <20170221181849.GG8605@leverpostej>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Tue, 21 Feb 2017 19:19:39 +0100
+Subject: [PATCH v3 13/18] power: supply: add battery driver for AXP20X and
+ AXP22X PMICs
+In-Reply-To: <CAGb2v64MjfYSnXET1BWsv=VaZE+v7GwNj7nrWDRafjRCM5tcQg@mail.gmail.com>
+References: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
+ <20170214094112.27426-14-quentin.schulz@free-electrons.com>
+ <CAGb2v64MjfYSnXET1BWsv=VaZE+v7GwNj7nrWDRafjRCM5tcQg@mail.gmail.com>
+Message-ID: <c3b21cd4-6d1d-db6a-b1ef-ed119f683035@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Chen-Yu,
 
-On Tue, Feb 21, 2017 at 07:06:04PM +0100, Geert Uytterhoeven wrote:
-> On Tue, Feb 21, 2017 at 6:20 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Tue, Feb 21, 2017 at 05:32:50PM +0100, Geert Uytterhoeven wrote:
-
-> >> How can Linux know if using "deep" suspend will allow to wake-up the system
-> >> according to configured wake-up sources, or not?
-> >
-> > My understanding is that if a device can wake the system from
-> > PSCI_SYSTEM_SUSPEND, it should be described in the DT as a wakeup source
-> > [1]. So we should be able to determine the set of devices which can wake
-> > the system from a suspend. We shouldn't assume that other devices can
-> > (though I don't precisely what we do currently).
-> >
-> > Otherwise, where PSCI_CPU_SUSPEND, we'd expect that most devices
-> > (barring cpu-local timers) can wake up CPUs, and hence the system, by
-> > raising an interrupt.
+On 21/02/2017 05:44, Chen-Yu Tsai wrote:
+> On Tue, Feb 14, 2017 at 5:41 PM, Quentin Schulz
+> <quentin.schulz@free-electrons.com> wrote:
+>> The X-Powers AXP20X and AXP22X PMICs can have a battery as power supply.
+>>
+>> This patch adds the battery power supply driver to get various data from
+>> the PMIC, such as the battery status (charging, discharging, full,
+>> dead), current max limit, current current, battery capacity (in
+>> percentage), voltage max and min limits, current voltage and battery
+>> capacity (in Ah).
+>>
+>> This battery driver uses the AXP20X/AXP22X ADC driver as PMIC data
+>> provider.
+>>
+>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>> Acked-by: Jonathan Cameron <jic23@kernel.org>
+>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+[...]
+>> +static int axp20x_set_constant_charge_current(struct axp20x_batt_ps *axp_batt,
+>> +                                             int charge_current)
+>> +{
+>> +       if (axp_batt->axp_id == AXP209_ID)
+>> +               charge_current = (charge_current - 300000) / 100000;
+>> +       else
+>> +               charge_current = (charge_current - 300000) / 150000;
+>> +
+>> +       if (charge_current > AXP20X_CHRG_CTRL1_TGT_CURR || charge_current < 0)
+>> +               return -EINVAL;
 > 
-> > [1] Documentation/devicetree/bindings/power/wakeup-source.txt
+> I would add a check or warn if the value to be programmed exceeds that returned
+> by power_supply_get_battery_info.
+
+Completely agree on a warning.
+
+> A charge current exceeding the limits of the
+> battery is potentially disastrous. The battery may be destroyed or even burst
+> into flames and explode, taking the board and anything nearby with it. Otherwise
 > 
-> "wakeup-source" in DT is used as a mix of hardware description and software
-> policy.  E.g. some keys on a keyboard may have it, others don't, while there's
-> not always a technical reason for that.
+
+Yes, I understand. Maybe I'm seeing this ability to set the (max)
+constant current charge the wrong way. Here is what I think:
+If we limit the max constant charge current with a DT property, it would
+require a DT rebuild when changing the battery (i.e. if an end-user
+decides to change the battery with a bigger constant charge current, he
+has to recompile the DT to change the DT value).
+
+What I can suggest is the following:
+ - set the max constant charge current and the default constant charge
+current from the DT property,
+ - allow the user to change the constant charge current via sysfs within
+minimal-DT value range,
+ - allow the user to set max constant charge current via sysfs (and
+print a warning as well when setting it), then the user can set a higher
+constant charge current,
+
+That would require a two steps modification with a printed warning.
+"Safer" but does not remove the ability to change the constant charge
+current in the case of battery swapping/changing.
+
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 > 
-> Also, it doesn't specify from which suspend state it can wake-up.
+> Speaking of power_supply_get_battery_info, is it merged or ready to be merged?
+> 
 
-Joy.
-
-If we need to do something here, we should clarify the semantics of
-wakeup-source and/or introduce a property which is explicitly for the
-purpose of expressing HW capability to wake up from a specific power
-state.
-
-> On top of that, the Linux PM subsystem allows to configure wakeup by writing
-> "enabled" to a device's "wakeup" file in sysfs.  Or you can use ethtool for
-> Wake-on-LAN.
-
-Sure; userspace can always do something silly here.
-
-As I mentioned in my other reply, we could/should add an interface to
-allow userspace to determine if it has a guaranteed wakeup, which would
-allow us to do the right thing.
+v7 under way IIRC.
 
 Thanks,
-Mark.
+Quentin
+
+-- 
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
