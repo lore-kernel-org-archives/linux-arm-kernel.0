@@ -1,35 +1,42 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 21 Feb 2017 15:41:27 +0530
-Subject: [PATCH] ARM: dts: am57xx-idk: Add DCAN support
-In-Reply-To: <8981d49e7011a7246ff7dc6a9a9da0a56dfe5621.1487670384.git.nsekhar@ti.com>
-References: <8981d49e7011a7246ff7dc6a9a9da0a56dfe5621.1487670384.git.nsekhar@ti.com>
-Message-ID: <f8862417-e9e0-e2ac-865a-9684f96a5128@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 21 Feb 2017 11:12:46 +0100
+Subject: [PATCHv2 net-next 01/16] dt-bindings: net: update Marvell PPv2
+ binding for PPv2.2 support
+In-Reply-To: <20170214152503.602878cb@free-electrons.com>
+References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482943592-12556-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170103201842.hdg2uzzesog2jund@rob-hp-laptop>
+ <20170202175650.1fc06c2d@free-electrons.com>
+ <20170203164808.GD27312@n2100.armlinux.org.uk>
+ <20170214152503.602878cb@free-electrons.com>
+Message-ID: <20170221111246.2718c21a@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 February 2017 03:30 PM, Sekhar Nori wrote:
-> From: Schuyler Patton <spatton@ti.com>
-> 
-> AM571x IDK and the AM572x IDK use CAN1 interface.
-> This patch enables it for both boards.
-> 
-> Tested on AM572x IDK using cansequence.
-> 
-> Signed-off-by: Schuyler Patton <spatton@ti.com>
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> [nsekhar at ti.com: move to use DRA7XX_CORE_IOPAD())
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+Hello,
 
-I should have noted that although CAN does function on the IDK with this
-patch, there are "omap_hwmod: dcan1: _wait_target_disable failed"
-messages that come up due to lack of workaround for errata i893[1]
+On Tue, 14 Feb 2017 15:25:03 +0100, Thomas Petazzoni wrote:
 
-Roger does have some patches to workaround that errata. If you want to
-wait for those patches to be submitted and accepted first, it should be
-fine as well.
+> I'll try to get some more information about this, but I suspect this is
+> one case where we don't yet fully understand how all the HW works and
+> what all registers are doing, so it's hard to do a perfect DT binding
+> from day 1.
 
-Thanks,
-Sekhar
+So I've looked into this more closely, and after drawing a diagram of
+all the register areas, I came up with a much more reduced area, with
+only networking related registers: starting at 0x129000 for a size of
+0xb000. So now the DT node looks like this:
 
-[1] http://www.ti.com/lit/er/sprz436b/sprz436b.pdf
++                       cpm_ethernet: ethernet at 0 {
++                               compatible = "marvell,armada-7k-pp22";
++                               reg = <0x0 0x100000>, <0x129000 0xb000>;
+
+This will be part of my next iteration.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
