@@ -1,168 +1,110 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 21 Feb 2017 13:02:06 +0000
-Subject: [PATCH 3/7] drivers: dma-coherent: Account dma_pfn_offset when
- used with device tree
-In-Reply-To: <c7f1bc2f-6729-c01d-25a5-d07efd319828@arm.com>
-References: <1487152792-34214-1-git-send-email-vladimir.murzin@arm.com>
- <1487152792-34214-4-git-send-email-vladimir.murzin@arm.com>
- <c7f1bc2f-6729-c01d-25a5-d07efd319828@arm.com>
-Message-ID: <a565dd15-8447-c7c3-69d6-831bb5873cbe@arm.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Tue, 21 Feb 2017 14:02:57 +0100
+Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
+In-Reply-To: <1487593718-20752-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1487593718-20752-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1487593718-20752-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <4fc857bb-f4a1-e507-54bb-82c71bb7edca@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/02/17 12:37, Robin Murphy wrote:
-> On 15/02/17 09:59, Vladimir Murzin wrote:
->> dma_declare_coherent_memory() and friends are designed to account
->> difference in CPU and device addresses. However, when it is used with
->> reserved memory regions there is assumption that CPU and device have
->> the same view on address space. This assumption gets invalid when
->> reserved memory for coherent DMA allocations is referenced by device
->> with non-empty "dma-range" property.
->>
->> Simply feeding device address as rmem->base + dev->dma_pfn_offset
->> would not work due to reserved memory region can be shared, so this
->> patch turns device address to be expressed with help of CPU address
->> and device's dma_pfn_offset.
->>
->> For the case where device tree is not used and device sees memory
->> different to CPU we explicitly set device's dma_pfn_offset to
->> accomplish such difference. The latter might look controversial, but
->> it seems only a few drivers set device address different to CPU's:
->> - drivers/usb/host/ohci-sm501.c
->> - arch/sh/drivers/pci/fixups-dreamcast.c
->> so they can be screwed only if dma_pfn_offset there is set and not in
->> sync with device address range - we try to catch such cases with
->> WARN_ON.
->>
->> Cc: Michal Nazarewicz <mina86@mina86.com>
->> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
->> Cc: Alan Stern <stern@rowland.harvard.edu>
->> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
->> Cc: Rich Felker <dalias@libc.org>
->> Cc: Roger Quadros <rogerq@ti.com>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
->> Tested-by: Andras Szemzo <sza@esh.hu>
->> Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
->> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
->> ---
->>  drivers/base/dma-coherent.c | 17 +++++++++++++++--
->>  1 file changed, 15 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
->> index 640a7e6..c59708c 100644
->> --- a/drivers/base/dma-coherent.c
->> +++ b/drivers/base/dma-coherent.c
->> @@ -18,6 +18,12 @@ struct dma_coherent_mem {
->>  	spinlock_t	spinlock;
->>  };
->>  
->> +static inline dma_addr_t dma_get_device_base(struct device *dev,
->> +					     struct dma_coherent_mem * mem)
->> +{
->> +	return (mem->pfn_base - dev->dma_pfn_offset) << PAGE_SHIFT;
->> +}
->> +
->>  static bool dma_init_coherent_memory(
->>  	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
->>  	struct dma_coherent_mem **mem)
->> @@ -83,9 +89,16 @@ static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
->>  static int dma_assign_coherent_memory(struct device *dev,
->>  				      struct dma_coherent_mem *mem)
->>  {
->> +	unsigned long dma_pfn_offset = mem->pfn_base - PFN_DOWN(mem->device_base);
->> +
->>  	if (dev->dma_mem)
->>  		return -EBUSY;
->>  
->> +	if (dev->dma_pfn_offset)
->> +		WARN_ON(dma_pfn_offset && (dev->dma_pfn_offset != dma_pfn_offset));
->> +	else
->> +		dev->dma_pfn_offset = dma_pfn_offset;
+Le 20/02/2017 ? 13:28, Boris Brezillon a ?crit :
+> This is a complete rewrite of the driver whose main purpose is to
+> support the new DT representation where the NAND controller node is now
+> really visible in the DT and appears under the EBI bus. With this new
+> representation, we can add other devices under the EBI bus without
+> risking pinmuxing conflicts (the NAND controller is under the EBI
+> bus logic and as such, share some of its pins with other devices
+> connected on this bus).
 > 
-> This makes me rather uneasy - I can well imagine a device sharing the
-> CPU physical address map of external system memory, but having its own
-> view of its local coherent memory such that pfn_base != device_base
-> still. I know for a fact we've had internal FPGA tiles set up that way,
-> although whether it was entirely intentional is another matter... ;)
+> Even though the goal of this rework was not necessarily to add new
+> features, the new driver has been designed with this in mind. With a
+> clearer separation between the different blocks and different IP
+> revisions, adding new functionalities should be easier (we already
+> have plans to support SMC timing configuration so that we no longer
+> have to rely on the configuration done by the bootloader/bootstrap).
 > 
-> In that situation, setting dev->dma_pfn_offset like this would break
-> streaming DMA for such devices. Could we not keep the pool-specific
-> offset and the device-specific offset independent, apply whichever is
-> non-zero, and scream if both are set?
+> Also note that we no longer have a custom ->cmdfunc() implementation,
+> which means we can now benefit from new features added in the core
+> implementation for free (support for new NAND operations for example).
+> 
+> The last thing that we gain with this rework is support for multi-chips
+> and multi-dies chips, thanks to the clean NAND controller <-> NAND
+> devices representation.
+> 
+> This new driver has been tested on several platforms (at91sam9261,
+> at91sam9g45, at91sam9x5, sama5d3 and sama5d4) to make sure it did not
+> introduce regressions, and it's worth mentioning that old bindings are
+> still supported (which partly explain the positive diffstat).
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  MAINTAINERS                              |    2 +-
+>  drivers/mtd/nand/Makefile                |    2 +-
+>  drivers/mtd/nand/atmel/Makefile          |    4 +
+>  drivers/mtd/nand/atmel/nand-controller.c | 2269 +++++++++++++++++++++++++++
+>  drivers/mtd/nand/atmel/pmecc.c           | 1020 ++++++++++++
+>  drivers/mtd/nand/atmel/pmecc.h           |   73 +
+>  drivers/mtd/nand/atmel_nand.c            | 2479 ------------------------------
+>  drivers/mtd/nand/atmel_nand_ecc.h        |  163 --
+>  drivers/mtd/nand/atmel_nand_nfc.h        |  103 --
+>  9 files changed, 3368 insertions(+), 2747 deletions(-)
+>  create mode 100644 drivers/mtd/nand/atmel/Makefile
+>  create mode 100644 drivers/mtd/nand/atmel/nand-controller.c
+>  create mode 100644 drivers/mtd/nand/atmel/pmecc.c
+>  create mode 100644 drivers/mtd/nand/atmel/pmecc.h
+>  delete mode 100644 drivers/mtd/nand/atmel_nand.c
+>  delete mode 100644 drivers/mtd/nand/atmel_nand_ecc.h
+>  delete mode 100644 drivers/mtd/nand/atmel_nand_nfc.h
 
-Something like fixup bellow?
+[..]
 
-diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
-index 0c577ea..2060010 100644
---- a/drivers/base/dma-coherent.c
-+++ b/drivers/base/dma-coherent.c
-@@ -30,7 +30,15 @@ static inline struct dma_coherent_mem *dev_get_coherent_memory(struct device *de
- static inline dma_addr_t dma_get_device_base(struct device *dev,
- 					     struct dma_coherent_mem * mem)
- {
--	return (mem->pfn_base - dev->dma_pfn_offset) << PAGE_SHIFT;
-+	unsigned long dma_pfn_offset = mem->pfn_base - PFN_DOWN(mem->device_base);
-+
-+	if (dma_pfn_offset != dev->dma_pfn_offset )
-+		WARN_ON(device_pfn_offset && dev->dma_pfn_offset);
-+
-+	if (dma_pfn_offset)
-+		return mem->device_base;
-+	else
-+		return (mem->pfn_base - dev->dma_pfn_offset) << PAGE_SHIFT;
- }
- 
- static bool dma_init_coherent_memory(
-@@ -98,19 +106,12 @@ static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
- static int dma_assign_coherent_memory(struct device *dev,
- 				      struct dma_coherent_mem *mem)
- {
--	unsigned long dma_pfn_offset = mem->pfn_base - PFN_DOWN(mem->device_base);
--
- 	if (!dev)
- 		return -ENODEV;
- 
- 	if (dev->dma_mem)
- 		return -EBUSY;
- 
--	if (dev->dma_pfn_offset)
--		WARN_ON(dma_pfn_offset && (dev->dma_pfn_offset != dma_pfn_offset));
--	else
--		dev->dma_pfn_offset = dma_pfn_offset;
--
- 	dev->dma_mem = mem;
- 	/* FIXME: this routine just ignores DMA_MEMORY_INCLUDES_CHILDREN */
+> + * A few words about the naming convention in this file. This convention
+> + * applies to structure and function names.
+> + *
+> + * Prefixes:
+> + *
+> + * - atmel_nand_: all generic structures/functions
+> + * - atmel_smc_nand_: all structures/functions specific to the SMC interface
+> + *		      (at91sam9 and avr32 SoCs)
+> + * - atmel_hsmc_nand_: all structures/functions specific to the HSMC interface
+> + *		       (sama5 SoCs and later)
+> + * - atmel_nfc_: all structures/functions used to manipulate the NFC sub-block
+> + *		 that is available in the HSMC block
+> + * - <soc>_nand_: all SoC specific structures/functions
 
+Ok, good.
 
-Cheers
-Vladimir
+> + */
 
-> 
-> Robin.
-> 
->> +
->>  	dev->dma_mem = mem;
->>  	/* FIXME: this routine just ignores DMA_MEMORY_INCLUDES_CHILDREN */
->>  
->> @@ -133,7 +146,7 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
->>  		return ERR_PTR(-EINVAL);
->>  
->>  	spin_lock_irqsave(&mem->spinlock, flags);
->> -	pos = (device_addr - mem->device_base) >> PAGE_SHIFT;
->> +	pos = PFN_DOWN(device_addr - dma_get_device_base(dev, mem));
->>  	err = bitmap_allocate_region(mem->bitmap, pos, get_order(size));
->>  	spin_unlock_irqrestore(&mem->spinlock, flags);
->>  
->> @@ -186,7 +199,7 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
->>  	/*
->>  	 * Memory was found in the per-device area.
->>  	 */
->> -	*dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
->> +	*dma_handle = dma_get_device_base(dev, mem) + (pageno << PAGE_SHIFT);
->>  	*ret = mem->virt_base + (pageno << PAGE_SHIFT);
->>  	dma_memory_map = (mem->flags & DMA_MEMORY_MAP);
->>  	spin_unlock_irqrestore(&mem->spinlock, flags);
->>
-> 
-> 
+[..]
+
+> +static irqreturn_t atmel_nfc_interrupt(int irq, void *data)
+> +{
+> +	struct atmel_hsmc_nand_controller *nc = data;
+> +	u32 imr, sr;
+> +
+> +	regmap_read(nc->base.smc, ATMEL_HSMC_NFC_IMR, &imr);
+> +	regmap_read(nc->base.smc, ATMEL_HSMC_NFC_SR, &sr);
+> +
+> +	sr &= imr;
+> +
+> +	if (sr)
+> +		regmap_write(nc->base.smc, ATMEL_HSMC_NFC_IDR, sr);
+> +
+> +	if (sr == imr)
+> +		complete(&nc->complete);
+> +
+> +	return sr ? IRQ_HANDLED : IRQ_NONE;
+> +}
+
+It can be good as well to print out the error conditions. Not that it
+changes the behavior of the driver but it can warn us about issues like
+in the old function nfc_read_status().
+
+Othewise, I'm okay with the patch, so you can add my:
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+Best regards,
+-- 
+Nicolas Ferre
