@@ -1,88 +1,71 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Tue, 21 Feb 2017 09:52:54 -0700
-Subject: [PATCH V10 05/10] acpi: apei: handle SEA notification type for
- ARMv8
-In-Reply-To: <CAKv+Gu_+w4UW4ds-2hLe+c36Ch+H4Zx-pMzrkTkqDYbzTHrxnA@mail.gmail.com>
-References: <1487188282-2568-1-git-send-email-tbaicar@codeaurora.org>
- <1487188282-2568-6-git-send-email-tbaicar@codeaurora.org>
- <CAKv+Gu_+w4UW4ds-2hLe+c36Ch+H4Zx-pMzrkTkqDYbzTHrxnA@mail.gmail.com>
-Message-ID: <8c6130c4-7ccd-1f8a-7c7b-7d097f9b298a@codeaurora.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 21 Feb 2017 12:04:24 -0500
+Subject: [PATCH V3 2/2] PCI: handle CRS returned by device after FLR
+In-Reply-To: <1475473021-14251-3-git-send-email-okaya@codeaurora.org>
+References: <1475473021-14251-1-git-send-email-okaya@codeaurora.org>
+ <1475473021-14251-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <ac667a77-028d-d5da-f574-61f787fec72c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ard,
+Hi Alex,
+
+I'm coming back to work on this. 
+
+On 10/3/2016 1:37 AM, Sinan Kaya wrote:
+> An endpoint is allowed to issue CRS following an FLR request to indicate
+> that it is not ready to accept new requests. Changing the polling mechanism
+> in FLR wait function to go read the vendor ID instead of the command/status
+> register. A CRS indication will only be given if the address to be read is
+> vendor ID.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/pci/pci.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index c8749b9..7580b00 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -3725,7 +3725,8 @@ static void pci_flr_wait(struct pci_dev *dev)
+>  
+>  	do {
+>  		msleep(100);
+> -		pci_read_config_dword(dev, PCI_COMMAND, &id);
+
+Your comment here puzzled me. 
+
+https://patchwork.kernel.org/patch/8331851/
+
+"Self nak on this one, didn't account for VFs not implementing the first
+dword.  Thanks,"
+
+I'm trying to add Configuration Request Retry Status (CRS) support to FLR
+with this patch. 
+
+Basically, the root port will return 0xFFFF0001 only when a config read
+request is sent to the vendor ID register and CRS visibility is set.
+The SW needs to poll until this special read ID disappears. See the
+implementation note on Configuration Request Retry Status in PCIE
+specification for details.
+
+pci_bus_read_dev_vendor_id implements this loop for us.
+
+You are saying that there are VFs that do not implement vendor ID register.
+Can you give some history on this?
 
 
-On 2/16/2017 11:32 AM, Ard Biesheuvel wrote:
-> On 15 February 2017 at 19:51, Tyler Baicar <tbaicar@codeaurora.org> wrote:
->> ARM APEI extension proposal added SEA (Synchronous External Abort)
->> notification type for ARMv8.
->> Add a new GHES error source handling function for SEA. If an error
->> source's notification type is SEA, then this function can be registered
->> into the SEA exception handler. That way GHES will parse and report
->> SEA exceptions when they occur.
->> An SEA can interrupt code that had interrupts masked and is treated as
->> an NMI. To aid this the page of address space for mapping APEI buffers
->> while in_nmi() is always reserved, and ghes_ioremap_pfn_nmi() is
->> changed to use the helper methods to find the prot_t to map with in
->> the same way as ghes_ioremap_pfn_irq().
->>
->> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
->> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
->> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
->> ---
->>   arch/arm64/Kconfig        |  2 ++
->>   arch/arm64/mm/fault.c     | 13 ++++++++
->>   drivers/acpi/apei/Kconfig | 14 +++++++++
->>   drivers/acpi/apei/ghes.c  | 77 +++++++++++++++++++++++++++++++++++++++++++----
->>   include/acpi/ghes.h       |  7 +++++
->>   5 files changed, 107 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 1117421..8557556 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->>
->> @@ -498,6 +500,17 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>          pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
->>                   fault_name(esr), esr, addr);
->>
->> +       /*
->> +        * Synchronous aborts may interrupt code which had interrupts masked.
->> +        * Before calling out into the wider kernel tell the interested
->> +        * subsystems.
->> +        */
->> +       if(IS_ENABLED(HAVE_ACPI_APEI_SEA)) {
-> Missing space after 'if'
-I'll add that in.
->> +               nmi_enter();
->> +               ghes_notify_sea();
->> +               nmi_exit();
->> +       }
->> +
->>          info.si_signo = SIGBUS;
->>          info.si_errno = 0;
->>          info.si_code  = 0;
->> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
->> index b0140c8..ef7f7bd 100644
->> --- a/drivers/acpi/apei/Kconfig
->> +++ b/drivers/acpi/apei/Kconfig
->> @@ -4,6 +4,20 @@ config HAVE_ACPI_APEI
->>   config HAVE_ACPI_APEI_NMI
->>          bool
->>
->> +config HAVE_ACPI_APEI_SEA
-> HAVE_xxx Kconfig options are typically non user selectable, so I
-> suggest to drop the HAVE_ prefix here. Also, you should probably make
-> it 'default y' rather than select it elsewhere; this will still honour
-> the dependency on ARM64 && ACPI_APEI_GHES
->
-Okay, I will drop the HAVE_ and add in the default y
+> +		pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
+> +					   60 * 1000);
+>  	} while (i++ < 10 && id == ~0);
+>  
+>  	if (id == ~0)
+> 
 
-Thanks,
-Tyler
+Sinan
 
 -- 
+Sinan Kaya
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
