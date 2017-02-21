@@ -1,40 +1,50 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 21 Feb 2017 18:14:38 +0100
-Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
-In-Reply-To: <CAHp75Vc54+GR99qM8vUDfQnehFx0g5q137k-w5XY3023UZyr5w@mail.gmail.com>
-References: <CAHp75Vc_q-bEzA2-hVpHyR0GZ8mXxwJ8-UjECe31T04mb67q4w@mail.gmail.com>
- <20170221090610.6d531b94@bbrezillon>
- <CAHp75VfZfj-8ih3vg63w_dAq8xXE2Whu1bANXRcXS1_EGNq43A@mail.gmail.com>
- <20170221112641.6276c001@bbrezillon>
- <CAHp75Vcb9gtzF7LvH74JwL4dTUyQvKmg=dnTXKfjhVHuyK3WXg@mail.gmail.com>
- <20170221112720.ynehsryprhrhzjla@piout.net>
- <CAHp75VcKjYYAw8gw8yYXrd-vzZo50WOQ06AzPx+0g9Zakzjm-w@mail.gmail.com>
- <20170221162133.jch6yzpotj4s7zob@piout.net>
- <CAHp75VeB4eVuN5NMfAfQUtssuHezTyAM8FUswuR8FheUk1V-oA@mail.gmail.com>
- <CAHp75Vc54+GR99qM8vUDfQnehFx0g5q137k-w5XY3023UZyr5w@mail.gmail.com>
-Message-ID: <20170221171438.e5hvruoixafpcdps@piout.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 21 Feb 2017 17:20:13 +0000
+Subject: [PATCH/RFC 3/6] drivers: firmware: psci: Implement shallow
+ suspend mode
+In-Reply-To: <CAMuHMdVmu4AYZ6MZHd79N2-2gELR6s3oZ46UnEszCfLvHymY1w@mail.gmail.com>
+References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+ <1487622809-25127-4-git-send-email-geert+renesas@glider.be>
+ <20170221110712.GB5021@amd>
+ <de2a15d4-9ac2-9ba9-a47a-eacbf478f601@arm.com>
+ <CAMuHMdVmu4AYZ6MZHd79N2-2gELR6s3oZ46UnEszCfLvHymY1w@mail.gmail.com>
+Message-ID: <20170221172012.GD8605@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/02/2017 at 18:43:35 +0200, Andy Shevchenko wrote:
-> >> Come on, v4.10 has just been release and
+Hi,
+
+On Tue, Feb 21, 2017 at 05:32:50PM +0100, Geert Uytterhoeven wrote:
+> On Tue, Feb 21, 2017 at 12:14 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> > On 21/02/17 11:07, Pavel Machek wrote:
+> >>> Enable support for "shallow" suspend mode, also known as "Standby" or
+> >>> "Power-On Suspend".
+> >>>
+> >>> As secondary CPU cores are taken offline, "shallow" suspend mode saves
+> >>> slightly more power than "s2idle", but less than "deep" suspend mode.
+> >>> However, unlike "deep" suspend mode, "shallow" suspend mode can be used
+> >>> regardless of the presence of support for PSCI_SYSTEM_SUSPEND, which is
+> >>> an optional API in PSCI v1.0.
+> >>
+> >> If system supports "shallow" suspend, why does not PSCI implement it?
+> >
+> > Yes it can, and IIUC it already does on this platform with CPU_SUSPEND.
+> > All it now needs is just to use existing "freeze" suspend mode in Linux.
 > 
-> It doesn't build anymore. And current case even worse
-> Face it. It's dead.
-> 
+> How can Linux know if using "deep" suspend will allow to wake-up the system
+> according to configured wake-up sources, or not?
 
-I agree it hasn't seen any significant development in a while but I'm
-not the on able to take that decision.
+My understanding is that if a device can wake the system from
+PSCI_SYSTEM_SUSPEND, it should be described in the DT as a wakeup source
+[1]. So we should be able to determine the set of devices which can wake
+the system from a suspend. We shouldn't assume that other devices can
+(though I don't precisely what we do currently).
 
-A few weeks ago, I was telling Boris to let it not build for a while and
-then remove it. You already went out of your way to make it work. Again,
-feel free to send a patch removing avr32. I can only see a lot of
-benefits for the Atmel ARM SoCs and the many cleanups that will follow.
+Otherwise, where PSCI_CPU_SUSPEND, we'd expect that most devices
+(barring cpu-local timers) can wake up CPUs, and hence the system, by
+raising an interrupt.
 
-If nobody complains about the 4.10 breakage, You'll have plenty of time
-to remove it for 4.12
+Thanks,
+Mark.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+[1] Documentation/devicetree/bindings/power/wakeup-source.txt
