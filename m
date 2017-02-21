@@ -1,78 +1,86 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 21 Feb 2017 18:45:13 +0000
-Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
- power
-In-Reply-To: <94167d3a-e005-3af0-d290-a1086684d570@arm.com>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <69ab75a1-2e04-19e2-d1ad-12ca1cfc7625@arm.com>
- <CAMuHMdWjseO3XSOH2XCbM411Aj12RpdZZbHkpfFUfej58myz5Q@mail.gmail.com>
- <445b2f49-5d15-30af-a431-1c4edcd049a4@arm.com>
- <CAMuHMdUS96tPJRqNxG6sJjvC0LN-FjCeKOm7Zg2V_qMeQ_1QSQ@mail.gmail.com>
- <81df65a9-d2f1-26df-a977-5265feba25a3@arm.com>
- <94167d3a-e005-3af0-d290-a1086684d570@arm.com>
-Message-ID: <3c8b3f2d-8604-f999-4208-a82f171b64f2@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 21 Feb 2017 19:10:11 +0000
+Subject: [PATCH V10 07/10] efi: print unrecognized CPER section
+In-Reply-To: <1487188282-2568-8-git-send-email-tbaicar@codeaurora.org>
+References: <1487188282-2568-1-git-send-email-tbaicar@codeaurora.org>
+ <1487188282-2568-8-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <58AC9093.5020303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tyler,
+
+On 15/02/17 19:51, Tyler Baicar wrote:
+> UEFI spec allows for non-standard section in Common Platform Error
+> Record. This is defined in section N.2.3 of UEFI version 2.5.
+> 
+> Currently if the CPER section's type (UUID) does not match with
+> one of the section types that the kernel knows how to parse, the
+> section is skipped. Therefore, user is not able to see
+> such CPER data, for instance, error record of non-standard section.
+> 
+> For above mentioned case, this change prints out the raw data in
+> hex in dmesg buffer. Data length is taken from Error Data length
+> field of Generic Error Data Entry.
+> 
+> Following is a sample output from dmesg:
+> [  115.771702] {1}[Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
+> [  115.779042] {1}[Hardware Error]: It has been corrected by h/w and requires no further action
+> [  115.787456] {1}[Hardware Error]: event severity: corrected
+> [  115.792927] {1}[Hardware Error]:  Error 0, type: corrected
+> [  115.798415] {1}[Hardware Error]:  fru_id: 00000000-0000-0000-0000-000000000000
+> [  115.805596] {1}[Hardware Error]:  fru_text:
+> [  115.816105] {1}[Hardware Error]:  section type: d2e2621c-f936-468d-0d84-15a4ed015c8b
+> [  115.823880] {1}[Hardware Error]:  section length: 88
+> [  115.828779] {1}[Hardware Error]:   00000000: 01000001 00000002 5f434345 525f4543
+> [  115.836153] {1}[Hardware Error]:   00000010: 0000574d 00000000 00000000 00000000
+> [  115.843531] {1}[Hardware Error]:   00000020: 00000000 00000000 00000000 00000000
+> [  115.850908] {1}[Hardware Error]:   00000030: 00000000 00000000 00000000 00000000
+> [  115.858288] {1}[Hardware Error]:   00000040: fe800000 00000000 00000004 5f434345
+> [  115.865665] {1}[Hardware Error]:   00000050: 525f4543 0000574d
+
+The use-case for this is to capture the data and decode it with a vendor tool?
+(if so, please mention that in the commit message!)
 
 
-On 21/02/17 18:27, Sudeep Holla wrote:
-> 
-> 
-> On 21/02/17 17:51, Sudeep Holla wrote:
->>
->>
->> On 21/02/17 17:34, Geert Uytterhoeven wrote:
-> 
-> [...]
-> 
->>>
->>> The SoC can wake-up. It's just not guaranteed that it can wake-up using
->>> the wakeup-source configured from Linux. Which wakeup-sources are available
->>> depends on the actual PSCI implementation.  It's not specified by the PSCI
->>> specification.
->>>
->>>> Just botching whatever shallow state you can enter on a particular SoC
->>>> into standard "mem" state sounds *horrible* to me.
->>>
->>> That's more or less what /sys/power/mem_sleep does, though.
->>>
->>
->> OK, I will go through that in detail.
->>
-> 
-> OK, I went through the patch and the main intention is was added.
-> So I will begin by summarizing my understanding:
-> 
-> A new suspend interface(/sys/power/mem_sleep) is added to allow the
-> "mem" string in /sys/power/state to represent multiple things that can
-> be selected.
-> 
-> Before:
-> A. echo freeze > /sys/power/state ---> Enters s2idle
-> B. echo mem > /sys/power/state ---> Enters s2r(a.k.a now deep mem sleep)
-> 
-> After:
-> 1. echo freeze > /sys/power/state ---> Enters s2idle still same
-> 2. echo s2idle > /sys/power/mem_sleep
->    echo mem > /sys/power/state ---> Also enter s2idle
-> 3. echo deep > /sys/power/mem_sleep
->    echo mem > /sys/power/state ---> Also enter s2r(same as [B] above)
-> 
-> Please note I have carefully dropped standby/shallow as we will not
-> support that state on ARM64 platforms(refer previous discussions for the
-> same)
-> 
-> Now IIUC, you need 2 above. So, since this new interface allow mem to
-> mean "s2idle", we need to fix the core to register default suspend_ops
-> to achieve what you need. 
+> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
+> index c2b0a12..48cb8ee 100644
+> --- a/drivers/firmware/efi/cper.c
+> +++ b/drivers/firmware/efi/cper.c
+> @@ -591,8 +591,16 @@ static void cper_estatus_print_section(
+>  			cper_print_proc_arm(newpfx, arm_err);
+>  		else
+>  			goto err_section_too_small;
+> -	} else
+> -		printk("%s""section type: unknown, %pUl\n", newpfx, sec_type);
 
-I take this back, you have everything you need in place, nothing needs
-to be done. I just checked again. If I don't register PSCI suspend_ops,
-I still get mem in /sys/power/state with s2idle in /sys/power/mem_sleep
-which is exactly what we need. Again we don't support standby/shallow
-state on ARM64/PSCI.
+Nit: Its odd that you remove the 'unknown' from this, but we don't get told what
+it is, so surely its still unknown.
 
--- 
-Regards,
-Sudeep
+
+> +	} else {
+> +		const void *unknown_err;
+> +
+> +		unknown_err = acpi_hest_generic_data_payload(gdata);
+> +		printk("%ssection type: %pUl\n", newpfx, sec_type);
+> +		printk("%ssection length: %d\n", newpfx,
+
+Nit: please use the "%s""section... that this file consistently uses. This means
+this code will still work as expected when someone adds '%ss' support to printk!
+
+
+> +		       gdata->error_data_length);
+> +		print_hex_dump(newpfx, "", DUMP_PREFIX_OFFSET, 16, 4,
+> +			       unknown_err, gdata->error_data_length, 0);
+> +	}
+>  
+>  	return;
+
+
+FWIW:
+Reviewed-by: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+James
