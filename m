@@ -1,28 +1,67 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 21 Feb 2017 09:47:37 -0800
-Subject: next-20170221 build: 2 failures 9 warnings (next-20170221)
-In-Reply-To: <E1cg6WK-0000gP-QT@optimist>
-References: <E1cg6WK-0000gP-QT@optimist>
-Message-ID: <20170221174737.2gf63ywzdjrh33ub@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 21 Feb 2017 17:48:45 +0000
+Subject: [PATCH/RFC 4/6] drivers: firmware: psci: Fix non-PMIC wake-up if
+ SYSTEM_SUSPEND cuts power
+In-Reply-To: <1487622809-25127-5-git-send-email-geert+renesas@glider.be>
+References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+ <1487622809-25127-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170221174844.GE8605@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2017 at 09:14:04AM +0000, Build bot for Mark Brown wrote:
+Hi,
 
-Today's -next fails to build an ARM allmodconfig due to:
+On Mon, Feb 20, 2017 at 09:33:27PM +0100, Geert Uytterhoeven wrote:
+> + - arm,psci-system-suspend-is-power-down
+> +		Nothing in the PSCI specification requires the SoC to remain
+> +		powered and to support wake-up sources when suspended using
+> +		SYSTEM_SUSPEND.
+> +		If your firmware implements the PSCI SYSTEM_SUSPEND operation
+> +		by cutting power to the SoC, the only possibly wake-up sources
+> +		are thus the ones connected to the PMIC.  In such case you
+> +		should specify this property, so the operating system is aware
+> +		it should use a different suspend method when other wake-up
+> +		sources (e.g. wake on LAN, UART or GPIO) are enabled.
+> +
 
-> 	arm-allmodconfig
-> ../drivers/pci/dwc/pci-exynos.c:132:25: error: 'struct exynos_pcie' has no member named 'pp'
-> ../drivers/pci/dwc/pci-exynos.c:162:25: error: 'struct exynos_pcie' has no member named 'pp'
-> ../drivers/pci/dwc/pci-exynos.c:185:25: error: 'struct exynos_pcie' has no member named 'pp'
+My understanding is that we already have sufficient information here,
+encoded in the wakeup-source property on devices. If DTs have
+insufficient information today, we should add those as necessary rather
+than modifying the PSCI node.
 
-due to b09d4ac91a3934e9 (PCI: dwc: all: Split struct pcie_port into
-host-only and core structures) which replaced the struct member pp with
-*pci but has missed some users.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170221/778ec710/attachment.sig>
+As Sudeep mentioned, we already have systems which fall into this
+category, and those do not require us to do anything special.
+
+As such, I do not believe this is the correct way to describe the
+situation.
+
+[...]
+
+> @@ -440,12 +442,14 @@ static int psci_system_suspend_valid(suspend_state_t state)
+>  static int psci_system_suspend_enter(suspend_state_t state)
+>  {
+>  	switch (state) {
+> +	case PM_SUSPEND_MEM:
+> +		if (!psci_system_suspend_is_power_down ||
+> +		    !wakeup_source_available())
+> +			return cpu_suspend(0, psci_system_suspend);
+> +		/* fall through */
+
+I don't believe that this is the correct place to handle this.
+
+The wakeup_source_available() check *might* be ok, though even with that
+I'd rather we rejected the request rather than trying to fall back to a
+PSCI_CPU_SUSPEND. Otherwise we have a potential silent power regression.
+
+I can imagine that there are cases where the wakeup source is completely
+external and invisible to Linux (e.g. a power button that has no
+programming interface, and isn't desscribed at all). In that case, even
+the wakeup_source_available() check might be too much. :/
+
+What we could/should do is expose to userspace which suspend cases a
+device can wake up the system from and/or whether a wakeup source is
+suitable configured for a state currently. That way userspace can
+determine whether it is gauranteed to be woken.
+
+Thanks,
+Mark.
