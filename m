@@ -1,20 +1,18 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 21 Feb 2017 14:12:57 -0800
-Subject: [PATCH 6/7] drm/sun4i: Save newly created layer in layers array
- in sun4i_layers_init
-In-Reply-To: <20170217031330.14087-7-wens@csie.org>
+Date: Tue, 21 Feb 2017 14:13:18 -0800
+Subject: [PATCH 7/7] drm/sun4i: Make sun4i_crtc_init return ERR_PTR style
+ error codes
+In-Reply-To: <20170217031330.14087-8-wens@csie.org>
 References: <20170217031330.14087-1-wens@csie.org>
- <20170217031330.14087-7-wens@csie.org>
-Message-ID: <20170221221257.exuzq7sdnlo3qsqs@lukather>
+ <20170217031330.14087-8-wens@csie.org>
+Message-ID: <20170221221318.utxhhfmrpftn27ae@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2017 at 11:13:29AM +0800, Chen-Yu Tsai wrote:
-> sun4i_layers_init allocates an array to store pointers to newly created
-> layers returned by sun4i_layer_init_one(), but fails to actually store
-> them. But it actually returns the empty array to unsuspecting users.
-> 
-> Save the pointers in the array, so that they may be used later.
+On Fri, Feb 17, 2017 at 11:13:30AM +0800, Chen-Yu Tsai wrote:
+> sun4i_crtc_init can fail for a number of reasons. Instead of returning
+> a NULL pointer when it fails, pass back the encountered error using
+> ERR_PTR.
 > 
 > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
@@ -31,4 +29,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170221/36c136e1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170221/a65a90e5/attachment-0001.sig>
