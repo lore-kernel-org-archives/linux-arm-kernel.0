@@ -1,86 +1,20 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 21 Feb 2017 19:10:11 +0000
-Subject: [PATCH V10 07/10] efi: print unrecognized CPER section
-In-Reply-To: <1487188282-2568-8-git-send-email-tbaicar@codeaurora.org>
-References: <1487188282-2568-1-git-send-email-tbaicar@codeaurora.org>
- <1487188282-2568-8-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <58AC9093.5020303@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 21 Feb 2017 20:19:34 +0100
+Subject: [PATCH 0/4] ARM64: Initial Marvell IAP140 enablement
+In-Reply-To: <a8a1279c-4978-f612-e4cd-57b8645f3e79@suse.de>
+References: <20170219032000.4674-1-afaerber@suse.de>
+ <87bmtxatmt.fsf@free-electrons.com>
+ <a8a1279c-4978-f612-e4cd-57b8645f3e79@suse.de>
+Message-ID: <20170221191934.GF8852@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+> So MMP would mean Eric and Haojian only - I will drop the other Marvell
+> maintainers for v2 then, except where review comments have been provided.
 
-On 15/02/17 19:51, Tyler Baicar wrote:
-> UEFI spec allows for non-standard section in Common Platform Error
-> Record. This is defined in section N.2.3 of UEFI version 2.5.
-> 
-> Currently if the CPER section's type (UUID) does not match with
-> one of the section types that the kernel knows how to parse, the
-> section is skipped. Therefore, user is not able to see
-> such CPER data, for instance, error record of non-standard section.
-> 
-> For above mentioned case, this change prints out the raw data in
-> hex in dmesg buffer. Data length is taken from Error Data length
-> field of Generic Error Data Entry.
-> 
-> Following is a sample output from dmesg:
-> [  115.771702] {1}[Hardware Error]: Hardware error from APEI Generic Hardware Error Source: 2
-> [  115.779042] {1}[Hardware Error]: It has been corrected by h/w and requires no further action
-> [  115.787456] {1}[Hardware Error]: event severity: corrected
-> [  115.792927] {1}[Hardware Error]:  Error 0, type: corrected
-> [  115.798415] {1}[Hardware Error]:  fru_id: 00000000-0000-0000-0000-000000000000
-> [  115.805596] {1}[Hardware Error]:  fru_text:
-> [  115.816105] {1}[Hardware Error]:  section type: d2e2621c-f936-468d-0d84-15a4ed015c8b
-> [  115.823880] {1}[Hardware Error]:  section length: 88
-> [  115.828779] {1}[Hardware Error]:   00000000: 01000001 00000002 5f434345 525f4543
-> [  115.836153] {1}[Hardware Error]:   00000010: 0000574d 00000000 00000000 00000000
-> [  115.843531] {1}[Hardware Error]:   00000020: 00000000 00000000 00000000 00000000
-> [  115.850908] {1}[Hardware Error]:   00000030: 00000000 00000000 00000000 00000000
-> [  115.858288] {1}[Hardware Error]:   00000040: fe800000 00000000 00000004 5f434345
-> [  115.865665] {1}[Hardware Error]:   00000050: 525f4543 0000574d
+Hi Andreas
 
-The use-case for this is to capture the data and decode it with a vendor tool?
-(if so, please mention that in the commit message!)
+If you find there are any drivers shared by MVEBU and MMP, please do
+Cc: us if you need to touch them. We have knowledge we can share.
 
-
-> diff --git a/drivers/firmware/efi/cper.c b/drivers/firmware/efi/cper.c
-> index c2b0a12..48cb8ee 100644
-> --- a/drivers/firmware/efi/cper.c
-> +++ b/drivers/firmware/efi/cper.c
-> @@ -591,8 +591,16 @@ static void cper_estatus_print_section(
->  			cper_print_proc_arm(newpfx, arm_err);
->  		else
->  			goto err_section_too_small;
-> -	} else
-> -		printk("%s""section type: unknown, %pUl\n", newpfx, sec_type);
-
-Nit: Its odd that you remove the 'unknown' from this, but we don't get told what
-it is, so surely its still unknown.
-
-
-> +	} else {
-> +		const void *unknown_err;
-> +
-> +		unknown_err = acpi_hest_generic_data_payload(gdata);
-> +		printk("%ssection type: %pUl\n", newpfx, sec_type);
-> +		printk("%ssection length: %d\n", newpfx,
-
-Nit: please use the "%s""section... that this file consistently uses. This means
-this code will still work as expected when someone adds '%ss' support to printk!
-
-
-> +		       gdata->error_data_length);
-> +		print_hex_dump(newpfx, "", DUMP_PREFIX_OFFSET, 16, 4,
-> +			       unknown_err, gdata->error_data_length, 0);
-> +	}
->  
->  	return;
-
-
-FWIW:
-Reviewed-by: James Morse <james.morse@arm.com>
-
-
-Thanks,
-
-James
+    Andrew
