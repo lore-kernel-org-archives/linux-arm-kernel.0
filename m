@@ -1,62 +1,37 @@
 From: hsweeten@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 21 Feb 2017 11:15:26 -0700
-Subject: [PATCH 1/4] ARM: ep93xx: switch to SPARSEMEM
-In-Reply-To: <20170221181529.6780-1-hsweeten@visionengravers.com>
-References: <20170221181529.6780-1-hsweeten@visionengravers.com>
-Message-ID: <20170221181529.6780-2-hsweeten@visionengravers.com>
+Date: Tue, 21 Feb 2017 11:15:25 -0700
+Subject: [PATCH 0/4] ARM: ep93xx: various updates
+Message-ID: <20170221181529.6780-1-hsweeten@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EP93xx has four chip selects that can be used for the SDRAM memory.
-These chip selects are decoded to specify an address domain:
+Here are a couple mach-ep93xx patches that I have been holding on to.
+Some of these have been previously posted.
 
-  SDCS3  0x00000000-0x0fffffff with Boot Option ASDO=1
-  SDCS0  0xc0000000-0xcfffffff
-  SDCS1  0xd0000000-0xdfffffff
-  SDCS2  0xe0000000-x0efffffff
-  SDCS3  0xf0000000-0xffffffff with Boot Option ASDO=0
+The first patch is needed for 128 MiB version of the TS-7300 board.
+That board uses multiple chip selects for the SDRAM and does not boot
+with the previous flatmem setup. With the switch, all the other ep93xx
+boards I have still work properly.
 
-Because of the row/column/bank architecture of SDRAM, the mapping of
-these memories into the processor's memory space is discontiguous.
+The second patch has been rebased due to the chip select change in
+the spi-ep93xx driver which has been merged.
 
-Most ep93xx systems only use one of the chip selects. For these systems,
-ARCH_HAS_HOLES_MEMORYMODEL has worked fine to handle the discontiguous
-memory.
+Patch 3 is just a cosmetic change.
 
-But, some of the TS-72xx boards use multiple chip selects. The TS-7300 in
-particular uses SDCS3 (with ASDO=1) and SDCS2. On that system with
-ARCH_HAS_HOLES_MEMORYMODEL the SDCS2 memory does not get handled correctly
-and results in the system not booting.
+Patch 4 was originally from Florian Fainelli's github ts72xx branch.
+It has been updated to the new spi-ep93xx chip select method.
 
-Change the EP93xx to ARCH_SPARSEMEM_ENABLE. This handles the discontiguous
-memory for all configurations.
+H Hartley Sweeten (4):
+  ARM: ep93xx: switch to SPARSEMEM
+  ARM: ep93xx: simone: let the mmc_spi driver handle the card detect
+  ARM: ep93xx: tidy up TS-72xx Watchdog resources
+  ARM: ep93xx: Add lm70 HWMON sensor to TS-72xx boards
 
-This has been tested on the following ep93xx platforms:
+ arch/arm/Kconfig              |  2 +-
+ arch/arm/mach-ep93xx/simone.c | 54 +++----------------------------------------
+ arch/arm/mach-ep93xx/ts72xx.c | 47 +++++++++++++++++++++++++++----------
+ arch/arm/mach-ep93xx/ts72xx.h |  3 ---
+ 4 files changed, 39 insertions(+), 67 deletions(-)
 
-EDB9307A with 64 MiB on SDCS0
-Vision EP9307 with 64 MiB on SDCS0
-TS-7300 with 64 MiB on SDCS3 (with ASDO=1) and 64 MiB on SDCS2
-sim.one with 64 MiB on SDCS0
-
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Tested-by: Linus Walleij <linus.walleij@linaro.org>
-Cc: Russell King <linux@armlinux.org.uk>
----
- arch/arm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 71cea9e..cc8a88f 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -383,7 +383,7 @@ config ARCH_EBSA110
- 
- config ARCH_EP93XX
- 	bool "EP93xx-based"
--	select ARCH_HAS_HOLES_MEMORYMODEL
-+	select ARCH_SPARSEMEM_ENABLE
- 	select ARM_AMBA
- 	select ARM_PATCH_PHYS_VIRT
- 	select ARM_VIC
 -- 
 2.10.0
