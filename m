@@ -1,49 +1,45 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 21 Feb 2017 12:27:20 +0100
-Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
-In-Reply-To: <CAHp75Vcb9gtzF7LvH74JwL4dTUyQvKmg=dnTXKfjhVHuyK3WXg@mail.gmail.com>
-References: <1487593718-20752-2-git-send-email-boris.brezillon@free-electrons.com>
- <CAHp75VdwQGP-qa0c0KQwrdpZmCGc3RuEsJ-E-XLbBzQSn4Yxcg@mail.gmail.com>
- <20170220213803.7ba5591e@bbrezillon>
- <20170220215009.0ecbf5a1@bbrezillon>
- <CAHp75VczsC9WdZWR9iCRh2JoNLFZyOtodrsDRYQoyaN7nkyf=A@mail.gmail.com>
- <CAHp75Vc_q-bEzA2-hVpHyR0GZ8mXxwJ8-UjECe31T04mb67q4w@mail.gmail.com>
- <20170221090610.6d531b94@bbrezillon>
- <CAHp75VfZfj-8ih3vg63w_dAq8xXE2Whu1bANXRcXS1_EGNq43A@mail.gmail.com>
- <20170221112641.6276c001@bbrezillon>
- <CAHp75Vcb9gtzF7LvH74JwL4dTUyQvKmg=dnTXKfjhVHuyK3WXg@mail.gmail.com>
-Message-ID: <20170221112720.ynehsryprhrhzjla@piout.net>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Tue, 21 Feb 2017 12:41:53 +0100
+Subject: [PATCH v2 2/5] KVM: arm/arm64: Add ARM user space interrupt
+ signaling ABI
+In-Reply-To: <CAFEAcA-HMZnjbnhDC-13rWuQP-X2pk-W-6DvSR8n9_f-e4R=cA@mail.gmail.com>
+References: <20170203145655.15007-1-cdall@linaro.org>
+ <20170203145655.15007-3-cdall@linaro.org>
+ <CAFEAcA-HMZnjbnhDC-13rWuQP-X2pk-W-6DvSR8n9_f-e4R=cA@mail.gmail.com>
+Message-ID: <20170221114153.GA26976@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(adding Hans-Christian)
+Hi Alex,
 
-On 21/02/2017 at 13:02:21 +0200, Andy Shevchenko wrote:
-> Abusing platform data with pointers is also not welcome.
+On Fri, Feb 03, 2017 at 05:51:18PM +0000, Peter Maydell wrote:
+> On 3 February 2017 at 14:56, Christoffer Dall <cdall@linaro.org> wrote:
+> > From: Christoffer Dall <christoffer.dall@linaro.org>
+> >
+> > We have 2 modes for dealing with interrupts in the ARM world. We can
+> > either handle them all using hardware acceleration through the vgic or
+> > we can emulate a gic in user space and only drive CPU IRQ pins from
+> > there.
+> >
+> > Unfortunately, when driving IRQs from user space, we never tell user
+> > space about events from devices emulated inside the kernel, which may
+> > result in interrupt line state changes, so we lose out on for example
+> > timer and PMU events if we run with user space gic emulation.
+> >
+> > Define an ABI to publish such device output levels to userspace.
+> >
+> > Signed-off-by: Alexander Graf <agraf@suse.de>
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> > (in this case, avr32).
 > 
-> It's dead de facto.
+> Acked-by: Peter Maydell <peter.maydell@linaro.org>
 > 
-> When last time did you compile kernel for it? What was the version of kernel?
-> Did it get successfully?
+> for the userspace ABI/docs part.
 > 
 
-v4.10-rc3 was building successfully but had some issues in the network
-code.
+Given Peter's ack on this ABI, any chance you could take a look at
+fixing the userspace SMP issue and respinning the userspace patches for
+this series?
 
-> When are we going to remove avr32 support from kernel completely?
-> 
-
-Ask that to the avr32 maintainers. It still builds and is still booted
-by some people. And that actually seems to be you as you reported a bug
-we introduced in 4.3. I don't think we had any other report after that.
-
-It can be frustrating at times to handle that platform but if it is
-working for someone, I don't see why we would remove it.
-
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks,
+-Christoffer
