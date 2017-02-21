@@ -1,68 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 21 Feb 2017 21:42:30 +0100
-Subject: [PATCH] ARM: deconfig: fix the moxart defconfig
-Message-ID: <20170221204230.1861-1-linus.walleij@linaro.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 21 Feb 2017 20:48:03 +0000
+Subject: Tegra baseline test results for v4.10
+Message-ID: <29b8d5e4-93c5-b210-d0f5-b04e0b962eca@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The moxart defconfig wasn't even building a kernel for Moxart,
-it was building a kernel for V4T on the nothing platform. Switch
-to MULTI_V4 and keep the right drivers, update a few selections.
-Now it (presumably) builds a minimalist Moxart kernel again.
+Here are some basic Tegra test results for Linux v4.10.
+Logs and other details at:
 
-Cc: Jonas Jensen <jonas.jensen@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: ran into this when doing some moxart testing.
-Please apply this directly for fixes or defconfigs wherever it
-is applicable.
----
- arch/arm/configs/moxart_defconfig | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+    https://nvtb.github.io//linux/test_v4.10/20170219150103/
 
-diff --git a/arch/arm/configs/moxart_defconfig b/arch/arm/configs/moxart_defconfig
-index a3cb76cfb828..b2ddd534867f 100644
---- a/arch/arm/configs/moxart_defconfig
-+++ b/arch/arm/configs/moxart_defconfig
-@@ -18,9 +18,8 @@ CONFIG_EMBEDDED=y
- # CONFIG_LBDAF is not set
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
--CONFIG_ARCH_MULTI_V4T=y
-+CONFIG_ARCH_MULTI_V4=y
- # CONFIG_ARCH_MULTI_V7 is not set
--CONFIG_KEYBOARD_GPIO_POLLED=y
- CONFIG_ARCH_MOXART=y
- CONFIG_MACH_UC7112LX=y
- CONFIG_PREEMPT=y
-@@ -94,12 +93,10 @@ CONFIG_SERIAL_8250_EXTENDED=y
- CONFIG_SERIAL_8250_SHARE_IRQ=y
- CONFIG_SERIAL_OF_PLATFORM=y
- # CONFIG_HW_RANDOM is not set
--CONFIG_DEBUG_GPIO=y
--CONFIG_GPIO_SYSFS=y
- CONFIG_GPIO_MOXART=y
--CONFIG_POWER_SUPPLY=y
- CONFIG_POWER_RESET=y
- CONFIG_POWER_RESET_GPIO=y
-+CONFIG_POWER_SUPPLY=y
- # CONFIG_HWMON is not set
- CONFIG_WATCHDOG=y
- CONFIG_WATCHDOG_CORE=y
-@@ -107,10 +104,13 @@ CONFIG_WATCHDOG_NOWAYOUT=y
- CONFIG_MOXART_WDT=y
- # CONFIG_USB_SUPPORT is not set
- CONFIG_MMC=y
--CONFIG_MMC_SDHCI_MOXART=y
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_MOXART=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_TIMER=y
- CONFIG_LEDS_TRIGGER_ONESHOT=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
--- 
-2.9.3
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000, tegra210-smaug
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.10-rc8 (7089db84e356562f8ba737c29e472cc42d530dbc)):
+   text     data      bss    total  kernel
+    -24      +24        0        0  defconfig
+  +1984    +5384        0    +7368  multi_v7_defconfig
+   +528        0        0     +528  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.10-rc8 (7089db84e356562f8ba737c29e472cc42d530dbc))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
