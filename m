@@ -1,66 +1,141 @@
-From: p.figiel@camlintechnologies.com (Piotr Figiel)
-Date: Tue, 21 Feb 2017 09:48:54 +0100
-Subject: imx: Race when disabling RX in IMX.6 UART in half duplex
-In-Reply-To: <20170221081821.7n2345o4zacnfcvl@tarshish>
-References: <c07c95e2-3463-222b-c78a-b5716b4c5a14@camlintechnologies.com>
- <20170220192001.eqomprbgrqkefkas@tarshish>
- <e95b9a6f-9d61-3759-3eae-48e2900ca9b4@camlintechnologies.com>
- <20170221081821.7n2345o4zacnfcvl@tarshish>
-Message-ID: <6151d423-da84-d497-d82a-7347357790a0@camlintechnologies.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 21 Feb 2017 09:50:23 +0100
+Subject: [PATCH v4 29/36] media: imx: mipi-csi2: enable setting and
+ getting of frame rates
+In-Reply-To: <25596b21-70de-5e46-f149-f9ce3a86ecb7@gmail.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-30-git-send-email-steve_longerbeam@mentor.com>
+ <20170220220409.GX16975@valkosipuli.retiisi.org.uk>
+ <20170221001332.GS21222@n2100.armlinux.org.uk>
+ <25596b21-70de-5e46-f149-f9ce3a86ecb7@gmail.com>
+Message-ID: <1487667023.2331.8.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Baruch,
+On Mon, 2017-02-20 at 16:18 -0800, Steve Longerbeam wrote:
+> 
+> On 02/20/2017 04:13 PM, Russell King - ARM Linux wrote:
+> > On Tue, Feb 21, 2017 at 12:04:10AM +0200, Sakari Ailus wrote:
+> >> On Wed, Feb 15, 2017 at 06:19:31PM -0800, Steve Longerbeam wrote:
+> >>> From: Russell King <rmk+kernel@armlinux.org.uk>
+> >>>
+> >>> Setting and getting frame rates is part of the negotiation mechanism
+> >>> between subdevs.  The lack of support means that a frame rate at the
+> >>> sensor can't be negotiated through the subdev path.
+> >>
+> >> Just wondering --- what do you need this for?
+> >
+> > The v4l2 documentation contradicts the media-ctl implementation.
+> >
+> > While v4l2 documentation says:
+> >
+> >   These ioctls are used to get and set the frame interval at specific
+> >   subdev pads in the image pipeline. The frame interval only makes sense
+> >   for sub-devices that can control the frame period on their own. This
+> >   includes, for instance, image sensors and TV tuners. Sub-devices that
+> >   don't support frame intervals must not implement these ioctls.
+> >
+> > However, when trying to configure the pipeline using media-ctl, eg:
+> >
+> > media-ctl -d /dev/media1 --set-v4l2 '"imx219 pixel 0-0010":0[crop:(0,0)/3264x2464]'
+> > media-ctl -d /dev/media1 --set-v4l2 '"imx219 0-0010":1[fmt:SRGGB10/3264x2464 at 1/30]'
+> > media-ctl -d /dev/media1 --set-v4l2 '"imx219 0-0010":0[fmt:SRGGB8/816x616 at 1/30]'
+> > media-ctl -d /dev/media1 --set-v4l2 '"imx6-mipi-csi2":1[fmt:SRGGB8/816x616 at 1/30]'
+> > Unable to setup formats: Inappropriate ioctl for device (25)
+> > media-ctl -d /dev/media1 --set-v4l2 '"ipu1_csi0_mux":2[fmt:SRGGB8/816x616 at 1/30]'
+> > media-ctl -d /dev/media1 --set-v4l2 '"ipu1_csi0":2[fmt:SRGGB8/816x616 at 1/30]'
+> >
+> > The problem there is that the format setting for the csi2 does not get
+> > propagated forward:
+> >
+> > $ strace media-ctl -d /dev/media1 --set-v4l2 '"imx6-mipi-csi2":1[fmt:SRGGB8/816x616 at 1/30]'
+> > ...
+> > open("/dev/v4l-subdev16", O_RDWR)       = 3
+> > ioctl(3, VIDIOC_SUBDEV_S_FMT, 0xbec16244) = 0
+> > ioctl(3, VIDIOC_SUBDEV_S_FRAME_INTERVAL, 0xbec162a4) = -1 ENOTTY (Inappropriate
+> > ioctl for device)
+> > fstat64(1, {st_mode=S_IFCHR|0600, st_rdev=makedev(136, 2), ...}) = 0
+> > write(1, "Unable to setup formats: Inappro"..., 61) = 61
+> > Unable to setup formats: Inappropriate ioctl for device (25)
+> > close(3)                                = 0
+> > exit_group(1)                           = ?
+> > +++ exited with 1 +++
+> >
+> > because media-ctl exits as soon as it encouters the error while trying
+> > to set the frame rate.
+> >
+> > This makes implementing setup of the media pipeline in shell scripts
+> > unnecessarily difficult - as you need to then know whether an entity
+> > is likely not to support the VIDIOC_SUBDEV_S_FRAME_INTERVAL call,
+> > and either avoid specifying a frame rate:
+> >
+> > $ strace media-ctl -d /dev/media1 --set-v4l2 '"imx6-mipi-csi2":1[fmt:SRGGB8/816x616]'
+> > ...
+> > open("/dev/v4l-subdev16", O_RDWR)       = 3
+> > ioctl(3, VIDIOC_SUBDEV_S_FMT, 0xbeb1a254) = 0
+> > open("/dev/v4l-subdev0", O_RDWR)        = 4
+> > ioctl(4, VIDIOC_SUBDEV_S_FMT, 0xbeb1a254) = 0
+> > close(4)                                = 0
+> > close(3)                                = 0
+> > exit_group(0)                           = ?
+> > +++ exited with 0 +++
+> >
+> > or manually setting the format on the sink.
+> >
+> > Allowing the S_FRAME_INTERVAL call seems to me to be more in keeping
+> > with the negotiation mechanism that is implemented in subdevs, and
+> > IMHO should be implemented inside the kernel as a pad operation along
+> > with the format negotiation, especially so as frame skipping is
+> > defined as scaling, in just the same way as the frame size is also
+> > scaling:
+> >
+> >        -  ``MEDIA_ENT_F_PROC_VIDEO_SCALER``
+> >
+> >        -  Video scaler. An entity capable of video scaling must have
+> >           at least one sink pad and one source pad, and scale the
+> >           video frame(s) received on its sink pad(s) to a different
+> >           resolution output on its source pad(s). The range of
+> >           supported scaling ratios is entity-specific and can differ
+> >           between the horizontal and vertical directions (in particular
+> >           scaling can be supported in one direction only). Binning and
+> >           skipping are considered as scaling.
+> >
+> > Although, this is vague, as it doesn't define what it means by "skipping",
+> > whether that's skipping pixels (iow, sub-sampling) or whether that's
+> > frame skipping.
 
+I'd interpret this as meaning pixel skipping, not frame skipping.
 
-On 21.02.2017 09:18, Baruch Siach wrote:
-> Hi Piotr,
->
-> On Tue, Feb 21, 2017 at 09:00:39AM +0100, Piotr Figiel wrote:
->> On 20.02.2017 20:20, Baruch Siach wrote:
->>> On Mon, Feb 20, 2017 at 02:54:02PM +0100, Piotr Figiel wrote:
->>>>    I'm looking to find a correct way to disable RX in the I.MX6 UART during
->>>> TX-ing. I stumbled on the issue described below when working on
->>>> ~SER_RS485_RX_DURING_TX on custom 3.10 tree (branched from Freescale's/NXP's
->>>> BSP release) independently to what is now in the main line imx.c, but I see
->>>> now that the implementation in mainline also seem to have the same problem
->>>> I'm trying to solve now. I would like to request for comments to
->>>> confirm/deny whether the issue I raise here is valid and how to best
->>>> approach this.
->>>>
->>>>    I'm mostly concerned about the fact that the URXD register must not be
->>>> accessed (as documented in IMX.6 RM) when RX is disabled (RXEN=0). The issue
->>>> is that in the following sequence happening during imx_start_tx with
->>>> ~SER_RS485_RX_DURING_TX set:
->>>>
->>>> 1. Acquire spinlock, disable local interrupts (from serial_core.c),
->>>> 2. Disable RX receiver (RXEN=0 in UCR2),
->>>> 3. Release spinlock, reenable interrupts.
->>>>
->>>> The RX fifo may become not empty between #1 and #2. This will raise
->>>> interrupt which will be handled after re-enabling interrupts (after #3). ISR
->>>> in this case will check the status bit of the interrupt and fetch RX FIFO
->>>> contents, which I understand is forbidden by the documentation and may raise
->>>> error on the bus [1]. In addition disabling RX IRQ in this procedure, e.g.
->>>> after #1 doesn't seem to be enough, as the IRQ still may trigger after #1
->>>> and will need to be serviced.
->>> As I understand it, SER_RS485_RX_DURING_TX is for half-duplex RS-485 where
->>> only one device is allowed to transmit at any given time. Higher level code
->>> determines when any given device on the bus is allowed to transmit. If Rx FIFO
->>> becomes non-empty during Tx enable, you have a contention problem to solve.
->> That's correct, although I don't want bugs from the user-space or
->> misbehaving devices on RS-485 to cause errors on the AXI/AHB bus resulting
->> with possible crash/exception on the CPU core. The reason I write about this
->> is that the RM explicitly forbids accessing those registers in such case.
-> The trivial solution might be to return early from imx_rxint() when RXEN=0.
-> Would that be sufficient?
+> > Then there's the issue where, if you have this setup:
+> >
+> >  camera --> csi2 receiver --> csi --> capture
+> >
+> > and the "csi" subdev can skip frames, you need to know (a) at the CSI
+> > sink pad what the frame rate is of the source (b) what the desired
+> > source pad frame rate is, so you can configure the frame skipping.
+> > So, does the csi subdev have to walk back through the media graph
+> > looking for the frame rate?  Does the capture device have to walk back
+> > through the media graph looking for some subdev to tell it what the
+> > frame rate is - the capture device certainly can't go straight to the
+> > sensor to get an answer to that question, because that bypasses the
+> > effect of the CSI frame skipping (which will lower the frame rate.)
+> >
+> > IMHO, frame rate is just another format property, just like the
+> > resolution and data format itself, and v4l2 should be treating it no
+> > differently.
+> >
+> 
+> I agree, frame rate, if indicated/specified by both sides of a link,
+> should match. So maybe this should be part of v4l2 link validation.
+> 
+> This might be a good time to propose the following patch.
 
-I'm not sure if it's best idea, I don't know if the UART will keep 
-triggering the interrupt if the source won't be cleared (FIFO drained), 
-but if it does we'll be irq flooded, if it doesn't there will be old 
-contents in the RX fifo no-one will touch until some other interrupt 
-(other than TX fifo empty, as at that time RXEN would still be 0) comes. 
-RX fifo could be alternatively cleaned somewhere else, this is actually 
-question I raise in my initial e-mail.
+I agree with Steve and Russell. I don't see why the (nominal) frame
+interval should be handled differently than resolution, data format, and
+colorspace information. I think it should just be propagated in the same
+way, and there is no reason to have two connected pads set to a
+different interval. That would make implementing the g/s_frame_interval
+subdev calls mandatory.
 
-Best regards, Piotr.
+regards
+Philipp
