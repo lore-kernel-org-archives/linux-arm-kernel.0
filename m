@@ -1,39 +1,51 @@
-From: thor.thayer@linux.intel.com (thor.thayer at linux.intel.com)
-Date: Wed, 22 Feb 2017 11:10:19 -0600
-Subject: [PATCHv2 5/5] ARM: dts: socfpga: Add Devkit A10-SR Reset Controller
-In-Reply-To: <1487783419-10912-1-git-send-email-thor.thayer@linux.intel.com>
-References: <1487783419-10912-1-git-send-email-thor.thayer@linux.intel.com>
-Message-ID: <1487783419-10912-6-git-send-email-thor.thayer@linux.intel.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Wed, 22 Feb 2017 09:19:27 -0800
+Subject: [PATCH v4 12/36] add mux and video interface bridge entity
+ functions
+In-Reply-To: <20170219212812.GA28347@amd>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-13-git-send-email-steve_longerbeam@mentor.com>
+ <20170219212812.GA28347@amd>
+Message-ID: <1fdb3bb6-46fc-40d9-0011-3f53aa2ac899@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <thor.thayer@linux.intel.com>
 
-Add the Altera Arria10 System Resource Reset Controller to the MFD
 
-Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
-Acked-by: Dinh Nguyen <dinguyen@kernel.org>
----
-v2  change commit header to ARM: dts: socfpga.
----
- arch/arm/boot/dts/socfpga_arria10_socdk.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+On 02/19/2017 01:28 PM, Pavel Machek wrote:
+> On Wed 2017-02-15 18:19:14, Steve Longerbeam wrote:
+>> From: Philipp Zabel <p.zabel@pengutronix.de>
+>>
+>> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+>>
+>> - renamed MEDIA_ENT_F_MUX to MEDIA_ENT_F_VID_MUX
+>>
+>> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+>
+> This is slightly "interesting" format of changelog. Normally signoffs
+> go below.
+>
+>> diff --git a/Documentation/media/uapi/mediactl/media-types.rst b/Documentation/media/uapi/mediactl/media-types.rst
+>> index 3e03dc2..023be29 100644
+>> --- a/Documentation/media/uapi/mediactl/media-types.rst
+>> +++ b/Documentation/media/uapi/mediactl/media-types.rst
+>> @@ -298,6 +298,28 @@ Types and flags used to represent the media graph elements
+>>  	  received on its sink pad and outputs the statistics data on
+>>  	  its source pad.
+>>
+>> +    -  ..  row 29
+>> +
+>> +       ..  _MEDIA-ENT-F-MUX:
+>> +
+>> +       -  ``MEDIA_ENT_F_MUX``
+>
+> And you probably want to rename it here, too.
 
-diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-index c57e6ce..9329025 100644
---- a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-@@ -121,6 +121,11 @@
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 		};
-+
-+		a10sr_rst: reset-controller {
-+			compatible = "altr,a10sr-reset";
-+			#reset-cells = <1>;
-+		};
- 	};
- };
- 
--- 
-1.9.1
+Done, thanks.
+Steve
+
+>
+> With that fixed:
+>
+> Reviewed-by: Pavel Machek <pavel@ucw.cz>
+>
