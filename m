@@ -1,25 +1,55 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 22 Feb 2017 12:36:21 +0300
-Subject: [PATCH v3 7/8] arm64: dts: mt8173: move clock from phy node into
- port nodes
-In-Reply-To: <1487753705-6745-7-git-send-email-chunfeng.yun@mediatek.com>
-References: <1487753705-6745-1-git-send-email-chunfeng.yun@mediatek.com>
- <1487753705-6745-7-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <d2abde73-91b0-36c3-8b32-d50a9800bd52@cogentembedded.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 22 Feb 2017 10:13:28 +0000
+Subject: [PATCH V10 07/10] efi: print unrecognized CPER section
+In-Reply-To: <20170222011241.GX21222@n2100.armlinux.org.uk>
+References: <1487188282-2568-1-git-send-email-tbaicar@codeaurora.org>
+ <1487188282-2568-8-git-send-email-tbaicar@codeaurora.org>
+ <58AC9093.5020303@arm.com> <20170222011241.GX21222@n2100.armlinux.org.uk>
+Message-ID: <58AD6448.1070301@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/22/2017 11:55 AM, Chunfeng Yun wrote:
+On 22/02/17 01:12, Russell King - ARM Linux wrote:
+> On Tue, Feb 21, 2017 at 07:10:11PM +0000, James Morse wrote:
+>> Hi Tyler,
+>>
+>> On 15/02/17 19:51, Tyler Baicar wrote:
+>>> +	} else {
+>>> +		const void *unknown_err;
+>>> +
+>>> +		unknown_err = acpi_hest_generic_data_payload(gdata);
+>>> +		printk("%ssection type: %pUl\n", newpfx, sec_type);
+>>> +		printk("%ssection length: %d\n", newpfx,
+>>
+>> Nit: please use the "%s""section... that this file consistently uses. This means
+>> this code will still work as expected when someone adds '%ss' support to printk!
+> 
+> No.  That is wrong:
+> 
+> "%s""section" is stored in memory as bytes containing:
+> 
+> '%' 's' 's' 'e' 'c' 't' 'i' 'o' 'n'
+> 
+> whereas "%ssection" is stored in memory as bytes containing:
+> 
+> '%' 's' 's' 'e' 'c' 't' 'i' 'o' 'n'
+> 
+> They're exactly the same, so when printk() comes to parse the string, it
+> sees exactly the same byte sequence.  So, the only thing that's happening
+> is code obfuscation for no good reason what so ever.
+> 
+> If you don't believe me, run some build tests and look at the resulting
+> strings... also look at the C standard.  "Adjacent string literal tokens
+> are concatenated."
+> 
+> Please get rid of this obfuscation.
 
-> there is a reference clock for each port, HighSpeed port is 48M,
-> and SuperSpeed port is 26M which usually comes from 26M oscillator
-> directly, but some SoCs is not. it is flexible to move it into port
+Sure, I was always told not do this, clearly I didn't think about it for very long!
 
-    ... but on some SoCs does not?
+This file otherwise consistently uses the now-weird "%s""otherstring" pattern.
 
-> node.
->
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-[...]
 
-MBR, Sergei
+
+Thanks,
+
+James
