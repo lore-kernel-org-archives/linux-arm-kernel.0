@@ -1,76 +1,171 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 21 Feb 2017 16:26:10 -0800
-Subject: Applied "spi/bcm63xx: fix typo in bcm63xx_spi_max_length breaking
- compilation" to the spi tree
-In-Reply-To: <20170221233040.24241-1-jonas.gorski@gmail.com>
-Message-ID: <E1cgKl0-0005WH-Rm@finisterre>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 21 Feb 2017 18:26:40 -0600
+Subject: [PATCH 1/4] PCI: add DT bindings for Faraday Technology PCI Host
+ Bridge
+In-Reply-To: <20170211125220.10273-1-linus.walleij@linaro.org>
+References: <20170211125220.10273-1-linus.walleij@linaro.org>
+Message-ID: <20170222002640.y2uhumje5csioure@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Sat, Feb 11, 2017 at 01:52:17PM +0100, Linus Walleij wrote:
+> This adds device tree bindings for the Faraday technology PCI
+> Host Bridge. This IP is found in the Storlink/Storm/Cortina
+> Gemini SoC platform.
+> 
+> Cc: Janos Laube <janos.dev@gmail.com>
+> Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: Gavin Guo <gavinguo@andestech.com>
+> Cc: Macpaul Lin <macpaul@andestech.com>
+> Cc: Feng-Hsin Chiang <john453@faraday-tech.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Rename from Cortina prefixes to Faraday. This is clearly
+>   a Faraday IP block.
+> - Support both the version with cascaded interrupts and the
+>   "dual" version with 1-to-1 mapped interrupts.
+> - Change bus-range to <0x00 0xff>
+> - Fix spelling mistake
+> - Write a bit about swizzling interrupts on the interrupt
+>   controller side
+> - Reasonable swizzling in the interrupt mapping example
+> 
+> This can be merged to the PCI tree whenever it is considered
+> fine for inclusion.
+> ---
+>  .../devicetree/bindings/pci/faraday-pci.txt        | 113 +++++++++++++++++++++
+>  1 file changed, 113 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/faraday-pci.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/faraday-pci.txt b/Documentation/devicetree/bindings/pci/faraday-pci.txt
+> new file mode 100644
+> index 000000000000..5fbb0fc6b758
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/faraday-pci.txt
+> @@ -0,0 +1,113 @@
+> +Faraday Technology PCI Host Bridge
+> +
+> +This PCI bridge is found inside that Cortina Systems Gemini SoC platform and
+> +is a generic IP block from Faraday Technology. It exists in two variants:
+> +plain and dual PCI. The plain version embeds a cascading interrupt controller
+> +into the host bridge. The dual version routes the interrupts to the host
+> +chips interrupt controller.
+> +
+> +The host controller appear on the PCI bus with vendor ID 0x159b (Faraday
+> +Technology) and product ID 0x4321.
+> +
+> +Mandatory properties:
+> +
+> +- compatible: should be one of
+> +  "faraday,pci"
+> +  "faraday,dual-pci"
 
-   spi/bcm63xx: fix typo in bcm63xx_spi_max_length breaking compilation
+Probably should still have a Cortina specific compatible.
 
-has been applied to the spi tree at
+> +- reg: memory base and size for the host bridge
+> +- #address-cells: set to <3>
+> +- #size-cells: set to <2>
+> +- #interrupt-cells: set to <1>
+> +- bus-range: set to <0x00 0xff>
+> +- device_type, set to "pci"
+> +- ranges: see pci.txt
+> +- interrupt-map-mask: see pci.txt
+> +- interrupt-map: see pci.txt
+> +
+> +Mandatory subnodes:
+> +- For "faraday,pci" a node representing the interrupt-controller inside the
+> +  host bridge is mandatory. It has the following mandatory properties:
+> +  - interrupt: see interrupt-controller/interrupts.txt
+> +  - interrupt-parent: see interrupt-controller/interrupts.txt
+> +  - interrupt-controller: see interrupt-controller/interrupts.txt
+> +  - #address-cells: set to <0>
+> +  - #interrupt-cells: set to <1>
+> +
+> +I/O space considerations:
+> +
+> +The plain variant has 128MiB of non-prefetchable memory space, whereas the
+> +"dual" variant has 64MiB. Take this into account when describing the ranges.
+> +
+> +Interrupt map considerations:
+> +
+> +The "dual" variant will get INT A, B, C, D from the system interrupt controller
+> +and should point to respective interrupt in that controller in its
+> +interrupt-map.
+> +
+> +The code which is the only documentation of how the Faraday PCI (the non-dual
+> +variant) interrupts assigns the default interrupt mapping/swizzling has
+> +typically been like this, doing the swizzling on the interrupt controller side
+> +rather than in the interconnect:
+> +
+> +interrupt-map-mask = <0xf800 0 0 7>;
+> +interrupt-map =
+> +	<0x4800 0 0 1 &pci_intc 0>, /* Slot 9 */
+> +	<0x4800 0 0 2 &pci_intc 1>,
+> +	<0x4800 0 0 3 &pci_intc 2>,
+> +	<0x4800 0 0 4 &pci_intc 3>,
+> +	<0x5000 0 0 1 &pci_intc 1>, /* Slot 10 */
+> +	<0x5000 0 0 2 &pci_intc 2>,
+> +	<0x5000 0 0 3 &pci_intc 3>,
+> +	<0x5000 0 0 4 &pci_intc 0>,
+> +	<0x5800 0 0 1 &pci_intc 2>, /* Slot 11 */
+> +	<0x5800 0 0 2 &pci_intc 3>,
+> +	<0x5800 0 0 3 &pci_intc 0>,
+> +	<0x5800 0 0 4 &pci_intc 1>,
+> +	<0x6000 0 0 1 &pci_intc 3>, /* Slot 12 */
+> +	<0x6000 0 0 2 &pci_intc 0>,
+> +	<0x6000 0 0 3 &pci_intc 1>,
+> +	<0x6000 0 0 4 &pci_intc 2>;
+> +
+> +Example:
+> +
+> +pci at 50000000 {
+> +	compatible = "faraday,pci";
+> +	reg = <0x50000000 0x100>;
+> +	interrupts = <8 IRQ_TYPE_LEVEL_HIGH>, /* PCI A */
+> +			<26 IRQ_TYPE_LEVEL_HIGH>, /* PCI B */
+> +			<27 IRQ_TYPE_LEVEL_HIGH>, /* PCI C */
+> +			<28 IRQ_TYPE_LEVEL_HIGH>; /* PCI D */
+> +	#address-cells = <3>;
+> +	#size-cells = <2>;
+> +	#interrupt-cells = <1>;
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+This doesn't belong here (I think).
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From ccd0657c33b2c3701c5b14725284b7e671d3fb93 Mon Sep 17 00:00:00 2001
-From: Jonas Gorski <jonas.gorski@gmail.com>
-Date: Wed, 22 Feb 2017 00:30:40 +0100
-Subject: [PATCH] spi/bcm63xx: fix typo in bcm63xx_spi_max_length breaking
- compilation
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-Fix compilation by renaming argument dev to spi as expected by the code.
-
-Fixes the following error:
-
-drivers/spi/spi-bcm63xx.c: In function ???bcm63xx_spi_max_length???:
-drivers/spi/spi-bcm63xx.c:434:50: error: ???spi??? undeclared (first use in this function)
-  struct bcm63xx_spi *bs = spi_master_get_devdata(spi->master);
-                                                  ^~~
-
-Fixes: 0135c03df914 ("spi/bcm63xx: make spi subsystem aware of message size limits")
-Signed-off-by: Jonas Gorski <jonas.gorski@gmail.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-bcm63xx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/spi/spi-bcm63xx.c b/drivers/spi/spi-bcm63xx.c
-index 325131370941..247f71b02235 100644
---- a/drivers/spi/spi-bcm63xx.c
-+++ b/drivers/spi/spi-bcm63xx.c
-@@ -429,7 +429,7 @@ static irqreturn_t bcm63xx_spi_interrupt(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
--static size_t bcm63xx_spi_max_length(struct spi_device *dev)
-+static size_t bcm63xx_spi_max_length(struct spi_device *spi)
- {
- 	struct bcm63xx_spi *bs = spi_master_get_devdata(spi->master);
- 
--- 
-2.11.0
+> +
+> +	bus-range = <0x00 0xff>;
+> +	ranges = /* 1MiB I/O space 0x50000000-0x500fffff */
+> +		 <0x01000000 0 0          0x50000000 0 0x00100000>,
+> +		 /* 128MiB non-prefetchable memory 0x58000000-0x5fffffff */
+> +		 <0x02000000 0 0x58000000 0x58000000 0 0x08000000>;
+> +	interrupt-map-mask = <0xf800 0 0 7>;
+> +	interrupt-map =
+> +		<0x4800 0 0 1 &pci_intc 0>, /* Slot 9 */
+> +		<0x4800 0 0 2 &pci_intc 1>,
+> +		<0x4800 0 0 3 &pci_intc 2>,
+> +		<0x4800 0 0 4 &pci_intc 3>,
+> +		<0x5000 0 0 1 &pci_intc 1>, /* Slot 10 */
+> +		<0x5000 0 0 2 &pci_intc 2>,
+> +		<0x5000 0 0 3 &pci_intc 3>,
+> +		<0x5000 0 0 4 &pci_intc 0>,
+> +		<0x5800 0 0 1 &pci_intc 2>, /* Slot 11 */
+> +		<0x5800 0 0 2 &pci_intc 3>,
+> +		<0x5800 0 0 3 &pci_intc 0>,
+> +		<0x5800 0 0 4 &pci_intc 1>,
+> +		<0x6000 0 0 1 &pci_intc 3>, /* Slot 12 */
+> +		<0x6000 0 0 2 &pci_intc 0>,
+> +		<0x6000 0 0 3 &pci_intc 0>,
+> +		<0x6000 0 0 4 &pci_intc 0>;
+> +	pci_intc: interrupt-controller {
+> +		interrupt-parent = <&intcon>;
+> +		interrupt-controller;
+> +		#address-cells = <0>;
+> +		#interrupt-cells = <1>;
+> +	};
+> +};
+> -- 
+> 2.9.3
+> 
