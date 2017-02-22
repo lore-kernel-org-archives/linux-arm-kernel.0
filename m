@@ -1,57 +1,47 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Wed, 22 Feb 2017 20:44:00 +0100
-Subject: [PATCH v2] watchdog: imx2: fix hang-up on boot for i.MX21, i.MX27
- and i.MX31 SoCs
-In-Reply-To: <20170117083847.ijrvafqjdwduele6@pengutronix.de>
-References: <20170117012353.6948-1-vz@mleia.com>
- <20170117083847.ijrvafqjdwduele6@pengutronix.de>
-Message-ID: <CAM=E1R5zb4y9HK06C+BiLvY0cfp7YemrV2p6xdxP7DwWkMau1g@mail.gmail.com>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Wed, 22 Feb 2017 20:40:02 +0100 (CET)
+Subject: [PATCH v2 0/2] mfd: axp20x: Restore master mode support on AXP806
+Message-ID: <cover.1487791328.git.rask@formelder.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+The AXP806 (and very similar AXP808) PMICs can be wired to either master
+mode or slave mode on a board-by-board basis. A register on the PMIC needs
+to be set accordingly for the PMIC to respond to other register accesses.
+The "xpowers,master-mode" property introduced in this patch series lets a
+board's device tree specify the correct operating mode to use.
 
-On 17 January 2017 at 09:38, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello Vladimir,
->
-> On Tue, Jan 17, 2017 at 03:23:53AM +0200, Vladimir Zapolskiy wrote:
->> Power down counter enable/disable bit switch is located in WMCR register,
->> but watchdog controllers found on legacy i.MX21, i.MX27 and i.MX31 SoCs
->> don't have this register. As a result of writing data to the non-existing
->> register on driver probe the SoC hangs up, to fix the problem add more OF
->> compatible strings and on this basis get information about availability of
->> the WMCR register.
->>
->> Fixes: 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on boot")
->> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
->> Tested-by: Magnus Lilja <lilja.magnus@gmail.com>
->> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
->> Cc: <stable@vger.kernel.org>
->> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
->> ---
->> Changes from v1 to v2:
->> * removed i.MX27 and i.MX31 compatibles from the list, since it is expected
->>   that their DTB files has a reference to the listed i.MX21 compatible,
->>   many thanks to Uwe Kleine-K?nig for the hint,
->> * start the list of compatibles from an i.MX35 specific one, since it is
->>   agreed that i.MX35 precedes i.MX25, thanks to Uwe Kleine-K?nig for review,
->> * added a comment describing any potential changes in future over the list
->>   of watchdog compatible values,
->> * added all collected tags to the commit message.
->>
->> Changes from RFC to v1:
->> * replaced private data struct with a macro as suggested by Guenter,
->
-> I didn't see the RFC, but I like a data struct better. It has some
-> overhead, but allows for easier expansion later, needs less casting and
-> is easier to understand for a reader (see below).
->
->> * updated the comment in the source code to reflect the change,
->> * rearranged and simplified the logic of detecting WMCR presence,
->> * pulled the fix out from the series with optional proposed DTS changes.
+Known boards with the Allwinner A80 SoC include an AXP806 or AXP808.
+The AXP806 support used to rely on the vendor boot loader to set the
+operating mode, but nowadays, mainline U-Boot (since V2016.11) is usable
+on boards using the A80 SoC, but doesn't yet have any support for the
+AXP806 PMIC. So for kernel 4.11, a patch went in to always set the
+AXP806 to slave mode to keep those two boards working (see below). That,
+however, broke support for boards where the PMIC is wired for master mode.
 
-So, did we come to an agreement on a patch to be submitted? Perhaps I
-missed the info on it being accepted.
+There are so far three boards using the AXP806 PMIC support:
+- Merrii A80 Optimus and Cubieboard4 developer boards with an AXP809
+  paired with an AXP806 in slave mode. A device tree for each of these
+  boards have been in the tree for a while now.
+- Sunchip CX-A99 which uses just an AXP808 in master mode. An
+  out-of-tree device tree works with the 4.9.9 and 4.10-rc7 kernels.
+  A device tree will be submitted along with support for *-supply
+  properties taking a regulator list.
 
-Regards, Magnus
+The default needs to be slave mode for compatibility with the two boards'
+device trees that are using the "xpowers,axp806" compatible since kernel
+4.9 when the AXP806 support was added.
+
+Patch 1 adds the "xpowers,master-mode" property to the AXP806 binding.
+Patch 2 adds support for it to the axp20x driver.
+
+Rask Ingemann Lambertsen (2):
+  dts: mfd: axp20x: Add "xpowers,master-mode" property for AXP806 PMICs
+  mfd: axp20x: Add support for dts property "xpowers,master-mode"
+
+ Documentation/devicetree/bindings/mfd/axp20x.txt |  3 +++
+ drivers/mfd/axp20x.c                             | 21 +++++++++++++--------
+ 2 files changed, 16 insertions(+), 8 deletions(-)
+
+-- 
+2.10.2
