@@ -1,40 +1,41 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed, 22 Feb 2017 03:29:24 +0100
-Subject: [PATCH v2 4/8] sound: soc: pxa: Suppress SND_MMP_SOC for arm64
+Date: Wed, 22 Feb 2017 03:29:23 +0100
+Subject: [PATCH v2 3/8] tty: serial: 8250_pxa: Implement mmp earlycon
 In-Reply-To: <20170222022929.10540-1-afaerber@suse.de>
 References: <20170222022929.10540-1-afaerber@suse.de>
-Message-ID: <20170222022929.10540-5-afaerber@suse.de>
+Message-ID: <20170222022929.10540-4-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SND_MMP_SOC selects SND_ARM, which is limited to ARM, as well as
-MMP_SRAM, which is a non-DT driver in arch/arm/mach-arm/.
-
-Avoid Kconfig warnings by not making this driver available on ARM64.
-
-While at it, tidy the title (Soc -> SoC).
+There is an early_pxa earlycon available for "mrvl,pxa-uart", but
+mmp2.dtsi and soon iap140.dtsi have only "mrvl,mmp-uart". The binding
+does not mandate to have the fallback, so add a second earlycon for this
+alternative compatible string.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
+ Note: early_pxa is not documented in kernel-parameters.txt, so not adding
+       mmp either for now.
+ 
+ Should early_pxa be renamed to / accompanied by pxa before it gets documented?
+ An early_ prefix seems uncommon and redundant, thus not adopting here for mmp.
+ 
  v2: new
  
- sound/soc/pxa/Kconfig | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/tty/serial/8250/8250_pxa.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index 823b5a2..f8e1c06 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -8,8 +8,8 @@ config SND_PXA2XX_SOC
- 	  to select the audio interfaces to support below.
+diff --git a/drivers/tty/serial/8250/8250_pxa.c b/drivers/tty/serial/8250/8250_pxa.c
+index 4d68731..26ffa04 100644
+--- a/drivers/tty/serial/8250/8250_pxa.c
++++ b/drivers/tty/serial/8250/8250_pxa.c
+@@ -183,6 +183,7 @@ static int __init early_serial_pxa_setup(struct earlycon_device *device,
+ 	return early_serial8250_setup(device, NULL);
+ }
+ OF_EARLYCON_DECLARE(early_pxa, "mrvl,pxa-uart", early_serial_pxa_setup);
++OF_EARLYCON_DECLARE(mmp, "mrvl,mmp-uart", early_serial_pxa_setup);
+ #endif
  
- config SND_MMP_SOC
--	bool "Soc Audio for Marvell MMP chips"
--	depends on ARCH_MMP
-+	bool "SoC Audio for Marvell MMP chips"
-+	depends on ARCH_MMP && ARM
- 	select MMP_SRAM
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
- 	select SND_ARM
+ MODULE_AUTHOR("Sergei Ianovich");
 -- 
 2.10.2
