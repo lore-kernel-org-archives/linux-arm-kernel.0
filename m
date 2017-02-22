@@ -1,150 +1,318 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 22 Feb 2017 10:06:38 -0800
-Subject: [PATCH v5 1/3] [media] exynos-gsc: Use user configured colorspace
- if provided
-In-Reply-To: <58ee4eb5-981d-175f-52a9-445bbc265af0@osg.samsung.com>
-References: <20170221192059.29745-1-thibault.saunier@osg.samsung.com>
- <20170221192059.29745-2-thibault.saunier@osg.samsung.com>
- <329a892b-eb57-26a5-d048-cfe4efc331b6@xs4all.nl>
- <58ee4eb5-981d-175f-52a9-445bbc265af0@osg.samsung.com>
-Message-ID: <02a38e14-052b-faf2-a7a1-ef2f968f6d35@xs4all.nl>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 22 Feb 2017 19:09:02 +0100
+Subject: [RFC 41/55] KVM: arm/arm64: Unmap/flush shadow stage 2 page tables
+In-Reply-To: <1483943091-1364-42-git-send-email-jintack@cs.columbia.edu>
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+ <1483943091-1364-42-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <20170222180902.GW26976@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jan 09, 2017 at 01:24:37AM -0500, Jintack Lim wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> Unmap/flush shadow stage 2 page tables for the nested VMs as well as the
+> stage 2 page table for the guest hypervisor.
+> 
+> Note: A bunch of the code in mmu.c relating to MMU notifiers is
+> currently dealt with in an extremely abrupt way, for example by clearing
+> out an entire shadow stage-2 table.  Probably we can do smarter with
+> some sort of rmap structure.
+
+I think we need to do better than this patch for merging something
+upstream.  At least the current approach will not perform well if we run
+more than one guest hypervisor on the system.
+
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> ---
+>  arch/arm/include/asm/kvm_mmu.h   |  7 ++++
+>  arch/arm/kvm/arm.c               |  6 ++-
+>  arch/arm/kvm/mmu.c               | 11 +++++
+>  arch/arm64/include/asm/kvm_mmu.h | 13 ++++++
+>  arch/arm64/kvm/mmu-nested.c      | 90 ++++++++++++++++++++++++++++++++++++----
+>  5 files changed, 117 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index 1b3309c..ae3aa39 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -230,6 +230,13 @@ static inline unsigned int kvm_get_vmid_bits(void)
+>  	return 8;
+>  }
+>  
+> +static inline void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu) { }
+> +static inline int kvm_nested_s2_init(struct kvm_vcpu *vcpu) { return 0; }
+> +static inline void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu) { }
+> +static inline void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm) { }
+> +static inline void kvm_nested_s2_all_vcpus_unmap(struct kvm *kvm) { }
+> +static inline void kvm_nested_s2_all_vcpus_flush(struct kvm *kvm) { }
+> +
+>  static inline u64 kvm_get_vttbr(struct kvm_s2_vmid *vmid,
+>  				struct kvm_s2_mmu *mmu)
+>  {
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 6fa5754..dc2795f 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -191,6 +191,7 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
+>  
+>  	for (i = 0; i < KVM_MAX_VCPUS; ++i) {
+>  		if (kvm->vcpus[i]) {
+> +			kvm_nested_s2_teardown(kvm->vcpus[i]);
+>  			kvm_arch_vcpu_free(kvm->vcpus[i]);
+>  			kvm->vcpus[i] = NULL;
+>  		}
+> @@ -333,6 +334,7 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+>  
+>  	vcpu->arch.hw_mmu = mmu;
+>  	vcpu->arch.hw_vttbr = kvm_get_vttbr(&mmu->vmid, mmu);
+> +	kvm_nested_s2_init(vcpu);
+>  
+>  	return 0;
+>  }
+> @@ -871,8 +873,10 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+>  	 * Ensure a rebooted VM will fault in RAM pages and detect if the
+>  	 * guest MMU is turned off and flush the caches as needed.
+>  	 */
+> -	if (vcpu->arch.has_run_once)
+> +	if (vcpu->arch.has_run_once) {
+>  		stage2_unmap_vm(vcpu->kvm);
+> +		kvm_nested_s2_unmap(vcpu);
+> +	}
+>  
+>  	vcpu_reset_hcr(vcpu);
+>  
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 98b42e8..1677a87 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -416,6 +416,8 @@ static void stage2_flush_vm(struct kvm *kvm)
+>  	kvm_for_each_memslot(memslot, slots)
+>  		stage2_flush_memslot(&kvm->arch.mmu, memslot);
+>  
+> +	kvm_nested_s2_all_vcpus_flush(kvm);
+> +
+>  	spin_unlock(&kvm->mmu_lock);
+>  	srcu_read_unlock(&kvm->srcu, idx);
+>  }
+> @@ -1240,6 +1242,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot)
+>  
+>  	spin_lock(&kvm->mmu_lock);
+>  	kvm_stage2_wp_range(kvm, &kvm->arch.mmu, start, end);
+> +	kvm_nested_s2_all_vcpus_wp(kvm);
+>  	spin_unlock(&kvm->mmu_lock);
+>  	kvm_flush_remote_tlbs(kvm);
+>  }
+> @@ -1278,6 +1281,7 @@ void kvm_arch_mmu_enable_log_dirty_pt_masked(struct kvm *kvm,
+>  		gfn_t gfn_offset, unsigned long mask)
+>  {
+>  	kvm_mmu_write_protect_pt_masked(kvm, slot, gfn_offset, mask);
+> +	kvm_nested_s2_all_vcpus_wp(kvm);
+>  }
+>  
+>  static void coherent_cache_guest_page(struct kvm_vcpu *vcpu, kvm_pfn_t pfn,
+> @@ -1604,6 +1608,7 @@ static int handle_hva_to_gpa(struct kvm *kvm,
+>  static int kvm_unmap_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
+>  {
+>  	kvm_unmap_stage2_range(&kvm->arch.mmu, gpa, PAGE_SIZE);
+> +	kvm_nested_s2_all_vcpus_unmap(kvm);
+>  	return 0;
+>  }
+>  
+> @@ -1642,6 +1647,7 @@ static int kvm_set_spte_handler(struct kvm *kvm, gpa_t gpa, void *data)
+>  	 * through this calling path.
+>  	 */
+>  	stage2_set_pte(&kvm->arch.mmu, NULL, gpa, pte, 0);
+> +	kvm_nested_s2_all_vcpus_unmap(kvm);
+>  	return 0;
+>  }
+>  
+> @@ -1675,6 +1681,8 @@ static int kvm_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
+>  	if (pte_none(*pte))
+>  		return 0;
+>  
+> +	/* TODO: Handle nested_mmu structures here as well */
+> +
+>  	return stage2_ptep_test_and_clear_young(pte);
+>  }
+>  
+> @@ -1694,6 +1702,8 @@ static int kvm_test_age_hva_handler(struct kvm *kvm, gpa_t gpa, void *data)
+>  	if (!pte_none(*pte))		/* Just a page... */
+>  		return pte_young(*pte);
+>  
+> +	/* TODO: Handle nested_mmu structures here as well */
+
+These TODO's should be addresses somehow as well.
+
+> +
+>  	return 0;
+>  }
+>  
+> @@ -1959,6 +1969,7 @@ void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
+>  
+>  	spin_lock(&kvm->mmu_lock);
+>  	kvm_unmap_stage2_range(&kvm->arch.mmu, gpa, size);
+> +	kvm_nested_s2_all_vcpus_unmap(kvm);
+>  	spin_unlock(&kvm->mmu_lock);
+>  }
+>  
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index fdc9327..e4d5d54 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -328,6 +328,12 @@ static inline unsigned int kvm_get_vmid_bits(void)
+>  struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu, u64 vttbr);
+>  struct kvm_s2_mmu *vcpu_get_active_s2_mmu(struct kvm_vcpu *vcpu);
+>  bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr);
+> +void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu);
+> +int kvm_nested_s2_init(struct kvm_vcpu *vcpu);
+> +void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu);
+> +void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm);
+> +void kvm_nested_s2_all_vcpus_unmap(struct kvm *kvm);
+> +void kvm_nested_s2_all_vcpus_flush(struct kvm *kvm);
+>  #else
+>  static inline struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu,
+>  						       u64 vttbr)
+> @@ -343,6 +349,13 @@ static inline bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr)
+>  {
+>  	return false;
+>  }
+> +
+> +static inline void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu) { }
+> +static inline int kvm_nested_s2_init(struct kvm_vcpu *vcpu) { return 0; }
+> +static inline void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu) { }
+> +static inline void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm) { }
+> +static inline void kvm_nested_s2_all_vcpus_unmap(struct kvm *kvm) { }
+> +static inline void kvm_nested_s2_all_vcpus_flush(struct kvm *kvm) { }
+>  #endif
+>  
+>  static inline u64 kvm_get_vttbr(struct kvm_s2_vmid *vmid,
+> diff --git a/arch/arm64/kvm/mmu-nested.c b/arch/arm64/kvm/mmu-nested.c
+> index 0811d94..b22b78c 100644
+> --- a/arch/arm64/kvm/mmu-nested.c
+> +++ b/arch/arm64/kvm/mmu-nested.c
+> @@ -1,6 +1,7 @@
+>  /*
+>   * Copyright (C) 2016 - Columbia University
+>   * Author: Jintack Lim <jintack@cs.columbia.edu>
+> + * Author: Christoffer Dall <cdall@cs.columbia.edu>
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+> @@ -22,6 +23,86 @@
+>  #include <asm/kvm_mmu.h>
+>  #include <asm/kvm_nested.h>
+>  
+> +
+> +/* expects kvm->mmu_lock to be held */
+> +void kvm_nested_s2_all_vcpus_wp(struct kvm *kvm)
+> +{
+> +	int i;
+> +	struct kvm_vcpu *vcpu;
+> +	struct kvm_nested_s2_mmu *nested_mmu;
+> +	struct list_head *nested_mmu_list;
+> +
+> +	kvm_for_each_vcpu(i, vcpu, kvm) {
+> +		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+> +			cond_resched_lock(&kvm->mmu_lock);
+> +
+> +		nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
+> +		list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
+> +			kvm_stage2_wp_range(kvm, &nested_mmu->mmu,
+> +				    0, KVM_PHYS_SIZE);
+> +	}
+> +}
+> +
+> +/* expects kvm->mmu_lock to be held */
+> +void kvm_nested_s2_all_vcpus_unmap(struct kvm *kvm)
+> +{
+> +	int i;
+> +	struct kvm_vcpu *vcpu;
+> +	struct kvm_nested_s2_mmu *nested_mmu;
+> +	struct list_head *nested_mmu_list;
+> +
+> +	kvm_for_each_vcpu(i, vcpu, kvm) {
+> +		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+> +			cond_resched_lock(&kvm->mmu_lock);
+> +
+> +		nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
+> +		list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
+> +			kvm_unmap_stage2_range(&nested_mmu->mmu,
+> +				       0, KVM_PHYS_SIZE);
+> +	}
+> +}
+> +
+> +void kvm_nested_s2_all_vcpus_flush(struct kvm *kvm)
+> +{
+> +	int i;
+> +	struct kvm_vcpu *vcpu;
+> +	struct kvm_nested_s2_mmu *nested_mmu;
+> +	struct list_head *nested_mmu_list;
+> +
+> +	kvm_for_each_vcpu(i, vcpu, kvm) {
+> +		if (need_resched() || spin_needbreak(&kvm->mmu_lock))
+> +			cond_resched_lock(&kvm->mmu_lock);
+> +
+> +		nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
+> +		list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
+> +			kvm_stage2_flush_range(&nested_mmu->mmu,
+> +				       0, KVM_PHYS_SIZE);
+> +	}
+> +}
+> +
+> +void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu)
+> +{
+> +	struct kvm_nested_s2_mmu *nested_mmu;
+> +	struct list_head *nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
+> +
+> +	list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
+> +		kvm_unmap_stage2_range(&nested_mmu->mmu, 0, KVM_PHYS_SIZE);
+> +}
+
+Did we change the functionality of this function in this patch as well
+or are we just moving it around?  I can't really tell.
 
 
-On 02/22/2017 05:05 AM, Thibault Saunier wrote:
-> Hello,
+Thanks,
+-Christoffer
+
+> +
+> +int kvm_nested_s2_init(struct kvm_vcpu *vcpu)
+> +{
+> +	return 0;
+> +}
+> +
+> +void kvm_nested_s2_teardown(struct kvm_vcpu *vcpu)
+> +{
+> +	struct kvm_nested_s2_mmu *nested_mmu;
+> +	struct list_head *nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
+> +
+> +	list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
+> +		__kvm_free_stage2_pgd(&nested_mmu->mmu);
+> +}
+> +
+>  struct kvm_nested_s2_mmu *get_nested_mmu(struct kvm_vcpu *vcpu, u64 vttbr)
+>  {
+>  	struct kvm_nested_s2_mmu *mmu;
+> @@ -89,15 +170,6 @@ static struct kvm_nested_s2_mmu *create_nested_mmu(struct kvm_vcpu *vcpu,
+>  	return nested_mmu;
+>  }
+>  
+> -static void kvm_nested_s2_unmap(struct kvm_vcpu *vcpu)
+> -{
+> -	struct kvm_nested_s2_mmu *nested_mmu;
+> -	struct list_head *nested_mmu_list = &vcpu->kvm->arch.nested_mmu_list;
+> -
+> -	list_for_each_entry_rcu(nested_mmu, nested_mmu_list, list)
+> -		kvm_unmap_stage2_range(&nested_mmu->mmu, 0, KVM_PHYS_SIZE);
+> -}
+> -
+>  bool handle_vttbr_update(struct kvm_vcpu *vcpu, u64 vttbr)
+>  {
+>  	struct kvm_nested_s2_mmu *nested_mmu;
+> -- 
+> 1.9.1
 > 
 > 
-> On 02/21/2017 11:19 PM, Hans Verkuil wrote:
->>
->> On 02/21/2017 11:20 AM, Thibault Saunier wrote:
->>> Use colorspace provided by the user as we are only doing scaling and
->>> color encoding conversion, we won't be able to transform the colorspace
->>> itself and the colorspace won't mater in that operation.
->>>
->>> Also always use output colorspace on the capture side.
->>>
->>> Start using 576p as a threashold to compute the colorspace.
->>> The media documentation says that the V4L2_COLORSPACE_SMPTE170M colorspace
->>> should be used for SDTV and V4L2_COLORSPACE_REC709 for HDTV. But drivers
->>> don't agree on the display resolution that should be used as a threshold.
->>>
->>>  From EIA CEA 861B about colorimetry for various resolutions:
->>>
->>>    - 5.1 480p, 480i, 576p, 576i, 240p, and 288p
->>>      The color space used by the 480-line, 576-line, 240-line, and 288-line
->>>      formats will likely be based on SMPTE 170M [1].
->>>    - 5.2 1080i, 1080p, and 720p
->>>      The color space used by the high definition formats will likely be
->>>      based on ITU-R BT.709-4
->>>
->>> This indicates that in the case that userspace does not specify what
->>> colorspace should be used, we should use 576p  as a threshold to set
->>> V4L2_COLORSPACE_REC709 instead of V4L2_COLORSPACE_SMPTE170M. Even if it is
->>> only 'likely' and not a requirement it is the best guess we can make.
->>>
->>> The stream should have been encoded with the information and userspace
->>> has to pass it to the driver if it is not the case, otherwise we won't be
->>> able to handle it properly anyhow.
->>>
->>> Also, check for the resolution in G_FMT instead unconditionally setting
->>> the V4L2_COLORSPACE_REC709 colorspace.
->>>
->>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
->>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
->>>
->>> ---
->>>
->>> Changes in v5:
->>> - Squash commit to always use output colorspace on the capture side
->>>    inside this one
->>> - Fix typo in commit message
->>>
->>> Changes in v4:
->>> - Reword commit message to better back our assumptions on specifications
->>>
->>> Changes in v3:
->>> - Do not check values in the g_fmt functions as Andrzej explained in previous review
->>> - Added 'Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>'
->>>
->>> Changes in v2: None
->>>
->>>   drivers/media/platform/exynos-gsc/gsc-core.c | 20 +++++++++++++++-----
->>>   drivers/media/platform/exynos-gsc/gsc-core.h |  1 +
->>>   2 files changed, 16 insertions(+), 5 deletions(-)
->>>
->>> diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
->>> index 59a634201830..772599de8c13 100644
->>> --- a/drivers/media/platform/exynos-gsc/gsc-core.c
->>> +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
->>> @@ -454,6 +454,7 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
->>>       } else {
->>>           min_w = variant->pix_min->target_rot_dis_w;
->>>           min_h = variant->pix_min->target_rot_dis_h;
->>> +        pix_mp->colorspace = ctx->out_colorspace;
->>>       }
->>>         pr_debug("mod_x: %d, mod_y: %d, max_w: %d, max_h = %d",
->>> @@ -472,10 +473,15 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
->>>         pix_mp->num_planes = fmt->num_planes;
->>>   -    if (pix_mp->width >= 1280) /* HD */
->>> -        pix_mp->colorspace = V4L2_COLORSPACE_REC709;
->>> -    else /* SD */
->>> -        pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
->>> +    if (pix_mp->colorspace == V4L2_COLORSPACE_DEFAULT) {
->>> +        if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
->> I'd use || instead of && here. Ditto for the next patch.
->>
->>> +            pix_mp->colorspace = V4L2_COLORSPACE_REC709;
->>> +        else /* SD */
->>> +            pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
->>> +    }
->> Are you sure this is in fact how it is used? If the source of the video
->> is the sensor (camera), then the colorspace is typically SRGB. I'm not
->> really sure you should guess here. All a mem2mem driver should do is to
->> pass the colorspace etc. information from the output to the capture side,
->> and not invent things. That simply makes no sense.
-> 
-> This is not a camera device but a colorspace conversion device, in many
-
-Not really, this is a color encoding conversion device. I.e. it only affects
-the Y'CbCr encoding and quantization range. The colorspace (aka chromaticities)
-and transfer function remain unchanged.
-
-In fact, I suspect (correct me if I am wrong) that it only converts between
-RGB, Y'CbCr 601 and Y'CbCr 709 encodings, where RGB is full range and the Y'CbCr
-formats are limited range.
-
-If you pass in limited range RGB it will probably do the wrong thing as I don't
-seen any quantization checks in the code.
-
-So the colorspace and xfer_func fields remain unchanged by this driver.
-
-If you want to do this really correctly, then you need to do more. I don't have
-time right now to go into this in-depth, but I will try to get back to this on
-Monday. I am thinking of documenting this as part of the V4L2 colorspace
-documentation. This stuff is complex and if you don't know the rules then it
-can be hard to implement correctly.
-
-> cases the info will not be passed by the userspace, basically because the info
-> is not encoded in the media stream (this often happens). I am not inventing here,
-> just making sure we use the most likely value in case none was provided (and if none
-> was provided it should always be correct given that the encoded stream was not broken).
-> 
-> In the case the source is a camera and then we use the colorspace converter then the info
-> should copied from the camera to the transcoding node (by userspace) so there should be
-> no problem.
-> 
-> What I am doing here is what is done in other drivers.
-
-Most (all?) other mem2mem drivers do not do color encoding conversion, they just copy
-all the colorspace info from output to capture.
-
-If there are other m2m drivers that do this, then I doubt they do the right thing.
-They are probably right for most cases, but not all.
-
-Regards,
-
-	Hans
