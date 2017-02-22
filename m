@@ -1,78 +1,167 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed, 22 Feb 2017 23:23:10 +0800
-Subject: [PATCH 8/8] [DO NOT MERGE] ARM: dts: sun8i: enable LCD panel of
- Lichee Pi Zero
-In-Reply-To: <20170222152310.3719-5-icenowy@aosc.xyz>
-References: <20170222152310.3719-5-icenowy@aosc.xyz>
-Message-ID: <20170222152310.3719-9-icenowy@aosc.xyz>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Wed, 22 Feb 2017 17:30:36 +0200
+Subject: [BUG] hdlcd gets confused about base address
+In-Reply-To: <20170222151542.GA937@e110455-lin.cambridge.arm.com>
+References: <20161118233733.GP1041@n2100.armlinux.org.uk>
+ <20170220121603.GA1132@n2100.armlinux.org.uk>
+ <20170220175331.GC963@e110455-lin.cambridge.arm.com>
+ <20170220180558.GB31595@intel.com>
+ <20170222151542.GA937@e110455-lin.cambridge.arm.com>
+Message-ID: <20170222153036.GI31595@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A 480x272 QiaoDian QD43003C0-40-7LED panel is available from Lichee Pi.
+On Wed, Feb 22, 2017 at 03:15:42PM +0000, Liviu Dudau wrote:
+> Hi Ville,
+> 
+> On Mon, Feb 20, 2017 at 08:05:58PM +0200, Ville Syrj?l? wrote:
+> > On Mon, Feb 20, 2017 at 05:53:31PM +0000, Liviu Dudau wrote:
+> > > Hi Russell,
+> > > 
+> > > On Mon, Feb 20, 2017 at 12:16:03PM +0000, Russell King - ARM Linux wrote:
+> > > > On Fri, Nov 18, 2016 at 11:37:33PM +0000, Russell King - ARM Linux wrote:
+> > > > > Something I also noticed is this:
+> > > > > 
+> > > > >         scanout_start = gem->paddr + plane->state->fb->offsets[0] +
+> > > > >                 plane->state->crtc_y * plane->state->fb->pitches[0] +
+> > > > >                 plane->state->crtc_x * bpp / 8;
+> > > > > 
+> > > > > Surely this should be using src_[xy] (which are the position in the
+> > > > > source - iow, memory, and not crtc_[xy] which is the position on the
+> > > > > CRTC displayed window.  To put it another way, the src_* define the
+> > > > > region of the source material that is mapped onto a rectangular area
+> > > > > on the display defined by crtc_*.
+> > > > 
+> > > > This problem still exists...
+> > > 
+> > > Sorry, looks like this fell through the cracks of us trying to fix the
+> > > other issues you were seeing. I'm attaching a patch, please let me know
+> > > if this works for you.
+> > > 
+> > > Best regards,
+> > > Liviu
+> > > 
+> > > > 
+> > > > -- 
+> > > > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> > > > FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> > > > according to speedtest.net.
+> > 
+> > > >From a495d262cb91fdeccb00685646ddb71774c18e7e Mon Sep 17 00:00:00 2001
+> > > From: Liviu Dudau <Liviu.Dudau@arm.com>
+> > > Date: Mon, 20 Feb 2017 17:44:42 +0000
+> > > Subject: [PATCH] arm: hdlcd: Fix the calculation of scanout start address
+> > > 
+> > > The framebuffer start address uses the CRTC's x,y position rather
+> > > than the source framebuffer's. Fix that.
+> > > 
+> > > Reported-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> > > ---
+> > >  drivers/gpu/drm/arm/hdlcd_crtc.c | 11 +++++------
+> > >  1 file changed, 5 insertions(+), 6 deletions(-)
+> > > 
+> > > diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
+> > > index 798a3cc480a2..4c1ab73d9e07 100644
+> > > --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
+> > > +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
+> > > @@ -244,21 +244,20 @@ static void hdlcd_plane_atomic_update(struct drm_plane *plane,
+> > >  	struct drm_framebuffer *fb = plane->state->fb;
+> > >  	struct hdlcd_drm_private *hdlcd;
+> > >  	struct drm_gem_cma_object *gem;
+> > > -	u32 src_w, src_h, dest_w, dest_h;
+> > > +	u32 src_x, src_y, dest_w, dest_h;
+> > >  	dma_addr_t scanout_start;
+> > >  
+> > >  	if (!fb)
+> > >  		return;
+> > >  
+> > > -	src_w = plane->state->src_w >> 16;
+> > > -	src_h = plane->state->src_h >> 16;
+> > > +	src_x = plane->state->src_x >> 16;
+> > > +	src_y = plane->state->src_y >> 16;
+> 
+> While still waiting for your reply to Russell's comments ...
+> 
+> > 
+> > This stuff should be using the clipped coordinates, not the user
+> > coordinates. And it doesn't look like this guy is even calling the
+> > clip helper thing.
+> 
+> That's right, the code I believe predates the existence of the clip helper
+> thing (me reads it as "drm_plane_helper_check_state"), and I have not got
+> around to update the code here. Before I do that I would like to get a bit
+> more clarification on what you mean by the clipped coordinates, given
+> that HDLCD doesn't support dirty buffer updates.
 
-This commit connects this panel to Lichee Pi Zero.
+The requirement to handle out of bounds plane coordinates correctly
+was always there even before the helper existed. It's just that most
+people who wrote new drivers neglected to read the reference code (i915).
+Granted, it would be better to have actual documentation, and now that
+we have the clipped coordinates in the core state and we have some
+helpers we should have a sensible place for said documentation as well.
 
-Lichee Pi also provides a 800x480 panel without accurate model number,
-so do not merge this patch. It will finally come as device tree overlay.
+> 
+> > 
+> > malidp seems to be calling that thing, but it still doesn't
+> > manage to program the hw with the right coordinates from what
+> > I can see.
+> 
+> would like more clarity on what the right coordinates should be.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 36 +++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+state->src and state->dst
 
-diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-index 387fc2aa546d..7ae72bf63cd0 100644
---- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-@@ -75,6 +75,28 @@
- 			gpios = <&pio 6 2 GPIO_ACTIVE_LOW>; /* PG2 */
- 		};
- 	};
-+
-+	panel: panel {
-+		compatible = "qiaodian,qd43003c0-40", "simple-panel";
-+		enable-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* Should be backlight */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		port at 0 {
-+			reg = <0>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			panel_input: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&tcon0_out_lcd>;
-+			};
-+		};
-+	};
-+};
-+
-+&de {
-+	status = "okay";
- };
- 
- &mmc0 {
-@@ -86,6 +108,20 @@
- 	status = "okay";
- };
- 
-+&tcon0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_rgb666_pins>;
-+	status = "okay";
-+
-+};
-+
-+&tcon0_out {
-+	tcon0_out_lcd: endpoint at 0 {
-+		reg = <0>;
-+		remote-endpoint = <&panel_input>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-0 = <&uart0_pins_a>;
- 	pinctrl-names = "default";
+Well, that's assuming that you can't directly feed negative/large
+coordinates to your hardware.
+
+> 
+> > 
+> > /me feels a bit like a broken record...
+> 
+> Sorry, I was not aware of your previous interventions on the subject of "right
+> coordinates". Could you please point me in the right direction, if it is not
+> much trouble?
+> 
+> Best regards,
+> Liviu
+> 
+> > 
+> > >  	dest_w = plane->state->crtc_w;
+> > >  	dest_h = plane->state->crtc_h;
+> > >  	gem = drm_fb_cma_get_gem_obj(fb, 0);
+> > >  	scanout_start = gem->paddr + fb->offsets[0] +
+> > > -		plane->state->crtc_y * fb->pitches[0] +
+> > > -		plane->state->crtc_x *
+> > > -		fb->format->cpp[0];
+> > > +		src_y * fb->pitches[0] +
+> > > +		src_x *	fb->format->cpp[0];
+> > >  
+> > >  	hdlcd = plane->dev->dev_private;
+> > >  	hdlcd_write(hdlcd, HDLCD_REG_FB_LINE_LENGTH, fb->pitches[0]);
+> > > -- 
+> > > 2.11.0
+> > > 
+> > 
+> > > _______________________________________________
+> > > dri-devel mailing list
+> > > dri-devel at lists.freedesktop.org
+> > > https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> > 
+> > 
+> > -- 
+> > Ville Syrj?l?
+> > Intel OTC
+> 
+> -- 
+> ====================
+> | I would like to |
+> | fix the world,  |
+> | but they're not |
+> | giving me the   |
+>  \ source code!  /
+>   ---------------
+>     ?\_(?)_/?
+
 -- 
-2.11.1
+Ville Syrj?l?
+Intel OTC
