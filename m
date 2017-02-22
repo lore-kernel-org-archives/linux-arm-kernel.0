@@ -1,34 +1,48 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 22 Feb 2017 18:31:43 +0100
-Subject: [PATCH 0/3] Improving I2C related support on Armada 3720 DB
-Message-ID: <20170222173146.30993-1-gregory.clement@free-electrons.com>
+Date: Wed, 22 Feb 2017 18:31:45 +0100
+Subject: [PATCH 2/3] ARM64: dts: marvell: armada-3720-db: add gpio expander
+In-Reply-To: <20170222173146.30993-1-gregory.clement@free-electrons.com>
+References: <20170222173146.30993-1-gregory.clement@free-electrons.com>
+Message-ID: <20170222173146.30993-3-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+A gpio expander is present on the i2c bus on the Armada 3720 DB board. This
+patch add it to the device tree.
 
-Now that I2C controller of the Armada 37XX SoCs is supported in the
-kernel, this small series improve its usage in Armada 3720 DB board.
-
-The first patch fix the i2c controller nodes.
-
-The second one exposes an i2c device of the Armada 3720 board: a gpio
-expander mainly used for power control.
-
-The third one add the driver selection to the defconfig.
-
-Gregory
-
-Gregory CLEMENT (3):
-  ARM64: dts: marvell: armada37xx: add address and size property for i2c
-    cells
-  ARM64: dts: marvell: armada-3720-db: add gpio expander
-  arm64: defconfig: enable I2C_PXA
-
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
  arch/arm64/boot/dts/marvell/armada-3720-db.dts | 18 ++++++++++++++++++
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi   |  4 ++++
- arch/arm64/configs/defconfig                   |  1 +
- 3 files changed, 23 insertions(+)
+ 1 file changed, 18 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+index 86602c907a61..864936acc316 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -64,6 +64,24 @@
+ 
+ &i2c0 {
+ 	status = "okay";
++
++	gpio_exp: pca9555 at 22 {
++		compatible = "nxp,pca9555";
++		gpio-controller;
++		#gpio-cells = <2>;
++
++		reg = <0x22>;
++		/*
++		 * IO0_0: PWR_EN_USB2	IO1_0: PWR_EN_VTT
++		 * IO0_1: PWR_EN_USB23	IO1_1: MPCIE_WDISABLE
++		 * IO0_2: PWR_EN_SATA	IO1_2: RGMII_DEV_RSTN
++		 * IO0_3: PWR_EN_PCIE	IO1_3: SGMII_DEV_RSTN
++		 * IO0_4: PWR_EN_SD
++		 * IO0_5: PWR_EN_EMMC
++		 * IO0_6: PWR_EN_RGMII	IO1_6: SATA_USB3.0_SEL
++		 * IO0_7: PWR_EN_SGMII	IO1_7: PWR_MCI_PS
++		 */
++	};
+ };
+ 
+ /* CON3 */
 -- 
 2.11.0
