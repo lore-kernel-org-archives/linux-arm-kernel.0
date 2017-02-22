@@ -1,74 +1,39 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 22 Feb 2017 15:05:44 +0100
-Subject: [PATCH/RFC 4/6] drivers: firmware: psci: Fix non-PMIC wake-up if
- SYSTEM_SUSPEND cuts power
-In-Reply-To: <20170221174844.GE8605@leverpostej>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <1487622809-25127-5-git-send-email-geert+renesas@glider.be>
- <20170221174844.GE8605@leverpostej>
-Message-ID: <CAMuHMdW8JAYrgvWxi8c_ZLtsUWBYFGZ=V7pu2p+cO=NdwLas2w@mail.gmail.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Wed, 22 Feb 2017 15:13:19 +0100
+Subject: [PATCH v3 0/6] ARM: davinci: vpif capture & display support
+Message-ID: <1487772805-19021-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+This series adds pdata quirks and other changes required to make vpif
+work on the da850-evm board.
 
-On Tue, Feb 21, 2017 at 6:48 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Feb 20, 2017 at 09:33:27PM +0100, Geert Uytterhoeven wrote:
->> @@ -440,12 +442,14 @@ static int psci_system_suspend_valid(suspend_state_t state)
->>  static int psci_system_suspend_enter(suspend_state_t state)
->>  {
->>       switch (state) {
->> +     case PM_SUSPEND_MEM:
->> +             if (!psci_system_suspend_is_power_down ||
->> +                 !wakeup_source_available())
->> +                     return cpu_suspend(0, psci_system_suspend);
->> +             /* fall through */
->
-> I don't believe that this is the correct place to handle this.
->
-> The wakeup_source_available() check *might* be ok, though even with that
-> I'd rather we rejected the request rather than trying to fall back to a
-> PSCI_CPU_SUSPEND. Otherwise we have a potential silent power regression.
+v1 -> v2:
+- added patch 1/5 - don't bail-out from pdata_quirks_check() after
+  applying a single quirk
+- changed the comment above the new fixed regulator to make it more
+  descriptive
+- removed unnecessary #ifdefs from pdata-quirks.c
 
-If we reject the request here, I think the PM core has to be modified to
-try again using a shallower state. Note that it would be better to reject
-the state in the .valid() callback instead of in .enter().
+v2 -> v3:
+- added patch 6/6: add enable GPIOs to pdata-quirks - this is needed
+  because vpif gets its resources from pdata-quirks instead of the
+  device tree
 
-You also have to consider this is dynamic not static.
-I.e. the availability of other wake-up sources may change at runtime (cfr.
-the "wakeup" files in sysfs). Currently pm_sleep_states[] (which controls
-which states are available) is initialized from suspend_set_ops(), and not
-changed later.
+Bartosz Golaszewski (4):
+  ARM: davinci: da8xx: allow having multiple pdata-quirks
+  ARM: da850-evm: add a fixed regulator for the UI board IO expander
+  ARM: davinci: add pdata-quirks for da850-evm vpif display
+  ARM: davinci: add enable GPIOs for vpif capture to pdata-quirks
 
-Perhaps pm_sleep_states[] should be updated every time the wakeup_sources
-list is changed?
+Kevin Hilman (2):
+  ARM: davinci: board-da850-evm: add I2C ID for VPIF
+  ARM: davinci: da8xx: add pdata-quirks for VPIF capture
 
-> I can imagine that there are cases where the wakeup source is completely
-> external and invisible to Linux (e.g. a power button that has no
-> programming interface, and isn't desscribed at all). In that case, even
-> the wakeup_source_available() check might be too much. :/
+ arch/arm/mach-davinci/board-da850-evm.c |   4 +
+ arch/arm/mach-davinci/da8xx-dt.c        |   1 +
+ arch/arm/mach-davinci/pdata-quirks.c    | 187 +++++++++++++++++++++++++++++++-
+ 3 files changed, 191 insertions(+), 1 deletion(-)
 
-You mean the wakeup source that actually wakes up the system from PSCI
-SYSTEM_SUSPEND? On Renesas boards, that's a switch wired to the PMIC,
-and currently not described in DT.  Describing it in DT could indeed interfere
-with wakeup_source_available() :-(
-
-> What we could/should do is expose to userspace which suspend cases a
-> device can wake up the system from and/or whether a wakeup source is
-> suitable configured for a state currently. That way userspace can
-> determine whether it is gauranteed to be woken.
-
-Right.  And that information should come from DT?
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+2.9.3
