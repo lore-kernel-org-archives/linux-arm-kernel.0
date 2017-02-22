@@ -1,97 +1,21 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 22 Feb 2017 21:46:35 +0100
-Subject: [RFC] usb: gadget: scheduling while atomic in pxa27x_udc,
- IS_ERR_OR_NULL test, duplicated definition
-In-Reply-To: <e33b2bdb-f365-28d0-768a-c8e94a7794f9@tul.cz> (Petr Cvek's
- message of "Wed, 22 Feb 2017 05:44:39 +0100")
-References: <e33b2bdb-f365-28d0-768a-c8e94a7794f9@tul.cz>
-Message-ID: <87mvdex8b8.fsf@belgarion.home>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 22 Feb 2017 14:47:46 -0600
+Subject: [PATCH 2/7] dt-bindings: rk1108-cru: rename RK1108 to RV1108
+In-Reply-To: <1486983857-32399-1-git-send-email-andy.yan@rock-chips.com>
+References: <1486983566-32265-1-git-send-email-andy.yan@rock-chips.com>
+ <1486983857-32399-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <20170222204746.gcy4j6klz6fidrhq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
+On Mon, Feb 13, 2017 at 07:04:17PM +0800, Andy Yan wrote:
+> Rockchip finally named the SOC as RV1108, so change it.
+> 
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> ---
+> 
+>  .../{rockchip,rk1108-cru.txt => rockchip,rv1108-cru.txt}     | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+>  rename Documentation/devicetree/bindings/clock/{rockchip,rk1108-cru.txt => rockchip,rv1108-cru.txt} (83%)
 
-Hi Petr,
-
-> I found a few problems with the PXA27x UDC.
->
-> 	usb_function_activate() in drivers/usb/gadget/composite.c
->
-> does spin_lock_irqsave() and then calls 
->
-> 	gadget->ops->pullup() in drivers/usb/gadget/udc/core.c
->
-> which is set to pxa_udc_pullup(), which should be called not in interrupt
->
-> 	/**
-> 	 * pxa_udc_pullup - Offer manual D+ pullup control
-> 	 * @_gadget: usb gadget using the control
-> 	 * @is_active: 0 if disconnect, else connect D+ pullup resistor
-> 	 * Context: !in_interrupt()
-> 	 *
-> 	 * Returns 0 if OK, -EOPNOTSUPP if udc driver doesn't handle D+ pullup
-> 	 */
->
-> This finally causes fail at
->
-> 	udc_enable() in drivers/usb/gadget/udc/pxa27x_udc.c
-> 	
-> at code
->
-> 	/*
-> 	 * Caller must be able to sleep in order to cope with startup transients
-> 	 */
-> 	msleep(100);
->
-> with a following error (with CONFIG_DEBUG_PREEMPT on):
->
-> 	BUG: scheduling while atomic: v4l_id/360/0x00000002
->
-> With the msleep changed to mdelay, the code (specified as !in_interrupt()) seems to work fine
-> (after torture reloads). Can the caller (udc core) be changed to be able to
-> sleep?
-
-This question is for Felipe. From the several years back when I wrote this code
-I think it was granted that the pullup() callback was not in interrupt context,
-but Felipe knows better.
-
-> Second bug was discovered by Robert Jarzmik during discussion in
-Please go ahead and submit a patch.
-
-> And as we talking about it, is this return correct?
-I think so.
-
-> 	if (of_have_populated_dt()) {
-> 		udc->transceiver =
-> 			devm_usb_get_phy_by_phandle(udc->dev, "phys", 0);
->
-> 		if (IS_ERR(udc->transceiver))
-> 			return PTR_ERR(udc->transceiver);
-> 	} else {
-> 		udc->transceiver = usb_get_phy(USB_PHY_TYPE_USB2);
-> 	}
->
-> One branch returns on error and second one is fine, udc->transceiver then can hold an error,
-> but this is fine for the rest of driver (tested). Question is does it have to return from a first
-> branch (e.g. my device does not have phy)?
-In the devicetree context (first branch), even if you don't have a phy, you'll
-instanciate a "nop" phy, ie. "usb-nop-xceiv". From a hardware perspective, you
-have a phy, it's just that you don't have to do anything from a software
-perspective to activate your phy.
-
-In the platform_data context (second branch), an error is the common path, as
-there is no phy in many old platforms, and pxa27x are old ... hence no check of
-error.
-
-> And finally it seems definitions from drivers/usb/gadget/udc/pxa27x_udc.c are duplicated:
->
-> 	static void udc_enable(struct pxa_udc *udc);
-> 	static void udc_disable(struct pxa_udc *udc);
->
-> I will send patch series as soon as we agree on solutions.
-Excellent.
-
-Cheers.
-
--- 
-Robert
+Acked-by: Rob Herring <robh@kernel.org>
