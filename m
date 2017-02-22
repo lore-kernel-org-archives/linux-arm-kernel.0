@@ -1,10 +1,10 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 22 Feb 2017 12:30:22 +0100
+Date: Wed, 22 Feb 2017 12:31:50 +0100
 Subject: [RFC 12/55] KVM: arm64: Handle EL2 register access traps
 In-Reply-To: <1483943091-1364-13-git-send-email-jintack@cs.columbia.edu>
 References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
  <1483943091-1364-13-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <20170222113022.GG26976@cbox>
+Message-ID: <20170222113150.GH26976@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,27 +12,17 @@ On Mon, Jan 09, 2017 at 01:24:08AM -0500, Jintack Lim wrote:
 > ARM v8.3 introduces a new bit in the HCR_EL2, which is the NV bit. When
 > this bit is set, accessing EL2 registers in EL1 traps to EL2. In
 > addition, executing following instructions in EL1 will trap to EL2 -
-
-the following:
-
-So these instructions trap:
- - tlbi
- - at
- - eret
- - mrs/msr accessgin sp_el1
-
-And they would previously undef at EL1, but now trap to EL2?
-
 > tlbi and at instructions which are undefined when exectued in EL1, eret
 > instruction, msr/mrs instructions to access SP_EL1.
-
-this is a bit confusing to read.
-
 > 
 > This patch handles traps due to accessing EL2 registers in EL1.  The
 > host hypervisor keeps EL2 register values in memory, and will use them
 > to emulate the behavior that the guest hypervisor expects from the
 > hardware.
+
+This patch just sets up the handlers but doesn't actually enable the NV
+feature, right?
+
 > 
 > Subsequent patches will handle other kinds of traps.
 > 
