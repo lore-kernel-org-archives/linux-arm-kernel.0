@@ -1,56 +1,64 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 22 Feb 2017 01:53:54 +0100
-Subject: [PATCH V2] arm64: kconfig: allow support for memory failure
- handling
-In-Reply-To: <1487720723-14871-1-git-send-email-tbaicar@codeaurora.org>
-References: <1487720723-14871-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <4367727.rNzyOA836A@aspire.rjw.lan>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Wed, 22 Feb 2017 10:09:51 +0900
+Subject: [PATCH v10 1/3] dt-bindings: Add support for samsung s6e3ha2 panel
+ binding
+In-Reply-To: <CGME20170220071000epcas1p3fbc906fa085931b73b895b6724432cd3@epcas1p3.samsung.com>
+References: <1487574582-15746-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170220071000epcas1p3fbc906fa085931b73b895b6724432cd3@epcas1p3.samsung.com>
+Message-ID: <8e5109d0-6e6f-8bf8-7f9b-b7a5ddcbcf1e@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+ Boris]
+The Samsung s6e3ha2 is a 5.7" 1440x2560 AMOLED panel connected
+using MIPI-DSI interfaces.
 
-On Tuesday, February 21, 2017 04:45:23 PM Tyler Baicar wrote:
-> From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
-> 
-> If ACPI_APEI and MEMORY_FAILURE is configured, select
-> ACPI_APEI_MEMORY_FAILURE. This enables memory failure recovery
-> when such memory failure is reported through ACPI APEI. APEI
-> (ACPI Platform Error Interfaces) provides a means for the
-> platform to convey error information to the kernel.
-> 
-> Declare ARCH_SUPPORTS_MEMORY_FAILURE, as arm64 does support
-> memory failure recovery attempt.
-> 
-> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> ---
->  arch/arm64/Kconfig        | 1 +
->  drivers/acpi/apei/Kconfig | 1 +
->  2 files changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 1117421..61e0bb0 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -15,6 +15,7 @@ config ARM64
->  	select ARCH_HAS_SG_CHAIN
->  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
->  	select ARCH_USE_CMPXCHG_LOCKREF
-> +	select ARCH_SUPPORTS_MEMORY_FAILURE
->  	select ARCH_SUPPORTS_ATOMIC_RMW
->  	select ARCH_SUPPORTS_NUMA_BALANCING
->  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
-> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-> index b0140c8..6d9a812 100644
-> --- a/drivers/acpi/apei/Kconfig
-> +++ b/drivers/acpi/apei/Kconfig
-> @@ -9,6 +9,7 @@ config ACPI_APEI
->  	select MISC_FILESYSTEMS
->  	select PSTORE
->  	select UEFI_CPER
-> +	select ACPI_APEI_MEMORY_FAILURE if MEMORY_FAILURE
->  	depends on HAVE_ACPI_APEI
->  	help
->  	  APEI allows to report errors (for example from the chipset)
-> 
+Signed-off-by: Donghwa Lee <dh09.lee@samsung.com>
+Signed-off-by: Hyungwon Hwang <human.hwang@samsung.com>
+Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+  .../bindings/display/panel/samsung,s6e3ha2.txt     | 28 
+++++++++++++++++++++++
+  1 file changed, 28 insertions(+)
+  create mode 100644 
+Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2.txt
+
+diff --git 
+a/Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2.txt 
+b/Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2.txt
+new file mode 100644
+index 0000000..18854f4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2.txt
+@@ -0,0 +1,28 @@
++Samsung S6E3HA2 5.7" 1440x2560 AMOLED panel
++
++Required properties:
++  - compatible: "samsung,s6e3ha2"
++  - reg: the virtual channel number of a DSI peripheral
++  - vdd3-supply: I/O voltage supply
++  - vci-supply: voltage supply for analog circuits
++  - reset-gpios: a GPIO spec for the reset pin (active low)
++  - enable-gpios: a GPIO spec for the panel enable pin (active high)
++
++Optional properties:
++  - te-gpios: a GPIO spec for the tearing effect synchronization signal
++    gpio pin (active high)
++
++Example:
++&dsi {
++	...
++
++	panel at 0 {
++		compatible = "samsung,s6e3ha2";
++		reg = <0>;
++		vdd3-supply = <&ldo27_reg>;
++		vci-supply = <&ldo28_reg>;
++		reset-gpios = <&gpg0 0 GPIO_ACTIVE_LOW>;
++		enable-gpios = <&gpf1 5 GPIO_ACTIVE_HIGH>;
++		te-gpios = <&gpf1 3 GPIO_ACTIVE_HIGH>;
++	};
++};
+-- 
+1.9.1
