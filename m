@@ -1,55 +1,69 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 22 Feb 2017 10:13:28 +0000
-Subject: [PATCH V10 07/10] efi: print unrecognized CPER section
-In-Reply-To: <20170222011241.GX21222@n2100.armlinux.org.uk>
-References: <1487188282-2568-1-git-send-email-tbaicar@codeaurora.org>
- <1487188282-2568-8-git-send-email-tbaicar@codeaurora.org>
- <58AC9093.5020303@arm.com> <20170222011241.GX21222@n2100.armlinux.org.uk>
-Message-ID: <58AD6448.1070301@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Feb 2017 11:30:09 +0100
+Subject: linux-next build regressions, Re: next build: 208 builds: 2 failed,
+ 206 passed, 39 warnings (next-20170222)
+In-Reply-To: <58ad2e38.0d57190a.e5f64.04d6@mx.google.com>
+References: <58ad2e38.0d57190a.e5f64.04d6@mx.google.com>
+Message-ID: <2483588.cUC69WWsNF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/02/17 01:12, Russell King - ARM Linux wrote:
-> On Tue, Feb 21, 2017 at 07:10:11PM +0000, James Morse wrote:
->> Hi Tyler,
->>
->> On 15/02/17 19:51, Tyler Baicar wrote:
->>> +	} else {
->>> +		const void *unknown_err;
->>> +
->>> +		unknown_err = acpi_hest_generic_data_payload(gdata);
->>> +		printk("%ssection type: %pUl\n", newpfx, sec_type);
->>> +		printk("%ssection length: %d\n", newpfx,
->>
->> Nit: please use the "%s""section... that this file consistently uses. This means
->> this code will still work as expected when someone adds '%ss' support to printk!
-> 
-> No.  That is wrong:
-> 
-> "%s""section" is stored in memory as bytes containing:
-> 
-> '%' 's' 's' 'e' 'c' 't' 'i' 'o' 'n'
-> 
-> whereas "%ssection" is stored in memory as bytes containing:
-> 
-> '%' 's' 's' 'e' 'c' 't' 'i' 'o' 'n'
-> 
-> They're exactly the same, so when printk() comes to parse the string, it
-> sees exactly the same byte sequence.  So, the only thing that's happening
-> is code obfuscation for no good reason what so ever.
-> 
-> If you don't believe me, run some build tests and look at the resulting
-> strings... also look at the C standard.  "Adjacent string literal tokens
-> are concatenated."
-> 
-> Please get rid of this obfuscation.
+On Tuesday, February 21, 2017 10:22:48 PM CET kernelci. org bot wrote:
+> next build: 208 builds: 2 failed, 206 passed, 39 warnings (next-20170222)
 
-Sure, I was always told not do this, clearly I didn't think about it for very long!
+>From last week's 9, four patches got merged into linux-next, two new
+ones came in (drm/sti), three have pending patches and two are waiting
+for me to come up with a proper solution.
 
-This file otherwise consistently uses the now-weird "%s""otherstring" pattern.
+> --------------------------------------------------------------------------------
+> allmodconfig (arm) ? PASS, 0 errors, 9 warnings, 0 section mismatches
+> 
+> Warnings:
+>     drivers/gpu/drm/sti/sti_vtg.c:392:22: warning: unused variable 'np' [-Wunused-variable]
+>     drivers/gpu/drm/sti/sti_drv.c:120:13: warning: 'sti_drm_dbg_cleanup' defined but not used [-Wunused-function]
 
+I sent two patches for these yesterday, and Vincent also sent these
+already, 
 
+>     drivers/iio/adc/rcar-gyroadc.c:429:27: warning: 'num_channels' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>     drivers/iio/adc/rcar-gyroadc.c:426:22: warning: 'sample_width' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>     drivers/iio/adc/rcar-gyroadc.c:428:23: warning: 'channels' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>     drivers/iio/adc/rcar-gyroadc.c:398:26: warning: 'adcmode' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-Thanks,
+An old one, Jonathan Cameron said he'd send this one for 4.11-rc2,
+but it has not appeared in linux-next yet.
 
-James
+Jonathan, any update?
+
+>     drivers/media/platform/coda/imx-vdoa.c:333:181: warning: passing argument 1 of '__platform_driver_register' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+>     drivers/media/platform/coda/imx-vdoa.c:333:625: warning: passing argument 1 of 'platform_driver_unregister' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+
+Hans Verkuil said he'd take care of this if he remembers.
+
+>     drivers/usb/gadget/udc/atmel_usba_udc.c:632:550: warning: 'ept_cfg' may be used uninitialized in this function [-Wmaybe-uninitialized]
+
+Sent a patch on 2017-02-01. No reply since last update, resending now.
+
+> --------------------------------------------------------------------------------
+> cavium_octeon_defconfig (mips) ? PASS, 0 errors, 1 warning, 0 section mismatches
+> 
+> Warnings:
+>     drivers/staging/octeon/ethernet-rx.c:339:28: warning: unused variable 'priv' [-Wunused-variable]
+
+I sent a patch on 2017-02-17, no reply yet.
+
+> --------------------------------------------------------------------------------
+> defconfig+CONFIG_KASAN=y (x86) ? PASS, 0 errors, 5 warnings, 0 section mismatches
+> 
+> Warnings:
+>     net/wireless/nl80211.c:1415:1: warning: the frame size of 2232 bytes is larger than 2048 bytes [-Wframe-larger-than=]
+>     net/wireless/nl80211.c:4443:1: warning: the frame size of 2232 bytes is larger than 2048 bytes [-Wframe-larger-than=]
+>     net/wireless/nl80211.c:5743:1: warning: the frame size of 2064 bytes is larger than 2048 bytes [-Wframe-larger-than=]
+>     net/wireless/nl80211.c:1904:1: warning: the frame size of 3784 bytes is larger than 2048 bytes [-Wframe-larger-than=]
+>     drivers/tty/vt/keyboard.c:1470:1: warning: the frame size of 2344 bytes is larger than 2048 bytes [-Wframe-larger-than=]
+
+I have patches, but it's tricky. Expect a long set of patches in the next
+few days. Unlike the others, this is not a regression compared to 4.9, but
+a long-standing issue.
+
+	Arnd
