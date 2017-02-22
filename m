@@ -1,44 +1,43 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Wed, 22 Feb 2017 15:01:46 +0100
-Subject: [PATCH v2 1/4] ARM: dts: da850-evm: fix whitespace errors
+Date: Wed, 22 Feb 2017 15:01:48 +0100
+Subject: [PATCH v2 3/4] ARM: dts: da850-evm: add the UI expander node
 In-Reply-To: <1487772109-10014-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1487772109-10014-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1487772109-10014-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1487772109-10014-4-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The da850-evm dts file contains whitespace errors in the vpif node.
-
-This patch fixes them.
+We need the expander to be probed to allow the VPIF controller to
+receive interrupts from the video decoder.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/boot/dts/da850-evm.dts | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/da850-evm.dts | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index 8c5671c..dece981 100644
+index dece981..3968a18 100644
 --- a/arch/arm/boot/dts/da850-evm.dts
 +++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -302,14 +302,14 @@
- 	/* VPIF capture port */
- 	port {
- 		vpif_ch0: endpoint at 0 {
--			  reg = <0>;
--			  bus-width = <8>;
-+			reg = <0>;
-+			bus-width = <8>;
- 		};
+@@ -9,6 +9,7 @@
+  */
+ /dts-v1/;
+ #include "da850.dtsi"
++#include <dt-bindings/gpio/gpio.h>
  
- 		vpif_ch1: endpoint at 1 {
--			  reg = <1>;
--			  bus-width = <8>;
--			  data-shift = <8>;
-+			reg = <1>;
-+			bus-width = <8>;
-+			data-shift = <8>;
+ / {
+ 	compatible = "ti,da850-evm", "ti,da850";
+@@ -78,7 +79,10 @@
+ 				DRVDD-supply = <&vbat>;
+ 				DVDD-supply = <&vbat>;
+ 			};
+-
++			tca6416: gpio at 20 {
++				compatible = "ti,tca6416";
++				reg = <0x20>;
++			};
  		};
- 	};
- };
+ 		wdt: wdt at 21000 {
+ 			status = "okay";
 -- 
 2.9.3
