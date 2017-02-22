@@ -1,44 +1,41 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 22 Feb 2017 14:35:37 +0000
-Subject: [PATCH/RFC 3/6] drivers: firmware: psci: Implement shallow
- suspend mode
-In-Reply-To: <CAMuHMdU0fTtEXN9k477e3S-UUMNhd=U4_r0VOcyA1TGEgA5rmA@mail.gmail.com>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <1487622809-25127-4-git-send-email-geert+renesas@glider.be>
- <20170221110712.GB5021@amd> <de2a15d4-9ac2-9ba9-a47a-eacbf478f601@arm.com>
- <CAMuHMdVmu4AYZ6MZHd79N2-2gELR6s3oZ46UnEszCfLvHymY1w@mail.gmail.com>
- <3caf0f3f-76e5-cb1e-7c0f-87ed5e1c2b86@arm.com>
- <CAMuHMdU0fTtEXN9k477e3S-UUMNhd=U4_r0VOcyA1TGEgA5rmA@mail.gmail.com>
-Message-ID: <a2e09969-3a67-6947-4dd8-2a153d1f48e7@arm.com>
+From: elder@linaro.org (Alex Elder)
+Date: Wed, 22 Feb 2017 08:36:21 -0600
+Subject: [PATCH v2 1/2] dt-bindings: arm: hisilicon: add bindings for
+ hi3798cv200 SoC and Poplar board
+In-Reply-To: <1487752716-14824-2-git-send-email-xuejiancheng@hisilicon.com>
+References: <1487752716-14824-1-git-send-email-xuejiancheng@hisilicon.com>
+ <1487752716-14824-2-git-send-email-xuejiancheng@hisilicon.com>
+Message-ID: <842d2c57-3ea4-7e43-57a7-ddf69f44eceb@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 22/02/17 13:47, Geert Uytterhoeven wrote:
-> Hi Sudeep,
+On 02/22/2017 02:38 AM, Jiancheng Xue wrote:
+> Add bindings for HiSilicon hi3798cv200 SoC and Poplar Board.
 > 
-> On Tue, Feb 21, 2017 at 6:22 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
 
-[...]
+I reviewed this before; the only change is it's separated
+from the original patch.
 
->>
->> IIUC, it's not implemented today. I can't talk about future ;), but your
+Reviewed-by: Alex Elder <elder@linaro.org>
+
+> ---
+>  Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> Good, so there's no need for the DT property, and drivers/firmware/psci.c
-> should aways call do_cpu_idle() instead of PSCI SYSTEM_SUSPEND if any
-> other wake-up sources are configured?
+> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> index f1c1e21..1fd3dd7 100644
+> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> @@ -4,6 +4,10 @@ Hi3660 SoC
+>  Required root node properties:
+>  	- compatible = "hisilicon,hi3660";
+>  
+> +Hi3798cv200 Poplar Board
+> +Required root node properties:
+> +	- compatible = "hisilicon,hi3798cv200-poplar", "hisilicon,hi3798cv200";
+> +
+>  Hi4511 Board
+>  Required root node properties:
+>  	- compatible = "hisilicon,hi3620-hi4511";
 > 
-
-No.
-
-> That follows the principle of least surprise: it doesn't leave the user with
-> a system that won't wake up the way he configured it to wake up.
-> 
-
-But he can still wake up with the "switch" so there's no surprise. He
-just need to better understand his system before playing with it ;)
-
--- 
-Regards,
-Sudeep
