@@ -1,58 +1,97 @@
-From: steven.lin1@broadcom.com (Steve Lin)
-Date: Wed, 22 Feb 2017 15:42:26 -0500
-Subject: [PATCH 2/2] ARM: dts: NSP: Add mailbox (PDC) to NSP
-In-Reply-To: <1487796146-14690-1-git-send-email-steven.lin1@broadcom.com>
-References: <1487796146-14690-1-git-send-email-steven.lin1@broadcom.com>
-Message-ID: <1487796146-14690-3-git-send-email-steven.lin1@broadcom.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 22 Feb 2017 21:46:35 +0100
+Subject: [RFC] usb: gadget: scheduling while atomic in pxa27x_udc,
+ IS_ERR_OR_NULL test, duplicated definition
+In-Reply-To: <e33b2bdb-f365-28d0-768a-c8e94a7794f9@tul.cz> (Petr Cvek's
+ message of "Wed, 22 Feb 2017 05:44:39 +0100")
+References: <e33b2bdb-f365-28d0-768a-c8e94a7794f9@tul.cz>
+Message-ID: <87mvdex8b8.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds mailbox / PDC to NSP device tree.  Needs new compatibility string
-to differentiate from NS2 version.
+Petr Cvek <petr.cvek@tul.cz> writes:
 
-Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
----
- .../devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt          | 6 ++++--
- arch/arm/boot/dts/bcm-nsp.dtsi                                   | 9 +++++++++
- 2 files changed, 13 insertions(+), 2 deletions(-)
+Hi Petr,
 
-diff --git a/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
-index 411ccf4..0f3ee81 100644
---- a/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
-+++ b/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
-@@ -1,9 +1,11 @@
- The PDC driver manages data transfer to and from various offload engines
- on some Broadcom SoCs. An SoC may have multiple PDC hardware blocks. There is
--one device tree entry per block.
-+one device tree entry per block.  On some chips, the PDC functionality is
-+handled by the FA2 (Northstar Plus).
- 
- Required properties:
--- compatible : Should be "brcm,iproc-pdc-mbox".
-+- compatible : Should be "brcm,iproc-pdc-mbox" or "brcm,iproc-fa2-mbox" for
-+  FA2/Northstar Plus.
- - reg: Should contain PDC registers location and length.
- - interrupts: Should contain the IRQ line for the PDC.
- - #mbox-cells: 1
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index 15f07f9..8b56d74 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -227,6 +227,15 @@
- 			status = "disabled";
- 		};
- 
-+		mailbox: mailbox at 25000 {
-+			compatible = "brcm,iproc-fa2-mbox";
-+			reg = <0x25000 0x445>;
-+			interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
-+			#mbox-cells = <1>;
-+			brcm,rx-status-len = <32>;
-+			brcm,use-bcm-hdr;
-+		};
-+
- 		nand: nand at 26000 {
- 			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
- 			reg = <0x026000 0x600>,
+> I found a few problems with the PXA27x UDC.
+>
+> 	usb_function_activate() in drivers/usb/gadget/composite.c
+>
+> does spin_lock_irqsave() and then calls 
+>
+> 	gadget->ops->pullup() in drivers/usb/gadget/udc/core.c
+>
+> which is set to pxa_udc_pullup(), which should be called not in interrupt
+>
+> 	/**
+> 	 * pxa_udc_pullup - Offer manual D+ pullup control
+> 	 * @_gadget: usb gadget using the control
+> 	 * @is_active: 0 if disconnect, else connect D+ pullup resistor
+> 	 * Context: !in_interrupt()
+> 	 *
+> 	 * Returns 0 if OK, -EOPNOTSUPP if udc driver doesn't handle D+ pullup
+> 	 */
+>
+> This finally causes fail at
+>
+> 	udc_enable() in drivers/usb/gadget/udc/pxa27x_udc.c
+> 	
+> at code
+>
+> 	/*
+> 	 * Caller must be able to sleep in order to cope with startup transients
+> 	 */
+> 	msleep(100);
+>
+> with a following error (with CONFIG_DEBUG_PREEMPT on):
+>
+> 	BUG: scheduling while atomic: v4l_id/360/0x00000002
+>
+> With the msleep changed to mdelay, the code (specified as !in_interrupt()) seems to work fine
+> (after torture reloads). Can the caller (udc core) be changed to be able to
+> sleep?
+
+This question is for Felipe. From the several years back when I wrote this code
+I think it was granted that the pullup() callback was not in interrupt context,
+but Felipe knows better.
+
+> Second bug was discovered by Robert Jarzmik during discussion in
+Please go ahead and submit a patch.
+
+> And as we talking about it, is this return correct?
+I think so.
+
+> 	if (of_have_populated_dt()) {
+> 		udc->transceiver =
+> 			devm_usb_get_phy_by_phandle(udc->dev, "phys", 0);
+>
+> 		if (IS_ERR(udc->transceiver))
+> 			return PTR_ERR(udc->transceiver);
+> 	} else {
+> 		udc->transceiver = usb_get_phy(USB_PHY_TYPE_USB2);
+> 	}
+>
+> One branch returns on error and second one is fine, udc->transceiver then can hold an error,
+> but this is fine for the rest of driver (tested). Question is does it have to return from a first
+> branch (e.g. my device does not have phy)?
+In the devicetree context (first branch), even if you don't have a phy, you'll
+instanciate a "nop" phy, ie. "usb-nop-xceiv". From a hardware perspective, you
+have a phy, it's just that you don't have to do anything from a software
+perspective to activate your phy.
+
+In the platform_data context (second branch), an error is the common path, as
+there is no phy in many old platforms, and pxa27x are old ... hence no check of
+error.
+
+> And finally it seems definitions from drivers/usb/gadget/udc/pxa27x_udc.c are duplicated:
+>
+> 	static void udc_enable(struct pxa_udc *udc);
+> 	static void udc_disable(struct pxa_udc *udc);
+>
+> I will send patch series as soon as we agree on solutions.
+Excellent.
+
+Cheers.
+
 -- 
-2.1.0
+Robert
