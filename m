@@ -1,32 +1,58 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 22 Feb 2017 18:48:09 +0800
-Subject: [PATCH v3 7/8] arm64: dts: mt8173: move clock from phy node
- into port nodes
-In-Reply-To: <d2abde73-91b0-36c3-8b32-d50a9800bd52@cogentembedded.com>
-References: <1487753705-6745-1-git-send-email-chunfeng.yun@mediatek.com>
- <1487753705-6745-7-git-send-email-chunfeng.yun@mediatek.com>
- <d2abde73-91b0-36c3-8b32-d50a9800bd52@cogentembedded.com>
-Message-ID: <1487760489.7255.5.camel@mhfsdcap03>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 22 Feb 2017 11:03:22 +0000
+Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
+ power
+In-Reply-To: <1975396.x0czmkNPOW@aspire.rjw.lan>
+References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+ <94167d3a-e005-3af0-d290-a1086684d570@arm.com>
+ <3c8b3f2d-8604-f999-4208-a82f171b64f2@arm.com>
+ <1975396.x0czmkNPOW@aspire.rjw.lan>
+Message-ID: <35840771-e16f-d6fe-3a89-1b3f51f4a8f3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Wed, 2017-02-22 at 12:36 +0300, Sergei Shtylyov wrote:
-> On 2/22/2017 11:55 AM, Chunfeng Yun wrote:
+
+
+On 22/02/17 01:14, Rafael J. Wysocki wrote:
+> On Tuesday, February 21, 2017 06:45:13 PM Sudeep Holla wrote:
+
+[...]
+
+>>
+>> I take this back, you have everything you need in place, nothing needs
+>> to be done. I just checked again. If I don't register PSCI suspend_ops,
+>> I still get mem in /sys/power/state with s2idle in /sys/power/mem_sleep
+>> which is exactly what we need. Again we don't support standby/shallow
+>> state on ARM64/PSCI.
 > 
-> > there is a reference clock for each port, HighSpeed port is 48M,
-> > and SuperSpeed port is 26M which usually comes from 26M oscillator
-> > directly, but some SoCs is not. it is flexible to move it into port
+> Except for one thing which may or may not be a concern here.
 > 
->     ... but on some SoCs does not?
-I mean the reference clock of SuperSpeed port comes from PLL and need be
-controlled by driver on some SoCs. When it comes from oscillator
-directly, it is optional and is ok whether the driver controll it or not
+> Suspend to idle should only go into states in which all of the available wakeup
+> devices work.  If there are devices that cannot wake you up from a given state,
+> this isn't "idle" any more, is it?
 > 
-> > node.
-> >
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> [...]
+
+True. In this Renasas platform, since the platform doesn't have PSCI
+system suspend, we can only support s2idle and not s2ram. In this case
+we don't ask platform to enter some system state whereas we suspend all
+the devices(leaving wakeup capable devices active) and ask platform to
+enter deepest idle state on all the CPUs. I still don't understand the
+issue Geert is facing.
+
+Geert, so far you have failed to explain what's different from the new
+state you are adding and the existing s2idle.
+
+> As for the device wakeup disable/enable interface, it is for controlling
+> whether or not a given device should be allowed to generate wakeup signals at
+> all.
 > 
-> MBR, Sergei
+> The information on what states a given device can wake up the system from is
+> platform-specific and generally would need to be taken into consideration at
+> the platform level.
 > 
+
+Exactly, that's what I am trying to convince Geert ;)
+
+-- 
+Regards,
+Sudeep
