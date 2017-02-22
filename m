@@ -1,42 +1,83 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 22 Feb 2017 18:31:44 +0100
-Subject: [PATCH 1/3] ARM64: dts: marvell: armada37xx: add address and size
- property for i2c cells
-In-Reply-To: <20170222173146.30993-1-gregory.clement@free-electrons.com>
-References: <20170222173146.30993-1-gregory.clement@free-electrons.com>
-Message-ID: <20170222173146.30993-2-gregory.clement@free-electrons.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 22 Feb 2017 11:41:40 -0600
+Subject: [PATCH 2/2] ARM64: dts: meson-gxl: Add support for HwaCom AmazeTV
+In-Reply-To: <4f0d36ce-8b44-06f1-2dc1-6b681b80a685@suse.de>
+References: <20170212193247.22705-1-carlo@caione.org>
+ <20170212193247.22705-3-carlo@caione.org>
+ <20170222144406.zycqtc77dygavh3q@rob-hp-laptop>
+ <4f0d36ce-8b44-06f1-2dc1-6b681b80a685@suse.de>
+Message-ID: <CAL_JsqJo7QCUrMc-DdbSpy=yxrkjBShcE+mo_ZuatUnwjWKd7Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These property were missing when the nodes were added and their lack
-generate warning messages when adding i2c device in the subnodes.
+On Wed, Feb 22, 2017 at 8:49 AM, Andreas F?rber <afaerber@suse.de> wrote:
+> Am 22.02.2017 um 15:44 schrieb Rob Herring:
+>> On Sun, Feb 12, 2017 at 08:32:47PM +0100, Carlo Caione wrote:
+>>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-hwacom-amazetv.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-hwacom-amazetv.dts
+>>> new file mode 100644
+>>> index 0000000..4499789
+>>> --- /dev/null
+>>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-hwacom-amazetv.dts
+>>> @@ -0,0 +1,201 @@
+>>> +/*
+>>> + * Copyright (c) 2017 Carlo Caione
+>>> + * Copyright (c) 2016 Andreas F?rber
+>
+> You can drop me here, Carlo.
+>
+>>> + * Copyright (c) 2016 BayLibre, Inc.
+>>> + * Author: Neil Armstrong <narmstrong@kernel.org>
+>>> + *
+>>> + * This file is dual-licensed: you can use it either under the terms
+>>> + * of the GPL or the X11 license, at your option. Note that this dual
+>>> + * licensing only applies to this file, and not this project as a
+>>> + * whole.
+>>> + *
+>>> + *  a) This library is free software; you can redistribute it and/or
+>>> + *     modify it under the terms of the GNU General Public License as
+>>> + *     published by the Free Software Foundation; either version 2 of the
+>>> + *     License, or (at your option) any later version.
+>>> + *
+>>> + *     This library is distributed in the hope that it will be useful,
+>>> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + *     GNU General Public License for more details.
+>>> + *
+>>> + * Or, alternatively,
+>>> + *
+>>> + *  b) Permission is hereby granted, free of charge, to any person
+>>> + *     obtaining a copy of this software and associated documentation
+>>> + *     files (the "Software"), to deal in the Software without
+>>> + *     restriction, including without limitation the rights to use,
+>>> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+>>> + *     sell copies of the Software, and to permit persons to whom the
+>>> + *     Software is furnished to do so, subject to the following
+>>> + *     conditions:
+>>> + *
+>>> + *     The above copyright notice and this permission notice shall be
+>>> + *     included in all copies or substantial portions of the Software.
+>>> + *
+>>> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+>>> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+>>> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+>>> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+>>> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+>>> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+>>> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+>>> + *     OTHER DEALINGS IN THE SOFTWARE.
+>>> + */
+>>
+>> I'm going to start asking people to use SPDX tags and you are the first. :)
+>
+> Fine with me, I'll update my in-flight series. But:
+>
+>>
+>> SPDX-License-Identifier: GPL2.0+ OR MIT
+>
+> I'm fairly sure that it's GPL-2.0+ with a dash.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+Oh yes. Just making sure people are paying attention. ;)
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-index b48d668a6ab6..cf0c2f9ebd7d 100644
---- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
-@@ -112,6 +112,8 @@
- 			i2c0: i2c at 11000 {
- 				compatible = "marvell,armada-3700-i2c";
- 				reg = <0x11000 0x24>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				clocks = <&nb_periph_clk 10>;
- 				interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
- 				mrvl,i2c-fast-mode;
-@@ -121,6 +123,8 @@
- 			i2c1: i2c at 11080 {
- 				compatible = "marvell,armada-3700-i2c";
- 				reg = <0x11080 0x24>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				clocks = <&nb_periph_clk 9>;
- 				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
- 				mrvl,i2c-fast-mode;
--- 
-2.11.0
+I think it needs parenthesis around it, too.
+
+Rob
