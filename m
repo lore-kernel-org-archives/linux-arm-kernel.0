@@ -1,154 +1,115 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 22 Feb 2017 11:47:27 +0000
-Subject: [PATCH 7/8] arm64: KVM: pmu: Make illegal accesses seen as
- successfully emulated
-In-Reply-To: <20170222114728.2472-1-marc.zyngier@arm.com>
-References: <20170222114728.2472-1-marc.zyngier@arm.com>
-Message-ID: <20170222114728.2472-8-marc.zyngier@arm.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 22 Feb 2017 12:47:58 +0100
+Subject: [RFC 21/55] KVM: arm64: Forward HVC instruction to the guest
+ hypervisor
+In-Reply-To: <1483943091-1364-22-git-send-email-jintack@cs.columbia.edu>
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+ <1483943091-1364-22-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <20170222114758.GM26976@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can deliver an exception on an illegal PMU access,
-we can stop pretending that they have failed to be emulated.
+On Mon, Jan 09, 2017 at 01:24:17AM -0500, Jintack Lim wrote:
+> Forward exceptions due to hvc instruction to the guest hypervisor.
+> 
+> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> ---
+>  arch/arm64/include/asm/kvm_nested.h |  5 +++++
+>  arch/arm64/kvm/Makefile             |  1 +
+>  arch/arm64/kvm/handle_exit.c        | 11 +++++++++++
+>  arch/arm64/kvm/handle_exit_nested.c | 27 +++++++++++++++++++++++++++
+>  4 files changed, 44 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/kvm_nested.h
+>  create mode 100644 arch/arm64/kvm/handle_exit_nested.c
+> 
+> diff --git a/arch/arm64/include/asm/kvm_nested.h b/arch/arm64/include/asm/kvm_nested.h
+> new file mode 100644
+> index 0000000..620b4d3
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/kvm_nested.h
+> @@ -0,0 +1,5 @@
+> +#ifndef __ARM64_KVM_NESTED_H__
+> +#define __ARM64_KVM_NESTED_H__
+> +
+> +int handle_hvc_nested(struct kvm_vcpu *vcpu);
+> +#endif
+> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+> index b342bdd..9c35e9a 100644
+> --- a/arch/arm64/kvm/Makefile
+> +++ b/arch/arm64/kvm/Makefile
+> @@ -35,4 +35,5 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
+>  kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
+>  
+> +kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += handle_exit_nested.o
+>  kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += emulate-nested.o
+> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> index a891684..208be16 100644
+> --- a/arch/arm64/kvm/handle_exit.c
+> +++ b/arch/arm64/kvm/handle_exit.c
+> @@ -29,6 +29,10 @@
+>  #include <asm/kvm_mmu.h>
+>  #include <asm/kvm_psci.h>
+>  
+> +#ifdef CONFIG_KVM_ARM_NESTED_HYP
+> +#include <asm/kvm_nested.h>
+> +#endif
+> +
+>  #define CREATE_TRACE_POINTS
+>  #include "trace.h"
+>  
+> @@ -42,6 +46,13 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  			    kvm_vcpu_hvc_get_imm(vcpu));
+>  	vcpu->stat.hvc_exit_stat++;
+>  
+> +#ifdef CONFIG_KVM_ARM_NESTED_HYP
+> +	ret = handle_hvc_nested(vcpu);
+> +	if (ret < 0 && ret != -EINVAL)
+> +		return ret;
+> +	else if (ret >= 0)
+> +		return ret;
+> +#endif
+>  	ret = kvm_psci_call(vcpu);
+>  	if (ret < 0) {
+>  		kvm_inject_undefined(vcpu);
+> diff --git a/arch/arm64/kvm/handle_exit_nested.c b/arch/arm64/kvm/handle_exit_nested.c
+> new file mode 100644
+> index 0000000..a6ce23b
+> --- /dev/null
+> +++ b/arch/arm64/kvm/handle_exit_nested.c
+> @@ -0,0 +1,27 @@
+> +/*
+> + * Copyright (C) 2016 - Columbia University
+> + * Author: Jintack Lim <jintack@cs.columbia.edu>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
+> +
+> +#include <asm/kvm_emulate.h>
+> +
+> +/* We forward all hvc instruction to the guest hypervisor. */
+> +int handle_hvc_nested(struct kvm_vcpu *vcpu)
+> +{
+> +	return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
+> +}
 
-We can thus return "true" in all these cases.
+I don't understand the logic here or in the caller above.  Do we really
+forward *all" hvc calls to the guest hypervisor now, so that we no
+longer support any hypercalls from the VM?  That seems a little rough
+and probably requires some more discussions.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/sys_regs.c | 30 +++++++++++++++---------------
- 1 file changed, 15 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 01c8d841851e..44b7a7325229 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -506,7 +506,7 @@ static bool access_pmcr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 		return trap_raz_wi(vcpu, p, r);
- 
- 	if (pmu_access_el0_disabled(vcpu))
--		return false;
-+		return true;
- 
- 	if (p->is_write) {
- 		/* Only update writeable bits of PMCR */
-@@ -532,7 +532,7 @@ static bool access_pmselr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 		return trap_raz_wi(vcpu, p, r);
- 
- 	if (pmu_access_event_counter_el0_disabled(vcpu))
--		return false;
-+		return true;
- 
- 	if (p->is_write)
- 		vcpu_sys_reg(vcpu, PMSELR_EL0) = p->regval;
-@@ -555,7 +555,7 @@ static bool access_pmceid(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	BUG_ON(p->is_write);
- 
- 	if (pmu_access_el0_disabled(vcpu))
--		return false;
-+		return true;
- 
- 	if (!(p->Op2 & 1))
- 		pmceid = read_sysreg(pmceid0_el0);
-@@ -594,14 +594,14 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
- 		if (r->Op2 == 2) {
- 			/* PMXEVCNTR_EL0 */
- 			if (pmu_access_event_counter_el0_disabled(vcpu))
--				return false;
-+				return true;
- 
- 			idx = vcpu_sys_reg(vcpu, PMSELR_EL0)
- 			      & ARMV8_PMU_COUNTER_MASK;
- 		} else if (r->Op2 == 0) {
- 			/* PMCCNTR_EL0 */
- 			if (pmu_access_cycle_counter_el0_disabled(vcpu))
--				return false;
-+				return true;
- 
- 			idx = ARMV8_PMU_CYCLE_IDX;
- 		} else {
-@@ -610,13 +610,13 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
- 	} else if (r->CRn == 0 && r->CRm == 9) {
- 		/* PMCCNTR */
- 		if (pmu_access_event_counter_el0_disabled(vcpu))
--			return false;
-+			return true;
- 
- 		idx = ARMV8_PMU_CYCLE_IDX;
- 	} else if (r->CRn == 14 && (r->CRm & 12) == 8) {
- 		/* PMEVCNTRn_EL0 */
- 		if (pmu_access_event_counter_el0_disabled(vcpu))
--			return false;
-+			return true;
- 
- 		idx = ((r->CRm & 3) << 3) | (r->Op2 & 7);
- 	} else {
-@@ -624,11 +624,11 @@ static bool access_pmu_evcntr(struct kvm_vcpu *vcpu,
- 	}
- 
- 	if (!pmu_counter_idx_valid(vcpu, idx))
--		return false;
-+		return true;
- 
- 	if (p->is_write) {
- 		if (pmu_access_el0_disabled(vcpu))
--			return false;
-+			return true;
- 
- 		kvm_pmu_set_counter_value(vcpu, idx, p->regval);
- 	} else {
-@@ -647,7 +647,7 @@ static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 		return trap_raz_wi(vcpu, p, r);
- 
- 	if (pmu_access_el0_disabled(vcpu))
--		return false;
-+		return true;
- 
- 	if (r->CRn == 9 && r->CRm == 13 && r->Op2 == 1) {
- 		/* PMXEVTYPER_EL0 */
-@@ -665,7 +665,7 @@ static bool access_pmu_evtyper(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	}
- 
- 	if (!pmu_counter_idx_valid(vcpu, idx))
--		return false;
-+		return true;
- 
- 	if (p->is_write) {
- 		kvm_pmu_set_counter_event_type(vcpu, p->regval, idx);
-@@ -686,7 +686,7 @@ static bool access_pmcnten(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 		return trap_raz_wi(vcpu, p, r);
- 
- 	if (pmu_access_el0_disabled(vcpu))
--		return false;
-+		return true;
- 
- 	mask = kvm_pmu_valid_counter_mask(vcpu);
- 	if (p->is_write) {
-@@ -745,7 +745,7 @@ static bool access_pmovs(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 		return trap_raz_wi(vcpu, p, r);
- 
- 	if (pmu_access_el0_disabled(vcpu))
--		return false;
-+		return true;
- 
- 	if (p->is_write) {
- 		if (r->CRm & 0x2)
-@@ -770,7 +770,7 @@ static bool access_pmswinc(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 		return trap_raz_wi(vcpu, p, r);
- 
- 	if (pmu_write_swinc_el0_disabled(vcpu))
--		return false;
-+		return true;
- 
- 	if (p->is_write) {
- 		mask = kvm_pmu_valid_counter_mask(vcpu);
-@@ -779,7 +779,7 @@ static bool access_pmswinc(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	}
- 
- 	pend_undef(vcpu);
--	return false;
-+	return true;
- }
- 
- static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
--- 
-2.11.0
+Thanks,
+-Christoffer
