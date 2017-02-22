@@ -1,18 +1,29 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 22 Feb 2017 08:13:00 +0530
-Subject: [PATCH] dmaengine: stm32-dma: fix up error dev_err message
-In-Reply-To: <20170221183046.27560-1-colin.king@canonical.com>
-References: <20170221183046.27560-1-colin.king@canonical.com>
-Message-ID: <20170222024259.GW2843@localhost>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 21 Feb 2017 19:43:21 -0700
+Subject: [PATCH] MAINTAINERS: remove swarren from bcm2835
+Message-ID: <1487731401-4362-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2017 at 06:30:45PM +0000, Colin King wrote:
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> Trivial fix to spelling mistake and make channel plural.
+I haven't been active in BCM2835 maintenance for quite a while; Eric's
+been doing a great job. As such, remove myself from MAINTAINERS for that.
 
-Applied, thanks
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+---
+ MAINTAINERS | 1 -
+ 1 file changed, 1 deletion(-)
 
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 277c2e2062bd..87bbd3744238 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2648,7 +2648,6 @@ N:	kona
+ F:	arch/arm/mach-bcm/
+ 
+ BROADCOM BCM2835 ARM ARCHITECTURE
+-M:	Stephen Warren <swarren@wwwdotorg.org>
+ M:	Lee Jones <lee@kernel.org>
+ M:	Eric Anholt <eric@anholt.net>
+ L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
 -- 
-~Vinod
+2.7.4
