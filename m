@@ -1,103 +1,133 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 22 Feb 2017 14:38:03 +0100
-Subject: [RFC 35/55] KVM: arm/arm64: Support mmu for the virtual EL2
- execution
-In-Reply-To: <1483943091-1364-36-git-send-email-jintack@cs.columbia.edu>
-References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
- <1483943091-1364-36-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <20170222133803.GU26976@cbox>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 22 Feb 2017 14:38:59 +0100
+Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
+ power
+In-Reply-To: <35840771-e16f-d6fe-3a89-1b3f51f4a8f3@arm.com>
+References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+ <94167d3a-e005-3af0-d290-a1086684d570@arm.com>
+ <3c8b3f2d-8604-f999-4208-a82f171b64f2@arm.com>
+ <1975396.x0czmkNPOW@aspire.rjw.lan>
+ <35840771-e16f-d6fe-3a89-1b3f51f4a8f3@arm.com>
+Message-ID: <CAMuHMdXpKrJn9NrkAarvMtytk9gHEFcRoZLCsWBFgriUCeWo=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 01:24:31AM -0500, Jintack Lim wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> When running a guest hypervisor in virtual EL2, the translation context
-> has to be separate from the rest of the system, including the guest
-> EL1/0 translation regime, so we allocate a separate VMID for this mode.
-> 
-> Considering that we have two different vttbr values due to separate
-> VMIDs, it's racy to keep a vttbr value in a struct (kvm_s2_mmu) and
-> share it between multiple vcpus. So, keep the vttbr value per vcpu.
-> 
-> Hypercalls to flush tlb now have vttbr as a parameter instead of mmu,
-> since mmu structure does not have vttbr any more.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-> ---
->  arch/arm/include/asm/kvm_asm.h       |  6 ++--
->  arch/arm/include/asm/kvm_emulate.h   |  4 +++
->  arch/arm/include/asm/kvm_host.h      | 14 ++++++---
->  arch/arm/include/asm/kvm_mmu.h       | 11 +++++++
->  arch/arm/kvm/arm.c                   | 60 +++++++++++++++++++-----------------
->  arch/arm/kvm/hyp/switch.c            |  4 +--
->  arch/arm/kvm/hyp/tlb.c               | 15 ++++-----
->  arch/arm/kvm/mmu.c                   |  9 ++++--
->  arch/arm64/include/asm/kvm_asm.h     |  6 ++--
->  arch/arm64/include/asm/kvm_emulate.h |  8 +++++
->  arch/arm64/include/asm/kvm_host.h    | 14 ++++++---
->  arch/arm64/include/asm/kvm_mmu.h     | 11 +++++++
->  arch/arm64/kvm/hyp/switch.c          |  4 +--
->  arch/arm64/kvm/hyp/tlb.c             | 16 ++++------
->  14 files changed, 112 insertions(+), 70 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> index 36e3856..aa214f7 100644
-> --- a/arch/arm/include/asm/kvm_asm.h
-> +++ b/arch/arm/include/asm/kvm_asm.h
-> @@ -65,9 +65,9 @@
->  extern char __kvm_hyp_vector[];
->  
->  extern void __kvm_flush_vm_context(void);
-> -extern void __kvm_tlb_flush_vmid_ipa(struct kvm_s2_mmu *mmu, phys_addr_t ipa);
-> -extern void __kvm_tlb_flush_vmid(struct kvm_s2_mmu *mmu);
-> -extern void __kvm_tlb_flush_local_vmid(struct kvm_s2_mmu *mmu);
-> +extern void __kvm_tlb_flush_vmid_ipa(u64 vttbr, phys_addr_t ipa);
-> +extern void __kvm_tlb_flush_vmid(u64 vttbr);
-> +extern void __kvm_tlb_flush_local_vmid(u64 vttbr);
->  
->  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
->  
-> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> index 05d5906..6285f4f 100644
-> --- a/arch/arm/include/asm/kvm_emulate.h
-> +++ b/arch/arm/include/asm/kvm_emulate.h
-> @@ -305,4 +305,8 @@ static inline unsigned long vcpu_data_host_to_guest(struct kvm_vcpu *vcpu,
->  	}
->  }
->  
-> +static inline struct kvm_s2_vmid *vcpu_get_active_vmid(struct kvm_vcpu *vcpu)
-> +{
-> +	return &vcpu->kvm->arch.mmu.vmid;
-> +}
->  #endif /* __ARM_KVM_EMULATE_H__ */
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index f84a59c..da45394 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -53,16 +53,18 @@
->  int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
->  void kvm_reset_coprocs(struct kvm_vcpu *vcpu);
->  
-> -struct kvm_s2_mmu {
-> +struct kvm_s2_vmid {
->  	/* The VMID generation used for the virt. memory system */
->  	u64    vmid_gen;
->  	u32    vmid;
-> +};
-> +
-> +struct kvm_s2_mmu {
-> +	struct kvm_s2_vmid vmid;
-> +	struct kvm_s2_vmid el2_vmid;
+Hi Sudeep,
 
-So this is subtle:  We use struct kvm_s2_mmu for the stage-2 context
-used for the L1 VM, and for the L2 VM as well, right?  But only in the
-first case can the el2_vmid have any valid meaning, and it's simply
-ignored in other contexts.
+On Wed, Feb 22, 2017 at 12:03 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On 22/02/17 01:14, Rafael J. Wysocki wrote:
+>> On Tuesday, February 21, 2017 06:45:13 PM Sudeep Holla wrote:
+>
+> [...]
+>
+>>> I take this back, you have everything you need in place, nothing needs
+>>> to be done. I just checked again. If I don't register PSCI suspend_ops,
+>>> I still get mem in /sys/power/state with s2idle in /sys/power/mem_sleep
+>>> which is exactly what we need. Again we don't support standby/shallow
+>>> state on ARM64/PSCI.
+>>
+>> Except for one thing which may or may not be a concern here.
+>>
+>> Suspend to idle should only go into states in which all of the available wakeup
+>> devices work.  If there are devices that cannot wake you up from a given state,
+>> this isn't "idle" any more, is it?
+>>
+>
+> True. In this Renasas platform, since the platform doesn't have PSCI
+> system suspend, we can only support s2idle and not s2ram. In this case
 
-Not sure if we can improve on this data structure design, but we could
-at least add a comment on this somewhere.
+Not correct: this Renesas platform does have PSCI system suspend.
+So s2ram "works" (it suspends the system, which can be resumed by a switch)
 
-Thanks,
--Christoffer
+> we don't ask platform to enter some system state whereas we suspend all
+> the devices(leaving wakeup capable devices active) and ask platform to
+> enter deepest idle state on all the CPUs. I still don't understand the
+> issue Geert is facing.
+
+PSCI system suspend does not support wake-up sources configured from Linux.
+Hence I cannot use PSCI system suspend if any wake-up sources have been
+configured from Linux, and I expect to be able to use them for wake-up.
+
+> Geert, so far you have failed to explain what's different from the new
+> state you are adding and the existing s2idle.
+
+I did explain, cfr.:
+  1. The power consumption figures in the cover letter:
+      - shallow:    8.4 W   6.2 W   (secondary CPU cores off)
+  2. The description for patch 3/6:
+        As secondary CPU cores are taken offline, "shallow" suspend mode saves
+        slightly more power than "s2idle", but less than "deep" suspend mode.
+        However, unlike "deep" suspend mode, "shallow" suspend mode can be used
+        regardless of the presence of support for PSCI_SYSTEM_SUSPEND, which is
+        an optional API in PSCI v1.0.
+
+>> As for the device wakeup disable/enable interface, it is for controlling
+>> whether or not a given device should be allowed to generate wakeup signals at
+>> all.
+>>
+>> The information on what states a given device can wake up the system from is
+>> platform-specific and generally would need to be taken into consideration at
+>> the platform level.
+>
+> Exactly, that's what I am trying to convince Geert ;)
+
+So, how does the communication of wake-up sources happens between PSCI
+and Linux?
+
+Perhaps, I didn't make myself clear. Let's summarize:
+  1. On Renesas R-Car Gen3 platforms, PSCI SYSTEM_SUSPEND is implemented,
+  2. On these platforms, PSCI SYSTEM_SUSPEND powers down the SoC, and supports
+     wake-up from PMIC only,
+  3. If the user wants to use a different wake-up source, these other
+wake-up sources fail
+     to wake up the system from PSCI SYSTEM_SUSPEND.,
+  4. Patch 3/6 adds a new "shallow" state, as it allows to save more
+power (the difference
+     may be due to suboptimal cpuidle platform support on R-Car Gen3, though),
+  5. Patch 4/6 makes the system use the new "shallow" state iff
+       a. the user has configured other wake-up sources, and
+       b. DT advertises that PSCI will power down the SoC on SYSTEM_SUSPEND,
+     hence other wake-up sources now work as expected.
+
+(If you're so against implementing the "shallow" state, it's a red herring,
+ and that patch can be dropped.  Patch 4/6 can be trivially modified, as
+ all it does is call cpu_do_idle() instead).
+
+E.g. on non-PSCI platforms with an Ethernet driver that supports
+Wake-on-LAN, I can do:
+
+        ethtool -s eth0 wol g
+        echo mem > /sys/power/state
+
+and be sure that the system can be woken up by sending a WoL MagicPacket.
+
+On PSCI systems, the above may work, or may not work. And there's no way to
+find out (in an automated way) whether it will work or not.
+
+If it doesn't work, the user has to configure his system (manually) to
+not use "mem" state.
+Since v4.10-rc1, that can be done using e.g.
+
+    echo s2idle > /sys/power/mem_sleep
+
+and my patches make that automatic (for a new "shallow" state instead
+of "s2idle", though).
+
+So all of this is a usability issue, and a nightmare for userspace
+that wants to treat
+different platforms in a generic way (e.g. for distros).
+
+I hope this time it's clear what I want to achieve, and how.
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
