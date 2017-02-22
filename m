@@ -1,37 +1,161 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Thu, 23 Feb 2017 08:26:19 +0900
-Subject: [BUGFIX PATCH V2 0/3] kprobes/arm: Improve kprobes
- implementation on arm
-In-Reply-To: <1487779129.18810.10.camel@linaro.org>
-References: <148711844284.5814.10387227824715177703.stgit@devbox>
- <1487329270.3113.5.camel@linaro.org>
- <20170218064352.b1685bbd17c0189b1937ce3b@kernel.org>
- <1487779129.18810.10.camel@linaro.org>
-Message-ID: <20170223082619.b36fca9c6a91d48d6e8e2235@kernel.org>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Wed, 22 Feb 2017 18:29:11 -0500
+Subject: [PATCH 1/1] ARM: dts: BCM953012HR: Initial Checkin
+In-Reply-To: <1487798092-8631-1-git-send-email-steven.lin1@broadcom.com>
+References: <1487798092-8631-1-git-send-email-steven.lin1@broadcom.com>
+Message-ID: <CAC3K-4osnSkbOid_nABySEtioJkAbho+H_hmJcXeLmjB6KYxFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Feb 2017 15:58:49 +0000
-"Jon Medhurst (Tixy)" <tixy@linaro.org> wrote:
+On Wed, Feb 22, 2017 at 4:14 PM, Steve Lin <steven.lin1@broadcom.com> wrote:
+> Initial version of DTS to support Broadcom BCM953012HR Northstar
+> HR platform, similar to, but not the same as existing 953012K.
+>
+> Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
 
-> On Sat, 2017-02-18 at 06:43 +0900, Masami Hiramatsu wrote:
-> > On Fri, 17 Feb 2017 11:01:10 +0000
-> > "Jon Medhurst (Tixy)" <tixy@linaro.org> wrote:
-> [...]
-> > > Meantime
-> > > I'll investigate the kprobes test failures I see (which actually looks
-> > > like cache/TLB issues and not test code problems after all).
-> > 
-> > OK, btw, I couldn't reproduce the kprobes test failure with
-> > CONFIG_DEBUG_RODATA=y on qemu...
-> 
-> That's because it's a problem with caches which qemu doesn't emulate.
-> I worked out the cause and posted a patch...
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/489517.html
+Looks good to me!
 
-OK, I see.
+Acked-by: Jon Mason <jon.mason@broadcom.com>
 
-Thanks! 
-
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
+> ---
+>  arch/arm/boot/dts/Makefile        |   1 +
+>  arch/arm/boot/dts/bcm953012hr.dts | 115 ++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 116 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/bcm953012hr.dts
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 01d178a..c64ca3d 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -94,6 +94,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>         bcm94708.dtb \
+>         bcm94709.dtb \
+>         bcm953012er.dtb \
+> +       bcm953012hr.dtb \
+>         bcm953012k.dtb
+>  dtb-$(CONFIG_ARCH_BCM_53573) += \
+>         bcm47189-tenda-ac9.dtb
+> diff --git a/arch/arm/boot/dts/bcm953012hr.dts b/arch/arm/boot/dts/bcm953012hr.dts
+> new file mode 100644
+> index 0000000..c332277
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm953012hr.dts
+> @@ -0,0 +1,115 @@
+> +/*
+> + *  BSD LICENSE
+> + *
+> + *  Copyright(c) 2017 Broadcom
+> + *
+> + *  Redistribution and use in source and binary forms, with or without
+> + *  modification, are permitted provided that the following conditions
+> + *  are met:
+> + *
+> + *    * Redistributions of source code must retain the above copyright
+> + *      notice, this list of conditions and the following disclaimer.
+> + *    * Redistributions in binary form must reproduce the above copyright
+> + *      notice, this list of conditions and the following disclaimer in
+> + *      the documentation and/or other materials provided with the
+> + *      distribution.
+> + *    * Neither the name of Broadcom nor the names of its contributors
+> + *      may be used to endorse or promote products derived from this
+> + *      software without specific prior written permission.
+> + *
+> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "bcm4708.dtsi"
+> +
+> +/ {
+> +       model = "NorthStar HR (BCM953012HR)";
+> +       compatible = "brcm,bcm953012hr", "brcm,brcm53012", "brcm,bcm4708";
+> +
+> +       aliases {
+> +               serial0 = &uart0;
+> +       };
+> +
+> +       chosen {
+> +               stdout-path = "serial0:115200n8";
+> +       };
+> +
+> +       memory {
+> +               reg = <0x80000000 0x10000000>;
+> +       };
+> +};
+> +
+> +&uart0 {
+> +       status = "okay";
+> +};
+> +
+> +&nand {
+> +       nandcs at 0 {
+> +               compatible = "brcm,nandcs";
+> +               reg = <0>;
+> +               nand-on-flash-bbt;
+> +
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +
+> +               nand-ecc-strength = <4>;
+> +               nand-ecc-step-size = <512>;
+> +
+> +               partition at 0 {
+> +                       label = "nboot";
+> +                       reg = <0x00000000 0x00200000>;
+> +                       read-only;
+> +               };
+> +               partition at 200000 {
+> +                       label = "nenv";
+> +                       reg = <0x00200000 0x00400000>;
+> +               };
+> +               partition at 600000 {
+> +                       label = "nsystem";
+> +                       reg = <0x00600000 0x00a00000>;
+> +               };
+> +               partition at 1000000 {
+> +                       label = "nrootfs";
+> +                       reg = <0x01000000 0x07000000>;
+> +               };
+> +       };
+> +};
+> +
+> +&spi_nor {
+> +       status = "okay";
+> +       spi-max-frequency = <62500000>;
+> +       m25p,default-addr-width = <3>;
+> +
+> +       #address-cells = <1>;
+> +       #size-cells = <1>;
+> +
+> +       partition at 0 {
+> +               label = "boot";
+> +               reg = <0x00000000 0x000d0000>;
+> +       };
+> +       partition at d000 {
+> +               label = "env";
+> +               reg = <0x000d0000 0x00030000>;
+> +       };
+> +       partition at 100000 {
+> +               label = "system";
+> +               reg = <0x00100000 0x00600000>;
+> +       };
+> +       partition at 700000 {
+> +               label = "rootfs";
+> +               reg = <0x00700000 0x00900000>;
+> +       };
+> +};
+> +
+> --
+> 2.1.0
+>
