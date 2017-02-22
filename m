@@ -1,40 +1,39 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed, 22 Feb 2017 03:29:25 +0100
-Subject: [PATCH v2 5/8] ARM64: Prepare Marvell IAP140 aka PXA1908
+Date: Wed, 22 Feb 2017 03:29:26 +0100
+Subject: [PATCH v2 6/8] Documentation: devicetree: arm: marvell: Document
+ IAP140
 In-Reply-To: <20170222022929.10540-1-afaerber@suse.de>
 References: <20170222022929.10540-1-afaerber@suse.de>
-Message-ID: <20170222022929.10540-6-afaerber@suse.de>
+Message-ID: <20170222022929.10540-7-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Make ARCH_MMP available on arm64, too.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
  v1 -> v2:
- * Switched from ARCH_PXA to ARCH_MMP - obsoletes clk and mmp Kconfig changes
- * Split off serial Kconfig cleanup
+ * Adopted "marvell" vendor prefix (Thomas)
+ * Documented Andromeda Box Edge as example
  
- arch/arm64/Kconfig.platforms | 7 +++++++
- 1 file changed, 7 insertions(+)
+ Documentation/devicetree/bindings/arm/marvell/iap140.txt | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell/iap140.txt
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 129cc5a..c3ae8bc 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -111,6 +111,13 @@ config ARCH_MVEBU
- 	   - Armada 7K SoC Family
- 	   - Armada 8K SoC Family
- 
-+config ARCH_MMP
-+	bool "Marvell MMP SoC Family"
-+	select PINCTRL
-+	select PINCTRL_SINGLE
-+	help
-+	  This enables support for the Marvell MMP family.
+diff --git a/Documentation/devicetree/bindings/arm/marvell/iap140.txt b/Documentation/devicetree/bindings/arm/marvell/iap140.txt
+new file mode 100644
+index 0000000..37c6d92
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/marvell/iap140.txt
+@@ -0,0 +1,11 @@
++Marvell IAP140 Device Tree Bindings
++-----------------------------------
 +
- config ARCH_QCOM
- 	bool "Qualcomm Platforms"
- 	select GPIOLIB
++Boards using a SoC of the Marvell IAP140 family must carry the following
++root node property:
++
++ - compatible :  must contain "marvell,iap140"
++
++Example:
++
++    compatible = "marvell,andromeda-box-edge", "marvell,iap140";
 -- 
 2.10.2
