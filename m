@@ -1,49 +1,87 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Feb 2017 01:12:42 +0000
-Subject: [PATCH V10 07/10] efi: print unrecognized CPER section
-In-Reply-To: <58AC9093.5020303@arm.com>
-References: <1487188282-2568-1-git-send-email-tbaicar@codeaurora.org>
- <1487188282-2568-8-git-send-email-tbaicar@codeaurora.org>
- <58AC9093.5020303@arm.com>
-Message-ID: <20170222011241.GX21222@n2100.armlinux.org.uk>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 22 Feb 2017 02:14:54 +0100
+Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
+ power
+In-Reply-To: <3c8b3f2d-8604-f999-4208-a82f171b64f2@arm.com>
+References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+ <94167d3a-e005-3af0-d290-a1086684d570@arm.com>
+ <3c8b3f2d-8604-f999-4208-a82f171b64f2@arm.com>
+Message-ID: <1975396.x0czmkNPOW@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2017 at 07:10:11PM +0000, James Morse wrote:
-> Hi Tyler,
+On Tuesday, February 21, 2017 06:45:13 PM Sudeep Holla wrote:
 > 
-> On 15/02/17 19:51, Tyler Baicar wrote:
-> > +	} else {
-> > +		const void *unknown_err;
-> > +
-> > +		unknown_err = acpi_hest_generic_data_payload(gdata);
-> > +		printk("%ssection type: %pUl\n", newpfx, sec_type);
-> > +		printk("%ssection length: %d\n", newpfx,
+> On 21/02/17 18:27, Sudeep Holla wrote:
+> > 
+> > 
+> > On 21/02/17 17:51, Sudeep Holla wrote:
+> >>
+> >>
+> >> On 21/02/17 17:34, Geert Uytterhoeven wrote:
+> > 
+> > [...]
+> > 
+> >>>
+> >>> The SoC can wake-up. It's just not guaranteed that it can wake-up using
+> >>> the wakeup-source configured from Linux. Which wakeup-sources are available
+> >>> depends on the actual PSCI implementation.  It's not specified by the PSCI
+> >>> specification.
+> >>>
+> >>>> Just botching whatever shallow state you can enter on a particular SoC
+> >>>> into standard "mem" state sounds *horrible* to me.
+> >>>
+> >>> That's more or less what /sys/power/mem_sleep does, though.
+> >>>
+> >>
+> >> OK, I will go through that in detail.
+> >>
+> > 
+> > OK, I went through the patch and the main intention is was added.
+> > So I will begin by summarizing my understanding:
+> > 
+> > A new suspend interface(/sys/power/mem_sleep) is added to allow the
+> > "mem" string in /sys/power/state to represent multiple things that can
+> > be selected.
+> > 
+> > Before:
+> > A. echo freeze > /sys/power/state ---> Enters s2idle
+> > B. echo mem > /sys/power/state ---> Enters s2r(a.k.a now deep mem sleep)
+> > 
+> > After:
+> > 1. echo freeze > /sys/power/state ---> Enters s2idle still same
+> > 2. echo s2idle > /sys/power/mem_sleep
+> >    echo mem > /sys/power/state ---> Also enter s2idle
+> > 3. echo deep > /sys/power/mem_sleep
+> >    echo mem > /sys/power/state ---> Also enter s2r(same as [B] above)
+> > 
+> > Please note I have carefully dropped standby/shallow as we will not
+> > support that state on ARM64 platforms(refer previous discussions for the
+> > same)
+> > 
+> > Now IIUC, you need 2 above. So, since this new interface allow mem to
+> > mean "s2idle", we need to fix the core to register default suspend_ops
+> > to achieve what you need. 
 > 
-> Nit: please use the "%s""section... that this file consistently uses. This means
-> this code will still work as expected when someone adds '%ss' support to printk!
+> I take this back, you have everything you need in place, nothing needs
+> to be done. I just checked again. If I don't register PSCI suspend_ops,
+> I still get mem in /sys/power/state with s2idle in /sys/power/mem_sleep
+> which is exactly what we need. Again we don't support standby/shallow
+> state on ARM64/PSCI.
 
-No.  That is wrong:
+Except for one thing which may or may not be a concern here.
 
-"%s""section" is stored in memory as bytes containing:
+Suspend to idle should only go into states in which all of the available wakeup
+devices work.  If there are devices that cannot wake you up from a given state,
+this isn't "idle" any more, is it?
 
-'%' 's' 's' 'e' 'c' 't' 'i' 'o' 'n'
+As for the device wakeup disable/enable interface, it is for controlling
+whether or not a given device should be allowed to generate wakeup signals at
+all.
 
-whereas "%ssection" is stored in memory as bytes containing:
+The information on what states a given device can wake up the system from is
+platform-specific and generally would need to be taken into consideration at
+the platform level.
 
-'%' 's' 's' 'e' 'c' 't' 'i' 'o' 'n'
-
-They're exactly the same, so when printk() comes to parse the string, it
-sees exactly the same byte sequence.  So, the only thing that's happening
-is code obfuscation for no good reason what so ever.
-
-If you don't believe me, run some build tests and look at the resulting
-strings... also look at the C standard.  "Adjacent string literal tokens
-are concatenated."
-
-Please get rid of this obfuscation.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Rafael
