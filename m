@@ -1,99 +1,73 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Wed, 22 Feb 2017 14:43:46 +0100
-Subject: [PATCH v2 2/3] media: dt-bindings: vpif: extend the example with an
- output port
-In-Reply-To: <1487771027-7763-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1487771027-7763-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1487771027-7763-3-git-send-email-bgolaszewski@baylibre.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 22 Feb 2017 14:47:39 +0100
+Subject: [PATCH/RFC 3/6] drivers: firmware: psci: Implement shallow
+ suspend mode
+In-Reply-To: <3caf0f3f-76e5-cb1e-7c0f-87ed5e1c2b86@arm.com>
+References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+ <1487622809-25127-4-git-send-email-geert+renesas@glider.be>
+ <20170221110712.GB5021@amd> <de2a15d4-9ac2-9ba9-a47a-eacbf478f601@arm.com>
+ <CAMuHMdVmu4AYZ6MZHd79N2-2gELR6s3oZ46UnEszCfLvHymY1w@mail.gmail.com>
+ <3caf0f3f-76e5-cb1e-7c0f-87ed5e1c2b86@arm.com>
+Message-ID: <CAMuHMdU0fTtEXN9k477e3S-UUMNhd=U4_r0VOcyA1TGEgA5rmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This makes the example more or less correspond with the da850-evm
-hardware setup.
+Hi Sudeep,
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- .../devicetree/bindings/media/ti,da850-vpif.txt    | 40 +++++++++++++++++-----
- 1 file changed, 32 insertions(+), 8 deletions(-)
+On Tue, Feb 21, 2017 at 6:22 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On 21/02/17 16:32, Geert Uytterhoeven wrote:
+>> On Tue, Feb 21, 2017 at 12:14 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>> On 21/02/17 11:07, Pavel Machek wrote:
+>>>>> Enable support for "shallow" suspend mode, also known as "Standby" or
+>>>>> "Power-On Suspend".
+>>>>>
+>>>>> As secondary CPU cores are taken offline, "shallow" suspend mode saves
+>>>>> slightly more power than "s2idle", but less than "deep" suspend mode.
+>>>>> However, unlike "deep" suspend mode, "shallow" suspend mode can be used
+>>>>> regardless of the presence of support for PSCI_SYSTEM_SUSPEND, which is
+>>>>> an optional API in PSCI v1.0.
+>>>>
+>>>> If system supports "shallow" suspend, why does not PSCI implement it?
+>>>
+>>> Yes it can, and IIUC it already does on this platform with CPU_SUSPEND.
+>>> All it now needs is just to use existing "freeze" suspend mode in Linux.
+>>
+>> How can Linux know if using "deep" suspend will allow to wake-up the system
+>> according to configured wake-up sources, or not?
+>
+> I am not sure if we have such selective configuration of wakeup source
+> implemented in Linux.
+>
+> ACPI specification has some provisions where each device can state if it
+> can specify device state in each system sleeping state that can wake the
+> system.
+>
+> DT has no mechanism today to express this relations. I had brought up
+> this discussion in plumbers(2015). Refer slide 7 in [0]
+>
+> And the way you are trying to do that is not correct IMO especially
+> making it just PSCI specific.
+>
+>> Note that "it will not, ever" is an accepted answer.
+>
+> IIUC, it's not implemented today. I can't talk about future ;), but your
 
-diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
-index 9c7510b..df7182a 100644
---- a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
-+++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
-@@ -16,8 +16,10 @@ Required properties:
- Video Capture:
- 
- VPIF has a 16-bit parallel bus input, supporting 2 8-bit channels or a
--single 16-bit channel.  It should contain at least one port child node
--with child 'endpoint' node. Please refer to the bindings defined in
-+single 16-bit channel. It should contain one or two port child nodes
-+with child 'endpoint' node. If there are two ports then port at 0 must
-+describe the input and port at 1 output channels. Please refer to the
-+bindings defined in
- Documentation/devicetree/bindings/media/video-interfaces.txt.
- 
- Example using 2 8-bit input channels, one of which is connected to an
-@@ -28,19 +30,26 @@ I2C-connected TVP5147 decoder:
- 		reg = <0x217000 0x1000>;
- 		interrupts = <92>;
- 
--		port {
--			vpif_ch0: endpoint at 0 {
-+		port at 0 {
-+			vpif_input_ch0: endpoint at 0 {
- 				reg = <0>;
- 				bus-width = <8>;
--				remote-endpoint = <&composite>;
-+				remote-endpoint = <&composite_in>;
- 			};
- 
--			vpif_ch1: endpoint at 1 {
-+			vpif_input_ch1: endpoint at 1 {
- 				reg = <1>;
- 				bus-width = <8>;
- 				data-shift = <8>;
- 			};
- 		};
-+
-+		port at 1 {
-+			vpif_output_ch0: endpoint {
-+				bus-width = <8>;
-+				remote-endpoint = <&composite_out>;
-+			};
-+		};
- 	};
- 
- [ ... ]
-@@ -53,13 +62,28 @@ I2C-connected TVP5147 decoder:
- 		status = "okay";
- 
- 		port {
--			composite: endpoint {
-+			composite_in: endpoint {
- 				hsync-active = <1>;
- 				vsync-active = <1>;
- 				pclk-sample = <0>;
- 
- 				/* VPIF channel 0 (lower 8-bits) */
--				remote-endpoint = <&vpif_ch0>;
-+				remote-endpoint = <&vpif_input_ch0>;
-+				bus-width = <8>;
-+			};
-+		};
-+	};
-+
-+	adv7343 at 2a {
-+		compatible = "adi,adv7343";
-+		reg = <0x2a>;
-+
-+		port {
-+			composite_out: endpoint {
-+				adi,dac-enable = <1 1 1>;
-+				adi,sd-dac-enable = <1>;
-+
-+				remote-endpoint = <&vpif_output_ch0>;
- 				bus-width = <8>;
- 			};
- 		};
--- 
-2.9.3
+Good, so there's no need for the DT property, and drivers/firmware/psci.c
+should aways call do_cpu_idle() instead of PSCI SYSTEM_SUSPEND if any
+other wake-up sources are configured?
+
+That follows the principle of least surprise: it doesn't leave the user with
+a system that won't wake up the way he configured it to wake up.
+
+> proposal is horrible hack.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
