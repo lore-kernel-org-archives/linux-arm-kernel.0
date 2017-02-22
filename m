@@ -1,37 +1,42 @@
-From: steven.lin1@broadcom.com (Steve Lin)
-Date: Wed, 22 Feb 2017 16:22:23 -0500
-Subject: [PATCH 1/1] ARM: dts: NSP: Add crypto (SPU) to dtsi
-Message-ID: <1487798543-34229-1-git-send-email-steven.lin1@broadcom.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 22 Feb 2017 15:25:28 -0600
+Subject: [PATCH v3 01/18] dt-bindings: power: battery: add
+ constant-charge-current property
+In-Reply-To: <20170214094112.27426-2-quentin.schulz@free-electrons.com>
+References: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
+ <20170214094112.27426-2-quentin.schulz@free-electrons.com>
+Message-ID: <20170222212528.vo7fbayactwfzgao@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds crypto hardware (SPU) to Northstar Plus device tree file.
+On Tue, Feb 14, 2017 at 10:40:55AM +0100, Quentin Schulz wrote:
+> This adds the constant-charge-current property to the list of optional
+> properties of the battery.
+> 
+> The constant charge current is critical for batteries as they can't
+> handle all charge currents.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+> 
+> added in v3
+> 
+>  Documentation/devicetree/bindings/power/supply/battery.txt | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/power/supply/battery.txt b/Documentation/devicetree/bindings/power/supply/battery.txt
+> index d78a4aa..3e830fe 100644
+> --- a/Documentation/devicetree/bindings/power/supply/battery.txt
+> +++ b/Documentation/devicetree/bindings/power/supply/battery.txt
+> @@ -7,6 +7,7 @@ Optional Properties:
+>   - voltage-min-design-microvolt: drained battery voltage
+>   - energy-full-design-microwatt-hours: battery design energy
+>   - charge-full-design-microamp-hours: battery design capacity
+> + - constant-charge-current-microamp: battery constant charge current
 
-Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
+Kind of long, though so are the others. Maybe just 
+"constant-charge-microamp" as uA implies current.
 
----
-Code changes for this addition were submitted previously by Rob
-Rice: https://git.kernel.org/cgit/linux/kernel/git/herbert/cryptodev-2.6.git/commit/?id=9d12ba86f818aa9cfe9f01b750336aa441f2ffa2
----
- arch/arm/boot/dts/bcm-nsp.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Otherwise,
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index b6142bd..9bac0c8 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -241,6 +241,12 @@
- 			brcm,nand-has-wp;
- 		};
- 
-+		crypto at 2f000 {
-+			compatible = "brcm,spum-nsp-crypto";
-+			reg = <0x2f000 0x900>;
-+			mboxes = <&mailbox 0>;
-+		};
-+
- 		gpiob: gpio at 30000 {
- 			compatible = "brcm,iproc-nsp-gpio", "brcm,iproc-gpio";
- 			reg = <0x30000 0x50>;
--- 
-2.1.0
+Acked-by: Rob Herring <robh@kernel.org>
