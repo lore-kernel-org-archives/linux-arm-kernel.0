@@ -1,21 +1,17 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 22 Feb 2017 10:53:26 -0600
-Subject: [PATCH v3 1/3] binding: irqchip: mtk-cirq: Add binding document
-In-Reply-To: <1487040961-18319-2-git-send-email-youlin.pei@mediatek.com>
-References: <1487040961-18319-1-git-send-email-youlin.pei@mediatek.com>
- <1487040961-18319-2-git-send-email-youlin.pei@mediatek.com>
-Message-ID: <20170222165326.upw5ptpbqbsqrbnj@rob-hp-laptop>
+Date: Wed, 22 Feb 2017 10:54:10 -0600
+Subject: [PATCH 1/4] Documentation: devicetree: Add vendor prefix for Zidoo
+In-Reply-To: <20170214033440.18667-2-afaerber@suse.de>
+References: <20170214033440.18667-1-afaerber@suse.de>
+ <20170214033440.18667-2-afaerber@suse.de>
+Message-ID: <20170222165409.64sw22qrvnpffv63@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2017 at 10:55:59AM +0800, Youlin Pei wrote:
-> This commit adds the device tree binding document for
-> the mediatek cirq.
-> 
-> Signed-off-by: Youlin Pei <youlin.pei@mediatek.com>
+On Tue, Feb 14, 2017 at 04:34:36AM +0100, Andreas F?rber wrote:
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
->  .../interrupt-controller/mediatek,cirq.txt         |   35 ++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/mediatek,cirq.txt
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
