@@ -1,171 +1,217 @@
-From: thibault.saunier@osg.samsung.com (Thibault Saunier)
-Date: Wed, 22 Feb 2017 15:57:34 -0300
-Subject: [PATCH v5 1/3] [media] exynos-gsc: Use user configured colorspace
- if provided
-In-Reply-To: <02a38e14-052b-faf2-a7a1-ef2f968f6d35@xs4all.nl>
-References: <20170221192059.29745-1-thibault.saunier@osg.samsung.com>
- <20170221192059.29745-2-thibault.saunier@osg.samsung.com>
- <329a892b-eb57-26a5-d048-cfe4efc331b6@xs4all.nl>
- <58ee4eb5-981d-175f-52a9-445bbc265af0@osg.samsung.com>
- <02a38e14-052b-faf2-a7a1-ef2f968f6d35@xs4all.nl>
-Message-ID: <4fc7b224-b167-51f0-e60b-c4dff35a8986@osg.samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 22 Feb 2017 11:09:52 -0800
+Subject: [PATCH 2/8] clk: sunxi-ng: add support for DE2 CCU
+In-Reply-To: <20170222151854.3280-3-icenowy@aosc.xyz>
+References: <20170222151854.3280-1-icenowy@aosc.xyz>
+ <20170222151854.3280-3-icenowy@aosc.xyz>
+Message-ID: <20170222190952.2tfbtqotbi2bwd3f@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 02/22/2017 03:06 PM, Hans Verkuil wrote:
->
-> On 02/22/2017 05:05 AM, Thibault Saunier wrote:
->> Hello,
->>
->>
->> On 02/21/2017 11:19 PM, Hans Verkuil wrote:
->>> On 02/21/2017 11:20 AM, Thibault Saunier wrote:
->>>> Use colorspace provided by the user as we are only doing scaling and
->>>> color encoding conversion, we won't be able to transform the colorspace
->>>> itself and the colorspace won't mater in that operation.
->>>>
->>>> Also always use output colorspace on the capture side.
->>>>
->>>> Start using 576p as a threashold to compute the colorspace.
->>>> The media documentation says that the V4L2_COLORSPACE_SMPTE170M colorspace
->>>> should be used for SDTV and V4L2_COLORSPACE_REC709 for HDTV. But drivers
->>>> don't agree on the display resolution that should be used as a threshold.
->>>>
->>>>   From EIA CEA 861B about colorimetry for various resolutions:
->>>>
->>>>     - 5.1 480p, 480i, 576p, 576i, 240p, and 288p
->>>>       The color space used by the 480-line, 576-line, 240-line, and 288-line
->>>>       formats will likely be based on SMPTE 170M [1].
->>>>     - 5.2 1080i, 1080p, and 720p
->>>>       The color space used by the high definition formats will likely be
->>>>       based on ITU-R BT.709-4
->>>>
->>>> This indicates that in the case that userspace does not specify what
->>>> colorspace should be used, we should use 576p  as a threshold to set
->>>> V4L2_COLORSPACE_REC709 instead of V4L2_COLORSPACE_SMPTE170M. Even if it is
->>>> only 'likely' and not a requirement it is the best guess we can make.
->>>>
->>>> The stream should have been encoded with the information and userspace
->>>> has to pass it to the driver if it is not the case, otherwise we won't be
->>>> able to handle it properly anyhow.
->>>>
->>>> Also, check for the resolution in G_FMT instead unconditionally setting
->>>> the V4L2_COLORSPACE_REC709 colorspace.
->>>>
->>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>>> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
->>>> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
->>>>
->>>> ---
->>>>
->>>> Changes in v5:
->>>> - Squash commit to always use output colorspace on the capture side
->>>>     inside this one
->>>> - Fix typo in commit message
->>>>
->>>> Changes in v4:
->>>> - Reword commit message to better back our assumptions on specifications
->>>>
->>>> Changes in v3:
->>>> - Do not check values in the g_fmt functions as Andrzej explained in previous review
->>>> - Added 'Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>'
->>>>
->>>> Changes in v2: None
->>>>
->>>>    drivers/media/platform/exynos-gsc/gsc-core.c | 20 +++++++++++++++-----
->>>>    drivers/media/platform/exynos-gsc/gsc-core.h |  1 +
->>>>    2 files changed, 16 insertions(+), 5 deletions(-)
->>>>
->>>> diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
->>>> index 59a634201830..772599de8c13 100644
->>>> --- a/drivers/media/platform/exynos-gsc/gsc-core.c
->>>> +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
->>>> @@ -454,6 +454,7 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
->>>>        } else {
->>>>            min_w = variant->pix_min->target_rot_dis_w;
->>>>            min_h = variant->pix_min->target_rot_dis_h;
->>>> +        pix_mp->colorspace = ctx->out_colorspace;
->>>>        }
->>>>          pr_debug("mod_x: %d, mod_y: %d, max_w: %d, max_h = %d",
->>>> @@ -472,10 +473,15 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
->>>>          pix_mp->num_planes = fmt->num_planes;
->>>>    -    if (pix_mp->width >= 1280) /* HD */
->>>> -        pix_mp->colorspace = V4L2_COLORSPACE_REC709;
->>>> -    else /* SD */
->>>> -        pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
->>>> +    if (pix_mp->colorspace == V4L2_COLORSPACE_DEFAULT) {
->>>> +        if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
->>> I'd use || instead of && here. Ditto for the next patch.
->>>
->>>> +            pix_mp->colorspace = V4L2_COLORSPACE_REC709;
->>>> +        else /* SD */
->>>> +            pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
->>>> +    }
->>> Are you sure this is in fact how it is used? If the source of the video
->>> is the sensor (camera), then the colorspace is typically SRGB. I'm not
->>> really sure you should guess here. All a mem2mem driver should do is to
->>> pass the colorspace etc. information from the output to the capture side,
->>> and not invent things. That simply makes no sense.
->> This is not a camera device but a colorspace conversion device, in many
-> Not really, this is a color encoding conversion device. I.e. it only affects
-> the Y'CbCr encoding and quantization range. The colorspace (aka chromaticities)
-> and transfer function remain unchanged.
+On Wed, Feb 22, 2017 at 11:18:48PM +0800, Icenowy Zheng wrote:
+> +config SUNXI_DE2_CCU
+> +	bool "Support for the Allwinner SoCs DE2 CCU"
+> +	select SUNXI_CCU_DIV
+> +	select SUNXI_CCU_GATE
+> +	default n
 
-Well, right, sorry I am talking in GStreamer terminlogy where what you call
-colorspace is called colorimetry, and colorspace is what I am talking 
-about here.
+This is already the default.
 
-> In fact, I suspect (correct me if I am wrong) that it only converts between
-> RGB, Y'CbCr 601 and Y'CbCr 709 encodings, where RGB is full range and the Y'CbCr
-> formats are limited range.
-That sounds correct.
+> +
+>  endif
+> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+> index 6feaac0c5600..1d36c40384a6 100644
+> --- a/drivers/clk/sunxi-ng/Makefile
+> +++ b/drivers/clk/sunxi-ng/Makefile
+> @@ -28,3 +28,4 @@ obj-$(CONFIG_SUN8I_V3S_CCU)	+= ccu-sun8i-v3s.o
+>  obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80.o
+>  obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80-de.o
+>  obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80-usb.o
+> +obj-$(CONFIG_SUNXI_DE2_CCU)	+= ccu-sunxi-de2.o
 
-> If you pass in limited range RGB it will probably do the wrong thing as I don't
-> seen any quantization checks in the code.
->
-> So the colorspace and xfer_func fields remain unchanged by this driver.
->
-> If you want to do this really correctly, then you need to do more. I don't have
-> time right now to go into this in-depth, but I will try to get back to this on
-> Monday. I am thinking of documenting this as part of the V4L2 colorspace
-> documentation. This stuff is complex and if you don't know the rules then it
-> can be hard to implement correctly.
+sun8i-de2 please
 
-Here I am just making sure that we set the colorspace (v4l2 terminology)
-if the case the user is passing DEFAULT (meaning he does not know what
-it should be and lets the driver set it, this will happen in the case 
-where the
-information was not contain in the source, which means the value has to be
-guessed, and here I am simply doing an educated guess relying on what the
-previously named standard suggests.
+> diff --git a/drivers/clk/sunxi-ng/ccu-sunxi-de2.c b/drivers/clk/sunxi-ng/ccu-sunxi-de2.c
+> new file mode 100644
+> index 000000000000..4259c145d5da
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu-sunxi-de2.c
+> @@ -0,0 +1,204 @@
+> +/*
+> + * Copyright (c) 2016 Chen-Yu Tsai. All rights reserved.
 
-I would be happy to read more information about that subject and will
-try to fix remaining suggested points once I have a better understanding
-of the whole concepts and problems in that driver, but I still think 
-that this
-patch is correct for what it is aiming at fixing.
+Wrong author?
 
-Regards,
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reset.h>
+> +
+> +#include "ccu_common.h"
+> +#include "ccu_div.h"
+> +#include "ccu_gate.h"
+> +#include "ccu_reset.h"
+> +
+> +#include "ccu-sunxi-de2.h"
+> +
+> +static SUNXI_CCU_GATE(bus_mixer0_clk,	"bus-mixer0",	"bus-de",
+> +		      0x04, BIT(0), 0);
+> +static SUNXI_CCU_GATE(bus_mixer1_clk,	"bus-mixer1",	"bus-de",
+> +		      0x04, BIT(1), 0);
+> +static SUNXI_CCU_GATE(bus_wb_clk,	"bus-wb",	"bus-de",
+> +		      0x04, BIT(2), 0);
+> +
+> +static SUNXI_CCU_GATE(mixer0_clk,	"mixer0",	"mixer0-div",
+> +		      0x00, BIT(0), CLK_SET_RATE_PARENT);
+> +static SUNXI_CCU_GATE(mixer1_clk,	"mixer1",	"mixer1-div",
+> +		      0x00, BIT(1), CLK_SET_RATE_PARENT);
+> +static SUNXI_CCU_GATE(wb_clk,		"wb",		"wb-div",
+> +		      0x00, BIT(2), CLK_SET_RATE_PARENT);
+> +
+> +static SUNXI_CCU_M(mixer0_div_clk, "mixer0-div", "de", 0x0c, 0, 4,
+> +		   CLK_SET_RATE_PARENT);
+> +static SUNXI_CCU_M(mixer1_div_clk, "mixer1-div", "de", 0x0c, 4, 4,
+> +		   CLK_SET_RATE_PARENT);
+> +static SUNXI_CCU_M(wb_div_clk, "wb-div", "de", 0x0c, 8, 4,
+> +		   CLK_SET_RATE_PARENT);
+> +
+> +static struct ccu_common *sunxi_de2_clks[] = {
+> +	&mixer0_clk.common,
+> +	&mixer1_clk.common,
+> +	&wb_clk.common,
+> +
+> +	&bus_mixer0_clk.common,
+> +	&bus_mixer1_clk.common,
+> +	&bus_wb_clk.common,
+> +
+> +	&mixer0_div_clk.common,
+> +	&mixer1_div_clk.common,
+> +	&wb_div_clk.common,
+> +};
+> +
+> +static struct clk_hw_onecell_data sunxi_de2_hw_clks = {
+> +	.hws	= {
+> +		[CLK_MIXER0]		= &mixer0_clk.common.hw,
+> +		[CLK_MIXER1]		= &mixer1_clk.common.hw,
+> +		[CLK_WB]		= &wb_clk.common.hw,
+> +
+> +		[CLK_BUS_MIXER0]	= &bus_mixer0_clk.common.hw,
+> +		[CLK_BUS_MIXER1]	= &bus_mixer1_clk.common.hw,
+> +		[CLK_BUS_WB]		= &bus_wb_clk.common.hw,
+> +
+> +		[CLK_MIXER0_DIV]	= &mixer1_div_clk.common.hw,
+> +		[CLK_MIXER1_DIV]	= &mixer0_div_clk.common.hw,
+> +		[CLK_WB_DIV]		= &wb_div_clk.common.hw,
+> +	},
+> +	.num	= CLK_NUMBER,
+> +};
+> +
+> +static struct ccu_reset_map sun8i_a83t_de2_resets[] = {
+> +	[RST_MIXER0]	= { 0x08, BIT(0) },
+> +	/*
+> +	 * For A83T, H3 and R40, mixer1 reset line is shared with wb, so
+> +	 * only RST_WB is exported here.
+> +	 */
+> +	[RST_WB]	= { 0x08, BIT(2) },
+> +};
+> +
+> +static struct ccu_reset_map sun50i_a64_de2_resets[] = {
+> +	[RST_MIXER0]	= { 0x08, BIT(0) },
+> +	[RST_MIXER1]	= { 0x08, BIT(1) },
+> +	[RST_WB]	= { 0x08, BIT(2) },
+> +};
+> +
+> +static const struct sunxi_ccu_desc sun8i_a83t_de2_clk_desc = {
+> +	.ccu_clks	= sunxi_de2_clks,
+> +	.num_ccu_clks	= ARRAY_SIZE(sunxi_de2_clks),
+> +
+> +	.hw_clks	= &sunxi_de2_hw_clks,
+> +
+> +	.resets		= sun8i_a83t_de2_resets,
+> +	.num_resets	= ARRAY_SIZE(sun8i_a83t_de2_resets),
+> +};
+> +
+> +static const struct sunxi_ccu_desc sun50i_a64_de2_clk_desc = {
+> +	.ccu_clks	= sunxi_de2_clks,
+> +	.num_ccu_clks	= ARRAY_SIZE(sunxi_de2_clks),
+> +
+> +	.hw_clks	= &sunxi_de2_hw_clks,
+> +
+> +	.resets		= sun50i_a64_de2_resets,
+> +	.num_resets	= ARRAY_SIZE(sun50i_a64_de2_resets),
+> +};
+> +
+> +static int sunxi_de2_clk_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +	struct clk *bus_clk;
+> +	struct reset_control *rstc;
+> +	void __iomem *reg;
+> +	const struct sunxi_ccu_desc *ccu_desc;
+> +	int ret;
+> +
+> +	ccu_desc = of_device_get_match_data(&pdev->dev);
+> +	if (!ccu_desc)
+> +		return -EINVAL;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	reg = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(reg))
+> +		return PTR_ERR(reg);
+> +
+> +	bus_clk = devm_clk_get(&pdev->dev, "bus");
+> +	if (IS_ERR(bus_clk)) {
+> +		ret = PTR_ERR(bus_clk);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(&pdev->dev, "Couldn't get bus clk: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	rstc = devm_reset_control_get_exclusive(&pdev->dev, NULL);
+> +	if (IS_ERR(rstc)) {
+> +		ret = PTR_ERR(bus_clk);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(&pdev->dev,
+> +				"Couldn't get reset control: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	/* The bus clock needs to be enabled for us to access the registers */
+> +	ret = clk_prepare_enable(bus_clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Couldn't enable bus clk: %d\n", ret);
+> +		return ret;
+> +	}
 
-Thibault Saunier
+That looks inefficient if none of the clocks are enabled. Maybe you
+can use CLK_OPS_PARENT_ENABLE?
 
->> cases the info will not be passed by the userspace, basically because the info
->> is not encoded in the media stream (this often happens). I am not inventing here,
->> just making sure we use the most likely value in case none was provided (and if none
->> was provided it should always be correct given that the encoded stream was not broken).
->>
->> In the case the source is a camera and then we use the colorspace converter then the info
->> should copied from the camera to the transcoding node (by userspace) so there should be
->> no problem.
->>
->> What I am doing here is what is done in other drivers.
-> Most (all?) other mem2mem drivers do not do color encoding conversion, they just copy
-> all the colorspace info from output to capture.
->
-> If there are other m2m drivers that do this, then I doubt they do the right thing.
-> They are probably right for most cases, but not all.
->
-> Regards,
->
-> 	Hans
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170222/f064153a/attachment.sig>
