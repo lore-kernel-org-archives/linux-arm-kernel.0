@@ -1,56 +1,48 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 22 Feb 2017 10:29:27 +0100
-Subject: [PATCH v5 3/3] [media] s5p-mfc: Check and set
- 'v4l2_pix_format:field' field in try_fmt
-In-Reply-To: <20170221192059.29745-4-thibault.saunier@osg.samsung.com>
-References: <20170221192059.29745-1-thibault.saunier@osg.samsung.com>
- <CGME20170221192135epcas4p1811fa9ce35481d42144bdab368c9243a@epcas4p1.samsung.com>
- <20170221192059.29745-4-thibault.saunier@osg.samsung.com>
-Message-ID: <78444dcd-169f-0c16-0e09-6b71d1a502b2@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 22 Feb 2017 09:29:50 +0000
+Subject: [PATCH 2/2] arch_timer: acpi: add hisi timer erratum data
+In-Reply-To: <F2063470-F18A-4521-AABE-29E35D44CFE5@suse.de>
+References: <1485254391-51551-1-git-send-email-guohanjun@huawei.com>
+ <1485254391-51551-3-git-send-email-guohanjun@huawei.com>
+ <20170124105717.GB6277@leverpostej>
+ <a2ac2a70-09fb-5cec-c090-b8ebde90e24f@arm.com> <589D6776.2010400@huawei.com>
+ <6c3a2952-731b-dfae-ba22-f9d7df25d691@arm.com> <58AC2AEF.1030803@huawei.com>
+ <874lzn602f.fsf@on-the-bus.cambridge.arm.com>
+ <F2063470-F18A-4521-AABE-29E35D44CFE5@suse.de>
+Message-ID: <ff440d6e-fcec-fdbd-24c9-ea0485fc4192@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.02.2017 20:20, Thibault Saunier wrote:
-> It is required by the standard that the field order is set by the
-> driver.
->
-> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
->
-> ---
->
-> Changes in v5:
-> - Just adapt the field and never error out.
->
-> Changes in v4: None
-> Changes in v3:
-> - Do not check values in the g_fmt functions as Andrzej explained in previous review
->
-> Changes in v2:
-> - Fix a silly build error that slipped in while rebasing the patches
->
->  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> index 0976c3e0a5ce..44ed2afe0780 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> @@ -386,6 +386,9 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
->  	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
->  	struct s5p_mfc_fmt *fmt;
->  
-> +	if (f->fmt.pix.field == V4L2_FIELD_ANY)
-> +		f->fmt.pix.field = V4L2_FIELD_NONE;
-> +
+On 22/02/17 04:08, Alexander Graf wrote:
 
-In previous version the only supported field type was NONE, here you
-support everything.
-If the only supported format is none you should set 'field'
-unconditionally to NONE, nothing more.
+[irrelevant stuff]
 
-Regards
-Andrzej
+> Thanks for handling this quickly :).
+> 
+> One thing I can't get my head around yet is VM propagation of these
+> erratas. For the dt property based approach, I can at least see how
+> someone adds that property into the guest dt when running on broken
+> hosts.
+> 
+> But how would that work when the erratum matching happens based on
+> the OEM identifier? Would a VM suddenly have to have HiSilicon as
+> OEM? Or would we forbid kvm usage altogether on those CPUs?
 
->  	mfc_debug(2, "Type is %d\n", f->type);
->  	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
->  		fmt = find_format(f, MFC_FMT_DEC);
+s/CPU/SoC/
+
+Simple: you only use DT as a guest, because it is the only firmware
+interface that allows you to reliably describe an arbitrary erratum.
+ACPI is too inflexible for that. Injecting bits of the host's ACPI
+tables in the guest doesn't strike me as a reliable solution, as you're
+not describing the erratum itself. I imagine you 'd have some userspace
+tool to dump the host ACPI table, match it against a list of known
+errata, and inject the corresponding property into the guest's DT.
+
+Furthermore, I don't see any reason to actively prevent KVM from running
+on any system. If we did, we'd start with the RPi...
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
