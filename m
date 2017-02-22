@@ -1,69 +1,52 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Feb 2017 11:30:09 +0100
-Subject: linux-next build regressions, Re: next build: 208 builds: 2 failed,
- 206 passed, 39 warnings (next-20170222)
-In-Reply-To: <58ad2e38.0d57190a.e5f64.04d6@mx.google.com>
-References: <58ad2e38.0d57190a.e5f64.04d6@mx.google.com>
-Message-ID: <2483588.cUC69WWsNF@wuerfel>
+Date: Wed, 22 Feb 2017 11:33:27 +0100
+Subject: [PATCH, RESEND] usb: gadget: udc: atmel: fix debug output
+Message-ID: <20170222103348.3947633-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, February 21, 2017 10:22:48 PM CET kernelci. org bot wrote:
-> next build: 208 builds: 2 failed, 206 passed, 39 warnings (next-20170222)
+The debug output now contains the wrong variable, as seen from the compiler
+warning:
 
->From last week's 9, four patches got merged into linux-next, two new
-ones came in (drm/sti), three have pending patches and two are waiting
-for me to come up with a proper solution.
+drivers/usb/gadget/udc/atmel_usba_udc.c: In function 'usba_ep_enable':
+drivers/usb/gadget/udc/atmel_usba_udc.c:632:550: error: 'ept_cfg' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+  DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
 
-> --------------------------------------------------------------------------------
-> allmodconfig (arm) ? PASS, 0 errors, 9 warnings, 0 section mismatches
-> 
-> Warnings:
->     drivers/gpu/drm/sti/sti_vtg.c:392:22: warning: unused variable 'np' [-Wunused-variable]
->     drivers/gpu/drm/sti/sti_drv.c:120:13: warning: 'sti_drm_dbg_cleanup' defined but not used [-Wunused-function]
+This changes the debug output the same way as the other code.
 
-I sent two patches for these yesterday, and Vincent also sent these
-already, 
+Fixes: 741d2558bf0a ("usb: gadget: udc: atmel: Update endpoint allocation scheme")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+---
+Originally sent on Feb 1, but this was never picked up. Resending it now,
+as it is one of the few remaining build regressions in linux-next compared
+to linux-4.10.
 
->     drivers/iio/adc/rcar-gyroadc.c:429:27: warning: 'num_channels' may be used uninitialized in this function [-Wmaybe-uninitialized]
->     drivers/iio/adc/rcar-gyroadc.c:426:22: warning: 'sample_width' may be used uninitialized in this function [-Wmaybe-uninitialized]
->     drivers/iio/adc/rcar-gyroadc.c:428:23: warning: 'channels' may be used uninitialized in this function [-Wmaybe-uninitialized]
->     drivers/iio/adc/rcar-gyroadc.c:398:26: warning: 'adcmode' may be used uninitialized in this function [-Wmaybe-uninitialized]
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-An old one, Jonathan Cameron said he'd send this one for 4.11-rc2,
-but it has not appeared in linux-next yet.
-
-Jonathan, any update?
-
->     drivers/media/platform/coda/imx-vdoa.c:333:181: warning: passing argument 1 of '__platform_driver_register' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
->     drivers/media/platform/coda/imx-vdoa.c:333:625: warning: passing argument 1 of 'platform_driver_unregister' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
-
-Hans Verkuil said he'd take care of this if he remembers.
-
->     drivers/usb/gadget/udc/atmel_usba_udc.c:632:550: warning: 'ept_cfg' may be used uninitialized in this function [-Wmaybe-uninitialized]
-
-Sent a patch on 2017-02-01. No reply since last update, resending now.
-
-> --------------------------------------------------------------------------------
-> cavium_octeon_defconfig (mips) ? PASS, 0 errors, 1 warning, 0 section mismatches
-> 
-> Warnings:
->     drivers/staging/octeon/ethernet-rx.c:339:28: warning: unused variable 'priv' [-Wunused-variable]
-
-I sent a patch on 2017-02-17, no reply yet.
-
-> --------------------------------------------------------------------------------
-> defconfig+CONFIG_KASAN=y (x86) ? PASS, 0 errors, 5 warnings, 0 section mismatches
-> 
-> Warnings:
->     net/wireless/nl80211.c:1415:1: warning: the frame size of 2232 bytes is larger than 2048 bytes [-Wframe-larger-than=]
->     net/wireless/nl80211.c:4443:1: warning: the frame size of 2232 bytes is larger than 2048 bytes [-Wframe-larger-than=]
->     net/wireless/nl80211.c:5743:1: warning: the frame size of 2064 bytes is larger than 2048 bytes [-Wframe-larger-than=]
->     net/wireless/nl80211.c:1904:1: warning: the frame size of 3784 bytes is larger than 2048 bytes [-Wframe-larger-than=]
->     drivers/tty/vt/keyboard.c:1470:1: warning: the frame size of 2344 bytes is larger than 2048 bytes [-Wframe-larger-than=]
-
-I have patches, but it's tricky. Expect a long set of patches in the next
-few days. Unlike the others, this is not a regression compared to 4.9, but
-a long-standing issue.
-
-	Arnd
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 11bbce28bc23..2035906b8ced 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -610,7 +610,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
+ {
+ 	struct usba_ep *ep = to_usba_ep(_ep);
+ 	struct usba_udc *udc = ep->udc;
+-	unsigned long flags, ept_cfg, maxpacket;
++	unsigned long flags, maxpacket;
+ 	unsigned int nr_trans;
+ 
+ 	DBG(DBG_GADGET, "%s: ep_enable: desc=%p\n", ep->ep.name, desc);
+@@ -630,7 +630,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
+ 	ep->is_in = 0;
+ 
+ 	DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
+-			ep->ep.name, ept_cfg, maxpacket);
++			ep->ep.name, ep->ept_cfg, maxpacket);
+ 
+ 	if (usb_endpoint_dir_in(desc)) {
+ 		ep->is_in = 1;
+-- 
+2.9.0
