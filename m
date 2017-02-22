@@ -1,54 +1,70 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 22 Feb 2017 09:17:50 -0600
-Subject: [RFC v2 2/7] IIO: Add bindings for simple sigma delta adc
-In-Reply-To: <1487003909-11710-3-git-send-email-arnaud.pouliquen@st.com>
-References: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
- <1487003909-11710-3-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <20170222151750.h5d7gycltwnk7b4t@rob-hp-laptop>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Wed, 22 Feb 2017 23:18:46 +0800
+Subject: [PATCH 0/8] Initial Allwinner Display Engine 2.0 Support
+Message-ID: <20170222151854.3280-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2017 at 05:38:24PM +0100, Arnaud Pouliquen wrote:
-> Add documentation of device tree bindings to support
-> sigma delta modulator in IIO framework.
-> 
-> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> ---
->  Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt b/Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt
-> new file mode 100644
-> index 0000000..2b3968a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt
-> @@ -0,0 +1,13 @@
-> +Device-Tree bindings for simple sigma delta adc
+This patchset is the initial patchset for Allwinner DE2 support.
 
-What makes it "simple"?
+It contains the support of clocks in DE2 and the mixers in DE2.
 
-> +
-> +Required properties:
-> +- compatible: should be "sd-modulator".
-> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
-> +
-> +Example node:
-> +
-> +	ads1202: simple_sd_adc at 0 {
+The SoC used to develop this patchset is V3s, as V3s is the simplest
+one of the SoCs that have DE2.
+(Allwinner V3s features only one mixer, although its clock control
+unit contains support for second mixer's clock; and its only video
+output is RGB LCD, which is already supported in our TCON driver)
 
-Is ads1202 the actual chip? Then it should be in the compatible list.
+The last patch is only a testing patch, it shouldn't be merged; and
+for the patch to be really usable, the RFC fix of the TCON driver [1]
+is needed.
 
-unit address without a reg prop is an error. The node name should be 
-"adc".
+No HDMI, TV encoder or other internal bridges' support is included
+in this patchset, which makes it currently not usable on H3.
 
-> +		compatible = "sd-modulator";
-> +		#io-channel-cells = <1>;
-> +		status = "okay";
+Thanks to Jean-Francois Moine and Jernej Skrabec for their efforts
+to discover the internal of DE2!
 
-Drop status from examples.
+[1] https://lists.freedesktop.org/archives/dri-devel/2016-December/126264.html
 
-> +	};
-> -- 
-> 1.9.1
-> 
+Icenowy Zheng (8):
+  dt-bindings: add binding for the Allwinner DE2 CCU
+  clk: sunxi-ng: add support for DE2 CCU
+  dt-bindings: add bindings for DE2 on V3s SoC
+  drm/sun4i: add support for sun8i DE2 mixers and display engines
+  drm/sun4i: tcon: add support for V3s TCON
+  ARM: dts: sun8i: add DE2 nodes for V3s SoC
+  ARM: dts: sun8i: add pinmux for LCD pins of V3s SoC
+  [DO NOT MERGE] ARM: dts: sun8i: enable LCD panel of Lichee Pi Zero
+
+ .../devicetree/bindings/clock/sunxi-de2.txt        |  31 ++
+ .../bindings/display/sunxi/sun4i-drm.txt           |  37 +-
+ arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts      |  36 ++
+ arch/arm/boot/dts/sun8i-v3s.dtsi                   |  96 +++++
+ drivers/clk/sunxi-ng/Kconfig                       |   6 +
+ drivers/clk/sunxi-ng/Makefile                      |   1 +
+ drivers/clk/sunxi-ng/ccu-sunxi-de2.c               | 204 ++++++++++
+ drivers/clk/sunxi-ng/ccu-sunxi-de2.h               |  28 ++
+ drivers/gpu/drm/sun4i/Kconfig                      |   8 +
+ drivers/gpu/drm/sun4i/Makefile                     |   1 +
+ drivers/gpu/drm/sun4i/sun4i_crtc.c                 |   6 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.c                  |  41 +-
+ drivers/gpu/drm/sun4i/sun4i_drv.h                  |   1 +
+ drivers/gpu/drm/sun4i/sun4i_layer.c                |  92 ++++-
+ drivers/gpu/drm/sun4i/sun4i_layer.h                |   1 +
+ drivers/gpu/drm/sun4i/sun4i_tcon.c                 |   5 +
+ drivers/gpu/drm/sun4i/sun8i_mixer.c                | 417 +++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun8i_mixer.h                | 133 +++++++
+ include/dt-bindings/clock/sunxi-de2.h              |  54 +++
+ include/dt-bindings/reset/sunxi-de2.h              |  50 +++
+ 20 files changed, 1220 insertions(+), 28 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/sunxi-de2.txt
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sunxi-de2.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sunxi-de2.h
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_mixer.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_mixer.h
+ create mode 100644 include/dt-bindings/clock/sunxi-de2.h
+ create mode 100644 include/dt-bindings/reset/sunxi-de2.h
+
+-- 
+2.11.1
