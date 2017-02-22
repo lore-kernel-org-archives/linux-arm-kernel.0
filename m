@@ -1,88 +1,65 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 22 Feb 2017 12:41:32 +0100
-Subject: [RFC 18/55] KVM: arm64: Forward traps due to HCR_EL2.NV1 bit to
- the guest hypervisor
-In-Reply-To: <1483943091-1364-19-git-send-email-jintack@cs.columbia.edu>
-References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
- <1483943091-1364-19-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <20170222114132.GL26976@cbox>
+From: bp@suse.de (Borislav Petkov)
+Date: Wed, 22 Feb 2017 12:43:42 +0100
+Subject: [PATCH V2] arm64: kconfig: allow support for memory failure
+ handling
+In-Reply-To: <4367727.rNzyOA836A@aspire.rjw.lan>
+References: <1487720723-14871-1-git-send-email-tbaicar@codeaurora.org>
+ <4367727.rNzyOA836A@aspire.rjw.lan>
+Message-ID: <20170222114342.tz5wmnynwjos44fd@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 01:24:14AM -0500, Jintack Lim wrote:
-> Forward ELR_EL1, SPSR_EL1 and VBAR_EL1 traps to the guest hypervisor if
-> it has set the NV1 bit to the virtual HCR_EL2. The guest hypervisor
-> would set this NV1 bit to run a hypervisor in its VM (i.e. another level
-> of nested hypervisor).
+On Wed, Feb 22, 2017 at 01:53:54AM +0100, Rafael J. Wysocki wrote:
+> [+ Boris]
+> 
+> On Tuesday, February 21, 2017 04:45:23 PM Tyler Baicar wrote:
+> > From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
+> > 
+> > If ACPI_APEI and MEMORY_FAILURE is configured, select
+> > ACPI_APEI_MEMORY_FAILURE. This enables memory failure recovery
+> > when such memory failure is reported through ACPI APEI. APEI
+> > (ACPI Platform Error Interfaces) provides a means for the
+> > platform to convey error information to the kernel.
+> > 
+> > Declare ARCH_SUPPORTS_MEMORY_FAILURE, as arm64 does support
+> > memory failure recovery attempt.
+> > 
+> > Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> > Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> > ---
+> >  arch/arm64/Kconfig        | 1 +
+> >  drivers/acpi/apei/Kconfig | 1 +
+> >  2 files changed, 2 insertions(+)
+> > 
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index 1117421..61e0bb0 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -15,6 +15,7 @@ config ARM64
+> >  	select ARCH_HAS_SG_CHAIN
+> >  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+> >  	select ARCH_USE_CMPXCHG_LOCKREF
+> > +	select ARCH_SUPPORTS_MEMORY_FAILURE
+> >  	select ARCH_SUPPORTS_ATOMIC_RMW
+> >  	select ARCH_SUPPORTS_NUMA_BALANCING
+> >  	select ARCH_WANT_COMPAT_IPC_PARSE_VERSION
+> > diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+> > index b0140c8..6d9a812 100644
+> > --- a/drivers/acpi/apei/Kconfig
+> > +++ b/drivers/acpi/apei/Kconfig
+> > @@ -9,6 +9,7 @@ config ACPI_APEI
+> >  	select MISC_FILESYSTEMS
+> >  	select PSTORE
+> >  	select UEFI_CPER
+> > +	select ACPI_APEI_MEMORY_FAILURE if MEMORY_FAILURE
 
-Ah so this is recursively supporting the NV1 bit ?
+Yap, looks ok to me: we're basically enabling
+ghes_handle_memory_failure() to queue a memory address at fault for
+possibly offlining on arm64. And since the arch supports it...
 
-> 
-> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-> ---
->  arch/arm64/include/asm/kvm_arm.h |  1 +
->  arch/arm64/kvm/sys_regs.c        | 17 +++++++++++++++++
->  2 files changed, 18 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-> index 2a2752b..feded61 100644
-> --- a/arch/arm64/include/asm/kvm_arm.h
-> +++ b/arch/arm64/include/asm/kvm_arm.h
-> @@ -23,6 +23,7 @@
->  #include <asm/types.h>
->  
->  /* Hyp Configuration Register (HCR) bits */
-> +#define HCR_NV1		(UL(1) << 43)
->  #define HCR_E2H		(UL(1) << 34)
->  #define HCR_ID		(UL(1) << 33)
->  #define HCR_CD		(UL(1) << 32)
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 19d6a6e..59f9cc6 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -906,10 +906,21 @@ static inline void access_rw(struct sys_reg_params *p, u64 *sysreg)
->  		*sysreg = p->regval;
->  }
->  
-> +static bool forward_nv1_traps(struct kvm_vcpu *vcpu, struct sys_reg_params *p)
-> +{
-> +	if (!vcpu_mode_el2(vcpu) && (vcpu_el2_reg(vcpu, HCR_EL2) & HCR_NV1))
-> +		return true;
-> +
-> +	return false;
-> +}
-> +
->  static bool access_elr(struct kvm_vcpu *vcpu,
->  		struct sys_reg_params *p,
->  		const struct sys_reg_desc *r)
->  {
-> +	if (forward_nv1_traps(vcpu, p))
-> +		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-> +
->  	access_rw(p, &vcpu->arch.ctxt.gp_regs.elr_el1);
->  	return true;
->  }
-> @@ -918,6 +929,9 @@ static bool access_spsr(struct kvm_vcpu *vcpu,
->  		struct sys_reg_params *p,
->  		const struct sys_reg_desc *r)
->  {
-> +	if (forward_nv1_traps(vcpu, p))
-> +		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-> +
->  	access_rw(p, &vcpu->arch.ctxt.gp_regs.spsr[KVM_SPSR_EL1]);
->  	return true;
->  }
-> @@ -926,6 +940,9 @@ static bool access_vbar(struct kvm_vcpu *vcpu,
->  		struct sys_reg_params *p,
->  		const struct sys_reg_desc *r)
->  {
-> +	if (forward_nv1_traps(vcpu, p))
-> +		return kvm_inject_nested_sync(vcpu, kvm_vcpu_get_hsr(vcpu));
-> +
->  	access_rw(p, &vcpu_sys_reg(vcpu, r->reg));
->  	return true;
->  }
-> -- 
-> 1.9.1
-> 
-> 
+-- 
+Regards/Gruss,
+    Boris.
+
+SUSE Linux GmbH, GF: Felix Imend?rffer, Jane Smithard, Graham Norton, HRB 21284 (AG N?rnberg)
+-- 
