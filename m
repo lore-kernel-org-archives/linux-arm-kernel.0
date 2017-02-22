@@ -1,34 +1,24 @@
 From: xuejiancheng@hisilicon.com (Jiancheng Xue)
-Date: Wed, 22 Feb 2017 16:38:35 +0800
-Subject: [PATCH v2 1/2] dt-bindings: arm: hisilicon: add bindings for
- hi3798cv200 SoC and Poplar board
-In-Reply-To: <1487752716-14824-1-git-send-email-xuejiancheng@hisilicon.com>
-References: <1487752716-14824-1-git-send-email-xuejiancheng@hisilicon.com>
-Message-ID: <1487752716-14824-2-git-send-email-xuejiancheng@hisilicon.com>
+Date: Wed, 22 Feb 2017 16:38:34 +0800
+Subject: [PATCH v2 0/2] add dts files for hi3798cv200-Poplar board
+Message-ID: <1487752716-14824-1-git-send-email-xuejiancheng@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings for HiSilicon hi3798cv200 SoC and Poplar Board.
+This patch set mainly adds dts files for hi3798cv200-Poplar board.
 
-Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
----
- Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+Jiancheng Xue (2):
+  dt-bindings: arm: hisilicon: add bindings for hi3798cv200 SoC and
+    Poplar board
+  arm64: dts: hisilicon: add dts files for hi3798cv200-poplar board
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-index f1c1e21..1fd3dd7 100644
---- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -4,6 +4,10 @@ Hi3660 SoC
- Required root node properties:
- 	- compatible = "hisilicon,hi3660";
- 
-+Hi3798cv200 Poplar Board
-+Required root node properties:
-+	- compatible = "hisilicon,hi3798cv200-poplar", "hisilicon,hi3798cv200";
-+
- Hi4511 Board
- Required root node properties:
- 	- compatible = "hisilicon,hi3620-hi4511";
+ .../bindings/arm/hisilicon/hisilicon.txt           |   4 +
+ arch/arm64/boot/dts/hisilicon/Makefile             |   1 +
+ .../boot/dts/hisilicon/hi3798cv200-poplar.dts      | 171 +++++++++
+ arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi     | 415 +++++++++++++++++++++
+ 4 files changed, 591 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi3798cv200-poplar.dts
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi3798cv200.dtsi
+
 -- 
 1.9.1
