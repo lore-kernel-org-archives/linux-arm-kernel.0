@@ -1,53 +1,46 @@
-From: colin.king@canonical.com (Colin King)
-Date: Wed, 22 Feb 2017 23:30:52 +0000
-Subject: [PATCH] phy: rockchip-inno-usb2: fix spelling mistake: "connecetd" ->
- "connected"
-Message-ID: <20170222233052.8016-1-colin.king@canonical.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Wed, 22 Feb 2017 18:32:15 -0500
+Subject: [PATCH 1/1] ARM: dts: NSP: Add crypto (SPU) to dtsi
+In-Reply-To: <1487798543-34229-1-git-send-email-steven.lin1@broadcom.com>
+References: <1487798543-34229-1-git-send-email-steven.lin1@broadcom.com>
+Message-ID: <CAC3K-4oaFiP43wGWTqqeB-Hcr0Ov07Xu1RONCi+NAXqf9hr2-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On Wed, Feb 22, 2017 at 4:22 PM, Steve Lin <steven.lin1@broadcom.com> wrote:
+> Adds crypto hardware (SPU) to Northstar Plus device tree file.
+>
+> Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
 
-trivial fix to spelling mistake in dev_dbg message, also rejoin
-lines to clean up checkpatch warning
+Looks good to me!
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/phy/phy-rockchip-inno-usb2.c | 9 +++------
- 1 file changed, 3 insertions(+), 6 deletions(-)
+Acked-by: Jon Mason <jon.mason@broadcom.com>
 
-diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
-index 4ea95c2..761a921 100644
---- a/drivers/phy/phy-rockchip-inno-usb2.c
-+++ b/drivers/phy/phy-rockchip-inno-usb2.c
-@@ -554,8 +554,7 @@ static void rockchip_usb2phy_otg_sm_work(struct work_struct *work)
- 			case USB_CHG_STATE_DETECTED:
- 				switch (rphy->chg_type) {
- 				case POWER_SUPPLY_TYPE_USB:
--					dev_dbg(&rport->phy->dev,
--						"sdp cable is connecetd\n");
-+					dev_dbg(&rport->phy->dev, "sdp cable is connected\n");
- 					rockchip_usb2phy_power_on(rport->phy);
- 					rport->state = OTG_STATE_B_PERIPHERAL;
- 					notify_charger = true;
-@@ -563,16 +562,14 @@ static void rockchip_usb2phy_otg_sm_work(struct work_struct *work)
- 					cable = EXTCON_CHG_USB_SDP;
- 					break;
- 				case POWER_SUPPLY_TYPE_USB_DCP:
--					dev_dbg(&rport->phy->dev,
--						"dcp cable is connecetd\n");
-+					dev_dbg(&rport->phy->dev, "dcp cable is connected\n");
- 					rockchip_usb2phy_power_off(rport->phy);
- 					notify_charger = true;
- 					sch_work = true;
- 					cable = EXTCON_CHG_USB_DCP;
- 					break;
- 				case POWER_SUPPLY_TYPE_USB_CDP:
--					dev_dbg(&rport->phy->dev,
--						"cdp cable is connecetd\n");
-+					dev_dbg(&rport->phy->dev, "cdp cable is connected\n");
- 					rockchip_usb2phy_power_on(rport->phy);
- 					rport->state = OTG_STATE_B_PERIPHERAL;
- 					notify_charger = true;
--- 
-2.10.2
+>
+> ---
+> Code changes for this addition were submitted previously by Rob
+> Rice: https://git.kernel.org/cgit/linux/kernel/git/herbert/cryptodev-2.6.git/commit/?id=9d12ba86f818aa9cfe9f01b750336aa441f2ffa2
+> ---
+>  arch/arm/boot/dts/bcm-nsp.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
+> index b6142bd..9bac0c8 100644
+> --- a/arch/arm/boot/dts/bcm-nsp.dtsi
+> +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
+> @@ -241,6 +241,12 @@
+>                         brcm,nand-has-wp;
+>                 };
+>
+> +               crypto at 2f000 {
+> +                       compatible = "brcm,spum-nsp-crypto";
+> +                       reg = <0x2f000 0x900>;
+> +                       mboxes = <&mailbox 0>;
+> +               };
+> +
+>                 gpiob: gpio at 30000 {
+>                         compatible = "brcm,iproc-nsp-gpio", "brcm,iproc-gpio";
+>                         reg = <0x30000 0x50>;
+> --
+> 2.1.0
+>
