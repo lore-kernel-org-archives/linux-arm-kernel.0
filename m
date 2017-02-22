@@ -1,46 +1,33 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Wed, 22 Feb 2017 14:43:45 +0100
-Subject: [PATCH v2 1/3] media: dt-bindings: vpif: fix whitespace errors
-In-Reply-To: <1487771027-7763-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1487771027-7763-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1487771027-7763-2-git-send-email-bgolaszewski@baylibre.com>
+Date: Wed, 22 Feb 2017 14:43:44 +0100
+Subject: [PATCH v2 0/3] media: dt-bindings: extend the vpif bindings
+Message-ID: <1487771027-7763-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The examples have been copied from the DT with whitespace errors. Fix
-them.
+This series extends the DT bindings for TI vpif with an output
+port and enable-gpios property.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/media/ti,da850-vpif.txt | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+The first patch just fixes a couple whitespace errors in the vpif
+bindings.
 
-diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
-index 6d25d7f..9c7510b 100644
---- a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
-+++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
-@@ -30,15 +30,15 @@ I2C-connected TVP5147 decoder:
- 
- 		port {
- 			vpif_ch0: endpoint at 0 {
--				  reg = <0>;
--				  bus-width = <8>;
--				  remote-endpoint = <&composite>;
-+				reg = <0>;
-+				bus-width = <8>;
-+				remote-endpoint = <&composite>;
- 			};
- 
- 			vpif_ch1: endpoint at 1 {
--				  reg = <1>;
--				  bus-width = <8>;
--				  data-shift = <8>;
-+				reg = <1>;
-+				bus-width = <8>;
-+				data-shift = <8>;
- 			};
- 		};
- 	};
+The second extends the example with an output port since we want
+to support vpif display too.
+
+The third adds an optional property for selecting vpif functionality
+by driving GPIOs which is needed on some boards.
+
+v1 -> v2:
+- added patch 3/3
+- specified the purpose of port at 0 and port at 1 nodes
+
+Bartosz Golaszewski (3):
+  media: dt-bindings: vpif: fix whitespace errors
+  media: dt-bindings: vpif: extend the example with an output port
+  media: dt-bindings: vpif: new optional property
+
+ .../devicetree/bindings/media/ti,da850-vpif.txt    | 57 +++++++++++++++++-----
+ 1 file changed, 44 insertions(+), 13 deletions(-)
+
 -- 
 2.9.3
