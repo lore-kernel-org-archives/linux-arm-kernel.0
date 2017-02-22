@@ -1,266 +1,86 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 22 Feb 2017 14:06:16 +0100
-Subject: [RFC 27/55] KVM: arm/arm64: Emulate GICH interface on GICv2
-In-Reply-To: <1483943091-1364-28-git-send-email-jintack@cs.columbia.edu>
-References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
- <1483943091-1364-28-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <20170222130616.GO26976@cbox>
+From: thibault.saunier@osg.samsung.com (Thibault Saunier)
+Date: Wed, 22 Feb 2017 10:10:40 -0300
+Subject: [PATCH v5 3/3] [media] s5p-mfc: Check and set
+ 'v4l2_pix_format:field' field in try_fmt
+In-Reply-To: <78444dcd-169f-0c16-0e09-6b71d1a502b2@samsung.com>
+References: <20170221192059.29745-1-thibault.saunier@osg.samsung.com>
+ <CGME20170221192135epcas4p1811fa9ce35481d42144bdab368c9243a@epcas4p1.samsung.com>
+ <20170221192059.29745-4-thibault.saunier@osg.samsung.com>
+ <78444dcd-169f-0c16-0e09-6b71d1a502b2@samsung.com>
+Message-ID: <ed287d5a-687b-b344-3f20-10154071852c@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 01:24:23AM -0500, Jintack Lim wrote:
-> Emulate GICH interface accesses from the guest hypervisor.
-> 
-> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-> Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm64/kvm/Makefile            |   1 +
->  virt/kvm/arm/vgic/vgic-v2-nested.c | 207 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 208 insertions(+)
->  create mode 100644 virt/kvm/arm/vgic/vgic-v2-nested.c
-> 
-> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> index 9c35e9a..8573faf 100644
-> --- a/arch/arm64/kvm/Makefile
-> +++ b/arch/arm64/kvm/Makefile
-> @@ -37,3 +37,4 @@ kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
->  
->  kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += handle_exit_nested.o
->  kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += emulate-nested.o
-> +kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += $(KVM)/arm/vgic/vgic-v2-nested.o
-> diff --git a/virt/kvm/arm/vgic/vgic-v2-nested.c b/virt/kvm/arm/vgic/vgic-v2-nested.c
-> new file mode 100644
-> index 0000000..b13128e
-> --- /dev/null
-> +++ b/virt/kvm/arm/vgic/vgic-v2-nested.c
-> @@ -0,0 +1,207 @@
-> +#include <linux/cpu.h>
-> +#include <linux/kvm.h>
-> +#include <linux/kvm_host.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/uaccess.h>
-> +
-> +#include <linux/irqchip/arm-gic.h>
-> +
-> +#include <asm/kvm_emulate.h>
-> +#include <asm/kvm_arm.h>
-> +#include <asm/kvm_mmu.h>
-> +#include <kvm/arm_vgic.h>
-> +
-> +#include "vgic.h"
-> +#include "vgic-mmio.h"
-> +
-> +static inline struct vgic_v2_cpu_if *vcpu_nested_if(struct kvm_vcpu *vcpu)
-> +{
-> +	return &vcpu->arch.vgic_cpu.nested_vgic_v2;
-> +}
-> +
-> +static inline struct vgic_v2_cpu_if *vcpu_shadow_if(struct kvm_vcpu *vcpu)
-> +{
-> +	return &vcpu->arch.vgic_cpu.shadow_vgic_v2;
-> +}
-> +
-> +static unsigned long vgic_mmio_read_v2_vtr(struct kvm_vcpu *vcpu,
-> +					   gpa_t addr, unsigned int len)
-> +{
-> +	u32 reg;
-> +
-> +	reg = kvm_vgic_global_state.nr_lr - 1;
-> +	reg |= 0b100 << 26;
-> +	reg |= 0b100 << 29;
+Hello,
 
-Pure magic?  Can we have some defines?  Have you checked the existing
-header file if we have some defines for this?
+On 02/22/2017 06:29 AM, Andrzej Hajda wrote:
+> On 21.02.2017 20:20, Thibault Saunier wrote:
+>> It is required by the standard that the field order is set by the
+>> driver.
+>>
+>> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
+>>
+>> ---
+>>
+>> Changes in v5:
+>> - Just adapt the field and never error out.
+>>
+>> Changes in v4: None
+>> Changes in v3:
+>> - Do not check values in the g_fmt functions as Andrzej explained in previous review
+>>
+>> Changes in v2:
+>> - Fix a silly build error that slipped in while rebasing the patches
+>>
+>>   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 3 +++
+>>   1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+>> index 0976c3e0a5ce..44ed2afe0780 100644
+>> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+>> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+>> @@ -386,6 +386,9 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
+>>   	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
+>>   	struct s5p_mfc_fmt *fmt;
+>>   
+>> +	if (f->fmt.pix.field == V4L2_FIELD_ANY)
+>> +		f->fmt.pix.field = V4L2_FIELD_NONE;
+>> +
+> In previous version the only supported field type was NONE, here you
+> support everything.
+> If the only supported format is none you should set 'field'
+> unconditionally to NONE, nothing more.
+Afaict we  support 2 things:
 
-> +
-> +	return reg;
-> +}
-> +
-> +static inline bool lr_triggers_eoi(u32 lr)
-> +{
-> +	return !(lr & (GICH_LR_STATE | GICH_LR_HW)) && (lr & GICH_LR_EOI);
-> +}
-> +
-> +static unsigned long get_eisr(struct kvm_vcpu *vcpu, bool upper_reg)
-> +{
-> +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
-> +	int max_lr = upper_reg ? 64 : 32;
-> +	int min_lr = upper_reg ? 32 : 0;
-> +	int nr_lr = min(kvm_vgic_global_state.nr_lr, max_lr);
-> +	int i;
-> +	u32 reg = 0;
+   1. NONE
+   2. INTERLACE
 
-So the assumption here is that we can only emualte a virtual GICH
-interface with the same number of LRs that the hardware has, yes ?  Can
-you document this assumption in the commit message and explain how we
-deal with nr_lr for all this logic based on that.
+Until now we were not checking what was supported or not and basically 
+ignoring that info, this patch
+keeps the old behaviour making sure to be compliant.
 
-Seems like this could go in the commit message.
+I had a doubt and was pondering doing:
 
-> +
-> +	for (i = min_lr; i < nr_lr; i++) {
-> +		if (lr_triggers_eoi(cpu_if->vgic_lr[i]))
-> +			reg |= BIT(i - min_lr);
-> +	}
-> +
-> +	return reg;
-> +}
-> +
-> +static unsigned long vgic_mmio_read_v2_eisr0(struct kvm_vcpu *vcpu,
-> +					     gpa_t addr, unsigned int len)
-> +{
-> +	return get_eisr(vcpu, false);
-> +}
-> +
-> +static unsigned long vgic_mmio_read_v2_eisr1(struct kvm_vcpu *vcpu,
-> +					     gpa_t addr, unsigned int len)
-> +{
-> +	return get_eisr(vcpu, true);
-> +}
-> +
-> +static u32 get_elrsr(struct kvm_vcpu *vcpu, bool upper_reg)
-> +{
-> +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
-> +	int max_lr = upper_reg ? 64 : 32;
-> +	int min_lr = upper_reg ? 32 : 0;
-> +	int nr_lr = min(kvm_vgic_global_state.nr_lr, max_lr);
-> +	u32 reg = 0;
-> +	int i;
-> +
-> +	for (i = min_lr; i < nr_lr; i++) {
-> +		if (!(cpu_if->vgic_lr[i] & GICH_LR_STATE))
-> +			reg |= BIT(i - min_lr);
-> +	}
-> +
-> +	return reg;
-> +}
-> +
-> +static unsigned long vgic_mmio_read_v2_elrsr0(struct kvm_vcpu *vcpu,
-> +					      gpa_t addr, unsigned int len)
-> +{
-> +	return get_elrsr(vcpu, false);
-> +}
-> +
-> +static unsigned long vgic_mmio_read_v2_elrsr1(struct kvm_vcpu *vcpu,
-> +					      gpa_t addr, unsigned int len)
-> +{
-> +	return get_elrsr(vcpu, true);
-> +}
-> +
-> +static unsigned long vgic_mmio_read_v2_misr(struct kvm_vcpu *vcpu,
-> +					    gpa_t addr, unsigned int len)
-> +{
-> +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
-> +	int nr_lr = kvm_vgic_global_state.nr_lr;
-> +	u32 reg = 0;
-> +
-> +	if (vgic_mmio_read_v2_eisr0(vcpu, addr, len) ||
-> +			vgic_mmio_read_v2_eisr1(vcpu, addr, len))
-> +		reg |= GICH_MISR_EOI;
-> +
-> +	if (cpu_if->vgic_hcr & GICH_HCR_UIE) {
-> +		u32 elrsr0 = vgic_mmio_read_v2_elrsr0(vcpu, addr, len);
-> +		u32 elrsr1 = vgic_mmio_read_v2_elrsr1(vcpu, addr, len);
-> +		int used_lrs;
-> +
-> +		used_lrs = nr_lr - (hweight32(elrsr0) + hweight32(elrsr1));
-> +		if (used_lrs <= 1)
-> +			reg |= GICH_MISR_U;
-> +	}
-> +
-> +	/* TODO: Support remaining bits in this register */
+``` diff
 
-Is this going to happen in this series?  Why don't we just do it here?
++	if (f->fmt.pix.field != V4L2_FIELD_INTERLACED)
++		f->fmt.pix.field = V4L2_FIELD_NONE;
++
 
-> +	return reg;
-> +}
-> +
-> +static unsigned long vgic_mmio_read_v2_gich(struct kvm_vcpu *vcpu,
-> +					    gpa_t addr, unsigned int len)
-> +{
-> +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
-> +	u32 value;
-> +
-> +	switch (addr & 0xfff) {
-> +	case GICH_HCR:
-> +		value = cpu_if->vgic_hcr;
-> +		break;
-> +	case GICH_VMCR:
-> +		value = cpu_if->vgic_vmcr;
-> +		break;
-> +	case GICH_APR:
-> +		value = cpu_if->vgic_apr;
-> +		break;
-> +	case GICH_LR0 ... (GICH_LR0 + 4 * (VGIC_V2_MAX_LRS - 1)):
-> +		value = cpu_if->vgic_lr[(addr & 0xff) >> 2];
-> +		break;
-> +	default:
-> +		return 0;
-> +	}
-> +
-> +	return value;
-> +}
-> +
-> +static void vgic_mmio_write_v2_gich(struct kvm_vcpu *vcpu,
-> +				    gpa_t addr, unsigned int len,
-> +				    unsigned long val)
-> +{
-> +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
-> +
-> +	switch (addr & 0xfff) {
-> +	case GICH_HCR:
-> +		cpu_if->vgic_hcr = val;
-> +		break;
-> +	case GICH_VMCR:
-> +		cpu_if->vgic_vmcr = val;
-> +		break;
-> +	case GICH_APR:
-> +		cpu_if->vgic_apr = val;
-> +		break;
-> +	case GICH_LR0 ... (GICH_LR0 + 4 * (VGIC_V2_MAX_LRS - 1)):
-> +		cpu_if->vgic_lr[(addr & 0xff) >> 2] = val;
+```
 
-Don't you need to check if we actually support this particular LR ?
+instead, it is probably more correct, do you think it is what should be 
+done here?
 
-> +		break;
-> +	}
-> +}
-> +
-> +static const struct vgic_register_region vgic_v2_gich_registers[] = {
-> +	REGISTER_DESC_WITH_LENGTH(GICH_HCR,
-> +		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich, 4,
-> +		VGIC_ACCESS_32bit),
-> +	REGISTER_DESC_WITH_LENGTH(GICH_VTR,
-> +		vgic_mmio_read_v2_vtr, vgic_mmio_write_wi, 4,
-> +		VGIC_ACCESS_32bit),
-> +	REGISTER_DESC_WITH_LENGTH(GICH_VMCR,
-> +		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich, 4,
-> +		VGIC_ACCESS_32bit),
-> +	REGISTER_DESC_WITH_LENGTH(GICH_MISR,
-> +		vgic_mmio_read_v2_misr, vgic_mmio_write_wi, 4,
-> +		VGIC_ACCESS_32bit),
-> +	REGISTER_DESC_WITH_LENGTH(GICH_EISR0,
-> +		vgic_mmio_read_v2_eisr0, vgic_mmio_write_wi, 4,
-> +		VGIC_ACCESS_32bit),
-> +	REGISTER_DESC_WITH_LENGTH(GICH_EISR1,
-> +		vgic_mmio_read_v2_eisr1, vgic_mmio_write_wi, 4,
-> +		VGIC_ACCESS_32bit),
-> +	REGISTER_DESC_WITH_LENGTH(GICH_ELRSR0,
-> +		vgic_mmio_read_v2_elrsr0, vgic_mmio_write_wi, 4,
-> +		VGIC_ACCESS_32bit),
-> +	REGISTER_DESC_WITH_LENGTH(GICH_ELRSR1,
-> +		vgic_mmio_read_v2_elrsr1, vgic_mmio_write_wi, 4,
-> +		VGIC_ACCESS_32bit),
-> +	REGISTER_DESC_WITH_LENGTH(GICH_APR,
-> +		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich, 4,
-> +		VGIC_ACCESS_32bit),
-> +	REGISTER_DESC_WITH_LENGTH(GICH_LR0,
-> +		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich,
-> +		4 * VGIC_V2_MAX_LRS, VGIC_ACCESS_32bit),
-> +};
-> -- 
-> 1.9.1
-> 
-> 
+Regards,
+
+Thibault
+
+>
+> Regards
+> Andrzej
+>
+>>   	mfc_debug(2, "Type is %d\n", f->type);
+>>   	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+>>   		fmt = find_format(f, MFC_FMT_DEC);
+>
