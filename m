@@ -1,64 +1,21 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Wed, 22 Feb 2017 17:48:47 +0100
-Subject: [PATCH v2 0/8] ARM64: Initial Marvell IAP140 enablement
-In-Reply-To: <22850768-8ea8-3d56-5c34-31f24ca3b487@suse.de>
-References: <20170222022929.10540-1-afaerber@suse.de>
- <CAL_JsqJmv--wP+gEt27ZbTT+8GeqKhYc=x3MTPBiz2Jr2wys8A@mail.gmail.com>
- <22850768-8ea8-3d56-5c34-31f24ca3b487@suse.de>
-Message-ID: <482be055-0c8d-ac55-dae8-191f8f45bf06@suse.de>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 22 Feb 2017 10:53:26 -0600
+Subject: [PATCH v3 1/3] binding: irqchip: mtk-cirq: Add binding document
+In-Reply-To: <1487040961-18319-2-git-send-email-youlin.pei@mediatek.com>
+References: <1487040961-18319-1-git-send-email-youlin.pei@mediatek.com>
+ <1487040961-18319-2-git-send-email-youlin.pei@mediatek.com>
+Message-ID: <20170222165326.upw5ptpbqbsqrbnj@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 22.02.2017 um 17:43 schrieb Andreas F?rber:
-> Hi Rob,
+On Tue, Feb 14, 2017 at 10:55:59AM +0800, Youlin Pei wrote:
+> This commit adds the device tree binding document for
+> the mediatek cirq.
 > 
-> Am 22.02.2017 um 14:34 schrieb Rob Herring:
->> On Tue, Feb 21, 2017 at 8:29 PM, Andreas F?rber <afaerber@suse.de> wrote:
->>> One limitation is currently the lack of an IAP140 clk driver. Patch 4/4 works
->>> around that for UART0 with a fixed-clock.
->>
->> The PXA1928 clock driver should be close to what you need. They are
->> supposed to be very similar.
-> 
-> Where do you see that in mainline? Not in drivers/clk/pxa/ at least. I'm
-> certain the acorn-marvell tree has a PXA1908 clk driver somewhere, too,
-> I just haven't ported it yet.
-> 
->>> Andreas F?rber (8):
->>>   Documentation: arm: Marvell: Document IAP140
->>>   tty: serial: Suppress deprecated SERIAL_PXA on arm64
->>>   tty: serial: 8250_pxa: Implement mmp earlycon
->>
->> You should not use the pxa serial driver. AFAICT, it was separate to
->> add DMA support, but now the base 8250 driver supports DMA. The base
->> 8250 driver works with the PXA1928 and should also work with the
->> PXA1908.
-> 
-> Do you personally have one? I didn't spot a pxa1928 DT in mainline.
-> 
-> So, by my reading both 8250_of.c and 8250_pxa.c list "mrvl,mmp-uart" for
-> the platform driver. Is that really intentional?
-> 
-> What the early_pxa earlycon does is set the register shift and then
-> reuse the 8250 core - that looks perfectly valid to me. Are you possibly
-> mixing that up with the non-8250 pxa serial driver that I am already
-> suppressing one patch earlier?
+> Signed-off-by: Youlin Pei <youlin.pei@mediatek.com>
+> ---
+>  .../interrupt-controller/mediatek,cirq.txt         |   35 ++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/mediatek,cirq.txt
 
-Hit send too early: There's also 8250_early.c, but that does not appear
-to use the reg-shift property (which is not mentioned in the
-mrvl,mmp-uart binding) and thus omap has a custom earlycon driver there,
-similar to what is in 8250_pxa.c.
-
-> 
-> While at it, are you aware that we have two drivers, one pxa and one
-> mmp, that bind to "marvell,pdma-1.0"? That seemed wrong to me, too.
-> 
-> Regards,
-> Andreas
-> 
-
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Acked-by: Rob Herring <robh@kernel.org>
