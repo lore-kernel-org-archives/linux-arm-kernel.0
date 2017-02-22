@@ -1,54 +1,29 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 22 Feb 2017 10:57:05 -0500
-Subject: [RESEND PATCH v7 0/7] Rockchip dw-mipi-dsi driver
-In-Reply-To: <20170222134314.016a4940.john@metanate.com>
-References: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
- <20170221153918.GA25168@art_vandelay>
- <20170222134314.016a4940.john@metanate.com>
-Message-ID: <CAOw6vbJoS2P5m31+bgWw3Sghz=EVGj0fpLgCFnbVEhzRujNCLw@mail.gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 22 Feb 2017 15:58:49 +0000
+Subject: [BUGFIX PATCH V2 0/3] kprobes/arm: Improve kprobes
+ implementation on arm
+In-Reply-To: <20170218064352.b1685bbd17c0189b1937ce3b@kernel.org>
+References: <148711844284.5814.10387227824715177703.stgit@devbox>
+ <1487329270.3113.5.camel@linaro.org>
+ <20170218064352.b1685bbd17c0189b1937ce3b@kernel.org>
+Message-ID: <1487779129.18810.10.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2017 at 8:43 AM, John Keeping <john@metanate.com> wrote:
-> On Tue, 21 Feb 2017 10:39:18 -0500, Sean Paul wrote:
->
->> On Mon, Feb 20, 2017 at 04:02:16PM +0800, Chris Zhong wrote:
->> > Hi all
->> >
->> > [Resend this v7 version series, since there are 5 mails have gone missing, last
->> > week]
->> >
->> > This version does not change the existing v6 patches, just to add the
->> > "bandwidth fix" patch back, since we really need it.
->> >
->> > This patch serial is for RK3399 MIPI DSI. The MIPI DSI controller of
->> > RK3399 is almost the same as RK3288, except a little bit of difference
->> > in phy clock controlling and port id selection register. These patches
->> > add RK3399 support and the power domain support.
->> >
->> > And these patches base on John Keeping's v3 patches[0], it fixes many bugs,
->> > they have been tested on rk3288 evb board.
->>
->> Do we have an ETA on when John is planning on respinning his patchset based on
->> review feedback?
->
-> I have all of the changes queued but I was hoping to find some time to
-> test the latest version before sending it out; unfortunately everything
-> else is more important at the moment.  If you're happy with the caveat
-> that the latest changes are build tested only I can probably send it
-> out this afternoon.
+On Sat, 2017-02-18 at 06:43 +0900, Masami Hiramatsu wrote:
+> On Fri, 17 Feb 2017 11:01:10 +0000
+> "Jon Medhurst (Tixy)" <tixy@linaro.org> wrote:
+[...]
+> > Meantime
+> > I'll investigate the kprobes test failures I see (which actually looks
+> > like cache/TLB issues and not test code problems after all).
+> 
+> OK, btw, I couldn't reproduce the kprobes test failure with
+> CONFIG_DEBUG_RODATA=y on qemu...
 
-I suppose my answer depends on when the tested version will be
-available, or perhaps Chris can test the new set for you? I don't have
-any rockchip devices with mipi, so i'm not much help.
-
-Sean
-
->
->
-> John
-
-
+That's because it's a problem with caches which qemu doesn't emulate.
+I worked out the cause and posted a patch...
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/489517.html
 
 -- 
-Sean Paul, Software Engineer, Google / Chromium OS
+Tixy
