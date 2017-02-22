@@ -1,42 +1,26 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 22 Feb 2017 15:25:28 -0600
-Subject: [PATCH v3 01/18] dt-bindings: power: battery: add
- constant-charge-current property
-In-Reply-To: <20170214094112.27426-2-quentin.schulz@free-electrons.com>
-References: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
- <20170214094112.27426-2-quentin.schulz@free-electrons.com>
-Message-ID: <20170222212528.vo7fbayactwfzgao@rob-hp-laptop>
+Date: Wed, 22 Feb 2017 15:44:47 -0600
+Subject: [PATCH v6 07/14] dt: bindings: Add bindings for Marvell Xenon SD
+ Host Controller
+In-Reply-To: <3a4ce2fd25ed812482b0fc96f50dd305c8f40fe9.1487091464.git-series.gregory.clement@free-electrons.com>
+References: <cover.ff78bebe0384f650a51e5e6f0f1dca6e7894b53b.1487091464.git-series.gregory.clement@free-electrons.com>
+ <3a4ce2fd25ed812482b0fc96f50dd305c8f40fe9.1487091464.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20170222214447.bsa466vfiqa24kmw@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 14, 2017 at 10:40:55AM +0100, Quentin Schulz wrote:
-> This adds the constant-charge-current property to the list of optional
-> properties of the battery.
+On Tue, Feb 14, 2017 at 06:01:47PM +0100, Gregory CLEMENT wrote:
+> From: Hu Ziji <huziji@marvell.com>
 > 
-> The constant charge current is critical for batteries as they can't
-> handle all charge currents.
+> Marvell Xenon SDHC can support eMMC/SD/SDIO.
+> Add Xenon-specific properties.
+> Also add properties for Xenon PHY setting.
 > 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Signed-off-by: Hu Ziji <huziji@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
-> 
-> added in v3
-> 
->  Documentation/devicetree/bindings/power/supply/battery.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/power/supply/battery.txt b/Documentation/devicetree/bindings/power/supply/battery.txt
-> index d78a4aa..3e830fe 100644
-> --- a/Documentation/devicetree/bindings/power/supply/battery.txt
-> +++ b/Documentation/devicetree/bindings/power/supply/battery.txt
-> @@ -7,6 +7,7 @@ Optional Properties:
->   - voltage-min-design-microvolt: drained battery voltage
->   - energy-full-design-microwatt-hours: battery design energy
->   - charge-full-design-microamp-hours: battery design capacity
-> + - constant-charge-current-microamp: battery constant charge current
-
-Kind of long, though so are the others. Maybe just 
-"constant-charge-microamp" as uA implies current.
-
-Otherwise,
+>  Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt | 172 +++++++-
+>  1 file changed, 172 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/marvell,xenon-sdhci.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
