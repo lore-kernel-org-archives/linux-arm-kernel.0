@@ -1,195 +1,63 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Wed, 22 Feb 2017 16:53:47 -0300
-Subject: <Query> Looking more details and reasons for using orig_add_limit.
-In-Reply-To: <568205ddc2e7af6a57a71b8c5cd47d68@codeaurora.org>
-References: <def87360266193184dc013a055ec3869@codeaurora.org>
- <58A4450C.3040602@arm.com>
- <7c727e6043e58077d143e35de0ce632c@codeaurora.org>
- <58A58162.2020101@arm.com>
- <568205ddc2e7af6a57a71b8c5cd47d68@codeaurora.org>
-Message-ID: <20170222165347.4c4b7dc8@vento.lan>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 22 Feb 2017 12:00:30 -0800
+Subject: [PATCH v2] watchdog: imx2: fix hang-up on boot for i.MX21,
+ i.MX27 and i.MX31 SoCs
+In-Reply-To: <CAM=E1R5zb4y9HK06C+BiLvY0cfp7YemrV2p6xdxP7DwWkMau1g@mail.gmail.com>
+References: <20170117012353.6948-1-vz@mleia.com>
+ <20170117083847.ijrvafqjdwduele6@pengutronix.de>
+ <CAM=E1R5zb4y9HK06C+BiLvY0cfp7YemrV2p6xdxP7DwWkMau1g@mail.gmail.com>
+Message-ID: <20170222200030.GC3041@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Sodagudi,
+On Wed, Feb 22, 2017 at 08:44:00PM +0100, Magnus Lilja wrote:
+> Hi
+> 
+> On 17 January 2017 at 09:38, Uwe Kleine-K?nig
+> <u.kleine-koenig@pengutronix.de> wrote:
+> > Hello Vladimir,
+> >
+> > On Tue, Jan 17, 2017 at 03:23:53AM +0200, Vladimir Zapolskiy wrote:
+> >> Power down counter enable/disable bit switch is located in WMCR register,
+> >> but watchdog controllers found on legacy i.MX21, i.MX27 and i.MX31 SoCs
+> >> don't have this register. As a result of writing data to the non-existing
+> >> register on driver probe the SoC hangs up, to fix the problem add more OF
+> >> compatible strings and on this basis get information about availability of
+> >> the WMCR register.
+> >>
+> >> Fixes: 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on boot")
+> >> Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+> >> Tested-by: Magnus Lilja <lilja.magnus@gmail.com>
+> >> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+> >> Cc: <stable@vger.kernel.org>
+> >> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> >> ---
+> >> Changes from v1 to v2:
+> >> * removed i.MX27 and i.MX31 compatibles from the list, since it is expected
+> >>   that their DTB files has a reference to the listed i.MX21 compatible,
+> >>   many thanks to Uwe Kleine-K?nig for the hint,
+> >> * start the list of compatibles from an i.MX35 specific one, since it is
+> >>   agreed that i.MX35 precedes i.MX25, thanks to Uwe Kleine-K?nig for review,
+> >> * added a comment describing any potential changes in future over the list
+> >>   of watchdog compatible values,
+> >> * added all collected tags to the commit message.
+> >>
+> >> Changes from RFC to v1:
+> >> * replaced private data struct with a macro as suggested by Guenter,
+> >
+> > I didn't see the RFC, but I like a data struct better. It has some
+> > overhead, but allows for easier expansion later, needs less casting and
+> > is easier to understand for a reader (see below).
+> >
+> >> * updated the comment in the source code to reflect the change,
+> >> * rearranged and simplified the logic of detecting WMCR presence,
+> >> * pulled the fix out from the series with optional proposed DTS changes.
+> 
+> So, did we come to an agreement on a patch to be submitted? Perhaps I
 
-Em Tue, 21 Feb 2017 06:20:58 -0800
-Sodagudi Prasad <psodagud@codeaurora.org> escreveu:
+Not to my knowledge and understanding.
 
-> Hi mchehab/linux-media,
-> 
-> It is not clear why KERNEL_DS was set explicitly here. In this path 
-> video_usercopy() gets  called  and it
-> copies the ?struct v4l2_buffer? struct to user space stack memory.
-> 
-> Can you please share reasons for setting to KERNEL_DS here?
+Guenter
 
-I'm not sure. If I remember well, such code came from the patch that 
-moved the V4L2 compat32 code from FS core to V4L2 in the old days.
-As it worked fine since 2.6.x, it was assumed to be the right thing
-to do, and we never had any reason to change it to something else :-)
-
-As it is now causing troubles on newer Kernels, it needs to be 
-converted to the modern practices. Patches are welcomed!
-
+> missed the info on it being accepted.
 > 
-> static long do_video_ioctl(struct file *file, unsigned int cmd, unsigned 
-> long arg)
-> {
-> ?
-> ?
-> 
->          if (compatible_arg)
->                  err = native_ioctl(file, cmd, (unsigned long)up);
->          else {
->                  mm_segment_t old_fs = get_fs();
-> 
->                  set_fs(KERNEL_DS);
->                  err = native_ioctl(file, cmd, (unsigned long)&karg);
->                  set_fs(old_fs);
->          }
-> ?
-> }
-> 
-> On 2017-02-16 02:39, James Morse wrote:
-> > Hi Prasad,
-> > 
-> > On 15/02/17 21:12, Sodagudi Prasad wrote:  
-> >> On 2017-02-15 04:09, James Morse wrote:  
-> >>> On 15/02/17 05:52, Sodagudi Prasad wrote:  
-> >>>> that driver is calling set_fs(KERNEL_DS) and  then copy_to_user() to 
-> >>>> user space
-> >>>> memory.  
-> >>> 
-> >>> Don't do this, its exactly the case PAN+UAO and the code you pointed 
-> >>> to are
-> >>> designed to catch. Accessing userspace needs doing carefully, setting 
-> >>> USER_DS
-> >>> and using the put_user()/copy_to_user() accessors are the required 
-> >>> steps.
-> >>> 
-> >>> Which driver is doing this? Is it in mainline?  
-> >> 
-> >> Yes. It is mainline driver - 
-> >> drivers/media/v4l2-core/v4l2-compat-ioctl32.c  
-> >   
-> >> In some v4l2 use-case kernel panic is observed. Below part
-> >> of the code has set_fs to KERNEL_DS before calling native_ioctl().
-> >> 
-> >> static long do_video_ioctl(struct file *file, unsigned int cmd, 
-> >> unsigned long arg)
-> >> {
-> >> ?
-> >> ?
-> >>         if (compatible_arg)
-> >>                 err = native_ioctl(file, cmd, (unsigned long)up);
-> >>         else {
-> >>                 mm_segment_t old_fs = get_fs();
-> >> 
-> >>                 set_fs(KERNEL_DS);   ====> KERNEL_DS.
-> >>                 err = native_ioctl(file, cmd, (unsigned long)&karg);
-> >>                 set_fs(old_fs);
-> >>         }
-> >> 
-> >> Here is the call stack which is resulting crash, because user space 
-> >> memory has
-> >> read only permissions.
-> >> [27249.920041] [<ffffff8008357890>] __arch_copy_to_user+0x110/0x180
-> >> [27249.920047] [<ffffff8008847c98>] video_ioctl2+0x38/0x44
-> >> [27249.920054] [<ffffff8008840968>] v4l2_ioctl+0x78/0xb4
-> >> [27249.920059] [<ffffff80088542d8>] do_video_ioctl+0x91c/0x1160
-> >> [27249.920064] [<ffffff8008854b7c>] v4l2_compat_ioctl32+0x60/0xcc
-> >> [27249.920071] [<ffffff800822553c>] compat_SyS_ioctl+0x124/0xd88
-> >> [27249.920077] [<ffffff8008084e30>] el0_svc_naked+0x24/0x2  
-> > 
-> > It's not totally clear to me what is going on here, but some 
-> > observations:
-> > the ioctl is trying to copy_to_user() to some read-only memory.  This 
-> > would
-> > normally fail gracefully with -EFAULT, but because KERNEL_DS has been 
-> > set, the
-> > kernel checks this before calling the fault handler and calls die() on
-> > your ioctl().
-> > 
-> > The ioctl code is doing this deliberately as a compat mechanism, but 
-> > the code
-> > behind file->f_op->unlocked_ioctl() expects fs==USER_DS when it does 
-> > its work.
-> > That code needs to be made aware of this compat translation, or a 
-> > compat_ioctl
-> > call provided.  
-> 
-> > 
-> > Which v4l driver is this? Which ioctl is being called? Does the driver 
-> > using the
-> > v4l framework have a compat_ioctl() call?  
-> Yes. Same kernel crash is seen with both video and camera use cases. 
-> Yes. Driver have compact_ioctl().
-> 
-> > What path does this call take through v4l2_compat_ioctl32()? It looks 
-> > like
-> > compat_ioctl will be skipped in certain cases, v4l2_compat_ioctl32() 
-> > has:  
-> >> 	if (_IOC_TYPE(cmd) == 'V' && _IOC_NR(cmd) < BASE_VIDIOC_PRIVATE)
-> >> 		ret = do_video_ioctl(file, cmd, arg);
-> >> 	else if (vdev->fops->compat_ioctl32)
-> >> 		ret = vdev->fops->compat_ioctl32(file, cmd, arg);  
-> > 
-> > Is your ioctl matched by that top if()?  
-> Yes.  Top if condition in true and do_video_ioctl() getting called.
-> 
-> >   
-> >>>> If there is permission fault for user space address the above 
-> >>>> condition
-> >>>> is leading to kernel crash. Because orig_add_limit is having 
-> >>>> KERNEL_DS as set_fs
-> >>>> called before copy_to_user().
-> >>>> 
-> >>>> 1)    So I would like to understand that,  is that user space 
-> >>>> pointer leading to
-> >>>> permission fault not correct(condition_1) in this scenario?  
-> >>> 
-> >>> The correct thing has happened here. To access user space 
-> >>> set_fs(USER_DS) first.
-> >>> (and set it back to whatever it was afterwards).
-> >>>   
-> >> 
-> >> So, Any clean up needed to above call path similar to what was done in 
-> >> the below
-> >> commit?
-> >> commit a7f61e89af73e9bf760826b20dba4e637221fcb9 - compat_ioctl: don't 
-> >> call
-> >> do_ioctl under set_fs(KERNEL_DS)  
-> > 
-> > That's clever. Is that code doing a conversion, or do you have a 
-> > compat_ioctl()
-> > in your driver?
-> > 
-> > It's possible that fs/compat_ioctl.c has done this work, but 
-> > do_video_ioctl()
-> > un-does it. Someone who knows about v4l and compat-ioctls should take a 
-> > look...
-> > 
-> > 
-> > This looks like a case of:  
-> >> The accidental invocation of an unlocked_ioctl handler that 
-> >> unexpectedly
-> >> calls copy_to_user could be a severe security issue.  
-> > 
-> > that Jann describes in the commit message. Fixing the code behind
-> > file->f_op->unlocked_ioctl() to consider compat calls from 
-> > do_video_ioctl() is
-> > one way to solve this.
-> > 
-> > 
-> > 
-> > Thanks,
-> > 
-> > James  
-> 
-> -Thanks, Prasad
-
-
-
-Thanks,
-Mauro
