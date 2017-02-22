@@ -1,33 +1,23 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Wed, 22 Feb 2017 15:13:21 +0100
-Subject: [PATCH v3 2/6] ARM: davinci: board-da850-evm: add I2C ID for VPIF
-In-Reply-To: <1487772805-19021-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1487772805-19021-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1487772805-19021-3-git-send-email-bgolaszewski@baylibre.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 22 Feb 2017 08:25:58 -0600
+Subject: [PATCH 1/2] devicetree: Add vendor prefix for Hwacom Systems Inc.
+In-Reply-To: <20170212193247.22705-2-carlo@caione.org>
+References: <20170212193247.22705-1-carlo@caione.org>
+ <20170212193247.22705-2-carlo@caione.org>
+Message-ID: <20170222142558.wbedfw6l4maatkdy@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@baylibre.com>
+On Sun, Feb 12, 2017 at 08:32:46PM +0100, Carlo Caione wrote:
+> From: Carlo Caione <carlo@endlessm.com>
+> 
+> Hwacom Systems Inc. is a broadband system integrator and supplier of
+> mobile, fixed and IP networks related services as well as
+> multimedia application. Website: http://www.hwacom.com/
+> 
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-VPIF capture driver now has a way to specific I2C adapter ID (was
-previously hard-coded.)  Use the new interface.
-
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
- arch/arm/mach-davinci/board-da850-evm.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index 6f1e129..0b9ff2a 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -1213,6 +1213,7 @@ static struct vpif_subdev_info da850_vpif_capture_sdev_info[] = {
- static struct vpif_capture_config da850_vpif_capture_config = {
- 	.subdev_info = da850_vpif_capture_sdev_info,
- 	.subdev_count = ARRAY_SIZE(da850_vpif_capture_sdev_info),
-+	.i2c_adapter_id = 1,
- 	.chan_config[0] = {
- 		.inputs = da850_ch0_inputs,
- 		.input_count = ARRAY_SIZE(da850_ch0_inputs),
--- 
-2.9.3
+Acked-by: Rob Herring <robh@kernel.org>
