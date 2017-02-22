@@ -1,58 +1,119 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 22 Feb 2017 11:03:22 +0000
-Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
- power
-In-Reply-To: <1975396.x0czmkNPOW@aspire.rjw.lan>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <94167d3a-e005-3af0-d290-a1086684d570@arm.com>
- <3c8b3f2d-8604-f999-4208-a82f171b64f2@arm.com>
- <1975396.x0czmkNPOW@aspire.rjw.lan>
-Message-ID: <35840771-e16f-d6fe-3a89-1b3f51f4a8f3@arm.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 22 Feb 2017 12:10:17 +0100
+Subject: [RFC 06/55] KVM: arm64: Add EL2 execution context for nesting
+In-Reply-To: <1483943091-1364-7-git-send-email-jintack@cs.columbia.edu>
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+ <1483943091-1364-7-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <20170222111017.GB26976@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 22/02/17 01:14, Rafael J. Wysocki wrote:
-> On Tuesday, February 21, 2017 06:45:13 PM Sudeep Holla wrote:
-
-[...]
-
->>
->> I take this back, you have everything you need in place, nothing needs
->> to be done. I just checked again. If I don't register PSCI suspend_ops,
->> I still get mem in /sys/power/state with s2idle in /sys/power/mem_sleep
->> which is exactly what we need. Again we don't support standby/shallow
->> state on ARM64/PSCI.
+On Mon, Jan 09, 2017 at 01:24:02AM -0500, Jintack Lim wrote:
+> With the nested virtualization support, the context of the guest
+> includes EL2 register states. The host manages a set of virtual EL2
+> registers.  In addition to that, the guest hypervisor supposed to run in
+> EL2 is now deprivilaged and runs in EL1. So, the host also manages a set
+> of shadow system registers to be able to run the guest hypervisor in
+> EL1.
 > 
-> Except for one thing which may or may not be a concern here.
+> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm64/include/asm/kvm_host.h | 54 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
 > 
-> Suspend to idle should only go into states in which all of the available wakeup
-> devices work.  If there are devices that cannot wake you up from a given state,
-> this isn't "idle" any more, is it?
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index c0c8b02..ed78d73 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -146,6 +146,42 @@ enum vcpu_sysreg {
+>  	NR_SYS_REGS	/* Nothing after this line! */
+>  };
+>  
+> +enum el2_regs {
+> +	ELR_EL2,
+> +	SPSR_EL2,
+> +	SP_EL2,
+> +	AMAIR_EL2,
+> +	MAIR_EL2,
+> +	TCR_EL2,
+> +	TTBR0_EL2,
+> +	VTCR_EL2,
+> +	VTTBR_EL2,
+> +	VMPIDR_EL2,
+> +	VPIDR_EL2,      /* 10 */
+> +	MDCR_EL2,
+> +	CNTHCTL_EL2,
+> +	CNTHP_CTL_EL2,
+> +	CNTHP_CVAL_EL2,
+> +	CNTHP_TVAL_EL2,
+> +	CNTVOFF_EL2,
+> +	ACTLR_EL2,
+> +	AFSR0_EL2,
+> +	AFSR1_EL2,
+> +	CPTR_EL2,       /* 20 */
+> +	ESR_EL2,
+> +	FAR_EL2,
+> +	HACR_EL2,
+> +	HCR_EL2,
+> +	HPFAR_EL2,
+> +	HSTR_EL2,
+> +	RMR_EL2,
+> +	RVBAR_EL2,
+> +	SCTLR_EL2,
+> +	TPIDR_EL2,      /* 30 */
+> +	VBAR_EL2,
+> +	NR_EL2_REGS     /* Nothing after this line! */
+> +};
+
+Why do we have a separate enum and array for the EL2 regs and not simply
+expand vcpu_sysreg ?
+
+> +
+>  /* 32bit mapping */
+>  #define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */
+>  #define c0_CSSELR	(CSSELR_EL1 * 2)/* Cache Size Selection Register */
+> @@ -193,6 +229,23 @@ struct kvm_cpu_context {
+>  		u64 sys_regs[NR_SYS_REGS];
+>  		u32 copro[NR_COPRO_REGS];
+>  	};
+> +
+> +	u64 el2_regs[NR_EL2_REGS];         /* only used for nesting */
+> +	u64 shadow_sys_regs[NR_SYS_REGS];  /* only used for virtual EL2 */
+> +
+> +	/*
+> +	 * hw_* will be used when switching to a VM. They point to either
+> +	 * the virtual EL2 or EL1/EL0 context depending on vcpu mode.
+
+don't they either point to the shadow sys regs or the the normal EL1
+sysregs?
+
+> +	 */
+> +
+> +	/* pointing shadow_sys_regs or sys_regs */
+
+that's what this comment seems to indicate, so there's some duplicity
+here.
+
+> +	u64 *hw_sys_regs;
+> +
+> +	/* copy of either gp_regs.sp_el1 or el2_regs[SP_EL2] */
+> +	u64 hw_sp_el1;
+> +
+> +	/* pstate written to SPSR_EL2 */
+> +	u64 hw_pstate;
+>  };
+>  
+>  typedef struct kvm_cpu_context kvm_cpu_context_t;
+> @@ -277,6 +330,7 @@ struct kvm_vcpu_arch {
+>  
+>  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
+>  #define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
+> +#define vcpu_el2_reg(v, r)	((v)->arch.ctxt.el2_regs[(r)])
+>  /*
+>   * CP14 and CP15 live in the same array, as they are backed by the
+>   * same system registers.
+> -- 
+> 1.9.1
 > 
-
-True. In this Renasas platform, since the platform doesn't have PSCI
-system suspend, we can only support s2idle and not s2ram. In this case
-we don't ask platform to enter some system state whereas we suspend all
-the devices(leaving wakeup capable devices active) and ask platform to
-enter deepest idle state on all the CPUs. I still don't understand the
-issue Geert is facing.
-
-Geert, so far you have failed to explain what's different from the new
-state you are adding and the existing s2idle.
-
-> As for the device wakeup disable/enable interface, it is for controlling
-> whether or not a given device should be allowed to generate wakeup signals at
-> all.
 > 
-> The information on what states a given device can wake up the system from is
-> platform-specific and generally would need to be taken into consideration at
-> the platform level.
-> 
-
-Exactly, that's what I am trying to convince Geert ;)
-
--- 
-Regards,
-Sudeep
