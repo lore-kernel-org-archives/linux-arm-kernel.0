@@ -1,90 +1,54 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 22 Feb 2017 16:55:01 +0800
-Subject: [PATCH v3 4/8] phy: phy-mt65xx-usb3: move clock from phy node into
- port nodes
-In-Reply-To: <1487753705-6745-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1487753705-6745-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1487753705-6745-4-git-send-email-chunfeng.yun@mediatek.com>
+Date: Wed, 22 Feb 2017 16:54:58 +0800
+Subject: [PATCH v3 1/8] phy: phy-mt65xx-usb3: improve RX detection stable time
+Message-ID: <1487753705-6745-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the reference clock of HighSpeed port is 48M which comes from PLL;
-the reference clock of SuperSpeed port is 26M which usually comes
-from 26M oscillator directly, but some SoCs are not, add it for
-compatibility, and put them into port node for flexibility.
+The default value of RX detection stable time is 10us, and this
+margin is too big for some critical cases which cause U3 link fail
+and link to U2(probability is about 1%). So change it to 5us.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/phy/phy-mt65xx-usb3.c |   21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
+ drivers/phy/phy-mt65xx-usb3.c |   18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
 diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
-index 7fff482..f4a3505 100644
+index d972067..fe2392a 100644
 --- a/drivers/phy/phy-mt65xx-usb3.c
 +++ b/drivers/phy/phy-mt65xx-usb3.c
-@@ -153,6 +153,7 @@ struct mt65xx_phy_pdata {
- struct mt65xx_phy_instance {
- 	struct phy *phy;
- 	void __iomem *port_base;
-+	struct clk *ref_clk;	/* reference clock of anolog phy */
- 	u32 index;
- 	u8 type;
- };
-@@ -160,7 +161,6 @@ struct mt65xx_phy_instance {
- struct mt65xx_u3phy {
- 	struct device *dev;
- 	void __iomem *sif_base;	/* only shared sif */
--	struct clk *u3phya_ref;	/* reference clock of usb3 anolog phy */
- 	const struct mt65xx_phy_pdata *pdata;
- 	struct mt65xx_phy_instance **phys;
- 	int nphys;
-@@ -449,9 +449,9 @@ static int mt65xx_phy_init(struct phy *phy)
- 	struct mt65xx_u3phy *u3phy = dev_get_drvdata(phy->dev.parent);
- 	int ret;
+@@ -112,6 +112,14 @@
+ #define P3D_RG_CDR_BIR_LTD0		GENMASK(12, 8)
+ #define P3D_RG_CDR_BIR_LTD0_VAL(x)	((0x1f & (x)) << 8)
  
--	ret = clk_prepare_enable(u3phy->u3phya_ref);
-+	ret = clk_prepare_enable(instance->ref_clk);
- 	if (ret) {
--		dev_err(u3phy->dev, "failed to enable u3phya_ref\n");
-+		dev_err(u3phy->dev, "failed to enable ref_clk\n");
- 		return ret;
- 	}
++#define U3P_U3_PHYD_RXDET1		(SSUSB_SIFSLV_U3PHYD_BASE + 0x128)
++#define P3D_RG_RXDET_STB2_SET		GENMASK(17, 9)
++#define P3D_RG_RXDET_STB2_SET_VAL(x)	((0x1ff & (x)) << 9)
++
++#define U3P_U3_PHYD_RXDET2		(SSUSB_SIFSLV_U3PHYD_BASE + 0x12c)
++#define P3D_RG_RXDET_STB2_SET_P3	GENMASK(8, 0)
++#define P3D_RG_RXDET_STB2_SET_P3_VAL(x)	(0x1ff & (x))
++
+ #define U3P_XTALCTL3		(SSUSB_SIFSLV_SPLLC + 0x0018)
+ #define XC3_RG_U3_XTAL_RX_PWD		BIT(9)
+ #define XC3_RG_U3_FRC_XTAL_RX_PWD	BIT(8)
+@@ -295,6 +303,16 @@ static void phy_instance_init(struct mt65xx_u3phy *u3phy,
+ 	tmp |= P3D_RG_CDR_BIR_LTD0_VAL(0xc) | P3D_RG_CDR_BIR_LTD1_VAL(0x3);
+ 	writel(tmp, port_base + U3P_PHYD_CDR1);
  
-@@ -494,7 +494,7 @@ static int mt65xx_phy_exit(struct phy *phy)
- 	if (instance->type == PHY_TYPE_USB2)
- 		phy_instance_exit(u3phy, instance);
- 
--	clk_disable_unprepare(u3phy->u3phya_ref);
-+	clk_disable_unprepare(instance->ref_clk);
- 	return 0;
++	tmp = readl(port_base + U3P_U3_PHYD_RXDET1);
++	tmp &= ~P3D_RG_RXDET_STB2_SET;
++	tmp |= P3D_RG_RXDET_STB2_SET_VAL(0x10);
++	writel(tmp, port_base + U3P_U3_PHYD_RXDET1);
++
++	tmp = readl(port_base + U3P_U3_PHYD_RXDET2);
++	tmp &= ~P3D_RG_RXDET_STB2_SET_P3;
++	tmp |= P3D_RG_RXDET_STB2_SET_P3_VAL(0x10);
++	writel(tmp, port_base + U3P_U3_PHYD_RXDET2);
++
+ 	dev_dbg(u3phy->dev, "%s(%d)\n", __func__, index);
  }
  
-@@ -594,12 +594,6 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
- 		return PTR_ERR(u3phy->sif_base);
- 	}
- 
--	u3phy->u3phya_ref = devm_clk_get(dev, "u3phya_ref");
--	if (IS_ERR(u3phy->u3phya_ref)) {
--		dev_err(dev, "error to get u3phya_ref\n");
--		return PTR_ERR(u3phy->u3phya_ref);
--	}
--
- 	port = 0;
- 	for_each_child_of_node(np, child_np) {
- 		struct mt65xx_phy_instance *instance;
-@@ -634,6 +628,13 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
- 			goto put_child;
- 		}
- 
-+		instance->ref_clk = devm_clk_get(&phy->dev, "ref");
-+		if (IS_ERR(instance->ref_clk)) {
-+			dev_err(dev, "failed to get ref_clk(id-%d)\n", port);
-+			retval = PTR_ERR(instance->ref_clk);
-+			goto put_child;
-+		}
-+
- 		instance->phy = phy;
- 		instance->index = port;
- 		phy_set_drvdata(phy, instance);
 -- 
 1.7.9.5
