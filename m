@@ -1,177 +1,54 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 22 Feb 2017 10:42:09 -0600
-Subject: [RFC v2 6/7] IIO: add bindings for stm32 DFSDM filter
-In-Reply-To: <1487003909-11710-7-git-send-email-arnaud.pouliquen@st.com>
-References: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
- <1487003909-11710-7-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <20170222164209.62lk5igeymckhimv@rob-hp-laptop>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Wed, 22 Feb 2017 17:43:02 +0100
+Subject: [PATCH v2 0/8] ARM64: Initial Marvell IAP140 enablement
+In-Reply-To: <CAL_JsqJmv--wP+gEt27ZbTT+8GeqKhYc=x3MTPBiz2Jr2wys8A@mail.gmail.com>
+References: <20170222022929.10540-1-afaerber@suse.de>
+ <CAL_JsqJmv--wP+gEt27ZbTT+8GeqKhYc=x3MTPBiz2Jr2wys8A@mail.gmail.com>
+Message-ID: <22850768-8ea8-3d56-5c34-31f24ca3b487@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2017 at 05:38:28PM +0100, Arnaud Pouliquen wrote:
-> Add bindings that describe Digital Filter for Sigma Delta
-> Modulators. DFSDM allows to connect sigma delta
-> modulators and/or PDM microphones.
+Hi Rob,
+
+Am 22.02.2017 um 14:34 schrieb Rob Herring:
+> On Tue, Feb 21, 2017 at 8:29 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>> One limitation is currently the lack of an IAP140 clk driver. Patch 4/4 works
+>> around that for UART0 with a fixed-clock.
 > 
-> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> ---
->  .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        | 125 +++++++++++++++++++++
->  1 file changed, 125 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
+> The PXA1928 clock driver should be close to what you need. They are
+> supposed to be very similar.
+
+Where do you see that in mainline? Not in drivers/clk/pxa/ at least. I'm
+certain the acorn-marvell tree has a PXA1908 clk driver somewhere, too,
+I just haven't ported it yet.
+
+>> Andreas F?rber (8):
+>>   Documentation: arm: Marvell: Document IAP140
+>>   tty: serial: Suppress deprecated SERIAL_PXA on arm64
+>>   tty: serial: 8250_pxa: Implement mmp earlycon
 > 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-> new file mode 100644
-> index 0000000..83937cb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
-> @@ -0,0 +1,125 @@
-> +STMicroelectronics STM32 DFSDM ADC device driver
-> +
-> +
-> +STM32 DFSDM ADC is a sigma delta analog-to-digital converter dedicted to
-> +interface external sigma delta modulators to stm32 micro controlers.
-> +it is mainly targeted for:
-> +- Sigma delta modulators ( motor control, metering...)
-> +- PDM microphones ( audio digital microphone)
-> +
-> +It featured with up to 8 serial digital interface (SPI or Manchester) and
-> +up to 4 filters.
-> +
-> +Each instance of the sub-drivers uses one filter instance.
-> +
-> +Contents of a stm32 dfsdmc root node:
-> +-------------------------------------
-> +Required properties:
-> +- compatible: Should be "st,stm32-dfsdm-adc".
-> +- reg: Offset and length of the DFSDM block register set.
-> +- clocks: IP and serial interfaces clocking. Should be set according
-> +		to rcc clock ID and "clock-names".
-> +- clock-names: Input clock name "dfsdm" must be defined,
-> +		"audio" is optional. If defined CLKOUT is based on the audio
-> +		clock, else "dfsdm" is used.
-> +- clocks: Clock for the analog circuitry (common to all ADCs).
-> +- clock-names: Must be "adc".
-> +
-> +Optional properties:
-> +- st,clkout-freq: needed for SPI master mode
-> +		  SPI clock OUT frequency (Hz).This clock must be set according
-> +		  to "clock" property. Frequency must be a multiple of the rcc
-> +		  clock frequency. If not, clkout frequency will not be
-> +		  accurate.
+> You should not use the pxa serial driver. AFAICT, it was separate to
+> add DMA support, but now the base 8250 driver supports DMA. The base
+> 8250 driver works with the PXA1928 and should also work with the
+> PXA1908.
 
-We already have a standard property to specify the SPI freq.
+Do you personally have one? I didn't spot a pxa1928 DT in mainline.
 
-> +
-> +Contents of a stm32 DFSDM child nodes:
-> +----------------------------------------
-> +
-> +Required properties:
-> +- compatible: Must be:
-> +	"st,stm32-dfsdm-adc" for sigma delta ADCs
-> +	"st,stm32-dfsdm-pdm" for audio digital microphone.
-> +- reg: Specifies the DFSDM filter instance.
-> +- interrupts: IRQ lines connected to each DFSDM filter instance.
-> +- st,adc-channels:	List of single-ended channels muxed for this ADC.
-> +- st,adc-channel-names:	List of single-ended channels Name.
+So, by my reading both 8250_of.c and 8250_pxa.c list "mrvl,mmp-uart" for
+the platform driver. Is that really intentional?
 
-Why do you need names?
+What the early_pxa earlycon does is set the register shift and then
+reuse the 8250 core - that looks perfectly valid to me. Are you possibly
+mixing that up with the non-8250 pxa serial driver that I am already
+suppressing one patch earlier?
 
-> +- st,dai-filter-order:  SinC filter order from 0 to 5.
-> +			0: FastSinC
-> +			[1-5]: order 1 to 5.
-> +			For audio purpose it is recommended to use order 3 to 5.
-> +
-> +Required properties for "st,stm32-dfsdm-adc" compatibility:
-> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
-> +- io-channels: from common iio binding. use to pipe external sigma delta
-> +		modulator or internal ADC output to dfsdm channel.
-> +
-> +Required properties for "st,stm32-dfsdm-pdm" compatibility:
-> +- #sound-dai-cells: must be set to 0.
-> +- dma: DMA controller phandle and DMA request line associated to the
-> +		filter instance ( specified by the field "reg")
-> +- dma-names: must be "rx"
-> +
-> +Optional properties:
-> +- st,adc-channel-types:	Single-ended channel input type. Default value is 0.
+While at it, are you aware that we have two drivers, one pxa and one
+mmp, that bind to "marvell,pdma-1.0"? That seemed wrong to me, too.
 
-How is the default 0 when the values are strings?
+Regards,
+Andreas
 
-> +			- "SPI_R": SPI with data on rising edge (default)
-> +			- "SPI_F": SPI with data on falling edge
-> +			- "MANCH_R": manchester codec, rising edge = logic 0
-> +			- "MANCH_F": manchester codec, falling edge = logic 1
-> +- st,adc-channel-clk-src: Conversion clock source. default value is 1.
-
-Ditto.
-
-Perhaps you should be using the clock binding and assigned-clocks 
-property.
-
-> +			  - "CLKIN": External SPI clock (CLKIN x)
-> +			  - "CLKOUT": internal SPI clock (CLKOUT) (default)
-> +			  - "CLKOUT_F": internal SPI clock divided by 2 (falling edge).
-> +			  - "CLKOUT_R": internal SPI clock divided by 2 (rising edge).
-> +
-> +- st,adc-alt-channel: Must be defined if Two sigma delta modulator are
-> +			  connected on same SPI input.
-> +			  If not set channel n is connected to SPI input n.
-> +			  If set channel n is connected to SPI input n + 1.
-> +
-> +- st,filter0-sync: Set to 1 to synchronize with DFSDM filter instance 0.
-> +		   to used for multi microphone synchronization.
-
-Is there an instance 1?  If not, drop the 0. If you need to expand to 
-multiple instances, you can have multiple values.
-
-> +
-> +Example of a sigma delta adc purpose:
-> +	ads1202: simple_sd_adc at 0 {
-> +		compatible = "sd-modulator";
-> +		#io-channel-cells = <1>;
-> +		status = "okay";
-> +	};
-> +	dfsdm: dfsdm at 40017000 {
-> +		compatible = "st,stm32h7-dfsdm";
-> +		reg = <0x40017000 0x400>;
-> +		clocks = <&timer_clk>;
-> +		clock-names = "dfsdm";
-> +
-> +		dfsdm_adc0: dfsdm-adc0 at 0 {
-> +			compatible = "st,stm32-dfsdm-adc";
-> +			#io-channel-cells = <1>;
-> +			reg = <0>;
-> +			interrupts = <110>;
-> +			st,adc-channels = <0>;
-
-Does reg provide the same thing?
-
-> +			st,adc-channel-names = "in0";
-> +			st,adc-channel-types = "SPI_R";
-> +			st,adc-channel-clk-src = "CLKOUT";
-> +			io-channels = <&ads1202 0>;
-> +	};
-> +
-> +Example of a pdm microphone purpose:
-> +	dfsdm: dfsdm at 40017000 {
-> +		compatible = "st,stm32h7-dfsdm";
-> +		reg = <0x40017000 0x400>;
-> +		clocks = <&timer_clk>;
-> +		clock-names = "dfsdm";
-> +
-> +		dfsdm_pdm0: dfsdm-pdm at 0 {
-> +			compatible = "st,stm32-dfsdm-pdm";
-> +			#sound-dai-cells = <0>;
-> +			reg = <0>;
-> +			interrupts = <110>;
-> +			dmas = <&dmamux1 102 0x400 0x00>;
-> +			dma-names = "rx";
-> +			st,adc-channels = <0>;
-> +			st,adc-channel-names = "pdm1";
-> +			st,adc-channel-types = "SPI_R";
-> +			st,adc-channel-clk-src = "CLKOUT";
-> +		};
-> +	}
-> -- 
-> 1.9.1
-> 
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
