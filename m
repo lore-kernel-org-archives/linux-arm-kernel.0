@@ -1,172 +1,266 @@
-From: thibault.saunier@osg.samsung.com (Thibault Saunier)
-Date: Wed, 22 Feb 2017 10:05:56 -0300
-Subject: [PATCH v5 1/3] [media] exynos-gsc: Use user configured colorspace
- if provided
-In-Reply-To: <329a892b-eb57-26a5-d048-cfe4efc331b6@xs4all.nl>
-References: <20170221192059.29745-1-thibault.saunier@osg.samsung.com>
- <20170221192059.29745-2-thibault.saunier@osg.samsung.com>
- <329a892b-eb57-26a5-d048-cfe4efc331b6@xs4all.nl>
-Message-ID: <58ee4eb5-981d-175f-52a9-445bbc265af0@osg.samsung.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 22 Feb 2017 14:06:16 +0100
+Subject: [RFC 27/55] KVM: arm/arm64: Emulate GICH interface on GICv2
+In-Reply-To: <1483943091-1364-28-git-send-email-jintack@cs.columbia.edu>
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+ <1483943091-1364-28-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <20170222130616.GO26976@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Jan 09, 2017 at 01:24:23AM -0500, Jintack Lim wrote:
+> Emulate GICH interface accesses from the guest hypervisor.
+> 
+> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> Signed-off-by: Shih-Wei Li <shihwei@cs.columbia.edu>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm64/kvm/Makefile            |   1 +
+>  virt/kvm/arm/vgic/vgic-v2-nested.c | 207 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 208 insertions(+)
+>  create mode 100644 virt/kvm/arm/vgic/vgic-v2-nested.c
+> 
+> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+> index 9c35e9a..8573faf 100644
+> --- a/arch/arm64/kvm/Makefile
+> +++ b/arch/arm64/kvm/Makefile
+> @@ -37,3 +37,4 @@ kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
+>  
+>  kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += handle_exit_nested.o
+>  kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += emulate-nested.o
+> +kvm-$(CONFIG_KVM_ARM_NESTED_HYP) += $(KVM)/arm/vgic/vgic-v2-nested.o
+> diff --git a/virt/kvm/arm/vgic/vgic-v2-nested.c b/virt/kvm/arm/vgic/vgic-v2-nested.c
+> new file mode 100644
+> index 0000000..b13128e
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic-v2-nested.c
+> @@ -0,0 +1,207 @@
+> +#include <linux/cpu.h>
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/io.h>
+> +#include <linux/uaccess.h>
+> +
+> +#include <linux/irqchip/arm-gic.h>
+> +
+> +#include <asm/kvm_emulate.h>
+> +#include <asm/kvm_arm.h>
+> +#include <asm/kvm_mmu.h>
+> +#include <kvm/arm_vgic.h>
+> +
+> +#include "vgic.h"
+> +#include "vgic-mmio.h"
+> +
+> +static inline struct vgic_v2_cpu_if *vcpu_nested_if(struct kvm_vcpu *vcpu)
+> +{
+> +	return &vcpu->arch.vgic_cpu.nested_vgic_v2;
+> +}
+> +
+> +static inline struct vgic_v2_cpu_if *vcpu_shadow_if(struct kvm_vcpu *vcpu)
+> +{
+> +	return &vcpu->arch.vgic_cpu.shadow_vgic_v2;
+> +}
+> +
+> +static unsigned long vgic_mmio_read_v2_vtr(struct kvm_vcpu *vcpu,
+> +					   gpa_t addr, unsigned int len)
+> +{
+> +	u32 reg;
+> +
+> +	reg = kvm_vgic_global_state.nr_lr - 1;
+> +	reg |= 0b100 << 26;
+> +	reg |= 0b100 << 29;
 
+Pure magic?  Can we have some defines?  Have you checked the existing
+header file if we have some defines for this?
 
-On 02/21/2017 11:19 PM, Hans Verkuil wrote:
->
-> On 02/21/2017 11:20 AM, Thibault Saunier wrote:
->> Use colorspace provided by the user as we are only doing scaling and
->> color encoding conversion, we won't be able to transform the colorspace
->> itself and the colorspace won't mater in that operation.
->>
->> Also always use output colorspace on the capture side.
->>
->> Start using 576p as a threashold to compute the colorspace.
->> The media documentation says that the V4L2_COLORSPACE_SMPTE170M colorspace
->> should be used for SDTV and V4L2_COLORSPACE_REC709 for HDTV. But drivers
->> don't agree on the display resolution that should be used as a threshold.
->>
->>  From EIA CEA 861B about colorimetry for various resolutions:
->>
->>    - 5.1 480p, 480i, 576p, 576i, 240p, and 288p
->>      The color space used by the 480-line, 576-line, 240-line, and 288-line
->>      formats will likely be based on SMPTE 170M [1].
->>    - 5.2 1080i, 1080p, and 720p
->>      The color space used by the high definition formats will likely be
->>      based on ITU-R BT.709-4
->>
->> This indicates that in the case that userspace does not specify what
->> colorspace should be used, we should use 576p  as a threshold to set
->> V4L2_COLORSPACE_REC709 instead of V4L2_COLORSPACE_SMPTE170M. Even if it is
->> only 'likely' and not a requirement it is the best guess we can make.
->>
->> The stream should have been encoded with the information and userspace
->> has to pass it to the driver if it is not the case, otherwise we won't be
->> able to handle it properly anyhow.
->>
->> Also, check for the resolution in G_FMT instead unconditionally setting
->> the V4L2_COLORSPACE_REC709 colorspace.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
->> Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
->>
->> ---
->>
->> Changes in v5:
->> - Squash commit to always use output colorspace on the capture side
->>    inside this one
->> - Fix typo in commit message
->>
->> Changes in v4:
->> - Reword commit message to better back our assumptions on specifications
->>
->> Changes in v3:
->> - Do not check values in the g_fmt functions as Andrzej explained in previous review
->> - Added 'Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>'
->>
->> Changes in v2: None
->>
->>   drivers/media/platform/exynos-gsc/gsc-core.c | 20 +++++++++++++++-----
->>   drivers/media/platform/exynos-gsc/gsc-core.h |  1 +
->>   2 files changed, 16 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
->> index 59a634201830..772599de8c13 100644
->> --- a/drivers/media/platform/exynos-gsc/gsc-core.c
->> +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
->> @@ -454,6 +454,7 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
->>   	} else {
->>   		min_w = variant->pix_min->target_rot_dis_w;
->>   		min_h = variant->pix_min->target_rot_dis_h;
->> +		pix_mp->colorspace = ctx->out_colorspace;
->>   	}
->>   
->>   	pr_debug("mod_x: %d, mod_y: %d, max_w: %d, max_h = %d",
->> @@ -472,10 +473,15 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
->>   
->>   	pix_mp->num_planes = fmt->num_planes;
->>   
->> -	if (pix_mp->width >= 1280) /* HD */
->> -		pix_mp->colorspace = V4L2_COLORSPACE_REC709;
->> -	else /* SD */
->> -		pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
->> +	if (pix_mp->colorspace == V4L2_COLORSPACE_DEFAULT) {
->> +		if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
-> I'd use || instead of && here. Ditto for the next patch.
->
->> +			pix_mp->colorspace = V4L2_COLORSPACE_REC709;
->> +		else /* SD */
->> +			pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
->> +	}
-> Are you sure this is in fact how it is used? If the source of the video
-> is the sensor (camera), then the colorspace is typically SRGB. I'm not
-> really sure you should guess here. All a mem2mem driver should do is to
-> pass the colorspace etc. information from the output to the capture side,
-> and not invent things. That simply makes no sense.
+> +
+> +	return reg;
+> +}
+> +
+> +static inline bool lr_triggers_eoi(u32 lr)
+> +{
+> +	return !(lr & (GICH_LR_STATE | GICH_LR_HW)) && (lr & GICH_LR_EOI);
+> +}
+> +
+> +static unsigned long get_eisr(struct kvm_vcpu *vcpu, bool upper_reg)
+> +{
+> +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
+> +	int max_lr = upper_reg ? 64 : 32;
+> +	int min_lr = upper_reg ? 32 : 0;
+> +	int nr_lr = min(kvm_vgic_global_state.nr_lr, max_lr);
+> +	int i;
+> +	u32 reg = 0;
 
-This is not a camera device but a colorspace conversion device, in many
-cases the info will not be passed by the userspace, basically because 
-the info
-is not encoded in the media stream (this often happens). I am not 
-inventing here,
-just making sure we use the most likely value in case none was provided 
-(and if none
-was provided it should always be correct given that the encoded stream 
-was not broken).
+So the assumption here is that we can only emualte a virtual GICH
+interface with the same number of LRs that the hardware has, yes ?  Can
+you document this assumption in the commit message and explain how we
+deal with nr_lr for all this logic based on that.
 
-In the case the source is a camera and then we use the colorspace 
-converter then the info
-should copied from the camera to the transcoding node (by userspace) so 
-there should be
-no problem.
+Seems like this could go in the commit message.
 
-What I am doing here is what is done in other drivers.
+> +
+> +	for (i = min_lr; i < nr_lr; i++) {
+> +		if (lr_triggers_eoi(cpu_if->vgic_lr[i]))
+> +			reg |= BIT(i - min_lr);
+> +	}
+> +
+> +	return reg;
+> +}
+> +
+> +static unsigned long vgic_mmio_read_v2_eisr0(struct kvm_vcpu *vcpu,
+> +					     gpa_t addr, unsigned int len)
+> +{
+> +	return get_eisr(vcpu, false);
+> +}
+> +
+> +static unsigned long vgic_mmio_read_v2_eisr1(struct kvm_vcpu *vcpu,
+> +					     gpa_t addr, unsigned int len)
+> +{
+> +	return get_eisr(vcpu, true);
+> +}
+> +
+> +static u32 get_elrsr(struct kvm_vcpu *vcpu, bool upper_reg)
+> +{
+> +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
+> +	int max_lr = upper_reg ? 64 : 32;
+> +	int min_lr = upper_reg ? 32 : 0;
+> +	int nr_lr = min(kvm_vgic_global_state.nr_lr, max_lr);
+> +	u32 reg = 0;
+> +	int i;
+> +
+> +	for (i = min_lr; i < nr_lr; i++) {
+> +		if (!(cpu_if->vgic_lr[i] & GICH_LR_STATE))
+> +			reg |= BIT(i - min_lr);
+> +	}
+> +
+> +	return reg;
+> +}
+> +
+> +static unsigned long vgic_mmio_read_v2_elrsr0(struct kvm_vcpu *vcpu,
+> +					      gpa_t addr, unsigned int len)
+> +{
+> +	return get_elrsr(vcpu, false);
+> +}
+> +
+> +static unsigned long vgic_mmio_read_v2_elrsr1(struct kvm_vcpu *vcpu,
+> +					      gpa_t addr, unsigned int len)
+> +{
+> +	return get_elrsr(vcpu, true);
+> +}
+> +
+> +static unsigned long vgic_mmio_read_v2_misr(struct kvm_vcpu *vcpu,
+> +					    gpa_t addr, unsigned int len)
+> +{
+> +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
+> +	int nr_lr = kvm_vgic_global_state.nr_lr;
+> +	u32 reg = 0;
+> +
+> +	if (vgic_mmio_read_v2_eisr0(vcpu, addr, len) ||
+> +			vgic_mmio_read_v2_eisr1(vcpu, addr, len))
+> +		reg |= GICH_MISR_EOI;
+> +
+> +	if (cpu_if->vgic_hcr & GICH_HCR_UIE) {
+> +		u32 elrsr0 = vgic_mmio_read_v2_elrsr0(vcpu, addr, len);
+> +		u32 elrsr1 = vgic_mmio_read_v2_elrsr1(vcpu, addr, len);
+> +		int used_lrs;
+> +
+> +		used_lrs = nr_lr - (hweight32(elrsr0) + hweight32(elrsr1));
+> +		if (used_lrs <= 1)
+> +			reg |= GICH_MISR_U;
+> +	}
+> +
+> +	/* TODO: Support remaining bits in this register */
 
-Regards,
+Is this going to happen in this series?  Why don't we just do it here?
 
-Thibault
->
-> We may have to update the documentation or v4l2-compliance test if this
-> is an issue. The more I think about this, the more I think we shouldn't
-> do this guessing game.
->
-> Regards,
->
-> 	Hans
->
->> +
->> +	if (V4L2_TYPE_IS_OUTPUT(f->type))
->> +		ctx->out_colorspace = pix_mp->colorspace;
->>   
->>   	for (i = 0; i < pix_mp->num_planes; ++i) {
->>   		struct v4l2_plane_pix_format *plane_fmt = &pix_mp->plane_fmt[i];
->> @@ -519,9 +525,13 @@ int gsc_g_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
->>   	pix_mp->height		= frame->f_height;
->>   	pix_mp->field		= V4L2_FIELD_NONE;
->>   	pix_mp->pixelformat	= frame->fmt->pixelformat;
->> -	pix_mp->colorspace	= V4L2_COLORSPACE_REC709;
->>   	pix_mp->num_planes	= frame->fmt->num_planes;
->>   
->> +	if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
->> +		pix_mp->colorspace = V4L2_COLORSPACE_REC709;
->> +	else /* SD */
->> +		pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
->> +
->>   	for (i = 0; i < pix_mp->num_planes; ++i) {
->>   		pix_mp->plane_fmt[i].bytesperline = (frame->f_width *
->>   			frame->fmt->depth[i]) / 8;
->> diff --git a/drivers/media/platform/exynos-gsc/gsc-core.h b/drivers/media/platform/exynos-gsc/gsc-core.h
->> index 696217e9af66..715d9c9d8d30 100644
->> --- a/drivers/media/platform/exynos-gsc/gsc-core.h
->> +++ b/drivers/media/platform/exynos-gsc/gsc-core.h
->> @@ -376,6 +376,7 @@ struct gsc_ctx {
->>   	struct v4l2_ctrl_handler ctrl_handler;
->>   	struct gsc_ctrls	gsc_ctrls;
->>   	bool			ctrls_rdy;
->> +	enum v4l2_colorspace out_colorspace;
->>   };
->>   
->>   void gsc_set_prefbuf(struct gsc_dev *gsc, struct gsc_frame *frm);
->>
+> +	return reg;
+> +}
+> +
+> +static unsigned long vgic_mmio_read_v2_gich(struct kvm_vcpu *vcpu,
+> +					    gpa_t addr, unsigned int len)
+> +{
+> +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
+> +	u32 value;
+> +
+> +	switch (addr & 0xfff) {
+> +	case GICH_HCR:
+> +		value = cpu_if->vgic_hcr;
+> +		break;
+> +	case GICH_VMCR:
+> +		value = cpu_if->vgic_vmcr;
+> +		break;
+> +	case GICH_APR:
+> +		value = cpu_if->vgic_apr;
+> +		break;
+> +	case GICH_LR0 ... (GICH_LR0 + 4 * (VGIC_V2_MAX_LRS - 1)):
+> +		value = cpu_if->vgic_lr[(addr & 0xff) >> 2];
+> +		break;
+> +	default:
+> +		return 0;
+> +	}
+> +
+> +	return value;
+> +}
+> +
+> +static void vgic_mmio_write_v2_gich(struct kvm_vcpu *vcpu,
+> +				    gpa_t addr, unsigned int len,
+> +				    unsigned long val)
+> +{
+> +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
+> +
+> +	switch (addr & 0xfff) {
+> +	case GICH_HCR:
+> +		cpu_if->vgic_hcr = val;
+> +		break;
+> +	case GICH_VMCR:
+> +		cpu_if->vgic_vmcr = val;
+> +		break;
+> +	case GICH_APR:
+> +		cpu_if->vgic_apr = val;
+> +		break;
+> +	case GICH_LR0 ... (GICH_LR0 + 4 * (VGIC_V2_MAX_LRS - 1)):
+> +		cpu_if->vgic_lr[(addr & 0xff) >> 2] = val;
+
+Don't you need to check if we actually support this particular LR ?
+
+> +		break;
+> +	}
+> +}
+> +
+> +static const struct vgic_register_region vgic_v2_gich_registers[] = {
+> +	REGISTER_DESC_WITH_LENGTH(GICH_HCR,
+> +		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich, 4,
+> +		VGIC_ACCESS_32bit),
+> +	REGISTER_DESC_WITH_LENGTH(GICH_VTR,
+> +		vgic_mmio_read_v2_vtr, vgic_mmio_write_wi, 4,
+> +		VGIC_ACCESS_32bit),
+> +	REGISTER_DESC_WITH_LENGTH(GICH_VMCR,
+> +		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich, 4,
+> +		VGIC_ACCESS_32bit),
+> +	REGISTER_DESC_WITH_LENGTH(GICH_MISR,
+> +		vgic_mmio_read_v2_misr, vgic_mmio_write_wi, 4,
+> +		VGIC_ACCESS_32bit),
+> +	REGISTER_DESC_WITH_LENGTH(GICH_EISR0,
+> +		vgic_mmio_read_v2_eisr0, vgic_mmio_write_wi, 4,
+> +		VGIC_ACCESS_32bit),
+> +	REGISTER_DESC_WITH_LENGTH(GICH_EISR1,
+> +		vgic_mmio_read_v2_eisr1, vgic_mmio_write_wi, 4,
+> +		VGIC_ACCESS_32bit),
+> +	REGISTER_DESC_WITH_LENGTH(GICH_ELRSR0,
+> +		vgic_mmio_read_v2_elrsr0, vgic_mmio_write_wi, 4,
+> +		VGIC_ACCESS_32bit),
+> +	REGISTER_DESC_WITH_LENGTH(GICH_ELRSR1,
+> +		vgic_mmio_read_v2_elrsr1, vgic_mmio_write_wi, 4,
+> +		VGIC_ACCESS_32bit),
+> +	REGISTER_DESC_WITH_LENGTH(GICH_APR,
+> +		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich, 4,
+> +		VGIC_ACCESS_32bit),
+> +	REGISTER_DESC_WITH_LENGTH(GICH_LR0,
+> +		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich,
+> +		4 * VGIC_V2_MAX_LRS, VGIC_ACCESS_32bit),
+> +};
+> -- 
+> 1.9.1
+> 
+> 
