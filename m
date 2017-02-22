@@ -1,73 +1,36 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 22 Feb 2017 14:47:39 +0100
-Subject: [PATCH/RFC 3/6] drivers: firmware: psci: Implement shallow
- suspend mode
-In-Reply-To: <3caf0f3f-76e5-cb1e-7c0f-87ed5e1c2b86@arm.com>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <1487622809-25127-4-git-send-email-geert+renesas@glider.be>
- <20170221110712.GB5021@amd> <de2a15d4-9ac2-9ba9-a47a-eacbf478f601@arm.com>
- <CAMuHMdVmu4AYZ6MZHd79N2-2gELR6s3oZ46UnEszCfLvHymY1w@mail.gmail.com>
- <3caf0f3f-76e5-cb1e-7c0f-87ed5e1c2b86@arm.com>
-Message-ID: <CAMuHMdU0fTtEXN9k477e3S-UUMNhd=U4_r0VOcyA1TGEgA5rmA@mail.gmail.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Wed, 22 Feb 2017 15:01:45 +0100
+Subject: [PATCH v2 0/4] ARM: dts: da850-evm: vpif DT changes
+Message-ID: <1487772109-10014-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+This series adds necessary changes to make vpif work on the da850-evm
+board.
 
-On Tue, Feb 21, 2017 at 6:22 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> On 21/02/17 16:32, Geert Uytterhoeven wrote:
->> On Tue, Feb 21, 2017 at 12:14 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>> On 21/02/17 11:07, Pavel Machek wrote:
->>>>> Enable support for "shallow" suspend mode, also known as "Standby" or
->>>>> "Power-On Suspend".
->>>>>
->>>>> As secondary CPU cores are taken offline, "shallow" suspend mode saves
->>>>> slightly more power than "s2idle", but less than "deep" suspend mode.
->>>>> However, unlike "deep" suspend mode, "shallow" suspend mode can be used
->>>>> regardless of the presence of support for PSCI_SYSTEM_SUSPEND, which is
->>>>> an optional API in PSCI v1.0.
->>>>
->>>> If system supports "shallow" suspend, why does not PSCI implement it?
->>>
->>> Yes it can, and IIUC it already does on this platform with CPU_SUSPEND.
->>> All it now needs is just to use existing "freeze" suspend mode in Linux.
->>
->> How can Linux know if using "deep" suspend will allow to wake-up the system
->> according to configured wake-up sources, or not?
->
-> I am not sure if we have such selective configuration of wakeup source
-> implemented in Linux.
->
-> ACPI specification has some provisions where each device can state if it
-> can specify device state in each system sleeping state that can wake the
-> system.
->
-> DT has no mechanism today to express this relations. I had brought up
-> this discussion in plumbers(2015). Refer slide 7 in [0]
->
-> And the way you are trying to do that is not correct IMO especially
-> making it just PSCI specific.
->
->> Note that "it will not, ever" is an accepted answer.
->
-> IIUC, it's not implemented today. I can't talk about future ;), but your
+The first patch only contains whitespace error fixes.
 
-Good, so there's no need for the DT property, and drivers/firmware/psci.c
-should aways call do_cpu_idle() instead of PSCI SYSTEM_SUSPEND if any
-other wake-up sources are configured?
+The second patch add a pinctrl node for vpif display pins.
 
-That follows the principle of least surprise: it doesn't leave the user with
-a system that won't wake up the way he configured it to wake up.
+The third adds the UI expander node that is needed to select the video
+capture functionality.
 
-> proposal is horrible hack.
+The last patch extends the vpif node with an output port.
 
-Gr{oetje,eeting}s,
+v1 -> v2:
+- used enable-gpios property instead of gpio hogs
+- renamed the UI expander
+- corrected the commit message in patch 2/4
 
-                        Geert
+Bartosz Golaszewski (4):
+  ARM: dts: da850-evm: fix whitespace errors
+  ARM: dts: da850: add vpif video display pins
+  ARM: dts: da850-evm: add the UI expander node
+  ARM: dts: da850-evm: add the output port to the vpif node
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+ arch/arm/boot/dts/da850-evm.dts | 35 +++++++++++++++++++++++++----------
+ arch/arm/boot/dts/da850.dtsi    | 25 ++++++++++++++++++++++---
+ 2 files changed, 47 insertions(+), 13 deletions(-)
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+2.9.3
