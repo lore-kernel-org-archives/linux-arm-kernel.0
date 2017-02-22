@@ -1,99 +1,66 @@
-From: flatmax@flatmax.org (Matt Flax)
-Date: Wed, 22 Feb 2017 17:56:40 +1100
-Subject: [PATCH v8] ASoC: bcm2835: Add 8 channel (multitrack) capability
-In-Reply-To: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
-References: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
-Message-ID: <1487746600-11065-1-git-send-email-flatmax@flatmax.org>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 22 Feb 2017 15:41:02 +0800
+Subject: [PATCH 2/2] arch_timer: acpi: add hisi timer erratum data
+In-Reply-To: <874lzn602f.fsf@on-the-bus.cambridge.arm.com>
+References: <1485254391-51551-1-git-send-email-guohanjun@huawei.com>
+ <1485254391-51551-3-git-send-email-guohanjun@huawei.com>
+ <20170124105717.GB6277@leverpostej>
+ <a2ac2a70-09fb-5cec-c090-b8ebde90e24f@arm.com> <589D6776.2010400@huawei.com>
+ <6c3a2952-731b-dfae-ba22-f9d7df25d691@arm.com> <58AC2AEF.1030803@huawei.com>
+ <874lzn602f.fsf@on-the-bus.cambridge.arm.com>
+Message-ID: <58AD408E.5080409@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds multitrack capability if in DSP mode A and the
-codec is master.
+On 2017/2/21 23:22, Marc Zyngier wrote:
+> On Tue, Feb 21 2017 at 11:56:31 am GMT, Hanjun Guo <guohanjun@huawei.com> wrote:
+>> Hi Marc,
+> [...]
+>
+[...]
+>>
+>> And I got compile errors for this patch [1], seems "#include <linux/acpi.h>" in
+>> arch/arm64/include/asm/arch_timer.h triggers the problem of head
+>> file inclusions (too early to include <linux/sched.h>?), I'm looking into it,
+>> if you can help to take a look too, that will be great :)
+> This is really much more complicated (and uglier) than what I had in
+> mind, and I don't want to add more cruft to the erratum description
+> structure. So instead of trying to explain what I wanted to see, here's
+> the patches I whipped together.
+>
+> Please let me know if they work for you (as I have no way of testing
+> them).
+>
+> Thanks,
+>
+> 	M.
+>
+> >From 50eb735436f9f6482285939b39b52d858d848537 Mon Sep 17 00:00:00 2001
+> From: Marc Zyngier <marc.zyngier@arm.com>
+> Date: Tue, 21 Feb 2017 14:37:30 +0000
+> Subject: [PATCH 1/2] arm64: arch_timer: Allow erratum matching with ACPI OEM
+>  information
+>
+> Just as we're able to identify a broken platform using some DT
+> information, let's enable a way to spot the offenders with ACPI.
+>
+> The difference is that we can only match on some OEM info instead
+> of implementation-specific properties. So in order to avoid the
+> insane multiplication of errata structures, we allow an array
+> of OEM descriptions to be attached to an erratum structure.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/arch_timer.h  |  1 +
+>  drivers/clocksource/arm_arch_timer.c | 33 +++++++++++++++++++++++++++++++++
+>  2 files changed, 34 insertions(+)
 
-In bcm2835_i2s_startup, snd_pcm_hw_constraint_single is used to set
-channels to 8 if both SND_SOC_DAIFMT_CBM_CFM and SND_SOC_DAIFMT_DSP_A
-are set. Otherwise, channels are set to 2. These settings are
-accomplished using the SNDRV_PCM_HW_PARAM_CHANNELS variable.
+Marc, thank you for the help, I tested your patches on D03, I got:
 
-In bcm2835_i2s_shutdown the channels are set to 2 by default.
+[    0.000000] arm_arch_timer: Enabling global workaround for HiSilicon erratum 161010101
+[    0.000000] arm_arch_timer: CPU0: Trapping CNTVCT access
 
-In bcm2835_i2s_hw_params, DSP mode A format is now an option.
-Before replicating the format variable (from ch2 to ch1) for
-register loading, requested channels are checked to be either 2 or 8.
-This can be expanded later to accomodate other channel counts if
-supported by the sound card hardware.
+in the boot log, which means the framework and ACPI patches work fine.
 
-Signed-off-by: Matt Flax <flatmax@flatmax.org>
----
- sound/soc/bcm/bcm2835-i2s.c | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
-
-diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
-index 6ba2049..4b5f3f1 100644
---- a/sound/soc/bcm/bcm2835-i2s.c
-+++ b/sound/soc/bcm/bcm2835-i2s.c
-@@ -296,6 +296,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
- 
- 	switch (dev->fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
- 	case SND_SOC_DAIFMT_I2S:
-+	case SND_SOC_DAIFMT_DSP_A:
- 		data_delay = 1;
- 		break;
- 	default:
-@@ -312,6 +313,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
- 
- 	switch (params_channels(params)) {
- 	case 2:
-+	case 8:
- 		format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
- 		format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
- 		format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
-@@ -526,7 +528,17 @@ static int bcm2835_i2s_startup(struct snd_pcm_substream *substream,
- 	regmap_update_bits(dev->i2s_regmap, BCM2835_I2S_CS_A_REG,
- 			BCM2835_I2S_STBY, BCM2835_I2S_STBY);
- 
--	return 0;
-+	/* Set the max channels to 8 if the codec is master and
-+	 * we are in DSP A mode. Otherwise only allow 2 channels.
-+	 */
-+	if ((dev->fmt &
-+		(SND_SOC_DAIFMT_MASTER_MASK | SND_SOC_DAIFMT_FORMAT_MASK))
-+			== (SND_SOC_DAIFMT_CBM_CFM | SND_SOC_DAIFMT_DSP_A))
-+		return snd_pcm_hw_constraint_single(substream->runtime,
-+			SNDRV_PCM_HW_PARAM_CHANNELS, 8);
-+	else
-+		return snd_pcm_hw_constraint_single(substream->runtime,
-+			SNDRV_PCM_HW_PARAM_CHANNELS, 2);
- }
- 
- static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
-@@ -549,6 +561,10 @@ static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
- 	 * not stop the clock when SND_SOC_DAIFMT_CONT
- 	 */
- 	bcm2835_i2s_stop_clock(dev);
-+
-+	/* Default to 2 channels */
-+	snd_pcm_hw_constraint_single(substream->runtime,
-+			SNDRV_PCM_HW_PARAM_CHANNELS, 2);
- }
- 
- static const struct snd_soc_dai_ops bcm2835_i2s_dai_ops = {
-@@ -576,16 +592,12 @@ static struct snd_soc_dai_driver bcm2835_i2s_dai = {
- 	.name	= "bcm2835-i2s",
- 	.probe	= bcm2835_i2s_dai_probe,
- 	.playback = {
--		.channels_min = 2,
--		.channels_max = 2,
- 		.rates =	SNDRV_PCM_RATE_8000_192000,
- 		.formats =	SNDRV_PCM_FMTBIT_S16_LE
- 				| SNDRV_PCM_FMTBIT_S24_LE
- 				| SNDRV_PCM_FMTBIT_S32_LE
- 		},
- 	.capture = {
--		.channels_min = 2,
--		.channels_max = 2,
- 		.rates =	SNDRV_PCM_RATE_8000_192000,
- 		.formats =	SNDRV_PCM_FMTBIT_S16_LE
- 				| SNDRV_PCM_FMTBIT_S24_LE
--- 
-2.7.4
+Thanks
+Hanjun
