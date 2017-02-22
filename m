@@ -1,257 +1,88 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 22 Feb 2017 14:12:46 +0100
-Subject: [RFC 28/55] KVM: arm/arm64: Prepare vgic state for the nested VM
-In-Reply-To: <1483943091-1364-29-git-send-email-jintack@cs.columbia.edu>
-References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
- <1483943091-1364-29-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <20170222131246.GP26976@cbox>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 22 Feb 2017 14:14:42 +0100
+Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
+ power
+In-Reply-To: <1975396.x0czmkNPOW@aspire.rjw.lan>
+References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+ <94167d3a-e005-3af0-d290-a1086684d570@arm.com>
+ <3c8b3f2d-8604-f999-4208-a82f171b64f2@arm.com>
+ <1975396.x0czmkNPOW@aspire.rjw.lan>
+Message-ID: <CAMuHMdUWMN1ZyRn=eL6MQZeZHOf5zOC=njdnuL9-9CDS2h8CMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 01:24:24AM -0500, Jintack Lim wrote:
-> When entering a nested VM, we set up the hypervisor control interface
-> based on what the guest hypervisor has set. Especially, we investigate
-> each list register written by the guest hypervisor whether HW bit is
-> set.  If so, we translate hw irq number from the guest's point of view
-> to the real hardware irq number if there is a mapping.
+Hi Rafael,
 
-Does that really always work?
+On Wed, Feb 22, 2017 at 2:14 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Tuesday, February 21, 2017 06:45:13 PM Sudeep Holla wrote:
+>> On 21/02/17 18:27, Sudeep Holla wrote:
+>> > On 21/02/17 17:51, Sudeep Holla wrote:
+>> >> On 21/02/17 17:34, Geert Uytterhoeven wrote:
+>> >>> That's more or less what /sys/power/mem_sleep does, though.
+>> >>
+>> >> OK, I will go through that in detail.
+>> >
+>> > OK, I went through the patch and the main intention is was added.
+>> > So I will begin by summarizing my understanding:
+>> >
+>> > A new suspend interface(/sys/power/mem_sleep) is added to allow the
+>> > "mem" string in /sys/power/state to represent multiple things that can
+>> > be selected.
+>> >
+>> > Before:
+>> > A. echo freeze > /sys/power/state ---> Enters s2idle
+>> > B. echo mem > /sys/power/state ---> Enters s2r(a.k.a now deep mem sleep)
+>> >
+>> > After:
+>> > 1. echo freeze > /sys/power/state ---> Enters s2idle still same
+>> > 2. echo s2idle > /sys/power/mem_sleep
+>> >    echo mem > /sys/power/state ---> Also enter s2idle
+>> > 3. echo deep > /sys/power/mem_sleep
+>> >    echo mem > /sys/power/state ---> Also enter s2r(same as [B] above)
+>> >
+>> > Please note I have carefully dropped standby/shallow as we will not
+>> > support that state on ARM64 platforms(refer previous discussions for the
+>> > same)
+>> >
+>> > Now IIUC, you need 2 above. So, since this new interface allow mem to
+>> > mean "s2idle", we need to fix the core to register default suspend_ops
+>> > to achieve what you need.
+>>
+>> I take this back, you have everything you need in place, nothing needs
+>> to be done. I just checked again. If I don't register PSCI suspend_ops,
+>> I still get mem in /sys/power/state with s2idle in /sys/power/mem_sleep
+>> which is exactly what we need. Again we don't support standby/shallow
+>> state on ARM64/PSCI.
+>
+> Except for one thing which may or may not be a concern here.
+>
+> Suspend to idle should only go into states in which all of the available wakeup
+> devices work.  If there are devices that cannot wake you up from a given state,
+> this isn't "idle" any more, is it?
 
-Are there not some assumptions about the virtual device that the guest
-hypervisor is mapping the virtual IRQ to also exists as an equivalent
-device with some connected state on the host?
+Indeed. And I have no problem with handling wake-up sources from Linux,
+as Linux knows how to handle them.
 
-Thanks,
--Christoffer
+> As for the device wakeup disable/enable interface, it is for controlling
+> whether or not a given device should be allowed to generate wakeup signals at
+> all.
 
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-> ---
->  arch/arm/include/asm/kvm_emulate.h   |  5 ++
->  arch/arm64/include/asm/kvm_emulate.h |  5 ++
->  arch/arm64/kvm/context.c             |  4 ++
->  include/kvm/arm_vgic.h               |  8 +++
->  virt/kvm/arm/vgic/vgic-init.c        |  3 ++
->  virt/kvm/arm/vgic/vgic-v2-nested.c   | 99 ++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic.h             | 11 ++++
->  7 files changed, 135 insertions(+)
-> 
-> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> index 0fa2f5a..05d5906 100644
-> --- a/arch/arm/include/asm/kvm_emulate.h
-> +++ b/arch/arm/include/asm/kvm_emulate.h
-> @@ -101,6 +101,11 @@ static inline bool vcpu_mode_el2(const struct kvm_vcpu *vcpu)
->  	return false;
->  }
->  
-> +static inline bool vcpu_el2_imo_is_set(const struct kvm_vcpu *vcpu)
-> +{
-> +	return false;
-> +}
-> +
->  static inline unsigned long *vcpu_pc(struct kvm_vcpu *vcpu)
->  {
->  	return &vcpu->arch.ctxt.gp_regs.usr_regs.ARM_pc;
-> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> index 0987ee4..a9c993f 100644
-> --- a/arch/arm64/include/asm/kvm_emulate.h
-> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> @@ -178,6 +178,11 @@ static inline bool vcpu_mode_el2(const struct kvm_vcpu *vcpu)
->  	return mode == PSR_MODE_EL2h || mode == PSR_MODE_EL2t;
->  }
->  
-> +static inline bool vcpu_el2_imo_is_set(const struct kvm_vcpu *vcpu)
-> +{
-> +	return (vcpu_el2_reg(vcpu, HCR_EL2) & HCR_IMO);
-> +}
-> +
->  static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
->  {
->  	return vcpu->arch.fault.esr_el2;
-> diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
-> index 0025dd9..7a94c9d 100644
-> --- a/arch/arm64/kvm/context.c
-> +++ b/arch/arm64/kvm/context.c
-> @@ -161,6 +161,8 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
->  		ctxt->hw_sys_regs = ctxt->sys_regs;
->  		ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
->  	}
-> +
-> +	vgic_v2_setup_shadow_state(vcpu);
->  }
->  
->  /**
-> @@ -179,6 +181,8 @@ void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
->  		*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
->  		ctxt->gp_regs.sp_el1 = ctxt->hw_sp_el1;
->  	}
-> +
-> +	vgic_v2_restore_shadow_state(vcpu);
->  }
->  
->  void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt)
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 9a9cb27..484f6b1 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -312,6 +312,14 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
->  
->  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->  
-> +#ifdef CONFIG_KVM_ARM_NESTED_HYP
-> +void vgic_v2_setup_shadow_state(struct kvm_vcpu *vcpu);
-> +void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu);
-> +#else
-> +static inline void vgic_v2_setup_shadow_state(struct kvm_vcpu *vcpu) { }
-> +static inline void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu) { }
-> +#endif
-> +
->  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
->  #define vgic_initialized(k)	((k)->arch.vgic.initialized)
->  #define vgic_ready(k)		((k)->arch.vgic.ready)
-> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-> index 8cebfbc..06ab8a5 100644
-> --- a/virt/kvm/arm/vgic/vgic-init.c
-> +++ b/virt/kvm/arm/vgic/vgic-init.c
-> @@ -216,6 +216,9 @@ static void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
->  			irq->config = VGIC_CONFIG_LEVEL;
->  		}
->  	}
-> +
-> +	vgic_init_nested(vcpu);
-> +
->  	if (kvm_vgic_global_state.type == VGIC_V2)
->  		vgic_v2_enable(vcpu);
->  	else
-> diff --git a/virt/kvm/arm/vgic/vgic-v2-nested.c b/virt/kvm/arm/vgic/vgic-v2-nested.c
-> index b13128e..a992da5 100644
-> --- a/virt/kvm/arm/vgic/vgic-v2-nested.c
-> +++ b/virt/kvm/arm/vgic/vgic-v2-nested.c
-> @@ -205,3 +205,102 @@ static void vgic_mmio_write_v2_gich(struct kvm_vcpu *vcpu,
->  		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich,
->  		4 * VGIC_V2_MAX_LRS, VGIC_ACCESS_32bit),
->  };
-> +
-> +/*
-> + * For LRs which have HW bit set such as timer interrupts, we modify them to
-> + * have the host hardware interrupt number instead of the virtual one programmed
-> + * by the guest hypervisor.
-> + */
-> +static void vgic_v2_create_shadow_lr(struct kvm_vcpu *vcpu)
-> +{
-> +	int i;
-> +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
-> +	struct vgic_v2_cpu_if *s_cpu_if = vcpu_shadow_if(vcpu);
-> +	struct vgic_irq *irq;
-> +
-> +	int nr_lr = kvm_vgic_global_state.nr_lr;
-> +
-> +	for (i = 0; i < nr_lr; i++) {
-> +		u32 lr = cpu_if->vgic_lr[i];
-> +		int l1_irq;
-> +
-> +		if (!(lr & GICH_LR_HW))
-> +			goto next;
-> +
-> +		/* We have the HW bit set */
-> +		l1_irq = (lr & GICH_LR_PHYSID_CPUID) >>
-> +			GICH_LR_PHYSID_CPUID_SHIFT;
-> +		irq = vgic_get_irq(vcpu->kvm, vcpu, l1_irq);
-> +
-> +		if (!irq->hw) {
-> +			/* There was no real mapping, so nuke the HW bit */
-> +			lr &= ~GICH_LR_HW;
-> +			vgic_put_irq(vcpu->kvm, irq);
-> +			goto next;
-> +		}
-> +
-> +		/* Translate the virtual mapping to the real one */
-> +		lr &= ~GICH_LR_EOI;
-> +		lr &= ~GICH_LR_PHYSID_CPUID;
-> +		lr |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
-> +		vgic_put_irq(vcpu->kvm, irq);
-> +
-> +next:
-> +		s_cpu_if->vgic_lr[i] = lr;
-> +	}
-> +}
-> +
-> +/*
-> + * Change the shadow HWIRQ field back to the virtual value before copying over
-> + * the entire shadow struct to the nested state.
-> + */
-> +static void vgic_v2_restore_shadow_lr(struct kvm_vcpu *vcpu)
-> +{
-> +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
-> +	struct vgic_v2_cpu_if *s_cpu_if = vcpu_shadow_if(vcpu);
-> +	int nr_lr = kvm_vgic_global_state.nr_lr;
-> +	int lr;
-> +
-> +	for (lr = 0; lr < nr_lr; lr++) {
-> +		s_cpu_if->vgic_lr[lr] &= ~GICH_LR_PHYSID_CPUID;
-> +		s_cpu_if->vgic_lr[lr] |= cpu_if->vgic_lr[lr] &
-> +			GICH_LR_PHYSID_CPUID;
-> +	}
-> +}
-> +
-> +void vgic_v2_setup_shadow_state(struct kvm_vcpu *vcpu)
-> +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +	struct vgic_v2_cpu_if *cpu_if;
-> +
-> +	if (vcpu_el2_imo_is_set(vcpu) && !vcpu_mode_el2(vcpu)) {
-> +		vgic_cpu->shadow_vgic_v2 = vgic_cpu->nested_vgic_v2;
-> +		vgic_v2_create_shadow_lr(vcpu);
-> +		cpu_if = vcpu_shadow_if(vcpu);
-> +	} else {
-> +		cpu_if = &vgic_cpu->vgic_v2;
-> +	}
-> +
-> +	vgic_cpu->hw_v2_cpu_if = cpu_if;
-> +}
-> +
-> +void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu)
-> +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +
-> +	/* Not using shadow state: Nothing to do... */
-> +	if (vgic_cpu->hw_v2_cpu_if == &vgic_cpu->vgic_v2)
-> +		return;
-> +
-> +	/*
-> +	 * Translate the shadow state HW fields back to the virtual ones
-> +	 * before copying the shadow struct back to the nested one.
-> +	 */
-> +	vgic_v2_restore_shadow_lr(vcpu);
-> +	vgic_cpu->nested_vgic_v2 = vgic_cpu->shadow_vgic_v2;
-> +}
-> +
-> +void vgic_init_nested(struct kvm_vcpu *vcpu)
-> +{
-> +	vgic_v2_setup_shadow_state(vcpu);
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 9d9e014..2aef680 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -120,4 +120,15 @@ static inline int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
->  int vgic_lazy_init(struct kvm *kvm);
->  int vgic_init(struct kvm *kvm);
->  
-> +#ifdef CONFIG_KVM_ARM_NESTED_HYP
-> +void vgic_init_nested(struct kvm_vcpu *vcpu);
-> +#else
-> +static inline void vgic_init_nested(struct kvm_vcpu *vcpu)
-> +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +
-> +	vgic_cpu->hw_v2_cpu_if = &vgic_cpu->vgic_v2;
-> +}
-> +#endif
-> +
->  #endif
-> -- 
-> 1.9.1
-> 
-> 
+OK. So it's not guaranteed that it will actually work...
+
+> The information on what states a given device can wake up the system from is
+> platform-specific and generally would need to be taken into consideration at
+> the platform level.
+
+So that's PSCI on arm64?
+But the PSCI specification doesn't handle that.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
