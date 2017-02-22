@@ -1,164 +1,152 @@
-From: dan.sneddon@gmail.com (Dan Sneddon)
-Date: Wed, 22 Feb 2017 14:08:10 -0700
-Subject: SPI fix needed in kernel (DragonBoard 410c)
-In-Reply-To: <6857de0f674548d09ecad023211b3d1f@NASANEXM01D.na.qualcomm.com>
-References: <6857de0f674548d09ecad023211b3d1f@NASANEXM01D.na.qualcomm.com>
-Message-ID: <CACceFXeoV5DjekfDSbEhGOKrztwqSa9jLQ-pknCVaXQMkPOyqg@mail.gmail.com>
+From: steven.lin1@broadcom.com (Steve Lin)
+Date: Wed, 22 Feb 2017 16:14:52 -0500
+Subject: [PATCH 1/1] ARM: dts: BCM953012HR: Initial Checkin
+Message-ID: <1487798092-8631-1-git-send-email-steven.lin1@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<snip>
+Initial version of DTS to support Broadcom BCM953012HR Northstar
+HR platform, similar to, but not the same as existing 953012K.
 
-> I have been using SPI on the Dragonboard 410c and found some issues. Specifically Hardware Chip Select is not working on the Debian kernel from Linaro (Build #202). It turns out that the SPI_IO_C_MX_CS_MODE bit in the SPI_IO_CONTROL register needs to be set. My 'patch' is very simplistic, and I certainly haven't tested it against all cases of DMA/non-DMA and various transfer lengths, but it does fix my one case.
+Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
+---
+ arch/arm/boot/dts/Makefile        |   1 +
+ arch/arm/boot/dts/bcm953012hr.dts | 115 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 116 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm953012hr.dts
 
-Since the spi-qup driver used the generic spi transfer_one_message I would keep
-the CS pin as a GPIO function rather than the blsp_spi5 function and let the
-framework assert/deassert it.
-
-> First I changed only the dtsi files to enable a spidev driver with hardware chip select (and set the drive strength correctly):
->
-> diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> index f6d2bcb6dbd1..874150a412a2 100644
-> --- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-> @@ -208,8 +208,14 @@
->                 /* On Low speed expansion */
->                         label = "LS-SPI0";
-> +/*                        cs-gpios = <&msmgpio 18 0> */
->                         status = "okay";
-> +                       spidev at 0 {
-> +                               compatible = "spidev";
-> +                               spi-max-frequency = <100000>;
-> +                               reg = <0>;
-> +                       };
->                 };
->
->                 leds {
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> index 899f2b28a9c9..1c22b4414edf 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> @@ -208,7 +208,7 @@
->                         pins = "gpio16", "gpio17", "gpio19";
->                 };
->                 pinmux_cs {
-> -                       function = "gpio";
-> +                       function = "blsp_spi5";
->                         pins = "gpio18";
->                 };
->                 pinconf {
-> @@ -218,7 +218,7 @@
->                 };
->                 pinconf_cs {
->                         pins = "gpio18";
-> -                       drive-strength = <2>;
-> +                       drive-strength = <12>;
->                         bias-disable;
->                         output-high;
->                 };
->
-> Here is what my 3-byte transactions end up looking like (Yellow - Clock, Green ? Data Out, Magenta- Chip Select) :
->
->
-> As you can see the chip select is going high between each byte of data. This violates the SPI protocol and I am unable to transfer data from the device.
->
-> Next I changed the SPI driver:
->
-> diff --git a/drivers/spi/spi-qup.c b/drivers/spi/spi-qup.c
-> index 68f95acf7971..aed71ef7e3fd 100644
-> --- a/drivers/spi/spi-qup.c
-> +++ b/drivers/spi/spi-qup.c
-> @@ -580,6 +580,7 @@ static int spi_qup_io_config(struct spi_device *spi, struct spi_transfer *xfer)
->         else
->                 control &= ~SPI_IO_C_CLK_IDLE_HIGH;
->
-> +       config |= SPI_IO_C_MX_CS_MODE;
->         writel_relaxed(control, controller->base + SPI_IO_CONTROL);
->
->         config = readl_relaxed(controller->base + SPI_CONFIG);
-> @@ -928,7 +929,7 @@ static int spi_qup_probe(struct platform_device *pdev)
->                         base + QUP_ERROR_FLAGS_EN);
->
->         writel_relaxed(0, base + SPI_CONFIG);
-> -       writel_relaxed(SPI_IO_C_NO_TRI_STATE, base + SPI_IO_CONTROL);
-> +       writel_relaxed(SPI_IO_C_NO_TRI_STATE|SPI_IO_C_MX_CS_MODE, base + SPI_IO_CONTROL);
->
->         ret = devm_request_irq(dev, irq, spi_qup_qup_irq,
->                                IRQF_TRIGGER_HIGH, pdev->name, controller);
->
-> This sets the SPI_IO_C_MX_MODE bit in the SPI_IO_CONTROL register. Once this is done the SPI transactions look like this:
->
->
->
-> As you can see the Chip Select stays low for the entire transaction and the device successfully transfers data.
->
-> I have NOT tested this change very carefully and I have not covered all of the possible cases (different processors, DMA vs non-DMA, etc). This ?patch? is only known to work with MSM8916/APQ8016, and only with 3-byte transfers at 100kHz.
->
-> Lawrence King
-> Senior Staff Eng./mgr
-> Qualcomm Canada Inc.
-> Suite 100, 105 Commerce Valley Drive West
-> Markham Ontario Canada L3T 7W3
-> +1(905)482-5403 ? office
-> +1(416)627-7302 - cell
->
->
-> -----Original Message-----
-> From: Andy Gross [mailto:andy.gross at linaro.org]
-> Sent: Tuesday, February 14, 2017 4:21 PM
-> To: King, Lawrence <lking@qti.qualcomm.com>
-> Cc: Fradkin, Alex <alexf@qti.qualcomm.com>; nicolas.dechesne at linaro.org; Bjorn Andersson <bjorn.andersson@linaro.org>; Srinivas Kandagatla <srinivas.kandagatla@linaro.org>; Elster, Constantine <celster@qti.qualcomm.com>; Sedlak Grinbaum, Anna Hanna <c_asedla@qti.qualcomm.com>
-> Subject: Re: SPI fix needed in kernel
->
-> On 14 February 2017 at 14:37, King, Lawrence <lking@qti.qualcomm.com> wrote:
->> Dear All:
->>
->>
->>
->> I am back on the case of the SPI driver for the APQ8016. This time I
->> am using the 'latest' build #202 of Debian.
->>
->>
->>
->> In order to get the hardware Chip Select to operate correctly I tried
->> the same 'trick' I had been doing before, I added the line of code
->> that sets the SPI_IO_C_MX_CS_MODE bit in the SPI_IO_CONTROL register
->> in the function spi_qup_io_config(). But to my annoyance it didn't fix the problem.
->
-> Looking at the spi_qsd.c in 3.18, there is a pretty complex dance involved with deciding whether or not to set the MX_CS.  Probably because of the weird transfer coalescing they do.
->
-> In addition, they are doing a FORCE_CS when the spi core calls set_cs.
->
->>
->>
->> In order to get hardware CS control to work I also had to change the
->> SPI_IO_CONTROL in the function spi_qup_probe()  from
->>
->> writel_relaxed(SPI_IO_C_NO_TRI_STATE, base + SPI_IO_CONTROL);
->>
->> to
->>
->> writel_relaxed(SPI_IO_C_NO_TRI_STATE|SPI_IO_C_MX_CS_MODE, base +
->> SPI_IO_CONTROL);
->>
->>
->>
->> I would have thought that the spi_qup_io_config() ran after the
->> spi_qup_probe(), but this is apparently not the case.
->
-> The spi_qup_io_config() is run every time there is a spi transaction.
-> It is called from spi_qup_transfer_one().
->
->>
->>
->> Why is the SPI_IO_C_MX_CS_MODE bit still not set in the code? Without
->> this bit set hardware CS will never work properly. Now that you have
->> separated out the old controller from the new controller with the
->> qup_v1 flag it should be easy?
->
-> I presume no one sent a patch to the mailing list for this.  If you do, please CC linux-msm.  But due to the details above, it might be a good idea to ask someone in Boulder about all the different states where you need some flags set and others not set if you want to use auto chip select.  Sagar Dharia might be a good starting point.
->
->
-> Regards,
->
-> Andy
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 01d178a..c64ca3d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -94,6 +94,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm94708.dtb \
+ 	bcm94709.dtb \
+ 	bcm953012er.dtb \
++	bcm953012hr.dtb \
+ 	bcm953012k.dtb
+ dtb-$(CONFIG_ARCH_BCM_53573) += \
+ 	bcm47189-tenda-ac9.dtb
+diff --git a/arch/arm/boot/dts/bcm953012hr.dts b/arch/arm/boot/dts/bcm953012hr.dts
+new file mode 100644
+index 0000000..c332277
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm953012hr.dts
+@@ -0,0 +1,115 @@
++/*
++ *  BSD LICENSE
++ *
++ *  Copyright(c) 2017 Broadcom
++ *
++ *  Redistribution and use in source and binary forms, with or without
++ *  modification, are permitted provided that the following conditions
++ *  are met:
++ *
++ *    * Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *    * Redistributions in binary form must reproduce the above copyright
++ *      notice, this list of conditions and the following disclaimer in
++ *      the documentation and/or other materials provided with the
++ *      distribution.
++ *    * Neither the name of Broadcom nor the names of its contributors
++ *      may be used to endorse or promote products derived from this
++ *      software without specific prior written permission.
++ *
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++/dts-v1/;
++
++#include "bcm4708.dtsi"
++
++/ {
++	model = "NorthStar HR (BCM953012HR)";
++	compatible = "brcm,bcm953012hr", "brcm,brcm53012", "brcm,bcm4708";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		reg = <0x80000000 0x10000000>;
++	};
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&nand {
++	nandcs at 0 {
++		compatible = "brcm,nandcs";
++		reg = <0>;
++		nand-on-flash-bbt;
++
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		nand-ecc-strength = <4>;
++		nand-ecc-step-size = <512>;
++
++		partition at 0 {
++			label = "nboot";
++			reg = <0x00000000 0x00200000>;
++			read-only;
++		};
++		partition at 200000 {
++			label = "nenv";
++			reg = <0x00200000 0x00400000>;
++		};
++		partition at 600000 {
++			label = "nsystem";
++			reg = <0x00600000 0x00a00000>;
++		};
++		partition at 1000000 {
++			label = "nrootfs";
++			reg = <0x01000000 0x07000000>;
++		};
++	};
++};
++
++&spi_nor {
++	status = "okay";
++	spi-max-frequency = <62500000>;
++	m25p,default-addr-width = <3>;
++
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	partition at 0 {
++		label = "boot";
++		reg = <0x00000000 0x000d0000>;
++	};
++	partition at d000 {
++		label = "env";
++		reg = <0x000d0000 0x00030000>;
++	};
++	partition at 100000 {
++		label = "system";
++		reg = <0x00100000 0x00600000>;
++	};
++	partition at 700000 {
++		label = "rootfs";
++		reg = <0x00700000 0x00900000>;
++	};
++};
++
+-- 
+2.1.0
