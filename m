@@ -1,45 +1,34 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Wed, 22 Feb 2017 13:50:48 +0100
-Subject: [PATCH v2 0/5] ARM: davinci: vpif capture & display support
-In-Reply-To: <1487692172-11772-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1487692172-11772-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <CAMpxmJWu2knuAZtkotKPz5m+3o1_F-dW_uNQK6FdbDOA3PGTTg@mail.gmail.com>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Wed, 22 Feb 2017 14:00:21 +0100
+Subject: [PATCH] arm64: traps: Mark __le16, __le32, __user variables
+ properly
+In-Reply-To: <20170221110355.GD300@arm.com>
+References: <20170217165112.17512-1-stephen.boyd@linaro.org>
+ <20170219015808.2vc2kvpde7nlrey4@macbook.local>
+ <148758047729.2988.16966413648865610904@sboyd-linaro>
+ <20170220104947.GE9003@leverpostej>
+ <20170220213344.dqp4pzxr2dj6vbd3@macpro.local>
+ <20170221110355.GD300@arm.com>
+Message-ID: <20170222130020.vuk6wc2jwibtpc2h@macpro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-02-21 16:49 GMT+01:00 Bartosz Golaszewski <bgolaszewski@baylibre.com>:
-> This series adds pdata quirks and other changes required to make vpif
-> work on the da850-evm board.
->
-> v1 -> v2:
-> - added patch 1/5 - don't bail-out from pdata_quirks_check() after
->   applying a single quirk
-> - changed the comment above the new fixed regulator to make it more
->   descriptive
-> - removed unnecessary #ifdefs from pdata-quirks.c
->
-> Bartosz Golaszewski (3):
->   ARM: davinci: da8xx: allow having multiple pdata-quirks
->   ARM: da850-evm: add a fixed regulator for the UI board IO expander
->   ARM: davinci: add pdata-quirks for da850-evm vpif display
->
-> Kevin Hilman (2):
->   ARM: davinci: board-da850-evm: add I2C ID for VPIF
->   ARM: davinci: da8xx: add pdata-quirks for VPIF capture
->
->  arch/arm/mach-davinci/board-da850-evm.c |   4 +
->  arch/arm/mach-davinci/da8xx-dt.c        |   1 +
->  arch/arm/mach-davinci/pdata-quirks.c    | 171 +++++++++++++++++++++++++++++++-
->  3 files changed, 175 insertions(+), 1 deletion(-)
->
-> --
-> 2.9.3
->
+On Tue, Feb 21, 2017 at 11:03:56AM +0000, Will Deacon wrote:
+> On Mon, Feb 20, 2017 at 10:33:45PM +0100, Luc Van Oostenryck wrote:
+> > It's easy enough to patch sparse to not issue a warning when the
+> > override concerns a range (which would be perfect for the situation here),
+> > Controlled or not by a new warning flag. But I'm far from convinced
+> > that all uses of such "ranged-initialization" is used for default values
+> > that may be later overridden.
+> 
+> How about not warning only when the overridden range covers the entire
+> length of the array? The only broken case I can think of that slips
+> through the cracks then is if somebody typoed the range so that it
+> accidentally covered the whole array and therefore suppressed the override
+> warning.
+> 
+> Will
 
-Hi Sekhar,
+I like it. Patch is coming.
 
-please don't review/apply these patches yet - the enable GPIOs for
-vpif capture need to be added here as well - I'll send a v3.
-
-Thanks,
-Bartosz
+Luc
