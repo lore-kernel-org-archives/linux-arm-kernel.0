@@ -1,123 +1,99 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Wed, 22 Feb 2017 10:40:14 +0900
-Subject: [PATCH v10 0/3] Add support for the S6E3HA2 panel on TM2 board
-In-Reply-To: <50768133-aabc-6050-c9b2-8898bb8046a6@samsung.com>
-References: <CGME20170220071000epcas1p38e002e5064bdf4c3b1b4886207dcaaf4@epcas1p3.samsung.com>
- <50768133-aabc-6050-c9b2-8898bb8046a6@samsung.com>
-Message-ID: <f73ca3a7-8562-c561-95e6-3bec90a52223@samsung.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Wed, 22 Feb 2017 09:44:11 +0800
+Subject: [RESEND PATCH v7 0/7] Rockchip dw-mipi-dsi driver
+In-Reply-To: <20170221153918.GA25168@art_vandelay>
+References: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
+ <20170221153918.GA25168@art_vandelay>
+Message-ID: <58ACECEB.2080406@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Sean
+
+On 02/21/2017 11:39 PM, Sean Paul wrote:
+> On Mon, Feb 20, 2017 at 04:02:16PM +0800, Chris Zhong wrote:
+>> Hi all
+>>
+>> [Resend this v7 version series, since there are 5 mails have gone missing, last
+>> week]
+>>
+>> This version does not change the existing v6 patches, just to add the
+>> "bandwidth fix" patch back, since we really need it.
+>>
+>> This patch serial is for RK3399 MIPI DSI. The MIPI DSI controller of
+>> RK3399 is almost the same as RK3288, except a little bit of difference
+>> in phy clock controlling and port id selection register. These patches
+>> add RK3399 support and the power domain support.
+>>
+>> And these patches base on John Keeping's v3 patches[0], it fixes many bugs,
+>> they have been tested on rk3288 evb board.
+> Do we have an ETA on when John is planning on respinning his patchset based on
+> review feedback?
+>
+I guess John will send the v4 patch soon, since there are not many point 
+need to change.
+And as I know, Mark Yao is going to merge John's v4 series to his 
+branch, and this v7 series
+will be merged after that.
 
 
-This patchset is resent patchset.
+>> [0]:
+>> [01/24] https://patchwork.kernel.org/patch/9544089
+>> [02/24] https://patchwork.kernel.org/patch/9544061
+>> [03/24] https://patchwork.kernel.org/patch/9544065
+>> [04/24] https://patchwork.kernel.org/patch/9544077
+>> [05/24] https://patchwork.kernel.org/patch/9544033
+>> [06/24] https://patchwork.kernel.org/patch/9544037
+>> [07/24] https://patchwork.kernel.org/patch/9544029
+>> [08/24] https://patchwork.kernel.org/patch/9544031
+>> [09/24] https://patchwork.kernel.org/patch/9544083
+>> [10/24] https://patchwork.kernel.org/patch/9544063
+>> [11/24] https://patchwork.kernel.org/patch/9544085
+>> [12/24] https://patchwork.kernel.org/patch/9544093
+>> [13/24] https://patchwork.kernel.org/patch/9544081
+>> [14/24] https://patchwork.kernel.org/patch/9544057
+>> [15/24] https://patchwork.kernel.org/patch/9544079
+>> [16/24] https://patchwork.kernel.org/patch/9544035
+>> [17/24] https://patchwork.kernel.org/patch/9544105
+>> [18/24] https://patchwork.kernel.org/patch/9544059
+>> [21/24] https://patchwork.kernel.org/patch/9544009
+>> [22/24] https://patchwork.kernel.org/patch/9544049
+>> [23/24] https://patchwork.kernel.org/patch/9544055
+>> [24/24] https://patchwork.kernel.org/patch/9544109
+>>
+>>
+>> Changes in v6:
+>> - no need check phy_cfg_clk before enable/disable
+>>
+>> Changes in v5:
+>> - check the error of phy_cfg_clk in dw_mipi_dsi_bind
+>>
+>> Changes in v4:
+>> - remove the unrelated change
+>>
+>> Changes in v3:
+>> - base on John Keeping's patch series
+>>
+>> Chris Zhong (7):
+>>    dt-bindings: add rk3399 support for dw-mipi-rockchip
+>>    drm/rockchip/dsi: dw-mipi: support RK3399 mipi dsi
+>>    drm/rockchip/dsi: dw-mipi: correct the coding style
+>>    drm/rockchip/dsi: remove mode_valid function
+>>    dt-bindings: add power domain node for dw-mipi-rockchip
+>>    drm/rockchip/dsi: fix insufficient bandwidth of some panel
+>>    drm/rockchip/dsi: add dw-mipi power domain support
+>>
+>>   .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   7 +-
+>>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 160 ++++++++++++---------
+>>   2 files changed, 100 insertions(+), 67 deletions(-)
+>>
+>> -- 
+>> 2.6.3
+>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-Because I have a missing TO, CC, I sent it again.
-
-Sorry, I will send it in the correct format next time.
-
-
-Best Regards,
-
-Hoegeun
-
-
-On 02/22/2017 10:09 AM, Hoegeun Kwon wrote:
-> Dear Thierry,
->
-> I understand that your opinion is:
-> It is better to handle the error every time it is input to the
-> register, rather than error handling at once in the struct using
-> error. This not only makes the code easier to maintain, but also
-> reduces unnecessary computation.
->
-> So I modified the panel driver to code-by-code error handling.
-> If this is not your opinion, could you tell me what your opinion?
->
-> Best Regards,
-> Hoegeun
->
->
-> Changes for V10:
-> - Fixed code-by-code error handling.
->
-> Changes for V9:
-> - Fixed the te-gpio to optional in bindings
->
-> Changes for V8:
-> - Applied below two patches: (drm/exynos)
->   : drm/exynos: mic: Add mode_set callback function
->   : drm/exynos: mic: Fix parse_dt function
-> - The dt-binding patch and driver patch were divided.
-> - Rebase these patches on samsung SoC tree[1] and tm2 touckey patch[2].
->
-> Change for V7:
-> - Fixed the mode_set callback function of mic device driver.
->   because the mic register is initialized when entering suspend
->   mode, so should set the reg value whenever pre_enable is
->   called.
->
-> Changes for V6:
-> - Fixed the parse_dt function of dsi device driver.
-> - Removed OF graph of panel in DT and DT binding document.
-> - Fixed the s6e3ha2 panel device driver.
->   - Fixed from number size to ARRAY_SIZE().
->   - Fixed error handling in mipi_dsi_dcs_* functions.
->   - Fixed the clock of display_mode.
->   - Removed unnecessary casting and error log.
->
-> Change for V5:
-> - The V5 has only one fix in V4 below.
-> - Removed the enable check of the mic driver in mode_set
->   callback, because mode_set should be performed every time.
->
-> Changes for V4:
-> - Removed display-timings in devicetree, the display-timings has
->   been fixed to be provided by the device driver.
-> - Added the mode_set callback function into exynos_drm_mic,
->   because the exynos_drm_mic driver can not parse a videomode
->   struct by removing the display-timings from the devicetree.
->
-> Changes for V3:
-> - In the DT binding document, made it clearly that the panel is a
->   child node of dsi.
-> - Fix reset-gpio active from high to low.
-> - Is the OF graph saying related to patch2?
->   Althogh the panel is a child of dsi, I think OF graph necessary.
->   because if a remote-endpoint is not specified, the dsi also
->   panel is not probed.
-> - The display-timings has been fixed to be provided by the device
->   driver. however, I think display-timings is necessary in dts.
->   because if dts does not have display-timings, dsi will not load.
->
-> Changes for V2:
-> - Fixed the samsung,s6e3ha2.txt DT document.
->   - Added active high or low after the description of the GPIOs.
->   - Removed the reg and added a description of the virtual
->     channel number of a DSI peripheral.
->
-> Depends on:
-> [1] https://git.kernel.org/cgit/linux/kernel/git/krzk/linux.git/ 
-> (for-next branch)
-> [2] https://patchwork.kernel.org/patch/9504131/
->     - ("arm64: dts: exynos: Add tm2 touchkey node")
->
-> Hoegeun Kwon (2):
->   dt-bindings: Add support for samsung s6e3ha2 panel binding
->   drm/panel: Add support for S6E3HA2 panel driver on TM2 board
->
-> Hyungwon Hwang (1):
->   arm64: dts: exynos: Add support for S6E3HA2 panel device on TM2 board
->
->  .../bindings/display/panel/samsung,s6e3ha2.txt     |  28 +
->  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      |  12 +
->  drivers/gpu/drm/panel/Kconfig                      |   6 +
->  drivers/gpu/drm/panel/Makefile                     |   1 +
->  drivers/gpu/drm/panel/panel-samsung-s6e3ha2.c      | 739 
-> +++++++++++++++++++++
->  5 files changed, 786 insertions(+)
->  create mode 100644 
-> Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2.txt
->  create mode 100644 drivers/gpu/drm/panel/panel-samsung-s6e3ha2.c
->
+-- 
+Chris Zhong
