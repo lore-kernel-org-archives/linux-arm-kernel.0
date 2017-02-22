@@ -1,35 +1,40 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Wed, 22 Feb 2017 03:29:22 +0100
-Subject: [PATCH v2 2/8] tty: serial: Suppress deprecated SERIAL_PXA on arm64
+Date: Wed, 22 Feb 2017 03:29:24 +0100
+Subject: [PATCH v2 4/8] sound: soc: pxa: Suppress SND_MMP_SOC for arm64
 In-Reply-To: <20170222022929.10540-1-afaerber@suse.de>
 References: <20170222022929.10540-1-afaerber@suse.de>
-Message-ID: <20170222022929.10540-3-afaerber@suse.de>
+Message-ID: <20170222022929.10540-5-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With Marvell IAP140 being enabled as first arm64 MMP platform, don't
-make the deprecated SERIAL_PXA option available outside ARM.
+SND_MMP_SOC selects SND_ARM, which is limited to ARM, as well as
+MMP_SRAM, which is a non-DT driver in arch/arm/mach-arm/.
+
+Avoid Kconfig warnings by not making this driver available on ARM64.
+
+While at it, tidy the title (Soc -> SoC).
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- v1 -> v2: split off
- * Updated for ARCH_MMP
+ v2: new
  
- drivers/tty/serial/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ sound/soc/pxa/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index 6117ac8..db83085 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -439,7 +439,7 @@ config SERIAL_MPSC_CONSOLE
+diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
+index 823b5a2..f8e1c06 100644
+--- a/sound/soc/pxa/Kconfig
++++ b/sound/soc/pxa/Kconfig
+@@ -8,8 +8,8 @@ config SND_PXA2XX_SOC
+ 	  to select the audio interfaces to support below.
  
- config SERIAL_PXA
- 	bool "PXA serial port support (DEPRECATED)"
--	depends on ARCH_PXA || ARCH_MMP
-+	depends on ARCH_PXA || (ARCH_MMP && ARM)
- 	select SERIAL_CORE
- 	select SERIAL_8250_PXA if SERIAL_8250=y
- 	select SERIAL_PXA_NON8250 if !SERIAL_8250=y
+ config SND_MMP_SOC
+-	bool "Soc Audio for Marvell MMP chips"
+-	depends on ARCH_MMP
++	bool "SoC Audio for Marvell MMP chips"
++	depends on ARCH_MMP && ARM
+ 	select MMP_SRAM
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+ 	select SND_ARM
 -- 
 2.10.2
