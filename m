@@ -1,86 +1,257 @@
-From: thibault.saunier@osg.samsung.com (Thibault Saunier)
-Date: Wed, 22 Feb 2017 10:10:40 -0300
-Subject: [PATCH v5 3/3] [media] s5p-mfc: Check and set
- 'v4l2_pix_format:field' field in try_fmt
-In-Reply-To: <78444dcd-169f-0c16-0e09-6b71d1a502b2@samsung.com>
-References: <20170221192059.29745-1-thibault.saunier@osg.samsung.com>
- <CGME20170221192135epcas4p1811fa9ce35481d42144bdab368c9243a@epcas4p1.samsung.com>
- <20170221192059.29745-4-thibault.saunier@osg.samsung.com>
- <78444dcd-169f-0c16-0e09-6b71d1a502b2@samsung.com>
-Message-ID: <ed287d5a-687b-b344-3f20-10154071852c@osg.samsung.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 22 Feb 2017 14:12:46 +0100
+Subject: [RFC 28/55] KVM: arm/arm64: Prepare vgic state for the nested VM
+In-Reply-To: <1483943091-1364-29-git-send-email-jintack@cs.columbia.edu>
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+ <1483943091-1364-29-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <20170222131246.GP26976@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Jan 09, 2017 at 01:24:24AM -0500, Jintack Lim wrote:
+> When entering a nested VM, we set up the hypervisor control interface
+> based on what the guest hypervisor has set. Especially, we investigate
+> each list register written by the guest hypervisor whether HW bit is
+> set.  If so, we translate hw irq number from the guest's point of view
+> to the real hardware irq number if there is a mapping.
 
-On 02/22/2017 06:29 AM, Andrzej Hajda wrote:
-> On 21.02.2017 20:20, Thibault Saunier wrote:
->> It is required by the standard that the field order is set by the
->> driver.
->>
->> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
->>
->> ---
->>
->> Changes in v5:
->> - Just adapt the field and never error out.
->>
->> Changes in v4: None
->> Changes in v3:
->> - Do not check values in the g_fmt functions as Andrzej explained in previous review
->>
->> Changes in v2:
->> - Fix a silly build error that slipped in while rebasing the patches
->>
->>   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 3 +++
->>   1 file changed, 3 insertions(+)
->>
->> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
->> index 0976c3e0a5ce..44ed2afe0780 100644
->> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
->> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
->> @@ -386,6 +386,9 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
->>   	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
->>   	struct s5p_mfc_fmt *fmt;
->>   
->> +	if (f->fmt.pix.field == V4L2_FIELD_ANY)
->> +		f->fmt.pix.field = V4L2_FIELD_NONE;
->> +
-> In previous version the only supported field type was NONE, here you
-> support everything.
-> If the only supported format is none you should set 'field'
-> unconditionally to NONE, nothing more.
-Afaict we  support 2 things:
+Does that really always work?
 
-   1. NONE
-   2. INTERLACE
+Are there not some assumptions about the virtual device that the guest
+hypervisor is mapping the virtual IRQ to also exists as an equivalent
+device with some connected state on the host?
 
-Until now we were not checking what was supported or not and basically 
-ignoring that info, this patch
-keeps the old behaviour making sure to be compliant.
+Thanks,
+-Christoffer
 
-I had a doubt and was pondering doing:
-
-``` diff
-
-+	if (f->fmt.pix.field != V4L2_FIELD_INTERLACED)
-+		f->fmt.pix.field = V4L2_FIELD_NONE;
-+
-
-```
-
-instead, it is probably more correct, do you think it is what should be 
-done here?
-
-Regards,
-
-Thibault
-
->
-> Regards
-> Andrzej
->
->>   	mfc_debug(2, "Type is %d\n", f->type);
->>   	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
->>   		fmt = find_format(f, MFC_FMT_DEC);
->
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> ---
+>  arch/arm/include/asm/kvm_emulate.h   |  5 ++
+>  arch/arm64/include/asm/kvm_emulate.h |  5 ++
+>  arch/arm64/kvm/context.c             |  4 ++
+>  include/kvm/arm_vgic.h               |  8 +++
+>  virt/kvm/arm/vgic/vgic-init.c        |  3 ++
+>  virt/kvm/arm/vgic/vgic-v2-nested.c   | 99 ++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h             | 11 ++++
+>  7 files changed, 135 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> index 0fa2f5a..05d5906 100644
+> --- a/arch/arm/include/asm/kvm_emulate.h
+> +++ b/arch/arm/include/asm/kvm_emulate.h
+> @@ -101,6 +101,11 @@ static inline bool vcpu_mode_el2(const struct kvm_vcpu *vcpu)
+>  	return false;
+>  }
+>  
+> +static inline bool vcpu_el2_imo_is_set(const struct kvm_vcpu *vcpu)
+> +{
+> +	return false;
+> +}
+> +
+>  static inline unsigned long *vcpu_pc(struct kvm_vcpu *vcpu)
+>  {
+>  	return &vcpu->arch.ctxt.gp_regs.usr_regs.ARM_pc;
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index 0987ee4..a9c993f 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -178,6 +178,11 @@ static inline bool vcpu_mode_el2(const struct kvm_vcpu *vcpu)
+>  	return mode == PSR_MODE_EL2h || mode == PSR_MODE_EL2t;
+>  }
+>  
+> +static inline bool vcpu_el2_imo_is_set(const struct kvm_vcpu *vcpu)
+> +{
+> +	return (vcpu_el2_reg(vcpu, HCR_EL2) & HCR_IMO);
+> +}
+> +
+>  static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
+>  {
+>  	return vcpu->arch.fault.esr_el2;
+> diff --git a/arch/arm64/kvm/context.c b/arch/arm64/kvm/context.c
+> index 0025dd9..7a94c9d 100644
+> --- a/arch/arm64/kvm/context.c
+> +++ b/arch/arm64/kvm/context.c
+> @@ -161,6 +161,8 @@ void kvm_arm_setup_shadow_state(struct kvm_vcpu *vcpu)
+>  		ctxt->hw_sys_regs = ctxt->sys_regs;
+>  		ctxt->hw_sp_el1 = ctxt->gp_regs.sp_el1;
+>  	}
+> +
+> +	vgic_v2_setup_shadow_state(vcpu);
+>  }
+>  
+>  /**
+> @@ -179,6 +181,8 @@ void kvm_arm_restore_shadow_state(struct kvm_vcpu *vcpu)
+>  		*vcpu_cpsr(vcpu) = ctxt->hw_pstate;
+>  		ctxt->gp_regs.sp_el1 = ctxt->hw_sp_el1;
+>  	}
+> +
+> +	vgic_v2_restore_shadow_state(vcpu);
+>  }
+>  
+>  void kvm_arm_init_cpu_context(kvm_cpu_context_t *cpu_ctxt)
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 9a9cb27..484f6b1 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -312,6 +312,14 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+>  
+>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+>  
+> +#ifdef CONFIG_KVM_ARM_NESTED_HYP
+> +void vgic_v2_setup_shadow_state(struct kvm_vcpu *vcpu);
+> +void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu);
+> +#else
+> +static inline void vgic_v2_setup_shadow_state(struct kvm_vcpu *vcpu) { }
+> +static inline void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu) { }
+> +#endif
+> +
+>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+>  #define vgic_initialized(k)	((k)->arch.vgic.initialized)
+>  #define vgic_ready(k)		((k)->arch.vgic.ready)
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 8cebfbc..06ab8a5 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -216,6 +216,9 @@ static void kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+>  			irq->config = VGIC_CONFIG_LEVEL;
+>  		}
+>  	}
+> +
+> +	vgic_init_nested(vcpu);
+> +
+>  	if (kvm_vgic_global_state.type == VGIC_V2)
+>  		vgic_v2_enable(vcpu);
+>  	else
+> diff --git a/virt/kvm/arm/vgic/vgic-v2-nested.c b/virt/kvm/arm/vgic/vgic-v2-nested.c
+> index b13128e..a992da5 100644
+> --- a/virt/kvm/arm/vgic/vgic-v2-nested.c
+> +++ b/virt/kvm/arm/vgic/vgic-v2-nested.c
+> @@ -205,3 +205,102 @@ static void vgic_mmio_write_v2_gich(struct kvm_vcpu *vcpu,
+>  		vgic_mmio_read_v2_gich, vgic_mmio_write_v2_gich,
+>  		4 * VGIC_V2_MAX_LRS, VGIC_ACCESS_32bit),
+>  };
+> +
+> +/*
+> + * For LRs which have HW bit set such as timer interrupts, we modify them to
+> + * have the host hardware interrupt number instead of the virtual one programmed
+> + * by the guest hypervisor.
+> + */
+> +static void vgic_v2_create_shadow_lr(struct kvm_vcpu *vcpu)
+> +{
+> +	int i;
+> +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
+> +	struct vgic_v2_cpu_if *s_cpu_if = vcpu_shadow_if(vcpu);
+> +	struct vgic_irq *irq;
+> +
+> +	int nr_lr = kvm_vgic_global_state.nr_lr;
+> +
+> +	for (i = 0; i < nr_lr; i++) {
+> +		u32 lr = cpu_if->vgic_lr[i];
+> +		int l1_irq;
+> +
+> +		if (!(lr & GICH_LR_HW))
+> +			goto next;
+> +
+> +		/* We have the HW bit set */
+> +		l1_irq = (lr & GICH_LR_PHYSID_CPUID) >>
+> +			GICH_LR_PHYSID_CPUID_SHIFT;
+> +		irq = vgic_get_irq(vcpu->kvm, vcpu, l1_irq);
+> +
+> +		if (!irq->hw) {
+> +			/* There was no real mapping, so nuke the HW bit */
+> +			lr &= ~GICH_LR_HW;
+> +			vgic_put_irq(vcpu->kvm, irq);
+> +			goto next;
+> +		}
+> +
+> +		/* Translate the virtual mapping to the real one */
+> +		lr &= ~GICH_LR_EOI;
+> +		lr &= ~GICH_LR_PHYSID_CPUID;
+> +		lr |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
+> +		vgic_put_irq(vcpu->kvm, irq);
+> +
+> +next:
+> +		s_cpu_if->vgic_lr[i] = lr;
+> +	}
+> +}
+> +
+> +/*
+> + * Change the shadow HWIRQ field back to the virtual value before copying over
+> + * the entire shadow struct to the nested state.
+> + */
+> +static void vgic_v2_restore_shadow_lr(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_v2_cpu_if *cpu_if = vcpu_nested_if(vcpu);
+> +	struct vgic_v2_cpu_if *s_cpu_if = vcpu_shadow_if(vcpu);
+> +	int nr_lr = kvm_vgic_global_state.nr_lr;
+> +	int lr;
+> +
+> +	for (lr = 0; lr < nr_lr; lr++) {
+> +		s_cpu_if->vgic_lr[lr] &= ~GICH_LR_PHYSID_CPUID;
+> +		s_cpu_if->vgic_lr[lr] |= cpu_if->vgic_lr[lr] &
+> +			GICH_LR_PHYSID_CPUID;
+> +	}
+> +}
+> +
+> +void vgic_v2_setup_shadow_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +	struct vgic_v2_cpu_if *cpu_if;
+> +
+> +	if (vcpu_el2_imo_is_set(vcpu) && !vcpu_mode_el2(vcpu)) {
+> +		vgic_cpu->shadow_vgic_v2 = vgic_cpu->nested_vgic_v2;
+> +		vgic_v2_create_shadow_lr(vcpu);
+> +		cpu_if = vcpu_shadow_if(vcpu);
+> +	} else {
+> +		cpu_if = &vgic_cpu->vgic_v2;
+> +	}
+> +
+> +	vgic_cpu->hw_v2_cpu_if = cpu_if;
+> +}
+> +
+> +void vgic_v2_restore_shadow_state(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +
+> +	/* Not using shadow state: Nothing to do... */
+> +	if (vgic_cpu->hw_v2_cpu_if == &vgic_cpu->vgic_v2)
+> +		return;
+> +
+> +	/*
+> +	 * Translate the shadow state HW fields back to the virtual ones
+> +	 * before copying the shadow struct back to the nested one.
+> +	 */
+> +	vgic_v2_restore_shadow_lr(vcpu);
+> +	vgic_cpu->nested_vgic_v2 = vgic_cpu->shadow_vgic_v2;
+> +}
+> +
+> +void vgic_init_nested(struct kvm_vcpu *vcpu)
+> +{
+> +	vgic_v2_setup_shadow_state(vcpu);
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 9d9e014..2aef680 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -120,4 +120,15 @@ static inline int vgic_its_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
+>  int vgic_lazy_init(struct kvm *kvm);
+>  int vgic_init(struct kvm *kvm);
+>  
+> +#ifdef CONFIG_KVM_ARM_NESTED_HYP
+> +void vgic_init_nested(struct kvm_vcpu *vcpu);
+> +#else
+> +static inline void vgic_init_nested(struct kvm_vcpu *vcpu)
+> +{
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +
+> +	vgic_cpu->hw_v2_cpu_if = &vgic_cpu->vgic_v2;
+> +}
+> +#endif
+> +
+>  #endif
+> -- 
+> 1.9.1
+> 
+> 
