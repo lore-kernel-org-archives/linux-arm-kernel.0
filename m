@@ -1,87 +1,123 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 22 Feb 2017 02:14:54 +0100
-Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
- power
-In-Reply-To: <3c8b3f2d-8604-f999-4208-a82f171b64f2@arm.com>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <94167d3a-e005-3af0-d290-a1086684d570@arm.com>
- <3c8b3f2d-8604-f999-4208-a82f171b64f2@arm.com>
-Message-ID: <1975396.x0czmkNPOW@aspire.rjw.lan>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Wed, 22 Feb 2017 10:40:14 +0900
+Subject: [PATCH v10 0/3] Add support for the S6E3HA2 panel on TM2 board
+In-Reply-To: <50768133-aabc-6050-c9b2-8898bb8046a6@samsung.com>
+References: <CGME20170220071000epcas1p38e002e5064bdf4c3b1b4886207dcaaf4@epcas1p3.samsung.com>
+ <50768133-aabc-6050-c9b2-8898bb8046a6@samsung.com>
+Message-ID: <f73ca3a7-8562-c561-95e6-3bec90a52223@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, February 21, 2017 06:45:13 PM Sudeep Holla wrote:
-> 
-> On 21/02/17 18:27, Sudeep Holla wrote:
-> > 
-> > 
-> > On 21/02/17 17:51, Sudeep Holla wrote:
-> >>
-> >>
-> >> On 21/02/17 17:34, Geert Uytterhoeven wrote:
-> > 
-> > [...]
-> > 
-> >>>
-> >>> The SoC can wake-up. It's just not guaranteed that it can wake-up using
-> >>> the wakeup-source configured from Linux. Which wakeup-sources are available
-> >>> depends on the actual PSCI implementation.  It's not specified by the PSCI
-> >>> specification.
-> >>>
-> >>>> Just botching whatever shallow state you can enter on a particular SoC
-> >>>> into standard "mem" state sounds *horrible* to me.
-> >>>
-> >>> That's more or less what /sys/power/mem_sleep does, though.
-> >>>
-> >>
-> >> OK, I will go through that in detail.
-> >>
-> > 
-> > OK, I went through the patch and the main intention is was added.
-> > So I will begin by summarizing my understanding:
-> > 
-> > A new suspend interface(/sys/power/mem_sleep) is added to allow the
-> > "mem" string in /sys/power/state to represent multiple things that can
-> > be selected.
-> > 
-> > Before:
-> > A. echo freeze > /sys/power/state ---> Enters s2idle
-> > B. echo mem > /sys/power/state ---> Enters s2r(a.k.a now deep mem sleep)
-> > 
-> > After:
-> > 1. echo freeze > /sys/power/state ---> Enters s2idle still same
-> > 2. echo s2idle > /sys/power/mem_sleep
-> >    echo mem > /sys/power/state ---> Also enter s2idle
-> > 3. echo deep > /sys/power/mem_sleep
-> >    echo mem > /sys/power/state ---> Also enter s2r(same as [B] above)
-> > 
-> > Please note I have carefully dropped standby/shallow as we will not
-> > support that state on ARM64 platforms(refer previous discussions for the
-> > same)
-> > 
-> > Now IIUC, you need 2 above. So, since this new interface allow mem to
-> > mean "s2idle", we need to fix the core to register default suspend_ops
-> > to achieve what you need. 
-> 
-> I take this back, you have everything you need in place, nothing needs
-> to be done. I just checked again. If I don't register PSCI suspend_ops,
-> I still get mem in /sys/power/state with s2idle in /sys/power/mem_sleep
-> which is exactly what we need. Again we don't support standby/shallow
-> state on ARM64/PSCI.
+Hi all,
 
-Except for one thing which may or may not be a concern here.
 
-Suspend to idle should only go into states in which all of the available wakeup
-devices work.  If there are devices that cannot wake you up from a given state,
-this isn't "idle" any more, is it?
+This patchset is resent patchset.
 
-As for the device wakeup disable/enable interface, it is for controlling
-whether or not a given device should be allowed to generate wakeup signals at
-all.
+Because I have a missing TO, CC, I sent it again.
 
-The information on what states a given device can wake up the system from is
-platform-specific and generally would need to be taken into consideration at
-the platform level.
+Sorry, I will send it in the correct format next time.
 
-Thanks,
-Rafael
+
+Best Regards,
+
+Hoegeun
+
+
+On 02/22/2017 10:09 AM, Hoegeun Kwon wrote:
+> Dear Thierry,
+>
+> I understand that your opinion is:
+> It is better to handle the error every time it is input to the
+> register, rather than error handling at once in the struct using
+> error. This not only makes the code easier to maintain, but also
+> reduces unnecessary computation.
+>
+> So I modified the panel driver to code-by-code error handling.
+> If this is not your opinion, could you tell me what your opinion?
+>
+> Best Regards,
+> Hoegeun
+>
+>
+> Changes for V10:
+> - Fixed code-by-code error handling.
+>
+> Changes for V9:
+> - Fixed the te-gpio to optional in bindings
+>
+> Changes for V8:
+> - Applied below two patches: (drm/exynos)
+>   : drm/exynos: mic: Add mode_set callback function
+>   : drm/exynos: mic: Fix parse_dt function
+> - The dt-binding patch and driver patch were divided.
+> - Rebase these patches on samsung SoC tree[1] and tm2 touckey patch[2].
+>
+> Change for V7:
+> - Fixed the mode_set callback function of mic device driver.
+>   because the mic register is initialized when entering suspend
+>   mode, so should set the reg value whenever pre_enable is
+>   called.
+>
+> Changes for V6:
+> - Fixed the parse_dt function of dsi device driver.
+> - Removed OF graph of panel in DT and DT binding document.
+> - Fixed the s6e3ha2 panel device driver.
+>   - Fixed from number size to ARRAY_SIZE().
+>   - Fixed error handling in mipi_dsi_dcs_* functions.
+>   - Fixed the clock of display_mode.
+>   - Removed unnecessary casting and error log.
+>
+> Change for V5:
+> - The V5 has only one fix in V4 below.
+> - Removed the enable check of the mic driver in mode_set
+>   callback, because mode_set should be performed every time.
+>
+> Changes for V4:
+> - Removed display-timings in devicetree, the display-timings has
+>   been fixed to be provided by the device driver.
+> - Added the mode_set callback function into exynos_drm_mic,
+>   because the exynos_drm_mic driver can not parse a videomode
+>   struct by removing the display-timings from the devicetree.
+>
+> Changes for V3:
+> - In the DT binding document, made it clearly that the panel is a
+>   child node of dsi.
+> - Fix reset-gpio active from high to low.
+> - Is the OF graph saying related to patch2?
+>   Althogh the panel is a child of dsi, I think OF graph necessary.
+>   because if a remote-endpoint is not specified, the dsi also
+>   panel is not probed.
+> - The display-timings has been fixed to be provided by the device
+>   driver. however, I think display-timings is necessary in dts.
+>   because if dts does not have display-timings, dsi will not load.
+>
+> Changes for V2:
+> - Fixed the samsung,s6e3ha2.txt DT document.
+>   - Added active high or low after the description of the GPIOs.
+>   - Removed the reg and added a description of the virtual
+>     channel number of a DSI peripheral.
+>
+> Depends on:
+> [1] https://git.kernel.org/cgit/linux/kernel/git/krzk/linux.git/ 
+> (for-next branch)
+> [2] https://patchwork.kernel.org/patch/9504131/
+>     - ("arm64: dts: exynos: Add tm2 touchkey node")
+>
+> Hoegeun Kwon (2):
+>   dt-bindings: Add support for samsung s6e3ha2 panel binding
+>   drm/panel: Add support for S6E3HA2 panel driver on TM2 board
+>
+> Hyungwon Hwang (1):
+>   arm64: dts: exynos: Add support for S6E3HA2 panel device on TM2 board
+>
+>  .../bindings/display/panel/samsung,s6e3ha2.txt     |  28 +
+>  arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      |  12 +
+>  drivers/gpu/drm/panel/Kconfig                      |   6 +
+>  drivers/gpu/drm/panel/Makefile                     |   1 +
+>  drivers/gpu/drm/panel/panel-samsung-s6e3ha2.c      | 739 
+> +++++++++++++++++++++
+>  5 files changed, 786 insertions(+)
+>  create mode 100644 
+> Documentation/devicetree/bindings/display/panel/samsung,s6e3ha2.txt
+>  create mode 100644 drivers/gpu/drm/panel/panel-samsung-s6e3ha2.c
+>
