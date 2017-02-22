@@ -1,88 +1,83 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 22 Feb 2017 14:14:42 +0100
-Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
- power
-In-Reply-To: <1975396.x0czmkNPOW@aspire.rjw.lan>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <94167d3a-e005-3af0-d290-a1086684d570@arm.com>
- <3c8b3f2d-8604-f999-4208-a82f171b64f2@arm.com>
- <1975396.x0czmkNPOW@aspire.rjw.lan>
-Message-ID: <CAMuHMdUWMN1ZyRn=eL6MQZeZHOf5zOC=njdnuL9-9CDS2h8CMQ@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 22 Feb 2017 14:16:29 +0100
+Subject: [RFC 30/55] KVM: arm/arm64: Inject irqs to the guest hypervisor
+In-Reply-To: <1483943091-1364-31-git-send-email-jintack@cs.columbia.edu>
+References: <1483943091-1364-1-git-send-email-jintack@cs.columbia.edu>
+ <1483943091-1364-31-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <20170222131629.GQ26976@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+On Mon, Jan 09, 2017 at 01:24:26AM -0500, Jintack Lim wrote:
+> If we have a pending IRQ for the guest and the guest expects IRQs
+> to be handled in its virtual EL2 mode (the virtual IMO bit is set)
+> and it is not already running in virtual EL2 mode, then we have to
+> emulate an IRQ exception.
+> 
+> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  virt/kvm/arm/vgic/vgic.c | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index 6440b56..4a98654 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -17,6 +17,7 @@
+>  #include <linux/kvm.h>
+>  #include <linux/kvm_host.h>
+>  #include <linux/list_sort.h>
+> +#include <asm/kvm_emulate.h>
+>  
+>  #include "vgic.h"
+>  
+> @@ -652,6 +653,28 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+>  	/* Nuke remaining LRs */
+>  	for ( ; count < kvm_vgic_global_state.nr_lr; count++)
+>  		vgic_clear_lr(vcpu, count);
+> +
+> +	/*
+> +	 * If we have any pending IRQ for the guest and the guest expects IRQs
+> +	 * to be handled in its virtual EL2 mode (the virtual IMO bit is set)
+> +	 * and it is not already running in virtual EL2 mode, then we have to
+> +	 * emulate an IRQ exception to virtual IRQ. Note that a pending IRQ
+> +	 * means an irq of which state is pending but not active.
+> +	 */
+> +	if (vcpu_el2_imo_is_set(vcpu) && !vcpu_mode_el2(vcpu)) {
 
-On Wed, Feb 22, 2017 at 2:14 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Tuesday, February 21, 2017 06:45:13 PM Sudeep Holla wrote:
->> On 21/02/17 18:27, Sudeep Holla wrote:
->> > On 21/02/17 17:51, Sudeep Holla wrote:
->> >> On 21/02/17 17:34, Geert Uytterhoeven wrote:
->> >>> That's more or less what /sys/power/mem_sleep does, though.
->> >>
->> >> OK, I will go through that in detail.
->> >
->> > OK, I went through the patch and the main intention is was added.
->> > So I will begin by summarizing my understanding:
->> >
->> > A new suspend interface(/sys/power/mem_sleep) is added to allow the
->> > "mem" string in /sys/power/state to represent multiple things that can
->> > be selected.
->> >
->> > Before:
->> > A. echo freeze > /sys/power/state ---> Enters s2idle
->> > B. echo mem > /sys/power/state ---> Enters s2r(a.k.a now deep mem sleep)
->> >
->> > After:
->> > 1. echo freeze > /sys/power/state ---> Enters s2idle still same
->> > 2. echo s2idle > /sys/power/mem_sleep
->> >    echo mem > /sys/power/state ---> Also enter s2idle
->> > 3. echo deep > /sys/power/mem_sleep
->> >    echo mem > /sys/power/state ---> Also enter s2r(same as [B] above)
->> >
->> > Please note I have carefully dropped standby/shallow as we will not
->> > support that state on ARM64 platforms(refer previous discussions for the
->> > same)
->> >
->> > Now IIUC, you need 2 above. So, since this new interface allow mem to
->> > mean "s2idle", we need to fix the core to register default suspend_ops
->> > to achieve what you need.
->>
->> I take this back, you have everything you need in place, nothing needs
->> to be done. I just checked again. If I don't register PSCI suspend_ops,
->> I still get mem in /sys/power/state with s2idle in /sys/power/mem_sleep
->> which is exactly what we need. Again we don't support standby/shallow
->> state on ARM64/PSCI.
->
-> Except for one thing which may or may not be a concern here.
->
-> Suspend to idle should only go into states in which all of the available wakeup
-> devices work.  If there are devices that cannot wake you up from a given state,
-> this isn't "idle" any more, is it?
+Is this correct?
 
-Indeed. And I have no problem with handling wake-up sources from Linux,
-as Linux knows how to handle them.
+Shouldn't you also inject this to virtual EL2 even when virtual EL2 is
+already running as long as the PSTATE.I bit is clear?
 
-> As for the device wakeup disable/enable interface, it is for controlling
-> whether or not a given device should be allowed to generate wakeup signals at
-> all.
+> +		bool pending = false;
+> +
+> +		list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
 
-OK. So it's not guaranteed that it will actually work...
+You need to take a lock when iterating over this list.
 
-> The information on what states a given device can wake up the system from is
-> platform-specific and generally would need to be taken into consideration at
-> the platform level.
+> +			spin_lock(&irq->irq_lock);
+> +			pending = irq->pending && irq->enabled && !irq->active;
+> +			spin_unlock(&irq->irq_lock);
+> +
+> +			if (pending) {
+> +				kvm_inject_nested_irq(vcpu);
+> +				break;
+> +			}
+> +		}
 
-So that's PSCI on arm64?
-But the PSCI specification doesn't handle that.
+I would prefer to see this check that loops over the AP list as a
+separate function that you call, like vgic_vcpu_has_pending_irq.
 
-Gr{oetje,eeting}s,
+> +	}
+>  }
+>  
+>  /* Sync back the hardware VGIC state into our emulation after a guest's run. */
+> -- 
+> 1.9.1
+> 
+> 
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+-Christoffer
