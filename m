@@ -1,96 +1,58 @@
 From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 22 Feb 2017 15:50:39 +0100
-Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
- power
-In-Reply-To: <f649d707-8b0a-5ca9-b021-93ae8cf66b33@arm.com>
+Date: Wed, 22 Feb 2017 15:57:11 +0100
+Subject: [PATCH/RFC 4/6] drivers: firmware: psci: Fix non-PMIC wake-up if
+ SYSTEM_SUSPEND cuts power
+In-Reply-To: <CAMuHMdW8JAYrgvWxi8c_ZLtsUWBYFGZ=V7pu2p+cO=NdwLas2w@mail.gmail.com>
 References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <94167d3a-e005-3af0-d290-a1086684d570@arm.com>
- <3c8b3f2d-8604-f999-4208-a82f171b64f2@arm.com>
- <1975396.x0czmkNPOW@aspire.rjw.lan>
- <35840771-e16f-d6fe-3a89-1b3f51f4a8f3@arm.com>
- <CAMuHMdXpKrJn9NrkAarvMtytk9gHEFcRoZLCsWBFgriUCeWo=Q@mail.gmail.com>
- <f649d707-8b0a-5ca9-b021-93ae8cf66b33@arm.com>
-Message-ID: <CAJZ5v0iheYM-qj8=bO3NZhoM5=8+TikYhm23EZV72HxNxUXDsg@mail.gmail.com>
+ <1487622809-25127-5-git-send-email-geert+renesas@glider.be>
+ <20170221174844.GE8605@leverpostej>
+ <CAMuHMdW8JAYrgvWxi8c_ZLtsUWBYFGZ=V7pu2p+cO=NdwLas2w@mail.gmail.com>
+Message-ID: <CAJZ5v0ihFCe0phwKQHDnPETkfPgKDiWw27GOs8jVv1hyahJ+DQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2017 at 3:32 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+On Wed, Feb 22, 2017 at 3:05 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Mark,
 >
->
-> On 22/02/17 13:38, Geert Uytterhoeven wrote:
->> Hi Sudeep,
+> On Tue, Feb 21, 2017 at 6:48 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Mon, Feb 20, 2017 at 09:33:27PM +0100, Geert Uytterhoeven wrote:
+>>> @@ -440,12 +442,14 @@ static int psci_system_suspend_valid(suspend_state_t state)
+>>>  static int psci_system_suspend_enter(suspend_state_t state)
+>>>  {
+>>>       switch (state) {
+>>> +     case PM_SUSPEND_MEM:
+>>> +             if (!psci_system_suspend_is_power_down ||
+>>> +                 !wakeup_source_available())
+>>> +                     return cpu_suspend(0, psci_system_suspend);
+>>> +             /* fall through */
 >>
->> On Wed, Feb 22, 2017 at 12:03 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>> On 22/02/17 01:14, Rafael J. Wysocki wrote:
->>>> On Tuesday, February 21, 2017 06:45:13 PM Sudeep Holla wrote:
->>>
->>> [...]
->>>
->>>>> I take this back, you have everything you need in place, nothing needs
->>>>> to be done. I just checked again. If I don't register PSCI suspend_ops,
->>>>> I still get mem in /sys/power/state with s2idle in /sys/power/mem_sleep
->>>>> which is exactly what we need. Again we don't support standby/shallow
->>>>> state on ARM64/PSCI.
->>>>
->>>> Except for one thing which may or may not be a concern here.
->>>>
->>>> Suspend to idle should only go into states in which all of the available wakeup
->>>> devices work.  If there are devices that cannot wake you up from a given state,
->>>> this isn't "idle" any more, is it?
->>>>
->>>
->>> True. In this Renasas platform, since the platform doesn't have PSCI
->>> system suspend, we can only support s2idle and not s2ram. In this case
+>> I don't believe that this is the correct place to handle this.
 >>
->> Not correct: this Renesas platform does have PSCI system suspend.
->> So s2ram "works" (it suspends the system, which can be resumed by a switch)
->>
+>> The wakeup_source_available() check *might* be ok, though even with that
+>> I'd rather we rejected the request rather than trying to fall back to a
+>> PSCI_CPU_SUSPEND. Otherwise we have a potential silent power regression.
 >
-> Ah OK. Sorry for misunderstanding the platform support.
+> If we reject the request here, I think the PM core has to be modified to
+> try again using a shallower state. Note that it would be better to reject
+> the state in the .valid() callback instead of in .enter().
 >
->>> we don't ask platform to enter some system state whereas we suspend all
->>> the devices(leaving wakeup capable devices active) and ask platform to
->>> enter deepest idle state on all the CPUs. I still don't understand the
->>> issue Geert is facing.
->>
->> PSCI system suspend does not support wake-up sources configured from Linux.
->> Hence I cannot use PSCI system suspend if any wake-up sources have been
->> configured from Linux, and I expect to be able to use them for wake-up.
->>
+> You also have to consider this is dynamic not static.
+> I.e. the availability of other wake-up sources may change at runtime (cfr.
+> the "wakeup" files in sysfs). Currently pm_sleep_states[] (which controls
+> which states are available) is initialized from suspend_set_ops(), and not
+> changed later.
 >
-> OK, I thought I had told this before. What do you mean by PSCI system
-> suspend can't wakeup from the configured wakeup source. You just said
-> above that you can wake up from the switch.
->
-> Just enabling the wakeup sources in Linux doesn't mean you can enter
-> system suspend anytime. You must enter only the state from which you can
-> resume. And in your case if you can't wakeup from WLAN or wakeup source
-> you have configured then simply don't enter system suspend.
+> Perhaps pm_sleep_states[] should be updated every time the wakeup_sources
+> list is changed?
 
-Well, not quite.
+No, the definitions of sleep states *are* static.  They have to be, or
+user space won't know what sleep state it is asking for.
 
-The sysfs wakeup setting for devices only means whether or not to
-enable the generation of wakeup signals for them while suspending.  It
-allows to *prevent* devices from waking up the system, but it doesn't
-guarantee that they will actually wake up if enabled.
-
-Now, the platform doesn't decide on the sleep state it will go to on
-the basis of what devices have been enabled to wake up the system.
-The states ("shallow", "deep") have to be defined upfront, including
-what devices can wake up from the "shallow" and what devices can wake
-up from the "deep" states (these lists need not be the same).  [As I
-said before, the assumption is that all of them will be able to wake
-up the system from suspend-to-idle.]
-
-So, if user space triggers a transition to the "shallow" state, say,
-it will be possible to wake up the system from it by devices that (a)
-can wake it up from the "shallow" state as defined for the given
-platform and (b) have been enabled to wake up the system via sysfs.
-
-Conversely, if you have a system power state such that only a subset
-of devices can wake up from it, it needs to be defined as either
-"shallow" or "deep" and the list of possible wakeup sources is part of
-that definition.
+And, as I said in my last reply to Sudeep, the list of possible wakeup
+devices for the given state is part of that definition.  The sysfs
+"wakeup" interface is on top of that, not the other way around (which
+seems seems to be what you would want).
 
 Thanks,
 Rafael
