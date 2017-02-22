@@ -1,109 +1,101 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Wed, 22 Feb 2017 05:44:39 +0100
-Subject: [RFC] usb: gadget: scheduling while atomic in pxa27x_udc,
- IS_ERR_OR_NULL test, duplicated definition
-Message-ID: <e33b2bdb-f365-28d0-768a-c8e94a7794f9@tul.cz>
+From: flatmax@flatmax.org (Matt Flax)
+Date: Wed, 22 Feb 2017 16:20:46 +1100
+Subject: [PATCH v5] ASoC: bcm2835: Add 8 channel (multitrack) capability
+In-Reply-To: <1487740713-27093-1-git-send-email-flatmax@flatmax.org>
+References: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
+ <1487740713-27093-1-git-send-email-flatmax@flatmax.org>
+Message-ID: <2e48fe6c-0229-3ea3-d957-c3be03b14d16@flatmax.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch doesn't include the update, I will resend as v6
 
-I found a few problems with the PXA27x UDC.
 
-	usb_function_activate() in drivers/usb/gadget/composite.c
-
-does spin_lock_irqsave() and then calls 
-
-	gadget->ops->pullup() in drivers/usb/gadget/udc/core.c
-
-which is set to pxa_udc_pullup(), which should be called not in interrupt
-
-	/**
-	 * pxa_udc_pullup - Offer manual D+ pullup control
-	 * @_gadget: usb gadget using the control
-	 * @is_active: 0 if disconnect, else connect D+ pullup resistor
-	 * Context: !in_interrupt()
-	 *
-	 * Returns 0 if OK, -EOPNOTSUPP if udc driver doesn't handle D+ pullup
-	 */
-
-This finally causes fail at
-
-	udc_enable() in drivers/usb/gadget/udc/pxa27x_udc.c
-	
-at code
-
-	/*
-	 * Caller must be able to sleep in order to cope with startup transients
-	 */
-	msleep(100);
-
-with a following error (with CONFIG_DEBUG_PREEMPT on):
-
-	BUG: scheduling while atomic: v4l_id/360/0x00000002
-	...
-	Preemption disabled at:
-	[<bf43be34>] usb_function_activate+0x20/0xa4 [libcomposite]
-	CPU: 0 PID: 360 Comm: v4l_id Not tainted 4.10.0-rc5-magician+ #2
-	Hardware name: HTC Magician
-	[<c000f540>] (unwind_backtrace) from [<c000d3e0>] (show_stack+0x10/0x14)
-	[<c000d3e0>] (show_stack) from [<c00363b8>] (__schedule_bug+0x98/0xcc)
-	[<c00363b8>] (__schedule_bug) from [<c035d94c>] (__schedule+0x58/0x444)
-	[<c035d94c>] (__schedule) from [<c035dde0>] (schedule+0xa8/0xc8)
-	[<c035dde0>] (schedule) from [<c0361558>] (schedule_timeout+0x1c8/0x1ec)
-	[<c0361558>] (schedule_timeout) from [<c005312c>] (msleep+0x1c/0x20)
-	[<c005312c>] (msleep) from [<bf4322e4>] (udc_enable+0x170/0x1d4 [pxa27x_udc])
-	[<bf4322e4>] (udc_enable [pxa27x_udc]) from [<bf432560>] (pxa_udc_pullup+0x40/0x68 [pxa27x_udc])
-	[<bf432560>] (pxa_udc_pullup [pxa27x_udc]) from [<bf4271c8>] (usb_gadget_connect+0x3c/0x5c [udc_core])
-	[<bf4271c8>] (usb_gadget_connect [udc_core]) from [<bf43beac>] (usb_function_activate+0x98/0xa4 [libcomposite])
-	[<bf43beac>] (usb_function_activate [libcomposite]) from [<bf44df08>] (uvc_function_connect+0x14/0x38 [usb_f_uvc])
-	[<bf44df08>] (uvc_function_connect [usb_f_uvc]) from [<bf44e944>] (uvc_v4l2_open+0x4c/0x60 [usb_f_uvc])
-	[<bf44e944>] (uvc_v4l2_open [usb_f_uvc]) from [<bf156420>] (v4l2_open+0x7c/0xc0 [videodev])
-	[<bf156420>] (v4l2_open [videodev]) from [<c00b4010>] (chrdev_open+0x198/0x1b0)
-	[<c00b4010>] (chrdev_open) from [<c00ad314>] (do_dentry_open.constprop.3+0x1b0/0x2ec)
-	[<c00ad314>] (do_dentry_open.constprop.3) from [<c00bdbf0>] (path_openat+0xc10/0xdd4)
-	[<c00bdbf0>] (path_openat) from [<c00bdde4>] (do_filp_open+0x30/0x78)
-	[<c00bdde4>] (do_filp_open) from [<c00ae340>] (do_sys_open+0xf0/0x1b0)
-	[<c00ae340>] (do_sys_open) from [<c000a320>] (ret_fast_syscall+0x0/0x38)
-
-With the msleep changed to mdelay, the code (specified as !in_interrupt()) seems to work fine
-(after torture reloads). Can the caller (udc core) be changed to be able to sleep?
-	
-Second bug was discovered by Robert Jarzmik during discussion in
-
-	[BUG] usb: gadget: Kernel oops with UVC USB gadget and configfs
-
-A call to usb_put_phy(udc->transceiver) in pxa_udc_remove() can be called with  variable
-containing error pointer or NULL. So it should be moved to a previous call like this (modified
-original suggestion):
-
-	if (!IS_ERR_OR_NULL(udc->transceiver)) {
-		usb_unregister_notifier(udc->transceiver, &pxa27x_udc_phy);
-		usb_put_phy(udc->transceiver);
-	}
-
-And as we talking about it, is this return correct?
-
-	if (of_have_populated_dt()) {
-		udc->transceiver =
-			devm_usb_get_phy_by_phandle(udc->dev, "phys", 0);
-
-		if (IS_ERR(udc->transceiver))
-			return PTR_ERR(udc->transceiver);
-	} else {
-		udc->transceiver = usb_get_phy(USB_PHY_TYPE_USB2);
-	}
-
-One branch returns on error and second one is fine, udc->transceiver then can hold an error,
-but this is fine for the rest of driver (tested). Question is does it have to return from a first
-branch (e.g. my device does not have phy)?
-
-And finally it seems definitions from drivers/usb/gadget/udc/pxa27x_udc.c are duplicated:
-
-	static void udc_enable(struct pxa_udc *udc);
-	static void udc_disable(struct pxa_udc *udc);
-
-I will send patch series as soon as we agree on solutions.
-
-best regards,
-Petr
+On 22/02/17 16:18, Matt Flax wrote:
+> This patch adds multitrack capability if in DSP mode A and the
+> codec is master.
+>
+> In bcm2835_i2s_startup, snd_pcm_hw_constraint_single is used to set
+> channels to 8 if both SND_SOC_DAIFMT_CBM_CFM and SND_SOC_DAIFMT_DSP_A
+> are set. Otherwise, channels are set to 2. These settings are
+> accomplished using the SNDRV_PCM_HW_PARAM_CHANNELS variable.
+>
+> In bcm2835_i2s_shutdown the channels are set to 2 by default.
+>
+> In bcm2835_i2s_hw_params, DSP mode A format is now an option.
+> Before replicating the format variable (from ch2 to ch1) for
+> register loading, requested channels are checked to be either 2 or 8.
+> This can be expanded later to accomodate other channel counts if
+> supported by the sound card hardware.
+>
+> Signed-off-by: Matt Flax <flatmax@flatmax.org>
+> ---
+>   sound/soc/bcm/bcm2835-i2s.c | 21 ++++++++++++++++-----
+>   1 file changed, 16 insertions(+), 5 deletions(-)
+>
+> diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
+> index 6ba2049..300516d 100644
+> --- a/sound/soc/bcm/bcm2835-i2s.c
+> +++ b/sound/soc/bcm/bcm2835-i2s.c
+> @@ -296,6 +296,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
+>   
+>   	switch (dev->fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
+>   	case SND_SOC_DAIFMT_I2S:
+> +	case SND_SOC_DAIFMT_DSP_A:
+>   		data_delay = 1;
+>   		break;
+>   	default:
+> @@ -312,6 +313,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
+>   
+>   	switch (params_channels(params)) {
+>   	case 2:
+> +	case 8:
+>   		format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
+>   		format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
+>   		format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
+> @@ -526,7 +528,16 @@ static int bcm2835_i2s_startup(struct snd_pcm_substream *substream,
+>   	regmap_update_bits(dev->i2s_regmap, BCM2835_I2S_CS_A_REG,
+>   			BCM2835_I2S_STBY, BCM2835_I2S_STBY);
+>   
+> -	return 0;
+> +	/* Set the max channels to 8 if the codec is master and
+> +	 * we are in DSP A mode. Otherwise only allow 2 channels.
+> +	 */
+> +	if (dev->fmt &
+> +		(SND_SOC_DAIFMT_CBM_CFM | SND_SOC_DAIFMT_DSP_A))
+> +		return snd_pcm_hw_constraint_single(substream->runtime,
+> +			SNDRV_PCM_HW_PARAM_CHANNELS, 8);
+> +	else
+> +		return snd_pcm_hw_constraint_single(substream->runtime,
+> +			SNDRV_PCM_HW_PARAM_CHANNELS, 2);
+>   }
+>   
+>   static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
+> @@ -549,6 +560,10 @@ static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
+>   	 * not stop the clock when SND_SOC_DAIFMT_CONT
+>   	 */
+>   	bcm2835_i2s_stop_clock(dev);
+> +
+> +	/* Default to 2 channels */
+> +	snd_pcm_hw_constraint_single(substream->runtime,
+> +			SNDRV_PCM_HW_PARAM_CHANNELS, 2);
+>   }
+>   
+>   static const struct snd_soc_dai_ops bcm2835_i2s_dai_ops = {
+> @@ -576,16 +591,12 @@ static struct snd_soc_dai_driver bcm2835_i2s_dai = {
+>   	.name	= "bcm2835-i2s",
+>   	.probe	= bcm2835_i2s_dai_probe,
+>   	.playback = {
+> -		.channels_min = 2,
+> -		.channels_max = 2,
+>   		.rates =	SNDRV_PCM_RATE_8000_192000,
+>   		.formats =	SNDRV_PCM_FMTBIT_S16_LE
+>   				| SNDRV_PCM_FMTBIT_S24_LE
+>   				| SNDRV_PCM_FMTBIT_S32_LE
+>   		},
+>   	.capture = {
+> -		.channels_min = 2,
+> -		.channels_max = 2,
+>   		.rates =	SNDRV_PCM_RATE_8000_192000,
+>   		.formats =	SNDRV_PCM_FMTBIT_S16_LE
+>   				| SNDRV_PCM_FMTBIT_S24_LE
