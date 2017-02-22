@@ -1,109 +1,117 @@
-From: nicolas.dufresne@collabora.com (Nicolas Dufresne)
-Date: Wed, 22 Feb 2017 09:42:25 -0500
-Subject: [PATCH v5 3/3] [media] s5p-mfc: Check and set
- 'v4l2_pix_format:field' field in try_fmt
-In-Reply-To: <ed287d5a-687b-b344-3f20-10154071852c@osg.samsung.com>
-References: <20170221192059.29745-1-thibault.saunier@osg.samsung.com>
- <CGME20170221192135epcas4p1811fa9ce35481d42144bdab368c9243a@epcas4p1.samsung.com>
- <20170221192059.29745-4-thibault.saunier@osg.samsung.com>
- <78444dcd-169f-0c16-0e09-6b71d1a502b2@samsung.com>
- <ed287d5a-687b-b344-3f20-10154071852c@osg.samsung.com>
-Message-ID: <1487774545.5907.17.camel@collabora.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 22 Feb 2017 08:44:06 -0600
+Subject: [PATCH 2/2] ARM64: dts: meson-gxl: Add support for HwaCom AmazeTV
+In-Reply-To: <20170212193247.22705-3-carlo@caione.org>
+References: <20170212193247.22705-1-carlo@caione.org>
+ <20170212193247.22705-3-carlo@caione.org>
+Message-ID: <20170222144406.zycqtc77dygavh3q@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mercredi 22 f?vrier 2017 ? 10:10 -0300, Thibault Saunier a ?crit?:
-> Hello,
+On Sun, Feb 12, 2017 at 08:32:47PM +0100, Carlo Caione wrote:
+> From: Carlo Caione <carlo@endlessm.com>
 > 
-> On 02/22/2017 06:29 AM, Andrzej Hajda wrote:
-> > On 21.02.2017 20:20, Thibault Saunier wrote:
-> > > It is required by the standard that the field order is set by the
-> > > driver.
-> > > 
-> > > Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com
-> > > >
-> > > 
-> > > ---
-> > > 
-> > > Changes in v5:
-> > > - Just adapt the field and never error out.
-> > > 
-> > > Changes in v4: None
-> > > Changes in v3:
-> > > - Do not check values in the g_fmt functions as Andrzej explained
-> > > in previous review
-> > > 
-> > > Changes in v2:
-> > > - Fix a silly build error that slipped in while rebasing the
-> > > patches
-> > > 
-> > > ? drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 3 +++
-> > > ? 1 file changed, 3 insertions(+)
-> > > 
-> > > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> > > b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> > > index 0976c3e0a5ce..44ed2afe0780 100644
-> > > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> > > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> > > @@ -386,6 +386,9 @@ static int vidioc_try_fmt(struct file *file,
-> > > void *priv, struct v4l2_format *f)
-> > > ??	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
-> > > ??	struct s5p_mfc_fmt *fmt;
-> > > ??
-> > > +	if (f->fmt.pix.field == V4L2_FIELD_ANY)
-> > > +		f->fmt.pix.field = V4L2_FIELD_NONE;
-> > > +
-> > 
-> > In previous version the only supported field type was NONE, here
-> > you
-> > support everything.
-> > If the only supported format is none you should set 'field'
-> > unconditionally to NONE, nothing more.
+> This patch adds support for the HwaCom AmazeTV set-top-box. The
+> hardware configuration is really similar to the other GXL boards but
+> for this hardware we need to limit the max-frequency of the eMMC to
+> have it working.
 > 
-> Afaict we??support 2 things:
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/amlogic.txt  |   1 +
+>  arch/arm64/boot/dts/amlogic/Makefile               |   1 +
+>  .../boot/dts/amlogic/meson-gxl-hwacom-amazetv.dts  | 201 +++++++++++++++++++++
+>  3 files changed, 203 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-hwacom-amazetv.dts
 > 
-> ???1. NONE
-> ???2. INTERLACE
-> 
-> Until now we were not checking what was supported or not and
-> basically?
-> ignoring that info, this patch
-> keeps the old behaviour making sure to be compliant.
-> 
-> I had a doubt and was pondering doing:
-> 
-> ``` diff
-> 
-> +	if (f->fmt.pix.field != V4L2_FIELD_INTERLACED)
-> +		f->fmt.pix.field = V4L2_FIELD_NONE;
+> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+> index 9b2b41a..c369a55 100644
+> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
+> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+> @@ -47,3 +47,4 @@ Board compatible values:
+>    - "amlogic,q201" (Meson gxm s912)
+>    - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
+>    - "nexbox,a1" (Meson gxm s912)
+> +  - "hwacom,amazetv" (Meson gxl s905x)
+> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+> index 0d7bfbf..2932755 100644
+> --- a/arch/arm64/boot/dts/amlogic/Makefile
+> +++ b/arch/arm64/boot/dts/amlogic/Makefile
+> @@ -9,6 +9,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-nexbox-a95x.dtb
+> +dtb-$(CONFIG_ARCH_MESON) += meson-gxl-hwacom-amazetv.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-s912-q200.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-s912-q201.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-hwacom-amazetv.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-hwacom-amazetv.dts
+> new file mode 100644
+> index 0000000..4499789
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-hwacom-amazetv.dts
+> @@ -0,0 +1,201 @@
+> +/*
+> + * Copyright (c) 2017 Carlo Caione
+> + * Copyright (c) 2016 Andreas F?rber
+> + * Copyright (c) 2016 BayLibre, Inc.
+> + * Author: Neil Armstrong <narmstrong@kernel.org>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+
+I'm going to start asking people to use SPDX tags and you are the first. :)
+
+SPDX-License-Identifier: GPL2.0+ OR MIT
+
+Note that is really MIT license and not X11 which has additional 
+clauses.
+
 > +
-> 
+> +/dts-v1/;
+> +
+> +#include "meson-gxl-s905x.dtsi"
+> +
+> +/ {
+> +	compatible = "hwacom,amazetv", "amlogic,s905x", "amlogic,meson-gxl";
+> +	model = "HWACOM AMAZETV (S905X)";
 
-This looks better to me.
+Why yelling the model?
 
-> ```
-> 
-> instead, it is probably more correct, do you think it is what should
-> be?
-> done here?
-> 
-> Regards,
-> 
-> Thibault
-> 
-> > 
-> > Regards
-> > Andrzej
-> > 
-> > > ??	mfc_debug(2, "Type is %d\n", f->type);
-> > > ??	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
-> > > ??		fmt = find_format(f, MFC_FMT_DEC);
-> 
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170222/13a1ba63/attachment.sig>
+Rob
