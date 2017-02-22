@@ -1,65 +1,54 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 22 Feb 2017 15:51:18 +0000
-Subject: [RFC PATCH] arm: Fix cache inconsistency when using fixmap
-Message-ID: <1487778678.18810.8.camel@linaro.org>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 22 Feb 2017 10:57:05 -0500
+Subject: [RESEND PATCH v7 0/7] Rockchip dw-mipi-dsi driver
+In-Reply-To: <20170222134314.016a4940.john@metanate.com>
+References: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
+ <20170221153918.GA25168@art_vandelay>
+ <20170222134314.016a4940.john@metanate.com>
+Message-ID: <CAOw6vbJoS2P5m31+bgWw3Sghz=EVGj0fpLgCFnbVEhzRujNCLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cacheable memory mappings need to be marked as shareable otherwise the
-CPU accessing fixmap memory may end up with local cachelines for that
-memory, resulting in different CPUs in the system seeing different
-values for the same memory location.
+On Wed, Feb 22, 2017 at 8:43 AM, John Keeping <john@metanate.com> wrote:
+> On Tue, 21 Feb 2017 10:39:18 -0500, Sean Paul wrote:
+>
+>> On Mon, Feb 20, 2017 at 04:02:16PM +0800, Chris Zhong wrote:
+>> > Hi all
+>> >
+>> > [Resend this v7 version series, since there are 5 mails have gone missing, last
+>> > week]
+>> >
+>> > This version does not change the existing v6 patches, just to add the
+>> > "bandwidth fix" patch back, since we really need it.
+>> >
+>> > This patch serial is for RK3399 MIPI DSI. The MIPI DSI controller of
+>> > RK3399 is almost the same as RK3288, except a little bit of difference
+>> > in phy clock controlling and port id selection register. These patches
+>> > add RK3399 support and the power domain support.
+>> >
+>> > And these patches base on John Keeping's v3 patches[0], it fixes many bugs,
+>> > they have been tested on rk3288 evb board.
+>>
+>> Do we have an ETA on when John is planning on respinning his patchset based on
+>> review feedback?
+>
+> I have all of the changes queued but I was hoping to find some time to
+> test the latest version before sending it out; unfortunately everything
+> else is more important at the moment.  If you're happy with the caveat
+> that the latest changes are build tested only I can probably send it
+> out this afternoon.
 
-This issue was discovered when investigating failures in the ARM kprobe
-tests. kprobes uses patch_text() to modify the kernel image, which
-when CONFIG_DEBUG_RODATA is enabled makes use of fixmap to map the page
-to be modified. As the shareable attribute wasn't being set in the PTE
-entry for that page, a write to it wasn't being broadcast to other
-caches in the system, which in the the case being investigated was
-CPU's in the other cluster of a big.LITTLE system.
+I suppose my answer depends on when the tested version will be
+available, or perhaps Chris can test the new set for you? I don't have
+any rockchip devices with mipi, so i'm not much help.
 
-Fixes: a5f4c561b3b1 ("ARM: 8415/1: early fixmap support for earlycon")
-Cc: stable at vger.kernel.org # v4.3+
+Sean
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
+>
+>
+> John
 
-The fixmap changes in the original commit a5f4c561b3b1 look a bit iffy
-to me, shouldn't it have have made use of PAGE_KERNEL or pgprot_kernel
-or something like that to get PTE attributes suitable for the system
-being run, rather than rolling it's own set of values?
-That's why I'm marking this as an RFC, perhaps the correct fix is to
-rework the code to use the defines from arch/arm/include/asm/pgtable.h
 
- arch/arm/include/asm/fixmap.h       | 2 +-
- arch/arm/probes/kprobes/test-core.h | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 5c17d2dec777..26d4a4677cd7 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -41,7 +41,7 @@ static const enum fixed_addresses __end_of_fixed_addresses =
- 
- #define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
- 
--#define FIXMAP_PAGE_NORMAL	(FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
-+#define FIXMAP_PAGE_NORMAL	(FIXMAP_PAGE_COMMON | L_PTE_SHARED | L_PTE_MT_WRITEBACK)
- #define FIXMAP_PAGE_RO		(FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
- 
- /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
-diff --git a/arch/arm/probes/kprobes/test-core.h b/arch/arm/probes/kprobes/test-core.h
-index 94285203e9f7..cde2b4e9358a 100644
---- a/arch/arm/probes/kprobes/test-core.h
-+++ b/arch/arm/probes/kprobes/test-core.h
-@@ -8,7 +8,7 @@
-  * published by the Free Software Foundation.
-  */
- 
--#define VERBOSE 0 /* Set to '1' for more logging of test cases */
-+#define VERBOSE 1 /* Set to '1' for more logging of test cases */
- 
- #ifdef CONFIG_THUMB2_KERNEL
- #define NORMAL_ISA "16"
 -- 
-2.11.0
+Sean Paul, Software Engineer, Google / Chromium OS
