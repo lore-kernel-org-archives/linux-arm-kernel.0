@@ -1,24 +1,18 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 22 Feb 2017 10:28:47 -0800
-Subject: [PATCH v6] ASoC: bcm2835: Add 8 channel (multitrack) capability
-In-Reply-To: <1487740949-27583-1-git-send-email-flatmax@flatmax.org>
-References: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
- <1487740949-27583-1-git-send-email-flatmax@flatmax.org>
-Message-ID: <20170222182847.wdvk4stm5gbt46ch@sirena.org.uk>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 22 Feb 2017 19:33:05 +0100
+Subject: [PATCH 4/7] dt-bindings: rockchip,
+ pinctrl: rename RK1108 to RV1108
+In-Reply-To: <1486983983-32506-1-git-send-email-andy.yan@rock-chips.com>
+References: <1486983566-32265-1-git-send-email-andy.yan@rock-chips.com>
+ <1486983983-32506-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <27082192.QuVMo9lZhD@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2017 at 04:22:29PM +1100, Matt Flax wrote:
-> This patch adds multitrack capability if in DSP mode A and the
-> codec is master.
+Am Montag, 13. Februar 2017, 19:06:23 CET schrieb Andy Yan:
+> Rockchip finally named the SOC as RV1108, so change it.
+> Also move the compatible list to one compatible per line.
+> 
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
 
-As I'm pretty sure I've said before please don't send new patches in
-reply to existing threads, it makes it much harder to follow what's
-going on and what the current versions of things are.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170222/f700dc63/attachment.sig>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
