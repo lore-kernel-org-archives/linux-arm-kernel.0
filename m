@@ -1,46 +1,82 @@
-From: zhangqing@rock-chips.com (Elaine Zhang)
-Date: Wed, 22 Feb 2017 10:59:55 +0800
-Subject: [PATCH v1] clk: rockchip: add pll_wait_lock for pll_enable
-Message-ID: <1487732395-30353-1-git-send-email-zhangqing@rock-chips.com>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Wed, 22 Feb 2017 11:12:30 +0800
+Subject: [PATCH v20 2/4] mailbox: mediatek: Add Mediatek CMDQ driver
+In-Reply-To: <CABb+yY0jCGqnrMLkkTNoEmLX4jDstWh7-UYhDyKjV-gFOnxpsg@mail.gmail.com>
+References: <1483499169-16329-1-git-send-email-hs.liao@mediatek.com>
+ <1483499169-16329-3-git-send-email-hs.liao@mediatek.com>
+ <CABb+yY23TUB8NpmpiO=cCmVFAVJMqKPfGgX14j+_Yj7tJvMOuQ@mail.gmail.com>
+ <1485419833.990.1.camel@mtksdaap41>
+ <CABb+yY13VaFpYz6EExvAXLpAqEWDJ4R50WG0DYbXO6iCESbA5A@mail.gmail.com>
+ <1486359476.11424.33.camel@mtksdaap41>
+ <CABb+yY0jCGqnrMLkkTNoEmLX4jDstWh7-UYhDyKjV-gFOnxpsg@mail.gmail.com>
+Message-ID: <1487733150.15869.11.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If pll is power down,when power up pll need wait pll lock.
-The reference documents section:
-	PLL frequency change and lock check
+On Thu, 2017-02-16 at 21:02 +0530, Jassi Brar wrote:
+> On Mon, Feb 6, 2017 at 11:07 AM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+> > Hi Jassi,
+> >
+> > On Wed, 2017-02-01 at 10:52 +0530, Jassi Brar wrote:
+> >> On Thu, Jan 26, 2017 at 2:07 PM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+> >> > Hi Jassi,
+> >> >
+> >> > On Thu, 2017-01-26 at 10:08 +0530, Jassi Brar wrote:
+> >> >> On Wed, Jan 4, 2017 at 8:36 AM, HS Liao <hs.liao@mediatek.com> wrote:
+> >> >>
+> >> >> > diff --git a/drivers/mailbox/mtk-cmdq-mailbox.c b/drivers/mailbox/mtk-cmdq-mailbox.c
+> >> >> > new file mode 100644
+> >> >> > index 0000000..747bcd3
+> >> >> > --- /dev/null
+> >> >> > +++ b/drivers/mailbox/mtk-cmdq-mailbox.c
+> >> >>
+> >> >> ...
+> >> >>
+> >> >> > +static void cmdq_task_exec(struct cmdq_pkt *pkt, struct cmdq_thread *thread)
+> >> >> > +{
+> >> >> > +       struct cmdq *cmdq;
+> >> >> > +       struct cmdq_task *task;
+> >> >> > +       unsigned long curr_pa, end_pa;
+> >> >> > +
+> >> >> > +       cmdq = dev_get_drvdata(thread->chan->mbox->dev);
+> >> >> > +
+> >> >> > +       /* Client should not flush new tasks if suspended. */
+> >> >> > +       WARN_ON(cmdq->suspended);
+> >> >> > +
+> >> >> > +       task = kzalloc(sizeof(*task), GFP_ATOMIC);
+> >> >> > +       task->cmdq = cmdq;
+> >> >> > +       INIT_LIST_HEAD(&task->list_entry);
+> >> >> > +       task->pa_base = dma_map_single(cmdq->mbox.dev, pkt->va_base,
+> >> >> > +                                      pkt->cmd_buf_size, DMA_TO_DEVICE);
+> >> >> >
+> >> >> You seem to parse the requests and responses, that should ideally be
+> >> >> done in client driver.
+> >> >> Also, we are here in atomic context, can you move it in client driver
+> >> >> (before the spin_lock)?
+> >> >> Maybe by adding a new 'pa_base' member as well in 'cmdq_pkt'.
+> >> >
+> >> > will do
+> >
+> > I agree with moving dma_map_single out from spin_lock.
+> >
+> > However, mailbox clients cannot map virtual memory to mailbox
+> > controller's device for DMA.
+> >
+> If DMA is a resource used by MBox to transfer data, then yes the
+> mapping needs to be done in the Mbox controller driver. To map memory
+> outside of spinlock, you could schedule a tasklet in send_data() ?
 
-Signed-off-by: Elaine Zhang <zhangqing@rock-chips.com>
----
- drivers/clk/rockchip/clk-pll.c | 3 +++
- 1 file changed, 3 insertions(+)
+Hi Jassi,
 
-diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
-index 6ed605776abd..c4dfd26f37ae 100644
---- a/drivers/clk/rockchip/clk-pll.c
-+++ b/drivers/clk/rockchip/clk-pll.c
-@@ -268,6 +268,7 @@ static int rockchip_rk3036_pll_enable(struct clk_hw *hw)
- 
- 	writel(HIWORD_UPDATE(0, RK3036_PLLCON1_PWRDOWN, 0),
- 	       pll->reg_base + RK3036_PLLCON(1));
-+	rockchip_pll_wait_lock(pll);
- 
- 	return 0;
- }
-@@ -500,6 +501,7 @@ static int rockchip_rk3066_pll_enable(struct clk_hw *hw)
- 
- 	writel(HIWORD_UPDATE(0, RK3066_PLLCON3_PWRDOWN, 0),
- 	       pll->reg_base + RK3066_PLLCON(3));
-+	rockchip_pll_wait_lock(pll);
- 
- 	return 0;
- }
-@@ -745,6 +747,7 @@ static int rockchip_rk3399_pll_enable(struct clk_hw *hw)
- 
- 	writel(HIWORD_UPDATE(0, RK3399_PLLCON3_PWRDOWN, 0),
- 	       pll->reg_base + RK3399_PLLCON(3));
-+	rockchip_rk3399_pll_wait_lock(pll);
- 
- 	return 0;
- }
--- 
-1.9.1
+For CMDQ, the order of CMDQ tasks should be guaranteed.
+However, it seems tasklet cannot ensure this requirement.
+
+Quote from Linux Device Drivers 3rd edition ch7.
+"void tasklet_schedule(struct tasklet_struct *t);
+  Schedule the tasklet for execution. If a tasklet is scheduled again
+before it has a chance to run, it runs only once...."
+
+May I use workqueue instead of tasklet?
+
+Thanks,
+HS
