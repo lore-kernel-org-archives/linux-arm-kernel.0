@@ -1,147 +1,54 @@
-From: liviu.dudau@arm.com (Liviu Dudau)
-Date: Wed, 22 Feb 2017 15:15:42 +0000
-Subject: [BUG] hdlcd gets confused about base address
-In-Reply-To: <20170220180558.GB31595@intel.com>
-References: <20161118233733.GP1041@n2100.armlinux.org.uk>
- <20170220121603.GA1132@n2100.armlinux.org.uk>
- <20170220175331.GC963@e110455-lin.cambridge.arm.com>
- <20170220180558.GB31595@intel.com>
-Message-ID: <20170222151542.GA937@e110455-lin.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 22 Feb 2017 09:17:50 -0600
+Subject: [RFC v2 2/7] IIO: Add bindings for simple sigma delta adc
+In-Reply-To: <1487003909-11710-3-git-send-email-arnaud.pouliquen@st.com>
+References: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
+ <1487003909-11710-3-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20170222151750.h5d7gycltwnk7b4t@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ville,
-
-On Mon, Feb 20, 2017 at 08:05:58PM +0200, Ville Syrj?l? wrote:
-> On Mon, Feb 20, 2017 at 05:53:31PM +0000, Liviu Dudau wrote:
-> > Hi Russell,
-> > 
-> > On Mon, Feb 20, 2017 at 12:16:03PM +0000, Russell King - ARM Linux wrote:
-> > > On Fri, Nov 18, 2016 at 11:37:33PM +0000, Russell King - ARM Linux wrote:
-> > > > Something I also noticed is this:
-> > > > 
-> > > >         scanout_start = gem->paddr + plane->state->fb->offsets[0] +
-> > > >                 plane->state->crtc_y * plane->state->fb->pitches[0] +
-> > > >                 plane->state->crtc_x * bpp / 8;
-> > > > 
-> > > > Surely this should be using src_[xy] (which are the position in the
-> > > > source - iow, memory, and not crtc_[xy] which is the position on the
-> > > > CRTC displayed window.  To put it another way, the src_* define the
-> > > > region of the source material that is mapped onto a rectangular area
-> > > > on the display defined by crtc_*.
-> > > 
-> > > This problem still exists...
-> > 
-> > Sorry, looks like this fell through the cracks of us trying to fix the
-> > other issues you were seeing. I'm attaching a patch, please let me know
-> > if this works for you.
-> > 
-> > Best regards,
-> > Liviu
-> > 
-> > > 
-> > > -- 
-> > > RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> > > FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> > > according to speedtest.net.
+On Mon, Feb 13, 2017 at 05:38:24PM +0100, Arnaud Pouliquen wrote:
+> Add documentation of device tree bindings to support
+> sigma delta modulator in IIO framework.
 > 
-> > >From a495d262cb91fdeccb00685646ddb71774c18e7e Mon Sep 17 00:00:00 2001
-> > From: Liviu Dudau <Liviu.Dudau@arm.com>
-> > Date: Mon, 20 Feb 2017 17:44:42 +0000
-> > Subject: [PATCH] arm: hdlcd: Fix the calculation of scanout start address
-> > 
-> > The framebuffer start address uses the CRTC's x,y position rather
-> > than the source framebuffer's. Fix that.
-> > 
-> > Reported-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > ---
-> >  drivers/gpu/drm/arm/hdlcd_crtc.c | 11 +++++------
-> >  1 file changed, 5 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/arm/hdlcd_crtc.c b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > index 798a3cc480a2..4c1ab73d9e07 100644
-> > --- a/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > +++ b/drivers/gpu/drm/arm/hdlcd_crtc.c
-> > @@ -244,21 +244,20 @@ static void hdlcd_plane_atomic_update(struct drm_plane *plane,
-> >  	struct drm_framebuffer *fb = plane->state->fb;
-> >  	struct hdlcd_drm_private *hdlcd;
-> >  	struct drm_gem_cma_object *gem;
-> > -	u32 src_w, src_h, dest_w, dest_h;
-> > +	u32 src_x, src_y, dest_w, dest_h;
-> >  	dma_addr_t scanout_start;
-> >  
-> >  	if (!fb)
-> >  		return;
-> >  
-> > -	src_w = plane->state->src_w >> 16;
-> > -	src_h = plane->state->src_h >> 16;
-> > +	src_x = plane->state->src_x >> 16;
-> > +	src_y = plane->state->src_y >> 16;
-
-While still waiting for your reply to Russell's comments ...
-
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+> ---
+>  Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt
 > 
-> This stuff should be using the clipped coordinates, not the user
-> coordinates. And it doesn't look like this guy is even calling the
-> clip helper thing.
+> diff --git a/Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt b/Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt
+> new file mode 100644
+> index 0000000..2b3968a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt
+> @@ -0,0 +1,13 @@
+> +Device-Tree bindings for simple sigma delta adc
 
-That's right, the code I believe predates the existence of the clip helper
-thing (me reads it as "drm_plane_helper_check_state"), and I have not got
-around to update the code here. Before I do that I would like to get a bit
-more clarification on what you mean by the clipped coordinates, given
-that HDLCD doesn't support dirty buffer updates.
+What makes it "simple"?
 
-> 
-> malidp seems to be calling that thing, but it still doesn't
-> manage to program the hw with the right coordinates from what
-> I can see.
+> +
+> +Required properties:
+> +- compatible: should be "sd-modulator".
+> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
+> +
+> +Example node:
+> +
+> +	ads1202: simple_sd_adc at 0 {
 
-would like more clarity on what the right coordinates should be.
+Is ads1202 the actual chip? Then it should be in the compatible list.
 
-> 
-> /me feels a bit like a broken record...
+unit address without a reg prop is an error. The node name should be 
+"adc".
 
-Sorry, I was not aware of your previous interventions on the subject of "right
-coordinates". Could you please point me in the right direction, if it is not
-much trouble?
+> +		compatible = "sd-modulator";
+> +		#io-channel-cells = <1>;
+> +		status = "okay";
 
-Best regards,
-Liviu
+Drop status from examples.
 
-> 
-> >  	dest_w = plane->state->crtc_w;
-> >  	dest_h = plane->state->crtc_h;
-> >  	gem = drm_fb_cma_get_gem_obj(fb, 0);
-> >  	scanout_start = gem->paddr + fb->offsets[0] +
-> > -		plane->state->crtc_y * fb->pitches[0] +
-> > -		plane->state->crtc_x *
-> > -		fb->format->cpp[0];
-> > +		src_y * fb->pitches[0] +
-> > +		src_x *	fb->format->cpp[0];
-> >  
-> >  	hdlcd = plane->dev->dev_private;
-> >  	hdlcd_write(hdlcd, HDLCD_REG_FB_LINE_LENGTH, fb->pitches[0]);
-> > -- 
-> > 2.11.0
-> > 
-> 
-> > _______________________________________________
-> > dri-devel mailing list
-> > dri-devel at lists.freedesktop.org
-> > https://lists.freedesktop.org/mailman/listinfo/dri-devel
-> 
-> 
+> +	};
 > -- 
-> Ville Syrj?l?
-> Intel OTC
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+> 1.9.1
+> 
