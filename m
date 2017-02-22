@@ -1,70 +1,69 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Wed, 22 Feb 2017 18:37:26 -0500
-Subject: [PATCH 2/2] ARM: dts: NSP: Add mailbox (PDC) to NSP
-In-Reply-To: <1487796146-14690-3-git-send-email-steven.lin1@broadcom.com>
-References: <1487796146-14690-1-git-send-email-steven.lin1@broadcom.com>
- <1487796146-14690-3-git-send-email-steven.lin1@broadcom.com>
-Message-ID: <CAC3K-4qAF+4MEiJe=JNWjMNPjunF+vfPOSXBXHXPSTj0DHc3cw@mail.gmail.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Wed, 22 Feb 2017 15:38:57 -0800
+Subject: [PATCH v4 23/36] media: imx: Add MIPI CSI-2 Receiver subdev driver
+In-Reply-To: <1487331500.3107.43.camel@pengutronix.de>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-24-git-send-email-steve_longerbeam@mentor.com>
+ <1487328479.3107.21.camel@pengutronix.de>
+ <20170217110616.GD21222@n2100.armlinux.org.uk>
+ <1487331500.3107.43.camel@pengutronix.de>
+Message-ID: <4f75e016-839a-3c19-0b28-d229faf25357@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2017 at 3:42 PM, Steve Lin <steven.lin1@broadcom.com> wrote:
-> Adds mailbox / PDC to NSP device tree.  Needs new compatibility string
-> to differentiate from NS2 version.
->
-> Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
-> ---
->  .../devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt          | 6 ++++--
->  arch/arm/boot/dts/bcm-nsp.dtsi                                   | 9 +++++++++
 
-I believe it is preferred to have a separate patch for the binding
-documentation.
 
-Aside from that, it looks fine to me.
+On 02/17/2017 03:38 AM, Philipp Zabel wrote:
+> On Fri, 2017-02-17 at 11:06 +0000, Russell King - ARM Linux wrote:
+>> On Fri, Feb 17, 2017 at 11:47:59AM +0100, Philipp Zabel wrote:
+>>> On Wed, 2017-02-15 at 18:19 -0800, Steve Longerbeam wrote:
+>>>> +static void csi2_dphy_init(struct csi2_dev *csi2)
+>>>> +{
+>>>> +	/*
+>>>> +	 * FIXME: 0x14 is derived from a fixed D-PHY reference
+>>>> +	 * clock from the HSI_TX PLL, and a fixed target lane max
+>>>> +	 * bandwidth of 300 Mbps. This value should be derived
+>>>
+>>> If the table in https://community.nxp.com/docs/DOC-94312 is correct,
+>>> this should be 850 Mbps. Where does this 300 Mbps value come from?
+>>
+>> I thought you had some code to compute the correct value, although
+>> I guess we've lost the ability to know how fast the sensor is going
+>> to drive the link.
+>
+> I had code to calculate the number of needed lanes from the bit rate and
+> link frequency. I did not actually change the D-PHY register value.
+> And as you pointed out, calculating the number of lanes is not useful
+> without input from the sensor driver, as some lane configurations might
+> not be supported.
+>
+>> Note that the IMX219 currently drives the data lanes at 912Mbps almost
+>> exclusively, as I've yet to finish working out how to derive the PLL
+>> parameters.  (I have something that works, but it currently takes on
+>> the order of 100k iterations to derive the parameters.  gcd() doesn't
+>> help you in this instance.)
+>
+> The tc358743 also currently only implements a fixed rate (of 594 Mbps).
 
-Thanks,
-Jon
+I've analyzed the OV5640 video modes, and they generate the following
+"sysclk"'s in Mhz:
 
->  2 files changed, 13 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
-> index 411ccf4..0f3ee81 100644
-> --- a/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
-> +++ b/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
-> @@ -1,9 +1,11 @@
->  The PDC driver manages data transfer to and from various offload engines
->  on some Broadcom SoCs. An SoC may have multiple PDC hardware blocks. There is
-> -one device tree entry per block.
-> +one device tree entry per block.  On some chips, the PDC functionality is
-> +handled by the FA2 (Northstar Plus).
->
->  Required properties:
-> -- compatible : Should be "brcm,iproc-pdc-mbox".
-> +- compatible : Should be "brcm,iproc-pdc-mbox" or "brcm,iproc-fa2-mbox" for
-> +  FA2/Northstar Plus.
->  - reg: Should contain PDC registers location and length.
->  - interrupts: Should contain the IRQ line for the PDC.
->  - #mbox-cells: 1
-> diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-> index 15f07f9..8b56d74 100644
-> --- a/arch/arm/boot/dts/bcm-nsp.dtsi
-> +++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-> @@ -227,6 +227,15 @@
->                         status = "disabled";
->                 };
->
-> +               mailbox: mailbox at 25000 {
-> +                       compatible = "brcm,iproc-fa2-mbox";
-> +                       reg = <0x25000 0x445>;
-> +                       interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
-> +                       #mbox-cells = <1>;
-> +                       brcm,rx-status-len = <32>;
-> +                       brcm,use-bcm-hdr;
-> +               };
-> +
->                 nand: nand at 26000 {
->                         compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
->                         reg = <0x026000 0x600>,
-> --
-> 2.1.0
->
+210
+280
+420
+560
+840
+
+But I don't know whether this is equivalent to bit rate. Is it the same
+as Mbps-per-lane? If so, this could be indicated to the sink by
+implementing V4L2_CID_LINK_FREQ in the ov5640.c sensor driver.
+
+The Mbps-per-lane value would then be link_freq * 2, and then
+Mbps-per-lane could be used to lookup the correct "hsfreqsel"
+value to program the D-PHY.
+
+I've added this to imx6-mipi-csi2.c. If the source didn't implement
+V4L2_CID_LINK_FREQ then it uses a default 849 Mbps-per-lane.
+
+
+Steve
