@@ -1,66 +1,90 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 22 Feb 2017 15:41:02 +0800
-Subject: [PATCH 2/2] arch_timer: acpi: add hisi timer erratum data
-In-Reply-To: <874lzn602f.fsf@on-the-bus.cambridge.arm.com>
-References: <1485254391-51551-1-git-send-email-guohanjun@huawei.com>
- <1485254391-51551-3-git-send-email-guohanjun@huawei.com>
- <20170124105717.GB6277@leverpostej>
- <a2ac2a70-09fb-5cec-c090-b8ebde90e24f@arm.com> <589D6776.2010400@huawei.com>
- <6c3a2952-731b-dfae-ba22-f9d7df25d691@arm.com> <58AC2AEF.1030803@huawei.com>
- <874lzn602f.fsf@on-the-bus.cambridge.arm.com>
-Message-ID: <58AD408E.5080409@huawei.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 22 Feb 2017 16:55:01 +0800
+Subject: [PATCH v3 4/8] phy: phy-mt65xx-usb3: move clock from phy node into
+ port nodes
+In-Reply-To: <1487753705-6745-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1487753705-6745-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1487753705-6745-4-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/2/21 23:22, Marc Zyngier wrote:
-> On Tue, Feb 21 2017 at 11:56:31 am GMT, Hanjun Guo <guohanjun@huawei.com> wrote:
->> Hi Marc,
-> [...]
->
-[...]
->>
->> And I got compile errors for this patch [1], seems "#include <linux/acpi.h>" in
->> arch/arm64/include/asm/arch_timer.h triggers the problem of head
->> file inclusions (too early to include <linux/sched.h>?), I'm looking into it,
->> if you can help to take a look too, that will be great :)
-> This is really much more complicated (and uglier) than what I had in
-> mind, and I don't want to add more cruft to the erratum description
-> structure. So instead of trying to explain what I wanted to see, here's
-> the patches I whipped together.
->
-> Please let me know if they work for you (as I have no way of testing
-> them).
->
-> Thanks,
->
-> 	M.
->
-> >From 50eb735436f9f6482285939b39b52d858d848537 Mon Sep 17 00:00:00 2001
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> Date: Tue, 21 Feb 2017 14:37:30 +0000
-> Subject: [PATCH 1/2] arm64: arch_timer: Allow erratum matching with ACPI OEM
->  information
->
-> Just as we're able to identify a broken platform using some DT
-> information, let's enable a way to spot the offenders with ACPI.
->
-> The difference is that we can only match on some OEM info instead
-> of implementation-specific properties. So in order to avoid the
-> insane multiplication of errata structures, we allow an array
-> of OEM descriptions to be attached to an erratum structure.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/arch_timer.h  |  1 +
->  drivers/clocksource/arm_arch_timer.c | 33 +++++++++++++++++++++++++++++++++
->  2 files changed, 34 insertions(+)
+the reference clock of HighSpeed port is 48M which comes from PLL;
+the reference clock of SuperSpeed port is 26M which usually comes
+from 26M oscillator directly, but some SoCs are not, add it for
+compatibility, and put them into port node for flexibility.
 
-Marc, thank you for the help, I tested your patches on D03, I got:
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/phy/phy-mt65xx-usb3.c |   21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
 
-[    0.000000] arm_arch_timer: Enabling global workaround for HiSilicon erratum 161010101
-[    0.000000] arm_arch_timer: CPU0: Trapping CNTVCT access
-
-in the boot log, which means the framework and ACPI patches work fine.
-
-Thanks
-Hanjun
+diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
+index 7fff482..f4a3505 100644
+--- a/drivers/phy/phy-mt65xx-usb3.c
++++ b/drivers/phy/phy-mt65xx-usb3.c
+@@ -153,6 +153,7 @@ struct mt65xx_phy_pdata {
+ struct mt65xx_phy_instance {
+ 	struct phy *phy;
+ 	void __iomem *port_base;
++	struct clk *ref_clk;	/* reference clock of anolog phy */
+ 	u32 index;
+ 	u8 type;
+ };
+@@ -160,7 +161,6 @@ struct mt65xx_phy_instance {
+ struct mt65xx_u3phy {
+ 	struct device *dev;
+ 	void __iomem *sif_base;	/* only shared sif */
+-	struct clk *u3phya_ref;	/* reference clock of usb3 anolog phy */
+ 	const struct mt65xx_phy_pdata *pdata;
+ 	struct mt65xx_phy_instance **phys;
+ 	int nphys;
+@@ -449,9 +449,9 @@ static int mt65xx_phy_init(struct phy *phy)
+ 	struct mt65xx_u3phy *u3phy = dev_get_drvdata(phy->dev.parent);
+ 	int ret;
+ 
+-	ret = clk_prepare_enable(u3phy->u3phya_ref);
++	ret = clk_prepare_enable(instance->ref_clk);
+ 	if (ret) {
+-		dev_err(u3phy->dev, "failed to enable u3phya_ref\n");
++		dev_err(u3phy->dev, "failed to enable ref_clk\n");
+ 		return ret;
+ 	}
+ 
+@@ -494,7 +494,7 @@ static int mt65xx_phy_exit(struct phy *phy)
+ 	if (instance->type == PHY_TYPE_USB2)
+ 		phy_instance_exit(u3phy, instance);
+ 
+-	clk_disable_unprepare(u3phy->u3phya_ref);
++	clk_disable_unprepare(instance->ref_clk);
+ 	return 0;
+ }
+ 
+@@ -594,12 +594,6 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
+ 		return PTR_ERR(u3phy->sif_base);
+ 	}
+ 
+-	u3phy->u3phya_ref = devm_clk_get(dev, "u3phya_ref");
+-	if (IS_ERR(u3phy->u3phya_ref)) {
+-		dev_err(dev, "error to get u3phya_ref\n");
+-		return PTR_ERR(u3phy->u3phya_ref);
+-	}
+-
+ 	port = 0;
+ 	for_each_child_of_node(np, child_np) {
+ 		struct mt65xx_phy_instance *instance;
+@@ -634,6 +628,13 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
+ 			goto put_child;
+ 		}
+ 
++		instance->ref_clk = devm_clk_get(&phy->dev, "ref");
++		if (IS_ERR(instance->ref_clk)) {
++			dev_err(dev, "failed to get ref_clk(id-%d)\n", port);
++			retval = PTR_ERR(instance->ref_clk);
++			goto put_child;
++		}
++
+ 		instance->phy = phy;
+ 		instance->index = port;
+ 		phy_set_drvdata(phy, instance);
+-- 
+1.7.9.5
