@@ -1,72 +1,68 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Feb 2017 10:26:51 +0000
-Subject: [PATCH v2 16/22] ARM: KVM: Allow the main HYP code to use the init
- hyp stub implementation
+Date: Thu, 23 Feb 2017 10:26:52 +0000
+Subject: [PATCH v2 17/22] ARM: KVM: Convert __cpu_reset_hyp_mode to using
+ __hyp_reset_vectors
 In-Reply-To: <20170223102657.23100-1-marc.zyngier@arm.com>
 References: <20170223102657.23100-1-marc.zyngier@arm.com>
-Message-ID: <20170223102657.23100-17-marc.zyngier@arm.com>
+Message-ID: <20170223102657.23100-18-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now have a full hyp-stub implementation in the KVM init code,
-but the main KVM code only supports HVC_GET_VECTORS, which is not
-enough.
-
-Instead of reinventing the wheel, let's reuse the init implementation
-by branching to the idmap page when called with a hyp-stub hypercall.
+We are now able to use the hyp stub to reset HYP mode. Time to
+kiss __kvm_hyp_reset goodbye, and use __hyp_reset_vectors.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/hyp/hyp-entry.S | 29 ++++++++++++++++++++++++-----
- 1 file changed, 24 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/kvm_asm.h  | 2 --
+ arch/arm/include/asm/kvm_host.h | 2 +-
+ arch/arm/kvm/init.S             | 2 --
+ 3 files changed, 1 insertion(+), 5 deletions(-)
 
-diff --git a/arch/arm/kvm/hyp/hyp-entry.S b/arch/arm/kvm/hyp/hyp-entry.S
-index 1f8db7d21fc5..a35baa81fd23 100644
---- a/arch/arm/kvm/hyp/hyp-entry.S
-+++ b/arch/arm/kvm/hyp/hyp-entry.S
-@@ -126,11 +126,30 @@ hyp_hvc:
- 	 */
- 	pop	{r0, r1, r2}
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 8ef05381984b..7ccb6f1aac5b 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -72,8 +72,6 @@ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
  
--	/* Check for __hyp_get_vectors */
--	cmp	r0, #HVC_GET_VECTORS
--	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
--	beq	1f
-+	/*
-+	 * Check if we have a kernel function, which is guaranteed to be
-+	 * bigger than the maximum hyp stub hypercall
-+	 */
-+	cmp	r0, #HVC_STUB_HCALL_NR
-+	bhs	1f
+ extern void __init_stage2_translation(void);
  
-+	/*
-+	 * Not a kernel function, treat it as a stub hypercall.
-+	 * Compute the physical address for __kvm_handle_stub_hvc
-+	 * (as the code lives in the idmaped page) and branch there.
-+	 * We hijack ip (r12) as a tmp register.
-+	 */
-+	push	{r1}
-+	ldr	r1, =kimage_voffset
-+	ldr	r1, [r1]
-+	ldr	ip, =__kvm_handle_stub_hvc
-+	sub	ip, ip, r1
-+THUMB(	add	ip, ip, #1)
-+	pop	{r1}
-+
-+	bx	ip
-+
-+1:
- 	push	{lr}
+-extern void __kvm_hyp_reset(unsigned long);
+-
+ extern u64 __vgic_v3_get_ich_vtr_el2(void);
+ extern void __vgic_v3_init_lrs(void);
+ #endif
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index d5423ab15ed5..42774c6f458d 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -277,7 +277,7 @@ static inline void __cpu_init_stage2(void)
+ static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
+ 					phys_addr_t phys_idmap_start)
+ {
+-	kvm_call_hyp((void *)virt_to_idmap(__kvm_hyp_reset), vector_ptr);
++	__hyp_reset_vectors();
+ }
  
- 	mov	lr, r0
-@@ -142,7 +161,7 @@ THUMB(	orr	lr, #1)
- 	blx	lr			@ Call the HYP function
+ static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+index 0da120b71c2e..7335a510eee4 100644
+--- a/arch/arm/kvm/init.S
++++ b/arch/arm/kvm/init.S
+@@ -129,7 +129,6 @@ ENTRY(__kvm_handle_stub_hvc)
  
- 	pop	{lr}
--1:	eret
-+	eret
+ 1:	cmp	r0, #HVC_RESET_VECTORS
+ 	bne	1f
+-ENTRY(__kvm_hyp_reset)
+ 	/* We're now in idmap, disable MMU */
+ 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
+ 	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
+@@ -151,7 +150,6 @@ ENTRY(__kvm_hyp_reset)
+ exit:
+ 	eret
+ ENDPROC(__kvm_handle_stub_hvc)
+-ENDPROC(__kvm_hyp_reset)
  
- guest_trap:
- 	load_vcpu r0			@ Load VCPU pointer to r0
+ 	.ltorg
+ 
 -- 
 2.11.0
