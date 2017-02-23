@@ -1,30 +1,130 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 23 Feb 2017 17:14:45 +0100
-Subject: [PATCH] wireless/atmel: remove time_t usage
-Message-ID: <20170223161445.19200-1-alexandre.belloni@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 23 Feb 2017 16:22:55 +0000
+Subject: [PATCH] Revert "arm64: mm: set the contiguous bit for kernel mappings
+ where appropriate"
+Message-ID: <1487866978-25863-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-last_qual never really holds a time. It only holds jiffies. Make it the
-same type as jiffies.
+This reverts commit 0bfc445dec9dd8130d22c9f4476eed7598524129.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+When we change the permissions of regions mapped using contiguous
+entries, the architecture requires us to follow a Break-Before-Make
+strategy, breaking *all* associated entries before we can change any of
+the following properties from the entries:
+
+ - presence of the contiguous bit
+ - output address
+ - attributes
+ - permissiones
+
+Failure to do so can result in a number of problems (e.g. TLB conflict
+aborts and/or erroneous results from TLB lookups).
+
+See ARM DDI 0487A.k_iss10775, "Misprogramming of the Contiguous bit",
+page D4-1762.
+
+We do not take this into account when altering the permissions of kernel
+segments in mark_rodata_ro(), where we change the permissions of live
+contiguous entires one-by-one, leaving them transiently inconsistent.
+This has been observed to result in failures on some fast model
+configurations.
+
+Unfortunately, we cannot follow Break-Before-Make here as we'd have to
+unmap kernel text and data used to perform the sequence.
+
+For the timebeing, revert commit 0bfc445dec9dd813 so as to avoid issues
+resulting from this misuse of the contiguous bit.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reported-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <Will.Deacon@arm.com>
+Cc: stable at vger.kernel.org # v4.10
 ---
- drivers/net/wireless/atmel/atmel.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/mm/mmu.c | 34 ++++------------------------------
+ 1 file changed, 4 insertions(+), 30 deletions(-)
 
-diff --git a/drivers/net/wireless/atmel/atmel.c b/drivers/net/wireless/atmel/atmel.c
-index e12f62356fd1..27b110dc8cc6 100644
---- a/drivers/net/wireless/atmel/atmel.c
-+++ b/drivers/net/wireless/atmel/atmel.c
-@@ -513,7 +513,7 @@ struct atmel_private {
- 	} station_state;
+I'm aware that our hugtlbpage code has a similar issue. I'm looking into that
+now, and will address that with separate patches. It should be possible to use
+BBM there as it's a userspace mapping.
+
+Mark.
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 17243e4..c391b1f 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -108,10 +108,8 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
+ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 				  unsigned long end, unsigned long pfn,
+ 				  pgprot_t prot,
+-				  phys_addr_t (*pgtable_alloc)(void),
+-				  bool page_mappings_only)
++				  phys_addr_t (*pgtable_alloc)(void))
+ {
+-	pgprot_t __prot = prot;
+ 	pte_t *pte;
  
- 	int operating_mode, power_mode;
--	time_t last_qual;
-+	unsigned long last_qual;
- 	int beacons_this_sec;
- 	int channel;
- 	int reg_domain, config_reg_domain;
+ 	BUG_ON(pmd_sect(*pmd));
+@@ -129,18 +127,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	do {
+ 		pte_t old_pte = *pte;
+ 
+-		/*
+-		 * Set the contiguous bit for the subsequent group of PTEs if
+-		 * its size and alignment are appropriate.
+-		 */
+-		if (((addr | PFN_PHYS(pfn)) & ~CONT_PTE_MASK) == 0) {
+-			if (end - addr >= CONT_PTE_SIZE && !page_mappings_only)
+-				__prot = __pgprot(pgprot_val(prot) | PTE_CONT);
+-			else
+-				__prot = prot;
+-		}
+-
+-		set_pte(pte, pfn_pte(pfn, __prot));
++		set_pte(pte, pfn_pte(pfn, prot));
+ 		pfn++;
+ 
+ 		/*
+@@ -159,7 +146,6 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 				  phys_addr_t (*pgtable_alloc)(void),
+ 				  bool page_mappings_only)
+ {
+-	pgprot_t __prot = prot;
+ 	pmd_t *pmd;
+ 	unsigned long next;
+ 
+@@ -186,18 +172,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 		/* try section mapping first */
+ 		if (((addr | next | phys) & ~SECTION_MASK) == 0 &&
+ 		      !page_mappings_only) {
+-			/*
+-			 * Set the contiguous bit for the subsequent group of
+-			 * PMDs if its size and alignment are appropriate.
+-			 */
+-			if (((addr | phys) & ~CONT_PMD_MASK) == 0) {
+-				if (end - addr >= CONT_PMD_SIZE)
+-					__prot = __pgprot(pgprot_val(prot) |
+-							  PTE_CONT);
+-				else
+-					__prot = prot;
+-			}
+-			pmd_set_huge(pmd, phys, __prot);
++			pmd_set_huge(pmd, phys, prot);
+ 
+ 			/*
+ 			 * After the PMD entry has been populated once, we
+@@ -207,8 +182,7 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 						      pmd_val(*pmd)));
+ 		} else {
+ 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
+-				       prot, pgtable_alloc,
+-				       page_mappings_only);
++				       prot, pgtable_alloc);
+ 
+ 			BUG_ON(pmd_val(old_pmd) != 0 &&
+ 			       pmd_val(old_pmd) != pmd_val(*pmd));
 -- 
-2.11.0
+1.9.1
