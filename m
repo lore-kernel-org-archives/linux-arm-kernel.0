@@ -1,46 +1,94 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 23 Feb 2017 07:39:53 -0600
-Subject: [RFC/PATCH] of: Mark property::value as const
-In-Reply-To: <20170214025040.23955-1-stephen.boyd@linaro.org>
-References: <20170214025040.23955-1-stephen.boyd@linaro.org>
-Message-ID: <CAL_JsqJDaa+ozCTyS6M_1BP-sk3g5T2wQK+5DLTPWBKyp=AMeA@mail.gmail.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Thu, 23 Feb 2017 14:42:04 +0100
+Subject: [PATCH v5 2/3] [media] s5p-mfc: Set colorspace in
+ VIDIO_{G,TRY}_FMT if DEFAULT provided
+In-Reply-To: <20170221192059.29745-3-thibault.saunier@osg.samsung.com>
+References: <20170221192059.29745-1-thibault.saunier@osg.samsung.com>
+ <CGME20170221192320epcas4p2d8933310c2ba3f5fc0c5dca97c973890@epcas4p2.samsung.com>
+ <20170221192059.29745-3-thibault.saunier@osg.samsung.com>
+Message-ID: <d926308d-10c1-f6e9-a023-372ebf35d6de@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 13, 2017 at 8:50 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> The 'blob' we pass into populate_properties() is marked as const,
-> but we cast that const away when we assign the result of
-> fdt_getprop_by_offset() to pp->value. Let's mark value as const
-> instead, so that code can't mistakenly write to the value of the
-> property that we've so far advertised as const.
+On 21.02.2017 20:20, Thibault Saunier wrote:
+> The media documentation says that the V4L2_COLORSPACE_SMPTE170M colorspace
+> should be used for SDTV and V4L2_COLORSPACE_REC709 for HDTV but the driver
+> didn't set the colorimetry when userspace provided
+> V4L2_COLORSPACE_DEFAULT.
 >
-> Unfortunately, this exposes a problem with the fdt resolver code,
-> where we overwrite the value member of properties of phandles to
-> update them with their final value. Add a comment for now to
-> indicate where we're potentially writing over const data.
+> Use 576p display resolution as a threshold to set this as suggested by
+> EIA CEA 861B.
 >
-> You can see the problem here by loading an overlay dtb into
-> the kernel via the request firmware helper method (not direct
-> loading) and then passing that tree to the resolver on an arm64
-> device. In this case, the firmware data is vmapped with KERNEL_PAGE_RO
-> and the code crashes when attempting to write to the blob to update
-> the phandle properties.
-
-This problem exists with or without this patch, right?
-
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
+>
 > ---
 >
-> I was thinking perhaps it would work to store another __be32 variant
-> of the phandle in each device node, but then we still have a problem
-> with properties that have phandles inside them at some offset that we
-> need to update. I guess the only real solution is to deep copy the
-> property in that case and then save around some info to free the
-> duplicated property later on?
+> Changes in v5: None
+> Changes in v4:
+> - Set the colorspace only if the user passed V4L2_COLORSPACE_DEFAULT, in
+>   all other cases just use what userspace provided.
+>
+> Changes in v3:
+> - Do not check values in the g_fmt functions as Andrzej explained in previous review
+> - Set colorspace if user passed V4L2_COLORSPACE_DEFAULT in
+>
+> Changes in v2: None
+>
+>  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> index 367ef8e8dbf0..0976c3e0a5ce 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> @@ -354,6 +354,11 @@ static int vidioc_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
+>  		pix_mp->plane_fmt[0].sizeimage = ctx->luma_size;
+>  		pix_mp->plane_fmt[1].bytesperline = ctx->buf_width;
+>  		pix_mp->plane_fmt[1].sizeimage = ctx->chroma_size;
+> +
+> +		if (pix_mp->width > 720 && pix_mp->height > 576) /* HD */
+> +			pix_mp->colorspace = V4L2_COLORSPACE_REC709;
+> +		else /* SD */
+> +			pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
 
-Couldn't we just copy the overlay and free the firmware blob in this
-case? That seems easier than trying to selectively copy things. We
-keep the base FDT to pass to userspace and we could need that for
-overlays, but not ones we load from userspace.
+Again, it seems much more complicated for decoder, I suppose colorspace
+field should be filled according to decoded information from the header
+of byte stream. It looks like MFC does not parse  stream header for such
+info. So it should be done either by the driver, either by userspace, if
+userspace is able to get such info. For example in H.264 this info is
+encoded in VUI header [1], I do not know about other codecs. I guess the
+best solution for now is to not touch this field unless you can retrieve
+this info from MFC.
 
-Rob
+[1]:
+https://github.com/copiousfreetime/mp4parser/blob/master/isoparser/src/main/java/com/googlecode/mp4parser/h264/model/SeqParameterSet.java#L227
+
+Regards
+Andrzej
+
+>  	} else if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+>  		/* This is run on OUTPUT
+>  		   The buffer contains compressed image
+> @@ -378,6 +383,7 @@ static int vidioc_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
+>  static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
+>  {
+>  	struct s5p_mfc_dev *dev = video_drvdata(file);
+> +	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
+>  	struct s5p_mfc_fmt *fmt;
+>  
+>  	mfc_debug(2, "Type is %d\n", f->type);
+> @@ -405,6 +411,14 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
+>  			mfc_err("Unsupported format by this MFC version.\n");
+>  			return -EINVAL;
+>  		}
+> +
+> +		if (pix_mp->colorspace == V4L2_COLORSPACE_DEFAULT) {
+> +			if (pix_mp->width > 720 &&
+> +					pix_mp->height > 576) /* HD */
+> +				pix_mp->colorspace = V4L2_COLORSPACE_REC709;
+> +			else /* SD */
+> +				pix_mp->colorspace = V4L2_COLORSPACE_SMPTE170M;
+> +		}
+>  	}
+>  
+>  	return 0;
