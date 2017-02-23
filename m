@@ -1,43 +1,54 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 23 Feb 2017 18:30:50 +0100
-Subject: [PATCH 08/11] arm64: tegra: Enable current monitors on P3310
+Date: Thu, 23 Feb 2017 18:30:53 +0100
+Subject: [PATCH 11/11] arm64: tegra: Add GPIO expanders on P2771
 In-Reply-To: <20170223173053.19701-1-thierry.reding@gmail.com>
 References: <20170223173053.19701-1-thierry.reding@gmail.com>
-Message-ID: <20170223173053.19701-8-thierry.reding@gmail.com>
+Message-ID: <20170223173053.19701-11-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-The P3310 processor module contains two current monitors that can be
-used to determine the current flow across various parts of the board
-design.
+The P2771 development board expands the number of GPIOs via two I2C
+chips.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-index b18e166527d8..a1cb6b35314e 100644
---- a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-@@ -56,6 +56,16 @@
- 
- 	i2c at 3160000 {
- 		status = "okay";
+diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
+index 9485841e3351..eac75764bf3c 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
++++ b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
+@@ -18,6 +18,28 @@
+ 			compatible = "ti,ina3221";
+ 			reg = <0x43>;
+ 		};
 +
-+		power-monitor at 40 {
-+			compatible = "ti,ina3221";
-+			reg = <0x40>;
++		exp1: gpio at 74 {
++			compatible = "ti,tca9539";
++			reg = <0x74>;
++
++			interrupt-parent = <&gpio>;
++			interrupts = <TEGRA_MAIN_GPIO(Y, 0) GPIO_ACTIVE_LOW>;
++
++			#gpio-cells = <2>;
++			gpio-controller;
 +		};
 +
-+		power-monitor at 41 {
-+			compatible = "ti,ina3221";
-+			reg = <0x41>;
++		exp2: gpio at 77 {
++			compatible = "ti,tca9539";
++			reg = <0x77>;
++
++			interrupt-parent = <&gpio>;
++			interrupts = <TEGRA_MAIN_GPIO(Y, 6) GPIO_ACTIVE_LOW>;
++
++			#gpio-cells = <2>;
++			gpio-controller;
 +		};
  	};
  
- 	i2c at 3180000 {
+ 	gpio-keys {
 -- 
 2.11.1
