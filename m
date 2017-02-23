@@ -1,33 +1,25 @@
-From: Claudiu.Beznea@microchip.com (m18063)
-Date: Thu, 23 Feb 2017 17:22:36 +0200
-Subject: [PATCH 2/2] drivers: pwm: pwm-atmel: add support to allow run
- time changing of pwm parameters
-In-Reply-To: <20170223103239.tv6nodddlar5l5fl@piout.net>
-References: <1487839120-13650-1-git-send-email-claudiu.beznea@microchip.com>
- <1487839120-13650-3-git-send-email-claudiu.beznea@microchip.com>
- <20170223092148.5qmxy62xkufwbsrw@piout.net>
- <f963def2-6d82-3bf7-22fa-8915f408ca54@microchip.com>
- <20170223103239.tv6nodddlar5l5fl@piout.net>
-Message-ID: <8123991c-5e3c-ad5c-bbf3-bcd7ee2a5e5e@microchip.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 Feb 2017 16:25:14 +0100
+Subject: [RESEND PATCH] pinctrl: uniphier: change pin names of aio/xirq
+ for LD11
+In-Reply-To: <1487592042-22828-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1487592042-22828-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdang1JNde6ATDJ=P6QeXUa1_gGohQw9XOwmxA3-Ey1pZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Feb 20, 2017 at 1:00 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-On 23.02.2017 12:32, Alexandre Belloni wrote:
-> On 23/02/2017 at 12:25:58 +0200, m18063 wrote:
->>> It is probably worth switching to atomic PWM instead of changing this
->>> function. This would simplify the whole driver.
->> I was thinking to switch to atomic PWM in a future patch.
-> Then why wait ?
+> From: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 >
+> This patch changes pin names of AIO and XIRQ according to updated
+> specification.
 >
-I wanted to do it in progressively:
-- enable the support for SAMA5d2
-- make it work based on what is currently implemented
-- add atomic PWM support.
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Anyway, please ignore this patch. I will do it in atomic
-PWM way.
+Patch applied for fixes.
 
-Thank you,
-Claudiu
+Yours,
+Linus Walleij
