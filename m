@@ -1,59 +1,80 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Wed, 22 Feb 2017 16:09:23 -0800
-Subject: [PATCH v4 23/36] media: imx: Add MIPI CSI-2 Receiver subdev driver
-In-Reply-To: <20b7d3b7-85be-b701-19ca-1e8024260fc2@gmail.com>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-24-git-send-email-steve_longerbeam@mentor.com>
- <1487328479.3107.21.camel@pengutronix.de>
- <20170217110616.GD21222@n2100.armlinux.org.uk>
- <20b7d3b7-85be-b701-19ca-1e8024260fc2@gmail.com>
-Message-ID: <80ecf2ef-8e52-0c60-87b5-8325571857ee@gmail.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Thu, 23 Feb 2017 08:25:06 +0800
+Subject: [RESEND PATCH v7 0/7] Rockchip dw-mipi-dsi driver
+In-Reply-To: <CAOw6vbJO_TQnSAu6w7XHiMSYA+gB1tyHOvB7BMc7Q2+OMY=9=w@mail.gmail.com>
+References: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
+ <20170221153918.GA25168@art_vandelay>
+ <20170222134314.016a4940.john@metanate.com>
+ <CAOw6vbJoS2P5m31+bgWw3Sghz=EVGj0fpLgCFnbVEhzRujNCLw@mail.gmail.com>
+ <20170222185543.71e20187.john@metanate.com>
+ <CAOw6vbJO_TQnSAu6w7XHiMSYA+gB1tyHOvB7BMc7Q2+OMY=9=w@mail.gmail.com>
+Message-ID: <58AE2BE2.7040006@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-
-On 02/22/2017 04:06 PM, Steve Longerbeam wrote:
->
->
-> On 02/17/2017 03:06 AM, Russell King - ARM Linux wrote:
->> On Fri, Feb 17, 2017 at 11:47:59AM +0100, Philipp Zabel wrote:
->>> On Wed, 2017-02-15 at 18:19 -0800, Steve Longerbeam wrote:
->>>> +static void csi2_dphy_init(struct csi2_dev *csi2)
->>>> +{
->>>> +    /*
->>>> +     * FIXME: 0x14 is derived from a fixed D-PHY reference
->>>> +     * clock from the HSI_TX PLL, and a fixed target lane max
->>>> +     * bandwidth of 300 Mbps. This value should be derived
->>>
->>> If the table in https://community.nxp.com/docs/DOC-94312 is correct,
->>> this should be 850 Mbps. Where does this 300 Mbps value come from?
+On 02/23/2017 06:10 AM, Sean Paul wrote:
+> On Wed, Feb 22, 2017 at 1:55 PM, John Keeping <john@metanate.com> wrote:
+>> On Wed, 22 Feb 2017 10:57:05 -0500, Sean Paul wrote:
 >>
->> I thought you had some code to compute the correct value, although
->> I guess we've lost the ability to know how fast the sensor is going
->> to drive the link.
+>>> On Wed, Feb 22, 2017 at 8:43 AM, John Keeping <john@metanate.com> wrote:
+>>>> On Tue, 21 Feb 2017 10:39:18 -0500, Sean Paul wrote:
+>>>>
+>>>>> On Mon, Feb 20, 2017 at 04:02:16PM +0800, Chris Zhong wrote:
+>>>>>> Hi all
+>>>>>>
+>>>>>> [Resend this v7 version series, since there are 5 mails have gone missing, last
+>>>>>> week]
+>>>>>>
+>>>>>> This version does not change the existing v6 patches, just to add the
+>>>>>> "bandwidth fix" patch back, since we really need it.
+>>>>>>
+>>>>>> This patch serial is for RK3399 MIPI DSI. The MIPI DSI controller of
+>>>>>> RK3399 is almost the same as RK3288, except a little bit of difference
+>>>>>> in phy clock controlling and port id selection register. These patches
+>>>>>> add RK3399 support and the power domain support.
+>>>>>>
+>>>>>> And these patches base on John Keeping's v3 patches[0], it fixes many bugs,
+>>>>>> they have been tested on rk3288 evb board.
+>>>>> Do we have an ETA on when John is planning on respinning his patchset based on
+>>>>> review feedback?
+>>>> I have all of the changes queued but I was hoping to find some time to
+>>>> test the latest version before sending it out; unfortunately everything
+>>>> else is more important at the moment.  If you're happy with the caveat
+>>>> that the latest changes are build tested only I can probably send it
+>>>> out this afternoon.
+>>> I suppose my answer depends on when the tested version will be
+>>> available, or perhaps Chris can test the new set for you? I don't have
+>>> any rockchip devices with mipi, so i'm not much help.
+>> None of the changes scare me that much, so I don't expect testing to
+>> throw up any problems but I don't like throwing out patches without at
+>> least a basic test run.
 >>
->> Note that the IMX219 currently drives the data lanes at 912Mbps almost
->> exclusively, as I've yet to finish working out how to derive the PLL
->> parameters.  (I have something that works, but it currently takes on
->> the order of 100k iterations to derive the parameters.  gcd() doesn't
->> help you in this instance.)
+> Agreed. I don't think we're in such desperate need that we should
+> forego testing. If Chris can provide Tested-by, you should send them
+> out, otherwise I'm happy to wait.
 >
-> Hi Russell,
+> Thanks for the update,
 >
-> As I mentioned, I've added code to imx6-mipi-csi2 to determine the
-> sources link frequency via V4L2_CID_LINK_FREQ. If you were to implement
-> this control and return 912 Mbps-per-lane,
+> Sean
 
-argh, I mean return 912 / 2.
+Sure, I am very glad to test them.
+Actually, I have picked the v3 patches to cros kernel (changed a little 
+bit).
+So far, my 2 mipi dsi panels works well. The cros patches:
+https://chromium-review.googlesource.com/#/c/430596/
+...
+https://chromium-review.googlesource.com/#/c/442347/
 
-Steve
+>
+>> I might have time to test on Friday, but I expect Chris has more time to
+>> devote to this than I do, so maybe it's better if I send the patches out
+>> tomorrow.
+>>
+>>
+>> John
+>
+>
 
-  the D-PHY will be programmed
-> correctly for the IMX219 (at least, that is the theory anyway).
->
-> Alternatively, I could up the default in imx6-mipi-csi2 to 950
-> Mbps. I will have to test that to make sure it still works with
-> OV5640 and tc358743.
->
-> Steve
+-- 
+Chris Zhong
