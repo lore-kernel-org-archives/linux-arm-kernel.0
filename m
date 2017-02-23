@@ -1,49 +1,144 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 23 Feb 2017 16:05:40 +0800
-Subject: [PATCH 08/11] drm/sun4i: tv: Switch to drm_of_find_possible_crtcs
+Date: Thu, 23 Feb 2017 16:05:37 +0800
+Subject: [PATCH 05/11] drm/sun4i: Initialize crtc from tcon bind function
 In-Reply-To: <20170223080543.6659-1-wens@csie.org>
 References: <20170223080543.6659-1-wens@csie.org>
-Message-ID: <20170223080543.6659-9-wens@csie.org>
+Message-ID: <20170223080543.6659-6-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the crtcs have their .port field set properly, we can use
-drm_of_find_possible_crtcs to find the connected crtcs, instead of
-hardcoding the first crtc as usable. The new code also defers binding
-when the upstream crtc hasn't been registered yet.
+The tcon provides part of the functionality of the crtc, and also
+provides the device node for the output port of the crtc. To be able
+to use drm_of_find_possible_crtcs(), all crtc must be initialized before
+any downstream encoders. The other part of the crtc is the display
+backend.
 
-This makes it easier to support multiple tcons/crtcs.
+The Rockchip DRM driver does this by first binding all vops, which is
+their crtc, and this step also creates the crtc objects. Then all
+remaining hardware components are bound. With the Allwinner display
+pipeline, we have multiple components comprising the crtc, and varying
+depths of the display pipeline. Since components are added with a depth
+first search of the of_graph, we can initialize the crtc object within
+the tcon bind function. Since the backend precedes the tcon, and the
+backends cannot be muxed or switched around, we can be sure that the
+associated backend is already initialized.
+
+This patch also moves the crtc pointer from the main drm_device data to
+the tcon device data. Besides the crtc callbacks, the crtc structure is
+only used within the tcon driver to signal vblank events from its
+interrupt handler.
+
+As the crtc and layer bits are now called from the tcon bits, we must
+move them from the sun4i-drm module to the sun4i-tcon module to avoid
+circular dependencies between the two modules. This is because sun4i-drm
+also calls into sun4i-tcon.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_tv.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/Makefile     |  4 ++--
+ drivers/gpu/drm/sun4i/sun4i_drv.c  |  8 --------
+ drivers/gpu/drm/sun4i/sun4i_drv.h  |  1 -
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 10 ++++++++--
+ drivers/gpu/drm/sun4i/sun4i_tcon.h |  3 +++
+ 5 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-index c6f47222e8fc..32ed5fdf0c4d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-@@ -19,6 +19,7 @@
- #include <drm/drmP.h>
- #include <drm/drm_atomic_helper.h>
- #include <drm/drm_crtc_helper.h>
-+#include <drm/drm_of.h>
- #include <drm/drm_panel.h>
+diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+index d625a82a6e5f..59b757350a1f 100644
+--- a/drivers/gpu/drm/sun4i/Makefile
++++ b/drivers/gpu/drm/sun4i/Makefile
+@@ -1,11 +1,11 @@
+-sun4i-drm-y += sun4i_crtc.o
+ sun4i-drm-y += sun4i_drv.o
+ sun4i-drm-y += sun4i_framebuffer.o
+-sun4i-drm-y += sun4i_layer.o
  
- #include "sun4i_backend.h"
-@@ -623,7 +624,12 @@ static int sun4i_tv_bind(struct device *dev, struct device *master,
- 		goto err_disable_clk;
+ sun4i-tcon-y += sun4i_tcon.o
+ sun4i-tcon-y += sun4i_rgb.o
+ sun4i-tcon-y += sun4i_dotclock.o
++sun4i-tcon-y += sun4i_crtc.o
++sun4i-tcon-y += sun4i_layer.o
+ 
+ obj-$(CONFIG_DRM_SUN4I)		+= sun4i-drm.o sun4i-tcon.o
+ obj-$(CONFIG_DRM_SUN4I)		+= sun4i_backend.o
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 87bc0951eba8..4384c837baa8 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -20,7 +20,6 @@
+ #include <drm/drm_fb_helper.h>
+ #include <drm/drm_of.h>
+ 
+-#include "sun4i_crtc.h"
+ #include "sun4i_drv.h"
+ #include "sun4i_framebuffer.h"
+ #include "sun4i_tcon.h"
+@@ -142,13 +141,6 @@ static int sun4i_drv_bind(struct device *dev)
+ 		goto cleanup_mode_config;
  	}
  
--	tv->encoder.possible_crtcs = BIT(0);
-+	tv->encoder.possible_crtcs = drm_of_find_possible_crtcs(drm,
-+								dev->of_node);
-+	if (!tv->encoder.possible_crtcs) {
-+		ret = -EPROBE_DEFER;
-+		goto err_disable_clk;
-+	}
+-	/* Create our CRTC */
+-	drv->crtc = sun4i_crtc_init(drm);
+-	if (IS_ERR(drv->crtc)) {
+-		dev_err(drm->dev, "Couldn't create the CRTC\n");
+-		ret = PTR_ERR(drv->crtc);
+-		goto cleanup_mode_config;
+-	}
+ 	drm->irq_enabled = true;
  
- 	drm_connector_helper_add(&tv->connector,
- 				 &sun4i_tv_comp_connector_helper_funcs);
+ 	/* Remove early framebuffers (ie. simplefb) */
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h b/drivers/gpu/drm/sun4i/sun4i_drv.h
+index e22ee536677e..7a3345b7b6d1 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.h
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
+@@ -18,7 +18,6 @@
+ 
+ struct sun4i_drv {
+ 	struct sun4i_backend	*backend;
+-	struct sun4i_crtc	*crtc;
+ 	struct sun4i_tcon	*tcon;
+ 
+ 	struct drm_plane	*primary;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index ea2906f87cb9..3f3eb3f0b209 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -290,8 +290,7 @@ static irqreturn_t sun4i_tcon_handler(int irq, void *private)
+ {
+ 	struct sun4i_tcon *tcon = private;
+ 	struct drm_device *drm = tcon->drm;
+-	struct sun4i_drv *drv = drm->dev_private;
+-	struct sun4i_crtc *scrtc = drv->crtc;
++	struct sun4i_crtc *scrtc = tcon->crtc;
+ 	unsigned int status;
+ 
+ 	regmap_read(tcon->regs, SUN4I_TCON_GINT0_REG, &status);
+@@ -524,6 +523,13 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 		goto err_free_clocks;
+ 	}
+ 
++	tcon->crtc = sun4i_crtc_init(drm);
++	if (IS_ERR(tcon->crtc)) {
++		dev_err(dev, "Couldn't create our CRTC\n");
++		ret = PTR_ERR(tcon->crtc);
++		goto err_free_clocks;
++	}
++
+ 	ret = sun4i_rgb_init(drm);
+ 	if (ret < 0)
+ 		goto err_free_clocks;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index 166064bafe2e..f636343a935d 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -169,6 +169,9 @@ struct sun4i_tcon {
+ 
+ 	/* Platform adjustments */
+ 	const struct sun4i_tcon_quirks	*quirks;
++
++	/* Associated crtc */
++	struct sun4i_crtc		*crtc;
+ };
+ 
+ struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node);
 -- 
 2.11.0
