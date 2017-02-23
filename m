@@ -1,39 +1,47 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Thu, 23 Feb 2017 17:44:54 +0000
-Subject: [PATCH 4/8] drm/sun4i: add support for sun8i DE2 mixers and
- display engines
-In-Reply-To: <20170222151854.3280-5-icenowy@aosc.xyz>
-References: <20170222151854.3280-1-icenowy@aosc.xyz>
- <20170222151854.3280-5-icenowy@aosc.xyz>
-Message-ID: <CACvgo5117BB+o429cH=X0t3xz_5=XZ65YCEdE=ro+895a9e=RA@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 23 Feb 2017 09:53:41 -0800
+Subject: [PATCH 00/35] treewide trivial patches converting pr_warning to
+ pr_warn
+In-Reply-To: <CACvgo50LUm5VSn_F=Dh8kL5zCPpCQDoCyUEL=Z+=1+6hJpfTaw@mail.gmail.com>
+References: <cover.1487314666.git.joe@perches.com>
+ <CAL_JsqLTaq-QLTqfyDO8EVJYpgeUx1e4J0Fo2NvfFWqVoiVedQ@mail.gmail.com>
+ <1487870304.14159.29.camel@perches.com>
+ <CACvgo50LUm5VSn_F=Dh8kL5zCPpCQDoCyUEL=Z+=1+6hJpfTaw@mail.gmail.com>
+Message-ID: <1487872421.14159.38.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 February 2017 at 15:18, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> Allwinner have a new "Display Engine 2.0" in there new SoCs, which comes
-> in a new "Display Engine" (mixers instead of old backends and
-> frontends).
->
-> Add support for the mixer on Allwinner V3s SoC; it's the simplest one.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  drivers/gpu/drm/sun4i/Kconfig       |   8 +
->  drivers/gpu/drm/sun4i/Makefile      |   1 +
->  drivers/gpu/drm/sun4i/sun4i_crtc.c  |   6 +-
->  drivers/gpu/drm/sun4i/sun4i_drv.c   |  38 +++-
->  drivers/gpu/drm/sun4i/sun4i_drv.h   |   1 +
->  drivers/gpu/drm/sun4i/sun4i_layer.c |  92 ++++++--
->  drivers/gpu/drm/sun4i/sun4i_layer.h |   1 +
->  drivers/gpu/drm/sun4i/sun8i_mixer.c | 417 ++++++++++++++++++++++++++++++++++++
->  drivers/gpu/drm/sun4i/sun8i_mixer.h | 133 ++++++++++++
->  9 files changed, 674 insertions(+), 23 deletions(-)
-Silly question:
+On Thu, 2017-02-23 at 17:41 +0000, Emil Velikov wrote:
+> On 23 February 2017 at 17:18, Joe Perches <joe@perches.com> wrote:
+> > On Thu, 2017-02-23 at 09:28 -0600, Rob Herring wrote:
+> > > On Fri, Feb 17, 2017 at 1:11 AM, Joe Perches <joe@perches.com> wrote:
+> > > > There are ~4300 uses of pr_warn and ~250 uses of the older
+> > > > pr_warning in the kernel source tree.
+> > > > 
+> > > > Make the use of pr_warn consistent across all kernel files.
+> > > > 
+> > > > This excludes all files in tools/ as there is a separate
+> > > > define pr_warning for that directory tree and pr_warn is
+> > > > not used in tools/.
+> > > > 
+> > > > Done with 'sed s/\bpr_warning\b/pr_warn/' and some emacsing.
+> > 
+> > []
+> > > Where's the removal of pr_warning so we don't have more sneak in?
+> > 
+> > After all of these actually get applied,
+> > and maybe a cycle or two later, one would
+> > get sent.
+> > 
+> 
+> By which point you'll get a few reincarnation of it. So you'll have to
+> do the same exercise again :-(
 
-Does this series cover the same functionality/hardware as the separate
-sun8i driver proposed a few months back ?
-The diff stat looks quite different (~1.6k vs ~0.6k), although that
-could be due to reusing the existing sun4i code.
+Maybe to one or two files.  Not a big deal.
 
-Thanks
-Emil
+> I guess the question is - are you expecting to get the series merged
+> all together/via one tree ?
+
+No.  The only person that could do that effectively is Linus.
+
+> If not, your plan is perfectly reasonable.
