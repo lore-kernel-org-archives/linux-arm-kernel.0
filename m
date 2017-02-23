@@ -1,90 +1,47 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 23 Feb 2017 11:32:26 +0100
-Subject: [PATCH 2/2] drivers: pwm: pwm-atmel: add support to allow run
- time changing of pwm parameters
-In-Reply-To: <f963def2-6d82-3bf7-22fa-8915f408ca54@microchip.com>
-References: <1487839120-13650-1-git-send-email-claudiu.beznea@microchip.com>
- <1487839120-13650-3-git-send-email-claudiu.beznea@microchip.com>
- <20170223092148.5qmxy62xkufwbsrw@piout.net>
- <f963def2-6d82-3bf7-22fa-8915f408ca54@microchip.com>
-Message-ID: <20170223113226.7b24ffb6@bbrezillon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 23 Feb 2017 10:26:53 +0000
+Subject: [PATCH v2 18/22] ARM: KVM: Implement HVC_SOFT_RESTART in the init code
+In-Reply-To: <20170223102657.23100-1-marc.zyngier@arm.com>
+References: <20170223102657.23100-1-marc.zyngier@arm.com>
+Message-ID: <20170223102657.23100-19-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Claudiu,
+Another missing stub hypercall is HVC_SOFT_RESTART. It turns out
+that it is pretty easy to implement in terms of HVC_RESET_VECTORS
+(since it needs to turn the MMU off).
 
-On Thu, 23 Feb 2017 12:25:58 +0200
-m18063 <Claudiu.Beznea@microchip.com> wrote:
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/init.S | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-> Hi,
-> 
-> 
-> On 23.02.2017 11:21, Alexandre Belloni wrote:
-> > On 23/02/2017 at 10:38:40 +0200, Claudiu Beznea wrote:  
-> >> sama5d2 supports changing of pwm parameters like period and
-> >> duty factor without first to disable pwm. Since pwm code
-> >> is supported by more than one SoC add allow_runtime_cfg
-> >> parameter to atmel_pwm_chip data structure. This will be
-> >> filled statically for every SoC, saved in pwm specific
-> >> structure at probing time and checked while configuring
-> >> the device. Based on this, pwm clock will not be
-> >> enabled/disabled while configuring if it still enabled.
-> >>
-> >> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-> >> ---
-> >>  drivers/pwm/pwm-atmel.c | 24 ++++++++++++++++++------
-> >>  1 file changed, 18 insertions(+), 6 deletions(-)
-> >>
-> >> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-> >> index 4406639..9e1dece 100644
-> >> --- a/drivers/pwm/pwm-atmel.c
-> >> +++ b/drivers/pwm/pwm-atmel.c
-> >> @@ -68,6 +68,8 @@ struct atmel_pwm_chip {
-> >>  
-> >>  	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
-> >>  		       unsigned long dty, unsigned long prd);
-> >> +
-> >> +	bool allow_runtime_cfg;
-> >>  };
-> >>  
-> >>  static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
-> >> @@ -114,7 +116,8 @@ static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> >>  	u32 val;
-> >>  	int ret;
-> >>  
-> >> -	if (pwm_is_enabled(pwm) && (period_ns != pwm_get_period(pwm))) {
-> >> +	if (!atmel_pwm->allow_runtime_cfg &&
-> >> +	    pwm_is_enabled(pwm) && (period_ns != pwm_get_period(pwm))) {
-> >>  		dev_err(chip->dev, "cannot change PWM period while enabled\n");
-> >>  		return -EBUSY;
-> >>  	}
-> >> @@ -139,10 +142,12 @@ static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-> >>  	do_div(div, period_ns);
-> >>  	dty = prd - div;
-> >>  
-> >> -	ret = clk_enable(atmel_pwm->clk);
-> >> -	if (ret) {
-> >> -		dev_err(chip->dev, "failed to enable PWM clock\n");
-> >> -		return ret;
-> >> +	if (!pwm_is_enabled(pwm)) {
-> >> +		ret = clk_enable(atmel_pwm->clk);
-> >> +		if (ret) {
-> >> +			dev_err(chip->dev, "failed to enable PWM clock\n");
-> >> +			return ret;
-> >> +		}
-> >>  	}
-> >>    
-> > It is probably worth switching to atomic PWM instead of changing this
-> > function. This would simplify the whole driver.  
-> I was thinking to switch to atomic PWM in a future patch.
-
-Actually, I think it's better to do it before adding support for the
-new IP (even before patch 1), but maybe I'm the only one to think
-so :-).
-
-Note that switching to the atomic API is not a big (actually, it should
-even simplify the code).
-
-Regards,
-
-Boris
+diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+index 7335a510eee4..c92e092103b2 100644
+--- a/arch/arm/kvm/init.S
++++ b/arch/arm/kvm/init.S
+@@ -127,8 +127,22 @@ ENTRY(__kvm_handle_stub_hvc)
+ 	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
+ 	b	exit
+ 
++1:	cmp	r0, #HVC_SOFT_RESTART
++	bne	1f
++
++	/* The target is expected in r1 */
++	msr	ELR_hyp, r1
++	mrs	r0, cpsr
++	bic	r0, r0, #MODE_MASK
++	orr	r0, r0, #HYP_MODE
++THUMB(	orr	r0, r0, #PSR_T_BIT	)
++	msr	spsr_cxsf, r0
++	b	reset
++
+ 1:	cmp	r0, #HVC_RESET_VECTORS
+ 	bne	1f
++
++reset:
+ 	/* We're now in idmap, disable MMU */
+ 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
+ 	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
+-- 
+2.11.0
