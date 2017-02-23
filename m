@@ -1,26 +1,54 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 23 Feb 2017 13:29:15 -0600
-Subject: [PATCH] arm64: Fix the kernel panic() on QDF2400 platform
-In-Reply-To: <20170223144550.GE27512@arm.com>
-References: <1487819448-8715-1-git-send-email-shankerd@codeaurora.org>
- <20170223144550.GE27512@arm.com>
-Message-ID: <CAOZdJXUA0jAS-u_w5G0Nugm-6MiFkN49_nOvEuWQ7PpyAbeo2w@mail.gmail.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Thu, 23 Feb 2017 11:54:46 -0800
+Subject: [RFC/PATCH] of: Mark property::value as const
+In-Reply-To: <20170214025040.23955-1-stephen.boyd@linaro.org>
+References: <20170214025040.23955-1-stephen.boyd@linaro.org>
+Message-ID: <58AF3E06.4030701@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2017 at 8:45 AM, Will Deacon <will.deacon@arm.com> wrote:
->
-> Whilst I'm pleased that you've sent a fix (and I'll pick it up), I have
-> to ask... did anybody actually test the original patch? If so, why wasn't
-> this found earlier?
+On 02/13/17 18:50, Stephen Boyd wrote:
+> The 'blob' we pass into populate_properties() is marked as const,
+> but we cast that const away when we assign the result of
+> fdt_getprop_by_offset() to pp->value. Let's mark value as const
+> instead, so that code can't mistakenly write to the value of the
+> property that we've so far advertised as const.
+> 
+> Unfortunately, this exposes a problem with the fdt resolver code,
+> where we overwrite the value member of properties of phandles to
+> update them with their final value. Add a comment for now to
+> indicate where we're potentially writing over const data.
 
-First, Shanker's going to post a V2 with an improved patch description.
+The resolver should not be over writing anything in the FDT.  I'll
+look at what is going on there.
 
-As for testing it, well, I can't explain how that bug was missed.
-Looking at it, it's obvious now.  Unfortunately, the developer who
-wrote the code no longer works for Qualcomm.
+The FDT we expose to user space should be the FDT we booted with,
+not something later modified.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+-Frank
+
+> 
+> You can see the problem here by loading an overlay dtb into
+> the kernel via the request firmware helper method (not direct
+> loading) and then passing that tree to the resolver on an arm64
+> device. In this case, the firmware data is vmapped with KERNEL_PAGE_RO
+> and the code crashes when attempting to write to the blob to update
+> the phandle properties.
+> 
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> ---
+> 
+> I was thinking perhaps it would work to store another __be32 variant
+> of the phandle in each device node, but then we still have a problem
+> with properties that have phandles inside them at some offset that we
+> need to update. I guess the only real solution is to deep copy the
+> property in that case and then save around some info to free the
+> duplicated property later on?
+> 
+>  drivers/of/base.c     |  2 +-
+>  drivers/of/fdt.c      | 12 ++++++------
+>  drivers/of/resolver.c |  3 +++
+>  include/linux/of.h    |  2 +-
+>  4 files changed, 11 insertions(+), 8 deletions(-)
+
+< snip >
