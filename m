@@ -1,78 +1,162 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Thu, 23 Feb 2017 14:06:36 +0100
-Subject: [PATCH V3] ARM: dts: BCM5301X: Add basic DT for Linksys EA9500
-In-Reply-To: <20170223125612.2394-1-zajec5@gmail.com>
-References: <20170223125612.2394-1-zajec5@gmail.com>
-Message-ID: <20170223130636.4704-1-zajec5@gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 23 Feb 2017 07:22:19 -0600
+Subject: [PATCH 1/1] ARM: dts: BCM953012HR: Initial Checkin
+In-Reply-To: <1487798092-8631-1-git-send-email-steven.lin1@broadcom.com>
+References: <1487798092-8631-1-git-send-email-steven.lin1@broadcom.com>
+Message-ID: <CAL_JsqJGLEKvdCpb+U5sN2GU4hgfYdqMH3rfntNnKsBOdHfKLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rafa? Mi?ecki <rafal@milecki.pl>
+On Wed, Feb 22, 2017 at 3:14 PM, Steve Lin <steven.lin1@broadcom.com> wrote:
+> Initial version of DTS to support Broadcom BCM953012HR Northstar
+> HR platform, similar to, but not the same as existing 953012K.
+>
+> Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
+> ---
+>  arch/arm/boot/dts/Makefile        |   1 +
+>  arch/arm/boot/dts/bcm953012hr.dts | 115 ++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 116 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/bcm953012hr.dts
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 01d178a..c64ca3d 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -94,6 +94,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>         bcm94708.dtb \
+>         bcm94709.dtb \
+>         bcm953012er.dtb \
+> +       bcm953012hr.dtb \
+>         bcm953012k.dtb
+>  dtb-$(CONFIG_ARCH_BCM_53573) += \
+>         bcm47189-tenda-ac9.dtb
+> diff --git a/arch/arm/boot/dts/bcm953012hr.dts b/arch/arm/boot/dts/bcm953012hr.dts
+> new file mode 100644
+> index 0000000..c332277
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm953012hr.dts
+> @@ -0,0 +1,115 @@
+> +/*
+> + *  BSD LICENSE
 
-It's tri-band wireless home router based on BCM47094 AKA BCM4709C0. It
-uses 3 x BCM4366 chipsets for wireless.
-Panamera seems to be board name used by Linksys.
+Please use SDPX-License-Identifier tag instead.
 
-Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
----
- arch/arm/boot/dts/Makefile                      |  1 +
- arch/arm/boot/dts/bcm47094-linksys-panamera.dts | 36 +++++++++++++++++++++++++
- 2 files changed, 37 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm47094-linksys-panamera.dts
+> + *
+> + *  Copyright(c) 2017 Broadcom
+> + *
+> + *  Redistribution and use in source and binary forms, with or without
+> + *  modification, are permitted provided that the following conditions
+> + *  are met:
+> + *
+> + *    * Redistributions of source code must retain the above copyright
+> + *      notice, this list of conditions and the following disclaimer.
+> + *    * Redistributions in binary form must reproduce the above copyright
+> + *      notice, this list of conditions and the following disclaimer in
+> + *      the documentation and/or other materials provided with the
+> + *      distribution.
+> + *    * Neither the name of Broadcom nor the names of its contributors
+> + *      may be used to endorse or promote products derived from this
+> + *      software without specific prior written permission.
+> + *
+> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "bcm4708.dtsi"
+> +
+> +/ {
+> +       model = "NorthStar HR (BCM953012HR)";
+> +       compatible = "brcm,bcm953012hr", "brcm,brcm53012", "brcm,bcm4708";
+> +
+> +       aliases {
+> +               serial0 = &uart0;
+> +       };
+> +
+> +       chosen {
+> +               stdout-path = "serial0:115200n8";
+> +       };
+> +
+> +       memory {
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 52a05289c538..2feabbe16d53 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -93,6 +93,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4709-netgear-r8000.dtb \
- 	bcm4709-tplink-archer-c9-v1.dtb \
- 	bcm47094-dlink-dir-885l.dtb \
-+	bcm47094-linksys-panamera.dtb \
- 	bcm47094-luxul-xwr-3100.dtb \
- 	bcm47094-netgear-r8500.dtb \
- 	bcm94708.dtb \
-diff --git a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
-new file mode 100644
-index 000000000000..b6750f70dffb
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
-@@ -0,0 +1,36 @@
-+/*
-+ * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
-+ *
-+ * Licensed under the ISC license.
-+ */
-+
-+/dts-v1/;
-+
-+#include "bcm47094.dtsi"
-+#include "bcm5301x-nand-cs0-bch8.dtsi"
-+
-+/ {
-+	compatible = "linksys,panamera", "brcm,bcm47094", "brcm,bcm4708";
-+	model = "Linksys EA9500";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		reg = <0x00000000 0x08000000
-+		       0x88000000 0x08000000>;
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		wps {
-+			label = "WPS";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
--- 
-2.11.0
+memory at 80000000
+
+> +               reg = <0x80000000 0x10000000>;
+> +       };
+> +};
+> +
+> +&uart0 {
+> +       status = "okay";
+> +};
+> +
+> +&nand {
+> +       nandcs at 0 {
+> +               compatible = "brcm,nandcs";
+> +               reg = <0>;
+> +               nand-on-flash-bbt;
+> +
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +
+> +               nand-ecc-strength = <4>;
+> +               nand-ecc-step-size = <512>;
+> +
+> +               partition at 0 {
+> +                       label = "nboot";
+> +                       reg = <0x00000000 0x00200000>;
+> +                       read-only;
+> +               };
+> +               partition at 200000 {
+> +                       label = "nenv";
+> +                       reg = <0x00200000 0x00400000>;
+> +               };
+> +               partition at 600000 {
+> +                       label = "nsystem";
+> +                       reg = <0x00600000 0x00a00000>;
+> +               };
+> +               partition at 1000000 {
+> +                       label = "nrootfs";
+> +                       reg = <0x01000000 0x07000000>;
+> +               };
+> +       };
+> +};
+> +
+> +&spi_nor {
+> +       status = "okay";
+> +       spi-max-frequency = <62500000>;
+> +       m25p,default-addr-width = <3>;
+> +
+> +       #address-cells = <1>;
+> +       #size-cells = <1>;
+> +
+> +       partition at 0 {
+> +               label = "boot";
+> +               reg = <0x00000000 0x000d0000>;
+> +       };
+> +       partition at d000 {
+> +               label = "env";
+> +               reg = <0x000d0000 0x00030000>;
+> +       };
+> +       partition at 100000 {
+> +               label = "system";
+> +               reg = <0x00100000 0x00600000>;
+> +       };
+> +       partition at 700000 {
+> +               label = "rootfs";
+> +               reg = <0x00700000 0x00900000>;
+> +       };
+> +};
+> +
+> --
+> 2.1.0
+>
