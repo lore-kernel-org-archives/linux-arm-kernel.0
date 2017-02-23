@@ -1,66 +1,98 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Feb 2017 10:26:39 +0000
-Subject: [PATCH v2 04/22] arm64: KVM: Allow the main HYP code to use the init
- hyp stub implementation
+Date: Thu, 23 Feb 2017 10:26:40 +0000
+Subject: [PATCH v2 05/22] arm64: KVM: Convert __cpu_reset_hyp_mode to using
+ __hyp_reset_vectors
 In-Reply-To: <20170223102657.23100-1-marc.zyngier@arm.com>
 References: <20170223102657.23100-1-marc.zyngier@arm.com>
-Message-ID: <20170223102657.23100-5-marc.zyngier@arm.com>
+Message-ID: <20170223102657.23100-6-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now have a full hyp-stub implementation in the KVM init code,
-but the main KVM code only supports HVC_GET_VECTORS, which is not
-enough.
-
-Instead of reinventing the wheel, let's reuse the init implementation
-by branching to the idmap page when called with a hyp-stub hypercall.
+We are now able to use the hyp stub to reset HYP mode. Time to
+kiss __kvm_hyp_reset goodbye, and use __hyp_reset_vectors.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/hyp-entry.S | 24 +++++++++++++++++++-----
- 1 file changed, 19 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/kvm_asm.h  |  1 -
+ arch/arm64/include/asm/kvm_host.h |  3 +--
+ arch/arm64/kvm/hyp-init.S         |  2 --
+ arch/arm64/kvm/hyp/hyp-entry.S    | 15 ---------------
+ 4 files changed, 1 insertion(+), 20 deletions(-)
 
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index ec3553eb9349..3e242f6613b3 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -47,7 +47,6 @@ struct kvm_vcpu;
+ 
+ extern char __kvm_hyp_init[];
+ extern char __kvm_hyp_init_end[];
+-extern char __kvm_hyp_reset[];
+ 
+ extern char __kvm_hyp_vector[];
+ 
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index e5050388e062..7076ecae2bf0 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -361,11 +361,10 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+ 	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
+ }
+ 
+-void __kvm_hyp_teardown(void);
+ static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
+ 					phys_addr_t phys_idmap_start)
+ {
+-	kvm_call_hyp(__kvm_hyp_teardown, phys_idmap_start);
++	__hyp_reset_vectors();
+ }
+ 
+ static inline void kvm_arch_hardware_unsetup(void) {}
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index 1d89995378e9..b53e95efc1c5 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -134,7 +134,6 @@ ENTRY(__kvm_handle_stub_hvc)
+ 	/*
+ 	 * Reset kvm back to the hyp stub.
+ 	 */
+-ENTRY(__kvm_hyp_reset)
+ 	/* We're now in idmap, disable MMU */
+ 	mrs	x0, sctlr_el2
+ 	ldr	x1, =SCTLR_ELx_FLAGS
+@@ -151,7 +150,6 @@ ENTRY(__kvm_hyp_reset)
+ 
+ exit:
+ 	eret
+-ENDPROC(__kvm_hyp_reset)
+ ENDPROC(__kvm_handle_stub_hvc)
+ 
+ 	.ltorg
 diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index 5e9052f087f2..21eeb2552f33 100644
+index 21eeb2552f33..1277f81b63b7 100644
 --- a/arch/arm64/kvm/hyp/hyp-entry.S
 +++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -87,10 +87,24 @@ alternative_endif
- 	/* Here, we're pretty sure the host called HVC. */
- 	ldp	x0, x1, [sp], #16
+@@ -53,21 +53,6 @@ ENTRY(__vhe_hyp_call)
+ 	ret
+ ENDPROC(__vhe_hyp_call)
  
--	cmp	x0, #HVC_GET_VECTORS
--	b.ne	1f
--	mrs	x0, vbar_el2
--	b	2f
-+	/* Check for a stub HVC call */
-+	cmp	x0, #HVC_STUB_HCALL_NR
-+	b.hs	1f
-+
-+	/*
-+	 * Compute the idmap address of __kvm_handle_stub_hvc and
-+	 * jump there. Since we use kimage_voffset, do not use the
-+	 * HYP VA for __kvm_handle_stub_hvc, but the kernel VA instead
-+	 * (by loading it from the constant pool).
-+	 *
-+	 * Preserve x0-x4, which may contain stub parameters.
-+	 */
-+	ldr	x5, =__kvm_handle_stub_hvc
-+	ldr_l	x6, kimage_voffset
-+
-+	/* x5 = __pa(x5) */
-+	sub	x5, x5, x6
-+	br	x5
+-/*
+- * Compute the idmap address of __kvm_hyp_reset based on the idmap
+- * start passed as a parameter, and jump there.
+- *
+- * x0: HYP phys_idmap_start
+- */
+-ENTRY(__kvm_hyp_teardown)
+-	mov	x4, x0
+-	adr_l	x3, __kvm_hyp_reset
+-
+-	/* insert __kvm_hyp_reset()s offset into phys_idmap_start */
+-	bfi	x4, x3, #0, #PAGE_SHIFT
+-	br	x4
+-ENDPROC(__kvm_hyp_teardown)
+-	
+ el1_sync:				// Guest trapped into EL2
+ 	stp	x0, x1, [sp, #-16]!
  
- 1:
- 	/*
-@@ -99,7 +113,7 @@ alternative_endif
- 	kern_hyp_va	x0
- 	do_el2_call
- 
--2:	eret
-+	eret
- 
- el1_trap:
- 	/*
 -- 
 2.11.0
