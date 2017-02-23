@@ -1,35 +1,29 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 23 Feb 2017 18:16:18 +0100
-Subject: [PATCH] MAINTAINERS: Replace Stephen with Jon
-Message-ID: <20170223171618.14360-1-thierry.reding@gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Thu, 23 Feb 2017 09:18:24 -0800
+Subject: [PATCH 00/35] treewide trivial patches converting pr_warning to
+ pr_warn
+In-Reply-To: <CAL_JsqLTaq-QLTqfyDO8EVJYpgeUx1e4J0Fo2NvfFWqVoiVedQ@mail.gmail.com>
+References: <cover.1487314666.git.joe@perches.com>
+ <CAL_JsqLTaq-QLTqfyDO8EVJYpgeUx1e4J0Fo2NvfFWqVoiVedQ@mail.gmail.com>
+Message-ID: <1487870304.14159.29.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On Thu, 2017-02-23 at 09:28 -0600, Rob Herring wrote:
+> On Fri, Feb 17, 2017 at 1:11 AM, Joe Perches <joe@perches.com> wrote:
+> > There are ~4300 uses of pr_warn and ~250 uses of the older
+> > pr_warning in the kernel source tree.
+> > 
+> > Make the use of pr_warn consistent across all kernel files.
+> > 
+> > This excludes all files in tools/ as there is a separate
+> > define pr_warning for that directory tree and pr_warn is
+> > not used in tools/.
+> > 
+> > Done with 'sed s/\bpr_warning\b/pr_warn/' and some emacsing.
+[]
+> Where's the removal of pr_warning so we don't have more sneak in?
 
-For a while now, Stephen's been focussing on other areas of the open
-source community and within NVIDIA. Jon Hunter's been doing a great job
-keeping things working. Replace Stephen's entry with Jon's.
-
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- MAINTAINERS | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index b9af886ab3a0..58e85100fc2a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -12302,9 +12302,9 @@ S:	Maintained
- F:	drivers/media/rc/ttusbir.c
- 
- TEGRA ARCHITECTURE SUPPORT
--M:	Stephen Warren <swarren@wwwdotorg.org>
- M:	Thierry Reding <thierry.reding@gmail.com>
- M:	Alexandre Courbot <gnurou@gmail.com>
-+M:	Jonathan Hunter <jonathanh@nvidia.com>
- L:	linux-tegra at vger.kernel.org
- Q:	http://patchwork.ozlabs.org/project/linux-tegra/list/
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git
--- 
-2.11.1
+After all of these actually get applied,
+and maybe a cycle or two later, one would
+get sent.
