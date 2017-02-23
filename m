@@ -1,110 +1,115 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 23 Feb 2017 16:05:36 +0800
-Subject: [PATCH 04/11] drm/sun4i: Move layers from sun4i_drv to sun4i_crtc
-In-Reply-To: <20170223080543.6659-1-wens@csie.org>
-References: <20170223080543.6659-1-wens@csie.org>
-Message-ID: <20170223080543.6659-5-wens@csie.org>
+Date: Thu, 23 Feb 2017 16:05:32 +0800
+Subject: [PATCH 00/11] drm/sun4i: Various fixes and cleanups part 2
+Message-ID: <20170223080543.6659-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves the sun4i_layers_init call from sun4i_drv_bind to
-sun4i_crtc_init, and the layers pointer from struct sun4i_drv to
-struct sun4i_crtc.
+Hi Maxime,
 
-The layers are bound to a specific crtc, and they are not directly
-used once initiated. They are used through their included drm_plane
-structures.
+This is the second bunch of fixes for the sun4i drm driver. This is part
+of the cleanup I am doing towards making the driver support multiple
+display pipelines.
 
-Moving the layers into the crtc facilitates binding them to the crtc
-explicitly, by setting the corresponding bit in their .possible_crtcs
-fields right after the crtc is initialized. This is done in a later
-patch.
+This part mainly aims to get detection of crtcs working with of_graph,
+and moving data structure pointers around for a more layered and
+connected approach of associating the various components:
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- drivers/gpu/drm/sun4i/sun4i_crtc.c | 8 ++++++++
- drivers/gpu/drm/sun4i/sun4i_crtc.h | 1 +
- drivers/gpu/drm/sun4i/sun4i_drv.c  | 9 ---------
- drivers/gpu/drm/sun4i/sun4i_drv.h  | 2 --
- 4 files changed, 9 insertions(+), 11 deletions(-)
+	----------              ---------
+	|----------             |---------
+  SW:	||        |  included   ||       |
+	|| layers | ----------> || crtcs |
+	-|        |     in      -|       |
+	 ----------              ---------
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-index de6f7da69746..1d01667fa45d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-@@ -28,6 +28,7 @@
- #include "sun4i_backend.h"
- #include "sun4i_crtc.h"
- #include "sun4i_drv.h"
-+#include "sun4i_layer.h"
- #include "sun4i_tcon.h"
- 
- static void sun4i_crtc_atomic_begin(struct drm_crtc *crtc,
-@@ -125,6 +126,13 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm)
- 		return ERR_PTR(-ENOMEM);
- 	scrtc->drv = drv;
- 
-+	/* Create our layers */
-+	scrtc->layers = sun4i_layers_init(drm);
-+	if (IS_ERR(scrtc->layers)) {
-+		dev_err(drm->dev, "Couldn't create the planes\n");
-+		return ERR_CAST(scrtc->layers);
-+	}
-+
- 	ret = drm_crtc_init_with_planes(drm, &scrtc->crtc,
- 					drv->primary,
- 					NULL,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.h b/drivers/gpu/drm/sun4i/sun4i_crtc.h
-index dec8ce4d9b25..0a888f73c983 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.h
-@@ -18,6 +18,7 @@ struct sun4i_crtc {
- 	struct drm_pending_vblank_event	*event;
- 
- 	struct sun4i_drv		*drv;
-+	struct sun4i_layer		**layers;
- };
- 
- static inline struct sun4i_crtc *drm_crtc_to_sun4i_crtc(struct drm_crtc *crtc)
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index fc6ef4066c59..87bc0951eba8 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -23,7 +23,6 @@
- #include "sun4i_crtc.h"
- #include "sun4i_drv.h"
- #include "sun4i_framebuffer.h"
--#include "sun4i_layer.h"
- #include "sun4i_tcon.h"
- 
- static int sun4i_drv_enable_vblank(struct drm_device *drm, unsigned int pipe)
-@@ -143,14 +142,6 @@ static int sun4i_drv_bind(struct device *dev)
- 		goto cleanup_mode_config;
- 	}
- 
--	/* Create our layers */
--	drv->layers = sun4i_layers_init(drm);
--	if (IS_ERR(drv->layers)) {
--		dev_err(drm->dev, "Couldn't create the planes\n");
--		ret = PTR_ERR(drv->layers);
--		goto cleanup_mode_config;
--	}
--
- 	/* Create our CRTC */
- 	drv->crtc = sun4i_crtc_init(drm);
- 	if (IS_ERR(drv->crtc)) {
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h b/drivers/gpu/drm/sun4i/sun4i_drv.h
-index 597353eab728..e22ee536677e 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
-@@ -23,8 +23,6 @@ struct sun4i_drv {
- 
- 	struct drm_plane	*primary;
- 	struct drm_fbdev_cma	*fbdev;
--
--	struct sun4i_layer	**layers;
- };
- 
- #endif /* _SUN4I_DRV_H_ */
+	      |   \_______________   |
+	      |                   \  |
+	      v	     maps to      v  v
+
+	------------            ---------
+	|------------           |---------
+  HW:	||          |   feeds   ||       |
+	|| backends | --------> || tcons |
+	-|          |           -|       |
+	 ------------            ---------
+
+This will make it easier to support multiple display pipelines, as
+we only have to deal with indexes at bind time.
+
+
+Patch 1 makes the table of RGB-to-YUV conversion coefficients constant.
+
+Patch 2 sets the crtc's output port so drm_of_find_possible_crtcs can
+work.
+
+Patch 3 adds an empty end of list element to the list of layers returned
+from sun4i_layers_init.
+
+Patch 4 moves the list of layers from the main sun4i_drv structure into
+the crtc.
+
+Patch 5 initializes the crtc within the tcon's bind function. The crtc
+has to be initialized before any encoders downstream of the tcon, so
+drm_of_find_possible_crtcs() used within encoder bind functions work.
+Previously crtcs were initialized after all hardware components were
+bound.
+
+Patch 6 drops the pointer to the primary layer/plane from sun4i_drv.
+This pointer was only used for initializing the crtc later on.
+
+Patch 7 drops the hardcoded .possible_crtcs values for the layers.
+Instead we iterate through the list of layers and set the value
+for overlay layers with the value derived from the crtc that was
+just initialized.
+
+Patch 8 makes the tv encoder driver use drm_of_find_possible_crtcs
+instead of a hardcoded value.
+
+Patch 9 adds a argument to pass the tcon pointer when initializing
+the RGB encoder.
+
+Patch 10 adds a pointer to the underlying backend to sun4i_layer.
+
+Patch 11 adds pointers to the underlying backend and tcon to
+sun4i_crtc.
+
+
+Please have a look. Notably, I do not have hardware to test patch 8,
+though I do not expect any problems.
+
+Still to come is the actual work of supporting many display pipelines.
+
+Regards
+ChenYu
+
+Chen-Yu Tsai (11):
+  drm/sun4i: Make sunxi_rgb2yuv_coef constant
+  drm/sun4i: Set drm_crtc.port to the underlying TCON's output port node
+  drm/sun4i: Add end of list element for sun4i_layers_init's returned
+    list
+  drm/sun4i: Move layers from sun4i_drv to sun4i_crtc
+  drm/sun4i: Initialize crtc from tcon bind function
+  drm/sun4i: Drop primary layer pointer from sun4i_drv
+  drm/sun4i: Drop hardcoded .possible_crtcs values from layers
+  drm/sun4i: tv: Switch to drm_of_find_possible_crtcs
+  drm/sun4i: rgb: Pass tcon pointer when initializing RGB encoder
+  drm/sun4i: Add backend pointer to sun4i_layer
+  drm/sun4i: Add backend and tcon pointers to sun4i_crtc
+
+ drivers/gpu/drm/sun4i/Makefile        |  4 +--
+ drivers/gpu/drm/sun4i/sun4i_backend.c |  2 +-
+ drivers/gpu/drm/sun4i/sun4i_crtc.c    | 57 +++++++++++++++++++++++++++++------
+ drivers/gpu/drm/sun4i/sun4i_crtc.h    |  4 ++-
+ drivers/gpu/drm/sun4i/sun4i_drv.c     | 17 -----------
+ drivers/gpu/drm/sun4i/sun4i_drv.h     |  4 ---
+ drivers/gpu/drm/sun4i/sun4i_layer.c   | 16 ++++------
+ drivers/gpu/drm/sun4i/sun4i_layer.h   |  1 +
+ drivers/gpu/drm/sun4i/sun4i_rgb.c     | 30 +++++++-----------
+ drivers/gpu/drm/sun4i/sun4i_rgb.h     |  2 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.c    | 12 ++++++--
+ drivers/gpu/drm/sun4i/sun4i_tcon.h    |  3 ++
+ drivers/gpu/drm/sun4i/sun4i_tv.c      |  8 ++++-
+ 13 files changed, 91 insertions(+), 69 deletions(-)
+
 -- 
 2.11.0
