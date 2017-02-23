@@ -1,44 +1,33 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 23 Feb 2017 16:05:34 +0800
-Subject: [PATCH 02/11] drm/sun4i: Set drm_crtc.port to the underlying TCON's
- output port node
+Date: Thu, 23 Feb 2017 16:05:33 +0800
+Subject: [PATCH 01/11] drm/sun4i: Make sunxi_rgb2yuv_coef constant
 In-Reply-To: <20170223080543.6659-1-wens@csie.org>
 References: <20170223080543.6659-1-wens@csie.org>
-Message-ID: <20170223080543.6659-3-wens@csie.org>
+Message-ID: <20170223080543.6659-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The way drm_of_find_possible_crtcs is it tries to match the
-remote-endpoint of the given node's various endpoints to all the
-crtc's .port field. Thus we need to set drm_crtc.port to the output
-port node of the underlying TCON.
+sunxi_rgb2yuv_coef is a table of RGB-to-YUV conversion coefficients.
+They are programmed into the hardware, and can be declared constant.
 
+Reported-by: Priit Laes <plaes@plaes.org>
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_crtc.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-index 4e2e89c3104f..de6f7da69746 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-@@ -19,6 +19,7 @@
- #include <linux/clk-provider.h>
- #include <linux/ioport.h>
- #include <linux/of_address.h>
-+#include <linux/of_graph.h>
- #include <linux/of_irq.h>
- #include <linux/regmap.h>
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index 5bf1ea4d92fc..7a61bd330f04 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -24,7 +24,7 @@
+ #include "sun4i_backend.h"
+ #include "sun4i_drv.h"
  
-@@ -136,5 +137,9 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm)
- 
- 	drm_crtc_helper_add(&scrtc->crtc, &sun4i_crtc_helper_funcs);
- 
-+	/* Set crtc.port to output port node of the tcon */
-+	scrtc->crtc.port = of_graph_get_port_by_id(drv->tcon->dev->of_node,
-+						   1);
-+
- 	return scrtc;
- }
+-static u32 sunxi_rgb2yuv_coef[12] = {
++static const u32 sunxi_rgb2yuv_coef[12] = {
+ 	0x00000107, 0x00000204, 0x00000064, 0x00000108,
+ 	0x00003f69, 0x00003ed6, 0x000001c1, 0x00000808,
+ 	0x000001c1, 0x00003e88, 0x00003fb8, 0x00000808
 -- 
 2.11.0
