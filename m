@@ -1,44 +1,43 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 23 Feb 2017 18:30:52 +0100
-Subject: [PATCH 10/11] arm64: tegra: Add power monitors on P2771
-In-Reply-To: <20170223173053.19701-1-thierry.reding@gmail.com>
-References: <20170223173053.19701-1-thierry.reding@gmail.com>
-Message-ID: <20170223173053.19701-10-thierry.reding@gmail.com>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Thu, 23 Feb 2017 17:41:20 +0000
+Subject: [PATCH 00/35] treewide trivial patches converting pr_warning to
+ pr_warn
+In-Reply-To: <1487870304.14159.29.camel@perches.com>
+References: <cover.1487314666.git.joe@perches.com>
+ <CAL_JsqLTaq-QLTqfyDO8EVJYpgeUx1e4J0Fo2NvfFWqVoiVedQ@mail.gmail.com>
+ <1487870304.14159.29.camel@perches.com>
+Message-ID: <CACvgo50LUm5VSn_F=Dh8kL5zCPpCQDoCyUEL=Z+=1+6hJpfTaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+On 23 February 2017 at 17:18, Joe Perches <joe@perches.com> wrote:
+> On Thu, 2017-02-23 at 09:28 -0600, Rob Herring wrote:
+>> On Fri, Feb 17, 2017 at 1:11 AM, Joe Perches <joe@perches.com> wrote:
+>> > There are ~4300 uses of pr_warn and ~250 uses of the older
+>> > pr_warning in the kernel source tree.
+>> >
+>> > Make the use of pr_warn consistent across all kernel files.
+>> >
+>> > This excludes all files in tools/ as there is a separate
+>> > define pr_warning for that directory tree and pr_warn is
+>> > not used in tools/.
+>> >
+>> > Done with 'sed s/\bpr_warning\b/pr_warn/' and some emacsing.
+> []
+>> Where's the removal of pr_warning so we don't have more sneak in?
+>
+> After all of these actually get applied,
+> and maybe a cycle or two later, one would
+> get sent.
+>
+By which point you'll get a few reincarnation of it. So you'll have to
+do the same exercise again :-(
 
-The P2771 development board comes with two power monitors that can be
-used to determine power consumption in different parts of the board.
+I guess the question is - are you expecting to get the series merged
+all together/via one tree ? If not, your plan is perfectly reasonable.
+Fwiw in the DRM subsystem, similar cleanups does purge the respective
+macros/other with the final commit. But there one can pull the lot in
+one go.
 
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-index 1c195d71806d..9485841e3351 100644
---- a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-+++ b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
-@@ -8,6 +8,18 @@
- 	model = "NVIDIA Tegra186 P2771-0000 Development Board";
- 	compatible = "nvidia,p2771-0000", "nvidia,tegra186";
- 
-+	i2c at 3160000 {
-+		power-monitor at 42 {
-+			compatible = "ti,ina3221";
-+			reg = <0x42>;
-+		};
-+
-+		power-monitor at 43 {
-+			compatible = "ti,ina3221";
-+			reg = <0x43>;
-+		};
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 
--- 
-2.11.1
+Regards,
+Emil
