@@ -1,81 +1,67 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Thu, 23 Feb 2017 16:46:03 -0500
-Subject: [PATCH] phy: phy-exynos-pcie: make it explicitly non-modular
-Message-ID: <20170223214603.18692-1-paul.gortmaker@windriver.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Thu, 23 Feb 2017 13:47:07 -0800
+Subject: [RFC/PATCH] of: Mark property::value as const
+In-Reply-To: <58AF3E06.4030701@gmail.com>
+References: <20170214025040.23955-1-stephen.boyd@linaro.org>
+ <58AF3E06.4030701@gmail.com>
+Message-ID: <58AF585B.7060303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig currently controlling compilation of this code is:
+On 02/23/17 11:54, Frank Rowand wrote:
+> On 02/13/17 18:50, Stephen Boyd wrote:
+>> The 'blob' we pass into populate_properties() is marked as const,
+>> but we cast that const away when we assign the result of
+>> fdt_getprop_by_offset() to pp->value. Let's mark value as const
+>> instead, so that code can't mistakenly write to the value of the
+>> property that we've so far advertised as const.
+>>
+>> Unfortunately, this exposes a problem with the fdt resolver code,
+>> where we overwrite the value member of properties of phandles to
+>> update them with their final value. Add a comment for now to
+>> indicate where we're potentially writing over const data.
+> 
+> The resolver should not be over writing anything in the FDT.  I'll
+> look at what is going on there.
 
-drivers/phy/Kconfig:config PHY_EXYNOS_PCIE
-drivers/phy/Kconfig:    bool "Exynos PCIe PHY driver"
+OK, now that I have looked at the resolver, I see that you meant that
+the resolver code is modifying the _overlay_ FDT, not the FDT that
+was used at initial boot.  So not what I thought you meant.
 
-...meaning that it currently is not being built as a module by anyone.
+I'll reply separately to the original patch email with a more complete
+response.
 
-Lets remove the couple traces of modular infrastructure use, so that
-when reading the driver there is no doubt it is builtin-only.
+-Frank
 
-Since module_platform_driver() uses the same init level priority as
-builtin_platform_driver() the init ordering remains unchanged with
-this commit.
-
-Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
-
-We also delete the MODULE_LICENSE tag etc. since all that information
-is already contained at the top of the file in the comments.
-
-Cc: Jaehoon Chung <jh80.chung@samsung.com>
-Cc: Jingoo Han <jingoohan1@gmail.com>
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: Pankaj Dubey <pankaj.dubey@samsung.com>
-Cc: Vivek Gautam <vivek.gautam@codeaurora.org>
-Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
----
-
-[ I'd normally not send patches in the merge window, but this driver
- just appeared in linux-next and so I'm assuming it is intended for
- addition during this merge window, hence we might as well fix it now.]
-
- drivers/phy/phy-exynos-pcie.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/phy/phy-exynos-pcie.c b/drivers/phy/phy-exynos-pcie.c
-index 4f60b83641d5..d92d8616a106 100644
---- a/drivers/phy/phy-exynos-pcie.c
-+++ b/drivers/phy/phy-exynos-pcie.c
-@@ -14,8 +14,8 @@
- #include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/iopoll.h>
-+#include <linux/init.h>
- #include <linux/mfd/syscon.h>
--#include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-@@ -228,7 +228,6 @@ static const struct of_device_id exynos_pcie_phy_match[] = {
- 	},
- 	{},
- };
--MODULE_DEVICE_TABLE(of, exynos_pcie_phy_match);
- 
- static int exynos_pcie_phy_probe(struct platform_device *pdev)
- {
-@@ -278,8 +277,4 @@ static struct platform_driver exynos_pcie_phy_driver = {
- 		.name		= "exynos_pcie_phy",
- 	}
- };
--module_platform_driver(exynos_pcie_phy_driver);
--
--MODULE_DESCRIPTION("Samsung S5P/EXYNOS SoC PCIe PHY driver");
--MODULE_AUTHOR("Jaehoon Chung <jh80.chung@samsung.com>");
--MODULE_LICENSE("GPL v2");
-+builtin_platform_driver(exynos_pcie_phy_driver);
--- 
-2.11.0
+> 
+> The FDT we expose to user space should be the FDT we booted with,
+> not something later modified.
+> 
+> -Frank
+> 
+>>
+>> You can see the problem here by loading an overlay dtb into
+>> the kernel via the request firmware helper method (not direct
+>> loading) and then passing that tree to the resolver on an arm64
+>> device. In this case, the firmware data is vmapped with KERNEL_PAGE_RO
+>> and the code crashes when attempting to write to the blob to update
+>> the phandle properties.
+>>
+>> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+>> ---
+>>
+>> I was thinking perhaps it would work to store another __be32 variant
+>> of the phandle in each device node, but then we still have a problem
+>> with properties that have phandles inside them at some offset that we
+>> need to update. I guess the only real solution is to deep copy the
+>> property in that case and then save around some info to free the
+>> duplicated property later on?
+>>
+>>  drivers/of/base.c     |  2 +-
+>>  drivers/of/fdt.c      | 12 ++++++------
+>>  drivers/of/resolver.c |  3 +++
+>>  include/linux/of.h    |  2 +-
+>>  4 files changed, 11 insertions(+), 8 deletions(-)
+> 
+> < snip >
+> 
