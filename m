@@ -1,65 +1,95 @@
 From: fisaksen@baylibre.com (Frode Isaksen)
-Date: Thu, 23 Feb 2017 19:01:59 +0100
-Subject: [PATCH v3 4/6] spi: davinci: do not use DMA if transfer length is
- less than 16
+Date: Thu, 23 Feb 2017 19:02:01 +0100
+Subject: [PATCH v3 6/6] spi: loopback-test: add option to use vmalloc'ed
+ buffers
 In-Reply-To: <1487872921-26628-1-git-send-email-fisaksen@baylibre.com>
 References: <1487872921-26628-1-git-send-email-fisaksen@baylibre.com>
-Message-ID: <1487872921-26628-5-git-send-email-fisaksen@baylibre.com>
+Message-ID: <1487872921-26628-7-git-send-email-fisaksen@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Higher bitrate and lower CPU load if using PIO in this case.
+Using vmalloc'ed buffers will use one SG entry for each page,
+that may provoke DMA errors for large transfers.
+Also vmalloc'ed buffers may cause errors on CPU's with VIVT cache.
+Add this option to catch these errors when testing.
+Note that to catch VIVT cache errors, checking the rx range
+has to be disabled, so this option has been added as well.
 
 Signed-off-by: Frode Isaksen <fisaksen@baylibre.com>
 ---
- drivers/spi/spi-davinci.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ drivers/spi/spi-loopback-test.c | 34 +++++++++++++++++++++++++++-------
+ 1 file changed, 27 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-index ca12216..75c658e 100644
---- a/drivers/spi/spi-davinci.c
-+++ b/drivers/spi/spi-davinci.c
-@@ -109,6 +109,8 @@
- #define SPIDEF		0x4c
- #define SPIFMT0		0x50
+diff --git a/drivers/spi/spi-loopback-test.c b/drivers/spi/spi-loopback-test.c
+index 50e620f..3596051 100644
+--- a/drivers/spi/spi-loopback-test.c
++++ b/drivers/spi/spi-loopback-test.c
+@@ -55,6 +55,18 @@ module_param(run_only_test, int, 0);
+ MODULE_PARM_DESC(run_only_test,
+ 		 "only run the test with this number (0-based !)");
  
-+#define DMA_MIN_BYTES	16
++/* use vmalloc'ed buffers */
++int use_vmalloc;
++module_param(use_vmalloc, int, 0644);
++MODULE_PARM_DESC(use_vmalloc,
++		 "use vmalloc'ed buffers instead of kmalloc'ed");
 +
- /* SPI Controller driver's private data. */
- struct davinci_spi {
- 	struct spi_bitbang	bitbang;
-@@ -479,7 +481,8 @@ static bool davinci_spi_can_dma(struct spi_master *master,
- 	bool can_dma = false;
++/* check rx ranges */
++int check_ranges = 1;
++module_param(check_ranges, int, 0644);
++MODULE_PARM_DESC(check_ranges,
++		 "checks rx_buffer pattern are valid");
++
+ /* the actual tests to execute */
+ static struct spi_test spi_tests[] = {
+ 	{
+@@ -492,9 +504,11 @@ static int spi_test_check_loopback_result(struct spi_device *spi,
+ 	int ret;
  
- 	if (spicfg)
--		can_dma = spicfg->io_type == SPI_IO_TYPE_DMA;
-+		can_dma = (spicfg->io_type == SPI_IO_TYPE_DMA) &&
-+			(xfer->len >= DMA_MIN_BYTES);
+ 	/* checks rx_buffer pattern are valid with loopback or without */
+-	ret = spi_check_rx_ranges(spi, msg, rx);
+-	if (ret)
+-		return ret;
++	if (check_ranges) {
++		ret = spi_check_rx_ranges(spi, msg, rx);
++		if (ret)
++			return ret;
++	}
  
- 	return can_dma;
- }
-@@ -620,10 +623,9 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
- 
- 	reinit_completion(&dspi->done);
- 
--	if (spicfg->io_type == SPI_IO_TYPE_INTR)
--		set_io_bits(dspi->base + SPIINT, SPIINT_MASKINT);
--
--	if (spicfg->io_type != SPI_IO_TYPE_DMA) {
-+	if (!davinci_spi_can_dma(spi->master, spi, t)) {
-+		if (spicfg->io_type != SPI_IO_TYPE_POLL)
-+			set_io_bits(dspi->base + SPIINT, SPIINT_MASKINT);
- 		/* start the transfer */
- 		dspi->wcount--;
- 		tx_data = dspi->get_tx(dspi);
-@@ -698,7 +700,7 @@ static int davinci_spi_bufs(struct spi_device *spi, struct spi_transfer *t)
+ 	/* if we run without loopback, then return now */
+ 	if (!loopback)
+@@ -965,13 +979,19 @@ int spi_test_run_tests(struct spi_device *spi,
+ 	/* allocate rx/tx buffers of 128kB size without devm
+ 	 * in the hope that is on a page boundary
+ 	 */
+-	rx = kzalloc(SPI_TEST_MAX_SIZE_PLUS, GFP_KERNEL);
++	if (use_vmalloc)
++		rx = vmalloc(SPI_TEST_MAX_SIZE_PLUS);
++	else
++		rx = kzalloc(SPI_TEST_MAX_SIZE_PLUS, GFP_KERNEL);
+ 	if (!rx) {
+ 		ret = -ENOMEM;
+ 		goto out;
  	}
  
- 	clear_io_bits(dspi->base + SPIINT, SPIINT_MASKALL);
--	if (spicfg->io_type == SPI_IO_TYPE_DMA)
-+	if (davinci_spi_can_dma(spi->master, spi, t))
- 		clear_io_bits(dspi->base + SPIINT, SPIINT_DMA_REQ_EN);
+-	tx = kzalloc(SPI_TEST_MAX_SIZE_PLUS, GFP_KERNEL);
++	if (use_vmalloc)
++		tx = vmalloc(SPI_TEST_MAX_SIZE_PLUS);
++	else
++		tx = kzalloc(SPI_TEST_MAX_SIZE_PLUS, GFP_KERNEL);
+ 	if (!tx) {
+ 		ret = -ENOMEM;
+ 		goto out;
+@@ -999,8 +1019,8 @@ int spi_test_run_tests(struct spi_device *spi,
+ 	}
  
- 	clear_io_bits(dspi->base + SPIGCR1, SPIGCR1_SPIENA_MASK);
+ out:
+-	kfree(rx);
+-	kfree(tx);
++	kvfree(rx);
++	kvfree(tx);
+ 	return ret;
+ }
+ EXPORT_SYMBOL_GPL(spi_test_run_tests);
 -- 
 2.7.4
