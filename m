@@ -1,121 +1,122 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 22 Feb 2017 16:44:04 -0800
-Subject: [PATCH 0/8] ARM: sun8i: a33: Mali improvements
-In-Reply-To: <20170220164926.GB15493@ulmo.ba.sec>
-References: <10fd28cb-269a-ec38-ecfb-b7c86be3e716@math.uni-bielefeld.de>
- <20170216184524.cxcy2ux37yrwutla@lukather>
- <2cecfc48-576f-3888-08aa-1fe2edc3c752@math.uni-bielefeld.de>
- <20170217154341.vn7uqvdaijtrj64s@lukather>
- <20170220164926.GB15493@ulmo.ba.sec>
-Message-ID: <20170223004404.jyxlvvsoojw7qnud@lukather>
+From: puck.chen@hisilicon.com (Chen Feng)
+Date: Thu, 23 Feb 2017 09:01:13 +0800
+Subject: [Linaro-mm-sig] [RFCv3][PATCH 3/5] arm64: Implement
+ ARCH_HAS_FORCE_CACHE
+In-Reply-To: <3551e685-fed1-de9c-a30e-12025ee480fb@redhat.com>
+References: <1473715978-11633-1-git-send-email-labbott@redhat.com>
+ <1473715978-11633-4-git-send-email-labbott@redhat.com>
+ <20160913091946.GB7467@arm.com>
+ <27805ccf-1f2d-81ea-044e-b21207be8e7f@redhat.com>
+ <20160913151325.GF17731@arm.com>
+ <b4a92c52-cbe8-9009-43bf-4c7b49e31916@redhat.com>
+ <58ABD8B8.6050204@hisilicon.com>
+ <3551e685-fed1-de9c-a30e-12025ee480fb@redhat.com>
+Message-ID: <58AE3459.8080806@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
 
-On Mon, Feb 20, 2017 at 05:49:26PM +0100, Thierry Reding wrote:
-> On Fri, Feb 17, 2017 at 04:43:41PM +0100, Maxime Ripard wrote:
-> > On Fri, Feb 17, 2017 at 01:45:44PM +0100, Tobias Jakobi wrote:
-> > > Hello Maxime,
-> > > 
-> > > Maxime Ripard wrote:
-> > > > Hi,
-> > > > 
-> > > > On Thu, Feb 16, 2017 at 01:43:06PM +0100, Tobias Jakobi wrote:
-> > > >> I was wondering about the following. Wasn't there some strict
-> > > >> requirement about code going upstream, which also included that there
-> > > >> was a full open-source driver stack for it?
-> > > >>
-> > > >> I don't see how this is the case for Mali, neither in the kernel, nor in
-> > > >> userspace. I'm aware that the Mali kernel driver is open-source. But it
-> > > >> is not upstream, maintained out of tree, and won't land upstream in its
-> > > >> current form (no resemblence to a DRM driver at all). And let's not talk
-> > > >> about the userspace part.
-> > > >>
-> > > >> So, why should this be here?
-> > > > 
-> > > > The device tree is a representation of the hardware itself. The state
-> > > > of the driver support doesn't change the hardware you're running on,
-> > > > just like your BIOS/UEFI on x86 won't change the device it reports to
-> > > > Linux based on whether it has a driver for it.
-> > >
-> > > Like Emil already said, the new bindings and the DT entries are solely
-> > > introduced to support a proprietary out-of-tree module.
-> > 
-> > No. This new binding and the DT entries are solely introduced to
-> > describe a device found in a number of SoCs, just like any other DT
-> > binding we have.
-> > 
-> > > The current workflow when introducing new DT entries is the following:
-> > > - upstream a driver that uses the entries
-> > > - THEN add the new entries
-> > 
-> > And that's never been the preferred workflow, for *any* patches.
-> 
-> Actually it has. How else are you going to test that your driver really
-> works? You've got to have both pieces before you can verify that they're
-> both adequate. So the typical workflow is to:
-> 
-> 	1) define the bindings
-> 	2) write a driver that implements the bindings
-> 	3) add entries to device tree files
-> 
-> Usually it doesn't matter in which order you do the above because they
-> are all part of the same patch series. But that's not what you're doing
-> here. The more general problem here is that you're providing device tree
-> content (and therefore ABI) that's based on a binding which has no
-> upstream users. So you don't actually have a way of validating that what
-> you merge is going to be an adequate description.
-> 
-> You're probably going to respond: "but DT describes hardware, so it must
-> be known already, there won't be a need for changes". Unfortunately that
-> is only partially true. We've had a number of occasions where it later
-> turned out that a binding was in fact not an adequate description, and
-> then we've had to jump through hoops in order to preserve backwards
-> compatibility. That's already annoying enough if you've got in-tree
-> users, but it's going to be even more painful if you start out with an
-> out-of-tree user.
-> 
-> All of that said, you've got an Acked-by from Rob and that's about as
-> good as it's going to get. So I'm not going to NAK this. But I will
-> caution against this, because I don't think you're doing yourself any
-> favours with this.
-> 
-> So perhaps the question that we should ask is this: what do you gain by
-> merging this series? The fact remains that you don't have an upstream
-> driver that implements this binding, so ultimately you're going to be
-> carrying patches in some development tree anyway. Why not simply stash
-> these patches into the same tree? That should be about the same amount
-> of work for you and your users, but it has the advantage of not locking
-> you into something that you may regret.
 
-This is really a usability issue. I don't want the average Jane / Joe
-to have to patch and recompile the DT in order to get the GPU running
-on her / his distro of choice. The only thing that should be needed
-would be to install an (or a couple of) extra package in order to get
-everything running. Just like it's done for any other GPU out there,
-or wifi, disregarding whether it's supported upstream or not.
+On 2017/2/22 3:29, Laura Abbott wrote:
+> On 02/20/2017 10:05 PM, Chen Feng wrote:
+>> Hi Laura,
+>>
+>> When we enable kernel v4.4 or newer version on our platform, we meet the issue
+>> of flushing cache without reference device. It seems that this patch set is
+>> a solution. I'm curious the progress of the discussion. Do you have any plan
+>> to fix it in v4.4 and newer kernel verison?
+>>
+> 
+> No, I've abandoned this approach based on feedback. The APIs had too much
+> potential for incorrect usage. I'm ripping out the implicit caching in Ion
+> and switching it to a model where there should always be a device available.
+> 
+> What's your use case where you don't have a device structure?
+> 
+Userspace use ioctl to flush cache for device.
 
-Another nice thing is also that the mali bindings have been a huge
-mess so far. If we have a common bindings, everything will just work
-the same for all the platforms, and we can use the same driver there,
-allowing us at least to consolidate the source code.
+ion_sync_for_device
+	dma_sync_sg_for_device(NULL, buffer->sg_table->sgl,
+		 buffer->sg_table->nents, DMA_BIDIRECTIONAL);
 
-I'm not too afraid about getting something wrong. We already have code
-working for two different vendors, and all the other GPUs already
-described in DT (nvidia's, the Adreno) all have the same kind of
-binding that we have.
+And sys-heap when allocate a zero buffer flush zero data to ddr.
+alloc_buffer_page
+	ion_pages_sync_for_device(NULL, page, PAGE_SIZE << order,
+		DMA_BIDIRECTIONAL);
 
-Maxime
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170222/d94edd35/attachment.sig>
+
+> Thanks,
+> Laura
+> 
+>> On 2016/9/14 2:41, Laura Abbott wrote:
+>>> On 09/13/2016 08:14 AM, Will Deacon wrote:
+>>>> On Tue, Sep 13, 2016 at 08:02:20AM -0700, Laura Abbott wrote:
+>>>>> On 09/13/2016 02:19 AM, Will Deacon wrote:
+>>>>>> On Mon, Sep 12, 2016 at 02:32:56PM -0700, Laura Abbott wrote:
+>>>>>>>
+>>>>>>> arm64 may need to guarantee the caches are synced. Implement versions of
+>>>>>>> the kernel_force_cache API to allow this.
+>>>>>>>
+>>>>>>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>>>>>>> ---
+>>>>>>> v3: Switch to calling cache operations directly instead of relying on
+>>>>>>> DMA mapping.
+>>>>>>> ---
+>>>>>>> arch/arm64/include/asm/cacheflush.h |  8 ++++++++
+>>>>>>> arch/arm64/mm/cache.S               | 24 ++++++++++++++++++++----
+>>>>>>> arch/arm64/mm/flush.c               | 11 +++++++++++
+>>>>>>> 3 files changed, 39 insertions(+), 4 deletions(-)
+>>>>>>
+>>>>>> I'm really hesitant to expose these cache routines as an API solely to
+>>>>>> support a driver sitting in staging/. I appreciate that there's a chicken
+>>>>>> and egg problem here, but we *really* don't want people using these routines
+>>>>>> in preference to the DMA API, and I fear that we'll simply grow a bunch
+>>>>>> more users of these things if we promote it as an API like you're proposing.
+>>>>>>
+>>>>>> Can the code not be contained under staging/, as part of ion?
+>>>>>>
+>>>>>
+>>>>> I proposed that in V1 and it was suggested I make it a proper API
+>>>>>
+>>>>> http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47654.html
+>>>>> http://www.mail-archive.com/driverdev-devel at linuxdriverproject.org/msg47672.html
+>>>>
+>>>> :/ then I guess we're in disagreement. If ion really needs this stuff
+>>>> (which I don't fully grok), perhaps we should be exposing something at
+>>>> a higher level from the architecture, so it really can't be used for
+>>>> anything other than ion.
+>>>
+>>> I talked/complained about this at a past plumbers. The gist is that Ion
+>>> ends up acting as a fake DMA layer for clients. It doesn't match nicely
+>>> because clients can allocate both coherent and non-coherent memory.
+>>> Trying to use dma_map doesn't work because a) a device for coherency isn't
+>>> known at allocation time b) it kills performance. Part of the motivation
+>>> for taking this approach is to avoid the need to rework the existing
+>>> Android userspace and keep the existing behavior, as terrible as it
+>>> is. Having Ion out of staging and not actually usable isn't helpful.
+>>>
+>>> I'll give this all some more thought and hopefully have one or two more
+>>> proposals before Connect/Plumbers.
+>>>
+>>>>
+>>>> Will
+>>>>
+>>>
+>>> Thanks,
+>>> Laura
+>>> _______________________________________________
+>>> Linaro-mm-sig mailing list
+>>> Linaro-mm-sig at lists.linaro.org
+>>> https://lists.linaro.org/mailman/listinfo/linaro-mm-sig
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> 
+> 
+> .
+> 
