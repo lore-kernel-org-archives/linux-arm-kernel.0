@@ -1,38 +1,24 @@
-From: jk@ozlabs.org (Jeremy Kerr)
-Date: Thu, 23 Feb 2017 22:24:10 +0800
-Subject: [PATCH v3 01/18] drivers/fsi: Add empty fsi bus definitions
-In-Reply-To: <CAMuHMdUhiXCnjT60Lsqq4eGGnVv9eavtkVL1Mdk_6naBHBDVrQ@mail.gmail.com>
-References: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
- <20170201165358.45415-2-cbostic@linux.vnet.ibm.com>
- <CAMuHMdUhiXCnjT60Lsqq4eGGnVv9eavtkVL1Mdk_6naBHBDVrQ@mail.gmail.com>
-Message-ID: <53c63405-8aeb-9751-62d6-4583847dce3c@ozlabs.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 23 Feb 2017 14:45:50 +0000
+Subject: [PATCH] arm64: Fix the kernel panic() on QDF2400 platform
+In-Reply-To: <1487819448-8715-1-git-send-email-shankerd@codeaurora.org>
+References: <1487819448-8715-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <20170223144550.GE27512@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
->> --- /dev/null
->> +++ b/drivers/fsi/Kconfig
->> @@ -0,0 +1,12 @@
->> +#
->> +# FSI subsystem
->> +#
->> +
->> +menu "FSI support"
->> +
->> +config FSI
->> +       tristate "FSI support"
+On Wed, Feb 22, 2017 at 09:10:48PM -0600, Shanker Donthineni wrote:
+> The commit 38fd94b0 'arm64: Work around Falkor erratum 1003' has
+> been added to fix the hardware bug but causing a system crash.
+> The value of the register x1 which contains 'struct mm_struct *'
+> should be preserved inside macro pre_ttbr0_update_workaround.
 > 
-> I guess this should depend on some POWER symbol || COMPILE_TEST?
+> Macro pre_ttbr0_update_workaround expects 2nd and 3rd arguments
+> are temporary registers. Don't clobber register x1, Otherwise
+> the next load operation 'mmid x1 x1' access the invalid address.
 
-No, this is pretty hardware-independent - all it requires on the HW side
-is two GPIOs.
+Whilst I'm pleased that you've sent a fix (and I'll pick it up), I have
+to ask... did anybody actually test the original patch? If so, why wasn't
+this found earlier?
 
-Although the FSI slave devices are typically only present on POWER
-systems, they can be driven from anything, with currently
-implementations being on ARM and 32-bit powerpc.
-
-Cheers,
-
-
-Jeremy
+Will
