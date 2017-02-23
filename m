@@ -1,476 +1,54 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 23 Feb 2017 09:57:47 +0800
-Subject: [PATCH v1 2/2] coresight: add support for debug module
-In-Reply-To: <1487815067-27511-1-git-send-email-leo.yan@linaro.org>
-References: <1487815067-27511-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1487815067-27511-3-git-send-email-leo.yan@linaro.org>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Wed, 22 Feb 2017 21:10:48 -0600
+Subject: [PATCH] arm64: Fix the kernel panic() on QDF2400 platform
+Message-ID: <1487819448-8715-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Coresight includes debug module and usually the module connects with CPU
-debug logic. ARMv8 architecture reference manual (ARM DDI 0487A.k) has
-description for related info in "Part H: External Debug".
+The commit 38fd94b0 'arm64: Work around Falkor erratum 1003' has
+been added to fix the hardware bug but causing a system crash.
+The value of the register x1 which contains 'struct mm_struct *'
+should be preserved inside macro pre_ttbr0_update_workaround.
 
-Chapter H7 "The Sample-based Profiling Extension" introduces several
-sampling registers, e.g. we can check program counter value with
-combined CPU exception level, secure state, etc. So this is helpful for
-analysis CPU lockup scenarios, e.g. if one CPU has run into infinite
-loop with IRQ disabled. In this case the CPU cannot switch context and
-handle any interrupt (including IPIs), as the result it cannot handle
-SMP call for stack dump.
+Macro pre_ttbr0_update_workaround expects 2nd and 3rd arguments
+are temporary registers. Don't clobber register x1, Otherwise
+the next load operation 'mmid x1 x1' access the invalid address.
 
-This patch is to enable coresight debug module, so firstly this driver
-is to enable clocks for debug module and this is to ensure the debug
-module can be accessed from program or external debugger. And the driver
-uses sample-based registers for debug purpose, e.g. when system detects
-the CPU lockup and trigger panic, the driver will dump program counter
-and combined context registers (EDCIDSR, EDVIDSR); by parsing context
-registers so can quickly get to know CPU secure state, exception level,
-etc.
+[<ffff0000080989a0>] cpu_do_switch_mm+0x20/0x40
+[<ffff000008b18614>] efi_virtmap_load+0x34/0x40
+[<ffff000008b1812c>] virt_efi_get_next_variable+0x64/0xc8
+[<ffff000008b16204>] efivar_init+0x8c/0x348
+[<ffff0000092b777c>] efisubsys_init+0xd4/0x270
+[<ffff000009270c74>] do_one_initcall+0x80/0x110
+[<ffff000009270ea0>] kernel_init_freeable+0x19c/0x240
+[<ffff000008d8cef0>] kernel_init+0x10/0x100
+[<ffff000008082ec0>] ret_from_fork+0x10/0x50
+ Code: d5033fdf b340bc01 d5182001 d5033fdf (f9416821)
+ ---[ end trace 15247ca922eb6bb7 ]---
+ note: swapper/0[1] exited with preempt_count 2
+ Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
 
-Some of the debug module registers are located in CPU power domain, so
-in the driver it has checked the power state for CPU before accessing
-registers within CPU power domain. For most safe way to use this driver,
-it's suggested to disable CPU low power states, this can simply set
-"nohlt" in kernel command line.
+ SMP: stopping secondary CPUs
+ ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 ---
- drivers/hwtracing/coresight/Kconfig           |  10 +
- drivers/hwtracing/coresight/Makefile          |   1 +
- drivers/hwtracing/coresight/coresight-debug.c | 396 ++++++++++++++++++++++++++
- 3 files changed, 407 insertions(+)
- create mode 100644 drivers/hwtracing/coresight/coresight-debug.c
+ arch/arm64/mm/proc.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
-index 130cb21..2c8883b 100644
---- a/drivers/hwtracing/coresight/Kconfig
-+++ b/drivers/hwtracing/coresight/Kconfig
-@@ -89,4 +89,14 @@ config CORESIGHT_STM
- 	  logging useful software events or data coming from various entities
- 	  in the system, possibly running different OSs
- 
-+config CORESIGHT_DEBUG
-+	bool "CoreSight debug driver"
-+	depends on ARM || ARM64
-+	help
-+	  This driver provides support for coresight debugging module. This
-+	  is primarily used to dump sample-based profiling registers for
-+	  panic. By disable CPU low power states (like "nohlt" in kernel
-+	  command line), this is more safe and avoid lockup issue when
-+	  access debug module registers.
-+
- endif
-diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
-index af480d9..d540d45 100644
---- a/drivers/hwtracing/coresight/Makefile
-+++ b/drivers/hwtracing/coresight/Makefile
-@@ -16,3 +16,4 @@ obj-$(CONFIG_CORESIGHT_SOURCE_ETM4X) += coresight-etm4x.o \
- 					coresight-etm4x-sysfs.o
- obj-$(CONFIG_CORESIGHT_QCOM_REPLICATOR) += coresight-replicator-qcom.o
- obj-$(CONFIG_CORESIGHT_STM) += coresight-stm.o
-+obj-$(CONFIG_CORESIGHT_DEBUG) += coresight-debug.o
-diff --git a/drivers/hwtracing/coresight/coresight-debug.c b/drivers/hwtracing/coresight/coresight-debug.c
-new file mode 100644
-index 0000000..a109fef
---- /dev/null
-+++ b/drivers/hwtracing/coresight/coresight-debug.c
-@@ -0,0 +1,396 @@
-+/*
-+ * Copyright (c) 2017 Linaro Limited. All rights reserved.
-+ *
-+ * Author: Leo Yan <leo.yan@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ */
-+#include <linux/amba/bus.h>
-+#include <linux/coresight.h>
-+#include <linux/cpu.h>
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/moduleparam.h>
-+#include <linux/slab.h>
-+#include <linux/smp.h>
-+#include <linux/types.h>
-+#include <linux/uaccess.h>
-+
-+#include "coresight-priv.h"
-+
-+#define EDPCSR				0x0A0
-+#define EDCIDSR				0x0A4
-+#define EDVIDSR				0x0A8
-+#define EDPCSR_HI			0x0AC
-+#define EDOSLAR				0x300
-+#define EDPRSR				0x314
-+#define EDDEVID1			0xFC4
-+#define EDDEVID				0xFC8
-+
-+#define EDPCSR_PROHIBITED		0xFFFFFFFF
-+
-+/* bits definition for EDPCSR */
-+#ifndef CONFIG_64BIT
-+#define EDPCSR_THUMB			BIT(0)
-+#define EDPCSR_ARM_INST_MASK		GENMASK(31, 2)
-+#define EDPCSR_THUMB_INST_MASK		GENMASK(31, 1)
-+#endif
-+
-+/* bits definition for EDPRSR */
-+#define EDPRSR_DLK			BIT(6)
-+#define EDPRSR_PU			BIT(0)
-+
-+/* bits definition for EDVIDSR */
-+#define EDVIDSR_NS			BIT(31)
-+#define EDVIDSR_E2			BIT(30)
-+#define EDVIDSR_E3			BIT(29)
-+#define EDVIDSR_HV			BIT(28)
-+#define EDVIDSR_VMID			GENMASK(7, 0)
-+
-+/* bits definition for EDDEVID1 */
-+#define EDDEVID1_PCSR_OFFSET_MASK	GENMASK(3, 0)
-+#define EDDEVID1_PCSR_OFFSET_INS_SET	(0x0)
-+#define EDDEVID1_PCSR_NO_OFFSET		(0x1)
-+
-+/* bits definition for EDDEVID */
-+#define EDDEVID_PCSAMPLE_MODE		GENMASK(3, 0)
-+#define EDDEVID_IMPL_NONE		(0x0)
-+#define EDDEVID_IMPL_EDPCSR_EDCIDSR	(0x2)
-+#define EDDEVID_IMPL_FULL		(0x3)
-+
-+struct debug_drvdata {
-+	void __iomem	*base;
-+	struct device	*dev;
-+	int		cpu;
-+	struct clk	*dbg_clk;
-+
-+	bool		edpcsr_present;
-+	bool		edvidsr_present;
-+	bool		pc_has_offset;
-+
-+	u32		eddevid;
-+	u32		eddevid1;
-+
-+	u32		edpcsr;
-+	u32		edpcsr_hi;
-+	u32		edprsr;
-+	u32		edvidsr;
-+	u32		edcidsr;
-+};
-+
-+static int debug_count;
-+static DEFINE_PER_CPU(struct debug_drvdata *, debug_drvdata);
-+
-+static void debug_os_unlock(struct debug_drvdata *drvdata)
-+{
-+	/* Unlocks the debug registers */
-+	writel_relaxed(0x0, drvdata->base + EDOSLAR);
-+	wmb();
-+}
-+
-+/*
-+ * According to ARM DDI 0487A.k, before access external debug
-+ * registers should firstly check the access permission; if any
-+ * below condition has been met then cannot access debug
-+ * registers to avoid lockup issue:
-+ *
-+ * - CPU power domain is powered off;
-+ * - The OS Double Lock is locked;
-+ *
-+ * By checking EDPRSR can get to know if meet these conditions.
-+ */
-+static bool debug_access_permit(struct debug_drvdata *drvdata)
-+{
-+	/* CPU is powered off */
-+	if (!(drvdata->edprsr & EDPRSR_PU))
-+		return false;
-+
-+	/* The OS Double Lock is locked */
-+	if (drvdata->edprsr & EDPRSR_DLK)
-+		return false;
-+
-+	return true;
-+}
-+
-+static void debug_read_regs(struct debug_drvdata *drvdata)
-+{
-+	drvdata->edprsr = readl_relaxed(drvdata->base + EDPRSR);
-+
-+	if (!debug_access_permit(drvdata))
-+		return;
-+
-+	if (!drvdata->edpcsr_present)
-+		return;
-+
-+	CS_UNLOCK(drvdata->base);
-+
-+	debug_os_unlock(drvdata);
-+
-+	drvdata->edpcsr = readl_relaxed(drvdata->base + EDPCSR);
-+
-+	/*
-+	 * As described in ARM DDI 0487A.k, if the processing
-+	 * element (PE) is in debug state, or sample-based
-+	 * profiling is prohibited, EDPCSR reads as 0xFFFFFFFF;
-+	 * EDCIDSR, EDVIDSR and EDPCSR_HI registers also become
-+	 * UNKNOWN state. So directly bail out for this case.
-+	 */
-+	if (drvdata->edpcsr == EDPCSR_PROHIBITED) {
-+		CS_LOCK(drvdata->base);
-+		return;
-+	}
-+
-+	/*
-+	 * A read of the EDPCSR normally has the side-effect of
-+	 * indirectly writing to EDCIDSR, EDVIDSR and EDPCSR_HI;
-+	 * at this point it's safe to read value from them.
-+	 */
-+	drvdata->edcidsr = readl_relaxed(drvdata->base + EDCIDSR);
-+#ifdef CONFIG_64BIT
-+	drvdata->edpcsr_hi = readl_relaxed(drvdata->base + EDPCSR_HI);
-+#endif
-+
-+	if (drvdata->edvidsr_present)
-+		drvdata->edvidsr = readl_relaxed(drvdata->base + EDVIDSR);
-+
-+	CS_LOCK(drvdata->base);
-+}
-+
-+#ifndef CONFIG_64BIT
-+static bool debug_pc_has_offset(struct debug_drvdata *drvdata)
-+{
-+	u32 pcsr_offset;
-+
-+	pcsr_offset = drvdata->eddevid1 & EDDEVID1_PCSR_OFFSET_MASK;
-+
-+	return (pcsr_offset == EDDEVID1_PCSR_OFFSET_INS_SET);
-+}
-+
-+static unsigned long debug_adjust_pc(struct debug_drvdata *drvdata,
-+				     unsigned long pc)
-+{
-+	unsigned long arm_inst_offset = 0, thumb_inst_offset = 0;
-+
-+	if (debug_pc_has_offset(drvdata)) {
-+		arm_inst_offset = 8;
-+		thumb_inst_offset = 4;
-+	}
-+
-+	/* Handle thumb instruction */
-+	if (pc & EDPCSR_THUMB) {
-+		pc = (pc & EDPCSR_THUMB_INST_MASK) - thumb_inst_offset;
-+		return pc;
-+	}
-+
-+	/*
-+	 * Handle arm instruction offset, if the arm instruction
-+	 * is not 4 byte alignment then it's possible the case
-+	 * for implementation defined; keep original value for this
-+	 * case and print info for notice.
-+	 */
-+	if (pc & BIT(1))
-+		pr_emerg("Instruction offset is implementation defined\n");
-+	else
-+		pc = (pc & EDPCSR_ARM_INST_MASK) - arm_inst_offset;
-+
-+	return pc;
-+}
-+#endif
-+
-+static void debug_dump_regs(struct debug_drvdata *drvdata)
-+{
-+	unsigned long pc;
-+
-+	pr_emerg("\tEDPRSR:  %08x (Power:%s DLK:%s)\n", drvdata->edprsr,
-+		 drvdata->edprsr & EDPRSR_PU ? "On" : "Off",
-+		 drvdata->edprsr & EDPRSR_DLK ? "Lock" : "Unlock");
-+
-+	if (!debug_access_permit(drvdata) || !drvdata->edpcsr_present) {
-+		pr_emerg("No permission to access debug registers!\n");
-+		return;
-+	}
-+
-+	if (drvdata->edpcsr == EDPCSR_PROHIBITED) {
-+		pr_emerg("CPU is in Debug state or profiling is prohibited!\n");
-+		return;
-+	}
-+
-+#ifdef CONFIG_64BIT
-+	pc = (unsigned long)drvdata->edpcsr_hi << 32 |
-+	     (unsigned long)drvdata->edpcsr;
-+#else
-+	pc = debug_adjust_pc(drvdata, (unsigned long)drvdata->edpcsr);
-+#endif
-+
-+	pr_emerg("\tEDPCSR:  [<%p>] %pS\n", (void *)pc, (void *)pc);
-+	pr_emerg("\tEDCIDSR: %08x\n", drvdata->edcidsr);
-+
-+	if (!drvdata->edvidsr_present)
-+		return;
-+
-+	pr_emerg("\tEDVIDSR: %08x (State:%s Mode:%s Width:%s VMID:%x)\n",
-+		 drvdata->edvidsr,
-+		 drvdata->edvidsr & EDVIDSR_NS ? "Non-secure" : "Secure",
-+		 drvdata->edvidsr & EDVIDSR_E3 ? "EL3" :
-+			(drvdata->edvidsr & EDVIDSR_E2 ? "EL2" : "EL1/0"),
-+		 drvdata->edvidsr & EDVIDSR_HV ? "64bits" : "32bits",
-+		 drvdata->edvidsr & (u32)EDVIDSR_VMID);
-+}
-+
-+/*
-+ * Dump out information on panic.
-+ */
-+static int debug_notifier_call(struct notifier_block *self,
-+			       unsigned long v, void *p)
-+{
-+	int cpu;
-+
-+	pr_emerg("ARM external debug module:\n");
-+
-+	for_each_possible_cpu(cpu) {
-+
-+		if (!per_cpu(debug_drvdata, cpu))
-+			continue;
-+
-+		pr_emerg("CPU[%d]:\n", per_cpu(debug_drvdata, cpu)->cpu);
-+
-+		debug_read_regs(per_cpu(debug_drvdata, cpu));
-+		debug_dump_regs(per_cpu(debug_drvdata, cpu));
-+	}
-+
-+	return 0;
-+}
-+
-+static struct notifier_block debug_notifier = {
-+	.notifier_call = debug_notifier_call,
-+};
-+
-+static void debug_init_arch_data(void *info)
-+{
-+	struct debug_drvdata *drvdata = info;
-+	u32 mode;
-+
-+	CS_UNLOCK(drvdata->base);
-+
-+	debug_os_unlock(drvdata);
-+
-+	/* Read device info */
-+	drvdata->eddevid  = readl_relaxed(drvdata->base + EDDEVID);
-+	drvdata->eddevid1 = readl_relaxed(drvdata->base + EDDEVID1);
-+
-+	/* Parse implementation feature */
-+	mode = drvdata->eddevid & EDDEVID_PCSAMPLE_MODE;
-+	if (mode == EDDEVID_IMPL_FULL) {
-+		drvdata->edpcsr_present  = true;
-+		drvdata->edvidsr_present = true;
-+	} else if (mode == EDDEVID_IMPL_EDPCSR_EDCIDSR) {
-+		drvdata->edpcsr_present  = true;
-+		drvdata->edvidsr_present = false;
-+	} else {
-+		drvdata->edpcsr_present  = false;
-+		drvdata->edvidsr_present = false;
-+	}
-+
-+	CS_LOCK(drvdata->base);
-+}
-+
-+static int debug_probe(struct amba_device *adev, const struct amba_id *id)
-+{
-+	int ret;
-+	void __iomem *base;
-+	struct device *dev = &adev->dev;
-+	struct coresight_platform_data *pdata = NULL;
-+	struct debug_drvdata *drvdata;
-+	struct resource *res = &adev->res;
-+	struct device_node *np = adev->dev.of_node;
-+
-+	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
-+	if (!drvdata)
-+		return -ENOMEM;
-+
-+	if (np) {
-+		pdata = of_get_coresight_platform_data(dev, np);
-+		if (IS_ERR(pdata))
-+			return PTR_ERR(pdata);
-+		adev->dev.platform_data = pdata;
-+	}
-+
-+	drvdata->dev = &adev->dev;
-+	drvdata->dbg_clk = devm_clk_get(&adev->dev, "dbg_clk");
-+	if (IS_ERR(drvdata->dbg_clk)) {
-+		dev_err(dev, "debug clock initialization failed.\n");
-+		return PTR_ERR(drvdata->dbg_clk);
-+	}
-+
-+	ret = clk_prepare_enable(drvdata->dbg_clk);
-+	if (ret)
-+		return ret;
-+
-+	dev_set_drvdata(dev, drvdata);
-+
-+	/* Validity for the resource is already checked by the AMBA core */
-+	base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	drvdata->base = base;
-+	drvdata->cpu = pdata ? pdata->cpu : 0;
-+
-+	get_online_cpus();
-+	per_cpu(debug_drvdata, drvdata->cpu) = drvdata;
-+
-+	if (smp_call_function_single(drvdata->cpu,
-+				debug_init_arch_data, drvdata, 1))
-+		dev_err(dev, "Debug arch init failed\n");
-+
-+	if (!debug_count++)
-+		atomic_notifier_chain_register(&panic_notifier_list,
-+					       &debug_notifier);
-+	put_online_cpus();
-+
-+	dev_info(dev, "%s initialized\n", (char *)id->data);
-+	return 0;
-+}
-+
-+static struct amba_id debug_ids[] = {
-+	{       /* Debug for Cortex-A53 */
-+		.id	= 0x000bbd03,
-+		.mask	= 0x000fffff,
-+		.data	= "debug",
-+	},
-+	{       /* Debug for Cortex-A57 */
-+		.id	= 0x000bbd07,
-+		.mask	= 0x000fffff,
-+		.data	= "debug",
-+	},
-+	{       /* Debug for Cortex-A72 */
-+		.id	= 0x000bbd08,
-+		.mask	= 0x000fffff,
-+		.data	= "debug",
-+	},
-+	{ 0, 0},
-+};
-+
-+static struct amba_driver debug_driver = {
-+	.drv = {
-+		.name   = "coresight-debug",
-+		.suppress_bind_attrs = true,
-+	},
-+	.probe		= debug_probe,
-+	.id_table	= debug_ids,
-+};
-+builtin_amba_driver(debug_driver);
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index cd4d53d..877d42f 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -138,7 +138,7 @@ ENDPROC(cpu_do_resume)
+  *	- pgd_phys - physical address of new TTB
+  */
+ ENTRY(cpu_do_switch_mm)
+-	pre_ttbr0_update_workaround x0, x1, x2
++	pre_ttbr0_update_workaround x0, x2, x3
+ 	mmid	x1, x1				// get mm->context.id
+ 	bfi	x0, x1, #48, #16		// set the ASID
+ 	msr	ttbr0_el1, x0			// set TTBR0
 -- 
-2.7.4
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
