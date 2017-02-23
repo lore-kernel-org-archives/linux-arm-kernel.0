@@ -1,37 +1,60 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Thu, 23 Feb 2017 02:35:26 +0100
-Subject: [PATCH 2/2] usb: gadget: Add test if argument pointer has a valid
- value in pxa27x_udc
-In-Reply-To: <cover.1487812323.git.petr.cvek@tul.cz>
-References: <cover.1487812323.git.petr.cvek@tul.cz>
-Message-ID: <3c2b75a6-55ec-bf5e-1f84-4c9a50e04660@tul.cz>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 23 Feb 2017 09:57:45 +0800
+Subject: [PATCH v1 0/2] coresight: enable debug module
+Message-ID: <1487815067-27511-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move call usb_put_phy(udc->transceiver) inside a valid pointer test.
+ARMv8 architecture reference manual (ARM DDI 0487A.k) Chapter H7 "The
+Sample-based Profiling Extension" has description for sampling
+registers, we can utilize these registers to check program counter
+value with combined CPU exception level, secure state, etc. So this is
+helpful for CPU lockup bugs, e.g. if one CPU has run into infinite loop
+with IRQ disabled; the 'hang' CPU cannot switch context and handle any
+interrupt, so it cannot handle SMP call for stack dump, etc.
 
-Reported-by: robert.jarzmik at free.fr
-Signed-off-by: Petr Cvek <petr.cvek@tul.cz>
----
- drivers/usb/gadget/udc/pxa27x_udc.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+This patch series is to enable coresight debug module with sample-based
+registers and register call back notifier for PCSR register dumping
+when panic happens, so we can see below dumping info for panic; and
+this patch series has considered the conditions for access permission
+for debug registers self, so this can avoid access debug registers when
+CPU power domain is off; the driver also try to figure out the CPU is
+in secure or non-secure state.
 
-diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
-index 6fa675bf2c6f..9d2e1a8aa69d 100644
---- a/drivers/usb/gadget/udc/pxa27x_udc.c
-+++ b/drivers/usb/gadget/udc/pxa27x_udc.c
-@@ -2531,9 +2531,10 @@ static int pxa_udc_remove(struct platform_device *_dev)
- 	usb_del_gadget_udc(&udc->gadget);
- 	pxa_cleanup_debugfs(udc);
- 
--	if (!IS_ERR_OR_NULL(udc->transceiver))
-+	if (!IS_ERR_OR_NULL(udc->transceiver)) {
- 		usb_unregister_notifier(udc->transceiver, &pxa27x_udc_phy);
--	usb_put_phy(udc->transceiver);
-+		usb_put_phy(udc->transceiver);
-+	}
- 
- 	udc->transceiver = NULL;
- 	the_controller = NULL;
+ARM external debug module:
+CPU[0]:
+ EDPRSR:  0000000b (Power:On DLK:Unlock)
+ EDPCSR:  [<ffff00000808eb54>] handle_IPI+0xe4/0x150
+ EDCIDSR: 00000000
+ EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+CPU[1]:
+ EDPRSR:  0000000b (Power:On DLK:Unlock)
+ EDPCSR:  [<ffff0000087a64c0>] debug_notifier_call+0x108/0x288
+ EDCIDSR: 00000000
+ EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+
+[...]
+
+This patch series has been verified on 96boards Hikey.
+
+Changes from RFC:
+* According to Mike Leach suggestion, added check for EDPRSR to avoid
+  lockup; added supporting EDVIDSR and EDCIDSR registers;
+* According to Mark Rutland and Mathieu Poirier suggestion, rewrote
+  the documentation for DT binding;
+* According to Mark and Mathieu suggestion, refined debug driver;
+
+Leo Yan (2):
+  coresight: bindings for debug module
+  coresight: add support for debug module
+
+ .../devicetree/bindings/arm/coresight-debug.txt    |  39 ++
+ drivers/hwtracing/coresight/Kconfig                |  10 +
+ drivers/hwtracing/coresight/Makefile               |   1 +
+ drivers/hwtracing/coresight/coresight-debug.c      | 396 +++++++++++++++++++++
+ 4 files changed, 446 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/coresight-debug.txt
+ create mode 100644 drivers/hwtracing/coresight/coresight-debug.c
+
 -- 
-2.11.0
+2.7.4
