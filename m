@@ -1,68 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Feb 2017 10:26:52 +0000
-Subject: [PATCH v2 17/22] ARM: KVM: Convert __cpu_reset_hyp_mode to using
- __hyp_reset_vectors
+Date: Thu, 23 Feb 2017 10:26:42 +0000
+Subject: [PATCH v2 07/22] ARM: hyp-stub: improve ABI
 In-Reply-To: <20170223102657.23100-1-marc.zyngier@arm.com>
 References: <20170223102657.23100-1-marc.zyngier@arm.com>
-Message-ID: <20170223102657.23100-18-marc.zyngier@arm.com>
+Message-ID: <20170223102657.23100-8-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are now able to use the hyp stub to reset HYP mode. Time to
-kiss __kvm_hyp_reset goodbye, and use __hyp_reset_vectors.
+From: Russell King <rmk+kernel@armlinux.org.uk>
 
+Improve the hyp-stub ABI to allow it to do more than just get/set the
+vectors.  We follow the example in ARM64, where r0 is used as an opcode
+with the other registers as an argument.
+
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_asm.h  | 2 --
- arch/arm/include/asm/kvm_host.h | 2 +-
- arch/arm/kvm/init.S             | 2 --
- 3 files changed, 1 insertion(+), 5 deletions(-)
+ arch/arm/kernel/hyp-stub.S | 27 ++++++++++++++++++++++-----
+ 1 file changed, 22 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 8ef05381984b..7ccb6f1aac5b 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -72,8 +72,6 @@ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 15d073ae5da2..f3e9ba5fb642 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -22,6 +22,9 @@
+ #include <asm/assembler.h>
+ #include <asm/virt.h>
  
- extern void __init_stage2_translation(void);
++#define HVC_GET_VECTORS 0
++#define HVC_SET_VECTORS 1
++
+ #ifndef ZIMAGE
+ /*
+  * For the kernel proper, we need to find out the CPU boot mode long after
+@@ -202,9 +205,19 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
+ ENDPROC(__hyp_stub_install_secondary)
  
--extern void __kvm_hyp_reset(unsigned long);
--
- extern u64 __vgic_v3_get_ich_vtr_el2(void);
- extern void __vgic_v3_init_lrs(void);
- #endif
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index d5423ab15ed5..42774c6f458d 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -277,7 +277,7 @@ static inline void __cpu_init_stage2(void)
- static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
- 					phys_addr_t phys_idmap_start)
- {
--	kvm_call_hyp((void *)virt_to_idmap(__kvm_hyp_reset), vector_ptr);
-+	__hyp_reset_vectors();
- }
+ __hyp_stub_do_trap:
+-	cmp	r0, #-1
+-	mrceq	p15, 4, r0, c12, c0, 0	@ get HVBAR
+-	mcrne	p15, 4, r0, c12, c0, 0	@ set HVBAR
++	teq	r0, #HVC_GET_VECTORS
++	bne	1f
++	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
++	b	__hyp_stub_exit
++
++1:	teq	r0, #HVC_SET_VECTORS
++	bne	1f
++	mcr	p15, 4, r1, c12, c0, 0	@ set HVBAR
++	b	__hyp_stub_exit
++
++1:	mov	r0, #-1
++
++__hyp_stub_exit:
+ 	__ERET
+ ENDPROC(__hyp_stub_do_trap)
  
- static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 0da120b71c2e..7335a510eee4 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -129,7 +129,6 @@ ENTRY(__kvm_handle_stub_hvc)
- 
- 1:	cmp	r0, #HVC_RESET_VECTORS
- 	bne	1f
--ENTRY(__kvm_hyp_reset)
- 	/* We're now in idmap, disable MMU */
- 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
- 	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
-@@ -151,7 +150,6 @@ ENTRY(__kvm_hyp_reset)
- exit:
- 	eret
- ENDPROC(__kvm_handle_stub_hvc)
--ENDPROC(__kvm_hyp_reset)
- 
- 	.ltorg
- 
+@@ -231,10 +244,14 @@ ENDPROC(__hyp_stub_do_trap)
+  * initialisation entry point.
+  */
+ ENTRY(__hyp_get_vectors)
+-	mov	r0, #-1
++	mov	r0, #HVC_GET_VECTORS
++	__HVC(0)
++	ret	lr
+ ENDPROC(__hyp_get_vectors)
+-	@ fall through
++
+ ENTRY(__hyp_set_vectors)
++	mov	r1, r0
++	mov	r0, #HVC_SET_VECTORS
+ 	__HVC(0)
+ 	ret	lr
+ ENDPROC(__hyp_set_vectors)
 -- 
 2.11.0
