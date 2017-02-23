@@ -1,54 +1,57 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Thu, 23 Feb 2017 11:54:46 -0800
-Subject: [RFC/PATCH] of: Mark property::value as const
-In-Reply-To: <20170214025040.23955-1-stephen.boyd@linaro.org>
-References: <20170214025040.23955-1-stephen.boyd@linaro.org>
-Message-ID: <58AF3E06.4030701@gmail.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Thu, 23 Feb 2017 14:02:05 -0600
+Subject: [PATCH v2] arm64: Fix the kernel panic() on QDF2400 platform
+Message-ID: <1487880125-1371-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/17 18:50, Stephen Boyd wrote:
-> The 'blob' we pass into populate_properties() is marked as const,
-> but we cast that const away when we assign the result of
-> fdt_getprop_by_offset() to pp->value. Let's mark value as const
-> instead, so that code can't mistakenly write to the value of the
-> property that we've so far advertised as const.
-> 
-> Unfortunately, this exposes a problem with the fdt resolver code,
-> where we overwrite the value member of properties of phandles to
-> update them with their final value. Add a comment for now to
-> indicate where we're potentially writing over const data.
+The commit 38fd94b0275c 'arm64: Work around Falkor erratum 1003' has
+been added to fix the hardware bug but causing a system crash. The
+value of the register x1 which contains 'struct mm_struct *' should
+be preserved inside macro pre_ttbr0_update_workaround.
 
-The resolver should not be over writing anything in the FDT.  I'll
-look at what is going on there.
+Macro pre_ttbr0_update_workaround expects 2nd and 3rd arguments are
+temporary registers. Don't clobber register x1, Otherwise the next
+load operation 'mmid x1 x1' access the invalid address.
 
-The FDT we expose to user space should be the FDT we booted with,
-not something later modified.
+[<ffff0000080989a0>] cpu_do_switch_mm+0x20/0x40
+[<ffff000008b18614>] efi_virtmap_load+0x34/0x40
+[<ffff000008b1812c>] virt_efi_get_next_variable+0x64/0xc8
+[<ffff000008b16204>] efivar_init+0x8c/0x348
+[<ffff0000092b777c>] efisubsys_init+0xd4/0x270
+[<ffff000009270c74>] do_one_initcall+0x80/0x110
+[<ffff000009270ea0>] kernel_init_freeable+0x19c/0x240
+[<ffff000008d8cef0>] kernel_init+0x10/0x100
+[<ffff000008082ec0>] ret_from_fork+0x10/0x50
+ Code: d5033fdf b340bc01 d5182001 d5033fdf (f9416821)
+ ---[ end trace 15247ca922eb6bb7 ]---
+ note: swapper/0[1] exited with preempt_count 2
+ Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
 
--Frank
+ SMP: stopping secondary CPUs
+ ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
 
-> 
-> You can see the problem here by loading an overlay dtb into
-> the kernel via the request firmware helper method (not direct
-> loading) and then passing that tree to the resolver on an arm64
-> device. In this case, the firmware data is vmapped with KERNEL_PAGE_RO
-> and the code crashes when attempting to write to the blob to update
-> the phandle properties.
-> 
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
-> 
-> I was thinking perhaps it would work to store another __be32 variant
-> of the phandle in each device node, but then we still have a problem
-> with properties that have phandles inside them at some offset that we
-> need to update. I guess the only real solution is to deep copy the
-> property in that case and then save around some info to free the
-> duplicated property later on?
-> 
->  drivers/of/base.c     |  2 +-
->  drivers/of/fdt.c      | 12 ++++++------
->  drivers/of/resolver.c |  3 +++
->  include/linux/of.h    |  2 +-
->  4 files changed, 11 insertions(+), 8 deletions(-)
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+Tested-by: Manoj Iyer <manoj.iyer@canonical.com>
+---
+v2: include 12 digit commit-id in commit description.
 
-< snip >
+ arch/arm64/mm/proc.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index cd4d53d..877d42f 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -138,7 +138,7 @@ ENDPROC(cpu_do_resume)
+  *	- pgd_phys - physical address of new TTB
+  */
+ ENTRY(cpu_do_switch_mm)
+-	pre_ttbr0_update_workaround x0, x1, x2
++	pre_ttbr0_update_workaround x0, x2, x3
+ 	mmid	x1, x1				// get mm->context.id
+ 	bfi	x0, x1, #48, #16		// set the ASID
+ 	msr	ttbr0_el1, x0			// set TTBR0
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
