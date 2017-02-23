@@ -1,38 +1,80 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 23 Feb 2017 13:51:10 +0100
-Subject: [PATCH] ARM: dts: BCM5301X: Add basic DT for Linksys EA9500
-In-Reply-To: <5c57772b-71fd-d9e2-efe6-1175cf048e0b@openwrt.org>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Thu, 23 Feb 2017 13:56:12 +0100
+Subject: [PATCH V2] ARM: dts: BCM5301X: Add basic DT for Linksys EA9500
+In-Reply-To: <20170223104025.5755-1-zajec5@gmail.com>
 References: <20170223104025.5755-1-zajec5@gmail.com>
- <bd36df47-cefe-5736-e02c-621a21ae1b7a@openwrt.org>
- <CACna6rzN-OQv4UJoRso_Kyf1rCEtuU5Lu9LDjvTTt011UgrA=Q@mail.gmail.com>
- <5c57772b-71fd-d9e2-efe6-1175cf048e0b@openwrt.org>
-Message-ID: <CACna6rzeuy+-0cQCUCrXYBnLv-twrzVvd65L6LANPPejarWAWQ@mail.gmail.com>
+Message-ID: <20170223125612.2394-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 February 2017 at 13:44, Imre Kaloz <kaloz@openwrt.org> wrote:
-> On 2017-02-23 13:29, Rafa? Mi?ecki wrote:
->>
->> On 23 February 2017 at 13:27, Imre Kaloz <kaloz@openwrt.org> wrote:
->>>
->>> As discussed for other platforms as well, please use the board's name as
->>> the
->>> same board can end up being sold under multiple model numbers.
->>>
->>> So please rename the file to bcm47094-linksys-panamera.dts
->>
->> Huh? Where did you get panamera name from?!
->
-> Your manners shine on these dark days of winter. For about a decade now,
-> http://192.168.1.1/sysinfo.cgi will show you quite a bit of information if
-> you are too lazy to look into the GPL tarball or at the original bootlogs.
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Sadly Linksys doesn't sponsor me or provide me any hardware. The
-bootlogs I found:
-https://www.snbforums.com/threads/ea9500-serial-console-to-cfe.35228/
-http://www.dd-wrt.com/phpBB2/viewtopic.php?t=288470&start=30
-didn't include board name. As you probably can guess
-http://192.168.1.1/ was useful in my case as well.
+It's tri-band wireless home router based on BCM47094 AKA BCM4709C0. It
+uses 3 x BCM4366 chipsets for wireless.
+Panamera seems to be board name used by Linksys.
 
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+V2: Use panamera board name
+---
+ arch/arm/boot/dts/Makefile                      |  1 +
+ arch/arm/boot/dts/bcm47094-linksys-panamera.dts | 36 +++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm47094-linksys-panamera.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 52a05289c538..2feabbe16d53 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -93,6 +93,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4709-netgear-r8000.dtb \
+ 	bcm4709-tplink-archer-c9-v1.dtb \
+ 	bcm47094-dlink-dir-885l.dtb \
++	bcm47094-linksys-panamera.dtb \
+ 	bcm47094-luxul-xwr-3100.dtb \
+ 	bcm47094-netgear-r8500.dtb \
+ 	bcm94708.dtb \
+diff --git a/arch/arm/boot/dts/bcm47094-linksys-panamera.dts b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
+new file mode 100644
+index 000000000000..31639e5b8c72
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm47094-linksys-panamera.dts
+@@ -0,0 +1,36 @@
++/*
++ * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
++ *
++ * Licensed under the ISC license.
++ */
++
++/dts-v1/;
++
++#include "bcm47094.dtsi"
++#include "bcm5301x-nand-cs0-bch8.dtsi"
++
++/ {
++	compatible = "linksys,ea9500", "brcm,bcm47094", "brcm,bcm4708";
++	model = "Linksys EA9500";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000
++		       0x88000000 0x08000000>;
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		wps {
++			label = "WPS";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
 -- 
-Rafa?
+2.11.0
