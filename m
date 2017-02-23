@@ -1,25 +1,75 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 23 Feb 2017 11:32:39 +0100
-Subject: [PATCH 2/2] drivers: pwm: pwm-atmel: add support to allow run
- time changing of pwm parameters
-In-Reply-To: <f963def2-6d82-3bf7-22fa-8915f408ca54@microchip.com>
-References: <1487839120-13650-1-git-send-email-claudiu.beznea@microchip.com>
- <1487839120-13650-3-git-send-email-claudiu.beznea@microchip.com>
- <20170223092148.5qmxy62xkufwbsrw@piout.net>
- <f963def2-6d82-3bf7-22fa-8915f408ca54@microchip.com>
-Message-ID: <20170223103239.tv6nodddlar5l5fl@piout.net>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Thu, 23 Feb 2017 11:40:25 +0100
+Subject: [PATCH] ARM: dts: BCM5301X: Add basic DT for Linksys EA9500
+Message-ID: <20170223104025.5755-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/02/2017 at 12:25:58 +0200, m18063 wrote:
-> > It is probably worth switching to atomic PWM instead of changing this
-> > function. This would simplify the whole driver.
-> I was thinking to switch to atomic PWM in a future patch.
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Then why wait ?
+It's tri-band wireless home router based on BCM47094 AKA BCM4709C0. It
+uses 3 x BCM4366 chipsets for wireless.
 
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+ arch/arm/boot/dts/Makefile                    |  1 +
+ arch/arm/boot/dts/bcm47094-linksys-ea9500.dts | 36 +++++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm47094-linksys-ea9500.dts
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 52a05289c538..931db0b41246 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -93,6 +93,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+ 	bcm4709-netgear-r8000.dtb \
+ 	bcm4709-tplink-archer-c9-v1.dtb \
+ 	bcm47094-dlink-dir-885l.dtb \
++	bcm47094-linksys-ea9500.dtb \
+ 	bcm47094-luxul-xwr-3100.dtb \
+ 	bcm47094-netgear-r8500.dtb \
+ 	bcm94708.dtb \
+diff --git a/arch/arm/boot/dts/bcm47094-linksys-ea9500.dts b/arch/arm/boot/dts/bcm47094-linksys-ea9500.dts
+new file mode 100644
+index 000000000000..31639e5b8c72
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm47094-linksys-ea9500.dts
+@@ -0,0 +1,36 @@
++/*
++ * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
++ *
++ * Licensed under the ISC license.
++ */
++
++/dts-v1/;
++
++#include "bcm47094.dtsi"
++#include "bcm5301x-nand-cs0-bch8.dtsi"
++
++/ {
++	compatible = "linksys,ea9500", "brcm,bcm47094", "brcm,bcm4708";
++	model = "Linksys EA9500";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	memory {
++		reg = <0x00000000 0x08000000
++		       0x88000000 0x08000000>;
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		wps {
++			label = "WPS";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.11.0
