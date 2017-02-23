@@ -1,99 +1,95 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 23 Feb 2017 16:05:38 +0800
-Subject: [PATCH 06/11] drm/sun4i: Drop primary layer pointer from sun4i_drv
+Date: Thu, 23 Feb 2017 16:05:43 +0800
+Subject: [PATCH 11/11] drm/sun4i: Add backend and tcon pointers to sun4i_crtc
 In-Reply-To: <20170223080543.6659-1-wens@csie.org>
 References: <20170223080543.6659-1-wens@csie.org>
-Message-ID: <20170223080543.6659-7-wens@csie.org>
+Message-ID: <20170223080543.6659-12-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current layer init code keeps a pointer to the primary plane layer
-in sun4i_drv. When we eventually support multiple display pipelines,
-this would force us to keep track of primary planes for all crtcs. And
-these pointers only get used at bind time.
+sun4i_crtc controls the backend and tcon hardware blocks of the display
+pipeline. Instead of doing so through the master drm structure, leave
+pointers to the corresponding backend and tcon in itself.
 
-Instead, have the crtc init code iterate through the returned layers
-to find the primary and cursor layers. And drop the pointer from the
-sun4i_drv structure.
+Also drop the drm_device pointer, since it is no longer needed.
+
+The next step forward would be to pass the pointers in through
+sun4i_crtc_init as parameters. This would make it easier to support
+multiple display pipelines layer on.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_crtc.c  | 25 +++++++++++++++++++++----
- drivers/gpu/drm/sun4i/sun4i_drv.h   |  1 -
- drivers/gpu/drm/sun4i/sun4i_layer.c |  3 ---
- 3 files changed, 21 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_crtc.c | 12 +++++-------
+ drivers/gpu/drm/sun4i/sun4i_crtc.h |  3 ++-
+ 2 files changed, 7 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-index 1d01667fa45d..cb1a901bc389 100644
+index 4a30932643c3..018239870a0b 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-@@ -119,7 +119,8 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm)
+@@ -52,12 +52,11 @@ static void sun4i_crtc_atomic_flush(struct drm_crtc *crtc,
+ 				    struct drm_crtc_state *old_state)
  {
- 	struct sun4i_drv *drv = drm->dev_private;
- 	struct sun4i_crtc *scrtc;
--	int ret;
-+	struct drm_plane *primary = NULL, *cursor = NULL;
-+	int ret, i;
+ 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
+-	struct sun4i_drv *drv = scrtc->drv;
+ 	struct drm_pending_vblank_event *event = crtc->state->event;
  
+ 	DRM_DEBUG_DRIVER("Committing plane changes\n");
+ 
+-	sun4i_backend_commit(drv->backend);
++	sun4i_backend_commit(scrtc->backend);
+ 
+ 	if (event) {
+ 		crtc->state->event = NULL;
+@@ -74,11 +73,10 @@ static void sun4i_crtc_atomic_flush(struct drm_crtc *crtc,
+ static void sun4i_crtc_disable(struct drm_crtc *crtc)
+ {
+ 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
+-	struct sun4i_drv *drv = scrtc->drv;
+ 
+ 	DRM_DEBUG_DRIVER("Disabling the CRTC\n");
+ 
+-	sun4i_tcon_disable(drv->tcon);
++	sun4i_tcon_disable(scrtc->tcon);
+ 
+ 	if (crtc->state->event && !crtc->state->active) {
+ 		spin_lock_irq(&crtc->dev->event_lock);
+@@ -92,11 +90,10 @@ static void sun4i_crtc_disable(struct drm_crtc *crtc)
+ static void sun4i_crtc_enable(struct drm_crtc *crtc)
+ {
+ 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
+-	struct sun4i_drv *drv = scrtc->drv;
+ 
+ 	DRM_DEBUG_DRIVER("Enabling the CRTC\n");
+ 
+-	sun4i_tcon_enable(drv->tcon);
++	sun4i_tcon_enable(scrtc->tcon);
+ }
+ 
+ static const struct drm_crtc_helper_funcs sun4i_crtc_helper_funcs = {
+@@ -125,7 +122,8 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm)
  	scrtc = devm_kzalloc(drm->dev, sizeof(*scrtc), GFP_KERNEL);
  	if (!scrtc)
-@@ -130,12 +131,28 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm)
+ 		return ERR_PTR(-ENOMEM);
+-	scrtc->drv = drv;
++	scrtc->backend = drv->backend;
++	scrtc->tcon = drv->tcon;
+ 
+ 	/* Create our layers */
  	scrtc->layers = sun4i_layers_init(drm);
- 	if (IS_ERR(scrtc->layers)) {
- 		dev_err(drm->dev, "Couldn't create the planes\n");
--		return ERR_CAST(scrtc->layers);
-+		return NULL;
-+	}
-+
-+	/* find primary and cursor planes for drm_crtc_init_with_planes */
-+	for (i = 0; scrtc->layers[i]; i++) {
-+		struct sun4i_layer *layer = scrtc->layers[i];
-+
-+		switch (layer->plane.type) {
-+		case DRM_PLANE_TYPE_PRIMARY:
-+			primary = &layer->plane;
-+			break;
-+		case DRM_PLANE_TYPE_CURSOR:
-+			cursor = &layer->plane;
-+			break;
-+		default:
-+			break;
-+		}
- 	}
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.h b/drivers/gpu/drm/sun4i/sun4i_crtc.h
+index 0a888f73c983..cd0e633cce3a 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.h
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.h
+@@ -17,7 +17,8 @@ struct sun4i_crtc {
+ 	struct drm_crtc			crtc;
+ 	struct drm_pending_vblank_event	*event;
  
- 	ret = drm_crtc_init_with_planes(drm, &scrtc->crtc,
--					drv->primary,
--					NULL,
-+					primary,
-+					cursor,
- 					&sun4i_crtc_funcs,
- 					NULL);
- 	if (ret) {
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h b/drivers/gpu/drm/sun4i/sun4i_drv.h
-index 7a3345b7b6d1..5df50126ff52 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
-@@ -20,7 +20,6 @@ struct sun4i_drv {
- 	struct sun4i_backend	*backend;
- 	struct sun4i_tcon	*tcon;
- 
--	struct drm_plane	*primary;
- 	struct drm_fbdev_cma	*fbdev;
+-	struct sun4i_drv		*drv;
++	struct sun4i_backend		*backend;
++	struct sun4i_tcon		*tcon;
+ 	struct sun4i_layer		**layers;
  };
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 0b703fb02656..9c0baee25fae 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -127,9 +127,6 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
- 			     &sun4i_backend_layer_helper_funcs);
- 	layer->drv = drv;
- 
--	if (plane->type == DRM_PLANE_TYPE_PRIMARY)
--		drv->primary = &layer->plane;
--
- 	return layer;
- }
  
 -- 
 2.11.0
