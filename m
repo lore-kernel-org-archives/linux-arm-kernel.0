@@ -1,37 +1,69 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Thu, 23 Feb 2017 09:54:50 -0800
-Subject: [PATCH v2 0/3] Add Northstar Plus support to PDC mailbox driver
-In-Reply-To: <1487861392-23039-1-git-send-email-steven.lin1@broadcom.com>
-References: <1487861392-23039-1-git-send-email-steven.lin1@broadcom.com>
-Message-ID: <CAC3K-4oxR8+6=BcU5-c72JZmrSV2ezUueGK30Xt263Dg_4gmYA@mail.gmail.com>
+From: manoj.iyer@canonical.com (Manoj Iyer)
+Date: Thu, 23 Feb 2017 11:57:04 -0600 (CST)
+Subject: arm64: Fix the kernel panic() on QDF2400 platform
+In-Reply-To: <1487819448-8715-1-git-send-email-shankerd@codeaurora.org>
+References: <1487819448-8715-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <alpine.DEB.2.20.1702231156101.8521@lazy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2017 at 6:49 AM, Steve Lin <steven.lin1@broadcom.com> wrote:
-> Adds support for Broadcom Northstar+ to mailbox (PDC) driver.
->
-> Patch 1/3: Driver code and Kconfig changes
-> Patch 2/3: Device tree changes
-> Patch 3/3: DT bindings documentation changes
->
-> v2 addresses Jon Mason's suggestion about making the bindings doc change
-> a separate patch.
 
-FWIW, looks good to me.  Feel free to add my
-Acked-by: Jon Mason <jon.mason@broadcom.com>
-to the relevant pieces
+Tested on Ubuntu 17.04 (Linux 4.10). I am able to boot the kernel on 
+QDF2400 platform without any panics.
 
-> Steve Lin (3):
->   mailbox: bcm-pdc: Add Northstar Plus support to PDC driver
->   ARM: dts: NSP: Add mailbox (PDC) to NSP
->   dt-bindings: mailbox: Update doc with NSP PDC/mailbox support
+Tested-by: Manoj Iyer <manoj.iyer@canonical.com>
+
+--
+============================
+Manoj Iyer
+Ubuntu/Canonical
+ARM Servers - Cloud
+============================
+
+On Wed, 22 Feb 2017, Shanker Donthineni wrote:
+
+> The commit 38fd94b0 'arm64: Work around Falkor erratum 1003' has
+> been added to fix the hardware bug but causing a system crash.
+> The value of the register x1 which contains 'struct mm_struct *'
+> should be preserved inside macro pre_ttbr0_update_workaround.
 >
->  .../bindings/mailbox/brcm,iproc-pdc-mbox.txt       |  6 ++-
->  arch/arm/boot/dts/bcm-nsp.dtsi                     |  9 ++++
->  drivers/mailbox/Kconfig                            |  9 ++--
->  drivers/mailbox/bcm-pdc-mailbox.c                  | 61 ++++++++++++++++------
->  4 files changed, 63 insertions(+), 22 deletions(-)
+> Macro pre_ttbr0_update_workaround expects 2nd and 3rd arguments
+> are temporary registers. Don't clobber register x1, Otherwise
+> the next load operation 'mmid x1 x1' access the invalid address.
 >
-> --
-> 2.1.0
+> [<ffff0000080989a0>] cpu_do_switch_mm+0x20/0x40
+> [<ffff000008b18614>] efi_virtmap_load+0x34/0x40
+> [<ffff000008b1812c>] virt_efi_get_next_variable+0x64/0xc8
+> [<ffff000008b16204>] efivar_init+0x8c/0x348
+> [<ffff0000092b777c>] efisubsys_init+0xd4/0x270
+> [<ffff000009270c74>] do_one_initcall+0x80/0x110
+> [<ffff000009270ea0>] kernel_init_freeable+0x19c/0x240
+> [<ffff000008d8cef0>] kernel_init+0x10/0x100
+> [<ffff000008082ec0>] ret_from_fork+0x10/0x50
+> Code: d5033fdf b340bc01 d5182001 d5033fdf (f9416821)
+> ---[ end trace 15247ca922eb6bb7 ]---
+> note: swapper/0[1] exited with preempt_count 2
+> Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+>
+> SMP: stopping secondary CPUs
+> ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+>
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+> arch/arm64/mm/proc.S | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index cd4d53d..877d42f 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -138,7 +138,7 @@ ENDPROC(cpu_do_resume)
+>  *	- pgd_phys - physical address of new TTB
+>  */
+> ENTRY(cpu_do_switch_mm)
+> -	pre_ttbr0_update_workaround x0, x1, x2
+> +	pre_ttbr0_update_workaround x0, x2, x3
+> 	mmid	x1, x1				// get mm->context.id
+> 	bfi	x0, x1, #48, #16		// set the ASID
+> 	msr	ttbr0_el1, x0			// set TTBR0
 >
