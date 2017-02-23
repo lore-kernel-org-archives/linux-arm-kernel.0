@@ -1,38 +1,113 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 23 Feb 2017 16:09:40 -0600
-Subject: [RFC/PATCH] of: Mark property::value as const
-In-Reply-To: <58AF4D03.7020908@gmail.com>
-References: <20170214025040.23955-1-stephen.boyd@linaro.org>
- <58AF3E06.4030701@gmail.com> <58AF4D03.7020908@gmail.com>
-Message-ID: <CAL_Jsq+OQgmqvHQ_AWXOqnK0Yh8T3EVyxyiTFk1+0AwNHCf+Ag@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 23 Feb 2017 23:17:49 +0100
+Subject: [RESEND PATCH] PM / AVS: rockchip-io: add io selectors and
+ supplies for rk3328
+In-Reply-To: <1487853191-10994-1-git-send-email-david.wu@rock-chips.com>
+References: <1487853191-10994-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <7881849.7PL70mOCMj@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2017 at 2:58 PM, Frank Rowand <frowand.list@gmail.com> wrote:
-> On 02/23/17 11:54, Frank Rowand wrote:
->> On 02/13/17 18:50, Stephen Boyd wrote:
->>> The 'blob' we pass into populate_properties() is marked as const,
->>> but we cast that const away when we assign the result of
->>> fdt_getprop_by_offset() to pp->value. Let's mark value as const
->>> instead, so that code can't mistakenly write to the value of the
->>> property that we've so far advertised as const.
->>>
->>> Unfortunately, this exposes a problem with the fdt resolver code,
->>> where we overwrite the value member of properties of phandles to
->>> update them with their final value. Add a comment for now to
->>> indicate where we're potentially writing over const data.
->>
->> The resolver should not be over writing anything in the FDT.  I'll
->> look at what is going on there.
->>
->> The FDT we expose to user space should be the FDT we booted with,
->> not something later modified.
->
-> It seems that /sys/firmware/fdt is not documented.  I'll look into
-> fixing that.
+On Thursday, February 23, 2017 08:33:11 PM David Wu wrote:
+> From: "david.wu" <david.wu@rock-chips.com>
+> 
+> This adds the necessary data for handling io voltage domains on the rk3328.
+> As interesting tidbit, the rk3328 only contains one iodomain area in the
+> regular General Register Files (GRF).
+> 
+> Signed-off-by: david.wu <david.wu@rock-chips.com>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-That's because the "official" interface is /proc/device-tree/ which is
-now a symlink. IIRC, it is documented to use /proc/device-tree, not
-the sysfs path.
+Kevin?
 
-Rob
+> ---
+>  .../bindings/power/rockchip-io-domain.txt          |  1 +
+>  drivers/power/avs/rockchip-io-domain.c             | 41 ++++++++++++++++++++++
+>  2 files changed, 42 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+> index d23dc00..d3a5a93 100644
+> --- a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+> +++ b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
+> @@ -33,6 +33,7 @@ Required properties:
+>  - compatible: should be one of:
+>    - "rockchip,rk3188-io-voltage-domain" for rk3188
+>    - "rockchip,rk3288-io-voltage-domain" for rk3288
+> +  - "rockchip,rk3328-io-voltage-domain" for rk3328
+>    - "rockchip,rk3368-io-voltage-domain" for rk3368
+>    - "rockchip,rk3368-pmu-io-voltage-domain" for rk3368 pmu-domains
+>    - "rockchip,rk3399-io-voltage-domain" for rk3399
+> diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
+> index 56bce19..8581252 100644
+> --- a/drivers/power/avs/rockchip-io-domain.c
+> +++ b/drivers/power/avs/rockchip-io-domain.c
+> @@ -43,6 +43,10 @@
+>  #define RK3288_SOC_CON2_FLASH0		BIT(7)
+>  #define RK3288_SOC_FLASH_SUPPLY_NUM	2
+>  
+> +#define RK3328_SOC_CON4			0x410
+> +#define RK3328_SOC_CON4_VCCIO2		BIT(7)
+> +#define RK3328_SOC_VCCIO2_SUPPLY_NUM	1
+> +
+>  #define RK3368_SOC_CON15		0x43c
+>  #define RK3368_SOC_CON15_FLASH0		BIT(14)
+>  #define RK3368_SOC_FLASH_SUPPLY_NUM	2
+> @@ -166,6 +170,25 @@ static void rk3288_iodomain_init(struct rockchip_iodomain *iod)
+>  		dev_warn(iod->dev, "couldn't update flash0 ctrl\n");
+>  }
+>  
+> +static void rk3328_iodomain_init(struct rockchip_iodomain *iod)
+> +{
+> +	int ret;
+> +	u32 val;
+> +
+> +	/* if no vccio2 supply we should leave things alone */
+> +	if (!iod->supplies[RK3328_SOC_VCCIO2_SUPPLY_NUM].reg)
+> +		return;
+> +
+> +	/*
+> +	 * set vccio2 iodomain to also use this framework
+> +	 * instead of a special gpio.
+> +	 */
+> +	val = RK3328_SOC_CON4_VCCIO2 | (RK3328_SOC_CON4_VCCIO2 << 16);
+> +	ret = regmap_write(iod->grf, RK3328_SOC_CON4, val);
+> +	if (ret < 0)
+> +		dev_warn(iod->dev, "couldn't update vccio2 vsel ctrl\n");
+> +}
+> +
+>  static void rk3368_iodomain_init(struct rockchip_iodomain *iod)
+>  {
+>  	int ret;
+> @@ -247,6 +270,20 @@ static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
+>  	.init = rk3288_iodomain_init,
+>  };
+>  
+> +static const struct rockchip_iodomain_soc_data soc_data_rk3328 = {
+> +	.grf_offset = 0x410,
+> +	.supply_names = {
+> +		"vccio1",
+> +		"vccio2",
+> +		"vccio3",
+> +		"vccio4",
+> +		"vccio5",
+> +		"vccio6",
+> +		"pmuio",
+> +	},
+> +	.init = rk3328_iodomain_init,
+> +};
+> +
+>  static const struct rockchip_iodomain_soc_data soc_data_rk3368 = {
+>  	.grf_offset = 0x900,
+>  	.supply_names = {
+> @@ -312,6 +349,10 @@ static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
+>  		.data = (void *)&soc_data_rk3288
+>  	},
+>  	{
+> +		.compatible = "rockchip,rk3328-io-voltage-domain",
+> +		.data = (void *)&soc_data_rk3328
+> +	},
+> +	{
+>  		.compatible = "rockchip,rk3368-io-voltage-domain",
+>  		.data = (void *)&soc_data_rk3368
+>  	},
+> 
