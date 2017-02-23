@@ -1,153 +1,52 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 23 Feb 2017 16:05:41 +0800
-Subject: [PATCH 09/11] drm/sun4i: rgb: Pass tcon pointer when initializing RGB
- encoder
-In-Reply-To: <20170223080543.6659-1-wens@csie.org>
-References: <20170223080543.6659-1-wens@csie.org>
-Message-ID: <20170223080543.6659-10-wens@csie.org>
+From: claudiu.beznea@microchip.com (Claudiu Beznea)
+Date: Thu, 23 Feb 2017 10:32:58 +0200
+Subject: [PATCH] ATM: dts: at91: sama5d2_xplained: add pwm controller
+Message-ID: <1487838778-13473-1-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RGB encoder represents channel 0 of the TCON. Instead of fetching
-the pointer to its TCON from the main sun4i_drv structure, pass it in
-as part of the init call, save it, and use it directly in the encoder
-and connector callbacks.
+Add pwm controller bindings for sam5d2_xplained
+and enable it.
 
-We can also drop the otherwise unused sun4i_drv pointer.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_rgb.c  | 27 +++++++++------------------
- drivers/gpu/drm/sun4i/sun4i_rgb.h  |  2 +-
- drivers/gpu/drm/sun4i/sun4i_tcon.c |  2 +-
- 3 files changed, 11 insertions(+), 20 deletions(-)
+ arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi | 4 ++++
+ arch/arm/boot/dts/sama5d2.dtsi                      | 8 ++++++++
+ 2 files changed, 12 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index fc7f7467d120..a244458197e1 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -18,7 +18,6 @@
- #include <drm/drm_panel.h>
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi b/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi
+index 9fc270f..493ea29 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi
+@@ -318,6 +318,10 @@
+ 				};
+ 			};
  
- #include "sun4i_crtc.h"
--#include "sun4i_drv.h"
- #include "sun4i_tcon.h"
- #include "sun4i_rgb.h"
++			pwm0: pwm at f802c000 {
++				status = "okay";
++			};
++
+ 			flx0: flexcom at f8034000 {
+ 				atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_USART>;
+ 				status = "disabled"; /* conflict with ISC_D2 & ISC_D3 data pins */
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index cd459e8..e88785e 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -1098,6 +1098,14 @@
+ 				status = "disabled";
+ 			};
  
-@@ -26,7 +25,7 @@ struct sun4i_rgb {
- 	struct drm_connector	connector;
- 	struct drm_encoder	encoder;
- 
--	struct sun4i_drv	*drv;
-+	struct sun4i_tcon	*tcon;
- };
- 
- static inline struct sun4i_rgb *
-@@ -47,8 +46,7 @@ static int sun4i_rgb_get_modes(struct drm_connector *connector)
- {
- 	struct sun4i_rgb *rgb =
- 		drm_connector_to_sun4i_rgb(connector);
--	struct sun4i_drv *drv = rgb->drv;
--	struct sun4i_tcon *tcon = drv->tcon;
-+	struct sun4i_tcon *tcon = rgb->tcon;
- 
- 	return drm_panel_get_modes(tcon->panel);
- }
-@@ -57,8 +55,7 @@ static int sun4i_rgb_mode_valid(struct drm_connector *connector,
- 				struct drm_display_mode *mode)
- {
- 	struct sun4i_rgb *rgb = drm_connector_to_sun4i_rgb(connector);
--	struct sun4i_drv *drv = rgb->drv;
--	struct sun4i_tcon *tcon = drv->tcon;
-+	struct sun4i_tcon *tcon = rgb->tcon;
- 	u32 hsync = mode->hsync_end - mode->hsync_start;
- 	u32 vsync = mode->vsync_end - mode->vsync_start;
- 	unsigned long rate = mode->clock * 1000;
-@@ -115,8 +112,7 @@ static void
- sun4i_rgb_connector_destroy(struct drm_connector *connector)
- {
- 	struct sun4i_rgb *rgb = drm_connector_to_sun4i_rgb(connector);
--	struct sun4i_drv *drv = rgb->drv;
--	struct sun4i_tcon *tcon = drv->tcon;
-+	struct sun4i_tcon *tcon = rgb->tcon;
- 
- 	drm_panel_detach(tcon->panel);
- 	drm_connector_cleanup(connector);
-@@ -141,8 +137,7 @@ static int sun4i_rgb_atomic_check(struct drm_encoder *encoder,
- static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
- {
- 	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
--	struct sun4i_drv *drv = rgb->drv;
--	struct sun4i_tcon *tcon = drv->tcon;
-+	struct sun4i_tcon *tcon = rgb->tcon;
- 
- 	DRM_DEBUG_DRIVER("Enabling RGB output\n");
- 
-@@ -158,8 +153,7 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
- static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
- {
- 	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
--	struct sun4i_drv *drv = rgb->drv;
--	struct sun4i_tcon *tcon = drv->tcon;
-+	struct sun4i_tcon *tcon = rgb->tcon;
- 
- 	DRM_DEBUG_DRIVER("Disabling RGB output\n");
- 
-@@ -177,8 +171,7 @@ static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
- 				       struct drm_display_mode *adjusted_mode)
- {
- 	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
--	struct sun4i_drv *drv = rgb->drv;
--	struct sun4i_tcon *tcon = drv->tcon;
-+	struct sun4i_tcon *tcon = rgb->tcon;
- 
- 	sun4i_tcon0_mode_set(tcon, mode);
- 
-@@ -204,10 +197,8 @@ static struct drm_encoder_funcs sun4i_rgb_enc_funcs = {
- 	.destroy	= sun4i_rgb_enc_destroy,
- };
- 
--int sun4i_rgb_init(struct drm_device *drm)
-+int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
- {
--	struct sun4i_drv *drv = drm->dev_private;
--	struct sun4i_tcon *tcon = drv->tcon;
- 	struct drm_encoder *encoder;
- 	struct sun4i_rgb *rgb;
- 	int ret;
-@@ -215,7 +206,7 @@ int sun4i_rgb_init(struct drm_device *drm)
- 	rgb = devm_kzalloc(drm->dev, sizeof(*rgb), GFP_KERNEL);
- 	if (!rgb)
- 		return -ENOMEM;
--	rgb->drv = drv;
-+	rgb->tcon = tcon;
- 	encoder = &rgb->encoder;
- 
- 	tcon->panel = sun4i_tcon_find_panel(tcon->dev->of_node);
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.h b/drivers/gpu/drm/sun4i/sun4i_rgb.h
-index 7c4da4c8acdd..40c18f4a6c7e 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.h
-@@ -13,6 +13,6 @@
- #ifndef _SUN4I_RGB_H_
- #define _SUN4I_RGB_H_
- 
--int sun4i_rgb_init(struct drm_device *drm);
-+int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon);
- 
- #endif /* _SUN4I_RGB_H_ */
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index 3f3eb3f0b209..505520baa585 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -530,7 +530,7 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 		goto err_free_clocks;
- 	}
- 
--	ret = sun4i_rgb_init(drm);
-+	ret = sun4i_rgb_init(drm, tcon);
- 	if (ret < 0)
- 		goto err_free_clocks;
- 
++			pwm0: pwm at f802c000 {
++				compatible = "atmel,sama5d2-pwm";
++				reg = <0xf802c000 0x4000>;
++				interrupts = <38 IRQ_TYPE_LEVEL_HIGH 7>;
++				#pwm-cells = <3>;
++				clocks = <&pwm_clk>;
++			};
++
+ 			sfr: sfr at f8030000 {
+ 				compatible = "atmel,sama5d2-sfr", "syscon";
+ 				reg = <0xf8030000 0x98>;
 -- 
-2.11.0
+2.7.4
