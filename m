@@ -1,52 +1,254 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 23 Feb 2017 18:30:47 +0100
-Subject: [PATCH 05/11] arm64: tegra: Enable ethernet on P3310
+Date: Thu, 23 Feb 2017 18:30:48 +0100
+Subject: [PATCH 06/11] arm64: tegra: Add initial power tree for P3310
 In-Reply-To: <20170223173053.19701-1-thierry.reding@gmail.com>
 References: <20170223173053.19701-1-thierry.reding@gmail.com>
-Message-ID: <20170223173053.19701-5-thierry.reding@gmail.com>
+Message-ID: <20170223173053.19701-6-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-The P3310 processor module provides networking via the ethernet
-controller found on NVIDIA Tegra186 SoCs.
+Enable the Maxim MAX77620 PMIC found on P3310 and add some fixed
+regulators to model the power tree.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 211 +++++++++++++++++++++++++
+ 1 file changed, 211 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-index 762f4756346c..ffbb4be5122e 100644
+index ffbb4be5122e..1a9ac73b4ecb 100644
 --- a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
 +++ b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-@@ -26,6 +26,26 @@
- 		reg = <0x0 0x80000000 0x2 0x00000000>;
+@@ -1,5 +1,7 @@
+ #include "tegra186.dtsi"
+ 
++#include <dt-bindings/mfd/max77620.h>
++
+ / {
+ 	model = "NVIDIA Tegra186 P3310 Processor Module";
+ 	compatible = "nvidia,p3310", "nvidia,tegra186";
+@@ -115,6 +117,180 @@
+ 	bpmp {
+ 		i2c {
+ 			status = "okay";
++
++			pmic: pmic at 3c {
++				compatible = "maxim,max77620";
++				reg = <0x3c>;
++
++				interrupts = <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>;
++				#interrupt-cells = <2>;
++				interrupt-controller;
++
++				#gpio-cells = <2>;
++				gpio-controller;
++
++				pinctrl-names = "default";
++				pinctrl-0 = <&max77620_default>;
++
++				max77620_default: pinmux {
++					gpio0 {
++						pins = "gpio0";
++						function = "gpio";
++					};
++
++					gpio1 {
++						pins = "gpio1";
++						function = "fps-out";
++						maxim,active-fps-source = <MAX77620_FPS_SRC_0>;
++					};
++
++					gpio2 {
++						pins = "gpio2";
++						function = "fps-out";
++						maxim,active-fps-source = <MAX77620_FPS_SRC_1>;
++					};
++
++					gpio3 {
++						pins = "gpio3";
++						function = "fps-out";
++						maxim,active-fps-source = <MAX77620_FPS_SRC_1>;
++					};
++
++					gpio4 {
++						pins = "gpio4";
++						function = "32k-out1";
++						drive-push-pull = <1>;
++					};
++
++					gpio5 {
++						pins = "gpio5";
++						function = "gpio";
++						drive-push-pull = <0>;
++					};
++
++					gpio6 {
++						pins = "gpio6";
++						function = "gpio";
++						drive-push-pull = <1>;
++					};
++
++					gpio7 {
++						pins = "gpio7";
++						function = "gpio";
++						drive-push-pull = <0>;
++					};
++				};
++
++				fps {
++					fps0 {
++						maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN0>;
++						maxim,shutdown-fps-time-period-us = <640>;
++					};
++
++					fps1 {
++						maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN1>;
++						maxim,shutdown-fps-time-period-us = <640>;
++					};
++
++					fps2 {
++						maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN0>;
++						maxim,shutdown-fps-time-period-us = <640>;
++					};
++				};
++
++				regulators {
++					in-sd0-supply = <&vdd_5v0_sys>;
++					in-sd1-supply = <&vdd_5v0_sys>;
++					in-sd2-supply = <&vdd_5v0_sys>;
++					in-sd3-supply = <&vdd_5v0_sys>;
++
++					in-ldo0-1-supply = <&vdd_5v0_sys>;
++					in-ldo2-supply = <&vdd_5v0_sys>;
++					in-ldo3-5-supply = <&vdd_5v0_sys>;
++					in-ldo4-6-supply = <&vdd_1v8>;
++					in-ldo7-8-supply = <&avdd_dsi_csi>;
++
++					sd0 {
++						regulator-name = "VDD_DDR_1V1_PMIC";
++						regulator-min-microvolt = <1100000>;
++						regulator-max-microvolt = <1100000>;
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					avdd_dsi_csi: sd1 {
++						regulator-name = "AVDD_DSI_CSI_1V2";
++						regulator-min-microvolt = <1200000>;
++						regulator-max-microvolt = <1200000>;
++						/* XXX */
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					vdd_1v8: sd2 {
++						regulator-name = "VDD_1V8";
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <1800000>;
++						/* XXX */
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					vdd_3v3_sys: sd3 {
++						regulator-name = "VDD_3V3_SYS";
++						regulator-min-microvolt = <3300000>;
++						regulator-max-microvolt = <3300000>;
++						/* XXX */
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					ldo0 {
++						regulator-name = "VDD_1V8_AP_PLL";
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <1800000>;
++						/* XXX */
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					ldo2 {
++						regulator-name = "VDDIO_3V3_AOHV";
++						regulator-min-microvolt = <3300000>;
++						regulator-max-microvolt = <3300000>;
++						/* XXX */
++						regulator-always-on;
++						regulator-boot-on;
++					};
++
++					vddio_sdmmc1: ldo3 {
++						regulator-name = "VDDIO_SDMMC1_AP";
++						regulator-min-microvolt = <1800000>;
++						regulator-max-microvolt = <3300000>;
++					};
++
++					ldo4 {
++						regulator-name = "VDD_RTC";
++						regulator-min-microvolt = <1000000>;
++						regulator-max-microvolt = <1000000>;
++					};
++
++					vddio_sdmmc3: ldo5 {
++						regulator-name = "VDDIO_SDMMC3_AP";
++						regulator-min-microvolt = <2800000>;
++						regulator-max-microvolt = <2800000>;
++					};
++
++					vdd_pex: ldo7 {
++						regulator-name = "VDD_PEX_1V05";
++						regulator-min-microvolt = <1050000>;
++						regulator-max-microvolt = <1050000>;
++						/* XXX */
++						regulator-always-on;
++						regulator-boot-on;
++					};
++				};
++			};
+ 		};
  	};
  
-+	ethernet at 2490000 {
-+		status = "okay";
+@@ -123,4 +299,39 @@
+ 		status = "okay";
+ 		method = "smc";
+ 	};
 +
-+		phy-reset-gpios = <&gpio TEGRA_MAIN_GPIO(M, 4) GPIO_ACTIVE_LOW>;
-+		phy-handle = <&phy>;
-+		phy-mode = "rgmii";
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+		mdio {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++		vdd_5v0_sys: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
 +
-+			phy: phy at 0 {
-+				compatible = "ethernet-phy-ieee802.3-c22";
-+				reg = <0x0>;
-+				interrupt-parent = <&gpio>;
-+				interrupts = <TEGRA_MAIN_GPIO(M, 5) IRQ_TYPE_LEVEL_HIGH>;
-+			};
++			regulator-name = "VDD_5V0_SYS";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		vdd_1v8_ap: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++
++			regulator-name = "VDD_1V8_AP";
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <1800000>;
++
++			/* XXX */
++			regulator-always-on;
++			regulator-boot-on;
++
++			gpio = <&pmic 1 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++
++			vin-supply = <&vdd_1v8>;
 +		};
 +	};
-+
- 	serial at 3100000 {
- 		status = "okay";
- 	};
+ };
 -- 
 2.11.1
