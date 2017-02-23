@@ -1,54 +1,44 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 23 Feb 2017 11:14:07 +0100
-Subject: [PATCH V2 2/2] KVM: arm64: Increase number of user memslots to 508
-In-Reply-To: <1486538141-30627-3-git-send-email-linucherian@gmail.com>
-References: <1486538141-30627-1-git-send-email-linucherian@gmail.com>
- <1486538141-30627-3-git-send-email-linucherian@gmail.com>
-Message-ID: <20170223101407.GB1409@cbox>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 Feb 2017 11:15:56 +0100
+Subject: [PATCH 0/7] Rename RK1108 to RV1108
+In-Reply-To: <0bbc4151-d954-1a27-48c3-1e8c9cb9e16f@rock-chips.com>
+References: <1486983566-32265-1-git-send-email-andy.yan@rock-chips.com>
+ <2809087.MHZWQWdaOC@phil>
+ <0bbc4151-d954-1a27-48c3-1e8c9cb9e16f@rock-chips.com>
+Message-ID: <CACRpkdbNbGvwUq3uLgekimOwzBZCXf37JW9LCCqLm1so=CMNrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 08, 2017 at 12:45:41PM +0530, linucherian at gmail.com wrote:
-> From: Linu Cherian <linu.cherian@cavium.com>
-> 
-> Having only 32 memslots is a real constraint for the maximum
-> number of PCI devices that can be assigned to a single guest.
-> Assuming each PCI device/virtual function having two memory BAR
-> regions, we could assign only 15 devices/virtual functions to a
-> guest.
-> 
-> Hence increase KVM_USER_MEM_SLOTS to 508, so that KVM_MEM_SLOTS_NUM is
-> 512 as done in other archs like x86 and powerpc.
+On Tue, Feb 14, 2017 at 1:44 AM, Andy Yan <andy.yan@rock-chips.com> wrote:
+> Hi Heiko & Rob:
+> On 2017?02?13? 20:51, Heiko Stuebner wrote:
+>>
+>> Hi Andy,
+>>
+>> Am Montag, 13. Februar 2017, 18:59:26 CET schrieb Andy Yan:
+>>>
+>>> Rockchip finally named this soc as RV1108, so change
+>>> RK1108/rk1108 to RV1108/rv1108 for compatible.
+>>
+>> renaming existing bindings (that have been in multiple kernel versions
+>> already) always is a hot topic. So I'll be hoping for Rob to give a
+>> go-ahead
+>> for it :-) .
+>>
+>> Just to confirm, the rk1108/rv1108 is completely new to the market, so
+>> we're
+>> not breaking any existing devices, right?
+>
+>
+>     Yes, the 1108 Soc is completely new to market, this change will not
+> breaking any existing devices.
 
-Actually on powerpc they just define KVM_USER_MEM_SLOTS as 512 directly.
+Nobody gets hurt. Just rename everything to avoid confusion.
+Just my ?0.01.
 
-On x86 they define them as 509 and have 3 private mem slots.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-I don't understand the difference and as far as I can tell we don't have
-any private memslots on arm/arm64, so this is just weird to me.
+Tell me if I can merge a subset of the patches to the pinctrl tree.
 
-Thanks,
--Christoffer
-
-> 
-> Signed-off-by: Linu Cherian <linu.cherian@cavium.com>
-> ---
->  arch/arm64/include/asm/kvm_host.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index e505038..88f017d 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -30,7 +30,7 @@
->  
->  #define __KVM_HAVE_ARCH_INTC_INITIALIZED
->  
-> -#define KVM_USER_MEM_SLOTS 32
-> +#define KVM_USER_MEM_SLOTS 508
->  #define KVM_PRIVATE_MEM_SLOTS 4
->  #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
->  #define KVM_HALT_POLL_NS_DEFAULT 500000
-> -- 
-> 1.9.1
-> 
+Yours,
+Linus Walleij
