@@ -1,38 +1,62 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Thu, 23 Feb 2017 17:45:52 +0100
-Subject: [PATCH v2 5/5] MAINTAINERS: Add Realtek section
-In-Reply-To: <20170223164553.3715-1-afaerber@suse.de>
-References: <20170223164553.3715-1-afaerber@suse.de>
-Message-ID: <20170223164553.3715-6-afaerber@suse.de>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Thu, 23 Feb 2017 11:48:12 -0500
+Subject: [PATCH v2] drm/rockchip: cdn-dp: Fix error handling
+In-Reply-To: <20170220070815.23096-1-christophe.jaillet@wanadoo.fr>
+References: <20170220070815.23096-1-christophe.jaillet@wanadoo.fr>
+Message-ID: <20170223164812.GB24066@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add myself as maintainer.
+On Mon, Feb 20, 2017 at 08:08:15AM +0100, Christophe JAILLET wrote:
+> It is likely that both 'clk_disable_unprepare()' should be called if
+> 'pm_runtime_get_sync()' fails.
+> 
+> Add a new label for that, because 'err_set_rate' is not meaningful in this
+> case.
+> 
+> Add a missing call to 'pm_runtime_put()'.
+> 
+> Fixes: 1a0f7ed3abe2 ("drm/rockchip: cdn-dp: add cdn DP support for rk3399")
+> 
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- v2: new
- 
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+Applied to drm-misc-next-fixes
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index b9af886..16f4216 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1647,6 +1647,13 @@ M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
-+ARM/REALTEK ARCHITECTURE
-+M:	Andreas F?rber <afaerber@suse.de>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Supported
-+F:	arch/arm64/boot/dts/realtek/
-+F:	Documentation/devicetree/bindings/arm/realtek.txt
-+
- ARM/RENESAS ARM64 ARCHITECTURE
- M:	Simon Horman <horms@verge.net.au>
- M:	Magnus Damm <magnus.damm@gmail.com>
+Thanks,
+
+Sean
+
+> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> ---
+> V2: rename label
+>     add missing call to 'pm_runtime_put_sync()' in error path
+> ---
+>  drivers/gpu/drm/rockchip/cdn-dp-core.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/cdn-dp-core.c b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+> index 9ab67a670885..0fe1ec8b8fb1 100644
+> --- a/drivers/gpu/drm/rockchip/cdn-dp-core.c
+> +++ b/drivers/gpu/drm/rockchip/cdn-dp-core.c
+> @@ -111,7 +111,7 @@ static int cdn_dp_clk_enable(struct cdn_dp_device *dp)
+>  	ret = pm_runtime_get_sync(dp->dev);
+>  	if (ret < 0) {
+>  		DRM_DEV_ERROR(dp->dev, "cannot get pm runtime %d\n", ret);
+> -		goto err_pclk;
+> +		goto err_pm_runtime_get;
+>  	}
+>  
+>  	reset_control_assert(dp->core_rst);
+> @@ -133,6 +133,8 @@ static int cdn_dp_clk_enable(struct cdn_dp_device *dp)
+>  	return 0;
+>  
+>  err_set_rate:
+> +	pm_runtime_put(dp->dev);
+> +err_pm_runtime_get:
+>  	clk_disable_unprepare(dp->core_clk);
+>  err_core_clk:
+>  	clk_disable_unprepare(dp->pclk);
+> -- 
+> 2.9.3
+
 -- 
-2.10.2
+Sean Paul, Software Engineer, Google / Chromium OS
