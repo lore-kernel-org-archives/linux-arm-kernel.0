@@ -1,35 +1,44 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 23 Feb 2017 16:05:35 +0800
-Subject: [PATCH 03/11] drm/sun4i: Add end of list element for
- sun4i_layers_init's returned list
+Date: Thu, 23 Feb 2017 16:05:34 +0800
+Subject: [PATCH 02/11] drm/sun4i: Set drm_crtc.port to the underlying TCON's
+ output port node
 In-Reply-To: <20170223080543.6659-1-wens@csie.org>
 References: <20170223080543.6659-1-wens@csie.org>
-Message-ID: <20170223080543.6659-4-wens@csie.org>
+Message-ID: <20170223080543.6659-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The number of defined planes in sun4i_layer is unknown to other parts
-of the sun4i drm driver. Since the return value of sun4i_layers_init
-is a list of layers, make it return 1 more empty layer as an end of
-list guard value.
+The way drm_of_find_possible_crtcs is it tries to match the
+remote-endpoint of the given node's various endpoints to all the
+crtc's .port field. Thus we need to set drm_crtc.port to the output
+port node of the underlying TCON.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_layer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun4i_crtc.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 41bc0f860f5c..0b703fb02656 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -139,7 +139,7 @@ struct sun4i_layer **sun4i_layers_init(struct drm_device *drm)
- 	struct sun4i_layer **layers;
- 	int i;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index 4e2e89c3104f..de6f7da69746 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -19,6 +19,7 @@
+ #include <linux/clk-provider.h>
+ #include <linux/ioport.h>
+ #include <linux/of_address.h>
++#include <linux/of_graph.h>
+ #include <linux/of_irq.h>
+ #include <linux/regmap.h>
  
--	layers = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes),
-+	layers = devm_kcalloc(drm->dev, ARRAY_SIZE(sun4i_backend_planes) + 1,
- 			      sizeof(*layers), GFP_KERNEL);
- 	if (!layers)
- 		return ERR_PTR(-ENOMEM);
+@@ -136,5 +137,9 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm)
+ 
+ 	drm_crtc_helper_add(&scrtc->crtc, &sun4i_crtc_helper_funcs);
+ 
++	/* Set crtc.port to output port node of the tcon */
++	scrtc->crtc.port = of_graph_get_port_by_id(drv->tcon->dev->of_node,
++						   1);
++
+ 	return scrtc;
+ }
 -- 
 2.11.0
