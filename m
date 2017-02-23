@@ -1,50 +1,38 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 23 Feb 2017 11:53:17 +0100
-Subject: [PATCH v3 01/18] drivers/fsi: Add empty fsi bus definitions
-In-Reply-To: <20170201165358.45415-2-cbostic@linux.vnet.ibm.com>
-References: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
- <20170201165358.45415-2-cbostic@linux.vnet.ibm.com>
-Message-ID: <CAMuHMdUhiXCnjT60Lsqq4eGGnVv9eavtkVL1Mdk_6naBHBDVrQ@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 23 Feb 2017 10:56:11 +0000
+Subject: [PATCH V2 1/3] arm64: dts: Add basic DT to support Spreadtrum's
+ SP9860G
+In-Reply-To: <CAAfSe-t8pVM=bO+S4YatE0rYKgeeZntDbV4ufD5sC3jQYCwVMg@mail.gmail.com>
+References: <1487660104-15693-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1487660104-15693-2-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20170221162744.GA29581@linaro.org> <20170222034632.GA18116@spreadtrum.com>
+ <CANLsYkyba+QscLK5m=Fb4ErK_WEtyteR0ozS47W48izhrbSBfg@mail.gmail.com>
+ <CAAfSe-t8pVM=bO+S4YatE0rYKgeeZntDbV4ufD5sC3jQYCwVMg@mail.gmail.com>
+Message-ID: <76146c97-d4ff-7058-0ca7-6b2baa3bf5fe@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris, Jeremy,
+Hi Chunyan,
 
-On Wed, Feb 1, 2017 at 5:53 PM, Christopher Bostic
-<cbostic@linux.vnet.ibm.com> wrote:
-> From: Jeremy Kerr <jk@ozlabs.org>
->
-> This change adds the initial (empty) fsi bus definition, and introduces
-> drivers/fsi/.
->
-> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-> Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
+On 23/02/17 06:20, Chunyan Zhang wrote:
+[...]
 
-> --- /dev/null
-> +++ b/drivers/fsi/Kconfig
-> @@ -0,0 +1,12 @@
-> +#
-> +# FSI subsystem
-> +#
-> +
-> +menu "FSI support"
-> +
-> +config FSI
-> +       tristate "FSI support"
+>>> I noticed Juno use the 2), would you suggest that way?
+>>
+>> It is better to describe the HW component themselves rather than where
+>> they are in the topology - the address of the component will make sure
+>> the names are unique.  So just the component type (etm, funnel,
+>> replicator, ....) and the address they are located at.
+>>
+> 
+> OK. And to avoid making other person confused in the future, is it
+> better to revise juno-base.dtsi according to this convention?
+> 
 
-I guess this should depend on some POWER symbol || COMPILE_TEST?
+Yes, it was noticed by Olof and should be now fixed for v4.11(already
+queued). You can check linux-next if you want to have a look before it
+gets merged.
 
-> +       ---help---
-> +         FSI - the FRU Support Interface - is a simple bus for low-level
-> +         access to POWER-based hardware.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Regards,
+Sudeep
