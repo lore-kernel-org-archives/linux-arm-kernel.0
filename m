@@ -1,71 +1,25 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Feb 2017 10:26:54 +0000
-Subject: [PATCH v2 19/22] arm/arm64: KVM: Use __hyp_reset_vectors() directly
-In-Reply-To: <20170223102657.23100-1-marc.zyngier@arm.com>
-References: <20170223102657.23100-1-marc.zyngier@arm.com>
-Message-ID: <20170223102657.23100-20-marc.zyngier@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 23 Feb 2017 11:32:39 +0100
+Subject: [PATCH 2/2] drivers: pwm: pwm-atmel: add support to allow run
+ time changing of pwm parameters
+In-Reply-To: <f963def2-6d82-3bf7-22fa-8915f408ca54@microchip.com>
+References: <1487839120-13650-1-git-send-email-claudiu.beznea@microchip.com>
+ <1487839120-13650-3-git-send-email-claudiu.beznea@microchip.com>
+ <20170223092148.5qmxy62xkufwbsrw@piout.net>
+ <f963def2-6d82-3bf7-22fa-8915f408ca54@microchip.com>
+Message-ID: <20170223103239.tv6nodddlar5l5fl@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__cpu_reset_hyp_mode doesn't need to be passed any argument now,
-as the hyp-stub implementations are self-contained, and is now
-reduced to just calling __hyp_reset_vectors(). Let's drop the
-wrapper and use the stub hypercall directly.
+On 23/02/2017 at 12:25:58 +0200, m18063 wrote:
+> > It is probably worth switching to atomic PWM instead of changing this
+> > function. This would simplify the whole driver.
+> I was thinking to switch to atomic PWM in a future patch.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_host.h   | 6 ------
- arch/arm/kvm/arm.c                | 3 +--
- arch/arm64/include/asm/kvm_host.h | 6 ------
- 3 files changed, 1 insertion(+), 14 deletions(-)
+Then why wait ?
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 42774c6f458d..435dc837e5b0 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -274,12 +274,6 @@ static inline void __cpu_init_stage2(void)
- 	kvm_call_hyp(__init_stage2_translation);
- }
- 
--static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
--					phys_addr_t phys_idmap_start)
--{
--	__hyp_reset_vectors();
--}
--
- static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
- {
- 	return 0;
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 9d7446456e0c..7c3abeb49554 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1122,8 +1122,7 @@ static void cpu_hyp_reinit(void)
- static void cpu_hyp_reset(void)
- {
- 	if (!is_kernel_in_hyp_mode())
--		__cpu_reset_hyp_mode(hyp_default_vectors,
--				     kvm_get_idmap_start());
-+		__hyp_reset_vectors();
- }
- 
- static void _kvm_arch_hardware_enable(void *discard)
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 7076ecae2bf0..4bd242f11f1b 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -361,12 +361,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
- 	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
- }
- 
--static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
--					phys_addr_t phys_idmap_start)
--{
--	__hyp_reset_vectors();
--}
--
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
- static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+
 -- 
-2.11.0
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
