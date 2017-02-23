@@ -1,187 +1,228 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Thu, 23 Feb 2017 15:08:56 -0800
-Subject: [RFC/PATCH] of: Mark property::value as const
-In-Reply-To: <20170214025040.23955-1-stephen.boyd@linaro.org>
-References: <20170214025040.23955-1-stephen.boyd@linaro.org>
-Message-ID: <58AF6B88.6020709@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Feb 2017 00:11:48 +0100
+Subject: [GIT PULL 7/7] ARM: SoC driver updates
+In-Reply-To: <8729461.VkrRdW7LzJ@wuerfel>
+References: <8729461.VkrRdW7LzJ@wuerfel>
+Message-ID: <7385881.DYWctooIcO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/13/17 18:50, Stephen Boyd wrote:
-> The 'blob' we pass into populate_properties() is marked as const,
-> but we cast that const away when we assign the result of
-> fdt_getprop_by_offset() to pp->value. Let's mark value as const
-> instead, so that code can't mistakenly write to the value of the
-> property that we've so far advertised as const.
+The following changes since commit a121103c922847ba5010819a3f250f1f7fc84ab8:
 
-Instead of struct property field value being a pointer into the
-FDT, I would rather copy the data to newly allocated memory and
-have value be a pointer to that memory.  This is required if we
-want to make /sys/firmware/fdt optional, which would allow us to
-free the memory containing the initial boot FDT.
+  Linux 4.10-rc3 (2017-01-08 14:18:17 -0800)
 
-I also do not want overlay live subtrees to have any pointers
-into the FDT that was used to populate the overlay, so copying
-the data solves that problem also.
+are available in the git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-drivers
 
-> Unfortunately, this exposes a problem with the fdt resolver code,
-> where we overwrite the value member of properties of phandles to
-> update them with their final value. Add a comment for now to
-> indicate where we're potentially writing over const data.
+for you to fetch changes up to db27dd05b1da6e658494a2570680f8d0ddbc578c:
 
-Yes, the resolver code needs to adjust phandle values.
+  Merge tag 'davinci-for-v4.11/drivers' of git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci into next/drivers (2017-02-16 17:14:07 +0100)
 
-I think I can get rid of the resolver modifying the various phandle
-values, and instead just modify the phandle value in struct
-device_node.  At the same time, I think I can also remove all
-instances of the phandle properties ('linux,phandle', 'ibm,phandle',
-'phandle') in the live tree.  These properties should not be
-accessed directly by any code outside of the device tree framework
-since the phandle is located in the struct device_node.  A quick
-grep does not show any such accesses of the phandle properties,
-but I want to look more closely.
+----------------------------------------------------------------
+ARM: SoC driver updates
 
+Driver updates for ARM SoCs.
 
-> 
-> You can see the problem here by loading an overlay dtb into
-> the kernel via the request firmware helper method (not direct
-> loading) and then passing that tree to the resolver on an arm64
-> device. In this case, the firmware data is vmapped with KERNEL_PAGE_RO
-> and the code crashes when attempting to write to the blob to update
-> the phandle properties.
-> 
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
-> 
-> I was thinking perhaps it would work to store another __be32 variant
-> of the phandle in each device node, but then we still have a problem
+A handful of driver changes this time around. The larger changes are:
 
-That would complicate the overlay code.  Once adjustments are done to
-the phandle property value, the overlay code does not need to special
-case phandle - phandle is just another property.  I am hoping I can
-instead modify the resolver code as I described above.
+ - Reset drivers for hi3660 and zx2967
+ - AHCI driver for Davinci, acked by Tejun and brought in here due to
+   platform dependencies
+ - Cleanups of atmel-ebi (External Bus Interface)
+ - Tweaks for Rockchip GRF (General Register File) usage (kitchensink misc
+   register range on the SoCs)
+ - PM domains changes for support of two new ZTE SoCs (zx296718 and zx2967)
 
+----------------------------------------------------------------
+Andy Gross (2):
+      firmware: qcom: scm: Mask APQ8064 core clk dependency
+      firmware: qcom_scm: Add set remote state API
 
-> with properties that have phandles inside them at some offset that we
-> need to update. I guess the only real solution is to deep copy the
-> property in that case and then save around some info to free the
-> duplicated property later on?
-> 
->  drivers/of/base.c     |  2 +-
->  drivers/of/fdt.c      | 12 ++++++------
->  drivers/of/resolver.c |  3 +++
->  include/linux/of.h    |  2 +-
->  4 files changed, 11 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index fb6bb855714e..8e5f29b814c9 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -1156,7 +1156,7 @@ EXPORT_SYMBOL_GPL(of_property_count_elems_of_size);
->   * property data is too small or too large.
->   *
->   */
-> -static void *of_find_property_value_of_size(const struct device_node *np,
-> +static const void *of_find_property_value_of_size(const struct device_node *np,
->  			const char *propname, u32 min, u32 max, size_t *len)
->  {
->  	struct property *prop = of_find_property(np, propname, NULL);
-> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> index c9b5cac03b36..0635ef5dabf3 100644
-> --- a/drivers/of/fdt.c
-> +++ b/drivers/of/fdt.c
-> @@ -222,7 +222,7 @@ static void populate_properties(const void *blob,
->  
->  		pp->name   = (char *)pname;
->  		pp->length = sz;
-> -		pp->value  = (__be32 *)val;
-> +		pp->value  = val;
->  		*pprev     = pp;
->  		pprev      = &pp->next;
->  	}
-> @@ -232,6 +232,7 @@ static void populate_properties(const void *blob,
->  	 */
->  	if (!has_name) {
->  		const char *p = nodename, *ps = p, *pa = NULL;
-> +		char *b;
->  		int len;
->  
->  		while (*p) {
-> @@ -250,13 +251,12 @@ static void populate_properties(const void *blob,
->  		if (!dryrun) {
->  			pp->name   = "name";
->  			pp->length = len;
-> -			pp->value  = pp + 1;
-> +			pp->value  = b = (char *)(pp + 1);
+Arnd Bergmann (4):
+      Merge tag 'reset-for-4.11-2' of git://git.pengutronix.de/pza/linux into next/drivers
+      Merge tag 'samsung-drivers-soc-pm-domains-4.11' of git://git.kernel.org/.../krzk/linux into next/drivers
+      Merge tag 'samsung-drivers-soc-pmu-4.11-3' of git://git.kernel.org/.../krzk/linux into next/drivers
+      Merge tag 'davinci-for-v4.11/drivers' of git://git.kernel.org/.../nsekhar/linux-davinci into next/drivers
 
-I would prefer not to hide an assignment in the middle of a statement.
+Baoyou Xie (8):
+      dt-bindings: zte: add bindings document for zx2967 power domain controller
+      MAINTAINERS: add zx2967 SoC drivers to ARM ZTE architecture
+      soc: zte: Add header for PM domains specifiers
+      soc: zte: pm_domains: Prepare for supporting ARMv8 zx2967 family
+      soc: zte: pm_domains: Add support for zx296718
+      dt: bindings: add documentation for zx2967 family reset controller
+      MAINTAINERS: add zx2967 reset controller driver to ARM ZTE architecture
+      reset: zx2967: add reset controller driver for ZTE's zx2967 family
 
+Bartosz Golaszewski (6):
+      sata: ahci-da850: get the sata clock using a connection id
+      sata: ahci-da850: add device tree match table
+      sata: ahci-da850: implement a workaround for the softreset quirk
+      sata: ahci: export ahci_do_hardreset() locally
+      sata: ahci-da850: add a workaround for controller instability
+      sata: ahci-da850: un-hardcode the MPY bits
 
->  			*pprev     = pp;
->  			pprev      = &pp->next;
-> -			memcpy(pp->value, ps, len - 1);
-> -			((char *)pp->value)[len - 1] = 0;
-> -			pr_debug("fixed up name for %s -> %s\n",
-> -				 nodename, (char *)pp->value);
-> +			memcpy(b, ps, len - 1);
-> +			b[len - 1] = 0;
-> +			pr_debug("fixed up name for %s -> %s\n", nodename, b);
+Bhumika Goyal (1):
+      reset: constify reset_control_ops structures
 
-Nit: I would prefer 'value' to 'b'.  'value' would make the pr_debug longer
-that 80 characters, which could be resolved by removing 'for ':
+Boris Brezillon (4):
+      memory/atmel-ebi: Fix ns <-> cycles conversions
+      memory: atmel-ebi: Fix the test to enable generic SMC logic
+      memory: atmel-ebi: Properly handle multiple reference to the same CS
+      memory: atmel-ebi: Enable the SMC clock if specified
 
-                        pr_debug("fixed up name %s -> %s\n", nodename, value);
+Chanwoo Choi (1):
+      soc: samsung: pm_domains: Add new Exynos5433 compatible
 
->  		}
->  	}
->  
-> diff --git a/drivers/of/resolver.c b/drivers/of/resolver.c
-> index 8bf12e904fd2..6d88f8100318 100644
-> --- a/drivers/of/resolver.c
-> +++ b/drivers/of/resolver.c
-> @@ -93,6 +93,7 @@ static void adjust_overlay_phandles(struct device_node *overlay,
->  		if (phandle == OF_PHANDLE_ILLEGAL)
->  			continue;
->  
-> +		/* This is bad because we cast away const */
->  		*(uint32_t *)prop->value = cpu_to_be32(overlay->phandle);
->  	}
->  
-> @@ -154,6 +155,7 @@ static int update_usages_of_a_phandle_reference(struct device_node *overlay,
->  			goto err_fail;
->  		}
->  
-> +		/* This is bad because we cast away const */
->  		*(__be32 *)(prop->value + offset) = cpu_to_be32(phandle);
->  	}
->  
-> @@ -222,6 +224,7 @@ static int adjust_local_phandle_references(struct device_node *local_fixups,
->  
->  			phandle = be32_to_cpu(*(__be32 *)(prop->value + off));
->  			phandle += phandle_delta;
-> +			/* This is bad because we cast away const */
->  			*(__be32 *)(prop->value + off) = cpu_to_be32(phandle);
->  		}
->  	}
-> diff --git a/include/linux/of.h b/include/linux/of.h
-> index f22d4a83ca07..b0253886ef46 100644
-> --- a/include/linux/of.h
-> +++ b/include/linux/of.h
-> @@ -35,7 +35,7 @@ typedef u32 ihandle;
->  struct property {
->  	char	*name;
->  	int	length;
-> -	void	*value;
-> +	const void *value;
+Christophe Jaillet (1):
+      memory: tegra: Add a missing 'of_node_put()' call
 
-What is the result when all of the files that touch value are compiled?
-Any warnings or errors?
+Elaine Zhang (4):
+      soc: rockchip: power-domain: Support domain control in hiword-registers
+      dt-bindings: power: add RK3328 SoCs header for idle-request
+      dt-bindings: add binding for rk3328 power domains
+      soc: rockchip: power-domain: add power domain support for rk3328
 
+Heiko Stuebner (4):
+      Merge branch 'v4.11-shared/pdids' into v4.11-armsoc/drivers
+      dt-bindings: add used but undocumented rockchip grf compatible values
+      soc: rockchip: add driver handling grf setup
+      ARM: rockchip: drop rk3288 jtag/mmc switch handling
 
->  	struct property *next;
->  	unsigned long _flags;
->  	unsigned int unique_id;
-> 
+Heiner Kallweit (1):
+      reset: core: fix reset_control_put
 
--Frank
+Jiancheng Xue (1):
+      reset: ti_syscon: fix a ti_syscon_reset_status issue
+
+Krzysztof Kozlowski (2):
+      soc: samsung: pmu: Remove unused and duplicated defines
+      soc: samsung: pmu: Remove duplicated define for ARM_L2_OPTION register
+
+Linus Walleij (1):
+      bus: qcom_ebi2: default y if ARCH_QCOM
+
+Marek Szyprowski (9):
+      soc: samsung: pmu: Provide global function to get PMU regmap
+      soc: samsung: pmu: Use of_device_get_match_data helper
+      soc: samsung: pmu: Remove messages for failed memory allocation
+      soc: samsung: pmu: Add dummy support for Exynos5433 SoC
+      soc: samsung: pm_domains: Use full names in subdomains registration log
+      soc: samsung: pm_domains: Remove unused name field
+      soc: samsung: pm_domains: Remove message about failed memory allocation
+      soc: samsung: pm_domains: Read domain name from the new label property
+      soc: samsung: pmu: Add register defines for pad retention control
+
+Masahiro Yamada (1):
+      reset: uniphier: add compatible string for LD11 SD-reset block
+
+Murali Karicheri (2):
+      soc: ti: knav_dma: fix typos in trace message
+      soc: ti: knav: cleanup includes and sort header files
+
+Olof Johansson (11):
+      Merge tag 'at91-ab-4.11-drivers' of git://git.kernel.org/.../abelloni/linux into next/drivers
+      Merge tag 'reset-for-4.11' of git://git.pengutronix.de/pza/linux into next/drivers
+      Merge tag 'samsung-drivers-soc-pmu-4.11' of git://git.kernel.org/.../krzk/linux into next/drivers
+      Merge tag 'v4.11-armsoc-drivers1' of git://git.kernel.org/.../mmind/linux-rockchip into next/drivers
+      Merge tag 'keystone_soc_for_4.11' of git://git.kernel.org/.../ssantosh/linux-keystone into next/drivers
+      Merge tag 'qcom-drivers-for-4.11' of git://git.kernel.org/.../agross/linux into next/drivers
+      Merge tag 'omap-for-v4.11/drivers-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/drivers
+      Merge tag 'tegra-for-4.11-memory' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'at91-ab-4.11-drivers2' of git://git.kernel.org/.../abelloni/linux into next/drivers
+      Merge tag 'zte-pd-4.11' of git://git.kernel.org/.../shawnguo/linux into next/drivers
+      Merge tag 'samsung-drivers-soc-pmu-4.11-2' of git://git.kernel.org/.../krzk/linux into next/drivers
+
+Paul Gortmaker (1):
+      reset: make zx2967 explicitly non-modular
+
+Pramod Gurav (1):
+      MAINTAINERS: Update the files to include the Qualcomm DMA folder
+
+Ramiro Oliveira (2):
+      reset: Change shared flag from int to bool
+      reset: make optional functions really optional
+
+Sarangdhar Joshi (1):
+      soc: ti: wkup_m3_ipc: Drop wait from wkup_m3_rproc_boot_thread
+
+Stanimir Varbanov (1):
+      firmware: qcom: scm: Add empty functions to help compile testing
+
+Suman Anna (1):
+      Documentation: dt: reset: Revise typos in TI syscon reset example
+
+Zhangfei Gao (2):
+      dt-bindings: Document the hi3660 reset bindings
+      reset: hisilicon: add reset-hi3660
+
+ .../devicetree/bindings/power/pd-samsung.txt       |   5 +
+ .../bindings/reset/hisilicon,hi3660-reset.txt      |  43 +++++
+ .../devicetree/bindings/reset/ti-syscon-reset.txt  |   8 +-
+ .../devicetree/bindings/reset/uniphier-reset.txt   |  47 +++---
+ .../devicetree/bindings/reset/zte,zx2967-reset.txt |  20 +++
+ .../devicetree/bindings/soc/rockchip/grf.txt       |   4 +
+ .../bindings/soc/rockchip/power_domain.txt         |   3 +
+ .../devicetree/bindings/soc/zte/pd-2967xx.txt      |  19 +++
+ MAINTAINERS                                        |   7 +
+ arch/arm/mach-exynos/suspend.c                     |   6 +-
+ arch/arm/mach-rockchip/rockchip.c                  |  12 --
+ drivers/ata/ahci.h                                 |   3 +
+ drivers/ata/ahci_da850.c                           | 175 ++++++++++++++++++--
+ drivers/ata/libahci.c                              |  18 +-
+ drivers/bus/Kconfig                                |   1 +
+ drivers/firmware/qcom_scm-32.c                     |  18 ++
+ drivers/firmware/qcom_scm-64.c                     |  16 ++
+ drivers/firmware/qcom_scm.c                        |   8 +-
+ drivers/firmware/qcom_scm.h                        |   2 +
+ drivers/memory/atmel-ebi.c                         | 126 ++++++++------
+ drivers/memory/tegra/tegra124-emc.c                |   5 +-
+ drivers/reset/Kconfig                              |   6 +
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/core.c                               |  55 +++++--
+ drivers/reset/hisilicon/Kconfig                    |   7 +
+ drivers/reset/hisilicon/Makefile                   |   1 +
+ drivers/reset/hisilicon/reset-hi3660.c             | 126 ++++++++++++++
+ drivers/reset/reset-ti-syscon.c                    |   6 +-
+ drivers/reset/reset-uniphier.c                     |   4 +
+ drivers/reset/reset-zx2967.c                       |  99 +++++++++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/rockchip/Kconfig                       |  10 ++
+ drivers/soc/rockchip/Makefile                      |   1 +
+ drivers/soc/rockchip/grf.c                         | 134 +++++++++++++++
+ drivers/soc/rockchip/pm_domains.c                  |  63 ++++++-
+ drivers/soc/samsung/exynos-pmu.c                   |  28 ++--
+ drivers/soc/samsung/exynos5250-pmu.c               |   2 +-
+ drivers/soc/samsung/exynos5420-pmu.c               |   4 +-
+ drivers/soc/samsung/pm_domains.c                   |  31 ++--
+ drivers/soc/ti/knav_dma.c                          |   4 +-
+ drivers/soc/ti/knav_qmss_acc.c                     |  15 +-
+ drivers/soc/ti/knav_qmss_queue.c                   |  25 +--
+ drivers/soc/ti/wkup_m3_ipc.c                       |   2 -
+ drivers/soc/zte/Kconfig                            |  13 ++
+ drivers/soc/zte/Makefile                           |   5 +
+ drivers/soc/zte/zx296718_pm_domains.c              | 182 +++++++++++++++++++++
+ drivers/soc/zte/zx2967_pm_domains.c                | 143 ++++++++++++++++
+ drivers/soc/zte/zx2967_pm_domains.h                |  44 +++++
+ include/dt-bindings/power/rk3328-power.h           |  18 ++
+ include/dt-bindings/soc/zte,pm_domains.h           |  24 +++
+ include/linux/qcom_scm.h                           |  54 ++++--
+ include/linux/reset.h                              |  45 ++---
+ include/linux/soc/samsung/exynos-pmu.h             |  10 ++
+ include/linux/soc/samsung/exynos-regs-pmu.h        |  91 +++--------
+ 55 files changed, 1505 insertions(+), 296 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt
+ create mode 100644 Documentation/devicetree/bindings/soc/zte/pd-2967xx.txt
+ create mode 100644 drivers/reset/hisilicon/reset-hi3660.c
+ create mode 100644 drivers/reset/reset-zx2967.c
+ create mode 100644 drivers/soc/rockchip/grf.c
+ create mode 100644 drivers/soc/zte/Kconfig
+ create mode 100644 drivers/soc/zte/Makefile
+ create mode 100644 drivers/soc/zte/zx296718_pm_domains.c
+ create mode 100644 drivers/soc/zte/zx2967_pm_domains.c
+ create mode 100644 drivers/soc/zte/zx2967_pm_domains.h
+ create mode 100644 include/dt-bindings/power/rk3328-power.h
+ create mode 100644 include/dt-bindings/soc/zte,pm_domains.h
