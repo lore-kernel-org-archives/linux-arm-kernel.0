@@ -1,182 +1,146 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 23 Feb 2017 15:53:14 +0000
-Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
- power
-In-Reply-To: <CAMuHMdVTEbqEocYwu=KW_uXpykYkVwUgSJBnLvQp_Epn8Pjp1g@mail.gmail.com>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <94167d3a-e005-3af0-d290-a1086684d570@arm.com>
- <3c8b3f2d-8604-f999-4208-a82f171b64f2@arm.com>
- <1975396.x0czmkNPOW@aspire.rjw.lan>
- <35840771-e16f-d6fe-3a89-1b3f51f4a8f3@arm.com>
- <CAMuHMdXpKrJn9NrkAarvMtytk9gHEFcRoZLCsWBFgriUCeWo=Q@mail.gmail.com>
- <f649d707-8b0a-5ca9-b021-93ae8cf66b33@arm.com>
- <CAMuHMdVTEbqEocYwu=KW_uXpykYkVwUgSJBnLvQp_Epn8Pjp1g@mail.gmail.com>
-Message-ID: <df07e546-34a3-b03f-7c9d-248b8d7fb756@arm.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Thu, 23 Feb 2017 10:54:37 -0500
+Subject: [PATCH RFC] drm/sun4i: rgb: Add 5% tolerance to dot clock
+ frequency check
+In-Reply-To: <7603150.D9x404uVey@avalon>
+References: <20161124112231.4297-1-wens@csie.org>
+ <20161206172911.z6sbjzgqv3vfcrfh@lukather>
+ <CAGb2v65uTH_PD28KqAhhzkE5zhLt54GUb7xXNxxe0xHW0A+xjQ@mail.gmail.com>
+ <7603150.D9x404uVey@avalon>
+Message-ID: <20170223155437.GA24066@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 23/02/17 15:26, Geert Uytterhoeven wrote:
-> Hi Sudeep,
+On Wed, Dec 07, 2016 at 11:48:55AM +0200, Laurent Pinchart wrote:
+> Hello,
 > 
-> On Wed, Feb 22, 2017 at 3:32 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> On 22/02/17 13:38, Geert Uytterhoeven wrote:
->>> On Wed, Feb 22, 2017 at 12:03 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>> On 22/02/17 01:14, Rafael J. Wysocki wrote:
->>>>> On Tuesday, February 21, 2017 06:45:13 PM Sudeep Holla wrote:
->>>> Geert, so far you have failed to explain what's different from the new
->>>> state you are adding and the existing s2idle.
->>>
->>> I did explain, cfr.:
->>>   1. The power consumption figures in the cover letter:
->>>       - shallow:    8.4 W   6.2 W   (secondary CPU cores off)
->>
->> That's because your CPU_SUSPEND implementation is incomplete. You can
->> enter the same state as secondary CPU core off even with idle. It's just
->> that we can save by not entering and exiting the CPU hotplug state
->> machine. So this "shallow" state can be achieved if your CPU_SUSPEND
->> implements that state.
+> On Wednesday 07 Dec 2016 10:26:25 Chen-Yu Tsai wrote:
+> > On Wed, Dec 7, 2016 at 1:29 AM, Maxime Ripard wrote:
+> > > On Thu, Nov 24, 2016 at 07:22:31PM +0800, Chen-Yu Tsai wrote:
+> > >> The panels shipped with Allwinner devices are very "generic", i.e.
+> > >> they do not have model numbers or reliable sources of information
+> > >> for the timings (that we know of) other than the fex files shipped
+> > >> on them. The dot clock frequency provided in the fex files have all
+> > >> been rounded to the nearest MHz, as that is the unit used in them.
+> > >> 
+> > >> We were using the simple panel "urt,umsh-8596md-t" as a substitute
+> > >> for the A13 Q8 tablets in the absence of a specific model for what
+> > >> may be many different but otherwise timing compatible panels. This
+> > >> was usable without any visual artifacts or side effects, until the
+> > >> dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
+> > >> rgb: Validate the clock rate").
+> > >> 
+> > >> The reason this check fails is because the dotclock frequency for
+> > >> this model is 33.26 MHz, which is not achievable with our dot clock
+> > >> hardware, and the rate returned by clk_round_rate deviates slightly,
+> > >> causing the driver to reject the display mode.
+> > >> 
+> > >> The LCD panels have some tolerance on the dot clock frequency, even
+> > >> if it's not specified in their datasheets.
+> > >> 
+> > >> This patch adds a 5% tolerence to the dot clock check.
+> > > 
+> > > As we discussed already, I really believe this is just as arbitrary as
+> > > the current behaviour.
+> > 
+> > Yes. I agree. This patch is mainly to give something that works for
+> > people who don't care about the details, and to get some feedback
+> > from people that do.
+> > 
+> > > Some panels require an exact frequency,
 > 
-> Does that include power areas?
+> There's no such thing as an exact frequency, there will always be some 
+> tolerance (and if your display controller can really generate an exact 
+> frequency I'd be very interested in that hardware :-)).
+
+There is such thing as exact frequency when you have to worry about panel
+warranty. We are fortunate, since we can talk to the panel manufacturer and
+discuss which frequencies are tolerable inside the warranty. We usually hand
+pick a rate/mode within these constraints.
+
+Also, even though things *look* ok on the panel at a certain clock rate, running
+outside the specified clock could damage the hardware.
+
+I don't think it's unreasonable to add tolerances to drm_panel, since they will
+differ in what is acceptable. The tricky part is teasing out what the tolerances
+are.
+
+Sean
+
 > 
-
-OK, I first I didn't understand what you are referring here but I see
-some reference further in the email.
-
->>>   2. The description for patch 3/6:
->>>         As secondary CPU cores are taken offline, "shallow" suspend mode saves
->>>         slightly more power than "s2idle", but less than "deep" suspend mode.
->>>         However, unlike "deep" suspend mode, "shallow" suspend mode can be used
->>>         regardless of the presence of support for PSCI_SYSTEM_SUSPEND, which is
->>>         an optional API in PSCI v1.0.
->>
->> Yes I understood that, you need to add an extra idle states to get that
->> shallow state. We have discussed this in past to depth. On ARM64/PSCI,
->> we will that support "shallow" system suspend mode which can't be
->> defined generically. Also we can support this shallow state with s2idle.
->>
->> Your system probably not supporting all the CPU idle states. E.g.: it
->> may just support CPU ON/OFF/RET and not cluster ON/OFF/RET. Please add
->> that state to CPU_SUSPEND implementation in the firmware.
+> This is something that has been bugging me for some time now. The problem has 
+> been mostly ignored, or worked around in different ways by different drivers. 
+> I'm afraid I have no generic solution available, but I think we should try to 
+> agree on a common behaviour.
 > 
-> I can find CPU_ON and CPU_OFF in the PSCI specification, but not
-> CPU_RET?
+> I don't believe it would be reasonable to request each panel to report a 
+> tolerance, as the value is most of the time not available from the 
+> documentation (when documentation is available). Worse, I'm pretty sure that 
+> most panels documented as fixed timing can actually accept a wide range of 
+> timings. The timings reported in the datasheet are just the nominal values.
 > 
-
-No, they were just examples of idle states that CPU_SUSPEND call might
-support based on what h/w can support on a particular platform.
-
-> How is the cluster ON/OFF/RET called exactly? I can't find any CLUSTER_*
-> calls in the PSCI specification.
+> Panels that don't support multiple resolutions obviously require fixed active 
+> h/v values. Even if they can tolerate some departure from the nominal timings 
+> for the sync and porches lengths, it might not be very useful to support that 
+> as I don't expect the display controllers and encoders to be a limiting factor 
+> by not supporting the particular timings that a panel considers as nominal. On 
+> the other hand, departing from the nominal pixel clock frequency is needed as 
+> we can't achieve an exact match, and even possibly to have some control over 
+> the frame rate (although that might also require changing the sync and porches 
+> timings). Without specific information about panel tolerance, do we have any 
+> option other than picking an arbitrary value ?
 > 
-
-CPU_SUSPEND with different parameters, just look at the details on
-suspend parameters in Section 5.4.2 CPU_SUSPEND parameters: power_state
-
-
-> From a quick glance in the PSCI sources, there's some support for powering
-> down clusters.
+> > > some have a minimal frequency
+> > > but no maximum, some have a maximum frequency but no minimal, and I
+> > > guess most of them deviates by how much exactly they can take (and
+> > > possibly can take more easily a higher frequency, but are less
+> > > tolerant if you take a frequency lower than the nominal.
+> > > 
+> > > And we cannot remove that check entirely, since some bridges will
+> > > report out of range frequencies for higher modes that we know we
+> > > cannot reach.
+> > 
+> > I believe this should be handled by the bridge driver in the check
+> > callback? The callback I'm changing is attached to the connector,
+> > which I think doesn't get used if you have a bridge instead.
+> > And this only checks the pre-registered display modes, such as
+> > those specified in simple-panel or EDID.
+> > 
+> > > We could just try to see if the screen pixel clock frequency is out of
+> > > the pixel clock range we can generate, but then we will loop back on
+> > > how much out of range is it exactly, and is it within the screen
+> > > tolerancy.
+> > > 
+> > > We have an API to deal with the panel tolerancies in the DRM panel
+> > > framework, we can (and should) use it.
+> > 
+> > If you mean the get_timings callback, it's not very useful. Most of
+> > the panels in simple-panel do not use the display_timings structure,
+> > so they don't return anything. And I get that. The few datasheets
+> > I found don't list min/max tolerances for the dotclock.
+> > 
+> > The ones that do have the min/max the same as the recommended value.
+> > This may or may not be accurate. IIRC the one panel that had this
+> > that I did check didn't list min/max values in its datasheet.
+> > 
+> > > I'm not sure how others usually deal with this though. I think I
+> > > remember Eric telling me that for the RPi they just adjusted the
+> > > timings a bit, but they only really had a single panel to deal with.
+> > > 
+> > > Daniel, Eric, Laurent, Sean? Any ideas?
+> > 
+> > Yes! Feedback please! Between Maxime and me I think we only have a
+> > limited number of panels, with some overlap.
 > 
-
-Yes, the above section should provide some insight on the same.
-
->>> Perhaps, I didn't make myself clear. Let's summarize:
->>>   1. On Renesas R-Car Gen3 platforms, PSCI SYSTEM_SUSPEND is implemented,
->>
->> OK got that.
->>
->>>   2. On these platforms, PSCI SYSTEM_SUSPEND powers down the SoC, and supports
->>>      wake-up from PMIC only,
->>
->> OK
->>
->>>   3. If the user wants to use a different wake-up source, these other
->>> wake-up sources fail to wake up the system from PSCI SYSTEM_SUSPEND.
->>
->> In that case don't enter PSCI SYSTEM_SUSPEND
+> -- 
+> Regards,
 > 
-> Or prevent the system from doing that...
+> Laurent Pinchart
 > 
-
-Agreed.
-
->>>   4. Patch 3/6 adds a new "shallow" state, as it allows to save more
->>> power (the difference may be due to suboptimal cpuidle platform support on R-Car Gen3, though),
->>
->> Why can't you do that in s2idle mode. Please give me the difference
->> between your shallow state and s2idle state, not just power numbers
->> but the actual state of CPUs and the devices in the system.
-> 
-> From the Linux side, there's not much difference, except that the secondary
-> CPU cores are disabled.  As that is handled by PSCI, the difference may be
-> in the PSCI implementation.  I will have to check that...
-> 
-
-Yes it's better to check. I am afraid that both these states will be
-same if PSCI implementation is correct and hence we don't want to
-support standby suspend mode.
-
-> On these SoCs, the individual CPU cores and the SCU/L2 are in separate
-> (nested) power areas.  Perhaps these power areas are turned off when
-> disabling the CPU cores, but not when suspending them.
-> 
-
-Yes that's what I suspect and hence I said it's incomplete
-implementation of CPU_SUSPEND
-
->>> E.g. on non-PSCI platforms with an Ethernet driver that supports
->>> Wake-on-LAN, I can do:
->>>
->>>         ethtool -s eth0 wol g
->>>         echo mem > /sys/power/state
->>>
->>> and be sure that the system can be woken up by sending a WoL MagicPacket.
->>
->> Still possible with s2idle if CPU_SUSPEND is correctly implemented by
->> the platform.
-> 
-> Sure. But not automatic, as it needs fiddling with mem_sleep.
-> 
-
-Yes that's true form any thing other than "deep" state. i.e. s2idle or
-standby. If you are OK to choose standby why not s2idle ?
-
->>> On PSCI systems, the above may work, or may not work. And there's no way to
->>> find out (in an automated way) whether it will work or not.
->>>
->>> If it doesn't work, the user has to configure his system (manually) to
->>> not use "mem" state.
->>> Since v4.10-rc1, that can be done using e.g.
->>>
->>>     echo s2idle > /sys/power/mem_sleep
->>>
->>> and my patches make that automatic (for a new "shallow" state instead
->>> of "s2idle", though).
->>
->> How is that ? If "deep" is available as in your case too, why will
->> shallow become default. IIUC the user still have to write "shallow"
->> to mem_sleep.
-> 
-> After patch 4, if needed (DT property + extra wake-up sources configured),
-> psci_system_suspend_enter() will call cpu_do_idle() instead of
-> psci_system_suspend(). No need to fiddle with mem_sleep manually.
-> 
-
-I understand your intentions and but I have NACKed it with sufficient
-reasoning. I don't want to repeat them again here.
-
->> Does this platform use generic arm64 DT cpuidle driver ? I don't see so
->> from the DT.
-> 
-> I think that task isn't complete yet.
->
-
-So, all these hacks are just to cope up with that ? Sorry that's
-non-sense. Working around a firmware bug is different from working
-around the incomplete firmware implementation. We may consider former
-but for me latter is just insane.
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-Regards,
-Sudeep
+Sean Paul, Software Engineer, Google / Chromium OS
