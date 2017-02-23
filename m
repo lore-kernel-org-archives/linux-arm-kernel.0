@@ -1,194 +1,182 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 23 Feb 2017 15:45:59 +0000
-Subject: [RFT PATCH 1/2] ARM: module: split core and init PLT sections
-In-Reply-To: <1487628041-2147-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1487628041-2147-1-git-send-email-ard.biesheuvel@linaro.org>
- <1487628041-2147-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu9B+0cQ9=5ZUepiBjAB2243Hp1Thq8gSTar71SLWHCk4g@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 23 Feb 2017 15:53:14 +0000
+Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
+ power
+In-Reply-To: <CAMuHMdVTEbqEocYwu=KW_uXpykYkVwUgSJBnLvQp_Epn8Pjp1g@mail.gmail.com>
+References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
+ <94167d3a-e005-3af0-d290-a1086684d570@arm.com>
+ <3c8b3f2d-8604-f999-4208-a82f171b64f2@arm.com>
+ <1975396.x0czmkNPOW@aspire.rjw.lan>
+ <35840771-e16f-d6fe-3a89-1b3f51f4a8f3@arm.com>
+ <CAMuHMdXpKrJn9NrkAarvMtytk9gHEFcRoZLCsWBFgriUCeWo=Q@mail.gmail.com>
+ <f649d707-8b0a-5ca9-b021-93ae8cf66b33@arm.com>
+ <CAMuHMdVTEbqEocYwu=KW_uXpykYkVwUgSJBnLvQp_Epn8Pjp1g@mail.gmail.com>
+Message-ID: <df07e546-34a3-b03f-7c9d-248b8d7fb756@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 February 2017 at 22:00, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Since commit 35fa91eed817 ("ARM: kernel: merge core and init PLTs"),
-> the ARM module PLT code allocates all PLT entries in a single core
-> section, since the overhead of having a separate init PLT section is
-> not justified by the small number of PLT entries usually required for
-> init code.
->
-> However, the core and init module regions are allocated independently,
-> and there is a corner case where the core region may be allocated from
-> the VMALLOC region if the dedicated module region is exhausted, but the
-> init region, being much smaller, can still be allocated from the module
-> region. This puts the PLT entries out of reach of the relocated branch
-> instructions, defeating the whole purpose of PLTs.
->
-> So split the core and init PLT regions, and name the latter ".init.plt"
-> so it gets allocated along with (and sufficiently close to) the .init
-> sections that it serves. This is not a straight revert, given that the
-> PLT code was heavily modified since the commit in question was merged.
->
-> Fixes: 35fa91eed817 ("ARM: kernel: merge core and init PLTs")
-> Reported-by: Angus Clark <angus@angusclark.org>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
 
-I have dropped this into the patch system as #8662
+On 23/02/17 15:26, Geert Uytterhoeven wrote:
+> Hi Sudeep,
+> 
+> On Wed, Feb 22, 2017 at 3:32 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> On 22/02/17 13:38, Geert Uytterhoeven wrote:
+>>> On Wed, Feb 22, 2017 at 12:03 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>> On 22/02/17 01:14, Rafael J. Wysocki wrote:
+>>>>> On Tuesday, February 21, 2017 06:45:13 PM Sudeep Holla wrote:
+>>>> Geert, so far you have failed to explain what's different from the new
+>>>> state you are adding and the existing s2idle.
+>>>
+>>> I did explain, cfr.:
+>>>   1. The power consumption figures in the cover letter:
+>>>       - shallow:    8.4 W   6.2 W   (secondary CPU cores off)
+>>
+>> That's because your CPU_SUSPEND implementation is incomplete. You can
+>> enter the same state as secondary CPU core off even with idle. It's just
+>> that we can save by not entering and exiting the CPU hotplug state
+>> machine. So this "shallow" state can be achieved if your CPU_SUSPEND
+>> implements that state.
+> 
+> Does that include power areas?
+> 
 
-> ---
->  arch/arm/include/asm/module.h |  9 ++-
->  arch/arm/kernel/module-plts.c | 62 ++++++++++++++------
->  arch/arm/kernel/module.lds    |  1 +
->  3 files changed, 51 insertions(+), 21 deletions(-)
+OK, I first I didn't understand what you are referring here but I see
+some reference further in the email.
+
+>>>   2. The description for patch 3/6:
+>>>         As secondary CPU cores are taken offline, "shallow" suspend mode saves
+>>>         slightly more power than "s2idle", but less than "deep" suspend mode.
+>>>         However, unlike "deep" suspend mode, "shallow" suspend mode can be used
+>>>         regardless of the presence of support for PSCI_SYSTEM_SUSPEND, which is
+>>>         an optional API in PSCI v1.0.
+>>
+>> Yes I understood that, you need to add an extra idle states to get that
+>> shallow state. We have discussed this in past to depth. On ARM64/PSCI,
+>> we will that support "shallow" system suspend mode which can't be
+>> defined generically. Also we can support this shallow state with s2idle.
+>>
+>> Your system probably not supporting all the CPU idle states. E.g.: it
+>> may just support CPU ON/OFF/RET and not cluster ON/OFF/RET. Please add
+>> that state to CPU_SUSPEND implementation in the firmware.
+> 
+> I can find CPU_ON and CPU_OFF in the PSCI specification, but not
+> CPU_RET?
+> 
+
+No, they were just examples of idle states that CPU_SUSPEND call might
+support based on what h/w can support on a particular platform.
+
+> How is the cluster ON/OFF/RET called exactly? I can't find any CLUSTER_*
+> calls in the PSCI specification.
+> 
+
+CPU_SUSPEND with different parameters, just look at the details on
+suspend parameters in Section 5.4.2 CPU_SUSPEND parameters: power_state
+
+
+> From a quick glance in the PSCI sources, there's some support for powering
+> down clusters.
+> 
+
+Yes, the above section should provide some insight on the same.
+
+>>> Perhaps, I didn't make myself clear. Let's summarize:
+>>>   1. On Renesas R-Car Gen3 platforms, PSCI SYSTEM_SUSPEND is implemented,
+>>
+>> OK got that.
+>>
+>>>   2. On these platforms, PSCI SYSTEM_SUSPEND powers down the SoC, and supports
+>>>      wake-up from PMIC only,
+>>
+>> OK
+>>
+>>>   3. If the user wants to use a different wake-up source, these other
+>>> wake-up sources fail to wake up the system from PSCI SYSTEM_SUSPEND.
+>>
+>> In that case don't enter PSCI SYSTEM_SUSPEND
+> 
+> Or prevent the system from doing that...
+> 
+
+Agreed.
+
+>>>   4. Patch 3/6 adds a new "shallow" state, as it allows to save more
+>>> power (the difference may be due to suboptimal cpuidle platform support on R-Car Gen3, though),
+>>
+>> Why can't you do that in s2idle mode. Please give me the difference
+>> between your shallow state and s2idle state, not just power numbers
+>> but the actual state of CPUs and the devices in the system.
+> 
+> From the Linux side, there's not much difference, except that the secondary
+> CPU cores are disabled.  As that is handled by PSCI, the difference may be
+> in the PSCI implementation.  I will have to check that...
+> 
+
+Yes it's better to check. I am afraid that both these states will be
+same if PSCI implementation is correct and hence we don't want to
+support standby suspend mode.
+
+> On these SoCs, the individual CPU cores and the SCU/L2 are in separate
+> (nested) power areas.  Perhaps these power areas are turned off when
+> disabling the CPU cores, but not when suspending them.
+> 
+
+Yes that's what I suspect and hence I said it's incomplete
+implementation of CPU_SUSPEND
+
+>>> E.g. on non-PSCI platforms with an Ethernet driver that supports
+>>> Wake-on-LAN, I can do:
+>>>
+>>>         ethtool -s eth0 wol g
+>>>         echo mem > /sys/power/state
+>>>
+>>> and be sure that the system can be woken up by sending a WoL MagicPacket.
+>>
+>> Still possible with s2idle if CPU_SUSPEND is correctly implemented by
+>> the platform.
+> 
+> Sure. But not automatic, as it needs fiddling with mem_sleep.
+> 
+
+Yes that's true form any thing other than "deep" state. i.e. s2idle or
+standby. If you are OK to choose standby why not s2idle ?
+
+>>> On PSCI systems, the above may work, or may not work. And there's no way to
+>>> find out (in an automated way) whether it will work or not.
+>>>
+>>> If it doesn't work, the user has to configure his system (manually) to
+>>> not use "mem" state.
+>>> Since v4.10-rc1, that can be done using e.g.
+>>>
+>>>     echo s2idle > /sys/power/mem_sleep
+>>>
+>>> and my patches make that automatic (for a new "shallow" state instead
+>>> of "s2idle", though).
+>>
+>> How is that ? If "deep" is available as in your case too, why will
+>> shallow become default. IIUC the user still have to write "shallow"
+>> to mem_sleep.
+> 
+> After patch 4, if needed (DT property + extra wake-up sources configured),
+> psci_system_suspend_enter() will call cpu_do_idle() instead of
+> psci_system_suspend(). No need to fiddle with mem_sleep manually.
+> 
+
+I understand your intentions and but I have NACKed it with sufficient
+reasoning. I don't want to repeat them again here.
+
+>> Does this platform use generic arm64 DT cpuidle driver ? I don't see so
+>> from the DT.
+> 
+> I think that task isn't complete yet.
 >
-> diff --git a/arch/arm/include/asm/module.h b/arch/arm/include/asm/module.h
-> index 464748b9fd7d..ed2319663a1e 100644
-> --- a/arch/arm/include/asm/module.h
-> +++ b/arch/arm/include/asm/module.h
-> @@ -18,13 +18,18 @@ enum {
->  };
->  #endif
->
-> +struct mod_plt_sec {
-> +       struct elf32_shdr       *plt;
-> +       int                     plt_count;
-> +};
-> +
->  struct mod_arch_specific {
->  #ifdef CONFIG_ARM_UNWIND
->         struct unwind_table *unwind[ARM_SEC_MAX];
->  #endif
->  #ifdef CONFIG_ARM_MODULE_PLTS
-> -       struct elf32_shdr   *plt;
-> -       int                 plt_count;
-> +       struct mod_plt_sec      core;
-> +       struct mod_plt_sec      init;
->  #endif
->  };
->
-> diff --git a/arch/arm/kernel/module-plts.c b/arch/arm/kernel/module-plts.c
-> index 3a5cba90c971..1a79f2789325 100644
-> --- a/arch/arm/kernel/module-plts.c
-> +++ b/arch/arm/kernel/module-plts.c
-> @@ -31,9 +31,17 @@ struct plt_entries {
->         u32     lit[PLT_ENT_COUNT];
->  };
->
-> +static bool in_init(const struct module *mod, void *loc)
-> +{
-> +       return (u32)loc - (u32)mod->init_layout.base < mod->init_layout.size;
-> +}
-> +
->  u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
->  {
-> -       struct plt_entries *plt = (struct plt_entries *)mod->arch.plt->sh_addr;
-> +       struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
-> +                                                         &mod->arch.init;
-> +
-> +       struct plt_entries *plt = (struct plt_entries *)pltsec->plt->sh_addr;
->         int idx = 0;
->
->         /*
-> @@ -41,9 +49,9 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
->          * relocations are sorted, this will be the last entry we allocated.
->          * (if one exists).
->          */
-> -       if (mod->arch.plt_count > 0) {
-> -               plt += (mod->arch.plt_count - 1) / PLT_ENT_COUNT;
-> -               idx = (mod->arch.plt_count - 1) % PLT_ENT_COUNT;
-> +       if (pltsec->plt_count > 0) {
-> +               plt += (pltsec->plt_count - 1) / PLT_ENT_COUNT;
-> +               idx = (pltsec->plt_count - 1) % PLT_ENT_COUNT;
->
->                 if (plt->lit[idx] == val)
->                         return (u32)&plt->ldr[idx];
-> @@ -53,8 +61,8 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
->                         plt++;
->         }
->
-> -       mod->arch.plt_count++;
-> -       BUG_ON(mod->arch.plt_count * PLT_ENT_SIZE > mod->arch.plt->sh_size);
-> +       pltsec->plt_count++;
-> +       BUG_ON(pltsec->plt_count * PLT_ENT_SIZE > pltsec->plt->sh_size);
->
->         if (!idx)
->                 /* Populate a new set of entries */
-> @@ -174,7 +182,8 @@ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
->  int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
->                               char *secstrings, struct module *mod)
->  {
-> -       unsigned long plts = 0;
-> +       unsigned long core_plts = 0;
-> +       unsigned long init_plts = 0;
->         Elf32_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
->         Elf32_Sym *syms = NULL;
->
-> @@ -184,13 +193,15 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
->          */
->         for (s = sechdrs; s < sechdrs_end; ++s) {
->                 if (strcmp(".plt", secstrings + s->sh_name) == 0)
-> -                       mod->arch.plt = s;
-> +                       mod->arch.core.plt = s;
-> +               else if (strcmp(".init.plt", secstrings + s->sh_name) == 0)
-> +                       mod->arch.init.plt = s;
->                 else if (s->sh_type == SHT_SYMTAB)
->                         syms = (Elf32_Sym *)s->sh_addr;
->         }
->
-> -       if (!mod->arch.plt) {
-> -               pr_err("%s: module PLT section missing\n", mod->name);
-> +       if (!mod->arch.core.plt || !mod->arch.init.plt) {
-> +               pr_err("%s: module PLT section(s) missing\n", mod->name);
->                 return -ENOEXEC;
->         }
->         if (!syms) {
-> @@ -213,16 +224,29 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
->                 /* sort by type and symbol index */
->                 sort(rels, numrels, sizeof(Elf32_Rel), cmp_rel, NULL);
->
-> -               plts += count_plts(syms, dstsec->sh_addr, rels, numrels);
-> +               if (strncmp(secstrings + dstsec->sh_name, ".init", 5) != 0)
-> +                       core_plts += count_plts(syms, dstsec->sh_addr, rels,
-> +                                               numrels);
-> +               else
-> +                       init_plts += count_plts(syms, dstsec->sh_addr, rels,
-> +                                               numrels);
->         }
->
-> -       mod->arch.plt->sh_type = SHT_NOBITS;
-> -       mod->arch.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> -       mod->arch.plt->sh_addralign = L1_CACHE_BYTES;
-> -       mod->arch.plt->sh_size = round_up(plts * PLT_ENT_SIZE,
-> -                                         sizeof(struct plt_entries));
-> -       mod->arch.plt_count = 0;
-> -
-> -       pr_debug("%s: plt=%x\n", __func__, mod->arch.plt->sh_size);
-> +       mod->arch.core.plt->sh_type = SHT_NOBITS;
-> +       mod->arch.core.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> +       mod->arch.core.plt->sh_addralign = L1_CACHE_BYTES;
-> +       mod->arch.core.plt->sh_size = round_up(core_plts * PLT_ENT_SIZE,
-> +                                              sizeof(struct plt_entries));
-> +       mod->arch.core.plt_count = 0;
-> +
-> +       mod->arch.init.plt->sh_type = SHT_NOBITS;
-> +       mod->arch.init.plt->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-> +       mod->arch.init.plt->sh_addralign = L1_CACHE_BYTES;
-> +       mod->arch.init.plt->sh_size = round_up(init_plts * PLT_ENT_SIZE,
-> +                                              sizeof(struct plt_entries));
-> +       mod->arch.init.plt_count = 0;
-> +
-> +       pr_debug("%s: plt=%x, init.plt=%x\n", __func__,
-> +                mod->arch.core.plt->sh_size, mod->arch.init.plt->sh_size);
->         return 0;
->  }
-> diff --git a/arch/arm/kernel/module.lds b/arch/arm/kernel/module.lds
-> index 05881e2b414c..eacb5c67f61e 100644
-> --- a/arch/arm/kernel/module.lds
-> +++ b/arch/arm/kernel/module.lds
-> @@ -1,3 +1,4 @@
->  SECTIONS {
->         .plt : { BYTE(0) }
-> +       .init.plt : { BYTE(0) }
->  }
-> --
-> 2.7.4
->
+
+So, all these hacks are just to cope up with that ? Sorry that's
+non-sense. Working around a firmware bug is different from working
+around the incomplete firmware implementation. We may consider former
+but for me latter is just insane.
+
+-- 
+Regards,
+Sudeep
