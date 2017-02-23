@@ -1,29 +1,93 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Thu, 23 Feb 2017 13:44:47 +0100
-Subject: [PATCH] ARM: dts: BCM5301X: Add basic DT for Linksys EA9500
-In-Reply-To: <CACna6rzN-OQv4UJoRso_Kyf1rCEtuU5Lu9LDjvTTt011UgrA=Q@mail.gmail.com>
-References: <20170223104025.5755-1-zajec5@gmail.com>
- <bd36df47-cefe-5736-e02c-621a21ae1b7a@openwrt.org>
- <CACna6rzN-OQv4UJoRso_Kyf1rCEtuU5Lu9LDjvTTt011UgrA=Q@mail.gmail.com>
-Message-ID: <5c57772b-71fd-d9e2-efe6-1175cf048e0b@openwrt.org>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Thu, 23 Feb 2017 20:48:24 +0800
+Subject: [PATCH v20 2/4] mailbox: mediatek: Add Mediatek CMDQ driver
+In-Reply-To: <CABb+yY2dzcR4fYvrSQK5jemwUSkYVJ8aWEmiE6wstw-Yyqy7bw@mail.gmail.com>
+References: <1483499169-16329-1-git-send-email-hs.liao@mediatek.com>
+ <1483499169-16329-3-git-send-email-hs.liao@mediatek.com>
+ <CABb+yY23TUB8NpmpiO=cCmVFAVJMqKPfGgX14j+_Yj7tJvMOuQ@mail.gmail.com>
+ <1485419833.990.1.camel@mtksdaap41>
+ <CABb+yY13VaFpYz6EExvAXLpAqEWDJ4R50WG0DYbXO6iCESbA5A@mail.gmail.com>
+ <1486359476.11424.33.camel@mtksdaap41>
+ <CABb+yY0jCGqnrMLkkTNoEmLX4jDstWh7-UYhDyKjV-gFOnxpsg@mail.gmail.com>
+ <1487733150.15869.11.camel@mtksdaap41>
+ <CABb+yY2dzcR4fYvrSQK5jemwUSkYVJ8aWEmiE6wstw-Yyqy7bw@mail.gmail.com>
+Message-ID: <1487854104.17813.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Rafal,
+On Thu, 2017-02-23 at 09:40 +0530, Jassi Brar wrote:
+> On Wed, Feb 22, 2017 at 8:42 AM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+> > On Thu, 2017-02-16 at 21:02 +0530, Jassi Brar wrote:
+> >> On Mon, Feb 6, 2017 at 11:07 AM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+> >> > Hi Jassi,
+> >> >
+> >> > On Wed, 2017-02-01 at 10:52 +0530, Jassi Brar wrote:
+> >> >> On Thu, Jan 26, 2017 at 2:07 PM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+> >> >> > Hi Jassi,
+> >> >> >
+> >> >> > On Thu, 2017-01-26 at 10:08 +0530, Jassi Brar wrote:
+> >> >> >> On Wed, Jan 4, 2017 at 8:36 AM, HS Liao <hs.liao@mediatek.com> wrote:
+> >> >> >>
+> >> >> >> > diff --git a/drivers/mailbox/mtk-cmdq-mailbox.c b/drivers/mailbox/mtk-cmdq-mailbox.c
+> >> >> >> > new file mode 100644
+> >> >> >> > index 0000000..747bcd3
+> >> >> >> > --- /dev/null
+> >> >> >> > +++ b/drivers/mailbox/mtk-cmdq-mailbox.c
+> >> >> >>
+> >> >> >> ...
+> >> >> >>
+> >> >> >> > +static void cmdq_task_exec(struct cmdq_pkt *pkt, struct cmdq_thread *thread)
+> >> >> >> > +{
+> >> >> >> > +       struct cmdq *cmdq;
+> >> >> >> > +       struct cmdq_task *task;
+> >> >> >> > +       unsigned long curr_pa, end_pa;
+> >> >> >> > +
+> >> >> >> > +       cmdq = dev_get_drvdata(thread->chan->mbox->dev);
+> >> >> >> > +
+> >> >> >> > +       /* Client should not flush new tasks if suspended. */
+> >> >> >> > +       WARN_ON(cmdq->suspended);
+> >> >> >> > +
+> >> >> >> > +       task = kzalloc(sizeof(*task), GFP_ATOMIC);
+> >> >> >> > +       task->cmdq = cmdq;
+> >> >> >> > +       INIT_LIST_HEAD(&task->list_entry);
+> >> >> >> > +       task->pa_base = dma_map_single(cmdq->mbox.dev, pkt->va_base,
+> >> >> >> > +                                      pkt->cmd_buf_size, DMA_TO_DEVICE);
+> >> >> >> >
+> >> >> >> You seem to parse the requests and responses, that should ideally be
+> >> >> >> done in client driver.
+> >> >> >> Also, we are here in atomic context, can you move it in client driver
+> >> >> >> (before the spin_lock)?
+> >> >> >> Maybe by adding a new 'pa_base' member as well in 'cmdq_pkt'.
+> >> >> >
+> >> >> > will do
+> >> >
+> >> > I agree with moving dma_map_single out from spin_lock.
+> >> >
+> >> > However, mailbox clients cannot map virtual memory to mailbox
+> >> > controller's device for DMA.
+> >> >
+> >> If DMA is a resource used by MBox to transfer data, then yes the
+> >> mapping needs to be done in the Mbox controller driver. To map memory
+> >> outside of spinlock, you could schedule a tasklet in send_data() ?
+> >
+> > Hi Jassi,
+> >
+> > For CMDQ, the order of CMDQ tasks should be guaranteed.
+> > However, it seems tasklet cannot ensure this requirement.
+> >
+> > Quote from Linux Device Drivers 3rd edition ch7.
+> > "void tasklet_schedule(struct tasklet_struct *t);
+> >   Schedule the tasklet for execution. If a tasklet is scheduled again
+> > before it has a chance to run, it runs only once...."
+> >
+> Not sure what bothers you.
+> If you only add requests to a list, protected by some spinlock, during
+> send_datam you could always iterate over (submit) requests in the
+> order you queued them.
 
-On 2017-02-23 13:29, Rafa? Mi?ecki wrote:
-> On 23 February 2017 at 13:27, Imre Kaloz <kaloz@openwrt.org> wrote:
->> As discussed for other platforms as well, please use the board's name as the
->> same board can end up being sold under multiple model numbers.
->>
->> So please rename the file to bcm47094-linksys-panamera.dts
-> Huh? Where did you get panamera name from?!
-Your manners shine on these dark days of winter. For about a decade now, 
-http://192.168.1.1/sysinfo.cgi will show you quite a bit of information 
-if you are too lazy to look into the GPL tarball or at the original 
-bootlogs.
+Hi Jassi,
 
+OK. I will do it.
 
-Best,
-
-Imre
+Thanks,
+HS
