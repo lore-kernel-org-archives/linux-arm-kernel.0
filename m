@@ -1,112 +1,44 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 23 Feb 2017 12:17:35 +0100
-Subject: [PATCH v5 3/3] [media] s5p-mfc: Check and set
- 'v4l2_pix_format:field' field in try_fmt
-In-Reply-To: <ed287d5a-687b-b344-3f20-10154071852c@osg.samsung.com>
-References: <20170221192059.29745-1-thibault.saunier@osg.samsung.com>
- <CGME20170221192135epcas4p1811fa9ce35481d42144bdab368c9243a@epcas4p1.samsung.com>
- <20170221192059.29745-4-thibault.saunier@osg.samsung.com>
- <78444dcd-169f-0c16-0e09-6b71d1a502b2@samsung.com>
- <ed287d5a-687b-b344-3f20-10154071852c@osg.samsung.com>
-Message-ID: <ded4b715-39a2-adfa-0f2d-7276a0024e29@samsung.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 23 Feb 2017 11:21:19 +0000
+Subject: [GIT PULL] arm64: dts: juno: fixes for v4.11
+Message-ID: <00e4e03a-7d74-d7ac-ca55-21311071ed66@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.02.2017 14:10, Thibault Saunier wrote:
-> Hello,
->
-> On 02/22/2017 06:29 AM, Andrzej Hajda wrote:
->> On 21.02.2017 20:20, Thibault Saunier wrote:
->>> It is required by the standard that the field order is set by the
->>> driver.
->>>
->>> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
->>>
->>> ---
->>>
->>> Changes in v5:
->>> - Just adapt the field and never error out.
->>>
->>> Changes in v4: None
->>> Changes in v3:
->>> - Do not check values in the g_fmt functions as Andrzej explained in previous review
->>>
->>> Changes in v2:
->>> - Fix a silly build error that slipped in while rebasing the patches
->>>
->>>   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 3 +++
->>>   1 file changed, 3 insertions(+)
->>>
->>> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
->>> index 0976c3e0a5ce..44ed2afe0780 100644
->>> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
->>> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
->>> @@ -386,6 +386,9 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
->>>   	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
->>>   	struct s5p_mfc_fmt *fmt;
->>>   
->>> +	if (f->fmt.pix.field == V4L2_FIELD_ANY)
->>> +		f->fmt.pix.field = V4L2_FIELD_NONE;
->>> +
->> In previous version the only supported field type was NONE, here you
->> support everything.
->> If the only supported format is none you should set 'field'
->> unconditionally to NONE, nothing more.
-> Afaict we  support 2 things:
->
->    1. NONE
->    2. INTERLACE
->
-> Until now we were not checking what was supported or not and basically 
-> ignoring that info, this patch
-> keeps the old behaviour making sure to be compliant.
->
-> I had a doubt and was pondering doing:
->
-> ``` diff
->
-> +	if (f->fmt.pix.field != V4L2_FIELD_INTERLACED)
-> +		f->fmt.pix.field = V4L2_FIELD_NONE;
-> +
->
-> ```
->
-> instead, it is probably more correct, do you think it is what should be 
-> done here?
+Hi ARM SoC Team,
 
-I have realized I have forgot that it is not simple mem2mem device, it
-is decoder. It is feed with compressed data which is just byte stream,
-the only valid field value on output side is V4L2_FIELD_NONE.
-About possible interlacing we could only say in case of capture side.
-And in this case there are multiple questions:
-- how MFC decodes stream with interlaced content?
-- is it possible to convince it to decode it as user asks?
-- does it perform (de-)interlacing?
-- what is implemented in the driver?
+Sorry for sending fixes during the merge window. Since I will be off for
+next 2 weeks, I am sending in advance. For that reason, it's based on my
+earlier juno updates that I sent for v4.11. Please pull at your ease.
 
-After answering above questions we will be able to say how fmt.pix.field
-should be treated on capture side.
-And similar question we can pose in case of encoder.
+-- 
+Regards,
+Sudeep
 
-So simple patch and so many doubts.
+The following changes since commit 1492a864364ed46be2abeaaaf3b1a248f19e6644:
 
-Regards
-Andrzej
+  arm64: dts: juno: remove motherboard USB node (2017-01-18 14:01:20 +0000)
 
->
-> Regards,
->
-> Thibault
->
->> Regards
->> Andrzej
->>
->>>   	mfc_debug(2, "Type is %d\n", f->type);
->>>   	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
->>>   		fmt = find_format(f, MFC_FMT_DEC);
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
+tags/juno-fixes-4.11
+
+for you to fetch changes up to 7e6a69ee954caf8dd8c98f70c8ee894c8ebfdcf0:
+
+  arm64: dts: juno: update definition for programmable replicator
+(2017-02-21 16:02:02 +0000)
+
+----------------------------------------------------------------
+ARMv8 Juno DT fix for v4.11
+
+Just single patch to fix replicator in order to prevent overflows at
+the source and reduce the back pressure by splitting the trace output
+to TPIU and ETR.
+
+----------------------------------------------------------------
+Mike Leach (1):
+      arm64: dts: juno: update definition for programmable replicator
+
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
