@@ -1,80 +1,58 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Thu, 23 Feb 2017 08:25:06 +0800
-Subject: [RESEND PATCH v7 0/7] Rockchip dw-mipi-dsi driver
-In-Reply-To: <CAOw6vbJO_TQnSAu6w7XHiMSYA+gB1tyHOvB7BMc7Q2+OMY=9=w@mail.gmail.com>
-References: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
- <20170221153918.GA25168@art_vandelay>
- <20170222134314.016a4940.john@metanate.com>
- <CAOw6vbJoS2P5m31+bgWw3Sghz=EVGj0fpLgCFnbVEhzRujNCLw@mail.gmail.com>
- <20170222185543.71e20187.john@metanate.com>
- <CAOw6vbJO_TQnSAu6w7XHiMSYA+gB1tyHOvB7BMc7Q2+OMY=9=w@mail.gmail.com>
-Message-ID: <58AE2BE2.7040006@rock-chips.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 23 Feb 2017 02:25:53 +0200
+Subject: <Query> Looking more details and reasons for using orig_add_limit.
+In-Reply-To: <20170222172541.49b7cbb1@vento.lan>
+References: <def87360266193184dc013a055ec3869@codeaurora.org>
+ <2944633.ljab0sy3Dg@avalon> <20170222172541.49b7cbb1@vento.lan>
+Message-ID: <1721361.FT1A3EpsKm@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mauro,
 
-On 02/23/2017 06:10 AM, Sean Paul wrote:
-> On Wed, Feb 22, 2017 at 1:55 PM, John Keeping <john@metanate.com> wrote:
->> On Wed, 22 Feb 2017 10:57:05 -0500, Sean Paul wrote:
->>
->>> On Wed, Feb 22, 2017 at 8:43 AM, John Keeping <john@metanate.com> wrote:
->>>> On Tue, 21 Feb 2017 10:39:18 -0500, Sean Paul wrote:
->>>>
->>>>> On Mon, Feb 20, 2017 at 04:02:16PM +0800, Chris Zhong wrote:
->>>>>> Hi all
->>>>>>
->>>>>> [Resend this v7 version series, since there are 5 mails have gone missing, last
->>>>>> week]
->>>>>>
->>>>>> This version does not change the existing v6 patches, just to add the
->>>>>> "bandwidth fix" patch back, since we really need it.
->>>>>>
->>>>>> This patch serial is for RK3399 MIPI DSI. The MIPI DSI controller of
->>>>>> RK3399 is almost the same as RK3288, except a little bit of difference
->>>>>> in phy clock controlling and port id selection register. These patches
->>>>>> add RK3399 support and the power domain support.
->>>>>>
->>>>>> And these patches base on John Keeping's v3 patches[0], it fixes many bugs,
->>>>>> they have been tested on rk3288 evb board.
->>>>> Do we have an ETA on when John is planning on respinning his patchset based on
->>>>> review feedback?
->>>> I have all of the changes queued but I was hoping to find some time to
->>>> test the latest version before sending it out; unfortunately everything
->>>> else is more important at the moment.  If you're happy with the caveat
->>>> that the latest changes are build tested only I can probably send it
->>>> out this afternoon.
->>> I suppose my answer depends on when the tested version will be
->>> available, or perhaps Chris can test the new set for you? I don't have
->>> any rockchip devices with mipi, so i'm not much help.
->> None of the changes scare me that much, so I don't expect testing to
->> throw up any problems but I don't like throwing out patches without at
->> least a basic test run.
->>
-> Agreed. I don't think we're in such desperate need that we should
-> forego testing. If Chris can provide Tested-by, you should send them
-> out, otherwise I'm happy to wait.
->
-> Thanks for the update,
->
-> Sean
+On Wednesday 22 Feb 2017 17:25:41 Mauro Carvalho Chehab wrote:
+> Em Wed, 22 Feb 2017 21:53:08 +0200 Laurent Pinchart escreveu:
+> > On Tuesday 21 Feb 2017 06:20:58 Sodagudi Prasad wrote:
+> >> Hi mchehab/linux-media,
+> >> 
+> >> It is not clear why KERNEL_DS was set explicitly here. In this path
+> >> video_usercopy() gets  called  and it
+> >> copies the ?struct v4l2_buffer? struct to user space stack memory.
+> >> 
+> >> Can you please share reasons for setting to KERNEL_DS here?
+> > 
+> > It's a bit of historical hack. To implement compat ioctl handling, we copy
+> > the ioctl 32-bit argument from userspace, turn it into a native 64-bit
+> > ioctl argument, and call the native ioctl code. That code expects the
+> > argument to be stored in userspace memory and uses get_user() and
+> > put_user() to access it. As the 64-bit argument now lives in kernel
+> > memory, my understanding is that we fake things up with KERNEL_DS.
+> 
+> Precisely. Actually, if I remember well, this was needed to pass pointer
+> arguments from 32 bits userspace to 64 bits kernelspace. There are a lot of
+> V4L2 ioctls that pass structures with pointers on it. Setting DS cause
+> those pointers to do the right thing, but yeah, it is hackish.
 
-Sure, I am very glad to test them.
-Actually, I have picked the v3 patches to cros kernel (changed a little 
-bit).
-So far, my 2 mipi dsi panels works well. The cros patches:
-https://chromium-review.googlesource.com/#/c/430596/
-...
-https://chromium-review.googlesource.com/#/c/442347/
+We should restructure the core ioctl code to decouple copy from/to user and 
+ioctl execution (this might just be a matter of exporting a currently static 
+function), and change the compat code to perform the copy/from to user 
+directly when converting between 32-bit and 64-bit structures (dropping all 
+the alloc in userspace hacks) and call the ioctl execution handler. That will 
+fix the problem. Any volunteer ? :-)
 
->
->> I might have time to test on Friday, but I expect Chris has more time to
->> devote to this than I do, so maybe it's better if I send the patches out
->> tomorrow.
->>
->>
->> John
->
->
+> This used to work fine on x86_64 (when such code was written e. g. Kernel
+> 2.6.1x). I never tested myself on ARM64, but I guess it used to work, as we
+> received some patches fixing support for some ioctl compat code due to
+> x86_64/arm64 differences in the past.
+> 
+> On what Kernel version it started to cause troubles? 4.9? If so, then
+> maybe the breakage is a side effect of VM stack changes.
+> 
+> > The ioctl code should be refactored to get rid of this hack.
+> 
+> Agreed.
 
 -- 
-Chris Zhong
+Regards,
+
+Laurent Pinchart
