@@ -1,79 +1,90 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Feb 2017 10:26:57 +0000
-Subject: [PATCH v2 22/22] arm/arm64: Add hyp-stub API documentation
-In-Reply-To: <20170223102657.23100-1-marc.zyngier@arm.com>
-References: <20170223102657.23100-1-marc.zyngier@arm.com>
-Message-ID: <20170223102657.23100-23-marc.zyngier@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 23 Feb 2017 11:32:26 +0100
+Subject: [PATCH 2/2] drivers: pwm: pwm-atmel: add support to allow run
+ time changing of pwm parameters
+In-Reply-To: <f963def2-6d82-3bf7-22fa-8915f408ca54@microchip.com>
+References: <1487839120-13650-1-git-send-email-claudiu.beznea@microchip.com>
+ <1487839120-13650-3-git-send-email-claudiu.beznea@microchip.com>
+ <20170223092148.5qmxy62xkufwbsrw@piout.net>
+ <f963def2-6d82-3bf7-22fa-8915f408ca54@microchip.com>
+Message-ID: <20170223113226.7b24ffb6@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to help people understanding the hyp-stub API that exists
-between the host kernel and the hypervisor mode (whether a hypervisor
-has been installed or not), let's document said API.
+Hi Claudiu,
 
-As as with any form of documentation, I expect it to become obsolete
-and completely misleading within 20 minutes after having being merged.
+On Thu, 23 Feb 2017 12:25:58 +0200
+m18063 <Claudiu.Beznea@microchip.com> wrote:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- Documentation/virtual/kvm/arm/hyp-abi.txt | 49 +++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
- create mode 100644 Documentation/virtual/kvm/arm/hyp-abi.txt
+> Hi,
+> 
+> 
+> On 23.02.2017 11:21, Alexandre Belloni wrote:
+> > On 23/02/2017 at 10:38:40 +0200, Claudiu Beznea wrote:  
+> >> sama5d2 supports changing of pwm parameters like period and
+> >> duty factor without first to disable pwm. Since pwm code
+> >> is supported by more than one SoC add allow_runtime_cfg
+> >> parameter to atmel_pwm_chip data structure. This will be
+> >> filled statically for every SoC, saved in pwm specific
+> >> structure at probing time and checked while configuring
+> >> the device. Based on this, pwm clock will not be
+> >> enabled/disabled while configuring if it still enabled.
+> >>
+> >> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> >> ---
+> >>  drivers/pwm/pwm-atmel.c | 24 ++++++++++++++++++------
+> >>  1 file changed, 18 insertions(+), 6 deletions(-)
+> >>
+> >> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+> >> index 4406639..9e1dece 100644
+> >> --- a/drivers/pwm/pwm-atmel.c
+> >> +++ b/drivers/pwm/pwm-atmel.c
+> >> @@ -68,6 +68,8 @@ struct atmel_pwm_chip {
+> >>  
+> >>  	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
+> >>  		       unsigned long dty, unsigned long prd);
+> >> +
+> >> +	bool allow_runtime_cfg;
+> >>  };
+> >>  
+> >>  static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
+> >> @@ -114,7 +116,8 @@ static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> >>  	u32 val;
+> >>  	int ret;
+> >>  
+> >> -	if (pwm_is_enabled(pwm) && (period_ns != pwm_get_period(pwm))) {
+> >> +	if (!atmel_pwm->allow_runtime_cfg &&
+> >> +	    pwm_is_enabled(pwm) && (period_ns != pwm_get_period(pwm))) {
+> >>  		dev_err(chip->dev, "cannot change PWM period while enabled\n");
+> >>  		return -EBUSY;
+> >>  	}
+> >> @@ -139,10 +142,12 @@ static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+> >>  	do_div(div, period_ns);
+> >>  	dty = prd - div;
+> >>  
+> >> -	ret = clk_enable(atmel_pwm->clk);
+> >> -	if (ret) {
+> >> -		dev_err(chip->dev, "failed to enable PWM clock\n");
+> >> -		return ret;
+> >> +	if (!pwm_is_enabled(pwm)) {
+> >> +		ret = clk_enable(atmel_pwm->clk);
+> >> +		if (ret) {
+> >> +			dev_err(chip->dev, "failed to enable PWM clock\n");
+> >> +			return ret;
+> >> +		}
+> >>  	}
+> >>    
+> > It is probably worth switching to atomic PWM instead of changing this
+> > function. This would simplify the whole driver.  
+> I was thinking to switch to atomic PWM in a future patch.
 
-diff --git a/Documentation/virtual/kvm/arm/hyp-abi.txt b/Documentation/virtual/kvm/arm/hyp-abi.txt
-new file mode 100644
-index 000000000000..af6463f4de39
---- /dev/null
-+++ b/Documentation/virtual/kvm/arm/hyp-abi.txt
-@@ -0,0 +1,49 @@
-+* Internal ABI between the kernel and HYP
-+
-+This file documents the interaction between the Linux kernel and the
-+hypervisor layer when running Linux as a hypervisor (for example
-+KVM). It doesn't cover the interaction of the kernel with the
-+hypervisor when running as a guest (under Xen, KVM or any other
-+hypervisor), or any hypervisor-specific interaction when the kernel is
-+used as a host.
-+
-+On arm and arm64 (without VHE), the kernel doesn't run in hypervisor
-+mode, but still needs to interact with it, allowing a built-in
-+hypervisor to be either installed or torn down.
-+
-+In order to achieve this, the kernel must be booted at HYP (arm) or
-+EL2 (arm64), allowing it to install a set of stubs before dropping to
-+SVC/EL1. These stubs are accessible by using a 'hvc #0' instruction,
-+and only act on individual CPUs.
-+
-+Unless specified otherwise, any built-in hypervisor must implement
-+these functions (see arch/arm{,64}/include/asm/virt.h):
-+
-+* r0/x0 = HVC_GET_VECTORS
-+
-+  Return the current value of HVBAR/VBAR_EL2 in r0/x0.
-+
-+* r0/x0 = HVC_SET_VECTORS
-+  r1/x1 = vectors
-+
-+  Set HVBAR/VBAR_EL2 to 'vectors' to enable a hypervisor. 'vectors'
-+  must be a physical address, and respect the alignment requirements
-+  of the architecture. Only implemented by the initial stubs.
-+
-+* r0/x0 = HVC_RESET_VECTORS
-+
-+  Turn HYP/EL2 MMU off, and reset HVBAR/VBAR_EL2 to the default
-+  value. This effectively disables an existing hypervisor.
-+
-+* r0/x0 = HVC_SOFT_RESTART
-+  r1/x1 = restart address
-+  x2 = x0's value when entering the next payload (arm64)
-+  x3 = x1's value when entering the next payload (arm64)
-+  x4 = x2's value when entering the next payload (arm64)
-+
-+  Mask all exceptions, disable the MMU, move the arguments into place
-+  (arm64 only), and jump to the restart address while at HYP/EL2. This
-+  hypercall is not expected to return to its caller.
-+
-+Any other value of r0/x0 triggers a hypervisor-specific handling,
-+which is not documented here.
--- 
-2.11.0
+Actually, I think it's better to do it before adding support for the
+new IP (even before patch 1), but maybe I'm the only one to think
+so :-).
+
+Note that switching to the atomic API is not a big (actually, it should
+even simplify the code).
+
+Regards,
+
+Boris
