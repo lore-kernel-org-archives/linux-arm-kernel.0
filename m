@@ -1,95 +1,49 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 23 Feb 2017 16:05:43 +0800
-Subject: [PATCH 11/11] drm/sun4i: Add backend and tcon pointers to sun4i_crtc
+Date: Thu, 23 Feb 2017 16:05:40 +0800
+Subject: [PATCH 08/11] drm/sun4i: tv: Switch to drm_of_find_possible_crtcs
 In-Reply-To: <20170223080543.6659-1-wens@csie.org>
 References: <20170223080543.6659-1-wens@csie.org>
-Message-ID: <20170223080543.6659-12-wens@csie.org>
+Message-ID: <20170223080543.6659-9-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun4i_crtc controls the backend and tcon hardware blocks of the display
-pipeline. Instead of doing so through the master drm structure, leave
-pointers to the corresponding backend and tcon in itself.
+Now that the crtcs have their .port field set properly, we can use
+drm_of_find_possible_crtcs to find the connected crtcs, instead of
+hardcoding the first crtc as usable. The new code also defers binding
+when the upstream crtc hasn't been registered yet.
 
-Also drop the drm_device pointer, since it is no longer needed.
-
-The next step forward would be to pass the pointers in through
-sun4i_crtc_init as parameters. This would make it easier to support
-multiple display pipelines layer on.
+This makes it easier to support multiple tcons/crtcs.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_crtc.c | 12 +++++-------
- drivers/gpu/drm/sun4i/sun4i_crtc.h |  3 ++-
- 2 files changed, 7 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_tv.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-index 4a30932643c3..018239870a0b 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
-@@ -52,12 +52,11 @@ static void sun4i_crtc_atomic_flush(struct drm_crtc *crtc,
- 				    struct drm_crtc_state *old_state)
- {
- 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
--	struct sun4i_drv *drv = scrtc->drv;
- 	struct drm_pending_vblank_event *event = crtc->state->event;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
+index c6f47222e8fc..32ed5fdf0c4d 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
+@@ -19,6 +19,7 @@
+ #include <drm/drmP.h>
+ #include <drm/drm_atomic_helper.h>
+ #include <drm/drm_crtc_helper.h>
++#include <drm/drm_of.h>
+ #include <drm/drm_panel.h>
  
- 	DRM_DEBUG_DRIVER("Committing plane changes\n");
+ #include "sun4i_backend.h"
+@@ -623,7 +624,12 @@ static int sun4i_tv_bind(struct device *dev, struct device *master,
+ 		goto err_disable_clk;
+ 	}
  
--	sun4i_backend_commit(drv->backend);
-+	sun4i_backend_commit(scrtc->backend);
+-	tv->encoder.possible_crtcs = BIT(0);
++	tv->encoder.possible_crtcs = drm_of_find_possible_crtcs(drm,
++								dev->of_node);
++	if (!tv->encoder.possible_crtcs) {
++		ret = -EPROBE_DEFER;
++		goto err_disable_clk;
++	}
  
- 	if (event) {
- 		crtc->state->event = NULL;
-@@ -74,11 +73,10 @@ static void sun4i_crtc_atomic_flush(struct drm_crtc *crtc,
- static void sun4i_crtc_disable(struct drm_crtc *crtc)
- {
- 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
--	struct sun4i_drv *drv = scrtc->drv;
- 
- 	DRM_DEBUG_DRIVER("Disabling the CRTC\n");
- 
--	sun4i_tcon_disable(drv->tcon);
-+	sun4i_tcon_disable(scrtc->tcon);
- 
- 	if (crtc->state->event && !crtc->state->active) {
- 		spin_lock_irq(&crtc->dev->event_lock);
-@@ -92,11 +90,10 @@ static void sun4i_crtc_disable(struct drm_crtc *crtc)
- static void sun4i_crtc_enable(struct drm_crtc *crtc)
- {
- 	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
--	struct sun4i_drv *drv = scrtc->drv;
- 
- 	DRM_DEBUG_DRIVER("Enabling the CRTC\n");
- 
--	sun4i_tcon_enable(drv->tcon);
-+	sun4i_tcon_enable(scrtc->tcon);
- }
- 
- static const struct drm_crtc_helper_funcs sun4i_crtc_helper_funcs = {
-@@ -125,7 +122,8 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm)
- 	scrtc = devm_kzalloc(drm->dev, sizeof(*scrtc), GFP_KERNEL);
- 	if (!scrtc)
- 		return ERR_PTR(-ENOMEM);
--	scrtc->drv = drv;
-+	scrtc->backend = drv->backend;
-+	scrtc->tcon = drv->tcon;
- 
- 	/* Create our layers */
- 	scrtc->layers = sun4i_layers_init(drm);
-diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.h b/drivers/gpu/drm/sun4i/sun4i_crtc.h
-index 0a888f73c983..cd0e633cce3a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_crtc.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_crtc.h
-@@ -17,7 +17,8 @@ struct sun4i_crtc {
- 	struct drm_crtc			crtc;
- 	struct drm_pending_vblank_event	*event;
- 
--	struct sun4i_drv		*drv;
-+	struct sun4i_backend		*backend;
-+	struct sun4i_tcon		*tcon;
- 	struct sun4i_layer		**layers;
- };
- 
+ 	drm_connector_helper_add(&tv->connector,
+ 				 &sun4i_tv_comp_connector_helper_funcs);
 -- 
 2.11.0
