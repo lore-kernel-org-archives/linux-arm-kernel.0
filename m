@@ -1,108 +1,29 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Thu, 23 Feb 2017 20:33:11 +0800
-Subject: [RESEND PATCH] PM / AVS: rockchip-io: add io selectors and supplies
- for rk3328
-Message-ID: <1487853191-10994-1-git-send-email-david.wu@rock-chips.com>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Thu, 23 Feb 2017 13:44:47 +0100
+Subject: [PATCH] ARM: dts: BCM5301X: Add basic DT for Linksys EA9500
+In-Reply-To: <CACna6rzN-OQv4UJoRso_Kyf1rCEtuU5Lu9LDjvTTt011UgrA=Q@mail.gmail.com>
+References: <20170223104025.5755-1-zajec5@gmail.com>
+ <bd36df47-cefe-5736-e02c-621a21ae1b7a@openwrt.org>
+ <CACna6rzN-OQv4UJoRso_Kyf1rCEtuU5Lu9LDjvTTt011UgrA=Q@mail.gmail.com>
+Message-ID: <5c57772b-71fd-d9e2-efe6-1175cf048e0b@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "david.wu" <david.wu@rock-chips.com>
+Dear Rafal,
 
-This adds the necessary data for handling io voltage domains on the rk3328.
-As interesting tidbit, the rk3328 only contains one iodomain area in the
-regular General Register Files (GRF).
+On 2017-02-23 13:29, Rafa? Mi?ecki wrote:
+> On 23 February 2017 at 13:27, Imre Kaloz <kaloz@openwrt.org> wrote:
+>> As discussed for other platforms as well, please use the board's name as the
+>> same board can end up being sold under multiple model numbers.
+>>
+>> So please rename the file to bcm47094-linksys-panamera.dts
+> Huh? Where did you get panamera name from?!
+Your manners shine on these dark days of winter. For about a decade now, 
+http://192.168.1.1/sysinfo.cgi will show you quite a bit of information 
+if you are too lazy to look into the GPL tarball or at the original 
+bootlogs.
 
-Signed-off-by: david.wu <david.wu@rock-chips.com>
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
----
- .../bindings/power/rockchip-io-domain.txt          |  1 +
- drivers/power/avs/rockchip-io-domain.c             | 41 ++++++++++++++++++++++
- 2 files changed, 42 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-index d23dc00..d3a5a93 100644
---- a/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-+++ b/Documentation/devicetree/bindings/power/rockchip-io-domain.txt
-@@ -33,6 +33,7 @@ Required properties:
- - compatible: should be one of:
-   - "rockchip,rk3188-io-voltage-domain" for rk3188
-   - "rockchip,rk3288-io-voltage-domain" for rk3288
-+  - "rockchip,rk3328-io-voltage-domain" for rk3328
-   - "rockchip,rk3368-io-voltage-domain" for rk3368
-   - "rockchip,rk3368-pmu-io-voltage-domain" for rk3368 pmu-domains
-   - "rockchip,rk3399-io-voltage-domain" for rk3399
-diff --git a/drivers/power/avs/rockchip-io-domain.c b/drivers/power/avs/rockchip-io-domain.c
-index 56bce19..8581252 100644
---- a/drivers/power/avs/rockchip-io-domain.c
-+++ b/drivers/power/avs/rockchip-io-domain.c
-@@ -43,6 +43,10 @@
- #define RK3288_SOC_CON2_FLASH0		BIT(7)
- #define RK3288_SOC_FLASH_SUPPLY_NUM	2
- 
-+#define RK3328_SOC_CON4			0x410
-+#define RK3328_SOC_CON4_VCCIO2		BIT(7)
-+#define RK3328_SOC_VCCIO2_SUPPLY_NUM	1
-+
- #define RK3368_SOC_CON15		0x43c
- #define RK3368_SOC_CON15_FLASH0		BIT(14)
- #define RK3368_SOC_FLASH_SUPPLY_NUM	2
-@@ -166,6 +170,25 @@ static void rk3288_iodomain_init(struct rockchip_iodomain *iod)
- 		dev_warn(iod->dev, "couldn't update flash0 ctrl\n");
- }
- 
-+static void rk3328_iodomain_init(struct rockchip_iodomain *iod)
-+{
-+	int ret;
-+	u32 val;
-+
-+	/* if no vccio2 supply we should leave things alone */
-+	if (!iod->supplies[RK3328_SOC_VCCIO2_SUPPLY_NUM].reg)
-+		return;
-+
-+	/*
-+	 * set vccio2 iodomain to also use this framework
-+	 * instead of a special gpio.
-+	 */
-+	val = RK3328_SOC_CON4_VCCIO2 | (RK3328_SOC_CON4_VCCIO2 << 16);
-+	ret = regmap_write(iod->grf, RK3328_SOC_CON4, val);
-+	if (ret < 0)
-+		dev_warn(iod->dev, "couldn't update vccio2 vsel ctrl\n");
-+}
-+
- static void rk3368_iodomain_init(struct rockchip_iodomain *iod)
- {
- 	int ret;
-@@ -247,6 +270,20 @@ static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
- 	.init = rk3288_iodomain_init,
- };
- 
-+static const struct rockchip_iodomain_soc_data soc_data_rk3328 = {
-+	.grf_offset = 0x410,
-+	.supply_names = {
-+		"vccio1",
-+		"vccio2",
-+		"vccio3",
-+		"vccio4",
-+		"vccio5",
-+		"vccio6",
-+		"pmuio",
-+	},
-+	.init = rk3328_iodomain_init,
-+};
-+
- static const struct rockchip_iodomain_soc_data soc_data_rk3368 = {
- 	.grf_offset = 0x900,
- 	.supply_names = {
-@@ -312,6 +349,10 @@ static void rk3399_pmu_iodomain_init(struct rockchip_iodomain *iod)
- 		.data = (void *)&soc_data_rk3288
- 	},
- 	{
-+		.compatible = "rockchip,rk3328-io-voltage-domain",
-+		.data = (void *)&soc_data_rk3328
-+	},
-+	{
- 		.compatible = "rockchip,rk3368-io-voltage-domain",
- 		.data = (void *)&soc_data_rk3368
- 	},
--- 
-1.9.1
+Best,
+
+Imre
