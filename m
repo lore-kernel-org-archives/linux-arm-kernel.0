@@ -1,25 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 23 Feb 2017 09:28:27 -0800
-Subject: [alsa-devel] [PATCH v6] ASoC: bcm2835: Add 8 channel
- (multitrack) capability
-In-Reply-To: <15a86aef-f091-0f86-f971-4ed56579b428@flatmax.org>
-References: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
- <1487740949-27583-1-git-send-email-flatmax@flatmax.org>
- <20170222182847.wdvk4stm5gbt46ch@sirena.org.uk>
- <15a86aef-f091-0f86-f971-4ed56579b428@flatmax.org>
-Message-ID: <20170223172827.gp7uhievk3vxxhz4@sirena.org.uk>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 23 Feb 2017 18:30:43 +0100
+Subject: [PATCH 01/11] arm64: tegra: Add PMC controller on Tegra186
+Message-ID: <20170223173053.19701-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2017 at 09:45:54AM +1100, Matt Flax wrote:
+From: Thierry Reding <treding@nvidia.com>
 
-> Understood, would you like me to resend my patch on a new thread ?
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ arch/arm64/boot/dts/nvidia/tegra186.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-It's fine, I've seen it this time.  Just please remember this in future.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170223/8a4360ea/attachment.sig>
+diff --git a/arch/arm64/boot/dts/nvidia/tegra186.dtsi b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+index 62fa85ae0271..d6955bb46ae0 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra186.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra186.dtsi
+@@ -307,6 +307,15 @@
+ 		#interrupt-cells = <2>;
+ 	};
+ 
++	pmc at c360000 {
++		compatible = "nvidia,tegra186-pmc";
++		reg = <0 0x0c360000 0 0x10000>,
++		      <0 0x0c370000 0 0x10000>,
++		      <0 0x0c380000 0 0x10000>,
++		      <0 0x0c390000 0 0x10000>;
++		reg-names = "pmc", "wake", "aotag", "scratch";
++	};
++
+ 	sysram at 30000000 {
+ 		compatible = "nvidia,tegra186-sysram", "mmio-sram";
+ 		reg = <0x0 0x30000000 0x0 0x50000>;
+-- 
+2.11.1
