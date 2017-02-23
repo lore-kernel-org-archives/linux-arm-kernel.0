@@ -1,122 +1,83 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Feb 2017 10:26:49 +0000
-Subject: [PATCH v2 14/22] ARM: KVM: Implement HVC_RESET_VECTORS stub hypercall
+Date: Thu, 23 Feb 2017 10:26:56 +0000
+Subject: [PATCH v2 21/22] arm/arm64: KVM: Use HVC_RESET_VECTORS to reinit HYP
+ mode
 In-Reply-To: <20170223102657.23100-1-marc.zyngier@arm.com>
 References: <20170223102657.23100-1-marc.zyngier@arm.com>
-Message-ID: <20170223102657.23100-15-marc.zyngier@arm.com>
+Message-ID: <20170223102657.23100-22-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to restore HYP mode to its original condition, KVM currently
-implements __kvm_hyp_reset(). As we're moving towards a hyp-stub
-defined API, it becomes necessary to implement HVC_RESET_VECTORS.
-
-This patch adds the HVC_RESET_VECTORS hypercall to the KVM init
-code, which so far lacked any form of hypercall support.
+Instead of trying to compare the value given by __hyp_get_vectors(),
+which doesn't offer any real guarantee to be the stub's address, use
+HVC_RESET_VECTORS to make sure we're in a sane state to reinstall
+KVM across PM events.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/virt.h |  1 +
- arch/arm/kernel/hyp-stub.S  |  2 +-
- arch/arm/kvm/init.S         | 33 +++++++++++++++++++++++++++------
- 3 files changed, 29 insertions(+), 7 deletions(-)
+ arch/arm/kvm/arm.c | 24 +++++++++---------------
+ 1 file changed, 9 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index 5186718aab68..8d5625b790b5 100644
---- a/arch/arm/include/asm/virt.h
-+++ b/arch/arm/include/asm/virt.h
-@@ -54,6 +54,7 @@ static inline void sync_boot_mode(void)
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 7c3abeb49554..c4be9e0400f2 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -53,7 +53,6 @@ __asm__(".arch_extension	virt");
  
- void __hyp_set_vectors(unsigned long phys_vector_base);
- unsigned long __hyp_get_vectors(void);
-+void __hyp_reset_vectors(void);
- #else
- #define __boot_cpu_mode	(SVC_MODE)
- #define sync_boot_mode()
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 21794d4a8f36..3cb01e8a291d 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -280,7 +280,7 @@ ENDPROC(__hyp_reset_vectors)
- #endif
+ static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
+ static kvm_cpu_context_t __percpu *kvm_host_cpu_state;
+-static unsigned long hyp_default_vectors;
  
- .align 5
--__hyp_stub_vectors:
-+ENTRY(__hyp_stub_vectors)
- __hyp_stub_reset:	W(b)	.
- __hyp_stub_und:		W(b)	.
- __hyp_stub_svc:		W(b)	.
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index bf89c919efc1..9b0c735a68f7 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -23,6 +23,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_arm.h>
- #include <asm/kvm_mmu.h>
-+#include <asm/virt.h>
+ /* Per-CPU variable containing the currently running vcpu. */
+ static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
+@@ -1105,8 +1104,16 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	kvm_arm_init_debug();
+ }
  
- /********************************************************************
-  * Hypervisor initialization
-@@ -39,6 +40,10 @@
-  * - Setup the page tables
-  * - Enable the MMU
-  * - Profit! (or eret, if you only care about the code).
-+ *
-+ * Another possibility is to get a HYP stub hypercall.
-+ * We discriminate between the two by checking if r0 contains a value
-+ * that is less than HVC_STUB_HCALL_NR.
-  */
- 
- 	.text
-@@ -58,6 +63,10 @@ __kvm_hyp_init:
- 	W(b)	.
- 
- __do_hyp_init:
-+	@ Check for a stub hypercall
-+	cmp	r0, #HVC_STUB_HCALL_NR
-+	blo	__kvm_handle_stub_hvc
++static void cpu_hyp_reset(void)
++{
++	if (!is_kernel_in_hyp_mode())
++		__hyp_reset_vectors();
++}
 +
- 	@ Set stack pointer
- 	mov	sp, r0
- 
-@@ -112,19 +121,31 @@ __do_hyp_init:
- 
- 	eret
- 
--	@ r0 : stub vectors address
-+ENTRY(__kvm_handle_stub_hvc)
-+	cmp	r0, #HVC_RESET_VECTORS
-+	bne	1f
- ENTRY(__kvm_hyp_reset)
- 	/* We're now in idmap, disable MMU */
- 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
--	ldr	r2, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
--	bic	r1, r1, r2
-+	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
-+	bic	r1, r1, r0
- 	mcr	p15, 4, r1, c1, c0, 0	@ HSCTLR
- 
--	/* Install stub vectors */
--	mcr	p15, 4, r0, c12, c0, 0	@ HVBAR
--	isb
-+	/*
-+	 * Install stub vectors, using ardb's VA->PA trick.
-+	 */
-+0:	adr	r0, 0b					@ PA(0)
-+	movw	r1, #:lower16:__hyp_stub_vectors - 0b   @ VA(stub) - VA(0)
-+	movt	r1, #:upper16:__hyp_stub_vectors - 0b
-+	add	r1, r1, r0				@ PA(stub)
-+	mcr	p15, 4, r1, c12, c0, 0	@ HVBAR
-+	b	exit
+ static void cpu_hyp_reinit(void)
+ {
++	cpu_hyp_reset();
 +
-+1:	mov	r0, #-1
+ 	if (is_kernel_in_hyp_mode()) {
+ 		/*
+ 		 * __cpu_init_stage2() is safe to call even if the PM
+@@ -1114,17 +1121,10 @@ static void cpu_hyp_reinit(void)
+ 		 */
+ 		__cpu_init_stage2();
+ 	} else {
+-		if (__hyp_get_vectors() == hyp_default_vectors)
+-			cpu_init_hyp_mode(NULL);
++		cpu_init_hyp_mode(NULL);
+ 	}
+ }
  
-+exit:
- 	eret
-+ENDPROC(__kvm_handle_stub_hvc)
- ENDPROC(__kvm_hyp_reset)
+-static void cpu_hyp_reset(void)
+-{
+-	if (!is_kernel_in_hyp_mode())
+-		__hyp_reset_vectors();
+-}
+-
+ static void _kvm_arch_hardware_enable(void *discard)
+ {
+ 	if (!__this_cpu_read(kvm_arm_hardware_enabled)) {
+@@ -1308,12 +1308,6 @@ static int init_hyp_mode(void)
+ 		goto out_err;
  
- 	.ltorg
+ 	/*
+-	 * It is probably enough to obtain the default on one
+-	 * CPU. It's unlikely to be different on the others.
+-	 */
+-	hyp_default_vectors = __hyp_get_vectors();
+-
+-	/*
+ 	 * Allocate stack pages for Hypervisor-mode
+ 	 */
+ 	for_each_possible_cpu(cpu) {
 -- 
 2.11.0
