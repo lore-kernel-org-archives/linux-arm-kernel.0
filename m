@@ -1,130 +1,167 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 23 Feb 2017 10:21:48 +0100
-Subject: [PATCH 2/2] drivers: pwm: pwm-atmel: add support to allow run
- time changing of pwm parameters
-In-Reply-To: <1487839120-13650-3-git-send-email-claudiu.beznea@microchip.com>
-References: <1487839120-13650-1-git-send-email-claudiu.beznea@microchip.com>
- <1487839120-13650-3-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <20170223092148.5qmxy62xkufwbsrw@piout.net>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Thu, 23 Feb 2017 10:37:07 +0100
+Subject: [PATCH 1/1] ARM: dts: BCM953012HR: Initial Checkin
+In-Reply-To: <1487798092-8631-1-git-send-email-steven.lin1@broadcom.com>
+References: <1487798092-8631-1-git-send-email-steven.lin1@broadcom.com>
+Message-ID: <68373798-376d-43d9-85cb-c6af7c6fa302@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/02/2017 at 10:38:40 +0200, Claudiu Beznea wrote:
-> sama5d2 supports changing of pwm parameters like period and
-> duty factor without first to disable pwm. Since pwm code
-> is supported by more than one SoC add allow_runtime_cfg
-> parameter to atmel_pwm_chip data structure. This will be
-> filled statically for every SoC, saved in pwm specific
-> structure at probing time and checked while configuring
-> the device. Based on this, pwm clock will not be
-> enabled/disabled while configuring if it still enabled.
-> 
-> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+On 02/22/2017 10:14 PM, Steve Lin wrote:
+> Initial version of DTS to support Broadcom BCM953012HR Northstar
+> HR platform, similar to, but not the same as existing 953012K.
+>
+> Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
 > ---
->  drivers/pwm/pwm-atmel.c | 24 ++++++++++++++++++------
->  1 file changed, 18 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-> index 4406639..9e1dece 100644
-> --- a/drivers/pwm/pwm-atmel.c
-> +++ b/drivers/pwm/pwm-atmel.c
-> @@ -68,6 +68,8 @@ struct atmel_pwm_chip {
->  
->  	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
->  		       unsigned long dty, unsigned long prd);
+>  arch/arm/boot/dts/Makefile        |   1 +
+>  arch/arm/boot/dts/bcm953012hr.dts | 115 ++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 116 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/bcm953012hr.dts
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 01d178a..c64ca3d 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -94,6 +94,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>  	bcm94708.dtb \
+>  	bcm94709.dtb \
+>  	bcm953012er.dtb \
+> +	bcm953012hr.dtb \
+>  	bcm953012k.dtb
+>  dtb-$(CONFIG_ARCH_BCM_53573) += \
+>  	bcm47189-tenda-ac9.dtb
+> diff --git a/arch/arm/boot/dts/bcm953012hr.dts b/arch/arm/boot/dts/bcm953012hr.dts
+> new file mode 100644
+> index 0000000..c332277
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm953012hr.dts
+> @@ -0,0 +1,115 @@
+> +/*
+> + *  BSD LICENSE
+> + *
+> + *  Copyright(c) 2017 Broadcom
+> + *
+> + *  Redistribution and use in source and binary forms, with or without
+> + *  modification, are permitted provided that the following conditions
+> + *  are met:
+> + *
+> + *    * Redistributions of source code must retain the above copyright
+> + *      notice, this list of conditions and the following disclaimer.
+> + *    * Redistributions in binary form must reproduce the above copyright
+> + *      notice, this list of conditions and the following disclaimer in
+> + *      the documentation and/or other materials provided with the
+> + *      distribution.
+> + *    * Neither the name of Broadcom nor the names of its contributors
+> + *      may be used to endorse or promote products derived from this
+> + *      software without specific prior written permission.
+> + *
+> + *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> + *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> + *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> + *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> + *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> + *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> + *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> + *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> + *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> + *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> + *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> + */
 > +
-> +	bool allow_runtime_cfg;
->  };
->  
->  static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
-> @@ -114,7 +116,8 @@ static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  	u32 val;
->  	int ret;
->  
-> -	if (pwm_is_enabled(pwm) && (period_ns != pwm_get_period(pwm))) {
-> +	if (!atmel_pwm->allow_runtime_cfg &&
-> +	    pwm_is_enabled(pwm) && (period_ns != pwm_get_period(pwm))) {
->  		dev_err(chip->dev, "cannot change PWM period while enabled\n");
->  		return -EBUSY;
->  	}
-> @@ -139,10 +142,12 @@ static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  	do_div(div, period_ns);
->  	dty = prd - div;
->  
-> -	ret = clk_enable(atmel_pwm->clk);
-> -	if (ret) {
-> -		dev_err(chip->dev, "failed to enable PWM clock\n");
-> -		return ret;
-> +	if (!pwm_is_enabled(pwm)) {
-> +		ret = clk_enable(atmel_pwm->clk);
-> +		if (ret) {
-> +			dev_err(chip->dev, "failed to enable PWM clock\n");
-> +			return ret;
-> +		}
->  	}
->  
-
-It is probably worth switching to atomic PWM instead of changing this
-function. This would simplify the whole driver.
-
->  	/* It is necessary to preserve CPOL, inside CMR */
-> @@ -155,7 +160,9 @@ static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  	atmel_pwm->updated_pwms &= ~(1 << pwm->hwpwm);
->  	mutex_unlock(&atmel_pwm->isr_lock);
->  
-> -	clk_disable(atmel_pwm->clk);
-> +	if (!pwm_is_enabled(pwm))
-> +		clk_disable(atmel_pwm->clk);
+> +/dts-v1/;
 > +
->  	return ret;
->  }
->  
-> @@ -294,18 +301,22 @@ static const struct pwm_ops atmel_pwm_ops = {
->  struct atmel_pwm_data {
->  	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
->  		       unsigned long dty, unsigned long prd);
-> +	bool allow_runtime_cfg;
->  };
->  
->  static const struct atmel_pwm_data atmel_pwm_data_v1 = {
->  	.config = atmel_pwm_config_v1,
-> +	.allow_runtime_cfg = false,
+> +#include "bcm4708.dtsi"
+> +
+> +/ {
+> +	model = "NorthStar HR (BCM953012HR)";
+> +	compatible = "brcm,bcm953012hr", "brcm,brcm53012", "brcm,bcm4708";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +
+> +	memory {
+> +		reg = <0x80000000 0x10000000>;
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
 
-This is useless as it is false even if not explicitly set.
+You don't need this.
+7b790d3b2943 ("ARM: dts: BCM5301X: Enable UART by default for BCM4708(1), BCM4709(4) & BCM53012")
 
->  };
->  
->  static const struct atmel_pwm_data atmel_pwm_data_v2 = {
->  	.config = atmel_pwm_config_v2,
-> +	.allow_runtime_cfg = false,
 
-ditto.
+> +&nand {
+> +	nandcs at 0 {
+> +		compatible = "brcm,nandcs";
+> +		reg = <0>;
+> +		nand-on-flash-bbt;
+> +
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		nand-ecc-strength = <4>;
+> +		nand-ecc-step-size = <512>;
 
->  };
->  
->  static const struct atmel_pwm_data atmel_pwm_data_v3 = {
->  	.config = atmel_pwm_config_v3,
-> +	.allow_runtime_cfg = true,
->  };
->  
->  static const struct platform_device_id atmel_pwm_devtypes[] = {
-> @@ -399,6 +410,7 @@ static int atmel_pwm_probe(struct platform_device *pdev)
->  	atmel_pwm->chip.npwm = 4;
->  	atmel_pwm->chip.can_sleep = true;
->  	atmel_pwm->config = data->config;
-> +	atmel_pwm->allow_runtime_cfg = data->allow_runtime_cfg;
+Can you just include bcm5301x-nand-cs0-bch4.dtsi?
 
-It is probably worth having a pointer to the atmel_pwm_data instead of
-having to copy all the members.
 
->  	atmel_pwm->updated_pwms = 0;
->  	mutex_init(&atmel_pwm->isr_lock);
->  
-> -- 
-> 2.7.4
-> 
+> +
+> +		partition at 0 {
+> +			label = "nboot";
+> +			reg = <0x00000000 0x00200000>;
+> +			read-only;
+> +		};
+> +		partition at 200000 {
+> +			label = "nenv";
+> +			reg = <0x00200000 0x00400000>;
+> +		};
+> +		partition at 600000 {
+> +			label = "nsystem";
+> +			reg = <0x00600000 0x00a00000>;
+> +		};
+> +		partition at 1000000 {
+> +			label = "nrootfs";
+> +			reg = <0x01000000 0x07000000>;
+> +		};
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+These could go to &nandcs with above dtsi include.
+
+
+> +	};
+> +};
+> +
+> +&spi_nor {
+> +	status = "okay";
+> +	spi-max-frequency = <62500000>;
+> +	m25p,default-addr-width = <3>;
+> +
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	partition at 0 {
+> +		label = "boot";
+> +		reg = <0x00000000 0x000d0000>;
+> +	};
+> +	partition at d000 {
+> +		label = "env";
+> +		reg = <0x000d0000 0x00030000>;
+> +	};
+> +	partition at 100000 {
+> +		label = "system";
+> +		reg = <0x00100000 0x00600000>;
+> +	};
+> +	partition at 700000 {
+> +		label = "rootfs";
+> +		reg = <0x00700000 0x00900000>;
+> +	};
+> +};
+
+This is a bit uncommon for me to have the same partitions on both flash device.
+Can you provide some extra description of this setup, please?
