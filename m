@@ -1,144 +1,153 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 23 Feb 2017 16:05:37 +0800
-Subject: [PATCH 05/11] drm/sun4i: Initialize crtc from tcon bind function
+Date: Thu, 23 Feb 2017 16:05:41 +0800
+Subject: [PATCH 09/11] drm/sun4i: rgb: Pass tcon pointer when initializing RGB
+ encoder
 In-Reply-To: <20170223080543.6659-1-wens@csie.org>
 References: <20170223080543.6659-1-wens@csie.org>
-Message-ID: <20170223080543.6659-6-wens@csie.org>
+Message-ID: <20170223080543.6659-10-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tcon provides part of the functionality of the crtc, and also
-provides the device node for the output port of the crtc. To be able
-to use drm_of_find_possible_crtcs(), all crtc must be initialized before
-any downstream encoders. The other part of the crtc is the display
-backend.
+The RGB encoder represents channel 0 of the TCON. Instead of fetching
+the pointer to its TCON from the main sun4i_drv structure, pass it in
+as part of the init call, save it, and use it directly in the encoder
+and connector callbacks.
 
-The Rockchip DRM driver does this by first binding all vops, which is
-their crtc, and this step also creates the crtc objects. Then all
-remaining hardware components are bound. With the Allwinner display
-pipeline, we have multiple components comprising the crtc, and varying
-depths of the display pipeline. Since components are added with a depth
-first search of the of_graph, we can initialize the crtc object within
-the tcon bind function. Since the backend precedes the tcon, and the
-backends cannot be muxed or switched around, we can be sure that the
-associated backend is already initialized.
-
-This patch also moves the crtc pointer from the main drm_device data to
-the tcon device data. Besides the crtc callbacks, the crtc structure is
-only used within the tcon driver to signal vblank events from its
-interrupt handler.
-
-As the crtc and layer bits are now called from the tcon bits, we must
-move them from the sun4i-drm module to the sun4i-tcon module to avoid
-circular dependencies between the two modules. This is because sun4i-drm
-also calls into sun4i-tcon.
+We can also drop the otherwise unused sun4i_drv pointer.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/Makefile     |  4 ++--
- drivers/gpu/drm/sun4i/sun4i_drv.c  |  8 --------
- drivers/gpu/drm/sun4i/sun4i_drv.h  |  1 -
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 10 ++++++++--
- drivers/gpu/drm/sun4i/sun4i_tcon.h |  3 +++
- 5 files changed, 13 insertions(+), 13 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_rgb.c  | 27 +++++++++------------------
+ drivers/gpu/drm/sun4i/sun4i_rgb.h  |  2 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.c |  2 +-
+ 3 files changed, 11 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index d625a82a6e5f..59b757350a1f 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -1,11 +1,11 @@
--sun4i-drm-y += sun4i_crtc.o
- sun4i-drm-y += sun4i_drv.o
- sun4i-drm-y += sun4i_framebuffer.o
--sun4i-drm-y += sun4i_layer.o
- 
- sun4i-tcon-y += sun4i_tcon.o
- sun4i-tcon-y += sun4i_rgb.o
- sun4i-tcon-y += sun4i_dotclock.o
-+sun4i-tcon-y += sun4i_crtc.o
-+sun4i-tcon-y += sun4i_layer.o
- 
- obj-$(CONFIG_DRM_SUN4I)		+= sun4i-drm.o sun4i-tcon.o
- obj-$(CONFIG_DRM_SUN4I)		+= sun4i_backend.o
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 87bc0951eba8..4384c837baa8 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -20,7 +20,6 @@
- #include <drm/drm_fb_helper.h>
- #include <drm/drm_of.h>
- 
--#include "sun4i_crtc.h"
- #include "sun4i_drv.h"
- #include "sun4i_framebuffer.h"
- #include "sun4i_tcon.h"
-@@ -142,13 +141,6 @@ static int sun4i_drv_bind(struct device *dev)
- 		goto cleanup_mode_config;
- 	}
- 
--	/* Create our CRTC */
--	drv->crtc = sun4i_crtc_init(drm);
--	if (IS_ERR(drv->crtc)) {
--		dev_err(drm->dev, "Couldn't create the CRTC\n");
--		ret = PTR_ERR(drv->crtc);
--		goto cleanup_mode_config;
--	}
- 	drm->irq_enabled = true;
- 
- 	/* Remove early framebuffers (ie. simplefb) */
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.h b/drivers/gpu/drm/sun4i/sun4i_drv.h
-index e22ee536677e..7a3345b7b6d1 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.h
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index fc7f7467d120..a244458197e1 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
 @@ -18,7 +18,6 @@
+ #include <drm/drm_panel.h>
  
- struct sun4i_drv {
- 	struct sun4i_backend	*backend;
--	struct sun4i_crtc	*crtc;
- 	struct sun4i_tcon	*tcon;
+ #include "sun4i_crtc.h"
+-#include "sun4i_drv.h"
+ #include "sun4i_tcon.h"
+ #include "sun4i_rgb.h"
  
- 	struct drm_plane	*primary;
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index ea2906f87cb9..3f3eb3f0b209 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -290,8 +290,7 @@ static irqreturn_t sun4i_tcon_handler(int irq, void *private)
- {
- 	struct sun4i_tcon *tcon = private;
- 	struct drm_device *drm = tcon->drm;
--	struct sun4i_drv *drv = drm->dev_private;
--	struct sun4i_crtc *scrtc = drv->crtc;
-+	struct sun4i_crtc *scrtc = tcon->crtc;
- 	unsigned int status;
+@@ -26,7 +25,7 @@ struct sun4i_rgb {
+ 	struct drm_connector	connector;
+ 	struct drm_encoder	encoder;
  
- 	regmap_read(tcon->regs, SUN4I_TCON_GINT0_REG, &status);
-@@ -524,6 +523,13 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 		goto err_free_clocks;
- 	}
- 
-+	tcon->crtc = sun4i_crtc_init(drm);
-+	if (IS_ERR(tcon->crtc)) {
-+		dev_err(dev, "Couldn't create our CRTC\n");
-+		ret = PTR_ERR(tcon->crtc);
-+		goto err_free_clocks;
-+	}
-+
- 	ret = sun4i_rgb_init(drm);
- 	if (ret < 0)
- 		goto err_free_clocks;
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index 166064bafe2e..f636343a935d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -169,6 +169,9 @@ struct sun4i_tcon {
- 
- 	/* Platform adjustments */
- 	const struct sun4i_tcon_quirks	*quirks;
-+
-+	/* Associated crtc */
-+	struct sun4i_crtc		*crtc;
+-	struct sun4i_drv	*drv;
++	struct sun4i_tcon	*tcon;
  };
  
- struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node);
+ static inline struct sun4i_rgb *
+@@ -47,8 +46,7 @@ static int sun4i_rgb_get_modes(struct drm_connector *connector)
+ {
+ 	struct sun4i_rgb *rgb =
+ 		drm_connector_to_sun4i_rgb(connector);
+-	struct sun4i_drv *drv = rgb->drv;
+-	struct sun4i_tcon *tcon = drv->tcon;
++	struct sun4i_tcon *tcon = rgb->tcon;
+ 
+ 	return drm_panel_get_modes(tcon->panel);
+ }
+@@ -57,8 +55,7 @@ static int sun4i_rgb_mode_valid(struct drm_connector *connector,
+ 				struct drm_display_mode *mode)
+ {
+ 	struct sun4i_rgb *rgb = drm_connector_to_sun4i_rgb(connector);
+-	struct sun4i_drv *drv = rgb->drv;
+-	struct sun4i_tcon *tcon = drv->tcon;
++	struct sun4i_tcon *tcon = rgb->tcon;
+ 	u32 hsync = mode->hsync_end - mode->hsync_start;
+ 	u32 vsync = mode->vsync_end - mode->vsync_start;
+ 	unsigned long rate = mode->clock * 1000;
+@@ -115,8 +112,7 @@ static void
+ sun4i_rgb_connector_destroy(struct drm_connector *connector)
+ {
+ 	struct sun4i_rgb *rgb = drm_connector_to_sun4i_rgb(connector);
+-	struct sun4i_drv *drv = rgb->drv;
+-	struct sun4i_tcon *tcon = drv->tcon;
++	struct sun4i_tcon *tcon = rgb->tcon;
+ 
+ 	drm_panel_detach(tcon->panel);
+ 	drm_connector_cleanup(connector);
+@@ -141,8 +137,7 @@ static int sun4i_rgb_atomic_check(struct drm_encoder *encoder,
+ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
+ {
+ 	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
+-	struct sun4i_drv *drv = rgb->drv;
+-	struct sun4i_tcon *tcon = drv->tcon;
++	struct sun4i_tcon *tcon = rgb->tcon;
+ 
+ 	DRM_DEBUG_DRIVER("Enabling RGB output\n");
+ 
+@@ -158,8 +153,7 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
+ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
+ {
+ 	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
+-	struct sun4i_drv *drv = rgb->drv;
+-	struct sun4i_tcon *tcon = drv->tcon;
++	struct sun4i_tcon *tcon = rgb->tcon;
+ 
+ 	DRM_DEBUG_DRIVER("Disabling RGB output\n");
+ 
+@@ -177,8 +171,7 @@ static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
+ 				       struct drm_display_mode *adjusted_mode)
+ {
+ 	struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(encoder);
+-	struct sun4i_drv *drv = rgb->drv;
+-	struct sun4i_tcon *tcon = drv->tcon;
++	struct sun4i_tcon *tcon = rgb->tcon;
+ 
+ 	sun4i_tcon0_mode_set(tcon, mode);
+ 
+@@ -204,10 +197,8 @@ static struct drm_encoder_funcs sun4i_rgb_enc_funcs = {
+ 	.destroy	= sun4i_rgb_enc_destroy,
+ };
+ 
+-int sun4i_rgb_init(struct drm_device *drm)
++int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
+ {
+-	struct sun4i_drv *drv = drm->dev_private;
+-	struct sun4i_tcon *tcon = drv->tcon;
+ 	struct drm_encoder *encoder;
+ 	struct sun4i_rgb *rgb;
+ 	int ret;
+@@ -215,7 +206,7 @@ int sun4i_rgb_init(struct drm_device *drm)
+ 	rgb = devm_kzalloc(drm->dev, sizeof(*rgb), GFP_KERNEL);
+ 	if (!rgb)
+ 		return -ENOMEM;
+-	rgb->drv = drv;
++	rgb->tcon = tcon;
+ 	encoder = &rgb->encoder;
+ 
+ 	tcon->panel = sun4i_tcon_find_panel(tcon->dev->of_node);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.h b/drivers/gpu/drm/sun4i/sun4i_rgb.h
+index 7c4da4c8acdd..40c18f4a6c7e 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.h
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.h
+@@ -13,6 +13,6 @@
+ #ifndef _SUN4I_RGB_H_
+ #define _SUN4I_RGB_H_
+ 
+-int sun4i_rgb_init(struct drm_device *drm);
++int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon);
+ 
+ #endif /* _SUN4I_RGB_H_ */
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 3f3eb3f0b209..505520baa585 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -530,7 +530,7 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 		goto err_free_clocks;
+ 	}
+ 
+-	ret = sun4i_rgb_init(drm);
++	ret = sun4i_rgb_init(drm, tcon);
+ 	if (ret < 0)
+ 		goto err_free_clocks;
+ 
 -- 
 2.11.0
