@@ -1,30 +1,20 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 23 Feb 2017 10:30:23 -0800
-Subject: [PATCH 11/11] drm/sun4i: Add backend and tcon pointers to
- sun4i_crtc
-In-Reply-To: <20170223080543.6659-12-wens@csie.org>
-References: <20170223080543.6659-1-wens@csie.org>
- <20170223080543.6659-12-wens@csie.org>
-Message-ID: <20170223183023.6mtafahkb4axl7ei@lukather>
+Date: Thu, 23 Feb 2017 10:37:35 -0800
+Subject: [PATCH] ARM: dts: sunxi: Add regulators for Sinovoip BPI-M2
+In-Reply-To: <20170223065539.47985-1-manu@bidouilliste.com>
+References: <20170223065539.47985-1-manu@bidouilliste.com>
+Message-ID: <20170223183735.23fzypxnvumsnpkr@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2017 at 04:05:43PM +0800, Chen-Yu Tsai wrote:
-> sun4i_crtc controls the backend and tcon hardware blocks of the display
-> pipeline. Instead of doing so through the master drm structure, leave
-> pointers to the corresponding backend and tcon in itself.
+On Thu, Feb 23, 2017 at 07:55:39AM +0100, Emmanuel Vadot wrote:
+> Add the needed node for DFVS on Sinovoip BPI-M2.
+> This add the axp221 under the p2wi node, the regulators and
+> the cpu-supply property for cpu0.
 > 
-> Also drop the drm_device pointer, since it is no longer needed.
-> 
-> The next step forward would be to pass the pointers in through
-> sun4i_crtc_init as parameters. This would make it easier to support
-> multiple display pipelines layer on.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Emmanuel Vadot <manu@bidouilliste.com>
 
-Applied all the previous patches, and this one
-
-Thanks!
+Applied, thanks!
 Maxime
 
 -- 
@@ -37,4 +27,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170223/92b70a11/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170223/a31a53b0/attachment.sig>
