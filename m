@@ -1,42 +1,38 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Thu, 23 Feb 2017 15:24:13 +0100
-Subject: [PATCH v2 4/8] sound: soc: pxa: Suppress SND_MMP_SOC for arm64
-In-Reply-To: <473e4976-77eb-4b67-e874-ae6bd717ddaa@suse.de>
-References: <20170222022929.10540-1-afaerber@suse.de>
- <20170222022929.10540-5-afaerber@suse.de>
- <20170222184734.wmkbzfsz4yklofcg@sirena.org.uk>
- <473e4976-77eb-4b67-e874-ae6bd717ddaa@suse.de>
-Message-ID: <s5hefyp6l4i.wl-tiwai@suse.de>
+From: jk@ozlabs.org (Jeremy Kerr)
+Date: Thu, 23 Feb 2017 22:24:10 +0800
+Subject: [PATCH v3 01/18] drivers/fsi: Add empty fsi bus definitions
+In-Reply-To: <CAMuHMdUhiXCnjT60Lsqq4eGGnVv9eavtkVL1Mdk_6naBHBDVrQ@mail.gmail.com>
+References: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
+ <20170201165358.45415-2-cbostic@linux.vnet.ibm.com>
+ <CAMuHMdUhiXCnjT60Lsqq4eGGnVv9eavtkVL1Mdk_6naBHBDVrQ@mail.gmail.com>
+Message-ID: <53c63405-8aeb-9751-62d6-4583847dce3c@ozlabs.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Feb 2017 15:11:46 +0100,
-Andreas F?rber wrote:
-> 
-> Am 22.02.2017 um 19:47 schrieb Mark Brown:
-> > On Wed, Feb 22, 2017 at 03:29:24AM +0100, Andreas F?rber wrote:
-> > 
-> > This is patch 4 of 8, what's going on with dependencies here?
-> 
-> No dependencies on previous patches. 5/8 adds ARCH_MMP to arm64.
-> 
-> It compiled without this (just Kconfig warnings), so this could go
-> through the appropriate sound tree as a cleanup.
-> 
-> > Please use subject lines matching the style for the subsystem.  This
-> > makes it easier for people to identify relevant patches.
-> 
-> Should I make it "ASoC: pxa: ..." then? SND_MMP_SOC selects SND_ARM,
-> which in sound/arm/Kconfig says 'Drivers that are implemented on ASoC
-> can be found in "ALSA for SoC audio support" section.', which confused
-> me about whether or not this is an ASoC compliant driver if it selects a
-> non-ASoC symbol.
+Hi Geert,
 
-It's a bug that selects SND_ARM there.  I guess this was wrongly taken
-from the old example of AC97 ARM SoC code, which was fixed later.
-ASoC stuff is basically irrelevant from the legacy sound/arm/*.
+>> --- /dev/null
+>> +++ b/drivers/fsi/Kconfig
+>> @@ -0,0 +1,12 @@
+>> +#
+>> +# FSI subsystem
+>> +#
+>> +
+>> +menu "FSI support"
+>> +
+>> +config FSI
+>> +       tristate "FSI support"
+> 
+> I guess this should depend on some POWER symbol || COMPILE_TEST?
+
+No, this is pretty hardware-independent - all it requires on the HW side
+is two GPIOs.
+
+Although the FSI slave devices are typically only present on POWER
+systems, they can be driven from anything, with currently
+implementations being on ARM and 32-bit powerpc.
+
+Cheers,
 
 
-thanks,
-
-Takashi
+Jeremy
