@@ -1,39 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 23 Feb 2017 09:41:25 -0800
-Subject: SPI fix needed in kernel (DragonBoard 410c)
-In-Reply-To: <6857de0f674548d09ecad023211b3d1f@NASANEXM01D.na.qualcomm.com>
-References: <6857de0f674548d09ecad023211b3d1f@NASANEXM01D.na.qualcomm.com>
-Message-ID: <20170223174125.be5ewn5o5tk2hwhk@sirena.org.uk>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Thu, 23 Feb 2017 17:44:54 +0000
+Subject: [PATCH 4/8] drm/sun4i: add support for sun8i DE2 mixers and
+ display engines
+In-Reply-To: <20170222151854.3280-5-icenowy@aosc.xyz>
+References: <20170222151854.3280-1-icenowy@aosc.xyz>
+ <20170222151854.3280-5-icenowy@aosc.xyz>
+Message-ID: <CACvgo5117BB+o429cH=X0t3xz_5=XZ65YCEdE=ro+895a9e=RA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2017 at 07:56:21PM +0000, King, Lawrence wrote:
-> Argghh.. I am such a Newbie ;-) I originally sent this as ?HTML? which of course was rejected by many of the recipients....
-> 
-> Resending as plain-text, with the formerly in-line oscilloscope screen shots attached as JPEG files.
-> 
-> Scope_4.jpg shows the problem with Chip Select, Scope_5.jpg shows the chip select with the fix.
+On 22 February 2017 at 15:18, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+> Allwinner have a new "Display Engine 2.0" in there new SoCs, which comes
+> in a new "Display Engine" (mixers instead of old backends and
+> frontends).
+>
+> Add support for the mixer on Allwinner V3s SoC; it's the simplest one.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>  drivers/gpu/drm/sun4i/Kconfig       |   8 +
+>  drivers/gpu/drm/sun4i/Makefile      |   1 +
+>  drivers/gpu/drm/sun4i/sun4i_crtc.c  |   6 +-
+>  drivers/gpu/drm/sun4i/sun4i_drv.c   |  38 +++-
+>  drivers/gpu/drm/sun4i/sun4i_drv.h   |   1 +
+>  drivers/gpu/drm/sun4i/sun4i_layer.c |  92 ++++++--
+>  drivers/gpu/drm/sun4i/sun4i_layer.h |   1 +
+>  drivers/gpu/drm/sun4i/sun8i_mixer.c | 417 ++++++++++++++++++++++++++++++++++++
+>  drivers/gpu/drm/sun4i/sun8i_mixer.h | 133 ++++++++++++
+>  9 files changed, 674 insertions(+), 23 deletions(-)
+Silly question:
 
-I'm sorry but I can't really tell what this mail is about, it looks like
-the end of a large, top posted thread with formatting issues so it's
-pretty hard to read.  Can you please concisely describe the issue you'd
-like to discuss?
+Does this series cover the same functionality/hardware as the separate
+sun8i driver proposed a few months back ?
+The diff stat looks quite different (~1.6k vs ~0.6k), although that
+could be due to reusing the existing sun4i code.
 
-Please don't top post, reply in line with needed context.  This allows
-readers to readily follow the flow of conversation and understand what
-you are talking about and also helps ensure that everything in the
-discussion is being addressed.
-
-Please fix your mail client to word wrap within paragraphs at something
-substantially less than 80 columns.  Doing this makes your messages much
-easier to read and reply to.
-
-Please also check the list of people you're CCing, you've sent this to
-a *very* large set of people.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170223/b817a865/attachment.sig>
+Thanks
+Emil
