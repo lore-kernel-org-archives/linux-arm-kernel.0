@@ -1,64 +1,23 @@
-From: jonathan.richardson@broadcom.com (Jonathan Richardson)
-Date: Thu, 23 Feb 2017 10:59:30 -0800
-Subject: [PATCH v4 2/3] mailbox: Add iProc mailbox controller driver
-In-Reply-To: <CABb+yY0rmAFutskhVkQ926QfsvtJ-WnXrQc=+PQNg=7NZEXC+Q@mail.gmail.com>
-References: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
- <1485463082-27067-3-git-send-email-jonathan.richardson@broadcom.com>
- <CABb+yY0rmAFutskhVkQ926QfsvtJ-WnXrQc=+PQNg=7NZEXC+Q@mail.gmail.com>
-Message-ID: <09177a6f-0612-1e17-a12e-0b1969f5b2e1@broadcom.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 23 Feb 2017 20:13:48 +0100 (CET)
+Subject: [PATCH 1/2] MAINTAINERS: Add Stefan Wahren to bcm2835.
+In-Reply-To: <20170223184257.6842-1-eric@anholt.net>
+References: <20170223184257.6842-1-eric@anholt.net>
+Message-ID: <3220711.229860.1487877228610@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Eric,
 
+> Eric Anholt <eric@anholt.net> hat am 23. Februar 2017 um 19:42 geschrieben:
+> 
+> 
+> Stefan has been active on the platform since 2015, helping to polish
+> drivers for upstreaming and providing review feedback to other
+> contributors, along with doing new development.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 
-On 17-02-16 10:20 PM, Jassi Brar wrote:
-> On Fri, Jan 27, 2017 at 2:08 AM, Jonathan Richardson
-> <jonathan.richardson@broadcom.com> wrote:
->
->> +static int iproc_mbox_send_data_m0(struct mbox_chan *chan, void *data)
->> +{
->> +       struct iproc_mbox *mbox = dev_get_drvdata(chan->mbox->dev);
->> +       struct iproc_mbox_msg *msg = (struct iproc_mbox_msg *)data;
->> +               unsigned long flags;
->> +       int err = 0;
->> +       const int poll_period_us = 5;
->> +       const int max_retries = (MAX_M0_TIMEOUT_MS * 1000) / poll_period_us;
->> +
->> +       if (!msg)
->> +               return -EINVAL;
->> +
->> +       spin_lock_irqsave(&mbox->lock, flags);
->> +
->> +       dev_dbg(mbox->dev, "Send msg to M0: cmd=0x%x, param=0x%x, wait_ack=%d\n",
->> +               msg->cmd, msg->param, msg->wait_ack);
->> +
-> prints should be outside the spinlocks.
->
->> +       writel(msg->cmd, mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
->> +       writel(msg->param, mbox->base + IPROC_CRMU_MAILBOX1_OFFSET);
->> +
->> +       if (msg->wait_ack) {
->> +               int retries;
->> +
-> move poll_period_us and max_retries in here or just define' them
->
->> +               err = msg->reply_code = -ETIMEDOUT;
->> +               for (retries = 0; retries < max_retries; retries++) {
->> +                       u32 val = readl(
->> +                               mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
->> +                       if (val & M0_IPC_CMD_DONE_MASK) {
->> +                               /*
->> +                                * M0 replied - save reply code and
->> +                                * clear error.
->> +                                */
->> +                               msg->reply_code = (val &
->> +                                       M0_IPC_CMD_REPLY_MASK) >>
->> +                                       M0_IPC_CMD_REPLY_SHIFT;
->> +                               err = 0;
->> +                               break;
->> +                       }
->> +                       udelay(poll_period_us);
->>
-> potentially 2ms inside spin_lock_irqsave. Alternative is to implement
-> a simple 'peek_data' and call it for requests with 'wait_ack'
-Hi Jassi. The M0 response is normally 25-30 us. We have one message that takes 280us but we can get rid of it if necessary. Regarding your suggestion of peek_data. I don't see how it can be used without the spinlock to serialize multiple clients/channels over a single mailbox channel. peek_data is going to allow the client to poll for data. But the spinlock is there to prevent other clients from accessing the mailbox channel until any pending transaction is complete. last_tx_done looks like an option but even that will not prevent another client from clobbering a pending transaction. A shared channel among all clients with a blocking model would probably work, but not pretty. Let me know what you advise. Thanks.
+as i already wrote i'm happy to help you here.
+
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
