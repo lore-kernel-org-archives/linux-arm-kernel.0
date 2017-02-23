@@ -1,49 +1,31 @@
-From: abhijitnaik27@gmail.com (Abhijit Naik)
-Date: Thu, 23 Feb 2017 18:31:00 +0530
-Subject: [PATCH 2/2] staging: bcm2835-audio: Removed braces of single
- statement blocks
-In-Reply-To: <20170223130100.6278-1-abhijitnaik27@gmail.com>
-References: <20170223130100.6278-1-abhijitnaik27@gmail.com>
-Message-ID: <20170223130100.6278-2-abhijitnaik27@gmail.com>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Thu, 23 Feb 2017 14:03:04 +0100
+Subject: [PATCH V2] ARM: dts: BCM5301X: Add basic DT for Linksys EA9500
+In-Reply-To: <20170223125612.2394-1-zajec5@gmail.com>
+References: <20170223104025.5755-1-zajec5@gmail.com>
+ <20170223125612.2394-1-zajec5@gmail.com>
+Message-ID: <b87821b6-57a5-e8cc-eeac-1b0e42ee50f1@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bcm2835-vchiq.c:
-fixing WARNING: braces {} are not necessary for single statement blocks
+Dear Rafal,
 
-Signed-off-by: Abhijit Naik <abhijitnaik27@gmail.com>
----
- drivers/staging/bcm2835-audio/bcm2835-vchiq.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+On 2017-02-23 13:56, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
+>
+> It's tri-band wireless home router based on BCM47094 AKA BCM4709C0. It
+> uses 3 x BCM4366 chipsets for wireless.
+> Panamera seems to be board name used by Linksys.
+>
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> ---
+> V2: Use panamera board name
 
-diff --git a/drivers/staging/bcm2835-audio/bcm2835-vchiq.c b/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
-index 1a6b4382c15b..df1f3dd9e226 100644
---- a/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
-+++ b/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
-@@ -227,9 +227,9 @@ static void audio_vchi_callback(void *param,
- 	LOG_DBG(" .. IN instance=%p, handle=%p, alsa=%p, reason=%d, handle=%p\n",
- 		instance, instance ? instance->vchi_handle[0] : NULL, instance ? instance->alsa_stream : NULL, reason, msg_handle);
- 
--	if (reason != VCHI_CALLBACK_MSG_AVAILABLE) {
-+	if (reason != VCHI_CALLBACK_MSG_AVAILABLE)
- 		return;
--	}
-+
- 	if (!instance) {
- 		LOG_ERR(" .. instance is null\n");
- 		BUG();
-@@ -818,9 +818,10 @@ static int bcm2835_audio_write_worker(struct bcm2835_alsa_stream *alsa_stream,
- 	}
- 	vchi_service_use(instance->vchi_handle[0]);
- 
--	if (instance->peer_version == 0 && vchi_get_peer_version(instance->vchi_handle[0], &instance->peer_version) == 0) {
-+	if (instance->peer_version == 0 &&
-+			vchi_get_peer_version(instance->vchi_handle[0], &instance->peer_version) == 0)
- 		LOG_DBG("%s: client version %d connected\n", __func__, instance->peer_version);
--	}
-+
- 	m.type = VC_AUDIO_MSG_TYPE_WRITE;
- 	m.u.write.count = count;
- 	// old version uses bulk, new version uses control
--- 
-2.11.0
+My bad, forgot to mention that you should also use "linksys,panamera" as 
+a compatibility name as well. "model" should stay as-is of course.
+
+
+
+Best,
+
+Imre
