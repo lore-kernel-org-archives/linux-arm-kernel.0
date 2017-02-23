@@ -1,59 +1,84 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 23 Feb 2017 10:10:19 +0100
-Subject: [PATCH v4 33/36] media: imx: redo pixel format enumeration and
- negotiation
-In-Reply-To: <9a4a4da7-418e-860e-05ec-da44b3c945cc@gmail.com>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-34-git-send-email-steve_longerbeam@mentor.com>
- <1487244744.2377.38.camel@pengutronix.de>
- <9a4a4da7-418e-860e-05ec-da44b3c945cc@gmail.com>
-Message-ID: <1487841019.2916.7.camel@pengutronix.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 23 Feb 2017 10:16:07 +0100
+Subject: [PATCH 1/2] drivers: pwm: pwm-atmel: add support for pwm on
+ sama5d2
+In-Reply-To: <1487839120-13650-2-git-send-email-claudiu.beznea@microchip.com>
+References: <1487839120-13650-1-git-send-email-claudiu.beznea@microchip.com>
+ <1487839120-13650-2-git-send-email-claudiu.beznea@microchip.com>
+Message-ID: <20170223091607.j5yfz7jvfzeinrap@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
-
-On Wed, 2017-02-22 at 15:52 -0800, Steve Longerbeam wrote:
-> Hi Philipp,
+On 23/02/2017 at 10:38:39 +0200, Claudiu Beznea wrote:
+> Enable PWM on sama5d2 by adding atmel_pwm_config_v3().
+> This, simply, sets the period and duty factor registers.
 > 
+> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+> ---
+>  Documentation/devicetree/bindings/pwm/atmel-pwm.txt |  1 +
+>  drivers/pwm/pwm-atmel.c                             | 16 ++++++++++++++++
+>  2 files changed, 17 insertions(+)
 > 
-> On 02/16/2017 03:32 AM, Philipp Zabel wrote:
-> > On Wed, 2017-02-15 at 18:19 -0800, Steve Longerbeam wrote:
-> >> The previous API and negotiation of mbus codes and pixel formats
-> >> was broken, and has been completely redone.
-> >>
-> >> The negotiation of media bus codes should be as follows:
-> >>
-> >> CSI:
-> >>
-> >> sink pad     direct src pad      IDMAC src pad
-> >> --------     ----------------    -------------
-> >> RGB (any)        IPU RGB           RGB (any)
-> >> YUV (any)        IPU YUV           YUV (any)
-> >> Bayer              N/A             must be same bayer code as sink
-> >
-> > The IDMAC src pad should also use the internal 32-bit RGB / YUV format,
-> > except if bayer/raw mode is selected, in which case the attached capture
-> > video device should only allow a single mode corresponding to the output
-> > pad media bus format.
+> diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+> index 02331b9..c8c831d 100644
+> --- a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+> +++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+> @@ -4,6 +4,7 @@ Required properties:
+>    - compatible: should be one of:
+>      - "atmel,at91sam9rl-pwm"
+>      - "atmel,sama5d3-pwm"
+> +    - "atmel,sama5d2-pwm"
+>    - reg: physical base address and length of the controller's registers
+>    - #pwm-cells: Should be 3. See pwm.txt in this directory for a
+>      description of the cells format.
+> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+> index 0e4bd4e..4406639 100644
+> --- a/drivers/pwm/pwm-atmel.c
+> +++ b/drivers/pwm/pwm-atmel.c
+> @@ -207,6 +207,15 @@ static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
+>  	}
+>  }
+>  
+> +static void atmel_pwm_config_v3(struct pwm_chip *chip, struct pwm_device *pwm,
+> +				unsigned long dty, unsigned long prd)
+> +{
+> +	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
+> +
+> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTY, dty);
+> +	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CPRD, prd);
+> +}
+> +
+>  static int atmel_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
+>  				  enum pwm_polarity polarity)
+>  {
+> @@ -295,6 +304,10 @@ static const struct atmel_pwm_data atmel_pwm_data_v2 = {
+>  	.config = atmel_pwm_config_v2,
+>  };
+>  
+> +static const struct atmel_pwm_data atmel_pwm_data_v3 = {
+> +	.config = atmel_pwm_config_v3,
+> +};
+> +
+>  static const struct platform_device_id atmel_pwm_devtypes[] = {
+>  	{
+>  		.name = "at91sam9rl-pwm",
+> @@ -316,6 +329,9 @@ static const struct of_device_id atmel_pwm_dt_ids[] = {
+>  		.compatible = "atmel,sama5d3-pwm",
+>  		.data = &atmel_pwm_data_v2,
+>  	}, {
+> +		.compatible = "atmel,sama5d2-pwm",
+> +		.data = &atmel_pwm_data_v3,
+> +	}, {
+>  		/* sentinel */
+>  	},
+>  };
+> -- 
+> 2.7.4
 > 
-> The IDMAC source pad is going to memory, so it has left the IPU.
-> Are you sure it should be an internal IPU format? I realize it
-> is linked to a capture device node, and the IPU format could then
-> be translated to a v4l2 fourcc by the capture device, but IMHO this
-> pad is external to the IPU.
 
-The CSI IDMAC source pad should describe the format at the connection
-between the CSI and the IDMAC, just as the icprpvf and icprpenc source
-pads.
-The format outside of the IPU is the memory format written by the IDMAC,
-but that is a memory pixel format and not a media bus format at all.
-
-That would also make it more straightforward to enumerate the memory
-pixel formats in the capture device: If the source pad media bus format
-is 32-bit YUV, enumerate all YUV formats, if it is 32-bit RGB or RGB565,
-enumerate all rgb formats, otherwise (bayer/raw mode) only allow the
-specific memory format matching the bus format.
-
-regards
-Philipp
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
