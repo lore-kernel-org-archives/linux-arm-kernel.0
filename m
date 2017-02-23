@@ -1,59 +1,32 @@
 From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 23 Feb 2017 14:03:23 +0100
-Subject: [PATCH] ARM: dts: BCM5301X: Add basic DT for Linksys EA9500
-In-Reply-To: <e756072c-f633-2507-ec58-7dfbf037f582@openwrt.org>
+Date: Thu, 23 Feb 2017 14:05:29 +0100
+Subject: [PATCH V2] ARM: dts: BCM5301X: Add basic DT for Linksys EA9500
+In-Reply-To: <b87821b6-57a5-e8cc-eeac-1b0e42ee50f1@openwrt.org>
 References: <20170223104025.5755-1-zajec5@gmail.com>
- <bd36df47-cefe-5736-e02c-621a21ae1b7a@openwrt.org>
- <CACna6rzN-OQv4UJoRso_Kyf1rCEtuU5Lu9LDjvTTt011UgrA=Q@mail.gmail.com>
- <5c57772b-71fd-d9e2-efe6-1175cf048e0b@openwrt.org>
- <CACna6rzeuy+-0cQCUCrXYBnLv-twrzVvd65L6LANPPejarWAWQ@mail.gmail.com>
- <e756072c-f633-2507-ec58-7dfbf037f582@openwrt.org>
-Message-ID: <CACna6rxMH5zz+zLxrZ+6F_aaQ-sXMEMpHE-oGyZA5B6kzq-8cA@mail.gmail.com>
+ <20170223125612.2394-1-zajec5@gmail.com>
+ <b87821b6-57a5-e8cc-eeac-1b0e42ee50f1@openwrt.org>
+Message-ID: <CACna6rxYScuKzm5156FviBut=SJHL+j=zc3D4B3+bH1Z1HK5vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 February 2017 at 13:59, Imre Kaloz <kaloz@openwrt.org> wrote:
-> On 2017-02-23 13:51, Rafa? Mi?ecki wrote:
+On 23 February 2017 at 14:03, Imre Kaloz <kaloz@openwrt.org> wrote:
+> On 2017-02-23 13:56, Rafa? Mi?ecki wrote:
 >>
->> On 23 February 2017 at 13:44, Imre Kaloz <kaloz@openwrt.org> wrote:
->>>
->>> On 2017-02-23 13:29, Rafa? Mi?ecki wrote:
->>>>
->>>> On 23 February 2017 at 13:27, Imre Kaloz <kaloz@openwrt.org> wrote:
->>>>>
->>>>> As discussed for other platforms as well, please use the board's name
->>>>> as
->>>>> the
->>>>> same board can end up being sold under multiple model numbers.
->>>>>
->>>>> So please rename the file to bcm47094-linksys-panamera.dts
->>>>
->>>> Huh? Where did you get panamera name from?!
->>>
->>> Your manners shine on these dark days of winter. For about a decade now,
->>> http://192.168.1.1/sysinfo.cgi will show you quite a bit of information
->>> if
->>> you are too lazy to look into the GPL tarball or at the original
->>> bootlogs.
+>> From: Rafa? Mi?ecki <rafal@milecki.pl>
 >>
->> Sadly Linksys doesn't sponsor me or provide me any hardware. The
->> bootlogs I found:
->> https://www.snbforums.com/threads/ea9500-serial-console-to-cfe.35228/
->> http://www.dd-wrt.com/phpBB2/viewtopic.php?t=288470&start=30
->> didn't include board name. As you probably can guess
->> http://192.168.1.1/ was useful in my case as well.
+>> It's tri-band wireless home router based on BCM47094 AKA BCM4709C0. It
+>> uses 3 x BCM4366 chipsets for wireless.
+>> Panamera seems to be board name used by Linksys.
 >>
+>> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+>> ---
+>> V2: Use panamera board name
 >
-> I've guessed you have the hardware - so you're submitting dts files without
-> testing it? I know they don't do much, but still, this is an interesting
-> concept.
+>
+> My bad, forgot to mention that you should also use "linksys,panamera" as a
+> compatibility name as well. "model" should stay as-is of course.
 
-I'm sending what was tested by EA9500 user:
-https://forum.lede-project.org/t/lede-tested-on-linksys-ea9500/1612
-
-I'm planning to add better support for this device, but it requires
-extra testing which may take some time. So I just started with what I
-can provide so far.
+Oops, I missed that. You're correct obviously.
 
 -- 
 Rafa?
