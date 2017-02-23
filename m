@@ -1,71 +1,79 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 23 Feb 2017 15:58:31 +0000
-Subject: [PATCH/RFC 0/6] PSCI: Fix non-PMIC wake-up if SYSTEM_SUSPEND cuts
- power
-In-Reply-To: <CAMuHMdX3_Vjw2NNTE1XnQkuKS=7YDA4eccEFO1pAZkjw_4q9cg@mail.gmail.com>
-References: <1487622809-25127-1-git-send-email-geert+renesas@glider.be>
- <94167d3a-e005-3af0-d290-a1086684d570@arm.com>
- <3c8b3f2d-8604-f999-4208-a82f171b64f2@arm.com>
- <1975396.x0czmkNPOW@aspire.rjw.lan>
- <35840771-e16f-d6fe-3a89-1b3f51f4a8f3@arm.com>
- <CAMuHMdXpKrJn9NrkAarvMtytk9gHEFcRoZLCsWBFgriUCeWo=Q@mail.gmail.com>
- <f649d707-8b0a-5ca9-b021-93ae8cf66b33@arm.com>
- <CAMuHMdVTEbqEocYwu=KW_uXpykYkVwUgSJBnLvQp_Epn8Pjp1g@mail.gmail.com>
- <CAMuHMdX3_Vjw2NNTE1XnQkuKS=7YDA4eccEFO1pAZkjw_4q9cg@mail.gmail.com>
-Message-ID: <aaf6b786-3c7e-7323-57b7-db7fc6dc8b3f@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 23 Feb 2017 16:03:17 +0000
+Subject: [PATCH] arm64/cpufeature: check correct field width when updating
+ sys_val
+Message-ID: <1487865797-25418-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+When we're updating a register's sys_val, we use arm64_ftr_value() to
+find the new field value. We use cpuid_feature_extract_field() to find
+the new value, but this implicitly assumes a 4-bit field, so we may
+extract more bits than we mean to for fields like CTR_EL0.L1ip.
 
-On 23/02/17 15:34, Geert Uytterhoeven wrote:
-> Hi Sudeep,
-> 
-> On Thu, Feb 23, 2017 at 4:26 PM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Wed, Feb 22, 2017 at 3:32 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>> On 22/02/17 13:38, Geert Uytterhoeven wrote:
->>>> On Wed, Feb 22, 2017 at 12:03 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>>>   4. Patch 3/6 adds a new "shallow" state, as it allows to save more
->>>> power (the difference may be due to suboptimal cpuidle platform support on R-Car Gen3, though),
->>>
->>> Why can't you do that in s2idle mode. Please give me the difference
->>> between your shallow state and s2idle state, not just power numbers
->>> but the actual state of CPUs and the devices in the system.
->>
->> From the Linux side, there's not much difference, except that the secondary
->> CPU cores are disabled.  As that is handled by PSCI, the difference may be
->> in the PSCI implementation.  I will have to check that...
->>
->> On these SoCs, the individual CPU cores and the SCU/L2 are in separate
->> (nested) power areas.  Perhaps these power areas are turned off when
->> disabling the CPU cores, but not when suspending them.
-> 
-> BTW, I don't care much about the extra state.
-> 
+This affects update_cpu_ftr_reg(), where we may extract erroneous values
+for ftr_cur and ftr_new. Depending on the additional bits extracted in
+either case, we may erroneously detect that the value is mismatched, and
+we'll try to compute a new safe value.
 
-Then stop caring about extra power usage too ;). Seriously this is not a
-valid argument.
+Dependent on these extra bits and feature type, arm64_ftr_safe_value()
+may pessimistically select the always-safe value, or may erroneously
+choose either the extracted cur or new value as the safe option. The
+extra bits will subsequently be masked out in arm64_ftr_set_value(), so
+we may choose a higher value, yet write back a lower one.
 
->>>> E.g. on non-PSCI platforms with an Ethernet driver that supports
->>>> Wake-on-LAN, I can do:
->>>>
->>>>         ethtool -s eth0 wol g
->>>>         echo mem > /sys/power/state
->>>>
->>>> and be sure that the system can be woken up by sending a WoL MagicPacket.
->>>
->>> Still possible with s2idle if CPU_SUSPEND is correctly implemented by
->>> the platform.
->>
->> Sure. But not automatic, as it needs fiddling with mem_sleep.
-> 
-> I do care about this, as it affects user experience.
-> 
+Fix this by passing the width down explicitly in arm64_ftr_value(), so
+we always extract the correct amount.
 
-Again when you have both "deep" and "standby" suspend states as per your
-patch set, user has to choose one. No escape from that.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/cpufeature.h | 14 ++++++++++----
+ 1 file changed, 10 insertions(+), 4 deletions(-)
 
+Strictly speaking, this fixes:
+
+  3c739b5710843621 ("arm64: Keep track of CPU feature registers")
+
+... but this doesn't (yet) have any functional impact.
+
+Luckily the L1ip detection reads from cpuinfo_arm64 directly, and is not
+affected by this error.
+
+Mark.
+
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 4ce82ed..05310ad 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -184,16 +184,22 @@ static inline u64 arm64_ftr_reg_user_value(const struct arm64_ftr_reg *reg)
+ }
+ 
+ static inline int __attribute_const__
+-cpuid_feature_extract_field(u64 features, int field, bool sign)
++cpuid_feature_extract_field_width(u64 features, int field, int width, bool sign)
+ {
+ 	return (sign) ?
+-		cpuid_feature_extract_signed_field(features, field) :
+-		cpuid_feature_extract_unsigned_field(features, field);
++		cpuid_feature_extract_signed_field_width(features, field, width) :
++		cpuid_feature_extract_unsigned_field_width(features, field, width);
++}
++
++static inline int __attribute_const__
++cpuid_feature_extract_field(u64 features, int field, bool sign)
++{
++	return cpuid_feature_extract_field_width(features, field, 4, sign);
+ }
+ 
+ static inline s64 arm64_ftr_value(const struct arm64_ftr_bits *ftrp, u64 val)
+ {
+-	return (s64)cpuid_feature_extract_field(val, ftrp->shift, ftrp->sign);
++	return (s64)cpuid_feature_extract_field_width(val, ftrp->shift, ftrp->width, ftrp->sign);
+ }
+ 
+ static inline bool id_aa64mmfr0_mixed_endian_el0(u64 mmfr0)
 -- 
-Regards,
-Sudeep
+1.9.1
