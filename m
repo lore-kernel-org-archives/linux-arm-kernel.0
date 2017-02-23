@@ -1,31 +1,56 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 23 Feb 2017 15:33:00 -0800
-Subject: [GIT PULL 1/7] ARM: SoC non-urgent fixes for merge window
-In-Reply-To: <9013724.FUQHNQsY9n@wuerfel>
-References: <8729461.VkrRdW7LzJ@wuerfel> <9013724.FUQHNQsY9n@wuerfel>
-Message-ID: <CA+55aFy6ZpXsRjz9mAV+wxg7Okq3FEkZvR69niPb7m1Vu=7xbQ@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 23 Feb 2017 17:38:24 -0600
+Subject: [RFC/PATCH] of: Mark property::value as const
+In-Reply-To: <58AF6B88.6020709@gmail.com>
+References: <20170214025040.23955-1-stephen.boyd@linaro.org>
+ <58AF6B88.6020709@gmail.com>
+Message-ID: <CAL_JsqJwMob=XN=SBXict4iz3QrLX01iRbMxhWEzC8zpD4XomA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2017 at 3:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Thu, Feb 23, 2017 at 5:08 PM, Frank Rowand <frowand.list@gmail.com> wrote:
+> On 02/13/17 18:50, Stephen Boyd wrote:
+>> The 'blob' we pass into populate_properties() is marked as const,
+>> but we cast that const away when we assign the result of
+>> fdt_getprop_by_offset() to pp->value. Let's mark value as const
+>> instead, so that code can't mistakenly write to the value of the
+>> property that we've so far advertised as const.
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes-nc
+> Instead of struct property field value being a pointer into the
+> FDT, I would rather copy the data to newly allocated memory and
+> have value be a pointer to that memory.  This is required if we
+> want to make /sys/firmware/fdt optional, which would allow us to
+> free the memory containing the initial boot FDT.
 
-Interesting. So I'm pulling this, and I get to pull request 3/7, and
-that's when I notice that the email is sent by Arnd, but the tag is
-signed by Olof.
+Making a copy would simplify several things.
 
-Which is fine, but I end up cutting-and-pasting the name of the "from"
-person from the signature, so the pull requests got merged as
+> I also do not want overlay live subtrees to have any pointers
+> into the FDT that was used to populate the overlay, so copying
+> the data solves that problem also.
+>
+>
+>> Unfortunately, this exposes a problem with the fdt resolver code,
+>> where we overwrite the value member of properties of phandles to
+>> update them with their final value. Add a comment for now to
+>> indicate where we're potentially writing over const data.
+>
+> Yes, the resolver code needs to adjust phandle values.
+>
+> I think I can get rid of the resolver modifying the various phandle
+> values, and instead just modify the phandle value in struct
+> device_node.  At the same time, I think I can also remove all
+> instances of the phandle properties ('linux,phandle', 'ibm,phandle',
+> 'phandle') in the live tree.  These properties should not be
+> accessed directly by any code outside of the device tree framework
+> since the phandle is located in the struct device_node.  A quick
+> grep does not show any such accesses of the phandle properties,
+> but I want to look more closely.
 
-   Pull ARM SoC ... from Olof Johansson:
+Good idea.
 
-instead or using "from Arnd Bergmann".
+BTW, I recently noticed that dtc by default generates both
+linux,phandle and phandle properties. I would think the new one has
+been around long enough that we can turn off the old one by default
+now.
 
-I guess it doesn't matter and you guys don't care, but I ended up
-re-doing the pulls. Olof gets credit in the pgp signature anyway.
-
-I wonder how many times before you guys have done this and I just
-didn't notice the ambiguity of who I should credit.
-
-            Linus
+Rob
