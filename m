@@ -1,68 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 23 Feb 2017 16:30:37 +0000
-Subject: [PATCH] Revert "arm64: mm: set the contiguous bit for kernel
- mappings where appropriate"
-In-Reply-To: <CAKv+Gu9q-gUaJG1OfUoi+FszFZ10RZJJtWjedRv9O=sZ11fm4A@mail.gmail.com>
-References: <1487866978-25863-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu9q-gUaJG1OfUoi+FszFZ10RZJJtWjedRv9O=sZ11fm4A@mail.gmail.com>
-Message-ID: <20170223163037.GA25065@leverpostej>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Thu, 23 Feb 2017 17:45:48 +0100
+Subject: [PATCH v2 1/5] dt-bindings: Add vendor prefix for Zidoo
+In-Reply-To: <20170223164553.3715-1-afaerber@suse.de>
+References: <20170223164553.3715-1-afaerber@suse.de>
+Message-ID: <20170223164553.3715-2-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2017 at 04:25:26PM +0000, Ard Biesheuvel wrote:
-> On 23 February 2017 at 16:22, Mark Rutland <mark.rutland@arm.com> wrote:
-> > This reverts commit 0bfc445dec9dd8130d22c9f4476eed7598524129.
-> >
-> > When we change the permissions of regions mapped using contiguous
-> > entries, the architecture requires us to follow a Break-Before-Make
-> > strategy, breaking *all* associated entries before we can change any of
-> > the following properties from the entries:
-> >
-> >  - presence of the contiguous bit
-> >  - output address
-> >  - attributes
-> >  - permissiones
-> >
-> > Failure to do so can result in a number of problems (e.g. TLB conflict
-> > aborts and/or erroneous results from TLB lookups).
-> >
-> > See ARM DDI 0487A.k_iss10775, "Misprogramming of the Contiguous bit",
-> > page D4-1762.
-> >
-> > We do not take this into account when altering the permissions of kernel
-> > segments in mark_rodata_ro(), where we change the permissions of live
-> > contiguous entires one-by-one, leaving them transiently inconsistent.
-> > This has been observed to result in failures on some fast model
-> > configurations.
-> >
-> > Unfortunately, we cannot follow Break-Before-Make here as we'd have to
-> > unmap kernel text and data used to perform the sequence.
-> >
-> > For the timebeing, revert commit 0bfc445dec9dd813 so as to avoid issues
-> > resulting from this misuse of the contiguous bit.
-> >
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Reported-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <Will.Deacon@arm.com>
-> > Cc: stable at vger.kernel.org # v4.10
-> 
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Zidoo is a Chinese manufacturer of TV boxes.
 
-Cheers.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Roc He <hepeng@zidoo.tv>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ v1 -> v2:
+ * Changed subject
+ * Extended commit message
+ 
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-> > ---
-> >  arch/arm64/mm/mmu.c | 34 ++++------------------------------
-> >  1 file changed, 4 insertions(+), 30 deletions(-)
-> >
-> > I'm aware that our hugtlbpage code has a similar issue. I'm looking into that
-> > now, and will address that with separate patches. It should be possible to use
-> > BBM there as it's a userspace mapping.
-> 
-> Are you looking into this issue as well?
-
-I'm looking into it now.
-
-Thanks,
-Mark.
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index a76b981..2776651 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -343,6 +343,7 @@ xlnx	Xilinx
+ xunlong	Shenzhen Xunlong Software CO.,Limited
+ zarlink	Zarlink Semiconductor
+ zeitec	ZEITEC Semiconductor Co., LTD.
++zidoo	Shenzhen Zidoo Technology Co., Ltd.
+ zii	Zodiac Inflight Innovations
+ zte	ZTE Corp.
+ zyxel	ZyXEL Communications Corp.
+-- 
+2.10.2
