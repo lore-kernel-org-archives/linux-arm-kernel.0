@@ -1,47 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Feb 2017 10:26:53 +0000
-Subject: [PATCH v2 18/22] ARM: KVM: Implement HVC_SOFT_RESTART in the init code
-In-Reply-To: <20170223102657.23100-1-marc.zyngier@arm.com>
-References: <20170223102657.23100-1-marc.zyngier@arm.com>
-Message-ID: <20170223102657.23100-19-marc.zyngier@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 23 Feb 2017 11:53:17 +0100
+Subject: [PATCH v3 01/18] drivers/fsi: Add empty fsi bus definitions
+In-Reply-To: <20170201165358.45415-2-cbostic@linux.vnet.ibm.com>
+References: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
+ <20170201165358.45415-2-cbostic@linux.vnet.ibm.com>
+Message-ID: <CAMuHMdUhiXCnjT60Lsqq4eGGnVv9eavtkVL1Mdk_6naBHBDVrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Another missing stub hypercall is HVC_SOFT_RESTART. It turns out
-that it is pretty easy to implement in terms of HVC_RESET_VECTORS
-(since it needs to turn the MMU off).
+Hi Chris, Jeremy,
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/init.S | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+On Wed, Feb 1, 2017 at 5:53 PM, Christopher Bostic
+<cbostic@linux.vnet.ibm.com> wrote:
+> From: Jeremy Kerr <jk@ozlabs.org>
+>
+> This change adds the initial (empty) fsi bus definition, and introduces
+> drivers/fsi/.
+>
+> Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+> Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
 
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 7335a510eee4..c92e092103b2 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -127,8 +127,22 @@ ENTRY(__kvm_handle_stub_hvc)
- 	mrc	p15, 4, r0, c12, c0, 0	@ get HVBAR
- 	b	exit
- 
-+1:	cmp	r0, #HVC_SOFT_RESTART
-+	bne	1f
-+
-+	/* The target is expected in r1 */
-+	msr	ELR_hyp, r1
-+	mrs	r0, cpsr
-+	bic	r0, r0, #MODE_MASK
-+	orr	r0, r0, #HYP_MODE
-+THUMB(	orr	r0, r0, #PSR_T_BIT	)
-+	msr	spsr_cxsf, r0
-+	b	reset
-+
- 1:	cmp	r0, #HVC_RESET_VECTORS
- 	bne	1f
-+
-+reset:
- 	/* We're now in idmap, disable MMU */
- 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
- 	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
--- 
-2.11.0
+> --- /dev/null
+> +++ b/drivers/fsi/Kconfig
+> @@ -0,0 +1,12 @@
+> +#
+> +# FSI subsystem
+> +#
+> +
+> +menu "FSI support"
+> +
+> +config FSI
+> +       tristate "FSI support"
+
+I guess this should depend on some POWER symbol || COMPILE_TEST?
+
+> +       ---help---
+> +         FSI - the FRU Support Interface - is a simple bus for low-level
+> +         access to POWER-based hardware.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
