@@ -1,72 +1,83 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 23 Feb 2017 16:05:42 +0800
-Subject: [PATCH 10/11] drm/sun4i: Add backend pointer to sun4i_layer
+Date: Thu, 23 Feb 2017 16:05:39 +0800
+Subject: [PATCH 07/11] drm/sun4i: Drop hardcoded .possible_crtcs values from
+ layers
 In-Reply-To: <20170223080543.6659-1-wens@csie.org>
 References: <20170223080543.6659-1-wens@csie.org>
-Message-ID: <20170223080543.6659-11-wens@csie.org>
+Message-ID: <20170223080543.6659-8-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun4i_layer only controls the backend hardware block of the display
-pipeline. Instead of getting a pointer to the underlying backend
-through the drm_device structure, leave one in itself.
+To support multiple display pipelines, we would have multiple crtcs,
+with one or more planes bound to them. Obviously having hardcoded
+values for the drm_plane .possible_crtcs field is not going to work.
 
-Also drop the drm_device pointer, since it is no longer needed.
+For primary and cursor planes, the value is set by
+drm_crtc_init_with_planes. We just need to set it for overlay planes.
 
-The next step forward would be to pass the pointer in through
-sun4i_layers_init as a parameter. This would make it easier to support
-multiple display pipelines layer on.
+We also fix the value set for the RGB encoder, by referencing the
+crtc set in sun4i_drv.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpu/drm/sun4i/sun4i_layer.c | 8 +++-----
- drivers/gpu/drm/sun4i/sun4i_layer.h | 1 +
- 2 files changed, 4 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_crtc.c  | 9 +++++++++
+ drivers/gpu/drm/sun4i/sun4i_layer.c | 3 ++-
+ drivers/gpu/drm/sun4i/sun4i_rgb.c   | 3 ++-
+ 3 files changed, 13 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/gpu/drm/sun4i/sun4i_crtc.c b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+index cb1a901bc389..4a30932643c3 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_crtc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_crtc.c
+@@ -166,5 +166,14 @@ struct sun4i_crtc *sun4i_crtc_init(struct drm_device *drm)
+ 	scrtc->crtc.port = of_graph_get_port_by_id(drv->tcon->dev->of_node,
+ 						   1);
+ 
++	/* Set possible_crtcs to this crtc for overlay planes */
++	for (i = 0; scrtc->layers[i]; i++) {
++		uint32_t possible_crtcs = BIT(drm_crtc_index(&scrtc->crtc));
++		struct sun4i_layer *layer = scrtc->layers[i];
++
++		if (layer->plane.type == DRM_PLANE_TYPE_OVERLAY)
++			layer->plane.possible_crtcs = possible_crtcs;
++	}
++
+ 	return scrtc;
+ }
 diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 431e13362b62..6feaf85a5942 100644
+index 9c0baee25fae..431e13362b62 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -36,8 +36,7 @@ static void sun4i_backend_layer_atomic_disable(struct drm_plane *plane,
- 					       struct drm_plane_state *old_state)
- {
- 	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
--	struct sun4i_drv *drv = layer->drv;
--	struct sun4i_backend *backend = drv->backend;
-+	struct sun4i_backend *backend = layer->backend;
+@@ -114,7 +114,8 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
+ 	if (!layer)
+ 		return ERR_PTR(-ENOMEM);
  
- 	sun4i_backend_layer_enable(backend, layer->id, false);
- }
-@@ -46,8 +45,7 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
- 					      struct drm_plane_state *old_state)
- {
- 	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
--	struct sun4i_drv *drv = layer->drv;
--	struct sun4i_backend *backend = drv->backend;
-+	struct sun4i_backend *backend = layer->backend;
+-	ret = drm_universal_plane_init(drm, &layer->plane, BIT(0),
++	/* possible crtcs are set later */
++	ret = drm_universal_plane_init(drm, &layer->plane, 0,
+ 				       &sun4i_backend_layer_funcs,
+ 				       plane->formats, plane->nformats,
+ 				       plane->type, NULL);
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index f5e86fe7750e..fc7f7467d120 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -17,6 +17,7 @@
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_panel.h>
  
- 	sun4i_backend_update_layer_coord(backend, layer->id, plane);
- 	sun4i_backend_update_layer_formats(backend, layer->id, plane);
-@@ -126,7 +124,7 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
++#include "sun4i_crtc.h"
+ #include "sun4i_drv.h"
+ #include "sun4i_tcon.h"
+ #include "sun4i_rgb.h"
+@@ -237,7 +238,7 @@ int sun4i_rgb_init(struct drm_device *drm)
+ 	}
  
- 	drm_plane_helper_add(&layer->plane,
- 			     &sun4i_backend_layer_helper_funcs);
--	layer->drv = drv;
-+	layer->backend = drv->backend;
+ 	/* The RGB encoder can only work with the TCON channel 0 */
+-	rgb->encoder.possible_crtcs = BIT(0);
++	rgb->encoder.possible_crtcs = BIT(drm_crtc_index(&tcon->crtc->crtc));
  
- 	return layer;
- }
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.h b/drivers/gpu/drm/sun4i/sun4i_layer.h
-index a2f65d7a3f4e..a97e376bae17 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.h
-@@ -16,6 +16,7 @@
- struct sun4i_layer {
- 	struct drm_plane	plane;
- 	struct sun4i_drv	*drv;
-+	struct sun4i_backend	*backend;
- 	int			id;
- };
- 
+ 	if (!IS_ERR(tcon->panel)) {
+ 		drm_connector_helper_add(&rgb->connector,
 -- 
 2.11.0
