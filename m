@@ -1,89 +1,68 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 23 Feb 2017 18:30:49 +0100
-Subject: [PATCH 07/11] arm64: tegra: Enable SDHCI controllers on P3110
+Date: Thu, 23 Feb 2017 18:30:51 +0100
+Subject: [PATCH 09/11] arm64: tegra: Add GPIO keys on P2771
 In-Reply-To: <20170223173053.19701-1-thierry.reding@gmail.com>
 References: <20170223173053.19701-1-thierry.reding@gmail.com>
-Message-ID: <20170223173053.19701-7-thierry.reding@gmail.com>
+Message-ID: <20170223173053.19701-9-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-The P3110 processor module wires one of the SDHCI controllers to an on-
-board eMMC and exposes another set of SD/MMC signals on the connector to
-support an external SD/MMC card. A third controller is connected to the
-SDIO pins of an M.2 KEY E connector.
+The P2771 has three keys (power, volume up and volume down) that are
+connected to pins on the AON GPIO controller.
 
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi | 42 ++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-index 1a9ac73b4ecb..b18e166527d8 100644
---- a/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra186-p3310.dtsi
-@@ -7,6 +7,8 @@
- 	compatible = "nvidia,p3310", "nvidia,tegra186";
+diff --git a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
+index 0d3c0996d832..1c195d71806d 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
++++ b/arch/arm64/boot/dts/nvidia/tegra186-p2771-0000.dts
+@@ -1,8 +1,42 @@
+ /dts-v1/;
  
- 	aliases {
-+		sdhci0 = "/sdhci at 3460000";
-+		sdhci1 = "/sdhci at 3400000";
- 		serial0 = &uarta;
- 		i2c0 = "/bpmp/i2c";
- 		i2c1 = "/i2c at 3160000";
-@@ -72,6 +74,32 @@
- 		status = "okay";
- 	};
++#include <dt-bindings/input/linux-event-codes.h>
++
+ #include "tegra186-p3310.dtsi"
  
-+	/* SDMMC1 (SD/MMC) */
-+	sdhci at 3400000 {
-+		status = "okay";
+ / {
+ 	model = "NVIDIA Tegra186 P2771-0000 Development Board";
+ 	compatible = "nvidia,p2771-0000", "nvidia,tegra186";
 +
-+		cd-gpios = <&gpio TEGRA_MAIN_GPIO(P, 6) GPIO_ACTIVE_LOW>;
-+		wp-gpios = <&gpio TEGRA_MAIN_GPIO(P, 4) GPIO_ACTIVE_LOW>;
++	gpio-keys {
++		compatible = "gpio-keys";
 +
-+		vqmmc-supply = <&vddio_sdmmc1>;
-+		vmmc-supply = <&vdd_sd>;
-+	};
-+
-+	/* SDMMC3 (SDIO) */
-+	sdhci at 3440000 {
-+		status = "okay";
-+	};
-+
-+	/* SDMMC4 (eMMC) */
-+	sdhci at 3460000 {
-+		status = "okay";
-+		bus-width = <8>;
-+		non-removable;
-+
-+		vqmmc-supply = <&vdd_1v8_ap>;
-+		vmmc-supply = <&vdd_3v3_sys>;
-+	};
-+
- 	hsp at 3c00000 {
- 		status = "okay";
- 	};
-@@ -333,5 +361,19 @@
- 
- 			vin-supply = <&vdd_1v8>;
- 		};
-+
-+		vdd_sd: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+
-+			regulator-name = "SD_CARD_SW_PWR";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+
-+			gpio = <&gpio TEGRA_MAIN_GPIO(P, 5) GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+
-+			vin-supply = <&vdd_3v3_sys>;
++		power {
++			label = "Power";
++			gpios = <&gpio_aon TEGRA_AON_GPIO(FF, 0)
++					   GPIO_ACTIVE_LOW>;
++			linux,input-type = <EV_KEY>;
++			linux,code = <KEY_POWER>;
++			debounce-interval = <10>;
++			wakeup-source;
 +		};
- 	};
++
++		volume-up {
++			label = "Volume Up";
++			gpios = <&gpio_aon TEGRA_AON_GPIO(FF, 1)
++					   GPIO_ACTIVE_LOW>;
++			linux,input-type = <EV_KEY>;
++			linux,code = <KEY_VOLUMEUP>;
++			debounce-interval = <10>;
++		};
++
++		volume-down {
++			label = "Volume Down";
++			gpios = <&gpio_aon TEGRA_AON_GPIO(FF, 2)
++					   GPIO_ACTIVE_LOW>;
++			linux,input-type = <EV_KEY>;
++			linux,code = <KEY_VOLUMEDOWN>;
++			debounce-interval = <10>;
++		};
++	};
  };
 -- 
 2.11.1
