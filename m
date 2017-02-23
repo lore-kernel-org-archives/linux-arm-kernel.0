@@ -1,52 +1,25 @@
 From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Thu, 23 Feb 2017 10:32:58 +0200
-Subject: [PATCH] ATM: dts: at91: sama5d2_xplained: add pwm controller
-Message-ID: <1487838778-13473-1-git-send-email-claudiu.beznea@microchip.com>
+Date: Thu, 23 Feb 2017 10:38:38 +0200
+Subject: [PATCH 0/2] drivers: pwm: add pwm support for sama5d2
+Message-ID: <1487839120-13650-1-git-send-email-claudiu.beznea@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pwm controller bindings for sam5d2_xplained
-and enable it.
+Extend atmel-pwm driver in order to support sama5d2 pwm
+specifics. Since the new SoC supports changing of pwm
+parameters (period and duty factor) without need to first
+disable/enable the pwm channel this series adapt the
+existing code in order to let changing of these parameters
+for sama5d2.
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi | 4 ++++
- arch/arm/boot/dts/sama5d2.dtsi                      | 8 ++++++++
- 2 files changed, 12 insertions(+)
+Claudiu Beznea (2):
+  drivers: pwm: pwm-atmel: add support for pwm on sama5d2
+  drivers: pwm: pwm-atmel: add support to allow run time changing of
+    pwm parameters
 
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi b/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi
-index 9fc270f..493ea29 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained_common.dtsi
-@@ -318,6 +318,10 @@
- 				};
- 			};
- 
-+			pwm0: pwm at f802c000 {
-+				status = "okay";
-+			};
-+
- 			flx0: flexcom at f8034000 {
- 				atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_USART>;
- 				status = "disabled"; /* conflict with ISC_D2 & ISC_D3 data pins */
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index cd459e8..e88785e 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -1098,6 +1098,14 @@
- 				status = "disabled";
- 			};
- 
-+			pwm0: pwm at f802c000 {
-+				compatible = "atmel,sama5d2-pwm";
-+				reg = <0xf802c000 0x4000>;
-+				interrupts = <38 IRQ_TYPE_LEVEL_HIGH 7>;
-+				#pwm-cells = <3>;
-+				clocks = <&pwm_clk>;
-+			};
-+
- 			sfr: sfr at f8030000 {
- 				compatible = "atmel,sama5d2-sfr", "syscon";
- 				reg = <0xf8030000 0x98>;
+ .../devicetree/bindings/pwm/atmel-pwm.txt          |  1 +
+ drivers/pwm/pwm-atmel.c                            | 40 ++++++++++++++++++----
+ 2 files changed, 35 insertions(+), 6 deletions(-)
+
 -- 
 2.7.4
