@@ -1,48 +1,118 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Fri, 24 Feb 2017 11:33:28 +0100
-Subject: [PATCH] ASoC: atmel-classd: fix audio clock rate
-In-Reply-To: <20170224071043.25522-1-songjun.wu@microchip.com>
-References: <20170224071043.25522-1-songjun.wu@microchip.com>
-Message-ID: <1c43cc9a-162b-b4c4-ed97-5eb1476ddc4f@microchip.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 24 Feb 2017 10:42:26 +0000
+Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
+References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
+ <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <58B00E12.5020602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 24/02/2017 ? 08:10, Songjun Wu a ?crit :
-> Fix the audio clock rate according to the datasheet.
-> 
-> Reported-by: Dushara Jayasinghe <dushara@successful.com.au>
-> Signed-off-by: Songjun Wu <songjun.wu@microchip.com>
+Hi Tyler,
 
-Yes, for sure ;-)
+On 21/02/17 21:22, Tyler Baicar wrote:
+> Currently external aborts are unsupported by the guest abort
+> handling. Add handling for SEAs so that the host kernel reports
+> SEAs which occur in the guest kernel.
 
-But with these tags:
-Fixes: e0a25b6d1862 ("ASoC: atmel-classd: add the Audio Class D Amplifier")
-Cc: <stable@vger.kernel.org> # 4.4+
+> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+> index e22089f..33a77509 100644
+> --- a/arch/arm/include/asm/kvm_arm.h
+> +++ b/arch/arm/include/asm/kvm_arm.h
+> @@ -187,6 +187,7 @@
+>  #define FSC_FAULT	(0x04)
+>  #define FSC_ACCESS	(0x08)
+>  #define FSC_PERM	(0x0c)
+> +#define FSC_EXTABT	(0x10)
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+arm64 has ESR_ELx_FSC_EXTABT which is used in inject_abt64(), but for matching
+an external abort coming from hardware the range is wider.
 
-Thanks!
+Looking at the ARM-ARMs 'ISS encoding for an exception from an Instruction
+Abort' in 'D7.2.27 ESR_ELx, Exception Syndrome Register (ELx)' (page D7-1954 of
+version 'k'...iss10775), the ten flavours of you Synchronous abort you hooked
+with do_sea() in patch 4 occupy 0x10 to 0x1f...
 
-> ---
-> 
->  sound/soc/atmel/atmel-classd.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/sound/soc/atmel/atmel-classd.c b/sound/soc/atmel/atmel-classd.c
-> index 89ac5f5a93eb..7ae46c2647d4 100644
-> --- a/sound/soc/atmel/atmel-classd.c
-> +++ b/sound/soc/atmel/atmel-classd.c
-> @@ -349,7 +349,7 @@ static int atmel_classd_codec_dai_digital_mute(struct snd_soc_dai *codec_dai,
+
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index a5265ed..04f1dd50 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -29,6 +29,7 @@
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_emulate.h>
+>  #include <asm/virt.h>
+> +#include <asm/system_misc.h>
+>  
+>  #include "trace.h"
+>  
+> @@ -1444,8 +1445,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  
+>  	/* Check the stage-2 fault is trans. fault or write fault */
+>  	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+
+... kvm_vcpu_trap_get_fault_type() on both arm and arm64 masks the HSR/ESR_EL2
+with 0x3c ...
+
+
+> -	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+> -	    fault_status != FSC_ACCESS) {
+> +
+> +	/* The host kernel will handle the synchronous external abort. There
+> +	 * is no need to pass the error into the guest.
+> +	 */
+> +	if (fault_status == FSC_EXTABT) {
+
+... but here we only check for 'Synchronous external abort, not on a translation
+table walk'. Are the other types relevant?
+
+If so we need some helper as this range is sparse and 'all other values are
+reserved'. The aarch32 HSR format is slightly different. (G6-4411 ISS encoding
+from an exception from a Data Abort).
+
+If not, can we change patch 4 to check this type too so we don't call out to
+APEI for a fault type we know isn't relevant.
+
+
+> +		if(handle_guest_sea((unsigned long)fault_ipa,
+> +				    kvm_vcpu_get_hsr(vcpu))) {
+> +			kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+> +				kvm_vcpu_trap_get_class(vcpu),
+> +				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+> +				(unsigned long)kvm_vcpu_get_hsr(vcpu));
+> +			return -EFAULT;
+> +		}
+> +	} else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+> +		   fault_status != FSC_ACCESS) {
+>  		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+>  			kvm_vcpu_trap_get_class(vcpu),
+>  			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index b2d57fc..403277b 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -602,6 +602,24 @@ static const char *fault_name(unsigned int esr)
 >  }
->  
->  #define CLASSD_ACLK_RATE_11M2896_MPY_8 (112896 * 100 * 8)
-> -#define CLASSD_ACLK_RATE_12M288_MPY_8  (12228 * 1000 * 8)
-> +#define CLASSD_ACLK_RATE_12M288_MPY_8  (12288 * 1000 * 8)
->  
->  static struct {
->  	int rate;
-> 
+>
+>  /*
+> + * Handle Synchronous External Aborts that occur in a guest kernel.
+> + */
+> +int handle_guest_sea(unsigned long addr, unsigned int esr)
+> +{
+
+> +	if(IS_ENABLED(HAVE_ACPI_APEI_SEA)) {
+> +		nmi_enter();
+> +		ghes_notify_sea();
+> +		nmi_exit();
+
+This nmi stuff was needed for synchronous aborts that may have interrupted
+APEI's interrupts-masked code. We want to avoid trying to take the same set of
+locks, hence taking the in_nmi() path through APEI. Here we know we interrupted
+a guest, so there is no risk that we have interrupted APEI on the host.
+ghes_notify_sea() can safely take the normal path.
 
 
--- 
-Nicolas Ferre
+Thanks,
+
+James
