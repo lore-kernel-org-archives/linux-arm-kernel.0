@@ -1,53 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Feb 2017 10:43:12 +0100
-Subject: [GIT PULL 1/7] ARM: SoC non-urgent fixes for merge window
-In-Reply-To: <CA+55aFy6ZpXsRjz9mAV+wxg7Okq3FEkZvR69niPb7m1Vu=7xbQ@mail.gmail.com>
-References: <8729461.VkrRdW7LzJ@wuerfel> <9013724.FUQHNQsY9n@wuerfel>
- <CA+55aFy6ZpXsRjz9mAV+wxg7Okq3FEkZvR69niPb7m1Vu=7xbQ@mail.gmail.com>
-Message-ID: <CAK8P3a25-2XdYAJnisSF8cxjyoPwNa_ajTGGAzxFXQaMqwSCVA@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 24 Feb 2017 10:51:05 +0100
+Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
+In-Reply-To: <20170224090435.GA11313@samfundet.no>
+References: <20170221162133.jch6yzpotj4s7zob@piout.net>
+ <CAHp75VeB4eVuN5NMfAfQUtssuHezTyAM8FUswuR8FheUk1V-oA@mail.gmail.com>
+ <CAHp75Vc54+GR99qM8vUDfQnehFx0g5q137k-w5XY3023UZyr5w@mail.gmail.com>
+ <20170221171438.e5hvruoixafpcdps@piout.net>
+ <CACiLriSdRM4ZfoDsxFhf6ZVwAtacJOJ28M8CvOg6kC_XN0T-Mw@mail.gmail.com>
+ <20170224081430.GB19663@samfundet.no>
+ <20170224092742.3ce205e2@bbrezillon>
+ <20170224085209.GA27812@samfundet.no>
+ <20170224095509.777da771@bbrezillon>
+ <20170224090435.GA11313@samfundet.no>
+Message-ID: <20170224095105.s4svpysgju3uhb3z@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2017 at 12:33 AM, Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
-> On Thu, Feb 23, 2017 at 3:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes-nc
->
-> Interesting. So I'm pulling this, and I get to pull request 3/7, and
-> that's when I notice that the email is sent by Arnd, but the tag is
-> signed by Olof.
->
-> Which is fine, but I end up cutting-and-pasting the name of the "from"
-> person from the signature, so the pull requests got merged as
->
->    Pull ARM SoC ... from Olof Johansson:
->
-> instead or using "from Arnd Bergmann".
->
-> I guess it doesn't matter and you guys don't care, but I ended up
-> re-doing the pulls. Olof gets credit in the pgp signature anyway.
->
-> I wonder how many times before you guys have done this and I just
-> didn't notice the ambiguity of who I should credit.
+On 24/02/2017 at 10:04:35 +0100, Hans-Christian Noren Egtvedt wrote:
+> Around Fri 24 Feb 2017 09:55:09 +0100 or thereabout, Boris Brezillon wrote:
+> > On Fri, 24 Feb 2017 09:52:09 +0100
+> > Hans-Christian Noren Egtvedt <egtvedt@samfundet.no> wrote:
+> >> OK, I will try to prepare it during the weekend.
+> >> 
+> >> Any reason to wait for 4.11-rc1? AFAIK Linus prefers the larger changes
+> >> before he starts tagging rc's.
+> >> 
+> > 
+> > Oh, so you want to queue it for 4.11, that's even better.
+> 
+> Perhaps I misunderstood you, by after 4.11-rc1 you mean queue it for 4.12?
+> 
+> I will see what I get around to do in the weekend, it should be pretty
+> straightforward, just want to make sure we remove all the bits.
+> 
 
-We really don't care, as we don't split the work by topic branches but
-rather according to who gets the job done on a given day. Any given
-branch likely contains work from both of us and the signature is
-from whoever wrote the text is in the tag.
+I think the main task is removing arch/avr32 and update MAINTAINERS
+(don't forget to add yourself to CREDITS) and Documentation/ anything
+else will have to go through the driver maintainers tree.
 
-This merge window, Olof did most of the merges and he also started
-writing up the tag descriptions for some branches, but I finished the
-job while he was attending ELC. This is probably the first time
-you got pull request with tags signed by more than one of us, but
-IIRC we had one merge window where all the signatures came from
-one person and the pull request was sent by the other, and one time
-(long ago) I created a signed tag that pointed to a tag that Olof had
-signed rather than a tree object. That looked very odd in git, so I
-decided not to do that again.
+If you feel like it, you can also prepare patches for the avr32 only
+drivers. I'll be happy to help with the individual drivers if you can't
+find the time to do it. We will definitively take care of the shared
+avr32/at91 drivers.
 
-If we ever get into the same situation again, with the signature
-coming from someone other than the person sending the mail, I'll
-try to explain that in the mail.
 
-    Arnd
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
