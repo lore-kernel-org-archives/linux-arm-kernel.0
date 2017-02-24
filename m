@@ -1,50 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Feb 2017 15:18:23 +0000
-Subject: [RFC PATCH v1] iommu/io-pgtable-arm-v7s: Check for leaf entry
- right after finding it
-In-Reply-To: <CAPD2p-nPoiSanU4jYvnaYtAbbERE8c=4mLjTC3NX2bGYkZM5UA@mail.gmail.com>
-References: <1487253137-13792-1-git-send-email-olekstysh@gmail.com>
- <bc24299c-748a-4b86-fead-a9ed6b5e5b9f@arm.com>
- <CAPD2p-nPoiSanU4jYvnaYtAbbERE8c=4mLjTC3NX2bGYkZM5UA@mail.gmail.com>
-Message-ID: <20170224151823.GH20130@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 24 Feb 2017 17:25:38 +0200
+Subject: [PATCH 3/8] ARM: dts: exynos: Fix watchdog reset on Exynos4412
+In-Reply-To: <20170224151122.12142-4-krzk@kernel.org>
+References: <20170224151122.12142-1-krzk@kernel.org>
+ <20170224151122.12142-4-krzk@kernel.org>
+Message-ID: <20170224152538.3zwgoa3oreuqkx6m@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2017 at 03:31:26PM +0200, Oleksandr Tyshchenko wrote:
-> On Tue, Feb 21, 2017 at 2:00 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> > Would it not be more logical (and simpler) to just check that the thing
-> > we dereference is valid to dereference when we dereference it? i.e.:
-> >
-> > -----8<-----
-> > diff --git a/drivers/iommu/io-pgtable-arm-v7s.c
-> > b/drivers/iommu/io-pgtable-arm-v7s.c
-> > index 0769276c0537..f3112f9ff494 100644
-> > --- a/drivers/iommu/io-pgtable-arm-v7s.c
-> > +++ b/drivers/iommu/io-pgtable-arm-v7s.c
-> > @@ -418,8 +418,10 @@ static int __arm_v7s_map(struct arm_v7s_io_pgtable
-> > *data, unsigned long iova,
-> >                         pte |= ARM_V7S_ATTR_NS_TABLE;
-> >
-> >                 __arm_v7s_set_pte(ptep, pte, 1, cfg);
-> > -       } else {
-> > +       } else if (ARM_V7S_PTE_IS_TABLE(pte, lvl)) {
-> >                 cptep = iopte_deref(pte, lvl);
-> > +       } else {
-> > +               return -EEXIST;
-> >         }
-> >
-> >         /* Rinse, repeat */
-> > ----->8-----
+On Fri, Feb 24, 2017 at 05:11:17PM +0200, Krzysztof Kozlowski wrote:
+> The Exynos4412 has the same watchdog as newer SoCs (e.g. Exynos5250).
+> Just like the others, for working it requires additional steps in Power
+> Management Unit: unmasking the reset request and enabling the system
+> reset.  Without these additional steps in PMU, the watchdog will not be
+> able to reset the system on expiration event.
 > 
-> Agree. Sounds reasonable.
+> Change the compatible of Exynos4412 watchdog device node to
+> samsung,exynos5250-wdt which includes the additional PMU steps.
 > 
-> >
-> > I think the equivalent could be done in LPAE as well.
+> This will also fix infinite watchdog interrupt in soft mode (lack of
+> interrupt clear) because it is also included in samsung,exynos5250-wdt.
 > 
-> OK.
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  arch/arm/boot/dts/exynos4.dtsi    |  9 ---------
+>  arch/arm/boot/dts/exynos4210.dtsi |  9 +++++++++
+>  arch/arm/boot/dts/exynos4412.dtsi | 10 ++++++++++
+>  3 files changed, 19 insertions(+), 9 deletions(-)
 > 
-> I will resend both modified patches without RFC prefix, right?
+> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+> index 18def1c774d5..71e2cdae6068 100644
+> --- a/arch/arm/boot/dts/exynos4.dtsi
+> +++ b/arch/arm/boot/dts/exynos4.dtsi
+> @@ -283,15 +283,6 @@
+>  		};
+>  	};
+>  
+> -	watchdog: watchdog at 10060000 {
+> -		compatible = "samsung,s3c2410-wdt";
+> -		reg = <0x10060000 0x100>;
+> -		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+> -		clocks = <&clock CLK_WDT>;
+> -		clock-names = "watchdog";
+> -		status = "disabled";
+> -	};
+> -
+>  	rtc: rtc at 10070000 {
+>  		compatible = "samsung,s3c6410-rtc";
+>  		reg = <0x10070000 0x100>;
+> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+> index f9408188f97f..e126357aba9a 100644
+> --- a/arch/arm/boot/dts/exynos4210.dtsi
+> +++ b/arch/arm/boot/dts/exynos4210.dtsi
+> @@ -119,6 +119,15 @@
+>  		};
+>  	};
+>  
+> +	watchdog: watchdog at 10060000 {
+> +		compatible = "samsung,s3c6410-wdt";
 
-Sounds good to me.
+My mistake - here it should still remain at samsung,s3c2410-wdt because
+I am just copying existing nodes to Exynso4210. The compatible should be
+changed in patch 6/8.
 
-Will
+
+Best regards,
+Krzysztof
