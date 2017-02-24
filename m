@@ -1,118 +1,50 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 24 Feb 2017 10:42:26 +0000
-Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
-References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
- <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <58B00E12.5020602@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 24 Feb 2017 10:58:53 +0000
+Subject: [PATCH v3] arm64: Fix kernel panic() in cpu_do_switch_mm() on
+ QDF2400
+In-Reply-To: <1487887418-20195-1-git-send-email-shankerd@codeaurora.org>
+References: <1487887418-20195-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <20170224105852.GC20130@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+On Thu, Feb 23, 2017 at 04:03:38PM -0600, Shanker Donthineni wrote:
+> The commit 38fd94b0275c 'arm64: Work around Falkor erratum 1003' has
+> been added to fix the hardware bug but causes a system crash. The
+> value of the register x1 which contains 'struct mm_struct *' should
+> be preserved inside macro pre_ttbr0_update_workaround.
+> 
+> Macro pre_ttbr0_update_workaround expects 2nd and 3rd arguments are
+> temporary registers. Don't clobber register x1, Otherwise the next
+> load operation 'mmid x1 x1' access the invalid address.
+> 
+> [<ffff0000080989a0>] cpu_do_switch_mm+0x20/0x40
+> [<ffff000008b18614>] efi_virtmap_load+0x34/0x40
+> [<ffff000008b1812c>] virt_efi_get_next_variable+0x64/0xc8
+> [<ffff000008b16204>] efivar_init+0x8c/0x348
+> [<ffff0000092b777c>] efisubsys_init+0xd4/0x270
+> [<ffff000009270c74>] do_one_initcall+0x80/0x110
+> [<ffff000009270ea0>] kernel_init_freeable+0x19c/0x240
+> [<ffff000008d8cef0>] kernel_init+0x10/0x100
+> [<ffff000008082ec0>] ret_from_fork+0x10/0x50
+>  Code: d5033fdf b340bc01 d5182001 d5033fdf (f9416821)
+>  ---[ end trace 15247ca922eb6bb7 ]---
+>  note: swapper/0[1] exited with preempt_count 2
+>  Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+> 
+>  SMP: stopping secondary CPUs
+>  ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+> 
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> Tested-by: Manoj Iyer <manoj.iyer@canonical.com>
+> ---
+> v2: include 12 digit commit-id in commit description.
+> v3: modified the commit subject to more descriptive.
 
-On 21/02/17 21:22, Tyler Baicar wrote:
-> Currently external aborts are unsupported by the guest abort
-> handling. Add handling for SEAs so that the host kernel reports
-> SEAs which occur in the guest kernel.
+Thanks for the v3, but I actually already rewrote the commit log when I
+applied the patch locally yesterday :)
 
-> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-> index e22089f..33a77509 100644
-> --- a/arch/arm/include/asm/kvm_arm.h
-> +++ b/arch/arm/include/asm/kvm_arm.h
-> @@ -187,6 +187,7 @@
->  #define FSC_FAULT	(0x04)
->  #define FSC_ACCESS	(0x08)
->  #define FSC_PERM	(0x0c)
-> +#define FSC_EXTABT	(0x10)
+I'll push out the branch later today once I've hoovered up any other fixes
+kicking around.
 
-arm64 has ESR_ELx_FSC_EXTABT which is used in inject_abt64(), but for matching
-an external abort coming from hardware the range is wider.
-
-Looking at the ARM-ARMs 'ISS encoding for an exception from an Instruction
-Abort' in 'D7.2.27 ESR_ELx, Exception Syndrome Register (ELx)' (page D7-1954 of
-version 'k'...iss10775), the ten flavours of you Synchronous abort you hooked
-with do_sea() in patch 4 occupy 0x10 to 0x1f...
-
-
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index a5265ed..04f1dd50 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -29,6 +29,7 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_emulate.h>
->  #include <asm/virt.h>
-> +#include <asm/system_misc.h>
->  
->  #include "trace.h"
->  
-> @@ -1444,8 +1445,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  
->  	/* Check the stage-2 fault is trans. fault or write fault */
->  	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
-
-... kvm_vcpu_trap_get_fault_type() on both arm and arm64 masks the HSR/ESR_EL2
-with 0x3c ...
-
-
-> -	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
-> -	    fault_status != FSC_ACCESS) {
-> +
-> +	/* The host kernel will handle the synchronous external abort. There
-> +	 * is no need to pass the error into the guest.
-> +	 */
-> +	if (fault_status == FSC_EXTABT) {
-
-... but here we only check for 'Synchronous external abort, not on a translation
-table walk'. Are the other types relevant?
-
-If so we need some helper as this range is sparse and 'all other values are
-reserved'. The aarch32 HSR format is slightly different. (G6-4411 ISS encoding
-from an exception from a Data Abort).
-
-If not, can we change patch 4 to check this type too so we don't call out to
-APEI for a fault type we know isn't relevant.
-
-
-> +		if(handle_guest_sea((unsigned long)fault_ipa,
-> +				    kvm_vcpu_get_hsr(vcpu))) {
-> +			kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
-> +				kvm_vcpu_trap_get_class(vcpu),
-> +				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
-> +				(unsigned long)kvm_vcpu_get_hsr(vcpu));
-> +			return -EFAULT;
-> +		}
-> +	} else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
-> +		   fault_status != FSC_ACCESS) {
->  		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
->  			kvm_vcpu_trap_get_class(vcpu),
->  			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
-
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index b2d57fc..403277b 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -602,6 +602,24 @@ static const char *fault_name(unsigned int esr)
->  }
->
->  /*
-> + * Handle Synchronous External Aborts that occur in a guest kernel.
-> + */
-> +int handle_guest_sea(unsigned long addr, unsigned int esr)
-> +{
-
-> +	if(IS_ENABLED(HAVE_ACPI_APEI_SEA)) {
-> +		nmi_enter();
-> +		ghes_notify_sea();
-> +		nmi_exit();
-
-This nmi stuff was needed for synchronous aborts that may have interrupted
-APEI's interrupts-masked code. We want to avoid trying to take the same set of
-locks, hence taking the in_nmi() path through APEI. Here we know we interrupted
-a guest, so there is no risk that we have interrupted APEI on the host.
-ghes_notify_sea() can safely take the normal path.
-
-
-Thanks,
-
-James
+Will
