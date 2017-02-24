@@ -1,37 +1,32 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 24 Feb 2017 13:57:15 -0800
-Subject: [PATCH 2/7] watchdog: s3c2410: Select MFD_SYSCON on all Exynos
- platforms
-In-Reply-To: <20170224210746.12459-2-krzk@kernel.org>
-References: <20170224210746.12459-1-krzk@kernel.org>
- <20170224210746.12459-2-krzk@kernel.org>
-Message-ID: <b8ece30e-ceef-459a-a71d-d439d222a37e@roeck-us.net>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 24 Feb 2017 15:58:14 -0600
+Subject: [PATCH V2] perf: qcom: Add L3 cache PMU driver
+In-Reply-To: <1487257385-28930-1-git-send-email-agustinv@codeaurora.org>
+References: <1487257385-28930-1-git-send-email-agustinv@codeaurora.org>
+Message-ID: <09a4f5a1-d306-43db-ce7e-03c5c87440c4@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/2017 01:07 PM, Krzysztof Kozlowski wrote:
-> Syscon is used not only on Exynos5 SoCs but also on Exynos3250,
-> Exynos4412 and ARMv8 versions (Exynos5433, Exynos7).
->
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+On 02/16/2017 09:03 AM, Agustin Vega-Frias wrote:
+> +config QCOM_L3_PMU
+> +	 bool "Qualcomm Technologies L3-cache PMU"
+> +	 depends on ARCH_QCOM && ARM64 && PERF_EVENTS && ACPI
+> +	   help
+> +	   Provides support for the L3 cache performance monitor unit (PMU)
+> +	   in Qualcomm Technologies processors.
+> +	   Adds the L3 cache PMU into the perf events subsystem for
+> +	   monitoring L3 cache events.
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Since the L3 PMU driver doesn't work without the IRQ combiner driver, I think 
+you need to add:
 
-> ---
->  drivers/watchdog/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index acb00b53a520..338c5bc46f73 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -335,7 +335,7 @@ config S3C2410_WATCHDOG
->  	tristate "S3C2410 Watchdog"
->  	depends on HAVE_S3C2410_WATCHDOG
->  	select WATCHDOG_CORE
-> -	select MFD_SYSCON if ARCH_EXYNOS5
-> +	select MFD_SYSCON if ARCH_EXYNOS
->  	help
->  	  Watchdog timer block in the Samsung SoCs. This will reboot
->  	  the system when the timer expires with the watchdog enabled.
->
+     select QCOM_IRQ_COMBINER
+
+or
+
+     depends on QCOM_IRQ_COMBINER
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
