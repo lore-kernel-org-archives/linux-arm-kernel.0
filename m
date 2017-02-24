@@ -1,51 +1,111 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 24 Feb 2017 11:16:50 +0100
-Subject: [RFC PATCH 00/13] arm64/kvm: use common sysreg definitions
-In-Reply-To: <1485885951-2747-1-git-send-email-mark.rutland@arm.com>
-References: <1485885951-2747-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170224101650.GE1409@cbox>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 24 Feb 2017 18:20:12 +0800
+Subject: [linux-sunxi] Re: [PATCH RFC] drm/sun4i: rgb: Add 5% tolerance to
+ dot clock frequency check
+In-Reply-To: <1487929872.6887.11.camel@pengutronix.de>
+References: <20161124112231.4297-1-wens@csie.org>
+ <20161206172911.z6sbjzgqv3vfcrfh@lukather>
+ <CAGb2v65uTH_PD28KqAhhzkE5zhLt54GUb7xXNxxe0xHW0A+xjQ@mail.gmail.com>
+ <7603150.D9x404uVey@avalon> <20170223155437.GA24066@art_vandelay>
+ <1487929872.6887.11.camel@pengutronix.de>
+Message-ID: <CAGb2v67qBLwqPyQKD82Ei_gpkBQjxMdSwQiML+PprqW3NOn7Sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Fri, Feb 24, 2017 at 5:51 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> +CC Thierry, as the drm_panel maintainer.
+>
+> Am Donnerstag, den 23.02.2017, 10:54 -0500 schrieb Sean Paul:
+>> On Wed, Dec 07, 2016 at 11:48:55AM +0200, Laurent Pinchart wrote:
+>> > Hello,
+>> >
+>> > On Wednesday 07 Dec 2016 10:26:25 Chen-Yu Tsai wrote:
+>> > > On Wed, Dec 7, 2016 at 1:29 AM, Maxime Ripard wrote:
+>> > > > On Thu, Nov 24, 2016 at 07:22:31PM +0800, Chen-Yu Tsai wrote:
+>> > > >> The panels shipped with Allwinner devices are very "generic", i.e.
+>> > > >> they do not have model numbers or reliable sources of information
+>> > > >> for the timings (that we know of) other than the fex files shipped
+>> > > >> on them. The dot clock frequency provided in the fex files have all
+>> > > >> been rounded to the nearest MHz, as that is the unit used in them.
+>> > > >>
+>> > > >> We were using the simple panel "urt,umsh-8596md-t" as a substitute
+>> > > >> for the A13 Q8 tablets in the absence of a specific model for what
+>> > > >> may be many different but otherwise timing compatible panels. This
+>> > > >> was usable without any visual artifacts or side effects, until the
+>> > > >> dot clock rate check was added in commit bb43d40d7c83 ("drm/sun4i:
+>> > > >> rgb: Validate the clock rate").
+>> > > >>
+>> > > >> The reason this check fails is because the dotclock frequency for
+>> > > >> this model is 33.26 MHz, which is not achievable with our dot clock
+>> > > >> hardware, and the rate returned by clk_round_rate deviates slightly,
+>> > > >> causing the driver to reject the display mode.
+>> > > >>
+>> > > >> The LCD panels have some tolerance on the dot clock frequency, even
+>> > > >> if it's not specified in their datasheets.
+>> > > >>
+>> > > >> This patch adds a 5% tolerence to the dot clock check.
+>> > > >
+>> > > > As we discussed already, I really believe this is just as arbitrary as
+>> > > > the current behaviour.
+>> > >
+>> > > Yes. I agree. This patch is mainly to give something that works for
+>> > > people who don't care about the details, and to get some feedback
+>> > > from people that do.
+>> > >
+>> > > > Some panels require an exact frequency,
+>> >
+>> > There's no such thing as an exact frequency, there will always be some
+>> > tolerance (and if your display controller can really generate an exact
+>> > frequency I'd be very interested in that hardware :-)).
+>>
+>> There is such thing as exact frequency when you have to worry about panel
+>> warranty. We are fortunate, since we can talk to the panel manufacturer and
+>> discuss which frequencies are tolerable inside the warranty. We usually hand
+>> pick a rate/mode within these constraints.
+>>
+>> Also, even though things *look* ok on the panel at a certain clock rate, running
+>> outside the specified clock could damage the hardware.
+>>
+>> I don't think it's unreasonable to add tolerances to drm_panel, since they will
+>> differ in what is acceptable. The tricky part is teasing out what the tolerances
+>> are.
+>
+> The drm_panel already allows to specify all panel timings in pairs of
+> min/typical/max. Just use this instead of some arbitrary tolerance.
+>
+> I know most panels currently only expose a fixed mode, but it's not hard
+> to convert this into a display_timing if you can get hold of the display
+> datasheet. A lot of the panel datasheets I had to deal with lately
+> actually specify all the required information. Most of the time you need
+> to sanity check things, as most vendors seem to produce them by "copy
+> the last datasheet we made and change only necessary fields", but that
+> really isn't a hard job.
 
-On Tue, Jan 31, 2017 at 06:05:38PM +0000, Mark Rutland wrote:
-> Whenever we add new functionality involving new system registers, we need to
-> add sys_reg() definitions so that we can access the registers regardless of
-> whether the toolchain can assemble them. At the same time, we have to add
-> duplicate definitions of the register encodings to KVM's sysreg tables, so that
-> we can handle any configurable traps. This redundancy is unfortunate, and
-> defining the encodings directly in the sysreg tables can make those tables
-> difficult to read.
-> 
-> This series attempts to address both of these issues by allowing us to use
-> common sys_reg() mnemonics in <asm/sysreg.h> to initialise KVM's sysreg tables.
-> To that end, this series tries to make <asm/sysreg.h> the canonical location
-> for common sysreg encodings.
-> 
-> Largely, I've only attacked the AArch64-native SYS encodings required by KVM
-> today, though for the debug and perfmon groups it was easier to take the whole
-> group from the ARM ARM than to filter them to only what KVM needed. I've
-> ignored CP{15,14} registers for now, but these could be encoded similarly.
-> 
-> To verify that I haven't accidentally broken KVM, I've diffed sys_regs.o and
-> sys_regs_generic_v8.o on a section-by-section basis before and after the series
-> is applied. The .text, .data, and .rodata sections (and most others) are
-> identical. The __bug_table section, and some .debug* sections differ, and this
-> appears to be due to line numbers changing due to removed lines.
-> 
-> One thing I wasn't sure how to address was banks of registers such as
-> PMEVCNTR<n>_EL0. We currently enumerate all cases for our GICv3 definitions,
-> but it seemed painful to expand ~30 cases for PMEVCNTR<n>_EL0 and friends, and
-> for these I've made the macros take an 'n' parameter.
-> 
-> The series is based on the arm64/for-next/core branch, since it relies on
-> commit c9ee0f98662a6e35 ("arm64: cpufeature: Define helpers for sys_reg id")
-> for the definition of SYS_DESC().
-> 
+I wish it were that easy to identify panels and find datasheets, especially
+when the vendors themselves use whatever cheap panel they can get their hands
+on. Think no-brand cheap tablets from Aliexpress. These cheap panels may have
+some model-number-like markings on them, but Googling fails to produce anything,
+other than more vendors/items on Aliexpress.
 
-I did not do a full in-depth review, but I really like this overall
-change and the changes to KVM look great to me.
+Take the Q8 tablets with Allwinner SoCs in them. We have no idea what
+panel the vendors use, and panels even vary between batches. We're using
+the urt,umsh-8596md series of compatibles, which seems to have compatible
+timings. Now the datasheet I found for them [1] just lists a typical
+frequency for the pixel clock, and no min/max values. The typical frequency
+is unachievable, for reasons already explained in the commit message.
 
-Thanks for doing this!
--Christoffer
+Another example would be the LG LP079X01 or Auo B079XAN01 DSI panels, which
+supposedly were also used in the 1st gen. iPad Minis. I found datasheets for
+both [2][3], but neither lists tolerances for the dot clock.
+
+So we're back to where we started. What is a reasonable tolerance to set in
+the driver if we don't know the tolerances of the panel?
+
+
+Regards
+ChenYu
+
+
+[1] http://www.udoo.org/download/files/datasheets/datasheet7.pdf
+[2] http://recomit.de/service_manuals/LP079X01-SMA1.pdf
+[3] http://img.jdzj.com/UserDocument/2012Y/hxzczmf/Document/20121229105325.pdf
