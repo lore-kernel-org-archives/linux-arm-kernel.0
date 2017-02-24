@@ -1,85 +1,80 @@
 From: john@metanate.com (John Keeping)
-Date: Fri, 24 Feb 2017 12:55:06 +0000
-Subject: [PATCH v4 23/23] drm/rockchip: dw-mipi-dsi: add reset control
+Date: Fri, 24 Feb 2017 12:55:05 +0000
+Subject: [PATCH v4 22/23] drm/rockchip: dw-mipi-dsi: support non-burst modes
 In-Reply-To: <20170224125506.21533-1-john@metanate.com>
 References: <20170224125506.21533-1-john@metanate.com>
-Message-ID: <20170224125506.21533-24-john@metanate.com>
+Message-ID: <20170224125506.21533-23-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to fully reset the state of the MIPI controller we must assert
-this reset.
-
-This is slightly more complicated than it could be in order to maintain
-compatibility with device trees that do not specify the reset property.
-
 Signed-off-by: John Keeping <john@metanate.com>
 Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
 ---
 v4:
-- Fix error check for devm_reset_control_get() to use ENOENT
+- Add Sean's Reviewed-by
 v3:
 - Add Chris' Reviewed-by
 Unchanged in v2
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 0c4bae711e84..30da75667334 100644
+index 9edb868f8dc1..0c4bae711e84 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -13,6 +13,7 @@
- #include <linux/module.h>
- #include <linux/of_device.h>
- #include <linux/regmap.h>
-+#include <linux/reset.h>
- #include <linux/mfd/syscon.h>
- #include <drm/drm_atomic_helper.h>
- #include <drm/drm_crtc.h>
-@@ -1144,6 +1145,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 			of_match_device(dw_mipi_dsi_dt_ids, dev);
- 	const struct dw_mipi_dsi_plat_data *pdata = of_id->data;
- 	struct platform_device *pdev = to_platform_device(dev);
-+	struct reset_control *apb_rst;
- 	struct drm_device *drm = data;
- 	struct dw_mipi_dsi *dsi;
- 	struct resource *res;
-@@ -1182,6 +1184,35 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 		return ret;
+@@ -82,7 +82,9 @@
+ #define FRAME_BTA_ACK			BIT(14)
+ #define ENABLE_LOW_POWER		(0x3f << 8)
+ #define ENABLE_LOW_POWER_MASK		(0x3f << 8)
+-#define VID_MODE_TYPE_BURST_SYNC_PULSES		0x2
++#define VID_MODE_TYPE_NON_BURST_SYNC_PULSES	0x0
++#define VID_MODE_TYPE_NON_BURST_SYNC_EVENTS	0x1
++#define VID_MODE_TYPE_BURST			0x2
+ #define VID_MODE_TYPE_MASK			0x3
+ 
+ #define DSI_VID_PKT_SIZE		0x3c
+@@ -286,6 +288,7 @@ struct dw_mipi_dsi {
+ 	u32 format;
+ 	u16 input_div;
+ 	u16 feedback_div;
++	unsigned long mode_flags;
+ 
+ 	const struct dw_mipi_dsi_plat_data *pdata;
+ };
+@@ -558,15 +561,10 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
+ 		return -EINVAL;
  	}
  
-+	/*
-+	 * Note that the reset was not defined in the initial device tree, so
-+	 * we have to be prepared for it not being found.
-+	 */
-+	apb_rst = devm_reset_control_get(dev, "apb");
-+	if (IS_ERR(apb_rst)) {
-+		ret = PTR_ERR(apb_rst);
-+		if (ret == -ENOENT) {
-+			apb_rst = NULL;
-+		} else {
-+			dev_err(dev, "Unable to get reset control: %d\n", ret);
-+			return ret;
-+		}
-+	}
+-	if (!(device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) ||
+-	    !(device->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)) {
+-		dev_err(dsi->dev, "device mode is unsupported\n");
+-		return -EINVAL;
+-	}
+-
+ 	dsi->lanes = device->lanes;
+ 	dsi->channel = device->channel;
+ 	dsi->format = device->format;
++	dsi->mode_flags = device->mode_flags;
+ 	dsi->panel = of_drm_find_panel(device->dev.of_node);
+ 	if (dsi->panel)
+ 		return drm_panel_attach(dsi->panel, &dsi->connector);
+@@ -725,7 +723,14 @@ static void dw_mipi_dsi_video_mode_config(struct dw_mipi_dsi *dsi)
+ {
+ 	u32 val;
+ 
+-	val = VID_MODE_TYPE_BURST_SYNC_PULSES | ENABLE_LOW_POWER;
++	val = ENABLE_LOW_POWER;
 +
-+	if (apb_rst) {
-+		ret = clk_prepare_enable(dsi->pclk);
-+		if (ret) {
-+			dev_err(dev, "%s: Failed to enable pclk\n", __func__);
-+			return ret;
-+		}
-+
-+		reset_control_assert(apb_rst);
-+		usleep_range(10, 20);
-+		reset_control_deassert(apb_rst);
-+
-+		clk_disable_unprepare(dsi->pclk);
-+	}
-+
- 	ret = clk_prepare_enable(dsi->pllref_clk);
- 	if (ret) {
- 		dev_err(dev, "%s: Failed to enable pllref_clk\n", __func__);
++	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
++		val |= VID_MODE_TYPE_BURST;
++	else if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)
++		val |= VID_MODE_TYPE_NON_BURST_SYNC_PULSES;
++	else
++		val |= VID_MODE_TYPE_NON_BURST_SYNC_EVENTS;
+ 
+ 	dsi_write(dsi, DSI_VID_MODE_CFG, val);
+ }
 -- 
 2.12.0.rc0.230.gf625d4cdb9.dirty
