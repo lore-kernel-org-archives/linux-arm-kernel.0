@@ -1,50 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Feb 2017 10:58:53 +0000
-Subject: [PATCH v3] arm64: Fix kernel panic() in cpu_do_switch_mm() on
- QDF2400
-In-Reply-To: <1487887418-20195-1-git-send-email-shankerd@codeaurora.org>
-References: <1487887418-20195-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <20170224105852.GC20130@arm.com>
+From: decui@microsoft.com (Dexuan Cui)
+Date: Fri, 24 Feb 2017 11:16:03 +0000
+Subject: [PATCH v1 0/3] PCI: Configure PCIe MPS settings
+In-Reply-To: <20170210215959.GR29169@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170208224632.14351.89895.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20170210215959.GR29169@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <MWHPR03MB26690F3B4C7E83596C35D377BF520@MWHPR03MB2669.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2017 at 04:03:38PM -0600, Shanker Donthineni wrote:
-> The commit 38fd94b0275c 'arm64: Work around Falkor erratum 1003' has
-> been added to fix the hardware bug but causes a system crash. The
-> value of the register x1 which contains 'struct mm_struct *' should
-> be preserved inside macro pre_ttbr0_update_workaround.
-> 
-> Macro pre_ttbr0_update_workaround expects 2nd and 3rd arguments are
-> temporary registers. Don't clobber register x1, Otherwise the next
-> load operation 'mmid x1 x1' access the invalid address.
-> 
-> [<ffff0000080989a0>] cpu_do_switch_mm+0x20/0x40
-> [<ffff000008b18614>] efi_virtmap_load+0x34/0x40
-> [<ffff000008b1812c>] virt_efi_get_next_variable+0x64/0xc8
-> [<ffff000008b16204>] efivar_init+0x8c/0x348
-> [<ffff0000092b777c>] efisubsys_init+0xd4/0x270
-> [<ffff000009270c74>] do_one_initcall+0x80/0x110
-> [<ffff000009270ea0>] kernel_init_freeable+0x19c/0x240
-> [<ffff000008d8cef0>] kernel_init+0x10/0x100
-> [<ffff000008082ec0>] ret_from_fork+0x10/0x50
->  Code: d5033fdf b340bc01 d5182001 d5033fdf (f9416821)
->  ---[ end trace 15247ca922eb6bb7 ]---
->  note: swapper/0[1] exited with preempt_count 2
->  Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
-> 
->  SMP: stopping secondary CPUs
->  ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> Tested-by: Manoj Iyer <manoj.iyer@canonical.com>
-> ---
-> v2: include 12 digit commit-id in commit description.
-> v3: modified the commit subject to more descriptive.
+> From: devel [mailto:driverdev-devel.. at ...] On Behalf Of Bjorn Helgaas
+> Sent: Saturday, February 11, 2017 06:00
+> ...
+> On Wed, Feb 08, 2017 at 04:49:22PM -0600, Bjorn Helgaas wrote:
+> > The PCI core doesn't configure the PCIe MPS settings by itself.  Each
+> > host bridge driver has to call pcie_bus_configure_settings() to make
+> > this happen.
+> >
+> > Jon fixed this already for pcie-iproc.c.  I propose these similar
+> > patches for other drivers.
+> >
+> > HV guys, I included you because create_root_hv_pci_bus() is one place
+> > that calls pci_scan_child_bus() but does not call
+> > pcie_bus_configure_settings().  I know you probably don't strictly
+> > *need* to configure MPS settings in a paravirtual front-end, but the
+> > PCI core does other device configuration in this path:
+> >
+> >   pci_scan_child_bus
+> >     pci_scan_slot
+> >       pci_scan_single_device
+> >         pci_device_add
+> >           pci_configure_device
+> >           pci_init_capabilities
+> >
+> > and I would like to eventually migrate the MPS configuration into that
+> > same path.  Since we do this other configuration for HV devices
+> > already, I think pcie_bus_configure_settings() should also work (even
+> > if it ends up not doing anything to real devices).
+> >
+> > It would make that eventual migration easier if all the
+> > pci_scan_child_bus() callers had the same pattern of calling
+> > pcie_bus_configure_settings().
+> >
+> > So would it make sense to make a similar patch for HV?  It looks easy
+> > to add it to create_root_hv_pci_bus(), but I don't know exactly what
+> > to do about pci_devices_present_work().
 
-Thanks for the v3, but I actually already rewrote the commit log when I
-applied the patch locally yesterday :)
+(I'm sorry for the really late response. I neglected the thread somehow...)
 
-I'll push out the branch later today once I've hoovered up any other fixes
-kicking around.
+Hi Bjorn,
+IMO we don't need to make any change to pci-hyperv.c: when a
+PCIe device is passed through to a guest on Hyper-V, in the guest the
+device only directly appears on a new root bus, and the new root bus
+doesn't have any child bus, and the new root bus itself is actually only
+a logical concept instead of a concrete device (i.e. it doesn't have its
+own BDF at all).
 
-Will
+So, in the path pci_scan_child_bus -> ... -> pci_device_add ->
+pci_configure_device -> pci_configure_mps, we're sure
+pci_upstream_bridge() is NULL, so pci_configure_mps does nothing.
+
+And since the root bus has no child bus, we don't need to call
+pcie_bus_configure_settings(child).
+
+Then you may ask how the MPS is set.
+I suppose the para-virtual PCI back-end driver on the host
+should take care of this properly.
+
+FWIW, after passing through a Mellanox VF to Linux guest, in the
+guest I get this for the device by lspci:
+        DevCap: MaxPayload 512 bytes
+        DevCtl: MaxPayload 128 bytes, MaxReadReq 128 bytes
+
+Thanks
+-- Dexuan
