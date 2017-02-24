@@ -1,33 +1,55 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Fri, 24 Feb 2017 22:57:31 +0300
-Subject: [PATCH] staging: bcm2835: Fix a memory leak in error handling path
-In-Reply-To: <6585ca42-71f4-1517-c6fc-b9ed2f23c687@i2se.com>
-References: <20170219103412.10092-1-christophe.jaillet@wanadoo.fr>
- <6585ca42-71f4-1517-c6fc-b9ed2f23c687@i2se.com>
-Message-ID: <20170224195731.GB4480@mwanda>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 24 Feb 2017 21:09:02 +0100
+Subject: [PATCH v4 15/36] platform: add video-multiplexer subdevice driver
+In-Reply-To: <1487668265.2331.23.camel@pengutronix.de>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-16-git-send-email-steve_longerbeam@mentor.com>
+ <20170219220237.GD32327@amd>
+ <1487668265.2331.23.camel@pengutronix.de>
+Message-ID: <20170224200902.GA19893@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2017 at 01:37:30PM +0100, Stefan Wahren wrote:
-> Hi Christophe,
+Hi!
+
+> > Plus you might want to describe which port correspond to which gpio
+> > state/bitfield values...
+> > 
+> > > +struct vidsw {
+> > 
+> > I knew it: it is secretely a switch! :-).
 > 
-> Am 19.02.2017 um 11:34 schrieb Christophe JAILLET:
-> >If 'kzalloc()' fails, we should release resources allocated so far, just as
-> >done in all other cases in this function.
-> >
-> >Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-> >---
-> >Not sure that the error handling path is correct.
-> >Is 'gdev[0]' freed? Should it be?
+> This driver started as a two-input gpio controlled bus switch.
+> I changed the name when adding support for bitfield controlled
+> multiplexers with more than two inputs.
+
+We had discussion with Sakari / Rob whether gpio controlled thing is a
+switch or a multiplexer :-).
+
+> > > +	if (!pad) {
+> > > +		/* Mirror the input side on the output side */
+> > > +		cfg->type = vidsw->endpoint[vidsw->active].bus_type;
+> > > +		if (cfg->type == V4L2_MBUS_PARALLEL ||
+> > > +		    cfg->type == V4L2_MBUS_BT656)
+> > > +			cfg->flags = vidsw->endpoint[vidsw->active].bus.parallel.flags;
+> > > +	}
+> > 
+> > Will this need support for other V4L2_MBUS_ values?
 > 
+> To support CSI-2 multiplexers, yes.
 
-Yes, but I already sent a patch to fix this and your leak as well and
-Greg merged it.
+Can you stick switch () { .... default: dev_err() } there, to help
+future hackers?
 
-> sorry, didn't checked your patch yet.
-
-It takes like 30 seconds to review this patch.  Do you use mutt?  I have
-a macro that applies patches and loads vim at the right line.
-
-regards,
-dan carpenter
+Thank,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170224/521fe700/attachment.sig>
