@@ -1,68 +1,82 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 24 Feb 2017 17:25:38 +0200
-Subject: [PATCH 3/8] ARM: dts: exynos: Fix watchdog reset on Exynos4412
-In-Reply-To: <20170224151122.12142-4-krzk@kernel.org>
-References: <20170224151122.12142-1-krzk@kernel.org>
- <20170224151122.12142-4-krzk@kernel.org>
-Message-ID: <20170224152538.3zwgoa3oreuqkx6m@kozik-lap>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Fri, 24 Feb 2017 16:30:17 +0100
+Subject: [PATCH 4/8] drm/sun4i: add support for sun8i DE2 mixers and
+ display engines
+In-Reply-To: <CAL_JsqKY1sXT9g9wHhQEt9-x32PaY0yQi8++bTajcEVk1x8E_w@mail.gmail.com>
+References: <20170222152310.3719-5-icenowy@aosc.xyz>
+ <20170222200947.3ikrhvv76ymfu5tv@lukather>
+ <CAL_JsqKY1sXT9g9wHhQEt9-x32PaY0yQi8++bTajcEVk1x8E_w@mail.gmail.com>
+Message-ID: <1634001.dRmL8h9ofd@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2017 at 05:11:17PM +0200, Krzysztof Kozlowski wrote:
-> The Exynos4412 has the same watchdog as newer SoCs (e.g. Exynos5250).
-> Just like the others, for working it requires additional steps in Power
-> Management Unit: unmasking the reset request and enabling the system
-> reset.  Without these additional steps in PMU, the watchdog will not be
-> able to reset the system on expiration event.
-> 
-> Change the compatible of Exynos4412 watchdog device node to
-> samsung,exynos5250-wdt which includes the additional PMU steps.
-> 
-> This will also fix infinite watchdog interrupt in soft mode (lack of
-> interrupt clear) because it is also included in samsung,exynos5250-wdt.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  arch/arm/boot/dts/exynos4.dtsi    |  9 ---------
->  arch/arm/boot/dts/exynos4210.dtsi |  9 +++++++++
->  arch/arm/boot/dts/exynos4412.dtsi | 10 ++++++++++
->  3 files changed, 19 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-> index 18def1c774d5..71e2cdae6068 100644
-> --- a/arch/arm/boot/dts/exynos4.dtsi
-> +++ b/arch/arm/boot/dts/exynos4.dtsi
-> @@ -283,15 +283,6 @@
->  		};
->  	};
->  
-> -	watchdog: watchdog at 10060000 {
-> -		compatible = "samsung,s3c2410-wdt";
-> -		reg = <0x10060000 0x100>;
-> -		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
-> -		clocks = <&clock CLK_WDT>;
-> -		clock-names = "watchdog";
-> -		status = "disabled";
-> -	};
-> -
->  	rtc: rtc at 10070000 {
->  		compatible = "samsung,s3c6410-rtc";
->  		reg = <0x10070000 0x100>;
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> index f9408188f97f..e126357aba9a 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -119,6 +119,15 @@
->  		};
->  	};
->  
-> +	watchdog: watchdog at 10060000 {
-> +		compatible = "samsung,s3c6410-wdt";
+Hi,
 
-My mistake - here it should still remain at samsung,s3c2410-wdt because
-I am just copying existing nodes to Exynso4210. The compatible should be
-changed in patch 6/8.
+Dne petek, 24. februar 2017 ob 14:30:36 CET je Rob Herring napisal(a):
+> On Wed, Feb 22, 2017 at 2:09 PM, Maxime Ripard
+> 
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> > 
+> > On Wed, Feb 22, 2017 at 11:23:06PM +0800, Icenowy Zheng wrote:
+> >> Allwinner have a new "Display Engine 2.0" in there new SoCs, which comes
+> >> in a new "Display Engine" (mixers instead of old backends and
+> >> frontends).
+> >> 
+> >> Add support for the mixer on Allwinner V3s SoC; it's the simplest one.
+> >> 
+> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >> ---
+> 
+> [...]
+> 
+> >> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> >> b/drivers/gpu/drm/sun4i/sun8i_mixer.c new file mode 100644
+> >> index 000000000000..9427b57240d3
+> >> --- /dev/null
+> >> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> >> @@ -0,0 +1,417 @@
+> >> +/*
+> >> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.xyz>
+> >> + *
+> >> + * Based on sun4i_backend.c, which is:
+> >> + *   Copyright (C) 2015 Free Electrons
+> >> + *   Copyright (C) 2015 NextThing Co
+> >> + *
+> >> + * This program is free software; you can redistribute it and/or
+> >> + * modify it under the terms of the GNU General Public License as
+> >> + * published by the Free Software Foundation; either version 2 of
+> >> + * the License, or (at your option) any later version.
+> >> + */
+> >> +
+> >> +#include <drm/drmP.h>
+> >> +#include <drm/drm_atomic_helper.h>
+> >> +#include <drm/drm_crtc.h>
+> >> +#include <drm/drm_crtc_helper.h>
+> >> +#include <drm/drm_fb_cma_helper.h>
+> >> +#include <drm/drm_gem_cma_helper.h>
+> >> +#include <drm/drm_plane_helper.h>
+> >> +
+> >> +#include <linux/component.h>
+> >> +#include <linux/reset.h>
+> >> +#include <linux/of_device.h>
+> >> +
+> >> +#include "sun8i_mixer.h"
+> >> +#include "sun4i_drv.h"
+> >> +
+> >> +#define SUN8I_DRAM_OFFSET 0x40000000
+> > 
+> > PHYS_OFFSET?
+> 
+> PHYS_OFFSET is not portable. __pa(PAGE_OFFSET) instead.
+> 
+> If your DMA addresses are different from CPU addresses (i.e. have some
+> offset), then use "dma-ranges" in DT.
+> 
+> Rob
 
+That adjustment is not needed and should be removed. Such adjusment breaks DE 
+on boards with 2 GiB of RAM.
 
-Best regards,
-Krzysztof
+Regards,
+Jernej
