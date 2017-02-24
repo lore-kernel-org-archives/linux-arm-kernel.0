@@ -1,82 +1,85 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Fri, 24 Feb 2017 16:30:17 +0100
-Subject: [PATCH 4/8] drm/sun4i: add support for sun8i DE2 mixers and
- display engines
-In-Reply-To: <CAL_JsqKY1sXT9g9wHhQEt9-x32PaY0yQi8++bTajcEVk1x8E_w@mail.gmail.com>
-References: <20170222152310.3719-5-icenowy@aosc.xyz>
- <20170222200947.3ikrhvv76ymfu5tv@lukather>
- <CAL_JsqKY1sXT9g9wHhQEt9-x32PaY0yQi8++bTajcEVk1x8E_w@mail.gmail.com>
-Message-ID: <1634001.dRmL8h9ofd@jernej-laptop>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 24 Feb 2017 07:32:47 -0800
+Subject: [PATCH 1/8] watchdog: s3c2410: Remove confusing CONFIG prefix
+ from local defines
+In-Reply-To: <20170224151122.12142-2-krzk@kernel.org>
+References: <20170224151122.12142-1-krzk@kernel.org>
+ <20170224151122.12142-2-krzk@kernel.org>
+Message-ID: <a176ce28-e5ca-77b3-2f4c-58b7d27d98e4@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 02/24/2017 07:11 AM, Krzysztof Kozlowski wrote:
+> The CONFIG prefix from defines in the s3c2410_wdt.c might suggest that
+> these constants come from Kconfig.
+>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Dne petek, 24. februar 2017 ob 14:30:36 CET je Rob Herring napisal(a):
-> On Wed, Feb 22, 2017 at 2:09 PM, Maxime Ripard
-> 
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> > 
-> > On Wed, Feb 22, 2017 at 11:23:06PM +0800, Icenowy Zheng wrote:
-> >> Allwinner have a new "Display Engine 2.0" in there new SoCs, which comes
-> >> in a new "Display Engine" (mixers instead of old backends and
-> >> frontends).
-> >> 
-> >> Add support for the mixer on Allwinner V3s SoC; it's the simplest one.
-> >> 
-> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> >> ---
-> 
-> [...]
-> 
-> >> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> >> b/drivers/gpu/drm/sun4i/sun8i_mixer.c new file mode 100644
-> >> index 000000000000..9427b57240d3
-> >> --- /dev/null
-> >> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> >> @@ -0,0 +1,417 @@
-> >> +/*
-> >> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.xyz>
-> >> + *
-> >> + * Based on sun4i_backend.c, which is:
-> >> + *   Copyright (C) 2015 Free Electrons
-> >> + *   Copyright (C) 2015 NextThing Co
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or
-> >> + * modify it under the terms of the GNU General Public License as
-> >> + * published by the Free Software Foundation; either version 2 of
-> >> + * the License, or (at your option) any later version.
-> >> + */
-> >> +
-> >> +#include <drm/drmP.h>
-> >> +#include <drm/drm_atomic_helper.h>
-> >> +#include <drm/drm_crtc.h>
-> >> +#include <drm/drm_crtc_helper.h>
-> >> +#include <drm/drm_fb_cma_helper.h>
-> >> +#include <drm/drm_gem_cma_helper.h>
-> >> +#include <drm/drm_plane_helper.h>
-> >> +
-> >> +#include <linux/component.h>
-> >> +#include <linux/reset.h>
-> >> +#include <linux/of_device.h>
-> >> +
-> >> +#include "sun8i_mixer.h"
-> >> +#include "sun4i_drv.h"
-> >> +
-> >> +#define SUN8I_DRAM_OFFSET 0x40000000
-> > 
-> > PHYS_OFFSET?
-> 
-> PHYS_OFFSET is not portable. __pa(PAGE_OFFSET) instead.
-> 
-> If your DMA addresses are different from CPU addresses (i.e. have some
-> offset), then use "dma-ranges" in DT.
-> 
-> Rob
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-That adjustment is not needed and should be removed. Such adjusment breaks DE 
-on boards with 2 GiB of RAM.
-
-Regards,
-Jernej
+> ---
+>  drivers/watchdog/s3c2410_wdt.c | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+> index 59e95762a6de..3e216f54cb6f 100644
+> --- a/drivers/watchdog/s3c2410_wdt.c
+> +++ b/drivers/watchdog/s3c2410_wdt.c
+> @@ -64,8 +64,8 @@
+>  #define S3C2410_WTCON_PRESCALE_MASK	(0xff << 8)
+>  #define S3C2410_WTCON_PRESCALE_MAX	0xff
+>
+> -#define CONFIG_S3C2410_WATCHDOG_ATBOOT		(0)
+> -#define CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME	(15)
+> +#define S3C2410_WATCHDOG_ATBOOT		(0)
+> +#define S3C2410_WATCHDOG_DEFAULT_TIME	(15)
+>
+>  #define EXYNOS5_RST_STAT_REG_OFFSET		0x0404
+>  #define EXYNOS5_WDT_DISABLE_REG_OFFSET		0x0408
+> @@ -79,7 +79,7 @@
+>
+>  static bool nowayout	= WATCHDOG_NOWAYOUT;
+>  static int tmr_margin;
+> -static int tmr_atboot	= CONFIG_S3C2410_WATCHDOG_ATBOOT;
+> +static int tmr_atboot	= S3C2410_WATCHDOG_ATBOOT;
+>  static int soft_noboot;
+>  static int debug;
+>
+> @@ -90,10 +90,10 @@ module_param(soft_noboot, int, 0);
+>  module_param(debug,	  int, 0);
+>
+>  MODULE_PARM_DESC(tmr_margin, "Watchdog tmr_margin in seconds. (default="
+> -		__MODULE_STRING(CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME) ")");
+> +		__MODULE_STRING(S3C2410_WATCHDOG_DEFAULT_TIME) ")");
+>  MODULE_PARM_DESC(tmr_atboot,
+>  		"Watchdog is started at boot time if set to 1, default="
+> -			__MODULE_STRING(CONFIG_S3C2410_WATCHDOG_ATBOOT));
+> +			__MODULE_STRING(S3C2410_WATCHDOG_ATBOOT));
+>  MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
+>  			__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+>  MODULE_PARM_DESC(soft_noboot, "Watchdog action, set to 1 to ignore reboots, "
+> @@ -406,7 +406,7 @@ static struct watchdog_ops s3c2410wdt_ops = {
+>  static struct watchdog_device s3c2410_wdd = {
+>  	.info = &s3c2410_wdt_ident,
+>  	.ops = &s3c2410wdt_ops,
+> -	.timeout = CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME,
+> +	.timeout = S3C2410_WATCHDOG_DEFAULT_TIME,
+>  };
+>
+>  /* interrupt handler code */
+> @@ -600,12 +600,12 @@ static int s3c2410wdt_probe(struct platform_device *pdev)
+>  					wdt->wdt_device.timeout);
+>  	if (ret) {
+>  		started = s3c2410wdt_set_heartbeat(&wdt->wdt_device,
+> -					CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME);
+> +					S3C2410_WATCHDOG_DEFAULT_TIME);
+>
+>  		if (started == 0)
+>  			dev_info(dev,
+>  			   "tmr_margin value out of range, default %d used\n",
+> -			       CONFIG_S3C2410_WATCHDOG_DEFAULT_TIME);
+> +			       S3C2410_WATCHDOG_DEFAULT_TIME);
+>  		else
+>  			dev_info(dev, "default timer value is out of range, "
+>  							"cannot start\n");
+>
