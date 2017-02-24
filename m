@@ -1,246 +1,71 @@
-From: abelvesa@linux.com (Abel Vesa)
-Date: Fri, 24 Feb 2017 22:58:20 +0000
-Subject: [PATCHv4] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-Message-ID: <1487977101-29027-1-git-send-email-abelvesa@linux.com>
+From: hias@horus.com (Matthias Reichl)
+Date: Sat, 25 Feb 2017 00:02:00 +0100
+Subject: [alsa-devel] [PATCH v8] ASoC: bcm2835: Add 8 channel
+ (multitrack) capability
+In-Reply-To: <501e4af5-51b7-c124-4a29-ef5804d8a03c@flatmax.org>
+References: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
+ <1487746600-11065-1-git-send-email-flatmax@flatmax.org>
+ <20170224121832.GA19227@camel2.lan>
+ <3b693ff9-b3a6-1c10-5b1a-78be04006113@flatmax.org>
+ <20170224202553.GA28529@camel2.lan>
+ <501e4af5-51b7-c124-4a29-ef5804d8a03c@flatmax.org>
+Message-ID: <20170224230159.GA30456@camel2.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DYNAMIC_FTRACE_WITH_REGS configuration makes it possible for a ftrace
-operation to specify if registers need to saved/restored by the ftrace handler.
-This is needed by kgraft and possibly other ftrace-based tools, and the ARM
-architecture is currently lacking this feature. It would also be the first step
-to support the "Kprobes-on-ftrace" optimization on ARM.
+On Sat, Feb 25, 2017 at 08:30:03AM +1100, Matt Flax wrote:
+> 
+> 
+> On 25/02/17 07:25, Matthias Reichl wrote:
+> 
+> >I'd put it in another way: it seems to me that the bcm2835 I2S
+> >won't reliably sync in DSP mode A.
+> >
+> >
+> 
+> What you are explaining here is the nature of the BCM2835 responding to a
+> codec master. The hardware setup you are describing is elegantly simple, but
+> TOO simple.
 
-This patch introduces a new ftrace handler that stores the registers on the
-stack before calling the next stage. The registers are restored from the stack
-before going back to the instrumented function.
+Your patch only changes the CPU DAI driver. At this point it doesn't
+matter if the codec or an external source is driving the clocks.
 
-A side-effect of this patch is to activate the support for ftrace_modify_call()
-as it defines ARCH_SUPPORTS_FTRACE_OPS for the ARM architecture.
+If the clock timing adheres to DSP mode A timing and you add code
+to the the CPU DAI driver so it can operate in DSP mode A then
+that should also work. If not, it's broken.
 
-Signed-off-by: Abel Vesa <abelvesa@linux.com>
----
- arch/arm/Kconfig               |  1 +
- arch/arm/include/asm/ftrace.h  |  4 ++
- arch/arm/kernel/entry-ftrace.S | 83 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/ftrace.c       | 37 +++++++++++++++++++
- 4 files changed, 125 insertions(+)
+The (rather brief) publically available bcm2835 datasheet only
+mentions I2S mode and my tests lead me to the conclusion that the
+bcm2835 is actually expecting I2S timing, not DSP A - at least with
+the current code.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index fda6a46..877df5b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -55,6 +55,7 @@ config ARM
- 	select HAVE_DMA_API_DEBUG
- 	select HAVE_DMA_CONTIGUOUS if MMU
- 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
-+	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE && OLD_MCOUNT
- 	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
- 	select HAVE_EXIT_THREAD
- 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
-diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-index 22b7311..f379881 100644
---- a/arch/arm/include/asm/ftrace.h
-+++ b/arch/arm/include/asm/ftrace.h
-@@ -1,6 +1,10 @@
- #ifndef _ASM_ARM_FTRACE
- #define _ASM_ARM_FTRACE
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+#define ARCH_SUPPORTS_FTRACE_OPS 1
-+#endif
-+
- #ifdef CONFIG_FUNCTION_TRACER
- #define MCOUNT_ADDR		((unsigned long)(__gnu_mcount_nc))
- #define MCOUNT_INSN_SIZE	4 /* sizeof mcount call */
-diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
-index c73c403..3916dd6 100644
---- a/arch/arm/kernel/entry-ftrace.S
-+++ b/arch/arm/kernel/entry-ftrace.S
-@@ -92,12 +92,78 @@
- 2:	mcount_exit
- .endm
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+
-+.macro __ftrace_regs_caller
-+
-+	sub	sp, sp, #8	@ space for CPSR and OLD_R0 (not used)
-+
-+	add 	ip, sp, #12	@ move in IP the value of SP as it was
-+				@ before the push {lr} of the mcount mechanism
-+	stmdb	sp!, {ip,lr,pc}
-+	stmdb	sp!, {r0-r11,lr}
-+
-+	@ stack content at this point:
-+	@ 0  4          48   52       56   60   64    68       72
-+	@ R0 | R1 | ... | LR | SP + 4 | LR | PC | PSR | OLD_R0 | previous LR |
-+
-+	mov r3, sp				@ struct pt_regs*
-+	ldr r2, =function_trace_op
-+	ldr r2, [r2]				@ pointer to the current
-+						@ function tracing op
-+	ldr	r1, [sp, #PT_REGS_SIZE]		@ lr of instrumented func
-+	mcount_adjust_addr	r0, lr		@ instrumented function
-+
-+	.globl ftrace_regs_call
-+ftrace_regs_call:
-+	bl	ftrace_stub
-+
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	.globl ftrace_graph_regs_call
-+ftrace_graph_regs_call:
-+	mov	r0, r0
-+#endif
-+	@ pop saved regs
-+	@ first, get the previous LR value from stack
-+	ldr	lr, [sp, #PT_REGS_SIZE]
-+	@ now pop the rest of the saved registers INCLUDING stack pointer
-+	ldmia   sp, {r0-r11, ip, sp, pc}
-+.endm
-+
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+.macro __ftrace_graph_regs_caller
-+
-+	sub	r0, fp, #4		@ lr of instrumented routine (parent)
-+
-+	@ called from __ftrace_regs_caller
-+	ldr     r1, [sp, #S_LR]		@ instrumented routine (func)
-+	mcount_adjust_addr	r1, r1
-+
-+	sub	r2, r0, #4		@ frame pointer
-+	bl	prepare_ftrace_return
-+
-+	@ pop registers saved in ftrace_regs_caller
-+	@ first, get the previous LR value from stack
-+	ldr	lr, [sp, #PT_REGS_SIZE]
-+	@ now pop the rest of the saved registers INCLUDING stack pointer
-+	ldmia   sp, {r0-r11, ip, sp, pc}
-+.endm
-+#endif
-+#endif
-+
- .macro __ftrace_caller suffix
- 	mcount_enter
- 
- 	mcount_get_lr	r1			@ lr of instrumented func
- 	mcount_adjust_addr	r0, lr		@ instrumented function
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+	ldr r2, =function_trace_op
-+	ldr r2, [r2]				@ pointer to the current
-+						@ function tracing op
-+	mov r3, #0				@ regs is NULL
-+#endif
-+
- 	.globl ftrace_call\suffix
- ftrace_call\suffix:
- 	bl	ftrace_stub
-@@ -212,6 +278,15 @@ UNWIND(.fnstart)
- 	__ftrace_caller
- UNWIND(.fnend)
- ENDPROC(ftrace_caller)
-+
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+ENTRY(ftrace_regs_caller)
-+UNWIND(.fnstart)
-+	__ftrace_regs_caller
-+UNWIND(.fnend)
-+ENDPROC(ftrace_regs_caller)
-+#endif
-+
- #endif
- 
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
-@@ -220,6 +295,14 @@ UNWIND(.fnstart)
- 	__ftrace_graph_caller
- UNWIND(.fnend)
- ENDPROC(ftrace_graph_caller)
-+
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+ENTRY(ftrace_graph_regs_caller)
-+UNWIND(.fnstart)
-+	__ftrace_graph_regs_caller
-+UNWIND(.fnend)
-+ENDPROC(ftrace_graph_regs_caller)
-+#endif
- #endif
- 
- .purgem mcount_enter
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index 3f17594..cb0358c 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -139,6 +139,15 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
- 
- 	ret = ftrace_modify_code(pc, 0, new, false);
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+	if (!ret) {
-+		pc = (unsigned long)&ftrace_regs_call;
-+		new = ftrace_call_replace(pc, (unsigned long)func);
-+
-+		ret = ftrace_modify_code(pc, 0, new, false);
-+	}
-+#endif
-+
- #ifdef CONFIG_OLD_MCOUNT
- 	if (!ret) {
- 		pc = (unsigned long)&ftrace_call_old;
-@@ -157,11 +166,29 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- 	unsigned long ip = rec->ip;
- 
- 	old = ftrace_nop_replace(rec);
-+
-+	new = ftrace_call_replace(ip, adjust_address(rec, addr));
-+
-+	return ftrace_modify_code(rec->ip, old, new, true);
-+}
-+
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+
-+int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
-+				unsigned long addr)
-+{
-+	unsigned long new, old;
-+	unsigned long ip = rec->ip;
-+
-+	old = ftrace_call_replace(ip, adjust_address(rec, old_addr));
-+
- 	new = ftrace_call_replace(ip, adjust_address(rec, addr));
- 
- 	return ftrace_modify_code(rec->ip, old, new, true);
- }
- 
-+#endif
-+
- int ftrace_make_nop(struct module *mod,
- 		    struct dyn_ftrace *rec, unsigned long addr)
- {
-@@ -229,6 +256,8 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
- extern unsigned long ftrace_graph_call;
- extern unsigned long ftrace_graph_call_old;
- extern void ftrace_graph_caller_old(void);
-+extern unsigned long ftrace_graph_regs_call;
-+extern void ftrace_graph_regs_caller(void);
- 
- static int __ftrace_modify_caller(unsigned long *callsite,
- 				  void (*func) (void), bool enable)
-@@ -251,6 +280,14 @@ static int ftrace_modify_graph_caller(bool enable)
- 				     ftrace_graph_caller,
- 				     enable);
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+	if (!ret)
-+		ret = __ftrace_modify_caller(&ftrace_graph_regs_call,
-+				     ftrace_graph_regs_caller,
-+				     enable);
-+#endif
-+
-+
- #ifdef CONFIG_OLD_MCOUNT
- 	if (!ret)
- 		ret = __ftrace_modify_caller(&ftrace_graph_call_old,
--- 
-2.7.4
+> Measurements on a system which uses a codec master don't represent a robust
+> implementation of multichannel with the BCM2835. My experiments (and now
+> yours) have shown that the system has a bit shift and an uncontrollable
+> channel drift.
+> 
+> Multichannel simply can't be done (on the BCM2835) without control at the
+> hardware level - this requires an intermediate master control chip.
+>
+> The Audio Injector Octo machine driver, sets both the codec and the BCM2835
+> as slaves - the FPGA is master because it has to control both the BCM2835
+> and the codec's systems to get reliability. You can see the machine driver
+> on github :
+> https://github.com/flatmax/linux/blob/rpi-4.4.y/sound/soc/bcm/audioinjector-octo-soundcard.c
+> 
+> It has taken month to implement a robust solution to this problem using an
+> FPGA and the result is a fantastic (Audio Injector Octo) sound card. I am
+> almost certain this hardware technique can be used on all stereo I2S SoC
+> chips.
+
+Can you please provide details about the timing / protocol you are
+actually using?
+
+so long,
+
+Hias
+
+> 
+> 
+> Matt
+> 
