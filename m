@@ -1,50 +1,45 @@
-From: decui@microsoft.com (Dexuan Cui)
-Date: Fri, 24 Feb 2017 15:10:42 +0000
-Subject: [PATCH v1 0/3] PCI: Configure PCIe MPS settings
-In-Reply-To: <20170224143224.GA15547@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170208224632.14351.89895.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20170210215959.GR29169@bhelgaas-glaptop.roam.corp.google.com>
- <MWHPR03MB26690F3B4C7E83596C35D377BF520@MWHPR03MB2669.namprd03.prod.outlook.com>
- <20170224143224.GA15547@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <CY4PR03MB2662B31A164D509D476A3B43BF520@CY4PR03MB2662.namprd03.prod.outlook.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 24 Feb 2017 17:11:14 +0200
+Subject: [PATCH 0/8] watchdog: s3c2410: Fixes and improvements
+Message-ID: <20170224151122.12142-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Bjorn Helgaas
-> ...
-> My question wasn't so much whether pci-hyperv.c *needs* to set MPS; I
-> don't expect a guest to need to or even be able to configure things
-> like that.
+Hi,
 
-I agree.
+Minor cleanup and some fixes for the watchdog used on all
+Samsung SoCs.
 
-> My question is whether it would do any harm if we did eventually do
-> MPS configuration in the generic pci_scan_child_bus() path.  If/when
-> we do that, the Hyper-V guest will attempt to do MPS configuration.  I
-> think this would be a no-op.
+The patches are independent of each other - DTS will go through
+separate (my) tree.
 
-Yes. It's a no-op, as I explained in my previous mail.
 
->  And I think it would also be a no-op if
-> we made pci-hyperv.c call pcie_bus_configure_settings() today.
+Best regards,
+Krzysztof
 
-Yes, I can confirm it's a no-op too.
+Krzysztof Kozlowski (8):
+  watchdog: s3c2410: Remove confusing CONFIG prefix from local defines
+  watchdog: s3c2410: Fix infinite interrupt in soft mode
+  ARM: dts: exynos: Fix watchdog reset on Exynos4412
+  ARM: dts: s3c64xx: Enable watchdog on all S3C64xx boards
+  ARM: dts: exynos: Enable watchdog on all Exynos4 boards
+  ARM: dts: exynos: Fix infinite interrupt in soft mode on Exynos5440
+  ARM: dts: s3c64xx: Fix infinite interrupt in soft mode
+  ARM: dts: s5pv210: Fix infinite interrupt in soft mode
 
-> I'm really just looking for confirmation of that.  If it is true that
-> these are no-ops, I would consider adding a pci-hyperv.c call to
-> pcie_bus_configure_settings() simply to make it conform to the pattern
-> that "everything that calls pci_scan_child_bus() should also call
-> pcie_bus_configure_settings()".
+ .../devicetree/bindings/watchdog/samsung-wdt.txt   |  9 +++---
+ arch/arm/boot/dts/exynos4.dtsi                     |  9 ------
+ arch/arm/boot/dts/exynos4210-origen.dts            |  4 ---
+ arch/arm/boot/dts/exynos4210.dtsi                  |  8 +++++
+ arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi    |  4 ---
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi    |  4 ---
+ arch/arm/boot/dts/exynos4412-origen.dts            |  4 ---
+ arch/arm/boot/dts/exynos4412.dtsi                  |  9 ++++++
+ arch/arm/boot/dts/exynos5440.dtsi                  |  2 +-
+ arch/arm/boot/dts/s3c64xx.dtsi                     |  3 +-
+ arch/arm/boot/dts/s5pv210.dtsi                     |  2 +-
+ drivers/watchdog/s3c2410_wdt.c                     | 37 +++++++++++++++-------
+ 12 files changed, 51 insertions(+), 44 deletions(-)
 
-Please help to add that. Thanks!
- 
-> If every caller of pci_scan_child_bus() also calls
-> pcie_bus_configure_settings(), it will make it easier in the future to
-> fold pcie_bus_configure_settings() into pci_scan_child_bus().
-> 
-> Bjorn
-
-Thanks! I see.
-
-Thanks,
--- Dexuan
+-- 
+2.9.3
