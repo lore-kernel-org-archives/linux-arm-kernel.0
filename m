@@ -1,71 +1,63 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 24 Feb 2017 07:30:36 -0600
-Subject: [PATCH 4/8] drm/sun4i: add support for sun8i DE2 mixers and
- display engines
-In-Reply-To: <20170222200947.3ikrhvv76ymfu5tv@lukather>
-References: <20170222152310.3719-5-icenowy@aosc.xyz>
- <20170222200947.3ikrhvv76ymfu5tv@lukather>
-Message-ID: <CAL_JsqKY1sXT9g9wHhQEt9-x32PaY0yQi8++bTajcEVk1x8E_w@mail.gmail.com>
+From: kimran@codeaurora.org (Imran Khan)
+Date: Fri, 24 Feb 2017 19:11:55 +0530
+Subject: Perf degradation seen with thread_info stored in sp_el0
+Message-ID: <72e51627-9155-96f2-f7a9-1be8a8198930@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2017 at 2:09 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Wed, Feb 22, 2017 at 11:23:06PM +0800, Icenowy Zheng wrote:
->> Allwinner have a new "Display Engine 2.0" in there new SoCs, which comes
->> in a new "Display Engine" (mixers instead of old backends and
->> frontends).
->>
->> Add support for the mixer on Allwinner V3s SoC; it's the simplest one.
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ---
+Hi,
 
-[...]
+I am observing some degradation in context switch performance (reported by sched benchmark of perf), after including the change
+to keep thread_info in sp_el0:
 
->> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
->> new file mode 100644
->> index 000000000000..9427b57240d3
->> --- /dev/null
->> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
->> @@ -0,0 +1,417 @@
->> +/*
->> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.xyz>
->> + *
->> + * Based on sun4i_backend.c, which is:
->> + *   Copyright (C) 2015 Free Electrons
->> + *   Copyright (C) 2015 NextThing Co
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License as
->> + * published by the Free Software Foundation; either version 2 of
->> + * the License, or (at your option) any later version.
->> + */
->> +
->> +#include <drm/drmP.h>
->> +#include <drm/drm_atomic_helper.h>
->> +#include <drm/drm_crtc.h>
->> +#include <drm/drm_crtc_helper.h>
->> +#include <drm/drm_fb_cma_helper.h>
->> +#include <drm/drm_gem_cma_helper.h>
->> +#include <drm/drm_plane_helper.h>
->> +
->> +#include <linux/component.h>
->> +#include <linux/reset.h>
->> +#include <linux/of_device.h>
->> +
->> +#include "sun8i_mixer.h"
->> +#include "sun4i_drv.h"
->> +
->> +#define SUN8I_DRAM_OFFSET 0x40000000
->
-> PHYS_OFFSET?
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6cdf9c7ca687e01840d0215437620a20263012fc
 
-PHYS_OFFSET is not portable. __pa(PAGE_OFFSET) instead.
+However, if I use D0 to store the same information, I see that performance improves. 
 
-If your DMA addresses are different from CPU addresses (i.e. have some
-offset), then use "dma-ranges" in DT.
+For example, I am getting following numbers for the above mentioned scenarios:
 
-Rob
+Thread info obtained from stack:
+
+        /data/local # ./perf bench sched messaging -g 5 -l 500
+        # Running 'sched/messaging' benchmark:
+        # 20 sender and receiver processes per group
+        # 5 groups == 200 processes run
+
+        Total time: 2.911 [sec]
+
+
+Thread info obtained from sp_el0:
+
+        /data/local # ./perf bench sched messaging -g 5 -l 500
+        # Running 'sched/messaging' benchmark:
+        # 20 sender and receiver processes per group
+        # 5 groups == 200 processes run
+
+        Total time: 3.590 [sec]
+
+
+Thread info obtained from D0: 
+
+        /data/local # ./perf bench sched messaging -g 5 -l 500
+        # Running 'sched/messaging' benchmark:
+        # 20 sender and receiver processes per group
+        # 5 groups == 200 processes run
+
+        Total time: 3.103 [sec]
+
+
+So keeping thread_info in sp_el0 is resulting in degradation of around 23% , while keeping the same in D0 is 
+resulting in degradation of about 6-7%. Of course so far my test cases are not involving cases where D0 might
+get changed in kernel space itself e.g. snippets under kernel_neon_begin/end and taking care of those cases
+will have further overhead.
+
+But right now I just wanted to have a feedback regarding, what are the possible complications I may face if 
+I try to keep thread_info in D0 and whether such a solution will be feasible or not.
+Moreover is there any other alternative way to get rid of this performance degradation.
+
+Thanks and Regards,
+Imran
+
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a\nmember of the Code Aurora Forum, hosted by The Linux Foundation
