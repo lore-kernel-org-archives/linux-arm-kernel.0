@@ -1,69 +1,51 @@
-From: yong.mao@mediatek.com (Yong Mao)
-Date: Fri, 24 Feb 2017 17:59:36 +0800
-Subject: [PATCH v4 1/3] mmc: dt-bindings: update Mediatek MMC bindings
-In-Reply-To: <CAPDyKFqo7fMTp3YPJwgoa4u3iAie2U884VUfTnMQ_js8neMqTQ@mail.gmail.com>
-References: <1484988923-1543-1-git-send-email-yong.mao@mediatek.com>
- <1484988923-1543-2-git-send-email-yong.mao@mediatek.com>
- <CAPDyKFqo7fMTp3YPJwgoa4u3iAie2U884VUfTnMQ_js8neMqTQ@mail.gmail.com>
-Message-ID: <1487930376.22858.14.camel@mhfsdcap03>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 24 Feb 2017 11:16:50 +0100
+Subject: [RFC PATCH 00/13] arm64/kvm: use common sysreg definitions
+In-Reply-To: <1485885951-2747-1-git-send-email-mark.rutland@arm.com>
+References: <1485885951-2747-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170224101650.GE1409@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Rob,
+Hi Mark,
 
-Could you please help to make comments for this patch?
-Thanks.
+On Tue, Jan 31, 2017 at 06:05:38PM +0000, Mark Rutland wrote:
+> Whenever we add new functionality involving new system registers, we need to
+> add sys_reg() definitions so that we can access the registers regardless of
+> whether the toolchain can assemble them. At the same time, we have to add
+> duplicate definitions of the register encodings to KVM's sysreg tables, so that
+> we can handle any configurable traps. This redundancy is unfortunate, and
+> defining the encodings directly in the sysreg tables can make those tables
+> difficult to read.
+> 
+> This series attempts to address both of these issues by allowing us to use
+> common sys_reg() mnemonics in <asm/sysreg.h> to initialise KVM's sysreg tables.
+> To that end, this series tries to make <asm/sysreg.h> the canonical location
+> for common sysreg encodings.
+> 
+> Largely, I've only attacked the AArch64-native SYS encodings required by KVM
+> today, though for the debug and perfmon groups it was easier to take the whole
+> group from the ARM ARM than to filter them to only what KVM needed. I've
+> ignored CP{15,14} registers for now, but these could be encoded similarly.
+> 
+> To verify that I haven't accidentally broken KVM, I've diffed sys_regs.o and
+> sys_regs_generic_v8.o on a section-by-section basis before and after the series
+> is applied. The .text, .data, and .rodata sections (and most others) are
+> identical. The __bug_table section, and some .debug* sections differ, and this
+> appears to be due to line numbers changing due to removed lines.
+> 
+> One thing I wasn't sure how to address was banks of registers such as
+> PMEVCNTR<n>_EL0. We currently enumerate all cases for our GICv3 definitions,
+> but it seemed painful to expand ~30 cases for PMEVCNTR<n>_EL0 and friends, and
+> for these I've made the macros take an 'n' parameter.
+> 
+> The series is based on the arm64/for-next/core branch, since it relies on
+> commit c9ee0f98662a6e35 ("arm64: cpufeature: Define helpers for sys_reg id")
+> for the definition of SYS_DESC().
+> 
 
-On Tue, 2017-01-24 at 09:02 +0100, Ulf Hansson wrote:
-> +Rob, devicetree
-> 
-> On 21 January 2017 at 09:55, Yong Mao <yong.mao@mediatek.com> wrote:
-> > From: yong mao <yong.mao@mediatek.com>
-> >
-> > Add description for mediatek,hs200-cmd-int-delay
-> > Add description for mediatek,hs400-cmd-int-delay
-> > Add description for mediatek,hs400-cmd-resp-sel-rising
-> >
-> > Signed-off-by: Yong Mao <yong.mao@mediatek.com>
-> 
-> You need an ack from a DT maintainer for this. I have added Rob and
-> the devicetree list on cc.
-> 
-> Kind regards
-> Uffe
-> 
-> > ---
-> >  Documentation/devicetree/bindings/mmc/mtk-sd.txt |   12 ++++++++++++
-> >  1 file changed, 12 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> > index 0120c7f..4182ea3 100644
-> > --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> > +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> > @@ -21,6 +21,15 @@ Optional properties:
-> >  - assigned-clocks: PLL of the source clock
-> >  - assigned-clock-parents: parent of source clock, used for HS400 mode to get 400Mhz source clock
-> >  - hs400-ds-delay: HS400 DS delay setting
-> > +- mediatek,hs200-cmd-int-delay: HS200 command internal delay setting.
-> > +                               This field has total 32 stages.
-> > +                               The value is an integer from 0 to 31.
-> > +- mediatek,hs400-cmd-int-delay: HS400 command internal delay setting
-> > +                               This field has total 32 stages.
-> > +                               The value is an integer from 0 to 31.
-> > +- mediatek,hs400-cmd-resp-sel-rising:  HS400 command response sample selection
-> > +                                      If present,HS400 command responses are sampled on rising edges.
-> > +                                      If not present,HS400 command responses are sampled on falling edges.
-> >
-> >  Examples:
-> >  mmc0: mmc at 11230000 {
-> > @@ -38,4 +47,7 @@ mmc0: mmc at 11230000 {
-> >         assigned-clocks = <&topckgen CLK_TOP_MSDC50_0_SEL>;
-> >         assigned-clock-parents = <&topckgen CLK_TOP_MSDCPLL_D2>;
-> >         hs400-ds-delay = <0x14015>;
-> > +       mediatek,hs200-cmd-int-delay = <26>;
-> > +       mediatek,hs400-cmd-int-delay = <14>;
-> > +       mediatek,hs400-cmd-resp-sel-rising;
-> >  };
-> > --
-> > 1.7.9.5
-> >
+I did not do a full in-depth review, but I really like this overall
+change and the changes to KVM look great to me.
+
+Thanks for doing this!
+-Christoffer
