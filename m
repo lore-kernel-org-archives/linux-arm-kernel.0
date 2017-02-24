@@ -1,112 +1,247 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Fri, 24 Feb 2017 04:40:43 +0100
-Subject: [PATCH v2 05/17] ARM: Prepare Actions Semi S500
+Date: Fri, 24 Feb 2017 04:40:48 +0100
+Subject: [PATCH v2 10/17] ARM: dts: Add Actions Semi S500 and LeMaker Guitar
 In-Reply-To: <20170224034055.18807-1-afaerber@suse.de>
 References: <20170224034055.18807-1-afaerber@suse.de>
-Message-ID: <20170224034055.18807-6-afaerber@suse.de>
+Message-ID: <20170224034055.18807-11-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Add ARCH_ACTIONS and mach-actions/owl.c for "actions,s500".
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
  v1 -> v2:
- * Renamed ARCH_OWL to ARCH_ACTION (Arnd)
- * Renamed mach-owl to mach-actions, leaving owl.c
+ * Reworded subject
+ * Updated ARCH_OWL to ARCH_ACTIONS (Arnd)
  * Adopted "actions" vendor prefix
+ * Dropped irq.h include
+ * Added memory at 0 node for Guitar SoM
+ * Dropped bogus uart3 clock-frequency
+ * Added device_type for CPU nodes
+ * Fixed UART reg size
+ * Adopted SPDX-License-Identifier (Rob)
+ * Added remaining UART nodes
+ * Added timer node
  
- arch/arm/Kconfig               |  2 ++
- arch/arm/Makefile              |  1 +
- arch/arm/mach-actions/Kconfig  | 10 ++++++++++
- arch/arm/mach-actions/Makefile |  1 +
- arch/arm/mach-actions/owl.c    | 28 ++++++++++++++++++++++++++++
- 5 files changed, 42 insertions(+)
- create mode 100644 arch/arm/mach-actions/Kconfig
- create mode 100644 arch/arm/mach-actions/Makefile
- create mode 100644 arch/arm/mach-actions/owl.c
+ arch/arm/boot/dts/Makefile                 |   2 +
+ arch/arm/boot/dts/s500-guitar-bb-rev-b.dts |  26 ++++++
+ arch/arm/boot/dts/s500-guitar.dtsi         |  20 +++++
+ arch/arm/boot/dts/s500.dtsi                | 135 +++++++++++++++++++++++++++++
+ 4 files changed, 183 insertions(+)
+ create mode 100644 arch/arm/boot/dts/s500-guitar-bb-rev-b.dts
+ create mode 100644 arch/arm/boot/dts/s500-guitar.dtsi
+ create mode 100644 arch/arm/boot/dts/s500.dtsi
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0d4e71b..94fa3925 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -720,6 +720,8 @@ config ARCH_VIRT
- #
- source "arch/arm/mach-mvebu/Kconfig"
- 
-+source "arch/arm/mach-actions/Kconfig"
-+
- source "arch/arm/mach-alpine/Kconfig"
- 
- source "arch/arm/mach-artpec/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index ab30cc6..d2ccf72 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -151,6 +151,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
- 
- # Machine directory name.  This list is sorted alphanumerically
- # by CONFIG_* macro name.
-+machine-$(CONFIG_ARCH_ACTIONS)		+= actions
- machine-$(CONFIG_ARCH_ALPINE)		+= alpine
- machine-$(CONFIG_ARCH_ARTPEC)		+= artpec
- machine-$(CONFIG_ARCH_AT91)		+= at91
-diff --git a/arch/arm/mach-actions/Kconfig b/arch/arm/mach-actions/Kconfig
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 0118084..578a20b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -638,6 +638,8 @@ dtb-$(CONFIG_ARCH_ORION5X) += \
+ 	orion5x-maxtor-shared-storage-2.dtb \
+ 	orion5x-netgear-wnr854t.dtb \
+ 	orion5x-rd88f5182-nas.dtb
++dtb-$(CONFIG_ARCH_ACTIONS) += \
++	s500-guitar-bb-rev-b.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += \
+ 	prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_OXNAS) += \
+diff --git a/arch/arm/boot/dts/s500-guitar-bb-rev-b.dts b/arch/arm/boot/dts/s500-guitar-bb-rev-b.dts
 new file mode 100644
-index 0000000..d40cec7
+index 0000000..834b71d
 --- /dev/null
-+++ b/arch/arm/mach-actions/Kconfig
-@@ -0,0 +1,10 @@
-+menuconfig ARCH_ACTIONS
-+	bool "Actions Semi SoCs"
-+	depends on ARCH_MULTI_V7
-+	select ARM_GIC
-+	select CACHE_L2X0
-+	select COMMON_CLK
-+	select GENERIC_IRQ_CHIP
-+	select OWL_TIMER
-+	help
-+	  This enables support for the Actions Semiconductor S500 SoC family.
-diff --git a/arch/arm/mach-actions/Makefile b/arch/arm/mach-actions/Makefile
-new file mode 100644
-index 0000000..524c381
---- /dev/null
-+++ b/arch/arm/mach-actions/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_ARCH_ACTIONS) += owl.o
-diff --git a/arch/arm/mach-actions/owl.c b/arch/arm/mach-actions/owl.c
-new file mode 100644
-index 0000000..74dc670
---- /dev/null
-+++ b/arch/arm/mach-actions/owl.c
-@@ -0,0 +1,28 @@
++++ b/arch/arm/boot/dts/s500-guitar-bb-rev-b.dts
+@@ -0,0 +1,26 @@
 +/*
-+ * Copyright (C) 2017 Andreas F?rber
++ * Copyright (c) 2016-2017 Andreas F?rber
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 + */
 +
-+#include <linux/of_platform.h>
-+#include <asm/mach/arch.h>
++/dts-v1/;
 +
-+static const char * const owl_dt_compat[] = {
-+	"actions,s500",
-+	NULL
++#include "s500-guitar.dtsi"
++
++/ {
++	compatible = "lemaker,guitar-bb-rev-b", "lemaker,guitar", "actions,s500";
++	model = "LeMaker Guitar Base Board rev. B";
++
++	aliases {
++		serial3 = &uart3;
++	};
++
++	chosen {
++		stdout-path = "serial3:115200n8";
++	};
 +};
 +
-+DT_MACHINE_START(MESON, "Actions Semi Owl platform")
-+	.dt_compat	= owl_dt_compat,
-+	.l2c_aux_val	= 0,
-+	.l2c_aux_mask	= ~0,
-+MACHINE_END
++&uart3 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/s500-guitar.dtsi b/arch/arm/boot/dts/s500-guitar.dtsi
+new file mode 100644
+index 0000000..ef0e7e3
+--- /dev/null
++++ b/arch/arm/boot/dts/s500-guitar.dtsi
+@@ -0,0 +1,20 @@
++/*
++ * LeMaker Guitar SoM
++ *
++ * Copyright (c) 2016-2017 Andreas F?rber
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ */
++
++#include "s500.dtsi"
++
++/ {
++	compatible = "lemaker,guitar", "actions,s500";
++
++	/delete-node/ memory;
++
++	memory at 0 {
++		device_type = "memory";
++		reg = <0x0 0x40000000>;
++	};
++};
+diff --git a/arch/arm/boot/dts/s500.dtsi b/arch/arm/boot/dts/s500.dtsi
+new file mode 100644
+index 0000000..149bb7a
+--- /dev/null
++++ b/arch/arm/boot/dts/s500.dtsi
+@@ -0,0 +1,135 @@
++/*
++ * Actions Semi S500 SoC
++ *
++ * Copyright (c) 2016-2017 Andreas F?rber
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ */
++
++#include "skeleton.dtsi"
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	compatible = "actions,s500";
++	interrupt-parent = <&gic>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0x0>;
++		};
++
++		cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0x1>;
++		};
++
++		cpu2: cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0x2>;
++		};
++
++		cpu3: cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a9";
++			reg = <0x3>;
++		};
++	};
++
++	arm-pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
++		             <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
++		             <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
++		             <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		gic: interrupt-controller at b0021000 {
++			compatible = "arm,cortex-a9-gic";
++			reg = <0xb0021000 0x1000>,
++			      <0xb0020100 0x0100>;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++		};
++
++		l2: cache-controller at b0022000 {
++			compatible = "arm,pl310-cache";
++			reg = <0xb0022000 0x1000>;
++			cache-unified;
++			cache-level = <2>;
++			interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
++			arm,tag-latency = <3 3 2>;
++			arm,data-latency = <5 3 3>;
++		};
++
++		uart0: serial at b0120000 {
++			compatible = "actions,s500-uart", "actions,owl-uart";
++			reg = <0xb0120000 0x2000>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		uart1: serial at b0122000 {
++			compatible = "actions,s500-uart", "actions,owl-uart";
++			reg = <0xb0122000 0x2000>;
++			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		uart2: serial at b0124000 {
++			compatible = "actions,s500-uart", "actions,owl-uart";
++			reg = <0xb0126000 0x2000>;
++			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		uart3: serial at b0126000 {
++			compatible = "actions,s500-uart", "actions,owl-uart";
++			reg = <0xb0126000 0x2000>;
++			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		uart4: serial at b0128000 {
++			compatible = "actions,s500-uart", "actions,owl-uart";
++			reg = <0xb0128000 0x2000>;
++			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		uart5: serial at b012a000 {
++			compatible = "actions,s500-uart", "actions,owl-uart";
++			reg = <0xb012a000 0x2000>;
++			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		uart6: serial at b012c000 {
++			compatible = "actions,s500-uart", "actions,owl-uart";
++			reg = <0xb012c000 0x2000>;
++			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++		};
++
++		timer at b0168000 {
++			compatible = "actions,owl-timer";
++			reg = <0xb0168000 0x100>;
++			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
++			             <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++		};
++	};
++};
 -- 
 2.10.2
