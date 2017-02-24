@@ -1,50 +1,48 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 24 Feb 2017 18:19:17 -0300
-Subject: [PATCH] [media] exynos4-is: Add missing 'of_node_put'
-In-Reply-To: <20170123211656.11185-1-christophe.jaillet@wanadoo.fr>
-References: <20170123211656.11185-1-christophe.jaillet@wanadoo.fr>
-Message-ID: <2357ef6e-8d90-77d0-0399-21fec41389a1@osg.samsung.com>
+From: flatmax@flatmax.org (Matt Flax)
+Date: Sat, 25 Feb 2017 08:30:03 +1100
+Subject: [alsa-devel] [PATCH v8] ASoC: bcm2835: Add 8 channel (multitrack)
+ capability
+In-Reply-To: <20170224202553.GA28529@camel2.lan>
+References: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
+ <1487746600-11065-1-git-send-email-flatmax@flatmax.org>
+ <20170224121832.GA19227@camel2.lan>
+ <3b693ff9-b3a6-1c10-5b1a-78be04006113@flatmax.org>
+ <20170224202553.GA28529@camel2.lan>
+Message-ID: <501e4af5-51b7-c124-4a29-ef5804d8a03c@flatmax.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Christophe,
 
-On 01/23/2017 06:16 PM, Christophe JAILLET wrote:
-> It is likely that a "of_node_put(ep)" is missing here.
-> There is one in the previous error handling code, and one a few lines
-> below in the normal case as well.
-> 
-> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-> ---
->  drivers/media/platform/exynos4-is/media-dev.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
-> index e3a8709138fa..da5b76c1df98 100644
-> --- a/drivers/media/platform/exynos4-is/media-dev.c
-> +++ b/drivers/media/platform/exynos4-is/media-dev.c
-> @@ -402,8 +402,10 @@ static int fimc_md_parse_port_node(struct fimc_md *fmd,
->  		return ret;
->  	}
->  
-> -	if (WARN_ON(endpoint.base.port == 0) || index >= FIMC_MAX_SENSORS)
-> +	if (WARN_ON(endpoint.base.port == 0) || index >= FIMC_MAX_SENSORS) {
-> +		of_node_put(ep);
->  		return -EINVAL;
-> +	}
->  
->  	pd->mux_id = (endpoint.base.port - 1) & 0x1;
->  
-> 
 
-Thanks for the patch, but Krzysztof sent the exact same patch before [0]. There
-was feedback from Sylwester at the time that you can also look at [0]. Could you
-please take that into account and post a patch according to what he suggested?
+On 25/02/17 07:25, Matthias Reichl wrote:
 
-[0]: http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/415207.html
+> I'd put it in another way: it seems to me that the bcm2835 I2S
+> won't reliably sync in DSP mode A.
+>
+>
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+What you are explaining here is the nature of the BCM2835 responding to 
+a codec master. The hardware setup you are describing is elegantly 
+simple, but TOO simple.
+
+Measurements on a system which uses a codec master don't represent a 
+robust implementation of multichannel with the BCM2835. My experiments 
+(and now yours) have shown that the system has a bit shift and an 
+uncontrollable channel drift.
+
+Multichannel simply can't be done (on the BCM2835) without control at 
+the hardware level - this requires an intermediate master control chip.
+
+The Audio Injector Octo machine driver, sets both the codec and the 
+BCM2835 as slaves - the FPGA is master because it has to control both 
+the BCM2835 and the codec's systems to get reliability. You can see the 
+machine driver on github :
+https://github.com/flatmax/linux/blob/rpi-4.4.y/sound/soc/bcm/audioinjector-octo-soundcard.c
+
+It has taken month to implement a robust solution to this problem using 
+an FPGA and the result is a fantastic (Audio Injector Octo) sound card. 
+I am almost certain this hardware technique can be used on all stereo 
+I2S SoC chips.
+
+
+Matt
