@@ -1,69 +1,85 @@
 From: john@metanate.com (John Keeping)
-Date: Fri, 24 Feb 2017 12:54:51 +0000
-Subject: [PATCH v4 08/23] drm/rockchip: dw-mipi-dsi: respect message flags
+Date: Fri, 24 Feb 2017 12:55:06 +0000
+Subject: [PATCH v4 23/23] drm/rockchip: dw-mipi-dsi: add reset control
 In-Reply-To: <20170224125506.21533-1-john@metanate.com>
 References: <20170224125506.21533-1-john@metanate.com>
-Message-ID: <20170224125506.21533-9-john@metanate.com>
+Message-ID: <20170224125506.21533-24-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of always sending commands in LP mode, respect the
-MIPI_DSI_MSG_USE_LPM flag to decide how to send each message.  Also
-request acks if MIPI_DSI_MSG_REQ_ACK is set.
+In order to fully reset the state of the MIPI controller we must assert
+this reset.
+
+This is slightly more complicated than it could be in order to maintain
+compatibility with device trees that do not specify the reset property.
 
 Signed-off-by: John Keeping <john@metanate.com>
 Reviewed-by: Chris Zhong <zyw@rock-chips.com>
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
 ---
 v4:
-- Add Sean's Reviewed-by
+- Fix error check for devm_reset_control_get() to use ENOENT
 v3:
 - Add Chris' Reviewed-by
 Unchanged in v2
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 374b18c550fd..a20d669b73ee 100644
+index 0c4bae711e84..30da75667334 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -542,6 +542,19 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
- 	return 0;
- }
+@@ -13,6 +13,7 @@
+ #include <linux/module.h>
+ #include <linux/of_device.h>
+ #include <linux/regmap.h>
++#include <linux/reset.h>
+ #include <linux/mfd/syscon.h>
+ #include <drm/drm_atomic_helper.h>
+ #include <drm/drm_crtc.h>
+@@ -1144,6 +1145,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+ 			of_match_device(dw_mipi_dsi_dt_ids, dev);
+ 	const struct dw_mipi_dsi_plat_data *pdata = of_id->data;
+ 	struct platform_device *pdev = to_platform_device(dev);
++	struct reset_control *apb_rst;
+ 	struct drm_device *drm = data;
+ 	struct dw_mipi_dsi *dsi;
+ 	struct resource *res;
+@@ -1182,6 +1184,35 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+ 		return ret;
+ 	}
  
-+static void dw_mipi_message_config(struct dw_mipi_dsi *dsi,
-+				   const struct mipi_dsi_msg *msg)
-+{
-+	u32 val = 0;
++	/*
++	 * Note that the reset was not defined in the initial device tree, so
++	 * we have to be prepared for it not being found.
++	 */
++	apb_rst = devm_reset_control_get(dev, "apb");
++	if (IS_ERR(apb_rst)) {
++		ret = PTR_ERR(apb_rst);
++		if (ret == -ENOENT) {
++			apb_rst = NULL;
++		} else {
++			dev_err(dev, "Unable to get reset control: %d\n", ret);
++			return ret;
++		}
++	}
 +
-+	if (msg->flags & MIPI_DSI_MSG_REQ_ACK)
-+		val |= EN_ACK_RQST;
-+	if (msg->flags & MIPI_DSI_MSG_USE_LPM)
-+		val |= CMD_MODE_ALL_LP;
++	if (apb_rst) {
++		ret = clk_prepare_enable(dsi->pclk);
++		if (ret) {
++			dev_err(dev, "%s: Failed to enable pclk\n", __func__);
++			return ret;
++		}
 +
-+	dsi_write(dsi, DSI_CMD_MODE_CFG, val);
-+}
++		reset_control_assert(apb_rst);
++		usleep_range(10, 20);
++		reset_control_deassert(apb_rst);
 +
- static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- {
- 	int ret;
-@@ -636,6 +649,8 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
- 	struct dw_mipi_dsi *dsi = host_to_dsi(host);
- 	int ret;
- 
-+	dw_mipi_message_config(dsi, msg);
++		clk_disable_unprepare(dsi->pclk);
++	}
 +
- 	switch (msg->type) {
- 	case MIPI_DSI_DCS_SHORT_WRITE:
- 	case MIPI_DSI_DCS_SHORT_WRITE_PARAM:
-@@ -747,7 +762,6 @@ static void dw_mipi_dsi_command_mode_config(struct dw_mipi_dsi *dsi)
- {
- 	dsi_write(dsi, DSI_TO_CNT_CFG, HSTX_TO_CNT(1000) | LPRX_TO_CNT(1000));
- 	dsi_write(dsi, DSI_BTA_TO_CNT, 0xd00);
--	dsi_write(dsi, DSI_CMD_MODE_CFG, CMD_MODE_ALL_LP);
- 	dsi_write(dsi, DSI_MODE_CFG, ENABLE_CMD_MODE);
- }
- 
+ 	ret = clk_prepare_enable(dsi->pllref_clk);
+ 	if (ret) {
+ 		dev_err(dev, "%s: Failed to enable pllref_clk\n", __func__);
 -- 
 2.12.0.rc0.230.gf625d4cdb9.dirty
