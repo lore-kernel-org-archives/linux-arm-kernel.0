@@ -1,84 +1,56 @@
 From: john@metanate.com (John Keeping)
-Date: Fri, 24 Feb 2017 12:54:59 +0000
-Subject: [PATCH v4 16/23] drm/rockchip: dw-mipi-dsi: properly configure PHY
- timing
+Date: Fri, 24 Feb 2017 12:54:49 +0000
+Subject: [PATCH v4 06/23] drm/rockchip: dw-mipi-dsi: avoid out-of-bounds read
+ on tx_buf
 In-Reply-To: <20170224125506.21533-1-john@metanate.com>
 References: <20170224125506.21533-1-john@metanate.com>
-Message-ID: <20170224125506.21533-17-john@metanate.com>
+Message-ID: <20170224125506.21533-7-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These values are specified as constant time periods but the PHY
-configuration is in terms of the current lane byte clock so using
-constant values guarantees that the timings will be outside the
-specification with some display configurations.
-
-Derive the necessary configuration from the byte clock in order to
-ensure that the PHY configuration is correct.
+As a side-effect of this, encode the endianness explicitly rather than
+casting a u16.
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
 v4:
-- Simplify ns2bc and ns2ui calculations as suggested by Sean Paul
+- Introduce "data" variable to avoid confusion around the masking in
+  GEN_HDATA()
 v3:
-- Wrap some long lines
+- Add Chris' Reviewed-by
 Unchanged in v2
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 35 ++++++++++++++++++++++++++++++----
- 1 file changed, 31 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 4fee5176c606..9b6a60deb69e 100644
+index 4be1ff3a42bb..f55010312f25 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -383,6 +383,22 @@ static void dw_mipi_dsi_phy_write(struct dw_mipi_dsi *dsi, u8 test_code,
- 	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLK | PHY_UNTESTCLR);
+@@ -572,8 +572,14 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
+ static int dw_mipi_dsi_dcs_short_write(struct dw_mipi_dsi *dsi,
+ 				       const struct mipi_dsi_msg *msg)
+ {
+-	const u16 *tx_buf = msg->tx_buf;
+-	u32 val = GEN_HDATA(*tx_buf) | GEN_HTYPE(msg->type);
++	const u8 *tx_buf = msg->tx_buf;
++	u16 data = 0;
++	u32 val;
++
++	if (msg->tx_len > 0)
++		data |= tx_buf[0];
++	if (msg->tx_len > 1)
++		data |= tx_buf[1] << 8;
+ 
+ 	if (msg->tx_len > 2) {
+ 		dev_err(dsi->dev, "too long tx buf length %zu for short write\n",
+@@ -581,6 +587,7 @@ static int dw_mipi_dsi_dcs_short_write(struct dw_mipi_dsi *dsi,
+ 		return -EINVAL;
+ 	}
+ 
++	val = GEN_HDATA(data) | GEN_HTYPE(msg->type);
+ 	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, val);
  }
  
-+/**
-+ * ns2bc - Nanoseconds to byte clock cycles
-+ */
-+static inline unsigned int ns2bc(struct dw_mipi_dsi *dsi, int ns)
-+{
-+	return DIV_ROUND_UP(ns * dsi->lane_mbps / 8, 1000);
-+}
-+
-+/**
-+ * ns2ui - Nanoseconds to UI time periods
-+ */
-+static inline unsigned int ns2ui(struct dw_mipi_dsi *dsi, int ns)
-+{
-+	return DIV_ROUND_UP(ns * dsi->lane_mbps, 1000);
-+}
-+
- static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- {
- 	int ret, testdin, vco, val;
-@@ -434,10 +450,21 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 					 SETRD_MAX | POWER_MANAGE |
- 					 TER_RESISTORS_ON);
- 
--
--	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
--	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
--	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | 0xa);
-+	dw_mipi_dsi_phy_write(dsi, 0x60, TLP_PROGRAM_EN | ns2bc(dsi, 500));
-+	dw_mipi_dsi_phy_write(dsi, 0x61, THS_PRE_PROGRAM_EN | ns2ui(dsi, 40));
-+	dw_mipi_dsi_phy_write(dsi, 0x62, THS_ZERO_PROGRAM_EN | ns2bc(dsi, 300));
-+	dw_mipi_dsi_phy_write(dsi, 0x63, THS_PRE_PROGRAM_EN | ns2ui(dsi, 100));
-+	dw_mipi_dsi_phy_write(dsi, 0x64, BIT(5) | ns2bc(dsi, 100));
-+	dw_mipi_dsi_phy_write(dsi, 0x65, BIT(5) | (ns2bc(dsi, 60) + 7));
-+
-+	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | ns2bc(dsi, 500));
-+	dw_mipi_dsi_phy_write(dsi, 0x71,
-+			      THS_PRE_PROGRAM_EN | (ns2ui(dsi, 50) + 5));
-+	dw_mipi_dsi_phy_write(dsi, 0x72,
-+			      THS_ZERO_PROGRAM_EN | (ns2bc(dsi, 140) + 2));
-+	dw_mipi_dsi_phy_write(dsi, 0x73,
-+			      THS_PRE_PROGRAM_EN | (ns2ui(dsi, 60) + 8));
-+	dw_mipi_dsi_phy_write(dsi, 0x74, BIT(5) | ns2bc(dsi, 100));
- 
- 	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
- 				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
 -- 
 2.12.0.rc0.230.gf625d4cdb9.dirty
