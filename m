@@ -1,75 +1,71 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Fri, 24 Feb 2017 17:04:45 +0100
-Subject: [PATCH 1/2] dt-bindings: iio: stm32-adc: add option to set
- resolution
-In-Reply-To: <c2b73482-ae01-34b5-3c16-b7e63893259e@kernel.org>
-References: <1487177757-19427-1-git-send-email-fabrice.gasnier@st.com>
- <1487177757-19427-2-git-send-email-fabrice.gasnier@st.com>
- <c2b73482-ae01-34b5-3c16-b7e63893259e@kernel.org>
-Message-ID: <b9f59559-c7a8-f575-0868-bd3b149a35c9@st.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 24 Feb 2017 17:56:50 +0100
+Subject: [PATCH 0/5] Fix regression introduced by set_irq_flags() removal
+In-Reply-To: <alpine.DEB.2.11.1512081153410.3595@nanos>
+References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20151020140427.GE3953@io.lakedaemon.net>
+ <20151020160828.497fcc80@free-electrons.com>
+ <alpine.DEB.2.11.1510202121590.8159@nanos>
+ <20151111092638.587a53a4@free-electrons.com>
+ <alpine.DEB.2.11.1511131509180.3987@nanos>
+ <20151204120329.30a52cf4@free-electrons.com>
+ <alpine.DEB.2.11.1512051823140.3595@nanos>
+ <alpine.DEB.2.11.1512061018450.3595@nanos>
+ <20151208095835.582dc34b@free-electrons.com>
+ <alpine.DEB.2.11.1512081153410.3595@nanos>
+Message-ID: <20170224175650.72115d4d@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/19/2017 01:09 PM, Jonathan Cameron wrote:
-> On 15/02/17 16:55, Fabrice Gasnier wrote:
->> Add documentation for 'st,adc-res' dt optional property.
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> I'm happy with this, but would like to leave time for a device tree review.
->
-> Ultimately we may well want to make this a generic property and call it something
-> like adc-resolution but perhaps we need to wait until we have a few more devices
-> supporting setting it via device tree to figure out what the best interface is.
-> It would exactly be a problem to support this as a deprecated binding at that
-> point.
+Thomas,
 
-Hi Jonathan,
+On Tue, 8 Dec 2015 11:54:11 +0100 (CET), Thomas Gleixner wrote:
+> On Tue, 8 Dec 2015, Thomas Petazzoni wrote:
+> > When a device driver uses a normal (non per-CPU) interrupt, then it
+> > doesn't have to take care of disabling the interrupt on suspend and
+> > re-enabling the interrupt on resume at the interrupt controller level.
+> > This is all transparently handled by the irqchip driver.
+> > 
+> > Why should the handling of per-CPU interrupts be different and require
+> > explicit handling from each device driver rather than being
+> > transparently handled by the irqchip driver ?  
+> 
+> Fair enough. Did not think about the boot cpu part.
 
-I agree with you on this... It may be better to have generic property
-for this, especially if you see that it will come in the near future.
-May I suggest this prop to be less restrictive, e.g. like 
-resolution-bits as is may also be worth for other device types, e.g. DAC 
-as an example ?
+I am reviving this *very* old thread, as I wanted to push the remaining
+patches. But it seems like the issue no longer exists.
 
->
-> Give me a poke if we hear nothing from Rob or Mark for say another week.
+Summary of the story:
 
-No news yet, but it can wait a little longer.
+ - Between 4.2 and 4.3-rc, commit d17cab4451df1 broke suspend/resume on
+   Armada XP. The issue was that the IRQ_NOAUTOEN was no longer
+   cleared, and therefore irqd_irq_disabled() no longer indicated that
+   our per-CPU interrupts were enabled, and consequently our local
+   timer per-CPU interrupt was not re-enabled upon resume.
 
-Please advise,
-Regards,
-Fabrice
+ - After some discussion, we merged a very simple workaround for 4.3,
+   which consists in clearing IRQ_NOAUTOEN:
 
->
-> Thanks,
->
-> Jonathan
->
->> ---
->>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
->> index 5dfc88e..45f7ff2 100644
->> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
->> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
->> @@ -57,6 +57,9 @@ Optional properties:
->>  - dmas: Phandle to dma channel for this ADC instance.
->>    See ../../dma/dma.txt for details.
->>  - dma-names: Must be "rx" when dmas property is being used.
->> +- st,adc-res: Resolution (bits) to use for conversions. Must match device
->> +  available resolutions (e.g. can be 6, 8, 10 or 12 on stm32f4). Default
->> +  is maximum resolution if unset.
->>
->>  Example:
->>  	adc: adc at 40012000 {
->> @@ -84,6 +87,7 @@ Example:
->>  			st,adc-channels = <8>;
->>  			dmas = <&dma2 0 0 0x400 0x0>;
->>  			dma-names = "rx";
->> +			st,adc-res = <8>;
->>  		};
->>  		...
->>  		other adc child nodes follow...
->>
->
+    irq_clear_status_flags(virq, IRQ_NOAUTOEN);
+
+   But the idea was to do a better implementation later on, which my
+   patch series at the same time was trying.
+
+ - Now, fast forward to 4.10, if I remove the:
+
+    irq_clear_status_flags(virq, IRQ_NOAUTOEN);
+
+   then I can no longer reproduce the original issue from 4.3-rc, which
+   clearing IRQ_NOAUTOEN was fixing. My system resumes fine.
+
+Has there been some changes in this area that could explain that
+irqd_irq_disable() now indicates that my per-CPU interrupt is enabled,
+while it didn't say so back in 4.3-rc ?
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
