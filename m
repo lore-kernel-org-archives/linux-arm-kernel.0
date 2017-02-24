@@ -1,97 +1,53 @@
 From: anurupvasu@gmail.com (Anurup M)
-Date: Fri, 24 Feb 2017 08:34:44 +0530
-Subject: [PATCH v4 10/11] drivers: perf: hisi: Handle counter overflow IRQ
- in MN PMU
-In-Reply-To: <20170221120334.GB8605@leverpostej>
-References: <1487530282-42731-1-git-send-email-anurup.m@huawei.com>
- <20170220112918.GG9003@leverpostej> <58AC2966.3060200@gmail.com>
- <20170221120334.GB8605@leverpostej>
-Message-ID: <58AFA2CC.206@gmail.com>
+Date: Fri, 24 Feb 2017 08:41:10 +0530
+Subject: [PATCH v4 08/11] drivers: perf: hisi: use poll method to avoid
+ L3C counter overflow
+In-Reply-To: <20170221120927.GF300@arm.com>
+References: <1487530263-42643-1-git-send-email-anurup.m@huawei.com>
+ <20170220110942.GF9003@leverpostej> <20170221120927.GF300@arm.com>
+Message-ID: <58AFA44E.2060401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for delay in reply.
 
-On Tuesday 21 February 2017 05:33 PM, Mark Rutland wrote:
-> On Tue, Feb 21, 2017 at 05:19:58PM +0530, Anurup M wrote:
->> On Monday 20 February 2017 04:59 PM, Mark Rutland wrote:
->>> On Sun, Feb 19, 2017 at 01:51:22PM -0500, Anurup M wrote:
->>>> +			/* Clear the IRQ status flag */
->>>> +			hisi_djtag_writereg(module_id, MN1_BANK_SELECT,
->>>> +				MN1_INTC_REG_OFF, (1 << bit_pos), client);
->>>> +
->>>> +			/* Get the corresponding event struct */
->>>> +			event = mn_pmu->hw_perf_events[bit_pos];
->>>> +			if (!event)
->>>> +				continue;
->>> Do we expect to take interrupts for an event which does not exist?
->> Here I ignore if the event does not exist. I have seen it is handled
->> in arm_pmu and other reference
->> implementations to ignore if there is no event.
->> The event is cleared in .del. So if .del is called before the IRQ
->> handler, this check is required right?
->> Please comment.
-> If there's a particular case whre we'd see the overflow bit set for an
-> event, please add a comment describing that case here.
+
+On Tuesday 21 February 2017 05:39 PM, Will Deacon wrote:
+> On Mon, Feb 20, 2017 at 11:09:43AM +0000, Mark Rutland wrote:
+>> On Sun, Feb 19, 2017 at 01:51:03PM -0500, Anurup M wrote:
+>>> The L3 cache PMU use N-N SPI interrupt which has no support
+>>> in kernel mainline.
+>> Could you elaborate on what you mean by this?
+>>
+>> I don't understand what is meant here. How exactly are the interrupts
+>> wired up in HW, and what exactly is not supported by Linux?
+>>
+>>> So use hrtimer to poll and update event
+>>> counter to avoid overflow condition for L3 cache PMU.
+>>> A interval of 10 seconds is used for the hrtimer.
+>>> The time interval can be configured in the sysfs.
+>> I'm not too keen on giving userspace the ability to control this, since
+>> it gives an awful lot of rope for userspace to tie around itself.
+> Agreed. I'd also go a step further and say that for PMUs with either
+> terminally broken interrupts (like this one) or just missing interrupts
+> (like the CPU PMU on raspberry pi iirc), then the perf core should take
+> care of an hrtimer in an attempt to generate samples often enough. We
+> already have PERF_PMU_CAP_NO_INTERRUPT, but it currently just disables
+> sampling events.
 >
-> [...]
+> The fiddly part is knowing how to program the timer, and I think you'd
+> need the PMU driver to provide an upper-bound on events per nanosecond.
+> I'm pretty sure that would be highly unreliable (especially for shared
+> resources such as the L3), at which point, is it worth the hassle?
 
-Sure. I will do that.
+Agreed, it is difficult for user to arrive at a interval for the shared 
+resource
+like L3 cache. So I shall remove this facility exposed to user.
 
->>>> +static int hisi_mn_init_irqs_fdt(struct device *dev,
->>>> +				struct hisi_pmu *mn_pmu)
->>>> +{
->>>> +	struct hisi_mn_data *mn_data = mn_pmu->hwmod_data;
->>>> +	struct hisi_djtag_client *client = mn_data->client;
->>>> +	int irq = -1, num_irqs, i;
->>>> +
->>>> +	num_irqs = of_irq_count(dev->of_node);
->>> Surely we expect a specific number of interrupts?
->>>
->>>> +	for (i = 0; i < num_irqs; i++) {
->>>> +		irq = of_irq_get(dev->of_node, i);
->>>> +		if (irq < 0)
->>>> +			dev_info(dev, "No IRQ resource!\n");
->>>> +	}
->>> Why are we throwing these away?
->>>
->>>> +
->>>> +	if (irq < 0)
->>>> +		return 0;
->>>> +
->>>> +	/* The last entry in the IRQ list to be chosen
->>>> +	 * This is as per mbigen-v2 IRQ mapping
->>>> +	 */
->>>> +	return hisi_mn_init_irq(irq, mn_pmu, client);
->>> I don't understand this comment.
->>>
->>> Why do we only use the list IRQ?
->>>
->>> What does this have to do with the mbigen?
->>>
->>> No ordering requirement was described in the DT binding.
->> There is a defect in the mbigen hardware to handle the IRQ mapping
->> for MN.
->> Due to this the IRQ property
->> of MN is made as a list and we read all IRQs and use only the last one.
->> I shall mention it in the comment and also add note in the DT bindings.
-> You'll need to elaborate on that a bit further; I don't understand.
->
-> If the interrupts aren't usable, there's arguably not much point listing
-> them in the DT.
->
-> Regardless, the order of the list *must* be specified in the DT binding.
-
-I'm sorry for creating this confusion. It was a wrong workaround due to 
-my misunderstanding of the
-IRQ mapping.
-The MN will use a single IRQ for overflow in HiP07. I shall update it 
-and resend.
-But in HiP05/06 there is no support for this IRQ, So I shall modify to 
-use polling when IRQ is not available.
+Shall use a realistic and safer upper bound as hrtimer interval for the 
+uncore
+units which do not support IRQ.
 
 Thanks,
-Anurup
+Anuurp
 
-> Thanks,
-> Mark.
+> Will
