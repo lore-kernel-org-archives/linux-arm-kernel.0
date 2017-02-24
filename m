@@ -1,247 +1,211 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Fri, 24 Feb 2017 04:40:48 +0100
-Subject: [PATCH v2 10/17] ARM: dts: Add Actions Semi S500 and LeMaker Guitar
+Date: Fri, 24 Feb 2017 04:40:46 +0100
+Subject: [PATCH v2 08/17] tty: serial: Add Actions Semi Owl UART earlycon
 In-Reply-To: <20170224034055.18807-1-afaerber@suse.de>
 References: <20170224034055.18807-1-afaerber@suse.de>
-Message-ID: <20170224034055.18807-11-afaerber@suse.de>
+Message-ID: <20170224034055.18807-9-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+This implements an earlycon for Actions Semi S500/S900 SoCs.
+
+Based on LeMaker linux-actions tree.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
  v1 -> v2:
- * Reworded subject
- * Updated ARCH_OWL to ARCH_ACTIONS (Arnd)
+ * Extended Kconfig help to mention earlycon (Arnd)
+ * Spelled out Actions Semiconductor in Kconfig help
  * Adopted "actions" vendor prefix
- * Dropped irq.h include
- * Added memory at 0 node for Guitar SoM
- * Dropped bogus uart3 clock-frequency
- * Added device_type for CPU nodes
- * Fixed UART reg size
- * Adopted SPDX-License-Identifier (Rob)
- * Added remaining UART nodes
- * Added timer node
  
- arch/arm/boot/dts/Makefile                 |   2 +
- arch/arm/boot/dts/s500-guitar-bb-rev-b.dts |  26 ++++++
- arch/arm/boot/dts/s500-guitar.dtsi         |  20 +++++
- arch/arm/boot/dts/s500.dtsi                | 135 +++++++++++++++++++++++++++++
- 4 files changed, 183 insertions(+)
- create mode 100644 arch/arm/boot/dts/s500-guitar-bb-rev-b.dts
- create mode 100644 arch/arm/boot/dts/s500-guitar.dtsi
- create mode 100644 arch/arm/boot/dts/s500.dtsi
+ drivers/tty/serial/Kconfig    |  19 ++++++
+ drivers/tty/serial/Makefile   |   1 +
+ drivers/tty/serial/owl-uart.c | 135 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 155 insertions(+)
+ create mode 100644 drivers/tty/serial/owl-uart.c
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0118084..578a20b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -638,6 +638,8 @@ dtb-$(CONFIG_ARCH_ORION5X) += \
- 	orion5x-maxtor-shared-storage-2.dtb \
- 	orion5x-netgear-wnr854t.dtb \
- 	orion5x-rd88f5182-nas.dtb
-+dtb-$(CONFIG_ARCH_ACTIONS) += \
-+	s500-guitar-bb-rev-b.dtb
- dtb-$(CONFIG_ARCH_PRIMA2) += \
- 	prima2-evb.dtb
- dtb-$(CONFIG_ARCH_OXNAS) += \
-diff --git a/arch/arm/boot/dts/s500-guitar-bb-rev-b.dts b/arch/arm/boot/dts/s500-guitar-bb-rev-b.dts
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 6117ac8..e145822 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1677,6 +1677,25 @@ config SERIAL_MVEBU_CONSOLE
+ 	  and warnings and which allows logins in single user mode)
+ 	  Otherwise, say 'N'.
+ 
++config SERIAL_OWL
++	bool "Actions Semi Owl serial port support"
++	depends on ARCH_ACTIONS || COMPILE_TEST
++	select SERIAL_CORE
++	help
++	  This driver is for Actions Semiconductor S500/S900 SoC's UART.
++	  Say 'Y' here if you wish to use the on-board serial port.
++	  Otherwise, say 'N'.
++
++config SERIAL_OWL_CONSOLE
++	bool "Console on Actions Semi Owl serial port"
++	depends on SERIAL_OWL=y
++	select SERIAL_CORE_CONSOLE
++	select SERIAL_EARLYCON
++	default y
++	help
++	  Say 'Y' here if you wish to use Actions Semiconductor S500/S900 UART
++	  as the system console. Only earlycon is implemented currently.
++
+ endmenu
+ 
+ config SERIAL_MCTRL_GPIO
+diff --git a/drivers/tty/serial/Makefile b/drivers/tty/serial/Makefile
+index 2d6288b..91f3571 100644
+--- a/drivers/tty/serial/Makefile
++++ b/drivers/tty/serial/Makefile
+@@ -91,6 +91,7 @@ obj-$(CONFIG_SERIAL_STM32)	+= stm32-usart.o
+ obj-$(CONFIG_SERIAL_MVEBU_UART)	+= mvebu-uart.o
+ obj-$(CONFIG_SERIAL_PIC32)	+= pic32_uart.o
+ obj-$(CONFIG_SERIAL_MPS2_UART)	+= mps2-uart.o
++obj-$(CONFIG_SERIAL_OWL)	+= owl-uart.o
+ 
+ # GPIOLIB helpers for modem control lines
+ obj-$(CONFIG_SERIAL_MCTRL_GPIO)	+= serial_mctrl_gpio.o
+diff --git a/drivers/tty/serial/owl-uart.c b/drivers/tty/serial/owl-uart.c
 new file mode 100644
-index 0000000..834b71d
+index 0000000..e097443
 --- /dev/null
-+++ b/arch/arm/boot/dts/s500-guitar-bb-rev-b.dts
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright (c) 2016-2017 Andreas F?rber
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+/dts-v1/;
-+
-+#include "s500-guitar.dtsi"
-+
-+/ {
-+	compatible = "lemaker,guitar-bb-rev-b", "lemaker,guitar", "actions,s500";
-+	model = "LeMaker Guitar Base Board rev. B";
-+
-+	aliases {
-+		serial3 = &uart3;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial3:115200n8";
-+	};
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/s500-guitar.dtsi b/arch/arm/boot/dts/s500-guitar.dtsi
-new file mode 100644
-index 0000000..ef0e7e3
---- /dev/null
-+++ b/arch/arm/boot/dts/s500-guitar.dtsi
-@@ -0,0 +1,20 @@
-+/*
-+ * LeMaker Guitar SoM
-+ *
-+ * Copyright (c) 2016-2017 Andreas F?rber
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+#include "s500.dtsi"
-+
-+/ {
-+	compatible = "lemaker,guitar", "actions,s500";
-+
-+	/delete-node/ memory;
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x40000000>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/s500.dtsi b/arch/arm/boot/dts/s500.dtsi
-new file mode 100644
-index 0000000..149bb7a
---- /dev/null
-+++ b/arch/arm/boot/dts/s500.dtsi
++++ b/drivers/tty/serial/owl-uart.c
 @@ -0,0 +1,135 @@
 +/*
-+ * Actions Semi S500 SoC
++ * Actions Semi Owl family serial console
++ *
++ * Copyright 2013 Actions Semi Inc.
++ * Author: Actions Semi, Inc.
 + *
 + * Copyright (c) 2016-2017 Andreas F?rber
 + *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include "skeleton.dtsi"
++#include <linux/console.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/serial.h>
++#include <linux/serial_core.h>
 +
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
++#define OWL_UART_CTL	0x000
++#define OWL_UART_TXDAT	0x008
++#define OWL_UART_STAT	0x00c
 +
-+/ {
-+	compatible = "actions,s500";
-+	interrupt-parent = <&gic>;
++#define OWL_UART_CTL_TRFS_TX		(1 << 14)
++#define OWL_UART_CTL_EN			(1 << 15)
++#define OWL_UART_CTL_RXIE		(1 << 18)
++#define OWL_UART_CTL_TXIE		(1 << 19)
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++#define OWL_UART_STAT_RIP		(1 << 0)
++#define OWL_UART_STAT_TIP		(1 << 1)
++#define OWL_UART_STAT_TFFU		(1 << 6)
++#define OWL_UART_STAT_TRFL_MASK		(0x1f << 11)
++#define OWL_UART_STAT_UTBB		(1 << 17)
 +
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x0>;
-+		};
++static inline void owl_uart_write(struct uart_port *port, u32 val, unsigned int off)
++{
++	writel(val, port->membase + off);
++}
 +
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x1>;
-+		};
++static inline u32 owl_uart_read(struct uart_port *port, unsigned int off)
++{
++	return readl(port->membase + off);
++}
 +
-+		cpu2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x2>;
-+		};
++#ifdef CONFIG_SERIAL_OWL_CONSOLE
 +
-+		cpu3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a9";
-+			reg = <0x3>;
-+		};
-+	};
++static void owl_console_putchar(struct uart_port *port, int ch)
++{
++	if (!port->membase)
++		return;
 +
-+	arm-pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
-+		             <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
-+		             <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-+		             <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
-+	};
++	while (owl_uart_read(port, OWL_UART_STAT) & OWL_UART_STAT_TFFU)
++		cpu_relax();
 +
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
++	owl_uart_write(port, ch, OWL_UART_TXDAT);
++}
 +
-+		gic: interrupt-controller at b0021000 {
-+			compatible = "arm,cortex-a9-gic";
-+			reg = <0xb0021000 0x1000>,
-+			      <0xb0020100 0x0100>;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+		};
++static void owl_uart_port_write(struct uart_port *port, const char *s,
++				u_int count)
++{
++	u32 old_ctl, val;
++	unsigned long flags;
++	int locked;
 +
-+		l2: cache-controller at b0022000 {
-+			compatible = "arm,pl310-cache";
-+			reg = <0xb0022000 0x1000>;
-+			cache-unified;
-+			cache-level = <2>;
-+			interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>;
-+			arm,tag-latency = <3 3 2>;
-+			arm,data-latency = <5 3 3>;
-+		};
++	local_irq_save(flags);
 +
-+		uart0: serial at b0120000 {
-+			compatible = "actions,s500-uart", "actions,owl-uart";
-+			reg = <0xb0120000 0x2000>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
++	if (port->sysrq)
++		locked = 0;
++	else if (oops_in_progress)
++		locked = spin_trylock(&port->lock);
++	else {
++		spin_lock(&port->lock);
++		locked = 1;
++	}
 +
-+		uart1: serial at b0122000 {
-+			compatible = "actions,s500-uart", "actions,owl-uart";
-+			reg = <0xb0122000 0x2000>;
-+			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
++	old_ctl = owl_uart_read(port, OWL_UART_CTL);
++	val = old_ctl | OWL_UART_CTL_TRFS_TX;
++	/* disable IRQ */
++	val &= ~(OWL_UART_CTL_RXIE | OWL_UART_CTL_TXIE);
++	owl_uart_write(port, val, OWL_UART_CTL);
 +
-+		uart2: serial at b0124000 {
-+			compatible = "actions,s500-uart", "actions,owl-uart";
-+			reg = <0xb0126000 0x2000>;
-+			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
++	uart_console_write(port, s, count, owl_console_putchar);
 +
-+		uart3: serial at b0126000 {
-+			compatible = "actions,s500-uart", "actions,owl-uart";
-+			reg = <0xb0126000 0x2000>;
-+			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
++	/* wait until all contents have been sent out */
++	while (owl_uart_read(port, OWL_UART_STAT) & OWL_UART_STAT_TRFL_MASK)
++		cpu_relax();
 +
-+		uart4: serial at b0128000 {
-+			compatible = "actions,s500-uart", "actions,owl-uart";
-+			reg = <0xb0128000 0x2000>;
-+			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
++	/* clear IRQ pending */
++	val = owl_uart_read(port, OWL_UART_STAT);
++	val |= OWL_UART_STAT_TIP | OWL_UART_STAT_RIP;
++	owl_uart_write(port, val, OWL_UART_STAT);
 +
-+		uart5: serial at b012a000 {
-+			compatible = "actions,s500-uart", "actions,owl-uart";
-+			reg = <0xb012a000 0x2000>;
-+			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
++	owl_uart_write(port, old_ctl, OWL_UART_CTL);
 +
-+		uart6: serial at b012c000 {
-+			compatible = "actions,s500-uart", "actions,owl-uart";
-+			reg = <0xb012c000 0x2000>;
-+			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
++	if (locked)
++		spin_unlock(&port->lock);
 +
-+		timer at b0168000 {
-+			compatible = "actions,owl-timer";
-+			reg = <0xb0168000 0x100>;
-+			interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>,
-+			             <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+		};
-+	};
-+};
++	local_irq_restore(flags);
++}
++
++static void owl_uart_early_console_write(struct console *co,
++					 const char *s,
++					 u_int count)
++{
++	struct earlycon_device *dev = co->data;
++
++	owl_uart_port_write(&dev->port, s, count);
++}
++
++static int __init
++owl_uart_early_console_setup(struct earlycon_device *device, const char *opt)
++{
++	if (!device->port.membase)
++		return -ENODEV;
++
++	device->con->write = owl_uart_early_console_write;
++
++	return 0;
++}
++OF_EARLYCON_DECLARE(owl, "actions,owl-uart",
++		    owl_uart_early_console_setup);
++
++#endif /* CONFIG_SERIAL_OWL_CONSOLE */
 -- 
 2.10.2
