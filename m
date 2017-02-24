@@ -1,57 +1,103 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 24 Feb 2017 10:28:41 +0100
-Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
-In-Reply-To: <20170224081430.GB19663@samfundet.no>
-References: <20170221112641.6276c001@bbrezillon>
- <CAHp75Vcb9gtzF7LvH74JwL4dTUyQvKmg=dnTXKfjhVHuyK3WXg@mail.gmail.com>
- <20170221112720.ynehsryprhrhzjla@piout.net>
- <CAHp75VcKjYYAw8gw8yYXrd-vzZo50WOQ06AzPx+0g9Zakzjm-w@mail.gmail.com>
- <20170221162133.jch6yzpotj4s7zob@piout.net>
- <CAHp75VeB4eVuN5NMfAfQUtssuHezTyAM8FUswuR8FheUk1V-oA@mail.gmail.com>
- <CAHp75Vc54+GR99qM8vUDfQnehFx0g5q137k-w5XY3023UZyr5w@mail.gmail.com>
- <20170221171438.e5hvruoixafpcdps@piout.net>
- <CACiLriSdRM4ZfoDsxFhf6ZVwAtacJOJ28M8CvOg6kC_XN0T-Mw@mail.gmail.com>
- <20170224081430.GB19663@samfundet.no>
-Message-ID: <20170224092841.umpec3dsoabfoxwm@piout.net>
+From: yong.mao@mediatek.com (Yong Mao)
+Date: Fri, 24 Feb 2017 17:38:44 +0800
+Subject: [PATCH v1] mmc: mediatek: Fixed bug where clock frequency could
+ be set wrong
+In-Reply-To: <CAGS+omDuPwXqTJ2CrLbLvSHdp3CL895qop1x6dLT1u7bG7XnVw@mail.gmail.com>
+References: <1487924527-22584-1-git-send-email-yong.mao@mediatek.com>
+ <1487924527-22584-2-git-send-email-yong.mao@mediatek.com>
+ <CAGS+omDuPwXqTJ2CrLbLvSHdp3CL895qop1x6dLT1u7bG7XnVw@mail.gmail.com>
+Message-ID: <1487929124.22858.10.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/02/2017 at 09:14:30 +0100, Hans-Christian Noren Egtvedt wrote:
-> Around Thu 23 Feb 2017 21:18:13 -0800 or thereabout, H?vard Skinnemoen wrote:
-> > On Tue, Feb 21, 2017 at 9:14 AM, Alexandre Belloni
-> > <alexandre.belloni@free-electrons.com> wrote:
-> >> On 21/02/2017 at 18:43:35 +0200, Andy Shevchenko wrote:
+From: 	Yong Mao <yong.mao@mediatek.com>
+To: 	Daniel Kurtz <djkurtz@chromium.org>
+Subject: 	Re: [PATCH v1] mmc: mediatek: Fixed bug where clock frequency
+could be set wrong
+Date: 	Fri, 24 Feb 2017 17:33:37 +0800
+
+
+On Fri, 2017-02-24 at 17:52 +0900, Daniel Kurtz wrote:
+> On Fri, Feb 24, 2017 at 5:22 PM, Yong Mao <yong.mao@mediatek.com>
+wrote:
+> >
+> > From: yong mao <yong.mao@mediatek.com>
+> >
+> > This patch can fix two issues:
+> >
+> > Issue 1:
+> > The maximum value of clock divider is 0xff.
+> > Because the type of div is u32, div may be larger than max_div.
+> > In this case, we should use max_div to set the clock frequency.
+> >
+> > Issue 2:
+> > In previous code, we can not set the correct clock frequency when
+> > div equals 0xff.
+> >
+> > Signed-off-by: Yong Mao <yong.mao@mediatek.com>
+> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > ---
+> >  drivers/mmc/host/mtk-sd.c |   13 ++++++++++++-
+> >  1 file changed, 12 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> > index 07f3236..3174445 100644
+> > --- a/drivers/mmc/host/mtk-sd.c
+> > +++ b/drivers/mmc/host/mtk-sd.c
+> > @@ -540,6 +540,7 @@ static void msdc_set_mclk(struct msdc_host
+*host, unsigned char timing, u32 hz)
+> >         u32 mode;
+> >         u32 flags;
+> >         u32 div;
+> > +       u32 max_div;
 > 
-> <snipp>
+> There's really no need for this variable.  Just use 0xff below.
+For all of our IC, max_div is not a constant.
+We will upstream another patch which max_div will get the different
+value depending on the IC.
+Therefore, we keep the max_div as a variable here.
+
 > 
-> >> A few weeks ago, I was telling Boris to let it not build for a while and
-> >> then remove it. You already went out of your way to make it work. Again,
-> >> feel free to send a patch removing avr32. I can only see a lot of
-> >> benefits for the Atmel ARM SoCs and the many cleanups that will follow.
-> > 
-> > Agree, I can't help but feel that the AVR32 support is doing more harm
-> > than good at this point.
+> >         u32 sclk;
+> >
+> >         if (!hz) {
+> > @@ -590,8 +591,18 @@ static void msdc_set_mclk(struct msdc_host
+*host, unsigned char timing, u32 hz)
+> >                         sclk = (host->src_clk_freq >> 2) / div;
+> >                 }
+> >         }
+> > +
+> > +       /**
+> > +        * The maximum value of div is 0xff.
+> > +        * Check if the div is larger than max_div.
+> > +        */
+> > +       max_div = 0xff;
+> > +       if (div > max_div) {
+> > +               div = max_div;
+> > +               sclk = (host->src_clk_freq >> 2) / div;
+> > +       }
+> >         sdr_set_field(host->base + MSDC_CFG, MSDC_CFG_CKMOD |
+MSDC_CFG_CKDIV,
+> > -                       (mode << 8) | (div % 0xff));
+> > +                     (mode << 8) | div);
 > 
-> I also agree on this, I can relate to Nicolas (and Atmel friends) having to
-> always think about the less-maintained AVR32 parts when improving drivers.
-> 
-> >> If nobody complains about the 4.10 breakage, You'll have plenty of time
-> >> to remove it for 4.12
-> > 
-> > I'm fine with that, but I haven't put much effort into keeping it
-> > alive lately. If Hans-Christian agrees, I'm willing to post a patch to
-> > remove it, or ack someone else's patch.
-> 
-> Then lets plan this for 4.12, either you H?vard whip up a patch or I can
-> eventually do it.
-> 
-> I can push it through the linux-avr32 git tree on kernel.org.
+> Hmm, I don't know much about this sub-system, but should we even be
+> allowing requests to set a frequency that we can't actually achieve
+> with the divider?
 > 
 
-I think think it is fair to have one of you two prepare the patch. It is
-definitively a sad decision :( but it will help us immensely! Thank you!
+No. We can not get a frequency that we can't actually achieve with the
+divider. This patch is to solve this kind of issue.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+
+> >         sdr_set_bits(host->base + MSDC_CFG, MSDC_CFG_CKPDN);
+> >         while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
+> >                 cpu_relax();
+> > --
+> > 1.7.9.5
+> >
+> >
+> > _______________________________________________
+> > Linux-mediatek mailing list
+> > Linux-mediatek at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-mediatek
