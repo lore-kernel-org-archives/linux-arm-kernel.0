@@ -1,11 +1,10 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 24 Feb 2017 16:22:56 -0300
-Subject: [PATCH 1/2] media: s5p-mfc: convert drivers to use the new
- vb2_queue dev field
-In-Reply-To: <1481888915-19624-2-git-send-email-pankaj.dubey@samsung.com>
+Date: Fri, 24 Feb 2017 16:42:31 -0300
+Subject: [PATCH 2/2] media: s5p-mfc: fix MMAP of mfc buffer during reqbufs
+In-Reply-To: <1481888915-19624-3-git-send-email-pankaj.dubey@samsung.com>
 References: <1481888915-19624-1-git-send-email-pankaj.dubey@samsung.com>
- <1481888915-19624-2-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <a4db0512-8a5b-aaea-713b-5e3c09c3e8c2@osg.samsung.com>
+ <1481888915-19624-3-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <81c11e69-b7eb-ccb5-a377-2848ec551274@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,11 +13,10 @@ Hello Pankaj,
 On 12/16/2016 08:48 AM, Pankaj Dubey wrote:
 > From: Smitha T Murthy <smitha.t@samsung.com>
 > 
-> commit 2548fee63d9e ("[media] media/platform: convert drivers to use the new
-> vb2_queue dev field") has missed to set dev pointer of vb2_queue which will be
-> used in reqbufs of mfc driver. Without this change following error is observed:
-> 
-> ---------------------------------------------------------------
+> It has been observed on ARM64 based Exynos SoC, if IOMMU is not enabled
+> and we try to use reserved memory for MFC, reqbufs fails with below
+> mentioned error
+> ---------------------------------------------------------------------------
 > V4L2 Codec decoding example application
 > Kamil Debski <k.debski@samsung.com>
 > Copyright 2012 Samsung Electronics Co., Ltd.
@@ -38,44 +36,19 @@ On 12/16/2016 08:48 AM, Pankaj Dubey wrote:
 > [App] Out buf phy : 0x00000000, virt : 0xffffffff
 > Output Length is = 0x300000
 > Error (mfc.c:mfc_dec_setup_output:145): Failed to MMAP MFC OUTPUT buffer
-> -------------------------------------------------------
+> -------------------------------------------------------------------------
+> This is because the device requesting for memory is mfc0.left not the parent mfc0.
+> Hence setting of alloc_devs need to be done only if IOMMU is enabled
+> and in that case both the left and right device is treated as mfc0 only.
 > 
 
-On which kernel version did you face this issue?
+I see, so likely you were facing the issue described in patch 1/2 after this
+patch since the driver doesn't set alloc_devs when IOMMU is disabled, right?
 
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> [pankaj.dubey: debugging issue and formatting commit message]
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  drivers/media/platform/s5p-mfc/s5p_mfc.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> index 0a5b8f5..6ea8246 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> @@ -838,6 +838,7 @@ static int s5p_mfc_open(struct file *file)
->  	q->type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
->  	q->drv_priv = &ctx->fh;
->  	q->lock = &dev->mfc_mutex;
-> +	q->dev = &dev->plat_dev->dev;
->  	if (vdev == dev->vfd_dec) {
->  		q->io_modes = VB2_MMAP;
->  		q->ops = get_dec_queue_ops();
-> @@ -861,6 +862,7 @@ static int s5p_mfc_open(struct file *file)
->  	q->io_modes = VB2_MMAP;
->  	q->drv_priv = &ctx->fh;
->  	q->lock = &dev->mfc_mutex;
-> +	q->dev = &dev->plat_dev->dev;
->  	if (vdev == dev->vfd_dec) {
->  		q->io_modes = VB2_MMAP;
->  		q->ops = get_dec_queue_ops();
->
+In any case, I guess these patches have been superseded by Marek's series[0]
+so they are no longer needed?
 
-Please correct me if I'm wrong, but AFAIU this shouldn't be needed in
-the s5p-mfc driver since the videobuf2 core either uses the vb2_queue
-.dev field or the vb2_queue .alloc_devs. And the latter is set in the
-s5p_mfc_queue_setup() function, so the .dev field shouldn't be used.
+[0]: https://www.spinics.net/lists/linux-media/msg111156.html
 
 Best regards,
 -- 
