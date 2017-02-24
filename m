@@ -1,32 +1,97 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 24 Feb 2017 17:11:18 +0200
-Subject: [PATCH 4/8] ARM: dts: s3c64xx: Enable watchdog on all S3C64xx boards
+Date: Fri, 24 Feb 2017 17:11:19 +0200
+Subject: [PATCH 5/8] ARM: dts: exynos: Enable watchdog on all Exynos4 boards
 In-Reply-To: <20170224151122.12142-1-krzk@kernel.org>
 References: <20170224151122.12142-1-krzk@kernel.org>
-Message-ID: <20170224151122.12142-5-krzk@kernel.org>
+Message-ID: <20170224151122.12142-6-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Watchdog module does not have external dependencies so it can be safely
-enabled in s3c64xx.dtsi thus making it available for all S3C64xx-based
+enabled in exynos4.dtsi thus making it available for all Exynos4-based
 boards.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/boot/dts/s3c64xx.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/exynos4210-origen.dts         | 4 ----
+ arch/arm/boot/dts/exynos4210.dtsi               | 1 -
+ arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi | 4 ----
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi | 4 ----
+ arch/arm/boot/dts/exynos4412-origen.dts         | 4 ----
+ arch/arm/boot/dts/exynos4412.dtsi               | 1 -
+ 6 files changed, 18 deletions(-)
 
-diff --git a/arch/arm/boot/dts/s3c64xx.dtsi b/arch/arm/boot/dts/s3c64xx.dtsi
-index 0ccb414cd268..6caec5f27d38 100644
---- a/arch/arm/boot/dts/s3c64xx.dtsi
-+++ b/arch/arm/boot/dts/s3c64xx.dtsi
-@@ -100,7 +100,6 @@
- 			interrupts = <26>;
- 			clock-names = "watchdog";
- 			clocks = <&clocks PCLK_WDT>;
--			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+index a2c6a13fe67b..312650e2450f 100644
+--- a/arch/arm/boot/dts/exynos4210-origen.dts
++++ b/arch/arm/boot/dts/exynos4210-origen.dts
+@@ -328,7 +328,3 @@
+ &tmu {
+ 	status = "okay";
+ };
+-
+-&watchdog {
+-	status = "okay";
+-};
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index e126357aba9a..e6e62103a71f 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -125,7 +125,6 @@
+ 		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&clock CLK_WDT>;
+ 		clock-names = "watchdog";
+-		status = "disabled";
+ 	};
  
- 		i2c0: i2c at 7f004000 {
+ 	clock: clock-controller at 10030000 {
+diff --git a/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi b/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
+index a36cd36a26b8..4cd62487bb16 100644
+--- a/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
++++ b/arch/arm/boot/dts/exynos4412-itop-scp-core.dtsi
+@@ -495,7 +495,3 @@
+ 	vtmu-supply = <&ldo16_reg>;
+ 	status = "okay";
+ };
+-
+-&watchdog {
+-	status = "okay";
+-};
+diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+index 78f118cb73d4..0f1ff792fe44 100644
+--- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
++++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+@@ -555,7 +555,3 @@
+ 	vtmu-supply = <&ldo10_reg>;
+ 	status = "okay";
+ };
+-
+-&watchdog {
+-	status = "okay";
+-};
+diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
+index a1ab6f94bb64..7a83e2df18a6 100644
+--- a/arch/arm/boot/dts/exynos4412-origen.dts
++++ b/arch/arm/boot/dts/exynos4412-origen.dts
+@@ -541,7 +541,3 @@
+ &serial_3 {
+ 	status = "okay";
+ };
+-
+-&watchdog {
+-	status = "okay";
+-};
+diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+index 6f47988a1ab5..cc69466f17c0 100644
+--- a/arch/arm/boot/dts/exynos4412.dtsi
++++ b/arch/arm/boot/dts/exynos4412.dtsi
+@@ -222,7 +222,6 @@
+ 		clocks = <&clock CLK_WDT>;
+ 		clock-names = "watchdog";
+ 		samsung,syscon-phandle = <&pmu_system_controller>;
+-		status = "disabled";
+ 	};
+ 
+ 	adc: adc at 126C0000 {
 -- 
 2.9.3
