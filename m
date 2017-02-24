@@ -1,103 +1,53 @@
-From: yong.mao@mediatek.com (Yong Mao)
-Date: Fri, 24 Feb 2017 17:38:44 +0800
-Subject: [PATCH v1] mmc: mediatek: Fixed bug where clock frequency could
- be set wrong
-In-Reply-To: <CAGS+omDuPwXqTJ2CrLbLvSHdp3CL895qop1x6dLT1u7bG7XnVw@mail.gmail.com>
-References: <1487924527-22584-1-git-send-email-yong.mao@mediatek.com>
- <1487924527-22584-2-git-send-email-yong.mao@mediatek.com>
- <CAGS+omDuPwXqTJ2CrLbLvSHdp3CL895qop1x6dLT1u7bG7XnVw@mail.gmail.com>
-Message-ID: <1487929124.22858.10.camel@mhfsdcap03>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Feb 2017 10:43:12 +0100
+Subject: [GIT PULL 1/7] ARM: SoC non-urgent fixes for merge window
+In-Reply-To: <CA+55aFy6ZpXsRjz9mAV+wxg7Okq3FEkZvR69niPb7m1Vu=7xbQ@mail.gmail.com>
+References: <8729461.VkrRdW7LzJ@wuerfel> <9013724.FUQHNQsY9n@wuerfel>
+ <CA+55aFy6ZpXsRjz9mAV+wxg7Okq3FEkZvR69niPb7m1Vu=7xbQ@mail.gmail.com>
+Message-ID: <CAK8P3a25-2XdYAJnisSF8cxjyoPwNa_ajTGGAzxFXQaMqwSCVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: 	Yong Mao <yong.mao@mediatek.com>
-To: 	Daniel Kurtz <djkurtz@chromium.org>
-Subject: 	Re: [PATCH v1] mmc: mediatek: Fixed bug where clock frequency
-could be set wrong
-Date: 	Fri, 24 Feb 2017 17:33:37 +0800
+On Fri, Feb 24, 2017 at 12:33 AM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On Thu, Feb 23, 2017 at 3:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes-nc
+>
+> Interesting. So I'm pulling this, and I get to pull request 3/7, and
+> that's when I notice that the email is sent by Arnd, but the tag is
+> signed by Olof.
+>
+> Which is fine, but I end up cutting-and-pasting the name of the "from"
+> person from the signature, so the pull requests got merged as
+>
+>    Pull ARM SoC ... from Olof Johansson:
+>
+> instead or using "from Arnd Bergmann".
+>
+> I guess it doesn't matter and you guys don't care, but I ended up
+> re-doing the pulls. Olof gets credit in the pgp signature anyway.
+>
+> I wonder how many times before you guys have done this and I just
+> didn't notice the ambiguity of who I should credit.
 
+We really don't care, as we don't split the work by topic branches but
+rather according to who gets the job done on a given day. Any given
+branch likely contains work from both of us and the signature is
+from whoever wrote the text is in the tag.
 
-On Fri, 2017-02-24 at 17:52 +0900, Daniel Kurtz wrote:
-> On Fri, Feb 24, 2017 at 5:22 PM, Yong Mao <yong.mao@mediatek.com>
-wrote:
-> >
-> > From: yong mao <yong.mao@mediatek.com>
-> >
-> > This patch can fix two issues:
-> >
-> > Issue 1:
-> > The maximum value of clock divider is 0xff.
-> > Because the type of div is u32, div may be larger than max_div.
-> > In this case, we should use max_div to set the clock frequency.
-> >
-> > Issue 2:
-> > In previous code, we can not set the correct clock frequency when
-> > div equals 0xff.
-> >
-> > Signed-off-by: Yong Mao <yong.mao@mediatek.com>
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > ---
-> >  drivers/mmc/host/mtk-sd.c |   13 ++++++++++++-
-> >  1 file changed, 12 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> > index 07f3236..3174445 100644
-> > --- a/drivers/mmc/host/mtk-sd.c
-> > +++ b/drivers/mmc/host/mtk-sd.c
-> > @@ -540,6 +540,7 @@ static void msdc_set_mclk(struct msdc_host
-*host, unsigned char timing, u32 hz)
-> >         u32 mode;
-> >         u32 flags;
-> >         u32 div;
-> > +       u32 max_div;
-> 
-> There's really no need for this variable.  Just use 0xff below.
-For all of our IC, max_div is not a constant.
-We will upstream another patch which max_div will get the different
-value depending on the IC.
-Therefore, we keep the max_div as a variable here.
+This merge window, Olof did most of the merges and he also started
+writing up the tag descriptions for some branches, but I finished the
+job while he was attending ELC. This is probably the first time
+you got pull request with tags signed by more than one of us, but
+IIRC we had one merge window where all the signatures came from
+one person and the pull request was sent by the other, and one time
+(long ago) I created a signed tag that pointed to a tag that Olof had
+signed rather than a tree object. That looked very odd in git, so I
+decided not to do that again.
 
-> 
-> >         u32 sclk;
-> >
-> >         if (!hz) {
-> > @@ -590,8 +591,18 @@ static void msdc_set_mclk(struct msdc_host
-*host, unsigned char timing, u32 hz)
-> >                         sclk = (host->src_clk_freq >> 2) / div;
-> >                 }
-> >         }
-> > +
-> > +       /**
-> > +        * The maximum value of div is 0xff.
-> > +        * Check if the div is larger than max_div.
-> > +        */
-> > +       max_div = 0xff;
-> > +       if (div > max_div) {
-> > +               div = max_div;
-> > +               sclk = (host->src_clk_freq >> 2) / div;
-> > +       }
-> >         sdr_set_field(host->base + MSDC_CFG, MSDC_CFG_CKMOD |
-MSDC_CFG_CKDIV,
-> > -                       (mode << 8) | (div % 0xff));
-> > +                     (mode << 8) | div);
-> 
-> Hmm, I don't know much about this sub-system, but should we even be
-> allowing requests to set a frequency that we can't actually achieve
-> with the divider?
-> 
+If we ever get into the same situation again, with the signature
+coming from someone other than the person sending the mail, I'll
+try to explain that in the mail.
 
-No. We can not get a frequency that we can't actually achieve with the
-divider. This patch is to solve this kind of issue.
-
-
-> >         sdr_set_bits(host->base + MSDC_CFG, MSDC_CFG_CKPDN);
-> >         while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
-> >                 cpu_relax();
-> > --
-> > 1.7.9.5
-> >
-> >
-> > _______________________________________________
-> > Linux-mediatek mailing list
-> > Linux-mediatek at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-mediatek
+    Arnd
