@@ -1,63 +1,96 @@
-From: kimran@codeaurora.org (Imran Khan)
-Date: Fri, 24 Feb 2017 19:11:55 +0530
-Subject: Perf degradation seen with thread_info stored in sp_el0
-Message-ID: <72e51627-9155-96f2-f7a9-1be8a8198930@codeaurora.org>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 24 Feb 2017 14:46:27 +0100
+Subject: [RFC PATCH v6 0/7] ARM: Fix dma_alloc_coherent() and friends for
+ NOMMU
+In-Reply-To: <1485448965-32855-1-git-send-email-vladimir.murzin@arm.com>
+References: <1485448965-32855-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <ee0c9417-3665-4c56-dd57-2595eb3b8b1c@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Vlad,
 
-I am observing some degradation in context switch performance (reported by sched benchmark of perf), after including the change
-to keep thread_info in sp_el0:
+On 01/26/2017 05:42 PM, Vladimir Murzin wrote:
+> Hi,
+>
+> It seem that addition of cache support for M-class CPUs uncovered
+> latent bug in DMA usage. NOMMU memory model has been treated as being
+> always consistent; however, for R/M CPU classes memory can be covered
+> by MPU which in turn might configure RAM as Normal i.e. bufferable and
+> cacheable. It breaks dma_alloc_coherent() and friends, since data can
+> stuck in caches now or be buffered.
+>
+> This patch set is trying to address the issue by providing region of
+> memory suitable for consistent DMA operations. It is supposed that
+> such region is marked by MPU as non-cacheable. Robin suggested to
+> advertise such memory as reserved shared-dma-pool, rather then using
+> homebrew command line option, and extend dma-coherent to provide
+> default DMA area in the similar way as it is done for CMA (PATCH
+> 4/7). It allows us to offload all bookkeeping on generic coherent DMA
+> framework, and it seems that it might be reused by other architectures
+> like c6x and blackfin.
+>
+> While reviewing/testing previous vesrions of the patch set it turned
+> out that dma-coherent does not take into account "dma-ranges" device
+> tree property, so it is addressed in PATCH 3/7.
 
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=6cdf9c7ca687e01840d0215437620a20263012fc
+What it is the status of this RFC ? This patchset is very interesting 
+for STM32 platform based on cortex M7 (STM32F746 and STM32H743). Without 
+it, we can't activate DMA + CACHE.
 
-However, if I use D0 to store the same information, I see that performance improves. 
+Thanks in advance
+Alex
 
-For example, I am getting following numbers for the above mentioned scenarios:
-
-Thread info obtained from stack:
-
-        /data/local # ./perf bench sched messaging -g 5 -l 500
-        # Running 'sched/messaging' benchmark:
-        # 20 sender and receiver processes per group
-        # 5 groups == 200 processes run
-
-        Total time: 2.911 [sec]
-
-
-Thread info obtained from sp_el0:
-
-        /data/local # ./perf bench sched messaging -g 5 -l 500
-        # Running 'sched/messaging' benchmark:
-        # 20 sender and receiver processes per group
-        # 5 groups == 200 processes run
-
-        Total time: 3.590 [sec]
-
-
-Thread info obtained from D0: 
-
-        /data/local # ./perf bench sched messaging -g 5 -l 500
-        # Running 'sched/messaging' benchmark:
-        # 20 sender and receiver processes per group
-        # 5 groups == 200 processes run
-
-        Total time: 3.103 [sec]
-
-
-So keeping thread_info in sp_el0 is resulting in degradation of around 23% , while keeping the same in D0 is 
-resulting in degradation of about 6-7%. Of course so far my test cases are not involving cases where D0 might
-get changed in kernel space itself e.g. snippets under kernel_neon_begin/end and taking care of those cases
-will have further overhead.
-
-But right now I just wanted to have a feedback regarding, what are the possible complications I may face if 
-I try to keep thread_info in D0 and whether such a solution will be feasible or not.
-Moreover is there any other alternative way to get rid of this performance degradation.
-
-Thanks and Regards,
-Imran
-
-
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a\nmember of the Code Aurora Forum, hosted by The Linux Foundation
+>
+> For ARM, dedicated DMA region is required for cases other than:
+>  - MMU/MPU is off
+>  - cpu is v7m w/o cache support
+>  - device is coherent
+>
+> In case one of the above conditions is true dma operations are forced
+> to be coherent and wired with dma_noop_ops.
+>
+> To make life easier NOMMU dma operations are kept in separate
+> compilation unit.
+>
+> Since the issue was reported in the same time as Benjamin sent his
+> patch [1] to allow mmap for NOMMU, his case is also addressed in this
+> series (PATCH 1/7 and PATCH 2/7).
+>
+> Thanks!
+>
+> [1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
+>
+> Cc: Joerg Roedel <jroedel@suse.de>
+> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+> Cc: Michal Nazarewicz <mina86@mina86.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+> Cc: Rich Felker <dalias@libc.org>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+>
+> Vladimir Murzin (7):
+>   dma: Take into account dma_pfn_offset
+>   dma: Add simple dma_noop_mmap
+>   drivers: dma-coherent: Account dma_pfn_offset when used with device
+>     tree
+>   drivers: dma-coherent: Introduce default DMA pool
+>   ARM: NOMMU: Introduce dma operations for noMMU
+>   ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
+>   ARM: dma-mapping: Remove traces of NOMMU code
+>
+>  .../bindings/reserved-memory/reserved-memory.txt   |   3 +
+>  arch/arm/include/asm/dma-mapping.h                 |   3 +-
+>  arch/arm/mm/Kconfig                                |   2 +-
+>  arch/arm/mm/Makefile                               |   5 +-
+>  arch/arm/mm/dma-mapping-nommu.c                    | 253 +++++++++++++++++++++
+>  arch/arm/mm/dma-mapping.c                          |  26 +--
+>  drivers/base/dma-coherent.c                        |  76 ++++++-
+>  lib/dma-noop.c                                     |  29 ++-
+>  8 files changed, 356 insertions(+), 41 deletions(-)
+>  create mode 100644 arch/arm/mm/dma-mapping-nommu.c
+>
