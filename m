@@ -1,75 +1,59 @@
 From: john@metanate.com (John Keeping)
-Date: Fri, 24 Feb 2017 12:54:47 +0000
-Subject: [PATCH v4 04/23] drm/rockchip: dw-mipi-dsi: fix command header writes
+Date: Fri, 24 Feb 2017 12:54:56 +0000
+Subject: [PATCH v4 13/23] drm/rockchip: dw-mipi-dsi: fix escape clock rate
 In-Reply-To: <20170224125506.21533-1-john@metanate.com>
 References: <20170224125506.21533-1-john@metanate.com>
-Message-ID: <20170224125506.21533-5-john@metanate.com>
+Message-ID: <20170224125506.21533-14-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a couple of places here we use "val" for the value that is about to
-be written to a register but then reuse the same variable for the value
-of a status register before we get around to writing it.  Rename the
-value to be written to so that we write the value we intend to and not
-what we have just read from the status register.
+This clock rate is derived from the PHY PLL, so it should be calculated
+dynamically.  This calculation is the same as that used by the vendor
+kernel and ensures that the escape clock runs at <20MHz as required by
+the MIPI specification.
 
 Signed-off-by: John Keeping <john@metanate.com>
-Tested-by: Chris Zhong <zyw@rock-chips.com>
 Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 Reviewed-by: Sean Paul <seanpaul@chromium.org>
 ---
 v4:
+- Add a comment explaining the calculation and reword the commit message
+  so that the calculation doesn't seem so magical
 - Add Sean's Reviewed-by
-Unchanged in v3
+v3:
+- Improve the commit message a bit
+- Add Chris' Reviewed-by
 Unchanged in v2
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index bd92e58b64f3..4cbbbcb619b7 100644
+index 4201a2143295..0f9be41f0361 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -542,9 +542,10 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
- 	return 0;
+@@ -712,11 +712,21 @@ static void dw_mipi_dsi_disable(struct dw_mipi_dsi *dsi)
+ 
+ static void dw_mipi_dsi_init(struct dw_mipi_dsi *dsi)
+ {
++	/*
++	 * The maximum permitted escape clock is 20MHz and it is derived from
++	 * lanebyteclk, which is running at "lane_mbps / 8".  Thus we want:
++	 *
++	 *     (lane_mbps >> 3) / esc_clk_division < 20
++	 * which is:
++	 *     (lane_mbps >> 3) / 20 > esc_clk_division
++	 */
++	u32 esc_clk_division = (dsi->lane_mbps >> 3) / 20 + 1;
++
+ 	dsi_write(dsi, DSI_PWR_UP, RESET);
+ 	dsi_write(dsi, DSI_PHY_RSTZ, PHY_DISFORCEPLL | PHY_DISABLECLK
+ 		  | PHY_RSTZ | PHY_SHUTDOWNZ);
+ 	dsi_write(dsi, DSI_CLKMGR_CFG, TO_CLK_DIVIDSION(10) |
+-		  TX_ESC_CLK_DIVIDSION(7));
++		  TX_ESC_CLK_DIVIDSION(esc_clk_division));
  }
  
--static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 val)
-+static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- {
- 	int ret;
-+	u32 val;
- 
- 	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
- 				 val, !(val & GEN_CMD_FULL), 1000,
-@@ -554,7 +555,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 val)
- 		return ret;
- 	}
- 
--	dsi_write(dsi, DSI_GEN_HDR, val);
-+	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
- 
- 	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
- 				 val, val & (GEN_CMD_EMPTY | GEN_PLD_W_EMPTY),
-@@ -587,8 +588,9 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
- {
- 	const u32 *tx_buf = msg->tx_buf;
- 	int len = msg->tx_len, pld_data_bytes = sizeof(*tx_buf), ret;
--	u32 val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
-+	u32 hdr_val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
- 	u32 remainder = 0;
-+	u32 val;
- 
- 	if (msg->tx_len < 3) {
- 		dev_err(dsi->dev, "wrong tx buf length %zu for long write\n",
-@@ -617,7 +619,7 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
- 		}
- 	}
- 
--	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, val);
-+	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
- }
- 
- static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+ static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi,
 -- 
 2.12.0.rc0.230.gf625d4cdb9.dirty
