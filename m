@@ -1,71 +1,199 @@
-From: hias@horus.com (Matthias Reichl)
-Date: Sat, 25 Feb 2017 00:02:00 +0100
-Subject: [alsa-devel] [PATCH v8] ASoC: bcm2835: Add 8 channel
- (multitrack) capability
-In-Reply-To: <501e4af5-51b7-c124-4a29-ef5804d8a03c@flatmax.org>
-References: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
- <1487746600-11065-1-git-send-email-flatmax@flatmax.org>
- <20170224121832.GA19227@camel2.lan>
- <3b693ff9-b3a6-1c10-5b1a-78be04006113@flatmax.org>
- <20170224202553.GA28529@camel2.lan>
- <501e4af5-51b7-c124-4a29-ef5804d8a03c@flatmax.org>
-Message-ID: <20170224230159.GA30456@camel2.lan>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sat, 25 Feb 2017 00:25:32 +0100
+Subject: [PATCH v2 04/17] clocksource: Add Owl timer
+In-Reply-To: <20170224222921.GA23152@mai>
+References: <20170224034055.18807-1-afaerber@suse.de>
+ <20170224034055.18807-5-afaerber@suse.de> <20170224222921.GA23152@mai>
+Message-ID: <ab18d509-9fb2-1b4c-bdee-e2ce5d4273a3@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 25, 2017 at 08:30:03AM +1100, Matt Flax wrote:
+Am 24.02.2017 um 23:29 schrieb Daniel Lezcano:
+> On Fri, Feb 24, 2017 at 04:40:42AM +0100, Andreas F?rber wrote:
+>> Implement clocksource and clockevents for Actions Semi S500.
+>>
+>> Based on LeMaker linux-actions tree.
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > 
-> 
-> On 25/02/17 07:25, Matthias Reichl wrote:
-> 
-> >I'd put it in another way: it seems to me that the bcm2835 I2S
-> >won't reliably sync in DSP mode A.
-> >
-> >
-> 
-> What you are explaining here is the nature of the BCM2835 responding to a
-> codec master. The hardware setup you are describing is elegantly simple, but
-> TOO simple.
+> As this is a new driver, please give some technical information about the
+> driver itself and a pointer to documentation if it is publicly available.
 
-Your patch only changes the CPU DAI driver. At this point it doesn't
-matter if the codec or an external source is driving the clocks.
+What technical information would that be? Which of the timers we use as
+clock source vs. clock events?
 
-If the clock timing adheres to DSP mode A timing and you add code
-to the the CPU DAI driver so it can operate in DSP mode A then
-that should also work. If not, it's broken.
+The only public documentation beyond the source tree mentioned is here:
 
-The (rather brief) publically available bcm2835 datasheet only
-mentions I2S mode and my tests lead me to the conclusion that the
-bcm2835 is actually expecting I2S timing, not DSP A - at least with
-the current code.
+http://www.lemaker.org/product-guitar-download-29.html (section 3.4)
 
-> Measurements on a system which uses a codec master don't represent a robust
-> implementation of multichannel with the BCM2835. My experiments (and now
-> yours) have shown that the system has a bit shift and an uncontrollable
-> channel drift.
+>> +#define OWL_Tx_CTL_INTEN	(1 << 1)
+>> +#define OWL_Tx_CTL_EN		(1 << 2)
 > 
-> Multichannel simply can't be done (on the BCM2835) without control at the
-> hardware level - this requires an intermediate master control chip.
->
-> The Audio Injector Octo machine driver, sets both the codec and the BCM2835
-> as slaves - the FPGA is master because it has to control both the BCM2835
-> and the codec's systems to get reliability. You can see the machine driver
-> on github :
-> https://github.com/flatmax/linux/blob/rpi-4.4.y/sound/soc/bcm/audioinjector-octo-soundcard.c
-> 
-> It has taken month to implement a robust solution to this problem using an
-> FPGA and the result is a fantastic (Audio Injector Octo) sound card. I am
-> almost certain this hardware technique can be used on all stereo I2S SoC
-> chips.
+> s/(1 << 1)/BIT(1)/
+> s/(1 << 2)/BIT(2)/
 
-Can you please provide details about the timing / protocol you are
-actually using?
+OK
 
-so long,
+>> +
+>> +static void __iomem *owl_timer_base;
+>> +
+>> +static u64 notrace owl_timer_sched_read(void)
+>> +{
+>> +	return (u64)readl(owl_timer_base + OWL_T0_VAL);
+>> +}
+>> +
+>> +static int owl_timer_set_state_shutdown(struct clock_event_device *evt)
+>> +{
+>> +	writel(0, owl_timer_base + OWL_T1_CTL);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int owl_timer_set_state_oneshot(struct clock_event_device *evt)
+>> +{
+>> +	writel(0, owl_timer_base + OWL_T1_CTL);
+>> +	writel(0, owl_timer_base + OWL_T1_VAL);
+>> +	writel(0, owl_timer_base + OWL_T1_CMP);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int owl_timer_tick_resume(struct clock_event_device *evt)
+>> +{
+>> +	return 0;
+>> +}
+>> +
+>> +static int owl_timer_set_next_event(unsigned long evt,
+>> +				    struct clock_event_device *ev)
+>> +{
+>> +	writel(0, owl_timer_base + OWL_T1_CTL);
+>> +
+>> +	writel(0, owl_timer_base + OWL_T1_VAL);
+>> +	writel(evt, owl_timer_base + OWL_T1_CMP);
+>> +
+>> +	writel(OWL_Tx_CTL_EN | OWL_Tx_CTL_INTEN, owl_timer_base + OWL_T1_CTL);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static struct clock_event_device owl_clockevent = {
+>> +	.name			= "owl_tick",
+>> +	.rating			= 200,
+>> +	.features		= CLOCK_EVT_FEAT_ONESHOT,
+> 
+> Did you consider adding CLOCK_EVT_FEAT_DYNIRQ ?
 
-Hias
+No, it was not present downstream. Got a good example?
 
+>> +	.set_state_shutdown	= owl_timer_set_state_shutdown,
+>> +	.set_state_oneshot	= owl_timer_set_state_oneshot,
+>> +	.tick_resume		= owl_timer_tick_resume,
+>> +	.set_next_event		= owl_timer_set_next_event,
+>> +};
+>> +
+>> +static irqreturn_t owl_timer_interrupt(int irq, void *dev_id)
+>> +{
+>> +	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
+>> +
+>> +	evt->event_handler(evt);
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>> +
+>> +static struct irqaction owl_timer_irq = {
+>> +	.name = "owl-timer",
+>> +	.flags = IRQF_TIMER,
+>> +	.handler = owl_timer_interrupt,
+>> +	.dev_id = &owl_clockevent,
+>> +};
+>> +
+>> +static int __init owl_timer_init(struct device_node *node)
+>> +{
+>> +	const unsigned long rate = 24000000;
 > 
+> Use DT, either use clock-frequency or a clock ref.
+
+Are clk drivers really available at this point? clock-frequency sounds
+more promising.
+
+>> +	int irq1, ret;
+>> +
+>> +	owl_timer_base = of_io_request_and_map(node, 0, "owl-timer");
+>> +	if (IS_ERR(owl_timer_base)) {
+>> +		pr_err("Can't map timer registers");
+>> +		return -ENXIO;
 > 
-> Matt
+> Why not PTR_ERR(owl_timer_base) ?
+
+Only one in-tree driver (sun5i) matches such an expression. Will change.
+
+>> +	}
+>> +
+>> +	irq1 = irq_of_parse_and_map(node, 1);
+>> +	if (irq1 <= 0) {
+>> +		pr_err("Can't parse timer1 IRQ");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	writel(0, owl_timer_base + OWL_T0_CTL);
+>> +	writel(0, owl_timer_base + OWL_T0_VAL);
+>> +	writel(0, owl_timer_base + OWL_T0_CMP);
+>> +	writel(OWL_Tx_CTL_EN, owl_timer_base + OWL_T0_CTL);
 > 
+> Please factor out these calls into a function.
+
+Do you have something in particular in mind? Maybe ..._reset() for the
+first three?
+
+>> +
+>> +	sched_clock_register(owl_timer_sched_read, 32, rate);
+>> +	clocksource_mmio_init(owl_timer_base + OWL_T0_VAL, node->name,
+>> +			      rate, 200, 32, clocksource_mmio_readl_up);
+>> +
+>> +	writel(0, owl_timer_base + OWL_T1_CTL);
+>> +	writel(0, owl_timer_base + OWL_T1_VAL);
+>> +	writel(0, owl_timer_base + OWL_T1_CMP);
+>> +
+>> +	ret = setup_irq(irq1, &owl_timer_irq);
+>> +	if (ret) {
+>> +		pr_warn("failed to setup irq %d\n", irq1);
+>> +		return ret;
+>> +	}
+> 
+> s/setup_irq/request_irq/
+
+Care to explain? setup_irq has 32 hits vs. 28 for request_irq.
+
+>> +
+>> +	owl_clockevent.cpumask = cpumask_of(0);
+>> +	owl_clockevent.irq = irq1;
+>> +
+>> +	clockevents_config_and_register(&owl_clockevent, rate,
+>> +					0xf, 0xffffffff);
+>> +
+>> +	return 0;
+>> +}
+>> +CLOCKSOURCE_OF_DECLARE(owl, "actions,owl-timer", owl_timer_init);
+
+Do you spot anything functionally wrong in this driver? Despite adding
+this new driver, I am only getting the following additional earlycon output:
+
+[    0.000029] sched_clock: 32 bits at 24MHz, resolution 41ns, wraps
+every 89478484971ns
+[    0.007888] clocksource: timer: mask: 0xffffffff max_cycles:
+0xffffffff, max_idle_ns: 79635851949 ns
+[    0.017748] Console: colour dummy device 80x30
+[    0.022243] Calibrating delay loop...
+[    0.030895] random: fast init done
+[    0.231021] random: crng init done
+
+For S900 I'm using the generic timer instead.
+
+Thanks for your review,
+
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
