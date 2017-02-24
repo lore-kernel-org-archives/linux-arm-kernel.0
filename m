@@ -1,14 +1,16 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 24 Feb 2017 15:36:08 +0000
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Feb 2017 15:36:44 +0000
 Subject: [PATCH v2] efi/libstub/arm*: Set default address and size cells
  values for an empty dtb
 In-Reply-To: <1486502360-18071-1-git-send-email-jhugo@codeaurora.org>
 References: <1486502360-18071-1-git-send-email-jhugo@codeaurora.org>
-Message-ID: <b901a792-5ca0-1489-6dcf-b17a66920bc6@arm.com>
+Message-ID: <20170224153644.GE417@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/02/17 21:19, Jeffrey Hugo wrote:
+Hi,
+
+On Tue, Feb 07, 2017 at 02:19:20PM -0700, Jeffrey Hugo wrote:
 > From: Sameer Goel <sgoel@codeaurora.org>
 > 
 > In cases where a device tree is not provided (ie ACPI based system), an
@@ -26,16 +28,24 @@ On 07/02/17 21:19, Jeffrey Hugo wrote:
 > 
 > Setting #address-cells and #size-cells to 2 at creation of the empty fdt
 > resolves the observed issue, and makes the fdt less fragile.
-
-Hang on, if this code is shared with 32-bit ARM, doesn't this just move
-the problem around? If arm64 kexec is blindly punting reg properties
-into a DT assuming *-cells == 2, then wouldn't ARM kexec likely be doing
-the same relying on *-cells == 1?
-
-Robin.
-
+> 
 > Signed-off-by: Sameer Goel <sgoel@codeaurora.org>
 > Signed-off-by: Jeffrey Hugo <jhugo@codeaurora.org>
+
+Technically the kdump ABI isn't set in stone yet, and this isn't a
+problem until that goes in.
+
+So while this generally looks ok, it's possible that this may be
+unnecessary, and on reflection I do symptahise with Ard's earlier
+comment that this shouldn't otherwise be necessary for the empty dt.
+
+So I'd prefer if this were folded into the kdump series if it's
+necessary. That way this goes in if it's necessary, and we can drop it
+otherwise.
+
+Thanks,
+Mark.
+
 > ---
 > 
 > [v2]
@@ -95,4 +105,8 @@ Robin.
 >  
 >  	if (status != 0)
 >  		goto fdt_set_fail;
+> -- 
+> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the
+> Code Aurora Forum, a Linux Foundation Collaborative Project.
 > 
