@@ -1,57 +1,33 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 24 Feb 2017 16:42:31 -0300
-Subject: [PATCH 2/2] media: s5p-mfc: fix MMAP of mfc buffer during reqbufs
-In-Reply-To: <1481888915-19624-3-git-send-email-pankaj.dubey@samsung.com>
-References: <1481888915-19624-1-git-send-email-pankaj.dubey@samsung.com>
- <1481888915-19624-3-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <81c11e69-b7eb-ccb5-a377-2848ec551274@osg.samsung.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Fri, 24 Feb 2017 22:57:31 +0300
+Subject: [PATCH] staging: bcm2835: Fix a memory leak in error handling path
+In-Reply-To: <6585ca42-71f4-1517-c6fc-b9ed2f23c687@i2se.com>
+References: <20170219103412.10092-1-christophe.jaillet@wanadoo.fr>
+ <6585ca42-71f4-1517-c6fc-b9ed2f23c687@i2se.com>
+Message-ID: <20170224195731.GB4480@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Pankaj,
-
-On 12/16/2016 08:48 AM, Pankaj Dubey wrote:
-> From: Smitha T Murthy <smitha.t@samsung.com>
+On Fri, Feb 24, 2017 at 01:37:30PM +0100, Stefan Wahren wrote:
+> Hi Christophe,
 > 
-> It has been observed on ARM64 based Exynos SoC, if IOMMU is not enabled
-> and we try to use reserved memory for MFC, reqbufs fails with below
-> mentioned error
-> ---------------------------------------------------------------------------
-> V4L2 Codec decoding example application
-> Kamil Debski <k.debski@samsung.com>
-> Copyright 2012 Samsung Electronics Co., Ltd.
-> 
-> Opening MFC.
-> (mfc.c:mfc_open:58): MFC Info (/dev/video0): driver="s5p-mfc" \
-> bus_info="platform:12c30000.mfc0" card="s5p-mfc-dec" fd=0x4[
-> 42.339165] Remapping memory failed, error: -6
-> 
-> MFC Open Success.
-> (main.c:main:711): Successfully opened all necessary files and devices
-> (mfc.c:mfc_dec_setup_output:103): Setup MFC decoding OUTPUT buffer \
-> size=4194304 (requested=4194304)
-> (mfc.c:mfc_dec_setup_output:120): Number of MFC OUTPUT buffers is 2 \
-> (requested 2)
-> 
-> [App] Out buf phy : 0x00000000, virt : 0xffffffff
-> Output Length is = 0x300000
-> Error (mfc.c:mfc_dec_setup_output:145): Failed to MMAP MFC OUTPUT buffer
-> -------------------------------------------------------------------------
-> This is because the device requesting for memory is mfc0.left not the parent mfc0.
-> Hence setting of alloc_devs need to be done only if IOMMU is enabled
-> and in that case both the left and right device is treated as mfc0 only.
+> Am 19.02.2017 um 11:34 schrieb Christophe JAILLET:
+> >If 'kzalloc()' fails, we should release resources allocated so far, just as
+> >done in all other cases in this function.
+> >
+> >Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+> >---
+> >Not sure that the error handling path is correct.
+> >Is 'gdev[0]' freed? Should it be?
 > 
 
-I see, so likely you were facing the issue described in patch 1/2 after this
-patch since the driver doesn't set alloc_devs when IOMMU is disabled, right?
+Yes, but I already sent a patch to fix this and your leak as well and
+Greg merged it.
 
-In any case, I guess these patches have been superseded by Marek's series[0]
-so they are no longer needed?
+> sorry, didn't checked your patch yet.
 
-[0]: https://www.spinics.net/lists/linux-media/msg111156.html
+It takes like 30 seconds to review this patch.  Do you use mutt?  I have
+a macro that applies patches and loads vim at the right line.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+regards,
+dan carpenter
