@@ -1,51 +1,47 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 24 Feb 2017 07:56:18 -0600
-Subject: [PATCH 0/8] ARM: sun8i: a33: Mali improvements
-In-Reply-To: <1c13f7a8-b355-b985-c02f-a50bebfc86a7@math.uni-bielefeld.de>
-References: <10fd28cb-269a-ec38-ecfb-b7c86be3e716@math.uni-bielefeld.de>
- <20170216184524.cxcy2ux37yrwutla@lukather>
- <2cecfc48-576f-3888-08aa-1fe2edc3c752@math.uni-bielefeld.de>
- <20170217154219.d4z2gylzcrzntlt3@piout.net>
- <1c13f7a8-b355-b985-c02f-a50bebfc86a7@math.uni-bielefeld.de>
-Message-ID: <CAL_JsqKYSKnYzddh+utr9BUth60xVM7fGN_6yxk3tuGTNabUmg@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 24 Feb 2017 14:59:26 +0100
+Subject: [PATCH v4 0/2] arm64: dts: r8a7795: Add Cortex-A53 CPU cores and PMU
+Message-ID: <1487944768-31983-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 17, 2017 at 9:56 AM, Tobias Jakobi
-<tjakobi@math.uni-bielefeld.de> wrote:
-> Alexandre Belloni wrote:
->> On 17/02/2017 at 13:45:44 +0100, Tobias Jakobi wrote:
->>>> The device tree is a representation of the hardware itself. The state
->>>> of the driver support doesn't change the hardware you're running on,
->>>> just like your BIOS/UEFI on x86 won't change the device it reports to
->>>> Linux based on whether it has a driver for it.
->>> Like Emil already said, the new bindings and the DT entries are solely
->>> introduced to support a proprietary out-of-tree module.
->>>
->>
->> Because device tree describes the hardware, the added binding doesn't
->> support any particular module. The eventually upstreamed drvier will
->> share the same bindings.
-> OK, can we then agree that we _only_ merge the bindings and the entries,
-> once this driver is upstream?
+	Hi Simon, Magnus,
 
-Absolutely not.
+This patch series adds the Cortex-A53 CPU cores and PMU on the Renesas
+R-Car H3 SoC to its DTS file.
 
-> Driver upstreaming and DT work go hand-in-hand. It's usually after a lot
-> of discussion that new bindings get finalised. And for that discussion
-> to happen we need to know how the driver uses the information from the
-> DT. Otherwise we have no way to evaluate if the description is in any
-> way "appropriate".
->
-> And no, I don't follow the "DT is a separate/independent thing" thought.
-> It maybe is in an ideal world, but we've seen it now often enough that
-> bindings turned out to be poorly designed, even though they looked fine
-> at first.
+Note that these patches describes the hardware; actual enabling of the
+CPU depends on the PSCI firmware.
 
-Certainly, that happens (though arguably that was more often from lack
-of review). But this one is self contained, using standard, existing
-properties. I'm not worried about us getting it right. If this was
-something new or different, then certainly yes I would want to see the
-code.
+With the current firmware version (v2.16.0), only the CA57 CPU cores are
+enabled, hence these patches do not introduce undeterministic scheduling
+behavior due to migration between big and LITTLE cores.
 
-Rob
+Changes compared to v3:
+  - Drop bogus links from the pmu_a57 node to the CA53 nodes,
+  - Add Cortex-A53 PMU node.
+
+Tested on r8a7795/salvator-x, with CPU hot(un)plug and system suspend.
+
+Thanks for applying!
+
+Geert Uytterhoeven (2):
+  arm64: dts: r8a7795: Add Cortex-A53 CPU cores
+  arm64: dts: r8a7795: Add Cortex-A53 PMU node
+
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 58 +++++++++++++++++++++++++++++---
+ 1 file changed, 53 insertions(+), 5 deletions(-)
+
+-- 
+2.7.4
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
