@@ -1,80 +1,174 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 24 Feb 2017 14:05:56 -0800
-Subject: [PATCH 5/7] watchdog: s3c2410: Constify local structures
-In-Reply-To: <20170224210746.12459-5-krzk@kernel.org>
-References: <20170224210746.12459-1-krzk@kernel.org>
- <20170224210746.12459-5-krzk@kernel.org>
-Message-ID: <7100fd29-a21d-25c0-b989-644e1358b34b@roeck-us.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 24 Feb 2017 23:29:22 +0100
+Subject: [PATCH v2 04/17] clocksource: Add Owl timer
+In-Reply-To: <20170224034055.18807-5-afaerber@suse.de>
+References: <20170224034055.18807-1-afaerber@suse.de>
+ <20170224034055.18807-5-afaerber@suse.de>
+Message-ID: <20170224222921.GA23152@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/24/2017 01:07 PM, Krzysztof Kozlowski wrote:
-> Structures watchdog_device, watchdog_ops and s3c2410_wdt_variant are not
-> modified so they can be made const to increase code safeness.
->
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+On Fri, Feb 24, 2017 at 04:40:42AM +0100, Andreas F?rber wrote:
+> Implement clocksource and clockevents for Actions Semi S500.
+> 
+> Based on LeMaker linux-actions tree.
+> 
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
 
-Conflicts with "watchdog: constify watchdog_ops structures" in my tree.
-I rebased my tree to v4.10 (which I should not really have done ;-), but
-it still doesn't apply due to "fatal: sha1 information is lacking or useless"
-and "error: could not build fake ancestor". The subsequent patches also don't
-apply. You may have to wait until after -rc1, rebase your patches, and
-resubmit.
+As this is a new driver, please give some technical information about the
+driver itself and a pointer to documentation if it is publicly available.
 
-Guenter
+[ ... ]
 
-> ---
->  drivers/watchdog/s3c2410_wdt.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-> index a031842ffcb0..5eaec319e499 100644
-> --- a/drivers/watchdog/s3c2410_wdt.c
-> +++ b/drivers/watchdog/s3c2410_wdt.c
-> @@ -131,7 +131,7 @@ struct s3c2410_wdt {
->  	unsigned long		wtdat_save;
->  	struct watchdog_device	wdt_device;
->  	struct notifier_block	freq_transition;
-> -	struct s3c2410_wdt_variant *drv_data;
-> +	const struct s3c2410_wdt_variant *drv_data;
->  	struct regmap *pmureg;
->  };
->
-> @@ -392,7 +392,7 @@ static const struct watchdog_info s3c2410_wdt_ident = {
->  	.identity         =	"S3C2410 Watchdog",
->  };
->
-> -static struct watchdog_ops s3c2410wdt_ops = {
-> +static const struct watchdog_ops s3c2410wdt_ops = {
->  	.owner = THIS_MODULE,
->  	.start = s3c2410wdt_start,
->  	.stop = s3c2410wdt_stop,
-> @@ -401,7 +401,7 @@ static struct watchdog_ops s3c2410wdt_ops = {
->  	.restart = s3c2410wdt_restart,
->  };
->
-> -static struct watchdog_device s3c2410_wdd = {
-> +static const struct watchdog_device s3c2410_wdd = {
->  	.info = &s3c2410_wdt_ident,
->  	.ops = &s3c2410wdt_ops,
->  	.timeout = S3C2410_WATCHDOG_DEFAULT_TIME,
-> @@ -507,15 +507,15 @@ static inline unsigned int s3c2410wdt_get_bootstatus(struct s3c2410_wdt *wdt)
->  	return 0;
->  }
->
-> -static inline struct s3c2410_wdt_variant *
-> +static inline const struct s3c2410_wdt_variant *
->  s3c2410_get_wdt_drv_data(struct platform_device *pdev)
->  {
->  	if (pdev->dev.of_node) {
->  		const struct of_device_id *match;
->  		match = of_match_node(s3c2410_wdt_match, pdev->dev.of_node);
-> -		return (struct s3c2410_wdt_variant *)match->data;
-> +		return (const struct s3c2410_wdt_variant *)match->data;
->  	} else {
-> -		return (struct s3c2410_wdt_variant *)
-> +		return (const struct s3c2410_wdt_variant *)
->  			platform_get_device_id(pdev)->driver_data;
->  	}
->  }
->
+> +#define OWL_T0_CMP		0x0c
+> +#define OWL_T0_VAL		0x10
+> +#define OWL_T1_CTL		0x14
+> +#define OWL_T1_CMP		0x18
+> +#define OWL_T1_VAL		0x1c
+> +
+> +#define OWL_Tx_CTL_INTEN	(1 << 1)
+> +#define OWL_Tx_CTL_EN		(1 << 2)
+
+s/(1 << 1)/BIT(1)/
+s/(1 << 2)/BIT(2)/
+
+> +
+> +static void __iomem *owl_timer_base;
+> +
+> +static u64 notrace owl_timer_sched_read(void)
+> +{
+> +	return (u64)readl(owl_timer_base + OWL_T0_VAL);
+> +}
+> +
+> +static int owl_timer_set_state_shutdown(struct clock_event_device *evt)
+> +{
+> +	writel(0, owl_timer_base + OWL_T1_CTL);
+> +
+> +	return 0;
+> +}
+> +
+> +static int owl_timer_set_state_oneshot(struct clock_event_device *evt)
+> +{
+> +	writel(0, owl_timer_base + OWL_T1_CTL);
+> +	writel(0, owl_timer_base + OWL_T1_VAL);
+> +	writel(0, owl_timer_base + OWL_T1_CMP);
+> +
+> +	return 0;
+> +}
+> +
+> +static int owl_timer_tick_resume(struct clock_event_device *evt)
+> +{
+> +	return 0;
+> +}
+> +
+> +static int owl_timer_set_next_event(unsigned long evt,
+> +				    struct clock_event_device *ev)
+> +{
+> +	writel(0, owl_timer_base + OWL_T1_CTL);
+> +
+> +	writel(0, owl_timer_base + OWL_T1_VAL);
+> +	writel(evt, owl_timer_base + OWL_T1_CMP);
+> +
+> +	writel(OWL_Tx_CTL_EN | OWL_Tx_CTL_INTEN, owl_timer_base + OWL_T1_CTL);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct clock_event_device owl_clockevent = {
+> +	.name			= "owl_tick",
+> +	.rating			= 200,
+> +	.features		= CLOCK_EVT_FEAT_ONESHOT,
+
+Did you consider adding CLOCK_EVT_FEAT_DYNIRQ ?
+
+> +	.set_state_shutdown	= owl_timer_set_state_shutdown,
+> +	.set_state_oneshot	= owl_timer_set_state_oneshot,
+> +	.tick_resume		= owl_timer_tick_resume,
+> +	.set_next_event		= owl_timer_set_next_event,
+> +};
+> +
+> +static irqreturn_t owl_timer_interrupt(int irq, void *dev_id)
+> +{
+> +	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
+> +
+> +	evt->event_handler(evt);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static struct irqaction owl_timer_irq = {
+> +	.name = "owl-timer",
+> +	.flags = IRQF_TIMER,
+> +	.handler = owl_timer_interrupt,
+> +	.dev_id = &owl_clockevent,
+> +};
+> +
+> +static int __init owl_timer_init(struct device_node *node)
+> +{
+> +	const unsigned long rate = 24000000;
+
+Use DT, either use clock-frequency or a clock ref.
+
+> +	int irq1, ret;
+> +
+> +	owl_timer_base = of_io_request_and_map(node, 0, "owl-timer");
+> +	if (IS_ERR(owl_timer_base)) {
+> +		pr_err("Can't map timer registers");
+> +		return -ENXIO;
+
+Why not PTR_ERR(owl_timer_base) ?
+
+> +	}
+> +
+> +	irq1 = irq_of_parse_and_map(node, 1);
+> +	if (irq1 <= 0) {
+> +		pr_err("Can't parse timer1 IRQ");
+> +		return -EINVAL;
+> +	}
+> +
+> +	writel(0, owl_timer_base + OWL_T0_CTL);
+> +	writel(0, owl_timer_base + OWL_T0_VAL);
+> +	writel(0, owl_timer_base + OWL_T0_CMP);
+> +	writel(OWL_Tx_CTL_EN, owl_timer_base + OWL_T0_CTL);
+
+Please factor out these calls into a function.
+
+> +
+> +	sched_clock_register(owl_timer_sched_read, 32, rate);
+> +	clocksource_mmio_init(owl_timer_base + OWL_T0_VAL, node->name,
+> +			      rate, 200, 32, clocksource_mmio_readl_up);
+> +
+> +	writel(0, owl_timer_base + OWL_T1_CTL);
+> +	writel(0, owl_timer_base + OWL_T1_VAL);
+> +	writel(0, owl_timer_base + OWL_T1_CMP);
+> +
+> +	ret = setup_irq(irq1, &owl_timer_irq);
+> +	if (ret) {
+> +		pr_warn("failed to setup irq %d\n", irq1);
+> +		return ret;
+> +	}
+
+s/setup_irq/request_irq/
+
+> +
+> +	owl_clockevent.cpumask = cpumask_of(0);
+> +	owl_clockevent.irq = irq1;
+> +
+> +	clockevents_config_and_register(&owl_clockevent, rate,
+> +					0xf, 0xffffffff);
+> +
+> +	return 0;
+> +}
+> +CLOCKSOURCE_OF_DECLARE(owl, "actions,owl-timer", owl_timer_init);
+
+Thanks !
+
+  -- Daniel 
+
+-- 
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
