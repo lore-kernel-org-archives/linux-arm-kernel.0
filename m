@@ -1,508 +1,138 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 24 Feb 2017 12:07:11 -0700
-Subject: [PATCH v1 2/2] coresight: add support for debug module
-In-Reply-To: <1487815067-27511-3-git-send-email-leo.yan@linaro.org>
-References: <1487815067-27511-1-git-send-email-leo.yan@linaro.org>
- <1487815067-27511-3-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170224190711.GA12355@linaro.org>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Fri, 24 Feb 2017 11:15:51 -0800
+Subject: [WARNING: A/V UNSCANNABLE][Merge tag 'media/v4.11-1' of git]
+ ff58d005cd: BUG: unable to handle kernel NULL pointer dereference at 0000039c
+In-Reply-To: <58b07b30.9XFLj9Hhl7F6HMc2%fengguang.wu@intel.com>
+References: <58b07b30.9XFLj9Hhl7F6HMc2%fengguang.wu@intel.com>
+Message-ID: <CA+55aFytXj+TZ_TanbxcY0KgRTrV7Vvr=fWON8tioUGmYHYiNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 23, 2017 at 09:57:47AM +0800, Leo Yan wrote:
-> Coresight includes debug module and usually the module connects with CPU
-> debug logic. ARMv8 architecture reference manual (ARM DDI 0487A.k) has
-> description for related info in "Part H: External Debug".
-> 
-> Chapter H7 "The Sample-based Profiling Extension" introduces several
-> sampling registers, e.g. we can check program counter value with
-> combined CPU exception level, secure state, etc. So this is helpful for
-> analysis CPU lockup scenarios, e.g. if one CPU has run into infinite
-> loop with IRQ disabled. In this case the CPU cannot switch context and
-> handle any interrupt (including IPIs), as the result it cannot handle
-> SMP call for stack dump.
-> 
-> This patch is to enable coresight debug module, so firstly this driver
-> is to enable clocks for debug module and this is to ensure the debug
-> module can be accessed from program or external debugger. And the driver
-> uses sample-based registers for debug purpose, e.g. when system detects
-> the CPU lockup and trigger panic, the driver will dump program counter
-> and combined context registers (EDCIDSR, EDVIDSR); by parsing context
-> registers so can quickly get to know CPU secure state, exception level,
-> etc.
-> 
-> Some of the debug module registers are located in CPU power domain, so
-> in the driver it has checked the power state for CPU before accessing
-> registers within CPU power domain. For most safe way to use this driver,
-> it's suggested to disable CPU low power states, this can simply set
-> "nohlt" in kernel command line.
-> 
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> ---
->  drivers/hwtracing/coresight/Kconfig           |  10 +
->  drivers/hwtracing/coresight/Makefile          |   1 +
->  drivers/hwtracing/coresight/coresight-debug.c | 396 ++++++++++++++++++++++++++
->  3 files changed, 407 insertions(+)
->  create mode 100644 drivers/hwtracing/coresight/coresight-debug.c
-> 
-> diff --git a/drivers/hwtracing/coresight/Kconfig b/drivers/hwtracing/coresight/Kconfig
-> index 130cb21..2c8883b 100644
-> --- a/drivers/hwtracing/coresight/Kconfig
-> +++ b/drivers/hwtracing/coresight/Kconfig
-> @@ -89,4 +89,14 @@ config CORESIGHT_STM
->  	  logging useful software events or data coming from various entities
->  	  in the system, possibly running different OSs
->  
-> +config CORESIGHT_DEBUG
-> +	bool "CoreSight debug driver"
-> +	depends on ARM || ARM64
-> +	help
-> +	  This driver provides support for coresight debugging module. This
-> +	  is primarily used to dump sample-based profiling registers for
-> +	  panic. By disable CPU low power states (like "nohlt" in kernel
-> +	  command line), this is more safe and avoid lockup issue when
-> +	  access debug module registers.
-> +
->  endif
-> diff --git a/drivers/hwtracing/coresight/Makefile b/drivers/hwtracing/coresight/Makefile
-> index af480d9..d540d45 100644
-> --- a/drivers/hwtracing/coresight/Makefile
-> +++ b/drivers/hwtracing/coresight/Makefile
-> @@ -16,3 +16,4 @@ obj-$(CONFIG_CORESIGHT_SOURCE_ETM4X) += coresight-etm4x.o \
->  					coresight-etm4x-sysfs.o
->  obj-$(CONFIG_CORESIGHT_QCOM_REPLICATOR) += coresight-replicator-qcom.o
->  obj-$(CONFIG_CORESIGHT_STM) += coresight-stm.o
-> +obj-$(CONFIG_CORESIGHT_DEBUG) += coresight-debug.o
-> diff --git a/drivers/hwtracing/coresight/coresight-debug.c b/drivers/hwtracing/coresight/coresight-debug.c
-> new file mode 100644
-> index 0000000..a109fef
-> --- /dev/null
-> +++ b/drivers/hwtracing/coresight/coresight-debug.c
-> @@ -0,0 +1,396 @@
-> +/*
-> + * Copyright (c) 2017 Linaro Limited. All rights reserved.
-> + *
-> + * Author: Leo Yan <leo.yan@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published by
-> + * the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + *
-> + */
-> +#include <linux/amba/bus.h>
-> +#include <linux/coresight.h>
-> +#include <linux/cpu.h>
-> +#include <linux/device.h>
-> +#include <linux/err.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/moduleparam.h>
-> +#include <linux/slab.h>
-> +#include <linux/smp.h>
-> +#include <linux/types.h>
-> +#include <linux/uaccess.h>
-> +
-> +#include "coresight-priv.h"
-> +
-> +#define EDPCSR				0x0A0
-> +#define EDCIDSR				0x0A4
-> +#define EDVIDSR				0x0A8
-> +#define EDPCSR_HI			0x0AC
-> +#define EDOSLAR				0x300
-> +#define EDPRSR				0x314
-> +#define EDDEVID1			0xFC4
-> +#define EDDEVID				0xFC8
-> +
-> +#define EDPCSR_PROHIBITED		0xFFFFFFFF
-> +
-> +/* bits definition for EDPCSR */
-> +#ifndef CONFIG_64BIT
-> +#define EDPCSR_THUMB			BIT(0)
-> +#define EDPCSR_ARM_INST_MASK		GENMASK(31, 2)
-> +#define EDPCSR_THUMB_INST_MASK		GENMASK(31, 1)
-> +#endif
-> +
-> +/* bits definition for EDPRSR */
-> +#define EDPRSR_DLK			BIT(6)
-> +#define EDPRSR_PU			BIT(0)
-> +
-> +/* bits definition for EDVIDSR */
-> +#define EDVIDSR_NS			BIT(31)
-> +#define EDVIDSR_E2			BIT(30)
-> +#define EDVIDSR_E3			BIT(29)
-> +#define EDVIDSR_HV			BIT(28)
-> +#define EDVIDSR_VMID			GENMASK(7, 0)
-> +
-> +/* bits definition for EDDEVID1 */
-> +#define EDDEVID1_PCSR_OFFSET_MASK	GENMASK(3, 0)
-> +#define EDDEVID1_PCSR_OFFSET_INS_SET	(0x0)
-> +#define EDDEVID1_PCSR_NO_OFFSET		(0x1)
+Added more relevant people. I've debugged the immediate problem below,
+but I think there's another problem that actually triggered this.
 
-Hi Leo,
+On Fri, Feb 24, 2017 at 10:28 AM, kernel test robot
+<fengguang.wu@intel.com> wrote:
+>
+> 0day kernel testing robot got the below dmesg and the first bad commit is
+>
+> https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git master
+>
+> commit ff58d005cd10fcd372787cceac547e11cf706ff6
+> Merge: 5ab3566 9eeb0ed
+>
+>     Merge tag 'media/v4.11-1' of git://git.kernel.org/pub/scm/linux/kernel/git/mchehab/linux-media
+[...]
+> [    4.664940] rc rc0: lirc_dev: driver ir-lirc-codec (rc-loopback) registered at minor = 0
+> [    4.666322] BUG: unable to handle kernel NULL pointer dereference at 0000039c
+> [    4.666675] IP: serial_ir_irq_handler+0x189/0x410
 
-The above #define isn't used in the code - please remove.
+This merge being fingered ends up being a subtle interaction with other changes.
 
-> +
-> +/* bits definition for EDDEVID */
-> +#define EDDEVID_PCSAMPLE_MODE		GENMASK(3, 0)
-> +#define EDDEVID_IMPL_NONE		(0x0)
-> +#define EDDEVID_IMPL_EDPCSR_EDCIDSR	(0x2)
-> +#define EDDEVID_IMPL_FULL		(0x3)
-> +
-> +struct debug_drvdata {
-> +	void __iomem	*base;
-> +	struct device	*dev;
-> +	int		cpu;
-> +	struct clk	*dbg_clk;
-> +
-> +	bool		edpcsr_present;
-> +	bool		edvidsr_present;
-> +	bool		pc_has_offset;
-> +
-> +	u32		eddevid;
-> +	u32		eddevid1;
-> +
-> +	u32		edpcsr;
-> +	u32		edpcsr_hi;
-> +	u32		edprsr;
-> +	u32		edvidsr;
-> +	u32		edcidsr;
-> +};
-> +
-> +static int debug_count;
+Those "other changes" are (again) the interrupt retrigger code that
+was reverted for 4.10, and then we tried to merge them again this
+merge window.
 
-No need to make this global - please move this to debug_probe() 
+Because the immediate cause is:
 
-> +static DEFINE_PER_CPU(struct debug_drvdata *, debug_drvdata);
-> +
-> +static void debug_os_unlock(struct debug_drvdata *drvdata)
-> +{
-> +	/* Unlocks the debug registers */
-> +	writel_relaxed(0x0, drvdata->base + EDOSLAR);
-> +	wmb();
-> +}
-> +
-> +/*
-> + * According to ARM DDI 0487A.k, before access external debug
-> + * registers should firstly check the access permission; if any
-> + * below condition has been met then cannot access debug
-> + * registers to avoid lockup issue:
-> + *
-> + * - CPU power domain is powered off;
-> + * - The OS Double Lock is locked;
-> + *
-> + * By checking EDPRSR can get to know if meet these conditions.
-> + */
-> +static bool debug_access_permit(struct debug_drvdata *drvdata)
+> [    4.666675] EIP: serial_ir_irq_handler+0x189/0x410
+> [    4.666675] Call Trace:
+> [    4.666675]  <IRQ>
+> [    4.666675]  __handle_irq_event_percpu+0x57/0x100
+> [    4.666675]  handle_irq_event_percpu+0x1d/0x50
+> [    4.666675]  handle_irq_event+0x32/0x60
+> [    4.666675]  handle_edge_irq+0xa5/0x120
+> [    4.666675]  handle_irq+0x9d/0xd0
+> [    4.666675]  </IRQ>
+> [    4.666675]  do_IRQ+0x5f/0x130
+> [    4.666675]  common_interrupt+0x33/0x38
+> [    4.666675] EIP: hardware_init_port+0x3f/0x190
+> [    4.666675] EFLAGS: 00200246 CPU: 0
+> [    4.666675] EAX: c718990f EBX: 00000000 ECX: 00000000 EDX: 000003f9
+> [    4.666675] ESI: 000003f9 EDI: 000003f8 EBP: c0065d98 ESP: c0065d84
+> [    4.666675]  DS: 007b ES: 007b FS: 00d8 GS: 0000 SS: 0068
+> [    4.666675]  serial_ir_probe+0xbb/0x300
+> [    4.666675]  platform_drv_probe+0x48/0xb0
+...
 
-s/debug_access_permit/debug_access_permitted
+ie an interrupt came in immediately after the request_irq(), before
+all the data was properly set up, which then causes the interrupt
+handler to take a fault because it tries to access some field that
+hasn't even been set up yet.
 
-> +{
-> +	/* CPU is powered off */
-> +	if (!(drvdata->edprsr & EDPRSR_PU))
-> +		return false;
-> +
-> +	/* The OS Double Lock is locked */
-> +	if (drvdata->edprsr & EDPRSR_DLK)
-> +		return false;
-> +
-> +	return true;
-> +}
-> +
-> +static void debug_read_regs(struct debug_drvdata *drvdata)
-> +{
-> +	drvdata->edprsr = readl_relaxed(drvdata->base + EDPRSR);
-> +
-> +	if (!debug_access_permit(drvdata))
-> +		return;
-> +
-> +	if (!drvdata->edpcsr_present)
-> +		return;
-> +
-> +	CS_UNLOCK(drvdata->base);
-> +
-> +	debug_os_unlock(drvdata);
-> +
-> +	drvdata->edpcsr = readl_relaxed(drvdata->base + EDPCSR);
-> +
-> +	/*
-> +	 * As described in ARM DDI 0487A.k, if the processing
-> +	 * element (PE) is in debug state, or sample-based
-> +	 * profiling is prohibited, EDPCSR reads as 0xFFFFFFFF;
-> +	 * EDCIDSR, EDVIDSR and EDPCSR_HI registers also become
-> +	 * UNKNOWN state. So directly bail out for this case.
-> +	 */
-> +	if (drvdata->edpcsr == EDPCSR_PROHIBITED) {
-> +		CS_LOCK(drvdata->base);
-> +		return;
-> +	}
-> +
-> +	/*
-> +	 * A read of the EDPCSR normally has the side-effect of
-> +	 * indirectly writing to EDCIDSR, EDVIDSR and EDPCSR_HI;
-> +	 * at this point it's safe to read value from them.
-> +	 */
-> +	drvdata->edcidsr = readl_relaxed(drvdata->base + EDCIDSR);
-> +#ifdef CONFIG_64BIT
-> +	drvdata->edpcsr_hi = readl_relaxed(drvdata->base + EDPCSR_HI);
-> +#endif
-> +
-> +	if (drvdata->edvidsr_present)
-> +		drvdata->edvidsr = readl_relaxed(drvdata->base + EDVIDSR);
-> +
-> +	CS_LOCK(drvdata->base);
-> +}
-> +
-> +#ifndef CONFIG_64BIT
-> +static bool debug_pc_has_offset(struct debug_drvdata *drvdata)
-> +{
-> +	u32 pcsr_offset;
-> +
-> +	pcsr_offset = drvdata->eddevid1 & EDDEVID1_PCSR_OFFSET_MASK;
-> +
-> +	return (pcsr_offset == EDDEVID1_PCSR_OFFSET_INS_SET);
-> +}
-> +
-> +static unsigned long debug_adjust_pc(struct debug_drvdata *drvdata,
-> +				     unsigned long pc)
-> +{
-> +	unsigned long arm_inst_offset = 0, thumb_inst_offset = 0;
-> +
-> +	if (debug_pc_has_offset(drvdata)) {
-> +		arm_inst_offset = 8;
-> +		thumb_inst_offset = 4;
-> +	}
-> +
-> +	/* Handle thumb instruction */
-> +	if (pc & EDPCSR_THUMB) {
-> +		pc = (pc & EDPCSR_THUMB_INST_MASK) - thumb_inst_offset;
-> +		return pc;
-> +	}
-> +
-> +	/*
-> +	 * Handle arm instruction offset, if the arm instruction
-> +	 * is not 4 byte alignment then it's possible the case
-> +	 * for implementation defined; keep original value for this
-> +	 * case and print info for notice.
-> +	 */
-> +	if (pc & BIT(1))
-> +		pr_emerg("Instruction offset is implementation defined\n");
-> +	else
-> +		pc = (pc & EDPCSR_ARM_INST_MASK) - arm_inst_offset;
-> +
-> +	return pc;
-> +}
-> +#endif
-> +
-> +static void debug_dump_regs(struct debug_drvdata *drvdata)
-> +{
-> +	unsigned long pc;
-> +
-> +	pr_emerg("\tEDPRSR:  %08x (Power:%s DLK:%s)\n", drvdata->edprsr,
-> +		 drvdata->edprsr & EDPRSR_PU ? "On" : "Off",
-> +		 drvdata->edprsr & EDPRSR_DLK ? "Lock" : "Unlock");
-> +
-> +	if (!debug_access_permit(drvdata) || !drvdata->edpcsr_present) {
-> +		pr_emerg("No permission to access debug registers!\n");
-> +		return;
-> +	}
-> +
-> +	if (drvdata->edpcsr == EDPCSR_PROHIBITED) {
-> +		pr_emerg("CPU is in Debug state or profiling is prohibited!\n");
-> +		return;
-> +	}
-> +
-> +#ifdef CONFIG_64BIT
-> +	pc = (unsigned long)drvdata->edpcsr_hi << 32 |
-> +	     (unsigned long)drvdata->edpcsr;
-> +#else
-> +	pc = debug_adjust_pc(drvdata, (unsigned long)drvdata->edpcsr);
-> +#endif
-> +
-> +	pr_emerg("\tEDPCSR:  [<%p>] %pS\n", (void *)pc, (void *)pc);
-> +	pr_emerg("\tEDCIDSR: %08x\n", drvdata->edcidsr);
-> +
-> +	if (!drvdata->edvidsr_present)
-> +		return;
-> +
-> +	pr_emerg("\tEDVIDSR: %08x (State:%s Mode:%s Width:%s VMID:%x)\n",
-> +		 drvdata->edvidsr,
-> +		 drvdata->edvidsr & EDVIDSR_NS ? "Non-secure" : "Secure",
-> +		 drvdata->edvidsr & EDVIDSR_E3 ? "EL3" :
-> +			(drvdata->edvidsr & EDVIDSR_E2 ? "EL2" : "EL1/0"),
-> +		 drvdata->edvidsr & EDVIDSR_HV ? "64bits" : "32bits",
-> +		 drvdata->edvidsr & (u32)EDVIDSR_VMID);
-> +}
-> +
-> +/*
-> + * Dump out information on panic.
-> + */
-> +static int debug_notifier_call(struct notifier_block *self,
-> +			       unsigned long v, void *p)
-> +{
-> +	int cpu;
-> +
-> +	pr_emerg("ARM external debug module:\n");
-> +
-> +	for_each_possible_cpu(cpu) {
-> +
-> +		if (!per_cpu(debug_drvdata, cpu))
-> +			continue;
-> +
-> +		pr_emerg("CPU[%d]:\n", per_cpu(debug_drvdata, cpu)->cpu);
-> +
-> +		debug_read_regs(per_cpu(debug_drvdata, cpu));
-> +		debug_dump_regs(per_cpu(debug_drvdata, cpu));
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct notifier_block debug_notifier = {
-> +	.notifier_call = debug_notifier_call,
-> +};
-> +
-> +static void debug_init_arch_data(void *info)
-> +{
-> +	struct debug_drvdata *drvdata = info;
-> +	u32 mode;
-> +
-> +	CS_UNLOCK(drvdata->base);
-> +
-> +	debug_os_unlock(drvdata);
-> +
-> +	/* Read device info */
-> +	drvdata->eddevid  = readl_relaxed(drvdata->base + EDDEVID);
-> +	drvdata->eddevid1 = readl_relaxed(drvdata->base + EDDEVID1);
-> +
-> +	/* Parse implementation feature */
-> +	mode = drvdata->eddevid & EDDEVID_PCSAMPLE_MODE;
-> +	if (mode == EDDEVID_IMPL_FULL) {
-> +		drvdata->edpcsr_present  = true;
-> +		drvdata->edvidsr_present = true;
-> +	} else if (mode == EDDEVID_IMPL_EDPCSR_EDCIDSR) {
-> +		drvdata->edpcsr_present  = true;
-> +		drvdata->edvidsr_present = false;
-> +	} else {
-> +		drvdata->edpcsr_present  = false;
-> +		drvdata->edvidsr_present = false;
-> +	}
-> +
-> +	CS_LOCK(drvdata->base);
-> +}
-> +
-> +static int debug_probe(struct amba_device *adev, const struct amba_id *id)
-> +{
-> +	int ret;
-> +	void __iomem *base;
-> +	struct device *dev = &adev->dev;
-> +	struct coresight_platform_data *pdata = NULL;
-> +	struct debug_drvdata *drvdata;
-> +	struct resource *res = &adev->res;
-> +	struct device_node *np = adev->dev.of_node;
-> +
-> +	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
-> +	if (!drvdata)
-> +		return -ENOMEM;
-> +
-> +	if (np) {
-> +		pdata = of_get_coresight_platform_data(dev, np);
-> +		if (IS_ERR(pdata))
-> +			return PTR_ERR(pdata);
-> +		adev->dev.platform_data = pdata;
-> +	}
+The code line is helpful, the faulting instruction is
 
-I wonder if dragging a coresight_platform_data is worth it.  From what I see the
-only thing it is used for is to retrieve the CPU.  As such I think it is better
-get the portion of code in of_get_coresight_platform_data() that deals with the
-CPU and create a new function (of_coresight_get_cpu()).  That way you can reuse
-it here and in of_get_coresight_platform_data(). 
+      mov    0x39c(%rax),%eax   <--- fault
+      call ..
+      mov    someglobalvar,%edx
 
-> +
-> +	drvdata->dev = &adev->dev;
-> +	drvdata->dbg_clk = devm_clk_get(&adev->dev, "dbg_clk");
-> +	if (IS_ERR(drvdata->dbg_clk)) {
-> +		dev_err(dev, "debug clock initialization failed.\n");
-> +		return PTR_ERR(drvdata->dbg_clk);
-> +	}
-> +
-> +	ret = clk_prepare_enable(drvdata->dbg_clk);
-> +	if (ret)
-> +		return ret;
-> +
-> +	dev_set_drvdata(dev, drvdata);
-> +
-> +	/* Validity for the resource is already checked by the AMBA core */
-> +	base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(base))
-> +		return PTR_ERR(base);
-> +
-> +	drvdata->base = base;
-> +	drvdata->cpu = pdata ? pdata->cpu : 0;
-> +
-> +	get_online_cpus();
-> +	per_cpu(debug_drvdata, drvdata->cpu) = drvdata;
-> +
-> +	if (smp_call_function_single(drvdata->cpu,
-> +				debug_init_arch_data, drvdata, 1))
-> +		dev_err(dev, "Debug arch init failed\n");
-> +
-> +	if (!debug_count++)
-> +		atomic_notifier_chain_register(&panic_notifier_list,
-> +					       &debug_notifier);
-> +	put_online_cpus();
+which together with the supplied config file makes me able to match it
+up with the assembly generation around it:
 
-There is no need to hold the CPUs in place through the chain registration.  This
-should go before the if().
+        inb %dx, %al    # tmp254, value
+        andb    $1, %al #, tmp255
+        testb   %al, %al        # tmp255
+        je      .L233   #,
+  .L215:
+        movl    serial_ir+8, %eax       # serial_ir.rcdev, serial_ir.rcdev
+        xorl    %edx, %edx      # _66->timeout
+        movl    924(%eax), %eax # _66->timeout, _66->timeout
+        call    nsecs_to_jiffies        #
+        movl    jiffies, %edx   # jiffies, jiffies.33_70
+        addl    %eax, %edx      # _69, tmp259
+        movl    $serial_ir+16, %eax     #,
+        call    mod_timer       #
+        movl    serial_ir+8, %eax       # serial_ir.rcdev,
+        call    ir_raw_event_handle     #
+        movl    $1, %eax        #, <retval>
 
-> +
-> +	dev_info(dev, "%s initialized\n", (char *)id->data);
-        
-        fprintf(buffer, (char *)id->data, drvdata->cpu);
-        dev_info(dev, "%s initialized\n", buffer);
+so it's that "serial_ir.rcdev->timeout" access that faults. So this is
+the faulting source code:
 
-> +	return 0;
-> +}
-> +
-> +static struct amba_id debug_ids[] = {
-> +	{       /* Debug for Cortex-A53 */
-> +		.id	= 0x000bbd03,
-> +		.mask	= 0x000fffff,
-> +		.data	= "debug",
-       
-                .data   = "Coresight debug-CPU%d",
+drivers/media/rc/serial_ir.c: 402
 
-> +	},
-> +	{       /* Debug for Cortex-A57 */
-> +		.id	= 0x000bbd07,
-> +		.mask	= 0x000fffff,
-> +		.data	= "debug",
-> +	},
-> +	{       /* Debug for Cortex-A72 */
-> +		.id	= 0x000bbd08,
-> +		.mask	= 0x000fffff,
-> +		.data	= "debug",
-> +	},
-> +	{ 0, 0},
-> +};
-> +
-> +static struct amba_driver debug_driver = {
-> +	.drv = {
-> +		.name   = "coresight-debug",
-> +		.suppress_bind_attrs = true,
-> +	},
-> +	.probe		= debug_probe,
-> +	.id_table	= debug_ids,
-> +};
-> +builtin_amba_driver(debug_driver);
-> -- 
-> 2.7.4
-> 
+        mod_timer(&serial_ir.timeout_timer,
+                  jiffies + nsecs_to_jiffies(serial_ir.rcdev->timeout));
+
+        ir_raw_event_handle(serial_ir.rcdev);
+
+        return IRQ_HANDLED;
+
+and serial_ir.rcdev is NULL when ti tries to look up the timeout.
+
+That mod_timer() is new as of commit 2940c7e49775 ("[media] serial_ir:
+generate timeout") and *that* is the actual new bug.
+
+Looking at the code, that serial_ir.rcdev thing is initialized fairly
+late in serial_ir_init_module(), while the interrupt is allocated
+early in serial_ir_probe(), which is done _early_ in
+serial_ir_init_module():
+
+serial_ir_init_module -> serial_ir_init -> platform_driver_register ->
+serial_ir_probe -> devm_request_irq
+
+Mauro, Sean, please fix.
+
+Anyway, this is clearly a bug in the serial_ir code, but it is *also*
+once again clearly now being *triggered* due to the irq handling
+changes.
+
+I'm pretty sure that the thing that triggered this is once more commit
+a9b4f08770b4 ("x86/ioapic: Restore IO-APIC irq_chip retrigger
+callback") which seems to retrigger stale irqs that simply should not
+be retriggered.
+
+They aren't actually active any more, if they ever were.
+
+So that commit seems to act like a random CONFIG_DEBUG_SHIRQ. It's
+good for testing, but not good for actual users.
+
+I the local APIC retrigger just unconditionally resends that irq. But
+it's the core interrupt code that decides to retrigger it incorrectly
+for some reason.
+
+Why is IRQS_PENDING set for that thing? Something must have almost
+certainly set it, despite the irq not actually having ever been
+pending. Thomas?
+
+                  Linus
