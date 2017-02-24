@@ -1,220 +1,656 @@
-From: hias@horus.com (Matthias Reichl)
-Date: Fri, 24 Feb 2017 21:25:53 +0100
-Subject: [alsa-devel] [PATCH v8] ASoC: bcm2835: Add 8 channel
- (multitrack) capability
-In-Reply-To: <3b693ff9-b3a6-1c10-5b1a-78be04006113@flatmax.org>
-References: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
- <1487746600-11065-1-git-send-email-flatmax@flatmax.org>
- <20170224121832.GA19227@camel2.lan>
- <3b693ff9-b3a6-1c10-5b1a-78be04006113@flatmax.org>
-Message-ID: <20170224202553.GA28529@camel2.lan>
+From: florian.vaussard@gmail.com (Florian Vaussard)
+Date: Fri, 24 Feb 2017 21:41:25 +0100
+Subject: [PATCH] ARM: dts: socfpga: Use preprocessor defines for IRQs
+Message-ID: <1487968885-21452-1-git-send-email-florian.vaussard@heig-vd.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 25, 2017 at 12:50:47AM +1100, Matt Flax wrote:
-> 
-> 
-> On 24/02/17 23:18, Matthias Reichl wrote:
-> >Hi Matt,
-> >
-> >please include me in CC, your emails don't seem to get through
-> >linux-rpi-kernel reliably.
-> >
-> >I did a few tests with WM5102 in DSP A mode connected to RPi3
-> >with downstream kernel 4.9.11 plus your patch. wm5102 was configured
-> >as master, cpu<->codec dai_link.dai_fmt =
-> >SND_SOC_DAIFMT_DSP_A | SND_SOC_DAIFMT_NB_NF | SND_SOC_DAIFMT_CBM_CFM
-> >
-> >Comments are inline.
-> 
-> Sure will do, thanks for testing. My comments are also inline.
-> 
-> >
-> >On Wed, Feb 22, 2017 at 05:56:40PM +1100, Matt Flax wrote:
-> >>This patch adds multitrack capability if in DSP mode A and the
-> >>codec is master.
-> >>
-> >>In bcm2835_i2s_startup, snd_pcm_hw_constraint_single is used to set
-> >>channels to 8 if both SND_SOC_DAIFMT_CBM_CFM and SND_SOC_DAIFMT_DSP_A
-> >>are set. Otherwise, channels are set to 2. These settings are
-> >>accomplished using the SNDRV_PCM_HW_PARAM_CHANNELS variable.
-> >>
-> >>In bcm2835_i2s_shutdown the channels are set to 2 by default.
-> >>
-> >>In bcm2835_i2s_hw_params, DSP mode A format is now an option.
-> >>Before replicating the format variable (from ch2 to ch1) for
-> >>register loading, requested channels are checked to be either 2 or 8.
-> >>This can be expanded later to accomodate other channel counts if
-> >>supported by the sound card hardware.
-> >>
-> >>Signed-off-by: Matt Flax <flatmax@flatmax.org>
-> >>---
-> >>  sound/soc/bcm/bcm2835-i2s.c | 22 +++++++++++++++++-----
-> >>  1 file changed, 17 insertions(+), 5 deletions(-)
-> >>
-> >>diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
-> >>index 6ba2049..4b5f3f1 100644
-> >>--- a/sound/soc/bcm/bcm2835-i2s.c
-> >>+++ b/sound/soc/bcm/bcm2835-i2s.c
-> >>@@ -296,6 +296,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
-> >>  	switch (dev->fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
-> >>  	case SND_SOC_DAIFMT_I2S:
-> >>+	case SND_SOC_DAIFMT_DSP_A:
-> >>  		data_delay = 1;
-> >In DSP_A mode data_delay should be set to 0. With data_delay = 1
-> >the MSB is transmitted 1 clock cycle too late and the LSB of the
-> >previous sample is received as MSB (i.e. you get loud noise).
-> >
-> >See these screenshots, I2S data was 0xF000 (S16_LE format)
-> >
-> >data_delay = 1:
-> >http://www.horus.com/~hias/tmp/rpi/bcm2835-dsp-a-delay-1.png
-> >
-> >data_delay = 0:
-> >http://www.horus.com/~hias/tmp/rpi/bcm2835-dsp-a-delay-0.png
-> 
-> I can do this, however that would require DSP mode B to have an offset of
-> -1, which can't be set in the BCM2835 position register.
+Using defines makes it easier to read interrupt descriptors. Apply to
+both regular and GIC interrupts.
 
-I don't see where you are using mode B - you only added support for
-mode A. Not quite sure what you mean with that.
+This patch was tested by comparing all the original and the new SocFPGA
+DTBs. They are binary identical.
 
-> I really like your approach, however it needs extra resources at the
-> hardware level. Without those resources it will never be usable and stable.
-> The reason is that you will never be able to get proper synchrony and your
-> channels will be randomly shifted. It is the curious nature of the BCM2835
-> I2S silicon - I have used an FPGA to overcome this problem.
+Signed-off-by: Florian Vaussard <florian.vaussard@heig-vd.ch>
+---
+ arch/arm/boot/dts/socfpga.dtsi                    | 89 +++++++++++++----------
+ arch/arm/boot/dts/socfpga_arria10.dtsi            | 76 +++++++++----------
+ arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts |  2 +-
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts     |  2 +-
+ 4 files changed, 89 insertions(+), 80 deletions(-)
 
-I don't quite follow you here. DSP mode A timing usually means that
-the MSB follows immediately after the 1-cycle LR pulse. Or, if the
-pulse is longer than one cycle, MSB starts 1 clk after the leading
-LR pulse edge.
-
-With data delay=1 you are using I2S timing, not mode A timing.
-
-> >>  		break;
-> >>  	default:
-> >>@@ -312,6 +313,7 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
-> >>  	switch (params_channels(params)) {
-> >>  	case 2:
-> >>+	case 8:
-> >>  		format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
-> >>  		format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
-> >>  		format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
-> >>@@ -526,7 +528,17 @@ static int bcm2835_i2s_startup(struct snd_pcm_substream *substream,
-> >>  	regmap_update_bits(dev->i2s_regmap, BCM2835_I2S_CS_A_REG,
-> >>  			BCM2835_I2S_STBY, BCM2835_I2S_STBY);
-> >>-	return 0;
-> >>+	/* Set the max channels to 8 if the codec is master and
-> >>+	 * we are in DSP A mode. Otherwise only allow 2 channels.
-> >>+	 */
-> >>+	if ((dev->fmt &
-> >>+		(SND_SOC_DAIFMT_MASTER_MASK | SND_SOC_DAIFMT_FORMAT_MASK))
-> >>+			== (SND_SOC_DAIFMT_CBM_CFM | SND_SOC_DAIFMT_DSP_A))
-> >>+		return snd_pcm_hw_constraint_single(substream->runtime,
-> >>+			SNDRV_PCM_HW_PARAM_CHANNELS, 8);
-> >I'm not sure why you are limiting to exactly 8 channels. 2 channels
-> >worked fine here, too. Haven't tested with 4 or 6 channels yet but I
-> >guess any even number of channels should work.
-> >
-> >In 8-channel configuration I often got swapped/shifted channels.
-> >Not 100% sure why, but probably because bcm2835 hadn't DMAed the
-> >data in when the codec started the clocks - in that case bcm2835 seems
-> >to repeat the last stereo frame data it had in it's buffer. I haven't
-> >digged into that deeper though, could be something in my test setup as
-> >well.
-> 
-> Ah - there you go - I would imagine they are only shifted, not swapped !
-> 
-> I have a very robust stream, where I never get swapped channels. In other
-> words, I find that the channels 1 to 8 are always locked to the correct
-> pins.
-> 
-> Multichannel simply can't be done (on the BCM2835) without a suitable
-> FPGA/ASIC/chip between the codec and the BCM2835.
-
-I'd put it in another way: it seems to me that the bcm2835 I2S
-won't reliably sync in DSP mode A.
-
-I did some more tests and noticed channel/sample shifts both in
-2-channel and in 8-channel DSP mode A. When using 2-channel I2S
-mode I never got any channel/sample shifts.
-
-Here are screenshots of 8-channel S16_LE data, first transmitted
-sample is 0xf000, then 0xf100, then 0xf200 ... up to 0xf700.
-
-This is the first full frame with data from bcm2835. Before that
-the clocks were active for about 1.2ms and bcm2835 transmitted
-a low data signal:
-
-http://www.horus.com/~hias/tmp/rpi/bcm2835-dsp-a-8ch-frame1.png
-
-Note that immediately after LR pulse there's not a 0xf000 sample
-but 0x0000. The transmitted data doesn't seem to be synced on
-sample boundaries at all (i.e. the seem to be bit-shifted),
-let alone frame-synced.
-
-Here's the second full frame:
-
-http://www.horus.com/~hias/tmp/rpi/bcm2835-dsp-a-8ch-frame2.png
-
-Note that the first sample is rather odd, MSB isn't 1 but 0
-and then a long run of 1 bits follow. About 8us after that
-the data sees to be sample-synced.
-
-But also note that at the 3rd frame with data starts with 0xf500,
-not 0xf000 as expected. At least the samples are now synced
-and MSB occurs on the correct position. Still, the rest of the
-stream has the samples/channels shifted by 5.
-
-> 
-> >>+	else
-> >>+		return snd_pcm_hw_constraint_single(substream->runtime,
-> >>+			SNDRV_PCM_HW_PARAM_CHANNELS, 2);
-> >>  }
-> >>  static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
-> >>@@ -549,6 +561,10 @@ static void bcm2835_i2s_shutdown(struct snd_pcm_substream *substream,
-> >>  	 * not stop the clock when SND_SOC_DAIFMT_CONT
-> >>  	 */
-> >>  	bcm2835_i2s_stop_clock(dev);
-> >>+
-> >>+	/* Default to 2 channels */
-> >>+	snd_pcm_hw_constraint_single(substream->runtime,
-> >>+			SNDRV_PCM_HW_PARAM_CHANNELS, 2);
-> >>  }
-> >>  static const struct snd_soc_dai_ops bcm2835_i2s_dai_ops = {
-> >>@@ -576,16 +592,12 @@ static struct snd_soc_dai_driver bcm2835_i2s_dai = {
-> >>  	.name	= "bcm2835-i2s",
-> >>  	.probe	= bcm2835_i2s_dai_probe,
-> >>  	.playback = {
-> >>-		.channels_min = 2,
-> >>-		.channels_max = 2,
-> >>  		.rates =	SNDRV_PCM_RATE_8000_192000,
-> >>  		.formats =	SNDRV_PCM_FMTBIT_S16_LE
-> >>  				| SNDRV_PCM_FMTBIT_S24_LE
-> >>  				| SNDRV_PCM_FMTBIT_S32_LE
-> >>  		},
-> >>  	.capture = {
-> >>-		.channels_min = 2,
-> >>-		.channels_max = 2,
-> >>  		.rates =	SNDRV_PCM_RATE_8000_192000,
-> >>  		.formats =	SNDRV_PCM_FMTBIT_S16_LE
-> >>  				| SNDRV_PCM_FMTBIT_S24_LE
-> >With .channels_max removed I get no alsa PCMs with the downstream
-> >card drivers - "aplay -L" only reported the "null" PCM.
-> >
-> >Changing that to .channels_min = 2, .channels_max = 8 brought
-> >back the PCMs.
-> >
-> >
-> That is curious, channels_max and channels_min are set in _startup
-> implicitly in the snd_pcm_hw_constraint_single call which is inlined to the
-> snd_pcm_hw_constraint_minmax call.
-> 
-> I have tested with an Audio Injector stereo card for the Pi ... I can
-> confirm this problem. I will look into it further.
-> 
-> Can anyone explain why this would happen ?
-> 
-> Matt
-> 
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 2c43c4d..d5bdeea 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -16,6 +16,7 @@
+  */
+ 
+ #include "skeleton.dtsi"
++#include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/reset/altr,rst-mgr.h>
+ 
+ / {
+@@ -77,14 +78,14 @@
+ 			pdma: pdma at ffe01000 {
+ 				compatible = "arm,pl330", "arm,primecell";
+ 				reg = <0xffe01000 0x1000>;
+-				interrupts = <0 104 4>,
+-					     <0 105 4>,
+-					     <0 106 4>,
+-					     <0 107 4>,
+-					     <0 108 4>,
+-					     <0 109 4>,
+-					     <0 110 4>,
+-					     <0 111 4>;
++				interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+ 				#dma-cells = <1>;
+ 				#dma-channels = <8>;
+ 				#dma-requests = <32>;
+@@ -104,7 +105,10 @@
+ 		can0: can at ffc00000 {
+ 			compatible = "bosch,d_can";
+ 			reg = <0xffc00000 0x1000>;
+-			interrupts = <0 131 4>, <0 132 4>, <0 133 4>, <0 134 4>;
++			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&can0_clk>;
+ 			status = "disabled";
+ 		};
+@@ -112,7 +116,10 @@
+ 		can1: can at ffc01000 {
+ 			compatible = "bosch,d_can";
+ 			reg = <0xffc01000 0x1000>;
+-			interrupts = <0 135 4>, <0 136 4>, <0 137 4>, <0 138 4>;
++			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 138 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&can1_clk>;
+ 			status = "disabled";
+ 		};
+@@ -539,14 +546,14 @@
+ 			compatible = "altr,socfpga-fpga-mgr";
+ 			reg = <0xff706000 0x1000
+ 			       0xffb90000 0x4>;
+-			interrupts = <0 175 4>;
++			interrupts = <GIC_SPI 175 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
+ 		gmac0: ethernet at ff700000 {
+ 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
+ 			altr,sysmgr-syscon = <&sysmgr 0x60 0>;
+ 			reg = <0xff700000 0x2000>;
+-			interrupts = <0 115 4>;
++			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "macirq";
+ 			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
+ 			clocks = <&emac0_clk>;
+@@ -564,7 +571,7 @@
+ 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
+ 			altr,sysmgr-syscon = <&sysmgr 0x60 2>;
+ 			reg = <0xff702000 0x2000>;
+-			interrupts = <0 120 4>;
++			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "macirq";
+ 			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
+ 			clocks = <&emac1_clk>;
+@@ -594,7 +601,7 @@
+ 				reg = <0>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+-				interrupts = <0 164 4>;
++				interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 		};
+ 
+@@ -614,7 +621,7 @@
+ 				reg = <0>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+-				interrupts = <0 165 4>;
++				interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 		};
+ 
+@@ -634,7 +641,7 @@
+ 				reg = <0>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+-				interrupts = <0 166 4>;
++				interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 		};
+ 
+@@ -644,7 +651,7 @@
+ 			compatible = "snps,designware-i2c";
+ 			reg = <0xffc04000 0x1000>;
+ 			clocks = <&l4_sp_clk>;
+-			interrupts = <0 158 0x4>;
++			interrupts = <GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -654,7 +661,7 @@
+ 			compatible = "snps,designware-i2c";
+ 			reg = <0xffc05000 0x1000>;
+ 			clocks = <&l4_sp_clk>;
+-			interrupts = <0 159 0x4>;
++			interrupts = <GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -664,7 +671,7 @@
+ 			compatible = "snps,designware-i2c";
+ 			reg = <0xffc06000 0x1000>;
+ 			clocks = <&l4_sp_clk>;
+-			interrupts = <0 160 0x4>;
++			interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -674,7 +681,7 @@
+ 			compatible = "snps,designware-i2c";
+ 			reg = <0xffc07000 0x1000>;
+ 			clocks = <&l4_sp_clk>;
+-			interrupts = <0 161 0x4>;
++			interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -687,21 +694,23 @@
+ 			l2-ecc at ffd08140 {
+ 				compatible = "altr,socfpga-l2-ecc";
+ 				reg = <0xffd08140 0x4>;
+-				interrupts = <0 36 1>, <0 37 1>;
++				interrupts = <GIC_SPI 36 IRQ_TYPE_EDGE_RISING>,
++					     <GIC_SPI 37 IRQ_TYPE_EDGE_RISING>;
+ 			};
+ 
+ 			ocram-ecc at ffd08144 {
+ 				compatible = "altr,socfpga-ocram-ecc";
+ 				reg = <0xffd08144 0x4>;
+ 				iram = <&ocram>;
+-				interrupts = <0 178 1>, <0 179 1>;
++				interrupts = <GIC_SPI 178 IRQ_TYPE_EDGE_RISING>,
++					     <GIC_SPI 179 IRQ_TYPE_EDGE_RISING>;
+ 			};
+ 		};
+ 
+ 		L2: l2-cache at fffef000 {
+ 			compatible = "arm,pl310-cache";
+ 			reg = <0xfffef000 0x1000>;
+-			interrupts = <0 38 0x04>;
++			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+ 			cache-unified;
+ 			cache-level = <2>;
+ 			arm,tag-latency = <1 1 1>;
+@@ -724,7 +733,7 @@
+ 		mmc: dwmmc0 at ff704000 {
+ 			compatible = "altr,socfpga-dw-mshc";
+ 			reg = <0xff704000 0x1000>;
+-			interrupts = <0 139 4>;
++			interrupts = <GIC_SPI 139 IRQ_TYPE_LEVEL_HIGH>;
+ 			fifo-depth = <0x400>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -740,7 +749,7 @@
+ 			reg = <0xff900000 0x100000>,
+ 			      <0xffb80000 0x10000>;
+ 			reg-names = "nand_data", "denali_reg";
+-			interrupts = <0x0 0x90 0x4>;
++			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
+ 			dma-mask = <0xffffffff>;
+ 			clocks = <&nand_clk>;
+ 			status = "disabled";
+@@ -757,7 +766,7 @@
+ 			#size-cells = <0>;
+ 			reg = <0xff705000 0x1000>,
+ 			      <0xffa00000 0x1000>;
+-			interrupts = <0 151 4>;
++			interrupts = <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>;
+ 			cdns,fifo-depth = <128>;
+ 			cdns,fifo-width = <4>;
+ 			cdns,trigger-address = <0x00000000>;
+@@ -785,7 +794,7 @@
+ 		sdramedac {
+ 			compatible = "altr,sdram-edac";
+ 			altr,sdr-syscon = <&sdr>;
+-			interrupts = <0 39 4>;
++			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
+ 
+ 		spi0: spi at fff00000 {
+@@ -793,7 +802,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			reg = <0xfff00000 0x1000>;
+-			interrupts = <0 154 4>;
++			interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
+ 			num-cs = <4>;
+ 			clocks = <&spi_m_clk>;
+ 			status = "disabled";
+@@ -804,7 +813,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			reg = <0xfff01000 0x1000>;
+-			interrupts = <0 155 4>;
++			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
+ 			num-cs = <4>;
+ 			clocks = <&spi_m_clk>;
+ 			status = "disabled";
+@@ -819,13 +828,13 @@
+ 		timer at fffec600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0xfffec600 0x100>;
+-			interrupts = <1 13 0xf04>;
++			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 			clocks = <&mpu_periph_clk>;
+ 		};
+ 
+ 		timer0: timer0 at ffc08000 {
+ 			compatible = "snps,dw-apb-timer";
+-			interrupts = <0 167 4>;
++			interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0xffc08000 0x1000>;
+ 			clocks = <&l4_sp_clk>;
+ 			clock-names = "timer";
+@@ -833,7 +842,7 @@
+ 
+ 		timer1: timer1 at ffc09000 {
+ 			compatible = "snps,dw-apb-timer";
+-			interrupts = <0 168 4>;
++			interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0xffc09000 0x1000>;
+ 			clocks = <&l4_sp_clk>;
+ 			clock-names = "timer";
+@@ -841,7 +850,7 @@
+ 
+ 		timer2: timer2 at ffd00000 {
+ 			compatible = "snps,dw-apb-timer";
+-			interrupts = <0 169 4>;
++			interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0xffd00000 0x1000>;
+ 			clocks = <&osc1>;
+ 			clock-names = "timer";
+@@ -849,7 +858,7 @@
+ 
+ 		timer3: timer3 at ffd01000 {
+ 			compatible = "snps,dw-apb-timer";
+-			interrupts = <0 170 4>;
++			interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0xffd01000 0x1000>;
+ 			clocks = <&osc1>;
+ 			clock-names = "timer";
+@@ -858,7 +867,7 @@
+ 		uart0: serial0 at ffc02000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0xffc02000 0x1000>;
+-			interrupts = <0 162 4>;
++			interrupts = <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&l4_sp_clk>;
+@@ -870,7 +879,7 @@
+ 		uart1: serial1 at ffc03000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0xffc03000 0x1000>;
+-			interrupts = <0 163 4>;
++			interrupts = <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&l4_sp_clk>;
+@@ -888,7 +897,7 @@
+ 		usb0: usb at ffb00000 {
+ 			compatible = "snps,dwc2";
+ 			reg = <0xffb00000 0xffff>;
+-			interrupts = <0 125 4>;
++			interrupts = <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&usb_mp_clk>;
+ 			clock-names = "otg";
+ 			resets = <&rst USB0_RESET>;
+@@ -901,7 +910,7 @@
+ 		usb1: usb at ffb40000 {
+ 			compatible = "snps,dwc2";
+ 			reg = <0xffb40000 0xffff>;
+-			interrupts = <0 128 4>;
++			interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&usb_mp_clk>;
+ 			clock-names = "otg";
+ 			resets = <&rst USB1_RESET>;
+@@ -914,7 +923,7 @@
+ 		watchdog0: watchdog at ffd02000 {
+ 			compatible = "snps,dw-wdt";
+ 			reg = <0xffd02000 0x1000>;
+-			interrupts = <0 171 4>;
++			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&osc1>;
+ 			status = "disabled";
+ 		};
+@@ -922,7 +931,7 @@
+ 		watchdog1: watchdog at ffd03000 {
+ 			compatible = "snps,dw-wdt";
+ 			reg = <0xffd03000 0x1000>;
+-			interrupts = <0 172 4>;
++			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&osc1>;
+ 			status = "disabled";
+ 		};
+diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
+index 6b0b746..b0c8935 100644
+--- a/arch/arm/boot/dts/socfpga_arria10.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
+@@ -66,15 +66,15 @@
+ 			pdma: pdma at ffda1000 {
+ 				compatible = "arm,pl330", "arm,primecell";
+ 				reg = <0xffda1000 0x1000>;
+-				interrupts = <0 83 IRQ_TYPE_LEVEL_HIGH>,
+-					     <0 84 IRQ_TYPE_LEVEL_HIGH>,
+-					     <0 85 IRQ_TYPE_LEVEL_HIGH>,
+-					     <0 86 IRQ_TYPE_LEVEL_HIGH>,
+-					     <0 87 IRQ_TYPE_LEVEL_HIGH>,
+-					     <0 88 IRQ_TYPE_LEVEL_HIGH>,
+-					     <0 89 IRQ_TYPE_LEVEL_HIGH>,
+-					     <0 90 IRQ_TYPE_LEVEL_HIGH>,
+-					     <0 91 IRQ_TYPE_LEVEL_HIGH>;
++				interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 88 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
+ 				#dma-cells = <1>;
+ 				#dma-channels = <8>;
+ 				#dma-requests = <32>;
+@@ -418,7 +418,7 @@
+ 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.72a", "snps,dwmac";
+ 			altr,sysmgr-syscon = <&sysmgr 0x44 0>;
+ 			reg = <0xff800000 0x2000>;
+-			interrupts = <0 92 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "macirq";
+ 			/* Filled in by bootloader */
+ 			mac-address = [00 00 00 00 00 00];
+@@ -438,7 +438,7 @@
+ 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.72a", "snps,dwmac";
+ 			altr,sysmgr-syscon = <&sysmgr 0x48 0>;
+ 		        reg = <0xff802000 0x2000>;
+-			interrupts = <0 93 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "macirq";
+ 			/* Filled in by bootloader */
+ 			mac-address = [00 00 00 00 00 00];
+@@ -458,7 +458,7 @@
+ 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.72a", "snps,dwmac";
+ 			altr,sysmgr-syscon = <&sysmgr 0x4C 0>;
+ 			reg = <0xff804000 0x2000>;
+-			interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-names = "macirq";
+ 			/* Filled in by bootloader */
+ 			mac-address = [00 00 00 00 00 00];
+@@ -487,7 +487,7 @@
+ 				reg = <0>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+-				interrupts = <0 112 IRQ_TYPE_LEVEL_HIGH>;
++				interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 		};
+ 
+@@ -506,7 +506,7 @@
+ 				reg = <0>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+-				interrupts = <0 113 IRQ_TYPE_LEVEL_HIGH>;
++				interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 		};
+ 
+@@ -525,7 +525,7 @@
+ 				reg = <0>;
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+-				interrupts = <0 114 IRQ_TYPE_LEVEL_HIGH>;
++				interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
+ 			};
+ 		};
+ 
+@@ -543,7 +543,7 @@
+ 			#size-cells = <0>;
+ 			compatible = "snps,designware-i2c";
+ 			reg = <0xffc02200 0x100>;
+-			interrupts = <0 105 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&l4_sp_clk>;
+ 			status = "disabled";
+ 		};
+@@ -553,7 +553,7 @@
+ 			#size-cells = <0>;
+ 			compatible = "snps,designware-i2c";
+ 			reg = <0xffc02300 0x100>;
+-			interrupts = <0 106 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&l4_sp_clk>;
+ 			status = "disabled";
+ 		};
+@@ -563,7 +563,7 @@
+ 			#size-cells = <0>;
+ 			compatible = "snps,designware-i2c";
+ 			reg = <0xffc02400 0x100>;
+-			interrupts = <0 107 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&l4_sp_clk>;
+ 			status = "disabled";
+ 		};
+@@ -573,7 +573,7 @@
+ 			#size-cells = <0>;
+ 			compatible = "snps,designware-i2c";
+ 			reg = <0xffc02500 0x100>;
+-			interrupts = <0 108 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&l4_sp_clk>;
+ 			status = "disabled";
+ 		};
+@@ -583,7 +583,7 @@
+ 			#size-cells = <0>;
+ 			compatible = "snps,designware-i2c";
+ 			reg = <0xffc02600 0x100>;
+-			interrupts = <0 109 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&l4_sp_clk>;
+ 			status = "disabled";
+ 		};
+@@ -593,7 +593,7 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			reg = <0xffda5000 0x100>;
+-			interrupts = <0 102 4>;
++			interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
+ 			num-chipselect = <4>;
+ 			bus-num = <0>;
+ 			/*32bit_access;*/
+@@ -611,7 +611,7 @@
+ 		L2: l2-cache at fffff000 {
+ 			compatible = "arm,pl310-cache";
+ 			reg = <0xfffff000 0x1000>;
+-			interrupts = <0 18 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
+ 			cache-unified;
+ 			cache-level = <2>;
+ 			prefetch-data = <1>;
+@@ -624,7 +624,7 @@
+ 			#size-cells = <0>;
+ 			compatible = "altr,socfpga-dw-mshc";
+ 			reg = <0xff808000 0x1000>;
+-			interrupts = <0 98 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+ 			fifo-depth = <0x400>;
+ 			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
+ 			clock-names = "biu", "ciu";
+@@ -638,7 +638,7 @@
+ 			reg = <0xffb90000 0x72000>,
+ 			      <0xffb80000 0x10000>;
+ 			reg-names = "nand_data", "denali_reg";
+-			interrupts = <0 99 4>;
++			interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
+ 			dma-mask = <0xffffffff>;
+ 			clocks = <&nand_clk>;
+ 			status = "disabled";
+@@ -654,8 +654,8 @@
+ 			altr,sysmgr-syscon = <&sysmgr>;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+-			interrupts = <0 2 IRQ_TYPE_LEVEL_HIGH>,
+-				     <0 0 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+ 			ranges;
+@@ -720,7 +720,7 @@
+ 			#size-cells = <0>;
+ 			reg = <0xff809000 0x100>,
+ 			      <0xffa00000 0x100000>;
+-			interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+ 			cdns,fifo-depth = <128>;
+ 			cdns,fifo-width = <4>;
+ 			cdns,trigger-address = <0x00000000>;
+@@ -750,13 +750,13 @@
+ 		timer at ffffc600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+ 			reg = <0xffffc600 0x100>;
+-			interrupts = <1 13 0xf04>;
++			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 			clocks = <&mpu_periph_clk>;
+ 		};
+ 
+ 		timer0: timer0 at ffc02700 {
+ 			compatible = "snps,dw-apb-timer";
+-			interrupts = <0 115 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0xffc02700 0x100>;
+ 			clocks = <&l4_sp_clk>;
+ 			clock-names = "timer";
+@@ -764,7 +764,7 @@
+ 
+ 		timer1: timer1 at ffc02800 {
+ 			compatible = "snps,dw-apb-timer";
+-			interrupts = <0 116 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0xffc02800 0x100>;
+ 			clocks = <&l4_sp_clk>;
+ 			clock-names = "timer";
+@@ -772,7 +772,7 @@
+ 
+ 		timer2: timer2 at ffd00000 {
+ 			compatible = "snps,dw-apb-timer";
+-			interrupts = <0 117 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0xffd00000 0x100>;
+ 			clocks = <&l4_sys_free_clk>;
+ 			clock-names = "timer";
+@@ -780,7 +780,7 @@
+ 
+ 		timer3: timer3 at ffd00100 {
+ 			compatible = "snps,dw-apb-timer";
+-			interrupts = <0 118 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0xffd01000 0x100>;
+ 			clocks = <&l4_sys_free_clk>;
+ 			clock-names = "timer";
+@@ -789,7 +789,7 @@
+ 		uart0: serial0 at ffc02000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0xffc02000 0x100>;
+-			interrupts = <0 110 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&l4_sp_clk>;
+@@ -799,7 +799,7 @@
+ 		uart1: serial1 at ffc02100 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0xffc02100 0x100>;
+-			interrupts = <0 111 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+ 			clocks = <&l4_sp_clk>;
+@@ -815,7 +815,7 @@
+ 		usb0: usb at ffb00000 {
+ 			compatible = "snps,dwc2";
+ 			reg = <0xffb00000 0xffff>;
+-			interrupts = <0 95 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&usb_clk>;
+ 			clock-names = "otg";
+ 			resets = <&rst USB0_RESET>;
+@@ -828,7 +828,7 @@
+ 		usb1: usb at ffb40000 {
+ 			compatible = "snps,dwc2";
+ 			reg = <0xffb40000 0xffff>;
+-			interrupts = <0 96 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&usb_clk>;
+ 			clock-names = "otg";
+ 			resets = <&rst USB1_RESET>;
+@@ -841,7 +841,7 @@
+ 		watchdog0: watchdog at ffd00200 {
+ 			compatible = "snps,dw-wdt";
+ 			reg = <0xffd00200 0x100>;
+-			interrupts = <0 119 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&l4_sys_free_clk>;
+ 			status = "disabled";
+ 		};
+@@ -849,7 +849,7 @@
+ 		watchdog1: watchdog at ffd00300 {
+ 			compatible = "snps,dw-wdt";
+ 			reg = <0xffd00300 0x100>;
+-			interrupts = <0 120 IRQ_TYPE_LEVEL_HIGH>;
++			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&l4_sys_free_clk>;
+ 			status = "disabled";
+ 		};
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+index 5ecd2ef..371cacc 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+@@ -93,7 +93,7 @@
+ 		reg = <0x53>;
+ 
+ 		interrupt-parent = <&portc>;
+-		interrupts = <3 2>;
++		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+index a0c90b3b..00a6d74 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+@@ -165,7 +165,7 @@
+ 		reg = <0x53>;
+ 
+ 		interrupt-parent = <&portc>;
+-		interrupts = <3 2>;
++		interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
+ 	};
+ };
+ 
+-- 
+2.7.4
