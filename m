@@ -1,96 +1,59 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Fri, 24 Feb 2017 10:30:51 +0530
-Subject: [PATCH v4 2/3] mailbox: Add iProc mailbox controller driver
-In-Reply-To: <09177a6f-0612-1e17-a12e-0b1969f5b2e1@broadcom.com>
-References: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
- <1485463082-27067-3-git-send-email-jonathan.richardson@broadcom.com>
- <CABb+yY0rmAFutskhVkQ926QfsvtJ-WnXrQc=+PQNg=7NZEXC+Q@mail.gmail.com>
- <09177a6f-0612-1e17-a12e-0b1969f5b2e1@broadcom.com>
-Message-ID: <CABb+yY1o7QTYLm3HGWNeFDPnfpL7AAJ6+R91Stn-gNvO7afxoA@mail.gmail.com>
+From: hskinnemoen@gmail.com (=?UTF-8?Q?H=C3=A5vard_Skinnemoen?=)
+Date: Thu, 23 Feb 2017 21:18:13 -0800
+Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
+In-Reply-To: <20170221171438.e5hvruoixafpcdps@piout.net>
+References: <CAHp75Vc_q-bEzA2-hVpHyR0GZ8mXxwJ8-UjECe31T04mb67q4w@mail.gmail.com>
+ <20170221090610.6d531b94@bbrezillon>
+ <CAHp75VfZfj-8ih3vg63w_dAq8xXE2Whu1bANXRcXS1_EGNq43A@mail.gmail.com>
+ <20170221112641.6276c001@bbrezillon>
+ <CAHp75Vcb9gtzF7LvH74JwL4dTUyQvKmg=dnTXKfjhVHuyK3WXg@mail.gmail.com>
+ <20170221112720.ynehsryprhrhzjla@piout.net>
+ <CAHp75VcKjYYAw8gw8yYXrd-vzZo50WOQ06AzPx+0g9Zakzjm-w@mail.gmail.com>
+ <20170221162133.jch6yzpotj4s7zob@piout.net>
+ <CAHp75VeB4eVuN5NMfAfQUtssuHezTyAM8FUswuR8FheUk1V-oA@mail.gmail.com>
+ <CAHp75Vc54+GR99qM8vUDfQnehFx0g5q137k-w5XY3023UZyr5w@mail.gmail.com>
+ <20170221171438.e5hvruoixafpcdps@piout.net>
+Message-ID: <CACiLriSdRM4ZfoDsxFhf6ZVwAtacJOJ28M8CvOg6kC_XN0T-Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2017 at 12:29 AM, Jonathan Richardson
-<jonathan.richardson@broadcom.com> wrote:
->
->
-> On 17-02-16 10:20 PM, Jassi Brar wrote:
->> On Fri, Jan 27, 2017 at 2:08 AM, Jonathan Richardson
->> <jonathan.richardson@broadcom.com> wrote:
+On Tue, Feb 21, 2017 at 9:14 AM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> On 21/02/2017 at 18:43:35 +0200, Andy Shevchenko wrote:
+>> >> Come on, v4.10 has just been release and
 >>
->>> +static int iproc_mbox_send_data_m0(struct mbox_chan *chan, void *data)
->>> +{
->>> +       struct iproc_mbox *mbox = dev_get_drvdata(chan->mbox->dev);
->>> +       struct iproc_mbox_msg *msg = (struct iproc_mbox_msg *)data;
->>> +               unsigned long flags;
->>> +       int err = 0;
->>> +       const int poll_period_us = 5;
->>> +       const int max_retries = (MAX_M0_TIMEOUT_MS * 1000) / poll_period_us;
->>> +
->>> +       if (!msg)
->>> +               return -EINVAL;
->>> +
->>> +       spin_lock_irqsave(&mbox->lock, flags);
->>> +
->>> +       dev_dbg(mbox->dev, "Send msg to M0: cmd=0x%x, param=0x%x, wait_ack=%d\n",
->>> +               msg->cmd, msg->param, msg->wait_ack);
->>> +
->> prints should be outside the spinlocks.
+>> It doesn't build anymore. And current case even worse
+>> Face it. It's dead.
 >>
->>> +       writel(msg->cmd, mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
->>> +       writel(msg->param, mbox->base + IPROC_CRMU_MAILBOX1_OFFSET);
->>> +
->>> +       if (msg->wait_ack) {
->>> +               int retries;
->>> +
->> move poll_period_us and max_retries in here or just define' them
->>
->>> +               err = msg->reply_code = -ETIMEDOUT;
->>> +               for (retries = 0; retries < max_retries; retries++) {
->>> +                       u32 val = readl(
->>> +                               mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
->>> +                       if (val & M0_IPC_CMD_DONE_MASK) {
->>> +                               /*
->>> +                                * M0 replied - save reply code and
->>> +                                * clear error.
->>> +                                */
->>> +                               msg->reply_code = (val &
->>> +                                       M0_IPC_CMD_REPLY_MASK) >>
->>> +                                       M0_IPC_CMD_REPLY_SHIFT;
->>> +                               err = 0;
->>> +                               break;
->>> +                       }
->>> +                       udelay(poll_period_us);
->>>
->> potentially 2ms inside spin_lock_irqsave. Alternative is to implement
->> a simple 'peek_data' and call it for requests with 'wait_ack'
-> Hi Jassi. The M0 response is normally 25-30 us.
 >
-You hardcode the behaviour of your protocol in the controller driver.
-What if your next platform/protocol has commands that the remote/M0
-takes upto 10ms to respond (because they are not critical/trivial)?
+> I agree it hasn't seen any significant development in a while but I'm
+> not the on able to take that decision.
 
-If you don't have some h/w indicator (like irq or bit-flag) for
-tx-done and data-rx , you have to use ack-by-client and peek method.
-Commands that don't get a response will be immediately followed by
-mbox_client_txdone(), while others would need to call peek_data() to
-poll for data-rx. Please note, if you implement the tx_prepare
-callback, you will know when to start peeking for incoming data.
+I've been wanting to add devicetree support for some time, but I no
+longer remember how to build the toolchain, and I don't have fond
+memories of that whole process. And the fact that
+4.2.4-atmel.1.1.3.avr32linux.1 is still the most current version of
+gcc doesn't make me very optimistic.
 
-> We have one message that takes 280us but we can get rid of it if necessary.
->
-No. Please don't kill some needed feature just to make the driver simpler.
+So while Hans-Christian and others have been doing a great job of
+keeping AVR32 on life support, I tend to think that if there's not
+enough enthusiasm for the architecture to build a modern toolchain or
+add support for device tree, avr32-linux probably isn't going anywhere
+exciting.
 
-> Regarding your suggestion of peek_data. I don't see how it can be used
-> without the spinlock to serialize multiple clients/channels over a single
-> mailbox channel. peek_data is going to allow the client to poll for data.
-> But the spinlock is there to prevent other clients from accessing the
-> mailbox channel until any pending transaction is complete. last_tx_done
-> looks like an option but even that will not prevent another client from
-> clobbering a pending transaction. A shared channel among all clients
-> with a blocking model would probably work, but not pretty.
->
-Mailbox api provides exclusive access to its clients, just like dma-engine.
-Please have a look at how other platforms do it.
+> A few weeks ago, I was telling Boris to let it not build for a while and
+> then remove it. You already went out of your way to make it work. Again,
+> feel free to send a patch removing avr32. I can only see a lot of
+> benefits for the Atmel ARM SoCs and the many cleanups that will follow.
 
-Thanks.
+Agree, I can't help but feel that the AVR32 support is doing more harm
+than good at this point.
+
+> If nobody complains about the 4.10 breakage, You'll have plenty of time
+> to remove it for 4.12
+
+I'm fine with that, but I haven't put much effort into keeping it
+alive lately. If Hans-Christian agrees, I'm willing to post a patch to
+remove it, or ack someone else's patch.
+
+H?vard
