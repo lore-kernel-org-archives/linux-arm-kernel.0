@@ -1,112 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 24 Feb 2017 08:06:41 -0600
-Subject: [PATCH v2 4/9] dt-bindings: Add Ampire AM-480272H3TMQW-T01H panel
-In-Reply-To: <0036d551-91bc-9f3f-22a9-9dac2cf3527c@st.com>
-References: <1486738489-22154-1-git-send-email-yannick.fertre@st.com>
- <1486738489-22154-5-git-send-email-yannick.fertre@st.com>
- <20170216023408.apqukipi5zzkrk7j@rob-hp-laptop>
- <2b409ff7-54fe-4110-6495-1cc54585e5e2@st.com>
- <CAL_JsqLBZ0DGP62yGb2GjNZMto9hWce_HWNCX5iWhbrnE3ae_Q@mail.gmail.com>
- <0036d551-91bc-9f3f-22a9-9dac2cf3527c@st.com>
-Message-ID: <CAL_JsqLqNzpV1pjz3bX1gowHwJzsKKA=17aD5Ce18sy1B_V-0g@mail.gmail.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 24 Feb 2017 15:12:19 +0100
+Subject: [PATCH] KVM: arm/arm64: vgic-v3: Don't pretend to support
+ IRQ/FIQ bypass
+In-Reply-To: <20170222121348.3138-1-marc.zyngier@arm.com>
+References: <20170222121348.3138-1-marc.zyngier@arm.com>
+Message-ID: <20170224141219.GI1409@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2017 at 2:18 AM, Yannick FERTRE <yannick.fertre@st.com> wrote:
->
->
-> On 02/21/2017 03:07 PM, Rob Herring wrote:
->> On Mon, Feb 20, 2017 at 5:01 AM, Yannick FERTRE <yannick.fertre@st.com> wrote:
->>>
->>>
->>> On 02/16/2017 03:34 AM, Rob Herring wrote:
->>>> On Fri, Feb 10, 2017 at 03:54:44PM +0100, Yannick Fertre wrote:
->>>>> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
->>>>> ---
->>>>>  .../bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt         | 7 +++++++
->>>>>  1 file changed, 7 insertions(+)
->>>>>  create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
->>>>> new file mode 100644
->>>>> index 0000000..f59e3c4
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
->>>>> @@ -0,0 +1,7 @@
->>>>> +Ampire AM-480272H3TMQW-T01H 4.3" WQVGA TFT LCD panel
->>>>> +
->>>>> +Required properties:
->>>>> +- compatible: should be "ampire,am-480272h3tmqw-t01h"
->>>>
->>>> No GPIO controls or power supply for this panel?
->>>>
->>>> Rob
->>>>
->>>
->>> Hi Rob,
->>> thank for your reply.
->>> There is no gpio or power supply control for this panel with the eval
->>> board stm429x9i.
->>
->> You need to describe what the panel has, not what you have control of
->> or not on a particular board.
->
-> Yes, I don't have to describe control on a particular board. This
-> binding contains few lines. This compatible is used by panel-simple to
-> get only timings. Other staff like gpio or power-suypply is well managed
-> by panel-simple itself.
->
-> This binding is similar to these bindings & not required more details:
+On Wed, Feb 22, 2017 at 12:13:48PM +0000, Marc Zyngier wrote:
+> Our GICv3 emulation always presents ICC_SRE_EL1 with DIB/DFB set to
+> zero, which implies that there is a way to bypass the GIC and
+> inject raw IRQ/FIQ by driving the CPU pins.
+> 
+> Of course, we don't allow that when the GIC is configured, but
+> we fail to indicate that to the guest. The obvious fix is to
+> set these bits (and never let them being changed again).
+> 
+> Reported-by: Peter Maydell <peter.maydell@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Finding bad examples is not an argument. And yes, lots went in before
-we started being more particular in reviews, but now I want to see
-power supplies and control lines accurately described. Next week,
-there may be additional requirements.
+Acked-by: Christoffer Dall <cdall@linaro.org>
 
-This is no different than clock or interrupt bindings. We don't just
-say "uses clock/interrupt binding" in binding docs. You have to
-explicitly state how many clocks/interrupts and their order.
-
-
->    -ampire,am-480272h3tmqw-t01h.txt,ampire,am800480r3tmqwa1h.txt,
->    -auo,b080uan01.txt,auo,b101aw03.txt,auo,b101ean01.txt,
->    -auo,b101xtn01.txt,auo,b116xw03.txt,auo,b133htn01.txt,
->    -auo,b133xtn01.txt,auo,g133han01.txt,auo,g185han01.txt,
->    -auo,t215hvn01.txt,avic,tm070ddh03.txt,
->    -boe,tv080wum-nl0.txt,chunghwa,claa070wp03xg.txt,
->    -chunghwa,claa101wa01a.txt,chunghwa,claa101wb03.txt,
->    -edt,et057090dhu.txt,edt,et070080dh6.txt,edt,etm0700g0dh6.txt,
->    -foxlink,fl500wvr00-a0t.txt,giantplus,gpg482739qs5.txt,
->    -hannstar,hsd070pww1.txt,hannstar,hsd100pxn1.txt,
->    -hit,tx23d38vm0caa.txt,innolux,at043tn24.txt,
->    -innolux,at070tn92.txt,innolux,g101ice-l01.txt,
->    -innolux,g121i1-l01.txt,innolux,g121x1-l03.txt,
->    -innolux,n116bge.txt,innolux,n156bge-l21.txt,
->    -innolux,zj070na-01p.txt,kyo,tcg121xglp.txt,
->    -lg,lb070wv8.txt,lg,ld070wx3-sl01.txt,lg,lh500wx1-sd03.txt,
->    -lg,lp079qx1-sp0v.txt, lg,lp097qx1-spa1.txt,lg,lp120up1.txt,
->    -lg,lp129qe.txt, nec,nl4827hc19-05b.txt,
->    -nvd,9128.txt,okaya,rs800480t-7x0gp.txt,
->    -olimex,lcd-olinuxino-43-ts.txt,ontat,yx700wv03.txt,
->    -ortustech,com43h4m85ulc.txt, panasonic,vvx10f004b00.txt,
->    -qiaodian,qd43003c0-40.txt,
->    -samsung,lsn122dl01-c01.txt,samsung,ltn101nt05.txt,
->    -samsung,ltn140at29-301.txt,sharp,lq101k1ly04.txt,
->    -sharp,lq123p1jx31.txt,
->    -shelly,sca07010-bfn-lnn.txt,starry,kr122ea0sra.txt,
->    -tpk,f07a-0102.txt,tpk,f10a-0102.txt,urt,umsh-8596md.txt
->
-> Best regards
->
->>
->>> This binding is similar to all panel bindings which are link to panel
->>> simple. Details on gpio & power supply are describe with simple-panel
->>> binding.
->>
->> simple-panel.txt provides what possible standard properties there are,
->> not whether a panel uses them. The power supply needs to be explicit
->> because I don't know if you forgot and there's really 2 supplies or
->> you are using "power-supply" for a single supply.
->>
->> Rob
->>
+> ---
+>  include/linux/irqchip/arm-gic-v3.h | 2 ++
+>  virt/kvm/arm/vgic/vgic-v3.c        | 5 ++++-
+>  2 files changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index e808f8ae6f14..0a8bad331341 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -354,6 +354,8 @@
+>   */
+>  #define ICC_CTLR_EL1_EOImode_drop_dir	(0U << 1)
+>  #define ICC_CTLR_EL1_EOImode_drop	(1U << 1)
+> +#define ICC_SRE_EL1_DIB			(1U << 2)
+> +#define ICC_SRE_EL1_DFB			(1U << 1)
+>  #define ICC_SRE_EL1_SRE			(1U << 0)
+>  
+>  /*
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index e6b03fd8c374..d062256131fc 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -215,10 +215,13 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
+>  	/*
+>  	 * If we are emulating a GICv3, we do it in an non-GICv2-compatible
+>  	 * way, so we force SRE to 1 to demonstrate this to the guest.
+> +	 * Also, we don't support any form of IRQ/FIQ bypass.
+>  	 * This goes with the spec allowing the value to be RAO/WI.
+>  	 */
+>  	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) {
+> -		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
+> +		vgic_v3->vgic_sre = (ICC_SRE_EL1_DIB |
+> +				     ICC_SRE_EL1_DFB |
+> +				     ICC_SRE_EL1_SRE);
+>  		vcpu->arch.vgic_cpu.pendbaser = INITIAL_PENDBASER_VALUE;
+>  	} else {
+>  		vgic_v3->vgic_sre = 0;
+> -- 
+> 2.11.0
+> 
