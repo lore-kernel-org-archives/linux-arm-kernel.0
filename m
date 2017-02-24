@@ -1,79 +1,72 @@
-From: emmanuel.fuste@laposte.net (=?UTF-8?Q?Emmanuel_Fust=c3=a9?=)
-Date: Sat, 25 Feb 2017 01:08:23 +0100
-Subject: [alsa-devel] [PATCH v8] ASoC: bcm2835: Add 8 channel (multitrack)
- capability
-In-Reply-To: <20170224230159.GA30456@camel2.lan>
-References: <1486422576-6958-1-git-send-email-flatmax@flatmax.org>
- <1487746600-11065-1-git-send-email-flatmax@flatmax.org>
- <20170224121832.GA19227@camel2.lan>
- <3b693ff9-b3a6-1c10-5b1a-78be04006113@flatmax.org>
- <20170224202553.GA28529@camel2.lan>
- <501e4af5-51b7-c124-4a29-ef5804d8a03c@flatmax.org>
- <20170224230159.GA30456@camel2.lan>
-Message-ID: <27367161-11c6-2d62-cea0-f8936d8477e8@laposte.net>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Fri, 24 Feb 2017 08:26:05 -0800
+Subject: [PATCH] arm64: dts: msm8996: Add modem and slpi smp2p nodes
+Message-ID: <20170224162605.31290-1-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 25/02/2017 ? 00:02, Matthias Reichl a ?crit :
-> On Sat, Feb 25, 2017 at 08:30:03AM +1100, Matt Flax wrote:
->>
->> On 25/02/17 07:25, Matthias Reichl wrote:
->>
->>> I'd put it in another way: it seems to me that the bcm2835 I2S
->>> won't reliably sync in DSP mode A.
->>>
->>>
->> What you are explaining here is the nature of the BCM2835 responding to a
->> codec master. The hardware setup you are describing is elegantly simple, but
->> TOO simple.
-> Your patch only changes the CPU DAI driver. At this point it doesn't
-> matter if the codec or an external source is driving the clocks.
->
-> If the clock timing adheres to DSP mode A timing and you add code
-> to the the CPU DAI driver so it can operate in DSP mode A then
-> that should also work. If not, it's broken.
->
-> The (rather brief) publically available bcm2835 datasheet only
-> mentions I2S mode and my tests lead me to the conclusion that the
-> bcm2835 is actually expecting I2S timing, not DSP A - at least with
-> the current code.
-After reading this long thread and gluing all info together, my guess is 
-that the "real" thing he's trying to do is to introduce a new DPS mode 
-which is nothing more than a multichannel capable I2S mode or a "DSP I" 
-mode : DSP A with data_delay 1.
-As it is basically an I2S (2 channel) encapsulation of multichannel 
-stream, the real question is alsa plugin or new bastardized DSP mode ?
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/msm8996.dtsi | 48 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
->
->> Measurements on a system which uses a codec master don't represent a robust
->> implementation of multichannel with the BCM2835. My experiments (and now
->> yours) have shown that the system has a bit shift and an uncontrollable
->> channel drift.
->>
->> Multichannel simply can't be done (on the BCM2835) without control at the
->> hardware level - this requires an intermediate master control chip.
->>
->> The Audio Injector Octo machine driver, sets both the codec and the BCM2835
->> as slaves - the FPGA is master because it has to control both the BCM2835
->> and the codec's systems to get reliability. You can see the machine driver
->> on github :
->> https://github.com/flatmax/linux/blob/rpi-4.4.y/sound/soc/bcm/audioinjector-octo-soundcard.c
->>
->> It has taken month to implement a robust solution to this problem using an
->> FPGA and the result is a fantastic (Audio Injector Octo) sound card. I am
->> almost certain this hardware technique can be used on all stereo I2S SoC
->> chips.
-> Can you please provide details about the timing / protocol you are
-> actually using?
-I suspect that the FPGA act as an I2S <=> DSP A translator, taking care 
-of data_delay difference translation relative to the falling edge of LRCLK.
-It could translate the duration of the one BCLK duration of LRCLK DSP A 
-pulse to standard I2S LRCLK even if most codecs works with I2S fs LRCLK 
-timing as the sync point is the falling edge.
-As the FPGA has to deals with the clocks of the two sides, it's more 
-simple if it's the master.
-If I'm right, the real used mode from the soc point of view is I2S and 
-all of this is valid for all I2S IP, there is nothing BMC2835 specific 
-here. It is not the right place to do the mod.
-
-Emmanuel.
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index cfc7edc8fb15..4e16fedad5ec 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -1107,5 +1107,53 @@
+ 			#interrupt-cells = <2>;
+ 		};
+ 	};
++
++	modem-smp2p {
++		compatible = "qcom,smp2p";
++		qcom,smem = <435>, <428>;
++
++		interrupts = <0 451 IRQ_TYPE_EDGE_RISING>;
++
++		qcom,ipc = <&apcs 16 14>;
++
++		qcom,local-pid = <0>;
++		qcom,remote-pid = <1>;
++
++		modem_smp2p_out: master-kernel {
++			qcom,entry-name = "master-kernel";
++			#qcom,smem-state-cells = <1>;
++		};
++
++		modem_smp2p_in: slave-kernel {
++			qcom,entry-name = "slave-kernel";
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++	};
++
++	slpi-smp2p {
++		compatible = "qcom,smp2p";
++		qcom,smem = <481>, <430>;
++
++		interrupts = <0 178 IRQ_TYPE_EDGE_RISING>;
++
++		qcom,ipc = <&apcs 16 26>;
++
++		qcom,local-pid = <0>;
++		qcom,remote-pid = <3>;
++
++		slpi_smp2p_out: master-kernel {
++			qcom,entry-name = "master-kernel";
++			#qcom,smem-state-cells = <1>;
++		};
++
++		slpi_smp2p_in: slave-kernel {
++			qcom,entry-name = "slave-kernel";
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++	};
+ };
+ #include "msm8996-pins.dtsi"
+-- 
+2.11.1
