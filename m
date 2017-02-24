@@ -1,80 +1,55 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Fri, 24 Feb 2017 17:52:06 +0900
-Subject: [PATCH v1] mmc: mediatek: Fixed bug where clock frequency could
- be set wrong
-In-Reply-To: <1487924527-22584-2-git-send-email-yong.mao@mediatek.com>
-References: <1487924527-22584-1-git-send-email-yong.mao@mediatek.com>
- <1487924527-22584-2-git-send-email-yong.mao@mediatek.com>
-Message-ID: <CAGS+omDuPwXqTJ2CrLbLvSHdp3CL895qop1x6dLT1u7bG7XnVw@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 24 Feb 2017 09:55:09 +0100
+Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
+In-Reply-To: <20170224085209.GA27812@samfundet.no>
+References: <CAHp75Vcb9gtzF7LvH74JwL4dTUyQvKmg=dnTXKfjhVHuyK3WXg@mail.gmail.com>
+ <20170221112720.ynehsryprhrhzjla@piout.net>
+ <CAHp75VcKjYYAw8gw8yYXrd-vzZo50WOQ06AzPx+0g9Zakzjm-w@mail.gmail.com>
+ <20170221162133.jch6yzpotj4s7zob@piout.net>
+ <CAHp75VeB4eVuN5NMfAfQUtssuHezTyAM8FUswuR8FheUk1V-oA@mail.gmail.com>
+ <CAHp75Vc54+GR99qM8vUDfQnehFx0g5q137k-w5XY3023UZyr5w@mail.gmail.com>
+ <20170221171438.e5hvruoixafpcdps@piout.net>
+ <CACiLriSdRM4ZfoDsxFhf6ZVwAtacJOJ28M8CvOg6kC_XN0T-Mw@mail.gmail.com>
+ <20170224081430.GB19663@samfundet.no>
+ <20170224092742.3ce205e2@bbrezillon>
+ <20170224085209.GA27812@samfundet.no>
+Message-ID: <20170224095509.777da771@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2017 at 5:22 PM, Yong Mao <yong.mao@mediatek.com> wrote:
->
-> From: yong mao <yong.mao@mediatek.com>
->
-> This patch can fix two issues:
->
-> Issue 1:
-> The maximum value of clock divider is 0xff.
-> Because the type of div is u32, div may be larger than max_div.
-> In this case, we should use max_div to set the clock frequency.
->
-> Issue 2:
-> In previous code, we can not set the correct clock frequency when
-> div equals 0xff.
->
-> Signed-off-by: Yong Mao <yong.mao@mediatek.com>
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> ---
->  drivers/mmc/host/mtk-sd.c |   13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> index 07f3236..3174445 100644
-> --- a/drivers/mmc/host/mtk-sd.c
-> +++ b/drivers/mmc/host/mtk-sd.c
-> @@ -540,6 +540,7 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
->         u32 mode;
->         u32 flags;
->         u32 div;
-> +       u32 max_div;
+On Fri, 24 Feb 2017 09:52:09 +0100
+Hans-Christian Noren Egtvedt <egtvedt@samfundet.no> wrote:
 
-There's really no need for this variable.  Just use 0xff below.
+> Around Fri 24 Feb 2017 09:27:42 +0100 or thereabout, Boris Brezillon wrote:
+> > On Fri, 24 Feb 2017 09:14:30 +0100 Hans-Christian Noren Egtvedt <egtvedt@samfundet.no> wrote:  
+> >> Around Thu 23 Feb 2017 21:18:13 -0800 or thereabout, H?vard Skinnemoen wrote:  
+> >> > On Tue, Feb 21, 2017 at 9:14 AM, Alexandre Belloni
+> >> > <alexandre.belloni@free-electrons.com> wrote:    
+> >> >> On 21/02/2017 at 18:43:35 +0200, Andy Shevchenko wrote:    
+> 
+> <snipp>
+> 
+> >> >> If nobody complains about the 4.10 breakage, You'll have plenty of time
+> >> >> to remove it for 4.12    
+> >> > 
+> >> > I'm fine with that, but I haven't put much effort into keeping it
+> >> > alive lately. If Hans-Christian agrees, I'm willing to post a patch to
+> >> > remove it, or ack someone else's patch.    
+> >> 
+> >> Then lets plan this for 4.12, either you H?vard whip up a patch or I can
+> >> eventually do it.
+> >> 
+> >> I can push it through the linux-avr32 git tree on kernel.org.
+> >>   
+> > 
+> > Can you do that just after 4.11-rc1 is released and provide a topic
+> > branch I can pull in my nand/next branch, so that I can rework this
+> > patch and drop all the pdata-compat code (as suggested by Andy).  
+> 
+> OK, I will try to prepare it during the weekend.
+> 
+> Any reason to wait for 4.11-rc1? AFAIK Linus prefers the larger changes
+> before he starts tagging rc's.
+> 
 
->         u32 sclk;
->
->         if (!hz) {
-> @@ -590,8 +591,18 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
->                         sclk = (host->src_clk_freq >> 2) / div;
->                 }
->         }
-> +
-> +       /**
-> +        * The maximum value of div is 0xff.
-> +        * Check if the div is larger than max_div.
-> +        */
-> +       max_div = 0xff;
-> +       if (div > max_div) {
-> +               div = max_div;
-> +               sclk = (host->src_clk_freq >> 2) / div;
-> +       }
->         sdr_set_field(host->base + MSDC_CFG, MSDC_CFG_CKMOD | MSDC_CFG_CKDIV,
-> -                       (mode << 8) | (div % 0xff));
-> +                     (mode << 8) | div);
-
-Hmm, I don't know much about this sub-system, but should we even be
-allowing requests to set a frequency that we can't actually achieve
-with the divider?
-
->         sdr_set_bits(host->base + MSDC_CFG, MSDC_CFG_CKPDN);
->         while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
->                 cpu_relax();
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+Oh, so you want to queue it for 4.11, that's even better.
