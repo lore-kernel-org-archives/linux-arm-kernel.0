@@ -1,44 +1,36 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Fri, 24 Feb 2017 04:40:45 +0100
-Subject: [PATCH v2 07/17] dt-bindings: serial: Document Actions Semi Owl UARTs
+Date: Fri, 24 Feb 2017 04:40:44 +0100
+Subject: [PATCH v2 06/17] ARM64: Prepare Actions Semi S900
 In-Reply-To: <20170224034055.18807-1-afaerber@suse.de>
 References: <20170224034055.18807-1-afaerber@suse.de>
-Message-ID: <20170224034055.18807-8-afaerber@suse.de>
+Message-ID: <20170224034055.18807-7-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This UART is found on S500 and S900 SoCs.
+Add ARCH_ACTIONS.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
  v1 -> v2:
- * Adopted "actions" vendor prefix
+ * Renamed ARCH_OWL to ARCH_ACTION (Arnd)
  
- .../devicetree/bindings/serial/actions,owl-uart.txt      | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/serial/actions,owl-uart.txt
+ arch/arm64/Kconfig.platforms | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/serial/actions,owl-uart.txt b/Documentation/devicetree/bindings/serial/actions,owl-uart.txt
-new file mode 100644
-index 0000000..aa873ea
---- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/actions,owl-uart.txt
-@@ -0,0 +1,16 @@
-+Actions Semi Owl UART
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 129cc5a..b0266cd 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -1,5 +1,10 @@
+ menu "Platform selection"
+ 
++config ARCH_ACTIONS
++	bool "Actions Semi Platforms"
++	help
++	  This enables support for the Actions Semiconductor S900 SoC family.
 +
-+Required properties:
-+- compatible :  "actions,s500-uart", "actions,owl-uart" for S500
-+                "actions,s900-uart", "actions,owl-uart" for S900
-+- reg        :  Offset and length of the register set for the device.
-+- interrupts :  Should contain UART interrupt.
-+
-+
-+Example:
-+
-+		uart3: serial at b0126000 {
-+			compatible = "actions,s500-uart", "actions,owl-uart";
-+			reg = <0xb0126000 0x1000>;
-+			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+		};
+ config ARCH_SUNXI
+ 	bool "Allwinner sunxi 64-bit SoC Family"
+ 	select GENERIC_IRQ_CHIP
 -- 
 2.10.2
