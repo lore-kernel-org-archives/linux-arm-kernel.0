@@ -1,64 +1,98 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 24 Feb 2017 15:12:19 +0100
-Subject: [PATCH] KVM: arm/arm64: vgic-v3: Don't pretend to support
- IRQ/FIQ bypass
-In-Reply-To: <20170222121348.3138-1-marc.zyngier@arm.com>
-References: <20170222121348.3138-1-marc.zyngier@arm.com>
-Message-ID: <20170224141219.GI1409@cbox>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 24 Feb 2017 08:32:24 -0600
+Subject: [PATCH v1 0/3] PCI: Configure PCIe MPS settings
+In-Reply-To: <MWHPR03MB26690F3B4C7E83596C35D377BF520@MWHPR03MB2669.namprd03.prod.outlook.com>
+References: <20170208224632.14351.89895.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20170210215959.GR29169@bhelgaas-glaptop.roam.corp.google.com>
+ <MWHPR03MB26690F3B4C7E83596C35D377BF520@MWHPR03MB2669.namprd03.prod.outlook.com>
+Message-ID: <20170224143224.GA15547@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2017 at 12:13:48PM +0000, Marc Zyngier wrote:
-> Our GICv3 emulation always presents ICC_SRE_EL1 with DIB/DFB set to
-> zero, which implies that there is a way to bypass the GIC and
-> inject raw IRQ/FIQ by driving the CPU pins.
+On Fri, Feb 24, 2017 at 11:16:03AM +0000, Dexuan Cui wrote:
+> > From: devel [mailto:driverdev-devel.. at ...] On Behalf Of Bjorn Helgaas
+> > Sent: Saturday, February 11, 2017 06:00
+> > ...
+> > On Wed, Feb 08, 2017 at 04:49:22PM -0600, Bjorn Helgaas wrote:
+> > > The PCI core doesn't configure the PCIe MPS settings by itself.  Each
+> > > host bridge driver has to call pcie_bus_configure_settings() to make
+> > > this happen.
+> > >
+> > > Jon fixed this already for pcie-iproc.c.  I propose these similar
+> > > patches for other drivers.
+> > >
+> > > HV guys, I included you because create_root_hv_pci_bus() is one place
+> > > that calls pci_scan_child_bus() but does not call
+> > > pcie_bus_configure_settings().  I know you probably don't strictly
+> > > *need* to configure MPS settings in a paravirtual front-end, but the
+> > > PCI core does other device configuration in this path:
+> > >
+> > >   pci_scan_child_bus
+> > >     pci_scan_slot
+> > >       pci_scan_single_device
+> > >         pci_device_add
+> > >           pci_configure_device
+> > >           pci_init_capabilities
+> > >
+> > > and I would like to eventually migrate the MPS configuration into that
+> > > same path.  Since we do this other configuration for HV devices
+> > > already, I think pcie_bus_configure_settings() should also work (even
+> > > if it ends up not doing anything to real devices).
+> > >
+> > > It would make that eventual migration easier if all the
+> > > pci_scan_child_bus() callers had the same pattern of calling
+> > > pcie_bus_configure_settings().
+> > >
+> > > So would it make sense to make a similar patch for HV?  It looks easy
+> > > to add it to create_root_hv_pci_bus(), but I don't know exactly what
+> > > to do about pci_devices_present_work().
 > 
-> Of course, we don't allow that when the GIC is configured, but
-> we fail to indicate that to the guest. The obvious fix is to
-> set these bits (and never let them being changed again).
-> 
-> Reported-by: Peter Maydell <peter.maydell@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> (I'm sorry for the really late response. I neglected the thread somehow...)
 
-Acked-by: Christoffer Dall <cdall@linaro.org>
+No problem, I'm kind of bad about that, too.
 
-> ---
->  include/linux/irqchip/arm-gic-v3.h | 2 ++
->  virt/kvm/arm/vgic/vgic-v3.c        | 5 ++++-
->  2 files changed, 6 insertions(+), 1 deletion(-)
+> Hi Bjorn,
+> IMO we don't need to make any change to pci-hyperv.c: when a
+> PCIe device is passed through to a guest on Hyper-V, in the guest the
+> device only directly appears on a new root bus, and the new root bus
+> doesn't have any child bus, and the new root bus itself is actually only
+> a logical concept instead of a concrete device (i.e. it doesn't have its
+> own BDF at all).
 > 
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index e808f8ae6f14..0a8bad331341 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -354,6 +354,8 @@
->   */
->  #define ICC_CTLR_EL1_EOImode_drop_dir	(0U << 1)
->  #define ICC_CTLR_EL1_EOImode_drop	(1U << 1)
-> +#define ICC_SRE_EL1_DIB			(1U << 2)
-> +#define ICC_SRE_EL1_DFB			(1U << 1)
->  #define ICC_SRE_EL1_SRE			(1U << 0)
->  
->  /*
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index e6b03fd8c374..d062256131fc 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -215,10 +215,13 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
->  	/*
->  	 * If we are emulating a GICv3, we do it in an non-GICv2-compatible
->  	 * way, so we force SRE to 1 to demonstrate this to the guest.
-> +	 * Also, we don't support any form of IRQ/FIQ bypass.
->  	 * This goes with the spec allowing the value to be RAO/WI.
->  	 */
->  	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) {
-> -		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
-> +		vgic_v3->vgic_sre = (ICC_SRE_EL1_DIB |
-> +				     ICC_SRE_EL1_DFB |
-> +				     ICC_SRE_EL1_SRE);
->  		vcpu->arch.vgic_cpu.pendbaser = INITIAL_PENDBASER_VALUE;
->  	} else {
->  		vgic_v3->vgic_sre = 0;
-> -- 
-> 2.11.0
+> So, in the path pci_scan_child_bus -> ... -> pci_device_add ->
+> pci_configure_device -> pci_configure_mps, we're sure
+> pci_upstream_bridge() is NULL, so pci_configure_mps does nothing.
 > 
+> And since the root bus has no child bus, we don't need to call
+> pcie_bus_configure_settings(child).
+> 
+> Then you may ask how the MPS is set.
+> I suppose the para-virtual PCI back-end driver on the host
+> should take care of this properly.
+> 
+> FWIW, after passing through a Mellanox VF to Linux guest, in the
+> guest I get this for the device by lspci:
+>         DevCap: MaxPayload 512 bytes
+>         DevCtl: MaxPayload 128 bytes, MaxReadReq 128 bytes
+
+My question wasn't so much whether pci-hyperv.c *needs* to set MPS; I
+don't expect a guest to need to or even be able to configure things
+like that.
+
+My question is whether it would do any harm if we did eventually do
+MPS configuration in the generic pci_scan_child_bus() path.  If/when
+we do that, the Hyper-V guest will attempt to do MPS configuration.  I
+think this would be a no-op.  And I think it would also be a no-op if
+we made pci-hyperv.c call pcie_bus_configure_settings() today.
+
+I'm really just looking for confirmation of that.  If it is true that
+these are no-ops, I would consider adding a pci-hyperv.c call to
+pcie_bus_configure_settings() simply to make it conform to the pattern
+that "everything that calls pci_scan_child_bus() should also call
+pcie_bus_configure_settings()".
+
+If every caller of pci_scan_child_bus() also calls
+pcie_bus_configure_settings(), it will make it easier in the future to
+fold pcie_bus_configure_settings() into pci_scan_child_bus().
+
+Bjorn
