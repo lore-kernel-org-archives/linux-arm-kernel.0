@@ -1,73 +1,68 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Sat, 25 Feb 2017 10:07:41 +0100
-Subject: [WARNING: A/V UNSCANNABLE][Merge tag 'media/v4.11-1' of git]
- ff58d005cd: BUG: unable to handle kernel NULL pointer dereference at
- 0000039c
-In-Reply-To: <CA+55aFytXj+TZ_TanbxcY0KgRTrV7Vvr=fWON8tioUGmYHYiNA@mail.gmail.com>
-References: <58b07b30.9XFLj9Hhl7F6HMc2%fengguang.wu@intel.com>
- <CA+55aFytXj+TZ_TanbxcY0KgRTrV7Vvr=fWON8tioUGmYHYiNA@mail.gmail.com>
-Message-ID: <20170225090741.GA20463@gmail.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sat, 25 Feb 2017 17:23:09 +0800
+Subject: [linux-sunxi] [PATCH 2/3] pwm: sunxi: Add A64 support
+In-Reply-To: <CAGb2v67OaUps1yffyZ8pBvMwbAU+6WC2pPkt25e5i+SYU1nrDw@mail.gmail.com>
+References: <20170225074216.64868-1-icenowy@aosc.xyz>
+ <20170225074216.64868-2-icenowy@aosc.xyz>
+ <CAGb2v67OaUps1yffyZ8pBvMwbAU+6WC2pPkt25e5i+SYU1nrDw@mail.gmail.com>
+Message-ID: <870861488014589@web9m.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-* Linus Torvalds <torvalds@linux-foundation.org> wrote:
 
-> I'm pretty sure that the thing that triggered this is once more commit
-> a9b4f08770b4 ("x86/ioapic: Restore IO-APIC irq_chip retrigger
-> callback") which seems to retrigger stale irqs that simply should not
-> be retriggered.
-> 
-> They aren't actually active any more, if they ever were.
-> 
-> So that commit seems to act like a random CONFIG_DEBUG_SHIRQ. It's
-> good for testing, but not good for actual users.
+25.02.2017, 16:53, "Chen-Yu Tsai" <wens@csie.org>:
+> On Sat, Feb 25, 2017 at 3:42 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+>> ?A64 PWM controller has same register layout as sun4i driver, so it works
+>> ?by adding A64 specific data.
+>>
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ?---
+>> ??drivers/pwm/pwm-sun4i.c | 9 +++++++++
+>> ??1 file changed, 9 insertions(+)
+>>
+>> ?diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
+>> ?index 1284ffa05921..ca3431e03fb8 100644
+>> ?--- a/drivers/pwm/pwm-sun4i.c
+>> ?+++ b/drivers/pwm/pwm-sun4i.c
+>> ?@@ -290,6 +290,12 @@ static const struct sun4i_pwm_data sun4i_pwm_data_h3 = {
+>> ?????????.npwm = 1,
+>> ??};
+>>
+>> ?+static const struct sun4i_pwm_data sun4i_pwm_data_a64 = {
+>> ?+ .has_prescaler_bypass = true,
+>> ?+ .has_rdy = true,
+>> ?+ .npwm = 1,
+>> ?+};
+>> ?+
+>
+> This seems to be tha same as the H3. Any differences between the
+> H3 and A64? Otherwise please just use that compatible.
 
-Yeah, so some distros like Fedora already have CONFIG_DEBUG_SHIRQ=y enabled, but 
-part of the problem is that CONFIG_DEBUG_SHIRQ=y has this:
+H3 is also same as A13...
 
-#ifdef CONFIG_DEBUG_SHIRQ_FIXME
-        if (!retval && (irqflags & IRQF_SHARED)) {
-                /*
-                 * It's a shared IRQ -- the driver ought to be prepared for it
-                 * to happen immediately, so let's make sure....
-                 * We disable the irq to make sure that a 'real' IRQ doesn't
-                 * run in parallel with our fake.
-                 */
-                unsigned long flags;
+See http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/486595.html
 
-                disable_irq(irq);
-                local_irq_save(flags);
-
-                handler(irq, dev_id);
-
-                local_irq_restore(flags);
-                enable_irq(irq);
-        }
-#endif
-
-Note that the '_FIXME' postfix effectively turns off this particular debug check 
-...
-
-Thomas and me realized this risk a week ago ago, and tried to resurrect full 
-CONFIG_DEBUG_SHIRQ=y functionality to more reliably trigger these problems:
-
-  https://lkml.org/lkml/2017/2/15/341
-
-... but were forced to revert that fix because it's not working on x86 yet (it's 
-crashing). We also thought we fixed the problems exposed in drivers, as the 
-retrigger changes have been in -tip and -next for some time, but were clearly too 
-optimistic about that.
-
-So, should we revert the hw-retrigger change:
-
-  a9b4f08770b4 x86/ioapic: Restore IO-APIC irq_chip retrigger callback
-
-... until we managed to fix CONFIG_DEBUG_SHIRQ=y? If you'd like to revert it 
-upstream straight away:
-
-Acked-by: Ingo Molnar <mingo@kernel.org>
-
-Thanks,
-
-	Ingo
+>
+> ChenYu
+>
+>> ??static const struct of_device_id sun4i_pwm_dt_ids[] = {
+>> ?????????{
+>> ?????????????????.compatible = "allwinner,sun4i-a10-pwm",
+>> ?@@ -307,6 +313,9 @@ static const struct of_device_id sun4i_pwm_dt_ids[] = {
+>> ?????????????????.compatible = "allwinner,sun8i-h3-pwm",
+>> ?????????????????.data = &sun4i_pwm_data_h3,
+>> ?????????}, {
+>> ?+ .compatible = "allwinner,sun50i-a64-pwm",
+>> ?+ .data = &sun4i_pwm_data_a64,
+>> ?+ }, {
+>> ?????????????????/* sentinel */
+>> ?????????},
+>> ??};
+>> ?--
+>> ?2.11.1
+>>
+>> ?--
+>> ?You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>> ?To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> ?For more options, visit https://groups.google.com/d/optout.
