@@ -1,96 +1,55 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 25 Feb 2017 16:53:40 +0000
-Subject: [PATCH v3 04/18] iio: adc: add support for X-Powers AXP20X and
- AXP22X PMICs ADCs
-In-Reply-To: <cd4eac68-0155-d032-6d49-91e3ebdee72e@free-electrons.com>
-References: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
- <20170214094112.27426-5-quentin.schulz@free-electrons.com>
- <b76264cc-9c6c-169c-d490-91852c052890@kernel.org>
- <cd4eac68-0155-d032-6d49-91e3ebdee72e@free-electrons.com>
-Message-ID: <b46192ef-c516-c842-57ca-ff15016b1b75@kernel.org>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sun, 26 Feb 2017 00:55:06 +0800
+Subject: [PATCH] arm64: dts: allwinner: add support for Pinebook
+In-Reply-To: <20170225163802.guxwxzp734hlqoob@localhost>
+References: <20170225070032.35834-1-icenowy@aosc.xyz>
+ <20170225163802.guxwxzp734hlqoob@localhost>
+Message-ID: <1242601488041706@web21h.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/02/17 18:03, Quentin Schulz wrote:
-> Hi Jonathan,
-> 
-> On 19/02/2017 13:40, Jonathan Cameron wrote:
->> On 14/02/17 09:40, Quentin Schulz wrote:
->>> The X-Powers AXP20X and AXP22X PMICs have multiple ADCs. They expose the
->>> battery voltage, battery charge and discharge currents, AC-in and VBUS
->>> voltages and currents, 2 GPIOs muxable in ADC mode and PMIC temperature.
->>>
->>> This adds support for most of AXP20X and AXP22X ADCs.
->>>
->>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> Hi Quentin,
->>
->> A few bits and bobs inline.  The bigest one is that I don't think
->> you need to carry your struct axp_data pointer around in the iio_priv
->> structure as it only seems to be used in probe.
->>
->> Anyhow, tidy these little bits up (quite a few are optional in the
->> sense that they are a matter or personal taste and I don't feel
->> strongly about them) and you can add
->>
->> Reviewed-by: Jonathan Cameron <jic23@kernel.org>
->>
->> A nice driver.
->>
->> Jonathan
-> [...]
->>> +static int axp20x_probe(struct platform_device *pdev)
->>> +{
->>> +	struct axp20x_adc_iio *info;
->>> +	struct iio_dev *indio_dev;
->>> +	struct axp20x_dev *axp20x_dev;
->>> +	int ret;
->>> +
->>> +	axp20x_dev = dev_get_drvdata(pdev->dev.parent);
->>> +
->>> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
->>> +	if (!indio_dev)
->>> +		return -ENOMEM;
->>> +
->>> +	info = iio_priv(indio_dev);
->>> +	platform_set_drvdata(pdev, indio_dev);
->>> +
->>> +	info->regmap = axp20x_dev->regmap;
->>> +	indio_dev->dev.parent = &pdev->dev;
->>> +	indio_dev->dev.of_node = pdev->dev.of_node;
->>> +	indio_dev->modes = INDIO_DIRECT_MODE;
->>> +
->>> +	info->data = (struct axp_data *)platform_get_device_id(pdev)->driver_data;
->> I think this is only actually used in probe, so could be handled more
->> neatly with a local variable rather than sticking it in info.
->>
-> [...]
->>> +static int axp20x_remove(struct platform_device *pdev)
->>> +{
->>> +	struct axp20x_adc_iio *info;
->>> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
->>> +
->>> +	info = iio_priv(indio_dev);
->> Reorder the two lines above this one and then you could just do this
->> inline. (really trivial so feel free to not bother ;)
->>> +
->>> +	iio_device_unregister(indio_dev);
->>> +	iio_map_array_unregister(indio_dev);
->>> +
->>> +	regmap_write(info->regmap, AXP20X_ADC_EN1, 0);
->>> +
->>> +	if (info->data->adc_en2)
-> 
-> data is used here to know if I should disable misc ADCs (if supported by
-> the PMIC). So kinda need it only for that purpose, maybe I can use a
-> slightly simpler structure to only store regmap and this adc_en2 boolean.
-> 
-> Ack for everything else.
-cool. Not sure how my searching missed that!
 
-Up to you on whether you simplify that structure or not, I'm happy either way.
-> 
-> Thanks,
-> Quentin
-> 
+
+26.02.2017, 00:38, "Rask Ingemann Lambertsen" <rask@formelder.dk>:
+> On Sat, Feb 25, 2017 at 03:00:32PM +0800, Icenowy Zheng wrote:
+> [...]
+>> ?diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+>> ?new file mode 100644
+>> ?index 000000000000..2dceba3132b0
+>> ?--- /dev/null
+>> ?+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+>
+> [...]
+>> ?+ gpio_keys {
+>> ?+ compatible = "gpio-keys";
+>> ?+
+>> ?+ lid_switch {
+>
+> Node names should not contain underscores. You can use hyphens instead. See
+> https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1122967.html
+> https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1145633.html
+
+Sorry... but here I modelled after omap3-n900.dts, maybe it should also be changed?
+
+>
+>> ?+&mmc0 {
+>> ?+ pinctrl-names = "default";
+>> ?+ pinctrl-0 = <&mmc0_pins>;
+>> ?+ vmmc-supply = <&reg_vcc3v3>;
+>> ?+ cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+>> ?+ cd-inverted;
+>
+> You ought to be able to replace those last two lines with just
+> cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
+
+Before this all Allwinner boards uses GPIO_ACTIVE_HIGH and
+cd-inverted.
+
+>
+>> ?+ disable-wp;
+>> ?+ bus-width = <4>;
+>> ?+ status = "okay";
+>> ?+};
+>
+> --
+> Rask Ingemann Lambertsen
