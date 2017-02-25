@@ -1,163 +1,81 @@
-From: florian.vaussard@gmail.com (Florian Vaussard)
-Date: Sat, 25 Feb 2017 06:54:25 +0100
-Subject: [PATCH 2/6] ARM: dts: socfpga: Add unit name to memory nodes
-In-Reply-To: <1488002069-22404-1-git-send-email-florian.vaussard@heig-vd.ch>
-References: <1488002069-22404-1-git-send-email-florian.vaussard@heig-vd.ch>
-Message-ID: <1488002069-22404-3-git-send-email-florian.vaussard@heig-vd.ch>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Sat, 25 Feb 2017 14:47:25 +0800
+Subject: [PATCH RFC] arm64/mm: handle memmap kernel option
+Message-ID: <1488005245-54811-1-git-send-email-xieyisheng1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Memory nodes in Arria5, Cyclone5 and Arria10 do not have a unit name.
-This will trigger several warnings like this one (when compiled with
-W=1):
+When use device tree mode, user can reserve memory by changes the dts,
+however, when boot with ACPI, user cannot reserve memory except by
+changing the ACPI table in BIOS, which is not so convenient.
 
-Node /memory has a reg or ranges property, but no unit name
+To make user reserve memory for some specific use more convenient,
+this patch implement the following memmap variants:
+ - memmap=nn[KMG]$ss[KMG]: mark specified memory as reserved;
+ - memmap=nn[KMG]@ss[KMG]: force usage of a specific region of memory;
 
-Add the corresponding unit name to each node.
-
-Signed-off-by: Florian Vaussard <florian.vaussard@heig-vd.ch>
+Reported-by: Bob Dong <dongbo4@huawei.com>
+Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
 ---
- arch/arm/boot/dts/socfpga_arria10_socdk.dtsi       | 2 +-
- arch/arm/boot/dts/socfpga_arria5_socdk.dts         | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts  | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi        | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts       | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts      | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_socrates.dts    | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_sodia.dts       | 2 +-
- arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts | 2 +-
- arch/arm/boot/dts/socfpga_vt.dts                   | 2 +-
- 10 files changed, 10 insertions(+), 10 deletions(-)
+ arch/arm64/mm/init.c | 46 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
 
-diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-index c57e6ce..4d0a729 100644
---- a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-@@ -30,7 +30,7 @@
- 		stdout-path = "serial0:115200n8";
- 	};
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index e19e065..cf90c1d 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -188,6 +188,52 @@ static int __init early_mem(char *p)
+ }
+ early_param("mem", early_mem);
  
--	memory {
-+	memory at 0 {
- 		name = "memory";
- 		device_type = "memory";
- 		reg = <0x0 0x40000000>; /* 1GB */
-diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-index 8672edf..aac4fee 100644
---- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-@@ -26,7 +26,7 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
--	memory {
-+	memory at 0 {
- 		name = "memory";
- 		device_type = "memory";
- 		reg = <0x0 0x40000000>; /* 1GB */
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-index 5ecd2ef..7b49395 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-@@ -25,7 +25,7 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
--	memory {
-+	memory at 0 {
- 		name = "memory";
- 		device_type = "memory";
- 		reg = <0x0 0x40000000>; /* 1GB */
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi b/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-index 6ad3b1eb..3c03da6 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_mcv.dtsi
-@@ -21,7 +21,7 @@
- 	model = "Aries/DENX MCV";
- 	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
- 
--	memory {
-+	memory at 0 {
- 		name = "memory";
- 		device_type = "memory";
- 		reg = <0x0 0x40000000>; /* 1 GiB */
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-index 7ea32c8..155829f 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-@@ -26,7 +26,7 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
--	memory {
-+	memory at 0 {
- 		name = "memory";
- 		device_type = "memory";
- 		reg = <0x0 0x40000000>; /* 1GB */
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-index a0c90b3b..a4a555c 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -26,7 +26,7 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
--	memory {
-+	memory at 0 {
- 		name = "memory";
- 		device_type = "memory";
- 		reg = <0x0 0x40000000>; /* 1GB */
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-index c3d52f2..8e3b017 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socrates.dts
-@@ -25,7 +25,7 @@
- 		bootargs = "console=ttyS0,115200";
- 	};
- 
--	memory {
-+	memory at 0 {
- 		name = "memory";
- 		device_type = "memory";
- 		reg = <0x0 0x40000000>; /* 1GB */
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-index d69ad29..8860dd2 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sodia.dts
-@@ -28,7 +28,7 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
--	memory {
-+	memory at 0 {
- 		name = "memory";
- 		device_type = "memory";
- 		reg = <0x0 0x40000000>;
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-index 363ee62..8931980 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-@@ -57,7 +57,7 @@
- 		bootargs = "console=ttyS0,115200";
- 	};
- 
--	memory {
-+	memory at 0 {
- 		name = "memory";
- 		device_type = "memory";
- 		reg = <0x0 0x40000000>; /* 1GB */
-diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
-index f9345e0..dfe2193 100644
---- a/arch/arm/boot/dts/socfpga_vt.dts
-+++ b/arch/arm/boot/dts/socfpga_vt.dts
-@@ -26,7 +26,7 @@
- 		bootargs = "console=ttyS0,57600";
- 	};
- 
--	memory {
-+	memory at 0 {
- 		name = "memory";
- 		device_type = "memory";
- 		reg = <0x0 0x40000000>; /* 1 GB */
++static void __init parse_memmap_one(char *p)
++{
++	char *oldp;
++	unsigned long start_at, mem_size;
++
++	if (!p)
++		return;
++
++	oldp = p;
++	mem_size = memparse(p, &p);
++	if (p == oldp)
++		return;
++
++	switch (*p) {
++	case '@':
++		start_at = memparse(p + 1, &p);
++		memblock_add(start_at, mem_size);
++		break;
++
++	case '$':
++		start_at = memparse(p + 1, &p);
++		memblock_reserve(start_at, mem_size);
++		break;
++
++	default:
++		pr_warn("Unrecognized memmap syntax: %s\n", p);
++		break;
++	}
++}
++
++static int __init parse_memmap_opt(char *str)
++{
++	while (str) {
++		char *k = strchr(str, ',');
++
++		if (k)
++			*k++ = 0;
++
++		parse_memmap_one(str);
++		str = k;
++	}
++
++	return 0;
++}
++early_param("memmap", parse_memmap_opt);
++
+ void __init arm64_memblock_init(void)
+ {
+ 	const s64 linear_region_size = -(s64)PAGE_OFFSET;
 -- 
-2.7.4
+1.7.12.4
