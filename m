@@ -1,36 +1,32 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Sat, 25 Feb 2017 07:11:11 +0300
-Subject: [PATCH] staging: bcm2835: Fix a memory leak in error handling path
-In-Reply-To: <398315856.259038.1487972318815@email.1und1.de>
-References: <20170219103412.10092-1-christophe.jaillet@wanadoo.fr>
- <6585ca42-71f4-1517-c6fc-b9ed2f23c687@i2se.com>
- <20170224195731.GB4480@mwanda>
- <398315856.259038.1487972318815@email.1und1.de>
-Message-ID: <20170225041111.GB4429@mwanda>
+From: flatmax@flatmax.org (Matt Flax)
+Date: Sat, 25 Feb 2017 16:03:11 +1100
+Subject: [PATCH 0/3] ASoC: Enable a new IC master mode: bcm2835<=>IC<=>cs42xx8
+Message-ID: <cover.1487997974.git.flatmax@flatmax.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2017 at 10:38:38PM +0100, Stefan Wahren wrote:
-> 
-> > Dan Carpenter <dan.carpenter@oracle.com> hat am 24. Februar 2017 um 20:57 geschrieben:
-> > 
-> > 
-> > On Fri, Feb 24, 2017 at 01:37:30PM +0100, Stefan Wahren wrote:
-> > > Hi Christophe,
-> > > 
-> > > Am 19.02.2017 um 11:34 schrieb Christophe JAILLET:
-> > > >If 'kzalloc()' fails, we should release resources allocated so far, just as
-> > > >done in all other cases in this function.
-> > > >
-> > > >Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
-> > > >---
-> > > >Not sure that the error handling path is correct.
-> > > >Is 'gdev[0]' freed? Should it be?
-> > > 
-> > 
-> > Yes, but I already sent a patch to fix this and your leak as well and
-> > Greg merged it.
-> 
-> My leak? I'm confused.
+This patch set lets the ASoC system specify that an IC between the SoC and codec
+is master. This is intended to put both the SoC and Codec into slave modes.
 
-The one you're fixing I mean.
+By default un-patched SoC and Codec drivers will return -EINVAL if they aren't
+enabled and tested for this mode.
+
+soc-dia.h has the new SND_SOC_DAIFMT_IBM_IFM definition set as :
+#define SND_SOC_DAIFMT_IBM_IFM		(5 << 12) /* IC clk & FRM master */
+
+The cs42xx8 codec driver is enabled for this mode and so too is the BCM2835
+SoC driver. This forms a chain : bcm2835<=>IC<=>cs42xx8
+where the IC is bit and frame master.
+
+Matt Flax (3):
+  ASoC : Add an IC bit and frame master mode (SoC and Codec slave).
+  ASoC: cs42xx8: allow IC master mode.
+  ASoC: bcm2835: Add mutichannel mode in DSP and IC master modes.
+
+ include/sound/soc-dai.h     |  9 ++++++---
+ sound/soc/bcm/bcm2835-i2s.c | 21 ++++++++++++++++++++-
+ sound/soc/codecs/cs42xx8.c  |  1 +
+ 3 files changed, 27 insertions(+), 4 deletions(-)
+
+-- 
+2.7.4
