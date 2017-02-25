@@ -1,38 +1,100 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sat, 25 Feb 2017 20:30:29 +0800
-Subject: [PATCH 9/9] ARM: dts: sun8i: enable audio on Lichee Pi Zero Dock
+Date: Sat, 25 Feb 2017 20:30:25 +0800
+Subject: [PATCH 5/9] dmaengine: sun6i: support V3s SoC variant
 In-Reply-To: <20170225123029.55939-1-icenowy@aosc.xyz>
 References: <20170225123029.55939-1-icenowy@aosc.xyz>
-Message-ID: <20170225123029.55939-9-icenowy@aosc.xyz>
+Message-ID: <20170225123029.55939-5-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Dock board of Lichee Pi Zero features a 3.5mm Headphone Jack and an
-onboard MIC.
+Allwinner V3s has a DMA engine similar to the ones from A31, but with
+fewer channels and DRQs.
 
-Add support for them.
+Add support for it.
+
+As it also needs the special gate bit, make the gate bit generic.
+
+According to BSP source code, SUN8IW6 (A83T) also needs the bit, so it
+have also been specified gate_needed property.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ Documentation/devicetree/bindings/dma/sun6i-dma.txt |  1 +
+ drivers/dma/sun6i-dma.c                             | 17 ++++++++++++++---
+ 2 files changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
-index 68c114d6b939..d0f17bcaeaab 100644
---- a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
-+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
-@@ -47,3 +47,12 @@
- 	compatible = "licheepi,licheepi-zero-dock", "licheepi,licheepi-zero",
- 		     "allwinner,sun8i-v3s";
+diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+index 6b267045f522..98fbe1a5c6dd 100644
+--- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
++++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+@@ -9,6 +9,7 @@ Required properties:
+ 		  "allwinner,sun8i-a23-dma"
+ 		  "allwinner,sun8i-a83t-dma"
+ 		  "allwinner,sun8i-h3-dma"
++		  "allwinner,sun8i-v3s-dma"
+ - reg:		Should contain the registers base address and length
+ - interrupts:	Should contain a reference to the interrupt used by this device
+ - clocks:	Should contain a reference to the parent AHB clock
+diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+index a2358780ab2c..1f38424c1b14 100644
+--- a/drivers/dma/sun6i-dma.c
++++ b/drivers/dma/sun6i-dma.c
+@@ -101,6 +101,7 @@ struct sun6i_dma_config {
+ 	u32 nr_max_channels;
+ 	u32 nr_max_requests;
+ 	u32 nr_max_vchans;
++	bool gate_needed;
  };
-+
-+&codec {
-+	allwinner,audio-routing =
-+		"Headphone", "HP",
-+		"Headphone", "HPCOM",
-+		"MIC1", "Mic",
-+		"Mic",  "MBIAS";
-+	status = "okay";
+ 
+ /*
+@@ -1009,12 +1010,14 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
+ 	.nr_max_channels = 8,
+ 	.nr_max_requests = 24,
+ 	.nr_max_vchans   = 37,
++	.gate_needed	 = true,
+ };
+ 
+ static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
+ 	.nr_max_channels = 8,
+ 	.nr_max_requests = 28,
+ 	.nr_max_vchans   = 39,
++	.gate_needed	 = true,
+ };
+ 
+ /*
+@@ -1028,11 +1031,19 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
+ 	.nr_max_vchans   = 34,
+ };
+ 
++static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
++	.nr_max_channels = 8,
++	.nr_max_requests = 23,
++	.nr_max_vchans   = 24,
++	.gate_needed	 = true,
 +};
++
+ static const struct of_device_id sun6i_dma_match[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-dma", .data = &sun6i_a31_dma_cfg },
+ 	{ .compatible = "allwinner,sun8i-a23-dma", .data = &sun8i_a23_dma_cfg },
+ 	{ .compatible = "allwinner,sun8i-a83t-dma", .data = &sun8i_a83t_dma_cfg },
+ 	{ .compatible = "allwinner,sun8i-h3-dma", .data = &sun8i_h3_dma_cfg },
++	{ .compatible = "allwinner,sun8i-v3s-dma", .data = &sun8i_v3s_dma_cfg },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, sun6i_dma_match);
+@@ -1177,10 +1188,10 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 	/*
+ 	 * sun8i variant requires us to toggle a dma gating register,
+ 	 * as seen in Allwinner's SDK. This register is not documented
+-	 * in the A23 user manual.
++	 * in the A23 user manual, but documented at least in V3s user
++	 * manual.
+ 	 */
+-	if (of_device_is_compatible(pdev->dev.of_node,
+-				    "allwinner,sun8i-a23-dma"))
++	if (sdc->cfg->gate_needed)
+ 		writel(SUN8I_DMA_GATE_ENABLE, sdc->base + SUN8I_DMA_GATE);
+ 
+ 	return 0;
 -- 
 2.11.1
