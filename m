@@ -1,12 +1,10 @@
-From: mchehab@infradead.org (Mauro Carvalho Chehab)
-Date: Sat, 25 Feb 2017 11:44:19 -0300
-Subject: [PATCH v3] [media] serial_ir: ensure we're ready to receive interrupts
-Message-ID: <20170225112213.6e890b38@vento.lan>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Sat, 25 Feb 2017 11:55:46 -0300
+Subject: [PATCH v3.1] [media] serial_ir: ensure we're ready to receive
+ interrupts
+Message-ID: <4bf42b3935a6da2ec45730764c624ddc7c3f7c4f.1488032183.git.mchehab@s-opensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA256
 
 From: Sean Young <sean@mess.org>
 
@@ -20,16 +18,19 @@ Link: http://lkml.kernel.org/r/CA+55aFxsh2uF8gi5sN_guY3Z+tiLv7LpJYKBw+y8vqLzp+Ts
 
 [mchehab at s-opensource.com: moved serial_ir_probe() back to its original place]
 
-Cc: <stable@vger.kernel.org> # 4.10
+Cc: <stable@vger.kernel.org> # for 4.10
 Signed-off-by: Sean Young <sean@mess.org>
 Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
-- - ---
+---
+
+Resent, using git
+
  drivers/media/rc/serial_ir.c | 123 ++++++++++++++++++++++---------------------
  1 file changed, 62 insertions(+), 61 deletions(-)
 
 diff --git a/drivers/media/rc/serial_ir.c b/drivers/media/rc/serial_ir.c
 index 923fb2299553..41b54e40176c 100644
-- - --- a/drivers/media/rc/serial_ir.c
+--- a/drivers/media/rc/serial_ir.c
 +++ b/drivers/media/rc/serial_ir.c
 @@ -487,10 +487,69 @@ static void serial_ir_timeout(unsigned long arg)
  	ir_raw_event_handle(serial_ir.rcdev);
@@ -105,9 +106,9 @@ index 923fb2299553..41b54e40176c 100644
  		return -EBUSY;
  	}
  
-- - -	setup_timer(&serial_ir.timeout_timer, serial_ir_timeout,
-- - -		    (unsigned long)&serial_ir);
-- - -
+-	setup_timer(&serial_ir.timeout_timer, serial_ir_timeout,
+-		    (unsigned long)&serial_ir);
+-
  	result = hardware_init_port();
  	if (result < 0)
  		return result;
@@ -115,7 +116,7 @@ index 923fb2299553..41b54e40176c 100644
  			 sense ? "low" : "high");
  
  	dev_dbg(&dev->dev, "Interrupt %d, port %04x obtained\n", irq, io);
-- - -	return 0;
+-	return 0;
 +
 +	return devm_rc_register_device(&dev->dev, rcdev);
  }
@@ -125,7 +126,7 @@ index 923fb2299553..41b54e40176c 100644
  
  static int __init serial_ir_init_module(void)
  {
-- - -	struct rc_dev *rcdev;
+-	struct rc_dev *rcdev;
  	int result;
  
  	switch (type) {
@@ -133,63 +134,63 @@ index 923fb2299553..41b54e40176c 100644
  		sense = !!sense;
  
  	result = serial_ir_init();
-- - -	if (result)
-- - -		return result;
-- - -
-- - -	rcdev = devm_rc_allocate_device(&serial_ir.pdev->dev, RC_DRIVER_IR_RAW);
-- - -	if (!rcdev) {
-- - -		result = -ENOMEM;
-- - -		goto serial_cleanup;
-- - -	}
-- - -
-- - -	if (hardware[type].send_pulse && hardware[type].send_space)
-- - -		rcdev->tx_ir = serial_ir_tx;
-- - -	if (hardware[type].set_send_carrier)
-- - -		rcdev->s_tx_carrier = serial_ir_tx_carrier;
-- - -	if (hardware[type].set_duty_cycle)
-- - -		rcdev->s_tx_duty_cycle = serial_ir_tx_duty_cycle;
-- - -
-- - -	switch (type) {
-- - -	case IR_HOMEBREW:
-- - -		rcdev->input_name = "Serial IR type home-brew";
-- - -		break;
-- - -	case IR_IRDEO:
-- - -		rcdev->input_name = "Serial IR type IRdeo";
-- - -		break;
-- - -	case IR_IRDEO_REMOTE:
-- - -		rcdev->input_name = "Serial IR type IRdeo remote";
-- - -		break;
-- - -	case IR_ANIMAX:
-- - -		rcdev->input_name = "Serial IR type AnimaX";
-- - -		break;
-- - -	case IR_IGOR:
-- - -		rcdev->input_name = "Serial IR type IgorPlug";
-- - -		break;
-- - -	}
-- - -
-- - -	rcdev->input_phys = KBUILD_MODNAME "/input0";
-- - -	rcdev->input_id.bustype = BUS_HOST;
-- - -	rcdev->input_id.vendor = 0x0001;
-- - -	rcdev->input_id.product = 0x0001;
-- - -	rcdev->input_id.version = 0x0100;
-- - -	rcdev->open = serial_ir_open;
-- - -	rcdev->close = serial_ir_close;
-- - -	rcdev->dev.parent = &serial_ir.pdev->dev;
-- - -	rcdev->allowed_protocols = RC_BIT_ALL_IR_DECODER;
-- - -	rcdev->driver_name = KBUILD_MODNAME;
-- - -	rcdev->map_name = RC_MAP_RC6_MCE;
-- - -	rcdev->min_timeout = 1;
-- - -	rcdev->timeout = IR_DEFAULT_TIMEOUT;
-- - -	rcdev->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
-- - -	rcdev->rx_resolution = 250000;
-- - -
-- - -	serial_ir.rcdev = rcdev;
-- - -
-- - -	result = rc_register_device(rcdev);
-- - -
+-	if (result)
+-		return result;
+-
+-	rcdev = devm_rc_allocate_device(&serial_ir.pdev->dev, RC_DRIVER_IR_RAW);
+-	if (!rcdev) {
+-		result = -ENOMEM;
+-		goto serial_cleanup;
+-	}
+-
+-	if (hardware[type].send_pulse && hardware[type].send_space)
+-		rcdev->tx_ir = serial_ir_tx;
+-	if (hardware[type].set_send_carrier)
+-		rcdev->s_tx_carrier = serial_ir_tx_carrier;
+-	if (hardware[type].set_duty_cycle)
+-		rcdev->s_tx_duty_cycle = serial_ir_tx_duty_cycle;
+-
+-	switch (type) {
+-	case IR_HOMEBREW:
+-		rcdev->input_name = "Serial IR type home-brew";
+-		break;
+-	case IR_IRDEO:
+-		rcdev->input_name = "Serial IR type IRdeo";
+-		break;
+-	case IR_IRDEO_REMOTE:
+-		rcdev->input_name = "Serial IR type IRdeo remote";
+-		break;
+-	case IR_ANIMAX:
+-		rcdev->input_name = "Serial IR type AnimaX";
+-		break;
+-	case IR_IGOR:
+-		rcdev->input_name = "Serial IR type IgorPlug";
+-		break;
+-	}
+-
+-	rcdev->input_phys = KBUILD_MODNAME "/input0";
+-	rcdev->input_id.bustype = BUS_HOST;
+-	rcdev->input_id.vendor = 0x0001;
+-	rcdev->input_id.product = 0x0001;
+-	rcdev->input_id.version = 0x0100;
+-	rcdev->open = serial_ir_open;
+-	rcdev->close = serial_ir_close;
+-	rcdev->dev.parent = &serial_ir.pdev->dev;
+-	rcdev->allowed_protocols = RC_BIT_ALL_IR_DECODER;
+-	rcdev->driver_name = KBUILD_MODNAME;
+-	rcdev->map_name = RC_MAP_RC6_MCE;
+-	rcdev->min_timeout = 1;
+-	rcdev->timeout = IR_DEFAULT_TIMEOUT;
+-	rcdev->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
+-	rcdev->rx_resolution = 250000;
+-
+-	serial_ir.rcdev = rcdev;
+-
+-	result = rc_register_device(rcdev);
+-
  	if (!result)
  		return 0;
-- - -serial_cleanup:
+-serial_cleanup:
 +
  	serial_ir_exit();
  	return result;
@@ -198,26 +199,9 @@ index 923fb2299553..41b54e40176c 100644
  static void __exit serial_ir_exit_module(void)
  {
  	del_timer_sync(&serial_ir.timeout_timer);
-- - -	rc_unregister_device(serial_ir.rcdev);
+-	rc_unregister_device(serial_ir.rcdev);
  	serial_ir_exit();
  }
  
-- - -- 
+-- 
 2.9.3
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v2
-
-iQIcBAEBCAAGBQJYsZhEAAoJEAhfPr2O5OEV2l8P/i0jyikTsOC4NaCsImBhVsM5
-sdgjy+wib+hCwdn9HDORxFq7P0ZyKSErkRnHIZSiqu1q4S9Q+Xa5h93taEdZi38H
-2Ain5rB40y7eXgsssU9APHin89HmdT9XWKS7pAEE16mKhiiuu0cgFd+LngDypjNQ
-s5YlzfWFsN6ubjS/t2wJpxxyepsKoCtv8smTOfyQZIhwKUcWWC9kJTA77ubO9egr
-ZBFzsvw0XbEjW8cui4EEuduozD9K1OrSsCib+NK2NMU0luYy9YtsUtjN5Ozu1e6t
-J5QOdsJl0aqLPfEk8TW3++55MaK9LUgE6aaCdntbek5cZmgsk3ad79kDP8gSdxAV
-VUXDEPZQpJXedA6S/bAmXUbEW7mVHH9ALYSa8AGXCArKKtz+5iXNP0+83JoFGEHb
-tTCGInNfsBHd8/NqdW/u/ugGVj4xt0Kc+4oOPYecjO2tiCS+lpKWIDw9bOcaR4/0
-w+zbCmIEmBZ74lM0ys+TmCmDGwXC2QYEqY0U+9ZZcsy+7bMcxJH6slrjfaa6fJa0
-j2OU2qB0VnUTJq0a0O8IL7s5jQn1lKNpmG9TKYNntCzBuHbasL2rsr+Jrr6vpMKU
-vYbpRapoAnIXaUW708bdtA2x7/JfiLj9M7KvYJfeFAt9HGHeXq1HJsaGjix1mZh3
-nL/68Fqc2Scurbzq/C7Z
-=Apye
------END PGP SIGNATURE-----
