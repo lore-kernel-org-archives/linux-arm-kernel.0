@@ -1,203 +1,153 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sat, 25 Feb 2017 15:14:02 +0800
-Subject: [PATCH] arm64: dts: allwinner: add support for Pinebook
-In-Reply-To: <20170225070032.35834-1-icenowy@aosc.xyz>
-References: <20170225070032.35834-1-icenowy@aosc.xyz>
-Message-ID: <9241341488006842@web3g.yandex.ru>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Sat, 25 Feb 2017 15:15:47 +0800
+Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
+References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
+ <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <df6ba5dc-d93f-925a-46bf-1e1e209d17f3@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tyler,
 
 
-25.02.2017, 15:01, "Icenowy Zheng" <icenowy@aosc.xyz>:
-> Pinebook is a A64-based laptop produced by Pine64, with the following
-> peripherals:
->
-> USB:
-> - Two external USB ports (one is directly connected to A64's OTG
-> controller, the other is under a internal hub connected to the host-only
-> controller.)
-> - USB HID keyboard and touchpad connected to the internal hub.
-> - USB UVC camera connected to the internal hub.
->
-> Power-related:
-> - A DC IN jack connected to AXP803's DCIN pin.
-> - A Li-Polymer battery connected to AXP803's battery pins.
->
-> Storage:
-> - An eMMC by Foresee on the main board (in the product revision of the
-> main board it's designed to be switchable).
-> - An external MicroSD card slot.
->
-> Display:
-> - An eDP LCD panel (1366x768) connected via an ANX6345/ANX9807 RGB-eDP
-> bridge.
-> - A mini HDMI jack.
->
-> Misc:
-> - A Hall sensor designed to detect the status of lid, connected to GPIO PH10.
-> - A headphone jack connected to the SoC's internal codec.
-> - A BMA223 gravity sensor connected to the SoC's I2C1 bus. (Not
-> supported yet)
-> - A debug UART port muxed with one of the USB ports, only available on
-> product revision of the main board.
->
-> This commit adds basical support for it, with out-of-tree patches for
-> display support the laptop can be basically usable.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+On 2017/2/22 5:22, Tyler Baicar wrote:
+> Currently external aborts are unsupported by the guest abort
+> handling. Add handling for SEAs so that the host kernel reports
+> SEAs which occur in the guest kernel.
+> 
+> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
 > ---
-> ?arch/arm64/boot/dts/allwinner/Makefile | 1 +
-> ?.../boot/dts/allwinner/sun50i-a64-pinebook.dts | 123 +++++++++++++++++++++
-> ?2 files changed, 124 insertions(+)
-> ?create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
->
-> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-> index bc6f342be59f..893520c39955 100644
-> --- a/arch/arm64/boot/dts/allwinner/Makefile
-> +++ b/arch/arm64/boot/dts/allwinner/Makefile
-> @@ -1,4 +1,5 @@
-> ?dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
-> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
-> ?dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
->
-> ?always := $(dtb-y)
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-> new file mode 100644
-> index 000000000000..2dceba3132b0
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-> @@ -0,0 +1,123 @@
-> +/*
-> + * Copyright (c) 2016 ARM Ltd.
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + * a) This library is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of the
-> + * License, or (at your option) any later version.
-> + *
-> + * This library is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + * b) Permission is hereby granted, free of charge, to any person
-> + * obtaining a copy of this software and associated documentation
-> + * files (the "Software"), to deal in the Software without
-> + * restriction, including without limitation the rights to use,
-> + * copy, modify, merge, publish, distribute, sublicense, and/or
-> + * sell copies of the Software, and to permit persons to whom the
-> + * Software is furnished to do so, subject to the following
-> + * conditions:
-> + *
-> + * The above copyright notice and this permission notice shall be
-> + * included in all copies or substantial portions of the Software.
-> + *
-> + * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + * OTHER DEALINGS IN THE SOFTWARE.
+>  arch/arm/include/asm/kvm_arm.h       |  1 +
+>  arch/arm/include/asm/system_misc.h   |  5 +++++
+>  arch/arm/kvm/mmu.c                   | 18 ++++++++++++++++--
+>  arch/arm64/include/asm/kvm_arm.h     |  1 +
+>  arch/arm64/include/asm/system_misc.h |  2 ++
+>  arch/arm64/mm/fault.c                | 18 ++++++++++++++++++
+>  6 files changed, 43 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+> index e22089f..33a77509 100644
+> --- a/arch/arm/include/asm/kvm_arm.h
+> +++ b/arch/arm/include/asm/kvm_arm.h
+> @@ -187,6 +187,7 @@
+>  #define FSC_FAULT	(0x04)
+>  #define FSC_ACCESS	(0x08)
+>  #define FSC_PERM	(0x0c)
+> +#define FSC_EXTABT	(0x10)
+>  
+>  /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+>  #define HPFAR_MASK	(~0xf)
+> diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
+> index a3d61ad..ea45d94 100644
+> --- a/arch/arm/include/asm/system_misc.h
+> +++ b/arch/arm/include/asm/system_misc.h
+> @@ -24,4 +24,9 @@
+>  
+>  #endif /* !__ASSEMBLY__ */
+>  
+> +static inline int handle_guest_sea(unsigned long addr, unsigned int esr)
+> +{
+> +	return -1;
+> +}
+> +
+>  #endif /* __ASM_ARM_SYSTEM_MISC_H */
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index a5265ed..04f1dd50 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -29,6 +29,7 @@
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_emulate.h>
+>  #include <asm/virt.h>
+> +#include <asm/system_misc.h>
+>  
+>  #include "trace.h"
+>  
+> @@ -1444,8 +1445,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  
+>  	/* Check the stage-2 fault is trans. fault or write fault */
+>  	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+> -	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+> -	    fault_status != FSC_ACCESS) {
+> +
+> +	/* The host kernel will handle the synchronous external abort. There
+> +	 * is no need to pass the error into the guest.
+> +	 */
+
+Can we inject an sea into the guest, so that the guest can kill the
+application which causes the error if the guest won't be terminated
+later. I'm not sure whether ghes_handle_memory_failure() called in
+ghes_do_proc() will kill the qemu process. I think it only kill user
+processes marked with PF_MCE_PROCESS & PF_MCE_EARLY.
+
+> +	if (fault_status == FSC_EXTABT) {
+> +		if(handle_guest_sea((unsigned long)fault_ipa,
+> +				    kvm_vcpu_get_hsr(vcpu))) {
+> +			kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+> +				kvm_vcpu_trap_get_class(vcpu),
+> +				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+> +				(unsigned long)kvm_vcpu_get_hsr(vcpu));
+> +			return -EFAULT;
+> +		}
+> +	} else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+> +		   fault_status != FSC_ACCESS) {
+>  		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+>  			kvm_vcpu_trap_get_class(vcpu),
+>  			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 2a2752b..2b11d59 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -201,6 +201,7 @@
+>  #define FSC_FAULT	ESR_ELx_FSC_FAULT
+>  #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
+>  #define FSC_PERM	ESR_ELx_FSC_PERM
+> +#define FSC_EXTABT	ESR_ELx_FSC_EXTABT
+>  
+>  /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+>  #define HPFAR_MASK	(~UL(0xf))
+> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+> index bc81243..5b2cecd1 100644
+> --- a/arch/arm64/include/asm/system_misc.h
+> +++ b/arch/arm64/include/asm/system_misc.h
+> @@ -58,4 +58,6 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+>  
+>  #endif	/* __ASSEMBLY__ */
+>  
+> +int handle_guest_sea(unsigned long addr, unsigned int esr);
+> +
+>  #endif	/* __ASM_SYSTEM_MISC_H */
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index b2d57fc..403277b 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -602,6 +602,24 @@ static const char *fault_name(unsigned int esr)
+>  }
+>  
+>  /*
+> + * Handle Synchronous External Aborts that occur in a guest kernel.
 > + */
+> +int handle_guest_sea(unsigned long addr, unsigned int esr)
+> +{
+> +	/*
+> +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
+> +	 * rcu_read_lock().
+> +	 */
+> +	if(IS_ENABLED(HAVE_ACPI_APEI_SEA)) {
+> +		nmi_enter();
+> +		ghes_notify_sea();
+> +		nmi_exit();
+> +	}
 > +
-> +/dts-v1/;
+> +	return 0;
+> +}
 > +
-> +#include "sun50i-a64.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
+> +/*
+>   * Dispatch a data abort to the relevant handler.
+>   */
+>  asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+> 
 
-Sorry but I missed a line here:
-
-#include <dt-bindings/input/input.h>
-
-It's for the switch code for gpio_keys part (it's used to describe
-the Hall sensor).
-
-> +
-> +/ {
-> + model = "Pinebook";
-> + compatible = "pine64,pinebook", "allwinner,sun50i-a64";
-> +
-> + aliases {
-> + serial0 = &uart0;
-> + };
-> +
-> + chosen {
-> + stdout-path = "serial0:115200n8";
-> + };
-> +
-> + gpio_keys {
-> + compatible = "gpio-keys";
-> +
-> + lid_switch {
-> + label = "Lid Switch";
-> + gpios = <&pio 7 10 GPIO_ACTIVE_LOW>; /* PH10 */
-> + linux,input-type = <EV_SW>;
-> + linux,code = <SW_LID>;
-> + linux,can-disable;
-> + };
-> + };
-> +
-> + reg_vcc3v3: vcc3v3 {
-> + compatible = "regulator-fixed";
-> + regulator-name = "vcc3v3";
-> + regulator-min-microvolt = <3300000>;
-> + regulator-max-microvolt = <3300000>;
-> + };
-> +};
-> +
-> +&ehci1 {
-> + status = "okay";
-> +};
-> +
-> +&mmc0 {
-> + pinctrl-names = "default";
-> + pinctrl-0 = <&mmc0_pins>;
-> + vmmc-supply = <&reg_vcc3v3>;
-> + cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
-> + cd-inverted;
-> + disable-wp;
-> + bus-width = <4>;
-> + status = "okay";
-> +};
-> +
-> +&mmc2 {
-> + pinctrl-names = "default";
-> + pinctrl-0 = <&mmc2_pins>;
-> + vmmc-supply = <&reg_vcc3v3>;
-> + bus-width = <8>;
-> + non-removable;
-> + cap-mmc-hw-reset;
-> + status = "okay";
-> +};
-> +
-> +&ohci1 {
-> + status = "okay";
-> +};
-> +
-> +&uart0 {
-> + pinctrl-names = "default";
-> + pinctrl-0 = <&uart0_pins_a>;
-> + status = "okay";
-> +};
-> +
-> +&usb_otg {
-> + dr_mode = "host";
-> + status = "okay";
-> +};
-> +
-> +&usbphy {
-> + status = "okay";
-> +};
-> --
-> 2.11.1
+Thanks,
+Wang Xiongfeng
