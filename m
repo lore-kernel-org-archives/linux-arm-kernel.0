@@ -1,7 +1,7 @@
 From: codrut.cristian.grosu@gmail.com (Codrut Grosu)
-Date: Sat, 25 Feb 2017 23:40:31 +0200
-Subject: [PATCH] ASoC: pxa-ssp: Line up *s in block comments
-Message-ID: <1488058831-15912-1-git-send-email-codrut.cristian.grosu@gmail.com>
+Date: Sat, 25 Feb 2017 23:54:16 +0200
+Subject: [PATCH] ASoC: pxa: The open brace is placed with the previous line
+Message-ID: <1488059656-16725-1-git-send-email-codrut.cristian.grosu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,33 +9,29 @@ This was reported by checkpatch.pl
 
 Signed-off-by: Codrut Grosu <codrut.cristian.grosu@gmail.com>
 ---
- sound/soc/pxa/pxa-ssp.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ sound/soc/pxa/raumfeld.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/sound/soc/pxa/pxa-ssp.c b/sound/soc/pxa/pxa-ssp.c
-index 72a5e87..f3285a6 100644
---- a/sound/soc/pxa/pxa-ssp.c
-+++ b/sound/soc/pxa/pxa-ssp.c
-@@ -592,13 +592,13 @@ static int pxa_ssp_hw_params(struct snd_pcm_substream *substream,
+diff --git a/sound/soc/pxa/raumfeld.c b/sound/soc/pxa/raumfeld.c
+index 552b763..47c9173 100644
+--- a/sound/soc/pxa/raumfeld.c
++++ b/sound/soc/pxa/raumfeld.c
+@@ -228,14 +228,12 @@ static int raumfeld_ak4104_hw_params(struct snd_pcm_substream *substream,
+ 	.codec_name	= "spi0.0",			\
+ }
 
- 		if ((pxa_ssp_get_scr(ssp) == 4) && (width == 16)) {
- 			/* This is a special case where the bitclk is 64fs
--			* and we're not dealing with 2*32 bits of audio
--			* samples.
--			*
--			* The SSP values used for that are all found out by
--			* trying and failing a lot; some of the registers
--			* needed for that mode are only available on PXA3xx.
--			*/
-+			 * and we're not dealing with 2*32 bits of audio
-+			 * samples.
-+			 *
-+			 * The SSP values used for that are all found out by
-+			 * trying and failing a lot; some of the registers
-+			 * needed for that mode are only available on PXA3xx.
-+			 */
- 			if (ssp->type != PXA3xx_SSP)
- 				return -EINVAL;
+-static struct snd_soc_dai_link snd_soc_raumfeld_connector_dai[] =
+-{
++static struct snd_soc_dai_link snd_soc_raumfeld_connector_dai[] = {
+ 	DAI_LINK_CS4270,
+ 	DAI_LINK_AK4104,
+ };
+
+-static struct snd_soc_dai_link snd_soc_raumfeld_speaker_dai[] =
+-{
++static struct snd_soc_dai_link snd_soc_raumfeld_speaker_dai[] = {
+ 	DAI_LINK_CS4270,
+ };
 
 --
 1.9.1
