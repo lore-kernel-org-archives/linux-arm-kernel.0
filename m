@@ -1,325 +1,45 @@
-From: mchehab@infradead.org (Mauro Carvalho Chehab)
-Date: Sat, 25 Feb 2017 10:34:37 -0300
-Subject: [PATCH] [media] serial_ir: ensure we're ready to receive
- interrupts
-In-Reply-To: <20170225112816.GA7981@gofer.mess.org>
-References: <58b07b30.9XFLj9Hhl7F6HMc2%fengguang.wu@intel.com>
- <CA+55aFytXj+TZ_TanbxcY0KgRTrV7Vvr=fWON8tioUGmYHYiNA@mail.gmail.com>
- <20170225111424.GA7659@gofer.mess.org>
- <20170225112816.GA7981@gofer.mess.org>
-Message-ID: <20170225103437.58c5a199@vento.lan>
+From: hias@horus.com (Matthias Reichl)
+Date: Sat, 25 Feb 2017 14:39:53 +0100
+Subject: [PATCH 0/3] ASoC: Enable a new IC master mode:
+ bcm2835<=>IC<=>cs42xx8
+In-Reply-To: <cover.1487997974.git.flatmax@flatmax.org>
+References: <cover.1487997974.git.flatmax@flatmax.org>
+Message-ID: <20170225133952.GA28091@camel2.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Sat, 25 Feb 2017 11:28:16 +0000
-Sean Young <sean@mess.org> escreveu:
-
-> When the interrupt requested with devm_request_irq(), serial_ir.rcdev
-> is still null so will cause null deference if the irq handler is called
-> early on.
+On Sat, Feb 25, 2017 at 04:03:11PM +1100, Matt Flax wrote:
+> This patch set lets the ASoC system specify that an IC between the SoC and codec
+> is master. This is intended to put both the SoC and Codec into slave modes.
 > 
-> Also ensure that timeout_timer is setup.
+> By default un-patched SoC and Codec drivers will return -EINVAL if they aren't
+> enabled and tested for this mode.
 > 
-> Link: http://lkml.kernel.org/r/CA+55aFxsh2uF8gi5sN_guY3Z+tiLv7LpJYKBw+y8vqLzp+TsnQ at mail.gmail.com
+> soc-dia.h has the new SND_SOC_DAIFMT_IBM_IFM definition set as :
+> #define SND_SOC_DAIFMT_IBM_IFM		(5 << 12) /* IC clk & FRM master */
 > 
-> Cc: <stable@vger.kernel.org> # 4.10
-> Signed-off-by: Sean Young <sean@mess.org>
-> ---
->  drivers/media/rc/serial_ir.c | 243 +++++++++++++++++++++----------------------
->  1 file changed, 118 insertions(+), 125 deletions(-)
+> The cs42xx8 codec driver is enabled for this mode and so too is the BCM2835
+> SoC driver. This forms a chain : bcm2835<=>IC<=>cs42xx8
+> where the IC is bit and frame master.
+
+Model your IC as a codec. No need to add patches to random drivers
+and add a flag with the rather meaningless semantics "someone else is
+automagically setting up clocks for me".
+
+so long,
+
+Hias
 > 
-> diff --git a/drivers/media/rc/serial_ir.c b/drivers/media/rc/serial_ir.c
-> index 923fb22..22144b4 100644
-> --- a/drivers/media/rc/serial_ir.c
-> +++ b/drivers/media/rc/serial_ir.c
-> @@ -487,74 +487,6 @@ static void serial_ir_timeout(unsigned long arg)
->  	ir_raw_event_handle(serial_ir.rcdev);
->  }
->  
-> -static int serial_ir_probe(struct platform_device *dev)
-> -{
-> -	int i, nlow, nhigh, result;
-
-Hmm... why did you move this function to be after serial_ir_open()?
-
-That messes with the diff without no good reason, making harder to
-identify what you changed here.
-
-> -
-> -	result = devm_request_irq(&dev->dev, irq, serial_ir_irq_handler,
-> -				  share_irq ? IRQF_SHARED : 0,
-> -				  KBUILD_MODNAME, &hardware);
-> -	if (result < 0) {
-> -		if (result == -EBUSY)
-> -			dev_err(&dev->dev, "IRQ %d busy\n", irq);
-> -		else if (result == -EINVAL)
-> -			dev_err(&dev->dev, "Bad irq number or handler\n");
-> -		return result;
-> -	}
-> -
-> -	/* Reserve io region. */
-> -	if ((iommap &&
-> -	     (devm_request_mem_region(&dev->dev, iommap, 8 << ioshift,
-> -				      KBUILD_MODNAME) == NULL)) ||
-> -	     (!iommap && (devm_request_region(&dev->dev, io, 8,
-> -			  KBUILD_MODNAME) == NULL))) {
-> -		dev_err(&dev->dev, "port %04x already in use\n", io);
-> -		dev_warn(&dev->dev, "use 'setserial /dev/ttySX uart none'\n");
-> -		dev_warn(&dev->dev,
-> -			 "or compile the serial port driver as module and\n");
-> -		dev_warn(&dev->dev, "make sure this module is loaded first\n");
-> -		return -EBUSY;
-> -	}
-> -
-> -	setup_timer(&serial_ir.timeout_timer, serial_ir_timeout,
-> -		    (unsigned long)&serial_ir);
-> -
-> -	result = hardware_init_port();
-> -	if (result < 0)
-> -		return result;
-> -
-> -	/* Initialize pulse/space widths */
-> -	init_timing_params(50, 38000);
-> -
-> -	/* If pin is high, then this must be an active low receiver. */
-> -	if (sense == -1) {
-> -		/* wait 1/2 sec for the power supply */
-> -		msleep(500);
-> -
-> -		/*
-> -		 * probe 9 times every 0.04s, collect "votes" for
-> -		 * active high/low
-> -		 */
-> -		nlow = 0;
-> -		nhigh = 0;
-> -		for (i = 0; i < 9; i++) {
-> -			if (sinp(UART_MSR) & hardware[type].signal_pin)
-> -				nlow++;
-> -			else
-> -				nhigh++;
-> -			msleep(40);
-> -		}
-> -		sense = nlow >= nhigh ? 1 : 0;
-> -		dev_info(&dev->dev, "auto-detected active %s receiver\n",
-> -			 sense ? "low" : "high");
-> -	} else
-> -		dev_info(&dev->dev, "Manually using active %s receiver\n",
-> -			 sense ? "low" : "high");
-> -
-> -	dev_dbg(&dev->dev, "Interrupt %d, port %04x obtained\n", irq, io);
-> -	return 0;
-> -}
-> -
->  static int serial_ir_open(struct rc_dev *rcdev)
->  {
->  	unsigned long flags;
-> @@ -679,6 +611,123 @@ static int serial_ir_resume(struct platform_device *dev)
->  	return 0;
->  }
->  
-> +static int serial_ir_probe(struct platform_device *dev)
-> +{
-> +	struct rc_dev *rcdev;
-> +	int i, nlow, nhigh, result;
-> +
-> +	rcdev = devm_rc_allocate_device(&dev->dev, RC_DRIVER_IR_RAW);
-> +	if (!rcdev)
-> +		return -ENOMEM;
-> +
-> +	if (hardware[type].send_pulse && hardware[type].send_space)
-> +		rcdev->tx_ir = serial_ir_tx;
-> +	if (hardware[type].set_send_carrier)
-> +		rcdev->s_tx_carrier = serial_ir_tx_carrier;
-> +	if (hardware[type].set_duty_cycle)
-> +		rcdev->s_tx_duty_cycle = serial_ir_tx_duty_cycle;
-> +
-> +	switch (type) {
-> +	case IR_HOMEBREW:
-> +		rcdev->input_name = "Serial IR type home-brew";
-> +		break;
-> +	case IR_IRDEO:
-> +		rcdev->input_name = "Serial IR type IRdeo";
-> +		break;
-> +	case IR_IRDEO_REMOTE:
-> +		rcdev->input_name = "Serial IR type IRdeo remote";
-> +		break;
-> +	case IR_ANIMAX:
-> +		rcdev->input_name = "Serial IR type AnimaX";
-> +		break;
-> +	case IR_IGOR:
-> +		rcdev->input_name = "Serial IR type IgorPlug";
-> +		break;
-> +	}
-> +
-> +	rcdev->input_phys = KBUILD_MODNAME "/input0";
-> +	rcdev->input_id.bustype = BUS_HOST;
-> +	rcdev->input_id.vendor = 0x0001;
-> +	rcdev->input_id.product = 0x0001;
-> +	rcdev->input_id.version = 0x0100;
-> +	rcdev->open = serial_ir_open;
-> +	rcdev->close = serial_ir_close;
-> +	rcdev->dev.parent = &serial_ir.pdev->dev;
-> +	rcdev->allowed_protocols = RC_BIT_ALL_IR_DECODER;
-> +	rcdev->driver_name = KBUILD_MODNAME;
-> +	rcdev->map_name = RC_MAP_RC6_MCE;
-> +	rcdev->min_timeout = 1;
-> +	rcdev->timeout = IR_DEFAULT_TIMEOUT;
-> +	rcdev->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
-> +	rcdev->rx_resolution = 250000;
-> +
-> +	serial_ir.rcdev = rcdev;
-> +
-> +	setup_timer(&serial_ir.timeout_timer, serial_ir_timeout,
-> +		    (unsigned long)&serial_ir);
-> +
-> +	result = devm_request_irq(&dev->dev, irq, serial_ir_irq_handler,
-> +				  share_irq ? IRQF_SHARED : 0,
-> +				  KBUILD_MODNAME, &hardware);
-> +	if (result < 0) {
-> +		if (result == -EBUSY)
-> +			dev_err(&dev->dev, "IRQ %d busy\n", irq);
-> +		else if (result == -EINVAL)
-> +			dev_err(&dev->dev, "Bad irq number or handler\n");
-> +		return result;
-> +	}
-> +
-> +	/* Reserve io region. */
-> +	if ((iommap &&
-> +	     (devm_request_mem_region(&dev->dev, iommap, 8 << ioshift,
-> +				      KBUILD_MODNAME) == NULL)) ||
-> +	     (!iommap && (devm_request_region(&dev->dev, io, 8,
-> +			  KBUILD_MODNAME) == NULL))) {
-> +		dev_err(&dev->dev, "port %04x already in use\n", io);
-> +		dev_warn(&dev->dev, "use 'setserial /dev/ttySX uart none'\n");
-> +		dev_warn(&dev->dev,
-> +			 "or compile the serial port driver as module and\n");
-> +		dev_warn(&dev->dev, "make sure this module is loaded first\n");
-> +		return -EBUSY;
-> +	}
-> +
-> +	result = hardware_init_port();
-> +	if (result < 0)
-> +		return result;
-> +
-> +	/* Initialize pulse/space widths */
-> +	init_timing_params(50, 38000);
-> +
-> +	/* If pin is high, then this must be an active low receiver. */
-> +	if (sense == -1) {
-> +		/* wait 1/2 sec for the power supply */
-> +		msleep(500);
-> +
-> +		/*
-> +		 * probe 9 times every 0.04s, collect "votes" for
-> +		 * active high/low
-> +		 */
-> +		nlow = 0;
-> +		nhigh = 0;
-> +		for (i = 0; i < 9; i++) {
-> +			if (sinp(UART_MSR) & hardware[type].signal_pin)
-> +				nlow++;
-> +			else
-> +				nhigh++;
-> +			msleep(40);
-> +		}
-> +		sense = nlow >= nhigh ? 1 : 0;
-> +		dev_info(&dev->dev, "auto-detected active %s receiver\n",
-> +			 sense ? "low" : "high");
-> +	} else
-> +		dev_info(&dev->dev, "Manually using active %s receiver\n",
-> +			 sense ? "low" : "high");
-> +
-> +	dev_dbg(&dev->dev, "Interrupt %d, port %04x obtained\n", irq, io);
-> +
-> +	return devm_rc_register_device(&dev->dev, rcdev);
-> +}
-> +
->  static struct platform_driver serial_ir_driver = {
->  	.probe		= serial_ir_probe,
->  	.suspend	= serial_ir_suspend,
-> @@ -723,7 +772,6 @@ static void serial_ir_exit(void)
->  
->  static int __init serial_ir_init_module(void)
->  {
-> -	struct rc_dev *rcdev;
->  	int result;
->  
->  	switch (type) {
-> @@ -754,63 +802,9 @@ static int __init serial_ir_init_module(void)
->  		sense = !!sense;
->  
->  	result = serial_ir_init();
-> -	if (result)
-> -		return result;
-> -
-> -	rcdev = devm_rc_allocate_device(&serial_ir.pdev->dev, RC_DRIVER_IR_RAW);
-> -	if (!rcdev) {
-> -		result = -ENOMEM;
-> -		goto serial_cleanup;
-> -	}
-> -
-> -	if (hardware[type].send_pulse && hardware[type].send_space)
-> -		rcdev->tx_ir = serial_ir_tx;
-> -	if (hardware[type].set_send_carrier)
-> -		rcdev->s_tx_carrier = serial_ir_tx_carrier;
-> -	if (hardware[type].set_duty_cycle)
-> -		rcdev->s_tx_duty_cycle = serial_ir_tx_duty_cycle;
-> -
-> -	switch (type) {
-> -	case IR_HOMEBREW:
-> -		rcdev->input_name = "Serial IR type home-brew";
-> -		break;
-> -	case IR_IRDEO:
-> -		rcdev->input_name = "Serial IR type IRdeo";
-> -		break;
-> -	case IR_IRDEO_REMOTE:
-> -		rcdev->input_name = "Serial IR type IRdeo remote";
-> -		break;
-> -	case IR_ANIMAX:
-> -		rcdev->input_name = "Serial IR type AnimaX";
-> -		break;
-> -	case IR_IGOR:
-> -		rcdev->input_name = "Serial IR type IgorPlug";
-> -		break;
-> -	}
-> -
-> -	rcdev->input_phys = KBUILD_MODNAME "/input0";
-> -	rcdev->input_id.bustype = BUS_HOST;
-> -	rcdev->input_id.vendor = 0x0001;
-> -	rcdev->input_id.product = 0x0001;
-> -	rcdev->input_id.version = 0x0100;
-> -	rcdev->open = serial_ir_open;
-> -	rcdev->close = serial_ir_close;
-> -	rcdev->dev.parent = &serial_ir.pdev->dev;
-> -	rcdev->allowed_protocols = RC_BIT_ALL_IR_DECODER;
-> -	rcdev->driver_name = KBUILD_MODNAME;
-> -	rcdev->map_name = RC_MAP_RC6_MCE;
-> -	rcdev->min_timeout = 1;
-> -	rcdev->timeout = IR_DEFAULT_TIMEOUT;
-> -	rcdev->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
-> -	rcdev->rx_resolution = 250000;
-> -
-> -	serial_ir.rcdev = rcdev;
-> -
-> -	result = rc_register_device(rcdev);
-> -
->  	if (!result)
->  		return 0;
-> -serial_cleanup:
-> +
->  	serial_ir_exit();
->  	return result;
->  }
-> @@ -818,7 +812,6 @@ static int __init serial_ir_init_module(void)
->  static void __exit serial_ir_exit_module(void)
->  {
->  	del_timer_sync(&serial_ir.timeout_timer);
-> -	rc_unregister_device(serial_ir.rcdev);
->  	serial_ir_exit();
->  }
->  
-
-
-
-Thanks,
-Mauro
+> Matt Flax (3):
+>   ASoC : Add an IC bit and frame master mode (SoC and Codec slave).
+>   ASoC: cs42xx8: allow IC master mode.
+>   ASoC: bcm2835: Add mutichannel mode in DSP and IC master modes.
+> 
+>  include/sound/soc-dai.h     |  9 ++++++---
+>  sound/soc/bcm/bcm2835-i2s.c | 21 ++++++++++++++++++++-
+>  sound/soc/codecs/cs42xx8.c  |  1 +
+>  3 files changed, 27 insertions(+), 4 deletions(-)
+> 
+> -- 
+> 2.7.4
+> 
