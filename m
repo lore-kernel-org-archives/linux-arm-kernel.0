@@ -1,82 +1,70 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 25 Feb 2017 18:37:42 +0000
-Subject: linux-next build regressions, Re: next build: 208 builds: 2
- failed, 206 passed, 39 warnings (next-20170222)
-In-Reply-To: <2483588.cUC69WWsNF@wuerfel>
-References: <58ad2e38.0d57190a.e5f64.04d6@mx.google.com>
- <2483588.cUC69WWsNF@wuerfel>
-Message-ID: <6775f680-bf18-ed4a-223e-ef734f6b360f@kernel.org>
+From: codrut.cristian.grosu@gmail.com (Codrut Grosu)
+Date: Sat, 25 Feb 2017 21:59:33 +0200
+Subject: [PATCH] ASoC: sirf: Added blank line after declarations
+Message-ID: <1488052773-9845-1-git-send-email-codrut.cristian.grosu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/02/17 10:30, Arnd Bergmann wrote:
-> On Tuesday, February 21, 2017 10:22:48 PM CET kernelci. org bot wrote:
->> next build: 208 builds: 2 failed, 206 passed, 39 warnings (next-20170222)
-> 
-> From last week's 9, four patches got merged into linux-next, two new
-> ones came in (drm/sti), three have pending patches and two are waiting
-> for me to come up with a proper solution.
-> 
->> --------------------------------------------------------------------------------
->> allmodconfig (arm) ? PASS, 0 errors, 9 warnings, 0 section mismatches
->>
->> Warnings:
->>     drivers/gpu/drm/sti/sti_vtg.c:392:22: warning: unused variable 'np' [-Wunused-variable]
->>     drivers/gpu/drm/sti/sti_drv.c:120:13: warning: 'sti_drm_dbg_cleanup' defined but not used [-Wunused-function]
-> 
-> I sent two patches for these yesterday, and Vincent also sent these
-> already, 
-> 
->>     drivers/iio/adc/rcar-gyroadc.c:429:27: warning: 'num_channels' may be used uninitialized in this function [-Wmaybe-uninitialized]
->>     drivers/iio/adc/rcar-gyroadc.c:426:22: warning: 'sample_width' may be used uninitialized in this function [-Wmaybe-uninitialized]
->>     drivers/iio/adc/rcar-gyroadc.c:428:23: warning: 'channels' may be used uninitialized in this function [-Wmaybe-uninitialized]
->>     drivers/iio/adc/rcar-gyroadc.c:398:26: warning: 'adcmode' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> 
-> An old one, Jonathan Cameron said he'd send this one for 4.11-rc2,
-> but it has not appeared in linux-next yet.
-> 
-> Jonathan, any update?
-Was waiting for Greg's staging-linus branch to contain the dependencies
-so I could do a merge test before sending him the pull. Took a few
-more days after that to get to it as busy week. Now done.
+This was reported by checkpatch.pl
 
-Pull request for a micro set including this one just gone to Greg.
-Not rc2 time yet so plenty of time ;)
+Signed-off-by: Codrut GROSU <codrut.cristian.grosu@gmail.com>
+---
+ sound/soc/sirf/sirf-audio-port.c | 1 +
+ sound/soc/sirf/sirf-audio.c      | 1 +
+ sound/soc/sirf/sirf-usp.c        | 3 +++
+ 3 files changed, 5 insertions(+)
 
-Thanks
-
-Jonathan
-> 
->>     drivers/media/platform/coda/imx-vdoa.c:333:181: warning: passing argument 1 of '__platform_driver_register' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
->>     drivers/media/platform/coda/imx-vdoa.c:333:625: warning: passing argument 1 of 'platform_driver_unregister' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
-> 
-> Hans Verkuil said he'd take care of this if he remembers.
-> 
->>     drivers/usb/gadget/udc/atmel_usba_udc.c:632:550: warning: 'ept_cfg' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> 
-> Sent a patch on 2017-02-01. No reply since last update, resending now.
-> 
->> --------------------------------------------------------------------------------
->> cavium_octeon_defconfig (mips) ? PASS, 0 errors, 1 warning, 0 section mismatches
->>
->> Warnings:
->>     drivers/staging/octeon/ethernet-rx.c:339:28: warning: unused variable 'priv' [-Wunused-variable]
-> 
-> I sent a patch on 2017-02-17, no reply yet.
-> 
->> --------------------------------------------------------------------------------
->> defconfig+CONFIG_KASAN=y (x86) ? PASS, 0 errors, 5 warnings, 0 section mismatches
->>
->> Warnings:
->>     net/wireless/nl80211.c:1415:1: warning: the frame size of 2232 bytes is larger than 2048 bytes [-Wframe-larger-than=]
->>     net/wireless/nl80211.c:4443:1: warning: the frame size of 2232 bytes is larger than 2048 bytes [-Wframe-larger-than=]
->>     net/wireless/nl80211.c:5743:1: warning: the frame size of 2064 bytes is larger than 2048 bytes [-Wframe-larger-than=]
->>     net/wireless/nl80211.c:1904:1: warning: the frame size of 3784 bytes is larger than 2048 bytes [-Wframe-larger-than=]
->>     drivers/tty/vt/keyboard.c:1470:1: warning: the frame size of 2344 bytes is larger than 2048 bytes [-Wframe-larger-than=]
-> 
-> I have patches, but it's tricky. Expect a long set of patches in the next
-> few days. Unlike the others, this is not a regression compared to 4.9, but
-> a long-standing issue.
-> 
-> 	Arnd
-> 
+diff --git a/sound/soc/sirf/sirf-audio-port.c b/sound/soc/sirf/sirf-audio-port.c
+index 3f2cce0..be066de 100644
+--- a/sound/soc/sirf/sirf-audio-port.c
++++ b/sound/soc/sirf/sirf-audio-port.c
+@@ -19,6 +19,7 @@ struct sirf_audio_port {
+ static int sirf_audio_port_dai_probe(struct snd_soc_dai *dai)
+ {
+ 	struct sirf_audio_port *port = snd_soc_dai_get_drvdata(dai);
++
+ 	snd_soc_dai_init_dma_data(dai, &port->playback_dma_data,
+ 			&port->capture_dma_data);
+ 	return 0;
+diff --git a/sound/soc/sirf/sirf-audio.c b/sound/soc/sirf/sirf-audio.c
+index 94ea152..f2bc507 100644
+--- a/sound/soc/sirf/sirf-audio.c
++++ b/sound/soc/sirf/sirf-audio.c
+@@ -27,6 +27,7 @@ static int sirf_audio_hp_event(struct snd_soc_dapm_widget *w,
+ 	struct snd_soc_card *card = dapm->card;
+ 	struct sirf_audio_card *sirf_audio_card = snd_soc_card_get_drvdata(card);
+ 	int on = !SND_SOC_DAPM_EVENT_OFF(event);
++
+ 	if (gpio_is_valid(sirf_audio_card->gpio_hp_pa))
+ 		gpio_set_value(sirf_audio_card->gpio_hp_pa, on);
+ 	return 0;
+diff --git a/sound/soc/sirf/sirf-usp.c b/sound/soc/sirf/sirf-usp.c
+index 45fc06c..77e7dcf 100644
+--- a/sound/soc/sirf/sirf-usp.c
++++ b/sound/soc/sirf/sirf-usp.c
+@@ -71,6 +71,7 @@ static void sirf_usp_rx_disable(struct sirf_usp *usp)
+ static int sirf_usp_pcm_dai_probe(struct snd_soc_dai *dai)
+ {
+ 	struct sirf_usp *usp = snd_soc_dai_get_drvdata(dai);
++
+ 	snd_soc_dai_init_dma_data(dai, &usp->playback_dma_data,
+ 			&usp->capture_dma_data);
+ 	return 0;
+@@ -294,6 +295,7 @@ static int sirf_usp_pcm_trigger(struct snd_pcm_substream *substream, int cmd,
+ static int sirf_usp_pcm_runtime_suspend(struct device *dev)
+ {
+ 	struct sirf_usp *usp = dev_get_drvdata(dev);
++
+ 	clk_disable_unprepare(usp->clk);
+ 	return 0;
+ }
+@@ -302,6 +304,7 @@ static int sirf_usp_pcm_runtime_resume(struct device *dev)
+ {
+ 	struct sirf_usp *usp = dev_get_drvdata(dev);
+ 	int ret;
++
+ 	ret = clk_prepare_enable(usp->clk);
+ 	if (ret) {
+ 		dev_err(dev, "clk_enable failed: %d\n", ret);
+--
+1.9.1
