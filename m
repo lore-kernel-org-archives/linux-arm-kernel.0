@@ -1,46 +1,40 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sat, 25 Feb 2017 15:42:15 +0800
-Subject: [PATCH 2/3] pwm: sunxi: Add A64 support
+Date: Sat, 25 Feb 2017 15:42:16 +0800
+Subject: [PATCH 3/3] arm64: dts: allwinner: add pwm device node for A64
 In-Reply-To: <20170225074216.64868-1-icenowy@aosc.xyz>
 References: <20170225074216.64868-1-icenowy@aosc.xyz>
-Message-ID: <20170225074216.64868-2-icenowy@aosc.xyz>
+Message-ID: <20170225074216.64868-3-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A64 PWM controller has same register layout as sun4i driver, so it works
-by adding A64 specific data.
+Allwinner A64 features a PWM controller, which is used for backlight
+control by several boards (Pine64 Pinebook, Olimex TERES I).
+
+Add its device node.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- drivers/pwm/pwm-sun4i.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-index 1284ffa05921..ca3431e03fb8 100644
---- a/drivers/pwm/pwm-sun4i.c
-+++ b/drivers/pwm/pwm-sun4i.c
-@@ -290,6 +290,12 @@ static const struct sun4i_pwm_data sun4i_pwm_data_h3 = {
- 	.npwm = 1,
- };
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 601514ead28c..afc76d5df4e2 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -302,6 +302,14 @@
+ 			};
+ 		};
  
-+static const struct sun4i_pwm_data sun4i_pwm_data_a64 = {
-+	.has_prescaler_bypass = true,
-+	.has_rdy = true,
-+	.npwm = 1,
-+};
++		pwm: pwm at 01c21400 {
++			compatible = "allwinner,sun50i-a64-pwm";
++			reg = <0x01c21400 0x8>;
++			clocks = <&osc24M>;
++			#pwm-cells = <3>;
++			status = "disabled";
++		};
 +
- static const struct of_device_id sun4i_pwm_dt_ids[] = {
- 	{
- 		.compatible = "allwinner,sun4i-a10-pwm",
-@@ -307,6 +313,9 @@ static const struct of_device_id sun4i_pwm_dt_ids[] = {
- 		.compatible = "allwinner,sun8i-h3-pwm",
- 		.data = &sun4i_pwm_data_h3,
- 	}, {
-+		.compatible = "allwinner,sun50i-a64-pwm",
-+		.data = &sun4i_pwm_data_a64,
-+	}, {
- 		/* sentinel */
- 	},
- };
+ 		uart0: serial at 1c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
 -- 
 2.11.1
