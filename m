@@ -1,33 +1,38 @@
-From: mihai.dumitru2201@gmail.com (Mihai-Valentin DUMITRU)
-Date: Sat, 25 Feb 2017 12:18:34 +0200
-Subject: [PATCH] ASoC: rockchip: i2s: Remove unnecessary 'out of memory'
- message
-Message-ID: <20170225101834.28232-1-mihai.dumitru2201@stud.acs.upb.ro>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Sat, 25 Feb 2017 10:21:19 +0000
+Subject: [PATCH v2 1/2] dt-bindings: arm: hisilicon: add bindings for
+ hi3798cv200 SoC and Poplar board
+In-Reply-To: <1487752716-14824-2-git-send-email-xuejiancheng@hisilicon.com>
+References: <1487752716-14824-1-git-send-email-xuejiancheng@hisilicon.com>
+ <1487752716-14824-2-git-send-email-xuejiancheng@hisilicon.com>
+Message-ID: <20170225102119.GA6537@griffinp-mac>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was reported by checkpatch.pl
+On Wed, 22 Feb 2017, Jiancheng Xue wrote:
 
-Signed-off-by: Mihai-Valentin DUMITRU <mihai.dumitru2201@gmail.com>
----
- sound/soc/rockchip/rockchip_i2s.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+> Add bindings for HiSilicon hi3798cv200 SoC and Poplar Board.
+> 
+> Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index 974915cb4c4f..d02a1045fc0b 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -551,10 +551,8 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
- 	int val;
- 
- 	i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
--	if (!i2s) {
--		dev_err(&pdev->dev, "Can't allocate rk_i2s_dev\n");
-+	if (!i2s)
- 		return -ENOMEM;
--	}
- 
- 	i2s->dev = &pdev->dev;
- 
--- 
-2.11.1
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
+
+> ---
+>  Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> index f1c1e21..1fd3dd7 100644
+> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+> @@ -4,6 +4,10 @@ Hi3660 SoC
+>  Required root node properties:
+>  	- compatible = "hisilicon,hi3660";
+>  
+> +Hi3798cv200 Poplar Board
+> +Required root node properties:
+> +	- compatible = "hisilicon,hi3798cv200-poplar", "hisilicon,hi3798cv200";
+> +
+>  Hi4511 Board
+>  Required root node properties:
+>  	- compatible = "hisilicon,hi3620-hi4511";
