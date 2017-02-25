@@ -1,207 +1,87 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Sat, 25 Feb 2017 11:55:46 -0300
-Subject: [PATCH v3.1] [media] serial_ir: ensure we're ready to receive
- interrupts
-Message-ID: <4bf42b3935a6da2ec45730764c624ddc7c3f7c4f.1488032183.git.mchehab@s-opensource.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 25 Feb 2017 15:11:59 +0000
+Subject: [PATCH 1/2] dt-bindings: iio: stm32-adc: add option to set
+ resolution
+In-Reply-To: <b9f59559-c7a8-f575-0868-bd3b149a35c9@st.com>
+References: <1487177757-19427-1-git-send-email-fabrice.gasnier@st.com>
+ <1487177757-19427-2-git-send-email-fabrice.gasnier@st.com>
+ <c2b73482-ae01-34b5-3c16-b7e63893259e@kernel.org>
+ <b9f59559-c7a8-f575-0868-bd3b149a35c9@st.com>
+Message-ID: <d64bd76d-a2c6-6148-c126-fa73e96019a1@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Young <sean@mess.org>
+On 24/02/17 16:04, Fabrice Gasnier wrote:
+> On 02/19/2017 01:09 PM, Jonathan Cameron wrote:
+>> On 15/02/17 16:55, Fabrice Gasnier wrote:
+>>> Add documentation for 'st,adc-res' dt optional property.
+>>>
+>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> I'm happy with this, but would like to leave time for a device tree review.
+>>
+>> Ultimately we may well want to make this a generic property and call it something
+>> like adc-resolution but perhaps we need to wait until we have a few more devices
+>> supporting setting it via device tree to figure out what the best interface is.
+>> It would exactly be a problem to support this as a deprecated binding at that
+>> point.
+> 
+> Hi Jonathan,
+> 
+> I agree with you on this... It may be better to have generic property
+> for this, especially if you see that it will come in the near future.
+> May I suggest this prop to be less restrictive, e.g. like
+> resolution-bits as is may also be worth for other device types, e.g.
+> DAC as an example ?>
+Sure, why not - no loss of meaning here.  We may never use it for anything
+else but that doesn't matter.
+>>
+>> Give me a poke if we hear nothing from Rob or Mark for say another week.
+> 
+> No news yet, but it can wait a little longer.
+Rob / Mark, can you take a look at this if you have time?
 
-When the interrupt requested with devm_request_irq(), serial_ir.rcdev
-is still null so will cause null deference if the irq handler is called
-early on.
+Thanks,
 
-Also ensure that timeout_timer is setup.
-
-Link: http://lkml.kernel.org/r/CA+55aFxsh2uF8gi5sN_guY3Z+tiLv7LpJYKBw+y8vqLzp+TsnQ at mail.gmail.com
-
-[mchehab at s-opensource.com: moved serial_ir_probe() back to its original place]
-
-Cc: <stable@vger.kernel.org> # for 4.10
-Signed-off-by: Sean Young <sean@mess.org>
-Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
----
-
-Resent, using git
-
- drivers/media/rc/serial_ir.c | 123 ++++++++++++++++++++++---------------------
- 1 file changed, 62 insertions(+), 61 deletions(-)
-
-diff --git a/drivers/media/rc/serial_ir.c b/drivers/media/rc/serial_ir.c
-index 923fb2299553..41b54e40176c 100644
---- a/drivers/media/rc/serial_ir.c
-+++ b/drivers/media/rc/serial_ir.c
-@@ -487,10 +487,69 @@ static void serial_ir_timeout(unsigned long arg)
- 	ir_raw_event_handle(serial_ir.rcdev);
- }
- 
-+/* Needed by serial_ir_probe() */
-+static int serial_ir_tx(struct rc_dev *dev, unsigned int *txbuf,
-+			unsigned int count);
-+static int serial_ir_tx_duty_cycle(struct rc_dev *dev, u32 cycle);
-+static int serial_ir_tx_carrier(struct rc_dev *dev, u32 carrier);
-+static int serial_ir_open(struct rc_dev *rcdev);
-+static void serial_ir_close(struct rc_dev *rcdev);
-+
- static int serial_ir_probe(struct platform_device *dev)
- {
-+	struct rc_dev *rcdev;
- 	int i, nlow, nhigh, result;
- 
-+	rcdev = devm_rc_allocate_device(&dev->dev, RC_DRIVER_IR_RAW);
-+	if (!rcdev)
-+		return -ENOMEM;
-+
-+	if (hardware[type].send_pulse && hardware[type].send_space)
-+		rcdev->tx_ir = serial_ir_tx;
-+	if (hardware[type].set_send_carrier)
-+		rcdev->s_tx_carrier = serial_ir_tx_carrier;
-+	if (hardware[type].set_duty_cycle)
-+		rcdev->s_tx_duty_cycle = serial_ir_tx_duty_cycle;
-+
-+	switch (type) {
-+	case IR_HOMEBREW:
-+		rcdev->input_name = "Serial IR type home-brew";
-+		break;
-+	case IR_IRDEO:
-+		rcdev->input_name = "Serial IR type IRdeo";
-+		break;
-+	case IR_IRDEO_REMOTE:
-+		rcdev->input_name = "Serial IR type IRdeo remote";
-+		break;
-+	case IR_ANIMAX:
-+		rcdev->input_name = "Serial IR type AnimaX";
-+		break;
-+	case IR_IGOR:
-+		rcdev->input_name = "Serial IR type IgorPlug";
-+		break;
-+	}
-+
-+	rcdev->input_phys = KBUILD_MODNAME "/input0";
-+	rcdev->input_id.bustype = BUS_HOST;
-+	rcdev->input_id.vendor = 0x0001;
-+	rcdev->input_id.product = 0x0001;
-+	rcdev->input_id.version = 0x0100;
-+	rcdev->open = serial_ir_open;
-+	rcdev->close = serial_ir_close;
-+	rcdev->dev.parent = &serial_ir.pdev->dev;
-+	rcdev->allowed_protocols = RC_BIT_ALL_IR_DECODER;
-+	rcdev->driver_name = KBUILD_MODNAME;
-+	rcdev->map_name = RC_MAP_RC6_MCE;
-+	rcdev->min_timeout = 1;
-+	rcdev->timeout = IR_DEFAULT_TIMEOUT;
-+	rcdev->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
-+	rcdev->rx_resolution = 250000;
-+
-+	serial_ir.rcdev = rcdev;
-+
-+	setup_timer(&serial_ir.timeout_timer, serial_ir_timeout,
-+		    (unsigned long)&serial_ir);
-+
- 	result = devm_request_irq(&dev->dev, irq, serial_ir_irq_handler,
- 				  share_irq ? IRQF_SHARED : 0,
- 				  KBUILD_MODNAME, &hardware);
-@@ -516,9 +575,6 @@ static int serial_ir_probe(struct platform_device *dev)
- 		return -EBUSY;
- 	}
- 
--	setup_timer(&serial_ir.timeout_timer, serial_ir_timeout,
--		    (unsigned long)&serial_ir);
--
- 	result = hardware_init_port();
- 	if (result < 0)
- 		return result;
-@@ -552,7 +608,8 @@ static int serial_ir_probe(struct platform_device *dev)
- 			 sense ? "low" : "high");
- 
- 	dev_dbg(&dev->dev, "Interrupt %d, port %04x obtained\n", irq, io);
--	return 0;
-+
-+	return devm_rc_register_device(&dev->dev, rcdev);
- }
- 
- static int serial_ir_open(struct rc_dev *rcdev)
-@@ -723,7 +780,6 @@ static void serial_ir_exit(void)
- 
- static int __init serial_ir_init_module(void)
- {
--	struct rc_dev *rcdev;
- 	int result;
- 
- 	switch (type) {
-@@ -754,63 +810,9 @@ static int __init serial_ir_init_module(void)
- 		sense = !!sense;
- 
- 	result = serial_ir_init();
--	if (result)
--		return result;
--
--	rcdev = devm_rc_allocate_device(&serial_ir.pdev->dev, RC_DRIVER_IR_RAW);
--	if (!rcdev) {
--		result = -ENOMEM;
--		goto serial_cleanup;
--	}
--
--	if (hardware[type].send_pulse && hardware[type].send_space)
--		rcdev->tx_ir = serial_ir_tx;
--	if (hardware[type].set_send_carrier)
--		rcdev->s_tx_carrier = serial_ir_tx_carrier;
--	if (hardware[type].set_duty_cycle)
--		rcdev->s_tx_duty_cycle = serial_ir_tx_duty_cycle;
--
--	switch (type) {
--	case IR_HOMEBREW:
--		rcdev->input_name = "Serial IR type home-brew";
--		break;
--	case IR_IRDEO:
--		rcdev->input_name = "Serial IR type IRdeo";
--		break;
--	case IR_IRDEO_REMOTE:
--		rcdev->input_name = "Serial IR type IRdeo remote";
--		break;
--	case IR_ANIMAX:
--		rcdev->input_name = "Serial IR type AnimaX";
--		break;
--	case IR_IGOR:
--		rcdev->input_name = "Serial IR type IgorPlug";
--		break;
--	}
--
--	rcdev->input_phys = KBUILD_MODNAME "/input0";
--	rcdev->input_id.bustype = BUS_HOST;
--	rcdev->input_id.vendor = 0x0001;
--	rcdev->input_id.product = 0x0001;
--	rcdev->input_id.version = 0x0100;
--	rcdev->open = serial_ir_open;
--	rcdev->close = serial_ir_close;
--	rcdev->dev.parent = &serial_ir.pdev->dev;
--	rcdev->allowed_protocols = RC_BIT_ALL_IR_DECODER;
--	rcdev->driver_name = KBUILD_MODNAME;
--	rcdev->map_name = RC_MAP_RC6_MCE;
--	rcdev->min_timeout = 1;
--	rcdev->timeout = IR_DEFAULT_TIMEOUT;
--	rcdev->max_timeout = 10 * IR_DEFAULT_TIMEOUT;
--	rcdev->rx_resolution = 250000;
--
--	serial_ir.rcdev = rcdev;
--
--	result = rc_register_device(rcdev);
--
- 	if (!result)
- 		return 0;
--serial_cleanup:
-+
- 	serial_ir_exit();
- 	return result;
- }
-@@ -818,7 +820,6 @@ static int __init serial_ir_init_module(void)
- static void __exit serial_ir_exit_module(void)
- {
- 	del_timer_sync(&serial_ir.timeout_timer);
--	rc_unregister_device(serial_ir.rcdev);
- 	serial_ir_exit();
- }
- 
--- 
-2.9.3
+Jonathan
+> 
+> Please advise,
+> Regards,
+> Fabrice
+> 
+>>
+>> Thanks,
+>>
+>> Jonathan
+>>
+>>> ---
+>>>  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 4 ++++
+>>>  1 file changed, 4 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+>>> index 5dfc88e..45f7ff2 100644
+>>> --- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+>>> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+>>> @@ -57,6 +57,9 @@ Optional properties:
+>>>  - dmas: Phandle to dma channel for this ADC instance.
+>>>    See ../../dma/dma.txt for details.
+>>>  - dma-names: Must be "rx" when dmas property is being used.
+>>> +- st,adc-res: Resolution (bits) to use for conversions. Must match device
+>>> +  available resolutions (e.g. can be 6, 8, 10 or 12 on stm32f4). Default
+>>> +  is maximum resolution if unset.
+>>>
+>>>  Example:
+>>>      adc: adc at 40012000 {
+>>> @@ -84,6 +87,7 @@ Example:
+>>>              st,adc-channels = <8>;
+>>>              dmas = <&dma2 0 0 0x400 0x0>;
+>>>              dma-names = "rx";
+>>> +            st,adc-res = <8>;
+>>>          };
+>>>          ...
+>>>          other adc child nodes follow...
+>>>
+>>
+> -- 
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
