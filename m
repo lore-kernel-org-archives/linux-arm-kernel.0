@@ -1,74 +1,96 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 25 Feb 2017 16:41:07 +0000
-Subject: [PATCH v2] iio: adc: xilinx: Fix error handling
-In-Reply-To: <2c05b3bd-b5b4-e322-5d92-cd1c65d84ff5@metafoo.de>
-References: <20170221063400.2984-1-christophe.jaillet@wanadoo.fr>
- <2c05b3bd-b5b4-e322-5d92-cd1c65d84ff5@metafoo.de>
-Message-ID: <902ad8ee-c7f8-582c-fd58-3a69605fc0e0@kernel.org>
+Date: Sat, 25 Feb 2017 16:53:40 +0000
+Subject: [PATCH v3 04/18] iio: adc: add support for X-Powers AXP20X and
+ AXP22X PMICs ADCs
+In-Reply-To: <cd4eac68-0155-d032-6d49-91e3ebdee72e@free-electrons.com>
+References: <20170214094112.27426-1-quentin.schulz@free-electrons.com>
+ <20170214094112.27426-5-quentin.schulz@free-electrons.com>
+ <b76264cc-9c6c-169c-d490-91852c052890@kernel.org>
+ <cd4eac68-0155-d032-6d49-91e3ebdee72e@free-electrons.com>
+Message-ID: <b46192ef-c516-c842-57ca-ff15016b1b75@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/02/17 11:55, Lars-Peter Clausen wrote:
-> On 02/21/2017 07:34 AM, Christophe JAILLET wrote:
->> Reorder error handling labels in order to match the way resources have
->> been allocated.
+On 21/02/17 18:03, Quentin Schulz wrote:
+> Hi Jonathan,
+> 
+> On 19/02/2017 13:40, Jonathan Cameron wrote:
+>> On 14/02/17 09:40, Quentin Schulz wrote:
+>>> The X-Powers AXP20X and AXP22X PMICs have multiple ADCs. They expose the
+>>> battery voltage, battery charge and discharge currents, AC-in and VBUS
+>>> voltages and currents, 2 GPIOs muxable in ADC mode and PMIC temperature.
+>>>
+>>> This adds support for most of AXP20X and AXP22X ADCs.
+>>>
+>>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> Hi Quentin,
 >>
->> Signed-off-by: Christophe JAILLET <christophe.jaillet@wanadoo.fr>
+>> A few bits and bobs inline.  The bigest one is that I don't think
+>> you need to carry your struct axp_data pointer around in the iio_priv
+>> structure as it only seems to be used in probe.
+>>
+>> Anyhow, tidy these little bits up (quite a few are optional in the
+>> sense that they are a matter or personal taste and I don't feel
+>> strongly about them) and you can add
+>>
+>> Reviewed-by: Jonathan Cameron <jic23@kernel.org>
+>>
+>> A nice driver.
+>>
+>> Jonathan
+> [...]
+>>> +static int axp20x_probe(struct platform_device *pdev)
+>>> +{
+>>> +	struct axp20x_adc_iio *info;
+>>> +	struct iio_dev *indio_dev;
+>>> +	struct axp20x_dev *axp20x_dev;
+>>> +	int ret;
+>>> +
+>>> +	axp20x_dev = dev_get_drvdata(pdev->dev.parent);
+>>> +
+>>> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
+>>> +	if (!indio_dev)
+>>> +		return -ENOMEM;
+>>> +
+>>> +	info = iio_priv(indio_dev);
+>>> +	platform_set_drvdata(pdev, indio_dev);
+>>> +
+>>> +	info->regmap = axp20x_dev->regmap;
+>>> +	indio_dev->dev.parent = &pdev->dev;
+>>> +	indio_dev->dev.of_node = pdev->dev.of_node;
+>>> +	indio_dev->modes = INDIO_DIRECT_MODE;
+>>> +
+>>> +	info->data = (struct axp_data *)platform_get_device_id(pdev)->driver_data;
+>> I think this is only actually used in probe, so could be handled more
+>> neatly with a local variable rather than sticking it in info.
+>>
+> [...]
+>>> +static int axp20x_remove(struct platform_device *pdev)
+>>> +{
+>>> +	struct axp20x_adc_iio *info;
+>>> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+>>> +
+>>> +	info = iio_priv(indio_dev);
+>> Reorder the two lines above this one and then you could just do this
+>> inline. (really trivial so feel free to not bother ;)
+>>> +
+>>> +	iio_device_unregister(indio_dev);
+>>> +	iio_map_array_unregister(indio_dev);
+>>> +
+>>> +	regmap_write(info->regmap, AXP20X_ADC_EN1, 0);
+>>> +
+>>> +	if (info->data->adc_en2)
 > 
-> Thanks.
+> data is used here to know if I should disable misc ADCs (if supported by
+> the PMIC). So kinda need it only for that purpose, maybe I can use a
+> slightly simpler structure to only store regmap and this adc_en2 boolean.
 > 
-> Acked-by: Lars-Peter Clausen <lars@metafoo.de>
-Applied to the fixes-togreg-post-rc1 branch of iio.git.
+> Ack for everything else.
+cool. Not sure how my searching missed that!
 
-Thanks,
-
-Jonathan
+Up to you on whether you simplify that structure or not, I'm happy either way.
 > 
->> ---
->> v2: update goto label if 'xadc->ops->setup()' fails
->> ---
->>  drivers/iio/adc/xilinx-xadc-core.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
->> index 0a6beb3d99cb..515b91963db5 100644
->> --- a/drivers/iio/adc/xilinx-xadc-core.c
->> +++ b/drivers/iio/adc/xilinx-xadc-core.c
->> @@ -1206,11 +1206,11 @@ static int xadc_probe(struct platform_device *pdev)
->>  	}
->>  	clk_prepare_enable(xadc->clk);
->>  
->>  	ret = xadc->ops->setup(pdev, indio_dev, irq);
->>  	if (ret)
->> -		goto err_free_samplerate_trigger;
->> +		goto err_clk_disable_unprepare;
->>  
->>  	ret = request_irq(irq, xadc->ops->interrupt_handler, 0,
->>  			dev_name(&pdev->dev), indio_dev);
->>  	if (ret)
->>  		goto err_clk_disable_unprepare;
->> @@ -1268,6 +1268,8 @@ static int xadc_probe(struct platform_device *pdev)
->>  
->>  err_free_irq:
->>  	free_irq(irq, indio_dev);
->> +err_clk_disable_unprepare:
->> +	clk_disable_unprepare(xadc->clk);
->>  err_free_samplerate_trigger:
->>  	if (xadc->ops->flags & XADC_FLAGS_BUFFERED)
->>  		iio_trigger_free(xadc->samplerate_trigger);
->> @@ -1277,8 +1279,6 @@ static int xadc_probe(struct platform_device *pdev)
->>  err_triggered_buffer_cleanup:
->>  	if (xadc->ops->flags & XADC_FLAGS_BUFFERED)
->>  		iio_triggered_buffer_cleanup(indio_dev);
->> -err_clk_disable_unprepare:
->> -	clk_disable_unprepare(xadc->clk);
->>  err_device_free:
->>  	kfree(indio_dev->channels);
->>  
->>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Thanks,
+> Quentin
 > 
