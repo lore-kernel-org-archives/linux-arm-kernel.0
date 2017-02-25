@@ -1,66 +1,43 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 25 Feb 2017 16:21:22 +0000
-Subject: [RFC 4/4] iio: trigger: add GPIO trigger
-In-Reply-To: <03234803-c75d-bd1a-492b-761c0d5218ff@st.com>
-References: <1487347429-31761-1-git-send-email-fabrice.gasnier@st.com>
- <1487347429-31761-5-git-send-email-fabrice.gasnier@st.com>
- <06f74b54-91fa-31c5-f015-52a6524059ef@metafoo.de>
- <3e2653fe-874c-d761-b274-ffe889df18a7@kernel.org>
- <03234803-c75d-bd1a-492b-761c0d5218ff@st.com>
-Message-ID: <efefd474-4cfc-1e46-0c73-4be584ade7eb@kernel.org>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Sat, 25 Feb 2017 17:38:03 +0100
+Subject: [PATCH] arm64: dts: allwinner: add support for Pinebook
+In-Reply-To: <20170225070032.35834-1-icenowy@aosc.xyz>
+References: <20170225070032.35834-1-icenowy@aosc.xyz>
+Message-ID: <20170225163802.guxwxzp734hlqoob@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/02/17 16:24, Fabrice Gasnier wrote:
-> On 02/18/2017 08:19 PM, Jonathan Cameron wrote:
->> On 17/02/17 16:16, Lars-Peter Clausen wrote:
->>> On 02/17/2017 05:03 PM, Fabrice Gasnier wrote:
->>>> GPIOs can be used to generate triggers for any IIO device.
->>>> Introduce generic GPIO trigger driver. It offers some options
->>>> to tune polarity (e.g. rising/falling edge), and label so trigger
->>>> name may be customized.
->>>> By default, gpio triggers will be named gpiotrigX, where X is gpio
->>>> number as returned by desc_to_gpio() call.
->>>> Rising edge is selected if polarity isn't set.
->>>
->>> If you want to use the GPIO only as an interrupt, just use it as an
->>> interrupt directly, no need to go the route via the GPIO.
->> Absolutely.  The majority of the bindings will then just become standard
->> interrupt bindings and will be effectively handled for you.
->>
->> Please work to extend the existing interrupt trigger driver rather than adding
->> this new one.  That one actually started as a gpio trigger then got
->> generalised into a interrupt trigger later so lets not do that again ;)
-> 
-> Hi Lars, Jonathan
-> 
-> Ok, got it.
-> I'll drop this and focus on interrupt trigger, if this is worth having DT for it (e.g. patch 1 & 2 of this RFC).
-> 
-> BTW, I figured out there has been this patch a year ago, on interrupt trigger, to add device tree support:
-> http://www.spinics.net/lists/linux-iio/msg23126.html
-> Any reason why it hasn't found its way in ?
-Gregor being very busy I suspect and not having time to address the reviews.
+On Sat, Feb 25, 2017 at 03:00:32PM +0800, Icenowy Zheng wrote:
+[...]
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+> new file mode 100644
+> index 000000000000..2dceba3132b0
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+[...]
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +
+> +		lid_switch {
 
-I 'think' the conclusion then was we needed some representative device that
-could exist in devicetree to allow us to specify that a particular interrupt
-could be used to trigger sensor capture.
+Node names should not contain underscores. You can use hyphens instead. See
+https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1122967.html
+https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1145633.html
 
-Not a big issue, but probably still needs implementing unless Gregor has had
-a chance to look at this.
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+> +	cd-inverted;
 
-Jonathan
+You ought to be able to replace those last two lines with just
+cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
 
+> +	disable-wp;
+> +	bus-width = <4>;
+> +	status = "okay";
+> +};
 
-> 
-> Thanks for reviewing,
-> Best Regards,
-> Fabrice
-> 
->>
->> Jonathan
->>
-> -- 
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Rask Ingemann Lambertsen
