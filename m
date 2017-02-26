@@ -1,388 +1,183 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Sun, 26 Feb 2017 22:07:32 +0800
-Subject: [PATCH v1 2/2] coresight: add support for debug module
-In-Reply-To: <20170224190711.GA12355@linaro.org>
-References: <1487815067-27511-1-git-send-email-leo.yan@linaro.org>
- <1487815067-27511-3-git-send-email-leo.yan@linaro.org>
- <20170224190711.GA12355@linaro.org>
-Message-ID: <20170226140732.GA32233@leoy-linaro>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 26 Feb 2017 14:35:16 +0000
+Subject: [RFC PATCH] arm: Fix cache inconsistency when using fixmap
+In-Reply-To: <5497800b3271f13583e78710ac39a48e@agner.ch>
+References: <1487778678.18810.8.camel@linaro.org>
+ <5497800b3271f13583e78710ac39a48e@agner.ch>
+Message-ID: <CAKv+Gu9YeJ+WN1TETjh5G73=tCOK9fDW21VOw0E1XYy=UJcBkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2017 at 12:07:11PM -0700, Mathieu Poirier wrote:
-> On Thu, Feb 23, 2017 at 09:57:47AM +0800, Leo Yan wrote:
+On 25 February 2017 at 01:06, Stefan Agner <stefan@agner.ch> wrote:
+> [also added Ard]
+>
 
-[...]
+Thanks
 
-> > +/* bits definition for EDDEVID1 */
-> > +#define EDDEVID1_PCSR_OFFSET_MASK	GENMASK(3, 0)
-> > +#define EDDEVID1_PCSR_OFFSET_INS_SET	(0x0)
-> > +#define EDDEVID1_PCSR_NO_OFFSET		(0x1)
-> 
-> Hi Leo,
-> 
-> The above #define isn't used in the code - please remove.
+> On 2017-02-22 07:51, Jon Medhurst (Tixy) wrote:
+>> Cacheable memory mappings need to be marked as shareable otherwise the
+>> CPU accessing fixmap memory may end up with local cachelines for that
+>> memory, resulting in different CPUs in the system seeing different
+>> values for the same memory location.
+>>
+>> This issue was discovered when investigating failures in the ARM kprobe
+>> tests. kprobes uses patch_text() to modify the kernel image, which
+>> when CONFIG_DEBUG_RODATA is enabled makes use of fixmap to map the page
+>> to be modified. As the shareable attribute wasn't being set in the PTE
+>> entry for that page, a write to it wasn't being broadcast to other
+>> caches in the system, which in the the case being investigated was
+>> CPU's in the other cluster of a big.LITTLE system.
+>>
+>> Fixes: a5f4c561b3b1 ("ARM: 8415/1: early fixmap support for earlycon")
+>> Cc: stable at vger.kernel.org # v4.3+
+>>
+>> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+>> ---
+>>
+>> The fixmap changes in the original commit a5f4c561b3b1 look a bit iffy
+>> to me, shouldn't it have have made use of PAGE_KERNEL or pgprot_kernel
+>> or something like that to get PTE attributes suitable for the system
+>> being run, rather than rolling it's own set of values?
+>
+> The PAGE_KERNEL points to pgprot_kernel, which in turn is dynamically
+> setup in build_mem_type_table. This initialization is taking place late
+> in the boot process, too late for early fixmap...
+>
+> Early fixmap gets shut down before going SMP, so non shared mappings are
+> not an issue there. But FIXMAP_PAGE_NORMAL is also used for regular
+> fixmap, which is essentially the problem. Also, regular fixmap does not
+> make sure of the cache policy due to that, but just uses the hardcoded
+> writeback policy...
+>
+> With that in mind, populating kern_pgprot with a reasonable default
+> which works for early fixmap might be a reasonable approach. Later
+> kern_pgprot gets setup with the appropriate shared attribute and cache
+> policy...
+>
+> diff --git a/arch/arm/include/asm/fixmap.h
+> b/arch/arm/include/asm/fixmap.h
+> index 5c17d2dec777..c663e562716c 100644
+> --- a/arch/arm/include/asm/fixmap.h
+> +++ b/arch/arm/include/asm/fixmap.h
+> @@ -39,12 +39,11 @@ static const enum fixed_addresses
+> __end_of_fixed_addresses =
+>         __end_of_fixmap_region > __end_of_early_ioremap_region ?
+>         __end_of_fixmap_region : __end_of_early_ioremap_region;
+>
+> -#define FIXMAP_PAGE_COMMON     (L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN
+> | L_PTE_DIRTY)
+> -
+> -#define FIXMAP_PAGE_NORMAL     (FIXMAP_PAGE_COMMON |
+> L_PTE_MT_WRITEBACK)
+> +#define FIXMAP_PAGE_NORMAL     (pgprot_kernel | L_PTE_XN)
+>  #define FIXMAP_PAGE_RO         (FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
+>
+>  /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
+> +#define FIXMAP_PAGE_COMMON     (L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN
+> | L_PTE_DIRTY)
+>  #define FIXMAP_PAGE_IO         (FIXMAP_PAGE_COMMON |
+> L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
+>  #define FIXMAP_PAGE_NOCACHE    FIXMAP_PAGE_IO
+>
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 4001dd15818d..9cb7c559263f 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -65,7 +65,8 @@ pmdval_t user_pmd_table = _PAGE_USER_TABLE;
+>  static unsigned int cachepolicy __initdata = CPOLICY_WRITEBACK;
+>  static unsigned int ecc_mask __initdata = 0;
+>  pgprot_t pgprot_user;
+> -pgprot_t pgprot_kernel;
+> +pgprot_t pgprot_kernel = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG |
+> +                                 L_PTE_DIRTY | L_PTE_MT_WRITEBACK);
+>  pgprot_t pgprot_hyp_device;
+>  pgprot_t pgprot_s2;
+>  pgprot_t pgprot_s2_device;
+>
 
-Thanks a lot for quite detailed reivew and suggestion for below
-refactors. I will follow up them and send out new version for
-reviewing.
+This looks correct to me, and avoids using shareable attributes inadvertently.
 
-Thanks,
-Leo Yan
+However, we could make this a bit more private to the fixmap code by
+using something like
 
-> > +
-> > +/* bits definition for EDDEVID */
-> > +#define EDDEVID_PCSAMPLE_MODE		GENMASK(3, 0)
-> > +#define EDDEVID_IMPL_NONE		(0x0)
-> > +#define EDDEVID_IMPL_EDPCSR_EDCIDSR	(0x2)
-> > +#define EDDEVID_IMPL_FULL		(0x3)
-> > +
-> > +struct debug_drvdata {
-> > +	void __iomem	*base;
-> > +	struct device	*dev;
-> > +	int		cpu;
-> > +	struct clk	*dbg_clk;
-> > +
-> > +	bool		edpcsr_present;
-> > +	bool		edvidsr_present;
-> > +	bool		pc_has_offset;
-> > +
-> > +	u32		eddevid;
-> > +	u32		eddevid1;
-> > +
-> > +	u32		edpcsr;
-> > +	u32		edpcsr_hi;
-> > +	u32		edprsr;
-> > +	u32		edvidsr;
-> > +	u32		edcidsr;
-> > +};
-> > +
-> > +static int debug_count;
-> 
-> No need to make this global - please move this to debug_probe() 
-> 
-> > +static DEFINE_PER_CPU(struct debug_drvdata *, debug_drvdata);
-> > +
-> > +static void debug_os_unlock(struct debug_drvdata *drvdata)
-> > +{
-> > +	/* Unlocks the debug registers */
-> > +	writel_relaxed(0x0, drvdata->base + EDOSLAR);
-> > +	wmb();
-> > +}
-> > +
-> > +/*
-> > + * According to ARM DDI 0487A.k, before access external debug
-> > + * registers should firstly check the access permission; if any
-> > + * below condition has been met then cannot access debug
-> > + * registers to avoid lockup issue:
-> > + *
-> > + * - CPU power domain is powered off;
-> > + * - The OS Double Lock is locked;
-> > + *
-> > + * By checking EDPRSR can get to know if meet these conditions.
-> > + */
-> > +static bool debug_access_permit(struct debug_drvdata *drvdata)
-> 
-> s/debug_access_permit/debug_access_permitted
-> 
-> > +{
-> > +	/* CPU is powered off */
-> > +	if (!(drvdata->edprsr & EDPRSR_PU))
-> > +		return false;
-> > +
-> > +	/* The OS Double Lock is locked */
-> > +	if (drvdata->edprsr & EDPRSR_DLK)
-> > +		return false;
-> > +
-> > +	return true;
-> > +}
-> > +
-> > +static void debug_read_regs(struct debug_drvdata *drvdata)
-> > +{
-> > +	drvdata->edprsr = readl_relaxed(drvdata->base + EDPRSR);
-> > +
-> > +	if (!debug_access_permit(drvdata))
-> > +		return;
-> > +
-> > +	if (!drvdata->edpcsr_present)
-> > +		return;
-> > +
-> > +	CS_UNLOCK(drvdata->base);
-> > +
-> > +	debug_os_unlock(drvdata);
-> > +
-> > +	drvdata->edpcsr = readl_relaxed(drvdata->base + EDPCSR);
-> > +
-> > +	/*
-> > +	 * As described in ARM DDI 0487A.k, if the processing
-> > +	 * element (PE) is in debug state, or sample-based
-> > +	 * profiling is prohibited, EDPCSR reads as 0xFFFFFFFF;
-> > +	 * EDCIDSR, EDVIDSR and EDPCSR_HI registers also become
-> > +	 * UNKNOWN state. So directly bail out for this case.
-> > +	 */
-> > +	if (drvdata->edpcsr == EDPCSR_PROHIBITED) {
-> > +		CS_LOCK(drvdata->base);
-> > +		return;
-> > +	}
-> > +
-> > +	/*
-> > +	 * A read of the EDPCSR normally has the side-effect of
-> > +	 * indirectly writing to EDCIDSR, EDVIDSR and EDPCSR_HI;
-> > +	 * at this point it's safe to read value from them.
-> > +	 */
-> > +	drvdata->edcidsr = readl_relaxed(drvdata->base + EDCIDSR);
-> > +#ifdef CONFIG_64BIT
-> > +	drvdata->edpcsr_hi = readl_relaxed(drvdata->base + EDPCSR_HI);
-> > +#endif
-> > +
-> > +	if (drvdata->edvidsr_present)
-> > +		drvdata->edvidsr = readl_relaxed(drvdata->base + EDVIDSR);
-> > +
-> > +	CS_LOCK(drvdata->base);
-> > +}
-> > +
-> > +#ifndef CONFIG_64BIT
-> > +static bool debug_pc_has_offset(struct debug_drvdata *drvdata)
-> > +{
-> > +	u32 pcsr_offset;
-> > +
-> > +	pcsr_offset = drvdata->eddevid1 & EDDEVID1_PCSR_OFFSET_MASK;
-> > +
-> > +	return (pcsr_offset == EDDEVID1_PCSR_OFFSET_INS_SET);
-> > +}
-> > +
-> > +static unsigned long debug_adjust_pc(struct debug_drvdata *drvdata,
-> > +				     unsigned long pc)
-> > +{
-> > +	unsigned long arm_inst_offset = 0, thumb_inst_offset = 0;
-> > +
-> > +	if (debug_pc_has_offset(drvdata)) {
-> > +		arm_inst_offset = 8;
-> > +		thumb_inst_offset = 4;
-> > +	}
-> > +
-> > +	/* Handle thumb instruction */
-> > +	if (pc & EDPCSR_THUMB) {
-> > +		pc = (pc & EDPCSR_THUMB_INST_MASK) - thumb_inst_offset;
-> > +		return pc;
-> > +	}
-> > +
-> > +	/*
-> > +	 * Handle arm instruction offset, if the arm instruction
-> > +	 * is not 4 byte alignment then it's possible the case
-> > +	 * for implementation defined; keep original value for this
-> > +	 * case and print info for notice.
-> > +	 */
-> > +	if (pc & BIT(1))
-> > +		pr_emerg("Instruction offset is implementation defined\n");
-> > +	else
-> > +		pc = (pc & EDPCSR_ARM_INST_MASK) - arm_inst_offset;
-> > +
-> > +	return pc;
-> > +}
-> > +#endif
-> > +
-> > +static void debug_dump_regs(struct debug_drvdata *drvdata)
-> > +{
-> > +	unsigned long pc;
-> > +
-> > +	pr_emerg("\tEDPRSR:  %08x (Power:%s DLK:%s)\n", drvdata->edprsr,
-> > +		 drvdata->edprsr & EDPRSR_PU ? "On" : "Off",
-> > +		 drvdata->edprsr & EDPRSR_DLK ? "Lock" : "Unlock");
-> > +
-> > +	if (!debug_access_permit(drvdata) || !drvdata->edpcsr_present) {
-> > +		pr_emerg("No permission to access debug registers!\n");
-> > +		return;
-> > +	}
-> > +
-> > +	if (drvdata->edpcsr == EDPCSR_PROHIBITED) {
-> > +		pr_emerg("CPU is in Debug state or profiling is prohibited!\n");
-> > +		return;
-> > +	}
-> > +
-> > +#ifdef CONFIG_64BIT
-> > +	pc = (unsigned long)drvdata->edpcsr_hi << 32 |
-> > +	     (unsigned long)drvdata->edpcsr;
-> > +#else
-> > +	pc = debug_adjust_pc(drvdata, (unsigned long)drvdata->edpcsr);
-> > +#endif
-> > +
-> > +	pr_emerg("\tEDPCSR:  [<%p>] %pS\n", (void *)pc, (void *)pc);
-> > +	pr_emerg("\tEDCIDSR: %08x\n", drvdata->edcidsr);
-> > +
-> > +	if (!drvdata->edvidsr_present)
-> > +		return;
-> > +
-> > +	pr_emerg("\tEDVIDSR: %08x (State:%s Mode:%s Width:%s VMID:%x)\n",
-> > +		 drvdata->edvidsr,
-> > +		 drvdata->edvidsr & EDVIDSR_NS ? "Non-secure" : "Secure",
-> > +		 drvdata->edvidsr & EDVIDSR_E3 ? "EL3" :
-> > +			(drvdata->edvidsr & EDVIDSR_E2 ? "EL2" : "EL1/0"),
-> > +		 drvdata->edvidsr & EDVIDSR_HV ? "64bits" : "32bits",
-> > +		 drvdata->edvidsr & (u32)EDVIDSR_VMID);
-> > +}
-> > +
-> > +/*
-> > + * Dump out information on panic.
-> > + */
-> > +static int debug_notifier_call(struct notifier_block *self,
-> > +			       unsigned long v, void *p)
-> > +{
-> > +	int cpu;
-> > +
-> > +	pr_emerg("ARM external debug module:\n");
-> > +
-> > +	for_each_possible_cpu(cpu) {
-> > +
-> > +		if (!per_cpu(debug_drvdata, cpu))
-> > +			continue;
-> > +
-> > +		pr_emerg("CPU[%d]:\n", per_cpu(debug_drvdata, cpu)->cpu);
-> > +
-> > +		debug_read_regs(per_cpu(debug_drvdata, cpu));
-> > +		debug_dump_regs(per_cpu(debug_drvdata, cpu));
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static struct notifier_block debug_notifier = {
-> > +	.notifier_call = debug_notifier_call,
-> > +};
-> > +
-> > +static void debug_init_arch_data(void *info)
-> > +{
-> > +	struct debug_drvdata *drvdata = info;
-> > +	u32 mode;
-> > +
-> > +	CS_UNLOCK(drvdata->base);
-> > +
-> > +	debug_os_unlock(drvdata);
-> > +
-> > +	/* Read device info */
-> > +	drvdata->eddevid  = readl_relaxed(drvdata->base + EDDEVID);
-> > +	drvdata->eddevid1 = readl_relaxed(drvdata->base + EDDEVID1);
-> > +
-> > +	/* Parse implementation feature */
-> > +	mode = drvdata->eddevid & EDDEVID_PCSAMPLE_MODE;
-> > +	if (mode == EDDEVID_IMPL_FULL) {
-> > +		drvdata->edpcsr_present  = true;
-> > +		drvdata->edvidsr_present = true;
-> > +	} else if (mode == EDDEVID_IMPL_EDPCSR_EDCIDSR) {
-> > +		drvdata->edpcsr_present  = true;
-> > +		drvdata->edvidsr_present = false;
-> > +	} else {
-> > +		drvdata->edpcsr_present  = false;
-> > +		drvdata->edvidsr_present = false;
-> > +	}
-> > +
-> > +	CS_LOCK(drvdata->base);
-> > +}
-> > +
-> > +static int debug_probe(struct amba_device *adev, const struct amba_id *id)
-> > +{
-> > +	int ret;
-> > +	void __iomem *base;
-> > +	struct device *dev = &adev->dev;
-> > +	struct coresight_platform_data *pdata = NULL;
-> > +	struct debug_drvdata *drvdata;
-> > +	struct resource *res = &adev->res;
-> > +	struct device_node *np = adev->dev.of_node;
-> > +
-> > +	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
-> > +	if (!drvdata)
-> > +		return -ENOMEM;
-> > +
-> > +	if (np) {
-> > +		pdata = of_get_coresight_platform_data(dev, np);
-> > +		if (IS_ERR(pdata))
-> > +			return PTR_ERR(pdata);
-> > +		adev->dev.platform_data = pdata;
-> > +	}
-> 
-> I wonder if dragging a coresight_platform_data is worth it.  From what I see the
-> only thing it is used for is to retrieve the CPU.  As such I think it is better
-> get the portion of code in of_get_coresight_platform_data() that deals with the
-> CPU and create a new function (of_coresight_get_cpu()).  That way you can reuse
-> it here and in of_get_coresight_platform_data(). 
-> 
-> > +
-> > +	drvdata->dev = &adev->dev;
-> > +	drvdata->dbg_clk = devm_clk_get(&adev->dev, "dbg_clk");
-> > +	if (IS_ERR(drvdata->dbg_clk)) {
-> > +		dev_err(dev, "debug clock initialization failed.\n");
-> > +		return PTR_ERR(drvdata->dbg_clk);
-> > +	}
-> > +
-> > +	ret = clk_prepare_enable(drvdata->dbg_clk);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	dev_set_drvdata(dev, drvdata);
-> > +
-> > +	/* Validity for the resource is already checked by the AMBA core */
-> > +	base = devm_ioremap_resource(dev, res);
-> > +	if (IS_ERR(base))
-> > +		return PTR_ERR(base);
-> > +
-> > +	drvdata->base = base;
-> > +	drvdata->cpu = pdata ? pdata->cpu : 0;
-> > +
-> > +	get_online_cpus();
-> > +	per_cpu(debug_drvdata, drvdata->cpu) = drvdata;
-> > +
-> > +	if (smp_call_function_single(drvdata->cpu,
-> > +				debug_init_arch_data, drvdata, 1))
-> > +		dev_err(dev, "Debug arch init failed\n");
-> > +
-> > +	if (!debug_count++)
-> > +		atomic_notifier_chain_register(&panic_notifier_list,
-> > +					       &debug_notifier);
-> > +	put_online_cpus();
-> 
-> There is no need to hold the CPUs in place through the chain registration.  This
-> should go before the if().
-> 
-> > +
-> > +	dev_info(dev, "%s initialized\n", (char *)id->data);
->         
->         fprintf(buffer, (char *)id->data, drvdata->cpu);
->         dev_info(dev, "%s initialized\n", buffer);
-> 
-> > +	return 0;
-> > +}
-> > +
-> > +static struct amba_id debug_ids[] = {
-> > +	{       /* Debug for Cortex-A53 */
-> > +		.id	= 0x000bbd03,
-> > +		.mask	= 0x000fffff,
-> > +		.data	= "debug",
->        
->                 .data   = "Coresight debug-CPU%d",
-> 
-> > +	},
-> > +	{       /* Debug for Cortex-A57 */
-> > +		.id	= 0x000bbd07,
-> > +		.mask	= 0x000fffff,
-> > +		.data	= "debug",
-> > +	},
-> > +	{       /* Debug for Cortex-A72 */
-> > +		.id	= 0x000bbd08,
-> > +		.mask	= 0x000fffff,
-> > +		.data	= "debug",
-> > +	},
-> > +	{ 0, 0},
-> > +};
-> > +
-> > +static struct amba_driver debug_driver = {
-> > +	.drv = {
-> > +		.name   = "coresight-debug",
-> > +		.suppress_bind_attrs = true,
-> > +	},
-> > +	.probe		= debug_probe,
-> > +	.id_table	= debug_ids,
-> > +};
-> > +builtin_amba_driver(debug_driver);
-> > -- 
-> > 2.7.4
-> > 
+
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 5c17d2dec777..6c375aea8f22 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -41,11 +41,14 @@ static const enum fixed_addresses __end_of_fixed_addresses =
+
+ #define FIXMAP_PAGE_COMMON     (L_PTE_YOUNG | L_PTE_PRESENT |
+L_PTE_XN | L_PTE_DIRTY)
+
+-#define FIXMAP_PAGE_NORMAL     (FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
+-#define FIXMAP_PAGE_RO         (FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
++#define __FIXMAP_MT_NORMAL     ((pgprot_val(pgprot_kernel) ?:
+FIXMAP_PAGE_COMMON) | \
++                                L_PTE_MT_WRITEBACK)
++#define FIXMAP_PAGE_NORMAL     __pgprot(__FIXMAP_MT_NORMAL)
++#define FIXMAP_PAGE_RO         __pgprot(__FIXMAP_MT_NORMAL | L_PTE_RDONLY)
+
+ /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
+-#define FIXMAP_PAGE_IO         (FIXMAP_PAGE_COMMON |
+L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
++#define FIXMAP_PAGE_IO         __pgprot(FIXMAP_PAGE_COMMON |
+L_PTE_MT_DEV_SHARED | \
++                                        L_PTE_SHARED)
+ #define FIXMAP_PAGE_NOCACHE    FIXMAP_PAGE_IO
+
+ #define __early_set_fixmap     __set_fixmap
+
+(and drop the change to mm/mmu.c), which boils down to the same for
+fixmap but does not affect other users of pgprot_kernel. Also, it
+appears these definitions are broken under STRICT_MM_TYPECHECKS so
+this is a good opportunity to get that fixed as well.
+
+Thank,
+Ard.
+
+
+>
+>
+>> That's why I'm marking this as an RFC, perhaps the correct fix is to
+>> rework the code to use the defines from arch/arm/include/asm/pgtable.h
+>>
+>>  arch/arm/include/asm/fixmap.h       | 2 +-
+>>  arch/arm/probes/kprobes/test-core.h | 2 +-
+>>  2 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+>> index 5c17d2dec777..26d4a4677cd7 100644
+>> --- a/arch/arm/include/asm/fixmap.h
+>> +++ b/arch/arm/include/asm/fixmap.h
+>> @@ -41,7 +41,7 @@ static const enum fixed_addresses __end_of_fixed_addresses =
+>>
+>>  #define FIXMAP_PAGE_COMMON   (L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN |
+>> L_PTE_DIRTY)
+>>
+>> -#define FIXMAP_PAGE_NORMAL   (FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
+>> +#define FIXMAP_PAGE_NORMAL   (FIXMAP_PAGE_COMMON | L_PTE_SHARED |
+>> L_PTE_MT_WRITEBACK)
+>>  #define FIXMAP_PAGE_RO               (FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
+>>
+>>  /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
+>> diff --git a/arch/arm/probes/kprobes/test-core.h
+>> b/arch/arm/probes/kprobes/test-core.h
+>> index 94285203e9f7..cde2b4e9358a 100644
+>> --- a/arch/arm/probes/kprobes/test-core.h
+>> +++ b/arch/arm/probes/kprobes/test-core.h
+>> @@ -8,7 +8,7 @@
+>>   * published by the Free Software Foundation.
+>>   */
+>>
+>> -#define VERBOSE 0 /* Set to '1' for more logging of test cases */
+>> +#define VERBOSE 1 /* Set to '1' for more logging of test cases */
+>
+> That seems to be unrelated.
+>
+> --
+> Stefan
+>
+>>
+>>  #ifdef CONFIG_THUMB2_KERNEL
+>>  #define NORMAL_ISA "16"
