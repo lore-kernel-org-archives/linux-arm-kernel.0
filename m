@@ -1,127 +1,75 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 26 Feb 2017 14:04:07 +0900
-Subject: [PATCH 1/3] ARM: dts: uniphier: remove skeleton.dtsi inclusion
+Date: Sun, 26 Feb 2017 14:04:09 +0900
+Subject: [PATCH 3/3] arm64: dts: uniphier: fix no unit name warnings
 In-Reply-To: <1488085449-28922-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1488085449-28922-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1488085449-28922-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1488085449-28922-4-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9c0da3cc61f1 ("ARM: dts: explicitly mark skeleton.dtsi as
-deprecated") declared that skeleton.dtsi was deprecated.
+Fix warnings reported when built with W=1:
+  Node /memory has a reg or ranges property, but no unit name
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/boot/dts/uniphier-ld4.dtsi  | 4 ++--
- arch/arm/boot/dts/uniphier-pro4.dtsi | 4 ++--
- arch/arm/boot/dts/uniphier-pro5.dtsi | 4 ++--
- arch/arm/boot/dts/uniphier-pxs2.dtsi | 4 ++--
- arch/arm/boot/dts/uniphier-sld3.dtsi | 4 ++--
- arch/arm/boot/dts/uniphier-sld8.dtsi | 4 ++--
- 6 files changed, 12 insertions(+), 12 deletions(-)
+ arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts | 2 +-
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi    | 2 +-
+ arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts | 2 +-
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi    | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/uniphier-ld4.dtsi b/arch/arm/boot/dts/uniphier-ld4.dtsi
-index a7c494d..4f5fe15 100644
---- a/arch/arm/boot/dts/uniphier-ld4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ld4.dtsi
-@@ -43,10 +43,10 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
+index 7168cf8..1b96e24 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
+@@ -52,7 +52,7 @@
+ 	model = "UniPhier LD11 Reference Board";
+ 	compatible = "socionext,uniphier-ld11-ref", "socionext,uniphier-ld11";
  
--/include/ "skeleton.dtsi"
--
- / {
- 	compatible = "socionext,uniphier-ld4";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
+-	memory {
++	memory at 80000000 {
+ 		device_type = "memory";
+ 		reg = <0 0x80000000 0 0x40000000>;
+ 	};
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+index da881f5..2ed35e3 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+@@ -140,7 +140,7 @@
+ 			     <1 10 4>;
+ 	};
  
- 	cpus {
+-	soc {
++	soc at 0 {
+ 		compatible = "simple-bus";
  		#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/uniphier-pro4.dtsi b/arch/arm/boot/dts/uniphier-pro4.dtsi
-index e960b09..794a85a 100644
---- a/arch/arm/boot/dts/uniphier-pro4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pro4.dtsi
-@@ -43,10 +43,10 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
+ 		#size-cells = <1>;
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
+index 609162a..8cb0f11 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
+@@ -52,7 +52,7 @@
+ 	model = "UniPhier LD20 Reference Board";
+ 	compatible = "socionext,uniphier-ld20-ref", "socionext,uniphier-ld20";
  
--/include/ "skeleton.dtsi"
--
- / {
- 	compatible = "socionext,uniphier-pro4";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
+-	memory {
++	memory at 80000000 {
+ 		device_type = "memory";
+ 		reg = <0 0x80000000 0 0xc0000000>;
+ 	};
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index a6b3a70..96c053f 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -209,7 +209,7 @@
+ 			     <1 10 4>;
+ 	};
  
- 	cpus {
+-	soc {
++	soc at 0 {
+ 		compatible = "simple-bus";
  		#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/uniphier-pro5.dtsi b/arch/arm/boot/dts/uniphier-pro5.dtsi
-index dbc5e53..df07b55 100644
---- a/arch/arm/boot/dts/uniphier-pro5.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pro5.dtsi
-@@ -43,10 +43,10 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
--/include/ "skeleton.dtsi"
--
- / {
- 	compatible = "socionext,uniphier-pro5";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
- 
- 	cpus {
- 		#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-index e9e031d..58c3e2f 100644
---- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
-+++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-@@ -43,10 +43,10 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
--/include/ "skeleton.dtsi"
--
- / {
- 	compatible = "socionext,uniphier-pxs2";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
- 
- 	cpus {
- 		#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/uniphier-sld3.dtsi b/arch/arm/boot/dts/uniphier-sld3.dtsi
-index 9fad6bd..01d77ed 100644
---- a/arch/arm/boot/dts/uniphier-sld3.dtsi
-+++ b/arch/arm/boot/dts/uniphier-sld3.dtsi
-@@ -43,10 +43,10 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
--/include/ "skeleton.dtsi"
--
- / {
- 	compatible = "socionext,uniphier-sld3";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
- 
- 	cpus {
- 		#address-cells = <1>;
-diff --git a/arch/arm/boot/dts/uniphier-sld8.dtsi b/arch/arm/boot/dts/uniphier-sld8.dtsi
-index b2c980e..eb06fdc 100644
---- a/arch/arm/boot/dts/uniphier-sld8.dtsi
-+++ b/arch/arm/boot/dts/uniphier-sld8.dtsi
-@@ -43,10 +43,10 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
--/include/ "skeleton.dtsi"
--
- / {
- 	compatible = "socionext,uniphier-sld8";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
- 
- 	cpus {
- 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
 2.7.4
