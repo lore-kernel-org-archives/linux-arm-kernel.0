@@ -1,54 +1,60 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 26 Feb 2017 17:00:28 +0800
-Subject: [PATCH v5 6/7] arm64: dts: allwinner: add Allwinner H5 .dtsi
-In-Reply-To: <20170226085553.b6o6mv7ibe5op4dg@localhost>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Sun, 26 Feb 2017 10:19:55 +0100
+Subject: [PATCH v5 7/7] arm64: dts: sunxi: add support for the Orange Pi
+ PC 2 board
+In-Reply-To: <20170226011956.53581-8-icenowy@aosc.xyz>
 References: <20170226011956.53581-1-icenowy@aosc.xyz>
- <20170226011956.53581-7-icenowy@aosc.xyz>
- <20170226085553.b6o6mv7ibe5op4dg@localhost>
-Message-ID: <CAGb2v67BvVip+CX+HzAf7jAHxpL_EBtbxLxERMHRVv2+zE5Gcg@mail.gmail.com>
+ <20170226011956.53581-8-icenowy@aosc.xyz>
+Message-ID: <20170226091955.h3f5pgk7elboxqym@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 26, 2017 at 4:55 PM, Rask Ingemann Lambertsen
-<rask@formelder.dk> wrote:
-> On Sun, Feb 26, 2017 at 09:19:55AM +0800, Icenowy Zheng wrote:
->> From: Andre Przywara <andre.przywara@arm.com>
->>
->> The Allwinner H5 SoC is pin-compatible to the H3 SoC, but uses
->> Cortex-A53 cores instead.
->> Based on the now shared base .dtsi describing the common peripherals
->> describe the H5 specific nodes on top of that.
->> That symlinks in the sunxi-h3-h5.dtsi from the arch/arm tree.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> [Icenowy: add H5 pinctrl compatible, and changes for my h3-h5 dtsi
->>  refactor, commit message change to met new arm64 naming scheme,
->
-> s/change to met/change to meet/ or s/change to met/changed to meet/ ?
->
->> diff --git a/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi b/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
->> new file mode 120000
->> index 000000000000..036f01dc2b9b
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
->> @@ -0,0 +1 @@
->> +../../../../arm/boot/dts/sunxi-h3-h5.dtsi
->> \ No newline at end of file
->
-> But it's missing more than just a newline, isn't it? Shouldn't it read
+On Sun, Feb 26, 2017 at 09:19:56AM +0800, Icenowy Zheng wrote:
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+> new file mode 100644
+> index 000000000000..79784cba806c
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+[...]
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		pwr_led {
+> +			label = "orangepi:green:pwr";
+> +			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
+> +			default-state = "on";
+> +		};
+> +
+> +		status_led {
 
-This is a symbolic link.
+IMHO, you don't need the '_led' suffix inside the 'leds' node, and then you
+also avoid having underscores in the node names.
 
->
-> #include <../../../../arm/boot/dts/sunxi-h3-h5.dtsi>
+> +			label = "orangepi:red:status";
+> +			gpios = <&pio 0 20 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +
+> +	r_gpio_keys {
 
-This won't work directly with the split out device tree repository,
-which has a slightly different layout.
+Node names should not contain underscores. You can use hyphens instead. See
+https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1122967.html
+https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg1145633.html
 
-ChenYu
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
+> +	cd-inverted;
 
->
-> ?
->
-> --
-> Rask Ingemann Lambertsen
+You should be able to simplify those last two lines to just
+
+cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
+
+(see the paragraph which begins with "*NOTE* on CD and WP polarity."
+in 'Documentation/devicetree/bindings/mmc/mmc.txt'.)
+
+-- 
+Rask Ingemann Lambertsen
