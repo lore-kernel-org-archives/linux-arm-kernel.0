@@ -1,41 +1,42 @@
-From: o-takashi@sakamocchi.jp (Takashi Sakamoto)
-Date: Sun, 26 Feb 2017 17:04:16 +0900
-Subject: [PATCH] ASoC: rockchip: i2s: Remove unnecessary 'out of memory'
- message
-In-Reply-To: <20170225101834.28232-1-mihai.dumitru2201@stud.acs.upb.ro>
-References: <20170225101834.28232-1-mihai.dumitru2201@stud.acs.upb.ro>
-Message-ID: <ef03f4f4-ad76-8441-87b1-fe637f53977e@sakamocchi.jp>
+From: rask@formelder.dk (Rask Ingemann Lambertsen)
+Date: Sun, 26 Feb 2017 09:55:54 +0100
+Subject: [PATCH v5 6/7] arm64: dts: allwinner: add Allwinner H5 .dtsi
+In-Reply-To: <20170226011956.53581-7-icenowy@aosc.xyz>
+References: <20170226011956.53581-1-icenowy@aosc.xyz>
+ <20170226011956.53581-7-icenowy@aosc.xyz>
+Message-ID: <20170226085553.b6o6mv7ibe5op4dg@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Feb 25 2017 19:18, Mihai-Valentin DUMITRU wrote:
-> This was reported by checkpatch.pl
->
-> Signed-off-by: Mihai-Valentin DUMITRU <mihai.dumitru2201@gmail.com>
-> ---
->  sound/soc/rockchip/rockchip_i2s.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
->
-> diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-> index 974915cb4c4f..d02a1045fc0b 100644
-> --- a/sound/soc/rockchip/rockchip_i2s.c
-> +++ b/sound/soc/rockchip/rockchip_i2s.c
-> @@ -551,10 +551,8 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
->  	int val;
->
->  	i2s = devm_kzalloc(&pdev->dev, sizeof(*i2s), GFP_KERNEL);
-> -	if (!i2s) {
-> -		dev_err(&pdev->dev, "Can't allocate rk_i2s_dev\n");
-> +	if (!i2s)
+On Sun, Feb 26, 2017 at 09:19:55AM +0800, Icenowy Zheng wrote:
+> From: Andre Przywara <andre.przywara@arm.com>
+> 
+> The Allwinner H5 SoC is pin-compatible to the H3 SoC, but uses
+> Cortex-A53 cores instead.
+> Based on the now shared base .dtsi describing the common peripherals
+> describe the H5 specific nodes on top of that.
+> That symlinks in the sunxi-h3-h5.dtsi from the arch/arm tree.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> [Icenowy: add H5 pinctrl compatible, and changes for my h3-h5 dtsi
+>  refactor, commit message change to met new arm64 naming scheme,
 
-The line for dev_warn() should be kept.
+s/change to met/change to meet/ or s/change to met/changed to meet/ ?
 
->  		return -ENOMEM;
-> -	}
->
->  	i2s->dev = &pdev->dev;
+> diff --git a/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi b/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
+> new file mode 120000
+> index 000000000000..036f01dc2b9b
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
+> @@ -0,0 +1 @@
+> +../../../../arm/boot/dts/sunxi-h3-h5.dtsi
+> \ No newline at end of file
 
+But it's missing more than just a newline, isn't it? Shouldn't it read
 
-Regards
+#include <../../../../arm/boot/dts/sunxi-h3-h5.dtsi>
 
-Takashi Sakamoto
+?
+
+-- 
+Rask Ingemann Lambertsen
