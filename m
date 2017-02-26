@@ -1,75 +1,51 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 26 Feb 2017 14:04:09 +0900
-Subject: [PATCH 3/3] arm64: dts: uniphier: fix no unit name warnings
-In-Reply-To: <1488085449-28922-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1488085449-28922-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1488085449-28922-4-git-send-email-yamada.masahiro@socionext.com>
+Date: Sun, 26 Feb 2017 14:18:03 +0900
+Subject: Recommended notation for OPP to avoid DTC warnings
+Message-ID: <CAK7LNAQyc9=3d07-1upywYDk-AaRUGK4mJwAVduCuEJgnY1uFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix warnings reported when built with W=1:
-  Node /memory has a reg or ranges property, but no unit name
+Hi.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
 
- arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts | 2 +-
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi    | 2 +-
- arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts | 2 +-
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi    | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+Decumentation/devicetree/bindings/opp/opp.txt
+takes examples like this:
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
-index 7168cf8..1b96e24 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
-@@ -52,7 +52,7 @@
- 	model = "UniPhier LD11 Reference Board";
- 	compatible = "socionext,uniphier-ld11-ref", "socionext,uniphier-ld11";
- 
--	memory {
-+	memory at 80000000 {
- 		device_type = "memory";
- 		reg = <0 0x80000000 0 0x40000000>;
- 	};
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-index da881f5..2ed35e3 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-@@ -140,7 +140,7 @@
- 			     <1 10 4>;
- 	};
- 
--	soc {
-+	soc at 0 {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-index 609162a..8cb0f11 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-@@ -52,7 +52,7 @@
- 	model = "UniPhier LD20 Reference Board";
- 	compatible = "socionext,uniphier-ld20-ref", "socionext,uniphier-ld20";
- 
--	memory {
-+	memory at 80000000 {
- 		device_type = "memory";
- 		reg = <0 0x80000000 0 0xc0000000>;
- 	};
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-index a6b3a70..96c053f 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-@@ -209,7 +209,7 @@
- 			     <1 10 4>;
- 	};
- 
--	soc {
-+	soc at 0 {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+        opp at 1000000000 {
+                opp-hz = /bits/ 64 <1000000000>;
+                opp-microvolt = <970000 975000 985000>;
+                opp-microamp = <70000>;
+                clock-latency-ns = <300000>;
+                opp-suspend;
+        };
+        opp at 1100000000 {
+                opp-hz = /bits/ 64 <1100000000>;
+                opp-microvolt = <980000 1000000 1010000>;
+                opp-microamp = <80000>;
+                clock-latency-ns = <310000>;
+        };
+        opp at 1200000000 {
+                opp-hz = /bits/ 64 <1200000000>;
+                opp-microvolt = <1025000>;
+                clock-latency-ns = <290000>;
+                turbo-mode;
+        };
+
+
+If we follow this notation and the device-tree is built with W=1,
+DTC warns like follows:
+
+
+Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
+unit name, but no reg property
+
+
+Is there a recommended notation to avoid it?
+
+Maybe, simply omit the "@" ?
+
+
+
 -- 
-2.7.4
+Best Regards
+Masahiro Yamada
