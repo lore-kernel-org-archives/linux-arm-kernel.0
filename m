@@ -1,53 +1,89 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun, 26 Feb 2017 22:54:54 +0800
-Subject: [PATCH v5 6/7] arm64: dts: allwinner: add Allwinner H5 .dtsi
-In-Reply-To: <20170226085553.b6o6mv7ibe5op4dg@localhost>
-References: <20170226011956.53581-1-icenowy@aosc.xyz>
- <20170226011956.53581-7-icenowy@aosc.xyz>
- <20170226085553.b6o6mv7ibe5op4dg@localhost>
-Message-ID: <3514551488120894@web6m.yandex.ru>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Sun, 26 Feb 2017 15:56:31 +0100
+Subject: [PATCH v2 04/17] clocksource: Add Owl timer
+In-Reply-To: <afd6bfbc-e17c-dd79-d2ff-42bac6c274db@suse.de>
+References: <20170224034055.18807-1-afaerber@suse.de>
+ <20170224034055.18807-5-afaerber@suse.de>
+ <20170224222921.GA23152@mai>
+ <ab18d509-9fb2-1b4c-bdee-e2ce5d4273a3@suse.de>
+ <20170225215941.GA30601@mai>
+ <afd6bfbc-e17c-dd79-d2ff-42bac6c274db@suse.de>
+Message-ID: <20170226145631.GB30601@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Feb 26, 2017 at 03:40:49PM +0100, Andreas F?rber wrote:
+> Am 25.02.2017 um 22:59 schrieb Daniel Lezcano:
+> > On Sat, Feb 25, 2017 at 12:25:32AM +0100, Andreas F?rber wrote:
+> >> Am 24.02.2017 um 23:29 schrieb Daniel Lezcano:
+> >>> On Fri, Feb 24, 2017 at 04:40:42AM +0100, Andreas F?rber wrote:
+> >>>> +static struct clock_event_device owl_clockevent = {
+> >>>> +	.name			= "owl_tick",
+> >>>> +	.rating			= 200,
+> >>>> +	.features		= CLOCK_EVT_FEAT_ONESHOT,
+> >>>
+> >>> Did you consider adding CLOCK_EVT_FEAT_DYNIRQ ?
+> >>
+> >> No, it was not present downstream. Got a good example?
+> > 
+> > https://lwn.net/Articles/541000/
+> 
+> Looking at your current Nomadik code, it seems I can literally should
+> just add this flag (done), without needing to implement any new hooks.
+> 
+> On a related topic, how do we determine the cpumask? Downstream and some
+> in-tree drivers use cpumask_of(0), others use cpu_possible_mask.
 
+If you specify the CLOCK_EVT_FEAT_DYNIRQ, the cpumask is not important as it
+will be changed dynamically.
 
-26.02.2017, 16:56, "Rask Ingemann Lambertsen" <rask@formelder.dk>:
-> On Sun, Feb 26, 2017 at 09:19:55AM +0800, Icenowy Zheng wrote:
->> ?From: Andre Przywara <andre.przywara@arm.com>
->>
->> ?The Allwinner H5 SoC is pin-compatible to the H3 SoC, but uses
->> ?Cortex-A53 cores instead.
->> ?Based on the now shared base .dtsi describing the common peripherals
->> ?describe the H5 specific nodes on top of that.
->> ?That symlinks in the sunxi-h3-h5.dtsi from the arch/arm tree.
->>
->> ?Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> ?[Icenowy: add H5 pinctrl compatible, and changes for my h3-h5 dtsi
->> ??refactor, commit message change to met new arm64 naming scheme,
->
-> s/change to met/change to meet/ or s/change to met/changed to meet/ ?
->
->> ?diff --git a/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi b/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
->> ?new file mode 120000
->> ?index 000000000000..036f01dc2b9b
->> ?--- /dev/null
->> ?+++ b/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
->> ?@@ -0,0 +1 @@
->> ?+../../../../arm/boot/dts/sunxi-h3-h5.dtsi
->> ?\ No newline at end of file
->
-> But it's missing more than just a newline, isn't it? Shouldn't it read
->
-> #include <../../../../arm/boot/dts/sunxi-h3-h5.dtsi>
+Otherwise, cpumask_of(0) is often the default because it concentrates the
+wakeup on a single cpu, allowing the other cpus to go to deep idle state and if
+there are two clusters, it allows to have a cluster idle state. That results on
+a better energy saving.
 
-Oh you may do not know what a symlink seems like in git format-patch.
+The usage of cpu_possible_mask will randomly wakeup any cpu.
+ 
+> >> Do you spot anything functionally wrong in this driver? Despite adding
+> >> this new driver, I am only getting the following additional earlycon output:
+> >>
+> >> [    0.000029] sched_clock: 32 bits at 24MHz, resolution 41ns, wraps
+> >> every 89478484971ns
+> >> [    0.007888] clocksource: timer: mask: 0xffffffff max_cycles:
+> >> 0xffffffff, max_idle_ns: 79635851949 ns
+> >> [    0.017748] Console: colour dummy device 80x30
+> >> [    0.022243] Calibrating delay loop...
+> >> [    0.030895] random: fast init done
+> >> [    0.231021] random: crng init done
+> >>
+> >> For S900 I'm using the generic timer instead.
+> > 
+> > I don't get the issue, can you elaborate ?
+> 
+> Found it myself: I forgot to clear the interrupt pending bit in the
+> interrupt handler routine.
+> 
+> +       writel(OWL_Tx_CTL_PD, owl_timer_base + OWL_T1_CTL);
+> 
+> Now it goes past this point, initializes the real serial driver and
+> boots up to not finding the rootfs:
+> 
+> [    0.000032] sched_clock: 32 bits at 24MHz, resolution 41ns, wraps
+> every 89478484971ns
+> [    0.007898] clocksource: timer: mask: 0xffffffff max_cycles:
+> 0xffffffff, max_idle_ns: 79635851949 ns
+> [    0.017886] Console: colour dummy device 80x30
+> [    0.022386] Calibrating delay loop... 405.50 BogoMIPS (lpj=2027520)
 
-This is a symlink.
+May be you should also consider using register_current_timer_delay() instead of
+jiffies based delay loops.
 
-It's mode is not 100644, but 120000
+> [    0.083523] pid_max: default: 32768 minimum: 301
 
->
-> ?
->
-> --
-> Rask Ingemann Lambertsen
+-- 
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
