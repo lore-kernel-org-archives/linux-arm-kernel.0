@@ -1,49 +1,130 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 26 Feb 2017 21:17:46 +0100
-Subject: [PATCH 1/4] PCI: add DT bindings for Faraday Technology PCI Host
- Bridge
-In-Reply-To: <20170222002640.y2uhumje5csioure@rob-hp-laptop>
-References: <20170211125220.10273-1-linus.walleij@linaro.org>
- <20170222002640.y2uhumje5csioure@rob-hp-laptop>
-Message-ID: <CACRpkdZsFfnh8vA_-RQqXyrJOh-emZQytj2bxHXRDkTs9ga+eg@mail.gmail.com>
+From: flatmax@flatmax.org (Matt Flax)
+Date: Mon, 27 Feb 2017 07:21:13 +1100
+Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
+ bcm2835<=>IC<=>cs42xx8
+In-Reply-To: <20170226144958.GA5543@camel2.lan>
+References: <cover.1487997974.git.flatmax@flatmax.org>
+ <20170225133952.GA28091@camel2.lan>
+ <8cf68a3e-330d-e76d-e276-5df5453e3baf@flatmax.org>
+ <20170226144958.GA5543@camel2.lan>
+Message-ID: <732a71ac-5ec5-37e1-1190-be036ea34555@flatmax.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2017 at 1:26 AM, Rob Herring <robh@kernel.org> wrote:
-> On Sat, Feb 11, 2017 at 01:52:17PM +0100, Linus Walleij wrote:
 
->> +- compatible: should be one of
->> +  "faraday,pci"
->> +  "faraday,dual-pci"
+
+On 27/02/17 01:49, Matthias Reichl wrote:
+> On Sun, Feb 26, 2017 at 09:13:09AM +1100, Matt Flax wrote:
+>> On 26/02/17 00:39, Matthias Reichl wrote:
+>>> On Sat, Feb 25, 2017 at 04:03:11PM +1100, Matt Flax wrote:
+>>>> This patch set lets the ASoC system specify that an IC between the SoC and codec
+>>>> is master. This is intended to put both the SoC and Codec into slave modes.
+>>>>
+>>>> By default un-patched SoC and Codec drivers will return -EINVAL if they aren't
+>>>> enabled and tested for this mode.
+>>>>
+>>>> soc-dia.h has the new SND_SOC_DAIFMT_IBM_IFM definition set as :
+>>>> #define SND_SOC_DAIFMT_IBM_IFM		(5 << 12) /* IC clk & FRM master */
+>>>>
+>>>> The cs42xx8 codec driver is enabled for this mode and so too is the BCM2835
+>>>> SoC driver. This forms a chain : bcm2835<=>IC<=>cs42xx8
+>>>> where the IC is bit and frame master.
+>>> Model your IC as a codec. No need to add patches to random drivers
+>>> and add a flag with the rather meaningless semantics "someone else is
+>>> automagically setting up clocks for me".
+>>>
+>>>
+>> My last patch, used the two codec approach, however it was pointed out that
+>> the
+>> bcm2835 was run in DSP mode with a codec master (rather then IC master) and
+>> that
+>> the patch doesn't work. Which is clearly true and a problem, it can only
+>> work with an
+>> intermediate non-codec master.
+>>
+>> I think you summed it up well with your statement :
+>>
+>> On 25/02/17 Matthias Reichl wrote:
+>> If the clock timing adheres to DSP mode A timing and you add code
+>> to the the CPU DAI driver so it can operate in DSP mode A then
+>> that should also work. If not, it's broken.
+> Your bcm2835 patch doesn't configure the bcm2835 to DSP mode A,
+> it's still setup for I2S (slave) mode. You are just adding code
+> to pretend it's running in DSP mode A. Don't do that, it's wrong.
+
+All configuration is done in a machine driver, which I haven't submitted.
+The machine driver's dai_fmt is as follows :
+
+.dai_fmt = SND_SOC_DAIFMT_IBM_IFM|SND_SOC_DAIFMT_DSP_A|SND_SOC_DAIFMT_NB_NF,
+
+>> This patch set fixes the problem of a daisy chain of three possible masters
+>> (CPU <=> IC <=> codec) where only the IC can be master. In fact, when retro
+>> fitting DSP mode to old silicon, the CPU can specify which of the three can
+>> be masters
+>> and there is no chance that someone can fire the system up with the wrong
+>> master
+>> (which we know produces bit offset and random channel swapping when a codec
+>> is
+>> master).
+> Please follow the advice I gave you about 3 weeks ago and model your
+> setup properly.
 >
-> Probably should still have a Cortina specific compatible.
-
-OK I rewrote it using the specific-to-generic compatible pattern.
-
->> +pci at 50000000 {
->> +     compatible = "faraday,pci";
->> +     reg = <0x50000000 0x100>;
->> +     interrupts = <8 IRQ_TYPE_LEVEL_HIGH>, /* PCI A */
->> +                     <26 IRQ_TYPE_LEVEL_HIGH>, /* PCI B */
->> +                     <27 IRQ_TYPE_LEVEL_HIGH>, /* PCI C */
->> +                     <28 IRQ_TYPE_LEVEL_HIGH>; /* PCI D */
->> +     #address-cells = <3>;
->> +     #size-cells = <2>;
->> +     #interrupt-cells = <1>;
+> | So you have bcm2835 I2S <-> FPGA <-> codec - IOW a standard codec<->codec
+> | link.
+> |
+> | What you seem to be missing is just a method to transfer your 8-channel
+> | data via a 2-channel link - userspace want's to see an 8-channel PCM,
+> | but the hardware link (bcm2835-i2s) is only 2-channel.
+> |
+> | And that's where IMO as userspace plugin looks like a very good solution.
+> | It's basically the counterpart of your FPGA and contains the code that's
+> | neccessary to encapsulate/pack/whatever the 8-channel data into a 2-channel
+> | stream so it can then be unpacked to 8-channel by the FPGA.
+> |
+> | If you go this route your hardware and machine driver will work with
+> | other I2S codecs as well, and IMO that's a far better solution than
+> | adding very ugly hacks to a single I2S driver.
 >
-> This doesn't belong here (I think).
+> If you add an active hardware component (your "IC"/FPGA) you also
+> have to model that in software.
+>
+> If that component is acting as a clock master it probably has some
+> method to setup clocks. Even if you don't have that, eg if you
+> are running at some fixed rate you'll have to store that information
+> somewhere.
 
-This needs to be here because the interrupts for
-PCI are 1 cell. The PCI host acts as interrupt parent for all
-the cards you plug in, and they always have one cell, you
-can see this in the example for open-pic in Device Tree
-Specification release 0.1, page 19 for example.
+Clocks are set up in the machine driver as well.
 
-It gets a bit confusing maybe in cases like this (as with
-open-pic) where there is a cascades interrupt controller
-that in this case also has 1 cell of interrupt specifier.
+>
+> The place to do that is in a codec driver. In your setup it'll look
+> like this:
+>
+> That "IC" codec has 2 DAIs and operates as a clock master on both.
+> You link one DAI in I2S mode to the bcm2835 and the other DAI
+> in DSP (or whatever mode you are using) to the cs42xx8.
+>
+> If you model it this way you no longer work against ALSA and
+> you can stop adding hacks to existing drivers.
+>
+>
+Thanks, this is actually very constructive advice. Let me try to 
+understand what
+you are suggesting here... I am confused about how to set bit depth 
+correctly for
+the codec when I play to the IC chip in this setup... lets walk me 
+through this one...
 
-Or did you mean something else?
+I implement a new codec which matches this IC. The IC can be setup to be 
+master in
+its dai fmt. The sound card shows up with two devices, only the IC 
+device can be used to play
+and record.
 
-Yours,
-Linus Walleij
+Say I use aplay to play to the first device (the IC chip) it does 
+hw_params and clocks are set.
+But the second device (the codec) never gets hw_params executed ? If I 
+select 16 or 24 bits,
+it never knows ... is that right ? If so, how do we solve this problem ?
+
+thanks
+Matt
