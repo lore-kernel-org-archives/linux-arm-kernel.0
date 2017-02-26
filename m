@@ -1,50 +1,43 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun, 26 Feb 2017 09:19:49 +0800
-Subject: [PATCH v5 0/7] Allwinner H5 and Orange Pi PC2 support
-Message-ID: <20170226011956.53581-1-icenowy@aosc.xyz>
+Date: Sun, 26 Feb 2017 09:19:50 +0800
+Subject: [PATCH v5 1/7] arm64: allwinner: Kconfig: add essential pinctrl
+ driver for H5
+In-Reply-To: <20170226011956.53581-1-icenowy@aosc.xyz>
+References: <20170226011956.53581-1-icenowy@aosc.xyz>
+Message-ID: <20170226011956.53581-2-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H5 is a 64-bit SoC with a design like the 32-bit
-H3.
+H5 SoC has two pin controllers, one (in user manual called "CPUx") needs
+a slightly advanced driver, and the other (called "CPUs") is just equal
+to the on in H3, and the H3 driver can be just reused.
 
-This patchset adds support for it, along with the first available
-board -- Orange Pi PC2.
+Select the two necessary pinctrl drivers when building kernel for
+Allwinner SoCs.
 
-Andre Przywara (3):
-  arm: dts: sun8i: split Allwinner H3 .dtsi
-  arm64: dts: allwinner: add Allwinner H5 .dtsi
-  arm64: dts: sunxi: add support for the Orange Pi PC 2 board
+Also add H5 in the option's description.
 
-Icenowy Zheng (4):
-  arm64: allwinner: Kconfig: add essential pinctrl driver for H5
-  clk: sunxi-ng: rename sun8i-h3 driver to sunxi-h3-h5
-  clk: sunxi-ng: add support for Allwinner H5 SoC
-  ARM: dts: sun8i: convert H3 dtsi to use new sunxi-h3-h5 binding header
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ arch/arm64/Kconfig.platforms | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
- .../devicetree/bindings/clock/sunxi-ccu.txt        |   1 +
- arch/arm/boot/dts/sun8i-h3.dtsi                    | 589 ++-------------------
- arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 575 ++++++++++++++++++++
- arch/arm64/Kconfig.platforms                       |   5 +-
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 164 ++++++
- arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi       | 139 +++++
- arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi     |   1 +
- drivers/clk/sunxi-ng/Kconfig                       |   6 +-
- drivers/clk/sunxi-ng/Makefile                      |   2 +-
- .../sunxi-ng/{ccu-sun8i-h3.c => ccu-sunxi-h3-h5.c} | 339 +++++++++++-
- .../sunxi-ng/{ccu-sun8i-h3.h => ccu-sunxi-h3-h5.h} |  13 +-
- .../clock/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h}    |  11 +-
- .../reset/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h}    |  11 +-
- 14 files changed, 1277 insertions(+), 580 deletions(-)
- create mode 100644 arch/arm/boot/dts/sunxi-h3-h5.dtsi
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
- create mode 120000 arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
- rename drivers/clk/sunxi-ng/{ccu-sun8i-h3.c => ccu-sunxi-h3-h5.c} (71%)
- rename drivers/clk/sunxi-ng/{ccu-sun8i-h3.h => ccu-sunxi-h3-h5.h} (83%)
- rename include/dt-bindings/clock/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h} (95%)
- rename include/dt-bindings/reset/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h} (94%)
-
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 129cc5ae4091..81f0d6149c2e 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -5,8 +5,11 @@ config ARCH_SUNXI
+ 	select GENERIC_IRQ_CHIP
+ 	select PINCTRL
+ 	select PINCTRL_SUN50I_A64
++	select PINCTRL_SUN50I_H5
++	select PINCTRL_SUN8I_H3_R
+ 	help
+-	  This enables support for Allwinner sunxi based SoCs like the A64.
++	  This enables support for Allwinner sunxi based SoCs like the A64
++	  and H5.
+ 
+ config ARCH_ALPINE
+ 	bool "Annapurna Labs Alpine platform"
 -- 
 2.11.1
