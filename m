@@ -1,89 +1,38 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 26 Feb 2017 15:56:31 +0100
-Subject: [PATCH v2 04/17] clocksource: Add Owl timer
-In-Reply-To: <afd6bfbc-e17c-dd79-d2ff-42bac6c274db@suse.de>
-References: <20170224034055.18807-1-afaerber@suse.de>
- <20170224034055.18807-5-afaerber@suse.de>
- <20170224222921.GA23152@mai>
- <ab18d509-9fb2-1b4c-bdee-e2ce5d4273a3@suse.de>
- <20170225215941.GA30601@mai>
- <afd6bfbc-e17c-dd79-d2ff-42bac6c274db@suse.de>
-Message-ID: <20170226145631.GB30601@mai>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sun, 26 Feb 2017 22:57:58 +0800
+Subject: [PATCH v5 2/7] clk: sunxi-ng: rename sun8i-h3 driver to
+ sunxi-h3-h5
+In-Reply-To: <20170226095204.cwh7f2mbgjumr5fu@localhost>
+References: <20170226011956.53581-1-icenowy@aosc.xyz>
+ <20170226011956.53581-3-icenowy@aosc.xyz>
+ <20170226095204.cwh7f2mbgjumr5fu@localhost>
+Message-ID: <10821061488121078@web18g.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 26, 2017 at 03:40:49PM +0100, Andreas F?rber wrote:
-> Am 25.02.2017 um 22:59 schrieb Daniel Lezcano:
-> > On Sat, Feb 25, 2017 at 12:25:32AM +0100, Andreas F?rber wrote:
-> >> Am 24.02.2017 um 23:29 schrieb Daniel Lezcano:
-> >>> On Fri, Feb 24, 2017 at 04:40:42AM +0100, Andreas F?rber wrote:
-> >>>> +static struct clock_event_device owl_clockevent = {
-> >>>> +	.name			= "owl_tick",
-> >>>> +	.rating			= 200,
-> >>>> +	.features		= CLOCK_EVT_FEAT_ONESHOT,
-> >>>
-> >>> Did you consider adding CLOCK_EVT_FEAT_DYNIRQ ?
-> >>
-> >> No, it was not present downstream. Got a good example?
-> > 
-> > https://lwn.net/Articles/541000/
-> 
-> Looking at your current Nomadik code, it seems I can literally should
-> just add this flag (done), without needing to implement any new hooks.
-> 
-> On a related topic, how do we determine the cpumask? Downstream and some
-> in-tree drivers use cpumask_of(0), others use cpu_possible_mask.
 
-If you specify the CLOCK_EVT_FEAT_DYNIRQ, the cpumask is not important as it
-will be changed dynamically.
 
-Otherwise, cpumask_of(0) is often the default because it concentrates the
-wakeup on a single cpu, allowing the other cpus to go to deep idle state and if
-there are two clusters, it allows to have a cluster idle state. That results on
-a better energy saving.
+26.02.2017, 17:52, "Rask Ingemann Lambertsen" <rask@formelder.dk>:
+> On Sun, Feb 26, 2017 at 09:19:51AM +0800, Icenowy Zheng wrote:
+>> ?As the CCU in the Allwinner H5 SoC is very similar to the one in H3,
+>> ?rename the H3 driver to sunxi-h3-h5 so that it can be extended with H5
+>> ?support.
+>>
+>> ?Trasitional header symlinks are created, to ensure current device tree
+>
+> s/Trasitional/Transitional/ I guess.
+>
+>> ?files which included sun8i-h3-ccu.h can compile.
+>>
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ?---
+>> ?Changes in v5:
+>> ?- Add the reason to create trasitional headers in commit message.
+>
+> Likewise.
 
-The usage of cpu_possible_mask will randomly wakeup any cpu.
- 
-> >> Do you spot anything functionally wrong in this driver? Despite adding
-> >> this new driver, I am only getting the following additional earlycon output:
-> >>
-> >> [    0.000029] sched_clock: 32 bits at 24MHz, resolution 41ns, wraps
-> >> every 89478484971ns
-> >> [    0.007888] clocksource: timer: mask: 0xffffffff max_cycles:
-> >> 0xffffffff, max_idle_ns: 79635851949 ns
-> >> [    0.017748] Console: colour dummy device 80x30
-> >> [    0.022243] Calibrating delay loop...
-> >> [    0.030895] random: fast init done
-> >> [    0.231021] random: crng init done
-> >>
-> >> For S900 I'm using the generic timer instead.
-> > 
-> > I don't get the issue, can you elaborate ?
-> 
-> Found it myself: I forgot to clear the interrupt pending bit in the
-> interrupt handler routine.
-> 
-> +       writel(OWL_Tx_CTL_PD, owl_timer_base + OWL_T1_CTL);
-> 
-> Now it goes past this point, initializes the real serial driver and
-> boots up to not finding the rootfs:
-> 
-> [    0.000032] sched_clock: 32 bits at 24MHz, resolution 41ns, wraps
-> every 89478484971ns
-> [    0.007898] clocksource: timer: mask: 0xffffffff max_cycles:
-> 0xffffffff, max_idle_ns: 79635851949 ns
-> [    0.017886] Console: colour dummy device 80x30
-> [    0.022386] Calibrating delay loop... 405.50 BogoMIPS (lpj=2027520)
+Thanks ;-)
 
-May be you should also consider using register_current_timer_delay() instead of
-jiffies based delay loops.
-
-> [    0.083523] pid_max: default: 32768 minimum: 301
-
--- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+>
+> --
+> Rask Ingemann Lambertsen
