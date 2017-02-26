@@ -1,51 +1,49 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 26 Feb 2017 14:18:03 +0900
-Subject: Recommended notation for OPP to avoid DTC warnings
-Message-ID: <CAK7LNAQyc9=3d07-1upywYDk-AaRUGK4mJwAVduCuEJgnY1uFA@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 26 Feb 2017 07:00:58 +0100
+Subject: [PATCH 2/2] arm64: dts: add arm/arm64 include symlinks
+In-Reply-To: <20170226060058.5841-1-heiko@sntech.de>
+References: <20170226060058.5841-1-heiko@sntech.de>
+Message-ID: <20170226060058.5841-2-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+Allow including of dtsi files in an architecture-independent manner.
+Some dtsi files may be shared between architectures and one suggestion
+was to have symlinks and let these includes get accessed via a
+    #include <arm64/foo.dtsi>
+So add the necessary symlinks for arm32.
 
+Suggested-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+Suggested by Olof in response to the patch adding direct symlinks
+for cros-ec includes.
 
-Decumentation/devicetree/bindings/opp/opp.txt
-takes examples like this:
+Tested with adapted rk3399-Gru dtsi files and while we only need this arm64
+version right now, it might make sense to already have both the arm32 and
+arm64 versions ready.
 
-        opp at 1000000000 {
-                opp-hz = /bits/ 64 <1000000000>;
-                opp-microvolt = <970000 975000 985000>;
-                opp-microamp = <70000>;
-                clock-latency-ns = <300000>;
-                opp-suspend;
-        };
-        opp at 1100000000 {
-                opp-hz = /bits/ 64 <1100000000>;
-                opp-microvolt = <980000 1000000 1010000>;
-                opp-microamp = <80000>;
-                clock-latency-ns = <310000>;
-        };
-        opp at 1200000000 {
-                opp-hz = /bits/ 64 <1200000000>;
-                opp-microvolt = <1025000>;
-                clock-latency-ns = <290000>;
-                turbo-mode;
-        };
+ arch/arm64/boot/dts/include/arm   | 1 +
+ arch/arm64/boot/dts/include/arm64 | 1 +
+ 2 files changed, 2 insertions(+)
+ create mode 120000 arch/arm64/boot/dts/include/arm
+ create mode 120000 arch/arm64/boot/dts/include/arm64
 
-
-If we follow this notation and the device-tree is built with W=1,
-DTC warns like follows:
-
-
-Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
-unit name, but no reg property
-
-
-Is there a recommended notation to avoid it?
-
-Maybe, simply omit the "@" ?
-
-
-
+diff --git a/arch/arm64/boot/dts/include/arm b/arch/arm64/boot/dts/include/arm
+new file mode 120000
+index 000000000000..cf63d80e2b93
+--- /dev/null
++++ b/arch/arm64/boot/dts/include/arm
+@@ -0,0 +1 @@
++../../../../arm/boot/dts
+\ No newline at end of file
+diff --git a/arch/arm64/boot/dts/include/arm64 b/arch/arm64/boot/dts/include/arm64
+new file mode 120000
+index 000000000000..a96aa0ea9d8c
+--- /dev/null
++++ b/arch/arm64/boot/dts/include/arm64
+@@ -0,0 +1 @@
++..
+\ No newline at end of file
 -- 
-Best Regards
-Masahiro Yamada
+2.11.0
