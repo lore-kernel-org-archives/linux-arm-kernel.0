@@ -1,69 +1,34 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sun, 26 Feb 2017 14:16:11 +0800
-Subject: [PATCH 3/9] ASoC: sun8i-codec-analog: add support for V3s SoC
-In-Reply-To: <20170225123029.55939-3-icenowy@aosc.xyz>
-References: <20170225123029.55939-1-icenowy@aosc.xyz>
- <20170225123029.55939-3-icenowy@aosc.xyz>
-Message-ID: <CAGb2v67YfVo7RhkAPUZusfJiCW-_m6-d-=uq-DdgjEWNKYWVsQ@mail.gmail.com>
+From: linucherian@gmail.com (Linu Cherian)
+Date: Sun, 26 Feb 2017 12:36:58 +0530
+Subject: [PATCH V2 2/2] KVM: arm64: Increase number of user memslots to 508
+In-Reply-To: <20170223101407.GB1409@cbox>
+References: <1486538141-30627-1-git-send-email-linucherian@gmail.com>
+ <1486538141-30627-3-git-send-email-linucherian@gmail.com>
+ <20170223101407.GB1409@cbox>
+Message-ID: <CAGOz-0bKYbVB_Zu1J+fCnQ=icK9yNHjXjh_hBxj4AjATw7cEXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 25, 2017 at 8:30 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> The V3s SoC features an analog codec with headphone support but without
-> mic2 and linein.
+On Thu, Feb 23, 2017 at 3:44 PM, Christoffer Dall <cdall@linaro.org> wrote:
+> On Wed, Feb 08, 2017 at 12:45:41PM +0530, linucherian at gmail.com wrote:
+>> From: Linu Cherian <linu.cherian@cavium.com>
+>>
+>> Having only 32 memslots is a real constraint for the maximum
+>> number of PCI devices that can be assigned to a single guest.
+>> Assuming each PCI device/virtual function having two memory BAR
+>> regions, we could assign only 15 devices/virtual functions to a
+>> guest.
+>>
+>> Hence increase KVM_USER_MEM_SLOTS to 508, so that KVM_MEM_SLOTS_NUM is
+>> 512 as done in other archs like x86 and powerpc.
+>
+> Actually on powerpc they just define KVM_USER_MEM_SLOTS as 512 directly.
+>
+> On x86 they define them as 509 and have 3 private mem slots.
+>
+> I don't understand the difference and as far as I can tell we don't have
+> any private memslots on arm/arm64, so this is just weird to me.
+>
 
-It doesn't have MBIAS either. Please split it out as well.
-
-ChenYu
-
->
-> Add support for it.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt | 1 +
->  sound/soc/sunxi/sun8i-codec-analog.c                           | 9 +++++++++
->  2 files changed, 10 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt b/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
-> index 779b735781ba..1b6e7c4e50ab 100644
-> --- a/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
-> +++ b/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
-> @@ -4,6 +4,7 @@ Required properties:
->  - compatible: must be one of the following compatibles:
->                 - "allwinner,sun8i-a23-codec-analog"
->                 - "allwinner,sun8i-h3-codec-analog"
-> +               - "allwinner,sun8i-v3s-codec-analog"
->
->  Required properties if not a sub-node of the PRCM node:
->  - reg: must contain the registers location and length
-> diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
-> index 6c17c99c2c8d..6375932177a3 100644
-> --- a/sound/soc/sunxi/sun8i-codec-analog.c
-> +++ b/sound/soc/sunxi/sun8i-codec-analog.c
-> @@ -695,6 +695,11 @@ static const struct sun8i_codec_analog_quirks sun8i_h3_quirks = {
->         .has_mic2       = true,
->  };
->
-> +static const struct sun8i_codec_analog_quirks sun8i_v3s_quirks = {
-> +       .has_headphone  = true,
-> +       .has_hmic       = true,
-> +};
-> +
->  static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
->  {
->         struct device *dev = cmpnt->dev;
-> @@ -762,6 +767,10 @@ static const struct of_device_id sun8i_codec_analog_of_match[] = {
->                 .compatible = "allwinner,sun8i-h3-codec-analog",
->                 .data = &sun8i_h3_quirks,
->         },
-> +       {
-> +               .compatible = "allwinner,sun8i-v3s-codec-analog",
-> +               .data = &sun8i_v3s_quirks,
-> +       },
->         {}
->  };
->  MODULE_DEVICE_TABLE(of, sun8i_codec_analog_of_match);
-> --
-> 2.11.1
->
+Since the KVM_PRIVATE_MEM_SLOTS was already defined as 4, just kept
+it untouched. Should we remove this and keep KVM_USER_MEM_SLOTS as 512 ?
