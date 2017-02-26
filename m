@@ -1,72 +1,128 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sun, 26 Feb 2017 00:06:08 +0100
-Subject: [PATCH] ARM: dts: BCM5301X: Add basic DT for Linksys EA9500
-In-Reply-To: <9a2d6751-d7c3-458f-d717-2abe492e226d@openwrt.org>
-References: <20170223104025.5755-1-zajec5@gmail.com>
- <bd36df47-cefe-5736-e02c-621a21ae1b7a@openwrt.org>
- <CACna6rzN-OQv4UJoRso_Kyf1rCEtuU5Lu9LDjvTTt011UgrA=Q@mail.gmail.com>
- <5c57772b-71fd-d9e2-efe6-1175cf048e0b@openwrt.org>
- <CACna6ryFQHGN6xYiLcp9-v7f+55-4hoq+6kXCjiT6LJOS70sQQ@mail.gmail.com>
- <CACna6rzn3YDBqwReEikqjfhpMk-uQj0cuNaay2HyK0kLc_xuJg@mail.gmail.com>
- <9a2d6751-d7c3-458f-d717-2abe492e226d@openwrt.org>
-Message-ID: <CACna6rwdC+6DrKK4Zpp7t+W9w1H-Rzj+N3ANaZRAL_GP6JFO2Q@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 26 Feb 2017 01:02:09 +0100
+Subject: [PATCH] ARM: dts: add the AB8500 clocks to the device tree
+Message-ID: <20170226000209.20534-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 February 2017 at 23:43, Imre Kaloz <kaloz@openwrt.org> wrote:
-> On 2017-02-24 07:10, Rafa? Mi?ecki wrote:
->>>>
->>>> Your manners shine on these dark days of winter. For about a decade now,
->>>> http://192.168.1.1/sysinfo.cgi will show you quite a bit of information
->>>> if
->>>> you are too lazy to look into the GPL tarball or at the original
->>>> bootlogs.
->>>
->>> Today I decided to do my homework & check GPL sources of EA9500 fw.
->>>
->>> (...)
->>>
->>> Will you be so generous to tell us how did you get EA9500 board name
->>> by just looking at GPL sources?
->>
->> I also tried find with -name "*panamera*". One way of guessing board
->> name seems to be checking names of patches in ./src/linux/patches/.
->> Any other, more reliable method?
->>
->
-> First of all, it's really weird you never ever looked at the factory
-> bootlogs, but let me help in hope to enhance your communication style:
->
-> filenames:
->
-> src/linux/patches/linux-2.6.36.4-panamera_000_BSP.patch
-> src/linux/patches/linux-2.6.36.4-panamera_001_brcm_build.patch
-> src/linux/patches/linux-2.6.36.4-panamera_002_brcm_build_flags_temp_fix.patch
-> src/linux/patches/linux-2.6.36.4-panamera_003_ctf_bypass.patch
-> src/linux/patches/linux-2.6.36.4-panamera_006_cisco_comment.patch
-> src/linux/patches/linux-2.6.36.4-panamera_007_usb_remove_oops.patch
-> src/linux/patches/linux-2.6.36.4-panamera_008_6rd_sit_fragment.patch
-> src/linux/patches/linux-2.6.36.4-panamera_009_cisco_rtsp_conntrack.patch
-> src/linux/patches/linux-2.6.36.4-panamera_010_cisco_rtsp_conntrack2.patch
-> src/linux/patches/linux-2.6.36.4-panamera_014_ftp_pasv_command.patch
-> src/linux/patches/linux-2.6.36.4-panamera_046_sip_alg.patch
-> src/linux/patches/linux-2.6.36.4-panamera_047_add_usb_led.patch
-> src/linux/patches/linux-2.6.36.4-panamera_050_PPTP_L2TP_ctf.patch
-> src/linux/patches/linux-2.6.36.4-panamera_052_cfe_pass_led_to_blink.patch
-> src/linux/patches/linux-2.6.36.4-panamera_201_brcm_patch_20160226.patch
->
-> file contents:
->
-> src/mod_bdutil/platform/brcm/.board_id.o.cmd
-> src/mod_bdutil/platform/brcm/.buttons.o.cmd
-> src/mod_bdutil/platform/brcm/.leds_panamera.o.cmd
-> src/mod_bdutil/platform/brcm/.usbhub.o.cmd
->
->
-> If you have further questions, feel free to mail me directly and keep
-> off-topic discussion away from the lists.
+This adds the AB8500 clocks to the device tree using the new
+bindings from the clk subsystem, making audio work again.
 
-Thanks
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC guys: please consider this for late merge/early fix.
 
+Lee had audio working at some point in the past, but there is no
+way of fixing it backward or for stable. However: applying this
+fixes it for v4.11.
+
+ChangeLog v1->v2:
+- Rename DT node to clock-controller.
+---
+ arch/arm/boot/dts/ste-dbx5x0.dtsi  | 19 +++++++++++++++++++
+ arch/arm/boot/dts/ste-href.dtsi    |  9 ---------
+ arch/arm/boot/dts/ste-snowball.dts |  9 ---------
+ 3 files changed, 19 insertions(+), 18 deletions(-)
+
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index 82d8c4771293..162e1eb5373d 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -14,6 +14,7 @@
+ #include <dt-bindings/mfd/dbx500-prcmu.h>
+ #include <dt-bindings/arm/ux500_pm_domains.h>
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/clock/ste-ab8500.h>
+ #include "skeleton.dtsi"
+ 
+ / {
+@@ -603,6 +604,11 @@
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 
++				ab8500_clock: clock-controller {
++					compatible = "stericsson,ab8500-clk";
++					#clock-cells = <1>;
++				};
++
+ 				ab8500_gpio: ab8500-gpio {
+ 					compatible = "stericsson,ab8500-gpio";
+ 					gpio-controller;
+@@ -686,6 +692,8 @@
+ 
+ 				ab8500-pwm {
+ 					compatible = "stericsson,ab8500-pwm";
++					clocks = <&ab8500_clock AB8500_SYSCLK_INT>;
++					clock-names = "intclk";
+ 				};
+ 
+ 				ab8500-debugfs {
+@@ -700,6 +708,9 @@
+ 					V-AMIC2-supply = <&ab8500_ldo_anamic2_reg>;
+ 					V-DMIC-supply = <&ab8500_ldo_dmic_reg>;
+ 
++					clocks = <&ab8500_clock AB8500_SYSCLK_AUDIO>;
++					clock-names = "audioclk";
++
+ 					stericsson,earpeice-cmv = <950>; /* Units in mV. */
+ 				};
+ 
+@@ -1095,6 +1106,14 @@
+ 			status = "disabled";
+ 		};
+ 
++		sound {
++			compatible = "stericsson,snd-soc-mop500";
++			stericsson,cpu-dai = <&msp1 &msp3>;
++			stericsson,audio-codec = <&codec>;
++			clocks = <&prcmu_clk PRCMU_SYSCLK>, <&ab8500_clock AB8500_SYSCLK_ULP>, <&ab8500_clock AB8500_SYSCLK_INT>;
++			clock-names = "sysclk", "ulpclk", "intclk";
++		};
++
+ 		msp0: msp at 80123000 {
+ 			compatible = "stericsson,ux500-msp-i2s";
+ 			reg = <0x80123000 0x1000>;
+diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
+index f37f9e10713c..9e359e4f342e 100644
+--- a/arch/arm/boot/dts/ste-href.dtsi
++++ b/arch/arm/boot/dts/ste-href.dtsi
+@@ -186,15 +186,6 @@
+ 			status = "okay";
+ 		};
+ 
+-		sound {
+-			compatible = "stericsson,snd-soc-mop500";
+-
+-			stericsson,cpu-dai = <&msp1 &msp3>;
+-			stericsson,audio-codec = <&codec>;
+-			clocks = <&prcmu_clk PRCMU_SYSCLK>;
+-			clock-names = "sysclk";
+-		};
+-
+ 		msp0: msp at 80123000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&msp0_default_mode>;
+diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+index dd5514def604..ade1d0d4e5f4 100644
+--- a/arch/arm/boot/dts/ste-snowball.dts
++++ b/arch/arm/boot/dts/ste-snowball.dts
+@@ -159,15 +159,6 @@
+ 				     "", "", "", "", "", "", "", "";
+ 		};
+ 
+-		sound {
+-			compatible = "stericsson,snd-soc-mop500";
+-
+-			stericsson,cpu-dai = <&msp1 &msp3>;
+-			stericsson,audio-codec = <&codec>;
+-			clocks = <&prcmu_clk PRCMU_SYSCLK>;
+-			clock-names = "sysclk";
+-		};
+-
+ 		msp0: msp at 80123000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&msp0_default_mode>;
 -- 
-Rafa?
+2.9.3
