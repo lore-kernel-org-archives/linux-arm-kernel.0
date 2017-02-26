@@ -1,159 +1,103 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 26 Feb 2017 14:44:08 +0000
-Subject: [RFC PATCH] arm: Fix cache inconsistency when using fixmap
-In-Reply-To: <CAKv+Gu9YeJ+WN1TETjh5G73=tCOK9fDW21VOw0E1XYy=UJcBkg@mail.gmail.com>
-References: <1487778678.18810.8.camel@linaro.org>
- <5497800b3271f13583e78710ac39a48e@agner.ch>
- <CAKv+Gu9YeJ+WN1TETjh5G73=tCOK9fDW21VOw0E1XYy=UJcBkg@mail.gmail.com>
-Message-ID: <CAKv+Gu__kwhPGdQ4XzPF9WvkDQimh0kbGvrORs9PuDPTNsnE2A@mail.gmail.com>
+From: hias@horus.com (Matthias Reichl)
+Date: Sun, 26 Feb 2017 15:49:58 +0100
+Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
+ bcm2835<=>IC<=>cs42xx8
+In-Reply-To: <8cf68a3e-330d-e76d-e276-5df5453e3baf@flatmax.org>
+References: <cover.1487997974.git.flatmax@flatmax.org>
+ <20170225133952.GA28091@camel2.lan>
+ <8cf68a3e-330d-e76d-e276-5df5453e3baf@flatmax.org>
+Message-ID: <20170226144958.GA5543@camel2.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 February 2017 at 14:35, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 25 February 2017 at 01:06, Stefan Agner <stefan@agner.ch> wrote:
-[...]
->> Early fixmap gets shut down before going SMP, so non shared mappings are
->> not an issue there. But FIXMAP_PAGE_NORMAL is also used for regular
->> fixmap, which is essentially the problem. Also, regular fixmap does not
->> make sure of the cache policy due to that, but just uses the hardcoded
->> writeback policy...
->>
->> With that in mind, populating kern_pgprot with a reasonable default
->> which works for early fixmap might be a reasonable approach. Later
->> kern_pgprot gets setup with the appropriate shared attribute and cache
->> policy...
->>
->> diff --git a/arch/arm/include/asm/fixmap.h
->> b/arch/arm/include/asm/fixmap.h
->> index 5c17d2dec777..c663e562716c 100644
->> --- a/arch/arm/include/asm/fixmap.h
->> +++ b/arch/arm/include/asm/fixmap.h
->> @@ -39,12 +39,11 @@ static const enum fixed_addresses
->> __end_of_fixed_addresses =
->>         __end_of_fixmap_region > __end_of_early_ioremap_region ?
->>         __end_of_fixmap_region : __end_of_early_ioremap_region;
->>
->> -#define FIXMAP_PAGE_COMMON     (L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN
->> | L_PTE_DIRTY)
->> -
->> -#define FIXMAP_PAGE_NORMAL     (FIXMAP_PAGE_COMMON |
->> L_PTE_MT_WRITEBACK)
->> +#define FIXMAP_PAGE_NORMAL     (pgprot_kernel | L_PTE_XN)
->>  #define FIXMAP_PAGE_RO         (FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
->>
->>  /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
->> +#define FIXMAP_PAGE_COMMON     (L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN
->> | L_PTE_DIRTY)
->>  #define FIXMAP_PAGE_IO         (FIXMAP_PAGE_COMMON |
->> L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
->>  #define FIXMAP_PAGE_NOCACHE    FIXMAP_PAGE_IO
->>
->> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
->> index 4001dd15818d..9cb7c559263f 100644
->> --- a/arch/arm/mm/mmu.c
->> +++ b/arch/arm/mm/mmu.c
->> @@ -65,7 +65,8 @@ pmdval_t user_pmd_table = _PAGE_USER_TABLE;
->>  static unsigned int cachepolicy __initdata = CPOLICY_WRITEBACK;
->>  static unsigned int ecc_mask __initdata = 0;
->>  pgprot_t pgprot_user;
->> -pgprot_t pgprot_kernel;
->> +pgprot_t pgprot_kernel = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG |
->> +                                 L_PTE_DIRTY | L_PTE_MT_WRITEBACK);
->>  pgprot_t pgprot_hyp_device;
->>  pgprot_t pgprot_s2;
->>  pgprot_t pgprot_s2_device;
->>
+On Sun, Feb 26, 2017 at 09:13:09AM +1100, Matt Flax wrote:
+> 
+> On 26/02/17 00:39, Matthias Reichl wrote:
+> >On Sat, Feb 25, 2017 at 04:03:11PM +1100, Matt Flax wrote:
+> >>This patch set lets the ASoC system specify that an IC between the SoC and codec
+> >>is master. This is intended to put both the SoC and Codec into slave modes.
+> >>
+> >>By default un-patched SoC and Codec drivers will return -EINVAL if they aren't
+> >>enabled and tested for this mode.
+> >>
+> >>soc-dia.h has the new SND_SOC_DAIFMT_IBM_IFM definition set as :
+> >>#define SND_SOC_DAIFMT_IBM_IFM		(5 << 12) /* IC clk & FRM master */
+> >>
+> >>The cs42xx8 codec driver is enabled for this mode and so too is the BCM2835
+> >>SoC driver. This forms a chain : bcm2835<=>IC<=>cs42xx8
+> >>where the IC is bit and frame master.
+> >Model your IC as a codec. No need to add patches to random drivers
+> >and add a flag with the rather meaningless semantics "someone else is
+> >automagically setting up clocks for me".
+> >
+> >
+> 
+> My last patch, used the two codec approach, however it was pointed out that
+> the
+> bcm2835 was run in DSP mode with a codec master (rather then IC master) and
+> that
+> the patch doesn't work. Which is clearly true and a problem, it can only
+> work with an
+> intermediate non-codec master.
 >
-> This looks correct to me, and avoids using shareable attributes inadvertently.
->
-> However, we could make this a bit more private to the fixmap code by
-> using something like
->
->
-> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-> index 5c17d2dec777..6c375aea8f22 100644
-> --- a/arch/arm/include/asm/fixmap.h
-> +++ b/arch/arm/include/asm/fixmap.h
-> @@ -41,11 +41,14 @@ static const enum fixed_addresses __end_of_fixed_addresses =
->
->  #define FIXMAP_PAGE_COMMON     (L_PTE_YOUNG | L_PTE_PRESENT |
-> L_PTE_XN | L_PTE_DIRTY)
->
-> -#define FIXMAP_PAGE_NORMAL     (FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
-> -#define FIXMAP_PAGE_RO         (FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
-> +#define __FIXMAP_MT_NORMAL     ((pgprot_val(pgprot_kernel) ?:
-> FIXMAP_PAGE_COMMON) | \
-> +                                L_PTE_MT_WRITEBACK)
+> I think you summed it up well with your statement :
+> 
+> On 25/02/17 Matthias Reichl wrote:
+> If the clock timing adheres to DSP mode A timing and you add code
+> to the the CPU DAI driver so it can operate in DSP mode A then
+> that should also work. If not, it's broken.
 
-... only this L_PTE_MT_WRITEBACK belongs next to FIXMAP_PAGE_COMMON,
-since pgprot_kernel will already have a memory type index set, which
-may conflict with MT_WRITEBACK
+Your bcm2835 patch doesn't configure the bcm2835 to DSP mode A,
+it's still setup for I2S (slave) mode. You are just adding code
+to pretend it's running in DSP mode A. Don't do that, it's wrong.
 
+> This patch set fixes the problem of a daisy chain of three possible masters
+> (CPU <=> IC <=> codec) where only the IC can be master. In fact, when retro
+> fitting DSP mode to old silicon, the CPU can specify which of the three can
+> be masters
+> and there is no chance that someone can fire the system up with the wrong
+> master
+> (which we know produces bit offset and random channel swapping when a codec
+> is
+> master).
 
+Please follow the advice I gave you about 3 weeks ago and model your
+setup properly.
 
-> +#define FIXMAP_PAGE_NORMAL     __pgprot(__FIXMAP_MT_NORMAL)
-> +#define FIXMAP_PAGE_RO         __pgprot(__FIXMAP_MT_NORMAL | L_PTE_RDONLY)
->
->  /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
-> -#define FIXMAP_PAGE_IO         (FIXMAP_PAGE_COMMON |
-> L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
-> +#define FIXMAP_PAGE_IO         __pgprot(FIXMAP_PAGE_COMMON |
-> L_PTE_MT_DEV_SHARED | \
-> +                                        L_PTE_SHARED)
->  #define FIXMAP_PAGE_NOCACHE    FIXMAP_PAGE_IO
->
->  #define __early_set_fixmap     __set_fixmap
->
-> (and drop the change to mm/mmu.c), which boils down to the same for
-> fixmap but does not affect other users of pgprot_kernel. Also, it
-> appears these definitions are broken under STRICT_MM_TYPECHECKS so
-> this is a good opportunity to get that fixed as well.
->
-> Thank,
-> Ard.
->
->
->>
->>
->>> That's why I'm marking this as an RFC, perhaps the correct fix is to
->>> rework the code to use the defines from arch/arm/include/asm/pgtable.h
->>>
->>>  arch/arm/include/asm/fixmap.h       | 2 +-
->>>  arch/arm/probes/kprobes/test-core.h | 2 +-
->>>  2 files changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
->>> index 5c17d2dec777..26d4a4677cd7 100644
->>> --- a/arch/arm/include/asm/fixmap.h
->>> +++ b/arch/arm/include/asm/fixmap.h
->>> @@ -41,7 +41,7 @@ static const enum fixed_addresses __end_of_fixed_addresses =
->>>
->>>  #define FIXMAP_PAGE_COMMON   (L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN |
->>> L_PTE_DIRTY)
->>>
->>> -#define FIXMAP_PAGE_NORMAL   (FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
->>> +#define FIXMAP_PAGE_NORMAL   (FIXMAP_PAGE_COMMON | L_PTE_SHARED |
->>> L_PTE_MT_WRITEBACK)
->>>  #define FIXMAP_PAGE_RO               (FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
->>>
->>>  /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
->>> diff --git a/arch/arm/probes/kprobes/test-core.h
->>> b/arch/arm/probes/kprobes/test-core.h
->>> index 94285203e9f7..cde2b4e9358a 100644
->>> --- a/arch/arm/probes/kprobes/test-core.h
->>> +++ b/arch/arm/probes/kprobes/test-core.h
->>> @@ -8,7 +8,7 @@
->>>   * published by the Free Software Foundation.
->>>   */
->>>
->>> -#define VERBOSE 0 /* Set to '1' for more logging of test cases */
->>> +#define VERBOSE 1 /* Set to '1' for more logging of test cases */
->>
->> That seems to be unrelated.
->>
->> --
->> Stefan
->>
->>>
->>>  #ifdef CONFIG_THUMB2_KERNEL
->>>  #define NORMAL_ISA "16"
+| So you have bcm2835 I2S <-> FPGA <-> codec - IOW a standard codec<->codec
+| link.
+| 
+| What you seem to be missing is just a method to transfer your 8-channel
+| data via a 2-channel link - userspace want's to see an 8-channel PCM,
+| but the hardware link (bcm2835-i2s) is only 2-channel.
+| 
+| And that's where IMO as userspace plugin looks like a very good solution.
+| It's basically the counterpart of your FPGA and contains the code that's
+| neccessary to encapsulate/pack/whatever the 8-channel data into a 2-channel
+| stream so it can then be unpacked to 8-channel by the FPGA.
+| 
+| If you go this route your hardware and machine driver will work with
+| other I2S codecs as well, and IMO that's a far better solution than
+| adding very ugly hacks to a single I2S driver.
+
+If you add an active hardware component (your "IC"/FPGA) you also
+have to model that in software.
+
+If that component is acting as a clock master it probably has some
+method to setup clocks. Even if you don't have that, eg if you
+are running at some fixed rate you'll have to store that information
+somewhere.
+
+The place to do that is in a codec driver. In your setup it'll look
+like this:
+
+That "IC" codec has 2 DAIs and operates as a clock master on both.
+You link one DAI in I2S mode to the bcm2835 and the other DAI
+in DSP (or whatever mode you are using) to the cs42xx8.
+
+If you model it this way you no longer work against ALSA and
+you can stop adding hacks to existing drivers.
+
+so long,
+
+Hias
