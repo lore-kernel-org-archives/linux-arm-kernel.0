@@ -1,96 +1,388 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Sun, 26 Feb 2017 12:14:46 +0000
-Subject: [PATCH 0/8] ARM: sun8i: a33: Mali improvements
-In-Reply-To: <20170224001921.wsis65um3jnhtpil@lukather>
-References: <10fd28cb-269a-ec38-ecfb-b7c86be3e716@math.uni-bielefeld.de>
- <CACvgo51p+aqegjkbF6jGggwr+KXq_71w0VFzJvFAF6_egT1-kA@mail.gmail.com>
- <20170217154419.xr4n2ikp4li3c7co@lukather>
- <CACvgo51vLca_Ji8VQBO5fqCrbhpm_=6mrqx1K-7GddVv5yMKWg@mail.gmail.com>
- <20170224001921.wsis65um3jnhtpil@lukather>
-Message-ID: <CACvgo51GKYEiXqV4SMFbucmE5SxLwh7Jd_zNMMWvxZwSRP5pWA@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Sun, 26 Feb 2017 22:07:32 +0800
+Subject: [PATCH v1 2/2] coresight: add support for debug module
+In-Reply-To: <20170224190711.GA12355@linaro.org>
+References: <1487815067-27511-1-git-send-email-leo.yan@linaro.org>
+ <1487815067-27511-3-git-send-email-leo.yan@linaro.org>
+ <20170224190711.GA12355@linaro.org>
+Message-ID: <20170226140732.GA32233@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Fri, Feb 24, 2017 at 12:07:11PM -0700, Mathieu Poirier wrote:
+> On Thu, Feb 23, 2017 at 09:57:47AM +0800, Leo Yan wrote:
 
-Thanks for the links.
+[...]
 
-On 24 February 2017 at 00:19, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Fri, Feb 17, 2017 at 08:39:33PM +0000, Emil Velikov wrote:
->> As I feared things have taken a turn for the bitter end :-]
->>
->> It seems that this is a heated topic, so I'l kindly ask that we try
->> the following:
->>
->>  - For people such as myself/Tobias/others who feel that driver and DT
->> bindings should go hand in hand, prove them wrong.
->> But please, do so by pointing to the documentation (conclusion of a
->> previous discussion). This way you don't have to repeat yourself and
->> get [too] annoyed over silly suggestions.
->
-> http://lxr.free-electrons.com/source/Documentation/devicetree/usage-model.txt#L13
->
-> "The "Open Firmware Device Tree", or simply Device Tree (DT), is a
-> data structure and language for describing hardware. More
-> specifically, it is a description of hardware that is readable by an
-> operating system so that the operating system doesn't need to hard
-> code details of the machine"
->
-> http://lxr.free-electrons.com/source/Documentation/devicetree/usage-model.txt#L79
->
-> "What it does do is provide a language for decoupling the hardware
-> configuration from the board and device driver support in the Linux
-> kernel (or any other operating system for that matter)."
->
-The above seems to imply that there is (merged) device driver support
-in the Linux kernel (or other) that uses the bindings.
+> > +/* bits definition for EDDEVID1 */
+> > +#define EDDEVID1_PCSR_OFFSET_MASK	GENMASK(3, 0)
+> > +#define EDDEVID1_PCSR_OFFSET_INS_SET	(0x0)
+> > +#define EDDEVID1_PCSR_NO_OFFSET		(0x1)
+> 
+> Hi Leo,
+> 
+> The above #define isn't used in the code - please remove.
 
-It's not my call to make any of the policy, so I'll just kindly
-suggest improving the existing documentation:
- - Reword/elaborate if out of tree [Linux or in general?] drivers are
-suitable counterpart.
- - Patches could/should reference the "other OS" driver, or the "other
-OS" name at least ?
+Thanks a lot for quite detailed reivew and suggestion for below
+refactors. I will follow up them and send out new version for
+reviewing.
 
-Rather than clumping the above in 2.1 a separate section would be better ?
+Thanks,
+Leo Yan
 
-> And like I said, we already had bindings for out of tree bindings,
-> like this one:
-> https://patchwork.kernel.org/patch/9275707/
->
-> Which triggered no discussion at the time (but the technical one,
-> hence a v2, that should always be done).
->
-Needless to say, there's many of us waiting to see a Mali driver land
-- hence the noise. It's not meant to belittle/sway the work you and
-others do.
-
->> - The series has code changes which [seemingly] cater for out of tree
->> module(s).
->
-> That patch was dropped, only DT changes remains now, and do not depend
-> of that missing patch anyway.
->
->> Clearly state in the commit message who is the user, why it's save to
->> do so and get an Ack from more prominent [DRM] developers.
->
-> DRM is really not important here. We could implement a driver using
-> i2c as far as the DT is concerned.
->
-What I meant to say is:
-
-Please, provide clear expectations from the start - "Linux driver is
-OOT with no ETA on landing" or "driver for $FOO OS is at $LINK".
-Afaict Hans did the former in the patch mentioned. Perhaps you already
-did - in which case pardon for missing it.
-
-> FreeBSD for example uses a different, !DRM framework to support our
-> display stack, and still uses the DT.
->
-Interesting - do you have a link handy ? Does it use open-source usespace ?
-
-Thanks
-Emil
+> > +
+> > +/* bits definition for EDDEVID */
+> > +#define EDDEVID_PCSAMPLE_MODE		GENMASK(3, 0)
+> > +#define EDDEVID_IMPL_NONE		(0x0)
+> > +#define EDDEVID_IMPL_EDPCSR_EDCIDSR	(0x2)
+> > +#define EDDEVID_IMPL_FULL		(0x3)
+> > +
+> > +struct debug_drvdata {
+> > +	void __iomem	*base;
+> > +	struct device	*dev;
+> > +	int		cpu;
+> > +	struct clk	*dbg_clk;
+> > +
+> > +	bool		edpcsr_present;
+> > +	bool		edvidsr_present;
+> > +	bool		pc_has_offset;
+> > +
+> > +	u32		eddevid;
+> > +	u32		eddevid1;
+> > +
+> > +	u32		edpcsr;
+> > +	u32		edpcsr_hi;
+> > +	u32		edprsr;
+> > +	u32		edvidsr;
+> > +	u32		edcidsr;
+> > +};
+> > +
+> > +static int debug_count;
+> 
+> No need to make this global - please move this to debug_probe() 
+> 
+> > +static DEFINE_PER_CPU(struct debug_drvdata *, debug_drvdata);
+> > +
+> > +static void debug_os_unlock(struct debug_drvdata *drvdata)
+> > +{
+> > +	/* Unlocks the debug registers */
+> > +	writel_relaxed(0x0, drvdata->base + EDOSLAR);
+> > +	wmb();
+> > +}
+> > +
+> > +/*
+> > + * According to ARM DDI 0487A.k, before access external debug
+> > + * registers should firstly check the access permission; if any
+> > + * below condition has been met then cannot access debug
+> > + * registers to avoid lockup issue:
+> > + *
+> > + * - CPU power domain is powered off;
+> > + * - The OS Double Lock is locked;
+> > + *
+> > + * By checking EDPRSR can get to know if meet these conditions.
+> > + */
+> > +static bool debug_access_permit(struct debug_drvdata *drvdata)
+> 
+> s/debug_access_permit/debug_access_permitted
+> 
+> > +{
+> > +	/* CPU is powered off */
+> > +	if (!(drvdata->edprsr & EDPRSR_PU))
+> > +		return false;
+> > +
+> > +	/* The OS Double Lock is locked */
+> > +	if (drvdata->edprsr & EDPRSR_DLK)
+> > +		return false;
+> > +
+> > +	return true;
+> > +}
+> > +
+> > +static void debug_read_regs(struct debug_drvdata *drvdata)
+> > +{
+> > +	drvdata->edprsr = readl_relaxed(drvdata->base + EDPRSR);
+> > +
+> > +	if (!debug_access_permit(drvdata))
+> > +		return;
+> > +
+> > +	if (!drvdata->edpcsr_present)
+> > +		return;
+> > +
+> > +	CS_UNLOCK(drvdata->base);
+> > +
+> > +	debug_os_unlock(drvdata);
+> > +
+> > +	drvdata->edpcsr = readl_relaxed(drvdata->base + EDPCSR);
+> > +
+> > +	/*
+> > +	 * As described in ARM DDI 0487A.k, if the processing
+> > +	 * element (PE) is in debug state, or sample-based
+> > +	 * profiling is prohibited, EDPCSR reads as 0xFFFFFFFF;
+> > +	 * EDCIDSR, EDVIDSR and EDPCSR_HI registers also become
+> > +	 * UNKNOWN state. So directly bail out for this case.
+> > +	 */
+> > +	if (drvdata->edpcsr == EDPCSR_PROHIBITED) {
+> > +		CS_LOCK(drvdata->base);
+> > +		return;
+> > +	}
+> > +
+> > +	/*
+> > +	 * A read of the EDPCSR normally has the side-effect of
+> > +	 * indirectly writing to EDCIDSR, EDVIDSR and EDPCSR_HI;
+> > +	 * at this point it's safe to read value from them.
+> > +	 */
+> > +	drvdata->edcidsr = readl_relaxed(drvdata->base + EDCIDSR);
+> > +#ifdef CONFIG_64BIT
+> > +	drvdata->edpcsr_hi = readl_relaxed(drvdata->base + EDPCSR_HI);
+> > +#endif
+> > +
+> > +	if (drvdata->edvidsr_present)
+> > +		drvdata->edvidsr = readl_relaxed(drvdata->base + EDVIDSR);
+> > +
+> > +	CS_LOCK(drvdata->base);
+> > +}
+> > +
+> > +#ifndef CONFIG_64BIT
+> > +static bool debug_pc_has_offset(struct debug_drvdata *drvdata)
+> > +{
+> > +	u32 pcsr_offset;
+> > +
+> > +	pcsr_offset = drvdata->eddevid1 & EDDEVID1_PCSR_OFFSET_MASK;
+> > +
+> > +	return (pcsr_offset == EDDEVID1_PCSR_OFFSET_INS_SET);
+> > +}
+> > +
+> > +static unsigned long debug_adjust_pc(struct debug_drvdata *drvdata,
+> > +				     unsigned long pc)
+> > +{
+> > +	unsigned long arm_inst_offset = 0, thumb_inst_offset = 0;
+> > +
+> > +	if (debug_pc_has_offset(drvdata)) {
+> > +		arm_inst_offset = 8;
+> > +		thumb_inst_offset = 4;
+> > +	}
+> > +
+> > +	/* Handle thumb instruction */
+> > +	if (pc & EDPCSR_THUMB) {
+> > +		pc = (pc & EDPCSR_THUMB_INST_MASK) - thumb_inst_offset;
+> > +		return pc;
+> > +	}
+> > +
+> > +	/*
+> > +	 * Handle arm instruction offset, if the arm instruction
+> > +	 * is not 4 byte alignment then it's possible the case
+> > +	 * for implementation defined; keep original value for this
+> > +	 * case and print info for notice.
+> > +	 */
+> > +	if (pc & BIT(1))
+> > +		pr_emerg("Instruction offset is implementation defined\n");
+> > +	else
+> > +		pc = (pc & EDPCSR_ARM_INST_MASK) - arm_inst_offset;
+> > +
+> > +	return pc;
+> > +}
+> > +#endif
+> > +
+> > +static void debug_dump_regs(struct debug_drvdata *drvdata)
+> > +{
+> > +	unsigned long pc;
+> > +
+> > +	pr_emerg("\tEDPRSR:  %08x (Power:%s DLK:%s)\n", drvdata->edprsr,
+> > +		 drvdata->edprsr & EDPRSR_PU ? "On" : "Off",
+> > +		 drvdata->edprsr & EDPRSR_DLK ? "Lock" : "Unlock");
+> > +
+> > +	if (!debug_access_permit(drvdata) || !drvdata->edpcsr_present) {
+> > +		pr_emerg("No permission to access debug registers!\n");
+> > +		return;
+> > +	}
+> > +
+> > +	if (drvdata->edpcsr == EDPCSR_PROHIBITED) {
+> > +		pr_emerg("CPU is in Debug state or profiling is prohibited!\n");
+> > +		return;
+> > +	}
+> > +
+> > +#ifdef CONFIG_64BIT
+> > +	pc = (unsigned long)drvdata->edpcsr_hi << 32 |
+> > +	     (unsigned long)drvdata->edpcsr;
+> > +#else
+> > +	pc = debug_adjust_pc(drvdata, (unsigned long)drvdata->edpcsr);
+> > +#endif
+> > +
+> > +	pr_emerg("\tEDPCSR:  [<%p>] %pS\n", (void *)pc, (void *)pc);
+> > +	pr_emerg("\tEDCIDSR: %08x\n", drvdata->edcidsr);
+> > +
+> > +	if (!drvdata->edvidsr_present)
+> > +		return;
+> > +
+> > +	pr_emerg("\tEDVIDSR: %08x (State:%s Mode:%s Width:%s VMID:%x)\n",
+> > +		 drvdata->edvidsr,
+> > +		 drvdata->edvidsr & EDVIDSR_NS ? "Non-secure" : "Secure",
+> > +		 drvdata->edvidsr & EDVIDSR_E3 ? "EL3" :
+> > +			(drvdata->edvidsr & EDVIDSR_E2 ? "EL2" : "EL1/0"),
+> > +		 drvdata->edvidsr & EDVIDSR_HV ? "64bits" : "32bits",
+> > +		 drvdata->edvidsr & (u32)EDVIDSR_VMID);
+> > +}
+> > +
+> > +/*
+> > + * Dump out information on panic.
+> > + */
+> > +static int debug_notifier_call(struct notifier_block *self,
+> > +			       unsigned long v, void *p)
+> > +{
+> > +	int cpu;
+> > +
+> > +	pr_emerg("ARM external debug module:\n");
+> > +
+> > +	for_each_possible_cpu(cpu) {
+> > +
+> > +		if (!per_cpu(debug_drvdata, cpu))
+> > +			continue;
+> > +
+> > +		pr_emerg("CPU[%d]:\n", per_cpu(debug_drvdata, cpu)->cpu);
+> > +
+> > +		debug_read_regs(per_cpu(debug_drvdata, cpu));
+> > +		debug_dump_regs(per_cpu(debug_drvdata, cpu));
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct notifier_block debug_notifier = {
+> > +	.notifier_call = debug_notifier_call,
+> > +};
+> > +
+> > +static void debug_init_arch_data(void *info)
+> > +{
+> > +	struct debug_drvdata *drvdata = info;
+> > +	u32 mode;
+> > +
+> > +	CS_UNLOCK(drvdata->base);
+> > +
+> > +	debug_os_unlock(drvdata);
+> > +
+> > +	/* Read device info */
+> > +	drvdata->eddevid  = readl_relaxed(drvdata->base + EDDEVID);
+> > +	drvdata->eddevid1 = readl_relaxed(drvdata->base + EDDEVID1);
+> > +
+> > +	/* Parse implementation feature */
+> > +	mode = drvdata->eddevid & EDDEVID_PCSAMPLE_MODE;
+> > +	if (mode == EDDEVID_IMPL_FULL) {
+> > +		drvdata->edpcsr_present  = true;
+> > +		drvdata->edvidsr_present = true;
+> > +	} else if (mode == EDDEVID_IMPL_EDPCSR_EDCIDSR) {
+> > +		drvdata->edpcsr_present  = true;
+> > +		drvdata->edvidsr_present = false;
+> > +	} else {
+> > +		drvdata->edpcsr_present  = false;
+> > +		drvdata->edvidsr_present = false;
+> > +	}
+> > +
+> > +	CS_LOCK(drvdata->base);
+> > +}
+> > +
+> > +static int debug_probe(struct amba_device *adev, const struct amba_id *id)
+> > +{
+> > +	int ret;
+> > +	void __iomem *base;
+> > +	struct device *dev = &adev->dev;
+> > +	struct coresight_platform_data *pdata = NULL;
+> > +	struct debug_drvdata *drvdata;
+> > +	struct resource *res = &adev->res;
+> > +	struct device_node *np = adev->dev.of_node;
+> > +
+> > +	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
+> > +	if (!drvdata)
+> > +		return -ENOMEM;
+> > +
+> > +	if (np) {
+> > +		pdata = of_get_coresight_platform_data(dev, np);
+> > +		if (IS_ERR(pdata))
+> > +			return PTR_ERR(pdata);
+> > +		adev->dev.platform_data = pdata;
+> > +	}
+> 
+> I wonder if dragging a coresight_platform_data is worth it.  From what I see the
+> only thing it is used for is to retrieve the CPU.  As such I think it is better
+> get the portion of code in of_get_coresight_platform_data() that deals with the
+> CPU and create a new function (of_coresight_get_cpu()).  That way you can reuse
+> it here and in of_get_coresight_platform_data(). 
+> 
+> > +
+> > +	drvdata->dev = &adev->dev;
+> > +	drvdata->dbg_clk = devm_clk_get(&adev->dev, "dbg_clk");
+> > +	if (IS_ERR(drvdata->dbg_clk)) {
+> > +		dev_err(dev, "debug clock initialization failed.\n");
+> > +		return PTR_ERR(drvdata->dbg_clk);
+> > +	}
+> > +
+> > +	ret = clk_prepare_enable(drvdata->dbg_clk);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	dev_set_drvdata(dev, drvdata);
+> > +
+> > +	/* Validity for the resource is already checked by the AMBA core */
+> > +	base = devm_ioremap_resource(dev, res);
+> > +	if (IS_ERR(base))
+> > +		return PTR_ERR(base);
+> > +
+> > +	drvdata->base = base;
+> > +	drvdata->cpu = pdata ? pdata->cpu : 0;
+> > +
+> > +	get_online_cpus();
+> > +	per_cpu(debug_drvdata, drvdata->cpu) = drvdata;
+> > +
+> > +	if (smp_call_function_single(drvdata->cpu,
+> > +				debug_init_arch_data, drvdata, 1))
+> > +		dev_err(dev, "Debug arch init failed\n");
+> > +
+> > +	if (!debug_count++)
+> > +		atomic_notifier_chain_register(&panic_notifier_list,
+> > +					       &debug_notifier);
+> > +	put_online_cpus();
+> 
+> There is no need to hold the CPUs in place through the chain registration.  This
+> should go before the if().
+> 
+> > +
+> > +	dev_info(dev, "%s initialized\n", (char *)id->data);
+>         
+>         fprintf(buffer, (char *)id->data, drvdata->cpu);
+>         dev_info(dev, "%s initialized\n", buffer);
+> 
+> > +	return 0;
+> > +}
+> > +
+> > +static struct amba_id debug_ids[] = {
+> > +	{       /* Debug for Cortex-A53 */
+> > +		.id	= 0x000bbd03,
+> > +		.mask	= 0x000fffff,
+> > +		.data	= "debug",
+>        
+>                 .data   = "Coresight debug-CPU%d",
+> 
+> > +	},
+> > +	{       /* Debug for Cortex-A57 */
+> > +		.id	= 0x000bbd07,
+> > +		.mask	= 0x000fffff,
+> > +		.data	= "debug",
+> > +	},
+> > +	{       /* Debug for Cortex-A72 */
+> > +		.id	= 0x000bbd08,
+> > +		.mask	= 0x000fffff,
+> > +		.data	= "debug",
+> > +	},
+> > +	{ 0, 0},
+> > +};
+> > +
+> > +static struct amba_driver debug_driver = {
+> > +	.drv = {
+> > +		.name   = "coresight-debug",
+> > +		.suppress_bind_attrs = true,
+> > +	},
+> > +	.probe		= debug_probe,
+> > +	.id_table	= debug_ids,
+> > +};
+> > +builtin_amba_driver(debug_driver);
+> > -- 
+> > 2.7.4
+> > 
