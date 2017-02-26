@@ -1,56 +1,28 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Sun, 26 Feb 2017 20:40:39 +0100 (CET)
-Subject: [Outreachy kernel] [PATCH] staging: bcm2835-audio: Fixed spacing
- around '&'
-In-Reply-To: <1488137824.9188.7.camel@perches.com>
-References: <1488131271-2908-1-git-send-email-narcisaanamaria12@gmail.com>
- <alpine.DEB.2.20.1702261901180.2056@hadrien>
- <1488134072.9188.3.camel@perches.com>
- <alpine.DEB.2.20.1702261956070.2056@hadrien>
- <1488137824.9188.7.camel@perches.com>
-Message-ID: <alpine.DEB.2.20.1702262038560.2056@hadrien>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 26 Feb 2017 20:42:51 +0100
+Subject: [PATCH 2/4] PCI: add driver for Cortina Gemini Host Bridge
+In-Reply-To: <20170131003751.GF20550@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170128204839.18330-1-linus.walleij@linaro.org>
+ <20170128204839.18330-2-linus.walleij@linaro.org>
+ <20170131003751.GF20550@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <CACRpkdZ1ONM-sODoYi4isk65Eq5GUqPtfqnL9=is5s0=zObm_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 31, 2017 at 1:37 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
 
+> Looks nice; a couple unused definitions below.
 
-On Sun, 26 Feb 2017, Joe Perches wrote:
+Just so I do things right:  what is your policy on unused defines?
+I'm asking because the defines in this case is pretty much the
+documentation... there is no datasheet for this IP core. I usually
+like to keep the defines around so people can have them as a
+hint if they want to tinker and hack the driver.
 
-> On Sun, 2017-02-26 at 19:59 +0100, Julia Lawall wrote:
-> > On Sun, 26 Feb 2017, Joe Perches wrote:
-> > > Mailing lists _should_ be copied on patch submissions.
-> >
-> > The idea of outreachy is that it should be a place for people to get
-> > started without too much criticism from the outside.  Originally, only the
-> > outreachy mailing list received patches.  But staging maintainers were
-> > confused to have their drivers receiving patches that they had not seen.
-> > So we expanded it to maintainers.
->
-> That also doesn't make much sense as patches
-> should not be applied that have not reached
-> a mailing list for review.
->
-> As long as initial outreachy patches are not
-> applied and are just for internal review by
-> any outside person but the outreachy list and
-> are not be applied by maintainers, then perhaps
-> it's best if neither maintainers nor lists are
-> cc'd on the patches.
+Would you be OK with keeping them if I comment them out?
 
-The patches are applied by Greg.  Greg suggested the policy of adding
-maintainers but not including mailing lists.  I'll let him consider
-whether the policy should be changed.
+I'll repost the driver soon, including all things asked to be
+fixed up by you & Arnd.
 
-> And the link you sent is for newbies, not for
-> outreachy.
-
-The link is part of the outreachy tutorial, which is hosted by the
-kernelnewbies website.
-
-julia
-
->
-> The "don't cc lists" --nol use is inappropriate
-> there.
->
->
+Yours,
+Linus Walleij
