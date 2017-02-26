@@ -1,30 +1,29 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 26 Feb 2017 12:07:29 +0900
-Subject: [PATCH] ARM: prima2: remove redundant select CPU_V7
-Message-ID: <1488078449-3902-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Sun, 26 Feb 2017 12:07:01 +0900
+Subject: [PATCH] ARM: oxnas: remove redundant select CPU_V6K
+Message-ID: <1488078421-3751-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARCH_ATLAS7 resides in "if ARCH_SIRF ... end", and ARCH_SIRF depends
-on ARCH_MULTI_V7, which selects CPU_V7.
+MACH_OX820 depends on ARCH_MULTI_V6, which already selects CPU_V6K.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- arch/arm/mach-prima2/Kconfig | 1 -
+ arch/arm/mach-oxnas/Kconfig | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-prima2/Kconfig b/arch/arm/mach-prima2/Kconfig
-index 85e874a..7426211 100644
---- a/arch/arm/mach-prima2/Kconfig
-+++ b/arch/arm/mach-prima2/Kconfig
-@@ -27,7 +27,6 @@ config ARCH_ATLAS7
- 	bool "CSR SiRFSoC ATLAS7 ARM Cortex A7 Platform"
- 	default y
+diff --git a/arch/arm/mach-oxnas/Kconfig b/arch/arm/mach-oxnas/Kconfig
+index 8fa4557..e3610c5 100644
+--- a/arch/arm/mach-oxnas/Kconfig
++++ b/arch/arm/mach-oxnas/Kconfig
+@@ -28,7 +28,6 @@ config MACH_OX820
+ 	depends on ARCH_MULTI_V6
  	select ARM_GIC
--	select CPU_V7
- 	select ATLAS7_TIMER
- 	select HAVE_ARM_SCU if SMP
+ 	select DMA_CACHE_RWFO if SMP
+-	select CPU_V6K
  	select HAVE_SMP
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
 -- 
 2.7.4
