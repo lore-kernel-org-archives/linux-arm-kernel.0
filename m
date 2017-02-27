@@ -1,18 +1,37 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Feb 2017 08:26:01 -0600
-Subject: [PATCH 10/11] Documentation: devicetree: arm: Document Actions
- Semi S900
-In-Reply-To: <20170215165528.10052-11-afaerber@suse.de>
-References: <20170215165528.10052-1-afaerber@suse.de>
- <20170215165528.10052-11-afaerber@suse.de>
-Message-ID: <20170227142601.5iaekyenyfnmgtvo@rob-hp-laptop>
+Date: Mon, 27 Feb 2017 08:29:48 -0600
+Subject: [PATCH 1/2] dt-bindings: iio: stm32-adc: add option to set
+ resolution
+In-Reply-To: <b9f59559-c7a8-f575-0868-bd3b149a35c9@st.com>
+References: <1487177757-19427-1-git-send-email-fabrice.gasnier@st.com>
+ <1487177757-19427-2-git-send-email-fabrice.gasnier@st.com>
+ <c2b73482-ae01-34b5-3c16-b7e63893259e@kernel.org>
+ <b9f59559-c7a8-f575-0868-bd3b149a35c9@st.com>
+Message-ID: <20170227142948.eejne6j42lkzsiyq@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 05:55:27PM +0100, Andreas F?rber wrote:
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  Documentation/devicetree/bindings/arm/acts.txt | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
+On Fri, Feb 24, 2017 at 05:04:45PM +0100, Fabrice Gasnier wrote:
+> On 02/19/2017 01:09 PM, Jonathan Cameron wrote:
+> > On 15/02/17 16:55, Fabrice Gasnier wrote:
+> > > Add documentation for 'st,adc-res' dt optional property.
+> > > 
+> > > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> > I'm happy with this, but would like to leave time for a device tree review.
+> > 
+> > Ultimately we may well want to make this a generic property and call it something
+> > like adc-resolution but perhaps we need to wait until we have a few more devices
+> > supporting setting it via device tree to figure out what the best interface is.
+> > It would exactly be a problem to support this as a deprecated binding at that
+> > point.
+> 
+> Hi Jonathan,
+> 
+> I agree with you on this... It may be better to have generic property
+> for this, especially if you see that it will come in the near future.
+> May I suggest this prop to be less restrictive, e.g. like resolution-bits as
+> is may also be worth for other device types, e.g. DAC as an example ?
 
-Acked-by: Rob Herring <robh@kernel.org>
+Yes, please make this a commmon property.
+
+Rob
