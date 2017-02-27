@@ -1,62 +1,65 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Mon, 27 Feb 2017 09:41:26 +0800
-Subject: [PATCH v4 00/23] drm/rockchip: MIPI fixes & improvements
-In-Reply-To: <20170224125506.21533-1-john@metanate.com>
-References: <20170224125506.21533-1-john@metanate.com>
-Message-ID: <58B383C6.5050204@rock-chips.com>
+From: yuantian.tang@nxp.com (Y.T. Tang)
+Date: Mon, 27 Feb 2017 02:19:16 +0000
+Subject: [PATCH 1/2] dt-bindings: qoriq-clock: Add coreclk
+In-Reply-To: <1487137656-4006-1-git-send-email-yuantian.tang@nxp.com>
+References: <1487137656-4006-1-git-send-email-yuantian.tang@nxp.com>
+Message-ID: <VI1PR0402MB2848DEF2D443FF507CF03D78F0570@VI1PR0402MB2848.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?02?24? 20:54, John Keeping wrote:
-> This version is mostly small changes in response to review comments from
-> Sean and Chris, the details are in the individual patches.
->
-> I decided to drop the final patch which adds support for MIPI read
-> commands because I'm not using that feature now and I can't easily test
-> it.  It's on the list if anyone wants to pick it up in the future.
->
-> Version 3 was posted here:
-> http://www.spinics.net/lists/dri-devel/msg130977.html
->
-> Thanks to Sean Paul and Chris Zhong for their review and testing of this
-> series.
+PING!
 
-Looks good to me.
+Regards,
+Yuantian
 
-Acked-by: Mark Yao <mark.yao@rock-chips.com>
-
->
-> John Keeping (23):
->    drm/rockchip: dw-mipi-dsi: don't configure hardware in mode_set for
->      MIPI
->    drm/rockchip: dw-mipi-dsi: pass mode in where needed
->    drm/rockchip: dw-mipi-dsi: remove mode_set hook
->    drm/rockchip: dw-mipi-dsi: fix command header writes
->    drm/rockchip: dw-mipi-dsi: fix generic packet status check
->    drm/rockchip: dw-mipi-dsi: avoid out-of-bounds read on tx_buf
->    drm/rockchip: dw-mipi-dsi: include bad value in error message
->    drm/rockchip: dw-mipi-dsi: respect message flags
->    drm/rockchip: dw-mipi-dsi: only request HS clock when required
->    drm/rockchip: dw-mipi-dsi: don't assume buffer is aligned
->    drm/rockchip: dw-mipi-dsi: prepare panel after phy init
->    drm/rockchip: dw-mipi-dsi: allow commands in panel_disable
->    drm/rockchip: dw-mipi-dsi: fix escape clock rate
->    drm/rockchip: dw-mipi-dsi: ensure PHY is reset
->    drm/rockchip: dw-mipi-dsi: configure PHY before enabling
->    drm/rockchip: dw-mipi-dsi: properly configure PHY timing
->    drm/rockchip: dw-mipi-dsi: improve PLL configuration
->    drm/rockchip: dw-mipi-dsi: use specific poll helper
->    drm/rockchip: dw-mipi-dsi: use positive check for N{H,V}SYNC
->    drm/rockchip: vop: test for P{H,V}SYNC
->    drm/rockchip: dw-mipi-dsi: defer probe if panel is not loaded
->    drm/rockchip: dw-mipi-dsi: support non-burst modes
->    drm/rockchip: dw-mipi-dsi: add reset control
->
->   drivers/gpu/drm/rockchip/dw-mipi-dsi.c      | 325 +++++++++++++++++++---------
->   drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   4 +-
->   2 files changed, 220 insertions(+), 109 deletions(-)
->
-
-
--- 
-?ark Yao
+> -----Original Message-----
+> From: yuantian.tang at nxp.com [mailto:yuantian.tang at nxp.com]
+> Sent: Wednesday, February 15, 2017 1:48 PM
+> To: mturquette at baylibre.com
+> Cc: sboyd at codeaurora.org; robh+dt at kernel.org; mark.rutland at arm.com;
+> linux-clk at vger.kernel.org; devicetree at vger.kernel.org; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Y.T. Tang
+> <yuantian.tang@nxp.com>; Scott Wood <oss@buserror.net>; Y.T. Tang
+> <yuantian.tang@nxp.com>
+> Subject: [PATCH 1/2] dt-bindings: qoriq-clock: Add coreclk
+> 
+> From: Tang Yuantian <Yuantian.Tang@nxp.com>
+> 
+> ls1012a has separate input root clocks for core PLLs versus the platform PLL,
+> with the latter described as sysclk in the hw docs.
+> Update the qoriq-clock binding to allow a second input clock, named
+> "coreclk".  If present, this clock will be used for the core PLLs.
+> 
+> Signed-off-by: Scott Wood <oss@buserror.net>
+> Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
+> ---
+>  Documentation/devicetree/bindings/clock/qoriq-clock.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+> b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+> index df9cb5a..97a9666 100644
+> --- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+> @@ -55,6 +55,11 @@ Optional properties:
+>  - clocks: If clock-frequency is not specified, sysclk may be provided
+>  	as an input clock.  Either clock-frequency or clocks must be
+>  	provided.
+> +	A second input clock, called "coreclk", may be provided if
+> +	core PLLs are based on a different input clock from the
+> +	platform PLL.
+> +- clock-names: Required if a coreclk is present.  Valid names are
+> +	"sysclk" and "coreclk".
+> 
+>  2. Clock Provider
+> 
+> @@ -71,6 +76,7 @@ second cell is the clock index for the specified type.
+>  	2	hwaccel		index (n in CLKCGnHWACSR)
+>  	3	fman		0 for fm1, 1 for fm2
+>  	4	platform pll	0=pll, 1=pll/2, 2=pll/3, 3=pll/4
+> +	5	coreclk		must be 0
+> 
+>  3. Example
+> 
+> --
+> 2.1.0.27.g96db324
