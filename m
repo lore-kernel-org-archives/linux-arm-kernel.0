@@ -1,81 +1,35 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 28 Feb 2017 03:40:54 +0800
-Subject: [PATCH 3/3] ARM: dts: sun8i: add device node for H3 thermal sensor
-In-Reply-To: <20170227194054.51951-1-icenowy@aosc.xyz>
-References: <20170227194054.51951-1-icenowy@aosc.xyz>
-Message-ID: <20170227194054.51951-3-icenowy@aosc.xyz>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 27 Feb 2017 13:42:53 -0600
+Subject: [RESEND PATCH v5 1/4] PCI: imx6: Add code to support i.MX7D
+In-Reply-To: <20170220160900.7014-2-andrew.smirnov@gmail.com>
+References: <20170220160900.7014-1-andrew.smirnov@gmail.com>
+ <20170220160900.7014-2-andrew.smirnov@gmail.com>
+Message-ID: <20170227194253.i7vcouppxr62sgh5@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner H3 features a new "sun8i-ths" thermal sensor.
+On Mon, Feb 20, 2017 at 08:08:57AM -0800, Andrey Smirnov wrote:
+> Add various bits of code needed to support i.MX7D variant of the IP.
+> 
+> Cc: yurovsky at gmail.com
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> ---
+>  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |  13 ++-
 
-Add the device node for it, as well as the eFUSE cell for its
-calibration data.
+I guess the conclusion of the discussion is this is fine, so:
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
+Acked-by: Rob Herring <robh@kernel.org>
 
-This patch depends on the H3 SID dtsi patch [1].
-
-If this patch is merged before that one, the hunk about SID controller and the
-two nvmem properties in THS node can just be dropped.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/490300.html
-
- arch/arm/boot/dts/sun8i-h3.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index ed2eede5f1f0..fdf7f20b1526 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -79,6 +79,14 @@
- 		};
- 	};
- 
-+	thermal-zones {
-+		cpu_thermal: cpu_thermal {
-+			polling-delay-passive = <330>;
-+			polling-delay = <1000>;
-+			thermal-sensors = <&ths 0>;
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-@@ -209,6 +217,12 @@
- 		sid: eeprom at 01c14000 {
- 			compatible = "allwinner,sun8i-h3-sid";
- 			reg = <0x01c14000 0x400>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			ths_cal: ths-calibration at 34 {
-+				reg = <0x34 0x4>;
-+			};
- 		};
- 
- 		usbphy: phy at 01c19400 {
-@@ -429,6 +443,19 @@
- 			clocks = <&osc24M>;
- 		};
- 
-+		ths: ths at 01c25000 {
-+			compatible = "allwinner,sun8i-h3-ths";
-+			reg = <0x01c25000 0x400>;
-+			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+			resets = <&ccu RST_BUS_THS>;
-+			reset-names = "ahb";
-+			clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
-+			clock-names = "ahb", "ths";
-+			nvmem-cells = <&ths_cal>;
-+			nvmem-cell-names = "cal";
-+			#thermal-sensor-cells = <1>;
-+		};
-+
- 		spi0: spi at 01c68000 {
- 			compatible = "allwinner,sun8i-h3-spi";
- 			reg = <0x01c68000 0x1000>;
--- 
-2.11.1
+>  drivers/pci/host/pci-imx6.c                        | 121 ++++++++++++++++-----
+>  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
+>  3 files changed, 112 insertions(+), 26 deletions(-)
