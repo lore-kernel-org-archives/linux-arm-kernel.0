@@ -1,32 +1,85 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Feb 2017 17:00:44 -0600
-Subject: [PATCH v2 1/2] dts: mfd: axp20x: Add "xpowers,master-mode"
- property for AXP806 PMICs
-In-Reply-To: <396866a490b6056c60e93d862656bb90daedab98.1487791328.git.rask@formelder.dk>
-References: <cover.1487791328.git.rask@formelder.dk>
- <396866a490b6056c60e93d862656bb90daedab98.1487791328.git.rask@formelder.dk>
-Message-ID: <20170227230044.zjql2zlvjhsjdbpg@rob-hp-laptop>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 27 Feb 2017 15:34:05 -0800
+Subject: ARM: OMAP2+: Grab reference to device nodes where needed
+In-Reply-To: <1486853948-20978-1-git-send-email-linux@roeck-us.net>
+References: <1486853948-20978-1-git-send-email-linux@roeck-us.net>
+Message-ID: <20170227233405.GA16546@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2017 at 08:41:02PM +0100, Rask Ingemann Lambertsen wrote:
-> commit b101829a029a ("mfd: axp20x: Fix AXP806 access errors on cold boot")
-> was intended to fix the case where a board uses an AXP806 in slave mode,
-> but the boot loader leaves it in master mode for lack of AXP806 support.
-> But now the driver breaks on boards where the PMIC is operating in master
-> mode. To let the device tree describe which mode of operation is needed,
-> this patch introduces a new property "xpowers,master-mode".
-> 
-> Fixes: 204ae2963e10 ("mfd: axp20x: Add bindings for AXP806 PMIC")
-> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> Changes from v1 to v2:
-> Changed the commit message such that Fixes: points to the commit which
-> introduced the bindings for the AXP806 because the property should have been
-> included from the beginning of the AXP806 support.
-> 
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 3 +++
->  1 file changed, 3 insertions(+)
+ping ... this problem is now seen in mainline.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Guenter
+
+On Sat, Feb 11, 2017 at 02:59:08PM -0800, Guenter Roeck wrote:
+> After commit 'of: fix of_node leak caused in of_find_node_opts_by_path',
+> the following error may be reported when running omap images.
+> 
+> OF: ERROR: Bad of_node_put() on /ocp at 68000000
+> CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc7-next-20170210 #1
+> Hardware name: Generic OMAP3-GP (Flattened Device Tree)
+> [<c0310604>] (unwind_backtrace) from [<c030bbf4>] (show_stack+0x10/0x14)
+> [<c030bbf4>] (show_stack) from [<c05add8c>] (dump_stack+0x98/0xac)
+> [<c05add8c>] (dump_stack) from [<c05af1b0>] (kobject_release+0x48/0x7c)
+> [<c05af1b0>] (kobject_release)
+> 	from [<c0ad1aa4>] (of_find_node_by_name+0x74/0x94)
+> [<c0ad1aa4>] (of_find_node_by_name)
+> 	from [<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable+0x24/0x2c)
+> [<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable) from
+> [<c1215d5c>] (omap3xxx_hwmod_init+0x180/0x274)
+> [<c1215d5c>] (omap3xxx_hwmod_init)
+> 	from [<c120faa8>] (omap3_init_early+0xa0/0x11c)
+> [<c120faa8>] (omap3_init_early)
+> 	from [<c120fb2c>] (omap3430_init_early+0x8/0x30)
+> [<c120fb2c>] (omap3430_init_early)
+> 	from [<c1204710>] (setup_arch+0xc04/0xc34)
+> [<c1204710>] (setup_arch) from [<c1200948>] (start_kernel+0x68/0x38c)
+> [<c1200948>] (start_kernel) from [<8020807c>] (0x8020807c)
+> 
+> of_find_node_by_name() drops the reference to the passed device node,
+> so it is necessary to grab an extra one if it is still needed after the
+> call.
+> 
+> Cc: Qi Hou <qi.hou@windriver.com>
+> Cc: Peter Rosin <peda@axentia.se>
+> Cc: Rob Herring <robh@kernel.org>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> index 56f917ec8621..d4ca1e3964c3 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> @@ -3117,6 +3117,7 @@ static int __init omap3xxx_hwmod_is_hs_ip_block_usable(struct device_node *bus,
+>  	if (!bus)
+>  		return (omap_type() == OMAP2_DEVICE_TYPE_GP) ? 1 : 0;
+>  
+> +	of_node_get(bus);
+>  	if (of_device_is_available(of_find_node_by_name(bus, dev_name)))
+>  		return 1;
+>  
+> @@ -3189,15 +3190,20 @@ int __init omap3xxx_hwmod_init(void)
+>  
+>  	if (h_sham && omap3xxx_hwmod_is_hs_ip_block_usable(bus, "sham")) {
+>  		r = omap_hwmod_register_links(h_sham);
+> -		if (r < 0)
+> +		if (r < 0) {
+> +			of_node_put(bus);
+>  			return r;
+> +		}
+>  	}
+>  
+>  	if (h_aes && omap3xxx_hwmod_is_hs_ip_block_usable(bus, "aes")) {
+>  		r = omap_hwmod_register_links(h_aes);
+> -		if (r < 0)
+> +		if (r < 0) {
+> +			of_node_put(bus);
+>  			return r;
+> +		}
+>  	}
+> +	of_node_put(bus);
+>  
+>  	/*
+>  	 * Register hwmod links specific to certain ES levels of a
