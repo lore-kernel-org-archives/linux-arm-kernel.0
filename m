@@ -1,38 +1,33 @@
 From: plaes@plaes.org (Priit Laes)
-Date: Mon, 27 Feb 2017 23:09:10 +0200
-Subject: [PATCH 0/4] ARM: sun7i: Convert sun7i SoC to sunxi-ng
-Message-ID: <20170227210914.18954-1-plaes@plaes.org>
+Date: Mon, 27 Feb 2017 23:09:14 +0200
+Subject: [PATCH 4/4] dt-bindings: List devicetree binding for the CCU of
+ Allwinner A20
+In-Reply-To: <20170227210914.18954-1-plaes@plaes.org>
+References: <20170227210914.18954-1-plaes@plaes.org>
+Message-ID: <20170227210914.18954-5-plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Allwinner A20 is now driven by sunxi-ng CCU driver.
 
-This is serie brings another SoC into the sunxi-ng world.
+Add devicetree binding for it.
 
-As mentioned in sun5i conversion, this is pretty much standard
-stuff as all the required clocks were already implemented in
-the sunxi-ng framework.
+Signed-off-by: Priit Laes <plaes@plaes.org>
+---
+ Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-
-Priit Laes (4):
-  clk: sunxi-ng: Add clocks and reset indices for sun7i-a20 SoC
-  clk: sunxi-ng: Add sun7i-a20 CCU driver
-  ARM: sun7i: Convert to CCU
-  dt-bindings: List devicetree binding for the CCU of Allwinner A20
-
- .../devicetree/bindings/clock/sunxi-ccu.txt        |    1 +
- arch/arm/boot/dts/sun7i-a20.dtsi                   |  719 ++-----------
- drivers/clk/sunxi-ng/Kconfig                       |   11 +
- drivers/clk/sunxi-ng/Makefile                      |    1 +
- drivers/clk/sunxi-ng/ccu-sun7i-a20.c               | 1068 ++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun7i-a20.h               |  121 +++
- include/dt-bindings/clock/sun7i-ccu.h              |  127 +++
- include/dt-bindings/reset/sun7i-ccu.h              |   40 +
- 8 files changed, 1455 insertions(+), 633 deletions(-)
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun7i-a20.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun7i-a20.h
- create mode 100644 include/dt-bindings/clock/sun7i-ccu.h
- create mode 100644 include/dt-bindings/reset/sun7i-ccu.h
-
+diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+index bae5668..265262c 100644
+--- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
++++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+@@ -4,6 +4,7 @@ Allwinner Clock Control Unit Binding
+ Required properties :
+ - compatible: must contain one of the following compatibles:
+ 		- "allwinner,sun6i-a31-ccu"
++		- "allwinner,sun7i-a20-ccu"
+ 		- "allwinner,sun8i-a23-ccu"
+ 		- "allwinner,sun8i-a33-ccu"
+ 		- "allwinner,sun8i-h3-ccu"
 -- 
 2.9.3
