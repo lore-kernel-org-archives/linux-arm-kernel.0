@@ -1,213 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 27 Feb 2017 10:58:19 +0100
-Subject: [PATCH v4 2/3] nvmem: sunxi-sid: add support for H3's SID
- controller
-In-Reply-To: <20170226161003.12433-2-icenowy@aosc.xyz>
-References: <20170226161003.12433-1-icenowy@aosc.xyz>
- <20170226161003.12433-2-icenowy@aosc.xyz>
-Message-ID: <20170227095819.u3qxsijpxqyejpvf@lukather>
+From: flatmax@flatmax.org (Matt Flax)
+Date: Mon, 27 Feb 2017 21:08:14 +1100
+Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
+ bcm2835<=>IC<=>cs42xx8
+In-Reply-To: <20170227080433.GA2718@delle.lan>
+References: <cover.1487997974.git.flatmax@flatmax.org>
+ <20170225133952.GA28091@camel2.lan>
+ <8cf68a3e-330d-e76d-e276-5df5453e3baf@flatmax.org>
+ <20170226144958.GA5543@camel2.lan>
+ <732a71ac-5ec5-37e1-1190-be036ea34555@flatmax.org>
+ <20170226221648.GA10974@camel2.lan>
+ <7cef41ee-ef00-22b7-830f-517a9d594ed0@flatmax.org>
+ <20170227080433.GA2718@delle.lan>
+Message-ID: <170950f7-354f-e6a9-cefb-834a00fadd1b@flatmax.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2017 at 12:10:02AM +0800, Icenowy Zheng wrote:
-> The H3 SoC have a bigger SID controller, which has its direct read
-> address at 0x200 position in the SID block, not 0x0.
-> 
-> Also, H3 SID controller has some silicon bug that makes the direct read
-> value wrong at cold boot, add code to workaround the bug. (This bug has
-> already been fixed on A64 and later SoCs)
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
-> Changes in v4:
-> - Use readl_poll_timeout.
-> - Do register offset in sunxi_sid_read.
-> - Merge SUN8I_SID_OP_LOCK and SUN8I_SID_LOCK_SHIFT into one macro.
-> - Drop the result of register-based read operation.
-> 
->  .../bindings/nvmem/allwinner,sunxi-sid.txt         | 12 +++-
->  drivers/nvmem/sunxi_sid.c                          | 66 ++++++++++++++++++++++
->  2 files changed, 77 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-> index d543ed3f5363..9ab9e75a6351 100644
-> --- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-> +++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-> @@ -1,7 +1,11 @@
->  Allwinner sunxi-sid
->  
->  Required properties:
-> -- compatible: "allwinner,sun4i-a10-sid" or "allwinner,sun7i-a20-sid"
-> +- compatible: Should be one of the following (depending on your SoC):
 
-There's no need to add that it depends on the SoC, it's kind of obvious.
 
-> +  "allwinner,sun4i-a10-sid"
-> +  "allwinner,sun7i-a20-sid"
-> +  "allwinner,sun8i-h3-sid"
-> +
->  - reg: Should contain registers location and length
->  
->  = Data cells =
-> @@ -19,3 +23,9 @@ Example for sun7i:
->  		compatible = "allwinner,sun7i-a20-sid";
->  		reg = <0x01c23800 0x200>
->  	};
-> +
-> +Example for sun8i-h3:
-> +	sid at 01c14000 {
-> +		compatible = "allwinner,sun8i-h3-sid";
-> +		reg = <0x01c14000 0x400>;
-> +	};
+On 27/02/17 19:04, Matthias Reichl wrote:
+> On Mon, Feb 27, 2017 at 09:35:14AM +1100, Matt Flax wrote:
+>>
+>> On 27/02/17 09:16, Matthias Reichl wrote:
+>>>
+>>> Have a look at the end of Documentation/sound/alsa/soc/DPCM.txt
+>>> where codec<->codec links are explained.
+>>>
+>>> You can setup the stream parameters for the "IC"<->"real codec" link
+>>> with snd_soc_dai_link.params.
+>>>
+>>> You can do that for example in your machine driver in hwparams:
+>>> when hw_params is called eg with 2 channels 192kHz just set the
+>>> dai link parameters of the codec to 8 channels 48kHz.
+>>>
+>>> Maybe using dynamic pcm (which offers a be_hw_params_fixup hook)
+>>> is the more appropriate way to do that, but I can't tell for sure
+>>> as I never used it and am not familiar with it.
+>>>
+>>>
+>> Thanks for this information, I will give this a go - seems a better way now
+>> then introducing an IC master into the mix !
+>>
+>> Do you agree that we still need the BCM2835 SoC CPU driver to be expanded to
+>> handle DSP mode
+>> and multichannel setups ? I can't see any other way to enable the
+>> multichannel hardware setup without altering bcm2835_i2s.c to handle DSP
+>> mode and more then 2 channels in its _hw_params.
+> No, DSP mode and multichannel don't work on the BCM2835. Keep the driver
+> as it is.
+>
+> Use the alsa plugin approach to tunnel multichannel data over a 2-channel
+> PCM and you don't need to modify existing drivers.
+>
 
-And there's no need to add an example either, this is just as obvious
-if you compare it to the other.
+Thanks again for this suggestion. I have been playing around with user 
+space plugins lately, they are great. I plan to release some C++ classes 
+to help trivialise the creation of such plugins.
 
-> diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
-> index 69524b67007f..5179add54749 100644
-> --- a/drivers/nvmem/sunxi_sid.c
-> +++ b/drivers/nvmem/sunxi_sid.c
-> @@ -17,6 +17,7 @@
->  
->  #include <linux/device.h>
->  #include <linux/io.h>
-> +#include <linux/iopoll.h>
->  #include <linux/module.h>
->  #include <linux/nvmem-provider.h>
->  #include <linux/of.h>
-> @@ -25,6 +26,15 @@
->  #include <linux/slab.h>
->  #include <linux/random.h>
->  
-> +/* Registers and special values for doing register-based SID readout on H3 */
-> +#define SUN8I_SID_PRCTL		0x40
-> +#define SUN8I_SID_RDKEY		0x60
-> +
-> +#define SUN8I_SID_OFFSET_MASK	0x1FF
-> +#define SUN8I_SID_OFFSET_SHIFT	16
-> +#define SUN8I_SID_OP_LOCK	(0xAC << 8)
-> +#define SUN8I_SID_READ		BIT(1)
-> +
->  static struct nvmem_config econfig = {
->  	.name = "sunxi-sid",
->  	.read_only = true,
-> @@ -34,11 +44,14 @@ static struct nvmem_config econfig = {
->  };
->  
->  struct sunxi_sid_cfg {
-> +	u32	value_offset;
->  	u32	size;
-> +	bool	need_register_readout;
->  };
->  
->  struct sunxi_sid {
->  	void __iomem		*base;
-> +	u32			value_offset;
->  };
->  
->  /* We read the entire key, due to a 32 bit read alignment requirement. Since we
-> @@ -63,12 +76,36 @@ static int sunxi_sid_read(void *context, unsigned int offset,
->  	struct sunxi_sid *sid = context;
->  	u8 *buf = val;
->  
-> +	/* Offset the read operation to the real position of SID */
-> +	offset += sid->value_offset;
-> +
->  	while (bytes--)
->  		*buf++ = sunxi_sid_read_byte(sid, offset++);
->  
->  	return 0;
->  }
->  
-> +static int sun8i_sid_register_readout(const struct sunxi_sid *sid,
-> +				      const unsigned int word)
-> +{
-> +	u32 reg_val;
-> +	int ret;
-> +
-> +	/* Set word, lock access, and set read command */
-> +	reg_val = (word & SUN8I_SID_OFFSET_MASK)
-> +		  << SUN8I_SID_OFFSET_SHIFT;
-> +	reg_val |= SUN8I_SID_OP_LOCK | SUN8I_SID_READ;
-> +	writel(reg_val, sid->base + SUN8I_SID_PRCTL);
-> +
-> +	ret = readl_poll_timeout(sid->base + SUN8I_SID_PRCTL, reg_val,
-> +				 !(reg_val & SUN8I_SID_READ), 100, 250000);
-> +	if (ret)
-> +		return ret;
-> +
-> +	writel(0, sid->base + SUN8I_SID_PRCTL);
-> +	return 0;
-> +}
-> +
->  static int sunxi_sid_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -86,6 +123,7 @@ static int sunxi_sid_probe(struct platform_device *pdev)
->  	cfg = of_device_get_match_data(dev);
->  	if (!cfg)
->  		return -EINVAL;
-> +	sid->value_offset = cfg->value_offset;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	sid->base = devm_ioremap_resource(dev, res);
-> @@ -94,6 +132,23 @@ static int sunxi_sid_probe(struct platform_device *pdev)
->  
->  	size = cfg->size;
->  
-> +	if (cfg->need_register_readout) {
-> +		/*
-> +		 * H3's SID controller have a bug that the value at 0x200
-> +		 * offset is not the correct value when the hardware is reseted.
-> +		 * However, after doing a register-based read operation, the
-> +		 * value become right.
-> +		 * Do a full read operation here, but ignore its value
-> +		 * (as it's more fast to read by direct MMIO value than
-> +		 * with registers)
-> +		 */
-> +		for (i = 0; i < (size >> 2); i++) {
-> +			ret = sun8i_sid_register_readout(sid, i);
-> +			if (ret)
-> +				return ret;
-> +		}
-> +	}
-> +
->  	econfig.size = size;
->  	econfig.dev = dev;
->  	econfig.reg_read = sunxi_sid_read;
-> @@ -131,16 +186,27 @@ static int sunxi_sid_remove(struct platform_device *pdev)
->  }
->  
->  static const struct sunxi_sid_cfg sun4i_a10_cfg = {
-> +	.value_offset = 0,
+However for a product, a piece of robustly functioning hardware, I am 
+inclined to take the route of introducing a DSP mode into the 
+bcm2835_i2s.c driver.
 
-This is already the default value
+ From the previous patches, it is clear that people are willing to allow 
+multichannel (DSP mode) into the bcm2835 CPU driver. It improves the 
+usefulness of hardware which use the BCM2835 derived chipset. From my 
+point of view that is a major simplification in terms of releasing 
+functioning multichannel hardware. I would imagine from the 
+manufacturer's point of view that is a big bonus too !
 
->  	.size = 0x10,
-> +	.need_register_readout = false,
+Again I intend to implement your concept of the snd_soc_dai_link for my 
+machine driver, that is a fantasic lead you have given me ... when I 
+have questions @ implementation time I will copy you in seeking for more 
+guidance.
 
-And here too
-
->  };
->  
->  static const struct sunxi_sid_cfg sun7i_a20_cfg = {
-> +	.value_offset = 0,
->  	.size = 0x200,
-> +	.need_register_readout = false,
-
-Ditto.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170227/1e56bd8e/attachment.sig>
+thanks again,
+Matt
