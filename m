@@ -1,66 +1,51 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Mon, 27 Feb 2017 14:21:21 -0800
-Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
-In-Reply-To: <20170227170911.2280ca3e@gandalf.local.home>
-References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
- <f7532548-7007-1a32-f669-4520792805b3@caviumnetworks.com>
- <93219edf-0f6d-5cc7-309c-c998f16fe7ac@akamai.com>
- <aa139c18-1b04-2c20-2e22-89d74503b3cf@caviumnetworks.com>
- <20170227160601.5b79a1fe@gandalf.local.home>
- <6db89a8d-6053-51d1-5fd4-bae0179a5ebd@caviumnetworks.com>
- <20170227170911.2280ca3e@gandalf.local.home>
-Message-ID: <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 28 Feb 2017 06:24:50 +0800
+Subject: [nomadik:gemini 37/45] drivers/pci/host/pci-ftpci100.c:175:2: error:
+ implicit declaration of function 'pr_dbg'
+Message-ID: <201702280646.7TefO37f%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/27/2017 02:09 PM, Steven Rostedt wrote:
-> On Mon, 27 Feb 2017 13:41:13 -0800
-> David Daney <ddaney@caviumnetworks.com> wrote:
->
->> On 02/27/2017 01:06 PM, Steven Rostedt wrote:
->>> On Mon, 27 Feb 2017 11:59:50 -0800
->>> David Daney <ddaney@caviumnetworks.com> wrote:
->>>
->>>> For me the size is not the important issue, it is the alignment of the
->>>> struct jump_entry entries in the table.  I don't understand how your
->>>> patch helps, and I cannot Acked-by unless I understand what is being
->>>> done and can see that it is both correct and necessary.
->>>
->>> You brought up a very good point and I'm glad that I had Jason Cc all
->>> the arch maintainers in one patch.
->>>
->>> I think jump_labels may be much more broken than we think, and Jason's
->>> fix doesn't fix anything. We had this same issues with tracepoints.
->>>
->>> I'm looking at jump_label_init, and how we iterate over an array of
->>> struct jump_entry's that was put together by the linker. The problem is
->>> that jump_entry is not a power of 2 in size.
->>>
->>
->> ELF sections may have an ENTSIZE property exactly for arrays.  Since
->> each jump_entry will have a unique value they cannot be merged, but we
->> can tell the assembler they are an array and get them properly packed.
->> Perhaps something like (untested):
->>
->>     .pushsection __jump_table,  \"awM\", at progbits,24
->>     FOO
->>     .popsection
->>
->
-> And the linker will honor this too?
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git gemini
+head:   b5a084bbd084caf3c47995083d03bdc847a9f445
+commit: f81a2826bb2369b05cd06a97b27d9e3fbdc2150e [37/45] PCI: add driver for Faraday Technology Host Bridge
+config: arm-allmodconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout f81a2826bb2369b05cd06a97b27d9e3fbdc2150e
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-See attached for mips.  It seems to do the right thing.
+All errors (new ones prefixed by >>):
 
-I leave it as an exercise to the reader to fix the other architectures.
+   drivers/pci/host/pci-ftpci100.c: In function 'faraday_res_to_memcfg':
+>> drivers/pci/host/pci-ftpci100.c:175:2: error: implicit declaration of function 'pr_dbg' [-Werror=implicit-function-declaration]
+     pr_dbg("Translated pci base @%08x, size %08x to config %08x\n",
+     ^~~~~~
+   cc1: some warnings being treated as errors
 
-Consult your own  binutils experts to verify that what I say is true.
+vim +/pr_dbg +175 drivers/pci/host/pci-ftpci100.c
 
+   169	
+   170		/* This is probably not good */
+   171		if (mem_base & ~(FARADAY_PCI_MEMBASE_MASK))
+   172			pr_warn("truncated PCI memory base\n");
+   173		/* Translate to bridge side address space */
+   174		outval |= (mem_base & FARADAY_PCI_MEMBASE_MASK);
+ > 175		pr_dbg("Translated pci base @%08x, size %08x to config %08x\n",
+   176		       mem_base, mem_size, outval);
+   177	
+   178		*val = outval;
 
-David Daney
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: 0001-MIPS-jump_lable-Give-__jump_table-elements-an-entsiz.patch
-Type: text/x-patch
-Size: 2317 bytes
+Name: .config.gz
+Type: application/gzip
+Size: 60362 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170227/b2d33eff/attachment-0001.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170228/a2908ccf/attachment-0001.gz>
