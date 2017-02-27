@@ -1,40 +1,29 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Mon, 27 Feb 2017 11:48:50 +0800
-Subject: [PATCH RFC] arm64/mm: handle memmap kernel option
-In-Reply-To: <CAKv+Gu9j_4kSVAPrddsdcDiW+MWMTweHPe9bthf4=n4jLt2NZw@mail.gmail.com>
-References: <1488005245-54811-1-git-send-email-xieyisheng1@huawei.com>
- <CAKv+Gu9j_4kSVAPrddsdcDiW+MWMTweHPe9bthf4=n4jLt2NZw@mail.gmail.com>
-Message-ID: <ab8d4b0a-dfe5-629f-5ead-3c7e907509fa@huawei.com>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Mon, 27 Feb 2017 05:04:11 +0100
+Subject: [RFC] ADS7846 touchscreen questions
+Message-ID: <2ffa89be-e875-4b47-9598-87ccb670da3f@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hello,
 
-Thanks for comment.
-On 2017/2/26 18:46, Ard Biesheuvel wrote:
-> On 25 February 2017 at 06:47, Yisheng Xie <xieyisheng1@huawei.com> wrote:
->> When use device tree mode, user can reserve memory by changes the dts,
->> however, when boot with ACPI, user cannot reserve memory except by
->> changing the ACPI table in BIOS, which is not so convenient.
->>
->> To make user reserve memory for some specific use more convenient,
->> this patch implement the following memmap variants:
->>  - memmap=nn[KMG]$ss[KMG]: mark specified memory as reserved;
->>  - memmap=nn[KMG]@ss[KMG]: force usage of a specific region of memory;
->>
->> Reported-by: Bob Dong <dongbo4@huawei.com>
->> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
-> 
-> Could you explain which problem you are solving here? ACPI implies
-> UEFI on arm64, and so these reservations could be made by a boot
-> component instead, if it requires a fixed memory reservation. If this
-> is a reservation for, e.g., OP-TEE, we should not rely on the command
-> line to communicate this information.
-> 
-We just want to reserve some memory for a driver and I just not so familiar
-with how to reserve memory with UEFI. So doubt about whether it is suitable
-to reserve memory with cmdline like "memmap=xxx", which had appeared in x86
-for a long time.
+I'm trying to add ADS7846 touchscreen support for arch/arm/mach-pxa/magician machine, but I have some questions about functionality of the driver and/or possible enhancements.
 
-Thanks
-Yisheng Xie
+There seems to be an unnecessary computation of a pressure in ads7846_report_state(). The test for ignoring the measured data should be done before the computation. I would transfer it inside ads7846_irq() before the actual ads7846_report_state() call. Or at least before the pressure computation.
+
+	if (!ts->stopped && !packet->tc.ignore) {
+		ads7846_report_state(ts);
+	}
+
+If a 7845 model uses penirq_recheck_delay_usecs pdata, then get_pendown_state(ts) test for discarding the data is called twice.
+
+Anyway the last measurement will be almost always interrupted by pen up event. IMO it should be tested every time, preferably before ads7846_report_state() call. I would transfer it along with penirq_recheck_delay_usecs delay.
+
+With those changes the debug printks for different models could be merged along with some pressure computations.
+
+The arch/arm/mach-pxa/lubbock.c machine returns a constant 0 for get_pendown_state test. Does the touchscreen driver work at all? It seems it cannot call ads7846_report_state() at all (as a condition of while() will fail).
+
+Are there directions how to define x_plate_ohms constant? It seems to me that in extreme situations where z2 and x values will be near a maximum (4095) the unsigned int Rt will overflow when the constant x_plate_ohms is over 256. My machine has 317 ohms for x and 500 ohms for y.
+
+Thanks,
+Petr
