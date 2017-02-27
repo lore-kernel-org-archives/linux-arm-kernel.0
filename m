@@ -1,141 +1,330 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 27 Feb 2017 19:54:38 +0000
-Subject: [RFC PATCH 27/30] iommu/arm-smmu-v3: Handle PRI queue overflow
+Date: Mon, 27 Feb 2017 19:54:40 +0000
+Subject: [RFC PATCH 29/30] vfio: Add support for Shared Virtual Memory
 In-Reply-To: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
 References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
-Message-ID: <20170227195441.5170-28-jean-philippe.brucker@arm.com>
+Message-ID: <20170227195441.5170-30-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the PRI queue is full, it enters overflow condition, which is sticky
-and exited by the PRI thread once it has had time to free up some slots.
-During that time, no new entry is added to the queue. The SMMU
-automatically replies to PRI Page Requests (PPR) that have "last=1" with
-"success", to let the device retry later. PPRs that have "last=0" and
-PASID Stop Markers are silently ignored. Two related issues need to be
-fixed:
+Add two new ioctl for VFIO devices. VFIO_DEVICE_BIND_TASK creates a bond
+between a device and a process address space, identified by a
+device-specific ID named PASID. This allows the device to target DMA
+transactions at the process virtual addresses without a need for mapping
+and unmapping buffers explicitly in the IOMMU. The process page tables are
+shared with the IOMMU, and mechanisms such as PCI ATS/PRI may be used to
+handle faults. VFIO_DEVICE_UNBIND_TASK removed a bond identified by a
+PASID.
 
-* Any PPR in the PRI queue prior to the overflow condition might be in a
-  Page Request Group (PRG) that has its last entry auto-responded while in
-  overflow. Until we fix up the overflow, ignore any non-last PPR received
-  by the PRI thread.
+Also add a capability flag in device info to detect whether the system and
+the device support SVM.
 
-* In addition, any PRG of PPRs already committed to the fault queue is now
-  potentially invalid, since their last PPR might have been lost. Wait
-  until the overflow condition is fixed, and destroy *all* remaining PRG
-  structures :( We do that by appending a PRG sweeper work to the fault
-  queue, that will do some inefficient sweeping and lock up the fault
-  queue for a while. Awful, but necessary.
+Users need to specify the state of a PASID when unbinding, with flags
+VFIO_PASID_RELEASE_FLUSHED and VFIO_PASID_RELEASE_CLEAN. Even for PCI,
+PASID invalidation is specific to each device and only partially covered
+by the specification:
+
+* Device must have an implementation-defined mechanism for stopping the
+  use of a PASID. When this mechanism finishes, the device has stopped
+  issuing transactions for this PASID and all transactions for this PASID
+  have been flushed to the IOMMU.
+
+* Device may either wait for all outstanding PRI requests for this PASID
+  to finish, or issue a Stop Marker message, a barrier that separates PRI
+  requests affecting this instance of the PASID from PRI requests
+  affecting the next instance. In the first case, we say that the PASID is
+  "clean", in the second case it is "flushed" (and the IOMMU has to wait
+  for the Stop Marker before reassigning the PASID.)
+
+We expect similar distinctions for platform devices. Ideally there should
+be a callback for each PCI device, allowing the IOMMU to ask the device to
+stop using a PASID. When the callback returns, the PASID is either flushed
+or clean and the return value tells which.
+
+For the moment I don't know how to implement this callback for PCI, so if
+the user forgets to call unbind with either "clean" or "flushed", the
+PASID is never reused. For platform devices, it might be simpler to
+implement since we could associate an invalidate_pasid callback to a DT
+compatible string, as is currently done for reset.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 37 ++++++++++++++++++++++++++++++++++---
- 1 file changed, 34 insertions(+), 3 deletions(-)
+ drivers/vfio/pci/vfio_pci.c |  24 ++++++++++
+ drivers/vfio/vfio.c         | 104 ++++++++++++++++++++++++++++++++++++++++++++
+ include/uapi/linux/vfio.h   |  55 +++++++++++++++++++++++
+ 3 files changed, 183 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index b5d45c1e14d1..1a5e72752e6d 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -723,6 +723,7 @@ struct arm_smmu_device {
- 	struct list_head		tasks;
- 
- 	struct workqueue_struct		*fault_queue;
-+	struct work_struct		flush_prgs;
- 
- 	struct list_head		domains;
- 	struct mutex			domains_mutex;
-@@ -1798,7 +1799,8 @@ static irqreturn_t arm_smmu_evtq_thread(int irq, void *dev)
- 
- static void arm_smmu_handle_fault(struct work_struct *work);
- 
--static void arm_smmu_handle_ppr(struct arm_smmu_device *smmu, u64 *evt)
-+static void arm_smmu_handle_ppr(struct arm_smmu_device *smmu, u64 *evt,
-+				bool overflowing)
- {
- 	struct arm_smmu_fault *fault;
- 	struct arm_smmu_fault params = {
-@@ -1817,6 +1819,9 @@ static void arm_smmu_handle_ppr(struct arm_smmu_device *smmu, u64 *evt)
- 		.priv	= evt[0] & PRIQ_0_PERM_PRIV,
- 	};
- 
-+	if (overflowing && !params.last)
-+		return;
-+
- 	fault = kmem_cache_alloc(arm_smmu_fault_cache, GFP_KERNEL);
- 	if (!fault) {
- 		/* Out of memory, tell the device to retry later */
-@@ -1834,6 +1839,7 @@ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
- 	struct arm_smmu_device *smmu = dev;
- 	struct arm_smmu_queue *q = &smmu->priq.q;
- 	size_t queue_size = 1 << q->max_n_shift;
-+	bool overflowing = false;
- 	u64 evt[PRIQ_ENT_DWORDS];
- 	size_t i = 0;
- 
-@@ -1842,7 +1848,7 @@ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
- 	do {
- 		while (!queue_remove_raw(q, evt)) {
- 			spin_unlock(&smmu->priq.wq.lock);
--			arm_smmu_handle_ppr(smmu, evt);
-+			arm_smmu_handle_ppr(smmu, evt, overflowing);
- 			spin_lock(&smmu->priq.wq.lock);
- 			if (++i == queue_size) {
- 				smmu->priq.batch++;
-@@ -1851,8 +1857,10 @@ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
- 			}
- 		}
- 
--		if (queue_sync_prod(q) == -EOVERFLOW)
-+		if (queue_sync_prod(q) == -EOVERFLOW) {
- 			dev_err(smmu->dev, "PRIQ overflow detected -- requests lost\n");
-+			overflowing = true;
-+		}
- 	} while (!queue_empty(q));
- 
- 	/* Sync our overflow flag, as we believe we're up to speed */
-@@ -1863,6 +1871,9 @@ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
- 
- 	spin_unlock(&smmu->priq.wq.lock);
- 
-+	if (overflowing)
-+		queue_work(smmu->fault_queue, &smmu->flush_prgs);
-+
- 	return IRQ_HANDLED;
+diff --git a/drivers/vfio/pci/vfio_pci.c b/drivers/vfio/pci/vfio_pci.c
+index 324c52e3a1a4..3d7733f94891 100644
+--- a/drivers/vfio/pci/vfio_pci.c
++++ b/drivers/vfio/pci/vfio_pci.c
+@@ -22,6 +22,7 @@
+ #include <linux/mutex.h>
+ #include <linux/notifier.h>
+ #include <linux/pci.h>
++#include <linux/pci-ats.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/slab.h>
+ #include <linux/types.h>
+@@ -623,6 +624,26 @@ int vfio_pci_register_dev_region(struct vfio_pci_device *vdev,
+ 	return 0;
  }
  
-@@ -2820,6 +2831,24 @@ static void arm_smmu_handle_fault(struct work_struct *work)
- 	kfree(fault);
- }
- 
-+static void arm_smmu_flush_prgs(struct work_struct *work)
++static bool vfio_pci_supports_svm(struct vfio_pci_device *vdev)
 +{
-+	struct arm_smmu_device *smmu;
-+	struct arm_smmu_task *smmu_task;
-+	struct arm_smmu_pri_group *prg, *next_prg;
++	struct pci_dev *pdev = vdev->pdev;
 +
-+	smmu = container_of(work, struct arm_smmu_device, flush_prgs);
++	if (!pdev->ats_enabled)
++		return false;
 +
-+	spin_lock(&smmu->contexts_lock);
-+	list_for_each_entry(smmu_task, &smmu->tasks, smmu_head) {
-+		list_for_each_entry_safe(prg, next_prg, &smmu_task->prgs, list) {
-+			list_del(&prg->list);
-+			kfree(prg);
-+		}
-+	}
-+	spin_unlock(&smmu->contexts_lock);
++	if (!pdev->pasid_enabled || pci_max_pasids(pdev) <= 1)
++		return false;
++
++	if (!pdev->pri_enabled)
++		return false;
++
++	/*
++	 * If the IOMMU driver enabled all of these, then it supports PCI SVM
++	 * for this device.
++	 */
++	return true;
 +}
 +
- static void arm_smmu_sweep_contexts(struct work_struct *work)
+ static long vfio_pci_ioctl(void *device_data,
+ 			   unsigned int cmd, unsigned long arg)
  {
- 	u64 batch;
-@@ -4269,6 +4298,8 @@ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
- 		smmu->fault_queue = alloc_ordered_workqueue("smmu_fault_queue", 0);
- 		if (!smmu->fault_queue)
- 			return -ENOMEM;
-+
-+		INIT_WORK(&smmu->flush_prgs, arm_smmu_flush_prgs);
- 	}
+@@ -642,6 +663,9 @@ static long vfio_pci_ioctl(void *device_data,
  
- 	return arm_smmu_init_strtab(smmu);
+ 		info.flags = VFIO_DEVICE_FLAGS_PCI;
+ 
++		if (vfio_pci_supports_svm(vdev))
++			info.flags |= VFIO_DEVICE_FLAGS_SVM;
++
+ 		if (vdev->reset_works)
+ 			info.flags |= VFIO_DEVICE_FLAGS_RESET;
+ 
+diff --git a/drivers/vfio/vfio.c b/drivers/vfio/vfio.c
+index 609f4f982c74..c4505d8f4c61 100644
+--- a/drivers/vfio/vfio.c
++++ b/drivers/vfio/vfio.c
+@@ -97,6 +97,14 @@ struct vfio_device {
+ 	struct vfio_group		*group;
+ 	struct list_head		group_next;
+ 	void				*device_data;
++
++	struct mutex			tasks_lock;
++	struct list_head		tasks;
++};
++
++struct vfio_task {
++	int				pasid;
++	struct list_head		list;
+ };
+ 
+ #ifdef CONFIG_VFIO_NOIOMMU
+@@ -520,6 +528,9 @@ struct vfio_device *vfio_group_create_device(struct vfio_group *group,
+ 	device->device_data = device_data;
+ 	dev_set_drvdata(dev, device);
+ 
++	mutex_init(&device->tasks_lock);
++	INIT_LIST_HEAD(&device->tasks);
++
+ 	/* No need to get group_lock, caller has group reference */
+ 	vfio_group_get(group);
+ 
+@@ -532,6 +543,8 @@ struct vfio_device *vfio_group_create_device(struct vfio_group *group,
+ 
+ static void vfio_device_release(struct kref *kref)
+ {
++	int ret;
++	struct vfio_task *tmp, *task;
+ 	struct vfio_device *device = container_of(kref,
+ 						  struct vfio_device, kref);
+ 	struct vfio_group *group = device->group;
+@@ -539,6 +552,22 @@ static void vfio_device_release(struct kref *kref)
+ 	list_del(&device->group_next);
+ 	mutex_unlock(&group->device_lock);
+ 
++	mutex_lock(&device->tasks_lock);
++	list_for_each_entry_safe(task, tmp, &device->tasks, list) {
++		/*
++		 * This might leak the PASID, since the IOMMU won't know
++		 * if it is safe to reuse.
++		 */
++		ret = iommu_unbind_task(device->dev, task->pasid, 0);
++		if (ret)
++			dev_warn(device->dev, "failed to unbind PASID %u\n",
++				 task->pasid);
++
++		list_del(&task->list);
++		kfree(task);
++	}
++	mutex_unlock(&device->tasks_lock);
++
+ 	dev_set_drvdata(device->dev, NULL);
+ 
+ 	kfree(device);
+@@ -1622,6 +1651,75 @@ static int vfio_device_fops_release(struct inode *inode, struct file *filep)
+ 	return 0;
+ }
+ 
++static long vfio_svm_ioctl(struct vfio_device *device, unsigned int cmd,
++			   unsigned long arg)
++{
++	int ret;
++	unsigned long minsz;
++
++	struct vfio_device_svm svm;
++	struct vfio_task *vfio_task;
++
++	minsz = offsetofend(struct vfio_device_svm, pasid);
++
++	if (copy_from_user(&svm, (void __user *)arg, minsz))
++		return -EFAULT;
++
++	if (svm.argsz < minsz)
++		return -EINVAL;
++
++	if (cmd == VFIO_DEVICE_BIND_TASK) {
++		struct task_struct *task = current;
++
++		ret = iommu_bind_task(device->dev, task, &svm.pasid, 0, NULL);
++		if (ret)
++			return ret;
++
++		vfio_task = kzalloc(sizeof(*vfio_task), GFP_KERNEL);
++		if (!vfio_task) {
++			iommu_unbind_task(device->dev, svm.pasid,
++					  IOMMU_PASID_CLEAN);
++			return -ENOMEM;
++		}
++
++		vfio_task->pasid = svm.pasid;
++
++		mutex_lock(&device->tasks_lock);
++		list_add(&vfio_task->list, &device->tasks);
++		mutex_unlock(&device->tasks_lock);
++
++	} else {
++		int flags = 0;
++
++		if (svm.flags & ~(VFIO_SVM_PASID_RELEASE_FLUSHED |
++				  VFIO_SVM_PASID_RELEASE_CLEAN))
++			return -EINVAL;
++
++		if (svm.flags & VFIO_SVM_PASID_RELEASE_FLUSHED)
++			flags = IOMMU_PASID_FLUSHED;
++		else if (svm.flags & VFIO_SVM_PASID_RELEASE_CLEAN)
++			flags = IOMMU_PASID_CLEAN;
++
++		mutex_lock(&device->tasks_lock);
++		list_for_each_entry(vfio_task, &device->tasks, list) {
++			if (vfio_task->pasid != svm.pasid)
++				continue;
++
++			ret = iommu_unbind_task(device->dev, svm.pasid, flags);
++			if (ret)
++				dev_warn(device->dev, "failed to unbind PASID %u\n",
++					 vfio_task->pasid);
++
++			list_del(&vfio_task->list);
++			kfree(vfio_task);
++			break;
++		}
++		mutex_unlock(&device->tasks_lock);
++	}
++
++	return copy_to_user((void __user *)arg, &svm, minsz) ? -EFAULT : 0;
++}
++
+ static long vfio_device_fops_unl_ioctl(struct file *filep,
+ 				       unsigned int cmd, unsigned long arg)
+ {
+@@ -1630,6 +1728,12 @@ static long vfio_device_fops_unl_ioctl(struct file *filep,
+ 	if (unlikely(!device->ops->ioctl))
+ 		return -EINVAL;
+ 
++	switch (cmd) {
++	case VFIO_DEVICE_BIND_TASK:
++	case VFIO_DEVICE_UNBIND_TASK:
++		return vfio_svm_ioctl(device, cmd, arg);
++	}
++
+ 	return device->ops->ioctl(device->device_data, cmd, arg);
+ }
+ 
+diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
+index 519eff362c1c..3fe4197a5ea0 100644
+--- a/include/uapi/linux/vfio.h
++++ b/include/uapi/linux/vfio.h
+@@ -198,6 +198,7 @@ struct vfio_device_info {
+ #define VFIO_DEVICE_FLAGS_PCI	(1 << 1)	/* vfio-pci device */
+ #define VFIO_DEVICE_FLAGS_PLATFORM (1 << 2)	/* vfio-platform device */
+ #define VFIO_DEVICE_FLAGS_AMBA  (1 << 3)	/* vfio-amba device */
++#define VFIO_DEVICE_FLAGS_SVM	(1 << 4)	/* Device supports bind/unbind */
+ 	__u32	num_regions;	/* Max region index + 1 */
+ 	__u32	num_irqs;	/* Max IRQ index + 1 */
+ };
+@@ -409,6 +410,60 @@ struct vfio_irq_set {
+  */
+ #define VFIO_DEVICE_RESET		_IO(VFIO_TYPE, VFIO_BASE + 11)
+ 
++struct vfio_device_svm {
++	__u32	argsz;
++	__u32	flags;
++#define VFIO_SVM_PASID_RELEASE_FLUSHED	(1 << 0)
++#define VFIO_SVM_PASID_RELEASE_CLEAN	(1 << 1)
++	__u32	pasid;
++};
++/*
++ * VFIO_DEVICE_BIND_TASK - _IOWR(VFIO_TYPE, VFIO_BASE + 22,
++ *                               struct vfio_device_svm)
++ *
++ * Share a process' virtual address space with the device.
++ *
++ * This feature creates a new address space for the device, which is not
++ * affected by VFIO_IOMMU_MAP/UNMAP_DMA. Instead, the device can tag its DMA
++ * traffic with the given @pasid to perform transactions on the associated
++ * virtual address space. Mapping and unmapping of buffers is performed by
++ * standard functions such as mmap and malloc.
++ *
++ * On success, VFIO writes a Process Address Space ID (PASID) into @pasid. This
++ * ID is unique to a device.
++ *
++ * The bond between device and process must be removed with
++ * VFIO_DEVICE_UNBIND_TASK before exiting.
++ *
++ * On fork, the child inherits the device fd and can use the bonds setup by its
++ * parent. Consequently, the child has R/W access on the address spaces bound by
++ * its parent. After an execv, the device fd is closed and the child doesn't
++ * have access to the address space anymore.
++ *
++ * Availability of this feature depends on the device, its bus, the underlying
++ * IOMMU and the CPU architecture. All of these are guaranteed when the device
++ * has VFIO_DEVICE_FLAGS_SVM flag set.
++ *
++ * returns: 0 on success, -errno on failure.
++ */
++#define VFIO_DEVICE_BIND_TASK	_IO(VFIO_TYPE, VFIO_BASE + 22)
++
++/*
++ * VFIO_DEVICE_UNBIND_TASK - _IOWR(VFIO_TYPE, VFIO_BASE + 23,
++ *                                 struct vfio_device_svm)
++ *
++ * Unbind address space identified by @pasid from device. Device must have
++ * stopped issuing any DMA transaction for the PASID and flushed any reference
++ * to this PASID upstream. Some IOMMUs need to know when a PASID is safe to
++ * reuse, in which case one of the following must be present in @flags
++ *
++ * VFIO_PASID_RELEASE_FLUSHED: the PASID is safe to reassign after the IOMMU
++ *       receives an invalidation message from the device.
++ *
++ * VFIO_PASID_RELEASE_CLEAN: the PASID is safe to reassign immediately.
++ */
++#define VFIO_DEVICE_UNBIND_TASK	_IO(VFIO_TYPE, VFIO_BASE + 23)
++
+ /*
+  * The VFIO-PCI bus driver makes use of the following fixed region and
+  * IRQ index mapping.  Unimplemented regions return a size of zero.
 -- 
 2.11.0
