@@ -1,46 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Feb 2017 08:48:09 +0000
-Subject: [PATCH RFC] arm64/mm: handle memmap kernel option
-In-Reply-To: <ab8d4b0a-dfe5-629f-5ead-3c7e907509fa@huawei.com>
-References: <1488005245-54811-1-git-send-email-xieyisheng1@huawei.com>
- <CAKv+Gu9j_4kSVAPrddsdcDiW+MWMTweHPe9bthf4=n4jLt2NZw@mail.gmail.com>
- <ab8d4b0a-dfe5-629f-5ead-3c7e907509fa@huawei.com>
-Message-ID: <20170227084808.GA31271@remoulade>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Mon, 27 Feb 2017 10:05:18 +0100
+Subject: [RFC v2 4/7] ASoC: dmaengine_pcm: add copy support
+In-Reply-To: <20170216201427.z7ixcwbuyvb7ajgn@sirena.org.uk>
+References: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
+ <1487003909-11710-5-git-send-email-arnaud.pouliquen@st.com>
+ <20170214171630.qgkyoymxyqjiiblh@sirena.org.uk>
+ <40633f7c-a2ac-1658-cc9d-b30eaff8a95a@st.com>
+ <20170215145341.sntwx7oqyqmw6azv@sirena.org.uk>
+ <338f8db7-2077-626f-986b-b4e3df40469c@st.com>
+ <20170216201427.z7ixcwbuyvb7ajgn@sirena.org.uk>
+Message-ID: <6bdd18a9-d040-3b62-a5a5-8ac6e632a1b0@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Mark,
 
-On Mon, Feb 27, 2017 at 11:48:50AM +0800, Yisheng Xie wrote:
-> On 2017/2/26 18:46, Ard Biesheuvel wrote:
-> > On 25 February 2017 at 06:47, Yisheng Xie <xieyisheng1@huawei.com> wrote:
+Sorry for the late answer, i was OoO...
 
-> >> To make user reserve memory for some specific use more convenient,
-> >> this patch implement the following memmap variants:
-> >>  - memmap=nn[KMG]$ss[KMG]: mark specified memory as reserved;
-> >>  - memmap=nn[KMG]@ss[KMG]: force usage of a specific region of memory;
+On 02/16/2017 09:14 PM, Mark Brown wrote:
+> On Wed, Feb 15, 2017 at 04:46:44PM +0100, Arnaud Pouliquen wrote:
+>> On 02/15/2017 03:53 PM, Mark Brown wrote:
+>>> On Wed, Feb 15, 2017 at 02:59:18PM +0100, Arnaud Pouliquen
+>>> wrote:
+> 
+>>> No, copy() is an alternative to doing DMA rather than
+>>> something that works with DMA.  If you want to have some sort
+>>> of post processing operation it shoudn't be called copy().
+>>> It's probably worth considering just making a new format and
+>>> letting userspace convert things here.
+> 
+>> You mean using a plug-in alsa to do it? this seems not possible
+>> with tiny-alsa... Without a plug-in, driver will not be
+>> compatible with standard audio application.
+> 
+> Right.  But if you're using tinyalsa you've got some open coded
+> system specific stuff anyway!
+> 
+>> Do you think this would be reasonable if i implement something
+>> similar in my driver, without using the soc generic DMA engine?
+> 
+> Probably.  It might even be possible to fit it elegently into the 
+> generic dmaengine code, just don't say it's a copy() operation
+> since that's a specific thing in ALSA.
+> 
+Ok I will have a look in generic dmaengine and try to propose
+something in this way in the V2.
 
-> > Could you explain which problem you are solving here? ACPI implies
-> > UEFI on arm64, and so these reservations could be made by a boot
-> > component instead, if it requires a fixed memory reservation. If this
-> > is a reservation for, e.g., OP-TEE, we should not rely on the command
-> > line to communicate this information.
-> > 
-> We just want to reserve some memory for a driver and I just not so familiar
-> with how to reserve memory with UEFI. So doubt about whether it is suitable
-> to reserve memory with cmdline like "memmap=xxx", which had appeared in x86
-> for a long time.
-
-Could you please explain for what purpose this is necessary?
-
-Does the driver need a specific region of memory? Or just some contiguous
-region? Or something else?
-
-For the former, this is not an appropriate solution; firmware must absolutely
-mark the memory as reserved for a particular purpose.
-
-If you just need contiguous physical memory, I believe it would be better to
-use CMA, and request CMA reserve a larger area if necessary.
-
-Thanks,
-Mark.
+Regards,
+Arnaud
