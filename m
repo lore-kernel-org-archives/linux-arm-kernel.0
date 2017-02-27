@@ -1,528 +1,257 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 27 Feb 2017 19:54:21 +0000
-Subject: [RFC PATCH 10/30] iommu/arm-smmu-v3: Add task contexts
+Date: Mon, 27 Feb 2017 19:54:23 +0000
+Subject: [RFC PATCH 12/30] iommu/arm-smmu-v3: Keep track of process address
+ spaces
 In-Reply-To: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
 References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
-Message-ID: <20170227195441.5170-11-jean-philippe.brucker@arm.com>
+Message-ID: <20170227195441.5170-13-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we support substreams, add the required infrastructure to use
-them. Each device can be attached to multiple address spaces. The default
-address space is the domain, and additional ones are tasks. Each task can
-be attached to multiple devices as well.
+Binding to a task requires the following steps:
 
-            +------------+       +---------------+
-            | group      |       |        domain |
-            |            +-------+               |
-            |            |       |               |  (c)
-     (a) ,-----[master]-------------[context 1]---------[task]--. (d)
-        /   |         \  |  (b)  |               |               \
-       /    |          `------------[context 2]----.             [SMMU]
-      /     |            |       |               |  \             /
-   [SMMU]   +------------+       +---------------+   \           /
-      \                                               `-[task]--'
-       \    +------------+       +---------------+    /
-        \   |            |       |               |   /
-         \----.          |       |               |  /
-          `----[master]-------------[context 1]----'
-            |            |       |               |
-            |            +-------+               |
-            | group      |  (e)  |        domain |
-            +------------+       +---------------+
+* Pin down the mm context, and use its ASID to tag SMMU mappings. If
+  the ASID is already in use by the SMMU for a domain using the DMA API,
+  abort the binding. We can steal the domain's ASID since it is allocated
+  by the SMMU, but this deserves a patch of its own.
 
-(a) Add a rbtree of streams in each SMMU instance, indexed by stream ID.
-Each stream points to a single master, and masters can be identified by
-multiple stream IDs. PCIe endpoints are, for the moment, expected to have
-a unique stream ID (RID), but see the discussion about groups below.
-Platform devices may issue multiple stream IDs.
-
-(b) Add a rbtree of contexts in each SVM-capable master, indexed by
-substream ID. A context is the link between a device and a task. It is
-bidirectional since we need to lookup all devices attached to a task when
-invalidating a mapping, and all tasks attached to a device when handling a
-device fault (PRI).
-
-Both these rbtrees will allow fast lookup of an address space when
-handling a fault.
-
-(c) Add a task in each context. We need tasks and contexts to be separate
-entities with their own refcounting for at least two reasons. To reduce
-the number of mmu notifiers and simplify ASID tracking, tasks are allowed
-to be attached to multiple masters. It is also necessary for sane PASID
-invalidation but we won't go into that now.
-
-(d) Add a list of tasks in each SMMU instance. This allows to find
-existing tasks when binding to a device. We could make it an rbtree, but
-it's not clear whether we need this complication yet.
-
-Lifetime of contexts and tasks is the following:
-
-* arm_smmu_alloc_task creates smmu_task and adds it to the list.
-* arm_smmu_attach_task allocates an SSID, creates smmu_context and
-  connects task to master. Context descriptor is written, so the SSID is
-  active and can be used in transactions.
-* users may get krefs to task and contexts temporarily, and release them
-  with put_task/put_context.
-* arm_smmu_detach_task severs the link between context and task, and drops
-  the task's refcount. If the task was only attached to one master, it is
-  freed and removed from the list. arm_smmu_detach_task also clears the
-  context descriptor, after which any transaction with this SSID would
-  result in a fault.
-* arm_smmu_put_context is called later, freeing the dangling context.
-
-All these structures are protected by a single context_lock spinlock for
-each SMMU instance. Therefore context_lock also serializes modifications
-of the context descriptors. Any update of the krefs must be done while
-holding the lock. Reads of lists and context->task as well. As we expect a
-lot more reads than writes on the structures introduced by this patch,
-especially for handling page requests, we hope to make use of the RCU in
-the future.
-
-(e) A group still has a default DMA domain, represented by context 0 (no
-SSID). When attaching to a different domain, for example a VFIO domain, we
-also want to destroy all active contexts. If VFIO is handing control of a
-device to a guest for instance, we do not want the guest to have access to
-host tasks through bound contexts. So contexts are conceptually contained
-in the domain, although we do not need to maintain any structure for this.
-When detaching a domain from a group, all contexts attached to this group
-are also detached.
-
-An IOMMU group contains all devices that can't be distinguished from one
-another by their IOMMU. For PCIe this may be due to buggy devices, lack of
-ACS isolation, legacy or non-transparent bridges. Since PCIe SVM platforms
-on ARM have yet to be seen in the wild, legacy issues don't matter and SVM
-through NTB is pretty far off.
-
-So for prototyping, we currently bypass the concept of IOMMU groups, since
-we expect SVM-capable devices to be properly integrated. This might change
-as soon as someone starts taping out devices. There will then be some
-complication in attaching a task to a group instead of an individual
-device (for instance, finding a consensus for PASID sizes of all devices
-in the group, which may be altered by hotplugging a device in a group),
-but the current design doesn't prevent this change.
+* Register an MMU notifier to mirror invalidations of the system's TLBs
+  with a device's ATC.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 316 +++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 314 insertions(+), 2 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 171 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 169 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 2724788157a5..5b4d1f265194 100644
+index 5b4d1f265194..ab49164bf09b 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -701,6 +701,16 @@ struct arm_smmu_device {
+@@ -29,6 +29,8 @@
+ #include <linux/interrupt.h>
+ #include <linux/iommu.h>
+ #include <linux/iopoll.h>
++#include <linux/mmu_context.h>
++#include <linux/mmu_notifier.h>
+ #include <linux/module.h>
+ #include <linux/msi.h>
+ #include <linux/of.h>
+@@ -761,6 +763,9 @@ struct arm_smmu_task {
  
- 	/* IOMMU core code handle */
- 	struct iommu_device		iommu;
+ 	struct arm_smmu_s1_cfg		s1_cfg;
+ 
++	struct mmu_notifier		mmu_notifier;
++	struct mm_struct		*mm;
 +
-+	spinlock_t			contexts_lock;
-+	struct rb_root			streams;
-+	struct list_head		tasks;
-+};
-+
-+struct arm_smmu_stream {
-+	u32				id;
-+	struct arm_smmu_master_data	*master;
-+	struct rb_node			node;
+ 	struct kref			kref;
  };
  
- /* SMMU private data for each master */
-@@ -710,6 +720,9 @@ struct arm_smmu_master_data {
- 
- 	struct device			*dev;
- 	struct list_head		group_head;
-+
-+	struct arm_smmu_stream		*streams;
-+	struct rb_root			contexts;
- };
- 
- /* SMMU private data for an IOMMU domain */
-@@ -738,6 +751,31 @@ struct arm_smmu_domain {
- 	spinlock_t			groups_lock;
- };
- 
-+struct arm_smmu_task {
-+	struct pid			*pid;
-+
-+	struct arm_smmu_device		*smmu;
-+	struct list_head		smmu_head;
-+
-+	struct list_head		contexts;
-+
-+	struct arm_smmu_s1_cfg		s1_cfg;
-+
-+	struct kref			kref;
-+};
-+
-+struct arm_smmu_context {
-+	u32				ssid;
-+
-+	struct arm_smmu_task		*task;
-+	struct arm_smmu_master_data	*master;
-+
-+	struct list_head		task_head;
-+	struct rb_node			master_node;
-+
-+	struct kref			kref;
-+};
-+
- struct arm_smmu_group {
- 	struct arm_smmu_domain		*domain;
- 	struct list_head		domain_head;
-@@ -1363,7 +1401,6 @@ static void arm_smmu_free_cd_tables(struct arm_smmu_master_data *master)
- 	cfg->num_entries = 0;
+@@ -1984,6 +1989,33 @@ static size_t arm_smmu_atc_invalidate_domain(struct arm_smmu_domain *smmu_domain
+ 	return size;
  }
  
--__maybe_unused
- static int arm_smmu_alloc_cd(struct arm_smmu_master_data *master)
- {
- 	int ssid;
-@@ -1401,7 +1438,6 @@ static int arm_smmu_alloc_cd(struct arm_smmu_master_data *master)
- 	return -ENOSPC;
- }
- 
--__maybe_unused
- static void arm_smmu_free_cd(struct arm_smmu_master_data *master, u32 ssid)
- {
- 	unsigned long l1_idx, idx;
-@@ -1961,6 +1997,195 @@ static bool arm_smmu_capable(enum iommu_cap cap)
- 	}
- }
- 
-+__maybe_unused
-+static struct arm_smmu_context *
-+arm_smmu_attach_task(struct arm_smmu_task *smmu_task,
-+		     struct arm_smmu_master_data *master)
++static size_t arm_smmu_atc_invalidate_task(struct arm_smmu_task *smmu_task,
++					   unsigned long iova, size_t size)
 +{
-+	int ssid;
-+	int ret = 0;
-+	struct arm_smmu_context *smmu_context, *ctx;
-+	struct arm_smmu_device *smmu = master->smmu;
-+	struct rb_node **new_node, *parent_node = NULL;
-+
-+	smmu_context = kzalloc(sizeof(*smmu_context), GFP_KERNEL);
-+	if (!smmu_context)
-+		return ERR_PTR(-ENOMEM);
-+
-+	smmu_context->task = smmu_task;
-+	smmu_context->master = master;
-+	kref_init(&smmu_context->kref);
-+
-+	spin_lock(&smmu->contexts_lock);
-+
-+	/* Allocate a context descriptor and SSID */
-+	ssid = arm_smmu_alloc_cd(master);
-+	if (ssid <= 0) {
-+		if (WARN_ON_ONCE(ssid == 0))
-+			ret = -EEXIST;
-+		else
-+			ret = ssid;
-+		goto err_free_context;
-+	}
-+
-+	smmu_context->ssid = ssid;
-+
-+	arm_smmu_write_ctx_desc(master, ssid, &smmu_task->s1_cfg);
-+
-+	list_add(&smmu_context->task_head, &smmu_task->contexts);
-+
-+	/* Insert into master context list */
-+	new_node = &(master->contexts.rb_node);
-+	while (*new_node) {
-+		ctx = rb_entry(*new_node, struct arm_smmu_context,
-+			       master_node);
-+		parent_node = *new_node;
-+		if (ctx->ssid > ssid) {
-+			new_node = &((*new_node)->rb_left);
-+		} else if (ctx->ssid < ssid) {
-+			new_node = &((*new_node)->rb_right);
-+		} else {
-+			dev_warn(master->dev, "context %u already exists\n",
-+				 ctx->ssid);
-+			ret = -EEXIST;
-+			goto err_remove_context;
-+		}
-+	}
-+
-+	rb_link_node(&smmu_context->master_node, parent_node, new_node);
-+	rb_insert_color(&smmu_context->master_node, &master->contexts);
-+
-+	spin_unlock(&smmu->contexts_lock);
-+
-+	return smmu_context;
-+
-+err_remove_context:
-+	list_del(&smmu_context->task_head);
-+	arm_smmu_write_ctx_desc(master, ssid, NULL);
-+	arm_smmu_free_cd(master, ssid);
-+
-+err_free_context:
-+	spin_unlock(&smmu->contexts_lock);
-+
-+	kfree(smmu_context);
-+
-+	return ERR_PTR(ret);
-+}
-+
-+/* Caller must hold contexts_lock */
-+static void arm_smmu_free_context(struct kref *kref)
-+{
-+	struct arm_smmu_master_data *master;
++	struct arm_smmu_cmdq_ent cmd;
 +	struct arm_smmu_context *smmu_context;
++	struct arm_smmu_device *smmu = smmu_task->smmu;
++	struct arm_smmu_cmdq_ent sync_cmd = {
++		.opcode = CMDQ_OP_CMD_SYNC,
++	};
 +
-+	smmu_context = container_of(kref, struct arm_smmu_context, kref);
-+
-+	WARN_ON_ONCE(smmu_context->task);
-+
-+	master = smmu_context->master;
-+
-+	arm_smmu_free_cd(master, smmu_context->ssid);
-+
-+	rb_erase(&smmu_context->master_node, &master->contexts);
-+
-+	kfree(smmu_context);
-+}
-+
-+static void _arm_smmu_put_context(struct arm_smmu_context *smmu_context)
-+{
-+	kref_put(&smmu_context->kref, arm_smmu_free_context);
-+}
-+
-+__maybe_unused
-+static void arm_smmu_put_context(struct arm_smmu_device *smmu,
-+				 struct arm_smmu_context *smmu_context)
-+{
-+	spin_lock(&smmu->contexts_lock);
-+	_arm_smmu_put_context(smmu_context);
-+	spin_unlock(&smmu->contexts_lock);
-+}
-+
-+__maybe_unused
-+static struct arm_smmu_task *arm_smmu_alloc_task(struct arm_smmu_device *smmu,
-+						 struct task_struct *task)
-+{
-+	struct arm_smmu_task *smmu_task;
-+
-+	smmu_task = kzalloc(sizeof(*smmu_task), GFP_KERNEL);
-+	if (!smmu_task)
-+		return ERR_PTR(-ENOMEM);
-+
-+	smmu_task->smmu = smmu;
-+	smmu_task->pid = get_task_pid(task, PIDTYPE_PID);
-+	INIT_LIST_HEAD(&smmu_task->contexts);
-+	kref_init(&smmu_task->kref);
++	arm_smmu_atc_invalidate_to_cmd(smmu, iova, size, &cmd);
++	cmd.substream_valid = true;
 +
 +	spin_lock(&smmu->contexts_lock);
-+	list_add(&smmu_task->smmu_head, &smmu->tasks);
-+	spin_unlock(&smmu->contexts_lock);
 +
-+	return smmu_task;
-+}
-+
-+/* Caller must hold contexts_lock */
-+static void arm_smmu_free_task(struct kref *kref)
-+{
-+	struct arm_smmu_device *smmu;
-+	struct arm_smmu_task *smmu_task;
-+	struct arm_smmu_master_data *master;
-+	struct arm_smmu_context *smmu_context, *next;
-+
-+	smmu_task = container_of(kref, struct arm_smmu_task, kref);
-+	smmu = smmu_task->smmu;
-+
-+	if (WARN_ON_ONCE(!list_empty(&smmu_task->contexts))) {
-+		list_for_each_entry_safe(smmu_context, next,
-+					 &smmu_task->contexts, task_head) {
-+			master = smmu_context->master;
-+
-+			arm_smmu_write_ctx_desc(master, smmu_context->ssid, NULL);
-+			smmu_context->task = NULL;
-+			list_del(&smmu_context->task_head);
-+		}
++	list_for_each_entry(smmu_context, &smmu_task->contexts, task_head) {
++		cmd.atc.ssid = smmu_context->ssid;
++		arm_smmu_atc_invalidate_master(smmu_context->master, &cmd);
 +	}
 +
-+	list_del(&smmu_task->smmu_head);
-+
-+	put_pid(smmu_task->pid);
-+	kfree(smmu_task);
-+}
-+
-+static void _arm_smmu_put_task(struct arm_smmu_task *smmu_task)
-+{
-+	kref_put(&smmu_task->kref, arm_smmu_free_task);
-+}
-+
-+/* Caller must hold contexts_lock */
-+static void arm_smmu_detach_task(struct arm_smmu_context *smmu_context)
-+{
-+	struct arm_smmu_task *smmu_task = smmu_context->task;
-+
-+	smmu_context->task = NULL;
-+	list_del(&smmu_context->task_head);
-+	_arm_smmu_put_task(smmu_task);
-+
-+	arm_smmu_write_ctx_desc(smmu_context->master, smmu_context->ssid, NULL);
-+}
-+
-+__maybe_unused
-+static void arm_smmu_put_task(struct arm_smmu_device *smmu,
-+			      struct arm_smmu_task *smmu_task)
-+{
-+	spin_lock(&smmu->contexts_lock);
-+	_arm_smmu_put_task(smmu_task);
 +	spin_unlock(&smmu->contexts_lock);
++
++	arm_smmu_cmdq_issue_cmd(smmu, &sync_cmd);
++
++	return size;
 +}
 +
-+static bool arm_smmu_master_supports_svm(struct arm_smmu_master_data *master)
-+{
-+	return false;
-+}
-+
- static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ /* IOMMU API */
+ static bool arm_smmu_capable(enum iommu_cap cap)
  {
- 	struct arm_smmu_domain *smmu_domain;
-@@ -2173,12 +2398,31 @@ static struct arm_smmu_group *arm_smmu_group_alloc(struct iommu_group *group)
- static void arm_smmu_detach_dev(struct device *dev)
- {
- 	struct arm_smmu_master_data *master = dev->iommu_fwspec->iommu_priv;
-+	struct arm_smmu_device *smmu = master->smmu;
-+	struct arm_smmu_context *smmu_context;
-+	struct rb_node *node, *next;
- 
- 	master->ste.bypass = true;
- 	if (arm_smmu_install_ste_for_dev(dev->iommu_fwspec) < 0)
- 		dev_warn(dev, "failed to install bypass STE\n");
- 
- 	arm_smmu_write_ctx_desc(master, 0, NULL);
-+
-+	if (!master->ste.valid)
-+		return;
-+
-+	spin_lock(&smmu->contexts_lock);
-+	for (node = rb_first(&master->contexts); node; node = next) {
-+		smmu_context = rb_entry(node, struct arm_smmu_context,
-+					master_node);
-+		next = rb_next(node);
-+
-+		if (smmu_context->task)
-+			arm_smmu_detach_task(smmu_context);
-+
-+		_arm_smmu_put_context(smmu_context);
-+	}
-+	spin_unlock(&smmu->contexts_lock);
+@@ -2105,26 +2137,148 @@ static void arm_smmu_put_context(struct arm_smmu_device *smmu,
+ 	spin_unlock(&smmu->contexts_lock);
  }
  
- static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
-@@ -2418,6 +2662,54 @@ static void arm_smmu_disable_ats(struct arm_smmu_master_data *master)
- 	pci_disable_ats(pdev);
- }
- 
-+static int arm_smmu_insert_master(struct arm_smmu_device *smmu,
-+				  struct arm_smmu_master_data *master)
++static struct arm_smmu_task *mn_to_task(struct mmu_notifier *mn)
 +{
-+	int i;
++	return container_of(mn, struct arm_smmu_task, mmu_notifier);
++}
++
++static void arm_smmu_notifier_invalidate_range(struct mmu_notifier *mn,
++					       struct mm_struct *mm,
++					       unsigned long start,
++					       unsigned long end)
++{
++	struct arm_smmu_task *smmu_task = mn_to_task(mn);
++
++	arm_smmu_atc_invalidate_task(smmu_task, start, end - start);
++}
++
++static void arm_smmu_notifier_invalidate_page(struct mmu_notifier *mn,
++					      struct mm_struct *mm,
++					      unsigned long address)
++{
++	arm_smmu_notifier_invalidate_range(mn, mm, address, address + PAGE_SIZE);
++}
++
++static int arm_smmu_notifier_clear_flush_young(struct mmu_notifier *mn,
++					       struct mm_struct *mm,
++					       unsigned long start,
++					       unsigned long end)
++{
++	arm_smmu_notifier_invalidate_range(mn, mm, start, end);
++
++	return 0;
++}
++
++static const struct mmu_notifier_ops arm_smmu_mmu_notifier_ops = {
++	.invalidate_page	= arm_smmu_notifier_invalidate_page,
++	.invalidate_range	= arm_smmu_notifier_invalidate_range,
++	.clear_flush_young	= arm_smmu_notifier_clear_flush_young,
++};
++
++static int arm_smmu_context_share(struct arm_smmu_task *smmu_task, int asid)
++{
 +	int ret = 0;
-+	struct arm_smmu_stream *new_stream, *cur_stream;
-+	struct rb_node **new_node, *parent_node = NULL;
-+	struct iommu_fwspec *fwspec = master->dev->iommu_fwspec;
++	struct arm_smmu_device *smmu = smmu_task->smmu;
 +
-+	master->streams = kcalloc(fwspec->num_ids,
-+				  sizeof(struct arm_smmu_stream), GFP_KERNEL);
-+	if (!master->streams)
-+		return -ENOMEM;
-+
-+	spin_lock(&smmu->contexts_lock);
-+	for (i = 0; i < fwspec->num_ids && !ret; i++) {
-+		new_stream = &master->streams[i];
-+		new_stream->id = fwspec->ids[i];
-+		new_stream->master = master;
-+
-+		new_node = &(smmu->streams.rb_node);
-+		while (*new_node) {
-+			cur_stream = rb_entry(*new_node, struct arm_smmu_stream,
-+					      node);
-+			parent_node = *new_node;
-+			if (cur_stream->id > new_stream->id) {
-+				new_node = &((*new_node)->rb_left);
-+			} else if (cur_stream->id < new_stream->id) {
-+				new_node = &((*new_node)->rb_right);
-+			} else {
-+				dev_warn(master->dev,
-+					 "stream %u already in tree\n",
-+					 cur_stream->id);
-+				ret = -EINVAL;
-+				break;
-+			}
-+		}
-+
-+		if (!ret) {
-+			rb_link_node(&new_stream->node, parent_node, new_node);
-+			rb_insert_color(&new_stream->node, &smmu->streams);
-+		}
-+	}
-+	spin_unlock(&smmu->contexts_lock);
++	if (test_and_set_bit(asid, smmu->asid_map))
++		/* ASID is already used for a domain */
++		return -EEXIST;
 +
 +	return ret;
 +}
 +
- static struct iommu_ops arm_smmu_ops;
- 
- static int arm_smmu_add_device(struct device *dev)
-@@ -2452,6 +2744,8 @@ static int arm_smmu_add_device(struct device *dev)
- 		master->smmu = smmu;
- 		master->dev = dev;
- 		fwspec->iommu_priv = master;
++static int arm_smmu_init_task_pgtable(struct arm_smmu_task *smmu_task)
++{
++	int ret;
++	int asid;
 +
-+		master->contexts = RB_ROOT;
- 	}
- 
- 	/* Check the SIDs are in range of the SMMU and our stream table */
-@@ -2475,6 +2769,9 @@ static int arm_smmu_add_device(struct device *dev)
- 
- 	ats_enabled = !arm_smmu_enable_ats(master);
- 
-+	if (arm_smmu_master_supports_svm(master))
-+		arm_smmu_insert_master(smmu, master);
++	/* Pin ASID on the CPU side */
++	asid = mm_context_get(smmu_task->mm);
++	if (!asid)
++		return -ENOSPC;
 +
- 	group = iommu_group_get_for_dev(dev);
- 	if (IS_ERR(group)) {
- 		ret = PTR_ERR(group);
-@@ -2510,6 +2807,7 @@ static void arm_smmu_remove_device(struct device *dev)
- 	struct arm_smmu_device *smmu;
- 	struct iommu_group *group;
- 	unsigned long flags;
-+	int i;
- 
- 	if (!fwspec || fwspec->ops != &arm_smmu_ops)
- 		return;
-@@ -2520,6 +2818,16 @@ static void arm_smmu_remove_device(struct device *dev)
- 		arm_smmu_detach_dev(dev);
- 
- 	if (master) {
-+		if (master->streams) {
-+			spin_lock(&smmu->contexts_lock);
-+			for (i = 0; i < fwspec->num_ids; i++)
-+				rb_erase(&master->streams[i].node,
-+					 &smmu->streams);
-+			spin_unlock(&smmu->contexts_lock);
++	ret = arm_smmu_context_share(smmu_task, asid);
++	if (ret) {
++		mm_context_put(smmu_task->mm);
++		return ret;
++	}
 +
-+			kfree(master->streams);
-+		}
++	/* TODO: Initialize the rest of s1_cfg */
++	smmu_task->s1_cfg.asid = asid;
 +
- 		group = iommu_group_get(dev);
- 		smmu_group = to_smmu_group(group);
- 
-@@ -2820,6 +3128,10 @@ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
++	return 0;
++}
++
++static void arm_smmu_free_task_pgtable(struct arm_smmu_task *smmu_task)
++{
++	struct arm_smmu_device *smmu = smmu_task->smmu;
++
++	mm_context_put(smmu_task->mm);
++
++	arm_smmu_bitmap_free(smmu->asid_map, smmu_task->s1_cfg.asid);
++}
++
+ __maybe_unused
+ static struct arm_smmu_task *arm_smmu_alloc_task(struct arm_smmu_device *smmu,
+ 						 struct task_struct *task)
  {
- 	int ret;
++	int ret;
++	struct mm_struct *mm;
+ 	struct arm_smmu_task *smmu_task;
  
-+	spin_lock_init(&smmu->contexts_lock);
-+	smmu->streams = RB_ROOT;
-+	INIT_LIST_HEAD(&smmu->tasks);
++	mm = get_task_mm(task);
++	if (!mm)
++		return ERR_PTR(-EINVAL);
 +
- 	ret = arm_smmu_init_queues(smmu);
- 	if (ret)
- 		return ret;
+ 	smmu_task = kzalloc(sizeof(*smmu_task), GFP_KERNEL);
+-	if (!smmu_task)
+-		return ERR_PTR(-ENOMEM);
++	if (!smmu_task) {
++		ret = -ENOMEM;
++		goto err_put_mm;
++	}
+ 
+ 	smmu_task->smmu = smmu;
+ 	smmu_task->pid = get_task_pid(task, PIDTYPE_PID);
++	smmu_task->mmu_notifier.ops = &arm_smmu_mmu_notifier_ops;
++	smmu_task->mm = mm;
+ 	INIT_LIST_HEAD(&smmu_task->contexts);
+ 	kref_init(&smmu_task->kref);
+ 
++	ret = arm_smmu_init_task_pgtable(smmu_task);
++	if (ret)
++		goto err_free_task;
++
++	/*
++	 * TODO: check conflicts between task mappings and reserved HW
++	 * mappings. It is unclear which reserved mappings might be affected
++	 * because, for instance, devices are unlikely to send MSIs tagged with
++	 * PASIDs so we (probably) don't need to carve out MSI regions from the
++	 * task address space. Clarify this.
++	 */
++
++	ret = mmu_notifier_register(&smmu_task->mmu_notifier, mm);
++	if (ret)
++		goto err_free_pgtable;
++
+ 	spin_lock(&smmu->contexts_lock);
+ 	list_add(&smmu_task->smmu_head, &smmu->tasks);
+ 	spin_unlock(&smmu->contexts_lock);
+ 
++	/* A reference to mm is kept by the notifier */
++	mmput(mm);
++
+ 	return smmu_task;
++
++err_free_pgtable:
++	arm_smmu_free_task_pgtable(smmu_task);
++
++err_free_task:
++	put_pid(smmu_task->pid);
++	kfree(smmu_task);
++
++err_put_mm:
++	mmput(mm);
++
++	return ERR_PTR(ret);
+ }
+ 
+ /* Caller must hold contexts_lock */
+@@ -2151,8 +2305,21 @@ static void arm_smmu_free_task(struct kref *kref)
+ 
+ 	list_del(&smmu_task->smmu_head);
+ 
++	/*
++	 * Release the lock temporarily to unregister the notifier. This is safe
++	 * because the task is not accessible anymore.
++	 */
++	spin_unlock(&smmu->contexts_lock);
++
++	/* Unpin ASID */
++	arm_smmu_free_task_pgtable(smmu_task);
++
++	mmu_notifier_unregister(&smmu_task->mmu_notifier, smmu_task->mm);
++
+ 	put_pid(smmu_task->pid);
+ 	kfree(smmu_task);
++
++	spin_lock(&smmu->contexts_lock);
+ }
+ 
+ static void _arm_smmu_put_task(struct arm_smmu_task *smmu_task)
 -- 
 2.11.0
