@@ -1,43 +1,131 @@
-From: olekstysh@gmail.com (Oleksandr Tyshchenko)
-Date: Mon, 27 Feb 2017 14:30:26 +0200
-Subject: [PATCH v1 2/2] iommu/io-pgtable-arm-v7s: Check for leaf entry before
- dereferencing it
-In-Reply-To: <1488198626-1884-1-git-send-email-olekstysh@gmail.com>
-References: <1488198626-1884-1-git-send-email-olekstysh@gmail.com>
-Message-ID: <1488198626-1884-3-git-send-email-olekstysh@gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 27 Feb 2017 13:32:59 +0100 (CET)
+Subject: [WARNING: A/V UNSCANNABLE][Merge tag 'media/v4.11-1' of git]
+ ff58d005cd: BUG: unable to handle kernel NULL pointer dereference at
+ 0000039c
+In-Reply-To: <alpine.DEB.2.20.1702271105090.4732@nanos>
+References: <58b07b30.9XFLj9Hhl7F6HMc2%fengguang.wu@intel.com>
+ <CA+55aFytXj+TZ_TanbxcY0KgRTrV7Vvr=fWON8tioUGmYHYiNA@mail.gmail.com>
+ <20170225090741.GA20463@gmail.com>
+ <CA+55aFy+ER8cYV02eZsKAOLnZBWY96zNWqUFWSWT1+3sZD4XnQ@mail.gmail.com>
+ <alpine.DEB.2.20.1702271105090.4732@nanos>
+Message-ID: <alpine.DEB.2.20.1702271231410.4732@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oleksandr Tyshchenko <oleksandr_tyshchenko@epam.com>
+On Mon, 27 Feb 2017, Thomas Gleixner wrote:
+> On Sat, 25 Feb 2017, Linus Torvalds wrote:
+> > There are several things that set IRQS_PENDING, ranging from "try to
+> > test mis-routed interrupts while irqd was working", to "prepare for
+> > suspend losing the irq for us", to "irq auto-probing uses it on
+> > unassigned probable irqs".
+> > 
+> > The *actual* reason to re-send, namely getting a nested irq that we
+> > had to drop because we got a second one while still handling the first
+> > (or because it was disabled), is just one case.
+> > 
+> > Personally, I'd suspect some left-over state from auto-probing earlier
+> > in the boot, but I don't know. Could we fix that underlying issue?
+> 
+> I'm on it.
 
-Do a check for already installed leaf entry at the current level before
-dereferencing it in order to avoid walking the page table down with
-wrong pointer to the next level.
+Adding a few trace points to the irq code gives me a pretty consistent
+picture across a bunch of different machines.
 
-Signed-off-by: Oleksandr Tyshchenko <oleksandr_tyshchenko@epam.com>
-CC: Will Deacon <will.deacon@arm.com>
-CC: Robin Murphy <robin.murphy@arm.com>
----
- drivers/iommu/io-pgtable-arm-v7s.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+The pending interrupt issue happens, at least on my test boxen, mostly on
+the 'legacy' interrupts (0 - 15). But even the IOAPIC interrupts >=16
+happen occasionally.
 
-diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-index 1c049e2..8d6ca28 100644
---- a/drivers/iommu/io-pgtable-arm-v7s.c
-+++ b/drivers/iommu/io-pgtable-arm-v7s.c
-@@ -422,8 +422,12 @@ static int __arm_v7s_map(struct arm_v7s_io_pgtable *data, unsigned long iova,
- 			pte |= ARM_V7S_ATTR_NS_TABLE;
- 
- 		__arm_v7s_set_pte(ptep, pte, 1, cfg);
--	} else {
-+	} else if (ARM_V7S_PTE_IS_TABLE(pte, lvl)) {
- 		cptep = iopte_deref(pte, lvl);
-+	} else {
-+		/* We require an unmap first */
-+		WARN_ON(!selftest_running);
-+		return -EEXIST;
- 	}
- 
- 	/* Rinse, repeat */
--- 
-2.7.4
+ - Spurious interrupts on IRQ7, which are triggered by IRQ 0 (PIT/HPET). On
+   one of the affected machines this stops when the interrupt system is
+   switched to interrupt remapping !?!?!?
+
+ - Spurious interrupts on various interrupt lines, which are triggered by
+   IOAPIC interrupts >= IRQ16. That's a known issue on quite some chipsets
+   that the legacy PCI interrupt (which is used when IOAPIC is disabled) is
+   triggered when the IOAPIC >=16 interrupt fires.
+
+ - Spurious interrupt caused by driver probing itself. I.e. the driver
+   probing code causes an interrupt issued from the device
+   inadvertently. That happens even on IRQ >= 16.
+
+   This problem might be handled by the device driver code itself, but
+   that's going to be ugly. See below.
+
+None of that was caused by misrouted irq or autoprobing. Autoprobing is not
+used on any modern maschine at all and the misrouted mechanism cannot
+set the pending flag on a interrupt which has no action installed.
+
+Sure, we might not set the pending flag on spurious interrupts, when an
+interrupt has no action assigned. We had it that way quite some years
+ago. But that caused issues on a couple of (non x86) systems because the
+peripheral which sent the spurious interrupt was waiting for
+acknowledgement forever and therefor not sending new interrupts. There was
+no way to handle that other than resending the interrupt after the action
+was installed. The reason for this is the following race:
+
+Device driver init()
+
+  ack_bogus_pending_irq_in_device();
+                          <---- Device sends spurious interrupt
+  request_irq();
+
+We cannot call ack_bogus_pending_irq_in_device() after the handler has been
+installed because it might clear a real interrupt before the handler is
+invoked. In fact we can, but that requires pretty ugly code. See below.
+
+Yes, it's broken hardware, but in that area there is more broken than sane
+hardware.
+
+The other point here is, that the "IOAPIC triggers spurious interrupt on
+legacy lines" issue can actually cause the same problem as the immediate
+resend/retrigger:
+
+  request_irq();
+  			 <---- Other device sends IOAPIC interrupt which
+			       triggers the legacy line.
+
+If the handler is not prepared@that point, then it explodes as
+well. Same for this odd IRQ0 -> IRQ7 trigger, which I can observe on two
+machines.
+
+The whole resend/retrigger business is only relevant for edge type
+interrupts to deal with the following problem:
+
+  disable_irq();
+			<---- Device sends interrupt
+  enable_irq();
+
+  ===> Previously sent interrupt has not been acked in the device so no
+       further interrupts happen. We lost an edge and are toast.
+
+We never do the resend/retrigger for level type interrupts, because they
+are resent by hardware if the interrupt is still pending, which is the case
+when you don't acknowlegde it at the device level.
+
+So now you might argue that a driver could handle this by doing:
+
+  disable_irq();
+			<---- Device sends interrupt
+  enable_irq();
+
+  lock_device();
+   do_some_magic_checks_and_handle_pending_irq();
+  unlock_device();
+
+Requiring this would add tons of even more broken code to the device
+drivers and I really doubt that we want to go there. Same for the
+request_irq() case.
+
+I rather prefer that drivers are able to deal with spurious interrupts even
+on non shared interrupt lines and let the resend/retrigger mechanism expose
+them early when they do not.
+
+We can try to sample more data from the machines of affected users, but I
+doubt that it will give us more information than confirming that we really
+have to deal with all that hardware wreckage out there in some way or the
+other.
+
+Thanks,
+
+	tglx
