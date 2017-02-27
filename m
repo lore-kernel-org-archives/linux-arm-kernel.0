@@ -1,9 +1,10 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Feb 2017 15:14:31 +0000
-Subject: [PATCH 20/20] PCI: keystone-dw: update PCI config space remap function
+Date: Mon, 27 Feb 2017 15:14:24 +0000
+Subject: [PATCH 13/20] PCI: iproc-platform: update PCI config space remap
+ function
 In-Reply-To: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
 References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170227151436.18698-21-lorenzo.pieralisi@arm.com>
+Message-ID: <20170227151436.18698-14-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,23 +15,25 @@ memory mappings for PCI configuration space are used.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Murali Karicheri <m-karicheri2@ti.com>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Jon Mason <jonmason@broadcom.com>
 ---
- drivers/pci/dwc/pci-keystone-dw.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/host/pcie-iproc-platform.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pci/dwc/pci-keystone-dw.c b/drivers/pci/dwc/pci-keystone-dw.c
-index 6b396f6..8bc626e 100644
---- a/drivers/pci/dwc/pci-keystone-dw.c
-+++ b/drivers/pci/dwc/pci-keystone-dw.c
-@@ -543,7 +543,7 @@ int __init ks_dw_pcie_host_init(struct keystone_pcie *ks_pcie,
+diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
+index f4909bb..b48d0db 100644
+--- a/drivers/pci/host/pcie-iproc-platform.c
++++ b/drivers/pci/host/pcie-iproc-platform.c
+@@ -67,7 +67,8 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
  
- 	/* Index 0 is the config reg. space address */
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	pci->dbi_base = devm_ioremap_resource(dev, res);
-+	pci->dbi_base = devm_pci_remap_cfg_resource(dev, res);
- 	if (IS_ERR(pci->dbi_base))
- 		return PTR_ERR(pci->dbi_base);
- 
+-	pcie->base = devm_ioremap(dev, reg.start, resource_size(&reg));
++	pcie->base = devm_pci_remap_cfgspace(dev, reg.start,
++					     resource_size(&reg));
+ 	if (!pcie->base) {
+ 		dev_err(dev, "unable to map controller registers\n");
+ 		return -ENOMEM;
 -- 
 2.10.0
