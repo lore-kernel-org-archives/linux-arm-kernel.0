@@ -1,81 +1,24 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Mon, 27 Feb 2017 17:44:25 +0300
-Subject: [Outreachy kernel] [PATCH] staging: bcm2835-audio: Fixed spacing
- around '&'
-In-Reply-To: <alpine.DEB.2.20.1702270724430.2187@hadrien>
-References: <1488131271-2908-1-git-send-email-narcisaanamaria12@gmail.com>
- <alpine.DEB.2.20.1702261901180.2056@hadrien>
- <1488134072.9188.3.camel@perches.com>
- <alpine.DEB.2.20.1702261956070.2056@hadrien>
- <1488137824.9188.7.camel@perches.com>
- <alpine.DEB.2.20.1702262038560.2056@hadrien>
- <1488146211.9188.10.camel@perches.com>
- <3ed05e4f-b00a-8a4b-f4f2-de23ff9b461e@broadcom.com>
- <alpine.DEB.2.20.1702270724430.2187@hadrien>
-Message-ID: <20170227144425.GA4315@mwanda>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 27 Feb 2017 08:47:38 -0600
+Subject: [PATCH v5 4/4] dt-bindings: Add DT bindings document for
+ Broadcom SBA RAID driver
+In-Reply-To: <1487227695-965-5-git-send-email-anup.patel@broadcom.com>
+References: <1487227695-965-1-git-send-email-anup.patel@broadcom.com>
+ <1487227695-965-5-git-send-email-anup.patel@broadcom.com>
+Message-ID: <20170227144738.szmppcir6bvav4bb@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2017 at 07:25:30AM +0100, Julia Lawall wrote:
+On Thu, Feb 16, 2017 at 12:18:15PM +0530, Anup Patel wrote:
+> This patch adds the DT bindings document for newly added Broadcom
+> SBA RAID driver.
 > 
-> 
-> On Sun, 26 Feb 2017, Scott Branden wrote:
-> 
-> >
-> >
-> > On 17-02-26 01:56 PM, Joe Perches wrote:
-> > > On Sun, 2017-02-26 at 20:40 +0100, Julia Lawall wrote:
-> > > > On Sun, 26 Feb 2017, Joe Perches wrote:
-> > > > > On Sun, 2017-02-26 at 19:59 +0100, Julia Lawall wrote:
-> > > > > > On Sun, 26 Feb 2017, Joe Perches wrot
-> > > > > > > Mailing lists _should_ be copied on patch submissions.
-> > > > > > The idea of outreachy is that it should be a place for people to get
-> > > > > > started without too much criticism from the outside.  Originally, only
-> > > > > > the
-> > > > > > outreachy mailing list received patches.  But staging maintainers were
-> > > > > > confused to have their drivers receiving patches that they had not
-> > > > > > seen.
-> > > > > > So we expanded it to maintainers.
-> > > > >
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> ---
+>  .../devicetree/bindings/dma/brcm,iproc-sba.txt     | 29 ++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/brcm,iproc-sba.txt
 
-It was mostly me being annoyed because outreachy reviews are not that
-good frankly.  We just were just looking at outreachy code from 2013
-where they "fixed" sparse endian notations by removing the endian
-conversions.  It was so obviously wrong just from reading the changelog
-before you even got to the patch itself...
-
-> > > > > That also doesn't make much sense as patches
-> > > > > should not be applied that have not reached
-> > > > > a mailing list for review.
-> > > > >
-> > > > > As long as initial outreachy patches are not
-> > > > > applied and are just for internal review by
-> > > > > any outside person but the outreachy list and
-> > > > > are not be applied by maintainers, then perhaps
-> > > > > it's best if neither maintainers nor lists are
-> > > > > cc'd on the patches.
-> > > >
-> > > > The patches are applied by Greg.  Greg suggested the policy of adding
-> > > > maintainers but not including mailing lists.  I'll let him consider
-> > > > whether the policy should be changed.
-> > >
-> > > Well, I will comment on patches sent to the kernel list.
-> > >
-> > > I'm not subscribed to outreachy and I don't want to be
-> > > subscribed to that list either.
-> > >
-> > I would prefer this outreachy work uses their own mailing list and reviews
-> > their patches first.  Then once they have everything sorted out they send out
-> > the patch series to the proper maintainers/mailing lists. That way we're not
-> > spammed with all these emails of people as they are learning how to format and
-> > send out proper patches.
-> 
-
-Outreachy emails are not really worse than normal staging patches so
-I don't mind the spam.  But it would be good if driver-devel were always
-CC'd on the final patch.
-
-I know Greg feels differently.
-
-regards,
-dan carpenter
+Acked-by: Rob Herring <robh@kernel.org>
