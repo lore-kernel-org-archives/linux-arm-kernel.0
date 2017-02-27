@@ -1,43 +1,170 @@
-From: flatmax@flatmax.org (Matt Flax)
-Date: Mon, 27 Feb 2017 22:21:25 +1100
-Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
- bcm2835<=>IC<=>cs42xx8
-In-Reply-To: <20170227103024.GF2718@delle.lan>
-References: <cover.1487997974.git.flatmax@flatmax.org>
- <20170225133952.GA28091@camel2.lan>
- <8cf68a3e-330d-e76d-e276-5df5453e3baf@flatmax.org>
- <20170226144958.GA5543@camel2.lan>
- <732a71ac-5ec5-37e1-1190-be036ea34555@flatmax.org>
- <20170226221648.GA10974@camel2.lan>
- <7cef41ee-ef00-22b7-830f-517a9d594ed0@flatmax.org>
- <20170227080433.GA2718@delle.lan>
- <170950f7-354f-e6a9-cefb-834a00fadd1b@flatmax.org>
- <20170227103024.GF2718@delle.lan>
-Message-ID: <7b78c782-28e1-4849-5d00-8caf30847d5c@flatmax.org>
+From: gengdj.1984@gmail.com (gengdongjiu)
+Date: Mon, 27 Feb 2017 19:31:21 +0800
+Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <58B00E12.5020602@arm.com>
+References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
+ <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
+ <58B00E12.5020602@arm.com>
+Message-ID: <CAMj-D2AcBNozWXgKq2L_hb7G84i-10m=sGXx3j5ysrJ-nC=p0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+@@ -1444,8 +1445,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu
+*vcpu, struct kvm_run *run)
+
+        /* Check the stage-2 fault is trans. fault or write fault */
+        fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+-       if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+-           fault_status != FSC_ACCESS) {
++
++       /* The host kernel will handle the synchronous external abort. There
++        * is no need to pass the error into the guest.
++        */
++       if (fault_status == FSC_EXTABT) {
++               if(handle_guest_sea((unsigned long)fault_ipa,
++                                   kvm_vcpu_get_hsr(vcpu))) {
++                       kvm_err("Failed to handle guest SEA, FSC:
+EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
++                               kvm_vcpu_trap_get_class(vcpu),
++                               (unsigned long)kvm_vcpu_trap_get_fault(vcpu),
++                               (unsigned long)kvm_vcpu_get_hsr(vcpu));
++                       return -EFAULT;
++               }
++       } else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
++                  fault_status != FSC_ACCESS) {
+                kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+                        kvm_vcpu_trap_get_class(vcpu),
+                        (unsigned long)kvm_vcpu_trap_get_fault(vcpu),
 
 
-On 27/02/17 21:30, Matthias Reichl wrote:
+
+if the error is SEA and we want to inject the sea to guest OK, after
+finish the handle, whether we need to directly return? instead of
+continuation? as shown below:
+
+       if (fault_status == FSC_EXTABT) {
+               if(handle_guest_sea((unsigned long)fault_ipa,
+                                   kvm_vcpu_get_hsr(vcpu))) {
+                       kvm_err("Failed to handle guest SEA, FSC:
+EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+                               kvm_vcpu_trap_get_class(vcpu),
+                               (unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+                               (unsigned long)kvm_vcpu_get_hsr(vcpu));
+                       return -EFAULT;
+          } else
+                       return 1;
+
+
+
+
+
+
+2017-02-24 18:42 GMT+08:00 James Morse <james.morse@arm.com>:
+> Hi Tyler,
 >
-> I don't see that. Some people might want to be able to use multichannel
-> on RPi, but that's something very different than adding code that just
-> lies about driver capabilites.
+> On 21/02/17 21:22, Tyler Baicar wrote:
+>> Currently external aborts are unsupported by the guest abort
+>> handling. Add handling for SEAs so that the host kernel reports
+>> SEAs which occur in the guest kernel.
 >
-
-I am going to invite you over for dinner to eat steamed vegetables :)
-If I make the steamed vegetables in the microwave and they taste like 
-steamed vegetables, are they steamed vegetables ?
-
-I have a bcm2835 (Pi 2 and 3) SoC here. It is producing multichannel (8 
-out, 6 in) audio. In ALSA we call that DSP mode - right ?!
-
-If a chipset can do multichannel, do we need to invent a new DSP mode 
-name to call it dsp mode ? Surely not, because steamed vegetables are 
-steamed vegetables :)
-
-Just because steamed vegetables are made in the microwave doesn't mean 
-they don't belong in the Linux Kernel !
-
-Matt
+>> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+>> index e22089f..33a77509 100644
+>> --- a/arch/arm/include/asm/kvm_arm.h
+>> +++ b/arch/arm/include/asm/kvm_arm.h
+>> @@ -187,6 +187,7 @@
+>>  #define FSC_FAULT    (0x04)
+>>  #define FSC_ACCESS   (0x08)
+>>  #define FSC_PERM     (0x0c)
+>> +#define FSC_EXTABT   (0x10)
+>
+> arm64 has ESR_ELx_FSC_EXTABT which is used in inject_abt64(), but for matching
+> an external abort coming from hardware the range is wider.
+>
+> Looking at the ARM-ARMs 'ISS encoding for an exception from an Instruction
+> Abort' in 'D7.2.27 ESR_ELx, Exception Syndrome Register (ELx)' (page D7-1954 of
+> version 'k'...iss10775), the ten flavours of you Synchronous abort you hooked
+> with do_sea() in patch 4 occupy 0x10 to 0x1f...
+>
+>
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index a5265ed..04f1dd50 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -29,6 +29,7 @@
+>>  #include <asm/kvm_asm.h>
+>>  #include <asm/kvm_emulate.h>
+>>  #include <asm/virt.h>
+>> +#include <asm/system_misc.h>
+>>
+>>  #include "trace.h"
+>>
+>> @@ -1444,8 +1445,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>
+>>       /* Check the stage-2 fault is trans. fault or write fault */
+>>       fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+>
+> ... kvm_vcpu_trap_get_fault_type() on both arm and arm64 masks the HSR/ESR_EL2
+> with 0x3c ...
+>
+>
+>> -     if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+>> -         fault_status != FSC_ACCESS) {
+>> +
+>> +     /* The host kernel will handle the synchronous external abort. There
+>> +      * is no need to pass the error into the guest.
+>> +      */
+>> +     if (fault_status == FSC_EXTABT) {
+>
+> ... but here we only check for 'Synchronous external abort, not on a translation
+> table walk'. Are the other types relevant?
+>
+> If so we need some helper as this range is sparse and 'all other values are
+> reserved'. The aarch32 HSR format is slightly different. (G6-4411 ISS encoding
+> from an exception from a Data Abort).
+>
+> If not, can we change patch 4 to check this type too so we don't call out to
+> APEI for a fault type we know isn't relevant.
+>
+>
+>> +             if(handle_guest_sea((unsigned long)fault_ipa,
+>> +                                 kvm_vcpu_get_hsr(vcpu))) {
+>> +                     kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+>> +                             kvm_vcpu_trap_get_class(vcpu),
+>> +                             (unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+>> +                             (unsigned long)kvm_vcpu_get_hsr(vcpu));
+>> +                     return -EFAULT;
+>> +             }
+>> +     } else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+>> +                fault_status != FSC_ACCESS) {
+>>               kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+>>                       kvm_vcpu_trap_get_class(vcpu),
+>>                       (unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+>
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index b2d57fc..403277b 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -602,6 +602,24 @@ static const char *fault_name(unsigned int esr)
+>>  }
+>>
+>>  /*
+>> + * Handle Synchronous External Aborts that occur in a guest kernel.
+>> + */
+>> +int handle_guest_sea(unsigned long addr, unsigned int esr)
+>> +{
+>
+>> +     if(IS_ENABLED(HAVE_ACPI_APEI_SEA)) {
+>> +             nmi_enter();
+>> +             ghes_notify_sea();
+>> +             nmi_exit();
+>
+> This nmi stuff was needed for synchronous aborts that may have interrupted
+> APEI's interrupts-masked code. We want to avoid trying to take the same set of
+> locks, hence taking the in_nmi() path through APEI. Here we know we interrupted
+> a guest, so there is no risk that we have interrupted APEI on the host.
+> ghes_notify_sea() can safely take the normal path.
+>
+>
+> Thanks,
+>
+> James
