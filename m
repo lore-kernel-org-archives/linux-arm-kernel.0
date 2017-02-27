@@ -1,23 +1,20 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Feb 2017 16:31:30 -0600
-Subject: [PATCH v2 6/8] Documentation: devicetree: arm: marvell: Document
- IAP140
-In-Reply-To: <20170222022929.10540-7-afaerber@suse.de>
-References: <20170222022929.10540-1-afaerber@suse.de>
- <20170222022929.10540-7-afaerber@suse.de>
-Message-ID: <20170227223130.kvlkpe7ax55lfk2u@rob-hp-laptop>
+Date: Mon, 27 Feb 2017 16:35:19 -0600
+Subject: [PATCH v2 1/2] dt-bindings: arm: hisilicon: add bindings for
+ hi3798cv200 SoC and Poplar board
+In-Reply-To: <1487752716-14824-2-git-send-email-xuejiancheng@hisilicon.com>
+References: <1487752716-14824-1-git-send-email-xuejiancheng@hisilicon.com>
+ <1487752716-14824-2-git-send-email-xuejiancheng@hisilicon.com>
+Message-ID: <20170227223519.dxxjqcufovwefip4@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2017 at 03:29:26AM +0100, Andreas F?rber wrote:
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+On Wed, Feb 22, 2017 at 04:38:35PM +0800, Jiancheng Xue wrote:
+> Add bindings for HiSilicon hi3798cv200 SoC and Poplar Board.
+> 
+> Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
 > ---
->  v1 -> v2:
->  * Adopted "marvell" vendor prefix (Thomas)
->  * Documented Andromeda Box Edge as example
->  
->  Documentation/devicetree/bindings/arm/marvell/iap140.txt | 11 +++++++++++
->  1 file changed, 11 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/marvell/iap140.txt
+>  Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
