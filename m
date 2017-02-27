@@ -1,9 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Feb 2017 15:14:22 +0000
-Subject: [PATCH 11/20] PCI: rockchip: update PCI config space remap function
+Date: Mon, 27 Feb 2017 15:14:28 +0000
+Subject: [PATCH 17/20] PCI: xgene: update PCI config space remap function
 In-Reply-To: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
 References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170227151436.18698-12-lorenzo.pieralisi@arm.com>
+Message-ID: <20170227151436.18698-18-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,24 +14,32 @@ memory mappings for PCI configuration space are used.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Wenrui Li <wenrui.li@rock-chips.com>
-Cc: Shawn Lin <shawn.lin@rock-chips.com>
+Cc: Tanmay Inamdar <tinamdar@apm.com>
 ---
- drivers/pci/host/pcie-rockchip.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/host/pci-xgene.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-index 26ddd35..690a7b5 100644
---- a/drivers/pci/host/pcie-rockchip.c
-+++ b/drivers/pci/host/pcie-rockchip.c
-@@ -822,7 +822,7 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
- 	regs = platform_get_resource_byname(pdev,
- 					    IORESOURCE_MEM,
- 					    "axi-base");
--	rockchip->reg_base = devm_ioremap_resource(dev, regs);
-+	rockchip->reg_base = devm_pci_remap_cfg_resource(dev, regs);
- 	if (IS_ERR(rockchip->reg_base))
- 		return PTR_ERR(rockchip->reg_base);
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index 1a61087..de19898 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -248,7 +248,7 @@ static int xgene_pcie_ecam_init(struct pci_config_window *cfg, u32 ipversion)
+ 		dev_err(dev, "can't get CSR resource\n");
+ 		return ret;
+ 	}
+-	port->csr_base = devm_ioremap_resource(dev, &csr);
++	port->csr_base = devm_pci_remap_cfg_resource(dev, &csr);
+ 	if (IS_ERR(port->csr_base))
+ 		return PTR_ERR(port->csr_base);
+ 
+@@ -359,7 +359,7 @@ static int xgene_pcie_map_reg(struct xgene_pcie_port *port,
+ 	struct resource *res;
+ 
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "csr");
+-	port->csr_base = devm_ioremap_resource(dev, res);
++	port->csr_base = devm_pci_remap_cfg_resource(dev, res);
+ 	if (IS_ERR(port->csr_base))
+ 		return PTR_ERR(port->csr_base);
  
 -- 
 2.10.0
