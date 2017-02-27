@@ -1,391 +1,142 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Sun, 26 Feb 2017 21:18:25 -0800
-Subject: [PATCH v2 net-next 5/6] drivers: net: xgene-v2: Add transmit and
- receive
-In-Reply-To: <1488172706-29577-1-git-send-email-isubramanian@apm.com>
-References: <1488172706-29577-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1488172706-29577-6-git-send-email-isubramanian@apm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 27 Feb 2017 06:30:08 +0100
+Subject: [PATCH v2 2/3] soc: rockchip: add driver handling grf setup
+In-Reply-To: <CAOesGMj_RdxVDzirT97KLkXRsyVcFh3Z8jZLNjn0ehAv0Qhmhg@mail.gmail.com>
+References: <20161115223900.30728-1-heiko@sntech.de> <7144543.znLMLUJXpB@phil>
+ <CAOesGMj_RdxVDzirT97KLkXRsyVcFh3Z8jZLNjn0ehAv0Qhmhg@mail.gmail.com>
+Message-ID: <2206970.JAebETMOV6@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds,
-    - Transmit
-    - Transmit completion poll
-    - Receive poll
-    - NAPI handler
+Hi Olof,
 
-and enables the driver.
+sorry that took way longer than I expected, I was slightly swamped the last 
+days with general work and the travel to Portland.
 
-Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
----
- drivers/net/ethernet/apm/Kconfig           |   1 +
- drivers/net/ethernet/apm/Makefile          |   1 +
- drivers/net/ethernet/apm/xgene-v2/Kconfig  |  11 ++
- drivers/net/ethernet/apm/xgene-v2/Makefile |   6 +
- drivers/net/ethernet/apm/xgene-v2/main.c   | 248 ++++++++++++++++++++++++++++-
- drivers/net/ethernet/apm/xgene-v2/main.h   |   1 +
- 6 files changed, 267 insertions(+), 1 deletion(-)
- create mode 100644 drivers/net/ethernet/apm/xgene-v2/Kconfig
- create mode 100644 drivers/net/ethernet/apm/xgene-v2/Makefile
+Am Sonntag, 29. Januar 2017, 16:41:46 CET schrieb Olof Johansson:
+> On Sun, Jan 29, 2017 at 3:36 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> > Am Sonntag, 29. Januar 2017, 14:40:53 CET schrieb Olof Johansson:
+> >> On Tue, Nov 15, 2016 at 2:38 PM, Heiko Stuebner <heiko@sntech.de> wrote:
 
-diff --git a/drivers/net/ethernet/apm/Kconfig b/drivers/net/ethernet/apm/Kconfig
-index ec63d70..59efe5b 100644
---- a/drivers/net/ethernet/apm/Kconfig
-+++ b/drivers/net/ethernet/apm/Kconfig
-@@ -1 +1,2 @@
- source "drivers/net/ethernet/apm/xgene/Kconfig"
-+source "drivers/net/ethernet/apm/xgene-v2/Kconfig"
-diff --git a/drivers/net/ethernet/apm/Makefile b/drivers/net/ethernet/apm/Makefile
-index 65ce32a..946b2a4 100644
---- a/drivers/net/ethernet/apm/Makefile
-+++ b/drivers/net/ethernet/apm/Makefile
-@@ -3,3 +3,4 @@
- #
- 
- obj-$(CONFIG_NET_XGENE) += xgene/
-+obj-$(CONFIG_NET_XGENE_V2) += xgene-v2/
-diff --git a/drivers/net/ethernet/apm/xgene-v2/Kconfig b/drivers/net/ethernet/apm/xgene-v2/Kconfig
-new file mode 100644
-index 0000000..1205861
---- /dev/null
-+++ b/drivers/net/ethernet/apm/xgene-v2/Kconfig
-@@ -0,0 +1,11 @@
-+config NET_XGENE_V2
-+	tristate "APM X-Gene SoC Ethernet-v2 Driver"
-+	depends on HAS_DMA
-+	depends on ARCH_XGENE || COMPILE_TEST
-+	help
-+	  This is the Ethernet driver for the on-chip ethernet interface
-+	  which uses a linked list of DMA descriptor architecture (v2) for
-+	  APM X-Gene SoCs.
-+
-+	  To compile this driver as a module, choose M here. This module will
-+	  be called xgene-enet-v2.
-diff --git a/drivers/net/ethernet/apm/xgene-v2/Makefile b/drivers/net/ethernet/apm/xgene-v2/Makefile
-new file mode 100644
-index 0000000..735309c
---- /dev/null
-+++ b/drivers/net/ethernet/apm/xgene-v2/Makefile
-@@ -0,0 +1,6 @@
-+#
-+# Makefile for APM X-Gene Ethernet v2 driver
-+#
-+
-+xgene-enet-v2-objs := main.o mac.o enet.o ring.o
-+obj-$(CONFIG_NET_XGENE_V2) += xgene-enet-v2.o
-diff --git a/drivers/net/ethernet/apm/xgene-v2/main.c b/drivers/net/ethernet/apm/xgene-v2/main.c
-index c96b4cc..f613a78 100644
---- a/drivers/net/ethernet/apm/xgene-v2/main.c
-+++ b/drivers/net/ethernet/apm/xgene-v2/main.c
-@@ -113,7 +113,7 @@ static int xge_refill_buffers(struct net_device *ndev, u32 nbuf)
- 		raw_desc->m1 = cpu_to_le64(SET_BITS(NEXT_DESC_ADDRL, addr_lo) |
- 					   SET_BITS(NEXT_DESC_ADDRH, addr_hi) |
- 					   SET_BITS(PKT_ADDRH,
--						    dma_addr >> PKT_ADDRL_LEN));
-+						    upper_32_bits(dma_addr)));
- 
- 		dma_wmb();
- 		raw_desc->m0 = cpu_to_le64(SET_BITS(PKT_ADDRL, dma_addr) |
-@@ -177,6 +177,194 @@ static void xge_free_irq(struct net_device *ndev)
- 	devm_free_irq(dev, pdata->resources.irq, pdata);
- }
- 
-+static bool is_tx_slot_available(struct xge_raw_desc *raw_desc)
-+{
-+	if (GET_BITS(E, le64_to_cpu(raw_desc->m0)) &&
-+	    (GET_BITS(PKT_SIZE, le64_to_cpu(raw_desc->m0)) == SLOT_EMPTY))
-+		return true;
-+
-+		return false;
-+}
-+
-+static netdev_tx_t xge_start_xmit(struct sk_buff *skb, struct net_device *ndev)
-+{
-+	struct xge_pdata *pdata = netdev_priv(ndev);
-+	struct device *dev = &pdata->pdev->dev;
-+	static dma_addr_t dma_addr;
-+	struct xge_desc_ring *tx_ring;
-+	struct xge_raw_desc *raw_desc;
-+	u64 addr_lo, addr_hi;
-+	void *pkt_buf;
-+	u8 tail;
-+	u16 len;
-+
-+	tx_ring = pdata->tx_ring;
-+	tail = tx_ring->tail;
-+	len = skb_headlen(skb);
-+	raw_desc = &tx_ring->raw_desc[tail];
-+
-+	if (!is_tx_slot_available(raw_desc)) {
-+		netif_stop_queue(ndev);
-+		return NETDEV_TX_BUSY;
-+	}
-+
-+	/* Packet buffers should be 64B aligned */
-+	pkt_buf = dma_zalloc_coherent(dev, XGENE_ENET_STD_MTU, &dma_addr,
-+				      GFP_ATOMIC);
-+	if (unlikely(!pkt_buf)) {
-+		dev_kfree_skb_any(skb);
-+		return NETDEV_TX_OK;
-+	}
-+	memcpy(pkt_buf, skb->data, len);
-+
-+	addr_hi = GET_BITS(NEXT_DESC_ADDRH, le64_to_cpu(raw_desc->m1));
-+	addr_lo = GET_BITS(NEXT_DESC_ADDRL, le64_to_cpu(raw_desc->m1));
-+	raw_desc->m1 = cpu_to_le64(SET_BITS(NEXT_DESC_ADDRL, addr_lo) |
-+				   SET_BITS(NEXT_DESC_ADDRH, addr_hi) |
-+				   SET_BITS(PKT_ADDRH,
-+					    upper_32_bits(dma_addr)));
-+
-+	tx_ring->pkt_info[tail].skb = skb;
-+	tx_ring->pkt_info[tail].dma_addr = dma_addr;
-+	tx_ring->pkt_info[tail].pkt_buf = pkt_buf;
-+
-+	dma_wmb();
-+
-+	raw_desc->m0 = cpu_to_le64(SET_BITS(PKT_ADDRL, dma_addr) |
-+				   SET_BITS(PKT_SIZE, len) |
-+				   SET_BITS(E, 0));
-+	skb_tx_timestamp(skb);
-+	xge_wr_csr(pdata, DMATXCTRL, 1);
-+
-+	tx_ring->tail = (tail + 1) & (XGENE_ENET_NUM_DESC - 1);
-+
-+	return NETDEV_TX_OK;
-+}
-+
-+static bool is_tx_hw_done(struct xge_raw_desc *raw_desc)
-+{
-+	if (GET_BITS(E, le64_to_cpu(raw_desc->m0)) &&
-+	    !GET_BITS(PKT_SIZE, le64_to_cpu(raw_desc->m0)))
-+		return true;
-+
-+		return false;
-+}
-+
-+static void xge_txc_poll(struct net_device *ndev)
-+{
-+	struct xge_pdata *pdata = netdev_priv(ndev);
-+	struct device *dev = &pdata->pdev->dev;
-+	struct xge_desc_ring *tx_ring;
-+	struct xge_raw_desc *raw_desc;
-+	dma_addr_t dma_addr;
-+	struct sk_buff *skb;
-+	void *pkt_buf;
-+	u32 data;
-+	u8 head;
-+
-+	tx_ring = pdata->tx_ring;
-+	head = tx_ring->head;
-+
-+	data = xge_rd_csr(pdata, DMATXSTATUS);
-+	if (!GET_BITS(TXPKTCOUNT, data))
-+		return;
-+
-+	while (1) {
-+		raw_desc = &tx_ring->raw_desc[head];
-+
-+		if (!is_tx_hw_done(raw_desc))
-+			break;
-+
-+		dma_rmb();
-+
-+		skb = tx_ring->pkt_info[head].skb;
-+		dma_addr = tx_ring->pkt_info[head].dma_addr;
-+		pkt_buf = tx_ring->pkt_info[head].pkt_buf;
-+		pdata->stats.tx_packets++;
-+		pdata->stats.tx_bytes += skb->len;
-+		dma_free_coherent(dev, XGENE_ENET_STD_MTU, pkt_buf, dma_addr);
-+		dev_kfree_skb_any(skb);
-+
-+		/* clear pktstart address and pktsize */
-+		raw_desc->m0 = cpu_to_le64(SET_BITS(E, 1) |
-+					   SET_BITS(PKT_SIZE, SLOT_EMPTY));
-+		xge_wr_csr(pdata, DMATXSTATUS, 1);
-+
-+		head = (head + 1) & (XGENE_ENET_NUM_DESC - 1);
-+	}
-+
-+	if (netif_queue_stopped(ndev))
-+		netif_wake_queue(ndev);
-+
-+	tx_ring->head = head;
-+}
-+
-+static int xge_rx_poll(struct net_device *ndev, unsigned int budget)
-+{
-+	struct xge_pdata *pdata = netdev_priv(ndev);
-+	struct device *dev = &pdata->pdev->dev;
-+	struct xge_desc_ring *rx_ring;
-+	struct xge_raw_desc *raw_desc;
-+	struct sk_buff *skb;
-+	dma_addr_t dma_addr;
-+	int processed = 0;
-+	u8 head, rx_error;
-+	int i, ret;
-+	u32 data;
-+	u16 len;
-+
-+	rx_ring = pdata->rx_ring;
-+	head = rx_ring->head;
-+
-+	data = xge_rd_csr(pdata, DMARXSTATUS);
-+	if (!GET_BITS(RXPKTCOUNT, data))
-+		return 0;
-+
-+	for (i = 0; i < budget; i++) {
-+		raw_desc = &rx_ring->raw_desc[head];
-+
-+		if (GET_BITS(E, le64_to_cpu(raw_desc->m0)))
-+			break;
-+
-+		dma_rmb();
-+
-+		skb = rx_ring->pkt_info[head].skb;
-+		rx_ring->pkt_info[head].skb = NULL;
-+		dma_addr = rx_ring->pkt_info[head].dma_addr;
-+		len = GET_BITS(PKT_SIZE, le64_to_cpu(raw_desc->m0));
-+		dma_unmap_single(dev, dma_addr, XGENE_ENET_STD_MTU,
-+				 DMA_FROM_DEVICE);
-+
-+		rx_error = GET_BITS(D, le64_to_cpu(raw_desc->m2));
-+		if (unlikely(rx_error)) {
-+			pdata->stats.rx_errors++;
-+			dev_kfree_skb_any(skb);
-+			goto out;
-+		}
-+
-+		skb_put(skb, len);
-+		skb->protocol = eth_type_trans(skb, ndev);
-+
-+		pdata->stats.rx_packets++;
-+		pdata->stats.rx_bytes += len;
-+		napi_gro_receive(&pdata->napi, skb);
-+out:
-+		ret = xge_refill_buffers(ndev, 1);
-+		xge_wr_csr(pdata, DMARXSTATUS, 1);
-+		xge_wr_csr(pdata, DMARXCTRL, 1);
-+
-+		if (ret)
-+			break;
-+
-+		head = (head + 1) & (XGENE_ENET_NUM_DESC - 1);
-+		processed++;
-+	}
-+
-+	rx_ring->head = head;
-+
-+	return processed;
-+}
-+
- static void xge_delete_desc_ring(struct net_device *ndev,
- 				 struct xge_desc_ring *ring)
- {
-@@ -221,8 +409,10 @@ static void xge_delete_desc_rings(struct net_device *ndev)
- {
- 	struct xge_pdata *pdata = netdev_priv(ndev);
- 
-+	xge_txc_poll(ndev);
- 	xge_delete_desc_ring(ndev, pdata->tx_ring);
- 
-+	xge_rx_poll(ndev, 64);
- 	xge_free_buffers(ndev);
- 	xge_delete_desc_ring(ndev, pdata->rx_ring);
- }
-@@ -333,6 +523,25 @@ static int xge_close(struct net_device *ndev)
- 	return 0;
- }
- 
-+static int xge_napi(struct napi_struct *napi, const int budget)
-+{
-+	struct net_device *ndev = napi->dev;
-+	struct xge_pdata *pdata = netdev_priv(ndev);
-+	int processed;
-+
-+	pdata = netdev_priv(ndev);
-+
-+	xge_txc_poll(ndev);
-+	processed = xge_rx_poll(ndev, budget);
-+
-+	if (processed < budget) {
-+		napi_complete_done(napi, processed);
-+		xge_intr_enable(pdata);
-+	}
-+
-+	return processed;
-+}
-+
- static int xge_set_mac_addr(struct net_device *ndev, void *addr)
- {
- 	struct xge_pdata *pdata = netdev_priv(ndev);
-@@ -347,6 +556,41 @@ static int xge_set_mac_addr(struct net_device *ndev, void *addr)
- 	return 0;
- }
- 
-+static bool is_tx_pending(struct xge_raw_desc *raw_desc)
-+{
-+	if (!GET_BITS(E, le64_to_cpu(raw_desc->m0)))
-+		return true;
-+
-+	return false;
-+}
-+
-+static void xge_free_pending_skb(struct net_device *ndev)
-+{
-+	struct xge_pdata *pdata = netdev_priv(ndev);
-+	struct device *dev = &pdata->pdev->dev;
-+	struct xge_desc_ring *tx_ring;
-+	struct xge_raw_desc *raw_desc;
-+	dma_addr_t dma_addr;
-+	struct sk_buff *skb;
-+	void *pkt_buf;
-+	int i;
-+
-+	tx_ring = pdata->tx_ring;
-+
-+	for (i = 0; i < XGENE_ENET_NUM_DESC; i++) {
-+		raw_desc = &tx_ring->raw_desc[i];
-+
-+		if (!is_tx_pending(raw_desc))
-+			continue;
-+
-+		skb = tx_ring->pkt_info[i].skb;
-+		dma_addr = tx_ring->pkt_info[i].dma_addr;
-+		pkt_buf = tx_ring->pkt_info[i].pkt_buf;
-+		dma_free_coherent(dev, XGENE_ENET_STD_MTU, pkt_buf, dma_addr);
-+		dev_kfree_skb_any(skb);
-+	}
-+}
-+
- static void xge_timeout(struct net_device *ndev)
- {
- 	struct xge_pdata *pdata = netdev_priv(ndev);
-@@ -389,11 +633,13 @@ static void xge_get_stats64(struct net_device *ndev,
- 
- 	storage->rx_packets += stats->rx_packets;
- 	storage->rx_bytes += stats->rx_bytes;
-+	storage->rx_errors += stats->rx_errors;
- }
- 
- static const struct net_device_ops xgene_ndev_ops = {
- 	.ndo_open = xge_open,
- 	.ndo_stop = xge_close,
-+	.ndo_start_xmit = xge_start_xmit,
- 	.ndo_set_mac_address = xge_set_mac_addr,
- 	.ndo_tx_timeout = xge_timeout,
- 	.ndo_get_stats64 = xge_get_stats64,
-diff --git a/drivers/net/ethernet/apm/xgene-v2/main.h b/drivers/net/ethernet/apm/xgene-v2/main.h
-index a2f8712..ada7b0e 100644
---- a/drivers/net/ethernet/apm/xgene-v2/main.h
-+++ b/drivers/net/ethernet/apm/xgene-v2/main.h
-@@ -55,6 +55,7 @@ struct xge_stats {
- 	u64 tx_bytes;
- 	u64 rx_packets;
- 	u64 rx_bytes;
-+	u64 rx_errors;
- };
- 
- /* ethernet private data */
--- 
-1.9.1
+[...]
+
+> >> Would it be possible to describe this directly in the DT instead? If
+> >> nothing else, something like
+> >> 
+> >> function-regs = < array of regs >
+> >> function-values = < array of values >
+> >> function-names = < array of names >
+> >> 
+> >> Not ideal either, especially if abused into a random poke table, but
+> >> it won't require per-SoC changes to the kernel. If we keep the binding
+> >> under close eyes we can hopefully avoid abuse.
+> >> 
+> >> Given that Rockchip is still working on new SoCs, this list will just
+> >> grow and doing it in-kernel will stop scaling at some point.
+> > 
+> > As explained in the commit message, this is meant as a last resort for
+> > settings that no driver can be responsible for in a sensible way and that
+> > are Linux-specific and thus cannot be set in firmware for everybody. Most
+> > GRF- specific settings are already done by the specific drivers needing
+> > them.
+> > 
+> > I.e. you see the mmc/jtag thing, which is getting disabled because the
+> > Linux mmc subsystem gets a hickup if the pinmux is changed by the soc to
+> > early after card eject. Other OSes might like that behaviour.
+> > 
+> > As the dts is meant to be for everyone I don't see how that could be
+> > sanely
+> > defined for things.
+> 
+> But every OS that wants to use JTAG instead of MMC, or enable JTAG
+> around MMC, will need to know about this setting, right? So we're not
+> necessarily leaking linux implementation details into the DT here.
+> Whether each OS applies the setting is up to them.
+
+The issue with this specific setting is that the soc wants to be more 
+intelligent than the kernel :-)
+It makes the soc switch pin-muxes automatically between mmc and jtag depending 
+on the card-detect status - circumventing pinctrl completely and killing the 
+our mmc subsystem in the process.
+
+You can of course still select jtag pinmuxes using the regular linux pinctrl 
+subsystem. But as I said, other systems might like that functionality for 
+whatever reason.
+
+
+Describing the value (and others) in the dt creates the issue, that the driver 
+code still needs to have a list of "we as Linux want to set the jtag-property 
+but not other-property-y" and so on and would therefore rely on the function 
+being stable over multiple socs, as otherwise we may end up with function-
+names "mmc-jtag-rk3288", ... as the GRF and its contents are notorious 
+unpredictable :-) .
+
+
+> > Another option would be to burden the rockchip mmc-driver with that
+> > specific setting, but then the mmc-driver (and possible other drivers if
+> > needed) would need per-soc additions, resulting in the same scaling
+> > problem.
+> > Having one per-soc list at least keeps in one place :-) .
+> 
+> That's exactly what I'm looking to avoid -- i.e. I don't want the GRF
+> driver to need patching for every SoC either, if we can avoid it.
+> 
+> Once the list gets too long, you'll want to add #ifdef SOCNAME and
+> only build in the tables for some of the SoCs. And then we've all lost
+> 
+> :-)
+
+Right now we don't have any SOCNAME stuff. It's in the back of my mind because 
+we're currently also compiling for example all clock drivers for all 
+ARCH_ROCKCHIP socs, so it might make sense to split that up a bit, so people 
+will be able to limit kernel size if they like to.
+
+But one thing I stumbled upon is that while some arm32 socs do have per-soc 
+kconfig entries, there does not seem to be anything like this on arm64 yet.
+
+Is there a plan stated somewhere already on how this should be handled?
+I.e. introducing SOC_RK3399 (or similar) or having separate CLK_RK3399, 
+GRF_RK3399 (or similar) symbols that all need to be disabled separately if 
+desired.
+
+As stated in the original commit message, the list of settings in there is not 
+supposed to get "long", but that may or may not be wishful thinking on my part 
+;-) .
+
+> Or, if you're firmly deciding to keep updating kernel code for all
+> SoCs, could also just add one platform quirk file in
+> drivers/soc/rockchip with the postcore_initcall that matches toplevel
+> compatible per SoC, finds the device node, maps the address range,
+> sets the value.
+> 
+> That'll give you a place for other platform quirks, if they ever come
+> up. In one place, even if the other quirks might be in other register
+> ranges.
+
+I would very much prefer going this route, as I really don't trust the GRF to 
+keep conforming to any devicetree binding (or anything at all) and this way, 
+stuff is completely reversable / redoable if the need arises (hopefully not) 
+and we don't have to live with an inadequate bindings forever :-) .
+
+
+> > If you really dislike the current approach, we can of course postpone it
+> > for now though.
+> 
+> It's a bit bikesheddy, but it just seems like adding a driver that
+> will always need updates is a bit of a heavy solution.
+
+It's not the only one though, needing per soc updates.
+
+Closed neighbour is probably the io-domain handling in [0], whose binding I 
+really like, as it hides the the GRF-shenanigans nicely and only exposes the 
+actual supplies.
+
+So yes, I'd like to keep it codified, but we can split that up on a per-soc 
+basis as you suggested.
+
+
+Heiko
+
+
+[0] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/
+drivers/power/avs/rockchip-io-domain.c
