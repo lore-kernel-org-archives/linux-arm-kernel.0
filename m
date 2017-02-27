@@ -1,31 +1,40 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Feb 2017 15:14:13 +0000
-Subject: [PATCH 02/20] PCI: fix pci_remap_iospace() remap attribute
+Date: Mon, 27 Feb 2017 15:14:14 +0000
+Subject: [PATCH 03/20] asm-generic/io.h: add PCI config space remap interface
 In-Reply-To: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
 References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170227151436.18698-3-lorenzo.pieralisi@arm.com>
+Message-ID: <20170227151436.18698-4-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the PCI local bus specifications (Revision 3.0, 3.2.5),
-I/O Address space transactions are non-posted. On architectures where
-I/O space is implemented through a chunk of memory mapped space mapped
-to PCI address space (ie IA64/ARM/ARM64) the memory mapping for the
-region backing I/O Address Space transactions determines the I/O
-transactions attributes (before the transactions actually reaches the
-PCI bus where it is handled according to the PCI specifications).
+The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and
+Posting") mandate non-posted configuration transactions. As further
+highlighted in the PCIe specifications (4.0 - Rev0.3, "Ordering
+Considerations for the Enhanced Configuration Access Mechanism"),
+through ECAM and ECAM-derivative configuration mechanism, the memory
+mapped transactions from the host CPU into Configuration Requests on the
+PCI express fabric may create ordering problems for software because
+writes to memory address are typically posted transactions (unless the
+architecture can enforce through virtual address mapping non-posted
+write transactions behaviour) but writes to Configuration Space are not
+posted on the PCI express fabric.
 
-Current pci_remap_iospace() interface, that is used to map the PCI I/O
-Address Space into virtual address space, use pgprot_device() as memory
-attribute for the virtual address mapping, that in some architectures
-(ie ARM64) provides non-cacheable but write bufferable mappings (ie
-posted writes), which clash with the non-posted write behaviour for I/O
-Address Space mandated by the PCI specifications.
+Current DT and ACPI host bridge controllers map PCI configuration space
+(ECAM and ECAM-derivative) into the virtual address space through
+ioremap() calls, that are non-cacheable device accesses on most
+architectures, but may provide "bufferable" or "posted" write semantics
+in architecture like eg ARM/ARM64 that allow ioremap'ed regions writes
+to be buffered in the bus connecting the host CPU to the PCI fabric;
+this behaviour, as underlined in the PCIe specifications, may trigger
+transactions ordering rules and must be prevented.
 
-Update the prot ioremap_page_range() parameter in pci_remap_iospace()
-to pgprot_noncached to ensure that the virtual mapping backing
-I/O Address Space guarantee non-posted write transactions issued
-when addressing I/O Address Space through the MMIO mapping.
+Introduce a new generic and explicit API to create a memory
+mapping for ECAM and ECAM-derivative config space area that
+defaults to ioremap_nocache() (which should provide a sane default
+behaviour) but still allowing architectures on which ioremap_nocache()
+results in posted write transactions to override the function
+call with an arch specific implementation that complies with
+the PCI specifications for configuration transactions.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
@@ -34,21 +43,28 @@ Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Russell King <linux@armlinux.org.uk>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 ---
- drivers/pci/pci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/asm-generic/io.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index bd98674..bfb3c6e 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -3375,7 +3375,7 @@ int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
- 		return -EINVAL;
+diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+index 7ef015e..52dda81 100644
+--- a/include/asm-generic/io.h
++++ b/include/asm-generic/io.h
+@@ -915,6 +915,15 @@ extern void ioport_unmap(void __iomem *p);
+ #endif /* CONFIG_GENERIC_IOMAP */
+ #endif /* CONFIG_HAS_IOPORT_MAP */
  
- 	return ioremap_page_range(vaddr, vaddr + resource_size(res), phys_addr,
--				  pgprot_device(PAGE_KERNEL));
-+				  pgprot_noncached(PAGE_KERNEL));
- #else
- 	/* this architecture does not have memory mapped I/O space,
- 	   so this function should never be called */
++#ifndef pci_remap_cfgspace
++#define pci_remap_cfgspace pci_remap_cfgspace
++static inline void __iomem *pci_remap_cfgspace(phys_addr_t offset,
++					       size_t size)
++{
++	return ioremap_nocache(offset, size);
++}
++#endif
++
+ #ifndef xlate_dev_kmem_ptr
+ #define xlate_dev_kmem_ptr xlate_dev_kmem_ptr
+ static inline void *xlate_dev_kmem_ptr(void *addr)
 -- 
 2.10.0
