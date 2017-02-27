@@ -1,94 +1,249 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 27 Feb 2017 19:54:39 +0000
-Subject: [RFC PATCH 28/30] iommu/arm-smmu-v3: Add support for Hardware
- Translation Table Update at stage 1
+Date: Mon, 27 Feb 2017 19:54:34 +0000
+Subject: [RFC PATCH 23/30] iommu/arm-smmu-v3: Bind/unbind device and task
 In-Reply-To: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
 References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
-Message-ID: <20170227195441.5170-29-jean-philippe.brucker@arm.com>
+Message-ID: <20170227195441.5170-24-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the SMMU supports it and the kernel was built with HTTU support, enable
-hardware update of access and dirty flags.
+Now that everything is in place, implement bind and unbind operations.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 27 ++++++++++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
+ drivers/iommu/arm-smmu-v3.c | 178 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 175 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 1a5e72752e6d..5d202f164b95 100644
+index 5e0008ac68cb..3ba7f65020f9 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -68,6 +68,8 @@
- #define IDR0_ASID16			(1 << 12)
- #define IDR0_ATS			(1 << 10)
- #define IDR0_HYP			(1 << 9)
-+#define IDR0_HD				(1 << 7)
-+#define IDR0_HA				(1 << 6)
- #define IDR0_BTM			(1 << 5)
- #define IDR0_COHACC			(1 << 4)
- #define IDR0_TTF_SHIFT			2
-@@ -346,7 +348,16 @@
- #define ARM64_TCR_TBI0_SHIFT		37
- #define ARM64_TCR_TBI0_MASK		0x1UL
+@@ -742,6 +742,7 @@ struct arm_smmu_master_data {
  
-+#define ARM64_TCR_HA_SHIFT		39
-+#define ARM64_TCR_HA_MASK		0x1UL
-+#define ARM64_TCR_HD_SHIFT		40
-+#define ARM64_TCR_HD_MASK		0x1UL
-+
- #define CTXDESC_CD_0_AA64		(1UL << 41)
-+#define CTXDESC_CD_0_TCR_HD_SHIFT	42
-+#define CTXDESC_CD_0_TCR_HA_SHIFT	43
-+#define CTXDESC_CD_0_HD			(1UL << CTXDESC_CD_0_TCR_HD_SHIFT)
-+#define CTXDESC_CD_0_HA			(1UL << CTXDESC_CD_0_TCR_HA_SHIFT)
- #define CTXDESC_CD_0_R			(1UL << 45)
- #define CTXDESC_CD_0_A			(1UL << 46)
- #define CTXDESC_CD_0_ASET_SHIFT		47
-@@ -687,6 +698,8 @@ struct arm_smmu_device {
- #define ARM_SMMU_FEAT_E2H		(1 << 13)
- #define ARM_SMMU_FEAT_BTM		(1 << 14)
- #define ARM_SMMU_FEAT_SVM		(1 << 15)
-+#define ARM_SMMU_FEAT_HA		(1 << 16)
-+#define ARM_SMMU_FEAT_HD		(1 << 17)
- 	u32				features;
+ 	bool				can_fault;
+ 	u32				avail_contexts;
++	const struct iommu_svm_ops	*svm_ops;
+ };
  
- #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-@@ -1275,6 +1288,12 @@ static u64 arm_smmu_cpu_tcr_to_cd(struct arm_smmu_device *smmu, u64 tcr)
- 	if (!(smmu->features & ARM_SMMU_FEAT_ATS))
- 		val |= ARM_SMMU_TCR2CD(tcr, TBI0);
+ /* SMMU private data for an IOMMU domain */
+@@ -820,6 +821,7 @@ struct arm_smmu_context {
  
-+	if (smmu->features & ARM_SMMU_FEAT_HA)
-+		val |= ARM_SMMU_TCR2CD(tcr, HA);
-+
-+	if (smmu->features & ARM_SMMU_FEAT_HD)
-+		val |= ARM_SMMU_TCR2CD(tcr, HD);
-+
- 	return val;
+ 	struct arm_smmu_task		*task;
+ 	struct arm_smmu_master_data	*master;
++	void				*priv;
+ 
+ 	struct list_head		task_head;
+ 	struct rb_node			master_node;
+@@ -2085,6 +2087,26 @@ static size_t arm_smmu_atc_invalidate_task(struct arm_smmu_task *smmu_task,
+ 	return size;
  }
  
-@@ -2497,7 +2516,7 @@ static int arm_smmu_init_task_pgtable(struct arm_smmu_task *smmu_task)
- 	tcr |= par << ARM_LPAE_TCR_IPS_SHIFT;
- 
- 	/* Enable this by default, it will be filtered when writing the CD */
--	tcr |= TCR_TBI0;
-+	tcr |= TCR_TBI0 | TCR_HA | TCR_HD;
- 
- 	cfg->asid	= asid;
- 	cfg->ttbr	= virt_to_phys(smmu_task->mm->pgd);
-@@ -4734,6 +4753,12 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 			smmu->features |= ARM_SMMU_FEAT_E2H;
++static size_t arm_smmu_atc_invalidate_context(struct arm_smmu_context *smmu_context,
++					      unsigned long iova, size_t size)
++{
++	struct arm_smmu_cmdq_ent cmd;
++	struct arm_smmu_device *smmu = smmu_context->master->smmu;
++	struct arm_smmu_cmdq_ent sync_cmd = {
++		.opcode = CMDQ_OP_CMD_SYNC,
++	};
++
++	arm_smmu_atc_invalidate_to_cmd(smmu, iova, size, &cmd);
++
++	cmd.substream_valid = true;
++	cmd.atc.ssid = smmu_context->ssid;
++
++	arm_smmu_atc_invalidate_master(smmu_context->master, &cmd);
++	arm_smmu_cmdq_issue_cmd(smmu, &sync_cmd);
++
++	return size;
++}
++
+ /* IOMMU API */
+ static bool arm_smmu_capable(enum iommu_cap cap)
+ {
+@@ -2098,7 +2120,6 @@ static bool arm_smmu_capable(enum iommu_cap cap)
  	}
+ }
  
-+	if (IS_ENABLED(CONFIG_ARM64_HW_AFDBM) && (reg & (IDR0_HA | IDR0_HD))) {
-+		smmu->features |= ARM_SMMU_FEAT_HA;
-+		if (reg & IDR0_HD)
-+			smmu->features |= ARM_SMMU_FEAT_HD;
+-__maybe_unused
+ static struct arm_smmu_context *
+ arm_smmu_attach_task(struct arm_smmu_task *smmu_task,
+ 		     struct arm_smmu_master_data *master)
+@@ -2444,7 +2465,6 @@ static void arm_smmu_free_task_pgtable(struct arm_smmu_task *smmu_task)
+ 	arm_smmu_bitmap_free(smmu->asid_map, smmu_task->s1_cfg.asid);
+ }
+ 
+-__maybe_unused
+ static struct arm_smmu_task *arm_smmu_alloc_task(struct arm_smmu_device *smmu,
+ 						 struct task_struct *task)
+ {
+@@ -2741,7 +2761,156 @@ static void arm_smmu_handle_fault(struct work_struct *work)
+ 
+ static bool arm_smmu_master_supports_svm(struct arm_smmu_master_data *master)
+ {
+-	return false;
++	return dev_is_pci(master->dev) && master->can_fault &&
++		master->avail_contexts;
++}
++
++static int arm_smmu_set_svm_ops(struct device *dev,
++				const struct iommu_svm_ops *svm_ops)
++{
++	struct arm_smmu_master_data *master;
++
++	if (!dev->iommu_fwspec)
++		return -EINVAL;
++
++	master = dev->iommu_fwspec->iommu_priv;
++	if (!master)
++		return -EINVAL;
++
++	master->svm_ops = svm_ops;
++
++	return 0;
++}
++
++static int arm_smmu_bind_task(struct device *dev, struct task_struct *task,
++			      int *pasid, int flags, void *priv)
++{
++	int ret = 0;
++	struct pid *pid;
++	struct iommu_group *group;
++	struct arm_smmu_device *smmu;
++	struct arm_smmu_group *smmu_group;
++	struct arm_smmu_domain *smmu_domain;
++	struct arm_smmu_master_data *master;
++	struct arm_smmu_task *smmu_task = NULL, *cur_task;
++	struct arm_smmu_context *smmu_context = NULL, *cur_context;
++
++	if (!dev->iommu_fwspec)
++		return -EINVAL;
++
++	master = dev->iommu_fwspec->iommu_priv;
++	if (!master)
++		return -EINVAL;
++
++	if (!arm_smmu_master_supports_svm(master))
++		return -EINVAL;
++
++	smmu = master->smmu;
++
++	group = iommu_group_get(dev);
++	smmu_group = to_smmu_group(group);
++
++	smmu_domain = smmu_group->domain;
++	if (!smmu_domain) {
++		iommu_group_put(group);
++		return -EINVAL;
 +	}
 +
- 	/*
- 	 * If the CPU is using VHE, but the SMMU doesn't support it, the SMMU
- 	 * will create TLB entries for NH-EL1 world and will miss the
++	if (smmu_domain->stage != ARM_SMMU_DOMAIN_S1) {
++		/* We do not support stage-2 SVM yet... */
++		iommu_group_put(group);
++		return -ENOSYS;
++	}
++
++	iommu_group_put(group);
++
++	pid = get_task_pid(task, PIDTYPE_PID);
++
++	spin_lock(&smmu->contexts_lock);
++
++	list_for_each_entry(cur_task, &smmu->tasks, smmu_head) {
++		if (cur_task->pid == pid) {
++			kref_get(&cur_task->kref);
++			smmu_task = cur_task;
++			break;
++		}
++	}
++
++	if (smmu_task) {
++		list_for_each_entry(cur_context, &smmu_task->contexts,
++				    task_head) {
++			if (cur_context->master->dev == dev) {
++				smmu_context = cur_context;
++				_arm_smmu_put_task(cur_task);
++				break;
++			}
++		}
++	}
++	spin_unlock(&smmu->contexts_lock);
++
++	put_pid(pid);
++
++	if (smmu_context)
++		/* We don't support nested bind/unbind calls */
++		return -EEXIST;
++
++	if (!smmu_task) {
++		smmu_task = arm_smmu_alloc_task(smmu, task);
++		if (IS_ERR(smmu_task))
++			return -PTR_ERR(smmu_task);
++	}
++
++	smmu_context = arm_smmu_attach_task(smmu_task, master);
++	if (IS_ERR(smmu_context)) {
++		arm_smmu_put_task(smmu, smmu_task);
++		return PTR_ERR(smmu_context);
++	}
++
++	smmu_context->priv = priv;
++
++	*pasid = smmu_context->ssid;
++	dev_dbg(dev, "bound to task %d with PASID %d\n", pid_vnr(pid), *pasid);
++
++	return ret;
++}
++
++static int arm_smmu_unbind_task(struct device *dev, int pasid, int flags)
++{
++	struct arm_smmu_device *smmu;
++	struct arm_smmu_master_data *master;
++	struct arm_smmu_context *smmu_context = NULL;
++
++	if (!dev->iommu_fwspec)
++		return -EINVAL;
++
++	master = dev->iommu_fwspec->iommu_priv;
++	if (!master)
++		return -EINVAL;
++
++	smmu = master->smmu;
++
++	smmu_context = arm_smmu_get_context_by_id(smmu, master, 0, pasid);
++	if (!smmu_context)
++		return -ESRCH;
++
++	dev_dbg(dev, "unbind PASID %d\n", pasid);
++
++	/*
++	 * There isn't any "ATC invalidate all by PASID" command. If this isn't
++	 * good enough, we'll need fine-grained invalidation for each vma.
++	 */
++	arm_smmu_atc_invalidate_context(smmu_context, 0, -1);
++
++	spin_lock(&smmu->contexts_lock);
++	if (smmu_context->task)
++		arm_smmu_detach_task(smmu_context);
++
++	/* Release the ref we got earlier in this function */
++	_arm_smmu_put_context(smmu_context);
++	_arm_smmu_put_context(smmu_context);
++	spin_unlock(&smmu->contexts_lock);
++
++	return 0;
+ }
+ 
+ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+@@ -3626,6 +3795,9 @@ static struct iommu_ops arm_smmu_ops = {
+ 	.capable		= arm_smmu_capable,
+ 	.domain_alloc		= arm_smmu_domain_alloc,
+ 	.domain_free		= arm_smmu_domain_free,
++	.set_svm_ops		= arm_smmu_set_svm_ops,
++	.bind_task		= arm_smmu_bind_task,
++	.unbind_task		= arm_smmu_unbind_task,
+ 	.attach_dev		= arm_smmu_attach_dev,
+ 	.map			= arm_smmu_map,
+ 	.unmap			= arm_smmu_unmap,
 -- 
 2.11.0
