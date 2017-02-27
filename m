@@ -1,24 +1,30 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Feb 2017 08:47:38 -0600
-Subject: [PATCH v5 4/4] dt-bindings: Add DT bindings document for
- Broadcom SBA RAID driver
-In-Reply-To: <1487227695-965-5-git-send-email-anup.patel@broadcom.com>
-References: <1487227695-965-1-git-send-email-anup.patel@broadcom.com>
- <1487227695-965-5-git-send-email-anup.patel@broadcom.com>
-Message-ID: <20170227144738.szmppcir6bvav4bb@rob-hp-laptop>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 27 Feb 2017 15:49:19 +0100
+Subject: [PATCH 4/8] drm/sun4i: Grab reserved memory region
+In-Reply-To: <cf185f6de351837a9a29c123ca801682c983b83d.1486655917.git-series.maxime.ripard@free-electrons.com>
+References: <cover.7101c7323e6f22e281ad70b93488cf44caca4ca0.1486655917.git-series.maxime.ripard@free-electrons.com>
+ <cf185f6de351837a9a29c123ca801682c983b83d.1486655917.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20170227144919.pijmvi3yptvxlbkx@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 12:18:15PM +0530, Anup Patel wrote:
-> This patch adds the DT bindings document for newly added Broadcom
-> SBA RAID driver.
+On Thu, Feb 09, 2017 at 05:39:18PM +0100, Maxime Ripard wrote:
+> Allow to provide an optional memory region to allocate from for our DRM
+> driver.
 > 
-> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> ---
->  .../devicetree/bindings/dma/brcm,iproc-sba.txt     | 29 ++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/brcm,iproc-sba.txt
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Fixed the conflicts and applied.
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170227/8fe44a0c/attachment.sig>
