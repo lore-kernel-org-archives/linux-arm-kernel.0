@@ -1,37 +1,114 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Feb 2017 08:29:48 -0600
-Subject: [PATCH 1/2] dt-bindings: iio: stm32-adc: add option to set
- resolution
-In-Reply-To: <b9f59559-c7a8-f575-0868-bd3b149a35c9@st.com>
-References: <1487177757-19427-1-git-send-email-fabrice.gasnier@st.com>
- <1487177757-19427-2-git-send-email-fabrice.gasnier@st.com>
- <c2b73482-ae01-34b5-3c16-b7e63893259e@kernel.org>
- <b9f59559-c7a8-f575-0868-bd3b149a35c9@st.com>
-Message-ID: <20170227142948.eejne6j42lkzsiyq@rob-hp-laptop>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 27 Feb 2017 14:35:34 +0000
+Subject: [RFC PATCH] arm: Fix cache inconsistency when using fixmap
+In-Reply-To: <CAKv+Gu9YeJ+WN1TETjh5G73=tCOK9fDW21VOw0E1XYy=UJcBkg@mail.gmail.com>
+References: <1487778678.18810.8.camel@linaro.org>
+ <5497800b3271f13583e78710ac39a48e@agner.ch>
+ <CAKv+Gu9YeJ+WN1TETjh5G73=tCOK9fDW21VOw0E1XYy=UJcBkg@mail.gmail.com>
+Message-ID: <1488206134.9100.7.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2017 at 05:04:45PM +0100, Fabrice Gasnier wrote:
-> On 02/19/2017 01:09 PM, Jonathan Cameron wrote:
-> > On 15/02/17 16:55, Fabrice Gasnier wrote:
-> > > Add documentation for 'st,adc-res' dt optional property.
-> > > 
-> > > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> > I'm happy with this, but would like to leave time for a device tree review.
-> > 
-> > Ultimately we may well want to make this a generic property and call it something
-> > like adc-resolution but perhaps we need to wait until we have a few more devices
-> > supporting setting it via device tree to figure out what the best interface is.
-> > It would exactly be a problem to support this as a deprecated binding at that
-> > point.
-> 
-> Hi Jonathan,
-> 
-> I agree with you on this... It may be better to have generic property
-> for this, especially if you see that it will come in the near future.
-> May I suggest this prop to be less restrictive, e.g. like resolution-bits as
-> is may also be worth for other device types, e.g. DAC as an example ?
+On Sun, 2017-02-26 at 14:35 +0000, Ard Biesheuvel wrote:
 
-Yes, please make this a commmon property.
+> However, we could make this a bit more private to the fixmap code by
+> using something like
+> 
+> 
+> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+> index 5c17d2dec777..6c375aea8f22 100644
+> --- a/arch/arm/include/asm/fixmap.h
+> +++ b/arch/arm/include/asm/fixmap.h
+> @@ -41,11 +41,14 @@ static const enum fixed_addresses __end_of_fixed_addresses =
+> 
+>  #define FIXMAP_PAGE_COMMON     (L_PTE_YOUNG | L_PTE_PRESENT |
+> L_PTE_XN | L_PTE_DIRTY)
+> 
+> -#define FIXMAP_PAGE_NORMAL     (FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
+> -#define FIXMAP_PAGE_RO         (FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
+> +#define __FIXMAP_MT_NORMAL     ((pgprot_val(pgprot_kernel) ?:
 
-Rob
+The code above misses out setting L_PTE_XN when using pgprot_kernel
+
+> FIXMAP_PAGE_COMMON) | \
+> +                                L_PTE_MT_WRITEBACK)
+> +#define FIXMAP_PAGE_NORMAL     __pgprot(__FIXMAP_MT_NORMAL)
+> +#define FIXMAP_PAGE_RO         __pgprot(__FIXMAP_MT_NORMAL | L_PTE_RDONLY)
+> 
+>  /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
+> -#define FIXMAP_PAGE_IO         (FIXMAP_PAGE_COMMON |
+> L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
+> +#define FIXMAP_PAGE_IO         __pgprot(FIXMAP_PAGE_COMMON |
+> L_PTE_MT_DEV_SHARED | \
+> +                                        L_PTE_SHARED)
+>  #define FIXMAP_PAGE_NOCACHE    FIXMAP_PAGE_IO
+> 
+>  #define __early_set_fixmap     __set_fixmap
+> 
+> (and drop the change to mm/mmu.c), which boils down to the same for
+> fixmap but does not affect other users of pgprot_kernel. Also, it
+> appears these definitions are broken under STRICT_MM_TYPECHECKS so
+> this is a good opportunity to get that fixed as well.
+
+I like this method better because as you say it keeps things private to
+fixmap, and it doesn't risk affecting other things.
+
+As for getting STRICT_MM_TYPECHECKS working that looks good too, but
+should be a separate cleanup patch, especially as a fix for the cache
+problem possibly should go to stable kernels.
+
+I also think FIXMAP_PAGE_COMMON should be renamed (prefixed with '__')
+as it's an implementation detail an not a memory type used with fixmap.
+
+So I was thinking, one patch as a bugfix:
+
+----------------------------------------------------------------------
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 5c17d2dec777..4e6784dc5668 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -41,7 +41,8 @@ static const enum fixed_addresses __end_of_fixed_addresses =
+ 
+ #define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
+ 
+-#define FIXMAP_PAGE_NORMAL	(FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
++#define FIXMAP_PAGE_NORMAL	(pgprot_kernel ? pgprot_kernel | L_PTE_XN : \
++					FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
+ #define FIXMAP_PAGE_RO		(FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
+ 
+ /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
+----------------------------------------------------------------------
+
+Second patch as a cleanup. Note this is different to Ard's version as
+it uses PAGE_KERNEL rather than open coding the same code from
+pgtable.h to add XN permisions (Also, the default generic definition of
+FIXMAP_PAGE_NORMAL is PAGE_KERNEL, and the only reason we want to change
+it is to select an alternate value if that is not yet setup)
+
+----------------------------------------------------------------------
+diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
+index 4e6784dc5668..ec689c6aa644 100644
+--- a/arch/arm/include/asm/fixmap.h
++++ b/arch/arm/include/asm/fixmap.h
+@@ -39,14 +39,15 @@ static const enum fixed_addresses __end_of_fixed_addresses =
+ 	__end_of_fixmap_region > __end_of_early_ioremap_region ?
+ 	__end_of_fixmap_region : __end_of_early_ioremap_region;
+ 
+-#define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
++#define __FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
+ 
+-#define FIXMAP_PAGE_NORMAL	(pgprot_kernel ? pgprot_kernel | L_PTE_XN : \
+-					FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
+-#define FIXMAP_PAGE_RO		(FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
++#define FIXMAP_PAGE_NORMAL	(pgprot_val(pgprot_kernel) ? PAGE_KERNEL : \
++				 __pgprot(__FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK))
++#define FIXMAP_PAGE_RO		_MOD_PROT(FIXMAP_PAGE_NORMAL, L_PTE_RDONLY)
+ 
+ /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
+-#define FIXMAP_PAGE_IO		(FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
++#define FIXMAP_PAGE_IO         __pgprot(__FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED | \
++                                        L_PTE_SHARED)
+ #define FIXMAP_PAGE_NOCACHE	FIXMAP_PAGE_IO
+ 
+ #define __early_set_fixmap	__set_fixmap
+----------------------------------------------------------------------
