@@ -1,70 +1,59 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Feb 2017 15:14:14 +0000
-Subject: [PATCH 03/20] asm-generic/io.h: add PCI config space remap interface
+Date: Mon, 27 Feb 2017 15:14:15 +0000
+Subject: [PATCH 04/20] ARM64: implement pci_remap_cfgspace() interface
 In-Reply-To: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
 References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170227151436.18698-4-lorenzo.pieralisi@arm.com>
+Message-ID: <20170227151436.18698-5-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI specifications (Rev 3.0, 3.2.5 "Transaction Ordering and
-Posting") mandate non-posted configuration transactions. As further
-highlighted in the PCIe specifications (4.0 - Rev0.3, "Ordering
-Considerations for the Enhanced Configuration Access Mechanism"),
-through ECAM and ECAM-derivative configuration mechanism, the memory
-mapped transactions from the host CPU into Configuration Requests on the
-PCI express fabric may create ordering problems for software because
-writes to memory address are typically posted transactions (unless the
-architecture can enforce through virtual address mapping non-posted
-write transactions behaviour) but writes to Configuration Space are not
-posted on the PCI express fabric.
+The PCI bus specifications (rev 3.0, 3.2.5 "Transaction Ordering
+and Posting") defines rules for PCI configuration space transactions
+ordering and posting, that state that configuration writes
+are non-posted transactions.
 
-Current DT and ACPI host bridge controllers map PCI configuration space
-(ECAM and ECAM-derivative) into the virtual address space through
-ioremap() calls, that are non-cacheable device accesses on most
-architectures, but may provide "bufferable" or "posted" write semantics
-in architecture like eg ARM/ARM64 that allow ioremap'ed regions writes
-to be buffered in the bus connecting the host CPU to the PCI fabric;
-this behaviour, as underlined in the PCIe specifications, may trigger
-transactions ordering rules and must be prevented.
+This rule is reinforced by the ARM v8 architecture reference manual
+(issue A.k, Early Write Acknowledgment) that explicitly recommends
+that No Early Write Acknowledgment attribute should be used to map
+PCI configuration (write) transactions.
 
-Introduce a new generic and explicit API to create a memory
-mapping for ECAM and ECAM-derivative config space area that
-defaults to ioremap_nocache() (which should provide a sane default
-behaviour) but still allowing architectures on which ioremap_nocache()
-results in posted write transactions to override the function
-call with an arch specific implementation that complies with
-the PCI specifications for configuration transactions.
+Current ioremap interface on ARM64 implements mapping functions
+where the Early Write Acknowledgment hint is enabled, so they
+cannot be used to map PCI configuration space in a PCI specs
+compliant way.
+
+Implement an ARM64 specific pci_remap_cfgspace() interface
+that allows to map PCI config region with nGnRnE attributes, providing
+a remap function that complies with PCI specifications and the ARMv8
+architecture reference manual recommendations.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Russell King <linux@armlinux.org.uk>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 ---
- include/asm-generic/io.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/include/asm/io.h | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
-index 7ef015e..52dda81 100644
---- a/include/asm-generic/io.h
-+++ b/include/asm-generic/io.h
-@@ -915,6 +915,15 @@ extern void ioport_unmap(void __iomem *p);
- #endif /* CONFIG_GENERIC_IOMAP */
- #endif /* CONFIG_HAS_IOPORT_MAP */
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 0c00c87..7a03250 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -173,6 +173,16 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+ #define iounmap				__iounmap
  
-+#ifndef pci_remap_cfgspace
-+#define pci_remap_cfgspace pci_remap_cfgspace
-+static inline void __iomem *pci_remap_cfgspace(phys_addr_t offset,
-+					       size_t size)
-+{
-+	return ioremap_nocache(offset, size);
-+}
-+#endif
+ /*
++ * PCI configuration space mapping function.
++ *
++ * PCI specifications disallows posted write configuration transactions.
++ * Add an arch specific pci_remap_cfgspace definition that is implemented
++ * through nGnRnE device memory attribute as recommended by the ARM v8
++ * Architecture reference manual Issue A.k B2.8.2 "Device memory".
++ */
++#define pci_remap_cfgspace(addr, size) __ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRnE))
 +
- #ifndef xlate_dev_kmem_ptr
- #define xlate_dev_kmem_ptr xlate_dev_kmem_ptr
- static inline void *xlate_dev_kmem_ptr(void *addr)
++/*
+  * io{read,write}{16,32,64}be() macros
+  */
+ #define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
 -- 
 2.10.0
