@@ -1,114 +1,101 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Mon, 27 Feb 2017 14:35:34 +0000
-Subject: [RFC PATCH] arm: Fix cache inconsistency when using fixmap
-In-Reply-To: <CAKv+Gu9YeJ+WN1TETjh5G73=tCOK9fDW21VOw0E1XYy=UJcBkg@mail.gmail.com>
-References: <1487778678.18810.8.camel@linaro.org>
- <5497800b3271f13583e78710ac39a48e@agner.ch>
- <CAKv+Gu9YeJ+WN1TETjh5G73=tCOK9fDW21VOw0E1XYy=UJcBkg@mail.gmail.com>
-Message-ID: <1488206134.9100.7.camel@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 27 Feb 2017 08:38:23 -0600
+Subject: [PATCH v4 01/36] [media] dt-bindings: Add bindings for i.MX
+ media driver
+In-Reply-To: <1487211578-11360-2-git-send-email-steve_longerbeam@mentor.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-2-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <20170227143823.25oxk72jul3ldvpb@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2017-02-26 at 14:35 +0000, Ard Biesheuvel wrote:
-
-> However, we could make this a bit more private to the fixmap code by
-> using something like
+On Wed, Feb 15, 2017 at 06:19:03PM -0800, Steve Longerbeam wrote:
+> Add bindings documentation for the i.MX media driver.
 > 
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> ---
+>  Documentation/devicetree/bindings/media/imx.txt | 66 +++++++++++++++++++++++++
+>  1 file changed, 66 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/imx.txt
 > 
-> diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-> index 5c17d2dec777..6c375aea8f22 100644
-> --- a/arch/arm/include/asm/fixmap.h
-> +++ b/arch/arm/include/asm/fixmap.h
-> @@ -41,11 +41,14 @@ static const enum fixed_addresses __end_of_fixed_addresses =
+> diff --git a/Documentation/devicetree/bindings/media/imx.txt b/Documentation/devicetree/bindings/media/imx.txt
+> new file mode 100644
+> index 0000000..fd5af50
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/imx.txt
+> @@ -0,0 +1,66 @@
+> +Freescale i.MX Media Video Device
+> +=================================
+> +
+> +Video Media Controller node
+> +---------------------------
+> +
+> +This is the media controller node for video capture support. It is a
+> +virtual device that lists the camera serial interface nodes that the
+> +media device will control.
+> +
+> +Required properties:
+> +- compatible : "fsl,imx-capture-subsystem";
+> +- ports      : Should contain a list of phandles pointing to camera
+> +		sensor interface ports of IPU devices
+> +
+> +example:
+> +
+> +capture-subsystem {
+> +	compatible = "fsl,capture-subsystem";
+> +	ports = <&ipu1_csi0>, <&ipu1_csi1>;
+> +};
+> +
+> +fim child node
+> +--------------
+> +
+> +This is an optional child node of the ipu_csi port nodes. If present and
+> +available, it enables the Frame Interval Monitor. Its properties can be
+> +used to modify the method in which the FIM measures frame intervals.
+> +Refer to Documentation/media/v4l-drivers/imx.rst for more info on the
+> +Frame Interval Monitor.
+
+This should have a compatible string.
+
+> +
+> +Optional properties:
+> +- fsl,input-capture-channel: an input capture channel and channel flags,
+> +			     specified as <chan flags>. The channel number
+> +			     must be 0 or 1. The flags can be
+> +			     IRQ_TYPE_EDGE_RISING, IRQ_TYPE_EDGE_FALLING, or
+> +			     IRQ_TYPE_EDGE_BOTH, and specify which input
+> +			     capture signal edge will trigger the input
+> +			     capture event. If an input capture channel is
+> +			     specified, the FIM will use this method to
+> +			     measure frame intervals instead of via the EOF
+> +			     interrupt. The input capture method is much
+> +			     preferred over EOF as it is not subject to
+> +			     interrupt latency errors. However it requires
+> +			     routing the VSYNC or FIELD output signals of
+> +			     the camera sensor to one of the i.MX input
+> +			     capture pads (SD1_DAT0, SD1_DAT1), which also
+> +			     gives up support for SD1.
+> +
+> +
+> +mipi_csi2 node
+> +--------------
+> +
+> +This is the device node for the MIPI CSI-2 Receiver, required for MIPI
+> +CSI-2 sensors.
+> +
+> +Required properties:
+> +- compatible	: "fsl,imx6-mipi-csi2", "snps,dw-mipi-csi2";
+> +- reg           : physical base address and length of the register set;
+> +- clocks	: the MIPI CSI-2 receiver requires three clocks: hsi_tx
+> +                  (the DPHY clock), video_27m, and eim_podf;
+> +- clock-names	: must contain "dphy", "cfg", "pix";
+
+Don't you need ports to describe the sensor and IPU connections?
+
+> +
+> +Optional properties:
+> +- interrupts	: must contain two level-triggered interrupts,
+> +                  in order: 100 and 101;
+> -- 
+> 2.7.4
 > 
->  #define FIXMAP_PAGE_COMMON     (L_PTE_YOUNG | L_PTE_PRESENT |
-> L_PTE_XN | L_PTE_DIRTY)
-> 
-> -#define FIXMAP_PAGE_NORMAL     (FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
-> -#define FIXMAP_PAGE_RO         (FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
-> +#define __FIXMAP_MT_NORMAL     ((pgprot_val(pgprot_kernel) ?:
-
-The code above misses out setting L_PTE_XN when using pgprot_kernel
-
-> FIXMAP_PAGE_COMMON) | \
-> +                                L_PTE_MT_WRITEBACK)
-> +#define FIXMAP_PAGE_NORMAL     __pgprot(__FIXMAP_MT_NORMAL)
-> +#define FIXMAP_PAGE_RO         __pgprot(__FIXMAP_MT_NORMAL | L_PTE_RDONLY)
-> 
->  /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
-> -#define FIXMAP_PAGE_IO         (FIXMAP_PAGE_COMMON |
-> L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
-> +#define FIXMAP_PAGE_IO         __pgprot(FIXMAP_PAGE_COMMON |
-> L_PTE_MT_DEV_SHARED | \
-> +                                        L_PTE_SHARED)
->  #define FIXMAP_PAGE_NOCACHE    FIXMAP_PAGE_IO
-> 
->  #define __early_set_fixmap     __set_fixmap
-> 
-> (and drop the change to mm/mmu.c), which boils down to the same for
-> fixmap but does not affect other users of pgprot_kernel. Also, it
-> appears these definitions are broken under STRICT_MM_TYPECHECKS so
-> this is a good opportunity to get that fixed as well.
-
-I like this method better because as you say it keeps things private to
-fixmap, and it doesn't risk affecting other things.
-
-As for getting STRICT_MM_TYPECHECKS working that looks good too, but
-should be a separate cleanup patch, especially as a fix for the cache
-problem possibly should go to stable kernels.
-
-I also think FIXMAP_PAGE_COMMON should be renamed (prefixed with '__')
-as it's an implementation detail an not a memory type used with fixmap.
-
-So I was thinking, one patch as a bugfix:
-
-----------------------------------------------------------------------
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 5c17d2dec777..4e6784dc5668 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -41,7 +41,8 @@ static const enum fixed_addresses __end_of_fixed_addresses =
- 
- #define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
- 
--#define FIXMAP_PAGE_NORMAL	(FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
-+#define FIXMAP_PAGE_NORMAL	(pgprot_kernel ? pgprot_kernel | L_PTE_XN : \
-+					FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
- #define FIXMAP_PAGE_RO		(FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
- 
- /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
-----------------------------------------------------------------------
-
-Second patch as a cleanup. Note this is different to Ard's version as
-it uses PAGE_KERNEL rather than open coding the same code from
-pgtable.h to add XN permisions (Also, the default generic definition of
-FIXMAP_PAGE_NORMAL is PAGE_KERNEL, and the only reason we want to change
-it is to select an alternate value if that is not yet setup)
-
-----------------------------------------------------------------------
-diff --git a/arch/arm/include/asm/fixmap.h b/arch/arm/include/asm/fixmap.h
-index 4e6784dc5668..ec689c6aa644 100644
---- a/arch/arm/include/asm/fixmap.h
-+++ b/arch/arm/include/asm/fixmap.h
-@@ -39,14 +39,15 @@ static const enum fixed_addresses __end_of_fixed_addresses =
- 	__end_of_fixmap_region > __end_of_early_ioremap_region ?
- 	__end_of_fixmap_region : __end_of_early_ioremap_region;
- 
--#define FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
-+#define __FIXMAP_PAGE_COMMON	(L_PTE_YOUNG | L_PTE_PRESENT | L_PTE_XN | L_PTE_DIRTY)
- 
--#define FIXMAP_PAGE_NORMAL	(pgprot_kernel ? pgprot_kernel | L_PTE_XN : \
--					FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK)
--#define FIXMAP_PAGE_RO		(FIXMAP_PAGE_NORMAL | L_PTE_RDONLY)
-+#define FIXMAP_PAGE_NORMAL	(pgprot_val(pgprot_kernel) ? PAGE_KERNEL : \
-+				 __pgprot(__FIXMAP_PAGE_COMMON | L_PTE_MT_WRITEBACK))
-+#define FIXMAP_PAGE_RO		_MOD_PROT(FIXMAP_PAGE_NORMAL, L_PTE_RDONLY)
- 
- /* Used by set_fixmap_(io|nocache), both meant for mapping a device */
--#define FIXMAP_PAGE_IO		(FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED | L_PTE_SHARED)
-+#define FIXMAP_PAGE_IO         __pgprot(__FIXMAP_PAGE_COMMON | L_PTE_MT_DEV_SHARED | \
-+                                        L_PTE_SHARED)
- #define FIXMAP_PAGE_NOCACHE	FIXMAP_PAGE_IO
- 
- #define __early_set_fixmap	__set_fixmap
-----------------------------------------------------------------------
