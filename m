@@ -1,212 +1,120 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 27 Feb 2017 19:54:22 +0000
-Subject: [RFC PATCH 11/30] arm64: mm: Pin down ASIDs for sharing contexts with
- devices
+Date: Mon, 27 Feb 2017 19:54:29 +0000
+Subject: [RFC PATCH 18/30] PCI: Make "PRG Response PASID Required" handling
+ common
 In-Reply-To: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
 References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
-Message-ID: <20170227195441.5170-12-jean-philippe.brucker@arm.com>
+Message-ID: <20170227195441.5170-19-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to enable address space sharing with the IOMMU, we introduce
-functions mm_context_get and mm_context_put, that pin down a context and
-ensure that its ASID won't be modified willy-nilly after a rollover.
+The PASID ECN to the PCIe spec added a bit in the PRI status register that
+allows a Function to declare whether a PRG Response should contain the
+PASID prefix or not.
 
-Pinning is necessary because, once a device is using an ASID, it needs a
-valid and unique one at all times, whether the associated task is running
-or not.
-
-Without pinning, we would need to notify the IOMMU when we're about to use
-a new ASID for a task. Things would get messy when a new task is assigned
-a shared ASID. Consider the following scenario:
-
-1. Task t1 is running on CPUx with shared ASID (1, 1)
-2. Task t2 is scheduled on CPUx, gets ASID (1, 2)
-3. Task tn is scheduled on CPUy, a rollover occurs, tn gets ASID (2, 1)
-   We would now have to immediately generate a new ASID for t1, notify
-   the IOMMU, and finally enable task tn. We are holding the lock during
-   all that time, since we can't afford having another CPU trigger a
-   rollover.
-
-It gets needlessly complicated, and all we wanted to do was schedule poor
-task tn, that has no business with the IOMMU. By letting the IOMMU pin
-tasks when needed, we avoid stalling the slow path, and let the pinning
-fail when we're out of potential ASIDs.
-
-After a rollover, we assume that there is at least one more ASID than
-number of CPUs. So we can use (NR_ASIDS - NR_CPUS - 1) as a hard limit for
-the number of ASIDs we can afford to share with the IOMMU.
-
-Since multiple IOMMUs could pin the same context, we need to keep track of
-the number of references. Add a refcount value in mm_context_t for this
-purpose.
+Move the helper that accesses it from amd_iommu into the PCI subsystem,
+renaming it to something more consistent with the spec, and introducing
+another obscure acronym to make it all fit.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- arch/arm64/include/asm/mmu.h         |  1 +
- arch/arm64/include/asm/mmu_context.h | 11 ++++-
- arch/arm64/mm/context.c              | 80 +++++++++++++++++++++++++++++++++++-
- 3 files changed, 90 insertions(+), 2 deletions(-)
+ drivers/iommu/amd_iommu.c     | 19 +------------------
+ drivers/pci/ats.c             | 17 +++++++++++++++++
+ include/linux/pci-ats.h       |  8 ++++++++
+ include/uapi/linux/pci_regs.h |  1 +
+ 4 files changed, 27 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 47619411f0ff..e18a6dfcf745 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -18,6 +18,7 @@
+diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
+index 98940d1392cb..c5c598bf4ba3 100644
+--- a/drivers/iommu/amd_iommu.c
++++ b/drivers/iommu/amd_iommu.c
+@@ -2024,23 +2024,6 @@ static int pdev_iommuv2_enable(struct pci_dev *pdev)
+ 	return ret;
+ }
  
- typedef struct {
- 	atomic64_t	id;
-+	unsigned long	refcount;
- 	void		*vdso;
- 	unsigned long	flags;
- } mm_context_t;
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 1ef40d82cfd3..ce4216e09e13 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -152,7 +152,13 @@ static inline void cpu_replace_ttbr1(pgd_t *pgd)
- #define destroy_context(mm)		do { } while(0)
- void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
- 
--#define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
-+static inline int
-+init_new_context(struct task_struct *tsk, struct mm_struct *mm)
-+{
-+	atomic64_set(&mm->context.id, 0);
-+	mm->context.refcount = 0;
-+	return 0;
-+}
- 
+-/* FIXME: Move this to PCI code */
+-#define PCI_PRI_TLP_OFF		(1 << 15)
+-
+-static bool pci_pri_tlp_required(struct pci_dev *pdev)
+-{
+-	u16 status;
+-	int pos;
+-
+-	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PRI);
+-	if (!pos)
+-		return false;
+-
+-	pci_read_config_word(pdev, pos + PCI_PRI_STATUS, &status);
+-
+-	return (status & PCI_PRI_TLP_OFF) ? true : false;
+-}
+-
  /*
-  * This is called when "tsk" is about to enter lazy TLB mode.
-@@ -224,6 +230,9 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+  * If a device is not yet associated with a domain, this function
+  * assigns it visible for the hardware
+@@ -2069,7 +2052,7 @@ static int attach_device(struct device *dev,
  
- void verify_cpu_asid_bits(void);
- 
-+unsigned long mm_context_get(struct mm_struct *mm);
-+void mm_context_put(struct mm_struct *mm);
-+
- #endif /* !__ASSEMBLY__ */
- 
- #endif /* !__ASM_MMU_CONTEXT_H */
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index 68634c630cdd..b8ddd46bedb6 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -37,6 +37,10 @@ static DEFINE_PER_CPU(atomic64_t, active_asids);
- static DEFINE_PER_CPU(u64, reserved_asids);
- static cpumask_t tlb_flush_pending;
- 
-+static unsigned long max_pinned_asids;
-+static unsigned long nr_pinned_asids;
-+static unsigned long *pinned_asid_map;
-+
- #define ASID_MASK		(~GENMASK(asid_bits - 1, 0))
- #define ASID_FIRST_VERSION	(1UL << asid_bits)
- #define NUM_USER_ASIDS		ASID_FIRST_VERSION
-@@ -92,7 +96,7 @@ static void flush_context(unsigned int cpu)
- 	u64 asid;
- 
- 	/* Update the list of reserved ASIDs and the ASID bitmap. */
--	bitmap_clear(asid_map, 0, NUM_USER_ASIDS);
-+	bitmap_copy(asid_map, pinned_asid_map, NUM_USER_ASIDS);
- 
- 	set_reserved_asid_bits();
- 
-@@ -157,6 +161,10 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
- 	if (asid != 0) {
- 		u64 newasid = generation | (asid & ~ASID_MASK);
- 
-+		/* That ASID is pinned for us, we're good to go. */
-+		if (mm->context.refcount)
-+			return newasid;
-+
- 		/*
- 		 * If our current ASID was active during a rollover, we
- 		 * can continue to use it and this was just a false alarm.
-@@ -238,6 +246,63 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
- 		cpu_switch_mm(mm->pgd, mm);
+ 			dev_data->ats.enabled = true;
+ 			dev_data->ats.qdep    = pci_ats_queue_depth(pdev);
+-			dev_data->pri_tlp     = pci_pri_tlp_required(pdev);
++			dev_data->pri_tlp     = pci_prg_resp_requires_prefix(pdev);
+ 		}
+ 	} else if (amd_iommu_iotlb_sup &&
+ 		   pci_enable_ats(pdev, PAGE_SHIFT) == 0) {
+diff --git a/drivers/pci/ats.c b/drivers/pci/ats.c
+index eeb9fb2b47aa..331376e9bb8b 100644
+--- a/drivers/pci/ats.c
++++ b/drivers/pci/ats.c
+@@ -334,3 +334,20 @@ int pci_max_pasids(struct pci_dev *pdev)
  }
- 
-+unsigned long mm_context_get(struct mm_struct *mm)
+ EXPORT_SYMBOL_GPL(pci_max_pasids);
+ #endif /* CONFIG_PCI_PASID */
++
++#if defined(CONFIG_PCI_PASID) && defined(CONFIG_PCI_PRI)
++bool pci_prg_resp_requires_prefix(struct pci_dev *pdev)
 +{
-+	unsigned long flags;
-+	u64 asid;
++	u16 status;
++	int pos;
 +
-+	raw_spin_lock_irqsave(&cpu_asid_lock, flags);
++	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PRI);
++	if (!pos)
++		return false;
 +
-+	asid = atomic64_read(&mm->context.id);
++	pci_read_config_word(pdev, pos + PCI_PRI_STATUS, &status);
 +
-+	if (mm->context.refcount) {
-+		mm->context.refcount++;
-+		asid &= ~ASID_MASK;
-+		goto out_unlock;
-+	}
-+
-+	if (nr_pinned_asids >= max_pinned_asids) {
-+		asid = 0;
-+		goto out_unlock;
-+	}
-+
-+	if (((asid ^ atomic64_read(&asid_generation)) >> asid_bits)) {
-+		/*
-+		 * We went through one or more rollover since that ASID was
-+		 * used. Ensure that it is still valid, or generate a new one.
-+		 * The cpu argument isn't used by new_context.
-+		 */
-+		asid = new_context(mm, 0);
-+		atomic64_set(&mm->context.id, asid);
-+	}
-+
-+	asid &= ~ASID_MASK;
-+
-+	nr_pinned_asids++;
-+	__set_bit(asid, pinned_asid_map);
-+	mm->context.refcount++;
-+
-+out_unlock:
-+	raw_spin_unlock_irqrestore(&cpu_asid_lock, flags);
-+
-+	return asid;
++	return !!(status & PCI_PRI_STATUS_PRPR);
 +}
-+
-+void mm_context_put(struct mm_struct *mm)
++EXPORT_SYMBOL_GPL(pci_prg_resp_requires_prefix);
++#endif /* CONFIG_PCI_PASID && CONFIG_PCI_PRI */
+diff --git a/include/linux/pci-ats.h b/include/linux/pci-ats.h
+index 57e0b8250947..e21bcacbe80c 100644
+--- a/include/linux/pci-ats.h
++++ b/include/linux/pci-ats.h
+@@ -57,5 +57,13 @@ static inline int pci_max_pasids(struct pci_dev *pdev)
+ 
+ #endif /* CONFIG_PCI_PASID */
+ 
++#if defined(CONFIG_PCI_PASID) && defined(CONFIG_PCI_PRI)
++bool pci_prg_resp_requires_prefix(struct pci_dev *pdev);
++#else
++static inline bool pci_prg_resp_requires_prefix(struct pci_dev *pdev)
 +{
-+	unsigned long flags;
-+	u64 asid = atomic64_read(&mm->context.id) & ~ASID_MASK;
-+
-+	raw_spin_lock_irqsave(&cpu_asid_lock, flags);
-+
-+	if (--mm->context.refcount == 0) {
-+		__clear_bit(asid, pinned_asid_map);
-+		nr_pinned_asids--;
-+	}
-+
-+	raw_spin_unlock_irqrestore(&cpu_asid_lock, flags);
++	return false;
 +}
-+
- static int asids_init(void)
- {
- 	asid_bits = get_cpu_asid_bits();
-@@ -255,6 +320,19 @@ static int asids_init(void)
++#endif /* CONFIG_PCI_PASID && CONFIG_PCI_PRI */
  
- 	set_reserved_asid_bits();
- 
-+	pinned_asid_map = kzalloc(BITS_TO_LONGS(NUM_USER_ASIDS)
-+				  * sizeof(*pinned_asid_map), GFP_KERNEL);
-+	if (!pinned_asid_map)
-+		panic("Failed to allocate pinned bitmap\n");
-+
-+	/*
-+	 * We assume that an ASID is always available after a rollback. This
-+	 * means that even if all CPUs have a reserved ASID, there still is at
-+	 * least one slot available in the asid_bitmap.
-+	 */
-+	max_pinned_asids = NUM_USER_ASIDS - num_possible_cpus() - 2;
-+	nr_pinned_asids = 0;
-+
- 	pr_info("ASID allocator initialised with %lu entries\n", NUM_USER_ASIDS);
- 	return 0;
- }
+ #endif /* LINUX_PCI_ATS_H*/
+diff --git a/include/uapi/linux/pci_regs.h b/include/uapi/linux/pci_regs.h
+index 634c9c44ed6c..bae815876be6 100644
+--- a/include/uapi/linux/pci_regs.h
++++ b/include/uapi/linux/pci_regs.h
+@@ -864,6 +864,7 @@
+ #define  PCI_PRI_STATUS_RF	0x001	/* Response Failure */
+ #define  PCI_PRI_STATUS_UPRGI	0x002	/* Unexpected PRG index */
+ #define  PCI_PRI_STATUS_STOPPED	0x100	/* PRI Stopped */
++#define  PCI_PRI_STATUS_PRPR	0x8000	/* PRG Response requires PASID prefix */
+ #define PCI_PRI_MAX_REQ		0x08	/* PRI max reqs supported */
+ #define PCI_PRI_ALLOC_REQ	0x0c	/* PRI max reqs allowed */
+ #define PCI_EXT_CAP_PRI_SIZEOF	16
 -- 
 2.11.0
