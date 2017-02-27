@@ -1,49 +1,72 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 27 Feb 2017 19:20:48 +0100
-Subject: [PATCH v2 1/6] arm64: dts: Add symlinks for cros-ec-keyboard and
- cros-ec-sbs
-In-Reply-To: <CAOesGMiim2WFfEAg-bJmWTwWn69=V_GuEg6AxsxPYMyzd3KFUw@mail.gmail.com>
-References: <20170210010521.78872-1-briannorris@chromium.org>
- <20170210010521.78872-2-briannorris@chromium.org>
- <CAOesGMiim2WFfEAg-bJmWTwWn69=V_GuEg6AxsxPYMyzd3KFUw@mail.gmail.com>
-Message-ID: <1529949.5djtX72aeJ@phil>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 27 Feb 2017 12:35:34 -0600
+Subject: Using the generic host PCIe driver
+In-Reply-To: <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
+References: <8d4e5d8a-7683-0180-324c-0ffd1a9a641a@free.fr>
+ <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
+ <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
+Message-ID: <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-Am Dienstag, 21. Februar 2017, 15:47:31 CET schrieb Olof Johansson:
-> On Thu, Feb 9, 2017 at 5:05 PM, Brian Norris <briannorris@chromium.org> wrote:
-> > From: Douglas Anderson <dianders@chromium.org>
+On Mon, Feb 27, 2017 at 06:02:36PM +0100, Mason wrote:
+> On 27/02/2017 17:44, Bjorn Helgaas wrote:
+> 
+> > On Mon, Feb 27, 2017 at 05:14:15PM +0100, Mason wrote:
+> >
+> >> Bug #2
+> >>
+> >> Bus 0 cannot be enumerated, because it reports garbage data for
+> >> devices and functions other than 0, i.e. only 0/0/0 works.
+> >>
+> >> How do I work around that issue?
 > > 
-> > We'd like to be able to use the cros-ec-keyboard.dtsi and
-> > cros-ec-sbs.dtsi snippets for arm64 devices.  Currently those files live
-> > in the arm/boot/dts directory.
-> > 
-> > Let's follow the convention set by commit 8ee57b8182c4 ("ARM64: dts:
-> > vexpress: Use a symlink to vexpress-v2m-rs1.dtsi from arch=arm") and use
-> > a symlink.  Note that in this case we put the files in a new
-> > "include/common" directory since these snippets may need to be
-> > referenced by dts files in many different subdirectories.
+> > There are several drivers that provide their own "ECAM-like" config
+> > accessors.  Look at "struct pci_ecam_ops" structures, e.g.,
+> > hisi_pcie_ops, pci_thunder_ecam_ops, xgene_v1_pcie_ecam_ops, etc.
 > 
-> I'd rather have something like this:
+> If I understand correctly, I do need to write my own driver then,
+> if I need specific quirks to work around some issues?
 > 
-> https://marc.info/?m=147547436324674&w=2
+> I'm slightly confused because you originally said "The native drivers
+> in drivers/pci/host are a huge maintenance hassle for no real benefit."
 > 
-> Instead of having everybody move things over. I.e. make it easy to
-> refer to the arm version from arm64 instead of creating a "common"
-> layer inbetween.
+> But I do need to write one, correct?
 
-just so it gets noticed, I've done and tested [0], which hopefully should
-implement your suggestions above.
+When I said the native drivers provide no real benefit, I meant that
+they do not provide any value-add functionality beyond what a generic
+driver like drivers/acpi/pci_root.c already does.
 
-If that looks ok, how do you want that picked up? Should I just include
-them in my regular rockchip branches or do you to pick them into some
-immutable branch, if other surprise-users turn up in time for 4.12?
+Obviously there are many different host bridges and they have
+different programming models, so there has to be bridge-specific
+support *somewhere*.  The question is whether that's in firmware, in
+Linux, or both.  For ACPI systems, it's all in firmware.
 
+Systems with well-behaved hardware, i.e., it supports PCIe and ECAM
+without warts, firmware can initialize the bridge and tell the OS
+about it via DT, and the drivers/pci/pci-host-generic.c driver can do
+everything else.
 
-Thanks
-Heiko
+For systems that aren't so well-behaved, we'll need either a full
+native driver that knows how to program bridge window CSRs, set up
+interrupts, etc., or a simpler native driver that papers over warts
+like ECAM that doesn't work quite according to spec.
 
+It sounds like your system falls into the latter category.
 
-[0] http://lists.infradead.org/pipermail/linux-rockchip/2017-February/014226.html
+> > You can also work around Bug #1 in a custom accessor instead of a
+> > quirk.
+> 
+> By checking for the device ID and vendor ID, and returning the
+> expected class code, instead of the contents of the reg?
+> 
+> Do you consider this a better solution?
+
+It's not a big deal either way.  Doing it in the accessor has the
+advantage that you have to have the accessor anyway.  Doing it in a
+quirk means you need to figure out where to put the quirk.  It isn't
+really generic (so drivers/pci/quirks.c seems overly generic), it
+isn't really arch-specific (so arch/* seems maybe *too* specific),
+it's really just bridge-specific.
+
+Bjorn
