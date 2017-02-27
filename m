@@ -1,108 +1,131 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 27 Feb 2017 19:54:28 +0000
-Subject: [RFC PATCH 17/30] iommu/arm-smmu-v3: Add SVM feature checking
+Date: Mon, 27 Feb 2017 19:54:31 +0000
+Subject: [RFC PATCH 20/30] iommu/arm-smmu-v3: Enable PCI PASID in masters
 In-Reply-To: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
 References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
-Message-ID: <20170227195441.5170-18-jean-philippe.brucker@arm.com>
+Message-ID: <20170227195441.5170-21-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Aggregate all sanity-checks for SVM under a single ARM_SMMU_FEAT_SVM bit.
-For PCIe SVM, users also need to check FEAT_ATS and FEAT_PRI. For platform
-SVM, they will most likely have to check ARM_SMMU_FEAT_STALLS.
+Enable PASID for PCI devices that support it.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 63 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+ drivers/iommu/arm-smmu-v3.c | 66 ++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 63 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 86d5430bd68d..499dc1cd07eb 100644
+index 499dc1cd07eb..37fd061405e9 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -674,6 +674,7 @@ struct arm_smmu_device {
- #define ARM_SMMU_FEAT_HYP		(1 << 12)
- #define ARM_SMMU_FEAT_E2H		(1 << 13)
- #define ARM_SMMU_FEAT_BTM		(1 << 14)
-+#define ARM_SMMU_FEAT_SVM		(1 << 15)
- 	u32				features;
+@@ -730,6 +730,8 @@ struct arm_smmu_master_data {
  
- #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-@@ -3744,6 +3745,65 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
- 	return 0;
+ 	struct arm_smmu_stream		*streams;
+ 	struct rb_root			contexts;
++
++	u32				avail_contexts;
+ };
+ 
+ /* SMMU private data for an IOMMU domain */
+@@ -2954,6 +2956,47 @@ static void arm_smmu_disable_ats(struct arm_smmu_master_data *master)
+ 	pci_disable_ats(pdev);
  }
  
-+static bool arm_smmu_supports_svm(struct arm_smmu_device *smmu)
++static int arm_smmu_enable_ssid(struct arm_smmu_master_data *master)
 +{
-+	unsigned long reg, fld;
-+	unsigned long oas;
-+	unsigned long asid_bits;
++	int ret;
++	int features;
++	int nr_ssids;
++	struct pci_dev *pdev;
 +
-+	u32 feat_mask = ARM_SMMU_FEAT_BTM | ARM_SMMU_FEAT_COHERENCY;
++	if (!dev_is_pci(master->dev))
++		return -ENOSYS;
 +
-+	if ((smmu->features & feat_mask) != feat_mask)
-+		return false;
++	pdev = to_pci_dev(master->dev);
 +
-+	if (!smmu->ssid_bits)
-+		return false;
++	features = pci_pasid_features(pdev);
++	if (features < 0)
++		return -ENOSYS;
 +
-+	if (!(smmu->pgsize_bitmap & PAGE_SIZE))
-+		return false;
++	nr_ssids = pci_max_pasids(pdev);
 +
-+	/*
-+	 * Get the smallest PA size of all CPUs (sanitized by cpufeature). We're
-+	 * not even pretending to support AArch32 here.
-+	 */
-+	reg = read_system_reg(SYS_ID_AA64MMFR0_EL1);
-+	fld = cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR0_PARANGE_SHIFT);
-+	switch (fld) {
-+	case 0x0:
-+		oas = 32;
-+		break;
-+	case 0x1:
-+		oas = 36;
-+		break;
-+	case 0x2:
-+		oas = 40;
-+		break;
-+	case 0x3:
-+		oas = 42;
-+		break;
-+	case 0x4:
-+		oas = 44;
-+		break;
-+	case 0x5:
-+		oas = 48;
-+		break;
-+	default:
-+		return false;
-+	}
++	dev_dbg(&pdev->dev, "device supports %#x SSIDs [%s%s]\n", nr_ssids,
++		(features & PCI_PASID_CAP_EXEC) ? "x" : "",
++		(features & PCI_PASID_CAP_PRIV) ? "p" : "");
 +
-+	/* abort if MMU outputs addresses greater than what we support. */
-+	if (smmu->oas < oas)
-+		return false;
-+
-+	/* We can support bigger ASIDs than the CPU, but not smaller */
-+	fld = cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR0_ASID_SHIFT);
-+	asid_bits = fld ? 16 : 8;
-+	if (smmu->asid_bits < asid_bits)
-+		return false;
-+
-+	return true;
++	ret = pci_enable_pasid(pdev, features);
++	return ret ? ret : nr_ssids;
 +}
 +
- static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- {
- 	u32 reg;
-@@ -3937,6 +3997,9 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 
- 	smmu->ias = max(smmu->ias, smmu->oas);
- 
-+	if (arm_smmu_supports_svm(smmu))
-+		smmu->features |= ARM_SMMU_FEAT_SVM;
++static void arm_smmu_disable_ssid(struct arm_smmu_master_data *master)
++{
++	struct pci_dev *pdev;
 +
- 	dev_info(smmu->dev, "ias %lu-bit, oas %lu-bit (features 0x%08x)\n",
- 		 smmu->ias, smmu->oas, smmu->features);
- 	return 0;
++	if (!dev_is_pci(master->dev))
++		return;
++
++	pdev = to_pci_dev(master->dev);
++
++	if (!pdev->pasid_enabled)
++		return;
++
++	pci_disable_pasid(pdev);
++}
++
+ static int arm_smmu_insert_master(struct arm_smmu_device *smmu,
+ 				  struct arm_smmu_master_data *master)
+ {
+@@ -3007,6 +3050,7 @@ static struct iommu_ops arm_smmu_ops;
+ static int arm_smmu_add_device(struct device *dev)
+ {
+ 	int i, ret;
++	int nr_ssids;
+ 	bool ats_enabled;
+ 	unsigned long flags;
+ 	struct arm_smmu_device *smmu;
+@@ -3055,9 +3099,19 @@ static int arm_smmu_add_device(struct device *dev)
+ 		}
+ 	}
+ 
+-	ret = arm_smmu_alloc_cd_tables(master, 1);
+-	if (ret < 0)
+-		return ret;
++	/* PCIe PASID must be enabled before ATS */
++	nr_ssids = arm_smmu_enable_ssid(master);
++	if (nr_ssids <= 0)
++		nr_ssids = 1;
++
++	nr_ssids = arm_smmu_alloc_cd_tables(master, nr_ssids);
++	if (nr_ssids < 0) {
++		ret = nr_ssids;
++		goto err_disable_ssid;
++	}
++
++	/* SSID0 is reserved */
++	master->avail_contexts = nr_ssids - 1;
+ 
+ 	ats_enabled = !arm_smmu_enable_ats(master);
+ 
+@@ -3088,6 +3142,9 @@ static int arm_smmu_add_device(struct device *dev)
+ 
+ 	arm_smmu_free_cd_tables(master);
+ 
++err_disable_ssid:
++	arm_smmu_disable_ssid(master);
++
+ 	return ret;
+ }
+ 
+@@ -3129,7 +3186,10 @@ static void arm_smmu_remove_device(struct device *dev)
+ 
+ 		iommu_group_put(group);
+ 
++		/* PCIe PASID must be disabled after ATS */
+ 		arm_smmu_disable_ats(master);
++		arm_smmu_disable_ssid(master);
++
+ 		arm_smmu_free_cd_tables(master);
+ 	}
+ 
 -- 
 2.11.0
