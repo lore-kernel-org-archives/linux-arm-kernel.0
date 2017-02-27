@@ -1,61 +1,66 @@
-From: tanxiaojun@huawei.com (Tan Xiaojun)
-Date: Mon, 27 Feb 2017 08:36:30 +0800
-Subject: [tip:perf/urgent] perf/core: Fix the perf_cpu_time_max_percent
- check
-In-Reply-To: <20170225095117.GU6500@twins.programming.kicks-ass.net>
-References: <1487829879-56237-1-git-send-email-tanxiaojun@huawei.com>
- <tip-1572e45a924f254d9570093abde46430c3172e3d@git.kernel.org>
- <58B13BFD.2050304@huawei.com>
- <20170225095117.GU6500@twins.programming.kicks-ass.net>
-Message-ID: <58B3748E.7080901@huawei.com>
+From: xuejiancheng@hisilicon.com (Jiancheng Xue)
+Date: Mon, 27 Feb 2017 09:24:34 +0800
+Subject: [PATCH v2 1/2] dt-bindings: arm: hisilicon: add bindings for
+ hi3798cv200 SoC and Poplar board
+In-Reply-To: <ef8cca92-7f1f-40bd-4023-2e64dcf69a68@suse.de>
+References: <1487752716-14824-1-git-send-email-xuejiancheng@hisilicon.com>
+ <1487752716-14824-2-git-send-email-xuejiancheng@hisilicon.com>
+ <ef8cca92-7f1f-40bd-4023-2e64dcf69a68@suse.de>
+Message-ID: <798bfd0e-bd8d-a75d-e841-53d82b513f94@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/2/25 17:51, Peter Zijlstra wrote:
-> On Sat, Feb 25, 2017 at 04:10:37PM +0800, Tan Xiaojun wrote:
-> 
->> Recently I was using perf_fuzzer for testing in Hisilicon
->> D03/D05(arm64, linux-4.10-rc1).
->>
->> As we know perf_fuzzer will write a random value to procfs interface
->> of perf event(like sysctl_perf_cpu_time_max_percent). The value may be
->> 0 or 100, and I get logs like below:
->>
->> ----------------------------------
->> [ 4046.358811] perf: Dynamic interrupt throttling disabled, can hang your system!
->> ----------------------------------
->>
->> Most of the time, there is no problem, and the perf_fuzzer test can
->> end without any warings or errors.  But there is a small probability
->> that triggers the RCU and watchdog (The log is attached at the end).
->> It hungs after local_irq_enable() in __do_softirq.
->>
->> I think this is due to the dynamic interrupt throttling disabled and
->> too many hardware interruptions come. So I limit the
->> sysctl_perf_cpu_time_max_percent can only be set 1 to 99 in the kernel
->> codes. I test more than 20 times in D03, and there are no errors or
->> warnings in the test.
->>
->> So I want to ask:
->>
->> 1)Is it a problem or not? (It has already given you a warning.)
->>
->> 2)If it is, where we will fix it more appropriate, perf_fuzzer(not set
->> 0 or 100) or kernel(limit 1 to 99), or maybe it is the bug of
->> hardware(too many hardware interruptions)?
-> 
-> I think the best would be if the fuzzer would not set 0,100, those are
-> clearly 'unsafe' settings and you pretty much get to keep the pieces.
-> 
-> I would like to preserve these settings for people that 'know' what
-> they're doing and are willing to take the risk, but clearly, when you
-> take the guard-rails off, things can come apart.
-> 
+Hi Andreas,
 
-OK. It makes sense, I agree.
+On 2017/2/26 9:32, Andreas F?rber wrote:
+> Am 22.02.2017 um 09:38 schrieb Jiancheng Xue:
+>> Add bindings for HiSilicon hi3798cv200 SoC and Poplar Board.
+>>
+>> Signed-off-by: Jiancheng Xue <xuejiancheng@hisilicon.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>> index f1c1e21..1fd3dd7 100644
+>> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>> @@ -4,6 +4,10 @@ Hi3660 SoC
+>>  Required root node properties:
+>>  	- compatible = "hisilicon,hi3660";
+>>  
+>> +Hi3798cv200 Poplar Board
+>> +Required root node properties:
+>> +	- compatible = "hisilicon,hi3798cv200-poplar", "hisilicon,hi3798cv200";
+> 
+> Please remember to CC previous reviewers.
+> 
+Sorry for that.
 
-Thank you for your answer.
-Xiaojun.
+> This still looks wrong: Why is this not "hisilicon,poplar" if you choose
+> against "tocoding,poplar"? 
 
-> .
+I didn't think it was very important thing whether the compatbile string contained
+a preceding SoC name or not. I just referred to the hikey board and some other
+HiSilicon boards. I wanted to keep using the same rule with them.
+
+> Is there a second Poplar board with a different SoC? 
+
+I can't tell about this now.
+
+> Even then it would be redundant with the second
+> compatible string.
+> 
+The second compatilbe string can be removed here. Thanks.
+
+Regards,
+Jiancheng
+
+> Regards,
+> Andreas
+> 
+>> +
+>>  Hi4511 Board
+>>  Required root node properties:
+>>  	- compatible = "hisilicon,hi3620-hi4511";
 > 
