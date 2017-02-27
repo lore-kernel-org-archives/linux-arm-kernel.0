@@ -1,49 +1,82 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 27 Feb 2017 15:40:57 +0100
-Subject: [PATCH 8/8] ARM: sun8i: a33: Add the Mali OPPs
-In-Reply-To: <20170215234029.3vfh25gxtvz44dsw@rob-hp-laptop>
-References: <cover.7101c7323e6f22e281ad70b93488cf44caca4ca0.1486655917.git-series.maxime.ripard@free-electrons.com>
- <2e4a4f3f2f584f65f3c2d5e78f589015c651198d.1486655917.git-series.maxime.ripard@free-electrons.com>
- <20170215234029.3vfh25gxtvz44dsw@rob-hp-laptop>
-Message-ID: <20170227144057.in7uclundvd77s5q@lukather>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 27 Feb 2017 08:45:39 -0600
+Subject: [PATCH v4 24/36] [media] add Omnivision OV5640 sensor driver
+In-Reply-To: <1487211578-11360-25-git-send-email-steve_longerbeam@mentor.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-25-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <20170227144539.3la2veztkurhwa2p@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 05:40:29PM -0600, Rob Herring wrote:
-> On Thu, Feb 09, 2017 at 05:39:22PM +0100, Maxime Ripard wrote:
-> > The Mali GPU in the A33 has various operating frequencies used in the
-> > Allwinner BSP.
-> > 
-> > Add them to our DT.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/sun8i-a33.dtsi | 17 +++++++++++++++++
-> >  1 file changed, 17 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-> > index 043b1b017276..e1b0abfee42f 100644
-> > --- a/arch/arm/boot/dts/sun8i-a33.dtsi
-> > +++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-> > @@ -101,6 +101,22 @@
-> >  		status = "disabled";
-> >  	};
-> >  
-> > +	mali_opp_table: opp_table1 {
+On Wed, Feb 15, 2017 at 06:19:26PM -0800, Steve Longerbeam wrote:
+> This driver is based on ov5640_mipi.c from Freescale imx_3.10.17_1.0.0_beta
+> branch, modified heavily to bring forward to latest interfaces and code
+> cleanup.
 > 
-> gpu-opp-table
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> ---
+>  .../devicetree/bindings/media/i2c/ov5640.txt       |   43 +
 
-Applied with that change. Thanks!
-Maxime
+Please split to separate commit.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170227/fbd5b1a5/attachment.sig>
+>  drivers/media/i2c/Kconfig                          |    7 +
+>  drivers/media/i2c/Makefile                         |    1 +
+>  drivers/media/i2c/ov5640.c                         | 2109 ++++++++++++++++++++
+>  4 files changed, 2160 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/i2c/ov5640.txt
+>  create mode 100644 drivers/media/i2c/ov5640.c
+> 
+> diff --git a/Documentation/devicetree/bindings/media/i2c/ov5640.txt b/Documentation/devicetree/bindings/media/i2c/ov5640.txt
+> new file mode 100644
+> index 0000000..4607bbe
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/i2c/ov5640.txt
+> @@ -0,0 +1,43 @@
+> +* Omnivision OV5640 MIPI CSI-2 sensor
+> +
+> +Required Properties:
+> +- compatible: should be "ovti,ov5640"
+> +- clocks: reference to the xclk input clock.
+> +- clock-names: should be "xclk".
+> +- DOVDD-supply: Digital I/O voltage supply, 1.8 volts
+> +- AVDD-supply: Analog voltage supply, 2.8 volts
+> +- DVDD-supply: Digital core voltage supply, 1.5 volts
+> +
+> +Optional Properties:
+> +- reset-gpios: reference to the GPIO connected to the reset pin, if any.
+> +- pwdn-gpios: reference to the GPIO connected to the pwdn pin, if any.
+
+Use powerdown-gpios here as that is a somewhat standard name.
+
+Both need to state what is the active state.
+
+> +
+> +The device node must contain one 'port' child node for its digital output
+> +video port, in accordance with the video interface bindings defined in
+> +Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +
+> +Example:
+> +
+> +&i2c1 {
+> +	ov5640: camera at 3c {
+> +		compatible = "ovti,ov5640";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_ov5640>;
+> +		reg = <0x3c>;
+> +		clocks = <&clks IMX6QDL_CLK_CKO>;
+> +		clock-names = "xclk";
+> +		DOVDD-supply = <&vgen4_reg>; /* 1.8v */
+> +		AVDD-supply = <&vgen3_reg>;  /* 2.8v */
+> +		DVDD-supply = <&vgen2_reg>;  /* 1.5v */
+> +		pwdn-gpios = <&gpio1 19 GPIO_ACTIVE_HIGH>;
+> +		reset-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
+> +
+> +		port {
+> +			ov5640_to_mipi_csi2: endpoint {
+> +				remote-endpoint = <&mipi_csi2_from_ov5640>;
+> +				clock-lanes = <0>;
+> +				data-lanes = <1 2>;
+> +			};
+> +		};
+> +	};
+> +};
