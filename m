@@ -1,96 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Feb 2017 21:42:16 +0100
-Subject: [PATCH] staging: fsl-mc: fix warning in DT ranges parser
-Message-ID: <20170227204235.3547639-1-arnd@arndb.de>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Mon, 27 Feb 2017 12:47:04 -0800
+Subject: [Outreachy kernel] [PATCH] staging: bcm2835-audio: Fixed
+ spacing around '&'
+In-Reply-To: <954e0bc5-cd3c-c06f-dbfa-bed486b823c6@broadcom.com>
+References: <1488131271-2908-1-git-send-email-narcisaanamaria12@gmail.com>
+ <alpine.DEB.2.20.1702261901180.2056@hadrien>
+ <1488134072.9188.3.camel@perches.com>
+ <alpine.DEB.2.20.1702261956070.2056@hadrien>
+ <1488137824.9188.7.camel@perches.com>
+ <alpine.DEB.2.20.1702262038560.2056@hadrien>
+ <1488146211.9188.10.camel@perches.com>
+ <3ed05e4f-b00a-8a4b-f4f2-de23ff9b461e@broadcom.com>
+ <alpine.DEB.2.20.1702270724430.2187@hadrien>
+ <954e0bc5-cd3c-c06f-dbfa-bed486b823c6@broadcom.com>
+Message-ID: <1488228424.5276.1.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fsl-mc-bus driver in staging contains a copy of the standard
-'ranges' property parsing algorithm with a hack to treat a missing
-property the same way as an empty one. This code produces false-positive
-warnings for me in an allmodconfig build:
+On Mon, 2017-02-27 at 12:35 -0800, Scott Branden wrote:
+> > 
+> Hi Julia,
+> 
+> On 17-02-26 10:25 PM, Julia Lawall wrote:
+> > 
+> > If you consider that you are getting too much outreachy mail at the
+> > moment, just let me know what subsystem you want me to add an
+> > exception
+> > for.
+> 
+> The emails seem to mostly be coming with bcm2835-audio.
+> > 
+> > thanks,
+> > julia
+> 
+> Thanks,
+> ? Scott
 
-drivers/staging/fsl-mc/bus/fsl-mc-bus.c: In function 'fsl_mc_bus_probe':
-drivers/staging/fsl-mc/bus/fsl-mc-bus.c:645:6: error: 'mc_size_cells' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-drivers/staging/fsl-mc/bus/fsl-mc-bus.c:682:8: error: 'mc_addr_cells' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-drivers/staging/fsl-mc/bus/fsl-mc-bus.c:644:6: note: 'mc_addr_cells' was declared here
-drivers/staging/fsl-mc/bus/fsl-mc-bus.c:684:8: error: 'paddr_cells' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-drivers/staging/fsl-mc/bus/fsl-mc-bus.c:643:6: note: 'paddr_cells' was declared here
+I submitted the driver to stagging, so I feel a bit responsible for
+this.  
 
-To avoid the warnings, I'm simplifying the argument handling to pass
-the number of valid ranges in the property as the function return code
-rather than passing it by reference. With this change, gcc can see that
-we don't evaluate the cell numbers for an missing ranges property.
+I personally don't mind e-mails like this since people have to get
+started somehow, and e-mail is rather easy to ignore or delete...
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/staging/fsl-mc/bus/fsl-mc-bus.c | 22 +++++++++-------------
- 1 file changed, 9 insertions(+), 13 deletions(-)
-
-diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-index 47acb0a29842..3be5f25ff113 100644
---- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-+++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-@@ -588,8 +588,7 @@ static int parse_mc_ranges(struct device *dev,
- 			   int *paddr_cells,
- 			   int *mc_addr_cells,
- 			   int *mc_size_cells,
--			   const __be32 **ranges_start,
--			   u8 *num_ranges)
-+			   const __be32 **ranges_start)
- {
- 	const __be32 *prop;
- 	int range_tuple_cell_count;
-@@ -602,8 +601,6 @@ static int parse_mc_ranges(struct device *dev,
- 		dev_warn(dev,
- 			 "missing or empty ranges property for device tree node '%s'\n",
- 			 mc_node->name);
--
--		*num_ranges = 0;
- 		return 0;
- 	}
- 
-@@ -630,8 +627,7 @@ static int parse_mc_ranges(struct device *dev,
- 		return -EINVAL;
- 	}
- 
--	*num_ranges = ranges_len / tuple_len;
--	return 0;
-+	return ranges_len / tuple_len;
- }
- 
- static int get_mc_addr_translation_ranges(struct device *dev,
-@@ -639,7 +635,7 @@ static int get_mc_addr_translation_ranges(struct device *dev,
- 						**ranges,
- 					  u8 *num_ranges)
- {
--	int error;
-+	int ret;
- 	int paddr_cells;
- 	int mc_addr_cells;
- 	int mc_size_cells;
-@@ -647,16 +643,16 @@ static int get_mc_addr_translation_ranges(struct device *dev,
- 	const __be32 *ranges_start;
- 	const __be32 *cell;
- 
--	error = parse_mc_ranges(dev,
-+	ret = parse_mc_ranges(dev,
- 				&paddr_cells,
- 				&mc_addr_cells,
- 				&mc_size_cells,
--				&ranges_start,
--				num_ranges);
--	if (error < 0)
--		return error;
-+				&ranges_start);
-+	if (ret < 0)
-+		return ret;
- 
--	if (!(*num_ranges)) {
-+	*num_ranges = ret;
-+	if (!ret) {
- 		/*
- 		 * Missing or empty ranges property ("ranges;") for the
- 		 * 'fsl,qoriq-mc' node. In this case, identity mapping
--- 
-2.9.0
+Perhaps it would make sense to either update the maintainer list for
+this driver or move the driver somewhere else in staging?  I was
+looking at the maintainer list for bcm2835, and it already marks
+vc04_services as part of the bcm2835 files.  Perhaps another mark
+should be added or the driver moved under vc04_services?
