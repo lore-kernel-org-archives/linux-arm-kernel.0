@@ -1,85 +1,158 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Feb 2017 13:56:51 -0600
-Subject: [PATCH V2 2/3] Documentation: sprd: Add bindings for SP9860G
-In-Reply-To: <1487660104-15693-3-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1487660104-15693-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1487660104-15693-3-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <20170227195651.h63j73xlud5tp73l@rob-hp-laptop>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Mon, 27 Feb 2017 19:54:11 +0000
+Subject: [RFC PATCH 00/30] Add PCIe SVM support to ARM SMMUv3
+Message-ID: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 21, 2017 at 02:55:03PM +0800, Chunyan Zhang wrote:
-> Added support for Spreadtrum SP9860G board and SC9860 SoC.
-> This patch also revised bindings of SC9836 to make the format
-> more clear.
-> 
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> ---
->  Documentation/devicetree/bindings/arm/sprd.txt         | 13 ++++++++-----
->  Documentation/devicetree/bindings/serial/sprd-uart.txt | 16 +++++++++++++++-
+Hi,
 
-Probably should be 2 commits.
+This series adds support for PCI ATS, PRI and PASID extensions to the
+SMMUv3 driver. In systems that support it, it is now possible for some
+high-end devices to perform DMA into process address spaces. Page tables
+are shared between MMU and SMMU; page faults from devices are recoverable
+and handled by the mm subsystem.
 
-"dt-bindings: (arm|serial): " is the preferred subject prefix.
+We propose an extension to the IOMMU API that unifies existing SVM
+implementations (AMD, Intel and ARM) in patches 22 and 24. Nothing is set
+in stone, the goal is to start discussions and find an intersection
+between implementations.
 
->  2 files changed, 23 insertions(+), 6 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/sprd.txt b/Documentation/devicetree/bindings/arm/sprd.txt
-> index 31a629d..3df034b 100644
-> --- a/Documentation/devicetree/bindings/arm/sprd.txt
-> +++ b/Documentation/devicetree/bindings/arm/sprd.txt
-> @@ -1,11 +1,14 @@
->  Spreadtrum SoC Platforms Device Tree Bindings
->  ----------------------------------------------------
->  
-> -Sharkl64 is a Spreadtrum's SoC Platform which is based
-> -on ARM 64-bit processor.
-> +SC9836 openphone Board
-> +Required root node properties:
-> +	- compatible = "sprd,sc9836-openphone", "sprd,sc9836";
->  
-> -SC9836 openphone board with SC9836 SoC based on the
-> -Sharkl64 Platform shall have the following properties.
-> +SC9860 SoC
-> +Required root node properties:
-> +	- compatible = "sprd,sc9860"
->  
-> +SP9860G 3GFHD Board
->  Required root node properties:
-> -        - compatible = "sprd,sc9836-openphone", "sprd,sc9836";
-> +	- compatible = "sprd,sp9860g-1h10", "sprd,sc9860";
-> diff --git a/Documentation/devicetree/bindings/serial/sprd-uart.txt b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-> index 2aff0f2..f530cbb 100644
-> --- a/Documentation/devicetree/bindings/serial/sprd-uart.txt
-> +++ b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-> @@ -1,7 +1,21 @@
->  * Spreadtrum serial UART
->  
->  Required properties:
-> -- compatible: must be "sprd,sc9836-uart"
-> +- compatible must contain:
-> +  * "sprd,sc9836-uart" for SC9836 and all Spreadtrum SoCs
-> +  This also can be specific with:
-> +  * "sprd, sc9860-uart" for SC9860
-space        ^
+We also propose a VFIO interface in patches 29 and 30, that allows
+userspace device drivers to make use of SVM. It would also serve as
+example implementation for other device drivers.
 
-> +
->  - reg: offset and length of the register set for the device
->  - interrupts: exactly one interrupt specifier
->  - clocks: phandles to input clocks.
-> +
-> +Example:
-> +	uart0: serial at 70000000 {
-> +		compatible = "sprd,sc9838-uart",
-> +			     "sprd,sc9836-uart";
-> +		reg = <0x000000 0x100>;
-> +		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&ext_26m>;
-> +		status = "disabled";
+Overview of the patches:
 
-No need for status in examples.
+* 1 and 2 prepare the SMMUv3 structures for ATS,
+* 3 to 5 enable ATS for devices that support it.
+* 6 to 10 prepare the SMMUv3 structures for PASID and PRI. Patch 9,
+  in particular, provides details on the structure requirements.
+* 11 introduces an interface for sharing ASIDs on ARM64,
+* 12 to 17 add more infrastructure for sharing page tables,
+* 18 and 19 add minor helpers to PCI,
+* 20 enables PASID in devices that support it,
+* 21 enables PRI and adds device fault handler,
+* 22 and 24 draft a possible interface for SVM in the IOMMU API
+* 23 and 25-28 finalize support for SVM in SMMUv3
+* 29 and 30 draft a possible interface for SVM in VFIO. 
 
-> +	};
-> -- 
-> 2.7.4
-> 
+The series is available on git://linux-arm.org/linux-jpb.git svm/rfc1
+Enable CONFIG_PCI_PASID, CONFIG_PCI_PRI and you should be good to go.
+
+So far, this has only been tested with a software model of an SMMUv3 and a
+PCIe DMA engine. We don't intend to get this merged until it has been
+tested on silicon, but at least the driver implementation should be mature
+enough. I might split next versions depending on what is ready and what
+needs more work so we can merge it progressively.
+
+A lot of open questions remain:
+
+1. Can we declare that PASID 0 is always invalid?
+
+2. For this prototype, I kept the interface simple from an implementation
+   perspective. At the moment is is "bind this device to that address
+   space". For consistency with the rest of VFIO and IOMMU, I think "bind
+   this container to that address space" would be more in line with VFIO,
+   and "bind that group to that address space" more in line with IOMMU.
+   VFIO would tell the IOMMU "for all groups in this container, bind to
+   that address space".
+   This raises the question of inconsistency between device capabilities.
+   When adding a device that supports less PASID bits to a group, what do
+   we do? What if we already allocated a PASID that is out of range for
+   the new device?
+
+3. How do we reconcile the IOMMU fault reporting infrastructure with the
+   SVM interface?
+
+4. SVM is the product of two features: handling device faults, and devices
+   having multiple address spaces. What about one feature without the
+   other?
+   a. If we cannot afford to have a device fault, can we at least share a
+      pinned address space? Pinning all current memory would be done by
+      vfio, but there also need to be pinning of all future mappings.
+      (mlock isn't sufficient, still allows for minor faults.)
+   b. If the device has a single address space, can we still bind it to a
+      process? The main issue with unifying DMA and process page tables is
+      reserved regions on the device side. What do we do if, for instance,
+      and MSI frame address clashes with a process mapping? Or if a
+      process mapping exists outside of the device's DMA window?
+
+Please find more details in the IOMMU API and VFIO patches.
+
+Thanks,
+Jean-Philippe
+
+Cc: Harv Abdulhamid <harba@qti.qualcomm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Shanker Donthineni <shankerd@qti.qualcomm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Sinan Kaya <okaya@qti.qualcomm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Nate Watterson <nwatters@qti.qualcomm.com>
+Cc: Alex Williamson <alex.williamson@redhat.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
+
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-pci at vger.kernel.org
+Cc: iommu at lists.linux-foundation.org
+Cc: kvm at vger.kernel.org
+
+Jean-Philippe Brucker (30):
+  iommu/arm-smmu-v3: Link groups and devices
+  iommu/arm-smmu-v3: Link groups and domains
+  PCI: Move ATS declarations outside of CONFIG_PCI
+  iommu/arm-smmu-v3: Add support for PCI ATS
+  iommu/arm-smmu-v3: Disable tagged pointers when ATS is in use
+  iommu/arm-smmu-v3: Add support for Substream IDs
+  iommu/arm-smmu-v3: Add second level of context descriptor table
+  iommu/arm-smmu-v3: Add support for VHE
+  iommu/arm-smmu-v3: Support broadcast TLB maintenance
+  iommu/arm-smmu-v3: Add task contexts
+  arm64: mm: Pin down ASIDs for sharing contexts with devices
+  iommu/arm-smmu-v3: Keep track of process address spaces
+  iommu/io-pgtable-arm: Factor out ARM LPAE register defines
+  iommu/arm-smmu-v3: Share process page tables
+  iommu/arm-smmu-v3: Steal private ASID from a domain
+  iommu/arm-smmu-v3: Use shared ASID set
+  iommu/arm-smmu-v3: Add SVM feature checking
+  PCI: Make "PRG Response PASID Required" handling common
+  PCI: Cache PRI and PASID bits in pci_dev
+  iommu/arm-smmu-v3: Enable PCI PASID in masters
+  iommu/arm-smmu-v3: Handle device faults from PRI
+  iommu: Bind/unbind tasks to/from devices
+  iommu/arm-smmu-v3: Bind/unbind device and task
+  iommu: Specify PASID state when unbinding a task
+  iommu/arm-smmu-v3: Safe invalidation and recycling of PASIDs
+  iommu/arm-smmu-v3: Fix PRI queue overflow acknowledgement
+  iommu/arm-smmu-v3: Handle PRI queue overflow
+  iommu/arm-smmu-v3: Add support for Hardware Translation Table Update
+    at stage 1
+  vfio: Add support for Shared Virtual Memory
+  vfio: Allow to bind foreign task
+
+ MAINTAINERS                          |    1 +
+ arch/arm64/include/asm/mmu.h         |    1 +
+ arch/arm64/include/asm/mmu_context.h |   11 +-
+ arch/arm64/mm/context.c              |   80 +-
+ drivers/iommu/amd_iommu.c            |   19 +-
+ drivers/iommu/arm-smmu-v3.c          | 2593 ++++++++++++++++++++++++++++++++--
+ drivers/iommu/io-pgtable-arm.c       |   48 +-
+ drivers/iommu/io-pgtable-arm.h       |   67 +
+ drivers/iommu/iommu.c                |  116 ++
+ drivers/pci/ats.c                    |   40 +
+ drivers/vfio/pci/vfio_pci.c          |   24 +
+ drivers/vfio/vfio.c                  |  135 ++
+ include/linux/iommu.h                |   57 +
+ include/linux/pci-ats.h              |    8 +
+ include/linux/pci.h                  |   28 +-
+ include/uapi/linux/pci_regs.h        |    1 +
+ include/uapi/linux/vfio.h            |   70 +
+ 17 files changed, 3084 insertions(+), 215 deletions(-)
+ create mode 100644 drivers/iommu/io-pgtable-arm.h
+
+-- 
+2.11.0
