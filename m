@@ -1,75 +1,40 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 27 Feb 2017 20:21:02 +0800
-Subject: [PATCH v2 net-next 5/6] drivers: net: xgene-v2: Add transmit and
- receive
-In-Reply-To: <1488172706-29577-6-git-send-email-isubramanian@apm.com>
-Message-ID: <201702272053.fL0xZ22g%fengguang.wu@intel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 27 Feb 2017 13:24:44 +0100
+Subject: [PATCH v5 2/7] clk: sunxi-ng: rename sun8i-h3 driver to
+ sunxi-h3-h5
+In-Reply-To: <20170226011956.53581-3-icenowy@aosc.xyz>
+References: <20170226011956.53581-1-icenowy@aosc.xyz>
+ <20170226011956.53581-3-icenowy@aosc.xyz>
+Message-ID: <20170227122444.6523qu4wwm4ihlfx@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Iyappan,
+Hi,
 
-[auto build test WARNING on net-next/master]
+On Sun, Feb 26, 2017 at 09:19:51AM +0800, Icenowy Zheng wrote:
+> As the CCU in the Allwinner H5 SoC is very similar to the one in H3,
+> rename the H3 driver to sunxi-h3-h5 so that it can be extended with H5
+> support.
+> 
+> Trasitional header symlinks are created, to ensure current device tree
+> files which included sun8i-h3-ccu.h can compile.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-url:    https://github.com/0day-ci/linux/commits/Iyappan-Subramanian/drivers-net-xgene-v2-Add-RGMII-based-1G-driver/20170227-182414
-config: x86_64-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+Just like for the R40, I wonder whether this is needed at all. We have
+a lot of other drivers that we don't have to rename to support new
+SoCs. This is kind of weird to make an exception for this one only.
 
-All warnings (new ones prefixed by >>):
+Maxime
 
-   drivers/net/ethernet/apm/xgene-v2/main.c: In function 'is_tx_slot_available':
->> drivers/net/ethernet/apm/xgene-v2/main.c:182:2: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
-     if (GET_BITS(E, le64_to_cpu(raw_desc->m0)) &&
-     ^~
-   drivers/net/ethernet/apm/xgene-v2/main.c:186:3: note: ...this statement, but the latter is misleadingly indented as if it is guarded by the 'if'
-      return false;
-      ^~~~~~
-   drivers/net/ethernet/apm/xgene-v2/main.c: In function 'is_tx_hw_done':
-   drivers/net/ethernet/apm/xgene-v2/main.c:246:2: warning: this 'if' clause does not guard... [-Wmisleading-indentation]
-     if (GET_BITS(E, le64_to_cpu(raw_desc->m0)) &&
-     ^~
-   drivers/net/ethernet/apm/xgene-v2/main.c:250:3: note: ...this statement, but the latter is misleadingly indented as if it is guarded by the 'if'
-      return false;
-      ^~~~~~
-
-vim +/if +182 drivers/net/ethernet/apm/xgene-v2/main.c
-
-   166		if (ret)
-   167			netdev_err(ndev, "Failed to request irq %s\n", pdata->irq_name);
-   168	
-   169		return ret;
-   170	}
-   171	
-   172	static void xge_free_irq(struct net_device *ndev)
-   173	{
-   174		struct xge_pdata *pdata = netdev_priv(ndev);
-   175		struct device *dev = &pdata->pdev->dev;
-   176	
-   177		devm_free_irq(dev, pdata->resources.irq, pdata);
-   178	}
-   179	
-   180	static bool is_tx_slot_available(struct xge_raw_desc *raw_desc)
-   181	{
- > 182		if (GET_BITS(E, le64_to_cpu(raw_desc->m0)) &&
-   183		    (GET_BITS(PKT_SIZE, le64_to_cpu(raw_desc->m0)) == SLOT_EMPTY))
-   184			return true;
-   185	
-   186			return false;
-   187	}
-   188	
-   189	static netdev_tx_t xge_start_xmit(struct sk_buff *skb, struct net_device *ndev)
-   190	{
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 58535 bytes
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170227/e620ab63/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170227/d4422d54/attachment.sig>
