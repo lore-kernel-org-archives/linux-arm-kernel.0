@@ -1,75 +1,51 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Feb 2017 15:14:16 +0000
-Subject: [PATCH 05/20] ARM: implement pci_remap_cfgspace() interface
+Date: Mon, 27 Feb 2017 15:14:17 +0000
+Subject: [PATCH 06/20] PCI: ECAM: use pci_remap_cfgspace() to map config region
 In-Reply-To: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
 References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170227151436.18698-6-lorenzo.pieralisi@arm.com>
+Message-ID: <20170227151436.18698-7-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI bus specifications (rev 3.0, 3.2.5 "Transaction Ordering
-and Posting") define rules for PCI configuration space transactions
-ordering and posting, that state that configuration writes have to
-be non-posted transactions.
+Current ECAM kernel implementation uses ioremap() to map the ECAM
+configuration space memory region; this is not safe in that on some
+architectures the ioremap interface provides mappings that allow posted
+write transactions. This, as highlighted in the PCIe specifications
+(4.0 - Rev0.3, "Ordering Considerations for the Enhanced Configuration
+Address Mechanism"), can create ordering issues for software because
+posted writes transactions on the CPU host bus are non posted in the
+PCI express fabric.
 
-Current ioremap interface on ARM provides mapping functions that
-provide "bufferable" writes transactions (ie ioremap uses MT_DEVICE
-memory type) aka posted writes, so PCI host controller drivers have
-no arch interface to remap PCI configuration space with memory
-attributes that comply with the PCI specifications for configuration
-space.
-
-Implement an ARM specific pci_remap_cfgspace() interface that allows to
-map PCI config memory regions with MT_UNCACHED memory type (ie strongly
-ordered - non-posted writes), providing a remap function that complies
-with PCI specifications for config space transactions.
+Update the ioremap() interface to use pci_remap_cfgspace() whose
+mapping attributes guarantee that non-posted writes transactions
+are issued for memory writes within the ECAM memory mapped address
+region.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@armlinux.org.uk>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
 ---
- arch/arm/include/asm/io.h | 10 ++++++++++
- arch/arm/mm/ioremap.c     |  7 +++++++
- 2 files changed, 17 insertions(+)
+ drivers/pci/ecam.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index 42871fb..74d1b09 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -187,6 +187,16 @@ static inline void pci_ioremap_set_mem_type(int mem_type) {}
- extern int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr);
- 
- /*
-+ * PCI configuration space mapping function.
-+ *
-+ * PCI specifications does not allow configuration write
-+ * transactions to be posted. Add an arch specific
-+ * pci_remap_cfgspace definition that is implemented
-+ * through strongly ordered memory mappings.
-+ */
-+#define pci_remap_cfgspace pci_remap_cfgspace
-+void __iomem *pci_remap_cfgspace(resource_size_t res_cookie, size_t size);
-+/*
-  * Now, pick up the machine-defined IO definitions
-  */
- #ifdef CONFIG_NEED_MACH_IO_H
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index ff0eed2..fc91205 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -481,6 +481,13 @@ int pci_ioremap_io(unsigned int offset, phys_addr_t phys_addr)
- 				  __pgprot(get_mem_type(pci_ioremap_mem_type)->prot_pte));
- }
- EXPORT_SYMBOL_GPL(pci_ioremap_io);
-+
-+void __iomem *pci_remap_cfgspace(resource_size_t res_cookie, size_t size)
-+{
-+	return arch_ioremap_caller(res_cookie, size, MT_UNCACHED,
-+				   __builtin_return_address(0));
-+}
-+EXPORT_SYMBOL_GPL(pci_remap_cfgspace);
- #endif
- 
- /*
+diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+index 2fee61b..e2068a4 100644
+--- a/drivers/pci/ecam.c
++++ b/drivers/pci/ecam.c
+@@ -84,12 +84,13 @@ struct pci_config_window *pci_ecam_create(struct device *dev,
+ 		if (!cfg->winp)
+ 			goto err_exit_malloc;
+ 		for (i = 0; i < bus_range; i++) {
+-			cfg->winp[i] = ioremap(cfgres->start + i * bsz, bsz);
++			cfg->winp[i] =
++				pci_remap_cfgspace(cfgres->start + i * bsz, bsz);
+ 			if (!cfg->winp[i])
+ 				goto err_exit_iomap;
+ 		}
+ 	} else {
+-		cfg->win = ioremap(cfgres->start, bus_range * bsz);
++		cfg->win = pci_remap_cfgspace(cfgres->start, bus_range * bsz);
+ 		if (!cfg->win)
+ 			goto err_exit_iomap;
+ 	}
 -- 
 2.10.0
