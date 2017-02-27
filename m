@@ -1,37 +1,64 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Feb 2017 13:39:16 -0600
-Subject: [PATCH v3 3/7] dt-bindings: Add Ampire AM-480272H3TMQW-T01H panel
-In-Reply-To: <1487606921-26981-4-git-send-email-yannick.fertre@st.com>
-References: <1487606921-26981-1-git-send-email-yannick.fertre@st.com>
- <1487606921-26981-4-git-send-email-yannick.fertre@st.com>
-Message-ID: <20170227193916.5k7ti7e3xumzq7v3@rob-hp-laptop>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 28 Feb 2017 03:40:52 +0800
+Subject: [PATCH 1/3] dt-bindings: document the thermal sensor of Allwinner H3
+ SoC
+Message-ID: <20170227194054.51951-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2017 at 05:08:37PM +0100, Yannick Fertre wrote:
-> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
-> ---
->  .../bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt         | 7 +++++++
->  1 file changed, 7 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
-> new file mode 100644
-> index 0000000..f59e3c4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
-> @@ -0,0 +1,7 @@
-> +Ampire AM-480272H3TMQW-T01H 4.3" WQVGA TFT LCD panel
-> +
-> +Required properties:
-> +- compatible: should be "ampire,am-480272h3tmqw-t01h"
+From: Ondrej Jirman <megous@megous.com>
 
-No GPIO controls nor power supplies? You need to be explicit if using 
-'power-supply' or not?
+This patch adds the binding documentation for the thermal sensor
+found in Allwinner H3 SoC.
 
-> +
-> +This binding is compatible with the simple-panel binding, which is specified
-> +in simple-panel.txt in this directory.
-> -- 
-> 1.9.1
-> 
+Signed-off-by: Ond?ej Jirman <megous@megous.com>
+[Icenowy: some adjustments to documentation and the commit message]
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ .../devicetree/bindings/thermal/sun8i-ths.txt      | 35 ++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/sun8i-ths.txt
+
+diff --git a/Documentation/devicetree/bindings/thermal/sun8i-ths.txt b/Documentation/devicetree/bindings/thermal/sun8i-ths.txt
+new file mode 100644
+index 000000000000..eec094c459b8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/sun8i-ths.txt
+@@ -0,0 +1,35 @@
++* Thermal sensor for new Allwinner SoCs
++
++Required properties:
++- compatible : Should be one of the following:
++ - "allwinner,sun8i-h3-ths"
++- reg : Address range of the thermal sensor registers
++- resets : Must contain phandles to reset controls matching the entries
++  of the names
++- reset-names : Must include the name "ahb"
++- clocks : Must contain phandles to clock controls matching the entries
++  of the names
++- clock-names : Must contain "ahb" for the bus gate and "ths" for the THS
++  clock
++- #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description.
++
++Optional properties:
++- nvmem-cells: A phandle to the calibration data provided by a nvmem device. If
++               unspecified default values shall be used. Refer to
++               Documentation/devicetree/bindings/nvmem/nvmem.txt to know how to
++               specify nvmem cells.
++- nvmem-cell-names: Should be "cal"
++
++Example:
++ths: ths at 01c25000 {
++	compatible = "allwinner,sun8i-h3-ths";
++	reg = <0x01c25000 0x400>;
++	interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
++	resets = <&ccu RST_BUS_THS>;
++	reset-names = "ahb";
++	clocks = <&ccu CLK_BUS_THS>, <&ccu CLK_THS>;
++	clock-names = "ahb", "ths";
++	nvmem-cells = <&ths_cal>;
++	nvmem-cell-names = "cal";
++	#thermal-sensor-cells = <1>;
++};
+-- 
+2.11.1
