@@ -1,64 +1,92 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Mon, 27 Feb 2017 18:24:44 +0800
-Subject: [PATCH RFC] arm64/mm: handle memmap kernel option
-In-Reply-To: <20170227084808.GA31271@remoulade>
-References: <1488005245-54811-1-git-send-email-xieyisheng1@huawei.com>
- <CAKv+Gu9j_4kSVAPrddsdcDiW+MWMTweHPe9bthf4=n4jLt2NZw@mail.gmail.com>
- <ab8d4b0a-dfe5-629f-5ead-3c7e907509fa@huawei.com>
- <20170227084808.GA31271@remoulade>
-Message-ID: <fb1cdb09-3b75-cec8-dce2-7cabc99108da@huawei.com>
+From: hias@horus.com (Matthias Reichl)
+Date: Mon, 27 Feb 2017 11:30:24 +0100
+Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
+ bcm2835<=>IC<=>cs42xx8
+In-Reply-To: <170950f7-354f-e6a9-cefb-834a00fadd1b@flatmax.org>
+References: <cover.1487997974.git.flatmax@flatmax.org>
+ <20170225133952.GA28091@camel2.lan>
+ <8cf68a3e-330d-e76d-e276-5df5453e3baf@flatmax.org>
+ <20170226144958.GA5543@camel2.lan>
+ <732a71ac-5ec5-37e1-1190-be036ea34555@flatmax.org>
+ <20170226221648.GA10974@camel2.lan>
+ <7cef41ee-ef00-22b7-830f-517a9d594ed0@flatmax.org>
+ <20170227080433.GA2718@delle.lan>
+ <170950f7-354f-e6a9-cefb-834a00fadd1b@flatmax.org>
+Message-ID: <20170227103024.GF2718@delle.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Mark,
+On Mon, Feb 27, 2017 at 09:08:14PM +1100, Matt Flax wrote:
+> 
+> 
+> On 27/02/17 19:04, Matthias Reichl wrote:
+> >On Mon, Feb 27, 2017 at 09:35:14AM +1100, Matt Flax wrote:
+> >>
+> >>On 27/02/17 09:16, Matthias Reichl wrote:
+> >>>
+> >>>Have a look at the end of Documentation/sound/alsa/soc/DPCM.txt
+> >>>where codec<->codec links are explained.
+> >>>
+> >>>You can setup the stream parameters for the "IC"<->"real codec" link
+> >>>with snd_soc_dai_link.params.
+> >>>
+> >>>You can do that for example in your machine driver in hwparams:
+> >>>when hw_params is called eg with 2 channels 192kHz just set the
+> >>>dai link parameters of the codec to 8 channels 48kHz.
+> >>>
+> >>>Maybe using dynamic pcm (which offers a be_hw_params_fixup hook)
+> >>>is the more appropriate way to do that, but I can't tell for sure
+> >>>as I never used it and am not familiar with it.
+> >>>
+> >>>
+> >>Thanks for this information, I will give this a go - seems a better way now
+> >>then introducing an IC master into the mix !
+> >>
+> >>Do you agree that we still need the BCM2835 SoC CPU driver to be expanded to
+> >>handle DSP mode
+> >>and multichannel setups ? I can't see any other way to enable the
+> >>multichannel hardware setup without altering bcm2835_i2s.c to handle DSP
+> >>mode and more then 2 channels in its _hw_params.
+> >No, DSP mode and multichannel don't work on the BCM2835. Keep the driver
+> >as it is.
+> >
+> >Use the alsa plugin approach to tunnel multichannel data over a 2-channel
+> >PCM and you don't need to modify existing drivers.
+> >
+> 
+> Thanks again for this suggestion. I have been playing around with user space
+> plugins lately, they are great. I plan to release some C++ classes to help
+> trivialise the creation of such plugins.
+> 
+> However for a product, a piece of robustly functioning hardware, I am
+> inclined to take the route of introducing a DSP mode into the bcm2835_i2s.c
+> driver.
 
-Thanks for comment
-On 2017/2/27 16:48, Mark Rutland wrote:
-> Hi,
-> 
-> On Mon, Feb 27, 2017 at 11:48:50AM +0800, Yisheng Xie wrote:
->> On 2017/2/26 18:46, Ard Biesheuvel wrote:
->>> On 25 February 2017 at 06:47, Yisheng Xie <xieyisheng1@huawei.com> wrote:
-> 
->>>> To make user reserve memory for some specific use more convenient,
->>>> this patch implement the following memmap variants:
->>>>  - memmap=nn[KMG]$ss[KMG]: mark specified memory as reserved;
->>>>  - memmap=nn[KMG]@ss[KMG]: force usage of a specific region of memory;
-> 
->>> Could you explain which problem you are solving here? ACPI implies
->>> UEFI on arm64, and so these reservations could be made by a boot
->>> component instead, if it requires a fixed memory reservation. If this
->>> is a reservation for, e.g., OP-TEE, we should not rely on the command
->>> line to communicate this information.
->>>
->> We just want to reserve some memory for a driver and I just not so familiar
->> with how to reserve memory with UEFI. So doubt about whether it is suitable
->> to reserve memory with cmdline like "memmap=xxx", which had appeared in x86
->> for a long time.
-> 
-> Could you please explain for what purpose this is necessary?
-> 
-> Does the driver need a specific region of memory? Or just some contiguous
-> region? Or something else?
-> 
-Yes, we want to use a specific region of memory.
+You can add DSP mode when you found which undocumented registers inside
+the bcm2835 are needed to enable DSP mode, set channel 3-8 positions etc.
+I'm not sure they exist, so there's little point in doing that - as we both
+agreed, clocking the bcm2835 in DSP mode (while it's set up as a I2S slave)
+doesn't work.
 
-> For the former, this is not an appropriate solution; firmware must absolutely
-> mark the memory as reserved for a particular purpose.
+> From the previous patches, it is clear that people are willing to allow
+> multichannel (DSP mode) into the bcm2835 CPU driver.
+
+I don't see that. Some people might want to be able to use multichannel
+on RPi, but that's something very different than adding code that just
+lies about driver capabilites.
+
+> It improves the
+> usefulness of hardware which use the BCM2835 derived chipset. From my point
+> of view that is a major simplification in terms of releasing functioning
+> multichannel hardware. I would imagine from the manufacturer's point of view
+> that is a big bonus too !
 > 
-I see, so just forget about this patch. sorry for disturbing.
-
-Thanks again for your explain.
-Yisheng Xie
-
-> If you just need contiguous physical memory, I believe it would be better to
-> use CMA, and request CMA reserve a larger area if necessary.
+> Again I intend to implement your concept of the snd_soc_dai_link for my
+> machine driver, that is a fantasic lead you have given me ... when I have
+> questions @ implementation time I will copy you in seeking for more
+> guidance.
 > 
-
-
-
-> Thanks,
-> Mark.
+> thanks again,
+> Matt
 > 
-> .
 > 
