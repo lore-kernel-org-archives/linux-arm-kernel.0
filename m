@@ -1,114 +1,62 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 27 Feb 2017 17:12:18 +0100
-Subject: [PATCH v2 2/4] irqchip: armada-370-xp: document the overall driver
- logic
+Date: Mon, 27 Feb 2017 17:12:17 +0100
+Subject: [PATCH v2 1/4] irqchip: armada-370-xp: re-order register definitions
 In-Reply-To: <1488211940-26489-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1488211940-26489-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1488211940-26489-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1488211940-26489-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the overall logic of the driver to handle the global and per-CPU
-masking of the interrupts is far from trivial, this commit adds a long
-comment detailing how the hardware operates and what strategy the
-driver implements on top of that.
+In order to clarify to which register base the various register
+definitions apply, this commit re-orders them, and adds a comment that
+clearly indicate which registers are relative to "main_int_base" and
+which registers are relative to "per_cpu_int_base".
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/irqchip/irq-armada-370-xp.c | 80 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 80 insertions(+)
+ drivers/irqchip/irq-armada-370-xp.c | 21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index 76147df..1f7dea6 100644
+index eb0d4d4..76147df 100644
 --- a/drivers/irqchip/irq-armada-370-xp.c
 +++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -34,6 +34,86 @@
+@@ -34,25 +34,24 @@
  #include <asm/smp_plat.h>
  #include <asm/mach/irq.h>
  
-+/*
-+ * Overall diagram of the Armada XP interrupt controller:
-+ *
-+ *    To CPU 0                 To CPU 1
-+ *
-+ *       /\                       /\
-+ *       ||                       ||
-+ * +---------------+     +---------------+
-+ * |               |	 |               |
-+ * |    per-CPU    |	 |    per-CPU    |
-+ * |  mask/unmask  |	 |  mask/unmask  |
-+ * |     CPU0      |	 |     CPU1      |
-+ * |               |	 |               |
-+ * +---------------+	 +---------------+
-+ *        /\                       /\
-+ *        ||                       ||
-+ *        \\_______________________//
-+ *                     ||
-+ *            +-------------------+
-+ *            |                   |
-+ *            | Global interrupt  |
-+ *            |    mask/unmask    |
-+ *            |                   |
-+ *            +-------------------+
-+ *                     /\
-+ *                     ||
-+ *               interrupt from
-+ *                   device
-+ *
-+ * The "global interrupt mask/unmask" is modified using the
-+ * ARMADA_370_XP_INT_SET_ENABLE_OFFS and
-+ * ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS registers, which are relative
-+ * to "main_int_base".
-+ *
-+ * The "per-CPU mask/unmask" is modified using the
-+ * ARMADA_370_XP_INT_SET_MASK_OFFS and
-+ * ARMADA_370_XP_INT_CLEAR_MASK_OFFS registers, which are relative to
-+ * "per_cpu_int_base". This base address points to a special address,
-+ * which automatically accesses the registers of the current CPU.
-+ *
-+ * The per-CPU mask/unmask can also be adjusted using the global
-+ * per-interrupt ARMADA_370_XP_INT_SOURCE_CTL register, which we use
-+ * to configure interrupt affinity.
-+ *
-+ * Due to this model, all interrupts need to be mask/unmasked at two
-+ * different levels: at the global level and at the per-CPU level.
-+ *
-+ * This driver takes the following approach to deal with this:
-+ *
-+ *  - For global interrupts:
-+ *
-+ *    At ->map() time, a global interrupt is unmasked at the per-CPU
-+ *    mask/unmask level. It is therefore unmasked at this level for
-+ *    the current CPU, running the ->map() code. This allows to have
-+ *    the interrupt unmasked at this level in non-SMP
-+ *    configurations. In SMP configurations, the ->set_affinity()
-+ *    callback is called, which using the
-+ *    ARMADA_370_XP_INT_SOURCE_CTL() readjusts the per-CPU mask/unmask
-+ *    for the interrupt.
-+ *
-+ *    The ->mask() and ->unmask() operations only mask/unmask the
-+ *    interrupt at the "global" level.
-+ *
-+ *    So, a global interrupt is enabled at the per-CPU level as soon
-+ *    as it is mapped. At run time, the masking/unmasking takes place
-+ *    at the global level.
-+ *
-+ *  - For per-CPU interrupts
-+ *
-+ *    At ->map() time, a per-CPU interrupt is unmasked at the global
-+ *    mask/unmask level.
-+ *
-+ *    The ->mask() and ->unmask() operations mask/unmask the interrupt
-+ *    at the per-CPU level.
-+ *
-+ *    So, a per-CPU interrupt is enabled at the global level as soon
-+ *    as it is mapped. At run time, the masking/unmasking takes place
-+ *    at the per-CPU level.
-+ */
-+
- /* Registers relative to main_int_base */
+-/* Interrupt Controller Registers Map */
+-#define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
+-#define ARMADA_370_XP_INT_CLEAR_MASK_OFFS	(0x4C)
+-#define ARMADA_370_XP_INT_FABRIC_MASK_OFFS	(0x54)
+-#define ARMADA_370_XP_INT_CAUSE_PERF(cpu)	(1 << cpu)
+-
++/* Registers relative to main_int_base */
  #define ARMADA_370_XP_INT_CONTROL		(0x00)
- #define ARMADA_370_XP_SW_TRIG_INT_OFFS		(0x04)
++#define ARMADA_370_XP_SW_TRIG_INT_OFFS		(0x04)
+ #define ARMADA_370_XP_INT_SET_ENABLE_OFFS	(0x30)
+ #define ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS	(0x34)
+ #define ARMADA_370_XP_INT_SOURCE_CTL(irq)	(0x100 + irq*4)
+ #define ARMADA_370_XP_INT_SOURCE_CPU_MASK	0xF
+ #define ARMADA_370_XP_INT_IRQ_FIQ_MASK(cpuid)	((BIT(0) | BIT(8)) << cpuid)
+ 
+-#define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
++/* Registers relative to per_cpu_int_base */
++#define ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS	(0x08)
++#define ARMADA_370_XP_IN_DRBEL_MSK_OFFS		(0x0c)
+ #define ARMADA_375_PPI_CAUSE			(0x10)
+-
+-#define ARMADA_370_XP_SW_TRIG_INT_OFFS           (0x4)
+-#define ARMADA_370_XP_IN_DRBEL_MSK_OFFS          (0xc)
+-#define ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS        (0x8)
++#define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
++#define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
++#define ARMADA_370_XP_INT_CLEAR_MASK_OFFS	(0x4C)
++#define ARMADA_370_XP_INT_FABRIC_MASK_OFFS	(0x54)
++#define ARMADA_370_XP_INT_CAUSE_PERF(cpu)	(1 << cpu)
+ 
+ #define ARMADA_370_XP_MAX_PER_CPU_IRQS		(28)
+ 
 -- 
 2.7.4
