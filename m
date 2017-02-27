@@ -1,69 +1,68 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Mon, 27 Feb 2017 07:25:30 +0100 (CET)
-Subject: [Outreachy kernel] [PATCH] staging: bcm2835-audio: Fixed spacing
- around '&'
-In-Reply-To: <3ed05e4f-b00a-8a4b-f4f2-de23ff9b461e@broadcom.com>
-References: <1488131271-2908-1-git-send-email-narcisaanamaria12@gmail.com>
- <alpine.DEB.2.20.1702261901180.2056@hadrien>
- <1488134072.9188.3.camel@perches.com>
- <alpine.DEB.2.20.1702261956070.2056@hadrien>
- <1488137824.9188.7.camel@perches.com>
- <alpine.DEB.2.20.1702262038560.2056@hadrien>
- <1488146211.9188.10.camel@perches.com>
- <3ed05e4f-b00a-8a4b-f4f2-de23ff9b461e@broadcom.com>
-Message-ID: <alpine.DEB.2.20.1702270724430.2187@hadrien>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 27 Feb 2017 08:44:58 +0100
+Subject: [linux-sunxi] [PATCH 2/3] pwm: sunxi: Add A64 support
+In-Reply-To: <870861488014589@web9m.yandex.ru>
+References: <20170225074216.64868-1-icenowy@aosc.xyz>
+ <20170225074216.64868-2-icenowy@aosc.xyz>
+ <CAGb2v67OaUps1yffyZ8pBvMwbAU+6WC2pPkt25e5i+SYU1nrDw@mail.gmail.com>
+ <870861488014589@web9m.yandex.ru>
+Message-ID: <20170227074458.ivj5el2u4glhyrpw@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Sun, 26 Feb 2017, Scott Branden wrote:
-
->
->
-> On 17-02-26 01:56 PM, Joe Perches wrote:
-> > On Sun, 2017-02-26 at 20:40 +0100, Julia Lawall wrote:
-> > > On Sun, 26 Feb 2017, Joe Perches wrote:
-> > > > On Sun, 2017-02-26 at 19:59 +0100, Julia Lawall wrote:
-> > > > > On Sun, 26 Feb 2017, Joe Perches wrot
-> > > > > > Mailing lists _should_ be copied on patch submissions.
-> > > > > The idea of outreachy is that it should be a place for people to get
-> > > > > started without too much criticism from the outside.  Originally, only
-> > > > > the
-> > > > > outreachy mailing list received patches.  But staging maintainers were
-> > > > > confused to have their drivers receiving patches that they had not
-> > > > > seen.
-> > > > > So we expanded it to maintainers.
-> > > >
-> > > > That also doesn't make much sense as patches
-> > > > should not be applied that have not reached
-> > > > a mailing list for review.
-> > > >
-> > > > As long as initial outreachy patches are not
-> > > > applied and are just for internal review by
-> > > > any outside person but the outreachy list and
-> > > > are not be applied by maintainers, then perhaps
-> > > > it's best if neither maintainers nor lists are
-> > > > cc'd on the patches.
-> > >
-> > > The patches are applied by Greg.  Greg suggested the policy of adding
-> > > maintainers but not including mailing lists.  I'll let him consider
-> > > whether the policy should be changed.
+On Sat, Feb 25, 2017 at 05:23:09PM +0800, Icenowy Zheng wrote:
+> 
+> 
+> 25.02.2017, 16:53, "Chen-Yu Tsai" <wens@csie.org>:
+> > On Sat, Feb 25, 2017 at 3:42 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+> >> ?A64 PWM controller has same register layout as sun4i driver, so it works
+> >> ?by adding A64 specific data.
+> >>
+> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >> ?---
+> >> ??drivers/pwm/pwm-sun4i.c | 9 +++++++++
+> >> ??1 file changed, 9 insertions(+)
+> >>
+> >> ?diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
+> >> ?index 1284ffa05921..ca3431e03fb8 100644
+> >> ?--- a/drivers/pwm/pwm-sun4i.c
+> >> ?+++ b/drivers/pwm/pwm-sun4i.c
+> >> ?@@ -290,6 +290,12 @@ static const struct sun4i_pwm_data sun4i_pwm_data_h3 = {
+> >> ?????????.npwm = 1,
+> >> ??};
+> >>
+> >> ?+static const struct sun4i_pwm_data sun4i_pwm_data_a64 = {
+> >> ?+ .has_prescaler_bypass = true,
+> >> ?+ .has_rdy = true,
+> >> ?+ .npwm = 1,
+> >> ?+};
+> >> ?+
 > >
-> > Well, I will comment on patches sent to the kernel list.
-> >
-> > I'm not subscribed to outreachy and I don't want to be
-> > subscribed to that list either.
-> >
-> I would prefer this outreachy work uses their own mailing list and reviews
-> their patches first.  Then once they have everything sorted out they send out
-> the patch series to the proper maintainers/mailing lists. That way we're not
-> spammed with all these emails of people as they are learning how to format and
-> send out proper patches.
+> > This seems to be tha same as the H3. Any differences between the
+> > H3 and A64? Otherwise please just use that compatible.
+> 
+> H3 is also same as A13...
+> 
+> See http://lists.infradead.org/pipermail/linux-arm-kernel/2017-February/486595.html
 
-If you consider that you are getting too much outreachy mail at the
-moment, just let me know what subsystem you want me to add an exception
-for.
+What I meant was that you should have a compatible in your DT like this:
 
-thanks,
-julia
+compatible = "allwinner,sun50i-a64-pwm", "allwinner,sun5i-a13-pwm".
+
+There's no need to add a new one in the driver (for now).
+
+And you still haven't fixed the size.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170227/ef2ba801/attachment.sig>
