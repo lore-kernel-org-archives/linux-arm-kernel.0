@@ -1,85 +1,85 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Mon, 27 Feb 2017 20:53:37 +0100
-Subject: Microphone gain on N900
-In-Reply-To: <20170226202831.GA31405@amd>
-References: <20170226202831.GA31405@amd>
-Message-ID: <201702272053.37882@pali>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 27 Feb 2017 13:56:51 -0600
+Subject: [PATCH V2 2/3] Documentation: sprd: Add bindings for SP9860G
+In-Reply-To: <1487660104-15693-3-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <1487660104-15693-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1487660104-15693-3-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <20170227195651.h63j73xlud5tp73l@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 26 February 2017 21:28:32 Pavel Machek wrote:
-> Hi!
+On Tue, Feb 21, 2017 at 02:55:03PM +0800, Chunyan Zhang wrote:
+> Added support for Spreadtrum SP9860G board and SC9860 SoC.
+> This patch also revised bindings of SC9836 to make the format
+> more clear.
 > 
-> v4.10 works quite nicely on N900, but I still have problems with
-> audio. Even GSM calls would be usable, if I had reasonable volume on
-> microphone and speaker... but I don't.
+> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> ---
+>  Documentation/devicetree/bindings/arm/sprd.txt         | 13 ++++++++-----
+>  Documentation/devicetree/bindings/serial/sprd-uart.txt | 16 +++++++++++++++-
+
+Probably should be 2 commits.
+
+"dt-bindings: (arm|serial): " is the preferred subject prefix.
+
+>  2 files changed, 23 insertions(+), 6 deletions(-)
 > 
-> Both speaker and microphone are too quiet. I can get louder output by
-> plugging headset -- good. I can hear the other side nicely, but am
-> too quiet for them. Unfortunately, even if I plug in wired headset,
-> internal microphone is still used.
+> diff --git a/Documentation/devicetree/bindings/arm/sprd.txt b/Documentation/devicetree/bindings/arm/sprd.txt
+> index 31a629d..3df034b 100644
+> --- a/Documentation/devicetree/bindings/arm/sprd.txt
+> +++ b/Documentation/devicetree/bindings/arm/sprd.txt
+> @@ -1,11 +1,14 @@
+>  Spreadtrum SoC Platforms Device Tree Bindings
+>  ----------------------------------------------------
+>  
+> -Sharkl64 is a Spreadtrum's SoC Platform which is based
+> -on ARM 64-bit processor.
+> +SC9836 openphone Board
+> +Required root node properties:
+> +	- compatible = "sprd,sc9836-openphone", "sprd,sc9836";
+>  
+> -SC9836 openphone board with SC9836 SoC based on the
+> -Sharkl64 Platform shall have the following properties.
+> +SC9860 SoC
+> +Required root node properties:
+> +	- compatible = "sprd,sc9860"
+>  
+> +SP9860G 3GFHD Board
+>  Required root node properties:
+> -        - compatible = "sprd,sc9836-openphone", "sprd,sc9836";
+> +	- compatible = "sprd,sp9860g-1h10", "sprd,sc9860";
+> diff --git a/Documentation/devicetree/bindings/serial/sprd-uart.txt b/Documentation/devicetree/bindings/serial/sprd-uart.txt
+> index 2aff0f2..f530cbb 100644
+> --- a/Documentation/devicetree/bindings/serial/sprd-uart.txt
+> +++ b/Documentation/devicetree/bindings/serial/sprd-uart.txt
+> @@ -1,7 +1,21 @@
+>  * Spreadtrum serial UART
+>  
+>  Required properties:
+> -- compatible: must be "sprd,sc9836-uart"
+> +- compatible must contain:
+> +  * "sprd,sc9836-uart" for SC9836 and all Spreadtrum SoCs
+> +  This also can be specific with:
+> +  * "sprd, sc9860-uart" for SC9860
+space        ^
+
+> +
+>  - reg: offset and length of the register set for the device
+>  - interrupts: exactly one interrupt specifier
+>  - clocks: phandles to input clocks.
+> +
+> +Example:
+> +	uart0: serial at 70000000 {
+> +		compatible = "sprd,sc9838-uart",
+> +			     "sprd,sc9836-uart";
+> +		reg = <0x000000 0x100>;
+> +		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&ext_26m>;
+> +		status = "disabled";
+
+No need for status in examples.
+
+> +	};
+> -- 
+> 2.7.4
 > 
-> Now... I researched mixer settings in v4.4, v4.10 and v2.6.28... and
-> could not find way to control microphone. v2.6.28 is completely
-> different from the other two. v4.10 misses many controls from v4.4;
-> and I guess this might be related:
-> 
-> [    2.579925] rx51-audio n900-audio: tlv320aic3x-hifi <->
-> 49022000.mcbsp mapping ok
-> [    2.586486] rx51-audio n900-audio: ASoC: no source widget found
-> for TPA6130A2 HPLEFT
-> [    2.592651] rx51-audio n900-audio: ASoC: Failed to add route
-> TPA6130A2 HPLEFT -> direct -> Headphone Jack
-> [    2.605163] rx51-audio n900-audio: ASoC: no source widget found
-> for TPA6130A2 HPRIGHT
-> [    2.611938] rx51-audio n900-audio: ASoC: Failed to add route
-> TPA6130A2 HPRIGHT -> direct -> Headphone Jack
-> [    2.625701] rx51-audio n900-audio: ASoC: no sink widget found for
-> TPA6130A2 LEFTIN
-> [    2.632965] rx51-audio n900-audio: ASoC: Failed to add route LLOUT
-> -> direct -> TPA6130A2 LEFTIN
-> [    2.640563] rx51-audio n900-audio: ASoC: no sink widget found for
-> TPA6130A2 RIGHTIN
-> [    2.648101] rx51-audio n900-audio: ASoC: Failed to add route RLOUT
-> -> direct -> TPA6130A2 RIGHTIN
-> [    2.655761] rx51-audio n900-audio: ASoC: no sink widget found for
-> b LINE2R
-> [    2.663208] rx51-audio n900-audio: ASoC: Failed to add route
-> MONO_LOUT -> direct -> b LINE2R
-> [    2.670501] rx51-audio n900-audio: ASoC: no source widget found
-> for b HPLOUT
-> [    2.677642] rx51-audio n900-audio: ASoC: Failed to add route b
-> HPLOUT -> direct -> Earphone
-> [    2.685058] rx51-audio n900-audio: ASoC: no source widget found
-> for b Mic Bias
-> [    2.692352] rx51-audio n900-audio: ASoC: Failed to add route b Mic
-> Bias -> direct -> HS Mic
-> [    2.706298] input: RX-51 AV Jack as
-> /devices/platform/n900-audio/sound/card0/input6
-
-Jarkko, Peter: can you look at above errors? Looks like audio routing is 
-not correctly configured.
-
-> Pali, do you have maemo running on top of recent kernel (v4.1, v4.4,
-> v4.10?). Do voice calls work there?
-
-Now I do not have prepared Maemo + mainline kernel for testing...
-
-I remember that Maemo sscd/csd/... daemons were able to connect to 
-cellular network but I was not trying to make voice calls.
-
-> Any ideas welcome...
-> 
-> Best regards,
-> 									Pavel
-
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170227/2bfc4c0d/attachment.sig>
