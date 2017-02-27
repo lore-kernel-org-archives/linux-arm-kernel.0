@@ -1,80 +1,61 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Sun, 26 Feb 2017 21:11:33 -0800
-Subject: [PATCH net-next 5/6] drivers: net: xgene-v2: Add transmit and
- receive
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DB0277BB0@AcuExch.aculab.com>
-References: <1485889401-13909-1-git-send-email-isubramanian@apm.com>
- <1485889401-13909-6-git-send-email-isubramanian@apm.com>
- <fb8fcd33-4b5b-5999-7662-4165aeb179e1@gmail.com>
- <063D6719AE5E284EB5DD2968C1650D6DB0277BB0@AcuExch.aculab.com>
-Message-ID: <CAKh23FnfarredMmtGiL25KmQwWus36aGv0dKoWnbmF-nwgJkKg@mail.gmail.com>
+Date: Sun, 26 Feb 2017 21:18:20 -0800
+Subject: [PATCH v2 net-next 0/6] drivers: net: xgene-v2: Add RGMII based 1G
+ driver
+Message-ID: <1488172706-29577-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 1, 2017 at 3:09 AM, David Laight <David.Laight@aculab.com> wrote:
-> From Florian Fainelli
->> Sent: 31 January 2017 20:33
->> On 01/31/2017 11:03 AM, Iyappan Subramanian wrote:
->> > This patch adds,
->> >     - Transmit
->> >     - Transmit completion poll
->> >     - Receive poll
->> >     - NAPI handler
->> >
->> > and enables the driver.
->> >
->> > Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
->> > Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
->> > ---
->>
->> > +
->> > +   tx_ring = pdata->tx_ring;
->> > +   tail = tx_ring->tail;
->> > +   len = skb_headlen(skb);
->> > +   raw_desc = &tx_ring->raw_desc[tail];
->> > +
->> > +   /* Tx descriptor not available */
->> > +   if (!GET_BITS(E, le64_to_cpu(raw_desc->m0)) ||
->> > +       GET_BITS(PKT_SIZE, le64_to_cpu(raw_desc->m0)))
->> > +           return NETDEV_TX_BUSY;
->
-> Aren't you supposed to detect 'ring full' and stop the code
-> giving you packets to transmit.
+This patch set adds support for RGMII based 1GbE hardware which uses a linked
+list of DMA descriptor architecture (v2) for APM X-Gene SoCs.
 
-I'll add stop queue and wake queue.
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+---
+v2: Address review comments from v1
+	- moved create_desc_ring and delete_desc_ring to open() and close()
+	  respectively
+	- changed to use dma_zalloc APIs
+	- fixed tx_timeout()
+	- removed tx completion polling upper bound
+	- added error checking on rx packets
+	- added netif_stop_queue() and netif_wake_queue()
 
->
->> > +
->> > +   /* Packet buffers should be 64B aligned */
->
-> Is that really a requirement of the hardware?
-> Almost all ethernet frames are 4n+2 aligned.
+v1:
+	- Initial version
+---
 
-Yes, it's a hardware requirement.
+Iyappan Subramanian (6):
+  drivers: net: xgene-v2: Add DMA descriptor
+  drivers: net: xgene-v2: Add mac configuration
+  drivers: net: xgene-v2: Add ethernet hardware configuration
+  drivers: net: xgene-v2: Add base driver
+  drivers: net: xgene-v2: Add transmit and receive
+  MAINTAINERS: Add entry for APM X-Gene SoC Ethernet (v2) driver
 
->
->> > +   pkt_buf = dma_alloc_coherent(dev, XGENE_ENET_STD_MTU, &dma_addr,
->> > +                                GFP_ATOMIC);
->> > +   if (unlikely(!pkt_buf))
->> > +           goto out;
->>
->> Can't you obtain a DMA-API mapping for skb->data and pass it down to the
->> hardware? This copy here is inefficient.
->>
->> > +
->> > +   memcpy(pkt_buf, skb->data, len);
->
-> You really need to verify that the len <= XGENE_ENET_STD_MTU.
+ MAINTAINERS                                |   6 +
+ drivers/net/ethernet/apm/Kconfig           |   1 +
+ drivers/net/ethernet/apm/Makefile          |   1 +
+ drivers/net/ethernet/apm/xgene-v2/Kconfig  |  11 +
+ drivers/net/ethernet/apm/xgene-v2/Makefile |   6 +
+ drivers/net/ethernet/apm/xgene-v2/enet.c   |  71 +++
+ drivers/net/ethernet/apm/xgene-v2/enet.h   |  43 ++
+ drivers/net/ethernet/apm/xgene-v2/mac.c    | 116 +++++
+ drivers/net/ethernet/apm/xgene-v2/mac.h    | 110 +++++
+ drivers/net/ethernet/apm/xgene-v2/main.c   | 756 +++++++++++++++++++++++++++++
+ drivers/net/ethernet/apm/xgene-v2/main.h   |  75 +++
+ drivers/net/ethernet/apm/xgene-v2/ring.c   |  81 ++++
+ drivers/net/ethernet/apm/xgene-v2/ring.h   | 119 +++++
+ 13 files changed, 1396 insertions(+)
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/Kconfig
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/Makefile
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/enet.c
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/enet.h
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/mac.c
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/mac.h
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/main.c
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/main.h
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/ring.c
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/ring.h
 
-This version of the driver, doesn't support jumbo frame.  So, the
-check is not required.
-
->
-> Isn't this code only transmitting the 'head' of the packet?
-> What about the fragments??
-
-This driver doesn't enable SG yet.
-
-> ...
->         David
->
+-- 
+1.9.1
