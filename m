@@ -1,74 +1,63 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Mon, 27 Feb 2017 08:47:18 +0530
-Subject: [PATCH 2/2] media: s5p-mfc: fix MMAP of mfc buffer during reqbufs
-In-Reply-To: <81c11e69-b7eb-ccb5-a377-2848ec551274@osg.samsung.com>
-References: <1481888915-19624-1-git-send-email-pankaj.dubey@samsung.com>
- <1481888915-19624-3-git-send-email-pankaj.dubey@samsung.com>
- <CGME20170224194302epcas2p2edea64bf7b2fc89ee97b6f5391b2dad0@epcas2p2.samsung.com>
- <81c11e69-b7eb-ccb5-a377-2848ec551274@osg.samsung.com>
-Message-ID: <384899ef-4e7e-d7f5-8f4f-ef2f023cb681@samsung.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Mon, 27 Feb 2017 11:34:44 +0800
+Subject: [PATCH v4 00/23] drm/rockchip: MIPI fixes & improvements
+In-Reply-To: <20170224125506.21533-1-john@metanate.com>
+References: <20170224125506.21533-1-john@metanate.com>
+Message-ID: <58B39E54.1030007@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Javier,
+Hi John
 
-On Saturday 25 February 2017 01:12 AM, Javier Martinez Canillas wrote:
-> Hello Pankaj,
-> 
-> On 12/16/2016 08:48 AM, Pankaj Dubey wrote:
->> From: Smitha T Murthy <smitha.t@samsung.com>
->>
->> It has been observed on ARM64 based Exynos SoC, if IOMMU is not enabled
->> and we try to use reserved memory for MFC, reqbufs fails with below
->> mentioned error
->> ---------------------------------------------------------------------------
->> V4L2 Codec decoding example application
->> Kamil Debski <k.debski@samsung.com>
->> Copyright 2012 Samsung Electronics Co., Ltd.
->>
->> Opening MFC.
->> (mfc.c:mfc_open:58): MFC Info (/dev/video0): driver="s5p-mfc" \
->> bus_info="platform:12c30000.mfc0" card="s5p-mfc-dec" fd=0x4[
->> 42.339165] Remapping memory failed, error: -6
->>
->> MFC Open Success.
->> (main.c:main:711): Successfully opened all necessary files and devices
->> (mfc.c:mfc_dec_setup_output:103): Setup MFC decoding OUTPUT buffer \
->> size=4194304 (requested=4194304)
->> (mfc.c:mfc_dec_setup_output:120): Number of MFC OUTPUT buffers is 2 \
->> (requested 2)
->>
->> [App] Out buf phy : 0x00000000, virt : 0xffffffff
->> Output Length is = 0x300000
->> Error (mfc.c:mfc_dec_setup_output:145): Failed to MMAP MFC OUTPUT buffer
->> -------------------------------------------------------------------------
->> This is because the device requesting for memory is mfc0.left not the parent mfc0.
->> Hence setting of alloc_devs need to be done only if IOMMU is enabled
->> and in that case both the left and right device is treated as mfc0 only.
->>
-> 
-> I see, so likely you were facing the issue described in patch 1/2 after this
-> patch since the driver doesn't set alloc_devs when IOMMU is disabled, right?
-> 
+I have test this v4 series on my RK3399 board, it works well, thanks.
 
-Yes.
+Tested-by: Chris Zhong<zyw@rock-chips.com>
 
-> In any case, I guess these patches have been superseded by Marek's series[0]
-> so they are no longer needed?
-> 
 
-Yes, these patches have been superseded but now by Marek's series.
-I missed to check Marek's series [0] due to some official assignment,
-but we followed up our patch series with Marek, and fix was provided in
-of_reserved_mem.c via patch [1] which has been accepted and merged as
-well. I will try to find out some time and test Marek's patch series [0].
+On 02/24/2017 08:54 PM, John Keeping wrote:
+> This version is mostly small changes in response to review comments from
+> Sean and Chris, the details are in the individual patches.
+>
+> I decided to drop the final patch which adds support for MIPI read
+> commands because I'm not using that feature now and I can't easily test
+> it.  It's on the list if anyone wants to pick it up in the future.
+>
+> Version 3 was posted here:
+> http://www.spinics.net/lists/dri-devel/msg130977.html
+>
+> Thanks to Sean Paul and Chris Zhong for their review and testing of this
+> series.
+>
+> John Keeping (23):
+>    drm/rockchip: dw-mipi-dsi: don't configure hardware in mode_set for
+>      MIPI
+>    drm/rockchip: dw-mipi-dsi: pass mode in where needed
+>    drm/rockchip: dw-mipi-dsi: remove mode_set hook
+>    drm/rockchip: dw-mipi-dsi: fix command header writes
+>    drm/rockchip: dw-mipi-dsi: fix generic packet status check
+>    drm/rockchip: dw-mipi-dsi: avoid out-of-bounds read on tx_buf
+>    drm/rockchip: dw-mipi-dsi: include bad value in error message
+>    drm/rockchip: dw-mipi-dsi: respect message flags
+>    drm/rockchip: dw-mipi-dsi: only request HS clock when required
+>    drm/rockchip: dw-mipi-dsi: don't assume buffer is aligned
+>    drm/rockchip: dw-mipi-dsi: prepare panel after phy init
+>    drm/rockchip: dw-mipi-dsi: allow commands in panel_disable
+>    drm/rockchip: dw-mipi-dsi: fix escape clock rate
+>    drm/rockchip: dw-mipi-dsi: ensure PHY is reset
+>    drm/rockchip: dw-mipi-dsi: configure PHY before enabling
+>    drm/rockchip: dw-mipi-dsi: properly configure PHY timing
+>    drm/rockchip: dw-mipi-dsi: improve PLL configuration
+>    drm/rockchip: dw-mipi-dsi: use specific poll helper
+>    drm/rockchip: dw-mipi-dsi: use positive check for N{H,V}SYNC
+>    drm/rockchip: vop: test for P{H,V}SYNC
+>    drm/rockchip: dw-mipi-dsi: defer probe if panel is not loaded
+>    drm/rockchip: dw-mipi-dsi: support non-burst modes
+>    drm/rockchip: dw-mipi-dsi: add reset control
+>
+>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c      | 325 +++++++++++++++++++---------
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   4 +-
+>   2 files changed, 220 insertions(+), 109 deletions(-)
+>
 
-[1]: https://patchwork.kernel.org/patch/9482499/
-
-Thanks,
-Pankaj Dubey
-
-> [0]: https://www.spinics.net/lists/linux-media/msg111156.html
-> 
-> Best regards,
-> 
+-- 
+Chris Zhong
