@@ -1,42 +1,26 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 27 Feb 2017 18:02:36 +0100
-Subject: Using the generic host PCIe driver
-In-Reply-To: <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
-References: <8d4e5d8a-7683-0180-324c-0ffd1a9a641a@free.fr>
- <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 27 Feb 2017 11:05:42 -0600
+Subject: [PATCH 1/2] dts: mfd: axp20x: Add xpowers,master-mode property
+ for AXP806 PMICs
+In-Reply-To: <112c3e4aa625ce2c550ae7ae4446a61d058455b5.1487428238.git.rask@formelder.dk>
+References: <cover.1487428238.git.rask@formelder.dk>
+ <112c3e4aa625ce2c550ae7ae4446a61d058455b5.1487428238.git.rask@formelder.dk>
+Message-ID: <20170227170541.s5ntce5njwpavnyw@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/02/2017 17:44, Bjorn Helgaas wrote:
-
-> On Mon, Feb 27, 2017 at 05:14:15PM +0100, Mason wrote:
->
->> Bug #2
->>
->> Bus 0 cannot be enumerated, because it reports garbage data for
->> devices and functions other than 0, i.e. only 0/0/0 works.
->>
->> How do I work around that issue?
+On Sat, Feb 18, 2017 at 08:51:18PM +0100, Rask Ingemann Lambertsen wrote:
+> commit b101829a029a ("mfd: axp20x: Fix AXP806 access errors on cold boot")
+> was intended to fix the case where a board uses an AXP806 in slave mode,
+> but the boot loader leaves it in master mode for lack of AXP806 support.
+> But now the driver breaks on boards where the PMIC is operating in master
+> mode. To let the device tree describe which mode of operation is needed,
+> this patch introduces a new property "xpowers,master-mode".
 > 
-> There are several drivers that provide their own "ECAM-like" config
-> accessors.  Look at "struct pci_ecam_ops" structures, e.g.,
-> hisi_pcie_ops, pci_thunder_ecam_ops, xgene_v1_pcie_ecam_ops, etc.
+> Fixes: b101829a029a ("mfd: axp20x: Fix AXP806 access errors on cold boot")
+> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
+> ---
+>  Documentation/devicetree/bindings/mfd/axp20x.txt | 3 +++
+>  1 file changed, 3 insertions(+)
 
-If I understand correctly, I do need to write my own driver then,
-if I need specific quirks to work around some issues?
-
-I'm slightly confused because you originally said "The native drivers
-in drivers/pci/host are a huge maintenance hassle for no real benefit."
-
-But I do need to write one, correct?
-
-> You can also work around Bug #1 in a custom accessor instead of a
-> quirk.
-
-By checking for the device ID and vendor ID, and returning the
-expected class code, instead of the contents of the reg?
-
-Do you consider this a better solution?
-
-Regards.
+Acked-by: Rob Herring <robh@kernel.org>
