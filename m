@@ -1,49 +1,69 @@
-From: mzoran@crowfest.net (Michael Zoran)
-Date: Mon, 27 Feb 2017 12:47:04 -0800
-Subject: [Outreachy kernel] [PATCH] staging: bcm2835-audio: Fixed
- spacing around '&'
-In-Reply-To: <954e0bc5-cd3c-c06f-dbfa-bed486b823c6@broadcom.com>
-References: <1488131271-2908-1-git-send-email-narcisaanamaria12@gmail.com>
- <alpine.DEB.2.20.1702261901180.2056@hadrien>
- <1488134072.9188.3.camel@perches.com>
- <alpine.DEB.2.20.1702261956070.2056@hadrien>
- <1488137824.9188.7.camel@perches.com>
- <alpine.DEB.2.20.1702262038560.2056@hadrien>
- <1488146211.9188.10.camel@perches.com>
- <3ed05e4f-b00a-8a4b-f4f2-de23ff9b461e@broadcom.com>
- <alpine.DEB.2.20.1702270724430.2187@hadrien>
- <954e0bc5-cd3c-c06f-dbfa-bed486b823c6@broadcom.com>
-Message-ID: <1488228424.5276.1.camel@crowfest.net>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 27 Feb 2017 14:54:08 -0600
+Subject: [PATCH v4] reset: Add i.MX7 SRC reset driver
+In-Reply-To: <20170221161331.17012-1-andrew.smirnov@gmail.com>
+References: <20170221161331.17012-1-andrew.smirnov@gmail.com>
+Message-ID: <20170227205408.ajeu3stjpl45dnqf@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-02-27 at 12:35 -0800, Scott Branden wrote:
-> > 
-> Hi Julia,
+On Tue, Feb 21, 2017 at 08:13:31AM -0800, Andrey Smirnov wrote:
+> Add reset controller driver exposing various reset faculties,
+> implemented by System Reset Controller IP block.
 > 
-> On 17-02-26 10:25 PM, Julia Lawall wrote:
-> > 
-> > If you consider that you are getting too much outreachy mail at the
-> > moment, just let me know what subsystem you want me to add an
-> > exception
-> > for.
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> ---
 > 
-> The emails seem to mostly be coming with bcm2835-audio.
-> > 
-> > thanks,
-> > julia
+> Changes since v3 (see [v3]):
 > 
-> Thanks,
-> ? Scott
+> 	- Convert code IMX7_RESET_PCIEPHY to change G_RST and BTNRST
+>           simultaneously to make all resets be representable as
+>           signal->bit in signal->offset register
+> 
+> 	- Convert assert/deassert subroutines to be special cases of a
+>           common reset subroutine
+> 
+> Changes since v2 (see [v2]):
+> 
+> 	- Fix typos
+> 
+> 	- Kconfig/Makefile chagnes account for alphabetical sorting of
+>           those files
+> 
+> 	- Remove redundant includes
+> 
+> 	- Make use of regmap_attach_dev and avoid storing refernce to
+>           struct *dev in private data
+> 
+> 	- Change code and headers to expose almost all of the reset
+>           related bits in SRC IP block
+> 
+> Changes since v1 (see [v1]):
+> 
+> 	- Various small DT bindings description fixes as per feedback
+>           from Rob Herring
+> 
+> 
+> [v1] https://lkml.org/lkml/2017/2/6/554
+> [v2] https://lkml.org/lkml/2017/2/13/488
+> [v3] https://lkml.org/lkml/2017/2/20/344
+> 
+> 
+>  .../devicetree/bindings/reset/fsl,imx7-src.txt     |  47 ++++++
 
-I submitted the driver to stagging, so I feel a bit responsible for
-this.  
+Acked-by: Rob Herring <robh@kernel.org>
 
-I personally don't mind e-mails like this since people have to get
-started somehow, and e-mail is rather easy to ignore or delete...
-
-Perhaps it would make sense to either update the maintainer list for
-this driver or move the driver somewhere else in staging?  I was
-looking at the maintainer list for bcm2835, and it already marks
-vc04_services as part of the bcm2835 files.  Perhaps another mark
-should be added or the driver moved under vc04_services?
+>  drivers/reset/Kconfig                              |   8 ++
+>  drivers/reset/Makefile                             |   2 +
+>  drivers/reset/reset-imx7.c                         | 158 +++++++++++++++++++++
+>  include/dt-bindings/reset/imx7-reset.h             |  62 ++++++++
+>  5 files changed, 277 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+>  create mode 100644 drivers/reset/reset-imx7.c
+>  create mode 100644 include/dt-bindings/reset/imx7-reset.h
