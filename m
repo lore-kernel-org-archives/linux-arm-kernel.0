@@ -1,122 +1,177 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 27 Feb 2017 19:54:30 +0000
-Subject: [RFC PATCH 19/30] PCI: Cache PRI and PASID bits in pci_dev
+Date: Mon, 27 Feb 2017 19:54:24 +0000
+Subject: [RFC PATCH 13/30] iommu/io-pgtable-arm: Factor out ARM LPAE register
+ defines
 In-Reply-To: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
 References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
-Message-ID: <20170227195441.5170-20-jean-philippe.brucker@arm.com>
+Message-ID: <20170227195441.5170-14-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device drivers need to check if an IOMMU enabled ATS, PRI and PASID in
-order to know when they can use the SVM API. Cache PRI and PASID bits in
-the pci_dev structure, similarly to what is currently done for ATS.
+For unified address space, we'll need to extract CPU page table
+information and mirror it in the substream setup. Move relevant defines
+to a common header.
+
+Fix TCR_SZ_MASK while we're at it.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/pci/ats.c   | 23 +++++++++++++++++++++++
- include/linux/pci.h |  2 ++
- 2 files changed, 25 insertions(+)
+ MAINTAINERS                    |  1 +
+ drivers/iommu/io-pgtable-arm.c | 48 +-----------------------------
+ drivers/iommu/io-pgtable-arm.h | 67 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 69 insertions(+), 47 deletions(-)
+ create mode 100644 drivers/iommu/io-pgtable-arm.h
 
-diff --git a/drivers/pci/ats.c b/drivers/pci/ats.c
-index 331376e9bb8b..486dc2208119 100644
---- a/drivers/pci/ats.c
-+++ b/drivers/pci/ats.c
-@@ -153,6 +153,9 @@ int pci_enable_pri(struct pci_dev *pdev, u32 reqs)
- 	u32 max_requests;
- 	int pos;
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 8d97b1d83c3e..bb089396cdd1 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2025,6 +2025,7 @@ S:	Maintained
+ F:	drivers/iommu/arm-smmu.c
+ F:	drivers/iommu/arm-smmu-v3.c
+ F:	drivers/iommu/io-pgtable-arm.c
++F:	drivers/iommu/io-pgtable-arm.h
+ F:	drivers/iommu/io-pgtable-arm-v7s.c
  
-+	if (WARN_ON(pdev->pri_enabled))
-+		return -EBUSY;
+ ARM64 PORT (AARCH64 ARCHITECTURE)
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index feacc54bec68..973c335afd04 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -30,6 +30,7 @@
+ #include <asm/barrier.h>
+ 
+ #include "io-pgtable.h"
++#include "io-pgtable-arm.h"
+ 
+ #define ARM_LPAE_MAX_ADDR_BITS		48
+ #define ARM_LPAE_S2_MAX_CONCAT_PAGES	16
+@@ -115,53 +116,6 @@
+ #define ARM_LPAE_PTE_MEMATTR_DEV	(((arm_lpae_iopte)0x1) << 2)
+ 
+ /* Register bits */
+-#define ARM_32_LPAE_TCR_EAE		(1 << 31)
+-#define ARM_64_LPAE_S2_TCR_RES1		(1 << 31)
+-
+-#define ARM_LPAE_TCR_EPD1		(1 << 23)
+-
+-#define ARM_LPAE_TCR_TG0_4K		(0 << 14)
+-#define ARM_LPAE_TCR_TG0_64K		(1 << 14)
+-#define ARM_LPAE_TCR_TG0_16K		(2 << 14)
+-
+-#define ARM_LPAE_TCR_SH0_SHIFT		12
+-#define ARM_LPAE_TCR_SH0_MASK		0x3
+-#define ARM_LPAE_TCR_SH_NS		0
+-#define ARM_LPAE_TCR_SH_OS		2
+-#define ARM_LPAE_TCR_SH_IS		3
+-
+-#define ARM_LPAE_TCR_ORGN0_SHIFT	10
+-#define ARM_LPAE_TCR_IRGN0_SHIFT	8
+-#define ARM_LPAE_TCR_RGN_MASK		0x3
+-#define ARM_LPAE_TCR_RGN_NC		0
+-#define ARM_LPAE_TCR_RGN_WBWA		1
+-#define ARM_LPAE_TCR_RGN_WT		2
+-#define ARM_LPAE_TCR_RGN_WB		3
+-
+-#define ARM_LPAE_TCR_SL0_SHIFT		6
+-#define ARM_LPAE_TCR_SL0_MASK		0x3
+-
+-#define ARM_LPAE_TCR_T0SZ_SHIFT		0
+-#define ARM_LPAE_TCR_SZ_MASK		0xf
+-
+-#define ARM_LPAE_TCR_PS_SHIFT		16
+-#define ARM_LPAE_TCR_PS_MASK		0x7
+-
+-#define ARM_LPAE_TCR_IPS_SHIFT		32
+-#define ARM_LPAE_TCR_IPS_MASK		0x7
+-
+-#define ARM_LPAE_TCR_PS_32_BIT		0x0ULL
+-#define ARM_LPAE_TCR_PS_36_BIT		0x1ULL
+-#define ARM_LPAE_TCR_PS_40_BIT		0x2ULL
+-#define ARM_LPAE_TCR_PS_42_BIT		0x3ULL
+-#define ARM_LPAE_TCR_PS_44_BIT		0x4ULL
+-#define ARM_LPAE_TCR_PS_48_BIT		0x5ULL
+-
+-#define ARM_LPAE_MAIR_ATTR_SHIFT(n)	((n) << 3)
+-#define ARM_LPAE_MAIR_ATTR_MASK		0xff
+-#define ARM_LPAE_MAIR_ATTR_DEVICE	0x04
+-#define ARM_LPAE_MAIR_ATTR_NC		0x44
+-#define ARM_LPAE_MAIR_ATTR_WBRWA	0xff
+ #define ARM_LPAE_MAIR_ATTR_IDX_NC	0
+ #define ARM_LPAE_MAIR_ATTR_IDX_CACHE	1
+ #define ARM_LPAE_MAIR_ATTR_IDX_DEV	2
+diff --git a/drivers/iommu/io-pgtable-arm.h b/drivers/iommu/io-pgtable-arm.h
+new file mode 100644
+index 000000000000..cb31314971ac
+--- /dev/null
++++ b/drivers/iommu/io-pgtable-arm.h
+@@ -0,0 +1,67 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Copyright (C) 2017 ARM Limited
++ */
++#ifndef __IO_PGTABLE_ARM_H
++#define __IO_PGTABLE_ARM_H
 +
- 	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PRI);
- 	if (!pos)
- 		return -EINVAL;
-@@ -170,6 +173,8 @@ int pci_enable_pri(struct pci_dev *pdev, u32 reqs)
- 	control |= PCI_PRI_CTRL_ENABLE;
- 	pci_write_config_word(pdev, pos + PCI_PRI_CTRL, control);
- 
-+	pdev->pri_enabled = 1;
++#define ARM_32_LPAE_TCR_EAE		(1 << 31)
++#define ARM_64_LPAE_S2_TCR_RES1		(1 << 31)
 +
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(pci_enable_pri);
-@@ -185,6 +190,9 @@ void pci_disable_pri(struct pci_dev *pdev)
- 	u16 control;
- 	int pos;
- 
-+	if (WARN_ON(!pdev->pri_enabled))
-+		return;
++#define ARM_LPAE_TCR_EPD1		(1 << 23)
 +
- 	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PRI);
- 	if (!pos)
- 		return;
-@@ -192,6 +200,8 @@ void pci_disable_pri(struct pci_dev *pdev)
- 	pci_read_config_word(pdev, pos + PCI_PRI_CTRL, &control);
- 	control &= ~PCI_PRI_CTRL_ENABLE;
- 	pci_write_config_word(pdev, pos + PCI_PRI_CTRL, control);
++#define ARM_LPAE_TCR_TG0_4K		(0 << 14)
++#define ARM_LPAE_TCR_TG0_64K		(1 << 14)
++#define ARM_LPAE_TCR_TG0_16K		(2 << 14)
 +
-+	pdev->pri_enabled = 0;
- }
- EXPORT_SYMBOL_GPL(pci_disable_pri);
- 
-@@ -207,6 +217,9 @@ int pci_reset_pri(struct pci_dev *pdev)
- 	u16 control;
- 	int pos;
- 
-+	if (WARN_ON(pdev->pri_enabled))
-+		return -EBUSY;
++#define ARM_LPAE_TCR_SH0_SHIFT		12
++#define ARM_LPAE_TCR_SH0_MASK		0x3
++#define ARM_LPAE_TCR_SH_NS		0
++#define ARM_LPAE_TCR_SH_OS		2
++#define ARM_LPAE_TCR_SH_IS		3
 +
- 	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PRI);
- 	if (!pos)
- 		return -EINVAL;
-@@ -239,6 +252,9 @@ int pci_enable_pasid(struct pci_dev *pdev, int features)
- 	u16 control, supported;
- 	int pos;
- 
-+	if (WARN_ON(pdev->pasid_enabled))
-+		return -EBUSY;
++#define ARM_LPAE_TCR_ORGN0_SHIFT	10
++#define ARM_LPAE_TCR_IRGN0_SHIFT	8
++#define ARM_LPAE_TCR_RGN_MASK		0x3
++#define ARM_LPAE_TCR_RGN_NC		0
++#define ARM_LPAE_TCR_RGN_WBWA		1
++#define ARM_LPAE_TCR_RGN_WT		2
++#define ARM_LPAE_TCR_RGN_WB		3
 +
- 	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PASID);
- 	if (!pos)
- 		return -EINVAL;
-@@ -259,6 +275,8 @@ int pci_enable_pasid(struct pci_dev *pdev, int features)
- 
- 	pci_write_config_word(pdev, pos + PCI_PASID_CTRL, control);
- 
-+	pdev->pasid_enabled = 1;
++#define ARM_LPAE_TCR_SL0_SHIFT		6
++#define ARM_LPAE_TCR_SL0_MASK		0x3
 +
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(pci_enable_pasid);
-@@ -273,11 +291,16 @@ void pci_disable_pasid(struct pci_dev *pdev)
- 	u16 control = 0;
- 	int pos;
- 
-+	if (WARN_ON(!pdev->pasid_enabled))
-+		return;
++#define ARM_LPAE_TCR_T0SZ_SHIFT		0
++#define ARM_LPAE_TCR_SZ_MASK		0x3f
 +
- 	pos = pci_find_ext_capability(pdev, PCI_EXT_CAP_ID_PASID);
- 	if (!pos)
- 		return;
- 
- 	pci_write_config_word(pdev, pos + PCI_PASID_CTRL, control);
++#define ARM_LPAE_TCR_PS_SHIFT		16
++#define ARM_LPAE_TCR_PS_MASK		0x7
 +
-+	pdev->pasid_enabled = 0;
- }
- EXPORT_SYMBOL_GPL(pci_disable_pasid);
- 
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index e606f289bf5f..47c353ca9957 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -351,6 +351,8 @@ struct pci_dev {
- 	unsigned int	msix_enabled:1;
- 	unsigned int	ari_enabled:1;	/* ARI forwarding */
- 	unsigned int	ats_enabled:1;	/* Address Translation Service */
-+	unsigned int	pasid_enabled:1;	/* Process Address Space ID */
-+	unsigned int	pri_enabled:1;		/* Page Request Interface */
- 	unsigned int	is_managed:1;
- 	unsigned int    needs_freset:1; /* Dev requires fundamental reset */
- 	unsigned int	state_saved:1;
++#define ARM_LPAE_TCR_IPS_SHIFT		32
++#define ARM_LPAE_TCR_IPS_MASK		0x7
++
++#define ARM_LPAE_TCR_PS_32_BIT		0x0ULL
++#define ARM_LPAE_TCR_PS_36_BIT		0x1ULL
++#define ARM_LPAE_TCR_PS_40_BIT		0x2ULL
++#define ARM_LPAE_TCR_PS_42_BIT		0x3ULL
++#define ARM_LPAE_TCR_PS_44_BIT		0x4ULL
++#define ARM_LPAE_TCR_PS_48_BIT		0x5ULL
++
++#define ARM_LPAE_MAIR_ATTR_SHIFT(n)	((n) << 3)
++#define ARM_LPAE_MAIR_ATTR_MASK		0xff
++#define ARM_LPAE_MAIR_ATTR_DEVICE	0x04
++#define ARM_LPAE_MAIR_ATTR_NC		0x44
++#define ARM_LPAE_MAIR_ATTR_WBRWA	0xff
++
++#endif /* __IO_PGTABLE_ARM_H */
 -- 
 2.11.0
