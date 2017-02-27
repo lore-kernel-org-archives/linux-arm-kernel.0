@@ -1,58 +1,61 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Sun, 26 Feb 2017 16:08:06 -0800
-Subject: [Outreachy kernel] [PATCH] staging: bcm2835-audio: Fixed spacing
- around '&'
-In-Reply-To: <1488146211.9188.10.camel@perches.com>
-References: <1488131271-2908-1-git-send-email-narcisaanamaria12@gmail.com>
- <alpine.DEB.2.20.1702261901180.2056@hadrien>
- <1488134072.9188.3.camel@perches.com>
- <alpine.DEB.2.20.1702261956070.2056@hadrien>
- <1488137824.9188.7.camel@perches.com>
- <alpine.DEB.2.20.1702262038560.2056@hadrien>
- <1488146211.9188.10.camel@perches.com>
-Message-ID: <3ed05e4f-b00a-8a4b-f4f2-de23ff9b461e@broadcom.com>
+From: tanxiaojun@huawei.com (Tan Xiaojun)
+Date: Mon, 27 Feb 2017 08:36:30 +0800
+Subject: [tip:perf/urgent] perf/core: Fix the perf_cpu_time_max_percent
+ check
+In-Reply-To: <20170225095117.GU6500@twins.programming.kicks-ass.net>
+References: <1487829879-56237-1-git-send-email-tanxiaojun@huawei.com>
+ <tip-1572e45a924f254d9570093abde46430c3172e3d@git.kernel.org>
+ <58B13BFD.2050304@huawei.com>
+ <20170225095117.GU6500@twins.programming.kicks-ass.net>
+Message-ID: <58B3748E.7080901@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 17-02-26 01:56 PM, Joe Perches wrote:
-> On Sun, 2017-02-26 at 20:40 +0100, Julia Lawall wrote:
->> On Sun, 26 Feb 2017, Joe Perches wrote:
->>> On Sun, 2017-02-26 at 19:59 +0100, Julia Lawall wrote:
->>>> On Sun, 26 Feb 2017, Joe Perches wrot
->>>>> Mailing lists _should_ be copied on patch submissions.
->>>> The idea of outreachy is that it should be a place for people to get
->>>> started without too much criticism from the outside.  Originally, only the
->>>> outreachy mailing list received patches.  But staging maintainers were
->>>> confused to have their drivers receiving patches that they had not seen.
->>>> So we expanded it to maintainers.
->>>
->>> That also doesn't make much sense as patches
->>> should not be applied that have not reached
->>> a mailing list for review.
->>>
->>> As long as initial outreachy patches are not
->>> applied and are just for internal review by
->>> any outside person but the outreachy list and
->>> are not be applied by maintainers, then perhaps
->>> it's best if neither maintainers nor lists are
->>> cc'd on the patches.
+On 2017/2/25 17:51, Peter Zijlstra wrote:
+> On Sat, Feb 25, 2017 at 04:10:37PM +0800, Tan Xiaojun wrote:
+> 
+>> Recently I was using perf_fuzzer for testing in Hisilicon
+>> D03/D05(arm64, linux-4.10-rc1).
 >>
->> The patches are applied by Greg.  Greg suggested the policy of adding
->> maintainers but not including mailing lists.  I'll let him consider
->> whether the policy should be changed.
->
-> Well, I will comment on patches sent to the kernel list.
->
-> I'm not subscribed to outreachy and I don't want to be
-> subscribed to that list either.
->
-I would prefer this outreachy work uses their own mailing list and 
-reviews their patches first.  Then once they have everything sorted out 
-they send out the patch series to the proper maintainers/mailing lists. 
-That way we're not spammed with all these emails of people as they are 
-learning how to format and send out proper patches.
+>> As we know perf_fuzzer will write a random value to procfs interface
+>> of perf event(like sysctl_perf_cpu_time_max_percent). The value may be
+>> 0 or 100, and I get logs like below:
+>>
+>> ----------------------------------
+>> [ 4046.358811] perf: Dynamic interrupt throttling disabled, can hang your system!
+>> ----------------------------------
+>>
+>> Most of the time, there is no problem, and the perf_fuzzer test can
+>> end without any warings or errors.  But there is a small probability
+>> that triggers the RCU and watchdog (The log is attached at the end).
+>> It hungs after local_irq_enable() in __do_softirq.
+>>
+>> I think this is due to the dynamic interrupt throttling disabled and
+>> too many hardware interruptions come. So I limit the
+>> sysctl_perf_cpu_time_max_percent can only be set 1 to 99 in the kernel
+>> codes. I test more than 20 times in D03, and there are no errors or
+>> warnings in the test.
+>>
+>> So I want to ask:
+>>
+>> 1)Is it a problem or not? (It has already given you a warning.)
+>>
+>> 2)If it is, where we will fix it more appropriate, perf_fuzzer(not set
+>> 0 or 100) or kernel(limit 1 to 99), or maybe it is the bug of
+>> hardware(too many hardware interruptions)?
+> 
+> I think the best would be if the fuzzer would not set 0,100, those are
+> clearly 'unsafe' settings and you pretty much get to keep the pieces.
+> 
+> I would like to preserve these settings for people that 'know' what
+> they're doing and are willing to take the risk, but clearly, when you
+> take the guard-rails off, things can come apart.
+> 
 
-Thanks,
-  Scott
+OK. It makes sense, I agree.
+
+Thank you for your answer.
+Xiaojun.
+
+> .
+> 
