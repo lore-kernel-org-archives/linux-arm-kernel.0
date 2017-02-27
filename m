@@ -1,82 +1,81 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Feb 2017 08:45:39 -0600
-Subject: [PATCH v4 24/36] [media] add Omnivision OV5640 sensor driver
-In-Reply-To: <1487211578-11360-25-git-send-email-steve_longerbeam@mentor.com>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-25-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170227144539.3la2veztkurhwa2p@rob-hp-laptop>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Mon, 27 Feb 2017 17:44:25 +0300
+Subject: [Outreachy kernel] [PATCH] staging: bcm2835-audio: Fixed spacing
+ around '&'
+In-Reply-To: <alpine.DEB.2.20.1702270724430.2187@hadrien>
+References: <1488131271-2908-1-git-send-email-narcisaanamaria12@gmail.com>
+ <alpine.DEB.2.20.1702261901180.2056@hadrien>
+ <1488134072.9188.3.camel@perches.com>
+ <alpine.DEB.2.20.1702261956070.2056@hadrien>
+ <1488137824.9188.7.camel@perches.com>
+ <alpine.DEB.2.20.1702262038560.2056@hadrien>
+ <1488146211.9188.10.camel@perches.com>
+ <3ed05e4f-b00a-8a4b-f4f2-de23ff9b461e@broadcom.com>
+ <alpine.DEB.2.20.1702270724430.2187@hadrien>
+Message-ID: <20170227144425.GA4315@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 15, 2017 at 06:19:26PM -0800, Steve Longerbeam wrote:
-> This driver is based on ov5640_mipi.c from Freescale imx_3.10.17_1.0.0_beta
-> branch, modified heavily to bring forward to latest interfaces and code
-> cleanup.
+On Mon, Feb 27, 2017 at 07:25:30AM +0100, Julia Lawall wrote:
 > 
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> ---
->  .../devicetree/bindings/media/i2c/ov5640.txt       |   43 +
-
-Please split to separate commit.
-
->  drivers/media/i2c/Kconfig                          |    7 +
->  drivers/media/i2c/Makefile                         |    1 +
->  drivers/media/i2c/ov5640.c                         | 2109 ++++++++++++++++++++
->  4 files changed, 2160 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/i2c/ov5640.txt
->  create mode 100644 drivers/media/i2c/ov5640.c
 > 
-> diff --git a/Documentation/devicetree/bindings/media/i2c/ov5640.txt b/Documentation/devicetree/bindings/media/i2c/ov5640.txt
-> new file mode 100644
-> index 0000000..4607bbe
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/i2c/ov5640.txt
-> @@ -0,0 +1,43 @@
-> +* Omnivision OV5640 MIPI CSI-2 sensor
-> +
-> +Required Properties:
-> +- compatible: should be "ovti,ov5640"
-> +- clocks: reference to the xclk input clock.
-> +- clock-names: should be "xclk".
-> +- DOVDD-supply: Digital I/O voltage supply, 1.8 volts
-> +- AVDD-supply: Analog voltage supply, 2.8 volts
-> +- DVDD-supply: Digital core voltage supply, 1.5 volts
-> +
-> +Optional Properties:
-> +- reset-gpios: reference to the GPIO connected to the reset pin, if any.
-> +- pwdn-gpios: reference to the GPIO connected to the pwdn pin, if any.
+> On Sun, 26 Feb 2017, Scott Branden wrote:
+> 
+> >
+> >
+> > On 17-02-26 01:56 PM, Joe Perches wrote:
+> > > On Sun, 2017-02-26 at 20:40 +0100, Julia Lawall wrote:
+> > > > On Sun, 26 Feb 2017, Joe Perches wrote:
+> > > > > On Sun, 2017-02-26 at 19:59 +0100, Julia Lawall wrote:
+> > > > > > On Sun, 26 Feb 2017, Joe Perches wrot
+> > > > > > > Mailing lists _should_ be copied on patch submissions.
+> > > > > > The idea of outreachy is that it should be a place for people to get
+> > > > > > started without too much criticism from the outside.  Originally, only
+> > > > > > the
+> > > > > > outreachy mailing list received patches.  But staging maintainers were
+> > > > > > confused to have their drivers receiving patches that they had not
+> > > > > > seen.
+> > > > > > So we expanded it to maintainers.
+> > > > >
 
-Use powerdown-gpios here as that is a somewhat standard name.
+It was mostly me being annoyed because outreachy reviews are not that
+good frankly.  We just were just looking at outreachy code from 2013
+where they "fixed" sparse endian notations by removing the endian
+conversions.  It was so obviously wrong just from reading the changelog
+before you even got to the patch itself...
 
-Both need to state what is the active state.
+> > > > > That also doesn't make much sense as patches
+> > > > > should not be applied that have not reached
+> > > > > a mailing list for review.
+> > > > >
+> > > > > As long as initial outreachy patches are not
+> > > > > applied and are just for internal review by
+> > > > > any outside person but the outreachy list and
+> > > > > are not be applied by maintainers, then perhaps
+> > > > > it's best if neither maintainers nor lists are
+> > > > > cc'd on the patches.
+> > > >
+> > > > The patches are applied by Greg.  Greg suggested the policy of adding
+> > > > maintainers but not including mailing lists.  I'll let him consider
+> > > > whether the policy should be changed.
+> > >
+> > > Well, I will comment on patches sent to the kernel list.
+> > >
+> > > I'm not subscribed to outreachy and I don't want to be
+> > > subscribed to that list either.
+> > >
+> > I would prefer this outreachy work uses their own mailing list and reviews
+> > their patches first.  Then once they have everything sorted out they send out
+> > the patch series to the proper maintainers/mailing lists. That way we're not
+> > spammed with all these emails of people as they are learning how to format and
+> > send out proper patches.
+> 
 
-> +
-> +The device node must contain one 'port' child node for its digital output
-> +video port, in accordance with the video interface bindings defined in
-> +Documentation/devicetree/bindings/media/video-interfaces.txt.
-> +
-> +Example:
-> +
-> +&i2c1 {
-> +	ov5640: camera at 3c {
-> +		compatible = "ovti,ov5640";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_ov5640>;
-> +		reg = <0x3c>;
-> +		clocks = <&clks IMX6QDL_CLK_CKO>;
-> +		clock-names = "xclk";
-> +		DOVDD-supply = <&vgen4_reg>; /* 1.8v */
-> +		AVDD-supply = <&vgen3_reg>;  /* 2.8v */
-> +		DVDD-supply = <&vgen2_reg>;  /* 1.5v */
-> +		pwdn-gpios = <&gpio1 19 GPIO_ACTIVE_HIGH>;
-> +		reset-gpios = <&gpio1 20 GPIO_ACTIVE_LOW>;
-> +
-> +		port {
-> +			ov5640_to_mipi_csi2: endpoint {
-> +				remote-endpoint = <&mipi_csi2_from_ov5640>;
-> +				clock-lanes = <0>;
-> +				data-lanes = <1 2>;
-> +			};
-> +		};
-> +	};
-> +};
+Outreachy emails are not really worse than normal staging patches so
+I don't mind the spam.  But it would be good if driver-devel were always
+CC'd on the final patch.
+
+I know Greg feels differently.
+
+regards,
+dan carpenter
