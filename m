@@ -1,30 +1,21 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 27 Feb 2017 17:36:30 -0500
-Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
-In-Reply-To: <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
-References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
- <f7532548-7007-1a32-f669-4520792805b3@caviumnetworks.com>
- <93219edf-0f6d-5cc7-309c-c998f16fe7ac@akamai.com>
- <aa139c18-1b04-2c20-2e22-89d74503b3cf@caviumnetworks.com>
- <20170227160601.5b79a1fe@gandalf.local.home>
- <6db89a8d-6053-51d1-5fd4-bae0179a5ebd@caviumnetworks.com>
- <20170227170911.2280ca3e@gandalf.local.home>
- <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
-Message-ID: <20170227173630.57fff459@gandalf.local.home>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 27 Feb 2017 16:38:54 -0600
+Subject: [PATCH v3 8/8] dt-bindings: phy-mt65xx-usb: add support for new
+ version phy
+In-Reply-To: <1487753705-6745-8-git-send-email-chunfeng.yun@mediatek.com>
+References: <1487753705-6745-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1487753705-6745-8-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <20170227223853.htphbxx2hyvll6fd@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Feb 2017 14:21:21 -0800
-David Daney <ddaney@caviumnetworks.com> wrote:
-
-> See attached for mips.  It seems to do the right thing.
+On Wed, Feb 22, 2017 at 04:55:05PM +0800, Chunfeng Yun wrote:
+> add a new compatible string for "mt2712", and move reference clock
+> into each port node;
 > 
-> I leave it as an exercise to the reader to fix the other architectures.
-> 
-> Consult your own  binutils experts to verify that what I say is true.
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  .../devicetree/bindings/phy/phy-mt65xx-usb.txt     |   93 +++++++++++++++++---
+>  1 file changed, 80 insertions(+), 13 deletions(-)
 
-It may still just be safer to do the pointers instead. That way we
-don't need to worry about some strange arch or off by one binutils
-messing it up.
-
--- Steve
+Acked-by: Rob Herring <robh@kernel.org>
