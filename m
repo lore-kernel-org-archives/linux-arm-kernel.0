@@ -1,61 +1,53 @@
-From: jbaron@akamai.com (Jason Baron)
-Date: Mon, 27 Feb 2017 17:50:25 -0500
-Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
-In-Reply-To: <7bd72716-feea-073f-741c-04212ebd0802@caviumnetworks.com>
-References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
- <f7532548-7007-1a32-f669-4520792805b3@caviumnetworks.com>
- <93219edf-0f6d-5cc7-309c-c998f16fe7ac@akamai.com>
- <aa139c18-1b04-2c20-2e22-89d74503b3cf@caviumnetworks.com>
- <20170227160601.5b79a1fe@gandalf.local.home>
- <6db89a8d-6053-51d1-5fd4-bae0179a5ebd@caviumnetworks.com>
- <20170227170911.2280ca3e@gandalf.local.home>
- <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
- <20170227173630.57fff459@gandalf.local.home>
- <7bd72716-feea-073f-741c-04212ebd0802@caviumnetworks.com>
-Message-ID: <68fe24ea-7795-24d8-211b-9d8a50affe9f@akamai.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 27 Feb 2017 16:52:09 -0600
+Subject: [PATCH v2 3/3] media: dt-bindings: vpif: new optional property
+In-Reply-To: <1487771027-7763-4-git-send-email-bgolaszewski@baylibre.com>
+References: <1487771027-7763-1-git-send-email-bgolaszewski@baylibre.com>
+ <1487771027-7763-4-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <20170227225209.26oieqwbafqjga2a@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Feb 22, 2017 at 02:43:47PM +0100, Bartosz Golaszewski wrote:
+> Add an optional property - enable-gpios - which can be used to specify
+> the GPIOs that must be requested to select the vpif functionality.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  Documentation/devicetree/bindings/media/ti,da850-vpif.txt | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+> index df7182a..23c5405 100644
+> --- a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+> +++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+> @@ -13,6 +13,9 @@ Required properties:
+>  - reg: physical base address and length of the registers set for the device;
+>  - interrupts: should contain IRQ line for the VPIF
+>  
+> +Optional properties:
+> +- enable-gpios: phandle of the GPIOs used to select the vpif functionality
 
+What does this control exactly? The GPIOs belong in the node they are 
+connected to and having GPIOs routed to this block seems strange.
 
-On 02/27/2017 05:45 PM, David Daney wrote:
-> On 02/27/2017 02:36 PM, Steven Rostedt wrote:
->> On Mon, 27 Feb 2017 14:21:21 -0800
->> David Daney <ddaney@caviumnetworks.com> wrote:
->>
->>> See attached for mips.  It seems to do the right thing.
->>>
->>> I leave it as an exercise to the reader to fix the other architectures.
->>>
->>> Consult your own  binutils experts to verify that what I say is true.
->>
->> It may still just be safer to do the pointers instead. That way we
->> don't need to worry about some strange arch or off by one binutils
->> messing it up.
->
-> Obviously it is your choice, but this is bog standard ELF linking.  In
-> theory even the arrays of power-of-2 sized objects should also supply an
-> entity size.  Think __ex_table and its ilk.
->
->
-> The benefit of supplying an entsize is that you don't have to change the
-> structure of the existing code and risk breaking something in the process.
->
-> David Daney
->
->
+There are inputs or outputs?
 
-Thanks for the suggestion! I would like to see if this resolves the ppc 
-issue we had. I'm attaching a powerpc patch based on your suggestion. 
-Hopefully, Sachin can try it.
-
-Thanks,
-
--Jason
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: ppc-pack.patch
-Type: text/x-patch
-Size: 1975 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170227/b285fe75/attachment.bin>
+> +
+>  Video Capture:
+>  
+>  VPIF has a 16-bit parallel bus input, supporting 2 8-bit channels or a
+> @@ -30,6 +33,10 @@ I2C-connected TVP5147 decoder:
+>  		reg = <0x217000 0x1000>;
+>  		interrupts = <92>;
+>  
+> +		enable-gpios = <&tca6416 7 GPIO_ACTIVE_HIGH
+> +				&tca6416 6 GPIO_ACTIVE_HIGH
+> +				&tca6416 5 GPIO_ACTIVE_LOW>;
+> +
+>  		port at 0 {
+>  			vpif_input_ch0: endpoint at 0 {
+>  				reg = <0>;
+> -- 
+> 2.9.3
+> 
