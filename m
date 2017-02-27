@@ -1,83 +1,141 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 27 Feb 2017 19:54:25 +0000
-Subject: [RFC PATCH 14/30] iommu/arm-smmu-v3: Share process page tables
+Date: Mon, 27 Feb 2017 19:54:38 +0000
+Subject: [RFC PATCH 27/30] iommu/arm-smmu-v3: Handle PRI queue overflow
 In-Reply-To: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
 References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
-Message-ID: <20170227195441.5170-15-jean-philippe.brucker@arm.com>
+Message-ID: <20170227195441.5170-28-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Copy the content of TCR, MAIR and TTBR of a given task into a context
-descriptor.
+When the PRI queue is full, it enters overflow condition, which is sticky
+and exited by the PRI thread once it has had time to free up some slots.
+During that time, no new entry is added to the queue. The SMMU
+automatically replies to PRI Page Requests (PPR) that have "last=1" with
+"success", to let the device retry later. PPRs that have "last=0" and
+PASID Stop Markers are silently ignored. Two related issues need to be
+fixed:
+
+* Any PPR in the PRI queue prior to the overflow condition might be in a
+  Page Request Group (PRG) that has its last entry auto-responded while in
+  overflow. Until we fix up the overflow, ignore any non-last PPR received
+  by the PRI thread.
+
+* In addition, any PRG of PPRs already committed to the fault queue is now
+  potentially invalid, since their last PPR might have been lost. Wait
+  until the overflow condition is fixed, and destroy *all* remaining PRG
+  structures :( We do that by appending a PRG sweeper work to the fault
+  queue, that will do some inefficient sweeping and lock up the fault
+  queue for a while. Awful, but necessary.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 39 +++++++++++++++++++++++++++++++++++++--
- 1 file changed, 37 insertions(+), 2 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 37 ++++++++++++++++++++++++++++++++++---
+ 1 file changed, 34 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index ab49164bf09b..c3fa4616bd58 100644
+index b5d45c1e14d1..1a5e72752e6d 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -44,6 +44,7 @@
- #include <linux/amba/bus.h>
+@@ -723,6 +723,7 @@ struct arm_smmu_device {
+ 	struct list_head		tasks;
  
- #include "io-pgtable.h"
-+#include "io-pgtable-arm.h"
+ 	struct workqueue_struct		*fault_queue;
++	struct work_struct		flush_prgs;
  
- /* MMIO registers */
- #define ARM_SMMU_IDR0			0x0
-@@ -2191,6 +2192,9 @@ static int arm_smmu_init_task_pgtable(struct arm_smmu_task *smmu_task)
+ 	struct list_head		domains;
+ 	struct mutex			domains_mutex;
+@@ -1798,7 +1799,8 @@ static irqreturn_t arm_smmu_evtq_thread(int irq, void *dev)
+ 
+ static void arm_smmu_handle_fault(struct work_struct *work);
+ 
+-static void arm_smmu_handle_ppr(struct arm_smmu_device *smmu, u64 *evt)
++static void arm_smmu_handle_ppr(struct arm_smmu_device *smmu, u64 *evt,
++				bool overflowing)
  {
- 	int ret;
- 	int asid;
-+	unsigned long tcr;
-+	unsigned long reg, par;
-+	struct arm_smmu_s1_cfg *cfg = &smmu_task->s1_cfg;
+ 	struct arm_smmu_fault *fault;
+ 	struct arm_smmu_fault params = {
+@@ -1817,6 +1819,9 @@ static void arm_smmu_handle_ppr(struct arm_smmu_device *smmu, u64 *evt)
+ 		.priv	= evt[0] & PRIQ_0_PERM_PRIV,
+ 	};
  
- 	/* Pin ASID on the CPU side */
- 	asid = mm_context_get(smmu_task->mm);
-@@ -2203,8 +2207,39 @@ static int arm_smmu_init_task_pgtable(struct arm_smmu_task *smmu_task)
- 		return ret;
++	if (overflowing && !params.last)
++		return;
++
+ 	fault = kmem_cache_alloc(arm_smmu_fault_cache, GFP_KERNEL);
+ 	if (!fault) {
+ 		/* Out of memory, tell the device to retry later */
+@@ -1834,6 +1839,7 @@ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
+ 	struct arm_smmu_device *smmu = dev;
+ 	struct arm_smmu_queue *q = &smmu->priq.q;
+ 	size_t queue_size = 1 << q->max_n_shift;
++	bool overflowing = false;
+ 	u64 evt[PRIQ_ENT_DWORDS];
+ 	size_t i = 0;
+ 
+@@ -1842,7 +1848,7 @@ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
+ 	do {
+ 		while (!queue_remove_raw(q, evt)) {
+ 			spin_unlock(&smmu->priq.wq.lock);
+-			arm_smmu_handle_ppr(smmu, evt);
++			arm_smmu_handle_ppr(smmu, evt, overflowing);
+ 			spin_lock(&smmu->priq.wq.lock);
+ 			if (++i == queue_size) {
+ 				smmu->priq.batch++;
+@@ -1851,8 +1857,10 @@ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
+ 			}
+ 		}
+ 
+-		if (queue_sync_prod(q) == -EOVERFLOW)
++		if (queue_sync_prod(q) == -EOVERFLOW) {
+ 			dev_err(smmu->dev, "PRIQ overflow detected -- requests lost\n");
++			overflowing = true;
++		}
+ 	} while (!queue_empty(q));
+ 
+ 	/* Sync our overflow flag, as we believe we're up to speed */
+@@ -1863,6 +1871,9 @@ static irqreturn_t arm_smmu_priq_thread(int irq, void *dev)
+ 
+ 	spin_unlock(&smmu->priq.wq.lock);
+ 
++	if (overflowing)
++		queue_work(smmu->fault_queue, &smmu->flush_prgs);
++
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -2820,6 +2831,24 @@ static void arm_smmu_handle_fault(struct work_struct *work)
+ 	kfree(fault);
+ }
+ 
++static void arm_smmu_flush_prgs(struct work_struct *work)
++{
++	struct arm_smmu_device *smmu;
++	struct arm_smmu_task *smmu_task;
++	struct arm_smmu_pri_group *prg, *next_prg;
++
++	smmu = container_of(work, struct arm_smmu_device, flush_prgs);
++
++	spin_lock(&smmu->contexts_lock);
++	list_for_each_entry(smmu_task, &smmu->tasks, smmu_head) {
++		list_for_each_entry_safe(prg, next_prg, &smmu_task->prgs, list) {
++			list_del(&prg->list);
++			kfree(prg);
++		}
++	}
++	spin_unlock(&smmu->contexts_lock);
++}
++
+ static void arm_smmu_sweep_contexts(struct work_struct *work)
+ {
+ 	u64 batch;
+@@ -4269,6 +4298,8 @@ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
+ 		smmu->fault_queue = alloc_ordered_workqueue("smmu_fault_queue", 0);
+ 		if (!smmu->fault_queue)
+ 			return -ENOMEM;
++
++		INIT_WORK(&smmu->flush_prgs, arm_smmu_flush_prgs);
  	}
  
--	/* TODO: Initialize the rest of s1_cfg */
--	smmu_task->s1_cfg.asid = asid;
-+	tcr = TCR_T0SZ(VA_BITS) | TCR_IRGN0_WBWA | TCR_ORGN0_WBWA |
-+		TCR_SH0_INNER | ARM_LPAE_TCR_EPD1;
-+
-+	switch (PAGE_SIZE) {
-+	case SZ_4K:
-+		tcr |= TCR_TG0_4K;
-+		break;
-+	case SZ_16K:
-+		tcr |= TCR_TG0_16K;
-+		break;
-+	case SZ_64K:
-+		tcr |= TCR_TG0_64K;
-+		break;
-+	default:
-+		WARN_ON(1);
-+		return -EFAULT;
-+	}
-+
-+	reg = read_system_reg(SYS_ID_AA64MMFR0_EL1);
-+	par = cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR0_PARANGE_SHIFT);
-+	tcr |= par << ARM_LPAE_TCR_IPS_SHIFT;
-+
-+	/* Enable this by default, it will be filtered when writing the CD */
-+	tcr |= TCR_TBI0;
-+
-+	cfg->asid	= asid;
-+	cfg->ttbr	= virt_to_phys(smmu_task->mm->pgd);
-+	/*
-+	 * MAIR value is pretty much constant and global, so we can just get it
-+	 * from the current CPU register
-+	 */
-+	cfg->mair	= read_sysreg(mair_el1);
-+	cfg->tcr	= tcr;
- 
- 	return 0;
- }
+ 	return arm_smmu_init_strtab(smmu);
 -- 
 2.11.0
