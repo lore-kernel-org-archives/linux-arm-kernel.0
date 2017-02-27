@@ -1,134 +1,397 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 27 Feb 2017 19:54:19 +0000
-Subject: [RFC PATCH 08/30] iommu/arm-smmu-v3: Add support for VHE
+Date: Mon, 27 Feb 2017 19:54:18 +0000
+Subject: [RFC PATCH 07/30] iommu/arm-smmu-v3: Add second level of context
+ descriptor table
 In-Reply-To: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
 References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
-Message-ID: <20170227195441.5170-9-jean-philippe.brucker@arm.com>
+Message-ID: <20170227195441.5170-8-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8.1 extensions added Virtualization Host Extensions (VHE), which allow
-to run a host kernel at EL2. When using normal DMA, Device and CPU address
-spaces are orthogonal, and do not need to implement the same capabilities,
-so VHE hasn't been in use on the SMMU side until now.
-
-With shared address spaces however, ASIDs are shared between MMU and SMMU,
-and broadcast TLB invalidations issued by a CPU are taken into account by
-the SMMU. TLB entries on both sides need to have identical exception level
-in order to be shot with a single invalidation.
-
-When the CPU is using VHE, enable VHE in the SMMU and for all streams.
-Normal DMA mappings will need to use TLBI_EL2 commands instead of TLBI_NH,
-but shouldn't be otherwise affected by this change.
+The SMMU can support up to 20 bits of SSID. Add a second level of page
+tables to accommodate this. Devices without support for SSID still have a
+single context descriptor, but the others now have a first table of 1024
+entries (8kB), pointing to tables of 1024 context descriptors (64kB),
+allocated on demand.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 29 ++++++++++++++++++++++++-----
- 1 file changed, 24 insertions(+), 5 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 251 +++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 223 insertions(+), 28 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index cebbc8a22ec6..0981159ada04 100644
+index f88d62025efa..cebbc8a22ec6 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -22,6 +22,7 @@
+@@ -241,6 +241,8 @@
  
- #include <linux/acpi.h>
- #include <linux/acpi_iort.h>
-+#include <linux/cpufeature.h>
- #include <linux/delay.h>
- #include <linux/dma-iommu.h>
- #include <linux/err.h>
-@@ -522,6 +523,8 @@ struct arm_smmu_cmdq_ent {
- 		#define CMDQ_OP_TLBI_NH_ASID	0x11
- 		#define CMDQ_OP_TLBI_NH_VA	0x12
- 		#define CMDQ_OP_TLBI_EL2_ALL	0x20
-+		#define CMDQ_OP_TLBI_EL2_ASID	0x21
-+		#define CMDQ_OP_TLBI_EL2_VA	0x22
- 		#define CMDQ_OP_TLBI_S12_VMALL	0x28
- 		#define CMDQ_OP_TLBI_S2_IPA	0x2a
- 		#define CMDQ_OP_TLBI_NSNH_ALL	0x30
-@@ -665,6 +668,7 @@ struct arm_smmu_device {
- #define ARM_SMMU_FEAT_TRANS_S2		(1 << 10)
- #define ARM_SMMU_FEAT_STALLS		(1 << 11)
- #define ARM_SMMU_FEAT_HYP		(1 << 12)
-+#define ARM_SMMU_FEAT_E2H		(1 << 13)
- 	u32				features;
+ #define STRTAB_STE_0_S1FMT_SHIFT	4
+ #define STRTAB_STE_0_S1FMT_LINEAR	(0UL << STRTAB_STE_0_S1FMT_SHIFT)
++#define STRTAB_STE_0_S1FMT_4K_L2	(1UL << STRTAB_STE_0_S1FMT_SHIFT)
++#define STRTAB_STE_0_S1FMT_64K_L2	(2UL << STRTAB_STE_0_S1FMT_SHIFT)
+ #define STRTAB_STE_0_S1CTXPTR_SHIFT	6
+ #define STRTAB_STE_0_S1CTXPTR_MASK	0x3ffffffffffUL
+ #define STRTAB_STE_0_S1CDMAX_SHIFT	59
+@@ -289,7 +291,21 @@
+ #define STRTAB_STE_3_S2TTB_SHIFT	4
+ #define STRTAB_STE_3_S2TTB_MASK		0xfffffffffffUL
  
- #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-@@ -928,6 +932,7 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
- 		cmd[1] |= CMDQ_CFGI_1_RANGE_MASK << CMDQ_CFGI_1_RANGE_SHIFT;
- 		break;
- 	case CMDQ_OP_TLBI_NH_VA:
-+	case CMDQ_OP_TLBI_EL2_VA:
- 		cmd[0] |= (u64)ent->tlbi.asid << CMDQ_TLBI_0_ASID_SHIFT;
- 		cmd[1] |= ent->tlbi.leaf ? CMDQ_TLBI_1_LEAF : 0;
- 		cmd[1] |= ent->tlbi.addr & CMDQ_TLBI_1_VA_MASK;
-@@ -943,6 +948,9 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
- 	case CMDQ_OP_TLBI_S12_VMALL:
- 		cmd[0] |= (u64)ent->tlbi.vmid << CMDQ_TLBI_0_VMID_SHIFT;
- 		break;
-+	case CMDQ_OP_TLBI_EL2_ASID:
-+		cmd[0] |= (u64)ent->tlbi.asid << CMDQ_TLBI_0_ASID_SHIFT;
-+		break;
- 	case CMDQ_OP_ATC_INV:
- 		cmd[0] |= ent->substream_valid ? CMDQ_0_SSV : 0;
- 		cmd[0] |= ent->atc.global ? CMDQ_ATC_0_GLOBAL : 0;
-@@ -1522,7 +1530,9 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
- 			 STRTAB_STE_1_S1C_CACHE_WBRA
- 			 << STRTAB_STE_1_S1COR_SHIFT |
- 			 STRTAB_STE_1_S1C_SH_ISH << STRTAB_STE_1_S1CSH_SHIFT |
--			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
-+			 (smmu->features & ARM_SMMU_FEAT_E2H ?
-+			  STRTAB_STE_1_STRW_EL2 : STRTAB_STE_1_STRW_NSEL1) <<
-+			 STRTAB_STE_1_STRW_SHIFT);
- 
- 		if (smmu->features & ARM_SMMU_FEAT_STALLS)
- 			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
-@@ -1776,7 +1786,8 @@ static void arm_smmu_tlb_inv_context(void *cookie)
- 	struct arm_smmu_cmdq_ent cmd;
- 
- 	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
--		cmd.opcode	= CMDQ_OP_TLBI_NH_ASID;
-+		cmd.opcode	= smmu->features & ARM_SMMU_FEAT_E2H ?
-+				  CMDQ_OP_TLBI_EL2_ASID : CMDQ_OP_TLBI_NH_ASID;
- 		cmd.tlbi.asid	= smmu_domain->s1_cfg.asid;
- 		cmd.tlbi.vmid	= 0;
- 	} else {
-@@ -1801,7 +1812,8 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- 	};
- 
- 	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
--		cmd.opcode	= CMDQ_OP_TLBI_NH_VA;
-+		cmd.opcode	= smmu->features & ARM_SMMU_FEAT_E2H ?
-+				  CMDQ_OP_TLBI_EL2_VA : CMDQ_OP_TLBI_NH_VA;
- 		cmd.tlbi.asid	= smmu_domain->s1_cfg.asid;
- 	} else {
- 		cmd.opcode	= CMDQ_OP_TLBI_S2_IPA;
-@@ -3011,7 +3023,11 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
- 	writel_relaxed(reg, smmu->base + ARM_SMMU_CR1);
- 
- 	/* CR2 (random crap) */
--	reg = CR2_PTM | CR2_RECINVSID | CR2_E2H;
-+	reg = CR2_PTM | CR2_RECINVSID;
+-/* Context descriptor (stage-1 only) */
++/*
++ * Context descriptor
++ *
++ * Linear: when less than 1024 SSIDs are supported
++ * 2lvl:@most 1024 L1 entrie,
++ *	 1024 lazy entries per table.
++ */
++#define CTXDESC_SPLIT			10
++#define CTXDESC_NUM_L2_ENTRIES		(1 << CTXDESC_SPLIT)
 +
-+	if (smmu->features & ARM_SMMU_FEAT_E2H)
-+		reg |= CR2_E2H;
++#define CTXDESC_L1_DESC_DWORD		1
++#define CTXDESC_L1_DESC_VALID		1
++#define CTXDESC_L1_DESC_L2PTR_SHIFT	12
++#define CTXDESC_L1_DESC_L2PTR_MASK	0xfffffffffUL
 +
- 	writel_relaxed(reg, smmu->base + ARM_SMMU_CR2);
+ #define CTXDESC_CD_DWORDS		8
+ #define CTXDESC_CD_0_TCR_T0SZ_SHIFT	0
+ #define ARM64_TCR_T0SZ_SHIFT		0
+@@ -588,11 +604,27 @@ struct arm_smmu_s2_cfg {
+ 	u64				vtcr;
+ };
  
- 	/* Stream table */
-@@ -3169,8 +3185,11 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 	if (reg & IDR0_MSI)
- 		smmu->features |= ARM_SMMU_FEAT_MSI;
+-struct arm_smmu_cd_cfg {
++struct arm_smmu_cd_table {
+ 	__le64				*cdptr;
+ 	dma_addr_t			cdptr_dma;
  
--	if (reg & IDR0_HYP)
-+	if (reg & IDR0_HYP) {
- 		smmu->features |= ARM_SMMU_FEAT_HYP;
-+		if (cpus_have_cap(ARM64_HAS_VIRT_HOST_EXTN))
-+			smmu->features |= ARM_SMMU_FEAT_E2H;
-+	}
+ 	unsigned long			*context_map;
++};
++
++struct arm_smmu_cd_cfg {
++	bool				linear;
++
++	union {
++		struct arm_smmu_cd_table table;
++		struct {
++			__le64		*ptr;
++			dma_addr_t	ptr_dma;
++
++			struct arm_smmu_cd_table *tables;
++			unsigned long	cur_table;
++		} l1;
++	};
++
+ 	size_t				num_entries;
+ };
+ 
+@@ -1054,6 +1086,27 @@ static void arm_smmu_sync_cd(struct arm_smmu_master_data *master, u32 ssid,
+ 	arm_smmu_cmdq_issue_cmd(smmu, &cmd);
+ }
+ 
++static __u64 *arm_smmu_get_cd_ptr(struct arm_smmu_cd_cfg *cfg, u32 ssid)
++{
++	unsigned long idx;
++	struct arm_smmu_cd_table *l1_desc;
++
++	if (cfg->linear)
++		return cfg->table.cdptr + ssid * CTXDESC_CD_DWORDS;
++
++	idx = ssid >> CTXDESC_SPLIT;
++	if (idx >= cfg->num_entries)
++		return NULL;
++
++	l1_desc = &cfg->l1.tables[idx];
++	if (!l1_desc->cdptr)
++		return NULL;
++
++	idx = ssid & ((1 << CTXDESC_SPLIT) - 1);
++
++	return l1_desc->cdptr + idx * CTXDESC_CD_DWORDS;
++}
++
+ static u64 arm_smmu_cpu_tcr_to_cd(struct arm_smmu_device *smmu, u64 tcr)
+ {
+ 	u64 val = 0;
+@@ -1073,6 +1126,15 @@ static u64 arm_smmu_cpu_tcr_to_cd(struct arm_smmu_device *smmu, u64 tcr)
+ 	return val;
+ }
+ 
++static void arm_smmu_write_cd_l1_desc(__le64 *dst,
++				      struct arm_smmu_cd_table *table)
++{
++	u64 val = (table->cdptr_dma & CTXDESC_L1_DESC_L2PTR_MASK
++		  << CTXDESC_L1_DESC_L2PTR_SHIFT) | CTXDESC_L1_DESC_VALID;
++
++	*dst = cpu_to_le64(val);
++}
++
+ static void arm_smmu_write_ctx_desc(struct arm_smmu_master_data *master,
+ 				    u32 ssid, struct arm_smmu_s1_cfg *cfg)
+ {
+@@ -1080,7 +1142,7 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_master_data *master,
+ 	bool cd_live;
+ 	struct arm_smmu_device *smmu = master->smmu;
+ 	struct arm_smmu_cd_cfg *descs_cfg = &master->ste.cd_cfg;
+-	__u64 *cdptr = (__u64 *)descs_cfg->cdptr + ssid * CTXDESC_CD_DWORDS;
++	__u64 *cdptr = arm_smmu_get_cd_ptr(descs_cfg, ssid);
  
  	/*
- 	 * The coherency feature as set by FW is used in preference to the ID
+ 	 * This function handles the following cases:
+@@ -1097,6 +1159,9 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_master_data *master,
+ 	 *     so this CD is already unreachable and invalidated.
+ 	 */
+ 
++	if (WARN_ON(!cdptr))
++		return;
++
+ 	val = le64_to_cpu(cdptr[0]);
+ 	cd_live = !!(val & CTXDESC_CD_0_V);
+ 
+@@ -1152,9 +1217,43 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_master_data *master,
+ 		arm_smmu_sync_cd(master, ssid, true);
+ }
+ 
++static int arm_smmu_alloc_cd_leaf_table(struct arm_smmu_device *smmu,
++					struct arm_smmu_cd_table *desc,
++					size_t num_entries)
++{
++	size_t size = num_entries * (CTXDESC_CD_DWORDS << 3);
++
++	desc->context_map = devm_kzalloc(smmu->dev, BITS_TO_LONGS(num_entries) *
++					 sizeof(long), GFP_ATOMIC);
++	if (!desc->context_map)
++		return -ENOMEM;
++
++	desc->cdptr = dmam_alloc_coherent(smmu->dev, size, &desc->cdptr_dma,
++					  GFP_ATOMIC | __GFP_ZERO);
++	if (!desc->cdptr) {
++		devm_kfree(smmu->dev, desc->context_map);
++		return -ENOMEM;
++	}
++
++	return 0;
++}
++
++static void arm_smmu_free_cd_leaf_table(struct arm_smmu_device *smmu,
++					struct arm_smmu_cd_table *desc,
++					size_t num_entries)
++{
++	size_t size = num_entries * (CTXDESC_CD_DWORDS << 3);
++
++	dmam_free_coherent(smmu->dev, size, desc->cdptr, desc->cdptr_dma);
++	devm_kfree(smmu->dev, desc->context_map);
++}
++
+ static int arm_smmu_alloc_cd_tables(struct arm_smmu_master_data *master,
+-				    size_t nr_ssids)
++				    int nr_ssids)
+ {
++	int ret;
++	size_t num_leaf_entries, size = 0;
++	struct arm_smmu_cd_table *leaf_table;
+ 	struct arm_smmu_device *smmu = master->smmu;
+ 	struct arm_smmu_cd_cfg *cfg = &master->ste.cd_cfg;
+ 
+@@ -1170,42 +1269,86 @@ static int arm_smmu_alloc_cd_tables(struct arm_smmu_master_data *master,
+ 	if (WARN_ON_ONCE(!is_power_of_2(nr_ssids)))
+ 		nr_ssids = 1;
+ 
+-	cfg->num_entries = nr_ssids;
++	if (nr_ssids <= (1 << CTXDESC_SPLIT)) {
++		/* Fits in a single table */
++		cfg->linear = true;
++		cfg->num_entries = num_leaf_entries = nr_ssids;
++		leaf_table = &cfg->table;
++	} else {
++		/*
++		 * SSID[S1CDmax-1:10] indexes 1st-level table, SSID[9:0] indexes
++		 * 2nd-level
++		 */
++		cfg->linear = false;
++		cfg->num_entries = nr_ssids / CTXDESC_NUM_L2_ENTRIES;
+ 
+-	cfg->context_map = devm_kzalloc(smmu->dev,
+-					BITS_TO_LONGS(nr_ssids) * sizeof(long),
+-					GFP_KERNEL);
+-	if (!cfg->context_map)
+-		return -ENOMEM;
++		cfg->l1.tables = devm_kzalloc(smmu->dev,
++					      sizeof(struct arm_smmu_cd_table) *
++					      cfg->num_entries, GFP_KERNEL);
++		if (!cfg->l1.tables)
++			return -ENOMEM;
+ 
+-	/* SSID 0 corresponds to default context */
+-	set_bit(0, cfg->context_map);
+-
+-	cfg->cdptr = dmam_alloc_coherent(smmu->dev,
+-					 nr_ssids * (CTXDESC_CD_DWORDS << 3),
+-					 &cfg->cdptr_dma,
+-					 GFP_KERNEL | __GFP_ZERO);
+-	if (!cfg->cdptr) {
+-		devm_kfree(smmu->dev, cfg->context_map);
+-		return -ENOMEM;
++		size = cfg->num_entries * (CTXDESC_L1_DESC_DWORD << 3);
++		cfg->l1.ptr = dmam_alloc_coherent(smmu->dev, size,
++						  &cfg->l1.ptr_dma,
++						  GFP_KERNEL | __GFP_ZERO);
++		if (!cfg->l1.ptr) {
++			devm_kfree(smmu->dev, cfg->l1.tables);
++			return -ENOMEM;
++		}
++
++		num_leaf_entries = CTXDESC_NUM_L2_ENTRIES;
++		leaf_table = cfg->l1.tables;
+ 	}
+ 
++	ret = arm_smmu_alloc_cd_leaf_table(smmu, leaf_table, num_leaf_entries);
++	if (ret) {
++		if (!cfg->linear) {
++			dmam_free_coherent(smmu->dev, size, cfg->l1.ptr,
++					   cfg->l1.ptr_dma);
++			devm_kfree(smmu->dev, cfg->l1.tables);
++		}
++
++		cfg->num_entries = 0;
++		return ret;
++	}
++
++	if (!cfg->linear)
++		arm_smmu_write_cd_l1_desc(cfg->l1.ptr, leaf_table);
++
++	/* SSID 0 corresponds to default context */
++	set_bit(0, leaf_table->context_map);
++
+ 	return nr_ssids;
+ }
+ 
+ static void arm_smmu_free_cd_tables(struct arm_smmu_master_data *master)
+ {
++	size_t i, size;
+ 	struct arm_smmu_device *smmu = master->smmu;
+ 	struct arm_smmu_cd_cfg *cfg = &master->ste.cd_cfg;
+ 
+ 	if (!cfg->num_entries)
+ 		return;
+ 
+-	dmam_free_coherent(smmu->dev,
+-			   cfg->num_entries * (CTXDESC_CD_DWORDS << 3),
+-			   cfg->cdptr, cfg->cdptr_dma);
++	if (cfg->linear) {
++		arm_smmu_free_cd_leaf_table(smmu, &cfg->table, cfg->num_entries);
++	} else {
++		for (i = 0; i < cfg->num_entries; i++) {
++			struct arm_smmu_cd_table *desc = &cfg->l1.tables[i];
++
++			if (!desc->cdptr)
++				continue;
++
++			arm_smmu_free_cd_leaf_table(smmu, desc,
++						    CTXDESC_NUM_L2_ENTRIES);
++		}
++
++		size = cfg->num_entries * (CTXDESC_L1_DESC_DWORD << 3);
++		dmam_free_coherent(smmu->dev, size, cfg->l1.ptr, cfg->l1.ptr_dma);
+ 
+-	devm_kfree(smmu->dev, cfg->context_map);
++		devm_kfree(smmu->dev, cfg->l1.tables);
++	}
+ 
+ 	cfg->num_entries = 0;
+ }
+@@ -1213,17 +1356,59 @@ static void arm_smmu_free_cd_tables(struct arm_smmu_master_data *master)
+ __maybe_unused
+ static int arm_smmu_alloc_cd(struct arm_smmu_master_data *master)
+ {
++	int ssid;
++	int i, ret;
+ 	struct arm_smmu_cd_cfg *cfg = &master->ste.cd_cfg;
+ 
+-	return arm_smmu_bitmap_alloc(cfg->context_map, ilog2(cfg->num_entries));
++	if (cfg->linear)
++		return arm_smmu_bitmap_alloc(cfg->table.context_map,
++					     ilog2(cfg->num_entries));
++
++	/* Find first leaf table with an empty slot, or allocate a new leaf */
++	for (i = cfg->l1.cur_table; i < cfg->num_entries; i++) {
++		struct arm_smmu_cd_table *table = &cfg->l1.tables[i];
++
++		if (!table->cdptr) {
++			__le64 *l1ptr = cfg->l1.ptr + i * CTXDESC_L1_DESC_DWORD;
++
++			ret = arm_smmu_alloc_cd_leaf_table(master->smmu, table,
++							   CTXDESC_NUM_L2_ENTRIES);
++			if (ret)
++				return ret;
++
++			arm_smmu_write_cd_l1_desc(l1ptr, table);
++			arm_smmu_sync_cd(master, i << CTXDESC_SPLIT, false);
++		}
++
++		ssid = arm_smmu_bitmap_alloc(table->context_map, CTXDESC_SPLIT);
++		if (ssid < 0)
++			continue;
++
++		cfg->l1.cur_table = i;
++		return i << CTXDESC_SPLIT | ssid;
++	}
++
++	return -ENOSPC;
+ }
+ 
+ __maybe_unused
+ static void arm_smmu_free_cd(struct arm_smmu_master_data *master, u32 ssid)
+ {
++	unsigned long l1_idx, idx;
+ 	struct arm_smmu_cd_cfg *cfg = &master->ste.cd_cfg;
+ 
+-	arm_smmu_bitmap_free(cfg->context_map, ssid);
++	if (cfg->linear) {
++		arm_smmu_bitmap_free(cfg->table.context_map, ssid);
++		return;
++	}
++
++	l1_idx = ssid >> CTXDESC_SPLIT;
++	idx = ssid & ((1 << CTXDESC_SPLIT) - 1);
++	arm_smmu_bitmap_free(cfg->l1.tables[l1_idx].context_map, idx);
++
++	/* Prepare next allocation */
++	if (cfg->l1.cur_table > idx)
++		cfg->l1.cur_table = idx;
+ }
+ 
+ /* Stream table manipulation functions */
+@@ -1318,7 +1503,16 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+ 	}
+ 
+ 	if (ste->s1_cfg) {
++		dma_addr_t s1ctxptr;
+ 		unsigned int s1cdmax = ilog2(ste->cd_cfg.num_entries);
++
++		if (ste->cd_cfg.linear) {
++			s1ctxptr = ste->cd_cfg.table.cdptr_dma;
++		} else {
++			s1cdmax += CTXDESC_SPLIT;
++			s1ctxptr = ste->cd_cfg.l1.ptr_dma;
++		}
++
+ 		BUG_ON(ste_live);
+ 
+ 		dst[1] = cpu_to_le64(
+@@ -1333,11 +1527,12 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+ 		if (smmu->features & ARM_SMMU_FEAT_STALLS)
+ 			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
+ 
+-		val |= (ste->cd_cfg.cdptr_dma & STRTAB_STE_0_S1CTXPTR_MASK
++		val |= (s1ctxptr & STRTAB_STE_0_S1CTXPTR_MASK
+ 		        << STRTAB_STE_0_S1CTXPTR_SHIFT) |
+ 			(u64)(s1cdmax & STRTAB_STE_0_S1CDMAX_MASK)
+ 			<< STRTAB_STE_0_S1CDMAX_SHIFT |
+-			STRTAB_STE_0_S1FMT_LINEAR |
++			(ste->cd_cfg.linear ? STRTAB_STE_0_S1FMT_LINEAR :
++			   STRTAB_STE_0_S1FMT_64K_L2) |
+ 			STRTAB_STE_0_CFG_S1_TRANS;
+ 	}
+ 
 -- 
 2.11.0
