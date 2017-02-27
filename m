@@ -1,5 +1,5 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Feb 2017 08:07:51 -0800
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 27 Feb 2017 17:12:16 +0100 (CET)
 Subject: [WARNING: A/V UNSCANNABLE][Merge tag 'media/v4.11-1' of git]
  ff58d005cd: BUG: unable to handle kernel NULL pointer dereference at
  0000039c
@@ -9,14 +9,12 @@ References: <58b07b30.9XFLj9Hhl7F6HMc2%fengguang.wu@intel.com>
  <20170225090741.GA20463@gmail.com>
  <CA+55aFy+ER8cYV02eZsKAOLnZBWY96zNWqUFWSWT1+3sZD4XnQ@mail.gmail.com>
  <alpine.DEB.2.20.1702271105090.4732@nanos>
- <alpine.DEB.2.20.1702271231410.4732@nanos>
- <20170227154124.GA20569@gmail.com>
-Message-ID: <20170227160750.GM21809@atomide.com>
+ <alpine.DEB.2.20.1702271231410.4732@nanos> <20170227154124.GA20569@gmail.com>
+Message-ID: <alpine.DEB.2.20.1702271647570.4732@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ingo Molnar <mingo@kernel.org> [170227 07:44]:
-> 
+On Mon, 27 Feb 2017, Ingo Molnar wrote:
 > * Thomas Gleixner <tglx@linutronix.de> wrote:
 > 
 > > The pending interrupt issue happens, at least on my test boxen, mostly on
@@ -36,12 +34,7 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > >  - Spurious interrupt caused by driver probing itself. I.e. the driver
 > >    probing code causes an interrupt issued from the device
 > >    inadvertently. That happens even on IRQ >= 16.
-
-This sounds a lot like what we saw few weeks ago with dwc3. See commit
-12a7f17fac5b ("usb: dwc3: omap: fix race of pm runtime with irq handler in
-probe"). It was caused by runtime PM and -EPROBE_DEFER, see the description
-Grygorii wrote up in that commit.
-
+> > 
 > >    This problem might be handled by the device driver code itself, but
 > >    that's going to be ugly. See below.
 > 
@@ -64,11 +57,32 @@ Grygorii wrote up in that commit.
 > If the IRQ handler crashed the moment it was first written by the driver author 
 > we'd never see these problems.
 
-Just in case this is PM related.. Maybe the spurious interrupt is pending
-from earlier? This could be caused by glitches on the lines with runtime PM,
-or a pending interrupt during suspend/resume. In that case IRQ_DISABLE_UNLAZY
-might provide more clues if the problem goes away.
+Yes, I'd love to do that. That's just a nightmare as well.
 
-Regards,
+See commit 6d83f94db95cf, which added the _FIXME suffix to that code.
 
-Tony
+So recently I tried to invoke the primary handler, which causes another
+issue:
+
+  Some of the low level code (e.g. IOAPIC interrupt migration, but also
+  some PPC irq chip machinery) depends on being called in hard interrupt
+  context. They invoke get_irq_regs(), which obviously does not work from
+  thread context.
+
+So I removed that one from -next as well and postponed it another time. And
+I should have known before I tried it that it does not work. Simply because
+of that stuff x86 cannot use the software based resend mechanism.
+
+Still trying to wrap my head around a proper solution for the problem. On
+x86 we might just check whether we are really in hard irq context and
+otherwise skip the part which depends on get_irq_regs(). That would be a
+sane thing to do. Have not yet looked at the PPC side of affairs, whether
+that's easy to solve as well. But even if it is, then there might be still
+other magic code in some irq chip drivers which relies on things which are
+only available/correct when actually invoked by a hardware interrupt.
+
+Not only the hardware has colorful behaviour ....
+
+Thanks,
+
+	tglx
