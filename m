@@ -1,76 +1,43 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Mon, 27 Feb 2017 12:15:47 +0100
-Subject: [RFC v2 2/7] IIO: Add bindings for simple sigma delta adc
-In-Reply-To: <20170222151750.h5d7gycltwnk7b4t@rob-hp-laptop>
-References: <1487003909-11710-1-git-send-email-arnaud.pouliquen@st.com>
- <1487003909-11710-3-git-send-email-arnaud.pouliquen@st.com>
- <20170222151750.h5d7gycltwnk7b4t@rob-hp-laptop>
-Message-ID: <6943aaf5-b580-0fd1-7a2e-b99f7a266388@st.com>
+From: flatmax@flatmax.org (Matt Flax)
+Date: Mon, 27 Feb 2017 22:21:25 +1100
+Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
+ bcm2835<=>IC<=>cs42xx8
+In-Reply-To: <20170227103024.GF2718@delle.lan>
+References: <cover.1487997974.git.flatmax@flatmax.org>
+ <20170225133952.GA28091@camel2.lan>
+ <8cf68a3e-330d-e76d-e276-5df5453e3baf@flatmax.org>
+ <20170226144958.GA5543@camel2.lan>
+ <732a71ac-5ec5-37e1-1190-be036ea34555@flatmax.org>
+ <20170226221648.GA10974@camel2.lan>
+ <7cef41ee-ef00-22b7-830f-517a9d594ed0@flatmax.org>
+ <20170227080433.GA2718@delle.lan>
+ <170950f7-354f-e6a9-cefb-834a00fadd1b@flatmax.org>
+ <20170227103024.GF2718@delle.lan>
+Message-ID: <7b78c782-28e1-4849-5d00-8caf30847d5c@flatmax.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rob,
 
-Please find my answers in-line
 
-Regards,
+On 27/02/17 21:30, Matthias Reichl wrote:
+>
+> I don't see that. Some people might want to be able to use multichannel
+> on RPi, but that's something very different than adding code that just
+> lies about driver capabilites.
+>
 
-Arnaud
+I am going to invite you over for dinner to eat steamed vegetables :)
+If I make the steamed vegetables in the microwave and they taste like 
+steamed vegetables, are they steamed vegetables ?
 
-On 02/22/2017 04:17 PM, Rob Herring wrote:
-> On Mon, Feb 13, 2017 at 05:38:24PM +0100, Arnaud Pouliquen wrote:
->> Add documentation of device tree bindings to support
->> sigma delta modulator in IIO framework.
->>
->> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
->> ---
->>  Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt | 13 +++++++++++++
->>  1 file changed, 13 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt b/Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt
->> new file mode 100644
->> index 0000000..2b3968a
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/iio/adc/simple_sd_adc.txt
->> @@ -0,0 +1,13 @@
->> +Device-Tree bindings for simple sigma delta adc
-> 
-> What makes it "simple"?
-"simple" sigma delta modulator are external chip that just converts
-analog signal in sigma delta modulation. No configuration needs.
-"Simple" is use to differentiate SD ADC that offers interfaces to
-activate some internal processing ( gain, offset compensation...)
+I have a bcm2835 (Pi 2 and 3) SoC here. It is producing multichannel (8 
+out, 6 in) audio. In ALSA we call that DSP mode - right ?!
 
-> 
->> +
->> +Required properties:
->> +- compatible: should be "sd-modulator".
->> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
->> +
->> +Example node:
->> +
->> +	ads1202: simple_sd_adc at 0 {
-> 
-> Is ads1202 the actual chip? Then it should be in the compatible list.
-I tried to define a generic device to support several SD modulator
-chips, inspired by ALSA "dmic-codec" device.
-I have none exhaustive list of chip that can be handled by the driver,
-but i found several devices that could match...
-That why i did not use chip name in compatible list.
-What should be the best way to do it?
+If a chipset can do multichannel, do we need to invent a new DSP mode 
+name to call it dsp mode ? Surely not, because steamed vegetables are 
+steamed vegetables :)
 
-> 
-> unit address without a reg prop is an error. The node name should be 
-> "adc".
-> 
->> +		compatible = "sd-modulator";
->> +		#io-channel-cells = <1>;
->> +		status = "okay";
-> 
-> Drop status from examples.
-> 
->> +	};
->> -- 
->> 1.9.1
->>
+Just because steamed vegetables are made in the microwave doesn't mean 
+they don't belong in the Linux Kernel !
+
+Matt
