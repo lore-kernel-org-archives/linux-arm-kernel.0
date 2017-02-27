@@ -1,62 +1,86 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 27 Feb 2017 17:12:17 +0100
-Subject: [PATCH v2 1/4] irqchip: armada-370-xp: re-order register definitions
-In-Reply-To: <1488211940-26489-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1488211940-26489-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1488211940-26489-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 27 Feb 2017 17:14:15 +0100
+Subject: Using the generic host PCIe driver
+Message-ID: <8d4e5d8a-7683-0180-324c-0ffd1a9a641a@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to clarify to which register base the various register
-definitions apply, this commit re-orders them, and adds a comment that
-clearly indicate which registers are relative to "main_int_base" and
-which registers are relative to "per_cpu_int_base".
+On 17/02/2017, Bjorn Helgaas wrote:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/irqchip/irq-armada-370-xp.c | 21 ++++++++++-----------
- 1 file changed, 10 insertions(+), 11 deletions(-)
+> I don't know anything about your hardware or environment, but I highly
+> encourage you to use [...] generic DT (drivers/pci/host/pci-host-generic.c)
+> instead of writing a custom host controller driver.
+> 
+> The native drivers in drivers/pci/host are a huge maintenance hassle
+> for no real benefit.
+>
+> You're right that the programming model of the host bridge itself is
+> not specified by PCI specs, so it's impossible to have a generic
+> driver that can manage it completely by itself.
+> 
+> If you have firmware that initializes the bridge and tells the OS what
+> the windows are (bus numbers, memory space, I/O space) and where the
+> PCIe-specified ECAM space is, a generic driver can take it from there.
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index eb0d4d4..76147df 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -34,25 +34,24 @@
- #include <asm/smp_plat.h>
- #include <asm/mach/irq.h>
- 
--/* Interrupt Controller Registers Map */
--#define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
--#define ARMADA_370_XP_INT_CLEAR_MASK_OFFS	(0x4C)
--#define ARMADA_370_XP_INT_FABRIC_MASK_OFFS	(0x54)
--#define ARMADA_370_XP_INT_CAUSE_PERF(cpu)	(1 << cpu)
--
-+/* Registers relative to main_int_base */
- #define ARMADA_370_XP_INT_CONTROL		(0x00)
-+#define ARMADA_370_XP_SW_TRIG_INT_OFFS		(0x04)
- #define ARMADA_370_XP_INT_SET_ENABLE_OFFS	(0x30)
- #define ARMADA_370_XP_INT_CLEAR_ENABLE_OFFS	(0x34)
- #define ARMADA_370_XP_INT_SOURCE_CTL(irq)	(0x100 + irq*4)
- #define ARMADA_370_XP_INT_SOURCE_CPU_MASK	0xF
- #define ARMADA_370_XP_INT_IRQ_FIQ_MASK(cpuid)	((BIT(0) | BIT(8)) << cpuid)
- 
--#define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
-+/* Registers relative to per_cpu_int_base */
-+#define ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS	(0x08)
-+#define ARMADA_370_XP_IN_DRBEL_MSK_OFFS		(0x0c)
- #define ARMADA_375_PPI_CAUSE			(0x10)
--
--#define ARMADA_370_XP_SW_TRIG_INT_OFFS           (0x4)
--#define ARMADA_370_XP_IN_DRBEL_MSK_OFFS          (0xc)
--#define ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS        (0x8)
-+#define ARMADA_370_XP_CPU_INTACK_OFFS		(0x44)
-+#define ARMADA_370_XP_INT_SET_MASK_OFFS		(0x48)
-+#define ARMADA_370_XP_INT_CLEAR_MASK_OFFS	(0x4C)
-+#define ARMADA_370_XP_INT_FABRIC_MASK_OFFS	(0x54)
-+#define ARMADA_370_XP_INT_CAUSE_PERF(cpu)	(1 << cpu)
- 
- #define ARMADA_370_XP_MAX_PER_CPU_IRQS		(28)
- 
--- 
-2.7.4
+I am currently trying the approach suggested by Bjorn.
+
+This is what my DT node currently looks like:
+
+		pcie at 50000000 {
+			compatible = "pci-host-ecam-generic";
+			reg = <0x50000000 0x200000>;
+			device_type = "pci";
+			bus-range = <0>, <1>;
+			#size-cells = <2>;
+			#address-cells = <3>;
+			#interrupt-cells = <1>;
+			/* BUS_ADDRESS(3)  CPU_PHYSICAL(1)  SIZE(2) */
+			ranges = <0x02000000 0x0 0xa0000000  0xa0000000  0x0 0x00100000>;
+		};
+
+(I am aware that interrupt specs are missing, but I hope this
+is not a problem at an early stage.)
+
+I.e. the configuration space is at 0x5000_0000
+(so bus_0 at 0x5000_0000, and bus_1 at 0x5010_0000)
+
+And I defined a 32-bit non-prefetchable memory space at 0xa0000000
+
+Question 1:
+Is there any reason to map CPU address 0xa0000000 anywhere else than
+PCI bus address 0xa0000000?
+
+
+Now, this host controller is revision 1, and as such contains several
+"interesting" bugs. How can I work around them in software?
+
+
+Bug #1
+
+The controller reports an incorrect class. It is a bridge, but it
+reports class = 0x048000
+
+AFAICT, tegra had a similar problem, and the solution seems to be
+to define a DECLARE_PCI_FIXUP_EARLY hook:
+
+/* Root complex reports incorrect device class */
+static void tango_pcie_fixup_class(struct pci_dev *dev)
+{
+	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
+}
+DECLARE_PCI_FIXUP_EARLY(0x1105, 0x8758, tango_pcie_fixup_class);
+
+Is that the correct way to work around bug #1
+
+
+Bug #2
+
+Bus 0 cannot be enumerated, because it reports garbage data for
+devices and functions other than 0, i.e. only 0/0/0 works.
+
+How do I work around that issue?
+
+
+I have a googol more questions, but I'll stick to these for the time being.
+
+Regards.
