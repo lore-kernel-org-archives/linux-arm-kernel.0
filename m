@@ -1,29 +1,27 @@
 From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Mon, 27 Feb 2017 08:39:16 +0530
-Subject: [PATCH 1/2] media: s5p-mfc: convert drivers to use the new
- vb2_queue dev field
-In-Reply-To: <a4db0512-8a5b-aaea-713b-5e3c09c3e8c2@osg.samsung.com>
+Date: Mon, 27 Feb 2017 08:47:18 +0530
+Subject: [PATCH 2/2] media: s5p-mfc: fix MMAP of mfc buffer during reqbufs
+In-Reply-To: <81c11e69-b7eb-ccb5-a377-2848ec551274@osg.samsung.com>
 References: <1481888915-19624-1-git-send-email-pankaj.dubey@samsung.com>
- <1481888915-19624-2-git-send-email-pankaj.dubey@samsung.com>
- <CGME20170224192311epcas1p34370fb737bd0d30e592431809d0dc540@epcas1p3.samsung.com>
- <a4db0512-8a5b-aaea-713b-5e3c09c3e8c2@osg.samsung.com>
-Message-ID: <63c351de-6b2f-3d32-ccbd-898e4443a4bf@samsung.com>
+ <1481888915-19624-3-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20170224194302epcas2p2edea64bf7b2fc89ee97b6f5391b2dad0@epcas2p2.samsung.com>
+ <81c11e69-b7eb-ccb5-a377-2848ec551274@osg.samsung.com>
+Message-ID: <384899ef-4e7e-d7f5-8f4f-ef2f023cb681@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello Javier,
 
-On Saturday 25 February 2017 12:52 AM, Javier Martinez Canillas wrote:
+On Saturday 25 February 2017 01:12 AM, Javier Martinez Canillas wrote:
 > Hello Pankaj,
 > 
 > On 12/16/2016 08:48 AM, Pankaj Dubey wrote:
 >> From: Smitha T Murthy <smitha.t@samsung.com>
 >>
->> commit 2548fee63d9e ("[media] media/platform: convert drivers to use the new
->> vb2_queue dev field") has missed to set dev pointer of vb2_queue which will be
->> used in reqbufs of mfc driver. Without this change following error is observed:
->>
->> ---------------------------------------------------------------
+>> It has been observed on ARM64 based Exynos SoC, if IOMMU is not enabled
+>> and we try to use reserved memory for MFC, reqbufs fails with below
+>> mentioned error
+>> ---------------------------------------------------------------------------
 >> V4L2 Codec decoding example application
 >> Kamil Debski <k.debski@samsung.com>
 >> Copyright 2012 Samsung Electronics Co., Ltd.
@@ -43,57 +41,34 @@ On Saturday 25 February 2017 12:52 AM, Javier Martinez Canillas wrote:
 >> [App] Out buf phy : 0x00000000, virt : 0xffffffff
 >> Output Length is = 0x300000
 >> Error (mfc.c:mfc_dec_setup_output:145): Failed to MMAP MFC OUTPUT buffer
->> -------------------------------------------------------
+>> -------------------------------------------------------------------------
+>> This is because the device requesting for memory is mfc0.left not the parent mfc0.
+>> Hence setting of alloc_devs need to be done only if IOMMU is enabled
+>> and in that case both the left and right device is treated as mfc0 only.
 >>
 > 
-> On which kernel version did you face this issue?
+> I see, so likely you were facing the issue described in patch 1/2 after this
+> patch since the driver doesn't set alloc_devs when IOMMU is disabled, right?
 > 
 
-We observed this issue, on Linux 4.9 kernel while doing some experiment
-for using reserved-memory for MFC on Exynos7880 based development board.
+Yes.
 
-Anyways FYI, This patch is series is superseded by patch [1] after
-review comments and suggestion from Marek. Patch [1] has been accepted
-and merged and working well for us.
+> In any case, I guess these patches have been superseded by Marek's series[0]
+> so they are no longer needed?
+> 
+
+Yes, these patches have been superseded but now by Marek's series.
+I missed to check Marek's series [0] due to some official assignment,
+but we followed up our patch series with Marek, and fix was provided in
+of_reserved_mem.c via patch [1] which has been accepted and merged as
+well. I will try to find out some time and test Marek's patch series [0].
 
 [1]: https://patchwork.kernel.org/patch/9482499/
 
 Thanks,
 Pankaj Dubey
 
->> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
->> [pankaj.dubey: debugging issue and formatting commit message]
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>  drivers/media/platform/s5p-mfc/s5p_mfc.c | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
->> index 0a5b8f5..6ea8246 100644
->> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
->> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
->> @@ -838,6 +838,7 @@ static int s5p_mfc_open(struct file *file)
->>  	q->type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
->>  	q->drv_priv = &ctx->fh;
->>  	q->lock = &dev->mfc_mutex;
->> +	q->dev = &dev->plat_dev->dev;
->>  	if (vdev == dev->vfd_dec) {
->>  		q->io_modes = VB2_MMAP;
->>  		q->ops = get_dec_queue_ops();
->> @@ -861,6 +862,7 @@ static int s5p_mfc_open(struct file *file)
->>  	q->io_modes = VB2_MMAP;
->>  	q->drv_priv = &ctx->fh;
->>  	q->lock = &dev->mfc_mutex;
->> +	q->dev = &dev->plat_dev->dev;
->>  	if (vdev == dev->vfd_dec) {
->>  		q->io_modes = VB2_MMAP;
->>  		q->ops = get_dec_queue_ops();
->>
-> 
-> Please correct me if I'm wrong, but AFAIU this shouldn't be needed in
-> the s5p-mfc driver since the videobuf2 core either uses the vb2_queue
-> .dev field or the vb2_queue .alloc_devs. And the latter is set in the
-> s5p_mfc_queue_setup() function, so the .dev field shouldn't be used.
+> [0]: https://www.spinics.net/lists/linux-media/msg111156.html
 > 
 > Best regards,
 > 
