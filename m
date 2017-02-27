@@ -1,76 +1,134 @@
 From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 27 Feb 2017 19:54:16 +0000
-Subject: [RFC PATCH 05/30] iommu/arm-smmu-v3: Disable tagged pointers when ATS
- is in use
+Date: Mon, 27 Feb 2017 19:54:19 +0000
+Subject: [RFC PATCH 08/30] iommu/arm-smmu-v3: Add support for VHE
 In-Reply-To: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
 References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
-Message-ID: <20170227195441.5170-6-jean-philippe.brucker@arm.com>
+Message-ID: <20170227195441.5170-9-jean-philippe.brucker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM architecture has a "Top Byte Ignore" (TBI) option that makes the
-MMU mask out bits [63:56] of an address, allowing a userspace application
-to store data in its pointers.
+ARMv8.1 extensions added Virtualization Host Extensions (VHE), which allow
+to run a host kernel at EL2. When using normal DMA, Device and CPU address
+spaces are orthogonal, and do not need to implement the same capabilities,
+so VHE hasn't been in use on the SMMU side until now.
 
-The ATS doesn't have an architected mechanism to enable TBI, and might
-create ATC entries for addresses that include a tag. Software would then
-have to send ATC invalidation packets for each 255 possible alias of an
-address, or just wipe the whole address space. This is not a viable
-option, so disable TBI when ATS is in use.
+With shared address spaces however, ASIDs are shared between MMU and SMMU,
+and broadcast TLB invalidations issued by a CPU are taken into account by
+the SMMU. TLB entries on both sides need to have identical exception level
+in order to be shot with a single invalidation.
 
-It is unclear for the moment how this restriction will affect user
-applications. One example I can imagine (with my complete lack of
-knowledge about JIT engines and their use of tagged pointers) is a JIT
-translating a WebCL applications that uses SVM. Since this kind of
-interpreted language doesn't expose addresses, the interpreter and SVM
-implementations will be given the opportunity to do the right thing and
-remove tags before handing pointers to devices.
-
-Ideally we should remove TBI only for domains that are susceptible to use
-ATS. But at the point we're writing the context descriptor of a domain, we
-are still probing the first device in the group. If that device doesn't
-have an ATC but the next one does, we would then have to clear the TBI
-bit, invalidate the ATCs of previous devices, and notify the drivers that
-their devices cannot use tagged pointers anymore. Such a level of
-complexity doesn't make any sense here since it is unlikely devices will
-use tagged pointers at all.
+When the CPU is using VHE, enable VHE in the SMMU and for all streams.
+Normal DMA mappings will need to use TLBI_EL2 commands instead of TLBI_NH,
+but shouldn't be otherwise affected by this change.
 
 Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 29 ++++++++++++++++++++++++-----
+ 1 file changed, 24 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index e7b940146ae3..06b29d4fcf65 100644
+index cebbc8a22ec6..0981159ada04 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -987,7 +987,7 @@ static void arm_smmu_cmdq_issue_cmd(struct arm_smmu_device *smmu,
- }
+@@ -22,6 +22,7 @@
  
- /* Context descriptor manipulation functions */
--static u64 arm_smmu_cpu_tcr_to_cd(u64 tcr)
-+static u64 arm_smmu_cpu_tcr_to_cd(struct arm_smmu_device *smmu, u64 tcr)
- {
- 	u64 val = 0;
+ #include <linux/acpi.h>
+ #include <linux/acpi_iort.h>
++#include <linux/cpufeature.h>
+ #include <linux/delay.h>
+ #include <linux/dma-iommu.h>
+ #include <linux/err.h>
+@@ -522,6 +523,8 @@ struct arm_smmu_cmdq_ent {
+ 		#define CMDQ_OP_TLBI_NH_ASID	0x11
+ 		#define CMDQ_OP_TLBI_NH_VA	0x12
+ 		#define CMDQ_OP_TLBI_EL2_ALL	0x20
++		#define CMDQ_OP_TLBI_EL2_ASID	0x21
++		#define CMDQ_OP_TLBI_EL2_VA	0x22
+ 		#define CMDQ_OP_TLBI_S12_VMALL	0x28
+ 		#define CMDQ_OP_TLBI_S2_IPA	0x2a
+ 		#define CMDQ_OP_TLBI_NSNH_ALL	0x30
+@@ -665,6 +668,7 @@ struct arm_smmu_device {
+ #define ARM_SMMU_FEAT_TRANS_S2		(1 << 10)
+ #define ARM_SMMU_FEAT_STALLS		(1 << 11)
+ #define ARM_SMMU_FEAT_HYP		(1 << 12)
++#define ARM_SMMU_FEAT_E2H		(1 << 13)
+ 	u32				features;
  
-@@ -1000,7 +1000,8 @@ static u64 arm_smmu_cpu_tcr_to_cd(u64 tcr)
- 	val |= ARM_SMMU_TCR2CD(tcr, EPD0);
- 	val |= ARM_SMMU_TCR2CD(tcr, EPD1);
- 	val |= ARM_SMMU_TCR2CD(tcr, IPS);
--	val |= ARM_SMMU_TCR2CD(tcr, TBI0);
-+	if (!(smmu->features & ARM_SMMU_FEAT_ATS))
-+		val |= ARM_SMMU_TCR2CD(tcr, TBI0);
+ #define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
+@@ -928,6 +932,7 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
+ 		cmd[1] |= CMDQ_CFGI_1_RANGE_MASK << CMDQ_CFGI_1_RANGE_SHIFT;
+ 		break;
+ 	case CMDQ_OP_TLBI_NH_VA:
++	case CMDQ_OP_TLBI_EL2_VA:
+ 		cmd[0] |= (u64)ent->tlbi.asid << CMDQ_TLBI_0_ASID_SHIFT;
+ 		cmd[1] |= ent->tlbi.leaf ? CMDQ_TLBI_1_LEAF : 0;
+ 		cmd[1] |= ent->tlbi.addr & CMDQ_TLBI_1_VA_MASK;
+@@ -943,6 +948,9 @@ static int arm_smmu_cmdq_build_cmd(u64 *cmd, struct arm_smmu_cmdq_ent *ent)
+ 	case CMDQ_OP_TLBI_S12_VMALL:
+ 		cmd[0] |= (u64)ent->tlbi.vmid << CMDQ_TLBI_0_VMID_SHIFT;
+ 		break;
++	case CMDQ_OP_TLBI_EL2_ASID:
++		cmd[0] |= (u64)ent->tlbi.asid << CMDQ_TLBI_0_ASID_SHIFT;
++		break;
+ 	case CMDQ_OP_ATC_INV:
+ 		cmd[0] |= ent->substream_valid ? CMDQ_0_SSV : 0;
+ 		cmd[0] |= ent->atc.global ? CMDQ_ATC_0_GLOBAL : 0;
+@@ -1522,7 +1530,9 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+ 			 STRTAB_STE_1_S1C_CACHE_WBRA
+ 			 << STRTAB_STE_1_S1COR_SHIFT |
+ 			 STRTAB_STE_1_S1C_SH_ISH << STRTAB_STE_1_S1CSH_SHIFT |
+-			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
++			 (smmu->features & ARM_SMMU_FEAT_E2H ?
++			  STRTAB_STE_1_STRW_EL2 : STRTAB_STE_1_STRW_NSEL1) <<
++			 STRTAB_STE_1_STRW_SHIFT);
  
- 	return val;
- }
-@@ -1014,7 +1015,7 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_device *smmu,
- 	 * We don't need to issue any invalidation here, as we'll invalidate
- 	 * the STE when installing the new entry anyway.
- 	 */
--	val = arm_smmu_cpu_tcr_to_cd(cfg->cd.tcr) |
-+	val = arm_smmu_cpu_tcr_to_cd(smmu, cfg->cd.tcr) |
- #ifdef __BIG_ENDIAN
- 	      CTXDESC_CD_0_ENDI |
- #endif
+ 		if (smmu->features & ARM_SMMU_FEAT_STALLS)
+ 			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
+@@ -1776,7 +1786,8 @@ static void arm_smmu_tlb_inv_context(void *cookie)
+ 	struct arm_smmu_cmdq_ent cmd;
+ 
+ 	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
+-		cmd.opcode	= CMDQ_OP_TLBI_NH_ASID;
++		cmd.opcode	= smmu->features & ARM_SMMU_FEAT_E2H ?
++				  CMDQ_OP_TLBI_EL2_ASID : CMDQ_OP_TLBI_NH_ASID;
+ 		cmd.tlbi.asid	= smmu_domain->s1_cfg.asid;
+ 		cmd.tlbi.vmid	= 0;
+ 	} else {
+@@ -1801,7 +1812,8 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+ 	};
+ 
+ 	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
+-		cmd.opcode	= CMDQ_OP_TLBI_NH_VA;
++		cmd.opcode	= smmu->features & ARM_SMMU_FEAT_E2H ?
++				  CMDQ_OP_TLBI_EL2_VA : CMDQ_OP_TLBI_NH_VA;
+ 		cmd.tlbi.asid	= smmu_domain->s1_cfg.asid;
+ 	} else {
+ 		cmd.opcode	= CMDQ_OP_TLBI_S2_IPA;
+@@ -3011,7 +3023,11 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu, bool bypass)
+ 	writel_relaxed(reg, smmu->base + ARM_SMMU_CR1);
+ 
+ 	/* CR2 (random crap) */
+-	reg = CR2_PTM | CR2_RECINVSID | CR2_E2H;
++	reg = CR2_PTM | CR2_RECINVSID;
++
++	if (smmu->features & ARM_SMMU_FEAT_E2H)
++		reg |= CR2_E2H;
++
+ 	writel_relaxed(reg, smmu->base + ARM_SMMU_CR2);
+ 
+ 	/* Stream table */
+@@ -3169,8 +3185,11 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
+ 	if (reg & IDR0_MSI)
+ 		smmu->features |= ARM_SMMU_FEAT_MSI;
+ 
+-	if (reg & IDR0_HYP)
++	if (reg & IDR0_HYP) {
+ 		smmu->features |= ARM_SMMU_FEAT_HYP;
++		if (cpus_have_cap(ARM64_HAS_VIRT_HOST_EXTN))
++			smmu->features |= ARM_SMMU_FEAT_E2H;
++	}
+ 
+ 	/*
+ 	 * The coherency feature as set by FW is used in preference to the ID
 -- 
 2.11.0
