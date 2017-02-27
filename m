@@ -1,111 +1,105 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 27 Feb 2017 19:54:35 +0000
-Subject: [RFC PATCH 24/30] iommu: Specify PASID state when unbinding a task
-In-Reply-To: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
-Message-ID: <20170227195441.5170-25-jean-philippe.brucker@arm.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Mon, 27 Feb 2017 11:59:50 -0800
+Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
+In-Reply-To: <93219edf-0f6d-5cc7-309c-c998f16fe7ac@akamai.com>
+References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
+ <f7532548-7007-1a32-f669-4520792805b3@caviumnetworks.com>
+ <93219edf-0f6d-5cc7-309c-c998f16fe7ac@akamai.com>
+Message-ID: <aa139c18-1b04-2c20-2e22-89d74503b3cf@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a way for device drivers to tell the IOMMU driver about the state
-of the PASID they are trying to decommission. When unbinding a task from a
-device, the IOMMU driver needs to know whether it can immediately reuse
-the PASID for another task, or if there is additional work to be done
-before the PASID is safe to re-use.
+On 02/27/2017 11:18 AM, Jason Baron wrote:
+>
+>
+> On 02/27/2017 01:57 PM, David Daney wrote:
+>> On 02/27/2017 10:49 AM, Jason Baron wrote:
+>>> The core jump_label code makes use of the 2 lower bits of the
+>>> static_key::[type|entries|next] field. Thus, ensure that the jump_entry
+>>> table is at least 4-byte aligned.
+>>>
+>> [...]
+>>> diff --git a/arch/mips/include/asm/jump_label.h
+>>> b/arch/mips/include/asm/jump_label.h
+>>> index e77672539e8e..243791f3ae71 100644
+>>> --- a/arch/mips/include/asm/jump_label.h
+>>> +++ b/arch/mips/include/asm/jump_label.h
+>>> @@ -31,6 +31,7 @@ static __always_inline bool
+>>> arch_static_branch(struct static_key *key, bool bran
+>>>      asm_volatile_goto("1:\t" NOP_INSN "\n\t"
+>>>          "nop\n\t"
+>>>          ".pushsection __jump_table,  \"aw\"\n\t"
+>>> +        ".balign 4\n\t"
+>>>          WORD_INSN " 1b, %l[l_yes], %0\n\t"
+>>>          ".popsection\n\t"
+>>>          : :  "i" (&((char *)key)[branch]) : : l_yes);
+>>> @@ -45,6 +46,7 @@ static __always_inline bool
+>>> arch_static_branch_jump(struct static_key *key, bool
+>>>      asm_volatile_goto("1:\tj %l[l_yes]\n\t"
+>>>          "nop\n\t"
+>>>          ".pushsection __jump_table,  \"aw\"\n\t"
+>>> +        ".balign 4\n\t"
+>>>          WORD_INSN " 1b, %l[l_yes], %0\n\t"
+>>>          ".popsection\n\t"
+>>>          : :  "i" (&((char *)key)[branch]) : : l_yes);
+>>
+>>
+>> I will speak only for the MIPS part.
+>>
+>> If the section is not already properly aligned, this change will add
+>> padding, which is probably not what we want.
+>>
+>> Have you ever seen a problem with misalignment in the real world?
+>>
+>
+> Hi,
+>
+> Yes, there was a WARN_ON() reported on POWER here:
+>
+> https://lkml.org/lkml/2017/2/19/85
+>
+> The WARN_ON() triggers if either of the 2 lsb are set. More
+> specifically, its coming from 'static_key_set_entries()' from the
+> following patch, which was recently added to linux-next:
+>
+> https://lkml.org/lkml/2017/2/3/558
+>
+> So this was not seen on mips, but I included all arches in this patch
+> that I though might be affected.
+>
+>> If so, I think a better approach might be to set properties on the
+>> __jump_table section to force the proper alignment, or do something in
+>> the linker script.
+>>
+>
+> So in include/asm-generic/vmlinux.lds.h, we are already setting
+> 'ALIGN(8)', but that does not appear to be sufficient for POWER...
 
-One hard requirement when calling unbind is that the associated PASID is
-not present in any transaction downstream of the IOMMU anymore. In other
-words, any read, write, page requests referring to this PASID has
-finished.
+Yes, I just looked at that.  The ALIGN(8), combined with the fact that 
+on MIPS, WORD_INSN will always be of size 4 or 8 (32-bit vs. 64-bit 
+kernel), seems to make any additional .balign completely unnecessary.
 
-For PCIe, this means that the driver has successfully executed the
-device-specific stop request mechanism described in 6.20.1 (Managing PASID
-TLP Prefix Usage). In particular:
 
-* device doesn't issue any new request for this PASID,
-* all non-posted requests for this PASID have been completed,
-* all posted requests for this PASID (addressing host memory) have been
-  flushed to the host.
+Really, I think you need to figure out why on powerpc the alignments are 
+getting screwed up.  The struct jump_entry entries are on a stride of 12 
+(for a 32-bit kernel) or 24 (for a 64-bit kernel), any alignment padding 
+added by .balign 4 will surely screw that up.
 
-Address Translation Requests are non-posted, and PRI Page Requests (PPR)
-are posted. In addition with PRI, device must implement one of the
-following mechanism (ATS spec 4.1.2. - Managing PASID TLP Prefix Usage):
+This patch seems like it is papering over a bigger issue that is not 
+understood.
 
-A. Finish transmitting any PPR affecting this PASID and wait for their
-   response. In this case, the IOMMU driver can safely reuse the PASID and
-   must not wait for a Stop Marker.
+I think a proper fix would be to fix whatever is causing the powerpc 
+JUMP_ENTRY_TYPE to misbehave.
 
-B. Finish transmitting any PPR affecting this PASID and send a Stop
-   Marker. The driver must wait to receive a Stop Marker for this PASID
-   before reusing it.
 
-This patch lets the driver communicate the current state of the PASID with
-either IOMMU_PASID_FLUSHED for case A, or IOMMU_PASID_CLEAN for case B.
+>
+> Also, I checked the size of the vmlinux generated after this change on
+> all 4 arches, and it was rather minimal. I think POWER increased the
+> most, but the other arches increased by only a few bytes.
 
-It is an important distinction because, if the IOMMU driver reassigns a
-PASID while the IOMMU still holds pending PPR targeting that PASID
-internally, the PPR will trigger a fault in the wrong address space.
+For me the size is not the important issue, it is the alignment of the 
+struct jump_entry entries in the table.  I don't understand how your 
+patch helps, and I cannot Acked-by unless I understand what is being 
+done and can see that it is both correct and necessary.
 
-Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
----
- drivers/iommu/iommu.c |  8 ++++++++
- include/linux/iommu.h | 18 +++++++++++++++++-
- 2 files changed, 25 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 26c5f6528c69..eed52500d469 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -1517,6 +1517,14 @@ EXPORT_SYMBOL_GPL(iommu_bind_task);
-  * @dev: device bound to the task
-  * @pasid: identifier of the bond
-  * @flags: state of the PASID and driver-specific flags
-+ *
-+ * The caller must informs the IOMMU driver whether the PASID is safe to reuse
-+ * immediately or if it needs more invalidation steps, by setting flags to
-+ * either IOMMU_PASID_FLUSHED, or IOMMU_PASID_CLEAN.
-+ *
-+ * Without one of these flags, the device driver must have provided an
-+ * invalidate_pasid callback in iommu_svm_ops. Otherwise, iommu_unbind_task
-+ * returns an error.
-  */
- int iommu_unbind_task(struct device *dev, int pasid, int flags)
- {
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 9554f45d4305..204943ef38b2 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -50,6 +50,21 @@ struct notifier_block;
- #define IOMMU_FAULT_READ	0x0
- #define IOMMU_FAULT_WRITE	0x1
- 
-+/*
-+ * State of a PASID in the system
-+ *
-+ * IOMMU_PASID_FLUSHED: the device does not generate any traffic for this PASID
-+ *   anymore, and all references to the PASID have been flushed; in other words,
-+ *   the IOMMU will not receive any transaction referring to this instance of
-+ *   the PASID anymore.
-+ *
-+ * IOMMU_PASID_CLEAN: in addition to IOMMU_PASID_FLUSHED, the PASID isn't
-+ *   present in the IOMMU either. For instance when using PRI, the device waited
-+ *   for all of its page requests to come back with a response.
-+ */
-+#define IOMMU_PASID_FLUSHED	0x1
-+#define IOMMU_PASID_CLEAN	0x2
-+
- typedef int (*iommu_fault_handler_t)(struct iommu_domain *,
- 			struct device *, unsigned long, int, void *);
- 
-@@ -147,7 +162,8 @@ struct iommu_resv_region {
- 
- /*
-  * @handle_fault: report or handle a fault from the device (FIXME: imprecise)
-- * @invalidate_pasid: stop using a PASID.
-+ * @invalidate_pasid: stop using a PASID. Returns one of IOMMU_PASID_FLUSHED or
-+ *                    IOMMU_PASID_CLEAN when stopped successfully. 0 otherwise.
-  */
- struct iommu_svm_ops {
- 	int (*handle_fault)(struct device *dev, int pasid, u64 address,
--- 
-2.11.0
+David.
