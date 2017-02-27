@@ -1,171 +1,39 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 27 Feb 2017 13:58:19 -0500
-Subject: [RFC PATCH V1 v4.10-rc3 1/1] acpi: apei: handle GSIV
- notification type
-In-Reply-To: <86258A5CC0A3704780874CF6004BA8A62DCAB57E@lhreml502-mbs>
-References: <86258A5CC0A3704780874CF6004BA8A62DCAB57E@lhreml502-mbs>
-Message-ID: <20170227185818.GA8577@windriver.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 27 Feb 2017 13:00:32 -0600
+Subject: [PATCH 2/4] devicetree: Add vendor prefix for Kontron AG
+In-Reply-To: <20170219202801.2082-3-plaes@plaes.org>
+References: <20170219202801.2082-1-plaes@plaes.org>
+ <20170219202801.2082-3-plaes@plaes.org>
+Message-ID: <20170227190032.p32ophqwp5ffrrvu@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[[RFC PATCH V1 v4.10-rc3 1/1] acpi: apei: handle GSIV notification type] On 27/02/2017 (Mon 18:19) Shiju Jose wrote:
-
-> Add a new GHES error source handling function for
-> GSIV(Global System Interrupt Vector).
-> If an error source's notification type is GSIV,
-> then this handling function can be registered
-> into the GSIV handler and it can parse
-> and report error information when they occur.
+On Sun, Feb 19, 2017 at 10:27:59PM +0200, Priit Laes wrote:
+> Kontron AG is a German-based company designing and manufacturing
+> embedded modules, computers and systems.
 > 
-> Signed-off-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
-> Signed-off-by: Shiju Jose <shiju.jose@huawei.com>
+> Signed-off-by: Priit Laes <plaes@plaes.org>
 > ---
->  arch/arm64/Kconfig        |  1 +
->  drivers/acpi/apei/Kconfig |  9 +++++++
->  drivers/acpi/apei/ghes.c  | 66 +++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 76 insertions(+)
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 1117421..e41fdcf 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -53,6 +53,7 @@ config ARM64
->  	select HANDLE_DOMAIN_IRQ
->  	select HARDIRQS_SW_RESEND
->  	select HAVE_ACPI_APEI if (ACPI && EFI)
-> +	select HAVE_ACPI_APEI_GSIV if (ACPI && EFI)
->  	select HAVE_ALIGNED_STRUCT_PAGE if SLUB
->  	select HAVE_ARCH_AUDITSYSCALL
->  	select HAVE_ARCH_BITREVERSE
-> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-> index b0140c8..f45ddb5 100644
-> --- a/drivers/acpi/apei/Kconfig
-> +++ b/drivers/acpi/apei/Kconfig
-> @@ -1,6 +1,15 @@
->  config HAVE_ACPI_APEI
->  	bool
->  
-> +config HAVE_ACPI_APEI_GSIV
-> +        bool "APEI GSIV(Global System Interrupt) logging/recovering support"
-> +        depends on ACPI_APEI && ACPI_APEI_GHES
-> +        help
-> +          This option should be enabled if the system supports
-> +          firmware first handling of GSIV (Global System Interrupt)
-> +	  for the hardware errors and allows OS to do error
-> +          recovery/logging.
-> +
->  config HAVE_ACPI_APEI_NMI
->  	bool
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 16d3b5e..4dca895 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -154,7 +154,8 @@ jedec	JEDEC Solid State Technology Association
+>  karo	Ka-Ro electronics GmbH
+>  keithkoep	Keith & Koep GmbH
+>  keymile	Keymile GmbH
+> -kinetic Kinetic Technologies
+> +kinetic	Kinetic Technologies
 
-A "config HAVE_<foo>" option normally doesn't have a "help" section
-since it isn't meant to be user selected.  You can see that in the other
-two options that exist right here in the context of your patch.
+No doubt this needs re-formatting, but don't do that in this patch.
 
-Also your Cc list here seems rather large; not sure how you came up with
-such a large list...
-
-P.
---
-
->  
-> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-> index e53bef6..e1611d2 100644
-> --- a/drivers/acpi/apei/ghes.c
-> +++ b/drivers/acpi/apei/ghes.c
-> @@ -721,6 +721,58 @@ static struct notifier_block ghes_notifier_sci = {
->  	.notifier_call = ghes_notify_sci,
->  };
->  
-> +#ifdef CONFIG_HAVE_ACPI_APEI_GSIV
-> +static LIST_HEAD(ghes_gsiv);
-> +
-> +static int ghes_notify_gsiv(struct notifier_block *this,
-> +				unsigned long event, void *data)
-> +{
-> +	struct ghes *ghes;
-> +	int ret = NOTIFY_DONE;
-> +
-> +	rcu_read_lock();
-> +	list_for_each_entry_rcu(ghes, &ghes_gsiv, list) {
-> +	if (!ghes_proc(ghes))
-> +		ret = NOTIFY_OK;
-> +	}
-> +	rcu_read_unlock();
-> +	return ret;
-> +}
-> +static struct notifier_block ghes_notifier_gsiv = {
-> +	.notifier_call = ghes_notify_gsiv,
-> +};
-> +
-> +static void ghes_gsiv_add(struct ghes *ghes)
-> +{
-> +	mutex_lock(&ghes_list_mutex);
-> +	if (list_empty(&ghes_gsiv))
-> +		register_acpi_hed_notifier(&ghes_notifier_gsiv);
-> +	list_add_rcu(&ghes->list, &ghes_gsiv);
-> +	mutex_unlock(&ghes_list_mutex);
-> +}
-> +
-> +static void ghes_gsiv_remove(struct ghes *ghes)
-> +{
-> +	mutex_lock(&ghes_list_mutex);
-> +	list_del_rcu(&ghes->list);
-> +	if (list_empty(&ghes_gsiv))
-> +		unregister_acpi_hed_notifier(&ghes_notifier_gsiv);
-> +	mutex_unlock(&ghes_list_mutex);
-> +}
-> +#else /* CONFIG_HAVE_ACPI_APEI_GSIV */
-> +static inline void ghes_gsiv_add(struct ghes *ghes)
-> +{
-> +	pr_err(GHES_PFX "ID: %d, trying to add GSIV notification which is not supported\n",
-> +	       ghes->generic->header.source_id);
-> +}
-> +
-> +static inline void ghes_gsiv_remove(struct ghes *ghes)
-> +{
-> +	pr_err(GHES_PFX "ID: %d, trying to remove GSIV notification which is not supported\n",
-> +	       ghes->generic->header.source_id);
-> +}
-> +#endif /* CONFIG_HAVE_ACPI_APEI_GSIV */
-> +
->  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
->  /*
->   * printk is not safe in NMI context.  So in NMI handler, we allocate
-> @@ -973,6 +1025,14 @@ static int ghes_probe(struct platform_device *ghes_dev)
->  			goto err;
->  		}
->  		break;
-> +	case ACPI_HEST_NOTIFY_GSIV:
-> +		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_GSIV)) {
-> +			pr_warn(GHES_PFX "Generic hardware error source: %d notified via notification GSIV is not supported\n",
-> +				generic->header.source_id);
-> +			rc = -ENOTSUPP;
-> +			goto err;
-> +		}
-> +		break;
->  	case ACPI_HEST_NOTIFY_LOCAL:
->  		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
->  			   generic->header.source_id);
-> @@ -1034,6 +1094,9 @@ static int ghes_probe(struct platform_device *ghes_dev)
->  	case ACPI_HEST_NOTIFY_NMI:
->  		ghes_nmi_add(ghes);
->  		break;
-> +	case ACPI_HEST_NOTIFY_GSIV:
-> +		ghes_gsiv_add(ghes);
-> +		break;
->  	default:
->  		BUG();
->  	}
-> @@ -1076,6 +1139,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
->  	case ACPI_HEST_NOTIFY_NMI:
->  		ghes_nmi_remove(ghes);
->  		break;
-> +	case ACPI_HEST_NOTIFY_GSIV:
-> +		ghes_gsiv_remove(ghes);
-> +		break;
->  	default:
->  		BUG();
->  		break;
+> +kontron	Kontron AG
+>  kosagi	Sutajio Ko-Usagi PTE Ltd.
+>  kyo	Kyocera Corporation
+>  lacie	LaCie
 > -- 
-> 2.1.4
+> 2.9.3
 > 
