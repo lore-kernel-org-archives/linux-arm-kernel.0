@@ -1,75 +1,36 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Feb 2017 09:22:26 -0600
-Subject: [PATCH 1/4] dt-bindings: dma: uart: add uart dma bindings
-In-Reply-To: <1487243251-964-2-git-send-email-long.cheng@mediatek.com>
-References: <1487243251-964-1-git-send-email-long.cheng@mediatek.com>
- <1487243251-964-2-git-send-email-long.cheng@mediatek.com>
-Message-ID: <20170227152226.g4zokauxii2nuyxn@rob-hp-laptop>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 27 Feb 2017 15:14:27 +0000
+Subject: [PATCH 16/20] PCI: armada8k: update PCI config space remap function
+In-Reply-To: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170227151436.18698-17-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 07:07:28PM +0800, Long Cheng wrote:
-> add uart dma bindings
+PCI configuration space should be mapped with a memory region type that
+generates on the CPU host bus non-posted write transations. Update the
+driver to use the devm_pci_remap_cfg* interface to make sure the correct
+memory mappings for PCI configuration space are used.
 
-This and the subject need to be more specific in that this is for 
-Mediatek.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/pci/dwc/pcie-armada8k.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> 
-> Signed-off-by: Long Cheng <long.cheng@mediatek.com>
-> ---
->  .../devicetree/bindings/dma/mtk_uart_dma.txt       |   32 ++++++++++++++++++++
-
-mediatek,uart-dma.txt for filename.
-
->  1 file changed, 32 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/mtk_uart_dma.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/mtk_uart_dma.txt b/Documentation/devicetree/bindings/dma/mtk_uart_dma.txt
-> new file mode 100644
-> index 0000000..b8aa7f4
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/mtk_uart_dma.txt
-> @@ -0,0 +1,32 @@
-> +* Mediatek UART APDMA Controller
-
-Is the block really for UARTs only or just happens to be connected to 
-UARTs. For the latter, you should drop UART here and in the compatible.
-
-> +
-> +Required properties:
-> +- compatible should contain:
-> +  * "mediatek,mt2701-uart-dma" for MT2701 compatible APDMA
-> +  * "mediatek,mt6577-uart-dma" for MT6577 and all of the above
-> +
-> +- reg: The base address of the APDMA register bank.
-> +
-> +- interrupts: A single interrupt specifier.
-> +
-> +- clocks : Must contain an entry for each entry in clock-names.
-> +  See ../clocks/clock-bindings.txt for details.
-> +- clock-names: The APDMA clock for register accesses
-
-Needs to list "apdma" here. Is apdma really the right name here? It 
-should be the name of the input to this block.
-
-> +
-> +Examples:
-> +
-> +	apdma: dma-controller at 11000380 {
-> +		compatible = "mediatek,mt2701-uart-dma";
-> +		reg = <0 0x11000380 0 0x400>;
-> +		interrupts = <GIC_SPI 63 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_SPI 64 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_SPI 65 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_SPI 66 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_SPI 67 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_SPI 68 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_SPI 69 IRQ_TYPE_LEVEL_LOW>,
-> +			     <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&pericfg CLK_PERI_AP_DMA>;
-> +		clock-names = "apdma";
-> +		#dma-cells = <1>;
-> +	};
-> -- 
-> 1.7.9.5
-> 
+diff --git a/drivers/pci/dwc/pcie-armada8k.c b/drivers/pci/dwc/pcie-armada8k.c
+index 66bac6f..31f5cb1 100644
+--- a/drivers/pci/dwc/pcie-armada8k.c
++++ b/drivers/pci/dwc/pcie-armada8k.c
+@@ -228,7 +228,7 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
+ 
+ 	/* Get the dw-pcie unit configuration/control registers base. */
+ 	base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "ctrl");
+-	pci->dbi_base = devm_ioremap_resource(dev, base);
++	pci->dbi_base = devm_pci_remap_cfg_resource(dev, base);
+ 	if (IS_ERR(pci->dbi_base)) {
+ 		dev_err(dev, "couldn't remap regs base %p\n", base);
+ 		ret = PTR_ERR(pci->dbi_base);
+-- 
+2.10.0
