@@ -1,27 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Feb 2017 16:58:42 -0600
-Subject: [PATCH 2/2] ARM64: dts: meson-gxl: Add support for HwaCom AmazeTV
-In-Reply-To: <20170222163131.14136-3-carlo@caione.org>
-References: <20170222163131.14136-1-carlo@caione.org>
- <20170222163131.14136-3-carlo@caione.org>
-Message-ID: <20170227225842.pkix32wpcdien3cu@rob-hp-laptop>
+Date: Mon, 27 Feb 2017 16:59:50 -0600
+Subject: [PATCHv2 1/5] dt-bindings: mfd: Add Altera Arria10 SR Reset
+ Controller bindings
+In-Reply-To: <1487783419-10912-2-git-send-email-thor.thayer@linux.intel.com>
+References: <1487783419-10912-1-git-send-email-thor.thayer@linux.intel.com>
+ <1487783419-10912-2-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <20170227225950.dzejvz7w5j52di5f@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2017 at 05:31:31PM +0100, Carlo Caione wrote:
-> From: Carlo Caione <carlo@endlessm.com>
+On Wed, Feb 22, 2017 at 11:10:15AM -0600, thor.thayer at linux.intel.com wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
 > 
-> This patch adds support for the HwaCom AmazeTV set-top-box. The
-> hardware configuration is really similar to the other GXL boards but
-> for this hardware we need to limit the max-frequency of the eMMC to
-> have it working.
+> This patch adds documentation for the Altera A10-SR Reset
+> Controller DT bindings.
 > 
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
 > ---
->  Documentation/devicetree/bindings/arm/amlogic.txt  |   1 +
->  arch/arm64/boot/dts/amlogic/Makefile               |   1 +
->  .../boot/dts/amlogic/meson-gxl-hwacom-amazetv.dts  | 164 +++++++++++++++++++++
->  3 files changed, 166 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-hwacom-amazetv.dts
+> v2  No change
+> ---
+>  Documentation/devicetree/bindings/mfd/altera-a10sr.txt | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
