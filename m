@@ -1,40 +1,137 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Feb 2017 15:14:25 +0000
-Subject: [PATCH 14/20] PCI: hisi: update PCI config space remap function
-In-Reply-To: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
-References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
-Message-ID: <20170227151436.18698-15-lorenzo.pieralisi@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 27 Feb 2017 15:24:37 +0000
+Subject: [PATCH] arm64: KVM: VHE: Clear HCR_TGE when invalidating guest TLBs
+Message-ID: <20170227152437.26261-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCI configuration space should be mapped with a memory region type that
-generates on the CPU host bus non-posted write transations. Update the
-driver to use the devm_pci_remap_cfg* interface to make sure the correct
-memory mappings for PCI configuration space are used.
+When invalidating guest TLBs, special care must be taken to
+actually shoot the guest TLBs and not the host ones if we're
+running on a VHE system.  This is controlled by the HCR_EL2.TGE
+bit, which we forget to clear before invalidating TLBs.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-Cc: Zhou Wang <wangzhou1@hisilicon.com>
+Address the issue by introducing two wrappers (__tlb_switch_to_guest
+and __tlb_switch_to_host) that take care of both the VTTBR_EL2
+and HCR_EL2.TGE switching.
+
+Reported-by: Tomasz Nowicki <tnowicki@caviumnetworks.com>
+Tested-by: Tomasz Nowicki <tnowicki@caviumnetworks.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/pci/dwc/pcie-hisi.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm64/kvm/hyp/tlb.c | 64 +++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 55 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/pci/dwc/pcie-hisi.c b/drivers/pci/dwc/pcie-hisi.c
-index e3e4fed..8042780 100644
---- a/drivers/pci/dwc/pcie-hisi.c
-+++ b/drivers/pci/dwc/pcie-hisi.c
-@@ -294,10 +294,9 @@ static int hisi_pcie_probe(struct platform_device *pdev)
- 	}
+diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+index 88e2f2b938f0..55889d057757 100644
+--- a/arch/arm64/kvm/hyp/tlb.c
++++ b/arch/arm64/kvm/hyp/tlb.c
+@@ -17,14 +17,62 @@
  
- 	reg = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rc_dbi");
--	pci->dbi_base = devm_ioremap_resource(dev, reg);
-+	pci->dbi_base = devm_pci_remap_cfg_resource(dev, reg);
- 	if (IS_ERR(pci->dbi_base))
- 		return PTR_ERR(pci->dbi_base);
--
- 	platform_set_drvdata(pdev, hisi_pcie);
+ #include <asm/kvm_hyp.h>
  
- 	ret = hisi_add_pcie_port(hisi_pcie, pdev);
++static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
++{
++	u64 val;
++
++	/*
++	 * With VHE enabled, we have HCR_EL2.{E2H,TGE} = {1,1}, and
++	 * most TLB operations target EL2/EL0. In order to affect the
++	 * guest TLBs (EL1/EL0), we need to change one of these two
++	 * bits. Changing E2H is impossible (goodbye TTBR1_EL2), so
++	 * let's flip TGE before executing the TLB operation.
++	 */
++	write_sysreg(kvm->arch.vttbr, vttbr_el2);
++	val = read_sysreg(hcr_el2);
++	val &= ~HCR_TGE;
++	write_sysreg(val, hcr_el2);
++	isb();
++}
++
++static void __hyp_text __tlb_switch_to_guest_nvhe(struct kvm *kvm)
++{
++	write_sysreg(kvm->arch.vttbr, vttbr_el2);
++	isb();
++}
++
++static hyp_alternate_select(__tlb_switch_to_guest,
++			    __tlb_switch_to_guest_nvhe,
++			    __tlb_switch_to_guest_vhe,
++			    ARM64_HAS_VIRT_HOST_EXTN);
++
++static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm)
++{
++	/*
++	 * We're done with the TLB operation, let's restore the host's
++	 * view of HCR_EL2.
++	 */
++	write_sysreg(0, vttbr_el2);
++	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
++}
++
++static void __hyp_text __tlb_switch_to_host_nvhe(struct kvm *kvm)
++{
++	write_sysreg(0, vttbr_el2);
++}
++
++static hyp_alternate_select(__tlb_switch_to_host,
++			    __tlb_switch_to_host_nvhe,
++			    __tlb_switch_to_host_vhe,
++			    ARM64_HAS_VIRT_HOST_EXTN);
++
+ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ {
+ 	dsb(ishst);
+ 
+ 	/* Switch to requested VMID */
+ 	kvm = kern_hyp_va(kvm);
+-	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+-	isb();
++	__tlb_switch_to_guest()(kvm);
+ 
+ 	/*
+ 	 * We could do so much better if we had the VA as well.
+@@ -45,7 +93,7 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+ 	dsb(ish);
+ 	isb();
+ 
+-	write_sysreg(0, vttbr_el2);
++	__tlb_switch_to_host()(kvm);
+ }
+ 
+ void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
+@@ -54,14 +102,13 @@ void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
+ 
+ 	/* Switch to requested VMID */
+ 	kvm = kern_hyp_va(kvm);
+-	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+-	isb();
++	__tlb_switch_to_guest()(kvm);
+ 
+ 	asm volatile("tlbi vmalls12e1is" : : );
+ 	dsb(ish);
+ 	isb();
+ 
+-	write_sysreg(0, vttbr_el2);
++	__tlb_switch_to_host()(kvm);
+ }
+ 
+ void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu)
+@@ -69,14 +116,13 @@ void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu)
+ 	struct kvm *kvm = kern_hyp_va(kern_hyp_va(vcpu)->kvm);
+ 
+ 	/* Switch to requested VMID */
+-	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+-	isb();
++	__tlb_switch_to_guest()(kvm);
+ 
+ 	asm volatile("tlbi vmalle1" : : );
+ 	dsb(nsh);
+ 	isb();
+ 
+-	write_sysreg(0, vttbr_el2);
++	__tlb_switch_to_host()(kvm);
+ }
+ 
+ void __hyp_text __kvm_flush_vm_context(void)
 -- 
-2.10.0
+2.11.0
