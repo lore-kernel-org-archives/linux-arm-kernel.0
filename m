@@ -1,29 +1,35 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Mon, 27 Feb 2017 05:04:11 +0100
-Subject: [RFC] ADS7846 touchscreen questions
-Message-ID: <2ffa89be-e875-4b47-9598-87ccb670da3f@tul.cz>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sun, 26 Feb 2017 20:06:20 -0800
+Subject: [PATCH 5/7] watchdog: s3c2410: Constify local structures
+In-Reply-To: <20170225074237.txpetwb6e5p4bqyt@kozik-lap>
+References: <20170224210746.12459-1-krzk@kernel.org>
+ <20170224210746.12459-5-krzk@kernel.org>
+ <7100fd29-a21d-25c0-b989-644e1358b34b@roeck-us.net>
+ <20170225074237.txpetwb6e5p4bqyt@kozik-lap>
+Message-ID: <85c5bfa6-8c6c-d438-143f-f11d872776fc@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 02/24/2017 11:42 PM, Krzysztof Kozlowski wrote:
+> On Fri, Feb 24, 2017 at 02:05:56PM -0800, Guenter Roeck wrote:
+>> On 02/24/2017 01:07 PM, Krzysztof Kozlowski wrote:
+>>> Structures watchdog_device, watchdog_ops and s3c2410_wdt_variant are not
+>>> modified so they can be made const to increase code safeness.
+>>>
+>>> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+>>
+>> Conflicts with "watchdog: constify watchdog_ops structures" in my tree.
+>> I rebased my tree to v4.10 (which I should not really have done ;-), but
+>> it still doesn't apply due to "fatal: sha1 information is lacking or useless"
+>> and "error: could not build fake ancestor". The subsequent patches also don't
+>> apply. You may have to wait until after -rc1, rebase your patches, and
+>> resubmit.
+>
+> Sure, I'll resend after merge window. These aren't important fixes so
+> there is no problem in waiting for merge window to end.
+>
 
-I'm trying to add ADS7846 touchscreen support for arch/arm/mach-pxa/magician machine, but I have some questions about functionality of the driver and/or possible enhancements.
-
-There seems to be an unnecessary computation of a pressure in ads7846_report_state(). The test for ignoring the measured data should be done before the computation. I would transfer it inside ads7846_irq() before the actual ads7846_report_state() call. Or at least before the pressure computation.
-
-	if (!ts->stopped && !packet->tc.ignore) {
-		ads7846_report_state(ts);
-	}
-
-If a 7845 model uses penirq_recheck_delay_usecs pdata, then get_pendown_state(ts) test for discarding the data is called twice.
-
-Anyway the last measurement will be almost always interrupted by pen up event. IMO it should be tested every time, preferably before ads7846_report_state() call. I would transfer it along with penirq_recheck_delay_usecs delay.
-
-With those changes the debug printks for different models could be merged along with some pressure computations.
-
-The arch/arm/mach-pxa/lubbock.c machine returns a constant 0 for get_pendown_state test. Does the touchscreen driver work at all? It seems it cannot call ads7846_report_state() at all (as a condition of while() will fail).
-
-Are there directions how to define x_plate_ohms constant? It seems to me that in extreme situations where z2 and x values will be near a maximum (4095) the unsigned int Rt will overflow when the constant x_plate_ohms is over 256. My machine has 317 ohms for x and 500 ohms for y.
+Watchdog patches are in, so please feel free to resubmit at your convenience.
 
 Thanks,
-Petr
+Guenter
