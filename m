@@ -1,88 +1,61 @@
-From: psodagud@codeaurora.org (Sodagudi Prasad)
-Date: Mon, 27 Feb 2017 09:12:00 -0800
-Subject: Schedule affinity_notify work while migrating IRQs during hot plug
-In-Reply-To: <05102c455476941d37904f8c6f387452@codeaurora.org>
-References: <05102c455476941d37904f8c6f387452@codeaurora.org>
-Message-ID: <a5b146bd9a36dd7b4fe2bc36cbaadade@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 27 Feb 2017 11:14:27 -0600
+Subject: [PATCH v2 1/2] Documentation: devicetree: Add i2c binding for
+ mediatek MT2701 Soc Platform
+In-Reply-To: <1487125976-25243-2-git-send-email-jun.gao@mediatek.com>
+References: <1487125976-25243-1-git-send-email-jun.gao@mediatek.com>
+ <1487125976-25243-2-git-send-email-jun.gao@mediatek.com>
+Message-ID: <20170227171427.4szwecmvn3qzytjz@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-02-21 12:59, Sodagudi Prasad wrote:
-> Hi Thomas,
+On Wed, Feb 15, 2017 at 10:32:55AM +0800, Jun Gao wrote:
+> From: Jun Gao <jun.gao@mediatek.com>
 > 
-> Currently irq_set_affinity() is called to migrate irqs from 
-> migrate_one_irq()
-> during cpu hot plug and clients which are interested to know the irq
-> affinity change
-> not getting notified
+> Add i2c DT binding to i2c-mt6577.txt for MT2701 and there is no need to modify i2c driver.
+
+Wrap your lines.
+
 > 
-> take_cpu_down () --> __cpu_disable() --> 
-> irq_migrate_all_off_this_cpu();
+> Change-Id: I892f866d755aa3865bffd1a80884cd41b6ecc1f1
+
+Remove Gerrit Ids.
+
+> Signed-off-by: Jun Gao <jun.gao@mediatek.com>
+> ---
+>  .../devicetree/bindings/i2c/i2c-mt6577.txt         |   11 ++++++-----
+>  1 file changed, 6 insertions(+), 5 deletions(-)
 > 
-> irq_set_affinity() is changing the IRQ affinity at chip level
-> but it is not notifying the affinity_notify work.
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+> index 0ce6fa3..ef22ecf 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+> @@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
+>  
+>  Required properties:
+>    - compatible: value should be either of the following.
+> -      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
+> -      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
+> -      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
+> -      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
+> -      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
+> +	"mediatek,mt2701-i2c", for i2c compatible with mt2701 i2c.
+> +	"mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
+> +	"mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
+> +	"mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
+> +	"mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
+> +	"mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
+
+All the parts after the compatible strings are a bit redundant. Just 
+drop them.
+
+>    - reg: physical base address of the controller and dma base, length of memory
+>      mapped region.
+>    - interrupts: interrupt number to the cpu.
+> -- 
+> 1.7.9.5
 > 
-
-Hi Thomas and All,
-
-I could see that in the 3.10 kernel irq affinity notifiers are getting 
-called when a core getting hot plugged. But in later kernel versions api 
-used to change
-affinity was changed from irq_set_affinity_locked() to 
-irq_do_set_affinity(), so irq notifiers are not getting called when a 
-core hot plugged.
-https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/tree/kernel/irq/manage.c?id=refs/tags/v3.10.105#n201
-
-
-In latest kernel following path is executed to migrate IRQs.
-irq_migrate_all_off_this_cpu() --> migrate_one_irq() -> 
-irq_do_set_affinity().
-
-As I mentioned above, irq_set_affinity_locked() notifies all clients 
-drivers, which are registered for IRQ affinity change but 
-irq_do_set_affinity() API just changes the affinity at irq chip level 
-but does not notify the clients drivers. I am not sure whether it is 
-just a miss during IRQ framework refactor or intentionally done like 
-this. Can you please check whether following code change make sense or 
-not?
-
-So I am thinking that, adding following sched_work() would notify 
-clients.
-
-diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-index 6b66959..5e4766b 100644
---- a/kernel/irq/manage.c
-+++ b/kernel/irq/manage.c
-@@ -207,6 +207,7 @@ int irq_do_set_affinity(struct irq_data *data, const 
-struct cpumask *mask,
-         case IRQ_SET_MASK_OK_DONE:
-                 cpumask_copy(desc->irq_common_data.affinity, mask);
-         case IRQ_SET_MASK_OK_NOCOPY:
-+               schedule_work(&desc->affinity_notify->work);
-                 irq_set_thread_affinity(desc);
-                 ret = 0;
-         }
-
-
-> How about below change, so that clients drivers gets notified about
-> irq affinity changes?
-> --- a/kernel/irq/manage.c
-> +++ b/kernel/irq/manage.c
-> @@ -207,6 +207,7 @@ int irq_do_set_affinity(struct irq_data *data,
-> const struct cpumask *mask,
->         case IRQ_SET_MASK_OK_DONE:
->                 cpumask_copy(desc->irq_common_data.affinity, mask);
->         case IRQ_SET_MASK_OK_NOCOPY:
-> +               schedule_work(&desc->affinity_notify->work);
->                 irq_set_thread_affinity(desc);
->                 ret = 0;
-> 
-> With this change, notifications of IRQ affinity gets executed and 
-> notified
-> to client drivers.
-
--Thanks, Prasad
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
-Forum,
-Linux Foundation Collaborative Project
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
