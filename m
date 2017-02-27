@@ -1,86 +1,45 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 27 Feb 2017 17:14:15 +0100
-Subject: Using the generic host PCIe driver
-Message-ID: <8d4e5d8a-7683-0180-324c-0ffd1a9a641a@free.fr>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 27 Feb 2017 17:18:28 +0100 (CET)
+Subject: [WARNING: A/V UNSCANNABLE][Merge tag 'media/v4.11-1' of git]
+ ff58d005cd: BUG: unable to handle kernel NULL pointer dereference at
+ 0000039c
+In-Reply-To: <20170227160750.GM21809@atomide.com>
+References: <58b07b30.9XFLj9Hhl7F6HMc2%fengguang.wu@intel.com>
+ <CA+55aFytXj+TZ_TanbxcY0KgRTrV7Vvr=fWON8tioUGmYHYiNA@mail.gmail.com>
+ <20170225090741.GA20463@gmail.com>
+ <CA+55aFy+ER8cYV02eZsKAOLnZBWY96zNWqUFWSWT1+3sZD4XnQ@mail.gmail.com>
+ <alpine.DEB.2.20.1702271105090.4732@nanos>
+ <alpine.DEB.2.20.1702271231410.4732@nanos> <20170227154124.GA20569@gmail.com>
+ <20170227160750.GM21809@atomide.com>
+Message-ID: <alpine.DEB.2.20.1702271712470.4732@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/02/2017, Bjorn Helgaas wrote:
-
-> I don't know anything about your hardware or environment, but I highly
-> encourage you to use [...] generic DT (drivers/pci/host/pci-host-generic.c)
-> instead of writing a custom host controller driver.
+On Mon, 27 Feb 2017, Tony Lindgren wrote:
+> * Ingo Molnar <mingo@kernel.org> [170227 07:44]:
+> > Because it's not the requirement that hurts primarily, but the resulting 
+> > non-determinism and the sporadic crashes. Which can be solved by making the race 
+> > deterministic via the debug facility.
+> > 
+> > If the IRQ handler crashed the moment it was first written by the driver author 
+> > we'd never see these problems.
 > 
-> The native drivers in drivers/pci/host are a huge maintenance hassle
-> for no real benefit.
->
-> You're right that the programming model of the host bridge itself is
-> not specified by PCI specs, so it's impossible to have a generic
-> driver that can manage it completely by itself.
-> 
-> If you have firmware that initializes the bridge and tells the OS what
-> the windows are (bus numbers, memory space, I/O space) and where the
-> PCIe-specified ECAM space is, a generic driver can take it from there.
+> Just in case this is PM related.. Maybe the spurious interrupt is pending
+> from earlier? This could be caused by glitches on the lines with runtime PM,
+> or a pending interrupt during suspend/resume. In that case IRQ_DISABLE_UNLAZY
+> might provide more clues if the problem goes away.
 
-I am currently trying the approach suggested by Bjorn.
+It's not PM related.  That's just silly hardware. At the moment when you
+enable some magic bit in the control register, which is required to probe
+the version, the fricking thing spits out a spurious interrupt despite the
+interrupt enable bit in the same control register being still disabled. Of
+course we cannot install an interrupt handler before having probed the
+version and setup other stuff, except we add magic 'if (!initialized)'
+crappola into the handler and lose the ability to install version dependent
+handlers afterwards.
 
-This is what my DT node currently looks like:
+Wonderful crap that, isn't it?
 
-		pcie at 50000000 {
-			compatible = "pci-host-ecam-generic";
-			reg = <0x50000000 0x200000>;
-			device_type = "pci";
-			bus-range = <0>, <1>;
-			#size-cells = <2>;
-			#address-cells = <3>;
-			#interrupt-cells = <1>;
-			/* BUS_ADDRESS(3)  CPU_PHYSICAL(1)  SIZE(2) */
-			ranges = <0x02000000 0x0 0xa0000000  0xa0000000  0x0 0x00100000>;
-		};
+Thanks,
 
-(I am aware that interrupt specs are missing, but I hope this
-is not a problem at an early stage.)
-
-I.e. the configuration space is at 0x5000_0000
-(so bus_0 at 0x5000_0000, and bus_1 at 0x5010_0000)
-
-And I defined a 32-bit non-prefetchable memory space at 0xa0000000
-
-Question 1:
-Is there any reason to map CPU address 0xa0000000 anywhere else than
-PCI bus address 0xa0000000?
-
-
-Now, this host controller is revision 1, and as such contains several
-"interesting" bugs. How can I work around them in software?
-
-
-Bug #1
-
-The controller reports an incorrect class. It is a bridge, but it
-reports class = 0x048000
-
-AFAICT, tegra had a similar problem, and the solution seems to be
-to define a DECLARE_PCI_FIXUP_EARLY hook:
-
-/* Root complex reports incorrect device class */
-static void tango_pcie_fixup_class(struct pci_dev *dev)
-{
-	dev->class = PCI_CLASS_BRIDGE_PCI << 8;
-}
-DECLARE_PCI_FIXUP_EARLY(0x1105, 0x8758, tango_pcie_fixup_class);
-
-Is that the correct way to work around bug #1
-
-
-Bug #2
-
-Bus 0 cannot be enumerated, because it reports garbage data for
-devices and functions other than 0, i.e. only 0/0/0 works.
-
-How do I work around that issue?
-
-
-I have a googol more questions, but I'll stick to these for the time being.
-
-Regards.
+	tglx
