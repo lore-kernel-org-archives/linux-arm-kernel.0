@@ -1,21 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Feb 2017 17:47:20 -0600
-Subject: [PATCH 2/2] ARM: dts: NSP: Add mailbox (PDC) to NSP
-In-Reply-To: <1487796146-14690-3-git-send-email-steven.lin1@broadcom.com>
-References: <1487796146-14690-1-git-send-email-steven.lin1@broadcom.com>
- <1487796146-14690-3-git-send-email-steven.lin1@broadcom.com>
-Message-ID: <20170227234720.jaxsnxbjcbzhf7hn@rob-hp-laptop>
+Date: Mon, 27 Feb 2017 17:56:18 -0600
+Subject: [PATCH v2 3/3] dt-bindings: mailbox: Update doc with NSP
+ PDC/mailbox support
+In-Reply-To: <1487861392-23039-4-git-send-email-steven.lin1@broadcom.com>
+References: <1487861392-23039-1-git-send-email-steven.lin1@broadcom.com>
+ <1487861392-23039-4-git-send-email-steven.lin1@broadcom.com>
+Message-ID: <20170227235618.6zhahh4uyij2eqcl@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 22, 2017 at 03:42:26PM -0500, Steve Lin wrote:
-> Adds mailbox / PDC to NSP device tree.  Needs new compatibility string
-> to differentiate from NS2 version.
+On Thu, Feb 23, 2017 at 09:49:52AM -0500, Steve Lin wrote:
+> Update the DT bindings documentation to reflect the new NSP version
+> of PDC driver compatibility string.
 > 
 > Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
 > ---
->  .../devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt          | 6 ++++--
->  arch/arm/boot/dts/bcm-nsp.dtsi                                   | 9 +++++++++
->  2 files changed, 13 insertions(+), 2 deletions(-)
+>  Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
