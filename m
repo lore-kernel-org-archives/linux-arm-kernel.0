@@ -1,53 +1,40 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 27 Feb 2017 09:12:05 +0530
-Subject: Recommended notation for OPP to avoid DTC warnings
-In-Reply-To: <CAK7LNAQyc9=3d07-1upywYDk-AaRUGK4mJwAVduCuEJgnY1uFA@mail.gmail.com>
-References: <CAK7LNAQyc9=3d07-1upywYDk-AaRUGK4mJwAVduCuEJgnY1uFA@mail.gmail.com>
-Message-ID: <20170227034205.GG7147@vireshk-i7>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Mon, 27 Feb 2017 11:48:50 +0800
+Subject: [PATCH RFC] arm64/mm: handle memmap kernel option
+In-Reply-To: <CAKv+Gu9j_4kSVAPrddsdcDiW+MWMTweHPe9bthf4=n4jLt2NZw@mail.gmail.com>
+References: <1488005245-54811-1-git-send-email-xieyisheng1@huawei.com>
+ <CAKv+Gu9j_4kSVAPrddsdcDiW+MWMTweHPe9bthf4=n4jLt2NZw@mail.gmail.com>
+Message-ID: <ab8d4b0a-dfe5-629f-5ead-3c7e907509fa@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26-02-17, 14:18, Masahiro Yamada wrote:
-> Hi.
-> 
-> 
-> Decumentation/devicetree/bindings/opp/opp.txt
-> takes examples like this:
-> 
->         opp at 1000000000 {
->                 opp-hz = /bits/ 64 <1000000000>;
->                 opp-microvolt = <970000 975000 985000>;
->                 opp-microamp = <70000>;
->                 clock-latency-ns = <300000>;
->                 opp-suspend;
->         };
->         opp at 1100000000 {
->                 opp-hz = /bits/ 64 <1100000000>;
->                 opp-microvolt = <980000 1000000 1010000>;
->                 opp-microamp = <80000>;
->                 clock-latency-ns = <310000>;
->         };
->         opp at 1200000000 {
->                 opp-hz = /bits/ 64 <1200000000>;
->                 opp-microvolt = <1025000>;
->                 clock-latency-ns = <290000>;
->                 turbo-mode;
->         };
-> 
-> 
-> If we follow this notation and the device-tree is built with W=1,
-> DTC warns like follows:
-> 
-> 
-> Warning (unit_address_vs_reg): Node /opp_table0/opp at 1000000000 has a
-> unit name, but no reg property
-> 
-> 
-> Is there a recommended notation to avoid it?
-> 
-> Maybe, simply omit the "@" ?
+Hi Ard,
 
-I would let Rob suggest something here.
+Thanks for comment.
+On 2017/2/26 18:46, Ard Biesheuvel wrote:
+> On 25 February 2017 at 06:47, Yisheng Xie <xieyisheng1@huawei.com> wrote:
+>> When use device tree mode, user can reserve memory by changes the dts,
+>> however, when boot with ACPI, user cannot reserve memory except by
+>> changing the ACPI table in BIOS, which is not so convenient.
+>>
+>> To make user reserve memory for some specific use more convenient,
+>> this patch implement the following memmap variants:
+>>  - memmap=nn[KMG]$ss[KMG]: mark specified memory as reserved;
+>>  - memmap=nn[KMG]@ss[KMG]: force usage of a specific region of memory;
+>>
+>> Reported-by: Bob Dong <dongbo4@huawei.com>
+>> Signed-off-by: Yisheng Xie <xieyisheng1@huawei.com>
+> 
+> Could you explain which problem you are solving here? ACPI implies
+> UEFI on arm64, and so these reservations could be made by a boot
+> component instead, if it requires a fixed memory reservation. If this
+> is a reservation for, e.g., OP-TEE, we should not rely on the command
+> line to communicate this information.
+> 
+We just want to reserve some memory for a driver and I just not so familiar
+with how to reserve memory with UEFI. So doubt about whether it is suitable
+to reserve memory with cmdline like "memmap=xxx", which had appeared in x86
+for a long time.
 
--- 
-viresh
+Thanks
+Yisheng Xie
