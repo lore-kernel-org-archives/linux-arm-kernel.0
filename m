@@ -1,35 +1,155 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 27 Feb 2017 18:21:20 +0100 (CET)
-Subject: Schedule affinity_notify work while migrating IRQs during hot plug
-In-Reply-To: <a5b146bd9a36dd7b4fe2bc36cbaadade@codeaurora.org>
-References: <05102c455476941d37904f8c6f387452@codeaurora.org>
- <a5b146bd9a36dd7b4fe2bc36cbaadade@codeaurora.org>
-Message-ID: <alpine.DEB.2.20.1702271818370.4732@nanos>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Mon, 27 Feb 2017 18:27:19 +0100
+Subject: [PATCH v15 2/5] Documentation: bindings: add dt documentation for
+ cdn DP controller
+In-Reply-To: <1473473748-22331-3-git-send-email-zyw@rock-chips.com>
+References: <1473473748-22331-1-git-send-email-zyw@rock-chips.com>
+ <1473473748-22331-3-git-send-email-zyw@rock-chips.com>
+Message-ID: <CAFqH_50uNrgwkHeS7F5qp+d7DFnm6pORGyA1x5=yPtzjXQyULg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Feb 2017, Sodagudi Prasad wrote:
-> So I am thinking that, adding following sched_work() would notify clients.
+Hi all,
 
-And break the world and some more.
+2016-09-10 4:15 GMT+02:00 Chris Zhong <zyw@rock-chips.com>:
+> This patch adds a binding that describes the cdn DP controller for
+> rk3399.
+>
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Reviewed-by: Guenter Roeck <groeck@chromium.org>
+>
+> ---
+>
+> Changes in v15: None
+> Changes in v14: None
+> Changes in v13:
+> - add dptx and apb reset
+>
+> Changes in v12: None
+> Changes in v11:
+> - refer dp phy
+>
+> Changes in v10:
+> - add pclk_vio_grf clock
+>
+> Changes in v9:
+> - modify the reference phy = <&tcphy0 0>, <&tcphy1 0>;
+>
+> Changes in v8: None
+> Changes in v7: None
+> Changes in v6:
+> - add assigned-clocks and assigned-clock-rates
+> - add power-domains
+>
+> Changes in v5: None
+> Changes in v4:
+> - add a reset node
+> - support 2 phys
+>
+> Changes in v3:
+> - add SoC specific compatible string
+> - remove reg = <1>;
+>
+> Changes in v2: None
+> Changes in v1:
+> - add extcon node description
+> - add #sound-dai-cells description
+>
+>  .../bindings/display/rockchip/cdn-dp-rockchip.txt  | 75 ++++++++++++++++++++++
+>  1 file changed, 75 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+>
+> diff --git a/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+> new file mode 100644
+> index 0000000..9bd2c13
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+> @@ -0,0 +1,75 @@
+> +Rockchip RK3399 specific extensions to the cdn Display Port
+> +================================
+> +
+> +Required properties:
+> +- compatible: must be "rockchip,rk3399-cdn-dp"
+> +
+> +- reg: physical base address of the controller and length
+> +
+> +- clocks: from common clock binding: handle to dp clock.
+> +
+> +- clock-names: from common clock binding:
+> +              Required elements: "core-clk" "pclk" "spdif" "grf"
+> +
+> +- resets : a list of phandle + reset specifier pairs
+> +- reset-names : string reset name, must be:
+> +               "spdif", "dptx", "apb".
+> +- power-domains : power-domain property defined with a phandle
+> +                 to respective power domain.
+> +- assigned-clocks: main clock, should be <&cru SCLK_DP_CORE>
+> +- assigned-clock-rates : the DP core clk frequency, shall be: 100000000
+> +
+> +- rockchip,grf: this soc should set GRF regs, so need get grf here.
+> +
+> +- ports: contain a port nodes with endpoint definitions as defined in
+> +        Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +        contained 2 endpoints, connecting to the output of vop.
+> +
+> +- phys: from general PHY binding: the phandle for the PHY device.
+> +
+> +- extcon: extcon specifier for the Power Delivery
+> +
+> +- #sound-dai-cells = it must be 1 if your system is using 2 DAIs: I2S, SPDIF
+> +
+> +-------------------------------------------------------------------------------
+> +
+> +Example:
+> +       cdn_dp: dp at fec00000 {
+> +               compatible = "rockchip,rk3399-cdn-dp";
+> +               reg = <0x0 0xfec00000 0x0 0x100000>;
+> +               interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
+> +               clocks = <&cru SCLK_DP_CORE>, <&cru PCLK_DP_CTRL>,
+> +                        <&cru SCLK_SPDIF_REC_DPTX>, <&cru PCLK_VIO_GRF>;
+> +               clock-names = "core-clk", "pclk", "spdif", "grf";
+> +               assigned-clocks = <&cru SCLK_DP_CORE>;
+> +               assigned-clock-rates = <100000000>;
+> +               power-domains = <&power RK3399_PD_HDCP>;
+> +               phys = <&tcphy0_dp>, <&tcphy1_dp>;
+> +               resets = <&cru SRST_DPTX_SPDIF_REC>, <&cru SRST_P_UPHY0_DPTX>,
+> +                        <&cru SRST_P_UPHY0_APB>;
+> +               reset-names = "spdif", "dptx", "apb";
+> +               extcon = <&fusb0>, <&fusb1>;
+> +               rockchip,grf = <&grf>;
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               #sound-dai-cells = <1>;
+> +
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       dp_in: port {
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +                               dp_in_vopb: endpoint at 0 {
+> +                                       reg = <0>;
+> +                                       remote-endpoint = <&vopb_out_dp>;
+> +                               };
+> +
+> +                               dp_in_vopl: endpoint at 1 {
+> +                                       reg = <1>;
+> +                                       remote-endpoint = <&vopl_out_dp>;
+> +                               };
+> +                       };
+> +               };
+> +       };
+> --
+> 1.9.1
+>
 
-> diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
-> index 6b66959..5e4766b 100644
-> --- a/kernel/irq/manage.c
-> +++ b/kernel/irq/manage.c
-> @@ -207,6 +207,7 @@ int irq_do_set_affinity(struct irq_data *data, const
-> struct cpumask *mask,
->         case IRQ_SET_MASK_OK_DONE:
->                 cpumask_copy(desc->irq_common_data.affinity, mask);
->         case IRQ_SET_MASK_OK_NOCOPY:
-> +               schedule_work(&desc->affinity_notify->work);
->                 irq_set_thread_affinity(desc);
->                 ret = 0;
+CC'ing Mark Yao
 
-You cannot do that unconditionally and just slap that schedule_work() call
-into the code. Aside of that schedule_work() would be invoked twice for all
-calls which come via irq_set_affinity_locked() ....
+I saw that the cdn-dp driver is merged but not the documentation
+binding. Maybe we forget to include this patch with the pull request?
+Or there is another reason?
 
 Thanks,
-
-	tglx
+  Enric
