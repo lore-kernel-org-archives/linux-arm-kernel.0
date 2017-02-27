@@ -1,34 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Feb 2017 09:15:25 -0600
-Subject: [PATCH v3 6/6] ARM: dts: mvebu: Move mv98dx3236 clock bindings
-In-Reply-To: <20170216085041.28337-7-chris.packham@alliedtelesis.co.nz>
-References: <20170216085041.28337-1-chris.packham@alliedtelesis.co.nz>
- <20170216085041.28337-7-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170227151525.cmtza63aw5ogszjr@rob-hp-laptop>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 27 Feb 2017 15:14:29 +0000
+Subject: [PATCH 18/20] PCI: tegra: update PCI config space remap function
+In-Reply-To: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+Message-ID: <20170227151436.18698-19-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 16, 2017 at 09:50:40PM +1300, Chris Packham wrote:
-> Previously the coreclk binding for the 98dx3236 SoC was inherited from
-> the armada-370/xp. This block is present in as much as it is possible to
-> read from the register location without causing any harm. However the
-> actual sampled at reset values are reflected in the DFX block.
-> 
-> Moving the binding to the DFX block enables support for different clock
-> strapping options in hardware.
-> 
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-> ---
-> 
-> Notes:
->     Changes in v2:
->     - New. Split out from "clk: mvebu: Expand mv98dx3236-core-clock support"
->     Changes in v3:
->     - Clarify why the old location was wrong (but worked).
-> 
->  .../devicetree/bindings/clock/mvebu-core-clock.txt         |  7 +++++++
->  .../devicetree/bindings/clock/mvebu-gated-clock.txt        | 11 +++++++++++
->  arch/arm/boot/dts/armada-xp-98dx3236.dtsi                  | 14 +++++++-------
->  3 files changed, 25 insertions(+), 7 deletions(-)
+PCI configuration space should be mapped with a memory region type that
+generates on the CPU host bus non-posted write transations. Update the
+driver to use correct memory mapping attributes to map config space
+regions to enforce configuration space non-posted writes behaviour.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+---
+ drivers/pci/host/pci-tegra.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index ed8a93f..2618f87 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -380,7 +380,7 @@ static struct tegra_pcie_bus *tegra_pcie_bus_alloc(struct tegra_pcie *pcie,
+ 						   unsigned int busnr)
+ {
+ 	struct device *dev = pcie->dev;
+-	pgprot_t prot = pgprot_device(PAGE_KERNEL);
++	pgprot_t prot = pgprot_noncached(PAGE_KERNEL);
+ 	phys_addr_t cs = pcie->cs->start;
+ 	struct tegra_pcie_bus *bus;
+ 	unsigned int i;
+@@ -1962,7 +1962,7 @@ static int tegra_pcie_parse_dt(struct tegra_pcie *pcie)
+ 		rp->pcie = pcie;
+ 		rp->np = port;
+ 
+-		rp->base = devm_ioremap_resource(dev, &rp->regs);
++		rp->base = devm_pci_remap_cfg_resource(dev, &rp->regs);
+ 		if (IS_ERR(rp->base))
+ 			return PTR_ERR(rp->base);
+ 
+-- 
+2.10.0
