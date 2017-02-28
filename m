@@ -1,22 +1,20 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 28 Feb 2017 12:26:38 -0800
-Subject: [PATCH V3] ARM: dts: BCM5301X: Add basic DT for Linksys EA9500
-In-Reply-To: <20170223130636.4704-1-zajec5@gmail.com>
-References: <20170223125612.2394-1-zajec5@gmail.com>
- <20170223130636.4704-1-zajec5@gmail.com>
-Message-ID: <6cb5264c-ca64-b305-3436-6e6aaabb60eb@gmail.com>
+Date: Tue, 28 Feb 2017 12:27:00 -0800
+Subject: [PATCH v2] ARM: dts: BCM953012HR: Initial Checkin
+In-Reply-To: <1487877783-25610-1-git-send-email-steven.lin1@broadcom.com>
+References: <1487877783-25610-1-git-send-email-steven.lin1@broadcom.com>
+Message-ID: <20170228202700.8540-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/23/2017 05:06 AM, Rafa? Mi?ecki wrote:
-> From: Rafa? Mi?ecki <rafal@milecki.pl>
-> 
-> It's tri-band wireless home router based on BCM47094 AKA BCM4709C0. It
-> uses 3 x BCM4366 chipsets for wireless.
-> Panamera seems to be board name used by Linksys.
-> 
-> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+On Thu, 23 Feb 2017 14:23:03 -0500, Steve Lin <steven.lin1@broadcom.com> wrote:
+> Initial version of DTS to support Broadcom BCM953012HR Northstar
+> HR platform, similar to, but not the same as existing 953012K.
+>
+> Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
+> Acked-by: Jon Mason <jon.mason@broadcom.com>
+> ---
 
 Applied, thanks!
--- 
+--
 Florian
