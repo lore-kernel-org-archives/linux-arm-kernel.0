@@ -1,47 +1,32 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue, 28 Feb 2017 07:35:18 +0100
-Subject: [PATCH v3 08/25] dt-bindings: serial: Document Actions Semi Owl UARTs
+Date: Tue, 28 Feb 2017 07:35:22 +0100
+Subject: [PATCH v3 12/25] dt-bindings: Add vendor prefix for uCRobotics
 In-Reply-To: <20170228063535.32069-1-afaerber@suse.de>
 References: <20170228063535.32069-1-afaerber@suse.de>
-Message-ID: <20170228063535.32069-9-afaerber@suse.de>
+Message-ID: <20170228063535.32069-13-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This UART is found on S500 and S900 SoCs.
-
+Cc: 96boards at ucrobotics.com
 Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- v2 -> v3: unchanged
+ v1 -> v2 -> v3: unchanged
  
- v1 -> v2:
- * Adopted "actions" vendor prefix
- 
- .../devicetree/bindings/serial/actions,owl-uart.txt      | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/serial/actions,owl-uart.txt
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/serial/actions,owl-uart.txt b/Documentation/devicetree/bindings/serial/actions,owl-uart.txt
-new file mode 100644
-index 0000000..aa873ea
---- /dev/null
-+++ b/Documentation/devicetree/bindings/serial/actions,owl-uart.txt
-@@ -0,0 +1,16 @@
-+Actions Semi Owl UART
-+
-+Required properties:
-+- compatible :  "actions,s500-uart", "actions,owl-uart" for S500
-+                "actions,s900-uart", "actions,owl-uart" for S900
-+- reg        :  Offset and length of the register set for the device.
-+- interrupts :  Should contain UART interrupt.
-+
-+
-+Example:
-+
-+		uart3: serial at b0126000 {
-+			compatible = "actions,s500-uart", "actions,owl-uart";
-+			reg = <0xb0126000 0x1000>;
-+			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+		};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 2f294c8..44232c2 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -320,6 +320,7 @@ tronfy	Tronfy
+ tronsmart	Tronsmart
+ truly	Truly Semiconductors Limited
+ tyan	Tyan Computer Corporation
++ucrobotics	uCRobotics
+ udoo	Udoo
+ uniwest	United Western Technologies Corp (UniWest)
+ upisemi	uPI Semiconductor Corp.
 -- 
 2.10.2
