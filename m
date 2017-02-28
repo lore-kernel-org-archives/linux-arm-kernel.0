@@ -1,25 +1,36 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Feb 2017 18:17:36 -0600
-Subject: [PATCH v2 12/17] dt-bindings: arm: Document Actions Semi S900
-In-Reply-To: <20170224034055.18807-13-afaerber@suse.de>
-References: <20170224034055.18807-1-afaerber@suse.de>
- <20170224034055.18807-13-afaerber@suse.de>
-Message-ID: <20170228001736.dwyj47g2ocx6rru3@rob-hp-laptop>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Mon, 27 Feb 2017 17:23:52 -0700
+Subject: [PATCH] arm: exynos increase CONFIG_CMA_SIZE_MBYTES to 96
+Message-ID: <20170228002353.3101-1-shuahkh@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2017 at 04:40:50AM +0100, Andreas F?rber wrote:
-> The Actions Semi S900 is a quad-core ARM Cortex-A53 SoC.
-> The Bubblegum-96 is a 96Boards Consumer Edition compliant board (4/96).
-> 
-> Cc: 96boards at ucrobotics.com
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  v1 -> v2:
->  * Adopted "actions" vendor prefix
->  * Extended text
->  
->  Documentation/devicetree/bindings/arm/actions.txt | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
+Current CMA size of 64 Mbytes is right on the edge of being too small
+for some display managers.  With the proposed s5p_mfc patch series that
+pre-allocate buffers, when display manager starts, it fails to get GEM
+buffers.  Increasing the CMA size to 96 solves the problem.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Change CONFIG_CMA_SIZE_MBYTES to 96 in exynos_defconfig to address the
+problem.
+
+Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/configs/exynos_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 742baf0..2541414 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -53,7 +53,7 @@ CONFIG_RFKILL_REGULATOR=y
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_DMA_CMA=y
+-CONFIG_CMA_SIZE_MBYTES=64
++CONFIG_CMA_SIZE_MBYTES=96
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_CRYPTOLOOP=y
+ CONFIG_BLK_DEV_RAM=y
+-- 
+2.7.4
