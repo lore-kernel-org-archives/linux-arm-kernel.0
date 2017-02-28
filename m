@@ -1,146 +1,122 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue, 28 Feb 2017 07:35:10 +0100
-Subject: [PATCH v3 00/25] ARM: Initial Actions Semi S500 and S900 enablement
-Message-ID: <20170228063535.32069-1-afaerber@suse.de>
+Date: Tue, 28 Feb 2017 07:35:16 +0100
+Subject: [PATCH v3 06/25] ARM: Prepare Actions Semi S500
+In-Reply-To: <20170228063535.32069-1-afaerber@suse.de>
+References: <20170228063535.32069-1-afaerber@suse.de>
+Message-ID: <20170228063535.32069-7-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add ARCH_ACTIONS and mach-actions/owl.c for "actions,s500".
 
-This series adds initial support for Actions Semiconductor S500 (ARMv7) and
-S900 (ARMv8) SoCs.
-
-v3 has the serial driver working almost equally for both, still glitch on S900.
-SMP support and power-gating for S500 are implemented, so both get 4 CPUs up.
-
-https://github.com/afaerber/linux/commits/bg96-next
-
-Booting from U-Boot is straightforward on both boards:
-
-https://en.opensuse.org/HCL:Guitar
-https://en.opensuse.org/HCL:Bubblegum-96
-
-Have a lot of fun!
-
-Cheers,
-Andreas
-
-v2 -> v3:
-* Clocksource fix
-* Clocksource cleanups (Daniel)
-* Serial cleanups
-* Add S500 CPU enable-method
-* Add power domain driver
-* Rework clocksource for S900 compatibility
-
-v1 -> v2:
-* S900 DT fixes (Mark)
-* Kconfig name changes (Arnd)
-* Bubblegum-96 .dts rename
-* Vendor prefix rename
-* Minor cleanups
-* Add serial driver
-* Add MAINTAINERS section
-* Use SPDX-License-Identifier in DT (Rob)
-* Add clocksource driver
-
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: mp-cs at actions-semi.com
-Cc: 96boards at ucrobotics.com
-Cc: support at lemaker.org
-Cc: linux-serial at vger.kernel.org
-Cc: linux-doc at vger.kernel.org
-Cc: devicetree at vger.kernel.org
-
-Andreas F?rber (25):
-  dt-bindings: Add vendor prefix for Actions Semi
-  dt-bindings: arm: Document Actions Semi S500
-  dt-bindings: timer: Document Owl timer
-  clocksource: Add Owl timer
-  clocksource: owl: Add S900 support
-  ARM: Prepare Actions Semi S500
-  ARM64: Prepare Actions Semi S900
-  dt-bindings: serial: Document Actions Semi Owl UARTs
-  tty: serial: Add Actions Semi Owl UART earlycon
-  Documentation: kernel-parameters: Document owl earlycon
-  ARM: dts: Add Actions Semi S500 and LeMaker Guitar
-  dt-bindings: Add vendor prefix for uCRobotics
-  dt-bindings: arm: Document Actions Semi S900
-  ARM64: dts: Add Actions Semi S900 and Bubblegum-96
-  MAINTAINERS: Add Actions Semi Owl section
-  tty: serial: owl: Implement console driver
-  ARM64: dts: actions: s900-bubblegum-96: Add fake uart5 clock
-  ARM: dts: s500-guitar-bb-rev-b: Add fake uart3 clock
-  dt-bindings: arm: cpus: Add S500 enable-method
-  ARM: owl: Implement CPU enable-method for S500
-  ARM: dts: s500: Set CPU enable-method
-  dt-bindings: power: Add Owl SPS power domains
-  soc: actions: Add Owl SPS
-  ARM: dts: s500: Add SPS node
-  ARM: owl: smp: Reimplement SPS power-gating for CPU2 and CPU3
-
- Documentation/admin-guide/kernel-parameters.txt    |   6 +
- Documentation/devicetree/bindings/arm/actions.txt  |  39 ++
- Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
- .../devicetree/bindings/power/actions,owl-sps.txt  |  17 +
- .../bindings/serial/actions,owl-uart.txt           |  16 +
- .../bindings/timer/actions,owl-timer.txt           |  20 +
- .../devicetree/bindings/vendor-prefixes.txt        |   2 +
- MAINTAINERS                                        |  10 +
- arch/arm/Kconfig                                   |   2 +
- arch/arm/Makefile                                  |   1 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/s500-guitar-bb-rev-b.dts         |  33 +
- arch/arm/boot/dts/s500-guitar.dtsi                 |  24 +
- arch/arm/boot/dts/s500.dtsi                        | 183 ++++++
- arch/arm/mach-actions/Kconfig                      |  15 +
- arch/arm/mach-actions/Makefile                     |   2 +
- arch/arm/mach-actions/headsmp.S                    |  68 ++
- arch/arm/mach-actions/owl.c                        |  28 +
- arch/arm/mach-actions/platsmp.c                    | 229 +++++++
- arch/arm64/Kconfig.platforms                       |   6 +
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/actions/Makefile               |   5 +
- arch/arm64/boot/dts/actions/s900-bubblegum-96.dts  |  42 ++
- arch/arm64/boot/dts/actions/s900.dtsi              | 164 +++++
- drivers/clocksource/Kconfig                        |   7 +
- drivers/clocksource/Makefile                       |   1 +
- drivers/clocksource/owl-timer.c                    | 205 ++++++
- drivers/soc/Kconfig                                |   1 +
- drivers/soc/Makefile                               |   1 +
- drivers/soc/actions/Kconfig                        |  12 +
- drivers/soc/actions/Makefile                       |   1 +
- drivers/soc/actions/owl-sps.c                      | 245 +++++++
- drivers/tty/serial/Kconfig                         |  19 +
- drivers/tty/serial/Makefile                        |   1 +
- drivers/tty/serial/owl-uart.c                      | 724 +++++++++++++++++++++
- include/dt-bindings/power/s500-powergate.h         |  19 +
- include/uapi/linux/serial_core.h                   |   3 +
- 37 files changed, 2155 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/actions.txt
- create mode 100644 Documentation/devicetree/bindings/power/actions,owl-sps.txt
- create mode 100644 Documentation/devicetree/bindings/serial/actions,owl-uart.txt
- create mode 100644 Documentation/devicetree/bindings/timer/actions,owl-timer.txt
- create mode 100644 arch/arm/boot/dts/s500-guitar-bb-rev-b.dts
- create mode 100644 arch/arm/boot/dts/s500-guitar.dtsi
- create mode 100644 arch/arm/boot/dts/s500.dtsi
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ v2 -> v3:
+ * Selected AMBA, global timer, TWD drivers
+ * Fixed copy&paste in machine definition (Alberto)
+ 
+ v1 -> v2:
+ * Renamed ARCH_OWL to ARCH_ACTION (Arnd)
+ * Renamed mach-owl to mach-actions, leaving owl.c
+ * Adopted "actions" vendor prefix
+ * Selected new clocksource driver
+ 
+ arch/arm/Kconfig               |  2 ++
+ arch/arm/Makefile              |  1 +
+ arch/arm/mach-actions/Kconfig  | 15 +++++++++++++++
+ arch/arm/mach-actions/Makefile |  1 +
+ arch/arm/mach-actions/owl.c    | 28 ++++++++++++++++++++++++++++
+ 5 files changed, 47 insertions(+)
  create mode 100644 arch/arm/mach-actions/Kconfig
  create mode 100644 arch/arm/mach-actions/Makefile
- create mode 100644 arch/arm/mach-actions/headsmp.S
  create mode 100644 arch/arm/mach-actions/owl.c
- create mode 100644 arch/arm/mach-actions/platsmp.c
- create mode 100644 arch/arm64/boot/dts/actions/Makefile
- create mode 100644 arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
- create mode 100644 arch/arm64/boot/dts/actions/s900.dtsi
- create mode 100644 drivers/clocksource/owl-timer.c
- create mode 100644 drivers/soc/actions/Kconfig
- create mode 100644 drivers/soc/actions/Makefile
- create mode 100644 drivers/soc/actions/owl-sps.c
- create mode 100644 drivers/tty/serial/owl-uart.c
- create mode 100644 include/dt-bindings/power/s500-powergate.h
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 0d4e71b..94fa3925 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -720,6 +720,8 @@ config ARCH_VIRT
+ #
+ source "arch/arm/mach-mvebu/Kconfig"
+ 
++source "arch/arm/mach-actions/Kconfig"
++
+ source "arch/arm/mach-alpine/Kconfig"
+ 
+ source "arch/arm/mach-artpec/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index ab30cc6..d2ccf72 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -151,6 +151,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
+ 
+ # Machine directory name.  This list is sorted alphanumerically
+ # by CONFIG_* macro name.
++machine-$(CONFIG_ARCH_ACTIONS)		+= actions
+ machine-$(CONFIG_ARCH_ALPINE)		+= alpine
+ machine-$(CONFIG_ARCH_ARTPEC)		+= artpec
+ machine-$(CONFIG_ARCH_AT91)		+= at91
+diff --git a/arch/arm/mach-actions/Kconfig b/arch/arm/mach-actions/Kconfig
+new file mode 100644
+index 0000000..717adc1
+--- /dev/null
++++ b/arch/arm/mach-actions/Kconfig
+@@ -0,0 +1,15 @@
++menuconfig ARCH_ACTIONS
++	bool "Actions Semi SoCs"
++	depends on ARCH_MULTI_V7
++	select ARM_AMBA
++	select ARM_GIC
++	select ARM_GLOBAL_TIMER
++	select CACHE_L2X0
++	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
++	select COMMON_CLK
++	select GENERIC_IRQ_CHIP
++	select HAVE_ARM_SCU if SMP
++	select HAVE_ARM_TWD if SMP
++	select OWL_TIMER
++	help
++	  This enables support for the Actions Semiconductor S500 SoC family.
+diff --git a/arch/arm/mach-actions/Makefile b/arch/arm/mach-actions/Makefile
+new file mode 100644
+index 0000000..524c381
+--- /dev/null
++++ b/arch/arm/mach-actions/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_ARCH_ACTIONS) += owl.o
+diff --git a/arch/arm/mach-actions/owl.c b/arch/arm/mach-actions/owl.c
+new file mode 100644
+index 0000000..4ac4a86
+--- /dev/null
++++ b/arch/arm/mach-actions/owl.c
+@@ -0,0 +1,28 @@
++/*
++ * Copyright (C) 2017 Andreas F?rber
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ */
++
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
++
++static const char * const owl_dt_compat[] = {
++	"actions,s500",
++	NULL
++};
++
++DT_MACHINE_START(OWL, "Actions Semi Owl platform")
++	.dt_compat	= owl_dt_compat,
++	.l2c_aux_val	= 0,
++	.l2c_aux_mask	= ~0,
++MACHINE_END
 -- 
 2.10.2
