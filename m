@@ -1,50 +1,112 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Tue, 28 Feb 2017 12:12:21 -0700
-Subject: [PATCH v2] ARM: exynos_defconfig: increase CONFIG_CMA_SIZE_MBYTES to
- 96
-Message-ID: <20170228191221.18135-1-shuahkh@osg.samsung.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 28 Feb 2017 11:22:18 -0800
+Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
+In-Reply-To: <999e2c3f-698c-703c-67a9-26aea3c97dc0@caviumnetworks.com>
+References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
+ <f7532548-7007-1a32-f669-4520792805b3@caviumnetworks.com>
+ <93219edf-0f6d-5cc7-309c-c998f16fe7ac@akamai.com>
+ <aa139c18-1b04-2c20-2e22-89d74503b3cf@caviumnetworks.com>
+ <20170227160601.5b79a1fe@gandalf.local.home>
+ <6db89a8d-6053-51d1-5fd4-bae0179a5ebd@caviumnetworks.com>
+ <20170227170911.2280ca3e@gandalf.local.home>
+ <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
+ <20170227173630.57fff459@gandalf.local.home>
+ <7bd72716-feea-073f-741c-04212ebd0802@caviumnetworks.com>
+ <68fe24ea-7795-24d8-211b-9d8a50affe9f@akamai.com>
+ <510FF566-011D-4199-86F7-2BB4DBF36434@linux.vnet.ibm.com>
+ <20170228112144.65455de5@gandalf.local.home>
+ <cdf98840-8d43-2c58-e2f9-75ae8fb8a600@caviumnetworks.com>
+ <1de00727-de97-f887-78bd-dd49131cdf61@akamai.com>
+ <999e2c3f-698c-703c-67a9-26aea3c97dc0@caviumnetworks.com>
+Message-ID: <d10e986c-7f6a-3935-88e2-ba39708f79ad@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current CMA size of 64 Mbytes is right on the edge of being small when
-several drivers need to allocate large CMA buffers.
+On 02/28/2017 11:05 AM, David Daney wrote:
+> On 02/28/2017 10:39 AM, Jason Baron wrote:
+>>
+[...]
+>>> I suspect that the alignment of the __jump_table section in the .ko
+>>> files is not correct, and you are seeing some sort of problem due to
+>>> that.
+>>>
+>>>
+>>
+>> Hi,
+>>
+>> Yes, if you look at the trace that Sachin sent the module being loaded
+>> that does the WARN_ON() is nfsd.ko.
+>>
+>> That module from Sachin's trace has:
+>>
+>>   [31] __jump_table      PROGBITS        0000000000000000 03fd77 0000c0
+>> 18 WAM  0   0  1
+>
+> The problem is then the section alignment (last column) for power.
+>
+> On mips with no patches applied, we get:
+>
+>   [17] __jump_table      PROGBITS        0000000000000000 00d2c0 000048
+> 00  WA  0   0  8
+>
+> Look, proper alignment!
+>
+> The question I have is why do the power ".llong" and ".long" assembler
+> directives not force section alignment?  Is there an alternative that
+> could be used that would result in the proper alignment?  Would ".word"
+> work?
+>
+> If not, then I would say patch only power with your balign thing. 8-byte
+> alignment for 64-bit kernel, 4-byte alignment for 32-bit kernel
+>
 
-For example, if the s5p-mfc driver needs to pre-allocate N MiB CMA memory
-to decode a H.264 1080p video, then there won't be enough CMA memory left
-for other drivers, such as the exynos-drm driver that may need to allocate
-GEM buffers for the display manager.
+I think the proper fix is either:
 
-Increasing CMA size to 96 Mbytes in exynos_defconfig addresses use-cases
-such as these.
+A) Modify scripts/module-common.lds to force __jump_table alignment for 
+all architectures.
 
-Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
+B) Add arch/powerpc/kernel/module.lds to force __jump_table alignment 
+for powerpc only.
 
-Changes since v1:
-Fix short and long commit log.
+David.
 
-Reason for this patch:
-With the proposed s5p_mfc patch series that pre-allocate buffers, when
-display manager starts, it fails to get GEM buffers.  Increasing the CMA
-size to 96 solved the problem.
 
- arch/arm/configs/exynos_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 742baf0..2541414 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -53,7 +53,7 @@ CONFIG_RFKILL_REGULATOR=y
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_DMA_CMA=y
--CONFIG_CMA_SIZE_MBYTES=64
-+CONFIG_CMA_SIZE_MBYTES=96
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_CRYPTOLOOP=y
- CONFIG_BLK_DEV_RAM=y
--- 
-2.7.4
+>
+>>
+>> So its not the size but rather the start offset '03fd77', that is the
+>> problem here. That is what the WARN_ON triggers on, that the start of
+>> the table is not 4-byte aligned.
+>>
+>> Using a ppc cross-compiler and the ENTSIZE patch that line does not
+>> change, however if I use the initial patch posted in this thread, the
+>> start does align to 4-bytes and thus the warning goes away, as Sachin
+>> verified. In fact, without the patch I found several modules that don't
+>> start at the proper alignment, however with the patch that started this
+>> thread they were all properly aligned.
+>>
+>> In terms of the '.balign' causing holes, we originally added the
+>> '_ASM_ALIGN' to x86 for precisely this reason. See commit:
+>> ef64789 jump label: Add _ASM_ALIGN for x86 and x86_64 and discussion.
+>>
+>> In addition, we have a lot of runtime with the .balign in the tree and
+>> I'm not aware of any holes in the table. I think the code would blow up
+>> pretty badly if there were.
+>>
+>> A number of arches were already using the '.balign', and the patch I
+>> proposed simply added it to remaining ones, now that we added a
+>> WARN_ON() to catch this condition.
+>>
+>> Thanks,
+>>
+>> -Jason
+>>
+>>
+>>
+>>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
