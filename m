@@ -1,120 +1,50 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 28 Feb 2017 08:55:44 +0100
-Subject: [PATCH] pwm: rockchip: State of pwm clock should synchronize
- with pwm enabled state
-In-Reply-To: <1488264216-9361-1-git-send-email-david.wu@rock-chips.com>
-References: <1488264216-9361-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <20170228085544.1b3d7283@bbrezillon>
+From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
+Date: Tue, 28 Feb 2017 17:17:54 +0900
+Subject: [RESEND PATCH v2 0/5] Fix the parse_dt of exynos dsi and remove the OF
+ graph
+References: <CGME20170228081811epcas5p3c0a8151d94511e47a0e0d2b8787b1fb0@epcas5p3.samsung.com>
+Message-ID: <1488269879-28876-1-git-send-email-hoegeun.kwon@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi All,
 
-On Tue, 28 Feb 2017 14:43:36 +0800
-David Wu <david.wu@rock-chips.com> wrote:
+[Resend this v2 patches, because i have missing TO and CC.]
 
-> From: "david.wu" <david.wu@rock-chips.com>
-> 
-> If the pwm was not enabled at uboot loader, pwm could not work for clock
-> always disabled at pwm driver. The pwm clock is enabled at beginning of
-> pwm_apply(), but disabled at end of pwm_apply().
-> 
-> If the pwm was enabled at uboot loader, pwm clock is always enabled unless
-> closed by ATF. The pwm-backlight might turn off the power at early suspend,
-> should disable pwm clock for saving power consume.
-> 
-> It is important to provide opportunity to enable/disable clock at pwm driver,
-> the pwm consumer should ensure correct order to call pwm enable/disable, and
-> pwm driver ensure state of pwm clock synchronized with pwm enabled state.
+The dsi + panel is a parental relationship, so OF grpah is not needed.
+Therefore, the current dsi_parse_dt function will throw an error,
+because there is no linked OF graph for case such as fimd + dsi +
+panel.
 
-Oops. It seems I'm the one who introduced this regression when moving
-to the atomic PWM API.
+So the 1/5 patch parse the Pll, burst and esc clock frequency
+properties in dsi_parse_dt and modified to create a bridge_node only
+if there is an OF graph associated with dsi.
 
-You should add
+Also fixed the dts, which depend on the 1/5 patch. So removed the
+ports node and move burst and esc clock frequency properties to the
+parent (DSI node).
 
-Fixes: 2bf1c98aa5a4 ("pwm: rockchip: Add support for atomic update")
-Cc: stable at vger.kernel.org
+Changes for V2:
+- Added the clear explanation for commit. (1/5 patch)
+- Fixed it to the same subject as the actual work. (2/5 ~ 5/5 patches)
 
-> 
-> Signed-off-by: David Wu <david.wu@rock-chips.com>
-> ---
->  drivers/pwm/pwm-rockchip.c | 38 +++++++++++++++++++++++++++++++-------
->  1 file changed, 31 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
-> index ef89df1..14a0445 100644
-> --- a/drivers/pwm/pwm-rockchip.c
-> +++ b/drivers/pwm/pwm-rockchip.c
-> @@ -191,6 +191,26 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  	return 0;
->  }
->  
-> +static int rk_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm,
-> +			 bool enable, enum pwm_polarity polarity)
+Best Regards,
+Hoegeun
 
-Please stay consistent with the existing naming scheme:
+Hoegeun Kwon (5):
+  drm/exynos: dsi: Fix the parse_dt function
+  arm64: dts: exynos: Remove the OF graph from DSI node for exynos5433
+    dts
+  arm: dts: Remove the OF graph from DSI node for exynos3250 dts
+  arm: dts: Remove the OF graph from DSI node for exynos4412 dts
+  arm: dts: Remove the OF graph from DSI node for exynos4210 dts
 
-static int rockchip_pwm_enable(struct pwm_chip *chip,
-			       struct pwm_device *pwm,
-			       bool enable,
-			       enum pwm_polarity polarity)
+ arch/arm/boot/dts/exynos3250-rinato.dts            | 23 ++--------------
+ arch/arm/boot/dts/exynos4210-trats.dts             | 23 ++--------------
+ arch/arm/boot/dts/exynos4412-trats2.dts            | 23 ++--------------
+ .../boot/dts/exynos/exynos5433-tm2-common.dtsi     | 16 ++---------
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c            | 32 ++++++----------------
+ 5 files changed, 16 insertions(+), 101 deletions(-)
 
-Once fixed, you can add
-
-Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-
-> +{
-> +	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
-> +	int ret;
-> +
-> +	if (enable) {
-> +		ret = clk_enable(pc->clk);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	pc->data->set_enable(chip, pwm, enable, polarity);
-> +
-> +	if (!enable)
-> +		clk_disable(pc->clk);
-> +
-> +	return 0;
-> +}
-> +
->  static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
->  			      struct pwm_state *state)
->  {
-> @@ -207,22 +227,26 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
->  		return ret;
->  
->  	if (state->polarity != curstate.polarity && enabled) {
-> -		pc->data->set_enable(chip, pwm, false, state->polarity);
-> +		ret = rk_pwm_enable(chip, pwm, false, state->polarity);
-> +		if (ret)
-> +			goto out;
->  		enabled = false;
->  	}
->  
->  	ret = rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
->  	if (ret) {
->  		if (enabled != curstate.enabled)
-> -			pc->data->set_enable(chip, pwm, !enabled,
-> -					     state->polarity);
-> -
-> +			rk_pwm_enable(chip, pwm, !enabled,
-> +				      state->polarity);
->  		goto out;
->  	}
->  
-> -	if (state->enabled != enabled)
-> -		pc->data->set_enable(chip, pwm, state->enabled,
-> -				     state->polarity);
-> +	if (state->enabled != enabled) {
-> +		ret = rk_pwm_enable(chip, pwm, state->enabled,
-> +				    state->polarity);
-> +		if (ret)
-> +			goto out;
-> +	}
->  
->  	/*
->  	 * Update the state with the real hardware, which can differ a bit
+-- 
+1.9.1
