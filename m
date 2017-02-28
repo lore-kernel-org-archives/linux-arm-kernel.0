@@ -1,85 +1,58 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Tue, 28 Feb 2017 09:42:20 -0800
-Subject: [PATCH 13/20] PCI: iproc-platform: update PCI config space remap
- function
-In-Reply-To: <20170228105428.GD7439@red-moon>
-References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
- <20170227151436.18698-14-lorenzo.pieralisi@arm.com>
- <84a0b24b-3c88-b750-dd9e-1607bc67a0a8@broadcom.com>
- <20170228105428.GD7439@red-moon>
-Message-ID: <e6ce59d4-59af-7c18-4589-342ac08aa88c@broadcom.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 28 Feb 2017 09:52:47 -0800
+Subject: ARM: OMAP2+: Grab reference to device nodes where needed
+In-Reply-To: <20170228172637.GA13455@roeck-us.net>
+References: <1486853948-20978-1-git-send-email-linux@roeck-us.net>
+ <20170227233405.GA16546@roeck-us.net>
+ <20170228162315.GS21809@atomide.com>
+ <20170228172637.GA13455@roeck-us.net>
+Message-ID: <20170228175246.GE20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2/28/2017 2:54 AM, Lorenzo Pieralisi wrote:
-> Hi Ray,
+* Guenter Roeck <linux@roeck-us.net> [170228 09:28]:
+> On Tue, Feb 28, 2017 at 08:23:16AM -0800, Tony Lindgren wrote:
+> > * Guenter Roeck <linux@roeck-us.net> [170227 15:36]:
+> > > ping ... this problem is now seen in mainline.
+> > 
+> > Oops sorry I had accidentally tagged this with "next" instead of
+> > "fixes".
+> > 
+> > Looking at the patch though, can't we make of_node_get/put local to
+> > omap3xxx_hwmod_is_hs_ip_block_usable()?
+> > 
+> Not really.
 > 
-> On Mon, Feb 27, 2017 at 01:21:39PM -0800, Ray Jui wrote:
->> Hi Lorenzo,
->>
->> On 2/27/2017 7:14 AM, Lorenzo Pieralisi wrote:
->>> PCI configuration space should be mapped with a memory region type that
->>> generates on the CPU host bus non-posted write transations. Update the
->>> driver to use the devm_pci_remap_cfg* interface to make sure the correct
->>> memory mappings for PCI configuration space are used.
->>>
->>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>> Cc: Bjorn Helgaas <bhelgaas@google.com>
->>> Cc: Ray Jui <rjui@broadcom.com>
->>> Cc: Jon Mason <jonmason@broadcom.com>
->>> ---
->>>  drivers/pci/host/pcie-iproc-platform.c | 3 ++-
->>>  1 file changed, 2 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/pci/host/pcie-iproc-platform.c b/drivers/pci/host/pcie-iproc-platform.c
->>> index f4909bb..b48d0db 100644
->>> --- a/drivers/pci/host/pcie-iproc-platform.c
->>> +++ b/drivers/pci/host/pcie-iproc-platform.c
->>> @@ -67,7 +67,8 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
->>>  		return ret;
->>>  	}
->>>  
->>> -	pcie->base = devm_ioremap(dev, reg.start, resource_size(&reg));
->>> +	pcie->base = devm_pci_remap_cfgspace(dev, reg.start,
->>> +					     resource_size(&reg));
->>
->> Note these are NOT config space registers; instead, they are host
->> controller registers. iProc PCIe controller access config space
->> registers indirectly through two of the controller registers instead of
->> directly mapped.
+> Strictly speaking the patch fixes two problems:
+> 1) of_find_node_by_name() gets a reference on "bus", thus of_node_put()
+>    is necessary to release it. This is the change in omap3xxx_hwmod_init().
+> 2) of_find_node_by_name() drops a reference to the passed device node,
+>    thus it is necessary to call of_node_get(bus) in
+>    omap3xxx_hwmod_is_hs_ip_block_usable().
 > 
-> Yes but IIUC those registers that allow indirection live in the address
-> space pointed at by pcie->base, right ? Question is whether it is fine
-> to access those registers through mappings resulting on posted writes
-> and that's a question I need your help to answer as I said in the cover
-> letter.
+> I should have stated that more clearly in the description.
 
-This I'll need to check with our ASIC team, and it may take a while.
+OK
 
-Note indirect access to the config registers is done with two registers
-within pcie->base, one specifies the
-address/bus/device/function/read/write direction and the other specifies
-the data. All other registers in the block pointed to by pcie->base
-really have nothing to do with config register access. They are used for
-other block related configurations.
+> We could ignore 1) to get rid of the warning, but that would leave us with
+> a dangling reference to the bus node. I could also improve the description,
+> or split the patch in two. Let me know what you prefer.
+
+Once patch is just fine with me.
+
+> Another possible change would be to use of_get_child_by_name() instead of
+> of_find_node_by_name(). That would, however, only search immediate children
+> of the 'ocp' node, not all nodes. I  think that is what is actually intended
+> here, but I am not entirely sure. Thoughts ?
+
+Yes that would be better.
+
+> Either case, turns out I'll have to re-submit the patch because, as mentioned
+> above, of_find_node_by_name() gets a reference to the device node it returns,
+> so a put on that node is necessary in omap3xxx_hwmod_is_hs_ip_block_usable().
+
+OK
 
 Thanks,
 
-Ray
-
-> 
-> Thanks a lot for flagging this up, that's exactly the feedback I need.
-> 
-> Lorenzo
-> 
->>
->> Thanks,
->>
->> Ray
->>
->>>  	if (!pcie->base) {
->>>  		dev_err(dev, "unable to map controller registers\n");
->>>  		return -ENOMEM;
->>>
+Tony
