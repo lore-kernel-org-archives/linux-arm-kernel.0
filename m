@@ -1,55 +1,71 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 28 Feb 2017 10:04:06 -0500
-Subject: [PATCH V2] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B2846666830C@IRSMSX101.ger.corp.intel.com>
-References: <1485891928-14573-1-git-send-email-okaya@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B2846666830C@IRSMSX101.ger.corp.intel.com>
-Message-ID: <b78207b6-2c22-3e6d-4837-8b4b396c4f5d@codeaurora.org>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 28 Feb 2017 23:06:57 +0800
+Subject: [PATCH v2 0/3] coresight: enable debug module
+Message-ID: <1488294420-14188-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/28/2017 6:03 AM, Patel, Mayurkumar wrote:
->> -	/* Save default state */
->> -	link->aspm_default = link->aspm_enabled;
-> But, I am finding a problem with this change, if Policy is set to default,
-> BIOS enables ASPM L1, but pcie_config_aspm_link() disables ASPM L1
-> due to link->aspm_enabled is different than link->aspm_default while
-> called from pcie_aspm_init_link_state() during hotplug insertion.
-> 
+ARMv8 architecture reference manual (ARM DDI 0487A.k) Chapter H7 "The
+Sample-based Profiling Extension" has description for sampling
+registers, we can utilize these registers to check program counter
+value with combined CPU exception level, secure state, etc. So this is
+helpful for CPU lockup bugs, e.g. if one CPU has run into infinite loop
+with IRQ disabled; the 'hang' CPU cannot switch context and handle any
+interrupt, so it cannot handle SMP call for stack dump, etc.
 
-Thanks for testing. I think it means the enable count logic I put below
-is not working.
+This patch series is to enable coresight debug module with sample-based
+registers and register call back notifier for PCSR register dumping
+when panic happens, so we can see below dumping info for panic; and
+this patch series has considered the conditions for access permission
+for debug registers self, so this can avoid access debug registers when
+CPU power domain is off; the driver also try to figure out the CPU is
+in secure or non-secure state.
 
-I was trying to figure out when to use saved values vs. the values in
-registers by looking at the enable_cnt.
+ARM external debug module:
+CPU[0]:
+ EDPRSR:  0000000b (Power:On DLK:Unlock)
+ EDPCSR:  [<ffff00000808eb54>] handle_IPI+0xe4/0x150
+ EDCIDSR: 00000000
+ EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
+CPU[1]:
+ EDPRSR:  0000000b (Power:On DLK:Unlock)
+ EDPCSR:  [<ffff0000087a64c0>] debug_notifier_call+0x108/0x288
+ EDCIDSR: 00000000
+ EDVIDSR: 90000000 (State:Non-secure Mode:EL1/0 Width:64bits VMID:0)
 
-enable_cnt is 0 during boot on my system.
+[...]
 
-The enable_cnt should have been non-zero following an insertion following
-remove and default and enabled values should have been identical. 
+This patch series has been verified on 96boards Hikey.
 
-Can you print out the values of pdev->aspm_default, link->aspm_default, 
-and link->aspm_enabled in this function along with atomic_read(&pdev->enable_cnt)?
+Changes from v1:
+* According to Mike Leach suggestion, remove the binding for debug
+  module clocks which have been directly provided by CPU clocks.
+* According to Mathieu Poirier suggestion, add function
+  of_coresight_get_cpu() and some minor refactors for debug module
+  driver.
 
-> 
->> +	/*
->> +	 * Save default state from FW when enabling ASPM for the first time
->> +	 * during boot by looking at the calculated link->aspm_enabled bits
->> +	 * above and enable_cnt will be zero.
->> +	 *
->> +	 * If this path is getting called for the second/third time
->> +	 * (enable_cnt will be non-zero). Assume that the current state of the
->> +	 * ASPM registers may not necessarily match what FW asked us to do as
->> +	 * in the case of hotplug insertion/removal.
->> +	 */
->> +	if (!atomic_read(&pdev->enable_cnt))
->> +		pdev->aspm_default = link->aspm_default = link->aspm_enabled;
->> +	else
->> +		link->aspm_default = pdev->aspm_default;
+Changes from RFC:
+* According to Mike Leach suggestion, added check for EDPRSR to avoid
+  lockup; added supporting EDVIDSR and EDCIDSR registers;
+* According to Mark Rutland and Mathieu Poirier suggestion, rewrote
+  the documentation for DT binding;
+* According to Mark and Mathieu suggestion, refined debug driver;
 
+
+Leo Yan (3):
+  coresight: bindings for debug module
+  coresight: refactor with function of_coresight_get_cpu
+  coresight: add support for debug module
+
+ .../devicetree/bindings/arm/coresight-debug.txt    |  40 +++
+ drivers/hwtracing/coresight/Kconfig                |  10 +
+ drivers/hwtracing/coresight/Makefile               |   1 +
+ drivers/hwtracing/coresight/coresight-debug.c      | 378 +++++++++++++++++++++
+ drivers/hwtracing/coresight/of_coresight.c         |  35 +-
+ include/linux/coresight.h                          |   2 +
+ 6 files changed, 454 insertions(+), 12 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/coresight-debug.txt
+ create mode 100644 drivers/hwtracing/coresight/coresight-debug.c
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.7.4
