@@ -1,68 +1,70 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Tue, 28 Feb 2017 09:52:33 -0700
-Subject: [PATCH] arm: exynos increase CONFIG_CMA_SIZE_MBYTES to 96
-In-Reply-To: <28dfa72b-13f5-2674-92de-d5a264a89e1a@osg.samsung.com>
-References: <20170228002353.3101-1-shuahkh@osg.samsung.com>
- <28dfa72b-13f5-2674-92de-d5a264a89e1a@osg.samsung.com>
-Message-ID: <82fe7b00-b1bc-cd32-8ff1-a079adfd8607@osg.samsung.com>
+From: emilio@elopez.com.ar (=?UTF-8?Q?Emilio_L=c3=b3pez?=)
+Date: Tue, 28 Feb 2017 14:01:48 -0300
+Subject: [linux-sunxi] [PATCH 3/4] ARM: sun7i: Convert to CCU
+In-Reply-To: <20170227210914.18954-4-plaes@plaes.org>
+References: <20170227210914.18954-1-plaes@plaes.org>
+ <20170227210914.18954-4-plaes@plaes.org>
+Message-ID: <bca96944-bd58-5011-5eb9-01c4a1440fe2@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2017 09:42 AM, Javier Martinez Canillas wrote:
-> Hello Shuah,
-> 
-> The subject line isn't consistent with what's used for exynos_defconfig
-> changes, please use instead:
-> 
-> ARM: exynos_defconfig: Increase CONFIG_CMA_SIZE_MBYTES to 96
-> 
+Hi,
 
-oops - I meant o make it exynos_defconfig
+I spotted a couple of things here on a quick look, see below
 
-> On 02/27/2017 09:23 PM, Shuah Khan wrote:
->> Current CMA size of 64 Mbytes is right on the edge of being too small
->> for some display managers.  With the proposed s5p_mfc patch series that
->> pre-allocate buffers, when display manager starts, it fails to get GEM
->> buffers.  Increasing the CMA size to 96 solves the problem.
->>
->> Change CONFIG_CMA_SIZE_MBYTES to 96 in exynos_defconfig to address the
->> problem.
->>
+El 27/02/17 a las 18:09, Priit Laes escribi?:
+> Convert sun7i-a20.dtsi to new CCU driver.
 > 
-> As you mention, the problem is when a driver pre-allocates a lot of CMA
-> memory. So instead of mentioning an in-flight patch series, I would make
-> the commit message more generic. Something along the following lines:
+> Signed-off-by: Priit Laes <plaes@plaes.org>
+> ---
+>  arch/arm/boot/dts/sun7i-a20.dtsi | 719 +++++----------------------------------
+>  1 file changed, 86 insertions(+), 633 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 04c9977..6f80cb8 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -47,7 +47,8 @@
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/thermal/thermal.h>
+>  
+> -#include <dt-bindings/clock/sun4i-a10-pll2.h>
+> +#include <dt-bindings/clock/sun7i-ccu.h>
+> +#include <dt-bindings/reset/sun7i-ccu.h>
+>  #include <dt-bindings/dma/sun4i-a10.h>
+>  #include <dt-bindings/pinctrl/sun4i-a10.h>
+>  
+> @@ -67,19 +68,19 @@
+>  			compatible = "allwinner,simple-framebuffer",
+>  				     "simple-framebuffer";
+>  			allwinner,pipeline = "de_be0-lcd0-hdmi";
+> -			clocks = <&ahb_gates 36>, <&ahb_gates 43>,
+> -				 <&ahb_gates 44>, <&de_be0_clk>,
+> -				 <&tcon0_ch1_clk>, <&dram_gates 26>;
+> +			clocks = <&ccu CLK_AHB_LCD0>, <&ccu CLK_AHB_HDMI1>,
+> +				 <&ccu CLK_AHB_DE_BE0>, <&ccu CLK_DE_BE0>,
+> +				 <&ccu CLK_TCON0_CH1>, <&ccu CLK_DRAM_DE_BE0>;
+>  			status = "disabled";
+>  		};
+>  
+> -		framebuffer at 1 {
+> +		framebuffer at 0 {
 
-I thought about making it generic and decided to mention the problem I am
-seeing, so there is a context to it. Without this patch, some display
-managers will see regression.
+This looks like an unrelated change
 
-> 
-> Current CMA size is 64 Mbytes, but this may not be enough if different
-> drivers need to allocate big memory chunks.
-> 
-> For example, the s5p-mfc driver may need to do a pre-allocation of N MiB
-> to decode a H.264 1080p video, and there won't be enough CMA memory left
-> for others drivers, like the exynos-drm driver that may need to allocate
-> GEM buffers for the display manager.
-> 
-> Increasing the CMA size to 96 MiB should be enough for most use cases.
+> @@ -184,21 +185,11 @@
+>  
+>  		osc24M: clk at 01c20050 {
+>  			#clock-cells = <0>;
+> -			compatible = "allwinner,sun4i-a10-osc-clk";
+> -			reg = <0x01c20050 0x4>;
+> +			compatible = "fixed-clock";
+>  			clock-frequency = <24000000>;
+>  			clock-output-names = "osc24M";
+>  		};
 
-I will add the current problem to throw away section of the patch for more
-information.
+allwinner,sun4i-a10-osc-clk implements a gate apart from a fixed clock,
+is the feature loss intended?
 
-> 
->> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
->> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
-> 
-> Patch looks good to me though.
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-thanks for the review. I will send v2 with your reviewed by tag
-> 
-> Best regards,
-> 
-
--- Shuah
+Cheers,
+Emilio
