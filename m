@@ -1,151 +1,111 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 28 Feb 2017 11:46:00 -0800
-Subject: [PATCH v4] reset: Add i.MX7 SRC reset driver
-In-Reply-To: <1488292707.2288.53.camel@pengutronix.de>
-References: <20170221161331.17012-1-andrew.smirnov@gmail.com>
- <1488292707.2288.53.camel@pengutronix.de>
-Message-ID: <CAHQ1cqG4VSr=E1U4CpruYtvzXK0xcJTow0VwurP1S4_Hi-TJzg@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 28 Feb 2017 11:54:00 -0800
+Subject: [PATCH v2] ARM: OMAP2+: Fix device node reference counts
+Message-ID: <1488311640-3594-1-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2017 at 6:38 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> On Tue, 2017-02-21 at 08:13 -0800, Andrey Smirnov wrote:
->> Add reset controller driver exposing various reset faculties,
->> implemented by System Reset Controller IP block.
->>
->> Cc: Lucas Stach <l.stach@pengutronix.de>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: devicetree at vger.kernel.org
->> Cc: linux-kernel at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
->> ---
->>
->> Changes since v3 (see [v3]):
->>
->>       - Convert code IMX7_RESET_PCIEPHY to change G_RST and BTNRST
->>           simultaneously to make all resets be representable as
->>           signal->bit in signal->offset register
->>
->>       - Convert assert/deassert subroutines to be special cases of a
->>           common reset subroutine
->>
->> Changes since v2 (see [v2]):
->>
->>       - Fix typos
->>
->>       - Kconfig/Makefile chagnes account for alphabetical sorting of
->>           those files
->>
->>       - Remove redundant includes
->>
->>       - Make use of regmap_attach_dev and avoid storing refernce to
->>           struct *dev in private data
->>
->>       - Change code and headers to expose almost all of the reset
->>           related bits in SRC IP block
->>
->> Changes since v1 (see [v1]):
->>
->>       - Various small DT bindings description fixes as per feedback
->>           from Rob Herring
->>
->>
->> [v1] https://lkml.org/lkml/2017/2/6/554
->> [v2] https://lkml.org/lkml/2017/2/13/488
->> [v3] https://lkml.org/lkml/2017/2/20/344
->>
->>
->>  .../devicetree/bindings/reset/fsl,imx7-src.txt     |  47 ++++++
->>  drivers/reset/Kconfig                              |   8 ++
->>  drivers/reset/Makefile                             |   2 +
->>  drivers/reset/reset-imx7.c                         | 158 +++++++++++++++++++++
->>  include/dt-bindings/reset/imx7-reset.h             |  62 ++++++++
->>  5 files changed, 277 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
->>  create mode 100644 drivers/reset/reset-imx7.c
->>  create mode 100644 include/dt-bindings/reset/imx7-reset.h
->>
->> diff --git a/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
->> new file mode 100644
->> index 0000000..5e1afc3
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
->> @@ -0,0 +1,47 @@
->> +Freescale i.MX7 System Reset Controller
->> +======================================
->> +
->> +Please also refer to reset.txt in this directory for common reset
->> +controller binding usage.
->> +
->> +Required properties:
->> +- compatible: Should be "fsl,imx7-src", "syscon"
->> +- reg: should be register base and length as documented in the
->> +  datasheet
->> +- interrupts: Should contain SRC interrupt
->> +- #reset-cells: 1, see below
->> +
->> +example:
->> +
->> +src: reset-controller at 30390000 {
->> +     compatible = "fsl,imx7d-src", "syscon";
->> +     reg = <0x30390000 0x2000>;
->> +     interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
->> +     #reset-cells = <1>;
->> +};
->> +
->> +
->> +Specifying reset lines connected to IP modules
->> +==============================================
->> +
->> +The system reset controller can be used to reset various set of
->> +peripherals. Device nodes that need access to reset lines should
->> +specify them as a reset phandle in their corresponding node as
->> +specified in reset.txt.
->> +
->> +Example:
->> +
->> +     pcie: pcie at 33800000 {
->> +
->> +             ...
->> +
->> +             resets = <&src IMX7_RESET_PCIEPHY>,
->> +                      <&src IMX7_RESET_PCIE_CTRL_APPS_EN>;
->> +             reset-names = "pciephy", "apps";
->> +
->> +             ...
->> +        };
->> +
->> +
->> +For list of all valid reset indicies see
->> +<dt-bindings/reset/imx7-reset.h>
->> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
->> index 172dc96..bea1800 100644
->> --- a/drivers/reset/Kconfig
->> +++ b/drivers/reset/Kconfig
->> @@ -27,6 +27,14 @@ config RESET_BERLIN
->>       help
->>         This enables the reset controller driver for Marvell Berlin SoCs.
->>
->> +config RESET_IMX7
->> +     bool "i.MX7 Reset Driver"
->> +     depends on SOC_IMX7D || COMPILE_TEST
->> +     select MFD_SYSCON
->> +     default SOC_IMX7D
->
-> Can we make this
->
-> config RESET_IMX7
->         bool "i.MX7 Reset Driver" if COMPILE_TEST
->         default SOC_IMX7D
->         select MFD_SYSCON
->
-> instead?
->
-> If you agree, I can fix it up while applying.
+After commit 'of: fix of_node leak caused in of_find_node_opts_by_path',
+the following error may be reported when running omap images.
 
-Sure, I have no problem with that change.
+OF: ERROR: Bad of_node_put() on /ocp at 68000000
+CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc7-next-20170210 #1
+Hardware name: Generic OMAP3-GP (Flattened Device Tree)
+[<c0310604>] (unwind_backtrace) from [<c030bbf4>] (show_stack+0x10/0x14)
+[<c030bbf4>] (show_stack) from [<c05add8c>] (dump_stack+0x98/0xac)
+[<c05add8c>] (dump_stack) from [<c05af1b0>] (kobject_release+0x48/0x7c)
+[<c05af1b0>] (kobject_release)
+	from [<c0ad1aa4>] (of_find_node_by_name+0x74/0x94)
+[<c0ad1aa4>] (of_find_node_by_name)
+	from [<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable+0x24/0x2c)
+[<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable) from
+[<c1215d5c>] (omap3xxx_hwmod_init+0x180/0x274)
+[<c1215d5c>] (omap3xxx_hwmod_init)
+	from [<c120faa8>] (omap3_init_early+0xa0/0x11c)
+[<c120faa8>] (omap3_init_early)
+	from [<c120fb2c>] (omap3430_init_early+0x8/0x30)
+[<c120fb2c>] (omap3430_init_early)
+	from [<c1204710>] (setup_arch+0xc04/0xc34)
+[<c1204710>] (setup_arch) from [<c1200948>] (start_kernel+0x68/0x38c)
+[<c1200948>] (start_kernel) from [<8020807c>] (0x8020807c)
 
-Thanks,
-Andrey
+of_find_node_by_name() drops the reference to the passed device node.
+Use of_get_child_by_name() instead. Also, release references to
+device nodes obtained with of_find_node_by_name() and
+of_get_child_by_name() after they are no longer needed.
+
+While at it, clean up the code and change the return type of
+omap3xxx_hwmod_is_hs_ip_block_usable() to bool to match its use
+and the return type of of_device_is_available().
+
+Cc: Qi Hou <qi.hou@windriver.com>
+Cc: Peter Rosin <peda@axentia.se>
+Cc: Rob Herring <robh@kernel.org>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+---
+v2: Change subject ('Grab reference to device nodes where needed'
+    didn't really cover all the changes made)
+    Use of_get_child_by_name() instead of of_find_node_by_name()
+    Drop references to device nodes as needed
+    Change return type of omap3xxx_hwmod_is_hs_ip_block_usable()
+    to bool
+
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 25 +++++++++++++++++--------
+ 1 file changed, 17 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 56f917ec8621..042e460f4aa4 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -3111,16 +3111,20 @@ static struct omap_hwmod_ocp_if *omap3xxx_dss_hwmod_ocp_ifs[] __initdata = {
+  * Return: 0 if device named @dev_name is not likely to be accessible,
+  * or 1 if it is likely to be accessible.
+  */
+-static int __init omap3xxx_hwmod_is_hs_ip_block_usable(struct device_node *bus,
+-						       const char *dev_name)
++static bool __init omap3xxx_hwmod_is_hs_ip_block_usable(struct device_node *bus,
++							const char *dev_name)
+ {
++	struct device_node *node;
++	bool available;
++
+ 	if (!bus)
+-		return (omap_type() == OMAP2_DEVICE_TYPE_GP) ? 1 : 0;
++		return omap_type() == OMAP2_DEVICE_TYPE_GP;
+ 
+-	if (of_device_is_available(of_find_node_by_name(bus, dev_name)))
+-		return 1;
++	node = of_get_child_by_name(bus, dev_name);
++	available = of_device_is_available(node);
++	of_node_put(node);
+ 
+-	return 0;
++	return available;
+ }
+ 
+ int __init omap3xxx_hwmod_init(void)
+@@ -3189,15 +3193,20 @@ int __init omap3xxx_hwmod_init(void)
+ 
+ 	if (h_sham && omap3xxx_hwmod_is_hs_ip_block_usable(bus, "sham")) {
+ 		r = omap_hwmod_register_links(h_sham);
+-		if (r < 0)
++		if (r < 0) {
++			of_node_put(bus);
+ 			return r;
++		}
+ 	}
+ 
+ 	if (h_aes && omap3xxx_hwmod_is_hs_ip_block_usable(bus, "aes")) {
+ 		r = omap_hwmod_register_links(h_aes);
+-		if (r < 0)
++		if (r < 0) {
++			of_node_put(bus);
+ 			return r;
++		}
+ 	}
++	of_node_put(bus);
+ 
+ 	/*
+ 	 * Register hwmod links specific to certain ES levels of a
+-- 
+2.7.4
