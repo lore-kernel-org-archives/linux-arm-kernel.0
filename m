@@ -1,24 +1,39 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 27 Feb 2017 23:33:06 -0800
-Subject: [PATCH 1/4] clk: rockchip: add "," to
- mux_pll_src_apll_dpll_gpll_usb480m_p on rk3036
-In-Reply-To: <20170228051420.7214-2-heiko@sntech.de>
-References: <20170228051420.7214-1-heiko@sntech.de>
- <20170228051420.7214-2-heiko@sntech.de>
-Message-ID: <20170228073306.GK25384@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Feb 2017 08:52:43 +0100
+Subject: [PATCH 0/4] ARM: sun7i: Convert sun7i SoC to sunxi-ng
+In-Reply-To: <20170227210914.18954-1-plaes@plaes.org>
+References: <20170227210914.18954-1-plaes@plaes.org>
+Message-ID: <20170228075243.gschowjzagwuxgok@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28, Heiko Stuebner wrote:
-> The mux_pll_src_apll_dpll_gpll_usb480m_p parent list was missing a ","
-> between the 3rd and 4th parent names, making them fall together and thus
-> lookups fail. Fix that.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
+Hi Priit,
 
-Subtle. Fixes tag?
+On Mon, Feb 27, 2017 at 11:09:10PM +0200, Priit Laes wrote:
+> Hi,
+> 
+> This is serie brings another SoC into the sunxi-ng world.
+> 
+> As mentioned in sun5i conversion, this is pretty much standard
+> stuff as all the required clocks were already implemented in
+> the sunxi-ng framework.
+
+Thanks a lot for that work. I think the A10 should be converted at the
+same time, and both would share the same driver.
+
+Fortunately, if I recall properly, both are not too far off.
+
+Thanks again,
+Maxime
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170228/4185273b/attachment.sig>
