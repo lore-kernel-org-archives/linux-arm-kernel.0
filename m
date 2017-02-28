@@ -1,293 +1,83 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 28 Feb 2017 15:31:14 +0100
-Subject: [PATCH v3 1/3] pci: pci-aardvark: move to MSI handling using generic
- MSI support
-In-Reply-To: <1488292276-11106-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1488292276-11106-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1488292276-11106-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 28 Feb 2017 08:33:40 -0600
+Subject: [PATCH v2 4/9] dt-bindings: Add Ampire AM-480272H3TMQW-T01H panel
+In-Reply-To: <c759770a-f250-7502-4ad1-c2fbb001cf92@st.com>
+References: <1486738489-22154-1-git-send-email-yannick.fertre@st.com>
+ <1486738489-22154-5-git-send-email-yannick.fertre@st.com>
+ <20170216023408.apqukipi5zzkrk7j@rob-hp-laptop>
+ <2b409ff7-54fe-4110-6495-1cc54585e5e2@st.com>
+ <CAL_JsqLBZ0DGP62yGb2GjNZMto9hWce_HWNCX5iWhbrnE3ae_Q@mail.gmail.com>
+ <0036d551-91bc-9f3f-22a9-9dac2cf3527c@st.com>
+ <CAL_JsqLqNzpV1pjz3bX1gowHwJzsKKA=17aD5Ce18sy1B_V-0g@mail.gmail.com>
+ <c759770a-f250-7502-4ad1-c2fbb001cf92@st.com>
+Message-ID: <CAL_Jsq+PO_KT-UY2QdX1a5pvEYJv_E6kyamthXS=hE-jjR0XKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSI support introduced with the initial Aardvark driver was based
-on the msi_controller structure and the of_pci_msi_chip_add() /
-of_pci_find_msi_chip_by_node() API, which are being deprecated in
-favor of the generic MSI support.
+On Tue, Feb 28, 2017 at 4:07 AM, Yannick FERTRE <yannick.fertre@st.com> wrote:
+> On 02/24/2017 03:06 PM, Rob Herring wrote:
+>> On Fri, Feb 24, 2017 at 2:18 AM, Yannick FERTRE <yannick.fertre@st.com> wrote:
+>>> On 02/21/2017 03:07 PM, Rob Herring wrote:
+>>>> On Mon, Feb 20, 2017 at 5:01 AM, Yannick FERTRE <yannick.fertre@st.com> wrote:
+>>>>> On 02/16/2017 03:34 AM, Rob Herring wrote:
+>>>>>> On Fri, Feb 10, 2017 at 03:54:44PM +0100, Yannick Fertre wrote:
+>>>>>>> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+>>>>>>> ---
+>>>>>>>  .../bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt         | 7 +++++++
+>>>>>>>  1 file changed, 7 insertions(+)
+>>>>>>>  create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
 
-Therefore, this commit updates the Aardvark driver to use the generic
-MSI support.
+[...]
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-Changes since v2:
- - Rebased on top of v4.10
- - Added the MSI_FLAG_MULTI_PCI_MSI flag, since we support
-   allocating/freeing multiple MSIs at once.
+>>>>> This binding is similar to all panel bindings which are link to panel
+>>>>> simple. Details on gpio & power supply are describe with simple-panel
+>>>>> binding.
+>>>>
+>>>> simple-panel.txt provides what possible standard properties there are,
+>>>> not whether a panel uses them. The power supply needs to be explicit
+>>>> because I don't know if you forgot and there's really 2 supplies or
+>>>> you are using "power-supply" for a single supply.
+>>>>
+>>>> Rob
+>>>>
+>
+>
+> Hi Rob,
+> ok, I'll push a V4 version with all details on properties.
+> I write bellow  a draft of binding:
+>
+> Ampire AM-480272H3TMQW-T01H 4.3" WQVGA TFT LCD panel
+>
+> This binding is compatible with the simple-panel binding, which is specified
+> in simple-panel.txt in this directory.
+>
+> Required properties:
+> - compatible: should be "ampire,am-480272h3tmqw-t01h"
+>
+> Optional properties:
+> - power-supply: regulator to provide the supply voltage
+> - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
 
-Changes since v1:
- - Rebased on top of v4.9
- - Removed the MSI_FLAG_PCI_MSIX flag since we don't support MSI-X for
-   the moment.
----
- drivers/pci/host/pci-aardvark.c | 173 ++++++++++++++++------------------------
- 1 file changed, 67 insertions(+), 106 deletions(-)
+Doesn't look like there's any DDC connection to this panel.
 
-diff --git a/drivers/pci/host/pci-aardvark.c b/drivers/pci/host/pci-aardvark.c
-index 4fce494..37d0bcd 100644
---- a/drivers/pci/host/pci-aardvark.c
-+++ b/drivers/pci/host/pci-aardvark.c
-@@ -200,10 +200,12 @@ struct advk_pcie {
- 	struct list_head resources;
- 	struct irq_domain *irq_domain;
- 	struct irq_chip irq_chip;
--	struct msi_controller msi;
- 	struct irq_domain *msi_domain;
-+	struct irq_domain *msi_inner_domain;
-+	struct irq_chip msi_bottom_irq_chip;
- 	struct irq_chip msi_irq_chip;
--	DECLARE_BITMAP(msi_irq_in_use, MSI_IRQ_NUM);
-+	struct msi_domain_info msi_domain_info;
-+	DECLARE_BITMAP(msi_used, MSI_IRQ_NUM);
- 	struct mutex msi_used_lock;
- 	u16 msi_msg;
- 	int root_bus_nr;
-@@ -545,94 +547,64 @@ static struct pci_ops advk_pcie_ops = {
- 	.write = advk_pcie_wr_conf,
- };
- 
--static int advk_pcie_alloc_msi(struct advk_pcie *pcie)
-+static void advk_msi_irq_compose_msi_msg(struct irq_data *data,
-+					 struct msi_msg *msg)
- {
--	int hwirq;
-+	struct advk_pcie *pcie = irq_data_get_irq_chip_data(data);
-+	phys_addr_t msi_msg = virt_to_phys(&pcie->msi_msg);
- 
--	mutex_lock(&pcie->msi_used_lock);
--	hwirq = find_first_zero_bit(pcie->msi_irq_in_use, MSI_IRQ_NUM);
--	if (hwirq >= MSI_IRQ_NUM)
--		hwirq = -ENOSPC;
--	else
--		set_bit(hwirq, pcie->msi_irq_in_use);
--	mutex_unlock(&pcie->msi_used_lock);
--
--	return hwirq;
-+	msg->address_lo = lower_32_bits(msi_msg);
-+	msg->address_hi = upper_32_bits(msi_msg);
-+	msg->data = data->irq;
- }
- 
--static void advk_pcie_free_msi(struct advk_pcie *pcie, int hwirq)
-+static int advk_msi_set_affinity(struct irq_data *irq_data,
-+				 const struct cpumask *mask, bool force)
- {
--	struct device *dev = &pcie->pdev->dev;
--
--	mutex_lock(&pcie->msi_used_lock);
--	if (!test_bit(hwirq, pcie->msi_irq_in_use))
--		dev_err(dev, "trying to free unused MSI#%d\n", hwirq);
--	else
--		clear_bit(hwirq, pcie->msi_irq_in_use);
--	mutex_unlock(&pcie->msi_used_lock);
-+	return -EINVAL;
- }
- 
--static int advk_pcie_setup_msi_irq(struct msi_controller *chip,
--				   struct pci_dev *pdev,
--				   struct msi_desc *desc)
-+static int advk_msi_irq_domain_alloc(struct irq_domain *domain,
-+				     unsigned int virq,
-+				     unsigned int nr_irqs, void *args)
- {
--	struct advk_pcie *pcie = pdev->bus->sysdata;
--	struct msi_msg msg;
--	int virq, hwirq;
--	phys_addr_t msi_msg_phys;
--
--	/* We support MSI, but not MSI-X */
--	if (desc->msi_attrib.is_msix)
--		return -EINVAL;
--
--	hwirq = advk_pcie_alloc_msi(pcie);
--	if (hwirq < 0)
--		return hwirq;
-+	struct advk_pcie *pcie = domain->host_data;
-+	int hwirq, i;
- 
--	virq = irq_create_mapping(pcie->msi_domain, hwirq);
--	if (!virq) {
--		advk_pcie_free_msi(pcie, hwirq);
--		return -EINVAL;
-+	mutex_lock(&pcie->msi_used_lock);
-+	hwirq = bitmap_find_next_zero_area(pcie->msi_used, MSI_IRQ_NUM,
-+					   0, nr_irqs, 0);
-+	if (hwirq >= MSI_IRQ_NUM) {
-+		mutex_unlock(&pcie->msi_used_lock);
-+		return -ENOSPC;
- 	}
- 
--	irq_set_msi_desc(virq, desc);
--
--	msi_msg_phys = virt_to_phys(&pcie->msi_msg);
--
--	msg.address_lo = lower_32_bits(msi_msg_phys);
--	msg.address_hi = upper_32_bits(msi_msg_phys);
--	msg.data = virq;
--
--	pci_write_msi_msg(virq, &msg);
--
--	return 0;
--}
-+	bitmap_set(pcie->msi_used, hwirq, nr_irqs);
-+	mutex_unlock(&pcie->msi_used_lock);
- 
--static void advk_pcie_teardown_msi_irq(struct msi_controller *chip,
--				       unsigned int irq)
--{
--	struct irq_data *d = irq_get_irq_data(irq);
--	struct msi_desc *msi = irq_data_get_msi_desc(d);
--	struct advk_pcie *pcie = msi_desc_to_pci_sysdata(msi);
--	unsigned long hwirq = d->hwirq;
-+	for (i = 0; i < nr_irqs; i++)
-+		irq_domain_set_info(domain, virq + i, hwirq + i,
-+				    &pcie->msi_bottom_irq_chip,
-+				    domain->host_data, handle_simple_irq,
-+				    NULL, NULL);
- 
--	irq_dispose_mapping(irq);
--	advk_pcie_free_msi(pcie, hwirq);
-+	return hwirq;
- }
- 
--static int advk_pcie_msi_map(struct irq_domain *domain,
--			     unsigned int virq, irq_hw_number_t hw)
-+static void advk_msi_irq_domain_free(struct irq_domain *domain,
-+				     unsigned int virq, unsigned int nr_irqs)
- {
-+	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
- 	struct advk_pcie *pcie = domain->host_data;
- 
--	irq_set_chip_and_handler(virq, &pcie->msi_irq_chip,
--				 handle_simple_irq);
--
--	return 0;
-+	mutex_lock(&pcie->msi_used_lock);
-+	bitmap_clear(pcie->msi_used, d->hwirq, nr_irqs);
-+	mutex_unlock(&pcie->msi_used_lock);
- }
- 
--static const struct irq_domain_ops advk_pcie_msi_irq_ops = {
--	.map = advk_pcie_msi_map,
-+static const struct irq_domain_ops advk_msi_domain_ops = {
-+	.alloc = advk_msi_irq_domain_alloc,
-+	.free = advk_msi_irq_domain_free,
- };
- 
- static void advk_pcie_irq_mask(struct irq_data *d)
-@@ -680,30 +652,25 @@ static int advk_pcie_init_msi_irq_domain(struct advk_pcie *pcie)
- {
- 	struct device *dev = &pcie->pdev->dev;
- 	struct device_node *node = dev->of_node;
--	struct irq_chip *msi_irq_chip;
--	struct msi_controller *msi;
-+	struct irq_chip *bottom_ic, *msi_ic;
-+	struct msi_domain_info *msi_di;
- 	phys_addr_t msi_msg_phys;
--	int ret;
- 
--	msi_irq_chip = &pcie->msi_irq_chip;
-+	mutex_init(&pcie->msi_used_lock);
- 
--	msi_irq_chip->name = devm_kasprintf(dev, GFP_KERNEL, "%s-msi",
--					    dev_name(dev));
--	if (!msi_irq_chip->name)
--		return -ENOMEM;
-+	bottom_ic = &pcie->msi_bottom_irq_chip;
- 
--	msi_irq_chip->irq_enable = pci_msi_unmask_irq;
--	msi_irq_chip->irq_disable = pci_msi_mask_irq;
--	msi_irq_chip->irq_mask = pci_msi_mask_irq;
--	msi_irq_chip->irq_unmask = pci_msi_unmask_irq;
-+	bottom_ic->name = "MSI";
-+	bottom_ic->irq_compose_msi_msg = advk_msi_irq_compose_msi_msg;
-+	bottom_ic->irq_set_affinity = advk_msi_set_affinity;
- 
--	msi = &pcie->msi;
-+	msi_ic = &pcie->msi_irq_chip;
-+	msi_ic->name = "advk-MSI";
- 
--	msi->setup_irq = advk_pcie_setup_msi_irq;
--	msi->teardown_irq = advk_pcie_teardown_msi_irq;
--	msi->of_node = node;
--
--	mutex_init(&pcie->msi_used_lock);
-+	msi_di = &pcie->msi_domain_info;
-+	msi_di->flags = MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
-+		MSI_FLAG_MULTI_PCI_MSI;
-+	msi_di->chip = msi_ic;
- 
- 	msi_msg_phys = virt_to_phys(&pcie->msi_msg);
- 
-@@ -712,16 +679,18 @@ static int advk_pcie_init_msi_irq_domain(struct advk_pcie *pcie)
- 	advk_writel(pcie, upper_32_bits(msi_msg_phys),
- 		    PCIE_MSI_ADDR_HIGH_REG);
- 
--	pcie->msi_domain =
-+	pcie->msi_inner_domain =
- 		irq_domain_add_linear(NULL, MSI_IRQ_NUM,
--				      &advk_pcie_msi_irq_ops, pcie);
--	if (!pcie->msi_domain)
-+				      &advk_msi_domain_ops, pcie);
-+	if (!pcie->msi_inner_domain)
- 		return -ENOMEM;
- 
--	ret = of_pci_msi_chip_add(msi);
--	if (ret < 0) {
--		irq_domain_remove(pcie->msi_domain);
--		return ret;
-+	pcie->msi_domain =
-+		pci_msi_create_irq_domain(of_node_to_fwnode(node),
-+					  msi_di, pcie->msi_inner_domain);
-+	if (!pcie->msi_domain) {
-+		irq_domain_remove(pcie->msi_inner_domain);
-+		return -ENOMEM;
- 	}
- 
- 	return 0;
-@@ -729,8 +698,8 @@ static int advk_pcie_init_msi_irq_domain(struct advk_pcie *pcie)
- 
- static void advk_pcie_remove_msi_irq_domain(struct advk_pcie *pcie)
- {
--	of_pci_msi_chip_remove(&pcie->msi);
- 	irq_domain_remove(pcie->msi_domain);
-+	irq_domain_remove(pcie->msi_inner_domain);
- }
- 
- static int advk_pcie_init_irq_domain(struct advk_pcie *pcie)
-@@ -917,8 +886,6 @@ static int advk_pcie_probe(struct platform_device *pdev)
- 	struct advk_pcie *pcie;
- 	struct resource *res;
- 	struct pci_bus *bus, *child;
--	struct msi_controller *msi;
--	struct device_node *msi_node;
- 	int ret, irq;
- 
- 	pcie = devm_kzalloc(dev, sizeof(struct advk_pcie), GFP_KERNEL);
-@@ -962,14 +929,8 @@ static int advk_pcie_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	msi_node = of_parse_phandle(dev->of_node, "msi-parent", 0);
--	if (msi_node)
--		msi = of_pci_find_msi_chip_by_node(msi_node);
--	else
--		msi = NULL;
--
--	bus = pci_scan_root_bus_msi(dev, 0, &advk_pcie_ops,
--				    pcie, &pcie->resources, &pcie->msi);
-+	bus = pci_scan_root_bus(dev, 0, &advk_pcie_ops,
-+				pcie, &pcie->resources);
- 	if (!bus) {
- 		advk_pcie_remove_msi_irq_domain(pcie);
- 		advk_pcie_remove_irq_domain(pcie);
--- 
-2.7.4
+> - enable-gpios: GPIO pin to enable or disable the panel
+
+Need to state this is active high.
+
+> - backlight: phandle of the backlight device attached to the panel
+>
+> Optional nodes:
+> - Video port for RGB input.
+>
+> Example:
+>         panel_rgb: panel-rgb {
+>                 compatible = "ampire,am-480272h3tmqw-t01h";
+>                 enable-gpios = <&gpioa 8 1>;
+>                 port {
+>                         panel_in_rgb: endpoint {
+>                                 remote-endpoint = <&controler_out_rgb>;
+>                         };
+>                 };
+>         };
+>
+> Best regards
