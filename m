@@ -1,272 +1,146 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue, 28 Feb 2017 07:35:24 +0100
-Subject: [PATCH v3 14/25] ARM64: dts: Add Actions Semi S900 and Bubblegum-96
-In-Reply-To: <20170228063535.32069-1-afaerber@suse.de>
-References: <20170228063535.32069-1-afaerber@suse.de>
-Message-ID: <20170228063535.32069-15-afaerber@suse.de>
+Date: Tue, 28 Feb 2017 07:35:10 +0100
+Subject: [PATCH v3 00/25] ARM: Initial Actions Semi S500 and S900 enablement
+Message-ID: <20170228063535.32069-1-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-UART0/1/4/6 interrupts are guesses.
+Hello,
 
+This series adds initial support for Actions Semiconductor S500 (ARMv7) and
+S900 (ARMv8) SoCs.
+
+v3 has the serial driver working almost equally for both, still glitch on S900.
+SMP support and power-gating for S500 are implemented, so both get 4 CPUs up.
+
+https://github.com/afaerber/linux/commits/bg96-next
+
+Booting from U-Boot is straightforward on both boards:
+
+https://en.opensuse.org/HCL:Guitar
+https://en.opensuse.org/HCL:Bubblegum-96
+
+Have a lot of fun!
+
+Cheers,
+Andreas
+
+v2 -> v3:
+* Clocksource fix
+* Clocksource cleanups (Daniel)
+* Serial cleanups
+* Add S500 CPU enable-method
+* Add power domain driver
+* Rework clocksource for S900 compatibility
+
+v1 -> v2:
+* S900 DT fixes (Mark)
+* Kconfig name changes (Arnd)
+* Bubblegum-96 .dts rename
+* Vendor prefix rename
+* Minor cleanups
+* Add serial driver
+* Add MAINTAINERS section
+* Use SPDX-License-Identifier in DT (Rob)
+* Add clocksource driver
+
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: mp-cs at actions-semi.com
 Cc: 96boards at ucrobotics.com
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- v2 -> v3:
- * Added remaining UART nodes -- some interrupts are guesses
- * Added timer node -- only TIMER1 interrupt known
- 
- v1 -> v2:
- * Reworded subject
- * Added memory at 0 node for Bubblegum-96 (Mark)
- * Filled in reserved-memory sub-node for Bubblegum-96 (Mark)
- * Added arm-pmu interrupt-affinity property (Mark)
- * Changed second GIC reg size 0x1000 -> 0x2000 for Bubblegum-96 (Mark)
- * Updated ARCH_OWL to ARCH_ACTIONS (Arnd)
- * Renamed s900-bubblegum96.dts to s900-bubblegum-96.dts
- * Adopted "actions" vendor prefix
- * Dropped irq.h include
- * Adopted SPDX-License-Identifier (Rob)
- 
- arch/arm64/boot/dts/Makefile                      |   1 +
- arch/arm64/boot/dts/actions/Makefile              |   5 +
- arch/arm64/boot/dts/actions/s900-bubblegum-96.dts |  35 +++++
- arch/arm64/boot/dts/actions/s900.dtsi             | 164 ++++++++++++++++++++++
- 4 files changed, 205 insertions(+)
+Cc: support at lemaker.org
+Cc: linux-serial at vger.kernel.org
+Cc: linux-doc at vger.kernel.org
+Cc: devicetree at vger.kernel.org
+
+Andreas F?rber (25):
+  dt-bindings: Add vendor prefix for Actions Semi
+  dt-bindings: arm: Document Actions Semi S500
+  dt-bindings: timer: Document Owl timer
+  clocksource: Add Owl timer
+  clocksource: owl: Add S900 support
+  ARM: Prepare Actions Semi S500
+  ARM64: Prepare Actions Semi S900
+  dt-bindings: serial: Document Actions Semi Owl UARTs
+  tty: serial: Add Actions Semi Owl UART earlycon
+  Documentation: kernel-parameters: Document owl earlycon
+  ARM: dts: Add Actions Semi S500 and LeMaker Guitar
+  dt-bindings: Add vendor prefix for uCRobotics
+  dt-bindings: arm: Document Actions Semi S900
+  ARM64: dts: Add Actions Semi S900 and Bubblegum-96
+  MAINTAINERS: Add Actions Semi Owl section
+  tty: serial: owl: Implement console driver
+  ARM64: dts: actions: s900-bubblegum-96: Add fake uart5 clock
+  ARM: dts: s500-guitar-bb-rev-b: Add fake uart3 clock
+  dt-bindings: arm: cpus: Add S500 enable-method
+  ARM: owl: Implement CPU enable-method for S500
+  ARM: dts: s500: Set CPU enable-method
+  dt-bindings: power: Add Owl SPS power domains
+  soc: actions: Add Owl SPS
+  ARM: dts: s500: Add SPS node
+  ARM: owl: smp: Reimplement SPS power-gating for CPU2 and CPU3
+
+ Documentation/admin-guide/kernel-parameters.txt    |   6 +
+ Documentation/devicetree/bindings/arm/actions.txt  |  39 ++
+ Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+ .../devicetree/bindings/power/actions,owl-sps.txt  |  17 +
+ .../bindings/serial/actions,owl-uart.txt           |  16 +
+ .../bindings/timer/actions,owl-timer.txt           |  20 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   2 +
+ MAINTAINERS                                        |  10 +
+ arch/arm/Kconfig                                   |   2 +
+ arch/arm/Makefile                                  |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/s500-guitar-bb-rev-b.dts         |  33 +
+ arch/arm/boot/dts/s500-guitar.dtsi                 |  24 +
+ arch/arm/boot/dts/s500.dtsi                        | 183 ++++++
+ arch/arm/mach-actions/Kconfig                      |  15 +
+ arch/arm/mach-actions/Makefile                     |   2 +
+ arch/arm/mach-actions/headsmp.S                    |  68 ++
+ arch/arm/mach-actions/owl.c                        |  28 +
+ arch/arm/mach-actions/platsmp.c                    | 229 +++++++
+ arch/arm64/Kconfig.platforms                       |   6 +
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/actions/Makefile               |   5 +
+ arch/arm64/boot/dts/actions/s900-bubblegum-96.dts  |  42 ++
+ arch/arm64/boot/dts/actions/s900.dtsi              | 164 +++++
+ drivers/clocksource/Kconfig                        |   7 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/owl-timer.c                    | 205 ++++++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/actions/Kconfig                        |  12 +
+ drivers/soc/actions/Makefile                       |   1 +
+ drivers/soc/actions/owl-sps.c                      | 245 +++++++
+ drivers/tty/serial/Kconfig                         |  19 +
+ drivers/tty/serial/Makefile                        |   1 +
+ drivers/tty/serial/owl-uart.c                      | 724 +++++++++++++++++++++
+ include/dt-bindings/power/s500-powergate.h         |  19 +
+ include/uapi/linux/serial_core.h                   |   3 +
+ 37 files changed, 2155 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/actions.txt
+ create mode 100644 Documentation/devicetree/bindings/power/actions,owl-sps.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/actions,owl-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/actions,owl-timer.txt
+ create mode 100644 arch/arm/boot/dts/s500-guitar-bb-rev-b.dts
+ create mode 100644 arch/arm/boot/dts/s500-guitar.dtsi
+ create mode 100644 arch/arm/boot/dts/s500.dtsi
+ create mode 100644 arch/arm/mach-actions/Kconfig
+ create mode 100644 arch/arm/mach-actions/Makefile
+ create mode 100644 arch/arm/mach-actions/headsmp.S
+ create mode 100644 arch/arm/mach-actions/owl.c
+ create mode 100644 arch/arm/mach-actions/platsmp.c
  create mode 100644 arch/arm64/boot/dts/actions/Makefile
  create mode 100644 arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
  create mode 100644 arch/arm64/boot/dts/actions/s900.dtsi
+ create mode 100644 drivers/clocksource/owl-timer.c
+ create mode 100644 drivers/soc/actions/Kconfig
+ create mode 100644 drivers/soc/actions/Makefile
+ create mode 100644 drivers/soc/actions/owl-sps.c
+ create mode 100644 drivers/tty/serial/owl-uart.c
+ create mode 100644 include/dt-bindings/power/s500-powergate.h
 
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index 080232b..d1a6b0a 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,3 +1,4 @@
-+dts-dirs += actions
- dts-dirs += al
- dts-dirs += allwinner
- dts-dirs += altera
-diff --git a/arch/arm64/boot/dts/actions/Makefile b/arch/arm64/boot/dts/actions/Makefile
-new file mode 100644
-index 0000000..62922d6
---- /dev/null
-+++ b/arch/arm64/boot/dts/actions/Makefile
-@@ -0,0 +1,5 @@
-+dtb-$(CONFIG_ARCH_ACTIONS) += s900-bubblegum-96.dtb
-+
-+always		:= $(dtb-y)
-+subdir-y	:= $(dts-dirs)
-+clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts b/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
-new file mode 100644
-index 0000000..a0c3484
---- /dev/null
-+++ b/arch/arm64/boot/dts/actions/s900-bubblegum-96.dts
-@@ -0,0 +1,35 @@
-+/*
-+ * Copyright (c) 2017 Andreas F?rber
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+/dts-v1/;
-+
-+#include "s900.dtsi"
-+
-+/ {
-+	compatible = "ucrobotics,bubblegum-96", "actions,s900";
-+	model = "Bubblegum-96";
-+
-+	aliases {
-+		serial5 = &uart5;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial5:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+	};
-+};
-+
-+&timer {
-+	clocks = <&hosc>;
-+};
-+
-+&uart5 {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/actions/s900.dtsi b/arch/arm64/boot/dts/actions/s900.dtsi
-new file mode 100644
-index 0000000..6048651
---- /dev/null
-+++ b/arch/arm64/boot/dts/actions/s900.dtsi
-@@ -0,0 +1,164 @@
-+/*
-+ * Copyright (c) 2017 Andreas F?rber
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "actions,s900";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		secmon at 1f000000 {
-+			reg = <0x0 0x1f000000 0x0 0x1000000>;
-+			no-map;
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	arm-pmu {
-+		compatible = "arm,cortex-a53-pmu";
-+		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
-+		             <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
-+		             <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-+		             <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	hosc: hosc {
-+		compatible = "fixed-clock";
-+		clock-frequency = <24000000>;
-+		#clock-cells = <0>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		gic: interrupt-controller at e00f1000 {
-+			compatible = "arm,gic-400";
-+			reg = <0x0 0xe00f1000 0x0 0x1000>,
-+			      <0x0 0xe00f2000 0x0 0x2000>,
-+			      <0x0 0xe00f4000 0x0 0x2000>,
-+			      <0x0 0xe00f6000 0x0 0x2000>;
-+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+		};
-+
-+		uart0: serial at e0120000 {
-+			compatible = "actions,s900-uart", "actions,owl-uart";
-+			reg = <0x0 0xe0120000 0x0 0x2000>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at e0122000 {
-+			compatible = "actions,s900-uart", "actions,owl-uart";
-+			reg = <0x0 0xe0122000 0x0 0x2000>;
-+			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at e0124000 {
-+			compatible = "actions,s900-uart", "actions,owl-uart";
-+			reg = <0x0 0xe0124000 0x0 0x2000>;
-+			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at e0126000 {
-+			compatible = "actions,s900-uart", "actions,owl-uart";
-+			reg = <0x0 0xe0126000 0x0 0x2000>;
-+			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		uart4: serial at e0128000 {
-+			compatible = "actions,s900-uart", "actions,owl-uart";
-+			reg = <0x0 0xe0128000 0x0 0x2000>;
-+			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		uart5: serial at e012a000 {
-+			compatible = "actions,s900-uart", "actions,owl-uart";
-+			reg = <0x0 0xe012a000 0x0 0x2000>;
-+			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		uart6: serial at e012c000 {
-+			compatible = "actions,s900-uart", "actions,owl-uart";
-+			reg = <0x0 0xe012c000 0x0 0x2000>;
-+			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		timer: timer at e0228000 {
-+			compatible = "actions,s900-timer";
-+			reg = <0x0 0xe0228000 0x0 0x8000>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "Timer1";
-+		};
-+	};
-+};
 -- 
 2.10.2
