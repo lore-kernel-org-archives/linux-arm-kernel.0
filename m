@@ -1,71 +1,42 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue, 28 Feb 2017 07:35:32 +0100
-Subject: [PATCH v3 22/25] dt-bindings: power: Add Owl SPS power domains
+Date: Tue, 28 Feb 2017 07:35:28 +0100
+Subject: [PATCH v3 18/25] ARM: dts: s500-guitar-bb-rev-b: Add fake uart3 clock
 In-Reply-To: <20170228063535.32069-1-afaerber@suse.de>
 References: <20170228063535.32069-1-afaerber@suse.de>
-Message-ID: <20170228063535.32069-23-afaerber@suse.de>
+Message-ID: <20170228063535.32069-19-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define power domains for all non-reserved S500 power gates.
+Add a fixed-clock for baudrate 115200.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- v3: new
+ v2 -> v3: unchanged
  
- .../devicetree/bindings/power/actions,owl-sps.txt     | 17 +++++++++++++++++
- include/dt-bindings/power/s500-powergate.h            | 19 +++++++++++++++++++
- 2 files changed, 36 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/actions,owl-sps.txt
- create mode 100644 include/dt-bindings/power/s500-powergate.h
+ v2: new
+ 
+ arch/arm/boot/dts/s500-guitar-bb-rev-b.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/actions,owl-sps.txt b/Documentation/devicetree/bindings/power/actions,owl-sps.txt
-new file mode 100644
-index 0000000..c5eed06
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/actions,owl-sps.txt
-@@ -0,0 +1,17 @@
-+Actions Semi Owl Smart Power System (SPS)
+diff --git a/arch/arm/boot/dts/s500-guitar-bb-rev-b.dts b/arch/arm/boot/dts/s500-guitar-bb-rev-b.dts
+index 834b71d..f6fd10a 100644
+--- a/arch/arm/boot/dts/s500-guitar-bb-rev-b.dts
++++ b/arch/arm/boot/dts/s500-guitar-bb-rev-b.dts
+@@ -19,8 +19,15 @@
+ 	chosen {
+ 		stdout-path = "serial3:115200n8";
+ 	};
 +
-+Required properties:
-+- compatible          :  "actions,s500-sps" for S500
-+- reg                 :  Offset and length of the register set for the device.
-+- #power-domain-cells :  Must be 1.
-+                         See macros in:
-+                          include/dt-bindings/power/s500-powergate.h for S500
-+
-+
-+Example:
-+
-+		sps: power-controller at b01b0100 {
-+			compatible = "actions,s500-sps";
-+			reg = <0xb01b0100 0x100>;
-+			#power-domain-cells = <1>;
-+		};
-diff --git a/include/dt-bindings/power/s500-powergate.h b/include/dt-bindings/power/s500-powergate.h
-new file mode 100644
-index 0000000..ccc4ac3
---- /dev/null
-+++ b/include/dt-bindings/power/s500-powergate.h
-@@ -0,0 +1,19 @@
-+/*
-+ * Copyright (c) 2017 Andreas F?rber
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+#ifndef DT_BINDINGS_POWER_S500_POWERGATE_H
-+#define DT_BINDINGS_POWER_S500_POWERGATE_H
-+
-+#define S500_PD_VDE	0
-+#define S500_PD_VCE_SI	1
-+#define S500_PD_USB2_1	2
-+#define S500_PD_CPU2	3
-+#define S500_PD_CPU3	4
-+#define S500_PD_DMA	5
-+#define S500_PD_DS	6
-+#define S500_PD_USB3	7
-+#define S500_PD_USB2_0	8
-+
-+#endif
++	uart3_clk: uart3-clk {
++		compatible = "fixed-clock";
++		clock-frequency = <921600>;
++		#clock-cells = <0>;
++	};
+ };
+ 
+ &uart3 {
+ 	status = "okay";
++	clocks = <&uart3_clk>;
+ };
 -- 
 2.10.2
