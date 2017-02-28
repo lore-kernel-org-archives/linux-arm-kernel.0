@@ -1,99 +1,73 @@
 From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 28 Feb 2017 17:12:38 -0600
-Subject: [PATCH 1/1] ARM64: dts: meson-gxl: improve support for the P212
- reference design
-In-Reply-To: <20170219224114.17201-2-martin.blumenstingl@googlemail.com>
-References: <20170219224114.17201-1-martin.blumenstingl@googlemail.com>
- <20170219224114.17201-2-martin.blumenstingl@googlemail.com>
-Message-ID: <CAL_JsqJikyKx4-VbdeS6RjWiJT5R4RDcUGsYisdQ7FgokjKgCA@mail.gmail.com>
+Date: Tue, 28 Feb 2017 17:14:59 -0600
+Subject: [PATCH] arm64: dts: allwinner: add support for Pinebook
+In-Reply-To: <20170225070032.35834-1-icenowy@aosc.xyz>
+References: <20170225070032.35834-1-icenowy@aosc.xyz>
+Message-ID: <CAL_JsqJ_Z+1gG1A7wRB16ApyY0=xkkjRNDkGPMAhVx3gF6PwcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 19, 2017 at 4:41 PM, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
-> The Amlogic P212 reference design is used by other devices as well, such
-> as (for example) the Khadas VIM boards. Thus this patch adds and moves
-> all common entries from meson-gxl-s905x-p212.dts to a new, separate
-> meson-gxl-s905x-p212.dtsi (which can be re-used on boards such as the
-> Khadas VIM).
-> Support for all boards based on the P212 reference design includes:
-> - enabling IR support
-> - enabling the SAR ADC (SARADC_CH1 is connected to a resistor which
->   indicates the hardware revision, a similar design is found on the
->   Khadas VIM boards)
-> - all MMC controllers (which means that SDIO wifi, the SD card and the
->   eMMC are now supported)
-> - pwm_ef as dependency for the SDIO wifi module
-> - uart_A which is connected to the bluetooth module (the bluetooth
->   module itself is not enabled yet due to missing devicetree bindings
->   for the Broadcom serial bluetooth devices)
-> - uart_AO is moved to the .dtsi (as all known devices use it as their
->   boot-console)
+On Sat, Feb 25, 2017 at 1:00 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+> Pinebook is a A64-based laptop produced by Pine64, with the following
+> peripherals:
 >
-> Specific to the P212 board:
-> - this also enables the CVBS connector (which is not available on the
->   Khadas VIM boards for example)
+> USB:
+> - Two external USB ports (one is directly connected to A64's OTG
+> controller, the other is under a internal hub connected to the host-only
+> controller.)
+> - USB HID keyboard and touchpad connected to the internal hub.
+> - USB UVC camera connected to the internal hub.
 >
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Power-related:
+> - A DC IN jack connected to AXP803's DCIN pin.
+> - A Li-Polymer battery connected to AXP803's battery pins.
+>
+> Storage:
+> - An eMMC by Foresee on the main board (in the product revision of the
+> main board it's designed to be switchable).
+> - An external MicroSD card slot.
+>
+> Display:
+> - An eDP LCD panel (1366x768) connected via an ANX6345/ANX9807 RGB-eDP
+> bridge.
+> - A mini HDMI jack.
+>
+> Misc:
+> - A Hall sensor designed to detect the status of lid, connected to GPIO PH10.
+> - A headphone jack connected to the SoC's internal codec.
+> - A BMA223 gravity sensor connected to the SoC's I2C1 bus. (Not
+> supported yet)
+> - A debug UART port muxed with one of the USB ports, only available on
+> product revision of the main board.
+>
+> This commit adds basical support for it, with out-of-tree patches for
+> display support the laptop can be basically usable.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 > ---
->  .../boot/dts/amlogic/meson-gxl-s905x-p212.dts      |  21 +-
->  .../boot/dts/amlogic/meson-gxl-s905x-p212.dtsi     | 214 +++++++++++++++++++++
->  2 files changed, 226 insertions(+), 9 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
+>  arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+>  .../boot/dts/allwinner/sun50i-a64-pinebook.dts     | 123 +++++++++++++++++++++
+>  2 files changed, 124 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
 >
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
-> index 9639f012b02b..db31e093f40e 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
-> @@ -43,23 +43,26 @@
+> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+> index bc6f342be59f..893520c39955 100644
+> --- a/arch/arm64/boot/dts/allwinner/Makefile
+> +++ b/arch/arm64/boot/dts/allwinner/Makefile
+> @@ -1,4 +1,5 @@
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
+> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
+>  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
 >
->  /dts-v1/;
->
-> -#include "meson-gxl-s905x.dtsi"
-> +#include "meson-gxl-s905x-p212.dtsi"
->
->  / {
->         compatible = "amlogic,p212", "amlogic,s905x", "amlogic,meson-gxl";
->         model = "Amlogic Meson GXL (S905X) P212 Development Board";
->
-> -       aliases {
-> -               serial0 = &uart_AO;
-> -       };
-> +       cvbs-connector {
-> +               compatible = "composite-video-connector";
->
-> -       chosen {
-> -               stdout-path = "serial0:115200n8";
-> +               port {
-> +                       cvbs_connector_in: endpoint {
-> +                               remote-endpoint = <&cvbs_vdac_out>;
-> +                       };
-> +               };
->         };
-> +};
->
-> -       memory at 0 {
-> -               device_type = "memory";
-> -               reg = <0x0 0x0 0x0 0x80000000>;
-> +&cvbs_vdac_port {
-> +       cvbs_vdac_out: endpoint {
-> +               remote-endpoint = <&cvbs_connector_in>;
->         };
->  };
->
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
+>  always         := $(dtb-y)
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
 > new file mode 100644
-> index 000000000000..fb0e7c999cb6
+> index 000000000000..2dceba3132b0
 > --- /dev/null
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi
-> @@ -0,0 +1,214 @@
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+> @@ -0,0 +1,123 @@
 > +/*
-> + * Copyright (c) 2016 Martin Blumenstingl <martin.blumenstingl@googlemail.com>.
-> + * Based on meson-gx-p23x-q20x.dtsi:
-> + * - Copyright (c) 2016 Endless Computers, Inc.
-> + *   Author: Carlo Caione <carlo@endlessm.com>
-> + * - Copyright (c) 2016 BayLibre, SAS.
-> + *   Author: Neil Armstrong <narmstrong@baylibre.com>
+> + * Copyright (c) 2016 ARM Ltd.
 > + *
 > + * This file is dual-licensed: you can use it either under the terms
 > + * of the GPL or the X11 license, at your option. Note that this dual
