@@ -1,43 +1,79 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 28 Feb 2017 17:15:15 +0100
-Subject: [PATCH v3 3/4] ARM: dts: da850-evm: add the UI expander node
+Date: Tue, 28 Feb 2017 17:15:16 +0100
+Subject: [PATCH v3 4/4] ARM: dts: da850-evm: add the output port to the vpif
+ node
 In-Reply-To: <1488298516-14363-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1488298516-14363-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1488298516-14363-4-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1488298516-14363-5-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need the expander to be probed to allow the VPIF controller to
-receive interrupts from the video decoder.
+Extend the vpif node with an output port with a single channel.
+
+NOTE: this is still mostly just hardware description - the actual
+driver is registered using pdata-quirks. We need the node however
+for correct pin control function selection.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/boot/dts/da850-evm.dts | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/da850-evm.dts | 15 +++++++++++----
+ arch/arm/boot/dts/da850.dtsi    |  8 +++++++-
+ 2 files changed, 18 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
-index dece981..3968a18 100644
+index 3968a18..aa29991 100644
 --- a/arch/arm/boot/dts/da850-evm.dts
 +++ b/arch/arm/boot/dts/da850-evm.dts
-@@ -9,6 +9,7 @@
-  */
- /dts-v1/;
- #include "da850.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
+@@ -300,20 +300,27 @@
  
- / {
- 	compatible = "ti,da850-evm", "ti,da850";
-@@ -78,7 +79,10 @@
- 				DRVDD-supply = <&vbat>;
- 				DVDD-supply = <&vbat>;
- 			};
--
-+			tca6416: gpio at 20 {
-+				compatible = "ti,tca6416";
-+				reg = <0x20>;
-+			};
+ &vpif {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&vpif_capture_pins>;
++	pinctrl-0 = <&vpif_capture_pins>, <&vpif_display_pins>;
+ 	status = "okay";
+ 
+ 	/* VPIF capture port */
+-	port {
+-		vpif_ch0: endpoint at 0 {
++	port at 0 {
++		vpif_input_ch0: endpoint at 0 {
+ 			reg = <0>;
+ 			bus-width = <8>;
  		};
- 		wdt: wdt at 21000 {
- 			status = "okay";
+ 
+-		vpif_ch1: endpoint at 1 {
++		vpif_input_ch1: endpoint at 1 {
+ 			reg = <1>;
+ 			bus-width = <8>;
+ 			data-shift = <8>;
+ 		};
+ 	};
++
++	/* VPIF display port */
++	port at 1 {
++		vpif_output_ch0: endpoint {
++			bus-width = <8>;
++		};
++	};
+ };
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 5150331..c708155 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -358,7 +358,13 @@
+ 			status = "disabled";
+ 
+ 			/* VPIF capture port */
+-			port {
++			port at 0 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++
++			/* VPIF display port */
++			port at 1 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 			};
 -- 
 2.9.3
