@@ -1,105 +1,56 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 28 Feb 2017 17:51:19 +0100
-Subject: [PATCH v3 6/6] iio: adc: stm32: add support for EXTI trigger
+Date: Tue, 28 Feb 2017 17:51:18 +0100
+Subject: [PATCH v3 5/6] dt-bindings: iio: stm32-adc: add external interrupt
+ trigger
 In-Reply-To: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
 References: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1488300679-3259-7-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1488300679-3259-6-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-EXTi (external interrupt) signal can be routed internally as trigger
-source for ADC conversions: STM32F4 ADC can use EXTI11.
-
-Retrieve interrupt trigger from DT, so it can be muxed into ADC IP,
-via extsel.
+Document support for EXTI trigger. STM32 ADC can use external interrupt
+line as trigger source for conversions.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- drivers/iio/adc/stm32-adc.c | 27 ++++++++++++++++++++++++---
- 1 file changed, 24 insertions(+), 3 deletions(-)
+ .../devicetree/bindings/iio/adc/st,stm32-adc.txt    | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-index 9b49a6ad..4d9040d 100644
---- a/drivers/iio/adc/stm32-adc.c
-+++ b/drivers/iio/adc/stm32-adc.c
-@@ -108,6 +108,9 @@ enum stm32_adc_extsel {
- 	STM32_EXT15,
- };
+diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+index 5dfc88e..9e4af7f 100644
+--- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+@@ -57,6 +57,10 @@ Optional properties:
+ - dmas: Phandle to dma channel for this ADC instance.
+   See ../../dma/dma.txt for details.
+ - dma-names: Must be "rx" when dmas property is being used.
++- io-triggers: Phandle to external interrupt trigger (e.g. EXTI). Must be
++  phandle to EXTI11 on stm32f4. See ../iio-bindings.txt for details on trigger
++  consumer.
++- io-trigger-names: Must be "exti" when io-triggers property is being used.
  
-+/* EXTI 11 trigger selection on STM32F4 */
-+#define STM32F4_EXTI11_EXTSEL		STM32_EXT15
+ Example:
+ 	adc: adc at 40012000 {
+@@ -88,3 +92,20 @@ Example:
+ 		...
+ 		other adc child nodes follow...
+ 	};
 +
- /**
-  * struct stm32_adc_trig_info - ADC trigger info
-  * @name:		name of the trigger, corresponding to its source
-@@ -146,6 +149,7 @@ struct stm32_adc_regs {
-  * @rx_buf:		dma rx buffer cpu address
-  * @rx_dma_buf:		dma rx buffer bus address
-  * @rx_buf_sz:		dma rx buffer size
-+ * @exti_trig		EXTI trigger
-  */
- struct stm32_adc {
- 	struct stm32_adc_common	*common;
-@@ -162,6 +166,7 @@ struct stm32_adc {
- 	u8			*rx_buf;
- 	dma_addr_t		rx_dma_buf;
- 	unsigned int		rx_buf_sz;
-+	struct iio_trigger	*exti_trig;
- };
- 
- /**
-@@ -395,10 +400,15 @@ static int stm32_adc_conf_scan_seq(struct iio_dev *indio_dev,
-  *
-  * Returns trigger extsel value, if trig matches, -EINVAL otherwise.
-  */
--static int stm32_adc_get_trig_extsel(struct iio_trigger *trig)
-+static int stm32_adc_get_trig_extsel(struct iio_dev *indio_dev,
-+				     struct iio_trigger *trig)
- {
-+	struct stm32_adc *adc = iio_priv(indio_dev);
- 	int i;
- 
-+	if (trig == adc->exti_trig)
-+		return STM32F4_EXTI11_EXTSEL;
-+
- 	/* lookup triggers registered by stm32 timer trigger driver */
- 	for (i = 0; stm32f4_adc_trigs[i].name; i++) {
- 		/**
-@@ -432,7 +442,7 @@ static int stm32_adc_set_trig(struct iio_dev *indio_dev,
- 	int ret;
- 
- 	if (trig) {
--		ret = stm32_adc_get_trig_extsel(trig);
-+		ret = stm32_adc_get_trig_extsel(indio_dev, trig);
- 		if (ret < 0)
- 			return ret;
- 
-@@ -604,7 +614,7 @@ static irqreturn_t stm32_adc_isr(int irq, void *data)
- static int stm32_adc_validate_trigger(struct iio_dev *indio_dev,
- 				      struct iio_trigger *trig)
- {
--	return stm32_adc_get_trig_extsel(trig) < 0 ? -EINVAL : 0;
-+	return stm32_adc_get_trig_extsel(indio_dev, trig) < 0 ? -EINVAL : 0;
- }
- 
- static int stm32_adc_set_watermark(struct iio_dev *indio_dev, unsigned int val)
-@@ -1030,6 +1040,17 @@ static int stm32_adc_probe(struct platform_device *pdev)
- 	if (ret < 0)
- 		goto err_clk_disable;
- 
-+	adc->exti_trig = devm_iio_trigger_get_by_name(&pdev->dev, "exti");
-+	if (IS_ERR(adc->exti_trig)) {
-+		ret = PTR_ERR(adc->exti_trig);
-+		if (ret == -EPROBE_DEFER)
-+			goto err_dma_disable;
-+		dev_dbg(&pdev->dev, "No exti trigger found (%d)\n", ret);
-+		adc->exti_trig = NULL;
-+	} else {
-+		dev_info(&pdev->dev, "Can use %s\n", adc->exti_trig->name);
++Example with EXTI11 trigger:
++	trig: interrupt-trigger {
++		#io-trigger-cells = <0>;
++		compatible = "interrupt-trigger";
++		interrupts = <11 0>;
++		interrupt-parent = <&gpioa>;
 +	}
 +
- 	ret = iio_triggered_buffer_setup(indio_dev,
- 					 &iio_pollfunc_store_time,
- 					 &stm32_adc_trigger_handler,
++	adc: adc at 40012000 {
++		...
++		adc at 0 {
++			...
++			io-triggers = <&trig>;
++			io-trigger-names = "exti";
++		};
++	};
 -- 
 1.9.1
