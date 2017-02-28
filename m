@@ -1,47 +1,65 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 28 Feb 2017 17:51:13 +0100
-Subject: [PATCH v3 0/6] Add EXTI GPIO trigger support to STM32 ADC
-Message-ID: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
+Date: Tue, 28 Feb 2017 17:51:14 +0100
+Subject: [PATCH v3 1/6] dt-bindings: iio: introduce trigger providers,
+ consumers
+In-Reply-To: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
+References: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1488300679-3259-2-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-STM32 ADC, can use EXTI line (external interrupt) as trigger source
-for conversions.
-This patchset introduces:
-- IIO trigger providers / consumers that can be configured from DT
-- DT support for IIO interrupt trigger
-- STM32 ADC EXTI trigger selection, configured by DT.
+Document iio provider and consumer bindings.
 
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
-Changes in V3:
-- Rework most of it, to use generic iio-interrupt-trigger
-- Drop GPIO trigger, use generic interrupt binding instead
-- Comments from V2 and RFC: iio: trigger: Add OF support and GPIO based trigger
-  https://lkml.org/lkml/2017/2/17/478
+ .../devicetree/bindings/iio/iio-bindings.txt       | 38 ++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
----
-Changes in V2:
-- Fixed Kconfig dependencies
-
-Fabrice Gasnier (5):
-  dt-bindings: iio: introduce trigger providers, consumers
-  iio: trigger: add OF support
-  dt-bindings: iio: document interrupt trigger support
-  dt-bindings: iio: stm32-adc: add external interrupt trigger
-  iio: adc: stm32: add support for EXTI trigger
-
-Gr?gor Boirie (1):
-  iio: iio-interrupt-trigger: device-tree support
-
- .../devicetree/bindings/iio/adc/st,stm32-adc.txt   |  21 +++++
- .../devicetree/bindings/iio/iio-bindings.txt       |  38 ++++++++
- .../bindings/iio/trigger/iio-trig-interrupt.txt    |  22 +++++
- drivers/iio/adc/stm32-adc.c                        |  27 +++++-
- drivers/iio/industrialio-trigger.c                 | 100 +++++++++++++++++++++
- drivers/iio/trigger/iio-trig-interrupt.c           |  10 +++
- include/linux/iio/trigger.h                        |   4 +
- 7 files changed, 219 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/iio/trigger/iio-trig-interrupt.txt
-
+diff --git a/Documentation/devicetree/bindings/iio/iio-bindings.txt b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+index 68d6f8c..01765e9 100644
+--- a/Documentation/devicetree/bindings/iio/iio-bindings.txt
++++ b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+@@ -95,3 +95,41 @@ vdd channel is connected to output 0 of the &ref device.
+ 		io-channels = <&adc 10>, <&adc 11>;
+ 		io-channel-names = "adc1", "adc2";
+ 	};
++
++==IIO trigger providers==
++Sources of IIO triggers can be represented by any node in the device
++tree. Those nodes are designated as IIO trigger providers. IIO trigger
++consumer uses a phandle and an IIO trigger specifier to connect to an
++IIO trigger provider.
++An IIO trigger specifier is an array of one or more cells identifying
++the IIO trigger output on a device. The length of an IIO trigger
++specifier is defined by the value of a #io-trigger-cells property in
++the IIO trigger provider node.
++
++Required properties:
++#io-trigger-cells:
++		Number of cells in an IIO trigger specifier; Typically
++		0 for nodes with a simple IIO trigger output.
++
++Example:
++	trig0: interrupt-trigger0 {
++		#io-trigger-cells = <0>;
++		compatible = "interrupt-trigger";
++		interrupts = <11 0>;
++		interrupt-parent = <&gpioa>;
++	}
++
++==IIO trigger consumers==
++Required properties:
++- io-triggers:	List of phandle representing the IIO trigger specifier.
++
++Optional properties:
++- io-trigger-names :
++		List of IIO trigger name strings that matches elements
++		in 'io-triggers' list property.
++
++Example:
++	some_trigger_consumer {
++		io-triggers = <&trig0>;
++		io-trigger-names = "mytrig";
++	}
 -- 
 1.9.1
