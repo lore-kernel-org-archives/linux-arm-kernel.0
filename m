@@ -1,45 +1,181 @@
-From: claudiu.beznea@microchip.com (Claudiu Beznea)
-Date: Tue, 28 Feb 2017 12:40:15 +0200
-Subject: [PATCH 2/2] drivers: pwm: pwm-atmel: enable pwm on sama5d2
-In-Reply-To: <1488278415-2786-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1488278415-2786-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1488278415-2786-3-git-send-email-claudiu.beznea@microchip.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 28 Feb 2017 10:43:51 +0000
+Subject: [PATCH 07/20] PCI: implement Devres interface to map PCI config
+ space
+In-Reply-To: <20170227151436.18698-8-lorenzo.pieralisi@arm.com>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+ <20170227151436.18698-8-lorenzo.pieralisi@arm.com>
+Message-ID: <20170228104351.GC7439@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sama5d2 can use the same atmel_pwm_data as sama5d3.
+Arnd, all,
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- Documentation/devicetree/bindings/pwm/atmel-pwm.txt | 1 +
- drivers/pwm/pwm-atmel.c                             | 3 +++
- 2 files changed, 4 insertions(+)
+On Mon, Feb 27, 2017 at 03:14:18PM +0000, Lorenzo Pieralisi wrote:
+> The introduction of the pci_remap_cfgspace() interface allows
+> PCI host controller drivers to map PCI config space through a
+> dedicated kernel interface. Current PCI host controller drivers
+> use the devm_ioremap_* Devres interfaces to map PCI configuration
+> space regions so in order to update them to the new
+> pci_remap_cfgspace() mapping interface a new set of Devres interfaces
+> should be implemented so that PCI host controller drivers can make
+> use of them.
+> 
+> Introduce two new functions in the PCI kernel layer and Devres
+> documentation:
+> 
+> - devm_pci_remap_cfgspace()
+> - devm_pci_remap_cfg_resource()
+> 
+> so that PCI host controller drivers can make use of them to map
+> PCI configuration space regions.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Jonathan Corbet <corbet@lwn.net>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> ---
+>  Documentation/driver-model/devres.txt |  6 ++-
+>  drivers/pci/pci.c                     | 82 +++++++++++++++++++++++++++++++++++
+>  include/linux/pci.h                   |  5 +++
+>  3 files changed, 91 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/driver-model/devres.txt b/Documentation/driver-model/devres.txt
+> index bf34d5b..e72587f 100644
+> --- a/Documentation/driver-model/devres.txt
+> +++ b/Documentation/driver-model/devres.txt
+> @@ -342,8 +342,10 @@ PER-CPU MEM
+>    devm_free_percpu()
+>  
+>  PCI
+> -  pcim_enable_device()	: after success, all PCI ops become managed
+> -  pcim_pin_device()	: keep PCI device enabled after release
+> +  devm_pci_remap_cfgspace()	: ioremap PCI configuration space
+> +  devm_pci_remap_cfg_resource()	: ioremap PCI configuration space resource
+> +  pcim_enable_device()		: after success, all PCI ops become managed
+> +  pcim_pin_device()		: keep PCI device enabled after release
+>  
+>  PHY
+>    devm_usb_get_phy()
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index bfb3c6e..1e435c2 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -3401,6 +3401,88 @@ void pci_unmap_iospace(struct resource *res)
+>  #endif
+>  }
+>  
+> +/**
+> + * devm_pci_remap_cfgspace - Managed pci_remap_cfgspace()
+> + * @dev: Generic device to remap IO address for
+> + * @offset: BUS offset to map
+> + * @size: Size of map
+> + *
+> + * Managed pci_remap_cfgspace().  Map is automatically unmapped on driver
+> + * detach.
+> + */
+> +void __iomem *devm_pci_remap_cfgspace(struct device *dev,
+> +				      resource_size_t offset,
+> +				      resource_size_t size)
+> +{
+> +	void __iomem **ptr, *addr;
+> +
+> +	ptr = devres_alloc(devm_ioremap_release, sizeof(*ptr), GFP_KERNEL);
+> +	if (!ptr)
+> +		return NULL;
+> +
+> +	addr = pci_remap_cfgspace(offset, size);
 
-diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-index 02331b9..c8c831d 100644
---- a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-@@ -4,6 +4,7 @@ Required properties:
-   - compatible: should be one of:
-     - "atmel,at91sam9rl-pwm"
-     - "atmel,sama5d3-pwm"
-+    - "atmel,sama5d2-pwm"
-   - reg: physical base address and length of the controller's registers
-   - #pwm-cells: Should be 3. See pwm.txt in this directory for a
-     description of the cells format.
-diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
-index 014b86c..209e877 100644
---- a/drivers/pwm/pwm-atmel.c
-+++ b/drivers/pwm/pwm-atmel.c
-@@ -346,6 +346,9 @@ static const struct of_device_id atmel_pwm_dt_ids[] = {
- 		.compatible = "atmel,sama5d3-pwm",
- 		.data = &atmel_pwm_data_v2,
- 	}, {
-+		.compatible = "atmel,sama5d2-pwm",
-+		.data = &atmel_pwm_data_v2,
-+	}, {
- 		/* sentinel */
- 	},
- };
--- 
-2.7.4
+Provided this series is acceptable as-is, I noticed that I have
+to add a #define for pci_remap_cfgspace() on all arches that do
+not include asm-generic/io.h in their asm/io.h, I missed that,
+please shout if you see an easier way to implement a
+pci_remap_cfgspace() fall-back to ioremap_nocache() on all arches
+that do not override it.
+
+Thanks !
+Lorenzo
+
+> +	if (addr) {
+> +		*ptr = addr;
+> +		devres_add(dev, ptr);
+> +	} else
+> +		devres_free(ptr);
+> +
+> +	return addr;
+> +}
+> +EXPORT_SYMBOL(devm_pci_remap_cfgspace);
+> +
+> +/**
+> + * devm_pci_remap_cfg_resource - check, request region and ioremap cfg resource
+> + * @dev: generic device to handle the resource for
+> + * @res: configuration space resource to be handled
+> + *
+> + * Checks that a resource is a valid memory region, requests the memory
+> + * region and ioremaps with pci_remap_cfgspace() API that ensures the
+> + * proper PCI configuration space memory attributes are guaranteed.
+> + *
+> + * All operations are managed and will be undone on driver detach.
+> + *
+> + * Returns a pointer to the remapped memory or an ERR_PTR() encoded error code
+> + * on failure. Usage example:
+> + *
+> + *	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> + *	base = devm_pci_remap_cfg_resource(&pdev->dev, res);
+> + *	if (IS_ERR(base))
+> + *		return PTR_ERR(base);
+> + */
+> +void __iomem *devm_pci_remap_cfg_resource(struct device *dev,
+> +					  struct resource *res)
+> +{
+> +	resource_size_t size;
+> +	const char *name;
+> +	void __iomem *dest_ptr;
+> +
+> +	BUG_ON(!dev);
+> +
+> +	if (!res || resource_type(res) != IORESOURCE_MEM) {
+> +		dev_err(dev, "invalid resource\n");
+> +		return IOMEM_ERR_PTR(-EINVAL);
+> +	}
+> +
+> +	size = resource_size(res);
+> +	name = res->name ?: dev_name(dev);
+> +
+> +	if (!devm_request_mem_region(dev, res->start, size, name)) {
+> +		dev_err(dev, "can't request region for resource %pR\n", res);
+> +		return IOMEM_ERR_PTR(-EBUSY);
+> +	}
+> +
+> +	dest_ptr = devm_pci_remap_cfgspace(dev, res->start, size);
+> +	if (!dest_ptr) {
+> +		dev_err(dev, "ioremap failed for resource %pR\n", res);
+> +		devm_release_mem_region(dev, res->start, size);
+> +		dest_ptr = IOMEM_ERR_PTR(-ENOMEM);
+> +	}
+> +
+> +	return dest_ptr;
+> +}
+> +EXPORT_SYMBOL(devm_pci_remap_cfg_resource);
+> +
+>  static void __pci_set_master(struct pci_dev *dev, bool enable)
+>  {
+>  	u16 old_cmd, cmd;
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 282ed32..5a3588b 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1199,6 +1199,11 @@ unsigned long pci_address_to_pio(phys_addr_t addr);
+>  phys_addr_t pci_pio_to_address(unsigned long pio);
+>  int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
+>  void pci_unmap_iospace(struct resource *res);
+> +void __iomem *devm_pci_remap_cfgspace(struct device *dev,
+> +				      resource_size_t offset,
+> +				      resource_size_t size);
+> +void __iomem *devm_pci_remap_cfg_resource(struct device *dev,
+> +					  struct resource *res);
+>  
+>  static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
+>  {
+> -- 
+> 2.10.0
+> 
