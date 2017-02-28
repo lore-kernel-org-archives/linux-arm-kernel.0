@@ -1,120 +1,151 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Tue, 28 Feb 2017 12:43:08 -0700
-Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <58B00E12.5020602@arm.com>
-References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
- <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
- <58B00E12.5020602@arm.com>
-Message-ID: <ff3aa805-0e03-9854-e294-ff6934c57f3f@codeaurora.org>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Tue, 28 Feb 2017 11:46:00 -0800
+Subject: [PATCH v4] reset: Add i.MX7 SRC reset driver
+In-Reply-To: <1488292707.2288.53.camel@pengutronix.de>
+References: <20170221161331.17012-1-andrew.smirnov@gmail.com>
+ <1488292707.2288.53.camel@pengutronix.de>
+Message-ID: <CAHQ1cqG4VSr=E1U4CpruYtvzXK0xcJTow0VwurP1S4_Hi-TJzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello James,
-
-
-On 2/24/2017 3:42 AM, James Morse wrote:
-> On 21/02/17 21:22, Tyler Baicar wrote:
->> Currently external aborts are unsupported by the guest abort
->> handling. Add handling for SEAs so that the host kernel reports
->> SEAs which occur in the guest kernel.
->> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
->> index e22089f..33a77509 100644
->> --- a/arch/arm/include/asm/kvm_arm.h
->> +++ b/arch/arm/include/asm/kvm_arm.h
->> @@ -187,6 +187,7 @@
->>   #define FSC_FAULT	(0x04)
->>   #define FSC_ACCESS	(0x08)
->>   #define FSC_PERM	(0x0c)
->> +#define FSC_EXTABT	(0x10)
-> arm64 has ESR_ELx_FSC_EXTABT which is used in inject_abt64(), but for matching
-> an external abort coming from hardware the range is wider.
->
-> Looking at the ARM-ARMs 'ISS encoding for an exception from an Instruction
-> Abort' in 'D7.2.27 ESR_ELx, Exception Syndrome Register (ELx)' (page D7-1954 of
-> version 'k'...iss10775), the ten flavours of you Synchronous abort you hooked
-> with do_sea() in patch 4 occupy 0x10 to 0x1f...
->
->
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index a5265ed..04f1dd50 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -29,6 +29,7 @@
->>   #include <asm/kvm_asm.h>
->>   #include <asm/kvm_emulate.h>
->>   #include <asm/virt.h>
->> +#include <asm/system_misc.h>
->>   
->>   #include "trace.h"
->>   
->> @@ -1444,8 +1445,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>   
->>   	/* Check the stage-2 fault is trans. fault or write fault */
->>   	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
-> ... kvm_vcpu_trap_get_fault_type() on both arm and arm64 masks the HSR/ESR_EL2
-> with 0x3c ...
->
->
->> -	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
->> -	    fault_status != FSC_ACCESS) {
->> +
->> +	/* The host kernel will handle the synchronous external abort. There
->> +	 * is no need to pass the error into the guest.
->> +	 */
->> +	if (fault_status == FSC_EXTABT) {
-> ... but here we only check for 'Synchronous external abort, not on a translation
-> table walk'. Are the other types relevant?
-I believe the others should be relevant here as well. I haven't been 
-able to test the other types within a guest though.
-> If so we need some helper as this range is sparse and 'all other values are
-> reserved'. The aarch32 HSR format is slightly different. (G6-4411 ISS encoding
-> from an exception from a Data Abort).
-I can add a helper so that this if statement matches any of the 10 FSC 
-values which are mapped to the do_sea in the host code.
-> If not, can we change patch 4 to check this type too so we don't call out to
-> APEI for a fault type we know isn't relevant.
->
->
->> +		if(handle_guest_sea((unsigned long)fault_ipa,
->> +				    kvm_vcpu_get_hsr(vcpu))) {
->> +			kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
->> +				kvm_vcpu_trap_get_class(vcpu),
->> +				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
->> +				(unsigned long)kvm_vcpu_get_hsr(vcpu));
->> +			return -EFAULT;
->> +		}
->> +	} else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
->> +		   fault_status != FSC_ACCESS) {
->>   		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
->>   			kvm_vcpu_trap_get_class(vcpu),
->>   			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->> index b2d57fc..403277b 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -602,6 +602,24 @@ static const char *fault_name(unsigned int esr)
->>   }
+On Tue, Feb 28, 2017 at 6:38 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> On Tue, 2017-02-21 at 08:13 -0800, Andrey Smirnov wrote:
+>> Add reset controller driver exposing various reset faculties,
+>> implemented by System Reset Controller IP block.
 >>
->>   /*
->> + * Handle Synchronous External Aborts that occur in a guest kernel.
->> + */
->> +int handle_guest_sea(unsigned long addr, unsigned int esr)
->> +{
->> +	if(IS_ENABLED(HAVE_ACPI_APEI_SEA)) {
->> +		nmi_enter();
->> +		ghes_notify_sea();
->> +		nmi_exit();
-> This nmi stuff was needed for synchronous aborts that may have interrupted
-> APEI's interrupts-masked code. We want to avoid trying to take the same set of
-> locks, hence taking the in_nmi() path through APEI. Here we know we interrupted
-> a guest, so there is no risk that we have interrupted APEI on the host.
-> ghes_notify_sea() can safely take the normal path.
-Makes sense, I can remove the nmi_* calls here.
+>> Cc: Lucas Stach <l.stach@pengutronix.de>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: devicetree at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+>> ---
+>>
+>> Changes since v3 (see [v3]):
+>>
+>>       - Convert code IMX7_RESET_PCIEPHY to change G_RST and BTNRST
+>>           simultaneously to make all resets be representable as
+>>           signal->bit in signal->offset register
+>>
+>>       - Convert assert/deassert subroutines to be special cases of a
+>>           common reset subroutine
+>>
+>> Changes since v2 (see [v2]):
+>>
+>>       - Fix typos
+>>
+>>       - Kconfig/Makefile chagnes account for alphabetical sorting of
+>>           those files
+>>
+>>       - Remove redundant includes
+>>
+>>       - Make use of regmap_attach_dev and avoid storing refernce to
+>>           struct *dev in private data
+>>
+>>       - Change code and headers to expose almost all of the reset
+>>           related bits in SRC IP block
+>>
+>> Changes since v1 (see [v1]):
+>>
+>>       - Various small DT bindings description fixes as per feedback
+>>           from Rob Herring
+>>
+>>
+>> [v1] https://lkml.org/lkml/2017/2/6/554
+>> [v2] https://lkml.org/lkml/2017/2/13/488
+>> [v3] https://lkml.org/lkml/2017/2/20/344
+>>
+>>
+>>  .../devicetree/bindings/reset/fsl,imx7-src.txt     |  47 ++++++
+>>  drivers/reset/Kconfig                              |   8 ++
+>>  drivers/reset/Makefile                             |   2 +
+>>  drivers/reset/reset-imx7.c                         | 158 +++++++++++++++++++++
+>>  include/dt-bindings/reset/imx7-reset.h             |  62 ++++++++
+>>  5 files changed, 277 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+>>  create mode 100644 drivers/reset/reset-imx7.c
+>>  create mode 100644 include/dt-bindings/reset/imx7-reset.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+>> new file mode 100644
+>> index 0000000..5e1afc3
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+>> @@ -0,0 +1,47 @@
+>> +Freescale i.MX7 System Reset Controller
+>> +======================================
+>> +
+>> +Please also refer to reset.txt in this directory for common reset
+>> +controller binding usage.
+>> +
+>> +Required properties:
+>> +- compatible: Should be "fsl,imx7-src", "syscon"
+>> +- reg: should be register base and length as documented in the
+>> +  datasheet
+>> +- interrupts: Should contain SRC interrupt
+>> +- #reset-cells: 1, see below
+>> +
+>> +example:
+>> +
+>> +src: reset-controller at 30390000 {
+>> +     compatible = "fsl,imx7d-src", "syscon";
+>> +     reg = <0x30390000 0x2000>;
+>> +     interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+>> +     #reset-cells = <1>;
+>> +};
+>> +
+>> +
+>> +Specifying reset lines connected to IP modules
+>> +==============================================
+>> +
+>> +The system reset controller can be used to reset various set of
+>> +peripherals. Device nodes that need access to reset lines should
+>> +specify them as a reset phandle in their corresponding node as
+>> +specified in reset.txt.
+>> +
+>> +Example:
+>> +
+>> +     pcie: pcie at 33800000 {
+>> +
+>> +             ...
+>> +
+>> +             resets = <&src IMX7_RESET_PCIEPHY>,
+>> +                      <&src IMX7_RESET_PCIE_CTRL_APPS_EN>;
+>> +             reset-names = "pciephy", "apps";
+>> +
+>> +             ...
+>> +        };
+>> +
+>> +
+>> +For list of all valid reset indicies see
+>> +<dt-bindings/reset/imx7-reset.h>
+>> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+>> index 172dc96..bea1800 100644
+>> --- a/drivers/reset/Kconfig
+>> +++ b/drivers/reset/Kconfig
+>> @@ -27,6 +27,14 @@ config RESET_BERLIN
+>>       help
+>>         This enables the reset controller driver for Marvell Berlin SoCs.
+>>
+>> +config RESET_IMX7
+>> +     bool "i.MX7 Reset Driver"
+>> +     depends on SOC_IMX7D || COMPILE_TEST
+>> +     select MFD_SYSCON
+>> +     default SOC_IMX7D
+>
+> Can we make this
+>
+> config RESET_IMX7
+>         bool "i.MX7 Reset Driver" if COMPILE_TEST
+>         default SOC_IMX7D
+>         select MFD_SYSCON
+>
+> instead?
+>
+> If you agree, I can fix it up while applying.
+
+Sure, I have no problem with that change.
 
 Thanks,
-Tyler
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Andrey
