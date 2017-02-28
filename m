@@ -1,116 +1,141 @@
-From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
-Date: Tue, 28 Feb 2017 11:03:08 +0000
-Subject: [PATCH V2] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <1485891928-14573-1-git-send-email-okaya@codeaurora.org>
-References: <1485891928-14573-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <92EBB4272BF81E4089A7126EC1E7B2846666830C@IRSMSX101.ger.corp.intel.com>
+From: abelvesa@gmail.com (Abel Vesa)
+Date: Tue, 28 Feb 2017 11:22:27 +0000
+Subject: [PATCHv4] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <87h93eoa3a.fsf@gmail.com>
+References: <1487977101-29027-1-git-send-email-abelvesa@linux.com>
+ <87r32jiqc9.fsf@d080-213.cis.zmaw.de> <20170228005636.GA23251@nuc>
+ <87h93eoa3a.fsf@gmail.com>
+Message-ID: <20170228112227.GB23251@nuc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Feb 28, 2017 at 11:58:49AM +0100, Nicolai Stange wrote:
+> Hi Abel,
+> 
+> On Tue, Feb 28 2017, Abel Vesa wrote:
+> 
+> > On Mon, Feb 27, 2017 at 04:52:06PM +0100, Nicolai Stange wrote:
+> >> On Fri, Feb 24 2017, Abel Vesa wrote:
+> >> 
+> >> <snip>
+> >> 
+> >> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> >> > index fda6a46..877df5b 100644
+> >> > --- a/arch/arm/Kconfig
+> >> > +++ b/arch/arm/Kconfig
+> >> > @@ -55,6 +55,7 @@ config ARM
+> >> >  	select HAVE_DMA_API_DEBUG
+> >> >  	select HAVE_DMA_CONTIGUOUS if MMU
+> >> >  	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
+> >> > +	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE && OLD_MCOUNT
+> >> 
+> >> 
+> >> AFAICS, your code depends on the __gnu_mcount_nc calling conventions,
+> >> i.e. on gcc pushing the original lr on the stack. In particular, there's
+> >> no implementation of a ftrace_regs_caller_old or so.
+> >> 
+> >> So shouldn't this read as !OLD_MCOUNT instead?
+> > The implementation of __ftrace_modify_code which sets the kernel text to rw
+> > needs OLD_MCOUNT (that is, the arch specific one, not the generic one).
+> 
+> You're right that ARM's implementation of __ftrace_modify_code() is hidden
+> within an #ifdef CONFIG_OLD_MCOUNT.
+> 
+> But,
+>  - its implementation doesn't "need" or depend on OLD_MCOUNT
+>  - and it's true in general that the kernel text must be made writable
+>    before ftrace_modify_all_code() attempts to write to it.
+> 
+> So, I bet that the set_kernel_text_rw()-calling ARM implementations of
+> arch_ftrace_update_code() and __ftrace_modify_code() resp. have been
+> inserted under that CONFIG_OLD_MCOUNT #ifdef by mistake with commit
+> 80d6b0c2eed2 ("ARM: mm: allow text and rodata sections to be
+> read-only").
+> 
+> In conclusion, I claim that DYNAMIC_FTRACE w/o OLD_MCOUNT had been
+> broken before your patch already. I didn't explicitly test that though.
 >
->When the operating system is booted with the default ASPM policy
->(POLICY_DEFAULT), the current code is determining the ASPM policy
->set up by the BIOS by querying the enable/disable states from ASPM
->registers.
->
->In the case of hotplug removal, the ASPM registers get cleared by
->calling the pcie_aspm_exit_link_state() function.
->
+That is correct. The DYNAMIC_FTRACE w/o OLD_MCOUNT doesn't work. 
+> I think that should be fixed rather than your DYNAMIC_FTRACE_WITH_REGS
+> pulling in OLD_MCOUNT in order to repair DYNAMIC_FTRACE.
+> 
+> Especially since your implementation seems to require !OLD_MCOUNT...
+> 
+So making arch specific __ftrace_modify_code to be OLD_MCOUNT independent might fix 
+DYNAMIC_FTRACE w/o OLD_MCOUNT and implicitly make DYNAMIC_FTRACE_WITH_REGS not dependent on
+OLD_MCOUNT.
 
-I see the same problem. So cherry-picked your change to resolve the problem
-on top of Linus mainline.
+I will investigate this further today. Probably the whole dependancy between FUNCTION_TRACER
+and OLD_MCOUNT will need to be changed/updated.
+> >> Also, at least the ldmia ..., {..., sp, ...} insn needs a !THUMB2_KERNEL.
+> >> 
+> >> 
+> >> >  	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
+> >> >  	select HAVE_EXIT_THREAD
+> >> >  	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+> >> 
+> >> <snip>
+> >> 
+> >> > diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
+> >> > index c73c403..3916dd6 100644
+> >> > --- a/arch/arm/kernel/entry-ftrace.S
+> >> > +++ b/arch/arm/kernel/entry-ftrace.S
+> >> > @@ -92,12 +92,78 @@
+> >> >  2:	mcount_exit
+> >> >  .endm
+> >> >  
+> >> > +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+> >> > +
+> >> > +.macro __ftrace_regs_caller
+> >> > +
+> >> > +	sub	sp, sp, #8	@ space for CPSR and OLD_R0 (not used)
+> >> > +
+> >> > +	add 	ip, sp, #12	@ move in IP the value of SP as it was
+> >> > +				@ before the push {lr} of the mcount mechanism
+> >> > +	stmdb	sp!, {ip,lr,pc}
+> >> > +	stmdb	sp!, {r0-r11,lr}
+> >> > +
+> >> > +	@ stack content at this point:
+> >> > +	@ 0  4          48   52       56   60   64    68       72
+> >> > +	@ R0 | R1 | ... | LR | SP + 4 | LR | PC | PSR | OLD_R0 | previous LR |
+> >> 
+> >> Being a constant, the saved pc is not very useful, I think.
+> > So you're saying skip it ? But you still need to leave space for it. So why not
+> > just save it even if the value is not useful?
+> 
+> No, no, I don't want to skip it. I'd just prefer to have the pt_regs'
+> ->ARM_lr and ->ARM_pc slots filled with different, perhaps more useful
+> values:
+> 
+> >> 
+> >> Wouldn't it be better (and more consistent with other archs) to have
+> >> 
+> >>   pt_regs->ARM_lr = original lr
+> >>   pt_refs->ARM_pc = current lr
+> >> 
+> >> instead?
+> 
+> The stack would look like this then
+> 
+> @ ...           | ARM_ip | ARM_sp | ARM_lr      | ARM_pc      | ...          |
+> @ 0  4          48       52       56            60            64    68       72
+> @ R0 | R1 | ... | LR     | SP + 4 | original LR | original PC | PSR | OLD_R0 | original LR |
+> 
+> I.e. the pt_regs would capture almost the full context of the
+> instrumented function (except for ip).
+> 
+So basicly what you are saying is:
+- instead of current LR save original LR (previous one saved in instrumented function epilog)
+- instead of current PC save original PC (previous one saved in instrumented function epilog)
 
->An insertion following hotplug removal reads incorrect policy as
->ASPM disabled even though ASPM was enabled during boot.
->
->Adding a flag to the struct pci_dev and saving the power up policy
->in the bridge to be reused during hotplug insertion. Bridge's enable
->counter is used as a switch to determine when to use saved value.
->
->Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->---
-> drivers/pci/pcie/aspm.c | 21 +++++++++++++++++----
-> include/linux/pci.h     |  1 +
-> 2 files changed, 18 insertions(+), 4 deletions(-)
->
->diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
->index 17ac1dc..5cfcc6d 100644
->--- a/drivers/pci/pcie/aspm.c
->+++ b/drivers/pci/pcie/aspm.c
->@@ -338,8 +338,9 @@ static void pcie_aspm_check_latency(struct pci_dev *endpoint)
-> 	}
-> }
->
->-static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
->+static void pcie_aspm_cap_init(struct pci_dev *pdev, int blacklist)
-> {
->+	struct pcie_link_state *link = pdev->link_state;
-> 	struct pci_dev *child, *parent = link->pdev;
-> 	struct pci_bus *linkbus = parent->subordinate;
-> 	struct aspm_register_info upreg, dwreg;
->@@ -397,8 +398,20 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
-> 	link->latency_up.l1 = calc_l1_latency(upreg.latency_encoding_l1);
-> 	link->latency_dw.l1 = calc_l1_latency(dwreg.latency_encoding_l1);
->
->-	/* Save default state */
->-	link->aspm_default = link->aspm_enabled;
+I still don't see the point of saving the actual value of PC since nobody will ever
+restore it. In case of livepatch it will get overwritten anyway. As for LR, I agree,
+it could be the original one in pt_regs.
 
-But, I am finding a problem with this change, if Policy is set to default,
-BIOS enables ASPM L1, but pcie_config_aspm_link() disables ASPM L1
-due to link->aspm_enabled is different than link->aspm_default while
-called from pcie_aspm_init_link_state() during hotplug insertion.
+I'll look into this sometime today or tomorrow and get back with updates.
+> Thanks,
+> 
+> Nicolai
 
-
->+	/*
->+	 * Save default state from FW when enabling ASPM for the first time
->+	 * during boot by looking at the calculated link->aspm_enabled bits
->+	 * above and enable_cnt will be zero.
->+	 *
->+	 * If this path is getting called for the second/third time
->+	 * (enable_cnt will be non-zero). Assume that the current state of the
->+	 * ASPM registers may not necessarily match what FW asked us to do as
->+	 * in the case of hotplug insertion/removal.
->+	 */
->+	if (!atomic_read(&pdev->enable_cnt))
->+		pdev->aspm_default = link->aspm_default = link->aspm_enabled;
->+	else
->+		link->aspm_default = pdev->aspm_default;
->
-> 	/* Setup initial capable state. Will be updated later */
-> 	link->aspm_capable = link->aspm_support;
->@@ -599,7 +612,7 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
-> 	 * upstream links also because capable state of them can be
-> 	 * update through pcie_aspm_cap_init().
-> 	 */
->-	pcie_aspm_cap_init(link, blacklist);
->+	pcie_aspm_cap_init(pdev, blacklist);
->
-> 	/* Setup initial Clock PM state */
-> 	pcie_clkpm_cap_init(link, blacklist);
->diff --git a/include/linux/pci.h b/include/linux/pci.h
->index e2d1a12..521f88c 100644
->--- a/include/linux/pci.h
->+++ b/include/linux/pci.h
->@@ -321,6 +321,7 @@ struct pci_dev {
->
-> #ifdef CONFIG_PCIEASPM
-> 	struct pcie_link_state	*link_state;	/* ASPM link state */
->+	unsigned int	aspm_default;		/* ASPM policy set by BIOS */
-> #endif
->
-> 	pci_channel_state_t error_state;	/* current connectivity state */
->--
->1.9.1
->
->--
->To unsubscribe from this list: send the line "unsubscribe linux-pci" in
->the body of a message to majordomo at vger.kernel.org
->More majordomo info at  http://vger.kernel.org/majordomo-info.html
-Intel Deutschland GmbH
-Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
-Tel: +49 89 99 8853-0, www.intel.de
-Managing Directors: Christin Eisenschmid, Christian Lamprechter
-Chairperson of the Supervisory Board: Nicole Lau
-Registered Office: Munich
-Commercial Register: Amtsgericht Muenchen HRB 186928
+Thanks
