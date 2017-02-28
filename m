@@ -1,18 +1,36 @@
-From: azhongweiwen@sina.com (abbrous)
-Date: Tue, 28 Feb 2017 17:15:42 +0800
-Subject: help: vga behind pci bridge, bridge not forwarding
-Message-ID: <mailman.3.1488273380.26981.linux-arm-kernel@lists.infradead.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 28 Feb 2017 10:19:17 +0100
+Subject: [PATCH v2 2/3] drm/vc4: Add HDMI audio support
+In-Reply-To: <20170227202803.12855-2-eric@anholt.net>
+References: <20170227202803.12855-1-eric@anholt.net>
+ <20170227202803.12855-2-eric@anholt.net>
+Message-ID: <20170228101917.40810aa9@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hello,
+On Mon, 27 Feb 2017 12:28:02 -0800
+Eric Anholt <eric@anholt.net> wrote:
 
-I want to ask a question, anybody can help me?
+> The HDMI encoder IP embeds all needed blocks to output audio, with a
+> custom DAI called MAI moving audio between the two parts of the HDMI
+> core.  This driver now exposes a sound card to let users stream audio
+> to their display.
+> 
+> Using the hdmi-codec driver has been considered here, but MAI meant
+> having to significantly rework hdmi-codec, and it would have left
+> little shared code with the I2S mode anyway.
+> 
+> The encoder requires that the audio be SPDIF-formatted frames only,
+> which alsalib will format-convert for us.
+> 
+> This patch is the combined work of Eric Anholt (initial register setup
+> with a separate dmaengine driver and using simple-audio-card) and
+> Boris Brezillon (moving it all into HDMI, massive debug to get it
+> actually working), and which Eric has the permission to release.
+> 
+> v2: Drop "-audio" from sound card name, since that's already implied
+>     (suggestion by Boris)
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 
-I have a armv8 compatible machine, and my only vga device is behind a bridge, I found this bridge can not route address: vgaarb: decodes=io+mem,owns = none (in dmesg log). And I don't have PCI_PROBE_ONLY in device tree. AND I noticed in file vgaarb.c there just have one BRIDGE FORWARDING check in a while loop. Before this check, bridge forwarding bit (write PCI_BRIDGE_CTL_VGA to BRIDGE_CONTROL register?)havn't set in bus enumetation routine.
-
-My question is how and where to add some code to repair this problem? Kernel version: 4.9.9.
-
-Thanks in advance.
-
-Send from mobile
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
