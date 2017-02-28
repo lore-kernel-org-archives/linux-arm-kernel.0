@@ -1,35 +1,32 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 28 Feb 2017 17:01:57 +0100
-Subject: [PATCH v4 3/6] ARM: davinci: da8xx: add OF_DEV_AUXDATA() for vpif
+Date: Tue, 28 Feb 2017 17:01:55 +0100
+Subject: [PATCH v4 1/6] ARM: davinci: da8xx: allow having multiple pdata-quirks
 In-Reply-To: <1488297720-4558-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1488297720-4558-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1488297720-4558-4-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1488297720-4558-2-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kevin Hilman <khilman@baylibre.com>
+We currently bail-out after applying a single quirk. We will want
+to reuse the function doing the vpif capture registration so remove
+the break; and continue iterating over the quirk array.
 
-This is needed for the driver to access the vpif clock.
-
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
-[Bartosz: split the pdata-quirks patch in two with one
-          adding the OF_DEV_AUXDATA entry]
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/da8xx-dt.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-davinci/pdata-quirks.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index e3cef50..5699ce3 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -53,6 +53,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,da830-musb", 0x01e00000, "musb-da8xx", NULL),
- 	OF_DEV_AUXDATA("ti,da830-usb-phy", 0x01c1417c, "da8xx-usb-phy", NULL),
- 	OF_DEV_AUXDATA("ti,da850-ahci", 0x01e18000, "ahci_da850", NULL),
-+	OF_DEV_AUXDATA("ti,da850-vpif", 0x01e17000, "vpif", NULL),
- 	{}
- };
- 
+diff --git a/arch/arm/mach-davinci/pdata-quirks.c b/arch/arm/mach-davinci/pdata-quirks.c
+index 5b57da4..36fb217 100644
+--- a/arch/arm/mach-davinci/pdata-quirks.c
++++ b/arch/arm/mach-davinci/pdata-quirks.c
+@@ -23,7 +23,6 @@ static void pdata_quirks_check(struct pdata_init *quirks)
+ 		if (of_machine_is_compatible(quirks->compatible)) {
+ 			if (quirks->fn)
+ 				quirks->fn();
+-			break;
+ 		}
+ 		quirks++;
+ 	}
 -- 
 2.9.3
