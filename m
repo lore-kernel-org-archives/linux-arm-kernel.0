@@ -1,113 +1,18 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 28 Feb 2017 12:15:10 -0800
-Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
-In-Reply-To: <542488db-5c59-afa5-6d1d-a437c87bc613@akamai.com>
-References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
- <f7532548-7007-1a32-f669-4520792805b3@caviumnetworks.com>
- <93219edf-0f6d-5cc7-309c-c998f16fe7ac@akamai.com>
- <aa139c18-1b04-2c20-2e22-89d74503b3cf@caviumnetworks.com>
- <20170227160601.5b79a1fe@gandalf.local.home>
- <6db89a8d-6053-51d1-5fd4-bae0179a5ebd@caviumnetworks.com>
- <20170227170911.2280ca3e@gandalf.local.home>
- <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
- <20170227173630.57fff459@gandalf.local.home>
- <7bd72716-feea-073f-741c-04212ebd0802@caviumnetworks.com>
- <68fe24ea-7795-24d8-211b-9d8a50affe9f@akamai.com>
- <510FF566-011D-4199-86F7-2BB4DBF36434@linux.vnet.ibm.com>
- <20170228112144.65455de5@gandalf.local.home>
- <cdf98840-8d43-2c58-e2f9-75ae8fb8a600@caviumnetworks.com>
- <1de00727-de97-f887-78bd-dd49131cdf61@akamai.com>
- <999e2c3f-698c-703c-67a9-26aea3c97dc0@caviumnetworks.com>
- <d10e986c-7f6a-3935-88e2-ba39708f79ad@caviumnetworks.com>
- <542488db-5c59-afa5-6d1d-a437c87bc613@akamai.com>
-Message-ID: <912fa97a-aa1d-c0e4-dc83-fc5c745db1c1@caviumnetworks.com>
+From: dann.frazier@canonical.com (dann frazier)
+Date: Tue, 28 Feb 2017 13:19:19 -0700
+Subject: [PATCH] tty: acpi/spcr: QDF2400 E44 checks for wrong OEM revision
+In-Reply-To: <1488252276-2425-1-git-send-email-timur@codeaurora.org>
+References: <1488252276-2425-1-git-send-email-timur@codeaurora.org>
+Message-ID: <CALdTtnsbh3fZF+Ci1JmQ=Awod5QPWB4+gTRWx0u9=xyaLfhNmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2017 11:34 AM, Jason Baron wrote:
->
->
-> On 02/28/2017 02:22 PM, David Daney wrote:
->> On 02/28/2017 11:05 AM, David Daney wrote:
->>> On 02/28/2017 10:39 AM, Jason Baron wrote:
->>>>
->> [...]
->>>>> I suspect that the alignment of the __jump_table section in the .ko
->>>>> files is not correct, and you are seeing some sort of problem due to
->>>>> that.
->>>>>
->>>>>
->>>>
->>>> Hi,
->>>>
->>>> Yes, if you look at the trace that Sachin sent the module being loaded
->>>> that does the WARN_ON() is nfsd.ko.
->>>>
->>>> That module from Sachin's trace has:
->>>>
->>>>   [31] __jump_table      PROGBITS        0000000000000000 03fd77 0000c0
->>>> 18 WAM  0   0  1
->>>
->>> The problem is then the section alignment (last column) for power.
->>>
->>> On mips with no patches applied, we get:
->>>
->>>   [17] __jump_table      PROGBITS        0000000000000000 00d2c0 000048
->>> 00  WA  0   0  8
->>>
->>> Look, proper alignment!
->>>
->>> The question I have is why do the power ".llong" and ".long" assembler
->>> directives not force section alignment?  Is there an alternative that
->>> could be used that would result in the proper alignment?  Would ".word"
->>> work?
->>>
->>> If not, then I would say patch only power with your balign thing. 8-byte
->>> alignment for 64-bit kernel, 4-byte alignment for 32-bit kernel
->>>
->>
->> I think the proper fix is either:
->>
->> A) Modify scripts/module-common.lds to force __jump_table alignment for
->> all architectures.
->>
->> B) Add arch/powerpc/kernel/module.lds to force __jump_table alignment
->> for powerpc only.
->>
->> David.
->>
->>
->
-> Ok, I can try adding it to the linger script.
->
-> FWIW, here is my before and after with the .balign thing for the nfsd.ko
-> module on powperc (using a cross-compiler):
->
-> before:
->
->   [31] __jump_table      PROGBITS        0000000000000000 03ee3e 0000f0
-> 00  WA  0   0  1
->
-> after:
->
->  [31] __jump_table      PROGBITS        0000000000000000 03ee40 0000f0
-> 00  WA  0   0  4
->
+On Mon, Feb 27, 2017 at 8:24 PM, Timur Tabi <timur@codeaurora.org> wrote:
+> For Qualcomm Technologies QDF2400 SOCs that are affected by
+> erratum E44, the ACPI oem_revision field is actually set to 1,
+> not 0.
 
-Try the (lightly tested) attached.
+Should this 'Fixes: d8a4995bcea1 ("PCI: Add ACS quirk for Qualcomm
+QDF2400 and QDF2432")' ?
 
-If it works and Steven likes it, perhaps someone can merge it.
-
-David.
-
-
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-module-set-__jump_table-alignment-to-8.patch
-Type: text/x-patch
-Size: 916 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170228/f4a8f907/attachment.bin>
+  -dann
