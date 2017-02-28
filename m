@@ -1,76 +1,122 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 31 Mar 2017 21:15:29 -0700
-Subject: [PATCH 2/2] ARM: dts: imx7: add USDHC NAND clock to SDHC instances
-In-Reply-To: <20170401030312.GB24882@b29396-OptiPlex-7040>
-References: <20170330005029.6472-1-stefan@agner.ch>
- <20170330005029.6472-2-stefan@agner.ch>
- <20170401030312.GB24882@b29396-OptiPlex-7040>
-Message-ID: <5c8339900fa1bd6215fb94d4386f7e06@agner.ch>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 1 Mar 2017 00:10:11 +0800
+Subject: [linux-sunxi] [PATCH 2/3] ARM: dts: sun8i: add usb_otg and
+ OHCI/EHCI for usbc0 on H3
+In-Reply-To: <244591488297463@web16h.yandex.ru>
+References: <20170228152702.42602-1-icenowy@aosc.xyz>
+ <20170228152702.42602-2-icenowy@aosc.xyz>
+ <CAGb2v67fsuhRnGp7X8PDkH_t_gb+gPb6VrY-pVu0B4HhD6d8qA@mail.gmail.com>
+ <244591488297463@web16h.yandex.ru>
+Message-ID: <CAGb2v64cu8Jz6PZ7mZ7Atw9jS7xaaG+8MSv+NX_6nKNmyyXotQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-03-31 20:03, Dong Aisheng wrote:
-> On Wed, Mar 29, 2017 at 05:50:29PM -0700, Stefan Agner wrote:
->> The USDHC instances need the USDHC NAND clock in order to operate.
->> Add the clock as ahb bus clock.
+On Tue, Feb 28, 2017 at 11:57 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+>
+>
+> 28.02.2017, 23:46, "Chen-Yu Tsai" <wens@csie.org>:
+>> On Tue, Feb 28, 2017 at 11:27 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+>>>  Allwinner H3 have a dual-routed USB PHY0 -- routed to either OHCI/EHCI
+>>>  or MUSB controller.
+>>>
+>>>  Add device nodes for these controllers.
+>>>
+>>>  Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>>>  ---
+>>>   arch/arm/boot/dts/sun8i-h3.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+>>>   1 file changed, 36 insertions(+)
+>>>
+>>>  diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+>>>  index 27780b97c863..bc9a53edf371 100644
+>>>  --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+>>>  +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+>>>  @@ -206,6 +206,19 @@
+>>>                          #size-cells = <0>;
+>>>                  };
+>>>
+>>>  + usb_otg: usb at 01c19000 {
+>>>  + compatible = "allwinner,sun8i-h3-musb";
+>>>  + reg = <0x01c19000 0x0400>;
+>>>  + clocks = <&ccu CLK_BUS_OTG>;
+>>>  + resets = <&ccu RST_BUS_OTG>;
+>>>  + interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+>>>  + interrupt-names = "mc";
+>>>  + phys = <&usbphy 0>;
+>>>  + phy-names = "usb";
+>>>  + extcon = <&usbphy 0>;
+>>>  + status = "disabled";
+>>>  + };
+>>>  +
+>>>                  usbphy: phy at 01c19400 {
+>>>                          compatible = "allwinner,sun8i-h3-usb-phy";
+>>>                          reg = <0x01c19400 0x2c>,
+>>>  @@ -238,6 +251,29 @@
+>>>                          #phy-cells = <1>;
+>>>                  };
+>>>
+>>>  + ehci0: usb at 01c1a000 {
+>>>  + compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
+>>>  + reg = <0x01c1a000 0x100>;
+>>>  + interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+>>>  + clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>;
+>>>  + resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
+>>>  + phys = <&usbphy 0>;
+>>>  + phy-names = "usb";
 >>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->>  arch/arm/boot/dts/imx7s.dtsi | 6 +++---
->>  1 file changed, 3 insertions(+), 3 deletions(-)
+>> So this bit is slightly concerning. IIRC the xHCI drivers power on the phy when
+>> probed, which means VBUS is _always_ going to be powered on, even when it's
+>> supposed to be in peripheral mode. You're probably going to need to rework
+>> either the phy or the musb driver to cope with this.
 >>
->> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
->> index 5d3a43b8de20..5794febb19a4 100644
->> --- a/arch/arm/boot/dts/imx7s.dtsi
->> +++ b/arch/arm/boot/dts/imx7s.dtsi
->> @@ -936,7 +936,7 @@
->>  				reg = <0x30b40000 0x10000>;
->>  				interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
->>  				clocks = <&clks IMX7D_CLK_DUMMY>,
-> 
-> Would you please change the left ipg dummy to IMX7D_IPG_ROOT_CLK as well?
+>> Or maybe just dropping the phy handle here and letting the musb driver handle
+>> it would work, but that requires the musb driver be loaded.
+>
+> In fact the MUSB driver is always needed -- to set the dr_mode.
 
-IMX7D_IPG_ROOT_CLK is currently not a valid clock in upstream... So we
-would have to add it to the clock driver first.
+I guess it's the same with DWC2/3 that have host controller pairs.
 
-I guess we could/should add it anyway at one point? But probably also as
-init on, just to make sure Linux does not disable it since it is
-currently used by several IPs implicitly.
+> And currently MUSB driver can take over the USB bus even if it's host-only by forcing
+> its mode in sysfs.
 
---
-Stefan
+IIUC that would also switch the phy muxing over to the HCI pairs.
 
-> 
-> Otherwise,
-> 
-> Acked-by: Dong Aisheng <aisheng.dong@nxp.com>
-> 
-> Regards
-> Dong Aisheng
-> 
->> -					<&clks IMX7D_CLK_DUMMY>,
->> +					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
->>  					<&clks IMX7D_USDHC1_ROOT_CLK>;
->>  				clock-names = "ipg", "ahb", "per";
->>  				bus-width = <4>;
->> @@ -948,7 +948,7 @@
->>  				reg = <0x30b50000 0x10000>;
->>  				interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
->>  				clocks = <&clks IMX7D_CLK_DUMMY>,
->> -					<&clks IMX7D_CLK_DUMMY>,
->> +					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
->>  					<&clks IMX7D_USDHC2_ROOT_CLK>;
->>  				clock-names = "ipg", "ahb", "per";
->>  				bus-width = <4>;
->> @@ -960,7 +960,7 @@
->>  				reg = <0x30b60000 0x10000>;
->>  				interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
->>  				clocks = <&clks IMX7D_CLK_DUMMY>,
->> -					<&clks IMX7D_CLK_DUMMY>,
->> +					<&clks IMX7D_NAND_USDHC_BUS_ROOT_CLK>,
->>  					<&clks IMX7D_USDHC3_ROOT_CLK>;
->>  				clock-names = "ipg", "ahb", "per";
->>  				bus-width = <4>;
+ChenYu
+
+>>
+>> ChenYu
+>>
+>>>  + status = "disabled";
+>>>  + };
+>>>  +
+>>>  + ohci0: usb at 01c1a400 {
+>>>  + compatible = "allwinner,sun8i-h3-ohci", "generic-ohci";
+>>>  + reg = <0x01c1a400 0x100>;
+>>>  + interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+>>>  + clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>,
+>>>  + <&ccu CLK_USB_OHCI0>;
+>>>  + resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
+>>>  + phys = <&usbphy 0>;
+>>>  + phy-names = "usb";
+>>>  + status = "disabled";
+>>>  + };
+>>>  +
+>>>                  ehci1: usb at 01c1b000 {
+>>>                          compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
+>>>                          reg = <0x01c1b000 0x100>;
+>>>  --
+>>>  2.11.1
+>>>
+>>>  --
+>>>  You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>>>  To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>>>  For more options, visit https://groups.google.com/d/optout.
+>>
 >> --
->> 2.12.1
->>
+>> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
