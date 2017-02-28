@@ -1,37 +1,109 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 28 Feb 2017 15:54:13 +0000
-Subject: [PATCH 2/2] crypto: arm - add build time test for CRC instruction
- support
-In-Reply-To: <1488292617-27317-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1488292617-27317-1-git-send-email-ard.biesheuvel@linaro.org>
- <1488292617-27317-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <be137899-cd94-5fb3-1f14-c1921509e0d7@nvidia.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 28 Feb 2017 23:57:43 +0800
+Subject: [linux-sunxi] [PATCH 2/3] ARM: dts: sun8i: add usb_otg and
+ OHCI/EHCI for usbc0 on H3
+In-Reply-To: <CAGb2v67fsuhRnGp7X8PDkH_t_gb+gPb6VrY-pVu0B4HhD6d8qA@mail.gmail.com>
+References: <20170228152702.42602-1-icenowy@aosc.xyz>
+ <20170228152702.42602-2-icenowy@aosc.xyz>
+ <CAGb2v67fsuhRnGp7X8PDkH_t_gb+gPb6VrY-pVu0B4HhD6d8qA@mail.gmail.com>
+Message-ID: <244591488297463@web16h.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 28/02/17 14:36, Ard Biesheuvel wrote:
-> The accelerated CRC32 module for ARM may use either the scalar CRC32
-> instructions, the NEON 64x64 to 128 bit polynomial multiplication
-> (vmull.p64) instruction, or both, depending on what the current CPU
-> supports.
-> 
-> However, this also requires support in binutils, and as it turns out,
-> versions of binutils exist that support the vmull.p64 instruction but
-> not the crc32 instructions.
-> 
-> So refactor the Makefile logic so that this module only gets built if
-> binutils has support for both.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Thanks!
+28.02.2017, 23:46, "Chen-Yu Tsai" <wens@csie.org>:
+> On Tue, Feb 28, 2017 at 11:27 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+>> ?Allwinner H3 have a dual-routed USB PHY0 -- routed to either OHCI/EHCI
+>> ?or MUSB controller.
+>>
+>> ?Add device nodes for these controllers.
+>>
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ?---
+>> ??arch/arm/boot/dts/sun8i-h3.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+>> ??1 file changed, 36 insertions(+)
+>>
+>> ?diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> ?index 27780b97c863..bc9a53edf371 100644
+>> ?--- a/arch/arm/boot/dts/sun8i-h3.dtsi
+>> ?+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+>> ?@@ -206,6 +206,19 @@
+>> ?????????????????????????#size-cells = <0>;
+>> ?????????????????};
+>>
+>> ?+ usb_otg: usb at 01c19000 {
+>> ?+ compatible = "allwinner,sun8i-h3-musb";
+>> ?+ reg = <0x01c19000 0x0400>;
+>> ?+ clocks = <&ccu CLK_BUS_OTG>;
+>> ?+ resets = <&ccu RST_BUS_OTG>;
+>> ?+ interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+>> ?+ interrupt-names = "mc";
+>> ?+ phys = <&usbphy 0>;
+>> ?+ phy-names = "usb";
+>> ?+ extcon = <&usbphy 0>;
+>> ?+ status = "disabled";
+>> ?+ };
+>> ?+
+>> ?????????????????usbphy: phy at 01c19400 {
+>> ?????????????????????????compatible = "allwinner,sun8i-h3-usb-phy";
+>> ?????????????????????????reg = <0x01c19400 0x2c>,
+>> ?@@ -238,6 +251,29 @@
+>> ?????????????????????????#phy-cells = <1>;
+>> ?????????????????};
+>>
+>> ?+ ehci0: usb at 01c1a000 {
+>> ?+ compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
+>> ?+ reg = <0x01c1a000 0x100>;
+>> ?+ interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
+>> ?+ clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>;
+>> ?+ resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
+>> ?+ phys = <&usbphy 0>;
+>> ?+ phy-names = "usb";
+>
+> So this bit is slightly concerning. IIRC the xHCI drivers power on the phy when
+> probed, which means VBUS is _always_ going to be powered on, even when it's
+> supposed to be in peripheral mode. You're probably going to need to rework
+> either the phy or the musb driver to cope with this.
+>
+> Or maybe just dropping the phy handle here and letting the musb driver handle
+> it would work, but that requires the musb driver be loaded.
 
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-Tested-by: Jon Hunter <jonathanh@nvidia.com>
+In fact the MUSB driver is always needed -- to set the dr_mode.
 
-Cheers
-Jon
+And currently MUSB driver can take over the USB bus even if it's host-only by forcing
+its mode in sysfs. 
 
--- 
-nvpublic
+>
+> ChenYu
+>
+>> ?+ status = "disabled";
+>> ?+ };
+>> ?+
+>> ?+ ohci0: usb at 01c1a400 {
+>> ?+ compatible = "allwinner,sun8i-h3-ohci", "generic-ohci";
+>> ?+ reg = <0x01c1a400 0x100>;
+>> ?+ interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+>> ?+ clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>,
+>> ?+ <&ccu CLK_USB_OHCI0>;
+>> ?+ resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
+>> ?+ phys = <&usbphy 0>;
+>> ?+ phy-names = "usb";
+>> ?+ status = "disabled";
+>> ?+ };
+>> ?+
+>> ?????????????????ehci1: usb at 01c1b000 {
+>> ?????????????????????????compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
+>> ?????????????????????????reg = <0x01c1b000 0x100>;
+>> ?--
+>> ?2.11.1
+>>
+>> ?--
+>> ?You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+>> ?To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+>> ?For more options, visit https://groups.google.com/d/optout.
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
