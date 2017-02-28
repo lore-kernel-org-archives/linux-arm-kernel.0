@@ -1,31 +1,52 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 28 Feb 2017 14:36:56 +0000
-Subject: [PATCH 1/2] crypto: arm/crc32 - fix build error with outdated binutils
-Message-ID: <1488292617-27317-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Tue, 28 Feb 2017 14:36:57 +0000
+Subject: [PATCH 2/2] crypto: arm - add build time test for CRC instruction
+ support
+In-Reply-To: <1488292617-27317-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1488292617-27317-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1488292617-27317-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Annotate a vmov instruction with an explicit element size of 32 bits.
-This is inferred by recent toolchains, but apparently, older versions
-need some help figuring this out.
+The accelerated CRC32 module for ARM may use either the scalar CRC32
+instructions, the NEON 64x64 to 128 bit polynomial multiplication
+(vmull.p64) instruction, or both, depending on what the current CPU
+supports.
+
+However, this also requires support in binutils, and as it turns out,
+versions of binutils exist that support the vmull.p64 instruction but
+not the crc32 instructions.
+
+So refactor the Makefile logic so that this module only gets built if
+binutils has support for both.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/crypto/crc32-ce-core.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/crypto/Makefile | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/crypto/crc32-ce-core.S b/arch/arm/crypto/crc32-ce-core.S
-index e63d400dc5c1..5cbd4a6fedad 100644
---- a/arch/arm/crypto/crc32-ce-core.S
-+++ b/arch/arm/crypto/crc32-ce-core.S
-@@ -135,7 +135,7 @@ ENTRY(crc32c_pmull_le)
- 	vld1.8		{q3-q4}, [BUF, :128]!
- 	vmov.i8		qzr, #0
- 	vmov.i8		qCONSTANT, #0
--	vmov		dCONSTANTl[0], CRC
-+	vmov.32		dCONSTANTl[0], CRC
- 	veor.8		d2, d2, dCONSTANTl
- 	sub		LEN, LEN, #0x40
- 	cmp		LEN, #0x40
+diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
+index 1822c4697278..f2215fbeed13 100644
+--- a/arch/arm/crypto/Makefile
++++ b/arch/arm/crypto/Makefile
+@@ -15,7 +15,17 @@ ce-obj-$(CONFIG_CRYPTO_SHA1_ARM_CE) += sha1-arm-ce.o
+ ce-obj-$(CONFIG_CRYPTO_SHA2_ARM_CE) += sha2-arm-ce.o
+ ce-obj-$(CONFIG_CRYPTO_GHASH_ARM_CE) += ghash-arm-ce.o
+ ce-obj-$(CONFIG_CRYPTO_CRCT10DIF_ARM_CE) += crct10dif-arm-ce.o
+-ce-obj-$(CONFIG_CRYPTO_CRC32_ARM_CE) += crc32-arm-ce.o
++crc-obj-$(CONFIG_CRYPTO_CRC32_ARM_CE) += crc32-arm-ce.o
++
++ifneq ($(crc-obj-y)$(crc-obj-m),)
++ifeq ($(call as-instr,.arch armv8-a\n.arch_extension crc,y,n),y)
++ce-obj-y += $(crc-obj-y)
++ce-obj-m += $(crc-obj-m)
++else
++$(warning These CRC Extensions modules need binutils 2.23 or higher)
++$(warning $(crc-obj-y) $(crc-obj-m))
++endif
++endif
+ 
+ ifneq ($(ce-obj-y)$(ce-obj-m),)
+ ifeq ($(call as-instr,.fpu crypto-neon-fp-armv8,y,n),y)
 -- 
 2.7.4
