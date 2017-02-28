@@ -1,14 +1,13 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue, 28 Feb 2017 07:35:35 +0100
-Subject: [PATCH v3 25/25] ARM: owl: smp: Reimplement SPS power-gating for CPU2
- and CPU3
+Date: Tue, 28 Feb 2017 07:35:30 +0100
+Subject: [PATCH v3 20/25] ARM: owl: Implement CPU enable-method for S500
 In-Reply-To: <20170228063535.32069-1-afaerber@suse.de>
 References: <20170228063535.32069-1-afaerber@suse.de>
-Message-ID: <20170228063535.32069-26-afaerber@suse.de>
+Message-ID: <20170228063535.32069-21-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bring up the two remaining CPUs.
+Allow to bring up CPU1.
 
 Based on LeMaker linux-actions tree.
 
@@ -16,114 +15,265 @@ Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
  v3: new
  
- arch/arm/mach-actions/platsmp.c | 67 +++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 65 insertions(+), 2 deletions(-)
+ arch/arm/mach-actions/Makefile  |   1 +
+ arch/arm/mach-actions/headsmp.S |  68 ++++++++++++++++
+ arch/arm/mach-actions/platsmp.c | 166 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 235 insertions(+)
+ create mode 100644 arch/arm/mach-actions/headsmp.S
+ create mode 100644 arch/arm/mach-actions/platsmp.c
 
+diff --git a/arch/arm/mach-actions/Makefile b/arch/arm/mach-actions/Makefile
+index 524c381..2fb61f8 100644
+--- a/arch/arm/mach-actions/Makefile
++++ b/arch/arm/mach-actions/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_ARCH_ACTIONS) += owl.o
++obj-${CONFIG_ARCH_ACTIONS} += platsmp.o headsmp.o
+diff --git a/arch/arm/mach-actions/headsmp.S b/arch/arm/mach-actions/headsmp.S
+new file mode 100644
+index 0000000..dc4832f
+--- /dev/null
++++ b/arch/arm/mach-actions/headsmp.S
+@@ -0,0 +1,68 @@
++/*
++ * Copyright 2012 Actions Semi Inc.
++ * Author: Actions Semi, Inc.
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++
++#include <linux/linkage.h>
++#include <linux/init.h>
++
++ENTRY(owl_v7_invalidate_l1)
++	mov	r0, #0
++	mcr	p15, 0, r0, c7, c5, 0	@ invalidate I cache
++	mcr	p15, 2, r0, c0, c0, 0
++	mrc	p15, 1, r0, c0, c0, 0
++
++	ldr	r1, =0x7fff
++	and	r2, r1, r0, lsr #13
++
++	ldr	r1, =0x3ff
++
++	and	r3, r1, r0, lsr #3	@ NumWays - 1
++	add	r2, r2, #1		@ NumSets
++
++	and	r0, r0, #0x7
++	add	r0, r0, #4	@ SetShift
++
++	clz	r1, r3		@ WayShift
++	add	r4, r3, #1	@ NumWays
++1:	sub	r2, r2, #1	@ NumSets--
++	mov	r3, r4		@ Temp = NumWays
++2:	subs	r3, r3, #1	@ Temp--
++	mov	r5, r3, lsl r1
++	mov	r6, r2, lsl r0
++	orr	r5, r5, r6	@ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
++	mcr	p15, 0, r5, c7, c6, 2
++	bgt	2b
++	cmp	r2, #0
++	bgt	1b
++	dsb
++	isb
++	mov	pc, lr
++ENDPROC(owl_v7_invalidate_l1)
++
++ENTRY(owl_secondary_startup)
++	mrc	p15, 0, r0, c0, c0, 5
++	and	r0, r0, #0xf
++	adr	r4, 1f
++	ldmia	r4, {r5, r6}
++	sub	r4, r4, r5
++	add	r6, r6, r4
++pen:
++	ldr	r7, [r6]
++	cmp	r7, r0
++	bne	pen
++
++	/*
++	 * we've been released from the holding pen: secondary_stack
++	 * should now contain the SVC stack for this core
++	 */
++	bl	owl_v7_invalidate_l1
++	b	secondary_startup
++
++1:	.long	.
++	.long	pen_release
 diff --git a/arch/arm/mach-actions/platsmp.c b/arch/arm/mach-actions/platsmp.c
-index 9d3601e..45b4bc5 100644
---- a/arch/arm/mach-actions/platsmp.c
+new file mode 100644
+index 0000000..9d3601e
+--- /dev/null
 +++ b/arch/arm/mach-actions/platsmp.c
-@@ -28,7 +28,15 @@
- 
- #define OWL_CPUx_FLAG_BOOT	0x55aa
- 
-+#define OWL_SPS_PG_CTL	0x0
+@@ -0,0 +1,166 @@
++/*
++ * Actions Semi Leopard
++ *
++ * This file is based on arm realview smp platform.
++ *
++ * Copyright 2012 Actions Semi Inc.
++ * Author: Actions Semi, Inc.
++ *
++ * Copyright (c) 2017 Andreas F?rber
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
++ */
 +
-+#define OWL_SPS_PG_CTL_PWR_CPU2	BIT(5)
-+#define OWL_SPS_PG_CTL_PWR_CPU3	BIT(6)
-+#define OWL_SPS_PG_CTL_ACK_CPU2	BIT(21)
-+#define OWL_SPS_PG_CTL_ACK_CPU3	BIT(22)
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/smp.h>
++#include <asm/cacheflush.h>
++#include <asm/smp_plat.h>
++#include <asm/smp_scu.h>
 +
- static void __iomem *scu_base_addr;
-+static void __iomem *sps_base_addr;
- static void __iomem *timer_base_addr;
- static int ncores;
- 
-@@ -42,6 +50,39 @@ static void write_pen_release(int val)
- 	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
- }
- 
-+/* The generic PM domain driver is not available this early. */
-+static int owl_sps_set_pg(u32 pwr_mask, u32 ack_mask, bool enable)
++#define OWL_CPU1_ADDR	0x50
++#define OWL_CPU1_FLAG	0x5c
++
++#define OWL_CPUx_FLAG_BOOT	0x55aa
++
++static void __iomem *scu_base_addr;
++static void __iomem *timer_base_addr;
++static int ncores;
++
++static DEFINE_SPINLOCK(boot_lock);
++
++static void write_pen_release(int val)
 +{
-+	u32 val;
-+	bool ack;
-+	int timeout;
++	pen_release = val;
++	smp_wmb();
++	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
++	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
++}
 +
-+	val = readl(sps_base_addr + OWL_SPS_PG_CTL);
-+	ack = val & ack_mask;
-+	if (ack == enable)
-+		return 0;
++static void s500_smp_secondary_init(unsigned int cpu)
++{
++	/*
++	 * let the primary processor know we're out of the
++	 * pen, then head off into the C entry point
++	 */
++	write_pen_release(-1);
 +
-+	if (enable)
-+		val |= pwr_mask;
-+	else
-+		val &= ~pwr_mask;
++	spin_lock(&boot_lock);
++	spin_unlock(&boot_lock);
++}
 +
-+	writel(val, sps_base_addr + OWL_SPS_PG_CTL);
++void owl_secondary_startup(void);
 +
-+	for (timeout = 5000; timeout > 0; timeout -= 50) {
-+		val = readl(sps_base_addr + OWL_SPS_PG_CTL);
-+		if ((val & ack_mask) == (enable ? ack_mask : 0))
-+			break;
-+		udelay(50);
++static int s500_wakeup_secondary(unsigned int cpu)
++{
++	if (cpu > 3)
++		return -EINVAL;
++
++	switch (cpu) {
++	case 2:
++	case 3:
++		/* CPU2/3 are power-gated */
++		return -EINVAL;
 +	}
-+	if (timeout <= 0)
-+		return -ETIMEDOUT;
 +
-+	udelay(10);
++	/* wait for CPUx to run to WFE instruction */
++	udelay(200);
++
++	writel(virt_to_phys(owl_secondary_startup),
++	       timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
++	writel(OWL_CPUx_FLAG_BOOT,
++	       timer_base_addr + OWL_CPU1_FLAG + (cpu - 1) * 4);
++
++	dsb_sev();
++	mb();
 +
 +	return 0;
 +}
 +
- static void s500_smp_secondary_init(unsigned int cpu)
- {
- 	/*
-@@ -58,14 +99,24 @@ void owl_secondary_startup(void);
- 
- static int s500_wakeup_secondary(unsigned int cpu)
- {
++static int s500_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	unsigned long timeout;
 +	int ret;
 +
- 	if (cpu > 3)
- 		return -EINVAL;
- 
- 	switch (cpu) {
- 	case 2:
-+		ret = owl_sps_set_pg(OWL_SPS_PG_CTL_PWR_CPU2,
-+				     OWL_SPS_PG_CTL_ACK_CPU2, true);
-+		if (ret)
-+			return ret;
-+		break;
- 	case 3:
--		/* CPU2/3 are power-gated */
--		return -EINVAL;
-+		ret = owl_sps_set_pg(OWL_SPS_PG_CTL_PWR_CPU3,
-+				     OWL_SPS_PG_CTL_ACK_CPU3, true);
-+		if (ret)
-+			return ret;
-+		break;
- 	}
- 
- 	/* wait for CPUx to run to WFE instruction */
-@@ -133,6 +184,18 @@ static void __init s500_smp_prepare_cpus(unsigned int max_cpus)
- 		return;
- 	}
- 
-+	node = of_find_compatible_node(NULL, NULL, "actions,s500-sps");
++	ret = s500_wakeup_secondary(cpu);
++	if (ret)
++		return ret;
++
++	udelay(10);
++
++	spin_lock(&boot_lock);
++
++	/*
++	 * The secondary processor is waiting to be released from
++	 * the holding pen - release it, then wait for it to flag
++	 * that it has been released by resetting pen_release.
++	 */
++	write_pen_release(cpu_logical_map(cpu));
++	smp_send_reschedule(cpu);
++
++	timeout = jiffies + (1 * HZ);
++	while (time_before(jiffies, timeout)) {
++		if (pen_release == -1)
++			break;
++	}
++
++	writel(0, timer_base_addr + OWL_CPU1_ADDR + (cpu - 1) * 4);
++	writel(0, timer_base_addr + OWL_CPU1_FLAG + (cpu - 1) * 4);
++
++	spin_unlock(&boot_lock);
++
++	return pen_release != -1 ? -ENOSYS : 0;
++}
++
++static void __init s500_smp_prepare_cpus(unsigned int max_cpus)
++{
++	struct device_node *node;
++
++	node = of_find_compatible_node(NULL, NULL, "actions,s500-timer");
 +	if (!node) {
-+		pr_err("%s: missing sps\n", __func__);
++		pr_err("%s: missing timer\n", __func__);
 +		return;
 +	}
 +
-+	sps_base_addr = of_iomap(node, 0);
-+	if (!sps_base_addr) {
-+		pr_err("%s: could not map sps registers\n", __func__);
++	timer_base_addr = of_iomap(node, 0);
++	if (!timer_base_addr) {
++		pr_err("%s: could not map timer registers\n", __func__);
 +		return;
 +	}
 +
- 	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
- 		node = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
- 		if (!node) {
++	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
++		node = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
++		if (!node) {
++			pr_err("%s: missing scu\n", __func__);
++			return;
++		}
++
++		scu_base_addr = of_iomap(node, 0);
++		if (!scu_base_addr) {
++			pr_err("%s: could not map scu registers\n", __func__);
++			return;
++		}
++
++		/*
++		 * While the number of cpus is gathered from dt, also get the
++		 * number of cores from the scu to verify this value when
++		 * booting the cores.
++		 */
++		ncores = scu_get_core_count(scu_base_addr);
++		pr_debug("%s: ncores %d\n", __func__, ncores);
++
++		scu_enable(scu_base_addr);
++	}
++}
++
++static const struct smp_operations s500_smp_ops __initconst = {
++	.smp_prepare_cpus = s500_smp_prepare_cpus,
++	.smp_secondary_init = s500_smp_secondary_init,
++	.smp_boot_secondary = s500_smp_boot_secondary,
++};
++CPU_METHOD_OF_DECLARE(s500_smp, "actions,s500-smp", &s500_smp_ops);
 -- 
 2.10.2
