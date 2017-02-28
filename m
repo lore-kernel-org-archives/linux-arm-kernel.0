@@ -1,32 +1,22 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 28 Feb 2017 11:21:44 -0500
-Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
-In-Reply-To: <510FF566-011D-4199-86F7-2BB4DBF36434@linux.vnet.ibm.com>
-References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
- <f7532548-7007-1a32-f669-4520792805b3@caviumnetworks.com>
- <93219edf-0f6d-5cc7-309c-c998f16fe7ac@akamai.com>
- <aa139c18-1b04-2c20-2e22-89d74503b3cf@caviumnetworks.com>
- <20170227160601.5b79a1fe@gandalf.local.home>
- <6db89a8d-6053-51d1-5fd4-bae0179a5ebd@caviumnetworks.com>
- <20170227170911.2280ca3e@gandalf.local.home>
- <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
- <20170227173630.57fff459@gandalf.local.home>
- <7bd72716-feea-073f-741c-04212ebd0802@caviumnetworks.com>
- <68fe24ea-7795-24d8-211b-9d8a50affe9f@akamai.com>
- <510FF566-011D-4199-86F7-2BB4DBF36434@linux.vnet.ibm.com>
-Message-ID: <20170228112144.65455de5@gandalf.local.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 28 Feb 2017 08:23:16 -0800
+Subject: ARM: OMAP2+: Grab reference to device nodes where needed
+In-Reply-To: <20170227233405.GA16546@roeck-us.net>
+References: <1486853948-20978-1-git-send-email-linux@roeck-us.net>
+ <20170227233405.GA16546@roeck-us.net>
+Message-ID: <20170228162315.GS21809@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Feb 2017 10:25:46 +0530
-Sachin Sant <sachinp@linux.vnet.ibm.com> wrote:
+* Guenter Roeck <linux@roeck-us.net> [170227 15:36]:
+> ping ... this problem is now seen in mainline.
 
-> File: ./net/ipv4/xfrm4_input.o
->   [12] __jump_table      PROGBITS        0000000000000000 000639 000018 18 WAM  0   0  1
-> File: ./net/ipv4/udplite.o
-> File: ./net/ipv4/xfrm4_output.o
->   [ 9] __jump_table      PROGBITS        0000000000000000 000481 000018 18 WAM  0   0  1
+Oops sorry I had accidentally tagged this with "next" instead of
+"fixes".
 
-Looks like there's some issues right there.
+Looking at the patch though, can't we make of_node_get/put local to
+omap3xxx_hwmod_is_hs_ip_block_usable()?
 
--- Steve
+Regards,
+
+Tony
