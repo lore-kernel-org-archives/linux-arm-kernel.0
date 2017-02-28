@@ -1,53 +1,110 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 28 Feb 2017 11:06:38 +0530
-Subject: [PATCH v2 3/3] media: dt-bindings: vpif: new optional property
-In-Reply-To: <20170227225209.26oieqwbafqjga2a@rob-hp-laptop>
-References: <1487771027-7763-1-git-send-email-bgolaszewski@baylibre.com>
- <1487771027-7763-4-git-send-email-bgolaszewski@baylibre.com>
- <20170227225209.26oieqwbafqjga2a@rob-hp-laptop>
-Message-ID: <6b392a4a-2de8-9981-ad40-ca7201bf813d@ti.com>
+From: wangxiongfeng2@huawei.com (Xiongfeng Wang)
+Date: Tue, 28 Feb 2017 14:25:07 +0800
+Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <58B43092.6040401@arm.com>
+References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
+ <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
+ <df6ba5dc-d93f-925a-46bf-1e1e209d17f3@huawei.com> <58B43092.6040401@arm.com>
+Message-ID: <3df82a7b-1a32-e2d7-ae78-7132a4eab1a0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 February 2017 04:22 AM, Rob Herring wrote:
-> On Wed, Feb 22, 2017 at 02:43:47PM +0100, Bartosz Golaszewski wrote:
->> Add an optional property - enable-gpios - which can be used to specify
->> the GPIOs that must be requested to select the vpif functionality.
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>  Documentation/devicetree/bindings/media/ti,da850-vpif.txt | 7 +++++++
->>  1 file changed, 7 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
->> index df7182a..23c5405 100644
->> --- a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
->> +++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
->> @@ -13,6 +13,9 @@ Required properties:
->>  - reg: physical base address and length of the registers set for the device;
->>  - interrupts: should contain IRQ line for the VPIF
->>  
->> +Optional properties:
->> +- enable-gpios: phandle of the GPIOs used to select the vpif functionality
+Hi James,
+
+On 2017/2/27 21:58, James Morse wrote:
+> Hi Wang Xiongfeng,
 > 
-> What does this control exactly? The GPIOs belong in the node they are 
-> connected to and having GPIOs routed to this block seems strange.
+> On 25/02/17 07:15, Xiongfeng Wang wrote:
+>> On 2017/2/22 5:22, Tyler Baicar wrote:
+>>> Currently external aborts are unsupported by the guest abort
+>>> handling. Add handling for SEAs so that the host kernel reports
+>>> SEAs which occur in the guest kernel.
+> 
+>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>>> index a5265ed..04f1dd50 100644
+>>> --- a/arch/arm/kvm/mmu.c
+>>> +++ b/arch/arm/kvm/mmu.c
+>>> @@ -1444,8 +1445,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>>  
+>>>  	/* Check the stage-2 fault is trans. fault or write fault */
+>>>  	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+>>> -	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+>>> -	    fault_status != FSC_ACCESS) {
+>>> +
+>>> +	/* The host kernel will handle the synchronous external abort. There
+>>> +	 * is no need to pass the error into the guest.
+>>> +	 */
+> 
+>> Can we inject an sea into the guest, so that the guest can kill the
+>> application which causes the error if the guest won't be terminated
+>> later. I'm not sure whether ghes_handle_memory_failure() called in
+>> ghes_do_proc() will kill the qemu process. I think it only kill user
+>> processes marked with PF_MCE_PROCESS & PF_MCE_EARLY.
+> 
+> My understanding is the pages will get unmapped and recovered where possible
+> (e.g. re-read from disk), the user space process will get SIGBUS/SIGSEV when it
+> next tries to access that page, which could be some time later.
+> These flags in find_early_kill_thread() are a way to make the memory-failure
+> code signal the process early, before it does any recovery. The 'MCE' makes me
+> think its x86 specific.
+> (early and late are described more in [0])
+> 
+> 
+> Guests are a special case as QEMU may never access the faulty memory itself, so
+> it won't receive the 'late' signal. It looks like ARM/arm64 KVM lacks support
+> for KVM_PFN_ERR_HWPOISON which sends SIGBUS from KVM's fault-handling code. I
+> have patches to add support for this which I intend to send at rc1.
+> 
+> [0] suggests 'KVM qemu' sets these MCE flags to take the 'early' path, but given
+> x86s KVM_PFN_ERR_HWPOISON, this may be out of date.
+> 
+> 
+> Either way, once QEMU gets a signal indicating the virtual address, it can
+> generate its own APEI CPER records and use the KVM APIs to mock up an
+> Synchronous External Abort, (or inject an IRQ or run the vcpu waiting for the
+> guest's polling thread to come round, whichever was described to the guest via
+> the HEST/GHES tables).
+> 
+> We can't hand the APEI CPER records we have in the kernel to the guest, as they
+> hold a host physical address, and maybe a host virtual address. We don't know
+> where in guest memory we could write new APEI CPER records as these locations
+> have to be reserved in the guests-UEFI memory map, and only QEMU knows where
+> they are.
+> 
+> To deliver RAS events to a guest we have to get QEMU involved.
 
-The DA850 EVM board implements on-board muxing which lets the video
-input (via VPIF) to be routed to a TVP5147 (video decoder) for composite
-input or to a camera header. There are other mux options which use the
-same VPIF SoC pins (RMII ethernet or character LCD).
+Thanks for your reply!
 
-There is a three-to-eight demux on the board which drives enable signals
-to buffers letting you choose from these options.
+I have another idea about the handling procedure of SEA. Can we divide
+the SEA handing procedure into two procedures? The first procedure does
+the more urgent work, including sending SIGBUS to user process or panic,
+just as PATCH 04/10 does. The second procedure does the APEI analysis
+work, including calling memory_failure. The second procedure is executed
+when actual errors detected in memory, such as a 2-bit ECC error is
+detected  on memory read or write, in which case, a fault handling
+interrupt is generated by the memory controller, as RAS Extension
+specification says.
 
->From your response, it looks like you want the enable-gpios property to
-be in the TVP5147 or camera node. That does make sense to me.
+We can route this fault handling interrupt into EL3. After BIOS has
+filled the HEST table, it can notify OS with an IRQ. And the second
+procedure is executed in the IRQ handler. The notification type of
+HEST/GHES tables is GSIV.
 
->
-> There are inputs or outputs?
+When uncorrectable data error is detected on write data, a fault
+handling interrupt is generated, and no SEA is generated, as RAS
+extension specification 6.4.4 says. In this situation, the second
+procedure should be executed since error occurs in memory.
 
-These GPIOs are driving a 3-to-8 demux so they are all outputs.
+In ARM/arm64 KVM situation, when an SEA takes place, an SEA is injected
+into guest os directly in kvm_handle_guest_abort(). And the guest os can
+execute the first procedure.
 
-Thanks,
-Sekhar
+When the host OS executes the second procedure and analyses the HEST
+table, it sends SIGBUS to qemu process in memory_failure(). And the qemu
+process can mock up a HEST table with IPA of the error data. Then the
+qemu process can notify the guest OS with an IRQ, and the second
+procedure is executed in guest OS. Is this idea reasonable?
+
+
+Thanks!
+Wang Xiongfeng
