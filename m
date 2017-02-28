@@ -1,53 +1,70 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Tue, 28 Feb 2017 17:17:56 +0900
-Subject: [RESEND PATCH v2 2/5] arm64: dts: exynos: Remove the OF graph from DSI
- node for exynos5433 dts
-In-Reply-To: <1488269879-28876-1-git-send-email-hoegeun.kwon@samsung.com>
-References: <1488269879-28876-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170228081811epcas5p322c1570e2e29c69592f798916b816a41@epcas5p3.samsung.com>
-Message-ID: <1488269879-28876-3-git-send-email-hoegeun.kwon@samsung.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 28 Feb 2017 09:34:41 +0100
+Subject: [PATCH 1/2] dt-bindings: iio: stm32-adc: add option to set
+ resolution
+In-Reply-To: <79e01c5c-d27c-89ea-4d8f-9e66a6c091e6@st.com>
+References: <1487177757-19427-1-git-send-email-fabrice.gasnier@st.com>
+ <1487177757-19427-2-git-send-email-fabrice.gasnier@st.com>
+ <c2b73482-ae01-34b5-3c16-b7e63893259e@kernel.org>
+ <b9f59559-c7a8-f575-0868-bd3b149a35c9@st.com>
+ <d64bd76d-a2c6-6148-c126-fa73e96019a1@kernel.org>
+ <79e01c5c-d27c-89ea-4d8f-9e66a6c091e6@st.com>
+Message-ID: <f486bd08-b562-5101-01ba-c8e36ac0d83b@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OF graph is not needed because the panel is a child of dsi. So
-Remove the ports node and move burst and esc clock frequency
-properties to the parent (DSI node).
+On 02/28/2017 09:21 AM, Fabrice Gasnier wrote:
+> On 02/25/2017 04:11 PM, Jonathan Cameron wrote:
+>> On 24/02/17 16:04, Fabrice Gasnier wrote:
+>>> On 02/19/2017 01:09 PM, Jonathan Cameron wrote:
+>>>> On 15/02/17 16:55, Fabrice Gasnier wrote:
+>>>>> Add documentation for 'st,adc-res' dt optional property.
+>>>>>
+>>>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>>>> I'm happy with this, but would like to leave time for a device tree review.
+>>>>
+>>>> Ultimately we may well want to make this a generic property and call it
+>>>> something
+>>>> like adc-resolution but perhaps we need to wait until we have a few more
+>>>> devices
+>>>> supporting setting it via device tree to figure out what the best
+>>>> interface is.
+>>>> It would exactly be a problem to support this as a deprecated binding at
+>>>> that
+>>>> point.
+>>>
+>>> Hi Jonathan,
+>>>
+>>> I agree with you on this... It may be better to have generic property
+>>> for this, especially if you see that it will come in the near future.
+>>> May I suggest this prop to be less restrictive, e.g. like
+>>> resolution-bits as is may also be worth for other device types, e.g.
+>>> DAC as an example ?>
+>> Sure, why not - no loss of meaning here.  We may never use it for anything
+>> else but that doesn't matter.
+> 
+> Hi Jonathan,
+> 
+> Following Rob's comment, how you see such a common property can be
+> integrated. Currently I don't see much devices are doing this.
+> Do you have ideas or preferences on this ?
+> 
+> - Do you think replacing 'st,adc-res' by 'resolution-bits' in current
+> patchset is enough for now ?
 
-Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
----
- arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi | 16 ++--------------
- 1 file changed, 2 insertions(+), 14 deletions(-)
+That name would be a bit confusing. Considering that the devicetree
+describes th capabilities of the hardware this name would suggest that this
+is the resolution supported by the device.
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-index 6ce93a3..77ba238 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos5433-tm2-common.dtsi
-@@ -298,23 +298,11 @@
- 	status = "okay";
- 	vddcore-supply = <&ldo6_reg>;
- 	vddio-supply = <&ldo7_reg>;
-+	samsung,burst-clock-frequency = <512000000>;
-+	samsung,esc-clock-frequency = <16000000>;
- 	samsung,pll-clock-frequency = <24000000>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&te_irq>;
--
--	ports {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		port at 1 {
--			reg = <1>;
--
--			dsi_out: endpoint {
--				samsung,burst-clock-frequency = <512000000>;
--				samsung,esc-clock-frequency = <16000000>;
--			};
--		};
--	};
- };
- 
- &hdmi {
--- 
-1.9.1
+If we want to allow selecting runtime configuration parameters for IIO
+devices from the devicetree we should probably follow the precedence set by
+the clock framework and use properties with the 'assigned-' prefix.
+
+But to be honest I'm not convinced yet that the whole approach of allowing
+runtime configuration parameters to be configured via the devicetree is the
+right approach. Converters and sensors often have a lot of runtime
+configurable parameters, typically we expose them to the application layer
+to allow maximum flexibility. Why is the resolution special in this case and
+should be pre-configured via the devicetree instead?
+
+- Lars
