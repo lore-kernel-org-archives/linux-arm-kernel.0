@@ -1,73 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 28 Feb 2017 14:04:55 +0000
-Subject: [PATCH] ARM: multi_v7_defconfig: enable some newly added crypto
- modules
-In-Reply-To: <68af3dce-14ce-b464-3b75-479759402f8a@nvidia.com>
-References: <1487183412-25261-1-git-send-email-ard.biesheuvel@linaro.org>
- <68af3dce-14ce-b464-3b75-479759402f8a@nvidia.com>
-Message-ID: <CAKv+Gu89zRKXkORpttoOPFw8WUAdJ+mLnGKvqbAYHYUUquPJqg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 28 Feb 2017 08:26:37 -0600
+Subject: [PATCH v2 3/3] media: dt-bindings: vpif: new optional property
+In-Reply-To: <6b392a4a-2de8-9981-ad40-ca7201bf813d@ti.com>
+References: <1487771027-7763-1-git-send-email-bgolaszewski@baylibre.com>
+ <1487771027-7763-4-git-send-email-bgolaszewski@baylibre.com>
+ <20170227225209.26oieqwbafqjga2a@rob-hp-laptop>
+ <6b392a4a-2de8-9981-ad40-ca7201bf813d@ti.com>
+Message-ID: <CAL_JsqLBYqGgOA1GUi9mHT-51D5k96w-N0FiOyF+qPY6BGStzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On 28 February 2017 at 14:01, Jon Hunter <jonathanh@nvidia.com> wrote:
->
-> On 15/02/17 18:30, Ard Biesheuvel wrote:
->> Enable the new accelerated CRC32(C), CRC-T10DIF and ChaCha20 drivers
->> as modules for multi_v7_defconfig builds.
+On Mon, Feb 27, 2017 at 11:36 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On Tuesday 28 February 2017 04:22 AM, Rob Herring wrote:
+>> On Wed, Feb 22, 2017 at 02:43:47PM +0100, Bartosz Golaszewski wrote:
+>>> Add an optional property - enable-gpios - which can be used to specify
+>>> the GPIOs that must be requested to select the vpif functionality.
+>>>
+>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/media/ti,da850-vpif.txt | 7 +++++++
+>>>  1 file changed, 7 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+>>> index df7182a..23c5405 100644
+>>> --- a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+>>> +++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+>>> @@ -13,6 +13,9 @@ Required properties:
+>>>  - reg: physical base address and length of the registers set for the device;
+>>>  - interrupts: should contain IRQ line for the VPIF
+>>>
+>>> +Optional properties:
+>>> +- enable-gpios: phandle of the GPIOs used to select the vpif functionality
 >>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm/configs/multi_v7_defconfig | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
->> index b01a43851294..597e56047747 100644
->> --- a/arch/arm/configs/multi_v7_defconfig
->> +++ b/arch/arm/configs/multi_v7_defconfig
->> @@ -936,6 +936,9 @@ CONFIG_CRYPTO_SHA512_ARM=m
->>  CONFIG_CRYPTO_AES_ARM=m
->>  CONFIG_CRYPTO_AES_ARM_BS=m
->>  CONFIG_CRYPTO_AES_ARM_CE=m
->> +CONFIG_CRYPTO_CHACHA20_NEON=m
->> +CONFIG_CRYPTO_CRC32_ARM_CE=m
->> +CONFIG_CRYPTO_CRCT10DIF_ARM_CE=m
->>  CONFIG_CRYPTO_GHASH_ARM_CE=m
->>  CONFIG_CRYPTO_DEV_ATMEL_AES=m
->>  CONFIG_CRYPTO_DEV_ATMEL_TDES=m
+>> What does this control exactly? The GPIOs belong in the node they are
+>> connected to and having GPIOs routed to this block seems strange.
 >
-> Now these are enabled by default, I see the following error ...
+> The DA850 EVM board implements on-board muxing which lets the video
+> input (via VPIF) to be routed to a TVP5147 (video decoder) for composite
+> input or to a camera header. There are other mux options which use the
+> same VPIF SoC pins (RMII ethernet or character LCD).
 >
-> AS [M]  arch/arm/crypto/crc32-ce-core.o
-> arch/arm/crypto/crc32-ce-core.S: Assembler messages:
-> arch/arm/crypto/crc32-ce-core.S:56: Error: unknown architecture `crc'
+> There is a three-to-eight demux on the board which drives enable signals
+> to buffers letting you choose from these options.
 >
-> arch/arm/crypto/crc32-ce-core.S:138: Error: bad type for scalar -- `vmov dCONSTANTl[0],CRC'
-> arch/arm/crypto/crc32-ce-core.S:300: Error: bad instruction `crc32w r0,r0,r2'
-> arch/arm/crypto/crc32-ce-core.S:300: Error: bad instruction `crc32w r0,r0,r3'
-> arch/arm/crypto/crc32-ce-core.S:300: Error: bad instruction `crc32w r0,r0,r3'
-> arch/arm/crypto/crc32-ce-core.S:300: Error: bad instruction `crc32h r0,r0,r3'
-> arch/arm/crypto/crc32-ce-core.S:300: Error: bad instruction `crc32b r0,r0,r3'
-> arch/arm/crypto/crc32-ce-core.S:300: Error: bad instruction `crc32b r0,r0,r3'
-> arch/arm/crypto/crc32-ce-core.S:300: Error: bad instruction `crc32h r0,r0,r3'
-> arch/arm/crypto/crc32-ce-core.S:305: Error: bad instruction `crc32cw r0,r0,r2'
-> arch/arm/crypto/crc32-ce-core.S:305: Error: bad instruction `crc32cw r0,r0,r3'
-> arch/arm/crypto/crc32-ce-core.S:305: Error: bad instruction `crc32cw r0,r0,r3'
-> arch/arm/crypto/crc32-ce-core.S:305: Error: bad instruction `crc32ch r0,r0,r3'
-> arch/arm/crypto/crc32-ce-core.S:305: Error: bad instruction `crc32cb r0,r0,r3'
-> arch/arm/crypto/crc32-ce-core.S:305: Error: bad instruction `crc32cb r0,r0,r3'
-> arch/arm/crypto/crc32-ce-core.S:305: Error: bad instruction `crc32ch r0,r0,r3'
-> scripts/Makefile.build:395: recipe for target 'arch/arm/crypto/crc32-ce-core.o' failed
-> make[1]: *** [arch/arm/crypto/crc32-ce-core.o] Error 1
->
-> Yes this is with an older toolchain that uses an older assembler (GNU assembler
-> (crosstool-NG linaro-1.13.1-4.7-2013.04-20130415 - Linaro GCC 2013.04) 2.23.1),
-> however, I am curious if older toolchains not supporting the 'crc' arch_extension
-> are deprecated now?
->
+> From your response, it looks like you want the enable-gpios property to
+> be in the TVP5147 or camera node. That does make sense to me.
 
-Hello Jon,
+Well, seems like they should be part of a mux node. I'd suggest you
+look at the video-multiplexer binding under review[1].
 
-This is surprising: this implies that there are toolchain that do
-support the crypto-neon-fp-armv8 FPU type but not the scalar (i.e.,
-non-NEON) CRC instructions. We could easily fix this by adding another
-build time test, I just didn't expect we'd need one
+Though for other non video functions, that would be some sort of board
+level pin mux control. There's a new mux binding too, maybe that would
+work. In any case, it shouldn't be the VPIF driver controlling the
+GPIOs directly.
+
+Rob
+
+[1] https://lkml.org/lkml/2017/1/6/1056
