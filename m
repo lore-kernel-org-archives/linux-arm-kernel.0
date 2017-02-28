@@ -1,94 +1,53 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 28 Feb 2017 23:46:05 +0800
-Subject: [linux-sunxi] [PATCH 2/3] ARM: dts: sun8i: add usb_otg and
- OHCI/EHCI for usbc0 on H3
-In-Reply-To: <20170228152702.42602-2-icenowy@aosc.xyz>
-References: <20170228152702.42602-1-icenowy@aosc.xyz>
- <20170228152702.42602-2-icenowy@aosc.xyz>
-Message-ID: <CAGb2v67fsuhRnGp7X8PDkH_t_gb+gPb6VrY-pVu0B4HhD6d8qA@mail.gmail.com>
+Date: Tue, 28 Feb 2017 23:50:14 +0800
+Subject: [linux-sunxi] Re: [RFC PATCH 4/9] clk: sunxi-ng: support R40 SoC
+In-Reply-To: <20170224002028.miupa6dzefgxbfse@lukather>
+References: <20170222231738.HXRSmi86@smtp1o.mail.yandex.net>
+ <20170224002028.miupa6dzefgxbfse@lukather>
+Message-ID: <CAGb2v66AZK+g3xX4cXd8Q6Ob_+SxpYsxHBEfC9Ec2QsdN4eA9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2017 at 11:27 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> Allwinner H3 have a dual-routed USB PHY0 -- routed to either OHCI/EHCI
-> or MUSB controller.
->
-> Add device nodes for these controllers.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  arch/arm/boot/dts/sun8i-h3.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 36 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> index 27780b97c863..bc9a53edf371 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -206,6 +206,19 @@
->                         #size-cells = <0>;
->                 };
->
-> +               usb_otg: usb at 01c19000 {
-> +                       compatible = "allwinner,sun8i-h3-musb";
-> +                       reg = <0x01c19000 0x0400>;
-> +                       clocks = <&ccu CLK_BUS_OTG>;
-> +                       resets = <&ccu RST_BUS_OTG>;
-> +                       interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
-> +                       interrupt-names = "mc";
-> +                       phys = <&usbphy 0>;
-> +                       phy-names = "usb";
-> +                       extcon = <&usbphy 0>;
-> +                       status = "disabled";
-> +               };
-> +
->                 usbphy: phy at 01c19400 {
->                         compatible = "allwinner,sun8i-h3-usb-phy";
->                         reg = <0x01c19400 0x2c>,
-> @@ -238,6 +251,29 @@
->                         #phy-cells = <1>;
->                 };
->
-> +               ehci0: usb at 01c1a000 {
-> +                       compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
-> +                       reg = <0x01c1a000 0x100>;
-> +                       interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>;
-> +                       resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
-> +                       phys = <&usbphy 0>;
-> +                       phy-names = "usb";
+Hi Icenowy,
 
-So this bit is slightly concerning. IIRC the xHCI drivers power on the phy when
-probed, which means VBUS is _always_ going to be powered on, even when it's
-supposed to be in peripheral mode. You're probably going to need to rework
-either the phy or the musb driver to cope with this.
+On Fri, Feb 24, 2017 at 8:20 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Wed, Feb 22, 2017 at 01:54:58PM +0800, Icenowy Zheng wrote:
+>>
+>> 2017?2?22? 07:03? Maxime Ripard <maxime.ripard@free-electrons.com>???
+>> >
+>> > Hi,
+>> >
+>> > On Sat, Feb 18, 2017 at 01:37:17AM +0800, Icenowy Zheng wrote:
+>> > > Allwinner R40 SoC have a clock controller module in the style of the
+>> > > SoCs beyond sun6i, however, it's more rich and complex.
+>> > >
+>> > > Add support for it.
+>> > >
+>> > > As the user manual is still not available, this driver is made with
+>> > > knowledge from clk-sun8iw11.c in the BSP kernel source.
+>> >
+>> > Missing SoB.
+>> >
+>> > Why are some patches tagged as RFC and some don't?
+>>
+>> There's still no open User Manual for R40, so I tagged CCU-related
+>> drivers RFC.
+>>
+>> Pinctrl driver can be written with the datasheet draft, which is
+>> available now.
+>>
+>> For USB we have never user manual so everything is educated guess --
+>> so it's not RFC.
+>
+> It's still kind of weird to mix and match patches with and without RFC
+> tags.
 
-Or maybe just dropping the phy handle here and letting the musb driver handle
-it would work, but that requires the musb driver be loaded.
+Allwinner just released the docs today. See
+
+    https://github.com/tinalinux/docs/tree/r40-v1.y
+
+Could you check your patches against it, and maybe we don't need the
+RFC tags anymore?
 
 ChenYu
-
-> +                       status = "disabled";
-> +               };
-> +
-> +               ohci0: usb at 01c1a400 {
-> +                       compatible = "allwinner,sun8i-h3-ohci", "generic-ohci";
-> +                       reg = <0x01c1a400 0x100>;
-> +                       interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>,
-> +                                <&ccu CLK_USB_OHCI0>;
-> +                       resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
-> +                       phys = <&usbphy 0>;
-> +                       phy-names = "usb";
-> +                       status = "disabled";
-> +               };
-> +
->                 ehci1: usb at 01c1b000 {
->                         compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
->                         reg = <0x01c1b000 0x100>;
-> --
-> 2.11.1
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
