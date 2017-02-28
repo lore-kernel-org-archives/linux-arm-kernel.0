@@ -1,138 +1,120 @@
-From: jbaron@akamai.com (Jason Baron)
-Date: Tue, 28 Feb 2017 14:34:52 -0500
-Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
-In-Reply-To: <d10e986c-7f6a-3935-88e2-ba39708f79ad@caviumnetworks.com>
-References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
- <f7532548-7007-1a32-f669-4520792805b3@caviumnetworks.com>
- <93219edf-0f6d-5cc7-309c-c998f16fe7ac@akamai.com>
- <aa139c18-1b04-2c20-2e22-89d74503b3cf@caviumnetworks.com>
- <20170227160601.5b79a1fe@gandalf.local.home>
- <6db89a8d-6053-51d1-5fd4-bae0179a5ebd@caviumnetworks.com>
- <20170227170911.2280ca3e@gandalf.local.home>
- <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
- <20170227173630.57fff459@gandalf.local.home>
- <7bd72716-feea-073f-741c-04212ebd0802@caviumnetworks.com>
- <68fe24ea-7795-24d8-211b-9d8a50affe9f@akamai.com>
- <510FF566-011D-4199-86F7-2BB4DBF36434@linux.vnet.ibm.com>
- <20170228112144.65455de5@gandalf.local.home>
- <cdf98840-8d43-2c58-e2f9-75ae8fb8a600@caviumnetworks.com>
- <1de00727-de97-f887-78bd-dd49131cdf61@akamai.com>
- <999e2c3f-698c-703c-67a9-26aea3c97dc0@caviumnetworks.com>
- <d10e986c-7f6a-3935-88e2-ba39708f79ad@caviumnetworks.com>
-Message-ID: <542488db-5c59-afa5-6d1d-a437c87bc613@akamai.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Tue, 28 Feb 2017 12:43:08 -0700
+Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <58B00E12.5020602@arm.com>
+References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
+ <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
+ <58B00E12.5020602@arm.com>
+Message-ID: <ff3aa805-0e03-9854-e294-ff6934c57f3f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello James,
 
 
-On 02/28/2017 02:22 PM, David Daney wrote:
-> On 02/28/2017 11:05 AM, David Daney wrote:
->> On 02/28/2017 10:39 AM, Jason Baron wrote:
->>>
-> [...]
->>>> I suspect that the alignment of the __jump_table section in the .ko
->>>> files is not correct, and you are seeing some sort of problem due to
->>>> that.
->>>>
->>>>
->>>
->>> Hi,
->>>
->>> Yes, if you look at the trace that Sachin sent the module being loaded
->>> that does the WARN_ON() is nfsd.ko.
->>>
->>> That module from Sachin's trace has:
->>>
->>>   [31] __jump_table      PROGBITS        0000000000000000 03fd77 0000c0
->>> 18 WAM  0   0  1
->>
->> The problem is then the section alignment (last column) for power.
->>
->> On mips with no patches applied, we get:
->>
->>   [17] __jump_table      PROGBITS        0000000000000000 00d2c0 000048
->> 00  WA  0   0  8
->>
->> Look, proper alignment!
->>
->> The question I have is why do the power ".llong" and ".long" assembler
->> directives not force section alignment?  Is there an alternative that
->> could be used that would result in the proper alignment?  Would ".word"
->> work?
->>
->> If not, then I would say patch only power with your balign thing. 8-byte
->> alignment for 64-bit kernel, 4-byte alignment for 32-bit kernel
->>
-> 
-> I think the proper fix is either:
-> 
-> A) Modify scripts/module-common.lds to force __jump_table alignment for
-> all architectures.
-> 
-> B) Add arch/powerpc/kernel/module.lds to force __jump_table alignment
-> for powerpc only.
-> 
-> David.
-> 
+On 2/24/2017 3:42 AM, James Morse wrote:
+> On 21/02/17 21:22, Tyler Baicar wrote:
+>> Currently external aborts are unsupported by the guest abort
+>> handling. Add handling for SEAs so that the host kernel reports
+>> SEAs which occur in the guest kernel.
+>> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+>> index e22089f..33a77509 100644
+>> --- a/arch/arm/include/asm/kvm_arm.h
+>> +++ b/arch/arm/include/asm/kvm_arm.h
+>> @@ -187,6 +187,7 @@
+>>   #define FSC_FAULT	(0x04)
+>>   #define FSC_ACCESS	(0x08)
+>>   #define FSC_PERM	(0x0c)
+>> +#define FSC_EXTABT	(0x10)
+> arm64 has ESR_ELx_FSC_EXTABT which is used in inject_abt64(), but for matching
+> an external abort coming from hardware the range is wider.
 >
-
-Ok, I can try adding it to the linger script.
-
-FWIW, here is my before and after with the .balign thing for the nfsd.ko
-module on powperc (using a cross-compiler):
-
-before:
-
-  [31] __jump_table      PROGBITS        0000000000000000 03ee3e 0000f0
-00  WA  0   0  1
-
-after:
-
- [31] __jump_table      PROGBITS        0000000000000000 03ee40 0000f0
-00  WA  0   0  4
+> Looking at the ARM-ARMs 'ISS encoding for an exception from an Instruction
+> Abort' in 'D7.2.27 ESR_ELx, Exception Syndrome Register (ELx)' (page D7-1954 of
+> version 'k'...iss10775), the ten flavours of you Synchronous abort you hooked
+> with do_sea() in patch 4 occupy 0x10 to 0x1f...
+>
+>
+>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>> index a5265ed..04f1dd50 100644
+>> --- a/arch/arm/kvm/mmu.c
+>> +++ b/arch/arm/kvm/mmu.c
+>> @@ -29,6 +29,7 @@
+>>   #include <asm/kvm_asm.h>
+>>   #include <asm/kvm_emulate.h>
+>>   #include <asm/virt.h>
+>> +#include <asm/system_misc.h>
+>>   
+>>   #include "trace.h"
+>>   
+>> @@ -1444,8 +1445,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>   
+>>   	/* Check the stage-2 fault is trans. fault or write fault */
+>>   	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+> ... kvm_vcpu_trap_get_fault_type() on both arm and arm64 masks the HSR/ESR_EL2
+> with 0x3c ...
+>
+>
+>> -	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+>> -	    fault_status != FSC_ACCESS) {
+>> +
+>> +	/* The host kernel will handle the synchronous external abort. There
+>> +	 * is no need to pass the error into the guest.
+>> +	 */
+>> +	if (fault_status == FSC_EXTABT) {
+> ... but here we only check for 'Synchronous external abort, not on a translation
+> table walk'. Are the other types relevant?
+I believe the others should be relevant here as well. I haven't been 
+able to test the other types within a guest though.
+> If so we need some helper as this range is sparse and 'all other values are
+> reserved'. The aarch32 HSR format is slightly different. (G6-4411 ISS encoding
+> from an exception from a Data Abort).
+I can add a helper so that this if statement matches any of the 10 FSC 
+values which are mapped to the do_sea in the host code.
+> If not, can we change patch 4 to check this type too so we don't call out to
+> APEI for a fault type we know isn't relevant.
+>
+>
+>> +		if(handle_guest_sea((unsigned long)fault_ipa,
+>> +				    kvm_vcpu_get_hsr(vcpu))) {
+>> +			kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+>> +				kvm_vcpu_trap_get_class(vcpu),
+>> +				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+>> +				(unsigned long)kvm_vcpu_get_hsr(vcpu));
+>> +			return -EFAULT;
+>> +		}
+>> +	} else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+>> +		   fault_status != FSC_ACCESS) {
+>>   		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+>>   			kvm_vcpu_trap_get_class(vcpu),
+>>   			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index b2d57fc..403277b 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -602,6 +602,24 @@ static const char *fault_name(unsigned int esr)
+>>   }
+>>
+>>   /*
+>> + * Handle Synchronous External Aborts that occur in a guest kernel.
+>> + */
+>> +int handle_guest_sea(unsigned long addr, unsigned int esr)
+>> +{
+>> +	if(IS_ENABLED(HAVE_ACPI_APEI_SEA)) {
+>> +		nmi_enter();
+>> +		ghes_notify_sea();
+>> +		nmi_exit();
+> This nmi stuff was needed for synchronous aborts that may have interrupted
+> APEI's interrupts-masked code. We want to avoid trying to take the same set of
+> locks, hence taking the in_nmi() path through APEI. Here we know we interrupted
+> a guest, so there is no risk that we have interrupted APEI on the host.
+> ghes_notify_sea() can safely take the normal path.
+Makes sense, I can remove the nmi_* calls here.
 
 Thanks,
+Tyler
 
--Jason
-
-
-> 
->>
->>>
->>> So its not the size but rather the start offset '03fd77', that is the
->>> problem here. That is what the WARN_ON triggers on, that the start of
->>> the table is not 4-byte aligned.
->>>
->>> Using a ppc cross-compiler and the ENTSIZE patch that line does not
->>> change, however if I use the initial patch posted in this thread, the
->>> start does align to 4-bytes and thus the warning goes away, as Sachin
->>> verified. In fact, without the patch I found several modules that don't
->>> start at the proper alignment, however with the patch that started this
->>> thread they were all properly aligned.
->>>
->>> In terms of the '.balign' causing holes, we originally added the
->>> '_ASM_ALIGN' to x86 for precisely this reason. See commit:
->>> ef64789 jump label: Add _ASM_ALIGN for x86 and x86_64 and discussion.
->>>
->>> In addition, we have a lot of runtime with the .balign in the tree and
->>> I'm not aware of any holes in the table. I think the code would blow up
->>> pretty badly if there were.
->>>
->>> A number of arches were already using the '.balign', and the patch I
->>> proposed simply added it to remaining ones, now that we added a
->>> WARN_ON() to catch this condition.
->>>
->>> Thanks,
->>>
->>> -Jason
->>>
->>>
->>>
->>>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
