@@ -1,59 +1,86 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 28 Feb 2017 08:26:37 -0600
-Subject: [PATCH v2 3/3] media: dt-bindings: vpif: new optional property
-In-Reply-To: <6b392a4a-2de8-9981-ad40-ca7201bf813d@ti.com>
-References: <1487771027-7763-1-git-send-email-bgolaszewski@baylibre.com>
- <1487771027-7763-4-git-send-email-bgolaszewski@baylibre.com>
- <20170227225209.26oieqwbafqjga2a@rob-hp-laptop>
- <6b392a4a-2de8-9981-ad40-ca7201bf813d@ti.com>
-Message-ID: <CAL_JsqLBYqGgOA1GUi9mHT-51D5k96w-N0FiOyF+qPY6BGStzA@mail.gmail.com>
+From: peter.senna@collabora.com (Peter Senna Tschudin)
+Date: Tue, 28 Feb 2017 15:28:09 +0100
+Subject: [PATCH V2 0/4] megachips-stdpxxxx-ge-b850v3-fw
+Message-ID: <cover.1488287639.git.peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2017 at 11:36 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On Tuesday 28 February 2017 04:22 AM, Rob Herring wrote:
->> On Wed, Feb 22, 2017 at 02:43:47PM +0100, Bartosz Golaszewski wrote:
->>> Add an optional property - enable-gpios - which can be used to specify
->>> the GPIOs that must be requested to select the vpif functionality.
->>>
->>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>> ---
->>>  Documentation/devicetree/bindings/media/ti,da850-vpif.txt | 7 +++++++
->>>  1 file changed, 7 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
->>> index df7182a..23c5405 100644
->>> --- a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
->>> +++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
->>> @@ -13,6 +13,9 @@ Required properties:
->>>  - reg: physical base address and length of the registers set for the device;
->>>  - interrupts: should contain IRQ line for the VPIF
->>>
->>> +Optional properties:
->>> +- enable-gpios: phandle of the GPIOs used to select the vpif functionality
->>
->> What does this control exactly? The GPIOs belong in the node they are
->> connected to and having GPIOs routed to this block seems strange.
->
-> The DA850 EVM board implements on-board muxing which lets the video
-> input (via VPIF) to be routed to a TVP5147 (video decoder) for composite
-> input or to a camera header. There are other mux options which use the
-> same VPIF SoC pins (RMII ethernet or character LCD).
->
-> There is a three-to-eight demux on the board which drives enable signals
-> to buffers letting you choose from these options.
->
-> From your response, it looks like you want the enable-gpios property to
-> be in the TVP5147 or camera node. That does make sense to me.
+The video processing pipeline on the second output on the GE B850v3:
 
-Well, seems like they should be part of a mux node. I'd suggest you
-look at the video-multiplexer binding under review[1].
+  Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
 
-Though for other non video functions, that would be some sort of board
-level pin mux control. There's a new mux binding too, maybe that would
-work. In any case, it shouldn't be the VPIF driver controlling the
-GPIOs directly.
+Each bridge has a dedicated flash containing firmware for supporting the
+custom design. The result is that in this design neither the STDP4028
+nor the STDP2690 behave as the stock bridges would. The compatible
+strings include the suffix "-ge-b850v3-fw" to make it clear that the
+driver is for the bridges with the firmware which is specific for the GE
+B850v3.
 
-Rob
+The driver is powerless to control the video processing pipeline, as the
+two bridges behaves as a single one. The driver is only needed for
+telling the host about EDID / HPD, and for giving the host powers to ack
+interrupts.
 
-[1] https://lkml.org/lkml/2017/1/6/1056
+Changes from V1:
+ - Fix bindings documentation
+ - Fix white space issues on the driver
+ - Improved ge_b850v3_lvds_remove() to not rely on ge_b850v3_lvds_ptr->edid
+
+Changes from V7(was GE B850v3 LVDS/DP++ Bridge):
+ - New devicetree binding with one node per bridge, and two ports per bridge
+ - Two i2c_devices, one per bridge
+ - Removed uneeded mutexes
+ - Moved documentation to bindings/display/bridge
+ - Included test for EDID extension blocks
+ - Renamed bridge pointer to ge_b850v3_lvds_ptr
+ - Removed the call to drm_helper_hpd_irq_event()
+ - Removed assignments to bridge.driver_private
+
+Changes from V6:
+ - Removed check for pixel clock as the bridge supports up to 330Mhz while the
+   host is limited to 264 MHz in very specific conditions.
+ - Added a second mutex to avoid concurrency issues while acking interrupts
+   from threaded interrupt handlers.
+ - Renamed the edid mutex to be more descriptive.
+ - Added a .detach() function that disables the interrupts.
+ - Adopted i2c_new_secondary_device() and updated the dts and documentation to
+   match the new method.
+ - Removed useless test to drm_bridge_add()
+ - Did some refactoring around devm_request_threaded_irq()
+ - Added a missing call to i2c_unregister_device() on the i2c_driver.remove()
+   function.
+
+Changes from V5:
+ - Change to MAINTAINERS in a separate patch
+ - Reworked interrupt handler initialization
+ - Removed useless calls to: drm_connector_register(),
+   drm_helper_hpd_irq_event(), and drm_bridge_enable()
+
+Changes from V4:
+ - Renamed the i2c_driver.name from "ge,b850v3-lvds-dp" to "b850v3-lvds-dp" to
+   remove the comma from the driver name
+
+Changes from V3:
+ - Removed the patch that was configuring the mapping between IPUs and external
+   displays on the dts file
+
+Peter Senna Tschudin (4):
+  dt-bindings: display: megachips-stdpxxxx-ge-b850v3-fw
+  MAINTAINERS: Add entry for megachips-stdpxxxx-ge-b850v3-fw
+  drm/bridge: Drivers for megachips-stdpxxxx-ge-b850v3-fw (LVDS-DP++)
+  dts/imx6q-b850v3: Use megachips-stdpxxxx-ge-b850v3-fw bridges
+    (LVDS-DP++)
+
+ .../bridge/megachips-stdpxxxx-ge-b850v3-fw.txt     |  94 +++++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ MAINTAINERS                                        |   8 +
+ arch/arm/boot/dts/imx6q-b850v3.dts                 |  68 ++++
+ drivers/gpu/drm/bridge/Kconfig                     |  11 +
+ drivers/gpu/drm/bridge/Makefile                    |   1 +
+ .../drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c   | 411 +++++++++++++++++++++
+ 7 files changed, 594 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/megachips-stdpxxxx-ge-b850v3-fw.txt
+ create mode 100644 drivers/gpu/drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c
+
+-- 
+2.9.3
