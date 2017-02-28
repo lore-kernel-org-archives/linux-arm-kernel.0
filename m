@@ -1,30 +1,36 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 28 Feb 2017 12:29:25 -0800
-Subject: [PATCH] soc: bcm: brcmstb: Match additional compatible strings
-In-Reply-To: <20170215004159.11096-1-florian.fainelli@broadcom.com>
-References: <20170215004159.11096-1-florian.fainelli@broadcom.com>
-Message-ID: <3df8fb67-1809-3781-6f7b-b1057b137f40@gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 28 Feb 2017 14:30:33 -0600
+Subject: [PATCH] [v2][for 4.11]tty: acpi/spcr: QDF2400 E44 checks for wrong
+ OEM revision
+Message-ID: <1488313833-12430-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/14/2017 04:41 PM, Florian Fainelli wrote:
-> From: Florian Fainelli <f.fainelli@gmail.com>
-> 
-> Match all known sun-top-ctrl compatible strings from our MIPS chips
-> counterparts. This allows us to properly report the SoC information to
-> user-space through our SoC driver.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+For Qualcomm Technologies QDF2400 SOCs that are affected by erratum E44,
+the ACPI oem_revision field is actually set to 1, not 0.
 
-Applied.
+Fixes: d8a4995bcea1 ("tty: pl011: Work around QDF2400 E44 stuck BUSY bit")
 
-> ---
-> Ralf, James,
-> 
-> I usually take patches touching this file through an ARM SoC pull request,
-> posting to linux-mips for people working on BMIPS STB to get a chance to review
-> this.
-> 
-> Thanks!
+Tested-by: Manoj Iyer <manoj.iyer@canonical.com>
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ drivers/acpi/spcr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
+index 2b5d0fa..2051a8c 100644
+--- a/drivers/acpi/spcr.c
++++ b/drivers/acpi/spcr.c
+@@ -30,7 +30,7 @@ static bool qdf2400_erratum_44_present(struct acpi_table_header *h)
+ 		return true;
+ 
+ 	if (!memcmp(h->oem_table_id, "QDF2400 ", ACPI_OEM_TABLE_ID_SIZE) &&
+-			h->oem_revision == 0)
++			h->oem_revision == 1)
+ 		return true;
+ 
+ 	return false;
 -- 
-Florian
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
