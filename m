@@ -1,114 +1,59 @@
 From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 28 Feb 2017 17:14:59 -0600
-Subject: [PATCH] arm64: dts: allwinner: add support for Pinebook
-In-Reply-To: <20170225070032.35834-1-icenowy@aosc.xyz>
-References: <20170225070032.35834-1-icenowy@aosc.xyz>
-Message-ID: <CAL_JsqJ_Z+1gG1A7wRB16ApyY0=xkkjRNDkGPMAhVx3gF6PwcA@mail.gmail.com>
+Date: Tue, 28 Feb 2017 17:20:07 -0600
+Subject: [PATCH 1/2] dts: arm64: add LS1043A DPAA support
+In-Reply-To: <1485787387-12410-2-git-send-email-madalin.bucur@nxp.com>
+References: <1485787387-12410-1-git-send-email-madalin.bucur@nxp.com>
+ <1485787387-12410-2-git-send-email-madalin.bucur@nxp.com>
+Message-ID: <CAL_Jsq+RnafS-sM=-NSUK1oXEEPrX4oU-x3qMjcFJpwKBGqPnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Feb 25, 2017 at 1:00 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> Pinebook is a A64-based laptop produced by Pine64, with the following
-> peripherals:
->
-> USB:
-> - Two external USB ports (one is directly connected to A64's OTG
-> controller, the other is under a internal hub connected to the host-only
-> controller.)
-> - USB HID keyboard and touchpad connected to the internal hub.
-> - USB UVC camera connected to the internal hub.
->
-> Power-related:
-> - A DC IN jack connected to AXP803's DCIN pin.
-> - A Li-Polymer battery connected to AXP803's battery pins.
->
-> Storage:
-> - An eMMC by Foresee on the main board (in the product revision of the
-> main board it's designed to be switchable).
-> - An external MicroSD card slot.
->
-> Display:
-> - An eDP LCD panel (1366x768) connected via an ANX6345/ANX9807 RGB-eDP
-> bridge.
-> - A mini HDMI jack.
->
-> Misc:
-> - A Hall sensor designed to detect the status of lid, connected to GPIO PH10.
-> - A headphone jack connected to the SoC's internal codec.
-> - A BMA223 gravity sensor connected to the SoC's I2C1 bus. (Not
-> supported yet)
-> - A debug UART port muxed with one of the USB ports, only available on
-> product revision of the main board.
->
-> This commit adds basical support for it, with out-of-tree patches for
-> display support the laptop can be basically usable.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+On Mon, Jan 30, 2017 at 8:43 AM, Madalin Bucur <madalin.bucur@nxp.com> wrote:
+> Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
 > ---
->  arch/arm64/boot/dts/allwinner/Makefile             |   1 +
->  .../boot/dts/allwinner/sun50i-a64-pinebook.dts     | 123 +++++++++++++++++++++
->  2 files changed, 124 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
->
-> diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-> index bc6f342be59f..893520c39955 100644
-> --- a/arch/arm64/boot/dts/allwinner/Makefile
-> +++ b/arch/arm64/boot/dts/allwinner/Makefile
-> @@ -1,4 +1,5 @@
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
-> +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pinebook.dtb
->  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
->
->  always         := $(dtb-y)
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+
+[...]
+
+> diff --git a/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi b/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
 > new file mode 100644
-> index 000000000000..2dceba3132b0
+> index 0000000..cfe6c58
 > --- /dev/null
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-> @@ -0,0 +1,123 @@
+> +++ b/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
+> @@ -0,0 +1,93 @@
 > +/*
-> + * Copyright (c) 2016 ARM Ltd.
+> + * QorIQ BMan Portal device tree stub for 9 portals
 > + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
+> + * Copyright 2011-2016 Freescale Semiconductor Inc.
 > + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
+> + * Redistribution and use in source and binary forms, with or without
+> + * modification, are permitted provided that the following conditions are met:
+> + *     * Redistributions of source code must retain the above copyright
+> + *      notice, this list of conditions and the following disclaimer.
+> + *     * Redistributions in binary form must reproduce the above copyright
+> + *      notice, this list of conditions and the following disclaimer in the
+> + *      documentation and/or other materials provided with the distribution.
+> + *     * Neither the name of Freescale Semiconductor nor the
+> + *      names of its contributors may be used to endorse or promote products
+> + *      derived from this software without specific prior written permission.
 > + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
 > + *
-> + * Or, alternatively,
+> + * ALTERNATIVELY, this software may be distributed under the terms of the
+> + * GNU General Public License ("GPL") as published by the Free Software
+> + * Foundation, either version 2 of that License or (at your option) any
+> + * later version.
 > + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + * THIS SOFTWARE IS PROVIDED BY Freescale Semiconductor ``AS IS'' AND ANY
+> + * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+> + * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+> + * DISCLAIMED. IN NO EVENT SHALL Freescale Semiconductor BE LIABLE FOR ANY
+> + * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+> + * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+> + * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+> + * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> + * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+> + * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+> + */
 
 Use SPDX tags here:
 
-SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-
-While it says X11, this is really MIT license text.
+SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
