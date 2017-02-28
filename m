@@ -1,52 +1,125 @@
-From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
-Date: Tue, 28 Feb 2017 09:59:29 +0000
-Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
- bcm2835<=>IC<=>cs42xx8
-In-Reply-To: <20170227115108.GA6732@delle.lan>
-References: <8cf68a3e-330d-e76d-e276-5df5453e3baf@flatmax.org>
- <20170226144958.GA5543@camel2.lan>
- <732a71ac-5ec5-37e1-1190-be036ea34555@flatmax.org>
- <20170226221648.GA10974@camel2.lan>
- <7cef41ee-ef00-22b7-830f-517a9d594ed0@flatmax.org>
- <20170227080433.GA2718@delle.lan>
- <170950f7-354f-e6a9-cefb-834a00fadd1b@flatmax.org>
- <20170227103024.GF2718@delle.lan>
- <7b78c782-28e1-4849-5d00-8caf30847d5c@flatmax.org>
- <20170227115108.GA6732@delle.lan>
-Message-ID: <20170228095929.GH2742@localhost.localdomain>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 28 Feb 2017 10:04:20 +0000
+Subject: [PATCH] arm64: dump: hide kernel pointers
+In-Reply-To: <CAKv+Gu_AG0n5jPDCuUD6tvr2sAz9a4sycDy9CtL4iT+OHiN_iQ@mail.gmail.com>
+References: <1488265536-20441-1-git-send-email-miles.chen@mediatek.com>
+ <CAKv+Gu_AG0n5jPDCuUD6tvr2sAz9a4sycDy9CtL4iT+OHiN_iQ@mail.gmail.com>
+Message-ID: <20170228100420.GA3691@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2017 at 12:51:08PM +0100, Matthias Reichl wrote:
-> On Mon, Feb 27, 2017 at 10:21:25PM +1100, Matt Flax wrote:
-> > 
-> > 
-> > On 27/02/17 21:30, Matthias Reichl wrote:
-> > >
-> > >I don't see that. Some people might want to be able to use multichannel
-> > >on RPi, but that's something very different than adding code that just
-> > >lies about driver capabilites.
-> > >
-> > 
-> > I am going to invite you over for dinner to eat steamed vegetables :)
-> > If I make the steamed vegetables in the microwave and they taste like
-> > steamed vegetables, are they steamed vegetables ?
-> 
-> If you connect an amplifier with a volume control to your soundcard
-> does that mean that your soundcard now has a volume control? No, your
-> amp has.
-> 
-> > I have a bcm2835 (Pi 2 and 3) SoC here. It is producing multichannel (8 out,
-> > 6 in) audio. In ALSA we call that DSP mode - right ?!
-> 
-> No. DSP modes are protocol/timing specifications as I2S, PDP, S/PDIF, ...
-> You can look these up in datasheets and if a chip implements such a
-> protocol you can be sure that it adheres to that standard - i.e. it
-> will sync the frames to the pulses on LRclk.
-> 
+On Tue, Feb 28, 2017 at 08:42:51AM +0000, Ard Biesheuvel wrote:
+> (+ Mark)
 
-I agree with the thoughts in this thread really if the AP doesn't
-actually support DSP A mode we shouldn't add DSP A mode.
+(+ Laura)
+
+> On 28 February 2017 at 07:05, Miles Chen <miles.chen@mediatek.com> wrote:
+> > Mask kernel pointers of /sys/kernel/debug/kernel_page_tables entry like
+> > /proc/vmallocinfo does.
+> >
+> > With sysctl kernel.kptr_restrict=0 or 1:
+> > cat /sys/kernel/debug/kernel_page_tables
+> 
+> I wonder if this file should be accessible at all if kptr_restrict > 0
+
+I don't have strong feelings either way.
+
+This isn't typically enabled, and it's under debugfs, so this shouldn't
+be accessible by a typical user anyhow.
+
+That said, there are very few of us who need to take a look at this
+file. I'm happy to deal with attacking kptr_restrict when required.
 
 Thanks,
-Charles
+Mark.
+
+> > ---[ Modules start ]---
+> > ---[ Modules end ]---
+> > ---[ vmalloc() Area ]---
+> > ffffff8008000000-ffffff8008010000          64K PTE       RW NX SHD AF...
+> > ffffff8008015000-ffffff8008016000           4K PTE       RW NX SHD AF...
+> > ffffff8008020000-ffffff8008030000          64K PTE       RW NX SHD AF...
+> > ffffff8008031000-ffffff8008071000         256K PTE       RW NX SHD AF...
+> > ffffff8008080000-ffffff8008200000        1536K PTE       ro x  SHD AF...
+> > ffffff8008200000-ffffff8008400000           2M PMD       ro x  SHD AF...
+> > ffffff8008400000-ffffff8008540000        1280K PTE       ro x  SHD AF...
+> > ffffff8008540000-ffffff8008690000        1344K PTE       ro NX SHD AF...
+> > ffffff8008940000-ffffff8008a10000         832K PTE       RW NX SHD AF...
+> > ffffff8008aca000-ffffff8008acd000          12K PTE       RW NX SHD AF...
+> > ffffffbebffd8000-ffffffbebffdb000          12K PTE       RW NX SHD AF...
+> > ---[ vmalloc() End ]---
+> > ---[ Fixmap start ]---
+> > ffffffbefe800000-ffffffbefea00000           2M PMD       ro NX SHD AF...
+> > ---[ Fixmap end ]---
+> > ---[ PCI I/O start ]---
+> > ---[ PCI I/O end ]---
+> > ---[ Linear Mapping ]---
+> > ffffffc000000000-ffffffc000080000         512K PTE       RW NX SHD AF...
+> > ffffffc000080000-ffffffc000200000        1536K PTE       ro NX SHD AF...
+> > ffffffc000200000-ffffffc000600000           4M PMD       ro NX SHD AF...
+> > ffffffc000600000-ffffffc000690000         576K PTE       ro NX SHD AF...
+> > ffffffc000690000-ffffffc000800000        1472K PTE       RW NX SHD AF...
+> > ffffffc000800000-ffffffc002000000          24M PMD       RW NX SHD AF...
+> > ffffffc002000000-ffffffc040000000         992M PMD       RW NX SHD AF...
+> > ffffffc040000000-ffffffc080000000           1G PGD       RW NX SHD AF...
+> >
+> > With sysctl kernel.kptr_restrict=2:
+> > cat /sys/kernel/debug/kernel_page_tables
+> > ---[ Modules start ]---
+> > ---[ Modules end ]---
+> > ---[ vmalloc() Area ]---
+> > 0000000000000000-0000000000000000          64K PTE       RW NX SHD AF...
+> > 0000000000000000-0000000000000000           4K PTE       RW NX SHD AF...
+> > 0000000000000000-0000000000000000          64K PTE       RW NX SHD AF...
+> > 0000000000000000-0000000000000000         256K PTE       RW NX SHD AF...
+> > 0000000000000000-0000000000000000        1536K PTE       ro x  SHD AF...
+> > 0000000000000000-0000000000000000           2M PMD       ro x  SHD AF...
+> > 0000000000000000-0000000000000000        1280K PTE       ro x  SHD AF...
+> > 0000000000000000-0000000000000000        1344K PTE       ro NX SHD AF...
+> > 0000000000000000-0000000000000000         832K PTE       RW NX SHD AF...
+> > 0000000000000000-0000000000000000          12K PTE       RW NX SHD AF...
+> > 0000000000000000-0000000000000000          12K PTE       RW NX SHD AF...
+> > ---[ vmalloc() End ]---
+> > ---[ Fixmap start ]---
+> > 0000000000000000-0000000000000000           2M PMD       ro NX SHD AF...
+> > ---[ Fixmap end ]---
+> > ---[ PCI I/O start ]---
+> > ---[ PCI I/O end ]---
+> > ---[ Linear Mapping ]---
+> > 0000000000000000-0000000000000000         512K PTE       RW NX SHD AF...
+> > 0000000000000000-0000000000000000        1536K PTE       ro NX SHD AF...
+> > 0000000000000000-0000000000000000           4M PMD       ro NX SHD AF...
+> > 0000000000000000-0000000000000000         576K PTE       ro NX SHD AF...
+> > 0000000000000000-0000000000000000        1472K PTE       RW NX SHD AF...
+> > 0000000000000000-0000000000000000          24M PMD       RW NX SHD AF...
+> > 0000000000000000-0000000000000000         992M PMD       RW NX SHD AF...
+> > 0000000000000000-0000000000000000           1G PGD       RW NX SHD AF...
+> >
+> > Signed-off-by: Miles Chen <miles.chen@mediatek.com>
+> > ---
+> >  arch/arm64/mm/dump.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+> > index ca74a2a..e055ecf 100644
+> > --- a/arch/arm64/mm/dump.c
+> > +++ b/arch/arm64/mm/dump.c
+> > @@ -253,8 +253,8 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
+> >                 if (st->current_prot) {
+> >                         note_prot_uxn(st, addr);
+> >                         note_prot_wx(st, addr);
+> > -                       pt_dump_seq_printf(st->seq, "0x%016lx-0x%016lx   ",
+> > -                                  st->start_address, addr);
+> > +                       pt_dump_seq_printf(st->seq, "%pK-%pK   ",
+> > +                                  (void *)st->start_address, (void *)addr);
+> >
+> >                         delta = (addr - st->start_address) >> 10;
+> >                         while (!(delta & 1023) && unit[1]) {
+> > --
+> > 1.9.1
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
