@@ -1,16 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 28 Feb 2017 08:50:54 -0800
-Subject: [PATCH] ARM: dts: am335x-pcm953: Fix legacy wakeup source binding
-In-Reply-To: <1486729747-4604-1-git-send-email-t.remmet@phytec.de>
-References: <1486729747-4604-1-git-send-email-t.remmet@phytec.de>
-Message-ID: <20170228165054.GU21809@atomide.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Tue, 28 Feb 2017 17:51:16 +0100
+Subject: [PATCH v3 3/6] dt-bindings: iio: document interrupt trigger support
+In-Reply-To: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
+References: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1488300679-3259-4-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Teresa Remmet <t.remmet@phytec.de> [170210 04:31]:
-> Replaced the legacy binding "gpio-key,wakeup" with "wakeup-source" as
-> noted in the kernel documentation.
+Document interrupt trigger that takes a generic interrupt, and
+can be used as trigger source for sampling devices such as sensors,
+ADCs...
 
-Applying this finally into omap-for-v4.11/fixes thanks.
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ .../bindings/iio/trigger/iio-trig-interrupt.txt    | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/trigger/iio-trig-interrupt.txt
 
-Tony
+diff --git a/Documentation/devicetree/bindings/iio/trigger/iio-trig-interrupt.txt b/Documentation/devicetree/bindings/iio/trigger/iio-trig-interrupt.txt
+new file mode 100644
+index 0000000..9de9856
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/trigger/iio-trig-interrupt.txt
+@@ -0,0 +1,22 @@
++Interrupt based trigger
++
++Any internal or external interrupt may be used as trigger source for
++devices like sensors, ADCs... As an example, external signal can be
++routed to a GPIO, and turned into an interrupt driven trigger.
++
++Required properties:
++- compatible: Should be "interrupt-trigger"
++- interrupts: The interrupt used as trigger. Generic interrupt client node as
++  described in ../../interrupt-controller/interrupts.txt
++
++Optional properties:
++- #io-trigger-cells = <0>; See the IIO bindings, IIO trigger providers
++  and consumers sections in ../iio-bindings.txt
++
++Example:
++	trig0: interrupt-trigger0 {
++		#io-trigger-cells = <0>;
++		compatible = "interrupt-trigger";
++		interrupts = <11 0>;
++		interrupt-parent = <&gpioa>;
++	}
+-- 
+1.9.1
