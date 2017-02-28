@@ -1,118 +1,105 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed, 01 Mar 2017 01:58:33 +0800
-Subject: [PATCH 5/9] dmaengine: sun6i: support V3s SoC variant
-In-Reply-To: <20170228175604.kdlmjjcncfljnbfp@lukather>
-References: <20170225123029.55939-1-icenowy@aosc.xyz>
- <20170225123029.55939-5-icenowy@aosc.xyz>
- <20170227075021.e7e43o54s23jzfto@lukather>
- <1426971488192481@web6g.yandex.ru> <20170228175604.kdlmjjcncfljnbfp@lukather>
-Message-ID: <535111488304713@web26h.yandex.ru>
+Date: Wed, 01 Mar 2017 02:55:21 +0800
+Subject: [linux-sunxi] [PATCH 1/5] pinctrl: sunxi: refactor pinctrl choice
+ selecting for ARM64
+In-Reply-To: <488811a1-b64f-c435-e919-7f83dc107697@arm.com>
+References: <20170228172444.59655-1-icenowy@aosc.xyz>
+ <488811a1-b64f-c435-e919-7f83dc107697@arm.com>
+Message-ID: <345321488308121@web2g.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-01.03.2017, 01:56, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> On Mon, Feb 27, 2017 at 06:48:01PM +0800, Icenowy Zheng wrote:
->> ?27.02.2017, 15:50, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
->> ?> On Sat, Feb 25, 2017 at 08:30:25PM +0800, Icenowy Zheng wrote:
->> ?>> ?Allwinner V3s has a DMA engine similar to the ones from A31, but with
->> ?>> ?fewer channels and DRQs.
->> ?>>
->> ?>> ?Add support for it.
->> ?>>
->> ?>> ?As it also needs the special gate bit, make the gate bit generic.
->> ?>
->> ?> That should be part of a separate patch.
->>
->> ?OK.
->>
->> ?>
->> ?>> ?According to BSP source code, SUN8IW6 (A83T) also needs the bit, so it
->> ?>> ?have also been specified gate_needed property.
->> ?>>
->> ?>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?>> ?---
->> ?>> ??Documentation/devicetree/bindings/dma/sun6i-dma.txt | 1 +
->> ?>> ??drivers/dma/sun6i-dma.c | 17 ++++++++++++++---
->> ?>> ??2 files changed, 15 insertions(+), 3 deletions(-)
->> ?>>
->> ?>> ?diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
->> ?>> ?index 6b267045f522..98fbe1a5c6dd 100644
->> ?>> ?--- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
->> ?>> ?+++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
->> ?>> ?@@ -9,6 +9,7 @@ Required properties:
->> ?>> ????????????????????"allwinner,sun8i-a23-dma"
->> ?>> ????????????????????"allwinner,sun8i-a83t-dma"
->> ?>> ????????????????????"allwinner,sun8i-h3-dma"
->> ?>> ?+ "allwinner,sun8i-v3s-dma"
->> ?>> ??- reg: Should contain the registers base address and length
->> ?>> ??- interrupts: Should contain a reference to the interrupt used by this device
->> ?>> ??- clocks: Should contain a reference to the parent AHB clock
->> ?>> ?diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
->> ?>> ?index a2358780ab2c..1f38424c1b14 100644
->> ?>> ?--- a/drivers/dma/sun6i-dma.c
->> ?>> ?+++ b/drivers/dma/sun6i-dma.c
->> ?>> ?@@ -101,6 +101,7 @@ struct sun6i_dma_config {
->> ?>> ??????????u32 nr_max_channels;
->> ?>> ??????????u32 nr_max_requests;
->> ?>> ??????????u32 nr_max_vchans;
->> ?>> ?+ bool gate_needed;
->> ?>> ??};
->> ?>>
->> ?>> ??/*
->> ?>> ?@@ -1009,12 +1010,14 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
->> ?>> ??????????.nr_max_channels = 8,
->> ?>> ??????????.nr_max_requests = 24,
->> ?>> ??????????.nr_max_vchans = 37,
->> ?>> ?+ .gate_needed = true,
->> ?>> ??};
->> ?>>
->> ?>> ??static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
->> ?>> ??????????.nr_max_channels = 8,
->> ?>> ??????????.nr_max_requests = 28,
->> ?>> ??????????.nr_max_vchans = 39,
->> ?>> ?+ .gate_needed = true,
->> ?>> ??};
->> ?>>
->> ?>> ??/*
->> ?>> ?@@ -1028,11 +1031,19 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
->> ?>> ??????????.nr_max_vchans = 34,
->> ?>> ??};
->> ?>>
->> ?>> ?+static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
->> ?>> ?+ .nr_max_channels = 8,
->> ?>> ?+ .nr_max_requests = 23,
->> ?>> ?+ .nr_max_vchans = 24,
->> ?>
->> ?> This one is suspicious. There's just a single endpoint that can be
->> ?> used in both directions?
->>
->> ?nr_max_vchans is the endpoint number. nr_max_requests is the
->> ?maximum DRQ number, for V3s, according to the datasheet, it's
->> ?23: SPI0_{R,T}X.
+01.03.2017, 02:15, "Andre Przywara" <andre.przywara@arm.com>:
+> Hi Icenowy,
 >
-> There's not a lot of endpoints indeed, but you need 28 vchans (2 *
-> 14).
+> (first thing: could you create your series with --cover-letter and fill
+> this in? There you could explain what this series is about and also
+> state things like dependencies from other patches and the commit that
+> you based that on.)
+>
+> On 28/02/17 17:24, Icenowy Zheng wrote:
+>> ?ARM64 Allwinner SoCs used to have every pinctrl driver selected in
+>> ?ARCH_SUNXI. Change this to make their default value to (ARM64 &&
+>> ?ARCH_SUNXI).
+>>
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>
+> Overall this is a nice solution. Thanks for posting this.
+>
+>> ?---
+>> ??drivers/pinctrl/sunxi/Kconfig | 9 +++++----
+>> ??1 file changed, 5 insertions(+), 4 deletions(-)
+>>
+>> ?diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+>> ?index 816015cf7053..92325736d953 100644
+>> ?--- a/drivers/pinctrl/sunxi/Kconfig
+>> ?+++ b/drivers/pinctrl/sunxi/Kconfig
+>> ?@@ -48,8 +48,9 @@ config PINCTRL_SUN8I_H3
+>> ??????????select PINCTRL_SUNXI
+>>
+>> ??config PINCTRL_SUN8I_H3_R
+>> ?- def_bool MACH_SUN8I
+>> ?- select PINCTRL_SUNXI_COMMON
+>> ?+ def_bool MACH_SUN8I || (ARM64 && ARCH_SUNXI)
+>> ?+ depends on RESET_CONTROLLER
+>
+> So this looks a bit odd. I take it this is for the extra reset register
+> in the PRCM block.
+> 1) I don't think this belongs into this patch. If this has been
+> forgotten in the past, please make an extra patch for this. It's cheap
+> to do so ;-)
+> 2) Is this really a "depends on"? Shouldn't this be a select? With
+> sunxi_ng clocks we don't need the reset controller for the normal
+> peripherals anymore, so this option might not be selected by default in
+> the future. And having this "depends on" leads to the PINCTRL_ option
+> being hidden if RESET_CONTROLLER isn't selected.
+> I think this bites us already in arm64, where ARCH_HAS_RESET_CONTROLLER
+> is not enabled for ARCH_SUNXI.
 
-Sorry but I counted only 12 pairs of vchans:
-Port 0. SRAM
-Port 1. SDRAM
-Port 6. UART0
-Port 7. UART1
-Port 8. UART2
-Port 15. Audio Codec
-Port 16. CE
-Port 17. OTG EP1
-Port 18. OTG EP2
-Port 19. OTG EP3
-Port 20. OTG EP4
-Port 23. SPI0
+PINCTRL_ options are always hidden now, Maxime, do you
+want to change that?
+
+We should enable ARCH_HAS_RESET_CONTROLLER for
+ARCH_SUNXI, as sunxi-ng ccu is a reset controller.
+
+Without RESET_CONTROLLER enabled, errors will occur
+when linking:
+```
+drivers/built-in.o: In function `sunxi_ccu_probe':
+of_reserved_mem.c:(.text+0x16058): undefined reference to `reset_controller_register'
+```
+
+If you don't care, I will make it an additional patch.
+
+And there's really a reset line for the R_PIO pinctrls.
+
+But you're right, this line shouldn't occur in this patch.
+I will make a more patch for it.
 
 >
-> Maxime
+> But as the rest of the patch is fine, if you remove this line:
+> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 >
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> Cheers,
+> Andre.
+>
+>> ?+ select PINCTRL_SUNXI
+>>
+>> ??config PINCTRL_SUN8I_V3S
+>> ??????????def_bool MACH_SUN8I
+>> ?@@ -65,11 +66,11 @@ config PINCTRL_SUN9I_A80_R
+>> ??????????select PINCTRL_SUNXI
+>>
+>> ??config PINCTRL_SUN50I_A64
+>> ?- bool
+>> ?+ def_bool ARM64 && ARCH_SUNXI
+>> ??????????select PINCTRL_SUNXI
+>>
+>> ??config PINCTRL_SUN50I_H5
+>> ?- bool
+>> ?+ def_bool ARM64 && ARCH_SUNXI
+>> ??????????select PINCTRL_SUNXI
+>>
+>> ??endif
