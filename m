@@ -1,40 +1,27 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Tue, 28 Feb 2017 21:48:50 +0100
-Subject: [PATCH 1/2] ARM: dts: bcm5301x: Add TWD WD Support to DT
-In-Reply-To: <CAC3K-4rCp3K8FDRQOoL5fG+pwM_H6UpKvQWqrNpysgAss--Xcg@mail.gmail.com>
-References: <1488313886-17155-1-git-send-email-jon.mason@broadcom.com>
- <1488313886-17155-2-git-send-email-jon.mason@broadcom.com>
- <CACna6rw1oeUn=QuD-c+X8uokypSEqXUP3yqmiMEK2wgMD-ENeQ@mail.gmail.com>
- <CAC3K-4rCp3K8FDRQOoL5fG+pwM_H6UpKvQWqrNpysgAss--Xcg@mail.gmail.com>
-Message-ID: <CACna6rzX=6MpcuQ8iPa_bLCf6f0UGO0hsHyD1X2pn=s6p=SA7Q@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 28 Feb 2017 12:53:57 -0800
+Subject: [PATCH] ARM: dts: BCM5301X: Relicense DTS files I created to the
+ ISC
+In-Reply-To: <20170128115135.6841-1-zajec5@gmail.com>
+References: <20170128115135.6841-1-zajec5@gmail.com>
+Message-ID: <e45a4d0c-b458-db57-d941-e0613b2fdeb1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 February 2017 at 21:46, Jon Mason <jon.mason@broadcom.com> wrote:
-> On Tue, Feb 28, 2017 at 3:43 PM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
->> On 28 February 2017 at 21:31, Jon Mason <jon.mason@broadcom.com> wrote:
->>> @@ -70,10 +70,19 @@
->>>                         clocks = <&periph_clk>;
->>>                 };
->>>
->>> -               local-timer at 20600 {
->>> +               timer at 20600 {
->>
->> Is there a reason for this rename? I don't really have preference for
->> any name, it's just we shouldn't keep renaming this depending of
->> personal preferences.
->>
->> It also doesn't seem like adjusting to any schema:
->> bcm63138.dtsi uses local-timer at 1e600
->> bcm-nsp.dtsi uses twd-timer at 20600
->> berlin2cd.dtsi uses local-timer at ad0600
->> berlin2.dtsi uses local-timer at ad0600
->> berlin2q.dtsi uses local-timer at ad0600
->
-> This was a suggestion from Sergei Shtylyov
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/395160.html
+On 01/28/2017 03:51 AM, Rafa? Mi?ecki wrote:
+> From: Rafa? Mi?ecki <rafal@milecki.pl>
+> 
+> It's preferred to have DT source files licensed under BSD compatible
+> license. All new BCM5301X DTS files use ISC so let's also relicense old
+> ones to it.
+> 
+> Except for me only Hauke was ever touched these files in his commit
+> 9faa5960eef3 ("ARM: BCM5301X: add NAND flash chip description") and
+> commit bb1d8fba1965 ("ARM: BCM5301X: add NAND flash chip description for
+> Asus RT-AC87U").
+> 
+> Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Good to know, thanks!
-
+Applied, thanks!
 -- 
-Rafa?
+Florian
