@@ -1,32 +1,53 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 28 Feb 2017 06:14:16 +0100
-Subject: [PATCH 0/4] rockchip: fix serial output on rk3036
-Message-ID: <20170228051420.7214-1-heiko@sntech.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 28 Feb 2017 11:06:38 +0530
+Subject: [PATCH v2 3/3] media: dt-bindings: vpif: new optional property
+In-Reply-To: <20170227225209.26oieqwbafqjga2a@rob-hp-laptop>
+References: <1487771027-7763-1-git-send-email-bgolaszewski@baylibre.com>
+ <1487771027-7763-4-git-send-email-bgolaszewski@baylibre.com>
+ <20170227225209.26oieqwbafqjga2a@rob-hp-laptop>
+Message-ID: <6b392a4a-2de8-9981-ad40-ca7201bf813d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Recent changes to the 8250-dw variant revealed issues concerning
-how the clock rates are handled on the rk3036 uart.
+On Tuesday 28 February 2017 04:22 AM, Rob Herring wrote:
+> On Wed, Feb 22, 2017 at 02:43:47PM +0100, Bartosz Golaszewski wrote:
+>> Add an optional property - enable-gpios - which can be used to specify
+>> the GPIOs that must be requested to select the vpif functionality.
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> ---
+>>  Documentation/devicetree/bindings/media/ti,da850-vpif.txt | 7 +++++++
+>>  1 file changed, 7 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+>> index df7182a..23c5405 100644
+>> --- a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+>> +++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+>> @@ -13,6 +13,9 @@ Required properties:
+>>  - reg: physical base address and length of the registers set for the device;
+>>  - interrupts: should contain IRQ line for the VPIF
+>>  
+>> +Optional properties:
+>> +- enable-gpios: phandle of the GPIOs used to select the vpif functionality
+> 
+> What does this control exactly? The GPIOs belong in the node they are 
+> connected to and having GPIOs routed to this block seems strange.
 
-For one, there was an error in the clock declaration, but also the
-shared uart-pll-select-mux also as default got supplied from the apll
-that also supplies the cpu and thus gets frequency scaled.
+The DA850 EVM board implements on-board muxing which lets the video
+input (via VPIF) to be routed to a TVP5147 (video decoder) for composite
+input or to a camera header. There are other mux options which use the
+same VPIF SoC pins (RMII ethernet or character LCD).
 
-The patches in this series remedy this and make the debug uart
-function again on 4.10 + current merge window.
+There is a three-to-eight demux on the board which drives enable signals
+to buffers letting you choose from these options.
 
+>From your response, it looks like you want the enable-gpios property to
+be in the TVP5147 or camera node. That does make sense to me.
 
-Heiko Stuebner (4):
-  clk: rockchip: add "," to mux_pll_src_apll_dpll_gpll_usb480m_p on
-    rk3036
-  clk: rockchip: add SCLK_UARTPLL to rk3036 clock ids
-  clk: rockchip: assign the SCLK_UARTPLL clock id on rk3036
-  ARM: dts: rockchip: Make uartpll a child of the gpll on rk3036
+>
+> There are inputs or outputs?
 
- arch/arm/boot/dts/rk3036.dtsi          | 5 +++--
- drivers/clk/rockchip/clk-rk3036.c      | 4 ++--
- include/dt-bindings/clock/rk3036-cru.h | 1 +
- 3 files changed, 6 insertions(+), 4 deletions(-)
+These GPIOs are driving a 3-to-8 demux so they are all outputs.
 
--- 
-2.11.0
+Thanks,
+Sekhar
