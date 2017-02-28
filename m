@@ -1,105 +1,52 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed, 01 Mar 2017 02:55:21 +0800
-Subject: [linux-sunxi] [PATCH 1/5] pinctrl: sunxi: refactor pinctrl choice
- selecting for ARM64
-In-Reply-To: <488811a1-b64f-c435-e919-7f83dc107697@arm.com>
+Date: Wed, 01 Mar 2017 02:57:20 +0800
+Subject: [linux-sunxi] [PATCH 2/5] arm64: only select PINCTRL_SUNXI for
+ Allwinner platforms
+In-Reply-To: <c878ba53-a33a-e042-2d65-11f86a47b844@arm.com>
 References: <20170228172444.59655-1-icenowy@aosc.xyz>
- <488811a1-b64f-c435-e919-7f83dc107697@arm.com>
-Message-ID: <345321488308121@web2g.yandex.ru>
+ <20170228172444.59655-2-icenowy@aosc.xyz>
+ <c878ba53-a33a-e042-2d65-11f86a47b844@arm.com>
+Message-ID: <608421488308240@web22h.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-01.03.2017, 02:15, "Andre Przywara" <andre.przywara@arm.com>:
-> Hi Icenowy,
->
-> (first thing: could you create your series with --cover-letter and fill
-> this in? There you could explain what this series is about and also
-> state things like dependencies from other patches and the commit that
-> you based that on.)
+01.03.2017, 02:17, "Andre Przywara" <andre.przywara@arm.com>:
+> Hi,
 >
 > On 28/02/17 17:24, Icenowy Zheng wrote:
->> ?ARM64 Allwinner SoCs used to have every pinctrl driver selected in
->> ?ARCH_SUNXI. Change this to make their default value to (ARM64 &&
->> ?ARCH_SUNXI).
+>> ?As the pinctrl driver selecting is refactored in Kconfig file of
+>> ?pinctrl-sunxi, now we can select only PINCTRL_SUNXI for Allwinner
+>> ?platform, and the default value of several pinctrl drivers useful on
+>> ?ARM64 Allwinner SoCs will become Y.
+>>
+>> ?Drop the select of per-SoC pinctrl choices, but select PINCTRL_SUNXI.
 >>
 >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->
-> Overall this is a nice solution. Thanks for posting this.
->
 >> ?---
->> ??drivers/pinctrl/sunxi/Kconfig | 9 +++++----
->> ??1 file changed, 5 insertions(+), 4 deletions(-)
+>> ??arch/arm64/Kconfig.platforms | 2 +-
+>> ??1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> ?diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
->> ?index 816015cf7053..92325736d953 100644
->> ?--- a/drivers/pinctrl/sunxi/Kconfig
->> ?+++ b/drivers/pinctrl/sunxi/Kconfig
->> ?@@ -48,8 +48,9 @@ config PINCTRL_SUN8I_H3
->> ??????????select PINCTRL_SUNXI
->>
->> ??config PINCTRL_SUN8I_H3_R
->> ?- def_bool MACH_SUN8I
->> ?- select PINCTRL_SUNXI_COMMON
->> ?+ def_bool MACH_SUN8I || (ARM64 && ARCH_SUNXI)
->> ?+ depends on RESET_CONTROLLER
+>> ?diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+>> ?index 129cc5ae4091..f6db2a938b1e 100644
+>> ?--- a/arch/arm64/Kconfig.platforms
+>> ?+++ b/arch/arm64/Kconfig.platforms
+>> ?@@ -4,7 +4,7 @@ config ARCH_SUNXI
+>> ??????????bool "Allwinner sunxi 64-bit SoC Family"
+>> ??????????select GENERIC_IRQ_CHIP
+>> ??????????select PINCTRL
+>> ?- select PINCTRL_SUN50I_A64
+>> ?+ select PINCTRL_SUNXI
 >
-> So this looks a bit odd. I take it this is for the extra reset register
-> in the PRCM block.
-> 1) I don't think this belongs into this patch. If this has been
-> forgotten in the past, please make an extra patch for this. It's cheap
-> to do so ;-)
-> 2) Is this really a "depends on"? Shouldn't this be a select? With
-> sunxi_ng clocks we don't need the reset controller for the normal
-> peripherals anymore, so this option might not be selected by default in
-> the future. And having this "depends on" leads to the PINCTRL_ option
-> being hidden if RESET_CONTROLLER isn't selected.
-> I think this bites us already in arm64, where ARCH_HAS_RESET_CONTROLLER
-> is not enabled for ARCH_SUNXI.
-
-PINCTRL_ options are always hidden now, Maxime, do you
-want to change that?
-
-We should enable ARCH_HAS_RESET_CONTROLLER for
-ARCH_SUNXI, as sunxi-ng ccu is a reset controller.
-
-Without RESET_CONTROLLER enabled, errors will occur
-when linking:
-```
-drivers/built-in.o: In function `sunxi_ccu_probe':
-of_reserved_mem.c:(.text+0x16058): undefined reference to `reset_controller_register'
-```
-
-If you don't care, I will make it an additional patch.
-
-And there's really a reset line for the R_PIO pinctrls.
-
-But you're right, this line shouldn't occur in this patch.
-I will make a more patch for it.
-
->
-> But as the rest of the patch is fine, if you remove this line:
-> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+> Why do we need to add this generic PINCTRL_SUNXI here? This is selected
+> already by the SoC specific PINCTRL symbols (see your previous patch).
 >
 > Cheers,
 > Andre.
+
+Oh yes... You're right...
+
 >
->> ?+ select PINCTRL_SUNXI
->>
->> ??config PINCTRL_SUN8I_V3S
->> ??????????def_bool MACH_SUN8I
->> ?@@ -65,11 +66,11 @@ config PINCTRL_SUN9I_A80_R
->> ??????????select PINCTRL_SUNXI
->>
->> ??config PINCTRL_SUN50I_A64
->> ?- bool
->> ?+ def_bool ARM64 && ARCH_SUNXI
->> ??????????select PINCTRL_SUNXI
->>
->> ??config PINCTRL_SUN50I_H5
->> ?- bool
->> ?+ def_bool ARM64 && ARCH_SUNXI
->> ??????????select PINCTRL_SUNXI
->>
->> ??endif
+>> ??????????help
+>> ????????????This enables support for Allwinner sunxi based SoCs like the A64.
