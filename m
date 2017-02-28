@@ -1,7 +1,7 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 28 Feb 2017 11:22:18 -0800
+From: jbaron@akamai.com (Jason Baron)
+Date: Tue, 28 Feb 2017 14:34:52 -0500
 Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
-In-Reply-To: <999e2c3f-698c-703c-67a9-26aea3c97dc0@caviumnetworks.com>
+In-Reply-To: <d10e986c-7f6a-3935-88e2-ba39708f79ad@caviumnetworks.com>
 References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
  <f7532548-7007-1a32-f669-4520792805b3@caviumnetworks.com>
  <93219edf-0f6d-5cc7-309c-c998f16fe7ac@akamai.com>
@@ -18,95 +18,121 @@ References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
  <cdf98840-8d43-2c58-e2f9-75ae8fb8a600@caviumnetworks.com>
  <1de00727-de97-f887-78bd-dd49131cdf61@akamai.com>
  <999e2c3f-698c-703c-67a9-26aea3c97dc0@caviumnetworks.com>
-Message-ID: <d10e986c-7f6a-3935-88e2-ba39708f79ad@caviumnetworks.com>
+ <d10e986c-7f6a-3935-88e2-ba39708f79ad@caviumnetworks.com>
+Message-ID: <542488db-5c59-afa5-6d1d-a437c87bc613@akamai.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2017 11:05 AM, David Daney wrote:
-> On 02/28/2017 10:39 AM, Jason Baron wrote:
+
+
+On 02/28/2017 02:22 PM, David Daney wrote:
+> On 02/28/2017 11:05 AM, David Daney wrote:
+>> On 02/28/2017 10:39 AM, Jason Baron wrote:
+>>>
+> [...]
+>>>> I suspect that the alignment of the __jump_table section in the .ko
+>>>> files is not correct, and you are seeing some sort of problem due to
+>>>> that.
+>>>>
+>>>>
+>>>
+>>> Hi,
+>>>
+>>> Yes, if you look at the trace that Sachin sent the module being loaded
+>>> that does the WARN_ON() is nfsd.ko.
+>>>
+>>> That module from Sachin's trace has:
+>>>
+>>>   [31] __jump_table      PROGBITS        0000000000000000 03fd77 0000c0
+>>> 18 WAM  0   0  1
 >>
-[...]
->>> I suspect that the alignment of the __jump_table section in the .ko
->>> files is not correct, and you are seeing some sort of problem due to
->>> that.
+>> The problem is then the section alignment (last column) for power.
+>>
+>> On mips with no patches applied, we get:
+>>
+>>   [17] __jump_table      PROGBITS        0000000000000000 00d2c0 000048
+>> 00  WA  0   0  8
+>>
+>> Look, proper alignment!
+>>
+>> The question I have is why do the power ".llong" and ".long" assembler
+>> directives not force section alignment?  Is there an alternative that
+>> could be used that would result in the proper alignment?  Would ".word"
+>> work?
+>>
+>> If not, then I would say patch only power with your balign thing. 8-byte
+>> alignment for 64-bit kernel, 4-byte alignment for 32-bit kernel
+>>
+> 
+> I think the proper fix is either:
+> 
+> A) Modify scripts/module-common.lds to force __jump_table alignment for
+> all architectures.
+> 
+> B) Add arch/powerpc/kernel/module.lds to force __jump_table alignment
+> for powerpc only.
+> 
+> David.
+> 
+>
+
+Ok, I can try adding it to the linger script.
+
+FWIW, here is my before and after with the .balign thing for the nfsd.ko
+module on powperc (using a cross-compiler):
+
+before:
+
+  [31] __jump_table      PROGBITS        0000000000000000 03ee3e 0000f0
+00  WA  0   0  1
+
+after:
+
+ [31] __jump_table      PROGBITS        0000000000000000 03ee40 0000f0
+00  WA  0   0  4
+
+Thanks,
+
+-Jason
+
+
+> 
+>>
+>>>
+>>> So its not the size but rather the start offset '03fd77', that is the
+>>> problem here. That is what the WARN_ON triggers on, that the start of
+>>> the table is not 4-byte aligned.
+>>>
+>>> Using a ppc cross-compiler and the ENTSIZE patch that line does not
+>>> change, however if I use the initial patch posted in this thread, the
+>>> start does align to 4-bytes and thus the warning goes away, as Sachin
+>>> verified. In fact, without the patch I found several modules that don't
+>>> start at the proper alignment, however with the patch that started this
+>>> thread they were all properly aligned.
+>>>
+>>> In terms of the '.balign' causing holes, we originally added the
+>>> '_ASM_ALIGN' to x86 for precisely this reason. See commit:
+>>> ef64789 jump label: Add _ASM_ALIGN for x86 and x86_64 and discussion.
+>>>
+>>> In addition, we have a lot of runtime with the .balign in the tree and
+>>> I'm not aware of any holes in the table. I think the code would blow up
+>>> pretty badly if there were.
+>>>
+>>> A number of arches were already using the '.balign', and the patch I
+>>> proposed simply added it to remaining ones, now that we added a
+>>> WARN_ON() to catch this condition.
+>>>
+>>> Thanks,
+>>>
+>>> -Jason
+>>>
+>>>
 >>>
 >>>
 >>
->> Hi,
 >>
->> Yes, if you look at the trace that Sachin sent the module being loaded
->> that does the WARN_ON() is nfsd.ko.
->>
->> That module from Sachin's trace has:
->>
->>   [31] __jump_table      PROGBITS        0000000000000000 03fd77 0000c0
->> 18 WAM  0   0  1
->
-> The problem is then the section alignment (last column) for power.
->
-> On mips with no patches applied, we get:
->
->   [17] __jump_table      PROGBITS        0000000000000000 00d2c0 000048
-> 00  WA  0   0  8
->
-> Look, proper alignment!
->
-> The question I have is why do the power ".llong" and ".long" assembler
-> directives not force section alignment?  Is there an alternative that
-> could be used that would result in the proper alignment?  Would ".word"
-> work?
->
-> If not, then I would say patch only power with your balign thing. 8-byte
-> alignment for 64-bit kernel, 4-byte alignment for 32-bit kernel
->
-
-I think the proper fix is either:
-
-A) Modify scripts/module-common.lds to force __jump_table alignment for 
-all architectures.
-
-B) Add arch/powerpc/kernel/module.lds to force __jump_table alignment 
-for powerpc only.
-
-David.
-
-
-
->
->>
->> So its not the size but rather the start offset '03fd77', that is the
->> problem here. That is what the WARN_ON triggers on, that the start of
->> the table is not 4-byte aligned.
->>
->> Using a ppc cross-compiler and the ENTSIZE patch that line does not
->> change, however if I use the initial patch posted in this thread, the
->> start does align to 4-bytes and thus the warning goes away, as Sachin
->> verified. In fact, without the patch I found several modules that don't
->> start at the proper alignment, however with the patch that started this
->> thread they were all properly aligned.
->>
->> In terms of the '.balign' causing holes, we originally added the
->> '_ASM_ALIGN' to x86 for precisely this reason. See commit:
->> ef64789 jump label: Add _ASM_ALIGN for x86 and x86_64 and discussion.
->>
->> In addition, we have a lot of runtime with the .balign in the tree and
->> I'm not aware of any holes in the table. I think the code would blow up
->> pretty badly if there were.
->>
->> A number of arches were already using the '.balign', and the patch I
->> proposed simply added it to remaining ones, now that we added a
->> WARN_ON() to catch this condition.
->>
->> Thanks,
->>
->> -Jason
->>
->>
->>
->>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
