@@ -1,110 +1,49 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed, 01 Mar 2017 00:07:48 +0800
-Subject: [linux-sunxi] [PATCH 2/3] ARM: dts: sun8i: add usb_otg and
- OHCI/EHCI for usbc0 on H3
-In-Reply-To: <CAGb2v67fsuhRnGp7X8PDkH_t_gb+gPb6VrY-pVu0B4HhD6d8qA@mail.gmail.com>
-References: <20170228152702.42602-1-icenowy@aosc.xyz>
- <20170228152702.42602-2-icenowy@aosc.xyz>
- <CAGb2v67fsuhRnGp7X8PDkH_t_gb+gPb6VrY-pVu0B4HhD6d8qA@mail.gmail.com>
-Message-ID: <59571488298068@web6j.yandex.ru>
+Date: Wed,  1 Mar 2017 01:24:40 +0800
+Subject: [PATCH 1/5] pinctrl: sunxi: refactor pinctrl choice selecting for
+ ARM64
+Message-ID: <20170228172444.59655-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ARM64 Allwinner SoCs used to have every pinctrl driver selected in
+ARCH_SUNXI. Change this to make their default value to (ARM64 &&
+ARCH_SUNXI).
 
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ drivers/pinctrl/sunxi/Kconfig | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-28.02.2017, 23:46, "Chen-Yu Tsai" <wens@csie.org>:
-> On Tue, Feb 28, 2017 at 11:27 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
->> ?Allwinner H3 have a dual-routed USB PHY0 -- routed to either OHCI/EHCI
->> ?or MUSB controller.
->>
->> ?Add device nodes for these controllers.
->>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?---
->> ??arch/arm/boot/dts/sun8i-h3.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->> ??1 file changed, 36 insertions(+)
->>
->> ?diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
->> ?index 27780b97c863..bc9a53edf371 100644
->> ?--- a/arch/arm/boot/dts/sun8i-h3.dtsi
->> ?+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
->> ?@@ -206,6 +206,19 @@
->> ?????????????????????????#size-cells = <0>;
->> ?????????????????};
->>
->> ?+ usb_otg: usb at 01c19000 {
->> ?+ compatible = "allwinner,sun8i-h3-musb";
->> ?+ reg = <0x01c19000 0x0400>;
->> ?+ clocks = <&ccu CLK_BUS_OTG>;
->> ?+ resets = <&ccu RST_BUS_OTG>;
->> ?+ interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
->> ?+ interrupt-names = "mc";
->> ?+ phys = <&usbphy 0>;
->> ?+ phy-names = "usb";
->> ?+ extcon = <&usbphy 0>;
->> ?+ status = "disabled";
->> ?+ };
->> ?+
->> ?????????????????usbphy: phy at 01c19400 {
->> ?????????????????????????compatible = "allwinner,sun8i-h3-usb-phy";
->> ?????????????????????????reg = <0x01c19400 0x2c>,
->> ?@@ -238,6 +251,29 @@
->> ?????????????????????????#phy-cells = <1>;
->> ?????????????????};
->>
->> ?+ ehci0: usb at 01c1a000 {
->> ?+ compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
->> ?+ reg = <0x01c1a000 0x100>;
->> ?+ interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
->> ?+ clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>;
->> ?+ resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
->> ?+ phys = <&usbphy 0>;
->> ?+ phy-names = "usb";
->
-> So this bit is slightly concerning. IIRC the xHCI drivers power on the phy when
-> probed, which means VBUS is _always_ going to be powered on, even when it's
-> supposed to be in peripheral mode. You're probably going to need to rework
-> either the phy or the musb driver to cope with this.
->
-> Or maybe just dropping the phy handle here and letting the musb driver handle
-> it would work, but that requires the musb driver be loaded.
-
-Tested this solution.
-
-I may choose it in the next version.
-
-Hans, how do you think of this solution?
-
->
-> ChenYu
->
->> ?+ status = "disabled";
->> ?+ };
->> ?+
->> ?+ ohci0: usb at 01c1a400 {
->> ?+ compatible = "allwinner,sun8i-h3-ohci", "generic-ohci";
->> ?+ reg = <0x01c1a400 0x100>;
->> ?+ interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
->> ?+ clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>,
->> ?+ <&ccu CLK_USB_OHCI0>;
->> ?+ resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
->> ?+ phys = <&usbphy 0>;
->> ?+ phy-names = "usb";
->> ?+ status = "disabled";
->> ?+ };
->> ?+
->> ?????????????????ehci1: usb at 01c1b000 {
->> ?????????????????????????compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
->> ?????????????????????????reg = <0x01c1b000 0x100>;
->> ?--
->> ?2.11.1
->>
->> ?--
->> ?You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->> ?To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> ?For more options, visit https://groups.google.com/d/optout.
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+index 816015cf7053..92325736d953 100644
+--- a/drivers/pinctrl/sunxi/Kconfig
++++ b/drivers/pinctrl/sunxi/Kconfig
+@@ -48,8 +48,9 @@ config PINCTRL_SUN8I_H3
+ 	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN8I_H3_R
+-	def_bool MACH_SUN8I
+-	select PINCTRL_SUNXI_COMMON
++	def_bool MACH_SUN8I || (ARM64 && ARCH_SUNXI)
++	depends on RESET_CONTROLLER
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN8I_V3S
+ 	def_bool MACH_SUN8I
+@@ -65,11 +66,11 @@ config PINCTRL_SUN9I_A80_R
+ 	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN50I_A64
+-	bool
++	def_bool ARM64 && ARCH_SUNXI
+ 	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN50I_H5
+-	bool
++	def_bool ARM64 && ARCH_SUNXI
+ 	select PINCTRL_SUNXI
+ 
+ endif
+-- 
+2.11.1
