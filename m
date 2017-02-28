@@ -1,82 +1,61 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 28 Feb 2017 18:17:30 +0000
-Subject: [linux-sunxi] [PATCH 1/5] pinctrl: sunxi: refactor pinctrl choice
- selecting for ARM64
-In-Reply-To: <20170228172444.59655-1-icenowy@aosc.xyz>
-References: <20170228172444.59655-1-icenowy@aosc.xyz>
-Message-ID: <488811a1-b64f-c435-e919-7f83dc107697@arm.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 28 Feb 2017 10:16:45 -0800
+Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
+In-Reply-To: <20170228112144.65455de5@gandalf.local.home>
+References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
+ <f7532548-7007-1a32-f669-4520792805b3@caviumnetworks.com>
+ <93219edf-0f6d-5cc7-309c-c998f16fe7ac@akamai.com>
+ <aa139c18-1b04-2c20-2e22-89d74503b3cf@caviumnetworks.com>
+ <20170227160601.5b79a1fe@gandalf.local.home>
+ <6db89a8d-6053-51d1-5fd4-bae0179a5ebd@caviumnetworks.com>
+ <20170227170911.2280ca3e@gandalf.local.home>
+ <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
+ <20170227173630.57fff459@gandalf.local.home>
+ <7bd72716-feea-073f-741c-04212ebd0802@caviumnetworks.com>
+ <68fe24ea-7795-24d8-211b-9d8a50affe9f@akamai.com>
+ <510FF566-011D-4199-86F7-2BB4DBF36434@linux.vnet.ibm.com>
+ <20170228112144.65455de5@gandalf.local.home>
+Message-ID: <cdf98840-8d43-2c58-e2f9-75ae8fb8a600@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Icenowy,
+On 02/28/2017 08:21 AM, Steven Rostedt wrote:
+> On Tue, 28 Feb 2017 10:25:46 +0530
+> Sachin Sant <sachinp@linux.vnet.ibm.com> wrote:
+>
+>> File: ./net/ipv4/xfrm4_input.o
+>>   [12] __jump_table      PROGBITS        0000000000000000 000639 000018 18 WAM  0   0  1
+>> File: ./net/ipv4/udplite.o
+>> File: ./net/ipv4/xfrm4_output.o
+>>   [ 9] __jump_table      PROGBITS        0000000000000000 000481 000018 18 WAM  0   0  1
+>
+> Looks like there's some issues right there.
 
-(first thing: could you create your series with --cover-letter and fill
-this in? There you could explain what this series is about and also
-state things like dependencies from other patches and the commit that
-you based that on.)
+Those look good to me 18/18 = 1 with no remainder.  The odd numbers are 
+the offset of the section in the ELF file.
 
-On 28/02/17 17:24, Icenowy Zheng wrote:
-> ARM64 Allwinner SoCs used to have every pinctrl driver selected in
-> ARCH_SUNXI. Change this to make their default value to (ARM64 &&
-> ARCH_SUNXI).
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+If you look at the stack trace, it seems that it is during module loading.
 
-Overall this is a nice solution. Thanks for posting this.
+Are the primitives for generating the tables doing something different 
+for the module case?  I am not familiar enough with the powerpc ABIs to 
+know.
 
-> ---
->  drivers/pinctrl/sunxi/Kconfig | 9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
-> index 816015cf7053..92325736d953 100644
-> --- a/drivers/pinctrl/sunxi/Kconfig
-> +++ b/drivers/pinctrl/sunxi/Kconfig
-> @@ -48,8 +48,9 @@ config PINCTRL_SUN8I_H3
->  	select PINCTRL_SUNXI
->  
->  config PINCTRL_SUN8I_H3_R
-> -	def_bool MACH_SUN8I
-> -	select PINCTRL_SUNXI_COMMON
-> +	def_bool MACH_SUN8I || (ARM64 && ARCH_SUNXI)
-> +	depends on RESET_CONTROLLER
+Try this:
 
-So this looks a bit odd. I take it this is for the extra reset register
-in the PRCM block.
-1) I don't think this belongs into this patch. If this has been
-forgotten in the past, please make an extra patch for this. It's cheap
-to do so ;-)
-2) Is this really a "depends on"? Shouldn't this be a select? With
-sunxi_ng clocks we don't need the reset controller for the normal
-peripherals anymore, so this option might not be selected by default in
-the future. And having this "depends on" leads to the PINCTRL_ option
-being hidden if RESET_CONTROLLER isn't selected.
-I think this bites us already in arm64, where ARCH_HAS_RESET_CONTROLLER
-is not enabled for ARCH_SUNXI.
+$ perl -n -e 's/\[ /\[/; my @f = split " "; print hex($f[5]) % 0x18 if 
+$#f > 5; print $_' <~/jump_table.log
 
 
-But as the rest of the patch is fine, if you remove this line:
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+There are no entries with size that is not a multiple of 0x18.
 
-Cheers,
-Andre.
+I think my patch to add the ENTSIZE is not doing anything here.
 
-> +	select PINCTRL_SUNXI
->  
->  config PINCTRL_SUN8I_V3S
->  	def_bool MACH_SUN8I
-> @@ -65,11 +66,11 @@ config PINCTRL_SUN9I_A80_R
->  	select PINCTRL_SUNXI
->  
->  config PINCTRL_SUN50I_A64
-> -	bool
-> +	def_bool ARM64 && ARCH_SUNXI
->  	select PINCTRL_SUNXI
->  
->  config PINCTRL_SUN50I_H5
-> -	bool
-> +	def_bool ARM64 && ARCH_SUNXI
->  	select PINCTRL_SUNXI
->  
->  endif
-> 
+I suspect that the alignment of the __jump_table section in the .ko 
+files is not correct, and you are seeing some sort of problem due to that.
+
+
+
+
+>
+> -- Steve
+>
