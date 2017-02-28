@@ -1,125 +1,151 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 28 Feb 2017 10:04:20 +0000
-Subject: [PATCH] arm64: dump: hide kernel pointers
-In-Reply-To: <CAKv+Gu_AG0n5jPDCuUD6tvr2sAz9a4sycDy9CtL4iT+OHiN_iQ@mail.gmail.com>
-References: <1488265536-20441-1-git-send-email-miles.chen@mediatek.com>
- <CAKv+Gu_AG0n5jPDCuUD6tvr2sAz9a4sycDy9CtL4iT+OHiN_iQ@mail.gmail.com>
-Message-ID: <20170228100420.GA3691@leverpostej>
+From: yannick.fertre@st.com (Yannick FERTRE)
+Date: Tue, 28 Feb 2017 10:07:22 +0000
+Subject: [PATCH v2 4/9] dt-bindings: Add Ampire AM-480272H3TMQW-T01H panel
+In-Reply-To: <CAL_JsqLqNzpV1pjz3bX1gowHwJzsKKA=17aD5Ce18sy1B_V-0g@mail.gmail.com>
+References: <1486738489-22154-1-git-send-email-yannick.fertre@st.com>
+ <1486738489-22154-5-git-send-email-yannick.fertre@st.com>
+ <20170216023408.apqukipi5zzkrk7j@rob-hp-laptop>
+ <2b409ff7-54fe-4110-6495-1cc54585e5e2@st.com>
+ <CAL_JsqLBZ0DGP62yGb2GjNZMto9hWce_HWNCX5iWhbrnE3ae_Q@mail.gmail.com>
+ <0036d551-91bc-9f3f-22a9-9dac2cf3527c@st.com>
+ <CAL_JsqLqNzpV1pjz3bX1gowHwJzsKKA=17aD5Ce18sy1B_V-0g@mail.gmail.com>
+Message-ID: <c759770a-f250-7502-4ad1-c2fbb001cf92@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2017 at 08:42:51AM +0000, Ard Biesheuvel wrote:
-> (+ Mark)
 
-(+ Laura)
 
-> On 28 February 2017 at 07:05, Miles Chen <miles.chen@mediatek.com> wrote:
-> > Mask kernel pointers of /sys/kernel/debug/kernel_page_tables entry like
-> > /proc/vmallocinfo does.
-> >
-> > With sysctl kernel.kptr_restrict=0 or 1:
-> > cat /sys/kernel/debug/kernel_page_tables
-> 
-> I wonder if this file should be accessible at all if kptr_restrict > 0
+On 02/24/2017 03:06 PM, Rob Herring wrote:
+> On Fri, Feb 24, 2017 at 2:18 AM, Yannick FERTRE <yannick.fertre@st.com> wrote:
+>>
+>>
+>> On 02/21/2017 03:07 PM, Rob Herring wrote:
+>>> On Mon, Feb 20, 2017 at 5:01 AM, Yannick FERTRE <yannick.fertre@st.com> wrote:
+>>>>
+>>>>
+>>>> On 02/16/2017 03:34 AM, Rob Herring wrote:
+>>>>> On Fri, Feb 10, 2017 at 03:54:44PM +0100, Yannick Fertre wrote:
+>>>>>> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+>>>>>> ---
+>>>>>>  .../bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt         | 7 +++++++
+>>>>>>  1 file changed, 7 insertions(+)
+>>>>>>  create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+>>>>>> new file mode 100644
+>>>>>> index 0000000..f59e3c4
+>>>>>> --- /dev/null
+>>>>>> +++ b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+>>>>>> @@ -0,0 +1,7 @@
+>>>>>> +Ampire AM-480272H3TMQW-T01H 4.3" WQVGA TFT LCD panel
+>>>>>> +
+>>>>>> +Required properties:
+>>>>>> +- compatible: should be "ampire,am-480272h3tmqw-t01h"
+>>>>>
+>>>>> No GPIO controls or power supply for this panel?
+>>>>>
+>>>>> Rob
+>>>>>
+>>>>
+>>>> Hi Rob,
+>>>> thank for your reply.
+>>>> There is no gpio or power supply control for this panel with the eval
+>>>> board stm429x9i.
+>>>
+>>> You need to describe what the panel has, not what you have control of
+>>> or not on a particular board.
+>>
+>> Yes, I don't have to describe control on a particular board. This
+>> binding contains few lines. This compatible is used by panel-simple to
+>> get only timings. Other staff like gpio or power-suypply is well managed
+>> by panel-simple itself.
+>>
+>> This binding is similar to these bindings & not required more details:
+>
+> Finding bad examples is not an argument. And yes, lots went in before
+> we started being more particular in reviews, but now I want to see
+> power supplies and control lines accurately described. Next week,
+> there may be additional requirements.
+>
+> This is no different than clock or interrupt bindings. We don't just
+> say "uses clock/interrupt binding" in binding docs. You have to
+> explicitly state how many clocks/interrupts and their order.
+>
+>
+>>    -ampire,am-480272h3tmqw-t01h.txt,ampire,am800480r3tmqwa1h.txt,
+>>    -auo,b080uan01.txt,auo,b101aw03.txt,auo,b101ean01.txt,
+>>    -auo,b101xtn01.txt,auo,b116xw03.txt,auo,b133htn01.txt,
+>>    -auo,b133xtn01.txt,auo,g133han01.txt,auo,g185han01.txt,
+>>    -auo,t215hvn01.txt,avic,tm070ddh03.txt,
+>>    -boe,tv080wum-nl0.txt,chunghwa,claa070wp03xg.txt,
+>>    -chunghwa,claa101wa01a.txt,chunghwa,claa101wb03.txt,
+>>    -edt,et057090dhu.txt,edt,et070080dh6.txt,edt,etm0700g0dh6.txt,
+>>    -foxlink,fl500wvr00-a0t.txt,giantplus,gpg482739qs5.txt,
+>>    -hannstar,hsd070pww1.txt,hannstar,hsd100pxn1.txt,
+>>    -hit,tx23d38vm0caa.txt,innolux,at043tn24.txt,
+>>    -innolux,at070tn92.txt,innolux,g101ice-l01.txt,
+>>    -innolux,g121i1-l01.txt,innolux,g121x1-l03.txt,
+>>    -innolux,n116bge.txt,innolux,n156bge-l21.txt,
+>>    -innolux,zj070na-01p.txt,kyo,tcg121xglp.txt,
+>>    -lg,lb070wv8.txt,lg,ld070wx3-sl01.txt,lg,lh500wx1-sd03.txt,
+>>    -lg,lp079qx1-sp0v.txt, lg,lp097qx1-spa1.txt,lg,lp120up1.txt,
+>>    -lg,lp129qe.txt, nec,nl4827hc19-05b.txt,
+>>    -nvd,9128.txt,okaya,rs800480t-7x0gp.txt,
+>>    -olimex,lcd-olinuxino-43-ts.txt,ontat,yx700wv03.txt,
+>>    -ortustech,com43h4m85ulc.txt, panasonic,vvx10f004b00.txt,
+>>    -qiaodian,qd43003c0-40.txt,
+>>    -samsung,lsn122dl01-c01.txt,samsung,ltn101nt05.txt,
+>>    -samsung,ltn140at29-301.txt,sharp,lq101k1ly04.txt,
+>>    -sharp,lq123p1jx31.txt,
+>>    -shelly,sca07010-bfn-lnn.txt,starry,kr122ea0sra.txt,
+>>    -tpk,f07a-0102.txt,tpk,f10a-0102.txt,urt,umsh-8596md.txt
+>>
+>> Best regards
+>>
+>>>
+>>>> This binding is similar to all panel bindings which are link to panel
+>>>> simple. Details on gpio & power supply are describe with simple-panel
+>>>> binding.
+>>>
+>>> simple-panel.txt provides what possible standard properties there are,
+>>> not whether a panel uses them. The power supply needs to be explicit
+>>> because I don't know if you forgot and there's really 2 supplies or
+>>> you are using "power-supply" for a single supply.
+>>>
+>>> Rob
+>>>
 
-I don't have strong feelings either way.
 
-This isn't typically enabled, and it's under debugfs, so this shouldn't
-be accessible by a typical user anyhow.
+Hi Rob,
+ok, I'll push a V4 version with all details on properties.
+I write bellow  a draft of binding:
 
-That said, there are very few of us who need to take a look at this
-file. I'm happy to deal with attacking kptr_restrict when required.
+Ampire AM-480272H3TMQW-T01H 4.3" WQVGA TFT LCD panel
 
-Thanks,
-Mark.
+This binding is compatible with the simple-panel binding, which is specified
+in simple-panel.txt in this directory.
 
-> > ---[ Modules start ]---
-> > ---[ Modules end ]---
-> > ---[ vmalloc() Area ]---
-> > ffffff8008000000-ffffff8008010000          64K PTE       RW NX SHD AF...
-> > ffffff8008015000-ffffff8008016000           4K PTE       RW NX SHD AF...
-> > ffffff8008020000-ffffff8008030000          64K PTE       RW NX SHD AF...
-> > ffffff8008031000-ffffff8008071000         256K PTE       RW NX SHD AF...
-> > ffffff8008080000-ffffff8008200000        1536K PTE       ro x  SHD AF...
-> > ffffff8008200000-ffffff8008400000           2M PMD       ro x  SHD AF...
-> > ffffff8008400000-ffffff8008540000        1280K PTE       ro x  SHD AF...
-> > ffffff8008540000-ffffff8008690000        1344K PTE       ro NX SHD AF...
-> > ffffff8008940000-ffffff8008a10000         832K PTE       RW NX SHD AF...
-> > ffffff8008aca000-ffffff8008acd000          12K PTE       RW NX SHD AF...
-> > ffffffbebffd8000-ffffffbebffdb000          12K PTE       RW NX SHD AF...
-> > ---[ vmalloc() End ]---
-> > ---[ Fixmap start ]---
-> > ffffffbefe800000-ffffffbefea00000           2M PMD       ro NX SHD AF...
-> > ---[ Fixmap end ]---
-> > ---[ PCI I/O start ]---
-> > ---[ PCI I/O end ]---
-> > ---[ Linear Mapping ]---
-> > ffffffc000000000-ffffffc000080000         512K PTE       RW NX SHD AF...
-> > ffffffc000080000-ffffffc000200000        1536K PTE       ro NX SHD AF...
-> > ffffffc000200000-ffffffc000600000           4M PMD       ro NX SHD AF...
-> > ffffffc000600000-ffffffc000690000         576K PTE       ro NX SHD AF...
-> > ffffffc000690000-ffffffc000800000        1472K PTE       RW NX SHD AF...
-> > ffffffc000800000-ffffffc002000000          24M PMD       RW NX SHD AF...
-> > ffffffc002000000-ffffffc040000000         992M PMD       RW NX SHD AF...
-> > ffffffc040000000-ffffffc080000000           1G PGD       RW NX SHD AF...
-> >
-> > With sysctl kernel.kptr_restrict=2:
-> > cat /sys/kernel/debug/kernel_page_tables
-> > ---[ Modules start ]---
-> > ---[ Modules end ]---
-> > ---[ vmalloc() Area ]---
-> > 0000000000000000-0000000000000000          64K PTE       RW NX SHD AF...
-> > 0000000000000000-0000000000000000           4K PTE       RW NX SHD AF...
-> > 0000000000000000-0000000000000000          64K PTE       RW NX SHD AF...
-> > 0000000000000000-0000000000000000         256K PTE       RW NX SHD AF...
-> > 0000000000000000-0000000000000000        1536K PTE       ro x  SHD AF...
-> > 0000000000000000-0000000000000000           2M PMD       ro x  SHD AF...
-> > 0000000000000000-0000000000000000        1280K PTE       ro x  SHD AF...
-> > 0000000000000000-0000000000000000        1344K PTE       ro NX SHD AF...
-> > 0000000000000000-0000000000000000         832K PTE       RW NX SHD AF...
-> > 0000000000000000-0000000000000000          12K PTE       RW NX SHD AF...
-> > 0000000000000000-0000000000000000          12K PTE       RW NX SHD AF...
-> > ---[ vmalloc() End ]---
-> > ---[ Fixmap start ]---
-> > 0000000000000000-0000000000000000           2M PMD       ro NX SHD AF...
-> > ---[ Fixmap end ]---
-> > ---[ PCI I/O start ]---
-> > ---[ PCI I/O end ]---
-> > ---[ Linear Mapping ]---
-> > 0000000000000000-0000000000000000         512K PTE       RW NX SHD AF...
-> > 0000000000000000-0000000000000000        1536K PTE       ro NX SHD AF...
-> > 0000000000000000-0000000000000000           4M PMD       ro NX SHD AF...
-> > 0000000000000000-0000000000000000         576K PTE       ro NX SHD AF...
-> > 0000000000000000-0000000000000000        1472K PTE       RW NX SHD AF...
-> > 0000000000000000-0000000000000000          24M PMD       RW NX SHD AF...
-> > 0000000000000000-0000000000000000         992M PMD       RW NX SHD AF...
-> > 0000000000000000-0000000000000000           1G PGD       RW NX SHD AF...
-> >
-> > Signed-off-by: Miles Chen <miles.chen@mediatek.com>
-> > ---
-> >  arch/arm64/mm/dump.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> > index ca74a2a..e055ecf 100644
-> > --- a/arch/arm64/mm/dump.c
-> > +++ b/arch/arm64/mm/dump.c
-> > @@ -253,8 +253,8 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
-> >                 if (st->current_prot) {
-> >                         note_prot_uxn(st, addr);
-> >                         note_prot_wx(st, addr);
-> > -                       pt_dump_seq_printf(st->seq, "0x%016lx-0x%016lx   ",
-> > -                                  st->start_address, addr);
-> > +                       pt_dump_seq_printf(st->seq, "%pK-%pK   ",
-> > +                                  (void *)st->start_address, (void *)addr);
-> >
-> >                         delta = (addr - st->start_address) >> 10;
-> >                         while (!(delta & 1023) && unit[1]) {
-> > --
-> > 1.9.1
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Required properties:
+- compatible: should be "ampire,am-480272h3tmqw-t01h"
+
+Optional properties:
+- power-supply: regulator to provide the supply voltage
+- ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
+- enable-gpios: GPIO pin to enable or disable the panel
+- backlight: phandle of the backlight device attached to the panel
+
+Optional nodes:
+- Video port for RGB input.
+
+Example:
+	panel_rgb: panel-rgb {
+		compatible = "ampire,am-480272h3tmqw-t01h";
+		enable-gpios = <&gpioa 8 1>;
+		port {
+			panel_in_rgb: endpoint {
+				remote-endpoint = <&controler_out_rgb>;
+			};
+		};
+	};
+
+Best regards
