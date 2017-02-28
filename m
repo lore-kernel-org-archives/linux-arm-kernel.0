@@ -1,99 +1,46 @@
-From: jbaron@akamai.com (Jason Baron)
-Date: Tue, 28 Feb 2017 13:39:27 -0500
-Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
-In-Reply-To: <cdf98840-8d43-2c58-e2f9-75ae8fb8a600@caviumnetworks.com>
-References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
- <f7532548-7007-1a32-f669-4520792805b3@caviumnetworks.com>
- <93219edf-0f6d-5cc7-309c-c998f16fe7ac@akamai.com>
- <aa139c18-1b04-2c20-2e22-89d74503b3cf@caviumnetworks.com>
- <20170227160601.5b79a1fe@gandalf.local.home>
- <6db89a8d-6053-51d1-5fd4-bae0179a5ebd@caviumnetworks.com>
- <20170227170911.2280ca3e@gandalf.local.home>
- <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
- <20170227173630.57fff459@gandalf.local.home>
- <7bd72716-feea-073f-741c-04212ebd0802@caviumnetworks.com>
- <68fe24ea-7795-24d8-211b-9d8a50affe9f@akamai.com>
- <510FF566-011D-4199-86F7-2BB4DBF36434@linux.vnet.ibm.com>
- <20170228112144.65455de5@gandalf.local.home>
- <cdf98840-8d43-2c58-e2f9-75ae8fb8a600@caviumnetworks.com>
-Message-ID: <1de00727-de97-f887-78bd-dd49131cdf61@akamai.com>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Tue, 28 Feb 2017 20:45:14 +0200
+Subject: Microphone gain on N900
+In-Reply-To: <201702272053.37882@pali>
+References: <20170226202831.GA31405@amd> <201702272053.37882@pali>
+Message-ID: <4435ddd2-ca0e-b05d-727d-9f38416c0f97@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 02/28/2017 01:16 PM, David Daney wrote:
-> On 02/28/2017 08:21 AM, Steven Rostedt wrote:
->> On Tue, 28 Feb 2017 10:25:46 +0530
->> Sachin Sant <sachinp@linux.vnet.ibm.com> wrote:
+On 02/27/17 21:53, Pali Roh?r wrote:
+> On Sunday 26 February 2017 21:28:32 Pavel Machek wrote:
+>> Hi!
 >>
->>> File: ./net/ipv4/xfrm4_input.o
->>>   [12] __jump_table      PROGBITS        0000000000000000 000639
->>> 000018 18 WAM  0   0  1
->>> File: ./net/ipv4/udplite.o
->>> File: ./net/ipv4/xfrm4_output.o
->>>   [ 9] __jump_table      PROGBITS        0000000000000000 000481
->>> 000018 18 WAM  0   0  1
+>> v4.10 works quite nicely on N900, but I still have problems with
+>> audio. Even GSM calls would be usable, if I had reasonable volume on
+>> microphone and speaker... but I don't.
 >>
->> Looks like there's some issues right there.
->
-> Those look good to me 18/18 = 1 with no remainder.  The odd numbers are
-> the offset of the section in the ELF file.
->
-> If you look at the stack trace, it seems that it is during module loading.
->
-> Are the primitives for generating the tables doing something different
-> for the module case?  I am not familiar enough with the powerpc ABIs to
-> know.
->
-> Try this:
->
-> $ perl -n -e 's/\[ /\[/; my @f = split " "; print hex($f[5]) % 0x18 if
-> $#f > 5; print $_' <~/jump_table.log
->
->
-> There are no entries with size that is not a multiple of 0x18.
->
-> I think my patch to add the ENTSIZE is not doing anything here.
->
-> I suspect that the alignment of the __jump_table section in the .ko
-> files is not correct, and you are seeing some sort of problem due to that.
->
->
+>> Both speaker and microphone are too quiet. I can get louder output by
+>> plugging headset -- good. I can hear the other side nicely, but am
+>> too quiet for them. Unfortunately, even if I plug in wired headset,
+>> internal microphone is still used.
+>>
+For me these settings provide reasonable playback and capture volumes
+using v4.10.1:
 
-Hi,
+amixer -D hw:0 set PCM 100%
+amixer -D hw:0 set 'Line DAC' 80% on
+amixer -D hw:0 set 'Line' on
+amixer -D hw:0 set 'Left Line Mixer DACL1' on
+amixer -D hw:0 set 'Right Line Mixer DACR1' on
+amixer -D hw:0 set 'Jack Function' 'Headphone'
+amixer -D hw:0 set 'TPA6130A2 Headphone' 80%
 
-Yes, if you look at the trace that Sachin sent the module being loaded 
-that does the WARN_ON() is nfsd.ko.
+amixer -D hw:0 set 'Jack Function' 'Headset'
+amixer -D hw:0 set 'AGC' off
+amixer -D hw:0 set 'Input Select' 'ADC'
+amixer -D hw:0 set 'Left PGA Mixer Line1L' on
+amixer -D hw:0 set 'Left Line1L Mux' 'differential'
+amixer -D hw:0 set 'Right PGA Mixer Line1L' on
+amixer -D hw:0 set 'Right Line1L Mux' 'differential'
+amixer -D hw:0 set 'ADC HPF Cut-off' '0.0045xFs' 'disabled'
+amixer -D hw:0 set PGA 50% on
+amixer -D hw:0 cset iface=MIXER,name='PGA Capture Switch',index=0 on
 
-That module from Sachin's trace has:
-
-   [31] __jump_table      PROGBITS        0000000000000000 03fd77 0000c0 
-18 WAM  0   0  1
-
-So its not the size but rather the start offset '03fd77', that is the 
-problem here. That is what the WARN_ON triggers on, that the start of 
-the table is not 4-byte aligned.
-
-Using a ppc cross-compiler and the ENTSIZE patch that line does not 
-change, however if I use the initial patch posted in this thread, the 
-start does align to 4-bytes and thus the warning goes away, as Sachin 
-verified. In fact, without the patch I found several modules that don't 
-start at the proper alignment, however with the patch that started this 
-thread they were all properly aligned.
-
-In terms of the '.balign' causing holes, we originally added the 
-'_ASM_ALIGN' to x86 for precisely this reason. See commit:
-ef64789 jump label: Add _ASM_ALIGN for x86 and x86_64 and discussion.
-
-In addition, we have a lot of runtime with the .balign in the tree and 
-I'm not aware of any holes in the table. I think the code would blow up 
-pretty badly if there were.
-
-A number of arches were already using the '.balign', and the patch I 
-proposed simply added it to remaining ones, now that we added a 
-WARN_ON() to catch this condition.
-
-Thanks,
-
--Jason
+-- 
+Jarkko
