@@ -1,96 +1,111 @@
-From: miles.chen@mediatek.com (Miles Chen)
-Date: Tue, 28 Feb 2017 15:05:36 +0800
-Subject: [PATCH] arm64: dump: hide kernel pointers
-Message-ID: <1488265536-20441-1-git-send-email-miles.chen@mediatek.com>
+From: zhang.lyra@gmail.com (Chunyan Zhang)
+Date: Tue, 28 Feb 2017 15:08:53 +0800
+Subject: [PATCH V2 1/3] arm64: dts: Add basic DT to support Spreadtrum's
+ SP9860G
+In-Reply-To: <CAL_Jsq+3JYQsDo92Azf5MX19=QQUEHu=3PYk2U5keACO5rSDrw@mail.gmail.com>
+References: <1487660104-15693-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1487660104-15693-2-git-send-email-chunyan.zhang@spreadtrum.com>
+ <CAL_JsqJ-VXB8pJw3r_fi9Lbmat2dqH-1jmGy8ibK8=PnoZ-c=Q@mail.gmail.com>
+ <20170224075725.GA32714@spreadtrum.com>
+ <CAL_Jsq+3JYQsDo92Azf5MX19=QQUEHu=3PYk2U5keACO5rSDrw@mail.gmail.com>
+Message-ID: <CAAfSe-v6O5k57T1zjZ+GM5PsWLLqXP3QdmJvsGPGPeZH7mHLiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mask kernel pointers of /sys/kernel/debug/kernel_page_tables entry like
-/proc/vmallocinfo does.
+On 24 February 2017 at 23:07, Rob Herring <robh+dt@kernel.org> wrote:
+> On Fri, Feb 24, 2017 at 1:57 AM, Chunyan Zhang
+> <chunyan.zhang@spreadtrum.com> wrote:
+>> On ?,  2? 23, 2017 at 06:00:20?? -0600, Rob Herring wrote:
+>>> On Tue, Feb 21, 2017 at 12:55 AM, Chunyan Zhang
+>>> <chunyan.zhang@spreadtrum.com> wrote:
+>>> > From: Orson Zhai <orson.zhai@spreadtrum.com>
+>>> >
+>>> > SC9860G is a 8 cores of A53 SoC with 4G LTE support SoC from Spreadtrum.
+>>> >
+>>> > According to regular hierarchy of sprd dts, whale2.dtsi contains SoC
+>>> > peripherals IP nodes, sc9860.dtsi contains stuff related to ARM core stuff
+>>> > and sp9860g dts is for the board level.
+>>> >
+>>> > Signed-off-by: Orson Zhai <orson.zhai@spreadtrum.com>
+>>> > Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+>>> > ---
+>>> >  arch/arm64/boot/dts/sprd/Makefile         |   3 +-
+>>> >  arch/arm64/boot/dts/sprd/sc9860.dtsi      | 531 ++++++++++++++++++++++++++++++
+>>> >  arch/arm64/boot/dts/sprd/sp9860g-1h10.dts |  56 ++++
+>>> >  arch/arm64/boot/dts/sprd/whale2.dtsi      |  70 ++++
+>>> >  4 files changed, 659 insertions(+), 1 deletion(-)
+>>> >  create mode 100644 arch/arm64/boot/dts/sprd/sc9860.dtsi
+>>> >  create mode 100644 arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+>>> >  create mode 100644 arch/arm64/boot/dts/sprd/whale2.dtsi
+>>> >
+>>> > diff --git a/arch/arm64/boot/dts/sprd/Makefile b/arch/arm64/boot/dts/sprd/Makefile
+>>> > index b658c5e..f0535e6 100644
+>>> > --- a/arch/arm64/boot/dts/sprd/Makefile
+>>> > +++ b/arch/arm64/boot/dts/sprd/Makefile
+>>> > @@ -1,4 +1,5 @@
+>>> > -dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb
+>>> > +dtb-$(CONFIG_ARCH_SPRD) += sc9836-openphone.dtb \
+>>> > +                       sp9860g-1h10.dtb
+>>> >
+>>> >  always         := $(dtb-y)
+>>> >  subdir-y       := $(dts-dirs)
+>>> > diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+>>> > new file mode 100644
+>>> > index 0000000..73deb4e
+>>> > --- /dev/null
+>>> > +++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
+>>> > @@ -0,0 +1,531 @@
+>>> > +/*
+>>> > + * Spreadtrum SP9860 SoC DTS file
+>>> > + *
+>>> > + * Copyright (C) 2016, Spreadtrum Communications Inc.
+>>> > + *
+>>> > + * This file is licensed under a dual GPLv2 or X11 license.
+>>>
+>>> Please use SPDX-License-Identifier tag instead.
+>>>
+>>
+>> Just to double check, if I use it like:
+>>
+>> SPDX-License-Identifier: (GPL-2.0 or X11)
+>>
+>> Is this what you mean?
+>
+> Yes. However, X11 is not actually correct (pretty much all dts files
+> have it wrong). This is the X11 license[1] which is explicitly for the
+> X Consortium and has a couple of extra clauses. While the MIT
+> license[2] is the text that most dts files actually use (while also
+> stating X11 license). It's obvious that everyone just copies and
+> pastes the license and has not consulted their lawyers.
 
-With sysctl kernel.kptr_restrict=0 or 1:
-cat /sys/kernel/debug/kernel_page_tables
----[ Modules start ]---
----[ Modules end ]---
----[ vmalloc() Area ]---
-ffffff8008000000-ffffff8008010000          64K PTE       RW NX SHD AF...
-ffffff8008015000-ffffff8008016000           4K PTE       RW NX SHD AF...
-ffffff8008020000-ffffff8008030000          64K PTE       RW NX SHD AF...
-ffffff8008031000-ffffff8008071000         256K PTE       RW NX SHD AF...
-ffffff8008080000-ffffff8008200000        1536K PTE       ro x  SHD AF...
-ffffff8008200000-ffffff8008400000           2M PMD       ro x  SHD AF...
-ffffff8008400000-ffffff8008540000        1280K PTE       ro x  SHD AF...
-ffffff8008540000-ffffff8008690000        1344K PTE       ro NX SHD AF...
-ffffff8008940000-ffffff8008a10000         832K PTE       RW NX SHD AF...
-ffffff8008aca000-ffffff8008acd000          12K PTE       RW NX SHD AF...
-ffffffbebffd8000-ffffffbebffdb000          12K PTE       RW NX SHD AF...
----[ vmalloc() End ]---
----[ Fixmap start ]---
-ffffffbefe800000-ffffffbefea00000           2M PMD       ro NX SHD AF...
----[ Fixmap end ]---
----[ PCI I/O start ]---
----[ PCI I/O end ]---
----[ Linear Mapping ]---
-ffffffc000000000-ffffffc000080000         512K PTE       RW NX SHD AF...
-ffffffc000080000-ffffffc000200000        1536K PTE       ro NX SHD AF...
-ffffffc000200000-ffffffc000600000           4M PMD       ro NX SHD AF...
-ffffffc000600000-ffffffc000690000         576K PTE       ro NX SHD AF...
-ffffffc000690000-ffffffc000800000        1472K PTE       RW NX SHD AF...
-ffffffc000800000-ffffffc002000000          24M PMD       RW NX SHD AF...
-ffffffc002000000-ffffffc040000000         992M PMD       RW NX SHD AF...
-ffffffc040000000-ffffffc080000000           1G PGD       RW NX SHD AF...
+OK, got it.
 
-With sysctl kernel.kptr_restrict=2:
-cat /sys/kernel/debug/kernel_page_tables
----[ Modules start ]---
----[ Modules end ]---
----[ vmalloc() Area ]---
-0000000000000000-0000000000000000          64K PTE       RW NX SHD AF...
-0000000000000000-0000000000000000           4K PTE       RW NX SHD AF...
-0000000000000000-0000000000000000          64K PTE       RW NX SHD AF...
-0000000000000000-0000000000000000         256K PTE       RW NX SHD AF...
-0000000000000000-0000000000000000        1536K PTE       ro x  SHD AF...
-0000000000000000-0000000000000000           2M PMD       ro x  SHD AF...
-0000000000000000-0000000000000000        1280K PTE       ro x  SHD AF...
-0000000000000000-0000000000000000        1344K PTE       ro NX SHD AF...
-0000000000000000-0000000000000000         832K PTE       RW NX SHD AF...
-0000000000000000-0000000000000000          12K PTE       RW NX SHD AF...
-0000000000000000-0000000000000000          12K PTE       RW NX SHD AF...
----[ vmalloc() End ]---
----[ Fixmap start ]---
-0000000000000000-0000000000000000           2M PMD       ro NX SHD AF...
----[ Fixmap end ]---
----[ PCI I/O start ]---
----[ PCI I/O end ]---
----[ Linear Mapping ]---
-0000000000000000-0000000000000000         512K PTE       RW NX SHD AF...
-0000000000000000-0000000000000000        1536K PTE       ro NX SHD AF...
-0000000000000000-0000000000000000           4M PMD       ro NX SHD AF...
-0000000000000000-0000000000000000         576K PTE       ro NX SHD AF...
-0000000000000000-0000000000000000        1472K PTE       RW NX SHD AF...
-0000000000000000-0000000000000000          24M PMD       RW NX SHD AF...
-0000000000000000-0000000000000000         992M PMD       RW NX SHD AF...
-0000000000000000-0000000000000000           1G PGD       RW NX SHD AF...
+>
+>> Will this file still be licensed under the same terms it was, right?
+>
+> Consult your lawyer. :)
+>
+> [...]
+>
+>>> > +               ext_26m: ext-26m {
+>>>
+>>> This should be at the top-level. It is not part of the bus.
+>>
+>> This clock node is in 'soc' node, not under 'ap-apb'.  Since there're other
+>> clocks on SC9860 which would have 'reg' property, we thought this fixed
+>> clock would be better under 'soc' with other clocks.
+>
+> But the clock is part of the board, not the soc. Or to put it another
+> way, it's not related to anything else, so it shouldn't be a child of
+> anything.
 
-Signed-off-by: Miles Chen <miles.chen@mediatek.com>
----
- arch/arm64/mm/dump.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Ok, I will move it to the top-level.
 
-diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index ca74a2a..e055ecf 100644
---- a/arch/arm64/mm/dump.c
-+++ b/arch/arm64/mm/dump.c
-@@ -253,8 +253,8 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
- 		if (st->current_prot) {
- 			note_prot_uxn(st, addr);
- 			note_prot_wx(st, addr);
--			pt_dump_seq_printf(st->seq, "0x%016lx-0x%016lx   ",
--				   st->start_address, addr);
-+			pt_dump_seq_printf(st->seq, "%pK-%pK   ",
-+				   (void *)st->start_address, (void *)addr);
- 
- 			delta = (addr - st->start_address) >> 10;
- 			while (!(delta & 1023) && unit[1]) {
--- 
-1.9.1
+Thanks,
+Chunyan
+
+>
+> Rob
+>
+> [1] https://spdx.org/licenses/X11.html
+> [2] https://spdx.org/licenses/MIT.html
