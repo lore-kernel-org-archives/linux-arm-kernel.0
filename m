@@ -1,94 +1,96 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Tue, 28 Feb 2017 14:43:36 +0800
-Subject: [PATCH] pwm: rockchip: State of pwm clock should synchronize with pwm
- enabled state
-Message-ID: <1488264216-9361-1-git-send-email-david.wu@rock-chips.com>
+From: miles.chen@mediatek.com (Miles Chen)
+Date: Tue, 28 Feb 2017 15:05:36 +0800
+Subject: [PATCH] arm64: dump: hide kernel pointers
+Message-ID: <1488265536-20441-1-git-send-email-miles.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "david.wu" <david.wu@rock-chips.com>
+Mask kernel pointers of /sys/kernel/debug/kernel_page_tables entry like
+/proc/vmallocinfo does.
 
-If the pwm was not enabled at uboot loader, pwm could not work for clock
-always disabled at pwm driver. The pwm clock is enabled at beginning of
-pwm_apply(), but disabled at end of pwm_apply().
+With sysctl kernel.kptr_restrict=0 or 1:
+cat /sys/kernel/debug/kernel_page_tables
+---[ Modules start ]---
+---[ Modules end ]---
+---[ vmalloc() Area ]---
+ffffff8008000000-ffffff8008010000          64K PTE       RW NX SHD AF...
+ffffff8008015000-ffffff8008016000           4K PTE       RW NX SHD AF...
+ffffff8008020000-ffffff8008030000          64K PTE       RW NX SHD AF...
+ffffff8008031000-ffffff8008071000         256K PTE       RW NX SHD AF...
+ffffff8008080000-ffffff8008200000        1536K PTE       ro x  SHD AF...
+ffffff8008200000-ffffff8008400000           2M PMD       ro x  SHD AF...
+ffffff8008400000-ffffff8008540000        1280K PTE       ro x  SHD AF...
+ffffff8008540000-ffffff8008690000        1344K PTE       ro NX SHD AF...
+ffffff8008940000-ffffff8008a10000         832K PTE       RW NX SHD AF...
+ffffff8008aca000-ffffff8008acd000          12K PTE       RW NX SHD AF...
+ffffffbebffd8000-ffffffbebffdb000          12K PTE       RW NX SHD AF...
+---[ vmalloc() End ]---
+---[ Fixmap start ]---
+ffffffbefe800000-ffffffbefea00000           2M PMD       ro NX SHD AF...
+---[ Fixmap end ]---
+---[ PCI I/O start ]---
+---[ PCI I/O end ]---
+---[ Linear Mapping ]---
+ffffffc000000000-ffffffc000080000         512K PTE       RW NX SHD AF...
+ffffffc000080000-ffffffc000200000        1536K PTE       ro NX SHD AF...
+ffffffc000200000-ffffffc000600000           4M PMD       ro NX SHD AF...
+ffffffc000600000-ffffffc000690000         576K PTE       ro NX SHD AF...
+ffffffc000690000-ffffffc000800000        1472K PTE       RW NX SHD AF...
+ffffffc000800000-ffffffc002000000          24M PMD       RW NX SHD AF...
+ffffffc002000000-ffffffc040000000         992M PMD       RW NX SHD AF...
+ffffffc040000000-ffffffc080000000           1G PGD       RW NX SHD AF...
 
-If the pwm was enabled at uboot loader, pwm clock is always enabled unless
-closed by ATF. The pwm-backlight might turn off the power at early suspend,
-should disable pwm clock for saving power consume.
+With sysctl kernel.kptr_restrict=2:
+cat /sys/kernel/debug/kernel_page_tables
+---[ Modules start ]---
+---[ Modules end ]---
+---[ vmalloc() Area ]---
+0000000000000000-0000000000000000          64K PTE       RW NX SHD AF...
+0000000000000000-0000000000000000           4K PTE       RW NX SHD AF...
+0000000000000000-0000000000000000          64K PTE       RW NX SHD AF...
+0000000000000000-0000000000000000         256K PTE       RW NX SHD AF...
+0000000000000000-0000000000000000        1536K PTE       ro x  SHD AF...
+0000000000000000-0000000000000000           2M PMD       ro x  SHD AF...
+0000000000000000-0000000000000000        1280K PTE       ro x  SHD AF...
+0000000000000000-0000000000000000        1344K PTE       ro NX SHD AF...
+0000000000000000-0000000000000000         832K PTE       RW NX SHD AF...
+0000000000000000-0000000000000000          12K PTE       RW NX SHD AF...
+0000000000000000-0000000000000000          12K PTE       RW NX SHD AF...
+---[ vmalloc() End ]---
+---[ Fixmap start ]---
+0000000000000000-0000000000000000           2M PMD       ro NX SHD AF...
+---[ Fixmap end ]---
+---[ PCI I/O start ]---
+---[ PCI I/O end ]---
+---[ Linear Mapping ]---
+0000000000000000-0000000000000000         512K PTE       RW NX SHD AF...
+0000000000000000-0000000000000000        1536K PTE       ro NX SHD AF...
+0000000000000000-0000000000000000           4M PMD       ro NX SHD AF...
+0000000000000000-0000000000000000         576K PTE       ro NX SHD AF...
+0000000000000000-0000000000000000        1472K PTE       RW NX SHD AF...
+0000000000000000-0000000000000000          24M PMD       RW NX SHD AF...
+0000000000000000-0000000000000000         992M PMD       RW NX SHD AF...
+0000000000000000-0000000000000000           1G PGD       RW NX SHD AF...
 
-It is important to provide opportunity to enable/disable clock at pwm driver,
-the pwm consumer should ensure correct order to call pwm enable/disable, and
-pwm driver ensure state of pwm clock synchronized with pwm enabled state.
-
-Signed-off-by: David Wu <david.wu@rock-chips.com>
+Signed-off-by: Miles Chen <miles.chen@mediatek.com>
 ---
- drivers/pwm/pwm-rockchip.c | 38 +++++++++++++++++++++++++++++++-------
- 1 file changed, 31 insertions(+), 7 deletions(-)
+ arch/arm64/mm/dump.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
-index ef89df1..14a0445 100644
---- a/drivers/pwm/pwm-rockchip.c
-+++ b/drivers/pwm/pwm-rockchip.c
-@@ -191,6 +191,26 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	return 0;
- }
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+index ca74a2a..e055ecf 100644
+--- a/arch/arm64/mm/dump.c
++++ b/arch/arm64/mm/dump.c
+@@ -253,8 +253,8 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
+ 		if (st->current_prot) {
+ 			note_prot_uxn(st, addr);
+ 			note_prot_wx(st, addr);
+-			pt_dump_seq_printf(st->seq, "0x%016lx-0x%016lx   ",
+-				   st->start_address, addr);
++			pt_dump_seq_printf(st->seq, "%pK-%pK   ",
++				   (void *)st->start_address, (void *)addr);
  
-+static int rk_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm,
-+			 bool enable, enum pwm_polarity polarity)
-+{
-+	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
-+	int ret;
-+
-+	if (enable) {
-+		ret = clk_enable(pc->clk);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	pc->data->set_enable(chip, pwm, enable, polarity);
-+
-+	if (!enable)
-+		clk_disable(pc->clk);
-+
-+	return 0;
-+}
-+
- static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 			      struct pwm_state *state)
- {
-@@ -207,22 +227,26 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 		return ret;
- 
- 	if (state->polarity != curstate.polarity && enabled) {
--		pc->data->set_enable(chip, pwm, false, state->polarity);
-+		ret = rk_pwm_enable(chip, pwm, false, state->polarity);
-+		if (ret)
-+			goto out;
- 		enabled = false;
- 	}
- 
- 	ret = rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
- 	if (ret) {
- 		if (enabled != curstate.enabled)
--			pc->data->set_enable(chip, pwm, !enabled,
--					     state->polarity);
--
-+			rk_pwm_enable(chip, pwm, !enabled,
-+				      state->polarity);
- 		goto out;
- 	}
- 
--	if (state->enabled != enabled)
--		pc->data->set_enable(chip, pwm, state->enabled,
--				     state->polarity);
-+	if (state->enabled != enabled) {
-+		ret = rk_pwm_enable(chip, pwm, state->enabled,
-+				    state->polarity);
-+		if (ret)
-+			goto out;
-+	}
- 
- 	/*
- 	 * Update the state with the real hardware, which can differ a bit
+ 			delta = (addr - st->start_address) >> 10;
+ 			while (!(delta & 1023) && unit[1]) {
 -- 
 1.9.1
