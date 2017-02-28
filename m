@@ -1,55 +1,116 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 28 Feb 2017 12:00:02 +0100
-Subject: [PATCH v2 3/3] media: dt-bindings: vpif: new optional property
-In-Reply-To: <6b392a4a-2de8-9981-ad40-ca7201bf813d@ti.com>
-References: <1487771027-7763-1-git-send-email-bgolaszewski@baylibre.com>
- <1487771027-7763-4-git-send-email-bgolaszewski@baylibre.com>
- <20170227225209.26oieqwbafqjga2a@rob-hp-laptop>
- <6b392a4a-2de8-9981-ad40-ca7201bf813d@ti.com>
-Message-ID: <CAMpxmJW4Rd6UvdkeS6GLOJeiGMV_XVTznL5T2L3+K9UgE=bWkw@mail.gmail.com>
+From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
+Date: Tue, 28 Feb 2017 11:03:08 +0000
+Subject: [PATCH V2] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <1485891928-14573-1-git-send-email-okaya@codeaurora.org>
+References: <1485891928-14573-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <92EBB4272BF81E4089A7126EC1E7B2846666830C@IRSMSX101.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-02-28 6:36 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
-> On Tuesday 28 February 2017 04:22 AM, Rob Herring wrote:
->> On Wed, Feb 22, 2017 at 02:43:47PM +0100, Bartosz Golaszewski wrote:
->>> Add an optional property - enable-gpios - which can be used to specify
->>> the GPIOs that must be requested to select the vpif functionality.
->>>
->>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>> ---
->>>  Documentation/devicetree/bindings/media/ti,da850-vpif.txt | 7 +++++++
->>>  1 file changed, 7 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
->>> index df7182a..23c5405 100644
->>> --- a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
->>> +++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
->>> @@ -13,6 +13,9 @@ Required properties:
->>>  - reg: physical base address and length of the registers set for the device;
->>>  - interrupts: should contain IRQ line for the VPIF
->>>
->>> +Optional properties:
->>> +- enable-gpios: phandle of the GPIOs used to select the vpif functionality
->>
->> What does this control exactly? The GPIOs belong in the node they are
->> connected to and having GPIOs routed to this block seems strange.
 >
-> The DA850 EVM board implements on-board muxing which lets the video
-> input (via VPIF) to be routed to a TVP5147 (video decoder) for composite
-> input or to a camera header. There are other mux options which use the
-> same VPIF SoC pins (RMII ethernet or character LCD).
+>When the operating system is booted with the default ASPM policy
+>(POLICY_DEFAULT), the current code is determining the ASPM policy
+>set up by the BIOS by querying the enable/disable states from ASPM
+>registers.
 >
-> There is a three-to-eight demux on the board which drives enable signals
-> to buffers letting you choose from these options.
->
-> From your response, it looks like you want the enable-gpios property to
-> be in the TVP5147 or camera node. That does make sense to me.
+>In the case of hotplug removal, the ASPM registers get cleared by
+>calling the pcie_aspm_exit_link_state() function.
 >
 
-Wouldn't that cause races again? The TVP5147 ADC is probed from within
-the vpif driver as a media subdev (after initialize_vpif(),
-v4l2_device_register(), irq requests etc.).
+I see the same problem. So cherry-picked your change to resolve the problem
+on top of Linus mainline.
 
-Thanks,
-Bartosz
+>An insertion following hotplug removal reads incorrect policy as
+>ASPM disabled even though ASPM was enabled during boot.
+>
+>Adding a flag to the struct pci_dev and saving the power up policy
+>in the bridge to be reused during hotplug insertion. Bridge's enable
+>counter is used as a switch to determine when to use saved value.
+>
+>Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>---
+> drivers/pci/pcie/aspm.c | 21 +++++++++++++++++----
+> include/linux/pci.h     |  1 +
+> 2 files changed, 18 insertions(+), 4 deletions(-)
+>
+>diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
+>index 17ac1dc..5cfcc6d 100644
+>--- a/drivers/pci/pcie/aspm.c
+>+++ b/drivers/pci/pcie/aspm.c
+>@@ -338,8 +338,9 @@ static void pcie_aspm_check_latency(struct pci_dev *endpoint)
+> 	}
+> }
+>
+>-static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
+>+static void pcie_aspm_cap_init(struct pci_dev *pdev, int blacklist)
+> {
+>+	struct pcie_link_state *link = pdev->link_state;
+> 	struct pci_dev *child, *parent = link->pdev;
+> 	struct pci_bus *linkbus = parent->subordinate;
+> 	struct aspm_register_info upreg, dwreg;
+>@@ -397,8 +398,20 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
+> 	link->latency_up.l1 = calc_l1_latency(upreg.latency_encoding_l1);
+> 	link->latency_dw.l1 = calc_l1_latency(dwreg.latency_encoding_l1);
+>
+>-	/* Save default state */
+>-	link->aspm_default = link->aspm_enabled;
+
+But, I am finding a problem with this change, if Policy is set to default,
+BIOS enables ASPM L1, but pcie_config_aspm_link() disables ASPM L1
+due to link->aspm_enabled is different than link->aspm_default while
+called from pcie_aspm_init_link_state() during hotplug insertion.
+
+
+>+	/*
+>+	 * Save default state from FW when enabling ASPM for the first time
+>+	 * during boot by looking at the calculated link->aspm_enabled bits
+>+	 * above and enable_cnt will be zero.
+>+	 *
+>+	 * If this path is getting called for the second/third time
+>+	 * (enable_cnt will be non-zero). Assume that the current state of the
+>+	 * ASPM registers may not necessarily match what FW asked us to do as
+>+	 * in the case of hotplug insertion/removal.
+>+	 */
+>+	if (!atomic_read(&pdev->enable_cnt))
+>+		pdev->aspm_default = link->aspm_default = link->aspm_enabled;
+>+	else
+>+		link->aspm_default = pdev->aspm_default;
+>
+> 	/* Setup initial capable state. Will be updated later */
+> 	link->aspm_capable = link->aspm_support;
+>@@ -599,7 +612,7 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
+> 	 * upstream links also because capable state of them can be
+> 	 * update through pcie_aspm_cap_init().
+> 	 */
+>-	pcie_aspm_cap_init(link, blacklist);
+>+	pcie_aspm_cap_init(pdev, blacklist);
+>
+> 	/* Setup initial Clock PM state */
+> 	pcie_clkpm_cap_init(link, blacklist);
+>diff --git a/include/linux/pci.h b/include/linux/pci.h
+>index e2d1a12..521f88c 100644
+>--- a/include/linux/pci.h
+>+++ b/include/linux/pci.h
+>@@ -321,6 +321,7 @@ struct pci_dev {
+>
+> #ifdef CONFIG_PCIEASPM
+> 	struct pcie_link_state	*link_state;	/* ASPM link state */
+>+	unsigned int	aspm_default;		/* ASPM policy set by BIOS */
+> #endif
+>
+> 	pci_channel_state_t error_state;	/* current connectivity state */
+>--
+>1.9.1
+>
+>--
+>To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>the body of a message to majordomo at vger.kernel.org
+>More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Intel Deutschland GmbH
+Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
+Tel: +49 89 99 8853-0, www.intel.de
+Managing Directors: Christin Eisenschmid, Christian Lamprechter
+Chairperson of the Supervisory Board: Nicole Lau
+Registered Office: Munich
+Commercial Register: Amtsgericht Muenchen HRB 186928
