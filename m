@@ -1,64 +1,83 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Feb 2017 23:10:33 +0000
-Subject: [PATCH] ARM: mvebu: add support for the Linksys WRT1900ACS
- (Shelby)
-In-Reply-To: <CAL_JsqJsrparnm8wTL4L3W2cvfSuH=1VddUdBP295MAFfCccWA@mail.gmail.com>
-References: <20170214085919.3997-1-ralph.sennhauser@gmail.com>
- <CAL_JsqJsrparnm8wTL4L3W2cvfSuH=1VddUdBP295MAFfCccWA@mail.gmail.com>
-Message-ID: <20170228231033.GE21222@n2100.armlinux.org.uk>
+Date: Tue, 28 Feb 2017 23:11:23 +0000
+Subject: [PATCH v3 2/4] arm: dts: imx6q: Add Engicam i.CoreM6 Quad/Dual
+ OpenFrame Cap 10.1 initial support
+In-Reply-To: <CAL_JsqLZFsBdZyBeJfe-mhxcEc_tUS1GrtPBcMvkwUL0VDcr1g@mail.gmail.com>
+References: <1487653593-3457-1-git-send-email-jagan@openedev.com>
+ <1487653593-3457-2-git-send-email-jagan@openedev.com>
+ <CAL_JsqLZFsBdZyBeJfe-mhxcEc_tUS1GrtPBcMvkwUL0VDcr1g@mail.gmail.com>
+Message-ID: <20170228231123.GF21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2017 at 05:08:15PM -0600, Rob Herring wrote:
-> On Tue, Feb 14, 2017 at 2:59 AM, Ralph Sennhauser
-> <ralph.sennhauser@gmail.com> wrote:
-> > The Linksys WRT1900ACS (Shelby) is another Armada 385 based router in
-> > the Linksys WRT AC Series which got released in October 2015.
+On Tue, Feb 28, 2017 at 05:04:57PM -0600, Rob Herring wrote:
+> On Mon, Feb 20, 2017 at 11:06 PM, Jagan Teki <jagan@openedev.com> wrote:
+> > From: Jagan Teki <jagan@amarulasolutions.com>
 > >
-> > The file armada-385-linksys-shelby.dts is taken from OpenWrt as-is and
-> > originally authored by Imre Kaloz.
+> > i.CoreM6 Quad/Dual OpenFrame modules are "system on modules plus
+> > openframe display carriers" which are good solution for develop
+> > user friendly graphic user interface.
 > >
-> > URL: http://tinyurl.com/j8lz83a
-> > CC: Imre Kaloz <kaloz@openwrt.org>
-> > Signed-off-by: Ralph Sennhauser <ralph.sennhauser@gmail.com>
+> > General features:
+> > CPU           NXP i.MX6Q rev1.2 at 792 MHz
+> > RAM           1GB, 32, 64 bit, DDR3-800/1066
+> > NAND          SLC,512MB
+> > LVDS Display  TFT 10.1" industrial, 1280x800 resolution
+> > Backlight     LED backlight, brightness 350 Cd/m2
+> > Power supply  15 to 30 Vdc
+> >
+> > Cc: Domenico Acri <domenico.acri@engicam.com>
+> > Cc: Matteo Lisi <matteo.lisi@engicam.com>
+> > Cc: Michael Trimarchi <michael@amarulasolutions.com>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 > > ---
-> >  arch/arm/boot/dts/Makefile                      |   1 +
-> >  arch/arm/boot/dts/armada-385-linksys-shelby.dts | 114 ++++++++++++++++++++++++
-> >  2 files changed, 115 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/armada-385-linksys-shelby.dts
+> > Changes for v3:
+> > - Use native-mode as timing0 since this is the initial lvds-channel
+> > - Rename hsd100pxn1 reference as timing0
+> > Changes for v2:
+> > - none
+> >
+> >  arch/arm/boot/dts/Makefile                |  1 +
+> >  arch/arm/boot/dts/imx6q-icore-ofcap10.dts | 76 +++++++++++++++++++++++++++++++
+> >  2 files changed, 77 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/imx6q-icore-ofcap10.dts
 > >
 > > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index 0118084..16f1748 100644
+> > index 0118084..458ec09 100644
 > > --- a/arch/arm/boot/dts/Makefile
 > > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -970,6 +970,7 @@ dtb-$(CONFIG_MACH_ARMADA_38X) += \
-> >         armada-385-db-ap.dtb \
-> >         armada-385-linksys-caiman.dtb \
-> >         armada-385-linksys-cobra.dtb \
-> > +       armada-385-linksys-shelby.dtb \
-> >         armada-385-turris-omnia.dtb \
-> >         armada-388-clearfog.dtb \
-> >         armada-388-clearfog-base.dtb \
-> > diff --git a/arch/arm/boot/dts/armada-385-linksys-shelby.dts b/arch/arm/boot/dts/armada-385-linksys-shelby.dts
+> > @@ -398,6 +398,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+> >         imx6q-h100.dtb \
+> >         imx6q-hummingboard.dtb \
+> >         imx6q-icore.dtb \
+> > +       imx6q-icore-ofcap10.dtb \
+> >         imx6q-icore-rqs.dtb \
+> >         imx6q-marsboard.dtb \
+> >         imx6q-mccmon6.dtb \
+> > diff --git a/arch/arm/boot/dts/imx6q-icore-ofcap10.dts b/arch/arm/boot/dts/imx6q-icore-ofcap10.dts
 > > new file mode 100644
-> > index 0000000..c7a8ddd
+> > index 0000000..8f40812
 > > --- /dev/null
-> > +++ b/arch/arm/boot/dts/armada-385-linksys-shelby.dts
-> > @@ -0,0 +1,114 @@
+> > +++ b/arch/arm/boot/dts/imx6q-icore-ofcap10.dts
+> > @@ -0,0 +1,76 @@
 > > +/*
-> > + * Device Tree file for the Linksys WRT1900ACS (Shelby)
-> > + *
-> > + * Copyright (C) 2015 Imre Kaloz <kaloz@openwrt.org>
-> > + *
+> > + * Copyright (C) 2016 Amarula Solutions B.V.
+> > + * Copyright (C) 2016 Engicam S.r.l.
 > > + *
 > > + * This file is dual-licensed: you can use it either under the terms
 > > + * of the GPL or the X11 license, at your option. Note that this dual
 > > + * licensing only applies to this file, and not this project as a
 > > + * whole.
 > > + *
-> > + *  a) This file is licensed under the terms of the GNU General Public
-> > + *     License version 2.  This program is licensed "as is" without
-> > + *     any warranty of any kind, whether express or implied.
+> > + *  a) This file is free software; you can redistribute it and/or
+> > + *     modify it under the terms of the GNU General Public License
+> > + *     version 2 as published by the Free Software Foundation.
+> > + *
+> > + *     This file is distributed in the hope that it will be useful,
+> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + *     GNU General Public License for more details.
 > > + *
 > > + * Or, alternatively,
 > > + *
@@ -82,14 +101,16 @@ On Tue, Feb 28, 2017 at 05:08:15PM -0600, Rob Herring wrote:
 > > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 > > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 > > + *     OTHER DEALINGS IN THE SOFTWARE.
+> > + */
 > 
-> Use SPDX tags here:
+> If you respin, use SPDX tags here:
 > 
 > SPDX-License-Identifier: (GPL-2.0 OR MIT)
 > 
 > While it says X11, this is really MIT license text.
 
-No.  As per my previous mail.
+No.  Please don't give misleading information.  See the FSF's licenses
+pages, specifically https://www.gnu.org/licenses/why-not-lgpl.html
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
