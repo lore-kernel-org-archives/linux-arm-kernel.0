@@ -1,43 +1,37 @@
-From: florian.vaussard@gmail.com (Florian Vaussard)
-Date: Tue, 28 Feb 2017 16:52:12 +0100
-Subject: [PATCH 2/2] ARM: dts: socfpga: Add support for PMU
-In-Reply-To: <1488297132-21553-1-git-send-email-florian.vaussard@heig-vd.ch>
-References: <1488297132-21553-1-git-send-email-florian.vaussard@heig-vd.ch>
-Message-ID: <1488297132-21553-3-git-send-email-florian.vaussard@heig-vd.ch>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 28 Feb 2017 15:54:13 +0000
+Subject: [PATCH 2/2] crypto: arm - add build time test for CRC instruction
+ support
+In-Reply-To: <1488292617-27317-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1488292617-27317-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1488292617-27317-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <be137899-cd94-5fb3-1f14-c1921509e0d7@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dual Cortex-A9 MPCore inside socfpga has a standard PMU unit for
-each core mapped in the DAP memory space. Add support for it!
 
-Tested with perf on a Cyclone 5 SoC DK.
+On 28/02/17 14:36, Ard Biesheuvel wrote:
+> The accelerated CRC32 module for ARM may use either the scalar CRC32
+> instructions, the NEON 64x64 to 128 bit polynomial multiplication
+> (vmull.p64) instruction, or both, depending on what the current CPU
+> supports.
+> 
+> However, this also requires support in binutils, and as it turns out,
+> versions of binutils exist that support the vmull.p64 instruction but
+> not the crc32 instructions.
+> 
+> So refactor the Makefile logic so that this module only gets built if
+> binutils has support for both.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Reported-by: Alberto Dassatti <alberto.dassatti@heig-vd.ch>
-Signed-off-by: Florian Vaussard <florian.vaussard@heig-vd.ch>
-Tested-by: Alberto Dassatti <alberto.dassatti@heig-vd.ch>
----
- arch/arm/boot/dts/socfpga.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Thanks!
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 478047e..a892de9 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -52,6 +52,15 @@
- 		};
- 	};
- 
-+	pmu: pmu at ff111000 {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupt-parent = <&intc>;
-+		interrupts = <0 176 4>, <0 177 4>;
-+		interrupt-affinity = <&cpu0>, <&cpu1>;
-+		reg = <0xff111000 0x1000>,
-+		      <0xff113000 0x1000>;
-+	};
-+
- 	intc: intc at fffed000 {
- 		compatible = "arm,cortex-a9-gic";
- 		#interrupt-cells = <3>;
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
+Tested-by: Jon Hunter <jonathanh@nvidia.com>
+
+Cheers
+Jon
+
 -- 
-2.7.4
+nvpublic
