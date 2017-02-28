@@ -1,36 +1,48 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 28 Feb 2017 10:19:17 +0100
-Subject: [PATCH v2 2/3] drm/vc4: Add HDMI audio support
-In-Reply-To: <20170227202803.12855-2-eric@anholt.net>
-References: <20170227202803.12855-1-eric@anholt.net>
- <20170227202803.12855-2-eric@anholt.net>
-Message-ID: <20170228101917.40810aa9@bbrezillon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Feb 2017 10:25:25 +0100
+Subject: [PATCH v5 2/3] nvmem: sunxi-sid: add support for H3's SID
+ controller
+In-Reply-To: <630891488270931@web10m.yandex.ru>
+References: <20170227192715.50198-1-icenowy@aosc.xyz>
+ <20170227192715.50198-2-icenowy@aosc.xyz>
+ <20170228064258.mqpu33udgokxazkz@lukather>
+ <630891488270931@web10m.yandex.ru>
+Message-ID: <20170228092525.xcwyhuit6w43rjzz@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Feb 2017 12:28:02 -0800
-Eric Anholt <eric@anholt.net> wrote:
+On Tue, Feb 28, 2017 at 04:35:31PM +0800, Icenowy Zheng wrote:
+> 
+> 
+> 28.02.2017, 14:43, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > On Tue, Feb 28, 2017 at 03:27:14AM +0800, Icenowy Zheng wrote:
+> >> ?The H3 SoC have a bigger SID controller, which has its direct read
+> >> ?address at 0x200 position in the SID block, not 0x0.
+> >>
+> >> ?Also, H3 SID controller has some silicon bug that makes the direct read
+> >> ?value wrong at cold boot, add code to workaround the bug. (This bug has
+> >> ?already been fixed on A64 and later SoCs)
+> >>
+> >> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Who will finally apply these patches?
+> 
+> I have seen that you are one of the maintainers of NVMEM subsystem.
 
-> The HDMI encoder IP embeds all needed blocks to output audio, with a
-> custom DAI called MAI moving audio between the two parts of the HDMI
-> core.  This driver now exposes a sound card to let users stream audio
-> to their display.
-> 
-> Using the hdmi-codec driver has been considered here, but MAI meant
-> having to significantly rework hdmi-codec, and it would have left
-> little shared code with the I2S mode anyway.
-> 
-> The encoder requires that the audio be SPDIF-formatted frames only,
-> which alsalib will format-convert for us.
-> 
-> This patch is the combined work of Eric Anholt (initial register setup
-> with a separate dmaengine driver and using simple-audio-card) and
-> Boris Brezillon (moving it all into HDMI, massive debug to get it
-> actually working), and which Eric has the permission to release.
-> 
-> v2: Drop "-audio" from sound card name, since that's already implied
->     (suggestion by Boris)
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+Srinivas usually merges the patches.
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170228/6bf16d28/attachment.sig>
