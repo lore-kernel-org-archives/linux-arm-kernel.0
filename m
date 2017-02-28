@@ -1,37 +1,46 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 28 Feb 2017 18:25:50 +0100
-Subject: [PATCH 0/4] rockchip: fix serial output on rk3036
-In-Reply-To: <20170228073240.GJ25384@codeaurora.org>
-References: <20170228051420.7214-1-heiko@sntech.de>
- <20170228073240.GJ25384@codeaurora.org>
-Message-ID: <1641374.43nVGhYm9v@phil>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 28 Feb 2017 09:26:37 -0800
+Subject: ARM: OMAP2+: Grab reference to device nodes where needed
+In-Reply-To: <20170228162315.GS21809@atomide.com>
+References: <1486853948-20978-1-git-send-email-linux@roeck-us.net>
+ <20170227233405.GA16546@roeck-us.net>
+ <20170228162315.GS21809@atomide.com>
+Message-ID: <20170228172637.GA13455@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 27. Februar 2017, 23:32:40 CET schrieb Stephen Boyd:
-> On 02/28, Heiko Stuebner wrote:
-> > Recent changes to the 8250-dw variant revealed issues concerning
-> > how the clock rates are handled on the rk3036 uart.
-> > 
-> > For one, there was an error in the clock declaration, but also the
-> > shared uart-pll-select-mux also as default got supplied from the apll
-> > that also supplies the cpu and thus gets frequency scaled.
-> > 
-> > The patches in this series remedy this and make the debug uart
-> > function again on 4.10 + current merge window.
+On Tue, Feb 28, 2017 at 08:23:16AM -0800, Tony Lindgren wrote:
+> * Guenter Roeck <linux@roeck-us.net> [170227 15:36]:
+> > ping ... this problem is now seen in mainline.
 > 
-> What's the merge path? The last patch is sort of questionable
-> because it fixes a regression by changing assigned clocks in DT,
-> which doesn't really make sense from a DT perspective (it should
-> have been right already or can be configured from the clk driver
-> itself in software).
+> Oops sorry I had accidentally tagged this with "next" instead of
+> "fixes".
+> 
+> Looking at the patch though, can't we make of_node_get/put local to
+> omap3xxx_hwmod_is_hs_ip_block_usable()?
+> 
+Not really.
 
-yeah, I was (and somewhat still am) debating on the dt vs. clk driver 
-positioning. As you can see, there are multiple sources, most of them are 
-somewhat questionable. I.e. apll and dpll are the cpu + ddr supplies and we 
-will want to do ddr-scaling at some point too.
+Strictly speaking the patch fixes two problems:
+1) of_find_node_by_name() gets a reference on "bus", thus of_node_put()
+   is necessary to release it. This is the change in omap3xxx_hwmod_init().
+2) of_find_node_by_name() drops a reference to the passed device node,
+   thus it is necessary to call of_node_get(bus) in
+   omap3xxx_hwmod_is_hs_ip_block_usable().
 
-So the gpll really is the only really sane option and I guess simply doing it 
-in the driver (similar to what rk3188 does) might be better.
-If some boards really want to select a different source, they then can do that 
-via assigned-clocks in the board-dts.
+I should have stated that more clearly in the description.
+
+We could ignore 1) to get rid of the warning, but that would leave us with
+a dangling reference to the bus node. I could also improve the description,
+or split the patch in two. Let me know what you prefer.
+
+Another possible change would be to use of_get_child_by_name() instead of
+of_find_node_by_name(). That would, however, only search immediate children
+of the 'ocp' node, not all nodes. I  think that is what is actually intended
+here, but I am not entirely sure. Thoughts ?
+
+Either case, turns out I'll have to re-submit the patch because, as mentioned
+above, of_find_node_by_name() gets a reference to the device node it returns,
+so a put on that node is necessary in omap3xxx_hwmod_is_hs_ip_block_usable().
+
+Guenter
