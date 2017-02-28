@@ -1,36 +1,52 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 28 Feb 2017 11:58:25 +0200
-Subject: [RESEND PATCH v2 0/5] Fix the parse_dt of exynos dsi and remove
- the OF graph
-In-Reply-To: <1488269879-28876-1-git-send-email-hoegeun.kwon@samsung.com>
-References: <CGME20170228081811epcas5p3c0a8151d94511e47a0e0d2b8787b1fb0@epcas5p3.samsung.com>
- <1488269879-28876-1-git-send-email-hoegeun.kwon@samsung.com>
-Message-ID: <CAJKOXPfv8wJ+0L4G_0sB1Qh-svXx4VvNJH_1THSy5SsXuUstzA@mail.gmail.com>
+From: ckeepax@opensource.wolfsonmicro.com (Charles Keepax)
+Date: Tue, 28 Feb 2017 09:59:29 +0000
+Subject: [alsa-devel] [PATCH 0/3] ASoC: Enable a new IC master mode:
+ bcm2835<=>IC<=>cs42xx8
+In-Reply-To: <20170227115108.GA6732@delle.lan>
+References: <8cf68a3e-330d-e76d-e276-5df5453e3baf@flatmax.org>
+ <20170226144958.GA5543@camel2.lan>
+ <732a71ac-5ec5-37e1-1190-be036ea34555@flatmax.org>
+ <20170226221648.GA10974@camel2.lan>
+ <7cef41ee-ef00-22b7-830f-517a9d594ed0@flatmax.org>
+ <20170227080433.GA2718@delle.lan>
+ <170950f7-354f-e6a9-cefb-834a00fadd1b@flatmax.org>
+ <20170227103024.GF2718@delle.lan>
+ <7b78c782-28e1-4849-5d00-8caf30847d5c@flatmax.org>
+ <20170227115108.GA6732@delle.lan>
+Message-ID: <20170228095929.GH2742@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2017 at 10:17 AM, Hoegeun Kwon <hoegeun.kwon@samsung.com> wrote:
-> Hi All,
->
-> [Resend this v2 patches, because i have missing TO and CC.]
->
-> The dsi + panel is a parental relationship, so OF grpah is not needed.
-> Therefore, the current dsi_parse_dt function will throw an error,
-> because there is no linked OF graph for case such as fimd + dsi +
-> panel.
->
-> So the 1/5 patch parse the Pll, burst and esc clock frequency
-> properties in dsi_parse_dt and modified to create a bridge_node only
-> if there is an OF graph associated with dsi.
->
-> Also fixed the dts, which depend on the 1/5 patch. So removed the
-> ports node and move burst and esc clock frequency properties to the
-> parent (DSI node).
+On Mon, Feb 27, 2017 at 12:51:08PM +0100, Matthias Reichl wrote:
+> On Mon, Feb 27, 2017 at 10:21:25PM +1100, Matt Flax wrote:
+> > 
+> > 
+> > On 27/02/17 21:30, Matthias Reichl wrote:
+> > >
+> > >I don't see that. Some people might want to be able to use multichannel
+> > >on RPi, but that's something very different than adding code that just
+> > >lies about driver capabilites.
+> > >
+> > 
+> > I am going to invite you over for dinner to eat steamed vegetables :)
+> > If I make the steamed vegetables in the microwave and they taste like
+> > steamed vegetables, are they steamed vegetables ?
+> 
+> If you connect an amplifier with a volume control to your soundcard
+> does that mean that your soundcard now has a volume control? No, your
+> amp has.
+> 
+> > I have a bcm2835 (Pi 2 and 3) SoC here. It is producing multichannel (8 out,
+> > 6 in) audio. In ALSA we call that DSP mode - right ?!
+> 
+> No. DSP modes are protocol/timing specifications as I2S, PDP, S/PDIF, ...
+> You can look these up in datasheets and if a chip implements such a
+> protocol you can be sure that it adheres to that standard - i.e. it
+> will sync the frames to the pulses on LRclk.
+> 
 
-Discussions in previous thread lead us to bisectability problem.
-Bisectability in regular driver changes is one thing but in case of
-driver + DTS the gap is much bigger. DTS will go through separate tree
-and branches. How do you want to solve the problem?
+I agree with the thoughts in this thread really if the AP doesn't
+actually support DSP A mode we shouldn't add DSP A mode.
 
-Best regards,
-Krzysztof
+Thanks,
+Charles
