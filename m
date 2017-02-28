@@ -1,20 +1,30 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 28 Feb 2017 12:27:00 -0800
-Subject: [PATCH v2] ARM: dts: BCM953012HR: Initial Checkin
-In-Reply-To: <1487877783-25610-1-git-send-email-steven.lin1@broadcom.com>
-References: <1487877783-25610-1-git-send-email-steven.lin1@broadcom.com>
-Message-ID: <20170228202700.8540-1-f.fainelli@gmail.com>
+Date: Tue, 28 Feb 2017 12:29:25 -0800
+Subject: [PATCH] soc: bcm: brcmstb: Match additional compatible strings
+In-Reply-To: <20170215004159.11096-1-florian.fainelli@broadcom.com>
+References: <20170215004159.11096-1-florian.fainelli@broadcom.com>
+Message-ID: <3df8fb67-1809-3781-6f7b-b1057b137f40@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Feb 2017 14:23:03 -0500, Steve Lin <steven.lin1@broadcom.com> wrote:
-> Initial version of DTS to support Broadcom BCM953012HR Northstar
-> HR platform, similar to, but not the same as existing 953012K.
->
-> Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
-> Acked-by: Jon Mason <jon.mason@broadcom.com>
-> ---
+On 02/14/2017 04:41 PM, Florian Fainelli wrote:
+> From: Florian Fainelli <f.fainelli@gmail.com>
+> 
+> Match all known sun-top-ctrl compatible strings from our MIPS chips
+> counterparts. This allows us to properly report the SoC information to
+> user-space through our SoC driver.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Applied, thanks!
---
+Applied.
+
+> ---
+> Ralf, James,
+> 
+> I usually take patches touching this file through an ARM SoC pull request,
+> posting to linux-mips for people working on BMIPS STB to get a chance to review
+> this.
+> 
+> Thanks!
+-- 
 Florian
