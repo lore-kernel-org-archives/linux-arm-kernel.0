@@ -1,42 +1,31 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 28 Feb 2017 06:14:20 +0100
-Subject: [PATCH 4/4] ARM: dts: rockchip: Make uartpll a child of the gpll on
- rk3036
+Date: Tue, 28 Feb 2017 06:14:19 +0100
+Subject: [PATCH 3/4] clk: rockchip: assign the SCLK_UARTPLL clock id on rk3036
 In-Reply-To: <20170228051420.7214-1-heiko@sntech.de>
 References: <20170228051420.7214-1-heiko@sntech.de>
-Message-ID: <20170228051420.7214-5-heiko@sntech.de>
+Message-ID: <20170228051420.7214-4-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The shared uart-pll is normally a child of the apll that can get changed
-by cpu frequency scaling. So move it away to the more stable gpll to
-make sure the uart doesn't break on cpu frequency changes.
-
-This turned up during the 4.11 merge-window when commit
-6a171b299379 ("serial: 8250_dw: Allow hardware flow control to be used")
-added general termios enablement making the uart on rk3036 change
-frequency and thus making it susceptible for the frequency scaling issue.
+Assign it to the matching clock in the clock driver.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3036.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/clk/rockchip/clk-rk3036.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-index ff9b90bfaefd..6442023854c5 100644
---- a/arch/arm/boot/dts/rk3036.dtsi
-+++ b/arch/arm/boot/dts/rk3036.dtsi
-@@ -310,8 +310,9 @@
- 		rockchip,grf = <&grf>;
- 		#clock-cells = <1>;
- 		#reset-cells = <1>;
--		assigned-clocks = <&cru PLL_GPLL>;
--		assigned-clock-rates = <594000000>;
-+		assigned-clocks = <&cru PLL_GPLL>, <&cru SCLK_UARTPLL>;
-+		assigned-clock-rates = <594000000>, <0>;
-+		assigned-clock-parents = <0>, <&cru PLL_GPLL>;
- 	};
+diff --git a/drivers/clk/rockchip/clk-rk3036.c b/drivers/clk/rockchip/clk-rk3036.c
+index dcde70f4c105..d10934b63a0d 100644
+--- a/drivers/clk/rockchip/clk-rk3036.c
++++ b/drivers/clk/rockchip/clk-rk3036.c
+@@ -242,7 +242,7 @@ static struct rockchip_clk_branch rk3036_clk_branches[] __initdata = {
+ 			RK2928_CLKSEL_CON(2), 7, 1, MFLAGS,
+ 			RK2928_CLKGATE_CON(2), 5, GFLAGS),
  
- 	grf: syscon at 20008000 {
+-	MUX(0, "uart_pll_clk", mux_pll_src_apll_dpll_gpll_usb480m_p, 0,
++	MUX(SCLK_UARTPLL, "uart_pll_clk", mux_pll_src_apll_dpll_gpll_usb480m_p, 0,
+ 			RK2928_CLKSEL_CON(13), 10, 2, MFLAGS),
+ 	COMPOSITE_NOMUX(0, "uart0_src", "uart_pll_clk", 0,
+ 			RK2928_CLKSEL_CON(13), 0, 7, DFLAGS,
 -- 
 2.11.0
