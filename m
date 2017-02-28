@@ -1,78 +1,154 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 28 Feb 2017 23:27:02 +0800
-Subject: [PATCH 3/3] ARM: dts: sun8i: enable USB OTG on Orange Pi One
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 28 Feb 2017 23:42:48 +0800
+Subject: [linux-sunxi] [PATCH 1/3] phy: sun4i-usb: support automatically
+ switch PHY0 route to MUSB/HCI
 In-Reply-To: <20170228152702.42602-1-icenowy@aosc.xyz>
 References: <20170228152702.42602-1-icenowy@aosc.xyz>
-Message-ID: <20170228152702.42602-3-icenowy@aosc.xyz>
+Message-ID: <CAGb2v67A8HKkVnHZtUHJnJXR4DZu5obo0ZrXCgpF7nTwVhGLAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Orange Pi One features a MicroUSB port that can work in both host mode
-and peripheral mode.
+On Tue, Feb 28, 2017 at 11:27 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+> On newer Allwinner SoCs (H3 and after), the PHY0 node is routed to both
+> MUSB controller for peripheral and host support (the host support is
+> slightly broken), and a pair of EHCI/OHCI controllers, which provide a
+> better support for host mode.
+>
+> Add support for automatically switch the route of PHY0 according to the
+> status of dr_mode and id det pin.
+>
+> Only H3 have this function enabled in this patch, as further SoCs will
+> be tested later and then have it enabled.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>  drivers/phy/phy-sun4i-usb.c | 55 +++++++++++++++++++++++++++++++--------------
+>  1 file changed, 38 insertions(+), 17 deletions(-)
+>
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index a21b5f24a340..8b91afe8f42d 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -49,12 +49,14 @@
+>  #define REG_PHYBIST                    0x08
+>  #define REG_PHYTUNE                    0x0c
+>  #define REG_PHYCTL_A33                 0x10
+> -#define REG_PHY_UNK_H3                 0x20
+> +#define REG_PHY_OTGCTL                 0x20
+>
+>  #define REG_PMU_UNK1                   0x10
+>
+>  #define PHYCTL_DATA                    BIT(7)
+>
+> +#define OTGCTL_ROUTE_MUSB              BIT(0)
+> +
+>  #define SUNXI_AHB_ICHR8_EN             BIT(10)
+>  #define SUNXI_AHB_INCR4_BURST_EN       BIT(9)
+>  #define SUNXI_AHB_INCRX_ALIGN_EN       BIT(8)
+> @@ -110,6 +112,7 @@ struct sun4i_usb_phy_cfg {
+>         u8 phyctl_offset;
+>         bool dedicated_clocks;
+>         bool enable_pmu_unk1;
+> +       bool phy0_dual_route;
+>  };
+>
+>  struct sun4i_usb_phy_data {
+> @@ -271,23 +274,16 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+>                 writel(val & ~2, phy->pmu + REG_PMU_UNK1);
+>         }
+>
+> -       if (data->cfg->type == sun8i_h3_phy) {
+> -               if (phy->index == 0) {
+> -                       val = readl(data->base + REG_PHY_UNK_H3);
+> -                       writel(val & ~1, data->base + REG_PHY_UNK_H3);
+> -               }
+> -       } else {
+> -               /* Enable USB 45 Ohm resistor calibration */
+> -               if (phy->index == 0)
+> -                       sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
+> +       /* Enable USB 45 Ohm resistor calibration */
+> +       if (phy->index == 0)
+> +               sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
+>
+> -               /* Adjust PHY's magnitude and rate */
+> -               sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
+> +       /* Adjust PHY's magnitude and rate */
+> +       sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
+>
+> -               /* Disconnect threshold adjustment */
+> -               sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
+> -                                   data->cfg->disc_thresh, 2);
+> -       }
+> +       /* Disconnect threshold adjustment */
+> +       sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
+> +                           data->cfg->disc_thresh, 2);
+>
+>         sun4i_usb_phy_passby(phy, 1);
+>
+> @@ -486,6 +482,26 @@ static const struct phy_ops sun4i_usb_phy_ops = {
+>         .owner          = THIS_MODULE,
+>  };
+>
+> +static void sun4i_usb_phy0_reroute(struct sun4i_usb_phy_data *data, int id_det)
+> +{
+> +       u32 regval;
+> +
+> +       if (data->dr_mode == USB_DR_MODE_HOST)
+> +               id_det = 0; /* Force host */
+> +       if (data->dr_mode == USB_DR_MODE_PERIPHERAL)
+> +               id_det = 1; /* Force peripheral*/
+> +
+> +       regval = readl(data->base + REG_PHY_OTGCTL);
+> +       if (id_det == 0) {
+> +               /* Host mode. Route phy0 to EHCI/OHCI */
+> +               regval &= ~OTGCTL_ROUTE_MUSB;
+> +       } else {
+> +               /* Peripheral mode. Route phy0 to MUSB */
+> +               regval |= OTGCTL_ROUTE_MUSB;
+> +       }
+> +       writel(regval, data->base + REG_PHY_OTGCTL);
+> +}
+> +
+>  static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+>  {
+>         struct sun4i_usb_phy_data *data =
+> @@ -511,6 +527,10 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+>         data->force_session_end = false;
+>
+>         if (id_det != data->id_det) {
+> +               /* Re-route PHY0 if necessary */
+> +               if (data->cfg->phy0_dual_route)
+> +                       sun4i_usb_phy0_reroute(data, id_det);
+> +
 
-When in host mode, its VBUS is controlled via a GPIO; when in peripheral
-mode, its VBUS cannot be used to power up the board.
+Would it make sense to do this after force session end?
 
-Add support for this port.
+ChenYu
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- arch/arm/boot/dts/sun8i-h3-orangepi-one.dts | 22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-index 34da853ee037..b87778d74239 100644
---- a/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-one.dts
-@@ -90,6 +90,10 @@
- 	};
- };
- 
-+&ehci0 {
-+	status = "okay";
-+};
-+
- &ehci1 {
- 	status = "okay";
- };
-@@ -104,6 +108,10 @@
- 	status = "okay";
- };
- 
-+&ohci0 {
-+	status = "okay";
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
-@@ -127,6 +135,11 @@
- 	};
- };
- 
-+&reg_usb0_vbus {
-+	gpio = <&r_pio 0 2 GPIO_ACTIVE_HIGH>; /* PL2 */
-+	status = "okay";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
-@@ -151,7 +164,14 @@
- 	status = "disabled";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
- &usbphy {
--	/* USB VBUS is always on */
-+	/* USB Type-A port's VBUS is always on */
-+	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
-+	usb0_vbus-supply = <&reg_usb0_vbus>;
- 	status = "okay";
- };
--- 
-2.11.1
+>                 /* id-change, force session end if we've no vbus detection */
+>                 if (data->dr_mode == USB_DR_MODE_OTG &&
+>                     !sun4i_usb_phy0_have_vbus_det(data))
+> @@ -700,7 +720,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+>                         return PTR_ERR(phy->reset);
+>                 }
+>
+> -               if (i) { /* No pmu for usbc0 */
+> +               if (i || data->cfg->phy0_dual_route) { /* No pmu for musb */
+>                         snprintf(name, sizeof(name), "pmu%d", i);
+>                         res = platform_get_resource_byname(pdev,
+>                                                         IORESOURCE_MEM, name);
+> @@ -825,6 +845,7 @@ static const struct sun4i_usb_phy_cfg sun8i_h3_cfg = {
+>         .disc_thresh = 3,
+>         .dedicated_clocks = true,
+>         .enable_pmu_unk1 = true,
+> +       .phy0_dual_route = true,
+>  };
+>
+>  static const struct sun4i_usb_phy_cfg sun8i_v3s_cfg = {
+> --
+> 2.11.1
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
