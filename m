@@ -1,109 +1,49 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 28 Feb 2017 23:57:43 +0800
-Subject: [linux-sunxi] [PATCH 2/3] ARM: dts: sun8i: add usb_otg and
- OHCI/EHCI for usbc0 on H3
-In-Reply-To: <CAGb2v67fsuhRnGp7X8PDkH_t_gb+gPb6VrY-pVu0B4HhD6d8qA@mail.gmail.com>
-References: <20170228152702.42602-1-icenowy@aosc.xyz>
- <20170228152702.42602-2-icenowy@aosc.xyz>
- <CAGb2v67fsuhRnGp7X8PDkH_t_gb+gPb6VrY-pVu0B4HhD6d8qA@mail.gmail.com>
-Message-ID: <244591488297463@web16h.yandex.ru>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Tue, 28 Feb 2017 17:01:54 +0100
+Subject: [PATCH v4 0/6] ARM: davinci: vpif capture & display support
+Message-ID: <1488297720-4558-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series adds pdata quirks and other changes required to make vpif
+work on the da850-evm board.
 
+v1 -> v2:
+- added patch 1/5 - don't bail-out from pdata_quirks_check() after
+  applying a single quirk
+- changed the comment above the new fixed regulator to make it more
+  descriptive
+- removed unnecessary #ifdefs from pdata-quirks.c
 
-28.02.2017, 23:46, "Chen-Yu Tsai" <wens@csie.org>:
-> On Tue, Feb 28, 2017 at 11:27 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
->> ?Allwinner H3 have a dual-routed USB PHY0 -- routed to either OHCI/EHCI
->> ?or MUSB controller.
->>
->> ?Add device nodes for these controllers.
->>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?---
->> ??arch/arm/boot/dts/sun8i-h3.dtsi | 36 ++++++++++++++++++++++++++++++++++++
->> ??1 file changed, 36 insertions(+)
->>
->> ?diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
->> ?index 27780b97c863..bc9a53edf371 100644
->> ?--- a/arch/arm/boot/dts/sun8i-h3.dtsi
->> ?+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
->> ?@@ -206,6 +206,19 @@
->> ?????????????????????????#size-cells = <0>;
->> ?????????????????};
->>
->> ?+ usb_otg: usb at 01c19000 {
->> ?+ compatible = "allwinner,sun8i-h3-musb";
->> ?+ reg = <0x01c19000 0x0400>;
->> ?+ clocks = <&ccu CLK_BUS_OTG>;
->> ?+ resets = <&ccu RST_BUS_OTG>;
->> ?+ interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
->> ?+ interrupt-names = "mc";
->> ?+ phys = <&usbphy 0>;
->> ?+ phy-names = "usb";
->> ?+ extcon = <&usbphy 0>;
->> ?+ status = "disabled";
->> ?+ };
->> ?+
->> ?????????????????usbphy: phy at 01c19400 {
->> ?????????????????????????compatible = "allwinner,sun8i-h3-usb-phy";
->> ?????????????????????????reg = <0x01c19400 0x2c>,
->> ?@@ -238,6 +251,29 @@
->> ?????????????????????????#phy-cells = <1>;
->> ?????????????????};
->>
->> ?+ ehci0: usb at 01c1a000 {
->> ?+ compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
->> ?+ reg = <0x01c1a000 0x100>;
->> ?+ interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
->> ?+ clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>;
->> ?+ resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
->> ?+ phys = <&usbphy 0>;
->> ?+ phy-names = "usb";
->
-> So this bit is slightly concerning. IIRC the xHCI drivers power on the phy when
-> probed, which means VBUS is _always_ going to be powered on, even when it's
-> supposed to be in peripheral mode. You're probably going to need to rework
-> either the phy or the musb driver to cope with this.
->
-> Or maybe just dropping the phy handle here and letting the musb driver handle
-> it would work, but that requires the musb driver be loaded.
+v2 -> v3:
+- added patch 6/6: add enable GPIOs to pdata-quirks - this is needed
+  because vpif gets its resources from pdata-quirks instead of the
+  device tree
 
-In fact the MUSB driver is always needed -- to set the dr_mode.
+v3 -> v4:
+- removed patch 6/6 - it may take some more time to determine the
+  correct solution for enable-gpios, so I decided to respin the
+  series without it and send it later as a follow-up
+- split the pdata-quirks patch for vpif capture into two separate
+  patches: one adding the OF_DEV_AUXDATA() and one adding the actual
+  quirks
+- split the vpif capture registration into two functions to avoid
+  redundant ifs
 
-And currently MUSB driver can take over the USB bus even if it's host-only by forcing
-its mode in sysfs. 
+Bartosz Golaszewski (3):
+  ARM: davinci: da8xx: allow having multiple pdata-quirks
+  ARM: da850-evm: add a fixed regulator for the UI board IO expander
+  ARM: davinci: add pdata-quirks for da850-evm vpif display
 
->
-> ChenYu
->
->> ?+ status = "disabled";
->> ?+ };
->> ?+
->> ?+ ohci0: usb at 01c1a400 {
->> ?+ compatible = "allwinner,sun8i-h3-ohci", "generic-ohci";
->> ?+ reg = <0x01c1a400 0x100>;
->> ?+ interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
->> ?+ clocks = <&ccu CLK_BUS_EHCI0>, <&ccu CLK_BUS_OHCI0>,
->> ?+ <&ccu CLK_USB_OHCI0>;
->> ?+ resets = <&ccu RST_BUS_EHCI0>, <&ccu RST_BUS_OHCI0>;
->> ?+ phys = <&usbphy 0>;
->> ?+ phy-names = "usb";
->> ?+ status = "disabled";
->> ?+ };
->> ?+
->> ?????????????????ehci1: usb at 01c1b000 {
->> ?????????????????????????compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
->> ?????????????????????????reg = <0x01c1b000 0x100>;
->> ?--
->> ?2.11.1
->>
->> ?--
->> ?You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
->> ?To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> ?For more options, visit https://groups.google.com/d/optout.
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Kevin Hilman (3):
+  ARM: davinci: board-da850-evm: add I2C ID for VPIF
+  ARM: davinci: da8xx: add OF_DEV_AUXDATA() for vpif
+  ARM: davinci: da8xx: add pdata-quirks for VPIF capture
+
+ arch/arm/mach-davinci/board-da850-evm.c |   4 +
+ arch/arm/mach-davinci/da8xx-dt.c        |   1 +
+ arch/arm/mach-davinci/pdata-quirks.c    | 178 +++++++++++++++++++++++++++++++-
+ 3 files changed, 182 insertions(+), 1 deletion(-)
+
+-- 
+2.9.3
