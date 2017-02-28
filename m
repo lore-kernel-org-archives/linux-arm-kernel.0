@@ -1,53 +1,72 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 28 Feb 2017 18:16:10 +0100
-Subject: [PATCH v3 05/25] clocksource: owl: Add S900 support
-In-Reply-To: <20170228063535.32069-6-afaerber@suse.de>
-References: <20170228063535.32069-1-afaerber@suse.de>
- <20170228063535.32069-6-afaerber@suse.de>
-Message-ID: <6fffb7b4-6346-ffb2-ba2c-d6feed0e1294@suse.de>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 28 Feb 2017 19:19:25 +0200
+Subject: [PATCH] arm: exynos increase CONFIG_CMA_SIZE_MBYTES to 96
+In-Reply-To: <82fe7b00-b1bc-cd32-8ff1-a079adfd8607@osg.samsung.com>
+References: <20170228002353.3101-1-shuahkh@osg.samsung.com>
+ <28dfa72b-13f5-2674-92de-d5a264a89e1a@osg.samsung.com>
+ <82fe7b00-b1bc-cd32-8ff1-a079adfd8607@osg.samsung.com>
+Message-ID: <20170228171925.wwr66u4k4vdqg27z@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
-
-Am 28.02.2017 um 07:35 schrieb Andreas F?rber:
-> The Actions Semi S900 SoC provides four 32-bit timers, TIMER0/1/2/3,
-> but no 2Hz timers.
+On Tue, Feb 28, 2017 at 09:52:33AM -0700, Shuah Khan wrote:
+> On 02/28/2017 09:42 AM, Javier Martinez Canillas wrote:
+> > Hello Shuah,
+> > 
+> > The subject line isn't consistent with what's used for exynos_defconfig
+> > changes, please use instead:
+> > 
+> > ARM: exynos_defconfig: Increase CONFIG_CMA_SIZE_MBYTES to 96
+> > 
 > 
-> Deal with the S500 having less timers.
+> oops - I meant o make it exynos_defconfig
 > 
-> An S900 datasheet can be found in 96Boards documentation:
-> https://github.com/96boards/documentation/blob/master/ConsumerEdition/Bubblegum-96/HardwareDocs/SoC_bubblegum96.pdf
+> > On 02/27/2017 09:23 PM, Shuah Khan wrote:
+> >> Current CMA size of 64 Mbytes is right on the edge of being too small
+> >> for some display managers.  With the proposed s5p_mfc patch series that
+> >> pre-allocate buffers, when display manager starts, it fails to get GEM
+> >> buffers.  Increasing the CMA size to 96 solves the problem.
+> >>
+> >> Change CONFIG_CMA_SIZE_MBYTES to 96 in exynos_defconfig to address the
+> >> problem.
+> >>
+> > 
+> > As you mention, the problem is when a driver pre-allocates a lot of CMA
+> > memory. So instead of mentioning an in-flight patch series, I would make
+> > the commit message more generic. Something along the following lines:
 > 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-[...]
-> @@ -126,10 +127,20 @@ static irqreturn_t owl_timer1_interrupt(int irq, void *dev_id)
->  static const struct owl_timer_info s500_timer_info = {
->  	.timer_offset[0] = 0x08,
->  	.timer_offset[1] = 0x14,
-> +	.timer_offset[2] = -1,
-> +	.timer_offset[3] = -1,
-> +};
-> +
-> +static const struct owl_timer_info s900_timer_info = {
-> +	.timer_offset[0] = 0x08,
-> +	.timer_offset[1] = 0x14,
-> +	.timer_offset[2] = 0x30,
-> +	.timer_offset[3] = 0x3c,
->  };
+> I thought about making it generic and decided to mention the problem I am
+> seeing, so there is a context to it. Without this patch, some display
+> managers will see regression.
+> 
+> > 
+> > Current CMA size is 64 Mbytes, but this may not be enough if different
+> > drivers need to allocate big memory chunks.
+> > 
+> > For example, the s5p-mfc driver may need to do a pre-allocation of N MiB
+> > to decode a H.264 1080p video, and there won't be enough CMA memory left
+> > for others drivers, like the exynos-drm driver that may need to allocate
+> > GEM buffers for the display manager.
+> > 
+> > Increasing the CMA size to 96 MiB should be enough for most use cases.
+> 
+> I will add the current problem to throw away section of the patch for more
+> information.
+> 
+> > 
+> >> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+> >> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> >> ---
+> > 
+> > Patch looks good to me though.
+> > 
+> > Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> thanks for the review. I will send v2 with your reviewed by tag
 
-I noticed later that the S900 manual describes TIMER2/3 as "used only in
-Secure mode". My driver code resetting them seems to work though.
+While at it, please put Suggested-by before Sob tag (let's say
+chronological order).
 
-Should we just drop these extra timer initializations then to make the
-driver simpler and more performant again? I'd still like to keep the two
-compatible strings in the DT though, and we may want to disable the 2Hz
-timers on S500 just in case.
 
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Best regards,
+Krzysztof
