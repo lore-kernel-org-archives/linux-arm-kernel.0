@@ -1,52 +1,147 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 28 Feb 2017 14:36:57 +0000
-Subject: [PATCH 2/2] crypto: arm - add build time test for CRC instruction
- support
-In-Reply-To: <1488292617-27317-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1488292617-27317-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1488292617-27317-2-git-send-email-ard.biesheuvel@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 28 Feb 2017 15:38:27 +0100
+Subject: [PATCH v4] reset: Add i.MX7 SRC reset driver
+In-Reply-To: <20170221161331.17012-1-andrew.smirnov@gmail.com>
+References: <20170221161331.17012-1-andrew.smirnov@gmail.com>
+Message-ID: <1488292707.2288.53.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The accelerated CRC32 module for ARM may use either the scalar CRC32
-instructions, the NEON 64x64 to 128 bit polynomial multiplication
-(vmull.p64) instruction, or both, depending on what the current CPU
-supports.
+On Tue, 2017-02-21 at 08:13 -0800, Andrey Smirnov wrote:
+> Add reset controller driver exposing various reset faculties,
+> implemented by System Reset Controller IP block.
+> 
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> ---
+> 
+> Changes since v3 (see [v3]):
+> 
+> 	- Convert code IMX7_RESET_PCIEPHY to change G_RST and BTNRST
+>           simultaneously to make all resets be representable as
+>           signal->bit in signal->offset register
+> 
+> 	- Convert assert/deassert subroutines to be special cases of a
+>           common reset subroutine
+> 
+> Changes since v2 (see [v2]):
+> 
+> 	- Fix typos
+> 
+> 	- Kconfig/Makefile chagnes account for alphabetical sorting of
+>           those files
+> 
+> 	- Remove redundant includes
+> 
+> 	- Make use of regmap_attach_dev and avoid storing refernce to
+>           struct *dev in private data
+> 
+> 	- Change code and headers to expose almost all of the reset
+>           related bits in SRC IP block
+> 
+> Changes since v1 (see [v1]):
+> 
+> 	- Various small DT bindings description fixes as per feedback
+>           from Rob Herring
+> 
+> 
+> [v1] https://lkml.org/lkml/2017/2/6/554
+> [v2] https://lkml.org/lkml/2017/2/13/488
+> [v3] https://lkml.org/lkml/2017/2/20/344
+> 
+> 
+>  .../devicetree/bindings/reset/fsl,imx7-src.txt     |  47 ++++++
+>  drivers/reset/Kconfig                              |   8 ++
+>  drivers/reset/Makefile                             |   2 +
+>  drivers/reset/reset-imx7.c                         | 158 +++++++++++++++++++++
+>  include/dt-bindings/reset/imx7-reset.h             |  62 ++++++++
+>  5 files changed, 277 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+>  create mode 100644 drivers/reset/reset-imx7.c
+>  create mode 100644 include/dt-bindings/reset/imx7-reset.h
+> 
+> diff --git a/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+> new file mode 100644
+> index 0000000..5e1afc3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
+> @@ -0,0 +1,47 @@
+> +Freescale i.MX7 System Reset Controller
+> +======================================
+> +
+> +Please also refer to reset.txt in this directory for common reset
+> +controller binding usage.
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx7-src", "syscon"
+> +- reg: should be register base and length as documented in the
+> +  datasheet
+> +- interrupts: Should contain SRC interrupt
+> +- #reset-cells: 1, see below
+> +
+> +example:
+> +
+> +src: reset-controller at 30390000 {
+> +     compatible = "fsl,imx7d-src", "syscon";
+> +     reg = <0x30390000 0x2000>;
+> +     interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
+> +     #reset-cells = <1>;
+> +};
+> +
+> +
+> +Specifying reset lines connected to IP modules
+> +==============================================
+> +
+> +The system reset controller can be used to reset various set of
+> +peripherals. Device nodes that need access to reset lines should
+> +specify them as a reset phandle in their corresponding node as
+> +specified in reset.txt.
+> +
+> +Example:
+> +
+> +	pcie: pcie at 33800000 {
+> +
+> +		...
+> +
+> +		resets = <&src IMX7_RESET_PCIEPHY>,
+> +			 <&src IMX7_RESET_PCIE_CTRL_APPS_EN>;
+> +		reset-names = "pciephy", "apps";
+> +
+> +		...
+> +        };
+> +
+> +
+> +For list of all valid reset indicies see
+> +<dt-bindings/reset/imx7-reset.h>
+> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+> index 172dc96..bea1800 100644
+> --- a/drivers/reset/Kconfig
+> +++ b/drivers/reset/Kconfig
+> @@ -27,6 +27,14 @@ config RESET_BERLIN
+>  	help
+>  	  This enables the reset controller driver for Marvell Berlin SoCs.
+>  
+> +config RESET_IMX7
+> +	bool "i.MX7 Reset Driver"
+> +	depends on SOC_IMX7D || COMPILE_TEST
+> +	select MFD_SYSCON
+> +	default SOC_IMX7D
 
-However, this also requires support in binutils, and as it turns out,
-versions of binutils exist that support the vmull.p64 instruction but
-not the crc32 instructions.
+Can we make this
 
-So refactor the Makefile logic so that this module only gets built if
-binutils has support for both.
+config RESET_IMX7
+	bool "i.MX7 Reset Driver" if COMPILE_TEST
+	default SOC_IMX7D
+	select MFD_SYSCON
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/crypto/Makefile | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+instead?
 
-diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
-index 1822c4697278..f2215fbeed13 100644
---- a/arch/arm/crypto/Makefile
-+++ b/arch/arm/crypto/Makefile
-@@ -15,7 +15,17 @@ ce-obj-$(CONFIG_CRYPTO_SHA1_ARM_CE) += sha1-arm-ce.o
- ce-obj-$(CONFIG_CRYPTO_SHA2_ARM_CE) += sha2-arm-ce.o
- ce-obj-$(CONFIG_CRYPTO_GHASH_ARM_CE) += ghash-arm-ce.o
- ce-obj-$(CONFIG_CRYPTO_CRCT10DIF_ARM_CE) += crct10dif-arm-ce.o
--ce-obj-$(CONFIG_CRYPTO_CRC32_ARM_CE) += crc32-arm-ce.o
-+crc-obj-$(CONFIG_CRYPTO_CRC32_ARM_CE) += crc32-arm-ce.o
-+
-+ifneq ($(crc-obj-y)$(crc-obj-m),)
-+ifeq ($(call as-instr,.arch armv8-a\n.arch_extension crc,y,n),y)
-+ce-obj-y += $(crc-obj-y)
-+ce-obj-m += $(crc-obj-m)
-+else
-+$(warning These CRC Extensions modules need binutils 2.23 or higher)
-+$(warning $(crc-obj-y) $(crc-obj-m))
-+endif
-+endif
- 
- ifneq ($(ce-obj-y)$(ce-obj-m),)
- ifeq ($(call as-instr,.fpu crypto-neon-fp-armv8,y,n),y)
--- 
-2.7.4
+If you agree, I can fix it up while applying.
+
+regards
+Philipp
