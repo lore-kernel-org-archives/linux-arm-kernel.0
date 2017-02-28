@@ -1,43 +1,128 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Feb 2017 07:44:26 +0100
-Subject: [PATCH 2/3] thermal: add support for the thermal sensor on
- Allwinner new SoCs
-In-Reply-To: <20170227194054.51951-2-icenowy@aosc.xyz>
-References: <20170227194054.51951-1-icenowy@aosc.xyz>
- <20170227194054.51951-2-icenowy@aosc.xyz>
-Message-ID: <20170228064426.jsukm53ybaatpgyx@lukather>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 28 Feb 2017 14:56:00 +0800
+Subject: [PATCH v1] mmc: mediatek: Fixed bug where clock frequency could
+ be set wrong
+In-Reply-To: <1487929124.22858.10.camel@mhfsdcap03>
+References: <1487924527-22584-1-git-send-email-yong.mao@mediatek.com>
+ <1487924527-22584-2-git-send-email-yong.mao@mediatek.com>
+ <CAGS+omDuPwXqTJ2CrLbLvSHdp3CL895qop1x6dLT1u7bG7XnVw@mail.gmail.com>
+ <1487929124.22858.10.camel@mhfsdcap03>
+Message-ID: <CAGS+omCaP99xvpu-A-NVGwdCSKETgtDBxxcYxjTRkFCyzBNL-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2017 at 03:40:53AM +0800, Icenowy Zheng wrote:
-> From: Ondrej Jirman <megous@megous.com>
-> 
-> Allwinner SoCs from H3 (including H5, A64, etc) have a new version of
-> thermal sensor, and needs a new driver for it.
-> 
-> Add such a driver.
-> 
-> Currently only H3 is supported, but other SoCs are easily to be
-> supported by adding new formula and set the sensor number.
-> 
-> Signed-off-by: Ond?ej Jirman <megous@megous.com>
-> [Icenowy: extend to support further multiple-sensor SoCs, change commit
->  message]
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+On Fri, Feb 24, 2017 at 5:38 PM, Yong Mao <yong.mao@mediatek.com> wrote:
+> From:   Yong Mao <yong.mao@mediatek.com>
+> To:     Daniel Kurtz <djkurtz@chromium.org>
+> Subject:        Re: [PATCH v1] mmc: mediatek: Fixed bug where clock frequency
+> could be set wrong
+> Date:   Fri, 24 Feb 2017 17:33:37 +0800
+>
+>
+> On Fri, 2017-02-24 at 17:52 +0900, Daniel Kurtz wrote:
+>> On Fri, Feb 24, 2017 at 5:22 PM, Yong Mao <yong.mao@mediatek.com>
+> wrote:
+>> >
+>> > From: yong mao <yong.mao@mediatek.com>
+>> >
+>> > This patch can fix two issues:
+>> >
+>> > Issue 1:
+>> > The maximum value of clock divider is 0xff.
+>> > Because the type of div is u32, div may be larger than max_div.
+>> > In this case, we should use max_div to set the clock frequency.
+>> >
+>> > Issue 2:
+>> > In previous code, we can not set the correct clock frequency when
+>> > div equals 0xff.
+>> >
+>> > Signed-off-by: Yong Mao <yong.mao@mediatek.com>
+>> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+>> > ---
+>> >  drivers/mmc/host/mtk-sd.c |   13 ++++++++++++-
+>> >  1 file changed, 12 insertions(+), 1 deletion(-)
+>> >
+>> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+>> > index 07f3236..3174445 100644
+>> > --- a/drivers/mmc/host/mtk-sd.c
+>> > +++ b/drivers/mmc/host/mtk-sd.c
+>> > @@ -540,6 +540,7 @@ static void msdc_set_mclk(struct msdc_host
+> *host, unsigned char timing, u32 hz)
+>> >         u32 mode;
+>> >         u32 flags;
+>> >         u32 div;
+>> > +       u32 max_div;
+>>
+>> There's really no need for this variable.  Just use 0xff below.
+> For all of our IC, max_div is not a constant.
+> We will upstream another patch which max_div will get the different
+> value depending on the IC.
+> Therefore, we keep the max_div as a variable here.
 
-There's no need to create a new driver for that. This can be handled
-by the GPADC driver we already have.
+Please add the variable in the patch that uses it as a variable.
 
-Maxime
+>
+>>
+>> >         u32 sclk;
+>> >
+>> >         if (!hz) {
+>> > @@ -590,8 +591,18 @@ static void msdc_set_mclk(struct msdc_host
+> *host, unsigned char timing, u32 hz)
+>> >                         sclk = (host->src_clk_freq >> 2) / div;
+>> >                 }
+>> >         }
+>> > +
+>> > +       /**
+>> > +        * The maximum value of div is 0xff.
+>> > +        * Check if the div is larger than max_div.
+>> > +        */
+>> > +       max_div = 0xff;
+>> > +       if (div > max_div) {
+>> > +               div = max_div;
+>> > +               sclk = (host->src_clk_freq >> 2) / div;
+>> > +       }
+>> >         sdr_set_field(host->base + MSDC_CFG, MSDC_CFG_CKMOD |
+> MSDC_CFG_CKDIV,
+>> > -                       (mode << 8) | (div % 0xff));
+>> > +                     (mode << 8) | div);
+>>
+>> Hmm, I don't know much about this sub-system, but should we even be
+>> allowing requests to set a frequency that we can't actually achieve
+>> with the divider?
+>>
+>
+> No. We can not get a frequency that we can't actually achieve with the
+> divider. This patch is to solve this kind of issue.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170228/e6309858/attachment.sig>
+Sorry, I am trying to understand why we need this patch.
+
+AFAICT, it looks like sometimes msdc_set_mclk() is being called with
+hz that cannot be generated by your hardware.  In particular,
+sometimes the original code computes "div > 255".
+To work around this problem, this patch just caps the divider value to
+255, which is the maximum divider provided by the hardware.  However,
+presumably this means that in this case we won't actually be
+generating the requested hz value.
+
+So, can you please explain in what exact scenario this patch is
+required, and justify why it is ok to generate a clock other than the
+requested in this case?
+
+-Dan
+
+>
+>
+>> >         sdr_set_bits(host->base + MSDC_CFG, MSDC_CFG_CKPDN);
+>> >         while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
+>> >                 cpu_relax();
+>> > --
+>> > 1.7.9.5
+>> >
+>> >
+>> > _______________________________________________
+>> > Linux-mediatek mailing list
+>> > Linux-mediatek at lists.infradead.org
+>> > http://lists.infradead.org/mailman/listinfo/linux-mediatek
+>
+>
+>
