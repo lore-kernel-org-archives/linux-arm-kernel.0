@@ -1,54 +1,107 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 1 Mar 2017 11:14:56 +0100
-Subject: [PATCH 2/3] thermal: add support for the thermal sensor on
- Allwinner new SoCs
-In-Reply-To: <20170301054835.mUDm4hZv@smtp2m.mail.yandex.net>
-References: <20170301054835.mUDm4hZv@smtp2m.mail.yandex.net>
-Message-ID: <20170301101456.a745eghkjoz5zzk7@lukather>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 1 Mar 2017 11:19:15 +0100
+Subject: [PATCH v2] pwm: rockchip: State of pwm clock should synchronize
+ with pwm enabled state
+In-Reply-To: <1488363362-26624-1-git-send-email-david.wu@rock-chips.com>
+References: <1488363362-26624-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <20170301111915.445925ad@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2017 at 03:18:13PM +0800, Icenowy Zheng wrote:
-> 
-> 2017?2?28? 14:44? Maxime Ripard <maxime.ripard@free-electrons.com>???
-> >
-> > On Tue, Feb 28, 2017 at 03:40:53AM +0800, Icenowy Zheng wrote: 
-> > > From: Ondrej Jirman <megous@megous.com> 
-> > > 
-> > > Allwinner SoCs from H3 (including H5, A64, etc) have a new version of 
-> > > thermal sensor, and needs a new driver for it. 
-> > > 
-> > > Add such a driver. 
-> > > 
-> > > Currently only H3 is supported, but other SoCs are easily to be 
-> > > supported by adding new formula and set the sensor number. 
-> > > 
-> > > Signed-off-by: Ond?ej Jirman <megous@megous.com> 
-> > > [Icenowy: extend to support further multiple-sensor SoCs, change commit 
-> > >? message] 
-> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz> 
-> >
-> > There's no need to create a new driver for that. This can be handled 
-> > by the GPADC driver we already have. 
-> 
-> sun8i-ths is not GPADC at all.
-> 
-> The latest SoC I know that use GPADC as thermal sensor is A33.
+On Wed,  1 Mar 2017 18:16:02 +0800
+David Wu <david.wu@rock-chips.com> wrote:
 
-It's not called the same way, but it definitely is an evolution of the
-same controller. There's no need for a new driver, only reworking what
-is already there.
+> From: "david.wu" <david.wu@rock-chips.com>
+> 
+> If the pwm was not enabled at uboot loader, pwm could not work for clock
+> always disabled at pwm driver. The pwm clock is enabled at beginning of
+> pwm_apply(), but disabled at end of pwm_apply().
+> 
+> If the pwm was enabled at uboot loader, pwm clock is always enabled unless
+> closed by ATF. The pwm-backlight might turn off the power at early suspend,
+> should disable pwm clock for saving power consume.
+> 
+> It is important to provide opportunity to enable/disable clock at pwm driver,
+> the pwm consumer should ensure correct order to call pwm enable/disable, and
+> pwm driver ensure state of pwm clock synchronized with pwm enabled state.
+> 
+> Fixes: 2bf1c98aa5a4 ("pwm: rockchip: Add support for atomic update")
+> Cc: stable at vger.kernel.org
+> Signed-off-by: David Wu <david.wu@rock-chips.com>
+> Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/pwm/pwm-rockchip.c | 40 +++++++++++++++++++++++++++++++++-------
+>  1 file changed, 33 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
+> index ef89df1..dbee3c3 100644
+> --- a/drivers/pwm/pwm-rockchip.c
+> +++ b/drivers/pwm/pwm-rockchip.c
+> @@ -191,6 +191,28 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>  	return 0;
+>  }
+>  
+> +static int rk_pwm_enable(struct pwm_chip *chip,
+> +			 struct pwm_device *pwm,
+> +			 bool enable,
+> +			 enum pwm_polarity polarity)
 
-Maxime
+You didn't change the function name:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170301/69df81b3/attachment-0001.sig>
+s/rk_pwm_enable/rockchip_pwm_enable/
+
+> +{
+> +	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+> +	int ret;
+> +
+> +	if (enable) {
+> +		ret = clk_enable(pc->clk);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	pc->data->set_enable(chip, pwm, enable, polarity);
+> +
+> +	if (!enable)
+> +		clk_disable(pc->clk);
+> +
+> +	return 0;
+> +}
+> +
+>  static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+>  			      struct pwm_state *state)
+>  {
+> @@ -207,22 +229,26 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+>  		return ret;
+>  
+>  	if (state->polarity != curstate.polarity && enabled) {
+> -		pc->data->set_enable(chip, pwm, false, state->polarity);
+> +		ret = rk_pwm_enable(chip, pwm, false, state->polarity);
+> +		if (ret)
+> +			goto out;
+>  		enabled = false;
+>  	}
+>  
+>  	ret = rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
+>  	if (ret) {
+>  		if (enabled != curstate.enabled)
+> -			pc->data->set_enable(chip, pwm, !enabled,
+> -					     state->polarity);
+> -
+> +			rk_pwm_enable(chip, pwm, !enabled,
+> +				      state->polarity);
+>  		goto out;
+>  	}
+>  
+> -	if (state->enabled != enabled)
+> -		pc->data->set_enable(chip, pwm, state->enabled,
+> -				     state->polarity);
+> +	if (state->enabled != enabled) {
+> +		ret = rk_pwm_enable(chip, pwm, state->enabled,
+> +				    state->polarity);
+> +		if (ret)
+> +			goto out;
+> +	}
+>  
+>  	/*
+>  	 * Update the state with the real hardware, which can differ a bit
