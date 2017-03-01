@@ -1,67 +1,83 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 1 Mar 2017 20:41:16 +0100 (CET)
-Subject: [PATCH v3 2/7] mmc: bcm2835: Add new driver for the sdhost
- controller.
-In-Reply-To: <87varsequk.fsf@eliezer.anholt.net>
-References: <1487668026-7100-1-git-send-email-kraxel@redhat.com>
- <1487668026-7100-3-git-send-email-kraxel@redhat.com>
- <87tw7c27xk.fsf@eliezer.anholt.net>
- <68761051.37200.1488396112552@email.1und1.de>
- <87varsequk.fsf@eliezer.anholt.net>
-Message-ID: <180442771.37741.1488397276709@email.1und1.de>
+From: plaes@plaes.org (Priit Laes)
+Date: Wed, 01 Mar 2017 21:41:55 +0200
+Subject: [linux-sunxi] [PATCH 3/4] ARM: sun7i: Convert to CCU
+In-Reply-To: <bca96944-bd58-5011-5eb9-01c4a1440fe2@elopez.com.ar>
+References: <20170227210914.18954-1-plaes@plaes.org>
+ <20170227210914.18954-4-plaes@plaes.org>
+ <bca96944-bd58-5011-5eb9-01c4a1440fe2@elopez.com.ar>
+Message-ID: <1488397315.29650.1.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 2017-02-28 at 14:01 -0300, Emilio L?pez wrote:
+> Hi,
+> 
+> I spotted a couple of things here on a quick look, see below
+> 
+> El 27/02/17 a las 18:09, Priit Laes escribi?:
+> > Convert sun7i-a20.dtsi to new CCU driver.
+> > 
+> > > > Signed-off-by: Priit Laes <plaes@plaes.org>
+> > ---
+> > ?arch/arm/boot/dts/sun7i-a20.dtsi | 719 +++++----------------------------------
+> > ?1 file changed, 86 insertions(+), 633 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> > index 04c9977..6f80cb8 100644
+> > --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> > +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> > @@ -47,7 +47,8 @@
+> > ?#include <dt-bindings/interrupt-controller/arm-gic.h>
+> > ?#include <dt-bindings/thermal/thermal.h>
+> > ?
+> > -#include <dt-bindings/clock/sun4i-a10-pll2.h>
+> > +#include <dt-bindings/clock/sun7i-ccu.h>
+> > +#include <dt-bindings/reset/sun7i-ccu.h>
+> > ?#include <dt-bindings/dma/sun4i-a10.h>
+> > ?#include <dt-bindings/pinctrl/sun4i-a10.h>
+> > ?
+> > @@ -67,19 +68,19 @@
+> > > > ?			compatible = "allwinner,simple-framebuffer",
+> > > > ?				?????"simple-framebuffer";
+> > > > ?			allwinner,pipeline = "de_be0-lcd0-hdmi";
+> > > > -			clocks = <&ahb_gates 36>, <&ahb_gates 43>,
+> > > > -				?<&ahb_gates 44>, <&de_be0_clk>,
+> > > > -				?<&tcon0_ch1_clk>, <&dram_gates 26>;
+> > > > +			clocks = <&ccu CLK_AHB_LCD0>, <&ccu CLK_AHB_HDMI1>,
+> > > > +				?<&ccu CLK_AHB_DE_BE0>, <&ccu CLK_DE_BE0>,
+> > > > +				?<&ccu CLK_TCON0_CH1>, <&ccu CLK_DRAM_DE_BE0>;
+> > > > ?			status = "disabled";
+> > > > ?		};
+> > ?
+> > > > -		framebuffer at 1 {
+> > +		framebuffer at 0 {
+> 
+> This looks like an unrelated change
 
-> Eric Anholt <eric@anholt.net> hat am 1. M?rz 2017 um 20:31 geschrieben:
-> 
-> 
-> Stefan Wahren <stefan.wahren@i2se.com> writes:
-> 
-> >> Eric Anholt <eric@anholt.net> hat am 1. M?rz 2017 um 19:00 geschrieben:
-> >> 
-> >> 
-> >> Gerd Hoffmann <kraxel@redhat.com> writes:
-> >> 
-> >> > From: Eric Anholt <eric@anholt.net>
-> >> >
-> >> > The 2835 has two SD controllers: The Arasan sdhci controller (supported
-> >> > by the iproc driver) and a custom sdhost controller.  This patch adds a
-> >> > driver for the latter.
-> >> >
-> >> > The sdhci controller supports both sdcard and sdio.  The sdhost
-> >> > controller supports the sdcard only, but has better performance.  Also
-> >> > note that the rpi3 has sdio wifi, so driving the sdcard with the sdhost
-> >> > controller allows to use the sdhci controller for wifi support.
-> >> >
-> >> > The configuration is done by devicetree via pin muxing.  Both SD
-> >> > controller are available on the same pins (2 pin groups = pin 22 to 27 +
-> >> > pin 48 to 53).  So it's possible to use both SD controllers at the same
-> >> > time with different pin groups.
-> >> >
-> >> > The code was originally written by Phil Elwell in the downstream
-> >> > Rasbperry Pi tree, and I did a major cleanup on it (+319, -707 lines
-> >> > out of the original 2055) for inclusion.
-> >> >
-> >> > Signed-off-by: Eric Anholt <eric@anholt.net>
-> >> 
-> >> Ulf, what do you need done to this driver patch before it can go in?
-> >> The commit message seems like it could use some rewriting at this point
-> >> (Personally I would drop the detailed changelogs from Stefan and Gerd,
-> >> updating the last paragraph here to give them credit), but what's
-> >> important to me is getting the driver in so that distros don't have to
-> >> carry this patch for wifi support.
-> >
-> > I'm still working on 3 small patches for this driver:
-> >
-> > 1. trivial error in a register comment
-> > 2. ignore SDCMD_FAIL_FLAG during bcm2835_finish_command (downstream [1])
-> > 3. remove unnecessary call to bcm2835_reset_internal
-> >
-> > I plan to submit them on Friday.
-> >
-> > [1] - https://github.com/raspberrypi/linux/commit/711cade866c9f865f9b283c9369e9486f27d1fec
-> 
-> Should any of those changes block merging the current code, though? 
+Yup, that 's leftover from changes made during initial debugging. Will
+fix in v2.
 
-No, but the recursion about bcm2835_finish_command() and bcm2835_transfer_complete() is still there.
+> 
+> > @@ -184,21 +185,11 @@
+> > ?
+> > > > > > ?		osc24M: clk at 01c20050 {
+> > > > ?			#clock-cells = <0>;
+> > > > -			compatible = "allwinner,sun4i-a10-osc-clk";
+> > > > -			reg = <0x01c20050 0x4>;
+> > > > +			compatible = "fixed-clock";
+> > > > ?			clock-frequency = <24000000>;
+> > > > ?			clock-output-names = "osc24M";
+> > ?		};
+> 
+> allwinner,sun4i-a10-osc-clk implements a gate apart from a fixed clock,
+> is the feature loss intended?
+
+This is how most of the existing drivers handle it (A13, A31, A33) so I
+didn't want to do anything fancy.. 
+Besides, the code for clock actually configures gate:
+
+static SUNXI_CCU_GATE(hosc_clk, "hosc", "osc24M", 0x050, BIT(0), 0);
+
+
+P?ikest,
+Priit 
