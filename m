@@ -1,98 +1,38 @@
-From: madalin.bucur@nxp.com (Madalin-Cristian Bucur)
-Date: Wed, 1 Mar 2017 10:19:53 +0000
-Subject: [PATCH 1/2] dts: arm64: add LS1043A DPAA support
-In-Reply-To: <CAL_Jsq+RnafS-sM=-NSUK1oXEEPrX4oU-x3qMjcFJpwKBGqPnQ@mail.gmail.com>
-References: <1485787387-12410-1-git-send-email-madalin.bucur@nxp.com>
- <1485787387-12410-2-git-send-email-madalin.bucur@nxp.com>
- <CAL_Jsq+RnafS-sM=-NSUK1oXEEPrX4oU-x3qMjcFJpwKBGqPnQ@mail.gmail.com>
-Message-ID: <HE1PR04MB1129D57E491AA55E7DF07147EC290@HE1PR04MB1129.eurprd04.prod.outlook.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 1 Mar 2017 11:21:12 +0100
+Subject: [PATCH] ARM: oxnas: remove redundant select CPU_V6K
+In-Reply-To: <1488078421-3751-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1488078421-3751-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <2f82de69-5e7e-1138-9a54-18f45f754834@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh+dt at kernel.org]
-> Sent: Wednesday, March 01, 2017 1:20 AM
+On 02/26/2017 04:07 AM, Masahiro Yamada wrote:
+> MACH_OX820 depends on ARCH_MULTI_V6, which already selects CPU_V6K.
 > 
-> On Mon, Jan 30, 2017 at 8:43 AM, Madalin Bucur <madalin.bucur@nxp.com>
-> wrote:
-> > Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
-> > ---
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 > 
-> [...]
+>  arch/arm/mach-oxnas/Kconfig | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> > diff --git a/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
-> b/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
-> > new file mode 100644
-> > index 0000000..cfe6c58
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
-> > @@ -0,0 +1,93 @@
-> > +/*
-> > + * QorIQ BMan Portal device tree stub for 9 portals
-> > + *
-> > + * Copyright 2011-2016 Freescale Semiconductor Inc.
-> > + *
-> > + * Redistribution and use in source and binary forms, with or without
-> > + * modification, are permitted provided that the following conditions
-> are met:
-> > + *     * Redistributions of source code must retain the above copyright
-> > + *      notice, this list of conditions and the following disclaimer.
-> > + *     * Redistributions in binary form must reproduce the above
-> copyright
-> > + *      notice, this list of conditions and the following disclaimer in
-> the
-> > + *      documentation and/or other materials provided with the
-> distribution.
-> > + *     * Neither the name of Freescale Semiconductor nor the
-> > + *      names of its contributors may be used to endorse or promote
-> products
-> > + *      derived from this software without specific prior written
-> permission.
-> > + *
-> > + *
-> > + * ALTERNATIVELY, this software may be distributed under the terms of
-> the
-> > + * GNU General Public License ("GPL") as published by the Free Software
-> > + * Foundation, either version 2 of that License or (at your option) any
-> > + * later version.
-> > + *
-> > + * THIS SOFTWARE IS PROVIDED BY Freescale Semiconductor ``AS IS'' AND
-> ANY
-> > + * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-> IMPLIED
-> > + * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-> ARE
-> > + * DISCLAIMED. IN NO EVENT SHALL Freescale Semiconductor BE LIABLE FOR
-> ANY
-> > + * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-> DAMAGES
-> > + * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-> SERVICES;
-> > + * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-> CAUSED AND
-> > + * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-> OR TORT
-> > + * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
-> USE OF THIS
-> > + * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-> > + */
+> diff --git a/arch/arm/mach-oxnas/Kconfig b/arch/arm/mach-oxnas/Kconfig
+> index 8fa4557..e3610c5 100644
+> --- a/arch/arm/mach-oxnas/Kconfig
+> +++ b/arch/arm/mach-oxnas/Kconfig
+> @@ -28,7 +28,6 @@ config MACH_OX820
+>  	depends on ARCH_MULTI_V6
+>  	select ARM_GIC
+>  	select DMA_CACHE_RWFO if SMP
+> -	select CPU_V6K
+>  	select HAVE_SMP
+>  	select HAVE_ARM_SCU if SMP
+>  	select HAVE_ARM_TWD if SMP
 > 
-> Use SPDX tags here:
-> 
-> SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
 
-Just to be sure, the copyright banner should look like this?
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
 
-/*
- * QorIQ BMan Portal device tree stub for 9 portals
- *
- * Copyright 2011-2016 Freescale Semiconductor Inc.
- * 
- * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
- */
-
-I can make this change for the new added files, for the existing files
-I think a different patch set should take care of the change.
+Applied in oxnas-for-next.
 
 Thanks,
-Madalin
+Neil
