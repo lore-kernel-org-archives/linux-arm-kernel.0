@@ -1,87 +1,77 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Wed, 1 Mar 2017 09:47:09 +0000
-Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy
- interrupts
-References: <1486364596-19699-1-git-send-email-bharatku@xilinx.com>
- <4b04e834-08b6-a728-8fe5-13106d50b3b2@arm.com>
- <8520D5D51A55D047800579B094147198263E68AA@XAP-PVEXMBX02.xlnx.xilinx.com>
- <131228fb-d3f8-3836-3713-e948ed30d398@arm.com>
- <8520D5D51A55D047800579B094147198263E6AF3@XAP-PVEXMBX02.xlnx.xilinx.com>
- <2196f028-b834-9d32-cc3a-e3eb5ed6c3b1@arm.com>
-Message-ID: <8520D5D51A55D047800579B094147198263F6526@XAP-PVEXMBX02.xlnx.xilinx.com>
+From: arend.vanspriel@broadcom.com (Arend Van Spriel)
+Date: Wed, 1 Mar 2017 10:53:46 +0100
+Subject: [PATCH] mmc: core: Fix power sequence ordering in mmc_power_up
+In-Reply-To: <20170301085902.7388-1-romain.perier@collabora.com>
+References: <20170301085902.7388-1-romain.perier@collabora.com>
+Message-ID: <ef8580d1-989f-c9ab-abc7-034eb8cad7d0@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Waiting for Marc's Reply...
- 
-> > -----Original Message-----
-> > From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> > Sent: Thursday, February 09, 2017 9:33 PM
-> > To: Bharat Kumar Gogada <bharatku@xilinx.com>; bhelgaas at google.com;
-> > robh at kernel.org; paul.gortmaker at windriver.com; colin.king at canonical.com;
-> > linux-pci at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> > michal.simek at xilinx.com; arnd at arndb.de; Ravikiran Gummaluri
-> > <rgummal@xilinx.com>
-> > Subject: Re: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy
-> interrupts
-> >
-> > On 09/02/17 15:16, Bharat Kumar Gogada wrote:
-> > >>
-> > >> On 09/02/17 12:01, Bharat Kumar Gogada wrote:
-> > >>>> On 06/02/17 07:03, Bharat Kumar Gogada wrote:
-> > >>>>> +static struct irq_chip nwl_leg_irq_chip = {
-> > >>>>> +	.name = "nwl_pcie:legacy",
-> > >>>>> +	.irq_enable = nwl_unmask_leg_irq,
-> > >>>>> +	.irq_disable = nwl_mask_leg_irq,
-> > >>>>
-> > >>>> You don't need these two if they are implemented in terms of
-> > mask/unmask.
-> > >>>
-> > >>> These are being invoked by some drivers other than interrupt flow.
-> > >>> Ex: drivers/net/wireless/ath/ath9k/main.c
-> > >>> static int ath_reset_internal(struct ath_softc *sc, struct
-> > >>> ath9k_channel *hchan) {
-> > >>>          ....
-> > >>>          disable_irq(sc->irq);
-> > >>>          tasklet_disable(&sc->intr_tq);
-> > >>>         ...
-> > >>>         ...
-> > >>>         enable_irq(sc->irq);
-> > >>>         spin_unlock_bh(&sc->sc_pcu_lock); } For us masking/unmasking
-> > >>> is the way to enable/disable interrupts.
-> > >>
-> > >> And if you looked at the way disable_irq is implemented, you would
-> > >> have found out that it falls back to masking if there is no disable
-> > >> method, preserving the semantic you expect.
-> > >>
-> > > Yes I did see, but this fall back requires extra "IRQ_DISABLE_UNLAZY" flag to
-> > be set to each virq.
-> >
-> > No it doesn't. If you do a disable_irq(), the interrupt is flagged as disabled, but
-> > nothing gets done. If an interrupt actually fires, then the interrupts gets
-> masked,
-> > and the handler is not called.
-> Yes agreed, this is where the problem comes for us. Here is the scenario
-> Ex:drivers/net/wireless/ath/ath9k/main.c
-> static int ath_reset_internal(struct ath_softc *sc, struct ath9k_channel *hchan)
-> {
->   ....
->    ath9k_hw_set_interrupts(ah);
->    ath9k_hw_enable_interrupts(ah);
->    ...
->   enable_irq(sc->irq);
->   ...
-> }
-> If you observe this they enable hardware interrupts first and then call enable_irq,
-> at this point of time
-> virq is in disabled state. So, if interrupt is raised in this period of time the handler
-> is never invoked
-> and DEASEERT_INTx will not be seen. As I mentioned in my subject the irq line
-> between bridge and
-> GIC goes low only after it sees DEASSERT_INTx. But since DEASSERT_INTx is
-> never seen line is always high
-> causing cpu stall.
-> So for this kind of EP's we need those two methods.
+On 1-3-2017 9:59, Romain Perier wrote:
+> Currently, mmc_power_up calls the pre_power_on callback, enables the
+> power supply of the mmc by calling mmc_set_ios() and then call
+> post_power_on. WiFi chipsets like the AP6335 require a specific power
+> sequence ordering before being used. You must enable the power supply
+> and wait until it reaches its minimum voltage, gate the clock and wait
+> at least two cycles and then assert the reset line.
+
+Hi Romain,
+
+You have to be more clear. What power supply, ie. vmmc or the supply for
+the wifi chipset. Without knowing much of the details to me this sounds
+like a new powerseq variant.
+
+> This commit prevents regulators to be enabled in the middle of or after
+> the power sequencing. We this fix, mmc_set_ios is first call, the
+> underlying regulators are enabled, then pre_power_on and post_power_on
+> are called, so clock and reset line are enabled in the right order,
+> after the regulator.
+
+It feels counter intuitive and maybe even wrong to change a setup
+pattern like this. Can you be sure this will not cause any regressions?
+
+Regards,
+Arend
+
+> Signed-off-by: Romain Perier <romain.perier@collabora.com>
+> ---
+>  drivers/mmc/core/core.c | 13 +++++++++----
+>  1 file changed, 9 insertions(+), 4 deletions(-)
 > 
-> Bharat
+> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+> index 1076b9d..36df24f 100644
+> --- a/drivers/mmc/core/core.c
+> +++ b/drivers/mmc/core/core.c
+> @@ -1798,8 +1798,6 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
+>  	if (host->ios.power_mode == MMC_POWER_ON)
+>  		return;
+>  
+> -	mmc_pwrseq_pre_power_on(host);
+> -
+>  	host->ios.vdd = fls(ocr) - 1;
+>  	host->ios.power_mode = MMC_POWER_UP;
+>  	/* Set initial state and call mmc_set_ios */
+> @@ -1819,13 +1817,20 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
+>  	 */
+>  	mmc_delay(10);
+>  
+> -	mmc_pwrseq_post_power_on(host);
+> -
+>  	host->ios.clock = host->f_init;
+>  
+>  	host->ios.power_mode = MMC_POWER_ON;
+>  	mmc_set_ios(host);
+>  
+> +	mmc_pwrseq_pre_power_on(host);
+> +
+> +	/*
+> +	 * This delay should be sufficient to wait at least two cycles of clock
+> +	 * gated by pre_power_on
+> +	 */
+> +	mmc_delay(1);
+> +	mmc_pwrseq_post_power_on(host);
+> +
+>  	/*
+>  	 * This delay must be at least 74 clock sizes, or 1 ms, or the
+>  	 * time required to reach a stable voltage.
+> 
