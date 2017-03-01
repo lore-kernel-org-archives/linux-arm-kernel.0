@@ -1,75 +1,139 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Wed, 1 Mar 2017 08:40:03 -0800
-Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
-In-Reply-To: <871suh5wtw.fsf@concordia.ellerman.id.au>
-References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
- <20170227160601.5b79a1fe@gandalf.local.home>
- <6db89a8d-6053-51d1-5fd4-bae0179a5ebd@caviumnetworks.com>
- <20170227170911.2280ca3e@gandalf.local.home>
- <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
- <20170227173630.57fff459@gandalf.local.home>
- <7bd72716-feea-073f-741c-04212ebd0802@caviumnetworks.com>
- <68fe24ea-7795-24d8-211b-9d8a50affe9f@akamai.com>
- <510FF566-011D-4199-86F7-2BB4DBF36434@linux.vnet.ibm.com>
- <20170228112144.65455de5@gandalf.local.home>
- <cdf98840-8d43-2c58-e2f9-75ae8fb8a600@caviumnetworks.com>
- <1de00727-de97-f887-78bd-dd49131cdf61@akamai.com>
- <999e2c3f-698c-703c-67a9-26aea3c97dc0@caviumnetworks.com>
- <d10e986c-7f6a-3935-88e2-ba39708f79ad@caviumnetworks.com>
- <542488db-5c59-afa5-6d1d-a437c87bc613@akamai.com>
- <912fa97a-aa1d-c0e4-dc83-fc5c745db1c1@caviumnetworks.com>
- <23989c10-7b47-3fda-f790-25b53 9704bec@akamai.com>
- <871suh5wtw.fsf@concordia.ellerman.id.au>
-Message-ID: <7e05bd3d-08da-00ba-1b79-c9be8c659524@caviumnetworks.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Wed, 01 Mar 2017 16:57:00 +0000
+Subject: [PATCH] hwmon: (scpi) Add slope and offset to SCP sensor readings
+In-Reply-To: <CAL9uMOG5qEgyGTue=n7abbFROKGBpUrWDOPi5_bEDUWuiHEUKg@mail.gmail.com>
+ (Carlo Caione's message of "Wed, 1 Mar 2017 17:16:36 +0100")
+References: <20170301132028.25309-1-carlo@caione.org>
+ <41f19cd3-5086-1da9-915a-8987cfc119f9@roeck-us.net>
+ <CAL9uMOG5qEgyGTue=n7abbFROKGBpUrWDOPi5_bEDUWuiHEUKg@mail.gmail.com>
+Message-ID: <87inntorz7.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2017 10:34 PM, Michael Ellerman wrote:
-> Jason Baron <jbaron@akamai.com> writes:
-> ...
->> I also checked all the other .ko files and they were properly aligned.
->> So I think this should hopefully work, and I like that its not a
->> per-arch fix.
+Carlo Caione <carlo@endlessm.com> writes:
+
+> On Wed, Mar 1, 2017 at 4:01 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>> On 03/01/2017 05:20 AM, Carlo Caione wrote:
+>>>
+>>> From: Carlo Caione <carlo@endlessm.com>
+>>>
+>>> The temperature provided by the SCP sensors not always is expressed in
+>>> millicelsius, whereas this is required by the thermal framework. This is
+>>> for example the case for the Amlogic devices, where the SCP sensor
+>>> readings are expressed in degree (and not milli degree) Celsius.
+>>>
+>> Are you saying that SCPI does not specify or provide the units to be used
+>> when reading values, and thus effectively just reports a more or less
+>> random number ?
+>
+> AFAICT the standard does not specify the units to be used for the
+> values or a way to get that information. For the Amlogic case the SCP
+> returns the value of the temperature in degree celsius and I'm not
+> sure how common is that.
+
+The standard does specify the units, but the way it is written seems to
+suggest that the units are part of the platform implementation rather
+than part of the standard [0].
+
+[0] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922g/CABBCJGH.html
+
+>
+> [cut]
+>>> -       *temp = value;
+>>> +       slope = thermal_zone_get_slope(zone->z);
+>>> +       offset = thermal_zone_get_offset(zone->z);
 >>
->> Sachin, sorry to bother you again, but I'm hoping you can try David's
->> latest patch to scripts/module-common.lds, just to test in your setup.
+>>
+>> This is conceptually wrong. The functions return -ENODEV if thermal is
+>> disabled.
+>> While a negative slope does not make sense, a negative offset does.
 >
-> It does fix the problem.
+> Yeah, but in that case we would have already failed to register the
+> thermal zone at all in devm_thermal_zone_of_sensor_register().
 >
-> I was reproducing with crc_t10dif:
->
-> [  695.890552] ------------[ cut here ]------------
-> [  695.890709] WARNING: CPU: 15 PID: 3019 at ../kernel/jump_label.c:287 static_key_set_entries+0x74/0xa0
-> [  695.890710] Modules linked in: crc_t10dif(+) crct10dif_generic crct10dif_common ipt_MASQUERADE nf_nat_masquerade_ipv4 iptable_nat nf_conntrack_ipv4 nf_defrag_ipv4 nf_nat_ipv4 xt_addrtype iptable_filter ip_tables xt_conntrack x_tables nf_nat nf_conntrack bridge stp llc dm_thin_pool dm_persistent_data dm_bio_prison dm_bufio libcrc32c kvm virtio_balloon binfmt_misc autofs4 virtio_net virtio_pci virtio_ring virtio
->
-> Which had:
->
->   [21] __jump_table      PROGBITS        0000000000000000 0004e8 000018 00  WA  0   0  1
->
->
-> And now has:
->
->   [18] __jump_table      PROGBITS        0000000000000000 0004d0 000018 00  WA  0   0  8
->
-> And all other modules have an alignment of 8 on __jump_table, as expected.
->
-> I'm inclined to merge a version of the balign patch for powerpc anyway,
-> just to be on the safe side. I guess the old code was coping fine with
-> the unaligned keys, but it still makes me nervous.
 
+In addition to the thermal sub-subsystem, hwmon sysfs interface also
+expects temperature in millidegree Celsius. Ideally, any change should
+fix the reporting there as well. More below.
 
-The original "balign patch" has a couple of problems:
-
-1) 4-byte alignment is not sufficient for 64-bit kernels
-
-2) It is redundant if the linker script patch is accepted.
-
-
+>> The code in the thermal subsystem does not clarify well how slope and offset
+>> are supposed to be used. Since coming from the thermal subsystem, one would
+>> think
+>> that the thermal subsystem would apply any corrections if they are supposed
+>> to be software correction values, but that does not appear to be the case,
+>> leaving it up to drivers to use or not use the provided values.
 >
-> cheers
+> Yes, this is my understanding also considering this comment here:
+> http://lxr.free-electrons.com/source/drivers/thermal/of-thermal.c#L1006
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> So apparently the slope and offset values are left to be used by the
+> driver, that's why I was changing the temperature driver to use those
+> values.
 >
+>> This is kind of odd; the values are thermal subsystem attributes/properties,
+>> and one would think that they are to be used there unless they are supposed
+>> to be
+>> written into hardware. Given that, I'd rather wait for the API to be
+>> clarified
+>> instead of jumping into using it.
+>
+> Zhang, Eduardo (+CC)
+> can you clarify a bit this point?
+>
+
+Another way to fix this would be to add optional properties to the scpi
+sensors binding and use them instead. This could then be used to fixup
+values reported to both thermal and hwmon.
+
+>> There are secondary problems with this approach; other drivers such as lm90
+>> which
+>> support the thermal subsystem have their own means to specify and use the
+>> offset
+>> (since it needs to be programmed into the chip registers).
+>
+> I fail to see how this is related to my patch. If no coefficient is
+> defined in the thermal zone node in the DT the framework sets slope=1
+> and offset=0, so in the hwmon driver nothing changes.
+>
+>> Also, this would only solve the problem for temperatures and does not
+>> address
+>> the generic problem (ie voltage and current values).
+>
+> This problem is specific for the interaction between the hwmon SCPI
+> driver and the thermal subsystem. Look for example at the board I'm
+> working with one single thermal zone using the temperature data coming
+> from SCP:
+>
+> scpi_sensors: sensors {
+>     compatible = "arm,scpi-sensors";
+>     #thermal-sensor-cells = <1>;
+> };
+>
+> thermal-zones {
+>     soc_thermal {
+>         thermal-sensors = <&scpi_sensors 0>;
+>         coefficients = <1000 0>;
+>
+>         trips {
+>             control: trip-point at 1 {
+>                 temperature = <80000>;
+>                 hysteresis = <1000>;
+>                 type = "passive";
+>             };
+>         };
+>
+>         cooling-maps {
+>             cpufreq_cooling_map {
+>                 trip = <&control>;
+>                 cooling-device = <&cpus THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+>             };
+>         };
+>     };
+> };
+>
+> trip points are defined in milli degree Celsius while the temperature
+> returned by the scpi_sensors node is in degree Celsius. Without using
+> the coefficients property and my changes how can I make the cooling
+> map working fine?
+>
+> Thanks,
