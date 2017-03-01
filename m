@@ -1,38 +1,49 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 1 Mar 2017 11:21:12 +0100
-Subject: [PATCH] ARM: oxnas: remove redundant select CPU_V6K
-In-Reply-To: <1488078421-3751-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1488078421-3751-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <2f82de69-5e7e-1138-9a54-18f45f754834@baylibre.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 1 Mar 2017 15:59:44 +0530
+Subject: [PATCH 1/7] ARM: DRA7: Thermal: Add slope and offset values
+In-Reply-To: <1488364190-23488-1-git-send-email-j-keerthy@ti.com>
+References: <1488364190-23488-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1488364190-23488-2-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/26/2017 04:07 AM, Masahiro Yamada wrote:
-> MACH_OX820 depends on ARCH_MULTI_V6, which already selects CPU_V6K.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
->  arch/arm/mach-oxnas/Kconfig | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-oxnas/Kconfig b/arch/arm/mach-oxnas/Kconfig
-> index 8fa4557..e3610c5 100644
-> --- a/arch/arm/mach-oxnas/Kconfig
-> +++ b/arch/arm/mach-oxnas/Kconfig
-> @@ -28,7 +28,6 @@ config MACH_OX820
->  	depends on ARCH_MULTI_V6
->  	select ARM_GIC
->  	select DMA_CACHE_RWFO if SMP
-> -	select CPU_V6K
->  	select HAVE_SMP
->  	select HAVE_ARM_SCU if SMP
->  	select HAVE_ARM_TWD if SMP
-> 
+Currently the slope and offset values for calculating the
+hot spot temperature of a particular thermal zone is part
+of driver data. Pass them here instead and obtain the values
+while of node parsing.
 
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Applied in oxnas-for-next.
-
-Thanks,
-Neil
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 2c9e56f..10e09dc 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1982,6 +1982,23 @@
+ 
+ &cpu_thermal {
+ 	polling-delay = <500>; /* milliseconds */
++	coefficients = <0 2000>;
++};
++
++&gpu_thermal {
++	coefficients = <0 2000>;
++};
++
++&core_thermal {
++	coefficients = <0 2000>;
++};
++
++&dspeve_thermal {
++	coefficients = <0 2000>;
++};
++
++&iva_thermal {
++	coefficients = <0 2000>;
+ };
+ 
+ /include/ "dra7xx-clocks.dtsi"
+-- 
+1.9.1
