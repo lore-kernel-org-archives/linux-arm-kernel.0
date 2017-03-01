@@ -1,101 +1,61 @@
-From: david.wu@rock-chips.com (David Wu)
-Date: Wed,  1 Mar 2017 19:10:55 +0800
-Subject: [PATCH v3] pwm: rockchip: State of pwm clock should synchronize with
- pwm enabled state
-Message-ID: <1488366655-31387-1-git-send-email-david.wu@rock-chips.com>
+From: thibault.saunier@osg.samsung.com (Thibault Saunier)
+Date: Wed,  1 Mar 2017 08:51:06 -0300
+Subject: [PATCH v6 0/2] Fixes for colorspace logic in exynos-gsc and s5p-mfc
+ drivers
+Message-ID: <20170301115108.14187-1-thibault.saunier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "david.wu" <david.wu@rock-chips.com>
 
-If the pwm was not enabled at uboot loader, pwm could not work for clock
-always disabled at pwm driver. The pwm clock is enabled at beginning of
-pwm_apply(), but disabled at end of pwm_apply().
+Hello,
 
-If the pwm was enabled at uboot loader, pwm clock is always enabled unless
-closed by ATF. The pwm-backlight might turn off the power at early suspend,
-should disable pwm clock for saving power consume.
+This patchset fixes a few issues on the colorspace logic for the exynos-gsc
+and s5p-mfc drivers.
 
-It is important to provide opportunity to enable/disable clock at pwm driver,
-the pwm consumer should ensure correct order to call pwm enable/disable, and
-pwm driver ensure state of pwm clock synchronized with pwm enabled state.
+We now handle the colorspace in those drivers, and make sure to respect user setting if
+possible.
 
-Fixes: 2bf1c98aa5a4 ("pwm: rockchip: Add support for atomic update")
-Cc: stable at vger.kernel.org
-Signed-off-by: David Wu <david.wu@rock-chips.com>
-Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
-change in v2:
- - change the function name from rk_pwm_enable to rockchip_pwm_enable
- drivers/pwm/pwm-rockchip.c | 40 +++++++++++++++++++++++++++++++++-------
- 1 file changed, 33 insertions(+), 7 deletions(-)
+We also now set the 'v4l2_pix_format:field' if userspace passed ANY, and
+replicate users value on the capture side.
 
-diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
-index ef89df1..744d561 100644
---- a/drivers/pwm/pwm-rockchip.c
-+++ b/drivers/pwm/pwm-rockchip.c
-@@ -191,6 +191,28 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 	return 0;
- }
- 
-+static int rockchip_pwm_enable(struct pwm_chip *chip,
-+			 struct pwm_device *pwm,
-+			 bool enable,
-+			 enum pwm_polarity polarity)
-+{
-+	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
-+	int ret;
-+
-+	if (enable) {
-+		ret = clk_enable(pc->clk);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	pc->data->set_enable(chip, pwm, enable, polarity);
-+
-+	if (!enable)
-+		clk_disable(pc->clk);
-+
-+	return 0;
-+}
-+
- static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 			      struct pwm_state *state)
- {
-@@ -207,22 +229,26 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 		return ret;
- 
- 	if (state->polarity != curstate.polarity && enabled) {
--		pc->data->set_enable(chip, pwm, false, state->polarity);
-+		ret = rockchip_pwm_enable(chip, pwm, false, state->polarity);
-+		if (ret)
-+			goto out;
- 		enabled = false;
- 	}
- 
- 	ret = rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
- 	if (ret) {
- 		if (enabled != curstate.enabled)
--			pc->data->set_enable(chip, pwm, !enabled,
--					     state->polarity);
--
-+			rockchip_pwm_enable(chip, pwm, !enabled,
-+				      state->polarity);
- 		goto out;
- 	}
- 
--	if (state->enabled != enabled)
--		pc->data->set_enable(chip, pwm, state->enabled,
--				     state->polarity);
-+	if (state->enabled != enabled) {
-+		ret = rockchip_pwm_enable(chip, pwm, state->enabled,
-+				    state->polarity);
-+		if (ret)
-+			goto out;
-+	}
- 
- 	/*
- 	 * Update the state with the real hardware, which can differ a bit
+This is the sixth version of the patch serie.
+
+Best regards,
+
+Thibault Saunier
+
+Changes in v6:
+- Do not ever guess colorspace
+- Pass user output field value to the capture as the device is not
+  doing any deinterlacing and thus decoded content will still be
+  interlaced on the output.
+
+Changes in v5:
+- Squash commit to always use output colorspace on the capture side
+  inside this one
+- Fix typo in commit message
+- Just adapt the field and never error out.
+
+Changes in v4:
+- Reword commit message to better back our assumptions on specifications
+
+Changes in v3:
+- Do not check values in the g_fmt functions as Andrzej explained in previous review
+- Added 'Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>'
+- Do not check values in the g_fmt functions as Andrzej explained in previous review
+
+Changes in v2:
+- Fix a silly build error that slipped in while rebasing the patches
+
+Thibault Saunier (2):
+  [media] exynos-gsc: Use user configured colorspace if provided
+  [media] s5p-mfc: Handle 'v4l2_pix_format:field' in try_fmt and g_fmt
+
+ drivers/media/platform/exynos-gsc/gsc-core.c    | 9 ++++-----
+ drivers/media/platform/exynos-gsc/gsc-core.h    | 1 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_common.h | 2 ++
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    | 6 +++++-
+ 4 files changed, 12 insertions(+), 6 deletions(-)
+
 -- 
-1.9.1
+2.11.1
