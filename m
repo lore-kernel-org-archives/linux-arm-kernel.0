@@ -1,86 +1,60 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 1 Mar 2017 18:42:37 +0000
-Subject: [PATCH] Documentation: dt: Add binding for
- /secure-chosen/stdout-path
-In-Reply-To: <CAFEAcA9AX5kSMs-PBQWDeDo=PTLoBHPMKc6ctYvR4LVni3rWAA@mail.gmail.com>
-References: <55a2f3cbe477bc876a7547eeb4693218698b87fe.1488387801.git.jerome.forissier@linaro.org>
- <CAFEAcA9AX5kSMs-PBQWDeDo=PTLoBHPMKc6ctYvR4LVni3rWAA@mail.gmail.com>
-Message-ID: <456c743d-5963-3169-be1b-568c9012a993@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 1 Mar 2017 18:43:13 +0000
+Subject: [PATCH v3 11/25] ARM: dts: Add Actions Semi S500 and LeMaker
+ Guitar
+In-Reply-To: <11053e03-8e28-e93d-f1f6-2589a9f7800c@suse.de>
+References: <20170228063535.32069-1-afaerber@suse.de>
+ <20170228063535.32069-12-afaerber@suse.de>
+ <20170228123245.GF3691@leverpostej>
+ <11053e03-8e28-e93d-f1f6-2589a9f7800c@suse.de>
+Message-ID: <20170301184313.GO28874@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/17 17:43, Peter Maydell wrote:
-> On 1 March 2017 at 17:08, Jerome Forissier <jerome.forissier@linaro.org> wrote:
->> Some platforms may use a single device tree to describe two address
->> spaces, as described in d9f43babb998 ("Documentation: dt: Add bindings
->> for Secure-only devices"). For these platforms it makes sense to define
->> a secure counterpart of /chosen, namely: /secure-chosen. This new node
->> is meant to be used by the secure firmware to pass data to the secure
->> OS. Only the stdout-path property is supported for now.
->>
->> Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/arm/secure.txt | 15 ++++++++++++++-
->>  1 file changed, 14 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/secure.txt b/Documentation/devicetree/bindings/arm/secure.txt
->> index e31303f..e7c596a 100644
->> --- a/Documentation/devicetree/bindings/arm/secure.txt
->> +++ b/Documentation/devicetree/bindings/arm/secure.txt
->> @@ -32,7 +32,8 @@ describe the view of Secure world using the standard bindings. These
->>  secure- bindings only need to be used where both the Secure and Normal
->>  world views need to be described in a single device tree.
->>
->> -Valid Secure world properties:
->> +Valid Secure world properties
->> +-----------------------------
->>
->>  - secure-status : specifies whether the device is present and usable
->>    in the secure world. The combination of this with "status" allows
->> @@ -51,3 +52,15 @@ Valid Secure world properties:
->>     status = "disabled"; secure-status = "okay";     /* S-only */
->>     status = "disabled";                             /* disabled in both */
->>     status = "disabled"; secure-status = "disabled"; /* disabled in both */
->> +
->> +The secure-chosen node
->> +----------------------
->> +
->> +Similar to the /chosen node which serves as a place for passing data
->> +between firmware and the operating system, the /secure-chosen node may
->> +be used to pass data to the secure OS. Only the properties defined
->> +below may appear in the /secure-chosen node. They have the same
->> +definition as when used under /chosen, unless explicitely stated
-> 
-> typo: "explicitly".
-> 
->> +otherwise.
->> +
->> +- stdout-path
-> 
-> What's the default for the Secure world if (a) the secure-chosen
-> node doesn't exist at all or (b) it does exist but doesn't
-> define stdout-path? Presumably it should be "fall back to
-> using the chosen node's stdout-path", to match the way we
-> do fallback for other secure world properties, but it would
-> be good to say so explicitly I think.
+On Tue, Feb 28, 2017 at 04:13:00PM +0100, Andreas F?rber wrote:
+> Am 28.02.2017 um 13:32 schrieb Mark Rutland:
+> > On Tue, Feb 28, 2017 at 07:35:21AM +0100, Andreas F?rber wrote:
 
-I'd agree that it would be reasonable for the secure OS to fall back to
-parsing /chosen in the absence of /secure-chosen, but if the latter is
-present I would (at least naively) expect it to be authoritative. I can
-imagine the case of a cut-down version of some system implementing only
-one UART, where you might want to tell the Normal world OS to use that
-and the Secure OS to keep its output to itself - allowing fallbacks at
-the individual property level would make that harder than it needs to
-be, and in general seems like it might be more confusing than useful.
-
-Maintaining the principal that "secure-X" takes complete precedence over
-"X" seems to me to be the least surprising; it's just that in this one
-case X gets to be an entire node rather than a property because /chosen
-is special.
-
-Robin.
-
+> >> +#include "skeleton.dtsi"
+> > 
+> > Please don't include skeleton.dtsi.
 > 
-> thanks
-> -- PMM
+> Wasn't aware that was permissible. I now see it has been updated with a
+> textual comment, which predates my past uses of skeleton.dtsi - for
+> other pending work such as FM4 and XMC4500 I only noticed it was moved
+> out of armv7m.dtsi so that dtc started spewing scary messages. ;)
 > 
+> A #warning might be a more effective way to make people aware of its
+> deprecation - but sadly we have users that predate #include:
+> 
+> $ git grep /include/ -- arch/arm/boot/dts/ | grep skeleton.dtsi | wc --lines
+> 32
+> $ git grep /include/ -- arch/arm/boot/dts/ | grep skeleton64.dtsi | wc
+> --lines
+> 0
+> $ git grep skeleton -- arch/arm/boot/dts/ | wc --lines
+> 117
+
+I deliberately didn't go that route, since people would blindly fix up
+the warning and mess it up (e.g. forgetting to add the required nodes).
+
+While it should be avoided for new dts, it's largely not problematic for
+old dts, and we can fix those up at our leisure.
+
+> > Please add the relevant nodes and
+> > properties explciitly to your dts{i,} files.
+> 
+> Great, will do.
+> 
+> But this series has grown too large to resend just for such nits. Is
+> there a chance we can get initial patches queued on some arm-soc
+> for-next branch soonish? It seems -rc1 pulls were merged 5 days ago?
+
+There seem to be other comments on this series, and I was under the
+impression that arm-soc generally pulled branches.
+
+Even if you're not going to repost, surely you can fold in the fixup
+before sending the pull request?
+
+Thanks,
+Mark.
