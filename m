@@ -1,145 +1,95 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  1 Mar 2017 23:24:02 +0000
-Subject: [PATCH] efi: arm: enable DMI/SMBIOS
-Message-ID: <1488410642-13176-1-git-send-email-ard.biesheuvel@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 1 Mar 2017 15:29:48 -0800
+Subject: [PATCH v2] ARM: OMAP2+: Fix device node reference counts
+In-Reply-To: <20170301201503.GC20160@roeck-us.net>
+References: <1488311640-3594-1-git-send-email-linux@roeck-us.net>
+ <20170301180439.GI20572@atomide.com>
+ <20170301201503.GC20160@roeck-us.net>
+Message-ID: <20170301232948.GJ20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wire up the existing support for SMBIOS tables (aka DMI), by moving the
-arm64 init code to drivers/firmware/efi/arm-runtime.c, which is shared
-between ARM and arm64, and adding a asm/dmi.h header to ARM that defines
-the mapping routines for the firmware tables.
+* Guenter Roeck <linux@roeck-us.net> [170301 12:16]:
+> On Wed, Mar 01, 2017 at 10:04:39AM -0800, Tony Lindgren wrote:
+> > * Guenter Roeck <linux@roeck-us.net> [170228 11:55]:
+> > > After commit 'of: fix of_node leak caused in of_find_node_opts_by_path',
+> > > the following error may be reported when running omap images.
+> > > 
+> > > OF: ERROR: Bad of_node_put() on /ocp at 68000000
+> > > CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc7-next-20170210 #1
+> > > Hardware name: Generic OMAP3-GP (Flattened Device Tree)
+> > > [<c0310604>] (unwind_backtrace) from [<c030bbf4>] (show_stack+0x10/0x14)
+> > > [<c030bbf4>] (show_stack) from [<c05add8c>] (dump_stack+0x98/0xac)
+> > > [<c05add8c>] (dump_stack) from [<c05af1b0>] (kobject_release+0x48/0x7c)
+> > > [<c05af1b0>] (kobject_release)
+> > > 	from [<c0ad1aa4>] (of_find_node_by_name+0x74/0x94)
+> > > [<c0ad1aa4>] (of_find_node_by_name)
+> > > 	from [<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable+0x24/0x2c)
+> > > [<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable) from
+> > > [<c1215d5c>] (omap3xxx_hwmod_init+0x180/0x274)
+> > > [<c1215d5c>] (omap3xxx_hwmod_init)
+> > > 	from [<c120faa8>] (omap3_init_early+0xa0/0x11c)
+> > > [<c120faa8>] (omap3_init_early)
+> > > 	from [<c120fb2c>] (omap3430_init_early+0x8/0x30)
+> > > [<c120fb2c>] (omap3430_init_early)
+> > > 	from [<c1204710>] (setup_arch+0xc04/0xc34)
+> > > [<c1204710>] (setup_arch) from [<c1200948>] (start_kernel+0x68/0x38c)
+> > > [<c1200948>] (start_kernel) from [<8020807c>] (0x8020807c)
+> > > 
+> > > of_find_node_by_name() drops the reference to the passed device node.
+> > > Use of_get_child_by_name() instead. Also, release references to
+> > > device nodes obtained with of_find_node_by_name() and
+> > > of_get_child_by_name() after they are no longer needed.
+> > > 
+> > > While at it, clean up the code and change the return type of
+> > > omap3xxx_hwmod_is_hs_ip_block_usable() to bool to match its use
+> > > and the return type of of_device_is_available().
+> > > 
+> > > Cc: Qi Hou <qi.hou@windriver.com>
+> > > Cc: Peter Rosin <peda@axentia.se>
+> > > Cc: Rob Herring <robh@kernel.org>
+> > > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> > > ---
+> > > v2: Change subject ('Grab reference to device nodes where needed'
+> > >     didn't really cover all the changes made)
+> > >     Use of_get_child_by_name() instead of of_find_node_by_name()
+> > >     Drop references to device nodes as needed
+> > >     Change return type of omap3xxx_hwmod_is_hs_ip_block_usable()
+> > >     to bool
+> > 
+> > OK so now we have a commit id for it and should have:
+> > 
+> > Fixes: 0549bde0fcb1 ("of: fix of_node leak caused in
+> > of_find_node_opts_by_path")
+> > 
+> Not really; 0549bde0fcb1 fixes a bug and hides _this_ bug.
+> More appropriate, if that would exist, would be something like
+> 
+> Exposed-by: 0549bde0fcb1 ("of: fix of_node leak caused in ...")
 
-This allows userspace to access these tables to discover system information
-exposed by the firmware. It also sets the hardware name used in crash
-dumps, e.g.,
+OK
 
-  Unable to handle kernel NULL pointer dereference at virtual address 00000000
-  pgd = ed3c0000
-  [00000000] *pgd=bf1f3835
-  Internal error: Oops: 817 [#1] SMP THUMB2
-  Modules linked in:
-  CPU: 0 PID: 759 Comm: bash Not tainted 4.10.0-09601-g0e8f38792120-dirty #112
-  Hardware name: QEMU KVM Virtual Machine, BIOS 0.0.0 02/06/2015
-  ^^^
+> > What about other leaky users of of_find_node_by_name() and
+> > of_get_child_by_name()?
+> > 
+> > We have those in:
+> > 
+> > control.c
+> > display.c
+> > omap_device.c
+> > omap_hwmod.c
+> > 
+> 
+> I am sure there are many more. For example, the bug solved in my patch
+> "disappears" if one adds some delays (or just log messages) at strategic
+> areas in the code. Such delays result in node leaks elsewhere, which
+> again hides the bug I am trying to fix with my patch.
+> 
+> > So probably it really should be two fixes, one for the regression
+> > causing the error. Then another one for fixing the leaky np use.
+> > 
+> No problem; I 'll split into two patches.
 
-NOTE: This does *NOT* enable or encourage the use of DMI quirks, i.e., the
-      the practice of identifying the platform via DMI to decide whether
-      certain workarounds for buggy hardware and/or firmware need to be
-      enabled. This would require the DMI subsystem to be enabled much
-      earlier than we do on ARM, which is non-trivial.
+OK thanks.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/Kconfig                   | 11 +++++++++++
- arch/arm/include/asm/dmi.h         | 19 +++++++++++++++++++
- arch/arm64/kernel/efi.c            | 15 ---------------
- drivers/firmware/efi/arm-runtime.c | 15 +++++++++++++++
- 4 files changed, 45 insertions(+), 15 deletions(-)
- create mode 100644 arch/arm/include/asm/dmi.h
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index fda6a46d27cf..8214ea99b2f3 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -2089,6 +2089,17 @@ config EFI
- 	  is only useful for kernels that may run on systems that have
- 	  UEFI firmware.
- 
-+config DMI
-+	bool "Enable support for SMBIOS (DMI) tables"
-+	depends on EFI
-+	default y
-+	help
-+	  This enables SMBIOS/DMI feature for systems.
-+
-+	  This option is only useful on systems that have UEFI firmware.
-+	  However, even with this option, the resultant kernel should
-+	  continue to boot on existing non-UEFI platforms.
-+
- endmenu
- 
- menu "CPU Power Management"
-diff --git a/arch/arm/include/asm/dmi.h b/arch/arm/include/asm/dmi.h
-new file mode 100644
-index 000000000000..df2d2ff06f5b
---- /dev/null
-+++ b/arch/arm/include/asm/dmi.h
-@@ -0,0 +1,19 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __ASM_DMI_H
-+#define __ASM_DMI_H
-+
-+#include <linux/io.h>
-+#include <linux/slab.h>
-+
-+#define dmi_early_remap(x, l)		memremap(x, l, MEMREMAP_WB)
-+#define dmi_early_unmap(x, l)		memunmap(x)
-+#define dmi_remap(x, l)			memremap(x, l, MEMREMAP_WB)
-+#define dmi_unmap(x)			memunmap(x)
-+#define dmi_alloc(l)			kzalloc(l, GFP_KERNEL)
-+
-+#endif
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 5d17f377d905..82cd07592519 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -11,7 +11,6 @@
-  *
-  */
- 
--#include <linux/dmi.h>
- #include <linux/efi.h>
- #include <linux/init.h>
- 
-@@ -117,20 +116,6 @@ int __init efi_set_mapping_permissions(struct mm_struct *mm,
- 				   set_permissions, md);
- }
- 
--static int __init arm64_dmi_init(void)
--{
--	/*
--	 * On arm64, DMI depends on UEFI, and dmi_scan_machine() needs to
--	 * be called early because dmi_id_init(), which is an arch_initcall
--	 * itself, depends on dmi_scan_machine() having been called already.
--	 */
--	dmi_scan_machine();
--	if (dmi_available)
--		dmi_set_dump_stack_arch_desc();
--	return 0;
--}
--core_initcall(arm64_dmi_init);
--
- /*
-  * UpdateCapsule() depends on the system being shutdown via
-  * ResetSystem().
-diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
-index 349dc3e1e52e..7149d2f48bb1 100644
---- a/drivers/firmware/efi/arm-runtime.c
-+++ b/drivers/firmware/efi/arm-runtime.c
-@@ -165,3 +165,18 @@ void efi_virtmap_unload(void)
- 	efi_set_pgd(current->active_mm);
- 	preempt_enable();
- }
-+
-+
-+static int __init arm_dmi_init(void)
-+{
-+	/*
-+	 * On arm64/ARM, DMI depends on UEFI, and dmi_scan_machine() needs to
-+	 * be called early because dmi_id_init(), which is an arch_initcall
-+	 * itself, depends on dmi_scan_machine() having been called already.
-+	 */
-+	dmi_scan_machine();
-+	if (dmi_available)
-+		dmi_set_dump_stack_arch_desc();
-+	return 0;
-+}
-+core_initcall(arm_dmi_init);
--- 
-2.7.4
+Tony
