@@ -1,33 +1,69 @@
-From: jerome.forissier@linaro.org (Jerome Forissier)
-Date: Wed,  1 Mar 2017 14:29:27 +0100
-Subject: [PATCH] Documentation: dt: Add binding for /chosen/secure-stdout-path
-Message-ID: <06154a2280a8423af80405825d7201c7aa927696.1488374335.git.jerome.forissier@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 1 Mar 2017 13:55:07 +0000
+Subject: [PATCH] Revert "tty: serial: pl011: add ttyAMA for matching pl011
+ console"
+In-Reply-To: <b5f58d62-7c26-a949-c866-6c292ea07f6b@linaro.org>
+References: <20170301122602.30025-1-aleksey.makarov@linaro.org>
+ <af761742-1362-a120-3f54-4cbe92ddbbbb@arm.com>
+ <b5f58d62-7c26-a949-c866-6c292ea07f6b@linaro.org>
+Message-ID: <49b62273-9645-5310-571a-326acdd35574@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms may use a single device tree to describe two address
-spaces, as described in d9f43babb998 ("Documentation: dt: Add bindings
-for Secure-only devices"). We extend the use of the secure- prefix to
-the stdout-path property, so that the Secure firmware may use a
-different console device than the one used by the kernel.
+On 01/03/17 13:01, Aleksey Makarov wrote:
+> 
+> 
+> On 03/01/2017 03:59 PM, Robin Murphy wrote:
+>> On 01/03/17 12:26, Aleksey Makarov wrote:
+>>> The original patch makes condition always true, so it is wrong.
+>>>
+>>> This reverts commit aea9a80ba98a0c9b4de88850260e9fbdcc98360b.
+>>
+>> It seems fairly clear that the intent of the code merely warrants
+>> s/||/&&/ - wouldn't it be more straightforward to just fix that?
+> 
+> No, I don't think so.  The description of the patch says that it fixes a problem
+> of double printing the logs with SPCR and both console=ttyAMA and earlycon are specified
+> on the command string.  That wrong patch does "fix" it, but introduces
+> a regression with the regular case.
+> 
+> With s/||/&&/ it would not even 'fix' the described problem.
 
-Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
----
- Documentation/devicetree/bindings/arm/secure.txt | 5 +++++
- 1 file changed, 5 insertions(+)
+Ah, I see, so it's that this fundamental approach itself was flawed, but
+the bug causing it to match nothing happened to hide the underlying
+problem. It might be useful to call that out explicitly in the commit
+log. FWIW the "enabling the main console reprints earlycon contents"
+problem has also been present for a while in the non-ACPI case when
+relying on stdout-path for both main console and earlycon in DT, i.e.
+with just "earlycon" on the command line (it seems to be OK if you
+specify "earlycon=pl011,..." or explicitly add "console=ttyAMA0").
 
-diff --git a/Documentation/devicetree/bindings/arm/secure.txt b/Documentation/devicetree/bindings/arm/secure.txt
-index e31303f..558c9a1 100644
---- a/Documentation/devicetree/bindings/arm/secure.txt
-+++ b/Documentation/devicetree/bindings/arm/secure.txt
-@@ -51,3 +51,8 @@ Valid Secure world properties:
-    status = "disabled"; secure-status = "okay";     /* S-only */
-    status = "disabled";                             /* disabled in both */
-    status = "disabled"; secure-status = "disabled"; /* disabled in both */
-+
-+- secure-stdout-path (/chosen node): specifies the device to be used
-+for console output by Secure firmware. The syntax is the same as for
-+"stdout-path". If "secure-stdout-path" is not specified it defaults to
-+the same value as "stdout-path".
--- 
-2.7.4
+Thanks,
+Robin.
+
+> 
+> Thank you
+> Aleksey Makarov
+> 
+>> Robin.
+>>
+>>> ---
+>>>  drivers/tty/serial/amba-pl011.c | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+>>> index 8789ea423ccf..56f92d7348bf 100644
+>>> --- a/drivers/tty/serial/amba-pl011.c
+>>> +++ b/drivers/tty/serial/amba-pl011.c
+>>> @@ -2373,7 +2373,7 @@ static int __init pl011_console_match(struct console *co, char *name, int idx,
+>>>  	if (strcmp(name, "qdf2400_e44") == 0) {
+>>>  		pr_info_once("UART: Working around QDF2400 SoC erratum 44");
+>>>  		qdf2400_e44_present = true;
+>>> -	} else if (strcmp(name, "pl011") != 0 || strcmp(name, "ttyAMA") != 0) {
+>>> +	} else if (strcmp(name, "pl011") != 0) {
+>>>  		return -ENODEV;
+>>>  	}
+>>>  
+>>>
+>>
+> 
