@@ -1,96 +1,61 @@
-From: jbaron@akamai.com (Jason Baron)
-Date: Wed, 1 Mar 2017 15:02:52 -0500
-Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
-In-Reply-To: <7e05bd3d-08da-00ba-1b79-c9be8c659524@caviumnetworks.com>
-References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
- <6db89a8d-6053-51d1-5fd4-bae0179a5ebd@caviumnetworks.com>
- <20170227170911.2280ca3e@gandalf.local.home>
- <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
- <20170227173630.57fff459@gandalf.local.home>
- <7bd72716-feea-073f-741c-04212ebd0802@caviumnetworks.com>
- <68fe24ea-7795-24d8-211b-9d8a50affe9f@akamai.com>
- <510FF566-011D-4199-86F7-2BB4DBF36434@linux.vnet.ibm.com>
- <20170228112144.65455de5@gandalf.local.home>
- <cdf98840-8d43-2c58-e2f9-75ae8fb8a600@caviumnetworks.com>
- <1de00727-de97-f887-78bd-dd49131cdf61@akamai.com>
- <999e2c3f-698c-703c-67a9-26aea3c97dc0@caviumnetworks.com>
- <d10e986c-7f6a-3935-88e2-ba39708f79ad@caviumnetworks.com>
- <542488db-5c59-afa5-6d1d-a437c87bc613@akamai.com>
- <912fa97a-aa1d-c0e4-dc83-fc5c745db1c1@caviumnetworks.com>
- <23989c10-7b47-3fda-f790-25b53 9704bec@akamai.com>
- <871suh5wtw.fsf@concordia.ellerman.id.au>
- <7e05bd3d-08da-00ba-1b79-c9be8c659524@caviumnetworks.com>
-Message-ID: <cd989fed-a136-5110-f22e-d334d923ca8b@akamai.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 1 Mar 2017 15:03:12 -0500
+Subject: [PATCH v4 00/23] drm/rockchip: MIPI fixes & improvements
+In-Reply-To: <20170224125506.21533-1-john@metanate.com>
+References: <20170224125506.21533-1-john@metanate.com>
+Message-ID: <20170301200312.GB13635@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/01/2017 11:40 AM, David Daney wrote:
-> On 02/28/2017 10:34 PM, Michael Ellerman wrote:
->> Jason Baron <jbaron@akamai.com> writes:
->> ...
->>> I also checked all the other .ko files and they were properly aligned.
->>> So I think this should hopefully work, and I like that its not a
->>> per-arch fix.
->>>
->>> Sachin, sorry to bother you again, but I'm hoping you can try David's
->>> latest patch to scripts/module-common.lds, just to test in your setup.
->>
->> It does fix the problem.
->>
->> I was reproducing with crc_t10dif:
->>
->> [  695.890552] ------------[ cut here ]------------
->> [  695.890709] WARNING: CPU: 15 PID: 3019 at
->> ../kernel/jump_label.c:287 static_key_set_entries+0x74/0xa0
->> [  695.890710] Modules linked in: crc_t10dif(+) crct10dif_generic
->> crct10dif_common ipt_MASQUERADE nf_nat_masquerade_ipv4 iptable_nat
->> nf_conntrack_ipv4 nf_defrag_ipv4 nf_nat_ipv4 xt_addrtype
->> iptable_filter ip_tables xt_conntrack x_tables nf_nat nf_conntrack
->> bridge stp llc dm_thin_pool dm_persistent_data dm_bio_prison dm_bufio
->> libcrc32c kvm virtio_balloon binfmt_misc autofs4 virtio_net virtio_pci
->> virtio_ring virtio
->>
->> Which had:
->>
->>   [21] __jump_table      PROGBITS        0000000000000000 0004e8
->> 000018 00  WA  0   0  1
->>
->>
->> And now has:
->>
->>   [18] __jump_table      PROGBITS        0000000000000000 0004d0
->> 000018 00  WA  0   0  8
->>
->> And all other modules have an alignment of 8 on __jump_table, as
->> expected.
->>
->> I'm inclined to merge a version of the balign patch for powerpc anyway,
->> just to be on the safe side. I guess the old code was coping fine with
->> the unaligned keys, but it still makes me nervous.
+On Fri, Feb 24, 2017 at 12:54:43PM +0000, John Keeping wrote:
+> This version is mostly small changes in response to review comments from
+> Sean and Chris, the details are in the individual patches.
 > 
+> I decided to drop the final patch which adds support for MIPI read
+> commands because I'm not using that feature now and I can't easily test
+> it.  It's on the list if anyone wants to pick it up in the future.
 > 
-> The original "balign patch" has a couple of problems:
+> Version 3 was posted here:
+> http://www.spinics.net/lists/dri-devel/msg130977.html
 > 
-> 1) 4-byte alignment is not sufficient for 64-bit kernels
+> Thanks to Sean Paul and Chris Zhong for their review and testing of this
+> series.
 > 
-> 2) It is redundant if the linker script patch is accepted.
+> John Keeping (23):
+>   drm/rockchip: dw-mipi-dsi: don't configure hardware in mode_set for
+>     MIPI
+>   drm/rockchip: dw-mipi-dsi: pass mode in where needed
+>   drm/rockchip: dw-mipi-dsi: remove mode_set hook
+>   drm/rockchip: dw-mipi-dsi: fix command header writes
+>   drm/rockchip: dw-mipi-dsi: fix generic packet status check
+>   drm/rockchip: dw-mipi-dsi: avoid out-of-bounds read on tx_buf
+>   drm/rockchip: dw-mipi-dsi: include bad value in error message
+>   drm/rockchip: dw-mipi-dsi: respect message flags
+>   drm/rockchip: dw-mipi-dsi: only request HS clock when required
+>   drm/rockchip: dw-mipi-dsi: don't assume buffer is aligned
+>   drm/rockchip: dw-mipi-dsi: prepare panel after phy init
+>   drm/rockchip: dw-mipi-dsi: allow commands in panel_disable
+>   drm/rockchip: dw-mipi-dsi: fix escape clock rate
+>   drm/rockchip: dw-mipi-dsi: ensure PHY is reset
+>   drm/rockchip: dw-mipi-dsi: configure PHY before enabling
+>   drm/rockchip: dw-mipi-dsi: properly configure PHY timing
+>   drm/rockchip: dw-mipi-dsi: improve PLL configuration
+>   drm/rockchip: dw-mipi-dsi: use specific poll helper
+>   drm/rockchip: dw-mipi-dsi: use positive check for N{H,V}SYNC
+>   drm/rockchip: vop: test for P{H,V}SYNC
+>   drm/rockchip: dw-mipi-dsi: defer probe if panel is not loaded
+>   drm/rockchip: dw-mipi-dsi: support non-burst modes
+>   drm/rockchip: dw-mipi-dsi: add reset control
 > 
-> 
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c      | 325 +++++++++++++++++++---------
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   4 +-
+>  2 files changed, 220 insertions(+), 109 deletions(-)
 
-The linker script patch seems reasonable to me.
-
-Maybe its worth adding a comment that the alignment is necessary because
-the core jump_label makes use of the 2 lsb bits of its __jump_table
-pointer due to commit:
-
-3821fd3 jump_label: Reduce the size of struct static_key
-
-Also, in the comment it says that it fixes an oops. We hit a WARN_ON()
-not an oops, although bad things are likely to happen when the branch is
-updated.
+Applied to drm-misc
 
 Thanks,
 
--Jason
+Sean
+> 
+> -- 
+> 2.12.0.rc0.230.gf625d4cdb9.dirty
