@@ -1,8 +1,9 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 1 Mar 2017 15:59:43 +0530
-Subject: [PATCH 0/7] thermal: ti-soc-thermal: Migrate slope/offset data to
- device tree
-Message-ID: <1488364190-23488-1-git-send-email-j-keerthy@ti.com>
+Date: Wed, 1 Mar 2017 15:59:46 +0530
+Subject: [PATCH 3/7] ARM: OMAP443x: Thermal: Add slope and offset values
+In-Reply-To: <1488364190-23488-1-git-send-email-j-keerthy@ti.com>
+References: <1488364190-23488-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <1488364190-23488-4-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,26 +12,23 @@ hot spot temperature of a particular thermal zone is part
 of driver data. Pass them here instead and obtain the values
 while of node parsing.
 
-Tested for the slope and constant values on DRA7-EVM.
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
+ arch/arm/boot/dts/omap443x.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Keerthy (7):
-  ARM: DRA7: Thermal: Add slope and offset values
-  ARM: OMAP5: Thermal: Add slope and offset values
-  ARM: OMAP443x: Thermal: Add slope and offset values
-  ARM: OMAP4460: Thermal: Add slope and offset values
-  thermal: ti-soc-thermal: Fetch slope and offset from DT
-  thermal: ti-soc-thermal: Remove redundant constants
-  thermal: ti-soc-thermal: Remove redundant code
-
- arch/arm/boot/dts/dra7.dtsi                        |  17 +++
- arch/arm/boot/dts/omap443x.dtsi                    |   4 +
- arch/arm/boot/dts/omap4460.dtsi                    |   4 +
- arch/arm/boot/dts/omap5.dtsi                       |   9 ++
- .../thermal/ti-soc-thermal/dra752-thermal-data.c   |  10 --
- .../thermal/ti-soc-thermal/omap4-thermal-data.c    |   4 -
- .../thermal/ti-soc-thermal/omap5-thermal-data.c    |   4 -
- drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 164 ++-------------------
- 8 files changed, 45 insertions(+), 171 deletions(-)
-
+diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
+index fc6a861..03c8ad9 100644
+--- a/arch/arm/boot/dts/omap443x.dtsi
++++ b/arch/arm/boot/dts/omap443x.dtsi
+@@ -71,4 +71,8 @@
+ 
+ };
+ 
++&cpu_thermal {
++	coefficients = <0 20000>;
++};
++
+ /include/ "omap443x-clocks.dtsi"
 -- 
 1.9.1
