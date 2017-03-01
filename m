@@ -1,149 +1,114 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  1 Mar 2017 11:46:04 +0100
-Subject: [PATCH v2 3/3] ARM64: dts: meson-gx: Add MALI nodes for GXBB and GXL
-In-Reply-To: <1488365164-22861-1-git-send-email-narmstrong@baylibre.com>
-References: <1488365164-22861-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1488365164-22861-4-git-send-email-narmstrong@baylibre.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 1 Mar 2017 18:41:40 +0800
+Subject: [PATCH] mm: free reserved area's memmap if possiable
+In-Reply-To: <a9c03f7d-355b-76c4-2a3a-771d57af1591@huawei.com>
+References: <1486987349-58711-1-git-send-email-zhouxianrong@huawei.com>
+ <1487055180-128750-1-git-send-email-zhouxianrong@huawei.com>
+ <CAKv+Gu9NF3dS_EWi4k42Ke+aagTScu-yk+UFZ_6sG6tK5zHP2Q@mail.gmail.com>
+ <04630153-bc82-ac1f-2f80-344c90200732@huawei.com>
+ <CAKv+Gu_X3fNhfUZ9+4Q_jdt2J12d9sxj1cgOq82HaQ8Gw_QaQA@mail.gmail.com>
+ <a9c03f7d-355b-76c4-2a3a-771d57af1591@huawei.com>
+Message-ID: <20170301184140.7ac9de0a@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The same MALI-450 MP3 GPU is present in the GXBB and GXL SoCs.
+Add Chen, Catalin
 
-The node is simply added in the meson-gxbb.dtsi file.
+On Thu, 16 Feb 2017 09:11:29 +0800 zhouxianrong wrote:
+> 
+> 
+> On 2017/2/15 15:10, Ard Biesheuvel wrote:
+> > On 15 February 2017 at 01:44, zhouxianrong wrote:  
+> >>
+> >>
+> >> On 2017/2/14 17:03, Ard Biesheuvel wrote:  
+> >>>
+> >>> On 14 February 2017 at 06:53,  <zhouxianrong@huawei.com> wrote:  
+> >>>>
+> >>>> From: zhouxianrong <zhouxianrong@huawei.com>
+> >>>>
+> >>>> just like freeing no-map area's memmap (gaps of memblock.memory)
+> >>>> we could free reserved area's memmap (areas of memblock.reserved)
+> >>>> as well only when user of reserved area indicate that we can do
+> >>>> this in drivers. that is, user of reserved area know how to
+> >>>> use the reserved area who could not memblock_free or free_reserved_xxx
+> >>>> the reserved area and regard the area as raw pfn usage by kernel.
+> >>>> the patch supply a way to users who want to utilize the memmap
+> >>>> memory corresponding to raw pfn reserved areas as many as possible.
+> >>>> users can do this by memblock_mark_raw_pfn interface which mark the
+> >>>> reserved area as raw pfn and tell free_unused_memmap that this area's
+> >>>> memmap could be freeed.
+> >>>>  
+> >>>
+> >>> Could you give an example how much memory we actually recover by doing
+> >>> this? I understand it depends on the size of the reserved regions, but
+> >>> I'm sure you have an actual example that inspired you to write this
+> >>> patch.  
+> >>
+> >>
+> >> i did statistics in our platform, the memmap of reserved region that can be
+> >> freed
+> >> is about 6MB. it's fewer.
 
-For GXL, since a lot is shared with the GXM that has a MALI-T820 IP, this
-patch adds a new meson-gxl-mali.dtsi and is included in the SoC specific
-dtsi files.
+<...>
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi      | 37 ++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi  | 43 ++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi |  1 +
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi |  1 +
- 4 files changed, 82 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
+> >>> In any case, it is good to emphasize that on 4 KB pagesize kernels, we
+> >>> will only free multiples of 8 MB that are 8 MB aligned, resulting in
+> >>> 128 KB of memmap backing to be released.  
+> >>
+> >>
+> >>  
+> >>>
+> >>>  
+> >>>> +               if (start < end)
+> >>>> +                       free_memmap(start, end);
+> >>>> +       }
+> >>>>  }
+> >>>>  #endif /* !CONFIG_SPARSEMEM_VMEMMAP */
+> >>>>
+> >>>> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+> >>>> index 5b759c9..9f8d277 100644
+> >>>> --- a/include/linux/memblock.h
+> >>>> +++ b/include/linux/memblock.h
+> >>>> @@ -26,6 +26,7 @@ enum {
+> >>>>         MEMBLOCK_HOTPLUG        = 0x1,  /* hotpluggable region */
+> >>>>         MEMBLOCK_MIRROR         = 0x2,  /* mirrored region */
+> >>>>         MEMBLOCK_NOMAP          = 0x4,  /* don't add to kernel direct
+> >>>> mapping */
+> >>>> +       MEMBLOCK_RAW_PFN        = 0x8,  /* region whose memmap never be
+> >>>> used */  
+> >>>
+> >>>
+> >>> I think we should be *very* careful about the combinatorial explosion
+> >>> that results when combining all these flags, given that this is not a
+> >>> proper enum but a bit field.
+> >>>
+> >>> In any case, the generic memblock change should be in a separate patch
+> >>> from the arm64 change.  
+> >>
+> >>
+> >> MEMBLOCK_RAW_PFN and MEMBLOCK_NOMAP can not be set at the same time
+> >>  
+> >
+> > They should not. But if I call  memblock_mark_raw_pfn() on a
+> > MEMBLOCK_NOMAP region, it will have both flags set.
+> >
+> > In summary, I don't think we need this patch. And if you can convince
+> > us otherwise, you should really be more methodical and explicit in
+> > implementing this RAW_PFN flag, not add it as a byproduct of the arch
+> > code that uses it. Also, you should explain how RAW_PFN relates to
+> > NOMAP, and ensure that RAW_PFN and NOMAP regions don't intersect if
+> > that is an unsupported combination.  
+> 
+> yes, setting both MEMBLOCK_RAW_PFN and MEMBLOCK_NOMAP could meet some problems
+> when gaps of memblock.memory intersect memblock.reserved. if they do not intersect,
+> that's ok. so as you said this should be carefully considered.
+> 
+> as you think this patch is not needed because, i have showed my idea, it's enough, thanks!
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index b353073..4f7ae6a 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -474,6 +474,43 @@
- 	};
- };
- 
-+&apb {
-+	mali: gpu at c0000 {
-+		compatible = "amlogic,meson-gxbb-mali", "arm,mali-450";
-+		reg = <0x0 0xc0000 0x0 0x40000>;
-+		interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "gp", "gpmmu", "pp", "pmu",
-+			"pp0", "ppmmu0", "pp1", "ppmmu1",
-+			"pp2", "ppmmu2";
-+		clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_MALI>;
-+		clock-names = "bus", "core";
-+
-+		/*
-+		 * Mali clocking is provided by two identical clock paths
-+		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
-+		 * free mux to safely change frequency while running.
-+		 */
-+		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
-+				  <&clkc CLKID_MALI_0>,
-+				  <&clkc CLKID_MALI>; /* Glitch free mux */
-+		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
-+					 <0>, /* Do Nothing */
-+					 <&clkc CLKID_MALI_0>;
-+		assigned-clock-rates = <0>, /* Do Nothing */
-+				       <666666666>,
-+				       <0>; /* Do Nothing */
-+	};
-+};
-+
- &i2c_A {
- 	clocks = <&clkc CLKID_I2C>;
- };
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
-new file mode 100644
-index 0000000..f06cc234
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
-@@ -0,0 +1,43 @@
-+/*
-+ * Copyright (c) 2017 BayLibre SAS
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+&apb {
-+	mali: gpu at c0000 {
-+		compatible = "amlogic,meson-gxbb-mali", "arm,mali-450";
-+		reg = <0x0 0xc0000 0x0 0x40000>;
-+		interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 163 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-names = "gp", "gpmmu", "pp", "pmu",
-+			"pp0", "ppmmu0", "pp1", "ppmmu1",
-+			"pp2", "ppmmu2";
-+		clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_MALI>;
-+		clock-names = "bus", "core";
-+
-+		/*
-+		 * Mali clocking is provided by two identical clock paths
-+		 * MALI_0 and MALI_1 muxed to a single clock by a glitch
-+		 * free mux to safely change frequency while running.
-+		 */
-+		assigned-clocks = <&clkc CLKID_MALI_0_SEL>,
-+				  <&clkc CLKID_MALI_0>,
-+				  <&clkc CLKID_MALI>; /* Glitch free mux */
-+		assigned-clock-parents = <&clkc CLKID_FCLK_DIV3>,
-+					 <0>, /* Do Nothing */
-+					 <&clkc CLKID_MALI_0>;
-+		assigned-clock-rates = <0>, /* Do Nothing */
-+				       <666666666>,
-+				       <0>; /* Do Nothing */
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
-index 615308e..5a90e30 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
-@@ -42,6 +42,7 @@
-  */
- 
- #include "meson-gxl.dtsi"
-+#include "meson-gxl-mali.dtsi"
- 
- / {
- 	compatible = "amlogic,s905d", "amlogic,meson-gxl";
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
-index 08237ee..0f78d83 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
-@@ -42,6 +42,7 @@
-  */
- 
- #include "meson-gxl.dtsi"
-+#include "meson-gxl-mali.dtsi"
- 
- / {
- 	compatible = "amlogic,s905x", "amlogic,meson-gxl";
--- 
-1.9.1
+we are also interested in this area.
+
+Just curious, is this patch to "free the vmemmap holes" mentioned by
+by Catalin in [1]?
+
+[1]http://lkml.iu.edu/hypermail/linux/kernel/1604.1/03036.html
