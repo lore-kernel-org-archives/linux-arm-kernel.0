@@ -1,89 +1,234 @@
-From: gerg@uclinux.org (Greg Ungerer)
-Date: Wed,  1 Mar 2017 11:50:40 +1000
-Subject: [PATCHv3 4/4] ARM: versatile: support configuring versatile machine
- for no-MMU
-In-Reply-To: <1488333040-3599-1-git-send-email-gerg@uclinux.org>
-References: <1488332385-3367-1-git-send-email-gerg@uclinux.org>
- <1488333040-3599-1-git-send-email-gerg@uclinux.org>
-Message-ID: <1488333040-3599-2-git-send-email-gerg@uclinux.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 1 Mar 2017 10:34:10 +0800
+Subject: [linux-sunxi] [PATCH 5/5] pinctrl: sunxi: Add A64 R_PIO
+ controller support
+In-Reply-To: <b04ad85d-698b-56b4-6b82-1791bd7b14b7@arm.com>
+References: <20170228172444.59655-1-icenowy@aosc.xyz>
+ <20170228172444.59655-5-icenowy@aosc.xyz>
+ <b04ad85d-698b-56b4-6b82-1791bd7b14b7@arm.com>
+Message-ID: <CAGb2v6793DDHHAA2ibeEQPK1e8WmUnLqJyoi-4PQbeDJwgmEDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow the arm versatile machine to be configured for no-MMU operation.
+On Wed, Mar 1, 2017 at 2:29 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Hi,
+>
+> On 28/02/17 17:24, Icenowy Zheng wrote:
+>> The A64 has a R_PIO pin controller, similar to the one found on the H3 SoC.
+>> Add support for the pins controlled by the R_PIO controller.
+>>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ---
+>>  drivers/pinctrl/sunxi/Kconfig                |   5 +
+>>  drivers/pinctrl/sunxi/Makefile               |   1 +
+>>  drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c | 143 +++++++++++++++++++++++++++
+>>  3 files changed, 149 insertions(+)
+>>  create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
+>>
+>> diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+>> index 92325736d953..0738b0df5a0b 100644
+>> --- a/drivers/pinctrl/sunxi/Kconfig
+>> +++ b/drivers/pinctrl/sunxi/Kconfig
+>> @@ -69,6 +69,11 @@ config PINCTRL_SUN50I_A64
+>>       def_bool ARM64 && ARCH_SUNXI
+>>       select PINCTRL_SUNXI
+>>
+>> +config PINCTRL_SUN50I_A64_R
+>> +     def_bool ARM64 && ARCH_SUNXI
+>> +     depends on RESET_CONTROLLER
+>
+> Same comment as on patch 1/5 (select instead of "depends on").
+> I take it this for drivers/reset/reset-sunxi.c?
+> Shouldn't this be the sunxi specific CONFIG_RESET_SUNXI then?
+> Also from from having a quick look at the driver this is broken for
+> arm64 (BITS_PER_LONG usage).
+> From having a closer look this driver is actually not Allwinner specific
+> at all, since it just describes a number of bits in consecutive
+> 32-bit(!) registers as reset cells.
+> As I today stumbled upon another SoC which has the same reset register
+> layout I was wondering if it's worth to generalise this? Possibly
+> renaming the driver, and allowing additional compatibles?
+> I can take a stab at this.
 
-Older kernels had the ability to build the versatile machine with the MMU
-disabled (!CONFIG_MMU). Recent changes to convert the versatile machine
-to device tree lost this ability. (Although older kernels could be built
-they did not run due to a bug in the IO_ADDRESS() mapping on this machine).
+CONFIG_RESET_SUNXI enables the old (pre-sunxi-ng) reset controller driver.
+This driver was never used for ARM64 sunxi. As for it being generic,
+I guess it's pretty standard, as it's just a bunch of registers with each
+bit assigned to some peripheral.
 
-The motivation for this is that the versatile machine is well supported
-in qemu. And this provides an excellent platform for development and
-testing no-MMU support on ARM in general.
+CONFIG_RESET enables the reset control subsystem, which we need. This
+is enabled by default if the platform selects ARCH_HAS_RESET_CONTROLLER,
+which we do.
 
-This patch adds a versatile platform selection in the upper level arm
-system type menu - where it appeared in older kernel versions - when
-configuring for the no-MMU case. There is no visible change to the way
-versatile is selected for the MMU enabled case.
+Regards
+ChenYu
 
-Signed-off-by: Greg Ungerer <gerg@uclinux.org>
----
- arch/arm/Kconfig                | 11 +++++++++++
- arch/arm/Kconfig.debug          |  3 ++-
- arch/arm/mach-versatile/Kconfig |  5 +++--
- 3 files changed, 16 insertions(+), 3 deletions(-)
-
-v2: don't use a multiplatform setup, move versatile choice to top level menu
-v3: rebase on top of linux-4.10
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 186c4c2..1d9ac7c 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -353,6 +353,17 @@ config ARM_SINGLE_ARMV7M
- 	select SPARSE_IRQ
- 	select USE_OF
- 
-+config ARM_SINGLE_ARCH_VERSATILE
-+	bool "ARM Ltd. Versatile family"
-+	depends on !MMU
-+	select AUTO_ZRELADDR
-+	select CLKSRC_OF
-+	select COMMON_CLK
-+	select GENERIC_CLOCKEVENTS
-+	select GPIOLIB
-+	select SPARSE_IRQ
-+	select USE_OF
-+
- config ARCH_GEMINI
- 	bool "Cortina Systems Gemini"
- 	select CLKSRC_MMIO
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index d83f7c3..3f393e4 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1712,7 +1712,8 @@ config DEBUG_UNCOMPRESS
- config UNCOMPRESS_INCLUDE
- 	string
- 	default "debug/uncompress.h" if ARCH_MULTIPLATFORM || ARCH_MSM || \
--					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M
-+					PLAT_SAMSUNG || ARM_SINGLE_ARMV7M || \
-+					ARM_SINGLE_ARCH_VERSATILE
- 	default "mach/uncompress.h"
- 
- config EARLY_PRINTK
-diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
-index c257d40..c03a8c8 100644
---- a/arch/arm/mach-versatile/Kconfig
-+++ b/arch/arm/mach-versatile/Kconfig
-@@ -1,6 +1,7 @@
- config ARCH_VERSATILE
--	bool "ARM Ltd. Versatile family"
--	depends on ARCH_MULTI_V5
-+	bool "ARM Ltd. Versatile family" if ARCH_MULTI_V5
-+	depends on ARCH_MULTI_V5 || ARM_SINGLE_ARCH_VERSATILE
-+	default y if ARM_SINGLE_ARCH_VERSATILE
- 	select ARM_AMBA
- 	select ARM_TIMER_SP804
- 	select ARM_VIC
--- 
-1.9.1
+> Cheers,
+> Andre.
+>
+>> +     select PINCTRL_SUNXI
+>> +
+>>  config PINCTRL_SUN50I_H5
+>>       def_bool ARM64 && ARCH_SUNXI
+>>       select PINCTRL_SUNXI
+>> diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
+>> index 04ccb88ebd5f..df4ccd6cd44c 100644
+>> --- a/drivers/pinctrl/sunxi/Makefile
+>> +++ b/drivers/pinctrl/sunxi/Makefile
+>> @@ -11,6 +11,7 @@ obj-$(CONFIG_PINCTRL_SUN8I_A23)             += pinctrl-sun8i-a23.o
+>>  obj-$(CONFIG_PINCTRL_SUN8I_A23_R)    += pinctrl-sun8i-a23-r.o
+>>  obj-$(CONFIG_PINCTRL_SUN8I_A33)              += pinctrl-sun8i-a33.o
+>>  obj-$(CONFIG_PINCTRL_SUN50I_A64)     += pinctrl-sun50i-a64.o
+>> +obj-$(CONFIG_PINCTRL_SUN50I_A64_R)   += pinctrl-sun50i-a64-r.o
+>>  obj-$(CONFIG_PINCTRL_SUN8I_A83T)     += pinctrl-sun8i-a83t.o
+>>  obj-$(CONFIG_PINCTRL_SUN8I_H3)               += pinctrl-sun8i-h3.o
+>>  obj-$(CONFIG_PINCTRL_SUN8I_H3_R)     += pinctrl-sun8i-h3-r.o
+>> diff --git a/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c b/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
+>> new file mode 100644
+>> index 000000000000..90996a63689b
+>> --- /dev/null
+>> +++ b/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
+>> @@ -0,0 +1,143 @@
+>> +/*
+>> + * Allwinner A64 SoCs special pins pinctrl driver.
+>> + *
+>> + * Based on pinctrl-sun8i-a23-r.c
+>> + *
+>> + * Copyright (C) 2016 Icenowy Zheng
+>> + * Icenowy Zheng <icenowy@aosc.xyz>
+>> + *
+>> + * Copyright (C) 2014 Chen-Yu Tsai
+>> + * Chen-Yu Tsai <wens@csie.org>
+>> + *
+>> + * Copyright (C) 2014 Boris Brezillon
+>> + * Boris Brezillon <boris.brezillon@free-electrons.com>
+>> + *
+>> + * Copyright (C) 2014 Maxime Ripard
+>> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public
+>> + * License version 2.  This program is licensed "as is" without any
+>> + * warranty of any kind, whether express or implied.
+>> + */
+>> +
+>> +#include <linux/of.h>
+>> +#include <linux/of_device.h>
+>> +#include <linux/pinctrl/pinctrl.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/reset.h>
+>> +
+>> +#include "pinctrl-sunxi.h"
+>> +
+>> +static const struct sunxi_desc_pin sun50i_a64_r_pins[] = {
+>> +     SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 0),
+>> +               SUNXI_FUNCTION(0x0, "gpio_in"),
+>> +               SUNXI_FUNCTION(0x1, "gpio_out"),
+>> +               SUNXI_FUNCTION(0x2, "s_rsb"),         /* SCK */
+>> +               SUNXI_FUNCTION(0x3, "s_i2c"),         /* SCK */
+>> +               SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)),  /* PL_EINT0 */
+>> +     SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 1),
+>> +               SUNXI_FUNCTION(0x0, "gpio_in"),
+>> +               SUNXI_FUNCTION(0x1, "gpio_out"),
+>> +               SUNXI_FUNCTION(0x2, "s_rsb"),         /* SDA */
+>> +               SUNXI_FUNCTION(0x3, "s_i2c"),         /* SDA */
+>> +               SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)),  /* PL_EINT1 */
+>> +     SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 2),
+>> +               SUNXI_FUNCTION(0x0, "gpio_in"),
+>> +               SUNXI_FUNCTION(0x1, "gpio_out"),
+>> +               SUNXI_FUNCTION(0x2, "s_uart"),        /* TX */
+>> +               SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 2)),  /* PL_EINT2 */
+>> +     SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 3),
+>> +               SUNXI_FUNCTION(0x0, "gpio_in"),
+>> +               SUNXI_FUNCTION(0x1, "gpio_out"),
+>> +               SUNXI_FUNCTION(0x2, "s_uart"),        /* RX */
+>> +               SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 3)),  /* PL_EINT3 */
+>> +     SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 4),
+>> +               SUNXI_FUNCTION(0x0, "gpio_in"),
+>> +               SUNXI_FUNCTION(0x1, "gpio_out"),
+>> +               SUNXI_FUNCTION(0x3, "s_jtag"),        /* MS */
+>> +               SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 4)),  /* PL_EINT4 */
+>> +     SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 5),
+>> +               SUNXI_FUNCTION(0x0, "gpio_in"),
+>> +               SUNXI_FUNCTION(0x1, "gpio_out"),
+>> +               SUNXI_FUNCTION(0x3, "s_jtag"),        /* CK */
+>> +               SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 5)),  /* PL_EINT5 */
+>> +     SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 6),
+>> +               SUNXI_FUNCTION(0x0, "gpio_in"),
+>> +               SUNXI_FUNCTION(0x1, "gpio_out"),
+>> +               SUNXI_FUNCTION(0x3, "s_jtag"),        /* DO */
+>> +               SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 6)),  /* PL_EINT6 */
+>> +     SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 7),
+>> +               SUNXI_FUNCTION(0x0, "gpio_in"),
+>> +               SUNXI_FUNCTION(0x1, "gpio_out"),
+>> +               SUNXI_FUNCTION(0x3, "s_jtag"),        /* DI */
+>> +               SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 7)),  /* PL_EINT7 */
+>> +     SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 8),
+>> +               SUNXI_FUNCTION(0x0, "gpio_in"),
+>> +               SUNXI_FUNCTION(0x1, "gpio_out"),
+>> +               SUNXI_FUNCTION(0x2, "s_i2c"),         /* SCK */
+>> +               SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 8)),  /* PL_EINT8 */
+>> +     SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 9),
+>> +               SUNXI_FUNCTION(0x0, "gpio_in"),
+>> +               SUNXI_FUNCTION(0x1, "gpio_out"),
+>> +               SUNXI_FUNCTION(0x2, "s_i2c"),         /* SDA */
+>> +               SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 9)),  /* PL_EINT9 */
+>> +     SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 10),
+>> +               SUNXI_FUNCTION(0x0, "gpio_in"),
+>> +               SUNXI_FUNCTION(0x1, "gpio_out"),
+>> +               SUNXI_FUNCTION(0x2, "s_pwm"),
+>> +               SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 10)), /* PL_EINT10 */
+>> +     SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 11),
+>> +               SUNXI_FUNCTION(0x0, "gpio_in"),
+>> +               SUNXI_FUNCTION(0x1, "gpio_out"),
+>> +               SUNXI_FUNCTION(0x2, "s_cir_rx"),
+>> +               SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 11)), /* PL_EINT11 */
+>> +     SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 12),
+>> +               SUNXI_FUNCTION(0x0, "gpio_in"),
+>> +               SUNXI_FUNCTION(0x1, "gpio_out"),
+>> +               SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 12)), /* PL_EINT12 */
+>> +};
+>> +
+>> +static const struct sunxi_pinctrl_desc sun50i_a64_r_pinctrl_data = {
+>> +     .pins = sun50i_a64_r_pins,
+>> +     .npins = ARRAY_SIZE(sun50i_a64_r_pins),
+>> +     .pin_base = PL_BASE,
+>> +     .irq_banks = 1,
+>> +};
+>> +
+>> +static int sun50i_a64_r_pinctrl_probe(struct platform_device *pdev)
+>> +{
+>> +     struct reset_control *rstc;
+>> +     int ret;
+>> +
+>> +     rstc = devm_reset_control_get(&pdev->dev, NULL);
+>> +     if (IS_ERR(rstc)) {
+>> +             dev_err(&pdev->dev, "Reset controller missing\n");
+>> +             return PTR_ERR(rstc);
+>> +     }
+>> +
+>> +     ret = reset_control_deassert(rstc);
+>> +     if (ret)
+>> +             return ret;
+>> +
+>> +     ret = sunxi_pinctrl_init(pdev,
+>> +                              &sun50i_a64_r_pinctrl_data);
+>> +
+>> +     if (ret)
+>> +             reset_control_assert(rstc);
+>> +
+>> +     return ret;
+>> +}
+>> +
+>> +static const struct of_device_id sun50i_a64_r_pinctrl_match[] = {
+>> +     { .compatible = "allwinner,sun50i-a64-r-pinctrl", },
+>> +     {}
+>> +};
+>> +
+>> +static struct platform_driver sun50i_a64_r_pinctrl_driver = {
+>> +     .probe  = sun50i_a64_r_pinctrl_probe,
+>> +     .driver = {
+>> +             .name           = "sun50i-a64-r-pinctrl",
+>> +             .of_match_table = sun50i_a64_r_pinctrl_match,
+>> +     },
+>> +};
+>> +builtin_platform_driver(sun50i_a64_r_pinctrl_driver);
+>>
