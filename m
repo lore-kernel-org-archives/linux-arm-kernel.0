@@ -1,48 +1,50 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 01 Mar 2017 10:00:55 -0800
-Subject: [PATCH v3 2/7] mmc: bcm2835: Add new driver for the sdhost
- controller.
-In-Reply-To: <1487668026-7100-3-git-send-email-kraxel@redhat.com>
-References: <1487668026-7100-1-git-send-email-kraxel@redhat.com>
- <1487668026-7100-3-git-send-email-kraxel@redhat.com>
-Message-ID: <87tw7c27xk.fsf@eliezer.anholt.net>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Thu,  2 Mar 2017 02:01:06 +0800
+Subject: [PATCH v2 0/5] Refactor of ARM64 sunxi pinctrl enabling and add A64
+ R_PIO driver
+Message-ID: <20170301180111.12365-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gerd Hoffmann <kraxel@redhat.com> writes:
+Nearly all Allwinner SoCs need a per-SoC pinctrl driver, some will need one
+more for the R_PIO pin controller.
 
-> From: Eric Anholt <eric@anholt.net>
->
-> The 2835 has two SD controllers: The Arasan sdhci controller (supported
-> by the iproc driver) and a custom sdhost controller.  This patch adds a
-> driver for the latter.
->
-> The sdhci controller supports both sdcard and sdio.  The sdhost
-> controller supports the sdcard only, but has better performance.  Also
-> note that the rpi3 has sdio wifi, so driving the sdcard with the sdhost
-> controller allows to use the sdhci controller for wifi support.
->
-> The configuration is done by devicetree via pin muxing.  Both SD
-> controller are available on the same pins (2 pin groups = pin 22 to 27 +
-> pin 48 to 53).  So it's possible to use both SD controllers at the same
-> time with different pin groups.
->
-> The code was originally written by Phil Elwell in the downstream
-> Rasbperry Pi tree, and I did a major cleanup on it (+319, -707 lines
-> out of the original 2055) for inclusion.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+This patchset try to refactor the enabling method of pinctrl drivers for
+64-bit Allwinner SoCs, to prevent furthur change of Kconfig.platforms when
+adding new SoC support.
 
-Ulf, what do you need done to this driver patch before it can go in?
-The commit message seems like it could use some rewriting at this point
-(Personally I would drop the detailed changelogs from Stefan and Gerd,
-updating the last paragraph here to give them credit), but what's
-important to me is getting the driver in so that distros don't have to
-carry this patch for wifi support.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170301/2f4adaaf/attachment.sig>
+Thus, the R_PIO pin controller driver for A64 will be added, and use the
+new method to get it enabled when building 64-bit sunxi kernel.
+
+The first patch makes the default value of pinctrl drivers about 64-bit
+Allwinner SoCs (ARM64 && ARCH_SUNXI), which means 64-bit Allwinner SoCs.
+
+The second patch then clean up Kconfig.platforms. It must be applied after
+the first one, otherwise newly built 64-bit Allwinner kernel will have no
+pinctrl drivers and become unusable.
+
+The third patch is only a small fix for a typo in H5 generic pinctrl
+compatible.
+
+The fourth patch adds compatible for A64 R_PIO pin controller.
+
+The fifth patch really introduces the A64 R_PIO pin controller driver,
+it still cannot be enabled in device tree, as we lack the R_CCU driver.
+
+Icenowy Zheng (5):
+  pinctrl: sunxi: refactor pinctrl choice selecting for ARM64
+  arm64: only select PINCTRL for Allwinner platforms
+  dt-bindings: fix for Allwinner H5 pinctrl's compatible
+  dt: bindings: add binding for Allwinner A64 R_PIO pinctrl
+  pinctrl: sunxi: Add A64 R_PIO controller support
+
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   3 +-
+ arch/arm64/Kconfig.platforms                       |   1 -
+ drivers/pinctrl/sunxi/Kconfig                      |  12 +-
+ drivers/pinctrl/sunxi/Makefile                     |   1 +
+ drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c       | 125 +++++++++++++++++++++
+ 5 files changed, 136 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
+
+-- 
+2.11.1
