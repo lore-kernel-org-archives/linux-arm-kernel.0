@@ -1,195 +1,45 @@
 From: clg@kaod.org (=?UTF-8?q?C=C3=A9dric=20Le=20Goater?=)
-Date: Wed,  1 Mar 2017 15:26:42 +0100
-Subject: [PATCH 1/2] ARM: dts: aspeed: add SPI controller bindings
+Date: Wed,  1 Mar 2017 15:26:43 +0100
+Subject: [PATCH 2/2] ARM: aspeed: Add CONFIG_SPI_ASPEED_SMC
 In-Reply-To: <1488378403-24640-1-git-send-email-clg@kaod.org>
 References: <1488378403-24640-1-git-send-email-clg@kaod.org>
-Message-ID: <1488378403-24640-2-git-send-email-clg@kaod.org>
+Message-ID: <1488378403-24640-3-git-send-email-clg@kaod.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's define the SPI controllers in the Aspeed SoCs AST2500 and
-AST2400 and also enable these, as well as the chips, on the associated
-platforms.
-
 Signed-off-by: C?dric Le Goater <clg@kaod.org>
 ---
- arch/arm/boot/dts/aspeed-ast2500-evb.dts      | 20 +++++++++
- arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 16 +++++++
- arch/arm/boot/dts/aspeed-g4.dtsi              | 29 ++++++++++++
- arch/arm/boot/dts/aspeed-g5.dtsi              | 63 +++++++++++++++++++++++++++
- 4 files changed, 128 insertions(+)
+ arch/arm/configs/aspeed_g4_defconfig | 3 +++
+ arch/arm/configs/aspeed_g5_defconfig | 3 +++
+ 2 files changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/aspeed-ast2500-evb.dts b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-index d967603dade8..8f82e8ab1875 100644
---- a/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-+++ b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-@@ -20,6 +20,26 @@
- 	};
- };
- 
-+&fmc {
-+	status = "okay";
-+	flash at 0 {
-+		status = "okay";
-+		label = "bmc";
-+	};
-+};
-+
-+&spi1 {
-+	status = "okay";
-+	flash at 0 {
-+		status = "okay";
-+		label = "pnor";
-+	};
-+};
-+
-+&spi2 {
-+	status = "okay";
-+};
-+
- &uart5 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-index 1d2fc1e1dc29..aab1889f702f 100644
---- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-+++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-@@ -31,6 +31,22 @@
- 	};
- };
- 
-+&fmc {
-+	status = "okay";
-+	flash at 0 {
-+		status = "okay";
-+		label = "bmc";
-+	};
-+};
-+
-+&spi {
-+	status = "okay";
-+	flash at 0 {
-+		status = "okay";
-+		label = "pnor";
-+	};
-+};
-+
- &uart5 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-index 0b4932cc02a8..7ef6442d0ade 100644
---- a/arch/arm/boot/dts/aspeed-g4.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-@@ -33,6 +33,35 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		fmc: flash-controller at 1e620000 {
-+			reg = < 0x1e620000 0x94
-+				0x20000000 0x02000000 >;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "aspeed,ast2400-fmc";
-+			status = "disabled";
-+			interrupts = <19>;
-+			flash at 0 {
-+				reg = < 0 >;
-+				compatible = "jedec,spi-nor";
-+				status = "disabled";
-+			};
-+		};
-+
-+		spi: flash-controller at 1e630000 {
-+			reg = < 0x1e630000 0x18
-+				0x30000000 0x02000000 >;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "aspeed,ast2400-spi";
-+			status = "disabled";
-+			flash at 0 {
-+				reg = < 0 >;
-+				compatible = "jedec,spi-nor";
-+				status = "disabled";
-+			};
-+		};
-+
- 		vic: interrupt-controller at 1e6c0080 {
- 			compatible = "aspeed,ast2400-vic";
- 			interrupt-controller;
-diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-index b664fe380936..8970f3cb8e2b 100644
---- a/arch/arm/boot/dts/aspeed-g5.dtsi
-+++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-@@ -24,6 +24,69 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		fmc: flash-controller at 1e620000 {
-+			reg = < 0x1e620000 0xc4
-+				0x20000000 0x10000000 >;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "aspeed,ast2500-fmc";
-+			status = "disabled";
-+			interrupts = <19>;
-+			flash at 0 {
-+				reg = < 0 >;
-+				compatible = "jedec,spi-nor";
-+				status = "disabled";
-+			};
-+			flash at 1 {
-+				reg = < 1 >;
-+				compatible = "jedec,spi-nor";
-+				status = "disabled";
-+			};
-+			flash at 2 {
-+				reg = < 2 >;
-+				compatible = "jedec,spi-nor";
-+				status = "disabled";
-+			};
-+		};
-+
-+		spi1: flash-controller at 1e630000 {
-+			reg = < 0x1e630000 0xc4
-+				0x30000000 0x08000000 >;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "aspeed,ast2500-spi";
-+			status = "disabled";
-+			flash at 0 {
-+				reg = < 0 >;
-+				compatible = "jedec,spi-nor";
-+				status = "disabled";
-+			};
-+			flash at 1 {
-+				reg = < 1 >;
-+				compatible = "jedec,spi-nor";
-+				status = "disabled";
-+			};
-+		};
-+
-+		spi2: flash-controller at 1e631000 {
-+			reg = < 0x1e631000 0xc4
-+				0x38000000 0x08000000 >;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "aspeed,ast2500-spi";
-+			status = "disabled";
-+			flash at 0 {
-+				reg = < 0 >;
-+				compatible = "jedec,spi-nor";
-+				status = "disabled";
-+			};
-+			flash at 1 {
-+				reg = < 1 >;
-+				compatible = "jedec,spi-nor";
-+				status = "disabled";
-+			};
-+		};
-+
- 		vic: interrupt-controller at 1e6c0080 {
- 			compatible = "aspeed,ast2400-vic";
- 			interrupt-controller;
+diff --git a/arch/arm/configs/aspeed_g4_defconfig b/arch/arm/configs/aspeed_g4_defconfig
+index d25010e3a0bc..8bd9e6a91d41 100644
+--- a/arch/arm/configs/aspeed_g4_defconfig
++++ b/arch/arm/configs/aspeed_g4_defconfig
+@@ -40,6 +40,9 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_PREVENT_FIRMWARE_BUILD is not set
++CONFIG_MTD=y
++CONFIG_MTD_SPI_NOR=y
++CONFIG_SPI_ASPEED_SMC=y
+ CONFIG_NETDEVICES=y
+ # CONFIG_NET_VENDOR_ALACRITECH is not set
+ # CONFIG_NET_VENDOR_AMAZON is not set
+diff --git a/arch/arm/configs/aspeed_g5_defconfig b/arch/arm/configs/aspeed_g5_defconfig
+index 5f660b02abd9..0eff4a53fd46 100644
+--- a/arch/arm/configs/aspeed_g5_defconfig
++++ b/arch/arm/configs/aspeed_g5_defconfig
+@@ -46,6 +46,9 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_DEVTMPFS=y
+ CONFIG_DEVTMPFS_MOUNT=y
+ # CONFIG_PREVENT_FIRMWARE_BUILD is not set
++CONFIG_MTD=y
++CONFIG_MTD_SPI_NOR=y
++CONFIG_SPI_ASPEED_SMC=y
+ CONFIG_NETDEVICES=y
+ # CONFIG_NET_VENDOR_ALACRITECH is not set
+ # CONFIG_NET_VENDOR_AMAZON is not set
 -- 
 2.7.4
