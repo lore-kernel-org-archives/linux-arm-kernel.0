@@ -1,130 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 1 Mar 2017 16:36:41 +0000
-Subject: Using the generic host PCIe driver
-In-Reply-To: <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
-References: <8d4e5d8a-7683-0180-324c-0ffd1a9a641a@free.fr>
- <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
- <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
- <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
- <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
- <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <01f41dd8-e8e6-f880-cad8-5cb83bf0a167@arm.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Wed, 1 Mar 2017 08:40:03 -0800
+Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
+In-Reply-To: <871suh5wtw.fsf@concordia.ellerman.id.au>
+References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
+ <20170227160601.5b79a1fe@gandalf.local.home>
+ <6db89a8d-6053-51d1-5fd4-bae0179a5ebd@caviumnetworks.com>
+ <20170227170911.2280ca3e@gandalf.local.home>
+ <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
+ <20170227173630.57fff459@gandalf.local.home>
+ <7bd72716-feea-073f-741c-04212ebd0802@caviumnetworks.com>
+ <68fe24ea-7795-24d8-211b-9d8a50affe9f@akamai.com>
+ <510FF566-011D-4199-86F7-2BB4DBF36434@linux.vnet.ibm.com>
+ <20170228112144.65455de5@gandalf.local.home>
+ <cdf98840-8d43-2c58-e2f9-75ae8fb8a600@caviumnetworks.com>
+ <1de00727-de97-f887-78bd-dd49131cdf61@akamai.com>
+ <999e2c3f-698c-703c-67a9-26aea3c97dc0@caviumnetworks.com>
+ <d10e986c-7f6a-3935-88e2-ba39708f79ad@caviumnetworks.com>
+ <542488db-5c59-afa5-6d1d-a437c87bc613@akamai.com>
+ <912fa97a-aa1d-c0e4-dc83-fc5c745db1c1@caviumnetworks.com>
+ <23989c10-7b47-3fda-f790-25b53 9704bec@akamai.com>
+ <871suh5wtw.fsf@concordia.ellerman.id.au>
+Message-ID: <7e05bd3d-08da-00ba-1b79-c9be8c659524@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/17 16:18, Bjorn Helgaas wrote:
-> [+cc Marc for MSI]
-> 
-> On Wed, Mar 01, 2017 at 04:18:51PM +0100, Mason wrote:
->> On 27/02/2017 19:35, Bjorn Helgaas wrote:
+On 02/28/2017 10:34 PM, Michael Ellerman wrote:
+> Jason Baron <jbaron@akamai.com> writes:
+> ...
+>> I also checked all the other .ko files and they were properly aligned.
+>> So I think this should hopefully work, and I like that its not a
+>> per-arch fix.
 >>
->>> When I said the native drivers provide no real benefit, I meant that
->>> they do not provide any value-add functionality beyond what a generic
->>> driver like drivers/acpi/pci_root.c already does.
->>>
->>> Obviously there are many different host bridges and they have
->>> different programming models, so there has to be bridge-specific
->>> support *somewhere*.  The question is whether that's in firmware, in
->>> Linux, or both.  For ACPI systems, it's all in firmware.
->>>
->>> Systems with well-behaved hardware, i.e., it supports PCIe and ECAM
->>> without warts, firmware can initialize the bridge and tell the OS
->>> about it via DT, and the drivers/pci/pci-host-generic.c driver can do
->>> everything else.
->>>
->>> For systems that aren't so well-behaved, we'll need either a full
->>> native driver that knows how to program bridge window CSRs, set up
->>> interrupts, etc., or a simpler native driver that papers over warts
->>> like ECAM that doesn't work quite according to spec.
->>>
->>> It sounds like your system falls into the latter category.
->>
->> Hello Bjorn,
->>
->> Having worked around 3 HW bugs, things are starting to look
->> slightly more "normal". Here is my current boot log:
->> (I've added a few questions inline.)
-> 
-> Sounds like you're making good progress!
-> 
->> [    0.197669] PCI: CLS 0 bytes, default 64
->>
->> Is it an error for Cache Line Size to be 0 here?
-> 
-> Not a problem.  I think your host bridge is to PCIe, and Cache Line
-> Size is not relevant for PCIe.  We should clean this up in the PCI
-> core someday.
-> 
->> [    0.652356] OF: PCI: host bridge /soc/pcie at 50000000 ranges:
->> [    0.652380] OF: PCI:   No bus range found for /soc/pcie at 50000000, using [bus 00-ff]
->> [    0.652407] OF: PCI: Parsing ranges property...
->> [    0.652494] OF: PCI:   MEM 0xa0000000..0xa03fffff -> 0xa0000000
->> [    0.655744] pci-host-generic 50000000.pcie: ECAM at [mem 0x50000000-0x5fffffff] for [bus 00-ff]
->> [    0.656097] pci-host-generic 50000000.pcie: PCI host bridge to bus 0000:00
->> [    0.656145] pci_bus 0000:00: root bus resource [bus 00-ff]
->> [    0.656168] pci_bus 0000:00: root bus resource [mem 0xa0000000-0xa03fffff]
->> [    0.656191] pci_bus 0000:00: scanning bus
->> [    0.656257] pci 0000:00:00.0: [1105:8758] type 01 class 0x048000
->> [    0.656314] pci 0000:00:00.0: calling tango_pcie_fixup_class+0x0/0x10
->> [    0.656358] pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x00ffffff 64bit]
->> [    0.656400] pci 0000:00:00.0: calling pci_fixup_ide_bases+0x0/0x40
->> [    0.656451] pci 0000:00:00.0: supports D1 D2
->> [    0.656468] pci 0000:00:00.0: PME# supported from D0 D1 D2 D3hot
->> [    0.656486] pci 0000:00:00.0: PME# disabled
->> [    0.656657] pci_bus 0000:00: fixups for bus
->> [    0.656686] PCI: bus0: Fast back to back transfers disabled
-> 
-> FWIW, back-to-back transfers is also irrelevant on PCIe.  Another
-> useless historical artifact.
-> 
->> [    0.656707] pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 0
->> [    0.656725] pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
->> [    0.656753] pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 1
->> [    0.656845] pci_bus 0000:01: scanning bus
->> [    0.656911] pci 0000:01:00.0: [1912:0014] type 00 class 0x0c0330
->> [    0.656968] pci 0000:01:00.0: reg 0x10: [mem 0x00000000-0x00001fff 64bit]
->> [    0.657065] pci 0000:01:00.0: calling pci_fixup_ide_bases+0x0/0x40
->> [    0.657192] pci 0000:01:00.0: PME# supported from D0 D3hot D3cold
->> [    0.657213] pci 0000:01:00.0: PME# disabled
->> [    0.657495] pci_bus 0000:01: fixups for bus
->> [    0.657521] PCI: bus1: Fast back to back transfers disabled
->> [    0.657538] pci_bus 0000:01: bus scan returning with max=01
->> [    0.657556] pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
->> [    0.657575] pci_bus 0000:00: bus scan returning with max=01
->> [    0.657593] pci 0000:00:00.0: fixup irq: got 0
->> [    0.657608] pci 0000:00:00.0: assigning IRQ 00
->> [    0.657651] pci 0000:01:00.0: fixup irq: got 20
->> [    0.657667] pci 0000:01:00.0: assigning IRQ 20
->>
->> This revision of the controller does not support legacy interrupt mode,
->> only MSI. I looked at the bindings for MSI:
->>
->> https://www.kernel.org/doc/Documentation/devicetree/bindings/pci/pci-msi.txt
->> https://www.kernel.org/doc/Documentation/devicetree/bindings/interrupt-controller/msi.txt
->>
->> But it is not clear to me if I need to write a specific driver
->> for the MSI controller, or if there is some kind of generic
->> support? If the latter, what are the required properties?
->> A "door-bell" address? Anything else?
-> 
-> I added Marc in case he has advice here.  My only advice would be to look
-> at other drivers and see how they did it.  I'm pretty sure MSI isn't
-> going to work unless your platform has some way to set the MSI
-> addresses, whether this is some arch-specific thing or something in
-> the host bridge.
+>> Sachin, sorry to bother you again, but I'm hoping you can try David's
+>> latest patch to scripts/module-common.lds, just to test in your setup.
+>
+> It does fix the problem.
+>
+> I was reproducing with crc_t10dif:
+>
+> [  695.890552] ------------[ cut here ]------------
+> [  695.890709] WARNING: CPU: 15 PID: 3019 at ../kernel/jump_label.c:287 static_key_set_entries+0x74/0xa0
+> [  695.890710] Modules linked in: crc_t10dif(+) crct10dif_generic crct10dif_common ipt_MASQUERADE nf_nat_masquerade_ipv4 iptable_nat nf_conntrack_ipv4 nf_defrag_ipv4 nf_nat_ipv4 xt_addrtype iptable_filter ip_tables xt_conntrack x_tables nf_nat nf_conntrack bridge stp llc dm_thin_pool dm_persistent_data dm_bio_prison dm_bufio libcrc32c kvm virtio_balloon binfmt_misc autofs4 virtio_net virtio_pci virtio_ring virtio
+>
+> Which had:
+>
+>   [21] __jump_table      PROGBITS        0000000000000000 0004e8 000018 00  WA  0   0  1
+>
+>
+> And now has:
+>
+>   [18] __jump_table      PROGBITS        0000000000000000 0004d0 000018 00  WA  0   0  8
+>
+> And all other modules have an alignment of 8 on __jump_table, as expected.
+>
+> I'm inclined to merge a version of the balign patch for powerpc anyway,
+> just to be on the safe side. I guess the old code was coping fine with
+> the unaligned keys, but it still makes me nervous.
 
-Thanks Bjorn.
 
-Mason: while the kernel has generic support for dealing with MSI, there
-is not standardization at the interrupt controller level, so you do have
-to write your own driver, and wire it in the rest of the framework.
+The original "balign patch" has a couple of problems:
 
-I suggest you look at things like drivers/pci/host/pcie-altera-msi.c,
-which has an extremely simple implementation. You can use this as a
-starting point for your own driver.
+1) 4-byte alignment is not sufficient for 64-bit kernels
 
-Thanks,
+2) It is redundant if the linker script patch is accepted.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+>
+> cheers
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
