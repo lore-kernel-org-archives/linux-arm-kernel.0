@@ -1,83 +1,130 @@
-From: jerome.forissier@linaro.org (Jerome Forissier)
-Date: Wed, 1 Mar 2017 17:23:23 +0100
-Subject: [PATCH] Documentation: dt: Add binding for
- /chosen/secure-stdout-path
-In-Reply-To: <1a3382c5-57d5-9d99-1569-3211a1844192@arm.com>
-References: <06154a2280a8423af80405825d7201c7aa927696.1488374335.git.jerome.forissier@linaro.org>
- <CAL_JsqKrUCCvGD_LKvOx+s8zh30GC_v=HAyqozgRm=7mcfSZzw@mail.gmail.com>
- <4847a1ee-caa7-509f-c540-ee3e1967ef7f@linaro.org>
- <1a3382c5-57d5-9d99-1569-3211a1844192@arm.com>
-Message-ID: <a1ca0933-5ca9-6bb9-5141-e9337e960735@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 1 Mar 2017 16:36:41 +0000
+Subject: Using the generic host PCIe driver
+In-Reply-To: <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
+References: <8d4e5d8a-7683-0180-324c-0ffd1a9a641a@free.fr>
+ <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
+ <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
+ <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
+ <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
+ <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <01f41dd8-e8e6-f880-cad8-5cb83bf0a167@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/01/2017 04:20 PM, Robin Murphy wrote:
-> On 01/03/17 15:04, Jerome Forissier wrote:
+On 01/03/17 16:18, Bjorn Helgaas wrote:
+> [+cc Marc for MSI]
+> 
+> On Wed, Mar 01, 2017 at 04:18:51PM +0100, Mason wrote:
+>> On 27/02/2017 19:35, Bjorn Helgaas wrote:
 >>
->>
->> On 03/01/2017 03:50 PM, Rob Herring wrote:
->>> On Wed, Mar 1, 2017 at 7:29 AM, Jerome Forissier
->>> <jerome.forissier@linaro.org> wrote:
->>>> Some platforms may use a single device tree to describe two address
->>>> spaces, as described in d9f43babb998 ("Documentation: dt: Add bindings
->>>> for Secure-only devices"). We extend the use of the secure- prefix to
->>>> the stdout-path property, so that the Secure firmware may use a
->>>> different console device than the one used by the kernel.
->>>>
->>>> Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
->>>> ---
->>>>  Documentation/devicetree/bindings/arm/secure.txt | 5 +++++
->>>>  1 file changed, 5 insertions(+)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/arm/secure.txt b/Documentation/devicetree/bindings/arm/secure.txt
->>>> index e31303f..558c9a1 100644
->>>> --- a/Documentation/devicetree/bindings/arm/secure.txt
->>>> +++ b/Documentation/devicetree/bindings/arm/secure.txt
->>>> @@ -51,3 +51,8 @@ Valid Secure world properties:
->>>>     status = "disabled"; secure-status = "okay";     /* S-only */
->>>>     status = "disabled";                             /* disabled in both */
->>>>     status = "disabled"; secure-status = "disabled"; /* disabled in both */
->>>> +
->>>> +- secure-stdout-path (/chosen node): specifies the device to be used
->>>> +for console output by Secure firmware. The syntax is the same as for
->>>> +"stdout-path". If "secure-stdout-path" is not specified it defaults to
->>>> +the same value as "stdout-path".
+>>> When I said the native drivers provide no real benefit, I meant that
+>>> they do not provide any value-add functionality beyond what a generic
+>>> driver like drivers/acpi/pci_root.c already does.
 >>>
->>> I'm not all that enthusiastic about this. This alone is okay, but
->>> continued additions of secure-* properties doesn't seem very scalable.
->>> Is this it or do you have other needs? What happens when we have 3
->>> modes/address spaces?
+>>> Obviously there are many different host bridges and they have
+>>> different programming models, so there has to be bridge-specific
+>>> support *somewhere*.  The question is whether that's in firmware, in
+>>> Linux, or both.  For ACPI systems, it's all in firmware.
+>>>
+>>> Systems with well-behaved hardware, i.e., it supports PCIe and ECAM
+>>> without warts, firmware can initialize the bridge and tell the OS
+>>> about it via DT, and the drivers/pci/pci-host-generic.c driver can do
+>>> everything else.
+>>>
+>>> For systems that aren't so well-behaved, we'll need either a full
+>>> native driver that knows how to program bridge window CSRs, set up
+>>> interrupts, etc., or a simpler native driver that papers over warts
+>>> like ECAM that doesn't work quite according to spec.
+>>>
+>>> It sounds like your system falls into the latter category.
 >>
->> How is this different from status/secure-status?
->> I have no other needs for the moment. I'm experimenting with the
->> introduction of DT in OP-TEE. The secure-status property (or lack
->> thereof) already allows me to know if a device can be used by the secure
->> OS and how it should be mapped (secure vs. non-secure). This extension
->> allows me to reuse the same TEE binary and change the console, which is
->> a simple use case to demonstrate the advantage of using the DT in the
->> secure FW.
-> 
-> Once you start using DT in the secure OS, it doesn't seem too big a leap
-> for folks to want to start passing arguments, so I'd consider
-> secure-bootargs to be almost inevitable at *some* point down this road.
-> 
-> Perhaps we should consider a /secure-chosen node containing standard
-> properties instead...
-
-Fine with me. I'll send a new patch.
-
->>> Maybe we should allow stdout-path to have multiple strings and secure
->>> fw grabs the first one and updates the DT removing it (perhaps only if
->>> the device is secure only). Might be nice to have multiple ones
->>> supported anyway (like we can do on the kernel command line:
->>> "console=ttyS0 console=ttyS1").
+>> Hello Bjorn,
 >>
->> The problem I see with removing entries is that the secure firmware may
->> have multiple stages (say, ARM Trusted Firmware plus a secure OS such as
->> OP-TEE).
+>> Having worked around 3 HW bugs, things are starting to look
+>> slightly more "normal". Here is my current boot log:
+>> (I've added a few questions inline.)
 > 
-> ...which different elements of firmware would in theory have a lot more
-> freedom to mangle between boot stages without the risk of disrupting the
-> regular /chosen properties.
+> Sounds like you're making good progress!
+> 
+>> [    0.197669] PCI: CLS 0 bytes, default 64
+>>
+>> Is it an error for Cache Line Size to be 0 here?
+> 
+> Not a problem.  I think your host bridge is to PCIe, and Cache Line
+> Size is not relevant for PCIe.  We should clean this up in the PCI
+> core someday.
+> 
+>> [    0.652356] OF: PCI: host bridge /soc/pcie at 50000000 ranges:
+>> [    0.652380] OF: PCI:   No bus range found for /soc/pcie at 50000000, using [bus 00-ff]
+>> [    0.652407] OF: PCI: Parsing ranges property...
+>> [    0.652494] OF: PCI:   MEM 0xa0000000..0xa03fffff -> 0xa0000000
+>> [    0.655744] pci-host-generic 50000000.pcie: ECAM at [mem 0x50000000-0x5fffffff] for [bus 00-ff]
+>> [    0.656097] pci-host-generic 50000000.pcie: PCI host bridge to bus 0000:00
+>> [    0.656145] pci_bus 0000:00: root bus resource [bus 00-ff]
+>> [    0.656168] pci_bus 0000:00: root bus resource [mem 0xa0000000-0xa03fffff]
+>> [    0.656191] pci_bus 0000:00: scanning bus
+>> [    0.656257] pci 0000:00:00.0: [1105:8758] type 01 class 0x048000
+>> [    0.656314] pci 0000:00:00.0: calling tango_pcie_fixup_class+0x0/0x10
+>> [    0.656358] pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x00ffffff 64bit]
+>> [    0.656400] pci 0000:00:00.0: calling pci_fixup_ide_bases+0x0/0x40
+>> [    0.656451] pci 0000:00:00.0: supports D1 D2
+>> [    0.656468] pci 0000:00:00.0: PME# supported from D0 D1 D2 D3hot
+>> [    0.656486] pci 0000:00:00.0: PME# disabled
+>> [    0.656657] pci_bus 0000:00: fixups for bus
+>> [    0.656686] PCI: bus0: Fast back to back transfers disabled
+> 
+> FWIW, back-to-back transfers is also irrelevant on PCIe.  Another
+> useless historical artifact.
+> 
+>> [    0.656707] pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 0
+>> [    0.656725] pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+>> [    0.656753] pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 1
+>> [    0.656845] pci_bus 0000:01: scanning bus
+>> [    0.656911] pci 0000:01:00.0: [1912:0014] type 00 class 0x0c0330
+>> [    0.656968] pci 0000:01:00.0: reg 0x10: [mem 0x00000000-0x00001fff 64bit]
+>> [    0.657065] pci 0000:01:00.0: calling pci_fixup_ide_bases+0x0/0x40
+>> [    0.657192] pci 0000:01:00.0: PME# supported from D0 D3hot D3cold
+>> [    0.657213] pci 0000:01:00.0: PME# disabled
+>> [    0.657495] pci_bus 0000:01: fixups for bus
+>> [    0.657521] PCI: bus1: Fast back to back transfers disabled
+>> [    0.657538] pci_bus 0000:01: bus scan returning with max=01
+>> [    0.657556] pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+>> [    0.657575] pci_bus 0000:00: bus scan returning with max=01
+>> [    0.657593] pci 0000:00:00.0: fixup irq: got 0
+>> [    0.657608] pci 0000:00:00.0: assigning IRQ 00
+>> [    0.657651] pci 0000:01:00.0: fixup irq: got 20
+>> [    0.657667] pci 0000:01:00.0: assigning IRQ 20
+>>
+>> This revision of the controller does not support legacy interrupt mode,
+>> only MSI. I looked at the bindings for MSI:
+>>
+>> https://www.kernel.org/doc/Documentation/devicetree/bindings/pci/pci-msi.txt
+>> https://www.kernel.org/doc/Documentation/devicetree/bindings/interrupt-controller/msi.txt
+>>
+>> But it is not clear to me if I need to write a specific driver
+>> for the MSI controller, or if there is some kind of generic
+>> support? If the latter, what are the required properties?
+>> A "door-bell" address? Anything else?
+> 
+> I added Marc in case he has advice here.  My only advice would be to look
+> at other drivers and see how they did it.  I'm pretty sure MSI isn't
+> going to work unless your platform has some way to set the MSI
+> addresses, whether this is some arch-specific thing or something in
+> the host bridge.
+
+Thanks Bjorn.
+
+Mason: while the kernel has generic support for dealing with MSI, there
+is not standardization at the interrupt controller level, so you do have
+to write your own driver, and wire it in the rest of the framework.
+
+I suggest you look at things like drivers/pci/host/pcie-altera-msi.c,
+which has an extremely simple implementation. You can use this as a
+starting point for your own driver.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
