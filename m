@@ -1,65 +1,42 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Wed, 1 Mar 2017 11:40:35 +0100
-Subject: [PATCH v3 20/25] ARM: owl: Implement CPU enable-method for S500
-In-Reply-To: <201703011539.2lGXT7m0%fengguang.wu@intel.com>
-References: <201703011539.2lGXT7m0%fengguang.wu@intel.com>
-Message-ID: <1639218b-a78a-4c49-17b6-eaf1173c2762@suse.de>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed,  1 Mar 2017 11:46:01 +0100
+Subject: [PATCH v2 0/3] meson-gx: Add mali-450 support
+Message-ID: <1488365164-22861-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 01.03.2017 um 08:19 schrieb kbuild test robot:
-> Hi Andreas,
-> 
-> [auto build test ERROR on next-20170228]
-> [also build test ERROR on v4.10]
-> [cannot apply to robh/for-next linus/master linux/master v4.9-rc8 v4.9-rc7 v4.9-rc6]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Andreas-F-rber/ARM-Initial-Actions-Semi-S500-and-S900-enablement/20170301-110028
-> config: arm-allmodconfig (attached as .config)
-> compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm 
-> 
-> All errors (new ones prefixed by >>):
-> 
->    arch/arm/mach-actions/headsmp.S: Assembler messages:
->>> arch/arm/mach-actions/headsmp.S:43: Error: selected processor does not support `dsb' in ARM mode
->>> arch/arm/mach-actions/headsmp.S:44: Error: selected processor does not support `isb' in ARM mode
-> 
-> vim +43 arch/arm/mach-actions/headsmp.S
-> 
->     37		mov	r6, r2, lsl r0
->     38		orr	r5, r5, r6	@ Reg = (Temp<<WayShift)|(NumSets<<SetShift)
->     39		mcr	p15, 0, r5, c7, c6, 2
->     40		bgt	2b
->     41		cmp	r2, #0
->     42		bgt	1b
->   > 43		dsb
->   > 44		isb
+Since the merge of the Mali dt bindings at [1], add support for Mali clocks
+and DT node.
 
-Any suggestion what to do about this error? Obviously it built fine for
-me, and the only thing I spotted in the attached config was that it's
-apparently a BE8 build...
+The Mali is clocked by two identical clock paths behind a glitch free mux
+to safely change frequency while running.
+So these clocks must be added to the meson-gxbb clock controller.
 
-Do we need a Kconfig "depends on" or some #ifdef here? This assembler
-part of the code was merely indentation-fixed by me.
+Changes since v1 at [2] :
+ - Remove GP0 fixes, this will pushed later, for base frequency it can depend on fclk_div3
+ - Add GXL support
+ - rebase on clk-next and jbrunet's patchset at [3] and [4]
+ - get rid of composite clocks, this adds more clocks IDs and exposes 2 more clocks
 
-Regards,
-Andreas
+[4] http://lkml.kernel.org/r/20170228093016.5624-1-jbrunet at baylibre.com
+[3] http://lkml.kernel.org/r/20170228133002.17894-1-jbrunet at baylibre.com
+[2] http://lkml.kernel.org/r/1486721084-1383-1-git-send-email-narmstrong at baylibre.com
+[1] http://lkml.kernel.org/r/b098c4fa9fce88361cca20417978734d0e1b5cca.1485939041.git-series.maxime.ripard at free-electrons.com
 
->     45		mov	pc, lr
->     46	ENDPROC(owl_v7_invalidate_l1)
->     47	
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Neil Armstrong (3):
+  clk: meson-gxbb: Add MALI clock IDS
+  clk: meson-gxbb: Add MALI clocks
+  ARM64: dts: meson-gx: Add MALI nodes for GXBB and GXL
+
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi      |  37 ++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi  |  43 +++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi |   1 +
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi |   1 +
+ drivers/clk/meson/gxbb.c                         | 139 +++++++++++++++++++++++
+ drivers/clk/meson/gxbb.h                         |   9 +-
+ include/dt-bindings/clock/gxbb-clkc.h            |   5 +
+ 7 files changed, 234 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+1.9.1
