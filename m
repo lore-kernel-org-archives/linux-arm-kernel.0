@@ -1,80 +1,86 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 1 Mar 2017 10:04:39 -0800
-Subject: [PATCH v2] ARM: OMAP2+: Fix device node reference counts
-In-Reply-To: <1488311640-3594-1-git-send-email-linux@roeck-us.net>
-References: <1488311640-3594-1-git-send-email-linux@roeck-us.net>
-Message-ID: <20170301180439.GI20572@atomide.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 1 Mar 2017 18:42:37 +0000
+Subject: [PATCH] Documentation: dt: Add binding for
+ /secure-chosen/stdout-path
+In-Reply-To: <CAFEAcA9AX5kSMs-PBQWDeDo=PTLoBHPMKc6ctYvR4LVni3rWAA@mail.gmail.com>
+References: <55a2f3cbe477bc876a7547eeb4693218698b87fe.1488387801.git.jerome.forissier@linaro.org>
+ <CAFEAcA9AX5kSMs-PBQWDeDo=PTLoBHPMKc6ctYvR4LVni3rWAA@mail.gmail.com>
+Message-ID: <456c743d-5963-3169-be1b-568c9012a993@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Guenter Roeck <linux@roeck-us.net> [170228 11:55]:
-> After commit 'of: fix of_node leak caused in of_find_node_opts_by_path',
-> the following error may be reported when running omap images.
+On 01/03/17 17:43, Peter Maydell wrote:
+> On 1 March 2017 at 17:08, Jerome Forissier <jerome.forissier@linaro.org> wrote:
+>> Some platforms may use a single device tree to describe two address
+>> spaces, as described in d9f43babb998 ("Documentation: dt: Add bindings
+>> for Secure-only devices"). For these platforms it makes sense to define
+>> a secure counterpart of /chosen, namely: /secure-chosen. This new node
+>> is meant to be used by the secure firmware to pass data to the secure
+>> OS. Only the stdout-path property is supported for now.
+>>
+>> Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
+>> ---
+>>  Documentation/devicetree/bindings/arm/secure.txt | 15 ++++++++++++++-
+>>  1 file changed, 14 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/secure.txt b/Documentation/devicetree/bindings/arm/secure.txt
+>> index e31303f..e7c596a 100644
+>> --- a/Documentation/devicetree/bindings/arm/secure.txt
+>> +++ b/Documentation/devicetree/bindings/arm/secure.txt
+>> @@ -32,7 +32,8 @@ describe the view of Secure world using the standard bindings. These
+>>  secure- bindings only need to be used where both the Secure and Normal
+>>  world views need to be described in a single device tree.
+>>
+>> -Valid Secure world properties:
+>> +Valid Secure world properties
+>> +-----------------------------
+>>
+>>  - secure-status : specifies whether the device is present and usable
+>>    in the secure world. The combination of this with "status" allows
+>> @@ -51,3 +52,15 @@ Valid Secure world properties:
+>>     status = "disabled"; secure-status = "okay";     /* S-only */
+>>     status = "disabled";                             /* disabled in both */
+>>     status = "disabled"; secure-status = "disabled"; /* disabled in both */
+>> +
+>> +The secure-chosen node
+>> +----------------------
+>> +
+>> +Similar to the /chosen node which serves as a place for passing data
+>> +between firmware and the operating system, the /secure-chosen node may
+>> +be used to pass data to the secure OS. Only the properties defined
+>> +below may appear in the /secure-chosen node. They have the same
+>> +definition as when used under /chosen, unless explicitely stated
 > 
-> OF: ERROR: Bad of_node_put() on /ocp at 68000000
-> CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc7-next-20170210 #1
-> Hardware name: Generic OMAP3-GP (Flattened Device Tree)
-> [<c0310604>] (unwind_backtrace) from [<c030bbf4>] (show_stack+0x10/0x14)
-> [<c030bbf4>] (show_stack) from [<c05add8c>] (dump_stack+0x98/0xac)
-> [<c05add8c>] (dump_stack) from [<c05af1b0>] (kobject_release+0x48/0x7c)
-> [<c05af1b0>] (kobject_release)
-> 	from [<c0ad1aa4>] (of_find_node_by_name+0x74/0x94)
-> [<c0ad1aa4>] (of_find_node_by_name)
-> 	from [<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable+0x24/0x2c)
-> [<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable) from
-> [<c1215d5c>] (omap3xxx_hwmod_init+0x180/0x274)
-> [<c1215d5c>] (omap3xxx_hwmod_init)
-> 	from [<c120faa8>] (omap3_init_early+0xa0/0x11c)
-> [<c120faa8>] (omap3_init_early)
-> 	from [<c120fb2c>] (omap3430_init_early+0x8/0x30)
-> [<c120fb2c>] (omap3430_init_early)
-> 	from [<c1204710>] (setup_arch+0xc04/0xc34)
-> [<c1204710>] (setup_arch) from [<c1200948>] (start_kernel+0x68/0x38c)
-> [<c1200948>] (start_kernel) from [<8020807c>] (0x8020807c)
+> typo: "explicitly".
 > 
-> of_find_node_by_name() drops the reference to the passed device node.
-> Use of_get_child_by_name() instead. Also, release references to
-> device nodes obtained with of_find_node_by_name() and
-> of_get_child_by_name() after they are no longer needed.
+>> +otherwise.
+>> +
+>> +- stdout-path
 > 
-> While at it, clean up the code and change the return type of
-> omap3xxx_hwmod_is_hs_ip_block_usable() to bool to match its use
-> and the return type of of_device_is_available().
+> What's the default for the Secure world if (a) the secure-chosen
+> node doesn't exist at all or (b) it does exist but doesn't
+> define stdout-path? Presumably it should be "fall back to
+> using the chosen node's stdout-path", to match the way we
+> do fallback for other secure world properties, but it would
+> be good to say so explicitly I think.
+
+I'd agree that it would be reasonable for the secure OS to fall back to
+parsing /chosen in the absence of /secure-chosen, but if the latter is
+present I would (at least naively) expect it to be authoritative. I can
+imagine the case of a cut-down version of some system implementing only
+one UART, where you might want to tell the Normal world OS to use that
+and the Secure OS to keep its output to itself - allowing fallbacks at
+the individual property level would make that harder than it needs to
+be, and in general seems like it might be more confusing than useful.
+
+Maintaining the principal that "secure-X" takes complete precedence over
+"X" seems to me to be the least surprising; it's just that in this one
+case X gets to be an entire node rather than a property because /chosen
+is special.
+
+Robin.
+
 > 
-> Cc: Qi Hou <qi.hou@windriver.com>
-> Cc: Peter Rosin <peda@axentia.se>
-> Cc: Rob Herring <robh@kernel.org>
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> ---
-> v2: Change subject ('Grab reference to device nodes where needed'
->     didn't really cover all the changes made)
->     Use of_get_child_by_name() instead of of_find_node_by_name()
->     Drop references to device nodes as needed
->     Change return type of omap3xxx_hwmod_is_hs_ip_block_usable()
->     to bool
-
-OK so now we have a commit id for it and should have:
-
-Fixes: 0549bde0fcb1 ("of: fix of_node leak caused in
-of_find_node_opts_by_path")
-
-What about other leaky users of of_find_node_by_name() and
-of_get_child_by_name()?
-
-We have those in:
-
-control.c
-display.c
-omap_device.c
-omap_hwmod.c
-
-So probably it really should be two fixes, one for the regression
-causing the error. Then another one for fixing the leaky np use.
-
-Sorry for going back and forth here, I guess I did not full understand
-the second part of the change in your earlier version of the patch
-when you asked if it should be two patches.
-
-Regards,
-
-Tony
+> thanks
+> -- PMM
+> 
