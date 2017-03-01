@@ -1,88 +1,51 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 01 Mar 2017 17:04:09 +0000
-Subject: [RFC PATCH V1 v4.10-rc3 1/1] acpi: apei: handle GSIV notification
- type
-In-Reply-To: <43507f99-d80b-6409-d249-b9b18425a1da@linaro.org>
-References: <86258A5CC0A3704780874CF6004BA8A62DCAB57E@lhreml502-mbs>
- <58B579A1.90109@arm.com> <43507f99-d80b-6409-d249-b9b18425a1da@linaro.org>
-Message-ID: <58B6FF09.6030306@arm.com>
+From: jerome.forissier@linaro.org (Jerome Forissier)
+Date: Wed,  1 Mar 2017 18:08:10 +0100
+Subject: [PATCH] Documentation: dt: Add binding for /secure-chosen/stdout-path
+Message-ID: <55a2f3cbe477bc876a7547eeb4693218698b87fe.1488387801.git.jerome.forissier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+Some platforms may use a single device tree to describe two address
+spaces, as described in d9f43babb998 ("Documentation: dt: Add bindings
+for Secure-only devices"). For these platforms it makes sense to define
+a secure counterpart of /chosen, namely: /secure-chosen. This new node
+is meant to be used by the secure firmware to pass data to the secure
+OS. Only the stdout-path property is supported for now.
 
-On 01/03/17 08:27, Hanjun Guo wrote:
-> On 2017/2/28 21:22, James Morse wrote:
->> On 27/02/17 18:19, Shiju Jose wrote:
->>> Add a new GHES error source handling function for
->>> GSIV(Global System Interrupt Vector).
->>> If an error source's notification type is GSIV,
->>> then this handling function can be registered
->>> into the GSIV handler and it can parse
->>> and report error information when they occur.
->>
->> I'm missing some of the story here, but how is GSIV different from 'External
->> Interrupt'? I'm guessing something other than the CPU takes this 'interrupt'...
-> 
-> Yes, it's the same from CPU side (they are interrupts!), but there
-> is history behind them and the usage is different.
-> 
-> I think External Interrupt was introduced before ACPI is available on
-> ARM (hardware reduced platforms), so I guess it was used for errors
-> reported to OS which were not using SCI mechanism, for example, some
-> IO error reporting.
-> 
-> For External Interrupt, we don't use the ACPI event system, so for
-> the firmware, it just report the errors associate with the interrupt
-> number, the kernel map the interrupt number and install the
-> irq handler for it.
-> 
-> For GSIV based event, it was introduced for hardware reduced platform
-> in recent ACPI revision, and ARM64 is one of its consumers. When
-> errors are reported via GSIV, ACPI event notification needs to be
-> implemented and requires the platform to define a hardware error device
-> (PNP0C33) in ACPI namespace, and also a generic event device ACPI0013.
+Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
+---
+ Documentation/devicetree/bindings/arm/secure.txt | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-Okay, so for APEI this really means PNP0C33 was Notify()d. 'SCI' means the same
-but the route they take to get into APEI is different.
-
-
-> For example, if we are using SPI (ARM GIC) 100 to report errors, there
-> is a ACPI0013 driver in drivers/acpi/evged.c to register the irq, when
-
-Aha, this is where the interrupt-magic happens.
-
-
-> error happened and trigger the interrupt, ACPI0013 driver will
-> notify the error device (PNP0C33), then error device driver
-> (drivers/acpi/hed.c) will process the error data form APEI table...
-
-
->> The GHES GSIV code below is identical to the behaviour of the SCI Notification
->> type... are these two names for the same thing? (I'm confused!)
-> 
-> SCI is also an 'interrupt' but it's a special irq number for ACPI
-> event, and it has GPE (general purpose event) registers behind it,
-> which is used only on Intel platforms. SCI based event use
-> Method(\_GPE._L0x) to notify the error device (PNP0C33), but GSIV
-> is used for HW-reduced platform which has no GPEs.
-
-> Hope it can clarify something :)
-
-Yes thanks! (the mist is slowly clearing...)
-
-If ACPI_HEST_NOTIFY_SCI and ACPI_HEST_NOTIFY_GSIV both mean 'receive
-notification from PNP0C33', is there any point having separate lists and
-add/remove functions for them?
-
-Instead, could we rename Linux's ghes_notifier_sci() and ghes_sci list to
-describe 'hed' instead, then group the two case statements together? There would
-be no need to add a selectable CONFIG_ACPI_APEI_GSIV, as SCI is already built-in
-and this way the code added is tiny. The only thing we would lose is the name
-'GSIV' in the not-supported error message which we don't need if its always
-supported.
-
-
-Thanks,
-
-James
+diff --git a/Documentation/devicetree/bindings/arm/secure.txt b/Documentation/devicetree/bindings/arm/secure.txt
+index e31303f..e7c596a 100644
+--- a/Documentation/devicetree/bindings/arm/secure.txt
++++ b/Documentation/devicetree/bindings/arm/secure.txt
+@@ -32,7 +32,8 @@ describe the view of Secure world using the standard bindings. These
+ secure- bindings only need to be used where both the Secure and Normal
+ world views need to be described in a single device tree.
+ 
+-Valid Secure world properties:
++Valid Secure world properties
++-----------------------------
+ 
+ - secure-status : specifies whether the device is present and usable
+   in the secure world. The combination of this with "status" allows
+@@ -51,3 +52,15 @@ Valid Secure world properties:
+    status = "disabled"; secure-status = "okay";     /* S-only */
+    status = "disabled";                             /* disabled in both */
+    status = "disabled"; secure-status = "disabled"; /* disabled in both */
++
++The secure-chosen node
++----------------------
++
++Similar to the /chosen node which serves as a place for passing data
++between firmware and the operating system, the /secure-chosen node may
++be used to pass data to the secure OS. Only the properties defined
++below may appear in the /secure-chosen node. They have the same
++definition as when used under /chosen, unless explicitely stated
++otherwise.
++
++- stdout-path
+-- 
+2.7.4
