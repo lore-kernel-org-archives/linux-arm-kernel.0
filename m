@@ -1,73 +1,41 @@
-From: yuantian.tang@nxp.com (Y.T. Tang)
-Date: Wed, 1 Mar 2017 01:45:54 +0000
-Subject: [PATCH 1/2] dt-bindings: qoriq-clock: Add coreclk
-In-Reply-To: <20170227171837.eymnyebgn7ocsp7w@rob-hp-laptop>
-References: <1487137656-4006-1-git-send-email-yuantian.tang@nxp.com>
- <20170227171837.eymnyebgn7ocsp7w@rob-hp-laptop>
-Message-ID: <DB6PR0402MB2837F35D8881AA2E4F12F430F0290@DB6PR0402MB2837.eurprd04.prod.outlook.com>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Wed,  1 Mar 2017 11:50:39 +1000
+Subject: [PATCHv3 3/4] ARM: versatile: empty Makefile.boot needed for no-MMU
+ compile
+In-Reply-To: <1488332385-3367-1-git-send-email-gerg@uclinux.org>
+References: <1488332385-3367-1-git-send-email-gerg@uclinux.org>
+Message-ID: <1488333040-3599-1-git-send-email-gerg@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+To compile the arm versatile board with the MMU disabled (!CONFIG_MMU)
+a Makefile.boot is required. Without it you get:
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Tuesday, February 28, 2017 1:19 AM
-> To: Y.T. Tang <yuantian.tang@nxp.com>
-> Cc: mturquette at baylibre.com; sboyd at codeaurora.org;
-> mark.rutland at arm.com; linux-clk at vger.kernel.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Scott Wood <oss@buserror.net>
-> Subject: Re: [PATCH 1/2] dt-bindings: qoriq-clock: Add coreclk
-> 
-> On Wed, Feb 15, 2017 at 01:47:35PM +0800, yuantian.tang at nxp.com wrote:
-> > From: Tang Yuantian <Yuantian.Tang@nxp.com>
-> >
-> > ls1012a has separate input root clocks for core PLLs versus the
-> > platform PLL, with the latter described as sysclk in the hw docs.
-> > Update the qoriq-clock binding to allow a second input clock, named
-> > "coreclk".  If present, this clock will be used for the core PLLs.
-> >
-> > Signed-off-by: Scott Wood <oss@buserror.net>
-> > Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
-> > ---
-> >  Documentation/devicetree/bindings/clock/qoriq-clock.txt | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> 
-> The change looks fine, but sounds like Scott should remain the author (or
-> agree he shouldn't be).
-> 
-Sure, please make Scott the author and apply this patch set.
+  SYSMAP  System.map
+arch/arm/boot/Makefile:15: arch/arm/mach-versatile//Makefile.boot: No such file or directory
+make[2]: *** No rule to make target `arch/arm/mach-versatile//Makefile.boot'.  Stop.
 
-Regards,
-Yuantian
+Create an empty Makefile.boot for the versatile machine. This is a
+copy of the other empty machine Makefile.boot files. (A few have this
+same commented empty file: stm32, ep93xx, lpc18xx, efm32 and vexpress).
 
-> >
-> > diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> > b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> > index df9cb5a..97a9666 100644
-> > --- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> > +++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> > @@ -55,6 +55,11 @@ Optional properties:
-> >  - clocks: If clock-frequency is not specified, sysclk may be provided
-> >  	as an input clock.  Either clock-frequency or clocks must be
-> >  	provided.
-> > +	A second input clock, called "coreclk", may be provided if
-> > +	core PLLs are based on a different input clock from the
-> > +	platform PLL.
-> > +- clock-names: Required if a coreclk is present.  Valid names are
-> > +	"sysclk" and "coreclk".
-> >
-> >  2. Clock Provider
-> >
-> > @@ -71,6 +76,7 @@ second cell is the clock index for the specified type.
-> >  	2	hwaccel		index (n in CLKCGnHWACSR)
-> >  	3	fman		0 for fm1, 1 for fm2
-> >  	4	platform pll	0=pll, 1=pll/2, 2=pll/3, 3=pll/4
-> > +	5	coreclk		must be 0
-> >
-> >  3. Example
-> >
-> > --
-> > 2.1.0.27.g96db324
-> >
+Signed-off-by: Greg Ungerer <gerg@uclinux.org>
+---
+ arch/arm/mach-versatile/Makefile.boot | 3 +++
+ 1 file changed, 3 insertions(+)
+ create mode 100644 arch/arm/mach-versatile/Makefile.boot
+
+v2: no change
+v3: rebase on top of linux-4.10
+
+diff --git a/arch/arm/mach-versatile/Makefile.boot b/arch/arm/mach-versatile/Makefile.boot
+new file mode 100644
+index 0000000..eacfc3f
+--- /dev/null
++++ b/arch/arm/mach-versatile/Makefile.boot
+@@ -0,0 +1,3 @@
++# Empty file waiting for deletion once Makefile.boot isn't needed any more.
++# Patch waits for application at
++# http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7889/1 .
+-- 
+1.9.1
