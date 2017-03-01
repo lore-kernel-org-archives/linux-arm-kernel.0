@@ -1,98 +1,100 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 1 Mar 2017 12:15:03 -0800
-Subject: [PATCH v2] ARM: OMAP2+: Fix device node reference counts
-In-Reply-To: <20170301180439.GI20572@atomide.com>
-References: <1488311640-3594-1-git-send-email-linux@roeck-us.net>
- <20170301180439.GI20572@atomide.com>
-Message-ID: <20170301201503.GC20160@roeck-us.net>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Wed, 1 Mar 2017 13:12:22 -0800
+Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
+In-Reply-To: <cd989fed-a136-5110-f22e-d334d923ca8b@akamai.com>
+References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
+ <20170227170911.2280ca3e@gandalf.local.home>
+ <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
+ <20170227173630.57fff459@gandalf.local.home>
+ <7bd72716-feea-073f-741c-04212ebd0802@caviumnetworks.com>
+ <68fe24ea-7795-24d8-211b-9d8a50affe9f@akamai.com>
+ <510FF566-011D-4199-86F7-2BB4DBF36434@linux.vnet.ibm.com>
+ <20170228112144.65455de5@gandalf.local.home>
+ <cdf98840-8d43-2c58-e2f9-75ae8fb8a600@caviumnetworks.com>
+ <1de00727-de97-f887-78bd-dd49131cdf61@akamai.com>
+ <999e2c3f-698c-703c-67a9-26aea3c97dc0@caviumnetworks.com>
+ <d10e986c-7f6a-3935-88e2-ba39708f79ad@caviumnetworks.com>
+ <542488db-5c59-afa5-6d1d-a437c87bc613@akamai.com>
+ <912fa97a-aa1d-c0e4-dc83-fc5c745db1c1@caviumnetworks.com>
+ <23989c10-7b47-3fda-f790-25b53 9704bec@akamai.com>
+ <871suh5wtw.fsf@concordia.ellerman.id.au>
+ <7e05bd3d-08da-00ba-1b79-c9be8c659524@caviumnetworks.com>
+ <cd989fed-a136-5110-f22e-d334d923ca8b@akamai.com>
+Message-ID: <d6e62866-4e7b-53cf-8198-35cadc1c8c2f@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 01, 2017 at 10:04:39AM -0800, Tony Lindgren wrote:
-> * Guenter Roeck <linux@roeck-us.net> [170228 11:55]:
-> > After commit 'of: fix of_node leak caused in of_find_node_opts_by_path',
-> > the following error may be reported when running omap images.
-> > 
-> > OF: ERROR: Bad of_node_put() on /ocp at 68000000
-> > CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc7-next-20170210 #1
-> > Hardware name: Generic OMAP3-GP (Flattened Device Tree)
-> > [<c0310604>] (unwind_backtrace) from [<c030bbf4>] (show_stack+0x10/0x14)
-> > [<c030bbf4>] (show_stack) from [<c05add8c>] (dump_stack+0x98/0xac)
-> > [<c05add8c>] (dump_stack) from [<c05af1b0>] (kobject_release+0x48/0x7c)
-> > [<c05af1b0>] (kobject_release)
-> > 	from [<c0ad1aa4>] (of_find_node_by_name+0x74/0x94)
-> > [<c0ad1aa4>] (of_find_node_by_name)
-> > 	from [<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable+0x24/0x2c)
-> > [<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable) from
-> > [<c1215d5c>] (omap3xxx_hwmod_init+0x180/0x274)
-> > [<c1215d5c>] (omap3xxx_hwmod_init)
-> > 	from [<c120faa8>] (omap3_init_early+0xa0/0x11c)
-> > [<c120faa8>] (omap3_init_early)
-> > 	from [<c120fb2c>] (omap3430_init_early+0x8/0x30)
-> > [<c120fb2c>] (omap3430_init_early)
-> > 	from [<c1204710>] (setup_arch+0xc04/0xc34)
-> > [<c1204710>] (setup_arch) from [<c1200948>] (start_kernel+0x68/0x38c)
-> > [<c1200948>] (start_kernel) from [<8020807c>] (0x8020807c)
-> > 
-> > of_find_node_by_name() drops the reference to the passed device node.
-> > Use of_get_child_by_name() instead. Also, release references to
-> > device nodes obtained with of_find_node_by_name() and
-> > of_get_child_by_name() after they are no longer needed.
-> > 
-> > While at it, clean up the code and change the return type of
-> > omap3xxx_hwmod_is_hs_ip_block_usable() to bool to match its use
-> > and the return type of of_device_is_available().
-> > 
-> > Cc: Qi Hou <qi.hou@windriver.com>
-> > Cc: Peter Rosin <peda@axentia.se>
-> > Cc: Rob Herring <robh@kernel.org>
-> > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> > ---
-> > v2: Change subject ('Grab reference to device nodes where needed'
-> >     didn't really cover all the changes made)
-> >     Use of_get_child_by_name() instead of of_find_node_by_name()
-> >     Drop references to device nodes as needed
-> >     Change return type of omap3xxx_hwmod_is_hs_ip_block_usable()
-> >     to bool
-> 
-> OK so now we have a commit id for it and should have:
-> 
-> Fixes: 0549bde0fcb1 ("of: fix of_node leak caused in
-> of_find_node_opts_by_path")
-> 
-Not really; 0549bde0fcb1 fixes a bug and hides _this_ bug.
-More appropriate, if that would exist, would be something like
+On 03/01/2017 12:02 PM, Jason Baron wrote:
+>
+>
+> On 03/01/2017 11:40 AM, David Daney wrote:
+>> On 02/28/2017 10:34 PM, Michael Ellerman wrote:
+>>> Jason Baron <jbaron@akamai.com> writes:
+>>> ...
+>>>> I also checked all the other .ko files and they were properly aligned.
+>>>> So I think this should hopefully work, and I like that its not a
+>>>> per-arch fix.
+>>>>
+>>>> Sachin, sorry to bother you again, but I'm hoping you can try David's
+>>>> latest patch to scripts/module-common.lds, just to test in your setup.
+>>>
+>>> It does fix the problem.
+>>>
+>>> I was reproducing with crc_t10dif:
+>>>
+>>> [  695.890552] ------------[ cut here ]------------
+>>> [  695.890709] WARNING: CPU: 15 PID: 3019 at
+>>> ../kernel/jump_label.c:287 static_key_set_entries+0x74/0xa0
+>>> [  695.890710] Modules linked in: crc_t10dif(+) crct10dif_generic
+>>> crct10dif_common ipt_MASQUERADE nf_nat_masquerade_ipv4 iptable_nat
+>>> nf_conntrack_ipv4 nf_defrag_ipv4 nf_nat_ipv4 xt_addrtype
+>>> iptable_filter ip_tables xt_conntrack x_tables nf_nat nf_conntrack
+>>> bridge stp llc dm_thin_pool dm_persistent_data dm_bio_prison dm_bufio
+>>> libcrc32c kvm virtio_balloon binfmt_misc autofs4 virtio_net virtio_pci
+>>> virtio_ring virtio
+>>>
+>>> Which had:
+>>>
+>>>   [21] __jump_table      PROGBITS        0000000000000000 0004e8
+>>> 000018 00  WA  0   0  1
+>>>
+>>>
+>>> And now has:
+>>>
+>>>   [18] __jump_table      PROGBITS        0000000000000000 0004d0
+>>> 000018 00  WA  0   0  8
+>>>
+>>> And all other modules have an alignment of 8 on __jump_table, as
+>>> expected.
+>>>
+>>> I'm inclined to merge a version of the balign patch for powerpc anyway,
+>>> just to be on the safe side. I guess the old code was coping fine with
+>>> the unaligned keys, but it still makes me nervous.
+>>
+>>
+>> The original "balign patch" has a couple of problems:
+>>
+>> 1) 4-byte alignment is not sufficient for 64-bit kernels
+>>
+>> 2) It is redundant if the linker script patch is accepted.
+>>
+>>
+>
+> The linker script patch seems reasonable to me.
+>
+> Maybe its worth adding a comment that the alignment is necessary because
+> the core jump_label makes use of the 2 lsb bits of its __jump_table
+> pointer due to commit:
+>
+> 3821fd3 jump_label: Reduce the size of struct static_key
+>
+> Also, in the comment it says that it fixes an oops. We hit a WARN_ON()
+> not an oops, although bad things are likely to happen when the branch is
+> updated.
+>
 
-Exposed-by: 0549bde0fcb1 ("of: fix of_node leak caused in ...")
+OK, I guess I will send a proper patch e-mail with an updated changelog 
+with the improvements you suggest.
 
-> What about other leaky users of of_find_node_by_name() and
-> of_get_child_by_name()?
-> 
-> We have those in:
-> 
-> control.c
-> display.c
-> omap_device.c
-> omap_hwmod.c
-> 
-
-I am sure there are many more. For example, the bug solved in my patch
-"disappears" if one adds some delays (or just log messages) at strategic
-areas in the code. Such delays result in node leaks elsewhere, which
-again hides the bug I am trying to fix with my patch.
-
-> So probably it really should be two fixes, one for the regression
-> causing the error. Then another one for fixing the leaky np use.
-> 
-No problem; I 'll split into two patches.
-
-Guenter
-
-> Sorry for going back and forth here, I guess I did not full understand
-> the second part of the change in your earlier version of the patch
-> when you asked if it should be two patches.
-> 
-
-> Regards,
-> 
-> Tony
+Thanks,
+David.
