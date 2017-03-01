@@ -1,31 +1,48 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 1 Mar 2017 12:58:08 -0500
-Subject: [PATCH V2] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B28466668774@IRSMSX101.ger.corp.intel.com>
-References: <1485891928-14573-1-git-send-email-okaya@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B2846666830C@IRSMSX101.ger.corp.intel.com>
- <b78207b6-2c22-3e6d-4837-8b4b396c4f5d@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B28466668774@IRSMSX101.ger.corp.intel.com>
-Message-ID: <f8f67b32-21eb-232b-2b7c-28b603865b9d@codeaurora.org>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 01 Mar 2017 10:00:55 -0800
+Subject: [PATCH v3 2/7] mmc: bcm2835: Add new driver for the sdhost
+ controller.
+In-Reply-To: <1487668026-7100-3-git-send-email-kraxel@redhat.com>
+References: <1487668026-7100-1-git-send-email-kraxel@redhat.com>
+ <1487668026-7100-3-git-send-email-kraxel@redhat.com>
+Message-ID: <87tw7c27xk.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Gerd Hoffmann <kraxel@redhat.com> writes:
 
-On 2/28/2017 1:57 PM, Patel, Mayurkumar wrote:
->> I was trying to figure out when to use saved values vs. the values in
->> registers by looking at the enable_cnt.
->> enable_cnt is 0 during boot on my system.
-> enable_cnt for the root port on my system is set to 1 for "root port" already without saving
-> any ASPM related settings. 
-> 
-> 
+> From: Eric Anholt <eric@anholt.net>
+>
+> The 2835 has two SD controllers: The Arasan sdhci controller (supported
+> by the iproc driver) and a custom sdhost controller.  This patch adds a
+> driver for the latter.
+>
+> The sdhci controller supports both sdcard and sdio.  The sdhost
+> controller supports the sdcard only, but has better performance.  Also
+> note that the rpi3 has sdio wifi, so driving the sdcard with the sdhost
+> controller allows to use the sdhci controller for wifi support.
+>
+> The configuration is done by devicetree via pin muxing.  Both SD
+> controller are available on the same pins (2 pin groups = pin 22 to 27 +
+> pin 48 to 53).  So it's possible to use both SD controllers at the same
+> time with different pin groups.
+>
+> The code was originally written by Phil Elwell in the downstream
+> Rasbperry Pi tree, and I did a major cleanup on it (+319, -707 lines
+> out of the original 2055) for inclusion.
+>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 
-What would be the best way to figure out when to save power-on values from
-the registers?
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Ulf, what do you need done to this driver patch before it can go in?
+The commit message seems like it could use some rewriting at this point
+(Personally I would drop the detailed changelogs from Stefan and Gerd,
+updating the last paragraph here to give them credit), but what's
+important to me is getting the driver in so that distros don't have to
+carry this patch for wifi support.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170301/2f4adaaf/attachment.sig>
