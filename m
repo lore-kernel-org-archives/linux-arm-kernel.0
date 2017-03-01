@@ -1,52 +1,68 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu,  2 Mar 2017 00:49:28 +0530
-Subject: [PATCH 20/20] arm64:ilp32: add ARM64_ILP32 to Kconfig
-In-Reply-To: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1488395968-14313-21-git-send-email-ynorov@caviumnetworks.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 01 Mar 2017 11:31:31 -0800
+Subject: [PATCH v3 2/7] mmc: bcm2835: Add new driver for the sdhost
+ controller.
+In-Reply-To: <68761051.37200.1488396112552@email.1und1.de>
+References: <1487668026-7100-1-git-send-email-kraxel@redhat.com>
+ <1487668026-7100-3-git-send-email-kraxel@redhat.com>
+ <87tw7c27xk.fsf@eliezer.anholt.net>
+ <68761051.37200.1488396112552@email.1und1.de>
+Message-ID: <87varsequk.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-This patch adds the config option for ILP32.
+>> Eric Anholt <eric@anholt.net> hat am 1. M?rz 2017 um 19:00 geschrieben:
+>> 
+>> 
+>> Gerd Hoffmann <kraxel@redhat.com> writes:
+>> 
+>> > From: Eric Anholt <eric@anholt.net>
+>> >
+>> > The 2835 has two SD controllers: The Arasan sdhci controller (supported
+>> > by the iproc driver) and a custom sdhost controller.  This patch adds a
+>> > driver for the latter.
+>> >
+>> > The sdhci controller supports both sdcard and sdio.  The sdhost
+>> > controller supports the sdcard only, but has better performance.  Also
+>> > note that the rpi3 has sdio wifi, so driving the sdcard with the sdhost
+>> > controller allows to use the sdhci controller for wifi support.
+>> >
+>> > The configuration is done by devicetree via pin muxing.  Both SD
+>> > controller are available on the same pins (2 pin groups = pin 22 to 27 +
+>> > pin 48 to 53).  So it's possible to use both SD controllers at the same
+>> > time with different pin groups.
+>> >
+>> > The code was originally written by Phil Elwell in the downstream
+>> > Rasbperry Pi tree, and I did a major cleanup on it (+319, -707 lines
+>> > out of the original 2055) for inclusion.
+>> >
+>> > Signed-off-by: Eric Anholt <eric@anholt.net>
+>> 
+>> Ulf, what do you need done to this driver patch before it can go in?
+>> The commit message seems like it could use some rewriting at this point
+>> (Personally I would drop the detailed changelogs from Stefan and Gerd,
+>> updating the last paragraph here to give them credit), but what's
+>> important to me is getting the driver in so that distros don't have to
+>> carry this patch for wifi support.
+>
+> I'm still working on 3 small patches for this driver:
+>
+> 1. trivial error in a register comment
+> 2. ignore SDCMD_FAIL_FLAG during bcm2835_finish_command (downstream [1])
+> 3. remove unnecessary call to bcm2835_reset_internal
+>
+> I plan to submit them on Friday.
+>
+> [1] - https://github.com/raspberrypi/linux/commit/711cade866c9f865f9b283c9369e9486f27d1fec
 
-Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Reviewed-by: David Daney <ddaney@caviumnetworks.com>
----
- arch/arm64/Kconfig | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index d059063..887f391 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1043,7 +1043,7 @@ source "fs/Kconfig.binfmt"
- 
- config COMPAT
- 	bool
--	depends on AARCH32_EL0
-+	depends on AARCH32_EL0 || ARM64_ILP32
- 
- config AARCH32_EL0
- 	bool "Kernel support for 32-bit EL0"
-@@ -1065,6 +1065,14 @@ config AARCH32_EL0
- 
- 	  If you want to execute 32-bit userspace applications, say Y.
- 
-+config ARM64_ILP32
-+	bool "Kernel support for ILP32"
-+	select COMPAT
-+	help
-+	  This option enables support for AArch64 ILP32 user space.  ILP32
-+	  is an ABI where long and pointers are 32bits but it uses the AARCH64
-+	  instruction set.
-+
- config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on COMPAT && SYSVIPC
--- 
-2.7.4
+Should any of those changes block merging the current code, though?  It
+doesn't sound like it to me.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170301/84efa163/attachment.sig>
