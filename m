@@ -1,42 +1,45 @@
-From: nicolas.dufresne@collabora.com (Nicolas Dufresne)
-Date: Wed, 01 Mar 2017 10:21:06 -0500
-Subject: [PATCH v6 2/2] [media] s5p-mfc: Handle 'v4l2_pix_format:field'
- in try_fmt and g_fmt
-In-Reply-To: <33dbd3fa-04b2-3d94-5163-0a10589ff1c7@samsung.com>
-References: <20170301115108.14187-1-thibault.saunier@osg.samsung.com>
- <CGME20170301115141epcas2p37801b1fbe0951cc37a4e01bf2bcae3da@epcas2p3.samsung.com>
- <20170301115108.14187-3-thibault.saunier@osg.samsung.com>
- <33dbd3fa-04b2-3d94-5163-0a10589ff1c7@samsung.com>
-Message-ID: <1488381666.14858.5.camel@collabora.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Wed,  1 Mar 2017 18:23:02 +0300
+Subject: [PATCH v3] Revert "tty: serial: pl011: add ttyAMA for matching pl011
+ console"
+In-Reply-To: <20170301122602.30025-1-aleksey.makarov@linaro.org>
+References: <20170301122602.30025-1-aleksey.makarov@linaro.org>
+Message-ID: <20170301152304.29635-1-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mercredi 01 mars 2017 ? 14:12 +0100, Andrzej Hajda a ?crit?:
-> - on output side you have encoded bytestream - you cannot say about
-> interlacing in such case, so the only valid value is NONE,
-> - on capture side you have decoded frames, and in this case it
-> depends
-> on the device and driver capabilities, if the driver/device does not
-> support (de-)interlacing (I suppose this is MFC case), interlace type
-> field should be filled according to decoded bytestream header (on
-> output
-> side), but no direct copying from output side!!!
+The original patch makes the condition always true, so it is wrong.
 
-I think we need some nuance here for this to actually be usable. If the
-information is not provided by the driver (yes, hardware is limiting
-sometimes), it would make sense to copy over the information that
-userspace provided. Setting NONE is just the worst approximation in my
-opinion.
+It masks (but not fixes) the bug described in the commit message
+but introduces a regression (no console is selected by SPCR)
+in regular (no 'console=ttyAMA') case.
 
-About MFC, it will be worth trying to read the DISPLAY_STATUS after the
-headers has been processed. It's not clearly stated in the spec if this
-will be set or not.
+s/||/&&/ would not fix the problem as the root cause was identified
+incorrectly.
 
-Nicolas
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170301/cd10c72b/attachment.sig>
+This reverts commit aea9a80ba98a0c9b4de88850260e9fbdcc98360b.
+
+Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+---
+
+v3: fix commit message (Robin Murphy)
+v2: add Signed-off-by:
+
+ drivers/tty/serial/amba-pl011.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 8789ea423ccf..56f92d7348bf 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -2373,7 +2373,7 @@ static int __init pl011_console_match(struct console *co, char *name, int idx,
+ 	if (strcmp(name, "qdf2400_e44") == 0) {
+ 		pr_info_once("UART: Working around QDF2400 SoC erratum 44");
+ 		qdf2400_e44_present = true;
+-	} else if (strcmp(name, "pl011") != 0 || strcmp(name, "ttyAMA") != 0) {
++	} else if (strcmp(name, "pl011") != 0) {
+ 		return -ENODEV;
+ 	}
+ 
+-- 
+2.11.1
