@@ -1,49 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 1 Mar 2017 04:51:56 +0000
-Subject: [GIT PULL] arm64 fixes for -rc1
-Message-ID: <20170301045156.GD12637@arm.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Wed, 01 Mar 2017 17:34:51 +1100
+Subject: [PATCH] jump_label: align jump_entry table to at least 4-bytes
+In-Reply-To: <23989c10-7b47-3fda-f790-25b539704bec@akamai.com>
+References: <1488221364-13905-1-git-send-email-jbaron@akamai.com>
+ <93219edf-0f6d-5cc7-309c-c998f16fe7ac@akamai.com>
+ <aa139c18-1b04-2c20-2e22-89d74503b3cf@caviumnetworks.com>
+ <20170227160601.5b79a1fe@gandalf.local.home>
+ <6db89a8d-6053-51d1-5fd4-bae0179a5ebd@caviumnetworks.com>
+ <20170227170911.2280ca3e@gandalf.local.home>
+ <7fa95eea-20be-611c-2b63-fca600779465@caviumnetworks.com>
+ <20170227173630.57fff459@gandalf.local.home>
+ <7bd72716-feea-073f-741c-04212ebd0802@caviumnetworks.com>
+ <68fe24ea-7795-24d8-211b-9d8a50affe9f@akamai.com>
+ <510FF566-011D-4199-86F7-2BB4DBF36434@linux.vnet.ibm.com>
+ <20170228112144.65455de5@gandalf.local.home>
+ <cdf98840-8d43-2c58-e2f9-75ae8fb8a600@caviumnetworks.com>
+ <1de00727-de97-f887-78bd-dd49131cdf61@akamai.com>
+ <999e2c3f-698c-703c-67a9-26aea3c97dc0@caviumnetworks.com>
+ <d10e986c-7f6a-3935-88e2-ba39708f79ad@caviumnetworks.com>
+ <542488db-5c59-afa5-6d1d-a437c87bc613@akamai.com>
+ <912fa97a-aa1d-c0e4-dc83-fc5c745db1c1@caviumnetworks.com>
+ <23989c10-7b47-3fda-f790-25b53 9704bec@akamai.com>
+Message-ID: <871suh5wtw.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Jason Baron <jbaron@akamai.com> writes:
+...
+> I also checked all the other .ko files and they were properly aligned. 
+> So I think this should hopefully work, and I like that its not a 
+> per-arch fix.
+>
+> Sachin, sorry to bother you again, but I'm hoping you can try David's 
+> latest patch to scripts/module-common.lds, just to test in your setup.
 
-Please pull these three arm64 fixes for -rc1. The main fix here addresses a
-kernel panic triggered on Qualcomm QDF2400 due to incorrect register usage
-in an erratum workaround introduced during the merge window.
+It does fix the problem.
 
-Cheers,
+I was reproducing with crc_t10dif:
 
-Will
+[  695.890552] ------------[ cut here ]------------
+[  695.890709] WARNING: CPU: 15 PID: 3019 at ../kernel/jump_label.c:287 static_key_set_entries+0x74/0xa0
+[  695.890710] Modules linked in: crc_t10dif(+) crct10dif_generic crct10dif_common ipt_MASQUERADE nf_nat_masquerade_ipv4 iptable_nat nf_conntrack_ipv4 nf_defrag_ipv4 nf_nat_ipv4 xt_addrtype iptable_filter ip_tables xt_conntrack x_tables nf_nat nf_conntrack bridge stp llc dm_thin_pool dm_persistent_data dm_bio_prison dm_bufio libcrc32c kvm virtio_balloon binfmt_misc autofs4 virtio_net virtio_pci virtio_ring virtio
 
---->8
+Which had:
 
-The following changes since commit ffe7afd1713558d73483834c2e2d03a1e39a4062:
+  [21] __jump_table      PROGBITS        0000000000000000 0004e8 000018 00  WA  0   0  1
 
-  arm64/kprobes: consistently handle MRS/MSR with XZR (2017-02-15 12:20:29 +0000)
 
-are available in the git repository at:
+And now has:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+  [18] __jump_table      PROGBITS        0000000000000000 0004d0 000018 00  WA  0   0  8
 
-for you to fetch changes up to 638f863dbbc8da16834ee0acc6ac10754f79c486:
+And all other modules have an alignment of 8 on __jump_table, as expected.
 
-  arm64/cpufeature: check correct field width when updating sys_val (2017-02-24 11:14:12 +0000)
+I'm inclined to merge a version of the balign patch for powerpc anyway,
+just to be on the safe side. I guess the old code was coping fine with
+the unaligned keys, but it still makes me nervous.
 
-----------------------------------------------------------------
-- Fix kernel panic on specific Qualcomm platform due to broken erratum
-  workaround
-- Revert contiguous bit support due to TLB conflict aborts in simulation
-- Don't treat all CPU ID register fields as 4-bit quantities
-
-----------------------------------------------------------------
-Mark Rutland (2):
-      Revert "arm64: mm: set the contiguous bit for kernel mappings where appropriate"
-      arm64/cpufeature: check correct field width when updating sys_val
-
-Shanker Donthineni (1):
-      arm64: Avoid clobbering mm in erratum workaround on QDF2400
-
- arch/arm64/include/asm/cpufeature.h | 14 ++++++++++----
- arch/arm64/mm/mmu.c                 | 34 ++++------------------------------
- arch/arm64/mm/proc.S                |  2 +-
- 3 files changed, 15 insertions(+), 35 deletions(-)
+cheers
