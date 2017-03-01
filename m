@@ -1,124 +1,236 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu,  2 Mar 2017 00:49:20 +0530
-Subject: [PATCH 12/20] arm64: ilp32: introduce binfmt_ilp32.c
+Date: Thu,  2 Mar 2017 00:49:21 +0530
+Subject: [PATCH 13/20] arm64: ilp32: share aarch32 syscall handlers
 In-Reply-To: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1488395968-14313-13-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1488395968-14313-14-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Like binfmt_elf32.c, binfmt_ilp32.c is needed to handle ILP32 binaries
+off_t is  passed in register pair just like in aarch32.
+In this patch corresponding aarch32 handlers are shared to
+ilp32 code.
 
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
 ---
- arch/arm64/kernel/Makefile       |  1 +
- arch/arm64/kernel/binfmt_ilp32.c | 85 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 86 insertions(+)
- create mode 100644 arch/arm64/kernel/binfmt_ilp32.c
+ arch/arm64/kernel/Makefile         |   1 +
+ arch/arm64/kernel/entry32.S        |  80 ---------------------------
+ arch/arm64/kernel/entry32_common.S | 107 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 108 insertions(+), 80 deletions(-)
+ create mode 100644 arch/arm64/kernel/entry32_common.S
 
 diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index aeaf474..b6f14a8 100644
+index b6f14a8..e0798d7 100644
 --- a/arch/arm64/kernel/Makefile
 +++ b/arch/arm64/kernel/Makefile
-@@ -29,6 +29,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
- 
+@@ -30,6 +30,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
  arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
  					   sys_compat.o entry32.o binfmt_elf32.o
-+arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o
+ arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o
++arm64-obj-$(CONFIG_COMPAT)		+= entry32_common.o
  arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
  arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
  arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
-diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
+diff --git a/arch/arm64/kernel/entry32.S b/arch/arm64/kernel/entry32.S
+index f332d5d..4bede03 100644
+--- a/arch/arm64/kernel/entry32.S
++++ b/arch/arm64/kernel/entry32.S
+@@ -39,83 +39,3 @@ ENTRY(compat_sys_rt_sigreturn_wrapper)
+ 	mov	x0, sp
+ 	b	compat_sys_rt_sigreturn
+ ENDPROC(compat_sys_rt_sigreturn_wrapper)
+-
+-ENTRY(compat_sys_statfs64_wrapper)
+-	mov	w3, #84
+-	cmp	w1, #88
+-	csel	w1, w3, w1, eq
+-	b	compat_sys_statfs64
+-ENDPROC(compat_sys_statfs64_wrapper)
+-
+-ENTRY(compat_sys_fstatfs64_wrapper)
+-	mov	w3, #84
+-	cmp	w1, #88
+-	csel	w1, w3, w1, eq
+-	b	compat_sys_fstatfs64
+-ENDPROC(compat_sys_fstatfs64_wrapper)
+-
+-/*
+- * Note: off_4k (w5) is always in units of 4K. If we can't do the
+- * requested offset because it is not page-aligned, we return -EINVAL.
+- */
+-ENTRY(compat_sys_mmap2_wrapper)
+-#if PAGE_SHIFT > 12
+-	tst	w5, #~PAGE_MASK >> 12
+-	b.ne	1f
+-	lsr	w5, w5, #PAGE_SHIFT - 12
+-#endif
+-	b	sys_mmap_pgoff
+-1:	mov	x0, #-EINVAL
+-	ret
+-ENDPROC(compat_sys_mmap2_wrapper)
+-
+-/*
+- * Wrappers for AArch32 syscalls that either take 64-bit parameters
+- * in registers or that take 32-bit parameters which require sign
+- * extension.
+- */
+-ENTRY(compat_sys_pread64_wrapper)
+-	regs_to_64	x3, x4, x5
+-	b	sys_pread64
+-ENDPROC(compat_sys_pread64_wrapper)
+-
+-ENTRY(compat_sys_pwrite64_wrapper)
+-	regs_to_64	x3, x4, x5
+-	b	sys_pwrite64
+-ENDPROC(compat_sys_pwrite64_wrapper)
+-
+-ENTRY(compat_sys_truncate64_wrapper)
+-	regs_to_64	x1, x2, x3
+-	b	sys_truncate
+-ENDPROC(compat_sys_truncate64_wrapper)
+-
+-ENTRY(compat_sys_ftruncate64_wrapper)
+-	regs_to_64	x1, x2, x3
+-	b	sys_ftruncate
+-ENDPROC(compat_sys_ftruncate64_wrapper)
+-
+-ENTRY(compat_sys_readahead_wrapper)
+-	regs_to_64	x1, x2, x3
+-	mov	w2, w4
+-	b	sys_readahead
+-ENDPROC(compat_sys_readahead_wrapper)
+-
+-ENTRY(compat_sys_fadvise64_64_wrapper)
+-	mov	w6, w1
+-	regs_to_64	x1, x2, x3
+-	regs_to_64	x2, x4, x5
+-	mov	w3, w6
+-	b	sys_fadvise64_64
+-ENDPROC(compat_sys_fadvise64_64_wrapper)
+-
+-ENTRY(compat_sys_sync_file_range2_wrapper)
+-	regs_to_64	x2, x2, x3
+-	regs_to_64	x3, x4, x5
+-	b	sys_sync_file_range2
+-ENDPROC(compat_sys_sync_file_range2_wrapper)
+-
+-ENTRY(compat_sys_fallocate_wrapper)
+-	regs_to_64	x2, x2, x3
+-	regs_to_64	x3, x4, x5
+-	b	sys_fallocate
+-ENDPROC(compat_sys_fallocate_wrapper)
+diff --git a/arch/arm64/kernel/entry32_common.S b/arch/arm64/kernel/entry32_common.S
 new file mode 100644
-index 0000000..bb31325
+index 0000000..f4a5e4d
 --- /dev/null
-+++ b/arch/arm64/kernel/binfmt_ilp32.c
-@@ -0,0 +1,85 @@
++++ b/arch/arm64/kernel/entry32_common.S
+@@ -0,0 +1,107 @@
 +/*
-+ * Support for ILP32 Linux/aarch64 ELF binaries.
++ * Compat system call wrappers
++ *
++ * Copyright (C) 2012 ARM Ltd.
++ * Authors: Will Deacon <will.deacon@arm.com>
++ *	    Catalin Marinas <catalin.marinas@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#undef CONFIG_AARCH32_EL0
-+#define compat_elf_gregset_t	elf_gregset_t
 +
-+#include <linux/elfcore-compat.h>
-+#include <linux/time.h>
++#include <linux/linkage.h>
++#include <linux/const.h>
 +
-+#undef	ELF_CLASS
-+#define ELF_CLASS	ELFCLASS32
-+
-+#undef	elfhdr
-+#undef	elf_phdr
-+#undef	elf_shdr
-+#undef	elf_note
-+#undef	elf_addr_t
-+#define elfhdr		elf32_hdr
-+#define elf_phdr	elf32_phdr
-+#define elf_shdr	elf32_shdr
-+#define elf_note	elf32_note
-+#define elf_addr_t	Elf32_Addr
-+
-+/*
-+ * Some data types as stored in coredump.
-+ */
-+#define user_long_t		compat_long_t
-+#define user_siginfo_t		compat_siginfo_t
-+#define copy_siginfo_to_user	copy_siginfo_to_user32
++#include <asm/assembler.h>
++#include <asm/asm-offsets.h>
++#include <asm/errno.h>
++#include <asm/page.h>
 +
 +/*
-+ * The machine-dependent core note format types are defined in elfcore-compat.h,
-+ * which requires asm/elf.h to define compat_elf_gregset_t et al.
++ * Note: off_4k (w5) is always in units of 4K. If we can't do the
++ * requested offset because it is not page-aligned, we return -EINVAL.
 + */
-+#define elf_prstatus	compat_elf_prstatus
-+#define elf_prpsinfo	compat_elf_prpsinfo
-+
-+/* AARCH64 ILP32 EABI. */
-+#undef elf_check_arch
-+#define elf_check_arch(x)		(((x)->e_machine == EM_AARCH64)	\
-+					&& (x)->e_ident[EI_CLASS] == ELFCLASS32)
-+
-+#undef SET_PERSONALITY
-+#define SET_PERSONALITY(ex)						\
-+do {									\
-+	set_bit(TIF_32BIT, &current->mm->context.flags);	\
-+	set_thread_flag(TIF_32BIT_AARCH64);				\
-+	clear_thread_flag(TIF_32BIT);					\
-+} while (0)
-+
-+#undef ARCH_DLINFO
-+#define ARCH_DLINFO							\
-+do {									\
-+	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
-+		    (elf_addr_t)(long)current->mm->context.vdso);	\
-+} while (0)
-+
-+#undef ELF_PLATFORM
-+#ifdef __AARCH64EB__
-+#define ELF_PLATFORM		("aarch64_be:ilp32")
-+#else
-+#define ELF_PLATFORM		("aarch64:ilp32")
++ENTRY(compat_sys_mmap2_wrapper)
++#if PAGE_SHIFT > 12
++	tst	w5, #~PAGE_MASK >> 12
++	b.ne	1f
++	lsr	w5, w5, #PAGE_SHIFT - 12
 +#endif
-+
-+#undef ELF_ET_DYN_BASE
-+#define ELF_ET_DYN_BASE COMPAT_ELF_ET_DYN_BASE
-+
-+#undef ELF_HWCAP
-+#undef ELF_HWCAP2
-+#define ELF_HWCAP			((u32) elf_hwcap)
-+#define ELF_HWCAP2			((u32) (elf_hwcap >> 32))
++	b	sys_mmap_pgoff
++1:	mov	x0, #-EINVAL
++	ret
++ENDPROC(compat_sys_mmap2_wrapper)
 +
 +/*
-+ * Rename a few of the symbols that binfmt_elf.c will define.
-+ * These are all local so the names don't really matter, but it
-+ * might make some debugging less confusing not to duplicate them.
++ * Wrappers for AArch32 syscalls that either take 64-bit parameters
++ * in registers or that take 32-bit parameters which require sign
++ * extension.
 + */
-+#define elf_format		compat_elf_format
-+#define init_elf_binfmt		init_compat_elf_binfmt
-+#define exit_elf_binfmt		exit_compat_elf_binfmt
++ENTRY(compat_sys_pread64_wrapper)
++	regs_to_64	x3, x4, x5
++	b	sys_pread64
++ENDPROC(compat_sys_pread64_wrapper)
 +
-+#undef ns_to_timeval
-+#define ns_to_timeval ns_to_compat_timeval
++ENTRY(compat_sys_pwrite64_wrapper)
++	regs_to_64	x3, x4, x5
++	b	sys_pwrite64
++ENDPROC(compat_sys_pwrite64_wrapper)
 +
-+#include "../../../fs/binfmt_elf.c"
++ENTRY(compat_sys_truncate64_wrapper)
++	regs_to_64	x1, x2, x3
++	b	sys_truncate
++ENDPROC(compat_sys_truncate64_wrapper)
++
++ENTRY(compat_sys_ftruncate64_wrapper)
++	regs_to_64	x1, x2, x3
++	b	sys_ftruncate
++ENDPROC(compat_sys_ftruncate64_wrapper)
++
++ENTRY(compat_sys_readahead_wrapper)
++	regs_to_64	x1, x2, x3
++	mov	w2, w4
++	b	sys_readahead
++ENDPROC(compat_sys_readahead_wrapper)
++
++ENTRY(compat_sys_fadvise64_64_wrapper)
++	mov	w6, w1
++	regs_to_64	x1, x2, x3
++	regs_to_64	x2, x4, x5
++	mov	w3, w6
++	b	sys_fadvise64_64
++ENDPROC(compat_sys_fadvise64_64_wrapper)
++
++ENTRY(compat_sys_sync_file_range2_wrapper)
++	regs_to_64	x2, x2, x3
++	regs_to_64	x3, x4, x5
++	b	sys_sync_file_range2
++ENDPROC(compat_sys_sync_file_range2_wrapper)
++
++ENTRY(compat_sys_fallocate_wrapper)
++	regs_to_64	x2, x2, x3
++	regs_to_64	x3, x4, x5
++	b	sys_fallocate
++ENDPROC(compat_sys_fallocate_wrapper)
++
++ENTRY(compat_sys_statfs64_wrapper)
++	mov	w3, #84
++	cmp	w1, #88
++	csel	w1, w3, w1, eq
++	b	compat_sys_statfs64
++ENDPROC(compat_sys_statfs64_wrapper)
++
++ENTRY(compat_sys_fstatfs64_wrapper)
++	mov	w3, #84
++	cmp	w1, #88
++	csel	w1, w3, w1, eq
++	b	compat_sys_fstatfs64
++ENDPROC(compat_sys_fstatfs64_wrapper)
 -- 
 2.7.4
