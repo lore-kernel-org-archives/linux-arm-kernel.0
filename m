@@ -1,36 +1,66 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Wed,  1 Mar 2017 15:50:52 +0300
-Subject: [PATCH v2] Revert "tty: serial: pl011: add ttyAMA for matching pl011
- console"
-In-Reply-To: <20170301122602.30025-1-aleksey.makarov@linaro.org>
-References: <20170301122602.30025-1-aleksey.makarov@linaro.org>
-Message-ID: <20170301125053.30480-1-aleksey.makarov@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 1 Mar 2017 18:26:24 +0530
+Subject: [PATCH v2 3/3] media: dt-bindings: vpif: new optional property
+In-Reply-To: <CAL_JsqLBYqGgOA1GUi9mHT-51D5k96w-N0FiOyF+qPY6BGStzA@mail.gmail.com>
+References: <1487771027-7763-1-git-send-email-bgolaszewski@baylibre.com>
+ <1487771027-7763-4-git-send-email-bgolaszewski@baylibre.com>
+ <20170227225209.26oieqwbafqjga2a@rob-hp-laptop>
+ <6b392a4a-2de8-9981-ad40-ca7201bf813d@ti.com>
+ <CAL_JsqLBYqGgOA1GUi9mHT-51D5k96w-N0FiOyF+qPY6BGStzA@mail.gmail.com>
+Message-ID: <fbac869d-2485-6269-6787-f3863906e961@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original patch makes condition always true, so it is wrong.
+On Tuesday 28 February 2017 07:56 PM, Rob Herring wrote:
+> On Mon, Feb 27, 2017 at 11:36 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+>> On Tuesday 28 February 2017 04:22 AM, Rob Herring wrote:
+>>> On Wed, Feb 22, 2017 at 02:43:47PM +0100, Bartosz Golaszewski wrote:
+>>>> Add an optional property - enable-gpios - which can be used to specify
+>>>> the GPIOs that must be requested to select the vpif functionality.
+>>>>
+>>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>> ---
+>>>>  Documentation/devicetree/bindings/media/ti,da850-vpif.txt | 7 +++++++
+>>>>  1 file changed, 7 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+>>>> index df7182a..23c5405 100644
+>>>> --- a/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+>>>> +++ b/Documentation/devicetree/bindings/media/ti,da850-vpif.txt
+>>>> @@ -13,6 +13,9 @@ Required properties:
+>>>>  - reg: physical base address and length of the registers set for the device;
+>>>>  - interrupts: should contain IRQ line for the VPIF
+>>>>
+>>>> +Optional properties:
+>>>> +- enable-gpios: phandle of the GPIOs used to select the vpif functionality
+>>>
+>>> What does this control exactly? The GPIOs belong in the node they are
+>>> connected to and having GPIOs routed to this block seems strange.
+>>
+>> The DA850 EVM board implements on-board muxing which lets the video
+>> input (via VPIF) to be routed to a TVP5147 (video decoder) for composite
+>> input or to a camera header. There are other mux options which use the
+>> same VPIF SoC pins (RMII ethernet or character LCD).
+>>
+>> There is a three-to-eight demux on the board which drives enable signals
+>> to buffers letting you choose from these options.
+>>
+>> From your response, it looks like you want the enable-gpios property to
+>> be in the TVP5147 or camera node. That does make sense to me.
+> 
+> Well, seems like they should be part of a mux node. I'd suggest you
+> look at the video-multiplexer binding under review[1].
+> 
+> Though for other non video functions, that would be some sort of board
+> level pin mux control. There's a new mux binding too, maybe that would
+> work. In any case, it shouldn't be the VPIF driver controlling the
+> GPIOs directly.
 
-This reverts commit aea9a80ba98a0c9b4de88850260e9fbdcc98360b.
+Yeah, since there are non-video functions involved, we need a more
+generic mux binding. I see the work Peter Rosin is doing[1]. Its not in
+linux-next yet, but seems quite near merging.
 
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
----
-v2: add Signed-off-by:
+[1] https://lkml.org/lkml/2017/2/8/394
 
- drivers/tty/serial/amba-pl011.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 8789ea423ccf..56f92d7348bf 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2373,7 +2373,7 @@ static int __init pl011_console_match(struct console *co, char *name, int idx,
- 	if (strcmp(name, "qdf2400_e44") == 0) {
- 		pr_info_once("UART: Working around QDF2400 SoC erratum 44");
- 		qdf2400_e44_present = true;
--	} else if (strcmp(name, "pl011") != 0 || strcmp(name, "ttyAMA") != 0) {
-+	} else if (strcmp(name, "pl011") != 0) {
- 		return -ENODEV;
- 	}
- 
--- 
-2.11.1
+Thanks,
+Sekhar
