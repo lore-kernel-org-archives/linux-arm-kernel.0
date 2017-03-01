@@ -1,75 +1,70 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 1 Mar 2017 09:22:24 +0100
-Subject: [PATCH v2 1/3] mtd: nand: Cleanup/rework the atmel_nand driver
-In-Reply-To: <20170224090435.GA11313@samfundet.no>
-References: <CAHp75VcKjYYAw8gw8yYXrd-vzZo50WOQ06AzPx+0g9Zakzjm-w@mail.gmail.com>
- <20170221162133.jch6yzpotj4s7zob@piout.net>
- <CAHp75VeB4eVuN5NMfAfQUtssuHezTyAM8FUswuR8FheUk1V-oA@mail.gmail.com>
- <CAHp75Vc54+GR99qM8vUDfQnehFx0g5q137k-w5XY3023UZyr5w@mail.gmail.com>
- <20170221171438.e5hvruoixafpcdps@piout.net>
- <CACiLriSdRM4ZfoDsxFhf6ZVwAtacJOJ28M8CvOg6kC_XN0T-Mw@mail.gmail.com>
- <20170224081430.GB19663@samfundet.no>
- <20170224092742.3ce205e2@bbrezillon>
- <20170224085209.GA27812@samfundet.no>
- <20170224095509.777da771@bbrezillon>
- <20170224090435.GA11313@samfundet.no>
-Message-ID: <20170301092224.169dc7ae@bbrezillon>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 1 Mar 2017 16:27:25 +0800
+Subject: [RFC PATCH V1 v4.10-rc3 1/1] acpi: apei: handle GSIV notification
+ type
+In-Reply-To: <58B579A1.90109@arm.com>
+References: <86258A5CC0A3704780874CF6004BA8A62DCAB57E@lhreml502-mbs>
+ <58B579A1.90109@arm.com>
+Message-ID: <43507f99-d80b-6409-d249-b9b18425a1da@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans-Christian,
+Hi James,
 
-On Fri, 24 Feb 2017 10:04:35 +0100
-Hans-Christian Noren Egtvedt <egtvedt@samfundet.no> wrote:
+On 2017/2/28 21:22, James Morse wrote:
+> Hi Shiju,
+>
+> On 27/02/17 18:19, Shiju Jose wrote:
+>> Add a new GHES error source handling function for
+>> GSIV(Global System Interrupt Vector).
+>> If an error source's notification type is GSIV,
+>> then this handling function can be registered
+>> into the GSIV handler and it can parse
+>> and report error information when they occur.
+>
+> I'm missing some of the story here, but how is GSIV different from 'External
+> Interrupt'? I'm guessing something other than the CPU takes this 'interrupt'...
 
-> Around Fri 24 Feb 2017 09:55:09 +0100 or thereabout, Boris Brezillon wrote:
-> > On Fri, 24 Feb 2017 09:52:09 +0100
-> > Hans-Christian Noren Egtvedt <egtvedt@samfundet.no> wrote:  
-> >> Around Fri 24 Feb 2017 09:27:42 +0100 or thereabout, Boris Brezillon wrote:  
-> >> > On Fri, 24 Feb 2017 09:14:30 +0100 Hans-Christian Noren Egtvedt <egtvedt@samfundet.no> wrote:    
-> >> >> Around Thu 23 Feb 2017 21:18:13 -0800 or thereabout, H?vard Skinnemoen wrote:    
-> >> >> > On Tue, Feb 21, 2017 at 9:14 AM, Alexandre Belloni
-> >> >> > <alexandre.belloni@free-electrons.com> wrote:      
-> >> >> >> On 21/02/2017 at 18:43:35 +0200, Andy Shevchenko wrote:      
-> >> 
-> >> <snipp>
-> >>   
-> >> >> >> If nobody complains about the 4.10 breakage, You'll have plenty of time
-> >> >> >> to remove it for 4.12      
-> >> >> > 
-> >> >> > I'm fine with that, but I haven't put much effort into keeping it
-> >> >> > alive lately. If Hans-Christian agrees, I'm willing to post a patch to
-> >> >> > remove it, or ack someone else's patch.      
-> >> >> 
-> >> >> Then lets plan this for 4.12, either you H?vard whip up a patch or I can
-> >> >> eventually do it.
-> >> >> 
-> >> >> I can push it through the linux-avr32 git tree on kernel.org.
-> >> >>     
-> >> > 
-> >> > Can you do that just after 4.11-rc1 is released and provide a topic
-> >> > branch I can pull in my nand/next branch, so that I can rework this
-> >> > patch and drop all the pdata-compat code (as suggested by Andy).    
-> >> 
-> >> OK, I will try to prepare it during the weekend.
-> >> 
-> >> Any reason to wait for 4.11-rc1? AFAIK Linus prefers the larger changes
-> >> before he starts tagging rc's.
-> >>   
-> > 
-> > Oh, so you want to queue it for 4.11, that's even better.  
-> 
-> Perhaps I misunderstood you, by after 4.11-rc1 you mean queue it for 4.12?
-> 
-> I will see what I get around to do in the weekend, it should be pretty
-> straightforward, just want to make sure we remove all the bits.
-> 
+Yes, it's the same from CPU side (they are interrupts!), but there
+is history behind them and the usage is different.
 
-Any progress on this? I plan to send a new version of this series soon
-and I'd like to know if I should drop pdata/avr32 support or not. Note
-that I'm targeting 4.12, so, as long as you drop avr32 support in 4.12
-we should be good.
+I think External Interrupt was introduced before ACPI is available on
+ARM (hardware reduced platforms), so I guess it was used for errors
+reported to OS which were not using SCI mechanism, for example, some
+IO error reporting.
 
-Thanks,
+For External Interrupt, we don't use the ACPI event system, so for
+the firmware, it just report the errors associate with the interrupt
+number, the kernel map the interrupt number and install the
+irq handler for it.
 
-Boris
+For GSIV based event, it was introduced for hardware reduced platform
+in recent ACPI revision, and ARM64 is one of its consumers. When
+errors are reported via GSIV, ACPI event notification needs to be
+implemented and requires the platform to define a hardware error device
+(PNP0C33) in ACPI namespace, and also a generic event device ACPI0013.
+
+For example, if we are using SPI (ARM GIC) 100 to report errors, there
+is a ACPI0013 driver in drivers/acpi/evged.c to register the irq, when
+error happened and trigger the interrupt, ACPI0013 driver will
+notify the error device (PNP0C33), then error device driver
+(drivers/acpi/hed.c) will process the error data form APEI table...
+
+So GSIV is quite different from 'External interrupt' in the way of
+working from both firmware and kernel side.
+
+>
+>
+> The GHES GSIV code below is identical to the behaviour of the SCI Notification
+> type... are these two names for the same thing? (I'm confused!)
+
+SCI is also an 'interrupt' but it's a special irq number for ACPI
+event, and it has GPE (general purpose event) registers behind it,
+which is used only on Intel platforms. SCI based event use
+Method(\_GPE._L0x) to notify the error device (PNP0C33), but GSIV
+is used for HW-reduced platform which has no GPEs.
+
+Hope it can clarify something :)
+
+Thanks
+Hanjun
