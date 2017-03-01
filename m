@@ -1,49 +1,61 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu,  2 Mar 2017 04:13:41 +0800
-Subject: [PATCH v6 3/4] arm64: dts: allwinner: add Allwinner H5 .dtsi
+Date: Thu,  2 Mar 2017 04:13:42 +0800
+Subject: [PATCH v6 4/4] arm64: dts: sunxi: add support for the Orange Pi PC 2
+ board
 In-Reply-To: <20170301201342.47583-1-icenowy@aosc.xyz>
 References: <20170301201342.47583-1-icenowy@aosc.xyz>
-Message-ID: <20170301201342.47583-4-icenowy@aosc.xyz>
+Message-ID: <20170301201342.47583-5-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andre Przywara <andre.przywara@arm.com>
 
-The Allwinner H5 SoC is pin-compatible to the H3 SoC, but uses
-Cortex-A53 cores instead.
-Based on the now shared base .dtsi describing the common peripherals
-describe the H5 specific nodes on top of that.
-That symlinks in the sunxi-h3-h5.dtsi from the arch/arm tree.
+The Orange Pi PC 2 is a typical single board computer using the
+Allwinner H5 SoC. Apart from the usual suspects it features three
+separately driven USB ports and a Gigabit Ethernet port.
+Also it has a SPI NOR flash soldered, from which the board can boot
+from. This enables the SBC to behave like a "real computer" with
+built-in firmware.
+
+Add the board specific .dts file, which includes the H5 .dtsi and
+enables the peripherals that we support so far.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-[Icenowy: add H5 pinctrl compatible, and changes for my h3-h5 dtsi
- refactor, commit message changed to meet new arm64 naming scheme,
- drop H3 pinctrl compatible because of interrupt bank change, drop
- H3 ccu compatible because of clock change, drop ccu node as it come
- into h3-h5 dtsi]
+[Icenowy: dropped all GPIO pinctrl nodes, change red LED gpio,
+ change MMC cd to active-low, rename some node names to prevent
+ underscores]
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
 Changes in v6:
-- Dropped GIC node as it's in sunxi-h3-h5.dtsi now
-- Fixed some words in commit message, thanks to Rask Ingemann Lambertsen
-Changes in v3:
-- Dropped sun5i-a13-mmc, sun8i-h3-ccu compatibles.
-- Used sun50i-{h5,a64}-emmc compatible for mmc2.
+- Renamed some node names to prevent underscores and changed MMC card
+  detect GPIO to active-low. Thanks to Rask Ingemann Lambertsen.
 Changes in v2:
-- Dropped sun8i-h3-pinctrl compatible, as the interrupt of H3 and H5 is
+- Dropped all GPIO pinctrl nodes.
+- Changed red LED gpio to the correct one.
+- Added audio codec configuration copied from Orange Pi PC.
 
- arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi   | 124 +++++++++++++++++++++++++
- arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi |   1 +
- 2 files changed, 125 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
- create mode 120000 arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 163 +++++++++++++++++++++
+ 2 files changed, 164 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index bc6f342be59f..244e8b7565f9 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -1,5 +1,6 @@
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
+ 
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
 new file mode 100644
-index 000000000000..4d314a253fd9
+index 000000000000..30639729920d
 --- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-@@ -0,0 +1,124 @@
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+@@ -0,0 +1,163 @@
 +/*
 + * Copyright (C) 2016 ARM Ltd.
 + *
@@ -86,95 +98,126 @@ index 000000000000..4d314a253fd9
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#include "sunxi-h3-h5.dtsi"
++/dts-v1/;
++#include "sun50i-h5.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
 +
 +/ {
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++	model = "Xunlong Orange Pi PC 2";
++	compatible = "xunlong,orangepi-pc2", "allwinner,sun50i-h5";
 +
-+		cpu at 0 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0>;
-+			enable-method = "psci";
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		pwr {
++			label = "orangepi:green:pwr";
++			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
 +		};
 +
-+		cpu at 1 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <1>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 2 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <2>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 3 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <3>;
-+			enable-method = "psci";
++		status {
++			label = "orangepi:red:status";
++			gpios = <&pio 0 20 GPIO_ACTIVE_HIGH>;
 +		};
 +	};
 +
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
++	r-gpio-keys {
++		compatible = "gpio-keys";
 +
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++		sw4 {
++			label = "sw4";
++			linux,code = <BTN_0>;
++			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
++		};
 +	};
 +};
 +
-+&ccu {
-+	compatible = "allwinner,sun50i-h5-ccu";
++&codec {
++	allwinner,audio-routing =
++		"Line Out", "LINEOUT",
++		"MIC1", "Mic",
++		"Mic",  "MBIAS";
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&ehci2 {
++	status = "okay";
++};
++
++&ehci3 {
++	status = "okay";
++};
++
++&ir {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir_pins_a>;
++	status = "okay";
 +};
 +
 +&mmc0 {
-+	compatible = "allwinner,sun50i-h5-mmc",
-+		     "allwinner,sun50i-a64-mmc";
-+	clocks = <&ccu CLK_BUS_MMC0>, <&ccu CLK_MMC0>;
-+	clock-names = "ahb", "mmc";
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
++	status = "okay";
 +};
 +
-+&mmc1 {
-+	compatible = "allwinner,sun50i-h5-mmc",
-+		     "allwinner,sun50i-a64-mmc";
-+	clocks = <&ccu CLK_BUS_MMC1>, <&ccu CLK_MMC1>;
-+	clock-names = "ahb", "mmc";
++&ohci1 {
++	status = "okay";
 +};
 +
-+&mmc2 {
-+	compatible = "allwinner,sun50i-h5-emmc",
-+		     "allwinner,sun50i-a64-emmc";
-+	clocks = <&ccu CLK_BUS_MMC2>, <&ccu CLK_MMC2>;
-+	clock-names = "ahb", "mmc";
++&ohci2 {
++	status = "okay";
 +};
 +
-+&pio {
-+	compatible = "allwinner,sun50i-h5-pinctrl";
++&ohci3 {
++	status = "okay";
 +};
-diff --git a/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi b/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
-new file mode 120000
-index 000000000000..036f01dc2b9b
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
-@@ -0,0 +1 @@
-+../../../../arm/boot/dts/sunxi-h3-h5.dtsi
-\ No newline at end of file
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>;
++	status = "disabled";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins>;
++	status = "disabled";
++};
++
++&usbphy {
++	/* USB VBUS is always on */
++	status = "okay";
++};
 -- 
 2.11.1
