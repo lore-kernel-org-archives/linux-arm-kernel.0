@@ -1,53 +1,118 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 1 Mar 2017 12:54:37 +0200
-Subject: usb/net/hso: WARNING: ungligned urb->setup_dma
-In-Reply-To: <1515966850.16584.1488306729844@email.1und1.de>
-References: <20170228082810.syn656o2zzms7urf@tarshish>
- <20170228120134.4f65yihw7x22hfwd@tarshish>
- <36230d64-4ba0-7515-1131-ecf3ab9f352c@i2se.com>
- <20170228180700.3fxpimfysnhm6uis@tarshish>
- <1515966850.16584.1488306729844@email.1und1.de>
-Message-ID: <20170301105437.tmm6ovmnrhce3ofa@tarshish>
+From: david.wu@rock-chips.com (David.Wu)
+Date: Wed, 1 Mar 2017 19:00:48 +0800
+Subject: [PATCH v2] pwm: rockchip: State of pwm clock should synchronize
+ with pwm enabled state
+In-Reply-To: <20170301111915.445925ad@bbrezillon>
+References: <1488363362-26624-1-git-send-email-david.wu@rock-chips.com>
+ <20170301111915.445925ad@bbrezillon>
+Message-ID: <cd8c01a0-3463-21ad-8958-28e8a86e01d7@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+Hi Boris?
 
-On Tue, Feb 28, 2017 at 07:32:09PM +0100, Stefan Wahren wrote: 
-> > Baruch Siach <baruch@tkos.co.il> hat am 28. Februar 2017 um 19:07 geschrieben:
-> > On Tue, Feb 28, 2017 at 05:21:18PM +0100, Stefan Wahren wrote:
-> > > Am 28.02.2017 um 13:01 schrieb Baruch Siach:
-> > > > On Tue, Feb 28, 2017 at 10:28:10AM +0200, Baruch Siach wrote:
-> > > > > I'm hitting this warning consistently on my Raspberry Pi 3 running 
-> > > > > kernel
-> > > > > v4.10.1 with some unrelated device tree changes, and a debug print (below).
-> > > > > The device identifies as "GlobeTrotter HSDPA Modem", VID: 0af0, PID: 6971.
-> > > > > The warning triggers consistently on first write access to /dev/ttyHS0 that
-> > > > > ModemManager attempts. The first line in the log is my debug print.
-> > > > I tested the same hardware successfully on an i.MX6 CuBox-i (ARM32) using the
-> > > > same kernel version (4.10.1), and on an x86_64 PC (4.9). So this seems to be
-> > > > platform specific. I don't have any other ARM64 machine at the moment, though.
-> > > 
-> > > those platforms usually doesn't use the dwc2 USB host controller. So it
-> > > should be tested with another dwc2 platform.
-> > 
-> > The code that initializes setup_dma is not under drivers/usb/dwc2/. Though the 
-> > problem looks like memory corruption, so its cause might be anywhere.
-> 
-> only a suspicion, but could you please try this patch [1]?
-> 
-> [1] - https://patchwork.kernel.org/patch/9166771/
+? 2017/3/1 18:19, Boris Brezillon ??:
+> On Wed,  1 Mar 2017 18:16:02 +0800
+> David Wu <david.wu@rock-chips.com> wrote:
+>
+>> From: "david.wu" <david.wu@rock-chips.com>
+>>
+>> If the pwm was not enabled at uboot loader, pwm could not work for clock
+>> always disabled at pwm driver. The pwm clock is enabled at beginning of
+>> pwm_apply(), but disabled at end of pwm_apply().
+>>
+>> If the pwm was enabled at uboot loader, pwm clock is always enabled unless
+>> closed by ATF. The pwm-backlight might turn off the power at early suspend,
+>> should disable pwm clock for saving power consume.
+>>
+>> It is important to provide opportunity to enable/disable clock at pwm driver,
+>> the pwm consumer should ensure correct order to call pwm enable/disable, and
+>> pwm driver ensure state of pwm clock synchronized with pwm enabled state.
+>>
+>> Fixes: 2bf1c98aa5a4 ("pwm: rockchip: Add support for atomic update")
+>> Cc: stable at vger.kernel.org
+>> Signed-off-by: David Wu <david.wu@rock-chips.com>
+>> Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>> ---
+>>  drivers/pwm/pwm-rockchip.c | 40 +++++++++++++++++++++++++++++++++-------
+>>  1 file changed, 33 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
+>> index ef89df1..dbee3c3 100644
+>> --- a/drivers/pwm/pwm-rockchip.c
+>> +++ b/drivers/pwm/pwm-rockchip.c
+>> @@ -191,6 +191,28 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>>  	return 0;
+>>  }
+>>
+>> +static int rk_pwm_enable(struct pwm_chip *chip,
+>> +			 struct pwm_device *pwm,
+>> +			 bool enable,
+>> +			 enum pwm_polarity polarity)
+>
+> You didn't change the function name:
+>
+> s/rk_pwm_enable/rockchip_pwm_enable/
 
-It doesn't change anything.
+Sorry, it is a pity not to fix in in v2.
 
-My guess is that source of the issue is memory corruption that just happens to 
-corrupt also the setup_dma field of struct urb. In other words, it has nothing 
-to do with DMA, IMO.
-
-Thanks,
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+>
+>> +{
+>> +	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+>> +	int ret;
+>> +
+>> +	if (enable) {
+>> +		ret = clk_enable(pc->clk);
+>> +		if (ret)
+>> +			return ret;
+>> +	}
+>> +
+>> +	pc->data->set_enable(chip, pwm, enable, polarity);
+>> +
+>> +	if (!enable)
+>> +		clk_disable(pc->clk);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+>>  			      struct pwm_state *state)
+>>  {
+>> @@ -207,22 +229,26 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+>>  		return ret;
+>>
+>>  	if (state->polarity != curstate.polarity && enabled) {
+>> -		pc->data->set_enable(chip, pwm, false, state->polarity);
+>> +		ret = rk_pwm_enable(chip, pwm, false, state->polarity);
+>> +		if (ret)
+>> +			goto out;
+>>  		enabled = false;
+>>  	}
+>>
+>>  	ret = rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
+>>  	if (ret) {
+>>  		if (enabled != curstate.enabled)
+>> -			pc->data->set_enable(chip, pwm, !enabled,
+>> -					     state->polarity);
+>> -
+>> +			rk_pwm_enable(chip, pwm, !enabled,
+>> +				      state->polarity);
+>>  		goto out;
+>>  	}
+>>
+>> -	if (state->enabled != enabled)
+>> -		pc->data->set_enable(chip, pwm, state->enabled,
+>> -				     state->polarity);
+>> +	if (state->enabled != enabled) {
+>> +		ret = rk_pwm_enable(chip, pwm, state->enabled,
+>> +				    state->polarity);
+>> +		if (ret)
+>> +			goto out;
+>> +	}
+>>
+>>  	/*
+>>  	 * Update the state with the real hardware, which can differ a bit
+>
+>
+>
+>
