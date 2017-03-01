@@ -1,63 +1,61 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 1 Mar 2017 19:09:10 +0200
-Subject: [PATCH v2] ARM: exynos_defconfig: increase
- CONFIG_CMA_SIZE_MBYTES to 96
-In-Reply-To: <20170228191221.18135-1-shuahkh@osg.samsung.com>
-References: <20170228191221.18135-1-shuahkh@osg.samsung.com>
-Message-ID: <20170301170910.4vvn4eeolkjbgzw5@kozik-lap>
+From: carlo@endlessm.com (Carlo Caione)
+Date: Wed, 1 Mar 2017 18:09:29 +0100
+Subject: [PATCH] hwmon: (scpi) Add slope and offset to SCP sensor readings
+In-Reply-To: <87inntorz7.fsf@e105922-lin.cambridge.arm.com>
+References: <20170301132028.25309-1-carlo@caione.org>
+ <41f19cd3-5086-1da9-915a-8987cfc119f9@roeck-us.net>
+ <CAL9uMOG5qEgyGTue=n7abbFROKGBpUrWDOPi5_bEDUWuiHEUKg@mail.gmail.com>
+ <87inntorz7.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <CAL9uMOHsKXpf01sw3NBJ8z=+9fOzW8E7meEg9r+YTJgxdsta7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2017 at 12:12:21PM -0700, Shuah Khan wrote:
-> Current CMA size of 64 Mbytes is right on the edge of being small when
-> several drivers need to allocate large CMA buffers.
-> 
-> For example, if the s5p-mfc driver needs to pre-allocate N MiB CMA memory
+On Wed, Mar 1, 2017 at 5:57 PM, Punit Agrawal <punit.agrawal@arm.com> wrote:
+> Carlo Caione <carlo@endlessm.com> writes:
+>>> Are you saying that SCPI does not specify or provide the units to be used
+>>> when reading values, and thus effectively just reports a more or less
+>>> random number ?
+>>
+>> AFAICT the standard does not specify the units to be used for the
+>> values or a way to get that information. For the Amlogic case the SCP
+>> returns the value of the temperature in degree celsius and I'm not
+>> sure how common is that.
+>
+> The standard does specify the units, but the way it is written seems to
+> suggest that the units are part of the platform implementation rather
+> than part of the standard [0].
+>
+> [0] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922g/CABBCJGH.html
 
-Everything looks good but I don't get this "N MiB". What do you mean by
-that? If N is infinite (or not known) then how do you know that 96 MiB
-will be enough?
+Oh, I missed that, odd indeed. Fantastic, one more non-compliancy.
 
-Best regards,
-Krzysztof
+>> [cut]
+>>>> -       *temp = value;
+>>>> +       slope = thermal_zone_get_slope(zone->z);
+>>>> +       offset = thermal_zone_get_offset(zone->z);
+>>>
+>>>
+>>> This is conceptually wrong. The functions return -ENODEV if thermal is
+>>> disabled.
+>>> While a negative slope does not make sense, a negative offset does.
+>>
+>> Yeah, but in that case we would have already failed to register the
+>> thermal zone at all in devm_thermal_zone_of_sensor_register().
+>>
+>
+> In addition to the thermal sub-subsystem, hwmon sysfs interface also
+> expects temperature in millidegree Celsius. Ideally, any change should
+> fix the reporting there as well. More below.
 
+[cut]
 
-> to decode a H.264 1080p video, then there won't be enough CMA memory left
-> for other drivers, such as the exynos-drm driver that may need to allocate
-> GEM buffers for the display manager.
-> 
-> Increasing CMA size to 96 Mbytes in exynos_defconfig addresses use-cases
-> such as these.
-> 
-> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
-> 
-> Changes since v1:
-> Fix short and long commit log.
-> 
-> Reason for this patch:
-> With the proposed s5p_mfc patch series that pre-allocate buffers, when
-> display manager starts, it fails to get GEM buffers.  Increasing the CMA
-> size to 96 solved the problem.
-> 
->  arch/arm/configs/exynos_defconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index 742baf0..2541414 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -53,7 +53,7 @@ CONFIG_RFKILL_REGULATOR=y
->  CONFIG_DEVTMPFS=y
->  CONFIG_DEVTMPFS_MOUNT=y
->  CONFIG_DMA_CMA=y
-> -CONFIG_CMA_SIZE_MBYTES=64
-> +CONFIG_CMA_SIZE_MBYTES=96
->  CONFIG_BLK_DEV_LOOP=y
->  CONFIG_BLK_DEV_CRYPTOLOOP=y
->  CONFIG_BLK_DEV_RAM=y
-> -- 
-> 2.7.4
-> 
+> Another way to fix this would be to add optional properties to the scpi
+> sensors binding and use them instead. This could then be used to fixup
+> values reported to both thermal and hwmon.
+
+Yeah, if we want to fix also the hwmon side probably it's the best solution.
+
+Cheers,
+
+-- 
+Carlo Caione  |  +39.340.80.30.096  |  Endless
