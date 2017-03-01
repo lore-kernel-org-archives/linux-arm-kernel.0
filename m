@@ -1,41 +1,50 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 2 Mar 2017 01:54:42 +0200
-Subject: [PATCH 07/20] PCI: implement Devres interface to map PCI config
- space
-In-Reply-To: <20170227151436.18698-8-lorenzo.pieralisi@arm.com>
-References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
- <20170227151436.18698-8-lorenzo.pieralisi@arm.com>
-Message-ID: <CAHp75VfdE6_W+DxhejorLxra2JQDGF3cG0uBedyOohhmcLiKLg@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu,  2 Mar 2017 00:56:20 +0100
+Subject: [PATCH 3/4] ARM: dts: rockchip: add rk3066/rk3188 dw-mmc resets
+In-Reply-To: <20170301235621.31726-1-heiko@sntech.de>
+References: <20170301235621.31726-1-heiko@sntech.de>
+Message-ID: <20170301235621.31726-3-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 27, 2017 at 5:14 PM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> The introduction of the pci_remap_cfgspace() interface allows
-> PCI host controller drivers to map PCI config space through a
-> dedicated kernel interface. Current PCI host controller drivers
-> use the devm_ioremap_* Devres interfaces to map PCI configuration
-> space regions so in order to update them to the new
-> pci_remap_cfgspace() mapping interface a new set of Devres interfaces
-> should be implemented so that PCI host controller drivers can make
-> use of them.
->
-> Introduce two new functions in the PCI kernel layer and Devres
-> documentation:
->
-> - devm_pci_remap_cfgspace()
-> - devm_pci_remap_cfg_resource()
->
-> so that PCI host controller drivers can make use of them to map
-> PCI configuration space regions.
+dw-mmc got its reset-properties specified, so add the softresets
+for it in rk3066/rk3188.
 
-Wouldn't you like to be consistent with current PCI API, i.e.:
-1. devm_*() functions called pcim_*() in PCI.
-2. If you may notice there is no separate pcim_*map*() stuff, they are
-dynamically adapting to the case.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3xxx.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-?
-
+diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
+index 0b45811cf28b..233513cdd279 100644
+--- a/arch/arm/boot/dts/rk3xxx.dtsi
++++ b/arch/arm/boot/dts/rk3xxx.dtsi
+@@ -224,6 +224,8 @@
+ 		clocks = <&cru HCLK_SDMMC>, <&cru SCLK_SDMMC>;
+ 		clock-names = "biu", "ciu";
+ 		fifo-depth = <256>;
++		resets = <&cru SRST_SDMMC>;
++		reset-names = "reset";
+ 		status = "disabled";
+ 	};
+ 
+@@ -234,6 +236,8 @@
+ 		clocks = <&cru HCLK_SDIO>, <&cru SCLK_SDIO>;
+ 		clock-names = "biu", "ciu";
+ 		fifo-depth = <256>;
++		resets = <&cru SRST_SDIO>;
++		reset-names = "reset";
+ 		status = "disabled";
+ 	};
+ 
+@@ -244,6 +248,8 @@
+ 		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>;
+ 		clock-names = "biu", "ciu";
+ 		fifo-depth = <256>;
++		resets = <&cru SRST_EMMC>;
++		reset-names = "reset";
+ 		status = "disabled";
+ 	};
+ 
 -- 
-With Best Regards,
-Andy Shevchenko
+2.11.0
