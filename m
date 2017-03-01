@@ -1,566 +1,314 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu,  2 Mar 2017 00:49:27 +0530
-Subject: [PATCH 19/20] arm64:ilp32: add vdso-ilp32 and use for signal return
+Date: Thu,  2 Mar 2017 00:49:25 +0530
+Subject: [PATCH 17/20] arm64: ilp32: introduce ilp32-specific handlers for
+ sigframe and ucontext
 In-Reply-To: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1488395968-14313-20-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1488395968-14313-18-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+From: Andrew Pinski <apinski@cavium.com>
 
-ILP32 VDSO exports next symbols:
- __kernel_rt_sigreturn;
- __kernel_gettimeofday;
- __kernel_clock_gettime;
- __kernel_clock_getres.
+ILP32 uses AARCH32 compat structures and syscall handlers for signals.
+But ILP32 struct rt_sigframe  and ucontext differs from both LP64 and
+AARCH32. So some specific mechanism is needed to take care of it.
 
-What shared object to use, kernel selects depending on result of
-is_ilp32_compat_task() in arch/arm64/kernel/vdso.c, so it substitutes
-correct pages and spec.
-
-Adjusted to move the data page before code pages in sync with
-commit 601255ae3c98 ("arm64: vdso: move data page before code pages")
-
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
 ---
- arch/arm64/include/asm/vdso.h                 |  6 ++
- arch/arm64/kernel/Makefile                    | 11 ++++
- arch/arm64/kernel/asm-offsets.c               |  7 ++
- arch/arm64/kernel/signal.c                    |  2 +
- arch/arm64/kernel/vdso-ilp32/.gitignore       |  2 +
- arch/arm64/kernel/vdso-ilp32/Makefile         | 74 +++++++++++++++++++++
- arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     | 33 ++++++++++
- arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S | 95 +++++++++++++++++++++++++++
- arch/arm64/kernel/vdso.c                      | 65 +++++++++++++++---
- arch/arm64/kernel/vdso/gettimeofday.S         | 20 +++++-
- arch/arm64/kernel/vdso/vdso.S                 |  6 +-
- 11 files changed, 305 insertions(+), 16 deletions(-)
- create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
- create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
- create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
- create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+ arch/arm64/include/asm/signal_ilp32.h |  38 ++++++++
+ arch/arm64/kernel/Makefile            |   3 +-
+ arch/arm64/kernel/entry_ilp32.S       |  22 +++++
+ arch/arm64/kernel/signal.c            |   3 +
+ arch/arm64/kernel/signal_ilp32.c      | 170 ++++++++++++++++++++++++++++++++++
+ 5 files changed, 235 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/asm/signal_ilp32.h
+ create mode 100644 arch/arm64/kernel/entry_ilp32.S
+ create mode 100644 arch/arm64/kernel/signal_ilp32.c
 
-diff --git a/arch/arm64/include/asm/vdso.h b/arch/arm64/include/asm/vdso.h
-index 839ce00..649a9a4 100644
---- a/arch/arm64/include/asm/vdso.h
-+++ b/arch/arm64/include/asm/vdso.h
-@@ -29,6 +29,12 @@
- 
- #include <generated/vdso-offsets.h>
- 
-+#ifdef CONFIG_ARM64_ILP32
-+#include <generated/vdso-ilp32-offsets.h>
-+#else
-+#define vdso_offset_sigtramp_ilp32
-+#endif
+diff --git a/arch/arm64/include/asm/signal_ilp32.h b/arch/arm64/include/asm/signal_ilp32.h
+new file mode 100644
+index 0000000..3c6d737
+--- /dev/null
++++ b/arch/arm64/include/asm/signal_ilp32.h
+@@ -0,0 +1,38 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
- #define VDSO_SYMBOL(base, name)						   \
- ({									   \
- 	(void *)(vdso_offset_##name - VDSO_LBASE + (unsigned long)(base)); \
++#include <asm/signal32_common.h>
++#include <asm/signal_common.h>
++
++#ifndef __ASM_SIGNAL_ILP32_H
++#define __ASM_SIGNAL_ILP32_H
++
++#ifdef CONFIG_ARM64_ILP32
++
++#include <linux/compat.h>
++
++int ilp32_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
++			  struct pt_regs *regs);
++
++#else
++
++static inline int ilp32_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
++			  struct pt_regs *regs)
++{
++	return -ENOSYS;
++}
++
++#endif /* CONFIG_ARM64_ILP32 */
++
++#endif /* __ASM_SIGNAL_ILP32_H */
 diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index d6089e5..8720416 100644
+index 9463af5..d6089e5 100644
 --- a/arch/arm64/kernel/Makefile
 +++ b/arch/arm64/kernel/Makefile
-@@ -55,6 +55,7 @@ arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
- 					   cpu-reset.o
+@@ -29,7 +29,8 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
  
- obj-y					+= $(arm64-obj-y) vdso/ probes/
-+obj-$(CONFIG_ARM64_ILP32)		+= vdso-ilp32/
- obj-m					+= $(arm64-obj-m)
- head-y					:= head.o
- extra-y					+= $(head-y) vmlinux.lds
-@@ -62,3 +63,13 @@ extra-y					+= $(head-y) vmlinux.lds
- ifeq ($(CONFIG_DEBUG_EFI),y)
- AFLAGS_head.o += -DVMLINUX_PATH="\"$(realpath $(objtree)/vmlinux)\""
- endif
+ arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o entry32.o binfmt_elf32.o
+-arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o
++arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o 		\
++					   signal_ilp32.o entry_ilp32.o
+ arm64-obj-$(CONFIG_COMPAT)		+= entry32_common.o signal32_common.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+diff --git a/arch/arm64/kernel/entry_ilp32.S b/arch/arm64/kernel/entry_ilp32.S
+new file mode 100644
+index 0000000..a8bb94b
+--- /dev/null
++++ b/arch/arm64/kernel/entry_ilp32.S
+@@ -0,0 +1,22 @@
++/*
++ * ILP32 system call wrappers
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+# vDSO - this must be built first to generate the symbol offsets
-+$(call objectify,$(arm64-obj-y)): $(obj)/vdso/vdso-offsets.h
-+$(obj)/vdso/vdso-offsets.h: $(obj)/vdso
++#include <linux/linkage.h>
 +
-+ifeq ($(CONFIG_ARM64_ILP32),y)
-+# vDSO - this must be built first to generate the symbol offsets
-+$(call objectify,$(arm64-obj-y)): $(obj)/vdso-ilp32/vdso-ilp32-offsets.h
-+$(obj)/vdso-ilp32/vdso-ilp32-offsets.h: $(obj)/vdso-ilp32
-+endif
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index aec5b6c..c8a0971 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -121,6 +121,13 @@ int main(void)
-   DEFINE(TSPEC_TV_SEC,		offsetof(struct timespec, tv_sec));
-   DEFINE(TSPEC_TV_NSEC,		offsetof(struct timespec, tv_nsec));
-   BLANK();
-+#ifdef CONFIG_COMPAT
-+  DEFINE(COMPAT_TVAL_TV_SEC,	offsetof(struct compat_timeval, tv_sec));
-+  DEFINE(COMPAT_TVAL_TV_USEC,	offsetof(struct compat_timeval, tv_usec));
-+  DEFINE(COMPAT_TSPEC_TV_SEC,	offsetof(struct compat_timespec, tv_sec));
-+  DEFINE(COMPAT_TSPEC_TV_NSEC,	offsetof(struct compat_timespec, tv_nsec));
-+  BLANK();
-+#endif
-   DEFINE(TZ_MINWEST,		offsetof(struct timezone, tz_minuteswest));
-   DEFINE(TZ_DSTTIME,		offsetof(struct timezone, tz_dsttime));
-   BLANK();
++ENTRY(ilp32_sys_rt_sigreturn_wrapper)
++	mov	x0, sp
++	b	ilp32_sys_rt_sigreturn
++ENDPROC(ilp32_sys_rt_sigreturn_wrapper)
 diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index b78f4c2..a7f201d 100644
+index 9f2ea60..b78f4c2 100644
 --- a/arch/arm64/kernel/signal.c
 +++ b/arch/arm64/kernel/signal.c
-@@ -267,6 +267,8 @@ void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
- 
- 	if (ka->sa.sa_flags & SA_RESTORER)
- 		sigtramp = ka->sa.sa_restorer;
-+	else if (is_ilp32_compat_task())
-+		sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp_ilp32);
- 	else
- 		sigtramp = VDSO_SYMBOL(current->mm->context.vdso, sigtramp);
- 
-diff --git a/arch/arm64/kernel/vdso-ilp32/.gitignore b/arch/arm64/kernel/vdso-ilp32/.gitignore
-new file mode 100644
-index 0000000..61806c3
---- /dev/null
-+++ b/arch/arm64/kernel/vdso-ilp32/.gitignore
-@@ -0,0 +1,2 @@
-+vdso-ilp32.lds
-+vdso-ilp32-offsets.h
-diff --git a/arch/arm64/kernel/vdso-ilp32/Makefile b/arch/arm64/kernel/vdso-ilp32/Makefile
-new file mode 100644
-index 0000000..0671e88
---- /dev/null
-+++ b/arch/arm64/kernel/vdso-ilp32/Makefile
-@@ -0,0 +1,74 @@
-+#
-+# Building a vDSO image for AArch64.
-+#
-+# Author: Will Deacon <will.deacon@arm.com>
-+# Heavily based on the vDSO Makefiles for other archs.
-+#
-+
-+obj-ilp32-vdso := gettimeofday-ilp32.o note-ilp32.o sigreturn-ilp32.o
-+
-+# Build rules
-+targets := $(obj-ilp32-vdso) vdso-ilp32.so vdso-ilp32.so.dbg
-+obj-ilp32-vdso := $(addprefix $(obj)/, $(obj-ilp32-vdso))
-+
-+ccflags-y := -shared -fno-common -fno-builtin
-+ccflags-y += -nostdlib -Wl,-soname=linux-ilp32-vdso.so.1 \
-+		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
-+
-+obj-y += vdso-ilp32.o
-+extra-y += vdso-ilp32.lds vdso-ilp32-offsets.h
-+CPPFLAGS_vdso-ilp32.lds += -P -C -U$(ARCH) -mabi=ilp32
-+
-+# Force dependency (incbin is bad)
-+$(obj)/vdso-ilp32.o : $(obj)/vdso-ilp32.so
-+
-+# Link rule for the .so file, .lds has to be first
-+$(obj)/vdso-ilp32.so.dbg: $(src)/vdso-ilp32.lds $(obj-ilp32-vdso)
-+	$(call if_changed,vdso-ilp32ld)
-+
-+# Strip rule for the .so file
-+$(obj)/%.so: OBJCOPYFLAGS := -S
-+$(obj)/%.so: $(obj)/%.so.dbg FORCE
-+	$(call if_changed,objcopy)
-+
-+# Generate VDSO offsets using helper script
-+gen-vdsosym := $(srctree)/$(src)/../vdso/gen_vdso_offsets.sh
-+quiet_cmd_vdsosym = VDSOSYM $@
-+define cmd_vdsosym
-+	$(NM) $< | $(gen-vdsosym) | LC_ALL=C sort > $@ && \
-+	cp $@ include/generated/
-+endef
-+
-+$(obj)/vdso-ilp32-offsets.h: $(obj)/vdso-ilp32.so.dbg FORCE
-+	$(call if_changed,vdsosym)
-+
-+# Assembly rules for the .S files
-+#$(obj-ilp32-vdso): %.o: $(src)/../vdso/$(subst -ilp32,,%.S)
-+#	$(call if_changed_dep,vdso-ilp32as)
-+
-+$(obj)/gettimeofday-ilp32.o: $(src)/../vdso/gettimeofday.S
-+	$(call if_changed_dep,vdso-ilp32as)
-+
-+$(obj)/note-ilp32.o: $(src)/../vdso/note.S
-+	$(call if_changed_dep,vdso-ilp32as)
-+
-+# This one should be fine because ILP32 uses the same generic
-+# __NR_rt_sigreturn syscall number.
-+$(obj)/sigreturn-ilp32.o: $(src)/../vdso/sigreturn.S
-+	$(call if_changed_dep,vdso-ilp32as)
-+
-+# Actual build commands
-+quiet_cmd_vdso-ilp32ld = VDSOILP32L $@
-+      cmd_vdso-ilp32ld = $(CC) $(c_flags) -mabi=ilp32  -Wl,-n -Wl,-T $^ -o $@
-+quiet_cmd_vdso-ilp32as = VDSOILP32A $@
-+      cmd_vdso-ilp32as = $(CC) $(a_flags) -mabi=ilp32 -c -o $@ $<
-+
-+# Install commands for the unstripped file
-+quiet_cmd_vdso_install = INSTALL $@
-+      cmd_vdso_install = cp $(obj)/$@.dbg $(MODLIB)/vdso/$@
-+
-+vdso-ilp32.so: $(obj)/vdso-ilp32.so.dbg
-+	@mkdir -p $(MODLIB)/vdso
-+	$(call cmd,vdso_install)
-+
-+vdso_install: vdso-ilp32.so
-diff --git a/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
-new file mode 100644
-index 0000000..46ac072
---- /dev/null
-+++ b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
-@@ -0,0 +1,33 @@
-+/*
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/linkage.h>
-+#include <linux/const.h>
-+#include <asm/page.h>
-+
-+	__PAGE_ALIGNED_DATA
-+
-+	.globl vdso_ilp32_start, vdso_ilp32_end
-+	.balign PAGE_SIZE
-+vdso_ilp32_start:
-+	.incbin "arch/arm64/kernel/vdso-ilp32/vdso-ilp32.so"
-+	.balign PAGE_SIZE
-+vdso_ilp32_end:
-+
-+	.previous
-diff --git a/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
-new file mode 100644
-index 0000000..ba98794
---- /dev/null
-+++ b/arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
-@@ -0,0 +1,95 @@
-+/*
-+ * GNU linker script for the VDSO library.
-+ *
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ * Heavily based on the vDSO linker scripts for other archs.
-+ */
-+
-+#include <linux/const.h>
-+#include <asm/page.h>
-+#include <asm/vdso.h>
-+
-+SECTIONS
-+{
-+	PROVIDE(_vdso_data = . - PAGE_SIZE);
-+	. = VDSO_LBASE + SIZEOF_HEADERS;
-+
-+	.hash		: { *(.hash) }			:text
-+	.gnu.hash	: { *(.gnu.hash) }
-+	.dynsym		: { *(.dynsym) }
-+	.dynstr		: { *(.dynstr) }
-+	.gnu.version	: { *(.gnu.version) }
-+	.gnu.version_d	: { *(.gnu.version_d) }
-+	.gnu.version_r	: { *(.gnu.version_r) }
-+
-+	.note		: { *(.note.*) }		:text	:note
-+
-+	. = ALIGN(16);
-+
-+	.text		: { *(.text*) }			:text	=0xd503201f
-+	PROVIDE (__etext = .);
-+	PROVIDE (_etext = .);
-+	PROVIDE (etext = .);
-+
-+	.eh_frame_hdr	: { *(.eh_frame_hdr) }		:text	:eh_frame_hdr
-+	.eh_frame	: { KEEP (*(.eh_frame)) }	:text
-+
-+	.dynamic	: { *(.dynamic) }		:text	:dynamic
-+
-+	.rodata		: { *(.rodata*) }		:text
-+
-+	_end = .;
-+	PROVIDE(end = .);
-+
-+	/DISCARD/	: {
-+		*(.note.GNU-stack)
-+		*(.data .data.* .gnu.linkonce.d.* .sdata*)
-+		*(.bss .sbss .dynbss .dynsbss)
-+	}
-+}
-+
-+/*
-+ * We must supply the ELF program headers explicitly to get just one
-+ * PT_LOAD segment, and set the flags explicitly to make segments read-only.
-+ */
-+PHDRS
-+{
-+	text		PT_LOAD		FLAGS(5) FILEHDR PHDRS; /* PF_R|PF_X */
-+	dynamic		PT_DYNAMIC	FLAGS(4);		/* PF_R */
-+	note		PT_NOTE		FLAGS(4);		/* PF_R */
-+	eh_frame_hdr	PT_GNU_EH_FRAME;
-+}
-+
-+/*
-+ * This controls what symbols we export from the DSO.
-+ */
-+VERSION
-+{
-+	LINUX_4.10 {
-+	global:
-+		__kernel_rt_sigreturn;
-+		__kernel_gettimeofday;
-+		__kernel_clock_gettime;
-+		__kernel_clock_getres;
-+	local: *;
-+	};
-+}
-+
-+/*
-+ * Make the sigreturn code visible to the kernel.
-+ */
-+VDSO_sigtramp_ilp32		= __kernel_rt_sigreturn;
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 9d44902..71bee92 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -37,8 +37,13 @@
+@@ -35,6 +35,7 @@
+ #include <asm/signal32.h>
  #include <asm/vdso.h>
- #include <asm/vdso_datapage.h>
+ #include <asm/signal_common.h>
++#include <asm/signal_ilp32.h>
  
--extern char vdso_start, vdso_end;
--static unsigned long vdso_pages __ro_after_init;
-+extern char vdso_lp64_start, vdso_lp64_end;
-+static unsigned long vdso_lp64_pages __ro_after_init;
+ #define RT_SIGFRAME_FP_POS (offsetof(struct rt_sigframe, sig)	\
+ 			+ offsetof(struct sigframe, fp))
+@@ -325,6 +326,8 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
+ 			ret = compat_setup_rt_frame(usig, ksig, oldset, regs);
+ 		else
+ 			ret = compat_setup_frame(usig, ksig, oldset, regs);
++	} else if (is_ilp32_compat_task()) {
++		ret = ilp32_setup_rt_frame(usig, ksig, oldset, regs);
+ 	} else {
+ 		ret = setup_rt_frame(usig, ksig, oldset, regs);
+ 	}
+diff --git a/arch/arm64/kernel/signal_ilp32.c b/arch/arm64/kernel/signal_ilp32.c
+new file mode 100644
+index 0000000..b9a3372
+--- /dev/null
++++ b/arch/arm64/kernel/signal_ilp32.c
+@@ -0,0 +1,170 @@
++/*
++ * Based on arch/arm/kernel/signal.c
++ *
++ * Copyright (C) 1995-2009 Russell King
++ * Copyright (C) 2012 ARM Ltd.
++ * Copyright (C) 2017 Cavium Networks.
++ * Yury Norov <ynorov@caviumnetworks.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+#ifdef CONFIG_ARM64_ILP32
-+extern char vdso_ilp32_start, vdso_ilp32_end;
-+static unsigned long vdso_ilp32_pages __ro_after_init;
-+#endif
- 
- /*
-  * The vDSO data page.
-@@ -110,7 +115,17 @@ int aarch32_setup_vectors_page(struct linux_binprm *bprm, int uses_interp)
- }
- #endif /* CONFIG_AARCH32_EL0 */
- 
--static struct vm_special_mapping vdso_spec[2] __ro_after_init = {
-+static struct vm_special_mapping vdso_lp64_spec[2] __ro_after_init = {
-+	{
-+		.name	= "[vvar]",
-+	},
-+	{
-+		.name	= "[vdso]",
-+	},
++#include <linux/compat.h>
++#include <linux/signal.h>
++#include <linux/syscalls.h>
++#include <linux/ratelimit.h>
++
++#include <asm/esr.h>
++#include <asm/fpsimd.h>
++#include <asm/signal_ilp32.h>
++#include <asm/uaccess.h>
++#include <asm/unistd.h>
++#include <asm/ucontext.h>
++
++
++#define ILP32_RT_SIGFRAME_FP_POS (offsetof(struct ilp32_rt_sigframe, sig)	\
++			+ offsetof(struct ilp32_sigframe, fp))
++
++struct ilp32_ucontext {
++        u32		uc_flags;
++        u32		uc_link;
++        compat_stack_t  uc_stack;
++        compat_sigset_t uc_sigmask;
++        /* glibc uses a 1024-bit sigset_t */
++        __u8            __unused[1024 / 8 - sizeof(compat_sigset_t)];
++        /* last for future expansion */
++        struct sigcontext uc_mcontext;
 +};
 +
-+#ifdef CONFIG_ARM64_ILP32
-+static struct vm_special_mapping vdso_ilp32_spec[2] __ro_after_init = {
- 	{
- 		.name	= "[vvar]",
- 	},
-@@ -118,21 +133,27 @@ static struct vm_special_mapping vdso_spec[2] __ro_after_init = {
- 		.name	= "[vdso]",
- 	},
- };
-+#endif
- 
--static int __init vdso_init(void)
-+static int __init vdso_init(char *vdso_start, char *vdso_end,
-+					  unsigned long *vdso_pagesp,
-+					  struct vm_special_mapping *vdso_spec)
- {
- 	int i;
-+	unsigned long vdso_pages;
- 	struct page **vdso_pagelist;
- 	unsigned long pfn;
- 
--	if (memcmp(&vdso_start, "\177ELF", 4)) {
-+	if (memcmp(vdso_start, "\177ELF", 4)) {
- 		pr_err("vDSO is not a valid ELF object!\n");
- 		return -EINVAL;
- 	}
- 
--	vdso_pages = (&vdso_end - &vdso_start) >> PAGE_SHIFT;
-+	vdso_pages = (vdso_end - vdso_start) >> PAGE_SHIFT;
-+	*vdso_pagesp = vdso_pages;
- 	pr_info("vdso: %ld pages (%ld code @ %p, %ld data @ %p)\n",
--		vdso_pages + 1, vdso_pages, &vdso_start, 1L, vdso_data);
-+					vdso_pages + 1, vdso_pages,
-+					vdso_start, 1L, vdso_data);
- 
- 	/* Allocate the vDSO pagelist, plus a page for the data. */
- 	vdso_pagelist = kcalloc(vdso_pages + 1, sizeof(struct page *),
-@@ -145,7 +166,7 @@ static int __init vdso_init(void)
- 
- 
- 	/* Grab the vDSO code pages. */
--	pfn = sym_to_pfn(&vdso_start);
-+	pfn = sym_to_pfn(vdso_start);
- 
- 	for (i = 0; i < vdso_pages; i++)
- 		vdso_pagelist[i + 1] = pfn_to_page(pfn + i);
-@@ -155,7 +176,22 @@ static int __init vdso_init(void)
- 
- 	return 0;
- }
--arch_initcall(vdso_init);
++struct ilp32_sigframe {
++	struct ilp32_ucontext uc;
++	u64 fp;
++	u64 lr;
++};
 +
-+static int __init vdso_lp64_init(void)
++struct ilp32_rt_sigframe {
++	struct compat_siginfo info;
++	struct ilp32_sigframe sig;
++};
++
++static int restore_ilp32_sigframe(struct pt_regs *regs,
++                            struct ilp32_sigframe __user *sf)
 +{
-+	return vdso_init(&vdso_lp64_start, &vdso_lp64_end,
-+				&vdso_lp64_pages, vdso_lp64_spec);
++	sigset_t set;
++	int err;
++	err = get_sigset_t(&set, &sf->uc.uc_sigmask);
++	if (err == 0)
++		set_current_blocked(&set);
++	err |= restore_sigcontext(regs, &sf->uc.uc_mcontext);
++	return err;
 +}
-+arch_initcall(vdso_lp64_init);
 +
-+#ifdef CONFIG_ARM64_ILP32
-+static int __init vdso_ilp32_init(void)
++static int setup_ilp32_sigframe(struct ilp32_sigframe __user *sf,
++                          struct pt_regs *regs, sigset_t *set)
 +{
-+	return vdso_init(&vdso_ilp32_start, &vdso_ilp32_end,
-+				&vdso_ilp32_pages, vdso_ilp32_spec);
-+}
-+arch_initcall(vdso_ilp32_init);
-+#endif
- 
- int arch_setup_additional_pages(struct linux_binprm *bprm,
- 				int uses_interp)
-@@ -163,8 +199,17 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
- 	struct mm_struct *mm = current->mm;
- 	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
- 	void *ret;
-+	unsigned long pages = vdso_lp64_pages;
-+	struct vm_special_mapping *vdso_spec = vdso_lp64_spec;
++	int err = 0;
++	/* set up the stack frame for unwinding */
++	__put_user_error(regs->regs[29], &sf->fp, err);
++	__put_user_error(regs->regs[30], &sf->lr, err);
 +
-+#ifdef CONFIG_ARM64_ILP32
-+	if (is_ilp32_compat_task()) {
-+	        pages = vdso_ilp32_pages;
-+	        vdso_spec = vdso_ilp32_spec;
++	err |= put_sigset_t(&sf->uc.uc_sigmask, set);
++	err |= setup_sigcontext(&sf->uc.uc_mcontext, regs);
++	return err;
++}
++
++asmlinkage long ilp32_sys_rt_sigreturn(struct pt_regs *regs)
++{
++	struct ilp32_rt_sigframe __user *frame;
++
++	/* Always make any pending restarted system calls return -EINTR */
++	current->restart_block.fn = do_no_restart_syscall;
++
++	/*
++	 * Since we stacked the signal on a 128-bit boundary,
++	 * then 'sp' should be word aligned here.  If it's
++	 * not, then the user is trying to mess with us.
++	 */
++	if (regs->sp & 15)
++		goto badframe;
++
++	frame = (struct ilp32_rt_sigframe __user *)regs->sp;
++
++	if (!access_ok(VERIFY_READ, frame, sizeof (*frame)))
++		goto badframe;
++
++	if (restore_ilp32_sigframe(regs, &frame->sig))
++		goto badframe;
++
++	if (compat_restore_altstack(&frame->sig.uc.uc_stack))
++		goto badframe;
++
++	return regs->regs[0];
++
++badframe:
++	if (show_unhandled_signals)
++		pr_info_ratelimited("%s[%d]: bad frame in %s: pc=%08llx sp=%08llx\n",
++				    current->comm, task_pid_nr(current), __func__,
++				    regs->pc, regs->sp);
++	force_sig(SIGSEGV, current);
++	return 0;
++}
++
++static struct ilp32_rt_sigframe __user *ilp32_get_sigframe(struct ksignal *ksig,
++					       struct pt_regs *regs)
++{
++	unsigned long sp, sp_top;
++	struct ilp32_rt_sigframe __user *frame;
++
++	sp = sp_top = sigsp(regs->sp, ksig);
++
++	sp = (sp - sizeof(struct ilp32_rt_sigframe)) & ~15;
++	frame = (struct ilp32_rt_sigframe __user *)sp;
++
++	/*
++	 * Check that we can actually write to the signal frame.
++	 */
++	if (!access_ok(VERIFY_WRITE, frame, sp_top - sp))
++		frame = NULL;
++
++	return frame;
++}
++
++/*
++ * ILP32 signal handling routines called from signal.c
++ */
++int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
++			  sigset_t *set, struct pt_regs *regs)
++{
++	struct ilp32_rt_sigframe __user *frame;
++	int err = 0;
++
++	frame = ilp32_get_sigframe(ksig, regs);
++
++	if (!frame)
++		return 1;
++
++	err |= copy_siginfo_to_user32(&frame->info, &ksig->info);
++
++	__put_user_error(0, &frame->sig.uc.uc_flags, err);
++	__put_user_error(0, &frame->sig.uc.uc_link, err);
++
++	err |= __compat_save_altstack(&frame->sig.uc.uc_stack, regs->sp);
++	err |= setup_ilp32_sigframe(&frame->sig, regs, set);
++	if (err == 0) {
++		setup_return(regs, &ksig->ka, frame, ILP32_RT_SIGFRAME_FP_POS, usig);
++		regs->regs[1] = (unsigned long)&frame->info;
++		regs->regs[2] = (unsigned long)&frame->sig.uc;
 +	}
-+#endif
- 
--	vdso_text_len = vdso_pages << PAGE_SHIFT;
-+	vdso_text_len = pages << PAGE_SHIFT;
- 	/* Be sure to map the data page */
- 	vdso_mapping_len = vdso_text_len + PAGE_SIZE;
- 
-diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
-index e00b467..062a33d 100644
---- a/arch/arm64/kernel/vdso/gettimeofday.S
-+++ b/arch/arm64/kernel/vdso/gettimeofday.S
-@@ -25,6 +25,16 @@
- #define NSEC_PER_SEC_LO16	0xca00
- #define NSEC_PER_SEC_HI16	0x3b9a
- 
-+#ifdef __LP64__
-+#define PTR_REG(n)	x##n
-+#define OFFSET(n)	n
-+#define DELOUSE(n)
-+#else
-+#define PTR_REG(n)	w##n
-+#define OFFSET(n)	COMPAT_##n
-+#define DELOUSE(n)	mov     w##n, w##n
-+#endif
 +
- vdso_data	.req	x6
- seqcnt		.req	w7
- w_tmp		.req	w8
-@@ -119,7 +129,7 @@ x_tmp		.req	x8
- 	.if \shift == 1
- 	lsr	x11, x11, x12
- 	.endif
--	stp	x10, x11, [x1, #TSPEC_TV_SEC]
-+	stp     PTR_REG(10), PTR_REG(11), [x1, #OFFSET(TSPEC_TV_SEC)]
- 	mov	x0, xzr
- 	ret
- 	.endm
-@@ -136,6 +146,8 @@ x_tmp		.req	x8
- /* int __kernel_gettimeofday(struct timeval *tv, struct timezone *tz); */
- ENTRY(__kernel_gettimeofday)
- 	.cfi_startproc
-+	DELOUSE(0)
-+	DELOUSE(1)
- 	adr	vdso_data, _vdso_data
- 	/* If tv is NULL, skip to the timezone code. */
- 	cbz	x0, 2f
-@@ -160,7 +172,7 @@ ENTRY(__kernel_gettimeofday)
- 	mov	x13, #1000
- 	lsl	x13, x13, x12
- 	udiv	x11, x11, x13
--	stp	x10, x11, [x0, #TVAL_TV_SEC]
-+	stp	PTR_REG(10), PTR_REG(11), [x0, #OFFSET(TVAL_TV_SEC)]
- 2:
- 	/* If tz is NULL, return 0. */
- 	cbz	x1, 3f
-@@ -182,6 +194,7 @@ ENDPROC(__kernel_gettimeofday)
- /* int __kernel_clock_gettime(clockid_t clock_id, struct timespec *tp); */
- ENTRY(__kernel_clock_gettime)
- 	.cfi_startproc
-+	DELOUSE(1)
- 	cmp	w0, #JUMPSLOT_MAX
- 	b.hi	syscall
- 	adr	vdso_data, _vdso_data
-@@ -297,6 +310,7 @@ ENDPROC(__kernel_clock_gettime)
- /* int __kernel_clock_getres(clockid_t clock_id, struct timespec *res); */
- ENTRY(__kernel_clock_getres)
- 	.cfi_startproc
-+	DELOUSE(1)
- 	cmp	w0, #CLOCK_REALTIME
- 	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
- 	ccmp	w0, #CLOCK_MONOTONIC_RAW, #0x4, ne
-@@ -311,7 +325,7 @@ ENTRY(__kernel_clock_getres)
- 	ldr	x2, 6f
- 2:
- 	cbz	w1, 3f
--	stp	xzr, x2, [x1]
-+	stp	PTR_REG(zr), PTR_REG(2), [x1]
- 
- 3:	/* res == NULL. */
- 	mov	w0, wzr
-diff --git a/arch/arm64/kernel/vdso/vdso.S b/arch/arm64/kernel/vdso/vdso.S
-index 82379a7..a40ae24 100644
---- a/arch/arm64/kernel/vdso/vdso.S
-+++ b/arch/arm64/kernel/vdso/vdso.S
-@@ -21,12 +21,12 @@
- #include <linux/const.h>
- #include <asm/page.h>
- 
--	.globl vdso_start, vdso_end
-+	.globl vdso_lp64_start, vdso_lp64_end
- 	.section .rodata
- 	.balign PAGE_SIZE
--vdso_start:
-+vdso_lp64_start:
- 	.incbin "arch/arm64/kernel/vdso/vdso.so"
- 	.balign PAGE_SIZE
--vdso_end:
-+vdso_lp64_end:
- 
- 	.previous
++	return err;
++}
 -- 
 2.7.4
