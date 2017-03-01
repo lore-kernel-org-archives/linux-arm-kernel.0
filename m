@@ -1,45 +1,141 @@
-From: clg@kaod.org (=?UTF-8?q?C=C3=A9dric=20Le=20Goater?=)
-Date: Wed,  1 Mar 2017 15:26:43 +0100
-Subject: [PATCH 2/2] ARM: aspeed: Add CONFIG_SPI_ASPEED_SMC
-In-Reply-To: <1488378403-24640-1-git-send-email-clg@kaod.org>
-References: <1488378403-24640-1-git-send-email-clg@kaod.org>
-Message-ID: <1488378403-24640-3-git-send-email-clg@kaod.org>
+From: nicolas.dufresne@collabora.com (Nicolas Dufresne)
+Date: Wed, 01 Mar 2017 09:35:36 -0500
+Subject: [PATCH v6 2/2] [media] s5p-mfc: Handle 'v4l2_pix_format:field'
+ in try_fmt and g_fmt
+In-Reply-To: <33dbd3fa-04b2-3d94-5163-0a10589ff1c7@samsung.com>
+References: <20170301115108.14187-1-thibault.saunier@osg.samsung.com>
+ <CGME20170301115141epcas2p37801b1fbe0951cc37a4e01bf2bcae3da@epcas2p3.samsung.com>
+ <20170301115108.14187-3-thibault.saunier@osg.samsung.com>
+ <33dbd3fa-04b2-3d94-5163-0a10589ff1c7@samsung.com>
+Message-ID: <1488378936.14858.1.camel@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: C?dric Le Goater <clg@kaod.org>
----
- arch/arm/configs/aspeed_g4_defconfig | 3 +++
- arch/arm/configs/aspeed_g5_defconfig | 3 +++
- 2 files changed, 6 insertions(+)
+Le mercredi 01 mars 2017 ? 14:12 +0100, Andrzej Hajda a ?crit?:
+> On 01.03.2017 12:51, Thibault Saunier wrote:
+> > It is required by the standard that the field order is set by the
+> > driver, default to NONE in case any is provided, but we can
+> > basically
+> > accept any value provided by the userspace as we will anyway not
+> > be able to do any deinterlacing.
+> > 
+> > In this patch we also make sure to pass the interlacing mode
+> > provided
+> > by userspace from the output to the capture side of the device so
+> > that the information is given back to userspace. This way it can
+> > handle it and potentially deinterlace afterward.
+> 
+> As I wrote previously:
+> - on output side you have encoded bytestream - you cannot say about
+> interlacing in such case, so the only valid value is NONE,
 
-diff --git a/arch/arm/configs/aspeed_g4_defconfig b/arch/arm/configs/aspeed_g4_defconfig
-index d25010e3a0bc..8bd9e6a91d41 100644
---- a/arch/arm/configs/aspeed_g4_defconfig
-+++ b/arch/arm/configs/aspeed_g4_defconfig
-@@ -40,6 +40,9 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+CONFIG_MTD=y
-+CONFIG_MTD_SPI_NOR=y
-+CONFIG_SPI_ASPEED_SMC=y
- CONFIG_NETDEVICES=y
- # CONFIG_NET_VENDOR_ALACRITECH is not set
- # CONFIG_NET_VENDOR_AMAZON is not set
-diff --git a/arch/arm/configs/aspeed_g5_defconfig b/arch/arm/configs/aspeed_g5_defconfig
-index 5f660b02abd9..0eff4a53fd46 100644
---- a/arch/arm/configs/aspeed_g5_defconfig
-+++ b/arch/arm/configs/aspeed_g5_defconfig
-@@ -46,6 +46,9 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
-+CONFIG_MTD=y
-+CONFIG_MTD_SPI_NOR=y
-+CONFIG_SPI_ASPEED_SMC=y
- CONFIG_NETDEVICES=y
- # CONFIG_NET_VENDOR_ALACRITECH is not set
- # CONFIG_NET_VENDOR_AMAZON is not set
--- 
-2.7.4
+Userspace may know. It's important for the driver not to reset it back
+to NONE, it would tell the userspace that this encoded format is not
+supported when interlaced.
+
+Obviously, when userspace don't know (ANY), it does not matter, it will
+fail when we try to set the CAPTURE format. Though, it's quite late in
+the process for the userspace, which makes implementing software
+fallback difficult.
+
+> - on capture side you have decoded frames, and in this case it
+> depends
+> on the device and driver capabilities, if the driver/device does not
+> support (de-)interlacing (I suppose this is MFC case), interlace type
+> field should be filled according to decoded bytestream header (on
+> output
+> side), but no direct copying from output side!!!
+
+That is exact.
+
+> 
+> Regards
+> Andrzej
+> 
+> > 
+> > Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
+> > 
+> > ---
+> > 
+> > Changes in v6:
+> > - Pass user output field value to the capture as the device is not
+> > ? doing any deinterlacing and thus decoded content will still be
+> > ? interlaced on the output.
+> > 
+> > Changes in v5:
+> > - Just adapt the field and never error out.
+> > 
+> > Changes in v4: None
+> > Changes in v3:
+> > - Do not check values in the g_fmt functions as Andrzej explained
+> > in previous review
+> > 
+> > Changes in v2:
+> > - Fix a silly build error that slipped in while rebasing the
+> > patches
+> > 
+> > ?drivers/media/platform/s5p-mfc/s5p_mfc_common.h | 2 ++
+> > ?drivers/media/platform/s5p-mfc/s5p_mfc_dec.c????| 6 +++++-
+> > ?2 files changed, 7 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> > b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> > index ab23236aa942..3816a37de4bc 100644
+> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> > @@ -652,6 +652,8 @@ struct s5p_mfc_ctx {
+> > ?	size_t me_buffer_size;
+> > ?	size_t tmv_buffer_size;
+> > ?
+> > +	enum v4l2_field field;
+> > +
+> > ?	enum v4l2_mpeg_mfc51_video_force_frame_type
+> > force_frame_type;
+> > ?
+> > ?	struct list_head ref_queue;
+> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> > b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> > index 367ef8e8dbf0..6e5ca86fb331 100644
+> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> > @@ -345,7 +345,7 @@ static int vidioc_g_fmt(struct file *file, void
+> > *priv, struct v4l2_format *f)
+> > ?		???rectangle. */
+> > ?		pix_mp->width = ctx->buf_width;
+> > ?		pix_mp->height = ctx->buf_height;
+> > -		pix_mp->field = V4L2_FIELD_NONE;
+> > +		pix_mp->field = ctx->field;
+> > ?		pix_mp->num_planes = 2;
+> > ?		/* Set pixelformat to the format in which MFC
+> > ?		???outputs the decoded frame */
+> > @@ -380,6 +380,9 @@ static int vidioc_try_fmt(struct file *file,
+> > void *priv, struct v4l2_format *f)
+> > ?	struct s5p_mfc_dev *dev = video_drvdata(file);
+> > ?	struct s5p_mfc_fmt *fmt;
+> > ?
+> > +	if (f->fmt.pix.field == V4L2_FIELD_ANY)
+> > +		f->fmt.pix.field = V4L2_FIELD_NONE;
+> > +
+> > ?	mfc_debug(2, "Type is %d\n", f->type);
+> > ?	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+> > ?		fmt = find_format(f, MFC_FMT_DEC);
+> > @@ -436,6 +439,7 @@ static int vidioc_s_fmt(struct file *file, void
+> > *priv, struct v4l2_format *f)
+> > ?		goto out;
+> > ?	} else if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+> > ?		/* src_fmt is validated by call to vidioc_try_fmt
+> > */
+> > +		ctx->field = f->fmt.pix.field;
+> > ?		ctx->src_fmt = find_format(f, MFC_FMT_DEC);
+> > ?		ctx->codec_mode = ctx->src_fmt->codec_mode;
+> > ?		mfc_debug(2, "The codec number is: %d\n", ctx-
+> > >codec_mode);
+> 
+> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170301/5b8317db/attachment-0001.sig>
