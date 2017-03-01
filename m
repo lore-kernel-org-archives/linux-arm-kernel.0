@@ -1,89 +1,31 @@
-From: thibault.saunier@osg.samsung.com (Thibault Saunier)
-Date: Wed,  1 Mar 2017 08:51:08 -0300
-Subject: [PATCH v6 2/2] [media] s5p-mfc: Handle 'v4l2_pix_format:field' in
- try_fmt and g_fmt
-In-Reply-To: <20170301115108.14187-1-thibault.saunier@osg.samsung.com>
-References: <20170301115108.14187-1-thibault.saunier@osg.samsung.com>
-Message-ID: <20170301115108.14187-3-thibault.saunier@osg.samsung.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 1 Mar 2017 19:52:10 +0800
+Subject: [PATCH 2/2] crypto: arm - add build time test for CRC
+ instruction support
+In-Reply-To: <1488292617-27317-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1488292617-27317-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1488292617-27317-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170301115210.GB11489@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is required by the standard that the field order is set by the
-driver, default to NONE in case any is provided, but we can basically
-accept any value provided by the userspace as we will anyway not
-be able to do any deinterlacing.
+On Tue, Feb 28, 2017 at 02:36:57PM +0000, Ard Biesheuvel wrote:
+> The accelerated CRC32 module for ARM may use either the scalar CRC32
+> instructions, the NEON 64x64 to 128 bit polynomial multiplication
+> (vmull.p64) instruction, or both, depending on what the current CPU
+> supports.
+> 
+> However, this also requires support in binutils, and as it turns out,
+> versions of binutils exist that support the vmull.p64 instruction but
+> not the crc32 instructions.
+> 
+> So refactor the Makefile logic so that this module only gets built if
+> binutils has support for both.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-In this patch we also make sure to pass the interlacing mode provided
-by userspace from the output to the capture side of the device so
-that the information is given back to userspace. This way it can
-handle it and potentially deinterlace afterward.
-
-Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
-
----
-
-Changes in v6:
-- Pass user output field value to the capture as the device is not
-  doing any deinterlacing and thus decoded content will still be
-  interlaced on the output.
-
-Changes in v5:
-- Just adapt the field and never error out.
-
-Changes in v4: None
-Changes in v3:
-- Do not check values in the g_fmt functions as Andrzej explained in previous review
-
-Changes in v2:
-- Fix a silly build error that slipped in while rebasing the patches
-
- drivers/media/platform/s5p-mfc/s5p_mfc_common.h | 2 ++
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    | 6 +++++-
- 2 files changed, 7 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-index ab23236aa942..3816a37de4bc 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-@@ -652,6 +652,8 @@ struct s5p_mfc_ctx {
- 	size_t me_buffer_size;
- 	size_t tmv_buffer_size;
- 
-+	enum v4l2_field field;
-+
- 	enum v4l2_mpeg_mfc51_video_force_frame_type force_frame_type;
- 
- 	struct list_head ref_queue;
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-index 367ef8e8dbf0..6e5ca86fb331 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-@@ -345,7 +345,7 @@ static int vidioc_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
- 		   rectangle. */
- 		pix_mp->width = ctx->buf_width;
- 		pix_mp->height = ctx->buf_height;
--		pix_mp->field = V4L2_FIELD_NONE;
-+		pix_mp->field = ctx->field;
- 		pix_mp->num_planes = 2;
- 		/* Set pixelformat to the format in which MFC
- 		   outputs the decoded frame */
-@@ -380,6 +380,9 @@ static int vidioc_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
- 	struct s5p_mfc_dev *dev = video_drvdata(file);
- 	struct s5p_mfc_fmt *fmt;
- 
-+	if (f->fmt.pix.field == V4L2_FIELD_ANY)
-+		f->fmt.pix.field = V4L2_FIELD_NONE;
-+
- 	mfc_debug(2, "Type is %d\n", f->type);
- 	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
- 		fmt = find_format(f, MFC_FMT_DEC);
-@@ -436,6 +439,7 @@ static int vidioc_s_fmt(struct file *file, void *priv, struct v4l2_format *f)
- 		goto out;
- 	} else if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
- 		/* src_fmt is validated by call to vidioc_try_fmt */
-+		ctx->field = f->fmt.pix.field;
- 		ctx->src_fmt = find_format(f, MFC_FMT_DEC);
- 		ctx->codec_mode = ctx->src_fmt->codec_mode;
- 		mfc_debug(2, "The codec number is: %d\n", ctx->codec_mode);
+Patch applied.  Thanks.
 -- 
-2.11.1
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
