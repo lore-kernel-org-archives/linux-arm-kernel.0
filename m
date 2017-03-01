@@ -1,342 +1,288 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu,  2 Mar 2017 00:49:24 +0530
-Subject: [PATCH 16/20] arm64: signal32: move ilp32 and aarch32 common code to
- separated file
-In-Reply-To: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1488395968-14313-17-git-send-email-ynorov@caviumnetworks.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Wed, 1 Mar 2017 12:22:40 -0700
+Subject: [PATCH V11 05/10] acpi: apei: handle SEA notification type for
+ ARMv8
+In-Reply-To: <58B67B69.8000702@huawei.com>
+References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
+ <1487712121-16688-6-git-send-email-tbaicar@codeaurora.org>
+ <58B67B69.8000702@huawei.com>
+Message-ID: <5f0b63c0-8a0d-8161-efcb-3d60e3275a21@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
----
- arch/arm64/include/asm/signal32.h        |   3 +
- arch/arm64/include/asm/signal32_common.h |  27 +++++++
- arch/arm64/kernel/Makefile               |   2 +-
- arch/arm64/kernel/signal32.c             | 107 ------------------------
- arch/arm64/kernel/signal32_common.c      | 135 +++++++++++++++++++++++++++++++
- 5 files changed, 166 insertions(+), 108 deletions(-)
- create mode 100644 arch/arm64/include/asm/signal32_common.h
- create mode 100644 arch/arm64/kernel/signal32_common.c
+Hello Xie XiuQi,
 
-diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
-index e68fcce..1c4ede7 100644
---- a/arch/arm64/include/asm/signal32.h
-+++ b/arch/arm64/include/asm/signal32.h
-@@ -13,6 +13,9 @@
-  * You should have received a copy of the GNU General Public License
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
-+
-+#include <asm/signal32_common.h>
-+
- #ifndef __ASM_SIGNAL32_H
- #define __ASM_SIGNAL32_H
- 
-diff --git a/arch/arm64/include/asm/signal32_common.h b/arch/arm64/include/asm/signal32_common.h
-new file mode 100644
-index 0000000..36c1ebc
---- /dev/null
-+++ b/arch/arm64/include/asm/signal32_common.h
-@@ -0,0 +1,27 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_SIGNAL32_COMMON_H
-+#define __ASM_SIGNAL32_COMMON_H
-+
-+#ifdef CONFIG_COMPAT
-+
-+int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from);
-+int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from);
-+
-+int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set);
-+int get_sigset_t(sigset_t *set, const compat_sigset_t __user *uset);
-+
-+#endif /* CONFIG_COMPAT*/
-+
-+#endif /* __ASM_SIGNAL32_COMMON_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 4ea7b97f..9463af5 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -30,7 +30,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
- arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o entry32.o binfmt_elf32.o
- arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o
--arm64-obj-$(CONFIG_COMPAT)		+= entry32_common.o
-+arm64-obj-$(CONFIG_COMPAT)		+= entry32_common.o signal32_common.o
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
- arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
-diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
-index c747a0f..181cc30 100644
---- a/arch/arm64/kernel/signal32.c
-+++ b/arch/arm64/kernel/signal32.c
-@@ -103,113 +103,6 @@ struct compat_rt_sigframe {
- 
- #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
- 
--static inline int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
--{
--	compat_sigset_t	cset;
--
--	cset.sig[0] = set->sig[0] & 0xffffffffull;
--	cset.sig[1] = set->sig[0] >> 32;
--
--	return copy_to_user(uset, &cset, sizeof(*uset));
--}
--
--static inline int get_sigset_t(sigset_t *set,
--			       const compat_sigset_t __user *uset)
--{
--	compat_sigset_t s32;
--
--	if (copy_from_user(&s32, uset, sizeof(*uset)))
--		return -EFAULT;
--
--	set->sig[0] = s32.sig[0] | (((long)s32.sig[1]) << 32);
--	return 0;
--}
--
--int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
--{
--	int err;
--
--	if (!access_ok(VERIFY_WRITE, to, sizeof(*to)))
--		return -EFAULT;
--
--	/* If you change siginfo_t structure, please be sure
--	 * this code is fixed accordingly.
--	 * It should never copy any pad contained in the structure
--	 * to avoid security leaks, but must copy the generic
--	 * 3 ints plus the relevant union member.
--	 * This routine must convert siginfo from 64bit to 32bit as well
--	 *@the same time.
--	 */
--	err = __put_user(from->si_signo, &to->si_signo);
--	err |= __put_user(from->si_errno, &to->si_errno);
--	err |= __put_user((short)from->si_code, &to->si_code);
--	if (from->si_code < 0)
--		err |= __copy_to_user(&to->_sifields._pad, &from->_sifields._pad,
--				      SI_PAD_SIZE);
--	else switch (from->si_code & __SI_MASK) {
--	case __SI_KILL:
--		err |= __put_user(from->si_pid, &to->si_pid);
--		err |= __put_user(from->si_uid, &to->si_uid);
--		break;
--	case __SI_TIMER:
--		 err |= __put_user(from->si_tid, &to->si_tid);
--		 err |= __put_user(from->si_overrun, &to->si_overrun);
--		 err |= __put_user(from->si_int, &to->si_int);
--		break;
--	case __SI_POLL:
--		err |= __put_user(from->si_band, &to->si_band);
--		err |= __put_user(from->si_fd, &to->si_fd);
--		break;
--	case __SI_FAULT:
--		err |= __put_user((compat_uptr_t)(unsigned long)from->si_addr,
--				  &to->si_addr);
--#ifdef BUS_MCEERR_AO
--		/*
--		 * Other callers might not initialize the si_lsb field,
--		 * so check explicitly for the right codes here.
--		 */
--		if (from->si_signo == SIGBUS &&
--		    (from->si_code == BUS_MCEERR_AR || from->si_code == BUS_MCEERR_AO))
--			err |= __put_user(from->si_addr_lsb, &to->si_addr_lsb);
--#endif
--		break;
--	case __SI_CHLD:
--		err |= __put_user(from->si_pid, &to->si_pid);
--		err |= __put_user(from->si_uid, &to->si_uid);
--		err |= __put_user(from->si_status, &to->si_status);
--		err |= __put_user(from->si_utime, &to->si_utime);
--		err |= __put_user(from->si_stime, &to->si_stime);
--		break;
--	case __SI_RT: /* This is not generated by the kernel as of now. */
--	case __SI_MESGQ: /* But this is */
--		err |= __put_user(from->si_pid, &to->si_pid);
--		err |= __put_user(from->si_uid, &to->si_uid);
--		err |= __put_user(from->si_int, &to->si_int);
--		break;
--	case __SI_SYS:
--		err |= __put_user((compat_uptr_t)(unsigned long)
--				from->si_call_addr, &to->si_call_addr);
--		err |= __put_user(from->si_syscall, &to->si_syscall);
--		err |= __put_user(from->si_arch, &to->si_arch);
--		break;
--	default: /* this is just in case for now ... */
--		err |= __put_user(from->si_pid, &to->si_pid);
--		err |= __put_user(from->si_uid, &to->si_uid);
--		break;
--	}
--	return err;
--}
--
--int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from)
--{
--	if (copy_from_user(to, from, __ARCH_SI_PREAMBLE_SIZE) ||
--	    copy_from_user(to->_sifields._pad,
--			   from->_sifields._pad, SI_PAD_SIZE))
--		return -EFAULT;
--
--	return 0;
--}
--
- /*
-  * VFP save/restore code.
-  *
-diff --git a/arch/arm64/kernel/signal32_common.c b/arch/arm64/kernel/signal32_common.c
-new file mode 100644
-index 0000000..06f0258
---- /dev/null
-+++ b/arch/arm64/kernel/signal32_common.c
-@@ -0,0 +1,135 @@
-+/*
-+ * Based on arch/arm/kernel/signal.c
-+ *
-+ * Copyright (C) 1995-2009 Russell King
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Modified by Will Deacon <will.deacon@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/compat.h>
-+#include <linux/signal.h>
-+#include <linux/ratelimit.h>
-+
-+#include <asm/esr.h>
-+#include <asm/fpsimd.h>
-+#include <asm/signal32_common.h>
-+#include <asm/uaccess.h>
-+#include <asm/unistd.h>
-+
-+int put_sigset_t(compat_sigset_t __user *uset, sigset_t *set)
-+{
-+	compat_sigset_t	cset;
-+
-+	cset.sig[0] = set->sig[0] & 0xffffffffull;
-+	cset.sig[1] = set->sig[0] >> 32;
-+
-+	return copy_to_user(uset, &cset, sizeof(*uset));
-+}
-+
-+int get_sigset_t(sigset_t *set, const compat_sigset_t __user *uset)
-+{
-+	compat_sigset_t s32;
-+
-+	if (copy_from_user(&s32, uset, sizeof(*uset)))
-+		return -EFAULT;
-+
-+	set->sig[0] = s32.sig[0] | (((long)s32.sig[1]) << 32);
-+	return 0;
-+}
-+
-+int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
-+{
-+	int err;
-+
-+	if (!access_ok(VERIFY_WRITE, to, sizeof(*to)))
-+		return -EFAULT;
-+
-+	/* If you change siginfo_t structure, please be sure
-+	 * this code is fixed accordingly.
-+	 * It should never copy any pad contained in the structure
-+	 * to avoid security leaks, but must copy the generic
-+	 * 3 ints plus the relevant union member.
-+	 * This routine must convert siginfo from 64bit to 32bit as well
-+	 *@the same time.
-+	 */
-+	err = __put_user(from->si_signo, &to->si_signo);
-+	err |= __put_user(from->si_errno, &to->si_errno);
-+	err |= __put_user((short)from->si_code, &to->si_code);
-+	if (from->si_code < 0)
-+		err |= __copy_to_user(&to->_sifields._pad, &from->_sifields._pad,
-+				      SI_PAD_SIZE);
-+	else switch (from->si_code & __SI_MASK) {
-+	case __SI_KILL:
-+		err |= __put_user(from->si_pid, &to->si_pid);
-+		err |= __put_user(from->si_uid, &to->si_uid);
-+		break;
-+	case __SI_TIMER:
-+		 err |= __put_user(from->si_tid, &to->si_tid);
-+		 err |= __put_user(from->si_overrun, &to->si_overrun);
-+		 err |= __put_user(from->si_int, &to->si_int);
-+		break;
-+	case __SI_POLL:
-+		err |= __put_user(from->si_band, &to->si_band);
-+		err |= __put_user(from->si_fd, &to->si_fd);
-+		break;
-+	case __SI_FAULT:
-+		err |= __put_user((compat_uptr_t)(unsigned long)from->si_addr,
-+				  &to->si_addr);
-+#ifdef BUS_MCEERR_AO
-+		/*
-+		 * Other callers might not initialize the si_lsb field,
-+		 * so check explicitly for the right codes here.
-+		 */
-+		if (from->si_signo == SIGBUS &&
-+		    (from->si_code == BUS_MCEERR_AR || from->si_code == BUS_MCEERR_AO))
-+			err |= __put_user(from->si_addr_lsb, &to->si_addr_lsb);
-+#endif
-+		break;
-+	case __SI_CHLD:
-+		err |= __put_user(from->si_pid, &to->si_pid);
-+		err |= __put_user(from->si_uid, &to->si_uid);
-+		err |= __put_user(from->si_status, &to->si_status);
-+		err |= __put_user(from->si_utime, &to->si_utime);
-+		err |= __put_user(from->si_stime, &to->si_stime);
-+		break;
-+	case __SI_RT: /* This is not generated by the kernel as of now. */
-+	case __SI_MESGQ: /* But this is */
-+		err |= __put_user(from->si_pid, &to->si_pid);
-+		err |= __put_user(from->si_uid, &to->si_uid);
-+		err |= __put_user(from->si_int, &to->si_int);
-+		break;
-+	case __SI_SYS:
-+		err |= __put_user((compat_uptr_t)(unsigned long)
-+				from->si_call_addr, &to->si_call_addr);
-+		err |= __put_user(from->si_syscall, &to->si_syscall);
-+		err |= __put_user(from->si_arch, &to->si_arch);
-+		break;
-+	default: /* this is just in case for now ... */
-+		err |= __put_user(from->si_pid, &to->si_pid);
-+		err |= __put_user(from->si_uid, &to->si_uid);
-+		break;
-+	}
-+	return err;
-+}
-+
-+int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from)
-+{
-+	if (copy_from_user(to, from, __ARCH_SI_PREAMBLE_SIZE) ||
-+	    copy_from_user(to->_sifields._pad,
-+			   from->_sifields._pad, SI_PAD_SIZE))
-+		return -EFAULT;
-+
-+	return 0;
-+}
+
+On 3/1/2017 12:42 AM, Xie XiuQi wrote:
+> Hi Tyler,
+>
+> On 2017/2/22 5:21, Tyler Baicar wrote:
+>> ARM APEI extension proposal added SEA (Synchronous External Abort)
+>> notification type for ARMv8.
+>> Add a new GHES error source handling function for SEA. If an error
+>> source's notification type is SEA, then this function can be registered
+>> into the SEA exception handler. That way GHES will parse and report
+>> SEA exceptions when they occur.
+> I have a question about ghes_proc. In ghes_proc, we just parse and report
+> the error information, but no one use it for error recovery now.
+>
+> Take the SEA case for example, we get the physical address from parsing
+> the GHES table. But the memory management system or other drivers/modules
+> know what the really meaning of the error address/page. There is no way to
+> notify them to do the recovery now.
+>
+> So, could we add a notify at appropriate position. All drivers or modules
+> which are interested in this error could receive and take the corresponding
+> action.
+Error recovery is outside the scope of these patches. These patches are 
+supposed to setup the infrastructure to parse/report the SEAs. Error 
+recovery can be added after the fact which is what has been done for 
+platform memory errors; the page off-lining support was added after the 
+error parsing/reporting code was in.
+
+Thanks,
+Tyler
+>
+>> An SEA can interrupt code that had interrupts masked and is treated as
+>> an NMI. To aid this the page of address space for mapping APEI buffers
+>> while in_nmi() is always reserved, and ghes_ioremap_pfn_nmi() is
+>> changed to use the helper methods to find the prot_t to map with in
+>> the same way as ghes_ioremap_pfn_irq().
+>>
+>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>> CC: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+>> ---
+>>   arch/arm64/Kconfig        |  1 +
+>>   arch/arm64/mm/fault.c     | 13 ++++++++
+>>   drivers/acpi/apei/Kconfig | 15 +++++++++
+>>   drivers/acpi/apei/ghes.c  | 77 +++++++++++++++++++++++++++++++++++++++++++----
+>>   include/acpi/ghes.h       |  7 +++++
+>>   5 files changed, 107 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 1117421..fca4dc1 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -88,6 +88,7 @@ config ARM64
+>>   	select HAVE_IRQ_TIME_ACCOUNTING
+>>   	select HAVE_MEMBLOCK
+>>   	select HAVE_MEMBLOCK_NODE_MAP if NUMA
+>> +	select HAVE_NMI if ACPI_APEI_SEA
+>>   	select HAVE_PATA_PLATFORM
+>>   	select HAVE_PERF_EVENTS
+>>   	select HAVE_PERF_REGS
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index d178dc0..b2d57fc 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -41,6 +41,8 @@
+>>   #include <asm/pgtable.h>
+>>   #include <asm/tlbflush.h>
+>>   
+>> +#include <acpi/ghes.h>
+>> +
+>>   static const char *fault_name(unsigned int esr);
+>>   
+>>   #ifdef CONFIG_KPROBES
+>> @@ -498,6 +500,17 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>>   	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+>>   		 fault_name(esr), esr, addr);
+>>   
+>> +	/*
+>> +	 * Synchronous aborts may interrupt code which had interrupts masked.
+>> +	 * Before calling out into the wider kernel tell the interested
+>> +	 * subsystems.
+>> +	 */
+>> +	if (IS_ENABLED(ACPI_APEI_SEA)) {
+>> +		nmi_enter();
+>> +		ghes_notify_sea();
+>> +		nmi_exit();
+>> +	}
+>> +
+>>   	info.si_signo = SIGBUS;
+>>   	info.si_errno = 0;
+>>   	info.si_code  = 0;
+>> diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
+>> index b0140c8..c545dd1 100644
+>> --- a/drivers/acpi/apei/Kconfig
+>> +++ b/drivers/acpi/apei/Kconfig
+>> @@ -39,6 +39,21 @@ config ACPI_APEI_PCIEAER
+>>   	  PCIe AER errors may be reported via APEI firmware first mode.
+>>   	  Turn on this option to enable the corresponding support.
+>>   
+>> +config ACPI_APEI_SEA
+>> +	bool "APEI Synchronous External Abort logging/recovering support"
+>> +	depends on ARM64 && ACPI_APEI && ACPI_APEI_GHES
+>> +	default y
+>> +	help
+>> +	  This option should be enabled if the system supports
+>> +	  firmware first handling of SEA (Synchronous External Abort).
+>> +	  SEA happens with certain faults of data abort or instruction
+>> +	  abort synchronous exceptions on ARMv8 systems. If a system
+>> +	  supports firmware first handling of SEA, the platform analyzes
+>> +	  and handles hardware error notifications from SEA, and it may then
+>> +	  form a HW error record for the OS to parse and handle. This
+>> +	  option allows the OS to look for such hardware error record, and
+>> +	  take appropriate action.
+>> +
+>>   config ACPI_APEI_MEMORY_FAILURE
+>>   	bool "APEI memory error recovering support"
+>>   	depends on ACPI_APEI && MEMORY_FAILURE
+>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+>> index b25e7cf..b0596ba 100644
+>> --- a/drivers/acpi/apei/ghes.c
+>> +++ b/drivers/acpi/apei/ghes.c
+>> @@ -114,11 +114,7 @@
+>>    * Two virtual pages are used, one for IRQ/PROCESS context, the other for
+>>    * NMI context (optionally).
+>>    */
+>> -#ifdef CONFIG_HAVE_ACPI_APEI_NMI
+>>   #define GHES_IOREMAP_PAGES           2
+>> -#else
+>> -#define GHES_IOREMAP_PAGES           1
+>> -#endif
+>>   #define GHES_IOREMAP_IRQ_PAGE(base)	(base)
+>>   #define GHES_IOREMAP_NMI_PAGE(base)	((base) + PAGE_SIZE)
+>>   
+>> @@ -157,10 +153,14 @@ static void ghes_ioremap_exit(void)
+>>   static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
+>>   {
+>>   	unsigned long vaddr;
+>> +	phys_addr_t paddr;
+>> +	pgprot_t prot;
+>>   
+>>   	vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
+>> -	ioremap_page_range(vaddr, vaddr + PAGE_SIZE,
+>> -			   pfn << PAGE_SHIFT, PAGE_KERNEL);
+>> +
+>> +	paddr = pfn << PAGE_SHIFT;
+>> +	prot = arch_apei_get_mem_attribute(paddr);
+>> +	ioremap_page_range(vaddr, vaddr + PAGE_SIZE, paddr, prot);
+>>   
+>>   	return (void __iomem *)vaddr;
+>>   }
+>> @@ -767,6 +767,50 @@ static int ghes_notify_sci(struct notifier_block *this,
+>>   	.notifier_call = ghes_notify_sci,
+>>   };
+>>   
+>> +#ifdef CONFIG_ACPI_APEI_SEA
+>> +static LIST_HEAD(ghes_sea);
+>> +
+>> +void ghes_notify_sea(void)
+>> +{
+>> +	struct ghes *ghes;
+>> +
+>> +	/*
+>> +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
+>> +	 * rcu_read_lock().
+>> +	 */
+>> +	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
+>> +		ghes_proc(ghes);
+>> +	}
+>> +}
+>> +
+>> +static void ghes_sea_add(struct ghes *ghes)
+>> +{
+>> +	mutex_lock(&ghes_list_mutex);
+>> +	list_add_rcu(&ghes->list, &ghes_sea);
+>> +	mutex_unlock(&ghes_list_mutex);
+>> +}
+>> +
+>> +static void ghes_sea_remove(struct ghes *ghes)
+>> +{
+>> +	mutex_lock(&ghes_list_mutex);
+>> +	list_del_rcu(&ghes->list);
+>> +	mutex_unlock(&ghes_list_mutex);
+>> +	synchronize_rcu();
+>> +}
+>> +#else /* CONFIG_ACPI_APEI_SEA */
+>> +static inline void ghes_sea_add(struct ghes *ghes)
+>> +{
+>> +	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not supported\n",
+>> +	       ghes->generic->header.source_id);
+>> +}
+>> +
+>> +static inline void ghes_sea_remove(struct ghes *ghes)
+>> +{
+>> +	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not supported\n",
+>> +	       ghes->generic->header.source_id);
+>> +}
+>> +#endif /* CONFIG_ACPI_APEI_SEA */
+>> +
+>>   #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+>>   /*
+>>    * printk is not safe in NMI context.  So in NMI handler, we allocate
+>> @@ -1012,6 +1056,14 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>>   	case ACPI_HEST_NOTIFY_EXTERNAL:
+>>   	case ACPI_HEST_NOTIFY_SCI:
+>>   		break;
+>> +	case ACPI_HEST_NOTIFY_SEA:
+>> +		if (!IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
+>> +			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
+>> +				generic->header.source_id);
+>> +			rc = -ENOTSUPP;
+>> +			goto err;
+>> +		}
+>> +		break;
+>>   	case ACPI_HEST_NOTIFY_NMI:
+>>   		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
+>>   			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
+>> @@ -1023,6 +1075,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>>   		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
+>>   			   generic->header.source_id);
+>>   		goto err;
+>> +	case ACPI_HEST_NOTIFY_GPIO:
+>> +	case ACPI_HEST_NOTIFY_SEI:
+>> +	case ACPI_HEST_NOTIFY_GSIV:
+>> +		pr_warn(GHES_PFX "Generic hardware error source: %d notified via notification type %u is not supported\n",
+>> +			generic->header.source_id, generic->header.source_id);
+>> +		rc = -ENOTSUPP;
+>> +		goto err;
+>>   	default:
+>>   		pr_warning(FW_WARN GHES_PFX "Unknown notification type: %u for generic hardware error source: %d\n",
+>>   			   generic->notify.type, generic->header.source_id);
+>> @@ -1077,6 +1136,9 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>>   		list_add_rcu(&ghes->list, &ghes_sci);
+>>   		mutex_unlock(&ghes_list_mutex);
+>>   		break;
+>> +	case ACPI_HEST_NOTIFY_SEA:
+>> +		ghes_sea_add(ghes);
+>> +		break;
+>>   	case ACPI_HEST_NOTIFY_NMI:
+>>   		ghes_nmi_add(ghes);
+>>   		break;
+>> @@ -1119,6 +1181,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
+>>   			unregister_acpi_hed_notifier(&ghes_notifier_sci);
+>>   		mutex_unlock(&ghes_list_mutex);
+>>   		break;
+>> +	case ACPI_HEST_NOTIFY_SEA:
+>> +		ghes_sea_remove(ghes);
+>> +		break;
+>>   	case ACPI_HEST_NOTIFY_NMI:
+>>   		ghes_nmi_remove(ghes);
+>>   		break;
+>> diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+>> index 6ae318b..18bc935 100644
+>> --- a/include/acpi/ghes.h
+>> +++ b/include/acpi/ghes.h
+>> @@ -1,3 +1,6 @@
+>> +#ifndef GHES_H
+>> +#define GHES_H
+>> +
+>>   #include <acpi/apei.h>
+>>   #include <acpi/hed.h>
+>>   
+>> @@ -95,3 +98,7 @@ static inline void *acpi_hest_generic_data_payload(struct acpi_hest_generic_data
+>>   		(void *)(((struct acpi_hest_generic_data_v300 *)(gdata)) + 1) :
+>>   		gdata + 1;
+>>   }
+>> +
+>> +void ghes_notify_sea(void);
+>> +
+>> +#endif /* GHES_H */
+>>
+
 -- 
-2.7.4
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
