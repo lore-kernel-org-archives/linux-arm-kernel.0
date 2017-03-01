@@ -1,45 +1,53 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Wed,  1 Mar 2017 18:23:02 +0300
-Subject: [PATCH v3] Revert "tty: serial: pl011: add ttyAMA for matching pl011
- console"
-In-Reply-To: <20170301122602.30025-1-aleksey.makarov@linaro.org>
-References: <20170301122602.30025-1-aleksey.makarov@linaro.org>
-Message-ID: <20170301152304.29635-1-aleksey.makarov@linaro.org>
+From: madalin.bucur@nxp.com (Madalin Bucur)
+Date: Wed, 1 Mar 2017 17:35:03 +0200
+Subject: [PATCH v2 0/2] dts: arm64: add DPAA 1 support for ARM based SoCs
+Message-ID: <1488382505-17554-1-git-send-email-madalin.bucur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original patch makes the condition always true, so it is wrong.
+Add DPAA 1 nodes for LS1043A/LS1046A and networking support for RDB
+and QDS boards with these SoCs.
 
-It masks (but not fixes) the bug described in the commit message
-but introduces a regression (no console is selected by SPCR)
-in regular (no 'console=ttyAMA') case.
+changes from v1: addressed comment from Rob Herring on using SPDX
+		 license identifiers
 
-s/||/&&/ would not fix the problem as the root cause was identified
-incorrectly.
+Madalin Bucur (2):
+  dts: arm64: add LS1043A DPAA support
+  dts: arm64: add LS1046A DPAA support
 
-This reverts commit aea9a80ba98a0c9b4de88850260e9fbdcc98360b.
+ arch/arm64/boot/dts/freescale/fsl-ls1043-post.dtsi | 41 +++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts  |  2 +
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts  | 75 ++++++++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     | 73 +++++++++++++++++++-
+ arch/arm64/boot/dts/freescale/fsl-ls1046-post.dtsi | 45 ++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-qds.dts  |  2 +
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts  | 62 +++++++++++++++++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi     | 66 +++++++++++++++++-
+ .../boot/dts/freescale/qoriq-bman1-portals.dtsi    | 67 ++++++++++++++++++
+ .../boot/dts/freescale/qoriq-fman3-0-10g-0.dtsi    | 42 ++++++++++++
+ .../boot/dts/freescale/qoriq-fman3-0-10g-1.dtsi    | 42 ++++++++++++
+ .../boot/dts/freescale/qoriq-fman3-0-1g-0.dtsi     | 41 +++++++++++
+ .../boot/dts/freescale/qoriq-fman3-0-1g-1.dtsi     | 41 +++++++++++
+ .../boot/dts/freescale/qoriq-fman3-0-1g-2.dtsi     | 41 +++++++++++
+ .../boot/dts/freescale/qoriq-fman3-0-1g-3.dtsi     | 41 +++++++++++
+ .../boot/dts/freescale/qoriq-fman3-0-1g-4.dtsi     | 41 +++++++++++
+ .../boot/dts/freescale/qoriq-fman3-0-1g-5.dtsi     | 41 +++++++++++
+ arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi   | 80 ++++++++++++++++++++++
+ .../boot/dts/freescale/qoriq-qman1-portals.dtsi    | 76 ++++++++++++++++++++
+ 19 files changed, 917 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043-post.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1046-post.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/qoriq-bman1-portals.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-10g-0.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-10g-1.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-0.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-1.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-2.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-3.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-4.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0-1g-5.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/qoriq-fman3-0.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/qoriq-qman1-portals.dtsi
 
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
----
-
-v3: fix commit message (Robin Murphy)
-v2: add Signed-off-by:
-
- drivers/tty/serial/amba-pl011.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 8789ea423ccf..56f92d7348bf 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2373,7 +2373,7 @@ static int __init pl011_console_match(struct console *co, char *name, int idx,
- 	if (strcmp(name, "qdf2400_e44") == 0) {
- 		pr_info_once("UART: Working around QDF2400 SoC erratum 44");
- 		qdf2400_e44_present = true;
--	} else if (strcmp(name, "pl011") != 0 || strcmp(name, "ttyAMA") != 0) {
-+	} else if (strcmp(name, "pl011") != 0) {
- 		return -ENODEV;
- 	}
- 
 -- 
-2.11.1
+2.1.0
