@@ -1,166 +1,124 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu,  2 Mar 2017 00:49:16 +0530
-Subject: [PATCH 08/20] thread: move thread bits accessors to separated file
+Date: Thu,  2 Mar 2017 00:49:20 +0530
+Subject: [PATCH 12/20] arm64: ilp32: introduce binfmt_ilp32.c
 In-Reply-To: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1488395968-14313-9-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1488395968-14313-13-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-They may be accessed from low-level code, so isolating is a measure to
-avoid circular dependencies in header files.
-
-The exact reason for circular dependency is WARN_ON() macro added in patch
-edd63a27 "set_restore_sigmask() is never called without SIGPENDING (and
-never should be)"
+Like binfmt_elf32.c, binfmt_ilp32.c is needed to handle ILP32 binaries
 
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@linaro.org>
 ---
- include/linux/thread_bits.h | 63 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/thread_info.h | 54 +-------------------------------------
- 2 files changed, 64 insertions(+), 53 deletions(-)
- create mode 100644 include/linux/thread_bits.h
+ arch/arm64/kernel/Makefile       |  1 +
+ arch/arm64/kernel/binfmt_ilp32.c | 85 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 86 insertions(+)
+ create mode 100644 arch/arm64/kernel/binfmt_ilp32.c
 
-diff --git a/include/linux/thread_bits.h b/include/linux/thread_bits.h
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index aeaf474..b6f14a8 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -29,6 +29,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+ 
+ arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o entry32.o binfmt_elf32.o
++arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+ arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
 new file mode 100644
-index 0000000..8735433
+index 0000000..bb31325
 --- /dev/null
-+++ b/include/linux/thread_bits.h
-@@ -0,0 +1,63 @@
-+/* thread_bits.h: common low-level thread bits accessors */
-+
-+#ifndef _LINUX_THREAD_BITS_H
-+#define _LINUX_THREAD_BITS_H
-+
-+#ifndef __ASSEMBLY__
-+
-+#include <linux/bitops.h>
-+#include <asm/thread_info.h>
-+
-+#ifdef CONFIG_THREAD_INFO_IN_TASK
++++ b/arch/arm64/kernel/binfmt_ilp32.c
+@@ -0,0 +1,85 @@
 +/*
-+ * For CONFIG_THREAD_INFO_IN_TASK kernels we need <asm/current.h> for the
-+ * definition of current, but for !CONFIG_THREAD_INFO_IN_TASK kernels,
-+ * including <asm/current.h> can cause a circular dependency on some platforms.
++ * Support for ILP32 Linux/aarch64 ELF binaries.
 + */
-+#include <asm/current.h>
-+#define current_thread_info() ((struct thread_info *)current)
++#undef CONFIG_AARCH32_EL0
++#define compat_elf_gregset_t	elf_gregset_t
++
++#include <linux/elfcore-compat.h>
++#include <linux/time.h>
++
++#undef	ELF_CLASS
++#define ELF_CLASS	ELFCLASS32
++
++#undef	elfhdr
++#undef	elf_phdr
++#undef	elf_shdr
++#undef	elf_note
++#undef	elf_addr_t
++#define elfhdr		elf32_hdr
++#define elf_phdr	elf32_phdr
++#define elf_shdr	elf32_shdr
++#define elf_note	elf32_note
++#define elf_addr_t	Elf32_Addr
++
++/*
++ * Some data types as stored in coredump.
++ */
++#define user_long_t		compat_long_t
++#define user_siginfo_t		compat_siginfo_t
++#define copy_siginfo_to_user	copy_siginfo_to_user32
++
++/*
++ * The machine-dependent core note format types are defined in elfcore-compat.h,
++ * which requires asm/elf.h to define compat_elf_gregset_t et al.
++ */
++#define elf_prstatus	compat_elf_prstatus
++#define elf_prpsinfo	compat_elf_prpsinfo
++
++/* AARCH64 ILP32 EABI. */
++#undef elf_check_arch
++#define elf_check_arch(x)		(((x)->e_machine == EM_AARCH64)	\
++					&& (x)->e_ident[EI_CLASS] == ELFCLASS32)
++
++#undef SET_PERSONALITY
++#define SET_PERSONALITY(ex)						\
++do {									\
++	set_bit(TIF_32BIT, &current->mm->context.flags);	\
++	set_thread_flag(TIF_32BIT_AARCH64);				\
++	clear_thread_flag(TIF_32BIT);					\
++} while (0)
++
++#undef ARCH_DLINFO
++#define ARCH_DLINFO							\
++do {									\
++	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
++		    (elf_addr_t)(long)current->mm->context.vdso);	\
++} while (0)
++
++#undef ELF_PLATFORM
++#ifdef __AARCH64EB__
++#define ELF_PLATFORM		("aarch64_be:ilp32")
++#else
++#define ELF_PLATFORM		("aarch64:ilp32")
 +#endif
 +
++#undef ELF_ET_DYN_BASE
++#define ELF_ET_DYN_BASE COMPAT_ELF_ET_DYN_BASE
++
++#undef ELF_HWCAP
++#undef ELF_HWCAP2
++#define ELF_HWCAP			((u32) elf_hwcap)
++#define ELF_HWCAP2			((u32) (elf_hwcap >> 32))
++
 +/*
-+ * flag set/clear/test wrappers
-+ * - pass TIF_xxxx constants to these functions
++ * Rename a few of the symbols that binfmt_elf.c will define.
++ * These are all local so the names don't really matter, but it
++ * might make some debugging less confusing not to duplicate them.
 + */
++#define elf_format		compat_elf_format
++#define init_elf_binfmt		init_compat_elf_binfmt
++#define exit_elf_binfmt		exit_compat_elf_binfmt
 +
-+static inline void set_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	set_bit(flag, (unsigned long *)&ti->flags);
-+}
++#undef ns_to_timeval
++#define ns_to_timeval ns_to_compat_timeval
 +
-+static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	clear_bit(flag, (unsigned long *)&ti->flags);
-+}
-+
-+static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
-+}
-+
-+static inline int test_and_clear_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	return test_and_clear_bit(flag, (unsigned long *)&ti->flags);
-+}
-+
-+static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
-+{
-+	return test_bit(flag, (unsigned long *)&ti->flags);
-+}
-+
-+#define set_thread_flag(flag) \
-+	set_ti_thread_flag(current_thread_info(), flag)
-+#define clear_thread_flag(flag) \
-+	clear_ti_thread_flag(current_thread_info(), flag)
-+#define test_and_set_thread_flag(flag) \
-+	test_and_set_ti_thread_flag(current_thread_info(), flag)
-+#define test_and_clear_thread_flag(flag) \
-+	test_and_clear_ti_thread_flag(current_thread_info(), flag)
-+#define test_thread_flag(flag) \
-+	test_ti_thread_flag(current_thread_info(), flag)
-+
-+#endif /* !__ASSEMBLY__ */
-+#endif /* _LINUX_THREAD_BITS_H */
-diff --git a/include/linux/thread_info.h b/include/linux/thread_info.h
-index 5837387..a325deb 100644
---- a/include/linux/thread_info.h
-+++ b/include/linux/thread_info.h
-@@ -11,18 +11,7 @@
- #include <linux/bug.h>
- #include <linux/restart_block.h>
- 
--#ifdef CONFIG_THREAD_INFO_IN_TASK
--/*
-- * For CONFIG_THREAD_INFO_IN_TASK kernels we need <asm/current.h> for the
-- * definition of current, but for !CONFIG_THREAD_INFO_IN_TASK kernels,
-- * including <asm/current.h> can cause a circular dependency on some platforms.
-- */
--#include <asm/current.h>
--#define current_thread_info() ((struct thread_info *)current)
--#endif
--
--#include <linux/bitops.h>
--#include <asm/thread_info.h>
-+#include <linux/thread_bits.h>
- 
- #ifdef __KERNEL__
- 
-@@ -33,47 +22,6 @@
- # define THREADINFO_GFP		(GFP_KERNEL_ACCOUNT | __GFP_NOTRACK)
- #endif
- 
--/*
-- * flag set/clear/test wrappers
-- * - pass TIF_xxxx constants to these functions
-- */
--
--static inline void set_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	set_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline void clear_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	clear_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline int test_and_set_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	return test_and_set_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline int test_and_clear_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	return test_and_clear_bit(flag, (unsigned long *)&ti->flags);
--}
--
--static inline int test_ti_thread_flag(struct thread_info *ti, int flag)
--{
--	return test_bit(flag, (unsigned long *)&ti->flags);
--}
--
--#define set_thread_flag(flag) \
--	set_ti_thread_flag(current_thread_info(), flag)
--#define clear_thread_flag(flag) \
--	clear_ti_thread_flag(current_thread_info(), flag)
--#define test_and_set_thread_flag(flag) \
--	test_and_set_ti_thread_flag(current_thread_info(), flag)
--#define test_and_clear_thread_flag(flag) \
--	test_and_clear_ti_thread_flag(current_thread_info(), flag)
--#define test_thread_flag(flag) \
--	test_ti_thread_flag(current_thread_info(), flag)
--
- #define tif_need_resched() test_thread_flag(TIF_NEED_RESCHED)
- 
- #ifndef CONFIG_HAVE_ARCH_WITHIN_STACK_FRAMES
++#include "../../../fs/binfmt_elf.c"
 -- 
 2.7.4
