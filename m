@@ -1,50 +1,56 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu,  2 Mar 2017 02:01:06 +0800
-Subject: [PATCH v2 0/5] Refactor of ARM64 sunxi pinctrl enabling and add A64
- R_PIO driver
-Message-ID: <20170301180111.12365-1-icenowy@aosc.xyz>
+Date: Thu,  2 Mar 2017 02:01:07 +0800
+Subject: [PATCH v2 1/5] pinctrl: sunxi: refactor pinctrl choice selecting for
+ ARM64
+In-Reply-To: <20170301180111.12365-1-icenowy@aosc.xyz>
+References: <20170301180111.12365-1-icenowy@aosc.xyz>
+Message-ID: <20170301180111.12365-2-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nearly all Allwinner SoCs need a per-SoC pinctrl driver, some will need one
-more for the R_PIO pin controller.
+ARM64 Allwinner SoCs used to have every pinctrl driver selected in
+ARCH_SUNXI. Change this to make their default value to (ARM64 &&
+ARCH_SUNXI).
 
-This patchset try to refactor the enabling method of pinctrl drivers for
-64-bit Allwinner SoCs, to prevent furthur change of Kconfig.platforms when
-adding new SoC support.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+---
+Changes in v2:
+- Drop PINCTRL_SUN8I_H3_R's dependency on RESET_CONTROLLER, as there's really
+  no reset line for H3 R_PIO pin controller. (By experiment and investigation
+  on A83T/A80 user manual)
 
-Thus, the R_PIO pin controller driver for A64 will be added, and use the
-new method to get it enabled when building 64-bit sunxi kernel.
+ drivers/pinctrl/sunxi/Kconfig | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-The first patch makes the default value of pinctrl drivers about 64-bit
-Allwinner SoCs (ARM64 && ARCH_SUNXI), which means 64-bit Allwinner SoCs.
-
-The second patch then clean up Kconfig.platforms. It must be applied after
-the first one, otherwise newly built 64-bit Allwinner kernel will have no
-pinctrl drivers and become unusable.
-
-The third patch is only a small fix for a typo in H5 generic pinctrl
-compatible.
-
-The fourth patch adds compatible for A64 R_PIO pin controller.
-
-The fifth patch really introduces the A64 R_PIO pin controller driver,
-it still cannot be enabled in device tree, as we lack the R_CCU driver.
-
-Icenowy Zheng (5):
-  pinctrl: sunxi: refactor pinctrl choice selecting for ARM64
-  arm64: only select PINCTRL for Allwinner platforms
-  dt-bindings: fix for Allwinner H5 pinctrl's compatible
-  dt: bindings: add binding for Allwinner A64 R_PIO pinctrl
-  pinctrl: sunxi: Add A64 R_PIO controller support
-
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   3 +-
- arch/arm64/Kconfig.platforms                       |   1 -
- drivers/pinctrl/sunxi/Kconfig                      |  12 +-
- drivers/pinctrl/sunxi/Makefile                     |   1 +
- drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c       | 125 +++++++++++++++++++++
- 5 files changed, 136 insertions(+), 6 deletions(-)
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
-
+diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+index 816015cf7053..a84bfa7f3c05 100644
+--- a/drivers/pinctrl/sunxi/Kconfig
++++ b/drivers/pinctrl/sunxi/Kconfig
+@@ -48,8 +48,8 @@ config PINCTRL_SUN8I_H3
+ 	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN8I_H3_R
+-	def_bool MACH_SUN8I
+-	select PINCTRL_SUNXI_COMMON
++	def_bool MACH_SUN8I || (ARM64 && ARCH_SUNXI)
++	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN8I_V3S
+ 	def_bool MACH_SUN8I
+@@ -65,11 +65,11 @@ config PINCTRL_SUN9I_A80_R
+ 	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN50I_A64
+-	bool
++	def_bool ARM64 && ARCH_SUNXI
+ 	select PINCTRL_SUNXI
+ 
+ config PINCTRL_SUN50I_H5
+-	bool
++	def_bool ARM64 && ARCH_SUNXI
+ 	select PINCTRL_SUNXI
+ 
+ endif
 -- 
 2.11.1
