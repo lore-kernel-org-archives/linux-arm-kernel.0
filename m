@@ -1,61 +1,56 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 1 Mar 2017 15:03:12 -0500
-Subject: [PATCH v4 00/23] drm/rockchip: MIPI fixes & improvements
-In-Reply-To: <20170224125506.21533-1-john@metanate.com>
-References: <20170224125506.21533-1-john@metanate.com>
-Message-ID: <20170301200312.GB13635@art_vandelay>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 1 Mar 2017 12:04:44 -0800
+Subject: [PATCH] hwmon: (scpi) Add slope and offset to SCP sensor readings
+In-Reply-To: <CAOQ7t2Y1=fL9a4A_gPtvrrWR_uOOP_gGT-61Q+1B39t2gRJBmw@mail.gmail.com>
+References: <20170301132028.25309-1-carlo@caione.org>
+ <41f19cd3-5086-1da9-915a-8987cfc119f9@roeck-us.net>
+ <CAL9uMOG5qEgyGTue=n7abbFROKGBpUrWDOPi5_bEDUWuiHEUKg@mail.gmail.com>
+ <87inntorz7.fsf@e105922-lin.cambridge.arm.com>
+ <20170301175618.GB15246@roeck-us.net>
+ <CAOQ7t2Y1=fL9a4A_gPtvrrWR_uOOP_gGT-61Q+1B39t2gRJBmw@mail.gmail.com>
+Message-ID: <20170301200444.GB20160@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Feb 24, 2017 at 12:54:43PM +0000, John Keeping wrote:
-> This version is mostly small changes in response to review comments from
-> Sean and Chris, the details are in the individual patches.
+On Wed, Mar 01, 2017 at 07:45:50PM +0100, Carlo Caione wrote:
+> On Wed, Mar 1, 2017 at 6:56 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > On Wed, Mar 01, 2017 at 04:57:00PM +0000, Punit Agrawal wrote:
 > 
-> I decided to drop the final patch which adds support for MIPI read
-> commands because I'm not using that feature now and I can't easily test
-> it.  It's on the list if anyone wants to pick it up in the future.
+> >> Another way to fix this would be to add optional properties to the scpi
+> >> sensors binding and use them instead. This could then be used to fixup
+> >> values reported to both thermal and hwmon.
+> >>
+> >
+> > Yes, this would be much more appropriate.
 > 
-> Version 3 was posted here:
-> http://www.spinics.net/lists/dri-devel/msg130977.html
+> What about something like:
 > 
-> Thanks to Sean Paul and Chris Zhong for their review and testing of this
-> series.
-> 
-> John Keeping (23):
->   drm/rockchip: dw-mipi-dsi: don't configure hardware in mode_set for
->     MIPI
->   drm/rockchip: dw-mipi-dsi: pass mode in where needed
->   drm/rockchip: dw-mipi-dsi: remove mode_set hook
->   drm/rockchip: dw-mipi-dsi: fix command header writes
->   drm/rockchip: dw-mipi-dsi: fix generic packet status check
->   drm/rockchip: dw-mipi-dsi: avoid out-of-bounds read on tx_buf
->   drm/rockchip: dw-mipi-dsi: include bad value in error message
->   drm/rockchip: dw-mipi-dsi: respect message flags
->   drm/rockchip: dw-mipi-dsi: only request HS clock when required
->   drm/rockchip: dw-mipi-dsi: don't assume buffer is aligned
->   drm/rockchip: dw-mipi-dsi: prepare panel after phy init
->   drm/rockchip: dw-mipi-dsi: allow commands in panel_disable
->   drm/rockchip: dw-mipi-dsi: fix escape clock rate
->   drm/rockchip: dw-mipi-dsi: ensure PHY is reset
->   drm/rockchip: dw-mipi-dsi: configure PHY before enabling
->   drm/rockchip: dw-mipi-dsi: properly configure PHY timing
->   drm/rockchip: dw-mipi-dsi: improve PLL configuration
->   drm/rockchip: dw-mipi-dsi: use specific poll helper
->   drm/rockchip: dw-mipi-dsi: use positive check for N{H,V}SYNC
->   drm/rockchip: vop: test for P{H,V}SYNC
->   drm/rockchip: dw-mipi-dsi: defer probe if panel is not loaded
->   drm/rockchip: dw-mipi-dsi: support non-burst modes
->   drm/rockchip: dw-mipi-dsi: add reset control
-> 
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c      | 325 +++++++++++++++++++---------
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   4 +-
->  2 files changed, 220 insertions(+), 109 deletions(-)
+> sensor-coefficients = <x1 y1 z1>,
+>                                   <x2 y2 z2>,
+>                                   ...;
 
-Applied to drm-misc
+As mentioned before, I don't think 'slope' and 'offset' are well enough
+defined, so I would rather not use that approach.
 
-Thanks,
+I don't know if there are DT examples on how to specify a translation
+from an arbitrary value to well-defined units; we could use that
+if it exists. Otherwise, we might just go with a combination of
+sensor class and the unit scale used for that sensor class.
+A simple approach might be something like
+    scpi,sensor-scale =	// pick preferred property name 
+	<0 1000>,
+	<1 1000>,
+	<2 1000>,
+	<3 1000000>,
+	<4 1000000>;
+or even simpler
+	scpi,sensor-scale = <1000, 1000, 1000, 1000000, 1000000>;
+since the class index is really redundant.
 
-Sean
-> 
-> -- 
-> 2.12.0.rc0.230.gf625d4cdb9.dirty
+This would describe the units for the Juno ARM development platform.
+
+In your case, that would be something like
+	scpi,sensor-scale = <1, 1000, 1000, 1000000, 1000000>;
+assuming that the other units are as expected (which may not be the case). 
+
+Guenter
