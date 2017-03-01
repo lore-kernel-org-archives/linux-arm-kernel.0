@@ -1,94 +1,99 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Wed, 1 Mar 2017 11:00:12 +0100
-Subject: [PATCH] mmc: core: Fix power sequence ordering in mmc_power_up
-In-Reply-To: <ef8580d1-989f-c9ab-abc7-034eb8cad7d0@broadcom.com>
-References: <20170301085902.7388-1-romain.perier@collabora.com>
- <ef8580d1-989f-c9ab-abc7-034eb8cad7d0@broadcom.com>
-Message-ID: <44646f74-6260-6c0e-3726-60f90fd57149@collabora.com>
+From: david.wu@rock-chips.com (David Wu)
+Date: Wed,  1 Mar 2017 18:16:02 +0800
+Subject: [PATCH v2] pwm: rockchip: State of pwm clock should synchronize with
+ pwm enabled state
+Message-ID: <1488363362-26624-1-git-send-email-david.wu@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: "david.wu" <david.wu@rock-chips.com>
 
+If the pwm was not enabled at uboot loader, pwm could not work for clock
+always disabled at pwm driver. The pwm clock is enabled at beginning of
+pwm_apply(), but disabled at end of pwm_apply().
 
-Le 01/03/2017 ? 10:53, Arend Van Spriel a ?crit :
-> On 1-3-2017 9:59, Romain Perier wrote:
->> Currently, mmc_power_up calls the pre_power_on callback, enables the
->> power supply of the mmc by calling mmc_set_ios() and then call
->> post_power_on. WiFi chipsets like the AP6335 require a specific power
->> sequence ordering before being used. You must enable the power supply
->> and wait until it reaches its minimum voltage, gate the clock and wait
->> at least two cycles and then assert the reset line.
-> Hi Romain,
->
-> You have to be more clear. What power supply, ie. vmmc or the supply for
-> the wifi chipset. Without knowing much of the details to me this sounds
-> like a new powerseq variant.
+If the pwm was enabled at uboot loader, pwm clock is always enabled unless
+closed by ATF. The pwm-backlight might turn off the power at early suspend,
+should disable pwm clock for saving power consume.
 
-That's for vqmmc. vqmmc has to be power on, then the clock must be
-enabled and then the reset line
-must be toggled.
+It is important to provide opportunity to enable/disable clock at pwm driver,
+the pwm consumer should ensure correct order to call pwm enable/disable, and
+pwm driver ensure state of pwm clock synchronized with pwm enabled state.
 
->
->> This commit prevents regulators to be enabled in the middle of or after
->> the power sequencing. We this fix, mmc_set_ios is first call, the
->> underlying regulators are enabled, then pre_power_on and post_power_on
->> are called, so clock and reset line are enabled in the right order,
->> after the regulator.
-> It feels counter intuitive and maybe even wrong to change a setup
-> pattern like this. Can you be sure this will not cause any regressions?
+Fixes: 2bf1c98aa5a4 ("pwm: rockchip: Add support for atomic update")
+Cc: stable at vger.kernel.org
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/pwm/pwm-rockchip.c | 40 +++++++++++++++++++++++++++++++++-------
+ 1 file changed, 33 insertions(+), 7 deletions(-)
 
-Well, I could keep the current pattern as it was currently working, and
-propose another one for this case (as an RFC).
-
-What do you think ?
-
-Regards,
-Romain
-
->
-> Regards,
-> Arend
->
->> Signed-off-by: Romain Perier <romain.perier@collabora.com>
->> ---
->>  drivers/mmc/core/core.c | 13 +++++++++----
->>  1 file changed, 9 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
->> index 1076b9d..36df24f 100644
->> --- a/drivers/mmc/core/core.c
->> +++ b/drivers/mmc/core/core.c
->> @@ -1798,8 +1798,6 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
->>  	if (host->ios.power_mode == MMC_POWER_ON)
->>  		return;
->>  
->> -	mmc_pwrseq_pre_power_on(host);
->> -
->>  	host->ios.vdd = fls(ocr) - 1;
->>  	host->ios.power_mode = MMC_POWER_UP;
->>  	/* Set initial state and call mmc_set_ios */
->> @@ -1819,13 +1817,20 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
->>  	 */
->>  	mmc_delay(10);
->>  
->> -	mmc_pwrseq_post_power_on(host);
->> -
->>  	host->ios.clock = host->f_init;
->>  
->>  	host->ios.power_mode = MMC_POWER_ON;
->>  	mmc_set_ios(host);
->>  
->> +	mmc_pwrseq_pre_power_on(host);
->> +
->> +	/*
->> +	 * This delay should be sufficient to wait at least two cycles of clock
->> +	 * gated by pre_power_on
->> +	 */
->> +	mmc_delay(1);
->> +	mmc_pwrseq_post_power_on(host);
->> +
->>  	/*
->>  	 * This delay must be at least 74 clock sizes, or 1 ms, or the
->>  	 * time required to reach a stable voltage.
->>
+diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
+index ef89df1..dbee3c3 100644
+--- a/drivers/pwm/pwm-rockchip.c
++++ b/drivers/pwm/pwm-rockchip.c
+@@ -191,6 +191,28 @@ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 	return 0;
+ }
+ 
++static int rk_pwm_enable(struct pwm_chip *chip,
++			 struct pwm_device *pwm,
++			 bool enable,
++			 enum pwm_polarity polarity)
++{
++	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
++	int ret;
++
++	if (enable) {
++		ret = clk_enable(pc->clk);
++		if (ret)
++			return ret;
++	}
++
++	pc->data->set_enable(chip, pwm, enable, polarity);
++
++	if (!enable)
++		clk_disable(pc->clk);
++
++	return 0;
++}
++
+ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 			      struct pwm_state *state)
+ {
+@@ -207,22 +229,26 @@ static int rockchip_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 		return ret;
+ 
+ 	if (state->polarity != curstate.polarity && enabled) {
+-		pc->data->set_enable(chip, pwm, false, state->polarity);
++		ret = rk_pwm_enable(chip, pwm, false, state->polarity);
++		if (ret)
++			goto out;
+ 		enabled = false;
+ 	}
+ 
+ 	ret = rockchip_pwm_config(chip, pwm, state->duty_cycle, state->period);
+ 	if (ret) {
+ 		if (enabled != curstate.enabled)
+-			pc->data->set_enable(chip, pwm, !enabled,
+-					     state->polarity);
+-
++			rk_pwm_enable(chip, pwm, !enabled,
++				      state->polarity);
+ 		goto out;
+ 	}
+ 
+-	if (state->enabled != enabled)
+-		pc->data->set_enable(chip, pwm, state->enabled,
+-				     state->polarity);
++	if (state->enabled != enabled) {
++		ret = rk_pwm_enable(chip, pwm, state->enabled,
++				    state->polarity);
++		if (ret)
++			goto out;
++	}
+ 
+ 	/*
+ 	 * Update the state with the real hardware, which can differ a bit
+-- 
+1.9.1
