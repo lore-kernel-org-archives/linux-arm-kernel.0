@@ -1,34 +1,52 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 1 Mar 2017 14:24:00 -0500
-Subject: [RFC PATCH 04/30] iommu/arm-smmu-v3: Add support for PCI ATS
-In-Reply-To: <20170227195441.5170-5-jean-philippe.brucker@arm.com>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-5-jean-philippe.brucker@arm.com>
-Message-ID: <5a7822f2-3991-aa51-169f-78ef49567feb@codeaurora.org>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu,  2 Mar 2017 00:49:28 +0530
+Subject: [PATCH 20/20] arm64:ilp32: add ARM64_ILP32 to Kconfig
+In-Reply-To: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1488395968-14313-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1488395968-14313-21-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2/27/2017 2:54 PM, Jean-Philippe Brucker wrote:
-> /* Initialise command lazily */
-> +		if (!cmd.opcode)
-> +			arm_smmu_atc_invalidate_to_cmd(smmu, iova, size, &cmd);
-> +
-> +		spin_lock(&smmu_group->devices_lock);
-> +
-> +		list_for_each_entry(master, &smmu_group->devices, group_head)
-> +			arm_smmu_atc_invalidate_master(master, &cmd);
-> +
-> +		/*
-> +		 * TODO: ensure we do a sync whenever we have sent ats_queue_depth
-> +		 * invalidations to the same device.
-> +		 */
-> +		arm_smmu_cmdq_issue_cmd(smmu, &sync_cmd);
-> +
+From: Andrew Pinski <apinski@cavium.com>
 
-It is possible to observe ATS invalidation timeout up to 90 seconds according to PCIe
-spec. How does the current code deal with this?
+This patch adds the config option for ILP32.
 
+Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Reviewed-by: David Daney <ddaney@caviumnetworks.com>
+---
+ arch/arm64/Kconfig | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index d059063..887f391 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1043,7 +1043,7 @@ source "fs/Kconfig.binfmt"
+ 
+ config COMPAT
+ 	bool
+-	depends on AARCH32_EL0
++	depends on AARCH32_EL0 || ARM64_ILP32
+ 
+ config AARCH32_EL0
+ 	bool "Kernel support for 32-bit EL0"
+@@ -1065,6 +1065,14 @@ config AARCH32_EL0
+ 
+ 	  If you want to execute 32-bit userspace applications, say Y.
+ 
++config ARM64_ILP32
++	bool "Kernel support for ILP32"
++	select COMPAT
++	help
++	  This option enables support for AArch64 ILP32 user space.  ILP32
++	  is an ABI where long and pointers are 32bits but it uses the AARCH64
++	  instruction set.
++
+ config SYSVIPC_COMPAT
+ 	def_bool y
+ 	depends on COMPAT && SYSVIPC
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.7.4
