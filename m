@@ -1,182 +1,80 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu,  2 Mar 2017 02:09:30 +0800
-Subject: [PATCH v2 5/5] pinctrl: sunxi: Add A64 R_PIO controller support
-Message-ID: <20170301180930.13155-1-icenowy@aosc.xyz>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 1 Mar 2017 10:04:39 -0800
+Subject: [PATCH v2] ARM: OMAP2+: Fix device node reference counts
+In-Reply-To: <1488311640-3594-1-git-send-email-linux@roeck-us.net>
+References: <1488311640-3594-1-git-send-email-linux@roeck-us.net>
+Message-ID: <20170301180439.GI20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 has a R_PIO pin controller, similar to the one found on the H3 SoC.
-Add support for the pins controlled by the R_PIO controller.
+* Guenter Roeck <linux@roeck-us.net> [170228 11:55]:
+> After commit 'of: fix of_node leak caused in of_find_node_opts_by_path',
+> the following error may be reported when running omap images.
+> 
+> OF: ERROR: Bad of_node_put() on /ocp at 68000000
+> CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc7-next-20170210 #1
+> Hardware name: Generic OMAP3-GP (Flattened Device Tree)
+> [<c0310604>] (unwind_backtrace) from [<c030bbf4>] (show_stack+0x10/0x14)
+> [<c030bbf4>] (show_stack) from [<c05add8c>] (dump_stack+0x98/0xac)
+> [<c05add8c>] (dump_stack) from [<c05af1b0>] (kobject_release+0x48/0x7c)
+> [<c05af1b0>] (kobject_release)
+> 	from [<c0ad1aa4>] (of_find_node_by_name+0x74/0x94)
+> [<c0ad1aa4>] (of_find_node_by_name)
+> 	from [<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable+0x24/0x2c)
+> [<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable) from
+> [<c1215d5c>] (omap3xxx_hwmod_init+0x180/0x274)
+> [<c1215d5c>] (omap3xxx_hwmod_init)
+> 	from [<c120faa8>] (omap3_init_early+0xa0/0x11c)
+> [<c120faa8>] (omap3_init_early)
+> 	from [<c120fb2c>] (omap3430_init_early+0x8/0x30)
+> [<c120fb2c>] (omap3430_init_early)
+> 	from [<c1204710>] (setup_arch+0xc04/0xc34)
+> [<c1204710>] (setup_arch) from [<c1200948>] (start_kernel+0x68/0x38c)
+> [<c1200948>] (start_kernel) from [<8020807c>] (0x8020807c)
+> 
+> of_find_node_by_name() drops the reference to the passed device node.
+> Use of_get_child_by_name() instead. Also, release references to
+> device nodes obtained with of_find_node_by_name() and
+> of_get_child_by_name() after they are no longer needed.
+> 
+> While at it, clean up the code and change the return type of
+> omap3xxx_hwmod_is_hs_ip_block_usable() to bool to match its use
+> and the return type of of_device_is_available().
+> 
+> Cc: Qi Hou <qi.hou@windriver.com>
+> Cc: Peter Rosin <peda@axentia.se>
+> Cc: Rob Herring <robh@kernel.org>
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> ---
+> v2: Change subject ('Grab reference to device nodes where needed'
+>     didn't really cover all the changes made)
+>     Use of_get_child_by_name() instead of of_find_node_by_name()
+>     Drop references to device nodes as needed
+>     Change return type of omap3xxx_hwmod_is_hs_ip_block_usable()
+>     to bool
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
----
-Changes in v2:
-- Drop reset line de-assert code (as the reset line in fact does not exist).
+OK so now we have a commit id for it and should have:
 
- drivers/pinctrl/sunxi/Kconfig                |   4 +
- drivers/pinctrl/sunxi/Makefile               |   1 +
- drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c | 125 +++++++++++++++++++++++++++
- 3 files changed, 130 insertions(+)
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
+Fixes: 0549bde0fcb1 ("of: fix of_node leak caused in
+of_find_node_opts_by_path")
 
-diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
-index a84bfa7f3c05..a0c419ac2a3b 100644
---- a/drivers/pinctrl/sunxi/Kconfig
-+++ b/drivers/pinctrl/sunxi/Kconfig
-@@ -68,6 +68,10 @@ config PINCTRL_SUN50I_A64
- 	def_bool ARM64 && ARCH_SUNXI
- 	select PINCTRL_SUNXI
- 
-+config PINCTRL_SUN50I_A64_R
-+	def_bool ARM64 && ARCH_SUNXI
-+	select PINCTRL_SUNXI
-+
- config PINCTRL_SUN50I_H5
- 	def_bool ARM64 && ARCH_SUNXI
- 	select PINCTRL_SUNXI
-diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
-index 04ccb88ebd5f..df4ccd6cd44c 100644
---- a/drivers/pinctrl/sunxi/Makefile
-+++ b/drivers/pinctrl/sunxi/Makefile
-@@ -11,6 +11,7 @@ obj-$(CONFIG_PINCTRL_SUN8I_A23)		+= pinctrl-sun8i-a23.o
- obj-$(CONFIG_PINCTRL_SUN8I_A23_R)	+= pinctrl-sun8i-a23-r.o
- obj-$(CONFIG_PINCTRL_SUN8I_A33)		+= pinctrl-sun8i-a33.o
- obj-$(CONFIG_PINCTRL_SUN50I_A64)	+= pinctrl-sun50i-a64.o
-+obj-$(CONFIG_PINCTRL_SUN50I_A64_R)	+= pinctrl-sun50i-a64-r.o
- obj-$(CONFIG_PINCTRL_SUN8I_A83T)	+= pinctrl-sun8i-a83t.o
- obj-$(CONFIG_PINCTRL_SUN8I_H3)		+= pinctrl-sun8i-h3.o
- obj-$(CONFIG_PINCTRL_SUN8I_H3_R)	+= pinctrl-sun8i-h3-r.o
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c b/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
-new file mode 100644
-index 000000000000..415870e82cbf
---- /dev/null
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun50i-a64-r.c
-@@ -0,0 +1,125 @@
-+/*
-+ * Allwinner A64 SoCs special pins pinctrl driver.
-+ *
-+ * Based on pinctrl-sun8i-a23-r.c
-+ *
-+ * Copyright (C) 2016 Icenowy Zheng
-+ * Icenowy Zheng <icenowy@aosc.xyz>
-+ *
-+ * Copyright (C) 2014 Chen-Yu Tsai
-+ * Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * Copyright (C) 2014 Boris Brezillon
-+ * Boris Brezillon <boris.brezillon@free-electrons.com>
-+ *
-+ * Copyright (C) 2014 Maxime Ripard
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/pinctrl/pinctrl.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset.h>
-+
-+#include "pinctrl-sunxi.h"
-+
-+static const struct sunxi_desc_pin sun50i_a64_r_pins[] = {
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 0),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_rsb"),		/* SCK */
-+		  SUNXI_FUNCTION(0x3, "s_i2c"),		/* SCK */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)),	/* PL_EINT0 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 1),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_rsb"),		/* SDA */
-+		  SUNXI_FUNCTION(0x3, "s_i2c"),		/* SDA */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)),	/* PL_EINT1 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 2),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_uart"),	/* TX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 2)),	/* PL_EINT2 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 3),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_uart"),	/* RX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 3)),	/* PL_EINT3 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 4),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_jtag"),	/* MS */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 4)),	/* PL_EINT4 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 5),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_jtag"),	/* CK */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 5)),	/* PL_EINT5 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 6),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_jtag"),	/* DO */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 6)),	/* PL_EINT6 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 7),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_jtag"),	/* DI */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 7)),	/* PL_EINT7 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 8),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_i2c"),		/* SCK */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 8)),	/* PL_EINT8 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 9),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_i2c"),		/* SDA */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 9)),	/* PL_EINT9 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 10),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_pwm"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 10)),	/* PL_EINT10 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 11),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "s_cir_rx"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 11)),	/* PL_EINT11 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(L, 12),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 12)),	/* PL_EINT12 */
-+};
-+
-+static const struct sunxi_pinctrl_desc sun50i_a64_r_pinctrl_data = {
-+	.pins = sun50i_a64_r_pins,
-+	.npins = ARRAY_SIZE(sun50i_a64_r_pins),
-+	.pin_base = PL_BASE,
-+	.irq_banks = 1,
-+};
-+
-+static int sun50i_a64_r_pinctrl_probe(struct platform_device *pdev)
-+{
-+	return sunxi_pinctrl_init(pdev,
-+				  &sun50i_a64_r_pinctrl_data);
-+}
-+
-+static const struct of_device_id sun50i_a64_r_pinctrl_match[] = {
-+	{ .compatible = "allwinner,sun50i-a64-r-pinctrl", },
-+	{}
-+};
-+
-+static struct platform_driver sun50i_a64_r_pinctrl_driver = {
-+	.probe	= sun50i_a64_r_pinctrl_probe,
-+	.driver	= {
-+		.name		= "sun50i-a64-r-pinctrl",
-+		.of_match_table	= sun50i_a64_r_pinctrl_match,
-+	},
-+};
-+builtin_platform_driver(sun50i_a64_r_pinctrl_driver);
--- 
-2.11.1
+What about other leaky users of of_find_node_by_name() and
+of_get_child_by_name()?
+
+We have those in:
+
+control.c
+display.c
+omap_device.c
+omap_hwmod.c
+
+So probably it really should be two fixes, one for the regression
+causing the error. Then another one for fixing the leaky np use.
+
+Sorry for going back and forth here, I guess I did not full understand
+the second part of the change in your earlier version of the patch
+when you asked if it should be two patches.
+
+Regards,
+
+Tony
