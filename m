@@ -1,132 +1,87 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 1 Mar 2017 10:32:52 +0100
-Subject: [PATCH 5/9] dmaengine: sun6i: support V3s SoC variant
-In-Reply-To: <535111488304713@web26h.yandex.ru>
-References: <20170225123029.55939-1-icenowy@aosc.xyz>
- <20170225123029.55939-5-icenowy@aosc.xyz>
- <20170227075021.e7e43o54s23jzfto@lukather>
- <1426971488192481@web6g.yandex.ru>
- <20170228175604.kdlmjjcncfljnbfp@lukather>
- <535111488304713@web26h.yandex.ru>
-Message-ID: <20170301093252.ukeurxvl55tfkymm@lukather>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Wed, 1 Mar 2017 09:47:09 +0000
+Subject: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy
+ interrupts
+References: <1486364596-19699-1-git-send-email-bharatku@xilinx.com>
+ <4b04e834-08b6-a728-8fe5-13106d50b3b2@arm.com>
+ <8520D5D51A55D047800579B094147198263E68AA@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <131228fb-d3f8-3836-3713-e948ed30d398@arm.com>
+ <8520D5D51A55D047800579B094147198263E6AF3@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <2196f028-b834-9d32-cc3a-e3eb5ed6c3b1@arm.com>
+Message-ID: <8520D5D51A55D047800579B094147198263F6526@XAP-PVEXMBX02.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 01, 2017 at 01:58:33AM +0800, Icenowy Zheng wrote:
-> 
-> 
-> 01.03.2017, 01:56, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> > On Mon, Feb 27, 2017 at 06:48:01PM +0800, Icenowy Zheng wrote:
-> >> ?27.02.2017, 15:50, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> >> ?> On Sat, Feb 25, 2017 at 08:30:25PM +0800, Icenowy Zheng wrote:
-> >> ?>> ?Allwinner V3s has a DMA engine similar to the ones from A31, but with
-> >> ?>> ?fewer channels and DRQs.
-> >> ?>>
-> >> ?>> ?Add support for it.
-> >> ?>>
-> >> ?>> ?As it also needs the special gate bit, make the gate bit generic.
-> >> ?>
-> >> ?> That should be part of a separate patch.
-> >>
-> >> ?OK.
-> >>
-> >> ?>
-> >> ?>> ?According to BSP source code, SUN8IW6 (A83T) also needs the bit, so it
-> >> ?>> ?have also been specified gate_needed property.
-> >> ?>>
-> >> ?>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> >> ?>> ?---
-> >> ?>> ??Documentation/devicetree/bindings/dma/sun6i-dma.txt | 1 +
-> >> ?>> ??drivers/dma/sun6i-dma.c | 17 ++++++++++++++---
-> >> ?>> ??2 files changed, 15 insertions(+), 3 deletions(-)
-> >> ?>>
-> >> ?>> ?diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-> >> ?>> ?index 6b267045f522..98fbe1a5c6dd 100644
-> >> ?>> ?--- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-> >> ?>> ?+++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
-> >> ?>> ?@@ -9,6 +9,7 @@ Required properties:
-> >> ?>> ????????????????????"allwinner,sun8i-a23-dma"
-> >> ?>> ????????????????????"allwinner,sun8i-a83t-dma"
-> >> ?>> ????????????????????"allwinner,sun8i-h3-dma"
-> >> ?>> ?+ "allwinner,sun8i-v3s-dma"
-> >> ?>> ??- reg: Should contain the registers base address and length
-> >> ?>> ??- interrupts: Should contain a reference to the interrupt used by this device
-> >> ?>> ??- clocks: Should contain a reference to the parent AHB clock
-> >> ?>> ?diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
-> >> ?>> ?index a2358780ab2c..1f38424c1b14 100644
-> >> ?>> ?--- a/drivers/dma/sun6i-dma.c
-> >> ?>> ?+++ b/drivers/dma/sun6i-dma.c
-> >> ?>> ?@@ -101,6 +101,7 @@ struct sun6i_dma_config {
-> >> ?>> ??????????u32 nr_max_channels;
-> >> ?>> ??????????u32 nr_max_requests;
-> >> ?>> ??????????u32 nr_max_vchans;
-> >> ?>> ?+ bool gate_needed;
-> >> ?>> ??};
-> >> ?>>
-> >> ?>> ??/*
-> >> ?>> ?@@ -1009,12 +1010,14 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
-> >> ?>> ??????????.nr_max_channels = 8,
-> >> ?>> ??????????.nr_max_requests = 24,
-> >> ?>> ??????????.nr_max_vchans = 37,
-> >> ?>> ?+ .gate_needed = true,
-> >> ?>> ??};
-> >> ?>>
-> >> ?>> ??static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
-> >> ?>> ??????????.nr_max_channels = 8,
-> >> ?>> ??????????.nr_max_requests = 28,
-> >> ?>> ??????????.nr_max_vchans = 39,
-> >> ?>> ?+ .gate_needed = true,
-> >> ?>> ??};
-> >> ?>>
-> >> ?>> ??/*
-> >> ?>> ?@@ -1028,11 +1031,19 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
-> >> ?>> ??????????.nr_max_vchans = 34,
-> >> ?>> ??};
-> >> ?>>
-> >> ?>> ?+static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
-> >> ?>> ?+ .nr_max_channels = 8,
-> >> ?>> ?+ .nr_max_requests = 23,
-> >> ?>> ?+ .nr_max_vchans = 24,
-> >> ?>
-> >> ?> This one is suspicious. There's just a single endpoint that can be
-> >> ?> used in both directions?
-> >>
-> >> ?nr_max_vchans is the endpoint number. nr_max_requests is the
-> >> ?maximum DRQ number, for V3s, according to the datasheet, it's
-> >> ?23: SPI0_{R,T}X.
+Waiting for Marc's Reply...
+ 
+> > -----Original Message-----
+> > From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> > Sent: Thursday, February 09, 2017 9:33 PM
+> > To: Bharat Kumar Gogada <bharatku@xilinx.com>; bhelgaas at google.com;
+> > robh at kernel.org; paul.gortmaker at windriver.com; colin.king at canonical.com;
+> > linux-pci at vger.kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> > michal.simek at xilinx.com; arnd at arndb.de; Ravikiran Gummaluri
+> > <rgummal@xilinx.com>
+> > Subject: Re: [PATCH v5] PCI: Xilinx NWL: Modifying irq chip for legacy
+> interrupts
 > >
-> > There's not a lot of endpoints indeed, but you need 28 vchans (2 *
-> > 14).
+> > On 09/02/17 15:16, Bharat Kumar Gogada wrote:
+> > >>
+> > >> On 09/02/17 12:01, Bharat Kumar Gogada wrote:
+> > >>>> On 06/02/17 07:03, Bharat Kumar Gogada wrote:
+> > >>>>> +static struct irq_chip nwl_leg_irq_chip = {
+> > >>>>> +	.name = "nwl_pcie:legacy",
+> > >>>>> +	.irq_enable = nwl_unmask_leg_irq,
+> > >>>>> +	.irq_disable = nwl_mask_leg_irq,
+> > >>>>
+> > >>>> You don't need these two if they are implemented in terms of
+> > mask/unmask.
+> > >>>
+> > >>> These are being invoked by some drivers other than interrupt flow.
+> > >>> Ex: drivers/net/wireless/ath/ath9k/main.c
+> > >>> static int ath_reset_internal(struct ath_softc *sc, struct
+> > >>> ath9k_channel *hchan) {
+> > >>>          ....
+> > >>>          disable_irq(sc->irq);
+> > >>>          tasklet_disable(&sc->intr_tq);
+> > >>>         ...
+> > >>>         ...
+> > >>>         enable_irq(sc->irq);
+> > >>>         spin_unlock_bh(&sc->sc_pcu_lock); } For us masking/unmasking
+> > >>> is the way to enable/disable interrupts.
+> > >>
+> > >> And if you looked at the way disable_irq is implemented, you would
+> > >> have found out that it falls back to masking if there is no disable
+> > >> method, preserving the semantic you expect.
+> > >>
+> > > Yes I did see, but this fall back requires extra "IRQ_DISABLE_UNLAZY" flag to
+> > be set to each virq.
+> >
+> > No it doesn't. If you do a disable_irq(), the interrupt is flagged as disabled, but
+> > nothing gets done. If an interrupt actually fires, then the interrupts gets
+> masked,
+> > and the handler is not called.
+> Yes agreed, this is where the problem comes for us. Here is the scenario
+> Ex:drivers/net/wireless/ath/ath9k/main.c
+> static int ath_reset_internal(struct ath_softc *sc, struct ath9k_channel *hchan)
+> {
+>   ....
+>    ath9k_hw_set_interrupts(ah);
+>    ath9k_hw_enable_interrupts(ah);
+>    ...
+>   enable_irq(sc->irq);
+>   ...
+> }
+> If you observe this they enable hardware interrupts first and then call enable_irq,
+> at this point of time
+> virq is in disabled state. So, if interrupt is raised in this period of time the handler
+> is never invoked
+> and DEASEERT_INTx will not be seen. As I mentioned in my subject the irq line
+> between bridge and
+> GIC goes low only after it sees DEASSERT_INTx. But since DEASSERT_INTx is
+> never seen line is always high
+> causing cpu stall.
+> So for this kind of EP's we need those two methods.
 > 
-> Sorry but I counted only 12 pairs of vchans:
-> Port 0. SRAM
-> Port 1. SDRAM
-> Port 6. UART0
-> Port 7. UART1
-> Port 8. UART2
-> Port 15. Audio Codec
-> Port 16. CE
-> Port 17. OTG EP1
-> Port 18. OTG EP2
-> Port 19. OTG EP3
-> Port 20. OTG EP4
-> Port 23. SPI0
-
-It seems like I can't count anymore... Yes, you're right, sorry.
-
-Having a comment on top of the structure, just like all the other SoCs
-would be nice though.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170301/f0f9eee0/attachment.sig>
+> Bharat
