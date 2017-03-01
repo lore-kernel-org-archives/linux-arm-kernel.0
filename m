@@ -1,63 +1,132 @@
-From: romain.perier@collabora.com (Romain Perier)
-Date: Wed,  1 Mar 2017 09:59:02 +0100
-Subject: [PATCH] mmc: core: Fix power sequence ordering in mmc_power_up
-Message-ID: <20170301085902.7388-1-romain.perier@collabora.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 1 Mar 2017 10:32:52 +0100
+Subject: [PATCH 5/9] dmaengine: sun6i: support V3s SoC variant
+In-Reply-To: <535111488304713@web26h.yandex.ru>
+References: <20170225123029.55939-1-icenowy@aosc.xyz>
+ <20170225123029.55939-5-icenowy@aosc.xyz>
+ <20170227075021.e7e43o54s23jzfto@lukather>
+ <1426971488192481@web6g.yandex.ru>
+ <20170228175604.kdlmjjcncfljnbfp@lukather>
+ <535111488304713@web26h.yandex.ru>
+Message-ID: <20170301093252.ukeurxvl55tfkymm@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, mmc_power_up calls the pre_power_on callback, enables the
-power supply of the mmc by calling mmc_set_ios() and then call
-post_power_on. WiFi chipsets like the AP6335 require a specific power
-sequence ordering before being used. You must enable the power supply
-and wait until it reaches its minimum voltage, gate the clock and wait
-at least two cycles and then assert the reset line.
+On Wed, Mar 01, 2017 at 01:58:33AM +0800, Icenowy Zheng wrote:
+> 
+> 
+> 01.03.2017, 01:56, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > On Mon, Feb 27, 2017 at 06:48:01PM +0800, Icenowy Zheng wrote:
+> >> ?27.02.2017, 15:50, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> >> ?> On Sat, Feb 25, 2017 at 08:30:25PM +0800, Icenowy Zheng wrote:
+> >> ?>> ?Allwinner V3s has a DMA engine similar to the ones from A31, but with
+> >> ?>> ?fewer channels and DRQs.
+> >> ?>>
+> >> ?>> ?Add support for it.
+> >> ?>>
+> >> ?>> ?As it also needs the special gate bit, make the gate bit generic.
+> >> ?>
+> >> ?> That should be part of a separate patch.
+> >>
+> >> ?OK.
+> >>
+> >> ?>
+> >> ?>> ?According to BSP source code, SUN8IW6 (A83T) also needs the bit, so it
+> >> ?>> ?have also been specified gate_needed property.
+> >> ?>>
+> >> ?>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> >> ?>> ?---
+> >> ?>> ??Documentation/devicetree/bindings/dma/sun6i-dma.txt | 1 +
+> >> ?>> ??drivers/dma/sun6i-dma.c | 17 ++++++++++++++---
+> >> ?>> ??2 files changed, 15 insertions(+), 3 deletions(-)
+> >> ?>>
+> >> ?>> ?diff --git a/Documentation/devicetree/bindings/dma/sun6i-dma.txt b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+> >> ?>> ?index 6b267045f522..98fbe1a5c6dd 100644
+> >> ?>> ?--- a/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+> >> ?>> ?+++ b/Documentation/devicetree/bindings/dma/sun6i-dma.txt
+> >> ?>> ?@@ -9,6 +9,7 @@ Required properties:
+> >> ?>> ????????????????????"allwinner,sun8i-a23-dma"
+> >> ?>> ????????????????????"allwinner,sun8i-a83t-dma"
+> >> ?>> ????????????????????"allwinner,sun8i-h3-dma"
+> >> ?>> ?+ "allwinner,sun8i-v3s-dma"
+> >> ?>> ??- reg: Should contain the registers base address and length
+> >> ?>> ??- interrupts: Should contain a reference to the interrupt used by this device
+> >> ?>> ??- clocks: Should contain a reference to the parent AHB clock
+> >> ?>> ?diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> >> ?>> ?index a2358780ab2c..1f38424c1b14 100644
+> >> ?>> ?--- a/drivers/dma/sun6i-dma.c
+> >> ?>> ?+++ b/drivers/dma/sun6i-dma.c
+> >> ?>> ?@@ -101,6 +101,7 @@ struct sun6i_dma_config {
+> >> ?>> ??????????u32 nr_max_channels;
+> >> ?>> ??????????u32 nr_max_requests;
+> >> ?>> ??????????u32 nr_max_vchans;
+> >> ?>> ?+ bool gate_needed;
+> >> ?>> ??};
+> >> ?>>
+> >> ?>> ??/*
+> >> ?>> ?@@ -1009,12 +1010,14 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
+> >> ?>> ??????????.nr_max_channels = 8,
+> >> ?>> ??????????.nr_max_requests = 24,
+> >> ?>> ??????????.nr_max_vchans = 37,
+> >> ?>> ?+ .gate_needed = true,
+> >> ?>> ??};
+> >> ?>>
+> >> ?>> ??static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
+> >> ?>> ??????????.nr_max_channels = 8,
+> >> ?>> ??????????.nr_max_requests = 28,
+> >> ?>> ??????????.nr_max_vchans = 39,
+> >> ?>> ?+ .gate_needed = true,
+> >> ?>> ??};
+> >> ?>>
+> >> ?>> ??/*
+> >> ?>> ?@@ -1028,11 +1031,19 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
+> >> ?>> ??????????.nr_max_vchans = 34,
+> >> ?>> ??};
+> >> ?>>
+> >> ?>> ?+static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
+> >> ?>> ?+ .nr_max_channels = 8,
+> >> ?>> ?+ .nr_max_requests = 23,
+> >> ?>> ?+ .nr_max_vchans = 24,
+> >> ?>
+> >> ?> This one is suspicious. There's just a single endpoint that can be
+> >> ?> used in both directions?
+> >>
+> >> ?nr_max_vchans is the endpoint number. nr_max_requests is the
+> >> ?maximum DRQ number, for V3s, according to the datasheet, it's
+> >> ?23: SPI0_{R,T}X.
+> >
+> > There's not a lot of endpoints indeed, but you need 28 vchans (2 *
+> > 14).
+> 
+> Sorry but I counted only 12 pairs of vchans:
+> Port 0. SRAM
+> Port 1. SDRAM
+> Port 6. UART0
+> Port 7. UART1
+> Port 8. UART2
+> Port 15. Audio Codec
+> Port 16. CE
+> Port 17. OTG EP1
+> Port 18. OTG EP2
+> Port 19. OTG EP3
+> Port 20. OTG EP4
+> Port 23. SPI0
 
-This commit prevents regulators to be enabled in the middle of or after
-the power sequencing. We this fix, mmc_set_ios is first call, the
-underlying regulators are enabled, then pre_power_on and post_power_on
-are called, so clock and reset line are enabled in the right order,
-after the regulator.
+It seems like I can't count anymore... Yes, you're right, sorry.
 
-Signed-off-by: Romain Perier <romain.perier@collabora.com>
----
- drivers/mmc/core/core.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+Having a comment on top of the structure, just like all the other SoCs
+would be nice though.
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 1076b9d..36df24f 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -1798,8 +1798,6 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
- 	if (host->ios.power_mode == MMC_POWER_ON)
- 		return;
- 
--	mmc_pwrseq_pre_power_on(host);
--
- 	host->ios.vdd = fls(ocr) - 1;
- 	host->ios.power_mode = MMC_POWER_UP;
- 	/* Set initial state and call mmc_set_ios */
-@@ -1819,13 +1817,20 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
- 	 */
- 	mmc_delay(10);
- 
--	mmc_pwrseq_post_power_on(host);
--
- 	host->ios.clock = host->f_init;
- 
- 	host->ios.power_mode = MMC_POWER_ON;
- 	mmc_set_ios(host);
- 
-+	mmc_pwrseq_pre_power_on(host);
-+
-+	/*
-+	 * This delay should be sufficient to wait at least two cycles of clock
-+	 * gated by pre_power_on
-+	 */
-+	mmc_delay(1);
-+	mmc_pwrseq_post_power_on(host);
-+
- 	/*
- 	 * This delay must be at least 74 clock sizes, or 1 ms, or the
- 	 * time required to reach a stable voltage.
+Maxime
+
 -- 
-2.9.3
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170301/f0f9eee0/attachment.sig>
