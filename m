@@ -1,72 +1,82 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  1 Mar 2017 15:52:27 +0100
-Subject: [PATCH] pwm: atmel-hlcdc: Implement the suspend/resume hooks
-Message-ID: <1488379947-13123-1-git-send-email-boris.brezillon@free-electrons.com>
+From: romain.perier@collabora.com (Romain Perier)
+Date: Wed,  1 Mar 2017 15:53:07 +0100
+Subject: [PATCH 1/4] mmc: core: Add post_ios_power_on callback for power
+ sequences
+In-Reply-To: <20170301145310.22813-1-romain.perier@collabora.com>
+References: <20170301145310.22813-1-romain.perier@collabora.com>
+Message-ID: <20170301145310.22813-2-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the suspend/resume hooks to make sure the PWM device is
-restored to a correct state after a suspend.
+Currently, ->pre_power_on() callback is called at the beginning of the
+mmc_power_up() function before MMC_POWER_UP and MMC_POWER_ON sequences.
+The callback ->post_power_on() is called at the end of the
+mmc_power_up() function. Some SDIO Chipsets require to gate the clock
+after than the vqmmc supply is powered on and then toggle the reset
+line. Currently, there is no way for doing this.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+This commit introduces a new callback ->post_ios_power_on(), that is
+called at the end of the mmc_power_up() function after the mmc_set_ios()
+operation. In this way the entire power sequences can be done from this
+function after the enablement of the power supply.
+
+Signed-off-by: Romain Perier <romain.perier@collabora.com>
 ---
-This patch depends on the atomic conversion patch [1].
+ drivers/mmc/core/core.c   | 1 +
+ drivers/mmc/core/pwrseq.c | 8 ++++++++
+ drivers/mmc/core/pwrseq.h | 2 ++
+ 3 files changed, 11 insertions(+)
 
-[1]https://patchwork.ozlabs.org/patch/734251/
-
- drivers/pwm/pwm-atmel-hlcdc.c | 33 +++++++++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
-
-diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
-index a3c65a165a52..e432f4d3d8d4 100644
---- a/drivers/pwm/pwm-atmel-hlcdc.c
-+++ b/drivers/pwm/pwm-atmel-hlcdc.c
-@@ -191,6 +191,38 @@ static const struct atmel_hlcdc_pwm_errata atmel_hlcdc_pwm_sama5d3_errata = {
- 	.div1_clk_erratum = true,
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 1076b9d..d73a050 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -1831,6 +1831,7 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
+ 	 * time required to reach a stable voltage.
+ 	 */
+ 	mmc_delay(10);
++	mmc_pwrseq_post_ios_power_on(host);
+ }
+ 
+ void mmc_power_off(struct mmc_host *host)
+diff --git a/drivers/mmc/core/pwrseq.c b/drivers/mmc/core/pwrseq.c
+index 9386c47..98f50b7 100644
+--- a/drivers/mmc/core/pwrseq.c
++++ b/drivers/mmc/core/pwrseq.c
+@@ -68,6 +68,14 @@ void mmc_pwrseq_post_power_on(struct mmc_host *host)
+ 		pwrseq->ops->post_power_on(host);
+ }
+ 
++void mmc_pwrseq_post_ios_power_on(struct mmc_host *host)
++{
++	struct mmc_pwrseq *pwrseq = host->pwrseq;
++
++	if (pwrseq && pwrseq->ops->post_ios_power_on)
++		pwrseq->ops->post_ios_power_on(host);
++}
++
+ void mmc_pwrseq_power_off(struct mmc_host *host)
+ {
+ 	struct mmc_pwrseq *pwrseq = host->pwrseq;
+diff --git a/drivers/mmc/core/pwrseq.h b/drivers/mmc/core/pwrseq.h
+index d69e751..2053ebd 100644
+--- a/drivers/mmc/core/pwrseq.h
++++ b/drivers/mmc/core/pwrseq.h
+@@ -13,6 +13,7 @@
+ struct mmc_pwrseq_ops {
+ 	void (*pre_power_on)(struct mmc_host *host);
+ 	void (*post_power_on)(struct mmc_host *host);
++	void (*post_ios_power_on)(struct mmc_host *host);
+ 	void (*power_off)(struct mmc_host *host);
  };
  
-+static int atmel_hlcdc_pwm_suspend(struct device *dev)
-+{
-+	struct atmel_hlcdc_pwm *chip = dev_get_drvdata(dev);
-+
-+	/* Keep the periph clock enabled if the PWM is still running. */
-+	if (pwm_is_enabled(&chip->chip.pwms[0]))
-+		clk_disable_unprepare(chip->hlcdc->periph_clk);
-+
-+	return 0;
-+}
-+
-+static int atmel_hlcdc_pwm_resume(struct device *dev)
-+{
-+	struct atmel_hlcdc_pwm *chip = dev_get_drvdata(dev);
-+	struct pwm_state state;
-+	int ret;
-+
-+	pwm_get_state(&chip->chip.pwms[0], &state);
-+
-+	/* Re-enable the periph clock it was stopped during suspend. */
-+	if (!state.enabled) {
-+		ret = clk_prepare_enable(chip->hlcdc->periph_clk);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return atmel_hlcdc_pwm_apply(&chip->chip, &chip->chip.pwms[0], &state);
-+}
-+
-+static SIMPLE_DEV_PM_OPS(atmel_hlcdc_pwm_pm_ops,
-+			 atmel_hlcdc_pwm_suspend, atmel_hlcdc_pwm_resume);
-+
- static const struct of_device_id atmel_hlcdc_dt_ids[] = {
- 	{
- 		.compatible = "atmel,at91sam9n12-hlcdc",
-@@ -281,6 +313,7 @@ static struct platform_driver atmel_hlcdc_pwm_driver = {
- 	.driver = {
- 		.name = "atmel-hlcdc-pwm",
- 		.of_match_table = atmel_hlcdc_pwm_dt_ids,
-+		.pm = &atmel_hlcdc_pwm_pm_ops,
- 	},
- 	.probe = atmel_hlcdc_pwm_probe,
- 	.remove = atmel_hlcdc_pwm_remove,
+@@ -31,6 +32,7 @@ void mmc_pwrseq_unregister(struct mmc_pwrseq *pwrseq);
+ int mmc_pwrseq_alloc(struct mmc_host *host);
+ void mmc_pwrseq_pre_power_on(struct mmc_host *host);
+ void mmc_pwrseq_post_power_on(struct mmc_host *host);
++void mmc_pwrseq_post_ios_power_on(struct mmc_host *host);
+ void mmc_pwrseq_power_off(struct mmc_host *host);
+ void mmc_pwrseq_free(struct mmc_host *host);
+ 
 -- 
-2.7.4
+2.9.3
