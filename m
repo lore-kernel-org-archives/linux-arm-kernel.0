@@ -1,260 +1,143 @@
-From: Claudiu.Beznea@microchip.com (m18063)
-Date: Wed, 1 Mar 2017 16:37:08 +0200
-Subject: [PATCH 1/2] drivers: pwm: pwm-atmel: switch to atomic PWM
-In-Reply-To: <20170301151320.1d3ebc0e@bbrezillon>
-References: <1488278415-2786-1-git-send-email-claudiu.beznea@microchip.com>
- <1488278415-2786-2-git-send-email-claudiu.beznea@microchip.com>
- <20170228220756.3e29b62e@bbrezillon>
- <4b72b07c-22c6-8224-3a21-5ed052f004a3@microchip.com>
- <20170301151320.1d3ebc0e@bbrezillon>
-Message-ID: <88104c6d-e9f2-c830-3f4d-f8f9d7eacff3@microchip.com>
+From: thibault.saunier@osg.samsung.com (Thibault Saunier)
+Date: Wed, 1 Mar 2017 11:41:27 -0300
+Subject: [PATCH v6 2/2] [media] s5p-mfc: Handle 'v4l2_pix_format:field' in
+ try_fmt and g_fmt
+In-Reply-To: <1488378936.14858.1.camel@collabora.com>
+References: <20170301115108.14187-1-thibault.saunier@osg.samsung.com>
+ <CGME20170301115141epcas2p37801b1fbe0951cc37a4e01bf2bcae3da@epcas2p3.samsung.com>
+ <20170301115108.14187-3-thibault.saunier@osg.samsung.com>
+ <33dbd3fa-04b2-3d94-5163-0a10589ff1c7@samsung.com>
+ <1488378936.14858.1.camel@collabora.com>
+Message-ID: <52c7eb8c-88f2-992a-321b-89b8d1a698c6@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Hello,
 
 
-On 01.03.2017 16:13, Boris Brezillon wrote:
-> Hi Claudiu,
->
-> On Wed, 1 Mar 2017 15:56:26 +0200
-> m18063 <Claudiu.Beznea@microchip.com> wrote:
->
->> Hi Boris,
->>
->> Thank you for the closer review. Please see my answers
->> inline.
->>
->> Thank you,
->> Claudiu
->>
->>
->> On 28.02.2017 23:07, Boris Brezillon wrote:
->>> Hi Claudiu,
+On 03/01/2017 11:35 AM, Nicolas Dufresne wrote:
+> Le mercredi 01 mars 2017 ? 14:12 +0100, Andrzej Hajda a ?crit :
+>> On 01.03.2017 12:51, Thibault Saunier wrote:
+>>> It is required by the standard that the field order is set by the
+>>> driver, default to NONE in case any is provided, but we can
+>>> basically
+>>> accept any value provided by the userspace as we will anyway not
+>>> be able to do any deinterlacing.
 >>>
->>> On Tue, 28 Feb 2017 12:40:14 +0200
->>> Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
->>>  
->>>> The currently Atmel PWM controllers supported by this driver
->>>> could change period and duty factor without channel disable
->>>> (sama5d3 supports this by using period and duty factor update
->>>> registers, sam9rl support this by writing channel update
->>>> register and select the corresponding update: period or duty
->>>> factor).  
->>> Hm, I had a closer a look at the datasheet, and I'm not sure this is
->>> possible in a safe way. AFAICT (I might be wrong), there's no way to
->>> atomically update both the period and duty cycles. So, imagine you're
->>> just at the end of the current period and you update one of the 2 params
->>> (either the period or the duty cycle) before the end of the period, but
->>> the other one is updated just after the beginning of a new period.
->>> During one cycle you'll have a bad config.  
->> I was also think at this scenario. I thought that this should be
->> good for most of the cases.
-> Unlikely, but not impossible.
+>>> In this patch we also make sure to pass the interlacing mode
+>>> provided
+>>> by userspace from the output to the capture side of the device so
+>>> that the information is given back to userspace. This way it can
+>>> handle it and potentially deinterlace afterward.
+>> As I wrote previously:
+>> - on output side you have encoded bytestream - you cannot say about
+>> interlacing in such case, so the only valid value is NONE,
+> Userspace may know. It's important for the driver not to reset it back
+> to NONE, it would tell the userspace that this encoded format is not
+> supported when interlaced.
 >
->>> While this should be acceptable in most cases, there are a few cases
->>> where glitches are not permitted (when the PWM drives a critical
->>> device). Also, I don't know what happens if we have duty > period.  
->> duty > period is checked by the PWM core before calling apply method.
-> No, I meant that, if you update the period then the duty (or the other
-> way around), one update might make it in one period-cycle, and the
-> other one might be delayed until the next period. In this case you
-> might end up with inconsistent values and possibly duty > period.
-I see what you're saying. Yes, you're right.
+> Obviously, when userspace don't know (ANY), it does not matter, it will
+> fail when we try to set the CAPTURE format. Though, it's quite late in
+> the process for the userspace, which makes implementing software
+> fallback difficult.
 >
->>>  
->>>> The chip doesn't support run time changings of signal
->>>> polarity. This has been adapted by first disabling the channel,
->>>> update registers and the enabling the channel.  
->>> Yep. I agree with that one.
->>>  
->>>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
->>>> ---
->>>>  drivers/pwm/pwm-atmel.c | 217 ++++++++++++++++++++++++++----------------------
->>>>  1 file changed, 118 insertions(+), 99 deletions(-)
->>>>
->>>> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
->>>> index 67a7023..014b86c 100644
->>>> --- a/drivers/pwm/pwm-atmel.c
->>>> +++ b/drivers/pwm/pwm-atmel.c
->>>> @@ -68,7 +68,7 @@ struct atmel_pwm_chip {
->>>>  	struct mutex isr_lock;
->>>>  
->>>>  	void (*config)(struct pwm_chip *chip, struct pwm_device *pwm,
->>>> -		       unsigned long dty, unsigned long prd);
->>>> +		       unsigned long dty, unsigned long prd, bool enabled);
->>>>  };
->>>>  
->>>>  static inline struct atmel_pwm_chip *to_atmel_pwm_chip(struct pwm_chip *chip)
->>>> @@ -105,99 +105,120 @@ static inline void atmel_pwm_ch_writel(struct atmel_pwm_chip *chip,
->>>>  	writel_relaxed(val, chip->base + base + offset);
->>>>  }
->>>>  
->>>> -static int atmel_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->>>> -			    int duty_ns, int period_ns)
->>>> +static int atmel_pwm_config_prepare(struct pwm_chip *chip,
->>>> +				    struct pwm_state *state, unsigned long *prd,
->>>> +				    unsigned long *dty, unsigned int *pres)  
->>> I'd rename the function atmel_pwm_calculate_params(). Also, when the
->>> period does not change we don't have to calculate prd and pres, so
->>> maybe we should have one function to calculate prd+pres and another one
->>> to calculate dty:
->> I agree. I didn't want to change the current implementation from
->> this point of view.
-> Well, I think this is preferable to have a one-time rework than keeping
-> things for historical reasons.
-I will change it in v2.
->
->
-> [...]
->
->>>  
->>>>  {
->>>>  	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
->>>> -	unsigned long prd, dty;
->>>>  	unsigned long long div;
->>>> -	unsigned int pres = 0;
->>>> -	u32 val;
->>>> -	int ret;
->>>> -
->>>> -	if (pwm_is_enabled(pwm) && (period_ns != pwm_get_period(pwm))) {
->>>> -		dev_err(chip->dev, "cannot change PWM period while enabled\n");
->>>> -		return -EBUSY;
->>>> -	}
->>>>  
->>>>  	/* Calculate the period cycles and prescale value */
->>>> -	div = (unsigned long long)clk_get_rate(atmel_pwm->clk) * period_ns;
->>>> +	div = (unsigned long long)clk_get_rate(atmel_pwm->clk) * state->period;
->>>>  	do_div(div, NSEC_PER_SEC);
->>>>  
->>>> +	*pres = 0;
->>>>  	while (div > PWM_MAX_PRD) {
->>>>  		div >>= 1;
->>>> -		pres++;
->>>> +		(*pres)++;
->>>>  	}
->>>>  
->>>> -	if (pres > PRD_MAX_PRES) {
->>>> +	if (*pres > PRD_MAX_PRES) {
->>>>  		dev_err(chip->dev, "pres exceeds the maximum value\n");
->>>>  		return -EINVAL;
->>>>  	}
->>>>  
->>>>  	/* Calculate the duty cycles */
->>>> -	prd = div;
->>>> -	div *= duty_ns;
->>>> -	do_div(div, period_ns);
->>>> -	dty = prd - div;
->>>> +	*prd = div;
->>>> +	div *= state->duty_cycle;
->>>> +	do_div(div, state->period);
->>>> +	*dty = *prd - div;  
->>> Not sure this subtraction is needed, you just need to revert the
->>> polarity selection (if polarity == NORMAL => set CPOL, otherwise, clear
->>> it).  
->> I didn't want to change the existing implementation.
-> Again, if it simplifies the whole logic, I think it's preferable to do
-> it now, since we're anyway refactoring the driver for the atomic
-> transition.
-I'll do it in v2.
->
-> [...]
->
->>>>  static void atmel_pwm_config_v1(struct pwm_chip *chip, struct pwm_device *pwm,
->>>> -				unsigned long dty, unsigned long prd)
->>>> +				unsigned long dty, unsigned long prd,
->>>> +				bool enabled)
->>>>  {
->>>>  	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
->>>>  	unsigned int val;
->>>> +	unsigned long timeout;
->>>>  
->>>> +	if (pwm_is_enabled(pwm) && enabled) {
->>>> +		/* Update duty factor. */
->>>> +		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
->>>> +		val &= ~PWM_CMR_UPD_CDTY;
->>>> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
->>>> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, dty);
->>>>  
->>>> -	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, dty);
->>>> -
->>>> -	val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
->>>> -	val &= ~PWM_CMR_UPD_CDTY;
->>>> -	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
->>>> -
->>>> -	/*
->>>> -	 * If the PWM channel is enabled, only update CDTY by using the update
->>>> -	 * register, it needs to set bit 10 of CMR to 0
->>>> -	 */
->>>> -	if (pwm_is_enabled(pwm))
->>>> -		return;
->>>> -	/*
->>>> -	 * If the PWM channel is disabled, write value to duty and period
->>>> -	 * registers directly.
->>>> -	 */
->>>> -	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CDTY, dty);
->>>> -	atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CPRD, prd);
->>>> +		/*
->>>> +		 * Wait for the duty factor update.
->>>> +		 */
->>>> +		mutex_lock(&atmel_pwm->isr_lock);
->>>> +		atmel_pwm->updated_pwms |= atmel_pwm_readl(atmel_pwm, PWM_ISR) &
->>>> +				~(1 << pwm->hwpwm);
->>>> +
->>>> +		timeout = jiffies + 2 * HZ;
->>>> +		while (!(atmel_pwm->updated_pwms & (1 << pwm->hwpwm)) &&
->>>> +		       time_before(jiffies, timeout)) {
->>>> +			usleep_range(10, 100);
->>>> +			atmel_pwm->updated_pwms |=
->>>> +					atmel_pwm_readl(atmel_pwm, PWM_ISR);
->>>> +		}
->>>> +
->>>> +		mutex_unlock(&atmel_pwm->isr_lock);
->>>> +
->>>> +		/* Update period. */
->>>> +		val = atmel_pwm_ch_readl(atmel_pwm, pwm->hwpwm, PWM_CMR);
->>>> +		val |= PWM_CMR_UPD_CDTY;
->>>> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWM_CMR, val);
->>>> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV1_CUPD, prd);  
->>> As I said above, I'm almost sure it's not 100% safe to update both
->>> parameters. We'd better stick to the existing implementation and see if
->>> new IPs provide an atomic period+duty update feature.  
->> There is such approach only for synchronous channels, which I didn't cover
->> in this implementation.
-> Yep, that's what I understood. So let's stick to "update duty only" for
-> now.
-Ok.
->
-> [...]
->
->>>>  static void atmel_pwm_config_v2(struct pwm_chip *chip, struct pwm_device *pwm,
->>>> -				unsigned long dty, unsigned long prd)
->>>> +				unsigned long dty, unsigned long prd,
->>>> +				bool enabled)
->>>>  {
->>>>  	struct atmel_pwm_chip *atmel_pwm = to_atmel_pwm_chip(chip);
->>>>  
->>>> -	if (pwm_is_enabled(pwm)) {
->>>> +	if (pwm_is_enabled(pwm) && enabled) {
->>>>  		/*
->>>> -		 * If the PWM channel is enabled, using the duty update register
->>>> -		 * to update the value.
->>>> +		 * If the PWM channel is enabled, use update registers
->>>> +		 * to update the duty and period.
->>>>  		 */
->>>>  		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CDTYUPD, dty);
->>>> +		atmel_pwm_ch_writel(atmel_pwm, pwm->hwpwm, PWMV2_CPRDUPD, prd);  
->>> Same here, I'm not convinced we are guaranteed that both parameters will
->>> be applied atomically. There's a sync mechanism described in the
->>> datasheet, but I'm not sure I understand how it works, and anyway,
->>> you're not using it here, so let's stick to the "update duty only"
->>> approach for now.  
->> Only for synchronous channels the atomicity is granted. I didn't cover that
->> in this commit. With this approach the dty, period will be changed at the
->> next period but there is no guarantee that they will be synchronously
->> updated.
-> Ditto, let's stick to the current approach.
->
-> Regards,
->
-> Boris
+>> - on capture side you have decoded frames, and in this case it
+>> depends
+>> on the device and driver capabilities, if the driver/device does not
+>> support (de-)interlacing (I suppose this is MFC case), interlace type
+>> field should be filled according to decoded bytestream header (on
+>> output
+>> side), but no direct copying from output side!!!
+> That is exact.
+It is yes, in case the driver is determining it properly, which is not
+the case here. So the information we have is what the userspace
+figured. That part should be fixed in the driver, but meanwhile it is
+better to copy to the output side than just loosing the info as otherwise
+the userspace never tries to deinterlace after the decoding because the
+driver always says field=NONE now.
+
+Regards,
+
+Thibault
+
+
+>> Regards
+>> Andrzej
+>>
+>>> Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
+>>>
+>>> ---
+>>>
+>>> Changes in v6:
+>>> - Pass user output field value to the capture as the device is not
+>>>    doing any deinterlacing and thus decoded content will still be
+>>>    interlaced on the output.
+>>>
+>>> Changes in v5:
+>>> - Just adapt the field and never error out.
+>>>
+>>> Changes in v4: None
+>>> Changes in v3:
+>>> - Do not check values in the g_fmt functions as Andrzej explained
+>>> in previous review
+>>>
+>>> Changes in v2:
+>>> - Fix a silly build error that slipped in while rebasing the
+>>> patches
+>>>
+>>>   drivers/media/platform/s5p-mfc/s5p_mfc_common.h | 2 ++
+>>>   drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    | 6 +++++-
+>>>   2 files changed, 7 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+>>> b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+>>> index ab23236aa942..3816a37de4bc 100644
+>>> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+>>> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+>>> @@ -652,6 +652,8 @@ struct s5p_mfc_ctx {
+>>>   	size_t me_buffer_size;
+>>>   	size_t tmv_buffer_size;
+>>>   
+>>> +	enum v4l2_field field;
+>>> +
+>>>   	enum v4l2_mpeg_mfc51_video_force_frame_type
+>>> force_frame_type;
+>>>   
+>>>   	struct list_head ref_queue;
+>>> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+>>> b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+>>> index 367ef8e8dbf0..6e5ca86fb331 100644
+>>> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+>>> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+>>> @@ -345,7 +345,7 @@ static int vidioc_g_fmt(struct file *file, void
+>>> *priv, struct v4l2_format *f)
+>>>   		   rectangle. */
+>>>   		pix_mp->width = ctx->buf_width;
+>>>   		pix_mp->height = ctx->buf_height;
+>>> -		pix_mp->field = V4L2_FIELD_NONE;
+>>> +		pix_mp->field = ctx->field;
+>>>   		pix_mp->num_planes = 2;
+>>>   		/* Set pixelformat to the format in which MFC
+>>>   		   outputs the decoded frame */
+>>> @@ -380,6 +380,9 @@ static int vidioc_try_fmt(struct file *file,
+>>> void *priv, struct v4l2_format *f)
+>>>   	struct s5p_mfc_dev *dev = video_drvdata(file);
+>>>   	struct s5p_mfc_fmt *fmt;
+>>>   
+>>> +	if (f->fmt.pix.field == V4L2_FIELD_ANY)
+>>> +		f->fmt.pix.field = V4L2_FIELD_NONE;
+>>> +
+>>>   	mfc_debug(2, "Type is %d\n", f->type);
+>>>   	if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+>>>   		fmt = find_format(f, MFC_FMT_DEC);
+>>> @@ -436,6 +439,7 @@ static int vidioc_s_fmt(struct file *file, void
+>>> *priv, struct v4l2_format *f)
+>>>   		goto out;
+>>>   	} else if (f->type == V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE) {
+>>>   		/* src_fmt is validated by call to vidioc_try_fmt
+>>> */
+>>> +		ctx->field = f->fmt.pix.field;
+>>>   		ctx->src_fmt = find_format(f, MFC_FMT_DEC);
+>>>   		ctx->codec_mode = ctx->src_fmt->codec_mode;
+>>>   		mfc_debug(2, "The codec number is: %d\n", ctx-
+>>>> codec_mode);
