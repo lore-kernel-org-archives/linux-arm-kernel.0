@@ -1,82 +1,38 @@
 From: romain.perier@collabora.com (Romain Perier)
-Date: Wed,  1 Mar 2017 15:53:07 +0100
-Subject: [PATCH 1/4] mmc: core: Add post_ios_power_on callback for power
- sequences
-In-Reply-To: <20170301145310.22813-1-romain.perier@collabora.com>
-References: <20170301145310.22813-1-romain.perier@collabora.com>
-Message-ID: <20170301145310.22813-2-romain.perier@collabora.com>
+Date: Wed,  1 Mar 2017 15:53:06 +0100
+Subject: [PATCH 0/4] mmc: pwrseq: post_ios power sequence
+Message-ID: <20170301145310.22813-1-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, ->pre_power_on() callback is called at the beginning of the
-mmc_power_up() function before MMC_POWER_UP and MMC_POWER_ON sequences.
-The callback ->post_power_on() is called at the end of the
-mmc_power_up() function. Some SDIO Chipsets require to gate the clock
-after than the vqmmc supply is powered on and then toggle the reset
-line. Currently, there is no way for doing this.
+Some devices, like WiFi chipsets AP6335 require a specific power-up
+sequence ordering before being used. You must enable the vqmmc power supply
+and wait until it reaches its minimum voltage, gate the clock and wait
+at least two cycles and then assert the reset line.
 
-This commit introduces a new callback ->post_ios_power_on(), that is
-called at the end of the mmc_power_up() function after the mmc_set_ios()
-operation. In this way the entire power sequences can be done from this
-function after the enablement of the power supply.
+See DS 1/
 
-Signed-off-by: Romain Perier <romain.perier@collabora.com>
----
- drivers/mmc/core/core.c   | 1 +
- drivers/mmc/core/pwrseq.c | 8 ++++++++
- drivers/mmc/core/pwrseq.h | 2 ++
- 3 files changed, 11 insertions(+)
+Currently, there is no generic manner for doing this with pwrseq_simple.
+This set of patches proposes an approach to support this use case.
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 1076b9d..d73a050 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -1831,6 +1831,7 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
- 	 * time required to reach a stable voltage.
- 	 */
- 	mmc_delay(10);
-+	mmc_pwrseq_post_ios_power_on(host);
- }
- 
- void mmc_power_off(struct mmc_host *host)
-diff --git a/drivers/mmc/core/pwrseq.c b/drivers/mmc/core/pwrseq.c
-index 9386c47..98f50b7 100644
---- a/drivers/mmc/core/pwrseq.c
-+++ b/drivers/mmc/core/pwrseq.c
-@@ -68,6 +68,14 @@ void mmc_pwrseq_post_power_on(struct mmc_host *host)
- 		pwrseq->ops->post_power_on(host);
- }
- 
-+void mmc_pwrseq_post_ios_power_on(struct mmc_host *host)
-+{
-+	struct mmc_pwrseq *pwrseq = host->pwrseq;
-+
-+	if (pwrseq && pwrseq->ops->post_ios_power_on)
-+		pwrseq->ops->post_ios_power_on(host);
-+}
-+
- void mmc_pwrseq_power_off(struct mmc_host *host)
- {
- 	struct mmc_pwrseq *pwrseq = host->pwrseq;
-diff --git a/drivers/mmc/core/pwrseq.h b/drivers/mmc/core/pwrseq.h
-index d69e751..2053ebd 100644
---- a/drivers/mmc/core/pwrseq.h
-+++ b/drivers/mmc/core/pwrseq.h
-@@ -13,6 +13,7 @@
- struct mmc_pwrseq_ops {
- 	void (*pre_power_on)(struct mmc_host *host);
- 	void (*post_power_on)(struct mmc_host *host);
-+	void (*post_ios_power_on)(struct mmc_host *host);
- 	void (*power_off)(struct mmc_host *host);
- };
- 
-@@ -31,6 +32,7 @@ void mmc_pwrseq_unregister(struct mmc_pwrseq *pwrseq);
- int mmc_pwrseq_alloc(struct mmc_host *host);
- void mmc_pwrseq_pre_power_on(struct mmc_host *host);
- void mmc_pwrseq_post_power_on(struct mmc_host *host);
-+void mmc_pwrseq_post_ios_power_on(struct mmc_host *host);
- void mmc_pwrseq_power_off(struct mmc_host *host);
- void mmc_pwrseq_free(struct mmc_host *host);
- 
+It is related to the old patch 2/
+
+1. http://www.t-firefly.com/download/firefly-rk3288/hardware/AP6335%20datasheet_V1.3_02102014.pdf
+2. http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/490681.html
+
+Romain Perier (4):
+  mmc: core: Add post_ios_power_on callback for power sequences
+  mmc: pwrseq-simple: Add optional op. for post_ios_power_on callback
+  mmc: pwrseq_simple: Add an optional pre-power-on-delay
+  arm: dts: rockchip: Enable post_ios_power_on and pre-power-on-delay-ms
+
+ .../devicetree/bindings/mmc/mmc-pwrseq-simple.txt   |  2 ++
+ arch/arm/boot/dts/rk3288-rock2-square.dts           |  2 ++
+ drivers/mmc/core/core.c                             |  1 +
+ drivers/mmc/core/pwrseq.c                           |  8 ++++++++
+ drivers/mmc/core/pwrseq.h                           |  2 ++
+ drivers/mmc/core/pwrseq_simple.c                    | 21 ++++++++++++++++++++-
+ 6 files changed, 35 insertions(+), 1 deletion(-)
+
 -- 
 2.9.3
