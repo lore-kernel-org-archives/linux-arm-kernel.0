@@ -1,48 +1,89 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 01 Mar 2017 19:48:48 +0000
-Subject: [PATCH/RFC] arm64: pmu: add Qualcomm Technologies extensions
-In-Reply-To: <20170301181032.GL28874@leverpostej> (Mark Rutland's message of
- "Wed, 1 Mar 2017 18:10:33 +0000")
-References: <1488385085-19238-1-git-send-email-nleeder@codeaurora.org>
- <20170301181032.GL28874@leverpostej>
-Message-ID: <87a8944w2n.fsf@on-the-bus.cambridge.arm.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 1 Mar 2017 15:02:50 -0500
+Subject: [RESEND PATCH v7 0/7] Rockchip dw-mipi-dsi driver
+In-Reply-To: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
+References: <1487577744-2855-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <20170301200250.GA13635@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 01 2017 at  6:10:33 pm GMT, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Neil,
->
-> On Wed, Mar 01, 2017 at 11:18:05AM -0500, Neil Leeder wrote:
->> Adds CPU PMU perf events support for Qualcomm Technologies' Falkor CPU.
->> 
->> The Qualcomm Technologies CPU PMU is named qcom_pmuv3 and provides
->> extensions to the architected PMU events.
->
-> Is this is a strict superset of PMUv3 (that could validly be treated as
-> just PMUv3), or do those IMP DEF parts need to be poked to use this at
-> all?
->
-> What is reported by ID_AA64DFR0_EL1.PMUVer on these CPUs?
->
-> Quite frankly, I'm less than thrilled about the prospect of
-> IMPLEMENTATION DEFINED CPU PMUs that fall outside of the architected PMU
-> model, especially for ACPI systems where the raison d'?tre is standards
-> and uniformity, and where we have no sensible mechanism to provide
-> information regarding IMPLEMENTATION DEFINED functionality.
->
-> This has knock-on effects for other things, like userspace PMU access
-> and/or virtualization, and this multiplies the support effort.
->
-> KVM already has (architected) PMU support, and without a corresponding
-> KVM patch this is at best insufficient. I don't imagine the KVM folk
-> will be too thrilled about the prospect of emulating an IMPLEMENTATION
-> DEFINED CPU feature like this.
+On Mon, Feb 20, 2017 at 04:02:16PM +0800, Chris Zhong wrote:
+> Hi all
+> 
+> [Resend this v7 version series, since there are 5 mails have gone missing, last
+> week]
+> 
+> This version does not change the existing v6 patches, just to add the
+> "bandwidth fix" patch back, since we really need it.
+> 
+> This patch serial is for RK3399 MIPI DSI. The MIPI DSI controller of
+> RK3399 is almost the same as RK3288, except a little bit of difference
+> in phy clock controlling and port id selection register. These patches
+> add RK3399 support and the power domain support.
+> 
+> And these patches base on John Keeping's v3 patches[0], it fixes many bugs,
+> they have been tested on rk3288 evb board.
+> 
+> [0]:
+> [01/24] https://patchwork.kernel.org/patch/9544089
+> [02/24] https://patchwork.kernel.org/patch/9544061
+> [03/24] https://patchwork.kernel.org/patch/9544065
+> [04/24] https://patchwork.kernel.org/patch/9544077
+> [05/24] https://patchwork.kernel.org/patch/9544033
+> [06/24] https://patchwork.kernel.org/patch/9544037
+> [07/24] https://patchwork.kernel.org/patch/9544029
+> [08/24] https://patchwork.kernel.org/patch/9544031
+> [09/24] https://patchwork.kernel.org/patch/9544083
+> [10/24] https://patchwork.kernel.org/patch/9544063
+> [11/24] https://patchwork.kernel.org/patch/9544085
+> [12/24] https://patchwork.kernel.org/patch/9544093
+> [13/24] https://patchwork.kernel.org/patch/9544081
+> [14/24] https://patchwork.kernel.org/patch/9544057
+> [15/24] https://patchwork.kernel.org/patch/9544079
+> [16/24] https://patchwork.kernel.org/patch/9544035
+> [17/24] https://patchwork.kernel.org/patch/9544105
+> [18/24] https://patchwork.kernel.org/patch/9544059
+> [21/24] https://patchwork.kernel.org/patch/9544009
+> [22/24] https://patchwork.kernel.org/patch/9544049
+> [23/24] https://patchwork.kernel.org/patch/9544055
+> [24/24] https://patchwork.kernel.org/patch/9544109
+> 
+> 
+> Changes in v6:
+> - no need check phy_cfg_clk before enable/disable
+> 
+> Changes in v5:
+> - check the error of phy_cfg_clk in dw_mipi_dsi_bind
+> 
+> Changes in v4:
+> - remove the unrelated change
+> 
+> Changes in v3:
+> - base on John Keeping's patch series
+> 
+> Chris Zhong (7):
+>   dt-bindings: add rk3399 support for dw-mipi-rockchip
+>   drm/rockchip/dsi: dw-mipi: support RK3399 mipi dsi
+>   drm/rockchip/dsi: dw-mipi: correct the coding style
+>   drm/rockchip/dsi: remove mode_valid function
+>   dt-bindings: add power domain node for dw-mipi-rockchip
+>   drm/rockchip/dsi: fix insufficient bandwidth of some panel
+>   drm/rockchip/dsi: add dw-mipi power domain support
 
-Indeed. Another nasty property of these "added value" features is that
-they break things like migration. Once the guest has booted on one of
-these systems, it cannot be moved to another system. This puts a bit of
-a dent on the architecture, frankly...
+Applied to drm-misc
 
-	M.
--- 
-Jazz is not dead, it just smell funny.
+Thanks,
+
+Sean
+> 
+>  .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   7 +-
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 160 ++++++++++++---------
+>  2 files changed, 100 insertions(+), 67 deletions(-)
+> 
+> -- 
+> 2.6.3
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
