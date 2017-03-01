@@ -1,68 +1,56 @@
-From: jerome.forissier@linaro.org (Jerome Forissier)
-Date: Wed, 1 Mar 2017 16:04:39 +0100
-Subject: [PATCH] Documentation: dt: Add binding for
- /chosen/secure-stdout-path
-In-Reply-To: <CAL_JsqKrUCCvGD_LKvOx+s8zh30GC_v=HAyqozgRm=7mcfSZzw@mail.gmail.com>
-References: <06154a2280a8423af80405825d7201c7aa927696.1488374335.git.jerome.forissier@linaro.org>
- <CAL_JsqKrUCCvGD_LKvOx+s8zh30GC_v=HAyqozgRm=7mcfSZzw@mail.gmail.com>
-Message-ID: <4847a1ee-caa7-509f-c540-ee3e1967ef7f@linaro.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 1 Mar 2017 07:18:33 -0800
+Subject: [PATCH] arm64: dump: hide kernel pointers
+In-Reply-To: <20170301035214.GA12637@arm.com>
+References: <1488265536-20441-1-git-send-email-miles.chen@mediatek.com>
+ <CAKv+Gu_AG0n5jPDCuUD6tvr2sAz9a4sycDy9CtL4iT+OHiN_iQ@mail.gmail.com>
+ <20170228100420.GA3691@leverpostej>
+ <ae6f608f-6c84-b999-d238-a74f6f42d2e5@redhat.com>
+ <20170301035214.GA12637@arm.com>
+Message-ID: <f27a46b7-e26f-5b22-be24-9e275ca19036@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 03/01/2017 03:50 PM, Rob Herring wrote:
-> On Wed, Mar 1, 2017 at 7:29 AM, Jerome Forissier
-> <jerome.forissier@linaro.org> wrote:
->> Some platforms may use a single device tree to describe two address
->> spaces, as described in d9f43babb998 ("Documentation: dt: Add bindings
->> for Secure-only devices"). We extend the use of the secure- prefix to
->> the stdout-path property, so that the Secure firmware may use a
->> different console device than the one used by the kernel.
+On 02/28/2017 07:52 PM, Will Deacon wrote:
+> On Tue, Feb 28, 2017 at 02:55:51PM -0800, Laura Abbott wrote:
+>> On 02/28/2017 02:04 AM, Mark Rutland wrote:
+>>> On Tue, Feb 28, 2017 at 08:42:51AM +0000, Ard Biesheuvel wrote:
+>>>> On 28 February 2017 at 07:05, Miles Chen <miles.chen@mediatek.com> wrote:
+>>>>> Mask kernel pointers of /sys/kernel/debug/kernel_page_tables entry like
+>>>>> /proc/vmallocinfo does.
+>>>>>
+>>>>> With sysctl kernel.kptr_restrict=0 or 1:
+>>>>> cat /sys/kernel/debug/kernel_page_tables
+>>>>
+>>>> I wonder if this file should be accessible at all if kptr_restrict > 0
+>>>
+>>> I don't have strong feelings either way.
+>>>
+>>> This isn't typically enabled, and it's under debugfs, so this shouldn't
+>>> be accessible by a typical user anyhow.
+>>>
+>>> That said, there are very few of us who need to take a look at this
+>>> file. I'm happy to deal with attacking kptr_restrict when required.
+>>>
 >>
->> Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/arm/secure.txt | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/secure.txt b/Documentation/devicetree/bindings/arm/secure.txt
->> index e31303f..558c9a1 100644
->> --- a/Documentation/devicetree/bindings/arm/secure.txt
->> +++ b/Documentation/devicetree/bindings/arm/secure.txt
->> @@ -51,3 +51,8 @@ Valid Secure world properties:
->>     status = "disabled"; secure-status = "okay";     /* S-only */
->>     status = "disabled";                             /* disabled in both */
->>     status = "disabled"; secure-status = "disabled"; /* disabled in both */
->> +
->> +- secure-stdout-path (/chosen node): specifies the device to be used
->> +for console output by Secure firmware. The syntax is the same as for
->> +"stdout-path". If "secure-stdout-path" is not specified it defaults to
->> +the same value as "stdout-path".
+>> In the interest of security it's probably for the best to switch to the
+>> restricted pointer. Who knows what might get enabled or forgotten about.
+>> I don't like the idea of tying enablement of the file to kptr_restrict
+>> though.
 > 
-> I'm not all that enthusiastic about this. This alone is okay, but
-> continued additions of secure-* properties doesn't seem very scalable.
-> Is this it or do you have other needs? What happens when we have 3
-> modes/address spaces?
+> ... but it's also pretty weird to show the sizes, mapping type and
+> permissions yet hide the virtual addresses. If you want to keep the file
+> in spite of kptr_restrict, which bits are actually useful once the
+> addresses are nobbled?
+> 
+> Will
+> 
 
-How is this different from status/secure-status?
-I have no other needs for the moment. I'm experimenting with the
-introduction of DT in OP-TEE. The secure-status property (or lack
-thereof) already allows me to know if a device can be used by the secure
-OS and how it should be mapped (secure vs. non-secure). This extension
-allows me to reuse the same TEE binary and change the console, which is
-a simple use case to demonstrate the advantage of using the DT in the
-secure FW.
-
-> Maybe we should allow stdout-path to have multiple strings and secure
-> fw grabs the first one and updates the DT removing it (perhaps only if
-> the device is secure only). Might be nice to have multiple ones
-> supported anyway (like we can do on the kernel command line:
-> "console=ttyS0 console=ttyS1").
-
-The problem I see with removing entries is that the secure firmware may
-have multiple stages (say, ARM Trusted Firmware plus a secure OS such as
-OP-TEE).
+I'm not saying the file is really useful, I just don't think kptr_restrict
+is the right mechanism for this. The current documented purpose is for printk
+formatting only and trying to double use that seems likely to confuse 
+people if others start following the pattern elsewhere in the kernel.
+A separate knob might be cleaner.
 
 Thanks,
--- 
-Jerome
+Laura
