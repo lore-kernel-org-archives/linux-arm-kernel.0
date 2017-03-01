@@ -1,61 +1,38 @@
-From: carlo@endlessm.com (Carlo Caione)
-Date: Wed, 1 Mar 2017 18:09:29 +0100
-Subject: [PATCH] hwmon: (scpi) Add slope and offset to SCP sensor readings
-In-Reply-To: <87inntorz7.fsf@e105922-lin.cambridge.arm.com>
-References: <20170301132028.25309-1-carlo@caione.org>
- <41f19cd3-5086-1da9-915a-8987cfc119f9@roeck-us.net>
- <CAL9uMOG5qEgyGTue=n7abbFROKGBpUrWDOPi5_bEDUWuiHEUKg@mail.gmail.com>
- <87inntorz7.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <CAL9uMOHsKXpf01sw3NBJ8z=+9fOzW8E7meEg9r+YTJgxdsta7g@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 1 Mar 2017 12:31:49 -0500
+Subject: [PATCH V3 2/2] PCI: handle CRS returned by device after FLR
+In-Reply-To: <fa4f3b57-dccc-c64a-0787-1ecd3687534f@codeaurora.org>
+References: <1475473021-14251-1-git-send-email-okaya@codeaurora.org>
+ <1475473021-14251-3-git-send-email-okaya@codeaurora.org>
+ <ac667a77-028d-d5da-f574-61f787fec72c@codeaurora.org>
+ <20170221135138.791ba4e2@t450s.home>
+ <fa4f3b57-dccc-c64a-0787-1ecd3687534f@codeaurora.org>
+Message-ID: <76938ac9-d898-1aa5-530c-d106584202d5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 1, 2017 at 5:57 PM, Punit Agrawal <punit.agrawal@arm.com> wrote:
-> Carlo Caione <carlo@endlessm.com> writes:
->>> Are you saying that SCPI does not specify or provide the units to be used
->>> when reading values, and thus effectively just reports a more or less
->>> random number ?
->>
->> AFAICT the standard does not specify the units to be used for the
->> values or a way to get that information. For the Amlogic case the SCP
->> returns the value of the temperature in degree celsius and I'm not
->> sure how common is that.
->
-> The standard does specify the units, but the way it is written seems to
-> suggest that the units are part of the platform implementation rather
-> than part of the standard [0].
->
-> [0] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922g/CABBCJGH.html
+On 2/21/2017 9:37 PM, Sinan Kaya wrote:
+>> SR-IOV spec rev 1.1, 3.4.1.1 & 3.4.1.2, Vendor ID and Device ID fields
+>> for the VF return 0xFFFF when read.  The "Virtualization Intermediary"
+>> is supposed to use the vendor ID from the PF and the device ID defined
+>> in the PF SR-IOV capability.
+> 
+> Interesting. Since lspci was showing the correct vendor id and device id, I
+> assumed that it is coming from offset 0.
+> 
+> Maybe, the right thing is to figure out if this is a virtual function or not.
+> If it is a physical function, check the CRS first before reading the command
+> register in the existing loop.
+> 
+> 
 
-Oh, I missed that, odd indeed. Fantastic, one more non-compliancy.
+I went back and read the spec for CRS in FLR case one more time. We are required
+to wait up to 1 seconds if the device is sending CRS. The current code seems to
+be already handling this delay. 
 
->> [cut]
->>>> -       *temp = value;
->>>> +       slope = thermal_zone_get_slope(zone->z);
->>>> +       offset = thermal_zone_get_offset(zone->z);
->>>
->>>
->>> This is conceptually wrong. The functions return -ENODEV if thermal is
->>> disabled.
->>> While a negative slope does not make sense, a negative offset does.
->>
->> Yeah, but in that case we would have already failed to register the
->> thermal zone at all in devm_thermal_zone_of_sensor_register().
->>
->
-> In addition to the thermal sub-subsystem, hwmon sysfs interface also
-> expects temperature in millidegree Celsius. Ideally, any change should
-> fix the reporting there as well. More below.
 
-[cut]
-
-> Another way to fix this would be to add optional properties to the scpi
-> sensors binding and use them instead. This could then be used to fixup
-> values reported to both thermal and hwmon.
-
-Yeah, if we want to fix also the hwmon side probably it's the best solution.
-
-Cheers,
 
 -- 
-Carlo Caione  |  +39.340.80.30.096  |  Endless
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
