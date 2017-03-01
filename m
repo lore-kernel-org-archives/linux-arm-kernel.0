@@ -1,49 +1,72 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 1 Mar 2017 08:50:23 -0600
-Subject: [PATCH] Documentation: dt: Add binding for
- /chosen/secure-stdout-path
-In-Reply-To: <06154a2280a8423af80405825d7201c7aa927696.1488374335.git.jerome.forissier@linaro.org>
-References: <06154a2280a8423af80405825d7201c7aa927696.1488374335.git.jerome.forissier@linaro.org>
-Message-ID: <CAL_JsqKrUCCvGD_LKvOx+s8zh30GC_v=HAyqozgRm=7mcfSZzw@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed,  1 Mar 2017 15:52:27 +0100
+Subject: [PATCH] pwm: atmel-hlcdc: Implement the suspend/resume hooks
+Message-ID: <1488379947-13123-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 1, 2017 at 7:29 AM, Jerome Forissier
-<jerome.forissier@linaro.org> wrote:
-> Some platforms may use a single device tree to describe two address
-> spaces, as described in d9f43babb998 ("Documentation: dt: Add bindings
-> for Secure-only devices"). We extend the use of the secure- prefix to
-> the stdout-path property, so that the Secure firmware may use a
-> different console device than the one used by the kernel.
->
-> Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
-> ---
->  Documentation/devicetree/bindings/arm/secure.txt | 5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/arm/secure.txt b/Documentation/devicetree/bindings/arm/secure.txt
-> index e31303f..558c9a1 100644
-> --- a/Documentation/devicetree/bindings/arm/secure.txt
-> +++ b/Documentation/devicetree/bindings/arm/secure.txt
-> @@ -51,3 +51,8 @@ Valid Secure world properties:
->     status = "disabled"; secure-status = "okay";     /* S-only */
->     status = "disabled";                             /* disabled in both */
->     status = "disabled"; secure-status = "disabled"; /* disabled in both */
-> +
-> +- secure-stdout-path (/chosen node): specifies the device to be used
-> +for console output by Secure firmware. The syntax is the same as for
-> +"stdout-path". If "secure-stdout-path" is not specified it defaults to
-> +the same value as "stdout-path".
+Implement the suspend/resume hooks to make sure the PWM device is
+restored to a correct state after a suspend.
 
-I'm not all that enthusiastic about this. This alone is okay, but
-continued additions of secure-* properties doesn't seem very scalable.
-Is this it or do you have other needs? What happens when we have 3
-modes/address spaces?
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+This patch depends on the atomic conversion patch [1].
 
-Maybe we should allow stdout-path to have multiple strings and secure
-fw grabs the first one and updates the DT removing it (perhaps only if
-the device is secure only). Might be nice to have multiple ones
-supported anyway (like we can do on the kernel command line:
-"console=ttyS0 console=ttyS1").
+[1]https://patchwork.ozlabs.org/patch/734251/
 
-Rob
+ drivers/pwm/pwm-atmel-hlcdc.c | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+
+diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
+index a3c65a165a52..e432f4d3d8d4 100644
+--- a/drivers/pwm/pwm-atmel-hlcdc.c
++++ b/drivers/pwm/pwm-atmel-hlcdc.c
+@@ -191,6 +191,38 @@ static const struct atmel_hlcdc_pwm_errata atmel_hlcdc_pwm_sama5d3_errata = {
+ 	.div1_clk_erratum = true,
+ };
+ 
++static int atmel_hlcdc_pwm_suspend(struct device *dev)
++{
++	struct atmel_hlcdc_pwm *chip = dev_get_drvdata(dev);
++
++	/* Keep the periph clock enabled if the PWM is still running. */
++	if (pwm_is_enabled(&chip->chip.pwms[0]))
++		clk_disable_unprepare(chip->hlcdc->periph_clk);
++
++	return 0;
++}
++
++static int atmel_hlcdc_pwm_resume(struct device *dev)
++{
++	struct atmel_hlcdc_pwm *chip = dev_get_drvdata(dev);
++	struct pwm_state state;
++	int ret;
++
++	pwm_get_state(&chip->chip.pwms[0], &state);
++
++	/* Re-enable the periph clock it was stopped during suspend. */
++	if (!state.enabled) {
++		ret = clk_prepare_enable(chip->hlcdc->periph_clk);
++		if (ret)
++			return ret;
++	}
++
++	return atmel_hlcdc_pwm_apply(&chip->chip, &chip->chip.pwms[0], &state);
++}
++
++static SIMPLE_DEV_PM_OPS(atmel_hlcdc_pwm_pm_ops,
++			 atmel_hlcdc_pwm_suspend, atmel_hlcdc_pwm_resume);
++
+ static const struct of_device_id atmel_hlcdc_dt_ids[] = {
+ 	{
+ 		.compatible = "atmel,at91sam9n12-hlcdc",
+@@ -281,6 +313,7 @@ static struct platform_driver atmel_hlcdc_pwm_driver = {
+ 	.driver = {
+ 		.name = "atmel-hlcdc-pwm",
+ 		.of_match_table = atmel_hlcdc_pwm_dt_ids,
++		.pm = &atmel_hlcdc_pwm_pm_ops,
+ 	},
+ 	.probe = atmel_hlcdc_pwm_probe,
+ 	.remove = atmel_hlcdc_pwm_remove,
+-- 
+2.7.4
