@@ -1,37 +1,116 @@
-From: david.daney@cavium.com (David Daney)
-Date: Wed,  1 Mar 2017 14:04:53 -0800
-Subject: [PATCH] module: set __jump_table alignment to 8
-Message-ID: <20170301220453.4756-1-david.daney@cavium.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed,  1 Mar 2017 23:38:49 +0100
+Subject: [PATCH] arm64: dts: rockchip: remove wrongly added idle states on
+ rk3368
+Message-ID: <20170301223849.13401-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For powerpc the __jump_table section in modules is not aligned, this
-causes a WARN_ON() splat when loading a module containing a __jump_table.
+As reported by Lorenzo, the residency/latency values defined in the
+idle-state for rk3368 "make no sense". When introducing them I
+simply took the idle-state node from the vendor kernel in error
+as I didn't look up if these values were sane in the first place.
 
-Strict alignment became necessary with commit 3821fd35b58d
-("jump_label: Reduce the size of struct static_key"), currently in
-linux-next, which uses the two least significant bits of pointers to
-__jump_table elements.
+Talking to people and determining why they were used in this way
+showed that it was meant to make sure the cpu_suspend callback
+got initialized which at the 3.10 time was somehow required even
+for wfi-based idle handling.
 
-Fix by forcing __jump_table to 8, which is the same alignment used for
-this section in the kernel proper.
+Of course the generic arch_cpu_idle() now does wfi-based idle-handling
+already, so there is no need for this.
 
-Signed-off-by: David Daney <david.daney@cavium.com>
-Tested-by: Sachin Sant <sachinp@linux.vnet.ibm.com>
+Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- scripts/module-common.lds | 2 ++
- 1 file changed, 2 insertions(+)
+This has been sitting ere for way to long :-(, but finally I got
+to finish the change.
 
-diff --git a/scripts/module-common.lds b/scripts/module-common.lds
-index 73a2c7d..53234e8 100644
---- a/scripts/module-common.lds
-+++ b/scripts/module-common.lds
-@@ -19,4 +19,6 @@ SECTIONS {
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi | 20 --------------------
+ 1 file changed, 20 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index 49d1191..5471ace 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -107,23 +107,10 @@
+ 			};
+ 		};
  
- 	. = ALIGN(8);
- 	.init_array		0 : { *(SORT(.init_array.*)) *(.init_array) }
-+
-+	__jump_table		0 : ALIGN(8) { KEEP(*(__jump_table)) }
- }
+-		idle-states {
+-			entry-method = "psci";
+-
+-			cpu_sleep: cpu-sleep-0 {
+-				compatible = "arm,idle-state";
+-				arm,psci-suspend-param = <0x1010000>;
+-				entry-latency-us = <0x3fffffff>;
+-				exit-latency-us = <0x40000000>;
+-				min-residency-us = <0xffffffff>;
+-			};
+-		};
+-
+ 		cpu_l0: cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x0>;
+-			cpu-idle-states = <&cpu_sleep>;
+ 			enable-method = "psci";
+ 
+ 			#cooling-cells = <2>; /* min followed by max */
+@@ -133,7 +120,6 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x1>;
+-			cpu-idle-states = <&cpu_sleep>;
+ 			enable-method = "psci";
+ 		};
+ 
+@@ -141,7 +127,6 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x2>;
+-			cpu-idle-states = <&cpu_sleep>;
+ 			enable-method = "psci";
+ 		};
+ 
+@@ -149,7 +134,6 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x3>;
+-			cpu-idle-states = <&cpu_sleep>;
+ 			enable-method = "psci";
+ 		};
+ 
+@@ -157,7 +141,6 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x100>;
+-			cpu-idle-states = <&cpu_sleep>;
+ 			enable-method = "psci";
+ 
+ 			#cooling-cells = <2>; /* min followed by max */
+@@ -167,7 +150,6 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x101>;
+-			cpu-idle-states = <&cpu_sleep>;
+ 			enable-method = "psci";
+ 		};
+ 
+@@ -175,7 +157,6 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x102>;
+-			cpu-idle-states = <&cpu_sleep>;
+ 			enable-method = "psci";
+ 		};
+ 
+@@ -183,7 +164,6 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0 0x103>;
+-			cpu-idle-states = <&cpu_sleep>;
+ 			enable-method = "psci";
+ 		};
+ 	};
 -- 
-2.9.3
+2.6.4
