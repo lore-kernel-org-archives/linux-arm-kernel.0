@@ -1,95 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 1 Mar 2017 15:29:48 -0800
-Subject: [PATCH v2] ARM: OMAP2+: Fix device node reference counts
-In-Reply-To: <20170301201503.GC20160@roeck-us.net>
-References: <1488311640-3594-1-git-send-email-linux@roeck-us.net>
- <20170301180439.GI20572@atomide.com>
- <20170301201503.GC20160@roeck-us.net>
-Message-ID: <20170301232948.GJ20572@atomide.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 2 Mar 2017 01:54:42 +0200
+Subject: [PATCH 07/20] PCI: implement Devres interface to map PCI config
+ space
+In-Reply-To: <20170227151436.18698-8-lorenzo.pieralisi@arm.com>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+ <20170227151436.18698-8-lorenzo.pieralisi@arm.com>
+Message-ID: <CAHp75VfdE6_W+DxhejorLxra2JQDGF3cG0uBedyOohhmcLiKLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Guenter Roeck <linux@roeck-us.net> [170301 12:16]:
-> On Wed, Mar 01, 2017 at 10:04:39AM -0800, Tony Lindgren wrote:
-> > * Guenter Roeck <linux@roeck-us.net> [170228 11:55]:
-> > > After commit 'of: fix of_node leak caused in of_find_node_opts_by_path',
-> > > the following error may be reported when running omap images.
-> > > 
-> > > OF: ERROR: Bad of_node_put() on /ocp at 68000000
-> > > CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc7-next-20170210 #1
-> > > Hardware name: Generic OMAP3-GP (Flattened Device Tree)
-> > > [<c0310604>] (unwind_backtrace) from [<c030bbf4>] (show_stack+0x10/0x14)
-> > > [<c030bbf4>] (show_stack) from [<c05add8c>] (dump_stack+0x98/0xac)
-> > > [<c05add8c>] (dump_stack) from [<c05af1b0>] (kobject_release+0x48/0x7c)
-> > > [<c05af1b0>] (kobject_release)
-> > > 	from [<c0ad1aa4>] (of_find_node_by_name+0x74/0x94)
-> > > [<c0ad1aa4>] (of_find_node_by_name)
-> > > 	from [<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable+0x24/0x2c)
-> > > [<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable) from
-> > > [<c1215d5c>] (omap3xxx_hwmod_init+0x180/0x274)
-> > > [<c1215d5c>] (omap3xxx_hwmod_init)
-> > > 	from [<c120faa8>] (omap3_init_early+0xa0/0x11c)
-> > > [<c120faa8>] (omap3_init_early)
-> > > 	from [<c120fb2c>] (omap3430_init_early+0x8/0x30)
-> > > [<c120fb2c>] (omap3430_init_early)
-> > > 	from [<c1204710>] (setup_arch+0xc04/0xc34)
-> > > [<c1204710>] (setup_arch) from [<c1200948>] (start_kernel+0x68/0x38c)
-> > > [<c1200948>] (start_kernel) from [<8020807c>] (0x8020807c)
-> > > 
-> > > of_find_node_by_name() drops the reference to the passed device node.
-> > > Use of_get_child_by_name() instead. Also, release references to
-> > > device nodes obtained with of_find_node_by_name() and
-> > > of_get_child_by_name() after they are no longer needed.
-> > > 
-> > > While at it, clean up the code and change the return type of
-> > > omap3xxx_hwmod_is_hs_ip_block_usable() to bool to match its use
-> > > and the return type of of_device_is_available().
-> > > 
-> > > Cc: Qi Hou <qi.hou@windriver.com>
-> > > Cc: Peter Rosin <peda@axentia.se>
-> > > Cc: Rob Herring <robh@kernel.org>
-> > > Signed-off-by: Guenter Roeck <linux@roeck-us.net>
-> > > ---
-> > > v2: Change subject ('Grab reference to device nodes where needed'
-> > >     didn't really cover all the changes made)
-> > >     Use of_get_child_by_name() instead of of_find_node_by_name()
-> > >     Drop references to device nodes as needed
-> > >     Change return type of omap3xxx_hwmod_is_hs_ip_block_usable()
-> > >     to bool
-> > 
-> > OK so now we have a commit id for it and should have:
-> > 
-> > Fixes: 0549bde0fcb1 ("of: fix of_node leak caused in
-> > of_find_node_opts_by_path")
-> > 
-> Not really; 0549bde0fcb1 fixes a bug and hides _this_ bug.
-> More appropriate, if that would exist, would be something like
-> 
-> Exposed-by: 0549bde0fcb1 ("of: fix of_node leak caused in ...")
+On Mon, Feb 27, 2017 at 5:14 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> The introduction of the pci_remap_cfgspace() interface allows
+> PCI host controller drivers to map PCI config space through a
+> dedicated kernel interface. Current PCI host controller drivers
+> use the devm_ioremap_* Devres interfaces to map PCI configuration
+> space regions so in order to update them to the new
+> pci_remap_cfgspace() mapping interface a new set of Devres interfaces
+> should be implemented so that PCI host controller drivers can make
+> use of them.
+>
+> Introduce two new functions in the PCI kernel layer and Devres
+> documentation:
+>
+> - devm_pci_remap_cfgspace()
+> - devm_pci_remap_cfg_resource()
+>
+> so that PCI host controller drivers can make use of them to map
+> PCI configuration space regions.
 
-OK
+Wouldn't you like to be consistent with current PCI API, i.e.:
+1. devm_*() functions called pcim_*() in PCI.
+2. If you may notice there is no separate pcim_*map*() stuff, they are
+dynamically adapting to the case.
 
-> > What about other leaky users of of_find_node_by_name() and
-> > of_get_child_by_name()?
-> > 
-> > We have those in:
-> > 
-> > control.c
-> > display.c
-> > omap_device.c
-> > omap_hwmod.c
-> > 
-> 
-> I am sure there are many more. For example, the bug solved in my patch
-> "disappears" if one adds some delays (or just log messages) at strategic
-> areas in the code. Such delays result in node leaks elsewhere, which
-> again hides the bug I am trying to fix with my patch.
-> 
-> > So probably it really should be two fixes, one for the regression
-> > causing the error. Then another one for fixing the leaky np use.
-> > 
-> No problem; I 'll split into two patches.
+?
 
-OK thanks.
-
-Tony
+-- 
+With Best Regards,
+Andy Shevchenko
