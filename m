@@ -1,140 +1,54 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Thu, 02 Mar 2017 19:20:19 +0900
-Subject: [PATCH v3 7/7] arm: dts: Remove the OF graph from DSI node
-In-Reply-To: <1488450019-6482-1-git-send-email-hoegeun.kwon@samsung.com>
-References: <1488450019-6482-1-git-send-email-hoegeun.kwon@samsung.com>
- <CGME20170302102113epcas1p30d42204d23a4e0def2a406086fea9cef@epcas1p3.samsung.com>
-Message-ID: <1488450019-6482-8-git-send-email-hoegeun.kwon@samsung.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 2 Mar 2017 19:34:08 +0900
+Subject: [PATCH v32 00/13] arm64: add kdump support
+In-Reply-To: <1f4c1497-129d-7350-89c1-1ba0a6764ba5@codeaurora.org>
+References: <20170207080601.5816-1-takahiro.akashi@linaro.org>
+ <1f4c1497-129d-7350-89c1-1ba0a6764ba5@codeaurora.org>
+Message-ID: <20170302103407.GC1746@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The OF graph is not needed because the panel is a child of dsi. So
-removed the ports node in DSI node, and port node in panel node.
+On Wed, Mar 01, 2017 at 05:51:21PM -0700, Goel, Sameer wrote:
+> 
+> 
+> On 2/7/2017 1:06 AM, AKASHI Takahiro wrote:
+> > This patch series adds kdump support on arm64.
+> > 
+> > To load a crash-dump kernel to the systems, a series of patches to
+> > kexec-tools[1] are also needed. Please use the latest one, v5 [2].
+> > For your convinience, you can pick them up from:
+> >    https://git.linaro.org/people/takahiro.akashi/linux-aarch64.git arm64/kdump
+> >    https://git.linaro.org/people/takahiro.akashi/kexec-tools.git arm64/kdump
+> > 
+> > To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+> >   - crash utility (v7.1.8 or later, i.e. master for now) [3]
+> > 
+> > I tested this patchset on fast model and hikey.
+> > (under various configurations, in particular 4KB-page/39,48-bits, 64KB-page/42
+> > -bits with hibernate)
+> > 
+> > The previous versions were also:
+> > Tested-by: Pratyush Anand <panand@redhat.com> (v29, mustang and seattle)
+> > Tested-by: James Morse <james.morse@arm.com> (v27, Juno)
+> > 
+> I tested this patch set on a QDT2400 device with 4k 4-level setup. This patchset worked after applying [1].
 
-Signed-off-by: Hoegeun Kwon <hoegeun.kwon@samsung.com>
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
----
- arch/arm/boot/dts/exynos3250-rinato.dts | 21 ---------------------
- arch/arm/boot/dts/exynos4210-trats.dts  | 21 ---------------------
- arch/arm/boot/dts/exynos4412-trats2.dts | 21 ---------------------
- 3 files changed, 63 deletions(-)
+Thank you for your test and report.
+While adding [1] is yet to be discussed, I will post v33 as soon as
+possible after v4.10-rc1.
 
-diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
-index c9f191c..82e676a 100644
---- a/arch/arm/boot/dts/exynos3250-rinato.dts
-+++ b/arch/arm/boot/dts/exynos3250-rinato.dts
-@@ -220,21 +220,6 @@
- 	samsung,pll-clock-frequency = <24000000>;
- 	status = "okay";
- 
--	ports {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		port at 1 {
--			reg = <1>;
--
--			dsi_out: endpoint {
--				remote-endpoint = <&dsi_in>;
--				samsung,burst-clock-frequency = <250000000>;
--				samsung,esc-clock-frequency = <20000000>;
--			};
--		};
--	};
--
- 	panel at 0 {
- 		compatible = "samsung,s6e63j0x03";
- 		reg = <0>;
-@@ -264,12 +249,6 @@
- 				vsync-len = <2>;
- 			};
- 		};
--
--		port {
--			dsi_in: endpoint {
--				remote-endpoint = <&dsi_out>;
--			};
--		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index 1743ca8..9452bed 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -202,21 +202,6 @@
- 	samsung,pll-clock-frequency = <24000000>;
- 	status = "okay";
- 
--	ports {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		port at 1 {
--			reg = <1>;
--
--			dsi_out: endpoint {
--				remote-endpoint = <&dsi_in>;
--				samsung,burst-clock-frequency = <500000000>;
--				samsung,esc-clock-frequency = <20000000>;
--			};
--		};
--	};
--
- 	panel at 0 {
- 		reg = <0>;
- 		compatible = "samsung,s6e8aa0";
-@@ -244,12 +229,6 @@
- 				vsync-len = <2>;
- 			};
- 		};
--
--		port {
--			dsi_in: endpoint {
--				remote-endpoint = <&dsi_out>;
--			};
--		};
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index 82221a0..86ce5e5 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -390,21 +390,6 @@
- 	samsung,pll-clock-frequency = <24000000>;
- 	status = "okay";
- 
--	ports {
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		port at 1 {
--			reg = <1>;
--
--			dsi_out: endpoint {
--				remote-endpoint = <&dsi_in>;
--				samsung,burst-clock-frequency = <500000000>;
--				samsung,esc-clock-frequency = <20000000>;
--			};
--		};
--	};
--
- 	panel at 0 {
- 		compatible = "samsung,s6e8aa0";
- 		reg = <0>;
-@@ -432,12 +417,6 @@
- 				vsync-len = <2>;
- 			};
- 		};
--
--		port {
--			dsi_in: endpoint {
--				remote-endpoint = <&dsi_out>;
--			};
--		};
- 	};
- };
- 
--- 
-1.9.1
+Thanks,
+-Takahiro AKASHI
+
+
+> [1] [PATCH] efi/libstub/arm*: Set default address and size cells values for an empty dtb
+> 
+> Without the above patch the start address of the crash kernel is recorded incorrectly and the 
+> memblock_cap_memory_range clears out the incorrect range. 
+>  
+> Thanks,
+> Sameer
+> -- 
+> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the
+> Code Aurora Forum, a Linux Foundation Collaborative Project.
