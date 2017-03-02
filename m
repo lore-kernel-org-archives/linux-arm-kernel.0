@@ -1,136 +1,142 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 2 Mar 2017 18:35:09 +0000
-Subject: ARM64 CONFIG_ZONE_DMA for 32-bit devices
-In-Reply-To: <66ba5ad3-456e-f205-b142-b3f938d7c42b@arm.com>
-References: <6eab56bb5a4ffd8812d8b59ffa8a7cce@mail.gmail.com>
- <66ba5ad3-456e-f205-b142-b3f938d7c42b@arm.com>
-Message-ID: <20170302183509.GH12157@e104818-lin.cambridge.arm.com>
+From: rafal@milecki.pl (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Thu, 2 Mar 2017 19:41:08 +0100
+Subject: BCM5301X: GIC: PPI11 is secure or misconfigured (same for PPI13)
+In-Reply-To: <c658d8a6-1935-9376-a626-0c527404a5ca@arm.com>
+References: <dc74d33c-aa3c-ec26-313e-d5f5cef76e6f@milecki.pl>
+ <0d18fe40-76ff-4703-d766-e895ddd36fba@arm.com>
+ <642c0092-9fe4-c9a9-ece7-dd6406920c3e@milecki.pl>
+ <c658d8a6-1935-9376-a626-0c527404a5ca@arm.com>
+Message-ID: <e3fefaa5-be4f-6413-3f5e-4e05d319d29f@milecki.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2017 at 12:42:51PM +0000, Robin Murphy wrote:
-> On 28/02/17 10:34, Kashyap Desai wrote:
-> > I was reading below articles. Mine is not similar issue, but  I understand
-> > few things about ARM64 SWIOTLB interface from below discussion.
-> > Any input will be a great help to resolve/understand the issue.
-> > 
-> > https://patchwork.codeaurora.org/patch/143833/
-> > https://patchwork.kernel.org/patch/9495893/
-> > 
-> > Current problem statement is -
-> > "Trying to load kdump kernel from above 4GB memory does not work on ARM64
-> > platform as <megaraid_sas> driver require certain DMA buffer from below
-> > 4GB memory range."
-> > 
-> > Looking for alternative/workaround for time being. Long term plan is to
-> > remove limitation of <megaraid_sas> driver to remove 32 bit DMA mask for
-> > SAS3.0 onwards controller.
-> > 
-> > 1) I found below code @arch/arm64/mm/init.c . ARM64 kernel has provision
-> > to support 32-bit DMA as well.  I am not sure about why CONFIG_ZONE_DMA
-> > option is an configurable option for ARM64 ?
-> > 
-> >         /* 4GB maximum for 32-bit only capable devices */
-> >         if (IS_ENABLED(CONFIG_ZONE_DMA))
-> >                 arm64_dma_phys_limit = max_zone_dma_phys();
-> >         else
-> >                 arm64_dma_phys_limit = PHYS_MASK + 1;
-> >         dma_contiguous_reserve(arm64_dma_phys_limit);
-> > 
-> > One of the reason I think "kdump" kernel can load from above 4GB memory
-> > range provided crashkernel=<>, high and crashkernel=0, low option. So I
-> > guess ARM64 kdump kernel may have disabled CONFIG_ZONE_DMA option, but
-> > base kernel must have enabled CONFIG_ZONE_DMA option to support 32-bit
-> > only capable devices.
-> 
-> I believe it's more that ZONE_DMA goes a bit crazy when the available
-> RAM starts above 4GB. It's not technically possible to turn it off
-> without hacking Kconfig.
+On 03/02/2017 07:09 PM, Marc Zyngier wrote:
+> On 02/03/17 18:02, Rafa? Mi?ecki wrote:
+>> On 03/02/2017 04:41 PM, Marc Zyngier wrote:
+>>> On 02/03/17 14:32, Rafa? Mi?ecki wrote:
+>>>> Hi,
+>>>>
+>>>> I just updated kernel on my SmartRG SR400ac (bcm4708-smartrg-sr400ac.dts) from
+>>>> 4.4 to 4.9 and noticed following warnings in the boot log:
+>>>> [    0.000000] GIC: PPI11 is secure or misconfigured
+>>>> [    0.000007] sched_clock: 64 bits at 400MHz, resolution 2ns, wraps every 4398046511103ns
+>>>> [    0.008553] clocksource: arm_global_timer: mask: 0xffffffffffffffff max_cycles: 0x5c4093a7d1, max_idle_ns: 440795210635 ns
+>>>> [    0.020380] GIC: PPI11 is secure or misconfigured
+>>>> [    0.025446] GIC: PPI13 is secure or misconfigured
+>>>> [    0.030498] GIC: PPI13 is secure or misconfigured
+>>>> [    0.035690] Calibrating delay loop... 1594.16 BogoMIPS (lpj=7970816)
+>>>> [    0.123484] pid_max: default: 32768 minimum: 301
+>>>> [    0.128511] Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
+>>>> [    0.135591] Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
+>>>> [    0.143687] CPU: Testing write buffer coherency: ok
+>>>> [    0.149226] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+>>>> [    0.155371] Setting up static identity map for 0x82a0 - 0x82d4
+>>>> [    0.163390] GIC: PPI11 is secure or misconfigured
+>>>> [    0.163407] GIC: PPI13 is secure or misconfigured
+>>>>
+>>>> This is caused by following commits:
+>>>> 992345a58e0c ("irqchip/gic: WARN if setting the interrupt type for a PPI fails")
+>>>> 4b357daed698 ("genirq: Look-up trigger type if not specified by caller")
+>>>> f35ad083783e ("genirq: Look-up percpu trigger type if not specified by caller")
+>>>>
+>>>> There warnings are coming from the following (forward) traces:
+>>>> request_percpu_irq ? __setup_irq ? (...) ? gic_set_type ? gic_configure_irq
+>>>> cpuhp_setup_state ? (...) ? gt_starting_cpu ? enable_percpu_irq ? __irq_set_trigger ? chip->irq_set_type
+>>>> (see e.g. global_timer_of_register).
+>>>> Later ones are coming e.g. from twd_local_timer_of_register.
+>>>>
+>>>> Before adding mentioned commits gic_set_type was never called for there IRQs.
+>>>
+>>> Which was a nasty bug the first place.
+>>>
+>>>>
+>>>> AFAIU we need to update following entries in the bcm5301x.dtsi:
+>>>>
+>>>> timer at 20200 {
+>>>> 	compatible = "arm,cortex-a9-global-timer";
+>>>> 	reg = <0x20200 0x100>;
+>>>> 	interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
+>>>> 	clocks = <&periph_clk>;
+>>>> };
+>>>>
+>>>> local-timer at 20600 {
+>>>> 	compatible = "arm,cortex-a9-twd-timer";
+>>>> 	reg = <0x20600 0x100>;
+>>>> 	interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
+>>>> 	clocks = <&periph_clk>;
+>>>> };
+>>>>
+>>>> Does anyone happen to know how to define these IRQs properly?
+>>>
+>>> It looks like the GIC's PPI configuration differs from what you have in
+>>> your DT. Since the PPI configuration is write-only on A9, you get a
+>>> warning. Try dumping the values in gic_configure_irq() with this
+>>> patchlet:
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
+>>> index 9ae71804b5dd..887be33dd6b1 100644
+>>> --- a/drivers/irqchip/irq-gic-common.c
+>>> +++ b/drivers/irqchip/irq-gic-common.c
+>>> @@ -76,12 +76,14 @@ int gic_configure_irq(unsigned int irq, unsigned int type,
+>>>  	 * non-secure mode, and hence it may not be catastrophic.
+>>>  	 */
+>>>  	writel_relaxed(val, base + GIC_DIST_CONFIG + confoff);
+>>> -	if (readl_relaxed(base + GIC_DIST_CONFIG + confoff) != val) {
+>>> +	oldval = val;
+>>> +	val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
+>>> +	if (oldval != val) {
+>>>  		if (WARN_ON(irq >= 32))
+>>>  			ret = -EINVAL;
+>>>  		else
+>>> -			pr_warn("GIC: PPI%d is secure or misconfigured\n",
+>>> -				irq - 16);
+>>> +			pr_warn("GIC: PPI%d is secure or misconfigured %x %x\n",
+>>> +				irq - 16, oldval, val);
+>>>  	}
+>>>
+>>>  	if (sync_access)
+>>>
+>>> The difference between the two values will tell you what the GIC thinks
+>>> of the interrupt trigger. Odds are that these interrupts are edge-triggered,
+>>> if I trust the following document:
+>>>
+>>> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0407f/CCHEIGIC.html
+>>
+>> [    0.000000] L2C: DT/platform modifies aux control register: 0x0a130000 -> 0x0a530000
+>> [    0.000000] L2C-310 enabling early BRESP for Cortex-A9
+>> [    0.000000] L2C-310 full line of zeros enabled for Cortex-A9
+>> [    0.000000] L2C-310 ID prefetch enabled, offset 1 lines
+>> [    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
+>> [    0.000000] L2C-310 cache controller enabled, 16 ways, 256 kB
+>> [    0.000000] L2C-310: CACHE_ID 0x410000c8, AUX_CTRL 0x7e530001
+>> [    0.000000] GIC: PPI11 is secure or misconfigured 7d400000 7dc00000
+>> [    0.000007] sched_clock: 64 bits at 400MHz, resolution 2ns, wraps every 4398046511103ns
+>> [    0.008571] clocksource: arm_global_timer: mask: 0xffffffffffffffff max_cycles: 0x5c4093a7d1, max_idle_ns: 440795210635 ns
+>> [    0.020399] GIC: PPI11 is secure or misconfigured 7d400000 7dc00000
+>> [    0.027091] Switching to timer-based delay loop, resolution 2ns
+>> [    0.033465] GIC: PPI13 is secure or misconfigured 75c00000 7dc00000
+>> [    0.040177] GIC: PPI13 is secure or misconfigured 75c00000 7dc00000
+>> [    0.047038] Calibrating delay loop (skipped), value calculated using timer frequency.. 800.00 BogoMIPS (lpj=4000000)
+>> [    0.058330] pid_max: default: 32768 minimum: 301
+>> [    0.063346] Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
+>> [    0.070419] Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
+>> [    0.078525] CPU: Testing write buffer coherency: ok
+>> [    0.084095] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
+>> [    0.090227] Setting up static identity map for 0x82a0 - 0x82d4
+>> [    0.098231] GIC: PPI11 is secure or misconfigured 7d400000 7dc00000
+>> [    0.098250] GIC: PPI13 is secure or misconfigured 75c00000 7dc00000
+>> [    0.098263] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
+>> [    0.098372] Brought up 2 CPUs
+>>
+>> PPI11 old value: 7d400000
+>> PPI11 new value: 7dc00000
+>> So new value has extra bit 0x00800000 set
+>>
+>> PPI13 old value: 75c00000
+>> PPI13 new value: 7dc00000
+>> So new value has extra bit 0x08000000 set
+>
+> Both indicating that the interrupt is edge triggered, as mentioned in
+> the documentation I quoted above.
 
-I think even if you hack Kconfig, the kernel may not build. We keep the
-Kconfig option so that enum zone_type has ZONE_DMA defined.
-
-Regarding the DMA zone selection, max_zone_dma_phys() is more of a hack
-(needed on Seattle where all RAM is above 4GB). Basically the first
-32-bit at the start of RAM are considered for ZONE_DMA, even though the
-actual physical address of the start of RAM would be well beyond 4GB.
-This assumes that 32-bit only devices have the relevant dma_pfn_offset
-passed via DT (not sure what we do on ACPI).
-
-> > 2.)
-> > 
-> > Typically - SWIOTLB uses DMA buffer from below 4GB range only. ARM64 is
-> > the only architecture which support Low memory definition as per ARCH
-> > specified. See below
-> > 
-> > [root@ linux]# grep -R ARCH_LOW_ADDRESS_LIMIT arch/
-> > arch/s390/include/asm/processor.h:#define ARCH_LOW_ADDRESS_LIMIT
-> > 0x7fffffffUL
-> > arch/arm64/include/asm/processor.h:#define ARCH_LOW_ADDRESS_LIMIT
-> > (arm64_dma_phys_limit - 1)
-> > 
-> > For only ARM64, it is possible to get SWTBL DMA buffer above 4GB. See
-> > below snippet from crashed kernel on ARM64.
-> > 
-> > [    0.000000] Zone ranges:
-> > [    0.000000]   DMA      [mem 0x0000005fc0000000-0x0000005fffffffff]
-> > [    0.000000]   Normal   empty
-
-I guess that's because the kernel thinks 0x5fc00000 is the start of all
-RAM that is available and just assumes that ZONE_DMA would be covered by
-the lower 32-bit of this (high) range.
-
-The physical address in the 32-bit DMA context is rather irrelevant.
-What you need is the actual DMA address that the device is seeing and
-this is calculated by phys_to_dma (taking dma_pfn_offset into account).
-
-> > SWIOTLB can map 64MB buffer from above 4GB only on ARM64 machine and that
-> > is causing problem for <megaraid_sas> driver.
-> > Current megaraid_sas driver wants certain resources from below 4GB memory
-> > and that is why it request consistent dma mask as below -
-> > pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(32)).
-> > 
-> > If I do the same on x86_64, SWTBL INIT will fail because there is no Low
-> > memory below 4GB. See below prints from x86_64 machine.
-> > 
-> > [    0.000000] Zone ranges:
-> > [    0.000000]   DMA      [mem 0x0000000000001000-0x0000000000ffffff]
-> > [    0.000000]   DMA32    [mem 0x0000000001000000-0x00000000ffffffff]
-> > [    0.000000]   Normal   [mem 0x0000000100000000-0x000000407effffff]
-> >   [    0.000000] Movable zone start for each node
-> >    ..
-> >    [    0.000000] Cannot allocate SWIOTLB buffer
-> > 
-> > Question is - "ARM64 platform can't allocate memory for crash kernel in
-> > below 4GB range ?"
-> 
-> If you want to use a device which requires 32-bit-addressable DMA
-> resources with your crash kernel, and that device isn't behind an IOMMU,
-> then don't load your crash kernel above 4GB. It's as simple as that,
-> because in general there's no other way around the issue. And if said
-> device doesn't actually need 32-bit-addressable resources, then yeah,
-> fix the dma_set_mask() calls in the driver.
-
-I agree. I don't think there is much we can do, other than parsing all
-dma_pfn_offsets early on in DT and deciding whether the ZONE_DMA
-heuristics actually helps (and, if not, print some warning).
-
-> That said, I think something is a bit wonky in max_zone_dma_phys() with
-> "It currently assumes that for memory starting above 4G, 32-bit devices
-> will use a DMA offset" - I think that assumption needs to be revisited
-> since, even disregarding cases like kdump, commonly available hardware
-> now exists for which that is not true (e.g. AMD Seattle). Catalin?
-
-IIRC, I did this specifically for Seattle, though not sure whether it
-was just a matter of failing memory allocations when ZONE_DMA was empty
-rather than a device actually using it. That's the best we could do if
-there actually is a device with the relevant dma_pfn_offset.
-
-The alternative would be to put everything in ZONE_DMA if the RAM is
-beyond 4GB but it doesn't help if we do have devices with a proper
-dma_pfn_offset. Leaving ZONE_DMA empty probably has other implications
-with failing allocations (you can fall back from ZONE_NORMAL to ZONE_DMA
-but not the other way around).
-
--- 
-Catalin
+Correct. Changing type to IRQ_TYPE_EDGE_RISING /fixes/ the issue for me. Thank you!
