@@ -1,174 +1,62 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Thu, 2 Mar 2017 08:46:18 +0000
-Subject: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function
- device for legacy interrupts.
-In-Reply-To: <20160913150511.GC27748@localhost>
-References: <1472553558-27215-1-git-send-email-bharatku@xilinx.com>
- <1472553558-27215-3-git-send-email-bharatku@xilinx.com>
- <57C57975.7040306@arm.com>
- <8520D5D51A55D047800579B094147198258D239D@XAP-PVEXMBX01.xlnx.xilinx.com>
- <57C59FE8.30307@arm.com>
- <8520D5D51A55D047800579B094147198258D28AF@XAP-PVEXMBX01.xlnx.xilinx.com>
- <57C6B7F1.5000001@arm.com>
- <8520D5D51A55D047800579B094147198258D2C99@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160912220241.GG23532@localhost> <57D7ADA8.5060201@arm.com>
- <20160913150511.GC27748@localhost>
-Message-ID: <8520D5D51A55D047800579B094147198263F7207@XAP-PVEXMBX02.xlnx.xilinx.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 2 Mar 2017 09:05:22 +0000
+Subject: [PATCH/RFC] arm64: pmu: add Qualcomm Technologies extensions
+In-Reply-To: <a44d89fa-c5ff-9511-c774-59e5a3f26676@codeaurora.org>
+References: <1488385085-19238-1-git-send-email-nleeder@codeaurora.org>
+ <20170301181032.GL28874@leverpostej>
+ <a44d89fa-c5ff-9511-c774-59e5a3f26676@codeaurora.org>
+Message-ID: <4b90b76f-f08d-f248-8153-287b2552dceb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/03/17 21:36, Leeder, Neil wrote:
+> Hi Mark,
+> Thanks for the quick response.
+> 
+> On 3/1/2017 1:10 PM, Mark Rutland wrote:
+>> Hi Neil,
+>>
+>> On Wed, Mar 01, 2017 at 11:18:05AM -0500, Neil Leeder wrote:
+>>> Adds CPU PMU perf events support for Qualcomm Technologies' Falkor CPU.
+>>>
+>>> The Qualcomm Technologies CPU PMU is named qcom_pmuv3 and provides
+>>> extensions to the architected PMU events.
+>>
+>> Is this is a strict superset of PMUv3 (that could validly be treated as
+>> just PMUv3), or do those IMP DEF parts need to be poked to use this at
+>> all?
+>>
+>> What is reported by ID_AA64DFR0_EL1.PMUVer on these CPUs?
+> 
+> It's a strict superset. If you don't use any of the extensions than it 
+> behaves as a PMUv3 for architected events. ID_AA64DFR0_EL1.PMUVer = 1.
+> 
+>> Quite frankly, I'm less than thrilled about the prospect of
+>> IMPLEMENTATION DEFINED CPU PMUs that fall outside of the architected PMU
+>> model, especially for ACPI systems where the raison d'?tre is standards
+>> and uniformity, and where we have no sensible mechanism to provide
+>> information regarding IMPLEMENTATION DEFINED functionality.
+>>
+>> This has knock-on effects for other things, like userspace PMU access
+>> and/or virtualization, and this multiplies the support effort.
+>>
+>> KVM already has (architected) PMU support, and without a corresponding
+>> KVM patch this is at best insufficient. I don't imagine the KVM folk
+>> will be too thrilled about the prospect of emulating an IMPLEMENTATION
+>> DEFINED CPU feature like this.
+> 
+> Does KVM handle ARMv7 PMU implementations? If so, do you know what it 
+> does for the scorpion_* and krait_* implementations in 
+> arch/arm/kernel/perf_events_v7.c? These extensions in ARMv8 are very 
+> similar to the krait extensions, with some 64-bit tweaks, so could be 
+> handled by KVM the same way it handles the ARMv7 cases.
 
-Any one is working on fix for this issue ? 
+No, KVM doesn't handle the ARMv7 PMU at all. I'm not aware of the
+virtualization extensions being available on Scorpion or Krait, which
+makes it a moot point. What it handles is the PMUv3 architecture.
 
-Regards,
-Bharat
+Thanks,
 
-> -----Original Message-----
-> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> Sent: Tuesday, September 13, 2016 8:35 PM
-> To: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Bharat Kumar Gogada <bharatku@xilinx.com>; robh at kernel.org;
-> bhelgaas at google.com; colin.king at canonical.com; Soren Brinkmann
-> <sorenb@xilinx.com>; Michal Simek <michals@xilinx.com>; arnd at arndb.de;
-> linux-arm-kernel at lists.infradead.org; linux-pci at vger.kernel.org; linux-
-> kernel at vger.kernel.org; Ravikiran Gummaluri <rgummal@xilinx.com>
-> Subject: Re: [PATCH 3/3] PCI: Xilinx NWL PCIe: Fix Error for multi function device
-> for legacy interrupts.
-> 
-> On Tue, Sep 13, 2016 at 08:41:28AM +0100, Marc Zyngier wrote:
-> > On 12/09/16 23:02, Bjorn Helgaas wrote:
-> > > On Thu, Sep 01, 2016 at 05:19:55AM +0000, Bharat Kumar Gogada wrote:
-> > >>>>>>> Hi Bharat,
-> > >>>>>>>> @@ -561,7 +561,7 @@ static int
-> > >>>>>>>> nwl_pcie_init_irq_domain(struct nwl_pcie
-> > >>>>>>> *pcie)
-> > >>>>>>>>     }
-> > >>>>>>>>
-> > >>>>>>>>     pcie->legacy_irq_domain =
-> irq_domain_add_linear(legacy_intc_node,
-> > >>>>>>>> -                                                   INTX_NUM,
-> > >>>>>>>> +                                                   INTX_NUM
-> > >>>>>>>> + + 1,
-> > >>>>>>>>                                                     &legacy_domain_ops,
-> > >>>>>>>>                                                     pcie);
-> > >>>>>>>
-> > >>>>>>> This feels like the wrong thing to do. You have INTX_NUM irqs,
-> > >>>>>>> so the domain allocation should reflect this. On the other
-> > >>>>>>> hand, the way the driver currently deals with mappings is
-> > >>>>>>> quite broken (consistently adding 1 to
-> > >>>>> the HW interrupt).
-> > >>>>>>>
-> > >>>>>> Hi Marc,
-> > >>>>>>
-> > >>>>>> Without above change I get following crash in kernel while booting.
-> > >>>>>>
-> > >>>>>> [    2.441684] error: hwirq 0x4 is too large for dummy
-> > >>>>>>
-> > >>>>>> [    2.441694] ------------[ cut here ]------------
-> > >>>>>>
-> > >>>>>> [    2.441698] WARNING: at kernel/irq/irqdomain.c:344
-> > >>>>>>
-> > >>>>>> [    2.441702] Modules linked in:
-> > >>>>>>
-> > >>>>>> [    2.441706]
-> > >>>>>>
-> > >>>>>> [    2.441714] CPU: 1 PID: 1 Comm: swapper/0 Not tainted 4.4.0 #8
-> > >>>>>>
-> > >>>>>> [    2.441718] Hardware name: xlnx,zynqmp (DT)
-> > >>>>>>
-> > >>>>>> [    2.441723] task: ffffffc071886b80 ti: ffffffc071888000 task.ti:
-> > >>>>> ffffffc071888000
-> > >>>>>>
-> > >>>>>> [    2.441732] PC is at irq_domain_associate+0x138/0x1c0
-> > >>>>>>
-> > >>>>>> [    2.441738] LR is at irq_domain_associate+0x138/0x1c0
-> > >>>>>>
-> > >>>>>> In kernel/irq/irqdomain.c function irq_domain_associate
-> > >>>>>>
-> > >>>>>> if (WARN(hwirq >= domain->hwirq_max,
-> > >>>>>>                  "error: hwirq 0x%x is too large for %s\n",
-> > >>>>>> (int)hwirq, domain-
-> > >>>> name))
-> > >>>>>>                 return -EINVAL;
-> > >>>>>>
-> > >>>>>> Here the hwirq and hwirq_max are equal to 4 without the above
-> > >>>>>> condition
-> > >>>>> (INTX_NUM + 1) due to which crash is coming.
-> > >>>>>> This is happening as the legacy interrupts are starting from 1 (INTA).
-> > >>>>>
-> > >>>>> I understood that. I'm still persisting in saying that you have the wrong
-> fix.
-> > >>>>>
-> > >>>>> Your domain should always allocate many interrupts as you have
-> > >>>>> interrupt sources. These interrupts (hwirq) should be numbered
-> > >>>>> from 0 to (n-
-> > >>> 1).
-> > >>>>
-> > >>>> Agreed, but here comes the problem the hwirq for legacy
-> > >>>> interrupts will start at 0x1 to 0x4 (INTA to INTD) and these
-> > >>>> values are as per PCIe specification for legacy interrupts. So
-> > >>>> these cannot be numbered from 0. So when 0x4 (INTD) for a
-> > >>>> multi-function device comes the crash occurs.
-> > >>>
-> > >>> So who provides this hwirq? Who calls irq_domain_associate() with
-> > >>> hwirq set to 4?
-> > >>>
-> > >> PCIe subsystem invokes pcibios_add_device function in
-> arch/arm64/kernel/pci.c for every pci device.
-> > >> The purpose of this function is to assign dev->irq using
-> of_irq_parse_and_map_pci.
-> > >> of_irq_parse_and_map_pci invokes of_irq_parse_pci where it reads
-> > >> PCI_INTERRUPT_PIN from configuration space and saves it in parameter of
-> struct of_phandle_args.
-> > >> This structure is passed to irq_create_of_mapping where it invokes
-> irq_create_fwspec_mapping.
-> > >> irq_create_fwspec_mapping invokes irq_domain_translate and gets
-> > >> hwirq, here the above saved PCI_INTERRUPT_PIN value is assigned to hwirq
-> (*hwirq = fwspec->param[0]).
-> > >> And then using this hwirq irq_create_mapping -> irq_domain_associate
-> were invoked and mapping is created for virtual irq with this hwirq.
-> > >> So for any end point PCI_INTERRUPT_PIN value starts from 0x1 to 0x4 and
-> so hwirq starts from 0x1 to 0x4.
-> > >>
-> > >> So the values are more generic w.r.t to protocol, that's why hwirq will
-> range from 0x1 to 0x4.
-> > >> And then if you check pcie-altera.c they are doing this adding one in their
-> handler and while creating legacy domain.
-> > >
-> > > Is this resolved yet?  Marc, are you happy, or should we iterate on
-> > > this again?
-> >
-> > Ah, sorry to have dropped the ball on this patch.
-> 
-> No problem, I wasn't making forward progress anyway.
-> 
-> > I guess that given that the infrastructure imposes the hwirq range on
-> > the host drivers, Bharat's approach is the only way (and a number of
-> > other host drivers are already slightly broken). I'll try and have a
-> > look at solving this at the generic level. In the meantime:
-> >
-> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> After looking at this myself, I'm not happy with this either.  It feels like there are
-> bugs lurking here and we're just hiding one of them.
-> 
-> Here are the callers of irq_domain_add_linear() for legacy INTx in
-> drivers/pci/host:
-> 
->   advk_pcie_init_irq_domain    LEGACY_IRQ_NUM   (4)
->   dra7xx_pcie_init_irq_domain  4
->   ks_dw_pcie_host_init         MAX_LEGACY_IRQS  (4)
->   altera_pcie_init_irq_domain  INTX_NUM + 1     (5)
->   nwl_pcie_init_irq_domain     INTX_NUM + 1     (5)
->   xilinx_pcie_init_irq_domain  4
-> 
-> I think all of these use the of_irq_parse_and_map_pci() path you mentioned, so
-> if the problem is in the way that path works, I would think these should *all* be
-> requesting the same number of interrupts in the domain.
-> 
-> I agree with Marc that we should request 4 IRQs, because that's what we need.
-> If we can't do that for some reason, we ought to at least make all these callers
-> the same.
-> 
-> Bjorn
+	M.
+-- 
+Jazz is not dead. It just smells funny...
