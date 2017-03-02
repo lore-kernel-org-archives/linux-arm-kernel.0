@@ -1,36 +1,51 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 2 Mar 2017 17:25:20 +0100
-Subject: [PATCH] drm/atmel-hlcdc: Rework the fbdev creation logic
-In-Reply-To: <9eef519a-57ea-a677-4bdc-a4198fb646b5@gmail.com>
-References: <1480345267-18461-1-git-send-email-boris.brezillon@free-electrons.com>
- <9eef519a-57ea-a677-4bdc-a4198fb646b5@gmail.com>
-Message-ID: <20170302172520.567c6f96@bbrezillon>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 2 Mar 2017 10:29:31 -0600
+Subject: [PATCH 3/4 v3] ARM: gemini: select MIGHT_HAVE_PCI
+In-Reply-To: <20170227190720.31409-3-linus.walleij@linaro.org>
+References: <20170227190720.31409-1-linus.walleij@linaro.org>
+ <20170227190720.31409-3-linus.walleij@linaro.org>
+Message-ID: <20170302162931.tyngslqsr2axy5qx@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 Mar 2017 17:04:51 +0100
-Richard Genoud <richard.genoud@gmail.com> wrote:
-
-> On 28/11/2016 16:01, Boris Brezillon wrote:
-> > Now that we wait for DRM panels to be available before registering the
-> > DRM device (returning -EPROBE_DEFER if the panel has not been probed
-> > yet), we no longer need to put the fbdev creation code in  
-> > ->output_poll_changed().  
-> > 
-> > This removes the 10 secs delay between DRM dev registration and fbdev
-> > creation (polling period = 10 seconds).
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Reported-by: Alex Vazquez <avazquez.dev@gmail.com>  
-> Tested-by: Richard Genoud <richard.genoud@gmail.com>
+On Mon, Feb 27, 2017 at 08:07:19PM +0100, Linus Walleij wrote:
+> As we have a PCI driver for the Gemini, we should select
+> MIGHT_HAVE_PCI.
 > 
-> Those 10 seconds where a real pain !
-> Any reason this has not been applied ?
+> Cc: Janos Laube <janos.dev@gmail.com>
+> Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Feng-Hsin Chiang <john453@faraday-tech.com>
+> Cc: Greentime Hu <green.hu@gmail.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2->v3:
+> - No changes
+> 
+> PCI maintainers: this is FYI only, I will funnel this to the ARM
+> SoC tree once we are done with the PCI driver.
+> ---
+>  arch/arm/mach-gemini/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-gemini/Kconfig b/arch/arm/mach-gemini/Kconfig
+> index a5ee5fbab796..21f89a4c16fe 100644
+> --- a/arch/arm/mach-gemini/Kconfig
+> +++ b/arch/arm/mach-gemini/Kconfig
+> @@ -6,6 +6,7 @@ menuconfig ARCH_GEMINI
+>  	select FTTMR010_TIMER
+>  	select GPIO_GEMINI
+>  	select GPIOLIB
+> +	select MIGHT_HAVE_PCI
 
-It should show up in 4.11 (it's already in Linus' tree [1] ;-)).
+Doesn't Multi-platform do this for you? If not, IMO, we should do that 
+or kill this option. We don't do an option like this for I2C, SPI, 
+display, anything else (well, except GPIOLIB ;)).
 
-Regards,
-
-Boris
-
-[1]https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/drivers/gpu/drm/atmel-hlcdc?id=db02b7614a54bf0bf548db07bc8d3e7518fd9481
+>  	select POWER_RESET
+>  	select POWER_RESET_SYSCON
+>  	select SERIAL_OF_PLATFORM
+> -- 
+> 2.9.3
+> 
