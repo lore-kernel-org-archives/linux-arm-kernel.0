@@ -1,186 +1,61 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 2 Mar 2017 15:21:40 +0100
-Subject: [linux-sunxi] Re: [PATCH 2/4] clk: sunxi-ng: Add sun7i-a20 CCU
- driver
-In-Reply-To: <1488404294.29650.3.camel@plaes.org>
-References: <20170227210914.18954-1-plaes@plaes.org>
- <20170227210914.18954-3-plaes@plaes.org>
- <20170228082108.cthaanfuffbwbkaf@lukather>
- <1488404294.29650.3.camel@plaes.org>
-Message-ID: <20170302142140.mjbqqhjuhmc2jgwq@lukather>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Thu, 2 Mar 2017 16:19:27 +0200
+Subject: [PATCH 2/9] mmc: sdhci: add a callback for signal voltage
+ switching
+In-Reply-To: <1488448050-7574-3-git-send-email-yangbo.lu@nxp.com>
+References: <1488448050-7574-1-git-send-email-yangbo.lu@nxp.com>
+ <1488448050-7574-3-git-send-email-yangbo.lu@nxp.com>
+Message-ID: <bf18ad90-e622-1b9f-d6f7-0becbe57ea76@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Priit,
+On 02/03/17 11:47, Yangbo Lu wrote:
+> Add a callback for signal voltage switching to let host driver
+> switch signal voltage in its own way.
 
-On Wed, Mar 01, 2017 at 11:38:14PM +0200, Priit Laes wrote:
-> > > +/* PLL2 - Audio clock */
-> > > +static struct ccu_nm pll_audio_base_clk = {
-> > > > > > > +	.enable		= BIT(31),
-> > > > > > > +	.n		= _SUNXI_CCU_MULT_OFFSET(8, 7, 0),
-> > > > > > > +	.m		= _SUNXI_CCU_DIV_OFFSET(0, 5, 0),
-> > > > > > > +	.common		= {
-> > > > > > > +		.reg		= 0x008,
-> > > > > > > +		.hw.init	= CLK_HW_INIT("pll-audio-base",
-> > > > > +					??????"hosc",
-> > > > > +					??????&ccu_nm_ops,
-> > > > > +					??????0),
-> > > > > +	},
-> > > +
-> > > +};
-> > 
-> > You're forgetting the post-divider here
+That is not how we do things now.  Please just replace the host operation
+instead e.g.
+
+host->mmc_host_ops.start_signal_voltage_switch =
+				esdhc_signal_voltage_switch;
+
+
+
 > 
-> It's hardcoded to 4 during ccu initialization, similar to what is done
-> on the other SoCs (A13, A31..).
-
-Right, sorry, I only saw it later. Please move that define you've been
-using here, and it will be fine :)
-
-> > > +/* TODO: pll8 gpu 0x040 */
-> > 
-> > Please add all the clocks.
+> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+> ---
+>  drivers/mmc/host/sdhci.c | 6 ++++++
+>  drivers/mmc/host/sdhci.h | 2 ++
+>  2 files changed, 8 insertions(+)
 > 
-> I'm not really comfortable adding clocks for blocks that currently lack
-> drivers.
-
-Yet, you did it for quite a significant amount already (VE, NAND,
-AC97, DE MP, etc.). Don't get me wrong, this is definitely not a
-criticism. One of the point of the switch to sunxi-ng was that we
-would get out of the previous situation where every time you wanted to
-do something, you needed to add some clocks.
-
-We have some generic code that, if fed the right data, will
-(hopefully) just work. So it's pretty safe to add (and this is better
-to be consistent, and that's the policy we had for all the other CCU
-drivers).
-
-> > > +/* BIT(21 .. 31) - reserved */
-> > 
-> > I'm not sure we need those comments either.
-> > 
-> > > +/*
-> > > + * TODO: SATA clock also supports external clock as parent.
-> > > + * Currently we default to using PLL6 SATA gate.
-> > > + */
-> > 
-> > Which external clock? It should be modelled anyway. If we have a
-> > dependency on some other clock, it should be in our DT binding, and
-> > listed in the mux there.
-> > 
-> > Otherwise, the clock framework will not be able to deal with that mux
-> > being already set by the bootloader, and if we need to support that
-> > clock in the future, our binding will be ready for it.
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index 6fdd7a7..3c9a924 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1852,6 +1852,12 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+>  	if (host->version < SDHCI_SPEC_300)
+>  		return 0;
+>  
+> +	if (host->ops->start_signal_voltage_switch) {
+> +		ret = host->ops->start_signal_voltage_switch(
+> +					host, ios->signal_voltage);
+> +		return ret;
+> +	}
+> +
+>  	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+>  
+>  	switch (ios->signal_voltage) {
+> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+> index edf3adf..04af687 100644
+> --- a/drivers/mmc/host/sdhci.h
+> +++ b/drivers/mmc/host/sdhci.h
+> @@ -566,6 +566,8 @@ struct sdhci_ops {
+>  					 struct mmc_card *card,
+>  					 unsigned int max_dtr, int host_drv,
+>  					 int card_drv, int *drv_type);
+> +	int	(*start_signal_voltage_switch)(struct sdhci_host *host,
+> +					       unsigned char signal_voltage);
+>  };
+>  
+>  #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
 > 
-> I wish I knew which clock they're talking about..
-> 
-> User manuals (A10/A20) only specify following in the clock register
-> description:
-> 
-> BIT(24) - CLK_SRC_GATING, default 0x0
-> Clock Source Select:
-> 0: PLL6 for SATA(100MHz)
-> 1: External Clock
-> 
-> There's no section for SATA?(called NC) in A10 manual, and in A20
-> manual only contains list of SATA/AHCI features.
-
-Hmmmm, ok :/
-
-> > > +/* Some AHB gates are exported */
-> > > > > +#define CLK_AHB_BIST		31
-> > > > > +#define CLK_AHB_MS		36
-> > > > > +#define CLK_AHB_SDRAM		38
-> > > > > +#define CLK_AHB_ACE		39
-> > > > > +#define CLK_AHB_TS		41
-> > > > > +#define CLK_AHB_VE		48
-> > > > > +#define CLK_AHB_TVD		49
-> > > > > +#define CLK_AHB_TVE1		51
-> > > > > +#define CLK_AHB_LCD1		53
-> > > > > +#define CLK_AHB_CSI0		54
-> > > > > +#define CLK_AHB_CSI1		55
-> > > > > +#define CLK_AHB_HDMI0		56
-> > > > > +#define CLK_AHB_DE_BE1		59
-> > > > > +#define CLK_AHB_DE_FE0		60
-> > > > > +#define CLK_AHB_DE_FE1		61
-> > > > > +#define CLK_AHB_MP		63
-> > > > > +#define CLK_AHB_GPU		64
-> > > +
-> > > +/* Some APB0 gates are exported */
-> > > > > +#define CLK_APB0_AC97		67
-> > > > > +#define CLK_APB0_KEYPAD		74
-> > > +
-> > > +/* Some APB1 gates are exported */
-> > > > > +#define CLK_APB1_CAN		79
-> > > > > +#define CLK_APB1_SCR		80
-> > > +
-> > > +/* Some IP module clocks are exported */
-> > > > > +#define CLK_MS			93
-> > > > > +#define CLK_TS			106
-> > > > > +#define CLK_PATA		111
-> > > > > +#define CLK_AC97		115
-> > > > > +#define CLK_KEYPAD		117
-> > > > > +#define CLK_SATA		118
-> > > +
-> > > +/* Some DRAM gates are exported */
-> > > > > +#define CLK_DRAM_VE		125
-> > > > > +#define CLK_DRAM_CSI0		126
-> > > > > +#define CLK_DRAM_CSI1		127
-> > > > > +#define CLK_DRAM_TS		128
-> > > > > +#define CLK_DRAM_TVD		129
-> > > > > +#define CLK_DRAM_TVE1		131
-> > > > > +#define CLK_DRAM_OUT		132
-> > > > > +#define CLK_DRAM_DE_FE1		133
-> > > > > +#define CLK_DRAM_DE_FE0		134
-> > > > > +#define CLK_DRAM_DE_BE1		136
-> > > > > +#define CLK_DRAM_MP		137
-> > > > > +#define CLK_DRAM_ACE		138
-> > > +
-> > > > > +#define CLK_DE_BE1		140
-> > > > > +#define CLK_DE_FE0		141
-> > > > > +#define CLK_DE_FE1		142
-> > > > > +#define CLK_DE_MP		143
-> > > > > +#define CLK_TCON1_CH0		145
-> > > > > +#define CLK_CSI_SPECIAL		146
-> > > > > +#define CLK_TVD			147
-> > > > > +#define CLK_TCON0_CH1_SCLK2	148
-> > > > > +#define CLK_TCON1_CH1_SCLK2	150
-> > > > > +#define CLK_TCON1_CH1		151
-> > > > > +#define CLK_CSI0		152
-> > > > > +#define CLK_CSI1		153
-> > > > > +#define CLK_VE			154
-> > > > > +#define CLK_AVS			156
-> > > > > +#define CLK_ACE			157
-> > > > > +#define CLK_HDMI		158
-> > > > > +#define CLK_GPU			159
-> > > > > +#define CLK_MBUS		160
-> > > > > +#define CLK_HDMI1_SLOW		161
-> > > > > +#define CLK_HDMI1_REPEAT	162
-> > > > > +#define CLK_OUT_A		163
-> > > +#define CLK_OUT_B		164
-> > 
-> > Is there a reason not to expose these clocks?
-> 
-> I exposed them on need to have basis. And basically did one-to-one
-> conversion from devicetree.
-
-I guess we can still make some pretty good assumptions on what's going
-to be needed at some point.
-
-All the mod clocks will be, the bus gates too, the CPU too. All the
-internal ones (PLL, AXI, APB, etc) can remain hidden though.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170302/1bf64653/attachment-0001.sig>
