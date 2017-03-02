@@ -1,55 +1,73 @@
-From: mzoran@crowfest.net (Michael Zoran)
-Date: Wed, 01 Mar 2017 17:59:38 -0800
-Subject: [PATCH 1/2] staging/vc04_services: initialize cache line size
- properly
-In-Reply-To: <20170301225050.1298349-1-arnd@arndb.de>
-References: <20170301225050.1298349-1-arnd@arndb.de>
-Message-ID: <1488419978.20502.1.camel@crowfest.net>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Thu, 2 Mar 2017 10:08:55 +0800
+Subject: [PATCH 1/4] ARM: dts: rockchip: add rk3288 dw-mmc resets
+In-Reply-To: <20170301235621.31726-1-heiko@sntech.de>
+References: <20170301235621.31726-1-heiko@sntech.de>
+Message-ID: <bec1b33e-e20c-5b0f-f8ef-3b6be0b8721f@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Heiko,
 
-I submitted a change which is in Linux-next now that makes the whole
-CACHE_LINE_SIZE macro meaningless.  It now always reads the size from
-the DT and errors out with -ENODEV if the property is missing.
+On 2017/3/2 7:56, Heiko Stuebner wrote:
+> dw-mmc got its reset-properties specified, so add the softresets
+> for it in rk3288.
+>
 
-I was going to submit a change to delete the macro completely, just
-never got to it.
+FWIW, for patch 1 to 4,
 
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit
-/drivers/staging/vc04_services/interface?id=6cf1bf636a067eb308cb3a8322b
-9d6b1844a075d
+Reviwed-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-On Wed, 2017-03-01 at 23:50 +0100, Arnd Bergmann wrote:
-> While debugging another problem I noticed that g_cache_line_size gets
-> set
-> to sizeof(CACHE_LINE_SIZE), which is sizeof(int) or 4, while
-> presumably
-> CACHE_LINE_SIZE (e.g. 32) was meant.
-> 
-> This initializes it the way it was meant.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+I guess you will follow up for ARM64 platforms?
+
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
-> ?drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c |
-> 2 +-
-> ?1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git
-> a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-> b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-> index 3aeffcb9c87e..b0e9eb6ff73f 100644
-> ---
-> a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-> +++
-> b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-> @@ -78,7 +78,7 @@ struct vchiq_pagelist_info {
-> ?};
-> ?
-> ?static void __iomem *g_regs;
-> -static unsigned int g_cache_line_size = sizeof(CACHE_LINE_SIZE);
-> +static unsigned int g_cache_line_size = CACHE_LINE_SIZE;
-> ?static unsigned int g_fragments_size;
-> ?static char *g_fragments_base;
-> ?static char *g_free_fragments;
+>  arch/arm/boot/dts/rk3288.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+> index df8a0dbe9d91..ad5d6022e95f 100644
+> --- a/arch/arm/boot/dts/rk3288.dtsi
+> +++ b/arch/arm/boot/dts/rk3288.dtsi
+> @@ -236,6 +236,8 @@
+>  		fifo-depth = <0x100>;
+>  		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
+>  		reg = <0xff0c0000 0x4000>;
+> +		resets = <&cru SRST_MMC0>;
+> +		reset-names = "reset";
+>  		status = "disabled";
+>  	};
+>
+> @@ -248,6 +250,8 @@
+>  		fifo-depth = <0x100>;
+>  		interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
+>  		reg = <0xff0d0000 0x4000>;
+> +		resets = <&cru SRST_SDIO0>;
+> +		reset-names = "reset";
+>  		status = "disabled";
+>  	};
+>
+> @@ -260,6 +264,8 @@
+>  		fifo-depth = <0x100>;
+>  		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
+>  		reg = <0xff0e0000 0x4000>;
+> +		resets = <&cru SRST_SDIO1>;
+> +		reset-names = "reset";
+>  		status = "disabled";
+>  	};
+>
+> @@ -272,6 +278,8 @@
+>  		fifo-depth = <0x100>;
+>  		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+>  		reg = <0xff0f0000 0x4000>;
+> +		resets = <&cru SRST_EMMC>;
+> +		reset-names = "reset";
+>  		status = "disabled";
+>  	};
+>
+>
+
+
+-- 
+Best Regards
+Shawn Lin
