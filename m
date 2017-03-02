@@ -1,125 +1,61 @@
-From: zhouxianrong@huawei.com (zhouxianrong)
-Date: Thu, 2 Mar 2017 14:00:27 +0800
-Subject: [PATCH] mm: free reserved area's memmap if possiable
-In-Reply-To: <20170301184140.7ac9de0a@xhacker>
-References: <1486987349-58711-1-git-send-email-zhouxianrong@huawei.com>
- <1487055180-128750-1-git-send-email-zhouxianrong@huawei.com>
- <CAKv+Gu9NF3dS_EWi4k42Ke+aagTScu-yk+UFZ_6sG6tK5zHP2Q@mail.gmail.com>
- <04630153-bc82-ac1f-2f80-344c90200732@huawei.com>
- <CAKv+Gu_X3fNhfUZ9+4Q_jdt2J12d9sxj1cgOq82HaQ8Gw_QaQA@mail.gmail.com>
- <a9c03f7d-355b-76c4-2a3a-771d57af1591@huawei.com>
- <20170301184140.7ac9de0a@xhacker>
-Message-ID: <dd26d083-2a9c-615f-efde-007f0405c37c@huawei.com>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Thu, 2 Mar 2017 14:22:06 +0800
+Subject: [PATCH V3 0/4] Add Spreadtrum SP9860G support
+Message-ID: <1488435730-6711-1-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+SC9860 is a Spreadtrum SoC with eight Cortex A53, which are divided
+into 4 Big cores and 4 little cores.
 
+This patch-set provides a basic configuration for SC9860 in device tree
+to make it run to console.  After this we will continue to submit other
+device drivers step by step, which are using on most of Spreadtrum's SoCs.
 
-On 2017/3/1 18:41, Jisheng Zhang wrote:
-> Add Chen, Catalin
->
-> On Thu, 16 Feb 2017 09:11:29 +0800 zhouxianrong wrote:
->>
->>
->> On 2017/2/15 15:10, Ard Biesheuvel wrote:
->>> On 15 February 2017 at 01:44, zhouxianrong wrote:
->>>>
->>>>
->>>> On 2017/2/14 17:03, Ard Biesheuvel wrote:
->>>>>
->>>>> On 14 February 2017 at 06:53,  <zhouxianrong@huawei.com> wrote:
->>>>>>
->>>>>> From: zhouxianrong <zhouxianrong@huawei.com>
->>>>>>
->>>>>> just like freeing no-map area's memmap (gaps of memblock.memory)
->>>>>> we could free reserved area's memmap (areas of memblock.reserved)
->>>>>> as well only when user of reserved area indicate that we can do
->>>>>> this in drivers. that is, user of reserved area know how to
->>>>>> use the reserved area who could not memblock_free or free_reserved_xxx
->>>>>> the reserved area and regard the area as raw pfn usage by kernel.
->>>>>> the patch supply a way to users who want to utilize the memmap
->>>>>> memory corresponding to raw pfn reserved areas as many as possible.
->>>>>> users can do this by memblock_mark_raw_pfn interface which mark the
->>>>>> reserved area as raw pfn and tell free_unused_memmap that this area's
->>>>>> memmap could be freeed.
->>>>>>
->>>>>
->>>>> Could you give an example how much memory we actually recover by doing
->>>>> this? I understand it depends on the size of the reserved regions, but
->>>>> I'm sure you have an actual example that inspired you to write this
->>>>> patch.
->>>>
->>>>
->>>> i did statistics in our platform, the memmap of reserved region that can be
->>>> freed
->>>> is about 6MB. it's fewer.
->
-> <...>
->
->>>>> In any case, it is good to emphasize that on 4 KB pagesize kernels, we
->>>>> will only free multiples of 8 MB that are 8 MB aligned, resulting in
->>>>> 128 KB of memmap backing to be released.
->>>>
->>>>
->>>>
->>>>>
->>>>>
->>>>>> +               if (start < end)
->>>>>> +                       free_memmap(start, end);
->>>>>> +       }
->>>>>>  }
->>>>>>  #endif /* !CONFIG_SPARSEMEM_VMEMMAP */
->>>>>>
->>>>>> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
->>>>>> index 5b759c9..9f8d277 100644
->>>>>> --- a/include/linux/memblock.h
->>>>>> +++ b/include/linux/memblock.h
->>>>>> @@ -26,6 +26,7 @@ enum {
->>>>>>         MEMBLOCK_HOTPLUG        = 0x1,  /* hotpluggable region */
->>>>>>         MEMBLOCK_MIRROR         = 0x2,  /* mirrored region */
->>>>>>         MEMBLOCK_NOMAP          = 0x4,  /* don't add to kernel direct
->>>>>> mapping */
->>>>>> +       MEMBLOCK_RAW_PFN        = 0x8,  /* region whose memmap never be
->>>>>> used */
->>>>>
->>>>>
->>>>> I think we should be *very* careful about the combinatorial explosion
->>>>> that results when combining all these flags, given that this is not a
->>>>> proper enum but a bit field.
->>>>>
->>>>> In any case, the generic memblock change should be in a separate patch
->>>>> from the arm64 change.
->>>>
->>>>
->>>> MEMBLOCK_RAW_PFN and MEMBLOCK_NOMAP can not be set at the same time
->>>>
->>>
->>> They should not. But if I call  memblock_mark_raw_pfn() on a
->>> MEMBLOCK_NOMAP region, it will have both flags set.
->>>
->>> In summary, I don't think we need this patch. And if you can convince
->>> us otherwise, you should really be more methodical and explicit in
->>> implementing this RAW_PFN flag, not add it as a byproduct of the arch
->>> code that uses it. Also, you should explain how RAW_PFN relates to
->>> NOMAP, and ensure that RAW_PFN and NOMAP regions don't intersect if
->>> that is an unsupported combination.
->>
->> yes, setting both MEMBLOCK_RAW_PFN and MEMBLOCK_NOMAP could meet some problems
->> when gaps of memblock.memory intersect memblock.reserved. if they do not intersect,
->> that's ok. so as you said this should be carefully considered.
->>
->> as you think this patch is not needed because, i have showed my idea, it's enough, thanks!
->
-> we are also interested in this area.
->
-> Just curious, is this patch to "free the vmemmap holes" mentioned by
-> by Catalin in [1]?
+Changes from v2:
+* Addressed comments from Mathieu
+  - Removed CoreSight devices' lables from DT;
+  - Added another level of imbrication for ETFs which have more than one port;
+* Addressed comments from Rob
+  - Switched to use SPDX-License-Identifier tag instead;
+  - Moved the 26m fixed clock node to top level in DT;
+  - Splited the patch into two, since they were revising two dt-bindings;
+  - Removed redundant space from sprd-usrt.txt;
+  - Removed useless property from the sprd_uart example of DT configuration.
 
-free the vmemmap of reserved memblock (other than no-map regions) whose driver owner know
-it is never be used.
+Changes from v1:
+* Removed useless idle-state node 'deep_sleep' from DT
+* Removed useless property 'sc-id' from DT
+* Removed 'clock-frequency' property from the node 'timer'
+* Added another compatible string '"arm,cortex-a53-pmu"' and property
+  'interrupt-affinity' for pmu
+* Kept using the existed compatible string of sprd_serial driver, and added
+  a new one for sc9860 in DT.
 
->
-> [1]http://lkml.iu.edu/hypermail/linux/kernel/1604.1/03036.html
->
-> .
->
+Thanks,
+Chunyan
+
+Chunyan Zhang (2):
+  dt-bindings: arm: Add bindings for SP9860G
+  dt-bindings: serial: add a new compatible string for SC9860
+
+Orson Zhai (1):
+  arm64: dts: Add basic DT to support Spreadtrum's SP9860G
+
+Wei Qiao (1):
+  serial: sprd: adjust TIMEOUT to a big value
+
+ Documentation/devicetree/bindings/arm/sprd.txt     |  13 +-
+ .../devicetree/bindings/serial/sprd-uart.txt       |  15 +-
+ arch/arm64/boot/dts/sprd/Makefile                  |   3 +-
+ arch/arm64/boot/dts/sprd/sc9860.dtsi               | 545 +++++++++++++++++++++
+ arch/arm64/boot/dts/sprd/sp9860g-1h10.dts          |  56 +++
+ arch/arm64/boot/dts/sprd/whale2.dtsi               |  71 +++
+ drivers/tty/serial/sprd_serial.c                   |   2 +-
+ 7 files changed, 697 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/sprd/sc9860.dtsi
+ create mode 100644 arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
+ create mode 100644 arch/arm64/boot/dts/sprd/whale2.dtsi
+
+-- 
+2.7.4
