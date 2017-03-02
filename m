@@ -1,61 +1,60 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 2 Mar 2017 16:19:27 +0200
-Subject: [PATCH 2/9] mmc: sdhci: add a callback for signal voltage
- switching
-In-Reply-To: <1488448050-7574-3-git-send-email-yangbo.lu@nxp.com>
-References: <1488448050-7574-1-git-send-email-yangbo.lu@nxp.com>
- <1488448050-7574-3-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <bf18ad90-e622-1b9f-d6f7-0becbe57ea76@intel.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 2 Mar 2017 15:28:22 +0100
+Subject: Microphone gain on N900
+In-Reply-To: <4435ddd2-ca0e-b05d-727d-9f38416c0f97@bitmer.com>
+References: <20170226202831.GA31405@amd> <201702272053.37882@pali>
+ <4435ddd2-ca0e-b05d-727d-9f38416c0f97@bitmer.com>
+Message-ID: <20170302142822.GA30427@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/17 11:47, Yangbo Lu wrote:
-> Add a callback for signal voltage switching to let host driver
-> switch signal voltage in its own way.
+Hi!
 
-That is not how we do things now.  Please just replace the host operation
-instead e.g.
-
-host->mmc_host_ops.start_signal_voltage_switch =
-				esdhc_signal_voltage_switch;
-
-
-
+> >> v4.10 works quite nicely on N900, but I still have problems with
+> >> audio. Even GSM calls would be usable, if I had reasonable volume on
+> >> microphone and speaker... but I don't.
+> >>
+> >> Both speaker and microphone are too quiet. I can get louder output by
+> >> plugging headset -- good. I can hear the other side nicely, but am
+> >> too quiet for them. Unfortunately, even if I plug in wired headset,
+> >> internal microphone is still used.
+> >>
+> For me these settings provide reasonable playback and capture volumes
+> using v4.10.1:
 > 
-> Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
-> ---
->  drivers/mmc/host/sdhci.c | 6 ++++++
->  drivers/mmc/host/sdhci.h | 2 ++
->  2 files changed, 8 insertions(+)
+> amixer -D hw:0 set PCM 100%
+> amixer -D hw:0 set 'Line DAC' 80% on
+> amixer -D hw:0 set 'Line' on
+> amixer -D hw:0 set 'Left Line Mixer DACL1' on
+> amixer -D hw:0 set 'Right Line Mixer DACR1' on
+> amixer -D hw:0 set 'Jack Function' 'Headphone'
+> amixer -D hw:0 set 'TPA6130A2 Headphone' 80%
 > 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 6fdd7a7..3c9a924 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -1852,6 +1852,12 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
->  	if (host->version < SDHCI_SPEC_300)
->  		return 0;
->  
-> +	if (host->ops->start_signal_voltage_switch) {
-> +		ret = host->ops->start_signal_voltage_switch(
-> +					host, ios->signal_voltage);
-> +		return ret;
-> +	}
-> +
->  	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
->  
->  	switch (ios->signal_voltage) {
-> diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-> index edf3adf..04af687 100644
-> --- a/drivers/mmc/host/sdhci.h
-> +++ b/drivers/mmc/host/sdhci.h
-> @@ -566,6 +566,8 @@ struct sdhci_ops {
->  					 struct mmc_card *card,
->  					 unsigned int max_dtr, int host_drv,
->  					 int card_drv, int *drv_type);
-> +	int	(*start_signal_voltage_switch)(struct sdhci_host *host,
-> +					       unsigned char signal_voltage);
->  };
->  
->  #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
-> 
+> amixer -D hw:0 set 'Jack Function' 'Headset'
+> amixer -D hw:0 set 'AGC' off
+> amixer -D hw:0 set 'Input Select' 'ADC'
+> amixer -D hw:0 set 'Left PGA Mixer Line1L' on
+> amixer -D hw:0 set 'Left Line1L Mux' 'differential'
+> amixer -D hw:0 set 'Right PGA Mixer Line1L' on
+> amixer -D hw:0 set 'Right Line1L Mux' 'differential'
+> amixer -D hw:0 set 'ADC HPF Cut-off' '0.0045xFs' 'disabled'
+> amixer -D hw:0 set PGA 50% on
+> amixer -D hw:0 cset iface=MIXER,name='PGA Capture Switch',index=0 on
+
+This seems to correspond to volumes I have had before. They are enough
+for phone call in quiet environment, but not really for normal usage.
+
+Do you have settings where microphone on wired headset works?
+
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170302/2b464f00/attachment.sig>
