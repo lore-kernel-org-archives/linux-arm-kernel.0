@@ -1,116 +1,56 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Thu,  2 Mar 2017 13:15:00 +0100
-Subject: [PATCH 2/2] hwmon: (scpi) Fix the scale of SCP sensor readings
-In-Reply-To: <20170302121500.8121-1-carlo@caione.org>
-References: <20170302121500.8121-1-carlo@caione.org>
-Message-ID: <20170302121500.8121-3-carlo@caione.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 2 Mar 2017 12:05:46 +0000
+Subject: [PATCH 07/20] PCI: implement Devres interface to map PCI config
+ space
+In-Reply-To: <CAHp75VfdE6_W+DxhejorLxra2JQDGF3cG0uBedyOohhmcLiKLg@mail.gmail.com>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+ <20170227151436.18698-8-lorenzo.pieralisi@arm.com>
+ <CAHp75VfdE6_W+DxhejorLxra2JQDGF3cG0uBedyOohhmcLiKLg@mail.gmail.com>
+Message-ID: <20170302120546.GB17277@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+Hi Andy,
 
-The implementation details for SCPI seems to suggest that the sensor
-readings must be reported by SCP using a well defined scale
-(millidegree Celsius for temperature, millivolts for voltage,
-milliamperes for current, microwatts for power and microjoules for
-energy).
+On Thu, Mar 02, 2017 at 01:54:42AM +0200, Andy Shevchenko wrote:
+> On Mon, Feb 27, 2017 at 5:14 PM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > The introduction of the pci_remap_cfgspace() interface allows
+> > PCI host controller drivers to map PCI config space through a
+> > dedicated kernel interface. Current PCI host controller drivers
+> > use the devm_ioremap_* Devres interfaces to map PCI configuration
+> > space regions so in order to update them to the new
+> > pci_remap_cfgspace() mapping interface a new set of Devres interfaces
+> > should be implemented so that PCI host controller drivers can make
+> > use of them.
+> >
+> > Introduce two new functions in the PCI kernel layer and Devres
+> > documentation:
+> >
+> > - devm_pci_remap_cfgspace()
+> > - devm_pci_remap_cfg_resource()
+> >
+> > so that PCI host controller drivers can make use of them to map
+> > PCI configuration space regions.
+> 
+> Wouldn't you like to be consistent with current PCI API, i.e.:
+> 1. devm_*() functions called pcim_*() in PCI.
 
-This is also important for the interaction with other subsystems: for
-example both the thermal sub-system and the hwmon sysfs interface expect
-the temperature expressed in millidegree Celsius.
+I thought about that and did not do it because here we are remapping
+resources that are _not_ PCI bus resources (ie it is not PCI BARs we
+are remapping), keeping the devm_* prefix would be more consistent
+to the typical device drivers remapping functions pattern (ie a
+typical PCI host controller driver would mix devm_ and pcim_ calls
+which is a bit hard to parse), that was my rationale.
 
-Unfortunately since this behaviour is dependent on the firmware
-implementation there are cases where the sensor readings are reported
-using a different scale. For example in the Amlogic SoCs the
-temperature is reported in degree and not millidegree Celsius.
+I am not too fussed about that either way, I am happy to update it to
+pcim_* though, it is Bjorn/Arnd's decision.
 
-To take into account this discrepancy and fixup the values reported by
-SCP a new DT property `scpi,sensors-scale' is introduced and used in
-this patch by the scpi-hwmon driver to convert the sensor readings to
-the expected scale.
+> 2. If you may notice there is no separate pcim_*map*() stuff, they are
+> dynamically adapting to the case.
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- drivers/hwmon/scpi-hwmon.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+I do not understand what you mean here I would ask you to elaborate
+a bit more please so that I can do something about it.
 
-diff --git a/drivers/hwmon/scpi-hwmon.c b/drivers/hwmon/scpi-hwmon.c
-index 094f948f99ff..64a51e06c8df 100644
---- a/drivers/hwmon/scpi-hwmon.c
-+++ b/drivers/hwmon/scpi-hwmon.c
-@@ -23,6 +23,7 @@
- #include <linux/thermal.h>
- 
- struct sensor_data {
-+	unsigned int scale;
- 	struct scpi_sensor_info info;
- 	struct device_attribute dev_attr_input;
- 	struct device_attribute dev_attr_label;
-@@ -44,6 +45,14 @@ struct scpi_sensors {
- 	const struct attribute_group *groups[2];
- };
- 
-+static const unsigned int scpi_scale[] = {
-+	1000,		/* Temperature (millidegrees Celsius)	*/
-+	1000,		/* Voltage     (millivolts)		*/
-+	1000,		/* Current     (milliamperes)		*/
-+	1000000,	/* Power       (microwatts)		*/
-+	1000000,	/* Energy      (microjoules)		*/
-+};
-+
- static int scpi_read_temp(void *dev, int *temp)
- {
- 	struct scpi_thermal_zone *zone = dev;
-@@ -57,6 +66,11 @@ static int scpi_read_temp(void *dev, int *temp)
- 	if (ret)
- 		return ret;
- 
-+	if (scpi_scale[sensor->info.class] != sensor->scale) {
-+		value *= scpi_scale[sensor->info.class];
-+		do_div(value, sensor->scale);
-+	}
-+
- 	*temp = value;
- 	return 0;
- }
-@@ -77,6 +91,11 @@ scpi_show_sensor(struct device *dev, struct device_attribute *attr, char *buf)
- 	if (ret)
- 		return ret;
- 
-+	if (scpi_scale[sensor->info.class] != sensor->scale) {
-+		value *= scpi_scale[sensor->info.class];
-+		do_div(value, sensor->scale);
-+	}
-+
- 	return sprintf(buf, "%llu\n", value);
- }
- 
-@@ -97,6 +116,7 @@ static struct thermal_zone_of_device_ops scpi_sensor_ops = {
- static int scpi_hwmon_probe(struct platform_device *pdev)
- {
- 	u16 nr_sensors, i;
-+	u32 scale[] = { 1000, 1000, 1000, 1000000, 1000000 };
- 	int num_temp = 0, num_volt = 0, num_current = 0, num_power = 0;
- 	int num_energy = 0;
- 	struct scpi_ops *scpi_ops;
-@@ -131,6 +151,9 @@ static int scpi_hwmon_probe(struct platform_device *pdev)
- 
- 	scpi_sensors->scpi_ops = scpi_ops;
- 
-+	of_property_read_u32_array(dev->of_node, "scpi,sensors-scale",
-+				   scale, ARRAY_SIZE(scale));
-+
- 	for (i = 0, idx = 0; i < nr_sensors; i++) {
- 		struct sensor_data *sensor = &scpi_sensors->data[idx];
- 
-@@ -178,6 +201,8 @@ static int scpi_hwmon_probe(struct platform_device *pdev)
- 			continue;
- 		}
- 
-+		sensor->scale = scale[sensor->info.class];
-+
- 		sensor->dev_attr_input.attr.mode = S_IRUGO;
- 		sensor->dev_attr_input.show = scpi_show_sensor;
- 		sensor->dev_attr_input.attr.name = sensor->input;
--- 
-2.12.0
+Thanks !
+Lorenzo
