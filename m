@@ -1,61 +1,50 @@
-From: ada@thorsis.com (Alexander Dahl)
-Date: Thu, 02 Mar 2017 13:02:16 +0100
-Subject: [PATCH 2/7] memory: atmel-ebi: Simplify SMC config code
-In-Reply-To: <1487609701-10300-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1487609701-10300-1-git-send-email-boris.brezillon@free-electrons.com>
- <1487609701-10300-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <16727676.CMj9rWYKWZ@ada>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu,  2 Mar 2017 13:14:59 +0100
+Subject: [PATCH 1/2] Documentation: bindings: Introduce scpi,sensors-scale
+In-Reply-To: <20170302121500.8121-1-carlo@caione.org>
+References: <20170302121500.8121-1-carlo@caione.org>
+Message-ID: <20170302121500.8121-2-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hei hei,
+From: Carlo Caione <carlo@endlessm.com>
 
-With 
+Document the new property `scpi,sensors-scale` used by the hwmon-scpi
+driver to convert the sensor readings to the correct / expected scale.
 
-#define ATMEL_SMC_MODE_TDF(x)           (((x) - 1) << 16)
+Signed-off-by: Carlo Caione <carlo@endlessm.com>
+---
+ Documentation/devicetree/bindings/arm/arm,scpi.txt | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-from include/linux/mfd/syscon/atmel-smc.h you added this:
-
-> +	ret = of_property_read_u32(np, "atmel,smc-tdf-ns", &val);
-> +	if (!ret) {
-> +		required = true;
-> +		ncycles = DIV_ROUND_UP(val, clk_period_ns);
-> +		if (ncycles > ATMEL_SMC_MODE_TDF_MAX) {
-> +			ret = -EINVAL;
-> +			goto out;
-> +		}
-
-[?]
-
-> +		smcconf->mode |= ATMEL_SMC_MODE_TDF(ncycles);
-> +	}
-
-This was the same algorithm at some other location in atmel-ebi.c 
-before:
-
-	#define AT91_SMC_TDF_(x)		((((x) - 1) << 16) & AT91_SMC_TDF)
-
-	val = DIV_ROUND_UP(timings->tdf_ns, clk_rate);
-	if (val > AT91_SMC_TDF_MAX)
-		val = AT91_SMC_TDF_MAX;
-	regmap_fields_write(fields->mode, conf->cs,
-			    config->mode | AT91_SMC_TDF_(val));
-
-The hardware manual (AT91SAM9G20) says values from 0 to 15 (4bit, 0x0 to 
-0xF) are possible and I guess the goal is to set it to a value 
-corresponding to the value in ns from the dts or to 15 if it's greater 
-(or -EINVAL in the new version).
-
-However how can one set it to zero? Put in zero to the div you get zero 
-for ncycles or val and that goes as x into (((x) - 1) << 16) which 
-results in 0xF ending up as TDF_CYCLES in the mode register, right?
-
-I can of course set a slightly greater value, which ends up in a 
-calculated register value of zero, but that seems more a hack to me and 
-is not obvious if I just look@the DTS.
-
-If I'm right this might be topic of another bugfix patch, or should it 
-be done right in a v2 of this one?
-
-Greets
-Alex
+diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+index 401831973638..35c621ce52c5 100644
+--- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
++++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+@@ -84,6 +84,24 @@ Required properties:
+ 			 as used by the firmware. Refer to  platform details
+ 			 for your implementation for the IDs to use.
+ 
++Optional properties:
++- scpi,sensors-scale: array of 5 elements defining the unit scale used by the
++                      SCP for the 5 different sensor classes (temperature,
++                      voltage, current, power, energy) such that 1 == unit,
++                      1000 == milli, 1000000 == micro, ...
++
++                      Example:
++                         scpi,sensors-scale = <1 1000 1000 1000000 1000000>
++                      In this case the values reported by SCP are:
++                      -> temperature in degree Celsius
++                      -> voltage in millivolts
++                      -> current in milliamperes
++                      -> power in microwatts
++                      -> energy in microjoules
++
++                      The default value is:
++                         scpi,sensors-scale = <1000 1000 1000 1000000 1000000>
++
+ Power domain bindings for the power domains based on SCPI Message Protocol
+ ------------------------------------------------------------
+ 
+-- 
+2.12.0
