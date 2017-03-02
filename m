@@ -1,16 +1,14 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Mar 2017 14:13:34 +0000
+From: rabin.vincent@axis.com (Rabin Vincent)
+Date: Thu, 2 Mar 2017 15:13:56 +0100
 Subject: DIfferent BogoMIPS value after bbaa06702719
  ("clocksource/drivers/arm_global_timer: Register delay timer")
 In-Reply-To: <d22ec429-1a71-e56f-e1d7-28b066be8c1b@milecki.pl>
 References: <d22ec429-1a71-e56f-e1d7-28b066be8c1b@milecki.pl>
-Message-ID: <20170302141334.GM21222@n2100.armlinux.org.uk>
+Message-ID: <20170302141356.GC6763@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Mar 02, 2017 at 02:36:23PM +0100, Rafa? Mi?ecki wrote:
-> Hi,
-> 
 > I just updated kernel on my SmartRG SR400ac (bcm4708-smartrg-sr400ac.dts) from
 > 4.4 to 4.9 and noticed that this part of the log:
 > [    0.020820] Calibrating delay loop... 1594.16 BogoMIPS (lpj=7970816)
@@ -27,20 +25,15 @@ On Thu, Mar 02, 2017 at 02:36:23PM +0100, Rafa? Mi?ecki wrote:
 > This is caused by commit bbaa06702719 ("clocksource/drivers/arm_global_timer:
 > Register delay timer").
 > 
-> Is this something expected?
+> Is this something expected? Or should I be worried about this? I'm aware it's
+> just BogoMIPS, but I still prefer to ask :)
 
-Yes.
+Yes, it's expected.
 
-> Or should I be worried about this? I'm aware it's just BogoMIPS, but I
-> still prefer to ask :)
+No, you shouldn't be worried.
 
-It's *bogus*.  Bogomips is the calibration value that the kernel uses
-to achieve delays.  It has nothing to do with the speed of the CPU on
-modern systems that use a timer instead.  (In that case, it's a
-calibration value for the timer, rather than a calibration value for
-the number of software loops required to achieve a delay.)
+It's even explained on Wikipedia:
+https://en.wikipedia.org/wiki/BogoMips#Timer-based_delays
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+You can run the udelay test (CONFIG_TEST_UDELAY) if you want to make
+sure that your delay loops are fine.
