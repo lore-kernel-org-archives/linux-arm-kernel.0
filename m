@@ -1,44 +1,39 @@
-From: sgoel@codeaurora.org (Goel, Sameer)
-Date: Wed, 1 Mar 2017 17:51:21 -0700
-Subject: [PATCH v32 00/13] arm64: add kdump support
-In-Reply-To: <20170207080601.5816-1-takahiro.akashi@linaro.org>
-References: <20170207080601.5816-1-takahiro.akashi@linaro.org>
-Message-ID: <1f4c1497-129d-7350-89c1-1ba0a6764ba5@codeaurora.org>
+From: sergio.prado@e-labworks.com (Sergio Prado)
+Date: Wed,  1 Mar 2017 22:18:54 -0300
+Subject: [PATCH v4 0/2] mmc: host: s3cmci: add device tree support
+Message-ID: <1488417536-15110-1-git-send-email-sergio.prado@e-labworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series adds support for configuring Samsung's S3C24XX MMC/SD/SDIO
+controller via device tree.
 
+Tested on FriendlyARM mini2440, based on s3c2440 SoC.
 
-On 2/7/2017 1:06 AM, AKASHI Takahiro wrote:
-> This patch series adds kdump support on arm64.
-> 
-> To load a crash-dump kernel to the systems, a series of patches to
-> kexec-tools[1] are also needed. Please use the latest one, v5 [2].
-> For your convinience, you can pick them up from:
->    https://git.linaro.org/people/takahiro.akashi/linux-aarch64.git arm64/kdump
->    https://git.linaro.org/people/takahiro.akashi/kexec-tools.git arm64/kdump
-> 
-> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
->   - crash utility (v7.1.8 or later, i.e. master for now) [3]
-> 
-> I tested this patchset on fast model and hikey.
-> (under various configurations, in particular 4KB-page/39,48-bits, 64KB-page/42
-> -bits with hibernate)
-> 
-> The previous versions were also:
-> Tested-by: Pratyush Anand <panand@redhat.com> (v29, mustang and seattle)
-> Tested-by: James Morse <james.morse@arm.com> (v27, Juno)
-> 
-I tested this patch set on a QDT2400 device with 4k 4-level setup. This patchset worked after applying [1].
+Changes since v3 (as suggested by Rob Herring)
+- describing properties that wasn't documented and removing unnecessary
+  comment in the device tree binding
 
-[1] [PATCH] efi/libstub/arm*: Set default address and size cells values for an empty dtb
+Changes since v2:
+- struct "s3cmci_drv_data" and flag "is2440" renamed
+- copying the whole driver data struct instead of only its member so
+  it will be easier to extend the information in the future
+- using mmc_of_parse() to read "cd-gpios" and "wp-gpios" properties
+  from device tree
 
-Without the above patch the start address of the crash kernel is recorded incorrectly and the 
-memblock_cap_memory_range clears out the incorrect range. 
- 
-Thanks,
-Sameer
+Changes since v1:
+- pinctrl description removed from DT binding
+- unit and label on DT binding renamed to mmc
+
+Sergio Prado (2):
+  dt-bindings: mmc: add DT binding for S3C24XX MMC/SD/SDIO controller
+  mmc: host: s3cmci: allow probing from device tree
+
+ .../devicetree/bindings/mmc/samsung,s3cmci.txt     |  42 +++
+ drivers/mmc/host/s3cmci.c                          | 298 +++++++++++----------
+ drivers/mmc/host/s3cmci.h                          |   3 +-
+ 3 files changed, 200 insertions(+), 143 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+
 -- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+1.9.1
