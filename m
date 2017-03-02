@@ -1,104 +1,60 @@
-From: jonathan.richardson@broadcom.com (Jonathan Richardson)
-Date: Thu, 2 Mar 2017 13:03:12 -0800
-Subject: [PATCH v4 2/3] mailbox: Add iProc mailbox controller driver
-In-Reply-To: <CABb+yY1o7QTYLm3HGWNeFDPnfpL7AAJ6+R91Stn-gNvO7afxoA@mail.gmail.com>
-References: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
- <1485463082-27067-3-git-send-email-jonathan.richardson@broadcom.com>
- <CABb+yY0rmAFutskhVkQ926QfsvtJ-WnXrQc=+PQNg=7NZEXC+Q@mail.gmail.com>
- <09177a6f-0612-1e17-a12e-0b1969f5b2e1@broadcom.com>
- <CABb+yY1o7QTYLm3HGWNeFDPnfpL7AAJ6+R91Stn-gNvO7afxoA@mail.gmail.com>
-Message-ID: <22d07bb1-9e93-4ae5-7215-923bde9ebfe5@broadcom.com>
+From: akurz@blala.de (Alexander Kurz)
+Date: Thu,  2 Mar 2017 22:03:48 +0100
+Subject: [PATCH v2] ARM: dts: imx50: imx50-esdhc use imx53-esdhc
+Message-ID: <1488488628-11711-1-git-send-email-akurz@blala.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+According to the reference manuals, both imx50/imx53 SOC seem to share
+the same eSDHC controller, especially the section on "Multi-block Read"
+mentioned in commit 361b8482026c ("mmc: sdhci-esdhc-imx: fix multiblock
+reads on i.MX53") is identical for both SOC.
+Hence, let imx50 use imx53-esdhc.
 
+Signed-off-by: Alexander Kurz <akurz@blala.de>
+---
+ arch/arm/boot/dts/imx50.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-On 17-02-23 09:00 PM, Jassi Brar wrote:
-> On Fri, Feb 24, 2017 at 12:29 AM, Jonathan Richardson
-> <jonathan.richardson@broadcom.com> wrote:
->>
->> On 17-02-16 10:20 PM, Jassi Brar wrote:
->>> On Fri, Jan 27, 2017 at 2:08 AM, Jonathan Richardson
->>> <jonathan.richardson@broadcom.com> wrote:
->>>
->>>> +static int iproc_mbox_send_data_m0(struct mbox_chan *chan, void *data)
->>>> +{
->>>> +       struct iproc_mbox *mbox = dev_get_drvdata(chan->mbox->dev);
->>>> +       struct iproc_mbox_msg *msg = (struct iproc_mbox_msg *)data;
->>>> +               unsigned long flags;
->>>> +       int err = 0;
->>>> +       const int poll_period_us = 5;
->>>> +       const int max_retries = (MAX_M0_TIMEOUT_MS * 1000) / poll_period_us;
->>>> +
->>>> +       if (!msg)
->>>> +               return -EINVAL;
->>>> +
->>>> +       spin_lock_irqsave(&mbox->lock, flags);
->>>> +
->>>> +       dev_dbg(mbox->dev, "Send msg to M0: cmd=0x%x, param=0x%x, wait_ack=%d\n",
->>>> +               msg->cmd, msg->param, msg->wait_ack);
->>>> +
->>> prints should be outside the spinlocks.
->>>
->>>> +       writel(msg->cmd, mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
->>>> +       writel(msg->param, mbox->base + IPROC_CRMU_MAILBOX1_OFFSET);
->>>> +
->>>> +       if (msg->wait_ack) {
->>>> +               int retries;
->>>> +
->>> move poll_period_us and max_retries in here or just define' them
->>>
->>>> +               err = msg->reply_code = -ETIMEDOUT;
->>>> +               for (retries = 0; retries < max_retries; retries++) {
->>>> +                       u32 val = readl(
->>>> +                               mbox->base + IPROC_CRMU_MAILBOX0_OFFSET);
->>>> +                       if (val & M0_IPC_CMD_DONE_MASK) {
->>>> +                               /*
->>>> +                                * M0 replied - save reply code and
->>>> +                                * clear error.
->>>> +                                */
->>>> +                               msg->reply_code = (val &
->>>> +                                       M0_IPC_CMD_REPLY_MASK) >>
->>>> +                                       M0_IPC_CMD_REPLY_SHIFT;
->>>> +                               err = 0;
->>>> +                               break;
->>>> +                       }
->>>> +                       udelay(poll_period_us);
->>>>
->>> potentially 2ms inside spin_lock_irqsave. Alternative is to implement
->>> a simple 'peek_data' and call it for requests with 'wait_ack'
->> Hi Jassi. The M0 response is normally 25-30 us.
->>
-> You hardcode the behaviour of your protocol in the controller driver.
-> What if your next platform/protocol has commands that the remote/M0
-> takes upto 10ms to respond (because they are not critical/trivial)?
->
-> If you don't have some h/w indicator (like irq or bit-flag) for
-> tx-done and data-rx , you have to use ack-by-client and peek method.
-There isn't any functionality not in the driver. We write the message to two registers and poll another to know when it's complete. Nothing can touch the registers again until the operation is complete. We can't even pass data back to the controller. We pass pointers to the M0 and it can write to the memory. The only data we sent back to the client is that status code from the polled register. When complete, data will already be written into the clients memory from the M0.
-> Commands that don't get a response will be immediately followed by
-> mbox_client_txdone(), while others would need to call peek_data() to
-> poll for data-rx. Please note, if you implement the tx_prepare
-> callback, you will know when to start peeking for incoming data.
-The driver will need to block access to the registers if we remove the spinlock. If a client sends a message that doesn't get a response and another client has already sent a message that does which is pending, it still needs to be blocked.
-
-The framework queues messages on a per channel basis. We have several clients for various drivers each with their own mbox channel. send_data in the controller could return EBUSY if the channel is being used by another channel (ie- transaction pending). If channel A sends a message, then client B sends one before A is complete, the controller's send_data must return an error. The message remains in the queue until tx_tick is called to re-submit it again. Client A polls the controller until complete then calls mbox_client_txdone. Client B can poll the controller but first needs a way of submitting the queued message again (via tx_tick->msg_submit). Using the ACK model I see no way client B can know when to start polling (ie- when client A's message was completed) or even kick off the msg_submit again. The submitting of messages from the queue to controller's send_data relies on knowing when sending a prior message on the channel was complete. It doesn't know when another
-channel's message has been sent. The only way I can see this working is using one channel shared among clients. We don't want to add any additional queuing of messages in the controller when the framework already does it (per channel). Hope this makes sense. Thanks.
-
->> We have one message that takes 280us but we can get rid of it if necessary.
->>
-> No. Please don't kill some needed feature just to make the driver simpler.
->
->> Regarding your suggestion of peek_data. I don't see how it can be used
->> without the spinlock to serialize multiple clients/channels over a single
->> mailbox channel. peek_data is going to allow the client to poll for data.
->> But the spinlock is there to prevent other clients from accessing the
->> mailbox channel until any pending transaction is complete. last_tx_done
->> looks like an option but even that will not prevent another client from
->> clobbering a pending transaction. A shared channel among all clients
->> with a blocking model would probably work, but not pretty.
->>
-> Mailbox api provides exclusive access to its clients, just like dma-engine.
-> Please have a look at how other platforms do it.
-
-> Thanks.
+diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
+index ceae909..2a98afc 100644
+--- a/arch/arm/boot/dts/imx50.dtsi
++++ b/arch/arm/boot/dts/imx50.dtsi
+@@ -109,7 +109,7 @@
+ 				ranges;
+ 
+ 				esdhc1: esdhc at 50004000 {
+-					compatible = "fsl,imx50-esdhc";
++					compatible = "fsl,imx50-esdhc", "fsl,imx53-esdhc";
+ 					reg = <0x50004000 0x4000>;
+ 					interrupts = <1>;
+ 					clocks = <&clks IMX5_CLK_ESDHC1_IPG_GATE>,
+@@ -121,7 +121,7 @@
+ 				};
+ 
+ 				esdhc2: esdhc at 50008000 {
+-					compatible = "fsl,imx50-esdhc";
++					compatible = "fsl,imx50-esdhc", "fsl,imx53-esdhc";
+ 					reg = <0x50008000 0x4000>;
+ 					interrupts = <2>;
+ 					clocks = <&clks IMX5_CLK_ESDHC2_IPG_GATE>,
+@@ -170,7 +170,7 @@
+ 				};
+ 
+ 				esdhc3: esdhc at 50020000 {
+-					compatible = "fsl,imx50-esdhc";
++					compatible = "fsl,imx50-esdhc", "fsl,imx53-esdhc";
+ 					reg = <0x50020000 0x4000>;
+ 					interrupts = <3>;
+ 					clocks = <&clks IMX5_CLK_ESDHC3_IPG_GATE>,
+@@ -182,7 +182,7 @@
+ 				};
+ 
+ 				esdhc4: esdhc at 50024000 {
+-					compatible = "fsl,imx50-esdhc";
++					compatible = "fsl,imx50-esdhc", "fsl,imx53-esdhc";
+ 					reg = <0x50024000 0x4000>;
+ 					interrupts = <4>;
+ 					clocks = <&clks IMX5_CLK_ESDHC4_IPG_GATE>,
+-- 
+2.1.4
