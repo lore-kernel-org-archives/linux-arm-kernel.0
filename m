@@ -1,187 +1,144 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Thu,  2 Mar 2017 13:44:38 -0800
-Subject: [RFC PATCH 06/12] staging: android: ion: Remove crufty cache support
+Date: Thu,  2 Mar 2017 13:44:40 -0800
+Subject: [RFC PATCH 08/12] cma: Store a name in the cma structure
 In-Reply-To: <1488491084-17252-1-git-send-email-labbott@redhat.com>
 References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
-Message-ID: <1488491084-17252-7-git-send-email-labbott@redhat.com>
+Message-ID: <1488491084-17252-9-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-
-Now that we call dma_map in the dma_buf API callbacks there is no need
-to use the existing cache APIs. Remove the sync ioctl and the existing
-bad dma_sync calls. Explicit caching can be handled with the dma_buf
-sync API.
+Frameworks that may want to enumerate CMA heaps (e.g. Ion) will find it
+useful to have an explicit name attached to each region. Store the name
+in each CMA structure.
 
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
- drivers/staging/android/ion/ion-ioctl.c         |  5 ----
- drivers/staging/android/ion/ion.c               | 40 -------------------------
- drivers/staging/android/ion/ion_carveout_heap.c |  6 ----
- drivers/staging/android/ion/ion_chunk_heap.c    |  6 ----
- drivers/staging/android/ion/ion_page_pool.c     |  3 --
- drivers/staging/android/ion/ion_system_heap.c   |  5 ----
- 6 files changed, 65 deletions(-)
+ drivers/base/dma-contiguous.c |  5 +++--
+ include/linux/cma.h           |  4 +++-
+ mm/cma.c                      | 11 +++++++++--
+ mm/cma.h                      |  1 +
+ mm/cma_debug.c                |  2 +-
+ 5 files changed, 17 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/staging/android/ion/ion-ioctl.c b/drivers/staging/android/ion/ion-ioctl.c
-index 5b2e93f..f820d77 100644
---- a/drivers/staging/android/ion/ion-ioctl.c
-+++ b/drivers/staging/android/ion/ion-ioctl.c
-@@ -146,11 +146,6 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
- 			data.handle.handle = handle->id;
- 		break;
+diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+index e167a1e1..4f638ab 100644
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -165,7 +165,8 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
+ {
+ 	int ret;
+ 
+-	ret = cma_declare_contiguous(base, size, limit, 0, 0, fixed, res_cma);
++	ret = cma_declare_contiguous(base, size, limit, 0, 0, fixed,
++					"reserved", res_cma);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -257,7 +258,7 @@ static int __init rmem_cma_setup(struct reserved_mem *rmem)
+ 		return -EINVAL;
  	}
--	case ION_IOC_SYNC:
--	{
--		ret = ion_sync_for_device(client, data.fd.fd);
--		break;
--	}
- 	case ION_IOC_CUSTOM:
- 	{
- 		if (!dev->custom_ioctl)
-diff --git a/drivers/staging/android/ion/ion.c b/drivers/staging/android/ion/ion.c
-index 8eef1d7..c3c316f 100644
---- a/drivers/staging/android/ion/ion.c
-+++ b/drivers/staging/android/ion/ion.c
-@@ -815,22 +815,6 @@ static void ion_unmap_dma_buf(struct dma_buf_attachment *attachment,
- 	free_duped_table(table);
+ 
+-	err = cma_init_reserved_mem(rmem->base, rmem->size, 0, &cma);
++	err = cma_init_reserved_mem(rmem->base, rmem->size, 0, rmem->name, &cma);
+ 	if (err) {
+ 		pr_err("Reserved memory: unable to setup CMA region\n");
+ 		return err;
+diff --git a/include/linux/cma.h b/include/linux/cma.h
+index 6f0a91b..49f98ea 100644
+--- a/include/linux/cma.h
++++ b/include/linux/cma.h
+@@ -21,13 +21,15 @@ struct cma;
+ extern unsigned long totalcma_pages;
+ extern phys_addr_t cma_get_base(const struct cma *cma);
+ extern unsigned long cma_get_size(const struct cma *cma);
++extern const char *cma_get_name(const struct cma *cma);
+ 
+ extern int __init cma_declare_contiguous(phys_addr_t base,
+ 			phys_addr_t size, phys_addr_t limit,
+ 			phys_addr_t alignment, unsigned int order_per_bit,
+-			bool fixed, struct cma **res_cma);
++			bool fixed, const char *name, struct cma **res_cma);
+ extern int cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
+ 					unsigned int order_per_bit,
++					const char *name,
+ 					struct cma **res_cma);
+ extern struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align);
+ extern bool cma_release(struct cma *cma, const struct page *pages, unsigned int count);
+diff --git a/mm/cma.c b/mm/cma.c
+index 94b3460..4a93d2b 100644
+--- a/mm/cma.c
++++ b/mm/cma.c
+@@ -53,6 +53,11 @@ unsigned long cma_get_size(const struct cma *cma)
+ 	return cma->count << PAGE_SHIFT;
  }
  
--void ion_pages_sync_for_device(struct device *dev, struct page *page,
--			       size_t size, enum dma_data_direction dir)
--{
--	struct scatterlist sg;
--
--	sg_init_table(&sg, 1);
--	sg_set_page(&sg, page, size, 0);
--	/*
--	 * This is not correct - sg_dma_address needs a dma_addr_t that is valid
--	 * for the targeted device, but this works on the currently targeted
--	 * hardware.
--	 */
--	sg_dma_address(&sg) = page_to_phys(page);
--	dma_sync_sg_for_device(dev, &sg, 1, dir);
--}
--
- static int ion_mmap(struct dma_buf *dmabuf, struct vm_area_struct *vma)
++const char *cma_get_name(const struct cma *cma)
++{
++	return cma->name ? cma->name : "(undefined)";
++}
++
+ static unsigned long cma_bitmap_aligned_mask(const struct cma *cma,
+ 					     int align_order)
  {
- 	struct ion_buffer *buffer = dmabuf->priv;
-@@ -1042,30 +1026,6 @@ struct ion_handle *ion_import_dma_buf_fd(struct ion_client *client, int fd)
- }
- EXPORT_SYMBOL(ion_import_dma_buf_fd);
- 
--int ion_sync_for_device(struct ion_client *client, int fd)
--{
--	struct dma_buf *dmabuf;
--	struct ion_buffer *buffer;
--
--	dmabuf = dma_buf_get(fd);
--	if (IS_ERR(dmabuf))
--		return PTR_ERR(dmabuf);
--
--	/* if this memory came from ion */
--	if (dmabuf->ops != &dma_buf_ops) {
--		pr_err("%s: can not sync dmabuf from another exporter\n",
--		       __func__);
--		dma_buf_put(dmabuf);
--		return -EINVAL;
--	}
--	buffer = dmabuf->priv;
--
--	dma_sync_sg_for_device(NULL, buffer->sg_table->sgl,
--			       buffer->sg_table->nents, DMA_BIDIRECTIONAL);
--	dma_buf_put(dmabuf);
--	return 0;
--}
--
- int ion_query_heaps(struct ion_client *client, struct ion_heap_query *query)
+@@ -168,6 +173,7 @@ core_initcall(cma_init_reserved_areas);
+  */
+ int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
+ 				 unsigned int order_per_bit,
++				 const char *name,
+ 				 struct cma **res_cma)
  {
- 	struct ion_device *dev = client->dev;
-diff --git a/drivers/staging/android/ion/ion_carveout_heap.c b/drivers/staging/android/ion/ion_carveout_heap.c
-index 9bf8e98..e0e360f 100644
---- a/drivers/staging/android/ion/ion_carveout_heap.c
-+++ b/drivers/staging/android/ion/ion_carveout_heap.c
-@@ -100,10 +100,6 @@ static void ion_carveout_heap_free(struct ion_buffer *buffer)
+ 	struct cma *cma;
+@@ -201,6 +207,7 @@ int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
+ 	cma->base_pfn = PFN_DOWN(base);
+ 	cma->count = size >> PAGE_SHIFT;
+ 	cma->order_per_bit = order_per_bit;
++	cma->name = name;
+ 	*res_cma = cma;
+ 	cma_area_count++;
+ 	totalcma_pages += (size / PAGE_SIZE);
+@@ -229,7 +236,7 @@ int __init cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
+ int __init cma_declare_contiguous(phys_addr_t base,
+ 			phys_addr_t size, phys_addr_t limit,
+ 			phys_addr_t alignment, unsigned int order_per_bit,
+-			bool fixed, struct cma **res_cma)
++			bool fixed, const char *name, struct cma **res_cma)
+ {
+ 	phys_addr_t memblock_end = memblock_end_of_DRAM();
+ 	phys_addr_t highmem_start;
+@@ -335,7 +342,7 @@ int __init cma_declare_contiguous(phys_addr_t base,
+ 		base = addr;
+ 	}
  
- 	ion_heap_buffer_zero(buffer);
- 
--	if (ion_buffer_cached(buffer))
--		dma_sync_sg_for_device(NULL, table->sgl, table->nents,
--				       DMA_BIDIRECTIONAL);
--
- 	ion_carveout_free(heap, paddr, buffer->size);
- 	sg_free_table(table);
- 	kfree(table);
-@@ -128,8 +124,6 @@ struct ion_heap *ion_carveout_heap_create(struct ion_platform_heap *heap_data)
- 	page = pfn_to_page(PFN_DOWN(heap_data->base));
- 	size = heap_data->size;
- 
--	ion_pages_sync_for_device(NULL, page, size, DMA_BIDIRECTIONAL);
--
- 	ret = ion_heap_pages_zero(page, size, pgprot_writecombine(PAGE_KERNEL));
+-	ret = cma_init_reserved_mem(base, size, order_per_bit, res_cma);
++	ret = cma_init_reserved_mem(base, size, order_per_bit, name, res_cma);
  	if (ret)
- 		return ERR_PTR(ret);
-diff --git a/drivers/staging/android/ion/ion_chunk_heap.c b/drivers/staging/android/ion/ion_chunk_heap.c
-index 8c41889..46e13f6 100644
---- a/drivers/staging/android/ion/ion_chunk_heap.c
-+++ b/drivers/staging/android/ion/ion_chunk_heap.c
-@@ -101,10 +101,6 @@ static void ion_chunk_heap_free(struct ion_buffer *buffer)
+ 		goto err;
  
- 	ion_heap_buffer_zero(buffer);
+diff --git a/mm/cma.h b/mm/cma.h
+index 17c75a4..4986128 100644
+--- a/mm/cma.h
++++ b/mm/cma.h
+@@ -11,6 +11,7 @@ struct cma {
+ 	struct hlist_head mem_head;
+ 	spinlock_t mem_head_lock;
+ #endif
++	const char *name;
+ };
  
--	if (ion_buffer_cached(buffer))
--		dma_sync_sg_for_device(NULL, table->sgl, table->nents,
--				       DMA_BIDIRECTIONAL);
--
- 	for_each_sg(table->sgl, sg, table->nents, i) {
- 		gen_pool_free(chunk_heap->pool, page_to_phys(sg_page(sg)),
- 			      sg->length);
-@@ -132,8 +128,6 @@ struct ion_heap *ion_chunk_heap_create(struct ion_platform_heap *heap_data)
- 	page = pfn_to_page(PFN_DOWN(heap_data->base));
- 	size = heap_data->size;
+ extern struct cma cma_areas[MAX_CMA_AREAS];
+diff --git a/mm/cma_debug.c b/mm/cma_debug.c
+index f8e4b60..4742efd 100644
+--- a/mm/cma_debug.c
++++ b/mm/cma_debug.c
+@@ -167,7 +167,7 @@ static void cma_debugfs_add_one(struct cma *cma, int idx)
+ 	char name[16];
+ 	int u32s;
  
--	ion_pages_sync_for_device(NULL, page, size, DMA_BIDIRECTIONAL);
--
- 	ret = ion_heap_pages_zero(page, size, pgprot_writecombine(PAGE_KERNEL));
- 	if (ret)
- 		return ERR_PTR(ret);
-diff --git a/drivers/staging/android/ion/ion_page_pool.c b/drivers/staging/android/ion/ion_page_pool.c
-index aea89c1..532eda7 100644
---- a/drivers/staging/android/ion/ion_page_pool.c
-+++ b/drivers/staging/android/ion/ion_page_pool.c
-@@ -30,9 +30,6 @@ static void *ion_page_pool_alloc_pages(struct ion_page_pool *pool)
+-	sprintf(name, "cma-%d", idx);
++	sprintf(name, "cma-%s", cma->name);
  
- 	if (!page)
- 		return NULL;
--	if (!pool->cached)
--		ion_pages_sync_for_device(NULL, page, PAGE_SIZE << pool->order,
--					  DMA_BIDIRECTIONAL);
- 	return page;
- }
+ 	tmp = debugfs_create_dir(name, cma_debugfs_root);
  
-diff --git a/drivers/staging/android/ion/ion_system_heap.c b/drivers/staging/android/ion/ion_system_heap.c
-index 6cb2fe7..a33331b 100644
---- a/drivers/staging/android/ion/ion_system_heap.c
-+++ b/drivers/staging/android/ion/ion_system_heap.c
-@@ -75,9 +75,6 @@ static struct page *alloc_buffer_page(struct ion_system_heap *heap,
- 
- 	page = ion_page_pool_alloc(pool);
- 
--	if (cached)
--		ion_pages_sync_for_device(NULL, page, PAGE_SIZE << order,
--					  DMA_BIDIRECTIONAL);
- 	return page;
- }
- 
-@@ -401,8 +398,6 @@ static int ion_system_contig_heap_allocate(struct ion_heap *heap,
- 
- 	buffer->sg_table = table;
- 
--	ion_pages_sync_for_device(NULL, page, len, DMA_BIDIRECTIONAL);
--
- 	return 0;
- 
- free_table:
 -- 
 2.7.4
