@@ -1,124 +1,186 @@
-From: jerome.forissier@linaro.org (Jerome Forissier)
-Date: Thu, 2 Mar 2017 15:18:34 +0100
-Subject: [PATCH] Documentation: dt: Add binding for
- /secure-chosen/stdout-path
-In-Reply-To: <456c743d-5963-3169-be1b-568c9012a993@arm.com>
-References: <55a2f3cbe477bc876a7547eeb4693218698b87fe.1488387801.git.jerome.forissier@linaro.org>
- <CAFEAcA9AX5kSMs-PBQWDeDo=PTLoBHPMKc6ctYvR4LVni3rWAA@mail.gmail.com>
- <456c743d-5963-3169-be1b-568c9012a993@arm.com>
-Message-ID: <6c233107-c6dc-3930-d5cb-53692da5cf6b@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 2 Mar 2017 15:21:40 +0100
+Subject: [linux-sunxi] Re: [PATCH 2/4] clk: sunxi-ng: Add sun7i-a20 CCU
+ driver
+In-Reply-To: <1488404294.29650.3.camel@plaes.org>
+References: <20170227210914.18954-1-plaes@plaes.org>
+ <20170227210914.18954-3-plaes@plaes.org>
+ <20170228082108.cthaanfuffbwbkaf@lukather>
+ <1488404294.29650.3.camel@plaes.org>
+Message-ID: <20170302142140.mjbqqhjuhmc2jgwq@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Priit,
 
-
-On 03/01/2017 07:42 PM, Robin Murphy wrote:
-> On 01/03/17 17:43, Peter Maydell wrote:
->> On 1 March 2017 at 17:08, Jerome Forissier <jerome.forissier@linaro.org> wrote:
->>> Some platforms may use a single device tree to describe two address
->>> spaces, as described in d9f43babb998 ("Documentation: dt: Add bindings
->>> for Secure-only devices"). For these platforms it makes sense to define
->>> a secure counterpart of /chosen, namely: /secure-chosen. This new node
->>> is meant to be used by the secure firmware to pass data to the secure
->>> OS. Only the stdout-path property is supported for now.
->>>
->>> Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
->>> ---
->>>  Documentation/devicetree/bindings/arm/secure.txt | 15 ++++++++++++++-
->>>  1 file changed, 14 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/secure.txt b/Documentation/devicetree/bindings/arm/secure.txt
->>> index e31303f..e7c596a 100644
->>> --- a/Documentation/devicetree/bindings/arm/secure.txt
->>> +++ b/Documentation/devicetree/bindings/arm/secure.txt
->>> @@ -32,7 +32,8 @@ describe the view of Secure world using the standard bindings. These
->>>  secure- bindings only need to be used where both the Secure and Normal
->>>  world views need to be described in a single device tree.
->>>
->>> -Valid Secure world properties:
->>> +Valid Secure world properties
->>> +-----------------------------
->>>
->>>  - secure-status : specifies whether the device is present and usable
->>>    in the secure world. The combination of this with "status" allows
->>> @@ -51,3 +52,15 @@ Valid Secure world properties:
->>>     status = "disabled"; secure-status = "okay";     /* S-only */
->>>     status = "disabled";                             /* disabled in both */
->>>     status = "disabled"; secure-status = "disabled"; /* disabled in both */
->>> +
->>> +The secure-chosen node
->>> +----------------------
->>> +
->>> +Similar to the /chosen node which serves as a place for passing data
->>> +between firmware and the operating system, the /secure-chosen node may
->>> +be used to pass data to the secure OS. Only the properties defined
->>> +below may appear in the /secure-chosen node. They have the same
->>> +definition as when used under /chosen, unless explicitely stated
->>
->> typo: "explicitly".
->>
->>> +otherwise.
->>> +
->>> +- stdout-path
->>
->> What's the default for the Secure world if (a) the secure-chosen
->> node doesn't exist at all or (b) it does exist but doesn't
->> define stdout-path? Presumably it should be "fall back to
->> using the chosen node's stdout-path", to match the way we
->> do fallback for other secure world properties, but it would
->> be good to say so explicitly I think.
+On Wed, Mar 01, 2017 at 11:38:14PM +0200, Priit Laes wrote:
+> > > +/* PLL2 - Audio clock */
+> > > +static struct ccu_nm pll_audio_base_clk = {
+> > > > > > > +	.enable		= BIT(31),
+> > > > > > > +	.n		= _SUNXI_CCU_MULT_OFFSET(8, 7, 0),
+> > > > > > > +	.m		= _SUNXI_CCU_DIV_OFFSET(0, 5, 0),
+> > > > > > > +	.common		= {
+> > > > > > > +		.reg		= 0x008,
+> > > > > > > +		.hw.init	= CLK_HW_INIT("pll-audio-base",
+> > > > > +					??????"hosc",
+> > > > > +					??????&ccu_nm_ops,
+> > > > > +					??????0),
+> > > > > +	},
+> > > +
+> > > +};
+> > 
+> > You're forgetting the post-divider here
 > 
-> I'd agree that it would be reasonable for the secure OS to fall back to
-> parsing /chosen in the absence of /secure-chosen,
+> It's hardcoded to 4 during ccu initialization, similar to what is done
+> on the other SoCs (A13, A31..).
 
-I don't think that "fall back to using stuff from /chosen" is generally
-useful. Indeed, of all the properties I can see mentioned for /chosen
-("stdout-path", "linux,syrq-reset-seq", "linux,pci-probe-only",
-"bootargs", "initrd_start" and "initrd_end"), only stdout-path is likely
-to be usable by the Secure OS as a fall back. So I'd rather make this an
-exception rather than the rule.
+Right, sorry, I only saw it later. Please move that define you've been
+using here, and it will be fine :)
 
-> but if the latter is
-> present I would (at least naively) expect it to be authoritative.
+> > > +/* TODO: pll8 gpu 0x040 */
+> > 
+> > Please add all the clocks.
+> 
+> I'm not really comfortable adding clocks for blocks that currently lack
+> drivers.
 
-Agreed.
+Yet, you did it for quite a significant amount already (VE, NAND,
+AC97, DE MP, etc.). Don't get me wrong, this is definitely not a
+criticism. One of the point of the switch to sunxi-ng was that we
+would get out of the previous situation where every time you wanted to
+do something, you needed to add some clocks.
 
-> I can
-> imagine the case of a cut-down version of some system implementing only
-> one UART, where you might want to tell the Normal world OS to use that
-> and the Secure OS to keep its output to itself - allowing fallbacks at
-> the individual property level would make that harder than it needs to
-> be, and in general seems like it might be more confusing than useful.
+We have some generic code that, if fed the right data, will
+(hopefully) just work. So it's pretty safe to add (and this is better
+to be consistent, and that's the policy we had for all the other CCU
+drivers).
 
-Yup.
+> > > +/* BIT(21 .. 31) - reserved */
+> > 
+> > I'm not sure we need those comments either.
+> > 
+> > > +/*
+> > > + * TODO: SATA clock also supports external clock as parent.
+> > > + * Currently we default to using PLL6 SATA gate.
+> > > + */
+> > 
+> > Which external clock? It should be modelled anyway. If we have a
+> > dependency on some other clock, it should be in our DT binding, and
+> > listed in the mux there.
+> > 
+> > Otherwise, the clock framework will not be able to deal with that mux
+> > being already set by the bootloader, and if we need to support that
+> > clock in the future, our binding will be ready for it.
+> 
+> I wish I knew which clock they're talking about..
+> 
+> User manuals (A10/A20) only specify following in the clock register
+> description:
+> 
+> BIT(24) - CLK_SRC_GATING, default 0x0
+> Clock Source Select:
+> 0: PLL6 for SATA(100MHz)
+> 1: External Clock
+> 
+> There's no section for SATA?(called NC) in A10 manual, and in A20
+> manual only contains list of SATA/AHCI features.
 
-> Maintaining the principal that "secure-X" takes complete precedence over
-> "X" seems to me to be the least surprising; it's just that in this one
-> case X gets to be an entire node rather than a property because /chosen
-> is special.
+Hmmmm, ok :/
 
-OK, can we agree on the following?
+> > > +/* Some AHB gates are exported */
+> > > > > +#define CLK_AHB_BIST		31
+> > > > > +#define CLK_AHB_MS		36
+> > > > > +#define CLK_AHB_SDRAM		38
+> > > > > +#define CLK_AHB_ACE		39
+> > > > > +#define CLK_AHB_TS		41
+> > > > > +#define CLK_AHB_VE		48
+> > > > > +#define CLK_AHB_TVD		49
+> > > > > +#define CLK_AHB_TVE1		51
+> > > > > +#define CLK_AHB_LCD1		53
+> > > > > +#define CLK_AHB_CSI0		54
+> > > > > +#define CLK_AHB_CSI1		55
+> > > > > +#define CLK_AHB_HDMI0		56
+> > > > > +#define CLK_AHB_DE_BE1		59
+> > > > > +#define CLK_AHB_DE_FE0		60
+> > > > > +#define CLK_AHB_DE_FE1		61
+> > > > > +#define CLK_AHB_MP		63
+> > > > > +#define CLK_AHB_GPU		64
+> > > +
+> > > +/* Some APB0 gates are exported */
+> > > > > +#define CLK_APB0_AC97		67
+> > > > > +#define CLK_APB0_KEYPAD		74
+> > > +
+> > > +/* Some APB1 gates are exported */
+> > > > > +#define CLK_APB1_CAN		79
+> > > > > +#define CLK_APB1_SCR		80
+> > > +
+> > > +/* Some IP module clocks are exported */
+> > > > > +#define CLK_MS			93
+> > > > > +#define CLK_TS			106
+> > > > > +#define CLK_PATA		111
+> > > > > +#define CLK_AC97		115
+> > > > > +#define CLK_KEYPAD		117
+> > > > > +#define CLK_SATA		118
+> > > +
+> > > +/* Some DRAM gates are exported */
+> > > > > +#define CLK_DRAM_VE		125
+> > > > > +#define CLK_DRAM_CSI0		126
+> > > > > +#define CLK_DRAM_CSI1		127
+> > > > > +#define CLK_DRAM_TS		128
+> > > > > +#define CLK_DRAM_TVD		129
+> > > > > +#define CLK_DRAM_TVE1		131
+> > > > > +#define CLK_DRAM_OUT		132
+> > > > > +#define CLK_DRAM_DE_FE1		133
+> > > > > +#define CLK_DRAM_DE_FE0		134
+> > > > > +#define CLK_DRAM_DE_BE1		136
+> > > > > +#define CLK_DRAM_MP		137
+> > > > > +#define CLK_DRAM_ACE		138
+> > > +
+> > > > > +#define CLK_DE_BE1		140
+> > > > > +#define CLK_DE_FE0		141
+> > > > > +#define CLK_DE_FE1		142
+> > > > > +#define CLK_DE_MP		143
+> > > > > +#define CLK_TCON1_CH0		145
+> > > > > +#define CLK_CSI_SPECIAL		146
+> > > > > +#define CLK_TVD			147
+> > > > > +#define CLK_TCON0_CH1_SCLK2	148
+> > > > > +#define CLK_TCON1_CH1_SCLK2	150
+> > > > > +#define CLK_TCON1_CH1		151
+> > > > > +#define CLK_CSI0		152
+> > > > > +#define CLK_CSI1		153
+> > > > > +#define CLK_VE			154
+> > > > > +#define CLK_AVS			156
+> > > > > +#define CLK_ACE			157
+> > > > > +#define CLK_HDMI		158
+> > > > > +#define CLK_GPU			159
+> > > > > +#define CLK_MBUS		160
+> > > > > +#define CLK_HDMI1_SLOW		161
+> > > > > +#define CLK_HDMI1_REPEAT	162
+> > > > > +#define CLK_OUT_A		163
+> > > +#define CLK_OUT_B		164
+> > 
+> > Is there a reason not to expose these clocks?
+> 
+> I exposed them on need to have basis. And basically did one-to-one
+> conversion from devicetree.
 
-- The secure OS is supposed to get its boot data from /secure-chosen
-- Only the stdout-path path property is defined currently. Its
-definition is the same as for /chosen. If not present but /secure-chosen
-is present, it takes no default value. If /secure-chosen does not exist
-however, it defaults to the value of /chosen/stdout-path.
-- As we add properties to /secure-chosen we'll see if it makes sense to
-allow fall back to their counterparts in /chosen (which I don't expect
-to happen too often).
+I guess we can still make some pretty good assumptions on what's going
+to be needed at some point.
 
-If that sounds good to you I'll send a V2.
+All the mod clocks will be, the bus gates too, the CPU too. All the
+internal ones (PLL, AXI, APB, etc) can remain hidden though.
 
-Thanks,
+Thanks!
+Maxime
+
 -- 
-Jerome
-
-> 
-> Robin.
-> 
->>
->> thanks
->> -- PMM
->>
-> 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170302/1bf64653/attachment-0001.sig>
