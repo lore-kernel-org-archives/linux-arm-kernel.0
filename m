@@ -1,57 +1,74 @@
-From: ldv@altlinux.org (Dmitry V. Levin)
-Date: Thu, 2 Mar 2017 18:48:45 +0300
-Subject: [PATCH] uapi: fix asm/signal.h userspace compilation errors
-In-Reply-To: <CAE2sS1h9QNV+31GMSv8aahJYOb9hFtFp5Aj-yVOfg7cjBHr_kg@mail.gmail.com>
-References: <20170226010156.GA28831@altlinux.org>
- <CAK8P3a0YX3RGAqWN0mwUJtBsqUX0C+QRtJLrT_UA=wX6Z+q0DA@mail.gmail.com>
- <CAE2sS1h9QNV+31GMSv8aahJYOb9hFtFp5Aj-yVOfg7cjBHr_kg@mail.gmail.com>
-Message-ID: <20170302154845.GB3503@altlinux.org>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Thu, 2 Mar 2017 17:53:45 +0200
+Subject: [PATCH v4 13/36] [media] v4l2: add a frame timeout event
+In-Reply-To: <1487211578-11360-14-git-send-email-steve_longerbeam@mentor.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-14-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <20170302155342.GJ3220@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 10:22:18AM -0500, Carlos O'Donell wrote:
-> On Wed, Mar 1, 2017 at 11:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Sun, Feb 26, 2017 at 2:01 AM, Dmitry V. Levin <ldv@altlinux.org> wrote:
-> >> Include <stddef.h> (guarded by #ifndef __KERNEL__) to fix asm/signal.h
-> >> userspace compilation errors like this:
-> >>
-> >> /usr/include/asm/signal.h:126:2: error: unknown type name 'size_t'
-> >>   size_t ss_size;
-> >>
-> >> As no uapi header provides a definition of size_t, inclusion
-> >> of <stddef.h> seems to be the most conservative fix available.
-[...]
-> > I'm not sure if this is the best fix. We generally should not include one
-> > standard header from another standard header. Would it be possible
-> > to use __kernel_size_t instead of size_t?
-> 
-> In glibc we handle this with special use of __need_size_t with GCC's
-> provided stddef.h.
-> 
-> For example glibc's signal.h does this:
-> 
-> # define __need_size_t
-> # include <stddef.h>
+Hi Steve,
 
-Just to make it clear, do you suggest this approach for asm/signal.h as well?
-
-[...]
-> Changing the fundamental type causes the issues you see in patch v2
-> where sizeof(size_t) < sizeof(__kernel_size_t).
+On Wed, Feb 15, 2017 at 06:19:15PM -0800, Steve Longerbeam wrote:
+> Add a new FRAME_TIMEOUT event to signal that a video capture or
+> output device has timed out waiting for reception or transmit
+> completion of a video frame.
 > 
-> It will only lead to problem substituting the wrong type.
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> ---
+>  Documentation/media/uapi/v4l/vidioc-dqevent.rst | 5 +++++
+>  Documentation/media/videodev2.h.rst.exceptions  | 1 +
+>  include/uapi/linux/videodev2.h                  | 1 +
+>  3 files changed, 7 insertions(+)
+> 
+> diff --git a/Documentation/media/uapi/v4l/vidioc-dqevent.rst b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+> index 8d663a7..dd77d9b 100644
+> --- a/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+> +++ b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+> @@ -197,6 +197,11 @@ call.
+>  	the regions changes. This event has a struct
+>  	:c:type:`v4l2_event_motion_det`
+>  	associated with it.
+> +    * - ``V4L2_EVENT_FRAME_TIMEOUT``
+> +      - 7
+> +      - This event is triggered when the video capture or output device
+> +	has timed out waiting for the reception or transmit completion of
+> +	a frame of video.
 
-I don't see any appetite for creating more ABIs like x32 with
-sizeof(size_t) < sizeof(__kernel_size_t), so v2 approach
-is not going to be any different from v1 in maintenance.
+As you're adding a new interface, I suppose you have an implementation
+around. How do you determine what that timeout should be?
 
+>      * - ``V4L2_EVENT_PRIVATE_START``
+>        - 0x08000000
+>        - Base event number for driver-private events.
+> diff --git a/Documentation/media/videodev2.h.rst.exceptions b/Documentation/media/videodev2.h.rst.exceptions
+> index e11a0d0..5b0f767 100644
+> --- a/Documentation/media/videodev2.h.rst.exceptions
+> +++ b/Documentation/media/videodev2.h.rst.exceptions
+> @@ -459,6 +459,7 @@ replace define V4L2_EVENT_CTRL event-type
+>  replace define V4L2_EVENT_FRAME_SYNC event-type
+>  replace define V4L2_EVENT_SOURCE_CHANGE event-type
+>  replace define V4L2_EVENT_MOTION_DET event-type
+> +replace define V4L2_EVENT_FRAME_TIMEOUT event-type
+>  replace define V4L2_EVENT_PRIVATE_START event-type
+>  
+>  replace define V4L2_EVENT_CTRL_CH_VALUE ctrl-changes-flags
+> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+> index 46e8a2e3..e174c45 100644
+> --- a/include/uapi/linux/videodev2.h
+> +++ b/include/uapi/linux/videodev2.h
+> @@ -2132,6 +2132,7 @@ struct v4l2_streamparm {
+>  #define V4L2_EVENT_FRAME_SYNC			4
+>  #define V4L2_EVENT_SOURCE_CHANGE		5
+>  #define V4L2_EVENT_MOTION_DET			6
+> +#define V4L2_EVENT_FRAME_TIMEOUT		7
+>  #define V4L2_EVENT_PRIVATE_START		0x08000000
+>  
+>  /* Payload for V4L2_EVENT_VSYNC */
 
 -- 
-ldv
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170302/f75b9e11/attachment.sig>
+Regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
