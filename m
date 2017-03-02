@@ -1,86 +1,85 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 2 Mar 2017 13:30:13 +0100
-Subject: [PATCH 2/7] memory: atmel-ebi: Simplify SMC config code
-In-Reply-To: <16727676.CMj9rWYKWZ@ada>
-References: <1487609701-10300-1-git-send-email-boris.brezillon@free-electrons.com>
- <1487609701-10300-3-git-send-email-boris.brezillon@free-electrons.com>
- <16727676.CMj9rWYKWZ@ada>
-Message-ID: <20170302133013.4dee0b4a@bbrezillon>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Thu, 2 Mar 2017 13:31:38 +0100
+Subject: [PATCH v2 3/3] ARM64: dts: meson-gx: Add MALI nodes for GXBB and
+ GXL
+In-Reply-To: <1488365164-22861-4-git-send-email-narmstrong@baylibre.com>
+References: <1488365164-22861-1-git-send-email-narmstrong@baylibre.com>
+ <1488365164-22861-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <e26cf584-dab2-2702-f7e6-b28f750fa00c@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+Hi Neil,
 
-On Thu, 02 Mar 2017 13:02:16 +0100
-Alexander Dahl <ada@thorsis.com> wrote:
+Am 01.03.2017 um 11:46 schrieb Neil Armstrong:
+> The same MALI-450 MP3 GPU is present in the GXBB and GXL SoCs.
 
-> Hei hei,
-> 
-> With 
-> 
-> #define ATMEL_SMC_MODE_TDF(x)           (((x) - 1) << 16)
-> 
-> from include/linux/mfd/syscon/atmel-smc.h you added this:
-> 
-> > +	ret = of_property_read_u32(np, "atmel,smc-tdf-ns", &val);
-> > +	if (!ret) {
-> > +		required = true;
-> > +		ncycles = DIV_ROUND_UP(val, clk_period_ns);
-> > +		if (ncycles > ATMEL_SMC_MODE_TDF_MAX) {
-> > +			ret = -EINVAL;
-> > +			goto out;
-> > +		}  
-> 
-> [?]
-> 
-> > +		smcconf->mode |= ATMEL_SMC_MODE_TDF(ncycles);
-> > +	}  
-> 
-> This was the same algorithm at some other location in atmel-ebi.c 
-> before:
-> 
-> 	#define AT91_SMC_TDF_(x)		((((x) - 1) << 16) & AT91_SMC_TDF)
-> 
-> 	val = DIV_ROUND_UP(timings->tdf_ns, clk_rate);
-> 	if (val > AT91_SMC_TDF_MAX)
-> 		val = AT91_SMC_TDF_MAX;
-> 	regmap_fields_write(fields->mode, conf->cs,
-> 			    config->mode | AT91_SMC_TDF_(val));
-> 
-> The hardware manual (AT91SAM9G20) says values from 0 to 15 (4bit, 0x0 to 
-> 0xF) are possible and I guess the goal is to set it to a value 
-> corresponding to the value in ns from the dts or to 15 if it's greater 
-> (or -EINVAL in the new version).
-> 
-> However how can one set it to zero? Put in zero to the div you get zero 
-> for ncycles or val and that goes as x into (((x) - 1) << 16) which 
-> results in 0xF ending up as TDF_CYCLES in the mode register, right?
-
-Indeed.
+First of all, any reason you're upper-casing Mali in the commit message?
+ARM doesn't.
 
 > 
-> I can of course set a slightly greater value, which ends up in a 
-> calculated register value of zero, but that seems more a hack to me and 
-> is not obvious if I just look at the DTS.
+> The node is simply added in the meson-gxbb.dtsi file.
 
-No, we should fix the bug.
+The GXBB part looks fine on a quick look.
 
 > 
-> If I'm right this might be topic of another bugfix patch, or should it 
-> be done right in a v2 of this one?
+> For GXL, since a lot is shared with the GXM that has a MALI-T820 IP, this
+> patch adds a new meson-gxl-mali.dtsi and is included in the SoC specific
+> dtsi files.
 
-It should be done right in a v2. Something like:
+This part is slightly confusing though.
 
-		if (ncycles < ATMEL_SMC_MODE_TDF_MIN)
-			ncycles = ATMEL_SMC_MODE_TDF_MIN;
+What exactly is the GXL vs. GXM difference that this can't be handled by
+overriding node properties compatible/interrupts/clocks? I am missing a
+GXM patch in this series as rationale for doing it this way.
 
-with
+In particular I am wondering whether the whole GXM-inherits-from-GXL
+concept is flawed and should be adjusted if this leads to secondary
+.dtsi files like this: My proposal would be to instead create a
+meson-gxl-gxm.dtsi, that meson-gxl.dtsi and meson-gxm.dtsi can inherit
+the current common parts from, then the Mali bits can simply go into
+meson-gxl.dtsi without extra #includes needed in S905X and S905D. While
+it's slightly more work to split once again, I think it would be cleaner.
 
-#define ATMEL_SMC_MODE_TDF_MIN 1
+Regards,
+Andreas
 
-I don't think we need to backport the fix, since no-one uses this driver
-yet.
+> 
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi      | 37 ++++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi  | 43 ++++++++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi |  1 +
+>  arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi |  1 +
+>  4 files changed, 82 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
+[...]
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
+> index 615308e..5a90e30 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
+> @@ -42,6 +42,7 @@
+>   */
+>  
+>  #include "meson-gxl.dtsi"
+> +#include "meson-gxl-mali.dtsi"
+>  
+>  / {
+>  	compatible = "amlogic,s905d", "amlogic,meson-gxl";
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+> index 08237ee..0f78d83 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+> @@ -42,6 +42,7 @@
+>   */
+>  
+>  #include "meson-gxl.dtsi"
+> +#include "meson-gxl-mali.dtsi"
+>  
+>  / {
+>  	compatible = "amlogic,s905x", "amlogic,meson-gxl";
 
-Thanks for this report.
-
-Boris
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
