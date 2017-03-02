@@ -1,55 +1,49 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Mar 2017 23:03:32 +0000
-Subject: [PATCHv4] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-In-Reply-To: <20170302210124.GA9391@nuc>
-References: <1487977101-29027-1-git-send-email-abelvesa@linux.com>
- <87r32jiqc9.fsf@d080-213.cis.zmaw.de> <20170228005636.GA23251@nuc>
- <87h93eoa3a.fsf@gmail.com> <20170228112227.GB23251@nuc>
- <20170228114638.GC21222@n2100.armlinux.org.uk>
- <20170228115429.GC23251@nuc> <20170302210124.GA9391@nuc>
-Message-ID: <20170302230332.GN21222@n2100.armlinux.org.uk>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Thu, 2 Mar 2017 15:07:21 -0800
+Subject: [PATCH v4 13/36] [media] v4l2: add a frame timeout event
+In-Reply-To: <20170302155342.GJ3220@valkosipuli.retiisi.org.uk>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-14-git-send-email-steve_longerbeam@mentor.com>
+ <20170302155342.GJ3220@valkosipuli.retiisi.org.uk>
+Message-ID: <4b2bcee1-8da0-776e-4455-8d8e7a7abf0a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 09:01:24PM +0000, Abel Vesa wrote:
-> On Tue, Feb 28, 2017 at 11:54:29AM +0000, Abel Vesa wrote:
-> > On Tue, Feb 28, 2017 at 11:46:38AM +0000, Russell King - ARM Linux wrote:
-> > > On Tue, Feb 28, 2017 at 11:22:27AM +0000, Abel Vesa wrote:
-> > > > On Tue, Feb 28, 2017 at 11:58:49AM +0100, Nicolai Stange wrote:
-> > > > > Hi Abel,
-> > > > > 
-> > > > > On Tue, Feb 28 2017, Abel Vesa wrote:
-> > > > > 
-> > > > > > On Mon, Feb 27, 2017 at 04:52:06PM +0100, Nicolai Stange wrote:
-> > > > > >> On Fri, Feb 24 2017, Abel Vesa wrote:
-> > > > > >> Wouldn't it be better (and more consistent with other archs) to have
-> > > > > >> 
-> > > > > >>   pt_regs->ARM_lr = original lr
-> > > > > >>   pt_refs->ARM_pc = current lr
-> > > > > >> 
-> > > > > >> instead?
-> > > > > 
-> > > > > The stack would look like this then
-> > > > > 
-> > > > > @ ...           | ARM_ip | ARM_sp | ARM_lr      | ARM_pc      | ...          |
-> > > > > @ 0  4          48       52       56            60            64    68       72
-> > > > > @ R0 | R1 | ... | LR     | SP + 4 | original LR | original PC | PSR | OLD_R0 | original LR |
-> Just to make sure we're on the same page. If we are replacing the LR 
-> with the original_LR is it worth keeping around the one pushed before 
-> the ftrace_regs_caller is called?
-> 
-> Another thing, PC needs to be new_LR and then we can restore all 
-> regs r0 through r15 like this:
-> 
-> 	ldmia   sp, {r0-r15}
 
-That's the intention - the point is to save the state as it was at the
-point that the function was entered, not at the point when the ftrace
-code was entered.  What we don't want is the implementation details of
-GCC's mcount or ftrace's adaption of mcount being exposed via ftrace.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+On 03/02/2017 07:53 AM, Sakari Ailus wrote:
+> Hi Steve,
+>
+> On Wed, Feb 15, 2017 at 06:19:15PM -0800, Steve Longerbeam wrote:
+>> Add a new FRAME_TIMEOUT event to signal that a video capture or
+>> output device has timed out waiting for reception or transmit
+>> completion of a video frame.
+>>
+>> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+>> ---
+>>  Documentation/media/uapi/v4l/vidioc-dqevent.rst | 5 +++++
+>>  Documentation/media/videodev2.h.rst.exceptions  | 1 +
+>>  include/uapi/linux/videodev2.h                  | 1 +
+>>  3 files changed, 7 insertions(+)
+>>
+>> diff --git a/Documentation/media/uapi/v4l/vidioc-dqevent.rst b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+>> index 8d663a7..dd77d9b 100644
+>> --- a/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+>> +++ b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+>> @@ -197,6 +197,11 @@ call.
+>>  	the regions changes. This event has a struct
+>>  	:c:type:`v4l2_event_motion_det`
+>>  	associated with it.
+>> +    * - ``V4L2_EVENT_FRAME_TIMEOUT``
+>> +      - 7
+>> +      - This event is triggered when the video capture or output device
+>> +	has timed out waiting for the reception or transmit completion of
+>> +	a frame of video.
+>
+> As you're adding a new interface, I suppose you have an implementation
+> around. How do you determine what that timeout should be?
+
+The imx-media driver sets the timeout to 1 second, or 30 frame
+periods at 30 fps.
+
+Steve
