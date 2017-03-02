@@ -1,73 +1,32 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 Mar 2017 10:56:07 -0800
-Subject: [PATCH DO NOT MERGE 5/6] ARM: dts: omap4: add some sample
- clkctrl data
-In-Reply-To: <c92a6176-e749-95c3-8eeb-d9bad7a97672@ti.com>
+Date: Thu, 2 Mar 2017 10:57:01 -0800
+Subject: clk: ti: clkctrl clock support
+In-Reply-To: <1486992157-10673-1-git-send-email-t-kristo@ti.com>
 References: <1486992157-10673-1-git-send-email-t-kristo@ti.com>
- <1486992157-10673-6-git-send-email-t-kristo@ti.com>
- <20170302174503.GP20572@atomide.com>
- <c92a6176-e749-95c3-8eeb-d9bad7a97672@ti.com>
-Message-ID: <20170302185607.GS20572@atomide.com>
+Message-ID: <20170302185700.GT20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [170302 10:45]:
-> On 02/03/17 19:45, Tony Lindgren wrote:
-> > Hi,
-> > 
-> > * Tero Kristo <t-kristo@ti.com> [170213 05:24]:
-> > > Adds clkctrl nodes for cm_l4per and cm_abe as example. Peripherals using
-> > > clocks from these nodes are modified also.
-> > 
-> > Finally got around testing these. Looks like applying this patch
-> > breaks things for devices not using the new clocks entry?
-> > 
-> > For example, SPI now breaks causing "imprecise external abort" during boot
-> > at least on droid 4.
+* Tero Kristo <t-kristo@ti.com> [170213 05:24]:
+> Hi,
 > 
-> If SPI is under l4per, then yes, a breakage is expected. This will cause a
-> conflict with the existing hwmod data, and the new clock data, effectively
-> disabling the IP clocks during boot. This patch only converts part of the DT
-> data to the new format, and as such is only suitable for testing purposes.
+> This series is a derivative of the hwmod clock support framework
+> (https://www.spinics.net/lists/arm-kernel/msg536742.html.) This
+> adds support for clkctrl main and optional clocks, which can be
+> linked initially with hwmod framework, and later with the
+> interconnect driver functionality. The implementation is based
+> on the DT bindings patch from Tony:
+> https://patchwork.kernel.org/patch/9533605/
 > 
-> I will provide a full data conversion for the DT file for 4.11-rc.
-
-OK
-
-> > > --- a/arch/arm/boot/dts/omap4.dtsi
-> > > +++ b/arch/arm/boot/dts/omap4.dtsi
-> > > +				cm_l4per: cm_l4per at 0 {
-> > 
-> > Above should be cm_l4per: cm_l4per at 1400, right?
+> This series also depends on the TI clock driver cleanup series
+> posted here: https://www.spinics.net/lists/arm-kernel/msg562362.html
 > 
-> Yea thats a bug in this test patch. Same issue with other nodes. DT compiler
-> isn't too picky about these so it works even with wrong node name.
-> 
-> > 
-> > > +					compatible = "ti,omap4-cm";
-> > > +					reg = <0x1400 0x200>;
-> > > +					#address-cells = <1>;
-> > > +					#size-cells = <1>;
-> > > +					ranges = <0 0x1400 0x200>;
-> > > +
-> > > +					cm_l4per_clkctrl: cm_l4per_clkctrl at 20 {
-> > > +						compatible = "ti,omap4-clkctrl";
-> > > +						reg = <0x20 0x1b0>;
-> > > +						#clock-cells = <2>;
-> > > +					};
-> > > +				};
-> > 
-> > You should update the binding doc accordingly if the "cm_l4per at 0" node
-> > there is not needed. I also noticed the binding doc still has
-> > "#clock-cells = <4>" while it should be 2.
-> 
-> cm_l4per is somewhat redundant right now, but we want to add clockdomains
-> under that one in the future. Or, we could just add those directly under
-> parent node also (cm2 in this case.)
+> OMAP4 used as a reference platform for the work, patches 4-6 contain
+> SoC specific patches, out of which 5-6 should not be merged; these
+> are only provided as a reference and for testing purposes and are
+> incomplete. Rest of the data can be provided once the code is
+> approved / merged.
 
-OK so probably best to add it to avoid tweaking the dts files again
-later on.
+Looks good to me:
 
-Regards,
-
-Tony
+Acked-by: Tony Lindgren <tony@atomide.com>
