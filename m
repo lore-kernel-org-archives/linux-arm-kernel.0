@@ -1,39 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 2 Mar 2017 14:12:52 +0000
-Subject: [PATCHv2 14/14] treewide: Decouple cacheflush.h and set_memory.h
-In-Reply-To: <1488413706-9739-15-git-send-email-labbott@redhat.com>
-References: <1488413706-9739-1-git-send-email-labbott@redhat.com>
- <1488413706-9739-15-git-send-email-labbott@redhat.com>
-Message-ID: <20170302141251.GM19632@leverpostej>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Mar 2017 14:13:34 +0000
+Subject: DIfferent BogoMIPS value after bbaa06702719
+ ("clocksource/drivers/arm_global_timer: Register delay timer")
+In-Reply-To: <d22ec429-1a71-e56f-e1d7-28b066be8c1b@milecki.pl>
+References: <d22ec429-1a71-e56f-e1d7-28b066be8c1b@milecki.pl>
+Message-ID: <20170302141334.GM21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 01, 2017 at 04:15:06PM -0800, Laura Abbott wrote:
+On Thu, Mar 02, 2017 at 02:36:23PM +0100, Rafa? Mi?ecki wrote:
+> Hi,
 > 
-> Now that all call sites, completely decouple cacheflush.h and
-> set_memory.h
+> I just updated kernel on my SmartRG SR400ac (bcm4708-smartrg-sr400ac.dts) from
+> 4.4 to 4.9 and noticed that this part of the log:
+> [    0.020820] Calibrating delay loop... 1594.16 BogoMIPS (lpj=7970816)
+> (...)
+> [    0.190806] Brought up 2 CPUs
+> [    0.200022] SMP: Total of 2 processors activated (3188.32 BogoMIPS).
 > 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
->  arch/arm/include/asm/cacheflush.h   | 1 -
->  arch/arm64/include/asm/cacheflush.h | 1 -
->  arch/s390/include/asm/Kbuild        | 1 +
->  arch/s390/include/asm/cacheflush.h  | 8 --------
->  arch/x86/include/asm/cacheflush.h   | 1 -
->  5 files changed, 1 insertion(+), 11 deletions(-)
->  delete mode 100644 arch/s390/include/asm/cacheflush.h
+> became:
+> [    0.027082] Calibrating delay loop (skipped), value calculated using timer frequency.. 800.00 BogoMIPS (lpj=4000000)
+> (...)
+> [    0.078858] Brought up 2 CPUs
+> [    0.088254] SMP: Total of 2 processors activated (1600.00 BogoMIPS).
 > 
-> diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-> index 1cb9d11..d69bebf 100644
-> --- a/arch/arm/include/asm/cacheflush.h
-> +++ b/arch/arm/include/asm/cacheflush.h
-> @@ -16,7 +16,6 @@
->  #include <asm/shmparam.h>
->  #include <asm/cachetype.h>
->  #include <asm/outercache.h>
-> -#include <asm/set_memory.h>
+> This is caused by commit bbaa06702719 ("clocksource/drivers/arm_global_timer:
+> Register delay timer").
+> 
+> Is this something expected?
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Yes.
 
-Thanks,
-Mark.
+> Or should I be worried about this? I'm aware it's just BogoMIPS, but I
+> still prefer to ask :)
+
+It's *bogus*.  Bogomips is the calibration value that the kernel uses
+to achieve delays.  It has nothing to do with the speed of the CPU on
+modern systems that use a timer instead.  (In that case, it's a
+calibration value for the timer, rather than a calibration value for
+the number of software loops required to achieve a delay.)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
