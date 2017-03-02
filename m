@@ -1,54 +1,69 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 2 Mar 2017 19:34:08 +0900
-Subject: [PATCH v32 00/13] arm64: add kdump support
-In-Reply-To: <1f4c1497-129d-7350-89c1-1ba0a6764ba5@codeaurora.org>
-References: <20170207080601.5816-1-takahiro.akashi@linaro.org>
- <1f4c1497-129d-7350-89c1-1ba0a6764ba5@codeaurora.org>
-Message-ID: <20170302103407.GC1746@linaro.org>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Thu,  2 Mar 2017 18:36:26 +0800
+Subject: [PATCH] cpufreq: mt8173: Add support for MT8176 and MT817x compatibles
+Message-ID: <20170302103626.69195-1-djkurtz@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 01, 2017 at 05:51:21PM -0700, Goel, Sameer wrote:
-> 
-> 
-> On 2/7/2017 1:06 AM, AKASHI Takahiro wrote:
-> > This patch series adds kdump support on arm64.
-> > 
-> > To load a crash-dump kernel to the systems, a series of patches to
-> > kexec-tools[1] are also needed. Please use the latest one, v5 [2].
-> > For your convinience, you can pick them up from:
-> >    https://git.linaro.org/people/takahiro.akashi/linux-aarch64.git arm64/kdump
-> >    https://git.linaro.org/people/takahiro.akashi/kexec-tools.git arm64/kdump
-> > 
-> > To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
-> >   - crash utility (v7.1.8 or later, i.e. master for now) [3]
-> > 
-> > I tested this patchset on fast model and hikey.
-> > (under various configurations, in particular 4KB-page/39,48-bits, 64KB-page/42
-> > -bits with hibernate)
-> > 
-> > The previous versions were also:
-> > Tested-by: Pratyush Anand <panand@redhat.com> (v29, mustang and seattle)
-> > Tested-by: James Morse <james.morse@arm.com> (v27, Juno)
-> > 
-> I tested this patch set on a QDT2400 device with 4k 4-level setup. This patchset worked after applying [1].
+The Mediatek MT8173 is just on of several SOCs from the same MT817x family,
+including the 6-core (4-little/2-big) MT8176.
 
-Thank you for your test and report.
-While adding [1] is yet to be discussed, I will post v33 as soon as
-possible after v4.10-rc1.
+The mt8173-cpufreq driver supports all of these SOCs, however, machines
+using them may use a different machine compatible.
 
-Thanks,
--Takahiro AKASHI
+Since this driver checks explicitly for the machine compatible string, add
+support for the whole family.
 
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+---
+This patch is based on the compatibles added by the MT8176 series:
 
-> [1] [PATCH] efi/libstub/arm*: Set default address and size cells values for an empty dtb
-> 
-> Without the above patch the start address of the crash kernel is recorded incorrectly and the 
-> memblock_cap_memory_range clears out the incorrect range. 
->  
-> Thanks,
-> Sameer
-> -- 
-> Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-> Qualcomm Technologies, Inc. is a member of the
-> Code Aurora Forum, a Linux Foundation Collaborative Project.
+ https://patchwork.kernel.org/patch/9573209/
+ https://patchwork.kernel.org/patch/9573213/
+
+ drivers/cpufreq/mt8173-cpufreq.c | 25 +++++++++++++++++++++++--
+ 1 file changed, 23 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+index ab25b1235a5e..07f7aac56f31 100644
+--- a/drivers/cpufreq/mt8173-cpufreq.c
++++ b/drivers/cpufreq/mt8173-cpufreq.c
+@@ -573,13 +573,34 @@ static struct platform_driver mt8173_cpufreq_platdrv = {
+ 	.probe		= mt8173_cpufreq_probe,
+ };
+ 
++/* List of machine compatible strings supported by this driver */
++static const char *mt8173_cpufreq_machines[] = {
++	"mediatek,mt817x",
++	"mediatek,mt8173",
++	"mediatek,mt8176",
++};
++
++static int mt8173_cpufreq_is_compatible(void)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(mt8173_cpufreq_machines); i++)
++		if (of_machine_is_compatible(mt8173_cpufreq_machines[i]))
++			return 0;
++
++	return -ENODEV;
++}
++
+ static int mt8173_cpufreq_driver_init(void)
+ {
+ 	struct platform_device *pdev;
+ 	int err;
+ 
+-	if (!of_machine_is_compatible("mediatek,mt8173"))
+-		return -ENODEV;
++	err = mt8173_cpufreq_is_compatible();
++	if (err) {
++		pr_err("Machine is not compatible with 'mediatek,mt8173'\n");
++		return err;
++	}
+ 
+ 	err = platform_driver_register(&mt8173_cpufreq_platdrv);
+ 	if (err)
+-- 
+2.12.0.rc1.440.g5b76565f74-goog
