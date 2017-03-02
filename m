@@ -1,33 +1,32 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  2 Mar 2017 16:40:00 +0100
-Subject: [PATCH 04/11] drm/meson: venc_cvbs: no more return -ENODEV if CVBS is
- not available
-In-Reply-To: <1488469207-523-1-git-send-email-narmstrong@baylibre.com>
-References: <1488469207-523-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1488469207-523-5-git-send-email-narmstrong@baylibre.com>
+From: jbaron@akamai.com (Jason Baron)
+Date: Thu, 2 Mar 2017 10:30:50 -0500
+Subject: [PATCH] module: set __jump_table alignment to 8
+In-Reply-To: <20170301220453.4756-1-david.daney@cavium.com>
+References: <20170301220453.4756-1-david.daney@cavium.com>
+Message-ID: <7bc6b5af-85e0-5b06-f979-368b8b840a16@akamai.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since this is managed now by the components code, if CVBS is not available
-and HDMI neither, the drm driver won't bind anyway.
+On 03/01/2017 05:04 PM, David Daney wrote:
+> For powerpc the __jump_table section in modules is not aligned, this
+> causes a WARN_ON() splat when loading a module containing a __jump_table.
+>
+> Strict alignment became necessary with commit 3821fd35b58d
+> ("jump_label: Reduce the size of struct static_key"), currently in
+> linux-next, which uses the two least significant bits of pointers to
+> __jump_table elements.
+>
+> Fix by forcing __jump_table to 8, which is the same alignment used for
+> this section in the kernel proper.
+>
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> Tested-by: Sachin Sant <sachinp@linux.vnet.ibm.com>
+> ---
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/gpu/drm/meson/meson_venc_cvbs.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Looks good to me.
 
-diff --git a/drivers/gpu/drm/meson/meson_venc_cvbs.c b/drivers/gpu/drm/meson/meson_venc_cvbs.c
-index a2bcc70..a96fcb4 100644
---- a/drivers/gpu/drm/meson/meson_venc_cvbs.c
-+++ b/drivers/gpu/drm/meson/meson_venc_cvbs.c
-@@ -248,7 +248,7 @@ int meson_venc_cvbs_create(struct meson_drm *priv)
- 
- 	if (!meson_venc_cvbs_connector_is_available(priv)) {
- 		dev_info(drm->dev, "CVBS Output connector not available\n");
--		return -ENODEV;
-+		return 0;
- 	}
- 
- 	meson_venc_cvbs = devm_kzalloc(priv->dev, sizeof(*meson_venc_cvbs),
--- 
-1.9.1
+Reviewed-by: Jason Baron <jbaron@akamai.com>
+
+Thanks,
+
+-Jason
