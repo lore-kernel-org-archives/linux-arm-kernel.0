@@ -1,39 +1,34 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 2 Mar 2017 09:01:26 +0100
-Subject: [PATCHv2 05/14] x86: Use set_memory.h header
-In-Reply-To: <1488413706-9739-6-git-send-email-labbott@redhat.com>
-References: <1488413706-9739-1-git-send-email-labbott@redhat.com>
- <1488413706-9739-6-git-send-email-labbott@redhat.com>
-Message-ID: <20170302080126.GA9574@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 2 Mar 2017 09:25:38 +0100
+Subject: [PATCH v2 1/5] pinctrl: sunxi: refactor pinctrl choice selecting
+ for ARM64
+In-Reply-To: <20170301180111.12365-2-icenowy@aosc.xyz>
+References: <20170301180111.12365-1-icenowy@aosc.xyz>
+ <20170301180111.12365-2-icenowy@aosc.xyz>
+Message-ID: <20170302082538.dej6h3l5zfdgttj4@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-* Laura Abbott <labbott@redhat.com> wrote:
-
+On Thu, Mar 02, 2017 at 02:01:07AM +0800, Icenowy Zheng wrote:
+> ARM64 Allwinner SoCs used to have every pinctrl driver selected in
+> ARCH_SUNXI. Change this to make their default value to (ARM64 &&
+> ARCH_SUNXI).
 > 
-> set_memory_* functions have moved to set_memory.h. Switch to this
-> explicitly.
-> 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
-> ---
->  arch/x86/kernel/amd_gart_64.c      | 2 +-
->  arch/x86/kernel/cpu/amd.c          | 2 +-
->  arch/x86/kernel/cpu/bugs.c         | 2 +-
->  arch/x86/kernel/ftrace.c           | 2 +-
->  arch/x86/kernel/machine_kexec_64.c | 1 +
->  arch/x86/mm/init.c                 | 2 +-
->  arch/x86/mm/init_64.c              | 2 +-
->  arch/x86/mm/ioremap.c              | 2 +-
->  arch/x86/mm/pageattr.c             | 1 +
->  arch/x86/net/bpf_jit_comp.c        | 1 +
->  arch/x86/pci/pcbios.c              | 2 +-
->  arch/x86/platform/efi/efi.c        | 2 +-
->  arch/x86/realmode/init.c           | 2 +-
->  13 files changed, 13 insertions(+), 10 deletions(-)
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 
-Acked-by: Ingo Molnar <mingo@kernel.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Thanks,
+Maxime
 
-	Ingo
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170302/58769f37/attachment.sig>
