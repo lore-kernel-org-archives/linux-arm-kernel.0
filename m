@@ -1,68 +1,55 @@
-From: jeyu@redhat.com (Jessica Yu)
-Date: Thu, 2 Mar 2017 17:49:57 -0500
-Subject: [PATCH] module: set __jump_table alignment to 8
-In-Reply-To: <f38431ab-ad33-ac14-03b5-7cb4a172be64@caviumnetworks.com>
-References: <20170301220453.4756-1-david.daney@cavium.com>
- <20170302131119.6f52203f@gandalf.local.home>
- <20170302182625.GB13268@packer-debian-8-amd64.digitalocean.com>
- <f38431ab-ad33-ac14-03b5-7cb4a172be64@caviumnetworks.com>
-Message-ID: <20170302224957.GC13268@packer-debian-8-amd64.digitalocean.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Mar 2017 23:03:32 +0000
+Subject: [PATCHv4] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <20170302210124.GA9391@nuc>
+References: <1487977101-29027-1-git-send-email-abelvesa@linux.com>
+ <87r32jiqc9.fsf@d080-213.cis.zmaw.de> <20170228005636.GA23251@nuc>
+ <87h93eoa3a.fsf@gmail.com> <20170228112227.GB23251@nuc>
+ <20170228114638.GC21222@n2100.armlinux.org.uk>
+ <20170228115429.GC23251@nuc> <20170302210124.GA9391@nuc>
+Message-ID: <20170302230332.GN21222@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+++ David Daney [02/03/17 11:24 -0800]:
->On 03/02/2017 10:26 AM, Jessica Yu wrote:
->>+++ Steven Rostedt [02/03/17 13:11 -0500]:
->>>
->>>Can I get an Ack from a module maintainer?
->>
->>Acked-by: Jessica Yu <jeyu@redhat.com>
->>
->>Thanks!
->>
->>Jessica
->
->Thanks Jessica,
->
->Can you also add scripts/module-common.lds to MAINTAINERS so that 
->get_maintainers.pl will indicate that Jessica Yu and Rusty Russell be 
->CCed on things like this in the future?
+On Thu, Mar 02, 2017 at 09:01:24PM +0000, Abel Vesa wrote:
+> On Tue, Feb 28, 2017 at 11:54:29AM +0000, Abel Vesa wrote:
+> > On Tue, Feb 28, 2017 at 11:46:38AM +0000, Russell King - ARM Linux wrote:
+> > > On Tue, Feb 28, 2017 at 11:22:27AM +0000, Abel Vesa wrote:
+> > > > On Tue, Feb 28, 2017 at 11:58:49AM +0100, Nicolai Stange wrote:
+> > > > > Hi Abel,
+> > > > > 
+> > > > > On Tue, Feb 28 2017, Abel Vesa wrote:
+> > > > > 
+> > > > > > On Mon, Feb 27, 2017 at 04:52:06PM +0100, Nicolai Stange wrote:
+> > > > > >> On Fri, Feb 24 2017, Abel Vesa wrote:
+> > > > > >> Wouldn't it be better (and more consistent with other archs) to have
+> > > > > >> 
+> > > > > >>   pt_regs->ARM_lr = original lr
+> > > > > >>   pt_refs->ARM_pc = current lr
+> > > > > >> 
+> > > > > >> instead?
+> > > > > 
+> > > > > The stack would look like this then
+> > > > > 
+> > > > > @ ...           | ARM_ip | ARM_sp | ARM_lr      | ARM_pc      | ...          |
+> > > > > @ 0  4          48       52       56            60            64    68       72
+> > > > > @ R0 | R1 | ... | LR     | SP + 4 | original LR | original PC | PSR | OLD_R0 | original LR |
+> Just to make sure we're on the same page. If we are replacing the LR 
+> with the original_LR is it worth keeping around the one pushed before 
+> the ftrace_regs_caller is called?
+> 
+> Another thing, PC needs to be new_LR and then we can restore all 
+> regs r0 through r15 like this:
+> 
+> 	ldmia   sp, {r0-r15}
 
-Sure thing. Thanks for the heads up!
+That's the intention - the point is to save the state as it was at the
+point that the function was entered, not at the point when the ftrace
+code was entered.  What we don't want is the implementation details of
+GCC's mcount or ftrace's adaption of mcount being exposed via ftrace.
 
-Jessica
-
->>>On Wed,  1 Mar 2017 14:04:53 -0800
->>>David Daney <david.daney@cavium.com> wrote:
->>>
->>>>For powerpc the __jump_table section in modules is not aligned, this
->>>>causes a WARN_ON() splat when loading a module containing a
->>>>__jump_table.
->>>>
->>>>Strict alignment became necessary with commit 3821fd35b58d
->>>>("jump_label: Reduce the size of struct static_key"), currently in
->>>>linux-next, which uses the two least significant bits of pointers to
->>>>__jump_table elements.
->>>>
->>>>Fix by forcing __jump_table to 8, which is the same alignment used for
->>>>this section in the kernel proper.
->>>>
->>>>Signed-off-by: David Daney <david.daney@cavium.com>
->>>>Tested-by: Sachin Sant <sachinp@linux.vnet.ibm.com>
->>>>---
->>>> scripts/module-common.lds | 2 ++
->>>> 1 file changed, 2 insertions(+)
->>>>
->>>>diff --git a/scripts/module-common.lds b/scripts/module-common.lds
->>>>index 73a2c7d..53234e8 100644
->>>>--- a/scripts/module-common.lds
->>>>+++ b/scripts/module-common.lds
->>>>@@ -19,4 +19,6 @@ SECTIONS {
->>>>
->>>>     . = ALIGN(8);
->>>>     .init_array        0 : { *(SORT(.init_array.*)) *(.init_array) }
->>>>+
->>>>+    __jump_table        0 : ALIGN(8) { KEEP(*(__jump_table)) }
->>>> }
->>>
->
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
