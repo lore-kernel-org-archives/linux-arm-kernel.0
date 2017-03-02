@@ -1,45 +1,66 @@
-From: rafal@milecki.pl (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 2 Mar 2017 18:46:10 +0100
-Subject: DIfferent BogoMIPS value after bbaa06702719
- ("clocksource/drivers/arm_global_timer: Register delay timer")
-In-Reply-To: <20170302141334.GM21222@n2100.armlinux.org.uk>
-References: <d22ec429-1a71-e56f-e1d7-28b066be8c1b@milecki.pl>
- <20170302141334.GM21222@n2100.armlinux.org.uk>
-Message-ID: <8d136a2c-c306-e8c8-780a-f55cb891f6e0@milecki.pl>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 2 Mar 2017 20:43:12 +0200
+Subject: [PATCH DO NOT MERGE 5/6] ARM: dts: omap4: add some sample clkctrl
+ data
+In-Reply-To: <20170302174503.GP20572@atomide.com>
+References: <1486992157-10673-1-git-send-email-t-kristo@ti.com>
+ <1486992157-10673-6-git-send-email-t-kristo@ti.com>
+ <20170302174503.GP20572@atomide.com>
+Message-ID: <c92a6176-e749-95c3-8eeb-d9bad7a97672@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2017 03:13 PM, Russell King - ARM Linux wrote:
-> On Thu, Mar 02, 2017 at 02:36:23PM +0100, Rafa? Mi?ecki wrote:
->> Hi,
->>
->> I just updated kernel on my SmartRG SR400ac (bcm4708-smartrg-sr400ac.dts) from
->> 4.4 to 4.9 and noticed that this part of the log:
->> [    0.020820] Calibrating delay loop... 1594.16 BogoMIPS (lpj=7970816)
->> (...)
->> [    0.190806] Brought up 2 CPUs
->> [    0.200022] SMP: Total of 2 processors activated (3188.32 BogoMIPS).
->>
->> became:
->> [    0.027082] Calibrating delay loop (skipped), value calculated using timer frequency.. 800.00 BogoMIPS (lpj=4000000)
->> (...)
->> [    0.078858] Brought up 2 CPUs
->> [    0.088254] SMP: Total of 2 processors activated (1600.00 BogoMIPS).
->>
->> This is caused by commit bbaa06702719 ("clocksource/drivers/arm_global_timer:
->> Register delay timer").
->>
->> Is this something expected?
+On 02/03/17 19:45, Tony Lindgren wrote:
+> Hi,
 >
-> Yes.
+> * Tero Kristo <t-kristo@ti.com> [170213 05:24]:
+>> Adds clkctrl nodes for cm_l4per and cm_abe as example. Peripherals using
+>> clocks from these nodes are modified also.
 >
->> Or should I be worried about this? I'm aware it's just BogoMIPS, but I
->> still prefer to ask :)
+> Finally got around testing these. Looks like applying this patch
+> breaks things for devices not using the new clocks entry?
 >
-> It's *bogus*.  Bogomips is the calibration value that the kernel uses
-> to achieve delays.  It has nothing to do with the speed of the CPU on
-> modern systems that use a timer instead.  (In that case, it's a
-> calibration value for the timer, rather than a calibration value for
-> the number of software loops required to achieve a delay.)
+> For example, SPI now breaks causing "imprecise external abort" during boot
+> at least on droid 4.
 
-Now I can sleep calm ;) thanks!
+If SPI is under l4per, then yes, a breakage is expected. This will cause 
+a conflict with the existing hwmod data, and the new clock data, 
+effectively disabling the IP clocks during boot. This patch only 
+converts part of the DT data to the new format, and as such is only 
+suitable for testing purposes.
+
+I will provide a full data conversion for the DT file for 4.11-rc.
+
+>
+>> --- a/arch/arm/boot/dts/omap4.dtsi
+>> +++ b/arch/arm/boot/dts/omap4.dtsi
+>> +				cm_l4per: cm_l4per at 0 {
+>
+> Above should be cm_l4per: cm_l4per at 1400, right?
+
+Yea thats a bug in this test patch. Same issue with other nodes. DT 
+compiler isn't too picky about these so it works even with wrong node name.
+
+>
+>> +					compatible = "ti,omap4-cm";
+>> +					reg = <0x1400 0x200>;
+>> +					#address-cells = <1>;
+>> +					#size-cells = <1>;
+>> +					ranges = <0 0x1400 0x200>;
+>> +
+>> +					cm_l4per_clkctrl: cm_l4per_clkctrl at 20 {
+>> +						compatible = "ti,omap4-clkctrl";
+>> +						reg = <0x20 0x1b0>;
+>> +						#clock-cells = <2>;
+>> +					};
+>> +				};
+>
+> You should update the binding doc accordingly if the "cm_l4per at 0" node
+> there is not needed. I also noticed the binding doc still has
+> "#clock-cells = <4>" while it should be 2.
+
+cm_l4per is somewhat redundant right now, but we want to add 
+clockdomains under that one in the future. Or, we could just add those 
+directly under parent node also (cm2 in this case.)
+
+-Tero
