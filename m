@@ -1,158 +1,68 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Thu, 2 Mar 2017 18:02:57 +0200
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Thu, 2 Mar 2017 17:04:51 +0100
+Subject: [PATCH] drm/atmel-hlcdc: Rework the fbdev creation logic
+In-Reply-To: <1480345267-18461-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1480345267-18461-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <9eef519a-57ea-a677-4bdc-a4198fb646b5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
-
-On Wed, Feb 15, 2017 at 06:19:16PM -0800, Steve Longerbeam wrote:
-> v4l2_pipeline_inherit_controls() will add the v4l2 controls from
-> all subdev entities in a pipeline to a given video device.
+On 28/11/2016 16:01, Boris Brezillon wrote:
+> Now that we wait for DRM panels to be available before registering the
+> DRM device (returning -EPROBE_DEFER if the panel has not been probed
+> yet), we no longer need to put the fbdev creation code in
+> ->output_poll_changed().
 > 
-> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> This removes the 10 secs delay between DRM dev registration and fbdev
+> creation (polling period = 10 seconds).
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Reported-by: Alex Vazquez <avazquez.dev@gmail.com>
+Tested-by: Richard Genoud <richard.genoud@gmail.com>
+
+Those 10 seconds where a real pain !
+Any reason this has not been applied ?
+
 > ---
->  drivers/media/v4l2-core/v4l2-mc.c | 48 +++++++++++++++++++++++++++++++++++++++
->  include/media/v4l2-mc.h           | 25 ++++++++++++++++++++
->  2 files changed, 73 insertions(+)
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 18 +++++++-----------
+>  1 file changed, 7 insertions(+), 11 deletions(-)
 > 
-> diff --git a/drivers/media/v4l2-core/v4l2-mc.c b/drivers/media/v4l2-core/v4l2-mc.c
-> index 303980b..09d4d97 100644
-> --- a/drivers/media/v4l2-core/v4l2-mc.c
-> +++ b/drivers/media/v4l2-core/v4l2-mc.c
-> @@ -22,6 +22,7 @@
->  #include <linux/usb.h>
->  #include <media/media-device.h>
->  #include <media/media-entity.h>
-> +#include <media/v4l2-ctrls.h>
->  #include <media/v4l2-fh.h>
->  #include <media/v4l2-mc.h>
->  #include <media/v4l2-subdev.h>
-> @@ -238,6 +239,53 @@ int v4l_vb2q_enable_media_source(struct vb2_queue *q)
->  }
->  EXPORT_SYMBOL_GPL(v4l_vb2q_enable_media_source);
->  
-> +int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
-> +				     struct media_entity *start_entity)
-
-I have a few concerns / questions:
-
-- What's the purpose of this patch? Why not to access the sub-device node
-  directly?
-
-- This implementation is only workable as long as you do not modify the
-  pipeline. Once you disable a link along the pipeline, a device where the
-  control was inherited from may no longer be a part of the pipeline.
-  Depending on the hardware, it could be a part of another pipeline, in
-  which case it certainly must not be accessible through an unrelated video
-  node. As the function is added to the framework, I would expect it to
-  handle such a case correctly.
-
-- I assume it is the responsibility of the caller of this function to ensure
-  the device in question will not be powered off whilst the video node is
-  used as another user space interface to such a sub-device. If the driver
-  uses the generic PM functions in the same file, this works, but it still
-  has to be documented.
-
-> +{
-> +	struct media_device *mdev = start_entity->graph_obj.mdev;
-> +	struct media_entity *entity;
-> +	struct media_graph graph;
-> +	struct v4l2_subdev *sd;
-> +	int ret;
-> +
-> +	ret = media_graph_walk_init(&graph, mdev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	media_graph_walk_start(&graph, start_entity);
-> +
-> +	while ((entity = media_graph_walk_next(&graph))) {
-> +		if (!is_media_entity_v4l2_subdev(entity))
-> +			continue;
-> +
-> +		sd = media_entity_to_v4l2_subdev(entity);
-> +
-> +		ret = v4l2_ctrl_add_handler(vfd->ctrl_handler,
-> +					    sd->ctrl_handler,
-> +					    NULL);
-> +		if (ret)
-> +			break;
-> +	}
-> +
-> +	media_graph_walk_cleanup(&graph);
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(__v4l2_pipeline_inherit_controls);
-> +
-> +int v4l2_pipeline_inherit_controls(struct video_device *vfd,
-> +				   struct media_entity *start_entity)
-> +{
-> +	struct media_device *mdev = start_entity->graph_obj.mdev;
-> +	int ret;
-> +
-> +	mutex_lock(&mdev->graph_mutex);
-> +	ret = __v4l2_pipeline_inherit_controls(vfd, start_entity);
-> +	mutex_unlock(&mdev->graph_mutex);
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(v4l2_pipeline_inherit_controls);
-> +
->  /* -----------------------------------------------------------------------------
->   * Pipeline power management
->   *
-> diff --git a/include/media/v4l2-mc.h b/include/media/v4l2-mc.h
-> index 2634d9d..9848e77 100644
-> --- a/include/media/v4l2-mc.h
-> +++ b/include/media/v4l2-mc.h
-> @@ -171,6 +171,17 @@ void v4l_disable_media_source(struct video_device *vdev);
->   */
->  int v4l_vb2q_enable_media_source(struct vb2_queue *q);
->  
-> +/**
-> + * v4l2_pipeline_inherit_controls - Add the v4l2 controls from all
-> + *				    subdev entities in a pipeline to
-> + *				    the given video device.
-> + * @vfd: the video device
-> + * @start_entity: Starting entity
-> + */
-> +int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
-> +				     struct media_entity *start_entity);
-> +int v4l2_pipeline_inherit_controls(struct video_device *vfd,
-> +				   struct media_entity *start_entity);
->  
->  /**
->   * v4l2_pipeline_pm_use - Update the use count of an entity
-> @@ -231,6 +242,20 @@ static inline int v4l_vb2q_enable_media_source(struct vb2_queue *q)
->  	return 0;
->  }
->  
-> +static inline int __v4l2_pipeline_inherit_controls(
-> +	struct video_device *vfd,
-> +	struct media_entity *start_entity)
-> +{
-> +	return 0;
-> +}
-> +
-> +static inline int v4l2_pipeline_inherit_controls(
-> +	struct video_device *vfd,
-> +	struct media_entity *start_entity)
-> +{
-> +	return 0;
-> +}
-> +
->  static inline int v4l2_pipeline_pm_use(struct media_entity *entity, int use)
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> index 5f484310bee9..2325de7c5c6f 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> @@ -431,15 +431,8 @@ static void atmel_hlcdc_fb_output_poll_changed(struct drm_device *dev)
 >  {
+>  	struct atmel_hlcdc_dc *dc = dev->dev_private;
+>  
+> -	if (dc->fbdev) {
+> +	if (dc->fbdev)
+>  		drm_fbdev_cma_hotplug_event(dc->fbdev);
+> -	} else {
+> -		dc->fbdev = drm_fbdev_cma_init(dev, 24,
+> -				dev->mode_config.num_crtc,
+> -				dev->mode_config.num_connector);
+> -		if (IS_ERR(dc->fbdev))
+> -			dc->fbdev = NULL;
+> -	}
+>  }
+>  
+>  struct atmel_hlcdc_dc_commit {
+> @@ -652,10 +645,13 @@ static int atmel_hlcdc_dc_load(struct drm_device *dev)
+>  
+>  	platform_set_drvdata(pdev, dev);
+>  
+> -	drm_kms_helper_poll_init(dev);
+> +	dc->fbdev = drm_fbdev_cma_init(dev, 24,
+> +			dev->mode_config.num_crtc,
+> +			dev->mode_config.num_connector);
+> +	if (IS_ERR(dc->fbdev))
+> +		dc->fbdev = NULL;
+>  
+> -	/* force connectors detection */
+> -	drm_helper_hpd_irq_event(dev);
+> +	drm_kms_helper_poll_init(dev);
+>  
 >  	return 0;
-
--- 
-Kind regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+>  
+> 
