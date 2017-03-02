@@ -1,131 +1,106 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 2 Mar 2017 09:37:54 -0800
-Subject: [PATCH 2/2] hwmon: (scpi) Fix the scale of SCP sensor readings
-In-Reply-To: <20170302121500.8121-3-carlo@caione.org>
-References: <20170302121500.8121-1-carlo@caione.org>
- <20170302121500.8121-3-carlo@caione.org>
-Message-ID: <20170302173754.GB28554@roeck-us.net>
+Date: Thu, 2 Mar 2017 09:42:24 -0800
+Subject: [PATCH 2/4] watchdog: sama5d4: fix race condition
+In-Reply-To: <20170302173114.28508-3-alexandre.belloni@free-electrons.com>
+References: <20170302173114.28508-1-alexandre.belloni@free-electrons.com>
+ <20170302173114.28508-3-alexandre.belloni@free-electrons.com>
+Message-ID: <20170302174224.GC28554@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 01:15:00PM +0100, Carlo Caione wrote:
-> From: Carlo Caione <carlo@endlessm.com>
+On Thu, Mar 02, 2017 at 06:31:12PM +0100, Alexandre Belloni wrote:
+> WDT_MR and WDT_CR must not updated within three slow clock periods after
+> the last ping (write to WDT_CR or WDT_MR). Ensure enough time has elapsed
+> before writing those registers.
+> wdt_write() waits for 4 periods to ensure at least 3 edges are seen by the
+> IP.
 > 
-> The implementation details for SCPI seems to suggest that the sensor
-> readings must be reported by SCP using a well defined scale
-> (millidegree Celsius for temperature, millivolts for voltage,
-> milliamperes for current, microwatts for power and microjoules for
-> energy).
-> 
-> This is also important for the interaction with other subsystems: for
-> example both the thermal sub-system and the hwmon sysfs interface expect
-> the temperature expressed in millidegree Celsius.
-> 
-> Unfortunately since this behaviour is dependent on the firmware
-> implementation there are cases where the sensor readings are reported
-> using a different scale. For example in the Amlogic SoCs the
-> temperature is reported in degree and not millidegree Celsius.
-> 
-> To take into account this discrepancy and fixup the values reported by
-> SCP a new DT property `scpi,sensors-scale' is introduced and used in
-> this patch by the scpi-hwmon driver to convert the sensor readings to
-> the expected scale.
-> 
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> ---
->  drivers/hwmon/scpi-hwmon.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/drivers/hwmon/scpi-hwmon.c b/drivers/hwmon/scpi-hwmon.c
-> index 094f948f99ff..64a51e06c8df 100644
-> --- a/drivers/hwmon/scpi-hwmon.c
-> +++ b/drivers/hwmon/scpi-hwmon.c
-> @@ -23,6 +23,7 @@
->  #include <linux/thermal.h>
->  
->  struct sensor_data {
-> +	unsigned int scale;
->  	struct scpi_sensor_info info;
->  	struct device_attribute dev_attr_input;
->  	struct device_attribute dev_attr_label;
-> @@ -44,6 +45,14 @@ struct scpi_sensors {
->  	const struct attribute_group *groups[2];
->  };
->  
-> +static const unsigned int scpi_scale[] = {
-> +	1000,		/* Temperature (millidegrees Celsius)	*/
-> +	1000,		/* Voltage     (millivolts)		*/
-> +	1000,		/* Current     (milliamperes)		*/
-> +	1000000,	/* Power       (microwatts)		*/
-> +	1000000,	/* Energy      (microjoules)		*/
-> +};
-> +
->  static int scpi_read_temp(void *dev, int *temp)
->  {
->  	struct scpi_thermal_zone *zone = dev;
-> @@ -57,6 +66,11 @@ static int scpi_read_temp(void *dev, int *temp)
->  	if (ret)
->  		return ret;
->  
-> +	if (scpi_scale[sensor->info.class] != sensor->scale) {
-> +		value *= scpi_scale[sensor->info.class];
-> +		do_div(value, sensor->scale);
 
-Pretty elegant, I like that solution.
+Would it be possible to use min_hw_heartbeat_ms for this purpose ?
 
-> +	}
-> +
->  	*temp = value;
->  	return 0;
->  }
-> @@ -77,6 +91,11 @@ scpi_show_sensor(struct device *dev, struct device_attribute *attr, char *buf)
->  	if (ret)
->  		return ret;
->  
-> +	if (scpi_scale[sensor->info.class] != sensor->scale) {
-> +		value *= scpi_scale[sensor->info.class];
-> +		do_div(value, sensor->scale);
-> +	}
-> +
->  	return sprintf(buf, "%llu\n", value);
->  }
->  
-> @@ -97,6 +116,7 @@ static struct thermal_zone_of_device_ops scpi_sensor_ops = {
->  static int scpi_hwmon_probe(struct platform_device *pdev)
->  {
->  	u16 nr_sensors, i;
-> +	u32 scale[] = { 1000, 1000, 1000, 1000000, 1000000 };
->  	int num_temp = 0, num_volt = 0, num_current = 0, num_power = 0;
->  	int num_energy = 0;
->  	struct scpi_ops *scpi_ops;
-> @@ -131,6 +151,9 @@ static int scpi_hwmon_probe(struct platform_device *pdev)
->  
->  	scpi_sensors->scpi_ops = scpi_ops;
->  
-> +	of_property_read_u32_array(dev->of_node, "scpi,sensors-scale",
-> +				   scale, ARRAY_SIZE(scale));
-> +
-We'll need some validation here. Otherwise a provided scale of 0 would
-crash the system.
-
+Thanks,
 Guenter
 
->  	for (i = 0, idx = 0; i < nr_sensors; i++) {
->  		struct sensor_data *sensor = &scpi_sensors->data[idx];
->  
-> @@ -178,6 +201,8 @@ static int scpi_hwmon_probe(struct platform_device *pdev)
->  			continue;
->  		}
->  
-> +		sensor->scale = scale[sensor->info.class];
-> +
->  		sensor->dev_attr_input.attr.mode = S_IRUGO;
->  		sensor->dev_attr_input.show = scpi_show_sensor;
->  		sensor->dev_attr_input.attr.name = sensor->input;
-> -- 
-> 2.12.0
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/watchdog/sama5d4_wdt.c | 33 +++++++++++++++++++++++++++++----
+>  1 file changed, 29 insertions(+), 4 deletions(-)
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-hwmon" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+> index 5cee20caca78..362fd229786d 100644
+> --- a/drivers/watchdog/sama5d4_wdt.c
+> +++ b/drivers/watchdog/sama5d4_wdt.c
+> @@ -6,6 +6,7 @@
+>   * Licensed under GPLv2.
+>   */
+>  
+> +#include <linux/delay.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/io.h>
+>  #include <linux/kernel.h>
+> @@ -29,6 +30,7 @@ struct sama5d4_wdt {
+>  	struct watchdog_device	wdd;
+>  	void __iomem		*reg_base;
+>  	u32			mr;
+> +	unsigned long		last_ping;
+>  };
+>  
+>  static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
+> @@ -49,8 +51,29 @@ MODULE_PARM_DESC(nowayout,
+>  #define wdt_read(wdt, field) \
+>  	readl_relaxed((wdt)->reg_base + (field))
+>  
+> -#define wdt_write(wtd, field, val) \
+> -	writel_relaxed((val), (wdt)->reg_base + (field))
+> +/* 4 slow clock periods is 4/32768 = 122.07?s*/
+> +#define WDT_DELAY	usecs_to_jiffies(123)
+> +
+> +static void wdt_write(struct sama5d4_wdt *wdt, u32 field, u32 val)
+> +{
+> +	/*
+> +	 * WDT_CR and WDT_MR must not be modified within three slow clock
+> +	 * periods following a restart of the watchdog performed by a write
+> +	 * access in WDT_CR.
+> +	 */
+> +	while (time_before(jiffies, wdt->last_ping + WDT_DELAY))
+> +		usleep_range(30, 125);
+> +	writel_relaxed(val, wdt->reg_base + field);
+> +	wdt->last_ping = jiffies;
+> +}
+> +
+> +static void wdt_write_nosleep(struct sama5d4_wdt *wdt, u32 field, u32 val)
+> +{
+> +	if (time_before(jiffies, wdt->last_ping + WDT_DELAY))
+> +		udelay(123);
+> +	writel_relaxed(val, wdt->reg_base + field);
+> +	wdt->last_ping = jiffies;
+> +}
+>  
+>  static int sama5d4_wdt_start(struct watchdog_device *wdd)
+>  {
+> @@ -164,11 +187,12 @@ static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)
+>  	 * Else, we have to disable it properly.
+>  	 */
+>  	if (wdt_enabled) {
+> -		wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+> +		wdt_write_nosleep(wdt, AT91_WDT_MR, wdt->mr);
+>  	} else {
+>  		reg = wdt_read(wdt, AT91_WDT_MR);
+>  		if (!(reg & AT91_WDT_WDDIS))
+> -			wdt_write(wdt, AT91_WDT_MR, reg | AT91_WDT_WDDIS);
+> +			wdt_write_nosleep(wdt, AT91_WDT_MR,
+> +					  reg | AT91_WDT_WDDIS);
+>  	}
+>  	return 0;
+>  }
+> @@ -193,6 +217,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+>  	wdd->ops = &sama5d4_wdt_ops;
+>  	wdd->min_timeout = MIN_WDT_TIMEOUT;
+>  	wdd->max_timeout = MAX_WDT_TIMEOUT;
+> +	wdt->last_ping = jiffies;
+>  
+>  	watchdog_set_drvdata(wdd, wdt);
+>  
+> -- 
+> 2.11.0
+> 
