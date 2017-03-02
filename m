@@ -1,89 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 2 Mar 2017 10:44:11 +0000
-Subject: ARM64 perf stacktraces on tracepoint events
-In-Reply-To: <CAEi0qNm3NKSWQOD6A2Z0NTNEfp1kLNEZz-=y+dbVCwYMP0HFoQ@mail.gmail.com>
-References: <CAEi0qNm3NKSWQOD6A2Z0NTNEfp1kLNEZz-=y+dbVCwYMP0HFoQ@mail.gmail.com>
-Message-ID: <20170302104349.GA19632@leverpostej>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Thu, 02 Mar 2017 21:47:07 +1100
+Subject: [PATCH] module: set __jump_table alignment to 8
+In-Reply-To: <20170301220453.4756-1-david.daney@cavium.com>
+References: <20170301220453.4756-1-david.daney@cavium.com>
+Message-ID: <87varsj6qc.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding James, Takahiro-san, and Will, for stacktracing and arm64 perf]
+David Daney <david.daney@cavium.com> writes:
 
-On Wed, Mar 01, 2017 at 04:42:17PM -0800, Joel Fernandes wrote:
-> Hi,
-> 
-> On 3.18 kernel running on an arm64 device, I tried running:
-> perf record -a -g -e sched:sched_wakeup
-> 
-> I was expecting something like the output at:
-> www.brendangregg.com/perf.html
-> 
-> But I don't see stacktraces, could I be missing any patches you could
-> point me to?
+> For powerpc the __jump_table section in modules is not aligned, this
+> causes a WARN_ON() splat when loading a module containing a __jump_table.
 
-I can't spot much obvious, looking at arm64's stacktrace.c and perf_callchain.c
-since v3.18. There's commit:
+Thanks for doing the patch.
 
-  9702970c7bd3e2d6 (Revert "ARM64: unwind: Fix PC calculation")
+If it helps:
 
-... though that was Cc'd stable.
+Acked-by: Michael Ellerman <mpe@ellerman.id.au> (powerpc)
 
-I can't immediately see why that would truncate unwinding, though I'm also not
-sure how perf and ftrace interact here, so I may be missing something obvious.
+> Strict alignment became necessary with commit 3821fd35b58d
+> ("jump_label: Reduce the size of struct static_key"), currently in
+> linux-next, which uses the two least significant bits of pointers to
+> __jump_table elements.
 
-> I do see stack traces if I do regular perf profiling
-> (perf record -F 99 -a -g).
+It would obviously be nice if this could go in before the commit that
+exposes the breakage, but I guess that's problematic because Steve
+doesn't want to rebase the tracing tree.
 
-> Below is the output I get. Thanks for any insight into this.
-> 
-> Regards,
-> Joel
-> 
-> sailfish:/data # ./perf report
->        # Samples: 22  of event 'sched:sched_wakeup'
-> # Event count (approx.): 410333
-> #
-> # Children      Self  Trace output
-> # ........  ........
-> .............................................................
-> #
->     61.29%    61.29%  comm=ksoftirqd/0 pid=3 prio=120 success=1 target_cpu=000
->             |
->             ---0
-> 
->     33.25%    33.25%  comm=hw pid=12777 prio=120 success=1 target_cpu=002
->             |
->             ---0
-> 
->      2.46%     2.46%  comm=kworker/u8:2 pid=12482 prio=120 success=1
-> target_cpu=002
->             |
->             ---0
-> 
->      1.39%     1.39%  comm=migration/2 pid=21 prio=0 success=1 target_cpu=002
->             |
->             ---0
+Steve I think you've already sent your pull request for this cycle? So I
+guess if this can go in your first batch of fixes?
 
+Or we could just send it directly to Linus?
 
-FWIW, on a recent HEAD (86292b33d4b79ee0), I see reasonable looking backtraces,
-e.g.
+cheers
 
-    77.48%     0.00%  swapper      [kernel.kallsyms]  [k] do_idle
-            |
-            ---do_idle
-               |          
-               |--68.84%--call_cpuidle
-               |          cpuidle_enter
-               |          cpuidle_enter_state
-               |          |          
-               |           --61.05%--el1_irq
-               |                     gic_handle_irq
-               |                     __handle_domain_irq
-               |                     irq_exit
-               |                     __do_softirq
-               |                     |          
-               |                     |--22.29%--run_timer_softirq
-
-
-Thanks,
-Mark.
+> Fix by forcing __jump_table to 8, which is the same alignment used for
+> this section in the kernel proper.
+>
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> Tested-by: Sachin Sant <sachinp@linux.vnet.ibm.com>
+> ---
+>  scripts/module-common.lds | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/scripts/module-common.lds b/scripts/module-common.lds
+> index 73a2c7d..53234e8 100644
+> --- a/scripts/module-common.lds
+> +++ b/scripts/module-common.lds
+> @@ -19,4 +19,6 @@ SECTIONS {
+>  
+>  	. = ALIGN(8);
+>  	.init_array		0 : { *(SORT(.init_array.*)) *(.init_array) }
+> +
+> +	__jump_table		0 : ALIGN(8) { KEEP(*(__jump_table)) }
+>  }
+> -- 
+> 2.9.3
