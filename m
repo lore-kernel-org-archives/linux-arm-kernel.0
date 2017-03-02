@@ -1,60 +1,56 @@
-From: akurz@blala.de (Alexander Kurz)
-Date: Thu,  2 Mar 2017 22:03:48 +0100
-Subject: [PATCH v2] ARM: dts: imx50: imx50-esdhc use imx53-esdhc
-Message-ID: <1488488628-11711-1-git-send-email-akurz@blala.de>
+From: sergio.prado@e-labworks.com (Sergio Prado)
+Date: Thu,  2 Mar 2017 18:23:19 -0300
+Subject: [PATCH] pinctrl: samsung: fix segfault when using external interrupts
+ on s3c24xx
+Message-ID: <1488489799-18136-1-git-send-email-sergio.prado@e-labworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the reference manuals, both imx50/imx53 SOC seem to share
-the same eSDHC controller, especially the section on "Multi-block Read"
-mentioned in commit 361b8482026c ("mmc: sdhci-esdhc-imx: fix multiblock
-reads on i.MX53") is identical for both SOC.
-Hence, let imx50 use imx53-esdhc.
+We are getting a NULL pointer dereference when working with external
+interrupts on s3c24xx:
 
-Signed-off-by: Alexander Kurz <akurz@blala.de>
+Unable to handle kernel NULL pointer dereference at virtual address 000000a8
+pgd = c0104000
+[000000a8] *pgd=00000000
+Internal error: Oops: 5 [#1] ARM
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc8mini2440-sub-00047-g0722f57bfae9-dirty #3
+Hardware name: Samsung S3C2416 (Flattened Device Tree)
+task: c07399f8 task.stack: c0734000
+PC is at s3c24xx_demux_eint4_7+0x24/0x10c
+LR is at s3c24xx_demux_eint4_7+0x108/0x10c
+
+The problem is in the function s3c24xx_demux_eint() when dereferencing
+bank->eint_base.
+
+At this point, we cannot get the bank pointer from the irq_desc
+structure since it is pointing to the hardware irq, not virq.
+
+So let's get the bank pointer directly from data->drvdata.
+
+This is a regression from commit 8b1bd11c1f8f529057369c5b3702d13fd24e2765.
+
+Tested on FriendlyARM mini2440.
+
+Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
 ---
- arch/arm/boot/dts/imx50.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/pinctrl/samsung/pinctrl-s3c24xx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
-index ceae909..2a98afc 100644
---- a/arch/arm/boot/dts/imx50.dtsi
-+++ b/arch/arm/boot/dts/imx50.dtsi
-@@ -109,7 +109,7 @@
- 				ranges;
+diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+index b82a003546ae..1b8d887796e8 100644
+--- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
++++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+@@ -356,8 +356,8 @@ static inline void s3c24xx_demux_eint(struct irq_desc *desc,
+ {
+ 	struct s3c24xx_eint_data *data = irq_desc_get_handler_data(desc);
+ 	struct irq_chip *chip = irq_desc_get_chip(desc);
+-	struct irq_data *irqd = irq_desc_get_irq_data(desc);
+-	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
++	struct samsung_pinctrl_drv_data *d = data->drvdata;
++	struct samsung_pin_bank *bank = d->pin_banks;
+ 	unsigned int pend, mask;
  
- 				esdhc1: esdhc at 50004000 {
--					compatible = "fsl,imx50-esdhc";
-+					compatible = "fsl,imx50-esdhc", "fsl,imx53-esdhc";
- 					reg = <0x50004000 0x4000>;
- 					interrupts = <1>;
- 					clocks = <&clks IMX5_CLK_ESDHC1_IPG_GATE>,
-@@ -121,7 +121,7 @@
- 				};
- 
- 				esdhc2: esdhc at 50008000 {
--					compatible = "fsl,imx50-esdhc";
-+					compatible = "fsl,imx50-esdhc", "fsl,imx53-esdhc";
- 					reg = <0x50008000 0x4000>;
- 					interrupts = <2>;
- 					clocks = <&clks IMX5_CLK_ESDHC2_IPG_GATE>,
-@@ -170,7 +170,7 @@
- 				};
- 
- 				esdhc3: esdhc at 50020000 {
--					compatible = "fsl,imx50-esdhc";
-+					compatible = "fsl,imx50-esdhc", "fsl,imx53-esdhc";
- 					reg = <0x50020000 0x4000>;
- 					interrupts = <3>;
- 					clocks = <&clks IMX5_CLK_ESDHC3_IPG_GATE>,
-@@ -182,7 +182,7 @@
- 				};
- 
- 				esdhc4: esdhc at 50024000 {
--					compatible = "fsl,imx50-esdhc";
-+					compatible = "fsl,imx50-esdhc", "fsl,imx53-esdhc";
- 					reg = <0x50024000 0x4000>;
- 					interrupts = <4>;
- 					clocks = <&clks IMX5_CLK_ESDHC4_IPG_GATE>,
+ 	chained_irq_enter(chip, desc);
 -- 
-2.1.4
+1.9.1
