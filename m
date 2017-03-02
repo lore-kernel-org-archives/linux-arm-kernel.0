@@ -1,39 +1,46 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu,  2 Mar 2017 18:31:14 +0100
-Subject: [PATCH 4/4] watchdog: sama5d4: Add comment explaining what happens on
- resume
-In-Reply-To: <20170302173114.28508-1-alexandre.belloni@free-electrons.com>
-References: <20170302173114.28508-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170302173114.28508-5-alexandre.belloni@free-electrons.com>
+Date: Thu,  2 Mar 2017 18:31:10 +0100
+Subject: [PATCH 0/4] watchdog: sama5d4: fix issues
+Message-ID: <20170302173114.28508-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because suspending to RAM may lose the register values, they are restored
-on resume. This is currently done unconditionally because there is
-currently no way to know (from the driver) whether they have really been
-lost or are still valid. Writing MR also pings the watchdog and this may
-not be what is expected so add a comment explaining why it happens.
+Hi,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/watchdog/sama5d4_wdt.c | 5 +++++
- 1 file changed, 5 insertions(+)
+This is a rework of how the watchdog is getting programmed. Currently,
+there are multiple issue that have the same symptoms: the watchdog is
+unexpectidly resetting the SoCs when configuring it.
 
-diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-index d710014f3b7d..0ae947c3d7bc 100644
---- a/drivers/watchdog/sama5d4_wdt.c
-+++ b/drivers/watchdog/sama5d4_wdt.c
-@@ -300,6 +300,11 @@ static int sama5d4_wdt_resume(struct device *dev)
- {
- 	struct sama5d4_wdt *wdt = dev_get_drvdata(dev);
- 
-+	/*
-+	 * FIXME: writing MR also pings the watchdog which may not be desired.
-+	 * This should only be done when the registers are lost on suspend but
-+	 * there is no way to get this information right now.
-+	 */
- 	sama5d4_wdt_init(wdt);
- 
- 	return 0;
+The first issue was how WDDIS was handled. To sum it up, the watchdog
+has to be configured when removing WDDIS instead of first removing it
+then configuring it. It is solved by only configuring the IP when
+enabling the watchdog.
+Note that there were no issue updating the timeout with the watchdog
+running.
+
+The second issue is how the write are synchronized inside the IP. The
+datasheet state that iit is necessary to wait 3 slow clock periods
+between a write to CR and subsequents writes to CR and MR. This was not
+done in the driver. Also, it apears it is necessary to wait the same
+amount of time between a write to MR and a write to CR or MR.
+
+Finally, a simplification of the probe is done and a comment is added in
+the resume function to explain why the reset may be delayed after a
+suspend/resume cycle (but it will still happen).
+
+Before the series, the watchdog would reset the SoC after a few
+configurations. Now, I've lett a test progam run that managed to do more
+than 1 000 000 configurations with the watchdog enabled and the same
+while disabled.
+
+Alexandre Belloni (4):
+  watchdog: sama5d4: fix WDDIS handling
+  watchdog: sama5d4: fix race condition
+  watchodg: sama5d4: simplify probe
+  watchdog: sama5d4: Add comment explaining what happens on resume
+
+ drivers/watchdog/sama5d4_wdt.c | 96 ++++++++++++++++++++++++++++++------------
+ 1 file changed, 68 insertions(+), 28 deletions(-)
+
 -- 
 2.11.0
