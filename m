@@ -1,62 +1,48 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 2 Mar 2017 13:10:53 -0500
-Subject: [PATCH V2] PCI/ASPM: reconfigure ASPM following hotplug for
- POLICY_DEFAULT
-In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B28466669BFF@IRSMSX101.ger.corp.intel.com>
-References: <1485891928-14573-1-git-send-email-okaya@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B2846666830C@IRSMSX101.ger.corp.intel.com>
- <b78207b6-2c22-3e6d-4837-8b4b396c4f5d@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B28466668774@IRSMSX101.ger.corp.intel.com>
- <f8f67b32-21eb-232b-2b7c-28b603865b9d@codeaurora.org>
- <92EBB4272BF81E4089A7126EC1E7B28466669BFF@IRSMSX101.ger.corp.intel.com>
-Message-ID: <fed12fe1-3b13-0118-6a11-5004779d9c06@codeaurora.org>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 2 Mar 2017 13:11:19 -0500
+Subject: [PATCH] module: set __jump_table alignment to 8
+In-Reply-To: <20170301220453.4756-1-david.daney@cavium.com>
+References: <20170301220453.4756-1-david.daney@cavium.com>
+Message-ID: <20170302131119.6f52203f@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mayurkumar
 
-On 3/2/2017 11:05 AM, Patel, Mayurkumar wrote:
->>
->> Hi Bjorn,
->>
->> On 2/28/2017 1:57 PM, Patel, Mayurkumar wrote:
->>>> I was trying to figure out when to use saved values vs. the values in
->>>> registers by looking at the enable_cnt.
->>>> enable_cnt is 0 during boot on my system.
->>> enable_cnt for the root port on my system is set to 1 for "root port" already without saving
->>> any ASPM related settings.
->>>
->>>
->>
->> What would be the best way to figure out when to save power-on values from
->> the registers?
->>
-> 
-> I can upload the diffs) because enable_cnt in pci_enable_device() can be triggered
-> from multiple places at boot time so it might not be safe to use it? 
+Can I get an Ack from a module maintainer?
 
-Go ahead and share your diff. It doesn't hurt to look at other alternatives.
+Thanks!
 
-> 
-> @Kaya/Bjorn: Do you have any other suggestions or Could you also please help by comment what would make sense?
-> 
-> 
->> --
->> Sinan Kaya
->> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
->> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
-> Intel Deutschland GmbH
-> Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
-> Tel: +49 89 99 8853-0, www.intel.de
-> Managing Directors: Christin Eisenschmid, Christian Lamprechter
-> Chairperson of the Supervisory Board: Nicole Lau
-> Registered Office: Munich
-> Commercial Register: Amtsgericht Muenchen HRB 186928
-> 
-> 
+-- Steve
 
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+On Wed,  1 Mar 2017 14:04:53 -0800
+David Daney <david.daney@cavium.com> wrote:
+
+> For powerpc the __jump_table section in modules is not aligned, this
+> causes a WARN_ON() splat when loading a module containing a __jump_table.
+> 
+> Strict alignment became necessary with commit 3821fd35b58d
+> ("jump_label: Reduce the size of struct static_key"), currently in
+> linux-next, which uses the two least significant bits of pointers to
+> __jump_table elements.
+> 
+> Fix by forcing __jump_table to 8, which is the same alignment used for
+> this section in the kernel proper.
+> 
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> Tested-by: Sachin Sant <sachinp@linux.vnet.ibm.com>
+> ---
+>  scripts/module-common.lds | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/scripts/module-common.lds b/scripts/module-common.lds
+> index 73a2c7d..53234e8 100644
+> --- a/scripts/module-common.lds
+> +++ b/scripts/module-common.lds
+> @@ -19,4 +19,6 @@ SECTIONS {
+>  
+>  	. = ALIGN(8);
+>  	.init_array		0 : { *(SORT(.init_array.*)) *(.init_array) }
+> +
+> +	__jump_table		0 : ALIGN(8) { KEEP(*(__jump_table)) }
+>  }
