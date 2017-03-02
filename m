@@ -1,48 +1,93 @@
-From: joel.opensrc@gmail.com (Joel Fernandes)
-Date: Wed, 1 Mar 2017 16:42:17 -0800
-Subject: ARM64 perf stacktraces on tracepoint events
-Message-ID: <CAEi0qNm3NKSWQOD6A2Z0NTNEfp1kLNEZz-=y+dbVCwYMP0HFoQ@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 2 Mar 2017 08:43:18 +0800
+Subject: [PATCH v2 1/3] coresight: bindings for debug module
+In-Reply-To: <20170301154550.GA4009@linaro.org>
+References: <1488294420-14188-1-git-send-email-leo.yan@linaro.org>
+ <1488294420-14188-2-git-send-email-leo.yan@linaro.org>
+ <20170301154550.GA4009@linaro.org>
+Message-ID: <20170302004318.GD1906@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Mar 01, 2017 at 08:45:50AM -0700, Mathieu Poirier wrote:
+> On Tue, Feb 28, 2017 at 11:06:58PM +0800, Leo Yan wrote:
+> > According to ARMv8 architecture reference manual (ARM DDI 0487A.k)
+> > Chapter 'Part H: External debug', the CPU can integrate debug module
+> > and it can support self-hosted debug and external debug. Especially
+> > for supporting self-hosted debug, this means the program can access
+> > the debug module from mmio region; and usually the mmio region is
+> > integrated with coresight.
+> > 
+> > So add document for binding debug component, includes binding to APB
+> > clock; and also need specify the CPU node which the debug module is
+> > dedicated to specific CPU.
+> > 
+> > Suggested-by: Mike Leach <mike.leach@linaro.org>
+> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > ---
+> >  .../devicetree/bindings/arm/coresight-debug.txt    | 40 ++++++++++++++++++++++
+> >  1 file changed, 40 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/coresight-debug.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/coresight-debug.txt b/Documentation/devicetree/bindings/arm/coresight-debug.txt
+> > new file mode 100644
+> > index 0000000..89820d5
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/coresight-debug.txt
+> > @@ -0,0 +1,40 @@
+> > +* CoreSight Debug Component:
+> > +
+> > +CoreSight debug component are compliant with the ARMv8 architecture reference
+> > +manual (ARM DDI 0487A.k) Chapter 'Part H: External debug'. The external debug
+> > +module is mainly used for two modes: self-hosted debug and external debug, and
+> > +it can be accessed from mmio region from Coresight and eventually the debug
+> > +module connects with CPU for debugging. And the debug module provides
+> > +sample-based profiling extension, which can be used to sample CPU program
+> > +counter, secure state and exception level, etc; usually every CPU has one
+> > +dedicated debug module to be connected.
+> > +
+> > +Required properties:
+> > +
+> > +- compatible : should be
+> > +	     * "arm,coresight-debug", "arm,primecell"; supplemented with
+> > +	       "arm,primecell" as driver is using the AMBA bus interface.
+> 
+>              * "arm,coresight-debug"; supplemented with "arm,primecell" since
+>                this driver is using the AMBA bus interface.
+> 
+> > +
+> > +- reg : physical base address and length of the register set.
+> > +
+> > +- clocks : the clock associated to this component.
+> > +
+> > +- clock-names : the name of the clock referenced by the code. Since we are
+> > +                using the AMBA framework, the name of the clock providing
+> > +		the interconnect should be "apb_pclk" and the clock is
+> > +		mandatory. The interface between the debug logic and the
+> > +		processor core is clocked by the internal CPU clock, so it
+> > +		is enabled with CPU clock by default.
+> > +
+> > +- cpu : the cpu phandle the debug module is affined to. When omitted
+> > +	the source is considered to belong to CPU0.
+> 
+> s/source/module
+> 
+> With those change:
+> 
+> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-On 3.18 kernel running on an arm64 device, I tried running:
-perf record -a -g -e sched:sched_wakeup
+Thanks for reviewing :)
 
-I was expecting something like the output at:
-www.brendangregg.com/perf.html
-
-But I don't see stacktraces, could I be missing any patches you could
-point me to? I do see stack traces if I do regular perf profiling
-(perf record -F 99 -a -g).
-
-Below is the output I get. Thanks for any insight into this.
-
-Regards,
-Joel
-
-sailfish:/data # ./perf report
-       # Samples: 22  of event 'sched:sched_wakeup'
-# Event count (approx.): 410333
-#
-# Children      Self  Trace output
-# ........  ........
-.............................................................
-#
-    61.29%    61.29%  comm=ksoftirqd/0 pid=3 prio=120 success=1 target_cpu=000
-            |
-            ---0
-
-    33.25%    33.25%  comm=hw pid=12777 prio=120 success=1 target_cpu=002
-            |
-            ---0
-
-     2.46%     2.46%  comm=kworker/u8:2 pid=12482 prio=120 success=1
-target_cpu=002
-            |
-            ---0
-
-     1.39%     1.39%  comm=migration/2 pid=21 prio=0 success=1 target_cpu=002
-            |
-            ---0
+> > +
+> > +Example:
+> > +
+> > +	debug at f6590000 {
+> > +		compatible = "arm,coresight-debug","arm,primecell";
+> > +		reg = <0 0xf6590000 0 0x1000>;
+> > +		clocks = <&sys_ctrl HI6220_DAPB_CLK>;
+> > +		clock-names = "apb_pclk";
+> > +		cpu = <&cpu0>;
+> > +	};
+> > -- 
+> > 2.7.4
+> > 
