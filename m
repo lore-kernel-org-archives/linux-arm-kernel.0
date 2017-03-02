@@ -1,36 +1,64 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Thu, 2 Mar 2017 14:22:10 +0800
-Subject: [PATCH V3 4/4] serial: sprd: adjust TIMEOUT to a big value
-In-Reply-To: <1488435730-6711-1-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1488435730-6711-1-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <1488435730-6711-5-git-send-email-chunyan.zhang@spreadtrum.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 2 Mar 2017 09:23:27 +0200
+Subject: [RESEND PATCH v2 0/5] Fix the parse_dt of exynos dsi and remove
+ the OF graph
+In-Reply-To: <a9e52516-bb05-7ad3-01d5-da1fe3bc7548@samsung.com>
+References: <CGME20170228081811epcas5p3c0a8151d94511e47a0e0d2b8787b1fb0@epcas5p3.samsung.com>
+ <1488269879-28876-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CAJKOXPfv8wJ+0L4G_0sB1Qh-svXx4VvNJH_1THSy5SsXuUstzA@mail.gmail.com>
+ <a9e52516-bb05-7ad3-01d5-da1fe3bc7548@samsung.com>
+Message-ID: <CAJKOXPeP-86=AsNH-xodkMpLJm1uLG0tKq2bz93FE5oFBDB4mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Qiao <wei.qiao@spreadtrum.com>
+On Thu, Mar 2, 2017 at 3:44 AM, Hoegeun Kwon <hoegeun.kwon@samsung.com> wrote:
+> On 02/28/2017 06:58 PM, Krzysztof Kozlowski wrote:
+>> Discussions in previous thread lead us to bisectability problem.
+>> Bisectability in regular driver changes is one thing but in case of
+>> driver + DTS the gap is much bigger. DTS will go through separate tree
+>> and branches. How do you want to solve the problem?
+>
+>
+> Sorry for the delay in reply, Mar 1st was the holiday.
+> I thought of two solutions.
+>
+> 1. squash the patches in a single patch
 
-SPRD_TIMEOUT was 256, which is too small to wait until the status
-switched to workable in a while loop, so that the earlycon could
-not work correctly.
+No, for the same reason. DTS code/patches have to go through arm-soc
+DTS branch without mixing with any driver changes. Otherwise arm-soc
+guys are angry.
 
-Signed-off-by: Wei Qiao <wei.qiao@spreadtrum.com>
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
----
- drivers/tty/serial/sprd_serial.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> 2. split the dts related patches so that the first part adds the:
+> +    samsung,burst-clock-frequency = <512000000>;
+> +    samsung,esc-clock-frequency = <16000000>;
+>
+> and the second part at the end removes the 'port' node
+> So it consists of 6 patches in total.
 
-diff --git a/drivers/tty/serial/sprd_serial.c b/drivers/tty/serial/sprd_serial.c
-index 699447a..cc1a55e 100644
---- a/drivers/tty/serial/sprd_serial.c
-+++ b/drivers/tty/serial/sprd_serial.c
-@@ -36,7 +36,7 @@
- #define SPRD_FIFO_SIZE		128
- #define SPRD_DEF_RATE		26000000
- #define SPRD_BAUD_IO_LIMIT	3000000
--#define SPRD_TIMEOUT		256
-+#define SPRD_TIMEOUT		256000
- 
- /* the offset of serial registers and BITs for them */
- /* data registers */
--- 
-2.7.4
+That's a solution. The remaining DTS patches would go in next release...
+
+Another solution would be for this release cycle:
+        if (of_property_does_not_exist(node, "samsung,burst-clock-frequency") {
+                // Fallback to old parsing mode
+                node = of_graph_get_endpoint_by_regs(node, DSI_PORT_OUT, 0);
+                if (!node) {
+                        dev_err(dev, "no burst-clock-frequency nor
+output port with endpoint specified\n");
+                        return -EINVAL;
+                }
+        }
+        ret = exynos_dsi_of_read_u32(node, "samsung,burst-clock-frequency",
+                                     &dsi->burst_clk_rate);
+        ...
+
+...and in next release the DTS patches would go in. This would give
+you also DTB backward compatibility. However still DTS could be
+applied later, after driver changes gets into mainline.
+
+Personally I would prefer your solution #2 (with separate DTS patch
+adding new properties). Does it sound reasonable for Inki?
+
+Thanks for looking into this problem.
+
+Best regards,
+Krzysztof
