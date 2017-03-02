@@ -1,93 +1,44 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 2 Mar 2017 08:43:18 +0800
-Subject: [PATCH v2 1/3] coresight: bindings for debug module
-In-Reply-To: <20170301154550.GA4009@linaro.org>
-References: <1488294420-14188-1-git-send-email-leo.yan@linaro.org>
- <1488294420-14188-2-git-send-email-leo.yan@linaro.org>
- <20170301154550.GA4009@linaro.org>
-Message-ID: <20170302004318.GD1906@leoy-linaro>
+From: sgoel@codeaurora.org (Goel, Sameer)
+Date: Wed, 1 Mar 2017 17:51:21 -0700
+Subject: [PATCH v32 00/13] arm64: add kdump support
+In-Reply-To: <20170207080601.5816-1-takahiro.akashi@linaro.org>
+References: <20170207080601.5816-1-takahiro.akashi@linaro.org>
+Message-ID: <1f4c1497-129d-7350-89c1-1ba0a6764ba5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 01, 2017 at 08:45:50AM -0700, Mathieu Poirier wrote:
-> On Tue, Feb 28, 2017 at 11:06:58PM +0800, Leo Yan wrote:
-> > According to ARMv8 architecture reference manual (ARM DDI 0487A.k)
-> > Chapter 'Part H: External debug', the CPU can integrate debug module
-> > and it can support self-hosted debug and external debug. Especially
-> > for supporting self-hosted debug, this means the program can access
-> > the debug module from mmio region; and usually the mmio region is
-> > integrated with coresight.
-> > 
-> > So add document for binding debug component, includes binding to APB
-> > clock; and also need specify the CPU node which the debug module is
-> > dedicated to specific CPU.
-> > 
-> > Suggested-by: Mike Leach <mike.leach@linaro.org>
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > ---
-> >  .../devicetree/bindings/arm/coresight-debug.txt    | 40 ++++++++++++++++++++++
-> >  1 file changed, 40 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/coresight-debug.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/coresight-debug.txt b/Documentation/devicetree/bindings/arm/coresight-debug.txt
-> > new file mode 100644
-> > index 0000000..89820d5
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/coresight-debug.txt
-> > @@ -0,0 +1,40 @@
-> > +* CoreSight Debug Component:
-> > +
-> > +CoreSight debug component are compliant with the ARMv8 architecture reference
-> > +manual (ARM DDI 0487A.k) Chapter 'Part H: External debug'. The external debug
-> > +module is mainly used for two modes: self-hosted debug and external debug, and
-> > +it can be accessed from mmio region from Coresight and eventually the debug
-> > +module connects with CPU for debugging. And the debug module provides
-> > +sample-based profiling extension, which can be used to sample CPU program
-> > +counter, secure state and exception level, etc; usually every CPU has one
-> > +dedicated debug module to be connected.
-> > +
-> > +Required properties:
-> > +
-> > +- compatible : should be
-> > +	     * "arm,coresight-debug", "arm,primecell"; supplemented with
-> > +	       "arm,primecell" as driver is using the AMBA bus interface.
-> 
->              * "arm,coresight-debug"; supplemented with "arm,primecell" since
->                this driver is using the AMBA bus interface.
-> 
-> > +
-> > +- reg : physical base address and length of the register set.
-> > +
-> > +- clocks : the clock associated to this component.
-> > +
-> > +- clock-names : the name of the clock referenced by the code. Since we are
-> > +                using the AMBA framework, the name of the clock providing
-> > +		the interconnect should be "apb_pclk" and the clock is
-> > +		mandatory. The interface between the debug logic and the
-> > +		processor core is clocked by the internal CPU clock, so it
-> > +		is enabled with CPU clock by default.
-> > +
-> > +- cpu : the cpu phandle the debug module is affined to. When omitted
-> > +	the source is considered to belong to CPU0.
-> 
-> s/source/module
-> 
-> With those change:
-> 
-> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 
-Thanks for reviewing :)
 
-> > +
-> > +Example:
-> > +
-> > +	debug at f6590000 {
-> > +		compatible = "arm,coresight-debug","arm,primecell";
-> > +		reg = <0 0xf6590000 0 0x1000>;
-> > +		clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-> > +		clock-names = "apb_pclk";
-> > +		cpu = <&cpu0>;
-> > +	};
-> > -- 
-> > 2.7.4
-> > 
+On 2/7/2017 1:06 AM, AKASHI Takahiro wrote:
+> This patch series adds kdump support on arm64.
+> 
+> To load a crash-dump kernel to the systems, a series of patches to
+> kexec-tools[1] are also needed. Please use the latest one, v5 [2].
+> For your convinience, you can pick them up from:
+>    https://git.linaro.org/people/takahiro.akashi/linux-aarch64.git arm64/kdump
+>    https://git.linaro.org/people/takahiro.akashi/kexec-tools.git arm64/kdump
+> 
+> To examine vmcore (/proc/vmcore) on a crash-dump kernel, you can use
+>   - crash utility (v7.1.8 or later, i.e. master for now) [3]
+> 
+> I tested this patchset on fast model and hikey.
+> (under various configurations, in particular 4KB-page/39,48-bits, 64KB-page/42
+> -bits with hibernate)
+> 
+> The previous versions were also:
+> Tested-by: Pratyush Anand <panand@redhat.com> (v29, mustang and seattle)
+> Tested-by: James Morse <james.morse@arm.com> (v27, Juno)
+> 
+I tested this patch set on a QDT2400 device with 4k 4-level setup. This patchset worked after applying [1].
+
+[1] [PATCH] efi/libstub/arm*: Set default address and size cells values for an empty dtb
+
+Without the above patch the start address of the crash kernel is recorded incorrectly and the 
+memblock_cap_memory_range clears out the incorrect range. 
+ 
+Thanks,
+Sameer
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
