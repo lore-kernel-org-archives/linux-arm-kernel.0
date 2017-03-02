@@ -1,80 +1,89 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 2 Mar 2017 16:09:57 +0530
-Subject: [PATCH] cpufreq: mt8173: Add support for MT8176 and MT817x
- compatibles
-In-Reply-To: <20170302103626.69195-1-djkurtz@chromium.org>
-References: <20170302103626.69195-1-djkurtz@chromium.org>
-Message-ID: <20170302103957.GB13760@vireshk-i7>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 2 Mar 2017 10:44:11 +0000
+Subject: ARM64 perf stacktraces on tracepoint events
+In-Reply-To: <CAEi0qNm3NKSWQOD6A2Z0NTNEfp1kLNEZz-=y+dbVCwYMP0HFoQ@mail.gmail.com>
+References: <CAEi0qNm3NKSWQOD6A2Z0NTNEfp1kLNEZz-=y+dbVCwYMP0HFoQ@mail.gmail.com>
+Message-ID: <20170302104349.GA19632@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02-03-17, 18:36, Daniel Kurtz wrote:
-> The Mediatek MT8173 is just on of several SOCs from the same MT817x family,
+[Adding James, Takahiro-san, and Will, for stacktracing and arm64 perf]
 
-s/on/one
+On Wed, Mar 01, 2017 at 04:42:17PM -0800, Joel Fernandes wrote:
+> Hi,
+> 
+> On 3.18 kernel running on an arm64 device, I tried running:
+> perf record -a -g -e sched:sched_wakeup
+> 
+> I was expecting something like the output at:
+> www.brendangregg.com/perf.html
+> 
+> But I don't see stacktraces, could I be missing any patches you could
+> point me to?
 
-> including the 6-core (4-little/2-big) MT8176.
-> 
-> The mt8173-cpufreq driver supports all of these SOCs, however, machines
-> using them may use a different machine compatible.
-> 
-> Since this driver checks explicitly for the machine compatible string, add
-> support for the whole family.
-> 
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> ---
-> This patch is based on the compatibles added by the MT8176 series:
-> 
->  https://patchwork.kernel.org/patch/9573209/
->  https://patchwork.kernel.org/patch/9573213/
-> 
->  drivers/cpufreq/mt8173-cpufreq.c | 25 +++++++++++++++++++++++--
->  1 file changed, 23 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
-> index ab25b1235a5e..07f7aac56f31 100644
-> --- a/drivers/cpufreq/mt8173-cpufreq.c
-> +++ b/drivers/cpufreq/mt8173-cpufreq.c
-> @@ -573,13 +573,34 @@ static struct platform_driver mt8173_cpufreq_platdrv = {
->  	.probe		= mt8173_cpufreq_probe,
->  };
->  
-> +/* List of machine compatible strings supported by this driver */
-> +static const char *mt8173_cpufreq_machines[] = {
-> +	"mediatek,mt817x",
-> +	"mediatek,mt8173",
-> +	"mediatek,mt8176",
-> +};
-> +
-> +static int mt8173_cpufreq_is_compatible(void)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(mt8173_cpufreq_machines); i++)
-> +		if (of_machine_is_compatible(mt8173_cpufreq_machines[i]))
-> +			return 0;
-> +
-> +	return -ENODEV;
-> +}
-> +
->  static int mt8173_cpufreq_driver_init(void)
->  {
->  	struct platform_device *pdev;
->  	int err;
->  
-> -	if (!of_machine_is_compatible("mediatek,mt8173"))
-> -		return -ENODEV;
-> +	err = mt8173_cpufreq_is_compatible();
+I can't spot much obvious, looking at arm64's stacktrace.c and perf_callchain.c
+since v3.18. There's commit:
 
-Use of_match_node() instead (hint: cpufreq-dt-platdev.c)
+  9702970c7bd3e2d6 (Revert "ARM64: unwind: Fix PC calculation")
 
-> +	if (err) {
-> +		pr_err("Machine is not compatible with 'mediatek,mt8173'\n");
-> +		return err;
-> +	}
->  
->  	err = platform_driver_register(&mt8173_cpufreq_platdrv);
->  	if (err)
+... though that was Cc'd stable.
 
--- 
-viresh
+I can't immediately see why that would truncate unwinding, though I'm also not
+sure how perf and ftrace interact here, so I may be missing something obvious.
+
+> I do see stack traces if I do regular perf profiling
+> (perf record -F 99 -a -g).
+
+> Below is the output I get. Thanks for any insight into this.
+> 
+> Regards,
+> Joel
+> 
+> sailfish:/data # ./perf report
+>        # Samples: 22  of event 'sched:sched_wakeup'
+> # Event count (approx.): 410333
+> #
+> # Children      Self  Trace output
+> # ........  ........
+> .............................................................
+> #
+>     61.29%    61.29%  comm=ksoftirqd/0 pid=3 prio=120 success=1 target_cpu=000
+>             |
+>             ---0
+> 
+>     33.25%    33.25%  comm=hw pid=12777 prio=120 success=1 target_cpu=002
+>             |
+>             ---0
+> 
+>      2.46%     2.46%  comm=kworker/u8:2 pid=12482 prio=120 success=1
+> target_cpu=002
+>             |
+>             ---0
+> 
+>      1.39%     1.39%  comm=migration/2 pid=21 prio=0 success=1 target_cpu=002
+>             |
+>             ---0
+
+
+FWIW, on a recent HEAD (86292b33d4b79ee0), I see reasonable looking backtraces,
+e.g.
+
+    77.48%     0.00%  swapper      [kernel.kallsyms]  [k] do_idle
+            |
+            ---do_idle
+               |          
+               |--68.84%--call_cpuidle
+               |          cpuidle_enter
+               |          cpuidle_enter_state
+               |          |          
+               |           --61.05%--el1_irq
+               |                     gic_handle_irq
+               |                     __handle_domain_irq
+               |                     irq_exit
+               |                     __do_softirq
+               |                     |          
+               |                     |--22.29%--run_timer_softirq
+
+
+Thanks,
+Mark.
