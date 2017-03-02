@@ -1,128 +1,35 @@
-From: shiju.jose@huawei.com (Shiju Jose)
-Date: Thu, 2 Mar 2017 13:45:51 +0000
-Subject: [RFC PATCH V1 v4.10-rc3 1/1] acpi: apei: handle GSIV
- notification type
-In-Reply-To: <58B6FF09.6030306@arm.com>
-References: <86258A5CC0A3704780874CF6004BA8A62DCAB57E@lhreml502-mbs>
- <58B579A1.90109@arm.com> <43507f99-d80b-6409-d249-b9b18425a1da@linaro.org>
- <58B6FF09.6030306@arm.com>
-Message-ID: <86258A5CC0A3704780874CF6004BA8A62DCAC378@lhreml502-mbs>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 2 Mar 2017 14:55:27 +0100
+Subject: [PATCH v6 1/4] clk: sunxi-ng: add Allwinner H5 CCU support for
+ H3 CCU driver
+In-Reply-To: <20170301201342.47583-2-icenowy@aosc.xyz>
+References: <20170301201342.47583-1-icenowy@aosc.xyz>
+ <20170301201342.47583-2-icenowy@aosc.xyz>
+Message-ID: <20170302135527.sgu2cipqmnadpxgj@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Thu, Mar 02, 2017 at 04:13:39AM +0800, Icenowy Zheng wrote:
+> Allwinner H5 is a SoC that features a design which keeps the peripheral
+> compatible with H3, so that it have also a CCU like the one on H3 --
+> only one bus gate/reset is added, and the mmc sample/output phases are
+> removed because of MMC controller update.
+> 
+> Add its support in our existing H3 CCU driver.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-> -----Original Message-----
-> From: James Morse [mailto:james.morse at arm.com]
-> Sent: 01 March 2017 17:04
-> To: Hanjun Guo; Shiju Jose
-> Cc: christoffer.dall at linaro.org; marc.zyngier at arm.com;
-> pbonzini at redhat.com; rkrcmar at redhat.com; linux at armlinux.org.uk;
-> catalin.marinas at arm.com; will.deacon at arm.com; rjw at rjwysocki.net;
-> lenb at kernel.org; matt at codeblueprint.co.uk; robert.moore at intel.com;
-> lv.zheng at intel.com; nkaje at codeaurora.org; zjzhang at codeaurora.org;
-> mark.rutland at arm.com; akpm at linux-foundation.org;
-> eun.taik.lee at samsung.com; sandeepa.s.prabhu at gmail.com;
-> labbott at redhat.com; shijie.huang at arm.com; rruigrok at codeaurora.org;
-> paul.gortmaker at windriver.com; tn at semihalf.com; fu.wei at linaro.org;
-> rostedt at goodmis.org; bristot at redhat.com; linux-arm-
-> kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
-> kvm at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
-> acpi at vger.kernel.org; linux-efi at vger.kernel.org; devel at acpica.org;
-> Suzuki.Poulose at arm.com; punit.agrawal at arm.com; astone at redhat.com;
-> harba at codeaurora.org; Tyler Baicar; joe at perches.com; John Garry;
-> Gabriele Paoloni; Guohanjun (Hanjun Guo); wangxiongfeng (C); Zhengqiang
-> (turing)
-> Subject: Re: [RFC PATCH V1 v4.10-rc3 1/1] acpi: apei: handle GSIV
-> notification type
-> 
-> Hi Hanjun,
-> 
-> On 01/03/17 08:27, Hanjun Guo wrote:
-> > On 2017/2/28 21:22, James Morse wrote:
-> >> On 27/02/17 18:19, Shiju Jose wrote:
-> >>> Add a new GHES error source handling function for GSIV(Global
-> System
-> >>> Interrupt Vector).
-> >>> If an error source's notification type is GSIV, then this handling
-> >>> function can be registered into the GSIV handler and it can parse
-> >>> and report error information when they occur.
-> >>
-> >> I'm missing some of the story here, but how is GSIV different from
-> >> 'External Interrupt'? I'm guessing something other than the CPU
-> takes this 'interrupt'...
-> >
-> > Yes, it's the same from CPU side (they are interrupts!), but there is
-> > history behind them and the usage is different.
-> >
-> > I think External Interrupt was introduced before ACPI is available on
-> > ARM (hardware reduced platforms), so I guess it was used for errors
-> > reported to OS which were not using SCI mechanism, for example, some
-> > IO error reporting.
-> >
-> > For External Interrupt, we don't use the ACPI event system, so for
-> the
-> > firmware, it just report the errors associate with the interrupt
-> > number, the kernel map the interrupt number and install the irq
-> > handler for it.
-> >
-> > For GSIV based event, it was introduced for hardware reduced platform
-> > in recent ACPI revision, and ARM64 is one of its consumers. When
-> > errors are reported via GSIV, ACPI event notification needs to be
-> > implemented and requires the platform to define a hardware error
-> > device
-> > (PNP0C33) in ACPI namespace, and also a generic event device ACPI0013.
-> 
-> Okay, so for APEI this really means PNP0C33 was Notify()d. 'SCI' means
-> the same but the route they take to get into APEI is different.
-> 
-> 
-> > For example, if we are using SPI (ARM GIC) 100 to report errors,
-> there
-> > is a ACPI0013 driver in drivers/acpi/evged.c to register the irq,
-> when
-> 
-> Aha, this is where the interrupt-magic happens.
-> 
-> 
-> > error happened and trigger the interrupt, ACPI0013 driver will notify
-> > the error device (PNP0C33), then error device driver
-> > (drivers/acpi/hed.c) will process the error data form APEI table...
-> 
-> 
-> >> The GHES GSIV code below is identical to the behaviour of the SCI
-> >> Notification type... are these two names for the same thing? (I'm
-> >> confused!)
-> >
-> > SCI is also an 'interrupt' but it's a special irq number for ACPI
-> > event, and it has GPE (general purpose event) registers behind it,
-> > which is used only on Intel platforms. SCI based event use
-> > Method(\_GPE._L0x) to notify the error device (PNP0C33), but GSIV is
-> > used for HW-reduced platform which has no GPEs.
-> 
-> > Hope it can clarify something :)
-> 
-> Yes thanks! (the mist is slowly clearing...)
-> 
-> If ACPI_HEST_NOTIFY_SCI and ACPI_HEST_NOTIFY_GSIV both mean 'receive
-> notification from PNP0C33', is there any point having separate lists
-> and add/remove functions for them?
-> 
-> Instead, could we rename Linux's ghes_notifier_sci() and ghes_sci list
-> to describe 'hed' instead, then group the two case statements together?
-> There would be no need to add a selectable CONFIG_ACPI_APEI_GSIV, as
-> SCI is already built-in and this way the code added is tiny. The only
-> thing we would lose is the name 'GSIV' in the not-supported error
-> message which we don't need if its always supported.
+Applied, thanks!
+Maxime
 
-This method was tested ok. However we were not sure about reusing/changing the 
-existing ghes_notifier_sci() for gsiv will be accepted. 
-Thus added a separate handling function ghes_notifier_gsiv() for gsiv.       
-
-Thanks,
-Shiju
-> 
-> 
-> Thanks,
-> 
-> James
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170302/96cc8a9e/attachment.sig>
