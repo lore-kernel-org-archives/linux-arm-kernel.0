@@ -1,81 +1,75 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 2 Mar 2017 15:11:05 +0100
-Subject: [PATCH 2/3] thermal: add support for the thermal sensor on
- Allwinner new SoCs
-In-Reply-To: <20170301190220.2EgSha6N@smtp3o.mail.yandex.net>
-References: <20170301190220.2EgSha6N@smtp3o.mail.yandex.net>
-Message-ID: <20170302141105.5fr3ru72rtdyv4pd@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 2 Mar 2017 14:11:50 +0000
+Subject: [PATCHv2 01/14] treewide: Move set_memory_* functions away from
+ cacheflush.h
+In-Reply-To: <1488413706-9739-2-git-send-email-labbott@redhat.com>
+References: <1488413706-9739-1-git-send-email-labbott@redhat.com>
+ <1488413706-9739-2-git-send-email-labbott@redhat.com>
+Message-ID: <20170302141150.GL19632@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 12:02:13AM +0800, Icenowy Zheng wrote:
-> 
-> 2017?3?1? 23:56? Maxime Ripard <maxime.ripard@free-electrons.com>???
-> >
-> > On Wed, Mar 01, 2017 at 06:20:51PM +0800, Icenowy Zheng wrote: 
-> > > 
-> > > 2017?3?1? 18:14? Maxime Ripard <maxime.ripard@free-electrons.com>??? 
-> > > > 
-> > > > On Tue, Feb 28, 2017 at 03:18:13PM +0800, Icenowy Zheng wrote: 
-> > > > > 
-> > > > > 2017?2?28? 14:44? Maxime Ripard <maxime.ripard@free-electrons.com>??? 
-> > > > > > 
-> > > > > > On Tue, Feb 28, 2017 at 03:40:53AM +0800, Icenowy Zheng wrote: 
-> > > > > > > From: Ondrej Jirman <megous@megous.com> 
-> > > > > > > 
-> > > > > > > Allwinner SoCs from H3 (including H5, A64, etc) have a new version of 
-> > > > > > > thermal sensor, and needs a new driver for it. 
-> > > > > > > 
-> > > > > > > Add such a driver. 
-> > > > > > > 
-> > > > > > > Currently only H3 is supported, but other SoCs are easily to be 
-> > > > > > > supported by adding new formula and set the sensor number. 
-> > > > > > > 
-> > > > > > > Signed-off-by: Ond?ej Jirman <megous@megous.com> 
-> > > > > > > [Icenowy: extend to support further multiple-sensor SoCs, change commit 
-> > > > > > >? message] 
-> > > > > > > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz> 
-> > > > > > 
-> > > > > > There's no need to create a new driver for that. This can be handled 
-> > > > > > by the GPADC driver we already have. 
-> > > > > 
-> > > > > sun8i-ths is not GPADC at all. 
-> > > > > 
-> > > > > The latest SoC I know that use GPADC as thermal sensor is A33. 
-> > > > 
-> > > > It's not called the same way, but it definitely is an evolution of the 
-> > > > same controller. There's no need for a new driver, only reworking what 
-> > > > is already there. 
-> > > 
-> > > I don't think so -- here's some evidence: 
-> 
-> But the H3 THS have many new IRQs, functions, different sampling
-> rate set method and a quite different register layout.
-> 
-> Doing this in GPADC driver is possible but meaningless.
-> 
-> > > 
-> > > 1. The old GPADC do not have module clock. 
-> >
-> > The A33 could use a PLL. 
-> 
-> But it's a dedicated mod clk on new generation THS.
+On Wed, Mar 01, 2017 at 04:14:53PM -0800, Laura Abbott wrote:
+> diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+> index a12f1af..e419965 100644
+> --- a/arch/arm64/include/asm/Kbuild
+> +++ b/arch/arm64/include/asm/Kbuild
+> @@ -27,6 +27,7 @@ generic-y += preempt.h
+>  generic-y += resource.h
+>  generic-y += rwsem.h
+>  generic-y += segment.h
+> +generic-y += set_memory.h
+>  generic-y += sembuf.h
+>  generic-y += serial.h
 
-And all of this really are evolutions. The block is still driven in
-the exact same way. And this is where there is value in having the
-same driver: you share the logic, which is mostly common, instead of
-duplicating it.
+Nit: alphabetical order, please.
 
-Maxime
+>  generic-y += shmbuf.h
+> diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
+> index 5a2a6ee..7db6962 100644
+> --- a/arch/arm64/include/asm/cacheflush.h
+> +++ b/arch/arm64/include/asm/cacheflush.h
+> @@ -20,6 +20,7 @@
+>  #define __ASM_CACHEFLUSH_H
+>  
+>  #include <linux/mm.h>
+> +#include <asm/set_memory.h>
+>  
+>  /*
+>   * This flag is used to indicate that the page pointed to by a pte is clean
+> @@ -150,9 +151,4 @@ static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
+>  {
+>  }
+>  
+> -int set_memory_ro(unsigned long addr, int numpages);
+> -int set_memory_rw(unsigned long addr, int numpages);
+> -int set_memory_x(unsigned long addr, int numpages);
+> -int set_memory_nx(unsigned long addr, int numpages);
+> -
+>  #endif
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170302/d0c15a25/attachment-0001.sig>
+> diff --git a/include/asm-generic/set_memory.h b/include/asm-generic/set_memory.h
+> new file mode 100644
+> index 0000000..83e81f8
+> --- /dev/null
+> +++ b/include/asm-generic/set_memory.h
+> @@ -0,0 +1,12 @@
+> +#ifndef __ASM_SET_MEMORY_H
+> +#define __ASM_SET_MEMORY_H
+> +
+> +/*
+> + * Functions to change memory attributes.
+> + */
+> +int set_memory_ro(unsigned long addr, int numpages);
+> +int set_memory_rw(unsigned long addr, int numpages);
+> +int set_memory_x(unsigned long addr, int numpages);
+> +int set_memory_nx(unsigned long addr, int numpages);
+> +
+> +#endif
+
+Otherwise, this looks fine to me. FWIW:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
