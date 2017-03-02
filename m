@@ -1,64 +1,38 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 2 Mar 2017 09:23:27 +0200
-Subject: [RESEND PATCH v2 0/5] Fix the parse_dt of exynos dsi and remove
- the OF graph
-In-Reply-To: <a9e52516-bb05-7ad3-01d5-da1fe3bc7548@samsung.com>
-References: <CGME20170228081811epcas5p3c0a8151d94511e47a0e0d2b8787b1fb0@epcas5p3.samsung.com>
- <1488269879-28876-1-git-send-email-hoegeun.kwon@samsung.com>
- <CAJKOXPfv8wJ+0L4G_0sB1Qh-svXx4VvNJH_1THSy5SsXuUstzA@mail.gmail.com>
- <a9e52516-bb05-7ad3-01d5-da1fe3bc7548@samsung.com>
-Message-ID: <CAJKOXPeP-86=AsNH-xodkMpLJm1uLG0tKq2bz93FE5oFBDB4mw@mail.gmail.com>
+From: kevin.tian@intel.com (Tian, Kevin)
+Date: Thu, 2 Mar 2017 07:29:03 +0000
+Subject: [RFC PATCH 22/30] iommu: Bind/unbind tasks to/from devices
+In-Reply-To: <20170227195441.5170-23-jean-philippe.brucker@arm.com>
+References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
+ <20170227195441.5170-23-jean-philippe.brucker@arm.com>
+Message-ID: <AADFC41AFE54684AB9EE6CBC0274A5D190C52DB1@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 2, 2017 at 3:44 AM, Hoegeun Kwon <hoegeun.kwon@samsung.com> wrote:
-> On 02/28/2017 06:58 PM, Krzysztof Kozlowski wrote:
->> Discussions in previous thread lead us to bisectability problem.
->> Bisectability in regular driver changes is one thing but in case of
->> driver + DTS the gap is much bigger. DTS will go through separate tree
->> and branches. How do you want to solve the problem?
->
->
-> Sorry for the delay in reply, Mar 1st was the holiday.
-> I thought of two solutions.
->
-> 1. squash the patches in a single patch
+> From: Jean-Philippe Brucker
+> Sent: Tuesday, February 28, 2017 3:55 AM
+> 
+[...]
+> 
+>   API naming
+>   ==========
+> 
+> I realize that "SVM" as a name isn't great because the svm namespace is
+> already taken by AMD-V (Secure Virtual Machine) in arch/x86. Also, the
+> name itself doesn't say much.
+> 
+> I personally prefer "Unified Virtual Addressing" (UVA), adopted by CUDA,
+> or rather Unified Virtual Address Space (UVAS). Another possibility is
+> Unified Virtual Memory (UVM). Acronym UAS for Unified Address Space is
+> already used by USB. Same for Shared Address Space (SAS), already in use
+> in the kernel, but SVAS would work (although it doesn't look good).
+> 
 
-No, for the same reason. DTS code/patches have to go through arm-soc
-DTS branch without mixing with any driver changes. Otherwise arm-soc
-guys are angry.
+'unified' is not exactly matching to 'shared'. In some context it means
+unifying device local memory and system memory in one virtual address
+space, while SVM is more for sharing of a CPU virtual address space with 
+device.
 
-> 2. split the dts related patches so that the first part adds the:
-> +    samsung,burst-clock-frequency = <512000000>;
-> +    samsung,esc-clock-frequency = <16000000>;
->
-> and the second part at the end removes the 'port' node
-> So it consists of 6 patches in total.
+What about Shared Virtual Addressing (SVA)?
 
-That's a solution. The remaining DTS patches would go in next release...
-
-Another solution would be for this release cycle:
-        if (of_property_does_not_exist(node, "samsung,burst-clock-frequency") {
-                // Fallback to old parsing mode
-                node = of_graph_get_endpoint_by_regs(node, DSI_PORT_OUT, 0);
-                if (!node) {
-                        dev_err(dev, "no burst-clock-frequency nor
-output port with endpoint specified\n");
-                        return -EINVAL;
-                }
-        }
-        ret = exynos_dsi_of_read_u32(node, "samsung,burst-clock-frequency",
-                                     &dsi->burst_clk_rate);
-        ...
-
-...and in next release the DTS patches would go in. This would give
-you also DTB backward compatibility. However still DTS could be
-applied later, after driver changes gets into mainline.
-
-Personally I would prefer your solution #2 (with separate DTS patch
-adding new properties). Does it sound reasonable for Inki?
-
-Thanks for looking into this problem.
-
-Best regards,
-Krzysztof
+Thanks
+Kevin
