@@ -1,59 +1,117 @@
-From: hoegeun.kwon@samsung.com (Hoegeun Kwon)
-Date: Thu, 02 Mar 2017 10:44:19 +0900
-Subject: [RESEND PATCH v2 0/5] Fix the parse_dt of exynos dsi and remove
- the OF graph
-In-Reply-To: <CAJKOXPfv8wJ+0L4G_0sB1Qh-svXx4VvNJH_1THSy5SsXuUstzA@mail.gmail.com>
-References: <CGME20170228081811epcas5p3c0a8151d94511e47a0e0d2b8787b1fb0@epcas5p3.samsung.com>
- <1488269879-28876-1-git-send-email-hoegeun.kwon@samsung.com>
- <CAJKOXPfv8wJ+0L4G_0sB1Qh-svXx4VvNJH_1THSy5SsXuUstzA@mail.gmail.com>
-Message-ID: <a9e52516-bb05-7ad3-01d5-da1fe3bc7548@samsung.com>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Thu, 2 Mar 2017 04:18:56 +0000
+Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
+In-Reply-To: <DB6PR0402MB2694957C2D7C648CC342627FE69F0@DB6PR0402MB2694.eurprd04.prod.outlook.com>
+References: <ad6b6a4937b1fe183e6d48ccbaf4cb46db92fed4.1481893907.git.robin.murphy@arm.com>
+ <DB6PR0402MB2694957C2D7C648CC342627FE69F0@DB6PR0402MB2694.eurprd04.prod.outlook.com>
+Message-ID: <AM5PR0401MB251438AFDE691D570353B537E6280@AM5PR0401MB2514.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2017 06:58 PM, Krzysztof Kozlowski wrote:
-> On Tue, Feb 28, 2017 at 10:17 AM, Hoegeun Kwon <hoegeun.kwon@samsung.com> wrote:
->> Hi All,
->>
->> [Resend this v2 patches, because i have missing TO and CC.]
->>
->> The dsi + panel is a parental relationship, so OF grpah is not needed.
->> Therefore, the current dsi_parse_dt function will throw an error,
->> because there is no linked OF graph for case such as fimd + dsi +
->> panel.
->>
->> So the 1/5 patch parse the Pll, burst and esc clock frequency
->> properties in dsi_parse_dt and modified to create a bridge_node only
->> if there is an OF graph associated with dsi.
->>
->> Also fixed the dts, which depend on the 1/5 patch. So removed the
->> ports node and move burst and esc clock frequency properties to the
->> parent (DSI node).
-> Discussions in previous thread lead us to bisectability problem.
-> Bisectability in regular driver changes is one thing but in case of
-> driver + DTS the gap is much bigger. DTS will go through separate tree
-> and branches. How do you want to solve the problem?
 
-Sorry for the delay in reply, Mar 1st was the holiday.
-I thought of two solutions.
+Hi Robin/Will,
 
-1. squash the patches in a single patch
+This patch is currently not applied on the tree.
+I had verified the patch and it seems good.
+Is ack required on the patch or do I need to send a non RFC patch (with Robin's signoff)?
+This is very much required to support SMMU on NXP platform.
 
-2. split the dts related patches so that the first part adds the:
-+    samsung,burst-clock-frequency = <512000000>;
-+    samsung,esc-clock-frequency = <16000000>;
+Thanks,
+Nipun
 
-and the second part at the end removes the 'port' node
-So it consists of 6 patches in total.
 
-Which do you think is better?
-If you have any other ideas, could you tell me?
-
-Best Regards,
-Hoegeun
-
->
-> Best regards,
-> Krzysztof
->
->
->
+> -----Original Message-----
+> From: Nipun Gupta
+> Sent: Sunday, December 18, 2016 2:37
+> To: Robin Murphy <robin.murphy@arm.com>; iommu at lists.linux-
+> foundation.org; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Cc: mark.rutland at arm.com; will.deacon at arm.com; Stuart Yoder
+> <stuart.yoder@nxp.com>
+> Subject: RE: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
+> 
+> 
+> 
+> > -----Original Message-----
+> > From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+> > bounces at lists.linux-foundation.org] On Behalf Of Robin Murphy
+> > Sent: Friday, December 16, 2016 18:49
+> > To: iommu at lists.linux-foundation.org; devicetree at vger.kernel.org; linux-
+> arm-
+> > kernel at lists.infradead.org
+> > Cc: mark.rutland at arm.com; will.deacon at arm.com; Stuart Yoder
+> > <stuart.yoder@nxp.com>
+> > Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
+> >
+> > The current SMR masking support using a 2-cell iommu-specifier is
+> > primarily intended to handle individual masters with large and/or
+> > complex Stream ID assignments; it quickly gets a bit clunky in other SMR
+> > use-cases where we just want to consistently mask out the same part of
+> > every Stream ID (e.g. for MMU-500 configurations where the appended TBU
+> > number gets in the way unnecessarily). Let's add a new property to allow
+> > a single global mask value to better fit the latter situation.
+> >
+> > CC: Stuart Yoder <stuart.yoder@nxp.com>
+> 
+> Tested-by: Nipun Gupta <nipun.gupta@nxp.com>
+> 
+> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> > ---
+> >
+> > Compile-tested only...
+> >
+> >  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 8 ++++++++
+> >  drivers/iommu/arm-smmu.c                             | 4 +++-
+> >  2 files changed, 11 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > index e862d1485205..98f5cbe5fdb4 100644
+> > --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> > @@ -60,6 +60,14 @@ conditions.
+> >                    aliases of secure registers have to be used during
+> >                    SMMU configuration.
+> >
+> > +- stream-match-mask : Specifies a fixed SMR mask value to combine with
+> > +                  the Stream ID value from every iommu-specifier. This
+> > +                  may be used instead of an "#iommu-cells" value of 2
+> > +                  when there is no need for per-master SMR masks, but
+> > +                  it is still desired to mask some portion of every
+> > +                  Stream ID (e.g. for certain MMU-500 configurations
+> > +                  given globally unique external IDs).
+> > +
+> >  ** Deprecated properties:
+> >
+> >  - mmu-masters (deprecated in favour of the generic "iommus" binding) :
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index 8f7281444551..f1abcb7dde36 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -1534,13 +1534,15 @@ static int arm_smmu_domain_set_attr(struct
+> > iommu_domain *domain,
+> >
+> >  static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args
+> *args)
+> >  {
+> > -	u32 fwid = 0;
+> > +	u32 mask, fwid = 0;
+> >
+> >  	if (args->args_count > 0)
+> >  		fwid |= (u16)args->args[0];
+> >
+> >  	if (args->args_count > 1)
+> >  		fwid |= (u16)args->args[1] << SMR_MASK_SHIFT;
+> > +	else if (!of_property_read_u32(args->np, "stream-match-mask",
+> > &mask))
+> > +		fwid |= (u16)mask << SMR_MASK_SHIFT;
+> >
+> >  	return iommu_fwspec_add_ids(dev, &fwid, 1);
+> >  }
+> > --
+> > 2.10.2.dirty
+> >
+> > _______________________________________________
+> > iommu mailing list
+> > iommu at lists.linux-foundation.org
+> > https://lists.linuxfoundation.org/mailman/listinfo/iommu
