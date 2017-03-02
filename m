@@ -1,128 +1,38 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 2 Mar 2017 16:48:03 +0000
-Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
-In-Reply-To: <AM5PR0401MB251438AFDE691D570353B537E6280@AM5PR0401MB2514.eurprd04.prod.outlook.com>
-References: <ad6b6a4937b1fe183e6d48ccbaf4cb46db92fed4.1481893907.git.robin.murphy@arm.com>
- <DB6PR0402MB2694957C2D7C648CC342627FE69F0@DB6PR0402MB2694.eurprd04.prod.outlook.com>
- <AM5PR0401MB251438AFDE691D570353B537E6280@AM5PR0401MB2514.eurprd04.prod.outlook.com>
-Message-ID: <72610bd3-71b2-0b4b-eb6c-5e9df7ec1aac@arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 02 Mar 2017 09:02:06 -0800
+Subject: [PATCH v5 0/9] meson-gx: reset RGMII PHYs and configure TX delay
+In-Reply-To: <1487581719.3734.1.camel@baylibre.com> (Jerome Brunet's message
+ of "Mon, 20 Feb 2017 10:08:39 +0100")
+References: <20170122181028.5014-1-martin.blumenstingl@googlemail.com>
+ <20170219214149.30418-1-martin.blumenstingl@googlemail.com>
+ <1487581719.3734.1.camel@baylibre.com>
+Message-ID: <m2varry5m9.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/17 04:18, Nipun Gupta wrote:
-> 
-> Hi Robin/Will,
-> 
-> This patch is currently not applied on the tree.
-> I had verified the patch and it seems good.
-> Is ack required on the patch or do I need to send a non RFC patch (with Robin's signoff)?
-> This is very much required to support SMMU on NXP platform.
+Jerome Brunet <jbrunet@baylibre.com> writes:
 
-It's still sat in my "patches to do something with" queue - I don't
-think we ever reached a concrete decision on the property name for a DT
-maintainer ack, but I've tweaked the description per Will's comment;
-thanks for the reminder. I'll send an rc1-based version out next week to
-reboot the discussion.
+> On Sun, 2017-02-19 at 22:41 +0100, Martin Blumenstingl wrote:
+>> This series adds the reset GPIOs for the (external) ethernet PHYs on
+>> all
+>> GXBB boards.
+>> Additionally it provides a ethernet PHY node which can be used to
+>> specify
+>> PHY-specific properties (this may be required if more boards require
+>> the
+>> "eee-broken-1000t" for the RTL8211F ethernet PHY). To make all board
+>> .dts
+>> consistent I chose to add the PHY node also for boards which don't
+>> have a
+>> RTL8211F PHY.
+>> 
+>
+> Looks good to me. For the patchset:
+> Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
+>
 
-Robin.
+Applying to v4.12/dt64 with Jerome's review.
 
-> 
-> Thanks,
-> Nipun
-> 
-> 
->> -----Original Message-----
->> From: Nipun Gupta
->> Sent: Sunday, December 18, 2016 2:37
->> To: Robin Murphy <robin.murphy@arm.com>; iommu at lists.linux-
->> foundation.org; devicetree at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org
->> Cc: mark.rutland at arm.com; will.deacon at arm.com; Stuart Yoder
->> <stuart.yoder@nxp.com>
->> Subject: RE: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
->>
->>
->>
->>> -----Original Message-----
->>> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
->>> bounces at lists.linux-foundation.org] On Behalf Of Robin Murphy
->>> Sent: Friday, December 16, 2016 18:49
->>> To: iommu at lists.linux-foundation.org; devicetree at vger.kernel.org; linux-
->> arm-
->>> kernel at lists.infradead.org
->>> Cc: mark.rutland at arm.com; will.deacon at arm.com; Stuart Yoder
->>> <stuart.yoder@nxp.com>
->>> Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
->>>
->>> The current SMR masking support using a 2-cell iommu-specifier is
->>> primarily intended to handle individual masters with large and/or
->>> complex Stream ID assignments; it quickly gets a bit clunky in other SMR
->>> use-cases where we just want to consistently mask out the same part of
->>> every Stream ID (e.g. for MMU-500 configurations where the appended TBU
->>> number gets in the way unnecessarily). Let's add a new property to allow
->>> a single global mask value to better fit the latter situation.
->>>
->>> CC: Stuart Yoder <stuart.yoder@nxp.com>
->>
->> Tested-by: Nipun Gupta <nipun.gupta@nxp.com>
->>
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>> ---
->>>
->>> Compile-tested only...
->>>
->>>  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 8 ++++++++
->>>  drivers/iommu/arm-smmu.c                             | 4 +++-
->>>  2 files changed, 11 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->>> b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->>> index e862d1485205..98f5cbe5fdb4 100644
->>> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->>> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
->>> @@ -60,6 +60,14 @@ conditions.
->>>                    aliases of secure registers have to be used during
->>>                    SMMU configuration.
->>>
->>> +- stream-match-mask : Specifies a fixed SMR mask value to combine with
->>> +                  the Stream ID value from every iommu-specifier. This
->>> +                  may be used instead of an "#iommu-cells" value of 2
->>> +                  when there is no need for per-master SMR masks, but
->>> +                  it is still desired to mask some portion of every
->>> +                  Stream ID (e.g. for certain MMU-500 configurations
->>> +                  given globally unique external IDs).
->>> +
->>>  ** Deprecated properties:
->>>
->>>  - mmu-masters (deprecated in favour of the generic "iommus" binding) :
->>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->>> index 8f7281444551..f1abcb7dde36 100644
->>> --- a/drivers/iommu/arm-smmu.c
->>> +++ b/drivers/iommu/arm-smmu.c
->>> @@ -1534,13 +1534,15 @@ static int arm_smmu_domain_set_attr(struct
->>> iommu_domain *domain,
->>>
->>>  static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args
->> *args)
->>>  {
->>> -	u32 fwid = 0;
->>> +	u32 mask, fwid = 0;
->>>
->>>  	if (args->args_count > 0)
->>>  		fwid |= (u16)args->args[0];
->>>
->>>  	if (args->args_count > 1)
->>>  		fwid |= (u16)args->args[1] << SMR_MASK_SHIFT;
->>> +	else if (!of_property_read_u32(args->np, "stream-match-mask",
->>> &mask))
->>> +		fwid |= (u16)mask << SMR_MASK_SHIFT;
->>>
->>>  	return iommu_fwspec_add_ids(dev, &fwid, 1);
->>>  }
->>> --
->>> 2.10.2.dirty
->>>
->>> _______________________________________________
->>> iommu mailing list
->>> iommu at lists.linux-foundation.org
->>> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+Thanks,
+
+Kevin
