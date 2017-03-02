@@ -1,35 +1,23 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 2 Mar 2017 09:26:07 +0100
-Subject: [PATCH v2 3/5] dt-bindings: fix for Allwinner H5 pinctrl's
- compatible
-In-Reply-To: <20170301180111.12365-4-icenowy@aosc.xyz>
-References: <20170301180111.12365-1-icenowy@aosc.xyz>
- <20170301180111.12365-4-icenowy@aosc.xyz>
-Message-ID: <20170302082607.gztuixghoyk5wabv@lukather>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 2 Mar 2017 00:38:30 -0800
+Subject: [PATCH] ARM: dump: Add domain to output
+In-Reply-To: <20170302075554.GA33308@beast>
+References: <20170302075554.GA33308@beast>
+Message-ID: <CAGXu5j+nO5oZuWLwPpv3mQbv-0Msu7KWEddd-wVEt3sBzZdHLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 02:01:09AM +0800, Icenowy Zheng wrote:
-> The compatible for Allwinner H5 pin controller is wrong written as
-> allwinner,sun50i-h5-r-pinctrl, however, it's really a generic pinctrl
-> rather than a "r" one.
-> 
-> Fix this compatible string.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+On Wed, Mar 1, 2017 at 11:55 PM, Kees Cook <keescook@chromium.org> wrote:
+> This adds the memory domain (on non-LPAE) to the PMD and PTE dumps. This
+> isn't in the regular PMD bits because I couldn't find a clean way to
+> fall back to retain some of the PMD bits when reporting PTE. So this is
+> special-cased currently.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Ugh, please ignore this. Further testing shows this doesn't work
+right... I'll keep poking at it.
 
-Maxime
+-Kees
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170302/20436b4a/attachment.sig>
+Kees Cook
+Pixel Security
