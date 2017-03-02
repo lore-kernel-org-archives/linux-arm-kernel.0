@@ -1,49 +1,48 @@
-From: nleeder@codeaurora.org (Leeder, Neil)
-Date: Thu, 2 Mar 2017 14:30:53 -0500
-Subject: [PATCH/RFC] arm64: pmu: add Qualcomm Technologies extensions
-In-Reply-To: <4b90b76f-f08d-f248-8153-287b2552dceb@arm.com>
-References: <1488385085-19238-1-git-send-email-nleeder@codeaurora.org>
- <20170301181032.GL28874@leverpostej>
- <a44d89fa-c5ff-9511-c774-59e5a3f26676@codeaurora.org>
- <4b90b76f-f08d-f248-8153-287b2552dceb@arm.com>
-Message-ID: <2c6fcb54-482a-14dc-0fbb-58df0f9a68b5@codeaurora.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 2 Mar 2017 21:08:00 +0100
+Subject: [PATCH 07/20] PCI: implement Devres interface to map PCI config
+ space
+In-Reply-To: <20170302192406.GA8519@wtj.duckdns.org>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+ <20170227151436.18698-8-lorenzo.pieralisi@arm.com>
+ <CAHp75VfdE6_W+DxhejorLxra2JQDGF3cG0uBedyOohhmcLiKLg@mail.gmail.com>
+ <20170302120546.GB17277@red-moon>
+ <CAHp75VfoZTr5L3z5_SXW58W2Ate5nCWSzP8hAA051fVwizSjag@mail.gmail.com>
+ <20170302192406.GA8519@wtj.duckdns.org>
+Message-ID: <20170302200800.GA21303@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark Z.,
+On Thu, Mar 02, 2017 at 02:24:06PM -0500, Tejun Heo wrote:
+> Hello,
+> 
+> On Thu, Mar 02, 2017 at 02:50:00PM +0200, Andy Shevchenko wrote:
+> > > I thought about that and did not do it because here we are remapping
+> > > resources that are _not_ PCI bus resources (ie it is not PCI BARs we
+> > > are remapping), keeping the devm_* prefix would be more consistent
+> > > to the typical device drivers remapping functions pattern (ie a
+> > > typical PCI host controller driver would mix devm_ and pcim_ calls
+> > > which is a bit hard to parse), that was my rationale.
+> > >
+> > > I am not too fussed about that either way, I am happy to update it to
+> > > pcim_* though, it is Bjorn/Arnd's decision.
+> > 
+> > I would vote for pcim_*() variant.
+> 
+> Me too, for brevity.
 
-On 3/2/2017 4:05 AM, Marc Zyngier wrote:
-> On 01/03/17 21:36, Leeder, Neil wrote:
->> On 3/1/2017 1:10 PM, Mark Rutland wrote:
->>> KVM already has (architected) PMU support, and without a corresponding
->>> KVM patch this is at best insufficient. I don't imagine the KVM folk
->>> will be too thrilled about the prospect of emulating an IMPLEMENTATION
->>> DEFINED CPU feature like this.
->>
->> Does KVM handle ARMv7 PMU implementations? If so, do you know what it
->> does for the scorpion_* and krait_* implementations in
->> arch/arm/kernel/perf_events_v7.c? These extensions in ARMv8 are very
->> similar to the krait extensions, with some 64-bit tweaks, so could be
->> handled by KVM the same way it handles the ARMv7 cases.
->
-> No, KVM doesn't handle the ARMv7 PMU at all. I'm not aware of the
-> virtualization extensions being available on Scorpion or Krait, which
-> makes it a moot point. What it handles is the PMUv3 architecture.
+devm_* is equally brief. Also, all existing pcim_*() functions take a
+struct pci_dev * as their first argument, because they operate on the
+PCI devices. However in this case the devm_pci_remap_*() functions do
+not operate on PCI devices. Rather they operate on the struct device
+that represents the PCI host bridge. Therefore I think devm_ is more
+appropriate here.
 
-Thank you for the explanation.
-
-This driver is specifically for Qualcomm Technologies server chips. They 
-will not be in a heterogenous environment with non-Qualcomm processors, 
-so there should be no migration issues.
-
-If we were to provide a patch which added KVM support for the 4 
-additional registers here, would you consider reviewing it, or is adding 
-implementation-defined registers a show-stopper?
-
-Thanks,
-Neil
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm 
-Technologies Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170302/9057b514/attachment.sig>
