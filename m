@@ -1,96 +1,194 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 02 Mar 2017 12:28:02 +0100
-Subject: [PATCH v2 2/3] clk: meson-gxbb: Add MALI clocks
-In-Reply-To: <6cd2e42d-6169-a2f0-db33-e13ca1619a41@baylibre.com>
-References: <1488365164-22861-1-git-send-email-narmstrong@baylibre.com>
- <1488365164-22861-3-git-send-email-narmstrong@baylibre.com>
- <20170301191119.GR25384@codeaurora.org>
- <6cd2e42d-6169-a2f0-db33-e13ca1619a41@baylibre.com>
-Message-ID: <1488454082.2420.3.camel@baylibre.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 2 Mar 2017 11:35:06 +0000
+Subject: [PATCH] arm64: restore get_current() optimisation
+In-Reply-To: <1483468021-8237-1-git-send-email-mark.rutland@arm.com>
+References: <1483468021-8237-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <ee26a4f0-e3e9-fb44-fe7c-c40a15c33b38@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-03-02 at 12:07 +0100, Neil Armstrong wrote:
-> Hi Stephen,
-> 
-> On 03/01/2017 08:11 PM, Stephen Boyd wrote:
-> > On 03/01, Neil Armstrong wrote:
-> > > diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-> > > index a52063f..31f6090 100644
-> > > --- a/drivers/clk/meson/gxbb.c
-> > > +++ b/drivers/clk/meson/gxbb.c
-> > > @@ -634,6 +634,131 @@
-> > > ?	},
-> > > ?};
-> > > ?
-> > > +/*
-> > > + * The MALI IP is clocked by two identical clocks (mali_0 and
-> > > mali_1)
-> > > + * muxed by a glitch-free switch.
-> > > + */
-> > > +
-> > > +static u32 mux_table_mali_0_1[] = {0, 1, 2, 3, 4, 5, 6, 7};
-> > > +const char *gxbb_mali_0_1_parent_names[] = {
-> > 
-> > static?
-> 
-> Will do !
-> 
-> > 
-> > > +	"xtal", "gp0_pll", "mpll2", "mpll1", "fclk_div7",
-> > > +	"fclk_div4", "fclk_div3", "fclk_div5"
-> > > +};
-> > > +
-> > 
-> > [..]
-> > > +	.reg = (void *)HHI_MALI_CLK_CNTL,
-> > > +	.bit_idx = 24,
-> > > +	.lock = &clk_lock,
-> > > +	.hw.init = &(struct clk_init_data){
-> > > +		.name = "mali_1",
-> > > +		.ops = &clk_gate_ops,
-> > > +		.parent_names = (const char *[]){ "mali_1_div"
-> > > },
-> > > +		.num_parents = 1,
-> > > +		.flags = (CLK_SET_RATE_PARENT |
-> > > CLK_IGNORE_UNUSED),
-> > > +	},
-> > > +};
-> > > +
-> > > +static u32 mux_table_mali[] = {0, 1};
-> > > +const char *gxbb_mali_parent_names[] = {
-> > 
-> > static?
-> > 
-> > > +	"mali_0", "mali_1"
-> > > +};
-> > 
-> > [...]
-> > > ?static struct clk_mux *gxbb_clk_muxes[] = {
-> > > ?	&gxbb_mpeg_clk_sel,
-> > > ?	&gxbb_sar_adc_clk_sel,
-> > > +	&gxbb_mali_0_sel,
-> > > +	&gxbb_mali_1_sel,
-> > > +	&gxbb_mali,
-> > > ?};
-> > > ?
-> > > ?static struct clk_divider *gxbb_clk_dividers[] = {
-> > 
-> > Can these arrays be const? If so, please do that in a separate
-> > patch.
-> 
-> Hmm, these were introduced by jerome, he should update them
-> accordingly.
-> 
+Hi Mark,
 
-Will do
-
-> > > ?	&gxbb_mpeg_clk_div,
-> > > ?	&gxbb_sar_adc_clk_div,
-> > > +	&gxbb_mali_0_div,
-> > > +	&gxbb_mali_1_div,
-> > > ?};
+On 03/01/17 18:27, Mark Rutland wrote:
+> Hi Catalin,
 > 
+> My THREAD_INFO_IN_TASK series had an unintended performance regression in
+> get_current() / current_thread_info(). Could you please take the below as a
+> fix for the next rc?
 > 
 > Thanks,
-> Neil
+> Mark.
+> 
+> ---->8----
+> Commit c02433dd6de32f04 ("arm64: split thread_info from task stack")
+> inverted the relationship between get_current() and
+> current_thread_info(), with sp_el0 now holding the current task_struct
+> rather than the current thead_info. The new implementation of
+> get_current() prevents the compiler from being able to optimize repeated
+> calls to either, resulting in a noticeable penalty in some
+> microbenchmarks.
+> 
+> This patch restores the previous optimisation by implementing
+> get_current() in the same way as our old current_thread_info(), using a
+> non-volatile asm statement.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Reported-by: Davidlohr Bueso <dbueso@suse.de>
+> ---
+>  arch/arm64/include/asm/current.h | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/current.h b/arch/arm64/include/asm/current.h
+> index f2bcbe2..86c4041 100644
+> --- a/arch/arm64/include/asm/current.h
+> +++ b/arch/arm64/include/asm/current.h
+> @@ -9,9 +9,17 @@
+>  
+>  struct task_struct;
+>  
+> +/*
+> + * We don't use read_sysreg() as we want the compiler to cache the value where
+> + * possible.
+> + */
+>  static __always_inline struct task_struct *get_current(void)
+>  {
+> -	return (struct task_struct *)read_sysreg(sp_el0);
+> +	unsigned long sp_el0;
+> +
+> +	asm ("mrs %0, sp_el0" : "=r" (sp_el0));
+> +
+> +	return (struct task_struct *)sp_el0;
+>  }
+>  
+>  #define current get_current()
+
+I noticed that with v4.10 I am seeing the following panic ...
+
+[  184.523390] Unable to handle kernel paging request at virtual address ffff8001bb7a2800
+[  184.531316] pgd = ffff8000b96b1000
+[  184.534711] [ffff8001bb7a2800] *pgd=0000000000000000
+[  184.539670] Internal error: Oops: 96000005 [#1] PREEMPT SMP
+[  184.545231] Modules linked in:
+[  184.548285] CPU: 2 PID: 1407 Comm: tinymix Not tainted 4.10.0-00017-g50bc4a8b2868 #19
+[  184.556104] Hardware name: Google Pixel C (DT)
+[  184.560540] task: ffff8000bb558c80 task.stack: ffff8000b9648000
+[  184.566458] PC is at regcache_flat_read+0x14/0x20
+[  184.571155] LR is at regcache_read+0x50/0x78
+[  184.575417] pc : [<ffff0000085d0c6c>] lr : [<ffff0000085cefa8>] pstate: 400001c5
+[  184.582802] sp : ffff8000b964b970
+[  184.586108] x29: ffff8000b964b970 x28: ffff8000b9584800 
+[  184.591412] x27: ffff8000b964bcc8 x26: ffff8000b9461000 
+[  184.596716] x25: 0000000000000000 x24: 0000000000000000 
+[  184.602019] x23: 00000000ffff8000 x22: ffff8000b964ba1c 
+[  184.607322] x21: ffff8000b964ba1c x20: 00000000ffff8000 
+[  184.612626] x19: ffff8000bb7dc400 x18: 0000000000000000 
+[  184.617928] x17: 0000000000000001 x16: ffff0000081f79e8 
+[  184.623230] x15: 0000000000497000 x14: 0000000000000000 
+[  184.628532] x13: 0000000000000001 x12: 0000000005cc6000 
+[  184.633835] x11: 0000000000000000 x10: ffff8000bc16bf00 
+[  184.639138] x9 : 0000000000000000 x8 : 0000000000000000 
+[  184.644441] x7 : ffff8000bff68908 x6 : 0000000000000000 
+[  184.649742] x5 : ffff000008fc9f00 x4 : ffff8000bb7aa800 
+[  184.655044] x3 : 0000000000000002 x2 : ffff8000b964ba1c 
+[  184.660347] x1 : 000000003fffe000 x0 : 0000000000000000 
+[  184.665650] 
+[  184.667137] Process tinymix (pid: 1407, stack limit = 0xffff8000b9648000)
+[  184.673913] Stack: (0xffff8000b964b970 to 0xffff8000b964c000)
+[  184.679649] b960:                                   ffff8000b964b9a0 ffff0000085cce60
+[  184.687469] b980: ffff8000bb7dc400 ffff8000bb7dc400 00000000ffff8000 ffff0000085cd104
+[  184.695288] b9a0: ffff8000b964b9d0 ffff0000085cd218 ffff8000b964ba8f ffff8000bb7dc400
+[  184.703109] b9c0: 00000000bc1d14a0 00000000ffff8000 ffff8000b964ba20 ffff0000085ce1d8
+[  184.710929] b9e0: ffff8000bb7dc400 00000000ffff8000 00000000bc1d14a0 00000000ffff8000
+[  184.718748] ba00: ffff8000b964ba8f 0000000000000000 ffff8000bb7dc400 ffff0000085ce1e8
+[  184.726567] ba20: ffff8000b964ba70 ffff000008856c44 ffff000008ffbff0 ffff000008ffbe08
+[  184.734386] ba40: 0000000000000001 ffff8000b964bb08 ffff8000b964bb28 0000000000000000
+[  184.742206] ba60: ffff000008ffc020 ffff00000884e700 ffff8000b964ba90 ffff00000884e7f4
+[  184.750026] ba80: ffff8000b964ba80 00ff8000b964ba80 ffff8000b964bb40 ffff00000884eb2c
+[  184.757846] baa0: ffff8000b9584748 0000000000000008 ffff8000b9583900 ffff000008ffbe08
+[  184.765666] bac0: ffff000008ffaa30 ffff8000b964bcc8 0000000000000003 0000000000000002
+[  184.773485] bae0: 0000000000000003 ffff000008ffaa20 ffff8000b964bb20 ffff000008d6ede8
+[  184.781303] bb00: ffff8000bb7dc400 ffff8000b9544710 ffff8000b9544710 ffff8000b964bb18
+[  184.789122] bb20: ffff8000b964bb18 ffff8000b964bb28 ffff8000b964bb28 ffff00000884ebbc
+[  184.796942] bb40: ffff8000b964bb80 ffff00000884eb9c ffff000008ffbe08 ffff8000b9583900
+[  184.804762] bb60: ffff000008ffbe58 0000000000000001 ffff000008ffaa20 0000000000000001
+[  184.812581] bb80: ffff8000b964bbc0 ffff00000886bd04 0000000000000001 ffff8000b9583900
+[  184.820402] bba0: ffff8000b964bcf0 ffff8000b964bcf0 ffff000009062000 ffff000008b0a390
+[  184.828220] bbc0: ffff8000b964bcf0 ffff000008830110 ffff8000bc33b000 ffff8000bc1d1000
+[  184.836039] bbe0: 00000000ffffffff ffff8000b96a9800 ffff8000bc1d14a0 ffff8000bc1d1870
+[  184.843858] bc00: 0000000000000123 000000000000001d ffff000008982000 ffff8000bb558c80
+[  184.851677] bc20: ffff8000b964bd40 0000000000000000 0000000000000001 ffff000008830b24
+[  184.859496] bc40: ffff000008b0a390 ffff8000bc33b000 ffff8000bb7b9520 ffff8000bb7b9400
+[  184.867316] bc60: 0000000200000139 0000024000000040 78754d2000000440 ffff8000b9583900
+[  184.875137] bc80: 3f30031f00000240 0000000000000000 0000000000000000 0000000000000000
+[  184.882956] bca0: ffff8000b9583900 ff1cf31300000440 ffff800000000000 ffff000008830038
+[  184.890777] bcc0: ffff8000bc33b000 ffff8000b9583900 0f1f03ff00000040 ffff800000000001
+[  184.898597] bce0: ffff8000bc1d14a0 ffff00000818f4e4 ffff8000b964bd70 ffff000008830610
+[  184.906417] bd00: ffff8000bc33b000 0000000000000000 0000fffffdbf4308 ffff8000bc1d1000
+[  184.914236] bd20: ffff8000b96a9800 000000000000001d ffff000008982000 0000000000000000
+[  184.922055] bd40: ffff8000b964bd70 ffff0000088305d0 00000000c4c85513 0000fffffdbf4308
+[  184.929875] bd60: 0000fffffdbf4308 0000000000000000 ffff8000b964be00 ffff0000081f7354
+[  184.937694] bd80: ffff8000b9665600 0000fffffdbf4308 ffff8000b969b238 0000000000000003
+[  184.945514] bda0: 00000000c4c85513 0000fffffdbf4308 0000000000000123 0000000092000047
+[  184.953333] bdc0: 000000003a0f1018 ffff8000b964bec0 0000000060000000 0000000000000024
+[  184.961152] bde0: 0000000092000047 000000003a0f1018 0000000000000020 ffff8000bb558c80
+[  184.968972] be00: ffff8000b964be80 ffff0000081f7a74 0000000000000000 ffff8000b9665600
+[  184.976792] be20: ffff8000b9665600 0000000000000003 00000000c4c85513 0000000000415230
+[  184.984612] be40: ffff8000b964be80 ffff0000081f7a28 0000000000000000 ffff8000b9665600
+[  184.992432] be60: ffff8000b9665600 0000000000000003 00000000c4c85513 ffff0000081f7a0c
+[  185.000253] be80: 0000000000000000 ffff000008082f30 0000000000000000 00008000b70ac000
+[  185.008072] bea0: ffffffffffffffff 000000000041c51c 0000000080000000 0000000000000015
+[  185.015892] bec0: 0000000000000003 00000000c4c85513 0000fffffdbf4308 0000000000000010
+[  185.023712] bee0: fffffffffffffff0 0000000000000040 000000000000003f 0000000000000000
+[  185.031530] bf00: 000000000000001d 0000000000000004 0101010101010101 0000000000000005
+[  185.039350] bf20: ffffffffffffffff 0000000000499000 0000000000499000 0000000000497000
+[  185.047169] bf40: 0000fffffdbf4b68 0000000000000001 0000000000000000 00000000004001a0
+[  185.054988] bf60: 0000000000000000 00000000004001a0 0000000000000000 0000000000000000
+[  185.062807] bf80: 000000000040559c 00000000004054e4 0000000000000000 0000000000000000
+[  185.070627] bfa0: 0000000000000000 0000fffffdbf42e0 0000000000402998 0000fffffdbf42e0
+[  185.078447] bfc0: 000000000041c51c 0000000080000000 0000000000000003 000000000000001d
+[  185.086265] bfe0: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+[  185.094083] Call trace:
+[  185.096525] Exception stack(0xffff8000b964b7a0 to 0xffff8000b964b8d0)
+[  185.102954] b7a0: ffff8000bb7dc400 0001000000000000 ffff8000b964b970 ffff0000085d0c6c
+[  185.110774] b7c0: ffff8000b964b7e0 ffff0000080fb520 0000000000000001 0000002af6734537
+[  185.118594] b7e0: ffff8000b964b810 ffff0000080e8f40 ffff8000bc16be80 00000000000008f4
+[  185.126415] b800: ffff8000b964b830 ffff0000080eeb14 ffff8000bbaa0d00 ffff8000bff688e0
+[  185.134234] b820: ffff8000b964b830 ffff0000080eeb28 ffff8000b964b850 ffff0000080e94f4
+[  185.142054] b840: 0000000000000000 000000003fffe000 ffff8000b964ba1c 0000000000000002
+[  185.149873] b860: ffff8000bb7aa800 ffff000008fc9f00 0000000000000000 ffff8000bff68908
+[  185.157693] b880: 0000000000000000 0000000000000000 ffff8000bc16bf00 0000000000000000
+[  185.165512] b8a0: 0000000005cc6000 0000000000000001 0000000000000000 0000000000497000
+[  185.173331] b8c0: ffff0000081f79e8 0000000000000001
+[  185.178203] [<ffff0000085d0c6c>] regcache_flat_read+0x14/0x20
+[  185.183939] [<ffff0000085cce60>] _regmap_read+0x98/0xe8
+[  185.189155] [<ffff0000085cd218>] _regmap_update_bits+0xa0/0xf0
+[  185.194978] [<ffff0000085ce1d8>] regmap_update_bits_base+0x60/0x90
+[  185.201152] [<ffff000008856c44>] snd_soc_component_update_bits+0x24/0x40
+[  185.207843] [<ffff00000884e7f4>] dapm_power_widgets+0x474/0x730
+[  185.213751] [<ffff00000884eb2c>] soc_dapm_mux_update_power.isra.29+0x7c/0xa0
+[  185.220787] [<ffff00000884eb9c>] snd_soc_dapm_mux_update_power+0x4c/0x88
+[  185.227479] [<ffff00000886bd04>] tegra210_xbar_put_value_enum+0x1b4/0x228
+[  185.234256] [<ffff000008830110>] snd_ctl_elem_write+0x110/0x188
+[  185.240165] [<ffff000008830610>] snd_ctl_ioctl+0xd0/0x798
+[  185.245557] [<ffff0000081f7354>] do_vfs_ioctl+0xa4/0x738
+[  185.250859] [<ffff0000081f7a74>] SyS_ioctl+0x8c/0xa0
+[  185.255818] [<ffff000008082f30>] el0_svc_naked+0x24/0x28
+[  185.261121] Code: 52800000 b941c883 f9410084 1ac32421 (b8615881) 
+[  185.267223] ---[ end trace 5f6a6332822eca30 ]---
+
+Bisecting the panic ends up at this patch and reverting it on top of v4.10 prevents this from
+occurring. 
+
+The occurs when I start playing audio on Tegra210 using tinymix. I do have some out-of-tree
+patches for Tegra audio that I am using when seeing this but I have been using those for
+probably a year or so, as I am gradually upstreaming bits.
+
+I am a bit flummoxed by the above, any thoughts?
+
+Cheers
+Jon
+
+-- 
+nvpublic
