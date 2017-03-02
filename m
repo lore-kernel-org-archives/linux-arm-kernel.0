@@ -1,39 +1,49 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 2 Mar 2017 12:44:41 -0500
-Subject: [PATCH] module: set __jump_table alignment to 8
-In-Reply-To: <8737ewexkp.fsf@concordia.ellerman.id.au>
-References: <20170301220453.4756-1-david.daney@cavium.com>
- <87varsj6qc.fsf@concordia.ellerman.id.au>
- <8737ewexkp.fsf@concordia.ellerman.id.au>
-Message-ID: <20170302124441.0e2634e0@gandalf.local.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 Mar 2017 09:45:03 -0800
+Subject: [PATCH DO NOT MERGE 5/6] ARM: dts: omap4: add some sample
+ clkctrl data
+In-Reply-To: <1486992157-10673-6-git-send-email-t-kristo@ti.com>
+References: <1486992157-10673-1-git-send-email-t-kristo@ti.com>
+ <1486992157-10673-6-git-send-email-t-kristo@ti.com>
+Message-ID: <20170302174503.GP20572@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 02 Mar 2017 22:18:30 +1100
-Michael Ellerman <mpe@ellerman.id.au> wrote:
+Hi,
 
-> Michael Ellerman <mpe@ellerman.id.au> writes:
-> > David Daney <david.daney@cavium.com> writes:  
-> >> Strict alignment became necessary with commit 3821fd35b58d
-> >> ("jump_label: Reduce the size of struct static_key"), currently in
-> >> linux-next, which uses the two least significant bits of pointers to
-> >> __jump_table elements.  
-> >
-> > It would obviously be nice if this could go in before the commit that
-> > exposes the breakage, but I guess that's problematic because Steve
-> > doesn't want to rebase the tracing tree.
-> >
-> > Steve I think you've already sent your pull request for this cycle? So I
-> > guess if this can go in your first batch of fixes?  
-> 
-> Ugh. Was looking at the wrong tree - Linus has already merged the commit
-> in question, so the above is all moot.
+* Tero Kristo <t-kristo@ti.com> [170213 05:24]:
+> Adds clkctrl nodes for cm_l4per and cm_abe as example. Peripherals using
+> clocks from these nodes are modified also.
 
-No problem. I've got some other "fixes" to push to Linus. That's what
-the -rc releases are for. To fix up breakage from the merge window ;-)
+Finally got around testing these. Looks like applying this patch
+breaks things for devices not using the new clocks entry?
 
-I'll pull this into my tree.
+For example, SPI now breaks causing "imprecise external abort" during boot
+at least on droid 4.
 
-Thanks!
+> --- a/arch/arm/boot/dts/omap4.dtsi
+> +++ b/arch/arm/boot/dts/omap4.dtsi
+> +				cm_l4per: cm_l4per at 0 {
 
--- Steve
+Above should be cm_l4per: cm_l4per at 1400, right?
+
+> +					compatible = "ti,omap4-cm";
+> +					reg = <0x1400 0x200>;
+> +					#address-cells = <1>;
+> +					#size-cells = <1>;
+> +					ranges = <0 0x1400 0x200>;
+> +
+> +					cm_l4per_clkctrl: cm_l4per_clkctrl at 20 {
+> +						compatible = "ti,omap4-clkctrl";
+> +						reg = <0x20 0x1b0>;
+> +						#clock-cells = <2>;
+> +					};
+> +				};
+
+You should update the binding doc accordingly if the "cm_l4per at 0" node
+there is not needed. I also noticed the binding doc still has
+"#clock-cells = <4>" while it should be 2.
+
+Regards,
+
+Tony
