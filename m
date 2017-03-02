@@ -1,45 +1,86 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 2 Mar 2017 13:29:06 +0100
-Subject: [PATCH V2 2/2] KVM: arm64: Increase number of user memslots to 508
-In-Reply-To: <CAGOz-0bKYbVB_Zu1J+fCnQ=icK9yNHjXjh_hBxj4AjATw7cEXg@mail.gmail.com>
-References: <1486538141-30627-1-git-send-email-linucherian@gmail.com>
- <1486538141-30627-3-git-send-email-linucherian@gmail.com>
- <20170223101407.GB1409@cbox>
- <CAGOz-0bKYbVB_Zu1J+fCnQ=icK9yNHjXjh_hBxj4AjATw7cEXg@mail.gmail.com>
-Message-ID: <20170302122906.GJ1409@cbox>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 2 Mar 2017 13:30:13 +0100
+Subject: [PATCH 2/7] memory: atmel-ebi: Simplify SMC config code
+In-Reply-To: <16727676.CMj9rWYKWZ@ada>
+References: <1487609701-10300-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1487609701-10300-3-git-send-email-boris.brezillon@free-electrons.com>
+ <16727676.CMj9rWYKWZ@ada>
+Message-ID: <20170302133013.4dee0b4a@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Feb 26, 2017 at 12:36:58PM +0530, Linu Cherian wrote:
-> On Thu, Feb 23, 2017 at 3:44 PM, Christoffer Dall <cdall@linaro.org> wrote:
-> > On Wed, Feb 08, 2017 at 12:45:41PM +0530, linucherian at gmail.com wrote:
-> >> From: Linu Cherian <linu.cherian@cavium.com>
-> >>
-> >> Having only 32 memslots is a real constraint for the maximum
-> >> number of PCI devices that can be assigned to a single guest.
-> >> Assuming each PCI device/virtual function having two memory BAR
-> >> regions, we could assign only 15 devices/virtual functions to a
-> >> guest.
-> >>
-> >> Hence increase KVM_USER_MEM_SLOTS to 508, so that KVM_MEM_SLOTS_NUM is
-> >> 512 as done in other archs like x86 and powerpc.
-> >
-> > Actually on powerpc they just define KVM_USER_MEM_SLOTS as 512 directly.
-> >
-> > On x86 they define them as 509 and have 3 private mem slots.
-> >
-> > I don't understand the difference and as far as I can tell we don't have
-> > any private memslots on arm/arm64, so this is just weird to me.
-> >
+Hi Alexander,
+
+On Thu, 02 Mar 2017 13:02:16 +0100
+Alexander Dahl <ada@thorsis.com> wrote:
+
+> Hei hei,
 > 
-> Since the KVM_PRIVATE_MEM_SLOTS was already defined as 4, just kept
-> it untouched. Should we remove this and keep KVM_USER_MEM_SLOTS as 512 ?
+> With 
+> 
+> #define ATMEL_SMC_MODE_TDF(x)           (((x) - 1) << 16)
+> 
+> from include/linux/mfd/syscon/atmel-smc.h you added this:
+> 
+> > +	ret = of_property_read_u32(np, "atmel,smc-tdf-ns", &val);
+> > +	if (!ret) {
+> > +		required = true;
+> > +		ncycles = DIV_ROUND_UP(val, clk_period_ns);
+> > +		if (ncycles > ATMEL_SMC_MODE_TDF_MAX) {
+> > +			ret = -EINVAL;
+> > +			goto out;
+> > +		}  
+> 
+> [?]
+> 
+> > +		smcconf->mode |= ATMEL_SMC_MODE_TDF(ncycles);
+> > +	}  
+> 
+> This was the same algorithm at some other location in atmel-ebi.c 
+> before:
+> 
+> 	#define AT91_SMC_TDF_(x)		((((x) - 1) << 16) & AT91_SMC_TDF)
+> 
+> 	val = DIV_ROUND_UP(timings->tdf_ns, clk_rate);
+> 	if (val > AT91_SMC_TDF_MAX)
+> 		val = AT91_SMC_TDF_MAX;
+> 	regmap_fields_write(fields->mode, conf->cs,
+> 			    config->mode | AT91_SMC_TDF_(val));
+> 
+> The hardware manual (AT91SAM9G20) says values from 0 to 15 (4bit, 0x0 to 
+> 0xF) are possible and I guess the goal is to set it to a value 
+> corresponding to the value in ns from the dts or to 15 if it's greater 
+> (or -EINVAL in the new version).
+> 
+> However how can one set it to zero? Put in zero to the div you get zero 
+> for ncycles or val and that goes as x into (((x) - 1) << 16) which 
+> results in 0xF ending up as TDF_CYCLES in the mode register, right?
 
-Do we have any use for KVM_PRIVATE_MEM_SLOTSA being 4?  I can't seem to
-see this.
+Indeed.
 
-I think we should either get rid of the definition or at least make sure
-we understand why we're doing things this way.
+> 
+> I can of course set a slightly greater value, which ends up in a 
+> calculated register value of zero, but that seems more a hack to me and 
+> is not obvious if I just look at the DTS.
 
-Thanks,
--Christoffer
+No, we should fix the bug.
+
+> 
+> If I'm right this might be topic of another bugfix patch, or should it 
+> be done right in a v2 of this one?
+
+It should be done right in a v2. Something like:
+
+		if (ncycles < ATMEL_SMC_MODE_TDF_MIN)
+			ncycles = ATMEL_SMC_MODE_TDF_MIN;
+
+with
+
+#define ATMEL_SMC_MODE_TDF_MIN 1
+
+I don't think we need to backport the fix, since no-one uses this driver
+yet.
+
+Thanks for this report.
+
+Boris
