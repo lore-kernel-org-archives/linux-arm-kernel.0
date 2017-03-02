@@ -1,30 +1,33 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  2 Mar 2017 16:39:58 +0100
-Subject: [PATCH 02/11] drm/meson: Add missing HDMI register
+Date: Thu,  2 Mar 2017 16:40:00 +0100
+Subject: [PATCH 04/11] drm/meson: venc_cvbs: no more return -ENODEV if CVBS is
+ not available
 In-Reply-To: <1488469207-523-1-git-send-email-narmstrong@baylibre.com>
 References: <1488469207-523-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1488469207-523-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1488469207-523-5-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing VPU HDMI register.
+Since this is managed now by the components code, if CVBS is not available
+and HDMI neither, the drm driver won't bind anyway.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/gpu/drm/meson/meson_registers.h | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/gpu/drm/meson/meson_venc_cvbs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/meson/meson_registers.h b/drivers/gpu/drm/meson/meson_registers.h
-index 6adf9c1..2847381 100644
---- a/drivers/gpu/drm/meson/meson_registers.h
-+++ b/drivers/gpu/drm/meson/meson_registers.h
-@@ -1319,6 +1319,7 @@
- #define VPU_MISC_CTRL 0x2740
- #define VPU_ISP_GCLK_CTRL0 0x2741
- #define VPU_ISP_GCLK_CTRL1 0x2742
-+#define VPU_HDMI_FMT_CTRL 0x2743
- #define VPU_VDIN_ASYNC_HOLD_CTRL 0x2743
- #define VPU_VDISP_ASYNC_HOLD_CTRL 0x2744
- #define VPU_VPUARB2_ASYNC_HOLD_CTRL 0x2745
+diff --git a/drivers/gpu/drm/meson/meson_venc_cvbs.c b/drivers/gpu/drm/meson/meson_venc_cvbs.c
+index a2bcc70..a96fcb4 100644
+--- a/drivers/gpu/drm/meson/meson_venc_cvbs.c
++++ b/drivers/gpu/drm/meson/meson_venc_cvbs.c
+@@ -248,7 +248,7 @@ int meson_venc_cvbs_create(struct meson_drm *priv)
+ 
+ 	if (!meson_venc_cvbs_connector_is_available(priv)) {
+ 		dev_info(drm->dev, "CVBS Output connector not available\n");
+-		return -ENODEV;
++		return 0;
+ 	}
+ 
+ 	meson_venc_cvbs = devm_kzalloc(priv->dev, sizeof(*meson_venc_cvbs),
 -- 
 1.9.1
