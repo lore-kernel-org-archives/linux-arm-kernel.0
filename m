@@ -1,31 +1,131 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 2 Mar 2017 18:35:41 +0100
-Subject: [PATCH v2 2/3] watchdog: sama5d4: Fix setting timeout when
- watchdog is disabled
-In-Reply-To: <cc75a19f-0d99-4d26-0789-6cd750983990@roeck-us.net>
-References: <20170216193053.5546-1-alexandre.belloni@free-electrons.com>
- <20170216193053.5546-2-alexandre.belloni@free-electrons.com>
- <968ef53e-c3c4-5322-020a-8382ce367931@roeck-us.net>
- <20170217151625.hv2vn5imx2kyeftt@piout.net>
- <c9f336fd-8761-7999-4ac0-cf68eb6c8ba1@roeck-us.net>
- <20170219235213.qcxfne5yvs3uzwg3@piout.net>
- <cc75a19f-0d99-4d26-0789-6cd750983990@roeck-us.net>
-Message-ID: <20170302173541.ggkypwjbhmtftbvi@piout.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 2 Mar 2017 09:37:54 -0800
+Subject: [PATCH 2/2] hwmon: (scpi) Fix the scale of SCP sensor readings
+In-Reply-To: <20170302121500.8121-3-carlo@caione.org>
+References: <20170302121500.8121-1-carlo@caione.org>
+ <20170302121500.8121-3-carlo@caione.org>
+Message-ID: <20170302173754.GB28554@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 19/02/2017 at 20:46:13 -0800, Guenter Roeck wrote:
-> Please keep us in the loop.
+On Thu, Mar 02, 2017 at 01:15:00PM +0100, Carlo Caione wrote:
+> From: Carlo Caione <carlo@endlessm.com>
 > 
+> The implementation details for SCPI seems to suggest that the sensor
+> readings must be reported by SCP using a well defined scale
+> (millidegree Celsius for temperature, millivolts for voltage,
+> milliamperes for current, microwatts for power and microjoules for
+> energy).
+> 
+> This is also important for the interaction with other subsystems: for
+> example both the thermal sub-system and the hwmon sysfs interface expect
+> the temperature expressed in millidegree Celsius.
+> 
+> Unfortunately since this behaviour is dependent on the firmware
+> implementation there are cases where the sensor readings are reported
+> using a different scale. For example in the Amlogic SoCs the
+> temperature is reported in degree and not millidegree Celsius.
+> 
+> To take into account this discrepancy and fixup the values reported by
+> SCP a new DT property `scpi,sensors-scale' is introduced and used in
+> this patch by the scpi-hwmon driver to convert the sensor readings to
+> the expected scale.
+> 
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> ---
+>  drivers/hwmon/scpi-hwmon.c | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+> 
+> diff --git a/drivers/hwmon/scpi-hwmon.c b/drivers/hwmon/scpi-hwmon.c
+> index 094f948f99ff..64a51e06c8df 100644
+> --- a/drivers/hwmon/scpi-hwmon.c
+> +++ b/drivers/hwmon/scpi-hwmon.c
+> @@ -23,6 +23,7 @@
+>  #include <linux/thermal.h>
+>  
+>  struct sensor_data {
+> +	unsigned int scale;
+>  	struct scpi_sensor_info info;
+>  	struct device_attribute dev_attr_input;
+>  	struct device_attribute dev_attr_label;
+> @@ -44,6 +45,14 @@ struct scpi_sensors {
+>  	const struct attribute_group *groups[2];
+>  };
+>  
+> +static const unsigned int scpi_scale[] = {
+> +	1000,		/* Temperature (millidegrees Celsius)	*/
+> +	1000,		/* Voltage     (millivolts)		*/
+> +	1000,		/* Current     (milliamperes)		*/
+> +	1000000,	/* Power       (microwatts)		*/
+> +	1000000,	/* Energy      (microjoules)		*/
+> +};
+> +
+>  static int scpi_read_temp(void *dev, int *temp)
+>  {
+>  	struct scpi_thermal_zone *zone = dev;
+> @@ -57,6 +66,11 @@ static int scpi_read_temp(void *dev, int *temp)
+>  	if (ret)
+>  		return ret;
+>  
+> +	if (scpi_scale[sensor->info.class] != sensor->scale) {
+> +		value *= scpi_scale[sensor->info.class];
+> +		do_div(value, sensor->scale);
 
-I've sent a new series that solves the issues we were seeing. I've tied
-to document as much as possible and to make the driver as simple as
-possible.
+Pretty elegant, I like that solution.
 
+> +	}
+> +
+>  	*temp = value;
+>  	return 0;
+>  }
+> @@ -77,6 +91,11 @@ scpi_show_sensor(struct device *dev, struct device_attribute *attr, char *buf)
+>  	if (ret)
+>  		return ret;
+>  
+> +	if (scpi_scale[sensor->info.class] != sensor->scale) {
+> +		value *= scpi_scale[sensor->info.class];
+> +		do_div(value, sensor->scale);
+> +	}
+> +
+>  	return sprintf(buf, "%llu\n", value);
+>  }
+>  
+> @@ -97,6 +116,7 @@ static struct thermal_zone_of_device_ops scpi_sensor_ops = {
+>  static int scpi_hwmon_probe(struct platform_device *pdev)
+>  {
+>  	u16 nr_sensors, i;
+> +	u32 scale[] = { 1000, 1000, 1000, 1000000, 1000000 };
+>  	int num_temp = 0, num_volt = 0, num_current = 0, num_power = 0;
+>  	int num_energy = 0;
+>  	struct scpi_ops *scpi_ops;
+> @@ -131,6 +151,9 @@ static int scpi_hwmon_probe(struct platform_device *pdev)
+>  
+>  	scpi_sensors->scpi_ops = scpi_ops;
+>  
+> +	of_property_read_u32_array(dev->of_node, "scpi,sensors-scale",
+> +				   scale, ARRAY_SIZE(scale));
+> +
+We'll need some validation here. Otherwise a provided scale of 0 would
+crash the system.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Guenter
+
+>  	for (i = 0, idx = 0; i < nr_sensors; i++) {
+>  		struct sensor_data *sensor = &scpi_sensors->data[idx];
+>  
+> @@ -178,6 +201,8 @@ static int scpi_hwmon_probe(struct platform_device *pdev)
+>  			continue;
+>  		}
+>  
+> +		sensor->scale = scale[sensor->info.class];
+> +
+>  		sensor->dev_attr_input.attr.mode = S_IRUGO;
+>  		sensor->dev_attr_input.show = scpi_show_sensor;
+>  		sensor->dev_attr_input.attr.name = sensor->input;
+> -- 
+> 2.12.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-hwmon" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
