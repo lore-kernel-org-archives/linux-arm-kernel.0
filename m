@@ -1,117 +1,81 @@
-From: nipun.gupta@nxp.com (Nipun Gupta)
-Date: Thu, 2 Mar 2017 04:18:56 +0000
-Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
-In-Reply-To: <DB6PR0402MB2694957C2D7C648CC342627FE69F0@DB6PR0402MB2694.eurprd04.prod.outlook.com>
-References: <ad6b6a4937b1fe183e6d48ccbaf4cb46db92fed4.1481893907.git.robin.murphy@arm.com>
- <DB6PR0402MB2694957C2D7C648CC342627FE69F0@DB6PR0402MB2694.eurprd04.prod.outlook.com>
-Message-ID: <AM5PR0401MB251438AFDE691D570353B537E6280@AM5PR0401MB2514.eurprd04.prod.outlook.com>
+From: anurupvasu@gmail.com (Anurup M)
+Date: Thu, 2 Mar 2017 10:50:08 +0530
+Subject: [PATCH v4 10/11] drivers: perf: hisi: Handle counter overflow IRQ
+ in MN PMU
+In-Reply-To: <58AFA2CC.206@gmail.com>
+References: <1487530282-42731-1-git-send-email-anurup.m@huawei.com>
+ <20170220112918.GG9003@leverpostej> <58AC2966.3060200@gmail.com>
+ <20170221120334.GB8605@leverpostej> <58AFA2CC.206@gmail.com>
+Message-ID: <58B7AB88.9030306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Robin/Will,
 
-This patch is currently not applied on the tree.
-I had verified the patch and it seems good.
-Is ack required on the patch or do I need to send a non RFC patch (with Robin's signoff)?
-This is very much required to support SMMU on NXP platform.
+On Friday 24 February 2017 08:34 AM, Anurup M wrote:
+>>>>> +static int hisi_mn_init_irqs_fdt(struct device *dev,
+>>>>> +                struct hisi_pmu *mn_pmu)
+>>>>> +{
+>>>>> +    struct hisi_mn_data *mn_data = mn_pmu->hwmod_data;
+>>>>> +    struct hisi_djtag_client *client = mn_data->client;
+>>>>> +    int irq = -1, num_irqs, i;
+>>>>> +
+>>>>> +    num_irqs = of_irq_count(dev->of_node);
+>>>> Surely we expect a specific number of interrupts?
+>>>>
+>>>>> +    for (i = 0; i < num_irqs; i++) {
+>>>>> +        irq = of_irq_get(dev->of_node, i);
+>>>>> +        if (irq < 0)
+>>>>> +            dev_info(dev, "No IRQ resource!\n");
+>>>>> +    }
+>>>> Why are we throwing these away?
+>>>>
+>>>>> +
+>>>>> +    if (irq < 0)
+>>>>> +        return 0;
+>>>>> +
+>>>>> +    /* The last entry in the IRQ list to be chosen
+>>>>> +     * This is as per mbigen-v2 IRQ mapping
+>>>>> +     */
+>>>>> +    return hisi_mn_init_irq(irq, mn_pmu, client);
+>>>> I don't understand this comment.
+>>>>
+>>>> Why do we only use the list IRQ?
+>>>>
+>>>> What does this have to do with the mbigen?
+>>>>
+>>>> No ordering requirement was described in the DT binding.
+>>> There is a defect in the mbigen hardware to handle the IRQ mapping
+>>> for MN.
+>>> Due to this the IRQ property
+>>> of MN is made as a list and we read all IRQs and use only the last one.
+>>> I shall mention it in the comment and also add note in the DT bindings.
+>> You'll need to elaborate on that a bit further; I don't understand.
+>>
+>> If the interrupts aren't usable, there's arguably not much point listing
+>> them in the DT.
+>>
+>> Regardless, the order of the list *must* be specified in the DT binding.
+>
+> I'm sorry for creating this confusion. It was a wrong workaround due 
+> to my misunderstanding of the
+> IRQ mapping.
+> The MN will use a single IRQ for overflow in HiP07. I shall update it 
+> and resend.
+> But in HiP05/06 there is no support for this IRQ, So I shall modify to 
+> use polling when IRQ is not available.
+>
+
+On further tests it is confirmed that the MN interrupt line is broken in 
+hardware. so the driver
+will only use poll method. I shall remove the IRQ support and resubmit 
+adding poll method.
 
 Thanks,
-Nipun
+Anurup
 
-
-> -----Original Message-----
-> From: Nipun Gupta
-> Sent: Sunday, December 18, 2016 2:37
-> To: Robin Murphy <robin.murphy@arm.com>; iommu at lists.linux-
-> foundation.org; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Cc: mark.rutland at arm.com; will.deacon at arm.com; Stuart Yoder
-> <stuart.yoder@nxp.com>
-> Subject: RE: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
-> 
-> 
-> 
-> > -----Original Message-----
-> > From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
-> > bounces at lists.linux-foundation.org] On Behalf Of Robin Murphy
-> > Sent: Friday, December 16, 2016 18:49
-> > To: iommu at lists.linux-foundation.org; devicetree at vger.kernel.org; linux-
-> arm-
-> > kernel at lists.infradead.org
-> > Cc: mark.rutland at arm.com; will.deacon at arm.com; Stuart Yoder
-> > <stuart.yoder@nxp.com>
-> > Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
-> >
-> > The current SMR masking support using a 2-cell iommu-specifier is
-> > primarily intended to handle individual masters with large and/or
-> > complex Stream ID assignments; it quickly gets a bit clunky in other SMR
-> > use-cases where we just want to consistently mask out the same part of
-> > every Stream ID (e.g. for MMU-500 configurations where the appended TBU
-> > number gets in the way unnecessarily). Let's add a new property to allow
-> > a single global mask value to better fit the latter situation.
-> >
-> > CC: Stuart Yoder <stuart.yoder@nxp.com>
-> 
-> Tested-by: Nipun Gupta <nipun.gupta@nxp.com>
-> 
-> > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> > ---
-> >
-> > Compile-tested only...
-> >
-> >  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 8 ++++++++
-> >  drivers/iommu/arm-smmu.c                             | 4 +++-
-> >  2 files changed, 11 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> > b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> > index e862d1485205..98f5cbe5fdb4 100644
-> > --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> > +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-> > @@ -60,6 +60,14 @@ conditions.
-> >                    aliases of secure registers have to be used during
-> >                    SMMU configuration.
-> >
-> > +- stream-match-mask : Specifies a fixed SMR mask value to combine with
-> > +                  the Stream ID value from every iommu-specifier. This
-> > +                  may be used instead of an "#iommu-cells" value of 2
-> > +                  when there is no need for per-master SMR masks, but
-> > +                  it is still desired to mask some portion of every
-> > +                  Stream ID (e.g. for certain MMU-500 configurations
-> > +                  given globally unique external IDs).
-> > +
-> >  ** Deprecated properties:
-> >
-> >  - mmu-masters (deprecated in favour of the generic "iommus" binding) :
-> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> > index 8f7281444551..f1abcb7dde36 100644
-> > --- a/drivers/iommu/arm-smmu.c
-> > +++ b/drivers/iommu/arm-smmu.c
-> > @@ -1534,13 +1534,15 @@ static int arm_smmu_domain_set_attr(struct
-> > iommu_domain *domain,
-> >
-> >  static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args
-> *args)
-> >  {
-> > -	u32 fwid = 0;
-> > +	u32 mask, fwid = 0;
-> >
-> >  	if (args->args_count > 0)
-> >  		fwid |= (u16)args->args[0];
-> >
-> >  	if (args->args_count > 1)
-> >  		fwid |= (u16)args->args[1] << SMR_MASK_SHIFT;
-> > +	else if (!of_property_read_u32(args->np, "stream-match-mask",
-> > &mask))
-> > +		fwid |= (u16)mask << SMR_MASK_SHIFT;
-> >
-> >  	return iommu_fwspec_add_ids(dev, &fwid, 1);
-> >  }
-> > --
-> > 2.10.2.dirty
-> >
-> > _______________________________________________
-> > iommu mailing list
-> > iommu at lists.linux-foundation.org
-> > https://lists.linuxfoundation.org/mailman/listinfo/iommu
+> Thanks,
+> Anurup
+>
+>> Thanks,
+>> Mark.
