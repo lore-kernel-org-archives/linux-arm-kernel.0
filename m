@@ -1,25 +1,61 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Mar 2017 12:01:52 +0000
-Subject: [PATCHv2 02/14] arm: Use set_memory.h header
-In-Reply-To: <1488413706-9739-3-git-send-email-labbott@redhat.com>
-References: <1488413706-9739-1-git-send-email-labbott@redhat.com>
- <1488413706-9739-3-git-send-email-labbott@redhat.com>
-Message-ID: <20170302120152.GJ21222@n2100.armlinux.org.uk>
+From: ada@thorsis.com (Alexander Dahl)
+Date: Thu, 02 Mar 2017 13:02:16 +0100
+Subject: [PATCH 2/7] memory: atmel-ebi: Simplify SMC config code
+In-Reply-To: <1487609701-10300-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1487609701-10300-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1487609701-10300-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <16727676.CMj9rWYKWZ@ada>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 01, 2017 at 04:14:54PM -0800, Laura Abbott wrote:
-> 
-> set_memory_* functions have moved to set_memory.h. Switch to this
-> explicitly
-> 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
+Hei hei,
 
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+With 
 
-Thanks for doing this Laura.
+#define ATMEL_SMC_MODE_TDF(x)           (((x) - 1) << 16)
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+from include/linux/mfd/syscon/atmel-smc.h you added this:
+
+> +	ret = of_property_read_u32(np, "atmel,smc-tdf-ns", &val);
+> +	if (!ret) {
+> +		required = true;
+> +		ncycles = DIV_ROUND_UP(val, clk_period_ns);
+> +		if (ncycles > ATMEL_SMC_MODE_TDF_MAX) {
+> +			ret = -EINVAL;
+> +			goto out;
+> +		}
+
+[?]
+
+> +		smcconf->mode |= ATMEL_SMC_MODE_TDF(ncycles);
+> +	}
+
+This was the same algorithm at some other location in atmel-ebi.c 
+before:
+
+	#define AT91_SMC_TDF_(x)		((((x) - 1) << 16) & AT91_SMC_TDF)
+
+	val = DIV_ROUND_UP(timings->tdf_ns, clk_rate);
+	if (val > AT91_SMC_TDF_MAX)
+		val = AT91_SMC_TDF_MAX;
+	regmap_fields_write(fields->mode, conf->cs,
+			    config->mode | AT91_SMC_TDF_(val));
+
+The hardware manual (AT91SAM9G20) says values from 0 to 15 (4bit, 0x0 to 
+0xF) are possible and I guess the goal is to set it to a value 
+corresponding to the value in ns from the dts or to 15 if it's greater 
+(or -EINVAL in the new version).
+
+However how can one set it to zero? Put in zero to the div you get zero 
+for ncycles or val and that goes as x into (((x) - 1) << 16) which 
+results in 0xF ending up as TDF_CYCLES in the mode register, right?
+
+I can of course set a slightly greater value, which ends up in a 
+calculated register value of zero, but that seems more a hack to me and 
+is not obvious if I just look@the DTS.
+
+If I'm right this might be topic of another bugfix patch, or should it 
+be done right in a v2 of this one?
+
+Greets
+Alex
