@@ -1,56 +1,96 @@
-From: sergio.prado@e-labworks.com (Sergio Prado)
-Date: Thu,  2 Mar 2017 18:23:19 -0300
-Subject: [PATCH] pinctrl: samsung: fix segfault when using external interrupts
- on s3c24xx
-Message-ID: <1488489799-18136-1-git-send-email-sergio.prado@e-labworks.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Thu,  2 Mar 2017 13:44:32 -0800
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of staging
+Message-ID: <1488491084-17252-1-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are getting a NULL pointer dereference when working with external
-interrupts on s3c24xx:
+Hi,
 
-Unable to handle kernel NULL pointer dereference at virtual address 000000a8
-pgd = c0104000
-[000000a8] *pgd=00000000
-Internal error: Oops: 5 [#1] ARM
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc8mini2440-sub-00047-g0722f57bfae9-dirty #3
-Hardware name: Samsung S3C2416 (Flattened Device Tree)
-task: c07399f8 task.stack: c0734000
-PC is at s3c24xx_demux_eint4_7+0x24/0x10c
-LR is at s3c24xx_demux_eint4_7+0x108/0x10c
+There's been some recent discussions[1] about Ion-like frameworks. There's
+apparently interest in just keeping Ion since it works reasonablly well.
+This series does what should be the final clean ups for it to possibly be
+moved out of staging.
 
-The problem is in the function s3c24xx_demux_eint() when dereferencing
-bank->eint_base.
+This includes the following:
+- Some general clean up and removal of features that never got a lot of use
+  as far as I can tell.
+- Fixing up the caching. This is the series I proposed back in December[2]
+  but never heard any feedback on. It will certainly break existing
+  applications that rely on the implicit caching. I'd rather make an effort
+  to move to a model that isn't going directly against the establishement
+  though.
+- Fixing up the platform support. The devicetree approach was never well
+  recieved by DT maintainers. The proposal here is to think of Ion less as
+  specifying requirements and more of a framework for exposing memory to
+  userspace.
+- CMA allocations now happen without the need of a dummy device structure.
+  This fixes a bunch of the reasons why I attempted to add devicetree
+  support before.
 
-At this point, we cannot get the bank pointer from the irq_desc
-structure since it is pointing to the hardware irq, not virq.
+I've had problems getting feedback in the past so if I don't hear any major
+objections I'm going to send out with the RFC dropped to be picked up.
+The only reason there isn't a patch to come out of staging is to discuss any
+other changes to the ABI people might want. Once this comes out of staging,
+I really don't want to mess with the ABI.
 
-So let's get the bank pointer directly from data->drvdata.
+Feedback appreciated.
 
-This is a regression from commit 8b1bd11c1f8f529057369c5b3702d13fd24e2765.
+Thanks,
+Laura
 
-Tested on FriendlyARM mini2440.
+[1] https://marc.info/?l=linux-kernel&m=148699712602105&w=2
+[2] https://marc.info/?l=linaro-mm-sig&m=148176050802908&w=2
 
-Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
----
- drivers/pinctrl/samsung/pinctrl-s3c24xx.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Laura Abbott (12):
+  staging: android: ion: Remove dmap_cnt
+  staging: android: ion: Remove alignment from allocation field
+  staging: android: ion: Duplicate sg_table
+  staging: android: ion: Call dma_map_sg for syncing and mapping
+  staging: android: ion: Remove page faulting support
+  staging: android: ion: Remove crufty cache support
+  staging: android: ion: Remove old platform support
+  cma: Store a name in the cma structure
+  cma: Introduce cma_for_each_area
+  staging: android: ion: Use CMA APIs directly
+  staging: android: ion: Make Ion heaps selectable
+  staging; android: ion: Enumerate all available heaps
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-index b82a003546ae..1b8d887796e8 100644
---- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-+++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-@@ -356,8 +356,8 @@ static inline void s3c24xx_demux_eint(struct irq_desc *desc,
- {
- 	struct s3c24xx_eint_data *data = irq_desc_get_handler_data(desc);
- 	struct irq_chip *chip = irq_desc_get_chip(desc);
--	struct irq_data *irqd = irq_desc_get_irq_data(desc);
--	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
-+	struct samsung_pinctrl_drv_data *d = data->drvdata;
-+	struct samsung_pin_bank *bank = d->pin_banks;
- 	unsigned int pend, mask;
- 
- 	chained_irq_enter(chip, desc);
+ drivers/base/dma-contiguous.c                      |   5 +-
+ drivers/staging/android/ion/Kconfig                |  51 ++--
+ drivers/staging/android/ion/Makefile               |  14 +-
+ drivers/staging/android/ion/hisilicon/Kconfig      |   5 -
+ drivers/staging/android/ion/hisilicon/Makefile     |   1 -
+ drivers/staging/android/ion/hisilicon/hi6220_ion.c | 113 ---------
+ drivers/staging/android/ion/ion-ioctl.c            |   6 -
+ drivers/staging/android/ion/ion.c                  | 282 ++++++---------------
+ drivers/staging/android/ion/ion.h                  |   5 +-
+ drivers/staging/android/ion/ion_carveout_heap.c    |  16 +-
+ drivers/staging/android/ion/ion_chunk_heap.c       |  15 +-
+ drivers/staging/android/ion/ion_cma_heap.c         | 102 ++------
+ drivers/staging/android/ion/ion_dummy_driver.c     | 156 ------------
+ drivers/staging/android/ion/ion_enumerate.c        |  89 +++++++
+ drivers/staging/android/ion/ion_of.c               | 184 --------------
+ drivers/staging/android/ion/ion_of.h               |  37 ---
+ drivers/staging/android/ion/ion_page_pool.c        |   3 -
+ drivers/staging/android/ion/ion_priv.h             |  57 ++++-
+ drivers/staging/android/ion/ion_system_heap.c      |  14 +-
+ drivers/staging/android/ion/tegra/Makefile         |   1 -
+ drivers/staging/android/ion/tegra/tegra_ion.c      |  80 ------
+ include/linux/cma.h                                |   6 +-
+ mm/cma.c                                           |  25 +-
+ mm/cma.h                                           |   1 +
+ mm/cma_debug.c                                     |   2 +-
+ 25 files changed, 312 insertions(+), 958 deletions(-)
+ delete mode 100644 drivers/staging/android/ion/hisilicon/Kconfig
+ delete mode 100644 drivers/staging/android/ion/hisilicon/Makefile
+ delete mode 100644 drivers/staging/android/ion/hisilicon/hi6220_ion.c
+ delete mode 100644 drivers/staging/android/ion/ion_dummy_driver.c
+ create mode 100644 drivers/staging/android/ion/ion_enumerate.c
+ delete mode 100644 drivers/staging/android/ion/ion_of.c
+ delete mode 100644 drivers/staging/android/ion/ion_of.h
+ delete mode 100644 drivers/staging/android/ion/tegra/Makefile
+ delete mode 100644 drivers/staging/android/ion/tegra/tegra_ion.c
+
 -- 
-1.9.1
+2.7.4
