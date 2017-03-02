@@ -1,118 +1,52 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 2 Mar 2017 18:54:30 +0100
-Subject: [PATCH 2/4] watchdog: sama5d4: fix race condition
-In-Reply-To: <20170302174224.GC28554@roeck-us.net>
-References: <20170302173114.28508-1-alexandre.belloni@free-electrons.com>
- <20170302173114.28508-3-alexandre.belloni@free-electrons.com>
- <20170302174224.GC28554@roeck-us.net>
-Message-ID: <20170302175430.4b3j7ptij525vrhm@piout.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 2 Mar 2017 18:00:57 +0000
+Subject: [PATCH 00/20] PCI: fix config and I/O Address space memory
+ mappings
+In-Reply-To: <CAK8P3a2ULkNH39UJAeZSuw2kS+7wNyySs1RaY74ELGm498NmnA@mail.gmail.com>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+ <CAK8P3a2ULkNH39UJAeZSuw2kS+7wNyySs1RaY74ELGm498NmnA@mail.gmail.com>
+Message-ID: <20170302180057.GA8094@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/2017 at 09:42:24 -0800, Guenter Roeck wrote:
-> On Thu, Mar 02, 2017 at 06:31:12PM +0100, Alexandre Belloni wrote:
-> > WDT_MR and WDT_CR must not updated within three slow clock periods after
-> > the last ping (write to WDT_CR or WDT_MR). Ensure enough time has elapsed
-> > before writing those registers.
-> > wdt_write() waits for 4 periods to ensure at least 3 edges are seen by the
-> > IP.
-> > 
+On Wed, Mar 01, 2017 at 05:18:27PM +0100, Arnd Bergmann wrote:
+> On Mon, Feb 27, 2017 at 4:14 PM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
 > 
-> Would it be possible to use min_hw_heartbeat_ms for this purpose ?
+> > This patch series[1] addresses both issues in one go:
+> >
+> > - It updates the pci_remap_iospace() function to use a page mapping
+> >   that guarantees non-posted write transactions for I/O space addresses
+> > - It adds a kernel API to remap PCI config space resources, so that
+> >   architecture can override it with a mapping implementation that
+> >   guarantees PCI specifications compliancy wrt non-posted write
+> >   configuration transactions
+> > - It updates all PCI host controller implementations (and the generic
+> >   ECAM layer) to use the newly introduced mapping interface
+> >
+> > Tested on Juno ECAM based interface (DT/ACPI).
 > 
+> This looks all good to me, nice work!
 
-I don't think so unless you want the core to also use that delay between
-__watchdog_ping, watchdog_start, watchdog_set_timeout and watchdog_stop.
-Currently, it is only between two calls of __watchdog_ping,
+Thanks a lot Arnd. There is a pending issue to complete the series,
+that is related to asm-generic/io.h, which is not included by all
+arches, therefore, on top of adding a default inline for
+pci_remap_cfg_space() in asm-generic/io.h I will have to patch
+all arches that do not include asm-generic/io.h (eg x86) to
+make the series completely functional - ie I will have to add a
 
-> Thanks,
-> Guenter
-> 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> >  drivers/watchdog/sama5d4_wdt.c | 33 +++++++++++++++++++++++++++++----
-> >  1 file changed, 29 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-> > index 5cee20caca78..362fd229786d 100644
-> > --- a/drivers/watchdog/sama5d4_wdt.c
-> > +++ b/drivers/watchdog/sama5d4_wdt.c
-> > @@ -6,6 +6,7 @@
-> >   * Licensed under GPLv2.
-> >   */
-> >  
-> > +#include <linux/delay.h>
-> >  #include <linux/interrupt.h>
-> >  #include <linux/io.h>
-> >  #include <linux/kernel.h>
-> > @@ -29,6 +30,7 @@ struct sama5d4_wdt {
-> >  	struct watchdog_device	wdd;
-> >  	void __iomem		*reg_base;
-> >  	u32			mr;
-> > +	unsigned long		last_ping;
-> >  };
-> >  
-> >  static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
-> > @@ -49,8 +51,29 @@ MODULE_PARM_DESC(nowayout,
-> >  #define wdt_read(wdt, field) \
-> >  	readl_relaxed((wdt)->reg_base + (field))
-> >  
-> > -#define wdt_write(wtd, field, val) \
-> > -	writel_relaxed((val), (wdt)->reg_base + (field))
-> > +/* 4 slow clock periods is 4/32768 = 122.07?s*/
-> > +#define WDT_DELAY	usecs_to_jiffies(123)
-> > +
-> > +static void wdt_write(struct sama5d4_wdt *wdt, u32 field, u32 val)
-> > +{
-> > +	/*
-> > +	 * WDT_CR and WDT_MR must not be modified within three slow clock
-> > +	 * periods following a restart of the watchdog performed by a write
-> > +	 * access in WDT_CR.
-> > +	 */
-> > +	while (time_before(jiffies, wdt->last_ping + WDT_DELAY))
-> > +		usleep_range(30, 125);
-> > +	writel_relaxed(val, wdt->reg_base + field);
-> > +	wdt->last_ping = jiffies;
-> > +}
-> > +
-> > +static void wdt_write_nosleep(struct sama5d4_wdt *wdt, u32 field, u32 val)
-> > +{
-> > +	if (time_before(jiffies, wdt->last_ping + WDT_DELAY))
-> > +		udelay(123);
-> > +	writel_relaxed(val, wdt->reg_base + field);
-> > +	wdt->last_ping = jiffies;
-> > +}
-> >  
-> >  static int sama5d4_wdt_start(struct watchdog_device *wdd)
-> >  {
-> > @@ -164,11 +187,12 @@ static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)
-> >  	 * Else, we have to disable it properly.
-> >  	 */
-> >  	if (wdt_enabled) {
-> > -		wdt_write(wdt, AT91_WDT_MR, wdt->mr);
-> > +		wdt_write_nosleep(wdt, AT91_WDT_MR, wdt->mr);
-> >  	} else {
-> >  		reg = wdt_read(wdt, AT91_WDT_MR);
-> >  		if (!(reg & AT91_WDT_WDDIS))
-> > -			wdt_write(wdt, AT91_WDT_MR, reg | AT91_WDT_WDDIS);
-> > +			wdt_write_nosleep(wdt, AT91_WDT_MR,
-> > +					  reg | AT91_WDT_WDDIS);
-> >  	}
-> >  	return 0;
-> >  }
-> > @@ -193,6 +217,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
-> >  	wdd->ops = &sama5d4_wdt_ops;
-> >  	wdd->min_timeout = MIN_WDT_TIMEOUT;
-> >  	wdd->max_timeout = MAX_WDT_TIMEOUT;
-> > +	wdt->last_ping = jiffies;
-> >  
-> >  	watchdog_set_drvdata(wdd, wdt);
-> >  
-> > -- 
-> > 2.11.0
-> > 
+#define pci_remap_cfgspace ioremap_nocache
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+in every given asm/io.h that does not include <asm-generic/io.h>
+
+Another option would consist in adding the default inline for
+pci_remap_cfg_space() in asm-generic/pci_iomap.h which seems to
+be included by all arches.
+
+I think the first option, even if it requires more extensive
+patching is more complete but please all let me know how
+you want me to fix this niggle, I am not sure I grasp the background
+policy behind asm-generic files entirely so I'd better ask.
+
+Thanks !
+Lorenzo
