@@ -1,66 +1,30 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  2 Mar 2017 16:39:57 +0100
-Subject: [PATCH 01/11] drm/meson: Use crtc_state for hdisplay and fix atomic
- flush/enable sync for vsync commit
+Date: Thu,  2 Mar 2017 16:39:58 +0100
+Subject: [PATCH 02/11] drm/meson: Add missing HDMI register
 In-Reply-To: <1488469207-523-1-git-send-email-narmstrong@baylibre.com>
 References: <1488469207-523-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1488469207-523-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1488469207-523-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clean the crtc_enable by using the proper crtc_state instead of the state
-of the primary plane state data.
-
-Also fix the dependency to commit the plane changes even if enable is called
-after the flush.
+Add missing VPU HDMI register.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/gpu/drm/meson/meson_crtc.c | 15 +++++++++++----
- 1 file changed, 11 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/meson/meson_registers.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/gpu/drm/meson/meson_crtc.c b/drivers/gpu/drm/meson/meson_crtc.c
-index 0fe49ec..c986eb0 100644
---- a/drivers/gpu/drm/meson/meson_crtc.c
-+++ b/drivers/gpu/drm/meson/meson_crtc.c
-@@ -82,11 +82,18 @@ static void meson_crtc_disable_vblank(struct drm_crtc *crtc)
- static void meson_crtc_enable(struct drm_crtc *crtc)
- {
- 	struct meson_crtc *meson_crtc = to_meson_crtc(crtc);
--	struct drm_plane *plane = meson_crtc->priv->primary_plane;
-+	struct drm_crtc_state *crtc_state = crtc->state;
- 	struct meson_drm *priv = meson_crtc->priv;
- 
-+	DRM_DEBUG_DRIVER("\n");
-+
-+	if (!crtc_state) {
-+		DRM_ERROR("Invalid crtc_state\n");
-+		return;
-+	}
-+
- 	/* Enable VPP Postblend */
--	writel(plane->state->crtc_w,
-+	writel(crtc_state->mode.hdisplay,
- 	       priv->io_base + _REG(VPP_POSTBLEND_H_SIZE));
- 
- 	writel_bits_relaxed(VPP_POSTBLEND_ENABLE, VPP_POSTBLEND_ENABLE,
-@@ -101,6 +108,7 @@ static void meson_crtc_disable(struct drm_crtc *crtc)
- 	struct meson_drm *priv = meson_crtc->priv;
- 
- 	priv->viu.osd1_enabled = false;
-+	priv->viu.osd1_commit = false;
- 
- 	/* Disable VPP Postblend */
- 	writel_bits_relaxed(VPP_POSTBLEND_ENABLE, 0,
-@@ -137,8 +145,7 @@ static void meson_crtc_atomic_flush(struct drm_crtc *crtc,
- 	struct meson_crtc *meson_crtc = to_meson_crtc(crtc);
- 	struct meson_drm *priv = meson_crtc->priv;
- 
--	if (priv->viu.osd1_enabled)
--		priv->viu.osd1_commit = true;
-+	priv->viu.osd1_commit = true;
- }
- 
- static const struct drm_crtc_helper_funcs meson_crtc_helper_funcs = {
+diff --git a/drivers/gpu/drm/meson/meson_registers.h b/drivers/gpu/drm/meson/meson_registers.h
+index 6adf9c1..2847381 100644
+--- a/drivers/gpu/drm/meson/meson_registers.h
++++ b/drivers/gpu/drm/meson/meson_registers.h
+@@ -1319,6 +1319,7 @@
+ #define VPU_MISC_CTRL 0x2740
+ #define VPU_ISP_GCLK_CTRL0 0x2741
+ #define VPU_ISP_GCLK_CTRL1 0x2742
++#define VPU_HDMI_FMT_CTRL 0x2743
+ #define VPU_VDIN_ASYNC_HOLD_CTRL 0x2743
+ #define VPU_VDISP_ASYNC_HOLD_CTRL 0x2744
+ #define VPU_VPUARB2_ASYNC_HOLD_CTRL 0x2745
 -- 
 1.9.1
