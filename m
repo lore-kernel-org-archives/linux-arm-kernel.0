@@ -1,128 +1,42 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 2 Mar 2017 11:49:37 +0000
-Subject: [PATCH 14/20] PCI: hisi: update PCI config space remap function
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1FA96A69@lhreml507-mbx>
-References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
- <20170227151436.18698-15-lorenzo.pieralisi@arm.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1FA96A69@lhreml507-mbx>
-Message-ID: <20170302114937.GA17277@red-moon>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Thu, 2 Mar 2017 12:54:24 +0100
+Subject: [PATCH] arm64: restore get_current() optimisation
+In-Reply-To: <1483468021-8237-1-git-send-email-mark.rutland@arm.com>
+References: <1483468021-8237-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <8928ec99-5f5b-905b-5922-81a009f18999@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriele,
+Hi Mark,
 
-On Thu, Mar 02, 2017 at 10:56:16AM +0000, Gabriele Paoloni wrote:
-> Hi Lorenzo
-> 
-> Many thanks for putting all of this together.
-> 
-> > -----Original Message-----
-> > From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> > Sent: 27 February 2017 15:14
-> > To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > Cc: linux-kernel at vger.kernel.org; linux-arch at vger.kernel.org; Lorenzo
-> > Pieralisi; Bjorn Helgaas; Gabriele Paoloni; Wangzhou (B)
-> > Subject: [PATCH 14/20] PCI: hisi: update PCI config space remap
-> > function
-> > 
-> > PCI configuration space should be mapped with a memory region type that
-> > generates on the CPU host bus non-posted write transations. Update the
-> > driver to use the devm_pci_remap_cfg* interface to make sure the
-> > correct
-> > memory mappings for PCI configuration space are used.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Bjorn Helgaas <bhelgaas@google.com>
-> > Cc: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> > Cc: Zhou Wang <wangzhou1@hisilicon.com>
-> > ---
-> >  drivers/pci/dwc/pcie-hisi.c | 3 +--
-> >  1 file changed, 1 insertion(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/pci/dwc/pcie-hisi.c b/drivers/pci/dwc/pcie-hisi.c
-> > index e3e4fed..8042780 100644
-> > --- a/drivers/pci/dwc/pcie-hisi.c
-> > +++ b/drivers/pci/dwc/pcie-hisi.c
-> > @@ -294,10 +294,9 @@ static int hisi_pcie_probe(struct platform_device
-> > *pdev)
-> >  	}
-> > 
-> >  	reg = platform_get_resource_byname(pdev, IORESOURCE_MEM,
-> > "rc_dbi");
-> > -	pci->dbi_base = devm_ioremap_resource(dev, reg);
-> > +	pci->dbi_base = devm_pci_remap_cfg_resource(dev, reg);
-> >  	if (IS_ERR(pci->dbi_base))
-> >  		return PTR_ERR(pci->dbi_base);
-> > -
-> >  	platform_set_drvdata(pdev, hisi_pcie);
-> > 
-> >  	ret = hisi_add_pcie_port(hisi_pcie, pdev);
-> > --
-> > 2.10.0
-> 
-> I think you missed a couple of places where cfg space is ioremapped.
-> I have added these and merged with your changes in the patch below:
-> 
-> Thanks again
-> Gab
-> 
-> ---------------------------------
-> From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Date: Tue, 21 Feb 2017 15:24:34 +0000
-> Subject: [PATCH 09/15] PCI: hisi: update PCI config space remap function
-> 
-> PCI configuration space should be mapped with a memory region type that
-> generates on the CPU host bus non-posted write transations. Update the
-> driver to use the devm_pci_remap_cfg* interface to make sure the correct
-> memory mappings for PCI configuration space are used.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> Cc: Zhou Wang <wangzhou1@hisilicon.com>
-> ---
->  drivers/pci/dwc/pcie-hisi.c | 7 +++----
->  1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pci/dwc/pcie-hisi.c b/drivers/pci/dwc/pcie-hisi.c
-> index e3e4fed..a5b542c 100644
-> --- a/drivers/pci/dwc/pcie-hisi.c
-> +++ b/drivers/pci/dwc/pcie-hisi.c
-> @@ -99,7 +99,7 @@ static int hisi_pcie_init(struct pci_config_window *cfg)
->  		return -ENOMEM;
->  	}
->  
-> -	reg_base = devm_ioremap(dev, res->start, resource_size(res));
-> +	reg_base = devm_pci_remap_cfgspace(dev, res->start, resource_size(res));
->  	if (!reg_base)
->  		return -ENOMEM;
->  
-> @@ -294,10 +294,9 @@ static int hisi_pcie_probe(struct platform_device *pdev)
->  	}
->  
->  	reg = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rc_dbi");
-> -	pci->dbi_base = devm_ioremap_resource(dev, reg);
-> +	pci->dbi_base = devm_pci_remap_cfg_resource(dev, reg);
->  	if (IS_ERR(pci->dbi_base))
->  		return PTR_ERR(pci->dbi_base);
-> -
->  	platform_set_drvdata(pdev, hisi_pcie);
->  
->  	ret = hisi_add_pcie_port(hisi_pcie, pdev);
-> @@ -358,7 +357,7 @@ static int hisi_pcie_platform_init(struct pci_config_window *cfg)
->  		return -EINVAL;
->  	}
->  
-> -	reg_base = devm_ioremap(dev, res->start, resource_size(res));
-> +	reg_base = devm_pci_remap_cfgspace(dev, res->start, resource_size(res));
->  	if (!reg_base)
->  		return -ENOMEM;
+Am 03.01.2017 um 19:27 schrieb Mark Rutland:
+> Commit c02433dd6de32f04 ("arm64: split thread_info from task stack")
+> inverted the relationship between get_current() and
+> current_thread_info(), with sp_el0 now holding the current task_struct
+> rather than the current thead_info. The new implementation of
 
-I will fold the changes into v2 (and I hope other host controllers
-maintainers will follow suit - I do not have enough knowledge of
-all host bridges drivers internals to understand what ioremap calls
-need patching).
+"thread_info"?
 
-Thanks !
-Lorenzo
+> get_current() prevents the compiler from being able to optimize repeated
+> calls to either, resulting in a noticeable penalty in some
+> microbenchmarks.
+> 
+> This patch restores the previous optimisation by implementing
+> get_current() in the same way as our old current_thread_info(), using a
+> non-volatile asm statement.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Reported-by: Davidlohr Bueso <dbueso@suse.de>
+
+Should this get a Fixes: c02433dd6de32f04 ("arm64: split thread_info
+from task stack") header?
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
