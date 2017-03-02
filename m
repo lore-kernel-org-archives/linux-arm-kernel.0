@@ -1,103 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 2 Mar 2017 15:41:16 +0000
-Subject: BCM5301X: GIC: PPI11 is secure or misconfigured (same for PPI13)
-In-Reply-To: <dc74d33c-aa3c-ec26-313e-d5f5cef76e6f@milecki.pl>
-References: <dc74d33c-aa3c-ec26-313e-d5f5cef76e6f@milecki.pl>
-Message-ID: <0d18fe40-76ff-4703-d766-e895ddd36fba@arm.com>
+From: ldv@altlinux.org (Dmitry V. Levin)
+Date: Thu, 2 Mar 2017 18:48:45 +0300
+Subject: [PATCH] uapi: fix asm/signal.h userspace compilation errors
+In-Reply-To: <CAE2sS1h9QNV+31GMSv8aahJYOb9hFtFp5Aj-yVOfg7cjBHr_kg@mail.gmail.com>
+References: <20170226010156.GA28831@altlinux.org>
+ <CAK8P3a0YX3RGAqWN0mwUJtBsqUX0C+QRtJLrT_UA=wX6Z+q0DA@mail.gmail.com>
+ <CAE2sS1h9QNV+31GMSv8aahJYOb9hFtFp5Aj-yVOfg7cjBHr_kg@mail.gmail.com>
+Message-ID: <20170302154845.GB3503@altlinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/03/17 14:32, Rafa? Mi?ecki wrote:
-> Hi,
+On Thu, Mar 02, 2017 at 10:22:18AM -0500, Carlos O'Donell wrote:
+> On Wed, Mar 1, 2017 at 11:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Sun, Feb 26, 2017 at 2:01 AM, Dmitry V. Levin <ldv@altlinux.org> wrote:
+> >> Include <stddef.h> (guarded by #ifndef __KERNEL__) to fix asm/signal.h
+> >> userspace compilation errors like this:
+> >>
+> >> /usr/include/asm/signal.h:126:2: error: unknown type name 'size_t'
+> >>   size_t ss_size;
+> >>
+> >> As no uapi header provides a definition of size_t, inclusion
+> >> of <stddef.h> seems to be the most conservative fix available.
+[...]
+> > I'm not sure if this is the best fix. We generally should not include one
+> > standard header from another standard header. Would it be possible
+> > to use __kernel_size_t instead of size_t?
 > 
-> I just updated kernel on my SmartRG SR400ac (bcm4708-smartrg-sr400ac.dts) from
-> 4.4 to 4.9 and noticed following warnings in the boot log:
-> [    0.000000] GIC: PPI11 is secure or misconfigured
-> [    0.000007] sched_clock: 64 bits at 400MHz, resolution 2ns, wraps every 4398046511103ns
-> [    0.008553] clocksource: arm_global_timer: mask: 0xffffffffffffffff max_cycles: 0x5c4093a7d1, max_idle_ns: 440795210635 ns
-> [    0.020380] GIC: PPI11 is secure or misconfigured
-> [    0.025446] GIC: PPI13 is secure or misconfigured
-> [    0.030498] GIC: PPI13 is secure or misconfigured
-> [    0.035690] Calibrating delay loop... 1594.16 BogoMIPS (lpj=7970816)
-> [    0.123484] pid_max: default: 32768 minimum: 301
-> [    0.128511] Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
-> [    0.135591] Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
-> [    0.143687] CPU: Testing write buffer coherency: ok
-> [    0.149226] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-> [    0.155371] Setting up static identity map for 0x82a0 - 0x82d4
-> [    0.163390] GIC: PPI11 is secure or misconfigured
-> [    0.163407] GIC: PPI13 is secure or misconfigured
+> In glibc we handle this with special use of __need_size_t with GCC's
+> provided stddef.h.
 > 
-> This is caused by following commits:
-> 992345a58e0c ("irqchip/gic: WARN if setting the interrupt type for a PPI fails")
-> 4b357daed698 ("genirq: Look-up trigger type if not specified by caller")
-> f35ad083783e ("genirq: Look-up percpu trigger type if not specified by caller")
+> For example glibc's signal.h does this:
 > 
-> There warnings are coming from the following (forward) traces:
-> request_percpu_irq ? __setup_irq ? (...) ? gic_set_type ? gic_configure_irq
-> cpuhp_setup_state ? (...) ? gt_starting_cpu ? enable_percpu_irq ? __irq_set_trigger ? chip->irq_set_type
-> (see e.g. global_timer_of_register).
-> Later ones are coming e.g. from twd_local_timer_of_register.
+> # define __need_size_t
+> # include <stddef.h>
+
+Just to make it clear, do you suggest this approach for asm/signal.h as well?
+
+[...]
+> Changing the fundamental type causes the issues you see in patch v2
+> where sizeof(size_t) < sizeof(__kernel_size_t).
 > 
-> Before adding mentioned commits gic_set_type was never called for there IRQs.
+> It will only lead to problem substituting the wrong type.
 
-Which was a nasty bug the first place.
+I don't see any appetite for creating more ABIs like x32 with
+sizeof(size_t) < sizeof(__kernel_size_t), so v2 approach
+is not going to be any different from v1 in maintenance.
 
-> 
-> AFAIU we need to update following entries in the bcm5301x.dtsi:
-> 
-> timer at 20200 {
-> 	compatible = "arm,cortex-a9-global-timer";
-> 	reg = <0x20200 0x100>;
-> 	interrupts = <GIC_PPI 11 IRQ_TYPE_LEVEL_HIGH>;
-> 	clocks = <&periph_clk>;
-> };
-> 
-> local-timer at 20600 {
-> 	compatible = "arm,cortex-a9-twd-timer";
-> 	reg = <0x20600 0x100>;
-> 	interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
-> 	clocks = <&periph_clk>;
-> };
-> 
-> Does anyone happen to know how to define these IRQs properly?
 
-It looks like the GIC's PPI configuration differs from what you have in 
-your DT. Since the PPI configuration is write-only on A9, you get a 
-warning. Try dumping the values in gic_configure_irq() with this 
-patchlet:
-
-diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
-index 9ae71804b5dd..887be33dd6b1 100644
---- a/drivers/irqchip/irq-gic-common.c
-+++ b/drivers/irqchip/irq-gic-common.c
-@@ -76,12 +76,14 @@ int gic_configure_irq(unsigned int irq, unsigned int type,
- 	 * non-secure mode, and hence it may not be catastrophic.
- 	 */
- 	writel_relaxed(val, base + GIC_DIST_CONFIG + confoff);
--	if (readl_relaxed(base + GIC_DIST_CONFIG + confoff) != val) {
-+	oldval = val;
-+	val = readl_relaxed(base + GIC_DIST_CONFIG + confoff);
-+	if (oldval != val) {
- 		if (WARN_ON(irq >= 32))
- 			ret = -EINVAL;
- 		else
--			pr_warn("GIC: PPI%d is secure or misconfigured\n",
--				irq - 16);
-+			pr_warn("GIC: PPI%d is secure or misconfigured %x %x\n",
-+				irq - 16, oldval, val);
- 	}
- 
- 	if (sync_access)
-
-The difference between the two values will tell you what the GIC thinks
-of the interrupt trigger. Odds are that these interrupts are edge-triggered,
-if I trust the following document:
-
-http://infocenter.arm.com/help/topic/com.arm.doc.ddi0407f/CCHEIGIC.html
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+ldv
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170302/f75b9e11/attachment.sig>
