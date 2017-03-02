@@ -1,38 +1,35 @@
-From: kevin.tian@intel.com (Tian, Kevin)
-Date: Thu, 2 Mar 2017 07:29:03 +0000
-Subject: [RFC PATCH 22/30] iommu: Bind/unbind tasks to/from devices
-In-Reply-To: <20170227195441.5170-23-jean-philippe.brucker@arm.com>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-23-jean-philippe.brucker@arm.com>
-Message-ID: <AADFC41AFE54684AB9EE6CBC0274A5D190C52DB1@SHSMSX101.ccr.corp.intel.com>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Thu, 2 Mar 2017 08:34:26 +0100
+Subject: [PATCHv2 00/14] set_memory_* functions header refactor
+In-Reply-To: <1488413706-9739-1-git-send-email-labbott@redhat.com>
+References: <1488413706-9739-1-git-send-email-labbott@redhat.com>
+Message-ID: <20170302073426.GA7265@osiris>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Jean-Philippe Brucker
-> Sent: Tuesday, February 28, 2017 3:55 AM
+On Wed, Mar 01, 2017 at 04:14:52PM -0800, Laura Abbott wrote:
+> Hi,
 > 
-[...]
+> This is v2 of my proposal to move set_memory_* function prototypes out of
+> cacheflush.h and into their own header file. This came out of a comment
+> Russell made while reviewing RODATA test cases
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/480855.html
+> While the final result of that series was the rodata code was refactored into
+> its own header file, the set_memory_* APIs are still out of place.
 > 
->   API naming
->   ==========
+> This version refactored the common set_memory_* functions into an asm-generic
+> header. s390x added some features so it can't just use the asm-generic header.
+> I debated how much more to try and shove into the asm-generic version (e.g.
+> stub prototypes for the ARM nommu case, set_kernel_text_*) but decided to stick
+> with just the basics for this version.
 > 
-> I realize that "SVM" as a name isn't great because the svm namespace is
-> already taken by AMD-V (Secure Virtual Machine) in arch/x86. Also, the
-> name itself doesn't say much.
+> I split out the cacheflush.h -> set_memory.h conversions into separate patches
+> to hopefully make merging easier. Worst case, the final patch to completely
+> separate the two can be delayed if there are more problems found. I'd like
+> for this to eventually go through the -mm tree so I'd like Acks where
+> appropriate.
 > 
-> I personally prefer "Unified Virtual Addressing" (UVA), adopted by CUDA,
-> or rather Unified Virtual Address Space (UVAS). Another possibility is
-> Unified Virtual Memory (UVM). Acronym UAS for Unified Address Space is
-> already used by USB. Same for Shared Address Space (SAS), already in use
-> in the kernel, but SVAS would work (although it doesn't look good).
-> 
+> As always, feedback appreciated.
 
-'unified' is not exactly matching to 'shared'. In some context it means
-unifying device local memory and system memory in one virtual address
-space, while SVM is more for sharing of a CPU virtual address space with 
-device.
-
-What about Shared Virtual Addressing (SVA)?
-
-Thanks
-Kevin
+For the s390 bits:
+Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
