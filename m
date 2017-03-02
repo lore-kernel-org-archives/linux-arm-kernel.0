@@ -1,117 +1,128 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 2 Mar 2017 16:46:58 +0000
-Subject: [PATCH] arm64: restore get_current() optimisation
-In-Reply-To: <086dff0b-126d-b5b7-e877-d3d46efce618@nvidia.com>
-References: <1483468021-8237-1-git-send-email-mark.rutland@arm.com>
- <ee26a4f0-e3e9-fb44-fe7c-c40a15c33b38@nvidia.com>
- <20170302123507.GD19632@leverpostej>
- <086dff0b-126d-b5b7-e877-d3d46efce618@nvidia.com>
-Message-ID: <20170302164654.GP19632@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 2 Mar 2017 16:48:03 +0000
+Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
+In-Reply-To: <AM5PR0401MB251438AFDE691D570353B537E6280@AM5PR0401MB2514.eurprd04.prod.outlook.com>
+References: <ad6b6a4937b1fe183e6d48ccbaf4cb46db92fed4.1481893907.git.robin.murphy@arm.com>
+ <DB6PR0402MB2694957C2D7C648CC342627FE69F0@DB6PR0402MB2694.eurprd04.prod.outlook.com>
+ <AM5PR0401MB251438AFDE691D570353B537E6280@AM5PR0401MB2514.eurprd04.prod.outlook.com>
+Message-ID: <72610bd3-71b2-0b4b-eb6c-5e9df7ec1aac@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 03:30:26PM +0000, Jon Hunter wrote:
-> On 02/03/17 12:35, Mark Rutland wrote:
-> > On Thu, Mar 02, 2017 at 11:35:06AM +0000, Jon Hunter wrote:
-> >> On 03/01/17 18:27, Mark Rutland wrote:
-
-> >> I noticed that with v4.10 I am seeing the following panic ...
-
-> This is with Ubuntu/Linaro 5.4.0-6ubuntu1~16.04.4. I have also tried ...
+On 02/03/17 04:18, Nipun Gupta wrote:
 > 
-> gcc version 5.3.1 20160412 (Linaro GCC 5.3-2016.05) 
-> gcc version 6.2.1 20161016 (Linaro GCC 6.2-2016.11)
+> Hi Robin/Will,
 > 
-> ... and see the same panic.
+> This patch is currently not applied on the tree.
+> I had verified the patch and it seems good.
+> Is ack required on the patch or do I need to send a non RFC patch (with Robin's signoff)?
+> This is very much required to support SMMU on NXP platform.
 
-So far I've been testing with the Linaro 15.08 toolchain; I'll give
-these a go.
+It's still sat in my "patches to do something with" queue - I don't
+think we ever reached a concrete decision on the property name for a DT
+maintainer ack, but I've tweaked the description per Will's comment;
+thanks for the reminder. I'll send an rc1-based version out next week to
+reboot the discussion.
 
-[...]
+Robin.
 
-> >> [  184.566458] PC is at regcache_flat_read+0x14/0x20
-> >> [  184.571155] LR is at regcache_read+0x50/0x78
-> >> [  184.575417] pc : [<ffff0000085d0c6c>] lr : [<ffff0000085cefa8>] pstate: 400001c5
-> > 
-> > Judging by the PC, that read could be any of:
-> > 
-> > * the read of map->cache at the start of regcache_flat_read()
-> > 
-> > * an inlined regcache_get_index_by_order()'s read of map->reg_stride_order
-> > 
-> > * the read of cache[regcache_flat_get_index(map, reg)]
-> > 
-> > ... so it seems either map or map->cache is dodgy.
-> > 
-> > If you're can addr2line that PC, that should tell us which access is
-> > blowing up, and therefore which pointer is dodgy.
-> > 
-> > We'll want the full output considering inlined functions, i.e.
-> > 
-> > ${CROSS_COMPILE}addr2line -ife vmlinux 0xffff0000085d0c6c
 > 
-> This shows ...
+> Thanks,
+> Nipun
 > 
-> regcache_flat_read
-> /home/jonathanh/workdir/tegra/korg-linux.git/drivers/base/regmap/regcache-flat.c:60
-
-Ok, so it appears that either map->cache is dodgy, or the reg passed to
-regcache_flat_read() is bogus, and we end up generating a cache index
-that is well out of bounds.
-
-Perhaps a caller is deriving that from an uninitialised variable? The
-code and stack layout changes as a result of my patch could easily
-tickle that.
-
-I'm not at all familiar with regmap, but IIUC we can catch that with:
-
----->8----
-diff --git a/drivers/base/regmap/regcache-flat.c b/drivers/base/regmap/regcache-flat.c
-index 4d2e50b..2d42c01 100644
---- a/drivers/base/regmap/regcache-flat.c
-+++ b/drivers/base/regmap/regcache-flat.c
-@@ -57,6 +57,8 @@ static int regcache_flat_read(struct regmap *map,
- {
-        unsigned int *cache = map->cache;
- 
-+       BUG_ON(reg > map->max_register);
-+
-        *value = cache[regcache_flat_get_index(map, reg)];
- 
-        return 0;
----->8----
-
-> > If the commit in question is resulting in get_current() behaving differently,
-> > it *might* be possible to detect with the hack below. I haven't seen it blow up
-> > on my test systems.
 > 
-> Unfortunately, that did not catch it :-(
-
-That would seem to imply that get_current() is returning the right value.
-
-So, I'd suspect that we've uncovered a latent bug elsewhere.
-
-If the reg index isn't out-of-bounds, it would imply that either the
-regmap data is getting corrupted somewhere, or it isn't initialised
-correctly.
-
-Can we log when the regmap and regcache in question are initialised,
-dumping their addresses? That way we can see if they're getting
-clobbered behind our backs.
-
-> > Otherwise, it might be worth giving KASAN a go; that might detect data
-> > corruption. If you have a recent enough toolchain, you only need enable
-> > CONFIG_KASAN. This will make your kernel Image a fair amount larger.
-> 
-> I enabled this with gcc 6.2.1 but now the PC is at __asan_load4 ...
-
-That's expected if the dodgy address is sufficiently dodgy, so we can ignore
-this. KASAN has a shadow of all mapped memory, and if you try to access
-something that falls outside of mapped memory it can also fall outside
-of the mapped shadow.
-
-KASAN didn't detect anything before that, so it's unlikely to help us
-here.
-
-Thanks,
-Mark.
+>> -----Original Message-----
+>> From: Nipun Gupta
+>> Sent: Sunday, December 18, 2016 2:37
+>> To: Robin Murphy <robin.murphy@arm.com>; iommu at lists.linux-
+>> foundation.org; devicetree at vger.kernel.org; linux-arm-
+>> kernel at lists.infradead.org
+>> Cc: mark.rutland at arm.com; will.deacon at arm.com; Stuart Yoder
+>> <stuart.yoder@nxp.com>
+>> Subject: RE: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
+>>
+>>
+>>
+>>> -----Original Message-----
+>>> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+>>> bounces at lists.linux-foundation.org] On Behalf Of Robin Murphy
+>>> Sent: Friday, December 16, 2016 18:49
+>>> To: iommu at lists.linux-foundation.org; devicetree at vger.kernel.org; linux-
+>> arm-
+>>> kernel at lists.infradead.org
+>>> Cc: mark.rutland at arm.com; will.deacon at arm.com; Stuart Yoder
+>>> <stuart.yoder@nxp.com>
+>>> Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
+>>>
+>>> The current SMR masking support using a 2-cell iommu-specifier is
+>>> primarily intended to handle individual masters with large and/or
+>>> complex Stream ID assignments; it quickly gets a bit clunky in other SMR
+>>> use-cases where we just want to consistently mask out the same part of
+>>> every Stream ID (e.g. for MMU-500 configurations where the appended TBU
+>>> number gets in the way unnecessarily). Let's add a new property to allow
+>>> a single global mask value to better fit the latter situation.
+>>>
+>>> CC: Stuart Yoder <stuart.yoder@nxp.com>
+>>
+>> Tested-by: Nipun Gupta <nipun.gupta@nxp.com>
+>>
+>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>>> ---
+>>>
+>>> Compile-tested only...
+>>>
+>>>  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 8 ++++++++
+>>>  drivers/iommu/arm-smmu.c                             | 4 +++-
+>>>  2 files changed, 11 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>>> b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>>> index e862d1485205..98f5cbe5fdb4 100644
+>>> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>>> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+>>> @@ -60,6 +60,14 @@ conditions.
+>>>                    aliases of secure registers have to be used during
+>>>                    SMMU configuration.
+>>>
+>>> +- stream-match-mask : Specifies a fixed SMR mask value to combine with
+>>> +                  the Stream ID value from every iommu-specifier. This
+>>> +                  may be used instead of an "#iommu-cells" value of 2
+>>> +                  when there is no need for per-master SMR masks, but
+>>> +                  it is still desired to mask some portion of every
+>>> +                  Stream ID (e.g. for certain MMU-500 configurations
+>>> +                  given globally unique external IDs).
+>>> +
+>>>  ** Deprecated properties:
+>>>
+>>>  - mmu-masters (deprecated in favour of the generic "iommus" binding) :
+>>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>>> index 8f7281444551..f1abcb7dde36 100644
+>>> --- a/drivers/iommu/arm-smmu.c
+>>> +++ b/drivers/iommu/arm-smmu.c
+>>> @@ -1534,13 +1534,15 @@ static int arm_smmu_domain_set_attr(struct
+>>> iommu_domain *domain,
+>>>
+>>>  static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args
+>> *args)
+>>>  {
+>>> -	u32 fwid = 0;
+>>> +	u32 mask, fwid = 0;
+>>>
+>>>  	if (args->args_count > 0)
+>>>  		fwid |= (u16)args->args[0];
+>>>
+>>>  	if (args->args_count > 1)
+>>>  		fwid |= (u16)args->args[1] << SMR_MASK_SHIFT;
+>>> +	else if (!of_property_read_u32(args->np, "stream-match-mask",
+>>> &mask))
+>>> +		fwid |= (u16)mask << SMR_MASK_SHIFT;
+>>>
+>>>  	return iommu_fwspec_add_ids(dev, &fwid, 1);
+>>>  }
+>>> --
+>>> 2.10.2.dirty
+>>>
+>>> _______________________________________________
+>>> iommu mailing list
+>>> iommu at lists.linux-foundation.org
+>>> https://lists.linuxfoundation.org/mailman/listinfo/iommu
