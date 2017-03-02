@@ -1,335 +1,196 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  2 Mar 2017 16:40:05 +0100
-Subject: [PATCH 09/11] ARM64: dts: meson-gx: Add support for HDMI output
+Date: Thu,  2 Mar 2017 16:39:59 +0100
+Subject: [PATCH 03/11] drm/meson: Add support for components
 In-Reply-To: <1488469207-523-1-git-send-email-narmstrong@baylibre.com>
 References: <1488469207-523-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1488469207-523-10-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1488469207-523-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add HDMI output and connector nodes.
+This patch adds support for optional components connected through the
+Device Tree endpoints scheme.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 39 ++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi          | 32 ++++++++++++++++++
- .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 23 +++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   | 23 +++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 12 +++++++
- .../boot/dts/amlogic/meson-gxl-nexbox-a95x.dts     | 23 +++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 13 ++++++++
- .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts | 23 +++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxm.dtsi         |  4 +++
- 9 files changed, 192 insertions(+)
+ drivers/gpu/drm/meson/meson_drv.c | 113 +++++++++++++++++++++++++++++++++-----
+ 1 file changed, 99 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-index 7a078be..a84e276 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-@@ -98,6 +98,27 @@
- 		clocks = <&wifi32k>;
- 		clock-names = "ext_clock";
- 	};
-+
-+	cvbs-connector {
-+		compatible = "composite-video-connector";
-+
-+		port {
-+			cvbs_connector_in: endpoint {
-+				remote-endpoint = <&cvbs_vdac_out>;
-+			};
-+		};
-+	};
-+
-+	hdmi-connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_connector_in: endpoint {
-+				remote-endpoint = <&hdmi_tx_tmds_out>;
-+			};
-+		};
-+	};
+diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+index 8d17d0e..f381088 100644
+--- a/drivers/gpu/drm/meson/meson_drv.c
++++ b/drivers/gpu/drm/meson/meson_drv.c
+@@ -24,6 +24,7 @@
+ #include <linux/module.h>
+ #include <linux/mutex.h>
+ #include <linux/platform_device.h>
++#include <linux/component.h>
+ #include <linux/of_graph.h>
+ 
+ #include <drm/drmP.h>
+@@ -162,9 +163,9 @@ static bool meson_vpu_has_available_connectors(struct device *dev)
+ 	.max_register   = 0x1000,
  };
  
- /* This UART is brought out to the DB9 connector */
-@@ -188,3 +209,21 @@
- &ethmac {
- 	status = "okay";
- };
-+
-+&cvbs_vdac_port {
-+	cvbs_vdac_out: endpoint {
-+		remote-endpoint = <&cvbs_connector_in>;
-+	};
-+};
-+
-+&hdmi_tx {
-+	status = "okay";
-+	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&hdmi_tx_tmds_port {
-+	hdmi_tx_tmds_out: endpoint {
-+		remote-endpoint = <&hdmi_connector_in>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index fc03f0e..ef0b17c 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -397,6 +397,38 @@
- 			cvbs_vdac_port: port at 0 {
- 				reg = <0>;
- 			};
-+
-+			/* HDMI-TX output port */
-+			hdmi_tx_port: port at 1 {
-+				reg = <1>;
-+
-+				hdmi_tx_out: endpoint {
-+					remote-endpoint = <&hdmi_tx_in>;
-+				};
-+			};
-+		};
-+
-+		hdmi_tx: hdmi-tx at c883a000 {
-+			compatible = "amlogic,meson-gx-dw-hdmi";
-+			reg = <0x0 0xc883a000 0x0 0x1c>;
-+			interrupts = <GIC_SPI 57 IRQ_TYPE_EDGE_RISING>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+
-+			/* VPU VENC Input */
-+			hdmi_tx_venc_port: port at 0 {
-+				reg = <0>;
-+
-+				hdmi_tx_in: endpoint {
-+					remote-endpoint = <&hdmi_tx_out>;
-+				};
-+			};
-+
-+			/* TMDS Output */
-+			hdmi_tx_tmds_port: port at 1 {
-+				reg = <1>;
-+			};
- 		};
- 	};
- };
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-index 4cbd626..a2c999f 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
-@@ -152,6 +152,17 @@
- 			};
- 		};
- 	};
-+
-+	hdmi-connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_connector_in: endpoint {
-+				remote-endpoint = <&hdmi_tx_tmds_out>;
-+			};
-+		};
-+	};
- };
+-static int meson_drv_probe(struct platform_device *pdev)
++static int meson_drv_bind(struct device *dev)
+ {
+-	struct device *dev = &pdev->dev;
++	struct platform_device *pdev = to_platform_device(dev);
+ 	struct meson_drm *priv;
+ 	struct drm_device *drm;
+ 	struct resource *res;
+@@ -227,6 +228,15 @@ static int meson_drv_probe(struct platform_device *pdev)
  
- &uart_AO {
-@@ -245,3 +256,15 @@
- 		remote-endpoint = <&cvbs_connector_in>;
- 	};
- };
+ 	drm_vblank_init(drm, 1);
+ 	drm_mode_config_init(drm);
++	drm->mode_config.max_width = 3840;
++	drm->mode_config.max_height = 2160;
++	drm->mode_config.funcs = &meson_mode_config_funcs;
 +
-+&hdmi_tx {
-+	status = "okay";
-+	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
-+	pinctrl-names = "default";
-+};
++	/* Hardware Initialization */
 +
-+&hdmi_tx_tmds_port {
-+	hdmi_tx_tmds_out: endpoint {
-+		remote-endpoint = <&hdmi_connector_in>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-index 4a96e0f..1c96fc8 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-@@ -135,6 +135,17 @@
- 			};
- 		};
- 	};
-+
-+	hdmi-connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_connector_in: endpoint {
-+				remote-endpoint = <&hdmi_tx_tmds_out>;
-+			};
-+		};
-+	};
- };
++	meson_venc_init(priv);
++	meson_vpp_init(priv);
++	meson_viu_init(priv);
  
- /* This UART is brought out to the DB9 connector */
-@@ -250,3 +261,15 @@
- 		remote-endpoint = <&cvbs_connector_in>;
- 	};
- };
-+
-+&hdmi_tx {
-+	status = "okay";
-+	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&hdmi_tx_tmds_port {
-+	hdmi_tx_tmds_out: endpoint {
-+		remote-endpoint = <&hdmi_connector_in>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 16686f2..46530cd 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -524,3 +524,15 @@
- &vpu {
- 	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
- };
-+
-+&hdmi_tx {
-+	compatible = "amlogic,meson-gxbb-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
-+	resets = <&reset RESET_HDMITX_CAPB3>,
-+		 <&reset RESET_HDMI_SYSTEM_RESET>,
-+		 <&reset RESET_HDMI_TX>;
-+	reset-names = "hdmitx_apb", "hdmitx", "hdmitx_phy";
-+	clocks = <&clkc CLKID_HDMI_PCLK>,
-+		 <&clkc CLKID_CLK81>,
-+		 <&clkc CLKID_GCLK_VENCI_INT0>;
-+	clock-names = "isfr", "iahb", "venci";
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
-index cea4a3e..8873c05 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
-@@ -127,6 +127,17 @@
- 			};
- 		};
- 	};
-+
-+	hdmi-connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_connector_in: endpoint {
-+				remote-endpoint = <&hdmi_tx_tmds_out>;
-+			};
-+		};
-+	};
- };
+ 	/* Encoder Initialization */
  
- &uart_AO {
-@@ -219,3 +230,15 @@
- 		remote-endpoint = <&cvbs_connector_in>;
- 	};
- };
-+
-+&hdmi_tx {
-+	status = "okay";
-+	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&hdmi_tx_tmds_port {
-+	hdmi_tx_tmds_out: endpoint {
-+		remote-endpoint = <&hdmi_connector_in>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index 17dbcf6..bf26974 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -44,6 +44,7 @@
- #include "meson-gx.dtsi"
- #include <dt-bindings/clock/gxbb-clkc.h>
- #include <dt-bindings/gpio/meson-gxl-gpio.h>
-+#include <dt-bindings/reset/amlogic,meson-gxbb-reset.h>
+@@ -234,11 +244,11 @@ static int meson_drv_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto free_drm;
  
- / {
- 	compatible = "amlogic,meson-gxl";
-@@ -317,3 +318,15 @@
- &vpu {
- 	compatible = "amlogic,meson-gxl-vpu", "amlogic,meson-gx-vpu";
- };
-+
-+&hdmi_tx {
-+	compatible = "amlogic,meson-gxl-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
-+	resets = <&reset RESET_HDMITX_CAPB3>,
-+		 <&reset RESET_HDMI_SYSTEM_RESET>,
-+		 <&reset RESET_HDMI_TX>;
-+	reset-names = "hdmitx_apb", "hdmitx", "hdmitx_phy";
-+	clocks = <&clkc CLKID_HDMI_PCLK>,
-+		 <&clkc CLKID_CLK81>,
-+		 <&clkc CLKID_GCLK_VENCI_INT0>;
-+	clock-names = "isfr", "iahb", "venci";
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-index 5a337d3..0e68c62e 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
-@@ -100,6 +100,17 @@
- 			};
- 		};
- 	};
-+
-+	hdmi-connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_connector_in: endpoint {
-+				remote-endpoint = <&hdmi_tx_tmds_out>;
-+			};
-+		};
-+	};
- };
+-	/* Hardware Initialization */
+-
+-	meson_venc_init(priv);
+-	meson_vpp_init(priv);
+-	meson_viu_init(priv);
++	ret = component_bind_all(drm->dev, drm);
++	if (ret) {
++		dev_err(drm->dev, "Couldn't bind all components\n");
++		goto free_drm;
++	}
  
- /* This UART is brought out to the DB9 connector */
-@@ -183,3 +194,15 @@
- 		remote-endpoint = <&cvbs_connector_in>;
- 	};
- };
-+
-+&hdmi_tx {
-+	status = "okay";
-+	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
-+	pinctrl-names = "default";
+ 	ret = meson_plane_create(priv);
+ 	if (ret)
+@@ -253,9 +263,6 @@ static int meson_drv_probe(struct platform_device *pdev)
+ 		goto free_drm;
+ 
+ 	drm_mode_config_reset(drm);
+-	drm->mode_config.max_width = 8192;
+-	drm->mode_config.max_height = 8192;
+-	drm->mode_config.funcs = &meson_mode_config_funcs;
+ 
+ 	priv->fbdev = drm_fbdev_cma_init(drm, 32,
+ 					 drm->mode_config.num_connector);
+@@ -280,9 +287,9 @@ static int meson_drv_probe(struct platform_device *pdev)
+ 	return ret;
+ }
+ 
+-static int meson_drv_remove(struct platform_device *pdev)
++static void meson_drv_unbind(struct device *dev)
+ {
+-	struct drm_device *drm = dev_get_drvdata(&pdev->dev);
++	struct drm_device *drm = dev_get_drvdata(dev);
+ 	struct meson_drm *priv = drm->dev_private;
+ 
+ 	drm_dev_unregister(drm);
+@@ -292,9 +299,88 @@ static int meson_drv_remove(struct platform_device *pdev)
+ 	drm_vblank_cleanup(drm);
+ 	drm_dev_unref(drm);
+ 
+-	return 0;
+ }
+ 
++static const struct component_master_ops meson_drv_master_ops = {
++	.bind	= meson_drv_bind,
++	.unbind	= meson_drv_unbind,
 +};
 +
-+&hdmi_tx_tmds_port {
-+	hdmi_tx_tmds_out: endpoint {
-+		remote-endpoint = <&hdmi_connector_in>;
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
-index eb2f0c3..ac0fc02 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxm.dtsi
-@@ -116,3 +116,7 @@
- &vpu {
- 	compatible = "amlogic,meson-gxm-vpu", "amlogic,meson-gx-vpu";
- };
++static int compare_of(struct device *dev, void *data)
++{
++	DRM_DEBUG_DRIVER("Comparing of node %s with %s\n",
++			 of_node_full_name(dev->of_node),
++			 of_node_full_name(data));
 +
-+&hdmi_tx {
-+	compatible = "amlogic,meson-gxm-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
++	return dev->of_node == data;
++}
++
++/* Possible connectors nodes to ignore */
++static const struct of_device_id connectors_match[] = {
++	{ .compatible = "composite-video-connector" },
++	{ .compatible = "svideo-connector" },
++	{ .compatible = "hdmi-connector" },
++	{ .compatible = "dvi-connector" },
++	{}
 +};
++
++static int meson_probe_remote(struct platform_device *pdev,
++			      struct component_match **match,
++			      struct device_node *parent,
++			      struct device_node *remote)
++{
++	struct device_node *ep, *remote_node;
++	int count = 1;
++
++	/* If node is a connector, return and do not add to match table */
++	if (of_match_node(connectors_match, remote))
++		return 1;
++
++	component_match_add(&pdev->dev, match, compare_of, remote);
++
++	for_each_endpoint_of_node(remote, ep) {
++		remote_node = of_graph_get_remote_port_parent(ep);
++		if (!remote_node ||
++		    remote_node == parent || /* Ignore parent endpoint */
++		    !of_device_is_available(remote_node))
++			continue;
++
++		count += meson_probe_remote(pdev, match, remote, remote_node);
++
++		of_node_put(remote_node);
++	}
++
++	return count;
++}
++
++static int meson_drv_probe(struct platform_device *pdev)
++{
++	struct component_match *match = NULL;
++	struct device_node *np = pdev->dev.of_node;
++	struct device_node *ep, *remote;
++	int count = 0;
++
++	for_each_endpoint_of_node(np, ep) {
++		remote = of_graph_get_remote_port_parent(ep);
++		if (!remote || !of_device_is_available(remote))
++			continue;
++
++		count += meson_probe_remote(pdev, &match, np, remote);
++	}
++
++	/* If some endpoints were found, initialize the nodes */
++	if (count) {
++		dev_info(&pdev->dev, "Queued %d outputs on vpu\n", count);
++
++		return component_master_add_with_match(&pdev->dev,
++						       &meson_drv_master_ops,
++						       match);
++	}
++
++	/* If no output endpoints were available, simply bail out */
++	return 0;
++};
++
+ static const struct of_device_id dt_match[] = {
+ 	{ .compatible = "amlogic,meson-gxbb-vpu" },
+ 	{ .compatible = "amlogic,meson-gxl-vpu" },
+@@ -305,7 +391,6 @@ static int meson_drv_remove(struct platform_device *pdev)
+ 
+ static struct platform_driver meson_drm_platform_driver = {
+ 	.probe      = meson_drv_probe,
+-	.remove     = meson_drv_remove,
+ 	.driver     = {
+ 		.name	= "meson-drm",
+ 		.of_match_table = dt_match,
 -- 
 1.9.1
