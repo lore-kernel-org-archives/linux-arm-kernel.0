@@ -1,63 +1,31 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Thu, 2 Mar 2017 11:24:23 -0800
-Subject: [PATCH] module: set __jump_table alignment to 8
-In-Reply-To: <20170302182625.GB13268@packer-debian-8-amd64.digitalocean.com>
-References: <20170301220453.4756-1-david.daney@cavium.com>
- <20170302131119.6f52203f@gandalf.local.home>
- <20170302182625.GB13268@packer-debian-8-amd64.digitalocean.com>
-Message-ID: <f38431ab-ad33-ac14-03b5-7cb4a172be64@caviumnetworks.com>
+From: post@lespocky.de (Alexander Dahl)
+Date: Thu, 2 Mar 2017 20:29:59 +0100
+Subject: [PATCH 3/4] watchodg: sama5d4: simplify probe
+In-Reply-To: <20170302173114.28508-4-alexandre.belloni@free-electrons.com>
+References: <20170302173114.28508-1-alexandre.belloni@free-electrons.com>
+ <20170302173114.28508-4-alexandre.belloni@free-electrons.com>
+Message-ID: <20170302192956.GR17911@falbala.home.lespocky.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2017 10:26 AM, Jessica Yu wrote:
-> +++ Steven Rostedt [02/03/17 13:11 -0500]:
->>
->> Can I get an Ack from a module maintainer?
->
-> Acked-by: Jessica Yu <jeyu@redhat.com>
->
-> Thanks!
->
-> Jessica
+Hei hei,
 
-Thanks Jessica,
+there's a typo in the subject you may want to fix in a v2:
 
-Can you also add scripts/module-common.lds to MAINTAINERS so that 
-get_maintainers.pl will indicate that Jessica Yu and Rusty Russell be 
-CCed on things like this in the future?
+watchodg ? watchdog
 
+Greets
+Alex
 
->
->> On Wed,  1 Mar 2017 14:04:53 -0800
->> David Daney <david.daney@cavium.com> wrote:
->>
->>> For powerpc the __jump_table section in modules is not aligned, this
->>> causes a WARN_ON() splat when loading a module containing a
->>> __jump_table.
->>>
->>> Strict alignment became necessary with commit 3821fd35b58d
->>> ("jump_label: Reduce the size of struct static_key"), currently in
->>> linux-next, which uses the two least significant bits of pointers to
->>> __jump_table elements.
->>>
->>> Fix by forcing __jump_table to 8, which is the same alignment used for
->>> this section in the kernel proper.
->>>
->>> Signed-off-by: David Daney <david.daney@cavium.com>
->>> Tested-by: Sachin Sant <sachinp@linux.vnet.ibm.com>
->>> ---
->>>  scripts/module-common.lds | 2 ++
->>>  1 file changed, 2 insertions(+)
->>>
->>> diff --git a/scripts/module-common.lds b/scripts/module-common.lds
->>> index 73a2c7d..53234e8 100644
->>> --- a/scripts/module-common.lds
->>> +++ b/scripts/module-common.lds
->>> @@ -19,4 +19,6 @@ SECTIONS {
->>>
->>>      . = ALIGN(8);
->>>      .init_array        0 : { *(SORT(.init_array.*)) *(.init_array) }
->>> +
->>> +    __jump_table        0 : ALIGN(8) { KEEP(*(__jump_table)) }
->>>  }
->>
+-- 
+?With the first link, the chain is forged. The first speech censured, 
+the first thought forbidden, the first freedom denied, chains us all 
+irrevocably.? (Jean-Luc Picard, quoting Judge Aaron Satie)
+*** GnuPG-FP: C28E E6B9 0263 95CF 8FAF  08FA 34AD CD00 7221 5CC6 ***
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170302/5b9646e1/attachment.sig>
