@@ -1,138 +1,30 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu,  2 Mar 2017 16:40:06 +0100
-Subject: [PATCH 10/11] dt-bindings: Add bindings for the Amlogic Meson dw-hdmi
- extension
+Date: Thu,  2 Mar 2017 16:40:07 +0100
+Subject: [PATCH 11/11] MAINTAINERS: update files for Amlogic DRM Driver
 In-Reply-To: <1488469207-523-1-git-send-email-narmstrong@baylibre.com>
 References: <1488469207-523-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1488469207-523-11-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1488469207-523-12-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This binding describes the Amlogic Meson specific extension to the
-Synopsys Designware HDMI Controller.
+This patch adds the dw-hdmi bindings to maintained files.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../bindings/display/amlogic,meson-dw-hdmi.txt     | 111 +++++++++++++++++++++
- 1 file changed, 111 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
-new file mode 100644
-index 0000000..7f040ed
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
-@@ -0,0 +1,111 @@
-+Amlogic specific extensions to the Synopsys Designware HDMI Controller
-+======================================================================
-+
-+The Amlogic Meson Synopsys Designware Integration is composed of :
-+- A Synopsys DesignWare HDMI Controller IP
-+- A TOP control block controlling the Clocks and PHY
-+- A custom HDMI PHY in order to convert video to TMDS signal
-+ ___________________________________
-+|            HDMI TOP               |<= HPD
-+|___________________________________|
-+|                  |                |
-+|  Synopsys HDMI   |   HDMI PHY     |=> TMDS
-+|    Controller    |________________|
-+|___________________________________|<=> DDC
-+
-+The HDMI TOP block only supports HPD sensing.
-+The Synopsys HDMI Controller interrupt is routed through the
-+TOP Block interrupt.
-+Communication to the TOP Block and the Synopsys HDMI Controller is done
-+via a pair of dedicated addr+read/write registers.
-+The HDMI PHY is configured by registers in the HHI register block.
-+
-+Pixel data arrives in 4:4:4 format from the VENC block and the VPU HDMI mux
-+selects either the ENCI encoder for the 576i or 480i formats or the ENCP
-+encoder for all the other formats including interlaced HD formats.
-+
-+The VENC uses a DVI encoder on top of the ENCI or ENCP encoders to generate
-+DVI timings for the HDMI controller.
-+
-+Amlogic Meson GXBB, GXL and GXM SoCs families embeds the Synopsys DesignWare
-+HDMI TX IP version 2.01a with HDCP and I2C & S/PDIF
-+audio source interfaces.
-+
-+Required properties:
-+- compatible: value should be different for each SoC family as :
-+	- GXBB (S905) : "amlogic,meson-gxbb-dw-hdmi"
-+	- GXL (S905X, S905D) : "amlogic,meson-gxl-dw-hdmi"
-+	- GXM (S912) : "amlogic,meson-gxm-dw-hdmi"
-+	followed by the common "amlogic,meson-gx-dw-hdmi"
-+- reg: Physical base address and length of the controller's registers.
-+- interrupts: The HDMI interrupt number
-+- clocks, clock-names : must have the phandles to the HDMI iahb and isfr clocks,
-+  and the Amlogic Meson venci clocks as described in
-+  Documentation/devicetree/bindings/clock/clock-bindings.txt,
-+  the clocks are soc specific, the clock-names should be "iahb", "isfr", "venci"
-+- resets, resets-names: must have the phandles to the HDMI apb, glue and phy
-+  resets as described in :
-+  Documentation/devicetree/bindings/reset/reset.txt,
-+  the reset-names should be "hdmitx_apb", "hdmitx", "hdmitx_phy"
-+
-+Required nodes:
-+
-+The connections to the HDMI ports are modeled using the OF graph
-+bindings specified in Documentation/devicetree/bindings/graph.txt.
-+
-+The following table lists for each supported model the port number
-+corresponding to each HDMI output and input.
-+
-+		Port 0		Port 1
-+-----------------------------------------
-+ S905 (GXBB)	VENC Input	TMDS Output
-+ S905X (GXL)	VENC Input	TMDS Output
-+ S905D (GXL)	VENC Input	TMDS Output
-+ S912 (GXM)	VENC Input	TMDS Output
-+
-+Example:
-+
-+hdmi-connector {
-+	compatible = "hdmi-connector";
-+	type = "a";
-+
-+	port {
-+		hdmi_connector_in: endpoint {
-+			remote-endpoint = <&hdmi_tx_tmds_out>;
-+		};
-+	};
-+};
-+
-+hdmi_tx: hdmi-tx at c883a000 {
-+	compatible = "amlogic,meson-gxbb-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
-+	reg = <0x0 0xc883a000 0x0 0x1c>;
-+	interrupts = <GIC_SPI 57 IRQ_TYPE_EDGE_RISING>;
-+	resets = <&reset RESET_HDMITX_CAPB3>,
-+		 <&reset RESET_HDMI_SYSTEM_RESET>,
-+		 <&reset RESET_HDMI_TX>;
-+	reset-names = "hdmitx_apb", "hdmitx", "hdmitx_phy";
-+	clocks = <&clkc CLKID_HDMI_PCLK>,
-+		 <&clkc CLKID_CLK81>,
-+		 <&clkc CLKID_GCLK_VENCI_INT0>;
-+	clock-names = "isfr", "iahb", "venci";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	/* VPU VENC Input */
-+	hdmi_tx_venc_port: port at 0 {
-+		reg = <0>;
-+
-+		hdmi_tx_in: endpoint {
-+			remote-endpoint = <&hdmi_tx_out>;
-+		};
-+	};
-+
-+	/* TMDS Output */
-+	hdmi_tx_tmds_port: port at 1 {
-+		reg = <1>;
-+
-+		hdmi_tx_tmds_out: endpoint {
-+			remote-endpoint = <&hdmi_connector_in>;
-+		};
-+	};
-+};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 8d302c0..3869d7b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -4255,6 +4255,7 @@ W:	http://linux-meson.com/
+ S:	Supported
+ F:	drivers/gpu/drm/meson/
+ F:	Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
++F:	Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+ 
+ DRM DRIVERS FOR EXYNOS
+ M:	Inki Dae <inki.dae@samsung.com>
 -- 
 1.9.1
