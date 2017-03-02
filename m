@@ -1,51 +1,63 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Thu, 2 Mar 2017 14:24:06 -0500
-Subject: [PATCH 07/20] PCI: implement Devres interface to map PCI config
- space
-In-Reply-To: <CAHp75VfoZTr5L3z5_SXW58W2Ate5nCWSzP8hAA051fVwizSjag@mail.gmail.com>
-References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
- <20170227151436.18698-8-lorenzo.pieralisi@arm.com>
- <CAHp75VfdE6_W+DxhejorLxra2JQDGF3cG0uBedyOohhmcLiKLg@mail.gmail.com>
- <20170302120546.GB17277@red-moon>
- <CAHp75VfoZTr5L3z5_SXW58W2Ate5nCWSzP8hAA051fVwizSjag@mail.gmail.com>
-Message-ID: <20170302192406.GA8519@wtj.duckdns.org>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Thu, 2 Mar 2017 11:24:23 -0800
+Subject: [PATCH] module: set __jump_table alignment to 8
+In-Reply-To: <20170302182625.GB13268@packer-debian-8-amd64.digitalocean.com>
+References: <20170301220453.4756-1-david.daney@cavium.com>
+ <20170302131119.6f52203f@gandalf.local.home>
+ <20170302182625.GB13268@packer-debian-8-amd64.digitalocean.com>
+Message-ID: <f38431ab-ad33-ac14-03b5-7cb4a172be64@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, Mar 02, 2017 at 02:50:00PM +0200, Andy Shevchenko wrote:
-> > I thought about that and did not do it because here we are remapping
-> > resources that are _not_ PCI bus resources (ie it is not PCI BARs we
-> > are remapping), keeping the devm_* prefix would be more consistent
-> > to the typical device drivers remapping functions pattern (ie a
-> > typical PCI host controller driver would mix devm_ and pcim_ calls
-> > which is a bit hard to parse), that was my rationale.
-> >
-> > I am not too fussed about that either way, I am happy to update it to
-> > pcim_* though, it is Bjorn/Arnd's decision.
-> 
-> I would vote for pcim_*() variant.
-
-Me too, for brevity.
-
-> >> 2. If you may notice there is no separate pcim_*map*() stuff, they are
-> >> dynamically adapting to the case.
-> >
-> > I do not understand what you mean here I would ask you to elaborate
-> > a bit more please so that I can do something about it.
-> 
-> Oh, sorry, there are two examples currently, i.e.
-> pci_enable_msi()/pci_enable_msix() and pci_request_region*() which has
-> no "m" in the name, but are managed on release by pcim_release().
-> Some developers consider this as a bad idea, but so far no patch has
-> been sent to introduce pcim_*() variants of those.
+On 03/02/2017 10:26 AM, Jessica Yu wrote:
+> +++ Steven Rostedt [02/03/17 13:11 -0500]:
+>>
+>> Can I get an Ack from a module maintainer?
 >
-> So, regarding to your stuff, I would stick with "pcim" prefix.
+> Acked-by: Jessica Yu <jeyu@redhat.com>
+>
+> Thanks!
+>
+> Jessica
 
-Sounds good to me.
+Thanks Jessica,
 
-Thanks.
+Can you also add scripts/module-common.lds to MAINTAINERS so that 
+get_maintainers.pl will indicate that Jessica Yu and Rusty Russell be 
+CCed on things like this in the future?
 
--- 
-tejun
+
+>
+>> On Wed,  1 Mar 2017 14:04:53 -0800
+>> David Daney <david.daney@cavium.com> wrote:
+>>
+>>> For powerpc the __jump_table section in modules is not aligned, this
+>>> causes a WARN_ON() splat when loading a module containing a
+>>> __jump_table.
+>>>
+>>> Strict alignment became necessary with commit 3821fd35b58d
+>>> ("jump_label: Reduce the size of struct static_key"), currently in
+>>> linux-next, which uses the two least significant bits of pointers to
+>>> __jump_table elements.
+>>>
+>>> Fix by forcing __jump_table to 8, which is the same alignment used for
+>>> this section in the kernel proper.
+>>>
+>>> Signed-off-by: David Daney <david.daney@cavium.com>
+>>> Tested-by: Sachin Sant <sachinp@linux.vnet.ibm.com>
+>>> ---
+>>>  scripts/module-common.lds | 2 ++
+>>>  1 file changed, 2 insertions(+)
+>>>
+>>> diff --git a/scripts/module-common.lds b/scripts/module-common.lds
+>>> index 73a2c7d..53234e8 100644
+>>> --- a/scripts/module-common.lds
+>>> +++ b/scripts/module-common.lds
+>>> @@ -19,4 +19,6 @@ SECTIONS {
+>>>
+>>>      . = ALIGN(8);
+>>>      .init_array        0 : { *(SORT(.init_array.*)) *(.init_array) }
+>>> +
+>>> +    __jump_table        0 : ALIGN(8) { KEEP(*(__jump_table)) }
+>>>  }
+>>
