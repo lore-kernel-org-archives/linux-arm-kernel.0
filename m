@@ -1,66 +1,72 @@
-From: Jean-Philippe.Brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu, 2 Mar 2017 10:51:54 +0000
-Subject: [RFC PATCH 04/30] iommu/arm-smmu-v3: Add support for PCI ATS
-In-Reply-To: <5a7822f2-3991-aa51-169f-78ef49567feb@codeaurora.org>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-5-jean-philippe.brucker@arm.com>
- <5a7822f2-3991-aa51-169f-78ef49567feb@codeaurora.org>
-Message-ID: <20170302105153.GB15742@e106794-lin.localdomain>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Thu,  2 Mar 2017 19:03:45 +0800
+Subject: [PATCH 2/2 v2] cpufreq: mediatek: Add support for MT8176 and MT817x
+In-Reply-To: <20170302110345.184924-1-djkurtz@chromium.org>
+References: <20170302110345.184924-1-djkurtz@chromium.org>
+Message-ID: <20170302110345.184924-2-djkurtz@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+The Mediatek MT8173 is just one of several SOCs from the same MT817x family,
+including the 6-core (4-little/2-big) MT8176.
 
-On 01/03/17 19:24, Sinan Kaya wrote:
-> On 2/27/2017 2:54 PM, Jean-Philippe Brucker wrote:
->> /* Initialise command lazily */
->> +		if (!cmd.opcode)
->> +			arm_smmu_atc_invalidate_to_cmd(smmu, iova, size, &cmd);
->> +
->> +		spin_lock(&smmu_group->devices_lock);
->> +
->> +		list_for_each_entry(master, &smmu_group->devices, group_head)
->> +			arm_smmu_atc_invalidate_master(master, &cmd);
->> +
->> +		/*
->> +		 * TODO: ensure we do a sync whenever we have sent ats_queue_depth
->> +		 * invalidations to the same device.
->> +		 */
->> +		arm_smmu_cmdq_issue_cmd(smmu, &sync_cmd);
->> +
-> 
-> It is possible to observe ATS invalidation timeout up to 90 seconds according to PCIe
-> spec. How does the current code deal with this?
-> 
+The mt8173-cpufreq driver supports all of these SOCs, however, machines
+using them may use a different machine compatible.
 
-Currently we give up waiting for sync after 100us (ARM_SMMU_POLL_TIMEOUT_US).
-A successful sync guarantees that all ATC invalidations since last sync
-were successful, so in case of timeout we should resend all of them.
-The delay itself isn't important at the moment, since we don't handle
-invalidaton failure at all. It's fire and forget, and I haven't come up
-with a complete solution yet.
+Since this driver checks explicitly for the machine compatible string, add
+support for the whole family.
 
-The simplest error handling would be to retry invalidation after 90
-seconds if the sync didn't complete. Then after a number of failed
-attempts, maybe try to reset the device. Given that ats_invalidate is
-generally called in irq-safe context, we would be blocking the CPU for
-minutes at a time, which seems unwise. A proper solution would be to
-postpone the unmap and return an error, although unmap errors are
-usually ignored.
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+---
+This patch is based on the compatibles added by the MT8176 series:
 
-To avoid letting anyone remap something at that address until we're sure
-the invalidation succeeded, we would need to repopulate the page tables
-with the stale mapping, and add a delayed work that inspects the status
-of the invalidation and tries again if it failed. If the invalidation
-comes from the IOMMU core, we control the page tables and it should be
-doable. If it comes from mm/ however, it's more complicated. MMU
-notifiers only tell us that the mapping is going away, they don't
-provide us with a way to hold on to them. Until all stale mappings have
-been invalidated, we also need to hold on to the address space.
+ https://patchwork.kernel.org/patch/9573209/
+ https://patchwork.kernel.org/patch/9573213/
 
-I think the problem is complex enough to deserve a series of its own,
-once we confirm that it may happen in hardware and have a rough idea of
-the timeout values encountered.
+v2:
+ - use of_match_node (Thanks, Viresh!)
 
-Thanks,
-Jean-Philippe
+ drivers/cpufreq/mt8173-cpufreq.c | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+index 72bc1192bd30..fd1886faf33a 100644
+--- a/drivers/cpufreq/mt8173-cpufreq.c
++++ b/drivers/cpufreq/mt8173-cpufreq.c
+@@ -573,14 +573,33 @@ static struct platform_driver mt8173_cpufreq_platdrv = {
+ 	.probe		= mt8173_cpufreq_probe,
+ };
+ 
++/* List of machines supported by this driver */
++static const struct of_device_id mt8173_cpufreq_machines[] __initconst = {
++	{ .compatible = "mediatek,mt817x", },
++	{ .compatible = "mediatek,mt8173", },
++	{ .compatible = "mediatek,mt8176", },
++
++	{ }
++};
++
+ static int __init mt8173_cpufreq_driver_init(void)
+ {
++	struct device_node *np;
++	const struct of_device_id *match;
+ 	struct platform_device *pdev;
+ 	int err;
+ 
+-	if (!of_machine_is_compatible("mediatek,mt8173"))
++	np = of_find_node_by_path("/");
++	if (!np)
+ 		return -ENODEV;
+ 
++	match = of_match_node(mt8173_cpufreq_machines, np);
++	of_node_put(np);
++	if (!match) {
++		pr_warn("Machine is not compatible with mt8173-cpufreq\n");
++		return -ENODEV;
++	}
++
+ 	err = platform_driver_register(&mt8173_cpufreq_platdrv);
+ 	if (err)
+ 		return err;
+-- 
+2.12.0.rc1.440.g5b76565f74-goog
