@@ -1,9 +1,9 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Wed,  1 Mar 2017 16:15:01 -0800
-Subject: [PATCHv2 09/14] watchdog: hpwdt: Use set_memory.h header
+Date: Wed,  1 Mar 2017 16:15:03 -0800
+Subject: [PATCHv2 11/14] module: Use set_memory.h header
 In-Reply-To: <1488413706-9739-1-git-send-email-labbott@redhat.com>
 References: <1488413706-9739-1-git-send-email-labbott@redhat.com>
-Message-ID: <1488413706-9739-10-git-send-email-labbott@redhat.com>
+Message-ID: <1488413706-9739-12-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,21 +13,20 @@ explicitly.
 
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
- drivers/watchdog/hpwdt.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ kernel/module.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/watchdog/hpwdt.c b/drivers/watchdog/hpwdt.c
-index 70c7194..67fbe35 100644
---- a/drivers/watchdog/hpwdt.c
-+++ b/drivers/watchdog/hpwdt.c
-@@ -34,7 +34,7 @@
- #include <linux/nmi.h>
- #include <linux/kdebug.h>
- #include <linux/notifier.h>
--#include <asm/cacheflush.h>
+diff --git a/kernel/module.c b/kernel/module.c
+index 7eba6de..c0f04b3 100644
+--- a/kernel/module.c
++++ b/kernel/module.c
+@@ -49,6 +49,7 @@
+ #include <linux/rculist.h>
+ #include <linux/uaccess.h>
+ #include <asm/cacheflush.h>
 +#include <asm/set_memory.h>
- #endif /* CONFIG_HPWDT_NMI_DECODING */
- #include <asm/nmi.h>
- #include <asm/frame.h>
+ #include <asm/mmu_context.h>
+ #include <linux/license.h>
+ #include <asm/sections.h>
 -- 
 2.7.4
