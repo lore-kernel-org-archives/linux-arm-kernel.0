@@ -1,61 +1,44 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Thu, 2 Mar 2017 14:22:06 +0800
-Subject: [PATCH V3 0/4] Add Spreadtrum SP9860G support
-Message-ID: <1488435730-6711-1-git-send-email-chunyan.zhang@spreadtrum.com>
+Date: Thu, 2 Mar 2017 14:22:08 +0800
+Subject: [PATCH V3 2/4] dt-bindings: arm: Add bindings for SP9860G
+In-Reply-To: <1488435730-6711-1-git-send-email-chunyan.zhang@spreadtrum.com>
+References: <1488435730-6711-1-git-send-email-chunyan.zhang@spreadtrum.com>
+Message-ID: <1488435730-6711-3-git-send-email-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SC9860 is a Spreadtrum SoC with eight Cortex A53, which are divided
-into 4 Big cores and 4 little cores.
+Added support for Spreadtrum SP9860G board and SC9860 SoC.
+This patch also revised bindings of SC9836 to make the format
+more clear.
 
-This patch-set provides a basic configuration for SC9860 in device tree
-to make it run to console.  After this we will continue to submit other
-device drivers step by step, which are using on most of Spreadtrum's SoCs.
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+---
+ Documentation/devicetree/bindings/arm/sprd.txt | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
 
-Changes from v2:
-* Addressed comments from Mathieu
-  - Removed CoreSight devices' lables from DT;
-  - Added another level of imbrication for ETFs which have more than one port;
-* Addressed comments from Rob
-  - Switched to use SPDX-License-Identifier tag instead;
-  - Moved the 26m fixed clock node to top level in DT;
-  - Splited the patch into two, since they were revising two dt-bindings;
-  - Removed redundant space from sprd-usrt.txt;
-  - Removed useless property from the sprd_uart example of DT configuration.
-
-Changes from v1:
-* Removed useless idle-state node 'deep_sleep' from DT
-* Removed useless property 'sc-id' from DT
-* Removed 'clock-frequency' property from the node 'timer'
-* Added another compatible string '"arm,cortex-a53-pmu"' and property
-  'interrupt-affinity' for pmu
-* Kept using the existed compatible string of sprd_serial driver, and added
-  a new one for sc9860 in DT.
-
-Thanks,
-Chunyan
-
-Chunyan Zhang (2):
-  dt-bindings: arm: Add bindings for SP9860G
-  dt-bindings: serial: add a new compatible string for SC9860
-
-Orson Zhai (1):
-  arm64: dts: Add basic DT to support Spreadtrum's SP9860G
-
-Wei Qiao (1):
-  serial: sprd: adjust TIMEOUT to a big value
-
- Documentation/devicetree/bindings/arm/sprd.txt     |  13 +-
- .../devicetree/bindings/serial/sprd-uart.txt       |  15 +-
- arch/arm64/boot/dts/sprd/Makefile                  |   3 +-
- arch/arm64/boot/dts/sprd/sc9860.dtsi               | 545 +++++++++++++++++++++
- arch/arm64/boot/dts/sprd/sp9860g-1h10.dts          |  56 +++
- arch/arm64/boot/dts/sprd/whale2.dtsi               |  71 +++
- drivers/tty/serial/sprd_serial.c                   |   2 +-
- 7 files changed, 697 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm64/boot/dts/sprd/sc9860.dtsi
- create mode 100644 arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
- create mode 100644 arch/arm64/boot/dts/sprd/whale2.dtsi
-
+diff --git a/Documentation/devicetree/bindings/arm/sprd.txt b/Documentation/devicetree/bindings/arm/sprd.txt
+index 31a629d..3df034b 100644
+--- a/Documentation/devicetree/bindings/arm/sprd.txt
++++ b/Documentation/devicetree/bindings/arm/sprd.txt
+@@ -1,11 +1,14 @@
+ Spreadtrum SoC Platforms Device Tree Bindings
+ ----------------------------------------------------
+ 
+-Sharkl64 is a Spreadtrum's SoC Platform which is based
+-on ARM 64-bit processor.
++SC9836 openphone Board
++Required root node properties:
++	- compatible = "sprd,sc9836-openphone", "sprd,sc9836";
+ 
+-SC9836 openphone board with SC9836 SoC based on the
+-Sharkl64 Platform shall have the following properties.
++SC9860 SoC
++Required root node properties:
++	- compatible = "sprd,sc9860"
+ 
++SP9860G 3GFHD Board
+ Required root node properties:
+-        - compatible = "sprd,sc9836-openphone", "sprd,sc9836";
++	- compatible = "sprd,sp9860g-1h10", "sprd,sc9860";
 -- 
 2.7.4
