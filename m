@@ -1,55 +1,114 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 2 Mar 2017 13:43:09 +0100
-Subject: [PATCH] arm64: restore get_current() optimisation
-In-Reply-To: <20170302124008.GE19632@leverpostej>
-References: <1483468021-8237-1-git-send-email-mark.rutland@arm.com>
- <8928ec99-5f5b-905b-5922-81a009f18999@suse.de>
- <20170302124008.GE19632@leverpostej>
-Message-ID: <3deb3450-f02d-68d1-826f-80028091e078@suse.de>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 2 Mar 2017 13:47:26 +0100
+Subject: [PATCH v2 3/3] ARM64: dts: meson-gx: Add MALI nodes for GXBB and
+ GXL
+In-Reply-To: <e26cf584-dab2-2702-f7e6-b28f750fa00c@suse.de>
+References: <1488365164-22861-1-git-send-email-narmstrong@baylibre.com>
+ <1488365164-22861-4-git-send-email-narmstrong@baylibre.com>
+ <e26cf584-dab2-2702-f7e6-b28f750fa00c@suse.de>
+Message-ID: <e80d9fb0-1d71-7cab-5e32-72316474fdfc@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 02.03.2017 um 13:40 schrieb Mark Rutland:
-> On Thu, Mar 02, 2017 at 12:54:24PM +0100, Andreas F?rber wrote:
->> Hi Mark,
->>
->> Am 03.01.2017 um 19:27 schrieb Mark Rutland:
->>> Commit c02433dd6de32f04 ("arm64: split thread_info from task stack")
->>> inverted the relationship between get_current() and
->>> current_thread_info(), with sp_el0 now holding the current task_struct
->>> rather than the current thead_info. The new implementation of
->>
->> "thread_info"?
+Hi Andreas,
+On 03/02/2017 01:31 PM, Andreas F?rber wrote:
+> Hi Neil,
 > 
-> struct thread_info, as returned by current_thread_info().
-
-I was pointing out the missing R. :)
-
->>> get_current() prevents the compiler from being able to optimize repeated
->>> calls to either, resulting in a noticeable penalty in some
->>> microbenchmarks.
->>>
->>> This patch restores the previous optimisation by implementing
->>> get_current() in the same way as our old current_thread_info(), using a
->>> non-volatile asm statement.
->>>
->>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Reported-by: Davidlohr Bueso <dbueso@suse.de>
->>
->> Should this get a Fixes: c02433dd6de32f04 ("arm64: split thread_info
->> from task stack") header?
+> Am 01.03.2017 um 11:46 schrieb Neil Armstrong:
+>> The same MALI-450 MP3 GPU is present in the GXBB and GXL SoCs.
 > 
-> Both c02433dd6de32f04 and this patch are already in mainline.
+> First of all, any reason you're upper-casing Mali in the commit message?
+> ARM doesn't.
 
-Sorry, this thread was at top of LAKML and it had one Acked-by but no
-reply saying someone merged it.
+No reason, only a type, indeed it was lower-casing on the v1.
+Will fix in v2.
 
-Cheers,
-Andreas
+> 
+>>
+>> The node is simply added in the meson-gxbb.dtsi file.
+> 
+> The GXBB part looks fine on a quick look.
+> 
+>>
+>> For GXL, since a lot is shared with the GXM that has a MALI-T820 IP, this
+>> patch adds a new meson-gxl-mali.dtsi and is included in the SoC specific
+>> dtsi files.
+> 
+> This part is slightly confusing though.
+> 
+> What exactly is the GXL vs. GXM difference that this can't be handled by
+> overriding node properties compatible/interrupts/clocks? I am missing a
+> GXM patch in this series as rationale for doing it this way.
+> 
+> In particular I am wondering whether the whole GXM-inherits-from-GXL
+> concept is flawed and should be adjusted if this leads to secondary
+> .dtsi files like this: My proposal would be to instead create a
+> meson-gxl-gxm.dtsi, that meson-gxl.dtsi and meson-gxm.dtsi can inherit
+> the current common parts from, then the Mali bits can simply go into
+> meson-gxl.dtsi without extra #includes needed in S905X and S905D. While
+> it's slightly more work to split once again, I think it would be cleaner.
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+The GXL and GXM differences are very small :
+ - They share the same clock tree
+ - They share the same pinctrl and even the same pinout (S905D and S912 are pin-to-pin compatible)
+ - They share all the peripherals
+
+The only changes are :
+ - Enhanced video encoding and decoding support, this will need a family-specific compatible when pushed
+ - Slightly differences in the Video Processing Unit, this is why I introduced family-specific compatibles
+ - A secondary Cortex-A53 cluster
+ - A secondary SCPI cpufreq clock entry
+ - A different Mali core, but with the same interrupts (less but they share the same lower interrupts), clocks and memory space
+
+This is why it was decided to have a sub-dtsi, having a secondary dtsi will simply copy 99% of the GXL dtsi,
+but surely we could also have an intermediate dtsi but for boards I'm ok with it, but less for a SoC dtsi,
+since it could lead to some confusion.
+
+Finally, yes I could have added the mali node to the GXL dtsi, but the midgard Mali dt-bindings are not upstream
+and the family is too big and recent enough to consider having stable bindings for now.
+
+Nevertheless, nothing is final, this gxl-mali.dtsi could be merged into the GXL dtsi in the future when we
+have proper dt-bindings and a real support of the T820 Mali on the S912.
+
+Kevin, what's your thought about this ?
+
+Neil
+
+> Regards,
+> Andreas
+> 
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi      | 37 ++++++++++++++++++++
+>>  arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi  | 43 ++++++++++++++++++++++++
+>>  arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi |  1 +
+>>  arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi |  1 +
+>>  4 files changed, 82 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-mali.dtsi
+> [...]
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
+>> index 615308e..5a90e30 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d.dtsi
+>> @@ -42,6 +42,7 @@
+>>   */
+>>  
+>>  #include "meson-gxl.dtsi"
+>> +#include "meson-gxl-mali.dtsi"
+>>  
+>>  / {
+>>  	compatible = "amlogic,s905d", "amlogic,meson-gxl";
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+>> index 08237ee..0f78d83 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x.dtsi
+>> @@ -42,6 +42,7 @@
+>>   */
+>>  
+>>  #include "meson-gxl.dtsi"
+>> +#include "meson-gxl-mali.dtsi"
+>>  
+>>  / {
+>>  	compatible = "amlogic,s905x", "amlogic,meson-gxl";
+> 
