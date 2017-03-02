@@ -1,27 +1,27 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Wed,  1 Mar 2017 16:14:54 -0800
-Subject: [PATCHv2 02/14] arm: Use set_memory.h header
+Date: Wed,  1 Mar 2017 16:14:55 -0800
+Subject: [PATCHv2 03/14] arm64: Use set_memory.h header
 In-Reply-To: <1488413706-9739-1-git-send-email-labbott@redhat.com>
 References: <1488413706-9739-1-git-send-email-labbott@redhat.com>
-Message-ID: <1488413706-9739-3-git-send-email-labbott@redhat.com>
+Message-ID: <1488413706-9739-4-git-send-email-labbott@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-set_memory_* functions have moved to set_memory.h. Switch to this
-explicitly
+The set_memory_* functions have moved to set_memory.h. Use that header
+explicitly.
 
 Signed-off-by: Laura Abbott <labbott@redhat.com>
 ---
- arch/arm/mm/pageattr.c    | 1 +
- arch/arm/net/bpf_jit_32.c | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/mm/pageattr.c      | 1 +
+ arch/arm64/net/bpf_jit_comp.c | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/arch/arm/mm/pageattr.c b/arch/arm/mm/pageattr.c
-index 3b69f26..1403cb4 100644
---- a/arch/arm/mm/pageattr.c
-+++ b/arch/arm/mm/pageattr.c
-@@ -15,6 +15,7 @@
+diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+index 8def55e..12ab86d 100644
+--- a/arch/arm64/mm/pageattr.c
++++ b/arch/arm64/mm/pageattr.c
+@@ -18,6 +18,7 @@
  
  #include <asm/pgtable.h>
  #include <asm/tlbflush.h>
@@ -29,18 +29,17 @@ index 3b69f26..1403cb4 100644
  
  struct page_change_data {
  	pgprot_t set_mask;
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 93d0b6d..c200910 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -17,7 +17,7 @@
- #include <linux/slab.h>
- #include <linux/if_vlan.h>
+diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+index a785554..84e4a91 100644
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -26,6 +26,7 @@
  
--#include <asm/cacheflush.h>
+ #include <asm/byteorder.h>
+ #include <asm/cacheflush.h>
 +#include <asm/set_memory.h>
- #include <asm/hwcap.h>
- #include <asm/opcodes.h>
+ #include <asm/debug-monitors.h>
  
+ #include "bpf_jit.h"
 -- 
 2.7.4
