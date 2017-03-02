@@ -1,106 +1,86 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 2 Mar 2017 09:42:24 -0800
-Subject: [PATCH 2/4] watchdog: sama5d4: fix race condition
-In-Reply-To: <20170302173114.28508-3-alexandre.belloni@free-electrons.com>
-References: <20170302173114.28508-1-alexandre.belloni@free-electrons.com>
- <20170302173114.28508-3-alexandre.belloni@free-electrons.com>
-Message-ID: <20170302174224.GC28554@roeck-us.net>
+From: pbrobinson@gmail.com (Peter Robinson)
+Date: Thu,  2 Mar 2017 17:43:57 +0000
+Subject: [PATCH] clk: sunxi-ng: tighten SoC deps on explicit AllWinner SoCs
+Message-ID: <20170302174357.6246-1-pbrobinson@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 06:31:12PM +0100, Alexandre Belloni wrote:
-> WDT_MR and WDT_CR must not updated within three slow clock periods after
-> the last ping (write to WDT_CR or WDT_MR). Ensure enough time has elapsed
-> before writing those registers.
-> wdt_write() waits for 4 periods to ensure at least 3 edges are seen by the
-> IP.
-> 
+Tighten the depends on the various AllWinn SoCs so we don't
+inadvertantly get clock drivers when we're not wanting them
+like 32 bit SoC clocks for 64 bit configs. Ensure there's
+still test coverage though.
 
-Would it be possible to use min_hw_heartbeat_ms for this purpose ?
+Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
+---
+ drivers/clk/sunxi-ng/Kconfig | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Thanks,
-Guenter
-
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  drivers/watchdog/sama5d4_wdt.c | 33 +++++++++++++++++++++++++++++----
->  1 file changed, 29 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-> index 5cee20caca78..362fd229786d 100644
-> --- a/drivers/watchdog/sama5d4_wdt.c
-> +++ b/drivers/watchdog/sama5d4_wdt.c
-> @@ -6,6 +6,7 @@
->   * Licensed under GPLv2.
->   */
->  
-> +#include <linux/delay.h>
->  #include <linux/interrupt.h>
->  #include <linux/io.h>
->  #include <linux/kernel.h>
-> @@ -29,6 +30,7 @@ struct sama5d4_wdt {
->  	struct watchdog_device	wdd;
->  	void __iomem		*reg_base;
->  	u32			mr;
-> +	unsigned long		last_ping;
->  };
->  
->  static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
-> @@ -49,8 +51,29 @@ MODULE_PARM_DESC(nowayout,
->  #define wdt_read(wdt, field) \
->  	readl_relaxed((wdt)->reg_base + (field))
->  
-> -#define wdt_write(wtd, field, val) \
-> -	writel_relaxed((val), (wdt)->reg_base + (field))
-> +/* 4 slow clock periods is 4/32768 = 122.07?s*/
-> +#define WDT_DELAY	usecs_to_jiffies(123)
-> +
-> +static void wdt_write(struct sama5d4_wdt *wdt, u32 field, u32 val)
-> +{
-> +	/*
-> +	 * WDT_CR and WDT_MR must not be modified within three slow clock
-> +	 * periods following a restart of the watchdog performed by a write
-> +	 * access in WDT_CR.
-> +	 */
-> +	while (time_before(jiffies, wdt->last_ping + WDT_DELAY))
-> +		usleep_range(30, 125);
-> +	writel_relaxed(val, wdt->reg_base + field);
-> +	wdt->last_ping = jiffies;
-> +}
-> +
-> +static void wdt_write_nosleep(struct sama5d4_wdt *wdt, u32 field, u32 val)
-> +{
-> +	if (time_before(jiffies, wdt->last_ping + WDT_DELAY))
-> +		udelay(123);
-> +	writel_relaxed(val, wdt->reg_base + field);
-> +	wdt->last_ping = jiffies;
-> +}
->  
->  static int sama5d4_wdt_start(struct watchdog_device *wdd)
->  {
-> @@ -164,11 +187,12 @@ static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)
->  	 * Else, we have to disable it properly.
->  	 */
->  	if (wdt_enabled) {
-> -		wdt_write(wdt, AT91_WDT_MR, wdt->mr);
-> +		wdt_write_nosleep(wdt, AT91_WDT_MR, wdt->mr);
->  	} else {
->  		reg = wdt_read(wdt, AT91_WDT_MR);
->  		if (!(reg & AT91_WDT_WDDIS))
-> -			wdt_write(wdt, AT91_WDT_MR, reg | AT91_WDT_WDDIS);
-> +			wdt_write_nosleep(wdt, AT91_WDT_MR,
-> +					  reg | AT91_WDT_WDDIS);
->  	}
->  	return 0;
->  }
-> @@ -193,6 +217,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
->  	wdd->ops = &sama5d4_wdt_ops;
->  	wdd->min_timeout = MIN_WDT_TIMEOUT;
->  	wdd->max_timeout = MAX_WDT_TIMEOUT;
-> +	wdt->last_ping = jiffies;
->  
->  	watchdog_set_drvdata(wdd, wdt);
->  
-> -- 
-> 2.11.0
-> 
+diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+index 695bbf9..8ab378e 100644
+--- a/drivers/clk/sunxi-ng/Kconfig
++++ b/drivers/clk/sunxi-ng/Kconfig
+@@ -63,6 +63,7 @@ config SUN50I_A64_CCU
+ 	select SUNXI_CCU_MP
+ 	select SUNXI_CCU_PHASE
+ 	default ARM64 && ARCH_SUNXI
++	depends (ARM64 && ARCH_SUNXI) || COMPILE_TEST
+ 
+ config SUN5I_CCU
+ 	bool "Support for the Allwinner sun5i family CCM"
+@@ -74,6 +75,7 @@ config SUN5I_CCU
+ 	select SUNXI_CCU_MP
+ 	select SUNXI_CCU_PHASE
+ 	default MACH_SUN5I
++	depends MACH_SUN5I || COMPILE_TEST
+ 
+ config SUN6I_A31_CCU
+ 	bool "Support for the Allwinner A31/A31s CCU"
+@@ -84,6 +86,7 @@ config SUN6I_A31_CCU
+ 	select SUNXI_CCU_MP
+ 	select SUNXI_CCU_PHASE
+ 	default MACH_SUN6I
++	depends MACH_SUN6I || COMPILE_TEST
+ 
+ config SUN8I_A23_CCU
+ 	bool "Support for the Allwinner A23 CCU"
+@@ -96,6 +99,7 @@ config SUN8I_A23_CCU
+ 	select SUNXI_CCU_MP
+ 	select SUNXI_CCU_PHASE
+ 	default MACH_SUN8I
++	depends MACH_SUN8I || COMPILE_TEST
+ 
+ config SUN8I_A33_CCU
+ 	bool "Support for the Allwinner A33 CCU"
+@@ -108,6 +112,7 @@ config SUN8I_A33_CCU
+ 	select SUNXI_CCU_MP
+ 	select SUNXI_CCU_PHASE
+ 	default MACH_SUN8I
++	depends MACH_SUN8I || COMPILE_TEST
+ 
+ config SUN8I_H3_CCU
+ 	bool "Support for the Allwinner H3 CCU"
+@@ -119,6 +124,7 @@ config SUN8I_H3_CCU
+ 	select SUNXI_CCU_MP
+ 	select SUNXI_CCU_PHASE
+ 	default MACH_SUN8I
++	depends MACH_SUN8I || COMPILE_TEST
+ 
+ config SUN8I_V3S_CCU
+ 	bool "Support for the Allwinner V3s CCU"
+@@ -130,6 +136,7 @@ config SUN8I_V3S_CCU
+ 	select SUNXI_CCU_MP
+ 	select SUNXI_CCU_PHASE
+ 	default MACH_SUN8I
++	depends MACH_SUN8I || COMPILE_TEST
+ 
+ config SUN9I_A80_CCU
+ 	bool "Support for the Allwinner A80 CCU"
+@@ -140,5 +147,6 @@ config SUN9I_A80_CCU
+ 	select SUNXI_CCU_MP
+ 	select SUNXI_CCU_PHASE
+ 	default MACH_SUN9I
++	depends MACH_SUN9I || COMPILE_TEST
+ 
+ endif
+-- 
+2.9.3
