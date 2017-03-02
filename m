@@ -1,72 +1,51 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 2 Mar 2017 20:19:26 +0100
-Subject: [PATCH 1/2] ARM: dts: bcm5301x: Add TWD WD Support to DT
-In-Reply-To: <CAC3K-4pg0TLF-1CV+NtgEh7a0-EHQBvxjNbbGJB32WsNa0U0wA@mail.gmail.com>
-References: <1488313886-17155-1-git-send-email-jon.mason@broadcom.com>
- <1488313886-17155-2-git-send-email-jon.mason@broadcom.com>
- <de705b40-1a8a-faef-846e-3635682671f6@gmail.com>
- <CAC3K-4pg0TLF-1CV+NtgEh7a0-EHQBvxjNbbGJB32WsNa0U0wA@mail.gmail.com>
-Message-ID: <CACna6rw_TY2fVBrzc2YfH_rYZkWJvK-v1TyAs0U6jp3PLdC2sg@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 2 Mar 2017 14:24:06 -0500
+Subject: [PATCH 07/20] PCI: implement Devres interface to map PCI config
+ space
+In-Reply-To: <CAHp75VfoZTr5L3z5_SXW58W2Ate5nCWSzP8hAA051fVwizSjag@mail.gmail.com>
+References: <20170227151436.18698-1-lorenzo.pieralisi@arm.com>
+ <20170227151436.18698-8-lorenzo.pieralisi@arm.com>
+ <CAHp75VfdE6_W+DxhejorLxra2JQDGF3cG0uBedyOohhmcLiKLg@mail.gmail.com>
+ <20170302120546.GB17277@red-moon>
+ <CAHp75VfoZTr5L3z5_SXW58W2Ate5nCWSzP8hAA051fVwizSjag@mail.gmail.com>
+Message-ID: <20170302192406.GA8519@wtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 March 2017 at 20:00, Jon Mason <jon.mason@broadcom.com> wrote:
-> On Thu, Mar 2, 2017 at 1:54 PM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
->>
->> On 02/28/2017 09:31 PM, Jon Mason wrote:
->>>
->>> From: Jon Mason <jonmason@broadcom.com>
->>>
->>> Add support for the ARM TWD Watchdog to the bcm5301x device tree.  The
->>> ARM TWD timer allocated the register space for the WDT, so this patch
->>> necessitated shrinking that.  Also, the GIC masks were added for these.
->>>
->>> Signed-off-by: Jon Mason <jonmason@broadcom.com>
->>> ---
->>>  arch/arm/boot/dts/bcm5301x.dtsi | 15 ++++++++++++---
->>>  1 file changed, 12 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi
->>> b/arch/arm/boot/dts/bcm5301x.dtsi
->>> index 4fbb089..3fbc450 100644
->>> --- a/arch/arm/boot/dts/bcm5301x.dtsi
->>> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
->>> @@ -70,10 +70,19 @@
->>>                         clocks = <&periph_clk>;
->>>                 };
->>>
->>> -               local-timer at 20600 {
->>> +               timer at 20600 {
->>>                         compatible = "arm,cortex-a9-twd-timer";
->>> -                       reg = <0x20600 0x100>;
->>> -                       interrupts = <GIC_PPI 13 IRQ_TYPE_LEVEL_HIGH>;
->>> +                       reg = <0x20600 0x20>;
->>> +                       interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2)
->>> |
->>> +                                                 IRQ_TYPE_LEVEL_HIGH)>;
->>> +                       clocks = <&periph_clk>;
->>> +               };
->>
->>
->> If you follow my recent e-mail thread:
->> BCM5301X: GIC: PPI11 is secure or misconfigured (same for PPI13)
->> you'll see IRQ_TYPE_LEVEL_HIGH type isn't correct. It should be
->> IRQ_TYPE_EDGE_RISING.
->>
->> I believe patch switching to IRQ_TYPE_EDGE_RISING should be sent with Cc
->> stable
->> for kernels 4.8+.
->>
->> The same change is needed for "arm,cortex-a9-global-timer".
->>
->> Would you find time to revise this patch?
->
->
-> I'll do 2 patches.  One to revise this one and one to address the issue
-> you've discovered.  Will that be okay for you?
+Hello,
 
-Sure. Please make sure you switch to IRQ_TYPE_EDGE_RISING before doing
-other changes, so it can be applied cleanly to the stable kernels.
+On Thu, Mar 02, 2017 at 02:50:00PM +0200, Andy Shevchenko wrote:
+> > I thought about that and did not do it because here we are remapping
+> > resources that are _not_ PCI bus resources (ie it is not PCI BARs we
+> > are remapping), keeping the devm_* prefix would be more consistent
+> > to the typical device drivers remapping functions pattern (ie a
+> > typical PCI host controller driver would mix devm_ and pcim_ calls
+> > which is a bit hard to parse), that was my rationale.
+> >
+> > I am not too fussed about that either way, I am happy to update it to
+> > pcim_* though, it is Bjorn/Arnd's decision.
+> 
+> I would vote for pcim_*() variant.
+
+Me too, for brevity.
+
+> >> 2. If you may notice there is no separate pcim_*map*() stuff, they are
+> >> dynamically adapting to the case.
+> >
+> > I do not understand what you mean here I would ask you to elaborate
+> > a bit more please so that I can do something about it.
+> 
+> Oh, sorry, there are two examples currently, i.e.
+> pci_enable_msi()/pci_enable_msix() and pci_request_region*() which has
+> no "m" in the name, but are managed on release by pcim_release().
+> Some developers consider this as a bad idea, but so far no patch has
+> been sent to introduce pcim_*() variants of those.
+>
+> So, regarding to your stuff, I would stick with "pcim" prefix.
+
+Sounds good to me.
+
+Thanks.
 
 -- 
-Rafa?
+tejun
