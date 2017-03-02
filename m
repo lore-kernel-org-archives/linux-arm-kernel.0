@@ -1,68 +1,57 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Thu, 2 Mar 2017 17:04:51 +0100
-Subject: [PATCH] drm/atmel-hlcdc: Rework the fbdev creation logic
-In-Reply-To: <1480345267-18461-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1480345267-18461-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <9eef519a-57ea-a677-4bdc-a4198fb646b5@gmail.com>
+From: mayurkumar.patel@intel.com (Patel, Mayurkumar)
+Date: Thu, 2 Mar 2017 16:05:17 +0000
+Subject: [PATCH V2] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <f8f67b32-21eb-232b-2b7c-28b603865b9d@codeaurora.org>
+References: <1485891928-14573-1-git-send-email-okaya@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B2846666830C@IRSMSX101.ger.corp.intel.com>
+ <b78207b6-2c22-3e6d-4837-8b4b396c4f5d@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B28466668774@IRSMSX101.ger.corp.intel.com>
+ <f8f67b32-21eb-232b-2b7c-28b603865b9d@codeaurora.org>
+Message-ID: <92EBB4272BF81E4089A7126EC1E7B28466669BFF@IRSMSX101.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/11/2016 16:01, Boris Brezillon wrote:
-> Now that we wait for DRM panels to be available before registering the
-> DRM device (returning -EPROBE_DEFER if the panel has not been probed
-> yet), we no longer need to put the fbdev creation code in
-> ->output_poll_changed().
-> 
-> This removes the 10 secs delay between DRM dev registration and fbdev
-> creation (polling period = 10 seconds).
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Reported-by: Alex Vazquez <avazquez.dev@gmail.com>
-Tested-by: Richard Genoud <richard.genoud@gmail.com>
+>
+>Hi Bjorn,
+>
+>On 2/28/2017 1:57 PM, Patel, Mayurkumar wrote:
+>>> I was trying to figure out when to use saved values vs. the values in
+>>> registers by looking at the enable_cnt.
+>>> enable_cnt is 0 during boot on my system.
+>> enable_cnt for the root port on my system is set to 1 for "root port" already without saving
+>> any ASPM related settings.
+>>
+>>
+>
+>What would be the best way to figure out when to save power-on values from
+>the registers?
+>
 
-Those 10 seconds where a real pain !
-Any reason this has not been applied ?
+So in my case, pci_enable_device() for root port is called from pcie_port_device_register() at the boot time which
+Is called from pcie_portdrv_probe() function which does not call pcie_aspm_init_link_state() but
+Increment's enable_cnt field. When the Endpoint get plugged in, pcie_aspm_init_link_state() is called
+from hotplug routine on "Root port" but due to enable_cnt is already incremented we do not set
+right policy and aspm gets disabled by aspm driver.
 
-> ---
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 18 +++++++-----------
->  1 file changed, 7 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> index 5f484310bee9..2325de7c5c6f 100644
-> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> @@ -431,15 +431,8 @@ static void atmel_hlcdc_fb_output_poll_changed(struct drm_device *dev)
->  {
->  	struct atmel_hlcdc_dc *dc = dev->dev_private;
->  
-> -	if (dc->fbdev) {
-> +	if (dc->fbdev)
->  		drm_fbdev_cma_hotplug_event(dc->fbdev);
-> -	} else {
-> -		dc->fbdev = drm_fbdev_cma_init(dev, 24,
-> -				dev->mode_config.num_crtc,
-> -				dev->mode_config.num_connector);
-> -		if (IS_ERR(dc->fbdev))
-> -			dc->fbdev = NULL;
-> -	}
->  }
->  
->  struct atmel_hlcdc_dc_commit {
-> @@ -652,10 +645,13 @@ static int atmel_hlcdc_dc_load(struct drm_device *dev)
->  
->  	platform_set_drvdata(pdev, dev);
->  
-> -	drm_kms_helper_poll_init(dev);
-> +	dc->fbdev = drm_fbdev_cma_init(dev, 24,
-> +			dev->mode_config.num_crtc,
-> +			dev->mode_config.num_connector);
-> +	if (IS_ERR(dc->fbdev))
-> +		dc->fbdev = NULL;
->  
-> -	/* force connectors detection */
-> -	drm_helper_hpd_irq_event(dev);
-> +	drm_kms_helper_poll_init(dev);
->  
->  	return 0;
->  
-> 
+Shall we introduce new atomic variable along with aspm_default in struct pci_dev and increment it in when called
+first time pcie_aspm_init_link_state()  to save power-on values ( I have tested it locally, if you think could be good approach
+I can upload the diffs) because enable_cnt in pci_enable_device() can be triggered
+from multiple places at boot time so it might not be safe to use it? 
+or adding pcie_aspm_init_link_state() in pcie_port_device_register() for ports before calling pci_enable_device()
+although I am not sure whether it's the right approach and that would work for all the devices!
+
+@Kaya/Bjorn: Do you have any other suggestions or Could you also please help by comment what would make sense?
+
+
+>--
+>Sinan Kaya
+>Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+>Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Intel Deutschland GmbH
+Registered Address: Am Campeon 10-12, 85579 Neubiberg, Germany
+Tel: +49 89 99 8853-0, www.intel.de
+Managing Directors: Christin Eisenschmid, Christian Lamprechter
+Chairperson of the Supervisory Board: Nicole Lau
+Registered Office: Munich
+Commercial Register: Amtsgericht Muenchen HRB 186928
