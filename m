@@ -1,49 +1,135 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Thu, 2 Mar 2017 15:07:21 -0800
-Subject: [PATCH v4 13/36] [media] v4l2: add a frame timeout event
-In-Reply-To: <20170302155342.GJ3220@valkosipuli.retiisi.org.uk>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-14-git-send-email-steve_longerbeam@mentor.com>
- <20170302155342.GJ3220@valkosipuli.retiisi.org.uk>
-Message-ID: <4b2bcee1-8da0-776e-4455-8d8e7a7abf0a@gmail.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Thu, 2 Mar 2017 17:21:49 -0600
+Subject: ARM64 perf stacktraces on tracepoint events
+In-Reply-To: <20170302104349.GA19632@leverpostej>
+References: <CAEi0qNm3NKSWQOD6A2Z0NTNEfp1kLNEZz-=y+dbVCwYMP0HFoQ@mail.gmail.com>
+ <20170302104349.GA19632@leverpostej>
+Message-ID: <20170302172149.168b430ff75d63adfe9ab389@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 2 Mar 2017 10:44:11 +0000
+Mark Rutland <mark.rutland@arm.com> wrote:
 
+> [Adding James, Takahiro-san, and Will, for stacktracing and arm64 perf]
+> 
+> On Wed, Mar 01, 2017 at 04:42:17PM -0800, Joel Fernandes wrote:
+> > Hi,
+> > 
+> > On 3.18 kernel running on an arm64 device, I tried running:
+> > perf record -a -g -e sched:sched_wakeup
+> > 
+> > I was expecting something like the output at:
+> > www.brendangregg.com/perf.html
+> > 
+> > But I don't see stacktraces, could I be missing any patches you could
+> > point me to?
+> 
+> I can't spot much obvious, looking at arm64's stacktrace.c and perf_callchain.c
+> since v3.18. There's commit:
+> 
+>   9702970c7bd3e2d6 (Revert "ARM64: unwind: Fix PC calculation")
+> 
+> ... though that was Cc'd stable.
+> 
+> I can't immediately see why that would truncate unwinding, though I'm also not
+> sure how perf and ftrace interact here, so I may be missing something obvious.
+> 
+> > I do see stack traces if I do regular perf profiling
+> > (perf record -F 99 -a -g).
+> 
+> > Below is the output I get. Thanks for any insight into this.
+> > 
+> > Regards,
+> > Joel
+> > 
+> > sailfish:/data # ./perf report
+> >        # Samples: 22  of event 'sched:sched_wakeup'
+> > # Event count (approx.): 410333
+> > #
+> > # Children      Self  Trace output
+> > # ........  ........
+> > .............................................................
+> > #
+> >     61.29%    61.29%  comm=ksoftirqd/0 pid=3 prio=120 success=1 target_cpu=000
+> >             |
+> >             ---0
+> > 
+> >     33.25%    33.25%  comm=hw pid=12777 prio=120 success=1 target_cpu=002
+> >             |
+> >             ---0
+> > 
+> >      2.46%     2.46%  comm=kworker/u8:2 pid=12482 prio=120 success=1
+> > target_cpu=002
+> >             |
+> >             ---0
+> > 
+> >      1.39%     1.39%  comm=migration/2 pid=21 prio=0 success=1 target_cpu=002
+> >             |
+> >             ---0
+> 
+> FWIW, on a recent HEAD (86292b33d4b79ee0), I see reasonable looking backtraces,
+> e.g.
 
-On 03/02/2017 07:53 AM, Sakari Ailus wrote:
-> Hi Steve,
->
-> On Wed, Feb 15, 2017 at 06:19:15PM -0800, Steve Longerbeam wrote:
->> Add a new FRAME_TIMEOUT event to signal that a video capture or
->> output device has timed out waiting for reception or transmit
->> completion of a video frame.
->>
->> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
->> ---
->>  Documentation/media/uapi/v4l/vidioc-dqevent.rst | 5 +++++
->>  Documentation/media/videodev2.h.rst.exceptions  | 1 +
->>  include/uapi/linux/videodev2.h                  | 1 +
->>  3 files changed, 7 insertions(+)
->>
->> diff --git a/Documentation/media/uapi/v4l/vidioc-dqevent.rst b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
->> index 8d663a7..dd77d9b 100644
->> --- a/Documentation/media/uapi/v4l/vidioc-dqevent.rst
->> +++ b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
->> @@ -197,6 +197,11 @@ call.
->>  	the regions changes. This event has a struct
->>  	:c:type:`v4l2_event_motion_det`
->>  	associated with it.
->> +    * - ``V4L2_EVENT_FRAME_TIMEOUT``
->> +      - 7
->> +      - This event is triggered when the video capture or output device
->> +	has timed out waiting for the reception or transmit completion of
->> +	a frame of video.
->
-> As you're adding a new interface, I suppose you have an implementation
-> around. How do you determine what that timeout should be?
+I cross-built the perf tool on an Ubuntu 16.10 system, after rewinding
+its base linux tree to ~v4.6 (e.g., commit 8beeb00 because it precedes a
+perf libunwind series), and still see reasonable output:
 
-The imx-media driver sets the timeout to 1 second, or 30 frame
-periods at 30 fps.
+#
+# Total Lost Samples: 0
+#
+# Samples: 30  of event 'sched:sched_wakeup'
+# Event count (approx.): 30
+#
+# Children      Self  Trace output                                         
+# ........  ........  .....................................................
+#
+    20.00%    20.00%  comm=rcu_preempt pid=7 prio=120 target_cpu=006
+            |
+            ---0x807f71c4
+               secondary_start_kernel
+               cpu_startup_entry
+               do_idle
+               call_cpuidle
+               cpuidle_enter
+               cpuidle_enter_state
+               el1_irq
+               gic_handle_irq
+               __handle_domain_irq
+               irq_exit
+               __do_softirq
+               |          
+               |--16.67%--run_timer_softirq
+               |          expire_timers
+               |          call_timer_fn
+               |          process_timeout
+               |          wake_up_process
+               |          try_to_wake_up
+               |          ttwu_do_activate
+               |          ttwu_do_wakeup
+               |          ttwu_do_wakeup
+               |          
+                --3.33%--rcu_process_callbacks
+                          note_gp_changes
+                          rcu_gp_kthread_wake
+                          swake_up
+                          swake_up_locked
+                          wake_up_process
+                          try_to_wake_up
+                          ttwu_do_activate
+                          ttwu_do_wakeup
+                          ttwu_do_wakeup
 
-Steve
+I tried to go even further back, e.g., v4.1-rc4-15-g10b48f7 but the
+compiler wouldn't build perf any more, e.g.,:
+
+util/event.c:416:2: error: ?readdir_r? is deprecated [-Werror=deprecated-declarations]
+
+Is it possible to try a newer perf binary (assuming it's also 3.18
+based), or check whether libunwind contains aarch64 support?  Note that
+it's possible to 'perf archive' the aarch64 run and run perf report on a
+more up-to-date x86 host also.
+
+Thanks,
+
+Kim
