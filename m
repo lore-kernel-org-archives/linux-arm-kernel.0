@@ -1,57 +1,60 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 2 Mar 2017 14:58:12 +0100
-Subject: [PATCH] arm: dts: sun8i: split Allwinner H3 .dtsi
-In-Reply-To: <20170301201342.47583-3-icenowy@aosc.xyz>
-References: <20170301201342.47583-1-icenowy@aosc.xyz>
- <20170301201342.47583-3-icenowy@aosc.xyz>
-Message-ID: <20170302135812.kvvqw6trjipjhhu5@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 2 Mar 2017 14:07:48 +0000
+Subject: [PATCHv2 03/14] arm64: Use set_memory.h header
+In-Reply-To: <1488413706-9739-4-git-send-email-labbott@redhat.com>
+References: <1488413706-9739-1-git-send-email-labbott@redhat.com>
+ <1488413706-9739-4-git-send-email-labbott@redhat.com>
+Message-ID: <20170302140747.GK19632@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 04:13:40AM +0800, Icenowy Zheng wrote:
-> From: Andre Przywara <andre.przywara@arm.com>
+On Wed, Mar 01, 2017 at 04:14:55PM -0800, Laura Abbott wrote:
 > 
-> The new Allwinner H5 SoC is pin-compatible to the H3 SoC, but with the
-> Cortex-A7 cores replaced by Cortex-A53 cores and the MMC controller
-> updated. So we should really share almost the whole .dtsi.
-> In preparation for that move the peripheral parts of the existing
-> sun8i-h3.dtsi into a new sunxi-h3-h5.dtsi.
-> The actual sun8i-h3.dtsi then includes that and defines the H3 specific
-> parts on top of it.
-> According to "Allwinner H3 Datasheet Version 1.2 Apr. 23, 2015" [1]
-> Chapter 4.12. GIC and "Allwinner H5 Datasheet Revision 1.0 May. 20,
-> 2016" [2] Chapter 4.12. GIC, the two SoCs both use ARM GIC-400 interrupt
-> controller (see the "Note" after the interrupt source table), so the GIC
-> node is extracted to sunxi-h3-h5.dtsi as well, and the compatible is
-> changed to "arm,gic-400".
+> The set_memory_* functions have moved to set_memory.h. Use that header
+> explicitly.
+> 
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+>  arch/arm64/mm/pageattr.c      | 1 +
+>  arch/arm64/net/bpf_jit_comp.c | 1 +
+>  2 files changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
+> index 8def55e..12ab86d 100644
+> --- a/arch/arm64/mm/pageattr.c
+> +++ b/arch/arm64/mm/pageattr.c
+> @@ -18,6 +18,7 @@
+>  
+>  #include <asm/pgtable.h>
+>  #include <asm/tlbflush.h>
+> +#include <asm/set_memory.h>
 
-This should be in a separate patch.
+Nit: alphabetical order, please.
 
-> On the way get rid of skeleton.dtsi, as recommended in that very file.
+>  
+>  struct page_change_data {
+>  	pgprot_t set_mask;
+> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+> index a785554..84e4a91 100644
+> --- a/arch/arm64/net/bpf_jit_comp.c
+> +++ b/arch/arm64/net/bpf_jit_comp.c
+> @@ -26,6 +26,7 @@
+>  
+>  #include <asm/byteorder.h>
+>  #include <asm/cacheflush.h>
+> +#include <asm/set_memory.h>
+>  #include <asm/debug-monitors.h>
 
-That too.
+Nit: likewise.
 
-> The inclusion of pinctrl-a10.h is also dropped, as it's now not needed
-> at all after changing pinctrl binding to the generic pinconf binding.
+Otherwise, this looks fine to me. FWIW:
 
-And that as well...
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-> [1] http://linux-sunxi.org/File:Allwinner_H3_Datasheet_V1.2.pdf
-> [2] https://github.com/OrangePiLibra/OrangePi_H5SDK/blob/master/Documentation/Hardware/H5_User_Manual.pdf
+Mark.
 
-Please don't put URLs in commit logs.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170302/027496b3/attachment.sig>
+>  
+>  #include "bpf_jit.h"
+> -- 
+> 2.7.4
+> 
