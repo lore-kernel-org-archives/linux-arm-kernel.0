@@ -1,131 +1,158 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 2 Mar 2017 16:58:45 +0100
-Subject: [PATCH 00/11] drm/meson: Initial support for HDMI Output
-In-Reply-To: <1488469207-523-1-git-send-email-narmstrong@baylibre.com>
-References: <1488469207-523-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20170302155845.pybae7xtuzjpawx6@phenom.ffwll.local>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Thu, 2 Mar 2017 18:02:57 +0200
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 04:39:56PM +0100, Neil Armstrong wrote:
-> The Amlogic GX SoCs implements a Synopsys DesignWare HDMI TX Controller
-> in combination with a very custom PHY.
-> 
-> This patchset depends on Laurent Pinchart v4 patchset at [1] and my v2
-> patchset at [2] to permit PHY control from outside the dw-hdmi driver.
-> 
-> The Synopsys DesignWare HDMI TX Controller is integrated like :
->          ___________________________________
->         |            HDMI TOP               |<= HPD
->         |___________________________________|
->         |                  |                |
-> HDMI-TX-|  Synopsys HDMI   |   HDMI PHY     |=> TMDS
->         |    Controller    |________________|
->         |___________________________________|<=> DDC
-> 
-> And uses the following paths for Pixels Encoding :
->        _____   _____   ____________________
-> vd1---|     |-|     | | VENC     /---------|----VDAC
-> vd2---| VIU |-| VPP |-|-----ENCI/-ENCI_DVI-|\
-> osd1--|     |-|     | | \                  | X--HDMI-TX
-> osd2--|_____|-|_____| |  |\-ENCP--ENCP_DVI-|/
->                       |  |                 |
->                       |  \--ENCL-----------|----LVDS
->                       |____________________|
-> 
-> The ENCI and ENCP encoders pre-formats the data for the ENCI-DVI and
-> ENCP-DVI encoders. Those DVI encoders will format the pixels for the
-> Synopsys DesignWare HDMI TX Controller.
-> 
-> In order to support display modes, the ENCI and ENCP encoders needs very
-> specific parameters for *each* display modes, so usage of the CEA VIC
-> identifier is necessary. But the DVI timings are generated from the
-> drm_mode structure in a generic way.
-> 
-> To simplify the first push, only the main CEA modes are supported up to
-> 1920x1080p60. Supporting the 480i and 576i needs tweaking in the dw-hdmi
-> in order to support the Clock Doubling necessary for these modes.
-> 
-> Support for more traditional modes like the EDID fallback modes is planned
-> but will need tome additionnal handling along the CEA modes.
-> Support for 4k2k modes needs to be able to get the EDID HDMI modes, but
-> for now only the HDMI 1.4 modes are currently available in the drm_edid
-> implementation.
+Hi Steve,
 
-Btw, with the neat ascii-art stuff here and in comments in your code, did
-you look into assembling all that into a meson driver documentation
-chapter like the one for vc4 that was just merged?
--Daniel
+On Wed, Feb 15, 2017 at 06:19:16PM -0800, Steve Longerbeam wrote:
+> v4l2_pipeline_inherit_controls() will add the v4l2 controls from
+> all subdev entities in a pipeline to a given video device.
+> 
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> ---
+>  drivers/media/v4l2-core/v4l2-mc.c | 48 +++++++++++++++++++++++++++++++++++++++
+>  include/media/v4l2-mc.h           | 25 ++++++++++++++++++++
+>  2 files changed, 73 insertions(+)
+> 
+> diff --git a/drivers/media/v4l2-core/v4l2-mc.c b/drivers/media/v4l2-core/v4l2-mc.c
+> index 303980b..09d4d97 100644
+> --- a/drivers/media/v4l2-core/v4l2-mc.c
+> +++ b/drivers/media/v4l2-core/v4l2-mc.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/usb.h>
+>  #include <media/media-device.h>
+>  #include <media/media-entity.h>
+> +#include <media/v4l2-ctrls.h>
+>  #include <media/v4l2-fh.h>
+>  #include <media/v4l2-mc.h>
+>  #include <media/v4l2-subdev.h>
+> @@ -238,6 +239,53 @@ int v4l_vb2q_enable_media_source(struct vb2_queue *q)
+>  }
+>  EXPORT_SYMBOL_GPL(v4l_vb2q_enable_media_source);
+>  
+> +int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
+> +				     struct media_entity *start_entity)
 
-> 
-> This patchset does :
->  - Fixes the CRTC handling
->  - Fixes the registers definitions
->  - Adds support for device components registration along of-graph
->  - Adds support for HDMI clocks
->  - Adds support for HDMI VENC video modes
->  - Adds support for the Custom HDMI PHY using callbacks added in [1] and [2]
->  - Adds CMA node to reserve enougth memory for 1080p display
->  - Adds the HDMI controller et connector modes on selected boards
->  - Adds a proper dt-bindings for the HDMI controller et connector
->  - Updates the MAINTAINERS file to track the new files
-> 
-> [1] http://lkml.kernel.org/r/20170301223915.29888-1-laurent.pinchart+renesas at ideasonboard.com
-> [2] http://lkml.kernel.org/r/1488468572-31971-1-git-send-email-narmstrong at baylibre.com
-> 
-> Neil Armstrong (11):
->   drm/meson: Use crtc_state for hdisplay and fix atomic flush/enable
->     sync for vsync commit
->   drm/meson: Add missing HDMI register
->   drm/meson: Add support for components
->   drm/meson: venc_cvbs: no more return -ENODEV if CVBS is not available
->   drm/meson: add support for HDMI clock support
->   drm/meson: Add support for HDMI venc modes and settings
->   drm/meson: Add support for HDMI encoder and DW-HDMI bridge + PHY
->   ARM64: dts: meson-gx: Add shared CMA dma memory pool
->   ARM64: dts: meson-gx: Add support for HDMI output
->   dt-bindings: Add bindings for the Amlogic Meson dw-hdmi extension
->   MAINTAINERS: update files for Amlogic DRM Driver
-> 
->  .../bindings/display/amlogic,meson-dw-hdmi.txt     |  111 ++
->  MAINTAINERS                                        |    1 +
->  .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi |   39 +
->  arch/arm64/boot/dts/amlogic/meson-gx.dtsi          |   40 +
->  .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    |   23 +
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   |   23 +
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   12 +
->  .../boot/dts/amlogic/meson-gxl-nexbox-a95x.dts     |   23 +
->  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         |   13 +
->  .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts |   23 +
->  arch/arm64/boot/dts/amlogic/meson-gxm.dtsi         |    4 +
->  drivers/gpu/drm/meson/Kconfig                      |    6 +
->  drivers/gpu/drm/meson/Makefile                     |    1 +
->  drivers/gpu/drm/meson/meson_crtc.c                 |   15 +-
->  drivers/gpu/drm/meson/meson_drv.c                  |  113 +-
->  drivers/gpu/drm/meson/meson_drv.h                  |    3 +
->  drivers/gpu/drm/meson/meson_dw_hdmi.c              |  918 +++++++++++++++
->  drivers/gpu/drm/meson/meson_dw_hdmi.h              |  146 +++
->  drivers/gpu/drm/meson/meson_registers.h            |    1 +
->  drivers/gpu/drm/meson/meson_vclk.c                 |  624 +++++++++-
->  drivers/gpu/drm/meson/meson_vclk.h                 |    6 +-
->  drivers/gpu/drm/meson/meson_venc.c                 | 1245 +++++++++++++++++++-
->  drivers/gpu/drm/meson/meson_venc.h                 |    7 +
->  drivers/gpu/drm/meson/meson_venc_cvbs.c            |   11 +-
->  drivers/gpu/drm/meson/meson_vpp.h                  |    2 +
->  25 files changed, 3370 insertions(+), 40 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
->  create mode 100644 drivers/gpu/drm/meson/meson_dw_hdmi.c
->  create mode 100644 drivers/gpu/drm/meson/meson_dw_hdmi.h
-> 
-> -- 
-> 1.9.1
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+I have a few concerns / questions:
+
+- What's the purpose of this patch? Why not to access the sub-device node
+  directly?
+
+- This implementation is only workable as long as you do not modify the
+  pipeline. Once you disable a link along the pipeline, a device where the
+  control was inherited from may no longer be a part of the pipeline.
+  Depending on the hardware, it could be a part of another pipeline, in
+  which case it certainly must not be accessible through an unrelated video
+  node. As the function is added to the framework, I would expect it to
+  handle such a case correctly.
+
+- I assume it is the responsibility of the caller of this function to ensure
+  the device in question will not be powered off whilst the video node is
+  used as another user space interface to such a sub-device. If the driver
+  uses the generic PM functions in the same file, this works, but it still
+  has to be documented.
+
+> +{
+> +	struct media_device *mdev = start_entity->graph_obj.mdev;
+> +	struct media_entity *entity;
+> +	struct media_graph graph;
+> +	struct v4l2_subdev *sd;
+> +	int ret;
+> +
+> +	ret = media_graph_walk_init(&graph, mdev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	media_graph_walk_start(&graph, start_entity);
+> +
+> +	while ((entity = media_graph_walk_next(&graph))) {
+> +		if (!is_media_entity_v4l2_subdev(entity))
+> +			continue;
+> +
+> +		sd = media_entity_to_v4l2_subdev(entity);
+> +
+> +		ret = v4l2_ctrl_add_handler(vfd->ctrl_handler,
+> +					    sd->ctrl_handler,
+> +					    NULL);
+> +		if (ret)
+> +			break;
+> +	}
+> +
+> +	media_graph_walk_cleanup(&graph);
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(__v4l2_pipeline_inherit_controls);
+> +
+> +int v4l2_pipeline_inherit_controls(struct video_device *vfd,
+> +				   struct media_entity *start_entity)
+> +{
+> +	struct media_device *mdev = start_entity->graph_obj.mdev;
+> +	int ret;
+> +
+> +	mutex_lock(&mdev->graph_mutex);
+> +	ret = __v4l2_pipeline_inherit_controls(vfd, start_entity);
+> +	mutex_unlock(&mdev->graph_mutex);
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(v4l2_pipeline_inherit_controls);
+> +
+>  /* -----------------------------------------------------------------------------
+>   * Pipeline power management
+>   *
+> diff --git a/include/media/v4l2-mc.h b/include/media/v4l2-mc.h
+> index 2634d9d..9848e77 100644
+> --- a/include/media/v4l2-mc.h
+> +++ b/include/media/v4l2-mc.h
+> @@ -171,6 +171,17 @@ void v4l_disable_media_source(struct video_device *vdev);
+>   */
+>  int v4l_vb2q_enable_media_source(struct vb2_queue *q);
+>  
+> +/**
+> + * v4l2_pipeline_inherit_controls - Add the v4l2 controls from all
+> + *				    subdev entities in a pipeline to
+> + *				    the given video device.
+> + * @vfd: the video device
+> + * @start_entity: Starting entity
+> + */
+> +int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
+> +				     struct media_entity *start_entity);
+> +int v4l2_pipeline_inherit_controls(struct video_device *vfd,
+> +				   struct media_entity *start_entity);
+>  
+>  /**
+>   * v4l2_pipeline_pm_use - Update the use count of an entity
+> @@ -231,6 +242,20 @@ static inline int v4l_vb2q_enable_media_source(struct vb2_queue *q)
+>  	return 0;
+>  }
+>  
+> +static inline int __v4l2_pipeline_inherit_controls(
+> +	struct video_device *vfd,
+> +	struct media_entity *start_entity)
+> +{
+> +	return 0;
+> +}
+> +
+> +static inline int v4l2_pipeline_inherit_controls(
+> +	struct video_device *vfd,
+> +	struct media_entity *start_entity)
+> +{
+> +	return 0;
+> +}
+> +
+>  static inline int v4l2_pipeline_pm_use(struct media_entity *entity, int use)
+>  {
+>  	return 0;
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
