@@ -1,36 +1,137 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 3 Mar 2017 12:41:49 -0800
-Subject: [PATCH] dt-bindings: display: rk3288-mipi-dsi: add reset property
-In-Reply-To: <20170303113945.3bd2cbd9.john@metanate.com>
-References: <20170224125506.21533-1-john@metanate.com>
- <20170224125506.21533-24-john@metanate.com>
- <20170302215643.GA49163@google.com>
- <20170303113945.3bd2cbd9.john@metanate.com>
-Message-ID: <20170303204148.GA78598@google.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri,  3 Mar 2017 12:41:32 -0800
+Subject: [PATCH V5 6/9] PM / cpu_domains: Add PM Domain governor for CPUs
+In-Reply-To: <1488573695-106680-1-git-send-email-lina.iyer@linaro.org>
+References: <1488573695-106680-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1488573695-106680-7-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 03, 2017 at 11:39:45AM +0000, John Keeping wrote:
-> This reset is required in order to fully reset the internal state of the
-> MIPI controller.
-> 
-> Signed-off-by: John Keeping <john@metanate.com>
-> ---
-> On Thu, 2 Mar 2017 13:56:46 -0800, Brian Norris wrote:
-> > On Fri, Feb 24, 2017 at 12:55:06PM +0000, John Keeping wrote:
-> > > +	/*
-> > > +	 * Note that the reset was not defined in the initial device tree, so
-> > > +	 * we have to be prepared for it not being found.
-> > > +	 */
-> > > +	apb_rst = devm_reset_control_get(dev, "apb");  
-> > 
-> > Did this reset ever get documented in the device tree bindings? I
-> > couldn't find it. Perhaps a follow-up patch is in order?
-> 
-> Here's a patch to do that.
+A PM domain comprising of CPUs may be powered off when all the CPUs in
+the domain are powered down. Powering down a CPU domain is generally a
+expensive operation and therefore the power performance trade offs
+should be considered. The time between the last CPU powering down and
+the first CPU powering up in a domain, is the time available for the
+domain to sleep. Ideally, the sleep time of the domain should fulfill
+the residency requirement of the domains' idle state.
 
-FWIW:
+To do this effectively, read the time before the wakeup of the cluster's
+CPUs and ensure that the domain's idle state sleep time guarantees the
+QoS requirements of each of the CPU, the PM QoS CPU_DMA_LATENCY and the
+state's residency.
 
-Reviewed-by: Brian Norris <briannorris@chromium.org>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+---
+ drivers/base/power/cpu_domains.c | 80 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 79 insertions(+), 1 deletion(-)
 
-Thanks.
+diff --git a/drivers/base/power/cpu_domains.c b/drivers/base/power/cpu_domains.c
+index 04891dc..4f2a40e 100644
+--- a/drivers/base/power/cpu_domains.c
++++ b/drivers/base/power/cpu_domains.c
+@@ -16,9 +16,12 @@
+ #include <linux/kernel.h>
+ #include <linux/list.h>
+ #include <linux/pm_domain.h>
++#include <linux/pm_qos.h>
++#include <linux/pm_runtime.h>
+ #include <linux/rculist.h>
+ #include <linux/rcupdate.h>
+ #include <linux/slab.h>
++#include <linux/tick.h>
+ 
+ #define CPU_PD_NAME_MAX 36
+ 
+@@ -50,6 +53,81 @@ static inline struct cpu_pm_domain *to_cpu_pd(struct generic_pm_domain *d)
+ 	return res;
+ }
+ 
++static bool cpu_pd_down_ok(struct dev_pm_domain *pd)
++{
++	struct generic_pm_domain *genpd = pd_to_genpd(pd);
++	struct cpu_pm_domain *cpu_pd = to_cpu_pd(genpd);
++	int qos_ns = pm_qos_request(PM_QOS_CPU_DMA_LATENCY);
++	u64 sleep_ns;
++	ktime_t earliest, next_wakeup;
++	int cpu;
++	int i;
++
++	/* Reset the last set genpd state, default to index 0 */
++	genpd->state_idx = 0;
++
++	/* We don't want to power down, if QoS is 0 */
++	if (!qos_ns)
++		return false;
++
++	/*
++	 * Find the sleep time for the cluster.
++	 * The time between now and the first wake up of any CPU that
++	 * are in this domain hierarchy is the time available for the
++	 * domain to be idle.
++	 *
++	 * We only care about the next wakeup for any online CPU in that
++	 * cluster. Hotplug off any of the CPUs that we care about will
++	 * wait on the genpd lock, until we are done. Any other CPU hotplug
++	 * is not of consequence to our sleep time.
++	 */
++	earliest = ktime_set(KTIME_SEC_MAX, 0);
++	for_each_cpu_and(cpu, cpu_pd->cpus, cpu_online_mask) {
++		next_wakeup = tick_nohz_get_next_wakeup(cpu);
++		if (earliest > next_wakeup)
++			earliest = next_wakeup;
++	}
++
++	sleep_ns = ktime_to_ns(ktime_sub(earliest, ktime_get()));
++	if (sleep_ns <= 0)
++		return false;
++
++	/*
++	 * Find the deepest sleep state that satisfies the residency
++	 * requirement and the QoS constraint
++	 */
++	for (i = genpd->state_count - 1; i >= 0; i--) {
++		u64 state_sleep_ns;
++
++		state_sleep_ns = genpd->states[i].power_off_latency_ns +
++			genpd->states[i].power_on_latency_ns +
++			genpd->states[i].residency_ns;
++
++		/*
++		 * If we can't sleep to save power in the state, move on
++		 * to the next lower idle state.
++		 */
++		if (state_sleep_ns > sleep_ns)
++			continue;
++
++		/*
++		 * We also don't want to sleep more than we should to
++		 * gaurantee QoS.
++		 */
++		if (state_sleep_ns < (qos_ns * NSEC_PER_USEC))
++			break;
++	}
++
++	if (i >= 0)
++		genpd->state_idx = i;
++
++	return (i >= 0);
++}
++
++static struct dev_power_governor cpu_pd_gov = {
++	.power_down_ok = cpu_pd_down_ok,
++};
++
+ static int cpu_pd_power_on(struct generic_pm_domain *genpd)
+ {
+ 	struct cpu_pm_domain *pd = to_cpu_pd(genpd);
+@@ -172,7 +250,7 @@ int cpu_pd_init(struct generic_pm_domain *genpd, const struct cpu_pd_ops *ops)
+ 	list_add_rcu(&pd->link, &of_cpu_pd_list);
+ 	mutex_unlock(&cpu_pd_list_lock);
+ 
+-	ret = pm_genpd_init(genpd, &simple_qos_governor, false);
++	ret = pm_genpd_init(genpd, &cpu_pd_gov, false);
+ 	if (ret) {
+ 		pr_err("Unable to initialize domain %s\n", genpd->name);
+ 		goto fail;
+-- 
+2.7.4
