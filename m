@@ -1,23 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 3 Mar 2017 00:21:47 -0600
-Subject: [PATCH v4 1/2] dt-bindings: mmc: add DT binding for S3C24XX
- MMC/SD/SDIO controller
-In-Reply-To: <1488417536-15110-2-git-send-email-sergio.prado@e-labworks.com>
-References: <1488417536-15110-1-git-send-email-sergio.prado@e-labworks.com>
- <1488417536-15110-2-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <20170303062147.gm5bl43zctztpadb@rob-hp-laptop>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 3 Mar 2017 07:36:54 +0100
+Subject: [PATCH v1] nvmem: i.MX IIM driver
+In-Reply-To: <20170213153149.11710-1-s.hauer@pengutronix.de>
+References: <20170213153149.11710-1-s.hauer@pengutronix.de>
+Message-ID: <20170303063654.osmmhi5v6yne5ij5@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 01, 2017 at 10:18:55PM -0300, Sergio Prado wrote:
-> Adds the device tree bindings description for Samsung S3C24XX
-> MMC/SD/SDIO controller, used as a connectivity interface with external
-> MMC, SD and SDIO storage mediums.
-> 
-> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
-> ---
->  .../devicetree/bindings/mmc/samsung,s3cmci.txt     | 42 ++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+Srinivas, Maxime,
 
-Acked-by: Rob Herring <robh@kernel.org>
+Any comments on this one?
+
+Sascha
+
+On Mon, Feb 13, 2017 at 04:31:47PM +0100, Sascha Hauer wrote:
+> 
+> This adds a readonly nvmem driver for the i.MX IC Identification Module (IIM)
+> which is found on the older i.MX SoCs. The IIM is part of the i.MX dts files
+> for long now, but so far there is no binding document for it, so add one now.
+> 
+> Sascha
+> 
+> ----------------------------------------------------------------
+> Michael Grzeschik (1):
+>       nvmem: Add driver for the i.MX IIM
+> 
+> Sascha Hauer (1):
+>       dt-bindings: nvmem: Add i.MX IIM binding doc
+> 
+>  .../devicetree/bindings/nvmem/imx-iim.txt          |  22 +++
+>  drivers/nvmem/Kconfig                              |  11 ++
+>  drivers/nvmem/Makefile                             |   2 +
+>  drivers/nvmem/imx-iim.c                            | 171 +++++++++++++++++++++
+>  4 files changed, 206 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/nvmem/imx-iim.txt
+>  create mode 100644 drivers/nvmem/imx-iim.c
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
