@@ -1,27 +1,54 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 3 Mar 2017 12:45:54 +0100
-Subject: [PATCH v3 6/6] iio: adc: stm32: add support for EXTI trigger
-In-Reply-To: <1488300679-3259-7-git-send-email-fabrice.gasnier@st.com>
-References: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
- <1488300679-3259-7-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <5be44ed9-2c86-ac51-d964-d231d5ca62fa@metafoo.de>
+From: eric.engestrom@imgtec.com (Eric Engestrom)
+Date: Fri, 3 Mar 2017 11:58:42 +0000
+Subject: [RFC PATCH 04/12] staging: android: ion: Call dma_map_sg for
+ syncing and mapping
+In-Reply-To: <20170303110329.GA4132@mwanda>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <1488491084-17252-5-git-send-email-labbott@redhat.com>
+ <20170303110329.GA4132@mwanda>
+Message-ID: <20170303115841.2fxuhkzo5yazgvrd@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/28/2017 05:51 PM, Fabrice Gasnier wrote:
-> EXTi (external interrupt) signal can be routed internally as trigger
-> source for ADC conversions: STM32F4 ADC can use EXTI11.
+On Friday, 2017-03-03 14:04:26 +0300, Dan Carpenter wrote:
+> On Thu, Mar 02, 2017 at 01:44:36PM -0800, Laura Abbott wrote:
+> >  static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
+> >  					enum dma_data_direction direction)
+> >  {
+> >  	struct dma_buf *dmabuf = attachment->dmabuf;
+> >  	struct ion_buffer *buffer = dmabuf->priv;
+> > +	struct sg_table *table;
+> > +	int ret;
+> > +
+> > +	/*
+> > +	 * TODO: Need to sync wrt CPU or device completely owning?
+> > +	 */
+> > +
+> > +	table = dup_sg_table(buffer->sg_table);
+> >  
+> > -	ion_buffer_sync_for_device(buffer, attachment->dev, direction);
+> > -	return dup_sg_table(buffer->sg_table);
+> > +	if (!dma_map_sg(attachment->dev, table->sgl, table->nents,
+> > +			direction)){
+> > +		ret = -ENOMEM;
+> > +		goto err;
+> > +	}
+
+Actually, I think `ret` should be left uninitialised on success,
+what's really missing is this return before the `err:` label:
+
++	return table;
+
+
+> > +
+> > +err:
+> > +	free_duped_table(table);
+> > +	return ERR_PTR(ret);
 > 
-> Retrieve interrupt trigger from DT, so it can be muxed into ADC IP,
-> via extsel.
-
-Hi,
-
-Sorry, I have some trouble understanding the specifics of this. Is EXTI a
-hardware input signal into the ADC that automatically triggers a conversion
-when asserted? If yes how is it configured which external signal is used
-here. Your bindings suggest that any GPIO can be used, but the driver only
-differentiates between EXTI on or EXTI off.
-
-Or is this just a software triggered conversion? The GPIO triggers a
-software interrupt routine and the interrupt routine than triggers conversion?
+> ret isn't initialized on success.
+> 
+> >  }
+> >  
+> 
+> regards,
+> dan carpenter
