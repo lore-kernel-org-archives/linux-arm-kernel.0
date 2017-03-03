@@ -1,80 +1,52 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 3 Mar 2017 18:26:38 +0100
-Subject: [PATCH] ARM: DTS armada: Add support for 2 more mvebu model
-In-Reply-To: <1488560855-421-1-git-send-email-ansuelsmth@gmail.com>
-References: <1488560855-421-1-git-send-email-ansuelsmth@gmail.com>
-Message-ID: <20170303172638.GD1488@lunn.ch>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 3 Mar 2017 09:37:55 -0800
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
+ staging
+In-Reply-To: <20170303132949.GC31582@dhcp22.suse.cz>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <20170303132949.GC31582@dhcp22.suse.cz>
+Message-ID: <cf383b9b-3cbc-0092-a071-f120874c053c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 03, 2017 at 06:07:35PM +0100, Ansuel Smith wrote:
-> This patch add support for 2 Linksys router model
-> (shelby and rango). With this we now support all
-> the mvebu board on the market.
+On 03/03/2017 05:29 AM, Michal Hocko wrote:
+> On Thu 02-03-17 13:44:32, Laura Abbott wrote:
+>> Hi,
+>>
+>> There's been some recent discussions[1] about Ion-like frameworks. There's
+>> apparently interest in just keeping Ion since it works reasonablly well.
+>> This series does what should be the final clean ups for it to possibly be
+>> moved out of staging.
+>>
+>> This includes the following:
+>> - Some general clean up and removal of features that never got a lot of use
+>>   as far as I can tell.
+>> - Fixing up the caching. This is the series I proposed back in December[2]
+>>   but never heard any feedback on. It will certainly break existing
+>>   applications that rely on the implicit caching. I'd rather make an effort
+>>   to move to a model that isn't going directly against the establishement
+>>   though.
+>> - Fixing up the platform support. The devicetree approach was never well
+>>   recieved by DT maintainers. The proposal here is to think of Ion less as
+>>   specifying requirements and more of a framework for exposing memory to
+>>   userspace.
+>> - CMA allocations now happen without the need of a dummy device structure.
+>>   This fixes a bunch of the reasons why I attempted to add devicetree
+>>   support before.
+>>
+>> I've had problems getting feedback in the past so if I don't hear any major
+>> objections I'm going to send out with the RFC dropped to be picked up.
+>> The only reason there isn't a patch to come out of staging is to discuss any
+>> other changes to the ABI people might want. Once this comes out of staging,
+>> I really don't want to mess with the ABI.
 > 
-> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
-> Signed-off-by: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
-> Signed-off-by: Ansuel Smith <ansuelsmth@gmail.com>
-> ---
->  arch/arm/boot/dts/armada-385-linksys-rango.dts  | 443 ++++++++++++++++++++++++
->  arch/arm/boot/dts/armada-385-linksys-shelby.dts | 115 ++++++
->  2 files changed, 558 insertions(+)
->  create mode 100644 arch/arm/boot/dts/armada-385-linksys-rango.dts
->  create mode 100644 arch/arm/boot/dts/armada-385-linksys-shelby.dts
+> Could you recapitulate concerns preventing the code being merged
+> normally rather than through the staging tree and how they were
+> addressed?
 > 
-> diff --git a/arch/arm/boot/dts/armada-385-linksys-rango.dts b/arch/arm/boot/dts/armada-385-linksys-rango.dts
-> new file mode 100644
-> index 0000000..61f4592
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-385-linksys-rango.dts
-> @@ -0,0 +1,443 @@
-> +/*
-> + * Device Tree file for the Linksys WRT3200ACM (Rango)
-> + *
-> + * Copyright (C) 2016 Imre Kaloz <kaloz@openwrt.org>
-> + *
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is licensed under the terms of the GNU General Public
-> + *     License version 2.  This program is licensed "as is" without
-> + *     any warranty of any kind, whether express or implied.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include "armada-385.dtsi"
 
-Hi Ansuel
+Sorry, I'm really not understanding your question here, can you
+clarify?
 
-Please could you explain why you did not use armada-385-linksys.dtsi
-
-Thanks
-	Andrew
+Thanks,
+Laura
