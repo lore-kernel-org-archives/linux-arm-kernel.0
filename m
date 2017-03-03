@@ -1,62 +1,149 @@
 From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Fri, 03 Mar 2017 14:37:05 +0530
-Subject: [Patch v2 00/11] Add MFC v10.10 support
-References: <CGME20170303090429epcas5p3c057f653b6a6b6299ad2392490925fd9@epcas5p3.samsung.com>
-Message-ID: <1488532036-13044-1-git-send-email-smitha.t@samsung.com>
+Date: Fri, 03 Mar 2017 14:37:06 +0530
+Subject: [Patch v2 01/11] s5p-mfc: Rename IS_MFCV8 macro
+In-Reply-To: <1488532036-13044-1-git-send-email-smitha.t@samsung.com>
+References: <1488532036-13044-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170303090433epcas5p35aed4fe00755163bd5dcf4fb56ccb9d0@epcas5p3.samsung.com>
+Message-ID: <1488532036-13044-2-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds MFC v10.10 support. MFC v10.10 is used in some
-of Exynos7 variants.
+This patch renames macro IS_MFCV8 to IS_MFCV8_PLUS so that the MFCv8
+code can be resued for MFCv10.10 support. Since the MFCv8 specific code
+holds good for MFC v10.10 also.
 
-This adds support for following:
+Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+Acked-by: Andrzej Hajda <a.hajda@samsung.com>
+---
+ drivers/media/platform/s5p-mfc/s5p_mfc_common.h |    2 +-
+ drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c   |    2 +-
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    |    2 +-
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |   18 +++++++++---------
+ 4 files changed, 12 insertions(+), 12 deletions(-)
 
-* Add support for HEVC encoder and decoder
-* Add support for VP9 decoder
-* Update Documentation for control id definitions
-* Update computation of min scratch buffer size requirement for V8 onwards
-
-Changes since v1:
- - Addressed review comments by Andrzej Hajda.
- - Addressed review comment by Rob Herring.
- - Rebased on latest krzk/for-next tree.
- - This patches are tested on top of Marek's patch v2 [1]
- - Applied acked-by and r-o-b from Andrzej on respective patches. 
-
-[1]: http://www.mail-archive.com/linux-media at vger.kernel.org/msg108520.html
-
-Smitha T Murthy (11):
-  s5p-mfc: Rename IS_MFCV8 macro
-  s5p-mfc: Adding initial support for MFC v10.10
-  s5p-mfc: Use min scratch buffer size as provided by F/W
-  s5p-mfc: Support MFCv10.10 buffer requirements
-  videodev2.h: Add v4l2 definition for HEVC
-  s5p-mfc: Add support for HEVC decoder
-  Documentation: v4l: Documentation for HEVC v4l2 definition
-  s5p-mfc: Add VP9 decoder support
-  v4l2: Add v4l2 control IDs for HEVC encoder
-  s5p-mfc: Add support for HEVC encoder
-  Documention: v4l: Documentation for HEVC CIDs
-
- .../devicetree/bindings/media/s5p-mfc.txt          |    1 +
- Documentation/media/uapi/v4l/extended-controls.rst |  314 ++++++++++
- Documentation/media/uapi/v4l/pixfmt-013.rst        |    5 +
- drivers/media/platform/s5p-mfc/regs-mfc-v10.h      |   88 +++
- drivers/media/platform/s5p-mfc/regs-mfc-v8.h       |    2 +
- drivers/media/platform/s5p-mfc/s5p_mfc.c           |   33 +
- drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c    |    9 +
- drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |   64 ++-
- drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |    6 +-
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |   62 ++-
- drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       |  621 +++++++++++++++++++-
- drivers/media/platform/s5p-mfc/s5p_mfc_opr.h       |   14 +
- drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    |  420 ++++++++++++--
- drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |   15 +
- drivers/media/v4l2-core/v4l2-ctrls.c               |   51 ++
- include/uapi/linux/v4l2-controls.h                 |  129 ++++
- include/uapi/linux/videodev2.h                     |    1 +
- 17 files changed, 1758 insertions(+), 77 deletions(-)
- create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+index ab23236..b45d18c 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+@@ -722,7 +722,7 @@ struct mfc_control {
+ #define IS_TWOPORT(dev)		(dev->variant->port_num == 2 ? 1 : 0)
+ #define IS_MFCV6_PLUS(dev)	(dev->variant->version >= 0x60 ? 1 : 0)
+ #define IS_MFCV7_PLUS(dev)	(dev->variant->version >= 0x70 ? 1 : 0)
+-#define IS_MFCV8(dev)		(dev->variant->version >= 0x80 ? 1 : 0)
++#define IS_MFCV8_PLUS(dev)	(dev->variant->version >= 0x80 ? 1 : 0)
+ 
+ #define MFC_V5_BIT	BIT(0)
+ #define MFC_V6_BIT	BIT(1)
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
+index cc88871..484af6b 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
+@@ -427,7 +427,7 @@ int s5p_mfc_wakeup(struct s5p_mfc_dev *dev)
+ 	s5p_mfc_clear_cmds(dev);
+ 	s5p_mfc_clean_dev_int_flags(dev);
+ 	/* 3. Send MFC wakeup command and wait for completion*/
+-	if (IS_MFCV8(dev))
++	if (IS_MFCV8_PLUS(dev))
+ 		ret = s5p_mfc_v8_wait_wakeup(dev);
+ 	else
+ 		ret = s5p_mfc_wait_wakeup(dev);
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+index 367ef8e..0ec2928 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -1177,7 +1177,7 @@ void s5p_mfc_dec_init(struct s5p_mfc_ctx *ctx)
+ 	struct v4l2_format f;
+ 	f.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_H264;
+ 	ctx->src_fmt = find_format(&f, MFC_FMT_DEC);
+-	if (IS_MFCV8(ctx->dev))
++	if (IS_MFCV8_PLUS(ctx->dev))
+ 		f.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12M;
+ 	else if (IS_MFCV6_PLUS(ctx->dev))
+ 		f.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12MT_16X16;
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+index d6f207e..7682b0e 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+@@ -74,7 +74,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 			  ctx->luma_size, ctx->chroma_size, ctx->mv_size);
+ 		mfc_debug(2, "Totals bufs: %d\n", ctx->total_dpb_count);
+ 	} else if (ctx->type == MFCINST_ENCODER) {
+-		if (IS_MFCV8(dev))
++		if (IS_MFCV8_PLUS(dev))
+ 			ctx->tmv_buffer_size = S5P_FIMV_NUM_TMV_BUFFERS_V6 *
+ 			ALIGN(S5P_FIMV_TMV_BUFFER_SIZE_V8(mb_width, mb_height),
+ 			S5P_FIMV_TMV_BUFFER_ALIGN_V6);
+@@ -89,7 +89,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 		ctx->chroma_dpb_size = ALIGN((mb_width * mb_height) *
+ 				S5P_FIMV_CHROMA_MB_TO_PIXEL_V6,
+ 				S5P_FIMV_CHROMA_DPB_BUFFER_ALIGN_V6);
+-		if (IS_MFCV8(dev))
++		if (IS_MFCV8_PLUS(dev))
+ 			ctx->me_buffer_size = ALIGN(S5P_FIMV_ME_BUFFER_SIZE_V8(
+ 						ctx->img_width, ctx->img_height,
+ 						mb_width, mb_height),
+@@ -110,7 +110,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 	switch (ctx->codec_mode) {
+ 	case S5P_MFC_CODEC_H264_DEC:
+ 	case S5P_MFC_CODEC_H264_MVC_DEC:
+-		if (IS_MFCV8(dev))
++		if (IS_MFCV8_PLUS(dev))
+ 			ctx->scratch_buf_size =
+ 				S5P_FIMV_SCRATCH_BUF_SIZE_H264_DEC_V8(
+ 					mb_width,
+@@ -167,7 +167,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 		ctx->bank1.size = ctx->scratch_buf_size;
+ 		break;
+ 	case S5P_MFC_CODEC_VP8_DEC:
+-		if (IS_MFCV8(dev))
++		if (IS_MFCV8_PLUS(dev))
+ 			ctx->scratch_buf_size =
+ 				S5P_FIMV_SCRATCH_BUF_SIZE_VP8_DEC_V8(
+ 						mb_width,
+@@ -182,7 +182,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 		ctx->bank1.size = ctx->scratch_buf_size;
+ 		break;
+ 	case S5P_MFC_CODEC_H264_ENC:
+-		if (IS_MFCV8(dev))
++		if (IS_MFCV8_PLUS(dev))
+ 			ctx->scratch_buf_size =
+ 				S5P_FIMV_SCRATCH_BUF_SIZE_H264_ENC_V8(
+ 					mb_width,
+@@ -215,7 +215,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 		ctx->bank2.size = 0;
+ 		break;
+ 	case S5P_MFC_CODEC_VP8_ENC:
+-		if (IS_MFCV8(dev))
++		if (IS_MFCV8_PLUS(dev))
+ 			ctx->scratch_buf_size =
+ 				S5P_FIMV_SCRATCH_BUF_SIZE_VP8_ENC_V8(
+ 					mb_width,
+@@ -366,7 +366,7 @@ static void s5p_mfc_dec_calc_dpb_size_v6(struct s5p_mfc_ctx *ctx)
+ 
+ 	ctx->luma_size = calc_plane(ctx->img_width, ctx->img_height);
+ 	ctx->chroma_size = calc_plane(ctx->img_width, (ctx->img_height >> 1));
+-	if (IS_MFCV8(ctx->dev)) {
++	if (IS_MFCV8_PLUS(ctx->dev)) {
+ 		/* MFCv8 needs additional 64 bytes for luma,chroma dpb*/
+ 		ctx->luma_size += S5P_FIMV_D_ALIGN_PLANE_SIZE_V8;
+ 		ctx->chroma_size += S5P_FIMV_D_ALIGN_PLANE_SIZE_V8;
+@@ -447,7 +447,7 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
+ 	writel(buf_addr1, mfc_regs->d_scratch_buffer_addr);
+ 	writel(ctx->scratch_buf_size, mfc_regs->d_scratch_buffer_size);
+ 
+-	if (IS_MFCV8(dev)) {
++	if (IS_MFCV8_PLUS(dev)) {
+ 		writel(ctx->img_width,
+ 			mfc_regs->d_first_plane_dpb_stride_size);
+ 		writel(ctx->img_width,
+@@ -2111,7 +2111,7 @@ static unsigned int s5p_mfc_get_crop_info_v_v6(struct s5p_mfc_ctx *ctx)
+ 			S5P_FIMV_E_ENCODED_SOURCE_SECOND_ADDR_V7);
+ 	R(e_vp8_options, S5P_FIMV_E_VP8_OPTIONS_V7);
+ 
+-	if (!IS_MFCV8(dev))
++	if (!IS_MFCV8_PLUS(dev))
+ 		goto done;
+ 
+ 	/* Initialize registers used in MFC v8 only.
 -- 
 1.7.2.3
