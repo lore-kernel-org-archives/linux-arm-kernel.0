@@ -1,149 +1,272 @@
 From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Fri, 03 Mar 2017 14:37:06 +0530
-Subject: [Patch v2 01/11] s5p-mfc: Rename IS_MFCV8 macro
+Date: Fri, 03 Mar 2017 14:37:08 +0530
+Subject: [Patch v2 03/11] s5p-mfc: Use min scratch buffer size as provided by
+ F/W
 In-Reply-To: <1488532036-13044-1-git-send-email-smitha.t@samsung.com>
 References: <1488532036-13044-1-git-send-email-smitha.t@samsung.com>
- <CGME20170303090433epcas5p35aed4fe00755163bd5dcf4fb56ccb9d0@epcas5p3.samsung.com>
-Message-ID: <1488532036-13044-2-git-send-email-smitha.t@samsung.com>
+ <CGME20170303090440epcas5p33f1bea986f2f9c961c93af94df7ec565@epcas5p3.samsung.com>
+Message-ID: <1488532036-13044-4-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch renames macro IS_MFCV8 to IS_MFCV8_PLUS so that the MFCv8
-code can be resued for MFCv10.10 support. Since the MFCv8 specific code
-holds good for MFC v10.10 also.
+After MFC v8.0, mfc f/w lets the driver know how much scratch buffer
+size is required for decoder. If mfc f/w has the functionality,
+E_MIN_SCRATCH_BUFFER_SIZE, driver can know how much scratch buffer size
+is required for encoder too.
 
 Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-Acked-by: Andrzej Hajda <a.hajda@samsung.com>
 ---
- drivers/media/platform/s5p-mfc/s5p_mfc_common.h |    2 +-
- drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c   |    2 +-
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    |    2 +-
- drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |   18 +++++++++---------
- 4 files changed, 12 insertions(+), 12 deletions(-)
+ drivers/media/platform/s5p-mfc/regs-mfc-v8.h    |    2 +
+ drivers/media/platform/s5p-mfc/s5p_mfc.c        |    2 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_common.h |    1 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_enc.c    |    5 ++
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr.h    |    4 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |   68 +++++++++++++++++------
+ 6 files changed, 65 insertions(+), 17 deletions(-)
 
+diff --git a/drivers/media/platform/s5p-mfc/regs-mfc-v8.h b/drivers/media/platform/s5p-mfc/regs-mfc-v8.h
+index 4d1c375..2cd396b 100644
+--- a/drivers/media/platform/s5p-mfc/regs-mfc-v8.h
++++ b/drivers/media/platform/s5p-mfc/regs-mfc-v8.h
+@@ -17,6 +17,7 @@
+ 
+ /* Additional registers for v8 */
+ #define S5P_FIMV_D_MVC_NUM_VIEWS_V8		0xf104
++#define S5P_FIMV_D_MIN_SCRATCH_BUFFER_SIZE_V8	0xf108
+ #define S5P_FIMV_D_FIRST_PLANE_DPB_SIZE_V8	0xf144
+ #define S5P_FIMV_D_SECOND_PLANE_DPB_SIZE_V8	0xf148
+ #define S5P_FIMV_D_MV_BUFFER_SIZE_V8		0xf150
+@@ -84,6 +85,7 @@
+ 
+ #define S5P_FIMV_E_VBV_BUFFER_SIZE_V8		0xf78c
+ #define S5P_FIMV_E_VBV_INIT_DELAY_V8		0xf790
++#define S5P_FIMV_E_MIN_SCRATCH_BUFFER_SIZE_V8   0xf894
+ 
+ #define S5P_FIMV_E_ASPECT_RATIO_V8		0xfb4c
+ #define S5P_FIMV_E_EXTENDED_SAR_V8		0xfb50
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+index a043cce..b014038 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+@@ -520,6 +520,8 @@ static void s5p_mfc_handle_seq_done(struct s5p_mfc_ctx *ctx,
+ 				dev);
+ 		ctx->mv_count = s5p_mfc_hw_call(dev->mfc_ops, get_mv_count,
+ 				dev);
++		ctx->scratch_buf_size = s5p_mfc_hw_call(dev->mfc_ops,
++						get_min_scratch_buf_size, dev);
+ 		if (ctx->img_width == 0 || ctx->img_height == 0)
+ 			ctx->state = MFCINST_ERROR;
+ 		else
 diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-index ab23236..b45d18c 100644
+index 1941c63..998e24b 100644
 --- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
 +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-@@ -722,7 +722,7 @@ struct mfc_control {
- #define IS_TWOPORT(dev)		(dev->variant->port_num == 2 ? 1 : 0)
- #define IS_MFCV6_PLUS(dev)	(dev->variant->version >= 0x60 ? 1 : 0)
+@@ -724,6 +724,7 @@ struct mfc_control {
  #define IS_MFCV7_PLUS(dev)	(dev->variant->version >= 0x70 ? 1 : 0)
--#define IS_MFCV8(dev)		(dev->variant->version >= 0x80 ? 1 : 0)
-+#define IS_MFCV8_PLUS(dev)	(dev->variant->version >= 0x80 ? 1 : 0)
+ #define IS_MFCV8_PLUS(dev)	(dev->variant->version >= 0x80 ? 1 : 0)
+ #define IS_MFCV10(dev)		(dev->variant->version >= 0xA0 ? 1 : 0)
++#define FW_HAS_E_MIN_SCRATCH_BUF(dev) (IS_MFCV10(dev))
  
  #define MFC_V5_BIT	BIT(0)
  #define MFC_V6_BIT	BIT(1)
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-index cc88871..484af6b 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-@@ -427,7 +427,7 @@ int s5p_mfc_wakeup(struct s5p_mfc_dev *dev)
- 	s5p_mfc_clear_cmds(dev);
- 	s5p_mfc_clean_dev_int_flags(dev);
- 	/* 3. Send MFC wakeup command and wait for completion*/
--	if (IS_MFCV8(dev))
-+	if (IS_MFCV8_PLUS(dev))
- 		ret = s5p_mfc_v8_wait_wakeup(dev);
- 	else
- 		ret = s5p_mfc_wait_wakeup(dev);
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-index 367ef8e..0ec2928 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-@@ -1177,7 +1177,7 @@ void s5p_mfc_dec_init(struct s5p_mfc_ctx *ctx)
- 	struct v4l2_format f;
- 	f.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_H264;
- 	ctx->src_fmt = find_format(&f, MFC_FMT_DEC);
--	if (IS_MFCV8(ctx->dev))
-+	if (IS_MFCV8_PLUS(ctx->dev))
- 		f.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12M;
- 	else if (IS_MFCV6_PLUS(ctx->dev))
- 		f.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12MT_16X16;
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+index 9042378..6623f79 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
+@@ -818,6 +818,11 @@ static int enc_post_seq_start(struct s5p_mfc_ctx *ctx)
+ 				get_enc_dpb_count, dev);
+ 		if (ctx->pb_count < enc_pb_count)
+ 			ctx->pb_count = enc_pb_count;
++		if (FW_HAS_E_MIN_SCRATCH_BUF(dev)) {
++			ctx->scratch_buf_size = s5p_mfc_hw_call(dev->mfc_ops,
++					get_e_min_scratch_buf_size, dev);
++			ctx->bank1.size += ctx->scratch_buf_size;
++		}
+ 		ctx->state = MFCINST_HEAD_PRODUCED;
+ 	}
+ 
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
+index b6ac417..6478f70 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
+@@ -169,6 +169,7 @@ struct s5p_mfc_regs {
+ 	void __iomem *d_decoded_third_addr;/* only v7 */
+ 	void __iomem *d_used_dpb_flag_upper;/* v7 and v8 */
+ 	void __iomem *d_used_dpb_flag_lower;/* v7 and v8 */
++	void __iomem *d_min_scratch_buffer_size; /* v10 */
+ 
+ 	/* encoder registers */
+ 	void __iomem *e_frame_width;
+@@ -268,6 +269,7 @@ struct s5p_mfc_regs {
+ 	void __iomem *e_vp8_hierarchical_qp_layer0;/* v7 and v8 */
+ 	void __iomem *e_vp8_hierarchical_qp_layer1;/* v7 and v8 */
+ 	void __iomem *e_vp8_hierarchical_qp_layer2;/* v7 and v8 */
++	void __iomem *e_min_scratch_buffer_size; /* v10 */
+ };
+ 
+ struct s5p_mfc_hw_ops {
+@@ -311,6 +313,8 @@ struct s5p_mfc_hw_ops {
+ 	unsigned int (*get_pic_type_bot)(struct s5p_mfc_ctx *ctx);
+ 	unsigned int (*get_crop_info_h)(struct s5p_mfc_ctx *ctx);
+ 	unsigned int (*get_crop_info_v)(struct s5p_mfc_ctx *ctx);
++	int (*get_min_scratch_buf_size)(struct s5p_mfc_dev *dev);
++	int (*get_e_min_scratch_buf_size)(struct s5p_mfc_dev *dev);
+ };
+ 
+ void s5p_mfc_init_hw_ops(struct s5p_mfc_dev *dev);
 diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-index d6f207e..7682b0e 100644
+index 9dc106e..5f0da0b 100644
 --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
 +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-@@ -74,7 +74,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
- 			  ctx->luma_size, ctx->chroma_size, ctx->mv_size);
- 		mfc_debug(2, "Totals bufs: %d\n", ctx->total_dpb_count);
- 	} else if (ctx->type == MFCINST_ENCODER) {
--		if (IS_MFCV8(dev))
-+		if (IS_MFCV8_PLUS(dev))
- 			ctx->tmv_buffer_size = S5P_FIMV_NUM_TMV_BUFFERS_V6 *
- 			ALIGN(S5P_FIMV_TMV_BUFFER_SIZE_V8(mb_width, mb_height),
- 			S5P_FIMV_TMV_BUFFER_ALIGN_V6);
-@@ -89,7 +89,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
- 		ctx->chroma_dpb_size = ALIGN((mb_width * mb_height) *
- 				S5P_FIMV_CHROMA_MB_TO_PIXEL_V6,
- 				S5P_FIMV_CHROMA_DPB_BUFFER_ALIGN_V6);
--		if (IS_MFCV8(dev))
-+		if (IS_MFCV8_PLUS(dev))
- 			ctx->me_buffer_size = ALIGN(S5P_FIMV_ME_BUFFER_SIZE_V8(
- 						ctx->img_width, ctx->img_height,
- 						mb_width, mb_height),
-@@ -110,7 +110,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+@@ -110,7 +110,9 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
  	switch (ctx->codec_mode) {
  	case S5P_MFC_CODEC_H264_DEC:
  	case S5P_MFC_CODEC_H264_MVC_DEC:
--		if (IS_MFCV8(dev))
-+		if (IS_MFCV8_PLUS(dev))
+-		if (IS_MFCV8_PLUS(dev))
++		if (IS_MFCV10(dev))
++			mfc_debug(2, "Use min scratch buffer size\n");
++		else if (IS_MFCV8_PLUS(dev))
  			ctx->scratch_buf_size =
  				S5P_FIMV_SCRATCH_BUF_SIZE_H264_DEC_V8(
  					mb_width,
-@@ -167,7 +167,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+@@ -127,7 +129,9 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 			(ctx->mv_count * ctx->mv_size);
+ 		break;
+ 	case S5P_MFC_CODEC_MPEG4_DEC:
+-		if (IS_MFCV7_PLUS(dev)) {
++		if (IS_MFCV10(dev))
++			mfc_debug(2, "Use min scratch buffer size\n");
++		else if (IS_MFCV7_PLUS(dev)) {
+ 			ctx->scratch_buf_size =
+ 				S5P_FIMV_SCRATCH_BUF_SIZE_MPEG4_DEC_V7(
+ 						mb_width,
+@@ -145,10 +149,14 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 		break;
+ 	case S5P_MFC_CODEC_VC1RCV_DEC:
+ 	case S5P_MFC_CODEC_VC1_DEC:
+-		ctx->scratch_buf_size =
+-			S5P_FIMV_SCRATCH_BUF_SIZE_VC1_DEC_V6(
+-					mb_width,
+-					mb_height);
++		if (IS_MFCV10(dev))
++			mfc_debug(2, "Use min scratch buffer size\n");
++		else
++			ctx->scratch_buf_size =
++				S5P_FIMV_SCRATCH_BUF_SIZE_VC1_DEC_V6(
++						mb_width,
++						mb_height);
++
+ 		ctx->scratch_buf_size = ALIGN(ctx->scratch_buf_size,
+ 				S5P_FIMV_SCRATCH_BUFFER_ALIGN_V6);
+ 		ctx->bank1.size = ctx->scratch_buf_size;
+@@ -158,16 +166,21 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 		ctx->bank2.size = 0;
+ 		break;
+ 	case S5P_MFC_CODEC_H263_DEC:
+-		ctx->scratch_buf_size =
+-			S5P_FIMV_SCRATCH_BUF_SIZE_H263_DEC_V6(
+-					mb_width,
+-					mb_height);
++		if (IS_MFCV10(dev))
++			mfc_debug(2, "Use min scratch buffer size\n");
++		else
++			ctx->scratch_buf_size =
++				S5P_FIMV_SCRATCH_BUF_SIZE_H263_DEC_V6(
++						mb_width,
++						mb_height);
+ 		ctx->scratch_buf_size = ALIGN(ctx->scratch_buf_size,
+ 				S5P_FIMV_SCRATCH_BUFFER_ALIGN_V6);
  		ctx->bank1.size = ctx->scratch_buf_size;
  		break;
  	case S5P_MFC_CODEC_VP8_DEC:
--		if (IS_MFCV8(dev))
-+		if (IS_MFCV8_PLUS(dev))
+-		if (IS_MFCV8_PLUS(dev))
++		if (IS_MFCV10(dev))
++			mfc_debug(2, "Use min scratch buffer size\n");
++		else if (IS_MFCV8_PLUS(dev))
  			ctx->scratch_buf_size =
  				S5P_FIMV_SCRATCH_BUF_SIZE_VP8_DEC_V8(
  						mb_width,
-@@ -182,7 +182,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+@@ -182,7 +195,9 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
  		ctx->bank1.size = ctx->scratch_buf_size;
  		break;
  	case S5P_MFC_CODEC_H264_ENC:
--		if (IS_MFCV8(dev))
-+		if (IS_MFCV8_PLUS(dev))
+-		if (IS_MFCV8_PLUS(dev))
++		if (IS_MFCV10(dev)) {
++			mfc_debug(2, "Use min scratch buffer size\n");
++		} else if (IS_MFCV8_PLUS(dev))
  			ctx->scratch_buf_size =
  				S5P_FIMV_SCRATCH_BUF_SIZE_H264_ENC_V8(
  					mb_width,
-@@ -215,7 +215,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+@@ -202,10 +217,13 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 		break;
+ 	case S5P_MFC_CODEC_MPEG4_ENC:
+ 	case S5P_MFC_CODEC_H263_ENC:
+-		ctx->scratch_buf_size =
+-			S5P_FIMV_SCRATCH_BUF_SIZE_MPEG4_ENC_V6(
+-					mb_width,
+-					mb_height);
++		if (IS_MFCV10(dev)) {
++			mfc_debug(2, "Use min scratch buffer size\n");
++		} else
++			ctx->scratch_buf_size =
++				S5P_FIMV_SCRATCH_BUF_SIZE_MPEG4_ENC_V6(
++						mb_width,
++						mb_height);
+ 		ctx->scratch_buf_size = ALIGN(ctx->scratch_buf_size,
+ 				S5P_FIMV_SCRATCH_BUFFER_ALIGN_V6);
+ 		ctx->bank1.size =
+@@ -215,7 +233,9 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
  		ctx->bank2.size = 0;
  		break;
  	case S5P_MFC_CODEC_VP8_ENC:
--		if (IS_MFCV8(dev))
-+		if (IS_MFCV8_PLUS(dev))
+-		if (IS_MFCV8_PLUS(dev))
++		if (IS_MFCV10(dev)) {
++			mfc_debug(2, "Use min scratch buffer size\n");
++			} else if (IS_MFCV8_PLUS(dev))
  			ctx->scratch_buf_size =
  				S5P_FIMV_SCRATCH_BUF_SIZE_VP8_ENC_V8(
  					mb_width,
-@@ -366,7 +366,7 @@ static void s5p_mfc_dec_calc_dpb_size_v6(struct s5p_mfc_ctx *ctx)
+@@ -1902,6 +1922,16 @@ static int s5p_mfc_get_mv_count_v6(struct s5p_mfc_dev *dev)
+ 	return readl(dev->mfc_regs->d_min_num_mv);
+ }
  
- 	ctx->luma_size = calc_plane(ctx->img_width, ctx->img_height);
- 	ctx->chroma_size = calc_plane(ctx->img_width, (ctx->img_height >> 1));
--	if (IS_MFCV8(ctx->dev)) {
-+	if (IS_MFCV8_PLUS(ctx->dev)) {
- 		/* MFCv8 needs additional 64 bytes for luma,chroma dpb*/
- 		ctx->luma_size += S5P_FIMV_D_ALIGN_PLANE_SIZE_V8;
- 		ctx->chroma_size += S5P_FIMV_D_ALIGN_PLANE_SIZE_V8;
-@@ -447,7 +447,7 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
- 	writel(buf_addr1, mfc_regs->d_scratch_buffer_addr);
- 	writel(ctx->scratch_buf_size, mfc_regs->d_scratch_buffer_size);
++static int s5p_mfc_get_min_scratch_buf_size(struct s5p_mfc_dev *dev)
++{
++	return readl(dev->mfc_regs->d_min_scratch_buffer_size);
++}
++
++static int s5p_mfc_get_e_min_scratch_buf_size(struct s5p_mfc_dev *dev)
++{
++	return readl(dev->mfc_regs->e_min_scratch_buffer_size);
++}
++
+ static int s5p_mfc_get_inst_no_v6(struct s5p_mfc_dev *dev)
+ {
+ 	return readl(dev->mfc_regs->ret_instance_id);
+@@ -2160,6 +2190,7 @@ static unsigned int s5p_mfc_get_crop_info_v_v6(struct s5p_mfc_ctx *ctx)
+ 	R(d_ret_picture_tag_bot, S5P_FIMV_D_RET_PICTURE_TAG_BOT_V8);
+ 	R(d_display_crop_info1, S5P_FIMV_D_DISPLAY_CROP_INFO1_V8);
+ 	R(d_display_crop_info2, S5P_FIMV_D_DISPLAY_CROP_INFO2_V8);
++	R(d_min_scratch_buffer_size, S5P_FIMV_D_MIN_SCRATCH_BUFFER_SIZE_V8);
  
--	if (IS_MFCV8(dev)) {
-+	if (IS_MFCV8_PLUS(dev)) {
- 		writel(ctx->img_width,
- 			mfc_regs->d_first_plane_dpb_stride_size);
- 		writel(ctx->img_width,
-@@ -2111,7 +2111,7 @@ static unsigned int s5p_mfc_get_crop_info_v_v6(struct s5p_mfc_ctx *ctx)
- 			S5P_FIMV_E_ENCODED_SOURCE_SECOND_ADDR_V7);
- 	R(e_vp8_options, S5P_FIMV_E_VP8_OPTIONS_V7);
+ 	/* encoder registers */
+ 	R(e_padding_ctrl, S5P_FIMV_E_PADDING_CTRL_V8);
+@@ -2175,6 +2206,7 @@ static unsigned int s5p_mfc_get_crop_info_v_v6(struct s5p_mfc_ctx *ctx)
+ 	R(e_aspect_ratio, S5P_FIMV_E_ASPECT_RATIO_V8);
+ 	R(e_extended_sar, S5P_FIMV_E_EXTENDED_SAR_V8);
+ 	R(e_h264_options, S5P_FIMV_E_H264_OPTIONS_V8);
++	R(e_min_scratch_buffer_size, S5P_FIMV_E_MIN_SCRATCH_BUFFER_SIZE_V8);
  
--	if (!IS_MFCV8(dev))
-+	if (!IS_MFCV8_PLUS(dev))
- 		goto done;
+ done:
+ 	return &mfc_regs;
+@@ -2223,6 +2255,8 @@ static unsigned int s5p_mfc_get_crop_info_v_v6(struct s5p_mfc_ctx *ctx)
+ 	.get_pic_type_bot = s5p_mfc_get_pic_type_bot_v6,
+ 	.get_crop_info_h = s5p_mfc_get_crop_info_h_v6,
+ 	.get_crop_info_v = s5p_mfc_get_crop_info_v_v6,
++	.get_min_scratch_buf_size = s5p_mfc_get_min_scratch_buf_size,
++	.get_e_min_scratch_buf_size = s5p_mfc_get_e_min_scratch_buf_size,
+ };
  
- 	/* Initialize registers used in MFC v8 only.
+ struct s5p_mfc_hw_ops *s5p_mfc_init_hw_ops_v6(void)
 -- 
 1.7.2.3
