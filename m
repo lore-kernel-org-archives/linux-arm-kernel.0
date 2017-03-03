@@ -1,247 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri,  3 Mar 2017 11:45:52 +0100
-Subject: [PATCH 1/2] nvmem: Add driver for the i.MX IIM
-In-Reply-To: <20170303104553.18477-1-s.hauer@pengutronix.de>
-References: <20170303104553.18477-1-s.hauer@pengutronix.de>
-Message-ID: <20170303104553.18477-2-s.hauer@pengutronix.de>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Fri,  3 Mar 2017 16:17:46 +0530
+Subject: [PATCH 0/4] net: thunderx: Miscellaneous fixes
+Message-ID: <1488538070-12549-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+From: Sunil Goutham <sgoutham@cavium.com>
 
-This adds a readonly nvmem driver for the i.MX IC Identification Module
-(IIM). The IIM is found on the older i.MX SoCs like the i.MX25, i.MX27,
-i.MX31, i.MX35, i.MX51 and the i.MX53.
+This patch set fixes multiples issues such as IOMMU
+translation faults when kernel is booted with IOMMU enabled
+on host, incorrect MAC ID reading from ACPI tables and IPv6
+UDP packet drop due to failure of checksum validation.
 
-The IIM can control up to 8 fuse banks with 256 bit each. Not all of the
-banks are equipped on the different SoCs. The actual number of fuses
-differ from 512 on the i.MX27 and 1152 on the i.MX53.
+Sunil Goutham (3):
+  net: thunderx: Fix IOMMU translation faults
+  net: thunderx: Fix LMAC mode debug prints for QSGMII mode
+  net: thunderx: Fix invalid mac addresses for node1 interfaces
 
-The fuses are one time writable, but writing is currently not supported
-in the driver.
+Thanneeru Srinivasulu (1):
+  net: thunderx: Allow IPv6 frames with zero UDP checksum
 
-Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- drivers/nvmem/Kconfig   |  11 +++
- drivers/nvmem/Makefile  |   2 +
- drivers/nvmem/imx-iim.c | 173 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 186 insertions(+)
- create mode 100644 drivers/nvmem/imx-iim.c
+ drivers/net/ethernet/cavium/thunder/nic.h          |   1 +
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   |  12 +-
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 193 +++++++++++++++++----
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h |   2 +
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |  64 +++++--
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h  |   1 -
+ 6 files changed, 223 insertions(+), 50 deletions(-)
 
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index 650f1b1797ad..101ced4c84be 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -13,6 +13,17 @@ menuconfig NVMEM
- 
- if NVMEM
- 
-+config NVMEM_IMX_IIM
-+	tristate "i.MX IC Identification Module support"
-+	depends on ARCH_MXC || COMPILE_TEST
-+	help
-+	  This is a driver for the IC Identification Module (IIM) available on
-+	  i.MX SoCs, providing access to 4 Kbits of programmable
-+	  eFuses.
-+
-+	  This driver can also be built as a module. If so, the module
-+	  will be called nvmem-imx-iim.
-+
- config NVMEM_IMX_OCOTP
- 	tristate "i.MX6 On-Chip OTP Controller support"
- 	depends on SOC_IMX6 || COMPILE_TEST
-diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-index 86e45995fdad..173140658693 100644
---- a/drivers/nvmem/Makefile
-+++ b/drivers/nvmem/Makefile
-@@ -8,6 +8,8 @@ nvmem_core-y			:= core.o
- # Devices
- obj-$(CONFIG_NVMEM_BCM_OCOTP)	+= nvmem-bcm-ocotp.o
- nvmem-bcm-ocotp-y		:= bcm-ocotp.o
-+obj-$(CONFIG_NVMEM_IMX_IIM)	+= nvmem-imx-iim.o
-+nvmem-imx-iim-y			:= imx-iim.o
- obj-$(CONFIG_NVMEM_IMX_OCOTP)	+= nvmem-imx-ocotp.o
- nvmem-imx-ocotp-y		:= imx-ocotp.o
- obj-$(CONFIG_NVMEM_LPC18XX_EEPROM)	+= nvmem_lpc18xx_eeprom.o
-diff --git a/drivers/nvmem/imx-iim.c b/drivers/nvmem/imx-iim.c
-new file mode 100644
-index 000000000000..52ff65e0673f
---- /dev/null
-+++ b/drivers/nvmem/imx-iim.c
-@@ -0,0 +1,173 @@
-+/*
-+ * i.MX IIM driver
-+ *
-+ * Copyright (c) 2017 Pengutronix, Michael Grzeschik <m.grzeschik@pengutronix.de>
-+ *
-+ * Based on the barebox iim driver,
-+ * Copyright (c) 2010 Baruch Siach <baruch@tkos.co.il>,
-+ *	Orex Computed Radiography
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2
-+ * as published by the Free Software Foundation.
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/device.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/nvmem-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/clk.h>
-+
-+#define IIM_BANK_BASE(n)	(0x800 + 0x400 * (n))
-+
-+struct imx_iim_drvdata {
-+	unsigned int nregs;
-+};
-+
-+struct iim_priv {
-+	void __iomem *base;
-+	struct clk *clk;
-+	struct nvmem_config nvmem;
-+};
-+
-+static int imx_iim_read(void *context, unsigned int offset,
-+			  void *buf, size_t bytes)
-+{
-+	struct iim_priv *iim = context;
-+	int i, ret;
-+	u8 *buf8 = buf;
-+
-+	ret = clk_prepare_enable(iim->clk);
-+	if (ret)
-+		return ret;
-+
-+	for (i = offset; i < offset + bytes; i++) {
-+		int bank = i >> 5;
-+		int reg = i & 0x1f;
-+
-+		*buf8++ = readl(iim->base + IIM_BANK_BASE(bank) + reg * 4);
-+	}
-+
-+	clk_disable_unprepare(iim->clk);
-+
-+	return 0;
-+}
-+
-+static struct imx_iim_drvdata imx27_drvdata = {
-+	.nregs = 2 * 32,
-+};
-+
-+static struct imx_iim_drvdata imx25_imx31_imx35_drvdata = {
-+	.nregs = 3 * 32,
-+};
-+
-+static struct imx_iim_drvdata imx51_drvdata = {
-+	.nregs = 4 * 32,
-+};
-+
-+static struct imx_iim_drvdata imx53_drvdata = {
-+	.nregs = 4 * 32 + 16,
-+};
-+
-+static const struct of_device_id imx_iim_dt_ids[] = {
-+	{
-+		.compatible = "fsl,imx25-iim",
-+		.data = &imx25_imx31_imx35_drvdata,
-+	}, {
-+		.compatible = "fsl,imx27-iim",
-+		.data = &imx27_drvdata,
-+	}, {
-+		.compatible = "fsl,imx31-iim",
-+		.data = &imx25_imx31_imx35_drvdata,
-+	}, {
-+		.compatible = "fsl,imx35-iim",
-+		.data = &imx25_imx31_imx35_drvdata,
-+	}, {
-+		.compatible = "fsl,imx51-iim",
-+		.data = &imx51_drvdata,
-+	}, {
-+		.compatible = "fsl,imx53-iim",
-+		.data = &imx53_drvdata,
-+	}, {
-+		/* sentinel */
-+	},
-+};
-+MODULE_DEVICE_TABLE(of, imx_iim_dt_ids);
-+
-+static int imx_iim_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *of_id;
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	struct iim_priv *iim;
-+	struct nvmem_device *nvmem;
-+	struct nvmem_config *cfg;
-+	const struct imx_iim_drvdata *drvdata = NULL;
-+
-+	iim = devm_kzalloc(dev, sizeof(*iim), GFP_KERNEL);
-+	if (!iim)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	iim->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(iim->base))
-+		return PTR_ERR(iim->base);
-+
-+	of_id = of_match_device(imx_iim_dt_ids, dev);
-+	if (!of_id)
-+		return -ENODEV;
-+
-+	drvdata = of_id->data;
-+
-+	iim->clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(iim->clk))
-+		return PTR_ERR(iim->clk);
-+
-+	cfg = &iim->nvmem;
-+
-+	cfg->name = "imx-iim",
-+	cfg->read_only = true,
-+	cfg->word_size = 1,
-+	cfg->stride = 1,
-+	cfg->owner = THIS_MODULE,
-+	cfg->reg_read = imx_iim_read,
-+	cfg->dev = dev;
-+	cfg->size = drvdata->nregs;
-+	cfg->priv = iim;
-+
-+	nvmem = nvmem_register(cfg);
-+	if (IS_ERR(nvmem))
-+		return PTR_ERR(nvmem);
-+
-+	platform_set_drvdata(pdev, nvmem);
-+
-+	return 0;
-+}
-+
-+static int imx_iim_remove(struct platform_device *pdev)
-+{
-+	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
-+
-+	return nvmem_unregister(nvmem);
-+}
-+
-+static struct platform_driver imx_iim_driver = {
-+	.probe	= imx_iim_probe,
-+	.remove	= imx_iim_remove,
-+	.driver = {
-+		.name	= "imx-iim",
-+		.of_match_table = imx_iim_dt_ids,
-+	},
-+};
-+module_platform_driver(imx_iim_driver);
-+
-+MODULE_AUTHOR("Michael Grzeschik <m.grzeschik@pengutronix.de>");
-+MODULE_DESCRIPTION("i.MX IIM driver");
-+MODULE_LICENSE("GPL v2");
 -- 
-2.11.0
+2.7.4
