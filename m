@@ -1,27 +1,57 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 3 Mar 2017 06:14:06 -0800
-Subject: [PATCH 3/4] watchodg: sama5d4: simplify probe
-In-Reply-To: <20170303092958.2phrxelq3xqojns7@piout.net>
-References: <20170302173114.28508-1-alexandre.belloni@free-electrons.com>
- <20170302173114.28508-4-alexandre.belloni@free-electrons.com>
- <20170303090325.41b9ce64@free-electrons.com>
- <20170303092958.2phrxelq3xqojns7@piout.net>
-Message-ID: <7abe4456-6c10-55bf-ead4-7379f23e7f6e@roeck-us.net>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri,  3 Mar 2017 15:17:02 +0100
+Subject: [PATCH 2/4] tty/serial: atmel: remove uneeded IS_ERR_OR_NULL calls
+Message-ID: <20170303141702.15331-1-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2017 01:29 AM, Alexandre Belloni wrote:
-> On 03/03/2017 at 09:03:25 +0100, Thomas Petazzoni wrote:
->> On Thu,  2 Mar 2017 18:31:13 +0100, Alexandre Belloni wrote:
->>
->>> +	irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
->>
->> Any reason to use irq_of_parse_and_map() over the more conventional
->> platform_get_irq() ?
->>
->
-> No particular reason but I'm just removing the if (pdev->dev.of_node)
->
-A function call change would (should) be a separate patch.
+Since commit 1d267ea6539f ("serial: mctrl-gpio: simplify init routine"),
+the mctrl_gpio_to_gpiod() function can't return an error anymore.
+So, just testing for a NULL pointer is ok.
 
-Guenter
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+---
+ drivers/tty/serial/atmel_serial.c | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index ad6c2bdea481..e0f1955b3c7e 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -315,32 +315,28 @@ static unsigned int atmel_get_lines_status(struct uart_port *port)
+ 
+ 	mctrl_gpio_get(atmel_port->gpios, &ret);
+ 
+-	if (!IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(atmel_port->gpios,
+-						UART_GPIO_CTS))) {
++	if (mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_CTS)) {
+ 		if (ret & TIOCM_CTS)
+ 			status &= ~ATMEL_US_CTS;
+ 		else
+ 			status |= ATMEL_US_CTS;
+ 	}
+ 
+-	if (!IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(atmel_port->gpios,
+-						UART_GPIO_DSR))) {
++	if (mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_DSR)) {
+ 		if (ret & TIOCM_DSR)
+ 			status &= ~ATMEL_US_DSR;
+ 		else
+ 			status |= ATMEL_US_DSR;
+ 	}
+ 
+-	if (!IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(atmel_port->gpios,
+-						UART_GPIO_RI))) {
++	if (mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_RI)) {
+ 		if (ret & TIOCM_RI)
+ 			status &= ~ATMEL_US_RI;
+ 		else
+ 			status |= ATMEL_US_RI;
+ 	}
+ 
+-	if (!IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(atmel_port->gpios,
+-						UART_GPIO_DCD))) {
++	if (mctrl_gpio_to_gpiod(atmel_port->gpios, UART_GPIO_DCD)) {
+ 		if (ret & TIOCM_CD)
+ 			status &= ~ATMEL_US_DCD;
+ 		else
