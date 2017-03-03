@@ -1,177 +1,133 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 3 Mar 2017 11:33:04 +0100
-Subject: [RFC PATCH 11/12] staging: android: ion: Make Ion heaps selectable
-In-Reply-To: <1488491084-17252-12-git-send-email-labbott@redhat.com>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <1488491084-17252-12-git-send-email-labbott@redhat.com>
-Message-ID: <20170303103304.nxfn7zlccx24b3xq@phenom.ffwll.local>
+From: okaya@codeaurora.org (okaya at codeaurora.org)
+Date: Fri, 03 Mar 2017 05:33:45 -0500
+Subject: [PATCH V2] PCI/ASPM: reconfigure ASPM following hotplug for
+ POLICY_DEFAULT
+In-Reply-To: <92EBB4272BF81E4089A7126EC1E7B2846666A1D5@IRSMSX101.ger.corp.intel.com>
+References: <1485891928-14573-1-git-send-email-okaya@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B2846666830C@IRSMSX101.ger.corp.intel.com>
+ <b78207b6-2c22-3e6d-4837-8b4b396c4f5d@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B28466668774@IRSMSX101.ger.corp.intel.com>
+ <f8f67b32-21eb-232b-2b7c-28b603865b9d@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B28466669BFF@IRSMSX101.ger.corp.intel.com>
+ <fed12fe1-3b13-0118-6a11-5004779d9c06@codeaurora.org>
+ <92EBB4272BF81E4089A7126EC1E7B2846666A1D5@IRSMSX101.ger.corp.intel.com>
+Message-ID: <e2e088742632a7c4fa6adef929343d12@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 01:44:43PM -0800, Laura Abbott wrote:
+On 2017-03-03 04:43, Patel, Mayurkumar wrote:
+> Hi Kaya
 > 
-> Currently, all heaps are compiled in all the time. In switching to
-> a better platform model, let's allow these to be compiled out for good
-> measure.
+>> 
+>> Hi Mayurkumar
+>> 
+>> On 3/2/2017 11:05 AM, Patel, Mayurkumar wrote:
+>>>> 
+>>>> Hi Bjorn,
+>>>> 
+>>>> On 2/28/2017 1:57 PM, Patel, Mayurkumar wrote:
+>>>>>> I was trying to figure out when to use saved values vs. the values 
+>>>>>> in
+>>>>>> registers by looking at the enable_cnt.
+>>>>>> enable_cnt is 0 during boot on my system.
+>>>>> enable_cnt for the root port on my system is set to 1 for "root 
+>>>>> port" already without saving
+>>>>> any ASPM related settings.
+>>>>> 
+>>>>> 
+>>>> 
+>>>> What would be the best way to figure out when to save power-on 
+>>>> values from
+>>>> the registers?
+>>>> 
+>>> 
+>>> I can upload the diffs) because enable_cnt in pci_enable_device() can 
+>>> be triggered
+>>> from multiple places at boot time so it might not be safe to use it?
+>> 
+>> Go ahead and share your diff. It doesn't hurt to look at other 
+>> alternatives.
+>> 
 > 
-> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> So basically, I introduced a new atomic variable to save the
+> aspm_policy for the first time.
+> Below is my diff.
 
-I'm not the biggest fan of making everything Kconfig-selectable. And the
-#ifdef stuff doesn't look all that pretty. If we'd also use this
-opportunity to split each heap into their own file I think this patch here
-would be a lot more useful.
+Thanks.
 
-Anyway, no real opinion from me on this, just an idea.
--Daniel
+Ok, i will incorporate your change and add your signoff, then repost the 
+next version after testing next week. I am OoO until next week.
 
-> ---
->  drivers/staging/android/ion/Kconfig    | 32 ++++++++++++++++++++
->  drivers/staging/android/ion/Makefile   |  8 +++--
->  drivers/staging/android/ion/ion_priv.h | 53 ++++++++++++++++++++++++++++++++--
->  3 files changed, 87 insertions(+), 6 deletions(-)
+
 > 
-> diff --git a/drivers/staging/android/ion/Kconfig b/drivers/staging/android/ion/Kconfig
-> index 0c91b2b..2e97990 100644
-> --- a/drivers/staging/android/ion/Kconfig
-> +++ b/drivers/staging/android/ion/Kconfig
-> @@ -17,3 +17,35 @@ config ION_TEST
->  	  Choose this option to create a device that can be used to test the
->  	  kernel and device side ION functions.
->  
-> +config ION_SYSTEM_HEAP
-> +	bool "Ion system heap"
-> +	depends on ION
-> +	help
-> +	  Choose this option to enable the Ion system heap. The system heap
-> +	  is backed by pages from the buddy allocator. If in doubt, say Y.
-> +
-> +config ION_CARVEOUT_HEAP
-> +	bool "Ion carveout heap support"
-> +	depends on ION
-> +	help
-> +	  Choose this option to enable carveout heaps with Ion. Carveout heaps
-> +	  are backed by memory reserved from the system. Allocation times are
-> +	  typically faster at the cost of memory not being used. Unless you
-> +	  know your system has these regions, you should say N here.
-> +
-> +config ION_CHUNK_HEAP
-> +	bool "Ion chunk heap support"
-> +	depends on ION
-> +	help
-> +          Choose this option to enable chunk heaps with Ion. This heap is
-> +	  similar in function the carveout heap but memory is broken down
-> +	  into smaller chunk sizes, typically corresponding to a TLB size.
-> +	  Unless you know your system has these regions, you should say N here.
-> +
-> +config ION_CMA_HEAP
-> +	bool "Ion CMA heap support"
-> +	depends on ION && CMA
-> +	help
-> +	  Choose this option to enable CMA heaps with Ion. This heap is backed
-> +	  by the Contiguous Memory Allocator (CMA). If your system has these
-> +	  regions, you should say Y here.
-> diff --git a/drivers/staging/android/ion/Makefile b/drivers/staging/android/ion/Makefile
-> index 9457090..eef022b 100644
-> --- a/drivers/staging/android/ion/Makefile
-> +++ b/drivers/staging/android/ion/Makefile
-> @@ -1,6 +1,8 @@
-> -obj-$(CONFIG_ION) +=	ion.o ion-ioctl.o ion_heap.o \
-> -			ion_page_pool.o ion_system_heap.o \
-> -			ion_carveout_heap.o ion_chunk_heap.o ion_cma_heap.o
-> +obj-$(CONFIG_ION) +=	ion.o ion-ioctl.o ion_heap.o
-> +obj-$(CONFIG_ION_SYSTEM_HEAP) += ion_system_heap.o ion_page_pool.o
-> +obj-$(CONFIG_ION_CARVEOUT_HEAP) += ion_carveout_heap.o
-> +obj-$(CONFIG_ION_CHUNK_HEAP) += ion_chunk_heap.o
-> +obj-$(CONFIG_ION_CMA_HEAP) += ion_cma_heap.o
->  obj-$(CONFIG_ION_TEST) += ion_test.o
->  ifdef CONFIG_COMPAT
->  obj-$(CONFIG_ION) += compat_ion.o
-> diff --git a/drivers/staging/android/ion/ion_priv.h b/drivers/staging/android/ion/ion_priv.h
-> index b09bc7c..6eafe0d 100644
-> --- a/drivers/staging/android/ion/ion_priv.h
-> +++ b/drivers/staging/android/ion/ion_priv.h
-> @@ -369,21 +369,68 @@ size_t ion_heap_freelist_size(struct ion_heap *heap);
->   * heaps as appropriate.
->   */
->  
-> +
->  struct ion_heap *ion_heap_create(struct ion_platform_heap *heap_data);
->  void ion_heap_destroy(struct ion_heap *heap);
-> +
-> +#ifdef CONFIG_ION_SYSTEM_HEAP
->  struct ion_heap *ion_system_heap_create(struct ion_platform_heap *unused);
->  void ion_system_heap_destroy(struct ion_heap *heap);
-> -
->  struct ion_heap *ion_system_contig_heap_create(struct ion_platform_heap *heap);
->  void ion_system_contig_heap_destroy(struct ion_heap *heap);
-> -
-> +#else
-> +static inline struct ion_heap * ion_system_heap_create(
-> +	struct ion_platform_heap *unused)
-> +{
-> +	return ERR_PTR(-ENODEV);
-> +}
-> +static inline void ion_system_heap_destroy(struct ion_heap *heap) { }
-> +
-> +static inline struct ion_heap *ion_system_contig_heap_create(
-> +	struct ion_platform_heap *heap)
-> +{
-> +	return ERR_PTR(-ENODEV);
-> +}
-> +
-> +static inline void ion_system_contig_heap_destroy(struct ion_heap *heap) { }
-> +#endif
-> +
-> +#ifdef CONFIG_ION_CARVEOUT_HEAP
->  struct ion_heap *ion_carveout_heap_create(struct ion_platform_heap *heap_data);
->  void ion_carveout_heap_destroy(struct ion_heap *heap);
-> -
-> +#else
-> +static inline struct ion_heap *ion_carveout_heap_create(
-> +	struct ion_platform_heap *heap_data)
-> +{
-> +	return ERR_PTR(-ENODEV);
-> +}
-> +static inline void ion_carveout_heap_destroy(struct ion_heap *heap) { }
-> +#endif
-> +
-> +#ifdef CONFIG_ION_CHUNK_HEAP
->  struct ion_heap *ion_chunk_heap_create(struct ion_platform_heap *heap_data);
->  void ion_chunk_heap_destroy(struct ion_heap *heap);
-> +#else
-> +static inline struct ion_heap *ion_chunk_heap_create(
-> +	struct ion_platform_heap *heap_data)
-> +{
-> +	return ERR_PTR(-ENODEV);
-> +}
-> +static inline void ion_chunk_heap_destroy(struct ion_heap *heap) { }
-> +
-> +#endif
-> +
-> +#ifdef CONFIG_ION_CMA_HEAP
->  struct ion_heap *ion_cma_heap_create(struct ion_platform_heap *data);
->  void ion_cma_heap_destroy(struct ion_heap *heap);
-> +#else
-> +static inline struct ion_heap *ion_cma_heap_create(
-> +	struct ion_platform_heap *data)
-> +{
-> +	return ERR_PTR(-ENODEV);
-> +}
-> +static inline void ion_cma_heap_destroy(struct ion_heap *heap) { }
-> +#endif
->  
->  /**
->   * functions for creating and destroying a heap pool -- allows you
-> -- 
-> 2.7.4
+> diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
+> index 3dd8bcb..c8e1e3a 100644
+> --- a/drivers/pci/pcie/aspm.c
+> +++ b/drivers/pci/pcie/aspm.c
+> @@ -338,8 +338,9 @@ static void pcie_aspm_check_latency(struct pci_dev
+> *endpoint)
+>         }
+>  }
 > 
-> --
-> To unsubscribe, send a message with 'unsubscribe linux-mm' in
-> the body to majordomo at kvack.org.  For more info on Linux MM,
-> see: http://www.linux-mm.org/ .
-> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
-
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+> -static void pcie_aspm_cap_init(struct pcie_link_state *link, int 
+> blacklist)
+> +static void pcie_aspm_cap_init(struct pci_dev *pdev, int blacklist)
+>  {
+> +       struct pcie_link_state *link = pdev->link_state;
+>         struct pci_dev *child, *parent = link->pdev;
+>         struct pci_bus *linkbus = parent->subordinate;
+>         struct aspm_register_info upreg, dwreg;
+> @@ -397,8 +398,21 @@ static void pcie_aspm_cap_init(struct
+> pcie_link_state *link, int blacklist)
+>         link->latency_up.l1 = 
+> calc_l1_latency(upreg.latency_encoding_l1);
+>         link->latency_dw.l1 = 
+> calc_l1_latency(dwreg.latency_encoding_l1);
+> 
+> -       /* Save default state */
+> -       link->aspm_default = link->aspm_enabled;
+> +       /*
+> +        * Save default state from FW when enabling ASPM for the first 
+> time
+> +        * during boot by looking at the calculated link->aspm_enabled 
+> bits
+> +        * above and aspm_enable_cnt will be zero.
+> +        *
+> +        * If this path is getting called for the second/third time
+> +        * (aspm_enable_cnt will be non-zero). Assume that the current 
+> state
+> +        * of the ASPM registers may not necessarily match what FW 
+> asked us to
+> +        * do as in the case of hotplug insertion/removal.
+> +        */
+> +       if (atomic_inc_return(&pdev->aspm_enable_cnt) == 1)
+> +               pdev->aspm_default = link->aspm_default = 
+> link->aspm_enabled;
+> +       else
+> +               link->aspm_default = pdev->aspm_default;
+> +
+> 
+>         /* Setup initial capable state. Will be updated later */
+>         link->aspm_capable = link->aspm_support;
+> @@ -606,7 +620,7 @@ void pcie_aspm_init_link_state(struct pci_dev 
+> *pdev)
+>          * upstream links also because capable state of them can be
+>          * update through pcie_aspm_cap_init().
+>          */
+> -       pcie_aspm_cap_init(link, blacklist);
+> +      pcie_aspm_cap_init(pdev, blacklist);
+> 
+>         /* Setup initial Clock PM state */
+>         pcie_clkpm_cap_init(link, blacklist);
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index e2d1a12..aa7bd7e 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -321,6 +321,8 @@ struct pci_dev {
+> 
+>  #ifdef CONFIG_PCIEASPM
+>          struct pcie_link_state  *link_state;    /* ASPM link state */
+> +       unsigned int    aspm_default;           /* ASPM policy set by 
+> BIOS */
+> +       atomic_t        aspm_enable_cnt;        /* ASPM policy 
+> initialization */
