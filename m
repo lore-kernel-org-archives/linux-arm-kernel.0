@@ -1,52 +1,61 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sat, 4 Mar 2017 00:28:32 +0100
-Subject: [PATCH v2 09/17] Documentation: kernel-parameters: Document owl
- earlycon
-In-Reply-To: <20170303154650.4d959227@lwn.net>
-References: <20170224034055.18807-1-afaerber@suse.de>
- <20170224034055.18807-10-afaerber@suse.de> <20170303154650.4d959227@lwn.net>
-Message-ID: <fc0061fe-c680-e8d7-9d45-583c2ae43ff2@suse.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 3 Mar 2017 15:56:39 -0800
+Subject: [PATCH 4/5] clk: sunxi-ng: Add driver for A83T CCU
+In-Reply-To: <20170303095333.hgxoli2h7clailvo@lukather>
+References: <20170214033526.16977-1-wens@csie.org>
+ <20170214033526.16977-5-wens@csie.org>
+ <20170214095819.utsftcvti5zdmlmi@lukather>
+ <CAGb2v66PxbhUdqSwFc5iFN2wDVQbOsibDkckXpFsxXW1WJNe3w@mail.gmail.com>
+ <20170215094954.h3wyaxlqkeb342yu@lukather>
+ <20170301191705.GS25384@codeaurora.org>
+ <20170303095333.hgxoli2h7clailvo@lukather>
+Message-ID: <20170303235639.GW25384@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 03.03.2017 um 23:46 schrieb Jonathan Corbet:
-> On Fri, 24 Feb 2017 04:40:47 +0100
-> Andreas F?rber <afaerber@suse.de> wrote:
+On 03/03, Maxime Ripard wrote:
+> On Wed, Mar 01, 2017 at 11:17:05AM -0800, Stephen Boyd wrote:
 > 
->> +		owl,<addr>
->> +			Start an early, polled-mode console on an Owl serial
->> +			port at the specified address. The serial port must
->> +			already be setup and configured. Options are not yet
->> +			supported.
->> +
+> > Can someone explain what the issue is? Could something like
+> > clk_get_phase() + clk_get_rate() tell us if we're in one mode
+> > vs. the other?
 > 
-> Apologies, I'm just getting around to looking at this.
+> So we have two modes of operation for that clock, old vs new (I know,
+> I didn't pick the names).
 > 
-> Is there any chance of getting a version of it that (1) has a proper
-> changelog, and (2) better describes the applicability of this option.
-> Presumably if I don't know what an "Owl serial port" is I don't need it,
-> but maybe a phrase saying where such ports might be found would be helpful
-> here?
+> The old mode is what we support right now. It has a combination of a
+> linear multiplier and divider, plus some phase controls.
+> 
+> The new mode however disables the phase controls and adds post-divider
+> of 2 on the rate.
+> 
+> We cannot really rely on the rate itself, since there's a huge overlap
+> between the rates we can obtain in the old and new modes. Same thing
+> for the phase, having a 0 deg phase is achieved both in the old and
+> new modes.
+> 
+> To make things worse, the new mode is only available on one out of
+> three MMC controllers (and associated clocks), and that MMC controller
+> needs to set a bit as well to switch to the new mode if needed. So we
+> definitely needs some synchronisation there, and also to be able to
+> retrieve if the mode switching is available, and if we're already
+> using that mode.
+> 
+> Mike agreed that the easiest way forward was to use a custom function.
+> 
 
-Note that there is already a v3 of this patch.
+Ok. Is there any need to change the mode dynamically at runtime?
+Or could it be decided once at clk driver probe time/boot time
+and detected via set_phase() failing when we're in the new mode?
+At least, it sounds like set_phase() should bail out there
+because it doesn't exist, although it could be argued that
+setting the phase to something it already is set to is valid and
+shouldn't return an error.
 
-Both v2 and v3 do have a changelog, indicating that nothing changed here
-between versions. Did you mean commit message, and if so what would you
-like to see added exactly?
-
-Did you notice that most earlycon options are described like this?
-pl011, my meson, msm, lantiq all just repeat the driver name. In this
-case Owl is a family of Actions Semiconductor SoCs that are newly being
-enabled in this series - I can add the vendor name to the text, but no
-idea what else to say about "applicability"...
-
-While at it, it is really ugly for both users and contributors that
-there is no consistent (e.g., alphabetical) order of these options.
-
-Regards,
-Andreas
+I'm not saying I'm opposed to the custom function, just thinking
+of alternatives if MMC maintainers don't agree with the custom
+function.
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
