@@ -1,90 +1,72 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Fri, 3 Mar 2017 21:17:46 +0200
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <fc8168ef-bf36-b2d9-627b-e4b8c6a5024e@gmail.com>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
- <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
- <141eb012-eb24-7558-2bc5-1fe82f6b7b4b@gmail.com>
- <fc8168ef-bf36-b2d9-627b-e4b8c6a5024e@gmail.com>
-Message-ID: <20170303191745.GQ3220@valkosipuli.retiisi.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 3 Mar 2017 20:21:05 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
+References: <20170303142201.16452-1-richard.genoud@gmail.com>
+ <CAMuHMdX-K9B20Tu5NtHJRHmGGuT60OFu8TokZxsF8aSaS7HuHQ@mail.gmail.com>
+ <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
+Message-ID: <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+Hi Uwe,
 
-On Thu, Mar 02, 2017 at 06:12:43PM -0800, Steve Longerbeam wrote:
-> 
-> 
-> On 03/02/2017 03:48 PM, Steve Longerbeam wrote:
-> >
-> >
-> >On 03/02/2017 08:02 AM, Sakari Ailus wrote:
-> >>Hi Steve,
-> >>
-> >>On Wed, Feb 15, 2017 at 06:19:16PM -0800, Steve Longerbeam wrote:
-> >>>v4l2_pipeline_inherit_controls() will add the v4l2 controls from
-> >>>all subdev entities in a pipeline to a given video device.
-> >>>
-> >>>Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> >>>---
-> >>> drivers/media/v4l2-core/v4l2-mc.c | 48
-> >>>+++++++++++++++++++++++++++++++++++++++
-> >>> include/media/v4l2-mc.h           | 25 ++++++++++++++++++++
-> >>> 2 files changed, 73 insertions(+)
-> >>>
-> >>>diff --git a/drivers/media/v4l2-core/v4l2-mc.c
-> >>>b/drivers/media/v4l2-core/v4l2-mc.c
-> >>>index 303980b..09d4d97 100644
-> >>>--- a/drivers/media/v4l2-core/v4l2-mc.c
-> >>>+++ b/drivers/media/v4l2-core/v4l2-mc.c
-> >>>@@ -22,6 +22,7 @@
-> >>> #include <linux/usb.h>
-> >>> #include <media/media-device.h>
-> >>> #include <media/media-entity.h>
-> >>>+#include <media/v4l2-ctrls.h>
-> >>> #include <media/v4l2-fh.h>
-> >>> #include <media/v4l2-mc.h>
-> >>> #include <media/v4l2-subdev.h>
-> >>>@@ -238,6 +239,53 @@ int v4l_vb2q_enable_media_source(struct
-> >>>vb2_queue *q)
-> >>> }
-> >>> EXPORT_SYMBOL_GPL(v4l_vb2q_enable_media_source);
-> >>>
-> >>>+int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
-> >>>+                     struct media_entity *start_entity)
-> >>
-> >>I have a few concerns / questions:
-> >>
-> >>- What's the purpose of this patch? Why not to access the sub-device node
-> >>  directly?
-> >
-> >
-> >I don't really understand what you are trying to say.<snip>
-> >
-> 
-> Actually I think I understand what you mean now. Yes, the user can
-> always access a subdev's control directly from its /dev/v4l-subdevXX.
-> I'm only providing this feature as a convenience to the user, so that
-> all controls in a pipeline can be accessed from one place, i.e. the
-> main capture device node.
+On Fri, Mar 3, 2017 at 8:12 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Fri, Mar 03, 2017 at 07:58:36PM +0100, Geert Uytterhoeven wrote:
+>> On Fri, Mar 3, 2017 at 3:22 PM, Richard Genoud <richard.genoud@gmail.com> wrote:
+>> > Since commit 1d267ea6539f ("serial: mctrl-gpio: simplify init routine"),
+>> > the mctrl_gpio_to_gpiod() function can't return an error anymore.
+>> > So, just testing for a NULL pointer is ok.
+>>
+>> If CONFIG_GPIOLIB=n, mctrl_gpio_to_gpiod() always returns ERR_PTR(-ENOSYS).
+>> That case should be handled correctly, too.
+>
+> The correct change to handle this is:
+>
+> diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
+> index 91e7dddbf72c..2f4cdd4e7b4f 100644
+> --- a/drivers/tty/serial/sh-sci.c
+> +++ b/drivers/tty/serial/sh-sci.c
+> @@ -3022,7 +3022,7 @@ static int sci_probe_single(struct platform_device *dev,
+>                 return ret;
+>
+>         sciport->gpios = mctrl_gpio_init(&sciport->port, 0);
+> -       if (IS_ERR(sciport->gpios) && PTR_ERR(sciport->gpios) != -ENOSYS)
+> +       if (IS_ERR(sciport->gpios))
+>                 return PTR_ERR(sciport->gpios);
 
-No other MC based V4L2 driver does this. You'd be creating device specific
-behaviour that differs from what the rest of the drivers do. The purpose of
-MC is to provide the user with knowledge of what devices are there, and the
-V4L2 sub-devices interface is used to access them in this case.
+Now the sh-sci driver fails to probe on legacy platforms where GPIOLIB=n.
+The check for -ENOSYS made it succeed before.
 
-It does matter where a control is implemented, too. If the pipeline contains
-multiple sub-devices that implement the same control, only one of them may
-be accessed. The driver calling the function (or even less the function)
-would not know which one of them should be ignored.
+> Then mctrl_gpio_to_gpiod isn't called. I don't have a machine to test
+> this, but I think currently this makes the machine barf to continue
+> here because with sciport->gpios = ERR_PTR(-ENOSYS) calling
+>
+>         mctrl_gpio_to_gpiod(sciport->gpios, ...)
+>
+> is a bad idea.
 
-If you need such functionality, it should be implemented in the user space
-instead.
+If sciport->gpios == ERR_PTR(-ENOSYS), CONFIG_GPIOLIB is not enabled, the
+feature is not available, and mctrl_gpio_to_gpiod() will not
+dereference the error
+pointer.
 
--- 
-Regards,
+>> Perhaps mctrl_gpio_to_gpiod() should always return NULL if !CONFIG_GPIOLIB?
+>
+> No, mctrl_gpio_to_gpiod is right. You are only supposed to call it if
+> mctrl_gpio_init succeeded.
 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Then I have to add checks for sciport->gpios == ERR_PTR(-ENOSYS)...
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
