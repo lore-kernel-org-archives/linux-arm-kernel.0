@@ -1,42 +1,59 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 3 Mar 2017 09:50:02 +0000
-Subject: [PATCH 1/2] nvmem: Add driver for the i.MX IIM
-In-Reply-To: <20170213153149.11710-2-s.hauer@pengutronix.de>
-References: <20170213153149.11710-1-s.hauer@pengutronix.de>
- <20170213153149.11710-2-s.hauer@pengutronix.de>
-Message-ID: <568bbe58-0bb5-f7ec-a646-271912a4313a@linaro.org>
+From: huibin.hong@rock-chips.com (Huibin Hong)
+Date: Fri,  3 Mar 2017 17:49:09 +0800
+Subject: [PATCH] arm64: dts: rockchip: add dmac nodes for rk3368 SoCs
+Message-ID: <1488534549-26175-1-git-send-email-huibin.hong@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Addd dmac bus and dmac peri dts nodes for peripherals,
+such as I2S, SPI, UART and so on.
 
+Signed-off-by: Huibin Hong <huibin.hong@rock-chips.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
-On 13/02/17 15:31, Sascha Hauer wrote:
-> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
->
-> This adds a readonly nvmem driver for the i.MX IC Identification Module
-> (IIM). The IIM is found on the older i.MX SoCs like the i.MX25, i.MX27,
-> i.MX31, i.MX35, i.MX51 and the i.MX53.
->
-> The IIM can control up to 8 fuse banks with 256 bit each. Not all of the
-> banks are equipped on the different SoCs. The actual number of fuses
-> differ from 512 on the i.MX27 and 1152 on the i.MX53.
->
-> The fuses are one time writable, but writing is currently not supported
-> in the driver.
->
-> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-
-> ---
->  drivers/nvmem/Kconfig   |  11 ++++
->  drivers/nvmem/Makefile  |   2 +
->  drivers/nvmem/imx-iim.c | 171 ++++++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 184 insertions(+)
->  create mode 100644 drivers/nvmem/imx-iim.c
-
-Patch looks good to me, Will pick both bindings and this patch in next 
-cycle for 4.12.
-
-thanks,
-srini
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index a635adc..c9be1b2 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -204,6 +204,37 @@
+ 				     <&cpu_b2>, <&cpu_b3>;
+ 	};
+ 
++	amba {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		dmac_peri: dma-controller at ff250000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x0 0xff250000 0x0 0x4000>;
++			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
++			#dma-cells = <1>;
++			clocks = <&cru ACLK_DMAC_PERI>;
++			clock-names = "apb_pclk";
++			arm,pl330-broken-no-flushp;
++			peripherals-req-type-burst;
++		};
++
++		dmac_bus: dma-controller at ff600000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x0 0xff600000 0x0 0x4000>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
++			#dma-cells = <1>;
++			clocks = <&cru ACLK_DMAC_BUS>;
++			clock-names = "apb_pclk";
++			arm,pl330-broken-no-flushp;
++			peripherals-req-type-burst;
++		};
++	};
++
+ 	psci {
+ 		compatible = "arm,psci-0.2";
+ 		method = "smc";
+-- 
+2.0.0
