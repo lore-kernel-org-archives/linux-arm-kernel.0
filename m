@@ -1,42 +1,34 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Thu,  2 Mar 2017 19:21:34 -0500
-Subject: [PATCH v2 3/3] ARM: dts: bcm5301x: Add I2C support to the DT
-In-Reply-To: <1488500494-20622-1-git-send-email-jon.mason@broadcom.com>
-References: <1488500494-20622-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1488500494-20622-4-git-send-email-jon.mason@broadcom.com>
+From: andi.shyti@samsung.com (Andi Shyti)
+Date: Fri, 03 Mar 2017 09:22:06 +0900
+Subject: [PATCH v3 0/7] Fix the parse_dt of exynos dsi and remove the OF
+ graph
+In-Reply-To: <1488450019-6482-1-git-send-email-hoegeun.kwon@samsung.com>
+References: <CGME20170302102112epcas5p476b30508bbaffbf1fe9781b941cd418f@epcas5p4.samsung.com>
+ <1488450019-6482-1-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <20170303002206.zh56dsx7iuysg374@gangnam.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Mason <jonmason@broadcom.com>
+Hi Hoegeun,
 
-Add I2C support to the bcm5301x Device Tree.  Since no driver changes
-are needed to enable this hardware, only the device tree changes are
-required to make this functional.
+> Hoegeun Kwon (7):
+>   arm64: dts: exynos: Add the burst and esc clock frequency properties
+>     for exynos5433 dts
+>   arm: dts: Add the burst and esc clock frequency properties for
+>     exynos3250 dts
+>   arm: dts: Add the burst and esc clock frequency properties for
+>     exynos4412 dts
+>   arm: dts: Add the burst and esc clock frequency properties for
+>     exynos4210 dts
+>   drm/exynos: dsi: Fix the parse_dt function
+>   arm64: dts: exynos: Remove the OF graph from DSI node
+>   arm: dts: Remove the OF graph from DSI node
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
----
- arch/arm/boot/dts/bcm5301x.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+for all of them:
 
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index 4e3fbce..2a343f2 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -338,6 +338,15 @@
- 		};
- 	};
- 
-+	i2c0: i2c at 18009000 {
-+		compatible = "brcm,iproc-i2c";
-+		reg = <0x18009000 0x50>;
-+		interrupts = <GIC_SPI 121 IRQ_TYPE_NONE>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		clock-frequency = <100000>;
-+	};
-+
- 	lcpll0: lcpll0 at 1800c100 {
- 		#clock-cells = <1>;
- 		compatible = "brcm,nsp-lcpll0";
--- 
-2.7.4
+Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
+
+although I would have squashed patch 2, 3 and 4, but no need to
+resend, unless someone else agrees.
+
+Andi
