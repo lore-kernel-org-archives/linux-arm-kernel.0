@@ -1,43 +1,129 @@
 From: jun.gao@mediatek.com (Jun Gao)
-Date: Fri, 3 Mar 2017 10:05:12 +0800
-Subject: [PATCH v3 1/2] dt-bindings: i2c: Add Mediatek MT2701 i2c binding
+Date: Fri, 3 Mar 2017 10:05:13 +0800
+Subject: [PATCH v3 2/2] arm: dts: Add Mediatek MT2701 i2c device node
 In-Reply-To: <1488506713-20767-1-git-send-email-jun.gao@mediatek.com>
 References: <1488506713-20767-1-git-send-email-jun.gao@mediatek.com>
-Message-ID: <1488506713-20767-2-git-send-email-jun.gao@mediatek.com>
+Message-ID: <1488506713-20767-3-git-send-email-jun.gao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jun Gao <jun.gao@mediatek.com>
 
-Add MT2701 i2c binding to i2c-mt6577.txt and there is no need to
-modify i2c driver.
+Add MT2701 i2c device node.
 
 Signed-off-by: Jun Gao <jun.gao@mediatek.com>
 ---
- .../devicetree/bindings/i2c/i2c-mt6577.txt         |   11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ arch/arm/boot/dts/mt2701-evb.dts |   44 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/mt2701.dtsi    |   42 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 86 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-index 0ce6fa3..27dbbf9 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
-@@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
+diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
+index 082ca88..a908e94 100644
+--- a/arch/arm/boot/dts/mt2701-evb.dts
++++ b/arch/arm/boot/dts/mt2701-evb.dts
+@@ -24,6 +24,50 @@
+ 	};
+ };
  
- Required properties:
-   - compatible: value should be either of the following.
--      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
--      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
--      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
--      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
--      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
-+	"mediatek,mt2701-i2c"
-+	"mediatek,mt6577-i2c"
-+	"mediatek,mt6589-i2c"
-+	"mediatek,mt8127-i2c"
-+	"mediatek,mt8135-i2c"
-+	"mediatek,mt8173-i2c"
-   - reg: physical base address of the controller and dma base, length of memory
-     mapped region.
-   - interrupts: interrupt number to the cpu.
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++};
++
++&pio {
++	i2c0_pins_a: i2c0 at 0 {
++		pins1 {
++			pinmux = <MT2701_PIN_75_SDA0__FUNC_SDA0>,
++				 <MT2701_PIN_76_SCL0__FUNC_SCL0>;
++			bias-disable;
++		};
++	};
++
++	i2c1_pins_a: i2c1 at 0 {
++		pins1 {
++			pinmux = <MT2701_PIN_57_SDA1__FUNC_SDA1>,
++				 <MT2701_PIN_58_SCL1__FUNC_SCL1>;
++			bias-disable;
++		};
++	};
++
++	i2c2_pins_a: i2c2 at 0 {
++		pins1 {
++			pinmux = <MT2701_PIN_77_SDA2__FUNC_SDA2>,
++				 <MT2701_PIN_78_SCL2__FUNC_SCL2>;
++			bias-disable;
++		};
++	};
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+index bdf8954..0d1539f 100644
+--- a/arch/arm/boot/dts/mt2701.dtsi
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -227,6 +227,48 @@
+ 		status = "disabled";
+ 	};
+ 
++	i2c0: i2c at 11007000 {
++		compatible = "mediatek,mt2701-i2c",
++			     "mediatek,mt6577-i2c";
++		reg = <0 0x11007000 0 0x70>,
++		      <0 0x11000200 0 0x80>;
++		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
++		clock-div = <16>;
++		clocks = <&pericfg CLK_PERI_I2C0>, <&pericfg CLK_PERI_AP_DMA>;
++		clock-names = "main", "dma";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	i2c1: i2c at 11008000 {
++		compatible = "mediatek,mt2701-i2c",
++			     "mediatek,mt6577-i2c";
++		reg = <0 0x11008000 0 0x70>,
++		      <0 0x11000280 0 0x80>;
++		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_LOW>;
++		clock-div = <16>;
++		clocks = <&pericfg CLK_PERI_I2C1>, <&pericfg CLK_PERI_AP_DMA>;
++		clock-names = "main", "dma";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	i2c2: i2c at 11009000 {
++		compatible = "mediatek,mt2701-i2c",
++			     "mediatek,mt6577-i2c";
++		reg = <0 0x11009000 0 0x70>,
++		      <0 0x11000300 0 0x80>;
++		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_LOW>;
++		clock-div = <16>;
++		clocks = <&pericfg CLK_PERI_I2C2>, <&pericfg CLK_PERI_AP_DMA>;
++		clock-names = "main", "dma";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
+ 	mmsys: syscon at 14000000 {
+ 		compatible = "mediatek,mt2701-mmsys", "syscon";
+ 		reg = <0 0x14000000 0 0x1000>;
 -- 
 1.7.9.5
