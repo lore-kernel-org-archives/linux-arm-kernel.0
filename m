@@ -1,75 +1,64 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 3 Mar 2017 12:26:27 +0100
-Subject: Using the generic host PCIe driver
-In-Reply-To: <01f41dd8-e8e6-f880-cad8-5cb83bf0a167@arm.com>
-References: <8d4e5d8a-7683-0180-324c-0ffd1a9a641a@free.fr>
- <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
- <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
- <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
- <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
- <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
- <01f41dd8-e8e6-f880-cad8-5cb83bf0a167@arm.com>
-Message-ID: <4059f88f-0f70-38c2-f2f9-58dd2bd5b280@free.fr>
+From: sergio.prado@e-labworks.com (Sergio Prado)
+Date: Fri, 3 Mar 2017 08:38:47 -0300
+Subject: [PATCH v4 2/2] mmc: host: s3cmci: allow probing from device tree
+In-Reply-To: <39c2b81b-6519-826b-2c8d-344725ce2882@samsung.com>
+References: <1488417536-15110-1-git-send-email-sergio.prado@e-labworks.com>
+ <CGME20170302012845epcas4p3d7e48f13c80b2115cea89e914b067eeb@epcas4p3.samsung.com>
+ <1488417536-15110-3-git-send-email-sergio.prado@e-labworks.com>
+ <39c2b81b-6519-826b-2c8d-344725ce2882@samsung.com>
+Message-ID: <20170303113847.GA17377@sprado-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2017 17:36, Marc Zyngier wrote:
-
-> Mason: while the kernel has generic support for dealing with MSI, there
-> is not standardization at the interrupt controller level, so you do have
-> to write your own driver, and wire it in the rest of the framework.
+On Fri, Mar 03, 2017 at 11:14:29AM +0900, Jaehoon Chung wrote:
+> On 03/02/2017 10:18 AM, Sergio Prado wrote:
+> > Allows configuring Samsung S3C24XX MMC/SD/SDIO controller using a device
+> > tree.
+> > 
+> > Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+> > ---
+> >  drivers/mmc/host/s3cmci.c | 298 ++++++++++++++++++++++++----------------------
+> >  drivers/mmc/host/s3cmci.h |   3 +-
+> >  2 files changed, 158 insertions(+), 143 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+> > index 7a173f8c455b..d066dbdb957c 100644
+> > --- a/drivers/mmc/host/s3cmci.c
+> > +++ b/drivers/mmc/host/s3cmci.c
+> > @@ -24,6 +24,10 @@
+> >  #include <linux/interrupt.h>
+> >  #include <linux/irq.h>
+> >  #include <linux/io.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_device.h>
+> > +#include <linux/of_gpio.h>
+> > +#include <linux/mmc/slot-gpio.h>
+> >  
+> >  #include <plat/gpio-cfg.h>
+> >  #include <mach/dma.h>
+> > @@ -128,6 +132,22 @@ enum dbg_channels {
+> >  	dbg_conf  = (1 << 8),
+> >  };
+> >  
+> > +struct s3cmci_variant_data {
+> > +	int s3c2440_compatible;
+> > +};
 > 
-> I suggest you look at things like drivers/pci/host/pcie-altera-msi.c,
-> which has an extremely simple implementation. You can use this as a
-> starting point for your own driver.
+> I didn't understand why this structure needs.
+> 
+> Before this patch,
+> host->is2440;
+> 
+> After this patch,
+> host->variant->s3c2440_compatible;
+> 
+> Just add the one pointer for checking s3c2400 compatible..
+> Is it really meaningful?
+> (I didn't read the previous comments fully.)
 
-Thanks Marc,
+Although just a pointer would be enought, having a structure makes it
+more flexible to extend it in the future.
 
-I'll have a close look at the Altera driver.
+Best regards,
 
-I'm having a hard time understanding 3 different kinds of interrupts:
-
-  1. MSI (message-signalled interrupts)
-  2. legacy interrupts
-  3. custom interrupts
-
-I mostly understand MSI. When a device needs attention from the CPU,
-it sends a specific packet over the PCIe data link to a specific
-PCI bus address, which the PCIe controller knows to interpret as
-an interrupt request, so it raises the appropriate signal to
-interrupt the CPU.
-
-Legacy interrupts are the old-style PCI interrupts, when a device
-expects to have an actual physical interrupt line to the PCI
-controller, correct? The controller then forwards the interrupt
-request to the CPU, as with MSIs.
-
-Custom interrupts, I'm not sure. Here's the list:
-
-system_error : indicates that the interrupt is triggered by a system error, signaled by the lower layers.
-dma_rd_int : interrupt is triggered by DMA read availability.
-dma_wr_int : interrupt is triggered by DMA write availability.
-cpl_ur : interrupt is triggered by unsupported completion request.
-cpl_crs : interrupt is triggered by configuration request retry status.
-cpl_ca : interrupt is triggered by completer abort event.
-cpl_timeout : interrupt is triggered by a completion timeout event.
-pci_intx : one of selected legacy interrupts INTx is triggered. 
-
-Notes:
-
-It appears that legacy interrupts are supported through this
-custom register.
-
-I think I might be able to ignore DMA for the time being.
-
-cpl_* interrupts look somewhat standard, yet the PCI framework
-cannot know they exist, since they are in some random MMIO register.
-I'm confused about these and system_error. I guess I can ignore
-them at first, or just print a message when they trigger, to try
-to figure out what to do with them.
-
-
-I suppose the interrupt controller I'm supposed to write needs
-to handle all 3 types of interrupts?
-
-Regards.
+Sergio Prado
