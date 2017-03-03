@@ -1,57 +1,27 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri,  3 Mar 2017 15:13:44 +0100
-Subject: [PATCH 1/4] tty/serial: atmel: move atmel_serial header into driver
- directory
-Message-ID: <20170303141344.14122-1-richard.genoud@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 3 Mar 2017 06:14:06 -0800
+Subject: [PATCH 3/4] watchodg: sama5d4: simplify probe
+In-Reply-To: <20170303092958.2phrxelq3xqojns7@piout.net>
+References: <20170302173114.28508-1-alexandre.belloni@free-electrons.com>
+ <20170302173114.28508-4-alexandre.belloni@free-electrons.com>
+ <20170303090325.41b9ce64@free-electrons.com>
+ <20170303092958.2phrxelq3xqojns7@piout.net>
+Message-ID: <7abe4456-6c10-55bf-ead4-7379f23e7f6e@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-atmel_serial.h is only used by atmel_serial.c, so there's no need for
-it to lie in include/linux.
+On 03/03/2017 01:29 AM, Alexandre Belloni wrote:
+> On 03/03/2017 at 09:03:25 +0100, Thomas Petazzoni wrote:
+>> On Thu,  2 Mar 2017 18:31:13 +0100, Alexandre Belloni wrote:
+>>
+>>> +	irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
+>>
+>> Any reason to use irq_of_parse_and_map() over the more conventional
+>> platform_get_irq() ?
+>>
+>
+> No particular reason but I'm just removing the if (pdev->dev.of_node)
+>
+A function call change would (should) be a separate patch.
 
-Suggested-by: Joe Perches <joe@perches.com>
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
----
- MAINTAINERS                                          | 2 +-
- drivers/tty/serial/atmel_serial.c                    | 2 +-
- {include/linux => drivers/tty/serial}/atmel_serial.h | 0
- 3 files changed, 2 insertions(+), 2 deletions(-)
- rename {include/linux => drivers/tty/serial}/atmel_serial.h (100%)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ad4f2ce991ca..d7b07cb23cbe 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -8218,7 +8218,7 @@ MICROCHIP / ATMEL AT91 / AT32 SERIAL DRIVER
- M:	Richard Genoud <richard.genoud@gmail.com>
- S:	Maintained
- F:	drivers/tty/serial/atmel_serial.c
--F:	include/linux/atmel_serial.h
-+F:	drivers/tty/serial/atmel_serial.h
- 
- MICROCHIP / ATMEL DMA DRIVER
- M:	Ludovic Desroches <ludovic.desroches@microchip.com>
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index dcebb28ffbc4..ad6c2bdea481 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -38,7 +38,6 @@
- #include <linux/dma-mapping.h>
- #include <linux/dmaengine.h>
- #include <linux/atmel_pdc.h>
--#include <linux/atmel_serial.h>
- #include <linux/uaccess.h>
- #include <linux/platform_data/atmel.h>
- #include <linux/timer.h>
-@@ -71,6 +70,7 @@
- #include <linux/serial_core.h>
- 
- #include "serial_mctrl_gpio.h"
-+#include "atmel_serial.h"
- 
- static void atmel_start_rx(struct uart_port *port);
- static void atmel_stop_rx(struct uart_port *port);
-diff --git a/include/linux/atmel_serial.h b/drivers/tty/serial/atmel_serial.h
-similarity index 100%
-rename from include/linux/atmel_serial.h
-rename to drivers/tty/serial/atmel_serial.h
+Guenter
