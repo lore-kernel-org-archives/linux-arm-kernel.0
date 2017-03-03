@@ -1,34 +1,32 @@
 From: andi.shyti@samsung.com (Andi Shyti)
-Date: Fri, 03 Mar 2017 09:22:06 +0900
-Subject: [PATCH v3 0/7] Fix the parse_dt of exynos dsi and remove the OF
- graph
-In-Reply-To: <1488450019-6482-1-git-send-email-hoegeun.kwon@samsung.com>
-References: <CGME20170302102112epcas5p476b30508bbaffbf1fe9781b941cd418f@epcas5p4.samsung.com>
- <1488450019-6482-1-git-send-email-hoegeun.kwon@samsung.com>
-Message-ID: <20170303002206.zh56dsx7iuysg374@gangnam.samsung>
+Date: Fri, 03 Mar 2017 09:26:07 +0900
+Subject: [PATCH v3 2/7] arm: dts: Add the burst and esc clock frequency
+ properties for exynos3250 dts
+In-Reply-To: <1488450019-6482-3-git-send-email-hoegeun.kwon@samsung.com>
+References: <1488450019-6482-1-git-send-email-hoegeun.kwon@samsung.com>
+ <CGME20170302102113epcas1p343e9da20f05be0a2359bf32834626c4a@epcas1p3.samsung.com>
+ <1488450019-6482-3-git-send-email-hoegeun.kwon@samsung.com>
+Message-ID: <20170303002607.fdw6ipqzzvo6j5wh@gangnam.samsung>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Hoegeun,
 
-> Hoegeun Kwon (7):
->   arm64: dts: exynos: Add the burst and esc clock frequency properties
->     for exynos5433 dts
->   arm: dts: Add the burst and esc clock frequency properties for
->     exynos3250 dts
->   arm: dts: Add the burst and esc clock frequency properties for
->     exynos4412 dts
->   arm: dts: Add the burst and esc clock frequency properties for
->     exynos4210 dts
->   drm/exynos: dsi: Fix the parse_dt function
->   arm64: dts: exynos: Remove the OF graph from DSI node
->   arm: dts: Remove the OF graph from DSI node
+On Thu, Mar 02, 2017 at 07:20:14PM +0900, Hoegeun Kwon wrote:
+> The OF graph is not needed because the panel is a child of dsi. So
+> added the burst and esc clock frequency properties to the parent (DSI
+> node), taking into account the bisectability problem so that remove
+> the OF graph from DSI node.
 
-for all of them:
+nitpick:
 
-Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
+1. bisectability is not a problem (and for bisectability you
+   should not mention it in the commit log, you would confuse
+   bisecting people)
 
-although I would have squashed patch 2, 3 and 4, but no need to
-resend, unless someone else agrees.
+2. you should use the imperative form, not "added the burst... "
+   but "add the burst..."
+
+Same for the other patches.
 
 Andi
