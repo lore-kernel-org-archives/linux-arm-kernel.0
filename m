@@ -1,49 +1,46 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Mar 2017 17:18:39 +0000
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Fri, 3 Mar 2017 18:26:28 +0100
 Subject: No output on console despite ignore_loglevel earlyprintk
-In-Reply-To: <0e7d14d5-d087-cba3-1792-fb0abf1142ef@sigmadesigns.com>
+In-Reply-To: <20170303165548.GO21222@n2100.armlinux.org.uk>
 References: <6d16a384-1a4c-bf27-fd81-ea3caf3de6b0@sigmadesigns.com>
- <6cc48f5c-b028-2bb7-c09b-92c36554fe07@suse.de>
- <0e7d14d5-d087-cba3-1792-fb0abf1142ef@sigmadesigns.com>
-Message-ID: <20170303171839.GP21222@n2100.armlinux.org.uk>
+ <20170303165548.GO21222@n2100.armlinux.org.uk>
+Message-ID: <3293964b-aec2-e8b8-46f5-49b0eacc4718@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 03, 2017 at 06:07:39PM +0100, Marc Gonzalez wrote:
-> On 03/03/2017 17:59, Andreas F?rber wrote:
-> >> I suppose this is related to my DT description?
-> >>
-> >> 	chosen {
-> >> 		stdout-path = "serial:115200n8";
-> >> 	};
-> >>
-> >> Isn't stdout-path = "serial:115200n8" supposed to be equivalent to
-> >> console=ttyS0,115200 ?
-> > 
-> > First of all, that should probably be serial0, and it needs to be
-> > defined as an alias. In my case that's a given.
+Am 03.03.2017 um 17:55 schrieb Russell King - ARM Linux:
+> On Fri, Mar 03, 2017 at 05:42:02PM +0100, Marc Gonzalez wrote:
+>> I'm confused about early consoles and earlyprintk, and all that good stuff.
+>> When my kernel panics, I don't get the expected output.
+>>
+>> Using "mem=256M ignore_loglevel earlyprintk"
+>>
+[...]
+>> [    0.014325] Console: colour dummy device 80x30
+>> [    0.018885] console [tty0] enabled
+>> [    0.022396] bootconsole [earlycon0] disabled
+>>
+>> And it hangs there.
 > 
-> My DT root node contains
+> tty0 is the kernel virtual terminal console, which is what appears on
+> VGA or framebuffers.  This is the default console if nothing else is
+> specified.
 > 
-> 	aliases {
-> 		serial = &uart;
-> 		eth0 = &eth0;
-> 	};
-> 
-> Should I be using serial0 everywhere?
-> (I thought I could call it "foo", if I wanted.)
+> What happened here is that the virtual terminal console registered, was
+> detected to be the system console, so early console was shut down, and
+> the boot messages logged to the virtual terminal console instead.
 
-Correct, stdout-path contains the node name - please see
-Documentation/devicetree/bindings/chosen.txt for the definitive
-information.
+Why does passing console= make a difference though?
 
-Setting the early console has no effect on the eventual system
-console that the kernel chooses.  See these files:
+I expect stdout-path to have the same effect as the command line, and I
+am pretty sure that that was previous behavior in, e.g., v4.4.
 
-drivers/of/fdt.c
-drivers/tty/serial/earlycon.c
+Note that I am using earlycon, as opposed to earlyprintk above.
+
+Regards,
+Andreas
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
