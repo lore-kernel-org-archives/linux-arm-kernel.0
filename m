@@ -1,162 +1,187 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Fri, 3 Mar 2017 16:18:43 +0800
-Subject: [v2, 1/7] mmc: sdhci-of-esdhc: add peripheral clock support
-In-Reply-To: <1488529129-23560-1-git-send-email-yangbo.lu@nxp.com>
-References: <1488529129-23560-1-git-send-email-yangbo.lu@nxp.com>
-Message-ID: <1488529129-23560-2-git-send-email-yangbo.lu@nxp.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri,  3 Mar 2017 09:43:47 +0100
+Subject: [PATCH 1/4 v4] PCI: add DT bindings for Faraday Technology PCI Host
+ Bridge
+Message-ID: <20170303084347.17335-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-eSDHC could select peripheral clock or platform clock as clock source by
-the PCS bit of eSDHC Control Register, and this bit couldn't be reset by
-software reset for all. In default, the platform clock is used. But we have
-to use peripheral clock since it has a higher frequency to support eMMC
-HS200 mode and SD UHS-I mode. This patch is to add peripheral clock support
-and use it instead of platform clock if it's declared in eSDHC dts node.
+This adds device tree bindings for the Faraday technology PCI
+Host Bridge. This IP is found in the Storlink/Storm/Cortina
+Gemini SoC platform.
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+Cc: Janos Laube <janos.dev@gmail.com>
+Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: devicetree at vger.kernel.org
+Cc: Feng-Hsin Chiang <john453@faraday-tech.com>
+Cc: Greentime Hu <green.hu@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-Changes for v2:
-	- None
----
- drivers/mmc/host/sdhci-esdhc.h    |  1 +
- drivers/mmc/host/sdhci-of-esdhc.c | 70 +++++++++++++++++++++++++++++++++++++--
- 2 files changed, 69 insertions(+), 2 deletions(-)
+ChangeLog v3->v4:
+- Add Rob's ACK
+ChangeLog v2->v3:
+- Reinstate the specific-to-generic bindings also specifying the
+  "cortina,gemini-pci" fixture for the Faraday block.
+- Set compatible to "faraday,ftpci100" and "faraday,ftpci100-dual"
+  this is clearly closer to or equal to what the IP blocks from
+  Faraday are actually named.
+- Add "dma-ranges" property, after deciphering that some hardcoded
+  constants in the driver is really about this.
+ChangeLog v1->v2:
+- Rename from Cortina prefixes to Faraday. This is clearly
+  a Faraday IP block.
+- Support both the version with cascaded interrupts and the
+  "dual" version with 1-to-1 mapped interrupts.
+- Change bus-range to <0x00 0xff>
+- Fix spelling mistake
+- Write a bit about swizzling interrupts on the interrupt
+  controller side
+- Reasonable swizzling in the interrupt mapping example
 
-diff --git a/drivers/mmc/host/sdhci-esdhc.h b/drivers/mmc/host/sdhci-esdhc.h
-index ece8b37..5343fc0 100644
---- a/drivers/mmc/host/sdhci-esdhc.h
-+++ b/drivers/mmc/host/sdhci-esdhc.h
-@@ -54,6 +54,7 @@
- 
- /* Control Register for DMA transfer */
- #define ESDHC_DMA_SYSCTL		0x40c
-+#define ESDHC_PERIPHERAL_CLK_SEL	0x00080000
- #define ESDHC_DMA_SNOOP			0x00000040
- 
- #endif /* _DRIVERS_MMC_SDHCI_ESDHC_H */
-diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of-esdhc.c
-index d3aa671..84865b0 100644
---- a/drivers/mmc/host/sdhci-of-esdhc.c
-+++ b/drivers/mmc/host/sdhci-of-esdhc.c
-@@ -19,6 +19,7 @@
- #include <linux/delay.h>
- #include <linux/module.h>
- #include <linux/sys_soc.h>
-+#include <linux/clk.h>
- #include <linux/mmc/host.h>
- #include "sdhci-pltfm.h"
- #include "sdhci-esdhc.h"
-@@ -30,6 +31,7 @@ struct sdhci_esdhc {
- 	u8 vendor_ver;
- 	u8 spec_ver;
- 	bool quirk_incorrect_hostver;
-+	unsigned int peripheral_clock;
- };
- 
- /**
-@@ -414,15 +416,25 @@ static int esdhc_of_enable_dma(struct sdhci_host *host)
- static unsigned int esdhc_of_get_max_clock(struct sdhci_host *host)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
- 
--	return pltfm_host->clock;
-+	if (esdhc->peripheral_clock)
-+		return esdhc->peripheral_clock;
-+	else
-+		return pltfm_host->clock;
- }
- 
- static unsigned int esdhc_of_get_min_clock(struct sdhci_host *host)
- {
- 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
-+	unsigned int clock;
- 
--	return pltfm_host->clock / 256 / 16;
-+	if (esdhc->peripheral_clock)
-+		clock = esdhc->peripheral_clock;
-+	else
-+		clock = pltfm_host->clock;
-+	return clock / 256 / 16;
- }
- 
- static void esdhc_of_set_clock(struct sdhci_host *host, unsigned int clock)
-@@ -512,6 +524,33 @@ static void esdhc_pltfm_set_bus_width(struct sdhci_host *host, int width)
- 	sdhci_writel(host, ctrl, ESDHC_PROCTL);
- }
- 
-+static void esdhc_clock_enable(struct sdhci_host *host, bool enable)
-+{
-+	u32 val;
-+	u32 timeout;
+This can be merged to the PCI tree whenever it is considered
+fine for inclusion.
+---
+ .../devicetree/bindings/pci/faraday,ftpci100.txt   | 129 +++++++++++++++++++++
+ 1 file changed, 129 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/faraday,ftpci100.txt
+
+diff --git a/Documentation/devicetree/bindings/pci/faraday,ftpci100.txt b/Documentation/devicetree/bindings/pci/faraday,ftpci100.txt
+new file mode 100644
+index 000000000000..35d4a979bb7b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/faraday,ftpci100.txt
+@@ -0,0 +1,129 @@
++Faraday Technology FTPCI100 PCI Host Bridge
 +
-+	val = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
++This PCI bridge is found inside that Cortina Systems Gemini SoC platform and
++is a generic IP block from Faraday Technology. It exists in two variants:
++plain and dual PCI. The plain version embeds a cascading interrupt controller
++into the host bridge. The dual version routes the interrupts to the host
++chips interrupt controller.
 +
-+	if (enable)
-+		val |= ESDHC_CLOCK_SDCLKEN;
-+	else
-+		val &= ~ESDHC_CLOCK_SDCLKEN;
++The host controller appear on the PCI bus with vendor ID 0x159b (Faraday
++Technology) and product ID 0x4321.
 +
-+	sdhci_writel(host, val, ESDHC_SYSTEM_CONTROL);
++Mandatory properties:
 +
-+	timeout = 20;
-+	val = ESDHC_CLOCK_STABLE;
-+	while (!(sdhci_readl(host, ESDHC_PRSSTAT) & val)) {
-+		if (timeout == 0) {
-+			pr_err("%s: Internal clock never stabilised.\n",
-+				mmc_hostname(host->mmc));
-+			break;
-+		}
-+		timeout--;
-+		mdelay(1);
-+	}
-+}
++- compatible: ranging from specific to generic, should be one of
++  "cortina,gemini-pci", "faraday,ftpci100"
++  "cortina,gemini-pci-dual", "faraday,ftpci100-dual"
++  "faraday,ftpci100"
++  "faraday,ftpci100-dual"
++- reg: memory base and size for the host bridge
++- #address-cells: set to <3>
++- #size-cells: set to <2>
++- #interrupt-cells: set to <1>
++- bus-range: set to <0x00 0xff>
++- device_type, set to "pci"
++- ranges: see pci.txt
++- interrupt-map-mask: see pci.txt
++- interrupt-map: see pci.txt
++- dma-ranges: three ranges for the inbound memory region. The ranges must
++  be aligned to a 1MB boundary, and may be 1MB, 2MB, 4MB, 8MB, 16MB, 32MB, 64MB,
++  128MB, 256MB, 512MB, 1GB or 2GB in size. The memory should be marked as
++  pre-fetchable.
 +
- static void esdhc_reset(struct sdhci_host *host, u8 mask)
- {
- 	sdhci_reset(host, mask);
-@@ -610,6 +649,9 @@ static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
- {
- 	struct sdhci_pltfm_host *pltfm_host;
- 	struct sdhci_esdhc *esdhc;
-+	struct device_node *np;
-+	struct clk *clk;
-+	u32 val;
- 	u16 host_ver;
- 
- 	pltfm_host = sdhci_priv(host);
-@@ -623,6 +665,30 @@ static void esdhc_init(struct platform_device *pdev, struct sdhci_host *host)
- 		esdhc->quirk_incorrect_hostver = true;
- 	else
- 		esdhc->quirk_incorrect_hostver = false;
++Mandatory subnodes:
++- For "faraday,ftpci100" a node representing the interrupt-controller inside the
++  host bridge is mandatory. It has the following mandatory properties:
++  - interrupt: see interrupt-controller/interrupts.txt
++  - interrupt-parent: see interrupt-controller/interrupts.txt
++  - interrupt-controller: see interrupt-controller/interrupts.txt
++  - #address-cells: set to <0>
++  - #interrupt-cells: set to <1>
 +
-+	np = pdev->dev.of_node;
-+	clk = of_clk_get(np, 0);
-+	if (!IS_ERR(clk)) {
-+		/*
-+		 * esdhc->peripheral_clock would be assigned with a value
-+		 * which is eSDHC base clock when use periperal clock.
-+		 * For ls1046a, the clock value got by common clk API is
-+		 * peripheral clock while the eSDHC base clock is 1/2
-+		 * peripheral clock.
-+		 */
-+		if (of_device_is_compatible(np, "fsl,ls1046a-esdhc"))
-+			esdhc->peripheral_clock = clk_get_rate(clk) / 2;
-+		else
-+			esdhc->peripheral_clock = clk_get_rate(clk);
-+	}
++I/O space considerations:
 +
-+	if (esdhc->peripheral_clock) {
-+		esdhc_clock_enable(host, false);
-+		val = sdhci_readl(host, ESDHC_DMA_SYSCTL);
-+		val |= ESDHC_PERIPHERAL_CLK_SEL;
-+		sdhci_writel(host, val, ESDHC_DMA_SYSCTL);
-+		esdhc_clock_enable(host, true);
-+	}
- }
- 
- static int sdhci_esdhc_probe(struct platform_device *pdev)
++The plain variant has 128MiB of non-prefetchable memory space, whereas the
++"dual" variant has 64MiB. Take this into account when describing the ranges.
++
++Interrupt map considerations:
++
++The "dual" variant will get INT A, B, C, D from the system interrupt controller
++and should point to respective interrupt in that controller in its
++interrupt-map.
++
++The code which is the only documentation of how the Faraday PCI (the non-dual
++variant) interrupts assigns the default interrupt mapping/swizzling has
++typically been like this, doing the swizzling on the interrupt controller side
++rather than in the interconnect:
++
++interrupt-map-mask = <0xf800 0 0 7>;
++interrupt-map =
++	<0x4800 0 0 1 &pci_intc 0>, /* Slot 9 */
++	<0x4800 0 0 2 &pci_intc 1>,
++	<0x4800 0 0 3 &pci_intc 2>,
++	<0x4800 0 0 4 &pci_intc 3>,
++	<0x5000 0 0 1 &pci_intc 1>, /* Slot 10 */
++	<0x5000 0 0 2 &pci_intc 2>,
++	<0x5000 0 0 3 &pci_intc 3>,
++	<0x5000 0 0 4 &pci_intc 0>,
++	<0x5800 0 0 1 &pci_intc 2>, /* Slot 11 */
++	<0x5800 0 0 2 &pci_intc 3>,
++	<0x5800 0 0 3 &pci_intc 0>,
++	<0x5800 0 0 4 &pci_intc 1>,
++	<0x6000 0 0 1 &pci_intc 3>, /* Slot 12 */
++	<0x6000 0 0 2 &pci_intc 0>,
++	<0x6000 0 0 3 &pci_intc 1>,
++	<0x6000 0 0 4 &pci_intc 2>;
++
++Example:
++
++pci at 50000000 {
++	compatible = "cortina,gemini-pci", "faraday,ftpci100";
++	reg = <0x50000000 0x100>;
++	interrupts = <8 IRQ_TYPE_LEVEL_HIGH>, /* PCI A */
++			<26 IRQ_TYPE_LEVEL_HIGH>, /* PCI B */
++			<27 IRQ_TYPE_LEVEL_HIGH>, /* PCI C */
++			<28 IRQ_TYPE_LEVEL_HIGH>; /* PCI D */
++	#address-cells = <3>;
++	#size-cells = <2>;
++	#interrupt-cells = <1>;
++
++	bus-range = <0x00 0xff>;
++	ranges = /* 1MiB I/O space 0x50000000-0x500fffff */
++		 <0x01000000 0 0          0x50000000 0 0x00100000>,
++		 /* 128MiB non-prefetchable memory 0x58000000-0x5fffffff */
++		 <0x02000000 0 0x58000000 0x58000000 0 0x08000000>;
++
++	/* DMA ranges */
++	dma-ranges =
++	/* 128MiB at 0x00000000-0x07ffffff */
++	<0x02000000 0 0x00000000 0x00000000 0 0x08000000>,
++	/* 64MiB at 0x00000000-0x03ffffff */
++	<0x02000000 0 0x00000000 0x00000000 0 0x04000000>,
++	/* 64MiB at 0x00000000-0x03ffffff */
++	<0x02000000 0 0x00000000 0x00000000 0 0x04000000>;
++
++	interrupt-map-mask = <0xf800 0 0 7>;
++	interrupt-map =
++		<0x4800 0 0 1 &pci_intc 0>, /* Slot 9 */
++		<0x4800 0 0 2 &pci_intc 1>,
++		<0x4800 0 0 3 &pci_intc 2>,
++		<0x4800 0 0 4 &pci_intc 3>,
++		<0x5000 0 0 1 &pci_intc 1>, /* Slot 10 */
++		<0x5000 0 0 2 &pci_intc 2>,
++		<0x5000 0 0 3 &pci_intc 3>,
++		<0x5000 0 0 4 &pci_intc 0>,
++		<0x5800 0 0 1 &pci_intc 2>, /* Slot 11 */
++		<0x5800 0 0 2 &pci_intc 3>,
++		<0x5800 0 0 3 &pci_intc 0>,
++		<0x5800 0 0 4 &pci_intc 1>,
++		<0x6000 0 0 1 &pci_intc 3>, /* Slot 12 */
++		<0x6000 0 0 2 &pci_intc 0>,
++		<0x6000 0 0 3 &pci_intc 0>,
++		<0x6000 0 0 4 &pci_intc 0>;
++	pci_intc: interrupt-controller {
++		interrupt-parent = <&intcon>;
++		interrupt-controller;
++		#address-cells = <0>;
++		#interrupt-cells = <1>;
++	};
++};
 -- 
-2.1.0.27.g96db324
+2.9.3
