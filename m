@@ -1,60 +1,88 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 3 Mar 2017 00:21:49 -0600
-Subject: [PATCH V3 3/4] dt-bindings: serial: add a new compatible string
- for SC9860
-In-Reply-To: <1488435730-6711-4-git-send-email-chunyan.zhang@spreadtrum.com>
-References: <1488435730-6711-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1488435730-6711-4-git-send-email-chunyan.zhang@spreadtrum.com>
-Message-ID: <20170303062149.xeernsjqhipwk7tq@rob-hp-laptop>
+Date: Fri, 3 Mar 2017 00:21:45 -0600
+Subject: [RFC v0 0/2] Introduce on-chip interconnect API
+In-Reply-To: <20170301182235.19154-1-georgi.djakov@linaro.org>
+References: <20170301182235.19154-1-georgi.djakov@linaro.org>
+Message-ID: <20170303062145.zpa4oblwgx2ecgv7@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 02:22:09PM +0800, Chunyan Zhang wrote:
-> SC9860 use the same serial device, so added a new compatible string to
-> support SC9860 as well, also added an example of how to describe this
-> serial device in DT.
+On Wed, Mar 01, 2017 at 08:22:33PM +0200, Georgi Djakov wrote:
+> Modern SoCs have multiple processors and various dedicated cores (video, gpu,
+> graphics, modem). These cores are talking to each other and can generate a lot
+> of data flowing through the on-chip interconnects. These interconnect buses
+> could form different topologies such as crossbar, point to point buses,
+> hierarchical buses or use the network-on-chip concept.
 > 
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> ---
->  Documentation/devicetree/bindings/serial/sprd-uart.txt | 15 ++++++++++++++-
->  1 file changed, 14 insertions(+), 1 deletion(-)
+> These buses have been sized usually to handle use cases with high data
+> throughput but it is not necessary all the time and consume a lot of power.
+> Furthermore, the priority between masters can vary depending on the running
+> use case like video playback or cpu intensive tasks.
 > 
-> diff --git a/Documentation/devicetree/bindings/serial/sprd-uart.txt b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-> index 2aff0f2..8bd8144 100644
-> --- a/Documentation/devicetree/bindings/serial/sprd-uart.txt
-> +++ b/Documentation/devicetree/bindings/serial/sprd-uart.txt
-> @@ -1,7 +1,20 @@
->  * Spreadtrum serial UART
->  
->  Required properties:
-> -- compatible: must be "sprd,sc9836-uart"
-> +- compatible must contain:
-> +  * "sprd,sc9836-uart" for SC9836 and all Spreadtrum SoCs
-> +  This also can be specific with:
-> +  * "sprd,sc9860-uart" for SC9860
-
-Just say:
-
-- compatible: must be one of:
-	"sprd,sc9836-uart"
-	"sprd,sc9860-uart", "sprd,sc9836-uart"
-
-> +
->  - reg: offset and length of the register set for the device
->  - interrupts: exactly one interrupt specifier
->  - clocks: phandles to input clocks.
-> +
-> +Example:
-> +	uart0: serial at 70000000 {
-> +		compatible = "sprd,sc9860-uart",
-> +			     "sprd,sc9836-uart";
-> +		reg = <0x000000 0x100>;
-
-unit address doesn't match the reg property.
-
-> +		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&ext_26m>;
-> +	};
-> -- 
-> 2.7.4
+> Having an API to control the requirement of the system in term of bandwidth
+> and QoS, so we can adapt the interconnect configuration to match those by
+> scaling the frequencies, setting link priority and tuning QoS parameters.
+> This configuration can be a static, one-time operation done at boot for some
+> platforms or a dynamic set of operations that happen at run-time.
 > 
+> This patchset introduce a new API to get the requirement and configure the
+> interconnect buses across the entire chipset to fit with the current demand.
+> The API is NOT for changing the performance of the endpoint devices, but only
+> the interconnect path in between them.
+> 
+> The API is using a consumer/provider-based model, where the providers are
+> the interconnect controllers and the consumers could be various drivers.
+> The consumers request interconnect resources (path) to an endpoint and set
+> the desired constraints on this data flow path. The provider(s) receive
+> requests from consumers and aggregate these requests for all master-slave
+> pairs on that path. Then the providers configure each participating in the
+> topology node according to the requested data flow path, physical links and
+> constraints. The topology could be complicated and multi-tiered and is SoC
+> specific.
+> 
+> Below is a simplified diagram of a real-world SoC topology. The interconnect
+> providers are the memory front-end and the NoCs.
+> 
+> +----------------+    +----------------+
+> | HW Accelerator |--->|      M NoC     |<---------------+
+> +----------------+    +----------------+                |
+>                         |      |                    +------------+
+>           +-------------+      V       +------+     |            |
+>           |                +--------+  | PCIe |     |            |
+>           |                | Slaves |  +------+     |            |
+>           |                +--------+     |         |   C NoC    |
+>           V                               V         |            |
+> +------------------+   +------------------------+   |            |   +-----+
+> |                  |-->|                        |-->|            |-->| CPU |
+> |                  |-->|                        |<--|            |   +-----+
+> |      Memory      |   |         S NoC          |   +------------+
+> |                  |<--|                        |---------+    |
+> |                  |<--|                        |<------+ |    |   +--------+
+> +------------------+   +------------------------+       | |    +-->| Slaves |
+>    ^     ^    ^           ^                             | |        +--------+
+>    |     |    |           |                             | V
+> +-----+  |  +-----+    +-----+  +---------+   +----------------+   +--------+
+> | CPU |  |  | GPU |    | DSP |  | Masters |-->|       P NoC    |-->| Slaves |
+> +-----+  |  +-----+    +-----+  +---------+   +----------------+   +--------+
+>          |
+>      +-------+
+>      | Modem |
+>      +-------+
+> 
+> This RFC does not implement all features but only main skeleton to check the
+> validity of the proposal. Currently it only works with device-tree and platform
+> devices.
+> 
+> TODO:
+>  * Constraints are currently stored in internal data structure. Should PM QoS
+>  be used instead?
+>  * Rework the framework to not depend on DT as frameworks cannot be tied
+>  directly to firmware interfaces. Add support for ACPI?
+
+I would start without DT even. You can always have the data you need in 
+the kernel. This will be more flexible as you're not defining an ABI as 
+this evolves. I think it will take some time to have consensus on how to 
+represent the bus master view of buses/interconnects (It's been 
+attempted before). 
+
+Rob
