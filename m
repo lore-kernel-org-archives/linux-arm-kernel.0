@@ -1,40 +1,68 @@
-From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Fri,  3 Mar 2017 16:17:50 +0530
-Subject: [PATCH 4/4] net: thunderx: Allow IPv6 frames with zero UDP checksum
-In-Reply-To: <1488538070-12549-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1488538070-12549-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1488538070-12549-5-git-send-email-sunil.kovvuri@gmail.com>
+From: zhang.lyra@gmail.com (Chunyan Zhang)
+Date: Fri, 3 Mar 2017 18:48:54 +0800
+Subject: [PATCH V3 3/4] dt-bindings: serial: add a new compatible string
+ for SC9860
+In-Reply-To: <20170303062149.xeernsjqhipwk7tq@rob-hp-laptop>
+References: <1488435730-6711-1-git-send-email-chunyan.zhang@spreadtrum.com>
+ <1488435730-6711-4-git-send-email-chunyan.zhang@spreadtrum.com>
+ <20170303062149.xeernsjqhipwk7tq@rob-hp-laptop>
+Message-ID: <CAAfSe-sgeG9WdxyJE25Bn3xYcp=AHTAtGob0xVJmvoLPkduPEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thanneeru Srinivasulu <tsrinivasulu@cavium.com>
+On 3 March 2017 at 14:21, Rob Herring <robh@kernel.org> wrote:
+> On Thu, Mar 02, 2017 at 02:22:09PM +0800, Chunyan Zhang wrote:
+>> SC9860 use the same serial device, so added a new compatible string to
+>> support SC9860 as well, also added an example of how to describe this
+>> serial device in DT.
+>>
+>> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+>> ---
+>>  Documentation/devicetree/bindings/serial/sprd-uart.txt | 15 ++++++++++++++-
+>>  1 file changed, 14 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/serial/sprd-uart.txt b/Documentation/devicetree/bindings/serial/sprd-uart.txt
+>> index 2aff0f2..8bd8144 100644
+>> --- a/Documentation/devicetree/bindings/serial/sprd-uart.txt
+>> +++ b/Documentation/devicetree/bindings/serial/sprd-uart.txt
+>> @@ -1,7 +1,20 @@
+>>  * Spreadtrum serial UART
+>>
+>>  Required properties:
+>> -- compatible: must be "sprd,sc9836-uart"
+>> +- compatible must contain:
+>> +  * "sprd,sc9836-uart" for SC9836 and all Spreadtrum SoCs
+>> +  This also can be specific with:
+>> +  * "sprd,sc9860-uart" for SC9860
+>
+> Just say:
+>
+> - compatible: must be one of:
+>         "sprd,sc9836-uart"
+>         "sprd,sc9860-uart", "sprd,sc9836-uart"
+>
+>> +
+>>  - reg: offset and length of the register set for the device
+>>  - interrupts: exactly one interrupt specifier
+>>  - clocks: phandles to input clocks.
+>> +
+>> +Example:
+>> +     uart0: serial at 70000000 {
+>> +             compatible = "sprd,sc9860-uart",
+>> +                          "sprd,sc9836-uart";
+>> +             reg = <0x000000 0x100>;
+>
+> unit address doesn't match the reg property.
 
-Do not consider IPv6 frames with zero UDP checksum as frames
-with bad checksum and drop them.
+OK, I will revise dts file accordingly.
 
-Signed-off-by: Thanneeru Srinivasulu <tsrinivasulu@cavium.com>
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+Thanks,
+Chunyan
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index ee3aa16..77a86a6 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -657,9 +657,11 @@ static void nicvf_rcv_queue_config(struct nicvf *nic, struct queue_set *qs,
- 	nicvf_send_msg_to_pf(nic, &mbx);
- 
- 	if (!nic->sqs_mode && (qidx == 0)) {
--		/* Enable checking L3/L4 length and TCP/UDP checksums */
-+		/* Enable checking L3/L4 length and TCP/UDP checksums
-+		 * Also allow IPv6 pkts with zero UDP checksum.
-+		 */
- 		nicvf_queue_reg_write(nic, NIC_QSET_RQ_GEN_CFG, 0,
--				      (BIT(24) | BIT(23) | BIT(21)));
-+				      (BIT(24) | BIT(23) | BIT(21) | BIT(20)));
- 		nicvf_config_vlan_stripping(nic, nic->netdev->features);
- 	}
- 
--- 
-2.7.4
+>
+>> +             interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+>> +             clocks = <&ext_26m>;
+>> +     };
+>> --
+>> 2.7.4
+>>
