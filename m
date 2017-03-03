@@ -1,30 +1,72 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 3 Mar 2017 00:21:24 -0600
-Subject: [PATCH v2 1/3] coresight: bindings for debug module
-In-Reply-To: <1488294420-14188-2-git-send-email-leo.yan@linaro.org>
-References: <1488294420-14188-1-git-send-email-leo.yan@linaro.org>
- <1488294420-14188-2-git-send-email-leo.yan@linaro.org>
-Message-ID: <20170303062124.rc2fw6axs3cp7ofc@rob-hp-laptop>
+Date: Fri, 3 Mar 2017 00:21:26 -0600
+Subject: [PATCH v3 1/6] dt-bindings: iio: introduce trigger providers,
+ consumers
+In-Reply-To: <1488300679-3259-2-git-send-email-fabrice.gasnier@st.com>
+References: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
+ <1488300679-3259-2-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <20170303062126.5bewa5u6o7wu7sy4@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2017 at 11:06:58PM +0800, Leo Yan wrote:
-> According to ARMv8 architecture reference manual (ARM DDI 0487A.k)
-> Chapter 'Part H: External debug', the CPU can integrate debug module
-> and it can support self-hosted debug and external debug. Especially
-> for supporting self-hosted debug, this means the program can access
-> the debug module from mmio region; and usually the mmio region is
-> integrated with coresight.
+On Tue, Feb 28, 2017 at 05:51:14PM +0100, Fabrice Gasnier wrote:
+> Document iio provider and consumer bindings.
 > 
-> So add document for binding debug component, includes binding to APB
-> clock; and also need specify the CPU node which the debug module is
-> dedicated to specific CPU.
-> 
-> Suggested-by: Mike Leach <mike.leach@linaro.org>
-> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 > ---
->  .../devicetree/bindings/arm/coresight-debug.txt    | 40 ++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/coresight-debug.txt
+>  .../devicetree/bindings/iio/iio-bindings.txt       | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/iio/iio-bindings.txt b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+> index 68d6f8c..01765e9 100644
+> --- a/Documentation/devicetree/bindings/iio/iio-bindings.txt
+> +++ b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+> @@ -95,3 +95,41 @@ vdd channel is connected to output 0 of the &ref device.
+>  		io-channels = <&adc 10>, <&adc 11>;
+>  		io-channel-names = "adc1", "adc2";
+>  	};
+> +
+> +==IIO trigger providers==
+> +Sources of IIO triggers can be represented by any node in the device
+> +tree. Those nodes are designated as IIO trigger providers. IIO trigger
+> +consumer uses a phandle and an IIO trigger specifier to connect to an
+> +IIO trigger provider.
+> +An IIO trigger specifier is an array of one or more cells identifying
+> +the IIO trigger output on a device. The length of an IIO trigger
+> +specifier is defined by the value of a #io-trigger-cells property in
+> +the IIO trigger provider node.
+> +
+> +Required properties:
+> +#io-trigger-cells:
+> +		Number of cells in an IIO trigger specifier; Typically
+> +		0 for nodes with a simple IIO trigger output.
+> +
+> +Example:
+> +	trig0: interrupt-trigger0 {
+> +		#io-trigger-cells = <0>;
+> +		compatible = "interrupt-trigger";
+> +		interrupts = <11 0>;
+> +		interrupt-parent = <&gpioa>;
+> +	}
+> +
+> +==IIO trigger consumers==
+> +Required properties:
+> +- io-triggers:	List of phandle representing the IIO trigger specifier.
+> +
+> +Optional properties:
+> +- io-trigger-names :
+> +		List of IIO trigger name strings that matches elements
+> +		in 'io-triggers' list property.
+> +
+> +Example:
+> +	some_trigger_consumer {
+> +		io-triggers = <&trig0>;
+> +		io-trigger-names = "mytrig";
+> +	}
 
-Acked-by: Rob Herring <robh@kernel.org>
+I have some reservations about this. We could just as easily add the 
+interrupt directly to the consumer node and use "trigger" for a standard 
+interrupt name. So the question is whether this extra level of 
+indirection is needed? 
+
+Rob
