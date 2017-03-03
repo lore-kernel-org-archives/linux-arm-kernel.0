@@ -1,175 +1,137 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Fri, 3 Mar 2017 17:42:02 +0100
-Subject: No output on console despite ignore_loglevel earlyprintk
-Message-ID: <6d16a384-1a4c-bf27-fd81-ea3caf3de6b0@sigmadesigns.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 03 Mar 2017 18:45:40 +0200
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
+ staging
+In-Reply-To: <20170303100433.lm5t4hqxj6friyp6@phenom.ffwll.local>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <20170303100433.lm5t4hqxj6friyp6@phenom.ffwll.local>
+Message-ID: <10344634.XsotFaGzfj@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Daniel,
 
-I'm confused about early consoles and earlyprintk, and all that good stuff.
-When my kernel panics, I don't get the expected output.
+On Friday 03 Mar 2017 11:04:33 Daniel Vetter wrote:
+> On Thu, Mar 02, 2017 at 01:44:32PM -0800, Laura Abbott wrote:
+> > Hi,
+> > 
+> > There's been some recent discussions[1] about Ion-like frameworks. There's
+> > apparently interest in just keeping Ion since it works reasonablly well.
+> > This series does what should be the final clean ups for it to possibly be
+> > moved out of staging.
+> > 
+> > This includes the following:
+> > - Some general clean up and removal of features that never got a lot of
+> >   use as far as I can tell.
+> > 
+> > - Fixing up the caching. This is the series I proposed back in December[2]
+> >   but never heard any feedback on. It will certainly break existing
+> >   applications that rely on the implicit caching. I'd rather make an
+> >   effort to move to a model that isn't going directly against the
+> >   establishement though.
+> > 
+> > - Fixing up the platform support. The devicetree approach was never well
+> >   recieved by DT maintainers. The proposal here is to think of Ion less as
+> >   specifying requirements and more of a framework for exposing memory to
+> >   userspace.
+> > 
+> > - CMA allocations now happen without the need of a dummy device structure.
+> >   This fixes a bunch of the reasons why I attempted to add devicetree
+> >   support before.
+> > 
+> > I've had problems getting feedback in the past so if I don't hear any
+> > major objections I'm going to send out with the RFC dropped to be picked
+> > up. The only reason there isn't a patch to come out of staging is to
+> > discuss any other changes to the ABI people might want. Once this comes
+> > out of staging, I really don't want to mess with the ABI.
+> > 
+> > Feedback appreciated.
+> 
+> Imo looks all good. And I just realized that cross-checking with the TODO,
+> the 2 items about _CUSTOM and _IMPORT ioctls I noted are already there.
+> 
+> Otherwise I looked through the patches, looks all really reasonable.
 
-Using "mem=256M ignore_loglevel earlyprintk"
+Two more items that need to be addressed in my opinion :
 
-Uncompressing Linux... done, booting the kernel.
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 4.9.7-1-rc2 (gcc version 5.3.1 20160113 (Linaro GCC 5.3-2016.02) ) #153 SMP PREEMPT Fri Mar 3 17:31:37 CET 2017
-[    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c5387d
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-[    0.000000] OF: fdt:Machine model: Sigma Designs SMP8758 Vantage-1172 Rev E1
-[    0.000000] debug: ignoring loglevel setting.
-[    0.000000] bootconsole [earlycon0] enabled
-[    0.000000] Memory policy: Data cache writealloc
-[    0.000000] On node 0 totalpages: 65536
-[    0.000000] free_area_init_node: node 0, pgdat c10234c0, node_mem_map cfdf9000
-[    0.000000]   Normal zone: 512 pages used for memmap
-[    0.000000]   Normal zone: 0 pages reserved
-[    0.000000]   Normal zone: 65536 pages, LIFO batch:15
-[    0.000000] percpu: Embedded 14 pages/cpu @cfdd7000 s24960 r8192 d24192 u57344
-[    0.000000] pcpu-alloc: s24960 r8192 d24192 u57344 alloc=14*4096
-[    0.000000] pcpu-alloc: [0] 0 [0] 1 
-[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 65024
-[    0.000000] Kernel command line: mem=256M ignore_loglevel earlyprintk
-[    0.000000] PID hash table entries: 1024 (order: 0, 4096 bytes)
-[    0.000000] Dentry cache hash table entries: 32768 (order: 5, 131072 bytes)
-[    0.000000] Inode-cache hash table entries: 16384 (order: 4, 65536 bytes)
-[    0.000000] Memory: 243980K/262144K available (4096K kernel code, 146K rwdata, 876K rodata, 10240K init, 233K bss, 18164K reserved, 0K cma-reserved, 0K highmem)
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-[    0.000000]     vmalloc : 0xd0800000 - 0xff800000   ( 752 MB)
-[    0.000000]     lowmem  : 0xc0000000 - 0xd0000000   ( 256 MB)
-[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
-[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
-[    0.000000]       .text : 0xc0008000 - 0xc0500000   (5088 kB)
-[    0.000000]       .init : 0xc0600000 - 0xc1000000   (10240 kB)
-[    0.000000]       .data : 0xc1000000 - 0xc1024860   ( 147 kB)
-[    0.000000]        .bss : 0xc1024860 - 0xc105ed40   ( 234 kB)
-[    0.000000] Preemptible hierarchical RCU implementation.
-[    0.000000]  Build-time adjustment of leaf fanout to 32.
-[    0.000000]  RCU restricting CPUs from NR_CPUS=4 to nr_cpu_ids=2.
-[    0.000000] RCU: Adjusting geometry for rcu_fanout_leaf=32, nr_cpu_ids=2
-[    0.000000] NR_IRQS:16 nr_irqs:16 16
-[    0.000000] L2C-310 enabling early BRESP for Cortex-A9
-[    0.000000] L2C-310 ID prefetch enabled, offset 4 lines
-[    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
-[    0.000000] L2C-310 cache controller enabled, 8 ways, 512 kB
-[    0.000000] L2C-310: CACHE_ID 0x410000c8, AUX_CTRL 0x72860401
-[    0.000000] clocksource: tango-xtal: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 70787423951 ns
-[    0.000004] sched_clock: 32 bits at 27MHz, resolution 37ns, wraps every 79536431085ns
-[    0.007960] Switching to timer-based delay loop, resolution 37ns
-[    0.014325] Console: colour dummy device 80x30
-[    0.018885] console [tty0] enabled
-[    0.022396] bootconsole [earlycon0] disabled
+- Let's not export the ion_client API, we don't want drivers to be ion-
+specific. Only the dma-buf interface should be visible to drivers.
 
-And it hangs there.
+- I haven't seen any proposal how a heap-based solution could be used in a 
+generic distribution. This needs to be figured out before committing to any 
+API/ABI.
 
+> Wrt merging, my experience from destaging the android syncpt stuff was
+> that merging the patches through the staging tree lead to lots of
+> cross-tree issues with the gpu folks wanting to use that. Ion will
+> probably run into similar things, so I'd propose we pull these cleanup
+> patches and the eventual de-staging in throught drm. Yes that defacto
+> means I'm also volunteering myself a bit :-)
+> 
+> In the end we could put it all into drivers/gpu/ion or something like
+> that.
+> 
+> Thoughts? Greg?
+> -Daniel
+> 
+> > Thanks,
+> > Laura
+> > 
+> > [1] https://marc.info/?l=linux-kernel&m=148699712602105&w=2
+> > [2] https://marc.info/?l=linaro-mm-sig&m=148176050802908&w=2
+> > 
+> > Laura Abbott (12):
+> >   staging: android: ion: Remove dmap_cnt
+> >   staging: android: ion: Remove alignment from allocation field
+> >   staging: android: ion: Duplicate sg_table
+> >   staging: android: ion: Call dma_map_sg for syncing and mapping
+> >   staging: android: ion: Remove page faulting support
+> >   staging: android: ion: Remove crufty cache support
+> >   staging: android: ion: Remove old platform support
+> >   cma: Store a name in the cma structure
+> >   cma: Introduce cma_for_each_area
+> >   staging: android: ion: Use CMA APIs directly
+> >   staging: android: ion: Make Ion heaps selectable
+> >   staging; android: ion: Enumerate all available heaps
+> >  
+> >  drivers/base/dma-contiguous.c                      |   5 +-
+> >  drivers/staging/android/ion/Kconfig                |  51 ++--
+> >  drivers/staging/android/ion/Makefile               |  14 +-
+> >  drivers/staging/android/ion/hisilicon/Kconfig      |   5 -
+> >  drivers/staging/android/ion/hisilicon/Makefile     |   1 -
+> >  drivers/staging/android/ion/hisilicon/hi6220_ion.c | 113 ---------
+> >  drivers/staging/android/ion/ion-ioctl.c            |   6 -
+> >  drivers/staging/android/ion/ion.c                  | 282
+> >  ++++++--------------- drivers/staging/android/ion/ion.h                 
+> >  |   5 +-
+> >  drivers/staging/android/ion/ion_carveout_heap.c    |  16 +-
+> >  drivers/staging/android/ion/ion_chunk_heap.c       |  15 +-
+> >  drivers/staging/android/ion/ion_cma_heap.c         | 102 ++------
+> >  drivers/staging/android/ion/ion_dummy_driver.c     | 156 ------------
+> >  drivers/staging/android/ion/ion_enumerate.c        |  89 +++++++
+> >  drivers/staging/android/ion/ion_of.c               | 184 --------------
+> >  drivers/staging/android/ion/ion_of.h               |  37 ---
+> >  drivers/staging/android/ion/ion_page_pool.c        |   3 -
+> >  drivers/staging/android/ion/ion_priv.h             |  57 ++++-
+> >  drivers/staging/android/ion/ion_system_heap.c      |  14 +-
+> >  drivers/staging/android/ion/tegra/Makefile         |   1 -
+> >  drivers/staging/android/ion/tegra/tegra_ion.c      |  80 ------
+> >  include/linux/cma.h                                |   6 +-
+> >  mm/cma.c                                           |  25 +-
+> >  mm/cma.h                                           |   1 +
+> >  mm/cma_debug.c                                     |   2 +-
+> >  25 files changed, 312 insertions(+), 958 deletions(-)
+> >  delete mode 100644 drivers/staging/android/ion/hisilicon/Kconfig
+> >  delete mode 100644 drivers/staging/android/ion/hisilicon/Makefile
+> >  delete mode 100644 drivers/staging/android/ion/hisilicon/hi6220_ion.c
+> >  delete mode 100644 drivers/staging/android/ion/ion_dummy_driver.c
+> >  create mode 100644 drivers/staging/android/ion/ion_enumerate.c
+> >  delete mode 100644 drivers/staging/android/ion/ion_of.c
+> >  delete mode 100644 drivers/staging/android/ion/ion_of.h
+> >  delete mode 100644 drivers/staging/android/ion/tegra/Makefile
+> >  delete mode 100644 drivers/staging/android/ion/tegra/tegra_ion.c
 
-If I use an explicit console= configuration, I do see the panic.
-Using "mem=256M ignore_loglevel console=ttyS0,115200 earlyprintk"
+-- 
+Regards,
 
-Uncompressing Linux... done, booting the kernel.
-[    0.000000] Booting Linux on physical CPU 0x0
-[    0.000000] Linux version 4.9.7-1-rc2 (gcc version 5.3.1 20160113 (Linaro GCC 5.3-2016.02) ) #153 SMP PREEMPT Fri Mar 3 17:31:37 CET 2017
-[    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c5387d
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-[    0.000000] OF: fdt:Machine model: Sigma Designs SMP8758 Vantage-1172 Rev E1
-[    0.000000] debug: ignoring loglevel setting.
-[    0.000000] bootconsole [earlycon0] enabled
-[    0.000000] Memory policy: Data cache writealloc
-[    0.000000] On node 0 totalpages: 65536
-[    0.000000] free_area_init_node: node 0, pgdat c10234c0, node_mem_map cfdf9000
-[    0.000000]   Normal zone: 512 pages used for memmap
-[    0.000000]   Normal zone: 0 pages reserved
-[    0.000000]   Normal zone: 65536 pages, LIFO batch:15
-[    0.000000] percpu: Embedded 14 pages/cpu @cfdd7000 s24960 r8192 d24192 u57344
-[    0.000000] pcpu-alloc: s24960 r8192 d24192 u57344 alloc=14*4096
-[    0.000000] pcpu-alloc: [0] 0 [0] 1 
-[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 65024
-[    0.000000] Kernel command line: mem=256M ignore_loglevel console=ttyS0,115200 earlyprintk
-[    0.000000] PID hash table entries: 1024 (order: 0, 4096 bytes)
-[    0.000000] Dentry cache hash table entries: 32768 (order: 5, 131072 bytes)
-[    0.000000] Inode-cache hash table entries: 16384 (order: 4, 65536 bytes)
-[    0.000000] Memory: 243980K/262144K available (4096K kernel code, 146K rwdata, 876K rodata, 10240K init, 233K bss, 18164K reserved, 0K cma-reserved, 0K highmem)
-[    0.000000] Virtual kernel memory layout:
-[    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-[    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-[    0.000000]     vmalloc : 0xd0800000 - 0xff800000   ( 752 MB)
-[    0.000000]     lowmem  : 0xc0000000 - 0xd0000000   ( 256 MB)
-[    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
-[    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
-[    0.000000]       .text : 0xc0008000 - 0xc0500000   (5088 kB)
-[    0.000000]       .init : 0xc0600000 - 0xc1000000   (10240 kB)
-[    0.000000]       .data : 0xc1000000 - 0xc1024860   ( 147 kB)
-[    0.000000]        .bss : 0xc1024860 - 0xc105ed40   ( 234 kB)
-[    0.000000] Preemptible hierarchical RCU implementation.
-[    0.000000]  Build-time adjustment of leaf fanout to 32.
-[    0.000000]  RCU restricting CPUs from NR_CPUS=4 to nr_cpu_ids=2.
-[    0.000000] RCU: Adjusting geometry for rcu_fanout_leaf=32, nr_cpu_ids=2
-[    0.000000] NR_IRQS:16 nr_irqs:16 16
-[    0.000000] L2C-310 enabling early BRESP for Cortex-A9
-[    0.000000] L2C-310 ID prefetch enabled, offset 4 lines
-[    0.000000] L2C-310 dynamic clock gating enabled, standby mode enabled
-[    0.000000] L2C-310 cache controller enabled, 8 ways, 512 kB
-[    0.000000] L2C-310: CACHE_ID 0x410000c8, AUX_CTRL 0x72860401
-[    0.000000] clocksource: tango-xtal: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 70787423951 ns
-[    0.000004] sched_clock: 32 bits at 27MHz, resolution 37ns, wraps every 79536431085ns
-[    0.007961] Switching to timer-based delay loop, resolution 37ns
-[    0.014325] Console: colour dummy device 80x30
-[    0.018899] Calibrating delay loop (skipped), value calculated using timer frequency.. 54.25 BogoMIPS (lpj=90000)
-[    0.029316] pid_max: default: 32768 minimum: 301
-[    0.034135] Mount-cache hash table entries: 1024 (order: 0, 4096 bytes)
-[    0.040876] Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes)
-[    0.048527] CPU: Testing write buffer coherency: ok
-[    0.053736] CPU0: thread -1, cpu 0, socket 0, mpidr 80000000
-[    0.059560] Setting up static identity map for 0x80100000 - 0x80100034
-[    0.120467] CPU1: thread -1, cpu 1, socket 0, mpidr 80000001
-[    0.120530] Brought up 2 CPUs
-[    0.129381] SMP: Total of 2 processors activated (108.50 BogoMIPS).
-[    0.135771] CPU: All CPU(s) started in SVC mode.
-[    0.141062] devtmpfs: initialized
-[    0.145393] VFP support v0.3: implementor 41 architecture 3 part 30 variant 9 rev 4
-[    0.153490] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 6370867519511994 ns
-[    0.163772] NET: Registered protocol family 16
-[    0.169026] DMA: preallocated 256 KiB pool for atomic coherent allocations
-[    0.177030] Kernel panic - not syncing: FAKE PANIC
-[    0.177030] 
-[    0.183510] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.9.7-1-rc2 #153
-[    0.190154] Hardware name: Sigma Tango DT
-[    0.194301] [<c010ed94>] (unwind_backtrace) from [<c010ae24>] (show_stack+0x10/0x14)
-[    0.202176] [<c010ae24>] (show_stack) from [<c02cecc0>] (dump_stack+0x78/0x8c)
-[    0.209527] [<c02cecc0>] (dump_stack) from [<c018b634>] (panic+0xdc/0x248)
-[    0.216530] [<c018b634>] (panic) from [<c0607acc>] (xenv_lookup.constprop.1+0x0/0x64)
-[    0.224493] [<c0607acc>] (xenv_lookup.constprop.1) from [<c0220830>] (proc_create_data+0x74/0xb8)
-[    0.233501] [<c0220830>] (proc_create_data) from [<c050fa08>] (0xc050fa08)
-[    0.240499] CPU1: stopping
-[    0.243303] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.9.7-1-rc2 #153
-[    0.249946] Hardware name: Sigma Tango DT
-[    0.254065] [<c010ed94>] (unwind_backtrace) from [<c010ae24>] (show_stack+0x10/0x14)
-[    0.261937] [<c010ae24>] (show_stack) from [<c02cecc0>] (dump_stack+0x78/0x8c)
-[    0.269283] [<c02cecc0>] (dump_stack) from [<c010dc10>] (handle_IPI+0x198/0x1ac)
-[    0.276803] [<c010dc10>] (handle_IPI) from [<c01014a4>] (gic_handle_irq+0x88/0x8c)
-[    0.284499] [<c01014a4>] (gic_handle_irq) from [<c010b90c>] (__irq_svc+0x6c/0xa8)
-[    0.292104] Exception stack(0xcf859f98 to 0xcf859fe0)
-[    0.297263] 9f80:                                                       00000001 00000000
-[    0.305568] 9fa0: 000002d8 c0114620 cf858000 c1002fe4 c1003048 00000002 c100ba2e 413fc090
-[    0.313874] 9fc0: 00000000 00000000 32dcd555 cf859fe8 c0108220 c0108224 60000013 ffffffff
-[    0.322182] [<c010b90c>] (__irq_svc) from [<c0108224>] (arch_cpu_idle+0x38/0x3c)
-[    0.329707] [<c0108224>] (arch_cpu_idle) from [<c0151f4c>] (cpu_startup_entry+0xcc/0x144)
-[    0.338015] [<c0151f4c>] (cpu_startup_entry) from [<8010154c>] (0x8010154c)
-[    0.345103] ---[ end Kernel panic - not syncing: FAKE PANIC
-
-
-I suppose this is related to my DT description?
-
-	chosen {
-		stdout-path = "serial:115200n8";
-	};
-
-Isn't stdout-path = "serial:115200n8" supposed to be equivalent to
-console=ttyS0,115200 ?
-
-I must be missing something.
-
-Regards.
+Laurent Pinchart
