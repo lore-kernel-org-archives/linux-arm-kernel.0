@@ -1,61 +1,99 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 3 Mar 2017 22:36:02 +0100
-Subject: [PATCH v3 03/25] dt-bindings: timer: Document Owl timer
-In-Reply-To: <20170303062058.yvekr5kawqtzxgpn@rob-hp-laptop>
-References: <20170228063535.32069-1-afaerber@suse.de>
- <20170228063535.32069-4-afaerber@suse.de> <20170228123908.GG3691@leverpostej>
- <20170303062058.yvekr5kawqtzxgpn@rob-hp-laptop>
-Message-ID: <cef60449-a6e3-c513-d1d8-ed5824fc0550@suse.de>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri,  3 Mar 2017 13:48:12 -0800
+Subject: [PATCH V5 1/6] drivers: cpuidle: Read CPU's idle state from PM domain
+In-Reply-To: <1488577697-127445-1-git-send-email-lina.iyer@linaro.org>
+References: <1488577697-127445-1-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1488577697-127445-2-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 03.03.2017 um 07:20 schrieb Rob Herring:
-> On Tue, Feb 28, 2017 at 12:39:08PM +0000, Mark Rutland wrote:
->> On Tue, Feb 28, 2017 at 07:35:13AM +0100, Andreas F?rber wrote:
->>> The Actions Semi S500 SoC contains a timer block with two 2 Hz and two
->>> 32-bit timers. The S900 SoC timer block has four 32-bit timers.
->>>
->>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->>> ---
->>>  v2 -> v3:
->>>  * Adopted interrupt-names
->>>  * Changed compatible for S500
->>>  * Added S900 compatible and interrupt names
->>>  
->>>  v2: new
->>>  
->>>  .../devicetree/bindings/timer/actions,owl-timer.txt  | 20 ++++++++++++++++++++
->>>  1 file changed, 20 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/timer/actions,owl-timer.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/timer/actions,owl-timer.txt b/Documentation/devicetree/bindings/timer/actions,owl-timer.txt
->>> new file mode 100644
->>> index 0000000..5b4834d
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/timer/actions,owl-timer.txt
->>> @@ -0,0 +1,20 @@
->>> +Actions Semi Owl Timer
->>> +
->>> +Required properties:
->>> +- compatible      :  "actions,s500-timer" for S500
->>> +                     "actions,s900-timer" for S900
->>> +- reg             :  Offset and length of the register set for the device.
->>> +- interrupts      :  Should contain the interrupts.
->>> +- interrupt-names :  Valid names are: "2Hz0", "2Hz1",
->>> +                                      "Timer0", "Timer1", "Timer2", "Timer3"
->>
->> Sticking to lower case for the names would be preferable.
+Currently CPUs idle states and idle states of its parent are represented
+in a flattened model by the cpu-dile-states property of the CPU node.
+The CPUs idle states are followed by its cluster idle states. With the
+introduction of CPU PM domains, the CPUs and domain idle states may be
+represented hierarchically as part of the domain DT definition. This
+would mean presenting idle state information in 2 places - CPU nodes for
+the CPU and the cluster's with the PM domains.
 
-Done.
+Also, it makes sense to define domains around each individual CPU since
+each of them is a power domain in its own right. The CPU idle states can
+now be represented as its domain's idle state, defined by the
+domain-idle-states property. This avoids presenting idle states in
+multiple places in the DT.
 
-> With that,
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
+Modify the DT-based cpuidle driver to check for the presence of a CPU's
+domain and if present read the domain-idle-states of the PM domain and
+if the CPU's domain is absent, revert to reading in the cpu-idle-states
+property of the CPU DT node.
 
-Thanks,
-Andreas
+Suggested-by: Sudeep Holla <sudeep.holla@qrm.com>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+---
+ drivers/cpuidle/dt_idle_states.c | 38 +++++++++++++++++++++++++++++++++++---
+ 1 file changed, 35 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/cpuidle/dt_idle_states.c b/drivers/cpuidle/dt_idle_states.c
+index ffca4fc..4df7d45 100644
+--- a/drivers/cpuidle/dt_idle_states.c
++++ b/drivers/cpuidle/dt_idle_states.c
+@@ -98,6 +98,39 @@ static int init_state_node(struct cpuidle_state *idle_state,
+ }
+ 
+ /*
++ * Get the state node at @idx. State node may be defined as domain's idle state
++ * if the CPU has its own domain or defined as CPU's idle state if it doesn't
++ * have a domain provider.
++ */
++static struct device_node *get_state_node(struct device_node *cpu_node,
++				unsigned int idx)
++{
++	struct device_node *dn;
++	bool cpu_has_domain = false;
++	struct of_phandle_args args;
++	const char *property;
++	int err;
++
++	err = of_parse_phandle_with_args(cpu_node, "power-domains",
++					"#power-domain-cells", 0, &args);
++	if (!err) {
++		dn = args.np;
++		err = of_count_phandle_with_args(dn, "domain-idle-states",
++								NULL);
++		cpu_has_domain = (err > 0);
++	}
++
++	if (cpu_has_domain) {
++		property = "domain-idle-states";
++	} else {
++		property = "cpu-idle-states";
++		dn = cpu_node;
++	}
++
++	return of_parse_phandle(dn, property, idx);
++}
++
++/*
+  * Check that the idle state is uniform across all CPUs in the CPUidle driver
+  * cpumask
+  */
+@@ -118,8 +151,7 @@ static bool idle_state_valid(struct device_node *state_node, unsigned int idx,
+ 	for (cpu = cpumask_next(cpumask_first(cpumask), cpumask);
+ 	     cpu < nr_cpu_ids; cpu = cpumask_next(cpu, cpumask)) {
+ 		cpu_node = of_cpu_device_node_get(cpu);
+-		curr_state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
+-						   idx);
++		curr_state_node = get_state_node(cpu_node, idx);
+ 		if (state_node != curr_state_node)
+ 			valid = false;
+ 
+@@ -176,7 +208,7 @@ int dt_init_idle_driver(struct cpuidle_driver *drv,
+ 	cpu_node = of_cpu_device_node_get(cpumask_first(cpumask));
+ 
+ 	for (i = 0; ; i++) {
+-		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
++		state_node = get_state_node(cpu_node, i);
+ 		if (!state_node)
+ 			break;
+ 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.7.4
