@@ -1,67 +1,60 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 3 Mar 2017 15:32:22 +0000
-Subject: [PATCH] arm64: restore get_current() optimisation
-In-Reply-To: <20170302164654.GP19632@leverpostej>
-References: <1483468021-8237-1-git-send-email-mark.rutland@arm.com>
- <ee26a4f0-e3e9-fb44-fe7c-c40a15c33b38@nvidia.com>
- <20170302123507.GD19632@leverpostej>
- <086dff0b-126d-b5b7-e877-d3d46efce618@nvidia.com>
- <20170302164654.GP19632@leverpostej>
-Message-ID: <515e311c-b044-8759-8bf3-99ac4565840d@nvidia.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 3 Mar 2017 16:31:31 +0100
+Subject: usb/net/hso: WARNING: ungligned urb->setup_dma
+In-Reply-To: <20170301105437.tmm6ovmnrhce3ofa@tarshish>
+References: <20170228082810.syn656o2zzms7urf@tarshish>
+ <20170228120134.4f65yihw7x22hfwd@tarshish>
+ <36230d64-4ba0-7515-1131-ecf3ab9f352c@i2se.com>
+ <20170228180700.3fxpimfysnhm6uis@tarshish>
+ <1515966850.16584.1488306729844@email.1und1.de>
+ <20170301105437.tmm6ovmnrhce3ofa@tarshish>
+Message-ID: <565616b2-e8f7-e704-1ac5-f84b57ca5ba8@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Baruch,
 
-On 02/03/17 16:46, Mark Rutland wrote:
+Am 01.03.2017 um 11:54 schrieb Baruch Siach:
+> Hi Stefan,
+>
+> On Tue, Feb 28, 2017 at 07:32:09PM +0100, Stefan Wahren wrote: 
+>>> Baruch Siach <baruch@tkos.co.il> hat am 28. Februar 2017 um 19:07 geschrieben:
+>>> On Tue, Feb 28, 2017 at 05:21:18PM +0100, Stefan Wahren wrote:
+>>>> Am 28.02.2017 um 13:01 schrieb Baruch Siach:
+>>>>> On Tue, Feb 28, 2017 at 10:28:10AM +0200, Baruch Siach wrote:
+>>>>>> I'm hitting this warning consistently on my Raspberry Pi 3 running 
+>>>>>> kernel
+>>>>>> v4.10.1 with some unrelated device tree changes, and a debug print (below).
+>>>>>> The device identifies as "GlobeTrotter HSDPA Modem", VID: 0af0, PID: 6971.
+>>>>>> The warning triggers consistently on first write access to /dev/ttyHS0 that
+>>>>>> ModemManager attempts. The first line in the log is my debug print.
+>>>>> I tested the same hardware successfully on an i.MX6 CuBox-i (ARM32) using the
+>>>>> same kernel version (4.10.1), and on an x86_64 PC (4.9). So this seems to be
+>>>>> platform specific. I don't have any other ARM64 machine at the moment, though.
+>>>> those platforms usually doesn't use the dwc2 USB host controller. So it
+>>>> should be tested with another dwc2 platform.
+>>> The code that initializes setup_dma is not under drivers/usb/dwc2/. Though the 
+>>> problem looks like memory corruption, so its cause might be anywhere.
+>> only a suspicion, but could you please try this patch [1]?
+>>
+>> [1] - https://patchwork.kernel.org/patch/9166771/
+> It doesn't change anything.
+>
+> My guess is that source of the issue is memory corruption that just happens to 
+> corrupt also the setup_dma field of struct urb. In other words, it has nothing 
+> to do with DMA, IMO.
 
-...
+may you could use
 
-> Ok, so it appears that either map->cache is dodgy, or the reg passed to
-> regcache_flat_read() is bogus, and we end up generating a cache index
-> that is well out of bounds.
-> 
-> Perhaps a caller is deriving that from an uninitialised variable? The
-> code and stack layout changes as a result of my patch could easily
-> tickle that.
-> 
-> I'm not at all familiar with regmap, but IIUC we can catch that with:
-> 
-> ---->8----
-> diff --git a/drivers/base/regmap/regcache-flat.c b/drivers/base/regmap/regcache-flat.c
-> index 4d2e50b..2d42c01 100644
-> --- a/drivers/base/regmap/regcache-flat.c
-> +++ b/drivers/base/regmap/regcache-flat.c
-> @@ -57,6 +57,8 @@ static int regcache_flat_read(struct regmap *map,
->  {
->         unsigned int *cache = map->cache;
->  
-> +       BUG_ON(reg > map->max_register);
-> +
->         *value = cache[regcache_flat_get_index(map, reg)];
->  
->         return 0;
-> ---->8----
+CONFIG_DMA_API_DEBUG
 
-You are correct, the reg passed to regcache_flat_read() is indeed dodgy
-and the above BUG() did trip it up.
+or
 
-Commit e411b0b5eb9b ('ASoC: dapm: Support second register for DAPM
-control updates') introduced a 2nd register set into the
-snd_soc_dapm_update struct and if the 'has_second_set' is true then it
-tries to access this register. One of our out-of-tree audio patches was
-not initialising the 'has_second_set' and hence it was trying to write a
-bogus register (need to get this upstream!).
+CONFIG_SLUB_DEBUG
 
-I should have caught this, but the bisect threw me off the scent! I
-think that with reverting this patch we were just getting lucky and the
-problem could have still occurred. I went back and tried it again and it
-still works when reverting this change, but its just luck.
+in order to find the source?
 
-Sorry for the noise and thanks for pointing me in the right direction!
-
-Cheers
-Jon
-
--- 
-nvpublic
+>
+> Thanks,
+> baruch
+>
