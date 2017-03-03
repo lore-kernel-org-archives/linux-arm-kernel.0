@@ -1,88 +1,62 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri,  3 Mar 2017 12:41:27 -0800
-Subject: [PATCH V5 1/9] PM / Domains: Ignore domain-idle-states that are not
- compatible
+Date: Fri,  3 Mar 2017 12:41:28 -0800
+Subject: [PATCH V5 2/9] drivers: cpu: Setup CPU devices to do runtime PM
 In-Reply-To: <1488573695-106680-1-git-send-email-lina.iyer@linaro.org>
 References: <1488573695-106680-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1488573695-106680-2-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1488573695-106680-3-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-domain-idle-states property may have phandles to idle state bindings
-that may not be compatible with idle state definition defined in [1].
-Such phandles would just be ignored and not throw and error when read by
-the domain core.
+CPU devices just like any other device, can do runtime PM. However, CPU
+devices may only do runtime only when IRQs are disabled. The devices
+must be set as IRQ safe.
 
-Cc: <devicetree@vger.kernel.org>
-Cc: Rob Herring <robh@kernel.org>
+Cc: Kevin Hilman <khilman@kernel.org>
+Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- Documentation/devicetree/bindings/power/power_domain.txt |  4 +++-
- drivers/base/power/domain.c                              | 16 +++++++++-------
- 2 files changed, 12 insertions(+), 8 deletions(-)
+ drivers/base/cpu.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/power_domain.txt b/Documentation/devicetree/bindings/power/power_domain.txt
-index 723e1ad..940707d 100644
---- a/Documentation/devicetree/bindings/power/power_domain.txt
-+++ b/Documentation/devicetree/bindings/power/power_domain.txt
-@@ -31,7 +31,9 @@ Optional properties:
+diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
+index 2c3b359..77451ad 100644
+--- a/drivers/base/cpu.c
++++ b/drivers/base/cpu.c
+@@ -18,6 +18,7 @@
+ #include <linux/cpufeature.h>
+ #include <linux/tick.h>
+ #include <linux/pm_qos.h>
++#include <linux/pm_runtime.h>
  
- - domain-idle-states : A phandle of an idle-state that shall be soaked into a
-                 generic domain power state. The idle state definitions are
--                compatible with domain-idle-state specified in [1].
-+                compatible with domain-idle-state specified in [1]. phandles
-+                that are not compatible with domain-idle-state will be
-+                ignored.
-   The domain-idle-state property reflects the idle state of this PM domain and
-   not the idle states of the devices or sub-domains in the PM domain. Devices
-   and sub-domains have their own idle-states independent of the parent
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index e697dec..de3e489 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -2079,11 +2079,6 @@ static int genpd_parse_state(struct genpd_power_state *genpd_state,
- 	int err;
- 	u32 residency;
- 	u32 entry_latency, exit_latency;
--	const struct of_device_id *match_id;
--
--	match_id = of_match_node(idle_state_match, state_node);
--	if (!match_id)
--		return -EINVAL;
+ #include "base.h"
  
- 	err = of_property_read_u32(state_node, "entry-latency-us",
- 						&entry_latency);
-@@ -2132,6 +2127,7 @@ int of_genpd_parse_idle_states(struct device_node *dn,
- 	int err, ret;
- 	int count;
- 	struct of_phandle_iterator it;
-+	const struct of_device_id *match_id;
+@@ -345,6 +346,19 @@ static int cpu_uevent(struct device *dev, struct kobj_uevent_env *env)
+ }
+ #endif
  
- 	count = of_count_phandle_with_args(dn, "domain-idle-states", NULL);
- 	if (count <= 0)
-@@ -2144,6 +2140,9 @@ int of_genpd_parse_idle_states(struct device_node *dn,
- 	/* Loop over the phandles until all the requested entry is found */
- 	of_for_each_phandle(&it, err, dn, "domain-idle-states", NULL, 0) {
- 		np = it.node;
-+		match_id = of_match_node(idle_state_match, np);
-+		if (!match_id)
-+			continue;
- 		ret = genpd_parse_state(&st[i++], np);
- 		if (ret) {
- 			pr_err
-@@ -2155,8 +2154,11 @@ int of_genpd_parse_idle_states(struct device_node *dn,
- 		}
- 	}
++#ifdef CONFIG_PM
++static void cpu_runtime_pm_init(struct device *dev)
++{
++	pm_runtime_irq_safe(dev);
++	pm_runtime_enable(dev);
++	if (cpu_online(dev->id))
++		pm_runtime_set_active(dev);
++}
++#else
++static void cpu_runtime_pm_init(struct device *dev)
++{ }
++#endif
++
+ /*
+  * register_cpu - Setup a sysfs device for a CPU.
+  * @cpu - cpu->hotpluggable field set to 1 will generate a control file in
+@@ -379,6 +393,7 @@ int register_cpu(struct cpu *cpu, int num)
+ 	register_cpu_under_node(num, cpu_to_node(num));
+ 	dev_pm_qos_expose_latency_limit(&cpu->dev, 0);
  
--	*n = count;
--	*states = st;
-+	*n = i;
-+	if (!i)
-+		kfree(st);
-+	else
-+		*states = st;
- 
++	cpu_runtime_pm_init(&cpu->dev);
  	return 0;
  }
+ 
 -- 
 2.7.4
