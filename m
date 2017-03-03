@@ -1,76 +1,47 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 3 Mar 2017 20:44:14 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
-References: <20170303142201.16452-1-richard.genoud@gmail.com>
- <CAMuHMdX-K9B20Tu5NtHJRHmGGuT60OFu8TokZxsF8aSaS7HuHQ@mail.gmail.com>
- <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
- <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
-Message-ID: <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 3 Mar 2017 19:48:47 +0000
+Subject: [PATCH] arm64: restore get_current() optimisation
+In-Reply-To: <515e311c-b044-8759-8bf3-99ac4565840d@nvidia.com>
+References: <1483468021-8237-1-git-send-email-mark.rutland@arm.com>
+ <ee26a4f0-e3e9-fb44-fe7c-c40a15c33b38@nvidia.com>
+ <20170302123507.GD19632@leverpostej>
+ <086dff0b-126d-b5b7-e877-d3d46efce618@nvidia.com>
+ <20170302164654.GP19632@leverpostej>
+ <515e311c-b044-8759-8bf3-99ac4565840d@nvidia.com>
+Message-ID: <20170303194846.GA15053@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert,
-
-On Fri, Mar 03, 2017 at 08:21:05PM +0100, Geert Uytterhoeven wrote:
-> > diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-> > index 91e7dddbf72c..2f4cdd4e7b4f 100644
-> > --- a/drivers/tty/serial/sh-sci.c
-> > +++ b/drivers/tty/serial/sh-sci.c
-> > @@ -3022,7 +3022,7 @@ static int sci_probe_single(struct platform_device *dev,
-> >                 return ret;
-> >
-> >         sciport->gpios = mctrl_gpio_init(&sciport->port, 0);
-> > -       if (IS_ERR(sciport->gpios) && PTR_ERR(sciport->gpios) != -ENOSYS)
-> > +       if (IS_ERR(sciport->gpios))
-> >                 return PTR_ERR(sciport->gpios);
+On Fri, Mar 03, 2017 at 03:32:22PM +0000, Jon Hunter wrote:
+> Hi Mark,
 > 
-> Now the sh-sci driver fails to probe on legacy platforms where GPIOLIB=n.
-> The check for -ENOSYS made it succeed before.
+> On 02/03/17 16:46, Mark Rutland wrote:
 
-That's right, intended and the only option that's save (for some
-definition of save; the obvious downside is that there is no
-/dev/tty$whatever for you).
+> > Perhaps a caller is deriving that from an uninitialised variable? The
+> > code and stack layout changes as a result of my patch could easily
+> > tickle that.
 
-Ignoring -ENOSYS is only ok if your device doesn't have a cts-gpio. If
-it has, ignoring -ENOSYS hides bugs because the driver sends data while
-it shouldn't or cannot signal the other side that it should stop (or
-start) a transmission.
-
-So the options are:
- - enable GPIOLIB (maybe enforce that by letting the driver select it)
- - introduce a CONFIG_HALFGPIOLIB that makes gpiod_get_optional and
-   mctrl_gpio_init return only then -ENOSYS if there is a gpio specified
-   and NULL otherwise.
-
-> > Then mctrl_gpio_to_gpiod isn't called. I don't have a machine to test
-> > this, but I think currently this makes the machine barf to continue
-> > here because with sciport->gpios = ERR_PTR(-ENOSYS) calling
-> >
-> >         mctrl_gpio_to_gpiod(sciport->gpios, ...)
-> >
-> > is a bad idea.
+> You are correct, the reg passed to regcache_flat_read() is indeed dodgy
+> and the above BUG() did trip it up.
 > 
-> If sciport->gpios == ERR_PTR(-ENOSYS), CONFIG_GPIOLIB is not enabled, the
-> feature is not available, and mctrl_gpio_to_gpiod() will not
-> dereference the error
-> pointer.
+> Commit e411b0b5eb9b ('ASoC: dapm: Support second register for DAPM
+> control updates') introduced a 2nd register set into the
+> snd_soc_dapm_update struct and if the 'has_second_set' is true then it
+> tries to access this register. One of our out-of-tree audio patches was
+> not initialising the 'has_second_set' and hence it was trying to write a
+> bogus register (need to get this upstream!).
 
-Ah, makes sense.
+Phew. That's get_current() off the hook!
 
-> >> Perhaps mctrl_gpio_to_gpiod() should always return NULL if !CONFIG_GPIOLIB?
-> >
-> > No, mctrl_gpio_to_gpiod is right. You are only supposed to call it if
-> > mctrl_gpio_init succeeded.
+> I should have caught this, but the bisect threw me off the scent! I
+> think that with reverting this patch we were just getting lucky and the
+> problem could have still occurred. I went back and tried it again and it
+> still works when reverting this change, but its just luck.
 > 
-> Then I have to add checks for sciport->gpios == ERR_PTR(-ENOSYS)...
+> Sorry for the noise and thanks for pointing me in the right direction!
 
-No, ignoring -ENOSYS is wrong.
+No worries; it's always a pain to debug this sort of thing, especially
+with a bisect seeming so reliable.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks,
+Mark.
