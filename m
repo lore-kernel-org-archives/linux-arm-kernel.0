@@ -1,296 +1,138 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri,  3 Mar 2017 12:41:34 -0800
-Subject: [PATCH V5 8/9] PM / cpu_domains: Initialize CPU PM domains from DT
+Date: Fri,  3 Mar 2017 12:41:35 -0800
+Subject: [PATCH V5 9/9] doc / cpu_domains: Describe CPU PM domains setup and
+ governor
 In-Reply-To: <1488573695-106680-1-git-send-email-lina.iyer@linaro.org>
 References: <1488573695-106680-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1488573695-106680-9-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1488573695-106680-10-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add helper functions to parse DT and initialize the CPU PM domains and
-attach CPU to their respective domains using information provided in the
-DT.
+A generic CPU PM domain functionality is provided by
+drivers/base/power/cpu_domains.c. This document describes the generic
+usecase of CPU's PM domains, the setup of such domains and a CPU
+specific genpd governor.
 
-For each CPU in the DT, we identify the domain provider; initialize and
-register the PM domain if isn't already registered and attach all the
-CPU devices to the domain. Usually, when there are multiple clusters of
-CPUs, there is a top level coherency domain that is dependent on these
-individual domains. All domains thus created are marked IRQ safe
-automatically and therefore may be powered down when the CPUs in the
-domain are powered down by cpuidle.
-
-Cc: Kevin Hilman <khilman@kernel.org>
-Suggested-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- drivers/base/power/cpu_domains.c | 210 +++++++++++++++++++++++++++++++++++++++
- include/linux/cpu_domains.h      |  20 ++++
- 2 files changed, 230 insertions(+)
+ Documentation/power/cpu_domains.txt | 109 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 109 insertions(+)
+ create mode 100644 Documentation/power/cpu_domains.txt
 
-diff --git a/drivers/base/power/cpu_domains.c b/drivers/base/power/cpu_domains.c
-index 4f2a40e..a566d84 100644
---- a/drivers/base/power/cpu_domains.c
-+++ b/drivers/base/power/cpu_domains.c
-@@ -13,8 +13,10 @@
- #include <linux/cpu_domains.h>
- #include <linux/cpu_pm.h>
- #include <linux/device.h>
-+#include <linux/fwnode.h>
- #include <linux/kernel.h>
- #include <linux/list.h>
-+#include <linux/of.h>
- #include <linux/pm_domain.h>
- #include <linux/pm_qos.h>
- #include <linux/pm_runtime.h>
-@@ -268,3 +270,211 @@ int cpu_pd_init(struct generic_pm_domain *genpd, const struct cpu_pd_ops *ops)
- 	return ret;
- }
- EXPORT_SYMBOL(cpu_pd_init);
+diff --git a/Documentation/power/cpu_domains.txt b/Documentation/power/cpu_domains.txt
+new file mode 100644
+index 0000000..6a39a64
+--- /dev/null
++++ b/Documentation/power/cpu_domains.txt
+@@ -0,0 +1,109 @@
++CPU PM domains
++==============
 +
-+#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
++Newer CPUs are grouped in SoCs as clusters. A cluster in addition to the CPUs
++may have caches, floating point units and other architecture specific power
++controller that share resources when any of the CPUs are active. When the CPUs
++are in idle, some of these cluster components may also idle. A cluster may
++also be nested inside another cluster that provides common coherency
++interfaces to share data between the clusters. The organization of such
++clusters and CPU may be descibed in DT, since they are SoC specific.
 +
-+static struct generic_pm_domain *of_get_genpd(struct device_node *dn)
-+{
-+	struct cpu_pm_domain *pd;
-+	struct generic_pm_domain *genpd = NULL;
++CPUIdle framework enables the CPUs to determine the sleep time and enter low
++power state to save power during periods of idle. CPUs in a cluster may enter
++and exit idle state independently of each other. During the time when all the
++CPUs are in idle state, the cluster may safely put some of the shared
++resources in their idle state. The time between the last CPU to enter idle and
++the first CPU to wake up is the time available for the cluster to enter its
++idle state.
 +
-+	rcu_read_lock();
-+	list_for_each_entry_rcu(pd, &of_cpu_pd_list, link)
-+		if (pd->genpd->provider == &dn->fwnode) {
-+			genpd = pd->genpd;
-+			break;
-+		}
-+	rcu_read_unlock();
++When SoCs power down the CPU during cpuidle, they generally have supplemental
++hardware that can handshake with the CPU with a signal that indicates that the
++CPU has stopped execution. The hardware is also responsible for warm booting
++the CPU on receiving an interrupt. In a cluster architecture, common resources
++that are shared by a cluster may also be powered down by an external
++microcontroller or a processor. The microcontroller may be programmed in
++advance to put the hardware blocks in a low power state, when the last active
++CPU sends the idle signal. When the signal is received, the microcontroller
++may trigger the hardware blocks to enter their low power state. When an
++interrupt to wakeup the processor is received, the microcontroller is
++responsible for bringing up the hardware blocks to its active state, before
++waking up the CPU. The timelines for such operations should be in the
++acceptable range for for CPU idle to get power benefits.
 +
-+	return genpd;
-+}
++CPU PM Domain Setup
++-------------------
 +
-+static struct generic_pm_domain *alloc_genpd(struct device_node *dn)
-+{
-+	struct generic_pm_domain *genpd;
++PM domains are represented in the DT as domain consumers and providers. A
++device may have a domain provider and a domain provider may support multiple
++domain consumers. Domains like clusters, may also be nested inside one
++another. A domain that has no active consumer, may be powered off and any
++resuming consumer would trigger the domain back to active. Parent domains may
++be powered off when the child domains are powered off. The CPU cluster can be
++fashioned as a PM domain. When the CPU devices are powered off, the PM domain
++may be powered off.
 +
-+	genpd = kzalloc(sizeof(*genpd), GFP_KERNEL);
-+	if (!genpd)
-+		return ERR_PTR(-ENOMEM);
++Device idle is reference counted by runtime PM. When there is no active need
++for the device, runtime PM invokes callbacks to suspend the parent domain.
++Generic PM domain (genpd) handles the hierarchy of devices, domains and the
++reference counting of objects leading to last man down and first man up in the
++domain. The CPU domains helper functions defines PM domains for each CPU
++cluster and attaches the CPU devices to the respective PM domains.
 +
-+	genpd->name = kstrndup(dn->full_name, CPU_PD_NAME_MAX, GFP_KERNEL);
-+	if (!genpd->name) {
-+		kfree(genpd);
-+		return ERR_PTR(-ENOMEM);
-+	}
++Platform drivers may use the following API to register their CPU PM domains.
 +
-+	return genpd;
-+}
++of_setup_cpu_pd() -
++Provides a single step registration of the CPU PM domain and attach CPUs to
++the genpd. Platform drivers may additionally register callbacks for power_on
++and power_off operations for the PM domain.
 +
-+/**
-+ * of_init_cpu_pm_domain() - Initialize a CPU PM domain from a device node
-+ *
-+ * @dn: The domain provider's device node
-+ * @ops: The power_on/_off callbacks for the domain
-+ *
-+ * Returns the generic_pm_domain (genpd) pointer to the domain on success
-+ */
-+static struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
-+				const struct cpu_pd_ops *plat_ops)
-+{
-+	struct cpu_pm_domain *pd = NULL;
-+	struct generic_pm_domain *genpd = NULL;
-+	int ret = -ENOMEM;
-+	struct genpd_power_state *states = NULL;
-+	const struct cpu_pd_ops *ops = plat_ops;
-+	int count;
-+	int i;
++of_setup_cpu_pd_single() -
++Define PM domain for a single CPU and attach the CPU to its domain.
 +
-+	if (!of_device_is_available(dn))
-+		return ERR_PTR(-ENODEV);
 +
-+	/* If we already have the PM domain return that */
-+	genpd = of_get_genpd(dn);
-+	if (genpd)
-+		return genpd;
++CPU PM Domain governor
++----------------------
 +
-+	/* Initialize a new PM Domains */
-+	genpd = alloc_genpd(dn);
-+	if (IS_ERR(genpd))
-+		return genpd;
++CPUs have a unique ability to determine their next wakeup. CPUs may wake up
++for known timer interrupts and unknown interrupts from idle. Prediction
++algorithms and heuristic based algorithms like the Menu governor for cpuidle
++can determine the next wakeup of the CPU. However, determining the wakeup
++across a group of CPUs is a tough problem to solve.
 +
-+	ret = of_genpd_parse_idle_states(dn, &states, &count);
-+	if (ret)
-+		goto fail;
-+	if (!count) {
-+		ops = NULL;
-+		goto skip_states;
-+	}
++A simplistic approach would be to resort to known wakeups of the CPUs in
++determining the next wakeup of any CPU in the cluster. The CPU PM domain
++governor does just that. By looking into the tick device of the CPUs, the
++governor can determine the sleep time between the last CPU and the first
++scheduled wakeup of any CPU in that domain. This combined with the PM QoS
++requirement for CPU_DMA_LATENCY can be used to determine the deepest possible
++idle state of the CPU domain.
 +
-+	/* Populate platform specific states from DT */
-+	for (i = 0; ops->populate_state_data && i < count; i++) {
-+		ret = ops->populate_state_data(to_of_node(states[i].fwnode),
-+						&states[i].param);
-+		if (ret)
-+			goto fail;
-+	}
 +
-+	genpd->states = states;
-+	genpd->state_count = count;
++PSCI based CPU PM Domains
++-------------------------
 +
-+skip_states:
-+	ret = cpu_pd_init(genpd, ops);
-+	if (ret)
-+		goto fail;
++ARM PSCI v1.0 supports PM domains for CPU clusters like in big.Little
++architecture. It is supported as part of the OS-Initiated (OSI) mode of the
++PSCI firmware. Since the control of domains is abstracted in the firmware,
++Linux does not need even a driver to control these domains. The complexity of
++determining the idle state of the PM domain is handled by the CPU PM domains.
 +
-+	ret = of_genpd_add_provider_simple(dn, genpd);
-+	if (ret)
-+		pr_warn("Unable to add genpd %s as provider\n",
-+				pd->genpd->name);
++Every PSCI CPU PM domain idle state has a unique PSCI state id. The state id
++is read from the DT and specified using the arm,psci-suspend-param property.
++This makes it easy for big.Little SoCs to just specify the PM domain idle
++states for the CPU along with the psci-suspend-param and everything else is
++handled by the PSCI fimrware drivers and the firmware.
 +
-+	return genpd;
-+fail:
-+	kfree(genpd->name);
-+	kfree(genpd);
-+	if (pd)
-+		kfree(pd->cpus);
-+	kfree(pd);
-+	return ERR_PTR(ret);
-+}
 +
-+static struct generic_pm_domain *of_get_cpu_domain(struct device_node *dn,
-+		const struct cpu_pd_ops *ops, int cpu)
-+{
-+	struct of_phandle_args args;
-+	struct generic_pm_domain *genpd, *parent;
-+	int ret;
++DT definitions for PSCI CPU PM Domains
++--------------------------------------
 +
-+	genpd = of_init_cpu_pm_domain(dn, ops);
-+	if (IS_ERR(genpd))
-+		return genpd;
++A PM domain's idle state can be defined in DT, the description of which is
++available in [1]. PSCI based CPU PM domains may define their idle states as
++part of the psci node. The additional parameter arm,psci-suspend-param is used
++to indicate to the firmwware the addition cluster state that would be achieved
++after the last CPU makes the PSCI call to suspend the CPU. The description of
++PSCI domain states is available in [2].
 +
-+	/* Is there a domain provider for this domain? */
-+	ret = of_parse_phandle_with_args(dn, "power-domains",
-+					"#power-domain-cells", 0, &args);
-+	if (ret < 0)
-+		goto skip_parent;
-+
-+	/* Find its parent and attach this domain to it, recursively */
-+	parent = of_get_cpu_domain(args.np, ops, cpu);
-+	if (IS_ERR(parent))
-+		goto skip_parent;
-+
-+	ret = cpu_pd_attach_domain(parent, genpd);
-+	if (ret)
-+		pr_err("Unable to attach domain %s to parent %s\n",
-+				genpd->name, parent->name);
-+
-+skip_parent:
-+	of_node_put(dn);
-+	return genpd;
-+}
-+
-+/**
-+ * of_setup_cpu_pd_single() - Setup the PM domains for a CPU
-+ *
-+ * @cpu: The CPU for which the PM domain is to be set up.
-+ * @ops: The PM domain suspend/resume ops for the CPU's domain
-+ *
-+ * If the CPU PM domain exists already, then the CPU is attached to
-+ * that CPU PD. If it doesn't, the domain is created, the @ops are
-+ * set for power_on/power_off callbacks and then the CPU is attached
-+ * to that domain. If the domain was created outside this framework,
-+ * then we do not attach the CPU to the domain.
-+ */
-+int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops)
-+{
-+
-+	struct device_node *dn, *np;
-+	struct generic_pm_domain *genpd;
-+	struct cpu_pm_domain *cpu_pd;
-+
-+	np = of_get_cpu_node(cpu, NULL);
-+	if (!np)
-+		return -ENODEV;
-+
-+	dn = of_parse_phandle(np, "power-domains", 0);
-+	of_node_put(np);
-+	if (!dn)
-+		return -ENODEV;
-+
-+	/* Find the genpd for this CPU, create if not found */
-+	genpd = of_get_cpu_domain(dn, ops, cpu);
-+	of_node_put(dn);
-+	if (IS_ERR(genpd))
-+		return PTR_ERR(genpd);
-+
-+	cpu_pd = to_cpu_pd(genpd);
-+	if (!cpu_pd) {
-+		pr_err("%s: Genpd was created outside CPU PM domains\n",
-+				__func__);
-+		return -ENOENT;
-+	}
-+
-+	return cpu_pd_attach_cpu(genpd, cpu);
-+}
-+EXPORT_SYMBOL(of_setup_cpu_pd_single);
-+
-+/**
-+ * of_setup_cpu_pd() - Setup the PM domains for all CPUs
-+ *
-+ * @ops: The PM domain suspend/resume ops for all the domains
-+ *
-+ * Setup the CPU PM domain and attach all possible CPUs to their respective
-+ * domains. The domains are created if not already and then attached.
-+ */
-+int of_setup_cpu_pd(const struct cpu_pd_ops *ops)
-+{
-+	int cpu;
-+	int ret;
-+
-+	for_each_possible_cpu(cpu) {
-+		ret = of_setup_cpu_pd_single(cpu, ops);
-+		if (ret)
-+			break;
-+	}
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL(of_setup_cpu_pd);
-+
-+#endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
-diff --git a/include/linux/cpu_domains.h b/include/linux/cpu_domains.h
-index 7e71291..251fbc2 100644
---- a/include/linux/cpu_domains.h
-+++ b/include/linux/cpu_domains.h
-@@ -15,8 +15,12 @@
- 
- struct generic_pm_domain;
- struct cpumask;
-+struct device_node;
- 
- struct cpu_pd_ops {
-+#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
-+	int (*populate_state_data)(struct device_node *n, u32 *param);
-+#endif
- 	int (*power_off)(u32 state_idx, u32 param, const struct cpumask *mask);
- 	int (*power_on)(void);
- };
-@@ -45,4 +49,20 @@ static inline int cpu_pd_attach_cpu(struct generic_pm_domain *genpd, int cpu)
- 
- #endif /* CONFIG_PM_GENERIC_DOMAINS */
- 
-+#ifdef CONFIG_PM_GENERIC_DOMAINS_OF
-+
-+int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops);
-+
-+int of_setup_cpu_pd(const struct cpu_pd_ops *ops);
-+
-+#else
-+
-+static inline int of_setup_cpu_pd_single(int cpu, const struct cpu_pd_ops *ops)
-+{ return -ENODEV; }
-+
-+static inline int of_setup_cpu_pd(const struct cpu_pd_ops *ops)
-+{ return -ENODEV; }
-+
-+#endif /* CONFIG_PM_GENERIC_DOMAINS_OF */
-+
- #endif /* __CPU_DOMAINS_H__ */
++[1]. Documentation/devicetree/bindings/arm/idle-states.txt
++[2]. Documentation/devicetree/bindings/arm/psci.txt
 -- 
 2.7.4
