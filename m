@@ -1,60 +1,21 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 3 Mar 2017 15:56:39 -0800
-Subject: [PATCH 4/5] clk: sunxi-ng: Add driver for A83T CCU
-In-Reply-To: <20170303095333.hgxoli2h7clailvo@lukather>
-References: <20170214033526.16977-1-wens@csie.org>
- <20170214033526.16977-5-wens@csie.org>
- <20170214095819.utsftcvti5zdmlmi@lukather>
- <CAGb2v66PxbhUdqSwFc5iFN2wDVQbOsibDkckXpFsxXW1WJNe3w@mail.gmail.com>
- <20170215094954.h3wyaxlqkeb342yu@lukather>
- <20170301191705.GS25384@codeaurora.org>
- <20170303095333.hgxoli2h7clailvo@lukather>
-Message-ID: <20170303235639.GW25384@codeaurora.org>
+Date: Fri, 3 Mar 2017 15:58:08 -0800
+Subject: [PATCH v3 4/5] clk: hi6220: add debug APB clock
+In-Reply-To: <1488520809-31670-5-git-send-email-leo.yan@linaro.org>
+References: <1488520809-31670-1-git-send-email-leo.yan@linaro.org>
+ <1488520809-31670-5-git-send-email-leo.yan@linaro.org>
+Message-ID: <20170303235808.GX25384@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03, Maxime Ripard wrote:
-> On Wed, Mar 01, 2017 at 11:17:05AM -0800, Stephen Boyd wrote:
+On 03/03, Leo Yan wrote:
+> The debug APB clock is absent in hi6220 driver, so this patch is to add
+> support for it.
 > 
-> > Can someone explain what the issue is? Could something like
-> > clk_get_phase() + clk_get_rate() tell us if we're in one mode
-> > vs. the other?
-> 
-> So we have two modes of operation for that clock, old vs new (I know,
-> I didn't pick the names).
-> 
-> The old mode is what we support right now. It has a combination of a
-> linear multiplier and divider, plus some phase controls.
-> 
-> The new mode however disables the phase controls and adds post-divider
-> of 2 on the rate.
-> 
-> We cannot really rely on the rate itself, since there's a huge overlap
-> between the rates we can obtain in the old and new modes. Same thing
-> for the phase, having a 0 deg phase is achieved both in the old and
-> new modes.
-> 
-> To make things worse, the new mode is only available on one out of
-> three MMC controllers (and associated clocks), and that MMC controller
-> needs to set a bit as well to switch to the new mode if needed. So we
-> definitely needs some synchronisation there, and also to be able to
-> retrieve if the mode switching is available, and if we're already
-> using that mode.
-> 
-> Mike agreed that the easiest way forward was to use a custom function.
-> 
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
 
-Ok. Is there any need to change the mode dynamically at runtime?
-Or could it be decided once at clk driver probe time/boot time
-and detected via set_phase() failing when we're in the new mode?
-At least, it sounds like set_phase() should bail out there
-because it doesn't exist, although it could be argued that
-setting the phase to something it already is set to is valid and
-shouldn't return an error.
-
-I'm not saying I'm opposed to the custom function, just thinking
-of alternatives if MMC maintainers don't agree with the custom
-function.
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
