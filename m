@@ -1,64 +1,61 @@
-From: sergio.prado@e-labworks.com (Sergio Prado)
-Date: Fri, 3 Mar 2017 08:38:47 -0300
-Subject: [PATCH v4 2/2] mmc: host: s3cmci: allow probing from device tree
-In-Reply-To: <39c2b81b-6519-826b-2c8d-344725ce2882@samsung.com>
-References: <1488417536-15110-1-git-send-email-sergio.prado@e-labworks.com>
- <CGME20170302012845epcas4p3d7e48f13c80b2115cea89e914b067eeb@epcas4p3.samsung.com>
- <1488417536-15110-3-git-send-email-sergio.prado@e-labworks.com>
- <39c2b81b-6519-826b-2c8d-344725ce2882@samsung.com>
-Message-ID: <20170303113847.GA17377@sprado-desktop>
+From: john@metanate.com (John Keeping)
+Date: Fri, 3 Mar 2017 11:39:45 +0000
+Subject: [PATCH] dt-bindings: display: rk3288-mipi-dsi: add reset property
+In-Reply-To: <20170302215643.GA49163@google.com>
+References: <20170224125506.21533-1-john@metanate.com>
+ <20170224125506.21533-24-john@metanate.com>
+ <20170302215643.GA49163@google.com>
+Message-ID: <20170303113945.3bd2cbd9.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 03, 2017 at 11:14:29AM +0900, Jaehoon Chung wrote:
-> On 03/02/2017 10:18 AM, Sergio Prado wrote:
-> > Allows configuring Samsung S3C24XX MMC/SD/SDIO controller using a device
-> > tree.
-> > 
-> > Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
-> > ---
-> >  drivers/mmc/host/s3cmci.c | 298 ++++++++++++++++++++++++----------------------
-> >  drivers/mmc/host/s3cmci.h |   3 +-
-> >  2 files changed, 158 insertions(+), 143 deletions(-)
-> > 
-> > diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-> > index 7a173f8c455b..d066dbdb957c 100644
-> > --- a/drivers/mmc/host/s3cmci.c
-> > +++ b/drivers/mmc/host/s3cmci.c
-> > @@ -24,6 +24,10 @@
-> >  #include <linux/interrupt.h>
-> >  #include <linux/irq.h>
-> >  #include <linux/io.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_device.h>
-> > +#include <linux/of_gpio.h>
-> > +#include <linux/mmc/slot-gpio.h>
-> >  
-> >  #include <plat/gpio-cfg.h>
-> >  #include <mach/dma.h>
-> > @@ -128,6 +132,22 @@ enum dbg_channels {
-> >  	dbg_conf  = (1 << 8),
-> >  };
-> >  
-> > +struct s3cmci_variant_data {
-> > +	int s3c2440_compatible;
-> > +};
-> 
-> I didn't understand why this structure needs.
-> 
-> Before this patch,
-> host->is2440;
-> 
-> After this patch,
-> host->variant->s3c2440_compatible;
-> 
-> Just add the one pointer for checking s3c2400 compatible..
-> Is it really meaningful?
-> (I didn't read the previous comments fully.)
+This reset is required in order to fully reset the internal state of the
+MIPI controller.
 
-Although just a pointer would be enought, having a structure makes it
-more flexible to extend it in the future.
+Signed-off-by: John Keeping <john@metanate.com>
+---
+On Thu, 2 Mar 2017 13:56:46 -0800, Brian Norris wrote:
+> On Fri, Feb 24, 2017 at 12:55:06PM +0000, John Keeping wrote:
+> > +	/*
+> > +	 * Note that the reset was not defined in the initial device tree, so
+> > +	 * we have to be prepared for it not being found.
+> > +	 */
+> > +	apb_rst = devm_reset_control_get(dev, "apb");  
+> 
+> Did this reset ever get documented in the device tree bindings? I
+> couldn't find it. Perhaps a follow-up patch is in order?
 
-Best regards,
+Here's a patch to do that.
 
-Sergio Prado
+ .../devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt  | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+index 1753f0cc6fad..28d0b437d3cd 100644
+--- a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
++++ b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+@@ -13,8 +13,13 @@ Required properties:
+ - ports: contain a port node with endpoint definitions as defined in [2].
+   For vopb,set the reg = <0> and set the reg = <1> for vopl.
+ 
++Optional properties:
++- resets: list of phandle + reset specifier pairs, as described in [3].
++- reset-names: string reset name, must be "apb".
++
+ [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+ [2] Documentation/devicetree/bindings/media/video-interfaces.txt
++[3] Documentation/devicetree/bindings/reset/reset.txt
+ 
+ Example:
+ 	mipi_dsi: mipi at ff960000 {
+@@ -25,6 +30,8 @@ Example:
+ 		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks = <&cru SCLK_MIPI_24M>, <&cru PCLK_MIPI_DSI0>;
+ 		clock-names = "ref", "pclk";
++		resets = <&cru SRST_MIPIDSI0>;
++		reset-names = "apb";
+ 		rockchip,grf = <&grf>;
+ 		status = "okay";
+ 
+-- 
+2.12.0.rc2.230.ga28edc07cd.dirty
