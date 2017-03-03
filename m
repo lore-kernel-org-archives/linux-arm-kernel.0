@@ -1,49 +1,45 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri,  3 Mar 2017 15:22:01 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL calls
-Message-ID: <20170303142201.16452-1-richard.genoud@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 3 Mar 2017 15:48:39 +0100
+Subject: [linux-sunxi] Re: [PATCH 2/3] clk: sunxi-ng: add support for
+ PRCM CCUs
+In-Reply-To: <3232491488467598@web22o.yandex.ru>
+References: <20170301152220.MEgmqtKw@smtp2p.mail.yandex.net>
+ <20170302140859.aqvwtgzxkdi2lqbc@lukather>
+ <3232491488467598@web22o.yandex.ru>
+Message-ID: <20170303144839.snrm5wgjyj5fvko7@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 1d267ea6539f ("serial: mctrl-gpio: simplify init routine"),
-the mctrl_gpio_to_gpiod() function can't return an error anymore.
-So, just testing for a NULL pointer is ok.
+On Thu, Mar 02, 2017 at 11:13:18PM +0800, Icenowy Zheng wrote:
+> 
+> 
+> 02.03.2017, 22:09, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > On Wed, Mar 01, 2017 at 08:17:39PM +0800, Icenowy Zheng wrote:
+> >> ?> I'm a bit worried by that to be honest. You claim to support the A31,
+> >> ?> yet jugdging by the current state of that code you never actually
+> >> ?> tested it on that SoC.
+> >>
+> >> ?I only claim to reserve possibility to extend the driver to support
+> >> ?A31, but I didn't claim it currently support A31.
+> >
+> > Well, you did call it sun6i.
+> >
+> > Please rename it, and we will consolidate in due time.
+> 
+> Then rename it back when it really gains support for A31?
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
----
- drivers/tty/serial/sh-sci.c | 12 +++++-------
- 1 file changed, 5 insertions(+), 7 deletions(-)
+Yes.
 
-diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index 9a47cc4f16a2..36fde6f24040 100644
---- a/drivers/tty/serial/sh-sci.c
-+++ b/drivers/tty/serial/sh-sci.c
-@@ -1934,12 +1934,12 @@ static unsigned int sci_get_mctrl(struct uart_port *port)
- 	if (s->autorts) {
- 		if (sci_get_cts(port))
- 			mctrl |= TIOCM_CTS;
--	} else if (IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(gpios, UART_GPIO_CTS))) {
-+	} else if (!mctrl_gpio_to_gpiod(gpios, UART_GPIO_CTS)) {
- 		mctrl |= TIOCM_CTS;
- 	}
--	if (IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(gpios, UART_GPIO_DSR)))
-+	if (!mctrl_gpio_to_gpiod(gpios, UART_GPIO_DSR))
- 		mctrl |= TIOCM_DSR;
--	if (IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(gpios, UART_GPIO_DCD)))
-+	if (!mctrl_gpio_to_gpiod(gpios, UART_GPIO_DCD))
- 		mctrl |= TIOCM_CAR;
- 
- 	return mctrl;
-@@ -3072,10 +3072,8 @@ static int sci_probe_single(struct platform_device *dev,
- 		return PTR_ERR(sciport->gpios);
- 
- 	if (sciport->has_rtscts) {
--		if (!IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(sciport->gpios,
--							UART_GPIO_CTS)) ||
--		    !IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(sciport->gpios,
--							UART_GPIO_RTS))) {
-+		if (mctrl_gpio_to_gpiod(sciport->gpios, UART_GPIO_CTS) ||
-+		    mctrl_gpio_to_gpiod(sciport->gpios, UART_GPIO_RTS)) {
- 			dev_err(&dev->dev, "Conflicting RTS/CTS config\n");
- 			return -EINVAL;
- 		}
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170303/b1f2dd6f/attachment.sig>
