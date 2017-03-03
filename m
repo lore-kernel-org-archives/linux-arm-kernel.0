@@ -1,142 +1,90 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 03 Mar 2017 16:56:34 +0100
-Subject: [GIT PULL] ARM: late soc updates for 4.11
-Message-ID: <7773127.YrcxT41Th4@wuerfel>
+From: peter.senna@collabora.com (Peter Senna Tschudin)
+Date: Fri,  3 Mar 2017 16:57:06 +0100
+Subject: [PATCH V3 0/4] megachips-stdpxxxx-ge-b850v3-fw
+Message-ID: <cover.1488555615.git.peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit b2e3c4319d40c9055c3c587cdb82ba69b50e919d:
+The video processing pipeline on the second output on the GE B850v3:
 
-  Merge tag 'armsoc-drivers' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2017-02-23 15:57:04 -0800)
+  Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
 
-are available in the git repository at:
+Each bridge has a dedicated flash containing firmware for supporting the
+custom design. The result is that in this design neither the STDP4028
+nor the STDP2690 behave as the stock bridges would. The compatible
+strings include the suffix "-ge-b850v3-fw" to make it clear that the
+driver is for the bridges with the firmware which is specific for the GE
+B850v3.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-late
+The driver is powerless to control the video processing pipeline, as the
+two bridges behaves as a single one. The driver is only needed for
+telling the host about EDID / HPD, and for giving the host powers to ack
+interrupts.
 
-for you to fetch changes up to ca2dea434d10e3a676482fdf6df17d20cdb3e907:
+Changes from V2:
+ - Added Acked-by: Rob Herring <robh@kernel.org> on patch 1/4
+ - Fixed the driver to allow it to be compiled as a module
 
-  Merge tag 'juno-fixes-4.11' of git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux into next/late (2017-03-02 23:08:31 +0100)
+Changes from V1:
+ - Fix bindings documentation
+ - Fix white space issues on the driver
+ - Improved ge_b850v3_lvds_remove() to not rely on ge_b850v3_lvds_ptr->edid
 
-----------------------------------------------------------------
-ARM: SoC: late DT updates for v4.11
+Changes from V7(was GE B850v3 LVDS/DP++ Bridge):
+ - New devicetree binding with one node per bridge, and two ports per bridge
+ - Two i2c_devices, one per bridge
+ - Removed uneeded mutexes
+ - Moved documentation to bindings/display/bridge
+ - Included test for EDID extension blocks
+ - Renamed bridge pointer to ge_b850v3_lvds_ptr
+ - Removed the call to drm_helper_hpd_irq_event()
+ - Removed assignments to bridge.driver_private
 
-These updates have been kept in a separate branch mostly because
-they rely on updates to the respective clk drivers to keep the
-shared header files in sync.
+Changes from V6:
+ - Removed check for pixel clock as the bridge supports up to 330Mhz while the
+   host is limited to 264 MHz in very specific conditions.
+ - Added a second mutex to avoid concurrency issues while acking interrupts
+   from threaded interrupt handlers.
+ - Renamed the edid mutex to be more descriptive.
+ - Added a .detach() function that disables the interrupts.
+ - Adopted i2c_new_secondary_device() and updated the dts and documentation to
+   match the new method.
+ - Removed useless test to drm_bridge_add()
+ - Did some refactoring around devm_request_threaded_irq()
+ - Added a missing call to i2c_unregister_device() on the i2c_driver.remove()
+   function.
 
-This includes two branches for arm64 dt updates, both following up
-on earlier changes for the same platforms that are already merged:
+Changes from V5:
+ - Change to MAINTAINERS in a separate patch
+ - Reworked interrupt handler initialization
+ - Removed useless calls to: drm_connector_register(),
+   drm_helper_hpd_irq_event(), and drm_bridge_enable()
 
-Samsung:
-  - add USB3 support in Exynos7
-  - minor PM related updates
+Changes from V4:
+ - Renamed the i2c_driver.name from "ge,b850v3-lvds-dp" to "b850v3-lvds-dp" to
+   remove the comma from the driver name
 
-Amlogic:
-  - new machines: WeTek Set-top-boxes
-  - various devices added to DT
+Changes from V3:
+ - Removed the patch that was configuring the mapping between IPUs and external
+   displays on the dts file
 
-There are also a couple of bugfixes that trickled in since the
-start of the merge window:
+Peter Senna Tschudin (4):
+  dt-bindings: display: megachips-stdpxxxx-ge-b850v3-fw
+  MAINTAINERS: Add entry for megachips-stdpxxxx-ge-b850v3-fw
+  drm/bridge: Drivers for megachips-stdpxxxx-ge-b850v3-fw (LVDS-DP++)
+  dts/imx6q-b850v3: Use megachips-stdpxxxx-ge-b850v3-fw bridges
+    (LVDS-DP++)
 
-- The moxart_defconfig was not building the intended platform
-- CPU-hotplug was broken on ux500
-- Coresight was broken on Juno (never worked)
-
-----------------------------------------------------------------
-Andreas F?rber (1):
-      ARM64: dts: meson-gxbb-vega-s95: Add LED
-
-Arnd Bergmann (4):
-      Merge tag 'samsung-dt64-4.11-3' of git://git.kernel.org/.../krzk/linux into next/late
-      Merge tag 'amlogic-dt64-2' of git://git.kernel.org/.../khilman/linux-amlogic into next/late
-      Merge branch 'next/late' with mainline
-      Merge tag 'juno-fixes-4.11' of git://git.kernel.org/.../sudeep.holla/linux into next/late
-
-Kevin Hilman (1):
-      ARM64: dts: meson-gxl: rename Nexbox A95x for consistency
-
-Krzysztof Kozlowski (2):
-      Merge tag 'clk-v4.11-samsung-dphy' of git://linuxtv.org/snawrocki/samsung into next/dt64
-      Merge tag 'samsung-pinctrl-4.11' into next/dt64
-
-Linus Walleij (2):
-      ARM: ux500: resume the second core properly
-      ARM: deconfig: fix the moxart defconfig
-
-Marek Szyprowski (1):
-      arm64: dts: exynos: Add initial configuration for DISP clocks for TM2/TM2e
-
-Martin Blumenstingl (8):
-      ARM64: dts: meson-gx: move the SCPI and SRAM nodes to meson-gx
-      ARM64: dts: meson-gxm: add SCPI configuration for GXM
-      ARM64: dts: meson-gx: add the missing uart_AO_B
-      ARM64: dts: meson-gx: add the serial CTS and RTS pin groups
-      clk: gxbb: add the SAR ADC clocks and expose them
-      ARM64: dts: meson-gx: add the missing pwm_AO_ab node
-      ARM64: dts: meson-gxl: add the pwm_ao_b pin
-      ARM64: dts: meson: meson-gx: add the SAR ADC
-
-Mike Leach (1):
-      arm64: dts: juno: update definition for programmable replicator
-
-Neil Armstrong (7):
-      clk: meson-gxbb: Export HDMI clocks
-      ARM64: dts: meson-gx: Add HDMI HPD/DDC pinctrl nodes
-      ARM64: dts: meson-gxm: Rename q200 and q201 DT files for consistency
-      dt-bindings: vendor-prefix: Add wetek vendor prefix
-      ARM64: dts: meson-gxbb: Add support for WeTek Hub and Play
-      dt-bindings: amlogic: Add WeTek boards
-      ARM64: dts: meson-gxbb-p200: add ADC laddered keys
-
-Pankaj Dubey (2):
-      pinctrl: dt-bindings: samsung: Add Exynos7 specific pinctrl macro definitions
-      arm64: dts: exynos: Use macros for pinctrl configuration on Exynos7
-
-Vivek Gautam (2):
-      arm64: dts: exynos: Add USB 3.0 controller node for Exynos7
-      arm64: dts: exynos: Add regulators for Vbus and Vbus-Boost
-
-jbrunet (1):
-      clk: gxbb: fix CLKID_ETH defined twice
-
- Documentation/devicetree/bindings/arm/amlogic.txt  |   2 +
+ .../bridge/megachips-stdpxxxx-ge-b850v3-fw.txt     |  94 +++++
  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/configs/moxart_defconfig                  |  12 +-
- arch/arm/mach-ux500/Makefile                       |   3 -
- arch/arm/mach-ux500/cpu-db8500.c                   |   2 -
- arch/arm/mach-ux500/hotplug.c                      |  37 ---
- arch/arm/mach-ux500/platsmp.c                      |   9 +-
- arch/arm/mach-ux500/setup.h                        |  16 --
- arch/arm64/boot/dts/amlogic/Makefile               |   8 +-
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi          |  68 +++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts    |  50 ++++
- .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |  11 +
- .../boot/dts/amlogic/meson-gxbb-wetek-hub.dts      |  66 +++++
- .../boot/dts/amlogic/meson-gxbb-wetek-play2.dts    |  94 +++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 128 +++++----
- ...ox-a95x.dts => meson-gxl-s905x-nexbox-a95x.dts} |   0
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         |  78 ++++++
- ...{meson-gxm-s912-q200.dts => meson-gxm-q200.dts} |   0
- ...{meson-gxm-s912-q201.dts => meson-gxm-q201.dts} |   0
- arch/arm64/boot/dts/amlogic/meson-gxm.dtsi         |  14 +
- arch/arm64/boot/dts/arm/juno-base.dtsi             |  13 +-
- .../boot/dts/exynos/exynos5433-tm2-common.dtsi     |  12 -
- arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      |  34 +++
- arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |  34 +++
- arch/arm64/boot/dts/exynos/exynos7-espresso.dts    |  49 +++-
- arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi    | 302 +++++++++++----------
- arch/arm64/boot/dts/exynos/exynos7.dtsi            |  34 +++
- drivers/clk/meson/gxbb.c                           |  48 ++++
- drivers/clk/meson/gxbb.h                           |  15 +-
- drivers/clk/samsung/clk-exynos5433.c               |   8 +-
- include/dt-bindings/clock/exynos5433.h             |   5 +-
- include/dt-bindings/clock/gxbb-clkc.h              |   6 +
- include/dt-bindings/pinctrl/samsung.h              |   8 +
- 33 files changed, 862 insertions(+), 305 deletions(-)
- delete mode 100644 arch/arm/mach-ux500/hotplug.c
- delete mode 100644 arch/arm/mach-ux500/setup.h
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
- rename arch/arm64/boot/dts/amlogic/{meson-gxl-nexbox-a95x.dts => meson-gxl-s905x-nexbox-a95x.dts} (100%)
- rename arch/arm64/boot/dts/amlogic/{meson-gxm-s912-q200.dts => meson-gxm-q200.dts} (100%)
- rename arch/arm64/boot/dts/amlogic/{meson-gxm-s912-q201.dts => meson-gxm-q201.dts} (100%)
+ MAINTAINERS                                        |   8 +
+ arch/arm/boot/dts/imx6q-b850v3.dts                 |  68 ++++
+ drivers/gpu/drm/bridge/Kconfig                     |  11 +
+ drivers/gpu/drm/bridge/Makefile                    |   1 +
+ .../drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c   | 428 +++++++++++++++++++++
+ 7 files changed, 611 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/megachips-stdpxxxx-ge-b850v3-fw.txt
+ create mode 100644 drivers/gpu/drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c
+
+-- 
+2.9.3
