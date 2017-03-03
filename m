@@ -1,75 +1,62 @@
-From: kashyap.desai@broadcom.com (Kashyap Desai)
-Date: Fri, 3 Mar 2017 14:29:28 +0530
-Subject: ARM64 CONFIG_ZONE_DMA for 32-bit devices
-In-Reply-To: 6eab56bb5a4ffd8812d8b59ffa8a7cce@mail.gmail.com
-References: 6eab56bb5a4ffd8812d8b59ffa8a7cce@mail.gmail.com
-Message-ID: <04e975a6fe5981d082639182a7be1653@mail.gmail.com>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Fri, 03 Mar 2017 14:37:05 +0530
+Subject: [Patch v2 00/11] Add MFC v10.10 support
+References: <CGME20170303090429epcas5p3c057f653b6a6b6299ad2392490925fd9@epcas5p3.samsung.com>
+Message-ID: <1488532036-13044-1-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Robin and Catalin. Somehow I did not received email due to some
-firewall or other technical issue, so copied your  discussion and replied
-inline.
+This patch series adds MFC v10.10 support. MFC v10.10 is used in some
+of Exynos7 variants.
 
+This adds support for following:
 
-> > If you want to use a device which requires 32-bit-addressable DMA
-> > resources with your crash kernel, and that device isn't behind an
-> > IOMMU, then don't load your crash kernel above 4GB. It's as simple
-> > as that, because in general there's no other way around the issue.
-> > And if said device doesn't actually need 32-bit-addressable
-> > resources, then yeah, fix the dma_set_mask() calls in the driver.
->
-> I am working on driver level changes. So kdump and base kernel
-> behavior is just setting and configuration problem.
-> It is not the case we are seeing difference in DMA zone in kdump is
-> different vs base kernel.
->
-> >
-> > That said, I think something is a bit wonky in max_zone_dma_phys()
-> > with "It currently assumes that for memory starting above 4G, 32-bit
-> > devices will use a DMA offset" - I think that assumption needs to be
-> > revisited since,
+* Add support for HEVC encoder and decoder
+* Add support for VP9 decoder
+* Update Documentation for control id definitions
+* Update computation of min scratch buffer size requirement for V8 onwards
 
- This is what exactly I could not understand as it is very specific to ARM
-and not  many Arch follow this.
+Changes since v1:
+ - Addressed review comments by Andrzej Hajda.
+ - Addressed review comment by Rob Herring.
+ - Rebased on latest krzk/for-next tree.
+ - This patches are tested on top of Marek's patch v2 [1]
+ - Applied acked-by and r-o-b from Andrzej on respective patches. 
 
- Do you mean always reserve some memory for DMA zone in below 4GB as an
-alternative solution?
+[1]: http://www.mail-archive.com/linux-media at vger.kernel.org/msg108520.html
 
- I am asking question with limited understanding of how ARM is working.
-Need time to understand your reply completely.
- Solution I am looking for is driver asking 64 bit DMA mask for Streaming
-IO and 32 bit consistent DMA can work in ARM64 platform ?
+Smitha T Murthy (11):
+  s5p-mfc: Rename IS_MFCV8 macro
+  s5p-mfc: Adding initial support for MFC v10.10
+  s5p-mfc: Use min scratch buffer size as provided by F/W
+  s5p-mfc: Support MFCv10.10 buffer requirements
+  videodev2.h: Add v4l2 definition for HEVC
+  s5p-mfc: Add support for HEVC decoder
+  Documentation: v4l: Documentation for HEVC v4l2 definition
+  s5p-mfc: Add VP9 decoder support
+  v4l2: Add v4l2 control IDs for HEVC encoder
+  s5p-mfc: Add support for HEVC encoder
+  Documention: v4l: Documentation for HEVC CIDs
 
-> >even disregarding cases like kdump, commonly available hardware now
-> >exists for  which that is not true (e.g. AMD Seattle). Catalin?
+ .../devicetree/bindings/media/s5p-mfc.txt          |    1 +
+ Documentation/media/uapi/v4l/extended-controls.rst |  314 ++++++++++
+ Documentation/media/uapi/v4l/pixfmt-013.rst        |    5 +
+ drivers/media/platform/s5p-mfc/regs-mfc-v10.h      |   88 +++
+ drivers/media/platform/s5p-mfc/regs-mfc-v8.h       |    2 +
+ drivers/media/platform/s5p-mfc/s5p_mfc.c           |   33 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c    |    9 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |   64 ++-
+ drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |    6 +-
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |   62 ++-
+ drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       |  621 +++++++++++++++++++-
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr.h       |   14 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    |  420 ++++++++++++--
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |   15 +
+ drivers/media/v4l2-core/v4l2-ctrls.c               |   51 ++
+ include/uapi/linux/v4l2-controls.h                 |  129 ++++
+ include/uapi/linux/videodev2.h                     |    1 +
+ 17 files changed, 1758 insertions(+), 77 deletions(-)
+ create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
 
- I recently receive another set of logs which has base kernel  causing
-problem same as kdump kernel with crashkernel option in high mem.
-
- Here is /proc/iomem snippet in base kernel -
-
- 7e930000-7e930fff : /soc/xxxxxxxx at 7e930000 4000200000-43ffffffff :
- System RAM
-   4000280000-4000ed0fff : Kernel code
-   4000fa1000-400116cfff : Kernel data
-  e0d0000000-e0d003ffff : cfg
-
- DMA and Normal zone are configured as below -
-
- Feb 22 15:34:54 dhcp-135-24-241-244 kernel: [    0.000000] Zone ranges:
- Feb 22 15:34:54 dhcp-135-24-241-244 kernel: [    0.000000]   DMA
-[mem
- 0x0000004000200000-0x00000040ffffffff]
- Feb 22 15:34:54 dhcp-135-24-241-244 kernel: [    0.000000]   Normal
-[mem
- 0x0000004100000000-0x00000043ffffffff]
-
- This is first instance where I observed RAM was mapped above 4GB and
-because of that driver asking for 32 bit DMA is failing.
-Which parameter plays role  here for mapping system RAM above 4GB ? Is it
-done in BIOS ?
-
->
-> >
-> > Robin.
+-- 
+1.7.2.3
