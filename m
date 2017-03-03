@@ -1,55 +1,44 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 3 Mar 2017 09:54:07 +0000
-Subject: [PATCH 1/2] nvmem: Add driver for the i.MX IIM
-In-Reply-To: <568bbe58-0bb5-f7ec-a646-271912a4313a@linaro.org>
-References: <20170213153149.11710-1-s.hauer@pengutronix.de>
- <20170213153149.11710-2-s.hauer@pengutronix.de>
- <568bbe58-0bb5-f7ec-a646-271912a4313a@linaro.org>
-Message-ID: <cf3664ee-dd90-a9c4-2b43-883c599aa6bf@linaro.org>
+From: Claudiu.Beznea@microchip.com (m18063)
+Date: Fri, 3 Mar 2017 11:53:17 +0200
+Subject: [PATCH 2/2] drivers: pwm: pwm-atmel: enable pwm on sama5d2
+In-Reply-To: <20170303062120.uippq2ajtnrxfcx5@rob-hp-laptop>
+References: <1488278415-2786-1-git-send-email-claudiu.beznea@microchip.com>
+ <1488278415-2786-3-git-send-email-claudiu.beznea@microchip.com>
+ <20170303062120.uippq2ajtnrxfcx5@rob-hp-laptop>
+Message-ID: <a4ce6e72-bc67-cb53-6c45-910a7c1497e0@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
 
-On 03/03/17 09:50, Srinivas Kandagatla wrote:
->
->
-> On 13/02/17 15:31, Sascha Hauer wrote:
->> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+On 03.03.2017 08:21, Rob Herring wrote:
+> On Tue, Feb 28, 2017 at 12:40:15PM +0200, Claudiu Beznea wrote:
+>> sama5d2 can use the same atmel_pwm_data as sama5d3.
 >>
->> This adds a readonly nvmem driver for the i.MX IC Identification Module
->> (IIM). The IIM is found on the older i.MX SoCs like the i.MX25, i.MX27,
->> i.MX31, i.MX35, i.MX51 and the i.MX53.
->>
->> The IIM can control up to 8 fuse banks with 256 bit each. Not all of the
->> banks are equipped on the different SoCs. The actual number of fuses
->> differ from 512 on the i.MX27 and 1152 on the i.MX53.
->>
->> The fuses are one time writable, but writing is currently not supported
->> in the driver.
->>
->> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
->> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
->
->
+>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
 >> ---
->>  drivers/nvmem/Kconfig   |  11 ++++
->>  drivers/nvmem/Makefile  |   2 +
->>  drivers/nvmem/imx-iim.c | 171
->> ++++++++++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 184 insertions(+)
->>  create mode 100644 drivers/nvmem/imx-iim.c
+>>  Documentation/devicetree/bindings/pwm/atmel-pwm.txt | 1 +
+>>  drivers/pwm/pwm-atmel.c                             | 3 +++
+>>  2 files changed, 4 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+>> index 02331b9..c8c831d 100644
+>> --- a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+>> +++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
+>> @@ -4,6 +4,7 @@ Required properties:
+>>    - compatible: should be one of:
+>>      - "atmel,at91sam9rl-pwm"
+>>      - "atmel,sama5d3-pwm"
+>> +    - "atmel,sama5d2-pwm"
+> Perhaps sama5d3 should be a fallback, then you don't need a driver 
+> change.
 >
-> Patch looks good to me, Will pick both bindings and this patch in next
-> cycle for 4.12.
-Opps sent email too quick..
+> Rob
 
-Can you also make sure that ids are null terminated as reported by 
-kbuild https://www.spinics.net/lists/arm-kernel/msg562543.html in next 
-version.
+sama5d2 PWM controller have additional features. We intend to support
+some of these. This is why I choose to add specific compatible string
+for it.
 
---srini
-
->
-> thanks,
-> srini
+Thank you,
+Claudiu Beznea
