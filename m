@@ -1,42 +1,146 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Fri, 03 Mar 2017 14:34:58 +1100
-Subject: [PATCH] module: set __jump_table alignment to 8
-In-Reply-To: <20170302124441.0e2634e0@gandalf.local.home>
-References: <20170301220453.4756-1-david.daney@cavium.com>
- <87varsj6qc.fsf@concordia.ellerman.id.au>
- <8737ewexkp.fsf@concordia.ellerman.id.au>
- <20170302124441.0e2634e0@gandalf.local.home>
-Message-ID: <87innrhw2l.fsf@concordia.ellerman.id.au>
+From: nipun.gupta@nxp.com (Nipun Gupta)
+Date: Fri, 3 Mar 2017 03:42:57 +0000
+Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
+In-Reply-To: <72610bd3-71b2-0b4b-eb6c-5e9df7ec1aac@arm.com>
+References: <ad6b6a4937b1fe183e6d48ccbaf4cb46db92fed4.1481893907.git.robin.murphy@arm.com>
+ <DB6PR0402MB2694957C2D7C648CC342627FE69F0@DB6PR0402MB2694.eurprd04.prod.outlook.com>
+ <AM5PR0401MB251438AFDE691D570353B537E6280@AM5PR0401MB2514.eurprd04.prod.outlook.com>
+ <72610bd3-71b2-0b4b-eb6c-5e9df7ec1aac@arm.com>
+Message-ID: <AM5PR0401MB2514A195633CE5496E74A861E62B0@AM5PR0401MB2514.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Steven Rostedt <rostedt@goodmis.org> writes:
-> On Thu, 02 Mar 2017 22:18:30 +1100
-> Michael Ellerman <mpe@ellerman.id.au> wrote:
->> Michael Ellerman <mpe@ellerman.id.au> writes:
->> > David Daney <david.daney@cavium.com> writes:  
->> >> Strict alignment became necessary with commit 3821fd35b58d
->> >> ("jump_label: Reduce the size of struct static_key"), currently in
->> >> linux-next, which uses the two least significant bits of pointers to
->> >> __jump_table elements.  
->> >
->> > It would obviously be nice if this could go in before the commit that
->> > exposes the breakage, but I guess that's problematic because Steve
->> > doesn't want to rebase the tracing tree.
->> >
->> > Steve I think you've already sent your pull request for this cycle? So I
->> > guess if this can go in your first batch of fixes?  
->> 
->> Ugh. Was looking at the wrong tree - Linus has already merged the commit
->> in question, so the above is all moot.
->
-> No problem. I've got some other "fixes" to push to Linus. That's what
-> the -rc releases are for. To fix up breakage from the merge window ;-)
+Thanks Robin,
+This would be of great help.
 
-Yep, no drama.
+Regards,
+Nipun
 
-> I'll pull this into my tree.
-
-Thanks.
-
-cheers
+> -----Original Message-----
+> From: Robin Murphy [mailto:robin.murphy at arm.com]
+> Sent: Thursday, March 02, 2017 22:18
+> To: Nipun Gupta <nipun.gupta@nxp.com>; iommu at lists.linux-foundation.org;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Cc: mark.rutland at arm.com; will.deacon at arm.com; stuyoder at gmail.com;
+> Bharat Bhushan <bharat.bhushan@nxp.com>
+> Subject: Re: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
+> 
+> On 02/03/17 04:18, Nipun Gupta wrote:
+> >
+> > Hi Robin/Will,
+> >
+> > This patch is currently not applied on the tree.
+> > I had verified the patch and it seems good.
+> > Is ack required on the patch or do I need to send a non RFC patch (with Robin's
+> signoff)?
+> > This is very much required to support SMMU on NXP platform.
+> 
+> It's still sat in my "patches to do something with" queue - I don't
+> think we ever reached a concrete decision on the property name for a DT
+> maintainer ack, but I've tweaked the description per Will's comment;
+> thanks for the reminder. I'll send an rc1-based version out next week to
+> reboot the discussion.
+> 
+> Robin.
+> 
+> >
+> > Thanks,
+> > Nipun
+> >
+> >
+> >> -----Original Message-----
+> >> From: Nipun Gupta
+> >> Sent: Sunday, December 18, 2016 2:37
+> >> To: Robin Murphy <robin.murphy@arm.com>; iommu at lists.linux-
+> >> foundation.org; devicetree at vger.kernel.org; linux-arm-
+> >> kernel at lists.infradead.org
+> >> Cc: mark.rutland at arm.com; will.deacon at arm.com; Stuart Yoder
+> >> <stuart.yoder@nxp.com>
+> >> Subject: RE: [RFC PATCH] iommu/arm-smmu: Add global SMR masking
+> property
+> >>
+> >>
+> >>
+> >>> -----Original Message-----
+> >>> From: iommu-bounces at lists.linux-foundation.org [mailto:iommu-
+> >>> bounces at lists.linux-foundation.org] On Behalf Of Robin Murphy
+> >>> Sent: Friday, December 16, 2016 18:49
+> >>> To: iommu at lists.linux-foundation.org; devicetree at vger.kernel.org; linux-
+> >> arm-
+> >>> kernel at lists.infradead.org
+> >>> Cc: mark.rutland at arm.com; will.deacon at arm.com; Stuart Yoder
+> >>> <stuart.yoder@nxp.com>
+> >>> Subject: [RFC PATCH] iommu/arm-smmu: Add global SMR masking property
+> >>>
+> >>> The current SMR masking support using a 2-cell iommu-specifier is
+> >>> primarily intended to handle individual masters with large and/or
+> >>> complex Stream ID assignments; it quickly gets a bit clunky in other SMR
+> >>> use-cases where we just want to consistently mask out the same part of
+> >>> every Stream ID (e.g. for MMU-500 configurations where the appended TBU
+> >>> number gets in the way unnecessarily). Let's add a new property to allow
+> >>> a single global mask value to better fit the latter situation.
+> >>>
+> >>> CC: Stuart Yoder <stuart.yoder@nxp.com>
+> >>
+> >> Tested-by: Nipun Gupta <nipun.gupta@nxp.com>
+> >>
+> >>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> >>> ---
+> >>>
+> >>> Compile-tested only...
+> >>>
+> >>>  Documentation/devicetree/bindings/iommu/arm,smmu.txt | 8 ++++++++
+> >>>  drivers/iommu/arm-smmu.c                             | 4 +++-
+> >>>  2 files changed, 11 insertions(+), 1 deletion(-)
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> >>> b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> >>> index e862d1485205..98f5cbe5fdb4 100644
+> >>> --- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> >>> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> >>> @@ -60,6 +60,14 @@ conditions.
+> >>>                    aliases of secure registers have to be used during
+> >>>                    SMMU configuration.
+> >>>
+> >>> +- stream-match-mask : Specifies a fixed SMR mask value to combine with
+> >>> +                  the Stream ID value from every iommu-specifier. This
+> >>> +                  may be used instead of an "#iommu-cells" value of 2
+> >>> +                  when there is no need for per-master SMR masks, but
+> >>> +                  it is still desired to mask some portion of every
+> >>> +                  Stream ID (e.g. for certain MMU-500 configurations
+> >>> +                  given globally unique external IDs).
+> >>> +
+> >>>  ** Deprecated properties:
+> >>>
+> >>>  - mmu-masters (deprecated in favour of the generic "iommus" binding) :
+> >>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> >>> index 8f7281444551..f1abcb7dde36 100644
+> >>> --- a/drivers/iommu/arm-smmu.c
+> >>> +++ b/drivers/iommu/arm-smmu.c
+> >>> @@ -1534,13 +1534,15 @@ static int arm_smmu_domain_set_attr(struct
+> >>> iommu_domain *domain,
+> >>>
+> >>>  static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args
+> >> *args)
+> >>>  {
+> >>> -	u32 fwid = 0;
+> >>> +	u32 mask, fwid = 0;
+> >>>
+> >>>  	if (args->args_count > 0)
+> >>>  		fwid |= (u16)args->args[0];
+> >>>
+> >>>  	if (args->args_count > 1)
+> >>>  		fwid |= (u16)args->args[1] << SMR_MASK_SHIFT;
+> >>> +	else if (!of_property_read_u32(args->np, "stream-match-mask",
+> >>> &mask))
+> >>> +		fwid |= (u16)mask << SMR_MASK_SHIFT;
+> >>>
+> >>>  	return iommu_fwspec_add_ids(dev, &fwid, 1);
+> >>>  }
+> >>> --
+> >>> 2.10.2.dirty
+> >>>
+> >>> _______________________________________________
+> >>> iommu mailing list
+> >>> iommu at lists.linux-foundation.org
+> >>> https://lists.linuxfoundation.org/mailman/listinfo/iommu
