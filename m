@@ -1,68 +1,45 @@
-From: zhang.lyra@gmail.com (Chunyan Zhang)
-Date: Fri, 3 Mar 2017 18:48:54 +0800
-Subject: [PATCH V3 3/4] dt-bindings: serial: add a new compatible string
- for SC9860
-In-Reply-To: <20170303062149.xeernsjqhipwk7tq@rob-hp-laptop>
-References: <1488435730-6711-1-git-send-email-chunyan.zhang@spreadtrum.com>
- <1488435730-6711-4-git-send-email-chunyan.zhang@spreadtrum.com>
- <20170303062149.xeernsjqhipwk7tq@rob-hp-laptop>
-Message-ID: <CAAfSe-sgeG9WdxyJE25Bn3xYcp=AHTAtGob0xVJmvoLPkduPEw@mail.gmail.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Fri, 3 Mar 2017 14:04:26 +0300
+Subject: [RFC PATCH 04/12] staging: android: ion: Call dma_map_sg for
+ syncing and mapping
+In-Reply-To: <1488491084-17252-5-git-send-email-labbott@redhat.com>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+ <1488491084-17252-5-git-send-email-labbott@redhat.com>
+Message-ID: <20170303110329.GA4132@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 March 2017 at 14:21, Rob Herring <robh@kernel.org> wrote:
-> On Thu, Mar 02, 2017 at 02:22:09PM +0800, Chunyan Zhang wrote:
->> SC9860 use the same serial device, so added a new compatible string to
->> support SC9860 as well, also added an example of how to describe this
->> serial device in DT.
->>
->> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
->> ---
->>  Documentation/devicetree/bindings/serial/sprd-uart.txt | 15 ++++++++++++++-
->>  1 file changed, 14 insertions(+), 1 deletion(-)
->>
->> diff --git a/Documentation/devicetree/bindings/serial/sprd-uart.txt b/Documentation/devicetree/bindings/serial/sprd-uart.txt
->> index 2aff0f2..8bd8144 100644
->> --- a/Documentation/devicetree/bindings/serial/sprd-uart.txt
->> +++ b/Documentation/devicetree/bindings/serial/sprd-uart.txt
->> @@ -1,7 +1,20 @@
->>  * Spreadtrum serial UART
->>
->>  Required properties:
->> -- compatible: must be "sprd,sc9836-uart"
->> +- compatible must contain:
->> +  * "sprd,sc9836-uart" for SC9836 and all Spreadtrum SoCs
->> +  This also can be specific with:
->> +  * "sprd,sc9860-uart" for SC9860
->
-> Just say:
->
-> - compatible: must be one of:
->         "sprd,sc9836-uart"
->         "sprd,sc9860-uart", "sprd,sc9836-uart"
->
->> +
->>  - reg: offset and length of the register set for the device
->>  - interrupts: exactly one interrupt specifier
->>  - clocks: phandles to input clocks.
->> +
->> +Example:
->> +     uart0: serial at 70000000 {
->> +             compatible = "sprd,sc9860-uart",
->> +                          "sprd,sc9836-uart";
->> +             reg = <0x000000 0x100>;
->
-> unit address doesn't match the reg property.
+On Thu, Mar 02, 2017 at 01:44:36PM -0800, Laura Abbott wrote:
+>  static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
+>  					enum dma_data_direction direction)
+>  {
+>  	struct dma_buf *dmabuf = attachment->dmabuf;
+>  	struct ion_buffer *buffer = dmabuf->priv;
+> +	struct sg_table *table;
+> +	int ret;
+> +
+> +	/*
+> +	 * TODO: Need to sync wrt CPU or device completely owning?
+> +	 */
+> +
+> +	table = dup_sg_table(buffer->sg_table);
+>  
+> -	ion_buffer_sync_for_device(buffer, attachment->dev, direction);
+> -	return dup_sg_table(buffer->sg_table);
+> +	if (!dma_map_sg(attachment->dev, table->sgl, table->nents,
+> +			direction)){
+> +		ret = -ENOMEM;
+> +		goto err;
+> +	}
+> +
+> +err:
+> +	free_duped_table(table);
+> +	return ERR_PTR(ret);
 
-OK, I will revise dts file accordingly.
+ret isn't initialized on success.
 
-Thanks,
-Chunyan
+>  }
+>  
 
->
->> +             interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
->> +             clocks = <&ext_26m>;
->> +     };
->> --
->> 2.7.4
->>
+regards,
+dan carpenter
