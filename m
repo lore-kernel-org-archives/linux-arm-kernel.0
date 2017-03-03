@@ -1,534 +1,138 @@
-From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Fri,  3 Mar 2017 16:57:09 +0100
-Subject: [PATCH V3 3/4] drm/bridge: Drivers for
- megachips-stdpxxxx-ge-b850v3-fw (LVDS-DP++)
-In-Reply-To: <cover.1488555615.git.peter.senna@collabora.com>
-References: <cover.1488555615.git.peter.senna@collabora.com>
-Message-ID: <ad92919f2eaff2623a551aac94cf11ef948ff9ee.1488555615.git.peter.senna@collabora.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 3 Mar 2017 17:18:59 +0100
+Subject: Panic in quirk_usb_early_handoff
+Message-ID: <4b2a7606-de27-c8ad-1530-958dd5d12233@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The video processing pipeline on the second output on the GE B850v3:
+Hello,
 
-  Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
+I'm seeing this panic randomly at boot-time, so I want to throw
+it out there in case someone recognizes the issue off the top of
+their head.
 
-Each bridge has a dedicated flash containing firmware for supporting the
-custom design. The result is that in this design neither the STDP4028
-nor the STDP2690 behave as the stock bridges would. The compatible
-strings include the suffix "-ge-b850v3-fw" to make it clear that the
-driver is for the bridges with the firmware which is specific for the GE
-B850v3.
+I'm on Linux 4.9, using a USB3 PCIe card. I'm actively working on
+the PCIe support, so I may be responsible for the crash by virtue
+of something I did or didn't do (e.g. I haven't set up the IRQs
+correctly, but I didn't think it would crash the system).
 
-The driver is powerless to control the video processing pipeline, as the
-two bridges behaves as a single one. The driver is only needed for
-telling the host about EDID / HPD, and for giving the host powers to ack
-interrupts.
-
-This driver adds one i2c_device for each bridge, but only one
-drm_bridge. This design allows the creation of a functional connector
-that is capable of reading EDID from the STDP2690 while handling
-interrupts on the STDP4028.
-
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: Martyn Welch <martyn.welch@collabora.co.uk>
-Cc: Martin Donnelly <martin.donnelly@ge.com>
-Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
-Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: David Airlie <airlied@linux.ie>
-Cc: Thierry Reding <treding@nvidia.com>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Archit Taneja <architt@codeaurora.org>
-Cc: Enric Balletbo <enric.balletbo@collabora.com>
-Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
----
-Changes from V2:
- - Fix the code to allow it be compiled as a module
-
-Changes from V1:
- - Updated copyright year
- - Fixed blank line issues
- - Updated ge_b850v3_lvds_remove() to not rely on ge_b850v3_lvds_ptr->edid and
-   added a comment to explain the test.
- - Fixed checkpatch strict warnings about continuation lines. In one case
-   fixing the warning would cause the continuation line to be over 80 chars and
-   that strict warning remains.
-
- drivers/gpu/drm/bridge/Kconfig                     |  11 +
- drivers/gpu/drm/bridge/Makefile                    |   1 +
- .../drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c   | 428 +++++++++++++++++++++
- 3 files changed, 440 insertions(+)
- create mode 100644 drivers/gpu/drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c
-
-diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
-index eb8688e..4a937f1 100644
---- a/drivers/gpu/drm/bridge/Kconfig
-+++ b/drivers/gpu/drm/bridge/Kconfig
-@@ -48,6 +48,17 @@ config DRM_DW_HDMI_I2S_AUDIO
- 	  Support the I2S Audio interface which is part of the Synopsis
- 	  Designware HDMI block.
- 
-+config DRM_MEGACHIPS_STDPXXXX_GE_B850V3_FW
-+	tristate "MegaChips stdp4028-ge-b850v3-fw and stdp2690-ge-b850v3-fw"
-+	depends on OF
-+	select DRM_KMS_HELPER
-+	select DRM_PANEL
-+	---help---
-+          This is a driver for the display bridges of
-+          GE B850v3 that convert dual channel LVDS
-+          to DP++. This is used with the i.MX6 imx-ldb
-+          driver. You are likely to say N here.
-+
- config DRM_NXP_PTN3460
- 	tristate "NXP PTN3460 DP/LVDS bridge"
- 	depends on OF
-diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
-index 2e83a785..af0b7cc 100644
---- a/drivers/gpu/drm/bridge/Makefile
-+++ b/drivers/gpu/drm/bridge/Makefile
-@@ -5,6 +5,7 @@ obj-$(CONFIG_DRM_DUMB_VGA_DAC) += dumb-vga-dac.o
- obj-$(CONFIG_DRM_DW_HDMI) += dw-hdmi.o
- obj-$(CONFIG_DRM_DW_HDMI_AHB_AUDIO) += dw-hdmi-ahb-audio.o
- obj-$(CONFIG_DRM_DW_HDMI_I2S_AUDIO) += dw-hdmi-i2s-audio.o
-+obj-$(CONFIG_DRM_MEGACHIPS_STDPXXXX_GE_B850V3_FW) += megachips-stdpxxxx-ge-b850v3-fw.o
- obj-$(CONFIG_DRM_NXP_PTN3460) += nxp-ptn3460.o
- obj-$(CONFIG_DRM_PARADE_PS8622) += parade-ps8622.o
- obj-$(CONFIG_DRM_SIL_SII8620) += sil-sii8620.o
-diff --git a/drivers/gpu/drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c b/drivers/gpu/drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c
-new file mode 100644
-index 0000000..e53c243
---- /dev/null
-+++ b/drivers/gpu/drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c
-@@ -0,0 +1,428 @@
-+/*
-+ * Driver for MegaChips STDP4028 with GE B850v3 firmware (LVDS-DP)
-+ * Driver for MegaChips STDP2690 with GE B850v3 firmware (DP-DP++)
-+
-+ * Copyright (c) 2017, Collabora Ltd.
-+ * Copyright (c) 2017, General Electric Company
-+
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+
-+ * This driver creates a drm_bridge and a drm_connector for the LVDS to DP++
-+ * display bridge of the GE B850v3. There are two physical bridges on the video
-+ * signal pipeline: a STDP4028(LVDS to DP) and a STDP2690(DP to DP++). The
-+ * physical bridges are automatically configured by the input video signal, and
-+ * the driver has no access to the video processing pipeline. The driver is
-+ * only needed to read EDID from the STDP2690 and to handle HPD events from the
-+ * STDP4028. The driver communicates with both bridges over i2c. The video
-+ * signal pipeline is as follows:
-+ *
-+ *   Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
-+ *
-+ */
-+
-+#include <linux/gpio.h>
-+#include <linux/i2c.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <drm/drm_atomic.h>
-+#include <drm/drm_atomic_helper.h>
-+#include <drm/drm_crtc_helper.h>
-+#include <drm/drm_edid.h>
-+#include <drm/drmP.h>
-+
-+#define EDID_EXT_BLOCK_CNT 0x7E
-+
-+#define STDP4028_IRQ_OUT_CONF_REG 0x02
-+#define STDP4028_DPTX_IRQ_EN_REG 0x3C
-+#define STDP4028_DPTX_IRQ_STS_REG 0x3D
-+#define STDP4028_DPTX_STS_REG 0x3E
-+
-+#define STDP4028_DPTX_DP_IRQ_EN 0x1000
-+
-+#define STDP4028_DPTX_HOTPLUG_IRQ_EN 0x0400
-+#define STDP4028_DPTX_LINK_CH_IRQ_EN 0x2000
-+#define STDP4028_DPTX_IRQ_CONFIG \
-+		(STDP4028_DPTX_LINK_CH_IRQ_EN | STDP4028_DPTX_HOTPLUG_IRQ_EN)
-+
-+#define STDP4028_DPTX_HOTPLUG_STS 0x0200
-+#define STDP4028_DPTX_LINK_STS 0x1000
-+#define STDP4028_CON_STATE_CONNECTED \
-+		(STDP4028_DPTX_HOTPLUG_STS | STDP4028_DPTX_LINK_STS)
-+
-+#define STDP4028_DPTX_HOTPLUG_CH_STS 0x0400
-+#define STDP4028_DPTX_LINK_CH_STS 0x2000
-+#define STDP4028_DPTX_IRQ_CLEAR \
-+		(STDP4028_DPTX_LINK_CH_STS | STDP4028_DPTX_HOTPLUG_CH_STS)
-+
-+static DEFINE_MUTEX(ge_b850v3_lvds_dev_mutex);
-+
-+struct ge_b850v3_lvds {
-+	struct drm_connector connector;
-+	struct drm_bridge bridge;
-+	struct i2c_client *stdp4028_i2c;
-+	struct i2c_client *stdp2690_i2c;
-+	struct edid *edid;
-+};
-+
-+static struct ge_b850v3_lvds *ge_b850v3_lvds_ptr;
-+
-+u8 *stdp2690_get_edid(struct i2c_client *client)
-+{
-+	struct i2c_adapter *adapter = client->adapter;
-+	unsigned char start = 0x00;
-+	unsigned int total_size;
-+	u8 *block = kmalloc(EDID_LENGTH, GFP_KERNEL);
-+
-+	struct i2c_msg msgs[] = {
-+		{
-+			.addr	= client->addr,
-+			.flags	= 0,
-+			.len	= 1,
-+			.buf	= &start,
-+		}, {
-+			.addr	= client->addr,
-+			.flags	= I2C_M_RD,
-+			.len	= EDID_LENGTH,
-+			.buf	= block,
-+		}
-+	};
-+
-+	if (!block)
-+		return NULL;
-+
-+	if (i2c_transfer(adapter, msgs, 2) != 2) {
-+		DRM_ERROR("Unable to read EDID.\n");
-+		goto err;
-+	}
-+
-+	if (!drm_edid_block_valid(block, 0, false, NULL)) {
-+		DRM_ERROR("Invalid EDID data\n");
-+		goto err;
-+	}
-+
-+	total_size = (block[EDID_EXT_BLOCK_CNT] + 1) * EDID_LENGTH;
-+	if (total_size > EDID_LENGTH) {
-+		kfree(block);
-+		block = kmalloc(total_size, GFP_KERNEL);
-+		if (!block)
-+			return NULL;
-+
-+		/* Yes, read the entire buffer, and do not skip the first
-+		 * EDID_LENGTH bytes.
-+		 */
-+		start = 0x00;
-+		msgs[1].len = total_size;
-+		msgs[1].buf = block;
-+
-+		if (i2c_transfer(adapter, msgs, 2) != 2) {
-+			DRM_ERROR("Unable to read EDID extension blocks.\n");
-+			goto err;
-+		}
-+		if (!drm_edid_block_valid(block, 1, false, NULL)) {
-+			DRM_ERROR("Invalid EDID data\n");
-+			goto err;
-+		}
-+	}
-+
-+	return block;
-+
-+err:
-+	kfree(block);
-+	return NULL;
-+}
-+
-+static int ge_b850v3_lvds_get_modes(struct drm_connector *connector)
-+{
-+	struct i2c_client *client;
-+	int num_modes = 0;
-+
-+	client = ge_b850v3_lvds_ptr->stdp2690_i2c;
-+
-+	kfree(ge_b850v3_lvds_ptr->edid);
-+	ge_b850v3_lvds_ptr->edid = (struct edid *)stdp2690_get_edid(client);
-+
-+	if (ge_b850v3_lvds_ptr->edid) {
-+		drm_mode_connector_update_edid_property(connector,
-+						      ge_b850v3_lvds_ptr->edid);
-+		num_modes = drm_add_edid_modes(connector,
-+					       ge_b850v3_lvds_ptr->edid);
-+	}
-+
-+	return num_modes;
-+}
-+
-+static enum drm_mode_status ge_b850v3_lvds_mode_valid(
-+		struct drm_connector *connector, struct drm_display_mode *mode)
-+{
-+	return MODE_OK;
-+}
-+
-+static const struct
-+drm_connector_helper_funcs ge_b850v3_lvds_connector_helper_funcs = {
-+	.get_modes = ge_b850v3_lvds_get_modes,
-+	.mode_valid = ge_b850v3_lvds_mode_valid,
-+};
-+
-+static enum drm_connector_status ge_b850v3_lvds_detect(
-+		struct drm_connector *connector, bool force)
-+{
-+	struct i2c_client *stdp4028_i2c =
-+			ge_b850v3_lvds_ptr->stdp4028_i2c;
-+	s32 link_state;
-+
-+	link_state = i2c_smbus_read_word_data(stdp4028_i2c,
-+					      STDP4028_DPTX_STS_REG);
-+
-+	if (link_state == STDP4028_CON_STATE_CONNECTED)
-+		return connector_status_connected;
-+
-+	if (link_state == 0)
-+		return connector_status_disconnected;
-+
-+	return connector_status_unknown;
-+}
-+
-+static const struct drm_connector_funcs ge_b850v3_lvds_connector_funcs = {
-+	.dpms = drm_atomic_helper_connector_dpms,
-+	.fill_modes = drm_helper_probe_single_connector_modes,
-+	.detect = ge_b850v3_lvds_detect,
-+	.destroy = drm_connector_cleanup,
-+	.reset = drm_atomic_helper_connector_reset,
-+	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
-+	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
-+};
-+
-+static irqreturn_t ge_b850v3_lvds_irq_handler(int irq, void *dev_id)
-+{
-+	struct i2c_client *stdp4028_i2c
-+			= ge_b850v3_lvds_ptr->stdp4028_i2c;
-+
-+	i2c_smbus_write_word_data(stdp4028_i2c,
-+				  STDP4028_DPTX_IRQ_STS_REG,
-+				  STDP4028_DPTX_IRQ_CLEAR);
-+
-+	if (ge_b850v3_lvds_ptr->connector.dev)
-+		drm_kms_helper_hotplug_event(ge_b850v3_lvds_ptr->connector.dev);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int ge_b850v3_lvds_attach(struct drm_bridge *bridge)
-+{
-+	struct drm_connector *connector = &ge_b850v3_lvds_ptr->connector;
-+	struct i2c_client *stdp4028_i2c
-+			= ge_b850v3_lvds_ptr->stdp4028_i2c;
-+	int ret;
-+
-+	if (!bridge->encoder) {
-+		DRM_ERROR("Parent encoder object not found");
-+		return -ENODEV;
-+	}
-+
-+	connector->polled = DRM_CONNECTOR_POLL_HPD;
-+
-+	drm_connector_helper_add(connector,
-+				 &ge_b850v3_lvds_connector_helper_funcs);
-+
-+	ret = drm_connector_init(bridge->dev, connector,
-+				 &ge_b850v3_lvds_connector_funcs,
-+				 DRM_MODE_CONNECTOR_DisplayPort);
-+	if (ret) {
-+		DRM_ERROR("Failed to initialize connector with drm\n");
-+		return ret;
-+	}
-+
-+	ret = drm_mode_connector_attach_encoder(connector, bridge->encoder);
-+	if (ret)
-+		return ret;
-+
-+	/* Configures the bridge to re-enable interrupts after each ack. */
-+	i2c_smbus_write_word_data(stdp4028_i2c,
-+				  STDP4028_IRQ_OUT_CONF_REG,
-+				  STDP4028_DPTX_DP_IRQ_EN);
-+
-+	/* Enable interrupts */
-+	i2c_smbus_write_word_data(stdp4028_i2c,
-+				  STDP4028_DPTX_IRQ_EN_REG,
-+				  STDP4028_DPTX_IRQ_CONFIG);
-+
-+	return 0;
-+}
-+
-+static const struct drm_bridge_funcs ge_b850v3_lvds_funcs = {
-+	.attach = ge_b850v3_lvds_attach,
-+};
-+
-+static int ge_b850v3_lvds_init(struct device *dev)
-+{
-+	mutex_lock(&ge_b850v3_lvds_dev_mutex);
-+
-+	if (ge_b850v3_lvds_ptr)
-+		goto success;
-+
-+	ge_b850v3_lvds_ptr = devm_kzalloc(dev,
-+					  sizeof(*ge_b850v3_lvds_ptr),
-+					  GFP_KERNEL);
-+
-+	if (!ge_b850v3_lvds_ptr) {
-+		mutex_unlock(&ge_b850v3_lvds_dev_mutex);
-+		return -ENOMEM;
-+	}
-+
-+	ge_b850v3_lvds_ptr->bridge.funcs = &ge_b850v3_lvds_funcs;
-+	ge_b850v3_lvds_ptr->bridge.of_node = dev->of_node;
-+	drm_bridge_add(&ge_b850v3_lvds_ptr->bridge);
-+
-+success:
-+	mutex_unlock(&ge_b850v3_lvds_dev_mutex);
-+	return 0;
-+}
-+
-+static void ge_b850v3_lvds_remove(void)
-+{
-+	mutex_lock(&ge_b850v3_lvds_dev_mutex);
-+	/*
-+	 * This check is to avoid both the drivers
-+	 * removing the bridge in their remove() function
-+	 */
-+	if (!ge_b850v3_lvds_ptr)
-+		goto out;
-+
-+	drm_bridge_remove(&ge_b850v3_lvds_ptr->bridge);
-+
-+	kfree(ge_b850v3_lvds_ptr->edid);
-+
-+	ge_b850v3_lvds_ptr = NULL;
-+out:
-+	mutex_unlock(&ge_b850v3_lvds_dev_mutex);
-+}
-+
-+static int stdp4028_ge_b850v3_fw_probe(struct i2c_client *stdp4028_i2c,
-+				       const struct i2c_device_id *id)
-+{
-+	struct device *dev = &stdp4028_i2c->dev;
-+
-+	ge_b850v3_lvds_init(dev);
-+
-+	ge_b850v3_lvds_ptr->stdp4028_i2c = stdp4028_i2c;
-+	i2c_set_clientdata(stdp4028_i2c, ge_b850v3_lvds_ptr);
-+
-+	/* Clear pending interrupts since power up. */
-+	i2c_smbus_write_word_data(stdp4028_i2c,
-+				  STDP4028_DPTX_IRQ_STS_REG,
-+				  STDP4028_DPTX_IRQ_CLEAR);
-+
-+	if (!stdp4028_i2c->irq)
-+		return 0;
-+
-+	return devm_request_threaded_irq(&stdp4028_i2c->dev,
-+			stdp4028_i2c->irq, NULL,
-+			ge_b850v3_lvds_irq_handler,
-+			IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
-+			"ge-b850v3-lvds-dp", ge_b850v3_lvds_ptr);
-+}
-+
-+static int stdp4028_ge_b850v3_fw_remove(struct i2c_client *stdp4028_i2c)
-+{
-+	ge_b850v3_lvds_remove();
-+
-+	return 0;
-+}
-+
-+static const struct i2c_device_id stdp4028_ge_b850v3_fw_i2c_table[] = {
-+	{"stdp4028_ge_fw", 0},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(i2c, stdp4028_ge_b850v3_fw_i2c_table);
-+
-+static const struct of_device_id stdp4028_ge_b850v3_fw_match[] = {
-+	{ .compatible = "megachips,stdp4028-ge-b850v3-fw" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, stdp4028_ge_b850v3_fw_match);
-+
-+static struct i2c_driver stdp4028_ge_b850v3_fw_driver = {
-+	.id_table	= stdp4028_ge_b850v3_fw_i2c_table,
-+	.probe		= stdp4028_ge_b850v3_fw_probe,
-+	.remove		= stdp4028_ge_b850v3_fw_remove,
-+	.driver		= {
-+		.name		= "stdp4028-ge-b850v3-fw",
-+		.of_match_table = stdp4028_ge_b850v3_fw_match,
-+	},
-+};
-+
-+static int stdp2690_ge_b850v3_fw_probe(struct i2c_client *stdp2690_i2c,
-+				       const struct i2c_device_id *id)
-+{
-+	struct device *dev = &stdp2690_i2c->dev;
-+
-+	ge_b850v3_lvds_init(dev);
-+
-+	ge_b850v3_lvds_ptr->stdp2690_i2c = stdp2690_i2c;
-+	i2c_set_clientdata(stdp2690_i2c, ge_b850v3_lvds_ptr);
-+
-+	return 0;
-+}
-+
-+static int stdp2690_ge_b850v3_fw_remove(struct i2c_client *stdp2690_i2c)
-+{
-+	ge_b850v3_lvds_remove();
-+
-+	return 0;
-+}
-+
-+static const struct i2c_device_id stdp2690_ge_b850v3_fw_i2c_table[] = {
-+	{"stdp2690_ge_fw", 0},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(i2c, stdp2690_ge_b850v3_fw_i2c_table);
-+
-+static const struct of_device_id stdp2690_ge_b850v3_fw_match[] = {
-+	{ .compatible = "megachips,stdp2690-ge-b850v3-fw" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, stdp2690_ge_b850v3_fw_match);
-+
-+static struct i2c_driver stdp2690_ge_b850v3_fw_driver = {
-+	.id_table	= stdp2690_ge_b850v3_fw_i2c_table,
-+	.probe		= stdp2690_ge_b850v3_fw_probe,
-+	.remove		= stdp2690_ge_b850v3_fw_remove,
-+	.driver		= {
-+		.name		= "stdp2690-ge-b850v3-fw",
-+		.of_match_table = stdp2690_ge_b850v3_fw_match,
-+	},
-+};
-+
-+static int __init stdpxxxx_ge_b850v3_init(void)
-+{
-+	int ret;
-+
-+	ret = i2c_add_driver(&stdp4028_ge_b850v3_fw_driver);
-+	if (ret)
-+		return ret;
-+
-+	return i2c_add_driver(&stdp2690_ge_b850v3_fw_driver);
-+}
-+module_init(stdpxxxx_ge_b850v3_init);
-+
-+static void __exit stdpxxxx_ge_b850v3_exit(void)
-+{
-+	i2c_del_driver(&stdp2690_ge_b850v3_fw_driver);
-+	i2c_del_driver(&stdp4028_ge_b850v3_fw_driver);
-+}
-+module_exit(stdpxxxx_ge_b850v3_exit);
-+
-+MODULE_AUTHOR("Peter Senna Tschudin <peter.senna@collabora.com>");
-+MODULE_AUTHOR("Martyn Welch <martyn.welch@collabora.co.uk>");
-+MODULE_DESCRIPTION("GE LVDS to DP++ display bridge)");
-+MODULE_LICENSE("GPL v2");
--- 
-2.9.3
+[    0.987520] OF: PCI: host bridge /soc/pcie at 50000000 ranges:
+[    0.993236] OF: PCI:   No bus range found for /soc/pcie at 50000000, using [bus 00-ff]
+[    1.001034] OF: PCI: Parsing ranges property...
+[    1.005693] OF: PCI:   MEM 0x90000000..0x9fffffff -> 0x90000000
+[    1.014791] pci-host-generic 50000000.pcie: ECAM at [mem 0x50000000-0x5fffffff] for [bus 00-ff]
+[    1.028570] pci-host-generic 50000000.pcie: PCI host bridge to bus 0000:00
+[    1.035597] pci_bus 0000:00: root bus resource [bus 00-ff]
+[    1.041212] pci_bus 0000:00: root bus resource [mem 0x90000000-0x9fffffff]
+[    1.048219] pci_bus 0000:00: scanning bus
+[    1.052376] pci 0000:00:00.0: [1105:0024] type 01 class 0x048000
+[    1.058529] pci 0000:00:00.0: calling tango_pcie_fixup_class+0x0/0x10
+[    1.065119] pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x00ffffff 64bit]
+[    1.072068] pci 0000:00:00.0: calling pci_fixup_ide_bases+0x0/0x40
+[    1.078415] pci 0000:00:00.0: supports D1 D2
+[    1.082803] pci 0000:00:00.0: PME# supported from D0 D1 D2 D3hot
+[    1.088937] pci 0000:00:00.0: PME# disabled
+[    1.093445] pci_bus 0000:00: fixups for bus
+[    1.097753] PCI: bus0: Fast back to back transfers disabled
+[    1.103453] pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 0
+[    1.110286] pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+[    1.118433] pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 1
+[    1.125385] pci_bus 0000:01: scanning bus
+[    1.129557] pci 0000:01:00.0: [1912:0014] type 00 class 0x0c0330
+[    1.135727] pci 0000:01:00.0: reg 0x10: [mem 0x00000000-0x00001fff 64bit]
+[    1.142730] pci 0000:01:00.0: calling pci_fixup_ide_bases+0x0/0x40
+[    1.149150] pci 0000:01:00.0: PME# supported from D0 D3hot D3cold
+[    1.155375] pci 0000:01:00.0: PME# disabled
+[    1.159976] pci_bus 0000:01: fixups for bus
+[    1.164305] PCI: bus1: Fast back to back transfers disabled
+[    1.170002] pci_bus 0000:01: bus scan returning with max=01
+[    1.175701] pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+[    1.182447] pci_bus 0000:00: bus scan returning with max=01
+[    1.188147] pci 0000:00:00.0: fixup irq: got 0
+[    1.192707] pci 0000:00:00.0: assigning IRQ 00
+[    1.197294] pci 0000:01:00.0: fixup irq: got 20
+[    1.201945] pci 0000:01:00.0: assigning IRQ 20
+[    1.206533] pci 0000:00:00.0: BAR 0: assigned [mem 0x90000000-0x90ffffff 64bit]
+[    1.213984] pci 0000:00:00.0: BAR 8: assigned [mem 0x91000000-0x910fffff]
+[    1.220908] pci 0000:01:00.0: BAR 0: assigned [mem 0x91000000-0x91001fff 64bit]
+[    1.228363] pci 0000:00:00.0: PCI bridge to [bus 01]
+[    1.233449] pci 0000:00:00.0:   bridge window [mem 0x91000000-0x910fffff]
+[    1.240419] pcieport 0000:00:00.0: enabling device (0140 -> 0142)
+[    1.246648] pcieport 0000:00:00.0: enabling bus mastering
+[    1.252321] pci 0000:01:00.0: calling quirk_usb_early_handoff+0x0/0x790
+[    1.259077] pci 0000:01:00.0: enabling device (0140 -> 0142)
+[    1.264893] Unable to handle kernel paging request at virtual address d08664f4
+[    1.272248] pgd = c0004000
+[    1.275060] [d08664f4] *pgd=8f804811, *pte=00000000, *ppte=00000000
+[    1.281476] Internal error: Oops: 7 [#1] PREEMPT SMP ARM
+[    1.286897] Modules linked in:
+[    1.290053] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.9.7-1-rc2 #151
+[    1.296696] Hardware name: Sigma Tango DT
+[    1.300808] task: cf82c9c0 task.stack: cf838000
+[    1.305446] PC is at quirk_usb_early_handoff+0x3e8/0x790
+[    1.310873] LR is at ioremap_page_range+0xf8/0x1a8
+[    1.315771] pc : [<c039fe8c>]    lr : [<c02d0a10>]    psr: 000e0013
+[    1.315771] sp : cf839d78  ip : 00000000  fp : cf839e38
+[    1.327482] r10: c10248a0  r9 : 00000000  r8 : d08664f4
+[    1.332816] r7 : d084e000  r6 : 00002000  r5 : 000c0300  r4 : cfb5f800
+[    1.339460] r3 : 000184f4  r2 : 00000000  r1 : 91001e13  r0 : d084e000
+[    1.346105] Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+[    1.353361] Control: 10c5387d  Table: 8fa9c04a  DAC: 00000051
+[    1.359218] Process swapper/0 (pid: 1, stack limit = 0xcf838210)
+[    1.365339] Stack: (0xcf839d78 to 0xcf83a000)
+[    1.369800] 9d60:                                                       c058f578 c058b180
+[    1.378107] 9d80: cfb55240 cf839d98 c0350218 c05adccc cfb5f800 c05adcdc cf838000 00000000
+[    1.386413] 9da0: 00000000 c10248a0 cf839e38 c030bfa4 cf923b80 c034e69c cf867270 00000000
+[    1.394719] 9dc0: cfb5f800 cf9ef414 cf9ef400 cf839e30 cf923b80 00000000 cf906010 c02fa484
+[    1.403025] 9de0: cfb5f800 cf9ef414 cf9ef400 c02fa538 cfb5fc00 cf9ef814 cf9ef800 c02fa56c
+[    1.411330] 9e00: cf9ef80c cf9ef80c cf9ef800 c031387c cf839e30 cfaa39b0 c05178c8 c10101d8
+[    1.419636] 9e20: cf881780 00000000 cf906000 c058cd2c cf839e30 cf839e30 50000000 5fffffff
+[    1.427942] 9e40: cfdf7764 00000200 00000000 00000000 00000000 00000000 c1057de8 cf906010
+[    1.436248] 9e60: c1010208 cf906044 c1010208 00000000 00000007 00000000 cfffcec0 c0351624
+[    1.444553] 9e80: c1056fb0 cf906010 cf906044 c03500c0 cf906010 c1010208 cf906044 c10177d0
+[    1.452859] 9ea0: 00000073 c0350214 00000000 c1010208 c0350150 c034e5e8 cf80545c cf8a60b4
+[    1.461165] 9ec0: c1010208 cf9b8a00 00000000 c034f72c c058cd84 c0616a64 c0633cb0 c1010208
+[    1.469471] 9ee0: c0616a64 c0633cb0 c0628834 c0350770 ffffe000 c0616a64 c0633cb0 c0101834
+[    1.477776] 9f00: c104a354 c100a5c8 00000000 c0220830 00000000 cf87cf00 00000000 c1009370
+[    1.486082] 9f20: cfffceee c050fa08 00000073 c0132aec c059a1c4 c05da4a4 00000000 00000006
+[    1.494388] 9f40: 00000006 c05723fc c1009358 c1024880 c1024880 c1024880 c0633cb0 c0628834
+[    1.502693] 9f60: 00000073 00000007 c062883c c0600db4 00000006 00000006 00000000 c06005ac
+[    1.510999] 9f80: 1113a9b3 00000000 c049fafc 00000000 00000000 00000000 00000000 00000000
+[    1.519304] 9fa0: 00000000 c049fb04 00000000 c01077b8 00000000 00000000 00000000 00000000
+[    1.527609] 9fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+[    1.535914] 9fe0: 00000000 00000000 00000000 00000000 00000013 00000000 2338eece a019c832
+[    1.544236] [<c039fe8c>] (quirk_usb_early_handoff) from [<c030bfa4>] (pci_do_fixups+0xc8/0x158)
+[    1.553077] [<c030bfa4>] (pci_do_fixups) from [<c02fa484>] (pci_bus_add_device+0x18/0x90)
+[    1.561386] [<c02fa484>] (pci_bus_add_device) from [<c02fa538>] (pci_bus_add_devices+0x3c/0x80)
+[    1.570218] [<c02fa538>] (pci_bus_add_devices) from [<c02fa56c>] (pci_bus_add_devices+0x70/0x80)
+[    1.579140] [<c02fa56c>] (pci_bus_add_devices) from [<c031387c>] (pci_host_common_probe+0xfc/0x324)
+[    1.588328] [<c031387c>] (pci_host_common_probe) from [<c0351624>] (platform_drv_probe+0x34/0x7c)
+[    1.597337] [<c0351624>] (platform_drv_probe) from [<c03500c0>] (really_probe+0x1c4/0x254)
+[    1.605733] [<c03500c0>] (really_probe) from [<c0350214>] (__driver_attach+0xc4/0xc8)
+[    1.613691] [<c0350214>] (__driver_attach) from [<c034e5e8>] (bus_for_each_dev+0x68/0x9c)
+[    1.621998] [<c034e5e8>] (bus_for_each_dev) from [<c034f72c>] (bus_add_driver+0x1a0/0x218)
+[    1.630393] [<c034f72c>] (bus_add_driver) from [<c0350770>] (driver_register+0x78/0xf8)
+[    1.638527] [<c0350770>] (driver_register) from [<c0101834>] (do_one_initcall+0x44/0x174)
+[    1.646845] [<c0101834>] (do_one_initcall) from [<c0600db4>] (kernel_init_freeable+0x154/0x1e4)
+[    1.655678] [<c0600db4>] (kernel_init_freeable) from [<c049fb04>] (kernel_init+0x8/0x10c)
+[    1.663990] [<c049fb04>] (kernel_init) from [<c01077b8>] (ret_from_fork+0x14/0x3c)
+[    1.671686] Code: e3500000 e0833100 0affffcb e0878003 (e5982000) 
+[    1.677929] ---[ end trace f034f5427be1ec2c ]---
+[    1.682673] Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
+[    1.682673] 
+[    1.692032] CPU1: stopping
+[    1.694837] CPU: 1 PID: 0 Comm: swapper/1 Tainted: G      D         4.9.7-1-rc2 #151
+[    1.702703] Hardware name: Sigma Tango DT
+[    1.706831] [<c010ed94>] (unwind_backtrace) from [<c010ae24>] (show_stack+0x10/0x14)
+[    1.714703] [<c010ae24>] (show_stack) from [<c02cecc0>] (dump_stack+0x78/0x8c)
+[    1.722051] [<c02cecc0>] (dump_stack) from [<c010dc10>] (handle_IPI+0x198/0x1ac)
+[    1.729571] [<c010dc10>] (handle_IPI) from [<c01014a4>] (gic_handle_irq+0x88/0x8c)
+[    1.737266] [<c01014a4>] (gic_handle_irq) from [<c010b90c>] (__irq_svc+0x6c/0xa8)
+[    1.744869] Exception stack(0xcf859f98 to 0xcf859fe0)
+[    1.750028] 9f80:                                                       00000001 00000000
+[    1.758334] 9fa0: 000017b2 c0114620 cf858000 c1002fe4 c1003048 00000002 c100ba2e 413fc090
+[    1.766640] 9fc0: 00000000 00000000 00000001 cf859fe8 c0108220 c0108224 60000013 ffffffff
+[    1.774946] [<c010b90c>] (__irq_svc) from [<c0108224>] (arch_cpu_idle+0x38/0x3c)
+[    1.782472] [<c0108224>] (arch_cpu_idle) from [<c0151f4c>] (cpu_startup_entry+0xcc/0x144)
+[    1.790782] [<c0151f4c>] (cpu_startup_entry) from [<8010154c>] (0x8010154c)
+[    1.797867] ---[ end Kernel panic - not syncing: Attempted to kill init! exitcode=0x0000000b
