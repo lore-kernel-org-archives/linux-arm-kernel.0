@@ -1,92 +1,22 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Fri,  3 Mar 2017 14:00:09 +0800
-Subject: [PATCH v3 5/5] arm64: dts: hi6220: register debug module
-In-Reply-To: <1488520809-31670-1-git-send-email-leo.yan@linaro.org>
-References: <1488520809-31670-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1488520809-31670-6-git-send-email-leo.yan@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 3 Mar 2017 00:20:49 -0600
+Subject: [PATCH 4/4] dt-bindings: List devicetree binding for the CCU of
+ Allwinner A20
+In-Reply-To: <20170227210914.18954-5-plaes@plaes.org>
+References: <20170227210914.18954-1-plaes@plaes.org>
+ <20170227210914.18954-5-plaes@plaes.org>
+Message-ID: <20170303062049.svbwwalcxkoaexo5@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bind debug module driver for Hi6220.
+On Mon, Feb 27, 2017 at 11:09:14PM +0200, Priit Laes wrote:
+> Allwinner A20 is now driven by sunxi-ng CCU driver.
+> 
+> Add devicetree binding for it.
+> 
+> Signed-off-by: Priit Laes <plaes@plaes.org>
+> ---
+>  Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi | 64 +++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-index 470461d..ed271ed 100644
---- a/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi6220.dtsi
-@@ -913,5 +913,69 @@
- 				};
- 			};
- 		};
-+
-+		debug at f6590000 {
-+			compatible = "arm,coresight-debug","arm,primecell";
-+			reg = <0 0xf6590000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu0>;
-+		};
-+
-+		debug at f6592000 {
-+			compatible = "arm,coresight-debug","arm,primecell";
-+			reg = <0 0xf6592000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu1>;
-+		};
-+
-+		debug at f6594000 {
-+			compatible = "arm,coresight-debug","arm,primecell";
-+			reg = <0 0xf6594000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu2>;
-+		};
-+
-+		debug at f6596000 {
-+			compatible = "arm,coresight-debug","arm,primecell";
-+			reg = <0 0xf6596000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu3>;
-+		};
-+
-+		debug at f65d0000 {
-+			compatible = "arm,coresight-debug","arm,primecell";
-+			reg = <0 0xf65d0000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu4>;
-+		};
-+
-+		debug at f65d2000 {
-+			compatible = "arm,coresight-debug","arm,primecell";
-+			reg = <0 0xf65d2000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu5>;
-+		};
-+
-+		debug at f65d4000 {
-+			compatible = "arm,coresight-debug","arm,primecell";
-+			reg = <0 0xf65d4000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu6>;
-+		};
-+
-+		debug at f65d6000 {
-+			compatible = "arm,coresight-debug","arm,primecell";
-+			reg = <0 0xf65d6000 0 0x1000>;
-+			clocks = <&sys_ctrl HI6220_DAPB_CLK>;
-+			clock-names = "apb_pclk";
-+			cpu = <&cpu7>;
-+		};
- 	};
- };
--- 
-2.7.4
+Acked-by: Rob Herring <robh@kernel.org>
