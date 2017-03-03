@@ -1,45 +1,75 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Fri, 3 Mar 2017 14:04:26 +0300
-Subject: [RFC PATCH 04/12] staging: android: ion: Call dma_map_sg for
- syncing and mapping
-In-Reply-To: <1488491084-17252-5-git-send-email-labbott@redhat.com>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <1488491084-17252-5-git-send-email-labbott@redhat.com>
-Message-ID: <20170303110329.GA4132@mwanda>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 3 Mar 2017 12:26:27 +0100
+Subject: Using the generic host PCIe driver
+In-Reply-To: <01f41dd8-e8e6-f880-cad8-5cb83bf0a167@arm.com>
+References: <8d4e5d8a-7683-0180-324c-0ffd1a9a641a@free.fr>
+ <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
+ <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
+ <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
+ <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
+ <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
+ <01f41dd8-e8e6-f880-cad8-5cb83bf0a167@arm.com>
+Message-ID: <4059f88f-0f70-38c2-f2f9-58dd2bd5b280@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 01:44:36PM -0800, Laura Abbott wrote:
->  static struct sg_table *ion_map_dma_buf(struct dma_buf_attachment *attachment,
->  					enum dma_data_direction direction)
->  {
->  	struct dma_buf *dmabuf = attachment->dmabuf;
->  	struct ion_buffer *buffer = dmabuf->priv;
-> +	struct sg_table *table;
-> +	int ret;
-> +
-> +	/*
-> +	 * TODO: Need to sync wrt CPU or device completely owning?
-> +	 */
-> +
-> +	table = dup_sg_table(buffer->sg_table);
->  
-> -	ion_buffer_sync_for_device(buffer, attachment->dev, direction);
-> -	return dup_sg_table(buffer->sg_table);
-> +	if (!dma_map_sg(attachment->dev, table->sgl, table->nents,
-> +			direction)){
-> +		ret = -ENOMEM;
-> +		goto err;
-> +	}
-> +
-> +err:
-> +	free_duped_table(table);
-> +	return ERR_PTR(ret);
+On 01/03/2017 17:36, Marc Zyngier wrote:
 
-ret isn't initialized on success.
+> Mason: while the kernel has generic support for dealing with MSI, there
+> is not standardization at the interrupt controller level, so you do have
+> to write your own driver, and wire it in the rest of the framework.
+> 
+> I suggest you look at things like drivers/pci/host/pcie-altera-msi.c,
+> which has an extremely simple implementation. You can use this as a
+> starting point for your own driver.
 
->  }
->  
+Thanks Marc,
 
-regards,
-dan carpenter
+I'll have a close look at the Altera driver.
+
+I'm having a hard time understanding 3 different kinds of interrupts:
+
+  1. MSI (message-signalled interrupts)
+  2. legacy interrupts
+  3. custom interrupts
+
+I mostly understand MSI. When a device needs attention from the CPU,
+it sends a specific packet over the PCIe data link to a specific
+PCI bus address, which the PCIe controller knows to interpret as
+an interrupt request, so it raises the appropriate signal to
+interrupt the CPU.
+
+Legacy interrupts are the old-style PCI interrupts, when a device
+expects to have an actual physical interrupt line to the PCI
+controller, correct? The controller then forwards the interrupt
+request to the CPU, as with MSIs.
+
+Custom interrupts, I'm not sure. Here's the list:
+
+system_error : indicates that the interrupt is triggered by a system error, signaled by the lower layers.
+dma_rd_int : interrupt is triggered by DMA read availability.
+dma_wr_int : interrupt is triggered by DMA write availability.
+cpl_ur : interrupt is triggered by unsupported completion request.
+cpl_crs : interrupt is triggered by configuration request retry status.
+cpl_ca : interrupt is triggered by completer abort event.
+cpl_timeout : interrupt is triggered by a completion timeout event.
+pci_intx : one of selected legacy interrupts INTx is triggered. 
+
+Notes:
+
+It appears that legacy interrupts are supported through this
+custom register.
+
+I think I might be able to ignore DMA for the time being.
+
+cpl_* interrupts look somewhat standard, yet the PCI framework
+cannot know they exist, since they are in some random MMIO register.
+I'm confused about these and system_error. I guess I can ignore
+them at first, or just print a message when they trigger, to try
+to figure out what to do with them.
+
+
+I suppose the interrupt controller I'm supposed to write needs
+to handle all 3 types of interrupts?
+
+Regards.
