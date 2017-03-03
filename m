@@ -1,22 +1,31 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 3 Mar 2017 01:01:31 -0600
-Subject: [PATCH 10/11] dt-bindings: Add bindings for the Amlogic Meson
- dw-hdmi extension
-In-Reply-To: <1488469207-523-11-git-send-email-narmstrong@baylibre.com>
-References: <1488469207-523-1-git-send-email-narmstrong@baylibre.com>
- <1488469207-523-11-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20170303070131.fdu3rdicbwepibc6@rob-hp-laptop>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 3 Mar 2017 08:12:03 +0100
+Subject: [PATCH] clk: sunxi-ng: tighten SoC deps on explicit AllWinner SoCs
+In-Reply-To: <20170302174357.6246-1-pbrobinson@gmail.com>
+References: <20170302174357.6246-1-pbrobinson@gmail.com>
+Message-ID: <20170303071203.xbfu4t2jgwt3low3@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 04:40:06PM +0100, Neil Armstrong wrote:
-> This binding describes the Amlogic Meson specific extension to the
-> Synopsys Designware HDMI Controller.
+On Thu, Mar 02, 2017 at 05:43:57PM +0000, Peter Robinson wrote:
+> Tighten the depends on the various AllWinn SoCs so we don't
+> inadvertantly get clock drivers when we're not wanting them
+> like 32 bit SoC clocks for 64 bit configs. Ensure there's
+> still test coverage though.
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  .../bindings/display/amlogic,meson-dw-hdmi.txt     | 111 +++++++++++++++++++++
->  1 file changed, 111 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
+> Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Applied, thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170303/a285001e/attachment-0001.sig>
