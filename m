@@ -1,53 +1,57 @@
-From: robin@protonic.nl (Robin van der Gracht)
-Date: Fri,  3 Mar 2017 15:14:05 +0100
-Subject: [PATCH v3] clk: imx: clk-imx6ul: The i.mx6ul has no aips_tz3 clock
-Message-ID: <20170303141405.17581-1-robin@protonic.nl>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri,  3 Mar 2017 15:13:44 +0100
+Subject: [PATCH 1/4] tty/serial: atmel: move atmel_serial header into driver
+ directory
+Message-ID: <20170303141344.14122-1-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock was mapped on CG15 (gpio2_clocks) in the CCRG0 register.
+atmel_serial.h is only used by atmel_serial.c, so there's no need for
+it to lie in include/linux.
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-Signed-off-by: Robin van der Gracht <robin@protonic.nl>
+Suggested-by: Joe Perches <joe@perches.com>
+Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 ---
-Fixed another title typo in v3
+ MAINTAINERS                                          | 2 +-
+ drivers/tty/serial/atmel_serial.c                    | 2 +-
+ {include/linux => drivers/tty/serial}/atmel_serial.h | 0
+ 3 files changed, 2 insertions(+), 2 deletions(-)
+ rename {include/linux => drivers/tty/serial}/atmel_serial.h (100%)
 
- drivers/clk/imx/clk-imx6ul.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
-index 75c35fb..dbd6e59 100644
---- a/drivers/clk/imx/clk-imx6ul.c
-+++ b/drivers/clk/imx/clk-imx6ul.c
-@@ -73,7 +73,7 @@ static struct clk *clks[IMX6UL_CLK_END];
- static struct clk_onecell_data clk_data;
+diff --git a/MAINTAINERS b/MAINTAINERS
+index ad4f2ce991ca..d7b07cb23cbe 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8218,7 +8218,7 @@ MICROCHIP / ATMEL AT91 / AT32 SERIAL DRIVER
+ M:	Richard Genoud <richard.genoud@gmail.com>
+ S:	Maintained
+ F:	drivers/tty/serial/atmel_serial.c
+-F:	include/linux/atmel_serial.h
++F:	drivers/tty/serial/atmel_serial.h
  
- static int const clks_init_on[] __initconst = {
--	IMX6UL_CLK_AIPSTZ1, IMX6UL_CLK_AIPSTZ2, IMX6UL_CLK_AIPSTZ3,
-+	IMX6UL_CLK_AIPSTZ1, IMX6UL_CLK_AIPSTZ2,
- 	IMX6UL_CLK_AXI, IMX6UL_CLK_ARM, IMX6UL_CLK_ROM,
- 	IMX6UL_CLK_MMDC_P0_FAST, IMX6UL_CLK_MMDC_P0_IPG,
- };
-@@ -341,9 +341,7 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6UL_CLK_GPT2_SERIAL]	= imx_clk_gate2("gpt2_serial",	"perclk",	base + 0x68,	26);
- 	clks[IMX6UL_CLK_UART2_IPG]	= imx_clk_gate2("uart2_ipg",	"ipg",		base + 0x68,	28);
- 	clks[IMX6UL_CLK_UART2_SERIAL]	= imx_clk_gate2("uart2_serial",	"uart_podf",	base + 0x68,	28);
--	if (clk_on_imx6ul())
--		clks[IMX6UL_CLK_AIPSTZ3]	= imx_clk_gate2("aips_tz3",	"ahb",		base + 0x68,	30);
--	else if (clk_on_imx6ull())
-+	if (clk_on_imx6ull())
- 		clks[IMX6UL_CLK_AIPSTZ3]	= imx_clk_gate2("aips_tz3",	"ahb",		 base + 0x80,	18);
+ MICROCHIP / ATMEL DMA DRIVER
+ M:	Ludovic Desroches <ludovic.desroches@microchip.com>
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index dcebb28ffbc4..ad6c2bdea481 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -38,7 +38,6 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/dmaengine.h>
+ #include <linux/atmel_pdc.h>
+-#include <linux/atmel_serial.h>
+ #include <linux/uaccess.h>
+ #include <linux/platform_data/atmel.h>
+ #include <linux/timer.h>
+@@ -71,6 +70,7 @@
+ #include <linux/serial_core.h>
  
- 	/* CCGR1 */
-@@ -482,6 +480,9 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
- 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
- 		clk_prepare_enable(clks[clks_init_on[i]]);
+ #include "serial_mctrl_gpio.h"
++#include "atmel_serial.h"
  
-+	if (clk_on_imx6ull())
-+		clk_prepare_enable(clks[IMX6UL_CLK_AIPSTZ3]);
-+
- 	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
- 		clk_prepare_enable(clks[IMX6UL_CLK_USBPHY1_GATE]);
- 		clk_prepare_enable(clks[IMX6UL_CLK_USBPHY2_GATE]);
--- 
-2.9.3
+ static void atmel_start_rx(struct uart_port *port);
+ static void atmel_stop_rx(struct uart_port *port);
+diff --git a/include/linux/atmel_serial.h b/drivers/tty/serial/atmel_serial.h
+similarity index 100%
+rename from include/linux/atmel_serial.h
+rename to drivers/tty/serial/atmel_serial.h
