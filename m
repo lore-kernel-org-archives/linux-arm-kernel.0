@@ -1,129 +1,79 @@
-From: jun.gao@mediatek.com (Jun Gao)
-Date: Fri, 3 Mar 2017 10:05:13 +0800
-Subject: [PATCH v3 2/2] arm: dts: Add Mediatek MT2701 i2c device node
-In-Reply-To: <1488506713-20767-1-git-send-email-jun.gao@mediatek.com>
-References: <1488506713-20767-1-git-send-email-jun.gao@mediatek.com>
-Message-ID: <1488506713-20767-3-git-send-email-jun.gao@mediatek.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 03 Mar 2017 11:07:09 +0900
+Subject: [PATCH v4 1/2] dt-bindings: mmc: add DT binding for S3C24XX
+ MMC/SD/SDIO controller
+In-Reply-To: <1488417536-15110-2-git-send-email-sergio.prado@e-labworks.com>
+References: <1488417536-15110-1-git-send-email-sergio.prado@e-labworks.com>
+ <CGME20170302012903epcas2p3f1ec4bbf556e97c9b650861412ebe22c@epcas2p3.samsung.com>
+ <1488417536-15110-2-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <6564ee3f-c274-eb42-3588-f8584745ba98@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jun Gao <jun.gao@mediatek.com>
+On 03/02/2017 10:18 AM, Sergio Prado wrote:
+> Adds the device tree bindings description for Samsung S3C24XX
+> MMC/SD/SDIO controller, used as a connectivity interface with external
+> MMC, SD and SDIO storage mediums.
+> 
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+> ---
+>  .../devicetree/bindings/mmc/samsung,s3cmci.txt     | 42 ++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt b/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+> new file mode 100644
+> index 000000000000..5f68feb9f9d6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+> @@ -0,0 +1,42 @@
+> +* Samsung's S3C24XX MMC/SD/SDIO controller device tree bindings
+> +
+> +Samsung's S3C24XX MMC/SD/SDIO controller is used as a connectivity interface
+> +with external MMC, SD and SDIO storage mediums.
+> +
+> +This file documents differences between the core mmc properties described by
+> +mmc.txt and the properties used by the Samsung S3C24XX MMC/SD/SDIO controller
+> +implementation.
+> +
+> +Required SoC Specific Properties:
+> +- compatible: should be one of the following
+> +  - "samsung,s3c2410-sdi": for controllers compatible with s3c2410
+> +  - "samsung,s3c2412-sdi": for controllers compatible with s3c2412
+> +  - "samsung,s3c2440-sdi": for controllers compatible with s3c2440
+> +- reg: register location and length
+> +- interrupts: mmc controller interrupt
+> +- clocks: Should reference the controller clock
+> +- clock-names: Should contain "sdi"
+> +
+> +Required Board Specific Properties:
+> +- pinctrl-0: Should specify pin control groups used for this controller.
+> +- pinctrl-names: Should contain only one value - "default".
+> +
+> +Optional Properties:
+> +- bus-width: number of data lines (see mmc.txt)
+> +- cd-gpios: gpio for card detection (see mmc.txt)
+> +- wp-gpios: gpio for write protection (see mmc.txt)
 
-Add MT2701 i2c device node.
+I think these properties don't need to describe at here.
+It's common properties.
 
-Signed-off-by: Jun Gao <jun.gao@mediatek.com>
----
- arch/arm/boot/dts/mt2701-evb.dts |   44 ++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/mt2701.dtsi    |   42 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 86 insertions(+)
+Best Regards,
+Jaehoon Chung
 
-diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-index 082ca88..a908e94 100644
---- a/arch/arm/boot/dts/mt2701-evb.dts
-+++ b/arch/arm/boot/dts/mt2701-evb.dts
-@@ -24,6 +24,50 @@
- 	};
- };
- 
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
-+
-+&pio {
-+	i2c0_pins_a: i2c0 at 0 {
-+		pins1 {
-+			pinmux = <MT2701_PIN_75_SDA0__FUNC_SDA0>,
-+				 <MT2701_PIN_76_SCL0__FUNC_SCL0>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2c1_pins_a: i2c1 at 0 {
-+		pins1 {
-+			pinmux = <MT2701_PIN_57_SDA1__FUNC_SDA1>,
-+				 <MT2701_PIN_58_SCL1__FUNC_SCL1>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2c2_pins_a: i2c2 at 0 {
-+		pins1 {
-+			pinmux = <MT2701_PIN_77_SDA2__FUNC_SDA2>,
-+				 <MT2701_PIN_78_SCL2__FUNC_SCL2>;
-+			bias-disable;
-+		};
-+	};
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index bdf8954..0d1539f 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -227,6 +227,48 @@
- 		status = "disabled";
- 	};
- 
-+	i2c0: i2c at 11007000 {
-+		compatible = "mediatek,mt2701-i2c",
-+			     "mediatek,mt6577-i2c";
-+		reg = <0 0x11007000 0 0x70>,
-+		      <0 0x11000200 0 0x80>;
-+		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
-+		clock-div = <16>;
-+		clocks = <&pericfg CLK_PERI_I2C0>, <&pericfg CLK_PERI_AP_DMA>;
-+		clock-names = "main", "dma";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	i2c1: i2c at 11008000 {
-+		compatible = "mediatek,mt2701-i2c",
-+			     "mediatek,mt6577-i2c";
-+		reg = <0 0x11008000 0 0x70>,
-+		      <0 0x11000280 0 0x80>;
-+		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_LOW>;
-+		clock-div = <16>;
-+		clocks = <&pericfg CLK_PERI_I2C1>, <&pericfg CLK_PERI_AP_DMA>;
-+		clock-names = "main", "dma";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	i2c2: i2c at 11009000 {
-+		compatible = "mediatek,mt2701-i2c",
-+			     "mediatek,mt6577-i2c";
-+		reg = <0 0x11009000 0 0x70>,
-+		      <0 0x11000300 0 0x80>;
-+		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_LOW>;
-+		clock-div = <16>;
-+		clocks = <&pericfg CLK_PERI_I2C2>, <&pericfg CLK_PERI_AP_DMA>;
-+		clock-names = "main", "dma";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	mmsys: syscon at 14000000 {
- 		compatible = "mediatek,mt2701-mmsys", "syscon";
- 		reg = <0 0x14000000 0 0x1000>;
--- 
-1.7.9.5
+> +
+> +Example:
+> +
+> +	mmc0: mmc at 5a000000 {
+> +		compatible = "samsung,s3c2440-sdi";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sdi_pins>;
+> +		reg = <0x5a000000 0x100000>;
+> +		interrupts = <0 0 21 3>;
+> +		clocks = <&clocks PCLK_SDI>;
+> +		clock-names = "sdi";
+> +		bus-width = <4>;
+> +		cd-gpios = <&gpg 8 GPIO_ACTIVE_LOW>;
+> +		wp-gpios = <&gph 8 GPIO_ACTIVE_LOW>;
+> +	};
+> 
