@@ -1,45 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 3 Mar 2017 15:48:39 +0100
-Subject: [linux-sunxi] Re: [PATCH 2/3] clk: sunxi-ng: add support for
- PRCM CCUs
-In-Reply-To: <3232491488467598@web22o.yandex.ru>
-References: <20170301152220.MEgmqtKw@smtp2p.mail.yandex.net>
- <20170302140859.aqvwtgzxkdi2lqbc@lukather>
- <3232491488467598@web22o.yandex.ru>
-Message-ID: <20170303144839.snrm5wgjyj5fvko7@lukather>
+From: cmetcalf@mellanox.com (Chris Metcalf)
+Date: Fri, 3 Mar 2017 09:48:52 -0500
+Subject: [PATCH 1/3] futex: remove duplicated code
+In-Reply-To: <20170303122712.13353-1-jslaby@suse.cz>
+References: <20170303122712.13353-1-jslaby@suse.cz>
+Message-ID: <8d435487-62a6-ebab-f45f-567d79237e9a@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 11:13:18PM +0800, Icenowy Zheng wrote:
-> 
-> 
-> 02.03.2017, 22:09, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> > On Wed, Mar 01, 2017 at 08:17:39PM +0800, Icenowy Zheng wrote:
-> >> ?> I'm a bit worried by that to be honest. You claim to support the A31,
-> >> ?> yet jugdging by the current state of that code you never actually
-> >> ?> tested it on that SoC.
-> >>
-> >> ?I only claim to reserve possibility to extend the driver to support
-> >> ?A31, but I didn't claim it currently support A31.
-> >
-> > Well, you did call it sun6i.
-> >
-> > Please rename it, and we will consolidate in due time.
-> 
-> Then rename it back when it really gains support for A31?
+On 3/3/2017 7:27 AM, Jiri Slaby wrote:
+> There is code duplicated over all architecture's headers for
+> futex_atomic_op_inuser. Namely op decoding, access_ok check for uaddr,
+> and comparison of the result.
+>
+> Remove this duplication and leave up to the arches only the needed
+> assembly which is now in arch_futex_atomic_op_inuser.
+>
+> Note that s390 removed access_ok check in d12a29703 ("s390/uaccess:
+> remove pointless access_ok() checks") as access_ok there returns true.
+> We introduce it back to the helper for the sake of simplicity (it gets
+> optimized away anyway).
+>
+> Signed-off-by: Jiri Slaby<jslaby@suse.cz>
 
-Yes.
-
-Maxime
+Acked-by: Chris Metcalf <cmetcalf@mellanox.com> [for tile]
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170303/b1f2dd6f/attachment.sig>
+Chris Metcalf, Mellanox Technologies
+http://www.mellanox.com
