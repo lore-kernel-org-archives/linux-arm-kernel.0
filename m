@@ -1,50 +1,46 @@
-From: robin@protonic.nl (Robin van der Gracht)
-Date: Fri,  3 Mar 2017 14:26:20 +0100
-Subject: [PATCH] clk: imx: clk-imxul: The i.mx6ul has no aips_tx3 clock
-Message-ID: <20170303132620.32156-1-robin@protonic.nl>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Fri, 3 Mar 2017 14:29:49 +0100
+Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
+ staging
+In-Reply-To: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
+Message-ID: <20170303132949.GC31582@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock was mapped on CG15 (gpio2_clocks) in the CCRG0 register.
+On Thu 02-03-17 13:44:32, Laura Abbott wrote:
+> Hi,
+> 
+> There's been some recent discussions[1] about Ion-like frameworks. There's
+> apparently interest in just keeping Ion since it works reasonablly well.
+> This series does what should be the final clean ups for it to possibly be
+> moved out of staging.
+> 
+> This includes the following:
+> - Some general clean up and removal of features that never got a lot of use
+>   as far as I can tell.
+> - Fixing up the caching. This is the series I proposed back in December[2]
+>   but never heard any feedback on. It will certainly break existing
+>   applications that rely on the implicit caching. I'd rather make an effort
+>   to move to a model that isn't going directly against the establishement
+>   though.
+> - Fixing up the platform support. The devicetree approach was never well
+>   recieved by DT maintainers. The proposal here is to think of Ion less as
+>   specifying requirements and more of a framework for exposing memory to
+>   userspace.
+> - CMA allocations now happen without the need of a dummy device structure.
+>   This fixes a bunch of the reasons why I attempted to add devicetree
+>   support before.
+> 
+> I've had problems getting feedback in the past so if I don't hear any major
+> objections I'm going to send out with the RFC dropped to be picked up.
+> The only reason there isn't a patch to come out of staging is to discuss any
+> other changes to the ABI people might want. Once this comes out of staging,
+> I really don't want to mess with the ABI.
 
-Signed-off-by: Robin van der Gracht <robin@protonic.nl>
----
- drivers/clk/imx/clk-imx6ul.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
-index 75c35fb..dbd6e59 100644
---- a/drivers/clk/imx/clk-imx6ul.c
-+++ b/drivers/clk/imx/clk-imx6ul.c
-@@ -73,7 +73,7 @@ static struct clk *clks[IMX6UL_CLK_END];
- static struct clk_onecell_data clk_data;
- 
- static int const clks_init_on[] __initconst = {
--	IMX6UL_CLK_AIPSTZ1, IMX6UL_CLK_AIPSTZ2, IMX6UL_CLK_AIPSTZ3,
-+	IMX6UL_CLK_AIPSTZ1, IMX6UL_CLK_AIPSTZ2,
- 	IMX6UL_CLK_AXI, IMX6UL_CLK_ARM, IMX6UL_CLK_ROM,
- 	IMX6UL_CLK_MMDC_P0_FAST, IMX6UL_CLK_MMDC_P0_IPG,
- };
-@@ -341,9 +341,7 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6UL_CLK_GPT2_SERIAL]	= imx_clk_gate2("gpt2_serial",	"perclk",	base + 0x68,	26);
- 	clks[IMX6UL_CLK_UART2_IPG]	= imx_clk_gate2("uart2_ipg",	"ipg",		base + 0x68,	28);
- 	clks[IMX6UL_CLK_UART2_SERIAL]	= imx_clk_gate2("uart2_serial",	"uart_podf",	base + 0x68,	28);
--	if (clk_on_imx6ul())
--		clks[IMX6UL_CLK_AIPSTZ3]	= imx_clk_gate2("aips_tz3",	"ahb",		base + 0x68,	30);
--	else if (clk_on_imx6ull())
-+	if (clk_on_imx6ull())
- 		clks[IMX6UL_CLK_AIPSTZ3]	= imx_clk_gate2("aips_tz3",	"ahb",		 base + 0x80,	18);
- 
- 	/* CCGR1 */
-@@ -482,6 +480,9 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
- 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
- 		clk_prepare_enable(clks[clks_init_on[i]]);
- 
-+	if (clk_on_imx6ull())
-+		clk_prepare_enable(clks[IMX6UL_CLK_AIPSTZ3]);
-+
- 	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
- 		clk_prepare_enable(clks[IMX6UL_CLK_USBPHY1_GATE]);
- 		clk_prepare_enable(clks[IMX6UL_CLK_USBPHY2_GATE]);
+Could you recapitulate concerns preventing the code being merged
+normally rather than through the staging tree and how they were
+addressed?
 -- 
-2.9.3
+Michal Hocko
+SUSE Labs
