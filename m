@@ -1,60 +1,59 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard at free-electrons.com)
-Date: Fri, 3 Mar 2017 15:51:01 +0100
-Subject: [linux-sunxi] Re: [PATCH 2/3] clk: sunxi-ng: add support for
- PRCM CCUs
-In-Reply-To: <2899221488467633@web38j.yandex.ru>
-References: <20170301152236.MUXmRgOe@smtp1m.mail.yandex.net>
- <20170302140931.tq3vpncln6giyjpr@lukather>
- <2899221488467633@web38j.yandex.ru>
-Message-ID: <20170303145101.ynv6vmmy4fyrgezw@lukather>
+From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
+Date: Fri, 3 Mar 2017 16:52:06 +0200
+Subject: [RFC 0/7] crypto: caam - add Queue Interface (QI) support
+Message-ID: <1488552733-20806-1-git-send-email-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 11:13:53PM +0800, Icenowy Zheng wrote:
-> 
-> 
-> 02.03.2017, 22:09, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> > On Wed, Mar 01, 2017 at 08:22:13PM +0800, Icenowy Zheng wrote:
-> >> ?> I'm a bit worried by that to be honest. You claim to support the A31,
-> >> ?> yet jugdging by the current state of that code you never actually
-> >> ?> tested it on that SoC.
-> >> ?>
-> >> ?> What makes you say that the PRCM clocks are the same for the H3 and
-> >> ?> A64? We have to be sure, otherwise we might not be able to get the DT
-> >> ?> binding right from the very beginning, and we might not be able to fix
-> >> ?> it later.
-> >>
-> >> ?In fact, if we worry about this, we shouldn't make r-ccu, as
-> >> ?dedicated clocks are more easy to fix.
-> >>
-> >> ?For newer SoCs' PRCM, we never have enough documents, and Allwinner
-> >> ?have said that they cannot provide it. (I asked them for this.)
-> >>
-> >> ?The best solution is to implement mature enough dedicated clocks
-> >> ?before we convert to ccu.
-> >
-> > What do you mean by dedicated clocks?
-> 
-> The legacy form of clocks.
+The patchset adds support for CAAM Queue Interface (QI), the additional
+interface (besides job ring) available for submitting jobs to the engine
+on platforms having DPAA (Datapath Acceleration Architecture).
 
-Which itself creates another form of issues. What happens if we get
-something wrong on those clocks (as it is likely to happen)?
+Patches 1-4 are QMan dependencies.
+I would prefer to take them through the crypto tree,
+but I am open to suggestions.
 
-We potentially can't fix it at all, that's what happens.
+Patch 5 adds a missing double inclusion guard in desc_constr.h.
 
-And that's leaving aside the DT and clocks maintainers regular
-complaints that we should get away from those.
+Patch 6 adds the caam/qi job submission backend.
 
-Maxime
+Patch 7 adds algorithms (ablkcipher and authenc) that run on top
+of caam/qi. For now, their priority is set lower than caam/jr.
+
+Thanks,
+Horia
+
+Horia Geant? (7):
+  soc/qman: export volatile dequeue related structs
+  soc/qman: add dedicated channel ID for CAAM
+  soc/qman: export non-programmable FQD fields query
+  soc/qman: add helper functions needed by caam/qi driver
+  crypto: caam - avoid double inclusion in desc_constr.h
+  crypto: caam - add Queue Interface (QI) backend support
+  crypto: caam/qi - add ablkcipher and authenc algorithms
+
+ drivers/crypto/caam/Kconfig             |   20 +-
+ drivers/crypto/caam/Makefile            |    5 +
+ drivers/crypto/caam/caamalg.c           |    9 +-
+ drivers/crypto/caam/caamalg_desc.c      |   77 +-
+ drivers/crypto/caam/caamalg_desc.h      |   15 +-
+ drivers/crypto/caam/caamalg_qi.c        | 2387 +++++++++++++++++++++++++++++++
+ drivers/crypto/caam/ctrl.c              |   58 +-
+ drivers/crypto/caam/desc_constr.h       |    5 +
+ drivers/crypto/caam/intern.h            |   24 +
+ drivers/crypto/caam/qi.c                |  805 +++++++++++
+ drivers/crypto/caam/qi.h                |  201 +++
+ drivers/crypto/caam/sg_sw_qm.h          |  107 ++
+ drivers/soc/fsl/qbman/qman.c            |   20 +-
+ drivers/soc/fsl/qbman/qman_ccsr.c       |    6 +-
+ drivers/soc/fsl/qbman/qman_priv.h       |   97 --
+ drivers/soc/fsl/qbman/qman_test_stash.c |    5 +-
+ include/soc/fsl/qman.h                  |  154 ++
+ 17 files changed, 3839 insertions(+), 156 deletions(-)
+ create mode 100644 drivers/crypto/caam/caamalg_qi.c
+ create mode 100644 drivers/crypto/caam/qi.c
+ create mode 100644 drivers/crypto/caam/qi.h
+ create mode 100644 drivers/crypto/caam/sg_sw_qm.h
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170303/a049eba7/attachment.sig>
+2.4.4
