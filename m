@@ -1,46 +1,80 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 3 Mar 2017 18:26:28 +0100
-Subject: No output on console despite ignore_loglevel earlyprintk
-In-Reply-To: <20170303165548.GO21222@n2100.armlinux.org.uk>
-References: <6d16a384-1a4c-bf27-fd81-ea3caf3de6b0@sigmadesigns.com>
- <20170303165548.GO21222@n2100.armlinux.org.uk>
-Message-ID: <3293964b-aec2-e8b8-46f5-49b0eacc4718@suse.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 3 Mar 2017 18:26:38 +0100
+Subject: [PATCH] ARM: DTS armada: Add support for 2 more mvebu model
+In-Reply-To: <1488560855-421-1-git-send-email-ansuelsmth@gmail.com>
+References: <1488560855-421-1-git-send-email-ansuelsmth@gmail.com>
+Message-ID: <20170303172638.GD1488@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 03.03.2017 um 17:55 schrieb Russell King - ARM Linux:
-> On Fri, Mar 03, 2017 at 05:42:02PM +0100, Marc Gonzalez wrote:
->> I'm confused about early consoles and earlyprintk, and all that good stuff.
->> When my kernel panics, I don't get the expected output.
->>
->> Using "mem=256M ignore_loglevel earlyprintk"
->>
-[...]
->> [    0.014325] Console: colour dummy device 80x30
->> [    0.018885] console [tty0] enabled
->> [    0.022396] bootconsole [earlycon0] disabled
->>
->> And it hangs there.
+On Fri, Mar 03, 2017 at 06:07:35PM +0100, Ansuel Smith wrote:
+> This patch add support for 2 Linksys router model
+> (shelby and rango). With this we now support all
+> the mvebu board on the market.
 > 
-> tty0 is the kernel virtual terminal console, which is what appears on
-> VGA or framebuffers.  This is the default console if nothing else is
-> specified.
+> Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+> Signed-off-by: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
+> Signed-off-by: Ansuel Smith <ansuelsmth@gmail.com>
+> ---
+>  arch/arm/boot/dts/armada-385-linksys-rango.dts  | 443 ++++++++++++++++++++++++
+>  arch/arm/boot/dts/armada-385-linksys-shelby.dts | 115 ++++++
+>  2 files changed, 558 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/armada-385-linksys-rango.dts
+>  create mode 100644 arch/arm/boot/dts/armada-385-linksys-shelby.dts
 > 
-> What happened here is that the virtual terminal console registered, was
-> detected to be the system console, so early console was shut down, and
-> the boot messages logged to the virtual terminal console instead.
+> diff --git a/arch/arm/boot/dts/armada-385-linksys-rango.dts b/arch/arm/boot/dts/armada-385-linksys-rango.dts
+> new file mode 100644
+> index 0000000..61f4592
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-385-linksys-rango.dts
+> @@ -0,0 +1,443 @@
+> +/*
+> + * Device Tree file for the Linksys WRT3200ACM (Rango)
+> + *
+> + * Copyright (C) 2016 Imre Kaloz <kaloz@openwrt.org>
+> + *
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is licensed under the terms of the GNU General Public
+> + *     License version 2.  This program is licensed "as is" without
+> + *     any warranty of any kind, whether express or implied.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/input/input.h>
+> +#include "armada-385.dtsi"
 
-Why does passing console= make a difference though?
+Hi Ansuel
 
-I expect stdout-path to have the same effect as the command line, and I
-am pretty sure that that was previous behavior in, e.g., v4.4.
+Please could you explain why you did not use armada-385-linksys.dtsi
 
-Note that I am using earlycon, as opposed to earlyprintk above.
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Thanks
+	Andrew
