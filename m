@@ -1,53 +1,45 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 3 Mar 2017 10:41:25 -0800
-Subject: [RFC PATCH 03/12] staging: android: ion: Duplicate sg_table
-In-Reply-To: <07df01d293f6$bcfb4f30$36f1ed90$@alibaba-inc.com>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <1488491084-17252-4-git-send-email-labbott@redhat.com>
- <07df01d293f6$bcfb4f30$36f1ed90$@alibaba-inc.com>
-Message-ID: <59f69b1b-0a10-01e9-3e64-387d8f123674@redhat.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 03 Mar 2017 10:43:14 -0800
+Subject: [PATCH 1/1] ARM64: defconfig: enable the leds-pwm driver and
+ default-on trigger
+In-Reply-To: <20170219222325.7085-2-martin.blumenstingl@googlemail.com>
+ (Martin Blumenstingl's message of "Sun, 19 Feb 2017 23:23:25 +0100")
+References: <20170219222325.7085-1-martin.blumenstingl@googlemail.com>
+ <20170219222325.7085-2-martin.blumenstingl@googlemail.com>
+Message-ID: <m2efye2ocd.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2017 12:18 AM, Hillf Danton wrote:
-> 
-> On March 03, 2017 5:45 AM Laura Abbott wrote: 
->>
->> +static struct sg_table *dup_sg_table(struct sg_table *table)
->> +{
->> +	struct sg_table *new_table;
->> +	int ret, i;
->> +	struct scatterlist *sg, *new_sg;
->> +
->> +	new_table = kzalloc(sizeof(*new_table), GFP_KERNEL);
->> +	if (!new_table)
->> +		return ERR_PTR(-ENOMEM);
->> +
->> +	ret = sg_alloc_table(new_table, table->nents, GFP_KERNEL);
->> +	if (ret) {
->> +		kfree(table);
-> 
-> Free new table?
-> 
->> +		return ERR_PTR(-ENOMEM);
->> +	}
->> +
->> +	new_sg = new_table->sgl;
->> +	for_each_sg(table->sgl, sg, table->nents, i) {
->> +		memcpy(new_sg, sg, sizeof(*sg));
->> +		sg->dma_address = 0;
->> +		new_sg = sg_next(new_sg);
->> +	}
->> +
-> 
-> Do we need a helper, sg_copy_table(dst_table, src_table)?
-> 
->> +	return new_table;
->> +}
->> +
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-Yes, that would probably be good since I've seen this
-code elsewhere.
+> This enables the leds-pwm driver to support LEDs which are PWM-powered
+> (and thus dimmable). Additionally we have to enable the "default-on"
+> trigger - this was not required before because the gpio-leds driver has
+> a separate "default-state" property which can be used to enable the LED
+> by default.
+>
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
-Thanks,
-Laura
+Applied to v4.12/defconfig of amlogic tree.
+
+Kevin
+
+> ---
+>  arch/arm64/configs/defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 33b744d54739..b36d02ce6154 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -394,8 +394,10 @@ CONFIG_MMC_SUNXI=y
+>  CONFIG_NEW_LEDS=y
+>  CONFIG_LEDS_CLASS=y
+>  CONFIG_LEDS_GPIO=y
+> +CONFIG_LEDS_PWM=y
+>  CONFIG_LEDS_SYSCON=y
+>  CONFIG_LEDS_TRIGGERS=y
+> +CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+>  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+>  CONFIG_LEDS_TRIGGER_CPU=y
+>  CONFIG_RTC_CLASS=y
