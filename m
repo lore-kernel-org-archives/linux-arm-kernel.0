@@ -1,46 +1,50 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  3 Mar 2017 14:18:16 +0100
-Subject: [PATCH 1/2] arm64: dts: r8a7795: Remove unit-addresses and regs from
- integrated caches
-In-Reply-To: <1488547097-4804-1-git-send-email-geert+renesas@glider.be>
-References: <1488547097-4804-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1488547097-4804-2-git-send-email-geert+renesas@glider.be>
+From: robin@protonic.nl (Robin van der Gracht)
+Date: Fri,  3 Mar 2017 14:26:20 +0100
+Subject: [PATCH] clk: imx: clk-imxul: The i.mx6ul has no aips_tx3 clock
+Message-ID: <20170303132620.32156-1-robin@protonic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortex-A57/A53 cache controllers are integrated controllers, and
-thus the device nodes representing them should not have unit-addresses
-or reg properties.
+The clock was mapped on CG15 (gpio2_clocks) in the CCRG0 register.
 
-Fixes: 6f7bf82cc912441f ("arm64: dts: r8a7795: Fix W=1 dtc warnings")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Robin van der Gracht <robin@protonic.nl>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ drivers/clk/imx/clk-imx6ul.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 13833aa8e035be04..67a8d2a4c9b568cc 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -110,17 +110,15 @@
- 			enable-method = "psci";
- 		};
+diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
+index 75c35fb..dbd6e59 100644
+--- a/drivers/clk/imx/clk-imx6ul.c
++++ b/drivers/clk/imx/clk-imx6ul.c
+@@ -73,7 +73,7 @@ static struct clk *clks[IMX6UL_CLK_END];
+ static struct clk_onecell_data clk_data;
  
--		L2_CA57: cache-controller at 0 {
-+		L2_CA57: cache-controller-0 {
- 			compatible = "cache";
--			reg = <0>;
- 			power-domains = <&sysc R8A7795_PD_CA57_SCU>;
- 			cache-unified;
- 			cache-level = <2>;
- 		};
+ static int const clks_init_on[] __initconst = {
+-	IMX6UL_CLK_AIPSTZ1, IMX6UL_CLK_AIPSTZ2, IMX6UL_CLK_AIPSTZ3,
++	IMX6UL_CLK_AIPSTZ1, IMX6UL_CLK_AIPSTZ2,
+ 	IMX6UL_CLK_AXI, IMX6UL_CLK_ARM, IMX6UL_CLK_ROM,
+ 	IMX6UL_CLK_MMDC_P0_FAST, IMX6UL_CLK_MMDC_P0_IPG,
+ };
+@@ -341,9 +341,7 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX6UL_CLK_GPT2_SERIAL]	= imx_clk_gate2("gpt2_serial",	"perclk",	base + 0x68,	26);
+ 	clks[IMX6UL_CLK_UART2_IPG]	= imx_clk_gate2("uart2_ipg",	"ipg",		base + 0x68,	28);
+ 	clks[IMX6UL_CLK_UART2_SERIAL]	= imx_clk_gate2("uart2_serial",	"uart_podf",	base + 0x68,	28);
+-	if (clk_on_imx6ul())
+-		clks[IMX6UL_CLK_AIPSTZ3]	= imx_clk_gate2("aips_tz3",	"ahb",		base + 0x68,	30);
+-	else if (clk_on_imx6ull())
++	if (clk_on_imx6ull())
+ 		clks[IMX6UL_CLK_AIPSTZ3]	= imx_clk_gate2("aips_tz3",	"ahb",		 base + 0x80,	18);
  
--		L2_CA53: cache-controller at 100 {
-+		L2_CA53: cache-controller-1 {
- 			compatible = "cache";
--			reg = <0x100>;
- 			power-domains = <&sysc R8A7795_PD_CA53_SCU>;
- 			cache-unified;
- 			cache-level = <2>;
+ 	/* CCGR1 */
+@@ -482,6 +480,9 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+ 		clk_prepare_enable(clks[clks_init_on[i]]);
+ 
++	if (clk_on_imx6ull())
++		clk_prepare_enable(clks[IMX6UL_CLK_AIPSTZ3]);
++
+ 	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
+ 		clk_prepare_enable(clks[IMX6UL_CLK_USBPHY1_GATE]);
+ 		clk_prepare_enable(clks[IMX6UL_CLK_USBPHY2_GATE]);
 -- 
-2.7.4
+2.9.3
