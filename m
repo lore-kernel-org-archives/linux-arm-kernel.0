@@ -1,44 +1,36 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 3 Mar 2017 10:12:29 +0000
-Subject: [PATCH 1/3] dt-bindings: imx-ocotp: add compatible string for
- i.MX7D/S
-In-Reply-To: <1488350454-23860-1-git-send-email-peng.fan@nxp.com>
-References: <1488350454-23860-1-git-send-email-peng.fan@nxp.com>
-Message-ID: <a3f9ebba-6dfe-c7a3-fabf-1f5ac69ecafc@linaro.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri,  3 Mar 2017 11:14:26 +0100
+Subject: [RFC PATCH 0/2] drm/meson: RST Documentation
+Message-ID: <1488536068-9407-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+To be aligned with the other DRM drivers, this patchset converts the
+actual drivers documentation to RST format, adds a top RTS meson file
+and adds an entry in the gpu/index.rst file.
 
+This patchser depends on the HDMI patchset at [1]
 
-On 01/03/17 06:40, Peng Fan wrote:
-> Add compatible string for i.MX7D/S
->
-> Signed-off-by: Peng Fan <peng.fan@nxp.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
->  Documentation/devicetree/bindings/nvmem/imx-ocotp.txt | 1 +
->  1 file changed, 1 insertion(+)
->
-Thanks for the patch, I will queue both nvmem driver changes and 
-bindings changes, via Greg's chars-misc tree.
-But the DT changes have to go via arm-soc tree.
+Sample output can be found at [2]
 
-Thanks,
-srini
-> diff --git a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
-> index 966a72e..bbde2e4 100644
-> --- a/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
-> +++ b/Documentation/devicetree/bindings/nvmem/imx-ocotp.txt
-> @@ -9,6 +9,7 @@ Required properties:
->  	"fsl,imx6sl-ocotp" (i.MX6SL), or
->  	"fsl,imx6sx-ocotp" (i.MX6SX),
->  	"fsl,imx6ul-ocotp" (i.MX6UL),
-> +	"fsl,imx7d-ocotp" (i.MX7D/S),
->  	followed by "syscon".
->  - reg: Should contain the register base and length.
->  - clocks: Should contain a phandle pointing to the gated peripheral clock.
->
+[2] http://people.freedesktop.org/~narmstrong/meson_drm_doc/gpu/meson.html
+[1] http://lkml.kernel.org/r/1488469207-523-1-git-send-email-narmstrong at baylibre.com
+
+Neil Armstrong (2):
+  drm/meson: Convert existing documentation to actual kerneldoc
+  drm/meson: Add RST to bring together kerneldoc
+
+ Documentation/gpu/index.rst           |  1 +
+ Documentation/gpu/meson.rst           | 61 +++++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/meson/meson_canvas.c  |  4 ++-
+ drivers/gpu/drm/meson/meson_drv.c     |  5 +--
+ drivers/gpu/drm/meson/meson_dw_hdmi.c | 25 +++++++++-----
+ drivers/gpu/drm/meson/meson_vclk.c    | 22 +++++++++----
+ drivers/gpu/drm/meson/meson_venc.c    | 25 ++++++++------
+ drivers/gpu/drm/meson/meson_viu.c     |  6 +++-
+ drivers/gpu/drm/meson/meson_vpp.c     |  8 +++--
+ 9 files changed, 127 insertions(+), 30 deletions(-)
+ create mode 100644 Documentation/gpu/meson.rst
+
+-- 
+1.9.1
