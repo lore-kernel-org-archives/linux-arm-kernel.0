@@ -1,137 +1,66 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 03 Mar 2017 18:45:40 +0200
-Subject: [RFC PATCH 00/12] Ion cleanup in preparation for moving out of
- staging
-In-Reply-To: <20170303100433.lm5t4hqxj6friyp6@phenom.ffwll.local>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <20170303100433.lm5t4hqxj6friyp6@phenom.ffwll.local>
-Message-ID: <10344634.XsotFaGzfj@avalon>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 3 Mar 2017 17:53:58 +0100
+Subject: Using the generic host PCIe driver
+In-Reply-To: <87tw7a2tz1.fsf@on-the-bus.cambridge.arm.com>
+References: <8d4e5d8a-7683-0180-324c-0ffd1a9a641a@free.fr>
+ <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
+ <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
+ <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
+ <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
+ <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
+ <01f41dd8-e8e6-f880-cad8-5cb83bf0a167@arm.com>
+ <4059f88f-0f70-38c2-f2f9-58dd2bd5b280@free.fr>
+ <87tw7a2tz1.fsf@on-the-bus.cambridge.arm.com>
+Message-ID: <5074ad21-9020-bba8-9890-fe4d9855bd9a@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On Friday 03 Mar 2017 11:04:33 Daniel Vetter wrote:
-> On Thu, Mar 02, 2017 at 01:44:32PM -0800, Laura Abbott wrote:
-> > Hi,
-> > 
-> > There's been some recent discussions[1] about Ion-like frameworks. There's
-> > apparently interest in just keeping Ion since it works reasonablly well.
-> > This series does what should be the final clean ups for it to possibly be
-> > moved out of staging.
-> > 
-> > This includes the following:
-> > - Some general clean up and removal of features that never got a lot of
-> >   use as far as I can tell.
-> > 
-> > - Fixing up the caching. This is the series I proposed back in December[2]
-> >   but never heard any feedback on. It will certainly break existing
-> >   applications that rely on the implicit caching. I'd rather make an
-> >   effort to move to a model that isn't going directly against the
-> >   establishement though.
-> > 
-> > - Fixing up the platform support. The devicetree approach was never well
-> >   recieved by DT maintainers. The proposal here is to think of Ion less as
-> >   specifying requirements and more of a framework for exposing memory to
-> >   userspace.
-> > 
-> > - CMA allocations now happen without the need of a dummy device structure.
-> >   This fixes a bunch of the reasons why I attempted to add devicetree
-> >   support before.
-> > 
-> > I've had problems getting feedback in the past so if I don't hear any
-> > major objections I'm going to send out with the RFC dropped to be picked
-> > up. The only reason there isn't a patch to come out of staging is to
-> > discuss any other changes to the ABI people might want. Once this comes
-> > out of staging, I really don't want to mess with the ABI.
-> > 
-> > Feedback appreciated.
+On 03/03/2017 17:41, Marc Zyngier wrote:
+> On Fri, Mar 03 2017 at 11:26:27 am GMT, Mason <slash.tmp@free.fr> wrote:
+>> On 01/03/2017 17:36, Marc Zyngier wrote:
+>>
+>>> Mason: while the kernel has generic support for dealing with MSI, there
+>>> is not standardization at the interrupt controller level, so you do have
+>>> to write your own driver, and wire it in the rest of the framework.
+>>>
+>>> I suggest you look at things like drivers/pci/host/pcie-altera-msi.c,
+>>> which has an extremely simple implementation. You can use this as a
+>>> starting point for your own driver.
+>>
+>> Thanks Marc,
+>>
+>> I'll have a close look at the Altera driver.
+>>
+>> I'm having a hard time understanding 3 different kinds of interrupts:
+>>
+>>   1. MSI (message-signalled interrupts)
+>>   2. legacy interrupts
+>>   3. custom interrupts
 > 
-> Imo looks all good. And I just realized that cross-checking with the TODO,
-> the 2 items about _CUSTOM and _IMPORT ioctls I noted are already there.
+> [...]
 > 
-> Otherwise I looked through the patches, looks all really reasonable.
-
-Two more items that need to be addressed in my opinion :
-
-- Let's not export the ion_client API, we don't want drivers to be ion-
-specific. Only the dma-buf interface should be visible to drivers.
-
-- I haven't seen any proposal how a heap-based solution could be used in a 
-generic distribution. This needs to be figured out before committing to any 
-API/ABI.
-
-> Wrt merging, my experience from destaging the android syncpt stuff was
-> that merging the patches through the staging tree lead to lots of
-> cross-tree issues with the gpu folks wanting to use that. Ion will
-> probably run into similar things, so I'd propose we pull these cleanup
-> patches and the eventual de-staging in throught drm. Yes that defacto
-> means I'm also volunteering myself a bit :-)
+>> I suppose the interrupt controller I'm supposed to write needs
+>> to handle all 3 types of interrupts?
 > 
-> In the end we could put it all into drivers/gpu/ion or something like
-> that.
-> 
-> Thoughts? Greg?
-> -Daniel
-> 
-> > Thanks,
-> > Laura
-> > 
-> > [1] https://marc.info/?l=linux-kernel&m=148699712602105&w=2
-> > [2] https://marc.info/?l=linaro-mm-sig&m=148176050802908&w=2
-> > 
-> > Laura Abbott (12):
-> >   staging: android: ion: Remove dmap_cnt
-> >   staging: android: ion: Remove alignment from allocation field
-> >   staging: android: ion: Duplicate sg_table
-> >   staging: android: ion: Call dma_map_sg for syncing and mapping
-> >   staging: android: ion: Remove page faulting support
-> >   staging: android: ion: Remove crufty cache support
-> >   staging: android: ion: Remove old platform support
-> >   cma: Store a name in the cma structure
-> >   cma: Introduce cma_for_each_area
-> >   staging: android: ion: Use CMA APIs directly
-> >   staging: android: ion: Make Ion heaps selectable
-> >   staging; android: ion: Enumerate all available heaps
-> >  
-> >  drivers/base/dma-contiguous.c                      |   5 +-
-> >  drivers/staging/android/ion/Kconfig                |  51 ++--
-> >  drivers/staging/android/ion/Makefile               |  14 +-
-> >  drivers/staging/android/ion/hisilicon/Kconfig      |   5 -
-> >  drivers/staging/android/ion/hisilicon/Makefile     |   1 -
-> >  drivers/staging/android/ion/hisilicon/hi6220_ion.c | 113 ---------
-> >  drivers/staging/android/ion/ion-ioctl.c            |   6 -
-> >  drivers/staging/android/ion/ion.c                  | 282
-> >  ++++++--------------- drivers/staging/android/ion/ion.h                 
-> >  |   5 +-
-> >  drivers/staging/android/ion/ion_carveout_heap.c    |  16 +-
-> >  drivers/staging/android/ion/ion_chunk_heap.c       |  15 +-
-> >  drivers/staging/android/ion/ion_cma_heap.c         | 102 ++------
-> >  drivers/staging/android/ion/ion_dummy_driver.c     | 156 ------------
-> >  drivers/staging/android/ion/ion_enumerate.c        |  89 +++++++
-> >  drivers/staging/android/ion/ion_of.c               | 184 --------------
-> >  drivers/staging/android/ion/ion_of.h               |  37 ---
-> >  drivers/staging/android/ion/ion_page_pool.c        |   3 -
-> >  drivers/staging/android/ion/ion_priv.h             |  57 ++++-
-> >  drivers/staging/android/ion/ion_system_heap.c      |  14 +-
-> >  drivers/staging/android/ion/tegra/Makefile         |   1 -
-> >  drivers/staging/android/ion/tegra/tegra_ion.c      |  80 ------
-> >  include/linux/cma.h                                |   6 +-
-> >  mm/cma.c                                           |  25 +-
-> >  mm/cma.h                                           |   1 +
-> >  mm/cma_debug.c                                     |   2 +-
-> >  25 files changed, 312 insertions(+), 958 deletions(-)
-> >  delete mode 100644 drivers/staging/android/ion/hisilicon/Kconfig
-> >  delete mode 100644 drivers/staging/android/ion/hisilicon/Makefile
-> >  delete mode 100644 drivers/staging/android/ion/hisilicon/hi6220_ion.c
-> >  delete mode 100644 drivers/staging/android/ion/ion_dummy_driver.c
-> >  create mode 100644 drivers/staging/android/ion/ion_enumerate.c
-> >  delete mode 100644 drivers/staging/android/ion/ion_of.c
-> >  delete mode 100644 drivers/staging/android/ion/ion_of.h
-> >  delete mode 100644 drivers/staging/android/ion/tegra/Makefile
-> >  delete mode 100644 drivers/staging/android/ion/tegra/tegra_ion.c
+> That's entirely up to you. INTx is the bare minimum.
 
--- 
-Regards,
+That's going to be a problem. Rev 1 of the PCIe controller does not
+support legacy interrupts at all.
 
-Laurent Pinchart
+> MSI is what people
+> actually need. The rest has more to do with configuring your host
+> controller, but only you know about it (and I'm not really interested in
+> the gory details of how this particular HW works).
+
+I was under the impression that some of the error interrupts might be
+required for proper PCIe functionality.
+
+> I mentioned the Altera driver because it is a very simple example of an
+> MSI controller driver that uses the generic MSI domains. It doesn't care
+> about INTx, nor host controller management interrupts (that's handled
+> separately).
+
+OK, MSI support is all I need to start with, so I'll try my best to
+decipher the cryptic intc API, without melting my remaining neuron.
+
+Regards.
