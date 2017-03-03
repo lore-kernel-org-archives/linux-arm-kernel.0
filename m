@@ -1,37 +1,29 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 03 Mar 2017 09:56:35 -0800 (PST)
-Subject: [PATCH 1/4] net: thunderx: Fix IOMMU translation faults
-In-Reply-To: <1488538070-12549-2-git-send-email-sunil.kovvuri@gmail.com>
-References: <1488538070-12549-1-git-send-email-sunil.kovvuri@gmail.com>
- <1488538070-12549-2-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <20170303.095635.355325147613813698.davem@davemloft.net>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 3 Mar 2017 19:21:12 +0100
+Subject: [PATCH] ARM: DTS armada: Add support for 2 more mvebu model
+In-Reply-To: <CA+_ehUx0wcbfHMzPYehbEpQNu-a6vpHqHYJ4U7TY4BkzkLsRBw@mail.gmail.com>
+References: <1488560855-421-1-git-send-email-ansuelsmth@gmail.com>
+ <20170303172638.GD1488@lunn.ch>
+ <CA+_ehUx0wcbfHMzPYehbEpQNu-a6vpHqHYJ4U7TY4BkzkLsRBw@mail.gmail.com>
+Message-ID: <20170303182112.GE1488@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: sunil.kovvuri@gmail.com
-Date: Fri,  3 Mar 2017 16:17:47 +0530
+On Fri, Mar 03, 2017 at 06:41:30PM +0100, Ansuel Smith wrote:
+> What you mean? There are some changes with leds for shelby and lots of
+> changes about rom size and led for rango.
 
-> @@ -1643,6 +1650,9 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
->  	if (!pass1_silicon(nic->pdev))
->  		nic->hw_tso = true;
->  
-> +	/* Check if we are attached to IOMMU */
-> +	nic->iommu_domain = iommu_get_domain_for_dev(dev);
+Hi Ansuel
 
-This function is not universally available.
+armada-385-linksys.dtsi does not contain any LEDs at
+all. armada-385-linksys-caiman.dts etc, define the LEDs specific to
+that board. You can do the same for Rango.
 
-This looks very hackish to me anyways, how all of this stuff is supposed
-to work is that you simply use the DMA interfaces unconditionally and
-whatever is behind the operations takes care of everything.
+Yes, the flash layout is different. So refactor that into another
+.dtsi file, which caiman and cobra can use.
 
-Doing it conditionally in the driver with all of this special IOMMU
-domain et al. knowledge makes no sense to me at all.
+You should be trying to place as much common stuff as possible into
+.dtsi files. Which might need a bit of refactoring.
 
-I don't see other drivers doing stuff like this at all, so if you're
-going to handle this in a unique way like this you better write
-several paragraphs in your commit message explaining why this weird
-crap is necessary.
-
-There is no way I can apply this series as it is current written.
-
-Thanks.
+      Thanks
+	Andrew
