@@ -1,43 +1,83 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Fri, 3 Mar 2017 15:43:46 -0700
-Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <86258A5CC0A3704780874CF6004BA8A62DCAD116@lhreml502-mbs>
-References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
- <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
- <86258A5CC0A3704780874CF6004BA8A62DCAD116@lhreml502-mbs>
-Message-ID: <e1578c9f-7595-9705-9a5a-5811cf6c8513@codeaurora.org>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Fri, 3 Mar 2017 14:43:51 -0800
+Subject: [PATCH v4 13/36] [media] v4l2: add a frame timeout event
+In-Reply-To: <20170303114506.GM3220@valkosipuli.retiisi.org.uk>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-14-git-send-email-steve_longerbeam@mentor.com>
+ <20170302155342.GJ3220@valkosipuli.retiisi.org.uk>
+ <4b2bcee1-8da0-776e-4455-8d8e7a7abf0a@gmail.com>
+ <20170303114506.GM3220@valkosipuli.retiisi.org.uk>
+Message-ID: <59663ea1-b277-1543-e770-6a102ac733a4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shiju,
 
 
-On 3/3/2017 8:34 AM, Shiju Jose wrote:
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c index
->> b2d57fc..403277b 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -602,6 +602,24 @@ static const char *fault_name(unsigned int esr)  }
+On 03/03/2017 03:45 AM, Sakari Ailus wrote:
+> On Thu, Mar 02, 2017 at 03:07:21PM -0800, Steve Longerbeam wrote:
 >>
->>   /*
->> + * Handle Synchronous External Aborts that occur in a guest kernel.
->> + */
->> +int handle_guest_sea(unsigned long addr, unsigned int esr) {
->> +	/*
->> +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
->> +	 * rcu_read_lock().
->> +	 */
->> +	if(IS_ENABLED(HAVE_ACPI_APEI_SEA)) {
-> IS_ENABLED(HAVE_ACPI_APEI_SEA) to be changed to IS_ENABLED(ACPI_APEI_SEA) same
-> as in the patch "acpi: apei: handle SEA notification type for ARMv8"?
+>>
+>> On 03/02/2017 07:53 AM, Sakari Ailus wrote:
+>>> Hi Steve,
+>>>
+>>> On Wed, Feb 15, 2017 at 06:19:15PM -0800, Steve Longerbeam wrote:
+>>>> Add a new FRAME_TIMEOUT event to signal that a video capture or
+>>>> output device has timed out waiting for reception or transmit
+>>>> completion of a video frame.
+>>>>
+>>>> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+>>>> ---
+>>>> Documentation/media/uapi/v4l/vidioc-dqevent.rst | 5 +++++
+>>>> Documentation/media/videodev2.h.rst.exceptions  | 1 +
+>>>> include/uapi/linux/videodev2.h                  | 1 +
+>>>> 3 files changed, 7 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/media/uapi/v4l/vidioc-dqevent.rst b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+>>>> index 8d663a7..dd77d9b 100644
+>>>> --- a/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+>>>> +++ b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+>>>> @@ -197,6 +197,11 @@ call.
+>>>> 	the regions changes. This event has a struct
+>>>> 	:c:type:`v4l2_event_motion_det`
+>>>> 	associated with it.
+>>>> +    * - ``V4L2_EVENT_FRAME_TIMEOUT``
+>>>> +      - 7
+>>>> +      - This event is triggered when the video capture or output device
+>>>> +	has timed out waiting for the reception or transmit completion of
+>>>> +	a frame of video.
+>>>
+>>> As you're adding a new interface, I suppose you have an implementation
+>>> around. How do you determine what that timeout should be?
+>>
+>> The imx-media driver sets the timeout to 1 second, or 30 frame
+>> periods at 30 fps.
 >
-Good catch, I guess my FW still triggers the SCI interrupt as well as 
-replays the SEA to kernel which is why I still get into the GHES handling :)
+> The frame rate is not necessarily constant during streaming. It may well
+> change as a result of lighting conditions.
 
-Thanks,
-Tyler
+I think you mean that would be a _temporary_ change in frame rate, but
+yes I agree the data rate can temporarily fluctuate. Although I doubt
+lighting conditions would cause a sensor to pause data transmission
+for a full 1 second.
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+
+> I wouldn't add an event for this:
+> this is unreliable and 30 times the frame period is an arbitrary value
+> anyway. No other drivers do this either.
+
+If no other drivers do this I don't mind removing it. It is really meant
+to deal with the ADV718x CVBS decoder, which often simply stops sending
+data on the BT.656 bus if there is an interruption in the input analog
+signal. But I agree that user space could detect this timeout instead.
+Unless I hear from someone else that they would like to keep this
+feature I'll remove it in version 5.
+
+Steve
+
+
+>
+> The user space is generally in control of the frame period (or on some
+> devices it could be the sensor, too, but *not* the CSI-2 receiver driver),
+> so detecting the condition of not receiving any frames is more reliably done
+> in the user space --- if needed.
+>
