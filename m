@@ -1,109 +1,44 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 3 Mar 2017 18:50:06 -0300
-Subject: [PATCH] ARM: dts: exynos: Use thermal fuse value for thermal zone
- 0 on Exynos5420
-In-Reply-To: <20170211201456.27974-1-krzk@kernel.org>
-References: <20170211201456.27974-1-krzk@kernel.org>
-Message-ID: <252f9e32-ff2c-a1ce-3c98-6383a1148e02@osg.samsung.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 3 Mar 2017 23:09:22 +0100
+Subject: Panic in quirk_usb_early_handoff
+In-Reply-To: <38b8c9be-724b-0cfc-a941-76f2c62e1c58@arm.com>
+References: <4b2a7606-de27-c8ad-1530-958dd5d12233@free.fr>
+ <45e38a07-e8da-80e4-36bb-31e471f02004@free.fr>
+ <3c5bd8f5-468f-d25e-08a9-8944ee419096@free.fr>
+ <38b8c9be-724b-0cfc-a941-76f2c62e1c58@arm.com>
+Message-ID: <45563021-b979-e35f-d039-f2a4cead124d@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On 03/03/2017 20:02, Robin Murphy wrote:
 
-On 02/11/2017 05:14 PM, Krzysztof Kozlowski wrote:
-> In Odroid XU3 Lite board, the temperature levels reported for thermal
-> zone 0 were weird. In warm room:
-> 	/sys/class/thermal/thermal_zone0/temp:32000
-> 	/sys/class/thermal/thermal_zone1/temp:51000
-> 	/sys/class/thermal/thermal_zone2/temp:55000
-> 	/sys/class/thermal/thermal_zone3/temp:54000
-> 	/sys/class/thermal/thermal_zone4/temp:51000
+> On 03/03/17 17:15, Mason wrote:
 > 
-> Sometimes after booting the value was even equal to ambient temperature
-> which is highly unlikely to be a real temperature of sensor in SoC.
+>> [    1.264893] Unable to handle kernel paging request at virtual address d08664f4
 > 
-> The thermal sensor's calibration (trimming) is based on fused values.
-> In case of the board above, the fused values are: 35, 52, 43, 58 and 43
-> (corresponding to each TMU device).  However driver defined a minimum value
-> for fused data as 40 and for smaller values it was using a hard-coded 55
-> instead.  This lead to mapping data from sensor to wrong temperatures
-> for thermal zone 0.
+> Note that that's a reasonable approximation of a vmalloc address...
 > 
-> Various vendor 3.10 trees (Hardkernel's based on Samsung LSI, Artik 10)
-> do not impose any limits on fused values.  Since we do not have any
-> knowledge about these limits, use 0 as a minimum accepted fused value.
-> This should essentially allow accepting any reasonable fused value thus
-> behaving like vendor driver.
+> ...and that specifically it's r0 + r3...
 > 
-> The exynos5420-tmu-sensor-conf.dtsi is copied directly from existing
-> exynso4412 with one change - the samsung,tmu_min_efuse_value.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> 
-> ---
-> 
-> Testing on other Exynos542x boards is much appreciated. Especially I
-> wonder what efuse values are there.
+> ...and again. And always at the same PC, too. Looking at
+> quirk_usb_early_handoff(), it mostly seems to go off poking bridge
+> resources, so I'd hazard a guess that it's down to your host driver,
+> with something uninitialised (or already freed) being used as an offset
+> into some ioremapped resource (which given the consistency of r0 is
+> probably allocated pretty early on).
 
-I tested on both Exynos5422 Odroid XU4 and Exynos5800 Peach Pi boards.
+When you say "host driver", do you mean the USB driver,
+or the PCIe controller driver?
 
-The temperatures levels reported for these two boards on a warm room are:
+I am currently writing the PCIe controller driver, so I do
+expect a large number of bugs there; but the USB driver is
+just the generic XHCI driver. Although I now realize that
+I wrote no DT node for the USB HW... Would that explain
+the random weirdness?
 
-Odroid XU4
+> "addr2line -i -e vmlinux c039fe44", and work backwards from there ;) In
+> particular I'd follow the provenance of r3.
 
-# cat /sys/class/thermal/thermal_zone*/temp
-50000
-50000
-54000
-51000
-48000
+I'll definitely take a closer look. Thanks for the disassembly.
 
-Peach Pi
-
-# cat /sys/class/thermal/thermal_zone*/temp
-42000
-44000
-27000 <-- weird value for thermal zone 2 like zone 0 in your XU3 lite
-45000
-45000
-
-And the efuse values for the TMU devices are:
-
-Odroid XU4
-
-TMU0 = 45
-TMU1 = 44
-TMU2 = 44
-TMU3 = 46
-TMU3 = 46
-
-Peach Pi
-
-TMU0 = 44
-TMU1 = 46
-TMU2 = 36
-TMU3 = 53
-TMU3 = 46
-
-The fused value for TMU2 is < 40 so that explains the weird temperature
-level for thermal zone 2 in Peach. So after your patch, makes more sense:
-
-# cat /sys/class/thermal/thermal_zone*/temp
-41000
-42000
-45000
-43000
-43000
-
-I wonder though if 0 is the best value or if we should just lower more
-to cover the used e-fuse values in Exynos5 boards. But as you said,
-we have no knowledge about these limits...
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Regards.
