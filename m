@@ -1,35 +1,61 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri,  3 Mar 2017 12:42:01 +0100
-Subject: [PATCH] Documentation: arm: Replace use of virt_to_phys with
- __pa_symbol
-Message-ID: <1488541321-17225-1-git-send-email-geert+renesas@glider.be>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 3 Mar 2017 11:47:13 +0100
+Subject: [PATCH 1/2] nvmem: Add driver for the i.MX IIM
+In-Reply-To: <cf3664ee-dd90-a9c4-2b43-883c599aa6bf@linaro.org>
+References: <20170213153149.11710-1-s.hauer@pengutronix.de>
+ <20170213153149.11710-2-s.hauer@pengutronix.de>
+ <568bbe58-0bb5-f7ec-a646-271912a4313a@linaro.org>
+ <cf3664ee-dd90-a9c4-2b43-883c599aa6bf@linaro.org>
+Message-ID: <20170303104713.p25bzw4exjavjlti@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All low-level PM/SMP code using virt_to_phys() should actually use
-__pa_symbol() against kernel symbols.  Update the documentation to move
-away from virt_to_phys().
+On Fri, Mar 03, 2017 at 09:54:07AM +0000, Srinivas Kandagatla wrote:
+> 
+> 
+> On 03/03/17 09:50, Srinivas Kandagatla wrote:
+> > 
+> > 
+> > On 13/02/17 15:31, Sascha Hauer wrote:
+> > > From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> > > 
+> > > This adds a readonly nvmem driver for the i.MX IC Identification Module
+> > > (IIM). The IIM is found on the older i.MX SoCs like the i.MX25, i.MX27,
+> > > i.MX31, i.MX35, i.MX51 and the i.MX53.
+> > > 
+> > > The IIM can control up to 8 fuse banks with 256 bit each. Not all of the
+> > > banks are equipped on the different SoCs. The actual number of fuses
+> > > differ from 512 on the i.MX27 and 1152 on the i.MX53.
+> > > 
+> > > The fuses are one time writable, but writing is currently not supported
+> > > in the driver.
+> > > 
+> > > Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+> > > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > 
+> > 
+> > > ---
+> > >  drivers/nvmem/Kconfig   |  11 ++++
+> > >  drivers/nvmem/Makefile  |   2 +
+> > >  drivers/nvmem/imx-iim.c | 171
+> > > ++++++++++++++++++++++++++++++++++++++++++++++++
+> > >  3 files changed, 184 insertions(+)
+> > >  create mode 100644 drivers/nvmem/imx-iim.c
+> > 
+> > Patch looks good to me, Will pick both bindings and this patch in next
+> > cycle for 4.12.
+> Opps sent email too quick..
+> 
+> Can you also make sure that ids are null terminated as reported by kbuild
+> https://www.spinics.net/lists/arm-kernel/msg562543.html in next version.
+> 
 
-Cfr. commit 6996cbb2372189f7 ("ARM: 8641/1: treewide: Replace uses of
-virt_to_phys with __pa_symbol")
+Thanks for looking. I just sent the v2 series.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- Documentation/arm/firmware.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Sascha
 
-diff --git a/Documentation/arm/firmware.txt b/Documentation/arm/firmware.txt
-index da6713adac8acffc..7f175dbb427e631a 100644
---- a/Documentation/arm/firmware.txt
-+++ b/Documentation/arm/firmware.txt
-@@ -60,7 +60,7 @@ Example of using a firmware operation:
- 
- 	/* some platform code, e.g. SMP initialization */
- 
--	__raw_writel(virt_to_phys(exynos4_secondary_startup),
-+	__raw_writel(__pa_symbol(exynos4_secondary_startup),
- 		CPU1_BOOT_REG);
- 
- 	/* Call Exynos specific smc call */
 -- 
-2.7.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
