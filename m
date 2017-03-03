@@ -1,71 +1,67 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Fri,  3 Mar 2017 16:17:59 +0100
-Subject: [PATCH 2/2] firmware: meson-sm: Allow 0 as valid return value
-In-Reply-To: <20170303151759.8330-1-carlo@caione.org>
-References: <20170303151759.8330-1-carlo@caione.org>
-Message-ID: <20170303151759.8330-3-carlo@caione.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 3 Mar 2017 15:32:22 +0000
+Subject: [PATCH] arm64: restore get_current() optimisation
+In-Reply-To: <20170302164654.GP19632@leverpostej>
+References: <1483468021-8237-1-git-send-email-mark.rutland@arm.com>
+ <ee26a4f0-e3e9-fb44-fe7c-c40a15c33b38@nvidia.com>
+ <20170302123507.GD19632@leverpostej>
+ <086dff0b-126d-b5b7-e877-d3d46efce618@nvidia.com>
+ <20170302164654.GP19632@leverpostej>
+Message-ID: <515e311c-b044-8759-8bf3-99ac4565840d@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+Hi Mark,
 
-Some special SMC calls (i.e. the function used to retrieve the serial
-number of the Amlogic SoCs) returns 0 in the register 0 also when the
-data was successfully read instead of using the register to hold the
-number of bytes returned in the bounce buffer as expected.
+On 02/03/17 16:46, Mark Rutland wrote:
 
-With the current implementation of the driver this is seen as an error
-and meson_sm_call_read() returns an error even though the data was
-correctly read.
+...
 
-To deal with this when we have no information about the amount of read
-data (that is 0 is returned by the SMC call) we return to the caller
-the requested amount of data and 0 as return value.
+> Ok, so it appears that either map->cache is dodgy, or the reg passed to
+> regcache_flat_read() is bogus, and we end up generating a cache index
+> that is well out of bounds.
+> 
+> Perhaps a caller is deriving that from an uninitialised variable? The
+> code and stack layout changes as a result of my patch could easily
+> tickle that.
+> 
+> I'm not at all familiar with regmap, but IIUC we can catch that with:
+> 
+> ---->8----
+> diff --git a/drivers/base/regmap/regcache-flat.c b/drivers/base/regmap/regcache-flat.c
+> index 4d2e50b..2d42c01 100644
+> --- a/drivers/base/regmap/regcache-flat.c
+> +++ b/drivers/base/regmap/regcache-flat.c
+> @@ -57,6 +57,8 @@ static int regcache_flat_read(struct regmap *map,
+>  {
+>         unsigned int *cache = map->cache;
+>  
+> +       BUG_ON(reg > map->max_register);
+> +
+>         *value = cache[regcache_flat_get_index(map, reg)];
+>  
+>         return 0;
+> ---->8----
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- drivers/firmware/meson/meson_sm.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+You are correct, the reg passed to regcache_flat_read() is indeed dodgy
+and the above BUG() did trip it up.
 
-diff --git a/drivers/firmware/meson/meson_sm.c b/drivers/firmware/meson/meson_sm.c
-index 5f30a5774e57..ff204421117b 100644
---- a/drivers/firmware/meson/meson_sm.c
-+++ b/drivers/firmware/meson/meson_sm.c
-@@ -136,11 +136,14 @@ EXPORT_SYMBOL(meson_sm_call);
-  * @arg4:	SMC32 Argument 4
-  *
-  * Return:	size of read data on success, a negative value on error
-+ *		When 0 is returned there is no guarantee about the amount of
-+ *		data read and bsize bytes are copied in buffer.
-  */
- int meson_sm_call_read(void *buffer, unsigned int bsize, unsigned int cmd_index,
- 		       u32 arg0, u32 arg1, u32 arg2, u32 arg3, u32 arg4)
- {
- 	u32 size;
-+	int ret;
- 
- 	if (!fw.chip)
- 		return -ENOENT;
-@@ -154,13 +157,18 @@ int meson_sm_call_read(void *buffer, unsigned int bsize, unsigned int cmd_index,
- 	if (meson_sm_call(cmd_index, &size, arg0, arg1, arg2, arg3, arg4) < 0)
- 		return -EINVAL;
- 
--	if (!size || size > bsize)
-+	if (size > bsize)
- 		return -EINVAL;
- 
-+	ret = size;
-+
-+	if (!size)
-+		size = bsize;
-+
- 	if (buffer)
- 		memcpy(buffer, fw.sm_shmem_out_base, size);
- 
--	return size;
-+	return ret;
- }
- EXPORT_SYMBOL(meson_sm_call_read);
- 
+Commit e411b0b5eb9b ('ASoC: dapm: Support second register for DAPM
+control updates') introduced a 2nd register set into the
+snd_soc_dapm_update struct and if the 'has_second_set' is true then it
+tries to access this register. One of our out-of-tree audio patches was
+not initialising the 'has_second_set' and hence it was trying to write a
+bogus register (need to get this upstream!).
+
+I should have caught this, but the bisect threw me off the scent! I
+think that with reverting this patch we were just getting lucky and the
+problem could have still occurred. I went back and tried it again and it
+still works when reverting this change, but its just luck.
+
+Sorry for the noise and thanks for pointing me in the right direction!
+
+Cheers
+Jon
+
 -- 
-2.12.0
+nvpublic
