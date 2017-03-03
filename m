@@ -1,83 +1,143 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 3 Mar 2017 13:44:54 +0100
-Subject: Using the generic host PCIe driver
-In-Reply-To: <20170301215726.GA32286@bhelgaas-glaptop.roam.corp.google.com>
-References: <8d4e5d8a-7683-0180-324c-0ffd1a9a641a@free.fr>
- <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
- <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
- <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
- <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
- <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
- <98ee3041-6a94-91af-b4bf-208aa02624ed@free.fr>
- <20170301215726.GA32286@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <258cd6f3-ef17-6705-ff48-ae06f26778c2@free.fr>
+From: shiju.jose@huawei.com (Shiju Jose)
+Date: Fri, 3 Mar 2017 12:48:48 +0000
+Subject: [RFC PATCH V1 v4.10-rc3 1/1] acpi: apei: handle GSIV
+ notification type
+In-Reply-To: <43301c6b-558c-990a-5736-7725063b0c23@linaro.org>
+References: <86258A5CC0A3704780874CF6004BA8A62DCAB57E@lhreml502-mbs>
+ <58B579A1.90109@arm.com> <43507f99-d80b-6409-d249-b9b18425a1da@linaro.org>
+ <58B6FF09.6030306@arm.com>
+ <86258A5CC0A3704780874CF6004BA8A62DCAC378@lhreml502-mbs>
+ <43301c6b-558c-990a-5736-7725063b0c23@linaro.org>
+Message-ID: <86258A5CC0A3704780874CF6004BA8A62DCAD0AB@lhreml502-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/03/2017 22:57, Bjorn Helgaas wrote:
+Hi Hanjun,
 
-> On Wed, Mar 01, 2017 at 07:05:26PM +0100, Mason wrote:
+> -----Original Message-----
+> From: Hanjun Guo [mailto:hanjun.guo at linaro.org]
+> Sent: 03 March 2017 04:20
+> To: Shiju Jose; James Morse
+> Cc: christoffer.dall at linaro.org; marc.zyngier at arm.com;
+> pbonzini at redhat.com; rkrcmar at redhat.com; linux at armlinux.org.uk;
+> catalin.marinas at arm.com; will.deacon at arm.com; rjw at rjwysocki.net;
+> lenb at kernel.org; matt at codeblueprint.co.uk; robert.moore at intel.com;
+> lv.zheng at intel.com; nkaje at codeaurora.org; zjzhang at codeaurora.org;
+> mark.rutland at arm.com; akpm at linux-foundation.org;
+> eun.taik.lee at samsung.com; sandeepa.s.prabhu at gmail.com;
+> labbott at redhat.com; shijie.huang at arm.com; rruigrok at codeaurora.org;
+> paul.gortmaker at windriver.com; tn at semihalf.com; fu.wei at linaro.org;
+> rostedt at goodmis.org; bristot at redhat.com; linux-arm-
+> kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
+> kvm at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
+> acpi at vger.kernel.org; linux-efi at vger.kernel.org; devel at acpica.org;
+> Suzuki.Poulose at arm.com; punit.agrawal at arm.com; astone at redhat.com;
+> harba at codeaurora.org; Tyler Baicar; joe at perches.com; John Garry;
+> Gabriele Paoloni; Guohanjun (Hanjun Guo); wangxiongfeng (C); Zhengqiang
+> (turing)
+> Subject: Re: [RFC PATCH V1 v4.10-rc3 1/1] acpi: apei: handle GSIV
+> notification type
 > 
->> Another thing I don't understand... According to this reference:
->> http://elinux.org/Device_Tree_Usage#PCI_Address_Translation
->>
->> The "ranges" prop starts with:
->>
->>     phys.hi  cell: npt000ss bbbbbbbb dddddfff rrrrrrrr
->>     phys.mid cell: hhhhhhhh hhhhhhhh hhhhhhhh hhhhhhhh
->>     phys.low cell: llllllll llllllll llllllll llllllll
->>
->> So I thought it might be possible to specify bbbbbbbb = 0x01
->> to mean "I want to assign memory only to bus 1, don't assign
->> any memory to bus 0". Am I mistaken?
+> On 2017/3/2 21:45, Shiju Jose wrote:
+> > Hi James,
+> >
+> >>
+> >> Hi Hanjun,
+> >>
+> >> On 01/03/17 08:27, Hanjun Guo wrote:
+> >>> On 2017/2/28 21:22, James Morse wrote:
+> >>>> On 27/02/17 18:19, Shiju Jose wrote:
+> >>>>> Add a new GHES error source handling function for GSIV(Global
+> >> System
+> >>>>> Interrupt Vector).
+> >>>>> If an error source's notification type is GSIV, then this
+> handling
+> >>>>> function can be registered into the GSIV handler and it can parse
+> >>>>> and report error information when they occur.
+> >>>>
+> >>>> I'm missing some of the story here, but how is GSIV different from
+> >>>> 'External Interrupt'? I'm guessing something other than the CPU
+> >> takes this 'interrupt'...
+> >>>
+> >>> Yes, it's the same from CPU side (they are interrupts!), but there
+> >>> is history behind them and the usage is different.
+> >>>
+> >>> I think External Interrupt was introduced before ACPI is available
+> >>> on ARM (hardware reduced platforms), so I guess it was used for
+> >>> errors reported to OS which were not using SCI mechanism, for
+> >>> example, some IO error reporting.
+> >>>
+> >>> For External Interrupt, we don't use the ACPI event system, so for
+> >> the
+> >>> firmware, it just report the errors associate with the interrupt
+> >>> number, the kernel map the interrupt number and install the irq
+> >>> handler for it.
+> >>>
+> >>> For GSIV based event, it was introduced for hardware reduced
+> >>> platform in recent ACPI revision, and ARM64 is one of its consumers.
+> >>> When errors are reported via GSIV, ACPI event notification needs to
+> >>> be implemented and requires the platform to define a hardware error
+> >>> device
+> >>> (PNP0C33) in ACPI namespace, and also a generic event device
+> ACPI0013.
+> >>
+> >> Okay, so for APEI this really means PNP0C33 was Notify()d. 'SCI'
+> >> means the same but the route they take to get into APEI is different.
+> >>
+> >>
+> >>> For example, if we are using SPI (ARM GIC) 100 to report errors,
+> >> there
+> >>> is a ACPI0013 driver in drivers/acpi/evged.c to register the irq,
+> >> when
+> >>
+> >> Aha, this is where the interrupt-magic happens.
+> >>
+> >>
+> >>> error happened and trigger the interrupt, ACPI0013 driver will
+> >>> notify the error device (PNP0C33), then error device driver
+> >>> (drivers/acpi/hed.c) will process the error data form APEI table...
+> >>
+> >>
+> >>>> The GHES GSIV code below is identical to the behaviour of the SCI
+> >>>> Notification type... are these two names for the same thing? (I'm
+> >>>> confused!)
+> >>>
+> >>> SCI is also an 'interrupt' but it's a special irq number for ACPI
+> >>> event, and it has GPE (general purpose event) registers behind it,
+> >>> which is used only on Intel platforms. SCI based event use
+> >>> Method(\_GPE._L0x) to notify the error device (PNP0C33), but GSIV
+> is
+> >>> used for HW-reduced platform which has no GPEs.
+> >>
+> >>> Hope it can clarify something :)
+> >>
+> >> Yes thanks! (the mist is slowly clearing...)
+> >>
+> >> If ACPI_HEST_NOTIFY_SCI and ACPI_HEST_NOTIFY_GSIV both mean 'receive
+> >> notification from PNP0C33', is there any point having separate lists
+> >> and add/remove functions for them?
+> >>
+> >> Instead, could we rename Linux's ghes_notifier_sci() and ghes_sci
+> >> list to describe 'hed' instead, then group the two case statements
+> together?
+> >> There would be no need to add a selectable CONFIG_ACPI_APEI_GSIV, as
+> >> SCI is already built-in and this way the code added is tiny. The
+> only
+> >> thing we would lose is the name 'GSIV' in the not-supported error
+> >> message which we don't need if its always supported.
+> >
+> > This method was tested ok. However we were not sure about
+> > reusing/changing the existing ghes_notifier_sci() for gsiv will be
+> accepted.
 > 
-> I don't really understand the "bbbbbbbb" field in that range.  The
-> bridge has a "bus-ranges" property that defines the PCI bus numbers
-> below the bridge.  As I understand it, the first number in bus-ranges
-> is the root bus (the bus immediately below the host bridge).  Is
-> "bbbbbbbb" supposed to be identical to the that root bus number?  If
-> so, it seems redundant, so why does the "bbbbbbbb" field even exist?
+> For now a notify (SCI/GSIV/GPIO) will trigger the process of all the
+> ghes data even they are on different list, so add them on a single list
+> and process them will have the same effect.
 > 
-> If "bbbbbbbb" can be different from the root bus number, I don't know
-> what it means.  The host bridge translates CPU physical addresses to
-> PCI bus address on the root bus (the PCI bus immediately below the
-> bridge).  Once on the PCI side, the correspondence of memory addresses
-> to bus numbers is controlled completely by PCI-to-PCI bridges,
-> independent of what DT contains.
-
-The answer (probably) lies in
-PCI Bus Binding to: IEEE Std 1275-1994
-Standard for Boot (Initialization Configuration) Firmware, Revision 2.1
-[What does "to" mean in "PCI Bus Binding to"? Is it a typo?]
-
-> 12. Use of the "ranges" property
+> > Thus added a separate handling function ghes_notifier_gsiv() for gsiv.
 > 
-> The "ranges" property of Open Firmware represents how address
-> transformation is done across bus bridges. The "ranges" property
-> conveys this information for PCI, but the use of the property is not
-> as straightforward as on some other busses.
+> I think we can prepare the patch and send out for review.
+Ok. I will do this.
 > 
-> In particular, the phys.hi fields of the child address spaces in the
-> "ranges" property for PCI does not contain the same information as
-> "reg" property entries within PCI nodes. The only information that is
-> present in "ranges" phys.hi entries are the non-relocatable,
-> prefetchable and the PCI address space bits for which the entry
-> applies. I.e., only the n, p and ss bits are present; the bbbbbbbb,
-> ddddd, fff and rrrrrrrr fields are 0.
-> 
-> When an address is to be mapped through a PCI bus bridge node, the
-> phys.hi value of the address to be mapped and the child field of a
-> "ranges" entry should be masked so that only the ss bits are
-> compared. I.e., the only portion of phys.hi that should participate
-> in the range determination is the address space indicator (the ss bits).
-
-So my bbbbbbbb = 0x01 attempt was non-sensical (as I expected).
-
-For now, I have "hidden" the root's BAR0 from the system with:
-
-	if (bus->number == 0 && where == PCI_BASE_ADDRESS_0) {
-		*val = 0;
-		return PCIBIOS_SUCCESSFUL;
-	}
-
-Regards.
+> Thanks
+> Hanjun
