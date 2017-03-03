@@ -1,75 +1,76 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 3 Mar 2017 19:58:36 +0100
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 3 Mar 2017 20:44:14 +0100
 Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
  calls
-In-Reply-To: <20170303142201.16452-1-richard.genoud@gmail.com>
+In-Reply-To: <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
 References: <20170303142201.16452-1-richard.genoud@gmail.com>
-Message-ID: <CAMuHMdX-K9B20Tu5NtHJRHmGGuT60OFu8TokZxsF8aSaS7HuHQ@mail.gmail.com>
+ <CAMuHMdX-K9B20Tu5NtHJRHmGGuT60OFu8TokZxsF8aSaS7HuHQ@mail.gmail.com>
+ <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
+ <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
+Message-ID: <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+Hello Geert,
 
-On Fri, Mar 3, 2017 at 3:22 PM, Richard Genoud <richard.genoud@gmail.com> wrote:
-> Since commit 1d267ea6539f ("serial: mctrl-gpio: simplify init routine"),
-> the mctrl_gpio_to_gpiod() function can't return an error anymore.
-> So, just testing for a NULL pointer is ok.
+On Fri, Mar 03, 2017 at 08:21:05PM +0100, Geert Uytterhoeven wrote:
+> > diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
+> > index 91e7dddbf72c..2f4cdd4e7b4f 100644
+> > --- a/drivers/tty/serial/sh-sci.c
+> > +++ b/drivers/tty/serial/sh-sci.c
+> > @@ -3022,7 +3022,7 @@ static int sci_probe_single(struct platform_device *dev,
+> >                 return ret;
+> >
+> >         sciport->gpios = mctrl_gpio_init(&sciport->port, 0);
+> > -       if (IS_ERR(sciport->gpios) && PTR_ERR(sciport->gpios) != -ENOSYS)
+> > +       if (IS_ERR(sciport->gpios))
+> >                 return PTR_ERR(sciport->gpios);
+> 
+> Now the sh-sci driver fails to probe on legacy platforms where GPIOLIB=n.
+> The check for -ENOSYS made it succeed before.
 
-If CONFIG_GPIOLIB=n, mctrl_gpio_to_gpiod() always returns ERR_PTR(-ENOSYS).
-That case should be handled correctly, too.
+That's right, intended and the only option that's save (for some
+definition of save; the obvious downside is that there is no
+/dev/tty$whatever for you).
 
-Perhaps mctrl_gpio_to_gpiod() should always return NULL if !CONFIG_GPIOLIB?
+Ignoring -ENOSYS is only ok if your device doesn't have a cts-gpio. If
+it has, ignoring -ENOSYS hides bugs because the driver sends data while
+it shouldn't or cannot signal the other side that it should stop (or
+start) a transmission.
 
-This may apply to the other 2 patches, too:
-[PATCH 2/4] tty/serial: atmel: remove uneeded IS_ERR_OR_NULL calls
-[PATCH 3/4] tty/serial: mxs-auart: remove uneeded IS_ERR_OR_NULL calls
+So the options are:
+ - enable GPIOLIB (maybe enforce that by letting the driver select it)
+ - introduce a CONFIG_HALFGPIOLIB that makes gpiod_get_optional and
+   mctrl_gpio_init return only then -ENOSYS if there is a gpio specified
+   and NULL otherwise.
 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-> ---
->  drivers/tty/serial/sh-sci.c | 12 +++++-------
->  1 file changed, 5 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-> index 9a47cc4f16a2..36fde6f24040 100644
-> --- a/drivers/tty/serial/sh-sci.c
-> +++ b/drivers/tty/serial/sh-sci.c
-> @@ -1934,12 +1934,12 @@ static unsigned int sci_get_mctrl(struct uart_port *port)
->         if (s->autorts) {
->                 if (sci_get_cts(port))
->                         mctrl |= TIOCM_CTS;
-> -       } else if (IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(gpios, UART_GPIO_CTS))) {
-> +       } else if (!mctrl_gpio_to_gpiod(gpios, UART_GPIO_CTS)) {
->                 mctrl |= TIOCM_CTS;
->         }
-> -       if (IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(gpios, UART_GPIO_DSR)))
-> +       if (!mctrl_gpio_to_gpiod(gpios, UART_GPIO_DSR))
->                 mctrl |= TIOCM_DSR;
-> -       if (IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(gpios, UART_GPIO_DCD)))
-> +       if (!mctrl_gpio_to_gpiod(gpios, UART_GPIO_DCD))
->                 mctrl |= TIOCM_CAR;
->
->         return mctrl;
-> @@ -3072,10 +3072,8 @@ static int sci_probe_single(struct platform_device *dev,
->                 return PTR_ERR(sciport->gpios);
->
->         if (sciport->has_rtscts) {
-> -               if (!IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(sciport->gpios,
-> -                                                       UART_GPIO_CTS)) ||
-> -                   !IS_ERR_OR_NULL(mctrl_gpio_to_gpiod(sciport->gpios,
-> -                                                       UART_GPIO_RTS))) {
-> +               if (mctrl_gpio_to_gpiod(sciport->gpios, UART_GPIO_CTS) ||
-> +                   mctrl_gpio_to_gpiod(sciport->gpios, UART_GPIO_RTS)) {
->                         dev_err(&dev->dev, "Conflicting RTS/CTS config\n");
->                         return -EINVAL;
->                 }
+> > Then mctrl_gpio_to_gpiod isn't called. I don't have a machine to test
+> > this, but I think currently this makes the machine barf to continue
+> > here because with sciport->gpios = ERR_PTR(-ENOSYS) calling
+> >
+> >         mctrl_gpio_to_gpiod(sciport->gpios, ...)
+> >
+> > is a bad idea.
+> 
+> If sciport->gpios == ERR_PTR(-ENOSYS), CONFIG_GPIOLIB is not enabled, the
+> feature is not available, and mctrl_gpio_to_gpiod() will not
+> dereference the error
+> pointer.
 
-Gr{oetje,eeting}s,
+Ah, makes sense.
 
-                        Geert
+> >> Perhaps mctrl_gpio_to_gpiod() should always return NULL if !CONFIG_GPIOLIB?
+> >
+> > No, mctrl_gpio_to_gpiod is right. You are only supposed to call it if
+> > mctrl_gpio_init succeeded.
+> 
+> Then I have to add checks for sciport->gpios == ERR_PTR(-ENOSYS)...
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+No, ignoring -ENOSYS is wrong.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
