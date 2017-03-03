@@ -1,52 +1,53 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri,  3 Mar 2017 14:13:26 +0000
-Subject: [PATCH] arm64/sve: Reserve HWCAP and ELF note numbers for SVE
-Message-ID: <1488550406-11204-1-git-send-email-Dave.Martin@arm.com>
+From: robin@protonic.nl (Robin van der Gracht)
+Date: Fri,  3 Mar 2017 15:14:05 +0100
+Subject: [PATCH v3] clk: imx: clk-imx6ul: The i.mx6ul has no aips_tz3 clock
+Message-ID: <20170303141405.17581-1-robin@protonic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the HWCAP and ELF note assignments that will be required for
-supporting the Scalable Vector Extension are well understood, it
-makes sense to reserve the relevant numbers now in order to help
-other projects coordinate.
+The clock was mapped on CG15 (gpio2_clocks) in the CCRG0 register.
 
-This patch documents reservations for the expcted assignments.
-
-Later patches implementing SVE support will replace these
-reservations with the appropriate #defines.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Robin van der Gracht <robin@protonic.nl>
 ---
+Fixed another title typo in v3
 
-The most recent full RFC series for SVE is here:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/470507.html
+ drivers/clk/imx/clk-imx6ul.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
- arch/arm64/include/uapi/asm/hwcap.h | 1 +
- include/uapi/linux/elf.h            | 1 +
- 2 files changed, 2 insertions(+)
-
-diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-index a739287..fb75a34 100644
---- a/arch/arm64/include/uapi/asm/hwcap.h
-+++ b/arch/arm64/include/uapi/asm/hwcap.h
-@@ -30,5 +30,6 @@
- #define HWCAP_ATOMICS		(1 << 8)
- #define HWCAP_FPHP		(1 << 9)
- #define HWCAP_ASIMDHP		(1 << 10)
-+				/* (1 << 11) reserved for SVE */
+diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
+index 75c35fb..dbd6e59 100644
+--- a/drivers/clk/imx/clk-imx6ul.c
++++ b/drivers/clk/imx/clk-imx6ul.c
+@@ -73,7 +73,7 @@ static struct clk *clks[IMX6UL_CLK_END];
+ static struct clk_onecell_data clk_data;
  
- #endif /* _UAPI__ASM_HWCAP_H */
-diff --git a/include/uapi/linux/elf.h b/include/uapi/linux/elf.h
-index b59ee07..b22d215 100644
---- a/include/uapi/linux/elf.h
-+++ b/include/uapi/linux/elf.h
-@@ -414,6 +414,7 @@ typedef struct elf64_shdr {
- #define NT_ARM_HW_BREAK	0x402		/* ARM hardware breakpoint registers */
- #define NT_ARM_HW_WATCH	0x403		/* ARM hardware watchpoint registers */
- #define NT_ARM_SYSTEM_CALL	0x404	/* ARM system call number */
-+					/* 0x405 reserved for SVE */
- #define NT_METAG_CBUF	0x500		/* Metag catch buffer registers */
- #define NT_METAG_RPIPE	0x501		/* Metag read pipeline state */
- #define NT_METAG_TLS	0x502		/* Metag TLS pointer */
+ static int const clks_init_on[] __initconst = {
+-	IMX6UL_CLK_AIPSTZ1, IMX6UL_CLK_AIPSTZ2, IMX6UL_CLK_AIPSTZ3,
++	IMX6UL_CLK_AIPSTZ1, IMX6UL_CLK_AIPSTZ2,
+ 	IMX6UL_CLK_AXI, IMX6UL_CLK_ARM, IMX6UL_CLK_ROM,
+ 	IMX6UL_CLK_MMDC_P0_FAST, IMX6UL_CLK_MMDC_P0_IPG,
+ };
+@@ -341,9 +341,7 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX6UL_CLK_GPT2_SERIAL]	= imx_clk_gate2("gpt2_serial",	"perclk",	base + 0x68,	26);
+ 	clks[IMX6UL_CLK_UART2_IPG]	= imx_clk_gate2("uart2_ipg",	"ipg",		base + 0x68,	28);
+ 	clks[IMX6UL_CLK_UART2_SERIAL]	= imx_clk_gate2("uart2_serial",	"uart_podf",	base + 0x68,	28);
+-	if (clk_on_imx6ul())
+-		clks[IMX6UL_CLK_AIPSTZ3]	= imx_clk_gate2("aips_tz3",	"ahb",		base + 0x68,	30);
+-	else if (clk_on_imx6ull())
++	if (clk_on_imx6ull())
+ 		clks[IMX6UL_CLK_AIPSTZ3]	= imx_clk_gate2("aips_tz3",	"ahb",		 base + 0x80,	18);
+ 
+ 	/* CCGR1 */
+@@ -482,6 +480,9 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
+ 	for (i = 0; i < ARRAY_SIZE(clks_init_on); i++)
+ 		clk_prepare_enable(clks[clks_init_on[i]]);
+ 
++	if (clk_on_imx6ull())
++		clk_prepare_enable(clks[IMX6UL_CLK_AIPSTZ3]);
++
+ 	if (IS_ENABLED(CONFIG_USB_MXS_PHY)) {
+ 		clk_prepare_enable(clks[IMX6UL_CLK_USBPHY1_GATE]);
+ 		clk_prepare_enable(clks[IMX6UL_CLK_USBPHY2_GATE]);
 -- 
-2.1.4
+2.9.3
