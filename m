@@ -1,37 +1,32 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Fri, 3 Mar 2017 21:56:25 +0800
-Subject: [PATCH v5 4/4] mfd: mt6397: Add MT6323 LED support into MT6397 driver
-In-Reply-To: <1488549385-19899-1-git-send-email-sean.wang@mediatek.com>
-References: <1488549385-19899-1-git-send-email-sean.wang@mediatek.com>
-Message-ID: <1488549385-19899-5-git-send-email-sean.wang@mediatek.com>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Fri, 3 Mar 2017 15:08:37 +0100
+Subject: [PATCH 1/3] futex: remove duplicated code
+In-Reply-To: <20170303122712.13353-1-jslaby@suse.cz>
+References: <20170303122712.13353-1-jslaby@suse.cz>
+Message-ID: <20170303140837.GF5319@osiris>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On Fri, Mar 03, 2017 at 01:27:10PM +0100, Jiri Slaby wrote:
+> There is code duplicated over all architecture's headers for
+> futex_atomic_op_inuser. Namely op decoding, access_ok check for uaddr,
+> and comparison of the result.
+> 
+> Remove this duplication and leave up to the arches only the needed
+> assembly which is now in arch_futex_atomic_op_inuser.
+> 
+> Note that s390 removed access_ok check in d12a29703 ("s390/uaccess:
+> remove pointless access_ok() checks") as access_ok there returns true.
+> We introduce it back to the helper for the sake of simplicity (it gets
+> optimized away anyway).
+> 
+> Signed-off-by: Jiri Slaby <jslaby@suse.cz>
+> ---
+>  arch/s390/include/asm/futex.h       | 23 ++++-------------
+>  include/asm-generic/futex.h         | 50 +++++++------------------------------
+>  kernel/futex.c                      | 36 ++++++++++++++++++++++++++
 
-Add compatible string as "mt6323-led" that will make
-the OF core spawn child devices for the LED subnode
-of that MT6323 MFD device.
+Looks good to me and still boots on s390. Therefore for the s390 bits:
+Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- drivers/mfd/mt6397-core.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-index e14d8b0..8e601c8 100644
---- a/drivers/mfd/mt6397-core.c
-+++ b/drivers/mfd/mt6397-core.c
-@@ -48,6 +48,10 @@
- 		.name = "mt6323-regulator",
- 		.of_compatible = "mediatek,mt6323-regulator"
- 	},
-+	{
-+		.name = "mt6323-led",
-+		.of_compatible = "mediatek,mt6323-led"
-+	},
- };
- 
- static const struct mfd_cell mt6397_devs[] = {
--- 
-1.9.1
+Thanks!
