@@ -1,45 +1,53 @@
-From: hillf.zj@alibaba-inc.com (Hillf Danton)
-Date: Fri, 03 Mar 2017 16:18:27 +0800
-Subject: [RFC PATCH 03/12] staging: android: ion: Duplicate sg_table
-In-Reply-To: <1488491084-17252-4-git-send-email-labbott@redhat.com>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <1488491084-17252-4-git-send-email-labbott@redhat.com>
-Message-ID: <07df01d293f6$bcfb4f30$36f1ed90$@alibaba-inc.com>
+From: yangbo.lu@nxp.com (Yangbo Lu)
+Date: Fri, 3 Mar 2017 16:18:42 +0800
+Subject: [v2, 0/7] Add SD UHS-I and eMMC HS200 support for eSDHC
+Message-ID: <1488529129-23560-1-git-send-email-yangbo.lu@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+It's complicated to support SD UHS-I and eMMC HS200 for eSDHC because
+there're many differences between eSDHC and SD/eMMC spec. Several
+differences as below must be considered:
+1. Peripheral clock must be used instead of platform clock.
+    - eSDHC could select peripheral clock or platform clock as its clock
+      source. According to RM, UHS-I/HS200 must use peripheral clock since
+      it supports higher frequency than platform clock.
+    - Patch 1 and patch 6 is to support this.
+2. Signal voltage switching requires a control circuit out of eSDHC.
+    - eSDHC supports signal voltage switch from 3.3v to 1.8v by
+      eSDHC_PROCTL[VOLT_SEL] bit. This bit changes the value of output
+      signal SDHC_VS, and there must be a control circuit out of eSDHC
+      to change the signal voltage according to SDHC_VS output signal.
+    - Patch 2 is to support this.
+3. eSDHC uses tuning block for tuning procedure.
+    - Tuning clock control register must be configured before tuning.
+    - Patch 3 is to support this.
+4. Delay is needed between tuning cycles for HS200 tuning.
+    - Once a patch removed mdelay between tuning cycles.
+      But eSDHC needs it.
+    - Patch 4 and patch 5 is to support this.
+5. UHS-I/HS200 modes could be enabled in dts node.
+    - Patch 7 is to support this.
 
-On March 03, 2017 5:45 AM Laura Abbott wrote: 
-> 
-> +static struct sg_table *dup_sg_table(struct sg_table *table)
-> +{
-> +	struct sg_table *new_table;
-> +	int ret, i;
-> +	struct scatterlist *sg, *new_sg;
-> +
-> +	new_table = kzalloc(sizeof(*new_table), GFP_KERNEL);
-> +	if (!new_table)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	ret = sg_alloc_table(new_table, table->nents, GFP_KERNEL);
-> +	if (ret) {
-> +		kfree(table);
+Please review and merge these patches on mmc git tree if no changes
+are required.
 
-Free new table?
+Yangbo Lu (7):
+  mmc: sdhci-of-esdhc: add peripheral clock support
+  mmc: sdhci-of-esdhc: add support for signal voltage switch
+  mmc: sdhci-of-esdhc: add tuning support
+  mmc: sdhci: add a quirk to restore delay in tuning
+  mmc: sdhci-of-esdhc: add delay between tuning cycles
+  arm64: dts: ls1046a: add clocks property and compatible for eSDHC node
+  arm64: dts: ls1046ardb: add MMC HS200/UHS-1 modes support
 
-> +		return ERR_PTR(-ENOMEM);
-> +	}
-> +
-> +	new_sg = new_table->sgl;
-> +	for_each_sg(table->sgl, sg, table->nents, i) {
-> +		memcpy(new_sg, sg, sizeof(*sg));
-> +		sg->dma_address = 0;
-> +		new_sg = sg_next(new_sg);
-> +	}
-> +
+ arch/arm64/boot/dts/freescale/fsl-ls1046a-rdb.dts |   8 ++
+ arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi    |   3 +-
+ drivers/mmc/host/sdhci-esdhc.h                    |   7 +
+ drivers/mmc/host/sdhci-of-esdhc.c                 | 167 +++++++++++++++++++++-
+ drivers/mmc/host/sdhci.c                          |   3 +-
+ drivers/mmc/host/sdhci.h                          |   2 +
+ 6 files changed, 186 insertions(+), 4 deletions(-)
 
-Do we need a helper, sg_copy_table(dst_table, src_table)?
-
-> +	return new_table;
-> +}
-> +
+-- 
+2.1.0.27.g96db324
