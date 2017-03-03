@@ -1,37 +1,62 @@
-From: ashok.raj@intel.com (Raj, Ashok)
-Date: Fri, 3 Mar 2017 09:05:51 -0800
-Subject: [RFC PATCH 22/30] iommu: Bind/unbind tasks to/from devices
-In-Reply-To: <1488534044.6234.14.camel@infradead.org>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-23-jean-philippe.brucker@arm.com>
- <1488534044.6234.14.camel@infradead.org>
-Message-ID: <20170303170550.rj7awy4jjfiw6qgd@araj-mobl1>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Fri, 3 Mar 2017 18:07:39 +0100
+Subject: No output on console despite ignore_loglevel earlyprintk
+In-Reply-To: <6cc48f5c-b028-2bb7-c09b-92c36554fe07@suse.de>
+References: <6d16a384-1a4c-bf27-fd81-ea3caf3de6b0@sigmadesigns.com>
+ <6cc48f5c-b028-2bb7-c09b-92c36554fe07@suse.de>
+Message-ID: <0e7d14d5-d087-cba3-1792-fb0abf1142ef@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On 03/03/2017 17:59, Andreas F?rber wrote:
 
-Good to hear back from you!
-
-
-On Fri, Mar 03, 2017 at 09:40:44AM +0000, David Woodhouse wrote:
+> Hi,
 > 
-> Intel slightly deviates from the "one PASID per process" vision too,
-> because it currently has a PASID allocator idr per IOMMU. That wants
-> making system-wide. And probably not Intel-specific.
-
-Intel version is getting the system wide pasid. We are actively working on it
-and should be out shortly.
-
+> Am 03.03.2017 um 17:42 schrieb Marc Gonzalez:
+>> I'm confused about early consoles and earlyprintk, and all that good stuff.
+>> When my kernel panics, I don't get the expected output.
+>>
+>> Using "mem=256M ignore_loglevel earlyprintk"
+> [...]
+>> [    0.014325] Console: colour dummy device 80x30
+>> [    0.018885] console [tty0] enabled
+>> [    0.022396] bootconsole [earlycon0] disabled
+>>
+>> And it hangs there.
+>>
+>>
+>> If I use an explicit console= configuration, I do see the panic.
+>> Using "mem=256M ignore_loglevel console=ttyS0,115200 earlyprintk"
+> [...]
+>> [    0.014325] Console: colour dummy device 80x30
+>> [    0.018899] Calibrating delay loop (skipped), value calculated using timer frequency.. 54.25 BogoMIPS (lpj=90000)
+> [...]
 > 
-> Some other comments...
+> I have reported a similar phenomenon for multiple new SoCs.
 > 
-> We also have SVM_FLAG_SUPERVISOR_MODE, which gives access to kernel
-> address space. Yes, people use it.
+>> I suppose this is related to my DT description?
+>>
+>> 	chosen {
+>> 		stdout-path = "serial:115200n8";
+>> 	};
+>>
+>> Isn't stdout-path = "serial:115200n8" supposed to be equivalent to
+>> console=ttyS0,115200 ?
+> 
+> First of all, that should probably be serial0, and it needs to be
+> defined as an alias. In my case that's a given.
 
-There are some gaps with the current implementation, esp related to 
-vmalloc. We have something internally, these will also be posted soon after
-some testing. 
+My DT root node contains
 
-Cheers,
-Ashok
+	aliases {
+		serial = &uart;
+		eth0 = &eth0;
+	};
+
+Should I be using serial0 everywhere?
+(I thought I could call it "foo", if I wanted.)
+
+> And yes, AFAIU stdout-path = "serialX:115200n8" should lead to
+> ttyFOOX,115200n8 being used, in your case it may be ttyS0.
+
+Regards.
