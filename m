@@ -1,33 +1,30 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 3 Mar 2017 00:21:20 -0600
-Subject: [PATCH 2/2] drivers: pwm: pwm-atmel: enable pwm on sama5d2
-In-Reply-To: <1488278415-2786-3-git-send-email-claudiu.beznea@microchip.com>
-References: <1488278415-2786-1-git-send-email-claudiu.beznea@microchip.com>
- <1488278415-2786-3-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <20170303062120.uippq2ajtnrxfcx5@rob-hp-laptop>
+Date: Fri, 3 Mar 2017 00:21:24 -0600
+Subject: [PATCH v2 1/3] coresight: bindings for debug module
+In-Reply-To: <1488294420-14188-2-git-send-email-leo.yan@linaro.org>
+References: <1488294420-14188-1-git-send-email-leo.yan@linaro.org>
+ <1488294420-14188-2-git-send-email-leo.yan@linaro.org>
+Message-ID: <20170303062124.rc2fw6axs3cp7ofc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 28, 2017 at 12:40:15PM +0200, Claudiu Beznea wrote:
-> sama5d2 can use the same atmel_pwm_data as sama5d3.
+On Tue, Feb 28, 2017 at 11:06:58PM +0800, Leo Yan wrote:
+> According to ARMv8 architecture reference manual (ARM DDI 0487A.k)
+> Chapter 'Part H: External debug', the CPU can integrate debug module
+> and it can support self-hosted debug and external debug. Especially
+> for supporting self-hosted debug, this means the program can access
+> the debug module from mmio region; and usually the mmio region is
+> integrated with coresight.
 > 
-> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> So add document for binding debug component, includes binding to APB
+> clock; and also need specify the CPU node which the debug module is
+> dedicated to specific CPU.
+> 
+> Suggested-by: Mike Leach <mike.leach@linaro.org>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 > ---
->  Documentation/devicetree/bindings/pwm/atmel-pwm.txt | 1 +
->  drivers/pwm/pwm-atmel.c                             | 3 +++
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-> index 02331b9..c8c831d 100644
-> --- a/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-> +++ b/Documentation/devicetree/bindings/pwm/atmel-pwm.txt
-> @@ -4,6 +4,7 @@ Required properties:
->    - compatible: should be one of:
->      - "atmel,at91sam9rl-pwm"
->      - "atmel,sama5d3-pwm"
-> +    - "atmel,sama5d2-pwm"
+>  .../devicetree/bindings/arm/coresight-debug.txt    | 40 ++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/coresight-debug.txt
 
-Perhaps sama5d3 should be a fallback, then you don't need a driver 
-change.
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
