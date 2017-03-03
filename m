@@ -1,110 +1,55 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 3 Mar 2017 10:53:33 +0100
-Subject: [PATCH 4/5] clk: sunxi-ng: Add driver for A83T CCU
-In-Reply-To: <20170301191705.GS25384@codeaurora.org>
-References: <20170214033526.16977-1-wens@csie.org>
- <20170214033526.16977-5-wens@csie.org>
- <20170214095819.utsftcvti5zdmlmi@lukather>
- <CAGb2v66PxbhUdqSwFc5iFN2wDVQbOsibDkckXpFsxXW1WJNe3w@mail.gmail.com>
- <20170215094954.h3wyaxlqkeb342yu@lukather>
- <20170301191705.GS25384@codeaurora.org>
-Message-ID: <20170303095333.hgxoli2h7clailvo@lukather>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 3 Mar 2017 09:54:07 +0000
+Subject: [PATCH 1/2] nvmem: Add driver for the i.MX IIM
+In-Reply-To: <568bbe58-0bb5-f7ec-a646-271912a4313a@linaro.org>
+References: <20170213153149.11710-1-s.hauer@pengutronix.de>
+ <20170213153149.11710-2-s.hauer@pengutronix.de>
+ <568bbe58-0bb5-f7ec-a646-271912a4313a@linaro.org>
+Message-ID: <cf3664ee-dd90-a9c4-2b43-883c599aa6bf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen
 
-On Wed, Mar 01, 2017 at 11:17:05AM -0800, Stephen Boyd wrote:
-> On 02/15, Maxime Ripard wrote:
-> > On Tue, Feb 14, 2017 at 06:26:39PM +0800, Chen-Yu Tsai wrote:
-> > > On Tue, Feb 14, 2017 at 5:58 PM, Maxime Ripard
-> > > <maxime.ripard@free-electrons.com> wrote:
-> > > > On Tue, Feb 14, 2017 at 11:35:25AM +0800, Chen-Yu Tsai wrote:
-> > > >> +/*
-> > > >> + * MMC2 supports what's called the "new timing mode". The CCU and the MMC
-> > > >> + * controller must be in sync about which mode is used. The new mode moves
-> > > >> + * the clock delay controls (and possibly the delay lines) into the MMC
-> > > >> + * block. Also, the output of the clock is divided by 2. The output and
-> > > >> + * sample phase clocks are unused under this mode.
-> > > >> + *
-> > > >> + * This new mode seems to be preferred. Hence we force this clock to the
-> > > >> + * new mode. And we don't add the phase clocks.
-> > > >> + */
-> > > >
-> > > > I'm sorry, but I said this several times, this isn't working. We
-> > > > should model it properly, and not hack this around in the clock
-> > > > driver.
-> > > >
-> > > > As you say in your comment, the MMC driver needs to be aware about
-> > > > which mode is used, in order to also set a bit in one of its registers
-> > > > accordingly, and modify its sampling behaviour.
-> > > >
-> > > > The new timing is preferred, but our previous clock implementations
-> > > > didn't hardcode it, so we can't even rely on that behaviour to always
-> > > > write it in our driver.
-> > > 
-> > > Correct. With the A83T there has never been a merged clock driver though.
-> > > I realize this is a one off thing.
-> > > 
-> > > > This is not something specific to the A83T, but is found in all the
-> > > > SoCs since the A23, so we need to come up with a good solution to
-> > > > address that.
-> > > >
-> > > > I'm not sure what a good solution would be though. One would be to
-> > > > just have a private function of our own to switch in the new mode (if
-> > > > relevant, because only the MMC2 controllers have it), but that would
-> > > > lead to troubles with !sunxi-ng. Not something we can't deal with, but
-> > > > some extra precautions should be taken (make sure to protect the call
-> > > > through an ifdef / IS_DEFINED, check that the sunxi-ng driver has been
-> > > > probed, etc.)
-> > > 
-> > > If the custom function route is acceptable, I'll come up with something.
-> > 
-> > I think it would be a great start yes. I'll try to discuss it with
-> > Mike and Stephen at ELC and see what they think about that.
-> > 
-> 
-> I didn't hear anything at ELC.
 
-Yeah, sorry, I ended up discussing this with Mike.
+On 03/03/17 09:50, Srinivas Kandagatla wrote:
+>
+>
+> On 13/02/17 15:31, Sascha Hauer wrote:
+>> From: Michael Grzeschik <m.grzeschik@pengutronix.de>
+>>
+>> This adds a readonly nvmem driver for the i.MX IC Identification Module
+>> (IIM). The IIM is found on the older i.MX SoCs like the i.MX25, i.MX27,
+>> i.MX31, i.MX35, i.MX51 and the i.MX53.
+>>
+>> The IIM can control up to 8 fuse banks with 256 bit each. Not all of the
+>> banks are equipped on the different SoCs. The actual number of fuses
+>> differ from 512 on the i.MX27 and 1152 on the i.MX53.
+>>
+>> The fuses are one time writable, but writing is currently not supported
+>> in the driver.
+>>
+>> Signed-off-by: Michael Grzeschik <m.grzeschik@pengutronix.de>
+>> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+>
+>
+>> ---
+>>  drivers/nvmem/Kconfig   |  11 ++++
+>>  drivers/nvmem/Makefile  |   2 +
+>>  drivers/nvmem/imx-iim.c | 171
+>> ++++++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 184 insertions(+)
+>>  create mode 100644 drivers/nvmem/imx-iim.c
+>
+> Patch looks good to me, Will pick both bindings and this patch in next
+> cycle for 4.12.
+Opps sent email too quick..
 
-> Can someone explain what the issue is? Could something like
-> clk_get_phase() + clk_get_rate() tell us if we're in one mode
-> vs. the other?
+Can you also make sure that ids are null terminated as reported by 
+kbuild https://www.spinics.net/lists/arm-kernel/msg562543.html in next 
+version.
 
-So we have two modes of operation for that clock, old vs new (I know,
-I didn't pick the names).
+--srini
 
-The old mode is what we support right now. It has a combination of a
-linear multiplier and divider, plus some phase controls.
-
-The new mode however disables the phase controls and adds post-divider
-of 2 on the rate.
-
-We cannot really rely on the rate itself, since there's a huge overlap
-between the rates we can obtain in the old and new modes. Same thing
-for the phase, having a 0 deg phase is achieved both in the old and
-new modes.
-
-To make things worse, the new mode is only available on one out of
-three MMC controllers (and associated clocks), and that MMC controller
-needs to set a bit as well to switch to the new mode if needed. So we
-definitely needs some synchronisation there, and also to be able to
-retrieve if the mode switching is available, and if we're already
-using that mode.
-
-Mike agreed that the easiest way forward was to use a custom function.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170303/09254849/attachment.sig>
+>
+> thanks,
+> srini
