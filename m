@@ -1,44 +1,43 @@
-From: slash.tmp@free.fr (Mason)
-Date: Fri, 3 Mar 2017 23:09:22 +0100
-Subject: Panic in quirk_usb_early_handoff
-In-Reply-To: <38b8c9be-724b-0cfc-a941-76f2c62e1c58@arm.com>
-References: <4b2a7606-de27-c8ad-1530-958dd5d12233@free.fr>
- <45e38a07-e8da-80e4-36bb-31e471f02004@free.fr>
- <3c5bd8f5-468f-d25e-08a9-8944ee419096@free.fr>
- <38b8c9be-724b-0cfc-a941-76f2c62e1c58@arm.com>
-Message-ID: <45563021-b979-e35f-d039-f2a4cead124d@free.fr>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Fri, 3 Mar 2017 15:43:46 -0700
+Subject: [PATCH V11 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <86258A5CC0A3704780874CF6004BA8A62DCAD116@lhreml502-mbs>
+References: <1487712121-16688-1-git-send-email-tbaicar@codeaurora.org>
+ <1487712121-16688-11-git-send-email-tbaicar@codeaurora.org>
+ <86258A5CC0A3704780874CF6004BA8A62DCAD116@lhreml502-mbs>
+Message-ID: <e1578c9f-7595-9705-9a5a-5811cf6c8513@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2017 20:02, Robin Murphy wrote:
+Hello Shiju,
 
-> On 03/03/17 17:15, Mason wrote:
-> 
->> [    1.264893] Unable to handle kernel paging request at virtual address d08664f4
-> 
-> Note that that's a reasonable approximation of a vmalloc address...
-> 
-> ...and that specifically it's r0 + r3...
-> 
-> ...and again. And always at the same PC, too. Looking at
-> quirk_usb_early_handoff(), it mostly seems to go off poking bridge
-> resources, so I'd hazard a guess that it's down to your host driver,
-> with something uninitialised (or already freed) being used as an offset
-> into some ioremapped resource (which given the consistency of r0 is
-> probably allocated pretty early on).
 
-When you say "host driver", do you mean the USB driver,
-or the PCIe controller driver?
+On 3/3/2017 8:34 AM, Shiju Jose wrote:
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c index
+>> b2d57fc..403277b 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -602,6 +602,24 @@ static const char *fault_name(unsigned int esr)  }
+>>
+>>   /*
+>> + * Handle Synchronous External Aborts that occur in a guest kernel.
+>> + */
+>> +int handle_guest_sea(unsigned long addr, unsigned int esr) {
+>> +	/*
+>> +	 * synchronize_rcu() will wait for nmi_exit(), so no need to
+>> +	 * rcu_read_lock().
+>> +	 */
+>> +	if(IS_ENABLED(HAVE_ACPI_APEI_SEA)) {
+> IS_ENABLED(HAVE_ACPI_APEI_SEA) to be changed to IS_ENABLED(ACPI_APEI_SEA) same
+> as in the patch "acpi: apei: handle SEA notification type for ARMv8"?
+>
+Good catch, I guess my FW still triggers the SCI interrupt as well as 
+replays the SEA to kernel which is why I still get into the GHES handling :)
 
-I am currently writing the PCIe controller driver, so I do
-expect a large number of bugs there; but the USB driver is
-just the generic XHCI driver. Although I now realize that
-I wrote no DT node for the USB HW... Would that explain
-the random weirdness?
+Thanks,
+Tyler
 
-> "addr2line -i -e vmlinux c039fe44", and work backwards from there ;) In
-> particular I'd follow the provenance of r3.
-
-I'll definitely take a closer look. Thanks for the disassembly.
-
-Regards.
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
