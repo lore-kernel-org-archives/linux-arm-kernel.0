@@ -1,202 +1,196 @@
 From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Fri, 3 Mar 2017 16:52:09 +0200
-Subject: [RFC 3/7] soc/qman: export non-programmable FQD fields query
+Date: Fri, 3 Mar 2017 16:52:10 +0200
+Subject: [RFC 4/7] soc/qman: add helper functions needed by caam/qi driver
 In-Reply-To: <1488552733-20806-1-git-send-email-horia.geanta@nxp.com>
 References: <1488552733-20806-1-git-send-email-horia.geanta@nxp.com>
-Message-ID: <1488552733-20806-4-git-send-email-horia.geanta@nxp.com>
+Message-ID: <1488552733-20806-5-git-send-email-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export qman_query_fq_np() function and related structures.
-This will be needed in the caam/qi driver, where "queue empty"
-condition will be decided based on the frm_cnt.
+Add helper functions, macros, #defines for accessing / enabling
+qman functionality from caam/qi driver, such that this driver
+is not aware of the need for data conversion to big endian.
+qman is updated to use these helpers internally.
 
 Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
 ---
- drivers/soc/fsl/qbman/qman.c      |  4 +--
- drivers/soc/fsl/qbman/qman_priv.h | 61 -----------------------------------
- include/soc/fsl/qman.h            | 68 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 70 insertions(+), 63 deletions(-)
+ drivers/soc/fsl/qbman/qman.c            | 16 +++++------
+ drivers/soc/fsl/qbman/qman_test_stash.c |  5 ++--
+ include/soc/fsl/qman.h                  | 47 +++++++++++++++++++++++++++++++++
+ 3 files changed, 56 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
-index 6f509f68085e..3d891db57ee6 100644
+index 3d891db57ee6..7668ff53cd90 100644
 --- a/drivers/soc/fsl/qbman/qman.c
 +++ b/drivers/soc/fsl/qbman/qman.c
-@@ -2019,8 +2019,7 @@ int qman_query_fq(struct qman_fq *fq, struct qm_fqd *fqd)
- 	return ret;
- }
+@@ -1764,16 +1764,15 @@ int qman_init_fq(struct qman_fq *fq, u32 flags, struct qm_mcc_initfq *opts)
+ 	if (fq_isclear(fq, QMAN_FQ_FLAG_TO_DCPORTAL)) {
+ 		dma_addr_t phys_fq;
  
--static int qman_query_fq_np(struct qman_fq *fq,
--			    struct qm_mcr_queryfq_np *np)
-+int qman_query_fq_np(struct qman_fq *fq, struct qm_mcr_queryfq_np *np)
- {
- 	union qm_mc_command *mcc;
- 	union qm_mc_result *mcr;
-@@ -2046,6 +2045,7 @@ static int qman_query_fq_np(struct qman_fq *fq,
- 	put_affine_portal();
- 	return ret;
- }
-+EXPORT_SYMBOL(qman_query_fq_np);
+-		mcc->initfq.we_mask |= cpu_to_be16(QM_INITFQ_WE_CONTEXTB);
+-		mcc->initfq.fqd.context_b = cpu_to_be32(fq_to_tag(fq));
++		qm_initfq_setbits(&mcc->initfq, QM_INITFQ_WE_CONTEXTB);
++		qm_fqd_set_contextb(&mcc->initfq.fqd, fq_to_tag(fq));
+ 		/*
+ 		 *  and the physical address - NB, if the user wasn't trying to
+ 		 * set CONTEXTA, clear the stashing settings.
+ 		 */
+ 		if (!(be16_to_cpu(mcc->initfq.we_mask) &
+ 				  QM_INITFQ_WE_CONTEXTA)) {
+-			mcc->initfq.we_mask |=
+-				cpu_to_be16(QM_INITFQ_WE_CONTEXTA);
++			qm_initfq_setbits(&mcc->initfq, QM_INITFQ_WE_CONTEXTA);
+ 			memset(&mcc->initfq.fqd.context_a, 0,
+ 				sizeof(mcc->initfq.fqd.context_a));
+ 		} else {
+@@ -1795,8 +1794,7 @@ int qman_init_fq(struct qman_fq *fq, u32 flags, struct qm_mcc_initfq *opts)
  
- static int qman_query_cgr(struct qman_cgr *cgr,
- 			  struct qm_mcr_querycgr *cgrd)
-diff --git a/drivers/soc/fsl/qbman/qman_priv.h b/drivers/soc/fsl/qbman/qman_priv.h
-index 64781eff6974..22725bdc6f15 100644
---- a/drivers/soc/fsl/qbman/qman_priv.h
-+++ b/drivers/soc/fsl/qbman/qman_priv.h
-@@ -89,67 +89,6 @@ static inline u64 qm_mcr_querycgr_a_get64(const struct qm_mcr_querycgr *q)
- 	return ((u64)q->a_bcnt_hi << 32) | be32_to_cpu(q->a_bcnt_lo);
- }
+ 		if (!(be16_to_cpu(mcc->initfq.we_mask) &
+ 				  QM_INITFQ_WE_DESTWQ)) {
+-			mcc->initfq.we_mask |=
+-				cpu_to_be16(QM_INITFQ_WE_DESTWQ);
++			qm_initfq_setbits(&mcc->initfq, QM_INITFQ_WE_DESTWQ);
+ 			wq = 4;
+ 		}
+ 		qm_fqd_set_destwq(&mcc->initfq.fqd, p->config->channel, wq);
+@@ -1816,7 +1814,7 @@ int qman_init_fq(struct qman_fq *fq, u32 flags, struct qm_mcc_initfq *opts)
+ 	}
+ 	if (opts) {
+ 		if (be16_to_cpu(opts->we_mask) & QM_INITFQ_WE_FQCTRL) {
+-			if (be16_to_cpu(opts->fqd.fq_ctrl) & QM_FQCTRL_CGE)
++			if (qm_fqd_isset_fqctrl(&opts->fqd, QM_FQCTRL_CGE))
+ 				fq_set(fq, QMAN_FQ_STATE_CGR_EN);
+ 			else
+ 				fq_clear(fq, QMAN_FQ_STATE_CGR_EN);
+@@ -2321,7 +2319,7 @@ int qman_create_cgr(struct qman_cgr *cgr, u32 flags,
  
--/* "Query FQ Non-Programmable Fields" */
--
--struct qm_mcr_queryfq_np {
--	u8 verb;
--	u8 result;
--	u8 __reserved1;
--	u8 state;		/* QM_MCR_NP_STATE_*** */
--	u32 fqd_link;		/* 24-bit, _res2[24-31] */
--	u16 odp_seq;		/* 14-bit, _res3[14-15] */
--	u16 orp_nesn;		/* 14-bit, _res4[14-15] */
--	u16 orp_ea_hseq;	/* 15-bit, _res5[15] */
--	u16 orp_ea_tseq;	/* 15-bit, _res6[15] */
--	u32 orp_ea_hptr;	/* 24-bit, _res7[24-31] */
--	u32 orp_ea_tptr;	/* 24-bit, _res8[24-31] */
--	u32 pfdr_hptr;		/* 24-bit, _res9[24-31] */
--	u32 pfdr_tptr;		/* 24-bit, _res10[24-31] */
--	u8 __reserved2[5];
--	u8 is;			/* 1-bit, _res12[1-7] */
--	u16 ics_surp;
--	u32 byte_cnt;
--	u32 frm_cnt;		/* 24-bit, _res13[24-31] */
--	u32 __reserved3;
--	u16 ra1_sfdr;		/* QM_MCR_NP_RA1_*** */
--	u16 ra2_sfdr;		/* QM_MCR_NP_RA2_*** */
--	u16 __reserved4;
--	u16 od1_sfdr;		/* QM_MCR_NP_OD1_*** */
--	u16 od2_sfdr;		/* QM_MCR_NP_OD2_*** */
--	u16 od3_sfdr;		/* QM_MCR_NP_OD3_*** */
--} __packed;
--
--#define QM_MCR_NP_STATE_FE		0x10
--#define QM_MCR_NP_STATE_R		0x08
--#define QM_MCR_NP_STATE_MASK		0x07	/* Reads FQD::STATE; */
--#define QM_MCR_NP_STATE_OOS		0x00
--#define QM_MCR_NP_STATE_RETIRED		0x01
--#define QM_MCR_NP_STATE_TEN_SCHED	0x02
--#define QM_MCR_NP_STATE_TRU_SCHED	0x03
--#define QM_MCR_NP_STATE_PARKED		0x04
--#define QM_MCR_NP_STATE_ACTIVE		0x05
--#define QM_MCR_NP_PTR_MASK		0x07ff	/* for RA[12] & OD[123] */
--#define QM_MCR_NP_RA1_NRA(v)		(((v) >> 14) & 0x3)	/* FQD::NRA */
--#define QM_MCR_NP_RA2_IT(v)		(((v) >> 14) & 0x1)	/* FQD::IT */
--#define QM_MCR_NP_OD1_NOD(v)		(((v) >> 14) & 0x3)	/* FQD::NOD */
--#define QM_MCR_NP_OD3_NPC(v)		(((v) >> 14) & 0x3)	/* FQD::NPC */
--
--enum qm_mcr_queryfq_np_masks {
--	qm_mcr_fqd_link_mask = BIT(24)-1,
--	qm_mcr_odp_seq_mask = BIT(14)-1,
--	qm_mcr_orp_nesn_mask = BIT(14)-1,
--	qm_mcr_orp_ea_hseq_mask = BIT(15)-1,
--	qm_mcr_orp_ea_tseq_mask = BIT(15)-1,
--	qm_mcr_orp_ea_hptr_mask = BIT(24)-1,
--	qm_mcr_orp_ea_tptr_mask = BIT(24)-1,
--	qm_mcr_pfdr_hptr_mask = BIT(24)-1,
--	qm_mcr_pfdr_tptr_mask = BIT(24)-1,
--	qm_mcr_is_mask = BIT(1)-1,
--	qm_mcr_frm_cnt_mask = BIT(24)-1,
--};
--#define qm_mcr_np_get(np, field) \
--	((np)->field & (qm_mcr_##field##_mask))
--
- /* Congestion Groups */
+ 		qm_cgr_cscn_targ_set(&local_opts.cgr, PORTAL_IDX(p),
+ 				     be32_to_cpu(cgr_state.cgr.cscn_targ));
+-		local_opts.we_mask |= cpu_to_be16(QM_CGR_WE_CSCN_TARG);
++		qm_initcgr_setbits(&local_opts, QM_CGR_WE_CSCN_TARG);
  
- /*
+ 		/* send init if flags indicate so */
+ 		if (flags & QMAN_CGR_FLAG_USE_INIT)
+@@ -2840,7 +2838,7 @@ static int cgr_cleanup(u32 cgrid)
+ 			err = qman_query_fq(&fq, &fqd);
+ 			if (WARN_ON(err))
+ 				return err;
+-			if (be16_to_cpu(fqd.fq_ctrl) & QM_FQCTRL_CGE &&
++			if (qm_fqd_isset_fqctrl(&fqd, QM_FQCTRL_CGE) &&
+ 			    fqd.cgid == cgrid) {
+ 				pr_err("CRGID 0x%x is being used by FQID 0x%x, CGR will be leaked\n",
+ 				       cgrid, fq.fqid);
+diff --git a/drivers/soc/fsl/qbman/qman_test_stash.c b/drivers/soc/fsl/qbman/qman_test_stash.c
+index e87b65403b67..d2bf453092d7 100644
+--- a/drivers/soc/fsl/qbman/qman_test_stash.c
++++ b/drivers/soc/fsl/qbman/qman_test_stash.c
+@@ -406,9 +406,8 @@ static int init_handler(void *h)
+ 		goto failed;
+ 	}
+ 	memset(&opts, 0, sizeof(opts));
+-	opts.we_mask = cpu_to_be16(QM_INITFQ_WE_FQCTRL |
+-				   QM_INITFQ_WE_CONTEXTA);
+-	opts.fqd.fq_ctrl = cpu_to_be16(QM_FQCTRL_CTXASTASHING);
++	qm_initfq_setbits(&opts, QM_INITFQ_WE_FQCTRL | QM_INITFQ_WE_CONTEXTA);
++	qm_fqd_set_fqctrl(&opts.fqd, QM_FQCTRL_CTXASTASHING);
+ 	qm_fqd_set_stashing(&opts.fqd, 0, STASH_DATA_CL, STASH_CTX_CL);
+ 	err = qman_init_fq(&handler->rx, QMAN_INITFQ_FLAG_SCHED |
+ 			   QMAN_INITFQ_FLAG_LOCAL, &opts);
 diff --git a/include/soc/fsl/qman.h b/include/soc/fsl/qman.h
-index 10b549783ec5..0252c32f7421 100644
+index 0252c32f7421..fc133c658385 100644
 --- a/include/soc/fsl/qman.h
 +++ b/include/soc/fsl/qman.h
-@@ -811,6 +811,67 @@ struct qman_cgr {
- #define QMAN_VOLATILE_FLAG_WAIT_INT  0x00000002 /* if wait, interruptible? */
- #define QMAN_VOLATILE_FLAG_FINISH    0x00000004 /* wait till VDQCR completes */
+@@ -168,6 +168,12 @@ static inline void qm_fd_set_param(struct qm_fd *fd, enum qm_fd_format fmt,
+ #define qm_fd_set_contig_big(fd, len) \
+ 	qm_fd_set_param(fd, qm_fd_contig_big, 0, len)
+ #define qm_fd_set_sg_big(fd, len) qm_fd_set_param(fd, qm_fd_sg_big, 0, len)
++#define qm_fd_set_compound(fd, len) qm_fd_set_param(fd, qm_fd_compound, 0, len)
++
++static inline int qm_fd_get_status(const struct qm_fd *fd)
++{
++	return be32_to_cpu(fd->status);
++}
  
-+/* "Query FQ Non-Programmable Fields" */
-+struct qm_mcr_queryfq_np {
-+	u8 verb;
-+	u8 result;
-+	u8 __reserved1;
-+	u8 state;		/* QM_MCR_NP_STATE_*** */
-+	u32 fqd_link;		/* 24-bit, _res2[24-31] */
-+	u16 odp_seq;		/* 14-bit, _res3[14-15] */
-+	u16 orp_nesn;		/* 14-bit, _res4[14-15] */
-+	u16 orp_ea_hseq;	/* 15-bit, _res5[15] */
-+	u16 orp_ea_tseq;	/* 15-bit, _res6[15] */
-+	u32 orp_ea_hptr;	/* 24-bit, _res7[24-31] */
-+	u32 orp_ea_tptr;	/* 24-bit, _res8[24-31] */
-+	u32 pfdr_hptr;		/* 24-bit, _res9[24-31] */
-+	u32 pfdr_tptr;		/* 24-bit, _res10[24-31] */
-+	u8 __reserved2[5];
-+	u8 is;			/* 1-bit, _res12[1-7] */
-+	u16 ics_surp;
-+	u32 byte_cnt;
-+	u32 frm_cnt;		/* 24-bit, _res13[24-31] */
-+	u32 __reserved3;
-+	u16 ra1_sfdr;		/* QM_MCR_NP_RA1_*** */
-+	u16 ra2_sfdr;		/* QM_MCR_NP_RA2_*** */
-+	u16 __reserved4;
-+	u16 od1_sfdr;		/* QM_MCR_NP_OD1_*** */
-+	u16 od2_sfdr;		/* QM_MCR_NP_OD2_*** */
-+	u16 od3_sfdr;		/* QM_MCR_NP_OD3_*** */
-+} __packed;
-+
-+#define QM_MCR_NP_STATE_FE		0x10
-+#define QM_MCR_NP_STATE_R		0x08
-+#define QM_MCR_NP_STATE_MASK		0x07	/* Reads FQD::STATE; */
-+#define QM_MCR_NP_STATE_OOS		0x00
-+#define QM_MCR_NP_STATE_RETIRED		0x01
-+#define QM_MCR_NP_STATE_TEN_SCHED	0x02
-+#define QM_MCR_NP_STATE_TRU_SCHED	0x03
-+#define QM_MCR_NP_STATE_PARKED		0x04
-+#define QM_MCR_NP_STATE_ACTIVE		0x05
-+#define QM_MCR_NP_PTR_MASK		0x07ff	/* for RA[12] & OD[123] */
-+#define QM_MCR_NP_RA1_NRA(v)		(((v) >> 14) & 0x3)	/* FQD::NRA */
-+#define QM_MCR_NP_RA2_IT(v)		(((v) >> 14) & 0x1)	/* FQD::IT */
-+#define QM_MCR_NP_OD1_NOD(v)		(((v) >> 14) & 0x3)	/* FQD::NOD */
-+#define QM_MCR_NP_OD3_NPC(v)		(((v) >> 14) & 0x3)	/* FQD::NPC */
-+
-+enum qm_mcr_queryfq_np_masks {
-+	qm_mcr_fqd_link_mask = BIT(24) - 1,
-+	qm_mcr_odp_seq_mask = BIT(14) - 1,
-+	qm_mcr_orp_nesn_mask = BIT(14) - 1,
-+	qm_mcr_orp_ea_hseq_mask = BIT(15) - 1,
-+	qm_mcr_orp_ea_tseq_mask = BIT(15) - 1,
-+	qm_mcr_orp_ea_hptr_mask = BIT(24) - 1,
-+	qm_mcr_orp_ea_tptr_mask = BIT(24) - 1,
-+	qm_mcr_pfdr_hptr_mask = BIT(24) - 1,
-+	qm_mcr_pfdr_tptr_mask = BIT(24) - 1,
-+	qm_mcr_is_mask = BIT(1) - 1,
-+	qm_mcr_frm_cnt_mask = BIT(24) - 1,
-+};
-+
-+#define qm_mcr_np_get(np, field) \
-+	((np)->field & (qm_mcr_##field##_mask))
-+
- 	/* Portal Management */
- /**
-  * qman_p_irqsource_add - add processing sources to be interrupt-driven
-@@ -1033,6 +1094,13 @@ int qman_alloc_fqid_range(u32 *result, u32 count);
-  */
- int qman_release_fqid(u32 fqid);
+ static inline void qm_fd_clear_fd(struct qm_fd *fd)
+ {
+@@ -233,16 +239,31 @@ static inline void qm_sg_entry_set_len(struct qm_sg_entry *sg, int len)
+ 	sg->cfg = cpu_to_be32(len & QM_SG_LEN_MASK);
+ }
  
-+/**
-+ * qman_query_fq_np - Queries non-programmable FQD fields
-+ * @fq: the frame queue object to be queried
-+ * @np: storage for the queried FQD fields
-+ */
-+int qman_query_fq_np(struct qman_fq *fq, struct qm_mcr_queryfq_np *np);
++static inline void qm_sg_entry_set_e(struct qm_sg_entry *sg, int len)
++{
++	sg->cfg = cpu_to_be32(QM_SG_EXT | (len & QM_SG_LEN_MASK));
++}
 +
- 	/* Pool-channel management */
- /**
-  * qman_alloc_pool_range - Allocate a contiguous range of pool-channel IDs
+ static inline void qm_sg_entry_set_f(struct qm_sg_entry *sg, int len)
+ {
+ 	sg->cfg = cpu_to_be32(QM_SG_FIN | (len & QM_SG_LEN_MASK));
+ }
+ 
++static inline void qm_sg_entry_set_ef(struct qm_sg_entry *sg, int len)
++{
++	sg->cfg = cpu_to_be32(QM_SG_EXT | QM_SG_FIN | (len & QM_SG_LEN_MASK));
++}
++
+ static inline int qm_sg_entry_get_off(const struct qm_sg_entry *sg)
+ {
+ 	return be32_to_cpu(sg->offset) & QM_SG_OFF_MASK;
+ }
+ 
++static inline void qm_sg_entry_set_off(struct qm_sg_entry *sg, int off)
++{
++	sg->offset = cpu_to_be16(off & QM_SG_OFF_MASK);
++}
++
+ /* "Frame Dequeue Response" */
+ struct qm_dqrr_entry {
+ 	u8 verb;
+@@ -494,6 +515,21 @@ static inline int qm_fqd_get_wq(const struct qm_fqd *fqd)
+ 	return be16_to_cpu(fqd->dest_wq) & QM_FQD_WQ_MASK;
+ }
+ 
++static inline bool qm_fqd_isset_fqctrl(const struct qm_fqd *fqd, u16 mask)
++{
++	return be16_to_cpu(fqd->fq_ctrl) & mask;
++}
++
++static inline void qm_fqd_set_fqctrl(struct qm_fqd *fqd, int val)
++{
++	fqd->fq_ctrl = cpu_to_be16(val);
++}
++
++static inline void qm_fqd_set_contextb(struct qm_fqd *fqd, int val)
++{
++	fqd->context_b = cpu_to_be32(val);
++}
++
+ /* See "Frame Queue Descriptor (FQD)" */
+ /* Frame Queue Descriptor (FQD) field 'fq_ctrl' uses these constants */
+ #define QM_FQCTRL_MASK		0x07ff	/* 'fq_ctrl' flags; */
+@@ -616,6 +652,16 @@ struct qm_mcc_initcgr {
+ 	u8 __reserved3[32];
+ } __packed;
+ 
++static inline void qm_initfq_setbits(struct qm_mcc_initfq *p, u16 we_mask)
++{
++	p->we_mask |= cpu_to_be16(we_mask);
++}
++
++static inline void qm_initcgr_setbits(struct qm_mcc_initcgr *p, u16 we_mask)
++{
++	p->we_mask |= cpu_to_be16(we_mask);
++}
++
+ /* INITFQ-specific flags */
+ #define QM_INITFQ_WE_MASK		0x01ff	/* 'Write Enable' flags; */
+ #define QM_INITFQ_WE_OAC		0x0100
+@@ -642,6 +688,7 @@ struct qm_mcc_initcgr {
+ #define QM_CGR_WE_MODE			0x0001
+ 
+ #define QMAN_CGR_FLAG_USE_INIT	     0x00000001
++#define QMAN_CGR_MODE_FRAME          0x00000001
+ 
+ 	/* Portal and Frame Queues */
+ /* Represents a managed portal */
 -- 
 2.4.4
