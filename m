@@ -1,80 +1,28 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 3 Mar 2017 12:27:04 +0000
-Subject: [PATCH] arm64: mm: Add workaround for Qualcomm Technologies
- Falkor erratum E1029
-In-Reply-To: <1488500355-7199-1-git-send-email-timur@codeaurora.org>
-References: <1488500355-7199-1-git-send-email-timur@codeaurora.org>
-Message-ID: <20170303122703.GA12945@leverpostej>
+From: robin@protonic.nl (Robin van der Gracht)
+Date: Fri,  3 Mar 2017 13:36:53 +0100
+Subject: [PATCH] clk: imx: correct uart4_serial clock name in driver for
+ i.MX6UL
+Message-ID: <20170303123653.8931-1-robin@protonic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 06:19:15PM -0600, Timur Tabi wrote:
-> From: Neil Leeder <nleeder@codeaurora.org>
-> 
-> The Falkor core includes support for generating interrupt requests from
-> CPU or L2 performance monitor events or cycle counter overflows,
-> resulting in an IRQ or FIQ asynchronous interrupt request.  In cases
-> where the CPU performance monitor interrupt request is generated in
-> close proximity to the instruction stream executing a WFI or WFE
-> instruction, the Falkor core may hang prior to entering the wait
-> state.
-> 
-> The workaround for this condition is to add a config option and
-> alternative_if processing in cpu_do_idle. For falkor v1 processor
-> For processors other than Falkor v1, these instructions are
-> replaced by nops.
+Signed-off-by: Robin van der Gracht <robin@protonic.nl>
+---
+ drivers/clk/imx/clk-imx6ul.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The idle loop is not the only place where WFI can occur.
-
-Notably, firmware is within its rights to use WFI, as is userspace given
-that SCTLR_EL1.nTWI is set at boot time. So IIUC, userspace can deadlock
-a core, which makes this sound very serious.
-
-Can this *only* happen for the PMU interrupt?
-
-I assume that as mentioned for other Falkor workarounds "the affected
-chips are pre-production and are only available to select customers for
-a limited time"?
-
-Given that we're having to a fair amount of the arm64 core code, for
-parts that QC don't even intend to support long term, it's increasingly
-difficult to care about this upstream.
-
-Are additional workarounds necessary for these parts?
-
-[...]
-
->  ENTRY(cpu_do_idle)
-> -	dsb	sy				// WFI may enter a low-power mode
-> +#ifndef CONFIG_QCOM_FALKOR_ERRATUM_E1029
-> +	dsb	sy			// WFI may enter a low-power mode
->  	wfi
->  	ret
-> +#else
-> +alternative_if_not ARM64_WORKAROUND_QCOM_FALKOR_E1029
-> +	dsb	sy			// WFI may enter a low-power mode
-> +	wfi
-> +	ret
-> +	nop
-> +	nop
-> +	nop
-> +	nop
-> +	nop
-> +alternative_else
-> +	mrs	x2, pmintenset_el1
-> +	msr	pmintenclr_el1, x2
-> +	isb
-> +	dsb	sy			// WFI may enter a low-power mode
-> +	wfi
-> +	msr	pmintenset_el1, x2
-> +	isb
-> +	ret
-> +alternative_endif
-> +#endif
->  ENDPROC(cpu_do_idle)
-
-NAK to poking the PMU registers here. This path shouldn't know anything
-about the PMU.
-
-Thanks,
-Mark.
+diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
+index 0f1f17a..4dcd107 100644
+--- a/drivers/clk/imx/clk-imx6ul.c
++++ b/drivers/clk/imx/clk-imx6ul.c
+@@ -325,7 +325,7 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX6UL_CLK_GPT1_BUS]	= imx_clk_gate2("gpt1_bus",	"perclk",	base + 0x6c,	20);
+ 	clks[IMX6UL_CLK_GPT1_SERIAL]	= imx_clk_gate2("gpt1_serial",	"perclk",	base + 0x6c,	22);
+ 	clks[IMX6UL_CLK_UART4_IPG]	= imx_clk_gate2("uart4_ipg",	"ipg",		base + 0x6c,	24);
+-	clks[IMX6UL_CLK_UART4_SERIAL]	= imx_clk_gate2("uart4_serail",	"uart_podf",	base + 0x6c,	24);
++	clks[IMX6UL_CLK_UART4_SERIAL]	= imx_clk_gate2("uart4_serial",	"uart_podf",	base + 0x6c,	24);
+ 
+ 	/* CCGR2 */
+ 	clks[IMX6UL_CLK_CSI]		= imx_clk_gate2("csi",		"csi_podf",		base + 0x70,	2);
+-- 
+2.9.3
