@@ -1,62 +1,593 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Fri, 3 Mar 2017 18:07:39 +0100
-Subject: No output on console despite ignore_loglevel earlyprintk
-In-Reply-To: <6cc48f5c-b028-2bb7-c09b-92c36554fe07@suse.de>
-References: <6d16a384-1a4c-bf27-fd81-ea3caf3de6b0@sigmadesigns.com>
- <6cc48f5c-b028-2bb7-c09b-92c36554fe07@suse.de>
-Message-ID: <0e7d14d5-d087-cba3-1792-fb0abf1142ef@sigmadesigns.com>
+From: ansuelsmth@gmail.com (Ansuel Smith)
+Date: Fri,  3 Mar 2017 18:07:35 +0100
+Subject: [PATCH] ARM: DTS armada: Add support for 2 more mvebu model
+Message-ID: <1488560855-421-1-git-send-email-ansuelsmth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2017 17:59, Andreas F?rber wrote:
+This patch add support for 2 Linksys router model
+(shelby and rango). With this we now support all
+the mvebu board on the market.
 
-> Hi,
-> 
-> Am 03.03.2017 um 17:42 schrieb Marc Gonzalez:
->> I'm confused about early consoles and earlyprintk, and all that good stuff.
->> When my kernel panics, I don't get the expected output.
->>
->> Using "mem=256M ignore_loglevel earlyprintk"
-> [...]
->> [    0.014325] Console: colour dummy device 80x30
->> [    0.018885] console [tty0] enabled
->> [    0.022396] bootconsole [earlycon0] disabled
->>
->> And it hangs there.
->>
->>
->> If I use an explicit console= configuration, I do see the panic.
->> Using "mem=256M ignore_loglevel console=ttyS0,115200 earlyprintk"
-> [...]
->> [    0.014325] Console: colour dummy device 80x30
->> [    0.018899] Calibrating delay loop (skipped), value calculated using timer frequency.. 54.25 BogoMIPS (lpj=90000)
-> [...]
-> 
-> I have reported a similar phenomenon for multiple new SoCs.
-> 
->> I suppose this is related to my DT description?
->>
->> 	chosen {
->> 		stdout-path = "serial:115200n8";
->> 	};
->>
->> Isn't stdout-path = "serial:115200n8" supposed to be equivalent to
->> console=ttyS0,115200 ?
-> 
-> First of all, that should probably be serial0, and it needs to be
-> defined as an alias. In my case that's a given.
+Signed-off-by: Imre Kaloz <kaloz@openwrt.org>
+Signed-off-by: ?lvaro Fern?ndez Rojas <noltari@gmail.com>
+Signed-off-by: Ansuel Smith <ansuelsmth@gmail.com>
+---
+ arch/arm/boot/dts/armada-385-linksys-rango.dts  | 443 ++++++++++++++++++++++++
+ arch/arm/boot/dts/armada-385-linksys-shelby.dts | 115 ++++++
+ 2 files changed, 558 insertions(+)
+ create mode 100644 arch/arm/boot/dts/armada-385-linksys-rango.dts
+ create mode 100644 arch/arm/boot/dts/armada-385-linksys-shelby.dts
 
-My DT root node contains
-
-	aliases {
-		serial = &uart;
-		eth0 = &eth0;
-	};
-
-Should I be using serial0 everywhere?
-(I thought I could call it "foo", if I wanted.)
-
-> And yes, AFAIU stdout-path = "serialX:115200n8" should lead to
-> ttyFOOX,115200n8 being used, in your case it may be ttyS0.
-
-Regards.
+diff --git a/arch/arm/boot/dts/armada-385-linksys-rango.dts b/arch/arm/boot/dts/armada-385-linksys-rango.dts
+new file mode 100644
+index 0000000..61f4592
+--- /dev/null
++++ b/arch/arm/boot/dts/armada-385-linksys-rango.dts
+@@ -0,0 +1,443 @@
++/*
++ * Device Tree file for the Linksys WRT3200ACM (Rango)
++ *
++ * Copyright (C) 2016 Imre Kaloz <kaloz@openwrt.org>
++ *
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is licensed under the terms of the GNU General Public
++ *     License version 2.  This program is licensed "as is" without
++ *     any warranty of any kind, whether express or implied.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include "armada-385.dtsi"
++
++/ {
++	model = "Linksys WRT3200ACM";
++	compatible = "linksys,rango", "linksys,armada385", "marvell,armada385",
++		     "marvell,armada380";
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x20000000>; /* 512 MB */
++	};
++
++	soc {
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000
++			  MBUS_ID(0x01, 0x1d) 0 0xfff00000 0x100000
++			  MBUS_ID(0x09, 0x19) 0 0xf1100000 0x10000
++			  MBUS_ID(0x09, 0x15) 0 0xf1110000 0x10000
++			  MBUS_ID(0x0c, 0x04) 0 0xf1200000 0x100000>;
++
++		internal-regs {
++
++			spi at 10600 {
++				status = "disabled";
++			};
++
++			i2c at 11000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&i2c0_pins>;
++				status = "okay";
++
++				tmp421 at 4c {
++					compatible = "ti,tmp421";
++					reg = <0x4c>;
++				};
++
++				pca9635 at 68 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					compatible = "nxp,pca9635";
++					reg = <0x68>;
++
++					wan_amber at 0 {
++						label = "rango:amber:wan";
++						reg = <0x0>;
++					};
++
++					wan_white at 1 {
++						label = "rango:white:wan";
++						reg = <0x1>;
++					};
++
++					usb2 at 5 {
++						label = "rango:white:usb2";
++						reg = <0x5>;
++					};
++
++					usb3_1 at 6 {
++						label = "rango:white:usb3_1";
++						reg = <0x6>;
++					};
++
++					usb3_2 at 7 {
++						label = "rango:white:usb3_2";
++						reg = <0x7>;
++					};
++
++					wps_white at 8 {
++						label = "rango:white:wps";
++						reg = <0x8>;
++					};
++
++					wps_amber at 9 {
++						label = "rango:amber:wps";
++						reg = <0x9>;
++					};
++				};
++			};
++
++			/* J10: VCC, NC, RX, NC, TX, GND  */
++			serial at 12000 {
++				status = "okay";
++			};
++
++			ethernet at 70000 {
++				status = "okay";
++				phy-mode = "rgmii-id";
++				buffer-manager = <&bm>;
++				bm,pool-long = <0>;
++				bm,pool-short = <3>;
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++				};
++			};
++
++			ethernet at 34000 {
++				status = "okay";
++				phy-mode = "sgmii";
++				buffer-manager = <&bm>;
++				bm,pool-long = <2>;
++				bm,pool-short = <3>;
++				fixed-link {
++					speed = <1000>;
++					full-duplex;
++				};
++			};
++
++			mdio {
++				status = "okay";
++			};
++
++			bm at c8000 {
++				status = "okay";
++			};
++
++			sata at a8000 {
++				status = "okay";
++			};
++
++			/* USB part of the eSATA/USB 2.0 port */
++			usb at 58000 {
++				status = "okay";
++			};
++
++			usb3 at f8000 {
++				status = "okay";
++				usb-phy = <&usb3_phy>;
++			};
++
++			flash at d0000 {
++				status = "okay";
++				num-cs = <1>;
++				marvell,nand-keep-config;
++				marvell,nand-enable-arbiter;
++				nand-on-flash-bbt;
++
++				partition at 0 {
++					label = "u-boot";
++					reg = <0x0000000 0x200000>;  /* 2MB */
++					read-only;
++				};
++
++				partition at 200000 {
++					label = "u_env";
++					reg = <0x200000 0x20000>;    /* 128KB */
++				};
++
++				partition at 220000 {
++					label = "s_env";
++					reg = <0x220000 0x40000>;    /* 256KB */
++				};
++
++				partition at 7e0000 {
++					label = "devinfo";
++					reg = <0x7e0000 0x40000>;   /* 256KB */
++					read-only;
++				};
++
++				partition at 820000 {
++					label = "sysdiag";
++					reg = <0x820000 0x1e0000>;   /* 1920KB */
++					read-only;
++				};
++
++				/* kernel1 overlaps with rootfs1 by design */
++				partition at a00000 {
++					label = "kernel1";
++					reg = <0xa00000 0x5000000>;  /* 80MB */
++				};
++
++				partition at 1000000 {
++					label = "rootfs1";
++					reg = <0x1000000 0x4a00000>;  /* 74MB */
++				};
++
++				/* kernel2 overlaps with rootfs2 by design */
++				partition at 5a00000 {
++					label = "kernel2";
++					reg = <0x5a00000 0x5000000>; /* 80MB */
++				};
++
++				partition at 6000000 {
++					label = "rootfs2";
++					reg = <0x6000000 0x4a00000>; /* 74MB */
++				};
++
++				/*
++				 * 86MB, last MB is for the BBT, not writable
++				 */
++				partition at aa00000 {
++					label = "syscfg";
++					reg = <0xaa00000 0x5600000>;
++				};
++
++				/*
++				 * Unused area between "s_env" and "devinfo".
++				 * Moved here because otherwise the renumbered
++				 * partitions would break the bootloader
++				 * supplied bootargs
++				 */
++				partition at 180000 {
++					label = "unused_area";
++					reg = <0x260000 0x5c0000>;   /* 5.75MB */
++				};
++			};
++		};
++
++		bm-bppi {
++			status = "okay";
++		};
++
++		pcie-controller {
++			status = "okay";
++
++			pcie at 1,0 {
++				/* Marvell 88W8964, 5GHz-only */
++				status = "okay";
++
++				mwlwifi {
++					marvell,2ghz = <0>;
++					marvell,chainmask = <4 4>;
++				};
++
++			};
++
++			pcie at 2,0 {
++				/* Marvell 88W8964, 2GHz-only */
++				status = "okay";
++
++				mwlwifi {
++					marvell,5ghz = <0>;
++					marvell,chainmask = <4 4>;
++				};
++
++			};
++		};
++	};
++
++	usb3_phy: usb3_phy {
++		compatible = "usb-nop-xceiv";
++		vcc-supply = <&reg_xhci0_vbus>;
++	};
++
++	reg_xhci0_vbus: xhci0-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&xhci0_vbus_pins>;
++		regulator-name = "xhci0-vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		enable-active-high;
++		gpio = <&gpio1 15 GPIO_ACTIVE_HIGH>;
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-0 = <&reset_key_pin &wps_key_pin>;
++		pinctrl-names = "default";
++
++		button at 1 {
++			label = "WPS";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
++		};
++
++		button at 2 {
++			label = "Factory Reset Button";
++			linux,code = <KEY_RESTART>;
++			gpios = <&gpio0 29 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-0 = <&power_led_pin &sata_led_pin &wlan_2g_led_pin &wlan_5g_led_pin>;
++		pinctrl-names = "default";
++
++		sata {
++			label = "rango:white:sata";
++			gpios = <&gpio0 21 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "disk-activity";
++		};
++
++		wlan_2g {
++			label = "rango:white:wlan_2g";
++			gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
++		};
++
++		wlan_5g {
++			label = "rango:white:wlan_5g";
++			gpios = <&gpio1 14 GPIO_ACTIVE_LOW>;
++		};
++
++		power {
++			label = "rango:white:power";
++			gpios = <&gpio1 24 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++	};
++
++	dsa at 0 {
++		compatible = "marvell,dsa";
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		dsa,ethernet = <&eth2>;
++		dsa,mii-bus = <&mdio>;
++
++		switch at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x0 0>;	/* MDIO address 0, switch 0 in tree */
++
++			port at 0 {
++				reg = <0>;
++				label = "lan4";
++			};
++
++			port at 1 {
++				reg = <1>;
++				label = "lan3";
++			};
++
++			port at 2 {
++				reg = <2>;
++				label = "lan2";
++			};
++
++			port at 3 {
++				reg = <3>;
++				label = "lan1";
++			};
++
++			port at 4 {
++				reg = <4>;
++				label = "wan";
++			};
++
++			port at 5 {
++				reg = <5>;
++				label = "cpu";
++			};
++		};
++	};
++
++	mvsw61xx {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "marvell,88e6352";
++		status = "okay";
++		reg = <0x10>;
++
++		mii-bus = <&mdio>;
++		cpu-port-0 = <5>;
++		cpu-port-1 = <6>;
++	};
++
++};
++
++&pinctrl {
++	sata_led_pin: sata-led-pin {
++		marvell,pins = "mpp21";
++		marvell,function = "gpio";
++	};
++
++	wps_key_pin: wps-key-pin {
++		marvell,pins = "mpp24";
++		marvell,function = "gpio";
++	};
++
++	reset_key_pin: reset-key-pin {
++		marvell,pins = "mpp29";
++		marvell,function = "gpio";
++	};
++
++	wlan_2g_led_pin: wlan-2g-led-pin {
++		marvell,pins = "mpp45";
++		marvell,function = "gpio";
++	};
++
++	wlan_5g_led_pin: wlan-5g-led-pin {
++		marvell,pins = "mpp46";
++		marvell,function = "gpio";
++	};
++
++	xhci0_vbus_pins: xhci0-vbus-pins {
++		marvell,pins = "mpp47";
++		marvell,function = "gpio";
++	};
++
++	power_led_pin: power-led-pin {
++		marvell,pins = "mpp56";
++		marvell,function = "gpio";
++	};
++};
+diff --git a/arch/arm/boot/dts/armada-385-linksys-shelby.dts b/arch/arm/boot/dts/armada-385-linksys-shelby.dts
+new file mode 100644
+index 0000000..f8dd193
+--- /dev/null
++++ b/arch/arm/boot/dts/armada-385-linksys-shelby.dts
+@@ -0,0 +1,115 @@
++/*
++ * Device Tree file for the Linksys WRT1900ACS (Shelby)
++ *
++ * Copyright (C) 2015 Imre Kaloz <kaloz@openwrt.org>
++ *
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is licensed under the terms of the GNU General Public
++ *     License version 2.  This program is licensed "as is" without
++ *     any warranty of any kind, whether express or implied.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "armada-385-linksys.dtsi"
++
++/ {
++	model = "Linksys WRT1900ACS";
++	compatible = "linksys,shelby", "linksys,armada385", "marvell,armada385",
++		     "marvell,armada380";
++
++	soc {
++		internal-regs{
++			i2c at 11000 {
++
++				pca9635 at 68 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++					wan_amber at 0 {
++						label = "shelby:amber:wan";
++						reg = <0x0>;
++					};
++
++					wan_white at 1 {
++						label = "shelby:white:wan";
++						reg = <0x1>;
++					};
++
++					wlan_2g at 2 {
++						label = "shelby:white:wlan_2g";
++						reg = <0x2>;
++					};
++
++					wlan_5g at 3 {
++						label = "shelby:white:wlan_5g";
++						reg = <0x3>;
++					};
++
++					usb2 at 5 {
++						label = "shelby:white:usb2";
++						reg = <0x5>;
++					};
++
++					usb3_1 at 6 {
++						label = "shelby:white:usb3_1";
++						reg = <0x6>;
++					};
++
++					usb3_2 at 7 {
++						label = "shelby:white:usb3_2";
++						reg = <0x7>;
++					};
++
++					wps_white at 8 {
++						label = "shelby:white:wps";
++						reg = <0x8>;
++					};
++
++					wps_amber at 9 {
++						label = "shelby:amber:wps";
++						reg = <0x9>;
++					};
++				};
++			};
++		};
++	};
++
++	gpio-leds {
++		power {
++			label = "shelby:white:power";
++		};
++
++		sata {
++			label = "shelby:white:sata";
++			linux,default-trigger = "disk-activity";
++		};
++	};
++};
+-- 
+2.7.4
