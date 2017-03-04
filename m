@@ -1,110 +1,195 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Sat, 4 Mar 2017 15:13:29 +0200
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170303230645.GR21222@n2100.armlinux.org.uk>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
- <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
- <20170303230645.GR21222@n2100.armlinux.org.uk>
-Message-ID: <20170304131329.GV3220@valkosipuli.retiisi.org.uk>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sat, 4 Mar 2017 14:15:39 +0100
+Subject: [PATCH v2 4/5] ARM64: dts: Prepare Realtek RTD1295 and Zidoo X9S
+In-Reply-To: <20170228000327.hnenlharcmiqxkpb@rob-hp-laptop>
+References: <20170223164553.3715-1-afaerber@suse.de>
+ <20170223164553.3715-5-afaerber@suse.de>
+ <20170228000327.hnenlharcmiqxkpb@rob-hp-laptop>
+Message-ID: <c8f9941f-17ab-5db0-5f6c-186fe1a87bbf@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-On Fri, Mar 03, 2017 at 11:06:45PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Mar 02, 2017 at 06:02:57PM +0200, Sakari Ailus wrote:
-> > Hi Steve,
-> > 
-> > On Wed, Feb 15, 2017 at 06:19:16PM -0800, Steve Longerbeam wrote:
-> > > v4l2_pipeline_inherit_controls() will add the v4l2 controls from
-> > > all subdev entities in a pipeline to a given video device.
-> > > 
-> > > Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> > > ---
-> > >  drivers/media/v4l2-core/v4l2-mc.c | 48 +++++++++++++++++++++++++++++++++++++++
-> > >  include/media/v4l2-mc.h           | 25 ++++++++++++++++++++
-> > >  2 files changed, 73 insertions(+)
-> > > 
-> > > diff --git a/drivers/media/v4l2-core/v4l2-mc.c b/drivers/media/v4l2-core/v4l2-mc.c
-> > > index 303980b..09d4d97 100644
-> > > --- a/drivers/media/v4l2-core/v4l2-mc.c
-> > > +++ b/drivers/media/v4l2-core/v4l2-mc.c
-> > > @@ -22,6 +22,7 @@
-> > >  #include <linux/usb.h>
-> > >  #include <media/media-device.h>
-> > >  #include <media/media-entity.h>
-> > > +#include <media/v4l2-ctrls.h>
-> > >  #include <media/v4l2-fh.h>
-> > >  #include <media/v4l2-mc.h>
-> > >  #include <media/v4l2-subdev.h>
-> > > @@ -238,6 +239,53 @@ int v4l_vb2q_enable_media_source(struct vb2_queue *q)
-> > >  }
-> > >  EXPORT_SYMBOL_GPL(v4l_vb2q_enable_media_source);
-> > >  
-> > > +int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
-> > > +				     struct media_entity *start_entity)
-> > 
-> > I have a few concerns / questions:
-> > 
-> > - What's the purpose of this patch? Why not to access the sub-device node
-> >   directly?
+Am 28.02.2017 um 01:03 schrieb Rob Herring:
+> On Thu, Feb 23, 2017 at 05:45:51PM +0100, Andreas F?rber wrote:
+>> Add initial device trees for the RTD1295 SoC and the Zidoo X9S TV box.
+>>
+>> The CPUs lack the enable-method property because the vendor device tree
+>> uses a custom "rtk-spin-table" method and "psci" did not appear to work.
+>>
+>> The UARTs lack the interrupts properties because the vendor device tree
+>> connects them to a custom interrupt controller. earlycon works without.
+>>
+>> A list of memory reservations is adopted from v1.2.11 vendor device tree:
+>> 0x02200000 can be used for an initrd, 0x01b00000 is audio-related;
+>> ion-related 0x02600000, 0x02c00000 and 0x11000000 are left out;
+>> 0x10000000 is used for sharing the U-Boot environment; others remain
+>> to be investigated.
+>>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  v1 -> v2:
+>>  * Dropped 0x0000000010000000 /memreserve/
+>>  
+>>  arch/arm64/boot/dts/Makefile                      |   1 +
+>>  arch/arm64/boot/dts/realtek/Makefile              |   5 +
+>>  arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts |  78 +++++++++++
+>>  arch/arm64/boot/dts/realtek/rtd1295.dtsi          | 162 ++++++++++++++++++++++
+>>  4 files changed, 246 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/realtek/Makefile
+>>  create mode 100644 arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts
+>>  create mode 100644 arch/arm64/boot/dts/realtek/rtd1295.dtsi
+>>
+>> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+>> index 080232b..78f7991 100644
+>> --- a/arch/arm64/boot/dts/Makefile
+>> +++ b/arch/arm64/boot/dts/Makefile
+>> @@ -14,6 +14,7 @@ dts-dirs += marvell
+>>  dts-dirs += mediatek
+>>  dts-dirs += nvidia
+>>  dts-dirs += qcom
+>> +dts-dirs += realtek
+>>  dts-dirs += renesas
+>>  dts-dirs += rockchip
+>>  dts-dirs += socionext
+>> diff --git a/arch/arm64/boot/dts/realtek/Makefile b/arch/arm64/boot/dts/realtek/Makefile
+>> new file mode 100644
+>> index 0000000..8521e92
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/realtek/Makefile
+>> @@ -0,0 +1,5 @@
+>> +dtb-$(CONFIG_ARCH_REALTEK) += rtd1295-zidoo-x9s.dtb
+>> +
+>> +always		:= $(dtb-y)
+>> +subdir-y	:= $(dts-dirs)
+>> +clean-files	:= *.dtb
+>> diff --git a/arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts b/arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts
+>> new file mode 100644
+>> index 0000000..53302bb
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts
+>> @@ -0,0 +1,78 @@
+>> +/*
+>> + * Copyright (c) 2016-2017 Andreas F?rber
+>> + *
+>> + * This file is dual-licensed: you can use it either under the terms
+>> + * of the GPL or the X11 license, at your option. Note that this dual
+>> + * licensing only applies to this file, and not this project as a
+>> + * whole.
 > 
-> What tools are in existance _today_ to provide access to these controls
-> via the sub-device nodes?
+> You can use SPDX tag here instead.
 
-yavta, for instance:
+Already done. :)
 
-<URL:http://git.ideasonboard.org/yavta.git>
-
-VIDIOC_QUERYCAP isn't supported on sub-devices and v4l2-ctl appears to be
-checking for that. That check should be removed (with possible other
-implications taken into account).
-
+>> +	reserved-memory {
+>> +		#address-cells = <2>;
+>> +		#size-cells = <2>;
 > 
-> v4l-tools doesn't last time I looked - in fact, the only tool in v4l-tools
-> which is capable of accessing the subdevices is media-ctl, and that only
-> provides functionality for configuring the pipeline.
+> Unless you have >4GB regions, you don't really need 2 cells here.
+
+Correct, but using less cells than in the root node requires a ranges
+mapping, and we don't have size information available for that. So I
+would rather leave it like this initially.
+
+>> +		ranges;
+>> +
+>> +		tee at 10100000 {
+>> +			reg = <0x0 0x10100000 0x0 0xf00000>;
+>> +			no-map;
+>> +		};
+>> +	};
 > 
-> So, pointing people at vapourware userspace is really quite rediculous.
-
-Do bear in mind that there are other programs that can make use of these
-interfaces. It's not just the test programs, or a test program you attempted
-to use.
-
 > 
-> The established way to control video capture is through the main video
-> capture device, not through the sub-devices.  Yes, the controls are
-> exposed through sub-devices too, but that does not mean that is the
-> correct way to access them.
-
-It is. That's the very purpose of the sub-devices: to provide access to the
-hardware independently of how the links are configured.
-
+>> +	soc {
+>> +		compatible = "simple-bus";
+>> +		#address-cells = <2>;
+>> +		#size-cells = <2>;
 > 
-> The v4l2 documentation (Documentation/media/kapi/v4l2-controls.rst)
-> even disagrees with your statements.  That talks about control
-> inheritence from sub-devices to the main video device, and the core
-> v4l2 code provides _automatic_ support for this - see
-> v4l2_device_register_subdev():
-> 
->         /* This just returns 0 if either of the two args is NULL */
->         err = v4l2_ctrl_add_handler(v4l2_dev->ctrl_handler, sd->ctrl_handler, NULL);
-> 
-> which merges the subdev's controls into the main device's control
-> handler.
+> Same here. And use ranges to narrow the address space to what you need.
 
-That's done on different kind of devices: those that provide plain V4L2 API
-to control the entire device. V4L2 sub-device interface is used *in kernel*
-as an interface to control sub-devices that do not need to be exposed to the
-user space.
+By my definition, SoC is the whole memory range.
 
-Devices that have complex pipeline that do essentially require using the
-Media controller interface to configure them are out of that scope.
+And as pointed out in the v1 cover letter, I don't have sufficient
+documentation for this chip - there's not even a general address map in
+the datasheet, nor any bus information - so any attempt to restrict it
+would be a wild guess and specific to the 2G .dts rather than suitable
+for the generic .dtsi here.
+
+If we had the info, I would still want to leave the soc node like this
+and instead have bus sub-nodes with suitable ranges, like we did for
+meson-gxbb. I don't see harm in having the .dts be a few cells larger.
+
+>> +		ranges;
+>> +
+>> +		uart0: serial at 98007800 {
+>> +			compatible = "snps,dw-apb-uart";
+>> +			reg = <0x0 0x98007800 0x0 0x400>,
+>> +			      <0x0 0x98007000 0x0 0x100>;
+>> +			reg-shift = <2>;
+>> +			reg-io-width = <4>;
+>> +			clock-frequency = <27000000>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		uart1: serial at 9801b200 {
+>> +			compatible = "snps,dw-apb-uart";
+>> +			reg = <0x0 0x9801b200 0x0 0x100>,
+>> +			      <0x0 0x9801b00c 0x0 0x100>;
+>> +			reg-shift = <2>;
+>> +			reg-io-width = <4>;
+>> +			clock-frequency = <432000000>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		uart2: serial at 9801b400 {
+>> +			compatible = "snps,dw-apb-uart";
+>> +			reg = <0x0 0x9801b400 0x0 0x100>,
+>> +			      <0x0 0x9801b00c 0x0 0x100>;
+>> +			reg-shift = <2>;
+>> +			reg-io-width = <4>;
+>> +			clock-frequency = <432000000>;
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		gic: interrupt-controller at ff011000 {
+>> +			compatible = "arm,gic-400";
+>> +			reg = <0x0 0xff011000 0x0 0x1000>,
+>> +			      <0x0 0xff012000 0x0 0x1000>;
+> 
+> You are missing some register ranges and the sizes may be wrong. Check 
+> the binding doc.
+
+I have in the meantime tested that 1k, 2k, 2k, 2k plus PPI 9 lets KVM
+initialize the vGIC:
+
+[    0.256915] kvm [1]: 8-bit VMID
+[    0.256951] kvm [1]: IDMAP page: 73f000
+[    0.256986] kvm [1]: HYP VA range: 800000000000:ffffffffffff
+[    0.257417] kvm [1]: Hyp mode initialized successfully
+[    0.257479] kvm [1]: vgic-v2 at ff014000
+[    0.257554] kvm [1]: vgic interrupt IRQ1
+[    0.257600] kvm [1]: virtual timer IRQ4
+
+As usual, not yet tested with a guest for lack of proper rootfs.
+
+Mark, is there any benefit in using a raw 0xf mask over a simple 4, when
+there are only 4 CPUs? I tested the simple 4 copied from my S900,
+whereas the timer based on the vendor device tree uses raw 0xf, i.e.,
+simple 8. Should I change that to be consistently simple 4?
+
+>> +			interrupt-controller;
+>> +			#interrupt-cells = <3>;
+>> +		};
+>> +	};
+>> +};
+
+Additionally I am dropping the irq.h include, because arm-gic.h already
+does that for us.
+
+Regards,
+Andreas
 
 -- 
-Regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
