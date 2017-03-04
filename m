@@ -1,101 +1,126 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat,  4 Mar 2017 07:02:10 -0800
-Subject: [PATCH v3 1/2] ARM: OMAP2+: Fix device node reference counts
-Message-ID: <1488639731-8047-1-git-send-email-linux@roeck-us.net>
+Date: Sat, 4 Mar 2017 07:04:58 -0800
+Subject: [PATCH 1/4] watchdog: sama5d4: fix WDDIS handling
+In-Reply-To: <20170302173114.28508-2-alexandre.belloni@free-electrons.com>
+References: <20170302173114.28508-1-alexandre.belloni@free-electrons.com>
+ <20170302173114.28508-2-alexandre.belloni@free-electrons.com>
+Message-ID: <75caf7fe-8922-cd7e-897f-59cb763c1583@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit 0549bde0fcb1 ("of: fix of_node leak caused in
-of_find_node_opts_by_path"), the following error may be
-reported when running omap images.
+On 03/02/2017 09:31 AM, Alexandre Belloni wrote:
+> The datasheet states: "When setting the WDDIS bit, and while it is set, the
+> fields WDV and WDD must not be modified."
+>
+> Because the whole configuration is already cached inside .mr, wait for the
+> user to enable the watchdog to configure it so it is enabled and configured
+> at the same time (what the IP is actually expecting).
+>
+> When the watchdog is already enabled, it is not an issue to reconfigure it.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-OF: ERROR: Bad of_node_put() on /ocp at 68000000
-CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc7-next-20170210 #1
-Hardware name: Generic OMAP3-GP (Flattened Device Tree)
-[<c0310604>] (unwind_backtrace) from [<c030bbf4>] (show_stack+0x10/0x14)
-[<c030bbf4>] (show_stack) from [<c05add8c>] (dump_stack+0x98/0xac)
-[<c05add8c>] (dump_stack) from [<c05af1b0>] (kobject_release+0x48/0x7c)
-[<c05af1b0>] (kobject_release)
-	from [<c0ad1aa4>] (of_find_node_by_name+0x74/0x94)
-[<c0ad1aa4>] (of_find_node_by_name)
-	from [<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable+0x24/0x2c)
-[<c1215bd4>] (omap3xxx_hwmod_is_hs_ip_block_usable) from
-[<c1215d5c>] (omap3xxx_hwmod_init+0x180/0x274)
-[<c1215d5c>] (omap3xxx_hwmod_init)
-	from [<c120faa8>] (omap3_init_early+0xa0/0x11c)
-[<c120faa8>] (omap3_init_early)
-	from [<c120fb2c>] (omap3430_init_early+0x8/0x30)
-[<c120fb2c>] (omap3430_init_early)
-	from [<c1204710>] (setup_arch+0xc04/0xc34)
-[<c1204710>] (setup_arch) from [<c1200948>] (start_kernel+0x68/0x38c)
-[<c1200948>] (start_kernel) from [<8020807c>] (0x8020807c)
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 
-of_find_node_by_name() drops the reference to the passed device node.
-The commit referenced above exposes this problem.
-
-To fix the problem, use of_get_child_by_name() instead of
-of_find_node_by_name(); of_get_child_by_name() does not drop
-the reference count of passed device nodes. While semantically
-different, we only look for immediate children of the passed
-device node, so of_get_child_by_name() is a more appropriate
-function to use anyway.
-
-Release the reference to the device node obtained with
-of_get_child_by_name() after it is no longer needed to avoid
-another device node leak.
-
-While at it, clean up the code and change the return type of
-omap3xxx_hwmod_is_hs_ip_block_usable() to bool to match its use
-and the return type of of_device_is_available().
-
-Cc: Qi Hou <qi.hou@windriver.com>
-Cc: Peter Rosin <peda@axentia.se>
-Cc: Rob Herring <robh@kernel.org>
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
----
-v3: Add commit SHA of patch exposing the problem
-    Clarify that it does not cause the problem but exposes it
-    Split into two patches
-v2: Change subject ('Grab reference to device nodes where needed'
-    didn't really cover all the changes made)
-    Use of_get_child_by_name() instead of of_find_node_by_name()
-    Drop references to device nodes as needed
-    Change return type of omap3xxx_hwmod_is_hs_ip_block_usable()
-    to bool
-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 56f917ec8621..44b5f9bbdde6 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -3111,16 +3111,20 @@ static struct omap_hwmod_ocp_if *omap3xxx_dss_hwmod_ocp_ifs[] __initdata = {
-  * Return: 0 if device named @dev_name is not likely to be accessible,
-  * or 1 if it is likely to be accessible.
-  */
--static int __init omap3xxx_hwmod_is_hs_ip_block_usable(struct device_node *bus,
--						       const char *dev_name)
-+static bool __init omap3xxx_hwmod_is_hs_ip_block_usable(struct device_node *bus,
-+							const char *dev_name)
- {
-+	struct device_node *node;
-+	bool available;
-+
- 	if (!bus)
--		return (omap_type() == OMAP2_DEVICE_TYPE_GP) ? 1 : 0;
-+		return omap_type() == OMAP2_DEVICE_TYPE_GP;
- 
--	if (of_device_is_available(of_find_node_by_name(bus, dev_name)))
--		return 1;
-+	node = of_get_child_by_name(bus, dev_name);
-+	available = of_device_is_available(node);
-+	of_node_put(node);
- 
--	return 0;
-+	return available;
- }
- 
- int __init omap3xxx_hwmod_init(void)
--- 
-2.7.4
+> ---
+>  drivers/watchdog/sama5d4_wdt.c | 48 ++++++++++++++++++++++++++----------------
+>  1 file changed, 30 insertions(+), 18 deletions(-)
+>
+> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+> index f709962018ac..5cee20caca78 100644
+> --- a/drivers/watchdog/sama5d4_wdt.c
+> +++ b/drivers/watchdog/sama5d4_wdt.c
+> @@ -44,6 +44,8 @@ MODULE_PARM_DESC(nowayout,
+>  	"Watchdog cannot be stopped once started (default="
+>  	__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+>
+> +#define wdt_enabled (!(wdt->mr & AT91_WDT_WDDIS))
+> +
+>  #define wdt_read(wdt, field) \
+>  	readl_relaxed((wdt)->reg_base + (field))
+>
+> @@ -89,7 +91,16 @@ static int sama5d4_wdt_set_timeout(struct watchdog_device *wdd,
+>  	wdt->mr &= ~AT91_WDT_WDD;
+>  	wdt->mr |= AT91_WDT_SET_WDV(value);
+>  	wdt->mr |= AT91_WDT_SET_WDD(value);
+> -	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+> +
+> +	/*
+> +	 * WDDIS has to be 0 when updating WDD/WDV. The datasheet states: When
+> +	 * setting the WDDIS bit, and while it is set, the fields WDV and WDD
+> +	 * must not be modified.
+> +	 * If the watchdog is enabled, then the timeout can be updated. Else,
+> +	 * wait that the user enables it.
+> +	 */
+> +	if (wdt_enabled)
+> +		wdt_write(wdt, AT91_WDT_MR, wdt->mr & ~AT91_WDT_WDDIS);
+>
+>  	wdd->timeout = timeout;
+>
+> @@ -145,23 +156,20 @@ static int of_sama5d4_wdt_init(struct device_node *np, struct sama5d4_wdt *wdt)
+>
+>  static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)
+>  {
+> -	struct watchdog_device *wdd = &wdt->wdd;
+> -	u32 value = WDT_SEC2TICKS(wdd->timeout);
+>  	u32 reg;
+> -
+>  	/*
+> -	 * Because the fields WDV and WDD must not be modified when the WDDIS
+> -	 * bit is set, so clear the WDDIS bit before writing the WDT_MR.
+> +	 * When booting and resuming, the bootloader may have changed the
+> +	 * watchdog configuration.
+> +	 * If the watchdog is already running, we can safely update it.
+> +	 * Else, we have to disable it properly.
+>  	 */
+> -	reg = wdt_read(wdt, AT91_WDT_MR);
+> -	reg &= ~AT91_WDT_WDDIS;
+> -	wdt_write(wdt, AT91_WDT_MR, reg);
+> -
+> -	wdt->mr |= AT91_WDT_SET_WDD(value);
+> -	wdt->mr |= AT91_WDT_SET_WDV(value);
+> -
+> -	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+> -
+> +	if (wdt_enabled) {
+> +		wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+> +	} else {
+> +		reg = wdt_read(wdt, AT91_WDT_MR);
+> +		if (!(reg & AT91_WDT_WDDIS))
+> +			wdt_write(wdt, AT91_WDT_MR, reg | AT91_WDT_WDDIS);
+> +	}
+>  	return 0;
+>  }
+>
+> @@ -172,6 +180,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+>  	struct resource *res;
+>  	void __iomem *regs;
+>  	u32 irq = 0;
+> +	u32 timeout;
+>  	int ret;
+>
+>  	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
+> @@ -221,6 +230,11 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>
+> +	timeout = WDT_SEC2TICKS(wdd->timeout);
+> +
+> +	wdt->mr |= AT91_WDT_SET_WDD(timeout);
+> +	wdt->mr |= AT91_WDT_SET_WDV(timeout);
+> +
+>  	ret = sama5d4_wdt_init(wdt);
+>  	if (ret)
+>  		return ret;
+> @@ -263,9 +277,7 @@ static int sama5d4_wdt_resume(struct device *dev)
+>  {
+>  	struct sama5d4_wdt *wdt = dev_get_drvdata(dev);
+>
+> -	wdt_write(wdt, AT91_WDT_MR, wdt->mr & ~AT91_WDT_WDDIS);
+> -	if (wdt->mr & AT91_WDT_WDDIS)
+> -		wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+> +	sama5d4_wdt_init(wdt);
+>
+>  	return 0;
+>  }
+>
