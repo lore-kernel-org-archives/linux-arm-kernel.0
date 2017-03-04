@@ -1,64 +1,241 @@
-From: carlos@systemhalted.org (Carlos O'Donell)
-Date: Fri, 3 Mar 2017 20:23:20 -0500
-Subject: [PATCH] uapi: fix asm/signal.h userspace compilation errors
-In-Reply-To: <20170302154845.GB3503@altlinux.org>
-References: <20170226010156.GA28831@altlinux.org>
- <CAK8P3a0YX3RGAqWN0mwUJtBsqUX0C+QRtJLrT_UA=wX6Z+q0DA@mail.gmail.com>
- <CAE2sS1h9QNV+31GMSv8aahJYOb9hFtFp5Aj-yVOfg7cjBHr_kg@mail.gmail.com>
- <20170302154845.GB3503@altlinux.org>
-Message-ID: <CAE2sS1i-xezJu2hHfzOxpCMZHc2J+dsturtqFPMRWHa6mm6ccQ@mail.gmail.com>
+From: robsonde@gmail.com (Derek Robson)
+Date: Sat,  4 Mar 2017 14:31:20 +1300
+Subject: [PATCH] Staging: media: platform: bcm2835 - Style fix
+Message-ID: <20170304013120.24949-1-robsonde@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 2, 2017 at 10:48 AM, Dmitry V. Levin <ldv@altlinux.org> wrote:
-> On Thu, Mar 02, 2017 at 10:22:18AM -0500, Carlos O'Donell wrote:
->> On Wed, Mar 1, 2017 at 11:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Sun, Feb 26, 2017 at 2:01 AM, Dmitry V. Levin <ldv@altlinux.org> wrote:
->> >> Include <stddef.h> (guarded by #ifndef __KERNEL__) to fix asm/signal.h
->> >> userspace compilation errors like this:
->> >>
->> >> /usr/include/asm/signal.h:126:2: error: unknown type name 'size_t'
->> >>   size_t ss_size;
->> >>
->> >> As no uapi header provides a definition of size_t, inclusion
->> >> of <stddef.h> seems to be the most conservative fix available.
-> [...]
->> > I'm not sure if this is the best fix. We generally should not include one
->> > standard header from another standard header. Would it be possible
->> > to use __kernel_size_t instead of size_t?
->>
->> In glibc we handle this with special use of __need_size_t with GCC's
->> provided stddef.h.
->>
->> For example glibc's signal.h does this:
->>
->> # define __need_size_t
->> # include <stddef.h>
->
-> Just to make it clear, do you suggest this approach for asm/signal.h as well?
+Fixed style of block comments across whole driver
+Found using checkpatch
 
-The kernel is duplicating userspace headers in the UAPI implementation
-and running into exactly the same problems we have already solved in
-userspace. We currently have no better solution than the "__need_*"
-interface for avoiding the duplication of the type definitions and the
-problems that come with that.
+Signed-off-by: Derek Robson <robsonde@gmail.com>
+---
+ .../media/platform/bcm2835/bcm2835-camera.c        | 24 ++++++++++++++--------
+ drivers/staging/media/platform/bcm2835/controls.c  | 22 +++++++++++---------
+ .../staging/media/platform/bcm2835/mmal-msg-port.h |  6 ++++--
+ drivers/staging/media/platform/bcm2835/mmal-msg.h  | 18 ++++++++--------
+ .../staging/media/platform/bcm2835/mmal-vchiq.c    |  3 ++-
+ .../staging/media/platform/bcm2835/mmal-vchiq.h    |  4 ++--
+ 6 files changed, 45 insertions(+), 32 deletions(-)
 
-I am taking this up with senior glibc developers on libc-alpha to see
-if we have a better suggestion. If you give me 72 hours I'll either
-have a better suggestion or the acknowledgement that my suggestion is
-the best practical solution we have.
-
-Note that in a GNU userspace stddef.h here comes from gcc, which
-completes the implementation of the C development environment that
-provides the types you need. The use of "__need_size_t" is a collusion
-between the components of the implementation and use by the Linux
-kernel would mean expecting something specific to a GNU
-implementation.
-
-I might suggest you use include/uapi/linux/libc-compat.h in an attempt
-to abstract away the GNU-specific magic for getting just size_t from
-stddef.h. That way you have documented the places that other runtime
-authors need to fill out for things to work.
-
-Cheers,
-Carlos.
+diff --git a/drivers/staging/media/platform/bcm2835/bcm2835-camera.c b/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
+index ca15a698e018..25beca62a8a9 100644
+--- a/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
++++ b/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
+@@ -239,8 +239,9 @@ static struct mmal_fmt *get_format(struct v4l2_format *f)
+ }
+ 
+ /* ------------------------------------------------------------------
+-	Videobuf queue operations
+-   ------------------------------------------------------------------*/
++ *	Videobuf queue operations
++ * ------------------------------------------------------------------
++ */
+ 
+ static int queue_setup(struct vb2_queue *vq,
+ 		       unsigned int *nbuffers, unsigned int *nplanes,
+@@ -668,8 +669,9 @@ static struct vb2_ops bm2835_mmal_video_qops = {
+ };
+ 
+ /* ------------------------------------------------------------------
+-	IOCTL operations
+-   ------------------------------------------------------------------*/
++ *	IOCTL operations
++ * ------------------------------------------------------------------
++ */
+ 
+ static int set_overlay_params(struct bm2835_mmal_dev *dev,
+ 			      struct vchiq_mmal_port *port)
+@@ -834,7 +836,8 @@ static int vidioc_g_fbuf(struct file *file, void *fh,
+ 			 struct v4l2_framebuffer *a)
+ {
+ 	/* The video overlay must stay within the framebuffer and can't be
+-	   positioned independently. */
++	 * positioned independently.
++	 */
+ 	struct bm2835_mmal_dev *dev = video_drvdata(file);
+ 	struct vchiq_mmal_port *preview_port =
+ 		    &dev->component[MMAL_COMPONENT_CAMERA]->
+@@ -1291,7 +1294,8 @@ static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
+ 	}
+ 
+ 	/* If the format is unsupported v4l2 says we should switch to
+-	 * a supported one and not return an error. */
++	 * a supported one and not return an error.
++	 */
+ 	mfmt = get_format(f);
+ 	if (!mfmt) {
+ 		v4l2_dbg(1, bcm2835_v4l2_debug, &dev->v4l2_dev,
+@@ -1485,7 +1489,8 @@ static const struct v4l2_ioctl_ops camera0_ioctl_ops_gstreamer = {
+ 	.vidioc_qbuf = vb2_ioctl_qbuf,
+ 	.vidioc_dqbuf = vb2_ioctl_dqbuf,
+ 	/* Remove this function ptr to fix gstreamer bug
+-	.vidioc_enum_framesizes = vidioc_enum_framesizes, */
++	 * .vidioc_enum_framesizes = vidioc_enum_framesizes,
++	 */
+ 	.vidioc_enum_frameintervals = vidioc_enum_frameintervals,
+ 	.vidioc_g_parm        = vidioc_g_parm,
+ 	.vidioc_s_parm        = vidioc_s_parm,
+@@ -1498,8 +1503,9 @@ static const struct v4l2_ioctl_ops camera0_ioctl_ops_gstreamer = {
+ };
+ 
+ /* ------------------------------------------------------------------
+-	Driver init/finalise
+-   ------------------------------------------------------------------*/
++ *	Driver init/finalise
++ * ------------------------------------------------------------------
++ */
+ 
+ static const struct v4l2_file_operations camera0_fops = {
+ 	.owner = THIS_MODULE,
+diff --git a/drivers/staging/media/platform/bcm2835/controls.c b/drivers/staging/media/platform/bcm2835/controls.c
+index a40987b2e75d..d96753fc761f 100644
+--- a/drivers/staging/media/platform/bcm2835/controls.c
++++ b/drivers/staging/media/platform/bcm2835/controls.c
+@@ -90,7 +90,8 @@ struct bm2835_mmal_v4l2_ctrl {
+ 	u32 id; /* v4l2 control identifier */
+ 	enum bm2835_mmal_ctrl_type type;
+ 	/* control minimum value or
+-	 * mask for MMAL_CONTROL_TYPE_STD_MENU */
++	 * mask for MMAL_CONTROL_TYPE_STD_MENU
++	 */
+ 	s32 min;
+ 	s32 max; /* maximum value of control */
+ 	s32 def;  /* default value of control */
+@@ -398,10 +399,10 @@ static int ctrl_set_metering_mode(struct bm2835_mmal_dev *dev,
+ 		break;
+ 
+ 	/* todo matrix weighting not added to Linux API till 3.9
+-	case V4L2_EXPOSURE_METERING_MATRIX:
+-		dev->metering_mode = MMAL_PARAM_EXPOSUREMETERINGMODE_MATRIX;
+-		break;
+-	*/
++	 * case V4L2_EXPOSURE_METERING_MATRIX:
++	 *	dev->metering_mode = MMAL_PARAM_EXPOSUREMETERINGMODE_MATRIX;
++	 *	break;
++	 */
+ 	}
+ 
+ 	if (dev->scene_mode == V4L2_SCENE_MODE_NONE) {
+@@ -982,8 +983,9 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
+ 		false
+ 	},
+ /*	{
+-		0, MMAL_CONTROL_TYPE_CLUSTER, 3, 1, 0, NULL, 0, NULL
+-	}, */
++ *		0, MMAL_CONTROL_TYPE_CLUSTER, 3, 1, 0, NULL, 0, NULL
++ *	},
++ */
+ 	{
+ 		V4L2_CID_EXPOSURE_AUTO, MMAL_CONTROL_TYPE_STD_MENU,
+ 		~0x03, 3, V4L2_EXPOSURE_AUTO, 0, NULL,
+@@ -992,9 +994,9 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
+ 		false
+ 	},
+ /* todo this needs mixing in with set exposure
+-	{
+-	       V4L2_CID_SCENE_MODE, MMAL_CONTROL_TYPE_STD_MENU,
+-	},
++ *	{
++ *		V4L2_CID_SCENE_MODE, MMAL_CONTROL_TYPE_STD_MENU,
++ *	},
+  */
+ 	{
+ 		V4L2_CID_EXPOSURE_ABSOLUTE, MMAL_CONTROL_TYPE_STD,
+diff --git a/drivers/staging/media/platform/bcm2835/mmal-msg-port.h b/drivers/staging/media/platform/bcm2835/mmal-msg-port.h
+index a55c1ea2eceb..c47c25e325d6 100644
+--- a/drivers/staging/media/platform/bcm2835/mmal-msg-port.h
++++ b/drivers/staging/media/platform/bcm2835/mmal-msg-port.h
+@@ -26,12 +26,14 @@ enum mmal_port_type {
+ #define MMAL_PORT_CAPABILITY_PASSTHROUGH                       0x01
+ /** The port wants to allocate the buffer payloads.
+  * This signals a preference that payload allocation should be done
+- * on this port for efficiency reasons. */
++ * on this port for efficiency reasons.
++ */
+ #define MMAL_PORT_CAPABILITY_ALLOCATION                        0x02
+ /** The port supports format change events.
+  * This applies to input ports and is used to let the client know
+  * whether the port supports being reconfigured via a format
+- * change event (i.e. without having to disable the port). */
++ * change event (i.e. without having to disable the port).
++ */
+ #define MMAL_PORT_CAPABILITY_SUPPORTS_EVENT_FORMAT_CHANGE      0x04
+ 
+ /* mmal port structure (MMAL_PORT_T)
+diff --git a/drivers/staging/media/platform/bcm2835/mmal-msg.h b/drivers/staging/media/platform/bcm2835/mmal-msg.h
+index 67b1076015a5..12c47d89cdb3 100644
+--- a/drivers/staging/media/platform/bcm2835/mmal-msg.h
++++ b/drivers/staging/media/platform/bcm2835/mmal-msg.h
+@@ -108,9 +108,9 @@ struct mmal_msg_component_create {
+ 
+ /* reply from VC to component creation request */
+ struct mmal_msg_component_create_reply {
+-	u32 status; /** enum mmal_msg_status - how does this differ to
+-		     * the one in the header?
+-		     */
++	u32 status;	/* enum mmal_msg_status - how does this differ to
++			 * the one in the header?
++			 */
+ 	u32 component_handle; /* VideoCore handle for component */
+ 	u32 input_num;        /* Number of input ports */
+ 	u32 output_num;       /* Number of output ports */
+@@ -234,10 +234,12 @@ struct mmal_msg_port_action_reply {
+ /** Signals that the current payload is a keyframe (i.e. self decodable) */
+ #define MMAL_BUFFER_HEADER_FLAG_KEYFRAME               (1<<3)
+ /** Signals a discontinuity in the stream of data (e.g. after a seek).
+- * Can be used for instance by a decoder to reset its state */
++ * Can be used for instance by a decoder to reset its state
++ */
+ #define MMAL_BUFFER_HEADER_FLAG_DISCONTINUITY          (1<<4)
+ /** Signals a buffer containing some kind of config data for the component
+- * (e.g. codec config data) */
++ * (e.g. codec config data)
++ */
+ #define MMAL_BUFFER_HEADER_FLAG_CONFIG                 (1<<5)
+ /** Signals an encrypted payload */
+ #define MMAL_BUFFER_HEADER_FLAG_ENCRYPTED              (1<<6)
+@@ -321,9 +323,9 @@ struct mmal_msg_port_parameter_set {
+ };
+ 
+ struct mmal_msg_port_parameter_set_reply {
+-	u32 status; /** enum mmal_msg_status todo: how does this
+-		     * differ to the one in the header?
+-		     */
++	u32 status;	/* enum mmal_msg_status todo: how does this
++			 * differ to the one in the header?
++			 */
+ };
+ 
+ /* port parameter getting */
+diff --git a/drivers/staging/media/platform/bcm2835/mmal-vchiq.c b/drivers/staging/media/platform/bcm2835/mmal-vchiq.c
+index f0639ee6c8b9..02ce5e3344e5 100644
+--- a/drivers/staging/media/platform/bcm2835/mmal-vchiq.c
++++ b/drivers/staging/media/platform/bcm2835/mmal-vchiq.c
+@@ -1426,7 +1426,8 @@ static int port_enable(struct vchiq_mmal_instance *instance,
+ 
+ /* ------------------------------------------------------------------
+  * Exported API
+- *------------------------------------------------------------------*/
++ *------------------------------------------------------------------
++ */
+ 
+ int vchiq_mmal_port_set_format(struct vchiq_mmal_instance *instance,
+ 			       struct vchiq_mmal_port *port)
+diff --git a/drivers/staging/media/platform/bcm2835/mmal-vchiq.h b/drivers/staging/media/platform/bcm2835/mmal-vchiq.h
+index 9d1d11e4a53e..029f9f1fe81e 100644
+--- a/drivers/staging/media/platform/bcm2835/mmal-vchiq.h
++++ b/drivers/staging/media/platform/bcm2835/mmal-vchiq.h
+@@ -109,8 +109,8 @@ int vchiq_mmal_init(struct vchiq_mmal_instance **out_instance);
+ int vchiq_mmal_finalise(struct vchiq_mmal_instance *instance);
+ 
+ /* Initialise a mmal component and its ports
+-*
+-*/
++ *
++ */
+ int vchiq_mmal_component_init(
+ 		struct vchiq_mmal_instance *instance,
+ 		const char *name,
+-- 
+2.11.1
