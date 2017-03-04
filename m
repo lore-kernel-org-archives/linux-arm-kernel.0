@@ -1,49 +1,51 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat,  4 Mar 2017 11:20:11 +0100
-Subject: [PATCH v2] phy: meson8b-usb2: fix offsets for some of the registers
-In-Reply-To: <20170113185358.8362-1-martin.blumenstingl@googlemail.com>
-References: <20170113185358.8362-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170304102011.14944-1-martin.blumenstingl@googlemail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 04 Mar 2017 10:50:36 +0000
+Subject: Using the generic host PCIe driver
+In-Reply-To: <20170303200407.GB30375@bhelgaas-glaptop.roam.corp.google.com>
+ (Bjorn Helgaas's message of "Fri, 3 Mar 2017 14:04:07 -0600")
+References: <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
+ <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
+ <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
+ <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
+ <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
+ <98ee3041-6a94-91af-b4bf-208aa02624ed@free.fr>
+ <20170301215726.GA32286@bhelgaas-glaptop.roam.corp.google.com>
+ <258cd6f3-ef17-6705-ff48-ae06f26778c2@free.fr>
+ <20170303154628.GA21522@bhelgaas-glaptop.roam.corp.google.com>
+ <8e1a0b5d-8dfb-4be1-a049-b16892a6c0d0@free.fr>
+ <20170303200407.GB30375@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <87fuit2u4j.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The register offsets for REG_DBG_UART (and all following) were off by
-0x4. This was not a problem yet because these registers are currently
-not used by the driver.
+On Fri, Mar 03 2017 at  8:04:07 pm GMT, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> On Fri, Mar 03, 2017 at 06:18:02PM +0100, Mason wrote:
+>> In fact, I thought I could ignore that BAR, but it is apparently NOT
+>> the case, as MSIs are supposed to be sent *within* the BAR of the root.
+>
+> I don't know much about this piece of the MSI puzzle, but maybe Marc
+> can enlighten us.  If this Root Port is the target of MSIs and the
+> Root Port turns them into some sort of interrupt on the CPU side, I
+> can see how this might make sense.
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
----
-changes since v1:
-- added Jerome's Reviewed-By
+There is a whole range of PCIe RC that require to be programmed with the
+doorbell address. It can be any address, but the kernel has to make sure
+it is not something you will ever DMA to, as the RC is unlikely to
+forward the transaction after having matched it.
 
- drivers/phy/phy-meson8b-usb2.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+> I think it's unusual for the PCI core to assign the MSI target using a
+> BAR, though.  I think this means you'll have to implement your
+> arch_setup_msi_irq() or .irq_compose_msi_msg() method such that it 
+> looks up that BAR value, since you won't know it at build-time.
 
-diff --git a/drivers/phy/phy-meson8b-usb2.c b/drivers/phy/phy-meson8b-usb2.c
-index 33c9f4ba157d..30f56a6a411f 100644
---- a/drivers/phy/phy-meson8b-usb2.c
-+++ b/drivers/phy/phy-meson8b-usb2.c
-@@ -81,9 +81,9 @@
- 	#define REG_ADP_BC_ACA_PIN_GND			BIT(25)
- 	#define REG_ADP_BC_ACA_PIN_FLOAT		BIT(26)
- 
--#define REG_DBG_UART					0x14
-+#define REG_DBG_UART					0x10
- 
--#define REG_TEST					0x18
-+#define REG_TEST					0x14
- 	#define REG_TEST_DATA_IN_MASK			GENMASK(3, 0)
- 	#define REG_TEST_EN_MASK			GENMASK(7, 4)
- 	#define REG_TEST_ADDR_MASK			GENMASK(11, 8)
-@@ -93,7 +93,7 @@
- 	#define REG_TEST_DATA_OUT_MASK			GENMASK(19, 16)
- 	#define REG_TEST_DISABLE_ID_PULLUP		BIT(20)
- 
--#define REG_TUNE					0x1c
-+#define REG_TUNE					0x18
- 	#define REG_TUNE_TX_RES_TUNE_MASK		GENMASK(1, 0)
- 	#define REG_TUNE_TX_HSXV_TUNE_MASK		GENMASK(3, 2)
- 	#define REG_TUNE_TX_VREF_TUNE_MASK		GENMASK(7, 4)
+A common trick is to set the doorbell address to a well known value,
+such as the base address for the PCIe RC itself. Of course, that only
+works if the RC doesn't forward writes to the doorbell. Otherwise, any
+RAM address will do, provided that it is not something we'd expect to
+DMA to.
+
+Thanks,
+
+        M.
 -- 
-2.12.0
+Jazz is not dead, it just smell funny.
