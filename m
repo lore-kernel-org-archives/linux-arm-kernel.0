@@ -1,98 +1,52 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sat, 4 Mar 2017 16:35:46 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
-References: <20170303142201.16452-1-richard.genoud@gmail.com>
- <CAMuHMdX-K9B20Tu5NtHJRHmGGuT60OFu8TokZxsF8aSaS7HuHQ@mail.gmail.com>
- <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
- <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
- <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
-Message-ID: <CAMuHMdXiz5hqW=fm-2H1aNKq_gXD2o0508jD2XjxYUvKoEvHdw@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Sat, 4 Mar 2017 10:51:19 -0500 (EST)
+Subject: Panic in quirk_usb_early_handoff
+In-Reply-To: <CAKv+Gu_M6aMMfeCy7ZUM46Ptei1suvX+F_KtWG2_QFp_6jbCWw@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1703041049340.6026-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+On Sat, 4 Mar 2017, Ard Biesheuvel wrote:
 
-On Fri, Mar 3, 2017 at 8:44 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> On Fri, Mar 03, 2017 at 08:21:05PM +0100, Geert Uytterhoeven wrote:
->> > diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
->> > index 91e7dddbf72c..2f4cdd4e7b4f 100644
->> > --- a/drivers/tty/serial/sh-sci.c
->> > +++ b/drivers/tty/serial/sh-sci.c
->> > @@ -3022,7 +3022,7 @@ static int sci_probe_single(struct platform_device *dev,
->> >                 return ret;
->> >
->> >         sciport->gpios = mctrl_gpio_init(&sciport->port, 0);
->> > -       if (IS_ERR(sciport->gpios) && PTR_ERR(sciport->gpios) != -ENOSYS)
->> > +       if (IS_ERR(sciport->gpios))
->> >                 return PTR_ERR(sciport->gpios);
->>
->> Now the sh-sci driver fails to probe on legacy platforms where GPIOLIB=n.
->> The check for -ENOSYS made it succeed before.
->
-> That's right, intended and the only option that's save (for some
-> definition of save; the obvious downside is that there is no
-> /dev/tty$whatever for you).
+> On 4 March 2017 at 00:24, Mason <slash.tmp@free.fr> wrote:
+> > On 03/03/2017 20:02, Robin Murphy wrote:
+> >
+> >> On 03/03/17 17:15, Mason wrote:
+> >>
+> >>> [    1.261813] Unable to handle kernel paging request at virtual address d08611e4
+> >>> [    1.269167] pgd = c0004000
+> >>> [    1.271979] [d08611e4] *pgd=8f804811, *pte=00000000, *ppte=00000000
+> >>> [    1.278394] Internal error: Oops: 7 [#1] PREEMPT SMP ARM
+> >>> [    1.283815] Modules linked in:
+> >>> [    1.286970] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.9.7-1-rc2 #157
+> >>> [    1.293614] Hardware name: Sigma Tango DT
+> >>> [    1.297726] task: cf82c9c0 task.stack: cf838000
+> >>> [    1.302364] PC is at quirk_usb_early_handoff+0x3e8/0x790
+> >>> [    1.307790] LR is at ioremap_page_range+0xf8/0x1a8
+> >>> [    1.312688] pc : [<c039fe44>]    lr : [<c02d0a10>]    psr: 000e0013
+> >>> [    1.312688] sp : cf839d78  ip : 00000000  fp : cf839e38
+> >>> [    1.324399] r10: c10248a0  r9 : 00000000  r8 : d08611e4
+> >>> [    1.329733] r7 : d084e000  r6 : 00002000  r5 : 000c0300  r4 : cfb4e800
+> >>> [    1.336377] r3 : 000131e4  r2 : 00000000  r1 : 91001e13  r0 : d084e000
+> >>
+> >> ...and again. And always at the same PC, too.
+> >
+> > By the way, isn't LR supposed to point to the caller of the
+> > current function? ("LR is at ioremap_page_range")
+> >
+> > If so, why does it not appear in the back trace?
+> >
+> 
+> lr is supposed to point to the return address at function entry. After
+> that, all bets are off, really, since ARM usually pops the return
+> address from the stack straight into the pc register. So in this case,
+> it looks like it still contains the address that the most recent leaf
+> function returned to (or another function that actually restores the
+> return address into lr before branching to it). But it could easily
+> contain garbage as well.
 
-That's not just a downside, but a plain regression on legacy platforms that
-do not use GPIO flow control.
+Besides, the compiler often inlines static subroutines that are called
+from only one place.  As a result there is no hardware stack frame for 
+these subroutine calls, and they don't show up in the back trace.
 
-> Ignoring -ENOSYS is only ok if your device doesn't have a cts-gpio. If
-> it has, ignoring -ENOSYS hides bugs because the driver sends data while
-> it shouldn't or cannot signal the other side that it should stop (or
-> start) a transmission.
-
-Mctrl_gpio supports modern platforms with GPIOLIB and DT or ACPI only.
-On legacy platforms, you cannot use GPIO flow control (except when using a
-custom implementation, which is out-of-scope here), so the issue of silently
-running without cts-gpio on these platforms is moot.
-
-> So the options are:
->  - enable GPIOLIB (maybe enforce that by letting the driver select it)
->  - introduce a CONFIG_HALFGPIOLIB that makes gpiod_get_optional and
->    mctrl_gpio_init return only then -ENOSYS if there is a gpio specified
->    and NULL otherwise.
->
->> > Then mctrl_gpio_to_gpiod isn't called. I don't have a machine to test
->> > this, but I think currently this makes the machine barf to continue
->> > here because with sciport->gpios = ERR_PTR(-ENOSYS) calling
->> >
->> >         mctrl_gpio_to_gpiod(sciport->gpios, ...)
->> >
->> > is a bad idea.
->>
->> If sciport->gpios == ERR_PTR(-ENOSYS), CONFIG_GPIOLIB is not enabled, the
->> feature is not available, and mctrl_gpio_to_gpiod() will not
->> dereference the error
->> pointer.
->
-> Ah, makes sense.
->
->> >> Perhaps mctrl_gpio_to_gpiod() should always return NULL if !CONFIG_GPIOLIB?
->> >
->> > No, mctrl_gpio_to_gpiod is right. You are only supposed to call it if
->> > mctrl_gpio_init succeeded.
->>
->> Then I have to add checks for sciport->gpios == ERR_PTR(-ENOSYS)...
->
-> No, ignoring -ENOSYS is wrong.
-
-How else to handle this in a driver that supports both modern (DT && GPIOLIB)
-and legacy platforms?
-
-sh-sci is not only used on DT-only architectures like arm, arm64, and h8300,
-but also on SuperH, where some platforms use GPIOLIB, others don't, and none
-of them use DT yet (jcore doesn't matter, as it doesn't use sh-sci).
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Alan Stern
