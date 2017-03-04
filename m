@@ -1,49 +1,69 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 4 Mar 2017 08:07:44 +0000
-Subject: Panic in quirk_usb_early_handoff
-In-Reply-To: <4f0a6c67-a50b-ac24-8ffa-0a68802e84b8@free.fr>
-References: <4b2a7606-de27-c8ad-1530-958dd5d12233@free.fr>
- <45e38a07-e8da-80e4-36bb-31e471f02004@free.fr>
- <3c5bd8f5-468f-d25e-08a9-8944ee419096@free.fr>
- <38b8c9be-724b-0cfc-a941-76f2c62e1c58@arm.com>
- <4f0a6c67-a50b-ac24-8ffa-0a68802e84b8@free.fr>
-Message-ID: <CAKv+Gu_M6aMMfeCy7ZUM46Ptei1suvX+F_KtWG2_QFp_6jbCWw@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 4 Mar 2017 10:15:04 +0200
+Subject: [PATCH] pinctrl: samsung: fix segfault when using external
+ interrupts on s3c24xx
+In-Reply-To: <1488489799-18136-1-git-send-email-sergio.prado@e-labworks.com>
+References: <1488489799-18136-1-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <20170304081504.unv6sihbmp76ynfy@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 March 2017 at 00:24, Mason <slash.tmp@free.fr> wrote:
-> On 03/03/2017 20:02, Robin Murphy wrote:
->
->> On 03/03/17 17:15, Mason wrote:
->>
->>> [    1.261813] Unable to handle kernel paging request at virtual address d08611e4
->>> [    1.269167] pgd = c0004000
->>> [    1.271979] [d08611e4] *pgd=8f804811, *pte=00000000, *ppte=00000000
->>> [    1.278394] Internal error: Oops: 7 [#1] PREEMPT SMP ARM
->>> [    1.283815] Modules linked in:
->>> [    1.286970] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.9.7-1-rc2 #157
->>> [    1.293614] Hardware name: Sigma Tango DT
->>> [    1.297726] task: cf82c9c0 task.stack: cf838000
->>> [    1.302364] PC is at quirk_usb_early_handoff+0x3e8/0x790
->>> [    1.307790] LR is at ioremap_page_range+0xf8/0x1a8
->>> [    1.312688] pc : [<c039fe44>]    lr : [<c02d0a10>]    psr: 000e0013
->>> [    1.312688] sp : cf839d78  ip : 00000000  fp : cf839e38
->>> [    1.324399] r10: c10248a0  r9 : 00000000  r8 : d08611e4
->>> [    1.329733] r7 : d084e000  r6 : 00002000  r5 : 000c0300  r4 : cfb4e800
->>> [    1.336377] r3 : 000131e4  r2 : 00000000  r1 : 91001e13  r0 : d084e000
->>
->> ...and again. And always at the same PC, too.
->
-> By the way, isn't LR supposed to point to the caller of the
-> current function? ("LR is at ioremap_page_range")
->
-> If so, why does it not appear in the back trace?
->
+On Thu, Mar 02, 2017 at 06:23:19PM -0300, Sergio Prado wrote:
+> We are getting a NULL pointer dereference when working with external
+> interrupts on s3c24xx:
+> 
+> Unable to handle kernel NULL pointer dereference at virtual address 000000a8
+> pgd = c0104000
+> [000000a8] *pgd=00000000
+> Internal error: Oops: 5 [#1] ARM
+> Modules linked in:
+> CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc8mini2440-sub-00047-g0722f57bfae9-dirty #3
+> Hardware name: Samsung S3C2416 (Flattened Device Tree)
+> task: c07399f8 task.stack: c0734000
+> PC is at s3c24xx_demux_eint4_7+0x24/0x10c
+> LR is at s3c24xx_demux_eint4_7+0x108/0x10c
+> 
+> The problem is in the function s3c24xx_demux_eint() when dereferencing
+> bank->eint_base.
+> 
+> At this point, we cannot get the bank pointer from the irq_desc
+> structure since it is pointing to the hardware irq, not virq.
+> 
+> So let's get the bank pointer directly from data->drvdata.
+> 
+> This is a regression from commit 8b1bd11c1f8f529057369c5b3702d13fd24e2765.
 
-lr is supposed to point to the return address at function entry. After
-that, all bets are off, really, since ARM usually pops the return
-address from the stack straight into the pc register. So in this case,
-it looks like it still contains the address that the most recent leaf
-function returned to (or another function that actually restores the
-return address into lr before branching to it). But it could easily
-contain garbage as well.
+Checkpatch should complain here about commit format.
+
+> 
+> Tested on FriendlyARM mini2440.
+> 
+
+Please add:
+  Fixes: 8b1bd11c1f8f ("pinctrl: samsung: Add the support the multiple IORESOURCE_MEM for one pin-bank")
+  Cc: <stable@vger.kernel.org>
+
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+> ---
+>  drivers/pinctrl/samsung/pinctrl-s3c24xx.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+> index b82a003546ae..1b8d887796e8 100644
+> --- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+> +++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+> @@ -356,8 +356,8 @@ static inline void s3c24xx_demux_eint(struct irq_desc *desc,
+>  {
+>  	struct s3c24xx_eint_data *data = irq_desc_get_handler_data(desc);
+>  	struct irq_chip *chip = irq_desc_get_chip(desc);
+> -	struct irq_data *irqd = irq_desc_get_irq_data(desc);
+> -	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
+> +	struct samsung_pinctrl_drv_data *d = data->drvdata;
+> +	struct samsung_pin_bank *bank = d->pin_banks;
+
+I think 'pin_banks' point to all banks of given controller not to the
+currently accessed one.
+
+
+Best regards,
+Krzysztof
