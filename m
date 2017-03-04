@@ -1,100 +1,80 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sat,  4 Mar 2017 22:23:18 +0100
-Subject: [PATCH 2/2] ARM64: dts: amlogic: meson-gxl: add the missing PWM pins
-In-Reply-To: <20170304212318.27076-1-martin.blumenstingl@googlemail.com>
-References: <20170304212318.27076-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170304212318.27076-3-martin.blumenstingl@googlemail.com>
+From: shorne@gmail.com (Stafford Horne)
+Date: Sun, 5 Mar 2017 06:38:05 +0900
+Subject: [PATCH 1/3] futex: remove duplicated code
+In-Reply-To: <3994975e-89a5-d2b5-60be-a8633ddc3733@zytor.com>
+References: <20170303122712.13353-1-jslaby@suse.cz>
+ <20170304130550.GT21222@n2100.armlinux.org.uk>
+ <3994975e-89a5-d2b5-60be-a8633ddc3733@zytor.com>
+Message-ID: <20170304213805.GA2449@lianli.shorne-pla.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the new DT nodes for the missing PWM pins in the EE and AO
-domain.
+On Sat, Mar 04, 2017 at 11:15:17AM -0800, H. Peter Anvin wrote:
+> On 03/04/17 05:05, Russell King - ARM Linux wrote:
+> >>  
+> >> +static int futex_atomic_op_inuser(int encoded_op, u32 __user *uaddr)
+> >> +{
+> >> +	int op = (encoded_op >> 28) & 7;
+> >> +	int cmp = (encoded_op >> 24) & 15;
+> >> +	int oparg = (encoded_op << 8) >> 20;
+> >> +	int cmparg = (encoded_op << 20) >> 20;
+> > 
+> > Hmm.  oparg and cmparg look like they're doing these shifts to get sign
+> > extension of the 12-bit values by assuming that "int" is 32-bit -
+> > probably worth a comment, or for safety, they should be "s32" so it's
+> > not dependent on the bit-width of "int".
+> > 
+> 
+> For readability, perhaps we should make sign- and zero-extension an
+> explicit facility?
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 56 ++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+There is some of this in already here, 32 and 64 bit versions:
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-index fe11b5fc61f7..583c7b88ba7c 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-@@ -118,6 +118,20 @@
- 			};
- 		};
- 
-+		pwm_ao_a_3_pins: pwm_ao_a_3 {
-+			mux {
-+				groups = "pwm_ao_a_3";
-+				function = "pwm_ao_a_3";
-+			};
-+		};
-+
-+		pwm_ao_a_8_pins: pwm_ao_a_8 {
-+			mux {
-+				groups = "pwm_ao_a_8";
-+				function = "pwm_ao_a_8";
-+			};
-+		};
-+
- 		pwm_ao_b_pins: pwm_ao_b {
- 			mux {
- 				groups = "pwm_ao_b";
-@@ -277,6 +291,34 @@
- 			};
- 		};
- 
-+		pwm_a_pins: pwm_a {
-+			mux {
-+				groups = "pwm_a";
-+				function = "pwm_a";
-+			};
-+		};
-+
-+		pwm_b_pins: pwm_b {
-+			mux {
-+				groups = "pwm_b";
-+				function = "pwm_b";
-+			};
-+		};
-+
-+		pwm_c_pins: pwm_c {
-+			mux {
-+				groups = "pwm_c";
-+				function = "pwm_c";
-+			};
-+		};
-+
-+		pwm_d_pins: pwm_d {
-+			mux {
-+				groups = "pwm_d";
-+				function = "pwm_d";
-+			};
-+		};
-+
- 		pwm_e_pins: pwm_e {
- 			mux {
- 				groups = "pwm_e";
-@@ -284,6 +326,20 @@
- 			};
- 		};
- 
-+		pwm_f_clk_pins: pwm_f_clk {
-+			mux {
-+				groups = "pwm_f_clk";
-+				function = "pwm_f_clk";
-+			};
-+		};
-+
-+		pwm_f_x_pins: pwm_f_x {
-+			mux {
-+				groups = "pwm_f_x";
-+				function = "pwm_f_x";
-+			};
-+		};
-+
- 		hdmi_hpd_pins: hdmi_hpd {
- 			mux {
- 				groups = "hdmi_hpd";
--- 
-2.12.0
+  include/linux/bitops.h
+
+Do we really need zero extension? It seems the same.
+
+Example implementation from bitops.h
+
+static inline __s32 sign_extend32(__u32 value, int index)
+{
+        __u8 shift = 31 - index;
+        return (__s32)(value << shift) >> shift;
+}
+
+> /*
+>  * Truncate an integer x to n bits, using sign- or
+>  * zero-extension, respectively.
+>  */
+> static inline __const_func__ s32 sex32(s32 x, int n)
+> {
+>   return (x << (32-n)) >> (32-n);
+> }
+> 
+> static inline __const_func__ s64 sex64(s64 x, int n)
+> {
+>   return (x << (64-n)) >> (64-n);
+> }
+> 
+> #define sex(x,y)						\
+> 	((__typeof__(x))					\
+> 	 (((__builtin_constant_p(y) && ((y) <= 32)) ||		\
+> 	   (sizeof(x) <= sizeof(s32)))				\
+> 	  ? sex32((x),(y)) : sex64((x),(y))))
+> 
+> static inline __const_func__ u32 zex32(u32 x, int n)
+> {
+>   return (x << (32-n)) >> (32-n);
+> }
+> 
+> static inline __const_func__ u64 zex64(u64 x, int n)
+> {
+>   return (x << (64-n)) >> (64-n);
+> }
+> 
+> #define zex(x,y)						\
+> 	((__typeof__(x))					\
+> 	 (((__builtin_constant_p(y) && ((y) <= 32)) ||		\
+> 	   (sizeof(x) <= sizeof(u32)))				\
+> 	  ? zex32((x),(y)) : zex64((x),(y))))
+> 
