@@ -1,69 +1,51 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 4 Mar 2017 10:15:04 +0200
-Subject: [PATCH] pinctrl: samsung: fix segfault when using external
- interrupts on s3c24xx
-In-Reply-To: <1488489799-18136-1-git-send-email-sergio.prado@e-labworks.com>
-References: <1488489799-18136-1-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <20170304081504.unv6sihbmp76ynfy@kozik-lap>
+Date: Sat, 4 Mar 2017 10:23:13 +0200
+Subject: [PATCH v3 0/7] Fix the parse_dt of exynos dsi and remove the OF
+ graph
+In-Reply-To: <20170303002206.zh56dsx7iuysg374@gangnam.samsung>
+References: <CGME20170302102112epcas5p476b30508bbaffbf1fe9781b941cd418f@epcas5p4.samsung.com>
+ <1488450019-6482-1-git-send-email-hoegeun.kwon@samsung.com>
+ <20170303002206.zh56dsx7iuysg374@gangnam.samsung>
+Message-ID: <20170304082313.c6muov76oiwl23tr@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 02, 2017 at 06:23:19PM -0300, Sergio Prado wrote:
-> We are getting a NULL pointer dereference when working with external
-> interrupts on s3c24xx:
+On Fri, Mar 03, 2017 at 09:22:06AM +0900, Andi Shyti wrote:
+> Hi Hoegeun,
 > 
-> Unable to handle kernel NULL pointer dereference at virtual address 000000a8
-> pgd = c0104000
-> [000000a8] *pgd=00000000
-> Internal error: Oops: 5 [#1] ARM
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc8mini2440-sub-00047-g0722f57bfae9-dirty #3
-> Hardware name: Samsung S3C2416 (Flattened Device Tree)
-> task: c07399f8 task.stack: c0734000
-> PC is at s3c24xx_demux_eint4_7+0x24/0x10c
-> LR is at s3c24xx_demux_eint4_7+0x108/0x10c
+> > Hoegeun Kwon (7):
+> >   arm64: dts: exynos: Add the burst and esc clock frequency properties
+> >     for exynos5433 dts
+> >   arm: dts: Add the burst and esc clock frequency properties for
+> >     exynos3250 dts
+> >   arm: dts: Add the burst and esc clock frequency properties for
+> >     exynos4412 dts
+> >   arm: dts: Add the burst and esc clock frequency properties for
+> >     exynos4210 dts
+> >   drm/exynos: dsi: Fix the parse_dt function
+> >   arm64: dts: exynos: Remove the OF graph from DSI node
+> >   arm: dts: Remove the OF graph from DSI node
 > 
-> The problem is in the function s3c24xx_demux_eint() when dereferencing
-> bank->eint_base.
+> for all of them:
 > 
-> At this point, we cannot get the bank pointer from the irq_desc
-> structure since it is pointing to the hardware irq, not virq.
-> 
-> So let's get the bank pointer directly from data->drvdata.
-> 
-> This is a regression from commit 8b1bd11c1f8f529057369c5b3702d13fd24e2765.
+> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
 
-Checkpatch should complain here about commit format.
+Andi,
+
+Thanks for review. It is much welcomed.
+
+I am trying not loose such review tags but it might happen because:
+1. Patchwork does not store them,
+2. Mail does not sit in inbox for long (inbox zero),
+so if it is possible the most convenient for me is to reply with review
+to each email.
 
 > 
-> Tested on FriendlyARM mini2440.
-> 
+> although I would have squashed patch 2, 3 and 4, but no need to
+> resend, unless someone else agrees.
 
-Please add:
-  Fixes: 8b1bd11c1f8f ("pinctrl: samsung: Add the support the multiple IORESOURCE_MEM for one pin-bank")
-  Cc: <stable@vger.kernel.org>
-
-> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
-> ---
->  drivers/pinctrl/samsung/pinctrl-s3c24xx.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-> index b82a003546ae..1b8d887796e8 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-> +++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
-> @@ -356,8 +356,8 @@ static inline void s3c24xx_demux_eint(struct irq_desc *desc,
->  {
->  	struct s3c24xx_eint_data *data = irq_desc_get_handler_data(desc);
->  	struct irq_chip *chip = irq_desc_get_chip(desc);
-> -	struct irq_data *irqd = irq_desc_get_irq_data(desc);
-> -	struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
-> +	struct samsung_pinctrl_drv_data *d = data->drvdata;
-> +	struct samsung_pin_bank *bank = d->pin_banks;
-
-I think 'pin_banks' point to all banks of given controller not to the
-currently accessed one.
-
+Yes, these are small additions to the same arch so they could be
+indeed squashed. I don't mind keeping them separated though.
 
 Best regards,
 Krzysztof
