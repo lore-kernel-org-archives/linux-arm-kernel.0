@@ -1,241 +1,46 @@
-From: robsonde@gmail.com (Derek Robson)
-Date: Sat,  4 Mar 2017 14:31:20 +1300
-Subject: [PATCH] Staging: media: platform: bcm2835 - Style fix
-Message-ID: <20170304013120.24949-1-robsonde@gmail.com>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Sat, 4 Mar 2017 11:24:51 +0530
+Subject: [PATCH 1/4] net: thunderx: Fix IOMMU translation faults
+In-Reply-To: <20170303.095635.355325147613813698.davem@davemloft.net>
+References: <1488538070-12549-1-git-send-email-sunil.kovvuri@gmail.com>
+ <1488538070-12549-2-git-send-email-sunil.kovvuri@gmail.com>
+ <20170303.095635.355325147613813698.davem@davemloft.net>
+Message-ID: <CA+sq2CcFxk=LuqYhR-sFaVVSu3rMaZUcytx-3tC9kEiRFNwREg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixed style of block comments across whole driver
-Found using checkpatch
+On Fri, Mar 3, 2017 at 11:26 PM, David Miller <davem@davemloft.net> wrote:
+> From: sunil.kovvuri at gmail.com
+> Date: Fri,  3 Mar 2017 16:17:47 +0530
+>
+>> @@ -1643,6 +1650,9 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+>>       if (!pass1_silicon(nic->pdev))
+>>               nic->hw_tso = true;
+>>
+>> +     /* Check if we are attached to IOMMU */
+>> +     nic->iommu_domain = iommu_get_domain_for_dev(dev);
+>
+> This function is not universally available.
 
-Signed-off-by: Derek Robson <robsonde@gmail.com>
----
- .../media/platform/bcm2835/bcm2835-camera.c        | 24 ++++++++++++++--------
- drivers/staging/media/platform/bcm2835/controls.c  | 22 +++++++++++---------
- .../staging/media/platform/bcm2835/mmal-msg-port.h |  6 ++++--
- drivers/staging/media/platform/bcm2835/mmal-msg.h  | 18 ++++++++--------
- .../staging/media/platform/bcm2835/mmal-vchiq.c    |  3 ++-
- .../staging/media/platform/bcm2835/mmal-vchiq.h    |  4 ++--
- 6 files changed, 45 insertions(+), 32 deletions(-)
+Even if CONFIG_IOMMU_API is not enabled, it will return NULL and will be okay.
+http://lxr.free-electrons.com/source/include/linux/iommu.h#L400
 
-diff --git a/drivers/staging/media/platform/bcm2835/bcm2835-camera.c b/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
-index ca15a698e018..25beca62a8a9 100644
---- a/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
-+++ b/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
-@@ -239,8 +239,9 @@ static struct mmal_fmt *get_format(struct v4l2_format *f)
- }
- 
- /* ------------------------------------------------------------------
--	Videobuf queue operations
--   ------------------------------------------------------------------*/
-+ *	Videobuf queue operations
-+ * ------------------------------------------------------------------
-+ */
- 
- static int queue_setup(struct vb2_queue *vq,
- 		       unsigned int *nbuffers, unsigned int *nplanes,
-@@ -668,8 +669,9 @@ static struct vb2_ops bm2835_mmal_video_qops = {
- };
- 
- /* ------------------------------------------------------------------
--	IOCTL operations
--   ------------------------------------------------------------------*/
-+ *	IOCTL operations
-+ * ------------------------------------------------------------------
-+ */
- 
- static int set_overlay_params(struct bm2835_mmal_dev *dev,
- 			      struct vchiq_mmal_port *port)
-@@ -834,7 +836,8 @@ static int vidioc_g_fbuf(struct file *file, void *fh,
- 			 struct v4l2_framebuffer *a)
- {
- 	/* The video overlay must stay within the framebuffer and can't be
--	   positioned independently. */
-+	 * positioned independently.
-+	 */
- 	struct bm2835_mmal_dev *dev = video_drvdata(file);
- 	struct vchiq_mmal_port *preview_port =
- 		    &dev->component[MMAL_COMPONENT_CAMERA]->
-@@ -1291,7 +1294,8 @@ static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
- 	}
- 
- 	/* If the format is unsupported v4l2 says we should switch to
--	 * a supported one and not return an error. */
-+	 * a supported one and not return an error.
-+	 */
- 	mfmt = get_format(f);
- 	if (!mfmt) {
- 		v4l2_dbg(1, bcm2835_v4l2_debug, &dev->v4l2_dev,
-@@ -1485,7 +1489,8 @@ static const struct v4l2_ioctl_ops camera0_ioctl_ops_gstreamer = {
- 	.vidioc_qbuf = vb2_ioctl_qbuf,
- 	.vidioc_dqbuf = vb2_ioctl_dqbuf,
- 	/* Remove this function ptr to fix gstreamer bug
--	.vidioc_enum_framesizes = vidioc_enum_framesizes, */
-+	 * .vidioc_enum_framesizes = vidioc_enum_framesizes,
-+	 */
- 	.vidioc_enum_frameintervals = vidioc_enum_frameintervals,
- 	.vidioc_g_parm        = vidioc_g_parm,
- 	.vidioc_s_parm        = vidioc_s_parm,
-@@ -1498,8 +1503,9 @@ static const struct v4l2_ioctl_ops camera0_ioctl_ops_gstreamer = {
- };
- 
- /* ------------------------------------------------------------------
--	Driver init/finalise
--   ------------------------------------------------------------------*/
-+ *	Driver init/finalise
-+ * ------------------------------------------------------------------
-+ */
- 
- static const struct v4l2_file_operations camera0_fops = {
- 	.owner = THIS_MODULE,
-diff --git a/drivers/staging/media/platform/bcm2835/controls.c b/drivers/staging/media/platform/bcm2835/controls.c
-index a40987b2e75d..d96753fc761f 100644
---- a/drivers/staging/media/platform/bcm2835/controls.c
-+++ b/drivers/staging/media/platform/bcm2835/controls.c
-@@ -90,7 +90,8 @@ struct bm2835_mmal_v4l2_ctrl {
- 	u32 id; /* v4l2 control identifier */
- 	enum bm2835_mmal_ctrl_type type;
- 	/* control minimum value or
--	 * mask for MMAL_CONTROL_TYPE_STD_MENU */
-+	 * mask for MMAL_CONTROL_TYPE_STD_MENU
-+	 */
- 	s32 min;
- 	s32 max; /* maximum value of control */
- 	s32 def;  /* default value of control */
-@@ -398,10 +399,10 @@ static int ctrl_set_metering_mode(struct bm2835_mmal_dev *dev,
- 		break;
- 
- 	/* todo matrix weighting not added to Linux API till 3.9
--	case V4L2_EXPOSURE_METERING_MATRIX:
--		dev->metering_mode = MMAL_PARAM_EXPOSUREMETERINGMODE_MATRIX;
--		break;
--	*/
-+	 * case V4L2_EXPOSURE_METERING_MATRIX:
-+	 *	dev->metering_mode = MMAL_PARAM_EXPOSUREMETERINGMODE_MATRIX;
-+	 *	break;
-+	 */
- 	}
- 
- 	if (dev->scene_mode == V4L2_SCENE_MODE_NONE) {
-@@ -982,8 +983,9 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
- 		false
- 	},
- /*	{
--		0, MMAL_CONTROL_TYPE_CLUSTER, 3, 1, 0, NULL, 0, NULL
--	}, */
-+ *		0, MMAL_CONTROL_TYPE_CLUSTER, 3, 1, 0, NULL, 0, NULL
-+ *	},
-+ */
- 	{
- 		V4L2_CID_EXPOSURE_AUTO, MMAL_CONTROL_TYPE_STD_MENU,
- 		~0x03, 3, V4L2_EXPOSURE_AUTO, 0, NULL,
-@@ -992,9 +994,9 @@ static const struct bm2835_mmal_v4l2_ctrl v4l2_ctrls[V4L2_CTRL_COUNT] = {
- 		false
- 	},
- /* todo this needs mixing in with set exposure
--	{
--	       V4L2_CID_SCENE_MODE, MMAL_CONTROL_TYPE_STD_MENU,
--	},
-+ *	{
-+ *		V4L2_CID_SCENE_MODE, MMAL_CONTROL_TYPE_STD_MENU,
-+ *	},
-  */
- 	{
- 		V4L2_CID_EXPOSURE_ABSOLUTE, MMAL_CONTROL_TYPE_STD,
-diff --git a/drivers/staging/media/platform/bcm2835/mmal-msg-port.h b/drivers/staging/media/platform/bcm2835/mmal-msg-port.h
-index a55c1ea2eceb..c47c25e325d6 100644
---- a/drivers/staging/media/platform/bcm2835/mmal-msg-port.h
-+++ b/drivers/staging/media/platform/bcm2835/mmal-msg-port.h
-@@ -26,12 +26,14 @@ enum mmal_port_type {
- #define MMAL_PORT_CAPABILITY_PASSTHROUGH                       0x01
- /** The port wants to allocate the buffer payloads.
-  * This signals a preference that payload allocation should be done
-- * on this port for efficiency reasons. */
-+ * on this port for efficiency reasons.
-+ */
- #define MMAL_PORT_CAPABILITY_ALLOCATION                        0x02
- /** The port supports format change events.
-  * This applies to input ports and is used to let the client know
-  * whether the port supports being reconfigured via a format
-- * change event (i.e. without having to disable the port). */
-+ * change event (i.e. without having to disable the port).
-+ */
- #define MMAL_PORT_CAPABILITY_SUPPORTS_EVENT_FORMAT_CHANGE      0x04
- 
- /* mmal port structure (MMAL_PORT_T)
-diff --git a/drivers/staging/media/platform/bcm2835/mmal-msg.h b/drivers/staging/media/platform/bcm2835/mmal-msg.h
-index 67b1076015a5..12c47d89cdb3 100644
---- a/drivers/staging/media/platform/bcm2835/mmal-msg.h
-+++ b/drivers/staging/media/platform/bcm2835/mmal-msg.h
-@@ -108,9 +108,9 @@ struct mmal_msg_component_create {
- 
- /* reply from VC to component creation request */
- struct mmal_msg_component_create_reply {
--	u32 status; /** enum mmal_msg_status - how does this differ to
--		     * the one in the header?
--		     */
-+	u32 status;	/* enum mmal_msg_status - how does this differ to
-+			 * the one in the header?
-+			 */
- 	u32 component_handle; /* VideoCore handle for component */
- 	u32 input_num;        /* Number of input ports */
- 	u32 output_num;       /* Number of output ports */
-@@ -234,10 +234,12 @@ struct mmal_msg_port_action_reply {
- /** Signals that the current payload is a keyframe (i.e. self decodable) */
- #define MMAL_BUFFER_HEADER_FLAG_KEYFRAME               (1<<3)
- /** Signals a discontinuity in the stream of data (e.g. after a seek).
-- * Can be used for instance by a decoder to reset its state */
-+ * Can be used for instance by a decoder to reset its state
-+ */
- #define MMAL_BUFFER_HEADER_FLAG_DISCONTINUITY          (1<<4)
- /** Signals a buffer containing some kind of config data for the component
-- * (e.g. codec config data) */
-+ * (e.g. codec config data)
-+ */
- #define MMAL_BUFFER_HEADER_FLAG_CONFIG                 (1<<5)
- /** Signals an encrypted payload */
- #define MMAL_BUFFER_HEADER_FLAG_ENCRYPTED              (1<<6)
-@@ -321,9 +323,9 @@ struct mmal_msg_port_parameter_set {
- };
- 
- struct mmal_msg_port_parameter_set_reply {
--	u32 status; /** enum mmal_msg_status todo: how does this
--		     * differ to the one in the header?
--		     */
-+	u32 status;	/* enum mmal_msg_status todo: how does this
-+			 * differ to the one in the header?
-+			 */
- };
- 
- /* port parameter getting */
-diff --git a/drivers/staging/media/platform/bcm2835/mmal-vchiq.c b/drivers/staging/media/platform/bcm2835/mmal-vchiq.c
-index f0639ee6c8b9..02ce5e3344e5 100644
---- a/drivers/staging/media/platform/bcm2835/mmal-vchiq.c
-+++ b/drivers/staging/media/platform/bcm2835/mmal-vchiq.c
-@@ -1426,7 +1426,8 @@ static int port_enable(struct vchiq_mmal_instance *instance,
- 
- /* ------------------------------------------------------------------
-  * Exported API
-- *------------------------------------------------------------------*/
-+ *------------------------------------------------------------------
-+ */
- 
- int vchiq_mmal_port_set_format(struct vchiq_mmal_instance *instance,
- 			       struct vchiq_mmal_port *port)
-diff --git a/drivers/staging/media/platform/bcm2835/mmal-vchiq.h b/drivers/staging/media/platform/bcm2835/mmal-vchiq.h
-index 9d1d11e4a53e..029f9f1fe81e 100644
---- a/drivers/staging/media/platform/bcm2835/mmal-vchiq.h
-+++ b/drivers/staging/media/platform/bcm2835/mmal-vchiq.h
-@@ -109,8 +109,8 @@ int vchiq_mmal_init(struct vchiq_mmal_instance **out_instance);
- int vchiq_mmal_finalise(struct vchiq_mmal_instance *instance);
- 
- /* Initialise a mmal component and its ports
--*
--*/
-+ *
-+ */
- int vchiq_mmal_component_init(
- 		struct vchiq_mmal_instance *instance,
- 		const char *name,
--- 
-2.11.1
+>
+> This looks very hackish to me anyways, how all of this stuff is supposed
+> to work is that you simply use the DMA interfaces unconditionally and
+> whatever is behind the operations takes care of everything.
+>
+> Doing it conditionally in the driver with all of this special IOMMU
+> domain et al. knowledge makes no sense to me at all.
+>
+> I don't see other drivers doing stuff like this at all, so if you're
+> going to handle this in a unique way like this you better write
+> several paragraphs in your commit message explaining why this weird
+> crap is necessary.
+
+I already tried to explain in the commit message that HW anyway takes care
+of data coherency, so calling DMA interfaces when there is no IOMMU will
+only result in performance drop.
+
+We are seeing a 0.75Mpps drop with IP forwarding rate due to that.
+Hence I have restricted calling DMA interfaces to only when IOMMU is enabled.
