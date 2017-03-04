@@ -1,52 +1,55 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sat, 4 Mar 2017 10:51:19 -0500 (EST)
-Subject: Panic in quirk_usb_early_handoff
-In-Reply-To: <CAKv+Gu_M6aMMfeCy7ZUM46Ptei1suvX+F_KtWG2_QFp_6jbCWw@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1703041049340.6026-100000@netrider.rowland.org>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Sat, 4 Mar 2017 18:01:21 +0200
+Subject: Microphone gain on N900
+In-Reply-To: <20170302142822.GA30427@amd>
+References: <20170226202831.GA31405@amd> <201702272053.37882@pali>
+ <4435ddd2-ca0e-b05d-727d-9f38416c0f97@bitmer.com>
+ <20170302142822.GA30427@amd>
+Message-ID: <defb507c-0f4b-7dfe-817b-cb488f289aa3@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 4 Mar 2017, Ard Biesheuvel wrote:
-
-> On 4 March 2017 at 00:24, Mason <slash.tmp@free.fr> wrote:
-> > On 03/03/2017 20:02, Robin Murphy wrote:
-> >
-> >> On 03/03/17 17:15, Mason wrote:
-> >>
-> >>> [    1.261813] Unable to handle kernel paging request at virtual address d08611e4
-> >>> [    1.269167] pgd = c0004000
-> >>> [    1.271979] [d08611e4] *pgd=8f804811, *pte=00000000, *ppte=00000000
-> >>> [    1.278394] Internal error: Oops: 7 [#1] PREEMPT SMP ARM
-> >>> [    1.283815] Modules linked in:
-> >>> [    1.286970] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.9.7-1-rc2 #157
-> >>> [    1.293614] Hardware name: Sigma Tango DT
-> >>> [    1.297726] task: cf82c9c0 task.stack: cf838000
-> >>> [    1.302364] PC is at quirk_usb_early_handoff+0x3e8/0x790
-> >>> [    1.307790] LR is at ioremap_page_range+0xf8/0x1a8
-> >>> [    1.312688] pc : [<c039fe44>]    lr : [<c02d0a10>]    psr: 000e0013
-> >>> [    1.312688] sp : cf839d78  ip : 00000000  fp : cf839e38
-> >>> [    1.324399] r10: c10248a0  r9 : 00000000  r8 : d08611e4
-> >>> [    1.329733] r7 : d084e000  r6 : 00002000  r5 : 000c0300  r4 : cfb4e800
-> >>> [    1.336377] r3 : 000131e4  r2 : 00000000  r1 : 91001e13  r0 : d084e000
-> >>
-> >> ...and again. And always at the same PC, too.
-> >
-> > By the way, isn't LR supposed to point to the caller of the
-> > current function? ("LR is at ioremap_page_range")
-> >
-> > If so, why does it not appear in the back trace?
-> >
+On 03/02/17 16:28, Pavel Machek wrote:
+> Hi!
 > 
-> lr is supposed to point to the return address at function entry. After
-> that, all bets are off, really, since ARM usually pops the return
-> address from the stack straight into the pc register. So in this case,
-> it looks like it still contains the address that the most recent leaf
-> function returned to (or another function that actually restores the
-> return address into lr before branching to it). But it could easily
-> contain garbage as well.
+>>>> v4.10 works quite nicely on N900, but I still have problems with
+>>>> audio. Even GSM calls would be usable, if I had reasonable volume on
+>>>> microphone and speaker... but I don't.
+>>>>
+>>>> Both speaker and microphone are too quiet. I can get louder output by
+>>>> plugging headset -- good. I can hear the other side nicely, but am
+>>>> too quiet for them. Unfortunately, even if I plug in wired headset,
+>>>> internal microphone is still used.
+>>>>
+>> For me these settings provide reasonable playback and capture volumes
+>> using v4.10.1:
+>>
+>> amixer -D hw:0 set PCM 100%
+>> amixer -D hw:0 set 'Line DAC' 80% on
+>> amixer -D hw:0 set 'Line' on
+>> amixer -D hw:0 set 'Left Line Mixer DACL1' on
+>> amixer -D hw:0 set 'Right Line Mixer DACR1' on
+>> amixer -D hw:0 set 'Jack Function' 'Headphone'
+>> amixer -D hw:0 set 'TPA6130A2 Headphone' 80%
+>>
+>> amixer -D hw:0 set 'Jack Function' 'Headset'
+>> amixer -D hw:0 set 'AGC' off
+>> amixer -D hw:0 set 'Input Select' 'ADC'
+>> amixer -D hw:0 set 'Left PGA Mixer Line1L' on
+>> amixer -D hw:0 set 'Left Line1L Mux' 'differential'
+>> amixer -D hw:0 set 'Right PGA Mixer Line1L' on
+>> amixer -D hw:0 set 'Right Line1L Mux' 'differential'
+>> amixer -D hw:0 set 'ADC HPF Cut-off' '0.0045xFs' 'disabled'
+>> amixer -D hw:0 set PGA 50% on
+>> amixer -D hw:0 cset iface=MIXER,name='PGA Capture Switch',index=0 on
+> 
+> This seems to correspond to volumes I have had before. They are enough
+> for phone call in quiet environment, but not really for normal usage.
+> 
+> Do you have settings where microphone on wired headset works?
+> 
+Those settings above. They are set after putting all volumes to 0 and
+muted. I'm using the Nokia WH-205 headset that came with the phone.
 
-Besides, the compiler often inlines static subroutines that are called
-from only one place.  As a result there is no hardware stack frame for 
-these subroutine calls, and they don't show up in the back trace.
-
-Alan Stern
+-- 
+Jarkko
