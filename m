@@ -1,76 +1,42 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 4 Mar 2017 18:48:19 +0100
-Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
- calls
-In-Reply-To: <CAMuHMdXiz5hqW=fm-2H1aNKq_gXD2o0508jD2XjxYUvKoEvHdw@mail.gmail.com>
-References: <20170303142201.16452-1-richard.genoud@gmail.com>
- <CAMuHMdX-K9B20Tu5NtHJRHmGGuT60OFu8TokZxsF8aSaS7HuHQ@mail.gmail.com>
- <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
- <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
- <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
- <CAMuHMdXiz5hqW=fm-2H1aNKq_gXD2o0508jD2XjxYUvKoEvHdw@mail.gmail.com>
-Message-ID: <20170304174819.esxhwwbsxzuq3vyc@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 4 Mar 2017 18:27:08 +0000
+Subject: Panic in quirk_usb_early_handoff
+In-Reply-To: <ed4e332d-28d6-e143-b2b3-f1e2829e89a7@free.fr>
+References: <4b2a7606-de27-c8ad-1530-958dd5d12233@free.fr>
+ <45e38a07-e8da-80e4-36bb-31e471f02004@free.fr>
+ <3c5bd8f5-468f-d25e-08a9-8944ee419096@free.fr>
+ <38b8c9be-724b-0cfc-a941-76f2c62e1c58@arm.com>
+ <4f0a6c67-a50b-ac24-8ffa-0a68802e84b8@free.fr>
+ <CAKv+Gu_M6aMMfeCy7ZUM46Ptei1suvX+F_KtWG2_QFp_6jbCWw@mail.gmail.com>
+ <4a07dbec-dcde-9ec0-514f-3b896e2b0b19@free.fr>
+ <46A35088-88E2-425B-963E-0DC2DCC54890@linaro.org>
+ <ed4e332d-28d6-e143-b2b3-f1e2829e89a7@free.fr>
+Message-ID: <239B6CA3-8879-4824-A2AA-A8E8880E1758@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-Cc += linux-gpio at vger.kernel.org
-
-On Sat, Mar 04, 2017 at 04:35:46PM +0100, Geert Uytterhoeven wrote:
-> On Fri, Mar 3, 2017 at 8:44 PM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > On Fri, Mar 03, 2017 at 08:21:05PM +0100, Geert Uytterhoeven wrote:
-> >> > diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-> >> > index 91e7dddbf72c..2f4cdd4e7b4f 100644
-> >> > --- a/drivers/tty/serial/sh-sci.c
-> >> > +++ b/drivers/tty/serial/sh-sci.c
-> >> > @@ -3022,7 +3022,7 @@ static int sci_probe_single(struct platform_device *dev,
-> >> >                 return ret;
-> >> >
-> >> >         sciport->gpios = mctrl_gpio_init(&sciport->port, 0);
-> >> > -       if (IS_ERR(sciport->gpios) && PTR_ERR(sciport->gpios) != -ENOSYS)
-> >> > +       if (IS_ERR(sciport->gpios))
-> >> >                 return PTR_ERR(sciport->gpios);
-> >>
-> >> Now the sh-sci driver fails to probe on legacy platforms where GPIOLIB=n.
-> >> The check for -ENOSYS made it succeed before.
-> >
-> > That's right, intended and the only option that's save (for some
-> > definition of save; the obvious downside is that there is no
-> > /dev/tty$whatever for you).
+> On 4 Mar 2017, at 17:29, Mason <slash.tmp@free.fr> wrote:
 > 
-> That's not just a downside, but a plain regression on legacy platforms that
-> do not use GPIO flow control.
-
-The only sane way out is that the driver somehow finds out that no gpios
-are supposed to be needed. So you can pass in via platform_data that no
-gpios are supposed to be used if you don't want to enable GPIOLIB (or
-implement CONFIG_HALFGPIOLIB). But I'd say this is a quirk that should
-better be fixed globally. So I think we should implement HALFGPIOLIB
-that includes the lookup stuff and so can make gpiod_get_optional and
-friends return NULL if there is really no GPIO.
-
-> > Ignoring -ENOSYS is only ok if your device doesn't have a cts-gpio. If
-> > it has, ignoring -ENOSYS hides bugs because the driver sends data while
-> > it shouldn't or cannot signal the other side that it should stop (or
-> > start) a transmission.
+>> On 04/03/2017 18:16, Ard Biesheuvel wrote:
+>> 
+>> After pc, the link register is the most likely to legally point into
+>> the kernel .text section so it makes sense imo to decode the address
+>> into a function name plus offset.
 > 
-> Mctrl_gpio supports modern platforms with GPIOLIB and DT or ACPI only.
+> Does gcc ever use the link register as a general purpose register?
 
-That's wrong. Even for a legacy device you can make use of GPIOs. See
-arch/arm/mach-tegra/board-paz00.c for a simple example.
+Yes.
 
-> On legacy platforms, you cannot use GPIO flow control (except when using a
-> custom implementation, which is out-of-scope here), so the issue of silently
-> running without cts-gpio on these platforms is moot.
+> (In which case, it is very likely to contain "garbage" as far as
+> function addresses are concerned.)
+> 
+>> Educating people about the architecture's calling convention and
+>> associated caveats is not the job of the panic handler.
+> 
+> That's a weird statement.
+> 
 
-Given that mctrl-gpio can be useful on legacy platforms, a device could
-silently run without cts-gpio even there.
+By your own admission (in various threads and in #armlinux on IRC), you are not an expert in the topics you seek help about. Yet, that does not seem to stop you from sharing your opinions vocally, how 'weird' or 'useless' some things are.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+As for the lr, I attempted to explain that in some cases, annotating its value can be useful. Adding an explanation to or letting the panic handler reason about whether this is currently the case is not so useful imo.
