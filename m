@@ -1,114 +1,49 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 4 Mar 2017 10:01:09 +0200
-Subject: [PATCH] ARM: dts: exynos: Use thermal fuse value for thermal
- zone 0 on Exynos5420
-In-Reply-To: <252f9e32-ff2c-a1ce-3c98-6383a1148e02@osg.samsung.com>
-References: <20170211201456.27974-1-krzk@kernel.org>
- <252f9e32-ff2c-a1ce-3c98-6383a1148e02@osg.samsung.com>
-Message-ID: <20170304080109.j2kuwmqj7mgfx3ky@kozik-lap>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 4 Mar 2017 08:07:44 +0000
+Subject: Panic in quirk_usb_early_handoff
+In-Reply-To: <4f0a6c67-a50b-ac24-8ffa-0a68802e84b8@free.fr>
+References: <4b2a7606-de27-c8ad-1530-958dd5d12233@free.fr>
+ <45e38a07-e8da-80e4-36bb-31e471f02004@free.fr>
+ <3c5bd8f5-468f-d25e-08a9-8944ee419096@free.fr>
+ <38b8c9be-724b-0cfc-a941-76f2c62e1c58@arm.com>
+ <4f0a6c67-a50b-ac24-8ffa-0a68802e84b8@free.fr>
+Message-ID: <CAKv+Gu_M6aMMfeCy7ZUM46Ptei1suvX+F_KtWG2_QFp_6jbCWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 03, 2017 at 06:50:06PM -0300, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
-> 
-> On 02/11/2017 05:14 PM, Krzysztof Kozlowski wrote:
-> > In Odroid XU3 Lite board, the temperature levels reported for thermal
-> > zone 0 were weird. In warm room:
-> > 	/sys/class/thermal/thermal_zone0/temp:32000
-> > 	/sys/class/thermal/thermal_zone1/temp:51000
-> > 	/sys/class/thermal/thermal_zone2/temp:55000
-> > 	/sys/class/thermal/thermal_zone3/temp:54000
-> > 	/sys/class/thermal/thermal_zone4/temp:51000
-> > 
-> > Sometimes after booting the value was even equal to ambient temperature
-> > which is highly unlikely to be a real temperature of sensor in SoC.
-> > 
-> > The thermal sensor's calibration (trimming) is based on fused values.
-> > In case of the board above, the fused values are: 35, 52, 43, 58 and 43
-> > (corresponding to each TMU device).  However driver defined a minimum value
-> > for fused data as 40 and for smaller values it was using a hard-coded 55
-> > instead.  This lead to mapping data from sensor to wrong temperatures
-> > for thermal zone 0.
-> > 
-> > Various vendor 3.10 trees (Hardkernel's based on Samsung LSI, Artik 10)
-> > do not impose any limits on fused values.  Since we do not have any
-> > knowledge about these limits, use 0 as a minimum accepted fused value.
-> > This should essentially allow accepting any reasonable fused value thus
-> > behaving like vendor driver.
-> > 
-> > The exynos5420-tmu-sensor-conf.dtsi is copied directly from existing
-> > exynso4412 with one change - the samsung,tmu_min_efuse_value.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > 
-> > ---
-> > 
-> > Testing on other Exynos542x boards is much appreciated. Especially I
-> > wonder what efuse values are there.
-> 
-> I tested on both Exynos5422 Odroid XU4 and Exynos5800 Peach Pi boards.
-> 
-> The temperatures levels reported for these two boards on a warm room are:
-> 
-> Odroid XU4
-> 
-> # cat /sys/class/thermal/thermal_zone*/temp
-> 50000
-> 50000
-> 54000
-> 51000
-> 48000
-> 
-> Peach Pi
-> 
-> # cat /sys/class/thermal/thermal_zone*/temp
-> 42000
-> 44000
-> 27000 <-- weird value for thermal zone 2 like zone 0 in your XU3 lite
-> 45000
-> 45000
-> 
-> And the efuse values for the TMU devices are:
-> 
-> Odroid XU4
-> 
-> TMU0 = 45
-> TMU1 = 44
-> TMU2 = 44
-> TMU3 = 46
-> TMU3 = 46
-> 
-> Peach Pi
-> 
-> TMU0 = 44
-> TMU1 = 46
-> TMU2 = 36
-> TMU3 = 53
-> TMU3 = 46
-> 
-> The fused value for TMU2 is < 40 so that explains the weird temperature
-> level for thermal zone 2 in Peach. So after your patch, makes more sense:
-> 
-> # cat /sys/class/thermal/thermal_zone*/temp
-> 41000
-> 42000
-> 45000
-> 43000
-> 43000
+On 4 March 2017 at 00:24, Mason <slash.tmp@free.fr> wrote:
+> On 03/03/2017 20:02, Robin Murphy wrote:
+>
+>> On 03/03/17 17:15, Mason wrote:
+>>
+>>> [    1.261813] Unable to handle kernel paging request at virtual address d08611e4
+>>> [    1.269167] pgd = c0004000
+>>> [    1.271979] [d08611e4] *pgd=8f804811, *pte=00000000, *ppte=00000000
+>>> [    1.278394] Internal error: Oops: 7 [#1] PREEMPT SMP ARM
+>>> [    1.283815] Modules linked in:
+>>> [    1.286970] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.9.7-1-rc2 #157
+>>> [    1.293614] Hardware name: Sigma Tango DT
+>>> [    1.297726] task: cf82c9c0 task.stack: cf838000
+>>> [    1.302364] PC is at quirk_usb_early_handoff+0x3e8/0x790
+>>> [    1.307790] LR is at ioremap_page_range+0xf8/0x1a8
+>>> [    1.312688] pc : [<c039fe44>]    lr : [<c02d0a10>]    psr: 000e0013
+>>> [    1.312688] sp : cf839d78  ip : 00000000  fp : cf839e38
+>>> [    1.324399] r10: c10248a0  r9 : 00000000  r8 : d08611e4
+>>> [    1.329733] r7 : d084e000  r6 : 00002000  r5 : 000c0300  r4 : cfb4e800
+>>> [    1.336377] r3 : 000131e4  r2 : 00000000  r1 : 91001e13  r0 : d084e000
+>>
+>> ...and again. And always at the same PC, too.
+>
+> By the way, isn't LR supposed to point to the caller of the
+> current function? ("LR is at ioremap_page_range")
+>
+> If so, why does it not appear in the back trace?
+>
 
-Great! Thanks for testing!
-
-
-> I wonder though if 0 is the best value or if we should just lower more
-> to cover the used e-fuse values in Exynos5 boards. But as you said,
-> we have no knowledge about these limits...
-
-Yeah... we could set value of 10 or 20... but that would be blind shot.
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-
-Thanks,
-Krzysztof
+lr is supposed to point to the return address at function entry. After
+that, all bets are off, really, since ARM usually pops the return
+address from the stack straight into the pc register. So in this case,
+it looks like it still contains the address that the most recent leaf
+function returned to (or another function that actually restores the
+return address into lr before branching to it). But it could easily
+contain garbage as well.
