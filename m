@@ -1,195 +1,123 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sat, 4 Mar 2017 14:15:39 +0100
-Subject: [PATCH v2 4/5] ARM64: dts: Prepare Realtek RTD1295 and Zidoo X9S
-In-Reply-To: <20170228000327.hnenlharcmiqxkpb@rob-hp-laptop>
-References: <20170223164553.3715-1-afaerber@suse.de>
- <20170223164553.3715-5-afaerber@suse.de>
- <20170228000327.hnenlharcmiqxkpb@rob-hp-laptop>
-Message-ID: <c8f9941f-17ab-5db0-5f6c-186fe1a87bbf@suse.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 4 Mar 2017 13:49:01 +0000
+Subject: Using the generic host PCIe driver
+In-Reply-To: <c6d21078-b2f0-8dd3-adf7-13fc6456c1aa@free.fr>
+References: <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
+ <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
+ <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
+ <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
+ <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
+ <98ee3041-6a94-91af-b4bf-208aa02624ed@free.fr>
+ <20170301215726.GA32286@bhelgaas-glaptop.roam.corp.google.com>
+ <258cd6f3-ef17-6705-ff48-ae06f26778c2@free.fr>
+ <20170303154628.GA21522@bhelgaas-glaptop.roam.corp.google.com>
+ <8e1a0b5d-8dfb-4be1-a049-b16892a6c0d0@free.fr>
+ <20170303200407.GB30375@bhelgaas-glaptop.roam.corp.google.com>
+ <5c899946-4220-a63e-fe98-6a103200c2ad@free.fr>
+ <CAKv+Gu-QxUYZcg4DPwuhhfqKCp4eJEWXCh43ZyvDe12=exEhWw@mail.gmail.com>
+ <8daa1f79-8fda-bef9-e216-3c15f53c4f32@free.fr>
+ <CAKv+Gu_fLKvruKy2Aoa95ThPAJ2XDJVUCjeuAWaRwpifsn_A_w@mail.gmail.com>
+ <c6d21078-b2f0-8dd3-adf7-13fc6456c1aa@free.fr>
+Message-ID: <CAKv+Gu_SG9ynmBKCpQyLgVcU2_cxWoHHeoyAhxN+cKQuR+su3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 28.02.2017 um 01:03 schrieb Rob Herring:
-> On Thu, Feb 23, 2017 at 05:45:51PM +0100, Andreas F?rber wrote:
->> Add initial device trees for the RTD1295 SoC and the Zidoo X9S TV box.
+On 4 March 2017 at 13:07, Mason <slash.tmp@free.fr> wrote:
+> On 04/03/2017 12:45, Ard Biesheuvel wrote:
+>> On 4 March 2017 at 10:56, Mason <slash.tmp@free.fr> wrote:
+[...]
+>>> In my 32-bit system, there are 2GB of RAM at [0x8000_0000,0x10000_0000[
+>>> There are MMIO registers at [0, 16MB[ and also other stuff higher
+>>> Suppose there is nothing mapped at [0x7000_0000, 0x8000_0000[
+>>>
+>>> Can I provide that range to the PCI subsystem?
 >>
->> The CPUs lack the enable-method property because the vendor device tree
->> uses a custom "rtk-spin-table" method and "psci" did not appear to work.
->>
->> The UARTs lack the interrupts properties because the vendor device tree
->> connects them to a custom interrupt controller. earlycon works without.
->>
->> A list of memory reservations is adopted from v1.2.11 vendor device tree:
->> 0x02200000 can be used for an initrd, 0x01b00000 is audio-related;
->> ion-related 0x02600000, 0x02c00000 and 0x11000000 are left out;
->> 0x10000000 is used for sharing the U-Boot environment; others remain
->> to be investigated.
->>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  v1 -> v2:
->>  * Dropped 0x0000000010000000 /memreserve/
->>  
->>  arch/arm64/boot/dts/Makefile                      |   1 +
->>  arch/arm64/boot/dts/realtek/Makefile              |   5 +
->>  arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts |  78 +++++++++++
->>  arch/arm64/boot/dts/realtek/rtd1295.dtsi          | 162 ++++++++++++++++++++++
->>  4 files changed, 246 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/realtek/Makefile
->>  create mode 100644 arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts
->>  create mode 100644 arch/arm64/boot/dts/realtek/rtd1295.dtsi
->>
->> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->> index 080232b..78f7991 100644
->> --- a/arch/arm64/boot/dts/Makefile
->> +++ b/arch/arm64/boot/dts/Makefile
->> @@ -14,6 +14,7 @@ dts-dirs += marvell
->>  dts-dirs += mediatek
->>  dts-dirs += nvidia
->>  dts-dirs += qcom
->> +dts-dirs += realtek
->>  dts-dirs += renesas
->>  dts-dirs += rockchip
->>  dts-dirs += socionext
->> diff --git a/arch/arm64/boot/dts/realtek/Makefile b/arch/arm64/boot/dts/realtek/Makefile
->> new file mode 100644
->> index 0000000..8521e92
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/realtek/Makefile
->> @@ -0,0 +1,5 @@
->> +dtb-$(CONFIG_ARCH_REALTEK) += rtd1295-zidoo-x9s.dtb
->> +
->> +always		:= $(dtb-y)
->> +subdir-y	:= $(dts-dirs)
->> +clean-files	:= *.dtb
->> diff --git a/arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts b/arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts
->> new file mode 100644
->> index 0000000..53302bb
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts
->> @@ -0,0 +1,78 @@
->> +/*
->> + * Copyright (c) 2016-2017 Andreas F?rber
->> + *
->> + * This file is dual-licensed: you can use it either under the terms
->> + * of the GPL or the X11 license, at your option. Note that this dual
->> + * licensing only applies to this file, and not this project as a
->> + * whole.
-> 
-> You can use SPDX tag here instead.
+>> Well, it obviously needs to be a range that is not otherwise occupied.
+>> But it is SoC specific where the forwarded MEM region(s) are, and
+>> whether they are configurable or not.
+>
+> My problem is that I don't understand bus addresses vs physical addresses.
+> (where and when they are used, and how.) Devices themselves put bus
+> addresses in messages in the PCIe protocol, I assume? When does it matter
+> what physical address maps to a bus address? When and where does this
+> mapping take place? (In the RC HW, in the RC driver, elsewhere?)
+>
 
-Already done. :)
+This is mostly for DMA: there is no 'mapping' that takes place, it
+simply means that the CPU physical address may deviate from the
+address used by a PCI bus master to refer to the same location.
 
->> +	reserved-memory {
->> +		#address-cells = <2>;
->> +		#size-cells = <2>;
-> 
-> Unless you have >4GB regions, you don't really need 2 cells here.
+For instance, there are arm64 SoCs that map the physical RAM way above
+the 4 GB limit. In this case, it may make sense to program the PCI
+host controller in such a way that it applies an offset so that at
+least the first 4 GB of RAM are 32-bit addressable by PCI devices
+(which may not be capable of 64-bit addressing).
 
-Correct, but using less cells than in the root node requires a ranges
-mapping, and we don't have size information available for that. So I
-would rather leave it like this initially.
+The implication is that, the memory address used when programming a
+PCI device to perform bus master DMA is different from the physical
+address used by the host.
 
->> +		ranges;
->> +
->> +		tee at 10100000 {
->> +			reg = <0x0 0x10100000 0x0 0xf00000>;
->> +			no-map;
->> +		};
->> +	};
-> 
-> 
->> +	soc {
->> +		compatible = "simple-bus";
->> +		#address-cells = <2>;
->> +		#size-cells = <2>;
-> 
-> Same here. And use ranges to narrow the address space to what you need.
+> I suppose some devices do actually need access to *real* *actual* memory
+> for stuff like DMA. I suppose they must use system memory for that.
+> Does the generic PCI(e) framework setup this memory?
+>
 
-By my definition, SoC is the whole memory range.
+You don't need to 'set up' this memory in the general case, although
+this is different in the presence of IOMMUs, but let's disregard that
+for now.
 
-And as pointed out in the v1 cover letter, I don't have sufficient
-documentation for this chip - there's not even a general address map in
-the datasheet, nor any bus information - so any attempt to restrict it
-would be a wild guess and specific to the 2G .dts rather than suitable
-for the generic .dtsi here.
+>> IOW, you can ask *us* all you
+>> want about these details, but only the H/W designer can answer this
+>> for you.
+> befor
+> My biggest problem is that, in order to get useful answers, one must
+> ask specific questions. And my understanding of PCI is still too
+> limited to ask good questions.
+>
+> My current understanding is that I must find a large area in the memory
+> map where there is NOTHING (no RAM, no registers). Then I can specify
+> this area in the "ranges" prop of my DT node, to be used as a
+> non-prefetchable memory address range.
+>
 
-If we had the info, I would still want to leave the soc node like this
-and instead have bus sub-nodes with suitable ranges, like we did for
-meson-gxbb. I don't see harm in having the .dts be a few cells larger.
+'Finding' a memory area suggests that you could pick a range at random
+and put that in the DT. This is *not* the case.
 
->> +		ranges;
->> +
->> +		uart0: serial at 98007800 {
->> +			compatible = "snps,dw-apb-uart";
->> +			reg = <0x0 0x98007800 0x0 0x400>,
->> +			      <0x0 0x98007000 0x0 0x100>;
->> +			reg-shift = <2>;
->> +			reg-io-width = <4>;
->> +			clock-frequency = <27000000>;
->> +			status = "disabled";
->> +		};
->> +
->> +		uart1: serial at 9801b200 {
->> +			compatible = "snps,dw-apb-uart";
->> +			reg = <0x0 0x9801b200 0x0 0x100>,
->> +			      <0x0 0x9801b00c 0x0 0x100>;
->> +			reg-shift = <2>;
->> +			reg-io-width = <4>;
->> +			clock-frequency = <432000000>;
->> +			status = "disabled";
->> +		};
->> +
->> +		uart2: serial at 9801b400 {
->> +			compatible = "snps,dw-apb-uart";
->> +			reg = <0x0 0x9801b400 0x0 0x100>,
->> +			      <0x0 0x9801b00c 0x0 0x100>;
->> +			reg-shift = <2>;
->> +			reg-io-width = <4>;
->> +			clock-frequency = <432000000>;
->> +			status = "disabled";
->> +		};
->> +
->> +		gic: interrupt-controller at ff011000 {
->> +			compatible = "arm,gic-400";
->> +			reg = <0x0 0xff011000 0x0 0x1000>,
->> +			      <0x0 0xff012000 0x0 0x1000>;
-> 
-> You are missing some register ranges and the sizes may be wrong. Check 
-> the binding doc.
+The PCIe controller hardware needs to know that it needs to decode
+that range, i.e., it needs to forward memory accesses that hit this
+window. You need to figure out how this is configured on the h/w that
+you are using.
 
-I have in the meantime tested that 1k, 2k, 2k, 2k plus PPI 9 lets KVM
-initialize the vGIC:
+>> The DT node that describes the host bridge should simply describe
+>> which MMIO regions are used by the device. This is no different from
+>> any other MMO peripheral.
+>
+> In my limited experience, the DT node for PCI is, by far, the most
+> complex node I've had to write.
+>
 
-[    0.256915] kvm [1]: 8-bit VMID
-[    0.256951] kvm [1]: IDMAP page: 73f000
-[    0.256986] kvm [1]: HYP VA range: 800000000000:ffffffffffff
-[    0.257417] kvm [1]: Hyp mode initialized successfully
-[    0.257479] kvm [1]: vgic-v2 at ff014000
-[    0.257554] kvm [1]: vgic interrupt IRQ1
-[    0.257600] kvm [1]: virtual timer IRQ4
+Yes, but that is not the point. My point is that the information you
+put in the DT should reflect *reailty* in one way or the other. Every
+value you put there should match the current configuration of the h/w
+IP block.
 
-As usual, not yet tested with a guest for lack of proper rootfs.
+>> As for the bus ranges: this also depends on the h/w, as far as i know,
+>> and has a direct relation with the size of the PCI configuration space
+>> (1 MB per bus for ECAM iirc?) On 32-bit systems, supporting that many
+>> buses may be costly in terms of 32-bit addressable space, given that
+>> the PCIe config space is typically below 4 GB. But it all depends on
+>> the h/w implementation.
+>
+> That I know. The HW designer has confirmed reserving 256 MB of address
+> space for the configuration space. In hind-sight, this was probably a
+> waste of address space. Supporting 4 buses seems amply sufficient.
+> Am I wrong?
+>
 
-Mark, is there any benefit in using a raw 0xf mask over a simple 4, when
-there are only 4 CPUs? I tested the simple 4 copied from my S900,
-whereas the timer based on the vendor device tree uses raw 0xf, i.e.,
-simple 8. Should I change that to be consistently simple 4?
+PCIe puts every device on its own bus, so it is good to have some headroom imo
 
->> +			interrupt-controller;
->> +			#interrupt-cells = <3>;
->> +		};
->> +	};
->> +};
+> I suppose wasting 256 MB of address space is not an issue on 64-bit
+> systems, though.
+>
 
-Additionally I am dropping the irq.h include, because arm-gic.h already
-does that for us.
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Hardly
