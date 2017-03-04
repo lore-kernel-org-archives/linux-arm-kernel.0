@@ -1,59 +1,107 @@
-From: slash.tmp@free.fr (Mason)
-Date: Sat, 4 Mar 2017 17:57:59 +0100
-Subject: Panic in quirk_usb_early_handoff
-In-Reply-To: <CAKv+Gu_M6aMMfeCy7ZUM46Ptei1suvX+F_KtWG2_QFp_6jbCWw@mail.gmail.com>
-References: <4b2a7606-de27-c8ad-1530-958dd5d12233@free.fr>
- <45e38a07-e8da-80e4-36bb-31e471f02004@free.fr>
- <3c5bd8f5-468f-d25e-08a9-8944ee419096@free.fr>
- <38b8c9be-724b-0cfc-a941-76f2c62e1c58@arm.com>
- <4f0a6c67-a50b-ac24-8ffa-0a68802e84b8@free.fr>
- <CAKv+Gu_M6aMMfeCy7ZUM46Ptei1suvX+F_KtWG2_QFp_6jbCWw@mail.gmail.com>
-Message-ID: <4a07dbec-dcde-9ec0-514f-3b896e2b0b19@free.fr>
+From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
+Date: Sat, 4 Mar 2017 22:29:23 +0530
+Subject: IOMMU in bypass mode by default on ARM64,
+ instead of command line option
+Message-ID: <CA+sq2CdawVNqEjpuzkdmEDbvW69aXufHJAEoH_g55=sr2d1rOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2017 09:07, Ard Biesheuvel wrote:
-> On 4 March 2017 at 00:24, Mason wrote:
->> On 03/03/2017 20:02, Robin Murphy wrote:
->>
->>> On 03/03/17 17:15, Mason wrote:
->>>
->>>> [    1.261813] Unable to handle kernel paging request at virtual address d08611e4
->>>> [    1.269167] pgd = c0004000
->>>> [    1.271979] [d08611e4] *pgd=8f804811, *pte=00000000, *ppte=00000000
->>>> [    1.278394] Internal error: Oops: 7 [#1] PREEMPT SMP ARM
->>>> [    1.283815] Modules linked in:
->>>> [    1.286970] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.9.7-1-rc2 #157
->>>> [    1.293614] Hardware name: Sigma Tango DT
->>>> [    1.297726] task: cf82c9c0 task.stack: cf838000
->>>> [    1.302364] PC is at quirk_usb_early_handoff+0x3e8/0x790
->>>> [    1.307790] LR is at ioremap_page_range+0xf8/0x1a8
->>>> [    1.312688] pc : [<c039fe44>]    lr : [<c02d0a10>]    psr: 000e0013
->>>> [    1.312688] sp : cf839d78  ip : 00000000  fp : cf839e38
->>>> [    1.324399] r10: c10248a0  r9 : 00000000  r8 : d08611e4
->>>> [    1.329733] r7 : d084e000  r6 : 00002000  r5 : 000c0300  r4 : cfb4e800
->>>> [    1.336377] r3 : 000131e4  r2 : 00000000  r1 : 91001e13  r0 : d084e000
->>>
->>> ...and again. And always at the same PC, too.
->>
->> By the way, isn't LR supposed to point to the caller of the
->> current function? ("LR is at ioremap_page_range")
->>
->> If so, why does it not appear in the back trace?
-> 
-> lr is supposed to point to the return address at function entry. After
-> that, all bets are off, really, since ARM usually pops the return
-> address from the stack straight into the pc register. So in this case,
-> it looks like it still contains the address that the most recent leaf
-> function returned to (or another function that actually restores the
-> return address into lr before branching to it). But it could easily
-> contain garbage as well.
+Hi,
 
-If there is only a tiny chance that LR contains genuinely useful
-information, then what is the rationale for providing the info
-at all in the panic message?
+I did see some patches submitted earlier to enable user to boot kernel
+with SMMU in bypass mode using a command line parameter.
 
-I would argue that no info is better than info that is wrong
-most of the time.
+Idea sounds good, but just wondering if it would be better if things are done in
+reverse i.e put SMMU in bypass mode by default on host and provide
+option to user to enable SMMU via bootargs. Reason i am saying this is
+with SMMU
+enabled on host, performance of devices drops down to pathetic levels, not
+because of HW but mostly because of ARM IOMMU implementation in kernel.
 
-Regards.
+On a Cavium's ARM64 platform below are some performance numbers
+with and without SMMU enabled on host.
+=======================================================
+Iperf numbers with Intel 40G NIC: Without SMMU: 31.5Gbps, with SMMU: 820Mbps
+FIO perf with Intel NVMe disk:
+
+With SMMU on
+=============
+
+Random read:
+--------------------
+
+TEST:Rand MIX:0 BLOCK_SIZE:4096 THREADS:32 IODEPTH:32 IOPS:69579
+MBPS:284 TOTALCPU
+TEST:Rand MIX:0 BLOCK_SIZE:16384 THREADS:32 IODEPTH:32 IOPS:25299
+MBPS:414 TOTALCPU:
+TEST:Rand MIX:0 BLOCK_SIZE:65536 THREADS:32 IODEPTH:32 IOPS:6264
+MBPS:410 TOTALCPU:
+TEST:Rand MIX:0 BLOCK_SIZE:1048576 THREADS:32 IODEPTH:32 IOPS:381
+MBPS:399 TOTALCPU:
+
+Random write
+-------------------
+
+TEST:Rand MIX:100 BLOCK_SIZE:4096 THREADS:32 IODEPTH:32 IOPS:77159
+MBPS:316 TOTALCPU:
+TEST:Rand MIX:100 BLOCK_SIZE:16384 THREADS:32 IODEPTH:32 IOPS:27283
+MBPS:447 TOTALCPU:
+TEST:Rand MIX:100 BLOCK_SIZE:65536 THREADS:32 IODEPTH:32 IOPS:6634
+MBPS:434 TOTALCPU:
+TEST:Rand MIX:100 BLOCK_SIZE:1048576 THREADS:32 IODEPTH:32 IOPS:385
+MBPS:403 TOTALCPU:
+
+
+With SMMU off
+==============
+
+Random read
+----------------------
+
+TEST:Rand MIX:0 BLOCK_SIZE:4096 THREADS:32 IODEPTH:32
+IOPS:410392MBPS:1680 TOTALCPU:
+TEST:Rand MIX:0 BLOCK_SIZE:16384 THREADS:32 IODEPTH:32 IOPS:152583
+MBPS:2499 TOTALCPU:
+TEST:Rand MIX:0 BLOCK_SIZE:65536 THREADS:32 IODEPTH:32
+IOPS:37144MBPS:2434 TOTALCPU:
+TEST:Rand MIX:0 BLOCK_SIZE:1048576 THREADS:32 IODEPTH:32 IOPS:2386
+MBPS:2501 TOTALCPU:
+
+Random write
+----------------------
+
+TEST:Rand MIX:100 BLOCK_SIZE:4096 THREADS:32 IODEPTH:32 IOPS:99678
+MBPS:408 TOTALCPU:
+TEST:Rand MIX:100 BLOCK_SIZE:16384 THREADS:32 IODEPTH:32 IOPS:113912
+MBPS:1866 TOTALCPU:
+TEST:Rand MIX:100 BLOCK_SIZE:65536 THREADS:32 IODEPTH:32 IOPS:28871
+MBPS:1892 TOTALCPU:
+TEST:Rand MIX:100 BLOCK_SIZE:1048576 THREADS:32 IODEPTH:32 IOPS:1828
+MBPS:1916 TOTALCPU:
+=====================================================
+
+Performance with SMMU enabled drops to <1/5th on NVMe disk and on NIC
+it's down to nothing. Problem seems to be with high contention for
+locks which are
+being used for IOVA maintenance and while updating translation tables inside
+ARM SMMUv2/v3 drivers.
+
+Intel and AMD IOMMU drivers does make use of per-cpu IOVA caches to
+reduce the impact of 'iova_rbtree_lock' but ARM is yet to catchup.
+http://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/drivers/iommu/iova.c?id=9257b4a206fc0229dd5f84b78e4d1ebf3f91d270
+
+And the other lock is 'pgtbl_lock' used in ARM SMMUv2/V3 drivers.
+
+Appreciate any feedback on the following
+# Has anyone done any sort performance benchmarking before and saw
+   similar results ?
+# Is there a possibility of improvement here, has anyone already started
+   working on these ?
+# Would it be a good idea to use ARM IOMMU only with VFIO/Virtualization
+   till things improve in this area, simply because kernel command
+line parameter
+   might be good from developer's perspective but in a deployment environment
+   with a standard distro, don't think it's a feasible option.
+
+Thanks,
+Sunil.
