@@ -1,43 +1,98 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 4 Mar 2017 07:07:28 -0800
-Subject: [PATCH 4/4] watchdog: sama5d4: Add comment explaining what
- happens on resume
-In-Reply-To: <20170302173114.28508-5-alexandre.belloni@free-electrons.com>
-References: <20170302173114.28508-1-alexandre.belloni@free-electrons.com>
- <20170302173114.28508-5-alexandre.belloni@free-electrons.com>
-Message-ID: <d97f8e83-7fdd-61e5-01c9-af089f92b71d@roeck-us.net>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sat, 4 Mar 2017 16:35:46 +0100
+Subject: [PATCH 4/4] tty/serial: sh-sci: remove uneeded IS_ERR_OR_NULL
+ calls
+In-Reply-To: <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
+References: <20170303142201.16452-1-richard.genoud@gmail.com>
+ <CAMuHMdX-K9B20Tu5NtHJRHmGGuT60OFu8TokZxsF8aSaS7HuHQ@mail.gmail.com>
+ <20170303191248.wlwjri55ip2x5pgg@pengutronix.de>
+ <CAMuHMdXFrwa2jCVDb+8ecqgARLG0oGrPp9pLs0b6vEiWeKJ+uA@mail.gmail.com>
+ <20170303194414.n76tr3oa2mlrzjre@pengutronix.de>
+Message-ID: <CAMuHMdXiz5hqW=fm-2H1aNKq_gXD2o0508jD2XjxYUvKoEvHdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/02/2017 09:31 AM, Alexandre Belloni wrote:
-> Because suspending to RAM may lose the register values, they are restored
-> on resume. This is currently done unconditionally because there is
-> currently no way to know (from the driver) whether they have really been
-> lost or are still valid. Writing MR also pings the watchdog and this may
-> not be what is expected so add a comment explaining why it happens.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Hi Uwe,
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+On Fri, Mar 3, 2017 at 8:44 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> On Fri, Mar 03, 2017 at 08:21:05PM +0100, Geert Uytterhoeven wrote:
+>> > diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
+>> > index 91e7dddbf72c..2f4cdd4e7b4f 100644
+>> > --- a/drivers/tty/serial/sh-sci.c
+>> > +++ b/drivers/tty/serial/sh-sci.c
+>> > @@ -3022,7 +3022,7 @@ static int sci_probe_single(struct platform_device *dev,
+>> >                 return ret;
+>> >
+>> >         sciport->gpios = mctrl_gpio_init(&sciport->port, 0);
+>> > -       if (IS_ERR(sciport->gpios) && PTR_ERR(sciport->gpios) != -ENOSYS)
+>> > +       if (IS_ERR(sciport->gpios))
+>> >                 return PTR_ERR(sciport->gpios);
+>>
+>> Now the sh-sci driver fails to probe on legacy platforms where GPIOLIB=n.
+>> The check for -ENOSYS made it succeed before.
+>
+> That's right, intended and the only option that's save (for some
+> definition of save; the obvious downside is that there is no
+> /dev/tty$whatever for you).
 
-> ---
->  drivers/watchdog/sama5d4_wdt.c | 5 +++++
->  1 file changed, 5 insertions(+)
+That's not just a downside, but a plain regression on legacy platforms that
+do not use GPIO flow control.
+
+> Ignoring -ENOSYS is only ok if your device doesn't have a cts-gpio. If
+> it has, ignoring -ENOSYS hides bugs because the driver sends data while
+> it shouldn't or cannot signal the other side that it should stop (or
+> start) a transmission.
+
+Mctrl_gpio supports modern platforms with GPIOLIB and DT or ACPI only.
+On legacy platforms, you cannot use GPIO flow control (except when using a
+custom implementation, which is out-of-scope here), so the issue of silently
+running without cts-gpio on these platforms is moot.
+
+> So the options are:
+>  - enable GPIOLIB (maybe enforce that by letting the driver select it)
+>  - introduce a CONFIG_HALFGPIOLIB that makes gpiod_get_optional and
+>    mctrl_gpio_init return only then -ENOSYS if there is a gpio specified
+>    and NULL otherwise.
 >
-> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-> index d710014f3b7d..0ae947c3d7bc 100644
-> --- a/drivers/watchdog/sama5d4_wdt.c
-> +++ b/drivers/watchdog/sama5d4_wdt.c
-> @@ -300,6 +300,11 @@ static int sama5d4_wdt_resume(struct device *dev)
->  {
->  	struct sama5d4_wdt *wdt = dev_get_drvdata(dev);
+>> > Then mctrl_gpio_to_gpiod isn't called. I don't have a machine to test
+>> > this, but I think currently this makes the machine barf to continue
+>> > here because with sciport->gpios = ERR_PTR(-ENOSYS) calling
+>> >
+>> >         mctrl_gpio_to_gpiod(sciport->gpios, ...)
+>> >
+>> > is a bad idea.
+>>
+>> If sciport->gpios == ERR_PTR(-ENOSYS), CONFIG_GPIOLIB is not enabled, the
+>> feature is not available, and mctrl_gpio_to_gpiod() will not
+>> dereference the error
+>> pointer.
 >
-> +	/*
-> +	 * FIXME: writing MR also pings the watchdog which may not be desired.
-> +	 * This should only be done when the registers are lost on suspend but
-> +	 * there is no way to get this information right now.
-> +	 */
->  	sama5d4_wdt_init(wdt);
+> Ah, makes sense.
 >
->  	return 0;
+>> >> Perhaps mctrl_gpio_to_gpiod() should always return NULL if !CONFIG_GPIOLIB?
+>> >
+>> > No, mctrl_gpio_to_gpiod is right. You are only supposed to call it if
+>> > mctrl_gpio_init succeeded.
+>>
+>> Then I have to add checks for sciport->gpios == ERR_PTR(-ENOSYS)...
 >
+> No, ignoring -ENOSYS is wrong.
+
+How else to handle this in a driver that supports both modern (DT && GPIOLIB)
+and legacy platforms?
+
+sh-sci is not only used on DT-only architectures like arm, arm64, and h8300,
+but also on SuperH, where some platforms use GPIOLIB, others don't, and none
+of them use DT yet (jcore doesn't matter, as it doesn't use sh-sci).
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
