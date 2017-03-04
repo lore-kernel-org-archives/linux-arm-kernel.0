@@ -1,63 +1,30 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Sat, 4 Mar 2017 11:15:17 -0800
-Subject: [PATCH 1/3] futex: remove duplicated code
-In-Reply-To: <20170304130550.GT21222@n2100.armlinux.org.uk>
-References: <20170303122712.13353-1-jslaby@suse.cz>
- <20170304130550.GT21222@n2100.armlinux.org.uk>
-Message-ID: <3994975e-89a5-d2b5-60be-a8633ddc3733@zytor.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Sat,  4 Mar 2017 21:26:23 +0100
+Subject: [PATCH v3 1/2] dt-bindings: amlogic: Add HwaCom board
+In-Reply-To: <20170304202624.29682-1-carlo@caione.org>
+References: <20170304202624.29682-1-carlo@caione.org>
+Message-ID: <20170304202624.29682-2-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/04/17 05:05, Russell King - ARM Linux wrote:
->>  
->> +static int futex_atomic_op_inuser(int encoded_op, u32 __user *uaddr)
->> +{
->> +	int op = (encoded_op >> 28) & 7;
->> +	int cmp = (encoded_op >> 24) & 15;
->> +	int oparg = (encoded_op << 8) >> 20;
->> +	int cmparg = (encoded_op << 20) >> 20;
-> 
-> Hmm.  oparg and cmparg look like they're doing these shifts to get sign
-> extension of the 12-bit values by assuming that "int" is 32-bit -
-> probably worth a comment, or for safety, they should be "s32" so it's
-> not dependent on the bit-width of "int".
-> 
+From: Carlo Caione <carlo@endlessm.com>
 
-For readability, perhaps we should make sign- and zero-extension an
-explicit facility?
+Signed-off-by: Carlo Caione <carlo@endlessm.com>
+---
+ Documentation/devicetree/bindings/arm/amlogic.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-/*
- * Truncate an integer x to n bits, using sign- or
- * zero-extension, respectively.
- */
-static inline __const_func__ s32 sex32(s32 x, int n)
-{
-  return (x << (32-n)) >> (32-n);
-}
-
-static inline __const_func__ s64 sex64(s64 x, int n)
-{
-  return (x << (64-n)) >> (64-n);
-}
-
-#define sex(x,y)						\
-	((__typeof__(x))					\
-	 (((__builtin_constant_p(y) && ((y) <= 32)) ||		\
-	   (sizeof(x) <= sizeof(s32)))				\
-	  ? sex32((x),(y)) : sex64((x),(y))))
-
-static inline __const_func__ u32 zex32(u32 x, int n)
-{
-  return (x << (32-n)) >> (32-n);
-}
-
-static inline __const_func__ u64 zex64(u64 x, int n)
-{
-  return (x << (64-n)) >> (64-n);
-}
-
-#define zex(x,y)						\
-	((__typeof__(x))					\
-	 (((__builtin_constant_p(y) && ((y) <= 32)) ||		\
-	   (sizeof(x) <= sizeof(u32)))				\
-	  ? zex32((x),(y)) : zex64((x),(y))))
+diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+index c246cd2730d9..b3241a6802f6 100644
+--- a/Documentation/devicetree/bindings/arm/amlogic.txt
++++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+@@ -45,6 +45,7 @@ Board compatible values:
+   - "amlogic,p212" (Meson gxl s905x)
+   - "amlogic,p230" (Meson gxl s905d)
+   - "amlogic,p231" (Meson gxl s905d)
++  - "hwacom,amazetv" (Meson gxl s905x)
+   - "amlogic,q200" (Meson gxm s912)
+   - "amlogic,q201" (Meson gxm s912)
+   - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
+-- 
+2.12.0
