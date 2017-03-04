@@ -1,32 +1,43 @@
-From: slash.tmp@free.fr (Mason)
-Date: Sat, 4 Mar 2017 18:29:46 +0100
-Subject: Panic in quirk_usb_early_handoff
-In-Reply-To: <46A35088-88E2-425B-963E-0DC2DCC54890@linaro.org>
-References: <4b2a7606-de27-c8ad-1530-958dd5d12233@free.fr>
- <45e38a07-e8da-80e4-36bb-31e471f02004@free.fr>
- <3c5bd8f5-468f-d25e-08a9-8944ee419096@free.fr>
- <38b8c9be-724b-0cfc-a941-76f2c62e1c58@arm.com>
- <4f0a6c67-a50b-ac24-8ffa-0a68802e84b8@free.fr>
- <CAKv+Gu_M6aMMfeCy7ZUM46Ptei1suvX+F_KtWG2_QFp_6jbCWw@mail.gmail.com>
- <4a07dbec-dcde-9ec0-514f-3b896e2b0b19@free.fr>
- <46A35088-88E2-425B-963E-0DC2DCC54890@linaro.org>
-Message-ID: <ed4e332d-28d6-e143-b2b3-f1e2829e89a7@free.fr>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Sat, 4 Mar 2017 18:29:47 +0100 (CET)
+Subject: [Outreachy kernel] [PATCH 0/3] staging: Clean up tests if NULL
+ returned on failure
+In-Reply-To: <1488646015-7059-1-git-send-email-singhalsimran0@gmail.com>
+References: <1488646015-7059-1-git-send-email-singhalsimran0@gmail.com>
+Message-ID: <alpine.DEB.2.20.1703041829220.2072@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2017 18:16, Ard Biesheuvel wrote:
 
-> After pc, the link register is the most likely to legally point into
-> the kernel .text section so it makes sense imo to decode the address
-> into a function name plus offset.
 
-Does gcc ever use the link register as a general purpose register?
-(In which case, it is very likely to contain "garbage" as far as
-function addresses are concerned.)
+On Sat, 4 Mar 2017, simran singhal wrote:
 
-> Educating people about the architecture's calling convention and
-> associated caveats is not the job of the panic handler.
+> This patch series tests if functions like kmalloc/kzalloc return NULL
+> on failure. When NULL represents failure, !x is commonly used.
+>
+> simran singhal (3):
+>   staging: rtl8192u: Clean up tests if NULL returned on failure
+>   staging: speakup: Clean up tests if NULL returned on failure
+>   staging: vc04_services: Clean up tests if NULL returned on failure
 
-That's a weird statement.
+Acked-by: Julia Lawall <julia.lawall@lip6.fr>
 
-Regards.
+>
+>  drivers/staging/rtl8192u/ieee80211/ieee80211_crypt_tkip.c      | 2 +-
+>  drivers/staging/rtl8192u/ieee80211/ieee80211_crypt_wep.c       | 2 +-
+>  drivers/staging/rtl8192u/ieee80211/ieee80211_softmac.c         | 2 +-
+>  drivers/staging/rtl8192u/ieee80211/ieee80211_wx.c              | 4 ++--
+>  drivers/staging/speakup/main.c                                 | 2 +-
+>  drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c | 2 +-
+>  6 files changed, 7 insertions(+), 7 deletions(-)
+>
+> --
+> 2.7.4
+>
+> --
+> You received this message because you are subscribed to the Google Groups "outreachy-kernel" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to outreachy-kernel+unsubscribe at googlegroups.com.
+> To post to this group, send email to outreachy-kernel at googlegroups.com.
+> To view this discussion on the web visit https://groups.google.com/d/msgid/outreachy-kernel/1488646015-7059-1-git-send-email-singhalsimran0%40gmail.com.
+> For more options, visit https://groups.google.com/d/optout.
+>
