@@ -1,47 +1,105 @@
-From: slash.tmp@free.fr (Mason)
-Date: Sat, 4 Mar 2017 01:24:58 +0100
-Subject: Panic in quirk_usb_early_handoff
-In-Reply-To: <38b8c9be-724b-0cfc-a941-76f2c62e1c58@arm.com>
-References: <4b2a7606-de27-c8ad-1530-958dd5d12233@free.fr>
- <45e38a07-e8da-80e4-36bb-31e471f02004@free.fr>
- <3c5bd8f5-468f-d25e-08a9-8944ee419096@free.fr>
- <38b8c9be-724b-0cfc-a941-76f2c62e1c58@arm.com>
-Message-ID: <4f0a6c67-a50b-ac24-8ffa-0a68802e84b8@free.fr>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Fri, 3 Mar 2017 16:36:40 -0800
+Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
+ controls from a pipeline
+In-Reply-To: <20170303230645.GR21222@n2100.armlinux.org.uk>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
+ <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
+ <20170303230645.GR21222@n2100.armlinux.org.uk>
+Message-ID: <c4108ed3-5ad7-900d-1a9b-cded4f763db6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/2017 20:02, Robin Murphy wrote:
 
-> On 03/03/17 17:15, Mason wrote:
-> 
->> [    1.261813] Unable to handle kernel paging request at virtual address d08611e4
->> [    1.269167] pgd = c0004000
->> [    1.271979] [d08611e4] *pgd=8f804811, *pte=00000000, *ppte=00000000
->> [    1.278394] Internal error: Oops: 7 [#1] PREEMPT SMP ARM
->> [    1.283815] Modules linked in:
->> [    1.286970] CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.9.7-1-rc2 #157
->> [    1.293614] Hardware name: Sigma Tango DT
->> [    1.297726] task: cf82c9c0 task.stack: cf838000
->> [    1.302364] PC is at quirk_usb_early_handoff+0x3e8/0x790
->> [    1.307790] LR is at ioremap_page_range+0xf8/0x1a8
->> [    1.312688] pc : [<c039fe44>]    lr : [<c02d0a10>]    psr: 000e0013
->> [    1.312688] sp : cf839d78  ip : 00000000  fp : cf839e38
->> [    1.324399] r10: c10248a0  r9 : 00000000  r8 : d08611e4
->> [    1.329733] r7 : d084e000  r6 : 00002000  r5 : 000c0300  r4 : cfb4e800
->> [    1.336377] r3 : 000131e4  r2 : 00000000  r1 : 91001e13  r0 : d084e000
-> 
-> ...and again. And always at the same PC, too.
 
-By the way, isn't LR supposed to point to the caller of the
-current function? ("LR is at ioremap_page_range")
+On 03/03/2017 03:06 PM, Russell King - ARM Linux wrote:
+> On Thu, Mar 02, 2017 at 06:02:57PM +0200, Sakari Ailus wrote:
+>> Hi Steve,
+>>
+>> On Wed, Feb 15, 2017 at 06:19:16PM -0800, Steve Longerbeam wrote:
+>>> v4l2_pipeline_inherit_controls() will add the v4l2 controls from
+>>> all subdev entities in a pipeline to a given video device.
+>>>
+>>> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+>>> ---
+>>>  drivers/media/v4l2-core/v4l2-mc.c | 48 +++++++++++++++++++++++++++++++++++++++
+>>>  include/media/v4l2-mc.h           | 25 ++++++++++++++++++++
+>>>  2 files changed, 73 insertions(+)
+>>>
+>>> diff --git a/drivers/media/v4l2-core/v4l2-mc.c b/drivers/media/v4l2-core/v4l2-mc.c
+>>> index 303980b..09d4d97 100644
+>>> --- a/drivers/media/v4l2-core/v4l2-mc.c
+>>> +++ b/drivers/media/v4l2-core/v4l2-mc.c
+>>> @@ -22,6 +22,7 @@
+>>>  #include <linux/usb.h>
+>>>  #include <media/media-device.h>
+>>>  #include <media/media-entity.h>
+>>> +#include <media/v4l2-ctrls.h>
+>>>  #include <media/v4l2-fh.h>
+>>>  #include <media/v4l2-mc.h>
+>>>  #include <media/v4l2-subdev.h>
+>>> @@ -238,6 +239,53 @@ int v4l_vb2q_enable_media_source(struct vb2_queue *q)
+>>>  }
+>>>  EXPORT_SYMBOL_GPL(v4l_vb2q_enable_media_source);
+>>>
+>>> +int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
+>>> +				     struct media_entity *start_entity)
+>>
+>> I have a few concerns / questions:
+>>
+>> - What's the purpose of this patch? Why not to access the sub-device node
+>>   directly?
+>
+> What tools are in existance _today_ to provide access to these controls
+> via the sub-device nodes?
+>
+> v4l-tools doesn't last time I looked - in fact, the only tool in v4l-tools
+> which is capable of accessing the subdevices is media-ctl, and that only
+> provides functionality for configuring the pipeline.
+>
+> So, pointing people at vapourware userspace is really quite rediculous.
 
-If so, why does it not appear in the back trace?
 
-[    1.541152] [<c039fe44>] (quirk_usb_early_handoff) from [<c030bf58>] (pci_do_fixups+0xc8/0x158)
-[    1.549992] [<c030bf58>] (pci_do_fixups) from [<c02fa484>] (pci_bus_add_device+0x18/0x90)
-[    1.558301] [<c02fa484>] (pci_bus_add_device) from [<c02fa538>] (pci_bus_add_devices+0x3c/0x80)
-[    1.567133] [<c02fa538>] (pci_bus_add_devices) from [<c02fa56c>] (pci_bus_add_devices+0x70/0x80)
-[    1.576055] [<c02fa56c>] (pci_bus_add_devices) from [<c0313830>] (pci_host_common_probe+0xfc/0x324)
-[    1.585243] [<c0313830>] (pci_host_common_probe) from [<c03515d8>] (platform_drv_probe+0x34/0x7c)
+Hi Russell,
 
-Regards.
+Yes, that's a big reason why I added this capability. The v4l2-ctl
+tool won't accept subdev nodes, although Philipp Zabel has a quick hack
+to get around this (ignore return code from VIDIOC_QUERYCAP).
+
+
+>
+> The established way to control video capture is through the main video
+> capture device, not through the sub-devices.  Yes, the controls are
+> exposed through sub-devices too, but that does not mean that is the
+> correct way to access them.
+>
+> The v4l2 documentation (Documentation/media/kapi/v4l2-controls.rst)
+> even disagrees with your statements.  That talks about control
+> inheritence from sub-devices to the main video device, and the core
+> v4l2 code provides _automatic_ support for this - see
+> v4l2_device_register_subdev():
+>
+>         /* This just returns 0 if either of the two args is NULL */
+>         err = v4l2_ctrl_add_handler(v4l2_dev->ctrl_handler, sd->ctrl_handler, NULL);
+>
+> which merges the subdev's controls into the main device's control
+> handler.
+
+Actually v4l2_dev->ctrl_handler is not of much use to me. This will
+compose a list of controls from all registered subdevs, i.e. _all
+possible controls_.
+
+What v4l2_pipeline_inherit_controls() does is compose a list of
+controls that are reachable and available in the currently configured
+pipeline.
+
+Steve
+
+>
+> So, (a) I don't think Steve needs to add this code, and (b) I think
+> your statements about not inheriting controls goes against the
+> documentation and API compatibility with _existing_ applications,
+> and ultimately hurts the user experience, since there's nothing
+> existing today to support what you're suggesting in userspace.
+>
