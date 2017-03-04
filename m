@@ -1,173 +1,205 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 4 Mar 2017 14:02:17 +0100
-Subject: [PATCHv5] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-In-Reply-To: <1488588672-21865-1-git-send-email-abelvesa@linux.com>
-References: <1488588672-21865-1-git-send-email-abelvesa@linux.com>
-Message-ID: <20170304130216.uz6chruwmyb2u4yv@debian>
+From: slash.tmp@free.fr (Mason)
+Date: Sat, 4 Mar 2017 14:07:13 +0100
+Subject: Using the generic host PCIe driver
+In-Reply-To: <CAKv+Gu_fLKvruKy2Aoa95ThPAJ2XDJVUCjeuAWaRwpifsn_A_w@mail.gmail.com>
+References: <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
+ <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
+ <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
+ <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
+ <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
+ <98ee3041-6a94-91af-b4bf-208aa02624ed@free.fr>
+ <20170301215726.GA32286@bhelgaas-glaptop.roam.corp.google.com>
+ <258cd6f3-ef17-6705-ff48-ae06f26778c2@free.fr>
+ <20170303154628.GA21522@bhelgaas-glaptop.roam.corp.google.com>
+ <8e1a0b5d-8dfb-4be1-a049-b16892a6c0d0@free.fr>
+ <20170303200407.GB30375@bhelgaas-glaptop.roam.corp.google.com>
+ <5c899946-4220-a63e-fe98-6a103200c2ad@free.fr>
+ <CAKv+Gu-QxUYZcg4DPwuhhfqKCp4eJEWXCh43ZyvDe12=exEhWw@mail.gmail.com>
+ <8daa1f79-8fda-bef9-e216-3c15f53c4f32@free.fr>
+ <CAKv+Gu_fLKvruKy2Aoa95ThPAJ2XDJVUCjeuAWaRwpifsn_A_w@mail.gmail.com>
+Message-ID: <c6d21078-b2f0-8dd3-adf7-13fc6456c1aa@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Mar 04, 2017 at 12:51:12AM +0000, Abel Vesa wrote:
-> diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
-> index c73c403..93f9abb 100644
-> --- a/arch/arm/kernel/entry-ftrace.S
-> +++ b/arch/arm/kernel/entry-ftrace.S
-> @@ -92,12 +92,78 @@
->  2:	mcount_exit
->  .endm
->  
-> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> +
-> +.macro __ftrace_regs_caller
-> +
-> +	sub	sp, sp, #8	@ space for CPSR and OLD_R0 (not used)
-> +
-> +	add 	ip, sp, #12	@ move in IP the value of SP as it was
-> +				@ before the push {lr} of the mcount mechanism
-> +	stmdb	sp!, {ip,lr,pc}
+On 04/03/2017 12:45, Ard Biesheuvel wrote:
+> On 4 March 2017 at 10:56, Mason <slash.tmp@free.fr> wrote:
+>> On 04/03/2017 10:35, Ard Biesheuvel wrote:
+>>> On 3 March 2017 at 23:23, Mason <slash.tmp@free.fr> wrote:
+>>>> On 03/03/2017 21:04, Bjorn Helgaas wrote:
+>>>>> On Fri, Mar 03, 2017 at 06:18:02PM +0100, Mason wrote:
+>>>>>> On 03/03/2017 16:46, Bjorn Helgaas wrote:
+>>>>>>> On Fri, Mar 03, 2017 at 01:44:54PM +0100, Mason wrote:
+>>>>>>>
+>>>>>>>> For now, I have "hidden" the root's BAR0 from the system with:
+>>>>>>>>
+>>>>>>>>    if (bus->number == 0 && where == PCI_BASE_ADDRESS_0) {
+>>>>>>>>            *val = 0;
+>>>>>>>>            return PCIBIOS_SUCCESSFUL;
+>>>>>>>>    }
+>>>>>>>
+>>>>>>> I'm scratching my head about this a little.  Here's what your dmesg
+>>>>>>> log contained originally:
+>>>>>>>
+>>>>>>>   pci 0000:00:00.0: [1105:8758] type 01 class 0x048000
+>>>>>>>   pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x00ffffff 64bit]
+>>>>>>>   pci 0000:00:00.0: BAR 0: no space for [mem size 0x01000000 64bit]
+>>>>>>>   pci 0000:00:00.0: BAR 0: failed to assign [mem size 0x01000000 64bit]
+>>>>>>>   pci 0000:00:00.0: PCI bridge to [bus 01]
+>>>>>>>   pcieport 0000:00:00.0: enabling device (0140 -> 0142)
+>>>>>>>
+>>>>>>> This device is a bridge (a Root Port, per your lspci output).  With a
+>>>>>>> BAR, which is legal but unusual.  We couldn't assign space for the
+>>>>>>> BAR, which means we can't use whatever vendor-specific functionality
+>>>>>>> it provides.
+>>>>>>
+>>>>>> I had several chats with the HW designer. I'll try to explain, only as
+>>>>>> far as I could understand ;-)
+>>>>>>
+>>>>>> We used to make devices, before implementing a root. Since at least
+>>>>>> one BAR is required (?) for a device, it was decided to have one BAR
+>>>>>> for the root, for symmetry.
+>>>>>
+>>>>> I'm not aware of a spec requirement for any BARs.  It's conceivable
+>>>>> that one could build a device that only uses config space.  And of
+>>>>> course, most bridges have windows but no BARs.  But that doesn't
+>>>>> matter; the hardware is what it is and we have to deal with it.
+>>>>
+>>>> I appreciate the compassion. RMK considered the DMA HW too screwy
+>>>> to bother supporting ;-)
+>>>>
+>>>>>> In fact, I thought I could ignore that BAR, but it is apparently NOT
+>>>>>> the case, as MSIs are supposed to be sent *within* the BAR of the root.
+>>>>>
+>>>>> I don't know much about this piece of the MSI puzzle, but maybe Marc
+>>>>> can enlighten us.  If this Root Port is the target of MSIs and the
+>>>>> Root Port turns them into some sort of interrupt on the CPU side, I
+>>>>> can see how this might make sense.
+>>>>>
+>>>>> I think it's unusual for the PCI core to assign the MSI target using a
+>>>>> BAR, though.  I think this means you'll have to implement your
+>>>>> arch_setup_msi_irq() or .irq_compose_msi_msg() method such that it
+>>>>> looks up that BAR value, since you won't know it at build-time.
+>>>>
+>>>> I'll hack the Altera driver to fit my purpose.
+>>>>
+>>>>>> The weird twist is that the BAR advertizes a 64-bit memory zone,
+>>>>>> but we will, in fact, map MMIO registers behind it. So all the
+>>>>>> RAM Linux assigns to the area is wasted, IIUC.
+>>>>>
+>>>>> I'm not sure what this means.  You have this:
+>>>>>
+>>>>>> OF: PCI:   MEM 0x90000000..0x9fffffff -> 0x90000000
+>>>>
+>>>> This means I've put 256 MB of system RAM aside for PCIe devices.
+>>>> This memory is no longer available for Linux "stuff".
+>>>>
+>>>
+>>> No it doesn't. It is a physical memory *range* that is assigned to the
+>>> PCI host bridge. Any memory accesses by the CPU to that window will be
+>>> forwarded to the PCI bus by the host bridge. From the kernel driver's
+>>> POV, this range is a given, but your host bridge h/w may involve some
+>>> configuration to make the host bridge 'listen' to this range. This is
+>>> h/w specific, and as Bjorn pointed out, usually configured by the
+>>> firmware so that the kernel driver does not require any knowledge of
+>>> those internals.
+>>>
+>>>>>> pci_bus 0000:00: root bus resource [mem 0x90000000-0x9fffffff]
+>>>>
+>>>> I suppose this is the PCI bus address. As we've discussed,
+>>>> I used the identity to map bus <-> CPU addresses.
+>>>>
+>>>
+>>> Yes, that is fine
+>>>
+>>>>> This [mem 0x90000000-0x9fffffff] host bridge window means there can't
+>>>>> be RAM in that region.  CPU accesses to 0x90000000-0x9fffffff have to
+>>>>> be claimed by the host bridge and forwarded to PCI.
+>>>>>
+>>>>> Linux doesn't "assign system RAM" anywhere; we just learn somehow
+>>>>> where that RAM is.  Linux *does* assign BARs of PCI devices, and they
+>>>>> have to be inside the host bridge windows(s).
+>>>>
+>>>> I'm confused, I thought I had understood that part...
+>>>> I thought the binding required me to specify (in the "ranges"
+>>>> property) a non-prefetchable zone of system RAM, and this
+>>>> memory is then "handed out" by Linux to different devices.
+>>>> Or do I just need to specify some address range that's not
+>>>> necessarily backed with actual RAM?
+>>>>
+>>>
+>>> Yes. Each PCI device advertises its need of memory windows via its
+>>> BARs, but the actual placement of those windows inside the host
+>>> bridge's memory range is configured dynamically, usually by the
+>>> firmware (on PCs) but on ARM/arm64 systems, this is done from scratch
+>>> by the kernel. The *purpose* of those memory windows is device
+>>> specific, but whatever is behind it lives on the PCI device. So this
+>>> is *not* system RAM.
+>>
+>> Hello Ard,
+>>
+>> It appears I have misunderstood something fundamental.
+>>
+>> The binding for generic PCI support
+>> http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+>> requires two address-type specs
+>> (please correct me if I'm wrong)
+>> 1) in the "reg" prop, the address of the configuration space (CPU physical)
+>> 2) in the "ranges" prop, at least a non-prefetchable area
+>> http://elinux.org/Device_Tree_Usage#PCI_Address_Translation
+>>
+>> In my 32-bit system, there are 2GB of RAM at [0x8000_0000,0x10000_0000[
+>> There are MMIO registers at [0, 16MB[ and also other stuff higher
+>> Suppose there is nothing mapped at [0x7000_0000, 0x8000_0000[
+>>
+>> Can I provide that range to the PCI subsystem?
+> 
+> Well, it obviously needs to be a range that is not otherwise occupied.
+> But it is SoC specific where the forwarded MEM region(s) are, and
+> whether they are configurable or not.
 
-This doesn't build with CONFIG_THUMB2_KERNEL:
+My problem is that I don't understand bus addresses vs physical addresses.
+(where and when they are used, and how.) Devices themselves put bus
+addresses in messages in the PCIe protocol, I assume? When does it matter
+what physical address maps to a bus address? When and where does this
+mapping take place? (In the RC HW, in the RC driver, elsewhere?)
 
-entry-ftrace.S:285: Error: PC not allowed in register list -- `stmdb sp!,{ip,lr,pc}'
+I suppose some devices do actually need access to *real* *actual* memory
+for stuff like DMA. I suppose they must use system memory for that.
+Does the generic PCI(e) framework setup this memory?
 
-Saving PC in STMDB is prohibited in Thumb and deprecated in ARM.
+> IOW, you can ask *us* all you
+> want about these details, but only the H/W designer can answer this
+> for you.
 
-> +	stmdb	sp!, {r0-r11,lr}
-> +
-> +	ldr	r0, [sp, #S_LR]			@ replace PC with LR
-> +	str	r0, [sp, #S_PC]			@ into pt_regs
-> +
-> +	ldr	r1, [sp, #PT_REGS_SIZE] 	@ replace new LR with
-> +	str	r1, [sp, #S_LR]			@ previous LR into pt_regs
-> +
-> +	@ stack content at this point:
-> +	@ 0  4          48   52       56            60   64    68       72
-> +	@ R0 | R1 | ... | LR | SP + 4 | previous LR | LR | PSR | OLD_R0 | previous LR |
+My biggest problem is that, in order to get useful answers, one must
+ask specific questions. And my understanding of PCI is still too
+limited to ask good questions.
 
-So this code only adjust the SP by 72 bytes.  Since the stack is not
-aligned to 8 bytes at entry to mcount, this code calls into C functions
-with a misaligned stack.  This is a violation of the procedure call
-standard.
+My current understanding is that I must find a large area in the memory
+map where there is NOTHING (no RAM, no registers). Then I can specify
+this area in the "ranges" prop of my DT node, to be used as a
+non-prefetchable memory address range.
 
-Also, I believe this should have unwind annotations to indicate where it
-saved the registers.  See mcount_enter for an example.
+> The DT node that describes the host bridge should simply describe
+> which MMIO regions are used by the device. This is no different from
+> any other MMO peripheral.
 
-> +
-> +	mov r3, sp				@ struct pt_regs*
-> +	ldr r2, =function_trace_op
-> +	ldr r2, [r2]				@ pointer to the current
-> +						@ function tracing op
-> +	ldr	r1, [sp, #PT_REGS_SIZE]		@ lr of instrumented func
-> +	mcount_adjust_addr	r0, lr		@ instrumented function
-> +
-> +	.globl ftrace_regs_call
-> +ftrace_regs_call:
-> +	bl	ftrace_stub
-> +
-> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> +	.globl ftrace_graph_regs_call
-> +ftrace_graph_regs_call:
-> +	mov	r0, r0
-> +#endif
-> +	@ pop saved regs
-> +	ldmia   sp, {r0-r15}
+In my limited experience, the DT node for PCI is, by far, the most
+complex node I've had to write.
 
-This doesn't build either:
+> As for the bus ranges: this also depends on the h/w, as far as i know,
+> and has a direct relation with the size of the PCI configuration space
+> (1 MB per bus for ECAM iirc?) On 32-bit systems, supporting that many
+> buses may be costly in terms of 32-bit addressable space, given that
+> the PCIe config space is typically below 4 GB. But it all depends on
+> the h/w implementation.
 
-entry-ftrace.S:285: Error: LR and PC should not both be in register list -- `ldmia sp,{r0-r15}'
+That I know. The HW designer has confirmed reserving 256 MB of address
+space for the configuration space. In hind-sight, this was probably a
+waste of address space. Supporting 4 buses seems amply sufficient.
+Am I wrong?
 
-Restoring LR and PC together is prohibited in Thumb and deprecated in
-ARM.  It's the same case with SP.
+I suppose wasting 256 MB of address space is not an issue on 64-bit
+systems, though.
 
-> +.endm
-> +
-> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> +.macro __ftrace_graph_regs_caller
-> +
-> +	sub	r0, fp, #4		@ lr of instrumented routine (parent)
-> +
-> +	@ called from __ftrace_regs_caller
-> +	ldr     r1, [sp, #S_PC]		@ instrumented routine (func)
-> +	mcount_adjust_addr	r1, r1
-> +
-> +	mov	r2, fp			@ frame pointer
-> +	bl	prepare_ftrace_return
-> +
-> +	@ pop registers saved in ftrace_regs_caller
-> +	ldmia   sp, {r0-r15}
-
-This doesn't get built on CONFIG_THUMB2_KERNEL since there's no suppport
-for CONFIG_FUNCTION_GRAPH_TRACER there, but this is also using
-deprecated operands.
-
-> +.endm
-> +#endif
-> +#endif
-...
-> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-> index 3f17594..f165265 100644
-> --- a/arch/arm/kernel/ftrace.c
-> +++ b/arch/arm/kernel/ftrace.c
-> @@ -29,11 +29,6 @@
->  #endif
->  
->  #ifdef CONFIG_DYNAMIC_FTRACE
-> -#ifdef CONFIG_OLD_MCOUNT
-> -#define OLD_MCOUNT_ADDR	((unsigned long) mcount)
-> -#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
-> -
-> -#define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
->  
->  static int __ftrace_modify_code(void *data)
->  {
-> @@ -51,6 +46,12 @@ void arch_ftrace_update_code(int command)
->  	stop_machine(__ftrace_modify_code, &command, NULL);
->  }
->  
-> +#ifdef CONFIG_OLD_MCOUNT
-> +#define OLD_MCOUNT_ADDR	((unsigned long) mcount)
-> +#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
-> +
-> +#define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
-> +
->  static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
-
-This chunk above fixes the problem which Nicolai pointed out earlier.  Since
-it's a bug fix for the current dynamic ftrace code, it should really be
-submitted as a separate patch.  Feel free to use some variant of this
-commit message which I wrote when I ran into this yesterday:
-
- ARM: ftrace: fix dynamic ftrace with DEBUG_RODATA and !FRAME_POINTER
- 
- The support for dynamic ftrace with CONFIG_DEBUG_RODATA involves
- overriding the weak arch_ftrace_update_code() with a variant which makes
- the kernel text writable around the patching.
- 
- This override was however added under the CONFIG_OLD_MCOUNT ifdef, and
- CONFIG_OLD_MCOUNT is only enabled if frame pointers are enabled.
- 
- This leads to non-functional dynamic ftrace (ftrace triggers a
- WARN_ON()) when CONFIG_DEBUG_RODATA is enabled and CONFIG_FRAME_POINTER
- is not.
- 
- Move the override out of that ifdef and into the CONFIG_DYNAMIC_FTRACE
- ifdef where it belongs.
-
- Fixes: 80d6b0c2eed2a ("ARM: mm: allow text and rodata sections to be read-only")
-
->  {
->  	return rec->arch.old_mcount ? OLD_NOP : NOP;
-> @@ -139,6 +140,15 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
->  
->  	ret = ftrace_modify_code(pc, 0, new, false);
->  
-> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-
-This code (and the rest of your additions to this file below), are already
-under CONFIG_DYNAMIC_FTRACE and afaics CONFIG_DYNAMIC_FTRACE_WITH_REGS is
-always enabled when the former is enabled, so could you please drop
-these ifdefs?
-
-The code in entry-ftrace.S under CONFIG_DYNAMIC_FTRACE_WITH_REGS would
-also benefit from just using CONFIG_DYNAMIC_FTRACE everywhere instead.
+Regards.
