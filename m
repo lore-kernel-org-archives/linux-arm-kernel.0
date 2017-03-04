@@ -1,53 +1,114 @@
-From: yong.mao@mediatek.com (Yong Mao)
-Date: Sat, 4 Mar 2017 15:10:03 +0800
-Subject: [PATCH] mmc: mediatek: Fixed bug where clock frequency could be set
- wrong
-In-Reply-To: <1488611403-30186-1-git-send-email-yong.mao@mediatek.com>
-References: <1488611403-30186-1-git-send-email-yong.mao@mediatek.com>
-Message-ID: <1488611403-30186-2-git-send-email-yong.mao@mediatek.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 4 Mar 2017 10:01:09 +0200
+Subject: [PATCH] ARM: dts: exynos: Use thermal fuse value for thermal
+ zone 0 on Exynos5420
+In-Reply-To: <252f9e32-ff2c-a1ce-3c98-6383a1148e02@osg.samsung.com>
+References: <20170211201456.27974-1-krzk@kernel.org>
+ <252f9e32-ff2c-a1ce-3c98-6383a1148e02@osg.samsung.com>
+Message-ID: <20170304080109.j2kuwmqj7mgfx3ky@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: yong mao <yong.mao@mediatek.com>
+On Fri, Mar 03, 2017 at 06:50:06PM -0300, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
+> 
+> On 02/11/2017 05:14 PM, Krzysztof Kozlowski wrote:
+> > In Odroid XU3 Lite board, the temperature levels reported for thermal
+> > zone 0 were weird. In warm room:
+> > 	/sys/class/thermal/thermal_zone0/temp:32000
+> > 	/sys/class/thermal/thermal_zone1/temp:51000
+> > 	/sys/class/thermal/thermal_zone2/temp:55000
+> > 	/sys/class/thermal/thermal_zone3/temp:54000
+> > 	/sys/class/thermal/thermal_zone4/temp:51000
+> > 
+> > Sometimes after booting the value was even equal to ambient temperature
+> > which is highly unlikely to be a real temperature of sensor in SoC.
+> > 
+> > The thermal sensor's calibration (trimming) is based on fused values.
+> > In case of the board above, the fused values are: 35, 52, 43, 58 and 43
+> > (corresponding to each TMU device).  However driver defined a minimum value
+> > for fused data as 40 and for smaller values it was using a hard-coded 55
+> > instead.  This lead to mapping data from sensor to wrong temperatures
+> > for thermal zone 0.
+> > 
+> > Various vendor 3.10 trees (Hardkernel's based on Samsung LSI, Artik 10)
+> > do not impose any limits on fused values.  Since we do not have any
+> > knowledge about these limits, use 0 as a minimum accepted fused value.
+> > This should essentially allow accepting any reasonable fused value thus
+> > behaving like vendor driver.
+> > 
+> > The exynos5420-tmu-sensor-conf.dtsi is copied directly from existing
+> > exynso4412 with one change - the samsung,tmu_min_efuse_value.
+> > 
+> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> > 
+> > ---
+> > 
+> > Testing on other Exynos542x boards is much appreciated. Especially I
+> > wonder what efuse values are there.
+> 
+> I tested on both Exynos5422 Odroid XU4 and Exynos5800 Peach Pi boards.
+> 
+> The temperatures levels reported for these two boards on a warm room are:
+> 
+> Odroid XU4
+> 
+> # cat /sys/class/thermal/thermal_zone*/temp
+> 50000
+> 50000
+> 54000
+> 51000
+> 48000
+> 
+> Peach Pi
+> 
+> # cat /sys/class/thermal/thermal_zone*/temp
+> 42000
+> 44000
+> 27000 <-- weird value for thermal zone 2 like zone 0 in your XU3 lite
+> 45000
+> 45000
+> 
+> And the efuse values for the TMU devices are:
+> 
+> Odroid XU4
+> 
+> TMU0 = 45
+> TMU1 = 44
+> TMU2 = 44
+> TMU3 = 46
+> TMU3 = 46
+> 
+> Peach Pi
+> 
+> TMU0 = 44
+> TMU1 = 46
+> TMU2 = 36
+> TMU3 = 53
+> TMU3 = 46
+> 
+> The fused value for TMU2 is < 40 so that explains the weird temperature
+> level for thermal zone 2 in Peach. So after your patch, makes more sense:
+> 
+> # cat /sys/class/thermal/thermal_zone*/temp
+> 41000
+> 42000
+> 45000
+> 43000
+> 43000
 
-This patch can fix two issues:
+Great! Thanks for testing!
 
-Issue 1:
-In previous code, div may be overflow when setting clock frequency
-as f_min. We can use DIV_ROUND_UP to fix this boundary related
-issue.
 
-Issue 2:
-In previous code, we can not set the correct clock frequency when
-div equals 0xff.
+> I wonder though if 0 is the best value or if we should just lower more
+> to cover the used e-fuse values in Exynos5 boards. But as you said,
+> we have no knowledge about these limits...
 
-Signed-off-by: Yong Mao <yong.mao@mediatek.com>
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
----
- drivers/mmc/host/mtk-sd.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Yeah... we could set value of 10 or 20... but that would be blind shot.
+> 
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
 
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index 07f3236..3ad5228 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -591,7 +591,7 @@ static void msdc_set_mclk(struct msdc_host *host, unsigned char timing, u32 hz)
- 		}
- 	}
- 	sdr_set_field(host->base + MSDC_CFG, MSDC_CFG_CKMOD | MSDC_CFG_CKDIV,
--			(mode << 8) | (div % 0xff));
-+		      (mode << 8) | div);
- 	sdr_set_bits(host->base + MSDC_CFG, MSDC_CFG_CKPDN);
- 	while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
- 		cpu_relax();
-@@ -1692,7 +1692,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
- 	host->src_clk_freq = clk_get_rate(host->src_clk);
- 	/* Set host parameters to mmc */
- 	mmc->ops = &mt_msdc_ops;
--	mmc->f_min = host->src_clk_freq / (4 * 255);
-+	mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 255);
- 
- 	mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
- 	/* MMC core transfer sizes tunable parameters */
--- 
-1.7.9.5
+Thanks,
+Krzysztof
