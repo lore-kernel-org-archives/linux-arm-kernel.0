@@ -1,152 +1,83 @@
-From: slash.tmp@free.fr (Mason)
-Date: Sat, 4 Mar 2017 11:56:26 +0100
-Subject: Using the generic host PCIe driver
-In-Reply-To: <CAKv+Gu-QxUYZcg4DPwuhhfqKCp4eJEWXCh43ZyvDe12=exEhWw@mail.gmail.com>
-References: <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
- <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
- <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
- <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
- <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
- <98ee3041-6a94-91af-b4bf-208aa02624ed@free.fr>
- <20170301215726.GA32286@bhelgaas-glaptop.roam.corp.google.com>
- <258cd6f3-ef17-6705-ff48-ae06f26778c2@free.fr>
- <20170303154628.GA21522@bhelgaas-glaptop.roam.corp.google.com>
- <8e1a0b5d-8dfb-4be1-a049-b16892a6c0d0@free.fr>
- <20170303200407.GB30375@bhelgaas-glaptop.roam.corp.google.com>
- <5c899946-4220-a63e-fe98-6a103200c2ad@free.fr>
- <CAKv+Gu-QxUYZcg4DPwuhhfqKCp4eJEWXCh43ZyvDe12=exEhWw@mail.gmail.com>
-Message-ID: <8daa1f79-8fda-bef9-e216-3c15f53c4f32@free.fr>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 4 Mar 2017 20:45:13 +0900
+Subject: [PATCH] pinctrl: samsung: fix segfault when using external
+ interrupts on s3c24xx
+In-Reply-To: <20170304081504.unv6sihbmp76ynfy@kozik-lap>
+References: <1488489799-18136-1-git-send-email-sergio.prado@e-labworks.com>
+ <20170304081504.unv6sihbmp76ynfy@kozik-lap>
+Message-ID: <CA+Ln22E1FOTdU+drwy8aV8=2Ww=FBs+fZUiPS974vU2N=sD6AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/03/2017 10:35, Ard Biesheuvel wrote:
-> On 3 March 2017 at 23:23, Mason <slash.tmp@free.fr> wrote:
->> On 03/03/2017 21:04, Bjorn Helgaas wrote:
->>> On Fri, Mar 03, 2017 at 06:18:02PM +0100, Mason wrote:
->>>> On 03/03/2017 16:46, Bjorn Helgaas wrote:
->>>>> On Fri, Mar 03, 2017 at 01:44:54PM +0100, Mason wrote:
->>>>>
->>>>>> For now, I have "hidden" the root's BAR0 from the system with:
->>>>>>
->>>>>>    if (bus->number == 0 && where == PCI_BASE_ADDRESS_0) {
->>>>>>            *val = 0;
->>>>>>            return PCIBIOS_SUCCESSFUL;
->>>>>>    }
->>>>>
->>>>> I'm scratching my head about this a little.  Here's what your dmesg
->>>>> log contained originally:
->>>>>
->>>>>   pci 0000:00:00.0: [1105:8758] type 01 class 0x048000
->>>>>   pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x00ffffff 64bit]
->>>>>   pci 0000:00:00.0: BAR 0: no space for [mem size 0x01000000 64bit]
->>>>>   pci 0000:00:00.0: BAR 0: failed to assign [mem size 0x01000000 64bit]
->>>>>   pci 0000:00:00.0: PCI bridge to [bus 01]
->>>>>   pcieport 0000:00:00.0: enabling device (0140 -> 0142)
->>>>>
->>>>> This device is a bridge (a Root Port, per your lspci output).  With a
->>>>> BAR, which is legal but unusual.  We couldn't assign space for the
->>>>> BAR, which means we can't use whatever vendor-specific functionality
->>>>> it provides.
->>>>
->>>> I had several chats with the HW designer. I'll try to explain, only as
->>>> far as I could understand ;-)
->>>>
->>>> We used to make devices, before implementing a root. Since at least
->>>> one BAR is required (?) for a device, it was decided to have one BAR
->>>> for the root, for symmetry.
->>>
->>> I'm not aware of a spec requirement for any BARs.  It's conceivable
->>> that one could build a device that only uses config space.  And of
->>> course, most bridges have windows but no BARs.  But that doesn't
->>> matter; the hardware is what it is and we have to deal with it.
->>
->> I appreciate the compassion. RMK considered the DMA HW too screwy
->> to bother supporting ;-)
->>
->>>> In fact, I thought I could ignore that BAR, but it is apparently NOT
->>>> the case, as MSIs are supposed to be sent *within* the BAR of the root.
->>>
->>> I don't know much about this piece of the MSI puzzle, but maybe Marc
->>> can enlighten us.  If this Root Port is the target of MSIs and the
->>> Root Port turns them into some sort of interrupt on the CPU side, I
->>> can see how this might make sense.
->>>
->>> I think it's unusual for the PCI core to assign the MSI target using a
->>> BAR, though.  I think this means you'll have to implement your
->>> arch_setup_msi_irq() or .irq_compose_msi_msg() method such that it
->>> looks up that BAR value, since you won't know it at build-time.
->>
->> I'll hack the Altera driver to fit my purpose.
->>
->>>> The weird twist is that the BAR advertizes a 64-bit memory zone,
->>>> but we will, in fact, map MMIO registers behind it. So all the
->>>> RAM Linux assigns to the area is wasted, IIUC.
->>>
->>> I'm not sure what this means.  You have this:
->>>
->>>> OF: PCI:   MEM 0x90000000..0x9fffffff -> 0x90000000
->>
->> This means I've put 256 MB of system RAM aside for PCIe devices.
->> This memory is no longer available for Linux "stuff".
->>
-> 
-> No it doesn't. It is a physical memory *range* that is assigned to the
-> PCI host bridge. Any memory accesses by the CPU to that window will be
-> forwarded to the PCI bus by the host bridge. From the kernel driver's
-> POV, this range is a given, but your host bridge h/w may involve some
-> configuration to make the host bridge 'listen' to this range. This is
-> h/w specific, and as Bjorn pointed out, usually configured by the
-> firmware so that the kernel driver does not require any knowledge of
-> those internals.
-> 
->>>> pci_bus 0000:00: root bus resource [mem 0x90000000-0x9fffffff]
->>
->> I suppose this is the PCI bus address. As we've discussed,
->> I used the identity to map bus <-> CPU addresses.
->>
-> 
-> Yes, that is fine
-> 
->>> This [mem 0x90000000-0x9fffffff] host bridge window means there can't
->>> be RAM in that region.  CPU accesses to 0x90000000-0x9fffffff have to
->>> be claimed by the host bridge and forwarded to PCI.
->>>
->>> Linux doesn't "assign system RAM" anywhere; we just learn somehow
->>> where that RAM is.  Linux *does* assign BARs of PCI devices, and they
->>> have to be inside the host bridge windows(s).
->>
->> I'm confused, I thought I had understood that part...
->> I thought the binding required me to specify (in the "ranges"
->> property) a non-prefetchable zone of system RAM, and this
->> memory is then "handed out" by Linux to different devices.
->> Or do I just need to specify some address range that's not
->> necessarily backed with actual RAM?
->>
-> 
-> Yes. Each PCI device advertises its need of memory windows via its
-> BARs, but the actual placement of those windows inside the host
-> bridge's memory range is configured dynamically, usually by the
-> firmware (on PCs) but on ARM/arm64 systems, this is done from scratch
-> by the kernel. The *purpose* of those memory windows is device
-> specific, but whatever is behind it lives on the PCI device. So this
-> is *not* system RAM.
+[+Chanwoo]
 
-Hello Ard,
+2017-03-04 17:15 GMT+09:00 Krzysztof Kozlowski <krzk@kernel.org>:
+> On Thu, Mar 02, 2017 at 06:23:19PM -0300, Sergio Prado wrote:
+>> We are getting a NULL pointer dereference when working with external
+>> interrupts on s3c24xx:
+>>
+>> Unable to handle kernel NULL pointer dereference at virtual address 000000a8
+>> pgd = c0104000
+>> [000000a8] *pgd=00000000
+>> Internal error: Oops: 5 [#1] ARM
+>> Modules linked in:
+>> CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc8mini2440-sub-00047-g0722f57bfae9-dirty #3
+>> Hardware name: Samsung S3C2416 (Flattened Device Tree)
+>> task: c07399f8 task.stack: c0734000
+>> PC is at s3c24xx_demux_eint4_7+0x24/0x10c
+>> LR is at s3c24xx_demux_eint4_7+0x108/0x10c
+>>
+>> The problem is in the function s3c24xx_demux_eint() when dereferencing
+>> bank->eint_base.
+>>
+>> At this point, we cannot get the bank pointer from the irq_desc
+>> structure since it is pointing to the hardware irq, not virq.
+>>
+>> So let's get the bank pointer directly from data->drvdata.
+>>
+>> This is a regression from commit 8b1bd11c1f8f529057369c5b3702d13fd24e2765.
+>
+> Checkpatch should complain here about commit format.
+>
+>>
+>> Tested on FriendlyARM mini2440.
+>>
+>
+> Please add:
+>   Fixes: 8b1bd11c1f8f ("pinctrl: samsung: Add the support the multiple IORESOURCE_MEM for one pin-bank")
+>   Cc: <stable@vger.kernel.org>
 
-It appears I have misunderstood something fundamental.
+Yeah, that patch seems to have also affected s3c64xx...
 
-The binding for generic PCI support
-http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/pci/host-generic-pci.txt
-requires two address-type specs
-(please correct me if I'm wrong)
-1) in the "reg" prop, the address of the configuration space (CPU physical)
-2) in the "ranges" prop, at least a non-prefetchable area
-http://elinux.org/Device_Tree_Usage#PCI_Address_Translation
+>
+>> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+>> ---
+>>  drivers/pinctrl/samsung/pinctrl-s3c24xx.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+>> index b82a003546ae..1b8d887796e8 100644
+>> --- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+>> +++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+>> @@ -356,8 +356,8 @@ static inline void s3c24xx_demux_eint(struct irq_desc *desc,
+>>  {
+>>       struct s3c24xx_eint_data *data = irq_desc_get_handler_data(desc);
+>>       struct irq_chip *chip = irq_desc_get_chip(desc);
+>> -     struct irq_data *irqd = irq_desc_get_irq_data(desc);
+>> -     struct samsung_pin_bank *bank = irq_data_get_irq_chip_data(irqd);
+>> +     struct samsung_pinctrl_drv_data *d = data->drvdata;
+>> +     struct samsung_pin_bank *bank = d->pin_banks;
+>
+> I think 'pin_banks' point to all banks of given controller not to the
+> currently accessed one.
 
-In my 32-bit system, there are 2GB of RAM at [0x8000_0000,0x10000_0000[
-There are MMIO registers at [0, 16MB[ and also other stuff higher
-Suppose there is nothing mapped at [0x7000_0000, 0x8000_0000[
+Yeah, this doesn't seem to be a logically correct fix, although it
+should work since in s3c24xx all banks would have the same eint_base
+value.
 
-Can I provide that range to the PCI subsystem?
+I would suggest a partial revert of 8b1bd11c1f8f, i.e. bringing back
+samsung_pinctrl_drv_data::virt_base and undoing the changes made in
+s3c24xx and s3c64xx EINT code.
 
-Regards.
+Best regards,
+Tomasz
