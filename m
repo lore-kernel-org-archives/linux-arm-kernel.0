@@ -1,77 +1,173 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sat, 4 Mar 2017 13:38:04 +0100
-Subject: [PATCH v2 3/3] ARM64: dts: meson-gx: Add MALI nodes for GXBB and
- GXL
-In-Reply-To: <m2tw7a17nb.fsf@baylibre.com>
-References: <1488365164-22861-1-git-send-email-narmstrong@baylibre.com>
- <1488365164-22861-4-git-send-email-narmstrong@baylibre.com>
- <e26cf584-dab2-2702-f7e6-b28f750fa00c@suse.de>
- <e80d9fb0-1d71-7cab-5e32-72316474fdfc@baylibre.com>
- <m2tw7a17nb.fsf@baylibre.com>
-Message-ID: <9f3a17e8-63fa-6c14-4d17-0539ef7cd5a2@suse.de>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sat, 4 Mar 2017 14:02:17 +0100
+Subject: [PATCHv5] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <1488588672-21865-1-git-send-email-abelvesa@linux.com>
+References: <1488588672-21865-1-git-send-email-abelvesa@linux.com>
+Message-ID: <20170304130216.uz6chruwmyb2u4yv@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 03.03.2017 um 20:29 schrieb Kevin Hilman:
-> Neil Armstrong <narmstrong@baylibre.com> writes:
->> On 03/02/2017 01:31 PM, Andreas F?rber wrote:
->>> Am 01.03.2017 um 11:46 schrieb Neil Armstrong:
->>>> The same MALI-450 MP3 GPU is present in the GXBB and GXL SoCs.
-[...]
->>>> The node is simply added in the meson-gxbb.dtsi file.
-[...]
->>>> For GXL, since a lot is shared with the GXM that has a MALI-T820 IP, this
->>>> patch adds a new meson-gxl-mali.dtsi and is included in the SoC specific
->>>> dtsi files.
->>>
->>> This part is slightly confusing though.
->>>
->>> What exactly is the GXL vs. GXM difference that this can't be handled by
->>> overriding node properties compatible/interrupts/clocks? I am missing a
->>> GXM patch in this series as rationale for doing it this way.
->>>
->>> In particular I am wondering whether the whole GXM-inherits-from-GXL
->>> concept is flawed and should be adjusted if this leads to secondary
->>> .dtsi files like this: My proposal would be to instead create a
->>> meson-gxl-gxm.dtsi, that meson-gxl.dtsi and meson-gxm.dtsi can inherit
->>> the current common parts from, then the Mali bits can simply go into
->>> meson-gxl.dtsi without extra #includes needed in S905X and S905D. While
->>> it's slightly more work to split once again, I think it would be cleaner.
-[...]
->> The only changes are :
-[...]
->>  - A different Mali core, but with the same interrupts (less but they share the same lower interrupts), clocks and memory space
->>
->> This is why it was decided to have a sub-dtsi, having a secondary dtsi will simply copy 99% of the GXL dtsi,
->> but surely we could also have an intermediate dtsi but for boards I'm ok with it, but less for a SoC dtsi,
->> since it could lead to some confusion.
->>
->> Finally, yes I could have added the mali node to the GXL dtsi, but the midgard Mali dt-bindings are not upstream
->> and the family is too big and recent enough to consider having stable bindings for now.
->>
->> Nevertheless, nothing is final, this gxl-mali.dtsi could be merged into the GXL dtsi in the future when we
->> have proper dt-bindings and a real support of the T820 Mali on the S912.
->>
->> Kevin, what's your thought about this ?
-> 
-> I don't have a strong preference.  I'm OK with a separate Mali .dtsi due
-> to the signficant overlap between GXL/GXM in terms of clocks, interrupts
-> etc.
-> 
-> However, if the plan is to #include this from GXM .dts files, whould a
-> better name be meson-gx-mali.dtsi?
+On Sat, Mar 04, 2017 at 12:51:12AM +0000, Abel Vesa wrote:
+> diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
+> index c73c403..93f9abb 100644
+> --- a/arch/arm/kernel/entry-ftrace.S
+> +++ b/arch/arm/kernel/entry-ftrace.S
+> @@ -92,12 +92,78 @@
+>  2:	mcount_exit
+>  .endm
+>  
+> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+> +
+> +.macro __ftrace_regs_caller
+> +
+> +	sub	sp, sp, #8	@ space for CPSR and OLD_R0 (not used)
+> +
+> +	add 	ip, sp, #12	@ move in IP the value of SP as it was
+> +				@ before the push {lr} of the mcount mechanism
+> +	stmdb	sp!, {ip,lr,pc}
 
-I thought the purpose was specifically to not have GXM include it
-because it uses a Midgard IP.
+This doesn't build with CONFIG_THUMB2_KERNEL:
 
-If you want to share the fragment with GXBB too (gx), we should rather
-use meson-gx-mali-utgard.dtsi, which would differentiate from GXM's
-Midgard while still allowing for variation on the 4xx side (e.g., 470).
+entry-ftrace.S:285: Error: PC not allowed in register list -- `stmdb sp!,{ip,lr,pc}'
 
-Regards,
-Andreas
+Saving PC in STMDB is prohibited in Thumb and deprecated in ARM.
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+> +	stmdb	sp!, {r0-r11,lr}
+> +
+> +	ldr	r0, [sp, #S_LR]			@ replace PC with LR
+> +	str	r0, [sp, #S_PC]			@ into pt_regs
+> +
+> +	ldr	r1, [sp, #PT_REGS_SIZE] 	@ replace new LR with
+> +	str	r1, [sp, #S_LR]			@ previous LR into pt_regs
+> +
+> +	@ stack content at this point:
+> +	@ 0  4          48   52       56            60   64    68       72
+> +	@ R0 | R1 | ... | LR | SP + 4 | previous LR | LR | PSR | OLD_R0 | previous LR |
+
+So this code only adjust the SP by 72 bytes.  Since the stack is not
+aligned to 8 bytes at entry to mcount, this code calls into C functions
+with a misaligned stack.  This is a violation of the procedure call
+standard.
+
+Also, I believe this should have unwind annotations to indicate where it
+saved the registers.  See mcount_enter for an example.
+
+> +
+> +	mov r3, sp				@ struct pt_regs*
+> +	ldr r2, =function_trace_op
+> +	ldr r2, [r2]				@ pointer to the current
+> +						@ function tracing op
+> +	ldr	r1, [sp, #PT_REGS_SIZE]		@ lr of instrumented func
+> +	mcount_adjust_addr	r0, lr		@ instrumented function
+> +
+> +	.globl ftrace_regs_call
+> +ftrace_regs_call:
+> +	bl	ftrace_stub
+> +
+> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> +	.globl ftrace_graph_regs_call
+> +ftrace_graph_regs_call:
+> +	mov	r0, r0
+> +#endif
+> +	@ pop saved regs
+> +	ldmia   sp, {r0-r15}
+
+This doesn't build either:
+
+entry-ftrace.S:285: Error: LR and PC should not both be in register list -- `ldmia sp,{r0-r15}'
+
+Restoring LR and PC together is prohibited in Thumb and deprecated in
+ARM.  It's the same case with SP.
+
+> +.endm
+> +
+> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> +.macro __ftrace_graph_regs_caller
+> +
+> +	sub	r0, fp, #4		@ lr of instrumented routine (parent)
+> +
+> +	@ called from __ftrace_regs_caller
+> +	ldr     r1, [sp, #S_PC]		@ instrumented routine (func)
+> +	mcount_adjust_addr	r1, r1
+> +
+> +	mov	r2, fp			@ frame pointer
+> +	bl	prepare_ftrace_return
+> +
+> +	@ pop registers saved in ftrace_regs_caller
+> +	ldmia   sp, {r0-r15}
+
+This doesn't get built on CONFIG_THUMB2_KERNEL since there's no suppport
+for CONFIG_FUNCTION_GRAPH_TRACER there, but this is also using
+deprecated operands.
+
+> +.endm
+> +#endif
+> +#endif
+...
+> diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+> index 3f17594..f165265 100644
+> --- a/arch/arm/kernel/ftrace.c
+> +++ b/arch/arm/kernel/ftrace.c
+> @@ -29,11 +29,6 @@
+>  #endif
+>  
+>  #ifdef CONFIG_DYNAMIC_FTRACE
+> -#ifdef CONFIG_OLD_MCOUNT
+> -#define OLD_MCOUNT_ADDR	((unsigned long) mcount)
+> -#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
+> -
+> -#define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
+>  
+>  static int __ftrace_modify_code(void *data)
+>  {
+> @@ -51,6 +46,12 @@ void arch_ftrace_update_code(int command)
+>  	stop_machine(__ftrace_modify_code, &command, NULL);
+>  }
+>  
+> +#ifdef CONFIG_OLD_MCOUNT
+> +#define OLD_MCOUNT_ADDR	((unsigned long) mcount)
+> +#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
+> +
+> +#define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
+> +
+>  static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
+
+This chunk above fixes the problem which Nicolai pointed out earlier.  Since
+it's a bug fix for the current dynamic ftrace code, it should really be
+submitted as a separate patch.  Feel free to use some variant of this
+commit message which I wrote when I ran into this yesterday:
+
+ ARM: ftrace: fix dynamic ftrace with DEBUG_RODATA and !FRAME_POINTER
+ 
+ The support for dynamic ftrace with CONFIG_DEBUG_RODATA involves
+ overriding the weak arch_ftrace_update_code() with a variant which makes
+ the kernel text writable around the patching.
+ 
+ This override was however added under the CONFIG_OLD_MCOUNT ifdef, and
+ CONFIG_OLD_MCOUNT is only enabled if frame pointers are enabled.
+ 
+ This leads to non-functional dynamic ftrace (ftrace triggers a
+ WARN_ON()) when CONFIG_DEBUG_RODATA is enabled and CONFIG_FRAME_POINTER
+ is not.
+ 
+ Move the override out of that ifdef and into the CONFIG_DYNAMIC_FTRACE
+ ifdef where it belongs.
+
+ Fixes: 80d6b0c2eed2a ("ARM: mm: allow text and rodata sections to be read-only")
+
+>  {
+>  	return rec->arch.old_mcount ? OLD_NOP : NOP;
+> @@ -139,6 +140,15 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
+>  
+>  	ret = ftrace_modify_code(pc, 0, new, false);
+>  
+> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+
+This code (and the rest of your additions to this file below), are already
+under CONFIG_DYNAMIC_FTRACE and afaics CONFIG_DYNAMIC_FTRACE_WITH_REGS is
+always enabled when the former is enabled, so could you please drop
+these ifdefs?
+
+The code in entry-ftrace.S under CONFIG_DYNAMIC_FTRACE_WITH_REGS would
+also benefit from just using CONFIG_DYNAMIC_FTRACE everywhere instead.
