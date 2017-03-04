@@ -1,105 +1,271 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Fri, 3 Mar 2017 16:36:40 -0800
-Subject: [PATCH v4 14/36] [media] v4l2-mc: add a function to inherit
- controls from a pipeline
-In-Reply-To: <20170303230645.GR21222@n2100.armlinux.org.uk>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-15-git-send-email-steve_longerbeam@mentor.com>
- <20170302160257.GK3220@valkosipuli.retiisi.org.uk>
- <20170303230645.GR21222@n2100.armlinux.org.uk>
-Message-ID: <c4108ed3-5ad7-900d-1a9b-cded4f763db6@gmail.com>
+From: abelvesa@linux.com (Abel Vesa)
+Date: Sat,  4 Mar 2017 00:51:12 +0000
+Subject: [PATCHv5] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+Message-ID: <1488588672-21865-1-git-send-email-abelvesa@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The DYNAMIC_FTRACE_WITH_REGS configuration makes it possible for a ftrace
+operation to specify if registers need to saved/restored by the ftrace handler.
+This is needed by kgraft and possibly other ftrace-based tools, and the ARM
+architecture is currently lacking this feature. It would also be the first step
+to support the "Kprobes-on-ftrace" optimization on ARM.
 
+This patch introduces a new ftrace handler that stores the registers on the
+stack before calling the next stage. The registers are restored from the stack
+before going back to the instrumented function.
 
-On 03/03/2017 03:06 PM, Russell King - ARM Linux wrote:
-> On Thu, Mar 02, 2017 at 06:02:57PM +0200, Sakari Ailus wrote:
->> Hi Steve,
->>
->> On Wed, Feb 15, 2017 at 06:19:16PM -0800, Steve Longerbeam wrote:
->>> v4l2_pipeline_inherit_controls() will add the v4l2 controls from
->>> all subdev entities in a pipeline to a given video device.
->>>
->>> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
->>> ---
->>>  drivers/media/v4l2-core/v4l2-mc.c | 48 +++++++++++++++++++++++++++++++++++++++
->>>  include/media/v4l2-mc.h           | 25 ++++++++++++++++++++
->>>  2 files changed, 73 insertions(+)
->>>
->>> diff --git a/drivers/media/v4l2-core/v4l2-mc.c b/drivers/media/v4l2-core/v4l2-mc.c
->>> index 303980b..09d4d97 100644
->>> --- a/drivers/media/v4l2-core/v4l2-mc.c
->>> +++ b/drivers/media/v4l2-core/v4l2-mc.c
->>> @@ -22,6 +22,7 @@
->>>  #include <linux/usb.h>
->>>  #include <media/media-device.h>
->>>  #include <media/media-entity.h>
->>> +#include <media/v4l2-ctrls.h>
->>>  #include <media/v4l2-fh.h>
->>>  #include <media/v4l2-mc.h>
->>>  #include <media/v4l2-subdev.h>
->>> @@ -238,6 +239,53 @@ int v4l_vb2q_enable_media_source(struct vb2_queue *q)
->>>  }
->>>  EXPORT_SYMBOL_GPL(v4l_vb2q_enable_media_source);
->>>
->>> +int __v4l2_pipeline_inherit_controls(struct video_device *vfd,
->>> +				     struct media_entity *start_entity)
->>
->> I have a few concerns / questions:
->>
->> - What's the purpose of this patch? Why not to access the sub-device node
->>   directly?
->
-> What tools are in existance _today_ to provide access to these controls
-> via the sub-device nodes?
->
-> v4l-tools doesn't last time I looked - in fact, the only tool in v4l-tools
-> which is capable of accessing the subdevices is media-ctl, and that only
-> provides functionality for configuring the pipeline.
->
-> So, pointing people at vapourware userspace is really quite rediculous.
+A side-effect of this patch is to activate the support for ftrace_modify_call()
+as it defines ARCH_SUPPORTS_FTRACE_OPS for the ARM architecture.
 
+Signed-off-by: Abel Vesa <abelvesa@linux.com>
+---
+ arch/arm/Kconfig               |  1 +
+ arch/arm/include/asm/ftrace.h  |  4 ++
+ arch/arm/kernel/entry-ftrace.S | 83 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/ftrace.c       | 48 +++++++++++++++++++++---
+ 4 files changed, 131 insertions(+), 5 deletions(-)
 
-Hi Russell,
-
-Yes, that's a big reason why I added this capability. The v4l2-ctl
-tool won't accept subdev nodes, although Philipp Zabel has a quick hack
-to get around this (ignore return code from VIDIOC_QUERYCAP).
-
-
->
-> The established way to control video capture is through the main video
-> capture device, not through the sub-devices.  Yes, the controls are
-> exposed through sub-devices too, but that does not mean that is the
-> correct way to access them.
->
-> The v4l2 documentation (Documentation/media/kapi/v4l2-controls.rst)
-> even disagrees with your statements.  That talks about control
-> inheritence from sub-devices to the main video device, and the core
-> v4l2 code provides _automatic_ support for this - see
-> v4l2_device_register_subdev():
->
->         /* This just returns 0 if either of the two args is NULL */
->         err = v4l2_ctrl_add_handler(v4l2_dev->ctrl_handler, sd->ctrl_handler, NULL);
->
-> which merges the subdev's controls into the main device's control
-> handler.
-
-Actually v4l2_dev->ctrl_handler is not of much use to me. This will
-compose a list of controls from all registered subdevs, i.e. _all
-possible controls_.
-
-What v4l2_pipeline_inherit_controls() does is compose a list of
-controls that are reachable and available in the currently configured
-pipeline.
-
-Steve
-
->
-> So, (a) I don't think Steve needs to add this code, and (b) I think
-> your statements about not inheriting controls goes against the
-> documentation and API compatibility with _existing_ applications,
-> and ultimately hurts the user experience, since there's nothing
-> existing today to support what you're suggesting in userspace.
->
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 0d4e71b..bf5d8fa 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -56,6 +56,7 @@ config ARM
+ 	select HAVE_DMA_API_DEBUG
+ 	select HAVE_DMA_CONTIGUOUS if MMU
+ 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
++	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
+ 	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
+ 	select HAVE_EXIT_THREAD
+ 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+index 22b7311..f379881 100644
+--- a/arch/arm/include/asm/ftrace.h
++++ b/arch/arm/include/asm/ftrace.h
+@@ -1,6 +1,10 @@
+ #ifndef _ASM_ARM_FTRACE
+ #define _ASM_ARM_FTRACE
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++#define ARCH_SUPPORTS_FTRACE_OPS 1
++#endif
++
+ #ifdef CONFIG_FUNCTION_TRACER
+ #define MCOUNT_ADDR		((unsigned long)(__gnu_mcount_nc))
+ #define MCOUNT_INSN_SIZE	4 /* sizeof mcount call */
+diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
+index c73c403..93f9abb 100644
+--- a/arch/arm/kernel/entry-ftrace.S
++++ b/arch/arm/kernel/entry-ftrace.S
+@@ -92,12 +92,78 @@
+ 2:	mcount_exit
+ .endm
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++
++.macro __ftrace_regs_caller
++
++	sub	sp, sp, #8	@ space for CPSR and OLD_R0 (not used)
++
++	add 	ip, sp, #12	@ move in IP the value of SP as it was
++				@ before the push {lr} of the mcount mechanism
++	stmdb	sp!, {ip,lr,pc}
++	stmdb	sp!, {r0-r11,lr}
++
++	ldr	r0, [sp, #S_LR]			@ replace PC with LR
++	str	r0, [sp, #S_PC]			@ into pt_regs
++
++	ldr	r1, [sp, #PT_REGS_SIZE] 	@ replace new LR with
++	str	r1, [sp, #S_LR]			@ previous LR into pt_regs
++
++	@ stack content at this point:
++	@ 0  4          48   52       56            60   64    68       72
++	@ R0 | R1 | ... | LR | SP + 4 | previous LR | LR | PSR | OLD_R0 | previous LR |
++
++	mov r3, sp				@ struct pt_regs*
++	ldr r2, =function_trace_op
++	ldr r2, [r2]				@ pointer to the current
++						@ function tracing op
++	ldr	r1, [sp, #PT_REGS_SIZE]		@ lr of instrumented func
++	mcount_adjust_addr	r0, lr		@ instrumented function
++
++	.globl ftrace_regs_call
++ftrace_regs_call:
++	bl	ftrace_stub
++
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++	.globl ftrace_graph_regs_call
++ftrace_graph_regs_call:
++	mov	r0, r0
++#endif
++	@ pop saved regs
++	ldmia   sp, {r0-r15}
++.endm
++
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++.macro __ftrace_graph_regs_caller
++
++	sub	r0, fp, #4		@ lr of instrumented routine (parent)
++
++	@ called from __ftrace_regs_caller
++	ldr     r1, [sp, #S_PC]		@ instrumented routine (func)
++	mcount_adjust_addr	r1, r1
++
++	mov	r2, fp			@ frame pointer
++	bl	prepare_ftrace_return
++
++	@ pop registers saved in ftrace_regs_caller
++	ldmia   sp, {r0-r15}
++.endm
++#endif
++#endif
++
+ .macro __ftrace_caller suffix
+ 	mcount_enter
+ 
+ 	mcount_get_lr	r1			@ lr of instrumented func
+ 	mcount_adjust_addr	r0, lr		@ instrumented function
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++	ldr r2, =function_trace_op
++	ldr r2, [r2]				@ pointer to the current
++						@ function tracing op
++	mov r3, #0				@ regs is NULL
++#endif
++
+ 	.globl ftrace_call\suffix
+ ftrace_call\suffix:
+ 	bl	ftrace_stub
+@@ -212,6 +278,15 @@ UNWIND(.fnstart)
+ 	__ftrace_caller
+ UNWIND(.fnend)
+ ENDPROC(ftrace_caller)
++
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++ENTRY(ftrace_regs_caller)
++UNWIND(.fnstart)
++	__ftrace_regs_caller
++UNWIND(.fnend)
++ENDPROC(ftrace_regs_caller)
++#endif
++
+ #endif
+ 
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+@@ -220,6 +295,14 @@ UNWIND(.fnstart)
+ 	__ftrace_graph_caller
+ UNWIND(.fnend)
+ ENDPROC(ftrace_graph_caller)
++
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++ENTRY(ftrace_graph_regs_caller)
++UNWIND(.fnstart)
++	__ftrace_graph_regs_caller
++UNWIND(.fnend)
++ENDPROC(ftrace_graph_regs_caller)
++#endif
+ #endif
+ 
+ .purgem mcount_enter
+diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
+index 3f17594..f165265 100644
+--- a/arch/arm/kernel/ftrace.c
++++ b/arch/arm/kernel/ftrace.c
+@@ -29,11 +29,6 @@
+ #endif
+ 
+ #ifdef CONFIG_DYNAMIC_FTRACE
+-#ifdef CONFIG_OLD_MCOUNT
+-#define OLD_MCOUNT_ADDR	((unsigned long) mcount)
+-#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
+-
+-#define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
+ 
+ static int __ftrace_modify_code(void *data)
+ {
+@@ -51,6 +46,12 @@ void arch_ftrace_update_code(int command)
+ 	stop_machine(__ftrace_modify_code, &command, NULL);
+ }
+ 
++#ifdef CONFIG_OLD_MCOUNT
++#define OLD_MCOUNT_ADDR	((unsigned long) mcount)
++#define OLD_FTRACE_ADDR ((unsigned long) ftrace_caller_old)
++
++#define	OLD_NOP		0xe1a00000	/* mov r0, r0 */
++
+ static unsigned long ftrace_nop_replace(struct dyn_ftrace *rec)
+ {
+ 	return rec->arch.old_mcount ? OLD_NOP : NOP;
+@@ -139,6 +140,15 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
+ 
+ 	ret = ftrace_modify_code(pc, 0, new, false);
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++	if (!ret) {
++		pc = (unsigned long)&ftrace_regs_call;
++		new = ftrace_call_replace(pc, (unsigned long)func);
++
++		ret = ftrace_modify_code(pc, 0, new, false);
++	}
++#endif
++
+ #ifdef CONFIG_OLD_MCOUNT
+ 	if (!ret) {
+ 		pc = (unsigned long)&ftrace_call_old;
+@@ -157,11 +167,29 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+ 	unsigned long ip = rec->ip;
+ 
+ 	old = ftrace_nop_replace(rec);
++
+ 	new = ftrace_call_replace(ip, adjust_address(rec, addr));
+ 
+ 	return ftrace_modify_code(rec->ip, old, new, true);
+ }
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++
++int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
++				unsigned long addr)
++{
++	unsigned long new, old;
++	unsigned long ip = rec->ip;
++
++	old = ftrace_call_replace(ip, adjust_address(rec, old_addr));
++
++	new = ftrace_call_replace(ip, adjust_address(rec, addr));
++
++	return ftrace_modify_code(rec->ip, old, new, true);
++}
++
++#endif
++
+ int ftrace_make_nop(struct module *mod,
+ 		    struct dyn_ftrace *rec, unsigned long addr)
+ {
+@@ -229,6 +257,8 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
+ extern unsigned long ftrace_graph_call;
+ extern unsigned long ftrace_graph_call_old;
+ extern void ftrace_graph_caller_old(void);
++extern unsigned long ftrace_graph_regs_call;
++extern void ftrace_graph_regs_caller(void);
+ 
+ static int __ftrace_modify_caller(unsigned long *callsite,
+ 				  void (*func) (void), bool enable)
+@@ -251,6 +281,14 @@ static int ftrace_modify_graph_caller(bool enable)
+ 				     ftrace_graph_caller,
+ 				     enable);
+ 
++#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
++	if (!ret)
++		ret = __ftrace_modify_caller(&ftrace_graph_regs_call,
++				     ftrace_graph_regs_caller,
++				     enable);
++#endif
++
++
+ #ifdef CONFIG_OLD_MCOUNT
+ 	if (!ret)
+ 		ret = __ftrace_modify_caller(&ftrace_graph_call_old,
+-- 
+2.7.4
