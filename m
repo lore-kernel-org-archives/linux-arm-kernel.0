@@ -1,51 +1,106 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 04 Mar 2017 10:50:36 +0000
-Subject: Using the generic host PCIe driver
-In-Reply-To: <20170303200407.GB30375@bhelgaas-glaptop.roam.corp.google.com>
- (Bjorn Helgaas's message of "Fri, 3 Mar 2017 14:04:07 -0600")
-References: <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
- <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
- <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
- <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
- <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
- <98ee3041-6a94-91af-b4bf-208aa02624ed@free.fr>
- <20170301215726.GA32286@bhelgaas-glaptop.roam.corp.google.com>
- <258cd6f3-ef17-6705-ff48-ae06f26778c2@free.fr>
- <20170303154628.GA21522@bhelgaas-glaptop.roam.corp.google.com>
- <8e1a0b5d-8dfb-4be1-a049-b16892a6c0d0@free.fr>
- <20170303200407.GB30375@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <87fuit2u4j.fsf@on-the-bus.cambridge.arm.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Sat, 4 Mar 2017 12:56:00 +0200
+Subject: [PATCH v4 13/36] [media] v4l2: add a frame timeout event
+In-Reply-To: <59663ea1-b277-1543-e770-6a102ac733a4@gmail.com>
+References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
+ <1487211578-11360-14-git-send-email-steve_longerbeam@mentor.com>
+ <20170302155342.GJ3220@valkosipuli.retiisi.org.uk>
+ <4b2bcee1-8da0-776e-4455-8d8e7a7abf0a@gmail.com>
+ <20170303114506.GM3220@valkosipuli.retiisi.org.uk>
+ <59663ea1-b277-1543-e770-6a102ac733a4@gmail.com>
+Message-ID: <20170304105600.GS3220@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 03 2017 at  8:04:07 pm GMT, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Fri, Mar 03, 2017 at 06:18:02PM +0100, Mason wrote:
->> In fact, I thought I could ignore that BAR, but it is apparently NOT
->> the case, as MSIs are supposed to be sent *within* the BAR of the root.
->
-> I don't know much about this piece of the MSI puzzle, but maybe Marc
-> can enlighten us.  If this Root Port is the target of MSIs and the
-> Root Port turns them into some sort of interrupt on the CPU side, I
-> can see how this might make sense.
+Hi Steve,
 
-There is a whole range of PCIe RC that require to be programmed with the
-doorbell address. It can be any address, but the kernel has to make sure
-it is not something you will ever DMA to, as the RC is unlikely to
-forward the transaction after having matched it.
+On Fri, Mar 03, 2017 at 02:43:51PM -0800, Steve Longerbeam wrote:
+> 
+> 
+> On 03/03/2017 03:45 AM, Sakari Ailus wrote:
+> >On Thu, Mar 02, 2017 at 03:07:21PM -0800, Steve Longerbeam wrote:
+> >>
+> >>
+> >>On 03/02/2017 07:53 AM, Sakari Ailus wrote:
+> >>>Hi Steve,
+> >>>
+> >>>On Wed, Feb 15, 2017 at 06:19:15PM -0800, Steve Longerbeam wrote:
+> >>>>Add a new FRAME_TIMEOUT event to signal that a video capture or
+> >>>>output device has timed out waiting for reception or transmit
+> >>>>completion of a video frame.
+> >>>>
+> >>>>Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> >>>>---
+> >>>>Documentation/media/uapi/v4l/vidioc-dqevent.rst | 5 +++++
+> >>>>Documentation/media/videodev2.h.rst.exceptions  | 1 +
+> >>>>include/uapi/linux/videodev2.h                  | 1 +
+> >>>>3 files changed, 7 insertions(+)
+> >>>>
+> >>>>diff --git a/Documentation/media/uapi/v4l/vidioc-dqevent.rst b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+> >>>>index 8d663a7..dd77d9b 100644
+> >>>>--- a/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+> >>>>+++ b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
+> >>>>@@ -197,6 +197,11 @@ call.
+> >>>>	the regions changes. This event has a struct
+> >>>>	:c:type:`v4l2_event_motion_det`
+> >>>>	associated with it.
+> >>>>+    * - ``V4L2_EVENT_FRAME_TIMEOUT``
+> >>>>+      - 7
+> >>>>+      - This event is triggered when the video capture or output device
+> >>>>+	has timed out waiting for the reception or transmit completion of
+> >>>>+	a frame of video.
+> >>>
+> >>>As you're adding a new interface, I suppose you have an implementation
+> >>>around. How do you determine what that timeout should be?
+> >>
+> >>The imx-media driver sets the timeout to 1 second, or 30 frame
+> >>periods at 30 fps.
+> >
+> >The frame rate is not necessarily constant during streaming. It may well
+> >change as a result of lighting conditions.
+> 
+> I think you mean that would be a _temporary_ change in frame rate, but
+> yes I agree the data rate can temporarily fluctuate. Although I doubt
+> lighting conditions would cause a sensor to pause data transmission
+> for a full 1 second.
 
-> I think it's unusual for the PCI core to assign the MSI target using a
-> BAR, though.  I think this means you'll have to implement your
-> arch_setup_msi_irq() or .irq_compose_msi_msg() method such that it 
-> looks up that BAR value, since you won't know it at build-time.
+Likely not, at least not in typical conditions. The exposure time is still
+quite specific to applications: it could be minutes if you take photos e.g.
+of the night sky.
 
-A common trick is to set the doorbell address to a well known value,
-such as the base address for the PCIe RC itself. Of course, that only
-works if the RC doesn't forward writes to the doorbell. Otherwise, any
-RAM address will do, provided that it is not something we'd expect to
-DMA to.
+What I'm saying here is that any static value is likely not both reasonable
+and workable in all potential situations all the time. Still there are cases
+(as yours below) that may happen in relatively common cases on some hardware
+(more common than taking long exposure photos of the night sky with the said
+hardware :)).
 
-Thanks,
+> 
+> 
+> >I wouldn't add an event for this:
+> >this is unreliable and 30 times the frame period is an arbitrary value
+> >anyway. No other drivers do this either.
+> 
+> If no other drivers do this I don't mind removing it. It is really meant
+> to deal with the ADV718x CVBS decoder, which often simply stops sending
+> data on the BT.656 bus if there is an interruption in the input analog
+> signal. But I agree that user space could detect this timeout instead.
+> Unless I hear from someone else that they would like to keep this
+> feature I'll remove it in version 5.
 
-        M.
+That's a bit of a special situation --- still there are alike conditions on
+existing hardware. You should return the buffers to the user with the ERROR
+flag set --- or return -EIO from VIDIOC_DQBUF, if the condition will
+persist:
+
+<URL:https://www.linuxtv.org/downloads/v4l-dvb-apis/uapi/v4l/vidioc-qbuf.html>
+
+Do you already obtain the frame rate from the image source (e.g. tuner,
+sensor, decoder) and multiply the frame time by some number in the current
+implementation? Not all sub-device drivers may implement g_frame_interval()
+so I'd disable the timeout in that case.
+
 -- 
-Jazz is not dead, it just smell funny.
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
