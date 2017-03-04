@@ -1,10 +1,10 @@
 From: singhalsimran0@gmail.com (simran singhal)
-Date: Sat,  4 Mar 2017 22:16:54 +0530
-Subject: [PATCH 2/3] staging: speakup: Clean up tests if NULL returned on
- failure
+Date: Sat,  4 Mar 2017 22:16:55 +0530
+Subject: [PATCH 3/3] staging: vc04_services: Clean up tests if NULL returned
+ on failure
 In-Reply-To: <1488646015-7059-1-git-send-email-singhalsimran0@gmail.com>
 References: <1488646015-7059-1-git-send-email-singhalsimran0@gmail.com>
-Message-ID: <1488646015-7059-3-git-send-email-singhalsimran0@gmail.com>
+Message-ID: <1488646015-7059-4-git-send-email-singhalsimran0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -24,21 +24,21 @@ e = \(kmalloc\|kzalloc\|kcalloc\|devm_kzalloc\)(...);
 
 Signed-off-by: simran singhal <singhalsimran0@gmail.com>
 ---
- drivers/staging/speakup/main.c | 2 +-
+ drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/speakup/main.c b/drivers/staging/speakup/main.c
-index c2f70ef..e8268bc 100644
---- a/drivers/staging/speakup/main.c
-+++ b/drivers/staging/speakup/main.c
-@@ -1324,7 +1324,7 @@ static int speakup_allocate(struct vc_data *vc)
- 	if (speakup_console[vc_num] == NULL) {
- 		speakup_console[vc_num] = kzalloc(sizeof(*speakup_console[0]),
- 						  GFP_ATOMIC);
--		if (speakup_console[vc_num] == NULL)
-+		if (!speakup_console[vc_num])
- 			return -ENOMEM;
- 		speakup_date(vc);
- 	} else if (!spk_parked)
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c
+index e0ba0ed..7fa0310 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c
+@@ -52,7 +52,7 @@ int vchiu_queue_init(VCHIU_QUEUE_T *queue, int size)
+ 	sema_init(&queue->push, 0);
+ 
+ 	queue->storage = kzalloc(size * sizeof(VCHIQ_HEADER_T *), GFP_KERNEL);
+-	if (queue->storage == NULL) {
++	if (!queue->storage) {
+ 		vchiu_queue_delete(queue);
+ 		return 0;
+ 	}
 -- 
 2.7.4
