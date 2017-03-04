@@ -1,46 +1,172 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Sat, 4 Mar 2017 11:24:51 +0530
-Subject: [PATCH 1/4] net: thunderx: Fix IOMMU translation faults
-In-Reply-To: <20170303.095635.355325147613813698.davem@davemloft.net>
-References: <1488538070-12549-1-git-send-email-sunil.kovvuri@gmail.com>
- <1488538070-12549-2-git-send-email-sunil.kovvuri@gmail.com>
- <20170303.095635.355325147613813698.davem@davemloft.net>
-Message-ID: <CA+sq2CcFxk=LuqYhR-sFaVVSu3rMaZUcytx-3tC9kEiRFNwREg@mail.gmail.com>
+From: yong.mao@mediatek.com (Yong Mao)
+Date: Sat, 4 Mar 2017 14:44:42 +0800
+Subject: [PATCH v1] mmc: mediatek: Fixed bug where clock frequency could
+ be set wrong
+In-Reply-To: <CAGS+omBw_vXMmjtjyE+9CbDBP06u_ngnEreEf9jfQvNw9dCktg@mail.gmail.com>
+References: <1487924527-22584-1-git-send-email-yong.mao@mediatek.com>
+ <1487924527-22584-2-git-send-email-yong.mao@mediatek.com>
+ <CAGS+omDuPwXqTJ2CrLbLvSHdp3CL895qop1x6dLT1u7bG7XnVw@mail.gmail.com>
+ <1487929124.22858.10.camel@mhfsdcap03>
+ <CAGS+omCaP99xvpu-A-NVGwdCSKETgtDBxxcYxjTRkFCyzBNL-Q@mail.gmail.com>
+ <1488362160.27826.27.camel@mhfsdcap03>
+ <CAGS+omBw_vXMmjtjyE+9CbDBP06u_ngnEreEf9jfQvNw9dCktg@mail.gmail.com>
+Message-ID: <1488609882.29409.1.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Mar 3, 2017 at 11:26 PM, David Miller <davem@davemloft.net> wrote:
-> From: sunil.kovvuri at gmail.com
-> Date: Fri,  3 Mar 2017 16:17:47 +0530
->
->> @@ -1643,6 +1650,9 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
->>       if (!pass1_silicon(nic->pdev))
->>               nic->hw_tso = true;
->>
->> +     /* Check if we are attached to IOMMU */
->> +     nic->iommu_domain = iommu_get_domain_for_dev(dev);
->
-> This function is not universally available.
+On Thu, 2017-03-02 at 20:20 +0800, Daniel Kurtz wrote:
+> On Wed, Mar 1, 2017 at 5:56 PM, Yong Mao <yong.mao@mediatek.com> wrote:
+> > On Tue, 2017-02-28 at 14:56 +0800, Daniel Kurtz wrote:
+> >> On Fri, Feb 24, 2017 at 5:38 PM, Yong Mao <yong.mao@mediatek.com> wrote:
+> >> > From:   Yong Mao <yong.mao@mediatek.com>
+> >> > To:     Daniel Kurtz <djkurtz@chromium.org>
+> >> > Subject:        Re: [PATCH v1] mmc: mediatek: Fixed bug where clock frequency
+> >> > could be set wrong
+> >> > Date:   Fri, 24 Feb 2017 17:33:37 +0800
+> >> >
+> >> >
+> >> > On Fri, 2017-02-24 at 17:52 +0900, Daniel Kurtz wrote:
+> >> >> On Fri, Feb 24, 2017 at 5:22 PM, Yong Mao <yong.mao@mediatek.com>
+> >> > wrote:
+> >> >> >
+> >> >> > From: yong mao <yong.mao@mediatek.com>
+> >> >> >
+> >> >> > This patch can fix two issues:
+> >> >> >
+> >> >> > Issue 1:
+> >> >> > The maximum value of clock divider is 0xff.
+> >> >> > Because the type of div is u32, div may be larger than max_div.
+> >> >> > In this case, we should use max_div to set the clock frequency.
+> >> >> >
+> >> >> > Issue 2:
+> >> >> > In previous code, we can not set the correct clock frequency when
+> >> >> > div equals 0xff.
+> >> >> >
+> >> >> > Signed-off-by: Yong Mao <yong.mao@mediatek.com>
+> >> >> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> >> >> > ---
+> >> >> >  drivers/mmc/host/mtk-sd.c |   13 ++++++++++++-
+> >> >> >  1 file changed, 12 insertions(+), 1 deletion(-)
+> >> >> >
+> >> >> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> >> >> > index 07f3236..3174445 100644
+> >> >> > --- a/drivers/mmc/host/mtk-sd.c
+> >> >> > +++ b/drivers/mmc/host/mtk-sd.c
+> >> >> > @@ -540,6 +540,7 @@ static void msdc_set_mclk(struct msdc_host
+> >> > *host, unsigned char timing, u32 hz)
+> >> >> >         u32 mode;
+> >> >> >         u32 flags;
+> >> >> >         u32 div;
+> >> >> > +       u32 max_div;
+> >> >>
+> >> >> There's really no need for this variable.  Just use 0xff below.
+> >> > For all of our IC, max_div is not a constant.
+> >> > We will upstream another patch which max_div will get the different
+> >> > value depending on the IC.
+> >> > Therefore, we keep the max_div as a variable here.
+> >>
+> >> Please add the variable in the patch that uses it as a variable.
+> >>
+> >> >
+> >> >>
+> >> >> >         u32 sclk;
+> >> >> >
+> >> >> >         if (!hz) {
+> >> >> > @@ -590,8 +591,18 @@ static void msdc_set_mclk(struct msdc_host
+> >> > *host, unsigned char timing, u32 hz)
+> >> >> >                         sclk = (host->src_clk_freq >> 2) / div;
+> >> >> >                 }
+> >> >> >         }
+> >> >> > +
+> >> >> > +       /**
+> >> >> > +        * The maximum value of div is 0xff.
+> >> >> > +        * Check if the div is larger than max_div.
+> >> >> > +        */
+> >> >> > +       max_div = 0xff;
+> >> >> > +       if (div > max_div) {
+> >> >> > +               div = max_div;
+> >> >> > +               sclk = (host->src_clk_freq >> 2) / div;
+> >> >> > +       }
+> >> >> >         sdr_set_field(host->base + MSDC_CFG, MSDC_CFG_CKMOD |
+> >> > MSDC_CFG_CKDIV,
+> >> >> > -                       (mode << 8) | (div % 0xff));
+> >> >> > +                     (mode << 8) | div);
+> >> >>
+> >> >> Hmm, I don't know much about this sub-system, but should we even be
+> >> >> allowing requests to set a frequency that we can't actually achieve
+> >> >> with the divider?
+> >> >>
+> >> >
+> >> > No. We can not get a frequency that we can't actually achieve with the
+> >> > divider. This patch is to solve this kind of issue.
+> >>
+> >> Sorry, I am trying to understand why we need this patch.
+> >>
+> >> AFAICT, it looks like sometimes msdc_set_mclk() is being called with
+> >> hz that cannot be generated by your hardware.  In particular,
+> >> sometimes the original code computes "div > 255".
+> >> To work around this problem, this patch just caps the divider value to
+> >> 255, which is the maximum divider provided by the hardware.  However,
+> >> presumably this means that in this case we won't actually be
+> >> generating the requested hz value.
+> >>
+> >> So, can you please explain in what exact scenario this patch is
+> >> required, and justify why it is ok to generate a clock other than the
+> >> requested in this case?
+> >>
+> >> -Dan
+> >>
+> >
+> > This issue is hidden deeply. It is a boundary related issue.
+> > Let me take the real value to explain how this issue occurs.
+> >
+> > 1. mmc->f_min = host->src_clk_freq / (4 * 255);
+> >    mmc->f_min = 400000000 / (4 * 255) = 392156;
+> > 2. mmc core tries to initialize emmc by using 400000hz.
+> >    If the first try failed, it will retry by using max(300000hz,
+> > mmc->f_min)= 392156hz
+> > 3. msdc_set_mclk will be invoked by mmc core to set the clock.
+> >    and then following code will be executed.
+> > div = (host->src_clk_freq + ((hz << 2) - 1)) / (hz << 2);
+> > (div = (400000000 + (392156 << 2) - 1)) / (392156 << 2) = 256)
+> >
+> > Why do we use (host->src_clk_freq + ((hz << 2) - 1))?
+> > ==> Because if we can not get a proper clock frequency, we should set a
+> > clock frequency which is less than proper clock frequency.
+> >
+> > 4. In this IC, it only use 8 bits to indicate the value of clock
+> > divider. Therefore, 256 is overflow, it is equal 0 here.
+> > And then we will get a wrong 100000000Hz clock frequency.
+> >
+> > Can you understand how this issue occurs now?
+> 
+> Thanks for the excellent explanation.  Things are a lot clearer now.
+> 
+> I think this can be solved even easier by computing f_min the same way:
+> 
+>   mmc->f_min = DIV_ROUND_UP(400000000, 4 * 255);  /* = 392157 */
+> 
+That is really a easier way to solve this issue.
+I will submit a new version as soon as possible.
+Thanks.
 
-Even if CONFIG_IOMMU_API is not enabled, it will return NULL and will be okay.
-http://lxr.free-electrons.com/source/include/linux/iommu.h#L400
-
->
-> This looks very hackish to me anyways, how all of this stuff is supposed
-> to work is that you simply use the DMA interfaces unconditionally and
-> whatever is behind the operations takes care of everything.
->
-> Doing it conditionally in the driver with all of this special IOMMU
-> domain et al. knowledge makes no sense to me at all.
->
-> I don't see other drivers doing stuff like this at all, so if you're
-> going to handle this in a unique way like this you better write
-> several paragraphs in your commit message explaining why this weird
-> crap is necessary.
-
-I already tried to explain in the commit message that HW anyway takes care
-of data coherency, so calling DMA interfaces when there is no IOMMU will
-only result in performance drop.
-
-We are seeing a 0.75Mpps drop with IP forwarding rate due to that.
-Hence I have restricted calling DMA interfaces to only when IOMMU is enabled.
+> 
+> >
+> >> >
+> >> >
+> >> >> >         sdr_set_bits(host->base + MSDC_CFG, MSDC_CFG_CKPDN);
+> >> >> >         while (!(readl(host->base + MSDC_CFG) & MSDC_CFG_CKSTB))
+> >> >> >                 cpu_relax();
+> >> >> > --
+> >> >> > 1.7.9.5
+> >> >> >
+> >> >> >
+> >> >> > _______________________________________________
+> >> >> > Linux-mediatek mailing list
+> >> >> > Linux-mediatek at lists.infradead.org
+> >> >> > http://lists.infradead.org/mailman/listinfo/linux-mediatek
+> >> >
+> >> >
+> >> >
+> >
+> >
