@@ -1,213 +1,72 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sat, 4 Mar 2017 13:17:55 +0100
-Subject: [PATCH v2] ARM64: dts: meson-gxl: Add support for HwaCom AmazeTV
-In-Reply-To: <20170304092651.6979-1-carlo@caione.org>
-References: <20170304092651.6979-1-carlo@caione.org>
-Message-ID: <6bec7bbc-cc4b-389c-2b5d-fa078629a4c9@suse.de>
+Date: Sat, 4 Mar 2017 13:38:04 +0100
+Subject: [PATCH v2 3/3] ARM64: dts: meson-gx: Add MALI nodes for GXBB and
+ GXL
+In-Reply-To: <m2tw7a17nb.fsf@baylibre.com>
+References: <1488365164-22861-1-git-send-email-narmstrong@baylibre.com>
+ <1488365164-22861-4-git-send-email-narmstrong@baylibre.com>
+ <e26cf584-dab2-2702-f7e6-b28f750fa00c@suse.de>
+ <e80d9fb0-1d71-7cab-5e32-72316474fdfc@baylibre.com>
+ <m2tw7a17nb.fsf@baylibre.com>
+Message-ID: <9f3a17e8-63fa-6c14-4d17-0539ef7cd5a2@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 04.03.2017 um 10:26 schrieb Carlo Caione:
-> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-> index c246cd2730d9..9c39c766cfdb 100644
-> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
-> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-> @@ -49,3 +49,4 @@ Board compatible values:
->    - "amlogic,q201" (Meson gxm s912)
->    - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
->    - "nexbox,a1" (Meson gxm s912)
-> +  - "hwacom,amazetv" (Meson gxl s905x)
+Am 03.03.2017 um 20:29 schrieb Kevin Hilman:
+> Neil Armstrong <narmstrong@baylibre.com> writes:
+>> On 03/02/2017 01:31 PM, Andreas F?rber wrote:
+>>> Am 01.03.2017 um 11:46 schrieb Neil Armstrong:
+>>>> The same MALI-450 MP3 GPU is present in the GXBB and GXL SoCs.
+[...]
+>>>> The node is simply added in the meson-gxbb.dtsi file.
+[...]
+>>>> For GXL, since a lot is shared with the GXM that has a MALI-T820 IP, this
+>>>> patch adds a new meson-gxl-mali.dtsi and is included in the SoC specific
+>>>> dtsi files.
+>>>
+>>> This part is slightly confusing though.
+>>>
+>>> What exactly is the GXL vs. GXM difference that this can't be handled by
+>>> overriding node properties compatible/interrupts/clocks? I am missing a
+>>> GXM patch in this series as rationale for doing it this way.
+>>>
+>>> In particular I am wondering whether the whole GXM-inherits-from-GXL
+>>> concept is flawed and should be adjusted if this leads to secondary
+>>> .dtsi files like this: My proposal would be to instead create a
+>>> meson-gxl-gxm.dtsi, that meson-gxl.dtsi and meson-gxm.dtsi can inherit
+>>> the current common parts from, then the Mali bits can simply go into
+>>> meson-gxl.dtsi without extra #includes needed in S905X and S905D. While
+>>> it's slightly more work to split once again, I think it would be cleaner.
+[...]
+>> The only changes are :
+[...]
+>>  - A different Mali core, but with the same interrupts (less but they share the same lower interrupts), clocks and memory space
+>>
+>> This is why it was decided to have a sub-dtsi, having a secondary dtsi will simply copy 99% of the GXL dtsi,
+>> but surely we could also have an intermediate dtsi but for boards I'm ok with it, but less for a SoC dtsi,
+>> since it could lead to some confusion.
+>>
+>> Finally, yes I could have added the mali node to the GXL dtsi, but the midgard Mali dt-bindings are not upstream
+>> and the family is too big and recent enough to consider having stable bindings for now.
+>>
+>> Nevertheless, nothing is final, this gxl-mali.dtsi could be merged into the GXL dtsi in the future when we
+>> have proper dt-bindings and a real support of the T820 Mali on the S912.
+>>
+>> Kevin, what's your thought about this ?
+> 
+> I don't have a strong preference.  I'm OK with a separate Mali .dtsi due
+> to the signficant overlap between GXL/GXM in terms of clocks, interrupts
+> etc.
+> 
+> However, if the plan is to #include this from GXM .dts files, whould a
+> better name be meson-gx-mali.dtsi?
 
-Really in the bottom and after gxm? Please don't make it harder to fix.
-Also, shouldn't that be a preceding dt-bindings: patch?
+I thought the purpose was specifically to not have GXM include it
+because it uses a Midgard IP.
 
-> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-> index 3f94bce33b7f..1f4102833e59 100644
-> --- a/arch/arm64/boot/dts/amlogic/Makefile
-> +++ b/arch/arm64/boot/dts/amlogic/Makefile
-> @@ -11,6 +11,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
-> +dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-hwacom-amazetv.dtb
-
-Please sort alphabetically.
-
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q200.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q201.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
-> new file mode 100644
-> index 000000000000..1f087e8805c7
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
-> @@ -0,0 +1,164 @@
-> +/*
-> + * Copyright (c) 2017 Carlo Caione
-> + * Copyright (c) 2016 BayLibre, Inc.
-> + * Author: Neil Armstrong <narmstrong@kernel.org>
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "meson-gxl-s905x.dtsi"
-> +
-> +/ {
-> +	compatible = "hwacom,amazetv", "amlogic,s905x", "amlogic,meson-gxl";
-> +	model = "Hwacom AmazeTV (S905X)";
-> +
-> +	aliases {
-> +		serial0 = &uart_AO;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory at 0 {
-> +		device_type = "memory";
-> +		reg = <0x0 0x0 0x0 0x80000000>;
-> +	};
-> +
-> +	vddio_card: gpio-regulator {
-> +		compatible = "regulator-gpio";
-> +
-> +		regulator-name = "VDDIO_CARD";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <3300000>;
-> +
-> +		gpios = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
-> +		gpios-states = <1>;
-> +
-> +		/* Based on P200 schematics, signal CARD_1.8V/3.3V_CTR */
-> +		states = <1800000 0
-> +			  3300000 1>;
-> +	};
-> +
-> +	vddio_boot: regulator-vddio_boot {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "VDDIO_BOOT";
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +	};
-> +
-> +	vddao_3v3: regulator-vddao_3v3 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "VDDAO_3V3";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> +
-> +	vcc_3v3: regulator-vcc_3v3 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "VCC_3V3";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> +
-> +	emmc_pwrseq: emmc-pwrseq {
-> +		compatible = "mmc-pwrseq-emmc";
-> +		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
-> +	};
-> +
-> +	wifi32k: wifi32k {
-> +		compatible = "pwm-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <32768>;
-> +		pwms = <&pwm_ef 0 30518 0>; /* PWM_E at 32.768KHz */
-> +	};
-> +
-> +	sdio_pwrseq: sdio-pwrseq {
-> +		compatible = "mmc-pwrseq-simple";
-> +		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>;
-> +		clocks = <&wifi32k>;
-> +		clock-names = "ext_clock";
-> +	};
-> +
-> +	cvbs-connector {
-> +		compatible = "composite-video-connector";
-> +
-> +		port {
-> +			cvbs_connector_in: endpoint {
-> +				remote-endpoint = <&cvbs_vdac_out>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&uart_AO {
-> +	status = "okay";
-> +	pinctrl-0 = <&uart_ao_a_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +&ethmac {
-> +	status = "okay";
-> +	phy-mode = "rmii";
-> +	phy-handle = <&internal_phy>;
-> +};
-> +
-> +&ir {
-> +	status = "okay";
-> +	pinctrl-0 = <&remote_input_ao_pins>;
-> +	pinctrl-names = "default";
-> +};
-> +
-> +/* SD card */
-> +&sd_emmc_b {
-> +	status = "okay";
-> +	pinctrl-0 = <&sdcard_pins>;
-> +	pinctrl-names = "default";
-> +
-> +	bus-width = <4>;
-> +	cap-sd-highspeed;
-> +	max-frequency = <100000000>;
-> +	disable-wp;
-> +
-> +	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
-> +	cd-inverted;
-> +
-> +	vmmc-supply = <&vddao_3v3>;
-> +	vqmmc-supply = <&vddio_card>;
-> +};
-> +
-> +/* eMMC */
-> +&sd_emmc_c {
-> +	status = "okay";
-> +	pinctrl-0 = <&emmc_pins>;
-> +	pinctrl-names = "default";
-> +
-> +	bus-width = <8>;
-> +	cap-sd-highspeed;
-> +	cap-mmc-highspeed;
-> +	max-frequency = <100000000>;
-> +	non-removable;
-> +	disable-wp;
-> +	mmc-ddr-1_8v;
-> +	mmc-hs200-1_8v;
-> +
-> +	mmc-pwrseq = <&emmc_pwrseq>;
-> +	vmmc-supply = <&vcc_3v3>;
-> +	vqmmc-supply = <&vddio_boot>;
-> +};
-> +
-> +&pwm_ef {
-> +	status = "okay";
-> +	pinctrl-0 = <&pwm_e_pins>;
-> +	pinctrl-names = "default";
-> +	clocks = <&clkc CLKID_FCLK_DIV4>;
-> +	clock-names = "clkin0";
-> +};
-> +
-> +&cvbs_vdac_port {
-> +	cvbs_vdac_out: endpoint {
-> +		remote-endpoint = <&cvbs_connector_in>;
-> +	};
-> +};
-
-These nodes are not sorted alphabetically.
+If you want to share the fragment with GXBB too (gx), we should rather
+use meson-gx-mali-utgard.dtsi, which would differentiate from GXM's
+Midgard while still allowing for variation on the 4xx side (e.g., 470).
 
 Regards,
 Andreas
