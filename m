@@ -1,216 +1,219 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sat,  4 Mar 2017 10:26:51 +0100
-Subject: [PATCH v2] ARM64: dts: meson-gxl: Add support for HwaCom AmazeTV
-Message-ID: <20170304092651.6979-1-carlo@caione.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 4 Mar 2017 09:35:10 +0000
+Subject: Using the generic host PCIe driver
+In-Reply-To: <5c899946-4220-a63e-fe98-6a103200c2ad@free.fr>
+References: <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
+ <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
+ <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
+ <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
+ <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
+ <98ee3041-6a94-91af-b4bf-208aa02624ed@free.fr>
+ <20170301215726.GA32286@bhelgaas-glaptop.roam.corp.google.com>
+ <258cd6f3-ef17-6705-ff48-ae06f26778c2@free.fr>
+ <20170303154628.GA21522@bhelgaas-glaptop.roam.corp.google.com>
+ <8e1a0b5d-8dfb-4be1-a049-b16892a6c0d0@free.fr>
+ <20170303200407.GB30375@bhelgaas-glaptop.roam.corp.google.com>
+ <5c899946-4220-a63e-fe98-6a103200c2ad@free.fr>
+Message-ID: <CAKv+Gu-QxUYZcg4DPwuhhfqKCp4eJEWXCh43ZyvDe12=exEhWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+On 3 March 2017 at 23:23, Mason <slash.tmp@free.fr> wrote:
+> On 03/03/2017 21:04, Bjorn Helgaas wrote:
+>> On Fri, Mar 03, 2017 at 06:18:02PM +0100, Mason wrote:
+>>> On 03/03/2017 16:46, Bjorn Helgaas wrote:
+>>>> On Fri, Mar 03, 2017 at 01:44:54PM +0100, Mason wrote:
+>>>>
+>>>>> For now, I have "hidden" the root's BAR0 from the system with:
+>>>>>
+>>>>>    if (bus->number == 0 && where == PCI_BASE_ADDRESS_0) {
+>>>>>            *val = 0;
+>>>>>            return PCIBIOS_SUCCESSFUL;
+>>>>>    }
+>>>>
+>>>> I'm scratching my head about this a little.  Here's what your dmesg
+>>>> log contained originally:
+>>>>
+>>>>   pci 0000:00:00.0: [1105:8758] type 01 class 0x048000
+>>>>   pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x00ffffff 64bit]
+>>>>   pci 0000:00:00.0: BAR 0: no space for [mem size 0x01000000 64bit]
+>>>>   pci 0000:00:00.0: BAR 0: failed to assign [mem size 0x01000000 64bit]
+>>>>   pci 0000:00:00.0: PCI bridge to [bus 01]
+>>>>   pcieport 0000:00:00.0: enabling device (0140 -> 0142)
+>>>>
+>>>> This device is a bridge (a Root Port, per your lspci output).  With a
+>>>> BAR, which is legal but unusual.  We couldn't assign space for the
+>>>> BAR, which means we can't use whatever vendor-specific functionality
+>>>> it provides.
+>>>
+>>> I had several chats with the HW designer. I'll try to explain, only as
+>>> far as I could understand ;-)
+>>>
+>>> We used to make devices, before implementing a root. Since at least
+>>> one BAR is required (?) for a device, it was decided to have one BAR
+>>> for the root, for symmetry.
+>>
+>> I'm not aware of a spec requirement for any BARs.  It's conceivable
+>> that one could build a device that only uses config space.  And of
+>> course, most bridges have windows but no BARs.  But that doesn't
+>> matter; the hardware is what it is and we have to deal with it.
+>
+> I appreciate the compassion. RMK considered the DMA HW too screwy
+> to bother supporting ;-)
+>
+>>> In fact, I thought I could ignore that BAR, but it is apparently NOT
+>>> the case, as MSIs are supposed to be sent *within* the BAR of the root.
+>>
+>> I don't know much about this piece of the MSI puzzle, but maybe Marc
+>> can enlighten us.  If this Root Port is the target of MSIs and the
+>> Root Port turns them into some sort of interrupt on the CPU side, I
+>> can see how this might make sense.
+>>
+>> I think it's unusual for the PCI core to assign the MSI target using a
+>> BAR, though.  I think this means you'll have to implement your
+>> arch_setup_msi_irq() or .irq_compose_msi_msg() method such that it
+>> looks up that BAR value, since you won't know it at build-time.
+>
+> I'll hack the Altera driver to fit my purpose.
+>
+>>> The weird twist is that the BAR advertizes a 64-bit memory zone,
+>>> but we will, in fact, map MMIO registers behind it. So all the
+>>> RAM Linux assigns to the area is wasted, IIUC.
+>>
+>> I'm not sure what this means.  You have this:
+>>
+>>> OF: PCI:   MEM 0x90000000..0x9fffffff -> 0x90000000
+>
+> This means I've put 256 MB of system RAM aside for PCIe devices.
+> This memory is no longer available for Linux "stuff".
+>
 
-This patch adds support for the HwaCom AmazeTV set-top-box. The
-hardware configuration is really similar to the other GXL boards but
-for this hardware we need to limit the max-frequency of the eMMC to
-have it working.
+No it doesn't. It is a physical memory *range* that is assigned to the
+PCI host bridge. Any memory accesses by the CPU to that window will be
+forwarded to the PCI bus by the host bridge. From the kernel driver's
+POV, this range is a given, but your host bridge h/w may involve some
+configuration to make the host bridge 'listen' to this range. This is
+h/w specific, and as Bjorn pointed out, usually configured by the
+firmware so that the kernel driver does not require any knowledge of
+those internals.
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- Documentation/devicetree/bindings/arm/amlogic.txt  |   1 +
- arch/arm64/boot/dts/amlogic/Makefile               |   1 +
- .../dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts | 164 +++++++++++++++++++++
- 3 files changed, 166 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
+>>> pci_bus 0000:00: root bus resource [mem 0x90000000-0x9fffffff]
+>
+> I suppose this is the PCI bus address. As we've discussed,
+> I used the identity to map bus <-> CPU addresses.
+>
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-index c246cd2730d9..9c39c766cfdb 100644
---- a/Documentation/devicetree/bindings/arm/amlogic.txt
-+++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-@@ -49,3 +49,4 @@ Board compatible values:
-   - "amlogic,q201" (Meson gxm s912)
-   - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
-   - "nexbox,a1" (Meson gxm s912)
-+  - "hwacom,amazetv" (Meson gxl s905x)
-diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-index 3f94bce33b7f..1f4102833e59 100644
---- a/arch/arm64/boot/dts/amlogic/Makefile
-+++ b/arch/arm64/boot/dts/amlogic/Makefile
-@@ -11,6 +11,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
-+dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-hwacom-amazetv.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q200.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q201.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
-new file mode 100644
-index 000000000000..1f087e8805c7
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-hwacom-amazetv.dts
-@@ -0,0 +1,164 @@
-+/*
-+ * Copyright (c) 2017 Carlo Caione
-+ * Copyright (c) 2016 BayLibre, Inc.
-+ * Author: Neil Armstrong <narmstrong@kernel.org>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+/dts-v1/;
-+
-+#include "meson-gxl-s905x.dtsi"
-+
-+/ {
-+	compatible = "hwacom,amazetv", "amlogic,s905x", "amlogic,meson-gxl";
-+	model = "Hwacom AmazeTV (S905X)";
-+
-+	aliases {
-+		serial0 = &uart_AO;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+	};
-+
-+	vddio_card: gpio-regulator {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "VDDIO_CARD";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpios = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
-+		gpios-states = <1>;
-+
-+		/* Based on P200 schematics, signal CARD_1.8V/3.3V_CTR */
-+		states = <1800000 0
-+			  3300000 1>;
-+	};
-+
-+	vddio_boot: regulator-vddio_boot {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDIO_BOOT";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+	};
-+
-+	vddao_3v3: regulator-vddao_3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VDDAO_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	vcc_3v3: regulator-vcc_3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "VCC_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	emmc_pwrseq: emmc-pwrseq {
-+		compatible = "mmc-pwrseq-emmc";
-+		reset-gpios = <&gpio BOOT_9 GPIO_ACTIVE_LOW>;
-+	};
-+
-+	wifi32k: wifi32k {
-+		compatible = "pwm-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <32768>;
-+		pwms = <&pwm_ef 0 30518 0>; /* PWM_E at 32.768KHz */
-+	};
-+
-+	sdio_pwrseq: sdio-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>;
-+		clocks = <&wifi32k>;
-+		clock-names = "ext_clock";
-+	};
-+
-+	cvbs-connector {
-+		compatible = "composite-video-connector";
-+
-+		port {
-+			cvbs_connector_in: endpoint {
-+				remote-endpoint = <&cvbs_vdac_out>;
-+			};
-+		};
-+	};
-+};
-+
-+&uart_AO {
-+	status = "okay";
-+	pinctrl-0 = <&uart_ao_a_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+&ethmac {
-+	status = "okay";
-+	phy-mode = "rmii";
-+	phy-handle = <&internal_phy>;
-+};
-+
-+&ir {
-+	status = "okay";
-+	pinctrl-0 = <&remote_input_ao_pins>;
-+	pinctrl-names = "default";
-+};
-+
-+/* SD card */
-+&sd_emmc_b {
-+	status = "okay";
-+	pinctrl-0 = <&sdcard_pins>;
-+	pinctrl-names = "default";
-+
-+	bus-width = <4>;
-+	cap-sd-highspeed;
-+	max-frequency = <100000000>;
-+	disable-wp;
-+
-+	cd-gpios = <&gpio CARD_6 GPIO_ACTIVE_HIGH>;
-+	cd-inverted;
-+
-+	vmmc-supply = <&vddao_3v3>;
-+	vqmmc-supply = <&vddio_card>;
-+};
-+
-+/* eMMC */
-+&sd_emmc_c {
-+	status = "okay";
-+	pinctrl-0 = <&emmc_pins>;
-+	pinctrl-names = "default";
-+
-+	bus-width = <8>;
-+	cap-sd-highspeed;
-+	cap-mmc-highspeed;
-+	max-frequency = <100000000>;
-+	non-removable;
-+	disable-wp;
-+	mmc-ddr-1_8v;
-+	mmc-hs200-1_8v;
-+
-+	mmc-pwrseq = <&emmc_pwrseq>;
-+	vmmc-supply = <&vcc_3v3>;
-+	vqmmc-supply = <&vddio_boot>;
-+};
-+
-+&pwm_ef {
-+	status = "okay";
-+	pinctrl-0 = <&pwm_e_pins>;
-+	pinctrl-names = "default";
-+	clocks = <&clkc CLKID_FCLK_DIV4>;
-+	clock-names = "clkin0";
-+};
-+
-+&cvbs_vdac_port {
-+	cvbs_vdac_out: endpoint {
-+		remote-endpoint = <&cvbs_connector_in>;
-+	};
-+};
--- 
-2.12.0
+Yes, that is fine
+
+>> This [mem 0x90000000-0x9fffffff] host bridge window means there can't
+>> be RAM in that region.  CPU accesses to 0x90000000-0x9fffffff have to
+>> be claimed by the host bridge and forwarded to PCI.
+>>
+>> Linux doesn't "assign system RAM" anywhere; we just learn somehow
+>> where that RAM is.  Linux *does* assign BARs of PCI devices, and they
+>> have to be inside the host bridge windows(s).
+>
+> I'm confused, I thought I had understood that part...
+> I thought the binding required me to specify (in the "ranges"
+> property) a non-prefetchable zone of system RAM, and this
+> memory is then "handed out" by Linux to different devices.
+> Or do I just need to specify some address range that's not
+> necessarily backed with actual RAM?
+>
+
+Yes. Each PCI device advertises its need of memory windows via its
+BARs, but the actual placement of those windows inside the host
+bridge's memory range is configured dynamically, usually by the
+firmware (on PCs) but on ARM/arm64 systems, this is done from scratch
+by the kernel. The *purpose* of those memory windows is device
+specific, but whatever is behind it lives on the PCI device. So this
+is *not* system RAM.
+
+>> The BARs may contain registers, RAM, frame buffers, etc., that live
+>> on the PCI device.  It's totally up to the device what it is.
+>>
+>>> OF: PCI: host bridge /soc/pcie at 50000000 ranges:
+>>> OF: PCI:   No bus range found for /soc/pcie at 50000000, using [bus 00-ff]
+>>
+>> Tangent: the lack of a bus range is a defect in your DTS.
+>
+> What range should I specify? 0-1? 0-2? 0-255?
+>
+>>> [    1.042737] pci_bus 0000:00: scanning bus
+>>> [    1.046895] pci 0000:00:00.0: [1105:0024] type 01 class 0x048000
+>>> [    1.053050] pci 0000:00:00.0: calling tango_pcie_fixup_class+0x0/0x10
+>>> [    1.059639] pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x00ffffff 64bit]
+>>> [    1.066583] pci 0000:00:00.0: calling pci_fixup_ide_bases+0x0/0x40
+>>> [    1.072929] pci 0000:00:00.0: supports D1 D2
+>>> [    1.077318] pci 0000:00:00.0: PME# supported from D0 D1 D2 D3hot
+>>> [    1.083452] pci 0000:00:00.0: PME# disabled
+>>> [    1.087901] pci_bus 0000:00: fixups for bus
+>>> [    1.092212] PCI: bus0: Fast back to back transfers disabled
+>>> [    1.097913] pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 0
+>>> [    1.104746] pci 0000:00:00.0: bridge configuration invalid ([bus 00-00]), reconfiguring
+>>> [    1.112893] pci 0000:00:00.0: scanning [bus 00-00] behind bridge, pass 1
+>>> [    1.119800] pci_bus 0000:01: scanning bus
+>>> [    1.123972] pci 0000:01:00.0: [1912:0014] type 00 class 0x0c0330
+>>> [    1.130144] pci 0000:01:00.0: reg 0x10: [mem 0x00000000-0x00001fff 64bit]
+>>> [    1.137147] pci 0000:01:00.0: calling pci_fixup_ide_bases+0x0/0x40
+>>> [    1.143577] pci 0000:01:00.0: PME# supported from D0 D3hot D3cold
+>>> [    1.149801] pci 0000:01:00.0: PME# disabled
+>>> [    1.154364] pci_bus 0000:01: fixups for bus
+>>> [    1.158671] PCI: bus1: Fast back to back transfers disabled
+>>> [    1.164368] pci_bus 0000:01: bus scan returning with max=01
+>>> [    1.170067] pci_bus 0000:01: busn_res: [bus 01-ff] end is updated to 01
+>>> [    1.176814] pci_bus 0000:00: bus scan returning with max=01
+>>> [    1.182511] pci 0000:00:00.0: fixup irq: got 0
+>>> [    1.187072] pci 0000:00:00.0: assigning IRQ 00
+>>> [    1.191658] pci 0000:01:00.0: fixup irq: got 20
+>>> [    1.196307] pci 0000:01:00.0: assigning IRQ 20
+>>> [    1.200892] pci 0000:00:00.0: BAR 0: assigned [mem 0x90000000-0x90ffffff 64bit]
+>>> [    1.208344] pci 0000:00:00.0: BAR 8: assigned [mem 0x91000000-0x910fffff]
+>>> [    1.215267] pci 0000:01:00.0: BAR 0: assigned [mem 0x91000000-0x91001fff 64bit]
+>>> [    1.222726] pci 0000:00:00.0: PCI bridge to [bus 01]
+>>> [    1.227812] pci 0000:00:00.0:   bridge window [mem 0x91000000-0x910fffff]
+>>> [    1.234781] pcieport 0000:00:00.0: enabling device (0140 -> 0142)
+>>> [    1.241013] pcieport 0000:00:00.0: enabling bus mastering
+>>> [    1.246634] pci 0000:01:00.0: calling quirk_usb_early_handoff+0x0/0x790
+>>> [    1.253389] pci 0000:01:00.0: enabling device (0140 -> 0142)
+>>> [    1.275215] pci 0000:01:00.0: xHCI HW did not halt within 16000 usec status = 0xd2f4167e
+>>>
+>>> # /usr/sbin/lspci -v
+>>> 00:00.0 PCI bridge: Sigma Designs, Inc. Device 0024 (rev 01) (prog-if 00 [Normal decode])
+>>>         Flags: bus master, fast devsel, latency 0
+>>>         Memory at 90000000 (64-bit, non-prefetchable) [size=16M]
+>>>         Bus: primary=00, secondary=01, subordinate=01, sec-latency=0
+>>>         I/O behind bridge: 00000000-00000fff
+>>
+>> Something's wrong with this.  You have no I/O windows through the host
+>> bridge, which implies that you can't generic PCI I/O transactions, so
+>> this I/O window should be disabled.  This might be an lspci issue;
+>> what does "lspci -xxx" show?
+>
+> I'll look on Monday. But I know that this revision of the controller
+> does not support any I/O areas. I don't know why Linux sees this.
+> Might be a bug in the controller, or a missing init in my code.
+>
+>>>         Memory behind bridge: 91000000-910fffff
+>>>         Prefetchable memory behind bridge: 00000000-000fffff
+>>
+>> This prefetchable memory window is bogus, too.  It should probably be
+>> disabled.  If the bridge doesn't support a prefetchable window, the
+>> base and limit should be hardwired to zero.  If it supports a window
+>> but it's disabled, the limit should be less than the base.  For
+>> example, on my system I see this for a bridge with the window
+>> disabled:
+>>
+>>   # setpci -s00:1c.0 PREF_MEMORY_BASE
+>>   fff1
+>>   # setpci -s00:1c.0 PREF_MEMORY_LIMIT
+>>   0001
+>
+> OK, one more thing for me to check. Thanks for your thoroughness.
+>
+> Regards.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
