@@ -1,106 +1,152 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Sat, 4 Mar 2017 12:56:00 +0200
-Subject: [PATCH v4 13/36] [media] v4l2: add a frame timeout event
-In-Reply-To: <59663ea1-b277-1543-e770-6a102ac733a4@gmail.com>
-References: <1487211578-11360-1-git-send-email-steve_longerbeam@mentor.com>
- <1487211578-11360-14-git-send-email-steve_longerbeam@mentor.com>
- <20170302155342.GJ3220@valkosipuli.retiisi.org.uk>
- <4b2bcee1-8da0-776e-4455-8d8e7a7abf0a@gmail.com>
- <20170303114506.GM3220@valkosipuli.retiisi.org.uk>
- <59663ea1-b277-1543-e770-6a102ac733a4@gmail.com>
-Message-ID: <20170304105600.GS3220@valkosipuli.retiisi.org.uk>
+From: slash.tmp@free.fr (Mason)
+Date: Sat, 4 Mar 2017 11:56:26 +0100
+Subject: Using the generic host PCIe driver
+In-Reply-To: <CAKv+Gu-QxUYZcg4DPwuhhfqKCp4eJEWXCh43ZyvDe12=exEhWw@mail.gmail.com>
+References: <20170227164430.GB11162@bhelgaas-glaptop.roam.corp.google.com>
+ <8643c952-e915-bcd1-390e-9d4001789872@free.fr>
+ <20170227183534.GA12481@bhelgaas-glaptop.roam.corp.google.com>
+ <347d4200-e089-60df-5f60-58d16efc7c4e@free.fr>
+ <20170301161801.GB13171@bhelgaas-glaptop.roam.corp.google.com>
+ <98ee3041-6a94-91af-b4bf-208aa02624ed@free.fr>
+ <20170301215726.GA32286@bhelgaas-glaptop.roam.corp.google.com>
+ <258cd6f3-ef17-6705-ff48-ae06f26778c2@free.fr>
+ <20170303154628.GA21522@bhelgaas-glaptop.roam.corp.google.com>
+ <8e1a0b5d-8dfb-4be1-a049-b16892a6c0d0@free.fr>
+ <20170303200407.GB30375@bhelgaas-glaptop.roam.corp.google.com>
+ <5c899946-4220-a63e-fe98-6a103200c2ad@free.fr>
+ <CAKv+Gu-QxUYZcg4DPwuhhfqKCp4eJEWXCh43ZyvDe12=exEhWw@mail.gmail.com>
+Message-ID: <8daa1f79-8fda-bef9-e216-3c15f53c4f32@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
-
-On Fri, Mar 03, 2017 at 02:43:51PM -0800, Steve Longerbeam wrote:
+On 04/03/2017 10:35, Ard Biesheuvel wrote:
+> On 3 March 2017 at 23:23, Mason <slash.tmp@free.fr> wrote:
+>> On 03/03/2017 21:04, Bjorn Helgaas wrote:
+>>> On Fri, Mar 03, 2017 at 06:18:02PM +0100, Mason wrote:
+>>>> On 03/03/2017 16:46, Bjorn Helgaas wrote:
+>>>>> On Fri, Mar 03, 2017 at 01:44:54PM +0100, Mason wrote:
+>>>>>
+>>>>>> For now, I have "hidden" the root's BAR0 from the system with:
+>>>>>>
+>>>>>>    if (bus->number == 0 && where == PCI_BASE_ADDRESS_0) {
+>>>>>>            *val = 0;
+>>>>>>            return PCIBIOS_SUCCESSFUL;
+>>>>>>    }
+>>>>>
+>>>>> I'm scratching my head about this a little.  Here's what your dmesg
+>>>>> log contained originally:
+>>>>>
+>>>>>   pci 0000:00:00.0: [1105:8758] type 01 class 0x048000
+>>>>>   pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x00ffffff 64bit]
+>>>>>   pci 0000:00:00.0: BAR 0: no space for [mem size 0x01000000 64bit]
+>>>>>   pci 0000:00:00.0: BAR 0: failed to assign [mem size 0x01000000 64bit]
+>>>>>   pci 0000:00:00.0: PCI bridge to [bus 01]
+>>>>>   pcieport 0000:00:00.0: enabling device (0140 -> 0142)
+>>>>>
+>>>>> This device is a bridge (a Root Port, per your lspci output).  With a
+>>>>> BAR, which is legal but unusual.  We couldn't assign space for the
+>>>>> BAR, which means we can't use whatever vendor-specific functionality
+>>>>> it provides.
+>>>>
+>>>> I had several chats with the HW designer. I'll try to explain, only as
+>>>> far as I could understand ;-)
+>>>>
+>>>> We used to make devices, before implementing a root. Since at least
+>>>> one BAR is required (?) for a device, it was decided to have one BAR
+>>>> for the root, for symmetry.
+>>>
+>>> I'm not aware of a spec requirement for any BARs.  It's conceivable
+>>> that one could build a device that only uses config space.  And of
+>>> course, most bridges have windows but no BARs.  But that doesn't
+>>> matter; the hardware is what it is and we have to deal with it.
+>>
+>> I appreciate the compassion. RMK considered the DMA HW too screwy
+>> to bother supporting ;-)
+>>
+>>>> In fact, I thought I could ignore that BAR, but it is apparently NOT
+>>>> the case, as MSIs are supposed to be sent *within* the BAR of the root.
+>>>
+>>> I don't know much about this piece of the MSI puzzle, but maybe Marc
+>>> can enlighten us.  If this Root Port is the target of MSIs and the
+>>> Root Port turns them into some sort of interrupt on the CPU side, I
+>>> can see how this might make sense.
+>>>
+>>> I think it's unusual for the PCI core to assign the MSI target using a
+>>> BAR, though.  I think this means you'll have to implement your
+>>> arch_setup_msi_irq() or .irq_compose_msi_msg() method such that it
+>>> looks up that BAR value, since you won't know it at build-time.
+>>
+>> I'll hack the Altera driver to fit my purpose.
+>>
+>>>> The weird twist is that the BAR advertizes a 64-bit memory zone,
+>>>> but we will, in fact, map MMIO registers behind it. So all the
+>>>> RAM Linux assigns to the area is wasted, IIUC.
+>>>
+>>> I'm not sure what this means.  You have this:
+>>>
+>>>> OF: PCI:   MEM 0x90000000..0x9fffffff -> 0x90000000
+>>
+>> This means I've put 256 MB of system RAM aside for PCIe devices.
+>> This memory is no longer available for Linux "stuff".
+>>
 > 
+> No it doesn't. It is a physical memory *range* that is assigned to the
+> PCI host bridge. Any memory accesses by the CPU to that window will be
+> forwarded to the PCI bus by the host bridge. From the kernel driver's
+> POV, this range is a given, but your host bridge h/w may involve some
+> configuration to make the host bridge 'listen' to this range. This is
+> h/w specific, and as Bjorn pointed out, usually configured by the
+> firmware so that the kernel driver does not require any knowledge of
+> those internals.
 > 
-> On 03/03/2017 03:45 AM, Sakari Ailus wrote:
-> >On Thu, Mar 02, 2017 at 03:07:21PM -0800, Steve Longerbeam wrote:
-> >>
-> >>
-> >>On 03/02/2017 07:53 AM, Sakari Ailus wrote:
-> >>>Hi Steve,
-> >>>
-> >>>On Wed, Feb 15, 2017 at 06:19:15PM -0800, Steve Longerbeam wrote:
-> >>>>Add a new FRAME_TIMEOUT event to signal that a video capture or
-> >>>>output device has timed out waiting for reception or transmit
-> >>>>completion of a video frame.
-> >>>>
-> >>>>Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> >>>>---
-> >>>>Documentation/media/uapi/v4l/vidioc-dqevent.rst | 5 +++++
-> >>>>Documentation/media/videodev2.h.rst.exceptions  | 1 +
-> >>>>include/uapi/linux/videodev2.h                  | 1 +
-> >>>>3 files changed, 7 insertions(+)
-> >>>>
-> >>>>diff --git a/Documentation/media/uapi/v4l/vidioc-dqevent.rst b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
-> >>>>index 8d663a7..dd77d9b 100644
-> >>>>--- a/Documentation/media/uapi/v4l/vidioc-dqevent.rst
-> >>>>+++ b/Documentation/media/uapi/v4l/vidioc-dqevent.rst
-> >>>>@@ -197,6 +197,11 @@ call.
-> >>>>	the regions changes. This event has a struct
-> >>>>	:c:type:`v4l2_event_motion_det`
-> >>>>	associated with it.
-> >>>>+    * - ``V4L2_EVENT_FRAME_TIMEOUT``
-> >>>>+      - 7
-> >>>>+      - This event is triggered when the video capture or output device
-> >>>>+	has timed out waiting for the reception or transmit completion of
-> >>>>+	a frame of video.
-> >>>
-> >>>As you're adding a new interface, I suppose you have an implementation
-> >>>around. How do you determine what that timeout should be?
-> >>
-> >>The imx-media driver sets the timeout to 1 second, or 30 frame
-> >>periods at 30 fps.
-> >
-> >The frame rate is not necessarily constant during streaming. It may well
-> >change as a result of lighting conditions.
+>>>> pci_bus 0000:00: root bus resource [mem 0x90000000-0x9fffffff]
+>>
+>> I suppose this is the PCI bus address. As we've discussed,
+>> I used the identity to map bus <-> CPU addresses.
+>>
 > 
-> I think you mean that would be a _temporary_ change in frame rate, but
-> yes I agree the data rate can temporarily fluctuate. Although I doubt
-> lighting conditions would cause a sensor to pause data transmission
-> for a full 1 second.
-
-Likely not, at least not in typical conditions. The exposure time is still
-quite specific to applications: it could be minutes if you take photos e.g.
-of the night sky.
-
-What I'm saying here is that any static value is likely not both reasonable
-and workable in all potential situations all the time. Still there are cases
-(as yours below) that may happen in relatively common cases on some hardware
-(more common than taking long exposure photos of the night sky with the said
-hardware :)).
-
+> Yes, that is fine
 > 
+>>> This [mem 0x90000000-0x9fffffff] host bridge window means there can't
+>>> be RAM in that region.  CPU accesses to 0x90000000-0x9fffffff have to
+>>> be claimed by the host bridge and forwarded to PCI.
+>>>
+>>> Linux doesn't "assign system RAM" anywhere; we just learn somehow
+>>> where that RAM is.  Linux *does* assign BARs of PCI devices, and they
+>>> have to be inside the host bridge windows(s).
+>>
+>> I'm confused, I thought I had understood that part...
+>> I thought the binding required me to specify (in the "ranges"
+>> property) a non-prefetchable zone of system RAM, and this
+>> memory is then "handed out" by Linux to different devices.
+>> Or do I just need to specify some address range that's not
+>> necessarily backed with actual RAM?
+>>
 > 
-> >I wouldn't add an event for this:
-> >this is unreliable and 30 times the frame period is an arbitrary value
-> >anyway. No other drivers do this either.
-> 
-> If no other drivers do this I don't mind removing it. It is really meant
-> to deal with the ADV718x CVBS decoder, which often simply stops sending
-> data on the BT.656 bus if there is an interruption in the input analog
-> signal. But I agree that user space could detect this timeout instead.
-> Unless I hear from someone else that they would like to keep this
-> feature I'll remove it in version 5.
+> Yes. Each PCI device advertises its need of memory windows via its
+> BARs, but the actual placement of those windows inside the host
+> bridge's memory range is configured dynamically, usually by the
+> firmware (on PCs) but on ARM/arm64 systems, this is done from scratch
+> by the kernel. The *purpose* of those memory windows is device
+> specific, but whatever is behind it lives on the PCI device. So this
+> is *not* system RAM.
 
-That's a bit of a special situation --- still there are alike conditions on
-existing hardware. You should return the buffers to the user with the ERROR
-flag set --- or return -EIO from VIDIOC_DQBUF, if the condition will
-persist:
+Hello Ard,
 
-<URL:https://www.linuxtv.org/downloads/v4l-dvb-apis/uapi/v4l/vidioc-qbuf.html>
+It appears I have misunderstood something fundamental.
 
-Do you already obtain the frame rate from the image source (e.g. tuner,
-sensor, decoder) and multiply the frame time by some number in the current
-implementation? Not all sub-device drivers may implement g_frame_interval()
-so I'd disable the timeout in that case.
+The binding for generic PCI support
+http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/pci/host-generic-pci.txt
+requires two address-type specs
+(please correct me if I'm wrong)
+1) in the "reg" prop, the address of the configuration space (CPU physical)
+2) in the "ranges" prop, at least a non-prefetchable area
+http://elinux.org/Device_Tree_Usage#PCI_Address_Translation
 
--- 
-Kind regards,
+In my 32-bit system, there are 2GB of RAM at [0x8000_0000,0x10000_0000[
+There are MMIO registers at [0, 16MB[ and also other stuff higher
+Suppose there is nothing mapped at [0x7000_0000, 0x8000_0000[
 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Can I provide that range to the PCI subsystem?
+
+Regards.
