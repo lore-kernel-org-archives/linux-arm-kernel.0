@@ -1,61 +1,69 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun,  5 Mar 2017 21:37:01 +0800
-Subject: [PATCH v2 04/12] ASoC: sun8i-codec-analog: add support for V3s SoC
+Date: Sun,  5 Mar 2017 21:37:03 +0800
+Subject: [PATCH v2 06/12] dmaengine: sun6i: make gate bit in sun8i's DMA
+ engines a common quirk
 In-Reply-To: <20170305133709.6288-1-icenowy@aosc.xyz>
 References: <20170305133709.6288-1-icenowy@aosc.xyz>
-Message-ID: <20170305133709.6288-5-icenowy@aosc.xyz>
+Message-ID: <20170305133709.6288-7-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The V3s SoC features an analog codec with headphone support but without
-mic2 and linein.
+Originally we enable a special gate bit when the compatible indicates
+A23/33.
 
-Add support for it.
+But according to BSP sources and user manuals, more SoCs will need this
+gate bit.
+
+So make it a common quirk configured in the config struct.
+
+The BSP source also indicates that A83T will need this gate bit (there's
+"SUN8IW6" in the #ifdef's), so also enable this gate bit for it.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt | 1 +
- sound/soc/sunxi/sun8i-codec-analog.c                           | 9 +++++++++
- 2 files changed, 10 insertions(+)
+ drivers/dma/sun6i-dma.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt b/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
-index 779b735781ba..1b6e7c4e50ab 100644
---- a/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
-+++ b/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
-@@ -4,6 +4,7 @@ Required properties:
- - compatible: must be one of the following compatibles:
- 		- "allwinner,sun8i-a23-codec-analog"
- 		- "allwinner,sun8i-h3-codec-analog"
-+		- "allwinner,sun8i-v3s-codec-analog"
- 
- Required properties if not a sub-node of the PRCM node:
- - reg: must contain the registers location and length
-diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
-index af56afe5c403..d87c75c6ad8e 100644
---- a/sound/soc/sunxi/sun8i-codec-analog.c
-+++ b/sound/soc/sunxi/sun8i-codec-analog.c
-@@ -713,6 +713,11 @@ static const struct sun8i_codec_analog_quirks sun8i_h3_quirks = {
- 	.has_mic2	= true,
+diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+index a2358780ab2c..889fb24023cd 100644
+--- a/drivers/dma/sun6i-dma.c
++++ b/drivers/dma/sun6i-dma.c
+@@ -101,6 +101,7 @@ struct sun6i_dma_config {
+ 	u32 nr_max_channels;
+ 	u32 nr_max_requests;
+ 	u32 nr_max_vchans;
++	bool gate_needed;
  };
  
-+static const struct sun8i_codec_analog_quirks sun8i_v3s_quirks = {
-+	.has_headphone	= true,
-+	.has_hmic	= true,
-+};
-+
- static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
- {
- 	struct device *dev = cmpnt->dev;
-@@ -786,6 +791,10 @@ static const struct of_device_id sun8i_codec_analog_of_match[] = {
- 		.compatible = "allwinner,sun8i-h3-codec-analog",
- 		.data = &sun8i_h3_quirks,
- 	},
-+	{
-+		.compatible = "allwinner,sun8i-v3s-codec-analog",
-+		.data = &sun8i_v3s_quirks,
-+	},
- 	{}
+ /*
+@@ -1009,12 +1010,14 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
+ 	.nr_max_channels = 8,
+ 	.nr_max_requests = 24,
+ 	.nr_max_vchans   = 37,
++	.gate_needed	 = true,
  };
- MODULE_DEVICE_TABLE(of, sun8i_codec_analog_of_match);
+ 
+ static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
+ 	.nr_max_channels = 8,
+ 	.nr_max_requests = 28,
+ 	.nr_max_vchans   = 39,
++	.gate_needed	 = true,
+ };
+ 
+ /*
+@@ -1177,10 +1180,10 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+ 	/*
+ 	 * sun8i variant requires us to toggle a dma gating register,
+ 	 * as seen in Allwinner's SDK. This register is not documented
+-	 * in the A23 user manual.
++	 * in the A23 user manual, but documented at least in V3s user
++	 * manual.
+ 	 */
+-	if (of_device_is_compatible(pdev->dev.of_node,
+-				    "allwinner,sun8i-a23-dma"))
++	if (sdc->cfg->gate_needed)
+ 		writel(SUN8I_DMA_GATE_ENABLE, sdc->base + SUN8I_DMA_GATE);
+ 
+ 	return 0;
 -- 
 2.11.1
