@@ -1,151 +1,120 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 5 Mar 2017 12:11:20 +0000
-Subject: [PATCH v3 2/6] iio: trigger: add OF support
-In-Reply-To: <1488300679-3259-3-git-send-email-fabrice.gasnier@st.com>
+Date: Sun, 5 Mar 2017 12:13:36 +0000
+Subject: [PATCH v3 1/6] dt-bindings: iio: introduce trigger providers,
+ consumers
+In-Reply-To: <948e5b96-7a8f-406d-6d03-d129d1b2ce54@kernel.org>
 References: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
- <1488300679-3259-3-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <4584aa2d-8cab-9708-4cfa-a1f1ed4f02b8@kernel.org>
+ <1488300679-3259-2-git-send-email-fabrice.gasnier@st.com>
+ <20170303062126.5bewa5u6o7wu7sy4@rob-hp-laptop>
+ <948e5b96-7a8f-406d-6d03-d129d1b2ce54@kernel.org>
+Message-ID: <12a6a2f8-9ff6-a4f0-c9a2-c7de037019ef@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/17 16:51, Fabrice Gasnier wrote:
-> Provide OF support. Device drivers can get IIO triggers from dt.
-> Introduce IIO trigger specifiers, so there are:
-> - IIO trigger providers, e.g. dt nodes designated with
->   #io-trigger-cells=<num of cells>
-> - IIO trigger consumers, e.g. phandles listed in io-triggers = <...>.
->   Those can be identified by names by using 'io-trigger-names'.
+On 05/03/17 11:43, Jonathan Cameron wrote:
+> On 03/03/17 06:21, Rob Herring wrote:
+>> On Tue, Feb 28, 2017 at 05:51:14PM +0100, Fabrice Gasnier wrote:
+>>> Document iio provider and consumer bindings.
+>>>
+>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>>> ---
+>>>  .../devicetree/bindings/iio/iio-bindings.txt       | 38 ++++++++++++++++++++++
+>>>  1 file changed, 38 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/iio/iio-bindings.txt b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+>>> index 68d6f8c..01765e9 100644
+>>> --- a/Documentation/devicetree/bindings/iio/iio-bindings.txt
+>>> +++ b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+>>> @@ -95,3 +95,41 @@ vdd channel is connected to output 0 of the &ref device.
+>>>  		io-channels = <&adc 10>, <&adc 11>;
+>>>  		io-channel-names = "adc1", "adc2";
+>>>  	};
+>>> +
+>>> +==IIO trigger providers==
+>>> +Sources of IIO triggers can be represented by any node in the device
+>>> +tree. Those nodes are designated as IIO trigger providers. IIO trigger
+>>> +consumer uses a phandle and an IIO trigger specifier to connect to an
+>>> +IIO trigger provider.
+>>> +An IIO trigger specifier is an array of one or more cells identifying
+>>> +the IIO trigger output on a device. The length of an IIO trigger
+>>> +specifier is defined by the value of a #io-trigger-cells property in
+>>> +the IIO trigger provider node.
+>>> +
+>>> +Required properties:
+>>> +#io-trigger-cells:
+>>> +		Number of cells in an IIO trigger specifier; Typically
+>>> +		0 for nodes with a simple IIO trigger output.
+>>> +
+>>> +Example:
+>>> +	trig0: interrupt-trigger0 {
+>>> +		#io-trigger-cells = <0>;
+>>> +		compatible = "interrupt-trigger";
+>>> +		interrupts = <11 0>;
+>>> +		interrupt-parent = <&gpioa>;
+>>> +	}
+>>> +
+>>> +==IIO trigger consumers==
+>>> +Required properties:
+>>> +- io-triggers:	List of phandle representing the IIO trigger specifier.
+>>> +
+>>> +Optional properties:
+>>> +- io-trigger-names :
+>>> +		List of IIO trigger name strings that matches elements
+>>> +		in 'io-triggers' list property.
+>>> +
+>>> +Example:
+>>> +	some_trigger_consumer {
+>>> +		io-triggers = <&trig0>;
+>>> +		io-trigger-names = "mytrig";
+>>> +	}
+>>
+>> I have some reservations about this. We could just as easily add the 
+>> interrupt directly to the consumer node and use "trigger" for a standard 
+>> interrupt name. So the question is whether this extra level of 
+>> indirection is needed? 
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Subject to binding discussion this looks fine to me.
+> First thing to note here, is that Fabrice's use of the generic interrupt
+> trigger is an extremely 'unusual' one! Normal use case is that we have
+> a random gpio pin providing interrupts to driver triggering on random
+> devices - there need be no association between the two whatsoever.
+> So what we are doing here is 'allowing' an interrupt to provide a trigger.
+> It's not necessarily the one going to be used by any particular device
+> driver.  The decision of which trigger to use is definitely one for
+> userspace, not something that should be configured in to the device tree.
+> 
+> For this particular case you could in theory just do it by using an interrupt
+> as you describe.  Ultimately though we should be able to play more complex
+> games with this device and having it able to handle any trigger - which 
+> includes those not using the direct hardware route.  It'll be up to the
+> driver to figure out when it can use the fast method and when it can't.
+> 
+> Conversely, even when we are using this hardware route to drive the
+> triggering it should be possible to hang off a device to be triggered
+> by the interrupt via the kernel rather than directly. 
+> 
+> So from a device tree point of view we are just describing the fact that
+> there is a pin, which may be used to trigger something.  What that something
+> is, is a question for userspace not the device tree.
+> 
+Ah, I'm half asleep this morning.  Clearly there is a more general follow
+up question.  If we are arguing these are generic, why are we setting
+up the mapping in device tree?
+
+My gut feeling is we shouldn't be.  So I think we need the first chunk
+above but the latter part should be a job for userspace not the devicetree.
 
 Jonathan
-> ---
->  drivers/iio/industrialio-trigger.c | 100 +++++++++++++++++++++++++++++++++++++
->  include/linux/iio/trigger.h        |   4 ++
->  2 files changed, 104 insertions(+)
+> Jonathan
+>>
+>> Rob
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
 > 
-> diff --git a/drivers/iio/industrialio-trigger.c b/drivers/iio/industrialio-trigger.c
-> index 978e1592..00ee3a7 100644
-> --- a/drivers/iio/industrialio-trigger.c
-> +++ b/drivers/iio/industrialio-trigger.c
-> @@ -768,3 +768,103 @@ int iio_triggered_buffer_predisable(struct iio_dev *indio_dev)
->  					     indio_dev->pollfunc);
->  }
->  EXPORT_SYMBOL(iio_triggered_buffer_predisable);
-> +
-> +#ifdef CONFIG_OF
-> +static int iio_trig_node_match(struct device *dev, void *data)
-> +{
-> +	return dev->of_node == data && dev->type == &iio_trig_type;
-> +}
-> +
-> +static struct iio_trigger *__of_iio_trig_get(struct device_node *np, int index)
-> +{
-> +	struct of_phandle_args trigspec;
-> +	struct device *dev;
-> +	int err;
-> +
-> +	err = of_parse_phandle_with_args(np, "io-triggers",
-> +					 "#io-trigger-cells",
-> +					 index, &trigspec);
-> +	if (err)
-> +		return ERR_PTR(err);
-> +
-> +	dev = bus_find_device(&iio_bus_type, NULL, trigspec.np,
-> +			      iio_trig_node_match);
-> +	of_node_put(trigspec.np);
-> +	if (!dev)
-> +		return ERR_PTR(-EPROBE_DEFER);
-> +
-> +	return to_iio_trigger(dev);
-> +}
-> +
-> +static struct iio_trigger *__of_iio_trig_get_by_name(struct device_node *np,
-> +						     const char *name)
-> +{
-> +	struct iio_trigger *trig;
-> +	int index = 0;
-> +
-> +	if (!np)
-> +		return ERR_PTR(-EINVAL);
-> +	if (name)
-> +		index = of_property_match_string(np, "io-trigger-names", name);
-> +	if (index < 0)
-> +		return ERR_PTR(index);
-> +	trig = __of_iio_trig_get(np, index);
-> +	if (!IS_ERR(trig) || PTR_ERR(trig) == -EPROBE_DEFER)
-> +		return trig;
-> +
-> +	if (name && index >= 0)
-> +		pr_err("ERROR: could not get IIO trigger %s:%s(%i)\n",
-> +		       np->full_name, name ? name : "", index);
-> +
-> +	return ERR_PTR(-ENOENT);
-> +}
-> +#else /* CONFIG_OF */
-> +static inline struct iio_trigger *
-> +__of_iio_trig_get_by_name(struct device_node *np, const char *name)
-> +{
-> +	return ERR_PTR(-ENOENT);
-> +}
-> +#endif
-> +
-> +struct iio_trigger *iio_trigger_get_by_name(struct device *dev,
-> +					    const char *name)
-> +{
-> +	struct iio_trigger *trig;
-> +
-> +	if (!dev)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	trig = __of_iio_trig_get_by_name(dev->of_node, name);
-> +	if (!IS_ERR(trig))
-> +		return iio_trigger_get(trig);
-> +
-> +	return trig;
-> +}
-> +EXPORT_SYMBOL_GPL(iio_trigger_get_by_name);
-> +
-> +static void devm_iio_trigger_put(struct device *dev, void *res)
-> +{
-> +	iio_trigger_put(*(struct iio_trigger **)res);
-> +}
-> +
-> +struct iio_trigger *devm_iio_trigger_get_by_name(struct device *dev,
-> +						 const char *name)
-> +{
-> +	struct iio_trigger **ptr, *trig;
-> +
-> +	ptr = devres_alloc(devm_iio_trigger_put, sizeof(*ptr), GFP_KERNEL);
-> +	if (!ptr)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	trig = iio_trigger_get_by_name(dev, name);
-> +	if (IS_ERR(trig)) {
-> +		devres_free(ptr);
-> +		return trig;
-> +	}
-> +
-> +	*ptr = trig;
-> +	devres_add(dev, ptr);
-> +
-> +	return trig;
-> +}
-> +EXPORT_SYMBOL_GPL(devm_iio_trigger_get_by_name);
-> diff --git a/include/linux/iio/trigger.h b/include/linux/iio/trigger.h
-> index ea08302..1f1ec20 100644
-> --- a/include/linux/iio/trigger.h
-> +++ b/include/linux/iio/trigger.h
-> @@ -173,6 +173,10 @@ void devm_iio_trigger_unregister(struct device *dev,
->  int iio_trigger_validate_own_device(struct iio_trigger *trig,
->  				     struct iio_dev *indio_dev);
->  
-> +struct iio_trigger *iio_trigger_get_by_name(struct device *dev,
-> +					    const char *name);
-> +struct iio_trigger *devm_iio_trigger_get_by_name(struct device *dev,
-> +						 const char *name);
->  #else
->  struct iio_trigger;
->  struct iio_trigger_ops;
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
