@@ -1,126 +1,62 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 5 Mar 2017 12:28:05 +0000
-Subject: [PATCH v3 6/6] iio: adc: stm32: add support for EXTI trigger
-In-Reply-To: <d2f25e67-a598-3d28-01d2-f6aa277e2f67@kernel.org>
-References: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
- <1488300679-3259-7-git-send-email-fabrice.gasnier@st.com>
- <d2f25e67-a598-3d28-01d2-f6aa277e2f67@kernel.org>
-Message-ID: <9af13ece-ce4a-9cf3-474a-f5ac4da89ccd@kernel.org>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sun,  5 Mar 2017 21:36:57 +0800
+Subject: [PATCH v2 00/12] Add support for the audio codec on Allwinner V3s
+Message-ID: <20170305133709.6288-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/17 12:21, Jonathan Cameron wrote:
-> On 28/02/17 16:51, Fabrice Gasnier wrote:
->> EXTi (external interrupt) signal can be routed internally as trigger
->> source for ADC conversions: STM32F4 ADC can use EXTI11.
->>
->> Retrieve interrupt trigger from DT, so it can be muxed into ADC IP,
->> via extsel.
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Minor question inline.
-and another.
-> J
->> ---
->>  drivers/iio/adc/stm32-adc.c | 27 ++++++++++++++++++++++++---
->>  1 file changed, 24 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
->> index 9b49a6ad..4d9040d 100644
->> --- a/drivers/iio/adc/stm32-adc.c
->> +++ b/drivers/iio/adc/stm32-adc.c
->> @@ -108,6 +108,9 @@ enum stm32_adc_extsel {
->>  	STM32_EXT15,
->>  };
->>  
->> +/* EXTI 11 trigger selection on STM32F4 */
->> +#define STM32F4_EXTI11_EXTSEL		STM32_EXT15
->> +
->>  /**
->>   * struct stm32_adc_trig_info - ADC trigger info
->>   * @name:		name of the trigger, corresponding to its source
->> @@ -146,6 +149,7 @@ struct stm32_adc_regs {
->>   * @rx_buf:		dma rx buffer cpu address
->>   * @rx_dma_buf:		dma rx buffer bus address
->>   * @rx_buf_sz:		dma rx buffer size
->> + * @exti_trig		EXTI trigger
->>   */
->>  struct stm32_adc {
->>  	struct stm32_adc_common	*common;
->> @@ -162,6 +166,7 @@ struct stm32_adc {
->>  	u8			*rx_buf;
->>  	dma_addr_t		rx_dma_buf;
->>  	unsigned int		rx_buf_sz;
->> +	struct iio_trigger	*exti_trig;
->>  };
->>  
->>  /**
->> @@ -395,10 +400,15 @@ static int stm32_adc_conf_scan_seq(struct iio_dev *indio_dev,
->>   *
->>   * Returns trigger extsel value, if trig matches, -EINVAL otherwise.
->>   */
->> -static int stm32_adc_get_trig_extsel(struct iio_trigger *trig)
->> +static int stm32_adc_get_trig_extsel(struct iio_dev *indio_dev,
->> +				     struct iio_trigger *trig)
->>  {
->> +	struct stm32_adc *adc = iio_priv(indio_dev);
->>  	int i;
->>  
->> +	if (trig == adc->exti_trig)
->> +		return STM32F4_EXTI11_EXTSEL;
->> +
->>  	/* lookup triggers registered by stm32 timer trigger driver */
->>  	for (i = 0; stm32f4_adc_trigs[i].name; i++) {
->>  		/**
->> @@ -432,7 +442,7 @@ static int stm32_adc_set_trig(struct iio_dev *indio_dev,
->>  	int ret;
->>  
->>  	if (trig) {
->> -		ret = stm32_adc_get_trig_extsel(trig);
->> +		ret = stm32_adc_get_trig_extsel(indio_dev, trig);
->>  		if (ret < 0)
->>  			return ret;
->>  
->> @@ -604,7 +614,7 @@ static irqreturn_t stm32_adc_isr(int irq, void *data)
->>  static int stm32_adc_validate_trigger(struct iio_dev *indio_dev,
->>  				      struct iio_trigger *trig)
->>  {
->> -	return stm32_adc_get_trig_extsel(trig) < 0 ? -EINVAL : 0;
->> +	return stm32_adc_get_trig_extsel(indio_dev, trig) < 0 ? -EINVAL : 0;
->>  }
->>  
->>  static int stm32_adc_set_watermark(struct iio_dev *indio_dev, unsigned int val)
->> @@ -1030,6 +1040,17 @@ static int stm32_adc_probe(struct platform_device *pdev)
->>  	if (ret < 0)
->>  		goto err_clk_disable;
->>  
->> +	adc->exti_trig = devm_iio_trigger_get_by_name(&pdev->dev, "exti");
-> Can we tighten this in any way? If not I guess we'll have to rely on no
-> one messing up the devicetree to put the wrong trigger in there with this name.
+Allwinner V3s features a audio codec with dedicated digital and analog parts,
+like the ones on A23/H3, but much simpler (lack of MIC2, LINE IN and MBIAS).
 
-Also, given I'm arguing for this association to not be done in devicetree but
-rather left to userspace, can we move this get to only occur during validate
-trigger rather than here?  To my mind we shouldn't even know the trigger
-is registered at during the ADC probe.  Also has the benefit of getting rid
-of needing to handle the deferred element.
-> 
->> +	if (IS_ERR(adc->exti_trig)) {
->> +		ret = PTR_ERR(adc->exti_trig);
->> +		if (ret == -EPROBE_DEFER)
->> +			goto err_dma_disable;
->> +		dev_dbg(&pdev->dev, "No exti trigger found (%d)\n", ret);
->> +		adc->exti_trig = NULL;
->> +	} else {
->> +		dev_info(&pdev->dev, "Can use %s\n", adc->exti_trig->name);
->> +	}
->> +
->>  	ret = iio_triggered_buffer_setup(indio_dev,
->>  					 &iio_pollfunc_store_time,
->>  					 &stm32_adc_trigger_handler,
->>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Add support for it.
+
+In order to make the codec usable, DMA support is also added in this series;
+the support of Lichee Pi Zero's dock board is also added here, as it's the
+only board hackable that come with ports connected to the codec.
+
+Patch 1~3 split out parts that is not available on V3s in the analog codec.
+
+Patch 4/5 adds support for V3s in analog/digital codec.
+
+Patch 6 add the gate bit as a common quirk of sun6i-dma driver, as V3s also
+needs it.
+
+Patch 7 really adds support for V3s in DMA engine.
+
+Patch 8 restores the inclusion of CCU headers in the DTSI file of V3s, as
+it's removed when merging.
+
+Patch 9/10/11 adds three parts of V3s: DMA engine, codec support and pinmux
+of mmc1 (used on Lichee Pi Zero dock).
+
+Patch 12 adds support for Lichee Pi Zero dock, with support of mmc1 and
+codec.
+
+Icenowy Zheng (12):
+  ASoC: sun8i-codec-analog: split out mic2
+  ASoC: sun8i-codec-analog: split out line in
+  ASoC: sun8i-codec-analog: split out mbias
+  ASoC: sun8i-codec-analog: add support for V3s SoC
+  ASoC: sun4i-codec: Add support for V3s codec
+  dmaengine: sun6i: make gate bit in sun8i's DMA engines a common quirk
+  dmaengine: sun6i: support V3s SoC variant
+  ARM: dts: sun8i: restore the inclusion of ccu headers in V3s DTSI
+  ARM: dts: sun8i: add DMA engine in V3s DTSI
+  ARM: dts: sun8i: add audio codec support into V3s DTSI
+  ARM: dts: sun8i: add pinmux for V3s mmc1
+  ARM: dts: sun8i: add device tree for Lichee Pi Zero with Dock
+
+ .../devicetree/bindings/dma/sun6i-dma.txt          |   1 +
+ .../devicetree/bindings/sound/sun4i-codec.txt      |  11 +-
+ .../bindings/sound/sun8i-codec-analog.txt          |   1 +
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts |  67 +++++++
+ arch/arm/boot/dts/sun8i-v3s.dtsi                   | 103 ++++++----
+ drivers/dma/sun6i-dma.c                            |  22 ++-
+ sound/soc/sunxi/sun4i-codec.c                      |  59 ++++++
+ sound/soc/sunxi/sun8i-codec-analog.c               | 211 +++++++++++++++++----
+ 9 files changed, 405 insertions(+), 73 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
+
+-- 
+2.11.1
