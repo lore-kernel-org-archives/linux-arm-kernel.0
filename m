@@ -1,207 +1,53 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 6 Mar 2017 09:43:45 +1030
-Subject: [PATCH 1/2] ARM: dts: aspeed: add SPI controller bindings
-In-Reply-To: <1488378403-24640-2-git-send-email-clg@kaod.org>
-References: <1488378403-24640-1-git-send-email-clg@kaod.org>
- <1488378403-24640-2-git-send-email-clg@kaod.org>
-Message-ID: <CACPK8XeaSh8MVTfPjwt=+NBPWCkMK7QqpAXF7+BYYQBViVSNKg@mail.gmail.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Mon,  6 Mar 2017 07:31:32 +0800
+Subject: [PATCH v7 0/6] Allwinner H5 and Orange Pi PC2 support
+Message-ID: <20170305233138.64574-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cedric,
+Allwinner H5 is a 64-bit SoC with a design like the 32-bit
+H3, and it's pin-to-pin compatible with H3.
 
-On Thu, Mar 2, 2017 at 12:56 AM, C?dric Le Goater <clg@kaod.org> wrote:
-> Let's define the SPI controllers in the Aspeed SoCs AST2500 and
-> AST2400 and also enable these, as well as the chips, on the associated
-> platforms.
+This patchset adds support for it, along with the first available
+board -- Orange Pi PC2.
 
-Thanks for this. Was there a reason you didn't modify the romulus dts as well?
+Several H5 boards by Sinovoip Banana Pi and FriendlyARM Nano Pi
+are coming, so we should get ready for them.
 
-Cheers,
+CCU changes are already said to be merged by Maxime Ripard, so
+this patchset now contains only device tree patches.
 
-Joel
+Some cleanups applied to H3 DTSI is extracted to separated commits,
+according to the suggestion of Maxime.
 
->
-> Signed-off-by: C?dric Le Goater <clg@kaod.org>
-> ---
->  arch/arm/boot/dts/aspeed-ast2500-evb.dts      | 20 +++++++++
->  arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 16 +++++++
->  arch/arm/boot/dts/aspeed-g4.dtsi              | 29 ++++++++++++
->  arch/arm/boot/dts/aspeed-g5.dtsi              | 63 +++++++++++++++++++++++++++
->  4 files changed, 128 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/aspeed-ast2500-evb.dts b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-> index d967603dade8..8f82e8ab1875 100644
-> --- a/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-> +++ b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
-> @@ -20,6 +20,26 @@
->         };
->  };
->
-> +&fmc {
-> +       status = "okay";
-> +       flash at 0 {
-> +               status = "okay";
-> +               label = "bmc";
-> +       };
-> +};
-> +
-> +&spi1 {
-> +       status = "okay";
-> +       flash at 0 {
-> +               status = "okay";
-> +               label = "pnor";
-> +       };
-> +};
-> +
-> +&spi2 {
-> +       status = "okay";
-> +};
-> +
->  &uart5 {
->         status = "okay";
->  };
-> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> index 1d2fc1e1dc29..aab1889f702f 100644
-> --- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
-> @@ -31,6 +31,22 @@
->         };
->  };
->
-> +&fmc {
-> +       status = "okay";
-> +       flash at 0 {
-> +               status = "okay";
-> +               label = "bmc";
-> +       };
-> +};
-> +
-> +&spi {
-> +       status = "okay";
-> +       flash at 0 {
-> +               status = "okay";
-> +               label = "pnor";
-> +       };
-> +};
-> +
->  &uart5 {
->         status = "okay";
->  };
-> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
-> index 0b4932cc02a8..7ef6442d0ade 100644
-> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
-> @@ -33,6 +33,35 @@
->                 #size-cells = <1>;
->                 ranges;
->
-> +               fmc: flash-controller at 1e620000 {
-> +                       reg = < 0x1e620000 0x94
-> +                               0x20000000 0x02000000 >;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       compatible = "aspeed,ast2400-fmc";
-> +                       status = "disabled";
-> +                       interrupts = <19>;
-> +                       flash at 0 {
-> +                               reg = < 0 >;
-> +                               compatible = "jedec,spi-nor";
-> +                               status = "disabled";
-> +                       };
-> +               };
-> +
-> +               spi: flash-controller at 1e630000 {
-> +                       reg = < 0x1e630000 0x18
-> +                               0x30000000 0x02000000 >;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       compatible = "aspeed,ast2400-spi";
-> +                       status = "disabled";
-> +                       flash at 0 {
-> +                               reg = < 0 >;
-> +                               compatible = "jedec,spi-nor";
-> +                               status = "disabled";
-> +                       };
-> +               };
-> +
->                 vic: interrupt-controller at 1e6c0080 {
->                         compatible = "aspeed,ast2400-vic";
->                         interrupt-controller;
-> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
-> index b664fe380936..8970f3cb8e2b 100644
-> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
-> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
-> @@ -24,6 +24,69 @@
->                 #size-cells = <1>;
->                 ranges;
->
-> +               fmc: flash-controller at 1e620000 {
-> +                       reg = < 0x1e620000 0xc4
-> +                               0x20000000 0x10000000 >;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       compatible = "aspeed,ast2500-fmc";
-> +                       status = "disabled";
-> +                       interrupts = <19>;
-> +                       flash at 0 {
-> +                               reg = < 0 >;
-> +                               compatible = "jedec,spi-nor";
-> +                               status = "disabled";
-> +                       };
-> +                       flash at 1 {
-> +                               reg = < 1 >;
-> +                               compatible = "jedec,spi-nor";
-> +                               status = "disabled";
-> +                       };
-> +                       flash at 2 {
-> +                               reg = < 2 >;
-> +                               compatible = "jedec,spi-nor";
-> +                               status = "disabled";
-> +                       };
-> +               };
-> +
-> +               spi1: flash-controller at 1e630000 {
-> +                       reg = < 0x1e630000 0xc4
-> +                               0x30000000 0x08000000 >;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       compatible = "aspeed,ast2500-spi";
-> +                       status = "disabled";
-> +                       flash at 0 {
-> +                               reg = < 0 >;
-> +                               compatible = "jedec,spi-nor";
-> +                               status = "disabled";
-> +                       };
-> +                       flash at 1 {
-> +                               reg = < 1 >;
-> +                               compatible = "jedec,spi-nor";
-> +                               status = "disabled";
-> +                       };
-> +               };
-> +
-> +               spi2: flash-controller at 1e631000 {
-> +                       reg = < 0x1e631000 0xc4
-> +                               0x38000000 0x08000000 >;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       compatible = "aspeed,ast2500-spi";
-> +                       status = "disabled";
-> +                       flash at 0 {
-> +                               reg = < 0 >;
-> +                               compatible = "jedec,spi-nor";
-> +                               status = "disabled";
-> +                       };
-> +                       flash at 1 {
-> +                               reg = < 1 >;
-> +                               compatible = "jedec,spi-nor";
-> +                               status = "disabled";
-> +                       };
-> +               };
-> +
->                 vic: interrupt-controller at 1e6c0080 {
->                         compatible = "aspeed,ast2400-vic";
->                         interrupt-controller;
-> --
-> 2.7.4
->
+This patchset depends on patchset [1] to finally take effect. At
+least the patch 1 of that patchset is needed if you want to test
+the kernel image -- without it the pinctrl driver won't be built
+and the kernel will become unusable without pinctrl.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-March/490780.html
+
+Andre Przywara (3):
+  arm: dts: sun8i: split Allwinner H3 .dtsi
+  arm64: dts: allwinner: add Allwinner H5 .dtsi
+  arm64: dts: sunxi: add support for the Orange Pi PC 2 board
+
+Icenowy Zheng (3):
+  ARM: dts: sun8i: drop skeleton.dtsi inclusion in H3 DTSI
+  ARM: dts: sun8i: drop pinctrl-a10.h inclusion for H3 DTSI
+  ARM: dts: sun8i: correct the GIC compatible in H3 to gic-400
+
+ arch/arm/boot/dts/sun8i-h3.dtsi                    | 602 ++-------------------
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 586 ++++++++++++++++++++
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 163 ++++++
+ arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi       | 124 +++++
+ arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi     |   1 +
+ 6 files changed, 915 insertions(+), 562 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sunxi-h3-h5.dtsi
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+ create mode 120000 arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
+
+-- 
+2.11.1
