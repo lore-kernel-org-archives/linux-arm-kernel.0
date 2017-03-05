@@ -1,42 +1,48 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sun,  5 Mar 2017 09:28:06 -0600
-Subject: [PATCH] irqchip/gicv3-its: Avoid memory over allocation for ITTEs
-Message-ID: <1488727686-26657-1-git-send-email-shankerd@codeaurora.org>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Mon,  6 Mar 2017 00:45:35 +0800
+Subject: [PATCH] mmc: sunxi: mask all Response Timeout error messages
+Message-ID: <20170305164535.36259-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are always allocating extra 255Bytes of memory to handle ITTE
-physical address alignment requirement. The kmalloc() satisfies
-the ITTE alignment since the ITS driver is requesting a minimum
-size of ITS_ITT_ALIGN bytes.
+Response Timeout is very usual: it will happen when trying to run some
+commands that do not belong to the card; it will happen when some SDIO
+card transfer beyond its SDIO bandwidth; and when the MMC controller is
+set to poll the card with "broken-cd" property (the Lichee Pi series of
+boards do this), it will flood to the console and make the console
+unusable.
 
-Let's try to allocate the exact amount of memory that is required
-for ITTEs to avoid wastage.
+Mask all response-timeout-only error messages, only show it when another
+error happens.
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/mmc/host/sunxi-mmc.c | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 86bd428..5aeca78 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1329,8 +1329,13 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
- 	 */
- 	nr_ites = max(2UL, roundup_pow_of_two(nvecs));
- 	sz = nr_ites * its->ite_size;
--	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
-+	sz = max(sz, ITS_ITT_ALIGN);
- 	itt = kzalloc(sz, GFP_KERNEL);
-+	if (itt && !IS_ALIGNED(virt_to_phys(itt), ITS_ITT_ALIGN)) {
-+		kfree(itt);
-+		itt = kzalloc(sz + ITS_ITT_ALIGN - 1, GFP_KERNEL);
-+	}
-+
- 	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
- 	if (lpi_map)
- 		col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 6ffcd2838272..7828e1f57cf0 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -483,10 +483,15 @@ static void sunxi_mmc_dump_errinfo(struct sunxi_mmc_host *host)
+ 	struct mmc_command *cmd = host->mrq->cmd;
+ 	struct mmc_data *data = host->mrq->data;
+ 
+-	/* For some cmds timeout is normal with sd/mmc cards */
+-	if ((host->int_sum & SDXC_INTERRUPT_ERROR_BIT) ==
+-		SDXC_RESP_TIMEOUT && (cmd->opcode == SD_IO_SEND_OP_COND ||
+-				      cmd->opcode == SD_IO_RW_DIRECT))
++	/*
++	 * Reading timeout is usually normal, especially when doing
++	 * card-polling with "broken-cd" in device tree.
++	 * If do not mask it, the RTO error message will flood the console
++	 * and even hide useful error messages.
++	 *
++	 * Some SDIO commands will also normally timeout with non-SDIO cards.
++	 */
++	if ((host->int_sum & SDXC_INTERRUPT_ERROR_BIT) == SDXC_RESP_TIMEOUT)
+ 		return;
+ 
+ 	dev_err(mmc_dev(host->mmc),
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.11.1
