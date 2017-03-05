@@ -1,204 +1,40 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun,  5 Mar 2017 21:37:05 +0800
-Subject: [PATCH v2 08/12] ARM: dts: sun8i: restore the inclusion of ccu
- headers in V3s DTSI
+Date: Sun,  5 Mar 2017 21:37:06 +0800
+Subject: [PATCH v2 09/12] ARM: dts: sun8i: add DMA engine in V3s DTSI
 In-Reply-To: <20170305133709.6288-1-icenowy@aosc.xyz>
 References: <20170305133709.6288-1-icenowy@aosc.xyz>
-Message-ID: <20170305133709.6288-9-icenowy@aosc.xyz>
+Message-ID: <20170305133709.6288-10-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the V3s support patchset is applied, CCU headers and V3s DTSI went
-into different trees, so the CCU inclusion is removed in the DTSI.
+Allwinner V3s SoC features a DMA engine.
 
-Add back them.
+Add it in the DTSI file.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
- arch/arm/boot/dts/sun8i-v3s.dtsi | 67 ++++++++++++++++++++--------------------
- 1 file changed, 34 insertions(+), 33 deletions(-)
+ arch/arm/boot/dts/sun8i-v3s.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
-index 71075969e5e6..b3f8b7f9c0bb 100644
+index b3f8b7f9c0bb..7e0342976ba8 100644
 --- a/arch/arm/boot/dts/sun8i-v3s.dtsi
 +++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
-@@ -40,6 +40,8 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
+@@ -95,6 +95,15 @@
+ 		#size-cells = <1>;
+ 		ranges;
  
-+#include <dt-bindings/clock/sun8i-v3s-ccu.h>
-+#include <dt-bindings/reset/sun8i-v3s-ccu.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
- / {
-@@ -55,7 +57,7 @@
- 			compatible = "arm,cortex-a7";
- 			device_type = "cpu";
- 			reg = <0>;
--			clocks = <&ccu 14>;
-+			clocks = <&ccu CLK_CPU>;
- 		};
- 	};
- 
-@@ -96,15 +98,15 @@
++		dma: dma-controller at 01c02000 {
++			compatible = "allwinner,sun8i-v3s-dma";
++			reg = <0x01c02000 0x1000>;
++			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_DMA>;
++			resets = <&ccu RST_BUS_DMA>;
++			#dma-cells = <1>;
++		};
++
  		mmc0: mmc at 01c0f000 {
  			compatible = "allwinner,sun7i-a20-mmc";
  			reg = <0x01c0f000 0x1000>;
--			clocks = <&ccu 22>,
--				 <&ccu 45>,
--				 <&ccu 47>,
--				 <&ccu 46>;
-+			clocks = <&ccu CLK_BUS_MMC0>,
-+				 <&ccu CLK_MMC0>,
-+				 <&ccu CLK_MMC0_OUTPUT>,
-+				 <&ccu CLK_MMC0_SAMPLE>;
- 			clock-names = "ahb",
- 				      "mmc",
- 				      "output",
- 				      "sample";
--			resets = <&ccu 7>;
-+			resets = <&ccu RST_BUS_MMC0>;
- 			reset-names = "ahb";
- 			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
- 			status = "disabled";
-@@ -115,15 +117,15 @@
- 		mmc1: mmc at 01c10000 {
- 			compatible = "allwinner,sun7i-a20-mmc";
- 			reg = <0x01c10000 0x1000>;
--			clocks = <&ccu 23>,
--				 <&ccu 48>,
--				 <&ccu 50>,
--				 <&ccu 49>;
-+			clocks = <&ccu CLK_BUS_MMC1>,
-+				 <&ccu CLK_MMC1>,
-+				 <&ccu CLK_MMC1_OUTPUT>,
-+				 <&ccu CLK_MMC1_SAMPLE>;
- 			clock-names = "ahb",
- 				      "mmc",
- 				      "output",
- 				      "sample";
--			resets = <&ccu 8>;
-+			resets = <&ccu RST_BUS_MMC1>;
- 			reset-names = "ahb";
- 			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
- 			status = "disabled";
-@@ -134,15 +136,15 @@
- 		mmc2: mmc at 01c11000 {
- 			compatible = "allwinner,sun7i-a20-mmc";
- 			reg = <0x01c11000 0x1000>;
--			clocks = <&ccu 24>,
--				 <&ccu 51>,
--				 <&ccu 53>,
--				 <&ccu 52>;
-+			clocks = <&ccu CLK_BUS_MMC2>,
-+				 <&ccu CLK_MMC2>,
-+				 <&ccu CLK_MMC2_OUTPUT>,
-+				 <&ccu CLK_MMC2_SAMPLE>;
- 			clock-names = "ahb",
- 				      "mmc",
- 				      "output",
- 				      "sample";
--			resets = <&ccu 9>;
-+			resets = <&ccu RST_BUS_MMC2>;
- 			reset-names = "ahb";
- 			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
- 			status = "disabled";
-@@ -153,8 +155,8 @@
- 		usb_otg: usb at 01c19000 {
- 			compatible = "allwinner,sun8i-h3-musb";
- 			reg = <0x01c19000 0x0400>;
--			clocks = <&ccu 29>;
--			resets = <&ccu 17>;
-+			clocks = <&ccu CLK_BUS_OTG>;
-+			resets = <&ccu RST_BUS_OTG>;
- 			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
- 			interrupt-names = "mc";
- 			phys = <&usbphy 0>;
-@@ -169,9 +171,9 @@
- 			      <0x01c1a800 0x4>;
- 			reg-names = "phy_ctrl",
- 				    "pmu0";
--			clocks = <&ccu 56>;
-+			clocks = <&ccu CLK_USB_PHY0>;
- 			clock-names = "usb0_phy";
--			resets = <&ccu 0>;
-+			resets = <&ccu RST_USB_PHY0>;
- 			reset-names = "usb0_reset";
- 			status = "disabled";
- 			#phy-cells = <1>;
-@@ -198,7 +200,7 @@
- 			reg = <0x01c20800 0x400>;
- 			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&ccu 37>, <&osc24M>, <&osc32k>;
-+			clocks = <&ccu CLK_BUS_PIO>, <&osc24M>, <&osc32k>;
- 			clock-names = "apb", "hosc", "losc";
- 			gpio-controller;
- 			#gpio-cells = <3>;
-@@ -213,6 +215,7 @@
- 			uart0_pins_a: uart0 at 0 {
- 				pins = "PB8", "PB9";
- 				function = "uart0";
-+				bias-pull-up;
- 			};
- 
- 			mmc0_pins_a: mmc0 at 0 {
-@@ -244,8 +247,8 @@
- 			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&ccu 40>;
--			resets = <&ccu 49>;
-+			clocks = <&ccu CLK_BUS_UART0>;
-+			resets = <&ccu RST_BUS_UART0>;
- 			status = "disabled";
- 		};
- 
-@@ -255,8 +258,8 @@
- 			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&ccu 41>;
--			resets = <&ccu 50>;
-+			clocks = <&ccu CLK_BUS_UART1>;
-+			resets = <&ccu RST_BUS_UART1>;
- 			status = "disabled";
- 		};
- 
-@@ -266,8 +269,8 @@
- 			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
- 			reg-shift = <2>;
- 			reg-io-width = <4>;
--			clocks = <&ccu 42>;
--			resets = <&ccu 51>;
-+			clocks = <&ccu CLK_BUS_UART2>;
-+			resets = <&ccu RST_BUS_UART2>;
- 			status = "disabled";
- 		};
- 
-@@ -275,10 +278,8 @@
- 			compatible = "allwinner,sun6i-a31-i2c";
- 			reg = <0x01c2ac00 0x400>;
- 			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&ccu 38>;
--			resets = <&ccu 46>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&i2c0_pins>;
-+			clocks = <&ccu CLK_BUS_I2C0>;
-+			resets = <&ccu RST_BUS_I2C0>;
- 			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -288,8 +289,8 @@
- 			compatible = "allwinner,sun6i-a31-i2c";
- 			reg = <0x01c2b000 0x400>;
- 			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&ccu 39>;
--			resets = <&ccu 47>;
-+			clocks = <&ccu CLK_BUS_I2C1>;
-+			resets = <&ccu RST_BUS_I2C1>;
- 			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
 -- 
 2.11.1
