@@ -1,119 +1,104 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 5 Mar 2017 11:14:30 +0000
-Subject: [PATCH 1/2] dt-bindings: iio: stm32-adc: add option to set
- resolution
-In-Reply-To: <84b7cbab-1342-7f80-cab6-132324e002a4@st.com>
-References: <1487177757-19427-1-git-send-email-fabrice.gasnier@st.com>
- <1487177757-19427-2-git-send-email-fabrice.gasnier@st.com>
- <c2b73482-ae01-34b5-3c16-b7e63893259e@kernel.org>
- <b9f59559-c7a8-f575-0868-bd3b149a35c9@st.com>
- <d64bd76d-a2c6-6148-c126-fa73e96019a1@kernel.org>
- <79e01c5c-d27c-89ea-4d8f-9e66a6c091e6@st.com>
- <f486bd08-b562-5101-01ba-c8e36ac0d83b@metafoo.de>
- <84b7cbab-1342-7f80-cab6-132324e002a4@st.com>
-Message-ID: <c306b51a-da1f-2e92-afb5-1bd2c19484a0@kernel.org>
+Date: Sun, 5 Mar 2017 11:43:02 +0000
+Subject: [PATCH v3 1/6] dt-bindings: iio: introduce trigger providers,
+ consumers
+In-Reply-To: <20170303062126.5bewa5u6o7wu7sy4@rob-hp-laptop>
+References: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
+ <1488300679-3259-2-git-send-email-fabrice.gasnier@st.com>
+ <20170303062126.5bewa5u6o7wu7sy4@rob-hp-laptop>
+Message-ID: <948e5b96-7a8f-406d-6d03-d129d1b2ce54@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/02/17 10:14, Fabrice Gasnier wrote:
-> On 02/28/2017 09:34 AM, Lars-Peter Clausen wrote:
->> On 02/28/2017 09:21 AM, Fabrice Gasnier wrote:
->>> On 02/25/2017 04:11 PM, Jonathan Cameron wrote:
->>>> On 24/02/17 16:04, Fabrice Gasnier wrote:
->>>>> On 02/19/2017 01:09 PM, Jonathan Cameron wrote:
->>>>>> On 15/02/17 16:55, Fabrice Gasnier wrote:
->>>>>>> Add documentation for 'st,adc-res' dt optional property.
->>>>>>>
->>>>>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->>>>>> I'm happy with this, but would like to leave time for a device tree review.
->>>>>>
->>>>>> Ultimately we may well want to make this a generic property and call it
->>>>>> something
->>>>>> like adc-resolution but perhaps we need to wait until we have a few more
->>>>>> devices
->>>>>> supporting setting it via device tree to figure out what the best
->>>>>> interface is.
->>>>>> It would exactly be a problem to support this as a deprecated binding at
->>>>>> that
->>>>>> point.
->>>>>
->>>>> Hi Jonathan,
->>>>>
->>>>> I agree with you on this... It may be better to have generic property
->>>>> for this, especially if you see that it will come in the near future.
->>>>> May I suggest this prop to be less restrictive, e.g. like
->>>>> resolution-bits as is may also be worth for other device types, e.g.
->>>>> DAC as an example ?>
->>>> Sure, why not - no loss of meaning here.  We may never use it for anything
->>>> else but that doesn't matter.
->>>
->>> Hi Jonathan,
->>>
->>> Following Rob's comment, how you see such a common property can be
->>> integrated. Currently I don't see much devices are doing this.
->>> Do you have ideas or preferences on this ?
->>>
->>> - Do you think replacing 'st,adc-res' by 'resolution-bits' in current
->>> patchset is enough for now ?
+On 03/03/17 06:21, Rob Herring wrote:
+> On Tue, Feb 28, 2017 at 05:51:14PM +0100, Fabrice Gasnier wrote:
+>> Document iio provider and consumer bindings.
 >>
->> That name would be a bit confusing. Considering that the devicetree
->> describes th capabilities of the hardware this name would suggest that this
->> is the resolution supported by the device.
+>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> ---
+>>  .../devicetree/bindings/iio/iio-bindings.txt       | 38 ++++++++++++++++++++++
+>>  1 file changed, 38 insertions(+)
 >>
->> If we want to allow selecting runtime configuration parameters for IIO
->> devices from the devicetree we should probably follow the precedence set by
->> the clock framework and use properties with the 'assigned-' prefix.
+>> diff --git a/Documentation/devicetree/bindings/iio/iio-bindings.txt b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+>> index 68d6f8c..01765e9 100644
+>> --- a/Documentation/devicetree/bindings/iio/iio-bindings.txt
+>> +++ b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+>> @@ -95,3 +95,41 @@ vdd channel is connected to output 0 of the &ref device.
+>>  		io-channels = <&adc 10>, <&adc 11>;
+>>  		io-channel-names = "adc1", "adc2";
+>>  	};
+>> +
+>> +==IIO trigger providers==
+>> +Sources of IIO triggers can be represented by any node in the device
+>> +tree. Those nodes are designated as IIO trigger providers. IIO trigger
+>> +consumer uses a phandle and an IIO trigger specifier to connect to an
+>> +IIO trigger provider.
+>> +An IIO trigger specifier is an array of one or more cells identifying
+>> +the IIO trigger output on a device. The length of an IIO trigger
+>> +specifier is defined by the value of a #io-trigger-cells property in
+>> +the IIO trigger provider node.
+>> +
+>> +Required properties:
+>> +#io-trigger-cells:
+>> +		Number of cells in an IIO trigger specifier; Typically
+>> +		0 for nodes with a simple IIO trigger output.
+>> +
+>> +Example:
+>> +	trig0: interrupt-trigger0 {
+>> +		#io-trigger-cells = <0>;
+>> +		compatible = "interrupt-trigger";
+>> +		interrupts = <11 0>;
+>> +		interrupt-parent = <&gpioa>;
+>> +	}
+>> +
+>> +==IIO trigger consumers==
+>> +Required properties:
+>> +- io-triggers:	List of phandle representing the IIO trigger specifier.
+>> +
+>> +Optional properties:
+>> +- io-trigger-names :
+>> +		List of IIO trigger name strings that matches elements
+>> +		in 'io-triggers' list property.
+>> +
+>> +Example:
+>> +	some_trigger_consumer {
+>> +		io-triggers = <&trig0>;
+>> +		io-trigger-names = "mytrig";
+>> +	}
 > 
-> Hi Lars,
-> 
-> This makes sense. Then, do you see 'assigned-resolution-bits' as a
-> better candidate ?
-> Also, do you think listing all devices caps in property like 'resolutions-bits', e.g. 'resolutions-bits = <6 8 10 12>', is
-> suitable/necessary ?
-Only suitable / necessary if what the options are is dependent on the hardware
-in some way that is not adequately described by the compatibility element.
-> 
->>
->> But to be honest I'm not convinced yet that the whole approach of allowing
->> runtime configuration parameters to be configured via the devicetree is the
->> right approach. Converters and sensors often have a lot of runtime
->> configurable parameters, typically we expose them to the application layer
->> to allow maximum flexibility. Why is the resolution special in this case and
->> should be pre-configured via the devicetree instead?
-> 
-To be cynical because it is PITA to change the assumption of it being
-fixed :)  Oh well, another design decision that we got wrong a long time
-back.
+> I have some reservations about this. We could just as easily add the 
+> interrupt directly to the consumer node and use "trigger" for a standard 
+> interrupt name. So the question is whether this extra level of 
+> indirection is needed? 
 
-> As I understand it, currently lots of devices have hard-coded 
-> (maximum?) resolution, then exposed to application layer as read only
-> data format. Then resolution depends on HW used (e.g. sensor,
-> converter). Depending on the application board, it may be worth to
-> offer pre-configured intermediate/lower resolution depending on
-> analog sources. Is it ok to offer devicetree pre-configuration ?
-> 
-Hmm.  It is in theory acceptable to put default values that make sense
-for a given set of hardware in device tree.  They are kind of a 
-'well this will work' state.  Make sense if there are states that
-don't make sense for a given hardware setup.
+First thing to note here, is that Fabrice's use of the generic interrupt
+trigger is an extremely 'unusual' one! Normal use case is that we have
+a random gpio pin providing interrupts to driver triggering on random
+devices - there need be no association between the two whatsoever.
+So what we are doing here is 'allowing' an interrupt to provide a trigger.
+It's not necessarily the one going to be used by any particular device
+driver.  The decision of which trigger to use is definitely one for
+userspace, not something that should be configured in to the device tree.
 
-If all states make equally good sense, then perhaps we should look at
-fixing up the IIO core to handle variable resolution devices.
-That strikes me as a non trivial exercise, but could probably be
-done.  We'd need to keep the simplicity of the current code
-for the vast majority of devices, but provide some relatively clean
-way of changing it when needed.
+For this particular case you could in theory just do it by using an interrupt
+as you describe.  Ultimately though we should be able to play more complex
+games with this device and having it able to handle any trigger - which 
+includes those not using the direct hardware route.  It'll be up to the
+driver to figure out when it can use the fast method and when it can't.
 
-Whilst I'm happy if someone else wants to look at this, it is
-nowhere near the top of my list!
+Conversely, even when we are using this hardware route to drive the
+triggering it should be possible to hang off a device to be triggered
+by the interrupt via the kernel rather than directly. 
+
+So from a device tree point of view we are just describing the fact that
+there is a pin, which may be used to trigger something.  What that something
+is, is a question for userspace not the device tree.
 
 Jonathan
-> Best Regards,
-> Fabrice
->>
->> - Lars
->>
-> -- 
+> 
+> Rob
+> --
 > To unsubscribe from this list: send the line "unsubscribe linux-iio" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
