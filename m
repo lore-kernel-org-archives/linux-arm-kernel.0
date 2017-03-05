@@ -1,164 +1,68 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun,  5 Mar 2017 21:37:02 +0800
-Subject: [PATCH v2 05/12] ASoC: sun4i-codec: Add support for V3s codec
-In-Reply-To: <20170305133709.6288-1-icenowy@aosc.xyz>
-References: <20170305133709.6288-1-icenowy@aosc.xyz>
-Message-ID: <20170305133709.6288-6-icenowy@aosc.xyz>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sun, 5 Mar 2017 07:01:09 -0800
+Subject: [PATCH 0/8] arm64: KVM: Fix PMU exception generation
+In-Reply-To: <20170222114728.2472-1-marc.zyngier@arm.com>
+References: <20170222114728.2472-1-marc.zyngier@arm.com>
+Message-ID: <20170305150109.GA1502@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The codec in the V3s is similar to the one found on the A31. One key
-difference is the analog path controls are routed through the PRCM
-block. This is supported by the sun8i-codec-analog driver, and tied
-into this codec driver with the audio card's aux_dev.
+Hi Marc,
 
-In addition, the V3s does not have LINEIN, LINEOUT, MBIAS and MIC2,
-MIC3, and the FIFO related registers are like H3.
+On Wed, Feb 22, 2017 at 11:47:20AM +0000, Marc Zyngier wrote:
+> Running the following code:
+> 
+> root at zomby-woof:~# cat test-pmu.c
+> int main(int argc, char *argv[])
+> {
+> 	unsigned int val;
+> 	asm ("mrc p15, 0, %0, c9, c13, 0\n" : "=r" (val));
+> 	return val;
+> }
+> 
+> in a 32bit guest (or a 64bit guest with a 32bit userspace) results in
+> this surprising result:
+> 
+> [  120.347497] kvm [1150]: Unsupported guest CP15 access at: ab0945ae
+> [  120.353689] kvm [1142]:  { Op0( 0), Op1( 0), CRn( 9), CRm(13), Op2( 0), func_read },
+> 
+> which is weird, because the guest behaves correctly:
+> root at zomby-woof:~# ./test-pmu 
+> [   16.184422] test-pmu[740]: undefined instruction: pc=00000000ab0945ae
+> [   16.186043] Code: 00340001 b4800000 af00b085 60396078 (3f1dee19) 
+> Illegal instruction
+> 
+> It gets the expected UNDEF, and all is fine. So what?
+> 
+> It turns out that the PMU emulation code is a bit lazy, and tells the
+> rest of KVM that the emulation has failed, so that an exception gets
+> delivered. Subtle differences in the 32bit vs 64bit handling make it
+> spit an "Unsupported..." error.
+> 
+> This series tries to set things straight:
+> - Allow an exception to be injected from an emulation handler
+> - Make all PMU illegal accesses inject an UNDEF
+> - Make these illegal accesses a successful emulation w.r.t the rest of KVM.
+> 
+> In the process, we also squash an interesting bug in the 64bit CP
+> access. Similar treatment could be applied to the 32bit kernel, except
+> that we don't ever inject an exception there (no PMU support yet).
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
- .../devicetree/bindings/sound/sun4i-codec.txt      | 11 ++--
- sound/soc/sunxi/sun4i-codec.c                      | 59 ++++++++++++++++++++++
- 2 files changed, 66 insertions(+), 4 deletions(-)
+I'm a bit confused about this series and not too thrilled of the
+approach where we add a side-channel of the sys_reg param in the vcpu
+structure, which may or may not contain valid data at any given point.
 
-diff --git a/Documentation/devicetree/bindings/sound/sun4i-codec.txt b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-index 3863531d1e6d..2d4e10deb6f4 100644
---- a/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-+++ b/Documentation/devicetree/bindings/sound/sun4i-codec.txt
-@@ -7,6 +7,7 @@ Required properties:
- 		- "allwinner,sun7i-a20-codec"
- 		- "allwinner,sun8i-a23-codec"
- 		- "allwinner,sun8i-h3-codec"
-+		- "allwinner,sun8i-v3s-codec"
- - reg: must contain the registers location and length
- - interrupts: must contain the codec interrupt
- - dmas: DMA channels for tx and rx dma. See the DMA client binding,
-@@ -25,6 +26,7 @@ Required properties for the following compatibles:
- 		- "allwinner,sun6i-a31-codec"
- 		- "allwinner,sun8i-a23-codec"
- 		- "allwinner,sun8i-h3-codec"
-+		- "allwinner,sun8i-v3s-codec"
- - resets: phandle to the reset control for this device
- - allwinner,audio-routing: A list of the connections between audio components.
- 			   Each entry is a pair of strings, the first being the
-@@ -34,15 +36,15 @@ Required properties for the following compatibles:
- 			   Audio pins on the SoC:
- 			   "HP"
- 			   "HPCOM"
--			   "LINEIN"
--			   "LINEOUT"	(not on sun8i-a23)
-+			   "LINEIN"	(not on sun8i-v3s)
-+			   "LINEOUT"	(not on sun8i-a23 or sun8i-v3s)
- 			   "MIC1"
--			   "MIC2"
-+			   "MIC2"	(not on sun8i-v3s)
- 			   "MIC3"	(sun6i-a31 only)
- 
- 			   Microphone biases from the SoC:
- 			   "HBIAS"
--			   "MBIAS"
-+			   "MBIAS"	(not on sun8i-v3s)
- 
- 			   Board connectors:
- 			   "Headphone"
-@@ -55,6 +57,7 @@ Required properties for the following compatibles:
- Required properties for the following compatibles:
- 		- "allwinner,sun8i-a23-codec"
- 		- "allwinner,sun8i-h3-codec"
-+		- "allwinner,sun8i-v3s-codec"
- - allwinner,codec-analog-controls: A phandle to the codec analog controls
- 				   block in the PRCM.
- 
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index c3aab10fa085..7f1b1aa95e0b 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -1339,6 +1339,44 @@ static struct snd_soc_card *sun8i_h3_codec_create_card(struct device *dev)
- 	return card;
- };
- 
-+static struct snd_soc_card *sun8i_v3s_codec_create_card(struct device *dev)
-+{
-+	struct snd_soc_card *card;
-+	int ret;
-+
-+	card = devm_kzalloc(dev, sizeof(*card), GFP_KERNEL);
-+	if (!card)
-+		return ERR_PTR(-ENOMEM);
-+
-+	aux_dev.codec_of_node = of_parse_phandle(dev->of_node,
-+						 "allwinner,codec-analog-controls",
-+						 0);
-+	if (!aux_dev.codec_of_node) {
-+		dev_err(dev, "Can't find analog controls for codec.\n");
-+		return ERR_PTR(-EINVAL);
-+	};
-+
-+	card->dai_link = sun4i_codec_create_link(dev, &card->num_links);
-+	if (!card->dai_link)
-+		return ERR_PTR(-ENOMEM);
-+
-+	card->dev		= dev;
-+	card->name		= "V3s Audio Codec";
-+	card->dapm_widgets	= sun6i_codec_card_dapm_widgets;
-+	card->num_dapm_widgets	= ARRAY_SIZE(sun6i_codec_card_dapm_widgets);
-+	card->dapm_routes	= sun8i_codec_card_routes;
-+	card->num_dapm_routes	= ARRAY_SIZE(sun8i_codec_card_routes);
-+	card->aux_dev		= &aux_dev;
-+	card->num_aux_devs	= 1;
-+	card->fully_routed	= true;
-+
-+	ret = snd_soc_of_parse_audio_routing(card, "allwinner,audio-routing");
-+	if (ret)
-+		dev_warn(dev, "failed to parse audio-routing: %d\n", ret);
-+
-+	return card;
-+};
-+
- static const struct regmap_config sun4i_codec_regmap_config = {
- 	.reg_bits	= 32,
- 	.reg_stride	= 4,
-@@ -1374,6 +1412,13 @@ static const struct regmap_config sun8i_h3_codec_regmap_config = {
- 	.max_register	= SUN8I_H3_CODEC_ADC_DBG,
- };
- 
-+static const struct regmap_config sun8i_v3s_codec_regmap_config = {
-+	.reg_bits	= 32,
-+	.reg_stride	= 4,
-+	.val_bits	= 32,
-+	.max_register	= SUN6I_CODEC_HMIC_DATA,
-+};
-+
- struct sun4i_codec_quirks {
- 	const struct regmap_config *regmap_config;
- 	const struct snd_soc_codec_driver *codec;
-@@ -1422,6 +1467,16 @@ static const struct sun4i_codec_quirks sun8i_a23_codec_quirks = {
- 	.has_reset	= true,
- };
- 
-+static const struct sun4i_codec_quirks sun8i_v3s_codec_quirks = {
-+	.regmap_config	= &sun8i_v3s_codec_regmap_config,
-+	.codec		= &sun8i_a23_codec_codec,
-+	.create_card	= sun8i_v3s_codec_create_card,
-+	.reg_adc_fifoc	= REG_FIELD(SUN6I_CODEC_ADC_FIFOC, 0, 31),
-+	.reg_dac_txdata	= SUN8I_H3_CODEC_DAC_TXDATA,
-+	.reg_adc_rxdata	= SUN6I_CODEC_ADC_RXDATA,
-+	.has_reset	= true,
-+};
-+
- static const struct sun4i_codec_quirks sun8i_h3_codec_quirks = {
- 	.regmap_config	= &sun8i_h3_codec_regmap_config,
- 	/*
-@@ -1458,6 +1513,10 @@ static const struct of_device_id sun4i_codec_of_match[] = {
- 		.compatible = "allwinner,sun8i-h3-codec",
- 		.data = &sun8i_h3_codec_quirks,
- 	},
-+	{
-+		.compatible = "allwinner,sun8i-v3s-codec",
-+		.data = &sun8i_v3s_codec_quirks,
-+	},
- 	{}
- };
- MODULE_DEVICE_TABLE(of, sun4i_codec_of_match);
--- 
-2.11.1
+Couldn't we use a slightly bigger hammer (with cleaner semantics) and
+let all system register handling (cp on 32-bit and 64-bit sys regs
+alike) simply return true if they were emulated, in which case the
+caller should advance the PC, or false ifsomething else happened, and
+leave it up to the emulation of the individual registers to decide if
+any exceptions should be injected.
+
+I don't think we have that many places where we want to inject an
+undefined exception in our handlers, and doing it explicitly might
+actually be a good idea to make it more clear that we're emulating the
+architecture properly.  What do you think?
+
+Thanks,
+-Christoffer
