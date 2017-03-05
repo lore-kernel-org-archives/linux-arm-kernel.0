@@ -1,62 +1,200 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun,  5 Mar 2017 21:36:57 +0800
-Subject: [PATCH v2 00/12] Add support for the audio codec on Allwinner V3s
-Message-ID: <20170305133709.6288-1-icenowy@aosc.xyz>
+Date: Sun,  5 Mar 2017 21:36:58 +0800
+Subject: [PATCH v2 01/12] ASoC: sun8i-codec-analog: split out mic2
+In-Reply-To: <20170305133709.6288-1-icenowy@aosc.xyz>
+References: <20170305133709.6288-1-icenowy@aosc.xyz>
+Message-ID: <20170305133709.6288-2-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner V3s features a audio codec with dedicated digital and analog parts,
-like the ones on A23/H3, but much simpler (lack of MIC2, LINE IN and MBIAS).
+Allwinner V3s features an analog codec without MIC2.
 
-Add support for it.
+Split out this part, in order to prepare for the V3s analog codec.
 
-In order to make the codec usable, DMA support is also added in this series;
-the support of Lichee Pi Zero's dock board is also added here, as it's the
-only board hackable that come with ports connected to the codec.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+ sound/soc/sunxi/sun8i-codec-analog.c | 92 +++++++++++++++++++++++++++++-------
+ 1 file changed, 76 insertions(+), 16 deletions(-)
 
-Patch 1~3 split out parts that is not available on V3s in the analog codec.
-
-Patch 4/5 adds support for V3s in analog/digital codec.
-
-Patch 6 add the gate bit as a common quirk of sun6i-dma driver, as V3s also
-needs it.
-
-Patch 7 really adds support for V3s in DMA engine.
-
-Patch 8 restores the inclusion of CCU headers in the DTSI file of V3s, as
-it's removed when merging.
-
-Patch 9/10/11 adds three parts of V3s: DMA engine, codec support and pinmux
-of mmc1 (used on Lichee Pi Zero dock).
-
-Patch 12 adds support for Lichee Pi Zero dock, with support of mmc1 and
-codec.
-
-Icenowy Zheng (12):
-  ASoC: sun8i-codec-analog: split out mic2
-  ASoC: sun8i-codec-analog: split out line in
-  ASoC: sun8i-codec-analog: split out mbias
-  ASoC: sun8i-codec-analog: add support for V3s SoC
-  ASoC: sun4i-codec: Add support for V3s codec
-  dmaengine: sun6i: make gate bit in sun8i's DMA engines a common quirk
-  dmaengine: sun6i: support V3s SoC variant
-  ARM: dts: sun8i: restore the inclusion of ccu headers in V3s DTSI
-  ARM: dts: sun8i: add DMA engine in V3s DTSI
-  ARM: dts: sun8i: add audio codec support into V3s DTSI
-  ARM: dts: sun8i: add pinmux for V3s mmc1
-  ARM: dts: sun8i: add device tree for Lichee Pi Zero with Dock
-
- .../devicetree/bindings/dma/sun6i-dma.txt          |   1 +
- .../devicetree/bindings/sound/sun4i-codec.txt      |  11 +-
- .../bindings/sound/sun8i-codec-analog.txt          |   1 +
- arch/arm/boot/dts/Makefile                         |   3 +-
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts |  67 +++++++
- arch/arm/boot/dts/sun8i-v3s.dtsi                   | 103 ++++++----
- drivers/dma/sun6i-dma.c                            |  22 ++-
- sound/soc/sunxi/sun4i-codec.c                      |  59 ++++++
- sound/soc/sunxi/sun8i-codec-analog.c               | 211 +++++++++++++++++----
- 9 files changed, 405 insertions(+), 73 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun8i-v3s-licheepi-zero-dock.dts
-
+diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
+index 72331332b72e..b95ff045cd7f 100644
+--- a/sound/soc/sunxi/sun8i-codec-analog.c
++++ b/sound/soc/sunxi/sun8i-codec-analog.c
+@@ -259,17 +259,11 @@ static const struct snd_kcontrol_new sun8i_codec_common_controls[] = {
+ 	SOC_SINGLE_TLV("Mic1 Playback Volume", SUN8I_ADDA_MICIN_GCTRL,
+ 		       SUN8I_ADDA_MICIN_GCTRL_MIC1G,
+ 		       0x7, 0, sun8i_codec_out_mixer_pregain_scale),
+-	SOC_SINGLE_TLV("Mic2 Playback Volume",
+-		       SUN8I_ADDA_MICIN_GCTRL, SUN8I_ADDA_MICIN_GCTRL_MIC2G,
+-		       0x7, 0, sun8i_codec_out_mixer_pregain_scale),
+ 
+-	/* Microphone Amp boost gains */
++	/* Microphone Amp boost gain */
+ 	SOC_SINGLE_TLV("Mic1 Boost Volume", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
+ 		       SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MIC1BOOST, 0x7, 0,
+ 		       sun8i_codec_mic_gain_scale),
+-	SOC_SINGLE_TLV("Mic2 Boost Volume", SUN8I_ADDA_MIC2G_CTRL,
+-		       SUN8I_ADDA_MIC2G_CTRL_MIC2BOOST, 0x7, 0,
+-		       sun8i_codec_mic_gain_scale),
+ 
+ 	/* ADC */
+ 	SOC_SINGLE_TLV("ADC Gain Capture Volume", SUN8I_ADDA_ADC_AP_EN,
+@@ -298,9 +292,8 @@ static const struct snd_soc_dapm_widget sun8i_codec_common_widgets[] = {
+ 	/* Line In */
+ 	SND_SOC_DAPM_INPUT("LINEIN"),
+ 
+-	/* Microphone inputs */
++	/* Microphone input */
+ 	SND_SOC_DAPM_INPUT("MIC1"),
+-	SND_SOC_DAPM_INPUT("MIC2"),
+ 
+ 	/* Microphone Bias */
+ 	SND_SOC_DAPM_SUPPLY("MBIAS", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
+@@ -310,8 +303,6 @@ static const struct snd_soc_dapm_widget sun8i_codec_common_widgets[] = {
+ 	/* Mic input path */
+ 	SND_SOC_DAPM_PGA("Mic1 Amplifier", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
+ 			 SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MIC1AMPEN, 0, NULL, 0),
+-	SND_SOC_DAPM_PGA("Mic2 Amplifier", SUN8I_ADDA_MIC2G_CTRL,
+-			 SUN8I_ADDA_MIC2G_CTRL_MIC2AMPEN, 0, NULL, 0),
+ 
+ 	/* Mixers */
+ 	SND_SOC_DAPM_MIXER("Left Mixer", SUN8I_ADDA_DAC_PA_SRC,
+@@ -335,35 +326,30 @@ static const struct snd_soc_dapm_widget sun8i_codec_common_widgets[] = {
+ static const struct snd_soc_dapm_route sun8i_codec_common_routes[] = {
+ 	/* Microphone Routes */
+ 	{ "Mic1 Amplifier", NULL, "MIC1"},
+-	{ "Mic2 Amplifier", NULL, "MIC2"},
+ 
+ 	/* Left Mixer Routes */
+ 	{ "Left Mixer", "DAC Playback Switch", "Left DAC" },
+ 	{ "Left Mixer", "DAC Reversed Playback Switch", "Right DAC" },
+ 	{ "Left Mixer", "Line In Playback Switch", "LINEIN" },
+ 	{ "Left Mixer", "Mic1 Playback Switch", "Mic1 Amplifier" },
+-	{ "Left Mixer", "Mic2 Playback Switch", "Mic2 Amplifier" },
+ 
+ 	/* Right Mixer Routes */
+ 	{ "Right Mixer", "DAC Playback Switch", "Right DAC" },
+ 	{ "Right Mixer", "DAC Reversed Playback Switch", "Left DAC" },
+ 	{ "Right Mixer", "Line In Playback Switch", "LINEIN" },
+ 	{ "Right Mixer", "Mic1 Playback Switch", "Mic1 Amplifier" },
+-	{ "Right Mixer", "Mic2 Playback Switch", "Mic2 Amplifier" },
+ 
+ 	/* Left ADC Mixer Routes */
+ 	{ "Left ADC Mixer", "Mixer Capture Switch", "Left Mixer" },
+ 	{ "Left ADC Mixer", "Mixer Reversed Capture Switch", "Right Mixer" },
+ 	{ "Left ADC Mixer", "Line In Capture Switch", "LINEIN" },
+ 	{ "Left ADC Mixer", "Mic1 Capture Switch", "Mic1 Amplifier" },
+-	{ "Left ADC Mixer", "Mic2 Capture Switch", "Mic2 Amplifier" },
+ 
+ 	/* Right ADC Mixer Routes */
+ 	{ "Right ADC Mixer", "Mixer Capture Switch", "Right Mixer" },
+ 	{ "Right ADC Mixer", "Mixer Reversed Capture Switch", "Left Mixer" },
+ 	{ "Right ADC Mixer", "Line In Capture Switch", "LINEIN" },
+ 	{ "Right ADC Mixer", "Mic1 Capture Switch", "Mic1 Amplifier" },
+-	{ "Right ADC Mixer", "Mic2 Capture Switch", "Mic2 Amplifier" },
+ 
+ 	/* ADC Routes */
+ 	{ "Left ADC", NULL, "Left ADC Mixer" },
+@@ -578,19 +564,87 @@ static int sun8i_codec_add_lineout(struct snd_soc_component *cmpnt)
+ 	return 0;
+ }
+ 
++/* mic2 specific controls, widgets and routes */
++static const struct snd_kcontrol_new sun8i_codec_mic2_controls[] = {
++	/* Mixer pre-gain */
++	SOC_SINGLE_TLV("Mic2 Playback Volume",
++		       SUN8I_ADDA_MICIN_GCTRL, SUN8I_ADDA_MICIN_GCTRL_MIC2G,
++		       0x7, 0, sun8i_codec_out_mixer_pregain_scale),
++
++	/* Microphone Amp boost gain */
++	SOC_SINGLE_TLV("Mic2 Boost Volume", SUN8I_ADDA_MIC2G_CTRL,
++		       SUN8I_ADDA_MIC2G_CTRL_MIC2BOOST, 0x7, 0,
++		       sun8i_codec_mic_gain_scale),
++};
++
++static const struct snd_soc_dapm_widget sun8i_codec_mic2_widgets[] = {
++	/* Microphone input */
++	SND_SOC_DAPM_INPUT("MIC2"),
++
++	/* Mic input path */
++	SND_SOC_DAPM_PGA("Mic2 Amplifier", SUN8I_ADDA_MIC2G_CTRL,
++			 SUN8I_ADDA_MIC2G_CTRL_MIC2AMPEN, 0, NULL, 0),
++};
++
++static const struct snd_soc_dapm_route sun8i_codec_mic2_routes[] = {
++	{ "Mic2 Amplifier", NULL, "MIC2"},
++
++	{ "Left Mixer", "Mic2 Playback Switch", "Mic2 Amplifier" },
++
++	{ "Right Mixer", "Mic2 Playback Switch", "Mic2 Amplifier" },
++
++	{ "Left ADC Mixer", "Mic2 Capture Switch", "Mic2 Amplifier" },
++
++	{ "Right ADC Mixer", "Mic2 Capture Switch", "Mic2 Amplifier" },
++};
++
++static int sun8i_codec_add_mic2(struct snd_soc_component *cmpnt)
++{
++	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(cmpnt);
++	struct device *dev = cmpnt->dev;
++	int ret;
++
++	ret = snd_soc_add_component_controls(cmpnt,
++					     sun8i_codec_mic2_controls,
++					     ARRAY_SIZE(sun8i_codec_mic2_controls));
++	if (ret) {
++		dev_err(dev, "Failed to add MIC2 controls: %d\n", ret);
++		return ret;
++	}
++
++	ret = snd_soc_dapm_new_controls(dapm, sun8i_codec_mic2_widgets,
++					ARRAY_SIZE(sun8i_codec_mic2_widgets));
++	if (ret) {
++		dev_err(dev, "Failed to add MIC2 DAPM widgets: %d\n", ret);
++		return ret;
++	}
++
++	ret = snd_soc_dapm_add_routes(dapm, sun8i_codec_mic2_routes,
++				      ARRAY_SIZE(sun8i_codec_mic2_routes));
++	if (ret) {
++		dev_err(dev, "Failed to add MIC2 DAPM routes: %d\n", ret);
++		return ret;
++	}
++
++	return 0;
++}
++
+ struct sun8i_codec_analog_quirks {
+ 	bool has_headphone;
+ 	bool has_hmic;
+ 	bool has_lineout;
++	bool has_mic2;
+ };
+ 
+ static const struct sun8i_codec_analog_quirks sun8i_a23_quirks = {
+ 	.has_headphone	= true,
+ 	.has_hmic	= true,
++	.has_mic2	= true,
+ };
+ 
+ static const struct sun8i_codec_analog_quirks sun8i_h3_quirks = {
+ 	.has_lineout	= true,
++	.has_mic2	= true,
+ };
+ 
+ static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
+@@ -626,6 +680,12 @@ static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
+ 			return ret;
+ 	}
+ 
++	if (quirks->has_mic2) {
++		ret = sun8i_codec_add_mic2(cmpnt);
++		if (ret)
++			return ret;
++	}
++
+ 	return 0;
+ }
+ 
 -- 
 2.11.1
