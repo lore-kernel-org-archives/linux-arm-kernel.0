@@ -1,104 +1,122 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 5 Mar 2017 11:43:02 +0000
+Date: Sun, 5 Mar 2017 11:45:28 +0000
 Subject: [PATCH v3 1/6] dt-bindings: iio: introduce trigger providers,
  consumers
-In-Reply-To: <20170303062126.5bewa5u6o7wu7sy4@rob-hp-laptop>
+In-Reply-To: <df84b9b2-dc93-287a-1ed2-52c818a64a01@st.com>
 References: <1488300679-3259-1-git-send-email-fabrice.gasnier@st.com>
  <1488300679-3259-2-git-send-email-fabrice.gasnier@st.com>
  <20170303062126.5bewa5u6o7wu7sy4@rob-hp-laptop>
-Message-ID: <948e5b96-7a8f-406d-6d03-d129d1b2ce54@kernel.org>
+ <df84b9b2-dc93-287a-1ed2-52c818a64a01@st.com>
+Message-ID: <46a15539-6297-46d1-e923-712b82fa4a7f@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/03/17 06:21, Rob Herring wrote:
-> On Tue, Feb 28, 2017 at 05:51:14PM +0100, Fabrice Gasnier wrote:
->> Document iio provider and consumer bindings.
+On 03/03/17 09:32, Fabrice Gasnier wrote:
+> On 03/03/2017 07:21 AM, Rob Herring wrote:
+>> On Tue, Feb 28, 2017 at 05:51:14PM +0100, Fabrice Gasnier wrote:
+>>> Document iio provider and consumer bindings.
+>>>
+>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>>> ---
+>>>  .../devicetree/bindings/iio/iio-bindings.txt       | 38 ++++++++++++++++++++++
+>>>  1 file changed, 38 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/iio/iio-bindings.txt b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+>>> index 68d6f8c..01765e9 100644
+>>> --- a/Documentation/devicetree/bindings/iio/iio-bindings.txt
+>>> +++ b/Documentation/devicetree/bindings/iio/iio-bindings.txt
+>>> @@ -95,3 +95,41 @@ vdd channel is connected to output 0 of the &ref device.
+>>>          io-channels = <&adc 10>, <&adc 11>;
+>>>          io-channel-names = "adc1", "adc2";
+>>>      };
+>>> +
+>>> +==IIO trigger providers==
+>>> +Sources of IIO triggers can be represented by any node in the device
+>>> +tree. Those nodes are designated as IIO trigger providers. IIO trigger
+>>> +consumer uses a phandle and an IIO trigger specifier to connect to an
+>>> +IIO trigger provider.
+>>> +An IIO trigger specifier is an array of one or more cells identifying
+>>> +the IIO trigger output on a device. The length of an IIO trigger
+>>> +specifier is defined by the value of a #io-trigger-cells property in
+>>> +the IIO trigger provider node.
+>>> +
+>>> +Required properties:
+>>> +#io-trigger-cells:
+>>> +        Number of cells in an IIO trigger specifier; Typically
+>>> +        0 for nodes with a simple IIO trigger output.
+>>> +
+>>> +Example:
+>>> +    trig0: interrupt-trigger0 {
+>>> +        #io-trigger-cells = <0>;
+>>> +        compatible = "interrupt-trigger";
+>>> +        interrupts = <11 0>;
+>>> +        interrupt-parent = <&gpioa>;
+>>> +    }
+>>> +
+>>> +==IIO trigger consumers==
+>>> +Required properties:
+>>> +- io-triggers:    List of phandle representing the IIO trigger specifier.
+>>> +
+>>> +Optional properties:
+>>> +- io-trigger-names :
+>>> +        List of IIO trigger name strings that matches elements
+>>> +        in 'io-triggers' list property.
+>>> +
+>>> +Example:
+>>> +    some_trigger_consumer {
+>>> +        io-triggers = <&trig0>;
+>>> +        io-trigger-names = "mytrig";
+>>> +    }
 >>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> ---
->>  .../devicetree/bindings/iio/iio-bindings.txt       | 38 ++++++++++++++++++++++
->>  1 file changed, 38 insertions(+)
+>> I have some reservations about this. We could just as easily add the
+>> interrupt directly to the consumer node and use "trigger" for a standard
+> Hi Rob,
+> 
+> Thanks for reviewing.
+> 
+> I hope I don't miss your point here... However, if I correctly
+> understand it:
+> Yes, this can be one way to get interrupt(s) directly from consumer node. Then, I understand consumer has to do exact same as what is being done in "iio_interrupt_trigger" for instance, basically:
+> - request irq, alloc and register trigger, do irq handling to call
+> trigger poll routine.
+> 
+> With current patchset, consumer is able to use standard trigger like
+> "interrupt-trigger" from DT. Please note I propose to add OF support
+> for it in current patchset (e.g. PATCHs 2 & 3). Currently only platform
+> data is supported.
+> 
+> -> And, please refer to PATCHs 5 & 6, I need to have some way to identify interrupt line (connected in HW to STM32 ADC IP). Currently,
+> this is best I came up with, trying to re-use, be generic, and to describe this HW in DT.
+> 
+> Of course, the other way is still valid. Also, I want to highlight,
+> STM32 has other IP, e.g. DAC, where same can be re-used then. This
+> will avoid having duplicates.
+Just to jump back a stage.  The binding here isn't stm32 specific
+at all.  In general this binding allows for triggering anything
+(currently IIO) from an interrupt. Nothing more - so that is the
+level at which it should be considered.
+> 
+>> interrupt name. So the question is whether this extra level of
+>> indirection is needed?
+> 
+> Purpose is to be able to get one or more named trigger(s) on consumer
+> side. Idea is to adopt similar 'philosophy' as in other bindings like
+> pinctrl, clk... where consumer has possibility to get them by name.
+> I hope this clarifies.
+Again, taking this in the general sense rather than on the stm32:
+flexibility - if it makes sense to expose something to userspace we
+do.  We could in theory list all the possible interrupt sources that
+might drive each device in a system and then expose that to userspace
+but that is hideous!
+> 
+> Please advise,
+> Best Regards,
+> Fabrice
+> 
 >>
->> diff --git a/Documentation/devicetree/bindings/iio/iio-bindings.txt b/Documentation/devicetree/bindings/iio/iio-bindings.txt
->> index 68d6f8c..01765e9 100644
->> --- a/Documentation/devicetree/bindings/iio/iio-bindings.txt
->> +++ b/Documentation/devicetree/bindings/iio/iio-bindings.txt
->> @@ -95,3 +95,41 @@ vdd channel is connected to output 0 of the &ref device.
->>  		io-channels = <&adc 10>, <&adc 11>;
->>  		io-channel-names = "adc1", "adc2";
->>  	};
->> +
->> +==IIO trigger providers==
->> +Sources of IIO triggers can be represented by any node in the device
->> +tree. Those nodes are designated as IIO trigger providers. IIO trigger
->> +consumer uses a phandle and an IIO trigger specifier to connect to an
->> +IIO trigger provider.
->> +An IIO trigger specifier is an array of one or more cells identifying
->> +the IIO trigger output on a device. The length of an IIO trigger
->> +specifier is defined by the value of a #io-trigger-cells property in
->> +the IIO trigger provider node.
->> +
->> +Required properties:
->> +#io-trigger-cells:
->> +		Number of cells in an IIO trigger specifier; Typically
->> +		0 for nodes with a simple IIO trigger output.
->> +
->> +Example:
->> +	trig0: interrupt-trigger0 {
->> +		#io-trigger-cells = <0>;
->> +		compatible = "interrupt-trigger";
->> +		interrupts = <11 0>;
->> +		interrupt-parent = <&gpioa>;
->> +	}
->> +
->> +==IIO trigger consumers==
->> +Required properties:
->> +- io-triggers:	List of phandle representing the IIO trigger specifier.
->> +
->> +Optional properties:
->> +- io-trigger-names :
->> +		List of IIO trigger name strings that matches elements
->> +		in 'io-triggers' list property.
->> +
->> +Example:
->> +	some_trigger_consumer {
->> +		io-triggers = <&trig0>;
->> +		io-trigger-names = "mytrig";
->> +	}
-> 
-> I have some reservations about this. We could just as easily add the 
-> interrupt directly to the consumer node and use "trigger" for a standard 
-> interrupt name. So the question is whether this extra level of 
-> indirection is needed? 
-
-First thing to note here, is that Fabrice's use of the generic interrupt
-trigger is an extremely 'unusual' one! Normal use case is that we have
-a random gpio pin providing interrupts to driver triggering on random
-devices - there need be no association between the two whatsoever.
-So what we are doing here is 'allowing' an interrupt to provide a trigger.
-It's not necessarily the one going to be used by any particular device
-driver.  The decision of which trigger to use is definitely one for
-userspace, not something that should be configured in to the device tree.
-
-For this particular case you could in theory just do it by using an interrupt
-as you describe.  Ultimately though we should be able to play more complex
-games with this device and having it able to handle any trigger - which 
-includes those not using the direct hardware route.  It'll be up to the
-driver to figure out when it can use the fast method and when it can't.
-
-Conversely, even when we are using this hardware route to drive the
-triggering it should be possible to hang off a device to be triggered
-by the interrupt via the kernel rather than directly. 
-
-So from a device tree point of view we are just describing the fact that
-there is a pin, which may be used to trigger something.  What that something
-is, is a question for userspace not the device tree.
-
-Jonathan
-> 
-> Rob
-> --
+>> Rob
+>>
+> -- 
 > To unsubscribe from this list: send the line "unsubscribe linux-iio" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
