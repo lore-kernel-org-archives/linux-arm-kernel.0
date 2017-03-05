@@ -1,27 +1,33 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 5 Mar 2017 23:55:42 +0100
-Subject: [PATCH] ARM: at91/dt: Disable SPI on at91sam9x5ek to allow MCI1
- to work.
-In-Reply-To: <1487265388-29390-1-git-send-email-cristian.birsan@microchip.com>
-References: <1487265388-29390-1-git-send-email-cristian.birsan@microchip.com>
-Message-ID: <20170305225542.dptirws7djsrrlas@piout.net>
+Date: Mon, 6 Mar 2017 00:07:41 +0100
+Subject: [PATCH] Revert "ARM: at91/dt: sama5d2: Use new compatible for
+ ohci node"
+In-Reply-To: <20170217151250.8572-1-romain.izard.pro@gmail.com>
+References: <20170217151250.8572-1-romain.izard.pro@gmail.com>
+Message-ID: <20170305230741.f2hq3iiwgakhsynl@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The proper commit prefix was "ARM: dts: at91:"
-
-On 16/02/2017 at 19:16:28 +0200, cristian.birsan at microchip.com wrote:
-> From: Cristian Birsan <cristian.birsan@microchip.com>
+On 17/02/2017 at 16:12:50 +0100, Romain Izard wrote:
+> This reverts commit cab43282682e ("ARM: at91/dt: sama5d2: Use new
+> compatible for ohci node")
 > 
-> The A13 hardware line is shared by SPI and MCI1 controller.This patch
-> disables the SPI controller so that the MCI1 (the big MMC card slot) can
-> be used.
+> It depends from commit 7150bc9b4d43 ("usb: ohci-at91: Forcibly suspend
+> ports while USB suspend") which was reverted and implemented
+> differently. With the new implementation, the compatible string must
+> remain the same.
 > 
-> Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+> The compatible string introduced by this commit has been used in the
+> default SAMA5D2 dtsi starting from Linux 4.8. As it has never been
+> working correctly in an official release, removing it should not be
+> breaking the stability rules.
+> 
+> Fixes: cab43282682e ("ARM: at91/dt: sama5d2: Use new compatible for ohci node")
+> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+> cc: <stable@vger.kernel.org>
 > ---
->  arch/arm/boot/dts/at91sam9x5ek.dtsi | 2 +-
+>  arch/arm/boot/dts/sama5d2.dtsi | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
 Applied, thanks.
 
 -- 
