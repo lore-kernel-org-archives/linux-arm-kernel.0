@@ -1,68 +1,92 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sun, 5 Mar 2017 07:01:09 -0800
-Subject: [PATCH 0/8] arm64: KVM: Fix PMU exception generation
-In-Reply-To: <20170222114728.2472-1-marc.zyngier@arm.com>
-References: <20170222114728.2472-1-marc.zyngier@arm.com>
-Message-ID: <20170305150109.GA1502@lvm>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sun,  5 Mar 2017 09:23:56 -0600
+Subject: [PATCH] irqchip/gicv3-its: Add workaround for QDF2400 ITS erratum 0065
+Message-ID: <1488727436-25085-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Qualcomm Datacenter Technologies QDF2400 SoCs, the ITS hardware
+implementation uses 16Bytes for Interrupt Translation Entry (ITTE),
+but reports an incorrect value of 8Bytes in GITS_TYPER.ITTE_size.
 
-On Wed, Feb 22, 2017 at 11:47:20AM +0000, Marc Zyngier wrote:
-> Running the following code:
-> 
-> root at zomby-woof:~# cat test-pmu.c
-> int main(int argc, char *argv[])
-> {
-> 	unsigned int val;
-> 	asm ("mrc p15, 0, %0, c9, c13, 0\n" : "=r" (val));
-> 	return val;
-> }
-> 
-> in a 32bit guest (or a 64bit guest with a 32bit userspace) results in
-> this surprising result:
-> 
-> [  120.347497] kvm [1150]: Unsupported guest CP15 access at: ab0945ae
-> [  120.353689] kvm [1142]:  { Op0( 0), Op1( 0), CRn( 9), CRm(13), Op2( 0), func_read },
-> 
-> which is weird, because the guest behaves correctly:
-> root at zomby-woof:~# ./test-pmu 
-> [   16.184422] test-pmu[740]: undefined instruction: pc=00000000ab0945ae
-> [   16.186043] Code: 00340001 b4800000 af00b085 60396078 (3f1dee19) 
-> Illegal instruction
-> 
-> It gets the expected UNDEF, and all is fine. So what?
-> 
-> It turns out that the PMU emulation code is a bit lazy, and tells the
-> rest of KVM that the emulation has failed, so that an exception gets
-> delivered. Subtle differences in the 32bit vs 64bit handling make it
-> spit an "Unsupported..." error.
-> 
-> This series tries to set things straight:
-> - Allow an exception to be injected from an emulation handler
-> - Make all PMU illegal accesses inject an UNDEF
-> - Make these illegal accesses a successful emulation w.r.t the rest of KVM.
-> 
-> In the process, we also squash an interesting bug in the 64bit CP
-> access. Similar treatment could be applied to the 32bit kernel, except
-> that we don't ever inject an exception there (no PMU support yet).
+It might cause kernel memory corruption depending on the number
+of MSI(x) that are configured and the amount of memory that has
+been allocated for ITTEs in its_create_device().
 
-I'm a bit confused about this series and not too thrilled of the
-approach where we add a side-channel of the sys_reg param in the vcpu
-structure, which may or may not contain valid data at any given point.
+This patch fixes the potential memory corruption by setting the
+correct ITTE size to 16Bytes.
 
-Couldn't we use a slightly bigger hammer (with cleaner semantics) and
-let all system register handling (cp on 32-bit and 64-bit sys regs
-alike) simply return true if they were emulated, in which case the
-caller should advance the PC, or false ifsomething else happened, and
-leave it up to the emulation of the individual registers to decide if
-any exceptions should be injected.
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+ Documentation/arm64/silicon-errata.txt |  1 +
+ arch/arm64/Kconfig                     | 10 ++++++++++
+ drivers/irqchip/irq-gic-v3-its.c       | 16 ++++++++++++++++
+ 3 files changed, 27 insertions(+)
 
-I don't think we have that many places where we want to inject an
-undefined exception in our handlers, and doing it explicitly might
-actually be a good idea to make it more clear that we're emulating the
-architecture properly.  What do you think?
-
-Thanks,
--Christoffer
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index a71b809..2f66683 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -68,3 +68,4 @@ stable kernels.
+ |                |                 |                 |                             |
+ | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
+ | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
++| Qualcomm Tech. | QDF2400 ITS     | E0065           | QCOM_QDF2400_ERRATUM_0065   |
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 896eba6..6bd51fb 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -509,6 +509,16 @@ config QCOM_FALKOR_ERRATUM_1009
+ 
+ 	  If unsure, say Y.
+ 
++config QCOM_QDF2400_ERRATUM_0065
++	bool "QDF2400 E0065: Incorrect GITS_TYPER.ITT_Entry_size"
++	default y
++	help
++	  On Qualcomm Datacenter Technologies QDF2400 SoC, ITS hardware reports
++	  ITTE size incorrectly. The GITS_TYPER.ITT_Entry_size field should have
++	  been indicated as 16Bytes (0xf), not 8Bytes (0x7).
++
++	  If unsure, say Y.
++
+ endmenu
+ 
+ 
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 2320100..86bd428 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1601,6 +1601,14 @@ static void __maybe_unused its_enable_quirk_cavium_23144(void *data)
+ 	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_23144;
+ }
+ 
++static void __maybe_unused its_enable_quirk_qdf2400_e0065(void *data)
++{
++	struct its_node *its = data;
++
++	/* On QDF2400, the size of the ITTE is 16Bytes */
++	its->ite_size = 16;
++}
++
+ static const struct gic_quirk its_quirks[] = {
+ #ifdef CONFIG_CAVIUM_ERRATUM_22375
+ 	{
+@@ -1618,6 +1626,14 @@ static void __maybe_unused its_enable_quirk_cavium_23144(void *data)
+ 		.init	= its_enable_quirk_cavium_23144,
+ 	},
+ #endif
++#ifdef CONFIG_QCOM_QDF2400_ERRATUM_0065
++	{
++		.desc	= "ITS: QDF2400 erratum 0065",
++		.iidr	= 0x00001070, /* QDF2400 ITS rev 1.x */
++		.mask	= 0xffffffff,
++		.init	= its_enable_quirk_qdf2400_e0065,
++	},
++#endif
+ 	{
+ 	}
+ };
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
