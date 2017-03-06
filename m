@@ -1,162 +1,139 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon,  6 Mar 2017 12:34:29 +0100
-Subject: [PATCH v3 14/19] KVM: arm64: ITS: Add infrastructure for table lookup
+Date: Mon,  6 Mar 2017 12:34:32 +0100
+Subject: [PATCH v3 17/19] KVM: arm64: ITS: ITT flush and restore
 In-Reply-To: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
 References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1488800074-21991-15-git-send-email-eric.auger@redhat.com>
+Message-ID: <1488800074-21991-18-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a generic lookup_table() helper whose role consists in
-scanning a contiguous table located in guest RAM and applying
-a callback on each entry. Entries can be handled as linked lists
-since the callback may return an offset to the next entry and
-also tell that an entry is the last one.
+Introduce routines to flush and restore device ITT and their
+interrupt table entries (ITE).
 
-Helper functions also are added to compute the device/event ID
-offset to the next DTE/ITE.
+The routines will be called on device table flush and
+restore.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
+
 ---
- virt/kvm/arm/vgic/vgic-its.c | 119 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 119 insertions(+)
+v2 -> v3:
+- add return 0 in vgic_its_restore_ite (was in subsequent patch)
+
+v2: creation
+---
+ virt/kvm/arm/vgic/vgic-its.c | 100 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 100 insertions(+)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 1cd6ae6..cf04776 100644
+index 1060125..a216849 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -181,6 +181,8 @@ static struct its_ite *find_ite(struct vgic_its *its, u32 device_id,
- #define VITS_ESZ 8
- #define VITS_TYPER_IDBITS 0xF
- #define VITS_TYPER_DEVBITS 0xF
-+#define VITS_DTE_MAX_DEVID_OFFSET GENMASK(19, 0)
-+#define VITS_ITE_MAX_EVENTID_OFFSET GENMASK(16, 0)
- 
- /*
-  * Finds and returns a collection in the ITS collection table.
-@@ -1607,6 +1609,123 @@ int vgic_its_attr_regs_access(struct kvm_device *dev,
- 	return 0;
+@@ -1748,6 +1748,106 @@ static int vgic_its_restore_pending_tables(struct vgic_its *its)
+ 	return -ENXIO;
  }
  
-+static u32 compute_next_devid_offset(struct list_head *h,
-+				     struct its_device *dev)
++static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
++			      struct its_ite *ite, gpa_t gpa)
 +{
-+	struct list_head *e = &dev->dev_list;
-+	struct its_device *next;
-+	u32 next_offset;
-+
-+	if (e->next == h)
-+		return 0;
-+	next = list_entry(e->next, struct its_device, dev_list);
-+	next_offset = next->device_id - dev->device_id;
-+
-+	return next_offset < VITS_DTE_MAX_DEVID_OFFSET ?
-+			next_offset : VITS_DTE_MAX_DEVID_OFFSET;
-+}
-+
-+static u32 compute_next_eventid_offset(struct list_head *h,
-+				       struct its_ite *ite)
-+{
-+	struct list_head *e = &ite->ite_list;
-+	struct its_ite *next;
-+	u32 next_offset;
-+
-+	if (e->next == h)
-+		return 0;
-+	next = list_entry(e->next, struct its_ite, ite_list);
-+	next_offset = next->event_id - ite->event_id;
-+
-+	return next_offset < VITS_ITE_MAX_EVENTID_OFFSET ?
-+			next_offset : VITS_ITE_MAX_EVENTID_OFFSET;
-+}
-+
-+static int next_segment(unsigned long len, int offset)
-+{
-+	if (len > PAGE_SIZE - offset)
-+		return PAGE_SIZE - offset;
-+	else
-+		return len;
-+}
-+
-+/**
-+ * entry_fn_t - Callback called on a table entry restore path
-+ * @its: its handle
-+ * @id: id of the entry
-+ * @addr: kernel VA of the entry
-+ * @opaque: pointer to an opaque data
-+ * @next_offset: minimal ID offset to the next entry. 0 if this
-+ * entry is the last one, 1 if the entry is invalid, >= 1 if an
-+ * entry's next_offset field was truly decoded
-+ *
-+ * Return: < 0 on error, 0 otherwise
-+ */
-+typedef int (*entry_fn_t)(struct vgic_its *its, u32 id, void *addr,
-+			  void *opaque, u32 *next_offset);
-+
-+/**
-+ * lookup_table - scans a contiguous table in guest RAM and applies a function
-+ * to each entry
-+ *
-+ * @its: its handle
-+ * @base: base gpa of the table
-+ * @size: size of the table in bytes
-+ * @esz: entry size in bytes
-+ * @start_id: first entry's ID
-+ * @fn: function to apply on each entry
-+ *
-+ * Return: < 0 on error, 1 if last element identified, 0 otherwise
-+ */
-+static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
-+			int start_id, entry_fn_t fn, void *opaque)
-+{
-+	gpa_t gpa = base, top = base + size - 1;
-+	unsigned long len = top - gpa;
-+	int ret, seg, offset = offset_in_page(gpa);
-+	gfn_t gfn = gpa >> PAGE_SHIFT;
-+	u32 id = start_id + (gpa - base)/esz;
 +	struct kvm *kvm = its->dev->kvm;
-+	kvm_pfn_t pfn;
++	u32 next_offset;
++	u64 val;
 +
-+	while ((seg = next_segment(len, offset)) != 0) {
-+		u32 next_offset;
-+		bool writeable;
-+		void *addr;
++	next_offset = compute_next_eventid_offset(&dev->itt_head, ite);
++	val = ((u64)next_offset << 48) | ((u64)ite->lpi << 16) |
++		ite->collection->collection_id;
++	val = cpu_to_le64(val);
++	return kvm_write_guest(kvm, gpa, &val, VITS_ESZ);
++}
 +
-+		pfn = gfn_to_pfn_prot(kvm, gfn, true, &writeable);
-+		if (is_error_noslot_pfn(pfn))
-+			return -EINVAL;
-+		addr = phys_to_virt((u64)pfn << PAGE_SHIFT);
-+		addr += offset;
++/**
++ * vgic_its_restore_ite - restore an interrupt translation entry
++ * @event_id: id used for indexing
++ * @ptr: kernel VA where the 8 byte ITE is located
++ * @opaque: pointer to the its_device
++ * @next: id offset to the next entry
++ */
++static int vgic_its_restore_ite(struct vgic_its *its, u32 event_id,
++				void *ptr, void *opaque, u32 *next)
++{
++	struct its_device *dev = (struct its_device *)opaque;
++	struct its_collection *collection;
++	struct kvm *kvm = its->dev->kvm;
++	u64 val, *p = (u64 *)ptr;
++	struct vgic_irq *irq;
++	u32 coll_id, lpi_id;
++	struct its_ite *ite;
++	int ret;
 +
-+		while (seg > 0) {
-+			size_t byte_offset;
++	val = *p;
++	*next = 1;
 +
-+			ret = fn(its, id, addr, opaque, &next_offset);
-+			if (ret < 0 || (!ret && !next_offset))
-+				goto out;
++	val = le64_to_cpu(val);
 +
-+			byte_offset = next_offset * esz;
++	coll_id = val & GENMASK_ULL(15, 0);
++	lpi_id = (val & GENMASK_ULL(47, 16)) >> 16;
 +
-+			id += next_offset;
-+			gpa += byte_offset;
-+			addr += byte_offset;
-+			seg -= byte_offset;
-+		}
-+		kvm_release_pfn_clean(pfn);
++	if (!lpi_id)
++		return 0;
 +
-+		len = top - gpa;
-+		offset = offset_in_page(gpa);
-+		gfn = gpa >> PAGE_SHIFT;
-+		id = start_id + (gpa - base)/esz;
++	*next = (val & GENMASK_ULL(63, 48)) >> 48;
++
++	collection = find_collection(its, coll_id);
++	if (!collection)
++		return -EINVAL;
++
++	ret = vgic_its_alloc_ite(dev, &ite, collection,
++				  lpi_id, event_id);
++	if (ret)
++		return ret;
++
++	irq = vgic_add_lpi(kvm, lpi_id);
++	if (IS_ERR(irq))
++		return PTR_ERR(irq);
++	ite->irq = irq;
++
++	/* restore the configuration of the LPI */
++	ret = update_lpi_config(kvm, irq, NULL);
++	if (ret)
++		return ret;
++
++	update_affinity_ite(kvm, ite);
++	return 0;
++}
++
++static int vgic_its_flush_itt(struct vgic_its *its, struct its_device *device)
++{
++	gpa_t base = device->itt_addr;
++	struct its_ite *ite;
++	int ret;
++
++	list_for_each_entry(ite, &device->itt_head, ite_list) {
++		gpa_t gpa = base + ite->event_id * VITS_ESZ;
++
++		ret = vgic_its_flush_ite(its, device, ite, gpa);
++		if (ret)
++			return ret;
 +	}
 +	return 0;
-+out:
-+	kvm_release_pfn_clean(pfn);
-+	return (ret < 0 ? ret : 1);
++}
++
++static int vgic_its_restore_itt(struct vgic_its *its,
++				struct its_device *dev)
++{
++	size_t max_size = (2 << dev->nb_eventid_bits) * VITS_ESZ;
++	gpa_t base = dev->itt_addr;
++	int ret;
++
++	ret =  lookup_table(its, base, max_size, VITS_ESZ, 0,
++			    vgic_its_restore_ite, dev);
++
++	if (ret < 0)
++		return ret;
++	return 0;
 +}
 +
  /**
-  * vgic_its_flush_pending_tables - Flush the pending tables into guest RAM
-  */
+  * vgic_its_flush_device_tables - flush the device table and all ITT
+  * into guest RAM
 -- 
 2.5.5
