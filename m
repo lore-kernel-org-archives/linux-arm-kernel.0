@@ -1,167 +1,217 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 6 Mar 2017 12:59:06 +0530
-Subject: [PATCH] ARM: dts: exynos: Use thermal fuse value for thermal zone
- 0 on Exynos5420
-In-Reply-To: <20170304080109.j2kuwmqj7mgfx3ky@kozik-lap>
-References: <20170211201456.27974-1-krzk@kernel.org>
- <252f9e32-ff2c-a1ce-3c98-6383a1148e02@osg.samsung.com>
- <20170304080109.j2kuwmqj7mgfx3ky@kozik-lap>
-Message-ID: <CANAwSgR9kstsMXAoDxLzW_nrLFo1esggDdHO9uqfmqCJ5--AJQ@mail.gmail.com>
+From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
+Date: Mon, 6 Mar 2017 08:35:52 +0100
+Subject: [PATCH 1/2] ARM: dts: aspeed: add SPI controller bindings
+In-Reply-To: <CACPK8XeaSh8MVTfPjwt=+NBPWCkMK7QqpAXF7+BYYQBViVSNKg@mail.gmail.com>
+References: <1488378403-24640-1-git-send-email-clg@kaod.org>
+ <1488378403-24640-2-git-send-email-clg@kaod.org>
+ <CACPK8XeaSh8MVTfPjwt=+NBPWCkMK7QqpAXF7+BYYQBViVSNKg@mail.gmail.com>
+Message-ID: <1506a763-5038-f630-e70c-f877a332659f@kaod.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On 03/06/2017 12:13 AM, Joel Stanley wrote:
+> Hi Cedric,
+> 
+> On Thu, Mar 2, 2017 at 12:56 AM, C?dric Le Goater <clg@kaod.org> wrote:
+>> Let's define the SPI controllers in the Aspeed SoCs AST2500 and
+>> AST2400 and also enable these, as well as the chips, on the associated
+>> platforms.
+> 
+> Thanks for this. Was there a reason you didn't modify the romulus dts as well?
 
-On 4 March 2017 at 13:31, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Fri, Mar 03, 2017 at 06:50:06PM -0300, Javier Martinez Canillas wrote:
->> Hello Krzysztof,
->>
->> On 02/11/2017 05:14 PM, Krzysztof Kozlowski wrote:
->> > In Odroid XU3 Lite board, the temperature levels reported for thermal
->> > zone 0 were weird. In warm room:
->> >     /sys/class/thermal/thermal_zone0/temp:32000
->> >     /sys/class/thermal/thermal_zone1/temp:51000
->> >     /sys/class/thermal/thermal_zone2/temp:55000
->> >     /sys/class/thermal/thermal_zone3/temp:54000
->> >     /sys/class/thermal/thermal_zone4/temp:51000
->> >
->> > Sometimes after booting the value was even equal to ambient temperature
->> > which is highly unlikely to be a real temperature of sensor in SoC.
->> >
->> > The thermal sensor's calibration (trimming) is based on fused values.
->> > In case of the board above, the fused values are: 35, 52, 43, 58 and 43
->> > (corresponding to each TMU device).  However driver defined a minimum value
->> > for fused data as 40 and for smaller values it was using a hard-coded 55
->> > instead.  This lead to mapping data from sensor to wrong temperatures
->> > for thermal zone 0.
->> >
->> > Various vendor 3.10 trees (Hardkernel's based on Samsung LSI, Artik 10)
->> > do not impose any limits on fused values.  Since we do not have any
->> > knowledge about these limits, use 0 as a minimum accepted fused value.
->> > This should essentially allow accepting any reasonable fused value thus
->> > behaving like vendor driver.
->> >
->> > The exynos5420-tmu-sensor-conf.dtsi is copied directly from existing
->> > exynso4412 with one change - the samsung,tmu_min_efuse_value.
->> >
->> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->> >
->> > ---
->> >
->> > Testing on other Exynos542x boards is much appreciated. Especially I
->> > wonder what efuse values are there.
->>
->> I tested on both Exynos5422 Odroid XU4 and Exynos5800 Peach Pi boards.
->>
->> The temperatures levels reported for these two boards on a warm room are:
->>
->> Odroid XU4
->>
->> # cat /sys/class/thermal/thermal_zone*/temp
->> 50000
->> 50000
->> 54000
->> 51000
->> 48000
->>
->> Peach Pi
->>
->> # cat /sys/class/thermal/thermal_zone*/temp
->> 42000
->> 44000
->> 27000 <-- weird value for thermal zone 2 like zone 0 in your XU3 lite
->> 45000
->> 45000
->>
->> And the efuse values for the TMU devices are:
->>
->> Odroid XU4
->>
->> TMU0 = 45
->> TMU1 = 44
->> TMU2 = 44
->> TMU3 = 46
->> TMU3 = 46
->>
->> Peach Pi
->>
->> TMU0 = 44
->> TMU1 = 46
->> TMU2 = 36
->> TMU3 = 53
->> TMU3 = 46
->>
->> The fused value for TMU2 is < 40 so that explains the weird temperature
->> level for thermal zone 2 in Peach. So after your patch, makes more sense:
->>
->> # cat /sys/class/thermal/thermal_zone*/temp
->> 41000
->> 42000
->> 45000
->> 43000
->> 43000
->
-> Great! Thanks for testing!
->
->
->> I wonder though if 0 is the best value or if we should just lower more
->> to cover the used e-fuse values in Exynos5 boards. But as you said,
->> we have no knowledge about these limits...
->
-> Yeah... we could set value of 10 or 20... but that would be blind shot.
->>
->> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>
->
-> Thanks,
-> Krzysztof
+Mostly because this is a pre-romulus patch that I refreshed. 
+I will send a extra patch for the romulus platform. 
 
-Reviewed-by: Anand Moon <linux.amoon@gmail.com>
-Tested-by: Anand Moon <linux.amoon@gmail.com>
+Thanks,
 
-I have being trying to change the trips temperature in the dts to some
-higher values
-in order to improve the performance of the board.
-Here are the results under idle state and stress state.
+C. 
 
-root at odroidxu4n:~# cat /sys/class/thermal/thermal_zone*/temp
-58000
-58000
-61000
-60000
-56000
-root at odroidxu4n:~# stress --vm 16 --vm-bytes 128M --timeout 10s
-stress: info: [2138] dispatching hogs: 0 cpu, 0 io, 16 vm, 0 hdd
-stress: info: [2138] successful run completed in 10s
-root at odroidxu4n:~# cat /sys/class/thermal/thermal_zone*/temp
-58000
-58000
-61000
-60000
-56000
 
-Which is too high for in idle state.
-
-Second part of my testcase is the pm-qa from linaro.
-
-[1] git://git.linaro.org/tools/pm-qa.git
-
-pm-qa# make -C thermal check
-
-I have observer in the testcase that their is use moderate heating of heat_cpu
-get started by the testcase but it dose not get signal to kill on
-exiting of the testcase.
-most of these testcase failed to Odroid XU4, but the same case pass on
-Odroid U3.
-
-I have also tested with different e-fuse values [10,20,30,40] but the
-results are same.
-
-Going through the source code for HK it seen to set exynos_tmu_control
-set more trigger level
-
-[2] https://github.com/hardkernel/linux/blob/odroidxu3-3.10.y/drivers/thermal/exynos_thermal.c#L1144
-
-Best Regards
--Anand Moon
+> Cheers,
+> 
+> Joel
+> 
+>>
+>> Signed-off-by: C?dric Le Goater <clg@kaod.org>
+>> ---
+>>  arch/arm/boot/dts/aspeed-ast2500-evb.dts      | 20 +++++++++
+>>  arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts | 16 +++++++
+>>  arch/arm/boot/dts/aspeed-g4.dtsi              | 29 ++++++++++++
+>>  arch/arm/boot/dts/aspeed-g5.dtsi              | 63 +++++++++++++++++++++++++++
+>>  4 files changed, 128 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/aspeed-ast2500-evb.dts b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
+>> index d967603dade8..8f82e8ab1875 100644
+>> --- a/arch/arm/boot/dts/aspeed-ast2500-evb.dts
+>> +++ b/arch/arm/boot/dts/aspeed-ast2500-evb.dts
+>> @@ -20,6 +20,26 @@
+>>         };
+>>  };
+>>
+>> +&fmc {
+>> +       status = "okay";
+>> +       flash at 0 {
+>> +               status = "okay";
+>> +               label = "bmc";
+>> +       };
+>> +};
+>> +
+>> +&spi1 {
+>> +       status = "okay";
+>> +       flash at 0 {
+>> +               status = "okay";
+>> +               label = "pnor";
+>> +       };
+>> +};
+>> +
+>> +&spi2 {
+>> +       status = "okay";
+>> +};
+>> +
+>>  &uart5 {
+>>         status = "okay";
+>>  };
+>> diff --git a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+>> index 1d2fc1e1dc29..aab1889f702f 100644
+>> --- a/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+>> +++ b/arch/arm/boot/dts/aspeed-bmc-opp-palmetto.dts
+>> @@ -31,6 +31,22 @@
+>>         };
+>>  };
+>>
+>> +&fmc {
+>> +       status = "okay";
+>> +       flash at 0 {
+>> +               status = "okay";
+>> +               label = "bmc";
+>> +       };
+>> +};
+>> +
+>> +&spi {
+>> +       status = "okay";
+>> +       flash at 0 {
+>> +               status = "okay";
+>> +               label = "pnor";
+>> +       };
+>> +};
+>> +
+>>  &uart5 {
+>>         status = "okay";
+>>  };
+>> diff --git a/arch/arm/boot/dts/aspeed-g4.dtsi b/arch/arm/boot/dts/aspeed-g4.dtsi
+>> index 0b4932cc02a8..7ef6442d0ade 100644
+>> --- a/arch/arm/boot/dts/aspeed-g4.dtsi
+>> +++ b/arch/arm/boot/dts/aspeed-g4.dtsi
+>> @@ -33,6 +33,35 @@
+>>                 #size-cells = <1>;
+>>                 ranges;
+>>
+>> +               fmc: flash-controller at 1e620000 {
+>> +                       reg = < 0x1e620000 0x94
+>> +                               0x20000000 0x02000000 >;
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +                       compatible = "aspeed,ast2400-fmc";
+>> +                       status = "disabled";
+>> +                       interrupts = <19>;
+>> +                       flash at 0 {
+>> +                               reg = < 0 >;
+>> +                               compatible = "jedec,spi-nor";
+>> +                               status = "disabled";
+>> +                       };
+>> +               };
+>> +
+>> +               spi: flash-controller at 1e630000 {
+>> +                       reg = < 0x1e630000 0x18
+>> +                               0x30000000 0x02000000 >;
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +                       compatible = "aspeed,ast2400-spi";
+>> +                       status = "disabled";
+>> +                       flash at 0 {
+>> +                               reg = < 0 >;
+>> +                               compatible = "jedec,spi-nor";
+>> +                               status = "disabled";
+>> +                       };
+>> +               };
+>> +
+>>                 vic: interrupt-controller at 1e6c0080 {
+>>                         compatible = "aspeed,ast2400-vic";
+>>                         interrupt-controller;
+>> diff --git a/arch/arm/boot/dts/aspeed-g5.dtsi b/arch/arm/boot/dts/aspeed-g5.dtsi
+>> index b664fe380936..8970f3cb8e2b 100644
+>> --- a/arch/arm/boot/dts/aspeed-g5.dtsi
+>> +++ b/arch/arm/boot/dts/aspeed-g5.dtsi
+>> @@ -24,6 +24,69 @@
+>>                 #size-cells = <1>;
+>>                 ranges;
+>>
+>> +               fmc: flash-controller at 1e620000 {
+>> +                       reg = < 0x1e620000 0xc4
+>> +                               0x20000000 0x10000000 >;
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +                       compatible = "aspeed,ast2500-fmc";
+>> +                       status = "disabled";
+>> +                       interrupts = <19>;
+>> +                       flash at 0 {
+>> +                               reg = < 0 >;
+>> +                               compatible = "jedec,spi-nor";
+>> +                               status = "disabled";
+>> +                       };
+>> +                       flash at 1 {
+>> +                               reg = < 1 >;
+>> +                               compatible = "jedec,spi-nor";
+>> +                               status = "disabled";
+>> +                       };
+>> +                       flash at 2 {
+>> +                               reg = < 2 >;
+>> +                               compatible = "jedec,spi-nor";
+>> +                               status = "disabled";
+>> +                       };
+>> +               };
+>> +
+>> +               spi1: flash-controller at 1e630000 {
+>> +                       reg = < 0x1e630000 0xc4
+>> +                               0x30000000 0x08000000 >;
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +                       compatible = "aspeed,ast2500-spi";
+>> +                       status = "disabled";
+>> +                       flash at 0 {
+>> +                               reg = < 0 >;
+>> +                               compatible = "jedec,spi-nor";
+>> +                               status = "disabled";
+>> +                       };
+>> +                       flash at 1 {
+>> +                               reg = < 1 >;
+>> +                               compatible = "jedec,spi-nor";
+>> +                               status = "disabled";
+>> +                       };
+>> +               };
+>> +
+>> +               spi2: flash-controller at 1e631000 {
+>> +                       reg = < 0x1e631000 0xc4
+>> +                               0x38000000 0x08000000 >;
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +                       compatible = "aspeed,ast2500-spi";
+>> +                       status = "disabled";
+>> +                       flash at 0 {
+>> +                               reg = < 0 >;
+>> +                               compatible = "jedec,spi-nor";
+>> +                               status = "disabled";
+>> +                       };
+>> +                       flash at 1 {
+>> +                               reg = < 1 >;
+>> +                               compatible = "jedec,spi-nor";
+>> +                               status = "disabled";
+>> +                       };
+>> +               };
+>> +
+>>                 vic: interrupt-controller at 1e6c0080 {
+>>                         compatible = "aspeed,ast2400-vic";
+>>                         interrupt-controller;
+>> --
+>> 2.7.4
+>>
