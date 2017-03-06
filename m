@@ -1,127 +1,90 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 6 Mar 2017 11:46:22 +0800
-Subject: [linux-sunxi] Re: [PATCH v2 03/12] ASoC: sun8i-codec-analog:
- split out mbias
-In-Reply-To: <6803451488721799@web16g.yandex.ru>
+Date: Mon, 6 Mar 2017 11:50:52 +0800
+Subject: [PATCH v2 06/12] dmaengine: sun6i: make gate bit in sun8i's DMA
+ engines a common quirk
+In-Reply-To: <20170305133709.6288-7-icenowy@aosc.xyz>
 References: <20170305133709.6288-1-icenowy@aosc.xyz>
- <20170305133709.6288-4-icenowy@aosc.xyz>
- <6803451488721799@web16g.yandex.ru>
-Message-ID: <CAGb2v65zaUEDc4BtEKA=zN17hGeQZaCmX3xROM8KGSxtDPZ2mg@mail.gmail.com>
+ <20170305133709.6288-7-icenowy@aosc.xyz>
+Message-ID: <CAGb2v65Cic941D7ioDZvqBXTdCxxYQTp-QDe3zwPhnXaiYoOOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Mar 5, 2017 at 9:49 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+On Sun, Mar 5, 2017 at 9:37 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+> Originally we enable a special gate bit when the compatible indicates
+> A23/33.
 >
+> But according to BSP sources and user manuals, more SoCs will need this
+> gate bit.
 >
-> 05.03.2017, 21:38, "Icenowy Zheng" <icenowy@aosc.xyz>:
->> Allwinner V3s features an analog codec without MBIAS pin.
->>
->> Split out this part, in order to prepare for the V3s analog codec.
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ---
->>  sound/soc/sunxi/sun8i-codec-analog.c | 34 +++++++++++++++++++++++++++++-----
->>  1 file changed, 29 insertions(+), 5 deletions(-)
->>
+> So make it a common quirk configured in the config struct.
 >
-> Sorry a definiation of has_mbias is mising in the patch...
->
-> It's
->
-> diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
-> index af56afe5c403..edcc3eb7cd9a 100644
-> --- a/sound/soc/sunxi/sun8i-codec-analog.c
-> +++ b/sound/soc/sunxi/sun8i-codec-analog.c
-> @@ -695,6 +695,7 @@ struct sun8i_codec_analog_quirks {
->         bool has_hmic;
->         bool has_linein;
->         bool has_lineout;
-> +       bool has_mbias;
->         bool has_mic2;
->  };
+> The BSP source also indicates that A83T will need this gate bit (there's
+> "SUN8IW6" in the #ifdef's), so also enable this gate bit for it.
 
-Please incorporate this into the patch in the next version, with
+This should be 2 patches, 1 making the option generic, and 1 setting it
+for A83T. The DMA engine on A83T is unused in past releases, so no need
+to CC stable.
+
+Normally when you mention "also xxxx" in your commit message, it is a
+good indicator you should split your patch, unless it is something really
+trivial like an extra whitespace cleanup, or splitting the patch would
+break the build.
+
+Once split, please add
 
 Acked-by: Chen-Yu Tsai <wens@csie.org>
 
+to both patches.
+
+Regards
+ChenYu
+
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>  drivers/dma/sun6i-dma.c | 9 ++++++---
+>  1 file changed, 6 insertions(+), 3 deletions(-)
 >
+> diff --git a/drivers/dma/sun6i-dma.c b/drivers/dma/sun6i-dma.c
+> index a2358780ab2c..889fb24023cd 100644
+> --- a/drivers/dma/sun6i-dma.c
+> +++ b/drivers/dma/sun6i-dma.c
+> @@ -101,6 +101,7 @@ struct sun6i_dma_config {
+>         u32 nr_max_channels;
+>         u32 nr_max_requests;
+>         u32 nr_max_vchans;
+> +       bool gate_needed;
+>  };
 >
->> diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
->> index 6c17c99c2c8d..af56afe5c403 100644
->> --- a/sound/soc/sunxi/sun8i-codec-analog.c
->> +++ b/sound/soc/sunxi/sun8i-codec-analog.c
->> @@ -289,11 +289,6 @@ static const struct snd_soc_dapm_widget sun8i_codec_common_widgets[] = {
->>          /* Microphone input */
->>          SND_SOC_DAPM_INPUT("MIC1"),
->>
->> - /* Microphone Bias */
->> - SND_SOC_DAPM_SUPPLY("MBIAS", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
->> - SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MMICBIASEN,
->> - 0, NULL, 0),
->> -
->>          /* Mic input path */
->>          SND_SOC_DAPM_PGA("Mic1 Amplifier", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
->>                           SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MIC1AMPEN, 0, NULL, 0),
->> @@ -453,6 +448,27 @@ static int sun8i_codec_add_headphone(struct snd_soc_component *cmpnt)
->>          return 0;
->>  }
->>
->> +/* mbias specific widget */
->> +static const struct snd_soc_dapm_widget sun8i_codec_mbias_widgets[] = {
->> + SND_SOC_DAPM_SUPPLY("MBIAS", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
->> + SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MMICBIASEN,
->> + 0, NULL, 0),
->> +};
->> +
->> +static int sun8i_codec_add_mbias(struct snd_soc_component *cmpnt)
->> +{
->> + struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(cmpnt);
->> + struct device *dev = cmpnt->dev;
->> + int ret;
->> +
->> + ret = snd_soc_dapm_new_controls(dapm, sun8i_codec_mbias_widgets,
->> + ARRAY_SIZE(sun8i_codec_mbias_widgets));
->> + if (ret)
->> + dev_err(dev, "Failed to add MBIAS DAPM widgets: %d\n", ret);
->> +
->> + return ret;
->> +}
->> +
->>  /* hmic specific widget */
->>  static const struct snd_soc_dapm_widget sun8i_codec_hmic_widgets[] = {
->>          SND_SOC_DAPM_SUPPLY("HBIAS", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
->> @@ -686,12 +702,14 @@ static const struct sun8i_codec_analog_quirks sun8i_a23_quirks = {
->>          .has_headphone = true,
->>          .has_hmic = true,
->>          .has_linein = true,
->> + .has_mbias = true,
->>          .has_mic2 = true,
->>  };
->>
->>  static const struct sun8i_codec_analog_quirks sun8i_h3_quirks = {
->>          .has_linein = true,
->>          .has_lineout = true,
->> + .has_mbias = true,
->>          .has_mic2 = true,
->>  };
->>
->> @@ -734,6 +752,12 @@ static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
->>                          return ret;
->>          }
->>
->> + if (quirks->has_mbias) {
->> + ret = sun8i_codec_add_mbias(cmpnt);
->> + if (ret)
->> + return ret;
->> + }
->> +
->>          if (quirks->has_mic2) {
->>                  ret = sun8i_codec_add_mic2(cmpnt);
->>                  if (ret)
->> --
->> 2.11.1
+>  /*
+> @@ -1009,12 +1010,14 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
+>         .nr_max_channels = 8,
+>         .nr_max_requests = 24,
+>         .nr_max_vchans   = 37,
+> +       .gate_needed     = true,
+>  };
 >
+>  static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
+>         .nr_max_channels = 8,
+>         .nr_max_requests = 28,
+>         .nr_max_vchans   = 39,
+> +       .gate_needed     = true,
+>  };
+>
+>  /*
+> @@ -1177,10 +1180,10 @@ static int sun6i_dma_probe(struct platform_device *pdev)
+>         /*
+>          * sun8i variant requires us to toggle a dma gating register,
+>          * as seen in Allwinner's SDK. This register is not documented
+> -        * in the A23 user manual.
+> +        * in the A23 user manual, but documented at least in V3s user
+> +        * manual.
+>          */
+> -       if (of_device_is_compatible(pdev->dev.of_node,
+> -                                   "allwinner,sun8i-a23-dma"))
+> +       if (sdc->cfg->gate_needed)
+>                 writel(SUN8I_DMA_GATE_ENABLE, sdc->base + SUN8I_DMA_GATE);
+>
+>         return 0;
 > --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+> 2.11.1
+>
