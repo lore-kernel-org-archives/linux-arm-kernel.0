@@ -1,59 +1,30 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 6 Mar 2017 11:15:28 -0800
-Subject: [PATCH] arm64: kasan: avoid bad virt_to_pfn()
-In-Reply-To: <1488827200-23990-1-git-send-email-mark.rutland@arm.com>
-References: <1488827200-23990-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <289ed685-7835-bd9d-1431-e836ab12a65b@redhat.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 6 Mar 2017 11:22:54 -0800
+Subject: [PATCH 1/1] ARM: dts: NSP: Add crypto (SPU) to dtsi
+In-Reply-To: <66ba937a-f1c3-1cae-ff2e-46a9d9c97344@gmail.com>
+References: <1487798543-34229-1-git-send-email-steven.lin1@broadcom.com>
+ <66ba937a-f1c3-1cae-ff2e-46a9d9c97344@gmail.com>
+Message-ID: <fd877ab2-48db-a677-b539-ba5ed55e75c6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2017 11:06 AM, Mark Rutland wrote:
-> Booting a v4.11-rc1 kernel with DEBUG_VIRTUAL and KASAN enabled produces
-> the following splat (trimmed for brevity):
+On 02/28/2017 12:31 PM, Florian Fainelli wrote:
+> On 02/22/2017 01:22 PM, Steve Lin wrote:
+>> Adds crypto hardware (SPU) to Northstar Plus device tree file.
+>>
+>> Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
 > 
-> [    0.000000] virt_to_phys used for non-linear address: ffff200008080000 (0xffff200008080000)
-> [    0.000000] WARNING: CPU: 0 PID: 0 at arch/arm64/mm/physaddr.c:14 __virt_to_phys+0x48/0x70
-> [    0.000000] PC is at __virt_to_phys+0x48/0x70
-> [    0.000000] LR is at __virt_to_phys+0x48/0x70
-> [    0.000000] Call trace:
-> [    0.000000] [<ffff2000080b1ac0>] __virt_to_phys+0x48/0x70
-> [    0.000000] [<ffff20000a03b86c>] kasan_init+0x1c0/0x498
-> [    0.000000] [<ffff20000a034018>] setup_arch+0x2fc/0x948
-> [    0.000000] [<ffff20000a030c68>] start_kernel+0xb8/0x570
-> [    0.000000] [<ffff20000a0301e8>] __primary_switched+0x6c/0x74
-> 
-> This is because we use virt_to_pfn() on a kernel image address when
-> trying to figure out its nid, so that we can allocate its shadow from
-> the same node.
-> 
-> As with other recent changes, this patch uses lm_alias() to solve this.
-> 
-> We could instead use NUMA_NO_NODE, as x86 does for all shadow
-> allocations, though we'll likely want the "real" memory shadow to be
-> backed from its corresponding nid anyway, so we may as well be
-> consistent and find the nid for the image shadow.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Laura Abbott <labbott@redhat.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/mm/kasan_init.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-> index 55d1e92..687a358 100644
-> --- a/arch/arm64/mm/kasan_init.c
-> +++ b/arch/arm64/mm/kasan_init.c
-> @@ -162,7 +162,7 @@ void __init kasan_init(void)
->  	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
->  
->  	vmemmap_populate(kimg_shadow_start, kimg_shadow_end,
-> -			 pfn_to_nid(virt_to_pfn(_text)));
-> +			 pfn_to_nid(virt_to_pfn(lm_alias(_text))));
->  
->  	/*
->  	 * vmemmap_populate() has populated the shadow region that covers the
-> 
+> Applied, thanks!
 
-Acked-by: Laura Abbott <labbott@redhat.com>
+And dropped, since there is a dependency on "ARM: dts: NSP: Add mailbox
+(PDC) to NSP" to be applied first.
+
+Let's wait for the mailbox maintainer to chime in before I apply the
+following patches (in that order):
+
+ARM: dts: NSP: Add mailbox (PDC) to NSP
+ARM: dts: NSP: Add crypto (SPU) to dtsi
+
+Thanks!
+-- 
+Florian
