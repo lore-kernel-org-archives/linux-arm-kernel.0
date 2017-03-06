@@ -1,41 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon,  6 Mar 2017 09:00:40 +0100
-Subject: [PATCH 2/2] ARM: dts: fix typo on APQ8060 Dragonboard
-Message-ID: <20170306080040.3472-1-linus.walleij@linaro.org>
+From: robin@protonic.nl (Robin van der Gracht)
+Date: Mon,  6 Mar 2017 09:13:43 +0100
+Subject: [PATCH v2] clk: imx: correct uart4_serial clock name in driver for
+ i.MX6UL
+Message-ID: <20170306081343.27641-1-robin@protonic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DTS referred to SDC5 when it meant SDC1.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Robin van der Gracht <robin@protonic.nl>
 ---
- arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+v2: Rebased on latest mainline
 
-diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-index 39d9e6ddefed..2da1413f5720 100644
---- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-+++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-@@ -95,17 +95,17 @@
- 					     function = "sdc1";
- 				};
- 				clk {
--					pins = "gpio167"; /* SDC5 CLK */
-+					pins = "gpio167"; /* SDC1 CLK */
- 					drive-strength = <16>;
- 					bias-disable;
- 				};
- 				cmd {
--					pins = "gpio168"; /* SDC5 CMD */
-+					pins = "gpio168"; /* SDC1 CMD */
- 					drive-strength = <10>;
- 					bias-pull-up;
- 				};
- 				data {
--					/* SDC5 D0 to D7 */
-+					/* SDC1 D0 to D7 */
- 					pins = "gpio159", "gpio160", "gpio161", "gpio162",
- 					     "gpio163", "gpio164", "gpio165", "gpio166";
- 					drive-strength = <10>;
+ drivers/clk/imx/clk-imx6ul.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/imx/clk-imx6ul.c b/drivers/clk/imx/clk-imx6ul.c
+index dbd6e59..b4e0dff 100644
+--- a/drivers/clk/imx/clk-imx6ul.c
++++ b/drivers/clk/imx/clk-imx6ul.c
+@@ -358,7 +358,7 @@ static void __init imx6ul_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX6UL_CLK_GPT1_BUS]	= imx_clk_gate2("gpt1_bus",	"perclk",	base + 0x6c,	20);
+ 	clks[IMX6UL_CLK_GPT1_SERIAL]	= imx_clk_gate2("gpt1_serial",	"perclk",	base + 0x6c,	22);
+ 	clks[IMX6UL_CLK_UART4_IPG]	= imx_clk_gate2("uart4_ipg",	"ipg",		base + 0x6c,	24);
+-	clks[IMX6UL_CLK_UART4_SERIAL]	= imx_clk_gate2("uart4_serail",	"uart_podf",	base + 0x6c,	24);
++	clks[IMX6UL_CLK_UART4_SERIAL]	= imx_clk_gate2("uart4_serial",	"uart_podf",	base + 0x6c,	24);
+ 
+ 	/* CCGR2 */
+ 	if (clk_on_imx6ull()) {
 -- 
 2.9.3
