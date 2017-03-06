@@ -1,95 +1,69 @@
 From: romain.perier@collabora.com (Romain Perier)
-Date: Mon,  6 Mar 2017 15:17:13 +0100
-Subject: [PATCH v2 1/4] mmc: core: Add post_ios_power_on callback for power
- sequences
+Date: Mon,  6 Mar 2017 15:17:14 +0100
+Subject: [PATCH v2 2/4] mmc: pwrseq-simple: Add optional op. for
+ post_ios_power_on callback
 In-Reply-To: <20170306141716.19120-1-romain.perier@collabora.com>
 References: <20170306141716.19120-1-romain.perier@collabora.com>
-Message-ID: <20170306141716.19120-2-romain.perier@collabora.com>
+Message-ID: <20170306141716.19120-3-romain.perier@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, ->pre_power_on() callback is called at the beginning of the
-mmc_power_up() function before MMC_POWER_UP and MMC_POWER_ON sequences.
-The callback ->post_power_on() is called at the end of the
-mmc_power_up() function. Some SDIO Chipsets require to gate the clock
-after than the vqmmc supply is powered on and then toggle the reset
-line. Currently, there is no way for doing this.
-
-This commit introduces a new callback ->post_ios_power_on(), that is
-called at the end of the mmc_power_up() function after the mmc_set_ios()
-operation. In this way the entire power sequences can be done from this
-function after the enablement of the power supply.
+Some devices require to do their entire power sequence after that the
+power supply of the MMC has been powered on. This can be done by
+only implementing the optional post_ios_power_on() callback that rely on
+pre_power_on/post_power_on functions, other functions being NULL. Then
+we introduce a new DT property "post_ios_power_on", when this property
+is set the driver will use its post_ios_power_on operations, otherwise
+it fallbacks to the default operations with pre_power_on/post_power_on.
 
 Signed-off-by: Romain Perier <romain.perier@collabora.com>
 ---
 
 Changes in v2:
- - Added missing declaration for mmc_pwrseq_post_ios_power_on when
-   CONFIG_OF is disabled.
+ - Added missing power_off function in mmc_pwrseq_post_ios_ops
 
- drivers/mmc/core/core.c   | 1 +
- drivers/mmc/core/pwrseq.c | 8 ++++++++
- drivers/mmc/core/pwrseq.h | 3 +++
- 3 files changed, 12 insertions(+)
+ drivers/mmc/core/pwrseq_simple.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 1076b9d..d73a050 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -1831,6 +1831,7 @@ void mmc_power_up(struct mmc_host *host, u32 ocr)
- 	 * time required to reach a stable voltage.
- 	 */
- 	mmc_delay(10);
-+	mmc_pwrseq_post_ios_power_on(host);
+diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/mmc/core/pwrseq_simple.c
+index 1304160..e27019f 100644
+--- a/drivers/mmc/core/pwrseq_simple.c
++++ b/drivers/mmc/core/pwrseq_simple.c
+@@ -84,12 +84,23 @@ static void mmc_pwrseq_simple_power_off(struct mmc_host *host)
+ 	}
  }
  
- void mmc_power_off(struct mmc_host *host)
-diff --git a/drivers/mmc/core/pwrseq.c b/drivers/mmc/core/pwrseq.c
-index 9386c47..98f50b7 100644
---- a/drivers/mmc/core/pwrseq.c
-+++ b/drivers/mmc/core/pwrseq.c
-@@ -68,6 +68,14 @@ void mmc_pwrseq_post_power_on(struct mmc_host *host)
- 		pwrseq->ops->post_power_on(host);
- }
- 
-+void mmc_pwrseq_post_ios_power_on(struct mmc_host *host)
++static void mmc_pwrseq_simple_post_ios_power_on(struct mmc_host *host)
 +{
-+	struct mmc_pwrseq *pwrseq = host->pwrseq;
-+
-+	if (pwrseq && pwrseq->ops->post_ios_power_on)
-+		pwrseq->ops->post_ios_power_on(host);
++	mmc_pwrseq_simple_pre_power_on(host);
++	mmc_pwrseq_simple_post_power_on(host);
 +}
 +
- void mmc_pwrseq_power_off(struct mmc_host *host)
- {
- 	struct mmc_pwrseq *pwrseq = host->pwrseq;
-diff --git a/drivers/mmc/core/pwrseq.h b/drivers/mmc/core/pwrseq.h
-index d69e751..ad6e3af 100644
---- a/drivers/mmc/core/pwrseq.h
-+++ b/drivers/mmc/core/pwrseq.h
-@@ -13,6 +13,7 @@
- struct mmc_pwrseq_ops {
- 	void (*pre_power_on)(struct mmc_host *host);
- 	void (*post_power_on)(struct mmc_host *host);
-+	void (*post_ios_power_on)(struct mmc_host *host);
- 	void (*power_off)(struct mmc_host *host);
+ static const struct mmc_pwrseq_ops mmc_pwrseq_simple_ops = {
+ 	.pre_power_on = mmc_pwrseq_simple_pre_power_on,
+ 	.post_power_on = mmc_pwrseq_simple_post_power_on,
+ 	.power_off = mmc_pwrseq_simple_power_off,
  };
  
-@@ -31,6 +32,7 @@ void mmc_pwrseq_unregister(struct mmc_pwrseq *pwrseq);
- int mmc_pwrseq_alloc(struct mmc_host *host);
- void mmc_pwrseq_pre_power_on(struct mmc_host *host);
- void mmc_pwrseq_post_power_on(struct mmc_host *host);
-+void mmc_pwrseq_post_ios_power_on(struct mmc_host *host);
- void mmc_pwrseq_power_off(struct mmc_host *host);
- void mmc_pwrseq_free(struct mmc_host *host);
++static const struct mmc_pwrseq_ops mmc_pwrseq_post_ios_ops = {
++	.post_ios_power_on = mmc_pwrseq_simple_post_ios_power_on,
++	.power_off = mmc_pwrseq_simple_power_off,
++};
++
+ static const struct of_device_id mmc_pwrseq_simple_of_match[] = {
+ 	{ .compatible = "mmc-pwrseq-simple",},
+ 	{/* sentinel */},
+@@ -121,7 +132,10 @@ static int mmc_pwrseq_simple_probe(struct platform_device *pdev)
+ 				 &pwrseq->post_power_on_delay_ms);
  
-@@ -44,6 +46,7 @@ static inline void mmc_pwrseq_unregister(struct mmc_pwrseq *pwrseq) {}
- static inline int mmc_pwrseq_alloc(struct mmc_host *host) { return 0; }
- static inline void mmc_pwrseq_pre_power_on(struct mmc_host *host) {}
- static inline void mmc_pwrseq_post_power_on(struct mmc_host *host) {}
-+static inline void mmc_pwrseq_post_ios_power_on(struct mmc_host *host) {}
- static inline void mmc_pwrseq_power_off(struct mmc_host *host) {}
- static inline void mmc_pwrseq_free(struct mmc_host *host) {}
+ 	pwrseq->pwrseq.dev = dev;
+-	pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
++	if (device_property_read_bool(dev, "post-ios-power-on"))
++		pwrseq->pwrseq.ops = &mmc_pwrseq_post_ios_ops;
++	else
++		pwrseq->pwrseq.ops = &mmc_pwrseq_simple_ops;
+ 	pwrseq->pwrseq.owner = THIS_MODULE;
+ 	platform_set_drvdata(pdev, pwrseq);
  
 -- 
 2.9.3
