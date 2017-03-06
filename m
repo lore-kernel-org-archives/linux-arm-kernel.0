@@ -1,81 +1,75 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon,  6 Mar 2017 08:46:42 -0800
-Subject: [GIT PULL] omap fixes v4.11-rc cycle
-Message-ID: <pull-1488818752-862211>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 6 Mar 2017 11:52:12 -0500
+Subject: [PATCH] dt-bindings: display: rk3288-mipi-dsi: add reset property
+In-Reply-To: <20170303113945.3bd2cbd9.john@metanate.com>
+References: <20170224125506.21533-1-john@metanate.com>
+ <20170224125506.21533-24-john@metanate.com>
+ <20170302215643.GA49163@google.com>
+ <20170303113945.3bd2cbd9.john@metanate.com>
+Message-ID: <20170306165212.GC13635@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+On Fri, Mar 03, 2017 at 11:39:45AM +0000, John Keeping wrote:
+> This reset is required in order to fully reset the internal state of the
+> MIPI controller.
+> 
+> Signed-off-by: John Keeping <john@metanate.com>
 
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+I'm sorry I missed this in my review. Adding Rob Herring directly for his ack.
 
-are available in the git repository at:
+Also,
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.11/fixes-rc1-v2
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
-for you to fetch changes up to e24bce8fb4c26bd0d8eca74cbbee1ad049246be3:
-
-  Merge tag 'v4.11-rc1' into omap-for-v4.11/fixes (2017-03-06 08:37:53 -0800)
-
-----------------------------------------------------------------
-Fixes for omaps for v4.11-rc cycle:
-
-- Fix smartreflex platform data regression where I accidentally
-  removed legacy platform data still in use
-
-- Fix hypervisor mode for thumb2 kernel
-
-- Fix misplaced tpic2810 to move it to right bus
-
-- Enable INPUT_MOUSEDEV as a loadable module have mice working
-
-- Fix use of gpio-key,wakeup and use wakeup-source instead as
-  this accidentally sneaked in during the merge window
-
-- Fix error handling for onenand to properly return error
-
-- Remove legacy gpmc-nand.c that's now dead code, this
-  also removes dependency to the MTD tree for further driver
-  changes
-
-- Fix device node reference count errors for omap3 and
-  related to it also release device nodes after no longer
-  needed
-
-----------------------------------------------------------------
-Guenter Roeck (2):
-      ARM: OMAP2+: Fix device node reference counts
-      ARM: OMAP2+: Release device node after it is no longer needed.
-
-Ladislav Michl (2):
-      ARM: OMAP2+: gpmc-onenand: propagate error on initialization failure
-      ARM: OMAP2+: Remove legacy gpmc-nand.c
-
-Matthijs van Duin (1):
-      ARM: OMAP5 / DRA7: Fix HYP mode boot for thumb2 build
-
-Sekhar Nori (1):
-      ARM: dts: am57xx-idk: tpic2810 is on I2C bus, not SPI
-
-Teresa Remmet (1):
-      ARM: dts: am335x-pcm953: Fix legacy wakeup source binding
-
-Tony Lindgren (5):
-      ARM: OMAP3: Fix smartreflex platform data regression
-      Merge branch 'omap-for-v4.10/fixes' into omap-for-v4.11/fixes
-      ARM: omap2plus_defconfig: Enable INPUT_MOUSEDEV as loadable modules
-      Merge branch 'gpio-key-wakeup-fix' into omap-for-v4.11/fixes
-      Merge tag 'v4.11-rc1' into omap-for-v4.11/fixes
-
- arch/arm/boot/dts/am335x-pcm-953.dtsi      |   4 +-
- arch/arm/boot/dts/am57xx-idk-common.dtsi   |  14 +--
- arch/arm/configs/omap2plus_defconfig       |   1 +
- arch/arm/mach-omap2/Makefile               |   3 -
- arch/arm/mach-omap2/gpmc-nand.c            | 154 -----------------------------
- arch/arm/mach-omap2/gpmc-onenand.c         |  10 +-
- arch/arm/mach-omap2/omap-headsmp.S         |   3 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |  45 +++++++--
- drivers/memory/omap-gpmc.c                 |   4 +-
- include/linux/omap-gpmc.h                  |  16 +--
- 10 files changed, 59 insertions(+), 195 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/gpmc-nand.c
+> ---
+> On Thu, 2 Mar 2017 13:56:46 -0800, Brian Norris wrote:
+> > On Fri, Feb 24, 2017 at 12:55:06PM +0000, John Keeping wrote:
+> > > +	/*
+> > > +	 * Note that the reset was not defined in the initial device tree, so
+> > > +	 * we have to be prepared for it not being found.
+> > > +	 */
+> > > +	apb_rst = devm_reset_control_get(dev, "apb");  
+> > 
+> > Did this reset ever get documented in the device tree bindings? I
+> > couldn't find it. Perhaps a follow-up patch is in order?
+> 
+> Here's a patch to do that.
+> 
+>  .../devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt  | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+> index 1753f0cc6fad..28d0b437d3cd 100644
+> --- a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+> +++ b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+> @@ -13,8 +13,13 @@ Required properties:
+>  - ports: contain a port node with endpoint definitions as defined in [2].
+>    For vopb,set the reg = <0> and set the reg = <1> for vopl.
+>  
+> +Optional properties:
+> +- resets: list of phandle + reset specifier pairs, as described in [3].
+> +- reset-names: string reset name, must be "apb".
+> +
+>  [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>  [2] Documentation/devicetree/bindings/media/video-interfaces.txt
+> +[3] Documentation/devicetree/bindings/reset/reset.txt
+>  
+>  Example:
+>  	mipi_dsi: mipi at ff960000 {
+> @@ -25,6 +30,8 @@ Example:
+>  		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
+>  		clocks = <&cru SCLK_MIPI_24M>, <&cru PCLK_MIPI_DSI0>;
+>  		clock-names = "ref", "pclk";
+> +		resets = <&cru SRST_MIPIDSI0>;
+> +		reset-names = "apb";
+>  		rockchip,grf = <&grf>;
+>  		status = "okay";
+>  
+> -- 
+> 2.12.0.rc2.230.ga28edc07cd.dirty
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
