@@ -1,59 +1,116 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 06 Mar 2017 15:43:53 +0200
-Subject: [RFC PATCH 10/12] staging: android: ion: Use CMA APIs directly
-In-Reply-To: <20170306103204.d3yf6woxpsqvdakp@phenom.ffwll.local>
-References: <1488491084-17252-1-git-send-email-labbott@redhat.com>
- <0541f57b-4060-ea10-7173-26ae77777518@redhat.com>
- <20170306103204.d3yf6woxpsqvdakp@phenom.ffwll.local>
-Message-ID: <6709093.jyTQHIiK7d@avalon>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Mon,  6 Mar 2017 12:34:34 +0100
+Subject: [PATCH v3 19/19] KVM: arm64: ITS: Pending table save/restore
+In-Reply-To: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1488800074-21991-20-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Save and restore the pending tables.
 
-On Monday 06 Mar 2017 11:32:04 Daniel Vetter wrote:
-> On Fri, Mar 03, 2017 at 10:50:20AM -0800, Laura Abbott wrote:
-> > On 03/03/2017 08:41 AM, Laurent Pinchart wrote:
-> >> On Thursday 02 Mar 2017 13:44:42 Laura Abbott wrote:
-> >>> When CMA was first introduced, its primary use was for DMA allocation
-> >>> and the only way to get CMA memory was to call dma_alloc_coherent. This
-> >>> put Ion in an awkward position since there was no device structure
-> >>> readily available and setting one up messed up the coherency model.
-> >>> These days, CMA can be allocated directly from the APIs. Switch to
-> >>> using this model to avoid needing a dummy device. This also avoids
-> >>> awkward caching questions.
-> >> 
-> >> If the DMA mapping API isn't suitable for today's requirements anymore,
-> >> I believe that's what needs to be fixed, instead of working around the
-> >> problem by introducing another use-case-specific API.
-> > 
-> > I don't think this is a usecase specific API. CMA has been decoupled from
-> > DMA already because it's used in other places. The trying to go through
-> > DMA was just another layer of abstraction, especially since there isn't
-> > a device available for allocation.
-> 
-> Also, we've had separation of allocation and dma-mapping since forever,
-> that's how it works almost everywhere. Not exactly sure why/how arm-soc
-> ecosystem ended up focused so much on dma_alloc_coherent.
+Pending table restore obviously requires the pendbaser to be
+already set.
 
-I believe because that was the easy way to specify memory constraints. The API 
-receives a device pointer and will allocate memory suitable for DMA for that 
-device. The fact that it maps it to the device is a side-effect in my opinion.
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
-> I think separating allocation from dma mapping/coherency is perfectly
-> fine, and the way to go.
+---
 
-Especially given that in many cases we'll want to share buffers between 
-multiple devices, so we'll need to map them multiple times.
+v1 -> v2:
+- do not care about the 1st KB which should be zeroed according to
+  the spec.
+---
+ virt/kvm/arm/vgic/vgic-its.c | 71 ++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 69 insertions(+), 2 deletions(-)
 
-My point still stands though, if we want to move towards a model where 
-allocation and mapping are decoupled, we need an allocation function that 
-takes constraints (possibly implemented with two layers, a constraint 
-resolution layer on top of a pool/heap/type/foo-based allocator), and a 
-mapping API. IOMMU handling being integrated in the DMA mapping API we're 
-currently stuck with it, which might call for brushing up that API.
-
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index 27ebabd..24824be 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1736,7 +1736,48 @@ static int lookup_table(struct vgic_its *its, gpa_t base, int size, int esz,
+  */
+ static int vgic_its_flush_pending_tables(struct vgic_its *its)
+ {
+-	return -ENXIO;
++	struct kvm *kvm = its->dev->kvm;
++	struct vgic_dist *dist = &kvm->arch.vgic;
++	struct vgic_irq *irq;
++	int ret;
++
++	/**
++	 * we do not take the dist->lpi_list_lock since we have a garantee
++	 * the LPI list is not touched while the its lock is held
++	 */
++	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
++		struct kvm_vcpu *vcpu;
++		gpa_t pendbase, ptr;
++		bool stored;
++		u8 val;
++
++		vcpu = irq->target_vcpu;
++		if (!vcpu)
++			return -EINVAL;
++
++		pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
++
++		ptr = pendbase + (irq->intid / BITS_PER_BYTE);
++
++		ret = kvm_read_guest(kvm, (gpa_t)ptr, &val, 1);
++		if (ret)
++			return ret;
++
++		stored = val & (irq->intid % BITS_PER_BYTE);
++		if (stored == irq->pending_latch)
++			continue;
++
++		if (irq->pending_latch)
++			val |= 1 << (irq->intid % BITS_PER_BYTE);
++		else
++			val &= ~(1 << (irq->intid % BITS_PER_BYTE));
++
++		ret = kvm_write_guest(kvm, (gpa_t)ptr, &val, 1);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
+ }
+ 
+ /**
+@@ -1745,7 +1786,33 @@ static int vgic_its_flush_pending_tables(struct vgic_its *its)
+  */
+ static int vgic_its_restore_pending_tables(struct vgic_its *its)
+ {
+-	return -ENXIO;
++	struct vgic_irq *irq;
++	struct kvm *kvm = its->dev->kvm;
++	struct vgic_dist *dist = &kvm->arch.vgic;
++	int ret;
++
++	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
++		struct kvm_vcpu *vcpu;
++		gpa_t pendbase, ptr;
++		u8 val;
++
++		vcpu = irq->target_vcpu;
++		if (!vcpu)
++			return -EINVAL;
++
++		if (!(vcpu->arch.vgic_cpu.pendbaser & GICR_PENDBASER_PTZ))
++			return 0;
++
++		pendbase = PENDBASER_ADDRESS(vcpu->arch.vgic_cpu.pendbaser);
++
++		ptr = pendbase + (irq->intid / BITS_PER_BYTE);
++
++		ret = kvm_read_guest(kvm, (gpa_t)ptr, &val, 1);
++		if (ret)
++			return ret;
++		irq->pending_latch = val & (1 << (irq->intid % BITS_PER_BYTE));
++	}
++	return 0;
+ }
+ 
+ static int vgic_its_flush_ite(struct vgic_its *its, struct its_device *dev,
 -- 
-Regards,
-
-Laurent Pinchart
+2.5.5
