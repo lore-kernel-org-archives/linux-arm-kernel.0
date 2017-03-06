@@ -1,45 +1,40 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Mon, 6 Mar 2017 11:29:28 +0000
-Subject: [RFC PATCH 03/30] PCI: Move ATS declarations outside of CONFIG_PCI
-In-Reply-To: <20170303210926.GB31767@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170227195441.5170-1-jean-philippe.brucker@arm.com>
- <20170227195441.5170-4-jean-philippe.brucker@arm.com>
- <20170303210926.GB31767@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170306112928.GB28804@e106794-lin.localdomain>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon,  6 Mar 2017 11:26:19 +0000
+Subject: [PATCH 14/17] arm64: Define Cortex-A73 MIDR
+In-Reply-To: <20170306112622.13853-1-marc.zyngier@arm.com>
+References: <20170306112622.13853-1-marc.zyngier@arm.com>
+Message-ID: <20170306112622.13853-15-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+As we're about to introduce a new workaround that is specific to
+Cortex-A73, let's define the coresponding MIDR.
 
-On 03/03/17 21:09, Bjorn Helgaas wrote:
-> On Mon, Feb 27, 2017 at 07:54:14PM +0000, Jean-Philippe Brucker wrote:
->> Currently ATS helpers like pci_enable_ats are only defined when CONFIG_PCI
->> is enabled. The ARM SMMU driver might get built with CONFIG_PCI disabled.
->> It would thus have to wrap any use of ATS helpers around #ifdef
->> CONFIG_PCI, which isn't ideal.
->>
->> A nicer solution is to always define these helpers. Since CONFIG_PCI_ATS
->> is only enabled in association with CONFIG_PCI, move defines outside of
->> CONFIG_PCI to prevent build failure when PCI is disabled.
->>
->> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-> 
-> I don't think there's any reason to make a pci_ats_init() stub when
-> CONFIG_PCI is not enabled, because it's only called from the PCI core.
-> But it does make some sense to keep them all together in one place.
-> 
-> I think you could also remove the #ifdef CONFIG_PCI_ATS in
-> arm_smmu_enable_ats() ("[RFC PATCH 04/30] iommu/arm-smmu-v3: Add
-> support for PCI ATS"), right?
-> 
-> If you remove the #ifdef, we'll call pci_enable_ats(), and it will
-> fail if !pdev->ats_cap.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/cputype.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-I wanted to display something when ATS is supported and enable fails.
-But this method is ugly and device drivers can check whether ATS is
-enabled, so I'll remove the #ifdef and the error message in patch 4.
-
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-
-Thanks!
-Jean-Philippe
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index fc502713ab37..0984d1b3a8f2 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -80,6 +80,7 @@
+ #define ARM_CPU_PART_FOUNDATION		0xD00
+ #define ARM_CPU_PART_CORTEX_A57		0xD07
+ #define ARM_CPU_PART_CORTEX_A53		0xD03
++#define ARM_CPU_PART_CORTEX_A73		0xD09
+ 
+ #define APM_CPU_PART_POTENZA		0x000
+ 
+@@ -92,6 +93,7 @@
+ 
+ #define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
+ #define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
++#define MIDR_CORTEX_A73 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A73)
+ #define MIDR_THUNDERX	MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX)
+ #define MIDR_THUNDERX_81XX MIDR_CPU_MODEL(ARM_CPU_IMP_CAVIUM, CAVIUM_CPU_PART_THUNDERX_81XX)
+ #define MIDR_QCOM_FALKOR_V1 MIDR_CPU_MODEL(ARM_CPU_IMP_QCOM, QCOM_CPU_PART_FALKOR_V1)
+-- 
+2.11.0
