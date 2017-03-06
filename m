@@ -1,68 +1,71 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Mar 2017 14:24:50 +0000
-Subject: [PATCH v3 17/25] ARM: KVM: Convert __cpu_reset_hyp_mode to using
- __hyp_reset_vectors
+Date: Mon,  6 Mar 2017 14:24:52 +0000
+Subject: [PATCH v3 19/25] arm/arm64: KVM: Use __hyp_reset_vectors() directly
 In-Reply-To: <20170306142458.8875-1-marc.zyngier@arm.com>
 References: <20170306142458.8875-1-marc.zyngier@arm.com>
-Message-ID: <20170306142458.8875-18-marc.zyngier@arm.com>
+Message-ID: <20170306142458.8875-20-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are now able to use the hyp stub to reset HYP mode. Time to
-kiss __kvm_hyp_reset goodbye, and use __hyp_reset_vectors.
+__cpu_reset_hyp_mode doesn't need to be passed any argument now,
+as the hyp-stub implementations are self-contained, and is now
+reduced to just calling __hyp_reset_vectors(). Let's drop the
+wrapper and use the stub hypercall directly.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_asm.h  | 2 --
- arch/arm/include/asm/kvm_host.h | 2 +-
- arch/arm/kvm/init.S             | 2 --
- 3 files changed, 1 insertion(+), 5 deletions(-)
+ arch/arm/include/asm/kvm_host.h   | 6 ------
+ arch/arm/kvm/arm.c                | 3 +--
+ arch/arm64/include/asm/kvm_host.h | 6 ------
+ 3 files changed, 1 insertion(+), 14 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 8ef05381984b..7ccb6f1aac5b 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -72,8 +72,6 @@ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
- 
- extern void __init_stage2_translation(void);
- 
--extern void __kvm_hyp_reset(unsigned long);
--
- extern u64 __vgic_v3_get_ich_vtr_el2(void);
- extern void __vgic_v3_init_lrs(void);
- #endif
 diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index cc495d799c67..d75638beca4e 100644
+index d75638beca4e..1590cd6849b0 100644
 --- a/arch/arm/include/asm/kvm_host.h
 +++ b/arch/arm/include/asm/kvm_host.h
-@@ -274,7 +274,7 @@ static inline void __cpu_init_stage2(void)
- static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
- 					phys_addr_t phys_idmap_start)
- {
--	kvm_call_hyp((void *)virt_to_idmap(__kvm_hyp_reset), vector_ptr);
-+	__hyp_reset_vectors();
+@@ -271,12 +271,6 @@ static inline void __cpu_init_stage2(void)
+ 	kvm_call_hyp(__init_stage2_translation);
  }
  
+-static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
+-					phys_addr_t phys_idmap_start)
+-{
+-	__hyp_reset_vectors();
+-}
+-
  static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index 0da120b71c2e..7335a510eee4 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -129,7 +129,6 @@ ENTRY(__kvm_handle_stub_hvc)
+ {
+ 	return 0;
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index c9a2103faeb9..c07284044b1e 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -1126,8 +1126,7 @@ static void cpu_hyp_reinit(void)
+ static void cpu_hyp_reset(void)
+ {
+ 	if (!is_kernel_in_hyp_mode())
+-		__cpu_reset_hyp_mode(hyp_default_vectors,
+-				     kvm_get_idmap_start());
++		__hyp_reset_vectors();
+ }
  
- 1:	cmp	r0, #HVC_RESET_VECTORS
- 	bne	1f
--ENTRY(__kvm_hyp_reset)
- 	/* We're now in idmap, disable MMU */
- 	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
- 	ldr	r0, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
-@@ -151,7 +150,6 @@ ENTRY(__kvm_hyp_reset)
- exit:
- 	eret
- ENDPROC(__kvm_handle_stub_hvc)
--ENDPROC(__kvm_hyp_reset)
+ static void _kvm_arch_hardware_enable(void *discard)
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index b8b6665dabbd..9a3d7b93944d 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -363,12 +363,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+ 	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
+ }
  
- 	.ltorg
- 
+-static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
+-					phys_addr_t phys_idmap_start)
+-{
+-	__hyp_reset_vectors();
+-}
+-
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
 -- 
 2.11.0
