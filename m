@@ -1,78 +1,79 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 6 Mar 2017 07:08:08 -0800
-Subject: [PATCH 2/2] arm64/kvm: survive unknown traps from guests
-In-Reply-To: <1487593812-9174-3-git-send-email-mark.rutland@arm.com>
-References: <1487593812-9174-1-git-send-email-mark.rutland@arm.com>
- <1487593812-9174-3-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170306150808.GC1502@lvm>
+From: carlos@systemhalted.org (Carlos O'Donell)
+Date: Mon, 6 Mar 2017 10:10:18 -0500
+Subject: [PATCH] uapi: fix asm/signal.h userspace compilation errors
+In-Reply-To: <CAE2sS1i-xezJu2hHfzOxpCMZHc2J+dsturtqFPMRWHa6mm6ccQ@mail.gmail.com>
+References: <20170226010156.GA28831@altlinux.org>
+ <CAK8P3a0YX3RGAqWN0mwUJtBsqUX0C+QRtJLrT_UA=wX6Z+q0DA@mail.gmail.com>
+ <CAE2sS1h9QNV+31GMSv8aahJYOb9hFtFp5Aj-yVOfg7cjBHr_kg@mail.gmail.com>
+ <20170302154845.GB3503@altlinux.org>
+ <CAE2sS1i-xezJu2hHfzOxpCMZHc2J+dsturtqFPMRWHa6mm6ccQ@mail.gmail.com>
+Message-ID: <CAE2sS1jTyENymA-fSAk4dt29rYgX50zYqubVYnGVGnFrH=-1nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Feb 20, 2017 at 12:30:12PM +0000, Mark Rutland wrote:
-> Currently we BUG() if we see an ESR_EL2.EC value we don't recognise. As
-> configurable disables/enables are added to the architecture (controlled
-> by RES1/RES0 bits respectively), with associated synchronous exceptions,
-> it may be possible for a guest to trigger exceptions with classes that
-> we don't recognise.
-> 
-> While we can't service these exceptions in a manner useful to the guest,
-> we can avoid bringing down the host. Per ARM DDI 0487A.k_iss10775, page
-> D7-1937, EC values within the range 0x00 - 0x2c are reserved for future
-> use with synchronous exceptions, and EC values within the range 0x2d -
-> 0x3f may be used for either synchronous or asynchronous exceptions.
-> 
-> The patch makes KVM handle any unknown EC by injecting an UNDEFINED
-> exception into the guest, with a corresponding (ratelimited) warning in
-> the host dmesg. We could later improve on this with with a new (opt-in)
-> exit to the host userspace.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Dave Martin <dave.martin@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/kvm/handle_exit.c | 19 ++++++++++++-------
->  1 file changed, 12 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index 1bfe30d..fa1b18e 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -135,7 +135,19 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	return ret;
->  }
->  
-> +static int kvm_handle_unknown_ec(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> +{
-> +	u32 hsr = kvm_vcpu_get_hsr(vcpu);
-> +
-> +	kvm_pr_unimpl("Unknown exception class: hsr: %#08x -- %s\n",
-> +		      hsr, esr_get_class_string(hsr));
-> +
-> +	kvm_inject_undefined(vcpu);
-> +	return 1;
-> +}
-> +
->  static exit_handle_fn arm_exit_handlers[] = {
-> +	[0 ... ESR_ELx_EC_MAX]	= kvm_handle_unknown_ec,
->  	[ESR_ELx_EC_WFx]	= kvm_handle_wfx,
->  	[ESR_ELx_EC_CP15_32]	= kvm_handle_cp15_32,
->  	[ESR_ELx_EC_CP15_64]	= kvm_handle_cp15_64,
-> @@ -162,13 +174,6 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
->  	u32 hsr = kvm_vcpu_get_hsr(vcpu);
->  	u8 hsr_ec = ESR_ELx_EC(hsr);
->  
-> -	if (hsr_ec >= ARRAY_SIZE(arm_exit_handlers) ||
-> -	    !arm_exit_handlers[hsr_ec]) {
-> -		kvm_err("Unknown exception class: hsr: %#08x -- %s\n",
-> -			hsr, esr_get_class_string(hsr));
-> -		BUG();
-> -	}
-> -
->  	return arm_exit_handlers[hsr_ec];
->  }
->  
-> -- 
+On Fri, Mar 3, 2017 at 8:23 PM, Carlos O'Donell <carlos@systemhalted.org> wrote:
+> On Thu, Mar 2, 2017 at 10:48 AM, Dmitry V. Levin <ldv@altlinux.org> wrote:
+>> On Thu, Mar 02, 2017 at 10:22:18AM -0500, Carlos O'Donell wrote:
+>>> On Wed, Mar 1, 2017 at 11:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> > On Sun, Feb 26, 2017 at 2:01 AM, Dmitry V. Levin <ldv@altlinux.org> wrote:
+>>> >> Include <stddef.h> (guarded by #ifndef __KERNEL__) to fix asm/signal.h
+>>> >> userspace compilation errors like this:
+>>> >>
+>>> >> /usr/include/asm/signal.h:126:2: error: unknown type name 'size_t'
+>>> >>   size_t ss_size;
+>>> >>
+>>> >> As no uapi header provides a definition of size_t, inclusion
+>>> >> of <stddef.h> seems to be the most conservative fix available.
+>> [...]
+>>> > I'm not sure if this is the best fix. We generally should not include one
+>>> > standard header from another standard header. Would it be possible
+>>> > to use __kernel_size_t instead of size_t?
+>>>
+>>> In glibc we handle this with special use of __need_size_t with GCC's
+>>> provided stddef.h.
+>>>
+>>> For example glibc's signal.h does this:
+>>>
+>>> # define __need_size_t
+>>> # include <stddef.h>
+>>
+>> Just to make it clear, do you suggest this approach for asm/signal.h as well?
 
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
+The best practice from the glibc community looks like this:
+
+(a) Create a bits/types/*.h header for the type you need.
+
+e.g.
+./time/bits/types/struct_timeval.h
+./time/bits/types/struct_itimerspec.h
+./time/bits/types/time_t.h
+./time/bits/types/struct_timespec.h
+./time/bits/types/struct_tm.h
+./time/bits/types/clockid_t.h
+./time/bits/types/clock_t.h
+./time/bits/types/timer_t.h
+
+(b) If neccessary the bits/types/*.h header is a wrapper:
+~~~
+#define __need_size_t
+#include <stddef.h>
+~~~
+to get access to the compiler provided type.
+
+This way all of the code you need simplifies to includes for the types you need.
+
+e.g.
+
+time/sys/time.h:
+...
+#include <bits/types.h>
+#include <bits/types/time_t.h>
+#include <bits/types/struct_timeval.h>
+...
+
+This is what we've been doing in glibc starting last September as we
+cleaned up all the convoluted conditional logic to get the types we
+needed in the headers that needed them.
+
+Cheers,
+Carlos.
