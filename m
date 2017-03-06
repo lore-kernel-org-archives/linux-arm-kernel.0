@@ -1,20 +1,59 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 6 Mar 2017 12:17:12 +0800
-Subject: [PATCH v2 10/12] ARM: dts: sun8i: add audio codec support into
- V3s DTSI
-In-Reply-To: <20170305133709.6288-11-icenowy@aosc.xyz>
+Date: Mon, 6 Mar 2017 12:22:47 +0800
+Subject: [linux-sunxi] [PATCH v2 11/12] ARM: dts: sun8i: add pinmux for
+ V3s mmc1
+In-Reply-To: <20170305133709.6288-12-icenowy@aosc.xyz>
 References: <20170305133709.6288-1-icenowy@aosc.xyz>
- <20170305133709.6288-11-icenowy@aosc.xyz>
-Message-ID: <CAGb2v67=qe3dqAy3NxxaBHdqKt0+iZY-vUz+Hvxp0DcFwXOTHg@mail.gmail.com>
+ <20170305133709.6288-12-icenowy@aosc.xyz>
+Message-ID: <CAGb2v64mCgAmWVsEsqMbAMZkiLEhdtaRnhjv6LRcWLY3GSBCwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sun, Mar 5, 2017 at 9:37 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
-> Allwinner V3s SoC features an internal audio codec like the one in H3,
-> and a analog codec like the one in H3/A23 (but much simpler).
+> Allwinner V3s SoC features 3 MMC controllers, mmc0 is used as the
+> MicroSD slot on Lichee Pi Zero, and on Lichee Pi Zero's dock mmc1 is
+> also soldered as a MicroSD slot.
 >
-> Add them in the DTSI file.
+> Add the pinmux for mmc1, thus we can enable the MicroSD slot on the
+> Lichee Pi Zero dock.
 >
 > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>  arch/arm/boot/dts/sun8i-v3s.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
+> index 5fb6cb69f7bc..a39c26bceedc 100644
+> --- a/arch/arm/boot/dts/sun8i-v3s.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
+> @@ -234,6 +234,14 @@
+>                                 drive-strength = <30>;
+>                                 bias-pull-up;
+>                         };
+> +
+> +                       mmc1_pins: mmc1 at 0 {
+
+This seems to be the only possible configuration. In that case, please drop
+the @0 from the node name. We shouldn't be adding them anyway, since it causes
+warnings from the device tree compiler.
+
+Otherwise,
 
 Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+> +                               pins = "PG0", "PG1", "PG2", "PG3",
+> +                                      "PG4", "PG5";
+> +                               function = "mmc1";
+> +                               drive-strength = <30>;
+> +                               bias-pull-up;
+> +                       };
+>                 };
+>
+>                 timer at 01c20c00 {
+> --
+> 2.11.1
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
