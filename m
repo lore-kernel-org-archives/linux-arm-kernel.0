@@ -1,170 +1,115 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Mon,  6 Mar 2017 12:34:20 +0100
-Subject: [PATCH v3 05/19] KVM: arm64: ITS: Implement vgic_its_has_attr_regs
- and attr_regs_access
+Date: Mon,  6 Mar 2017 12:34:16 +0100
+Subject: [PATCH v3 01/19] KVM: arm/arm64: Add vITS save/restore API
+ documentation
 In-Reply-To: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
 References: <1488800074-21991-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1488800074-21991-6-git-send-email-eric.auger@redhat.com>
+Message-ID: <1488800074-21991-2-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements vgic_its_has_attr_regs and vgic_its_attr_regs_access
-upon the MMIO framework. VGIC ITS KVM device KVM_DEV_ARM_VGIC_GRP_ITS_REGS
-group becomes functional.
-
-At least GITS_CREADR requires to differentiate a guest write action from a
-user access. As such let's introduce a new uaccess_its_write
-vgic_register_region callback.
+Add description for how to access vITS registers and how to flush/restore
+vITS tables into/from memory
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
----
- virt/kvm/arm/vgic/vgic-its.c  | 74 ++++++++++++++++++++++++++++++++++++-------
- virt/kvm/arm/vgic/vgic-mmio.h |  9 ++++--
- 2 files changed, 69 insertions(+), 14 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 43bb17e..e9c8f9f 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1287,13 +1287,14 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
- 	*regptr = reg;
- }
- 
--#define REGISTER_ITS_DESC(off, rd, wr, length, acc)		\
-+#define REGISTER_ITS_DESC(off, rd, wr, uwr, length, acc)		\
- {								\
- 	.reg_offset = off,					\
- 	.len = length,						\
- 	.access_flags = acc,					\
- 	.its_read = rd,						\
- 	.its_write = wr,					\
-+	.uaccess_its_write = uwr,					\
- }
- 
- static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
-@@ -1304,28 +1305,28 @@ static void its_mmio_write_wi(struct kvm *kvm, struct vgic_its *its,
- 
- static struct vgic_register_region its_registers[] = {
- 	REGISTER_ITS_DESC(GITS_CTLR,
--		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, 4,
-+		vgic_mmio_read_its_ctlr, vgic_mmio_write_its_ctlr, NULL, 4,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_ITS_DESC(GITS_IIDR,
--		vgic_mmio_read_its_iidr, its_mmio_write_wi, 4,
-+		vgic_mmio_read_its_iidr, its_mmio_write_wi, NULL, 4,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_ITS_DESC(GITS_TYPER,
--		vgic_mmio_read_its_typer, its_mmio_write_wi, 8,
-+		vgic_mmio_read_its_typer, its_mmio_write_wi, NULL, 8,
- 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
- 	REGISTER_ITS_DESC(GITS_CBASER,
--		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, 8,
-+		vgic_mmio_read_its_cbaser, vgic_mmio_write_its_cbaser, NULL, 8,
- 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
- 	REGISTER_ITS_DESC(GITS_CWRITER,
--		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, 8,
--		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
-+		vgic_mmio_read_its_cwriter, vgic_mmio_write_its_cwriter, NULL,
-+		8, VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
- 	REGISTER_ITS_DESC(GITS_CREADR,
--		vgic_mmio_read_its_creadr, its_mmio_write_wi, 8,
-+		vgic_mmio_read_its_creadr, its_mmio_write_wi, NULL, 8,
- 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
- 	REGISTER_ITS_DESC(GITS_BASER,
--		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, 0x40,
-+		vgic_mmio_read_its_baser, vgic_mmio_write_its_baser, NULL, 0x40,
- 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
- 	REGISTER_ITS_DESC(GITS_IDREGS_BASE,
--		vgic_mmio_read_its_idregs, its_mmio_write_wi, 0x30,
-+		vgic_mmio_read_its_idregs, its_mmio_write_wi, NULL, 0x30,
- 		VGIC_ACCESS_32bit),
- };
- 
-@@ -1448,14 +1449,63 @@ static void vgic_its_destroy(struct kvm_device *kvm_dev)
- int vgic_its_has_attr_regs(struct kvm_device *dev,
- 			   struct kvm_device_attr *attr)
- {
--	return -ENXIO;
-+	const struct vgic_register_region *region;
-+	struct vgic_io_device iodev = {
-+		.regions = its_registers,
-+		.nr_regions = ARRAY_SIZE(its_registers),
-+	};
-+	gpa_t offset;
+---
+
+v1 -> v2:
+- DTE and ITE now are 8 bytes
+- DTE and ITE now indexed by deviceid/eventid
+- use ITE name instead of ITTE
+- mentions ITT_addr matches bits [51:8] of the actual address
+- mentions LE layout
+---
+ Documentation/virtual/kvm/devices/arm-vgic-its.txt | 78 ++++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
+
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+index 6081a5b..49ade0c 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+@@ -36,3 +36,81 @@ Groups:
+     -ENXIO:  ITS not properly configured as required prior to setting
+              this attribute
+     -ENOMEM: Memory shortage when allocating ITS internal data
 +
-+	offset = attr->attr;
++  KVM_DEV_ARM_VGIC_GRP_ITS_REGS
++  Attributes:
++      The attr field of kvm_device_attr encodes the offset of the
++      ITS register, relative to the ITS control frame base address
++      (ITS_base).
 +
-+	region = vgic_find_mmio_region(iodev.regions,
-+				       iodev.nr_regions,
-+				       offset);
-+	if (!region)
-+		return -ENXIO;
-+	return 0;
- }
- 
- int vgic_its_attr_regs_access(struct kvm_device *dev,
- 			      struct kvm_device_attr *attr,
- 			      u64 *reg, bool is_write)
- {
--	return -ENXIO;
-+	const struct vgic_register_region *region;
-+	struct vgic_io_device iodev = {
-+		.regions = its_registers,
-+		.nr_regions = ARRAY_SIZE(its_registers),
-+	};
-+	struct vgic_its *its = dev->private;
-+	gpa_t addr, offset;
-+	unsigned int len;
++      kvm_device_attr.addr points to a __u64 value whatever the width
++      of the addressed register (32/64 bits).
 +
-+	if (IS_VGIC_ADDR_UNDEF(its->vgic_its_base))
-+		return -ENXIO;
++      Writes to read-only registers are ignored by the kernel except
++      for a single register, GITS_READR. Normally this register is RO
++      but it needs to be restored otherwise commands in the queue will
++      be re-executed after CWRITER setting.
 +
-+	offset = attr->attr;
-+	if (offset & 0x7)
-+		return -EINVAL;
++      For other registers, Getting or setting a register has the same
++      effect as reading/writing the register on real hardware.
++  Errors:
++    -ENXIO: Offset does not correspond to any supported register
++    -EFAULT: Invalid user pointer for attr->addr
++    -EINVAL: Offset is not 64-bit aligned
 +
-+	addr = its->vgic_its_base + offset;
++  KVM_DEV_ARM_VGIC_GRP_ITS_TABLES
++  Attributes
++       The attr field of kvm_device_attr is not used.
 +
-+	region = vgic_find_mmio_region(iodev.regions,
-+				       iodev.nr_regions,
-+				       offset);
-+	if (!region)
-+		return -ENXIO;
++       request the flush-save/restore of the ITS tables, namely
++       the device table, the collection table, all the ITT tables,
++       the LPI pending tables. On save, the tables are flushed
++       into guest memory at the location provisioned by the guest
++       in GITS_BASER (device and collection tables), on MAPD command
++       (ITT_addr), GICR_PENDBASERs (pending tables).
 +
-+	len = region->access_flags & VGIC_ACCESS_64bit ? 8 : 4;
++       This means the GIC should be restored before the ITS and all
++       ITS registers but the GITS_CTRL must be restored before
++       restoring the ITS tables.
 +
-+	if (is_write) {
-+		if (region->uaccess_its_write)
-+			region->uaccess_its_write(dev->kvm, its, addr,
-+						  len, *reg);
-+		else
-+			region->its_write(dev->kvm, its, addr, len, *reg);
-+	} else {
-+		*reg = region->its_read(dev->kvm, its, addr, len);
-+	}
-+	return 0;
- }
- 
- static int vgic_its_has_attr(struct kvm_device *dev,
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 055ad42..ad8a585 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -36,8 +36,13 @@ struct vgic_register_region {
- 	};
- 	unsigned long (*uaccess_read)(struct kvm_vcpu *vcpu, gpa_t addr,
- 				      unsigned int len);
--	void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
--			      unsigned int len, unsigned long val);
-+	union {
-+		void (*uaccess_write)(struct kvm_vcpu *vcpu, gpa_t addr,
-+				      unsigned int len, unsigned long val);
-+		void (*uaccess_its_write)(struct kvm *kvm, struct vgic_its *its,
-+					  gpa_t addr, unsigned int len,
-+					  unsigned long val);
-+	};
- };
- 
- extern struct kvm_io_device_ops kvm_io_gic_ops;
++       Note the LPI configuration table is read-only for the
++       in-kernel ITS and its save/restore goes through the standard
++       RAM save/restore.
++
++       The layout of the tables in guest memory defines an ABI.
++       The entries are laid in little endian format as follows;
++
++    The device table and ITE are respectively indexed by device id and
++    eventid. The collection table however is not indexed by collection id:
++    CTE are written at the beginning of the buffer.
++
++    Device Table Entry (DTE) layout: entry size = 8 bytes
++
++    bits:     | 63 ... 45 | 44 ... 5 | 4 ... 0 |
++    values:   |   next    | ITT_addr |  Size   |
++
++    where
++    - ITT_addr matches bits [48:8] of the ITT address (256B aligned).
++    - next field is meaningful only if the entry is valid (ITT_addr != NULL).
++    It equals to 0 if this entry is the last one; otherwise it corresponds
++    to the minimum between the offset to the next device id and 2^19 -1.
++
++    Collection Table Entry (CTE) layout: entry size = 8 bytes
++
++    bits:     | 63| 62 ..  52  | 51 ... 16 | 15  ...   0 |
++    values:   | V |    RES0    |  RDBase   |    ICID     |
++
++    Interrupt Translation Entry (ITE) layout: entry size = 8 bytes
++
++    bits:     | 63 ... 48 | 47 ... 16 | 15 ... 0 |
++    values:   |    next   |   pINTID  |  ICID    |
++
++    - next field is meaningful only if the entry is valid (pINTID != NULL).
++    It equals to 0 if this entry is the last one; otherwise it corresponds
++    to the minimum between the eventid offset to the next ITE and 2^16 -1.
++
++    LPI Pending Table layout:
++
++    As specified in the ARM Generic Interrupt Controller Architecture
++    Specification GIC Architecture version 3.0 and version 4. The first
++    1kB is not modified and therefore should contain zeroes.
 -- 
 2.5.5
