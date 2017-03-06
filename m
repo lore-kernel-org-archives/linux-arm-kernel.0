@@ -1,41 +1,67 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun,  5 Mar 2017 17:32:40 -0800
-Subject: [GIT PULL] Broadcom devicetree fixes for 4.11
-Message-ID: <20170306013240.21734-1-f.fainelli@gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon,  6 Mar 2017 01:35:56 +0000
+Subject: [PATCH] reset: sunxi: fix for 64-bit compilation
+Message-ID: <1488764156-22197-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit c1ae3cfa0e89fa1a7ecc4c99031f5e9ae99d9201:
+The Allwinner reset controller has 32-bit registers, so translating
+the reset cell number into a register and bit offset should not use
+any architecture dependent data size. Otherwise this breaks for 64-bit
+architectures like arm64.
+Fix this by making it clear that it's the hardware register width which
+matters here in the calculation.
 
-  Linux 4.11-rc1 (2017-03-05 12:59:56 -0800)
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ drivers/reset/reset-sunxi.c | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
 
-are available in the git repository at:
-
-  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.11/devicetree-fixes
-
-for you to fetch changes up to 0c2bf9f95983fe30aa2f6463cb761cd42c2d521a:
-
-  ARM: dts: BCM5301X: Correct GIC_PPI interrupt flags (2017-03-05 17:10:55 -0800)
-
-----------------------------------------------------------------
-This pull request contains Broadcom ARM-based SoC Device Tree fixes for 4.11,
-please pull the following:
-
-- Jon fixes the UART output on the Broadcom bcm953012k reference board by
-  using the proper clock reference instead of hard-coding the baud rate
-
-- Jon also fixes the memory map on the bcm953012k reference board by using
-  the appropriate physical RAM start address
-
-- Jon finally fixes the interrupt type for the Cortex A9 global and local
-  timers found in the BCM5301X SoC (Norsthar).
-
-----------------------------------------------------------------
-Jon Mason (3):
-      ARM: dts: BCM5301X: Fix UARTs on bcm953012k
-      ARM: dts: BCM5301X: Fix memory start address
-      ARM: dts: BCM5301X: Correct GIC_PPI interrupt flags
-
- arch/arm/boot/dts/bcm5301x.dtsi  | 4 ++--
- arch/arm/boot/dts/bcm953012k.dts | 5 ++---
- 2 files changed, 4 insertions(+), 5 deletions(-)
+diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
+index b44f6b5..cd585cd 100644
+--- a/drivers/reset/reset-sunxi.c
++++ b/drivers/reset/reset-sunxi.c
+@@ -34,15 +34,16 @@ static int sunxi_reset_assert(struct reset_controller_dev *rcdev,
+ 	struct sunxi_reset_data *data = container_of(rcdev,
+ 						     struct sunxi_reset_data,
+ 						     rcdev);
+-	int bank = id / BITS_PER_LONG;
+-	int offset = id % BITS_PER_LONG;
++	int reg_width = sizeof(u32);
++	int bank = id / (reg_width * BITS_PER_BYTE);
++	int offset = id % (reg_width * BITS_PER_BYTE);
+ 	unsigned long flags;
+ 	u32 reg;
+ 
+ 	spin_lock_irqsave(&data->lock, flags);
+ 
+-	reg = readl(data->membase + (bank * 4));
+-	writel(reg & ~BIT(offset), data->membase + (bank * 4));
++	reg = readl(data->membase + (bank * reg_width));
++	writel(reg & ~BIT(offset), data->membase + (bank * reg_width));
+ 
+ 	spin_unlock_irqrestore(&data->lock, flags);
+ 
+@@ -55,15 +56,16 @@ static int sunxi_reset_deassert(struct reset_controller_dev *rcdev,
+ 	struct sunxi_reset_data *data = container_of(rcdev,
+ 						     struct sunxi_reset_data,
+ 						     rcdev);
+-	int bank = id / BITS_PER_LONG;
+-	int offset = id % BITS_PER_LONG;
++	int reg_width = sizeof(u32);
++	int bank = id / (reg_width * BITS_PER_BYTE);
++	int offset = id % (reg_width * BITS_PER_BYTE);
+ 	unsigned long flags;
+ 	u32 reg;
+ 
+ 	spin_lock_irqsave(&data->lock, flags);
+ 
+-	reg = readl(data->membase + (bank * 4));
+-	writel(reg | BIT(offset), data->membase + (bank * 4));
++	reg = readl(data->membase + (bank * reg_width));
++	writel(reg | BIT(offset), data->membase + (bank * reg_width));
+ 
+ 	spin_unlock_irqrestore(&data->lock, flags);
+ 
+-- 
+2.8.2
